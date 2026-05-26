@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="/css/inner-cosmos.css?v=morandi-20260526">
+</head>
+<body>
+<main class="shell">
+  <div class="topbar" data-topbar></div>
+  <section class="panel">
+    <div class="row" style="justify-content:space-between">
+      <div>
+        <span class="route-hint">今日对话入口</span>
+        <h2>Aurora 今日对话</h2>
+        <p class="muted">不是问卷，也不是诊断。你可以从一句话开始。</p>
+      </div>
+      <button onclick="finish()">沉淀今日记录</button>
+    </div>
+    <div class="segmented" id="modes">
+      <button class="active" data-mode="今日倾诉">今日倾诉</button>
+      <button data-mode="思维整理">思维整理</button>
+      <button data-mode="睡前复盘">睡前复盘</button>
+      <button data-mode="苏格拉底追问">苏格拉底追问</button>
+    </div>
+    <p id="modeNote" class="mode-note">自由说今天发生了什么，Aurora 会帮你拆开事件、情绪和下一步。</p>
+    <div id="chat" class="chat" aria-live="polite"></div>
+    <p id="typing" class="muted" style="display:none">Aurora 正在把这句话放慢一点看...</p>
+    <div id="settling" class="panel" style="display:none">
+      <ul class="settling-list">
+        <li>正在整理今天发生的事...</li>
+        <li>正在提取情绪线索...</li>
+        <li>正在生成今日记录卡...</li>
+      </ul>
+    </div>
+    <div class="composer">
+      <div class="row">
+        <button class="voice-pill" onclick="mockVoice()">语音转写</button>
+        <input id="msg" placeholder="把今天最想说的一句话放在这里">
+        <button onclick="send()">发送</button>
+      </div>
+      <p id="voiceState" class="muted">节律保护：如果聊得太久，Aurora 会建议先沉淀，而不是无限继续。</p>
+    </div>
+  </section>
+</main>
+<script src="/js/app.js"></script>
+<script>
+IC.mountShell("Aurora");
+let sid = null;
+let mode = "今日倾诉";
+let voiceMeta = {};
+const modeCopy = {
+  "今日倾诉": "自由说今天发生了什么，Aurora 会帮你拆开事件、情绪和下一步。",
+  "思维整理": "适合把一团混乱想法摊开，先分清事实、担心、需求和行动。",
+  "睡前复盘": "降低刺激，温柔收束今天，不把问题带进睡前。",
+  "苏格拉底追问": "围绕一个信念连续澄清，帮助你看见它是否真的成立。"
+};
+document.querySelectorAll("#modes button").forEach(btn => btn.onclick = () => {
+  document.querySelectorAll("#modes button").forEach(x=>x.classList.remove("active"));
+  btn.classList.add("active");
+  mode = btn.dataset.mode;
+  modeNote.textContent = modeCopy[mode];
+  IC.pulse();
+});
+function esc(text){return String(text||"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));}
+function add(c,k){ chat.innerHTML += `<div class="bubble ${k}">${esc(c)}</div>`; chat.scrollTop = chat.scrollHeight; }
+function addAurora(text){
+  const parts = String(text||"").split(/(?<=[。！？?])/).map(x=>x.trim()).filter(Boolean);
+  (parts.length ? parts : [text]).slice(0, 3).forEach((part, index) => {
+    setTimeout(()=>{ add(part, "ai"); IC.stagger(chat); }, index * 180);
+  });
+}
+async function init(){
+  await IC.ensureDemoLogin();
+  const r = await IC.api("/api/dialog/session/create",{method:"POST",body:JSON.stringify({title:"今日对话",sessionType:"AURORA_CHAT"})});
+  sid = r.data.id;
+  add("我在。今天你不用整理好再开口，可以先从最散的一句话开始。","ai");
+}
+async function send(){
+  if(!msg.value.trim()) return;
+  const text = `[${mode}] ${msg.value.trim()}`;
+  add(msg.value,"user");
+  IC.pulse("send");
+  typing.style.display = "block";
+  const r = await IC.api("/api/aurora/message",{method:"POST",body:JSON.stringify({sessionId:sid,message:text,inputType:voiceMeta.inputType||"TEXT",audioDurationSec:voiceMeta.audioDurationSec,speechRate:voiceMeta.speechRate,pauseCount:voiceMeta.pauseCount,longPauseCount:voiceMeta.longPauseCount})});
+  typing.style.display = "none";
+  addAurora(r.data);
+  msg.value = "";
+  voiceMeta = {};
+}
+async function mockVoice(){
+  const hint = msg.value || "今天有点累，但我想把事情慢慢说清楚。";
+  const r = await IC.api("/api/asr/mock-transcribe",{method:"POST",body:JSON.stringify({hintText:hint})});
+  msg.value = r.data.text;
+  voiceMeta = {...r.data, inputType:"VOICE"};
+  voiceState.textContent = `语音已转写，可编辑后发送。时长 ${r.data.audioDurationSec || 0} 秒，停顿 ${r.data.pauseCount || 0} 次。`;
+  IC.toast("语音已转写，可编辑后发送");
+  IC.pulse("strong");
+}
+async function finish(){
+  settling.style.display = "block";
+  await IC.api(`/api/dialog/session/${sid}/finish`,{method:"POST"});
+  IC.pulse("record");
+  setTimeout(()=>location.href="/pages/daily-record.html",900);
+}
+init();
+</script>
+</body>
+</html>

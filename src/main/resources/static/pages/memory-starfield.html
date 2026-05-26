@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/css/inner-cosmos.css?v=morandi-20260526"></head>
+<body>
+<main class="shell">
+  <div class="topbar" data-topbar></div>
+  <section class="row" style="justify-content:space-between"><div><span class="route-hint">柔和内在星图</span><h1>记忆星图</h1><p>星体大小来自情感重力，亮度来自最近触发。你可以先看见它，不必立刻处理它。</p></div><select id="filter" onchange="render()"><option value="">全部主题</option><option>EMOTION</option><option>TODO</option><option>RELATION</option><option>COGNITION</option></select></section>
+  <section id="field" class="panel starfield"></section>
+  <section id="detail" class="panel" style="display:none"></section>
+</main>
+<script src="/js/app.js"></script>
+<script>
+IC.mountShell("记忆星空");
+let stars = [];
+IC.ensureDemoLogin().then(load);
+async function load(){ const r = await IC.api("/api/memory/starfield"); stars = r.data || []; render(); }
+function esc(text){return String(text||"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));}
+function render(){
+  const data = filter.value ? stars.filter(s=>s.memoryType===filter.value) : stars;
+  field.innerHTML = data.map((s,i)=>{
+    const x = Math.max(6,Math.min(88,45+s.x/2));
+    const y = Math.max(8,Math.min(86,45+s.y/2));
+    const size = Math.max(24, Math.min(96, 22+s.gravity*15));
+    return `<button class="star" onclick="show(${s.id})" title="${esc(s.title)}" style="--size:${size}px;--x:${x}%;--y:${y}%;--star-color:${s.color||"#9caf9f"};--star-glow:${s.glow||.7};"></button><span class="star-label" style="left:${x}%;top:${y}%;color:${s.color||"#77706a"}">${esc(s.theme||s.memoryType)}</span>`;
+  }).join("") || IC.empty("结束一次 Aurora 对话后，这里会出现记忆星体。");
+  IC.stagger(document);
+}
+function show(id){
+  const s = stars.find(x=>x.id===id);
+  detail.style.display = "block";
+  detail.innerHTML = `<div class="star-detail"><span class="route-hint">${esc(s.theme||s.memoryType)}</span><h2>${esc(s.title)}</h2><p>${esc(s.summary)}</p><p class="gold">${esc(s.detail||"这是一颗仍在成形的记忆星体。")}</p><div class="pill-row"><span class="pill">情感重力 ${Number(s.gravity||0).toFixed(2)}</span><span class="pill">新鲜度 ${Math.round((s.freshness||0)*100)}%</span><span class="pill">${s.suggestedForCapsule ? "适合脱敏预览" : "建议先私人保存"}</span></div><a class="button" href="/pages/capsule-create.html">进入脱敏预览</a></div>`;
+  IC.pulse("open");
+}
+</script>
+</body>
+</html>

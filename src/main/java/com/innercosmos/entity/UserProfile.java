@@ -10,4 +10,8 @@ public class UserProfile extends BaseEntity {
     public String preferredInputType;
     public String socialReachabilityStatus;
     public String bio;
+    public Integer reflectionDepth;
+    public Boolean allowMemoryRecall;
+    public String quietHoursStart;
+    public String quietHoursEnd;
 }

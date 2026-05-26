@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/css/inner-cosmos.css"></head>
+<body>
+<main class="shell">
+  <div class="topbar" data-topbar></div>
+  <h1>星海广场</h1>
+  <p>这里不是交友信息流。你先遇见的是一部分被授权的数字回声。</p>
+  <section id="list" class="grid"></section>
+</main>
+<script src="/js/app.js"></script>
+<script>
+IC.mountShell("星海广场");load();
+async function load(){
+  const r=await IC.api("/api/plaza/capsules");
+  list.innerHTML=(r.data||[]).map(c=>`<a class="card" href="/pages/capsule-chat.html?capsuleId=${c.id}"><strong>${c.pseudonym}</strong><p>${c.intro}</p><p class="gold">回声能量 ${(c.echoEnergy||0).toFixed(2)} / 每日 ${c.conversationLimitPerDay} 轮</p><p>${c.publicTags||""}</p></a>`).join("") || IC.empty("星海暂时安静。");
+  IC.stagger(list);
+}
+</script>
+</body></html>

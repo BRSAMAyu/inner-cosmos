@@ -18,3 +18,9 @@ llm:
   api-key: ""
   base-url: ""
   model: mock-inner-cosmos
+
+inner-cosmos:
+  demo:
+    seed-enabled: true
+  security:
+    session-user-key: LOGIN_USER_ID

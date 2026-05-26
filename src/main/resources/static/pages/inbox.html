@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/css/inner-cosmos.css?v=morandi-20260526"></head>
+<body>
+<main class="shell"><div class="topbar" data-topbar></div><h1>慢信箱</h1><section class="grid"><article class="panel"><h2>收信</h2><div id="inbox"></div></article><article class="panel"><h2>寄出</h2><div id="outbox"></div></article></section></main>
+<script src="/js/app.js"></script>
+<script>
+IC.mountShell("慢信箱");IC.ensureDemoLogin().then(load);
+async function load(){const i=await IC.api("/api/letters/inbox");const o=await IC.api("/api/letters/outbox");inbox.innerHTML=render(i.data,"暂时没有收信。");outbox.innerHTML=render(o.data,"还没有寄出的慢信。");IC.stagger(document);}
+function render(list,empty){return (list||[]).map(l=>`<article class="card"><strong>${l.title}</strong><p>${l.status}</p><p>${l.letterBody||""}</p><div class="row"><button data-letter-action onclick="transitionLetter(${l.id},'read')">已读</button><button data-letter-action onclick="transitionLetter(${l.id},'reply')">回信</button><button data-letter-action onclick="transitionLetter(${l.id},'decline')">婉拒</button><button data-letter-action onclick="transitionLetter(${l.id},'archive')">归档</button></div></article>`).join("")||IC.empty(empty);}
+async function transitionLetter(id, action){await IC.api(`/api/letters/${id}/${action}`,{method:"POST"});IC.toast("慢信状态已更新","success");IC.pulse("letter");load();}
+</script>
+</body></html>

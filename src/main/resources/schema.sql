@@ -20,6 +20,10 @@ CREATE TABLE IF NOT EXISTS tb_user_profile (
   preferred_input_type VARCHAR(32),
   social_reachability_status VARCHAR(32),
   bio TEXT,
+  reflection_depth INT DEFAULT 3,
+  allow_memory_recall BOOLEAN DEFAULT TRUE,
+  quiet_hours_start VARCHAR(8),
+  quiet_hours_end VARCHAR(8),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -242,4 +246,209 @@ CREATE TABLE IF NOT EXISTS tb_report_record (
   status VARCHAR(32),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Phase 1: Memory System Deepening
+
+CREATE TABLE IF NOT EXISTS tb_daily_record (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  record_date DATE NOT NULL,
+  source_session_id BIGINT,
+  theme VARCHAR(200),
+  event_summary TEXT,
+  emotion_weather VARCHAR(32),
+  cognitive_summary TEXT,
+  todo_summary TEXT,
+  aurora_summary TEXT,
+  capsule_suggested BOOLEAN DEFAULT FALSE,
+  user_accepted BOOLEAN DEFAULT FALSE,
+  status VARCHAR(32) DEFAULT 'DRAFT',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_daily_record_user_date (user_id, record_date)
+);
+
+CREATE TABLE IF NOT EXISTS tb_event_card (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  source_session_id BIGINT,
+  memory_card_id BIGINT,
+  event_title VARCHAR(200),
+  event_summary TEXT,
+  event_time_label VARCHAR(100),
+  scene TEXT,
+  people_tags TEXT,
+  emotion_tags TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_event_card_user (user_id)
+);
+
+CREATE TABLE IF NOT EXISTS tb_relation_mention (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  source_session_id BIGINT,
+  memory_card_id BIGINT,
+  relation_label VARCHAR(100),
+  relation_type VARCHAR(32),
+  emotion_tags TEXT,
+  trigger_summary TEXT,
+  boundary_hint TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_relation_mention_user (user_id)
+);
+
+CREATE TABLE IF NOT EXISTS tb_memory_theme (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  theme_name VARCHAR(160) NOT NULL,
+  theme_summary TEXT,
+  theme_type VARCHAR(32),
+  keywords TEXT,
+  memory_count INT DEFAULT 0,
+  average_gravity DOUBLE DEFAULT 0,
+  last_touched_at TIMESTAMP NULL,
+  status VARCHAR(32) DEFAULT 'ACTIVE',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_memory_theme_user (user_id)
+);
+
+CREATE TABLE IF NOT EXISTS tb_user_correction (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  target_type VARCHAR(32) NOT NULL,
+  target_id BIGINT NOT NULL,
+  field_name VARCHAR(64) NOT NULL,
+  old_value TEXT,
+  new_value TEXT,
+  reason TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_correction_user (user_id)
+);
+
+CREATE TABLE IF NOT EXISTS tb_weekly_review (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  week_start_date DATE NOT NULL,
+  week_end_date DATE NOT NULL,
+  dominant_theme VARCHAR(200),
+  theme_summary TEXT,
+  emotion_trend VARCHAR(32),
+  completed_todos INT DEFAULT 0,
+  total_todos INT DEFAULT 0,
+  gravity_change_summary TEXT,
+  aurora_observation TEXT,
+  status VARCHAR(32) DEFAULT 'DRAFT',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_weekly_review_user (user_id)
+);
+
+-- Phase 2: Aurora Agent Upgrade
+
+CREATE TABLE IF NOT EXISTS tb_dialog_summary (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  session_id BIGINT NOT NULL,
+  user_id BIGINT NOT NULL,
+  summary_text TEXT,
+  key_topics TEXT,
+  emotion_tone VARCHAR(64),
+  message_count_at_summary INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_dialog_summary_session (session_id)
+);
+
+CREATE TABLE IF NOT EXISTS tb_voice_transcription (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  session_id BIGINT,
+  message_id BIGINT,
+  original_text TEXT,
+  edited_text TEXT,
+  audio_duration_sec INT,
+  speech_rate DOUBLE,
+  pause_count INT,
+  emotion_hint VARCHAR(64),
+  status VARCHAR(32) DEFAULT 'RAW',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_voice_transcription_user (user_id)
+);
+
+-- Phase 4: Capsule Authorization
+
+CREATE TABLE IF NOT EXISTS tb_authorized_memory_ref (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  capsule_id BIGINT NOT NULL,
+  memory_card_id BIGINT NOT NULL,
+  abstract_excerpt TEXT,
+  authorization_status VARCHAR(32) DEFAULT 'AUTHORIZED',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_auth_mem_capsule (capsule_id)
+);
+
+-- Phase 5: Slow Letter Maturation
+
+CREATE TABLE IF NOT EXISTS tb_letter_thread (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  first_letter_id BIGINT,
+  participant_a BIGINT NOT NULL,
+  participant_b BIGINT NOT NULL,
+  capsule_id BIGINT,
+  status VARCHAR(32) DEFAULT 'ACTIVE',
+  last_letter_at TIMESTAMP NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_thread_participants (participant_a, participant_b)
+);
+
+CREATE TABLE IF NOT EXISTS tb_block_relation (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  blocker_user_id BIGINT NOT NULL,
+  blocked_user_id BIGINT NOT NULL,
+  reason TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_block_blocker (blocker_user_id)
+);
+
+-- Phase 6: Admin
+
+CREATE TABLE IF NOT EXISTS tb_model_config (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  config_key VARCHAR(128) NOT NULL UNIQUE,
+  config_value TEXT,
+  description VARCHAR(255),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS tb_prompt_template (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  prompt_key VARCHAR(128) NOT NULL,
+  version INT DEFAULT 1,
+  content TEXT NOT NULL,
+  description VARCHAR(255),
+  enabled BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_prompt_key_version (prompt_key, version)
+);
+
+CREATE TABLE IF NOT EXISTS tb_admin_action_log (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  admin_user_id BIGINT NOT NULL,
+  action_type VARCHAR(64) NOT NULL,
+  target_type VARCHAR(32),
+  target_id BIGINT,
+  detail TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_admin_action_admin (admin_user_id)
 );

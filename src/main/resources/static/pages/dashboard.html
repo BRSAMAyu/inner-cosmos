@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="/css/inner-cosmos.css?v=morandi-20260526">
+</head>
+<body>
+<main class="shell">
+  <div class="topbar" data-topbar></div>
+  <section class="hero" style="min-height:34vh">
+    <span class="route-hint">今日内在天气</span>
+    <h1>先把自己放回身体里</h1>
+    <p id="greeting">正在读取你的内宇宙...</p>
+    <div class="row">
+      <a class="button" href="/pages/aurora-chat.html">和 Aurora 聊聊今天</a>
+      <a class="button" href="/pages/daily-record.html">查看今日记录</a>
+    </div>
+  </section>
+  <section class="grid">
+    <article class="card metric"><span>情绪天气</span><strong id="weather">-</strong></article>
+    <article class="card metric"><span>记忆星体</span><strong id="memoryCount">0</strong></article>
+    <article class="card metric"><span>共鸣体</span><strong id="capsuleCount">0</strong></article>
+    <article class="card metric"><span>未读慢信</span><strong id="letterCount">0</strong></article>
+  </section>
+  <div class="spacer"></div>
+  <section class="grid">
+    <article class="panel">
+      <h2>最近被整理清楚的主题</h2>
+      <p id="summary"></p>
+      <div id="memories" class="timeline"></div>
+    </article>
+    <article class="panel">
+      <h2>可轻轻推进的事</h2>
+      <div id="todos" class="timeline"></div>
+      <a class="button" href="/pages/todo.html">管理待办</a>
+    </article>
+    <article class="panel">
+      <h2>可能产生共鸣的回声</h2>
+      <div id="capsules" class="timeline"></div>
+      <a class="button" href="/pages/echo-plaza.html">进入星海广场</a>
+    </article>
+  </section>
+</main>
+<script src="/js/app.js"></script>
+<script>
+IC.mountShell("宇宙核心");
+IC.ensureDemoLogin().then(load);
+async function load(){
+  const r = await IC.api("/api/dashboard/summary");
+  const d = r.data;
+  greeting.textContent = d.greeting;
+  weather.textContent = d.emotionWeather;
+  memoryCount.textContent = d.memoryCount;
+  capsuleCount.textContent = d.capsuleCount;
+  letterCount.textContent = d.unreadLetterCount;
+  summary.textContent = d.lastSummary;
+  memories.innerHTML = (d.highGravityMemories||[]).map(m=>`<div class="timeline-item"><strong>${m.title}</strong><p>${m.summary}</p></div>`).join("") || IC.empty("完成一次对话后，这里会出现高重力记忆。");
+  todos.innerHTML = (d.todos||[]).map(t=>`<div class="timeline-item"><strong>${t.taskName}</strong><p>${t.description||""}</p></div>`).join("") || IC.empty("暂时没有待办，先不用逼自己。");
+  capsules.innerHTML = (d.recommendations||[]).map(c=>`<div class="timeline-item"><strong>${c.pseudonym}</strong><p>${c.intro}</p></div>`).join("");
+  IC.stagger(document);
+}
+</script>
+</body>
+</html>

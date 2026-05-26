@@ -14,4 +14,8 @@ public class ChatRequest {
     public Integer pauseCount;
     public Integer longPauseCount;
     public String emotionHint;
+    public String mode;
+    public String clientMessageId;
+    public String timezone;
+    public String localTimeLabel;
 }

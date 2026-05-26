@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/css/inner-cosmos.css"></head>
+<body>
+<main class="shell"><div class="topbar" data-topbar></div><section class="panel"><h2>共鸣体对话</h2><p class="muted">它只是这个人的一部分回声。若产生真实共鸣，请写慢信。</p><div id="chat" class="chat"></div><div class="composer"><div class="row"><input id="msg" placeholder="向这枚数字回声提一个问题"><button onclick="send()">发送</button><a class="button" href="/pages/slow-letter.html">写慢信</a></div></div></section></main>
+<script src="/js/app.js"></script>
+<script>
+IC.mountShell("共鸣体对话");let sid=null;
+async function init(){await IC.ensureDemoLogin();const id=new URLSearchParams(location.search).get("capsuleId")||1;const r=await IC.api("/api/persona-chat/session/create",{method:"POST",body:JSON.stringify({capsuleId:id})});sid=r.data.id;add("我只是一个有限的数字回声。你可以先问一个真正让你停下来的问题。","ai");}
+function add(c,k){chat.innerHTML+=`<div class="bubble ${k}">${c}</div>`;chat.scrollTop=chat.scrollHeight;}
+async function send(){if(!msg.value.trim())return;add(msg.value,"user");const r=await IC.api("/api/persona-chat/message",{method:"POST",body:JSON.stringify({sessionId:sid,message:msg.value})});add(r.data.textContent,"ai");msg.value="";IC.pulse("send");IC.stagger(chat);}
+init();
+</script>
+</body></html>

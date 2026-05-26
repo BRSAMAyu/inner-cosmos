@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/css/inner-cosmos.css"></head>
+<body>
+<main class="shell"><div class="topbar" data-topbar></div><h1>管理后台</h1><p>后台只展示运营与审核所需信息，不默认暴露用户 P0 原始私密内容。</p><section class="grid"><article class="card metric"><span>用户</span><strong id="uc">0</strong></article><article class="card metric"><span>共鸣体</span><strong id="cc">0</strong></article><article class="card metric"><span>举报</span><strong id="rc">0</strong></article></section><div class="spacer"></div><section class="grid"><article class="panel"><h2>用户管理</h2><pre id="users"></pre></article><article class="panel"><h2>共鸣体管理</h2><pre id="capsules"></pre></article><article class="panel"><h2>模型配置</h2><pre>mode: mock / remote&#10;provider: mock / deepseek / glm / minimax / openai-compatible&#10;api-key: 通过 application.yml 或环境变量配置</pre></article></section></main>
+<script src="/js/app.js"></script>
+<script>
+IC.mountShell("管理后台");load();
+async function load(){const u=await IC.api("/api/admin/users");const c=await IC.api("/api/admin/capsules");const r=await IC.api("/api/admin/reports");uc.textContent=(u.data||[]).length;cc.textContent=(c.data||[]).length;rc.textContent=(r.data||[]).length;users.textContent=JSON.stringify((u.data||[]).map(x=>({id:x.id,username:x.username,nickname:x.nickname,role:x.role,status:x.status})),null,2);capsules.textContent=JSON.stringify((c.data||[]).map(x=>({id:x.id,pseudonym:x.pseudonym,type:x.capsuleType,public:x.isPublic,energy:x.echoEnergy})),null,2);}
+</script>
+</body></html>

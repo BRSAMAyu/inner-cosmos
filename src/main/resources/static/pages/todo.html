@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/css/inner-cosmos.css"></head>
+<body>
+<main class="shell"><div class="topbar" data-topbar></div><h1>待办清单</h1><p>待办不是自我审判，而是把下一步变小。</p><section id="list" class="grid"></section></main>
+<script src="/js/app.js"></script>
+<script>
+IC.mountShell("待办清单");IC.ensureDemoLogin().then(load);
+async function load(){const r=await IC.api("/api/todos");list.innerHTML=(r.data||[]).map(t=>`<article class="card"><strong>${t.taskName}</strong><p>${t.description||""}</p><p>${t.priority} / ${t.status}</p><div class="row"><button onclick="status(${t.id},'DOING')">开始</button><button onclick="status(${t.id},'DONE')">完成</button><button onclick="status(${t.id},'CANCELLED')">放下</button></div></article>`).join("")||IC.empty("没有待办。今天可以先休息。");IC.stagger(list);}
+async function status(id,s){await IC.api(`/api/todos/${id}/status`,{method:"POST",body:JSON.stringify({status:s})});IC.toast("状态已更新");load();}
+</script>
+</body></html>

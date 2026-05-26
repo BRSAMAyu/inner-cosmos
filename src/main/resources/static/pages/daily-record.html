@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/css/inner-cosmos.css?v=morandi-20260526"></head>
+<body>
+<main class="shell">
+  <div class="topbar" data-topbar></div>
+  <span class="route-hint">我被整理清楚了</span>
+  <h1>今日记录卡</h1>
+  <p>它不是诊断，也不是给你贴标签。它只是在帮你把今天摊平：发生了什么、你感到了什么、你可以怎样更轻地往前走。</p>
+  <section class="grid">
+    <article class="panel"><h2>今日主题</h2><p id="theme"></p><p id="summary" class="gold"></p></article>
+    <article class="panel"><h2>情绪天气</h2><div id="emotions" class="timeline"></div></article>
+    <article class="panel"><h2>待办线索</h2><div id="todos" class="timeline"></div></article>
+  </section>
+  <div class="spacer"></div>
+  <section class="panel"><h2>认知碎片</h2><div id="fragments" class="grid"></div></section>
+  <div class="spacer"></div>
+  <div class="row"><a class="button" href="/pages/memory-starfield.html">进入记忆星图</a><a class="button" href="/pages/capsule-create.html">编织共鸣体</a><a class="button" href="/pages/slow-letter.html">写一封慢信</a></div>
+</main>
+<script src="/js/app.js"></script>
+<script>
+IC.mountShell("今日记录卡");
+IC.ensureDemoLogin().then(load);
+async function load(){
+  const r = await IC.api("/api/daily-record/latest");
+  const d = r.data;
+  theme.textContent = d.theme;
+  summary.textContent = d.auroraSummary;
+  emotions.innerHTML = (d.emotions||[]).map(e=>`<div class="timeline-item"><strong>${e.weatherType} / ${e.emotionName}</strong><p>强度 ${e.emotionScore}，触发：${e.triggerScene||"未记录"}</p></div>`).join("") || IC.empty("还没有情绪轨迹。");
+  todos.innerHTML = (d.todos||[]).map(t=>`<div class="timeline-item"><strong>${t.taskName}</strong><p>${t.description||""}</p></div>`).join("") || IC.empty("今天没有强行生成待办。");
+  fragments.innerHTML = (d.fragments||[]).map(f=>`<article class="card"><strong>${f.fragmentType}</strong><p>${f.rawExcerpt}</p><p class="gold">${f.reframeText}</p></article>`).join("") || IC.empty("对话结束后会出现认知碎片。");
+  IC.stagger(document);
+}
+</script>
+</body>
+</html>
