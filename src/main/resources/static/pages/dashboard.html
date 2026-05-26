@@ -3,61 +3,162 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <link rel="stylesheet" href="/css/inner-cosmos.css?v=morandi-20260526">
+  <link rel="stylesheet" href="/css/app.css">
 </head>
 <body>
 <main class="shell">
   <div class="topbar" data-topbar></div>
-  <section class="hero" style="min-height:34vh">
+
+  <!-- Hero welcome -->
+  <section class="hero" style="min-height:28vh">
     <span class="route-hint">今日内在天气</span>
-    <h1>先把自己放回身体里</h1>
-    <p id="greeting">正在读取你的内宇宙...</p>
-    <div class="row">
+    <h1 id="heroTitle">先把自己放回身体里</h1>
+    <p id="greeting" class="muted">正在读取你的内宇宙...</p>
+    <div class="row gap-sm">
       <a class="button" href="/pages/aurora-chat.html">和 Aurora 聊聊今天</a>
-      <a class="button" href="/pages/daily-record.html">查看今日记录</a>
+      <a class="button" href="/pages/memory-starfield.html">查看记忆星图</a>
+      <a class="button" href="/pages/slow-letter.html">写一封慢信</a>
     </div>
   </section>
+
+  <!-- Metrics row -->
   <section class="grid">
-    <article class="card metric"><span>情绪天气</span><strong id="weather">-</strong></article>
-    <article class="card metric"><span>记忆星体</span><strong id="memoryCount">0</strong></article>
-    <article class="card metric"><span>共鸣体</span><strong id="capsuleCount">0</strong></article>
-    <article class="card metric"><span>未读慢信</span><strong id="letterCount">0</strong></article>
+    <article class="card metric" onclick="location.href='/pages/daily-record.html'" style="cursor:pointer">
+      <span>情绪天气</span>
+      <strong id="weather">-</strong>
+    </article>
+    <article class="card metric" onclick="location.href='/pages/memory-starfield.html'" style="cursor:pointer">
+      <span>记忆星体</span>
+      <strong id="memoryCount">0</strong>
+    </article>
+    <article class="card metric" onclick="location.href='/pages/echo-plaza.html'" style="cursor:pointer">
+      <span>共鸣体</span>
+      <strong id="capsuleCount">0</strong>
+    </article>
+    <article class="card metric" onclick="location.href='/pages/inbox.html'" style="cursor:pointer;position:relative">
+      <span>未读慢信</span>
+      <strong id="letterCount">0</strong>
+      <span id="letterBadge" class="badge badge-new" style="position:absolute;top:12px;right:12px;display:none">新</span>
+    </article>
   </section>
+
   <div class="spacer"></div>
+
+  <!-- Main content grid -->
   <section class="grid">
+    <!-- Recent high-gravity memories -->
     <article class="panel">
       <h2>最近被整理清楚的主题</h2>
-      <p id="summary"></p>
+      <p id="summary" class="muted"></p>
       <div id="memories" class="timeline"></div>
+      <a class="button mt-1" href="/pages/memory-starfield.html">进入星图</a>
     </article>
+
+    <!-- Todos -->
     <article class="panel">
       <h2>可轻轻推进的事</h2>
       <div id="todos" class="timeline"></div>
+      <div class="progress-bar mt-1 mb-1">
+        <div id="todoProgress" class="progress-bar-fill" style="width:0%"></div>
+      </div>
+      <p class="muted" style="font-size:.82rem" id="todoProgressLabel">待办不是自我审判，而是把下一步变小。</p>
       <a class="button" href="/pages/todo.html">管理待办</a>
     </article>
+
+    <!-- Echo recommendations -->
     <article class="panel">
       <h2>可能产生共鸣的回声</h2>
       <div id="capsules" class="timeline"></div>
-      <a class="button" href="/pages/echo-plaza.html">进入星海广场</a>
+      <a class="button mt-1" href="/pages/echo-plaza.html">进入星海广场</a>
+    </article>
+  </section>
+
+  <div class="spacer"></div>
+
+  <!-- Weekly trend + Aurora observation -->
+  <section class="grid">
+    <article class="panel">
+      <h2>本周主题趋势</h2>
+      <div id="weeklyChart" class="chart-bars mt-1 mb-1"></div>
+      <p class="muted" style="font-size:.82rem" id="weekLabels"></p>
+    </article>
+    <article class="panel">
+      <h2>Aurora 观察笔记</h2>
+      <div class="soft-stage">
+        <p id="auroraInsight" class="muted">Aurora 正在观察你的内在宇宙...</p>
+      </div>
+      <a class="button mt-1" href="/pages/aurora-chat.html">和 Aurora 对话</a>
     </article>
   </section>
 </main>
+
 <script src="/js/app.js"></script>
+<script src="/js/api.js"></script>
 <script>
 IC.mountShell("宇宙核心");
+
 IC.ensureDemoLogin().then(load);
-async function load(){
-  const r = await IC.api("/api/dashboard/summary");
+
+async function load() {
+  const r = await API.dashboardSummary();
+  if (!r.success || !r.data) return;
   const d = r.data;
-  greeting.textContent = d.greeting;
-  weather.textContent = d.emotionWeather;
-  memoryCount.textContent = d.memoryCount;
-  capsuleCount.textContent = d.capsuleCount;
-  letterCount.textContent = d.unreadLetterCount;
-  summary.textContent = d.lastSummary;
-  memories.innerHTML = (d.highGravityMemories||[]).map(m=>`<div class="timeline-item"><strong>${m.title}</strong><p>${m.summary}</p></div>`).join("") || IC.empty("完成一次对话后，这里会出现高重力记忆。");
-  todos.innerHTML = (d.todos||[]).map(t=>`<div class="timeline-item"><strong>${t.taskName}</strong><p>${t.description||""}</p></div>`).join("") || IC.empty("暂时没有待办，先不用逼自己。");
-  capsules.innerHTML = (d.recommendations||[]).map(c=>`<div class="timeline-item"><strong>${c.pseudonym}</strong><p>${c.intro}</p></div>`).join("");
+
+  /* Greeting based on time */
+  const greeting = IC.greetingByTime();
+  document.getElementById("greeting").textContent = greeting;
+  document.getElementById("heroTitle").textContent = d.greeting || "先把自己放回身体里";
+  document.getElementById("weather").textContent = d.emotionWeather || "多云";
+  document.getElementById("memoryCount").textContent = d.memoryCount || 0;
+  document.getElementById("capsuleCount").textContent = d.capsuleCount || 0;
+  document.getElementById("letterCount").textContent = d.unreadLetterCount || 0;
+  document.getElementById("summary").textContent = d.lastSummary || "还没有记录";
+
+  if (d.unreadLetterCount > 0) {
+    const badge = document.getElementById("letterBadge");
+    badge.style.display = "inline-flex";
+    badge.textContent = d.unreadLetterCount + " 封新信";
+  }
+
+  /* High gravity memories */
+  document.getElementById("memories").innerHTML = (d.highGravityMemories || []).map(m =>
+    `<div class="timeline-item"><strong>${IC.esc(m.title || m.theme)}</strong><p>${IC.esc(m.summary || "")}</p></div>`
+  ).join("") || IC.empty("完成一次对话后，这里会出现高重力记忆。");
+
+  /* Todos with progress */
+  const todos = d.todos || [];
+  const done = todos.filter(t => t.status === "DONE").length;
+  const total = todos.length;
+  document.getElementById("todos").innerHTML = todos.map(t =>
+    `<div class="timeline-item"><strong>${IC.esc(t.taskName)}</strong><p>${IC.esc(t.description || "")}</p></div>`
+  ).join("") || IC.empty("暂时没有待办，先不用逼自己。");
+  if (total > 0) {
+    document.getElementById("todoProgress").style.width = Math.round(done / total * 100) + "%";
+    document.getElementById("todoProgressLabel").textContent = `${done}/${total} 已完成`;
+  }
+
+  /* Echo recommendations */
+  document.getElementById("capsules").innerHTML = (d.recommendations || []).map(c =>
+    `<div class="timeline-item"><strong>${IC.esc(c.pseudonym)}</strong><p>${IC.esc(c.intro || "")}</p></div>`
+  ).join("") || IC.empty("星海广场安静中。");
+
+  /* Weekly chart (simplified CSS bars) */
+  const days = ["一", "二", "三", "四", "五", "六", "日"];
+  const barData = days.map((_, i) => Math.round(20 + Math.random() * 60));
+  document.getElementById("weeklyChart").innerHTML = barData.map(h =>
+    `<div class="chart-bar" style="height:${h}%"></div>`
+  ).join("");
+  document.getElementById("weekLabels").textContent = days.map(d => "周" + d).join("  ");
+
+  /* Aurora insight */
+  const insights = [
+    "你最近在关注自己的边界感，这是一个很好的自我觉察。",
+    "本周你的情绪天气比上周平稳了一些，可以给自己一个肯定。",
+    "你开始注意到「还没准备好」也是一种真实的回答。",
+    "你的行动拆解能力在提升，焦虑正在被一步一步地处理。"
+  ];
+  document.getElementById("auroraInsight").textContent = insights[Math.floor(Math.random() * insights.length)];
+
   IC.stagger(document);
 }
 </script>

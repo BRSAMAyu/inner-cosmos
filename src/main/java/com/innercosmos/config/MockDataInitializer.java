@@ -69,23 +69,22 @@ public class MockDataInitializer implements CommandLineRunner {
     private void ensureSeedCapsules() {
         QueryWrapper<EchoCapsule> query = new QueryWrapper<>();
         query.eq("capsule_type", "SEED_CAPSULE");
-        if (capsuleMapper.selectCount(query) >= 5) {
+        if (capsuleMapper.selectCount(query) >= 8) {
             return;
         }
-        seed("斯多葛信使", "关注可控与不可控，帮助用户把注意力放回可行动之处。", "[\"哲学\",\"克制\"]");
-        seed("苏格拉底之问", "通过追问帮助用户澄清信念，而不是替用户下结论。", "[\"追问\",\"信念\"]");
-        seed("庄周之梦", "提供松弛、相对化与逍遥视角。", "[\"文学\",\"松弛\"]");
-        seed("存在主义旅人", "关注自由、选择与意义创造。", "[\"意义\",\"选择\"]");
-        seed("热烈的画家", "关注敏感、痛苦与艺术表达。", "[\"艺术\",\"表达\"]");
+        for (SeedCapsuleContent.SeedCapsule sc : SeedCapsuleContent.seeds()) {
+            seed(sc);
+        }
     }
 
-    private void seed(String name, String intro, String tags) {
+    private void seed(SeedCapsuleContent.SeedCapsule sc) {
         EchoCapsule capsule = new EchoCapsule();
         capsule.capsuleType = "SEED_CAPSULE";
-        capsule.pseudonym = name;
-        capsule.intro = intro + " 基于公开思想与文学气质构建的哲学视角模拟体。";
-        capsule.personaPrompt = "你是" + name + "，只能作为哲学视角模拟体回应。";
-        capsule.publicTags = tags;
+        capsule.pseudonym = sc.name;
+        capsule.intro = sc.intro;
+        capsule.personaPrompt = "你是" + sc.name + "。" + sc.tagline + " 只能作为哲学视角模拟体回应。" +
+                " 你的座右铭：" + sc.mockReplies.get(0);
+        capsule.publicTags = toJsonArray(sc.tags);
         capsule.authorizedMemoryIds = "[]";
         capsule.echoEnergy = 0.9;
         capsule.freshnessScore = 1.0;
@@ -93,6 +92,16 @@ public class MockDataInitializer implements CommandLineRunner {
         capsule.visibilityStatus = "PUBLIC";
         capsule.isPublic = true;
         capsuleMapper.insert(capsule);
+    }
+
+    private String toJsonArray(java.util.List<String> items) {
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < items.size(); i++) {
+            if (i > 0) sb.append(",");
+            sb.append("\"").append(items.get(i)).append("\"");
+        }
+        sb.append("]");
+        return sb.toString();
     }
 
     private void ensureDemoAssets() {

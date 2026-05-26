@@ -33,6 +33,17 @@ llm:
   api-key: ""
   base-url: ""
   model: mock-inner-cosmos
+  glm:
+    api-key: ""
+    model: "glm-4-flash"
+    base-url: "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+    timeout-ms: 20000
+    asr-api-key: ""
+  minimax:
+    api-key: ""
+    model: "MiniMax-Text-01"
+    base-url: "https://api.minimax.chat/v1/text/chatcompletion_v2"
+    timeout-ms: 20000
 
 inner-cosmos:
   demo:

@@ -1,50 +1,295 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/css/app.css?v=morandi-20260526"></head>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
 <body>
 <main class="shell">
   <div class="topbar" data-topbar></div>
-  <section class="grid">
-    <article class="panel">
-      <span class="route-hint">脱敏预览与边界设置</span>
-      <h1>共鸣体编织</h1>
-      <p>共鸣体只携带被你允许的主题。真实身份、诊断承诺和强迫回应会被边界挡住。</p>
-      <div class="soft-stage">
-        <div class="field-group"><label for="capsuleName">化名</label><input id="capsuleName" placeholder="例如：柔雾回声"></div>
-        <div class="field-group"><label for="intro">可公开简介</label><textarea id="intro" placeholder="它能表达的只是脱敏后的经历轮廓，不包含真实身份。"></textarea></div>
-        <div class="field-group"><label for="allow">允许谈论</label><input id="allow" value="自我观察, 日常支持, 温柔建议"></div>
-        <div class="field-group"><label for="block">明确避开</label><input id="block" value="真实姓名, 诊断承诺, 强迫即时回应"></div>
-        <div class="row">
-          <select id="privacy"><option value="BALANCED">均衡保护</option><option value="STRICT">严格保护</option><option value="OPEN">开放一点</option></select>
-          <select id="visibility"><option value="PUBLIC">公开到星海</option><option value="PRIVATE">先仅自己可见</option><option value="HIDDEN">隐藏</option></select>
-          <input id="turns" type="number" min="2" max="12" value="5" aria-label="每日对话轮数">
+
+  <span class="route-hint">脱敏预览与边界设置</span>
+  <h1>共鸣体编织</h1>
+  <p class="muted mb-2">共鸣体只携带被你允许的主题。真实身份、诊断承诺和强迫回应会被边界挡住。</p>
+
+  <!-- Wizard steps -->
+  <div class="wizard-steps">
+    <div id="step1Bar" class="wizard-step active"></div>
+    <div id="step2Bar" class="wizard-step"></div>
+    <div id="step3Bar" class="wizard-step"></div>
+  </div>
+
+  <!-- Step 1: Select Memories -->
+  <section id="wizard1" class="panel mb-2">
+    <h2>第一步：选择记忆</h2>
+    <p class="muted mb-1">选择你想编织进共鸣体的记忆。只有高重力的记忆适合公开。</p>
+    <div class="row gap-sm mb-2">
+      <select id="memoryFilter" onchange="filterMemories()">
+        <option value="">全部</option>
+        <option value="high">仅高重力</option>
+        <option value="medium">中等重力</option>
+      </select>
+    </div>
+    <div id="memoryList" class="grid" style="max-height:400px;overflow-y:auto"></div>
+    <div class="row gap-sm mt-2">
+      <span class="muted" id="selectedCount">已选 0 条记忆</span>
+      <button onclick="goStep(2)">下一步：预览脱敏</button>
+    </div>
+  </section>
+
+  <!-- Step 2: Preview & Mask -->
+  <section id="wizard2" class="panel mb-2" style="display:none">
+    <h2>第二步：脱敏预览</h2>
+    <p class="muted mb-1">系统将自动移除敏感信息。你可以调整化名和保留内容。</p>
+    <div class="grid">
+      <article>
+        <div class="field-group mb-2">
+          <label for="capsuleName">化名</label>
+          <input id="capsuleName" placeholder="例如：柔雾回声">
         </div>
-        <div class="row"><button onclick="preview()">生成脱敏预览</button><button onclick="create()">确认编织</button></div>
+        <div class="field-group mb-2">
+          <label for="intro">可公开简介</label>
+          <textarea id="intro" placeholder="它能表达的只是脱敏后的经历轮廓，不包含真实身份。" style="min-height:100px"></textarea>
+        </div>
+        <div id="removedItems" class="soft-stage mb-2">
+          <h3>已移除的敏感项</h3>
+          <div id="removedList" class="timeline"></div>
+        </div>
+      </article>
+      <aside>
+        <h3>预览效果</h3>
+        <div id="previewCard" class="card mb-2"></div>
+        <div class="row gap-sm">
+          <button onclick="goStep(1)">上一步</button>
+          <button onclick="goStep(3)">下一步：设置边界</button>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- Step 3: Set Boundary & Publish -->
+  <section id="wizard3" class="panel mb-2" style="display:none">
+    <h2>第三步：边界设置与发布</h2>
+    <p class="muted mb-1">设定你的共鸣体可以做什么、不能做什么。</p>
+    <div class="soft-stage mb-2">
+      <div class="field-group mb-2">
+        <label for="allow">允许谈论的话题</label>
+        <input id="allow" value="自我观察, 日常支持, 温柔建议">
       </div>
-    </article>
-    <aside class="panel">
-      <h2>预览</h2>
-      <div id="previewBox" class="timeline"></div>
-      <div id="out" class="soft-stage" style="display:none"></div>
-    </aside>
+      <div class="field-group mb-2">
+        <label for="block">明确避开的话题</label>
+        <input id="block" value="真实姓名, 诊断承诺, 强迫即时回应">
+      </div>
+      <div class="row gap-sm mb-2">
+        <div class="field-group" style="flex:1">
+          <label for="privacy">隐私等级</label>
+          <select id="privacy">
+            <option value="BALANCED">均衡保护</option>
+            <option value="STRICT">严格保护</option>
+            <option value="OPEN">开放一点</option>
+          </select>
+        </div>
+        <div class="field-group" style="flex:1">
+          <label for="visibility">可见性</label>
+          <select id="visibility">
+            <option value="PUBLIC">公开到星海</option>
+            <option value="PRIVATE">先仅自己可见</option>
+            <option value="HIDDEN">隐藏</option>
+          </select>
+        </div>
+      </div>
+      <div class="field-group mb-2">
+        <label for="turns">每日对话轮数限制</label>
+        <input id="turns" type="number" min="2" max="12" value="5">
+      </div>
+    </div>
+
+    <!-- Final preview -->
+    <h3>发布前预览</h3>
+    <div id="finalPreview" class="card mb-2"></div>
+
+    <div class="row gap-sm">
+      <button onclick="goStep(2)">上一步</button>
+      <button onclick="create()">确认编织</button>
+    </div>
+  </section>
+
+  <!-- Result -->
+  <section id="result" class="panel" style="display:none">
+    <h2>共鸣体已生成</h2>
+    <div id="resultContent"></div>
   </section>
 </main>
+
 <script src="/js/app.js"></script>
+<script src="/js/api.js"></script>
 <script>
-IC.mountShell("共鸣体编织");IC.ensureDemoLogin();
-function values(input){return input.value.split(",").map(x=>x.trim()).filter(Boolean);}
-function preview(){
-  previewBox.innerHTML = `<div class="timeline-item"><strong>${capsuleName.value||"未命名回声"}</strong><p>${intro.value||"一枚从脱敏记忆中编织出的数字回声。"}</p></div><div class="timeline-item"><strong>允许谈论</strong><p>${values(allow).join("、")}</p></div><div class="timeline-item"><strong>边界</strong><p>${values(block).join("、")}</p></div>`;
-  IC.pulse("open");
+IC.mountShell("共鸣体编织");
+IC.ensureDemoLogin();
+
+let memories = [];
+let selectedMemoryIds = [];
+let currentStep = 1;
+
+/* Load memories on init */
+IC.ensureDemoLogin().then(loadMemories);
+
+async function loadMemories() {
+  const r = await API.memoryCards();
+  if (r.success) {
+    memories = r.data || [];
+    renderMemories();
+  }
 }
-async function create(){
-  preview();
-  const visibilityStatus = visibility.value;
-  const r=await IC.api('/api/capsule/create-from-memory',{method:'POST',body:JSON.stringify({pseudonym:capsuleName.value,intro:intro.value,memoryIds:[],allowTopics:values(allow),blockedTopics:values(block),maxConversationTurns:Number(turns.value||5),allowLetterRequest:true,privacyLevel:privacy.value,visibilityStatus,isPublic:visibilityStatus==="PUBLIC"})});
-  out.style.display="grid";
-  out.innerHTML = `<strong>${r.data.pseudonym}</strong><p>${r.data.intro}</p><div class="pill-row"><span class="pill">${r.data.visibilityStatus}</span><span class="pill">每日 ${r.data.conversationLimitPerDay} 轮</span><span class="pill">能量 ${Math.round((r.data.echoEnergy||0)*100)}%</span></div><a class="button" href="/pages/echo-plaza.html">查看星海广场</a>`;
-  IC.toast("共鸣体已生成","success");
-  IC.pulse("settle");
+
+function esc(text) { return IC.esc(text); }
+
+function filterMemories() {
+  renderMemories();
+}
+
+function renderMemories() {
+  const filter = document.getElementById("memoryFilter").value;
+  let data = memories;
+  if (filter === "high") data = data.filter(m => (m.gravity || 0) >= 0.7);
+  if (filter === "medium") data = data.filter(m => (m.gravity || 0) >= 0.3 && (m.gravity || 0) < 0.7);
+
+  document.getElementById("memoryList").innerHTML = data.map(m => {
+    const checked = selectedMemoryIds.includes(m.id) ? "checked" : "";
+    return `<article class="card" style="min-height:80px">
+      <div class="row gap-sm" style="align-items:flex-start">
+        <input type="checkbox" ${checked} onchange="toggleMemory(${m.id})" style="width:auto;min-height:auto">
+        <div style="flex:1">
+          <strong>${esc(m.title || m.theme || "记忆")}</strong>
+          <p>${esc(m.summary || "")}</p>
+          <div class="pill-row"><span class="pill">重力 ${Number(m.gravity || 0).toFixed(2)}</span><span class="pill">${esc(m.memoryType || "")}</span></div>
+        </div>
+      </div>
+    </article>`;
+  }).join("") || IC.empty("还没有记忆卡片。先完成一次 Aurora 对话。");
+  IC.stagger(document.getElementById("memoryList"));
+}
+
+function toggleMemory(id) {
+  if (selectedMemoryIds.includes(id)) {
+    selectedMemoryIds = selectedMemoryIds.filter(x => x !== id);
+  } else {
+    selectedMemoryIds.push(id);
+  }
+  document.getElementById("selectedCount").textContent = `已选 ${selectedMemoryIds.length} 条记忆`;
+}
+
+function goStep(step) {
+  /* Validation */
+  if (step === 2 && selectedMemoryIds.length === 0) {
+    IC.toast("请至少选择一条记忆", "warn");
+    return;
+  }
+
+  currentStep = step;
+  document.getElementById("wizard1").style.display = step === 1 ? "block" : "none";
+  document.getElementById("wizard2").style.display = step === 2 ? "block" : "none";
+  document.getElementById("wizard3").style.display = step === 3 ? "block" : "none";
+
+  /* Update step bars */
+  for (let i = 1; i <= 3; i++) {
+    const bar = document.getElementById("step" + i + "Bar");
+    bar.className = "wizard-step" + (i < step ? " done" : i === step ? " active" : "");
+  }
+
+  /* Populate step content */
+  if (step === 2) buildPreview();
+  if (step === 3) buildFinalPreview();
+
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+async function buildPreview() {
+  const r = await API.previewCapsuleFromMemory({
+    memoryIds: selectedMemoryIds,
+    privacyLevel: document.getElementById("privacy")?.value || "STRICT",
+    allowTopics: [],
+    blockedTopics: []
+  });
+
+  const data = r.success ? r.data : {};
+  document.getElementById("previewCard").innerHTML = `
+    <strong>${esc(data.pseudonym || document.getElementById("capsuleName").value || "未命名回声")}</strong>
+    <p class="muted">${esc(data.maskedIntro || document.getElementById("intro").value || "一枚从脱敏记忆中编织出的数字回声。")}</p>
+    <div class="pill-row"><span class="pill">脱敏预览</span></div>
+  `;
+
+  document.getElementById("removedList").innerHTML = (data.removedItems || ["个人身份信息", "具体时间地点", "诊断相关描述"]).map(item =>
+    `<div class="timeline-item"><p class="muted">${esc(item)}</p></div>`
+  ).join("");
+}
+
+function buildFinalPreview() {
+  document.getElementById("finalPreview").innerHTML = `
+    <strong>${esc(document.getElementById("capsuleName").value || "未命名回声")}</strong>
+    <p class="muted">${esc(document.getElementById("intro").value || "")}</p>
+    <div class="pill-row">
+      <span class="pill">${document.getElementById("privacy").value}</span>
+      <span class="pill">${document.getElementById("visibility").value}</span>
+      <span class="pill">每日 ${document.getElementById("turns").value} 轮</span>
+    </div>
+    <p class="muted mt-1" style="font-size:.82rem">允许：${esc(document.getElementById("allow").value)}</p>
+    <p class="muted" style="font-size:.82rem">避开：${esc(document.getElementById("block").value)}</p>
+  `;
+}
+
+function values(input) {
+  return input.value.split(",").map(x => x.trim()).filter(Boolean);
+}
+
+async function create() {
+  const name = document.getElementById("capsuleName").value;
+  const introVal = document.getElementById("intro").value;
+  const visibilityStatus = document.getElementById("visibility").value;
+
+  const r = await API.createCapsule({
+    pseudonym: name,
+    intro: introVal,
+    memoryIds: selectedMemoryIds,
+    allowTopics: values(document.getElementById("allow")),
+    blockedTopics: values(document.getElementById("block")),
+    maxConversationTurns: Number(document.getElementById("turns").value || 5),
+    allowLetterRequest: true,
+    privacyLevel: document.getElementById("privacy").value,
+    visibilityStatus,
+    isPublic: visibilityStatus === "PUBLIC"
+  });
+
+  if (r.success && r.data) {
+    document.getElementById("wizard3").style.display = "none";
+    document.getElementById("result").style.display = "block";
+    document.getElementById("resultContent").innerHTML = `
+      <div class="soft-stage">
+        <strong>${esc(r.data.pseudonym)}</strong>
+        <p class="muted">${esc(r.data.intro || "")}</p>
+        <div class="pill-row">
+          <span class="pill">${r.data.visibilityStatus}</span>
+          <span class="pill">每日 ${r.data.conversationLimitPerDay || 5} 轮</span>
+          <span class="pill">能量 ${Math.round((r.data.echoEnergy || 0) * 100)}%</span>
+        </div>
+      </div>
+      <div class="row gap-sm mt-2">
+        <a class="button" href="/pages/echo-plaza.html">查看星海广场</a>
+        <a class="button" href="/pages/dashboard.html">返回核心</a>
+      </div>
+    `;
+    IC.toast("共鸣体已生成", "success");
+    IC.pulse("settle");
+  }
+}
+
+/* Pre-fill from URL params */
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get("memoryId")) {
+  selectedMemoryIds.push(Number(urlParams.get("memoryId")));
+  document.getElementById("selectedCount").textContent = `已选 ${selectedMemoryIds.length} 条记忆`;
 }
 </script>
-</body></html>
+</body>
+</html>

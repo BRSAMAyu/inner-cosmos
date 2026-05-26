@@ -1,35 +1,197 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/css/inner-cosmos.css?v=morandi-20260526"></head>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
 <body>
 <main class="shell">
   <div class="topbar" data-topbar></div>
-  <span class="route-hint">我被整理清楚了</span>
-  <h1>今日记录卡</h1>
-  <p>它不是诊断，也不是给你贴标签。它只是在帮你把今天摊平：发生了什么、你感到了什么、你可以怎样更轻地往前走。</p>
-  <section class="grid">
-    <article class="panel"><h2>今日主题</h2><p id="theme"></p><p id="summary" class="gold"></p></article>
-    <article class="panel"><h2>情绪天气</h2><div id="emotions" class="timeline"></div></article>
-    <article class="panel"><h2>待办线索</h2><div id="todos" class="timeline"></div></article>
+
+  <div class="flex-between mb-2" style="flex-wrap:wrap;gap:12px">
+    <div>
+      <span class="route-hint">我被整理清楚了</span>
+      <h1>今日记录卡</h1>
+      <p class="muted">它不是诊断，也不是给你贴标签。它只是在帮你把今天摊平。</p>
+    </div>
+    <div class="row gap-sm">
+      <button id="acceptBtn" onclick="acceptRecord()">接受并保存</button>
+      <a class="button" href="/pages/memory-starfield.html">查看星图</a>
+    </div>
+  </div>
+
+  <!-- Previous records nav -->
+  <div class="row gap-sm mb-2">
+    <button onclick="prevRecord()" id="prevBtn" disabled>前一天</button>
+    <span id="recordDate" class="muted" style="font-size:.88rem">今天</span>
+    <button onclick="nextRecord()" id="nextBtn" disabled>后一天</button>
+  </div>
+
+  <!-- Weather + Theme -->
+  <section class="grid mb-2">
+    <article class="panel">
+      <div class="flex-between">
+        <div>
+          <h2>今日主题</h2>
+          <p id="theme" style="font-size:1.1rem;color:var(--ink)"></p>
+        </div>
+        <span id="weatherIcon" class="weather-icon"></span>
+      </div>
+      <p id="summary" class="gold mt-1"></p>
+    </article>
+    <article class="panel">
+      <h2>情绪天气</h2>
+      <div id="emotions" class="timeline"></div>
+    </article>
   </section>
-  <div class="spacer"></div>
-  <section class="panel"><h2>认知碎片</h2><div id="fragments" class="grid"></div></section>
-  <div class="spacer"></div>
-  <div class="row"><a class="button" href="/pages/memory-starfield.html">进入记忆星图</a><a class="button" href="/pages/capsule-create.html">编织共鸣体</a><a class="button" href="/pages/slow-letter.html">写一封慢信</a></div>
+
+  <!-- Event Summary -->
+  <section class="panel mb-2">
+    <div class="flex-between mb-1">
+      <h2>事件概览</h2>
+      <button onclick="editSection('event')" class="muted" style="font-size:.82rem">编辑</button>
+    </div>
+    <p id="eventSummary" class="muted"></p>
+  </section>
+
+  <!-- Cognitive Fragments -->
+  <section class="panel mb-2">
+    <h2>认知碎片</h2>
+    <p class="muted mb-1">每一段想法都被温柔地拆解了。</p>
+    <div id="fragments" class="grid"></div>
+  </section>
+
+  <!-- Relation Clues + Todo Clues -->
+  <section class="grid mb-2">
+    <article class="panel">
+      <h2>关系线索</h2>
+      <div id="relations" class="timeline"></div>
+    </article>
+    <article class="panel">
+      <h2>待办线索</h2>
+      <div id="todos" class="timeline"></div>
+      <a class="button mt-1" href="/pages/todo.html">管理待办</a>
+    </article>
+  </section>
+
+  <!-- Aurora Summary -->
+  <section class="panel mb-2">
+    <h2>Aurora 观察记录</h2>
+    <p id="auroraNote" class="muted" style="line-height:1.8"></p>
+  </section>
+
+  <!-- Actions -->
+  <div class="row gap-sm">
+    <a class="button" href="/pages/capsule-create.html">编织共鸣体预览</a>
+    <a class="button" href="/pages/memory-starfield.html">在星图中查看</a>
+    <a class="button" href="/pages/aurora-chat.html">继续对话</a>
+  </div>
 </main>
+
 <script src="/js/app.js"></script>
+<script src="/js/api.js"></script>
 <script>
 IC.mountShell("今日记录卡");
-IC.ensureDemoLogin().then(load);
-async function load(){
-  const r = await IC.api("/api/daily-record/latest");
-  const d = r.data;
-  theme.textContent = d.theme;
-  summary.textContent = d.auroraSummary;
-  emotions.innerHTML = (d.emotions||[]).map(e=>`<div class="timeline-item"><strong>${e.weatherType} / ${e.emotionName}</strong><p>强度 ${e.emotionScore}，触发：${e.triggerScene||"未记录"}</p></div>`).join("") || IC.empty("还没有情绪轨迹。");
-  todos.innerHTML = (d.todos||[]).map(t=>`<div class="timeline-item"><strong>${t.taskName}</strong><p>${t.description||""}</p></div>`).join("") || IC.empty("今天没有强行生成待办。");
-  fragments.innerHTML = (d.fragments||[]).map(f=>`<article class="card"><strong>${f.fragmentType}</strong><p>${f.rawExcerpt}</p><p class="gold">${f.reframeText}</p></article>`).join("") || IC.empty("对话结束后会出现认知碎片。");
+
+let records = [];
+let recordIndex = 0;
+let currentRecordId = null;
+
+IC.ensureDemoLogin().then(async () => {
+  await loadRecords();
+  await loadCurrent();
+});
+
+async function loadRecords() {
+  const r = await API.dailyRecords();
+  if (r.success) records = r.data || [];
+}
+
+async function loadCurrent() {
+  const r = await API.latestDailyRecord();
+  if (r.success && r.data) {
+    renderRecord(r.data);
+  } else {
+    document.getElementById("theme").textContent = "今天还没有记录";
+    document.getElementById("summary").textContent = "和 Aurora 聊一次天后，这里会出现你的今日记录。";
+    document.getElementById("weatherIcon").textContent = "☁️";
+  }
+}
+
+function esc(text) { return IC.esc(text); }
+
+function weatherIcon(type) {
+  return IC.weatherIcon(type);
+}
+
+function renderRecord(d) {
+  currentRecordId = d.id;
+  document.getElementById("theme").textContent = d.theme || "未命名主题";
+  document.getElementById("summary").textContent = d.auroraSummary || "";
+  document.getElementById("eventSummary").textContent = d.eventSummary || (d.mainMemory ? d.mainMemory.summary : "今天的事件已被整理。");
+  document.getElementById("auroraNote").textContent = d.auroraSummary || "Aurora 正在观察你的成长轨迹。";
+
+  /* Weather icon from emotions */
+  const emo = d.emotions || [];
+  if (emo.length) {
+    document.getElementById("weatherIcon").textContent = weatherIcon(emo[0].weatherType);
+  } else {
+    document.getElementById("weatherIcon").textContent = "☁️";
+  }
+
+  /* Emotions timeline */
+  document.getElementById("emotions").innerHTML = emo.map(e =>
+    `<div class="timeline-item"><strong>${weatherIcon(e.weatherType)} ${esc(e.emotionName || e.weatherType)}</strong><p>强度 ${e.emotionScore || 0}，触发：${esc(e.triggerScene || "未记录")}</p></div>`
+  ).join("") || IC.empty("还没有情绪轨迹。");
+
+  /* Fragments */
+  document.getElementById("fragments").innerHTML = (d.fragments || []).map(f => {
+    const iconMap = { COGNITION: "🧩", EMOTION: "💭", RELATION: "🤝", ACTION: "📋" };
+    const icon = iconMap[f.fragmentType] || "✦";
+    return `<article class="card"><strong>${icon} ${esc(f.fragmentType || "碎片")}</strong><p>${esc(f.rawExcerpt || "")}</p>${f.reframeText ? `<p class="gold">${esc(f.reframeText)}</p>` : ""}</article>`;
+  }).join("") || IC.empty("对话结束后会出现认知碎片。");
+
+  /* Relations */
+  document.getElementById("relations").innerHTML = (d.relations || []).map(r =>
+    `<div class="timeline-item"><strong>${esc(r.relationTarget || r.clue || "关系线索")}</strong><p>${esc(r.description || "")}</p></div>`
+  ).join("") || IC.empty("今天没有特别的关系线索。");
+
+  /* Todos */
+  document.getElementById("todos").innerHTML = (d.todos || []).map(t =>
+    `<div class="timeline-item"><strong>${esc(t.taskName)}</strong><p>${esc(t.description || "")}</p></div>`
+  ).join("") || IC.empty("今天没有强行生成待办。");
+
   IC.stagger(document);
+}
+
+async function acceptRecord() {
+  if (!currentRecordId) { IC.toast("没有可保存的记录", "warn"); return; }
+  await API.acceptDailyRecord(currentRecordId);
+  IC.toast("记录已接受并保存", "success");
+  IC.pulse("settle");
+}
+
+function editSection(section) {
+  IC.toast("编辑功能将在下一版本开放");
+}
+
+function prevRecord() {
+  if (recordIndex < records.length - 1) {
+    recordIndex++;
+    renderRecord(records[recordIndex]);
+    document.getElementById("nextBtn").disabled = (recordIndex === 0);
+    document.getElementById("prevBtn").disabled = (recordIndex >= records.length - 1);
+  }
+}
+
+function nextRecord() {
+  if (recordIndex > 0) {
+    recordIndex--;
+    renderRecord(records[recordIndex]);
+    document.getElementById("nextBtn").disabled = (recordIndex === 0);
+    document.getElementById("prevBtn").disabled = (recordIndex >= records.length - 1);
+  }
 }
 </script>
 </body>

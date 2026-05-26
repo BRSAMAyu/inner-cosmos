@@ -106,6 +106,18 @@ public class ThemeAggregationServiceImpl implements ThemeAggregationService {
         return theme;
     }
 
+    @Override
+    public List<MemoryTheme> themesForCard(Long cardId) {
+        MemoryCard card = memoryCardMapper.selectById(cardId);
+        if (card == null) {
+            return List.of();
+        }
+        String themeKey = extractThemeKey(card);
+        QueryWrapper<MemoryTheme> query = new QueryWrapper<>();
+        query.eq("user_id", card.userId).eq("theme_name", themeKey).eq("status", "ACTIVE");
+        return memoryThemeMapper.selectList(query);
+    }
+
     private String extractThemeKey(MemoryCard card) {
         if (card.memoryType == null) return "未分类";
         switch (card.memoryType) {

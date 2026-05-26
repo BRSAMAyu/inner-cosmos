@@ -1,14 +1,160 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/css/inner-cosmos.css"></head>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
 <body>
-<main class="shell"><div class="topbar" data-topbar></div><section class="panel"><h2>共鸣体对话</h2><p class="muted">它只是这个人的一部分回声。若产生真实共鸣，请写慢信。</p><div id="chat" class="chat"></div><div class="composer"><div class="row"><input id="msg" placeholder="向这枚数字回声提一个问题"><button onclick="send()">发送</button><a class="button" href="/pages/slow-letter.html">写慢信</a></div></div></section></main>
+<main class="shell">
+  <div class="topbar" data-topbar></div>
+
+  <!-- Capsule info header -->
+  <section class="panel mb-2">
+    <div class="flex-between mb-1">
+      <div>
+        <span class="route-hint">数字回声对话</span>
+        <h2 id="capsuleName">加载中...</h2>
+      </div>
+      <button onclick="closeSession()">结束对话</button>
+    </div>
+    <p id="capsuleIntro" class="muted"></p>
+    <div class="pill-row mt-1" id="capsuleTags"></div>
+
+    <!-- Remaining turns -->
+    <div class="row gap-sm mt-2" style="align-items:center">
+      <span class="muted" style="font-size:.82rem">剩余轮数</span>
+      <div class="energy-bar" style="flex:1;max-width:200px">
+        <div id="turnsFill" class="energy-bar-fill" style="width:100%"></div>
+      </div>
+      <span id="turnsLabel" class="muted" style="font-size:.82rem">5 / 5</span>
+    </div>
+
+    <!-- Disclaimer -->
+    <div class="soft-stage mt-2">
+      <p class="muted">它只是一段回声，不是一个人。如果产生真实共鸣，请写慢信。</p>
+    </div>
+  </section>
+
+  <!-- Chat area -->
+  <section class="panel" style="padding-bottom:0">
+    <div id="chat" class="chat" aria-live="polite" style="min-height:320px"></div>
+    <p id="typing" class="muted" style="display:none;padding:8px 0">回声正在回应...</p>
+  </section>
+
+  <!-- Composer -->
+  <section class="panel" style="position:sticky;bottom:0;z-index:5;margin-top:12px">
+    <div id="composerArea" class="row" style="flex-wrap:nowrap">
+      <input id="msg" placeholder="向这枚数字回声提一个问题" onkeydown="if(event.key==='Enter')send()">
+      <button onclick="send()">发送</button>
+    </div>
+    <div id="exhaustedHint" style="display:none" class="soft-stage mt-1">
+      <p class="gold">今日对话轮数已用完。它只是一段回声，也许你可以写一封慢信？</p>
+      <a class="button mt-1" id="letterLink" href="/pages/slow-letter.html">写一封慢信</a>
+    </div>
+  </section>
+</main>
+
 <script src="/js/app.js"></script>
+<script src="/js/api.js"></script>
 <script>
-IC.mountShell("共鸣体对话");let sid=null;
-async function init(){await IC.ensureDemoLogin();const id=new URLSearchParams(location.search).get("capsuleId")||1;const r=await IC.api("/api/persona-chat/session/create",{method:"POST",body:JSON.stringify({capsuleId:id})});sid=r.data.id;add("我只是一个有限的数字回声。你可以先问一个真正让你停下来的问题。","ai");}
-function add(c,k){chat.innerHTML+=`<div class="bubble ${k}">${c}</div>`;chat.scrollTop=chat.scrollHeight;}
-async function send(){if(!msg.value.trim())return;add(msg.value,"user");const r=await IC.api("/api/persona-chat/message",{method:"POST",body:JSON.stringify({sessionId:sid,message:msg.value})});add(r.data.textContent,"ai");msg.value="";IC.pulse("send");IC.stagger(chat);}
+IC.mountShell("共鸣体对话");
+
+let sid = null;
+let capsuleId = null;
+let totalTurns = 5;
+let usedTurns = 0;
+
+function esc(text) { return IC.esc(text); }
+
+async function init() {
+  await IC.ensureDemoLogin();
+  capsuleId = new URLSearchParams(location.search).get("capsuleId") || 1;
+
+  /* Load capsule info */
+  const capsuleResp = await API.capsuleDetail(capsuleId);
+  if (capsuleResp.success && capsuleResp.data) {
+    const c = capsuleResp.data;
+    document.getElementById("capsuleName").textContent = c.pseudonym || "数字回声";
+    document.getElementById("capsuleIntro").textContent = c.intro || "一枚从脱敏记忆中编织出的数字回声。";
+    totalTurns = c.conversationLimitPerDay || 5;
+    updateTurnsDisplay();
+
+    const tags = (c.publicTags || "").split(",").filter(Boolean);
+    document.getElementById("capsuleTags").innerHTML = tags.map(t =>
+      `<span class="pill">${esc(t.trim())}</span>`
+    ).join("");
+
+    document.getElementById("letterLink").href = `/pages/slow-letter.html?capsuleId=${c.id}`;
+  }
+
+  /* Create chat session */
+  const r = await API.createPersonaChat(Number(capsuleId));
+  if (r.success && r.data) {
+    sid = r.data.id;
+    addBubble("我只是一个有限的数字回声。你可以先问一个真正让你停下来的问题。", "ai");
+  } else {
+    addBubble("对话建立失败，请稍后再试。", "ai");
+  }
+}
+
+function addBubble(content, kind) {
+  const chat = document.getElementById("chat");
+  const div = document.createElement("div");
+  div.className = `bubble ${kind}`;
+  if (kind === "ai") {
+    div.innerHTML = `<div class="row gap-sm" style="align-items:flex-start;margin-bottom:4px"><span style="font-size:1rem;color:var(--accent-lavender)">✦</span><span class="muted" style="font-size:.78rem">回声</span></div><div>${esc(content)}</div>`;
+  } else {
+    div.textContent = content;
+  }
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function updateTurnsDisplay() {
+  const remaining = Math.max(0, totalTurns - usedTurns);
+  document.getElementById("turnsFill").style.width = (remaining / totalTurns * 100) + "%";
+  document.getElementById("turnsLabel").textContent = `${remaining} / ${totalTurns}`;
+
+  if (remaining <= 0) {
+    document.getElementById("composerArea").style.display = "none";
+    document.getElementById("exhaustedHint").style.display = "block";
+  }
+}
+
+async function send() {
+  const input = document.getElementById("msg");
+  if (!input.value.trim() || !sid) return;
+
+  const text = input.value.trim();
+  addBubble(text, "user");
+  input.value = "";
+  usedTurns++;
+  updateTurnsDisplay();
+  IC.pulse("send");
+
+  document.getElementById("typing").style.display = "block";
+  const r = await API.personaChatMessage(sid, text);
+  document.getElementById("typing").style.display = "none";
+
+  if (r.success && r.data) {
+    addBubble(r.data.textContent || r.data.content || "...", "ai");
+    IC.stagger(document.getElementById("chat"));
+  }
+}
+
+function closeSession() {
+  IC.showModal(`
+    <h2>结束对话</h2>
+    <p class="muted mb-2">确定要结束与这个回声的对话吗？</p>
+    <div class="row gap-sm">
+      <button onclick="IC.closeModal();location.href='/pages/echo-plaza.html'">确认离开</button>
+      <button onclick="IC.closeModal()">继续对话</button>
+    </div>
+  `);
+}
+
 init();
 </script>
-</body></html>
+</body>
+</html>

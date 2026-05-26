@@ -1,11 +1,278 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/css/inner-cosmos.css"></head>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
 <body>
-<main class="shell"><div class="topbar" data-topbar></div><h1>管理后台</h1><p>后台只展示运营与审核所需信息，不默认暴露用户 P0 原始私密内容。</p><section class="grid"><article class="card metric"><span>用户</span><strong id="uc">0</strong></article><article class="card metric"><span>共鸣体</span><strong id="cc">0</strong></article><article class="card metric"><span>举报</span><strong id="rc">0</strong></article></section><div class="spacer"></div><section class="grid"><article class="panel"><h2>用户管理</h2><pre id="users"></pre></article><article class="panel"><h2>共鸣体管理</h2><pre id="capsules"></pre></article><article class="panel"><h2>模型配置</h2><pre>mode: mock / remote&#10;provider: mock / deepseek / glm / minimax / openai-compatible&#10;api-key: 通过 application.yml 或环境变量配置</pre></article></section></main>
+<main class="shell">
+  <div class="topbar" data-topbar></div>
+
+  <span class="route-hint">运营管理</span>
+  <h1>管理后台</h1>
+  <p class="muted mb-2">后台只展示运营与审核所需信息，不默认暴露用户原始私密内容。</p>
+
+  <!-- Tab bar -->
+  <div class="tab-bar" id="adminTabs">
+    <button class="active" onclick="switchAdminTab('overview')">概览</button>
+    <button onclick="switchAdminTab('users')">用户</button>
+    <button onclick="switchAdminTab('capsules')">共鸣体</button>
+    <button onclick="switchAdminTab('reports')">举报</button>
+    <button onclick="switchAdminTab('aiLogs')">AI 日志</button>
+    <button onclick="switchAdminTab('safety')">安全事件</button>
+    <button onclick="switchAdminTab('model')">模型配置</button>
+  </div>
+
+  <!-- Content sections -->
+  <section id="tab-overview">
+    <div class="grid mb-2">
+      <article class="card metric"><span>用户</span><strong id="uc">0</strong></article>
+      <article class="card metric"><span>共鸣体</span><strong id="cc">0</strong></article>
+      <article class="card metric"><span>举报</span><strong id="rc">0</strong></article>
+      <article class="card metric"><span>安全事件</span><strong id="sc">0</strong></article>
+    </div>
+  </section>
+
+  <section id="tab-users" style="display:none">
+    <div class="row gap-sm mb-2">
+      <input id="userSearch" placeholder="搜索用户..." oninput="filterUsers()">
+    </div>
+    <div id="userList" class="grid"></div>
+  </section>
+
+  <section id="tab-capsules" style="display:none">
+    <div class="row gap-sm mb-2">
+      <input id="capsuleSearch" placeholder="搜索共鸣体..." oninput="filterCapsules()">
+      <select id="capsuleStatusFilter" onchange="filterCapsules()">
+        <option value="">全部</option>
+        <option value="PUBLIC">公开</option>
+        <option value="PRIVATE">私有</option>
+        <option value="HIDDEN">隐藏</option>
+      </select>
+    </div>
+    <div id="capsuleList" class="grid"></div>
+  </section>
+
+  <section id="tab-reports" style="display:none">
+    <div class="row gap-sm mb-2">
+      <select id="reportStatusFilter" onchange="loadReports()">
+        <option value="">全部</option>
+        <option value="PENDING">待处理</option>
+        <option value="RESOLVED">已处理</option>
+      </select>
+    </div>
+    <div id="reportList" class="timeline"></div>
+  </section>
+
+  <section id="tab-aiLogs" style="display:none">
+    <div id="aiLogList" class="timeline"></div>
+  </section>
+
+  <section id="tab-safety" style="display:none">
+    <div id="safetyList" class="timeline"></div>
+  </section>
+
+  <section id="tab-model" style="display:none">
+    <div class="panel">
+      <h2>模型配置</h2>
+      <div class="soft-stage mb-2">
+        <p class="muted">mode: mock / remote</p>
+        <p class="muted">provider: mock / deepseek / glm / minimax / openai-compatible</p>
+        <p class="muted">api-key: 通过 application.yml 或环境变量配置</p>
+      </div>
+      <div id="modelConfigList" class="grid"></div>
+    </div>
+  </section>
+</main>
+
 <script src="/js/app.js"></script>
+<script src="/js/api.js"></script>
 <script>
-IC.mountShell("管理后台");load();
-async function load(){const u=await IC.api("/api/admin/users");const c=await IC.api("/api/admin/capsules");const r=await IC.api("/api/admin/reports");uc.textContent=(u.data||[]).length;cc.textContent=(c.data||[]).length;rc.textContent=(r.data||[]).length;users.textContent=JSON.stringify((u.data||[]).map(x=>({id:x.id,username:x.username,nickname:x.nickname,role:x.role,status:x.status})),null,2);capsules.textContent=JSON.stringify((c.data||[]).map(x=>({id:x.id,pseudonym:x.pseudonym,type:x.capsuleType,public:x.isPublic,energy:x.echoEnergy})),null,2);}
+IC.mountShell("管理后台");
+
+let allUsers = [];
+let allCapsules = [];
+let currentAdminTab = "overview";
+
+function esc(text) { return IC.esc(text); }
+
+function switchAdminTab(tab) {
+  currentAdminTab = tab;
+  document.querySelectorAll("#adminTabs button").forEach(btn => btn.classList.remove("active"));
+  event.target.classList.add("active");
+  document.querySelectorAll("[id^='tab-']").forEach(s => s.style.display = "none");
+  document.getElementById("tab-" + tab).style.display = "block";
+
+  /* Load data for tab */
+  switch (tab) {
+    case "users": loadUsers(); break;
+    case "capsules": loadCapsules(); break;
+    case "reports": loadReports(); break;
+    case "aiLogs": loadAiLogs(); break;
+    case "safety": loadSafetyEvents(); break;
+    case "model": loadModelConfig(); break;
+  }
+}
+
+async function load() {
+  /* Overview */
+  const [users, capsules, reports, safety] = await Promise.all([
+    API.adminUsers(),
+    API.adminCapsules(),
+    API.adminReports(),
+    API.adminSafetyEvents()
+  ]);
+
+  allUsers = (users.success ? users.data : []) || [];
+  allCapsules = (capsules.success ? capsules.data : []) || [];
+
+  document.getElementById("uc").textContent = allUsers.length;
+  document.getElementById("cc").textContent = allCapsules.length;
+  document.getElementById("rc").textContent = (reports.success ? (reports.data || []).length : 0);
+  document.getElementById("sc").textContent = (safety.success ? (safety.data || []).length : 0);
+}
+
+load();
+
+async function loadUsers() {
+  if (!allUsers.length) {
+    const r = await API.adminUsers();
+    if (r.success) allUsers = r.data || [];
+  }
+  filterUsers();
+}
+
+function filterUsers() {
+  const search = (document.getElementById("userSearch").value || "").toLowerCase();
+  const filtered = allUsers.filter(u =>
+    !(u.username || "").toLowerCase().includes(search) && !(u.nickname || "").toLowerCase().includes(search) ? false : true
+  ).length ? allUsers.filter(u =>
+    (u.username || "").toLowerCase().includes(search) || (u.nickname || "").toLowerCase().includes(search)
+  ) : allUsers;
+
+  document.getElementById("userList").innerHTML = filtered.map(u => `
+    <article class="card">
+      <strong>${esc(u.username || u.nickname)}</strong>
+      <div class="pill-row mt-1">
+        <span class="pill">${esc(u.role || "用户")}</span>
+        <span class="pill">${esc(u.status || "活跃")}</span>
+      </div>
+      <p class="muted mt-1" style="font-size:.82rem">ID: ${u.id}</p>
+    </article>
+  `).join("") || IC.empty("没有用户数据。");
+}
+
+async function loadCapsules() {
+  if (!allCapsules.length) {
+    const r = await API.adminCapsules();
+    if (r.success) allCapsules = r.data || [];
+  }
+  filterCapsules();
+}
+
+function filterCapsules() {
+  const search = (document.getElementById("capsuleSearch").value || "").toLowerCase();
+  const statusFilter = document.getElementById("capsuleStatusFilter").value;
+  let filtered = allCapsules;
+  if (search) filtered = filtered.filter(c => (c.pseudonym || "").toLowerCase().includes(search));
+  if (statusFilter) filtered = filtered.filter(c => c.visibilityStatus === statusFilter);
+
+  document.getElementById("capsuleList").innerHTML = filtered.map(c => `
+    <article class="card">
+      <div class="flex-between mb-1">
+        <strong>${esc(c.pseudonym)}</strong>
+        <span class="badge badge-read">${esc(c.capsuleType || "")}</span>
+      </div>
+      <div class="pill-row">
+        <span class="pill">${c.isPublic ? "公开" : "私有"}</span>
+        <span class="pill">能量 ${(c.echoEnergy || 0).toFixed(2)}</span>
+      </div>
+      <div class="row gap-sm mt-2">
+        <button onclick="hideCapsule(${c.id})">隐藏</button>
+        <button onclick="restoreCapsule(${c.id})">恢复</button>
+      </div>
+    </article>
+  `).join("") || IC.empty("没有共鸣体数据。");
+}
+
+async function loadReports() {
+  const status = document.getElementById("reportStatusFilter").value;
+  const r = await API.adminReports(status);
+  const data = (r.success ? r.data : []) || [];
+  document.getElementById("reportList").innerHTML = data.map(rep => `
+    <div class="timeline-item panel">
+      <div class="flex-between mb-1">
+        <strong>举报 #${rep.id}</strong>
+        <span class="badge ${rep.status === 'RESOLVED' ? 'badge-replied' : 'badge-new'}">${esc(rep.status || "待处理")}</span>
+      </div>
+      <p class="muted">${esc(rep.reason || rep.description || "")}</p>
+      <div class="row gap-sm mt-1">
+        <button onclick="resolveReport(${rep.id}, 'dismiss')">忽略</button>
+        <button onclick="resolveReport(${rep.id}, 'warn')">警告</button>
+        <button onclick="resolveReport(${rep.id}, 'ban')">封禁</button>
+      </div>
+    </div>
+  `).join("") || IC.empty("没有举报记录。");
+}
+
+async function loadAiLogs() {
+  const r = await API.aiLogs();
+  const data = (r.success ? r.data : []) || [];
+  document.getElementById("aiLogList").innerHTML = data.slice(0, 20).map(log => `
+    <div class="timeline-item panel">
+      <strong>${esc(log.module || log.provider || "AI")}</strong>
+      <p class="muted">${esc(log.inputPreview || log.requestSummary || "")}</p>
+      <div class="pill-row mt-1">
+        <span class="pill">${esc(log.provider || "")}</span>
+        <span class="pill">${log.success ? "成功" : "失败"}</span>
+        <span class="pill">${IC.formatTime(log.createdAt)}</span>
+      </div>
+    </div>
+  `).join("") || IC.empty("没有 AI 日志。");
+}
+
+async function loadSafetyEvents() {
+  const r = await API.adminSafetyEvents();
+  const data = (r.success ? r.data : []) || [];
+  document.getElementById("safetyList").innerHTML = data.map(e => `
+    <div class="timeline-item panel">
+      <strong>安全事件 #${e.id}</strong>
+      <p class="muted">${esc(e.description || e.eventType || "")}</p>
+      <span class="muted" style="font-size:.78rem">${IC.formatTime(e.createdAt)}</span>
+    </div>
+  `).join("") || IC.empty("没有安全事件。");
+}
+
+async function loadModelConfig() {
+  const r = await API.adminModelConfig();
+  const data = (r.success ? r.data : []) || [];
+  document.getElementById("modelConfigList").innerHTML = data.map(c => `
+    <article class="card">
+      <strong>${esc(c.moduleName || c.provider || "模块")}</strong>
+      <p class="muted">Provider: ${esc(c.provider || "")}</p>
+      <p class="muted">Mode: ${esc(c.mode || "")}</p>
+    </article>
+  `).join("") || IC.empty("没有模型配置。");
+}
+
+async function hideCapsule(id) {
+  await API.adminHideCapsule(id);
+  IC.toast("已隐藏", "success");
+  loadCapsules();
+}
+
+async function restoreCapsule(id) {
+  await API.adminRestoreCapsule(id);
+  IC.toast("已恢复", "success");
+  loadCapsules();
+}
+
+async function resolveReport(id, action) {
+  await API.adminResolveReport(id, action);
+  IC.toast("举报已处理", "success");
+  loadReports();
+}
 </script>
-</body></html>
+</body>
+</html>

@@ -1,1 +1,133 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/css/app.css"></head><body><main class="shell"><div class="topbar" data-topbar></div><h1>成长时间轴</h1><section class="panel"><p>重要记忆将在这里按时间沉淀，当前版本读取 MemoryCard 作为后续扩展来源。</p></section></main><script src="/js/app.js"></script><script>IC.mountShell("成长时间轴")</script></body></html>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+<main class="shell">
+  <div class="topbar" data-topbar></div>
+
+  <div class="flex-between mb-2" style="flex-wrap:wrap;gap:12px">
+    <div>
+      <span class="route-hint">成长轨迹</span>
+      <h1>成长时间轴</h1>
+      <p class="muted">重要记忆按时间沉淀在这里。你可以看到自己的变化。</p>
+    </div>
+    <div class="row gap-sm">
+      <input type="date" id="datePicker" onchange="loadByDate()">
+      <button onclick="loadAll()">全部</button>
+    </div>
+  </div>
+
+  <!-- Theme evolution -->
+  <section class="panel mb-2">
+    <h2>主题演变</h2>
+    <div id="themeEvolution" class="chart-bars mt-1 mb-1" style="height:60px"></div>
+    <p class="muted" style="font-size:.82rem" id="themeLabels"></p>
+  </section>
+
+  <!-- Timeline entries -->
+  <section id="timeline" class="timeline"></section>
+</main>
+
+<script src="/js/app.js"></script>
+<script src="/js/api.js"></script>
+<script>
+IC.mountShell("成长时间轴");
+IC.ensureDemoLogin().then(loadAll);
+
+let allRecords = [];
+let allThemes = [];
+
+function esc(text) { return IC.esc(text); }
+
+async function loadAll() {
+  const [recordsResp, themesResp] = await Promise.all([API.dailyRecords(), API.memoryThemes()]);
+  allRecords = (recordsResp.success ? recordsResp.data : []) || [];
+  allThemes = (themesResp.success ? themesResp.data : []) || [];
+  renderTimeline();
+  renderThemeEvolution();
+}
+
+function loadByDate() {
+  const date = document.getElementById("datePicker").value;
+  if (!date) { renderTimeline(); return; }
+  const filtered = allRecords.filter(r => {
+    const rd = new Date(r.createdAt || r.recordDate).toISOString().split("T")[0];
+    return rd === date;
+  });
+  renderTimeline(filtered);
+}
+
+function renderTimeline(records) {
+  const data = records || allRecords;
+  const container = document.getElementById("timeline");
+
+  if (!data.length) {
+    container.innerHTML = IC.empty("还没有记录。完成一次 Aurora 对话后，记录会出现在这里。");
+    return;
+  }
+
+  container.innerHTML = data.map((r, i) => {
+    const date = IC.formatTime(r.createdAt || r.recordDate);
+    const weather = IC.weatherIcon(r.emotionWeather || "");
+    const todos = r.todos || [];
+    const doneTodos = todos.filter(t => t.status === "DONE").length;
+
+    return `
+      <article class="panel timeline-item">
+        <div class="flex-between mb-1">
+          <div>
+            <span class="muted" style="font-size:.82rem">${date}</span>
+            <h3>${esc(r.theme || "今日记录")}</h3>
+          </div>
+          <span class="weather-icon" style="font-size:1.6rem">${weather}</span>
+        </div>
+        <p class="muted">${esc(r.auroraSummary || r.summary || "")}</p>
+
+        ${todos.length ? `
+          <div class="mt-1">
+            <div class="progress-bar" style="max-width:200px">
+              <div class="progress-bar-fill" style="width:${todos.length ? Math.round(doneTodos / todos.length * 100) : 0}%"></div>
+            </div>
+            <p class="muted mt-1" style="font-size:.78rem">${doneTodos}/${todos.length} 待办完成</p>
+          </div>
+        ` : ""}
+
+        ${(r.fragments || []).length ? `
+          <div class="pill-row mt-1">
+            ${r.fragments.slice(0, 3).map(f => `<span class="pill">${esc((f.rawExcerpt || "").substring(0, 30))}...</span>`).join("")}
+          </div>
+        ` : ""}
+
+        <div class="row gap-sm mt-2">
+          <a class="button" href="/pages/daily-record.html">查看详情</a>
+          <a class="button" href="/pages/memory-starfield.html">查看星图</a>
+        </div>
+      </article>
+    `;
+  }).join("");
+  IC.stagger(container);
+}
+
+function renderThemeEvolution() {
+  if (!allThemes.length) return;
+  const chart = document.getElementById("themeEvolution");
+  const labels = document.getElementById("themeLabels");
+
+  const themeCounts = allThemes.slice(0, 7).map(t => ({
+    name: t.themeName || t.name || "主题",
+    count: t.memoryCount || t.count || Math.round(Math.random() * 8 + 1)
+  }));
+
+  const max = Math.max(...themeCounts.map(t => t.count));
+  chart.innerHTML = themeCounts.map(t =>
+    `<div class="chart-bar" style="height:${Math.round(t.count / max * 100)}%"></div>`
+  ).join("");
+  labels.textContent = themeCounts.map(t => t.name.substring(0, 4)).join("  ");
+}
+</script>
+</body>
+</html>

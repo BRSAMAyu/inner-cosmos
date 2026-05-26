@@ -1,13 +1,209 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/css/inner-cosmos.css?v=morandi-20260526"></head>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
 <body>
-<main class="shell"><div class="topbar" data-topbar></div><h1>慢信箱</h1><section class="grid"><article class="panel"><h2>收信</h2><div id="inbox"></div></article><article class="panel"><h2>寄出</h2><div id="outbox"></div></article></section></main>
+<main class="shell">
+  <div class="topbar" data-topbar></div>
+
+  <span class="route-hint">慢连接信箱</span>
+  <h1>慢信箱</h1>
+  <p class="muted mb-2">每一封信都穿过了一段宇宙距离。</p>
+
+  <!-- Tab bar -->
+  <div class="tab-bar">
+    <button class="active" onclick="switchTab('inbox')">收信</button>
+    <button onclick="switchTab('outbox')">寄出</button>
+    <button onclick="switchTab('drafts')">草稿</button>
+    <button onclick="switchTab('archived')">归档</button>
+  </div>
+
+  <!-- Letter list -->
+  <section id="letterList" class="timeline"></section>
+
+  <!-- Letter detail modal -->
+  <div id="letterModal" class="modal-overlay hidden">
+    <div class="modal-box">
+      <div class="flex-between mb-2">
+        <h2 id="modalTitle">信件详情</h2>
+        <button onclick="closeLetterDetail()">关闭</button>
+      </div>
+      <div id="modalContent"></div>
+    </div>
+  </div>
+</main>
+
 <script src="/js/app.js"></script>
+<script src="/js/api.js"></script>
 <script>
-IC.mountShell("慢信箱");IC.ensureDemoLogin().then(load);
-async function load(){const i=await IC.api("/api/letters/inbox");const o=await IC.api("/api/letters/outbox");inbox.innerHTML=render(i.data,"暂时没有收信。");outbox.innerHTML=render(o.data,"还没有寄出的慢信。");IC.stagger(document);}
-function render(list,empty){return (list||[]).map(l=>`<article class="card"><strong>${l.title}</strong><p>${l.status}</p><p>${l.letterBody||""}</p><div class="row"><button data-letter-action onclick="transitionLetter(${l.id},'read')">已读</button><button data-letter-action onclick="transitionLetter(${l.id},'reply')">回信</button><button data-letter-action onclick="transitionLetter(${l.id},'decline')">婉拒</button><button data-letter-action onclick="transitionLetter(${l.id},'archive')">归档</button></div></article>`).join("")||IC.empty(empty);}
-async function transitionLetter(id, action){await IC.api(`/api/letters/${id}/${action}`,{method:"POST"});IC.toast("慢信状态已更新","success");IC.pulse("letter");load();}
+IC.mountShell("慢信箱");
+IC.ensureDemoLogin().then(load);
+
+let allInbox = [];
+let allOutbox = [];
+let currentTab = "inbox";
+
+function esc(text) { return IC.esc(text); }
+
+async function load() {
+  const [inboxResp, outboxResp] = await Promise.all([API.letterInbox(), API.letterOutbox()]);
+  allInbox = (inboxResp.success ? inboxResp.data : []) || [];
+  allOutbox = (outboxResp.success ? outboxResp.data : []) || [];
+  renderTab();
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll(".tab-bar button").forEach(btn => btn.classList.remove("active"));
+  event.target.classList.add("active");
+  renderTab();
+}
+
+function statusBadge(status) {
+  const map = {
+    DRAFT: "badge-read",
+    SENT: "badge-read",
+    DELIVERED: "badge-new",
+    READ: "badge-replied",
+    REPLIED: "badge-replied",
+    DECLINED: "badge-declined",
+    BLOCKED: "badge-declined",
+    ARCHIVED: "badge-read",
+    NEW: "badge-new"
+  };
+  return map[status] || "badge-read";
+}
+
+function statusLabel(status) {
+  const map = {
+    DRAFT: "草稿", SENT: "已发送", DELIVERED: "已送达", READ: "已读",
+    REPLIED: "已回复", DECLINED: "已婉拒", BLOCKED: "已屏蔽", ARCHIVED: "已归档", NEW: "新信"
+  };
+  return map[status] || status;
+}
+
+function renderTab() {
+  let letters = [];
+  switch (currentTab) {
+    case "inbox": letters = allInbox.filter(l => l.status !== "ARCHIVED"); break;
+    case "outbox": letters = allOutbox.filter(l => l.status !== "ARCHIVED"); break;
+    case "drafts": letters = allOutbox.filter(l => l.status === "DRAFT"); break;
+    case "archived": letters = [...allInbox, ...allOutbox].filter(l => l.status === "ARCHIVED"); break;
+  }
+
+  const list = document.getElementById("letterList");
+  if (!letters.length) {
+    const emptyMsgs = {
+      inbox: "暂时没有收信。",
+      outbox: "还没有寄出的慢信。",
+      drafts: "没有草稿。",
+      archived: "没有归档的信件。"
+    };
+    list.innerHTML = IC.empty(emptyMsgs[currentTab]);
+    return;
+  }
+
+  list.innerHTML = letters.map(l => `
+    <article class="panel timeline-item" style="cursor:pointer" onclick="openLetter(${l.id}, '${currentTab === 'inbox' ? 'in' : 'out'}')">
+      <div class="flex-between mb-1">
+        <strong>${esc(l.title || "无标题")}</strong>
+        <span class="badge ${statusBadge(l.status)}">${statusLabel(l.status)}</span>
+      </div>
+      <p class="muted">${esc((l.letterBody || "").substring(0, 100))}${(l.letterBody || "").length > 100 ? "..." : ""}</p>
+      <div class="row gap-sm mt-1">
+        <span class="muted" style="font-size:.78rem">${IC.formatTime(l.createdAt)}</span>
+        ${l.status === "DELIVERED" ? '<span class="badge badge-new">新</span>' : ""}
+      </div>
+    </article>
+  `).join("");
+  IC.stagger(list);
+}
+
+async function openLetter(id, direction) {
+  const r = await API.letterDetail(id);
+  if (!r.success || !r.data) { IC.toast("无法加载信件", "warn"); return; }
+  const l = r.data;
+
+  document.getElementById("modalTitle").textContent = l.title || "信件详情";
+  document.getElementById("modalContent").innerHTML = `
+    <div class="letter-paper soft-stage mb-2" style="padding:18px;border-radius:var(--radius)">
+      <p style="white-space:pre-wrap;line-height:1.8">${esc(l.letterBody || "")}</p>
+    </div>
+    <div class="soft-stage mb-2">
+      <h3>送达时间线</h3>
+      <div class="timeline mt-1">
+        <div class="timeline-item"><strong>创建</strong><p class="muted">${IC.formatTime(l.createdAt)}</p></div>
+        ${l.sentAt ? `<div class="timeline-item"><strong>发送</strong><p class="muted">${IC.formatTime(l.sentAt)}</p></div>` : ""}
+        ${l.deliveredAt ? `<div class="timeline-item"><strong>送达</strong><p class="muted">${IC.formatTime(l.deliveredAt)}</p></div>` : ""}
+        ${l.readAt ? `<div class="timeline-item"><strong>已读</strong><p class="muted">${IC.formatTime(l.readAt)}</p></div>` : ""}
+      </div>
+      <div class="pill-row mt-1"><span class="badge ${statusBadge(l.status)}">${statusLabel(l.status)}</span></div>
+    </div>
+    <div class="row gap-sm">
+      ${direction === "in" && (l.status === "DELIVERED" || l.status === "READ") ? `
+        <button onclick="letterAction(${l.id}, 'read')">标记已读</button>
+        <button onclick="letterAction(${l.id}, 'reply')">回复慢信</button>
+        <button onclick="letterAction(${l.id}, 'decline')">婉拒</button>
+      ` : ""}
+      <button onclick="letterAction(${l.id}, 'archive')">归档</button>
+      ${direction === "in" ? `
+        <button onclick="letterAction(${l.id}, 'block')" style="color:var(--accent-coral)">屏蔽</button>
+        <button onclick="reportLetter(${l.id})" style="color:var(--accent-coral)">举报</button>
+      ` : ""}
+    </div>
+  `;
+
+  document.getElementById("letterModal").classList.remove("hidden");
+
+  /* Mark as read if new */
+  if (l.status === "DELIVERED") {
+    await API.letterRead(id);
+  }
+}
+
+function closeLetterDetail() {
+  document.getElementById("letterModal").classList.add("hidden");
+}
+
+async function letterAction(id, action) {
+  const actionMap = {
+    read: () => API.letterRead(id),
+    reply: () => API.letterReply(id),
+    decline: () => API.letterDecline(id),
+    block: () => API.letterBlock(id),
+    archive: () => API.letterArchive(id)
+  };
+  if (actionMap[action]) {
+    await actionMap[action]();
+    IC.toast("操作成功", "success");
+    closeLetterDetail();
+    load();
+  }
+}
+
+function reportLetter(id) {
+  IC.showModal(`
+    <h2>举报信件</h2>
+    <p class="muted mb-2">请描述你觉得不适的内容。</p>
+    <textarea id="reportReason" placeholder="请描述举报原因..." style="min-height:100px"></textarea>
+    <div class="row gap-sm mt-2">
+      <button onclick="submitReport(${id})">提交举报</button>
+      <button onclick="IC.closeModal()">取消</button>
+    </div>
+  `);
+}
+
+async function submitReport(id) {
+  const reason = document.getElementById("reportReason").value;
+  await API.letterReport(id, reason);
+  IC.closeModal();
+  IC.toast("举报已提交", "success");
+  closeLetterDetail();
+  load();
+}
 </script>
-</body></html>
+</body>
+</html>

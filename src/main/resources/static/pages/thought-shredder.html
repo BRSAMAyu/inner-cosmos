@@ -1,1 +1,155 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/css/app.css"></head><body><main class="shell"><div class="topbar" data-topbar></div><section class="panel"><h2>思维碎纸机</h2><textarea id="text" placeholder="把混乱、愤怒、焦虑、碎碎念一次性倒进来"></textarea><button onclick="go()">粉碎并沉淀</button><pre id="out" class="panel"></pre></section></main><script src="/js/app.js"></script><script>IC.mountShell("思维碎纸机");IC.ensureDemoLogin();async function go(){const r=await IC.api('/api/thought-shredder/process',{method:'POST',body:JSON.stringify({text:text.value})});out.textContent=JSON.stringify(r.data,null,2);}</script></body></html>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+<main class="shell">
+  <div class="topbar" data-topbar></div>
+
+  <span class="route-hint">思维碎纸机</span>
+  <h1>思维碎纸机</h1>
+  <p class="muted mb-2">把混乱、愤怒、焦虑、碎碎念一次性倒进来。它会帮你把噪音和真正的需求分开。</p>
+
+  <section class="grid">
+    <!-- Input area -->
+    <article class="panel">
+      <div class="field-group mb-2">
+        <label for="shredText">把想法倒进来</label>
+        <textarea id="shredText" placeholder="把混乱、愤怒、焦虑、碎碎念一次性倒进来..." style="min-height:200px"></textarea>
+      </div>
+
+      <div class="field-group mb-2">
+        <label>情绪强度</label>
+        <div class="row gap-sm" style="align-items:center">
+          <span class="muted" style="font-size:.82rem">温和</span>
+          <input type="range" id="intensity" min="1" max="10" value="5" style="flex:1;background:transparent;border:none;padding:0">
+          <span class="muted" style="font-size:.82rem">强烈</span>
+        </div>
+      </div>
+
+      <div class="field-group mb-2">
+        <label>保存模式</label>
+        <select id="saveMode">
+          <option value="KEEP_RAW">保留原始</option>
+          <option value="KEEP_ONLY_RESULT">仅保留结果</option>
+          <option value="DISPLAY_ONCE">仅看一次</option>
+        </select>
+      </div>
+
+      <button onclick="shred()" id="shredBtn" style="width:100%">粉碎并沉淀</button>
+    </article>
+
+    <!-- Result area -->
+    <article class="panel">
+      <h2>粉碎结果</h2>
+      <div id="result" class="soft-stage">
+        <p class="muted">粉碎后，结果会出现在这里。</p>
+      </div>
+      <div id="shredAnim" style="display:none" class="text-center" style="padding:24px 0">
+        <div class="empty-star" style="margin:0 auto"></div>
+        <p class="muted mt-1">正在粉碎...</p>
+      </div>
+    </article>
+  </section>
+
+  <div class="spacer"></div>
+
+  <!-- History -->
+  <section class="panel">
+    <h2>历史粉碎记录</h2>
+    <div id="history" class="grid"></div>
+  </section>
+</main>
+
+<script src="/js/app.js"></script>
+<script src="/js/api.js"></script>
+<script>
+IC.mountShell("思维碎纸机");
+IC.ensureDemoLogin().then(() => { loadHistory(); });
+
+function esc(text) { return IC.esc(text); }
+
+async function shred() {
+  const text = document.getElementById("shredText").value.trim();
+  if (!text) { IC.toast("请先写下你的想法", "warn"); return; }
+
+  const btn = document.getElementById("shredBtn");
+  btn.disabled = true;
+  btn.textContent = "正在粉碎...";
+
+  /* Shred animation */
+  document.getElementById("shredAnim").style.display = "block";
+  document.getElementById("result").style.display = "none";
+
+  const r = await API.shredderProcess(text);
+
+  document.getElementById("shredAnim").style.display = "none";
+  document.getElementById("result").style.display = "grid";
+
+  btn.disabled = false;
+  btn.textContent = "粉碎并沉淀";
+
+  if (r.success && r.data) {
+    const d = r.data;
+    document.getElementById("result").innerHTML = `
+      <h3>核心感受</h3>
+      <p class="gold">${esc(d.coreFeeling || d.reframeText || "正在识别中...")}</p>
+
+      <h3 class="mt-2">隐藏需求</h3>
+      <p class="muted">${esc(d.hiddenNeed || d.reframeText || "正在挖掘中...")}</p>
+
+      <h3 class="mt-2">可以放下的噪音</h3>
+      <p class="muted">${esc(d.noiseToDrop || d.rawExcerpt || "已识别")}</p>
+
+      <h3 class="mt-2">值得保留的一句话</h3>
+      <p class="teal">${esc(d.sentenceToKeep || d.reframeText || "...")}</p>
+
+      <div class="row gap-sm mt-2">
+        <button onclick="settleToMemory(${d.id})">沉淀到记忆</button>
+        <button onclick="deleteShred(${d.id})">删除</button>
+      </div>
+    `;
+    IC.pulse("settle");
+  } else {
+    document.getElementById("result").innerHTML = `<p class="muted">粉碎未能完成，请重试。</p>`;
+  }
+
+  loadHistory();
+}
+
+async function loadHistory() {
+  const r = await API.shredderHistory();
+  if (r.success && r.data) {
+    const historyEl = document.getElementById("history");
+    historyEl.innerHTML = r.data.slice(0, 6).map(h =>
+      `<article class="card" style="min-height:80px">
+        <strong>${esc(h.title || h.memoryType || "粉碎记录")}</strong>
+        <p class="muted">${esc((h.rawExcerpt || h.summary || "").substring(0, 80))}...</p>
+        <div class="pill-row mt-1">
+          <span class="pill">${esc(h.memoryType || "碎纸")}</span>
+          <span class="pill">重力 ${Number(h.gravity || 0).toFixed(2)}</span>
+        </div>
+      </article>`
+    ).join("") || IC.empty("还没有粉碎记录。");
+    IC.stagger(historyEl);
+  }
+}
+
+async function settleToMemory(id) {
+  await API.shredderSettle(id);
+  IC.toast("已沉淀到记忆", "success");
+  IC.pulse("settle");
+  loadHistory();
+}
+
+async function deleteShred(id) {
+  await API.shredderDelete(id);
+  IC.toast("记录已删除", "success");
+  loadHistory();
+}
+</script>
+</body>
+</html>

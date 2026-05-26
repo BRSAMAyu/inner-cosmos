@@ -1,6 +1,7 @@
 const IC = {
   soundEnabled: JSON.parse(localStorage.getItem("ic_sound") || "true"),
   audioCtx: null,
+  darkTheme: JSON.parse(localStorage.getItem("ic_dark") || "true"),
 
   async api(path, options = {}) {
     try {
@@ -24,22 +25,42 @@ const IC = {
     return [
       ["/pages/dashboard.html", "核心"],
       ["/pages/aurora-chat.html", "Aurora"],
-      ["/pages/daily-record.html", "今日记录"],
-      ["/pages/memory-starfield.html", "记忆星图"],
+      ["/pages/daily-record.html", "记录"],
+      ["/pages/memory-starfield.html", "星图"],
       ["/pages/todo.html", "待办"],
-      ["/pages/echo-plaza.html", "星海广场"],
-      ["/pages/inbox.html", "慢信箱"],
-      ["/pages/ai-log.html", "AI 日志"]
+      ["/pages/echo-plaza.html", "星海"],
+      ["/pages/slow-letter.html", "慢信"],
+      ["/pages/inbox.html", "信箱"],
+      ["/pages/timeline.html", "时间轴"],
+      ["/pages/safety-harbor.html", "避风港"],
+      ["/pages/admin.html", "管理"]
     ].map(([href, label]) => `<a href="${href}" data-route="${href}">${label}</a>`).join("");
   },
 
+  applyTheme() {
+    if (IC.darkTheme) {
+      document.body.classList.add("dark-star");
+    } else {
+      document.body.classList.remove("dark-star");
+    }
+  },
+
+  toggleTheme() {
+    IC.darkTheme = !IC.darkTheme;
+    localStorage.setItem("ic_dark", JSON.stringify(IC.darkTheme));
+    IC.applyTheme();
+    IC.toast(IC.darkTheme ? "星空主题已开启" : "暖雾主题已开启");
+  },
+
   mountShell(title) {
+    IC.applyTheme();
     const topbar = document.querySelector("[data-topbar]");
     if (topbar) {
       topbar.innerHTML = `
-        <a class="brand" href="/pages/index.html">Inner Cosmos 内宇宙</a>
+        <a class="brand" href="/pages/dashboard.html">Inner Cosmos</a>
         <nav class="nav" aria-label="主导航">
           ${IC.nav()}
+          <button class="icon-button" title="切换主题" aria-label="切换主题" onclick="IC.toggleTheme()">${IC.darkTheme ? "☾" : "☀"}</button>
           <button class="icon-button" title="切换轻柔音效" aria-label="切换轻柔音效" onclick="IC.toggleSound()">${IC.soundEnabled ? "♪" : "×"}</button>
         </nav>`;
       const path = location.pathname;
@@ -155,5 +176,45 @@ const IC = {
     root.querySelectorAll(".card,.panel,.timeline-item,.bubble").forEach((node, index) => {
       node.style.animationDelay = `${Math.min(index * 34, 260)}ms`;
     });
+  },
+
+  esc(text) {
+    return String(text || "").replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[m]));
+  },
+
+  formatTime(iso) {
+    if (!iso) return "";
+    const d = new Date(iso);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+  },
+
+  greetingByTime() {
+    const h = new Date().getHours();
+    if (h < 6) return "夜深了，你还在吗";
+    if (h < 9) return "早安，新的一天慢慢开始";
+    if (h < 12) return "上午好，今天你想先做什么";
+    if (h < 14) return "中午好，先给自己一点喘息";
+    if (h < 18) return "下午好，今天过得怎么样";
+    if (h < 21) return "傍晚了，今天可以慢慢收束";
+    return "晚上好，今天辛苦了";
+  },
+
+  weatherIcon(type) {
+    const map = { SUN: "☀️", CLOUD: "☁️", RAIN: "🌧️", STORM: "⛈️", FOG: "🌫️", SNOW: "🌨️" };
+    return map[type] || "☁️";
+  },
+
+  closeModal() {
+    const m = document.querySelector(".modal-overlay");
+    if (m) m.remove();
+  },
+
+  showModal(html) {
+    IC.closeModal();
+    const overlay = document.createElement("div");
+    overlay.className = "modal-overlay";
+    overlay.onclick = e => { if (e.target === overlay) IC.closeModal(); };
+    overlay.innerHTML = `<div class="modal-box">${html}</div>`;
+    document.body.appendChild(overlay);
   }
 };

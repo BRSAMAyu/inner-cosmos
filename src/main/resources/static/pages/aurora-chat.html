@@ -3,106 +3,243 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <link rel="stylesheet" href="/css/inner-cosmos.css?v=morandi-20260526">
+  <link rel="stylesheet" href="/css/app.css">
 </head>
 <body>
 <main class="shell">
   <div class="topbar" data-topbar></div>
-  <section class="panel">
-    <div class="row" style="justify-content:space-between">
+
+  <section class="panel" style="margin-bottom:16px">
+    <div class="flex-between mb-2">
       <div>
         <span class="route-hint">今日对话入口</span>
         <h2>Aurora 今日对话</h2>
         <p class="muted">不是问卷，也不是诊断。你可以从一句话开始。</p>
       </div>
-      <button onclick="finish()">沉淀今日记录</button>
-    </div>
-    <div class="segmented" id="modes">
-      <button class="active" data-mode="今日倾诉">今日倾诉</button>
-      <button data-mode="思维整理">思维整理</button>
-      <button data-mode="睡前复盘">睡前复盘</button>
-      <button data-mode="苏格拉底追问">苏格拉底追问</button>
-    </div>
-    <p id="modeNote" class="mode-note">自由说今天发生了什么，Aurora 会帮你拆开事件、情绪和下一步。</p>
-    <div id="chat" class="chat" aria-live="polite"></div>
-    <p id="typing" class="muted" style="display:none">Aurora 正在把这句话放慢一点看...</p>
-    <div id="settling" class="panel" style="display:none">
-      <ul class="settling-list">
-        <li>正在整理今天发生的事...</li>
-        <li>正在提取情绪线索...</li>
-        <li>正在生成今日记录卡...</li>
-      </ul>
-    </div>
-    <div class="composer">
-      <div class="row">
-        <button class="voice-pill" onclick="mockVoice()">语音转写</button>
-        <input id="msg" placeholder="把今天最想说的一句话放在这里">
-        <button onclick="send()">发送</button>
+      <div class="row gap-sm">
+        <button onclick="rhythmCheck()" class="muted" style="font-size:.84rem">节律检查</button>
+        <button onclick="finish()">沉淀今日记录</button>
       </div>
-      <p id="voiceState" class="muted">节律保护：如果聊得太久，Aurora 会建议先沉淀，而不是无限继续。</p>
+    </div>
+
+    <!-- Energy bar -->
+    <div class="mb-1">
+      <div class="row gap-sm" style="align-items:center">
+        <span class="muted" style="font-size:.82rem">对话能量</span>
+        <div class="energy-bar" style="flex:1"><div id="energyFill" class="energy-bar-fill" style="width:10%"></div></div>
+        <span id="energyLabel" class="muted" style="font-size:.82rem">刚开始</span>
+      </div>
+    </div>
+
+    <!-- Mode selector -->
+    <div id="modes" class="segmented"></div>
+
+    <!-- Mode note -->
+    <p id="modeNote" class="mode-note">自由说今天发生了什么，Aurora 会帮你拆开事件、情绪和下一步。</p>
+
+    <!-- Rhythm indicator -->
+    <div id="rhythmHint" class="soft-stage" style="display:none">
+      <p class="muted" id="rhythmText"></p>
     </div>
   </section>
+
+  <!-- Chat area -->
+  <section class="panel" style="padding-bottom:0">
+    <div id="chat" class="chat" aria-live="polite" style="min-height:380px"></div>
+    <p id="typing" class="muted" style="display:none;padding:8px 0">Aurora 正在把这句话放慢一点看...</p>
+  </section>
+
+  <!-- Settlement animation overlay -->
+  <div id="settleOverlay" class="modal-overlay hidden">
+    <div class="modal-box text-center">
+      <div class="empty-star" style="margin:0 auto 16px"></div>
+      <h2>正在沉淀今日记录</h2>
+      <div style="margin:20px 0">
+        <div id="settleStep1" class="settle-step" style="margin-bottom:12px"><span class="muted">正在整理今天发生的事...</span></div>
+        <div id="settleStep2" class="settle-step" style="margin-bottom:12px"><span class="muted">正在提取情绪线索...</span></div>
+        <div id="settleStep3" class="settle-step" style="margin-bottom:12px"><span class="muted">正在生成今日记录卡...</span></div>
+        <div id="settleStep4" class="settle-step"><span class="gold">沉淀完成，正在跳转...</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Composer -->
+  <section class="panel" style="position:sticky;bottom:0;z-index:5;margin-top:12px">
+    <div class="row" style="flex-wrap:nowrap">
+      <button class="voice-pill" onclick="mockVoice()" title="语音转写">🎤</button>
+      <input id="msg" placeholder="把今天最想说的一句话放在这里" onkeydown="if(event.key==='Enter')send()">
+      <button onclick="send()">发送</button>
+    </div>
+    <p id="voiceState" class="muted" style="font-size:.82rem;margin-top:6px">节律保护：如果聊得太久，Aurora 会建议先沉淀，而不是无限继续。</p>
+  </section>
 </main>
+
 <script src="/js/app.js"></script>
+<script src="/js/api.js"></script>
 <script>
 IC.mountShell("Aurora");
+
 let sid = null;
-let mode = "今日倾诉";
+let mode = "DAILY_TALK";
 let voiceMeta = {};
+let messageCount = 0;
+const maxEnergy = 12;
+let auroraAvatar = "✦";
+
 const modeCopy = {
-  "今日倾诉": "自由说今天发生了什么，Aurora 会帮你拆开事件、情绪和下一步。",
-  "思维整理": "适合把一团混乱想法摊开，先分清事实、担心、需求和行动。",
-  "睡前复盘": "降低刺激，温柔收束今天，不把问题带进睡前。",
-  "苏格拉底追问": "围绕一个信念连续澄清，帮助你看见它是否真的成立。"
+  DAILY_TALK: { label: "今日倾诉", icon: "💬", desc: "不用整理好再开口，先从最散的一句话开始" },
+  THOUGHT_CLARIFY: { label: "思维整理", icon: "🧩", desc: "帮你把一团东西分成事实、感受和下一步" },
+  SLEEP_REVIEW: { label: "睡前复盘", icon: "🌙", desc: "今天先到这里，收成一个可以放下的形状" },
+  SOCRATIC: { label: "苏格拉底追问", icon: "🔍", desc: "不急着给结论，先确认这个想法从哪来" },
+  ACTION_SPLIT: { label: "行动拆解", icon: "📋", desc: "把焦虑压缩成十分钟内能开始的第一步" },
+  RELATION_REVIEW: { label: "关系复盘", icon: "🤝", desc: "理清一段关系里你真正想说的和想听到的" }
 };
-document.querySelectorAll("#modes button").forEach(btn => btn.onclick = () => {
-  document.querySelectorAll("#modes button").forEach(x=>x.classList.remove("active"));
-  btn.classList.add("active");
-  mode = btn.dataset.mode;
-  modeNote.textContent = modeCopy[mode];
-  IC.pulse();
-});
-function esc(text){return String(text||"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));}
-function add(c,k){ chat.innerHTML += `<div class="bubble ${k}">${esc(c)}</div>`; chat.scrollTop = chat.scrollHeight; }
-function addAurora(text){
-  const parts = String(text||"").split(/(?<=[。！？?])/).map(x=>x.trim()).filter(Boolean);
-  (parts.length ? parts : [text]).slice(0, 3).forEach((part, index) => {
-    setTimeout(()=>{ add(part, "ai"); IC.stagger(chat); }, index * 180);
+
+const welcomeMessages = {
+  DAILY_TALK: "我在。今天你不用整理好再开口，可以先从最散的一句话开始。",
+  THOUGHT_CLARIFY: "把脑子里那团东西倒出来就行，我们一起来分分类。",
+  SLEEP_REVIEW: "今天先到这里。在睡前，我们轻轻收束一下。",
+  SOCRATIC: "你有一个想法在反复出现？我们来一起看看它。",
+  ACTION_SPLIT: "把那件让你焦虑的事说出来，我们把它拆成十分钟内能做的小步骤。",
+  RELATION_REVIEW: "有一段关系让你停下来了？我们来慢慢理一理。"
+};
+
+/* Build mode selector */
+function buildModes() {
+  const container = document.getElementById("modes");
+  container.innerHTML = Object.entries(modeCopy).map(([key, m]) =>
+    `<button data-mode="${key}" class="${key === mode ? 'active' : ''}"><span class="mode-icon">${m.icon}</span>${m.label}</button>`
+  ).join("");
+  container.querySelectorAll("button").forEach(btn => {
+    btn.onclick = () => {
+      container.querySelectorAll("button").forEach(x => x.classList.remove("active"));
+      btn.classList.add("active");
+      mode = btn.dataset.mode;
+      document.getElementById("modeNote").textContent = modeCopy[mode].desc;
+      IC.pulse("soft");
+    };
   });
 }
-async function init(){
+
+function esc(text) { return IC.esc(text); }
+
+function addBubble(content, kind) {
+  const chat = document.getElementById("chat");
+  const div = document.createElement("div");
+  div.className = `bubble ${kind}`;
+  if (kind === "ai") {
+    div.innerHTML = `<div class="row gap-sm" style="align-items:flex-start;margin-bottom:4px"><span style="font-size:1.1rem;color:var(--accent-sage)">${auroraAvatar}</span><span class="muted" style="font-size:.78rem">Aurora</span></div><div>${esc(content)}</div>`;
+  } else {
+    div.textContent = content;
+  }
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function addAurora(text) {
+  const parts = String(text || "").split(/(?<=[。！？?\n])/).map(x => x.trim()).filter(Boolean);
+  (parts.length ? parts : [text]).slice(0, 4).forEach((part, index) => {
+    setTimeout(() => {
+      addBubble(part, "ai");
+      IC.stagger(document.getElementById("chat"));
+    }, index * 220);
+  });
+}
+
+function updateEnergy() {
+  const pct = Math.min(100, Math.round((messageCount / maxEnergy) * 100));
+  const fill = document.getElementById("energyFill");
+  const label = document.getElementById("energyLabel");
+  fill.style.width = pct + "%";
+  if (pct < 30) label.textContent = "刚开始";
+  else if (pct < 60) label.textContent = "正在深入";
+  else if (pct < 85) label.textContent = "接近沉淀";
+  else label.textContent = "可以沉淀了";
+}
+
+async function init() {
   await IC.ensureDemoLogin();
-  const r = await IC.api("/api/dialog/session/create",{method:"POST",body:JSON.stringify({title:"今日对话",sessionType:"AURORA_CHAT"})});
-  sid = r.data.id;
-  add("我在。今天你不用整理好再开口，可以先从最散的一句话开始。","ai");
+  buildModes();
+
+  /* Create dialog session */
+  const r = await API.createSession({ title: "今日对话", sessionType: "AURORA_CHAT" });
+  if (r.success && r.data) sid = r.data.id;
+
+  /* Show welcome */
+  addBubble(welcomeMessages[mode], "ai");
 }
-async function send(){
-  if(!msg.value.trim()) return;
-  const text = `[${mode}] ${msg.value.trim()}`;
-  add(msg.value,"user");
+
+async function send() {
+  const input = document.getElementById("msg");
+  if (!input.value.trim()) return;
+  if (!sid) { IC.toast("对话尚未建立，请稍等", "warn"); return; }
+
+  const text = input.value.trim();
+  addBubble(text, "user");
+  input.value = "";
+  messageCount++;
+  updateEnergy();
   IC.pulse("send");
-  typing.style.display = "block";
-  const r = await IC.api("/api/aurora/message",{method:"POST",body:JSON.stringify({sessionId:sid,message:text,inputType:voiceMeta.inputType||"TEXT",audioDurationSec:voiceMeta.audioDurationSec,speechRate:voiceMeta.speechRate,pauseCount:voiceMeta.pauseCount,longPauseCount:voiceMeta.longPauseCount})});
-  typing.style.display = "none";
-  addAurora(r.data);
-  msg.value = "";
+
+  document.getElementById("typing").style.display = "block";
+  const r = await API.auroraMessage({
+    sessionId: sid,
+    message: `[${mode}] ${text}`,
+    inputType: voiceMeta.inputType || "TEXT",
+    audioDurationSec: voiceMeta.audioDurationSec,
+    speechRate: voiceMeta.speechRate,
+    pauseCount: voiceMeta.pauseCount,
+    longPauseCount: voiceMeta.longPauseCount
+  });
+  document.getElementById("typing").style.display = "none";
+
+  if (r.success && r.data) {
+    addAurora(r.data);
+  }
   voiceMeta = {};
+
+  /* Auto rhythm check every 4 messages */
+  if (messageCount % 4 === 0) rhythmCheck();
 }
-async function mockVoice(){
-  const hint = msg.value || "今天有点累，但我想把事情慢慢说清楚。";
-  const r = await IC.api("/api/asr/mock-transcribe",{method:"POST",body:JSON.stringify({hintText:hint})});
-  msg.value = r.data.text;
-  voiceMeta = {...r.data, inputType:"VOICE"};
-  voiceState.textContent = `语音已转写，可编辑后发送。时长 ${r.data.audioDurationSec || 0} 秒，停顿 ${r.data.pauseCount || 0} 次。`;
-  IC.toast("语音已转写，可编辑后发送");
-  IC.pulse("strong");
+
+async function mockVoice() {
+  const input = document.getElementById("msg");
+  const hint = input.value || "今天有点累，但我想把事情慢慢说清楚。";
+  const r = await API.asrMockTranscribe(hint);
+  if (r.success && r.data) {
+    input.value = r.data.text;
+    voiceMeta = { ...r.data, inputType: "VOICE" };
+    document.getElementById("voiceState").textContent = `语音已转写，可编辑后发送。时长 ${r.data.audioDurationSec || 0} 秒，停顿 ${r.data.pauseCount || 0} 次。`;
+    IC.toast("语音已转写，可编辑后发送");
+    IC.pulse("strong");
+  }
 }
-async function finish(){
-  settling.style.display = "block";
-  await IC.api(`/api/dialog/session/${sid}/finish`,{method:"POST"});
-  IC.pulse("record");
-  setTimeout(()=>location.href="/pages/daily-record.html",900);
+
+async function rhythmCheck() {
+  const r = await API.auroraRhythmCheck();
+  if (r.success && r.data && r.data.advice) {
+    document.getElementById("rhythmHint").style.display = "block";
+    document.getElementById("rhythmText").textContent = r.data.advice;
+  }
 }
+
+async function finish() {
+  if (!sid) return;
+  const overlay = document.getElementById("settleOverlay");
+  overlay.classList.remove("hidden");
+
+  const steps = ["settleStep1", "settleStep2", "settleStep3", "settleStep4"];
+  steps.forEach((id, i) => {
+    setTimeout(() => document.getElementById(id).classList.add("visible"), i * 600);
+  });
+
+  await API.finishSession(sid);
+  await API.auroraSettle(sid);
+
+  IC.pulse("settle");
+  setTimeout(() => location.href = "/pages/daily-record.html", 2800);
+}
+
 init();
 </script>
 </body>

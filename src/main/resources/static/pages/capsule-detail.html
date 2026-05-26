@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+<main class="shell">
+  <div class="topbar" data-topbar></div>
+
+  <!-- Capsule detail header -->
+  <section class="panel mb-2">
+    <div class="flex-between mb-2">
+      <div>
+        <span class="route-hint">数字回声</span>
+        <h1 id="capsuleName">加载中...</h1>
+      </div>
+      <span id="capsuleType" class="badge badge-read">用户</span>
+    </div>
+    <p id="capsuleIntro" class="muted mb-2"></p>
+
+    <div class="pill-row mb-2" id="capsuleTags"></div>
+
+    <!-- Stats -->
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))">
+      <div class="soft-stage text-center">
+        <strong id="echoEnergy" class="teal">0.00</strong>
+        <p class="muted">回声能量</p>
+      </div>
+      <div class="soft-stage text-center">
+        <strong id="dailyLimit">5</strong>
+        <p class="muted">每日对话轮数</p>
+      </div>
+      <div class="soft-stage text-center">
+        <strong id="letterAllowed">允许</strong>
+        <p class="muted">慢信请求</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Boundary info -->
+  <section class="panel mb-2">
+    <h2>边界说明</h2>
+    <div class="grid">
+      <div>
+        <h3 class="muted">允许谈论</h3>
+        <div id="allowTopics" class="pill-row"></div>
+      </div>
+      <div>
+        <h3 class="muted">明确避开</h3>
+        <div id="blockTopics" class="pill-row"></div>
+      </div>
+    </div>
+    <div class="soft-stage mt-2">
+      <p class="muted">它只是一段回声，不是一个人。对话内容会被边界系统监督。</p>
+    </div>
+  </section>
+
+  <!-- Actions -->
+  <section class="panel mb-2">
+    <h2>互动</h2>
+    <div class="row gap-sm">
+      <a class="button" id="chatBtn" href="#">和这个回声对话</a>
+      <a class="button" id="letterBtn" href="/pages/slow-letter.html">写一封慢信</a>
+    </div>
+  </section>
+
+  <!-- Owner controls (hidden by default) -->
+  <section id="ownerControls" class="panel" style="display:none">
+    <h2>管理我的共鸣体</h2>
+    <div class="row gap-sm">
+      <button onclick="toggleVisibility()">切换可见性</button>
+      <button onclick="archiveMyCapsule()" style="color:var(--accent-coral)">归档</button>
+    </div>
+  </section>
+</main>
+
+<script src="/js/app.js"></script>
+<script src="/js/api.js"></script>
+<script>
+IC.mountShell("共鸣体详情");
+IC.ensureDemoLogin();
+
+const capsuleId = new URLSearchParams(window.location.search).get("id");
+let capsuleData = null;
+let isOwner = false;
+
+function esc(text) { return IC.esc(text); }
+
+async function init() {
+  if (!capsuleId) {
+    document.getElementById("capsuleName").textContent = "未找到共鸣体";
+    return;
+  }
+
+  const r = await API.capsuleDetail(Number(capsuleId));
+  if (!r.success || !r.data) {
+    document.getElementById("capsuleName").textContent = "加载失败";
+    return;
+  }
+
+  capsuleData = r.data;
+  renderDetail(capsuleData);
+
+  /* Check boundary info */
+  try {
+    const br = await API.capsuleBoundary(Number(capsuleId));
+    if (br.success && br.data) renderBoundary(br.data);
+  } catch(e) {}
+
+  /* Check if owner */
+  const myCaps = await API.myCapsules();
+  if (myCaps.success && myCaps.data) {
+    isOwner = myCaps.data.some(c => c.id === Number(capsuleId));
+    if (isOwner) document.getElementById("ownerControls").style.display = "block";
+  }
+}
+
+function renderDetail(c) {
+  document.getElementById("capsuleName").textContent = c.pseudonym || "未命名回声";
+  document.getElementById("capsuleIntro").textContent = c.intro || "一枚数字回声。";
+  document.getElementById("capsuleType").textContent = c.capsuleType === "SEED" ? "种子" : "用户";
+  document.getElementById("echoEnergy").textContent = (c.echoEnergy || 0).toFixed(2);
+  document.getElementById("dailyLimit").textContent = c.conversationLimitPerDay || 5;
+  document.getElementById("letterAllowed").textContent = c.allowLetterRequest ? "允许" : "不允许";
+
+  const tags = (c.publicTags || "").split(",").filter(Boolean);
+  document.getElementById("capsuleTags").innerHTML = tags.map(t =>
+    `<span class="pill">${esc(t.trim())}</span>`
+  ).join("");
+
+  document.getElementById("chatBtn").href = `/pages/capsule-chat.html?capsuleId=${c.id}`;
+  document.getElementById("letterBtn").href = `/pages/slow-letter.html?capsuleId=${c.id}`;
+}
+
+function renderBoundary(b) {
+  const allow = (b.allowTopics || "").split(",").filter(Boolean);
+  const block = (b.blockedTopics || "").split(",").filter(Boolean);
+
+  document.getElementById("allowTopics").innerHTML = allow.map(t =>
+    `<span class="pill">${esc(t.trim())}</span>`
+  ).join("") || '<span class="muted">未设置</span>';
+
+  document.getElementById("blockTopics").innerHTML = block.map(t =>
+    `<span class="pill">${esc(t.trim())}</span>`
+  ).join("") || '<span class="muted">未设置</span>';
+}
+
+async function toggleVisibility() {
+  if (!capsuleData) return;
+  const newStatus = capsuleData.visibilityStatus === "PUBLIC" ? "PRIVATE" : "PUBLIC";
+  const r = await API.updateCapsuleVisibility(capsuleData.id, newStatus, newStatus === "PUBLIC");
+  if (r.success) {
+    capsuleData = r.data;
+    IC.toast("可见性已更新", "success");
+    renderDetail(capsuleData);
+  }
+}
+
+async function archiveMyCapsule() {
+  if (!capsuleData) return;
+  IC.showModal(`
+    <h2>归档共鸣体</h2>
+    <p class="muted mb-2">确定要归档这个共鸣体吗？它将不再出现在星海广场。</p>
+    <div class="row gap-sm">
+      <button onclick="confirmArchive()">确认归档</button>
+      <button onclick="IC.closeModal()">取消</button>
+    </div>
+  `);
+}
+
+async function confirmArchive() {
+  await API.archiveCapsule(capsuleData.id);
+  IC.closeModal();
+  IC.toast("共鸣体已归档", "success");
+  setTimeout(() => location.href = "/pages/echo-plaza.html", 800);
+}
+
+init();
+</script>
+</body>
+</html>

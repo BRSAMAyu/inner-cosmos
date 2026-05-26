@@ -1,20 +1,158 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/css/inner-cosmos.css"></head>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
 <body>
 <main class="shell">
   <div class="topbar" data-topbar></div>
+
+  <span class="route-hint">数字回声花园</span>
   <h1>星海广场</h1>
-  <p>这里不是交友信息流。你先遇见的是一部分被授权的数字回声。</p>
+  <p class="muted mb-2">这里不是交友信息流。你先遇见的是一部分被授权的数字回声。</p>
+
+  <!-- Tab bar: Seed / User -->
+  <div class="tab-bar mb-2">
+    <button class="active" onclick="switchTab('seed')">种子共鸣体</button>
+    <button onclick="switchTab('user')">用户共鸣体</button>
+  </div>
+
+  <!-- Search & Filters -->
+  <div class="row gap-sm mb-2" style="flex-wrap:wrap">
+    <input id="search" placeholder="搜索共鸣体..." style="max-width:280px" oninput="filterCapsules()">
+    <div id="tagFilters" class="pill-row"></div>
+    <select id="sortSelect" onchange="filterCapsules()">
+      <option value="energy">按回声能量</option>
+      <option value="newest">最新发布</option>
+      <option value="chat">最多对话</option>
+    </select>
+  </div>
+
+  <!-- Capsule grid -->
   <section id="list" class="grid"></section>
 </main>
+
 <script src="/js/app.js"></script>
+<script src="/js/api.js"></script>
 <script>
-IC.mountShell("星海广场");load();
-async function load(){
-  const r=await IC.api("/api/plaza/capsules");
-  list.innerHTML=(r.data||[]).map(c=>`<a class="card" href="/pages/capsule-chat.html?capsuleId=${c.id}"><strong>${c.pseudonym}</strong><p>${c.intro}</p><p class="gold">回声能量 ${(c.echoEnergy||0).toFixed(2)} / 每日 ${c.conversationLimitPerDay} 轮</p><p>${c.publicTags||""}</p></a>`).join("") || IC.empty("星海暂时安静。");
+IC.mountShell("星海广场");
+
+let capsules = [];
+let currentTab = "seed";
+let allTags = [];
+
+IC.ensureDemoLogin().then(load);
+
+async function load() {
+  const r = await API.plazaCapsules();
+  if (r.success) capsules = r.data || [];
+  buildTagFilters();
+  filterCapsules();
+}
+
+function esc(text) { return IC.esc(text); }
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll(".tab-bar button").forEach((btn, i) => {
+    btn.classList.toggle("active", (tab === "seed" && i === 0) || (tab === "user" && i === 1));
+  });
+  filterCapsules();
+}
+
+function buildTagFilters() {
+  allTags = [...new Set(capsules.flatMap(c => (c.publicTags || "").split(",").map(t => t.trim()).filter(Boolean)))];
+  document.getElementById("tagFilters").innerHTML = allTags.slice(0, 8).map(t =>
+    `<span class="pill" style="cursor:pointer" onclick="toggleTagFilter(this, '${esc(t)}')">${esc(t)}</span>`
+  ).join("");
+}
+
+let activeTagFilters = new Set();
+function toggleTagFilter(el, tag) {
+  if (activeTagFilters.has(tag)) {
+    activeTagFilters.delete(tag);
+    el.style.background = "";
+  } else {
+    activeTagFilters.add(tag);
+    el.style.background = "rgba(143,163,148,.32)";
+  }
+  filterCapsules();
+}
+
+function filterCapsules() {
+  const search = (document.getElementById("search").value || "").toLowerCase();
+  const sort = document.getElementById("sortSelect").value;
+  let filtered = capsules.filter(c => {
+    if (currentTab === "seed" && c.capsuleType !== "SEED") return false;
+    if (currentTab === "user" && c.capsuleType === "SEED") return false;
+    if (search && !(c.pseudonym || "").toLowerCase().includes(search) && !(c.intro || "").toLowerCase().includes(search)) return false;
+    if (activeTagFilters.size > 0) {
+      const tags = (c.publicTags || "").split(",").map(t => t.trim());
+      for (const ft of activeTagFilters) { if (!tags.includes(ft)) return false; }
+    }
+    return true;
+  });
+
+  /* Sort */
+  if (sort === "energy") filtered.sort((a, b) => (b.echoEnergy || 0) - (a.echoEnergy || 0));
+  if (sort === "newest") filtered.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  if (sort === "chat") filtered.sort((a, b) => (b.totalChats || 0) - (a.totalChats || 0));
+
+  renderList(filtered);
+}
+
+function renderList(data) {
+  const list = document.getElementById("list");
+  if (!data.length) {
+    list.innerHTML = IC.empty(currentTab === "seed"
+      ? "种子共鸣体正在生长中。"
+      : "还没有用户共鸣体。你可以编织一个。");
+    return;
+  }
+  list.innerHTML = data.map(c => `
+    <article class="card" style="cursor:pointer" onclick="openCapsule(${c.id})">
+      <div class="flex-between mb-1">
+        <strong>${esc(c.pseudonym)}</strong>
+        <span class="badge badge-read">${c.capsuleType === "SEED" ? "种子" : "用户"}</span>
+      </div>
+      <p class="muted">${esc(c.intro || "")}</p>
+      <div class="pill-row mt-1">
+        ${(c.publicTags || "").split(",").filter(Boolean).map(t => `<span class="pill">${esc(t.trim())}</span>`).join("")}
+      </div>
+      <p class="gold mt-1" style="font-size:.88rem">回声能量 ${(c.echoEnergy || 0).toFixed(2)} / 每日 ${c.conversationLimitPerDay || 5} 轮</p>
+    </article>
+  `).join("");
   IC.stagger(list);
 }
+
+function openCapsule(id) {
+  const c = capsules.find(x => x.id === id);
+  if (!c) return;
+
+  IC.showModal(`
+    <div class="flex-between mb-2">
+      <h2>${esc(c.pseudonym)}</h2>
+      <button onclick="IC.closeModal()">关闭</button>
+    </div>
+    <p class="muted mb-2">${esc(c.intro || "")}</p>
+    <div class="pill-row mb-2">
+      ${(c.publicTags || "").split(",").filter(Boolean).map(t => `<span class="pill">${esc(t.trim())}</span>`).join("")}
+    </div>
+    <div class="soft-stage mb-2">
+      <h3>边界</h3>
+      <p class="muted">每日对话轮数：${c.conversationLimitPerDay || 5}</p>
+      <p class="muted">回声能量：${(c.echoEnergy || 0).toFixed(2)}</p>
+      <p class="muted">它只是一段回声，不是一个人。</p>
+    </div>
+    <div class="row gap-sm">
+      <a class="button" href="/pages/capsule-chat.html?capsuleId=${c.id}">和回声对话</a>
+      <a class="button" href="/pages/slow-letter.html?capsuleId=${c.id}">写慢信</a>
+    </div>
+  `);
+  IC.pulse("open");
+}
 </script>
-</body></html>
+</body>
+</html>
