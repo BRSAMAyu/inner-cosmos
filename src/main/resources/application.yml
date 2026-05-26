@@ -28,8 +28,8 @@ mybatis-plus:
       id-type: auto
 
 llm:
-  mode: mock
-  provider: mock
+  mode: remote
+  provider: minimax
   api-key: ""
   base-url: ""
   model: mock-inner-cosmos
@@ -41,9 +41,9 @@ llm:
     asr-api-key: ""
   minimax:
     api-key: ""
-    model: "MiniMax-Text-01"
-    base-url: "https://api.minimax.chat/v1/text/chatcompletion_v2"
-    timeout-ms: 20000
+    model: "MiniMax-M2.5-highspeed"
+    base-url: "https://api.minimaxi.com/v1/chat/completions"
+    timeout-ms: 30000
 
 inner-cosmos:
   demo:
