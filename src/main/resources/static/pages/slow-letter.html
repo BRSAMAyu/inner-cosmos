@@ -80,15 +80,22 @@ IC.mountShell("写慢信");
 IC.ensureDemoLogin();
 
 let letterId = null;
+let receiverUserId = null;
 const urlParams = new URLSearchParams(window.location.search);
+const capsuleIdParam = urlParams.get("capsuleId");
+
+if (!capsuleIdParam) {
+  document.querySelector(".letter-paper").innerHTML = '<div style="text-align:center;padding:40px 20px"><h2>请先选择一个共鸣体作为收信人</h2><p class="muted mt-1">你需要先在星海广场选择一个共鸣体，再写慢信。</p><a class="button mt-2" href="/pages/echo-plaza.html">前往星海广场</a></div>';
+}
 
 /* Pre-fill from URL */
-if (urlParams.get("capsuleId")) {
-  document.getElementById("receiverCapsuleId").value = urlParams.get("capsuleId");
-  /* Try to load capsule name */
-  API.capsuleDetail(Number(urlParams.get("capsuleId"))).then(r => {
+if (capsuleIdParam) {
+  document.getElementById("receiverCapsuleId").value = capsuleIdParam;
+  /* Try to load capsule name and owner info */
+  API.capsuleDetail(Number(capsuleIdParam)).then(r => {
     if (r.success && r.data) {
       document.getElementById("receiverName").value = r.data.pseudonym;
+      receiverUserId = r.data.ownerId || r.data.userId || null;
     }
   });
 }
@@ -106,9 +113,11 @@ function updateCount() {
 }
 
 async function draft() {
+  const capsuleId = Number(document.getElementById("receiverCapsuleId").value);
+  if (!capsuleId) { IC.toast("请先选择收信人", "warn"); return; }
   const data = {
-    receiverUserId: 1,
-    receiverCapsuleId: Number(document.getElementById("receiverCapsuleId").value) || 1,
+    receiverUserId: receiverUserId,
+    receiverCapsuleId: capsuleId,
     title: document.getElementById("title").value,
     letterBody: document.getElementById("letterBody").value
   };

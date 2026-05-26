@@ -37,6 +37,9 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         if (capsule == null) {
             throw new BusinessException("NOT_FOUND", "共鸣体不存在");
         }
+        if (!Boolean.TRUE.equals(capsule.isPublic) || !"PUBLIC".equals(capsule.visibilityStatus)) {
+            throw new BusinessException("FORBIDDEN", "该共鸣体未公开，无法发起对话");
+        }
         PersonaChatSession session = new PersonaChatSession();
         session.visitorUserId = userId;
         session.capsuleId = capsuleId;

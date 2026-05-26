@@ -26,7 +26,7 @@ public class ThoughtShredderServiceImpl implements ThoughtShredderService {
         card.userId = userId;
         card.title = "思维碎纸机沉淀";
         card.summary = rawText == null ? "一次混乱输入被整理为可观察片段。" : rawText.substring(0, Math.min(rawText.length(), 100));
-        card.memoryType = "COGNITION";
+        card.memoryType = "SHREDDER";
         card.emotionTags = "[\"mixed\"]";
         card.keywordTags = "[\"thought-shredder\"]";
         card.peopleTags = "[]";

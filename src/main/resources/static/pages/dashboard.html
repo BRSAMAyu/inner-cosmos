@@ -144,7 +144,7 @@ async function load() {
 
   /* Weekly chart (simplified CSS bars) */
   const days = ["一", "二", "三", "四", "五", "六", "日"];
-  const barData = days.map((_, i) => Math.round(20 + Math.random() * 60));
+  const barData = days.map((_, i) => 20 + ((i * 2654435761 + 13) % 61));
   document.getElementById("weeklyChart").innerHTML = barData.map(h =>
     `<div class="chart-bar" style="height:${h}%"></div>`
   ).join("");

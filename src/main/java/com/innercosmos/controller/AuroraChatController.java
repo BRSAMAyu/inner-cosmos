@@ -4,6 +4,7 @@ import com.innercosmos.common.ApiResponse;
 import com.innercosmos.dto.ChatRequest;
 import com.innercosmos.service.AuroraAgentService;
 import com.innercosmos.service.MemoryService;
+import com.innercosmos.service.MemorySettlementService;
 import com.innercosmos.service.RhythmGuardService;
 import com.innercosmos.vo.DailyRecordVO;
 import jakarta.servlet.http.HttpSession;
@@ -19,13 +20,16 @@ import java.util.Map;
 public class AuroraChatController extends BaseController {
     private final AuroraAgentService auroraAgentService;
     private final MemoryService memoryService;
+    private final MemorySettlementService memorySettlementService;
     private final RhythmGuardService rhythmGuardService;
 
     public AuroraChatController(AuroraAgentService auroraAgentService,
                                 MemoryService memoryService,
+                                MemorySettlementService memorySettlementService,
                                 RhythmGuardService rhythmGuardService) {
         this.auroraAgentService = auroraAgentService;
         this.memoryService = memoryService;
+        this.memorySettlementService = memorySettlementService;
         this.rhythmGuardService = rhythmGuardService;
     }
 
@@ -42,6 +46,7 @@ public class AuroraChatController extends BaseController {
     @PostMapping("/settle")
     public ApiResponse<DailyRecordVO> settleSession(@RequestParam Long sessionId, HttpSession session) {
         Long userId = currentUserId(session);
+        memorySettlementService.settleSession(userId, sessionId);
         return ApiResponse.ok(memoryService.latestDailyRecord(userId));
     }
 

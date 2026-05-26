@@ -26,6 +26,16 @@ public class DataMaskingServiceImpl implements DataMaskingService {
     @Override
     public CapsulePreviewVO previewFromMemory(Long userId, List<Long> memoryIds,
                                                 String privacyLevel, List<String> allowTopics, List<String> blockedTopics) {
+        if (memoryIds == null || memoryIds.isEmpty()) {
+            CapsulePreviewVO emptyPreview = new CapsulePreviewVO();
+            emptyPreview.removedSensitiveItems = new ArrayList<>();
+            emptyPreview.publicTags = new ArrayList<>();
+            emptyPreview.riskWarnings = new ArrayList<>();
+            emptyPreview.abstractSummary = "暂无摘要";
+            emptyPreview.suggestedPseudonym = "星际旅人";
+            emptyPreview.personaPromptDraft = "这是一个空的共鸣体预览。";
+            return emptyPreview;
+        }
         // Load MemoryCards
         QueryWrapper<MemoryCard> query = new QueryWrapper<>();
         query.eq("user_id", userId).in("id", memoryIds).eq("status", "ACTIVE");

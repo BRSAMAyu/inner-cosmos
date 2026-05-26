@@ -69,7 +69,7 @@
 <script>
 IC.mountShell("安全避风港");
 
-load();
+IC.ensureDemoLogin().then(load);
 
 async function load() {
   const r = await API.safetyResources();

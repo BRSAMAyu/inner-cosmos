@@ -15,10 +15,10 @@
 
   <!-- Tab bar -->
   <div class="tab-bar">
-    <button class="active" onclick="switchTab('inbox')">收信</button>
-    <button onclick="switchTab('outbox')">寄出</button>
-    <button onclick="switchTab('drafts')">草稿</button>
-    <button onclick="switchTab('archived')">归档</button>
+    <button class="active" onclick="switchTab('inbox', this)">收信</button>
+    <button onclick="switchTab('outbox', this)">寄出</button>
+    <button onclick="switchTab('drafts', this)">草稿</button>
+    <button onclick="switchTab('archived', this)">归档</button>
   </div>
 
   <!-- Letter list -->
@@ -55,10 +55,10 @@ async function load() {
   renderTab();
 }
 
-function switchTab(tab) {
+function switchTab(tab, el) {
   currentTab = tab;
   document.querySelectorAll(".tab-bar button").forEach(btn => btn.classList.remove("active"));
-  event.target.classList.add("active");
+  if (el) el.classList.add("active");
   renderTab();
 }
 

@@ -28,6 +28,7 @@ public class GlmLlmClient implements LlmClient {
     private final AiLogService aiLogService;
     private final Executor aiExecutor;
     private final MockLlmClient fallback;
+    private final HttpClient httpClient;
 
     public GlmLlmClient(String apiKey, String baseUrl, String model, int timeoutMs,
                          AiLogService aiLogService, Executor aiExecutor) {
@@ -38,6 +39,7 @@ public class GlmLlmClient implements LlmClient {
         this.aiLogService = aiLogService;
         this.aiExecutor = aiExecutor;
         this.fallback = new MockLlmClient(aiExecutor);
+        this.httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(20)).build();
     }
 
     @Override
@@ -101,10 +103,6 @@ public class GlmLlmClient implements LlmClient {
     }
 
     private String doChat(LlmRequest request) throws Exception {
-        HttpClient client = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofMillis(timeoutMs))
-                .build();
-
         Map<String, Object> systemMsg = Map.of("role", "system", "content", "你是 Aurora，一个朋友式自我整理助手。温和、克制、主动追问一个问题，避免贴标签。");
         Map<String, Object> userMsg = Map.of("role", "user", "content", request.prompt);
         Map<String, Object> body = Map.of(
@@ -124,7 +122,7 @@ public class GlmLlmClient implements LlmClient {
                 .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
                 .build();
 
-        HttpResponse<String> httpResponse = client.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> httpResponse = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
 
         if (httpResponse.statusCode() != 200) {
             throw new RuntimeException("GLM API returned status " + httpResponse.statusCode() + ": " + httpResponse.body());

@@ -27,10 +27,10 @@
 
   <!-- Tab bar -->
   <div class="tab-bar">
-    <button class="active" onclick="switchTab('today')">今天</button>
-    <button onclick="switchTab('week')">本周</button>
-    <button onclick="switchTab('done')">已完成</button>
-    <button onclick="switchTab('letgo')">已放下</button>
+    <button class="active" onclick="switchTab('today', this)">今天</button>
+    <button onclick="switchTab('week', this)">本周</button>
+    <button onclick="switchTab('done', this)">已完成</button>
+    <button onclick="switchTab('letgo', this)">已放下</button>
   </div>
 
   <!-- Todo list -->
@@ -54,10 +54,10 @@ async function load() {
   renderTab();
 }
 
-function switchTab(tab) {
+function switchTab(tab, el) {
   currentTab = tab;
   document.querySelectorAll(".tab-bar button").forEach(btn => btn.classList.remove("active"));
-  event.target.classList.add("active");
+  if (el) el.classList.add("active");
   renderTab();
 }
 

@@ -15,7 +15,7 @@ spring:
       encoding: UTF-8
   h2:
     console:
-      enabled: true
+      enabled: false # Enable for development only
       path: /h2-console
   jackson:
     default-property-inclusion: non_null

@@ -68,7 +68,7 @@ public class AdminServiceImpl implements AdminService {
             query.eq("visibility_status", status);
         }
         if (keyword != null && !keyword.isBlank()) {
-            query.like("pseudonym", keyword).or().like("intro", keyword);
+            query.and(w -> w.like("pseudonym", keyword).or().like("intro", keyword));
         }
         query.orderByDesc("id");
         return capsuleMapper.selectList(query);

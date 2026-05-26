@@ -9,6 +9,7 @@ import com.innercosmos.mapper.CapsuleBoundaryMapper;
 import com.innercosmos.mapper.EchoCapsuleMapper;
 import com.innercosmos.service.CapsuleService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -26,6 +27,7 @@ public class CapsuleServiceImpl implements CapsuleService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public EchoCapsule createFromMemory(Long userId, CapsuleCreateRequest request) {
         EchoCapsule capsule = new EchoCapsule();
         capsule.ownerUserId = userId;

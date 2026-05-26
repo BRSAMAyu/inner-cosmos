@@ -13,8 +13,15 @@ import java.util.List;
 public class SafetyServiceImpl implements SafetyService {
     private final SafetyEventMapper safetyEventMapper;
 
-    private static final List<String> CRISIS_KEYWORDS = List.of("自杀", "杀人", "人肉", "威胁");
-    private static final List<String> ABUSE_KEYWORDS = List.of("辱骂", "歧视", "骚扰", "暴力");
+    private static final List<String> CRISIS_KEYWORDS = List.of(
+            "自杀", "轻生", "杀人", "跳楼", "割腕", "服药自杀",
+            "不想活", "寻死", "自残", "了结自己", "结束生命",
+            "死了一了百了", "活着没意义", "想死", "去死"
+    );
+    private static final List<String> ABUSE_KEYWORDS = List.of(
+            "人肉", "威胁", "骚扰", "恐吓", "跟踪", "网暴",
+            "侮辱", "诽谤", "泄露隐私", "曝光信息", "公布身份"
+    );
 
     public SafetyServiceImpl(SafetyEventMapper safetyEventMapper) {
         this.safetyEventMapper = safetyEventMapper;

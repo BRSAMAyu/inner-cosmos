@@ -22,11 +22,13 @@ import com.innercosmos.vo.DailyRecordVO;
 import com.innercosmos.vo.StarfieldDetailVO;
 import com.innercosmos.vo.StarfieldVO;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 public class MemoryServiceImpl implements MemoryService {
@@ -64,11 +66,12 @@ public class MemoryServiceImpl implements MemoryService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public MemoryCard extractFromSession(Long userId, Long sessionId) {
         QueryWrapper<DialogMessage> query = new QueryWrapper<>();
         query.eq("session_id", sessionId).eq("speaker", "USER").orderByAsc("id");
         List<DialogMessage> messages = messageMapper.selectList(query);
-        String raw = messages.stream().map(m -> m.textContent).reduce("", (a, b) -> a + "\n" + b);
+        String raw = messages.stream().map(m -> m.textContent).filter(Objects::nonNull).reduce("", (a, b) -> a + "\n" + b);
         MemoryCard card = new MemoryCard();
         card.userId = userId;
         card.sourceSessionId = sessionId;
@@ -311,7 +314,8 @@ public class MemoryServiceImpl implements MemoryService {
     public StarfieldDetailVO starfieldDetail(Long userId, Long cardId) {
         MemoryCard card = memoryCardMapper.selectById(cardId);
         if (card == null || !userId.equals(card.userId)) {
-            return null;
+            throw new com.innercosmos.exception.BusinessException(
+                    com.innercosmos.common.ErrorCode.NOT_FOUND, "记忆卡不存在或无权访问");
         }
         StarfieldDetailVO detail = new StarfieldDetailVO();
         detail.card = card;

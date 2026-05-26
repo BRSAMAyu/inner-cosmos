@@ -13,8 +13,8 @@ import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
-import java.util.HexFormat;
 
 @Service
 public class UserServiceImpl implements UserService {
@@ -47,7 +47,7 @@ public class UserServiceImpl implements UserService {
         QueryWrapper<User> query = new QueryWrapper<>();
         query.eq("username", request.username);
         User user = userMapper.selectOne(query);
-        if (user == null || !hash(request.password).equals(user.passwordHash)) {
+        if (user == null || !verify(request.password, user.passwordHash)) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED, "invalid username or password");
         }
         user.lastLoginAt = LocalDateTime.now();
@@ -68,11 +68,40 @@ public class UserServiceImpl implements UserService {
     }
 
     private String hash(String input) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            return HexFormat.of().formatHex(digest.digest(input.getBytes(StandardCharsets.UTF_8)));
-        } catch (Exception exception) {
-            throw new IllegalStateException(exception);
+        if (input == null) throw new BusinessException(ErrorCode.BAD_REQUEST, "密码不能为空");
+        SecureRandom random = new SecureRandom();
+        byte[] salt = new byte[16];
+        random.nextBytes(salt);
+        String saltHex = bytesToHex(salt);
+        String hashHex = sha256(saltHex + input);
+        return saltHex + ":" + hashHex;
+    }
+
+    private boolean verify(String input, String stored) {
+        if (input == null || stored == null) return false;
+        if (!stored.contains(":")) {
+            // Legacy format - plain SHA-256
+            return sha256(input).equals(stored);
         }
+        String[] parts = stored.split(":");
+        String salt = parts[0];
+        String expectedHash = parts[1];
+        return sha256(salt + input).equals(expectedHash);
+    }
+
+    private String sha256(String input) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] hash = md.digest(input.getBytes(StandardCharsets.UTF_8));
+            return bytesToHex(hash);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private String bytesToHex(byte[] bytes) {
+        StringBuilder sb = new StringBuilder();
+        for (byte b : bytes) sb.append(String.format("%02x", b));
+        return sb.toString();
     }
 }

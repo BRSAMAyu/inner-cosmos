@@ -146,7 +146,8 @@ public class LlmConfig {
                         aiExecutor
                 );
             case "deepseek":
-                return new DeepSeekLlmClient();
+                log.warn("DeepSeek provider not fully implemented, falling back to mock");
+                return new MockLlmClient(aiExecutor);
             case "openai-compatible":
                 return new GlmLlmClient(
                         resolveKey(apiKey),

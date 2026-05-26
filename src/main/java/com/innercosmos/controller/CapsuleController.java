@@ -56,7 +56,11 @@ public class CapsuleController extends BaseController {
     @PostMapping("/preview-from-memory")
     public ApiResponse<CapsulePreviewVO> previewFromMemory(@RequestBody Map<String, Object> body, HttpSession session) {
         Long userId = currentUserId(session);
-        List<Long> memoryIds = ((List<Number>) body.get("memoryIds")).stream().map(Number::longValue).collect(Collectors.toList());
+        Object rawMemoryIds = body.get("memoryIds");
+        if (rawMemoryIds == null) {
+            return ApiResponse.fail("BAD_REQUEST", "memoryIds不能为空");
+        }
+        List<Long> memoryIds = ((List<Number>) rawMemoryIds).stream().map(Number::longValue).collect(Collectors.toList());
         String privacyLevel = (String) body.getOrDefault("privacyLevel", "STRICT");
         List<String> allowTopics = (List<String>) body.getOrDefault("allowTopics", List.of());
         List<String> blockedTopics = (List<String>) body.getOrDefault("blockedTopics", List.of());

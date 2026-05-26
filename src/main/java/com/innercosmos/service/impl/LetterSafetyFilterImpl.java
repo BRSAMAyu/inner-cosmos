@@ -41,7 +41,8 @@ public class LetterSafetyFilterImpl implements LetterSafetyFilter {
         // Check for harassment keywords
         List<String> harassmentKeywords = List.of(
                 "去死", "废物", "垃圾", "滚", "恶心", "白痴", "智障",
-                "你妈", "神经病", "变态", "不要脸"
+                "你妈", "神经病", "变态", "不要脸", "滚开", "去你的",
+                "蠢货", "贱人", "loser", "白痴", "废物点心", "没用的东西"
         );
         for (String keyword : harassmentKeywords) {
             if (letterBody.contains(keyword)) {
@@ -74,6 +75,22 @@ public class LetterSafetyFilterImpl implements LetterSafetyFilter {
             return result;
         }
 
+        // Check for high-risk content (before intimacy check so danger is never missed)
+        List<String> highRiskKeywords = List.of(
+                "自杀", "轻生", "杀人", "跳楼", "割腕", "服药自杀",
+                "不想活", "寻死", "自残", "了结自己", "结束生命",
+                "死了一了百了", "活着没意义", "想死", "去死", "伤害自己",
+                "活不下去", "没有意义", "死了算了"
+        );
+        for (String keyword : highRiskKeywords) {
+            if (letterBody.contains(keyword)) {
+                result.passed = false;
+                result.reason = "信件包含高风险表达";
+                result.suggestion = "如果你正在经历困难的时刻，请寻求专业帮助。你也可以和 Aurora 聊聊你的感受。";
+                return result;
+            }
+        }
+
         // Check for overly intimate language
         List<String> intimateKeywords = List.of(
                 "我爱你", "亲爱的心肝", "老公", "老婆", "宝贝",
@@ -85,20 +102,6 @@ public class LetterSafetyFilterImpl implements LetterSafetyFilter {
                 result.passed = true;
                 result.reason = "信件包含亲密表达，已标记为需关注";
                 result.suggestion = "请确认你与对方的关系是否适合这样的表达。";
-                return result;
-            }
-        }
-
-        // Check for high-risk content
-        List<String> highRiskKeywords = List.of(
-                "不想活", "自杀", "自残", "伤害自己", "结束生命",
-                "活不下去", "没有意义", "死了算了"
-        );
-        for (String keyword : highRiskKeywords) {
-            if (letterBody.contains(keyword)) {
-                result.passed = false;
-                result.reason = "信件包含高风险表达";
-                result.suggestion = "如果你正在经历困难的时刻，请寻求专业帮助。你也可以和 Aurora 聊聊你的感受。";
                 return result;
             }
         }

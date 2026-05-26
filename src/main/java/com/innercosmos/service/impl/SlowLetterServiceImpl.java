@@ -16,6 +16,7 @@ import com.innercosmos.mapper.SlowLetterMapper;
 import com.innercosmos.service.LetterSafetyFilter;
 import com.innercosmos.service.SlowLetterService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -59,6 +60,7 @@ public class SlowLetterServiceImpl implements SlowLetterService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public SlowLetter transition(Long userId, Long id, String targetStatus) {
         SlowLetter letter = letterMapper.selectById(id);
         if (letter == null) {
@@ -117,10 +119,14 @@ public class SlowLetterServiceImpl implements SlowLetterService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public SlowLetter replyWithLetter(Long userId, Long letterId, LetterCreateRequest request) {
         SlowLetter original = letterMapper.selectById(letterId);
         if (original == null) {
             throw new com.innercosmos.exception.BusinessException(com.innercosmos.common.ErrorCode.NOT_FOUND, "原信件不存在");
+        }
+        if (!userId.equals(original.receiverUserId)) {
+            throw new com.innercosmos.exception.BusinessException(com.innercosmos.common.ErrorCode.UNAUTHORIZED, "只有收件人可以回复此信件");
         }
         if (!guardAgent.allow(request.letterBody)) {
             throw new SafetyBlockedException("letter contains unsafe content");

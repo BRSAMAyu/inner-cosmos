@@ -7,6 +7,7 @@ import com.innercosmos.dto.RegisterRequest;
 import com.innercosmos.entity.User;
 import com.innercosmos.service.UserService;
 import com.innercosmos.vo.UserProfileVO;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
@@ -28,9 +29,15 @@ public class AuthController extends BaseController {
     }
 
     @PostMapping("/login")
-    public ApiResponse<UserProfileVO> login(@Valid @RequestBody LoginRequest request, HttpSession session) {
+    public ApiResponse<UserProfileVO> login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
         User user = userService.login(request);
-        session.setAttribute(Constants.SESSION_USER_KEY, user.id);
+        // Prevent session fixation: invalidate old session and create a new one
+        HttpSession oldSession = httpRequest.getSession(false);
+        if (oldSession != null) {
+            oldSession.invalidate();
+        }
+        HttpSession newSession = httpRequest.getSession(true);
+        newSession.setAttribute(Constants.SESSION_USER_KEY, user.id);
         return ApiResponse.ok(UserProfileVO.from(user));
     }
 

@@ -2,6 +2,8 @@ package com.innercosmos.event;
 
 import com.innercosmos.entity.MemoryCard;
 import com.innercosmos.mapper.MemoryCardMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
@@ -11,6 +13,7 @@ import java.util.List;
 
 @Component
 public class GravityRecalculateListener {
+    private static final Logger log = LoggerFactory.getLogger(GravityRecalculateListener.class);
     private final MemoryCardMapper memoryCardMapper;
 
     public GravityRecalculateListener(MemoryCardMapper memoryCardMapper) {
@@ -38,7 +41,8 @@ public class GravityRecalculateListener {
                 card.updatedAt = LocalDateTime.now();
                 memoryCardMapper.updateById(card);
             }
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            log.error("Event processing failed", e);
         }
     }
 }

@@ -8,6 +8,7 @@ import com.innercosmos.service.MemorySettlementService;
 import com.innercosmos.service.ThemeAggregationService;
 import com.innercosmos.vo.DailyRecordVO;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -25,6 +26,7 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
     private final MemoryThemeMapper memoryThemeMapper;
     private final DailyRecordMapper dailyRecordMapper;
     private final DialogMessageMapper dialogMessageMapper;
+    private final DialogSessionMapper dialogSessionMapper;
     private final GravityService gravityService;
     private final ThemeAggregationService themeAggregationService;
 
@@ -37,6 +39,7 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
                                        MemoryThemeMapper memoryThemeMapper,
                                        DailyRecordMapper dailyRecordMapper,
                                        DialogMessageMapper dialogMessageMapper,
+                                       DialogSessionMapper dialogSessionMapper,
                                        GravityService gravityService,
                                        ThemeAggregationService themeAggregationService) {
         this.memoryCardMapper = memoryCardMapper;
@@ -48,12 +51,20 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
         this.memoryThemeMapper = memoryThemeMapper;
         this.dailyRecordMapper = dailyRecordMapper;
         this.dialogMessageMapper = dialogMessageMapper;
+        this.dialogSessionMapper = dialogSessionMapper;
         this.gravityService = gravityService;
         this.themeAggregationService = themeAggregationService;
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void settleSession(Long userId, Long sessionId) {
+        // Verify session ownership
+        DialogSession session = dialogSessionMapper.selectById(sessionId);
+        if (session == null || !userId.equals(session.userId)) {
+            throw new com.innercosmos.exception.BusinessException(
+                    com.innercosmos.common.ErrorCode.UNAUTHORIZED, "无权操作此对话会话");
+        }
         // Read user messages from session
         QueryWrapper<DialogMessage> msgQuery = new QueryWrapper<>();
         msgQuery.eq("session_id", sessionId).eq("speaker", "USER").orderByAsc("id");
@@ -150,6 +161,7 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public DailyRecordVO generateDailyRecord(Long userId, Long sessionId) {
         // Find the latest MemoryCard for this session
         QueryWrapper<MemoryCard> cardQuery = new QueryWrapper<>();

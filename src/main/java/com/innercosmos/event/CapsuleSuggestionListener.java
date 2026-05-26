@@ -35,7 +35,8 @@ public class CapsuleSuggestionListener {
                 log.info("建议用户 {} 将高重力记忆 '{}' (gravity={}) 编织为共鸣体",
                         event.userId, card.title, card.emotionalGravity);
             }
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            log.error("Event processing failed", e);
         }
     }
 }

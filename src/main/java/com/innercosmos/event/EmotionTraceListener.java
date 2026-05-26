@@ -3,6 +3,8 @@ package com.innercosmos.event;
 import com.innercosmos.entity.EmotionTrace;
 import com.innercosmos.mapper.DialogMessageMapper;
 import com.innercosmos.mapper.EmotionTraceMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
@@ -14,6 +16,7 @@ import java.util.Map;
 
 @Component
 public class EmotionTraceListener {
+    private static final Logger log = LoggerFactory.getLogger(EmotionTraceListener.class);
     private final DialogMessageMapper messageMapper;
     private final EmotionTraceMapper emotionTraceMapper;
 
@@ -79,7 +82,8 @@ public class EmotionTraceListener {
             trace.createdAt = LocalDateTime.now();
             trace.updatedAt = LocalDateTime.now();
             emotionTraceMapper.insert(trace);
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            log.error("Event processing failed", e);
         }
     }
 }

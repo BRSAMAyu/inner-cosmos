@@ -4,25 +4,24 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.innercosmos.config.LlmConfig;
 import com.innercosmos.exception.AiProviderException;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.MediaType;
-import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executor;
 
-@Component
-@ConditionalOnProperty(prefix = "llm", name = "mode", havingValue = "remote")
 public class OpenAiCompatibleLlmClient implements LlmClient {
     private final LlmConfig config;
     private final RestClient restClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final MockFallback mockFallback = new MockFallback();
+    private final Executor executor;
 
-    public OpenAiCompatibleLlmClient(LlmConfig config) {
+    public OpenAiCompatibleLlmClient(LlmConfig config, Executor executor) {
         this.config = config;
+        this.executor = executor;
         String baseUrl = config.baseUrl == null || config.baseUrl.isBlank() ? defaultBaseUrl(config.provider) : config.baseUrl;
         this.restClient = RestClient.builder().baseUrl(baseUrl).build();
     }
@@ -60,7 +59,7 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
     @Override
     public SseEmitter streamChat(LlmRequest request) {
         SseEmitter emitter = new SseEmitter(60_000L);
-        Thread worker = new Thread(() -> {
+        executor.execute(() -> {
             try {
                 String text = chat(request);
                 for (String token : text.split("")) {
@@ -73,8 +72,6 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
                 emitter.completeWithError(new AiProviderException("remote stream failed and fallback stream failed"));
             }
         });
-        worker.setName("inner-cosmos-remote-stream");
-        worker.start();
         return emitter;
     }
 

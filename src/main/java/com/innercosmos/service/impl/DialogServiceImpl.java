@@ -11,6 +11,7 @@ import com.innercosmos.mapper.DialogSessionMapper;
 import com.innercosmos.service.DialogService;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -42,6 +43,7 @@ public class DialogServiceImpl implements DialogService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public DialogMessage saveUserMessage(Long userId, ChatRequest request) {
         DialogMessage message = new DialogMessage();
         message.sessionId = request.sessionId;
@@ -56,7 +58,8 @@ public class DialogServiceImpl implements DialogService {
         message.emotionHint = request.emotionHint;
         message.safetyLevel = "LOW";
         messageMapper.insert(message);
-        increment(request.sessionId, request.message.length());
+        int tokens = request.message == null ? 0 : request.message.length();
+        increment(request.sessionId, tokens);
         return message;
     }
 
@@ -112,6 +115,7 @@ public class DialogServiceImpl implements DialogService {
         }
     }
 
+    @Transactional(rollbackFor = Exception.class)
     private void increment(Long sessionId, int textLength) {
         DialogSession session = sessionMapper.selectById(sessionId);
         if (session != null) {

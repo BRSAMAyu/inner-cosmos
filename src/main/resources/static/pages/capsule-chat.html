@@ -60,8 +60,14 @@
 <script>
 IC.mountShell("共鸣体对话");
 
+const params = new URLSearchParams(location.search);
+const capsuleId = params.get("capsuleId");
+if (!capsuleId) {
+  document.body.innerHTML = '<div style="text-align:center;padding:80px 20px"><h2>请先选择一个共鸣体</h2><p><a href="/pages/echo-plaza.html">前往星海广场</a></p></div>';
+  throw new Error('No capsuleId');
+}
+
 let sid = null;
-let capsuleId = null;
 let totalTurns = 5;
 let usedTurns = 0;
 
@@ -69,7 +75,6 @@ function esc(text) { return IC.esc(text); }
 
 async function init() {
   await IC.ensureDemoLogin();
-  capsuleId = new URLSearchParams(location.search).get("capsuleId") || 1;
 
   /* Load capsule info */
   const capsuleResp = await API.capsuleDetail(capsuleId);

@@ -15,13 +15,13 @@
 
   <!-- Tab bar -->
   <div class="tab-bar" id="adminTabs">
-    <button class="active" onclick="switchAdminTab('overview')">概览</button>
-    <button onclick="switchAdminTab('users')">用户</button>
-    <button onclick="switchAdminTab('capsules')">共鸣体</button>
-    <button onclick="switchAdminTab('reports')">举报</button>
-    <button onclick="switchAdminTab('aiLogs')">AI 日志</button>
-    <button onclick="switchAdminTab('safety')">安全事件</button>
-    <button onclick="switchAdminTab('model')">模型配置</button>
+    <button class="active" onclick="switchAdminTab('overview', this)">概览</button>
+    <button onclick="switchAdminTab('users', this)">用户</button>
+    <button onclick="switchAdminTab('capsules', this)">共鸣体</button>
+    <button onclick="switchAdminTab('reports', this)">举报</button>
+    <button onclick="switchAdminTab('aiLogs', this)">AI 日志</button>
+    <button onclick="switchAdminTab('safety', this)">安全事件</button>
+    <button onclick="switchAdminTab('model', this)">模型配置</button>
   </div>
 
   <!-- Content sections -->
@@ -97,10 +97,10 @@ let currentAdminTab = "overview";
 
 function esc(text) { return IC.esc(text); }
 
-function switchAdminTab(tab) {
+function switchAdminTab(tab, el) {
   currentAdminTab = tab;
   document.querySelectorAll("#adminTabs button").forEach(btn => btn.classList.remove("active"));
-  event.target.classList.add("active");
+  if (el) el.classList.add("active");
   document.querySelectorAll("[id^='tab-']").forEach(s => s.style.display = "none");
   document.getElementById("tab-" + tab).style.display = "block";
 
@@ -133,7 +133,16 @@ async function load() {
   document.getElementById("sc").textContent = (safety.success ? (safety.data || []).length : 0);
 }
 
-load();
+IC.ensureDemoLogin().then(user => {
+    if (user && user.role !== 'ADMIN') {
+        alert('需要管理员权限');
+        location.href = '/pages/dashboard.html';
+        return;
+    }
+    load();
+}).catch(() => {
+    location.href = '/pages/login.html';
+});
 
 async function loadUsers() {
   if (!allUsers.length) {

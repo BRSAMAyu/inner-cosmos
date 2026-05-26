@@ -103,9 +103,13 @@ function render() {
   }
 
   /* Place stars */
+  function pseudoRandom(seed) {
+    let x = Math.sin(seed * 12.9898) * 43758.5453;
+    return x - Math.floor(x);
+  }
   data.forEach((s, i) => {
-    const x = Math.max(6, Math.min(88, 10 + (i % 8) * 11 + Math.random() * 6));
-    const y = Math.max(8, Math.min(86, 10 + Math.floor(i / 8) * 18 + Math.random() * 8));
+    const x = Math.max(6, Math.min(88, 10 + (i % 8) * 11 + pseudoRandom(s.id || i) * 6));
+    const y = Math.max(8, Math.min(86, 10 + Math.floor(i / 8) * 18 + pseudoRandom((s.id || i) + 1000) * 8));
     const size = Math.max(24, Math.min(96, 22 + s.gravity * 15));
     const starEl = document.createElement("button");
     starEl.className = "star";

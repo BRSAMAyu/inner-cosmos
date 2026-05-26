@@ -34,7 +34,7 @@ const IC = {
       ["/pages/timeline.html", "时间轴"],
       ["/pages/safety-harbor.html", "避风港"],
       ["/pages/admin.html", "管理"]
-    ].map(([href, label]) => `<a href="${href}" data-route="${href}">${label}</a>`).join("");
+    ].map(([href, label]) => `<a href="${href}" data-route="${href}">${IC.esc(label)}</a>`).join("");
   },
 
   applyTheme() {
@@ -73,14 +73,20 @@ const IC = {
     IC.attachInteractionFeedback();
   },
 
+  // DEV-ONLY: demo credentials for development/testing
   async ensureDemoLogin() {
-    const current = await IC.api("/api/auth/current").catch(() => null);
-    if (!current || !current.success) {
-      await IC.api("/api/auth/login", {
-        method: "POST",
-        body: JSON.stringify({ username: "demo", password: "demo123" })
+    try {
+      const r = await IC.api('/api/auth/current');
+      if (r.success) { IC.userId = r.data?.id; return r.data; }
+    } catch(e) {}
+    try {
+      const r = await IC.api('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ username: 'demo', password: 'demo123' })
       });
-    }
+      if (r.success) { IC.userId = r.data?.id; return r.data; }
+    } catch(e) {}
+    return null;
   },
 
   toast(text, tone = "default") {
@@ -98,7 +104,7 @@ const IC = {
   },
 
   empty(text) {
-    return `<div class="empty"><div class="empty-star"></div><p>${text}</p></div>`;
+    return `<div class="empty"><div class="empty-star"></div><p>${IC.esc(text)}</p></div>`;
   },
 
   pulse(kind = "soft") {

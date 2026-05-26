@@ -9,6 +9,7 @@ import com.innercosmos.service.TodoService;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class TodoServiceImpl implements TodoService {
@@ -25,13 +26,18 @@ public class TodoServiceImpl implements TodoService {
         return todoItemMapper.selectList(query);
     }
 
+    private static final Set<String> VALID_STATUSES = Set.of("TODO", "IN_PROGRESS", "DONE", "DROPPED");
+
     @Override
     public TodoItem updateStatus(Long userId, Long id, String status) {
         TodoItem item = todoItemMapper.selectById(id);
         if (item == null || !userId.equals(item.userId)) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "todo not found");
         }
-        item.status = status == null || status.isBlank() ? "TODO" : status;
+        if (status == null || status.isBlank() || !VALID_STATUSES.contains(status)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "无效的状态值，允许值：TODO, IN_PROGRESS, DONE, DROPPED");
+        }
+        item.status = status;
         todoItemMapper.updateById(item);
         return item;
     }

@@ -7,6 +7,7 @@ import com.innercosmos.mapper.MemoryCardMapper;
 import com.innercosmos.mapper.MemoryThemeMapper;
 import com.innercosmos.service.ThemeAggregationService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -30,6 +31,7 @@ public class ThemeAggregationServiceImpl implements ThemeAggregationService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void aggregateThemes(Long userId) {
         // Read all active MemoryCards
         QueryWrapper<MemoryCard> cardQuery = new QueryWrapper<>();
