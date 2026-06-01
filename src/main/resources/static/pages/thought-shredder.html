@@ -12,6 +12,7 @@
   <span class="route-hint">思维碎纸机</span>
   <h1>思维碎纸机</h1>
   <p class="muted mb-2">把混乱、愤怒、焦虑、碎碎念一次性倒进来。它会帮你把噪音和真正的需求分开。</p>
+  <p id="aiStatus" class="muted mb-2" style="font-size:.82rem">正在检查结构化 AI 状态...</p>
 
   <section class="grid">
     <!-- Input area -->
@@ -68,9 +69,17 @@
 <script src="/js/api.js"></script>
 <script>
 IC.mountShell("思维碎纸机");
-IC.ensureDemoLogin().then(() => { loadHistory(); });
+IC.ensureDemoLogin().then(() => { loadAiStatus(); loadHistory(); });
 
 function esc(text) { return IC.esc(text); }
+
+async function loadAiStatus() {
+  const r = await API.aiHealth();
+  if (!r.success || !r.data) return;
+  const h = r.data;
+  document.getElementById("aiStatus").textContent =
+    `${h.provider || "-"} / ${h.model || "-"} · ${h.apiKeyConfigured ? "真实模型已配置" : "未配置真实模型密钥"} · ${h.fallbackAllowed ? "开发 fallback 可用" : "fallback 关闭"}`;
+}
 
 async function shred() {
   const text = document.getElementById("shredText").value.trim();
@@ -84,7 +93,7 @@ async function shred() {
   document.getElementById("shredAnim").style.display = "block";
   document.getElementById("result").style.display = "none";
 
-  const r = await API.shredderProcess(text);
+  const r = await API.shredderProcess(text, document.getElementById("saveMode").value);
 
   document.getElementById("shredAnim").style.display = "none";
   document.getElementById("result").style.display = "grid";
@@ -102,14 +111,14 @@ async function shred() {
       <p class="muted">${esc(d.hiddenNeed || d.reframeText || "正在挖掘中...")}</p>
 
       <h3 class="mt-2">可以放下的噪音</h3>
-      <p class="muted">${esc(d.noiseToDrop || d.rawExcerpt || "已识别")}</p>
+      <p class="muted">${Array.isArray(d.noiseToDrop) ? d.noiseToDrop.map(esc).join("；") : esc(d.noiseToDrop || "已识别")}</p>
 
       <h3 class="mt-2">值得保留的一句话</h3>
       <p class="teal">${esc(d.sentenceToKeep || d.reframeText || "...")}</p>
 
       <div class="row gap-sm mt-2">
-        <button onclick="settleToMemory(${d.id})">沉淀到记忆</button>
-        <button onclick="deleteShred(${d.id})">删除</button>
+        <button onclick="settleToMemory(${d.memoryCard.id})">沉淀到记忆</button>
+        <button onclick="deleteShred(${d.memoryCard.id})">删除</button>
       </div>
     `;
     IC.pulse("settle");
@@ -130,7 +139,7 @@ async function loadHistory() {
         <p class="muted">${esc((h.rawExcerpt || h.summary || "").substring(0, 80))}...</p>
         <div class="pill-row mt-1">
           <span class="pill">${esc(h.memoryType || "碎纸")}</span>
-          <span class="pill">重力 ${Number(h.gravity || 0).toFixed(2)}</span>
+          <span class="pill">重力 ${Number(h.emotionalGravity || h.gravity || 0).toFixed(2)}</span>
         </div>
       </article>`
     ).join("") || IC.empty("还没有粉碎记录。");

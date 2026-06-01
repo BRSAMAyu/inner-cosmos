@@ -32,4 +32,8 @@ public interface AdminService {
     List<ModelConfig> modelConfigs();
 
     void updateModelConfig(ModelConfig config);
+
+    void disableUser(Long id);
+
+    void enableUser(Long id);
 }

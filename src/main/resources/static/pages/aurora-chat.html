@@ -15,6 +15,7 @@
         <span class="route-hint">今日对话入口</span>
         <h2>Aurora 今日对话</h2>
         <p class="muted">不是问卷，也不是诊断。你可以从一句话开始。</p>
+        <p id="aiStatus" class="muted" style="font-size:.82rem;margin-top:6px">正在检查真实 AI 状态...</p>
       </div>
       <div class="row gap-sm">
         <button onclick="rhythmCheck()" class="muted" style="font-size:.84rem">节律检查</button>
@@ -40,6 +41,14 @@
     <!-- Rhythm indicator -->
     <div id="rhythmHint" class="soft-stage" style="display:none">
       <p class="muted" id="rhythmText"></p>
+    </div>
+    <div id="memoryLens" class="soft-stage" style="display:none;margin-top:10px">
+      <div class="flex-between">
+        <strong style="font-size:.9rem">Aurora 记忆镜头</strong>
+        <span id="memoryPolicy" class="route-hint">memory context</span>
+      </div>
+      <div id="memoryChips" class="row gap-sm" style="margin-top:8px;flex-wrap:wrap"></div>
+      <p id="memoryContinuity" class="muted" style="font-size:.82rem;margin-top:8px"></p>
     </div>
   </section>
 
@@ -137,13 +146,31 @@ function addBubble(content, kind) {
 }
 
 function addAurora(text) {
-  const parts = String(text || "").split(/(?<=[。！？?\n])/).map(x => x.trim()).filter(Boolean);
+  const parts = Array.isArray(text) ? text : String(text || "").split(/(?<=[。！？?\n])/).map(x => x.trim()).filter(Boolean);
   (parts.length ? parts : [text]).slice(0, 4).forEach((part, index) => {
     setTimeout(() => {
       addBubble(part, "ai");
       IC.stagger(document.getElementById("chat"));
     }, index * 220);
   });
+}
+
+function renderMemoryLens(context) {
+  if (!context) return;
+  const lens = document.getElementById("memoryLens");
+  const chips = document.getElementById("memoryChips");
+  const policy = document.getElementById("memoryPolicy");
+  const continuity = document.getElementById("memoryContinuity");
+  const notes = [
+    ...(context.longTermMemoryNotes || []).slice(0, 2),
+    ...(context.activeThemeNotes || []).slice(0, 2),
+    context.emotionWeather ? `emotion: ${context.emotionWeather}` : ""
+  ].filter(Boolean);
+  if (!notes.length && !context.continuityHypothesis) return;
+  policy.textContent = context.memoryPolicy || "memory context";
+  chips.innerHTML = notes.map(note => `<span class="tag">${esc(note).slice(0, 96)}</span>`).join("");
+  continuity.textContent = context.continuityHypothesis || "";
+  lens.style.display = "block";
 }
 
 function updateEnergy() {
@@ -182,19 +209,25 @@ async function send() {
   IC.pulse("send");
 
   document.getElementById("typing").style.display = "block";
-  const r = await API.auroraMessage({
+  const r = await API.auroraMessageRich({
     sessionId: sid,
-    message: `[${mode}] ${text}`,
+    message: text,
     inputType: voiceMeta.inputType || "TEXT",
     audioDurationSec: voiceMeta.audioDurationSec,
     speechRate: voiceMeta.speechRate,
     pauseCount: voiceMeta.pauseCount,
-    longPauseCount: voiceMeta.longPauseCount
+    longPauseCount: voiceMeta.longPauseCount,
+    mode
   });
   document.getElementById("typing").style.display = "none";
 
   if (r.success && r.data) {
-    addAurora(r.data);
+    addAurora(r.data.messages || r.data);
+    renderMemoryLens(r.data.memoryContext);
+    if (r.data.suggestSettle) {
+      document.getElementById("rhythmHint").style.display = "block";
+      document.getElementById("rhythmText").textContent = "Aurora 建议今天先沉淀一下，让这些内容变成一张今日记录。";
+    }
   }
   voiceMeta = {};
 
@@ -241,6 +274,16 @@ async function finish() {
 }
 
 init();
+loadAiStatus();
+
+async function loadAiStatus() {
+  const r = await API.aiHealth();
+  if (!r.success || !r.data) return;
+  const h = r.data;
+  const key = h.apiKeyConfigured ? "真实模型已配置" : "未配置真实模型密钥";
+  const fb = h.fallbackAllowed ? "开发 fallback 可用" : "fallback 关闭";
+  document.getElementById("aiStatus").textContent = `${h.provider || "-"} / ${h.model || "-"} · ${key} · ${fb}`;
+}
 </script>
 </body>
 </html>

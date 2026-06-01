@@ -1,1 +1,118 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/css/app.css"></head><body><main class="shell"><div class="topbar" data-topbar></div><h1>AI 交互日志</h1><section id="logs" class="grid"></section></main><script src="/js/app.js"></script><script>IC.mountShell("AI 日志");IC.ensureDemoLogin().then(load);async function load(){const r=await IC.api('/api/ai-logs');logs.innerHTML=(r.data||[]).map(l=>`<article class="card"><strong>${l.moduleName}</strong><p>${l.provider} / ${l.modelName} / ${l.latencyMs||0}ms</p></article>`).join('')||'<p class="muted">暂无 AI 调用日志。</p>';}</script></body></html>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+<main class="shell">
+  <div class="topbar" data-topbar></div>
+
+  <div class="flex-between mb-2" style="flex-wrap:wrap;gap:12px">
+    <div>
+      <span class="route-hint">模型调用追踪</span>
+      <h1>AI 交互日志</h1>
+      <p class="muted">每一次 Aurora 对话背后，都有一笔模型调用记录。这里是透明的技术追踪。</p>
+    </div>
+    <div class="row gap-sm">
+      <input type="text" id="searchInput" placeholder="搜索模块名..." oninput="filterLogs()" style="width:160px">
+      <select id="providerFilter" onchange="filterLogs()">
+        <option value="">全部 Provider</option>
+        <option value="minimax">MiniMax</option>
+        <option value="deepseek">DeepSeek</option>
+        <option value="glm">GLM</option>
+        <option value="mock">Mock</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Stats row -->
+  <section class="grid mb-2">
+    <article class="card metric">
+      <span>总调用次数</span>
+      <strong id="totalCount">0</strong>
+    </article>
+    <article class="card metric">
+      <span>平均延迟</span>
+      <strong id="avgLatency">-</strong>
+    </article>
+    <article class="card metric">
+      <span>使用的 Provider</span>
+      <strong id="providerList">-</strong>
+    </article>
+  </section>
+
+  <!-- Log entries -->
+  <section id="logs" class="grid"></section>
+</main>
+
+<script src="/js/app.js"></script>
+<script src="/js/api.js"></script>
+<script>
+IC.mountShell("AI 交互日志");
+
+let allLogs = [];
+
+IC.ensureDemoLogin().then(load);
+
+async function load() {
+  const r = await API.aiLogs();
+  allLogs = (r.success ? r.data : []) || [];
+  updateStats();
+  renderLogs(allLogs);
+}
+
+function esc(text) { return IC.esc(text); }
+
+function updateStats() {
+  document.getElementById("totalCount").textContent = allLogs.length;
+  if (allLogs.length) {
+    const avg = Math.round(allLogs.reduce((s, l) => s + (l.latencyMs || 0), 0) / allLogs.length);
+    document.getElementById("avgLatency").textContent = avg + "ms";
+    const providers = [...new Set(allLogs.map(l => l.provider).filter(Boolean))];
+    document.getElementById("providerList").textContent = providers.join(", ") || "-";
+  }
+}
+
+function filterLogs() {
+  const search = document.getElementById("searchInput").value.toLowerCase();
+  const provider = document.getElementById("providerFilter").value;
+  const filtered = allLogs.filter(l => {
+    if (provider && (l.provider || "").toLowerCase() !== provider) return false;
+    if (search && !(l.moduleName || "").toLowerCase().includes(search)) return false;
+    return true;
+  });
+  renderLogs(filtered);
+}
+
+function renderLogs(logs) {
+  const container = document.getElementById("logs");
+  if (!logs.length) {
+    container.innerHTML = IC.empty("暂无 AI 调用日志。和 Aurora 聊一次天后，这里会出现记录。");
+    return;
+  }
+  container.innerHTML = logs.map(l => {
+    const latency = l.latencyMs || 0;
+    const latencyClass = latency > 3000 ? "style=\"color:#c97b63\"" : latency > 1000 ? "style=\"color:#b8a882\"" : "";
+    return `<article class="card">
+      <div class="flex-between mb-1">
+        <strong>${esc(l.moduleName || "Unknown")}</strong>
+        <span class="muted" style="font-size:.82rem">${IC.formatTime(l.createdAt)}</span>
+      </div>
+      <div class="pill-row">
+        <span class="pill">${esc(l.provider || "-")}</span>
+        <span class="pill">${esc(l.modelName || "-")}</span>
+        <span class="pill" ${latencyClass}>${latency}ms</span>
+        ${l.fallbackUsed ? `<span class="pill">fallback</span>` : ""}
+        ${l.success === false ? `<span class="pill">failed</span>` : ""}
+      </div>
+      ${l.errorMessage ? `<p class="muted mt-1" style="font-size:.78rem;color:#b56b5c">${esc(l.errorMessage)}</p>` : ""}
+      ${l.tokenInputEstimate || l.tokenOutputEstimate ? `<p class="muted mt-1" style="font-size:.78rem">tokens≈ ${(l.tokenInputEstimate || 0)}+${(l.tokenOutputEstimate || 0)}</p>` : ""}
+    </article>`;
+  }).join("");
+  IC.stagger(container);
+}
+</script>
+</body>
+</html>

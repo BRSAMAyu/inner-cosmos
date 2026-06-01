@@ -137,4 +137,26 @@ public class AdminServiceImpl implements AdminService {
             modelConfigMapper.updateById(config);
         }
     }
+
+    @Override
+    public void disableUser(Long id) {
+        User user = userMapper.selectById(id);
+        if (user == null) {
+            throw new com.innercosmos.exception.BusinessException(
+                    com.innercosmos.common.ErrorCode.NOT_FOUND, "用户不存在");
+        }
+        user.status = "DISABLED";
+        userMapper.updateById(user);
+    }
+
+    @Override
+    public void enableUser(Long id) {
+        User user = userMapper.selectById(id);
+        if (user == null) {
+            throw new com.innercosmos.exception.BusinessException(
+                    com.innercosmos.common.ErrorCode.NOT_FOUND, "用户不存在");
+        }
+        user.status = "ACTIVE";
+        userMapper.updateById(user);
+    }
 }

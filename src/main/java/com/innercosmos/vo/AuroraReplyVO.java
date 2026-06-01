@@ -7,7 +7,9 @@ public class AuroraReplyVO {
     public String replyTone;
     public String detectedTheme;
     public String nextQuestion;
+    public String smallStep;
     public Boolean suggestSettle;
     public Boolean memoryReferenced;
     public List<Long> referencedMemoryIds;
+    public AuroraMemoryContextVO memoryContext;
 }

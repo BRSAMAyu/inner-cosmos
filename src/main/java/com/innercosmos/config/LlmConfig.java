@@ -21,8 +21,10 @@ public class LlmConfig {
     public String apiKey;
     public String baseUrl;
     public String model;
+    public boolean allowFallback = true;
     public GlmProperties glm = new GlmProperties();
     public MinimaxProperties minimax = new MinimaxProperties();
+    public DeepSeekProperties deepseek = new DeepSeekProperties();
 
     // --- Getters / Setters for top-level fields ---
 
@@ -66,6 +68,47 @@ public class LlmConfig {
         this.model = model;
     }
 
+    public boolean isAllowFallback() {
+        return allowFallback;
+    }
+
+    public void setAllowFallback(boolean allowFallback) {
+        this.allowFallback = allowFallback;
+    }
+
+    public boolean isProdMode() {
+        return "prod".equalsIgnoreCase(mode) || "production".equalsIgnoreCase(mode);
+    }
+
+    public boolean isDemoMode() {
+        return "demo".equalsIgnoreCase(mode) || "dev".equalsIgnoreCase(mode) || "local".equalsIgnoreCase(mode);
+    }
+
+    public boolean isEffectiveFallbackAllowed() {
+        return allowFallback && !isProdMode();
+    }
+
+    public String activeProvider() {
+        return (provider != null && !provider.isBlank()) ? provider : "minimax";
+    }
+
+    public String activeModel() {
+        String activeProvider = activeProvider().toLowerCase();
+        if ("minimax".equals(activeProvider)) return minimax.model;
+        if ("deepseek".equals(activeProvider)) return deepseek.model;
+        if ("glm".equals(activeProvider)) return glm.model;
+        return model;
+    }
+
+    public boolean hasActiveApiKey() {
+        String activeProvider = activeProvider().toLowerCase();
+        if ("mock".equals(activeProvider)) return false;
+        if ("minimax".equals(activeProvider)) return !resolveKey(minimax.apiKey).isBlank();
+        if ("deepseek".equals(activeProvider)) return !resolveKey(deepseek.apiKey).isBlank();
+        if ("glm".equals(activeProvider)) return !resolveKey(glm.apiKey).isBlank();
+        return !resolveKey(apiKey).isBlank();
+    }
+
     public GlmProperties getGlm() {
         return glm;
     }
@@ -80,6 +123,14 @@ public class LlmConfig {
 
     public void setMinimax(MinimaxProperties minimax) {
         this.minimax = minimax;
+    }
+
+    public DeepSeekProperties getDeepseek() {
+        return deepseek;
+    }
+
+    public void setDeepseek(DeepSeekProperties deepseek) {
+        this.deepseek = deepseek;
     }
 
     // --- Nested property classes ---
@@ -119,12 +170,29 @@ public class LlmConfig {
         public void setTimeoutMs(int timeoutMs) { this.timeoutMs = timeoutMs; }
     }
 
+    public static class DeepSeekProperties {
+        public String apiKey = "";
+        public String model = "deepseek-chat";
+        public String baseUrl = "https://api.deepseek.com";
+        public int timeoutMs = 30000;
+
+        public String getApiKey() { return apiKey; }
+        public void setApiKey(String apiKey) { this.apiKey = apiKey; }
+        public String getModel() { return model; }
+        public void setModel(String model) { this.model = model; }
+        public String getBaseUrl() { return baseUrl; }
+        public void setBaseUrl(String baseUrl) { this.baseUrl = baseUrl; }
+        public int getTimeoutMs() { return timeoutMs; }
+        public void setTimeoutMs(int timeoutMs) { this.timeoutMs = timeoutMs; }
+    }
+
     // --- Factory method ---
 
     @Bean
     public LlmClient llmClient(AiLogService aiLogService, Executor aiExecutor) {
-        String activeProvider = (provider != null && !provider.isBlank()) ? provider : "mock";
-        log.info("Creating LlmClient for provider: {}", activeProvider);
+        String activeProvider = activeProvider();
+        log.info("Creating LlmClient for provider: {}, mode: {}, fallbackAllowed: {}",
+                activeProvider, mode, isEffectiveFallbackAllowed());
 
         switch (activeProvider.toLowerCase()) {
             case "glm":
@@ -142,12 +210,20 @@ public class LlmConfig {
                         minimax.baseUrl,
                         minimax.model,
                         minimax.timeoutMs,
+                        isEffectiveFallbackAllowed(),
                         aiLogService,
                         aiExecutor
                 );
             case "deepseek":
-                log.warn("DeepSeek provider not fully implemented, falling back to mock");
-                return new MockLlmClient(aiExecutor);
+                return new DeepSeekLlmClient(
+                        resolveKey(deepseek.apiKey),
+                        deepseek.baseUrl,
+                        deepseek.model,
+                        deepseek.timeoutMs,
+                        isEffectiveFallbackAllowed(),
+                        aiLogService,
+                        aiExecutor
+                );
             case "openai-compatible":
                 return new GlmLlmClient(
                         resolveKey(apiKey),

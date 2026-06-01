@@ -385,4 +385,25 @@ public class MemoryServiceImpl implements MemoryService {
         record.userAccepted = true;
         dailyRecordMapper.updateById(record);
     }
+
+    @Override
+    public DailyRecord dailyRecordByDate(Long userId, String date) {
+        QueryWrapper<DailyRecord> query = new QueryWrapper<>();
+        query.eq("user_id", userId).eq("record_date", java.time.LocalDate.parse(date));
+        return dailyRecordMapper.selectOne(query);
+    }
+
+    @Override
+    public DailyRecord editDailyRecord(Long userId, Long recordId, String theme, String emotionWeather, String cognitiveSummary) {
+        DailyRecord record = dailyRecordMapper.selectById(recordId);
+        if (record == null || !userId.equals(record.userId)) {
+            throw new com.innercosmos.exception.BusinessException(
+                    com.innercosmos.common.ErrorCode.UNAUTHORIZED, "无权操作此记录");
+        }
+        if (theme != null && !theme.isBlank()) record.theme = theme;
+        if (emotionWeather != null && !emotionWeather.isBlank()) record.emotionWeather = emotionWeather;
+        if (cognitiveSummary != null && !cognitiveSummary.isBlank()) record.cognitiveSummary = cognitiveSummary;
+        dailyRecordMapper.updateById(record);
+        return record;
+    }
 }

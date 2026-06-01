@@ -13,6 +13,7 @@ public class AiInteractionLog extends BaseEntity {
     public String requestJson;
     public String responseJson;
     public Boolean success;
+    public Boolean fallbackUsed;
     public String errorMessage;
     public Long latencyMs;
     public Integer tokenInputEstimate;

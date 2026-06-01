@@ -7,6 +7,7 @@ public class LlmRequest {
     public Long userId;
     public String moduleName;
     public String prompt;
+    public String requestJson;
     public List<String> recentMessages = new ArrayList<>();
 
     public LlmRequest(Long userId, String moduleName, String prompt) {

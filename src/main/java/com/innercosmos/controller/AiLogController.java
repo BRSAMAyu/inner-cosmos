@@ -5,6 +5,7 @@ import com.innercosmos.entity.AiInteractionLog;
 import com.innercosmos.service.AiLogService;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -20,7 +21,10 @@ public class AiLogController extends BaseController {
     }
 
     @GetMapping
-    public ApiResponse<List<AiInteractionLog>> list(HttpSession session) {
-        return ApiResponse.ok(aiLogService.listRecent(currentUserId(session)));
+    public ApiResponse<List<AiInteractionLog>> list(@RequestParam(required = false) String module,
+                                                     @RequestParam(required = false) String provider,
+                                                     @RequestParam(required = false) Boolean success,
+                                                     HttpSession session) {
+        return ApiResponse.ok(aiLogService.listRecent(currentUserId(session), module, provider, success));
     }
 }

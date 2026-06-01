@@ -36,7 +36,10 @@
           <h2>今日主题</h2>
           <p id="theme" style="font-size:1.1rem;color:var(--ink)"></p>
         </div>
-        <span id="weatherIcon" class="weather-icon"></span>
+        <div class="row gap-sm" style="align-items:center">
+          <button onclick="editSection('theme')" class="muted" style="font-size:.82rem">编辑</button>
+          <span id="weatherIcon" class="weather-icon"></span>
+        </div>
       </div>
       <p id="summary" class="gold mt-1"></p>
     </article>
@@ -173,7 +176,63 @@ async function acceptRecord() {
 }
 
 function editSection(section) {
-  IC.toast("编辑功能将在下一版本开放");
+  const themeEl = document.getElementById("theme");
+  const eventEl = document.getElementById("eventSummary");
+
+  if (section === "event") {
+    const current = eventEl.textContent;
+    eventEl.outerHTML = `<div class="field-group" id="eventEditWrap">
+      <input type="text" id="eventEditInput" value="${IC.esc(current)}" style="width:100%">
+      <div class="row gap-sm mt-1">
+        <button onclick="saveEdit('event')">保存</button>
+        <button onclick="cancelEdit('event','${IC.esc(current)}')">取消</button>
+      </div>
+    </div>`;
+  } else if (section === "theme") {
+    const current = themeEl.textContent;
+    themeEl.outerHTML = `<div class="field-group" id="themeEditWrap">
+      <input type="text" id="themeEditInput" value="${IC.esc(current)}" style="width:100%">
+      <div class="row gap-sm mt-1">
+        <button onclick="saveEdit('theme')">保存</button>
+        <button onclick="cancelEdit('theme','${IC.esc(current)}')">取消</button>
+      </div>
+    </div>`;
+  }
+}
+
+async function saveEdit(field) {
+  if (!currentRecordId) { IC.toast("没有可编辑的记录", "warn"); return; }
+  let value = "";
+
+  if (field === "event") {
+    const input = document.getElementById("eventEditInput");
+    value = input ? input.value : "";
+  } else if (field === "theme") {
+    const input = document.getElementById("themeEditInput");
+    value = input ? input.value : "";
+  }
+
+  const body = {};
+  if (field === "theme") body.theme = value;
+  if (field === "event") body.cognitiveSummary = value;
+
+  await IC.api("/api/daily-record/" + currentRecordId + "/edit", {
+    method: "POST",
+    body: JSON.stringify(body)
+  });
+  IC.toast("已保存", "success");
+  IC.pulse("settle");
+  loadCurrent();
+}
+
+function cancelEdit(field, original) {
+  if (field === "event") {
+    const wrap = document.getElementById("eventEditWrap");
+    if (wrap) wrap.outerHTML = `<p id="eventSummary" class="muted">${IC.esc(original)}</p>`;
+  } else if (field === "theme") {
+    const wrap = document.getElementById("themeEditWrap");
+    if (wrap) wrap.outerHTML = `<p id="theme" style="font-size:1.1rem;color:var(--ink)">${IC.esc(original)}</p>`;
+  }
 }
 
 function prevRecord() {

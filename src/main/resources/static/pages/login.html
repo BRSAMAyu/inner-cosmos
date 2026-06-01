@@ -1,1 +1,207 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/css/app.css"></head><body><main class="shell"><div class="topbar" data-topbar></div><section class="panel"><h2>登录</h2><div class="form"><input id="username" value="demo"><input id="password" type="password" value="demo123"><button onclick="login()">进入</button><p id="out" class="muted"></p></div></section></main><script src="/js/app.js"></script><script>IC.mountShell("登录");async function login(){const r=await IC.api('/api/auth/login',{method:'POST',body:JSON.stringify({username:username.value,password:password.value})});out.textContent=r.message;if(r.success) location.href='/pages/dashboard.html';}</script></body></html>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="/css/app.css">
+  <title>登录 · Inner Cosmos</title>
+  <style>
+    .login-shell {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .login-card {
+      width: 100%;
+      max-width: 420px;
+      background: var(--surface-paper);
+      border-radius: var(--radius-flow);
+      box-shadow: var(--glow-soft);
+      padding: 48px 36px 40px;
+    }
+    .login-card h1 {
+      font-size: 1.6rem;
+      margin: 0 0 4px;
+      color: var(--ink);
+      letter-spacing: .02em;
+    }
+    .login-card .subtitle {
+      font-size: .88rem;
+      color: var(--muted);
+      margin-bottom: 32px;
+    }
+    .field {
+      margin-bottom: 20px;
+    }
+    .field label {
+      display: block;
+      font-size: .82rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .field input {
+      width: 100%;
+      padding: 12px 14px;
+      font-size: .95rem;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface-warm);
+      color: var(--text);
+      transition: border-color .2s;
+    }
+    .field input:focus {
+      outline: none;
+      border-color: var(--accent-sage);
+      box-shadow: 0 0 0 3px rgba(143, 163, 148, .15);
+    }
+    .login-btn {
+      width: 100%;
+      padding: 14px;
+      font-size: 1rem;
+      font-weight: 600;
+      color: #fff;
+      background: var(--accent-sage);
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: opacity .2s, transform .1s;
+      margin-top: 8px;
+    }
+    .login-btn:hover { opacity: .9; }
+    .login-btn:active { transform: scale(.98); }
+    .login-btn:disabled {
+      opacity: .5;
+      cursor: not-allowed;
+    }
+    .demo-hint {
+      font-size: .78rem;
+      color: var(--faint);
+      text-align: center;
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+    }
+    .demo-hint code {
+      background: var(--surface-mist);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: .76rem;
+    }
+    .error-box {
+      padding: 10px 14px;
+      margin-bottom: 16px;
+      border-radius: var(--radius);
+      background: rgba(200, 147, 145, .12);
+      color: var(--accent-coral);
+      font-size: .88rem;
+      display: none;
+    }
+    .error-box.visible { display: block; }
+    .link-row {
+      text-align: center;
+      margin-top: 16px;
+      font-size: .88rem;
+    }
+    .link-row a {
+      color: var(--accent-dusty-blue);
+      text-decoration: none;
+    }
+    .link-row a:hover { text-decoration: underline; }
+    .loader {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) {
+      .loader { animation: none; }
+      .login-btn { transition: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="login-shell">
+    <div class="login-card">
+      <h1>Inner Cosmos</h1>
+      <p class="subtitle">温柔的自我整理空间</p>
+
+      <div id="error" class="error-box" role="alert"></div>
+
+      <div class="field">
+        <label for="username">用户名</label>
+        <input id="username" type="text" placeholder="输入用户名" value="demo" autocomplete="username">
+      </div>
+
+      <div class="field">
+        <label for="password">密码</label>
+        <input id="password" type="password" placeholder="输入密码" value="demo123" autocomplete="current-password">
+      </div>
+
+      <button id="loginBtn" class="login-btn" onclick="doLogin()">进入内宇宙</button>
+
+      <div class="demo-hint">
+        演示账号：<code>demo</code> / <code>demo123</code>
+      </div>
+
+      <div class="link-row">
+        还没有账号？<a href="/pages/register.html">创建一个</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/app.js"></script>
+  <script>
+    IC.mountShell("登录");
+
+    document.getElementById("password").addEventListener("keydown", function(e) {
+      if (e.key === "Enter") doLogin();
+    });
+
+    async function doLogin() {
+      const btn = document.getElementById("loginBtn");
+      const errBox = document.getElementById("error");
+      const user = document.getElementById("username").value.trim();
+      const pass = document.getElementById("password").value;
+
+      if (!user || !pass) {
+        errBox.textContent = "请输入用户名和密码。";
+        errBox.classList.add("visible");
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="loader"></span>正在进入...';
+      errBox.classList.remove("visible");
+
+      try {
+        const r = await IC.api("/api/auth/login", {
+          method: "POST",
+          body: JSON.stringify({ username: user, password: pass })
+        });
+
+        if (r.success) {
+          location.href = "/pages/dashboard.html";
+        } else {
+          errBox.textContent = r.message || "登录失败，请检查用户名和密码。";
+          errBox.classList.add("visible");
+          btn.disabled = false;
+          btn.textContent = "进入内宇宙";
+        }
+      } catch (e) {
+        errBox.textContent = "网络连接出现问题，请稍后再试。";
+        errBox.classList.add("visible");
+        btn.disabled = false;
+        btn.textContent = "进入内宇宙";
+      }
+    }
+  </script>
+</body>
+</html>

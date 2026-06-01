@@ -27,4 +27,8 @@ public interface MemoryService {
     List<DailyRecord> listDailyRecords(Long userId);
 
     void acceptDailyRecord(Long userId, Long recordId);
+
+    DailyRecord dailyRecordByDate(Long userId, String date);
+
+    DailyRecord editDailyRecord(Long userId, Long recordId, String theme, String emotionWeather, String cognitiveSummary);
 }

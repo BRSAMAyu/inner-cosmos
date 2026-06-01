@@ -1,10 +1,11 @@
 package com.innercosmos.service;
 
 import com.innercosmos.entity.MemoryCard;
+import com.innercosmos.vo.ShredderResultVO;
 import java.util.List;
 
 public interface ThoughtShredderService {
-    MemoryCard process(Long userId, String rawText);
+    ShredderResultVO process(Long userId, String rawText, String originalHandlingMode);
 
     List<MemoryCard> history(Long userId);
 
