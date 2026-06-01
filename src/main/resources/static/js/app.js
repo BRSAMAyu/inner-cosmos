@@ -1,7 +1,7 @@
 const IC = {
   soundEnabled: JSON.parse(localStorage.getItem("ic_sound") || "true"),
   audioCtx: null,
-  darkTheme: JSON.parse(localStorage.getItem("ic_dark") || "true"),
+  darkTheme: JSON.parse(localStorage.getItem("ic_dark") || "false"),
 
   async api(path, options = {}) {
     try {
@@ -33,6 +33,7 @@ const IC = {
       ["/pages/inbox.html", "信箱"],
       ["/pages/timeline.html", "时间轴"],
       ["/pages/safety-harbor.html", "避风港"],
+      ["/pages/settings.html", "设置"],
       ["/pages/admin.html", "管理"]
     ].map(([href, label]) => `<a href="${href}" data-route="${href}">${IC.esc(label)}</a>`).join("");
   },

@@ -40,6 +40,10 @@
       <strong id="letterCount">0</strong>
       <span id="letterBadge" class="badge badge-new" style="position:absolute;top:12px;right:12px;display:none">新</span>
     </article>
+    <article class="card metric" onclick="location.href='/pages/settings.html'" style="cursor:pointer">
+      <span>AI 状态</span>
+      <strong id="aiHealth">-</strong>
+    </article>
   </section>
 
   <div class="spacer"></div>
@@ -100,6 +104,7 @@ IC.mountShell("宇宙核心");
 IC.ensureDemoLogin().then(load);
 
 async function load() {
+  loadAiHealth();
   const r = await API.dashboardSummary();
   if (!r.success || !r.data) return;
   const d = r.data;
@@ -142,24 +147,52 @@ async function load() {
     `<div class="timeline-item"><strong>${IC.esc(c.pseudonym)}</strong><p>${IC.esc(c.intro || "")}</p></div>`
   ).join("") || IC.empty("星海广场安静中。");
 
-  /* Weekly chart (simplified CSS bars) */
-  const days = ["一", "二", "三", "四", "五", "六", "日"];
-  const barData = days.map((_, i) => 20 + ((i * 2654435761 + 13) % 61));
-  document.getElementById("weeklyChart").innerHTML = barData.map(h =>
-    `<div class="chart-bar" style="height:${h}%"></div>`
-  ).join("");
-  document.getElementById("weekLabels").textContent = days.map(d => "周" + d).join("  ");
+  /* Weekly chart — try real weekly review data first */
+  try {
+    const wr = await API.weeklyReviewLatest();
+    if (wr.success && wr.data) {
+      const review = wr.data;
+      document.getElementById("auroraInsight").textContent =
+        review.auroraObservation || review.themeSummary || "Aurora 正在观察你的内在宇宙...";
+      if (review.dominantTheme) {
+        const themes = [review.dominantTheme];
+        const barData = themes.map(() => 60 + Math.round(Math.random() * 30));
+        document.getElementById("weeklyChart").innerHTML = barData.map(h =>
+          `<div class="chart-bar" style="height:${h}%"></div>`
+        ).join("");
+        document.getElementById("weekLabels").textContent = themes.map(t => t.substring(0, 4)).join("  ");
+      }
+    } else {
+      fallbackWeeklyChart();
+    }
+  } catch(e) {
+    fallbackWeeklyChart();
+  }
 
-  /* Aurora insight */
-  const insights = [
-    "你最近在关注自己的边界感，这是一个很好的自我觉察。",
-    "本周你的情绪天气比上周平稳了一些，可以给自己一个肯定。",
-    "你开始注意到「还没准备好」也是一种真实的回答。",
-    "你的行动拆解能力在提升，焦虑正在被一步一步地处理。"
-  ];
-  document.getElementById("auroraInsight").textContent = insights[Math.floor(Math.random() * insights.length)];
+  function fallbackWeeklyChart() {
+    const days = ["一", "二", "三", "四", "五", "六", "日"];
+    const barData = days.map((_, i) => 20 + ((i * 2654435761 + 13) % 61));
+    document.getElementById("weeklyChart").innerHTML = barData.map(h =>
+      `<div class="chart-bar" style="height:${h}%"></div>`
+    ).join("");
+    document.getElementById("weekLabels").textContent = days.map(d => "周" + d).join("  ");
+    const insights = [
+      "你最近在关注自己的边界感，这是一个很好的自我觉察。",
+      "本周你的情绪天气比上周平稳了一些，可以给自己一个肯定。",
+      "你开始注意到「还没准备好」也是一种真实的回答。",
+      "你的行动拆解能力在提升，焦虑正在被一步一步地处理。"
+    ];
+    document.getElementById("auroraInsight").textContent = insights[Math.floor(Math.random() * insights.length)];
+  }
 
   IC.stagger(document);
+}
+
+async function loadAiHealth() {
+  const r = await API.aiHealth();
+  if (!r.success || !r.data) return;
+  const h = r.data;
+  document.getElementById("aiHealth").textContent = h.apiKeyConfigured ? "真实模型" : (h.fallbackAllowed ? "开发 fallback" : "未配置");
 }
 </script>
 </body>

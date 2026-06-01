@@ -114,6 +114,147 @@ class ApplicationFlowTest {
                 .andExpect(jsonPath("$.data.isPublic").value(true));
     }
 
+    @Test
+    void auroraRichReplyThoughtShredderAndSafetyInspectionWork() throws Exception {
+        MockHttpSession session = login();
+
+        MvcResult createResult = mockMvc.perform(withSession(post("/api/dialog/session/create")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"rich\",\"sessionType\":\"AURORA_CHAT\"}"), session))
+                .andExpect(status().isOk())
+                .andReturn();
+        String sessionId = readId(createResult);
+
+        mockMvc.perform(withSession(post("/api/aurora/message-rich")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sessionId\":" + sessionId + ",\"message\":\"今天项目任务拖延了，压力很大\",\"inputType\":\"VOICE\",\"audioDurationSec\":36,\"speechRate\":2.4,\"pauseCount\":3,\"longPauseCount\":1,\"mode\":\"ACTION_SPLIT\",\"timezone\":\"Asia/Shanghai\"}"), session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.messages.length()", greaterThanOrEqualTo(1)))
+                .andExpect(jsonPath("$.data.detectedTheme").value("任务压力"))
+                .andExpect(jsonPath("$.data.memoryReferenced").exists())
+                .andExpect(jsonPath("$.data.memoryContext.memoryPolicy").exists())
+                .andExpect(jsonPath("$.data.memoryContext.shortTermMessages.length()", greaterThanOrEqualTo(1)))
+                .andExpect(jsonPath("$.data.suggestSettle").exists());
+
+        mockMvc.perform(withSession(get("/api/aurora/memory-context")
+                        .param("sessionId", sessionId)
+                        .param("q", "project deadline pressure"), session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.memoryPolicy").exists())
+                .andExpect(jsonPath("$.data.shortTermMessages.length()", greaterThanOrEqualTo(1)));
+
+        mockMvc.perform(withSession(post("/api/thought-shredder/process")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\":\"我真的很烦，作业一直拖延，感觉自己又没做好，明天必须交。\",\"originalHandlingMode\":\"KEEP_ONLY_RESULT\"}"), session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.coreFeeling").exists())
+                .andExpect(jsonPath("$.data.hiddenNeed").exists())
+                .andExpect(jsonPath("$.data.noiseToDrop.length()", greaterThanOrEqualTo(1)))
+                .andExpect(jsonPath("$.data.fragments.length()", greaterThanOrEqualTo(4)))
+                .andExpect(jsonPath("$.data.suggestedTodo.taskName").exists())
+                .andExpect(jsonPath("$.data.memoryCard.id").exists());
+
+        mockMvc.perform(withSession(post("/api/safety/inspect")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\":\"我要威胁并骚扰别人\"}"), session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.riskLevel").value("MEDIUM"))
+                .andExpect(jsonPath("$.data.blockModelCall").value(false));
+
+        mockMvc.perform(withSession(post("/api/safety/inspect")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\":\"我不想活了\"}"), session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.riskLevel").value("HIGH"))
+                .andExpect(jsonPath("$.data.blockModelCall").value(true));
+    }
+
+    @Test
+    void memoryThemeAggregationWorks() throws Exception {
+        MockHttpSession session = login();
+        String[] messages = {
+            "今天作业又没写完，压力很大",
+            "项目任务拖延了，好烦",
+            "考试快到了，一直没复习"
+        };
+        for (String msg : messages) {
+            MvcResult createResult = mockMvc.perform(withSession(post("/api/dialog/session/create")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"title\":\"theme-test\",\"sessionType\":\"AURORA_CHAT\"}"), session))
+                    .andExpect(status().isOk())
+                    .andReturn();
+            String sid = readId(createResult);
+            mockMvc.perform(withSession(post("/api/aurora/message")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"sessionId\":" + sid + ",\"message\":\"" + msg + "\",\"inputType\":\"TEXT\"}"), session))
+                    .andExpect(status().isOk());
+            mockMvc.perform(withSession(post("/api/dialog/session/" + sid + "/finish"), session))
+                    .andExpect(status().isOk());
+        }
+        Thread.sleep(800);
+        mockMvc.perform(withSession(get("/api/memory/themes"), session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isArray());
+    }
+
+    @Test
+    void starfieldDetailFlowWorks() throws Exception {
+        MockHttpSession session = login();
+        MvcResult createResult = mockMvc.perform(withSession(post("/api/dialog/session/create")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"detail-test\",\"sessionType\":\"AURORA_CHAT\"}"), session))
+                .andExpect(status().isOk())
+                .andReturn();
+        String sessionId = readId(createResult);
+        mockMvc.perform(withSession(post("/api/aurora/message")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sessionId\":" + sessionId + ",\"message\":\"今天有点累\",\"inputType\":\"TEXT\"}"), session))
+                .andExpect(status().isOk());
+        mockMvc.perform(withSession(post("/api/dialog/session/" + sessionId + "/finish"), session))
+                .andExpect(status().isOk());
+        Thread.sleep(500);
+        MvcResult starResult = mockMvc.perform(withSession(get("/api/memory/starfield"), session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()", greaterThanOrEqualTo(1)))
+                .andReturn();
+        JsonNode starData = objectMapper.readTree(starResult.getResponse().getContentAsString()).path("data");
+        String cardId = starData.get(0).path("detail").path("id").asText();
+        if ("0".equals(cardId) || cardId.isEmpty()) {
+            cardId = starData.get(0).path("id").asText();
+        }
+        mockMvc.perform(withSession(get("/api/memory/starfield/" + cardId + "/detail"), session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.card").exists());
+    }
+
+    @Test
+    void remoteLlmFallbackWorks() throws Exception {
+        MockHttpSession session = login();
+        MvcResult createResult = mockMvc.perform(withSession(post("/api/dialog/session/create")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"fallback-test\",\"sessionType\":\"AURORA_CHAT\"}"), session))
+                .andExpect(status().isOk())
+                .andReturn();
+        String sessionId = readId(createResult);
+        mockMvc.perform(withSession(post("/api/aurora/message")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sessionId\":" + sessionId + ",\"message\":\"测试 fallback\",\"inputType\":\"TEXT\"}"), session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isNotEmpty());
+        mockMvc.perform(withSession(get("/api/ai-logs"), session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()", greaterThanOrEqualTo(1)))
+                .andExpect(jsonPath("$.data[0].provider").exists())
+                .andExpect(jsonPath("$.data[0].modelName").exists())
+                .andExpect(jsonPath("$.data[0].fallbackUsed").exists());
+
+        mockMvc.perform(withSession(get("/api/ai/health"), session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.provider").value("minimax"))
+                .andExpect(jsonPath("$.data.apiKeyConfigured").value(false))
+                .andExpect(jsonPath("$.data.fallbackAllowed").value(true));
+    }
+
     private MockHttpSession login() throws Exception {
         MvcResult result = mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)

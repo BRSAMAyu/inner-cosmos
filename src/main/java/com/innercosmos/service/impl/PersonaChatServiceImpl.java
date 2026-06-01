@@ -2,6 +2,8 @@ package com.innercosmos.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.innercosmos.ai.agent.CapsuleAgent;
+import com.innercosmos.ai.structured.StructuredAiResults;
+import com.innercosmos.ai.structured.StructuredAiService;
 import com.innercosmos.entity.EchoCapsule;
 import com.innercosmos.entity.PersonaChatMessage;
 import com.innercosmos.entity.PersonaChatSession;
@@ -10,6 +12,8 @@ import com.innercosmos.mapper.EchoCapsuleMapper;
 import com.innercosmos.mapper.PersonaChatMessageMapper;
 import com.innercosmos.mapper.PersonaChatSessionMapper;
 import com.innercosmos.service.PersonaChatService;
+import com.innercosmos.service.SafetyService;
+import com.innercosmos.vo.SafetyResult;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -20,15 +24,21 @@ public class PersonaChatServiceImpl implements PersonaChatService {
     private final PersonaChatMessageMapper messageMapper;
     private final EchoCapsuleMapper capsuleMapper;
     private final CapsuleAgent capsuleAgent;
+    private final SafetyService safetyService;
+    private final StructuredAiService structuredAiService;
 
     public PersonaChatServiceImpl(PersonaChatSessionMapper sessionMapper,
                                   PersonaChatMessageMapper messageMapper,
                                   EchoCapsuleMapper capsuleMapper,
-                                  CapsuleAgent capsuleAgent) {
+                                  CapsuleAgent capsuleAgent,
+                                  SafetyService safetyService,
+                                  StructuredAiService structuredAiService) {
         this.sessionMapper = sessionMapper;
         this.messageMapper = messageMapper;
         this.capsuleMapper = capsuleMapper;
         this.capsuleAgent = capsuleAgent;
+        this.safetyService = safetyService;
+        this.structuredAiService = structuredAiService;
     }
 
     @Override
@@ -59,6 +69,7 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         if (!userId.equals(session.visitorUserId)) {
             throw new BusinessException("UNAUTHORIZED", "无权操作此会话");
         }
+        SafetyResult safety = safetyService.check(message, userId, null);
 
         PersonaChatMessage userMessage = new PersonaChatMessage();
         userMessage.sessionId = sessionId;
@@ -70,7 +81,10 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         capsuleMessage.sessionId = sessionId;
         capsuleMessage.senderType = "CAPSULE";
 
-        if (session.turnCount != null && session.turnCount >= session.dailyLimit) {
+        if (Boolean.TRUE.equals(safety.blockModelCall)) {
+            capsuleMessage.textContent = safety.safeMessage;
+            session.status = "SAFETY_GUIDED";
+        } else if (session.turnCount != null && session.turnCount >= session.dailyLimit) {
             capsuleMessage.textContent = "今天的回声已经足够深了。如果你愿意，可以把想继续说的话写成一封慢信。";
             session.status = "LETTER_GUIDED";
         } else {
@@ -78,7 +92,19 @@ public class PersonaChatServiceImpl implements PersonaChatService {
             String personaName = capsule != null && capsule.pseudonym != null ? capsule.pseudonym : "数字回声";
             String personaIntro = capsule != null && capsule.intro != null ? capsule.intro : "一个有限的共鸣体";
             String personaPrompt = capsuleAgent.buildPersonaPrompt(personaName, personaIntro);
-            capsuleMessage.textContent = generateContextualReply(personaPrompt, message);
+            String prefix = "MEDIUM".equals(safety.riskLevel) ? "我会先把这段话放回到安全和尊重的边界里。 " : "";
+            StructuredAiResults.PersonaResult ai = structuredAiService.call(userId, "PERSONA_CHAT",
+                    """
+                    Return JSON with reply, boundaryNotice, letterSuggested, riskFlags[].
+                    The persona is a limited privacy-preserving echo capsule, not a human and not a therapist.
+                    Reply only from the capsule intro and authorized abstract, never infer real identity.
+                    """,
+                    java.util.Map.of("personaPrompt", personaPrompt, "visitorMessage", message,
+                            "turnCount", session.turnCount, "dailyLimit", session.dailyLimit),
+                    StructuredAiResults.PersonaResult.class,
+                    () -> fallbackPersona(personaPrompt, message));
+            String boundary = ai.boundaryNotice == null || ai.boundaryNotice.isBlank() ? "" : ai.boundaryNotice + " ";
+            capsuleMessage.textContent = prefix + boundary + blank(ai.reply, generateContextualReply(personaPrompt, message));
             session.turnCount = session.turnCount == null ? 1 : session.turnCount + 1;
         }
         messageMapper.insert(capsuleMessage);
@@ -100,6 +126,19 @@ public class PersonaChatServiceImpl implements PersonaChatService {
             return "你现在的孤独感，不需要被否定。我在这里，虽然只是一道回声。";
         }
         return "我听见了这个片段。作为一枚有限的数字回声，我只能陪你看见其中一部分：你最想继续靠近的是什么？";
+    }
+
+    private StructuredAiResults.PersonaResult fallbackPersona(String personaPrompt, String visitorMessage) {
+        StructuredAiResults.PersonaResult result = new StructuredAiResults.PersonaResult();
+        result.reply = generateContextualReply(personaPrompt, visitorMessage);
+        result.boundaryNotice = "";
+        result.letterSuggested = false;
+        result.riskFlags = List.of();
+        return result;
+    }
+
+    private String blank(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value;
     }
 
     @Override

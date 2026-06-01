@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="/css/app.css">
+  <title>设置 · Inner Cosmos</title>
+  <style>
+    .settings-section {
+      background: var(--surface-paper);
+      border-radius: var(--radius-flow);
+      padding: 28px 32px;
+      margin-bottom: 20px;
+      box-shadow: var(--glow-soft);
+    }
+    .settings-section h2 {
+      font-size: 1.1rem;
+      margin: 0 0 18px;
+      color: var(--ink);
+      letter-spacing: .02em;
+    }
+    .field {
+      margin-bottom: 18px;
+    }
+    .field:last-child {
+      margin-bottom: 0;
+    }
+    .field label {
+      display: block;
+      font-size: .82rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .field input[type="text"],
+    .field input[type="time"],
+    .field select,
+    .field textarea {
+      width: 100%;
+      padding: 10px 14px;
+      font-size: .92rem;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface-warm);
+      color: var(--text);
+      transition: border-color .2s;
+    }
+    .field textarea {
+      min-height: 72px;
+      resize: vertical;
+    }
+    .field input:focus,
+    .field select:focus,
+    .field textarea:focus {
+      outline: none;
+      border-color: var(--accent-sage);
+      box-shadow: 0 0 0 3px rgba(143, 163, 148, .15);
+    }
+    .field-row {
+      display: flex;
+      gap: 16px;
+    }
+    .field-row .field {
+      flex: 1;
+    }
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0;
+    }
+    .toggle-row label {
+      font-size: .92rem;
+      color: var(--text);
+      margin: 0;
+    }
+    .toggle-row .hint {
+      font-size: .78rem;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .toggle-switch {
+      position: relative;
+      width: 48px;
+      height: 26px;
+      flex-shrink: 0;
+    }
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background: var(--line);
+      border-radius: 26px;
+      transition: background .2s;
+    }
+    .toggle-slider::before {
+      content: "";
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      left: 3px;
+      bottom: 3px;
+      background: var(--surface-paper);
+      border-radius: 50%;
+      transition: transform .2s;
+    }
+    .toggle-switch input:checked + .toggle-slider {
+      background: var(--accent-sage);
+    }
+    .toggle-switch input:checked + .toggle-slider::before {
+      transform: translateX(22px);
+    }
+    .slider-field {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .slider-field input[type="range"] {
+      flex: 1;
+      -webkit-appearance: none;
+      appearance: none;
+      height: 6px;
+      background: var(--line);
+      border-radius: 3px;
+      outline: none;
+    }
+    .slider-field input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--accent-sage);
+      cursor: pointer;
+    }
+    .slider-field input[type="range"]::-moz-range-thumb {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--accent-sage);
+      cursor: pointer;
+      border: none;
+    }
+    .slider-value {
+      font-size: .88rem;
+      color: var(--muted);
+      min-width: 24px;
+      text-align: center;
+    }
+    .danger-zone {
+      border: 1px solid rgba(200, 147, 145, .3);
+    }
+    .soft-panel {
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface-warm);
+      min-width: 0;
+    }
+    .soft-panel strong {
+      display: inline-block;
+      max-width: 100%;
+      overflow-wrap: anywhere;
+      margin-top: 4px;
+    }
+    .danger-zone h2 {
+      color: var(--accent-coral);
+    }
+    .btn-row {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+    }
+    .btn-save {
+      padding: 12px 32px;
+      font-size: .95rem;
+      font-weight: 600;
+      color: #fff;
+      background: var(--accent-sage);
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: opacity .2s, transform .1s;
+    }
+    .btn-save:hover { opacity: .9; }
+    .btn-save:active { transform: scale(.98); }
+    .btn-save:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-outline {
+      padding: 10px 20px;
+      font-size: .88rem;
+      color: var(--muted);
+      background: transparent;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: border-color .2s, color .2s;
+    }
+    .btn-outline:hover { border-color: var(--accent-dusty-blue); color: var(--accent-dusty-blue); }
+    .btn-danger {
+      padding: 10px 20px;
+      font-size: .88rem;
+      color: var(--accent-coral);
+      background: transparent;
+      border: 1px solid rgba(200, 147, 145, .4);
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: background .2s;
+    }
+    .btn-danger:hover { background: rgba(200, 147, 145, .08); }
+    .loader {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .modal-confirm-text {
+      font-size: .95rem;
+      color: var(--text);
+      line-height: 1.6;
+      margin-bottom: 20px;
+    }
+    .modal-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+    }
+    .modal-actions button {
+      padding: 10px 24px;
+      border-radius: var(--radius);
+      font-size: .88rem;
+      cursor: pointer;
+      border: none;
+      transition: opacity .2s;
+    }
+    .modal-actions button:hover { opacity: .85; }
+    .modal-btn-cancel {
+      background: var(--surface-mist);
+      color: var(--text);
+    }
+    .modal-btn-danger {
+      background: var(--accent-coral);
+      color: #fff;
+    }
+    @media (max-width: 600px) {
+      .settings-section { padding: 20px 18px; }
+      .field-row { flex-direction: column; gap: 0; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .loader { animation: none; }
+    }
+  </style>
+</head>
+<body>
+<main class="shell">
+  <div class="topbar" data-topbar></div>
+
+  <span class="route-hint">关于你</span>
+  <h1>设置</h1>
+  <p class="muted mb-2">调整你的内宇宙，让它更适合你。</p>
+
+  <section class="settings-section">
+    <h2>真实 AI 状态</h2>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">
+      <div class="soft-panel"><span class="muted">Provider</span><br><strong id="aiProvider">-</strong></div>
+      <div class="soft-panel"><span class="muted">Model</span><br><strong id="aiModel">-</strong></div>
+      <div class="soft-panel"><span class="muted">模式</span><br><strong id="aiMode">-</strong></div>
+      <div class="soft-panel"><span class="muted">最近调用</span><br><strong id="aiLast">-</strong></div>
+    </div>
+    <p id="aiHealthHint" class="muted" style="font-size:.82rem;margin:12px 0 0"></p>
+  </section>
+
+  <!-- Aurora preferences -->
+  <section class="settings-section">
+    <h2>Aurora 偏好</h2>
+
+    <div class="field">
+      <label for="auroraName">给 Aurora 起个名字</label>
+      <input id="auroraName" type="text" placeholder="比如：小星、守护者...">
+    </div>
+
+    <div class="field">
+      <label for="auroraTone">对话风格</label>
+      <select id="auroraTone">
+        <option value="">默认</option>
+        <option value="温柔安静">温柔安静</option>
+        <option value="理性清晰">理性清晰</option>
+        <option value="朋友式直接">朋友式直接</option>
+        <option value="哲学式追问">哲学式追问</option>
+        <option value="行动导向">行动导向</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>反思深度</label>
+      <div class="slider-field">
+        <input id="reflectionDepth" type="range" min="1" max="5" value="3" oninput="document.getElementById('depthLabel').textContent=this.value">
+        <span id="depthLabel" class="slider-value">3</span>
+      </div>
+    </div>
+
+    <div class="toggle-row">
+      <div>
+        <label>允许记忆回溯</label>
+        <p class="hint">Aurora 可以在对话中引用你之前的记忆</p>
+      </div>
+      <div class="toggle-switch">
+        <input id="allowMemoryRecall" type="checkbox" checked>
+        <span class="toggle-slider"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Social reachability -->
+  <section class="settings-section">
+    <h2>社交可达性</h2>
+
+    <div class="field">
+      <label for="socialReachabilityStatus">谁可以找到你</label>
+      <select id="socialReachabilityStatus">
+        <option value="PUBLIC">公开 - 其他人可以通过慢信找到你</option>
+        <option value="PRIVATE">私密 - 只有你知道自己的存在</option>
+      </select>
+    </div>
+  </section>
+
+  <!-- Quiet hours -->
+  <section class="settings-section">
+    <h2>安静时段</h2>
+    <p class="muted" style="font-size:.82rem;margin-bottom:14px">在这段时间内，Aurora 不会主动推送提醒。</p>
+
+    <div class="field-row">
+      <div class="field">
+        <label for="quietHoursStart">开始时间</label>
+        <input id="quietHoursStart" type="time" value="22:00">
+      </div>
+      <div class="field">
+        <label for="quietHoursEnd">结束时间</label>
+        <input id="quietHoursEnd" type="time" value="07:00">
+      </div>
+    </div>
+  </section>
+
+  <!-- Data management -->
+  <section class="settings-section danger-zone">
+    <h2>数据管理</h2>
+
+    <div class="toggle-row" style="margin-bottom:12px">
+      <div>
+        <label>导出你的数据</label>
+        <p class="hint">下载你在内宇宙中的所有数据</p>
+      </div>
+      <button class="btn-outline" onclick="exportData()">导出数据</button>
+    </div>
+
+    <div class="toggle-row">
+      <div>
+        <label>删除账户</label>
+        <p class="hint">永久删除你的账户和所有数据，此操作不可撤销</p>
+      </div>
+      <button class="btn-danger" onclick="confirmDelete()">删除账户</button>
+    </div>
+  </section>
+
+  <!-- Save button -->
+  <div class="btn-row">
+    <button id="saveBtn" class="btn-save" onclick="saveProfile()">保存设置</button>
+  </div>
+</main>
+
+<script src="/js/app.js"></script>
+<script src="/js/api.js"></script>
+<script>
+IC.mountShell("设置");
+IC.ensureDemoLogin().then(() => {
+  loadAiHealth();
+  loadProfile();
+});
+
+async function loadAiHealth() {
+  const r = await API.aiHealth();
+  if (!r.success || !r.data) return;
+  const h = r.data;
+  document.getElementById("aiProvider").textContent = h.provider || "-";
+  document.getElementById("aiModel").textContent = h.model || "-";
+  document.getElementById("aiMode").textContent = h.mode || "-";
+  document.getElementById("aiLast").textContent = h.lastSuccess === undefined || h.lastSuccess === null
+    ? "尚无调用"
+    : (h.lastSuccess ? (h.lastFallbackUsed ? "fallback" : "成功") : "失败");
+  const keyText = h.apiKeyConfigured ? "已配置真实模型密钥" : "未配置真实模型密钥";
+  const fallbackText = h.fallbackAllowed ? "当前允许开发/演示 fallback" : "当前不允许 fallback";
+  document.getElementById("aiHealthHint").textContent = `${keyText}，${fallbackText}。生产模式下缺少密钥或远程失败会直接暴露错误。`;
+}
+
+async function loadProfile() {
+  const r = await IC.api("/api/user/profile");
+  if (!r.success || !r.data) return;
+  const p = r.data;
+
+  if (p.auroraName) document.getElementById("auroraName").value = p.auroraName;
+  if (p.auroraTone) document.getElementById("auroraTone").value = p.auroraTone;
+  if (p.reflectionDepth) {
+    document.getElementById("reflectionDepth").value = p.reflectionDepth;
+    document.getElementById("depthLabel").textContent = p.reflectionDepth;
+  }
+  if (p.allowMemoryRecall !== null && p.allowMemoryRecall !== undefined) {
+    document.getElementById("allowMemoryRecall").checked = p.allowMemoryRecall;
+  }
+  if (p.socialReachabilityStatus) document.getElementById("socialReachabilityStatus").value = p.socialReachabilityStatus;
+  if (p.quietHoursStart) document.getElementById("quietHoursStart").value = p.quietHoursStart;
+  if (p.quietHoursEnd) document.getElementById("quietHoursEnd").value = p.quietHoursEnd;
+
+  IC.stagger(document);
+}
+
+async function saveProfile() {
+  const btn = document.getElementById("saveBtn");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loader"></span>保存中...';
+
+  const profile = {
+    auroraName: document.getElementById("auroraName").value.trim() || null,
+    auroraTone: document.getElementById("auroraTone").value || null,
+    reflectionDepth: parseInt(document.getElementById("reflectionDepth").value),
+    allowMemoryRecall: document.getElementById("allowMemoryRecall").checked,
+    socialReachabilityStatus: document.getElementById("socialReachabilityStatus").value,
+    quietHoursStart: document.getElementById("quietHoursStart").value || null,
+    quietHoursEnd: document.getElementById("quietHoursEnd").value || null
+  };
+
+  const r = await IC.api("/api/user/profile", {
+    method: "PUT",
+    body: JSON.stringify(profile)
+  });
+
+  btn.disabled = false;
+  btn.textContent = "保存设置";
+
+  if (r.success) {
+    IC.toast("设置已保存");
+    IC.pulse("soft");
+  }
+}
+
+async function exportData() {
+  const r = await IC.api("/api/user/export");
+  if (!r.success) return;
+
+  const blob = new Blob([JSON.stringify(r.data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "inner-cosmos-export-" + new Date().toISOString().slice(0, 10) + ".json";
+  a.click();
+  URL.revokeObjectURL(url);
+  IC.toast("数据已导出");
+  IC.pulse("soft");
+}
+
+function confirmDelete() {
+  IC.showModal(`
+    <h2 style="margin:0 0 12px;color:var(--accent-coral)">确认删除账户</h2>
+    <p class="modal-confirm-text">
+      这将永久删除你的账户和所有数据，包括记忆星体、每日记录、待办事项、慢信和共鸣体。<br>
+      <strong>此操作不可撤销。</strong>
+    </p>
+    <div class="modal-actions">
+      <button class="modal-btn-cancel" onclick="IC.closeModal()">取消</button>
+      <button class="modal-btn-danger" onclick="doDelete()">确认删除</button>
+    </div>
+  `);
+}
+
+async function doDelete() {
+  const r = await IC.api("/api/user/account", { method: "DELETE" });
+  IC.closeModal();
+  if (r.success) {
+    IC.toast("账户已删除");
+    setTimeout(() => { location.href = "/pages/login.html"; }, 1200);
+  }
+}
+</script>
+</body>
+</html>

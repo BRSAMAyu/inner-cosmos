@@ -165,6 +165,9 @@ async function showDetail(id) {
       <span class="pill">新鲜度 ${Math.round((s.freshness || 0) * 100)}%</span>
       <span class="pill">${s.suggestedForCapsule ? "适合脱敏预览" : "建议先私人保存"}</span>
     </div>
+    <div class="soft-stage mb-2">
+      <p class="muted">${esc(s.gravityExplanation || "这颗星由情绪强度、重要性、和出现次数共同决定。")}</p>
+    </div>
     <div class="field-group mb-2">
       <label>调整重要性</label>
       <input type="range" min="0" max="1" step="0.1" value="${s.gravity || 0.5}" onchange="adjustImportance(${s.id}, this.value)" style="background:transparent;border:none;padding:0">

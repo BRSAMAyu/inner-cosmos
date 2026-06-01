@@ -1,5 +1,126 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/css/inner-cosmos.css"></head>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
 <body>
-<main class="shell"><div class="topbar" data-topbar></div><h1>AI 共创记录</h1><section class="grid"><article class="card"><strong>选题</strong><p>从普通 AI 聊天站提升为 AI 自我共鸣与慢社交平台。</p></article><article class="card"><strong>工程决策</strong><p>Mock-first、MVC、MyBatis-Plus、H2 演示与 MySQL 生产配置并存。</p></article><article class="card"><strong>设计模式</strong><p>Adapter、Observer、State、Builder、Strategy 明确落入代码。</p></article><article class="card"><strong>安全边界</strong><p>AI 是镜子，不是医生；共鸣体是授权回声，不是真人替代。</p></article></section></main><script src="/js/app.js"></script><script>IC.mountShell("AI 共创记录")</script></body></html>
+<main class="shell">
+  <div class="topbar" data-topbar></div>
+
+  <div class="text-center mb-2" style="padding:16px 0">
+    <span class="route-hint">人机协作过程</span>
+    <h1>AI 共创记录</h1>
+    <p class="muted">这个项目的每一步，都是人类构思与 AI 执行共同完成的结果。</p>
+  </div>
+
+  <!-- Project overview -->
+  <section class="panel mb-2">
+    <h2>项目概述</h2>
+    <div class="soft-stage mb-1">
+      <p><strong>Inner Cosmos 内宇宙</strong> — 一个 AI 自我共鸣与慢社交平台。帮助年轻人通过温和的自我整理，把混乱的内心体验沉淀成清晰的记忆星图。</p>
+    </div>
+    <div class="pill-row mt-1">
+      <span class="pill">Spring Boot 3.3.6</span>
+      <span class="pill">Java 17</span>
+      <span class="pill">MyBatis-Plus 3.5.9</span>
+      <span class="pill">H2 / MySQL</span>
+      <span class="pill">Vanilla JS</span>
+      <span class="pill">Morandi Design</span>
+    </div>
+  </section>
+
+  <!-- Design patterns -->
+  <section class="mb-2">
+    <h2 class="mb-1">6 种设计模式的落地</h2>
+    <div class="grid">
+      <article class="card">
+        <strong>Adapter 适配器</strong>
+        <p class="muted">LlmClient 接口统一 MiniMax、DeepSeek、GLM 三家模型，上层只看一个接口。</p>
+        <span class="route-hint">ai/client/</span>
+      </article>
+      <article class="card">
+        <strong>Observer 观察者</strong>
+        <p class="muted">DialogFinishedEvent 发布后，MemoryExtractService 和 ThoughtShredder 各自独立响应。</p>
+        <span class="route-hint">event/</span>
+      </article>
+      <article class="card">
+        <strong>State 状态机</strong>
+        <p class="muted">SlowLetter 的 10 种状态（DRAFT→SENT→FLYING→DELIVERED→READ→...），用 LetterState 接口严格约束转移。</p>
+        <span class="route-hint">letterstate/</span>
+      </article>
+      <article class="card">
+        <strong>Builder 建造者</strong>
+        <p class="muted">PromptBuilder 链式构建 Aurora 的 system prompt，把系统边界、用户画像、记忆上下文分层叠加。</p>
+        <span class="route-hint">ai/prompt/PromptBuilder.java</span>
+      </article>
+      <article class="card">
+        <strong>Strategy 策略</strong>
+        <p class="muted">AgentReplyStrategy 根据对话模式（日常聊天、认知梳理、行动拆解等）选择不同的回复策略。</p>
+        <span class="route-hint">ai/agent/</span>
+      </article>
+      <article class="card">
+        <strong>Chain 责任链</strong>
+        <p class="muted">SafetyRule 链式检查用户输入，三级响应：LOW/MEDIUM/HIGH，高危输入直接阻断模型调用。</p>
+        <span class="route-hint">safety/</span>
+      </article>
+    </div>
+  </section>
+
+  <!-- Engineering decisions timeline -->
+  <section class="panel mb-2">
+    <h2>关键工程决策</h2>
+    <div class="timeline">
+      <div class="timeline-item">
+        <strong>Mock-first AI 架构</strong>
+        <p class="muted">课程环境无稳定 API Key，所有 AI 调用默认走 Mock 模板，配置真实 Key 后自动切换真实模型。Mock 内容经过精心撰写，不是占位符。</p>
+      </div>
+      <div class="timeline-item">
+        <strong>MVC 严格分层</strong>
+        <p class="muted">Controller 只做参数校验和路由，Service 包含全部业务逻辑，Mapper 继承 MyBatis-Plus BaseMapper。VO/DTO 隔离内外数据结构。</p>
+      </div>
+      <div class="timeline-item">
+        <strong>安全边界设计</strong>
+        <p class="muted">AI 是镜子不是医生。SafetyBoundaryFilter 在模型调用前拦截；共鸣体是授权回声不是真人替代；慢信延迟机制防止即时情绪冲动。</p>
+      </div>
+      <div class="timeline-item">
+        <strong>情感重力算法</strong>
+        <p class="muted">MemoryCard 的 emotionalGravity = intensity * recurrence^0.7 * importance * (1 + triggers*0.1)，综合情绪强度、重复次数、用户评分、触发次数。不是简单计数。</p>
+      </div>
+      <div class="timeline-item">
+        <strong>H2 演示 + MySQL 生产</strong>
+        <p class="muted">默认 H2 内存数据库零配置启动，application.yml 中提供 MySQL 配置模板，切换只需改 spring.datasource.url。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Design philosophy -->
+  <section class="grid mb-2">
+    <article class="panel">
+      <h2>设计理念</h2>
+      <div class="soft-stage">
+        <p class="muted">不是要让用户「变好」，而是提供一个安全的空间，让混乱的感受可以先被看见、被命名、被整理。</p>
+        <p class="muted mt-1">暖雾 Morandi 色系、缓慢的信件传递、非即时回复 — 每一个设计选择都在降低情绪压力。</p>
+      </div>
+    </article>
+    <article class="panel">
+      <h2>技术亮点</h2>
+      <div class="timeline">
+        <div class="timeline-item"><strong>31 张数据库表</strong><p class="muted">完整的用户、记忆、情绪、信件、共鸣体、安全事件全表设计。</p></div>
+        <div class="timeline-item"><strong>22 个页面</strong><p class="muted">从首页到管理后台，统一 Morandi 设计语言，无框架依赖。</p></div>
+        <div class="timeline-item"><strong>7 个集成测试</strong><p class="muted">覆盖注册登录、对话、信件、共鸣体、安全检查、星图详情、LLM 回退全流程。</p></div>
+        <div class="timeline-item"><strong>200+ AI 回复模板</strong><p class="muted">6 种对话模式各有开场、承接、澄清模板，节律保护和现实引导独立模板。</p></div>
+      </div>
+    </article>
+  </section>
+
+  <div class="text-center mt-2">
+    <p class="muted" style="font-size:.82rem">Built with Spring Boot 3 + Java 17 + MyBatis-Plus 3.5 + Vanilla JS</p>
+  </div>
+</main>
+
+<script src="/js/app.js"></script>
+<script>IC.mountShell("AI 共创记录"); IC.stagger(document);</script>
+</body>
+</html>

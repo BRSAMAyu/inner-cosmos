@@ -119,7 +119,7 @@ function renderThemeEvolution() {
 
   const themeCounts = allThemes.slice(0, 7).map(t => ({
     name: t.themeName || t.name || "主题",
-    count: t.memoryCount || t.count || Math.round(Math.random() * 8 + 1)
+    count: t.memoryCount || t.cardCount || 1
   }));
 
   const max = Math.max(...themeCounts.map(t => t.count));

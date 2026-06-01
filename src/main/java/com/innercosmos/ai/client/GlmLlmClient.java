@@ -12,12 +12,12 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
 
 public class GlmLlmClient implements LlmClient {
-
     private static final Logger log = LoggerFactory.getLogger(GlmLlmClient.class);
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -31,11 +31,12 @@ public class GlmLlmClient implements LlmClient {
     private final HttpClient httpClient;
 
     public GlmLlmClient(String apiKey, String baseUrl, String model, int timeoutMs,
-                         AiLogService aiLogService, Executor aiExecutor) {
+                        AiLogService aiLogService, Executor aiExecutor) {
         this.apiKey = apiKey;
-        this.baseUrl = baseUrl;
-        this.model = model;
-        this.timeoutMs = timeoutMs;
+        this.baseUrl = baseUrl == null || baseUrl.isBlank()
+                ? "https://open.bigmodel.cn/api/paas/v4/chat/completions" : baseUrl;
+        this.model = model == null || model.isBlank() ? "glm-4-flash" : model;
+        this.timeoutMs = timeoutMs <= 0 ? 20000 : timeoutMs;
         this.aiLogService = aiLogService;
         this.aiExecutor = aiExecutor;
         this.fallback = new MockLlmClient(aiExecutor);
@@ -44,43 +45,43 @@ public class GlmLlmClient implements LlmClient {
 
     @Override
     public String chat(LlmRequest request) {
-        if (apiKey == null || apiKey.isBlank()) {
-            log.warn("GLM API key is empty, falling back to mock");
-            return fallback.chat(request);
-        }
-
         long start = System.currentTimeMillis();
         String response = null;
         boolean success = false;
+        boolean fallbackUsed = false;
+        String errorMessage = null;
         try {
+            if (apiKey == null || apiKey.isBlank()) {
+                throw new IllegalStateException("GLM API key is empty");
+            }
             response = doChat(request);
             success = true;
             return response;
         } catch (Exception firstError) {
+            errorMessage = firstError.getMessage();
             log.warn("GLM chat failed on first attempt, retrying once: {}", firstError.getMessage());
             try {
                 response = doChat(request);
                 success = true;
                 return response;
             } catch (Exception retryError) {
+                errorMessage = retryError.getMessage();
                 log.error("GLM chat failed on retry, falling back to mock: {}", retryError.getMessage());
                 response = fallback.chat(request);
+                fallbackUsed = true;
                 success = true;
                 return response;
             }
         } finally {
-            long latency = System.currentTimeMillis() - start;
-            aiLogService.record(request.userId, request.moduleName, request.prompt, response, success, latency);
+            aiLogService.recordDetailed(request.userId, request.moduleName, fallbackUsed ? "MOCK" : "GLM",
+                    fallbackUsed ? "mock-inner-cosmos" : model, request.prompt, response, request.requestJson,
+                    response, success, fallbackUsed, fallbackUsed ? errorMessage : (success ? null : errorMessage),
+                    System.currentTimeMillis() - start);
         }
     }
 
     @Override
     public SseEmitter streamChat(LlmRequest request) {
-        if (apiKey == null || apiKey.isBlank()) {
-            log.warn("GLM API key is empty, falling back to mock");
-            return fallback.streamChat(request);
-        }
-
         SseEmitter emitter = new SseEmitter(60_000L);
         aiExecutor.execute(() -> {
             try {
@@ -92,51 +93,43 @@ public class GlmLlmClient implements LlmClient {
                 emitter.send(SseEmitter.event().name("done").data("{\"message\":\"done\"}"));
                 emitter.complete();
             } catch (Exception exception) {
-                log.error("GLM stream failed, falling back to mock stream: {}", exception.getMessage());
-                try {
-                    emitter.completeWithError(exception);
-                } catch (Exception ignored) {
-                }
+                emitter.completeWithError(exception);
             }
         });
         return emitter;
     }
 
     private String doChat(LlmRequest request) throws Exception {
-        Map<String, Object> systemMsg = Map.of("role", "system", "content", "你是 Aurora，一个朋友式自我整理助手。温和、克制、主动追问一个问题，避免贴标签。");
-        Map<String, Object> userMsg = Map.of("role", "user", "content", request.prompt);
+        List<Map<String, String>> messages = new ArrayList<>();
+        messages.add(Map.of("role", "system", "content", systemPrompt()));
+        messages.add(Map.of("role", "user", "content", request.prompt == null ? "" : request.prompt));
         Map<String, Object> body = Map.of(
                 "model", model,
-                "messages", List.of(systemMsg, userMsg),
-                "temperature", 0.7,
-                "max_tokens", 512
+                "messages", messages,
+                "temperature", 0.72,
+                "max_tokens", 900
         );
-
-        String jsonBody = objectMapper.writeValueAsString(body);
-
         HttpRequest httpRequest = HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl))
                 .header("Content-Type", "application/json")
                 .header("Authorization", "Bearer " + apiKey)
                 .timeout(Duration.ofMillis(timeoutMs))
-                .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
+                .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
                 .build();
-
         HttpResponse<String> httpResponse = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
-
-        if (httpResponse.statusCode() != 200) {
+        if (httpResponse.statusCode() < 200 || httpResponse.statusCode() >= 300) {
             throw new RuntimeException("GLM API returned status " + httpResponse.statusCode() + ": " + httpResponse.body());
         }
-
-        JsonNode root = objectMapper.readTree(httpResponse.body());
-        JsonNode choices = root.get("choices");
-        if (choices != null && choices.isArray() && !choices.isEmpty()) {
-            JsonNode message = choices.get(0).get("message");
-            if (message != null && message.has("content")) {
-                return message.get("content").asText();
-            }
+        JsonNode content = objectMapper.readTree(httpResponse.body()).path("choices").path(0).path("message").path("content");
+        if (content.isMissingNode() || content.asText().isBlank()) {
+            throw new RuntimeException("Unexpected GLM response format: " + httpResponse.body());
         }
-        throw new RuntimeException("Unexpected GLM response format: " + httpResponse.body());
+        return content.asText();
+    }
+
+    private String systemPrompt() {
+        return "You are Aurora in Inner Cosmos. Be warm, specific, safe, and reflective. "
+                + "Use the user's language. Ask at most one question. Never diagnose.";
     }
 
     private String escape(String token) {

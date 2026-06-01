@@ -5,23 +5,46 @@ import com.innercosmos.common.Constants;
 import com.innercosmos.common.ErrorCode;
 import com.innercosmos.dto.LoginRequest;
 import com.innercosmos.dto.RegisterRequest;
-import com.innercosmos.entity.User;
+import com.innercosmos.entity.*;
 import com.innercosmos.exception.BusinessException;
-import com.innercosmos.mapper.UserMapper;
+import com.innercosmos.mapper.*;
 import com.innercosmos.service.UserService;
+import com.innercosmos.vo.UserProfileVO;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @Service
 public class UserServiceImpl implements UserService {
     private final UserMapper userMapper;
+    private final UserProfileMapper userProfileMapper;
+    private final MemoryCardMapper memoryCardMapper;
+    private final DailyRecordMapper dailyRecordMapper;
+    private final TodoItemMapper todoItemMapper;
+    private final SlowLetterMapper slowLetterMapper;
+    private final EchoCapsuleMapper echoCapsuleMapper;
 
-    public UserServiceImpl(UserMapper userMapper) {
+    public UserServiceImpl(UserMapper userMapper,
+                           UserProfileMapper userProfileMapper,
+                           MemoryCardMapper memoryCardMapper,
+                           DailyRecordMapper dailyRecordMapper,
+                           TodoItemMapper todoItemMapper,
+                           SlowLetterMapper slowLetterMapper,
+                           EchoCapsuleMapper echoCapsuleMapper) {
         this.userMapper = userMapper;
+        this.userProfileMapper = userProfileMapper;
+        this.memoryCardMapper = memoryCardMapper;
+        this.dailyRecordMapper = dailyRecordMapper;
+        this.todoItemMapper = todoItemMapper;
+        this.slowLetterMapper = slowLetterMapper;
+        this.echoCapsuleMapper = echoCapsuleMapper;
     }
 
     @Override
@@ -50,6 +73,9 @@ public class UserServiceImpl implements UserService {
         if (user == null || !verify(request.password, user.passwordHash)) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED, "invalid username or password");
         }
+        if (!Constants.STATUS_ACTIVE.equals(user.status)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "account disabled");
+        }
         user.lastLoginAt = LocalDateTime.now();
         userMapper.updateById(user);
         return user;
@@ -65,6 +91,96 @@ public class UserServiceImpl implements UserService {
             throw new BusinessException(ErrorCode.UNAUTHORIZED, "not logged in");
         }
         return user;
+    }
+
+    @Override
+    public void updateProfile(Long userId, UserProfileVO profile) {
+        QueryWrapper<UserProfile> query = new QueryWrapper<>();
+        query.eq("user_id", userId);
+        UserProfile existing = userProfileMapper.selectOne(query);
+
+        if (existing == null) {
+            existing = new UserProfile();
+            existing.userId = userId;
+        }
+
+        if (profile.auroraName != null) existing.auroraName = profile.auroraName;
+        if (profile.auroraTone != null) existing.auroraTone = profile.auroraTone;
+        if (profile.preferredInputType != null) existing.preferredInputType = profile.preferredInputType;
+        if (profile.socialReachabilityStatus != null) existing.socialReachabilityStatus = profile.socialReachabilityStatus;
+        if (profile.bio != null) existing.bio = profile.bio;
+        if (profile.reflectionDepth != null) existing.reflectionDepth = profile.reflectionDepth;
+        if (profile.allowMemoryRecall != null) existing.allowMemoryRecall = profile.allowMemoryRecall;
+        if (profile.quietHoursStart != null) existing.quietHoursStart = profile.quietHoursStart;
+        if (profile.quietHoursEnd != null) existing.quietHoursEnd = profile.quietHoursEnd;
+
+        if (existing.id == null) {
+            userProfileMapper.insert(existing);
+        } else {
+            userProfileMapper.updateById(existing);
+        }
+    }
+
+    @Override
+    public Map<String, Object> exportData(Long userId) {
+        Map<String, Object> data = new HashMap<>();
+
+        QueryWrapper<MemoryCard> mcQuery = new QueryWrapper<>();
+        mcQuery.eq("user_id", userId);
+        List<MemoryCard> memoryCards = memoryCardMapper.selectList(mcQuery);
+        data.put("memoryCards", memoryCards);
+
+        QueryWrapper<DailyRecord> drQuery = new QueryWrapper<>();
+        drQuery.eq("user_id", userId);
+        List<DailyRecord> dailyRecords = dailyRecordMapper.selectList(drQuery);
+        data.put("dailyRecords", dailyRecords);
+
+        QueryWrapper<TodoItem> tiQuery = new QueryWrapper<>();
+        tiQuery.eq("user_id", userId);
+        List<TodoItem> todos = todoItemMapper.selectList(tiQuery);
+        data.put("todos", todos);
+
+        QueryWrapper<SlowLetter> slQuery = new QueryWrapper<>();
+        slQuery.eq("sender_user_id", userId).or().eq("receiver_user_id", userId);
+        List<SlowLetter> letters = slowLetterMapper.selectList(slQuery);
+        data.put("letters", letters);
+
+        QueryWrapper<EchoCapsule> ecQuery = new QueryWrapper<>();
+        ecQuery.eq("owner_user_id", userId);
+        List<EchoCapsule> capsules = echoCapsuleMapper.selectList(ecQuery);
+        data.put("capsules", capsules);
+
+        return data;
+    }
+
+    @Override
+    @Transactional
+    public void deleteAccount(Long userId) {
+        QueryWrapper<MemoryCard> mcQuery = new QueryWrapper<>();
+        mcQuery.eq("user_id", userId);
+        memoryCardMapper.delete(mcQuery);
+
+        QueryWrapper<DailyRecord> drQuery = new QueryWrapper<>();
+        drQuery.eq("user_id", userId);
+        dailyRecordMapper.delete(drQuery);
+
+        QueryWrapper<TodoItem> tiQuery = new QueryWrapper<>();
+        tiQuery.eq("user_id", userId);
+        todoItemMapper.delete(tiQuery);
+
+        QueryWrapper<SlowLetter> slQuery = new QueryWrapper<>();
+        slQuery.eq("sender_user_id", userId).or().eq("receiver_user_id", userId);
+        slowLetterMapper.delete(slQuery);
+
+        QueryWrapper<EchoCapsule> ecQuery = new QueryWrapper<>();
+        ecQuery.eq("owner_user_id", userId);
+        echoCapsuleMapper.delete(ecQuery);
+
+        QueryWrapper<UserProfile> upQuery = new QueryWrapper<>();
+        upQuery.eq("user_id", userId);
+        userProfileMapper.delete(upQuery);
+
+        userMapper.deleteById(userId);
     }
 
     private String hash(String input) {

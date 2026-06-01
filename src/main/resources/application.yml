@@ -28,22 +28,28 @@ mybatis-plus:
       id-type: auto
 
 llm:
-  mode: remote
-  provider: minimax
-  api-key: ""
-  base-url: ""
-  model: mock-inner-cosmos
+  mode: ${LLM_MODE:dev}
+  provider: ${LLM_PROVIDER:minimax}
+  api-key: ${LLM_API_KEY:}
+  base-url: ${LLM_BASE_URL:}
+  model: ${LLM_MODEL:mock-inner-cosmos}
+  allow-fallback: ${LLM_ALLOW_FALLBACK:true}
   glm:
-    api-key: ""
-    model: "glm-4-flash"
-    base-url: "https://open.bigmodel.cn/api/paas/v4/chat/completions"
-    timeout-ms: 20000
-    asr-api-key: ""
+    api-key: ${GLM_API_KEY:}
+    model: ${GLM_MODEL:glm-4-flash}
+    base-url: ${GLM_BASE_URL:https://open.bigmodel.cn/api/paas/v4/chat/completions}
+    timeout-ms: ${GLM_TIMEOUT_MS:20000}
+    asr-api-key: ${GLM_ASR_API_KEY:}
   minimax:
-    api-key: "REMOVED_FROM_HISTORY"
-    model: "MiniMax-M2.5-highspeed"
-    base-url: "https://api.minimaxi.com/v1/chat/completions"
-    timeout-ms: 30000
+    api-key: ${MINIMAX_API_KEY:}
+    model: ${MINIMAX_MODEL:MiniMax-M2.5-highspeed}
+    base-url: ${MINIMAX_BASE_URL:https://api.minimaxi.com/v1/chat/completions}
+    timeout-ms: ${MINIMAX_TIMEOUT_MS:30000}
+  deepseek:
+    api-key: ${DEEPSEEK_API_KEY:}
+    model: ${DEEPSEEK_MODEL:deepseek-chat}
+    base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
+    timeout-ms: ${DEEPSEEK_TIMEOUT_MS:30000}
 
 inner-cosmos:
   demo:

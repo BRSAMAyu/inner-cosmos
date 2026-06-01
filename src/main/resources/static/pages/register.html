@@ -1,1 +1,226 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/css/app.css"></head><body><main class="shell"><div class="topbar" data-topbar></div><section class="panel"><h2>注册</h2><div class="form"><input id="username" placeholder="用户名"><input id="nickname" placeholder="昵称"><input id="password" type="password" placeholder="密码"><button onclick="reg()">创建账号</button><p id="out" class="muted"></p></div></section></main><script src="/js/app.js"></script><script>IC.mountShell("注册");async function reg(){const r=await IC.api('/api/auth/register',{method:'POST',body:JSON.stringify({username:username.value,nickname:nickname.value,password:password.value})});out.textContent=r.message;if(r.success) location.href='/pages/dashboard.html';}</script></body></html>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="/css/app.css">
+  <title>注册 · Inner Cosmos</title>
+  <style>
+    .login-shell {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .login-card {
+      width: 100%;
+      max-width: 420px;
+      background: var(--surface-paper);
+      border-radius: var(--radius-flow);
+      box-shadow: var(--glow-soft);
+      padding: 48px 36px 40px;
+    }
+    .login-card h1 {
+      font-size: 1.6rem;
+      margin: 0 0 4px;
+      color: var(--ink);
+    }
+    .login-card .subtitle {
+      font-size: .88rem;
+      color: var(--muted);
+      margin-bottom: 32px;
+    }
+    .field {
+      margin-bottom: 18px;
+    }
+    .field label {
+      display: block;
+      font-size: .82rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .field input {
+      width: 100%;
+      padding: 12px 14px;
+      font-size: .95rem;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface-warm);
+      color: var(--text);
+      transition: border-color .2s;
+    }
+    .field input:focus {
+      outline: none;
+      border-color: var(--accent-sage);
+      box-shadow: 0 0 0 3px rgba(143, 163, 148, .15);
+    }
+    .register-btn {
+      width: 100%;
+      padding: 14px;
+      font-size: 1rem;
+      font-weight: 600;
+      color: #fff;
+      background: var(--accent-sage);
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: opacity .2s, transform .1s;
+      margin-top: 8px;
+    }
+    .register-btn:hover { opacity: .9; }
+    .register-btn:active { transform: scale(.98); }
+    .register-btn:disabled {
+      opacity: .5;
+      cursor: not-allowed;
+    }
+    .error-box {
+      padding: 10px 14px;
+      margin-bottom: 16px;
+      border-radius: var(--radius);
+      background: rgba(200, 147, 145, .12);
+      color: var(--accent-coral);
+      font-size: .88rem;
+      display: none;
+    }
+    .error-box.visible { display: block; }
+    .success-box {
+      padding: 10px 14px;
+      margin-bottom: 16px;
+      border-radius: var(--radius);
+      background: rgba(143, 163, 148, .12);
+      color: var(--accent-sage);
+      font-size: .88rem;
+      display: none;
+    }
+    .success-box.visible { display: block; }
+    .link-row {
+      text-align: center;
+      margin-top: 16px;
+      font-size: .88rem;
+    }
+    .link-row a {
+      color: var(--accent-dusty-blue);
+      text-decoration: none;
+    }
+    .link-row a:hover { text-decoration: underline; }
+    .loader {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) {
+      .loader { animation: none; }
+      .register-btn { transition: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="login-shell">
+    <div class="login-card">
+      <h1>加入 Inner Cosmos</h1>
+      <p class="subtitle">创建你的个人精神空间</p>
+
+      <div id="error" class="error-box" role="alert"></div>
+      <div id="success" class="success-box" role="status"></div>
+
+      <div class="field">
+        <label for="username">用户名</label>
+        <input id="username" type="text" placeholder="给自己取一个名字" autocomplete="username">
+      </div>
+
+      <div class="field">
+        <label for="nickname">昵称</label>
+        <input id="nickname" type="text" placeholder="怎么称呼你（可选）" autocomplete="nickname">
+      </div>
+
+      <div class="field">
+        <label for="password">密码</label>
+        <input id="password" type="password" placeholder="设置密码" autocomplete="new-password">
+      </div>
+
+      <div class="field">
+        <label for="password2">确认密码</label>
+        <input id="password2" type="password" placeholder="再输入一次密码" autocomplete="new-password">
+      </div>
+
+      <button id="regBtn" class="register-btn" onclick="doRegister()">创建账号</button>
+
+      <div class="link-row">
+        已有账号？<a href="/pages/login.html">去登录</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/app.js"></script>
+  <script>
+    IC.mountShell("注册");
+
+    document.getElementById("password2").addEventListener("keydown", function(e) {
+      if (e.key === "Enter") doRegister();
+    });
+
+    async function doRegister() {
+      const btn = document.getElementById("regBtn");
+      const errBox = document.getElementById("error");
+      const sucBox = document.getElementById("success");
+      const user = document.getElementById("username").value.trim();
+      const nick = document.getElementById("nickname").value.trim();
+      const pass = document.getElementById("password").value;
+      const pass2 = document.getElementById("password2").value;
+
+      errBox.classList.remove("visible");
+      sucBox.classList.remove("visible");
+
+      if (!user || !pass) {
+        errBox.textContent = "请填写用户名和密码。";
+        errBox.classList.add("visible");
+        return;
+      }
+      if (pass.length < 4) {
+        errBox.textContent = "密码至少 4 个字符。";
+        errBox.classList.add("visible");
+        return;
+      }
+      if (pass !== pass2) {
+        errBox.textContent = "两次输入的密码不一致。";
+        errBox.classList.add("visible");
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="loader"></span>正在创建...';
+
+      try {
+        const r = await IC.api("/api/auth/register", {
+          method: "POST",
+          body: JSON.stringify({ username: user, nickname: nick || user, password: pass })
+        });
+
+        if (r.success) {
+          sucBox.textContent = "账号创建成功，正在跳转到登录页...";
+          sucBox.classList.add("visible");
+          setTimeout(function() { location.href = "/pages/login.html"; }, 1500);
+        } else {
+          errBox.textContent = r.message || "注册失败，请换个用户名试试。";
+          errBox.classList.add("visible");
+          btn.disabled = false;
+          btn.textContent = "创建账号";
+        }
+      } catch (e) {
+        errBox.textContent = "网络连接出现问题，请稍后再试。";
+        errBox.classList.add("visible");
+        btn.disabled = false;
+        btn.textContent = "创建账号";
+      }
+    }
+  </script>
+</body>
+</html>

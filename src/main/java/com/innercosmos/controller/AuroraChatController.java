@@ -7,6 +7,7 @@ import com.innercosmos.service.MemoryService;
 import com.innercosmos.service.MemorySettlementService;
 import com.innercosmos.service.RhythmGuardService;
 import com.innercosmos.vo.DailyRecordVO;
+import com.innercosmos.vo.AuroraReplyVO;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
@@ -36,6 +37,11 @@ public class AuroraChatController extends BaseController {
     @PostMapping("/message")
     public ApiResponse<String> message(@Valid @RequestBody ChatRequest request, HttpSession session) {
         return ApiResponse.ok(auroraAgentService.reply(currentUserId(session), request));
+    }
+
+    @PostMapping("/message-rich")
+    public ApiResponse<AuroraReplyVO> messageRich(@Valid @RequestBody ChatRequest request, HttpSession session) {
+        return ApiResponse.ok(auroraAgentService.replyRich(currentUserId(session), request));
     }
 
     @GetMapping("/stream")

@@ -22,6 +22,16 @@ const API = {
   async auroraMessage(data) {
     return IC.api("/api/aurora/message", { method: "POST", body: JSON.stringify(data) });
   },
+  async auroraMessageRich(data) {
+    return IC.api("/api/aurora/message-rich", { method: "POST", body: JSON.stringify(data) });
+  },
+  async auroraMemoryContext(sessionId, q) {
+    const params = new URLSearchParams();
+    if (sessionId) params.set("sessionId", sessionId);
+    if (q) params.set("q", q);
+    const qs = params.toString();
+    return IC.api(`/api/aurora/memory-context${qs ? "?" + qs : ""}`);
+  },
   async auroraStream(sessionId, message) {
     return IC.api(`/api/aurora/stream?sessionId=${sessionId}&message=${encodeURIComponent(message)}`);
   },
@@ -164,8 +174,8 @@ const API = {
   },
 
   /* Thought Shredder */
-  async shredderProcess(text) {
-    return IC.api("/api/thought-shredder/process", { method: "POST", body: JSON.stringify({ text }) });
+  async shredderProcess(text, originalHandlingMode = "KEEP_ONLY_RESULT") {
+    return IC.api("/api/thought-shredder/process", { method: "POST", body: JSON.stringify({ text, originalHandlingMode }) });
   },
   async shredderHistory() {
     return IC.api("/api/thought-shredder/history");
@@ -241,6 +251,31 @@ const API = {
   /* AI Logs */
   async aiLogs() {
     return IC.api("/api/ai-logs");
+  },
+  async aiHealth() {
+    return IC.api("/api/ai/health");
+  },
+
+  /* Weekly Review */
+  async weeklyReviewLatest() {
+    return IC.api("/api/daily-record/weekly/latest");
+  },
+  async weeklyReviewGenerate() {
+    return IC.api("/api/daily-record/weekly/generate", { method: "POST" });
+  },
+
+  /* User Profile */
+  async userProfile() {
+    return IC.api("/api/user/profile");
+  },
+  async updateProfile(data) {
+    return IC.api("/api/user/profile", { method: "PUT", body: JSON.stringify(data) });
+  },
+  async exportData() {
+    return IC.api("/api/user/export");
+  },
+  async deleteAccount() {
+    return IC.api("/api/user/account", { method: "DELETE" });
   }
 };
 

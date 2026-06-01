@@ -9,7 +9,8 @@
 <body>
   <main class="shell">
     <div class="topbar" data-topbar></div>
-    <section class="hero">
+
+    <section class="hero" style="min-height:32vh">
       <span class="route-hint">温柔的自我整理空间</span>
       <h1>Inner Cosmos 内宇宙</h1>
       <p>这里不是要你立刻变好。你可以先把一句混乱的话放下来，让 Aurora 陪你慢慢看清事件、感受、念头和下一步。</p>
@@ -18,12 +19,79 @@
         <a class="button" href="/pages/aurora-chat.html">和 Aurora 聊聊</a>
       </div>
     </section>
-    <section class="grid">
+
+    <!-- Feature cards -->
+    <section class="grid mb-2">
       <article class="card"><strong>Aurora</strong><p>朋友式主动对话，让每日记录自然发生。</p></article>
       <article class="card"><strong>今日记录</strong><p>把表达沉淀成事件、情绪、认知碎片与轻量待办。</p></article>
       <article class="card"><strong>记忆星图</strong><p>用柔和星体呈现情感重力，让重要的事被温柔看见。</p></article>
       <article class="card"><strong>慢信连接</strong><p>通过脱敏共鸣体和慢信件建立郑重连接，而不是即时打扰。</p></article>
     </section>
+
+    <div class="spacer"></div>
+
+    <!-- User journey flow -->
+    <section class="panel mb-2">
+      <h2>你的内在旅程</h2>
+      <p class="muted mb-1">从一句混乱的话开始，到看见自己的星图。每一步都是自愿的。</p>
+      <div class="grid" style="grid-template-columns: repeat(5, 1fr)">
+        <article class="card text-center">
+          <strong style="font-size:1.4rem">💬</strong>
+          <p class="muted" style="font-size:.82rem">和 Aurora 对话</p>
+        </article>
+        <article class="card text-center">
+          <strong style="font-size:1.4rem">✨</strong>
+          <p class="muted" style="font-size:.82rem">沉淀为记忆</p>
+        </article>
+        <article class="card text-center">
+          <strong style="font-size:1.4rem">🌌</strong>
+          <p class="muted" style="font-size:.82rem">星图中看见</p>
+        </article>
+        <article class="card text-center">
+          <strong style="font-size:1.4rem">🎵</strong>
+          <p class="muted" style="font-size:.82rem">编织共鸣体</p>
+        </article>
+        <article class="card text-center">
+          <strong style="font-size:1.4rem">✉️</strong>
+          <p class="muted" style="font-size:.82rem">慢信连接</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- Design philosophy -->
+    <section class="grid mb-2">
+      <article class="panel">
+        <h2>安全边界</h2>
+        <div class="soft-stage">
+          <p class="muted">AI 是镜子，不是医生。每一层设计都在说：你先安全，其他都先等等。</p>
+          <p class="muted mt-1">安全避风港提供呼吸练习和紧急资源链接，高危输入自动触发保护机制。</p>
+        </div>
+      </article>
+      <article class="panel">
+        <h2>情感重力</h2>
+        <div class="soft-stage">
+          <p class="muted">记忆不是等权列表。情绪强度、重复次数、你自己打的重要性 — 三者共同决定哪颗星更亮。</p>
+          <p class="muted mt-1">不是算法在评判你，是你和自己的感受在对话。</p>
+        </div>
+      </article>
+      <article class="panel">
+        <h2>慢社交</h2>
+        <div class="soft-stage">
+          <p class="muted">共鸣体是经过脱敏处理的回声，不是真人替代。慢信不会即时到达。</p>
+          <p class="muted mt-1">慢，是因为郑重的连接值得等待。</p>
+        </div>
+      </article>
+    </section>
+
+    <div class="text-center mt-2">
+      <div class="pill-row" style="justify-content:center">
+        <span class="pill">Spring Boot 3</span>
+        <span class="pill">Java 17</span>
+        <span class="pill">MyBatis-Plus</span>
+        <span class="pill">6 设计模式</span>
+        <span class="pill">Morandi 色系</span>
+      </div>
+    </div>
   </main>
   <script src="/js/app.js"></script>
   <script>IC.mountShell("首页"); IC.stagger(document);</script>

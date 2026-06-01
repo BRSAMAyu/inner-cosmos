@@ -3,6 +3,7 @@ package com.innercosmos.controller;
 import com.innercosmos.common.ApiResponse;
 import com.innercosmos.entity.MemoryCard;
 import com.innercosmos.service.ThoughtShredderService;
+import com.innercosmos.vo.ShredderResultVO;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,8 +20,12 @@ public class ThoughtShredderController extends BaseController {
     }
 
     @PostMapping("/process")
-    public ApiResponse<MemoryCard> process(@RequestBody Map<String, String> body, HttpSession session) {
-        return ApiResponse.ok(thoughtShredderService.process(currentUserId(session), body.get("text")));
+    public ApiResponse<ShredderResultVO> process(@RequestBody Map<String, String> body, HttpSession session) {
+        return ApiResponse.ok(thoughtShredderService.process(
+                currentUserId(session),
+                body.get("text"),
+                body.getOrDefault("originalHandlingMode", "KEEP_ONLY_RESULT")
+        ));
     }
 
     @GetMapping("/history")

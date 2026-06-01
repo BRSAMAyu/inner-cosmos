@@ -1,6 +1,8 @@
 package com.innercosmos.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.innercosmos.ai.structured.StructuredAiResults;
+import com.innercosmos.ai.structured.StructuredAiService;
 import com.innercosmos.entity.*;
 import com.innercosmos.mapper.*;
 import com.innercosmos.service.GravityService;
@@ -14,6 +16,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class MemorySettlementServiceImpl implements MemorySettlementService {
@@ -29,6 +32,7 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
     private final DialogSessionMapper dialogSessionMapper;
     private final GravityService gravityService;
     private final ThemeAggregationService themeAggregationService;
+    private final StructuredAiService structuredAiService;
 
     public MemorySettlementServiceImpl(MemoryCardMapper memoryCardMapper,
                                        ThoughtFragmentMapper thoughtFragmentMapper,
@@ -41,7 +45,8 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
                                        DialogMessageMapper dialogMessageMapper,
                                        DialogSessionMapper dialogSessionMapper,
                                        GravityService gravityService,
-                                       ThemeAggregationService themeAggregationService) {
+                                       ThemeAggregationService themeAggregationService,
+                                       StructuredAiService structuredAiService) {
         this.memoryCardMapper = memoryCardMapper;
         this.thoughtFragmentMapper = thoughtFragmentMapper;
         this.emotionTraceMapper = emotionTraceMapper;
@@ -54,6 +59,7 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
         this.dialogSessionMapper = dialogSessionMapper;
         this.gravityService = gravityService;
         this.themeAggregationService = themeAggregationService;
+        this.structuredAiService = structuredAiService;
     }
 
     @Override
@@ -70,20 +76,32 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
         msgQuery.eq("session_id", sessionId).eq("speaker", "USER").orderByAsc("id");
         List<DialogMessage> messages = dialogMessageMapper.selectList(msgQuery);
         String raw = messages.stream().map(m -> m.textContent).reduce("", (a, b) -> a + "\n" + b);
+        StructuredAiResults.SettlementResult ai = structuredAiService.call(userId, "MEMORY_SETTLEMENT",
+                """
+                Return JSON for a private memory settlement:
+                memoryCard {title, summary, memoryType, emotionTags[], keywordTags[], peopleTags[], intensityScore, userImportance},
+                fragments[] {type, rawExcerpt, analysis, reframe},
+                emotionTrace {emotionName, emotionScore, weatherType, triggerScene},
+                eventCards[], relationMentions[], todos[].
+                Extract only from the user's messages. Keep it non-clinical and privacy-preserving.
+                """,
+                Map.of("sessionId", sessionId, "userMessages", raw),
+                StructuredAiResults.SettlementResult.class,
+                () -> fallbackSettlement(raw));
 
         // Extract MemoryCard
         MemoryCard card = new MemoryCard();
         card.userId = userId;
         card.sourceSessionId = sessionId;
-        card.title = "今日沉淀";
-        card.summary = firstSentence(raw);
-        card.memoryType = inferType(raw);
-        card.emotionTags = "[\"self-observation\"]";
-        card.keywordTags = inferKeywords(raw);
-        card.peopleTags = "[]";
-        card.intensityScore = inferIntensity(raw);
+        card.title = blank(ai.memoryCard.title, "今日沉淀");
+        card.summary = blank(ai.memoryCard.summary, firstSentence(raw));
+        card.memoryType = blank(ai.memoryCard.memoryType, inferType(raw));
+        card.emotionTags = jsonArray(ai.memoryCard.emotionTags, List.of("self-observation"));
+        card.keywordTags = jsonArray(ai.memoryCard.keywordTags, fallbackKeywords(raw));
+        card.peopleTags = jsonArray(ai.memoryCard.peopleTags, List.of());
+        card.intensityScore = ai.memoryCard.intensityScore == null ? inferIntensity(raw) : ai.memoryCard.intensityScore;
         card.recurrenceCount = 1;
-        card.userImportance = 4.0;
+        card.userImportance = ai.memoryCard.userImportance == null ? 4.0 : ai.memoryCard.userImportance;
         card.triggerCount = 1;
         card.emotionalGravity = gravityService.calculateGravity(card.intensityScore, 1, card.userImportance, 1, 0);
         card.lastTouchedAt = LocalDateTime.now();
@@ -92,10 +110,19 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
         memoryCardMapper.insert(card);
 
         // Create structured assets: fragments
-        createFragment(userId, card.id, "FACT", firstSentence(raw), "从用户表达中抽取出的事实片段。", "先区分事实和解释。");
-        createFragment(userId, card.id, "FEELING", inferEmotion(raw), "表达里出现的主要感受线索。", "允许感受存在，不急着证明它合理。");
-        createFragment(userId, card.id, "BELIEF", inferBelief(raw), "可能影响用户自我评价的信念。", "把事件和自我价值暂时分开看。");
-        createFragment(userId, card.id, "ACTION", inferAction(raw), "可以轻轻推进的一步。", "把下一步压缩到十分钟内能开始。");
+        if (ai.fragments != null && !ai.fragments.isEmpty()) {
+            for (StructuredAiResults.Fragment fragment : ai.fragments) {
+                createFragment(userId, card.id, blank(fragment.type, "OBSERVATION"),
+                        blank(fragment.rawExcerpt, firstSentence(raw)),
+                        blank(fragment.analysis, "从用户表达中抽取出的片段。"),
+                        blank(fragment.reframe, "先把它放成一个可以看见的形状。"));
+            }
+        } else {
+            createFragment(userId, card.id, "FACT", firstSentence(raw), "从用户表达中抽取出的事实片段。", "先区分事实和解释。");
+            createFragment(userId, card.id, "FEELING", inferEmotion(raw), "表达里出现的主要感受线索。", "允许感受存在，不急着证明它合理。");
+            createFragment(userId, card.id, "BELIEF", inferBelief(raw), "可能影响用户自我评价的信念。", "把事件和自我价值暂时分开看。");
+            createFragment(userId, card.id, "ACTION", inferAction(raw), "可以轻轻推进的一步。", "把下一步压缩到十分钟内能开始。");
+        }
 
         if (raw.contains("需要") || raw.contains("想要")) {
             createFragment(userId, card.id, "NEED", inferNeed(raw), "表达中隐含的深层需要。", "把需要从期待中分出来看看。");
@@ -108,15 +135,26 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
         EmotionTrace trace = new EmotionTrace();
         trace.userId = userId;
         trace.sourceSessionId = sessionId;
-        trace.emotionName = inferEmotionName(raw);
-        trace.emotionScore = card.intensityScore;
-        trace.weatherType = inferWeather(card.intensityScore);
-        trace.triggerScene = firstSentence(raw);
+        trace.emotionName = blank(ai.emotionTrace.emotionName, inferEmotionName(raw));
+        trace.emotionScore = ai.emotionTrace.emotionScore == null ? card.intensityScore : ai.emotionTrace.emotionScore;
+        trace.weatherType = blank(ai.emotionTrace.weatherType, inferWeather(card.intensityScore));
+        trace.triggerScene = blank(ai.emotionTrace.triggerScene, firstSentence(raw));
         trace.recordDate = LocalDate.now();
         emotionTraceMapper.insert(trace);
 
         // Create TodoItems if task-related
-        if (raw.contains("作业") || raw.contains("考试") || raw.contains("任务") || raw.contains("明天") || raw.contains("拖延")) {
+        if (ai.todos != null && !ai.todos.isEmpty()) {
+            for (StructuredAiResults.TodoSuggestion suggestion : ai.todos) {
+                TodoItem todo = new TodoItem();
+                todo.userId = userId;
+                todo.sourceMemoryCardId = card.id;
+                todo.taskName = blank(suggestion.taskName, "把今天提到的任务拆成第一步");
+                todo.description = blank(suggestion.description, "由 Aurora 对话自动提取，建议从一个十分钟动作开始。");
+                todo.priority = blank(suggestion.priority, "MEDIUM");
+                todo.status = "TODO";
+                todoItemMapper.insert(todo);
+            }
+        } else if (raw.contains("作业") || raw.contains("考试") || raw.contains("任务") || raw.contains("明天") || raw.contains("拖延")) {
             TodoItem todo = new TodoItem();
             todo.userId = userId;
             todo.sourceMemoryCardId = card.id;
@@ -128,7 +166,21 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
         }
 
         // Create EventCards if event-related
-        if (raw.contains("今天") || raw.contains("昨天") || raw.contains("上周") || raw.contains("发生")) {
+        if (ai.eventCards != null && !ai.eventCards.isEmpty()) {
+            for (StructuredAiResults.Event item : ai.eventCards) {
+                EventCard event = new EventCard();
+                event.userId = userId;
+                event.sourceSessionId = sessionId;
+                event.memoryCardId = card.id;
+                event.eventTitle = blank(item.eventTitle, firstSentence(raw));
+                event.eventSummary = blank(item.eventSummary, firstSentence(raw));
+                event.eventTimeLabel = blank(item.eventTimeLabel, inferTimeLabel(raw));
+                event.scene = blank(item.scene, "从对话中提取的事件场景");
+                event.peopleTags = jsonArray(item.peopleTags, List.of());
+                event.emotionTags = jsonArray(item.emotionTags, ai.memoryCard.emotionTags);
+                eventCardMapper.insert(event);
+            }
+        } else if (raw.contains("今天") || raw.contains("昨天") || raw.contains("上周") || raw.contains("发生")) {
             EventCard event = new EventCard();
             event.userId = userId;
             event.sourceSessionId = sessionId;
@@ -143,7 +195,20 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
         }
 
         // Create RelationMentions if relation-related
-        if (raw.contains("朋友") || raw.contains("同学") || raw.contains("老师") || raw.contains("家人") || raw.contains("关系")) {
+        if (ai.relationMentions != null && !ai.relationMentions.isEmpty()) {
+            for (StructuredAiResults.Relation item : ai.relationMentions) {
+                RelationMention mention = new RelationMention();
+                mention.userId = userId;
+                mention.sourceSessionId = sessionId;
+                mention.memoryCardId = card.id;
+                mention.relationLabel = blank(item.relationLabel, inferRelationLabel(raw));
+                mention.relationType = blank(item.relationType, inferRelationType(raw));
+                mention.emotionTags = jsonArray(item.emotionTags, ai.memoryCard.emotionTags);
+                mention.triggerSummary = blank(item.triggerSummary, firstSentence(raw));
+                mention.boundaryHint = blank(item.boundaryHint, "注意关系的边界和自己的感受");
+                relationMentionMapper.insert(mention);
+            }
+        } else if (raw.contains("朋友") || raw.contains("同学") || raw.contains("老师") || raw.contains("家人") || raw.contains("关系")) {
             RelationMention mention = new RelationMention();
             mention.userId = userId;
             mention.sourceSessionId = sessionId;
@@ -230,6 +295,43 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
         thoughtFragmentMapper.insert(fragment);
     }
 
+    private StructuredAiResults.SettlementResult fallbackSettlement(String raw) {
+        StructuredAiResults.SettlementResult result = new StructuredAiResults.SettlementResult();
+        result.memoryCard.title = "今日沉淀";
+        result.memoryCard.summary = firstSentence(raw);
+        result.memoryCard.memoryType = inferType(raw);
+        result.memoryCard.emotionTags = List.of("self-observation");
+        result.memoryCard.keywordTags = fallbackKeywords(raw);
+        result.memoryCard.peopleTags = List.of();
+        result.memoryCard.intensityScore = inferIntensity(raw);
+        result.memoryCard.userImportance = 4.0;
+        result.emotionTrace.emotionName = inferEmotionName(raw);
+        result.emotionTrace.emotionScore = inferIntensity(raw);
+        result.emotionTrace.weatherType = inferWeather(result.emotionTrace.emotionScore);
+        result.emotionTrace.triggerScene = firstSentence(raw);
+        return result;
+    }
+
+    private String blank(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value;
+    }
+
+    private String jsonArray(List<String> values, List<String> fallback) {
+        List<String> safe = values == null || values.isEmpty() ? fallback : values;
+        return com.innercosmos.util.JsonUtils.toJson(safe == null ? List.of() : safe);
+    }
+
+    private List<String> fallbackKeywords(String raw) {
+        List<String> keywords = new ArrayList<>();
+        if (raw.contains("作业") || raw.contains("考试")) keywords.add("学业");
+        if (raw.contains("朋友") || raw.contains("同学")) keywords.add("社交");
+        if (raw.contains("家人")) keywords.add("家庭");
+        if (raw.contains("累") || raw.contains("压力")) keywords.add("压力");
+        if (raw.contains("开心") || raw.contains("高兴")) keywords.add("积极");
+        if (keywords.isEmpty()) keywords.add("日常");
+        return keywords;
+    }
+
     private String firstSentence(String raw) {
         if (raw == null || raw.isBlank()) {
             return "用户完成了一次自我表达。";
@@ -246,14 +348,7 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
     }
 
     private String inferKeywords(String raw) {
-        List<String> keywords = new ArrayList<>();
-        if (raw.contains("作业") || raw.contains("考试")) keywords.add("学业");
-        if (raw.contains("朋友") || raw.contains("同学")) keywords.add("社交");
-        if (raw.contains("家人")) keywords.add("家庭");
-        if (raw.contains("累") || raw.contains("压力")) keywords.add("压力");
-        if (raw.contains("开心") || raw.contains("高兴")) keywords.add("积极");
-        if (keywords.isEmpty()) keywords.add("日常");
-        return keywords.toString();
+        return jsonArray(fallbackKeywords(raw), List.of("日常"));
     }
 
     private Double inferIntensity(String raw) {

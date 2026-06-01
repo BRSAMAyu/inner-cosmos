@@ -89,6 +89,20 @@ public class AdminController extends BaseController {
         return ApiResponse.ok(null);
     }
 
+    @PostMapping("/users/{id}/disable")
+    public ApiResponse<Void> disableUser(@PathVariable Long id, HttpSession session) {
+        requireAdmin(session);
+        adminService.disableUser(id);
+        return ApiResponse.ok(null);
+    }
+
+    @PostMapping("/users/{id}/enable")
+    public ApiResponse<Void> enableUser(@PathVariable Long id, HttpSession session) {
+        requireAdmin(session);
+        adminService.enableUser(id);
+        return ApiResponse.ok(null);
+    }
+
     @GetMapping("/safety-events")
     public ApiResponse<List<SafetyEvent>> safetyEvents(HttpSession session) {
         requireAdmin(session);
