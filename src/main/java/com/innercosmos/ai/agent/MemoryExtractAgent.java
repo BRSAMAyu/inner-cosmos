@@ -1,14 +1,186 @@
 package com.innercosmos.ai.agent;
 
+import com.innercosmos.ai.structured.StructuredAiService;
 import org.springframework.stereotype.Component;
 
+/**
+ * Memory extraction agent that uses LLM to extract structured insights
+ * from user conversations. Replaces simple substring truncation with
+ * semantic analysis of facts, feelings, worries, needs, beliefs, and actions.
+ */
 @Component
 public class MemoryExtractAgent {
+    private final StructuredAiService structuredAiService;
+
+    public MemoryExtractAgent(StructuredAiService structuredAiService) {
+        this.structuredAiService = structuredAiService;
+    }
+
+    /**
+     * Extract structured memory summary from raw conversation text.
+     * Uses LLM to identify key patterns across six dimensions.
+     *
+     * @param userId User ID for LLM tracking
+     * @param rawText Raw conversation text to analyze
+     * @return Structured summary with facts, feelings, worries, needs, beliefs, actions
+     */
+    public MemoryExtraction extract(Long userId, String rawText) {
+        if (rawText == null || rawText.isBlank()) {
+            return createDefaultExtraction();
+        }
+
+        try {
+            String prompt = buildExtractionPrompt(rawText);
+
+            var result = structuredAiService.call(userId, "MEMORY_EXTRACT", prompt,
+                java.util.Map.of("rawText", rawText),
+                MemoryExtractionResult.class,
+                () -> fallbackExtraction(rawText));
+
+            return convertToMemoryExtraction(rawText, result);
+
+        } catch (Exception e) {
+            // On error, return safe fallback
+            return fallbackExtraction(rawText);
+        }
+    }
+
+    /**
+     * Legacy summarize method for backward compatibility.
+     * Delegates to extract() and returns the summary text.
+     */
     public String summarize(String rawText) {
         if (rawText == null || rawText.isBlank()) {
             return "一次安静但仍值得保存的自我观察。";
         }
+
+        MemoryExtraction extraction = extract(null, rawText);
+        return extraction.summary;
+    }
+
+    private String buildExtractionPrompt(String rawText) {
+        return """
+            分析以下对话文本，提取六个维度的结构化信息：
+
+            文本：%s
+
+            请识别并提取：
+            1. facts[] - 事实片段：发生了什么客观事件
+            2. feelings[] - 情绪感受：用户表达了哪些感受
+            3. worries[] - 担忧内容：用户在担心什么
+            4. needs[] - 需求：用户可能需要什么
+            5. beliefs[] - 信念：可能存在的潜在信念模式
+            6. actions[] - 行动：可能的小步骤
+
+            对于每个维度，只提取明确出现的内容。如果某个维度没有明显内容，返回空数组。
+            保持温和、非评判的语言。
+
+            返回 JSON 格式：
+            {
+              "summary": "一句话总结",
+              "facts": ["fact1", "fact2"],
+              "feelings": ["feeling1"],
+              "worries": ["worry1"],
+              "needs": ["need1"],
+              "beliefs": ["belief1"],
+              "actions": ["action1"]
+            }
+            """.formatted(rawText.length() > 200 ? rawText.substring(0, 200) + "..." : rawText);
+    }
+
+    private MemoryExtraction createDefaultExtraction() {
+        MemoryExtraction extraction = new MemoryExtraction();
+        extraction.summary = "一次安静但仍值得保存的自我观察。";
+        extraction.facts = java.util.List.of();
+        extraction.feelings = java.util.List.of();
+        extraction.worries = java.util.List.of();
+        extraction.needs = java.util.List.of();
+        extraction.beliefs = java.util.List.of();
+        extraction.actions = java.util.List.of();
+        return extraction;
+    }
+
+    private MemoryExtraction fallbackExtraction(String rawText) {
+        MemoryExtraction extraction = new MemoryExtraction();
         String compact = rawText.replaceAll("\\s+", " ").trim();
+
+        // Simple fallback: first sentence as summary
+        extraction.summary = compact.length() > 80 ? compact.substring(0, 80) + "..." : compact;
+
+        // Try to identify simple patterns
+        java.util.List<String> facts = new java.util.ArrayList<>();
+        java.util.List<String> feelings = new java.util.ArrayList<>();
+        java.util.List<String> worries = new java.util.ArrayList<>();
+        java.util.List<String> needs = new java.util.List.of();
+        java.util.List<String> beliefs = new java.util.List.of();
+        java.util.List<String> actions = new java.util.List.of();
+
+        // Simple keyword-based extraction (better than nothing)
+        if (compact.contains("今天")) {
+            facts.add("用户今天完成了一次表达");
+        }
+        if (compact.contains("累") || compact.contains("压力")) {
+            feelings.add("用户感到疲惫或压力");
+            worries.add("对压力的担忧");
+        }
+        if (compact.contains("需要") || compact.contains("想要")) {
+            needs.add("用户表达了一些需要");
+        }
+        if (compact.contains("不行") || compact.contains("没做好")) {
+            beliefs.add("可能涉及自我评价的信念");
+        }
+
+        extraction.facts = facts;
+        extraction.feelings = feelings;
+        extraction.worries = worries;
+        extraction.needs = needs;
+        extraction.beliefs = beliefs;
+        extraction.actions = actions;
+
+        return extraction;
+    }
+
+    private MemoryExtraction convertToMemoryExtraction(String rawText, MemoryExtractionResult result) {
+        MemoryExtraction extraction = new MemoryExtraction();
+        extraction.summary = result.summary != null ? result.summary : firstSentence(rawText);
+        extraction.facts = result.facts != null ? result.facts : java.util.List.of();
+        extraction.feelings = result.feelings != null ? result.feelings : java.util.List.of();
+        extraction.worries = result.worries != null ? result.worries : java.util.List.of();
+        extraction.needs = result.needs != null ? result.needs : java.util.List.of();
+        extraction.beliefs = result.beliefs != null ? result.beliefs : java.util.List.of();
+        extraction.actions = result.actions != null ? result.actions : java.util.List.of();
+        return extraction;
+    }
+
+    private String firstSentence(String raw) {
+        if (raw == null || raw.isBlank()) return "用户完成了一次自我表达。";
+        String compact = raw.replaceAll("\\s+", " ").trim();
         return compact.length() > 80 ? compact.substring(0, 80) + "..." : compact;
+    }
+
+    /**
+     * Structured result class for LLM response.
+     */
+    private static class MemoryExtractionResult {
+        public String summary;
+        public java.util.List<String> facts;
+        public java.util.List<String> feelings;
+        public java.util.List<String> worries;
+        public java.util.List<String> needs;
+        public java.util.List<String> beliefs;
+        public java.util.List<String> actions;
+    }
+
+    /**
+     * Memory extraction data class.
+     */
+    public static class MemoryExtraction {
+        public String summary;
+        public java.util.List<String> facts;
+        public java.util.List<String> feelings;
+        public java.util.List<String> worries;
+        public java.util.List<String> needs;
+        public java.util.List<String> beliefs;
+        public java.util.List<String> actions;
     }
 }
