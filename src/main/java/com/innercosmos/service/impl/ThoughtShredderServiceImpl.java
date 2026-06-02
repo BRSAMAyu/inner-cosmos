@@ -3,6 +3,8 @@ package com.innercosmos.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.innercosmos.ai.structured.StructuredAiResults;
 import com.innercosmos.ai.structured.StructuredAiService;
+import com.innercosmos.ai.semantic.PseudoSemanticAnalyzer;
+import com.innercosmos.ai.semantic.PseudoSemanticAnalyzer.AnalysisResult;
 import com.innercosmos.entity.MemoryCard;
 import com.innercosmos.entity.ThoughtFragment;
 import com.innercosmos.entity.TodoItem;
@@ -210,51 +212,106 @@ public class ThoughtShredderServiceImpl implements ThoughtShredderService {
         return "KEEP_ONLY_RESULT";
     }
 
+    /**
+     * Get semantic analysis for the current input.
+     */
+    private AnalysisResult analyze(String raw) {
+        return PseudoSemanticAnalyzer.analyze(raw);
+    }
+
     private String inferCoreFeeling(String raw) {
-        if (containsAny(raw, List.of("气", "愤怒", "烦", "受够"))) return "愤怒和烦躁";
-        if (containsAny(raw, List.of("累", "疲惫", "压力", "撑不住"))) return "疲惫和压力";
-        if (containsAny(raw, List.of("怕", "担心", "焦虑", "慌"))) return "焦虑和不安";
-        if (containsAny(raw, List.of("孤独", "没人懂", "一个人"))) return "孤独和未被理解";
-        if (containsAny(raw, List.of("委屈", "难过", "想哭"))) return "委屈和难过";
-        return "还没被命名的复杂感受";
+        AnalysisResult analysis = analyze(raw);
+        // Build core feeling from semantic analysis
+        StringBuilder feeling = new StringBuilder();
+
+        // Check themes first
+        if (analysis.detectedThemes.contains(“情绪承压”)) {
+            feeling.append(“疲惫和压力”);
+        } else if (analysis.detectedThemes.contains(“关系牵动”)) {
+            feeling.append(“难过和委屈”);
+        } else if (analysis.detectedThemes.contains(“自我评价”)) {
+            feeling.append(“挫败和自我怀疑”);
+        } else {
+            // Fall back to sentiment label
+            switch (analysis.sentimentLabel) {
+                case “CRISIS”:
+                    feeling.append(“很重的痛苦”);
+                    break;
+                case “NEGATIVE”:
+                    feeling.append(“不舒服的感受”);
+                    break;
+                case “POSITIVE”:
+                    feeling.append(“积极的感受”);
+                    break;
+                default:
+                    feeling.append(“还没被命名的复杂感受”);
+                    break;
+            }
+        }
+
+        return feeling.toString();
     }
 
     private String inferHiddenNeed(String raw, String coreFeeling) {
-        if (containsAny(raw, List.of("没人懂", "看见", "理解", "在乎"))) return "被理解和被看见";
-        if (containsAny(raw, List.of("作业", "任务", "项目", "拖延"))) return "把压力变成可开始的一步";
-        if (containsAny(raw, List.of("朋友", "同学", "家人", "老师", "关系"))) return "在关系里保留自己的位置";
-        if (containsAny(raw, List.of("不行", "失败", "没做好", "废物"))) return "把事件和自我价值分开";
-        if (coreFeeling.contains("焦虑")) return "获得一点确定感";
-        return "让混乱先有一个可以被放下的形状";
+        AnalysisResult analysis = analyze(raw);
+        // Use primary intent and themes to infer need
+        switch (analysis.primaryIntent) {
+            case “SEEK_SUPPORT”:
+                return “被理解和被看见”;
+            case “TASK_STRESS”:
+                return “把压力变成可开始的一步”;
+            case “RELATION_ISSUE”:
+                return “在关系里保留自己的位置”;
+            case “COGNITIVE_CLARITY”:
+                return “把混乱整理成可以被看见的形状”;
+            case “SELF_HARM”:
+                return “获得活下去的支撑”;
+            default:
+                if (analysis.detectedThemes.contains(“自我评价”)) {
+                    return “把事件和自我价值分开”;
+                }
+                return “让混乱先有一个可以被放下的形状”;
+        }
     }
 
     private String sentenceToKeep(String raw, String coreFeeling, String hiddenNeed) {
-        return "我现在感到" + coreFeeling + "，背后也许是在需要" + hiddenNeed + "。";
+        return “我现在感到” + coreFeeling + “，背后也许是在需要” + hiddenNeed + “。”;
     }
 
     private List<String> noiseToDrop(String raw) {
+        AnalysisResult analysis = analyze(raw);
         List<String> noise = new ArrayList<>();
-        noise.add("把一次混乱直接解释成“我整个人都不行”的结论。");
-        if (containsAny(raw, List.of("应该", "必须", "一定"))) {
-            noise.add("那些把自己逼到没有余地的“应该”和“必须”。");
+
+        // Always add the base noise
+        noise.add(“把一次混乱直接解释成”我整个人都不行”的结论。”);
+
+        // Check for absolutist language patterns
+        if (analysis.detectedThemes.contains(“自我评价”)) {
+            noise.add(“那些把自己逼到没有余地的”应该”和”必须”。”);
         }
-        if (containsAny(raw, List.of("永远", "每次", "总是", "从来"))) {
-            noise.add("把今天扩大成永远的绝对化说法。");
+        if (analysis.sentimentScore <= -4) {
+            noise.add(“把今天扩大成永远的绝对化说法。”);
         }
-        if (noise.size() == 1) {
-            noise.add("暂时不需要反复咀嚼的责备语气。");
+        if (analysis.primaryIntent.equals(“COGNITIVE_CLARITY”)) {
+            noise.add(“暂时不需要反复咀嚼的责备语气。”);
         }
+
         return noise;
     }
 
     private String inferBelief(String raw) {
-        if (containsAny(raw, List.of("不行", "失败", "没做好", "废物"))) {
-            return "如果一件事没做好，就说明我这个人不行。";
+        AnalysisResult analysis = analyze(raw);
+        // Use themes and intent to infer belief patterns
+        if (analysis.detectedThemes.contains(“自我评价”)) {
+            return “如果一件事没做好，就说明我这个人不行。”;
         }
-        if (containsAny(raw, List.of("没人懂", "一个人"))) {
-            return "如果别人没有立刻理解我，也许我就只能一个人承受。";
+        if (analysis.primaryIntent.equals(“RELATION_ISSUE”)) {
+            return “如果别人没有立刻理解我，也许我就只能一个人承受。”;
         }
-        return "这件事现在很乱，所以我可能会急着给自己下结论。";
+        if (analysis.sentimentScore <= -3) {
+            return “这件事现在很乱，所以我可能会急着给自己下结论。”;
+        }
+        return “我正在尝试理解自己为什么会被这件事牵动。”;
     }
 
     private String inferAction(String raw) {
