@@ -1,6 +1,8 @@
 package com.innercosmos.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.innercosmos.ai.semantic.PseudoSemanticAnalyzer;
+import com.innercosmos.ai.semantic.PseudoSemanticAnalyzer.AnalysisResult;
 import com.innercosmos.entity.DialogMessage;
 import com.innercosmos.entity.DialogSession;
 import com.innercosmos.entity.DialogSummary;
@@ -170,15 +172,35 @@ public class AuroraMemoryContextServiceImpl implements AuroraMemoryContextServic
     private List<String> proactiveSuggestions(AuroraMemoryContextVO context, String userInput) {
         List<String> suggestions = new ArrayList<>();
         String text = normalize(userInput);
-        if (containsAny(text, "deadline", "todo", "task", "exam", "homework", "project", "明天", "作业", "任务", "考试")) {
+
+        // Use semantic analysis for better proactive suggestions
+        AnalysisResult analysis = PseudoSemanticAnalyzer.analyze(text);
+
+        // Task-related suggestions
+        if ("TASK_STRESS".equals(analysis.primaryIntent)) {
             suggestions.add("Offer one ten-minute next action and avoid overwhelming planning.");
         }
+        // Crisis/severe distress
+        if ("SELF_HARM".equals(analysis.primaryIntent) || "CRISIS".equals(analysis.sentimentLabel)) {
+            suggestions.add("Prioritize safety, validate pain, and provide crisis resources.");
+        }
+        // Relationship issues
+        if ("RELATION_ISSUE".equals(analysis.primaryIntent)) {
+            suggestions.add("Help user articulate both sides of the relationship dynamic.");
+        }
+        // High intensity情绪
+        if (analysis.intensityScore >= 7) {
+            suggestions.add("Slow down, validate pressure, and suggest grounding before problem solving.");
+        }
+        // Emotion-based suggestions
         if (context.emotionWeather != null && (context.emotionWeather.contains("STORM") || context.emotionWeather.contains("RAINY"))) {
             suggestions.add("Slow down, validate pressure, and suggest grounding before problem solving.");
         }
+        // Memory context suggestions
         if (context.longTermMemoryNotes != null && !context.longTermMemoryNotes.isEmpty()) {
             suggestions.add("If referencing memory, use transparent wording and avoid sounding like surveillance.");
         }
+        // Default suggestion
         if (suggestions.isEmpty()) {
             suggestions.add("Ask one concrete question that helps the user name what matters most right now.");
         }
