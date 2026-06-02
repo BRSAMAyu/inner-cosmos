@@ -2,6 +2,8 @@ package com.innercosmos.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.innercosmos.ai.prompt.PromptBuilder;
+import com.innercosmos.ai.semantic.PseudoSemanticAnalyzer;
+import com.innercosmos.ai.semantic.PseudoSemanticAnalyzer.AnalysisResult;
 import com.innercosmos.ai.structured.StructuredAiResults;
 import com.innercosmos.ai.structured.StructuredAiService;
 import com.innercosmos.dto.ChatRequest;
@@ -267,10 +269,17 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     }
 
     private String detectTheme(String message, String mode) {
-        String text = message == null ? "" : message;
-        if (containsAny(text, "作业", "任务", "拖延", "考试")) return "任务压力";
-        if (containsAny(text, "朋友", "同学", "家人", "老师", "关系")) return "关系牵动";
-        if (containsAny(text, "累", "压力", "焦虑", "烦")) return "情绪承压";
+        if (message == null || message.isBlank()) return mode;
+
+        // Use semantic analysis for better theme detection
+        AnalysisResult analysis = PseudoSemanticAnalyzer.analyze(message);
+
+        // Return primary detected theme if any, otherwise fall back to mode
+        if (!analysis.detectedThemes.isEmpty() && !analysis.detectedThemes.contains("日常分享")) {
+            return analysis.detectedThemes.get(0);
+        }
+
+        // Fall back to mode if no clear theme detected
         return mode;
     }
 
