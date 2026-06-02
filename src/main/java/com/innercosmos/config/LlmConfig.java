@@ -194,9 +194,10 @@ public class LlmConfig {
         log.info("Creating LlmClient for provider: {}, mode: {}, fallbackAllowed: {}",
                 activeProvider, mode, isEffectiveFallbackAllowed());
 
+        LlmClient actualClient;
         switch (activeProvider.toLowerCase()) {
             case "glm":
-                return new GlmLlmClient(
+                actualClient = new GlmLlmClient(
                         resolveKey(glm.apiKey),
                         glm.baseUrl,
                         glm.model,
@@ -204,8 +205,9 @@ public class LlmConfig {
                         aiLogService,
                         aiExecutor
                 );
+                break;
             case "minimax":
-                return new MiniMaxLlmClient(
+                actualClient = new MiniMaxLlmClient(
                         resolveKey(minimax.apiKey),
                         minimax.baseUrl,
                         minimax.model,
@@ -214,8 +216,9 @@ public class LlmConfig {
                         aiLogService,
                         aiExecutor
                 );
+                break;
             case "deepseek":
-                return new DeepSeekLlmClient(
+                actualClient = new DeepSeekLlmClient(
                         resolveKey(deepseek.apiKey),
                         deepseek.baseUrl,
                         deepseek.model,
@@ -224,8 +227,9 @@ public class LlmConfig {
                         aiLogService,
                         aiExecutor
                 );
+                break;
             case "openai-compatible":
-                return new GlmLlmClient(
+                actualClient = new GlmLlmClient(
                         resolveKey(apiKey),
                         baseUrl,
                         model,
@@ -233,10 +237,14 @@ public class LlmConfig {
                         aiLogService,
                         aiExecutor
                 );
+                break;
             case "mock":
             default:
-                return new MockLlmClient(aiExecutor);
+                actualClient = new MockLlmClient(aiExecutor);
         }
+
+        // Wrap with A/B test handler
+        return new ABTestLlmClientWrapper(actualClient, aiLogService, aiExecutor);
     }
 
     private String resolveKey(String key) {

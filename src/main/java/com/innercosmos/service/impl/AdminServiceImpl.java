@@ -1,6 +1,7 @@
 package com.innercosmos.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.innercosmos.entity.ABTestConfig;
 import com.innercosmos.entity.EchoCapsule;
 import com.innercosmos.entity.ModelConfig;
 import com.innercosmos.entity.ReportRecord;
@@ -8,17 +9,21 @@ import com.innercosmos.entity.SafetyEvent;
 import com.innercosmos.entity.SlowLetter;
 import com.innercosmos.entity.User;
 import com.innercosmos.mapper.AiInteractionLogMapper;
+import com.innercosmos.mapper.ABTestConfigMapper;
 import com.innercosmos.mapper.EchoCapsuleMapper;
 import com.innercosmos.mapper.ModelConfigMapper;
 import com.innercosmos.mapper.ReportRecordMapper;
 import com.innercosmos.mapper.SafetyEventMapper;
 import com.innercosmos.mapper.SlowLetterMapper;
 import com.innercosmos.mapper.UserMapper;
+import com.innercosmos.service.ABTestService;
 import com.innercosmos.service.AdminService;
 import com.innercosmos.vo.AdminOverviewVO;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class AdminServiceImpl implements AdminService {
@@ -29,8 +34,10 @@ public class AdminServiceImpl implements AdminService {
     private final SlowLetterMapper letterMapper;
     private final AiInteractionLogMapper aiLogMapper;
     private final ModelConfigMapper modelConfigMapper;
+    private final ABTestConfigMapper abTestConfigMapper;
+    private final ABTestService abTestService;
 
-    public AdminServiceImpl(UserMapper userMapper, EchoCapsuleMapper capsuleMapper, ReportRecordMapper reportMapper, SafetyEventMapper safetyEventMapper, SlowLetterMapper letterMapper, AiInteractionLogMapper aiLogMapper, ModelConfigMapper modelConfigMapper) {
+    public AdminServiceImpl(UserMapper userMapper, EchoCapsuleMapper capsuleMapper, ReportRecordMapper reportMapper, SafetyEventMapper safetyEventMapper, SlowLetterMapper letterMapper, AiInteractionLogMapper aiLogMapper, ModelConfigMapper modelConfigMapper, ABTestConfigMapper abTestConfigMapper, ABTestService abTestService) {
         this.userMapper = userMapper;
         this.capsuleMapper = capsuleMapper;
         this.reportMapper = reportMapper;
@@ -38,6 +45,8 @@ public class AdminServiceImpl implements AdminService {
         this.letterMapper = letterMapper;
         this.aiLogMapper = aiLogMapper;
         this.modelConfigMapper = modelConfigMapper;
+        this.abTestConfigMapper = abTestConfigMapper;
+        this.abTestService = abTestService;
     }
 
     public List<User> users() { return userMapper.selectList(null); }
@@ -158,5 +167,40 @@ public class AdminServiceImpl implements AdminService {
         }
         user.status = "ACTIVE";
         userMapper.updateById(user);
+    }
+
+    // A/B Testing Management
+
+    @Override
+    public List<ABTestConfig> abTestConfigs() {
+        return abTestConfigMapper.selectList(new QueryWrapper<ABTestConfig>().orderByDesc("created_at"));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public ABTestConfig createABTest(ABTestConfig config) {
+        if (config.id == null) {
+            abTestConfigMapper.insert(config);
+        } else {
+            abTestConfigMapper.updateById(config);
+        }
+        return config;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void toggleABTest(Long configId, boolean enabled) {
+        abTestService.toggleTest(configId, enabled);
+    }
+
+    @Override
+    public Map<String, ABTestService.ABTestStats> getABTestStats(String testName) {
+        return abTestService.getAggregatedStats(testName);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public ABTestService.ABTestReport completeABTest(Long configId) {
+        return abTestService.completeTest(configId);
     }
 }

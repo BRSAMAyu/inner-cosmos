@@ -3,6 +3,7 @@ package com.innercosmos.ai.structured;
 import com.innercosmos.ai.client.LlmClient;
 import com.innercosmos.ai.client.LlmRequest;
 import com.innercosmos.ai.prompt.StructuredOutputParser;
+import com.innercosmos.service.ABTestService;
 import com.innercosmos.util.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,37 +16,78 @@ public class StructuredAiService {
     private static final Logger log = LoggerFactory.getLogger(StructuredAiService.class);
 
     private final LlmClient llmClient;
+    private final ABTestService abTestService;
 
-    public StructuredAiService(LlmClient llmClient) {
+    public StructuredAiService(LlmClient llmClient, ABTestService abTestService) {
         this.llmClient = llmClient;
+        this.abTestService = abTestService;
     }
 
     public <T> T call(Long userId, String moduleName, String instruction, Object context,
                       Class<T> resultType, Supplier<T> fallback) {
-        String contextJson = JsonUtils.toJson(context);
-        String prompt = buildPrompt(instruction, contextJson, null);
+        // A/B test group assignment
+        String assignedGroup = abTestService.assignGroup(userId, moduleName);
+        long startTime = System.currentTimeMillis();
+        boolean success = false;
+        boolean usedFallback = false;
+
         try {
+            String contextJson = JsonUtils.toJson(context);
+            String prompt = buildPrompt(instruction, contextJson, null);
+
             LlmRequest request = new LlmRequest(userId, moduleName, prompt);
             request.requestJson = contextJson;
+
+            // Force group if A/B test is active
+            if ("MOCK".equals(assignedGroup)) {
+                request.forceMock = true;
+            }
+
             String raw = llmClient.chat(request);
             T parsed = StructuredOutputParser.parse(raw, resultType);
             if (parsed != null) {
+                success = true;
                 return parsed;
             }
 
+            // JSON repair attempt
             LlmRequest retry = new LlmRequest(userId, moduleName + "_JSON_REPAIR",
                     buildPrompt(instruction, contextJson, raw));
             retry.requestJson = contextJson;
+            if ("MOCK".equals(assignedGroup)) {
+                retry.forceMock = true;
+            }
+
             String repaired = llmClient.chat(retry);
             parsed = StructuredOutputParser.parse(repaired, resultType);
             if (parsed != null) {
+                success = true;
                 return parsed;
             }
             log.warn("Structured AI output for {} could not be parsed after repair", moduleName);
+
         } catch (Exception exception) {
             log.warn("Structured AI call for {} fell back to deterministic extraction: {}", moduleName, exception.getMessage());
+        } finally {
+            // Record A/B test metrics
+            double latency = System.currentTimeMillis() - startTime;
+            try {
+                abTestService.recordMetrics(userId, assignedGroup, moduleName, latency, success, !success && usedFallback);
+            } catch (Exception e) {
+                // Don't let metric recording affect the main flow
+                log.debug("Failed to record A/B test metrics: {}", e.getMessage());
+            }
         }
+
+        usedFallback = true;
         return fallback.get();
+    }
+
+    /**
+     * Check if A/B testing is active for current user.
+     */
+    public String getCurrentTestGroup(Long userId) {
+        return abTestService.getUserGroup(userId, null);
     }
 
     private String buildPrompt(String instruction, String contextJson, String invalidOutput) {

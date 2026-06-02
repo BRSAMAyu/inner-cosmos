@@ -453,6 +453,42 @@ CREATE TABLE IF NOT EXISTS tb_emotion_timeline (
   INDEX idx_emotion_timeline_user_date (user_id, record_date)
 );
 
+CREATE TABLE IF NOT EXISTS tb_ab_test_config (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  test_name VARCHAR(128) NOT NULL UNIQUE,
+  description TEXT,
+  enabled BOOLEAN DEFAULT TRUE,
+  mock_percentage INT DEFAULT 50,
+  control_group VARCHAR(32),
+  total_participants BIGINT DEFAULT 0,
+  start_time TIMESTAMP NULL,
+  end_time TIMESTAMP NULL,
+  status VARCHAR(32) DEFAULT 'ACTIVE',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_ab_test_enabled (enabled),
+  INDEX idx_ab_test_status (status)
+);
+
+CREATE TABLE IF NOT EXISTS tb_ab_test_metrics (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  test_name VARCHAR(128) NOT NULL,
+  assigned_group VARCHAR(32),
+  module_name VARCHAR(64),
+  request_count INT DEFAULT 1,
+  avg_latency DOUBLE DEFAULT 0,
+  success_count INT DEFAULT 0,
+  fallback_count INT DEFAULT 0,
+  success_rate DOUBLE DEFAULT 0,
+  last_request_at TIMESTAMP NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_ab_metrics_user (user_id),
+  INDEX idx_ab_metrics_test (test_name),
+  INDEX idx_ab_metrics_group (assigned_group)
+);
+
 -- Phase 6: Admin
 
 CREATE TABLE IF NOT EXISTS tb_model_config (
