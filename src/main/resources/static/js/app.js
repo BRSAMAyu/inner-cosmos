@@ -81,6 +81,9 @@ const IC = {
     IC.applyTheme();
     IC.startThemeChecker();
 
+    // Add time-based class
+    IC.applyTimeBasedClass();
+
     const topbar = document.querySelector("[data-topbar]");
     if (topbar) {
       topbar.innerHTML = `
@@ -99,6 +102,26 @@ const IC = {
     document.title = title ? `${title} - Inner Cosmos` : "Inner Cosmos";
     document.body.classList.add("page-ready");
     IC.attachInteractionFeedback();
+
+    // Initialize motion system
+    if (window.ICMotion) {
+      ICMotion.init();
+    }
+  },
+
+  applyTimeBasedClass() {
+    const hour = new Date().getHours();
+    document.body.classList.remove("time-morning", "time-afternoon", "time-evening", "time-night");
+
+    if (hour >= 5 && hour < 12) {
+      document.body.classList.add("time-morning");
+    } else if (hour >= 12 && hour < 17) {
+      document.body.classList.add("time-afternoon");
+    } else if (hour >= 17 && hour < 21) {
+      document.body.classList.add("time-evening");
+    } else {
+      document.body.classList.add("time-night");
+    }
   },
 
   startThemeChecker() {

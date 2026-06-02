@@ -302,13 +302,23 @@ textarea {
   border: 1px solid var(--line);
   background: rgba(255, 250, 243, .78);
   line-height: 1.68;
-  animation: message-in .26s ease both;
+  animation: message-in .26s ease both, bubble-flow var(--motion-breath, 5.6s) ease-in-out infinite;
 }
 
 .bubble.user {
   margin-left: auto;
   border-color: rgba(151, 169, 186, .38);
   background: linear-gradient(180deg, rgba(232, 237, 241, .96), rgba(255, 250, 243, .84));
+}
+
+.bubble.user::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius);
+  background: linear-gradient(45deg, transparent 30%, rgba(151, 169, 186, .08) 50%, transparent 70%);
+  animation: shimmer 3s ease-in-out infinite;
+  pointer-events: none;
 }
 
 .bubble.ai {
@@ -339,6 +349,39 @@ textarea {
     linear-gradient(35deg, rgba(241, 230, 227, .52), rgba(232, 237, 241, .58));
 }
 
+/* Flowing nebula effect */
+.starfield::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80% 50% at 20% 50%, rgba(143, 163, 148, .08) 0%, transparent 50%),
+    radial-gradient(ellipse 60% 40% at 80% 30%, rgba(151, 169, 186, .06) 0%, transparent 50%),
+    radial-gradient(ellipse 70% 60% at 50% 80%, rgba(191, 150, 152, .05) 0%, transparent 50%);
+  animation: nebula-drift 20s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes nebula-drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-2%, 1%) scale(1.05); }
+}
+
+.star-connections {
+  pointer-events: none;
+  opacity: 0.3;
+}
+
+.star-connections line {
+  stroke-linecap: round;
+  animation: connection-pulse 3s ease-in-out infinite;
+}
+
+@keyframes connection-pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.6; }
+}
+
 .star {
   position: absolute;
   width: var(--size);
@@ -352,10 +395,32 @@ textarea {
   background:
     radial-gradient(circle, #fffdf8 0 14%, var(--star-color, var(--accent-sage)) 18% 42%, rgba(255,255,255,.10) 72%);
   box-shadow: 0 0 calc(28px * var(--star-glow, .7)) var(--star-color, rgba(143,163,148,.5)), 0 0 54px rgba(255,250,243,.62);
-  animation: star-breathe var(--motion-breath);
+  animation: star-breathe var(--motion-breath), star-drift 15s ease-in-out infinite;
+  cursor: pointer;
+  transition: transform .3s ease, box-shadow .3s ease;
 }
 
-.star:hover { transform: scale(1.10); }
+.star:hover {
+  transform: scale(1.15);
+  box-shadow: 0 0 calc(36px * var(--star-glow, .8)) var(--star-color, rgba(143,163,148,.7)), 0 0 72px rgba(255,250,243,.82);
+}
+
+/* Star clustering animation */
+.star.clustered {
+  animation: star-cluster-breathe 4s ease-in-out infinite;
+}
+
+@keyframes star-cluster-breathe {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.15); }
+}
+
+@keyframes star-drift {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(1px, -1px); }
+  50% { transform: translate(0, 1px); }
+  75% { transform: translate(-1px, 0); }
+}
 
 .star-label {
   position: absolute;
@@ -364,6 +429,12 @@ textarea {
   font-size: .78rem;
   white-space: nowrap;
   pointer-events: none;
+  transition: opacity .3s ease;
+}
+
+.star:hover + .star-label {
+  opacity: 1;
+  color: var(--text);
 }
 
 .star-detail {
@@ -987,6 +1058,16 @@ body.dark-star .soft-stage {
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+@keyframes bubble-flow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
 @keyframes breath {
   0%, 100% { transform: scale(1); filter: brightness(1); }
   50% { transform: scale(1.035); filter: brightness(1.06); }
@@ -995,6 +1076,311 @@ body.dark-star .soft-stage {
 @keyframes star-breathe {
   0%, 100% { filter: brightness(1); opacity: .86; }
   50% { filter: brightness(1.12); opacity: 1; }
+}
+
+@keyframes aurora-glow {
+  0%, 100% { box-shadow: 0 0 26px rgba(143, 163, 148, .24), 0 0 52px rgba(143, 163, 148, .12); }
+  50% { box-shadow: 0 0 36px rgba(143, 163, 148, .36), 0 0 72px rgba(143, 163, 148, .18); }
+}
+
+@keyframes text-reveal {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Aurora-specific enhancements */
+.bubble.aurora {
+  border-color: rgba(134, 152, 169, .34);
+  background: linear-gradient(180deg, rgba(232, 237, 241, .94), rgba(238, 234, 242, .88));
+  box-shadow: 0 4px 16px rgba(134, 152, 169, .12);
+}
+
+.bubble.aurora::before {
+  content: "✦ Aurora";
+  position: absolute;
+  top: -8px;
+  left: 12px;
+  font-size: .7rem;
+  color: var(--accent-dusty-blue);
+  background: rgba(255, 255, 255, .9);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  animation: aurora-glow 5.6s ease-in-out infinite;
+}
+
+.bubble.aurora p {
+  animation: text-reveal .6s ease both;
+}
+
+/* Energy bar animation */
+.energy-bar-fill {
+  transition: width .6s ease, background .3s ease;
+  animation: energy-pulse 2s ease-in-out infinite;
+}
+
+@keyframes energy-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .8; }
+}
+
+/* Voice button state */
+.voice-pill.recording {
+  animation: recording-pulse 1s ease-in-out infinite;
+  background: rgba(191, 150, 152, .2);
+  border-color: var(--accent-rose);
+}
+
+@keyframes recording-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(191, 150, 152, .4); }
+  50% { box-shadow: 0 0 0 8px rgba(191, 150, 152, 0); }
+}
+
+/* Capsule personality visual customization */
+.capsule-persona-stoic {
+  --persona-primary: #8fa394;
+  --persona-secondary: #7a8e7f;
+  --persona-accent: #aab8b3;
+}
+
+.capsule-persona-socratic {
+  --persona-primary: #97a9ba;
+  --persona-secondary: #8698a9;
+  --persona-accent: #b8c4d4;
+}
+
+.capsule-persona-zhuangzi {
+  --persona-primary: #aaa1b8;
+  --persona-secondary: #9a90a7;
+  --persona-accent: #c4b8d4;
+}
+
+.capsule-persona-existential {
+  --persona-primary: #bf9698;
+  --persona-secondary: #a67a7c;
+  --persona-accent: #d4b8b8;
+}
+
+.capsule-persona-painter {
+  --persona-primary: #c89391;
+  --persona-secondary: #b07d7b;
+  --persona-accent: #e0b8b8;
+}
+
+.capsule-persona-librarian {
+  --persona-primary: #9caf9f;
+  --persona-secondary: #8b9f8f;
+  --persona-accent: #b8d4c4;
+}
+
+.capsule-persona-radio {
+  --persona-primary: #aab8c4;
+  --persona-secondary: #9a8faf;
+  --persona-accent: #c4d4e0;
+}
+
+.capsule-persona-watchmaker {
+  --persona-primary: #b8a890;
+  --persona-secondary: #a89878;
+  --persona-accent: #d4c4a8;
+}
+
+.capsule-bubble.capsule {
+  border-color: var(--persona-primary);
+  background: linear-gradient(180deg, rgba(255, 250, 243, .92), rgba(255, 250, 243, .88));
+  box-shadow: 0 4px 16px rgba(var(--persona-primary), .12);
+}
+
+.capsule-bubble.capsule::before {
+  content: "✦ 回声";
+  position: absolute;
+  top: -8px;
+  left: 12px;
+  font-size: .7rem;
+  color: var(--persona-primary);
+  background: rgba(255, 255, 255, .9);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--persona-primary);
+}
+
+/* Persona avatar colors */
+.capsule-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--persona-primary), var(--persona-secondary));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  color: white;
+  box-shadow: 0 0 26px var(--persona-primary);
+  animation: persona-breath var(--motion-breath) ease-in-out infinite;
+}
+
+@keyframes persona-breath {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+/* Slow Letter ceremonial animations */
+.letter-paper {
+  background: linear-gradient(180deg, rgba(255, 250, 243, .98) 0%, rgba(255, 250, 243, .94) 100%);
+  box-shadow: 0 8px 32px rgba(143, 163, 148, .12);
+  position: relative;
+}
+
+.letter-paper::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent-sage), transparent);
+}
+
+.letter-layout {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+}
+
+@keyframes fly-away {
+  0% { transform: scale(1) translateY(0); opacity: 1; }
+  50% { transform: scale(1.2) translateY(-20px); opacity: 0.8; }
+  100% { transform: scale(0.8) translateY(-100px); opacity: 0; }
+}
+
+@keyframes letter-seal {
+  0% { transform: scale(0) rotate(-180deg); opacity: 0; }
+  50% { transform: scale(1.1) rotate(0deg); opacity: 1; }
+  100% { transform: scale(1) rotate(10deg); opacity: 1; }
+}
+
+.letter-seal {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--accent-rose), var(--accent-rose));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 1.2rem;
+  margin: 16px auto;
+  box-shadow: 0 0 26px rgba(191, 150, 152, .4);
+  animation: letter-seal 0.8s ease-out;
+}
+
+.letter-unfolding {
+  animation: unfold 1.2s ease-out;
+}
+
+@keyframes unfold {
+  0% { transform: rotateX(90deg); opacity: 0; }
+  100% { transform: rotateX(0); opacity: 1; }
+}
+
+.ceremonial-glow {
+  animation: ceremonial-pulse 3s ease-in-out infinite;
+}
+
+@keyframes ceremonial-pulse {
+  0%, 100% { box-shadow: 0 0 26px rgba(191, 150, 152, .2); }
+  50% { box-shadow: 0 0 52px rgba(191, 150, 152, .4); }
+}
+
+/* Dashboard flowing enhancements */
+.metric {
+  animation: metric-drift var(--motion-breath, 5.6s) ease-in-out infinite;
+}
+
+@keyframes metric-drift {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+.chart-bar {
+  animation: bar-grow 1.2s ease-out both;
+}
+
+@keyframes bar-grow {
+  from { height: 0; opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Time-based dashboard variations */
+.time-morning .metric {
+  --metric-glow: rgba(143, 163, 148, .3);
+}
+
+.time-afternoon .metric {
+  --metric-glow: rgba(151, 169, 186, .3);
+}
+
+.time-evening .metric {
+  --metric-glow: rgba(191, 150, 152, .3);
+}
+
+.time-night .metric {
+  --metric-glow: rgba(122, 142, 127, .4);
+}
+
+.metric:hover {
+  box-shadow: 0 12px 28px var(--metric-glow, rgba(143, 163, 148, .24));
+  transform: translateY(-2px);
+}
+
+/* Hero section time-based gradients */
+.hero.morning {
+  background: linear-gradient(135deg, rgba(229, 235, 228, .4) 0%, rgba(247, 250, 243, .2) 100%);
+}
+
+.hero.afternoon {
+  background: linear-gradient(135deg, rgba(232, 237, 241, .4) 0%, rgba(247, 242, 236, .2) 100%);
+}
+
+.hero.evening {
+  background: linear-gradient(135deg, rgba(241, 230, 227, .4) 0%, rgba(247, 242, 236, .2) 100%);
+}
+
+.hero.night {
+  background: linear-gradient(135deg, rgba(42, 38, 34, .6) 0%, rgba(26, 30, 44, .4) 100%);
+}
+
+/* Welcome card with flowing border */
+.welcome-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.welcome-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(45deg, transparent, rgba(143, 163, 148, .1), transparent);
+  animation: welcome-flow 8s linear infinite;
+}
+
+@keyframes welcome-flow {
+  0% { transform: translateX(-100%) rotate(45deg); }
+  100% { transform: translateX(100%) rotate(45deg); }
+}
+
+/* Activity indicators with pulse */
+.activity-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-sage);
+  animation: activity-pulse 2s ease-in-out infinite;
+}
+
+@keyframes activity-pulse {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.2); }
 }
 
 /* ── Warm Dark Theme (activates at sunset) ── */
