@@ -34,6 +34,8 @@ llm:
   base-url: ${LLM_BASE_URL:}
   model: ${LLM_MODEL:mock-inner-cosmos}
   allow-fallback: ${LLM_ALLOW_FALLBACK:true}
+  prompt:
+    language: ${LLM_PROMPT_LANGUAGE:zh-CN}  # zh-CN for Chinese, en-US for English
   glm:
     api-key: ${GLM_API_KEY:}
     model: ${GLM_MODEL:glm-4-flash}
