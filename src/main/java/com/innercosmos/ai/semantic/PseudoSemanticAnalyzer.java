@@ -94,7 +94,7 @@ public final class PseudoSemanticAnalyzer {
     }
 
     // Simple tokenizer (splits by common delimiters)
-    private static final Pattern TOKENIZER = Pattern.compile("[\\s,。，！？!?;；、]+");
+    private static final Pattern TOKENIZER = Pattern.compile("[\\s,.,!?!?;;、]+");
 
     /**
      * Analyze user text and return semantic analysis result.
@@ -263,7 +263,14 @@ public final class PseudoSemanticAnalyzer {
     private static boolean hasAnyMatch(Set<String> tokens, Set<String> patterns) {
         for (String token : tokens) {
             for (String pattern : patterns) {
-                if (token.contains(pattern) || pattern.contains(token)) {
+                // Only match if token contains the full pattern, or if pattern contains token
+                // but avoid single-character false positives by requiring minimum length
+                if (token.contains(pattern)) {
+                    return true;
+                }
+                // For reverse match (pattern contains token), require token to be at least 2 characters
+                // to avoid single-character tokens matching multi-character patterns
+                if (pattern.contains(token) && token.length() >= 2) {
                     return true;
                 }
             }

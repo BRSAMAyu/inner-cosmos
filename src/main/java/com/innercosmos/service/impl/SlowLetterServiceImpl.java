@@ -135,7 +135,7 @@ public class SlowLetterServiceImpl implements SlowLetterService {
         reply.senderUserId = userId;
         reply.receiverUserId = original.senderUserId;
         reply.receiverCapsuleId = original.receiverCapsuleId;
-        reply.title = request.title == null ? "回复：" + original.title : request.title;
+        reply.title = request.title == null ? "回复:" + original.title : request.title;
         reply.letterBody = request.letterBody;
         reply.status = "DRAFT";
         reply.parallaxDistance = 3;
@@ -187,7 +187,7 @@ public class SlowLetterServiceImpl implements SlowLetterService {
         }
         LetterSafetyFilter.FilterResult result = letterSafetyFilter.filter(letter.letterBody, userId, letter.receiverUserId);
         if (!result.passed) {
-            return "信件内容未通过安全检查，建议修改：" + result.reason;
+            return "信件内容未通过安全检查,建议修改:" + result.reason;
         }
         return null;
     }

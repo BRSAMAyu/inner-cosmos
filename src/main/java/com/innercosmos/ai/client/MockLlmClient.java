@@ -24,7 +24,7 @@ public class MockLlmClient implements LlmClient {
     @Override
     public String chat(LlmRequest request) {
         String text = request.prompt == null ? "" : request.prompt;
-        String structured = structuredJson(request.moduleName, text);
+        String structured = structuredJson(request, text);
         if (structured != null) {
             return structured;
         }
@@ -35,11 +35,17 @@ public class MockLlmClient implements LlmClient {
         return String.join("\n\n", segments);
     }
 
-    private String structuredJson(String moduleName, String text) {
-        String module = moduleName == null ? "" : moduleName.toUpperCase();
+    private String structuredJson(LlmRequest request, String text) {
+        String module = request.moduleName == null ? "" : request.moduleName.toUpperCase();
+
+        // For LETTER_GUARD, extract the actual letter text from requestJson for analysis
+        String textToAnalyze = text;
+        if (module.contains("LETTER_GUARD") && request.requestJson != null) {
+            textToAnalyze = extractLetterText(request.requestJson);
+        }
 
         // Analyze input for semantic understanding
-        AnalysisResult analysis = PseudoSemanticAnalyzer.analyze(text);
+        AnalysisResult analysis = PseudoSemanticAnalyzer.analyze(textToAnalyze);
 
         if (module.contains("AURORA_CHAT")) {
             return buildAuroraChatJson(text, analysis);
@@ -57,7 +63,7 @@ public class MockLlmClient implements LlmClient {
             return buildPersonaChatJson(text, analysis);
         }
         if (module.contains("LETTER_GUARD")) {
-            return buildLetterGuardJson(text, analysis);
+            return buildLetterGuardJson(textToAnalyze, analysis);
         }
         return null;
     }
@@ -72,38 +78,38 @@ public class MockLlmClient implements LlmClient {
 
         // Segment 1: Reflective opening based on sentiment
         if ("CRISIS".equals(analysis.sentimentLabel)) {
-            segments.add("我听见你现在很不容易。我们先停一停，不急着处理任何事，先把呼吸找回来。");
+            segments.add("我听见你现在很不容易.我们先停一停,不急着处理任何事,先把呼吸找回来.");
         } else if ("NEGATIVE".equals(analysis.sentimentLabel)) {
             String theme = analysis.detectedThemes.isEmpty() ? "这件事" : analysis.detectedThemes.get(0);
-            segments.add("我听见" + theme + "对你有重量，尤其是此刻这种感觉。");
+            segments.add("我听见" + theme + "对你有重量,尤其是此刻这种感觉.");
         } else if ("POSITIVE".equals(analysis.sentimentLabel)) {
-            segments.add("我感觉到今天有一些明亮的东西在。");
+            segments.add("我感觉到今天有一些明亮的东西在.");
         } else {
-            segments.add("我听见这件事现在对你有重量。");
+            segments.add("我听见这件事现在对你有重量.");
         }
 
         // Segment 2: Clarification/reframing based on detected themes
         if (analysis.detectedThemes.contains("任务压力")) {
-            segments.add("我们先把'这件事'和'你这个人'分开来看，压力是一件事，你的价值是另一件事。");
+            segments.add("我们先把'这件事'和'你这个人'分开来看,压力是一件事,你的价值是另一件事.");
         } else if (analysis.detectedThemes.contains("关系牵动")) {
-            segments.add("关系里的事总是牵动很多层。我们先看看你的感受和对方的说法，各是什么。");
+            segments.add("关系里的事总是牵动很多层.我们先看看你的感受和对方的说法,各是什么.");
         } else if (analysis.detectedThemes.contains("情绪承压")) {
-            segments.add("我们先不急着把情绪推开，允许它存在一会儿，也许能看到它背后在说什么。");
+            segments.add("我们先不急着把情绪推开,允许它存在一会儿,也许能看到它背后在说什么.");
         } else if (analysis.detectedThemes.contains("认知探索")) {
-            segments.add("这团东西现在还模糊，我们可以把它拆开，看看事实、感受和想法各是什么。");
+            segments.add("这团东西现在还模糊,我们可以把它拆开,看看事实、感受和想法各是什么.");
         } else {
-            segments.add("我们先把事实、感受和下一步分开看。");
+            segments.add("我们先把事实、感受和下一步分开看.");
         }
 
         // Segment 3: Small step suggestion based on intent
         if ("TASK_STRESS".equals(analysis.primaryIntent)) {
-            segments.add("现在可以只留下一个很小的动作——也许只是打开那个文件，看十分钟。");
+            segments.add("现在可以只留下一个很小的动作--也许只是打开那个文件,看十分钟.");
         } else if ("RELATION_ISSUE".equals(analysis.primaryIntent)) {
-            segments.add("现在可以只做一件事：写下对方说了什么，以及你实际感受到什么。");
+            segments.add("现在可以只做一件事:写下对方说了什么,以及你实际感受到什么.");
         } else if ("SELF_HARM".equals(analysis.primaryIntent)) {
-            segments.add("现在最小的一步，是先让自己活下来，其他的明天再说。");
+            segments.add("现在最小的一步,是先让自己活下来,其他的明天再说.");
         } else {
-            segments.add("现在可以只留下一个很小的动作。");
+            segments.add("现在可以只留下一个很小的动作.");
         }
 
         // Dynamic theme detection
@@ -112,23 +118,23 @@ public class MockLlmClient implements LlmClient {
         // Dynamic next question based on intent
         String nextQuestion;
         if ("SELF_HARM".equals(analysis.primaryIntent)) {
-            nextQuestion = "你能答应我现在先不做任何伤害自己的决定，给自己五分钟吗？";
+            nextQuestion = "你能答应我现在先不做任何伤害自己的决定,给自己五分钟吗?";
         } else if ("TASK_STRESS".equals(analysis.primaryIntent)) {
-            nextQuestion = "如果只选一个最需要被看见的部分，会是哪一步最让你卡住？";
+            nextQuestion = "如果只选一个最需要被看见的部分,会是哪一步最让你卡住?";
         } else if ("RELATION_ISSUE".equals(analysis.primaryIntent)) {
-            nextQuestion = "这段关系里，你最不想被看见但又最想说出来的是什么？";
+            nextQuestion = "这段关系里,你最不想被看见但又最想说出来的是什么?";
         } else {
-            nextQuestion = "如果只选一个最需要被看见的部分，会是哪一个？";
+            nextQuestion = "如果只选一个最需要被看见的部分,会是哪一个?";
         }
 
         // Dynamic small step
         String smallStep;
         if ("TASK_STRESS".equals(analysis.primaryIntent)) {
-            smallStep = "把任务打开，只做十分钟。";
+            smallStep = "把任务打开,只做十分钟.";
         } else if ("RELATION_ISSUE".equals(analysis.primaryIntent)) {
-            smallStep = "写下关系里最重的一句话。";
+            smallStep = "写下关系里最重的一句话.";
         } else {
-            smallStep = "写下最重的一句话。";
+            smallStep = "写下最重的一句话.";
         }
 
         return String.format("""
@@ -180,41 +186,41 @@ public class MockLlmClient implements LlmClient {
 
         // Build fragments based on keywords
         List<String> fragments = new ArrayList<>();
-        fragments.add("{\"type\":\"FEELING\",\"rawExcerpt\":\"" + extractFragment(text, "feeling") + "\",\"analysis\":\"最先需要被承认的是" + coreFeeling + "。\",\"reframe\":\"先允许这个感受存在。\"}");
-        fragments.add("{\"type\":\"NEED\",\"rawExcerpt\":\"" + extractFragment(text, "need") + "\",\"analysis\":\"背后可能有一个尚未被满足的需要。\",\"reframe\":\"需要被看见并不等于脆弱。\"}");
+        fragments.add("{\"type\":\"FEELING\",\"rawExcerpt\":\"" + extractFragment(text, "feeling") + "\",\"analysis\":\"最先需要被承认的是" + coreFeeling + ".\",\"reframe\":\"先允许这个感受存在.\"}");
+        fragments.add("{\"type\":\"NEED\",\"rawExcerpt\":\"" + extractFragment(text, "need") + "\",\"analysis\":\"背后可能有一个尚未被满足的需要.\",\"reframe\":\"需要被看见并不等于脆弱.\"}");
 
         // Add BELIEF fragment if self-evaluation detected
         if (analysis.detectedThemes.contains("自我评价")) {
-            fragments.add("{\"type\":\"BELIEF\",\"rawExcerpt\":\"" + extractFragment(text, "belief") + "\",\"analysis\":\"这里可能把事件和自我价值绑在一起。\",\"reframe\":\"一件事没做好不等于整个人不行。\"}");
+            fragments.add("{\"type\":\"BELIEF\",\"rawExcerpt\":\"" + extractFragment(text, "belief") + "\",\"analysis\":\"这里可能把事件和自我价值绑在一起.\",\"reframe\":\"一件事没做好不等于整个人不行.\"}");
         } else {
-            fragments.add("{\"type\":\"BELIEF\",\"rawExcerpt\":\"自我判断\",\"analysis\":\"这里可能有一个过快的自我判断。\",\"reframe\":\"把事情没做好和我这个人不行暂时分开。\"}");
+            fragments.add("{\"type\":\"BELIEF\",\"rawExcerpt\":\"自我判断\",\"analysis\":\"这里可能有一个过快的自我判断.\",\"reframe\":\"把事情没做好和我这个人不行暂时分开.\"}");
         }
 
         // Add ACTION fragment
         if ("TASK_STRESS".equals(analysis.primaryIntent)) {
-            fragments.add("{\"type\":\"ACTION\",\"rawExcerpt\":\"任务压力\",\"analysis\":\"可以留下十分钟动作。\",\"reframe\":\"先打开文件十分钟。\"}");
+            fragments.add("{\"type\":\"ACTION\",\"rawExcerpt\":\"任务压力\",\"analysis\":\"可以留下十分钟动作.\",\"reframe\":\"先打开文件十分钟.\"}");
         } else if ("RELATION_ISSUE".equals(analysis.primaryIntent)) {
-            fragments.add("{\"type\":\"ACTION\",\"rawExcerpt\":\"关系\",\"analysis\":\"可以先写下对方说的话。\",\"reframe\":\"把对方的陈述和你的感受分开看。\"}");
+            fragments.add("{\"type\":\"ACTION\",\"rawExcerpt\":\"关系\",\"analysis\":\"可以先写下对方说的话.\",\"reframe\":\"把对方的陈述和你的感受分开看.\"}");
         } else {
-            fragments.add("{\"type\":\"ACTION\",\"rawExcerpt\":\"下一步\",\"analysis\":\"可以留下一个很小的下一步。\",\"reframe\":\"下一步小到十分钟内能开始。\"}");
+            fragments.add("{\"type\":\"ACTION\",\"rawExcerpt\":\"下一步\",\"analysis\":\"可以留下一个很小的下一步.\",\"reframe\":\"下一步小到十分钟内能开始.\"}");
         }
 
         // Noise to drop
         List<String> noise = new ArrayList<>();
         noise.add("\"把一次混乱直接解释成\\\"我整个人都不行\\\"的结论\"");
-        if (containsAny(text, "应该", "必须", "一定")) {
+        if (containsAny(text, List.of("应该", "必须", "一定"))) {
             noise.add("\"那些把自己逼到没有余地的\\\"应该\\\"和\\\"必须\\\"\"");
         }
-        if (containsAny(text, "永远", "每次", "总是", "从来")) {
+        if (containsAny(text, List.of("永远", "每次", "总是", "从来"))) {
             noise.add("\"把今天扩大成永远的绝对化说法\"");
         }
 
         // Suggested todo
         String todoJson = "null";
         if ("TASK_STRESS".equals(analysis.primaryIntent)) {
-            todoJson = "{\"taskName\":\"把任务打开并推进十分钟\",\"description\":\"由思维碎纸机从混乱输入中提取。\",\"priority\":\"HIGH\"}";
+            todoJson = "{\"taskName\":\"把任务打开并推进十分钟\",\"description\":\"由思维碎纸机从混乱输入中提取.\",\"priority\":\"HIGH\"}";
         } else if (analysis.intensityScore > 7) {
-            todoJson = "{\"taskName\":\"把最重的一句话写下来\",\"description\":\"由思维碎纸机从混乱输入中提取。\",\"priority\":\"MEDIUM\"}";
+            todoJson = "{\"taskName\":\"把最重的一句话写下来\",\"description\":\"由思维碎纸机从混乱输入中提取.\",\"priority\":\"MEDIUM\"}";
         }
 
         return String.format("""
@@ -222,7 +228,7 @@ public class MockLlmClient implements LlmClient {
                   "coreFeeling": "%s",
                   "hiddenNeed": "%s",
                   "noiseToDrop": [%s],
-                  "sentenceToKeep": "我现在感到%s，背后也许是在需要%s。",
+                  "sentenceToKeep": "我现在感到%s,背后也许是在需要%s.",
                   "fragments": [%s],
                   "suggestedTodo": %s,
                   "intensityScore": %.1f,
@@ -254,12 +260,12 @@ public class MockLlmClient implements LlmClient {
         return String.format("""
                 {
                   "memoryCard": {"title":"今日沉淀","summary":"%s","memoryType":"%s","emotionTags":["%s"],"keywordTags":["日常"],"peopleTags":[],"intensityScore":%.1f,"userImportance":4.0},
-                  "emotionTrace": {"emotionName":"%s","emotionScore":%.1f,"weatherType":"%s","triggerScene":"用户完成了一次自我表达。"},
+                  "emotionTrace": {"emotionName":"%s","emotionScore":%.1f,"weatherType":"%s","triggerScene":"用户完成了一次自我表达."},
                   "fragments": [
-                    {"type":"FACT","rawExcerpt":"一次表达","analysis":"从表达中抽取出的事实片段。","reframe":"先区分事实和解释。"},
-                    {"type":"FEELING","rawExcerpt":"%s","analysis":"表达里出现的主要感受线索。","reframe":"允许感受存在。"},
-                    {"type":"BELIEF","rawExcerpt":"自我判断","analysis":"可能有过快的自我判断。","reframe":"把事件和自我价值分开。"},
-                    {"type":"ACTION","rawExcerpt":"下一步","analysis":"可以轻轻推进一步。","reframe":"下一步小到十分钟内能开始。"}
+                    {"type":"FACT","rawExcerpt":"一次表达","analysis":"从表达中抽取出的事实片段.","reframe":"先区分事实和解释."},
+                    {"type":"FEELING","rawExcerpt":"%s","analysis":"表达里出现的主要感受线索.","reframe":"允许感受存在."},
+                    {"type":"BELIEF","rawExcerpt":"自我判断","analysis":"可能有过快的自我判断.","reframe":"把事件和自我价值分开."},
+                    {"type":"ACTION","rawExcerpt":"下一步","analysis":"可以轻轻推进一步.","reframe":"下一步小到十分钟内能开始."}
                   ],
                   "eventCards": [],
                   "relationMentions": [],
@@ -285,7 +291,7 @@ public class MockLlmClient implements LlmClient {
         String emotionTrend = analysis.sentimentScore > 0 ? "CLOUDY -> SUNNY" : analysis.sentimentScore < -2 ? "SUNNY -> RAINY" : "CLOUDY -> RAINY";
 
         return String.format("""
-                {"dominantTheme":"%s","themeSummary":"本周的记录显示出一些正在形成的模式。","emotionTrend":"%s","gravityChangeSummary":"高引力记忆开始形成可观察的模式。","weeklyObservation":"这一周最重要的变化，是你开始把混乱整理成可以被看见的线索。"}
+                {"dominantTheme":"%s","themeSummary":"本周的记录显示出一些正在形成的模式.","emotionTrend":"%s","gravityChangeSummary":"高引力记忆开始形成可观察的模式.","weeklyObservation":"这一周最重要的变化,是你开始把混乱整理成可以被看见的线索."}
                 """,
             escapeJson(dominantTheme),
             emotionTrend
@@ -298,11 +304,11 @@ public class MockLlmClient implements LlmClient {
     private String buildPersonaChatJson(String text, AnalysisResult analysis) {
         String reply;
         if ("SELF_HARM".equals(analysis.primaryIntent)) {
-            reply = "我听见这句话里有一些很重的声音。作为有限的回声，我不能替代现实中的人，但我想说，你现在的感受很重要，值得被一个人真实地听见。";
+            reply = "我听见这句话里有一些很重的声音.作为有限的回声,我不能替代现实中的人,但我想说,你现在的感受很重要,值得被一个人真实地听见.";
         } else if ("RELATION_ISSUE".equals(analysis.primaryIntent)) {
-            reply = "我听见关系里有一些牵动。作为有限的数字回声，我只能陪你看见其中一部分：这段关系里，你最想被理解的是什么？";
+            reply = "我听见关系里有一些牵动.作为有限的数字回声,我只能陪你看见其中一部分:这段关系里,你最想被理解的是什么?";
         } else {
-            reply = "我听见了这个片段。作为有限的数字回声，我只能陪你看见其中一部分：你最想继续靠近的是什么？";
+            reply = "我听见了这个片段.作为有限的数字回声,我只能陪你看见其中一部分:你最想继续靠近的是什么?";
         }
 
         return String.format("""
@@ -329,12 +335,33 @@ public class MockLlmClient implements LlmClient {
 
     // Helper methods
     private String extractFragment(String text, String type) {
-        String[] parts = text.split("[，。！？,\\.!\\?]", 3);
+        String[] parts = text.split("[,.!?,\\.!\\?]", 3);
         return parts.length > 0 ? parts[0].trim() : text.substring(0, Math.min(20, text.length()));
     }
 
+    private String extractLetterText(String requestJson) {
+        try {
+            if (requestJson == null || requestJson.isBlank()) {
+                return "";
+            }
+            int start = requestJson.indexOf("\"letterText\":");
+            if (start == -1) {
+                return requestJson;
+            }
+            start = requestJson.indexOf("\"", start + 13) + 1;
+            if (start == 0) return requestJson;
+            int end = requestJson.indexOf("\"", start);
+            if (end == -1) return requestJson;
+            String extracted = requestJson.substring(start, end);
+            // Handle escaped characters
+            return extracted.replace("\\n", "\n").replace("\\t", "\t").replace("\\\"", "\"").replace("\\\\", "\\");
+        } catch (Exception e) {
+            return requestJson;
+        }
+    }
+
     private String firstSentence(String raw) {
-        if (raw == null || raw.isBlank()) return "用户完成了一次自我表达。";
+        if (raw == null || raw.isBlank()) return "用户完成了一次自我表达.";
         String compact = raw.replaceAll("\\s+", " ").trim();
         return compact.length() > 64 ? compact.substring(0, 64) + "..." : compact;
     }

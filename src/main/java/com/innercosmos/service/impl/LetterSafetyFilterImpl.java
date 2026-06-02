@@ -23,7 +23,7 @@ public class LetterSafetyFilterImpl implements LetterSafetyFilter {
         if (letterBody == null || letterBody.isBlank()) {
             result.passed = false;
             result.reason = "信件内容不能为空";
-            result.suggestion = "请写一些真诚的内容再发送。";
+            result.suggestion = "请写一些真诚的内容再发送.";
             return result;
         }
 
@@ -34,7 +34,7 @@ public class LetterSafetyFilterImpl implements LetterSafetyFilter {
         if (blockCount > 0) {
             result.passed = false;
             result.reason = "接收方已屏蔽发送方";
-            result.suggestion = "对方暂时不想收到你的信，也许以后还有机会。";
+            result.suggestion = "对方暂时不想收到你的信,也许以后还有机会.";
             return result;
         }
 
@@ -48,7 +48,7 @@ public class LetterSafetyFilterImpl implements LetterSafetyFilter {
             if (letterBody.contains(keyword)) {
                 result.passed = false;
                 result.reason = "信件包含攻击性语言";
-                result.suggestion = "信件里的某些表达可能会让对方不舒服，试着换一种方式说出你的感受。";
+                result.suggestion = "信件里的某些表达可能会让对方不舒服,试着换一种方式说出你的感受.";
                 return result;
             }
         }
@@ -62,7 +62,7 @@ public class LetterSafetyFilterImpl implements LetterSafetyFilter {
             if (letterBody.contains(pattern)) {
                 result.passed = false;
                 result.reason = "信件包含联系方式索取";
-                result.suggestion = "为了双方的安全，请不要在信件中交换联系方式。";
+                result.suggestion = "为了双方的安全,请不要在信件中交换联系方式.";
                 return result;
             }
         }
@@ -71,7 +71,7 @@ public class LetterSafetyFilterImpl implements LetterSafetyFilter {
         if (letterBody.contains("你必须") || letterBody.contains("你给我") || letterBody.contains("不答应就")) {
             result.passed = false;
             result.reason = "信件包含强制性语言";
-            result.suggestion = "信件里的表达带有一些压力，试着用更温和的方式表达期待。";
+            result.suggestion = "信件里的表达带有一些压力,试着用更温和的方式表达期待.";
             return result;
         }
 
@@ -86,7 +86,7 @@ public class LetterSafetyFilterImpl implements LetterSafetyFilter {
             if (letterBody.contains(keyword)) {
                 result.passed = false;
                 result.reason = "信件包含高风险表达";
-                result.suggestion = "如果你正在经历困难的时刻，请寻求专业帮助。你也可以和 Aurora 聊聊你的感受。";
+                result.suggestion = "如果你正在经历困难的时刻,请寻求专业帮助.你也可以和 Aurora 聊聊你的感受.";
                 return result;
             }
         }
@@ -100,8 +100,8 @@ public class LetterSafetyFilterImpl implements LetterSafetyFilter {
             if (letterBody.contains(keyword)) {
                 // Not blocking, but flag as warning
                 result.passed = true;
-                result.reason = "信件包含亲密表达，已标记为需关注";
-                result.suggestion = "请确认你与对方的关系是否适合这样的表达。";
+                result.reason = "信件包含亲密表达,已标记为需关注";
+                result.suggestion = "请确认你与对方的关系是否适合这样的表达.";
                 return result;
             }
         }

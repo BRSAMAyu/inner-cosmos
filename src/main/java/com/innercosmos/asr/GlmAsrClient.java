@@ -104,7 +104,7 @@ public class GlmAsrClient implements AsrClient {
         }
         result.audioDurationSec = Math.max(3, result.text.length() / 3);
         result.speechRate = Math.max(1.0, result.text.length() / (double) result.audioDurationSec);
-        result.pauseCount = result.text.contains("，") ? 2 : 1;
+        result.pauseCount = result.text.contains(",") ? 2 : 1;
         result.longPauseCount = 0;
         result.inputConfidence = 0.92;
         return result;

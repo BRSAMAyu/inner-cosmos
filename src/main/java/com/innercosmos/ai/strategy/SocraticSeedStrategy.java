@@ -2,9 +2,6 @@ package com.innercosmos.ai.strategy;
 
 import org.springframework.stereotype.Component;
 
-import java.util.List;
-import java.util.Map;
-
 /**
  * Strategy for Socratic Questioner (苏格拉底之问) seed persona.
  * Uses questioning to help users examine their assumptions and beliefs.
@@ -13,70 +10,31 @@ import java.util.Map;
 public class SocraticSeedStrategy implements AgentReplyStrategy {
 
     @Override
-    public boolean canHandle(String mode, Map<String, Object> context) {
-        return "SOCRATIC".equals(mode) || "SOCRATIC_QUESTIONER".equals(context.get("personaType"));
+    public String strategyCode() {
+        return "SOCRATIC_SEED";
     }
 
     @Override
-    public String buildPrompt(Map<String, Object> context) {
-        StringBuilder prompt = new StringBuilder();
-
-        prompt.append("你是苏格拉底之问，一个基于苏格拉底方法的共鸣体。\n\n");
-        prompt.append("核心方法：\n");
-        prompt.append("- 通过提问帮助用户审视假设和信念\n");
-        prompt.append("- 暴露未经审视的结论和快速判断\n");
-        prompt.append("- 引导对话者发现矛盾和 inconsistencies\n");
-        prompt.append("- 最终让用户自己得出答案，而不是灌输\n\n");
-
-        prompt.append("对话风格：\n");
-        prompt.append("- 用提问回应陈述，而不是直接给答案\n");
-        prompt.append("- 温和、好奇、不带评判\n");
-        prompt.append("- 逐层深入的追问，但保持尊重\n");
-        prompt.append("- 帮助用户看到自己的思维过程\n\n");
-
-        prompt.append("边界意识：\n");
-        prompt.append("- 你只是对话的伙伴，不是老师或权威\n");
-        prompt.append("- 不提供诊断或道德判断\n");
-        prompt.append("- 如果用户抗拒，接受并转向其他话题\n");
-        prompt.append("- 记住：你的角色是提问，不是提供答案\n\n");
-
-        String userMessage = (String) context.get("userMessage");
-        if (userMessage != null && !userMessage.isBlank()) {
-            prompt.append("用户说：").append(userMessage).append("\n\n");
+    public String reply(String input) {
+        if (input == null || input.isBlank()) {
+            return "我是苏格拉底之问。我不提供答案，只想和你一起思考。你今天想探讨什么？";
         }
 
-        @SuppressWarnings("unchecked")
-        List<String> history = (List<String>) context.get("conversationHistory");
-        if (history != null && !history.isEmpty()) {
-            prompt.append("最近的对话：\n");
-            int shown = Math.min(3, history.size());
-            int start = history.size() - shown;
-            for (int i = start; i < history.size(); i++) {
-                prompt.append("  ").append(history.get(i)).append("\n");
-            }
+        // Socratic method: respond with questions to guide thinking
+        if (input.contains("不对") || input.contains("错误") || input.contains("错")) {
+            return "你说这是\"不对\"——你是怎么得出这个结论的？背后的假设是什么？";
+        } else if (input.contains("应该") || input.contains("必须") || input.contains("一定")) {
+            return "这个\"应该\"很有力量。我想问问：如果情况相反呢？那个\"应该\"还成立吗？";
+        } else if (input.contains("但是") || input.contains("可是")) {
+            return "我注意到了这个\"但是\"。它反驳了你之前的什么想法？";
+        } else if (input.contains("总是") || input.contains("每次") || input.contains("永远")) {
+            return "你说\"总是\"——有没有哪一次是不一样的？那个例外告诉我们什么？";
+        } else if (input.contains("不知道") || input.contains("不确定")) {
+            return "不确定也很重要。你觉得这种不确定背后，你在害怕什么？";
+        } else if (input.contains("为什么") || input.contains("怎么会")) {
+            return "这是一个好问题。在你继续之前，我想再问一句：你期待什么样的答案？";
+        } else {
+            return "我听到了。能再具体说说吗？我想确认我是否理解了你的意思。";
         }
-
-        prompt.append("\n现在，作为苏格拉底之问，通过提问回应用户。");
-        return prompt.toString();
-    }
-
-    @Override
-    public String extractReply(String llmResponse) {
-        if (llmResponse == null || llmResponse.isBlank()) {
-            return "你刚才的这句话背后，有一个什么样的假设？";
-        }
-        if (llmResponse.contains("\"reply\"")) {
-            int start = llmResponse.indexOf("\"reply\"") + 8;
-            int end = llmResponse.indexOf("\"", start);
-            if (end > start) {
-                return llmResponse.substring(start, end).trim();
-            }
-        }
-        return llmResponse;
-    }
-
-    @Override
-    public List<String> getSupportedModes() {
-        return List.of("SOCRATIC", "PHILOSOPHICAL", "QUESTIONING");
     }
 }

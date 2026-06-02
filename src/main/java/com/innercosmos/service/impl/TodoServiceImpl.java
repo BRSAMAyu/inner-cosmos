@@ -35,7 +35,7 @@ public class TodoServiceImpl implements TodoService {
             throw new BusinessException(ErrorCode.NOT_FOUND, "todo not found");
         }
         if (status == null || status.isBlank() || !VALID_STATUSES.contains(status)) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "无效的状态值，允许值：TODO, IN_PROGRESS, DONE, DROPPED");
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "无效的状态值,允许值:TODO, IN_PROGRESS, DONE, DROPPED");
         }
         item.status = status;
         todoItemMapper.updateById(item);

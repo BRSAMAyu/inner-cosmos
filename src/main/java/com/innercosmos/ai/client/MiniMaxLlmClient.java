@@ -36,7 +36,7 @@ public class MiniMaxLlmClient implements LlmClient {
         this.apiKey = apiKey;
         this.baseUrl = baseUrl == null || baseUrl.isBlank()
                 ? "https://api.minimaxi.com/v1/chat/completions" : baseUrl;
-        this.model = model == null || model.isBlank() ? "MiniMax-M2.5-highspeed" : model;
+        this.model = model == null || model.isBlank() ? "MiniMax-M2.7" : model;
         this.timeoutMs = timeoutMs <= 0 ? 30000 : timeoutMs;
         this.allowFallback = allowFallback;
         this.aiLogService = aiLogService;

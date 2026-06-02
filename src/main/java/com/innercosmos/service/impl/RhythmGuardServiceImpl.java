@@ -90,23 +90,23 @@ public class RhythmGuardServiceImpl implements RhythmGuardService {
         int hour = LocalTime.now().getHour();
 
         if (hour >= 23 || hour < 5) {
-            return "已经很晚了，也许今天可以先把感受放下，明天再慢慢整理。";
+            return "已经很晚了,也许今天可以先把感受放下,明天再慢慢整理.";
         }
         if (hour >= 5 && hour < 8) {
-            return "清晨的思绪往往很清晰，这是一个好好整理想法的好时间。";
+            return "清晨的思绪往往很清晰,这是一个好好整理想法的好时间.";
         }
         if (hour >= 8 && hour < 12) {
-            return "上午的精力充沛，适合做一些需要专注的事情。";
+            return "上午的精力充沛,适合做一些需要专注的事情.";
         }
         if (hour >= 12 && hour < 14) {
-            return "午后可以稍微放松一下，和 Aurora 随意聊聊也可以。";
+            return "午后可以稍微放松一下,和 Aurora 随意聊聊也可以.";
         }
         if (hour >= 14 && hour < 18) {
-            return "下午的时间，如果有什么想法冒出来，可以试着抓住它。";
+            return "下午的时间,如果有什么想法冒出来,可以试着抓住它.";
         }
         if (hour >= 18 && hour < 21) {
-            return "傍晚是一个适合回顾今天的时间。";
+            return "傍晚是一个适合回顾今天的时间.";
         }
-        return "夜晚适合安静地梳理内心的声音。";
+        return "夜晚适合安静地梳理内心的声音.";
     }
 }

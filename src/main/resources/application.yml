@@ -43,8 +43,8 @@ llm:
     timeout-ms: ${GLM_TIMEOUT_MS:20000}
     asr-api-key: ${GLM_ASR_API_KEY:}
   minimax:
-    api-key: ${MINIMAX_API_KEY:}
-    model: ${MINIMAX_MODEL:MiniMax-M2.5-highspeed}
+    api-key: ${MINIMAX_API_KEY:${LLM_API_KEY:}}
+    model: ${MINIMAX_MODEL:MiniMax-M2.7}
     base-url: ${MINIMAX_BASE_URL:https://api.minimaxi.com/v1/chat/completions}
     timeout-ms: ${MINIMAX_TIMEOUT_MS:30000}
   deepseek:

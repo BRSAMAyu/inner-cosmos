@@ -33,7 +33,7 @@ public class CapsuleServiceImpl implements CapsuleService {
         capsule.ownerUserId = userId;
         capsule.capsuleType = "USER_CAPSULE";
         capsule.pseudonym = request.pseudonym == null || request.pseudonym.isBlank() ? "未命名回声" : request.pseudonym;
-        capsule.intro = request.intro == null ? "一枚从脱敏记忆中编织出的数字回声。" : request.intro;
+        capsule.intro = request.intro == null ? "一枚从脱敏记忆中编织出的数字回声." : request.intro;
         capsule.personaPrompt = capsuleAgent.buildPersonaPrompt(capsule.pseudonym, capsule.intro);
         capsule.publicTags = toJsonArray(request.publicTags, "self-resonance");
         capsule.authorizedMemoryIds = toJsonArray(request.memoryIds != null ? request.memoryIds.stream().map(String::valueOf).toList() : null);

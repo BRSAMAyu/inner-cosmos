@@ -80,7 +80,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             blocked.messages = List.of(safety.safeMessage);
             blocked.replyTone = "SAFETY";
             blocked.detectedTheme = safety.riskType;
-            blocked.nextQuestion = "请优先联系现实中的可信任的人或当地紧急支持。";
+            blocked.nextQuestion = "请优先联系现实中的可信任的人或当地紧急支持.";
             blocked.suggestSettle = true;
             blocked.memoryReferenced = false;
             blocked.referencedMemoryIds = List.of();
@@ -167,7 +167,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 StringBuilder token = new StringBuilder();
                 for (char c : response.toCharArray()) {
                     token.append(c);
-                    if (token.length() >= 2 || c == '。' || c == '，' || c == '\n') {
+                    if (token.length() >= 2 || c == '.' || c == ',' || c == '\n') {
                         emitter.send(SseEmitter.event().data("{\"content\":\"" + escape(token.toString()) + "\"}"));
                         token.setLength(0);
                         Thread.sleep(30);
@@ -193,12 +193,12 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         String theme = detectTheme(message, mode);
         result.detectedTheme = theme;
         result.segments = List.of(
-                "我听见这件事现在对你有重量，尤其是「" + theme + "」这一层。",
-                "我们先不急着把它解释成你哪里不够好，可以先把事实、感受和下一步分开。",
-                "此刻最小的一步，是把最重的一句话写下来，再决定要不要处理它。"
+                "我听见这件事现在对你有重量,尤其是「" + theme + "」这一层.",
+                "我们先不急着把它解释成你哪里不够好,可以先把事实、感受和下一步分开.",
+                "此刻最小的一步,是把最重的一句话写下来,再决定要不要处理它."
         );
-        result.nextQuestion = "如果只选一个最需要被看见的部分，会是哪一个？";
-        result.smallStep = "写下一句最重的话。";
+        result.nextQuestion = "如果只选一个最需要被看见的部分,会是哪一个?";
+        result.smallStep = "写下一句最重的话.";
         result.memoryReferenced = memoryContext != null && memoryContext.referencedMemoryIds != null
                 && !memoryContext.referencedMemoryIds.isEmpty() && gravityMemories != null && !gravityMemories.isEmpty();
         result.referencedMemoryIds = result.memoryReferenced && memoryContext.referencedMemoryIds != null
@@ -210,8 +210,8 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         if (!"VOICE".equalsIgnoreCase(request.inputType)) {
             return "";
         }
-        return "语音时长 " + safe(request.audioDurationSec) + " 秒，语速 " + safe(request.speechRate)
-                + "，停顿 " + safe(request.pauseCount) + " 次，长停顿 " + safe(request.longPauseCount) + " 次";
+        return "语音时长 " + safe(request.audioDurationSec) + " 秒,语速 " + safe(request.speechRate)
+                + ",停顿 " + safe(request.pauseCount) + " 次,长停顿 " + safe(request.longPauseCount) + " 次";
     }
 
     private UserProfile loadProfile(Long userId) {
@@ -228,20 +228,20 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         List<String> result = new ArrayList<>();
         for (DialogMessage message : messages.subList(start, messages.size())) {
             String speaker = "USER".equals(message.speaker) ? "用户" : "Aurora";
-            result.add(speaker + "：" + abbreviate(message.textContent, 120));
+            result.add(speaker + ":" + abbreviate(message.textContent, 120));
         }
         return result;
     }
 
     private String profileBrief(UserProfile profile) {
         if (profile == null) {
-            return "默认温柔安静风格，允许适度记忆引用。";
+            return "默认温柔安静风格,允许适度记忆引用.";
         }
         String tone = profile.auroraTone == null || profile.auroraTone.isBlank() ? "温柔安静" : profile.auroraTone;
         String depth = profile.reflectionDepth == null ? "3" : profile.reflectionDepth.toString();
         String memory = Boolean.FALSE.equals(profile.allowMemoryRecall) ? "不要主动引用长期记忆" : "可以透明引用相关长期记忆";
         return "称呼 " + (profile.auroraName == null ? "Aurora" : profile.auroraName)
-                + "；陪伴风格 " + tone + "；反思深度 " + depth + "；" + memory + "。";
+                + ";陪伴风格 " + tone + ";反思深度 " + depth + ";" + memory + ".";
     }
 
     private String normalizeMode(String mode) {
@@ -259,9 +259,9 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     }
 
     private List<String> splitMessages(String response) {
-        if (response == null || response.isBlank()) return List.of("我在。我们可以先从一句最真实的话开始。");
+        if (response == null || response.isBlank()) return List.of("我在.我们可以先从一句最真实的话开始.");
         List<String> parts = new ArrayList<>();
-        for (String part : response.split("\\n\\s*\\n|(?<=[。！？?])")) {
+        for (String part : response.split("\\n\\s*\\n|(?<=[.!??])")) {
             String trimmed = part.trim();
             if (!trimmed.isBlank()) parts.add(trimmed);
         }
@@ -287,7 +287,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         if (messages == null) return "";
         for (int i = messages.size() - 1; i >= 0; i--) {
             String msg = messages.get(i);
-            if (msg.contains("？") || msg.contains("?")) return msg;
+            if (msg.contains("?") || msg.contains("?")) return msg;
         }
         return "";
     }

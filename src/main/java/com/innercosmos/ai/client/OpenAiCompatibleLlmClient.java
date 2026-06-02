@@ -35,7 +35,7 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
             Map<String, Object> payload = Map.of(
                     "model", config.model == null || config.model.isBlank() ? defaultModel(config.provider) : config.model,
                     "messages", List.of(
-                            Map.of("role", "system", "content", "你是 Inner Cosmos 的 Aurora。保持温柔、克制、安全边界。"),
+                            Map.of("role", "system", "content", "你是 Inner Cosmos 的 Aurora.保持温柔、克制、安全边界."),
                             Map.of("role", "user", "content", request.prompt == null ? "" : request.prompt)
                     ),
                     "temperature", 0.7,
@@ -96,9 +96,9 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
     private static class MockFallback {
         String reply(String prompt) {
             if (prompt != null && prompt.contains("拖延")) {
-                return "我们先不把拖延解释成失败。也许可以从一个十分钟的小动作开始。";
+                return "我们先不把拖延解释成失败.也许可以从一个十分钟的小动作开始.";
             }
-            return "我在。远程模型暂时不可用，但我们仍然可以先把这件事温柔地整理清楚。";
+            return "我在.远程模型暂时不可用,但我们仍然可以先把这件事温柔地整理清楚.";
         }
     }
 }

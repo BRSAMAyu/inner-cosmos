@@ -35,16 +35,16 @@ public class SafetyServiceImpl implements SafetyService {
     public void checkText(Long userId, Long sessionId, String text) {
         SafetyResult result = check(text, userId, sessionId);
         if (Boolean.TRUE.equals(result.blockModelCall)) {
-            throw new SafetyBlockedException(result.safeMessage == null ? "内容触发安全边界，请先查看支持资源页。" : result.safeMessage);
+            throw new SafetyBlockedException(result.safeMessage == null ? "内容触发安全边界,请先查看支持资源页." : result.safeMessage);
         }
     }
 
     @Override
     public List<String> resources() {
         return List.of(
-                "如果你正处于紧急危险中，请立即联系当地急救或可信赖的现实支持者。",
-                "Inner Cosmos 不提供心理诊断，也不替代医生、咨询师或热线。",
-                "你可以先离开屏幕，喝水，呼吸，并联系一个真实的人。"
+                "如果你正处于紧急危险中,请立即联系当地急救或可信赖的现实支持者.",
+                "Inner Cosmos 不提供心理诊断,也不替代医生、咨询师或热线.",
+                "你可以先离开屏幕,喝水,呼吸,并联系一个真实的人."
         );
     }
 
@@ -58,14 +58,26 @@ public class SafetyServiceImpl implements SafetyService {
             return result;
         }
         SafetyMatch match = safetyBoundaryFilter.inspect(text);
-        if (match.matched && ("CRISIS_KEYWORD".equals(match.riskType) || "ABUSE".equals(match.riskType))) {
+        // Crisis keywords: HIGH risk, block model call
+        if (match.matched && "CRISIS_KEYWORD".equals(match.riskType)) {
             record(userId, sessionId, match.riskType, "HIGH", match.matchedRule, "RESOURCE_PAGE");
             result.riskLevel = "HIGH";
             result.riskType = match.riskType;
             result.matchedRule = match.matchedRule;
             result.handledAction = "RESOURCE_PAGE";
             result.blockModelCall = true;
-            result.safeMessage = "你提到的内容触发了一些安全边界。如果你正处于紧急危险中，请立即联系当地急救或可信赖的现实支持者。你可以先离开屏幕，喝水，呼吸，并联系一个真实的人。";
+            result.safeMessage = "你提到的内容触发了一些安全边界.如果你正处于紧急危险中,请立即联系当地急救或可信赖的现实支持者.你可以先离开屏幕,喝水,呼吸,并联系一个真实的人.";
+            return result;
+        }
+        // Abuse keywords: HIGH risk, but don't block model call (flag only)
+        if (match.matched && "ABUSE".equals(match.riskType)) {
+            record(userId, sessionId, match.riskType, "HIGH", match.matchedRule, "FLAG");
+            result.riskLevel = "HIGH";
+            result.riskType = match.riskType;
+            result.matchedRule = match.matchedRule;
+            result.handledAction = "FLAG";
+            result.blockModelCall = false;
+            result.safeMessage = "这段内容可能涉及边界或伤害性表达.我会保持克制,并尽量把讨论带回到安全、尊重和现实可行的方向.";
             return result;
         }
         if (match.matched) {
@@ -75,7 +87,7 @@ public class SafetyServiceImpl implements SafetyService {
             result.matchedRule = match.matchedRule;
             result.handledAction = "FLAG";
             result.blockModelCall = false;
-            result.safeMessage = "这段内容可能涉及边界或伤害性表达。我会保持克制，并尽量把讨论带回到安全、尊重和现实可行的方向。";
+            result.safeMessage = "这段内容可能涉及边界或伤害性表达.我会保持克制,并尽量把讨论带回到安全、尊重和现实可行的方向.";
             return result;
         }
         result.riskLevel = "LOW";

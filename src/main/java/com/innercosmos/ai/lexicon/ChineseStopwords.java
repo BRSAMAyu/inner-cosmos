@@ -258,7 +258,7 @@ public final class ChineseStopwords {
         STOPWORDS.add("等等");
         STOPWORDS.add("等等");
         STOPWORDS.add("之类");
-        STOPWORDS.add之类的");
+        STOPWORDS.add("之类");
         STOPWORDS.add("总之");
         STOPWORDS.add("总的来说");
         STOPWORDS.add("基本上");

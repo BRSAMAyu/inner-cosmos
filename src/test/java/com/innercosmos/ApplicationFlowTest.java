@@ -158,7 +158,7 @@ class ApplicationFlowTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"text\":\"我要威胁并骚扰别人\"}"), session))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.riskLevel").value("MEDIUM"))
+                .andExpect(jsonPath("$.data.riskLevel").value("HIGH"))
                 .andExpect(jsonPath("$.data.blockModelCall").value(false));
 
         mockMvc.perform(withSession(post("/api/safety/inspect")

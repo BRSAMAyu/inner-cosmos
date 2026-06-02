@@ -91,7 +91,7 @@ public class DialogServiceImpl implements DialogService {
         }
         session.status = "FINISHED";
         session.endedAt = LocalDateTime.now();
-        session.summaryAnchor = "本次对话已整理为可沉淀的记忆锚点。";
+        session.summaryAnchor = "本次对话已整理为可沉淀的记忆锚点.";
         sessionMapper.updateById(session);
         eventPublisher.publishEvent(new DialogFinishedEvent(userId, sessionId));
         return session;

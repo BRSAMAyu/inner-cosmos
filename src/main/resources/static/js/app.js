@@ -2,7 +2,7 @@ const IC = {
   soundEnabled: JSON.parse(localStorage.getItem("ic_sound") || "true"),
   audioCtx: null,
   darkTheme: JSON.parse(localStorage.getItem("ic_dark") || "false"),
-  autoTheme: JSON.parse(localStorage.getItem("ic_auto_theme") || "true"),
+  autoTheme: JSON.parse(localStorage.getItem("ic_auto_theme") || "false"),
   sunsetHour: JSON.parse(localStorage.getItem("ic_sunset_hour") || "18"),
   sunriseHour: JSON.parse(localStorage.getItem("ic_sunrise_hour") || "6"),
 
@@ -42,13 +42,11 @@ const IC = {
   },
 
   applyTheme() {
-    if (IC.autoTheme) {
-      const hour = new Date().getHours();
-      const isNightTime = hour >= IC.sunsetHour || hour < IC.sunriseHour;
-      IC.darkTheme = isNightTime;
-    }
+    const useDark = IC.autoTheme
+      ? (new Date().getHours() >= IC.sunsetHour || new Date().getHours() < IC.sunriseHour)
+      : IC.darkTheme;
 
-    if (IC.darkTheme) {
+    if (useDark) {
       document.body.classList.add("dark-star");
     } else {
       document.body.classList.remove("dark-star");
@@ -90,7 +88,7 @@ const IC = {
         <a class="brand" href="/pages/dashboard.html">Inner Cosmos</a>
         <nav class="nav" aria-label="主导航">
           ${IC.nav()}
-          <button class="icon-button" title="${IC.autoTheme ? "自动：已启用" : "手动模式"}" aria-label="主题模式" onclick="IC.toggleAutoTheme()">${IC.autoTheme ? "auto" : "manual"}</button>
+          <button class="icon-button" title="${IC.autoTheme ? "自动：已启用" : "白昼固定"}" aria-label="主题模式" onclick="IC.toggleAutoTheme()">${IC.autoTheme ? "auto" : "day"}</button>
           <button class="icon-button" title="切换主题" aria-label="切换主题" onclick="IC.toggleTheme()">${IC.darkTheme ? "☾" : "☀"}</button>
           <button class="icon-button" title="切换轻柔音效" aria-label="切换轻柔音效" onclick="IC.toggleSound()">${IC.soundEnabled ? "♪" : "×"}</button>
         </nav>`;
@@ -233,12 +231,57 @@ const IC = {
   attachInteractionFeedback() {
     if (document.body.dataset.feedbackReady) return;
     document.body.dataset.feedbackReady = "true";
+
+    // Detect touch device
+    const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+    // Add mobile class to html if touch device
+    if (isTouch) {
+      document.documentElement.classList.add('touch');
+      // Prevent double-tap zoom on interactive elements
+      document.addEventListener('touchstart', (e) => {
+        if (e.target.closest('button, .button, .nav a, a')) {
+          // Prevent iOS zoom on double tap
+          // But allow natural touch behavior
+        }
+      }, { passive: true });
+    }
+
+    // Touch ripple for mobile
+    if (isTouch) {
+      document.addEventListener('touchstart', (e) => {
+        const target = e.target.closest('button, .button, .nav a, .card, .interactive, .star');
+        if (!target) return;
+
+        const touch = e.touches[0];
+        const rect = target.getBoundingClientRect();
+        const x = touch.clientX - rect.left;
+        const y = touch.clientY - rect.top;
+
+        if (window.ICMotion) {
+          ICMotion.createRipple(x, y, target);
+        }
+
+        // Add active state class
+        target.classList.add('touch-active');
+        setTimeout(() => target.classList.remove('touch-active'), 200);
+      }, { passive: true });
+    }
+
+    // Click feedback for all devices
     document.addEventListener("click", event => {
       const target = event.target.closest("button,.button,.nav a");
       if (!target || target.disabled) return;
       const tone = target.matches(".voice-pill") ? "strong" : target.matches("[data-letter-action]") ? "letter" : "soft";
       IC.pulse(tone);
     }, { passive: true });
+
+    // Prevent rubber-banding on scroll
+    if (isTouch) {
+      document.body.addEventListener('touchmove', (e) => {
+        // Allow normal scrolling
+      }, { passive: true });
+    }
   },
 
   stagger(container) {
@@ -289,5 +332,43 @@ const IC = {
     overlay.onclick = e => { if (e.target === overlay) IC.closeModal(); };
     overlay.innerHTML = `<div class="modal-box">${html}</div>`;
     document.body.appendChild(overlay);
+  },
+
+  // Weather control modal
+  showWeatherModal() {
+    const currentWeather = window.ICWeather ? window.ICWeather.getWeatherState() : null;
+    const weatherTypes = [
+      { type: 'CLEAR', label: '晴朗', icon: '☀️' },
+      { type: 'CLOUD', label: '多云', icon: '☁️' },
+      { type: 'RAIN', label: '下雨', icon: '🌧️' },
+      { type: 'STORM', label: '暴风雨', icon: '⛈️' },
+      { type: 'FOG', label: '有雾', icon: '🌫️' },
+      { type: 'SNOW', label: '下雪', icon: '🌨️' }
+    ];
+
+    const weatherButtons = weatherTypes.map(w => `
+      <button class="weather-option ${currentWeather?.type === w.type ? 'active' : ''}"
+              data-weather="${w.type}">
+        <span style="font-size: 1.5rem">${w.icon}</span>
+        <span>${w.label}</span>
+      </button>
+    `).join('');
+
+    IC.showModal(`
+      <h2>天气设置</h2>
+      <p class="muted mb-1">选择天气效果，或启用自动模式</p>
+      <div class="weather-grid">${weatherButtons}</div>
+      <div class="row mt-2">
+        <button class="button" onclick="window.ICWeather.setAutoWeather()">
+          ${currentWeather?.isAuto ? '✓ ' : ''}自动模式
+        </button>
+        <button class="button" onclick="IC.closeModal()">关闭</button>
+      </div>
+      <script>
+        document.querySelectorAll('.weather-option').forEach(btn => {
+          btn.onclick = () => window.ICWeather.setManualWeather(btn.dataset.weather);
+        });
+      </script>
+    `);
   }
 };

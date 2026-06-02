@@ -138,7 +138,7 @@ public class ThemeAggregationServiceImpl implements ThemeAggregationService {
 
     private String buildClusteringPrompt(List<MemoryCard> cards) {
         StringBuilder sb = new StringBuilder();
-        sb.append("分析以下记忆内容，将它们归纳为3-6个主题。\n\n");
+        sb.append("分析以下记忆内容,将它们归纳为3-6个主题.\n\n");
 
         int shown = Math.min(15, cards.size());
         for (int i = 0; i < shown; i++) {
@@ -147,14 +147,14 @@ public class ThemeAggregationServiceImpl implements ThemeAggregationService {
                     card.summary != null && card.summary.length() > 50 ? card.summary.substring(0, 50) + "..." : card.summary));
         }
 
-        sb.append("\n请识别主题并返回：\n");
-        sb.append("1. name - 主题名称（简洁，2-4字）\n");
-        sb.append("2. type - 主题类型：EMOTION, RELATION, WORK, GROWTH, DAILY\n");
-        sb.append("3. summary - 主题摘要（一句话描述）\n");
+        sb.append("\n请识别主题并返回:\n");
+        sb.append("1. name - 主题名称(简洁,2-4字)\n");
+        sb.append("2. type - 主题类型:EMOTION, RELATION, WORK, GROWTH, DAILY\n");
+        sb.append("3. summary - 主题摘要(一句话描述)\n");
         sb.append("4. keywords - 相关关键词数组\n");
         sb.append("5. cardIndices - 属于该主题的卡片索引数组\n");
 
-        sb.append("\n返回 JSON 格式：\n");
+        sb.append("\n返回 JSON 格式:\n");
         sb.append("{\n");
         sb.append("  \"themes\": [\n");
         sb.append("    {\n");
@@ -274,7 +274,7 @@ public class ThemeAggregationServiceImpl implements ThemeAggregationService {
     private String buildThemeSummary(String themeName, List<MemoryCard> cards) {
         int count = cards.size();
         String latestTitle = cards.get(0).title;
-        return themeName + "：共 " + count + " 条记忆，最近一条「" + latestTitle + "」";
+        return themeName + ":共 " + count + " 条记忆,最近一条「" + latestTitle + "」";
     }
 
     private String collectKeywords(List<MemoryCard> cards) {

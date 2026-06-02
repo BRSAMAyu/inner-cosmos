@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import org.springframework.beans.factory.annotation.Qualifier;
 
 /**
  * Async LLM re-check service for ambiguous safety cases.
@@ -29,7 +30,7 @@ public class SafetyReviewService {
 
     public SafetyReviewService(StructuredAiService structuredAiService,
                                SafetyEventMapper safetyEventMapper,
-                               Executor asyncExecutor) {
+                               @Qualifier("taskExecutor") Executor asyncExecutor) {
         this.structuredAiService = structuredAiService;
         this.safetyEventMapper = safetyEventMapper;
         this.asyncExecutor = asyncExecutor;
@@ -116,22 +117,26 @@ public class SafetyReviewService {
     /**
      * Fallback safety review for Mock mode.
      * Returns conservative HIGH for crisis-like content, MEDIUM for ambiguous.
+     * Self-harm/crisis blocks model call; abuse/harassment flags HIGH but doesn't block.
      */
     private SafetyReviewResult fallbackSafetyReview(String text, SafetyMatch initialMatch) {
         SafetyReviewResult result = new SafetyReviewResult();
 
-        // Check for severe patterns using existing keyword detection
+        // Check for self-harm/crisis patterns - these should block model call
         if (text.contains("我希望我从没出生") || text.contains("我想消失") ||
-            text.contains("活着好累") || text.contains("活不下去")) {
+            text.contains("活着好累") || text.contains("活不下去") ||
+            text.contains("不想活了") || text.contains("不想活")) {
             result.riskLevel = "HIGH";
             result.riskType = "CRISIS_KEYWORD";
             result.explanation = "Detected severe distress indicators";
             result.requiresBlock = true;
-        } else if (text.contains("威胁") || text.contains("骚扰") || text.contains("人肉")) {
+        }
+        // Check for abuse/harassment patterns - HIGH risk but don't block model call
+        else if (text.contains("威胁") || text.contains("骚扰") || text.contains("人肉")) {
             result.riskLevel = "HIGH";
             result.riskType = "ABUSE";
             result.explanation = "Detected abuse/harassment keywords";
-            result.requiresBlock = true;
+            result.requiresBlock = false;
         } else {
             result.riskLevel = initialMatch.riskLevel;
             result.riskType = initialMatch.riskType;

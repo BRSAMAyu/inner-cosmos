@@ -33,7 +33,7 @@ public class DataMaskingServiceImpl implements DataMaskingService {
             emptyPreview.riskWarnings = new ArrayList<>();
             emptyPreview.abstractSummary = "暂无摘要";
             emptyPreview.suggestedPseudonym = "星际旅人";
-            emptyPreview.personaPromptDraft = "这是一个空的共鸣体预览。";
+            emptyPreview.personaPromptDraft = "这是一个空的共鸣体预览.";
             return emptyPreview;
         }
         // Load MemoryCards
@@ -50,7 +50,7 @@ public class DataMaskingServiceImpl implements DataMaskingService {
         StringBuilder summaryBuilder = new StringBuilder();
         for (MemoryCard card : cards) {
             String masked = maskText(card.summary, privacyLevel);
-            summaryBuilder.append(masked).append("；");
+            summaryBuilder.append(masked).append(";");
         }
         preview.abstractSummary = summaryBuilder.length() > 0
                 ? summaryBuilder.substring(0, summaryBuilder.length() - 1)
@@ -80,10 +80,10 @@ public class DataMaskingServiceImpl implements DataMaskingService {
         // Check for risk warnings
         for (MemoryCard card : cards) {
             if (card.intensityScore != null && card.intensityScore > 7.0) {
-                preview.riskWarnings.add("包含高情绪强度记忆，建议谨慎公开");
+                preview.riskWarnings.add("包含高情绪强度记忆,建议谨慎公开");
             }
             if (containsSensitiveContent(card.summary)) {
-                preview.riskWarnings.add("部分内容可能包含敏感信息，已自动脱敏");
+                preview.riskWarnings.add("部分内容可能包含敏感信息,已自动脱敏");
                 preview.removedSensitiveItems.add("个人识别信息");
             }
         }
@@ -93,7 +93,7 @@ public class DataMaskingServiceImpl implements DataMaskingService {
             for (String blocked : blockedTopics) {
                 for (MemoryCard card : cards) {
                     if (card.keywordTags != null && card.keywordTags.contains(blocked)) {
-                        preview.riskWarnings.add("包含被限制话题：" + blocked);
+                        preview.riskWarnings.add("包含被限制话题:" + blocked);
                         preview.removedSensitiveItems.add(blocked);
                     }
                 }
@@ -133,9 +133,9 @@ public class DataMaskingServiceImpl implements DataMaskingService {
         // Mask common school names pattern
         text = text.replaceAll(".{2,6}(大学|学院|中学|小学|学校)", "***学校");
         // Mask QQ numbers
-        text = text.replaceAll("QQ\\s*[:：]?\\s*\\d{5,12}", "QQ:*******");
+        text = text.replaceAll("QQ\\s*[::]?\\s*\\d{5,12}", "QQ:*******");
         // Mask WeChat IDs
-        text = text.replaceAll("微信\\s*[:：]?\\s*\\S+", "微信:*******");
+        text = text.replaceAll("微信\\s*[::]?\\s*\\S+", "微信:*******");
         return text;
     }
 
@@ -147,8 +147,8 @@ public class DataMaskingServiceImpl implements DataMaskingService {
 
     private String maskNames(String text) {
         // Simple approach: mask common name patterns after certain keywords
-        text = text.replaceAll("叫(.{2,4})(的|了|是|，|。|\\s)", "叫***$2");
-        text = text.replaceAll("我是(.{2,4})(的|了|是|，|。|\\s)", "我是***$2");
+        text = text.replaceAll("叫(.{2,4})(的|了|是|,|.|\\s)", "叫***$2");
+        text = text.replaceAll("我是(.{2,4})(的|了|是|,|.|\\s)", "我是***$2");
         return text;
     }
 
@@ -183,8 +183,8 @@ public class DataMaskingServiceImpl implements DataMaskingService {
 
     private String generatePersonaPrompt(String summary, List<String> tags) {
         String tagStr = tags.isEmpty() ? "日常" : String.join("、", tags);
-        return "这是一个关于" + tagStr + "的共鸣体。" +
-                "它承载了一段真实但已脱敏的经历。" +
-                "与它对话时，请保持温柔和尊重，不要试图猜测真实身份。";
+        return "这是一个关于" + tagStr + "的共鸣体." +
+                "它承载了一段真实但已脱敏的经历." +
+                "与它对话时,请保持温柔和尊重,不要试图猜测真实身份.";
     }
 }
