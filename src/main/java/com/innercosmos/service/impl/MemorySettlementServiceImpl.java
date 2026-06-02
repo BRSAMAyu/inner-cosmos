@@ -3,6 +3,8 @@ package com.innercosmos.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.innercosmos.ai.structured.StructuredAiResults;
 import com.innercosmos.ai.structured.StructuredAiService;
+import com.innercosmos.ai.semantic.PseudoSemanticAnalyzer;
+import com.innercosmos.ai.semantic.PseudoSemanticAnalyzer.AnalysisResult;
 import com.innercosmos.entity.*;
 import com.innercosmos.mapper.*;
 import com.innercosmos.service.GravityService;
@@ -340,11 +342,30 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
         return compact.length() > 64 ? compact.substring(0, 64) + "..." : compact;
     }
 
+    /**
+     * Get semantic analysis for the current input.
+     * Uses PseudoSemanticAnalyzer for better inference.
+     */
+    private AnalysisResult analyze(String raw) {
+        return PseudoSemanticAnalyzer.analyze(raw);
+    }
+
     private String inferType(String raw) {
-        if (raw.contains("作业") || raw.contains("考试") || raw.contains("任务")) return "TODO";
-        if (raw.contains("朋友") || raw.contains("同学") || raw.contains("关系")) return "RELATION";
-        if (raw.contains("想") || raw.contains("觉得")) return "COGNITION";
-        return "EMOTION";
+        AnalysisResult analysis = analyze(raw);
+        // Use primary intent from semantic analysis
+        switch (analysis.primaryIntent) {
+            case "TASK_STRESS":
+                return "TODO";
+            case "RELATION_ISSUE":
+                return "RELATION";
+            case "COGNITIVE_CLARITY":
+                return "COGNITION";
+            case "SELF_HARM":
+            case "EXPRESS_EMOTION":
+                return "EMOTION";
+            default:
+                return "EMOTION";
+        }
     }
 
     private String inferKeywords(String raw) {
@@ -352,59 +373,118 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
     }
 
     private Double inferIntensity(String raw) {
-        if (raw.contains("非常") || raw.contains("特别") || raw.contains("极度")) return 8.0;
-        if (raw.contains("很") || raw.contains("挺")) return 6.0;
-        if (raw.contains("有点") || raw.contains("稍微")) return 3.5;
-        return 5.0;
+        AnalysisResult analysis = analyze(raw);
+        // Use intensity score from semantic analysis (0-10 scale)
+        return analysis.intensityScore;
     }
 
     private String inferEmotion(String raw) {
-        if (raw.contains("累") || raw.contains("压力")) return "疲惫和压力";
-        if (raw.contains("烦") || raw.contains("不舒服")) return "烦躁和不舒服";
-        if (raw.contains("开心") || raw.contains("高兴")) return "明亮和开心";
-        if (raw.contains("孤独") || raw.contains("没人懂")) return "孤独和未被理解";
-        return "还没有被命名的复杂感受";
+        AnalysisResult analysis = analyze(raw);
+        // Build emotion description from sentiment label and themes
+        StringBuilder emotion = new StringBuilder();
+
+        // Add sentiment base
+        switch (analysis.sentimentLabel) {
+            case "CRISIS":
+                emotion.append("很重的情绪，需要温柔的支持");
+                break;
+            case "NEGATIVE":
+                if (analysis.detectedThemes.contains("情绪承压")) {
+                    emotion.append("疲惫和压力");
+                } else if (analysis.detectedThemes.contains("关系牵动")) {
+                    emotion.append("委屈和难过");
+                } else {
+                    emotion.append("不舒服的感受");
+                }
+                break;
+            case "POSITIVE":
+                emotion.append("明亮和积极");
+                break;
+            default:
+                emotion.append("还没有被命名的复杂感受");
+                break;
+        }
+
+        return emotion.toString();
     }
 
     private String inferBelief(String raw) {
-        if (raw.contains("没做好") || raw.contains("不行")) {
-            return "如果一件事没做好，就说明我这个人不行。";
+        AnalysisResult analysis = analyze(raw);
+        // Use detected themes and intent to infer belief patterns
+        if (analysis.detectedThemes.contains("自我评价")) {
+            return "这件事也许让你再次怀疑自己，但一件事没做好不等于整个人不行。";
         }
-        if (raw.contains("没人懂")) {
-            return "如果别人没有立刻理解我，也许我就只能一个人承受。";
+        if (analysis.primaryIntent.equals("RELATION_ISSUE")) {
+            return "这段关系也许让你想起一些旧的感受，我们先把现在和过去分开看。";
+        }
+        if (analysis.sentimentScore <= -3) {
+            return "现在很难，但这不说明你不够好，只说明你现在需要一些支持。";
         }
         return "我正在尝试理解自己为什么会被这件事牵动。";
     }
 
     private String inferAction(String raw) {
-        if (raw.contains("作业") || raw.contains("任务")) {
-            return "明天先打开任务文件，只做十分钟。";
+        AnalysisResult analysis = analyze(raw);
+        // Use primary intent to suggest action
+        switch (analysis.primaryIntent) {
+            case "TASK_STRESS":
+                return "明天先打开任务文件，只做十分钟。";
+            case "RELATION_ISSUE":
+                return "先写下对方说了什么，以及我实际感受到什么。";
+            case "SELF_HARM":
+                return "现在最小的一步，是先让自己活下来，其他的明天再说。";
+            case "COGNITIVE_CLARITY":
+                return "把现在最乱的一句话写下来，明天再看一次。";
+            default:
+                return "把今天最重的一句话保存下来，明天再看一次。";
         }
-        if (raw.contains("关系") || raw.contains("朋友") || raw.contains("同学")) {
-            return "先写下对方说了什么，以及我实际感受到什么。";
-        }
-        return "把今天最重的一句话保存下来，明天再看一次。";
     }
 
     private String inferNeed(String raw) {
-        if (raw.contains("需要休息") || raw.contains("想要休息")) return "需要一个不被打扰的空间";
-        if (raw.contains("需要帮助") || raw.contains("想要帮助")) return "需要一个可以求助的人";
+        AnalysisResult analysis = analyze(raw);
+        // Infer need from sentiment and themes
+        if (analysis.sentimentScore <= -3) {
+            return "需要温柔的支持和允许自己休息";
+        }
+        if (analysis.primaryIntent.equals("SEEK_SUPPORT")) {
+            return "需要被理解和被看见";
+        }
+        if (analysis.detectedThemes.contains("任务压力")) {
+            return "需要把压力拆成可开始的小步";
+        }
         return "需要被看见和理解";
     }
 
     private String inferWorry(String raw) {
-        if (raw.contains("考试")) return "担心考试考不好";
-        if (raw.contains("朋友")) return "担心这段关系会变差";
+        AnalysisResult analysis = analyze(raw);
+        // Use detected themes to identify worry
+        if (analysis.detectedThemes.contains("任务压力")) {
+            return "担心任务完成不了，或者结果不如预期";
+        }
+        if (analysis.detectedThemes.contains("关系牵动")) {
+            return "担心这段关系会变差，或者不被理解";
+        }
+        if (analysis.sentimentScore <= -3) {
+            return "有一些深层的担心还没有被说出来";
+        }
         return "有一个还没有被说清楚的担心";
     }
 
     private String inferEmotionName(String raw) {
-        if (raw.contains("开心") || raw.contains("高兴")) return "开心";
-        if (raw.contains("孤独")) return "孤独";
-        if (raw.contains("烦")) return "烦躁";
-        if (raw.contains("累")) return "疲惫";
-        if (raw.contains("担心") || raw.contains("害怕")) return "焦虑";
-        return "复杂";
+        AnalysisResult analysis = analyze(raw);
+        // Map sentiment label to emotion name
+        switch (analysis.sentimentLabel) {
+            case "CRISIS":
+                return "危机";
+            case "NEGATIVE":
+                if (analysis.detectedThemes.contains("情绪承压")) return "焦虑";
+                if (analysis.detectedThemes.contains("关系牵动")) return "难过";
+                return "负面";
+            case "POSITIVE":
+                return "积极";
+            default:
+                return "平静";
+        }
     }
 
     private String inferWeather(Double intensity) {
