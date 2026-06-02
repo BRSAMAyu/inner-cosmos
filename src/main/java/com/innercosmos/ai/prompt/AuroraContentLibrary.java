@@ -1,5 +1,8 @@
 package com.innercosmos.ai.prompt;
 
+import com.innercosmos.ai.semantic.PseudoSemanticAnalyzer;
+import com.innercosmos.ai.semantic.PseudoSemanticAnalyzer.AnalysisResult;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -572,6 +575,7 @@ public class AuroraContentLibrary {
 
     /**
      * Build a multi-segment reply for MockLlmClient.
+     * Now uses semantic analysis to select more relevant templates.
      *
      * @param mode         conversation mode key (e.g. DAILY_TALK)
      * @param userMessage  the raw user message text
@@ -582,11 +586,17 @@ public class AuroraContentLibrary {
         String m = normalise(mode);
         List<String> segments = new ArrayList<>();
 
+        // Analyze user input for better template selection
+        AnalysisResult analysis = PseudoSemanticAnalyzer.analyze(userMessage);
+
         // Segment 1 – always present: a reflective receive line
-        segments.add(pick(RECEIVES.getOrDefault(m, DAILY_TALK_RECEIVES)));
+        // Now picks based on sentiment instead of random
+        List<String> receives = RECEIVES.getOrDefault(m, DAILY_TALK_RECEIVES);
+        segments.add(pickByRelevance(receives, analysis, "receive"));
 
         // Segment 2 – always present: a clarification / follow-up question
-        segments.add(pick(CLARIFIES.getOrDefault(m, DAILY_TALK_CLARIFIES)));
+        List<String> clarifies = CLARIFIES.getOrDefault(m, DAILY_TALK_CLARIFIES);
+        segments.add(pickByRelevance(clarifies, analysis, "clarify"));
 
         // Segment 3 – optional: rhythm protection when user has been talking a lot
         if (shouldSlowDown) {
@@ -594,6 +604,78 @@ public class AuroraContentLibrary {
         }
 
         return segments;
+    }
+
+    /**
+     * Pick a template from list based on semantic relevance to user input.
+     * Scores each template against detected themes and keywords, returns highest scoring.
+     */
+    private static String pickByRelevance(List<String> templates, AnalysisResult analysis, String segmentType) {
+        if (templates == null || templates.isEmpty()) {
+            return "";
+        }
+
+        // If no clear themes detected, return random
+        if (analysis.detectedThemes.isEmpty() || analysis.detectedThemes.contains("日常分享")) {
+            return pick(templates);
+        }
+
+        // Score each template based on keyword overlap with detected themes
+        String bestTemplate = templates.get(0);
+        double bestScore = -1;
+
+        for (String template : templates) {
+            double score = calculateRelevance(template, analysis, segmentType);
+            if (score > bestScore) {
+                bestScore = score;
+                bestTemplate = template;
+            }
+        }
+
+        return bestTemplate;
+    }
+
+    /**
+     * Calculate relevance score for a template given analysis.
+     * Higher score = more relevant to user's current state.
+     */
+    private static double calculateRelevance(String template, AnalysisResult analysis, String segmentType) {
+        double score = 0.0;
+
+        // Check theme keyword overlap
+        for (String theme : analysis.detectedThemes) {
+            if (template.contains(theme)) {
+                score += 2.0;
+            }
+        }
+
+        // Check sentiment alignment
+        if ("CRISIS".equals(analysis.sentimentLabel) && template.contains("停")) {
+            score += 1.5;
+        }
+        if ("NEGATIVE".equals(analysis.sentimentLabel) && (template.contains("感受") || template.contains("允许"))) {
+            score += 1.0;
+        }
+        if ("POSITIVE".equals(analysis.sentimentLabel) && (template.contains("继续") || template.contains("保持"))) {
+            score += 1.0;
+        }
+
+        // Check intent-specific keywords
+        if ("TASK_STRESS".equals(analysis.primaryIntent)) {
+            if (template.contains("任务") || template.contains("压力") || template.contains("开始")) {
+                score += 2.0;
+            }
+        }
+        if ("RELATION_ISSUE".equals(analysis.primaryIntent)) {
+            if (template.contains("关系") || template.contains("对方") || template.contains("感受")) {
+                score += 2.0;
+            }
+        }
+
+        // Small random factor to avoid deterministic repetition
+        score += RANDOM.nextDouble() * 0.5;
+
+        return score;
     }
 
     /** Normalise mode string, falling back to DAILY_TALK. */
