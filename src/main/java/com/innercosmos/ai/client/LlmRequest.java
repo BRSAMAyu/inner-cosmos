@@ -9,6 +9,7 @@ public class LlmRequest {
     public String prompt;
     public String requestJson;
     public List<String> recentMessages = new ArrayList<>();
+    public Boolean forceMock; // Force mock mode for A/B testing
 
     public LlmRequest(Long userId, String moduleName, String prompt) {
         this.userId = userId;
