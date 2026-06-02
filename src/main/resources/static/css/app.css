@@ -997,6 +997,107 @@ body.dark-star .soft-stage {
   50% { filter: brightness(1.12); opacity: 1; }
 }
 
+/* ── Warm Dark Theme (activates at sunset) ── */
+body.dark-star {
+  --surface-warm: #2a2622;
+  --surface-mist: #25211d;
+  --surface-paper: #1e1b18;
+  --surface-blush: #262220;
+  --surface-blue: #222428;
+  --surface-sage: #212421;
+  --accent-sage: #7a8e7f;
+  --accent-dusty-blue: #8698a9;
+  --accent-rose: #a67a7c;
+  --accent-lavender: #9a90a7;
+  --accent-coral: #b07d7b;
+  --ink: #d4cfc7;
+  --text: #cfc9c1;
+  --muted: #a9a49c;
+  --faint: #7a7570;
+  --line: rgba(163, 153, 143, .18);
+  --line-strong: rgba(163, 153, 143, .44);
+  --glow-soft: 0 18px 56px rgba(58, 54, 50, .34), 0 8px 24px rgba(90, 82, 78, .24);
+  --shadow: 0 18px 46px rgba(0, 0, 0, .42);
+}
+
+body.dark-star {
+  background:
+    linear-gradient(132deg, rgba(33, 36, 33, .82) 0%, rgba(42, 38, 34, 0) 34%),
+    linear-gradient(205deg, rgba(38, 34, 32, .80) 0%, rgba(42, 38, 34, .28) 44%, rgba(34, 36, 40, .76) 100%),
+    #2a2622;
+}
+
+body.dark-star::before {
+  background-image:
+    linear-gradient(rgba(255,255,255,.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.04) 1px, transparent 1px);
+  mask-image: linear-gradient(to bottom, rgba(0,0,0,.28), rgba(0,0,0,.08));
+}
+
+body.dark-star .brand::before {
+  background:
+    linear-gradient(135deg, #7a8e7f, #8698a9 52%, #a67a7c);
+  box-shadow: 0 0 0 7px rgba(122, 142, 127, .18), 0 0 30px rgba(166, 122, 124, .28);
+}
+
+body.dark-star ::selection {
+  background: rgba(166, 122, 124, .36);
+  color: #d4cfc7;
+}
+
+body.dark-star .nav a,
+body.dark-star button,
+body.dark-star .button {
+  background: rgba(30, 27, 24, .72);
+  color: #cfc9c1;
+}
+
+body.dark-star .nav a.active,
+body.dark-star .nav a:hover,
+body.dark-star button:hover,
+body.dark-star .button:hover {
+  background: rgba(30, 27, 24, .88);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, .38);
+}
+
+body.dark-star .panel,
+body.dark-star .card {
+  background: rgba(42, 38, 34, .72);
+  box-shadow: 0 18px 46px rgba(0, 0, 0, .28);
+}
+
+body.dark-star .bubble {
+  background: rgba(42, 38, 34, .82);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .24);
+}
+
+body.dark-star .bubble.user {
+  background: rgba(122, 142, 127, .18);
+  border-color: rgba(122, 142, 127, .38);
+}
+
+body.dark-star .bubble.aurora {
+  background: rgba(34, 36, 40, .72);
+  border-color: rgba(134, 152, 169, .38);
+}
+
+body.dark-star input,
+body.dark-star textarea,
+body.dark-star select {
+  background: rgba(30, 27, 24, .72);
+  color: #cfc9c1;
+}
+
+body.dark-star .modal-box {
+  background: rgba(42, 38, 34, .94);
+  box-shadow: 0 18px 56px rgba(0, 0, 0, .52);
+}
+
+body.dark-star .toast {
+  background: rgba(42, 38, 34, .96);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, .38);
+}
+
 @media (max-width: 920px) {
   h1 { font-size: 3.15rem; }
   .topbar {
