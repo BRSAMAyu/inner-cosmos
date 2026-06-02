@@ -419,6 +419,40 @@ CREATE TABLE IF NOT EXISTS tb_block_relation (
   INDEX idx_block_blocker (blocker_user_id)
 );
 
+CREATE TABLE IF NOT EXISTS tb_belief_pattern (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  belief_content TEXT NOT NULL,
+  belief_type VARCHAR(32),
+  belief_category VARCHAR(64),
+  strength_score DOUBLE DEFAULT 0.5,
+  supporting_memory_ids TEXT,
+  contradicting_memory_ids TEXT,
+  first_detected_at TIMESTAMP NULL,
+  last_confirmed_at TIMESTAMP NULL,
+  confirmation_count INT DEFAULT 1,
+  status VARCHAR(32) DEFAULT 'ACTIVE',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_belief_user (user_id),
+  INDEX idx_belief_type (belief_type),
+  INDEX idx_belief_strength (strength_score)
+);
+
+CREATE TABLE IF NOT EXISTS tb_emotion_timeline (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  record_date DATE NOT NULL,
+  dominant_emotion VARCHAR(64),
+  emotion_spectrum TEXT,
+  intensity_average DOUBLE DEFAULT 0,
+  trigger_summary TEXT,
+  memory_count INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_emotion_timeline_user_date (user_id, record_date)
+);
+
 -- Phase 6: Admin
 
 CREATE TABLE IF NOT EXISTS tb_model_config (
