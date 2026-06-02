@@ -2,6 +2,9 @@ const IC = {
   soundEnabled: JSON.parse(localStorage.getItem("ic_sound") || "true"),
   audioCtx: null,
   darkTheme: JSON.parse(localStorage.getItem("ic_dark") || "false"),
+  autoTheme: JSON.parse(localStorage.getItem("ic_auto_theme") || "true"),
+  sunsetHour: JSON.parse(localStorage.getItem("ic_sunset_hour") || "18"),
+  sunriseHour: JSON.parse(localStorage.getItem("ic_sunrise_hour") || "6"),
 
   async api(path, options = {}) {
     try {
@@ -39,6 +42,12 @@ const IC = {
   },
 
   applyTheme() {
+    if (IC.autoTheme) {
+      const hour = new Date().getHours();
+      const isNightTime = hour >= IC.sunsetHour || hour < IC.sunriseHour;
+      IC.darkTheme = isNightTime;
+    }
+
     if (IC.darkTheme) {
       document.body.classList.add("dark-star");
     } else {
@@ -47,20 +56,38 @@ const IC = {
   },
 
   toggleTheme() {
+    if (IC.autoTheme) {
+      IC.autoTheme = false;
+      localStorage.setItem("ic_auto_theme", "false");
+    }
     IC.darkTheme = !IC.darkTheme;
     localStorage.setItem("ic_dark", JSON.stringify(IC.darkTheme));
     IC.applyTheme();
     IC.toast(IC.darkTheme ? "星空主题已开启" : "暖雾主题已开启");
   },
 
+  toggleAutoTheme() {
+    IC.autoTheme = !IC.autoTheme;
+    localStorage.setItem("ic_auto_theme", JSON.stringify(IC.autoTheme));
+    if (IC.autoTheme) {
+      IC.applyTheme();
+      IC.toast("自动切换已启用（日落后切换星空主题）");
+    } else {
+      IC.toast("自动切换已关闭");
+    }
+  },
+
   mountShell(title) {
     IC.applyTheme();
+    IC.startThemeChecker();
+
     const topbar = document.querySelector("[data-topbar]");
     if (topbar) {
       topbar.innerHTML = `
         <a class="brand" href="/pages/dashboard.html">Inner Cosmos</a>
         <nav class="nav" aria-label="主导航">
           ${IC.nav()}
+          <button class="icon-button" title="${IC.autoTheme ? "自动：已启用" : "手动模式"}" aria-label="主题模式" onclick="IC.toggleAutoTheme()">${IC.autoTheme ? "auto" : "manual"}</button>
           <button class="icon-button" title="切换主题" aria-label="切换主题" onclick="IC.toggleTheme()">${IC.darkTheme ? "☾" : "☀"}</button>
           <button class="icon-button" title="切换轻柔音效" aria-label="切换轻柔音效" onclick="IC.toggleSound()">${IC.soundEnabled ? "♪" : "×"}</button>
         </nav>`;
@@ -72,6 +99,20 @@ const IC = {
     document.title = title ? `${title} - Inner Cosmos` : "Inner Cosmos";
     document.body.classList.add("page-ready");
     IC.attachInteractionFeedback();
+  },
+
+  startThemeChecker() {
+    if (IC.themeCheckInterval) return;
+    IC.themeCheckInterval = setInterval(() => {
+      if (IC.autoTheme) {
+        const hour = new Date().getHours();
+        const shouldBeDark = hour >= IC.sunsetHour || hour < IC.sunriseHour;
+        if (IC.darkTheme !== shouldBeDark) {
+          IC.darkTheme = shouldBeDark;
+          IC.applyTheme();
+        }
+      }
+    }, 60000);
   },
 
   // DEV-ONLY: demo credentials for development/testing
@@ -197,13 +238,15 @@ const IC = {
 
   greetingByTime() {
     const h = new Date().getHours();
-    if (h < 6) return "夜深了，你还在吗";
+    if (h < 5) return "夜深了，你还在吗";
+    if (h < 7) return "黎明前，星光还亮着";
     if (h < 9) return "早安，新的一天慢慢开始";
     if (h < 12) return "上午好，今天你想先做什么";
     if (h < 14) return "中午好，先给自己一点喘息";
-    if (h < 18) return "下午好，今天过得怎么样";
-    if (h < 21) return "傍晚了，今天可以慢慢收束";
-    return "晚上好，今天辛苦了";
+    if (h < 17) return "下午好，今天过得怎么样";
+    if (h < 19) return "傍晚了，今天可以慢慢收束";
+    if (h < 22) return "晚上好，星光在等你";
+    return "夜深了，愿你平静";
   },
 
   weatherIcon(type) {
