@@ -58,7 +58,7 @@ public class SafetyServiceImpl implements SafetyService {
             return result;
         }
         SafetyMatch match = safetyBoundaryFilter.inspect(text);
-        if (match.matched && "CRISIS_KEYWORD".equals(match.riskType)) {
+        if (match.matched && ("CRISIS_KEYWORD".equals(match.riskType) || "ABUSE".equals(match.riskType))) {
             record(userId, sessionId, match.riskType, "HIGH", match.matchedRule, "RESOURCE_PAGE");
             result.riskLevel = "HIGH";
             result.riskType = match.riskType;
