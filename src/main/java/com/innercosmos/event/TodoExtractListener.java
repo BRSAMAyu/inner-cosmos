@@ -63,9 +63,9 @@ public class TodoExtractListener {
     private String extractSentence(String text, String keyword) {
         int idx = text.indexOf(keyword);
         if (idx < 0) return null;
-        int start = Math.max(0, text.lastIndexOf('。', idx) + 1);
-        int end = text.indexOf('。', idx);
-        if (end < 0) end = text.indexOf('，', idx);
+        int start = Math.max(0, text.lastIndexOf('.', idx) + 1);
+        int end = text.indexOf('.', idx);
+        if (end < 0) end = text.indexOf(',', idx);
         if (end < 0) end = Math.min(text.length(), idx + 40);
         return text.substring(start, end).trim();
     }

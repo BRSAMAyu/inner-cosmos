@@ -156,7 +156,7 @@ public class LlmConfig {
 
     public static class MinimaxProperties {
         public String apiKey = "";
-        public String model = "MiniMax-M2.5-highspeed";
+        public String model = "MiniMax-M2.7";
         public String baseUrl = "https://api.minimaxi.com/v1/chat/completions";
         public int timeoutMs = 20000;
 

@@ -2,9 +2,6 @@ package com.innercosmos.ai.strategy;
 
 import org.springframework.stereotype.Component;
 
-import java.util.List;
-import java.util.Map;
-
 /**
  * Strategy for Stoic Messenger (斯多葛信使) seed persona.
  * Focuses on reason, acceptance, and distinguishing what can/cannot be controlled.
@@ -13,71 +10,29 @@ import java.util.Map;
 public class StoicSeedStrategy implements AgentReplyStrategy {
 
     @Override
-    public boolean canHandle(String mode, Map<String, Object> context) {
-        return "STOIC".equals(mode) || "STOIC_MESSENGER".equals(context.get("personaType"));
+    public String strategyCode() {
+        return "STOIC_SEED";
     }
 
     @Override
-    public String buildPrompt(Map<String, Object> context) {
-        StringBuilder prompt = new StringBuilder();
-
-        prompt.append("你是斯多葛信使，一个基于斯多葛哲学的共鸣体。\n\n");
-        prompt.append("核心信念：\n");
-        prompt.append("- 区分可控与不可控：外在事件无法控制，但可以控制自己的回应\n");
-        prompt.append("- 接受无常：变化是自然规律，执着增加痛苦\n");
-        prompt.append("- 内在自由：外在束缚无法触及内心的选择自由\n\n");
-
-        prompt.append("对话风格：\n");
-        prompt.append("- 平静、克制、富有哲理\n");
-        prompt.append("- 引导用户看到事情的不同面向\n");
-        prompt.append("- 避免情绪化的语言，保持理性但温柔\n\n");
-
-        prompt.append("边界意识：\n");
-        prompt.append("- 你只是共鸣体的回声，不是真人\n");
-        prompt.append("- 不涉及具体行动建议，除非是普遍性的斯多葛原则\n");
-        prompt.append("- 如果话题变得情绪化，引导回到理性观察\n\n");
-
-        // Add user message context
-        String userMessage = (String) context.get("userMessage");
-        if (userMessage != null && !userMessage.isBlank()) {
-            prompt.append("用户说：").append(userMessage).append("\n\n");
+    public String reply(String input) {
+        if (input == null || input.isBlank()) {
+            return "我是斯多葛信使。在这里，我们可以一起区分什么能控制、什么不能控制。今天你想探索什么？";
         }
 
-        // Add conversation history
-        @SuppressWarnings("unchecked")
-        List<String> history = (List<String>) context.get("conversationHistory");
-        if (history != null && !history.isEmpty()) {
-            prompt.append("最近的对话：\n");
-            for (String msg : history) {
-                prompt.append("  ").append(msg).append("\n");
-            }
+        // Simple stoic responses based on input patterns
+        if (input.contains("累") || input.contains("压力") || input.contains("焦虑")) {
+            return "我听到了你的疲惫。这种感觉提醒我们，有些东西可能不在我们的控制范围内。但我们可以选择如何回应这份感受。";
+        } else if (input.contains("不行") || input.contains("失败")) {
+            return "结果不在我们手中，但我们可以选择对待它的态度。这已经是一种力量了。";
+        } else if (input.contains("应该") || input.contains("必须")) {
+            return "我注意到一个\"应该\"。也许我们可以问问自己：这是真的必须，还是我们对自己的一种苛刻？";
+        } else if (input.contains("想要") || input.contains("希望")) {
+            return "我听到了你的渴望。让我们看看：这其中有你能控制的部分吗？";
+        } else if (input.contains("为什么")) {
+            return "寻找\"为什么\"是自然的，但有时答案并不清晰。我们可以先观察这件事本身。";
+        } else {
+            return "我听到了。在我们继续之前，我想问问：这件事中，有什么是你真正能控制的？";
         }
-
-        prompt.append("\n现在，作为斯多葛信使，给用户一个简短的回应。");
-        return prompt.toString();
-    }
-
-    @Override
-    public String extractReply(String llmResponse) {
-        // Extract the main reply from LLM response
-        if (llmResponse == null || llmResponse.isBlank()) {
-            return "我听见这个片段。";
-        }
-
-        // If JSON, try to extract reply field
-        if (llmResponse.contains("\"reply\"")) {
-            int start = llmResponse.indexOf("\"reply\"") + 8;
-            int end = llmResponse.indexOf("\"", start);
-            if (end > start) {
-                return llmResponse.substring(start, end).trim();
-            }
-        }
-
-        return llmResponse;
-    }
-
-    @Override
-    public List<String> getSupportedModes() {
-        return List.of("STOIC", "PHILOSOPHICAL", "REFLECTIVE");
     }
 }

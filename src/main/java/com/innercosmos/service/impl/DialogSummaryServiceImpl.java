@@ -65,7 +65,7 @@ public class DialogSummaryServiceImpl implements DialogSummaryService {
 
     private String generateSummary(String raw) {
         if (raw == null || raw.isBlank()) {
-            return "用户完成了一次与 Aurora 的对话。";
+            return "用户完成了一次与 Aurora 的对话.";
         }
 
         List<String> parts = new ArrayList<>();
@@ -88,10 +88,10 @@ public class DialogSummaryServiceImpl implements DialogSummaryService {
 
         if (parts.isEmpty()) {
             String compact = raw.replaceAll("\\s+", " ").trim();
-            return "用户表达了自己的想法：" + (compact.length() > 80 ? compact.substring(0, 80) + "..." : compact);
+            return "用户表达了自己的想法:" + (compact.length() > 80 ? compact.substring(0, 80) + "..." : compact);
         }
 
-        return String.join("；", parts) + "。";
+        return String.join(";", parts) + ".";
     }
 
     private String extractKeyTopics(String raw) {

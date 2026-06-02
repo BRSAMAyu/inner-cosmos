@@ -39,7 +39,7 @@ public class DashboardServiceImpl implements DashboardService {
     @Override
     public DashboardVO summary(Long userId) {
         DashboardVO vo = new DashboardVO();
-        vo.greeting = "你可以从一句话开始。今天不需要立刻变好，只需要先被看见。";
+        vo.greeting = "你可以从一句话开始.今天不需要立刻变好,只需要先被看见.";
         vo.memoryCount = memoryCardMapper.selectCount(new QueryWrapper<MemoryCard>().eq("user_id", userId));
         vo.capsuleCount = capsuleMapper.selectCount(new QueryWrapper<EchoCapsule>().eq("owner_user_id", userId));
         vo.unreadLetterCount = letterMapper.selectCount(new QueryWrapper<SlowLetter>().eq("receiver_user_id", userId).in("status", "DELIVERED", "SENT", "FLYING"));
@@ -50,7 +50,7 @@ public class DashboardServiceImpl implements DashboardService {
 
         EmotionTrace trace = emotionTraceMapper.selectOne(new QueryWrapper<EmotionTrace>().eq("user_id", userId).orderByDesc("id").last("LIMIT 1"));
         vo.emotionWeather = trace == null ? "尚未记录天气" : trace.weatherType + " / " + trace.emotionName;
-        vo.lastSummary = vo.highGravityMemories.isEmpty() ? "完成一次 Aurora 对话后，这里会出现今日摘要。" : vo.highGravityMemories.get(0).summary;
+        vo.lastSummary = vo.highGravityMemories.isEmpty() ? "完成一次 Aurora 对话后,这里会出现今日摘要." : vo.highGravityMemories.get(0).summary;
         return vo;
     }
 

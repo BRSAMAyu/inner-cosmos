@@ -1,5 +1,18 @@
 /* ── Inner Cosmos Motion System ── */
 window.ICMotion = {
+  // IntersectionObserver for reveal animations
+  revealObserver: null,
+  cursorDot: null,
+  cursorRing: null,
+  cursorTrails: [],
+  mousePos: { x: 0, y: 0 },
+  lastMousePos: { x: 0, y: 0 },
+  isDragging: false,
+  initialized: false,
+  cursorReady: false,
+  motionLoopStarted: false,
+  scrollIndicatorReady: false,
+
   // Time-based motion parameters
   getMotionParams() {
     const hour = new Date().getHours();
@@ -82,8 +95,258 @@ window.ICMotion = {
     }
   },
 
+  // Initialize enhanced cursor system
+  initCursor() {
+    if (this.cursorReady) return;
+    // Skip on mobile/touch devices
+    if ('ontouchstart' in window || window.matchMedia('(max-width: 768px)').matches) {
+      document.documentElement.classList.add('mobile');
+      return;
+    }
+
+    document.querySelectorAll('.flow-cursor-dot, .flow-cursor-ring').forEach(el => el.remove());
+
+    // Create cursor elements
+    this.cursorDot = document.createElement('div');
+    this.cursorDot.className = 'flow-cursor-dot';
+
+    this.cursorRing = document.createElement('div');
+    this.cursorRing.className = 'flow-cursor-ring';
+
+    document.body.appendChild(this.cursorDot);
+    document.body.appendChild(this.cursorRing);
+    this.cursorReady = true;
+
+    // Track mouse movement
+    document.addEventListener('mousemove', (e) => {
+      this.mousePos.x = e.clientX;
+      this.mousePos.y = e.clientY;
+
+      // Immediate update for dot
+      this.cursorDot.style.transform = `translate(${e.clientX - 4}px, ${e.clientY - 4}px)`;
+
+      // Smooth follow for ring
+      this.updateCursorRing();
+    });
+
+    // Track cursor state based on hovered elements
+    document.addEventListener('mouseover', (e) => {
+      const target = e.target;
+      this.updateCursorState(target);
+    });
+
+    // Handle dragging state
+    document.addEventListener('mousedown', () => {
+      this.isDragging = true;
+      this.cursorRing.classList.add('dragging');
+      this.cursorDot.classList.add('dragging');
+    });
+
+    document.addEventListener('mouseup', () => {
+      this.isDragging = false;
+      this.cursorRing.classList.remove('dragging');
+      this.cursorDot.classList.remove('dragging');
+    });
+
+    // Start smooth ring animation loop
+    this.animateCursorRing();
+  },
+
+  updateCursorRing() {
+    if (!this.cursorRing) return;
+
+    // Smooth lerp for ring
+    const lerp = (start, end, factor) => start + (end - start) * factor;
+    const smoothFactor = 0.15;
+
+    const targetX = this.mousePos.x - 16;
+    const targetY = this.mousePos.y - 16;
+
+    this.lastMousePos.x = lerp(this.lastMousePos.x, targetX, smoothFactor);
+    this.lastMousePos.y = lerp(this.lastMousePos.y, targetY, smoothFactor);
+
+    this.cursorRing.style.transform = `translate(${this.lastMousePos.x}px, ${this.lastMousePos.y}px)`;
+  },
+
+  animateCursorRing() {
+    if (this.cursorRing) {
+      this.updateCursorRing();
+      requestAnimationFrame(() => this.animateCursorRing());
+    }
+  },
+
+  updateCursorState(target) {
+    if (!this.cursorRing || !this.cursorDot) return;
+
+    // Reset all states
+    this.cursorRing.classList.remove('hovering', 'interactive', 'encounter');
+    this.cursorDot.classList.remove('hovering', 'interactive', 'encounter');
+
+    // Determine cursor state based on element
+    if (this.isDragging) return;
+
+    if (target.closest('.star, .encounter-element')) {
+      this.cursorRing.classList.add('encounter');
+      this.cursorDot.classList.add('encounter');
+    } else if (target.closest('input, textarea, select, [contenteditable]')) {
+      this.cursorRing.classList.add('interactive');
+      this.cursorDot.classList.add('interactive');
+    } else if (target.closest('a, button, .button, .card, .interactive')) {
+      this.cursorRing.classList.add('hovering');
+      this.cursorDot.classList.add('hovering');
+    }
+  },
+
+  createCursorTrail() {
+    if ('ontouchstart' in window) return;
+
+    const trail = document.createElement('div');
+    trail.className = 'flow-cursor-trail';
+    trail.style.left = this.mousePos.x + 'px';
+    trail.style.top = this.mousePos.y + 'px';
+    document.body.appendChild(trail);
+
+    setTimeout(() => trail.remove(), 800);
+  },
+
+  // Initialize reveal observer for scroll animations
+  initRevealObserver() {
+    const options = {
+      root: null,
+      rootMargin: '0px 0px -100px 0px',
+      threshold: 0.1
+    };
+
+    this.revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry, index) => {
+        if (entry.isIntersecting) {
+          // Stagger animation based on index
+          setTimeout(() => {
+            entry.target.classList.add('revealed');
+          }, index * 80);
+
+          this.revealObserver.unobserve(entry.target);
+        }
+      });
+    }, options);
+
+    // Observe all reveal elements
+    document.querySelectorAll('.reveal').forEach(el => {
+      this.revealObserver.observe(el);
+    });
+
+    // Initialize parallax scrolling
+    this.initParallaxScroll();
+  },
+
+  // Parallax scroll effects
+  initParallaxScroll() {
+    let ticking = false;
+
+    const updateParallax = () => {
+      const scrollY = window.scrollY;
+      const scrollPercent = scrollY / (document.body.scrollHeight - window.innerHeight);
+
+      // Parallax for flowing background
+      const bg = document.querySelector('.flowing-background');
+      if (bg) {
+        bg.style.transform = `translateY(${scrollY * 0.3}px)`;
+      }
+
+      // Parallax for hero sections
+      const heroes = document.querySelectorAll('.hero');
+      heroes.forEach(hero => {
+        const rect = hero.getBoundingClientRect();
+        const speed = 0.4;
+        const yPos = -(rect.top * speed);
+        hero.style.transform = `translateY(${yPos}px)`;
+        hero.style.opacity = Math.max(0, 1 - (scrollY * 0.002));
+      });
+
+      // Parallax for cards with depth
+      document.querySelectorAll('.parallax-card').forEach(card => {
+        const rect = card.getBoundingClientRect();
+        const centerY = rect.top + rect.height / 2;
+        const viewportCenter = window.innerHeight / 2;
+        const distanceFromCenter = (centerY - viewportCenter) / viewportCenter;
+
+        card.style.transform = `
+          perspective(1000px)
+          rotateX(${distanceFromCenter * 3}deg)
+          translateY(${distanceFromCenter * 10}px)
+        `;
+      });
+
+      // Parallax for star field
+      const starfield = document.querySelector('.starfield');
+      if (starfield) {
+        const stars = starfield.querySelectorAll('.star');
+        stars.forEach((star, i) => {
+          const speed = 0.1 + (i % 3) * 0.05;
+          const yPos = -(scrollY * speed);
+          star.style.marginTop = `${yPos}px`;
+        });
+      }
+
+      ticking = false;
+    };
+
+    window.addEventListener('scroll', () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          updateParallax();
+          ticking = false;
+        });
+        ticking = true;
+      }
+    }, { passive: true });
+
+    // Initial update
+    updateParallax();
+  },
+
+  // Horizontal scroll parallax
+  initHorizontalParallax(container) {
+    if (!container) return;
+
+    container.addEventListener('scroll', () => {
+      const scrollLeft = container.scrollLeft;
+      const maxScroll = container.scrollWidth - container.clientWidth;
+      const scrollPercent = scrollLeft / maxScroll;
+
+      const layers = container.querySelectorAll('.parallax-layer');
+      layers.forEach((layer, i) => {
+        const speed = 0.5 + (i * 0.2);
+        const xPos = -(scrollPercent * speed * 100);
+        layer.style.transform = `translateX(${xPos}%)`;
+      });
+    }, { passive: true });
+  },
+
+  // Add flowing background layers
+  initFlowingBackground() {
+    if (document.querySelector('.flowing-background')) return;
+    const bg = document.createElement('div');
+    bg.className = 'flowing-background';
+    document.body.appendChild(bg);
+
+    const particles = document.createElement('div');
+    particles.className = 'flowing-particles';
+    bg.appendChild(particles);
+
+    const texture = document.createElement('div');
+    texture.className = 'flowing-texture';
+    bg.appendChild(texture);
+
+    const inkwash = document.createElement('div');
+    inkwash.className = 'flowing-inkwash';
+    bg.appendChild(inkwash);
+  },
+
   // Initialize motion system
   init() {
+    if (this.initialized) return;
+    this.initialized = true;
     // Add motion CSS
     this.injectMotionCSS();
 
@@ -92,6 +355,109 @@ window.ICMotion = {
 
     // Start motion loop
     this.startMotionLoop();
+
+    // Initialize enhanced cursor
+    this.initCursor();
+
+    // Initialize reveal observer
+    this.initRevealObserver();
+
+    // Initialize flowing background
+    this.initFlowingBackground();
+
+    // Initialize scroll progress bar
+    this.initScrollIndicator();
+
+    // Expose stagger function globally for manual use
+    window.IC = window.IC || {};
+    window.IC.motion = {
+      fadeIn: (el) => {
+        el.style.opacity = '0';
+        el.style.transform = 'translateY(20px)';
+        requestAnimationFrame(() => {
+          el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+          el.style.opacity = '1';
+          el.style.transform = 'translateY(0)';
+        });
+      },
+      stagger: (container) => {
+        const children = container.children;
+        Array.from(children).forEach((child, i) => {
+          child.style.opacity = '0';
+          child.style.transform = 'translateY(10px)';
+          setTimeout(() => {
+            child.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
+            child.style.opacity = '1';
+            child.style.transform = 'translateY(0)';
+          }, i * 60);
+        });
+      },
+      starAppear: (star) => {
+        star.style.transform = 'scale(0)';
+        star.style.opacity = '0';
+        requestAnimationFrame(() => {
+          star.style.transition = 'transform 0.8s var(--ease-bloom), opacity 0.8s ease';
+          star.style.transform = 'scale(1)';
+          star.style.opacity = '1';
+        });
+      }
+    };
+  },
+
+  // Initialize scroll progress indicator
+  initScrollIndicator() {
+    if (this.scrollIndicatorReady) return;
+    this.scrollIndicatorReady = true;
+    document.querySelectorAll('.scroll-progress').forEach(el => el.remove());
+    // Create progress bar
+    const progressBar = document.createElement('div');
+    progressBar.className = 'scroll-progress';
+    document.body.appendChild(progressBar);
+
+    // Update progress on scroll
+    let ticking = false;
+    const updateProgress = () => {
+      const scrollY = window.scrollY;
+      const maxScroll = document.body.scrollHeight - window.innerHeight;
+      const progress = (scrollY / maxScroll) * 100;
+      progressBar.style.width = `${Math.min(100, progress)}%`;
+      ticking = false;
+    };
+
+    window.addEventListener('scroll', () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          updateProgress();
+          ticking = false;
+        });
+        ticking = true;
+      }
+    }, { passive: true });
+
+    // Initialize scroll-triggered animations
+    this.initScrollAnimations();
+  },
+
+  // Initialize scroll-triggered animations
+  initScrollAnimations() {
+    const observerOptions = {
+      root: null,
+      rootMargin: '0px 0px -100px 0px',
+      threshold: 0.15
+    };
+
+    const scrollObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('is-visible');
+        }
+      });
+    }, observerOptions);
+
+    // Observe all scroll-triggered elements
+    document.querySelectorAll('.scroll-fade-in, .scroll-scale, .scroll-slide-left, .scroll-slide-right').forEach(el => {
+      scrollObserver.observe(el);
+    });
   },
 
   injectMotionCSS() {
@@ -162,6 +528,8 @@ window.ICMotion = {
   },
 
   startMotionLoop() {
+    if (this.motionLoopStarted) return;
+    this.motionLoopStarted = true;
     // Update motion parameters every minute
     setInterval(() => {
       this.applyTimeBasedMotion();
@@ -171,19 +539,13 @@ window.ICMotion = {
   // Create ripple effect
   createRipple(x, y, container = document.body) {
     const ripple = document.createElement('div');
-    ripple.className = 'ripple';
-    ripple.style.cssText = `
-      position: absolute;
-      left: ${x}px;
-      top: ${y}px;
-      width: 0;
-      height: 0;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(143, 163, 148, 0.3) 0%, transparent 70%);
-      transform: translate(-50%, -50%);
-      animation: ripple-effect 600ms ease-out forwards;
-      pointer-events: none;
-    `;
+    ripple.className = 'touch-ripple';
+    ripple.style.left = x + 'px';
+    ripple.style.top = y + 'px';
+    ripple.style.width = '20px';
+    ripple.style.height = '20px';
+    ripple.style.marginLeft = '-10px';
+    ripple.style.marginTop = '-10px';
 
     container.appendChild(ripple);
     setTimeout(() => ripple.remove(), 600);

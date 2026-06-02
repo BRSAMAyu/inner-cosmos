@@ -90,7 +90,7 @@ public class RelationNetworkServiceImpl implements RelationNetworkService {
     }
 
     @Override
-    public List<TimelinePoint> getRelationTimeline(Long userId, String relationLabel) {
+    public List<RelationMention.TimelinePoint> getRelationTimeline(Long userId, String relationLabel) {
         QueryWrapper<RelationMention> query = new QueryWrapper<>();
         query.eq("user_id", userId)
              .eq("relation_label", relationLabel)
@@ -99,7 +99,7 @@ public class RelationNetworkServiceImpl implements RelationNetworkService {
         List<RelationMention> mentions = relationMentionMapper.selectList(query);
 
         return mentions.stream()
-                .map(m -> new TimelinePoint(m.createdAt, m.emotionTags, m.triggerSummary))
+                .map(m -> new RelationMention.TimelinePoint(m.createdAt, m.emotionTags, m.triggerSummary))
                 .collect(Collectors.toList());
     }
 
@@ -128,18 +128,18 @@ public class RelationNetworkServiceImpl implements RelationNetworkService {
 
     private String buildRelationExtractionPrompt(MemoryCard card) {
         return String.format("""
-            分析以下记忆内容，提取其中涉及的人际关系。
+            分析以下记忆内容,提取其中涉及的人际关系.
 
-            记忆标题：%s
-            记忆摘要：%s
+            记忆标题:%s
+            记忆摘要:%s
 
-            请识别：
-            1. relationLabel - 关系对象（如：妈妈、同事、朋友X）
-            2. relationType - 关系类型：FAMILY（家庭）、FRIEND（朋友）、COLLEAGUE（同事）、PARTNER（伴侣）、OTHER（其他）
-            3. emotionTags - 情绪标签（数组）：如["支持", "压力", "温暖", "冲突"]
-            4. triggerSummary - 触发摘要：简短描述发生了什么
+            请识别:
+            1. relationLabel - 关系对象(如:妈妈、同事、朋友X)
+            2. relationType - 关系类型:FAMILY(家庭)、FRIEND(朋友)、COLLEAGUE(同事)、PARTNER(伴侣)、OTHER(其他)
+            3. emotionTags - 情绪标签(数组):如["支持", "压力", "温暖", "冲突"]
+            4. triggerSummary - 触发摘要:简短描述发生了什么
 
-            返回 JSON 格式：
+            返回 JSON 格式:
             {
               "relations": [
                 {

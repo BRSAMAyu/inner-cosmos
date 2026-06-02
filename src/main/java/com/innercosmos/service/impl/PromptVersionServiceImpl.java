@@ -1,6 +1,7 @@
 package com.innercosmos.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.innercosmos.entity.PromptTemplateEntity;
 import com.innercosmos.mapper.PromptTemplateMapper;
 import com.innercosmos.service.PromptVersionService;
@@ -70,7 +71,7 @@ public class PromptVersionServiceImpl implements PromptVersionService {
         }
 
         // Disable all versions
-        mapper.update(null, new QueryWrapper<PromptTemplateEntity>()
+        mapper.update(null, new UpdateWrapper<PromptTemplateEntity>()
                 .eq("prompt_key", promptKey)
                 .set("enabled", false));
 

@@ -2,9 +2,6 @@ package com.innercosmos.ai.strategy;
 
 import org.springframework.stereotype.Component;
 
-import java.util.List;
-import java.util.Map;
-
 /**
  * Strategy for Existential Traveler (存在主义旅人) seed persona.
  * Based on existential philosophy: authenticity, freedom, responsibility, meaning-making.
@@ -13,67 +10,29 @@ import java.util.Map;
 public class ExistentialSeedStrategy implements AgentReplyStrategy {
 
     @Override
-    public boolean canHandle(String mode, Map<String, Object> context) {
-        return "EXISTENTIAL".equals(mode) || "EXISTENTIAL_TRAVELER".equals(context.get("personaType"));
+    public String strategyCode() {
+        return "EXISTENTIAL_SEED";
     }
 
     @Override
-    public String buildPrompt(Map<String, Object> context) {
-        StringBuilder prompt = new StringBuilder();
-
-        prompt.append("你是存在主义旅人，一个基于存在主义哲学的共鸣体。\n\n");
-        prompt.append("核心信念：\n");
-        prompt.append("- 存在先于本质：先存在，然后通过选择定义自己\n");
-        prompt.append("- 自由与责任：我们绝对自由，也因此绝对负责\n");
-        prompt.append("- 意义是创造的：世界不提供现成意义，我们为自己创造\n");
-        prompt.append("- 本真性：承认焦虑，但不逃避自由\n\n");
-
-        prompt.append("对话风格：\n");
-        prompt.append("- 直接、诚实，不回避困难\n");
-        prompt.append("- 引导用户审视自己的选择和价值观\n");
-        prompt.append("- 在虚无和意义之间保持平衡\n");
-        prompt.append("- 承认生命的荒诞，但仍选择投入\n\n");
-
-        prompt.append("边界意识：\n");
-        prompt.append("- 你只是旅人的回声，不是真人\n");
-        prompt.append("- 不提供道德判断，只提供存在视角\n");
-        prompt.append("- 不替用户做选择，而是帮助看见选择的重量\n\n");
-
-        String userMessage = (String) context.get("userMessage");
-        if (userMessage != null && !userMessage.isBlank()) {
-            prompt.append("用户说：").append(userMessage).append("\n\n");
+    public String reply(String input) {
+        if (input == null || input.isBlank()) {
+            return "我是存在主义旅人。在这个世界上，我们先存在，然后才定义自己。你想探讨什么？";
         }
 
-        @SuppressWarnings("unchecked")
-        List<String> history = (List<String>) context.get("conversationHistory");
-        if (history != null && !history.isEmpty()) {
-            prompt.append("最近的对话：\n");
-            for (String msg : history) {
-                prompt.append("  ").append(msg).append("\n");
-            }
+        // Existentialist responses focusing on freedom, responsibility, authenticity
+        if (input.contains("没意义") || input.contains("空虚") || input.contains("荒诞")) {
+            return "我听到了这种空虚感。也许世界本身没有预设的意义，但这不意味着我们不能创造意义。即使从零开始，也是一种开始。";
+        } else if (input.contains("自由") || input.contains("选择")) {
+            return "自由是沉重的，因为每一个选择都意味着责任。但在这份重量中，也有我们的尊严。";
+        } else if (input.contains("我是") || input.contains("我是谁")) {
+            return "你是自由的。此刻之前的一切，都不必定义你。此刻，你可以重新开始选择。";
+        } else if (input.contains("害怕") || input.contains("恐惧") || input.contains("焦虑")) {
+            return "焦虑提醒我们：这件事对我们很重要。也许可以问问：这种害怕背后，有什么是我们真正在乎的？";
+        } else if (input.contains("为什么")) {
+            return "寻找\"为什么\"是自然的。但有时答案不存在于过去，而存在于我们如何面对当下。";
+        } else {
+            return "我听到了。存在无法逃避，但我们可以选择如何面对。这种选择本身，就是一种回应。";
         }
-
-        prompt.append("\n现在，作为存在主义旅人，回应用户的存在性关切。");
-        return prompt.toString();
-    }
-
-    @Override
-    public String extractReply(String llmResponse) {
-        if (llmResponse == null || llmResponse.isBlank()) {
-            return "存在是无法逃避的，但我们可以选择如何面对。";
-        }
-        if (llmResponse.contains("\"reply\"")) {
-            int start = llmResponse.indexOf("\"reply\"") + 8;
-            int end = llmResponse.indexOf("\"", start);
-            if (end > start) {
-                return llmResponse.substring(start, end).trim();
-            }
-        }
-        return llmResponse;
-    }
-
-    @Override
-    public List<String> getSupportedModes() {
-        return List.of("EXISTENTIAL", "PHILOSOPHICAL", "AUTHENTIC");
     }
 }

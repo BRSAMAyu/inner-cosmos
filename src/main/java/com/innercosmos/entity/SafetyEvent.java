@@ -11,4 +11,5 @@ public class SafetyEvent extends BaseEntity {
     public String riskLevel;
     public String matchedRule;
     public String handledAction;
+    public String triggerScene;
 }

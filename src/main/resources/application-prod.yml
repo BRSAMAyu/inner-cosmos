@@ -1,0 +1,22 @@
+spring:
+  sql:
+    init:
+      mode: never
+  h2:
+    console:
+      enabled: false
+
+llm:
+  mode: ${LLM_MODE:prod}
+  provider: ${LLM_PROVIDER:minimax}
+  api-key: ${LLM_API_KEY:}
+  allow-fallback: ${LLM_ALLOW_FALLBACK:false}
+  minimax:
+    api-key: ${MINIMAX_API_KEY:${LLM_API_KEY:}}
+    model: ${MINIMAX_MODEL:MiniMax-M2.7}
+    base-url: ${MINIMAX_BASE_URL:https://api.minimaxi.com/v1/chat/completions}
+    timeout-ms: ${MINIMAX_TIMEOUT_MS:30000}
+
+inner-cosmos:
+  demo:
+    seed-enabled: ${DEMO_SEED_ENABLED:false}

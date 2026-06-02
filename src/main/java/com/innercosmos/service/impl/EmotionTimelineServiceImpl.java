@@ -172,20 +172,20 @@ public class EmotionTimelineServiceImpl implements EmotionTimelineService {
 
     private String buildEmotionAggregationPrompt(List<MemoryCard> cards) {
         StringBuilder sb = new StringBuilder();
-        sb.append("分析以下记忆内容，聚合当天的情绪状态。\n\n");
+        sb.append("分析以下记忆内容,聚合当天的情绪状态.\n\n");
 
         for (int i = 0; i < Math.min(5, cards.size()); i++) {
             MemoryCard card = cards.get(i);
-            sb.append(String.format("记忆%d：%s - %s\n", i+1, card.title, card.summary));
+            sb.append(String.format("记忆%d:%s - %s\n", i+1, card.title, card.summary));
         }
 
-        sb.append("\n请提取：\n");
-        sb.append("1. dominantEmotion - 主导情绪（如：平静、焦虑、愉悦、疲惫等）\n");
-        sb.append("2. emotionSpectrum - 情绪光谱：包含主要情绪成分的JSON数组\n");
-        sb.append("3. intensityAverage - 平均强度（0-1）\n");
+        sb.append("\n请提取:\n");
+        sb.append("1. dominantEmotion - 主导情绪(如:平静、焦虑、愉悦、疲惫等)\n");
+        sb.append("2. emotionSpectrum - 情绪光谱:包含主要情绪成分的JSON数组\n");
+        sb.append("3. intensityAverage - 平均强度(0-1)\n");
         sb.append("4. triggerSummary - 触发事件摘要\n");
 
-        sb.append("\n返回 JSON 格式：\n");
+        sb.append("\n返回 JSON 格式:\n");
         sb.append("{\n");
         sb.append("  \"dominantEmotion\": \"主导情绪\",\n");
         sb.append("  \"emotionSpectrum\": \"[{\\\"emotion\\\":\\\"情绪\\\",\\\"ratio\\\":0.5}]\",\n");

@@ -3,8 +3,24 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="/css/inner-cosmos.css?v=morandi-20260526">
   <title>Inner Cosmos</title>
+
+  <!-- Fonts - Morandi & Flowing Design System -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;600&family=Cormorant+Garamond:wght@300;400;600&family=Cormorant+It:wght@400&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/jetbrains-mono@2.0.0/fonts/jetbrains-mono.css" rel="stylesheet">
+
+  <style>
+    /* LXGW WenKai fallback */
+    @font-face {
+      font-family: 'LXGW WenKai';
+      src: local('LXGW WenKai'), local('STKaiti'), local('KaiTi');
+      font-display: swap;
+    }
+  </style>
+
+  <link rel="stylesheet" href="/css/app.css">
 </head>
 <body>
   <main class="shell">
@@ -93,6 +109,10 @@
       </div>
     </div>
   </main>
+  <script src="/js/time-system.js"></script>
+  <script src="/js/motion.js"></script>
+  <script src="/js/weather-system.js"></script>
+  <script src="/js/audio-system.js"></script>
   <script src="/js/app.js"></script>
   <script>IC.mountShell("首页"); IC.stagger(document);</script>
 </body>

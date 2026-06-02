@@ -96,15 +96,15 @@ public class ThoughtShredderServiceImpl implements ThoughtShredderService {
             for (StructuredAiResults.Fragment fragment : ai.fragments) {
                 fragments.add(createFragment(userId, card.id, blank(fragment.type, "OBSERVATION"),
                         blank(fragment.rawExcerpt, firstSentence(raw)),
-                        blank(fragment.analysis, "这是模型从混乱表达里整理出的片段。"),
-                        blank(fragment.reframe, "先把它放成一个可以看见的形状。")));
+                        blank(fragment.analysis, "这是模型从混乱表达里整理出的片段."),
+                        blank(fragment.reframe, "先把它放成一个可以看见的形状.")));
             }
         }
         while (fragments.size() < 4) {
-            if (fragments.size() == 0) fragments.add(createFragment(userId, card.id, "FEELING", firstSentence(raw), "混乱里最先需要被承认的是：" + coreFeeling, "先允许这个感受存在，不急着证明它合理。"));
-            else if (fragments.size() == 1) fragments.add(createFragment(userId, card.id, "NEED", hiddenNeed, "这段表达背后可能有一个尚未被满足的需要。", "需要被看见并不等于脆弱，它只是说明这件事对你有重量。"));
-            else if (fragments.size() == 2) fragments.add(createFragment(userId, card.id, "BELIEF", inferBelief(raw), "这里可能有一个过快的自我判断。", "把事情没做好和我这个人不行暂时分开。"));
-            else fragments.add(createFragment(userId, card.id, "ACTION", inferAction(raw), "可以留下一个很小的下一步。", "下一步只需要小到十分钟内能开始。"));
+            if (fragments.size() == 0) fragments.add(createFragment(userId, card.id, "FEELING", firstSentence(raw), "混乱里最先需要被承认的是:" + coreFeeling, "先允许这个感受存在,不急着证明它合理."));
+            else if (fragments.size() == 1) fragments.add(createFragment(userId, card.id, "NEED", hiddenNeed, "这段表达背后可能有一个尚未被满足的需要.", "需要被看见并不等于脆弱,它只是说明这件事对你有重量."));
+            else if (fragments.size() == 2) fragments.add(createFragment(userId, card.id, "BELIEF", inferBelief(raw), "这里可能有一个过快的自我判断.", "把事情没做好和我这个人不行暂时分开."));
+            else fragments.add(createFragment(userId, card.id, "ACTION", inferAction(raw), "可以留下一个很小的下一步.", "下一步只需要小到十分钟内能开始."));
         }
 
         TodoItem todo = maybeCreateTodo(userId, card.id, raw, hiddenNeed, ai.suggestedTodo);
@@ -173,7 +173,7 @@ public class ThoughtShredderServiceImpl implements ThoughtShredderService {
                 ? (containsAny(raw, List.of("作业", "项目", "提交")) ? "把任务打开并推进十分钟" : "把压力源拆成一个小动作")
                 : suggestion.taskName;
         todo.description = suggestion == null || suggestion.description == null || suggestion.description.isBlank()
-                ? "由思维碎纸机从混乱输入中提取。它不是审判，只是为了满足这个需要：" + hiddenNeed
+                ? "由思维碎纸机从混乱输入中提取.它不是审判,只是为了满足这个需要:" + hiddenNeed
                 : suggestion.description;
         todo.priority = suggestion == null || suggestion.priority == null || suggestion.priority.isBlank()
                 ? (containsAny(raw, List.of("考试", "截止", "ddl")) ? "HIGH" : "MEDIUM")
@@ -185,7 +185,7 @@ public class ThoughtShredderServiceImpl implements ThoughtShredderService {
 
     private String normalize(String rawText) {
         if (rawText == null || rawText.isBlank()) {
-            return "我现在有点乱，还不知道该怎么说。";
+            return "我现在有点乱,还不知道该怎么说.";
         }
         return rawText.replaceAll("\\s+", " ").trim();
     }
@@ -225,26 +225,26 @@ public class ThoughtShredderServiceImpl implements ThoughtShredderService {
         StringBuilder feeling = new StringBuilder();
 
         // Check themes first
-        if (analysis.detectedThemes.contains(“情绪承压”)) {
-            feeling.append(“疲惫和压力”);
-        } else if (analysis.detectedThemes.contains(“关系牵动”)) {
-            feeling.append(“难过和委屈”);
-        } else if (analysis.detectedThemes.contains(“自我评价”)) {
-            feeling.append(“挫败和自我怀疑”);
+        if (analysis.detectedThemes.contains("情绪承压")) {
+            feeling.append("疲惫和压力");
+        } else if (analysis.detectedThemes.contains("关系牵动")) {
+            feeling.append("难过和委屈");
+        } else if (analysis.detectedThemes.contains("自我评价")) {
+            feeling.append("挫败和自我怀疑");
         } else {
             // Fall back to sentiment label
             switch (analysis.sentimentLabel) {
-                case “CRISIS”:
-                    feeling.append(“很重的痛苦”);
+                case "CRISIS":
+                    feeling.append("很重的痛苦");
                     break;
-                case “NEGATIVE”:
-                    feeling.append(“不舒服的感受”);
+                case "NEGATIVE":
+                    feeling.append("不舒服的感受");
                     break;
-                case “POSITIVE”:
-                    feeling.append(“积极的感受”);
+                case "POSITIVE":
+                    feeling.append("积极的感受");
                     break;
                 default:
-                    feeling.append(“还没被命名的复杂感受”);
+                    feeling.append("还没被命名的复杂感受");
                     break;
             }
         }
@@ -256,26 +256,26 @@ public class ThoughtShredderServiceImpl implements ThoughtShredderService {
         AnalysisResult analysis = analyze(raw);
         // Use primary intent and themes to infer need
         switch (analysis.primaryIntent) {
-            case “SEEK_SUPPORT”:
-                return “被理解和被看见”;
-            case “TASK_STRESS”:
-                return “把压力变成可开始的一步”;
-            case “RELATION_ISSUE”:
-                return “在关系里保留自己的位置”;
-            case “COGNITIVE_CLARITY”:
-                return “把混乱整理成可以被看见的形状”;
-            case “SELF_HARM”:
-                return “获得活下去的支撑”;
+            case "SEEK_SUPPORT":
+                return "被理解和被看见";
+            case "TASK_STRESS":
+                return "把压力变成可开始的一步";
+            case "RELATION_ISSUE":
+                return "在关系里保留自己的位置";
+            case "COGNITIVE_CLARITY":
+                return "把混乱整理成可以被看见的形状";
+            case "SELF_HARM":
+                return "获得活下去的支撑";
             default:
-                if (analysis.detectedThemes.contains(“自我评价”)) {
-                    return “把事件和自我价值分开”;
+                if (analysis.detectedThemes.contains("自我评价")) {
+                    return "把事件和自我价值分开";
                 }
-                return “让混乱先有一个可以被放下的形状”;
+                return "让混乱先有一个可以被放下的形状";
         }
     }
 
     private String sentenceToKeep(String raw, String coreFeeling, String hiddenNeed) {
-        return “我现在感到” + coreFeeling + “，背后也许是在需要” + hiddenNeed + “。”;
+        return "我现在感到" + coreFeeling + ",背后也许是在需要" + hiddenNeed + ".";
     }
 
     private List<String> noiseToDrop(String raw) {
@@ -283,17 +283,17 @@ public class ThoughtShredderServiceImpl implements ThoughtShredderService {
         List<String> noise = new ArrayList<>();
 
         // Always add the base noise
-        noise.add(“把一次混乱直接解释成”我整个人都不行”的结论。”);
+        noise.add("把一次混乱直接解释成\"我整个人都不行\"的结论.");
 
         // Check for absolutist language patterns
-        if (analysis.detectedThemes.contains(“自我评价”)) {
-            noise.add(“那些把自己逼到没有余地的”应该”和”必须”。”);
+        if (analysis.detectedThemes.contains("自我评价")) {
+            noise.add("那些把自己逼到没有余地的\"应该\"和\"必须\".");
         }
         if (analysis.sentimentScore <= -4) {
-            noise.add(“把今天扩大成永远的绝对化说法。”);
+            noise.add("把今天扩大成永远的绝对化说法.");
         }
-        if (analysis.primaryIntent.equals(“COGNITIVE_CLARITY”)) {
-            noise.add(“暂时不需要反复咀嚼的责备语气。”);
+        if (analysis.primaryIntent.equals("COGNITIVE_CLARITY")) {
+            noise.add("暂时不需要反复咀嚼的责备语气.");
         }
 
         return noise;
@@ -302,22 +302,22 @@ public class ThoughtShredderServiceImpl implements ThoughtShredderService {
     private String inferBelief(String raw) {
         AnalysisResult analysis = analyze(raw);
         // Use themes and intent to infer belief patterns
-        if (analysis.detectedThemes.contains(“自我评价”)) {
-            return “如果一件事没做好，就说明我这个人不行。”;
+        if (analysis.detectedThemes.contains("自我评价")) {
+            return "如果一件事没做好,就说明我这个人不行.";
         }
-        if (analysis.primaryIntent.equals(“RELATION_ISSUE”)) {
-            return “如果别人没有立刻理解我，也许我就只能一个人承受。”;
+        if (analysis.primaryIntent.equals("RELATION_ISSUE")) {
+            return "如果别人没有立刻理解我,也许我就只能一个人承受.";
         }
         if (analysis.sentimentScore <= -3) {
-            return “这件事现在很乱，所以我可能会急着给自己下结论。”;
+            return "这件事现在很乱,所以我可能会急着给自己下结论.";
         }
-        return “我正在尝试理解自己为什么会被这件事牵动。”;
+        return "我正在尝试理解自己为什么会被这件事牵动.";
     }
 
     private String inferAction(String raw) {
-        if (containsAny(raw, List.of("作业", "任务", "项目", "提交"))) return "只打开任务文件，推进十分钟。";
-        if (containsAny(raw, List.of("朋友", "同学", "家人", "老师"))) return "写下对方说了什么，以及我实际感受到什么。";
-        return "把最重的一句话留下来，明天再看一次。";
+        if (containsAny(raw, List.of("作业", "任务", "项目", "提交"))) return "只打开任务文件,推进十分钟.";
+        if (containsAny(raw, List.of("朋友", "同学", "家人", "老师"))) return "写下对方说了什么,以及我实际感受到什么.";
+        return "把最重的一句话留下来,明天再看一次.";
     }
 
     private double inferIntensity(String raw) {

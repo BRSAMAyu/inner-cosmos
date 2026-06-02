@@ -32,7 +32,7 @@ public interface BeliefExtractService {
     /**
      * Find contradicting beliefs that may cause cognitive dissonance.
      */
-    List<BeliefPattern.ContradictionPair> findContradictions(Long userId);
+    List<ContradictionPair> findContradictions(Long userId);
 
     /**
      * Recalculate belief strength based on all supporting memories.

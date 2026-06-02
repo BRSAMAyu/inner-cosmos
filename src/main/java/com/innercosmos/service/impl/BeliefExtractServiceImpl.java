@@ -126,19 +126,19 @@ public class BeliefExtractServiceImpl implements BeliefExtractService {
 
     private String buildBeliefExtractionPrompt(MemoryCard card) {
         return String.format("""
-            分析以下记忆内容，提取其中反映的信念模式。
+            分析以下记忆内容,提取其中反映的信念模式.
 
-            记忆标题：%s
-            记忆摘要：%s
+            记忆标题:%s
+            记忆摘要:%s
 
-            请识别：
-            1. beliefs[] - 信念内容：用户可能持有的潜在信念或假设
-            2. beliefType - 信念类型：SELF（关于自我）、WORLD（关于世界）、OTHERS（关于他人）、FUTURE（关于未来）
-            3. beliefCategory - 信念分类：如"能力认知"、"关系模式"、"价值判断"、"期望设定"等
+            请识别:
+            1. beliefs[] - 信念内容:用户可能持有的潜在信念或假设
+            2. beliefType - 信念类型:SELF(关于自我)、WORLD(关于世界)、OTHERS(关于他人)、FUTURE(关于未来)
+            3. beliefCategory - 信念分类:如"能力认知"、"关系模式"、"价值判断"、"期望设定"等
 
-            对于每个信念，保持温和、非评判的语言。只提取明确反映的信念模式。
+            对于每个信念,保持温和、非评判的语言.只提取明确反映的信念模式.
 
-            返回 JSON 格式：
+            返回 JSON 格式:
             {
               "beliefs": [
                 {
@@ -230,7 +230,7 @@ public class BeliefExtractServiceImpl implements BeliefExtractService {
     }
 
     private String inferContradictionReason(BeliefPattern a, BeliefPattern b) {
-        return "可能存在认知冲突：" + a.beliefContent + " vs " + b.beliefContent;
+        return "可能存在认知冲突:" + a.beliefContent + " vs " + b.beliefContent;
     }
 
     private BeliefExtractionResult fallbackBeliefExtraction(MemoryCard card) {

@@ -116,21 +116,21 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
             for (StructuredAiResults.Fragment fragment : ai.fragments) {
                 createFragment(userId, card.id, blank(fragment.type, "OBSERVATION"),
                         blank(fragment.rawExcerpt, firstSentence(raw)),
-                        blank(fragment.analysis, "从用户表达中抽取出的片段。"),
-                        blank(fragment.reframe, "先把它放成一个可以看见的形状。"));
+                        blank(fragment.analysis, "从用户表达中抽取出的片段."),
+                        blank(fragment.reframe, "先把它放成一个可以看见的形状."));
             }
         } else {
-            createFragment(userId, card.id, "FACT", firstSentence(raw), "从用户表达中抽取出的事实片段。", "先区分事实和解释。");
-            createFragment(userId, card.id, "FEELING", inferEmotion(raw), "表达里出现的主要感受线索。", "允许感受存在，不急着证明它合理。");
-            createFragment(userId, card.id, "BELIEF", inferBelief(raw), "可能影响用户自我评价的信念。", "把事件和自我价值暂时分开看。");
-            createFragment(userId, card.id, "ACTION", inferAction(raw), "可以轻轻推进的一步。", "把下一步压缩到十分钟内能开始。");
+            createFragment(userId, card.id, "FACT", firstSentence(raw), "从用户表达中抽取出的事实片段.", "先区分事实和解释.");
+            createFragment(userId, card.id, "FEELING", inferEmotion(raw), "表达里出现的主要感受线索.", "允许感受存在,不急着证明它合理.");
+            createFragment(userId, card.id, "BELIEF", inferBelief(raw), "可能影响用户自我评价的信念.", "把事件和自我价值暂时分开看.");
+            createFragment(userId, card.id, "ACTION", inferAction(raw), "可以轻轻推进的一步.", "把下一步压缩到十分钟内能开始.");
         }
 
         if (raw.contains("需要") || raw.contains("想要")) {
-            createFragment(userId, card.id, "NEED", inferNeed(raw), "表达中隐含的深层需要。", "把需要从期待中分出来看看。");
+            createFragment(userId, card.id, "NEED", inferNeed(raw), "表达中隐含的深层需要.", "把需要从期待中分出来看看.");
         }
         if (raw.contains("担心") || raw.contains("害怕") || raw.contains("焦虑")) {
-            createFragment(userId, card.id, "WORRY", inferWorry(raw), "来自用户的担忧。", "先承认这个担心是合理的。");
+            createFragment(userId, card.id, "WORRY", inferWorry(raw), "来自用户的担忧.", "先承认这个担心是合理的.");
         }
 
         // Create EmotionTrace
@@ -151,7 +151,7 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
                 todo.userId = userId;
                 todo.sourceMemoryCardId = card.id;
                 todo.taskName = blank(suggestion.taskName, "把今天提到的任务拆成第一步");
-                todo.description = blank(suggestion.description, "由 Aurora 对话自动提取，建议从一个十分钟动作开始。");
+                todo.description = blank(suggestion.description, "由 Aurora 对话自动提取,建议从一个十分钟动作开始.");
                 todo.priority = blank(suggestion.priority, "MEDIUM");
                 todo.status = "TODO";
                 todoItemMapper.insert(todo);
@@ -161,7 +161,7 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
             todo.userId = userId;
             todo.sourceMemoryCardId = card.id;
             todo.taskName = raw.contains("作业") ? "推进 Java 作业的第一步" : "把今天提到的任务拆成第一步";
-            todo.description = "由 Aurora 对话自动提取，建议从一个十分钟动作开始。";
+            todo.description = "由 Aurora 对话自动提取,建议从一个十分钟动作开始.";
             todo.priority = raw.contains("考试") ? "HIGH" : "MEDIUM";
             todo.status = "TODO";
             todoItemMapper.insert(todo);
@@ -238,7 +238,7 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
         DailyRecordVO vo = new DailyRecordVO();
         if (card == null) {
             vo.theme = "还没有沉淀出的今日主题";
-            vo.auroraSummary = "和 Aurora 完成一次对话后，这里会生成今日记录卡。";
+            vo.auroraSummary = "和 Aurora 完成一次对话后,这里会生成今日记录卡.";
             return vo;
         }
 
@@ -336,7 +336,7 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
 
     private String firstSentence(String raw) {
         if (raw == null || raw.isBlank()) {
-            return "用户完成了一次自我表达。";
+            return "用户完成了一次自我表达.";
         }
         String compact = raw.replaceAll("\\s+", " ").trim();
         return compact.length() > 64 ? compact.substring(0, 64) + "..." : compact;
@@ -386,7 +386,7 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
         // Add sentiment base
         switch (analysis.sentimentLabel) {
             case "CRISIS":
-                emotion.append("很重的情绪，需要温柔的支持");
+                emotion.append("很重的情绪,需要温柔的支持");
                 break;
             case "NEGATIVE":
                 if (analysis.detectedThemes.contains("情绪承压")) {
@@ -412,15 +412,15 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
         AnalysisResult analysis = analyze(raw);
         // Use detected themes and intent to infer belief patterns
         if (analysis.detectedThemes.contains("自我评价")) {
-            return "这件事也许让你再次怀疑自己，但一件事没做好不等于整个人不行。";
+            return "这件事也许让你再次怀疑自己,但一件事没做好不等于整个人不行.";
         }
         if (analysis.primaryIntent.equals("RELATION_ISSUE")) {
-            return "这段关系也许让你想起一些旧的感受，我们先把现在和过去分开看。";
+            return "这段关系也许让你想起一些旧的感受,我们先把现在和过去分开看.";
         }
         if (analysis.sentimentScore <= -3) {
-            return "现在很难，但这不说明你不够好，只说明你现在需要一些支持。";
+            return "现在很难,但这不说明你不够好,只说明你现在需要一些支持.";
         }
-        return "我正在尝试理解自己为什么会被这件事牵动。";
+        return "我正在尝试理解自己为什么会被这件事牵动.";
     }
 
     private String inferAction(String raw) {
@@ -428,15 +428,15 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
         // Use primary intent to suggest action
         switch (analysis.primaryIntent) {
             case "TASK_STRESS":
-                return "明天先打开任务文件，只做十分钟。";
+                return "明天先打开任务文件,只做十分钟.";
             case "RELATION_ISSUE":
-                return "先写下对方说了什么，以及我实际感受到什么。";
+                return "先写下对方说了什么,以及我实际感受到什么.";
             case "SELF_HARM":
-                return "现在最小的一步，是先让自己活下来，其他的明天再说。";
+                return "现在最小的一步,是先让自己活下来,其他的明天再说.";
             case "COGNITIVE_CLARITY":
-                return "把现在最乱的一句话写下来，明天再看一次。";
+                return "把现在最乱的一句话写下来,明天再看一次.";
             default:
-                return "把今天最重的一句话保存下来，明天再看一次。";
+                return "把今天最重的一句话保存下来,明天再看一次.";
         }
     }
 
@@ -459,10 +459,10 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
         AnalysisResult analysis = analyze(raw);
         // Use detected themes to identify worry
         if (analysis.detectedThemes.contains("任务压力")) {
-            return "担心任务完成不了，或者结果不如预期";
+            return "担心任务完成不了,或者结果不如预期";
         }
         if (analysis.detectedThemes.contains("关系牵动")) {
-            return "担心这段关系会变差，或者不被理解";
+            return "担心这段关系会变差,或者不被理解";
         }
         if (analysis.sentimentScore <= -3) {
             return "有一些深层的担心还没有被说出来";

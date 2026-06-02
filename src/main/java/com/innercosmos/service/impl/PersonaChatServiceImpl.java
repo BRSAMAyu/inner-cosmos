@@ -48,7 +48,7 @@ public class PersonaChatServiceImpl implements PersonaChatService {
             throw new BusinessException("NOT_FOUND", "共鸣体不存在");
         }
         if (!Boolean.TRUE.equals(capsule.isPublic) || !"PUBLIC".equals(capsule.visibilityStatus)) {
-            throw new BusinessException("FORBIDDEN", "该共鸣体未公开，无法发起对话");
+            throw new BusinessException("FORBIDDEN", "该共鸣体未公开,无法发起对话");
         }
         PersonaChatSession session = new PersonaChatSession();
         session.visitorUserId = userId;
@@ -85,14 +85,14 @@ public class PersonaChatServiceImpl implements PersonaChatService {
             capsuleMessage.textContent = safety.safeMessage;
             session.status = "SAFETY_GUIDED";
         } else if (session.turnCount != null && session.turnCount >= session.dailyLimit) {
-            capsuleMessage.textContent = "今天的回声已经足够深了。如果你愿意，可以把想继续说的话写成一封慢信。";
+            capsuleMessage.textContent = "今天的回声已经足够深了.如果你愿意,可以把想继续说的话写成一封慢信.";
             session.status = "LETTER_GUIDED";
         } else {
             EchoCapsule capsule = capsuleMapper.selectById(session.capsuleId);
             String personaName = capsule != null && capsule.pseudonym != null ? capsule.pseudonym : "数字回声";
             String personaIntro = capsule != null && capsule.intro != null ? capsule.intro : "一个有限的共鸣体";
             String personaPrompt = capsuleAgent.buildPersonaPrompt(personaName, personaIntro);
-            String prefix = "MEDIUM".equals(safety.riskLevel) ? "我会先把这段话放回到安全和尊重的边界里。 " : "";
+            String prefix = "MEDIUM".equals(safety.riskLevel) ? "我会先把这段话放回到安全和尊重的边界里. " : "";
             StructuredAiResults.PersonaResult ai = structuredAiService.call(userId, "PERSONA_CHAT",
                     """
                     Return JSON with reply, boundaryNotice, letterSuggested, riskFlags[].
@@ -114,18 +114,18 @@ public class PersonaChatServiceImpl implements PersonaChatService {
 
     private String generateContextualReply(String personaPrompt, String visitorMessage) {
         if (visitorMessage.contains("难过") || visitorMessage.contains("痛苦")) {
-            return "我能感受到这份沉重。你的感受是真实的，我在这里陪你看清它。";
+            return "我能感受到这份沉重.你的感受是真实的,我在这里陪你看清它.";
         }
         if (visitorMessage.contains("开心") || visitorMessage.contains("高兴")) {
-            return "这份喜悦值得被记住。是什么让它发生的？";
+            return "这份喜悦值得被记住.是什么让它发生的?";
         }
         if (visitorMessage.contains("迷茫") || visitorMessage.contains("不知道")) {
-            return "不知道本身也是一种诚实。我们一起慢慢看，不急着下结论。";
+            return "不知道本身也是一种诚实.我们一起慢慢看,不急着下结论.";
         }
         if (visitorMessage.contains("孤独") || visitorMessage.contains("一个人")) {
-            return "你现在的孤独感，不需要被否定。我在这里，虽然只是一道回声。";
+            return "你现在的孤独感,不需要被否定.我在这里,虽然只是一道回声.";
         }
-        return "我听见了这个片段。作为一枚有限的数字回声，我只能陪你看见其中一部分：你最想继续靠近的是什么？";
+        return "我听见了这个片段.作为一枚有限的数字回声,我只能陪你看见其中一部分:你最想继续靠近的是什么?";
     }
 
     private StructuredAiResults.PersonaResult fallbackPersona(String personaPrompt, String visitorMessage) {

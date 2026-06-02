@@ -35,7 +35,7 @@ public class MemoryExtractAgent {
             var result = structuredAiService.call(userId, "MEMORY_EXTRACT", prompt,
                 java.util.Map.of("rawText", rawText),
                 MemoryExtractionResult.class,
-                () -> fallbackExtraction(rawText));
+                () -> fallbackExtractionResult(rawText));
 
             return convertToMemoryExtraction(rawText, result);
 
@@ -51,7 +51,7 @@ public class MemoryExtractAgent {
      */
     public String summarize(String rawText) {
         if (rawText == null || rawText.isBlank()) {
-            return "一次安静但仍值得保存的自我观察。";
+            return "一次安静但仍值得保存的自我观察.";
         }
 
         MemoryExtraction extraction = extract(null, rawText);
@@ -60,22 +60,22 @@ public class MemoryExtractAgent {
 
     private String buildExtractionPrompt(String rawText) {
         return """
-            分析以下对话文本，提取六个维度的结构化信息：
+            分析以下对话文本,提取六个维度的结构化信息:
 
-            文本：%s
+            文本:%s
 
-            请识别并提取：
-            1. facts[] - 事实片段：发生了什么客观事件
-            2. feelings[] - 情绪感受：用户表达了哪些感受
-            3. worries[] - 担忧内容：用户在担心什么
-            4. needs[] - 需求：用户可能需要什么
-            5. beliefs[] - 信念：可能存在的潜在信念模式
-            6. actions[] - 行动：可能的小步骤
+            请识别并提取:
+            1. facts[] - 事实片段:发生了什么客观事件
+            2. feelings[] - 情绪感受:用户表达了哪些感受
+            3. worries[] - 担忧内容:用户在担心什么
+            4. needs[] - 需求:用户可能需要什么
+            5. beliefs[] - 信念:可能存在的潜在信念模式
+            6. actions[] - 行动:可能的小步骤
 
-            对于每个维度，只提取明确出现的内容。如果某个维度没有明显内容，返回空数组。
-            保持温和、非评判的语言。
+            对于每个维度,只提取明确出现的内容.如果某个维度没有明显内容,返回空数组.
+            保持温和、非评判的语言.
 
-            返回 JSON 格式：
+            返回 JSON 格式:
             {
               "summary": "一句话总结",
               "facts": ["fact1", "fact2"],
@@ -90,7 +90,7 @@ public class MemoryExtractAgent {
 
     private MemoryExtraction createDefaultExtraction() {
         MemoryExtraction extraction = new MemoryExtraction();
-        extraction.summary = "一次安静但仍值得保存的自我观察。";
+        extraction.summary = "一次安静但仍值得保存的自我观察.";
         extraction.facts = java.util.List.of();
         extraction.feelings = java.util.List.of();
         extraction.worries = java.util.List.of();
@@ -111,9 +111,9 @@ public class MemoryExtractAgent {
         java.util.List<String> facts = new java.util.ArrayList<>();
         java.util.List<String> feelings = new java.util.ArrayList<>();
         java.util.List<String> worries = new java.util.ArrayList<>();
-        java.util.List<String> needs = new java.util.List.of();
-        java.util.List<String> beliefs = new java.util.List.of();
-        java.util.List<String> actions = new java.util.List.of();
+        java.util.List<String> needs = new java.util.ArrayList<>();
+        java.util.List<String> beliefs = new java.util.ArrayList<>();
+        java.util.List<String> actions = new java.util.ArrayList<>();
 
         // Simple keyword-based extraction (better than nothing)
         if (compact.contains("今天")) {
@@ -140,6 +140,21 @@ public class MemoryExtractAgent {
         return extraction;
     }
 
+    private MemoryExtractionResult fallbackExtractionResult(String rawText) {
+        MemoryExtractionResult result = new MemoryExtractionResult();
+        String compact = rawText.replaceAll("\\s+", " ").trim();
+
+        result.summary = compact.length() > 80 ? compact.substring(0, 80) + "..." : compact;
+        result.facts = java.util.List.of();
+        result.feelings = java.util.List.of();
+        result.worries = java.util.List.of();
+        result.needs = java.util.List.of();
+        result.beliefs = java.util.List.of();
+        result.actions = java.util.List.of();
+
+        return result;
+    }
+
     private MemoryExtraction convertToMemoryExtraction(String rawText, MemoryExtractionResult result) {
         MemoryExtraction extraction = new MemoryExtraction();
         extraction.summary = result.summary != null ? result.summary : firstSentence(rawText);
@@ -153,7 +168,7 @@ public class MemoryExtractAgent {
     }
 
     private String firstSentence(String raw) {
-        if (raw == null || raw.isBlank()) return "用户完成了一次自我表达。";
+        if (raw == null || raw.isBlank()) return "用户完成了一次自我表达.";
         String compact = raw.replaceAll("\\s+", " ").trim();
         return compact.length() > 80 ? compact.substring(0, 80) + "..." : compact;
     }
