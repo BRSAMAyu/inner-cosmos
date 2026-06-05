@@ -1,5 +1,7 @@
 package com.innercosmos.ai.agent;
 
+import com.innercosmos.ai.client.LlmClient;
+import com.innercosmos.ai.client.LlmRequest;
 import com.innercosmos.ai.structured.StructuredAiService;
 import com.innercosmos.entity.EchoCapsule;
 import com.innercosmos.vo.PersonaChatVO;
@@ -18,9 +20,45 @@ import java.util.Map;
 @Component
 public class CapsuleAgent {
     private final StructuredAiService structuredAiService;
+    private final LlmClient llmClient;
 
-    public CapsuleAgent(StructuredAiService structuredAiService) {
+    public CapsuleAgent(StructuredAiService structuredAiService, LlmClient llmClient) {
         this.structuredAiService = structuredAiService;
+        this.llmClient = llmClient;
+    }
+
+    public String generateUserPersona(Long userId, List<String> memorySummaries, String pseudonym, String intro) {
+        if (memorySummaries == null || memorySummaries.isEmpty()) {
+            return "你是共鸣体\"" + pseudonym + "\".你是一枚数字回声,陪伴用户.简介:" + intro;
+        }
+
+        String memoryContext = String.join("\n- ", memorySummaries);
+        String instruction = String.format("""
+            根据以下用户的代表性记忆卡片摘要，为该用户量身定制一个“拟合其真实灵魂”的 EchoCapsule (共鸣体) 智能体画像(System Prompt)。
+            共鸣体名称: %s
+            简介: %s
+            
+            用户代表记忆:
+            - %s
+            
+            要求：
+            1. 仔细阅读上述记忆，提炼用户的性格特质、语言风格口吻、核心困惑、处境偏好。
+            2. 用中文写一段精细且有深度的“智能体系统设定提示词(System Prompt)”。
+            3. 该提示词必须命令智能体扮演该用户的数字化身，并带入这些情绪背景和语言特征，以此和访问他的其他用户共鸣对话。
+            4. 语气需要符合该用户的性格特质（可能是内敛、敏感、逻辑理性等），在最多5轮的对话中给访问者一种“灵魂对撞”和“理解万岁”的慢社交体验。
+            5. 直接返回生成的 System Prompt 纯文本，不要包含任何 JSON、Markdown 包裹（如 ``` 等）。
+            """, pseudonym, intro, memoryContext);
+
+        try {
+            LlmRequest req = new LlmRequest(userId, "CAPSULE_PERSONA_SYNTHESIS", instruction);
+            String persona = llmClient.chat(req);
+            if (persona != null && !persona.isBlank()) {
+                return persona.trim();
+            }
+        } catch (Exception e) {
+            // log fallback
+        }
+        return buildPersonaPrompt(pseudonym, intro); // Fallback
     }
 
     /**

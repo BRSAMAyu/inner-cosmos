@@ -1,8 +1,5 @@
 package com.innercosmos.asr;
 
-import org.springframework.stereotype.Component;
-
-@Component
 public class MockAsrClient implements AsrClient {
     @Override
     public AsrResult transcribe(byte[] audioBytes, String hintText) {

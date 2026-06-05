@@ -3,134 +3,105 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>成长时间轴 - Inner Cosmos</title>
   <link rel="stylesheet" href="/css/app.css">
+  <style>
+    .cosmos-timeline { position: relative; padding: 12px 0 40px; }
+    .cosmos-timeline::before { content:""; position:absolute; left:160px; top:0; bottom:0; width:2px; background:linear-gradient(#d8cbb9,#9caf9f,#c7b7a3); }
+    .axis-item { display:grid; grid-template-columns:130px 34px 1fr; gap:14px; align-items:start; margin:0 0 24px; }
+    .axis-date { text-align:right; color:var(--muted); font-size:.86rem; padding-top:14px; }
+    .axis-node { width:22px; height:22px; border-radius:50%; margin-top:12px; background:var(--accent-sage); border:4px solid rgba(255,250,243,.95); box-shadow:0 0 0 1px var(--line),0 0 28px rgba(156,175,154,.32); z-index:1; }
+    .axis-node.major { width:30px; height:30px; margin-left:-4px; background:var(--accent-rose); box-shadow:0 0 34px rgba(191,150,152,.42); }
+    .axis-card { border-left:4px solid rgba(156,175,154,.45); animation:slideIn .42s ease both; }
+    @keyframes slideIn { from { opacity:0; transform:translateX(18px); } to { opacity:1; transform:none; } }
+    @media (max-width:720px){ .cosmos-timeline::before{left:18px}.axis-item{grid-template-columns:34px 1fr}.axis-date{grid-column:2;text-align:left;padding:0}.axis-node{grid-column:1;grid-row:1 / span 2}.axis-card{grid-column:2} }
+  </style>
 </head>
 <body>
 <main class="shell">
   <div class="topbar" data-topbar></div>
-
-  <div class="flex-between mb-2" style="flex-wrap:wrap;gap:12px">
+  <section class="flex-between mb-2" style="flex-wrap:wrap;gap:12px">
     <div>
       <span class="route-hint">成长轨迹</span>
       <h1>成长时间轴</h1>
-      <p class="muted">重要记忆按时间沉淀在这里。你可以看到自己的变化。</p>
+      <p class="muted">这里不是列表，而是 Aurora 和你的日记、对话、记忆共同沉淀出的时间轨迹。</p>
     </div>
     <div class="row gap-sm">
       <input type="date" id="datePicker" onchange="loadByDate()">
       <button onclick="loadAll()">全部</button>
     </div>
-  </div>
-
-  <!-- Theme evolution -->
-  <section class="panel mb-2">
-    <h2>主题演变</h2>
-    <div id="themeEvolution" class="chart-bars mt-1 mb-1" style="height:60px"></div>
-    <p class="muted" style="font-size:.82rem" id="themeLabels"></p>
   </section>
 
-  <!-- Timeline entries -->
-  <section id="timeline" class="timeline"></section>
-</main>
+  <section class="panel mb-2">
+    <h2>主题迁移</h2>
+    <div id="themeEvolution" class="chart-bars mt-1 mb-1" style="height:68px"></div>
+    <p class="muted" style="font-size:.84rem" id="themeLabels"></p>
+  </section>
 
+  <section id="timeline" class="cosmos-timeline"></section>
+</main>
 <script src="/js/app.js"></script>
-<script src="/js/time-system.js"></script>
 <script src="/js/motion.js"></script>
-<script src="/js/weather-system.js"></script>
-<script src="/js/audio-system.js"></script>
 <script src="/js/api.js"></script>
 <script>
-IC.mountShell("成长时间轴");
+IC.mountShell("时间轴");
 IC.ensureDemoLogin().then(loadAll);
-
 let allRecords = [];
 let allThemes = [];
-
-function esc(text) { return IC.esc(text); }
+const esc = IC.esc;
 
 async function loadAll() {
   const [recordsResp, themesResp] = await Promise.all([API.dailyRecords(), API.memoryThemes()]);
   allRecords = (recordsResp.success ? recordsResp.data : []) || [];
   allThemes = (themesResp.success ? themesResp.data : []) || [];
-  renderTimeline();
+  renderTimeline(allRecords);
   renderThemeEvolution();
 }
 
 function loadByDate() {
   const date = document.getElementById("datePicker").value;
-  if (!date) { renderTimeline(); return; }
-  const filtered = allRecords.filter(r => {
-    const rd = new Date(r.createdAt || r.recordDate).toISOString().split("T")[0];
-    return rd === date;
-  });
-  renderTimeline(filtered);
+  if (!date) return renderTimeline(allRecords);
+  renderTimeline(allRecords.filter(r => String(r.recordDate || r.createdAt || "").slice(0,10) === date));
 }
 
 function renderTimeline(records) {
-  const data = records || allRecords;
   const container = document.getElementById("timeline");
-
-  if (!data.length) {
-    container.innerHTML = IC.empty("还没有记录。完成一次 Aurora 对话后，记录会出现在这里。");
+  if (!records.length) {
+    container.innerHTML = IC.empty("完成一次 Aurora 对话或心声日记后，时间轴会出现真实沉淀。");
     return;
   }
-
-  container.innerHTML = data.map((r, i) => {
-    const date = IC.formatTime(r.createdAt || r.recordDate);
-    const weather = IC.weatherIcon(r.emotionWeather || "");
-    const todos = r.todos || [];
-    const doneTodos = todos.filter(t => t.status === "DONE").length;
-
+  container.innerHTML = records.map((r, i) => {
+    const date = String(r.recordDate || r.createdAt || "").slice(0, 10) || IC.formatTime(r.createdAt);
+    const major = (r.memoryCount || 0) > 2 || (r.theme || "").length > 8;
     return `
-      <article class="panel timeline-item">
-        <div class="flex-between mb-1">
-          <div>
-            <span class="muted" style="font-size:.82rem">${date}</span>
-            <h3>${esc(r.theme || "今日记录")}</h3>
-          </div>
-          <span class="weather-icon" style="font-size:1.6rem">${weather}</span>
-        </div>
-        <p class="muted">${esc(r.auroraSummary || r.summary || "")}</p>
-
-        ${todos.length ? `
-          <div class="mt-1">
-            <div class="progress-bar" style="max-width:200px">
-              <div class="progress-bar-fill" style="width:${todos.length ? Math.round(doneTodos / todos.length * 100) : 0}%"></div>
-            </div>
-            <p class="muted mt-1" style="font-size:.78rem">${doneTodos}/${todos.length} 待办完成</p>
-          </div>
-        ` : ""}
-
-        ${(r.fragments || []).length ? `
+      <article class="axis-item" style="animation-delay:${i * 40}ms">
+        <div class="axis-date">${esc(date)}</div>
+        <div class="axis-node ${major ? "major" : ""}"></div>
+        <div class="panel axis-card">
+          <div class="flex-between mb-1"><h3>${esc(r.theme || "今日记录")}</h3><span class="weather-icon">${IC.weatherIcon(r.emotionWeather || "")}</span></div>
+          <p class="muted">${esc(r.auroraSummary || r.eventSummary || r.cognitiveSummary || "")}</p>
           <div class="pill-row mt-1">
-            ${r.fragments.slice(0, 3).map(f => `<span class="pill">${esc((f.rawExcerpt || "").substring(0, 30))}...</span>`).join("")}
+            ${r.emotionWeather ? `<span class="pill">${esc(r.emotionWeather)}</span>` : ""}
+            ${r.todoSummary ? `<span class="pill">待办线索</span>` : ""}
+            ${r.capsuleSuggested ? `<span class="pill">适合编织共鸣体</span>` : ""}
           </div>
-        ` : ""}
-
-        <div class="row gap-sm mt-2">
-          <a class="button" href="/pages/daily-record.html">查看详情</a>
-          <a class="button" href="/pages/memory-starfield.html">查看星图</a>
+          <div class="row gap-sm mt-2">
+            <a class="button" href="/pages/daily-record.html">查看当日</a>
+            <a class="button" href="/pages/memory-starfield.html">跳到星图</a>
+          </div>
         </div>
-      </article>
-    `;
+      </article>`;
   }).join("");
-  IC.stagger(container);
 }
 
 function renderThemeEvolution() {
-  if (!allThemes.length) return;
   const chart = document.getElementById("themeEvolution");
   const labels = document.getElementById("themeLabels");
-
-  const themeCounts = allThemes.slice(0, 7).map(t => ({
-    name: t.themeName || t.name || "主题",
-    count: t.memoryCount || t.cardCount || 1
-  }));
-
-  const max = Math.max(...themeCounts.map(t => t.count));
-  chart.innerHTML = themeCounts.map(t =>
-    `<div class="chart-bar" style="height:${Math.round(t.count / max * 100)}%"></div>`
-  ).join("");
-  labels.textContent = themeCounts.map(t => t.name.substring(0, 4)).join("  ");
+  const data = allThemes.slice(0, 7).map(t => ({ name: t.themeName || t.name || "主题", count: t.memoryCount || 1 }));
+  if (!data.length) { chart.innerHTML = ""; labels.textContent = "还没有足够主题数据。"; return; }
+  const max = Math.max(...data.map(t => t.count));
+  chart.innerHTML = data.map(t => `<div class="chart-bar" title="${esc(t.name)}" style="height:${Math.round(t.count / max * 100)}%"></div>`).join("");
+  labels.textContent = data.map(t => t.name.slice(0, 6)).join(" / ");
 }
 </script>
 </body>

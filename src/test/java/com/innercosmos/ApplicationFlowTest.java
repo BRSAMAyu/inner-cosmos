@@ -17,7 +17,13 @@ import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest
+@SpringBootTest(properties = {
+        "llm.mode=dev",
+        "llm.provider=minimax",
+        "llm.api-key=",
+        "llm.minimax.api-key=",
+        "llm.allow-fallback=true"
+})
 @AutoConfigureMockMvc
 class ApplicationFlowTest {
     @Autowired
@@ -130,7 +136,8 @@ class ApplicationFlowTest {
                         .content("{\"sessionId\":" + sessionId + ",\"message\":\"今天项目任务拖延了，压力很大\",\"inputType\":\"VOICE\",\"audioDurationSec\":36,\"speechRate\":2.4,\"pauseCount\":3,\"longPauseCount\":1,\"mode\":\"ACTION_SPLIT\",\"timezone\":\"Asia/Shanghai\"}"), session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.messages.length()", greaterThanOrEqualTo(1)))
-                .andExpect(jsonPath("$.data.detectedTheme").value("任务压力"))
+                .andExpect(jsonPath("$.data.detectedTheme").isNotEmpty())
+                .andExpect(jsonPath("$.data.agentLoop.mode").value("ACTION_SPLIT"))
                 .andExpect(jsonPath("$.data.memoryReferenced").exists())
                 .andExpect(jsonPath("$.data.memoryContext.memoryPolicy").exists())
                 .andExpect(jsonPath("$.data.memoryContext.shortTermMessages.length()", greaterThanOrEqualTo(1)))

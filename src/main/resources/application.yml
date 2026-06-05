@@ -28,20 +28,29 @@ mybatis-plus:
       id-type: auto
 
 llm:
-  mode: ${LLM_MODE:dev}
+  mode: ${LLM_MODE:prod}
   provider: ${LLM_PROVIDER:minimax}
   api-key: ${LLM_API_KEY:}
   base-url: ${LLM_BASE_URL:}
-  model: ${LLM_MODEL:mock-inner-cosmos}
-  allow-fallback: ${LLM_ALLOW_FALLBACK:true}
+  model: ${LLM_MODEL:MiniMax-M2.7}
+  allow-fallback: ${LLM_ALLOW_FALLBACK:false}
+  asr-provider: ${ASR_PROVIDER:mimo}
   prompt:
     language: ${LLM_PROMPT_LANGUAGE:zh-CN}  # zh-CN for Chinese, en-US for English
+  mimo:
+    api-key: ${MIMO_API_KEY:}
+    asr-model: ${MIMO_ASR_MODEL:mimo-v2.5-asr}
+    asr-base-url: ${MIMO_ASR_BASE_URL:https://token-plan-cn.xiaomimimo.com/v1}
+    asr-language: ${MIMO_ASR_LANGUAGE:auto}
+    timeout-ms: ${MIMO_TIMEOUT_MS:30000}
   glm:
     api-key: ${GLM_API_KEY:}
     model: ${GLM_MODEL:glm-4-flash}
     base-url: ${GLM_BASE_URL:https://open.bigmodel.cn/api/paas/v4/chat/completions}
     timeout-ms: ${GLM_TIMEOUT_MS:20000}
     asr-api-key: ${GLM_ASR_API_KEY:}
+    asr-model: ${GLM_ASR_MODEL:glm-asr-2512}
+    asr-base-url: ${GLM_ASR_BASE_URL:https://open.bigmodel.cn/api/paas/v4/audio/transcriptions}
   minimax:
     api-key: ${MINIMAX_API_KEY:${LLM_API_KEY:}}
     model: ${MINIMAX_MODEL:MiniMax-M2.7}

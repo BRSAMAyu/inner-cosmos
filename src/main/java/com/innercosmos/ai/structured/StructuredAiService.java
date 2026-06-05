@@ -3,6 +3,7 @@ package com.innercosmos.ai.structured;
 import com.innercosmos.ai.client.LlmClient;
 import com.innercosmos.ai.client.LlmRequest;
 import com.innercosmos.ai.prompt.StructuredOutputParser;
+import com.innercosmos.config.LlmConfig;
 import com.innercosmos.service.ABTestService;
 import com.innercosmos.util.JsonUtils;
 import org.slf4j.Logger;
@@ -17,19 +18,24 @@ public class StructuredAiService {
 
     private final LlmClient llmClient;
     private final ABTestService abTestService;
+    private final LlmConfig llmConfig;
 
-    public StructuredAiService(LlmClient llmClient, ABTestService abTestService) {
+    public StructuredAiService(LlmClient llmClient, ABTestService abTestService, LlmConfig llmConfig) {
         this.llmClient = llmClient;
         this.abTestService = abTestService;
+        this.llmConfig = llmConfig;
     }
 
     public <T> T call(Long userId, String moduleName, String instruction, Object context,
                       Class<T> resultType, Supplier<T> fallback) {
-        // A/B test group assignment
+        // A/B test group assignment. Production must never route the main product
+        // experience into mock through experiments.
         String assignedGroup = abTestService.assignGroup(userId, moduleName);
+        if (llmConfig.isProdMode()) {
+            assignedGroup = "REMOTE";
+        }
         long startTime = System.currentTimeMillis();
         boolean success = false;
-        boolean usedFallback = false;
 
         try {
             String contextJson = JsonUtils.toJson(context);
@@ -65,21 +71,26 @@ public class StructuredAiService {
                 return parsed;
             }
             log.warn("Structured AI output for {} could not be parsed after repair", moduleName);
+            if (llmConfig.isProdMode()) {
+                throw new IllegalStateException("真实 AI 输出不是合法 JSON，生产模式不会静默回退 Mock");
+            }
 
         } catch (Exception exception) {
+            if (llmConfig.isProdMode()) {
+                throw new IllegalStateException("真实 AI 调用失败，生产模式不会静默回退 Mock：" + exception.getMessage(), exception);
+            }
             log.warn("Structured AI call for {} fell back to deterministic extraction: {}", moduleName, exception.getMessage());
         } finally {
             // Record A/B test metrics
             double latency = System.currentTimeMillis() - startTime;
             try {
-                abTestService.recordMetrics(userId, assignedGroup, moduleName, latency, success, !success && usedFallback);
+                abTestService.recordMetrics(userId, assignedGroup, moduleName, latency, success, !success);
             } catch (Exception e) {
                 // Don't let metric recording affect the main flow
                 log.debug("Failed to record A/B test metrics: {}", e.getMessage());
             }
         }
 
-        usedFallback = true;
         return fallback.get();
     }
 

@@ -19,6 +19,9 @@ const API = {
   async auroraModes() {
     return IC.api("/api/aurora/modes");
   },
+  async auroraGreeting(data) {
+    return IC.api("/api/aurora/greeting", { method: "POST", body: JSON.stringify(data) });
+  },
   async auroraMessage(data) {
     return IC.api("/api/aurora/message", { method: "POST", body: JSON.stringify(data) });
   },
@@ -34,6 +37,11 @@ const API = {
   },
   async auroraStream(sessionId, message) {
     return IC.api(`/api/aurora/stream?sessionId=${sessionId}&message=${encodeURIComponent(message)}`);
+  },
+  auroraStreamUrl(sessionId, message, mode) {
+    const params = new URLSearchParams({ sessionId, message });
+    if (mode) params.set("mode", mode);
+    return `/api/aurora/stream?${params.toString()}`;
   },
   async auroraSettle(sessionId) {
     return IC.api(`/api/aurora/settle?sessionId=${sessionId}`, { method: "POST" });
@@ -82,9 +90,104 @@ const API = {
     return IC.api(`/api/memory/daily-records/${id}/accept`, { method: "POST" });
   },
 
+  /* Belief (B2) */
+  async beliefList() {
+    return IC.api("/api/belief/list");
+  },
+  async beliefByCategory(category) {
+    return IC.api(`/api/belief/by-category?category=${encodeURIComponent(category)}`);
+  },
+  async beliefStrong(minStrength) {
+    return IC.api(`/api/belief/strong?minStrength=${minStrength || 0.5}`);
+  },
+  async beliefContradictions() {
+    return IC.api("/api/belief/contradictions");
+  },
+
+  /* Relation Network (B3) */
+  async relationList() {
+    return IC.api("/api/relation/list");
+  },
+  async relationStats() {
+    return IC.api("/api/relation/stats");
+  },
+  async relationHighEmotion() {
+    return IC.api("/api/relation/high-emotion");
+  },
+  async relationTimeline(label) {
+    return IC.api(`/api/relation/timeline?label=${encodeURIComponent(label)}`);
+  },
+  async relationHealth(label) {
+    return IC.api(`/api/relation/health?label=${encodeURIComponent(label)}`);
+  },
+
+  /* Emotion Timeline (B4) */
+  async emotionToday() {
+    return IC.api("/api/emotion/timeline/today");
+  },
+  async emotionRange(start, end) {
+    return IC.api(`/api/emotion/timeline/range?start=${start}&end=${end}`);
+  },
+  async emotionTrend(days) {
+    return IC.api(`/api/emotion/timeline/trend?days=${days || 30}`);
+  },
+  async emotionPatterns(days) {
+    return IC.api(`/api/emotion/timeline/patterns?days=${days || 30}`);
+  },
+  async emotionStability(days) {
+    return IC.api(`/api/emotion/timeline/stability?days=${days || 30}`);
+  },
+
+  /* ABTest (D5) */
+  async abtestActive() {
+    return IC.api("/api/abtest/active");
+  },
+  async abtestAssign(module) {
+    return IC.api(`/api/abtest/assign?module=${encodeURIComponent(module)}`);
+  },
+  async abtestStats(testName) {
+    return IC.api(`/api/abtest/stats?testName=${encodeURIComponent(testName)}`);
+  },
+
+  /* Token (D4) */
+  async tokenDailyUsage() {
+    return IC.api("/api/token/daily-usage");
+  },
+  async tokenEstimate(text) {
+    return IC.api(`/api/token/estimate?text=${encodeURIComponent(text)}`);
+  },
+  async tokenForecast() {
+    return IC.api("/api/token/forecast");
+  },
+
+  /* Aurora Proactive (B5) */
+  async auroraProactiveCheck() {
+    return IC.api("/api/aurora/proactive/check", { method: "POST" });
+  },
+  async auroraProactiveDismiss(id) {
+    return IC.api(`/api/aurora/proactive/${id}/dismiss`, { method: "POST" });
+  },
+
   /* Daily Record */
   async latestDailyRecord() {
     return IC.api("/api/daily-record/latest");
+  },
+  async diaryTranscribe(text) {
+    return IC.api("/api/diary/transcribe", { method: "POST", body: JSON.stringify({ text }) });
+  },
+  async diaryTranscribeAudio(file) {
+    const form = new FormData();
+    form.append("file", file);
+    return API.multipart("/api/diary/transcribe-audio", form);
+  },
+  async diaryPolish(text, level) {
+    return IC.api("/api/diary/polish", { method: "POST", body: JSON.stringify({ text, level }) });
+  },
+  async diarySubmit(id, content) {
+    return IC.api("/api/diary/submit", { method: "POST", body: JSON.stringify({ id, content }) });
+  },
+  async diaryAnalyze(id) {
+    return IC.api(`/api/diary/${id}/analyze`, { method: "POST" });
   },
 
   /* Capsule */
@@ -197,6 +300,15 @@ const API = {
   async todoDelete(id) {
     return IC.api(`/api/todos/${id}`, { method: "DELETE" });
   },
+  async todoCreate(data) {
+    return IC.api("/api/todos", { method: "POST", body: JSON.stringify(data) });
+  },
+  async todoUpdate(id, data) {
+    return IC.api(`/api/todos/${id}`, { method: "PUT", body: JSON.stringify(data) });
+  },
+  async todoSplit(id) {
+    return IC.api(`/api/todos/${id}/split`, { method: "POST" });
+  },
 
   /* Safety */
   async safetyResources() {
@@ -209,6 +321,11 @@ const API = {
   /* ASR */
   async asrMockTranscribe(hintText) {
     return IC.api("/api/asr/mock-transcribe", { method: "POST", body: JSON.stringify({ hintText }) });
+  },
+  async asrTranscribeFile(file) {
+    const form = new FormData();
+    form.append("file", file);
+    return API.multipart("/api/asr/transcribe", form);
   },
 
   /* Admin */
@@ -229,14 +346,17 @@ const API = {
     const qs = status ? `?status=${status}` : "";
     return IC.api(`/api/admin/reports${qs}`);
   },
-  async adminHideCapsule(id) {
-    return IC.api(`/api/admin/capsules/${id}/hide`, { method: "POST" });
+  async adminHideCapsule(id, reason = "") {
+    return IC.api(`/api/admin/capsules/${id}/hide`, { method: "POST", body: JSON.stringify({ reason }) });
   },
-  async adminRestoreCapsule(id) {
-    return IC.api(`/api/admin/capsules/${id}/restore`, { method: "POST" });
+  async adminRestoreCapsule(id, reason = "") {
+    return IC.api(`/api/admin/capsules/${id}/restore`, { method: "POST", body: JSON.stringify({ reason }) });
   },
-  async adminResolveReport(id, action) {
-    return IC.api(`/api/admin/reports/${id}/resolve`, { method: "POST", body: JSON.stringify({ action }) });
+  async adminResolveReport(id, action, reason = "") {
+    return IC.api(`/api/admin/reports/${id}/resolve`, { method: "POST", body: JSON.stringify({ action, reason }) });
+  },
+  async adminAuditLogs() {
+    return IC.api("/api/admin/audit-logs");
   },
   async adminSafetyEvents() {
     return IC.api("/api/admin/safety-events");
@@ -276,6 +396,24 @@ const API = {
   },
   async deleteAccount() {
     return IC.api("/api/user/account", { method: "DELETE" });
+  },
+
+  async multipart(path, formData) {
+    try {
+      const res = await fetch(path, {
+        method: "POST",
+        credentials: "include",
+        body: formData
+      });
+      const json = await res.json();
+      if (!json.success && json.message) {
+        IC.toast(json.message, "warn");
+      }
+      return json;
+    } catch (error) {
+      IC.toast("连接暂时没有响应，请稍后再试。", "warn");
+      return { success: false, message: error.message };
+    }
   }
 };
 

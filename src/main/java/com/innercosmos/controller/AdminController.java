@@ -3,6 +3,7 @@ package com.innercosmos.controller;
 import com.innercosmos.common.ApiResponse;
 import com.innercosmos.common.Constants;
 import com.innercosmos.common.ErrorCode;
+import com.innercosmos.entity.AdminActionLog;
 import com.innercosmos.entity.EchoCapsule;
 import com.innercosmos.entity.ModelConfig;
 import com.innercosmos.entity.ReportRecord;
@@ -69,24 +70,30 @@ public class AdminController extends BaseController {
     }
 
     @PostMapping("/capsules/{id}/hide")
-    public ApiResponse<Void> hideCapsule(@PathVariable Long id, HttpSession session) {
+    public ApiResponse<Void> hideCapsule(@PathVariable Long id, @RequestBody(required = false) Map<String, String> body, HttpSession session) {
         requireAdmin(session);
-        adminService.hideCapsule(id);
+        adminService.hideCapsule(currentUserId(session), id, reason(body));
         return ApiResponse.ok(null);
     }
 
     @PostMapping("/capsules/{id}/restore")
-    public ApiResponse<Void> restoreCapsule(@PathVariable Long id, HttpSession session) {
+    public ApiResponse<Void> restoreCapsule(@PathVariable Long id, @RequestBody(required = false) Map<String, String> body, HttpSession session) {
         requireAdmin(session);
-        adminService.restoreCapsule(id);
+        adminService.restoreCapsule(currentUserId(session), id, reason(body));
         return ApiResponse.ok(null);
     }
 
     @PostMapping("/reports/{id}/resolve")
     public ApiResponse<Void> resolveReport(@PathVariable Long id, @RequestBody Map<String, String> body, HttpSession session) {
         requireAdmin(session);
-        adminService.resolveReport(id, body.get("action"));
+        adminService.resolveReport(currentUserId(session), id, body.get("action"), reason(body));
         return ApiResponse.ok(null);
+    }
+
+    @GetMapping("/audit-logs")
+    public ApiResponse<List<AdminActionLog>> auditLogs(HttpSession session) {
+        requireAdmin(session);
+        return ApiResponse.ok(adminService.auditLogs());
     }
 
     @PostMapping("/users/{id}/disable")
@@ -120,5 +127,10 @@ public class AdminController extends BaseController {
         requireAdmin(session);
         adminService.updateModelConfig(config);
         return ApiResponse.ok(null);
+    }
+
+    private String reason(Map<String, String> body) {
+        if (body == null) return "";
+        return body.getOrDefault("reason", "");
     }
 }

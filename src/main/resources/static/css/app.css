@@ -3243,6 +3243,163 @@ body.time-deep-night {
     radial-gradient(ellipse 80% 50% at 20% 50%, rgba(192, 144, 96, 0.1) 0%, transparent 50%);
 }
 
+/* ── Time-Period Color Variables (Morandi Day / Nebula Night) ── */
+/* These variables override :root values when specific time classes are applied */
+
+/* Dawn (晨曦) - Warm orange to rice white transition */
+body.time-dawn {
+  --surface-warm: #faf2e4;
+  --surface-mist: #f5ebe0;
+  --surface-paper: #fff7ed;
+  --surface-blush: #f9eee0;
+  --surface-blue: #f0ece4;
+  --surface-sage: #f3ebe4;
+  --accent-sage: #c8b89a;
+  --accent-dusty-blue: #b8c4d0;
+  --accent-rose: #e0c8b8;
+  --accent-lavender: #c8c0d8;
+  --accent-coral: #d8b0a0;
+  --ink: #3a342e;
+  --text: #453f38;
+  --muted: #787268;
+  --line: rgba(180, 140, 100, .12);
+  --line-strong: rgba(200, 184, 140, .32);
+  --shadow: 0 12px 40px rgba(160, 140, 100, .08);
+  --glow-soft: 0 20px 60px rgba(240, 216, 176, .18), 0 8px 24px rgba(216, 184, 152, .10);
+}
+
+/* Morning (上午) - Clear Morandi with rice white base */
+body.time-morning {
+  --surface-warm: #f7f2ec;
+  --surface-mist: #f0ebe4;
+  --surface-paper: #fffaf3;
+  --surface-blush: #f2e8e4;
+  --surface-blue: #e8edf1;
+  --surface-sage: #e9eee6;
+  --accent-sage: #9caf9a;
+  --accent-dusty-blue: #a5b3c2;
+  --accent-rose: #d8b5b5;
+  --accent-lavender: #b5a8c0;
+  --accent-coral: #c89391;
+  --ink: #34302b;
+  --text: #403b35;
+  --muted: #746e67;
+  --line: rgba(111, 101, 91, .12);
+  --line-strong: rgba(143, 163, 148, .32);
+  --shadow: 0 12px 40px rgba(132, 151, 130, .08);
+  --glow-soft: 0 18px 54px rgba(156, 175, 154, .14), 0 6px 20px rgba(201, 166, 166, .08);
+}
+
+/* Noon (正午) - Bright, clear Morandi */
+body.time-noon {
+  --surface-warm: #fbf8f4;
+  --surface-mist: #f4efe8;
+  --surface-paper: #fffef9;
+  --surface-blush: #f5ebe8;
+  --surface-blue: #eef3f7;
+  --surface-sage: #eff2ec;
+  --accent-sage: #98b8a8;
+  --accent-dusty-blue: #a0b8c8;
+  --accent-rose: #d0b8b8;
+  --accent-lavender: #b8b0c8;
+  --accent-coral: #c89090;
+  --ink: #302c28;
+  --text: #3c3732;
+  --muted: #706a64;
+  --line: rgba(100, 90, 80, .11);
+  --line-strong: rgba(140, 160, 145, .34);
+  --shadow: 0 10px 36px rgba(122, 142, 120, .07);
+  --glow-soft: 0 16px 50px rgba(148, 168, 158, .12), 0 5px 18px rgba(196, 166, 166, .07);
+}
+
+/* Afternoon (午后) - Warm golden Morandi */
+body.time-afternoon {
+  --surface-warm: #f2ece0;
+  --surface-mist: #ede8dc;
+  --surface-paper: #fef8ec;
+  --surface-blush: #f0e4dc;
+  --surface-blue: #e8ece8;
+  --surface-sage: #ebece4;
+  --accent-sage: #a0b898;
+  --accent-dusty-blue: #98b0c0;
+  --accent-rose: #c8a8a0;
+  --accent-lavender: #b0a8b8;
+  --accent-coral: #d09888;
+  --ink: #38342e;
+  --text: #423d36;
+  --muted: #766d66;
+  --line: rgba(120, 100, 80, .13);
+  --line-strong: rgba(150, 140, 115, .30);
+  --shadow: 0 14px 44px rgba(140, 130, 100, .09);
+  --glow-soft: 0 20px 58px rgba(200, 180, 140, .16), 0 7px 22px rgba(204, 168, 156, .09);
+}
+
+/* Dusk (暮色) - Golden purple transition */
+body.time-dusk {
+  --surface-warm: #e8dcc8;
+  --surface-mist: #e0d6c4;
+  --surface-paper: #f4ebd8;
+  --surface-blush: #e8d8c8;
+  --surface-blue: #dcd8d0;
+  --surface-sage: #e0dcc4;
+  --accent-sage: #a0a890;
+  --accent-dusty-blue: #98a8b8;
+  --accent-rose: #c89888;
+  --accent-lavender: #a898b0;
+  --accent-coral: #c88070;
+  --ink: #3a3630;
+  --text: #464038;
+  --muted: #766d68;
+  --line: rgba(130, 110, 80, .14);
+  --line-strong: rgba(144, 128, 100, .32);
+  --shadow: 0 16px 48px rgba(128, 110, 80, .11);
+  --glow-soft: 0 22px 62px rgba(184, 144, 96, .18), 0 8px 26px rgba(168, 128, 128, .10);
+}
+
+/* Night (夜色) - Warm nebula with candle glow */
+body.time-night {
+  --surface-warm: #2a2420;
+  --surface-mist: #2e2824;
+  --surface-paper: #362e28;
+  --surface-blush: #2f2824;
+  --surface-blue: #2a2628;
+  --surface-sage: #2c2a26;
+  --accent-sage: #c0a080;
+  --accent-dusty-blue: #9890a0;
+  --accent-rose: #d8a090;
+  --accent-lavender: #b0a0b8;
+  --accent-coral: #e89888;
+  --ink: #f0ebe4;
+  --text: #e8e4df;
+  --muted: #a8a098;
+  --line: rgba(255, 240, 220, .08);
+  --line-strong: rgba(192, 160, 128, .28);
+  --shadow: 0 20px 60px rgba(0, 0, 0, .18), 0 8px 24px rgba(192, 144, 96, .08);
+  --glow-soft: 0 24px 68px rgba(192, 144, 96, .12), 0 10px 30px rgba(160, 128, 144, .08);
+}
+
+/* Deep Night (深夜) - Moonlit silver, very calm */
+body.time-deep-night {
+  --surface-warm: #1a1814;
+  --surface-mist: #1e1a18;
+  --surface-paper: #262220;
+  --surface-blush: #201c1a;
+  --surface-blue: #1a1a1c;
+  --surface-sage: #1e1e1a;
+  --accent-sage: #a09080;
+  --accent-dusty-blue: #808898;
+  --accent-rose: #c09080;
+  --accent-lavender: #9890a8;
+  --accent-coral: #d08878;
+  --ink: #d8d4d0;
+  --text: #d0ccc8;
+  --muted: #908c88;
+  --line: rgba(220, 210, 200, .06);
+  --line-strong: rgba(168, 148, 128, .22);
+  --shadow: 0 24px 72px rgba(0, 0, 0, .24), 0 10px 36px rgba(160, 128, 112, .06);
+  --glow-soft: 0 20px 56px rgba(160, 128, 96, .08), 0 8px 24px rgba(144, 128, 160, .06);
+}
+
 /* ── Final Day Morandi Polish: light, breathable, deploy-safe ── */
 :root {
   --surface-warm: #f7f2ec;
@@ -3521,6 +3678,68 @@ html:not(.mobile) select {
   animation: none;
 }
 
+.flow-cursor-dot,
+.flow-cursor-ring {
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%) !important;
+  will-change: left, top;
+}
+
+.flow-cursor-ring {
+  transition:
+    width .18s ease,
+    height .18s ease,
+    border-color .18s ease,
+    background .18s ease,
+    opacity .18s ease !important;
+}
+
+html:not(.mobile) body,
+html:not(.mobile) a,
+html:not(.mobile) button,
+html:not(.mobile) .button,
+html:not(.mobile) input,
+html:not(.mobile) textarea,
+html:not(.mobile) select {
+  cursor: auto !important;
+}
+
+html:not(.mobile) a,
+html:not(.mobile) button,
+html:not(.mobile) .button,
+html:not(.mobile) [role="button"] {
+  cursor: pointer !important;
+}
+
+html:not(.mobile) input,
+html:not(.mobile) textarea,
+html:not(.mobile) select {
+  cursor: text !important;
+}
+
+.flow-cursor-dot,
+.flow-cursor-ring {
+  pointer-events: none !important;
+  mix-blend-mode: normal !important;
+}
+
+.toast-root {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 12000;
+  display: grid;
+  gap: 10px;
+  max-width: min(360px, calc(100vw - 28px));
+}
+
+.toast-root .toast {
+  position: static;
+  opacity: 1;
+  transform: none;
+}
+
 body:not(.dark-star).time-night,
 body:not(.dark-star).time-deep-night {
   color-scheme: light;
@@ -3597,5 +3816,166 @@ body:not(.dark-star).time-deep-night {
     width: 40px;
     height: 40px;
     flex-basis: 40px;
+  }
+}
+
+/* Final custom cursor alignment override. Keep the browser cursor visible and
+   draw the decorative follower from the exact pointer center. */
+.flow-cursor-dot,
+.flow-cursor-ring {
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%) !important;
+  will-change: left, top;
+}
+
+.flow-cursor-ring {
+  transition:
+    width .18s ease,
+    height .18s ease,
+    border-color .18s ease,
+    background .18s ease,
+    opacity .18s ease !important;
+}
+
+/* ── Proactive Greeting Notification (Feature 5) ── */
+.proactive-greeting {
+  position: fixed;
+  top: 80px;
+  right: 20px;
+  z-index: 100;
+  min-width: 320px;
+  max-width: 380px;
+  background: rgba(255, 250, 243, 0.94);
+  backdrop-filter: blur(18px) saturate(108%);
+  -webkit-backdrop-filter: blur(18px) saturate(108%);
+  border-radius: var(--radius-flow);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 12px 40px rgba(83, 73, 62, 0.12), 0 4px 12px rgba(0, 0, 0, 0.06);
+  padding: 16px 18px;
+  opacity: 0;
+  transform: translateX(20px);
+  transition: opacity 0.4s var(--ease-bloom), transform 0.4s var(--ease-bloom);
+}
+
+.proactive-greeting.visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.proactive-greeting.hiding {
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: opacity 0.3s var(--ease-settle), transform 0.3s var(--ease-settle);
+}
+
+.greeting-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.greeting-icon {
+  font-size: 1.4rem;
+  flex-shrink: 0;
+}
+
+.greeting-text {
+  flex: 1;
+  font-size: 0.95rem;
+  color: var(--ink);
+  line-height: 1.5;
+}
+
+.greeting-close {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border: none;
+  background: rgba(143, 163, 148, 0.1);
+  border-radius: 50%;
+  font-size: 1.2rem;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.greeting-close:hover {
+  background: rgba(143, 163, 148, 0.2);
+  color: var(--ink);
+}
+
+.greeting-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.greeting-btn {
+  flex: 1;
+  min-height: 36px;
+  padding: 8px 12px;
+  font-size: 0.88rem;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.2s var(--ease-flow);
+}
+
+.greeting-btn.primary {
+  background: var(--accent-sage);
+  color: #fff;
+  border: 1px solid var(--accent-sage);
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.greeting-btn.primary:hover {
+  background: var(--accent-sage);
+  box-shadow: 0 4px 12px rgba(143, 163, 148, 0.3);
+  transform: translateY(-1px);
+}
+
+.greeting-btn.secondary {
+  background: rgba(255, 250, 243, 0.6);
+  color: var(--text);
+  border: 1px solid var(--line);
+}
+
+.greeting-btn.secondary:hover {
+  background: rgba(255, 250, 243, 0.9);
+  border-color: var(--line-strong);
+}
+
+/* Dark theme adjustments for proactive greeting */
+body.dark-star .proactive-greeting,
+body.time-night .proactive-greeting,
+body.time-deep-night .proactive-greeting {
+  background: rgba(40, 34, 30, 0.92);
+  border-color: rgba(192, 160, 128, 0.3);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(192, 144, 96, 0.08);
+}
+
+body.dark-star .greeting-btn.secondary,
+body.time-night .greeting-btn.secondary,
+body.time-deep-night .greeting-btn.secondary {
+  background: rgba(60, 54, 50, 0.6);
+  color: var(--text);
+}
+
+/* Mobile responsive */
+@media (max-width: 600px) {
+  .proactive-greeting {
+    top: auto;
+    bottom: 20px;
+    right: 20px;
+    left: 20px;
+    min-width: auto;
+    max-width: none;
   }
 }

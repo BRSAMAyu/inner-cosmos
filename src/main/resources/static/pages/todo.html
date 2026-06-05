@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="stylesheet" href="/css/app.css">
+  <title>待办清单 - Inner Cosmos</title>
 </head>
 <body>
 <main class="shell">
@@ -25,8 +26,36 @@
     <p class="muted mt-1" style="font-size:.82rem">这不是判断，只是下一步。做不完也没关系。</p>
   </section>
 
+  <!-- Create new todo -->
+  <section class="panel mb-2">
+    <h2>新建待办</h2>
+    <form id="createForm" onsubmit="createTodo(event)" class="form" style="max-width: 100%; margin-top: 10px;">
+      <div class="row gap-md" style="align-items: flex-end;">
+        <div style="flex: 2; min-width: 250px;">
+          <input type="text" id="new_taskName" placeholder="你想轻轻推进什么事？" required>
+        </div>
+        <div style="flex: 1; min-width: 120px;">
+          <select id="new_priority">
+            <option value="HIGH">优先</option>
+            <option value="MEDIUM" selected>中等</option>
+            <option value="LOW">不急</option>
+          </select>
+        </div>
+        <div style="flex: 1.5; min-width: 180px;">
+          <input type="datetime-local" id="new_deadline">
+        </div>
+      </div>
+      <div style="margin-top: 10px;">
+        <textarea id="new_description" placeholder="任务备注（可选，建议拆到十分钟内能开始）" style="min-height: 50px; padding: 8px 10px;"></textarea>
+      </div>
+      <div class="row mt-1">
+        <button type="submit">添加待办</button>
+      </div>
+    </form>
+  </section>
+
   <!-- Tab bar -->
-  <div class="tab-bar">
+  <div class="tab-bar mb-2">
     <button class="active" onclick="switchTab('today', this)">今天</button>
     <button onclick="switchTab('week', this)">本周</button>
     <button onclick="switchTab('done', this)">已完成</button>
@@ -38,10 +67,7 @@
 </main>
 
 <script src="/js/app.js"></script>
-<script src="/js/time-system.js"></script>
 <script src="/js/motion.js"></script>
-<script src="/js/weather-system.js"></script>
-<script src="/js/audio-system.js"></script>
 <script src="/js/api.js"></script>
 <script>
 IC.mountShell("待办清单");
@@ -103,14 +129,18 @@ function renderTab() {
       </div>
       <p class="muted">${esc(t.description || "")}</p>
       ${t.deadline ? `<p class="muted mt-1" style="font-size:.82rem">截止：${IC.formatTime(t.deadline)}</p>` : ""}
-      ${t.sourceMemoryId ? `<a class="route-hint mt-1" href="/pages/memory-starfield.html">来源记忆</a>` : ""}
+      ${t.sourceMemoryCardId ? `<a class="route-hint mt-1" href="/pages/memory-starfield.html">来源记忆</a>` : ""}
       <div class="row gap-sm mt-2">
         ${currentTab === "today" || currentTab === "week" ? `
           <button onclick="updateStatus(${t.id},'DOING')">开始</button>
           <button onclick="updateStatus(${t.id},'DONE')">完成</button>
           <button onclick="updateStatus(${t.id},'CANCELLED')">放下</button>
+          <button onclick="editTodo(${t.id})">修改</button>
         ` : ""}
-        ${currentTab === "done" ? `<button onclick="updateStatus(${t.id},'TODO')">重新打开</button>` : ""}
+        ${currentTab === "done" ? `
+          <button onclick="updateStatus(${t.id},'TODO')">重新打开</button>
+          <button onclick="editTodo(${t.id})">修改</button>
+        ` : ""}
         ${currentTab === "letgo" ? `
           <button onclick="updateStatus(${t.id},'TODO')">重新拾起</button>
           <button onclick="deleteTodo(${t.id})">彻底删除</button>
@@ -119,6 +149,85 @@ function renderTab() {
     </article>
   `).join("");
   IC.stagger(list);
+}
+
+async function createTodo(event) {
+  event.preventDefault();
+  const taskName = document.getElementById("new_taskName").value.trim();
+  const priority = document.getElementById("new_priority").value;
+  const deadlineValue = document.getElementById("new_deadline").value;
+  const description = document.getElementById("new_description").value.trim();
+  
+  const data = {
+    taskName,
+    priority,
+    deadline: deadlineValue ? new Date(deadlineValue).toISOString() : null,
+    description
+  };
+  
+  const r = await API.todoCreate(data);
+  if (r.success) {
+    IC.toast("待办已添加", "success");
+    document.getElementById("createForm").reset();
+    load();
+  }
+}
+
+function editTodo(id) {
+  const t = todos.find(x => x.id === id);
+  if (!t) return;
+  const deadlineStr = t.deadline ? t.deadline.substring(0, 16) : "";
+  IC.showModal(`
+    <h2 class="mb-2">修改待办</h2>
+    <form onsubmit="saveTodo(event, ${t.id})" class="form" style="margin-top: 10px;">
+      <div class="field-group mb-1">
+        <label style="font-size:.88rem;" class="muted">任务名称</label>
+        <input type="text" id="edit_taskName" value="${esc(t.taskName)}" required>
+      </div>
+      <div class="field-group mb-1">
+        <label style="font-size:.88rem;" class="muted">优先级</label>
+        <select id="edit_priority">
+          <option value="HIGH" ${t.priority === 'HIGH' ? 'selected' : ''}>优先</option>
+          <option value="MEDIUM" ${t.priority === 'MEDIUM' ? 'selected' : ''}>中等</option>
+          <option value="LOW" ${t.priority === 'LOW' ? 'selected' : ''}>不急</option>
+        </select>
+      </div>
+      <div class="field-group mb-1">
+        <label style="font-size:.88rem;" class="muted">截止时间</label>
+        <input type="datetime-local" id="edit_deadline" value="${deadlineStr}">
+      </div>
+      <div class="field-group mb-2">
+        <label style="font-size:.88rem;" class="muted">备注描述</label>
+        <textarea id="edit_description" style="min-height:70px; padding: 8px 10px;">${esc(t.description || "")}</textarea>
+      </div>
+      <div class="row gap-md">
+        <button type="submit">保存修改</button>
+        <button type="button" class="muted" onclick="IC.closeModal()">取消</button>
+      </div>
+    </form>
+  `);
+}
+
+async function saveTodo(event, id) {
+  event.preventDefault();
+  const taskName = document.getElementById("edit_taskName").value.trim();
+  const priority = document.getElementById("edit_priority").value;
+  const deadlineValue = document.getElementById("edit_deadline").value;
+  const description = document.getElementById("edit_description").value.trim();
+  
+  const data = {
+    taskName,
+    priority,
+    deadline: deadlineValue ? new Date(deadlineValue).toISOString() : null,
+    description
+  };
+  
+  const r = await API.todoUpdate(id, data);
+  if (r.success) {
+    IC.toast("修改成功", "success");
+    IC.closeModal();
+    load();
+  }
 }
 
 async function updateStatus(id, status) {

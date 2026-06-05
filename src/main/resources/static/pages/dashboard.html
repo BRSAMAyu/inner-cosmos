@@ -4,94 +4,255 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="stylesheet" href="/css/app.css">
+  <title>宇宙核心 · Inner Cosmos</title>
+  <style>
+    .dashboard-hero {
+      padding: 32px 28px;
+      border-radius: var(--radius-flow);
+      background: linear-gradient(135deg, rgba(143,163,148,.18), rgba(151,169,186,.18));
+      border: 1px solid var(--line);
+      margin-bottom: 24px;
+      position: relative;
+      overflow: hidden;
+    }
+    .dashboard-hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 80% 20%, rgba(240,216,176,.15), transparent 50%);
+      pointer-events: none;
+    }
+    .time-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(255,250,243,.6);
+      border: 1px solid var(--line);
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+    .greeting-large {
+      font-size: clamp(2rem, 5vw, 3rem);
+      color: var(--ink);
+      margin: 16px 0 8px;
+      line-height: 1.2;
+    }
+    .guiding-text {
+      font-size: 1.05rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    .emotion-weather-card {
+      padding: 24px;
+      border-radius: var(--radius-flow);
+      background: rgba(255,250,243,.55);
+      border: 1px solid var(--line);
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .emotion-weather-card .weather-icon {
+      font-size: 3rem;
+      margin-bottom: 8px;
+    }
+    .emotion-weather-card .weather-label {
+      font-size: 1.1rem;
+      color: var(--ink);
+      margin-bottom: 4px;
+    }
+    .emotion-weather-card .weather-desc {
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+    .theme-pill-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 4px;
+    }
+    .theme-pill-mini {
+      display: inline-block;
+      padding: 6px 14px;
+      border-radius: 999px;
+      background: rgba(143,163,148,.16);
+      border: 1px solid var(--line);
+      font-size: 0.82rem;
+      color: var(--ink);
+      cursor: pointer;
+      transition: transform .2s var(--ease-flow), background .2s;
+      text-decoration: none;
+    }
+    .theme-pill-mini:hover {
+      transform: translateY(-1px);
+      background: rgba(143,163,148,.24);
+      border-color: var(--line-strong);
+    }
+    .theme-pill-mini.size-1 { font-size: 0.75rem; padding: 4px 10px; }
+    .theme-pill-mini.size-2 { font-size: 0.82rem; padding: 6px 12px; }
+    .theme-pill-mini.size-3 { font-size: 0.92rem; padding: 8px 16px; font-weight: 500; }
+    .progress-ring {
+      width: 80px;
+      height: 80px;
+      position: relative;
+    }
+    .progress-ring circle {
+      fill: none;
+      stroke-width: 6;
+      stroke-linecap: round;
+      transform: rotate(-90deg);
+      transform-origin: 50% 50%;
+    }
+    .progress-ring .bg {
+      stroke: var(--line);
+    }
+    .progress-ring .progress {
+      stroke: var(--accent-sage);
+      transition: stroke-dashoffset 0.6s var(--ease-bloom);
+    }
+    .progress-ring-text {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 1.4rem;
+      font-weight: 600;
+      color: var(--ink);
+    }
+    .quick-action {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      background: rgba(255,250,243,.6);
+      border: 1px solid var(--line);
+      text-decoration: none;
+      transition: all .2s var(--ease-flow);
+    }
+    .quick-action:hover {
+      background: rgba(255,250,243,.9);
+      border-color: var(--line-strong);
+      transform: translateY(-1px);
+    }
+    .quick-action .icon {
+      font-size: 1.4rem;
+    }
+    .quick-action .label {
+      flex: 1;
+      font-size: 0.92rem;
+      color: var(--ink);
+    }
+    .quick-action .count {
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+    .aurora-note {
+      padding: 20px;
+      border-radius: var(--radius-flow);
+      background: linear-gradient(135deg, rgba(191,150,152,.16), rgba(143,163,148,.12));
+      border: 1px solid var(--line-strong);
+      font-style: italic;
+      color: var(--ink);
+      line-height: 1.7;
+    }
+  </style>
 </head>
 <body>
 <main class="shell">
   <div class="topbar" data-topbar></div>
 
-  <!-- Hero welcome -->
-  <section class="hero" style="min-height:28vh">
-    <span class="route-hint">今日内在天气</span>
-    <h1 id="heroTitle">先把自己放回身体里</h1>
-    <p id="greeting" class="muted">正在读取你的内宇宙...</p>
-    <div class="row gap-sm">
-      <a class="button" href="/pages/aurora-chat.html">和 Aurora 聊聊今天</a>
-      <a class="button" href="/pages/memory-starfield.html">查看记忆星图</a>
-      <a class="button" href="/pages/slow-letter.html">写一封慢信</a>
+  <!-- Dashboard Hero with time-aware greeting -->
+  <section class="dashboard-hero">
+    <div class="time-badge" id="timeBadge">
+      <span id="timeIcon">☀️</span>
+      <span id="timeDisplay">上午 09:23</span>
     </div>
+    <h1 class="greeting-large" id="greetingText">正在读取你的内宇宙...</h1>
+    <p class="guiding-text" id="guidingText">让自己先回到身体里</p>
   </section>
 
-  <!-- Metrics row -->
+  <!-- Main Grid -->
   <section class="grid">
-    <article class="card metric" onclick="location.href='/pages/daily-record.html'" style="cursor:pointer">
-      <span>情绪天气</span>
-      <strong id="weather">-</strong>
+    <!-- Center - Emotion Weather Card -->
+    <article class="emotion-weather-card">
+      <div class="weather-icon" id="weatherIcon">☁️</div>
+      <div class="weather-label" id="weatherLabel">多云</div>
+      <div class="weather-desc" id="weatherDesc">平静的一天</div>
+      <div class="row gap-sm mt-2" style="justify-content:center">
+        <a class="button" href="/pages/aurora-chat.html">和 Aurora 聊聊今天</a>
+      </div>
     </article>
-    <article class="card metric" onclick="location.href='/pages/memory-starfield.html'" style="cursor:pointer">
-      <span>记忆星体</span>
-      <strong id="memoryCount">0</strong>
+
+    <!-- Left - Todo Progress -->
+    <article class="panel">
+      <h2>今日待办</h2>
+      <div class="row" style="align-items:center;gap:20px;margin-top:12px">
+        <div class="progress-ring">
+          <svg width="80" height="80">
+            <circle class="bg" cx="40" cy="40" r="34"/>
+            <circle class="progress" id="todoProgressRing" cx="40" cy="40" r="34"
+                    stroke-dasharray="213.6" stroke-dashoffset="213.6"/>
+          </svg>
+          <div class="progress-ring-text" id="todoProgressText">0%</div>
+        </div>
+        <div style="flex:1">
+          <p id="todoCount" class="muted" style="font-size:.88rem">0 / 0 已完成</p>
+          <p id="todoNext" class="muted" style="font-size:.82rem;margin-top:4px">暂无待办</p>
+        </div>
+      </div>
+      <a class="button mt-2" href="/pages/todo.html">管理待办</a>
     </article>
-    <article class="card metric" onclick="location.href='/pages/echo-plaza.html'" style="cursor:pointer">
-      <span>共鸣体</span>
-      <strong id="capsuleCount">0</strong>
-    </article>
-    <article class="card metric" onclick="location.href='/pages/inbox.html'" style="cursor:pointer;position:relative">
-      <span>未读慢信</span>
-      <strong id="letterCount">0</strong>
-      <span id="letterBadge" class="badge badge-new" style="position:absolute;top:12px;right:12px;display:none">新</span>
-    </article>
-    <article class="card metric" onclick="location.href='/pages/settings.html'" style="cursor:pointer">
-      <span>AI 状态</span>
-      <strong id="aiHealth">-</strong>
+
+    <!-- Right - Unread Letters & Updates -->
+    <article class="panel">
+      <h2>待处理事项</h2>
+      <div id="quickActions" style="display:grid;gap:10px;margin-top:12px">
+        <a href="/pages/inbox.html" class="quick-action">
+          <span class="icon">✉️</span>
+          <span class="label">未读慢信</span>
+          <span class="count" id="letterCount">0 封</span>
+        </a>
+        <a href="/pages/echo-plaza.html" class="quick-action">
+          <span class="icon">💫</span>
+          <span class="label">共鸣体更新</span>
+          <span class="count" id="capsuleCount">0 个</span>
+        </a>
+        <a href="/pages/memory-starfield.html" class="quick-action">
+          <span class="icon">⭐</span>
+          <span class="label">新记忆星体</span>
+          <span class="count" id="newMemoryCount">0 颗</span>
+        </a>
+      </div>
     </article>
   </section>
 
   <div class="spacer"></div>
 
-  <!-- Main content grid -->
-  <section class="grid">
-    <!-- Recent high-gravity memories -->
-    <article class="panel">
-      <h2>最近被整理清楚的主题</h2>
-      <p id="summary" class="muted"></p>
-      <div id="memories" class="timeline"></div>
-      <a class="button mt-1" href="/pages/memory-starfield.html">进入星图</a>
-    </article>
-
-    <!-- Todos -->
-    <article class="panel">
-      <h2>可轻轻推进的事</h2>
-      <div id="todos" class="timeline"></div>
-      <div class="progress-bar mt-1 mb-1">
-        <div id="todoProgress" class="progress-bar-fill" style="width:0%"></div>
-      </div>
-      <p class="muted" style="font-size:.82rem" id="todoProgressLabel">待办不是自我审判，而是把下一步变小。</p>
-      <a class="button" href="/pages/todo.html">管理待办</a>
-    </article>
-
-    <!-- Echo recommendations -->
-    <article class="panel">
-      <h2>可能产生共鸣的回声</h2>
-      <div id="capsules" class="timeline"></div>
-      <a class="button mt-1" href="/pages/echo-plaza.html">进入星海广场</a>
-    </article>
+  <!-- Theme Cloud Widget -->
+  <section class="panel">
+    <div class="flex-between mb-1">
+      <h2>最近浮现的主题</h2>
+      <a href="/pages/themes.html" class="muted" style="font-size:.88rem">查看全部 →</a>
+    </div>
+    <div class="theme-pill-bar" id="themeCloud"></div>
   </section>
 
   <div class="spacer"></div>
 
-  <!-- Weekly trend + Aurora observation -->
+  <!-- Weekly Review Preview + Aurora Note -->
   <section class="grid">
     <article class="panel">
-      <h2>本周主题趋势</h2>
-      <div id="weeklyChart" class="chart-bars mt-1 mb-1"></div>
-      <p class="muted" style="font-size:.82rem" id="weekLabels"></p>
-    </article>
-    <article class="panel">
-      <h2>Aurora 观察笔记</h2>
-      <div class="soft-stage">
-        <p id="auroraInsight" class="muted">Aurora 正在观察你的内在宇宙...</p>
+      <h2>本周回顾</h2>
+      <div id="weeklySummary">
+        <p class="muted">Aurora 正在整理过去 7 天的内在轨迹...</p>
       </div>
-      <a class="button mt-1" href="/pages/aurora-chat.html">和 Aurora 对话</a>
+      <a class="button mt-2" href="/pages/weekly-review.html">查看完整周报</a>
+    </article>
+    <article class="aurora-note" id="auroraNote">
+      <strong>Aurora 的观察：</strong>
+      <p class="muted mt-1" id="auroraObservation">正在观察你的内在宇宙...</p>
     </article>
   </section>
 </main>
@@ -107,96 +268,127 @@ IC.mountShell("宇宙核心");
 
 IC.ensureDemoLogin().then(load);
 
+function esc(t) { return IC.esc(t); }
+
 async function load() {
   loadAiHealth();
+  updateDateTime();
+  setInterval(updateDateTime, 60000); // Update every minute
+
   const r = await API.dashboardSummary();
   if (!r.success || !r.data) return;
   const d = r.data;
 
-  /* Greeting based on time */
+  // Update greeting
   const greeting = IC.greetingByTime();
-  document.getElementById("greeting").textContent = greeting;
-  document.getElementById("heroTitle").textContent = d.greeting || "先把自己放回身体里";
-  document.getElementById("weather").textContent = d.emotionWeather || "多云";
-  document.getElementById("memoryCount").textContent = d.memoryCount || 0;
-  document.getElementById("capsuleCount").textContent = d.capsuleCount || 0;
-  document.getElementById("letterCount").textContent = d.unreadLetterCount || 0;
-  document.getElementById("summary").textContent = d.lastSummary || "还没有记录";
+  document.getElementById("greetingText").textContent = greeting;
+  document.getElementById("guidingText").textContent = d.greeting || "让自己先回到身体里";
 
-  if (d.unreadLetterCount > 0) {
-    const badge = document.getElementById("letterBadge");
-    badge.style.display = "inline-flex";
-    badge.textContent = d.unreadLetterCount + " 封新信";
-  }
+  // Update emotion weather
+  document.getElementById("weatherIcon").textContent = IC.weatherIcon(d.emotionWeather || "CLOUD");
+  document.getElementById("weatherLabel").textContent = d.emotionWeather || "多云";
+  const weatherDescs = {
+    "SUN": "晴朗的一天",
+    "CLOUD": "平静的一天",
+    "RAIN": "有些情绪",
+    "STORM": "波动强烈",
+    "FOG": "有些朦胧",
+    "SNOW": "安静沉淀"
+  };
+  document.getElementById("weatherDesc").textContent = weatherDescs[d.emotionWeather] || "平静的一天";
 
-  /* High gravity memories */
-  document.getElementById("memories").innerHTML = (d.highGravityMemories || []).map(m =>
-    `<div class="timeline-item"><strong>${IC.esc(m.title || m.theme)}</strong><p>${IC.esc(m.summary || "")}</p></div>`
-  ).join("") || IC.empty("完成一次对话后，这里会出现高重力记忆。");
-
-  /* Todos with progress */
+  // Update todos
   const todos = d.todos || [];
   const done = todos.filter(t => t.status === "DONE").length;
   const total = todos.length;
-  document.getElementById("todos").innerHTML = todos.map(t =>
-    `<div class="timeline-item"><strong>${IC.esc(t.taskName)}</strong><p>${IC.esc(t.description || "")}</p></div>`
-  ).join("") || IC.empty("暂时没有待办，先不用逼自己。");
-  if (total > 0) {
-    document.getElementById("todoProgress").style.width = Math.round(done / total * 100) + "%";
-    document.getElementById("todoProgressLabel").textContent = `${done}/${total} 已完成`;
+  const percent = total > 0 ? Math.round(done / total * 100) : 0;
+  document.getElementById("todoCount").textContent = `${done} / ${total} 已完成`;
+  const circumference = 2 * Math.PI * 34;
+  document.getElementById("todoProgressRing").style.strokeDashoffset = circumference - (percent / 100) * circumference;
+  document.getElementById("todoProgressText").textContent = `${percent}%`;
+
+  const nextTodo = todos.find(t => t.status !== "DONE");
+  document.getElementById("todoNext").textContent = nextTodo ? esc(nextTodo.taskName || nextTodo.description || "下一个待办") : "暂无待办";
+
+  // Update quick actions
+  document.getElementById("letterCount").textContent = `${d.unreadLetterCount || 0} 封`;
+  document.getElementById("capsuleCount").textContent = `${d.capsuleCount || 0} 个`;
+  document.getElementById("newMemoryCount").textContent = `${d.memoryCount || 0} 颗`;
+
+  // Load theme cloud
+  try {
+    const tr = await API.memoryThemes();
+    if (tr.success && tr.data) {
+      const themes = tr.data.slice(0, 8);
+      const max = Math.max(...themes.map(t => t.memoryCount || t.cardCount || 1), 1);
+      document.getElementById("themeCloud").innerHTML = themes.map(t => {
+        const count = t.memoryCount || t.cardCount || 1;
+        const size = Math.min(3, Math.max(1, Math.round(count / max * 3)));
+        return `<a href="/pages/themes.html" class="theme-pill-mini size-${size}">${esc(t.themeName || t.name)} <span class="muted">${count}</span></a>`;
+      }).join("") || '<span class="muted">还没有聚类出主题</span>';
+    }
+  } catch(e) {
+    document.getElementById("themeCloud").innerHTML = '<span class="muted">主题加载中...</span>';
   }
 
-  /* Echo recommendations */
-  document.getElementById("capsules").innerHTML = (d.recommendations || []).map(c =>
-    `<div class="timeline-item"><strong>${IC.esc(c.pseudonym)}</strong><p>${IC.esc(c.intro || "")}</p></div>`
-  ).join("") || IC.empty("星海广场安静中。");
-
-  /* Weekly chart — try real weekly review data first */
+  // Load weekly review
   try {
     const wr = await API.weeklyReviewLatest();
     if (wr.success && wr.data) {
       const review = wr.data;
-      document.getElementById("auroraInsight").textContent =
-        review.auroraObservation || review.themeSummary || "Aurora 正在观察你的内在宇宙...";
-      if (review.dominantTheme) {
-        const themes = [review.dominantTheme];
-        const barData = themes.map(() => 60 + Math.round(Math.random() * 30));
-        document.getElementById("weeklyChart").innerHTML = barData.map(h =>
-          `<div class="chart-bar" style="height:${h}%"></div>`
-        ).join("");
-        document.getElementById("weekLabels").textContent = themes.map(t => t.substring(0, 4)).join("  ");
-      }
-    } else {
-      fallbackWeeklyChart();
+      document.getElementById("auroraObservation").textContent = review.auroraObservation || review.themeSummary || "Aurora 正在观察你的内在宇宙...";
+      document.getElementById("weeklySummary").innerHTML = `
+        <p class="muted" style="font-size:.88rem;margin-bottom:8px">${esc(review.dateRange || "本周"}</p>
+        <p style="font-size:.92rem;line-height:1.6">${esc(review.title || "本周回顾")}</p>
+        <p class="muted" style="font-size:.82rem;margin-top:8px">${(d.memoryCount || 0)} 条记忆 · ${done} 个待办完成</p>
+      `;
     }
-  } catch(e) {
-    fallbackWeeklyChart();
-  }
-
-  function fallbackWeeklyChart() {
-    const days = ["一", "二", "三", "四", "五", "六", "日"];
-    const barData = days.map((_, i) => 20 + ((i * 2654435761 + 13) % 61));
-    document.getElementById("weeklyChart").innerHTML = barData.map(h =>
-      `<div class="chart-bar" style="height:${h}%"></div>`
-    ).join("");
-    document.getElementById("weekLabels").textContent = days.map(d => "周" + d).join("  ");
-    const insights = [
-      "你最近在关注自己的边界感，这是一个很好的自我觉察。",
-      "本周你的情绪天气比上周平稳了一些，可以给自己一个肯定。",
-      "你开始注意到「还没准备好」也是一种真实的回答。",
-      "你的行动拆解能力在提升，焦虑正在被一步一步地处理。"
-    ];
-    document.getElementById("auroraInsight").textContent = insights[Math.floor(Math.random() * insights.length)];
-  }
+  } catch(e) {}
 
   IC.stagger(document);
+}
+
+function updateDateTime() {
+  const now = new Date();
+  const hour = now.getHours();
+  const timeIcons = {
+    dawn: "🌅",
+    morning: "☀️",
+    noon: "🌤",
+    afternoon: "🌇",
+    dusk: "🌆",
+    night: "🌙",
+    "deep-night": "⭐"
+  };
+  const timeLabels = {
+    dawn: "晨曦",
+    morning: "上午",
+    noon: "正午",
+    afternoon: "午后",
+    dusk: "暮色",
+    night: "夜色",
+    "deep-night": "深夜"
+  };
+
+  let timeOfDay;
+  if (hour >= 5 && hour < 7) timeOfDay = "dawn";
+  else if (hour >= 7 && hour < 11) timeOfDay = "morning";
+  else if (hour >= 11 && hour < 15) timeOfDay = "noon";
+  else if (hour >= 15 && hour < 18) timeOfDay = "afternoon";
+  else if (hour >= 18 && hour < 20) timeOfDay = "dusk";
+  else if (hour >= 20 && hour < 23) timeOfDay = "night";
+  else timeOfDay = "deep-night";
+
+  const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  document.getElementById("timeIcon").textContent = timeIcons[timeOfDay] || "🕐";
+  document.getElementById("timeDisplay").textContent = `${timeLabels[timeOfDay]} ${timeStr}`;
 }
 
 async function loadAiHealth() {
   const r = await API.aiHealth();
   if (!r.success || !r.data) return;
   const h = r.data;
-  document.getElementById("aiHealth").textContent = h.apiKeyConfigured ? "真实模型" : (h.fallbackAllowed ? "开发 fallback" : "未配置");
+  // Could show a small indicator if needed
 }
 </script>
 </body>

@@ -10,6 +10,7 @@ window.ICMotion = {
   isDragging: false,
   initialized: false,
   cursorReady: false,
+  cursorSeen: false,
   motionLoopStarted: false,
   scrollIndicatorReady: false,
 
@@ -121,9 +122,15 @@ window.ICMotion = {
     document.addEventListener('mousemove', (e) => {
       this.mousePos.x = e.clientX;
       this.mousePos.y = e.clientY;
+      if (!this.cursorSeen) {
+        this.lastMousePos.x = e.clientX;
+        this.lastMousePos.y = e.clientY;
+        this.cursorSeen = true;
+      }
 
       // Immediate update for dot
-      this.cursorDot.style.transform = `translate(${e.clientX - 4}px, ${e.clientY - 4}px)`;
+      this.cursorDot.style.left = `${e.clientX}px`;
+      this.cursorDot.style.top = `${e.clientY}px`;
 
       // Smooth follow for ring
       this.updateCursorRing();
@@ -159,13 +166,14 @@ window.ICMotion = {
     const lerp = (start, end, factor) => start + (end - start) * factor;
     const smoothFactor = 0.15;
 
-    const targetX = this.mousePos.x - 16;
-    const targetY = this.mousePos.y - 16;
+    const targetX = this.mousePos.x;
+    const targetY = this.mousePos.y;
 
     this.lastMousePos.x = lerp(this.lastMousePos.x, targetX, smoothFactor);
     this.lastMousePos.y = lerp(this.lastMousePos.y, targetY, smoothFactor);
 
-    this.cursorRing.style.transform = `translate(${this.lastMousePos.x}px, ${this.lastMousePos.y}px)`;
+    this.cursorRing.style.left = `${this.lastMousePos.x}px`;
+    this.cursorRing.style.top = `${this.lastMousePos.y}px`;
   },
 
   animateCursorRing() {

@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="/css/app.css">
+  <title>视觉体验中心 · Inner Cosmos</title>
+  <style>
+    .preview-grid { display: grid; grid-template-columns: minmax(280px, 320px) 1fr; gap: 18px; }
+    @media (max-width: 880px) { .preview-grid { grid-template-columns: 1fr; } }
+    .control-stack { display: grid; gap: 18px; }
+    .picker-row { display: flex; flex-wrap: wrap; gap: 6px; }
+    .picker-row button {
+      flex: 1 1 calc(33.33% - 6px);
+      min-width: 78px;
+      font-size: .82rem;
+      padding: 8px 6px;
+    }
+    .picker-row button.active {
+      background: rgba(143, 163, 148, 0.32);
+      border-color: var(--line-strong);
+      color: var(--ink);
+    }
+    .preview-window {
+      position: relative;
+      min-height: 420px;
+      border-radius: var(--radius-flow);
+      overflow: hidden;
+      background: var(--surface-warm);
+      border: 1px solid var(--line);
+      transition: background 1.2s ease, color .8s ease;
+    }
+    .preview-window-inner {
+      position: relative;
+      padding: 28px;
+      min-height: 420px;
+    }
+    .preview-sample {
+      backdrop-filter: blur(18px) saturate(125%);
+      background: rgba(255, 250, 243, 0.18);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      border-radius: var(--radius-flow);
+      padding: 18px;
+      margin-bottom: 14px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.05);
+    }
+    .preview-palette { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .palette-swatch {
+      height: 56px;
+      border-radius: var(--radius);
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      transition: transform .3s var(--ease-bloom, ease);
+    }
+    .palette-swatch:hover { transform: translateY(-2px) scale(1.04); }
+    .palette-swatch .label {
+      position: absolute; bottom: 4px; left: 6px; right: 6px;
+      font-size: .68rem; color: rgba(255,255,255,.92); text-shadow: 0 1px 2px rgba(0,0,0,.4);
+      letter-spacing: .02em;
+    }
+    .summary-card { line-height: 1.7; font-size: 0.92rem; }
+    .summary-card .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; background: rgba(255,250,243,.4); border: 1px solid var(--line); margin-right: 4px; font-size: .78rem; }
+    .reset-btn {
+      width: 100%;
+      background: rgba(151, 169, 186, 0.22);
+      border-color: rgba(151, 169, 186, 0.4);
+    }
+    .motion-strength {
+      display: flex; align-items: center; gap: 12px;
+    }
+    .motion-strength input[type=range] { flex: 1; }
+  </style>
+</head>
+<body>
+<main class="shell">
+  <div class="topbar" data-topbar></div>
+
+  <span class="route-hint">展示用控制台</span>
+  <h1>视觉体验中心</h1>
+  <p class="muted mb-2">Inner Cosmos 的 UI 会随时间和天气动态变化。在这里可以主动切换所有状态组合，让评委看到 7 个时段 × 6 种天气 = 42 种不同的内在宇宙。</p>
+
+  <div class="preview-grid">
+    <!-- Control panel -->
+    <aside class="control-stack">
+      <section class="settings-section" style="margin:0;padding:22px">
+        <h2>1. 时段（7 种）</h2>
+        <p class="muted" style="font-size:.78rem;margin-bottom:10px">白天莫兰迪，夜晚星云</p>
+        <div class="picker-row" id="timePicker">
+          <button data-time="time-dawn">晨曦</button>
+          <button data-time="time-morning">上午</button>
+          <button data-time="time-noon">正午</button>
+          <button data-time="time-afternoon">午后</button>
+          <button data-time="time-dusk">暮色</button>
+          <button data-time="time-night">夜色</button>
+          <button data-time="time-deep-night">深夜</button>
+        </div>
+        <p id="timeDesc" class="muted mt-2" style="font-size:.78rem"></p>
+      </section>
+
+      <section class="settings-section" style="margin:0;padding:22px">
+        <h2>2. 天气（6 种）</h2>
+        <div class="picker-row" id="weatherPicker">
+          <button data-weather="clear">☀️ 晴</button>
+          <button data-weather="cloud">☁️ 云</button>
+          <button data-weather="rain">🌧️ 雨</button>
+          <button data-weather="storm">⛈️ 暴</button>
+          <button data-weather="fog">🌫️ 雾</button>
+          <button data-weather="snow">🌨️ 雪</button>
+        </div>
+        <p id="weatherDesc" class="muted mt-2" style="font-size:.78rem"></p>
+      </section>
+
+      <section class="settings-section" style="margin:0;padding:22px">
+        <h2>3. 流动强度</h2>
+        <div class="motion-strength">
+          <span class="muted" style="font-size:.78rem">静</span>
+          <input id="flowSlider" type="range" min="0" max="3" step="1" value="2">
+          <span class="muted" style="font-size:.78rem">动</span>
+        </div>
+        <p class="muted mt-1" style="font-size:.78rem">控制背景漂移、粒子密度、动效速度</p>
+      </section>
+
+      <button class="reset-btn" onclick="resetAll()">恢复自动模式（跟随真实时间 + 自动天气）</button>
+
+      <!-- Demo presets -->
+      <section class="settings-section" style="margin:0;padding:22px">
+        <h2>演示预设</h2>
+        <p class="muted" style="font-size:.78rem;margin-bottom:10px">快速切换到典型展示场景</p>
+        <div class="picker-row" id="presetPicker">
+          <button onclick="applyPreset('day-morandi')">☀️ 白昼莫兰迪</button>
+          <button onclick="applyPreset('night-nebula')">🌙 夜晚星云</button>
+          <button onclick="applyPreset('dusk-golden')">🌇 暮色金黄</button>
+          <button onclick="applyPreset('rainy-day')">🌧️ 雨天白昼</button>
+          <button onclick="applyPreset('storm-night')">⛈️ 暴雨黑夜</button>
+          <button onclick="applyPreset('calm-morning')">🌿 平静上午</button>
+        </div>
+      </section>
+    </aside>
+
+    <!-- Preview window -->
+    <section>
+      <div class="preview-window" id="previewWindow">
+        <div class="preview-window-inner" id="previewInner">
+          <div class="preview-sample">
+            <strong style="font-size:1.1rem">Inner Cosmos 此刻</strong>
+            <p class="muted mt-1" id="currentCombo">—</p>
+          </div>
+          <div class="preview-sample">
+            <strong>玻璃质感</strong>
+            <p class="muted" style="font-size:.84rem;margin-top:6px">backdrop-filter: blur(18px) saturate(125%) · 半透明面板 · 暖光高光边</p>
+          </div>
+          <div class="preview-sample">
+            <strong>流动动效</strong>
+            <p class="muted" style="font-size:.84rem;margin-top:6px" id="motionText">粒子缓慢漂移 · 元素入场用 cubic-bezier bloom · 离场用 settle</p>
+          </div>
+          <div class="preview-sample">
+            <strong>当前色板</strong>
+            <div class="preview-palette mt-1" id="palettePreview"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel mt-2">
+        <h2>完整色板（5 时段 × 6 天气）</h2>
+        <p class="muted" style="font-size:.82rem">所有时段和天气的色板一览。点任意时段或天气组合切到上面预览。</p>
+        <div id="fullPalette" style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:14px"></div>
+      </div>
+    </section>
+  </div>
+
+  <section class="settings-section mt-2">
+    <h2>设计语言说明</h2>
+    <ul class="muted" style="line-height:1.9;font-size:.92rem;padding-left:20px">
+      <li><strong>白天（dawn / morning / noon / afternoon）</strong>：莫兰迪色系（暖米 / 灰绿 / 抹茶 / 暮橙）</li>
+      <li><strong>夜晚（night / deep-night）</strong>：温暖星云（夜褐 / 烛光 / 月光银），不用纯黑不用冷蓝</li>
+      <li><strong>动效曲线</strong>：ease-bloom 入场（缓启动）、ease-settle 离场（快走慢停）</li>
+      <li><strong>流动母题</strong>：背景四层（基础渐变 + 粒子 + 纹理 + 水墨晕染）永远在动</li>
+      <li><strong>用户感知</strong>：从不弹通知，时间和天气是潜移默化的渐变</li>
+    </ul>
+  </section>
+</main>
+
+<script src="/js/app.js"></script>
+<script src="/js/time-system.js"></script>
+<script src="/js/motion.js"></script>
+<script src="/js/weather-system.js"></script>
+<script src="/js/audio-system.js"></script>
+<script src="/js/api.js"></script>
+<script>
+IC.mountShell("视觉体验中心");
+IC.ensureDemoLogin();
+
+// 完整调色板（白天莫兰迪 / 夜晚温暖星云）
+const PALETTES = {
+  "time-dawn":       { name: "晨曦", warmth: "#F0D8B0", surface: "#FAF4EC", glow: "rgba(240,216,176,.4)", mood: "暖橘光 · 醒来" },
+  "time-morning":    { name: "上午", warmth: "#F7F2EC", surface: "#FBF8F2", glow: "rgba(181,194,176,.3)", mood: "莫兰迪 · 清醒" },
+  "time-noon":       { name: "正午", warmth: "#FBF8F2", surface: "#FDFCF8", glow: "rgba(184,194,168,.3)", mood: "明亮 · 清晰" },
+  "time-afternoon":  { name: "午后", warmth: "#E8C895", surface: "#F4E8D2", glow: "rgba(216,152,112,.3)", mood: "暖黄 · 长影" },
+  "time-dusk":       { name: "暮色", warmth: "#B89060", surface: "#D9B690", glow: "rgba(144,128,160,.4)", mood: "暗金紫 · 过渡" },
+  "time-night":      { name: "夜色", warmth: "#C09060", surface: "#2A1F18", glow: "rgba(40,34,30,.5)", mood: "温暖星云 · 烛光" },
+  "time-deep-night": { name: "深夜", warmth: "#A08060", surface: "#1A1612", glow: "rgba(18,18,16,.6)", mood: "月色银 · 极静" }
+};
+
+const WEATHER_DESC = {
+  clear: "透明 · 明亮粒子 · 鸟鸣",
+  cloud: "云层渐变 · 缓慢漂移",
+  rain: "雨滴线条 · 下落动画 · 雨声",
+  storm: "暗紫 + 闪电 · 雨声 + 雷",
+  fog: "朦胧叠加 · 雾气流动 · 极轻白噪",
+  snow: "雪花粒子 · 飘落动画"
+};
+
+const WEATHER_TYPES = {
+  clear: "CLEAR",
+  cloud: "CLOUD",
+  rain: "RAIN",
+  storm: "STORM",
+  fog: "FOG",
+  snow: "SNOW"
+};
+
+let currentTime = "time-morning";
+let currentWeather = "clear";
+let flowStrength = 2;
+
+function applyVisuals() {
+  const palette = PALETTES[currentTime];
+  const isNight = currentTime === "time-night" || currentTime === "time-deep-night";
+
+  // Set body classes for the ENTIRE page, not just preview
+  document.body.className = "";
+  document.body.classList.add(currentTime);
+  document.body.classList.add("weather-" + currentWeather);
+  if (isNight) document.body.classList.add("time-dark");
+
+  // Apply CSS variables to the entire page via :root
+  const root = document.documentElement;
+
+  // Set surface colors based on time period
+  const surfaceColors = {
+    "time-dawn": { warm: "#faf2e4", mist: "#f5ebe0", paper: "#fff7ed", ink: "#3a342e" },
+    "time-morning": { warm: "#f7f2ec", mist: "#f0ebe4", paper: "#fffaf3", ink: "#34302b" },
+    "time-noon": { warm: "#fbf8f4", mist: "#f4efe8", paper: "#fffef9", ink: "#302c28" },
+    "time-afternoon": { warm: "#f2ece0", mist: "#ede8dc", paper: "#fef8ec", ink: "#38342e" },
+    "time-dusk": { warm: "#e8dcc8", mist: "#e0d6c4", paper: "#f4ebd8", ink: "#3a3630" },
+    "time-night": { warm: "#2a2420", mist: "#2e2824", paper: "#362e28", ink: "#e8e4df" },
+    "time-deep-night": { warm: "#1a1814", mist: "#1e1a18", paper: "#262220", ink: "#d0ccc8" }
+  };
+
+  const colors = surfaceColors[currentTime] || surfaceColors["time-morning"];
+
+  // Apply CSS variables to the entire page
+  root.style.setProperty("--surface-warm", colors.warm);
+  root.style.setProperty("--surface-mist", colors.mist);
+  root.style.setProperty("--surface-paper", colors.paper);
+  root.style.setProperty("--ink", colors.ink);
+  root.style.setProperty("--text", isNight ? "#e8e4df" : "#403b35");
+  root.style.setProperty("--muted", isNight ? "#a8a098" : "#746e67");
+
+  // Apply colors to preview window too
+  const win = document.getElementById("previewWindow");
+  win.style.background = palette.surface;
+  win.style.color = isNight ? "#E8E4DF" : "#3F3B37";
+  const inner = document.getElementById("previewInner");
+  inner.style.color = isNight ? "#E8E4DF" : "#3F3B37";
+
+  // Update sample panel styles for dark/light
+  document.querySelectorAll(".preview-sample").forEach(s => {
+    s.style.background = isNight ? "rgba(40, 34, 30, 0.32)" : "rgba(255, 250, 243, 0.18)";
+    s.style.color = isNight ? "#E8E4DF" : "inherit";
+    s.style.borderColor = isNight ? "rgba(160, 155, 180, 0.18)" : "rgba(255, 255, 255, 0.22)";
+  });
+
+  // Update summary text
+  document.getElementById("currentCombo").textContent =
+    `${palette.name} · ${currentWeather === "clear" ? "晴朗" : currentWeather === "cloud" ? "多云" : currentWeather === "rain" ? "下雨" : currentWeather === "storm" ? "暴风雨" : currentWeather === "fog" ? "有雾" : "下雪"}`;
+  document.getElementById("timeDesc").textContent = palette.mood;
+  document.getElementById("weatherDesc").textContent = WEATHER_DESC[currentWeather];
+
+  // Motion strength
+  const motionText = {
+    0: "无动效 · 静态界面 · 适合演示录屏",
+    1: "微弱呼吸 · 背景缓慢漂移",
+    2: "中等流动 · 粒子可见 · 元素 bloom 入场",
+    3: "强烈流动 · 粒子密 · 持续动效"
+  };
+  document.getElementById("motionText").textContent = motionText[flowStrength];
+  document.documentElement.style.setProperty("--motion-intensity", String(flowStrength / 3));
+
+  // Palette preview
+  const paletteEl = document.getElementById("palettePreview");
+  const swatches = isNight
+    ? [["夜褐", palette.surface], ["烛光", palette.warmth], ["月光银", "#C8C0BB"], ["星尘蓝", "#5A6A7A"]]
+    : [["米白", palette.surface], ["暖光", palette.warmth], ["灰绿", "#B5C2B0"], ["玫瑰灰", "#D8B5B5"]];
+  paletteEl.innerHTML = swatches.map(([n, c]) =>
+    `<div class="palette-swatch" style="background:${c}"><div class="label">${n}</div></div>`
+  ).join("");
+
+  // Sync to motion/time systems
+  if (window.ICMotion) ICMotion.applyTimeBasedMotion();
+  if (window.ICWeather && window.ICWeather.setManualWeather) {
+    const weatherType = WEATHER_TYPES[currentWeather] || "CLEAR";
+    window.ICWeather.setManualWeather(weatherType);
+  }
+}
+
+function buildFullPalette() {
+  const wrap = document.getElementById("fullPalette");
+  const html = ["", "<span class='muted' style='font-size:.72rem'>↓ 时段</span>"];
+  Object.entries(PALETTES).forEach(([key, p]) => {
+    const isNight = key === "time-night" || key === "time-deep-night";
+    html.push(`<div class="palette-swatch" style="background:${p.surface};color:${isNight ? '#E8E4DF' : '#3F3B37'};cursor:pointer" onclick="setTime('${key}')" title="${p.name}">
+      <div class="label" style="color:${isNight ? '#E8E4DF' : '#3F3B37'};text-shadow:none">${p.name}</div>
+    </div>`);
+  });
+  wrap.innerHTML = html.join("");
+}
+
+function setTime(t) {
+  currentTime = t;
+  document.querySelectorAll("#timePicker button").forEach(b => b.classList.toggle("active", b.dataset.time === t));
+  applyVisuals();
+}
+
+function setWeather(w) {
+  currentWeather = w;
+  document.querySelectorAll("#weatherPicker button").forEach(b => b.classList.toggle("active", b.dataset.weather === w));
+  applyVisuals();
+}
+
+function resetAll() {
+  // Restore to actual current time and real weather
+  document.body.className = "";
+  localStorage.removeItem("ic_preferred_weather");
+  localStorage.removeItem("ic_weather_mode");
+  if (window.ICTimeSystem && window.ICTimeSystem.updateTime) window.ICTimeSystem.updateTime();
+  if (window.ICWeather && window.ICWeather.fetchWeather) window.ICWeather.fetchWeather();
+  // Restore page to default
+  setTimeout(() => location.reload(), 200);
+}
+
+function applyPreset(preset) {
+  switch(preset) {
+    case 'day-morandi':
+      setTime('time-morning');
+      setWeather('clear');
+      document.getElementById('flowSlider').value = 2;
+      flowStrength = 2;
+      break;
+    case 'night-nebula':
+      setTime('time-night');
+      setWeather('clear');
+      document.getElementById('flowSlider').value = 1;
+      flowStrength = 1;
+      break;
+    case 'dusk-golden':
+      setTime('time-dusk');
+      setWeather('cloud');
+      document.getElementById('flowSlider').value = 2;
+      flowStrength = 2;
+      break;
+    case 'rainy-day':
+      setTime('time-morning');
+      setWeather('rain');
+      document.getElementById('flowSlider').value = 2;
+      flowStrength = 2;
+      break;
+    case 'storm-night':
+      setTime('time-night');
+      setWeather('storm');
+      document.getElementById('flowSlider').value = 3;
+      flowStrength = 3;
+      break;
+    case 'calm-morning':
+      setTime('time-morning');
+      setWeather('fog');
+      document.getElementById('flowSlider').value = 0;
+      flowStrength = 0;
+      break;
+  }
+  applyVisuals();
+  IC.toast(`已应用预设：${preset === 'day-morandi' ? '白昼莫兰迪' : preset === 'night-nebula' ? '夜晚星云' : preset === 'dusk-golden' ? '暮色金黄' : preset === 'rainy-day' ? '雨天白昼' : preset === 'storm-night' ? '暴雨黑夜' : '平静上午'}`);
+}
+
+// Bind
+document.querySelectorAll("#timePicker button").forEach(b =>
+  b.addEventListener("click", () => setTime(b.dataset.time))
+);
+document.querySelectorAll("#weatherPicker button").forEach(b =>
+  b.addEventListener("click", () => setWeather(b.dataset.weather))
+);
+document.getElementById("flowSlider").addEventListener("input", e => {
+  flowStrength = Number(e.target.value);
+  applyVisuals();
+});
+
+// Default to current real time
+const realTime = new Date();
+const h = realTime.getHours();
+if (h >= 5 && h < 7) currentTime = "time-dawn";
+else if (h >= 7 && h < 11) currentTime = "time-morning";
+else if (h >= 11 && h < 15) currentTime = "time-noon";
+else if (h >= 15 && h < 18) currentTime = "time-afternoon";
+else if (h >= 18 && h < 20) currentTime = "time-dusk";
+else if (h >= 20 && h < 23) currentTime = "time-night";
+else currentTime = "time-deep-night";
+
+document.querySelectorAll("#timePicker button").forEach(b => b.classList.toggle("active", b.dataset.time === currentTime));
+document.querySelectorAll("#weatherPicker button").forEach(b => b.classList.toggle("active", b.dataset.weather === currentWeather));
+buildFullPalette();
+applyVisuals();
+</script>
+</body>
+</html>

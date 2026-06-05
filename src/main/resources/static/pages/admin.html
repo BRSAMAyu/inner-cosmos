@@ -9,80 +9,101 @@
 <main class="shell">
   <div class="topbar" data-topbar></div>
 
-  <span class="route-hint">运营管理</span>
-  <h1>管理后台</h1>
-  <p class="muted mb-2">后台只展示运营与审核所需信息，不默认暴露用户原始私密内容。</p>
+  <section class="flex-between mb-2" style="flex-wrap:wrap;gap:12px">
+    <div>
+      <span class="route-hint">守护星空的秩序</span>
+      <h1>管理后台</h1>
+      <p class="muted">所有影响用户内容的操作都需要理由，并写入审计日志。技术而温暖。</p>
+    </div>
+    <button onclick="refreshAll()">刷新全部</button>
+  </section>
+
+  <!-- Overview Section -->
+  <section id="overview" class="grid metrics-grid mb-2"></section>
 
   <!-- Tab bar -->
-  <div class="tab-bar" id="adminTabs">
-    <button class="active" onclick="switchAdminTab('overview', this)">概览</button>
-    <button onclick="switchAdminTab('users', this)">用户</button>
-    <button onclick="switchAdminTab('capsules', this)">共鸣体</button>
-    <button onclick="switchAdminTab('reports', this)">举报</button>
-    <button onclick="switchAdminTab('aiLogs', this)">AI 日志</button>
-    <button onclick="switchAdminTab('safety', this)">安全事件</button>
-    <button onclick="switchAdminTab('model', this)">模型配置</button>
-  </div>
-
-  <!-- Content sections -->
-  <section id="tab-overview">
-    <div class="grid mb-2">
-      <article class="card metric"><span>用户</span><strong id="uc">0</strong></article>
-      <article class="card metric"><span>共鸣体</span><strong id="cc">0</strong></article>
-      <article class="card metric"><span>举报</span><strong id="rc">0</strong></article>
-      <article class="card metric"><span>安全事件</span><strong id="sc">0</strong></article>
+  <section class="panel mb-2">
+    <div class="tab-bar" style="border-bottom:none;padding-bottom:0;margin-bottom:0">
+      <button class="active" onclick="showTab(this,'users')">用户</button>
+      <button onclick="showTab(this,'capsules')">共鸣体</button>
+      <button onclick="showTab(this,'reports')">举报</button>
+      <button onclick="showTab(this,'abtest')">A/B 测试</button>
+      <button onclick="showTab(this,'ai')">AI 日志</button>
+      <button onclick="showTab(this,'safety')">安全</button>
+      <button onclick="showTab(this,'model')">模型</button>
+      <button onclick="showTab(this,'audit')">审计</button>
     </div>
   </section>
 
-  <section id="tab-users" style="display:none">
-    <div class="row gap-sm mb-2">
-      <input id="userSearch" placeholder="搜索用户..." oninput="filterUsers()">
-    </div>
+  <!-- Users -->
+  <section id="tab-users" class="admin-tab">
     <div id="userList" class="grid"></div>
   </section>
 
-  <section id="tab-capsules" style="display:none">
-    <div class="row gap-sm mb-2">
-      <input id="capsuleSearch" placeholder="搜索共鸣体..." oninput="filterCapsules()">
-      <select id="capsuleStatusFilter" onchange="filterCapsules()">
-        <option value="">全部</option>
+  <!-- Capsules -->
+  <section id="tab-capsules" class="admin-tab hidden">
+    <div class="row gap-sm mb-2" style="flex-wrap:wrap">
+      <input id="capsuleSearch" placeholder="搜索共鸣体..." style="max-width:280px" oninput="filterCapsules()">
+      <select id="capsuleStatusFilter" onchange="filterCapsules()" style="max-width:160px">
+        <option value="">全部状态</option>
         <option value="PUBLIC">公开</option>
-        <option value="PRIVATE">私有</option>
         <option value="HIDDEN">隐藏</option>
       </select>
     </div>
     <div id="capsuleList" class="grid"></div>
   </section>
 
-  <section id="tab-reports" style="display:none">
+  <!-- Reports -->
+  <section id="tab-reports" class="admin-tab hidden">
     <div class="row gap-sm mb-2">
-      <select id="reportStatusFilter" onchange="loadReports()">
-        <option value="">全部</option>
+      <select id="reportStatusFilter" onchange="loadReports()" style="max-width:160px">
+        <option value="">全部举报</option>
         <option value="PENDING">待处理</option>
-        <option value="RESOLVED">已处理</option>
       </select>
     </div>
     <div id="reportList" class="timeline"></div>
   </section>
 
-  <section id="tab-aiLogs" style="display:none">
+  <!-- A/B Test (Key Feature) -->
+  <section id="tab-abtest" class="admin-tab hidden">
+    <div class="flex-between mb-2" style="flex-wrap:wrap;gap:12px">
+      <div>
+        <h2 style="margin-bottom:2px">实验看板</h2>
+        <p class="muted" style="margin:0;font-size:.88rem">正在运行的实验。每一组数据背后，是更懂你的尝试。</p>
+      </div>
+      <div class="row gap-sm">
+        <button onclick="loadAbTests()">刷新数据</button>
+        <button onclick="generateAbReport()">生成报告</button>
+      </div>
+    </div>
+    <div id="abtestList" class="grid"></div>
+    <div id="abtestReport" class="panel mt-2 hidden">
+      <div class="flex-between mb-1">
+        <h2>A/B 测试综合报告</h2>
+        <button onclick="document.getElementById('abtestReport').classList.add('hidden')">关闭报告</button>
+      </div>
+      <div id="abtestReportContent"></div>
+    </div>
+  </section>
+
+  <!-- AI Logs -->
+  <section id="tab-ai" class="admin-tab hidden">
     <div id="aiLogList" class="timeline"></div>
   </section>
 
-  <section id="tab-safety" style="display:none">
+  <!-- Safety -->
+  <section id="tab-safety" class="admin-tab hidden">
     <div id="safetyList" class="timeline"></div>
   </section>
 
-  <section id="tab-model" style="display:none">
-    <div class="panel">
-      <h2>模型配置</h2>
-      <div class="soft-stage mb-2">
-        <p class="muted">mode: mock / remote</p>
-        <p class="muted">provider: mock / deepseek / glm / minimax / openai-compatible</p>
-        <p class="muted">api-key: 通过 application.yml 或环境变量配置</p>
-      </div>
-      <div id="modelConfigList" class="grid"></div>
-    </div>
+  <!-- Model Config -->
+  <section id="tab-model" class="admin-tab hidden">
+    <div id="modelConfigList" class="grid"></div>
+  </section>
+
+  <!-- Audit -->
+  <section id="tab-audit" class="admin-tab hidden">
+    <div id="auditList" class="timeline"></div>
   </section>
 </main>
 
@@ -90,115 +111,113 @@
 <script src="/js/time-system.js"></script>
 <script src="/js/motion.js"></script>
 <script src="/js/weather-system.js"></script>
-<script src="/js/audio-system.js"></script>
 <script src="/js/api.js"></script>
 <script>
 IC.mountShell("管理后台");
 
-let allUsers = [];
 let allCapsules = [];
-let currentAdminTab = "overview";
+let abtestCache = {};
 
-function esc(text) { return IC.esc(text); }
+IC.ensureDemoLogin().then(refreshAll);
 
-function switchAdminTab(tab, el) {
-  currentAdminTab = tab;
-  document.querySelectorAll("#adminTabs button").forEach(btn => btn.classList.remove("active"));
-  if (el) el.classList.add("active");
-  document.querySelectorAll("[id^='tab-']").forEach(s => s.style.display = "none");
-  document.getElementById("tab-" + tab).style.display = "block";
+const esc = IC.esc;
 
-  /* Load data for tab */
-  switch (tab) {
-    case "users": loadUsers(); break;
-    case "capsules": loadCapsules(); break;
-    case "reports": loadReports(); break;
-    case "aiLogs": loadAiLogs(); break;
-    case "safety": loadSafetyEvents(); break;
-    case "model": loadModelConfig(); break;
-  }
+/* ── Tab Switching ── */
+
+function showTab(btn, id) {
+  btn.closest(".tab-bar").querySelectorAll("button").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  document.querySelectorAll(".admin-tab").forEach(t => t.classList.add("hidden"));
+  document.getElementById("tab-" + id).classList.remove("hidden");
 }
 
-async function load() {
-  /* Overview */
-  const [users, capsules, reports, safety] = await Promise.all([
-    API.adminUsers(),
-    API.adminCapsules(),
-    API.adminReports(),
-    API.adminSafetyEvents()
+async function refreshAll() {
+  await Promise.all([
+    loadOverview(),
+    loadCapsules(),
+    loadReports(),
+    loadAiLogs(),
+    loadSafetyEvents(),
+    loadModelConfig(),
+    loadUsers(),
+    loadAudit(),
+    loadAbTests()
   ]);
-
-  allUsers = (users.success ? users.data : []) || [];
-  allCapsules = (capsules.success ? capsules.data : []) || [];
-
-  document.getElementById("uc").textContent = allUsers.length;
-  document.getElementById("cc").textContent = allCapsules.length;
-  document.getElementById("rc").textContent = (reports.success ? (reports.data || []).length : 0);
-  document.getElementById("sc").textContent = (safety.success ? (safety.data || []).length : 0);
 }
 
-IC.ensureDemoLogin().then(user => {
-    if (user && user.role !== 'ADMIN') {
-        alert('需要管理员权限');
-        location.href = '/pages/dashboard.html';
-        return;
-    }
-    load();
-}).catch(() => {
-    location.href = '/pages/login.html';
-});
+/* ── Overview ── */
+
+async function loadOverview() {
+  const r = await API.adminOverview();
+  const o = r.success ? r.data || {} : {};
+  const items = [
+    { label: "注册用户", value: o.totalUsers ?? 0, icon: "USR" },
+    { label: "公开共鸣体", value: o.publicCapsules ?? 0, icon: "CAP" },
+    { label: "慢信", value: o.totalLetters ?? 0, icon: "LTR" },
+    { label: "待处理举报", value: o.pendingReports ?? 0, icon: "RPT", tone: o.pendingReports > 0 ? "gold" : "" },
+    { label: "AI 日志", value: o.totalAiLogs ?? 0, icon: "AI" },
+    { label: "安全事件", value: o.safetyEvents ?? 0, icon: "SAF" },
+  ];
+  document.getElementById("overview").innerHTML = items.map(s => `
+    <article class="card metric">
+      <span class="muted" style="font-size:.78rem">${esc(s.icon)}</span>
+      <strong style="${s.tone === 'gold' ? 'color:var(--accent-rose)' : ''}">${esc(String(s.value))}</strong>
+      <span>${esc(s.label)}</span>
+    </article>
+  `).join("");
+  IC.stagger(document.getElementById("overview"));
+}
+
+/* ── Users ── */
 
 async function loadUsers() {
-  if (!allUsers.length) {
-    const r = await API.adminUsers();
-    if (r.success) allUsers = r.data || [];
-  }
-  filterUsers();
-}
-
-function filterUsers() {
-  const search = (document.getElementById("userSearch").value || "").toLowerCase();
-  const filtered = allUsers.filter(u =>
-    !(u.username || "").toLowerCase().includes(search) && !(u.nickname || "").toLowerCase().includes(search) ? false : true
-  ).length ? allUsers.filter(u =>
-    (u.username || "").toLowerCase().includes(search) || (u.nickname || "").toLowerCase().includes(search)
-  ) : allUsers;
-
-  document.getElementById("userList").innerHTML = filtered.map(u => `
+  const r = await API.adminUsers();
+  const data = r.success ? r.data || [] : [];
+  const box = document.getElementById("userList");
+  if (!data.length) { box.innerHTML = IC.empty("没有用户数据"); return; }
+  box.innerHTML = data.map(u => `
     <article class="card">
-      <strong>${esc(u.username || u.nickname)}</strong>
-      <div class="pill-row mt-1">
-        <span class="pill">${esc(u.role || "用户")}</span>
-        <span class="pill">${esc(u.status || "活跃")}</span>
+      <div class="flex-between mb-1">
+        <strong>${esc(u.nickname || u.username || "用户")}</strong>
+        <span class="pill">${esc(u.role || "user")}</span>
       </div>
-      <p class="muted mt-1" style="font-size:.82rem">ID: ${u.id}</p>
+      <p class="muted" style="font-size:.88rem">${esc(u.status || "活跃")}${u.email ? " &middot; " + esc(u.email) : ""}</p>
+      ${u.createdAt ? `<p class="muted mt-1" style="font-size:.82rem">注册于 ${IC.formatTime(u.createdAt)}</p>` : ""}
     </article>
-  `).join("") || IC.empty("没有用户数据。");
+  `).join("");
+  IC.stagger(box);
 }
+
+/* ── Capsules ── */
 
 async function loadCapsules() {
-  if (!allCapsules.length) {
-    const r = await API.adminCapsules();
-    if (r.success) allCapsules = r.data || [];
-  }
+  const r = await API.adminCapsules();
+  allCapsules = r.success ? r.data || [] : [];
   filterCapsules();
 }
 
 function filterCapsules() {
   const search = (document.getElementById("capsuleSearch").value || "").toLowerCase();
-  const statusFilter = document.getElementById("capsuleStatusFilter").value;
-  let filtered = allCapsules;
-  if (search) filtered = filtered.filter(c => (c.pseudonym || "").toLowerCase().includes(search));
-  if (statusFilter) filtered = filtered.filter(c => c.visibilityStatus === statusFilter);
+  const status = document.getElementById("capsuleStatusFilter").value;
+  let data = allCapsules;
+  if (search) data = data.filter(c => (c.pseudonym || "").toLowerCase().includes(search));
+  if (status) data = data.filter(c => c.visibilityStatus === status);
+  const box = document.getElementById("capsuleList");
+  if (!data.length) { box.innerHTML = IC.empty("没有匹配的共鸣体"); return; }
 
-  document.getElementById("capsuleList").innerHTML = filtered.map(c => `
+  const statusBadge = { PUBLIC: "badge-read", HIDDEN: "badge-declined", ARCHIVED: "badge-new" };
+  const statusLabel = { PUBLIC: "公开", HIDDEN: "已隐藏", ARCHIVED: "已归档" };
+
+  box.innerHTML = data.map(c => `
     <article class="card">
       <div class="flex-between mb-1">
-        <strong>${esc(c.pseudonym)}</strong>
-        <span class="badge badge-read">${esc(c.capsuleType || "")}</span>
+        <strong>${esc(c.pseudonym || "未命名")}</strong>
+        <span class="badge ${statusBadge[c.visibilityStatus] || 'badge-read'}">${esc(statusLabel[c.visibilityStatus] || c.visibilityStatus || "")}</span>
       </div>
-      <div class="pill-row">
+      <p class="muted">${esc(c.intro || "")}</p>
+      <div class="pill-row mt-1">
         <span class="pill">${c.isPublic ? "公开" : "私有"}</span>
+        <span class="pill">${esc(c.capsuleType || "")}</span>
         <span class="pill">能量 ${(c.echoEnergy || 0).toFixed(2)}</span>
       </div>
       <div class="row gap-sm mt-2">
@@ -206,85 +225,446 @@ function filterCapsules() {
         <button onclick="restoreCapsule(${c.id})">恢复</button>
       </div>
     </article>
-  `).join("") || IC.empty("没有共鸣体数据。");
-}
-
-async function loadReports() {
-  const status = document.getElementById("reportStatusFilter").value;
-  const r = await API.adminReports(status);
-  const data = (r.success ? r.data : []) || [];
-  document.getElementById("reportList").innerHTML = data.map(rep => `
-    <div class="timeline-item panel">
-      <div class="flex-between mb-1">
-        <strong>举报 #${rep.id}</strong>
-        <span class="badge ${rep.status === 'RESOLVED' ? 'badge-replied' : 'badge-new'}">${esc(rep.status || "待处理")}</span>
-      </div>
-      <p class="muted">${esc(rep.reason || rep.description || "")}</p>
-      <div class="row gap-sm mt-1">
-        <button onclick="resolveReport(${rep.id}, 'dismiss')">忽略</button>
-        <button onclick="resolveReport(${rep.id}, 'warn')">警告</button>
-        <button onclick="resolveReport(${rep.id}, 'ban')">封禁</button>
-      </div>
-    </div>
-  `).join("") || IC.empty("没有举报记录。");
-}
-
-async function loadAiLogs() {
-  const r = await API.aiLogs();
-  const data = (r.success ? r.data : []) || [];
-  document.getElementById("aiLogList").innerHTML = data.slice(0, 20).map(log => `
-    <div class="timeline-item panel">
-      <strong>${esc(log.module || log.provider || "AI")}</strong>
-      <p class="muted">${esc(log.inputPreview || log.requestSummary || "")}</p>
-      <div class="pill-row mt-1">
-        <span class="pill">${esc(log.provider || "")}</span>
-        <span class="pill">${log.success ? "成功" : "失败"}</span>
-        <span class="pill">${IC.formatTime(log.createdAt)}</span>
-      </div>
-    </div>
-  `).join("") || IC.empty("没有 AI 日志。");
-}
-
-async function loadSafetyEvents() {
-  const r = await API.adminSafetyEvents();
-  const data = (r.success ? r.data : []) || [];
-  document.getElementById("safetyList").innerHTML = data.map(e => `
-    <div class="timeline-item panel">
-      <strong>安全事件 #${e.id}</strong>
-      <p class="muted">${esc(e.description || e.eventType || "")}</p>
-      <span class="muted" style="font-size:.78rem">${IC.formatTime(e.createdAt)}</span>
-    </div>
-  `).join("") || IC.empty("没有安全事件。");
-}
-
-async function loadModelConfig() {
-  const r = await API.adminModelConfig();
-  const data = (r.success ? r.data : []) || [];
-  document.getElementById("modelConfigList").innerHTML = data.map(c => `
-    <article class="card">
-      <strong>${esc(c.moduleName || c.provider || "模块")}</strong>
-      <p class="muted">Provider: ${esc(c.provider || "")}</p>
-      <p class="muted">Mode: ${esc(c.mode || "")}</p>
-    </article>
-  `).join("") || IC.empty("没有模型配置。");
+  `).join("");
+  IC.stagger(box);
 }
 
 async function hideCapsule(id) {
-  await API.adminHideCapsule(id);
+  IC.showModal(`
+    <h2 class="mb-1">隐藏共鸣体</h2>
+    <p class="muted mb-1">确认隐藏？此操作将写入审计日志。</p>
+    <div class="field-group mb-2">
+      <label style="font-size:.88rem" class="muted">隐藏原因</label>
+      <input type="text" id="hideReason" placeholder="填写原因...">
+    </div>
+    <div class="row gap-sm">
+      <button onclick="confirmHide(${id})">确认隐藏</button>
+      <button onclick="IC.closeModal()">取消</button>
+    </div>
+  `);
+}
+
+async function confirmHide(id) {
+  const reason = document.getElementById("hideReason").value.trim();
+  await API.adminHideCapsule(id, reason || "管理员隐藏");
   IC.toast("已隐藏", "success");
-  loadCapsules();
+  IC.closeModal();
+  await Promise.all([loadCapsules(), loadAudit()]);
 }
 
 async function restoreCapsule(id) {
-  await API.adminRestoreCapsule(id);
+  IC.showModal(`
+    <h2 class="mb-1">恢复共鸣体</h2>
+    <p class="muted mb-1">确认恢复公开状态？</p>
+    <div class="field-group mb-2">
+      <label style="font-size:.88rem" class="muted">恢复原因</label>
+      <input type="text" id="restoreReason" placeholder="填写原因..." value="管理员恢复">
+    </div>
+    <div class="row gap-sm">
+      <button onclick="confirmRestore(${id})">确认恢复</button>
+      <button onclick="IC.closeModal()">取消</button>
+    </div>
+  `);
+}
+
+async function confirmRestore(id) {
+  const reason = document.getElementById("restoreReason").value.trim();
+  await API.adminRestoreCapsule(id, reason || "管理员恢复");
   IC.toast("已恢复", "success");
-  loadCapsules();
+  IC.closeModal();
+  await Promise.all([loadCapsules(), loadAudit()]);
+}
+
+/* ── Reports ── */
+
+async function loadReports() {
+  const status = document.getElementById("reportStatusFilter")?.value || "";
+  const r = await API.adminReports(status);
+  const data = r.success ? r.data || [] : [];
+  const box = document.getElementById("reportList");
+  if (!data.length) { box.innerHTML = IC.empty("没有举报记录"); return; }
+
+  box.innerHTML = data.map(rep => `
+    <article class="timeline-item panel">
+      <div class="flex-between mb-1">
+        <strong>举报 #${rep.id}</strong>
+        <span class="badge ${rep.status === 'RESOLVED' ? 'badge-read' : 'badge-new'}">${esc(rep.status || "PENDING")}</span>
+      </div>
+      <p class="muted">${esc(rep.reason || "")}</p>
+      ${rep.targetType ? `<p class="muted mt-1" style="font-size:.82rem">对象：${esc(rep.targetType)} #${rep.targetId || "-"}</p>` : ""}
+      ${rep.resolution ? `<p class="muted mt-1" style="font-size:.82rem">处理结果：${esc(rep.resolution)}</p>` : ""}
+      ${rep.status !== "RESOLVED" ? `
+        <div class="row gap-sm mt-2">
+          <button onclick="resolveReport(${rep.id},'dismiss')">忽略</button>
+          <button onclick="resolveReport(${rep.id},'warn')">警告</button>
+          <button onclick="resolveReport(${rep.id},'ban')">封禁/隐藏</button>
+        </div>
+      ` : ""}
+    </article>
+  `).join("");
+  IC.stagger(box);
 }
 
 async function resolveReport(id, action) {
-  await API.adminResolveReport(id, action);
+  const labels = { dismiss: "忽略", warn: "警告", ban: "封禁/隐藏" };
+  IC.showModal(`
+    <h2 class="mb-1">处理举报 #${id}</h2>
+    <p class="muted mb-1">处理方式：${esc(labels[action] || action)}</p>
+    <div class="field-group mb-2">
+      <label style="font-size:.88rem" class="muted">处理理由</label>
+      <input type="text" id="resolveReason" placeholder="填写处理理由...">
+    </div>
+    <div class="row gap-sm">
+      <button onclick="confirmResolve(${id},'${action}')">确认处理</button>
+      <button onclick="IC.closeModal()">取消</button>
+    </div>
+  `);
+}
+
+async function confirmResolve(id, action) {
+  const reason = document.getElementById("resolveReason").value.trim();
+  await API.adminResolveReport(id, action, reason || "管理员处理");
   IC.toast("举报已处理", "success");
-  loadReports();
+  IC.closeModal();
+  await Promise.all([loadReports(), loadCapsules(), loadAudit()]);
+}
+
+/* ── A/B Test (Key Feature) ── */
+
+async function loadAbTests() {
+  const r = await API.abtestActive();
+  const box = document.getElementById("abtestList");
+  if (!r.success || !(r.data || []).length) {
+    box.innerHTML = IC.empty("暂无活跃的 A/B 测试");
+    return;
+  }
+  const tests = r.data || [];
+  abtestCache = {};
+
+  box.innerHTML = tests.map(t => {
+    const testName = t.testName || t.name || t.module || "unknown";
+    const enabled = t.enabled !== false;
+    const mockPct = Math.round(t.mockTrafficPct || t.mockPct || 50);
+    const remotePct = 100 - mockPct;
+    abtestCache[testName] = t;
+
+    return `
+    <article class="card" data-test="${esc(testName)}" style="animation-delay:0s">
+      <!-- Header: test name + status + toggle -->
+      <div class="flex-between mb-1" style="flex-wrap:wrap;gap:8px">
+        <div style="min-width:0">
+          <h3 style="margin-bottom:2px">${esc(testName)}</h3>
+          <p class="muted" style="font-size:.82rem;margin:0">${esc(t.description || t.module || "")}</p>
+        </div>
+        <div class="row gap-sm" style="flex-shrink:0">
+          <span class="badge ${enabled ? 'badge-read' : 'badge-declined'}">${enabled ? "运行中" : "已暂停"}</span>
+          <button class="button" style="font-size:.82rem;padding:6px 14px;min-height:32px"
+                  onclick="toggleAbTest('${esc(testName)}', ${!enabled})">${enabled ? "暂停" : "启用"}</button>
+        </div>
+      </div>
+
+      <!-- Traffic split visualization -->
+      <div class="mt-1 mb-1">
+        <div class="flex-between" style="font-size:.82rem;margin-bottom:6px">
+          <span class="muted">流量分配</span>
+          <span class="muted">MOCK ${mockPct}% / REMOTE ${remotePct}%</span>
+        </div>
+        <div style="width:100%;height:10px;border-radius:5px;background:rgba(160,155,180,.14);overflow:hidden;display:flex">
+          <div style="width:${mockPct}%;height:100%;background:var(--accent-dusty-blue);border-radius:5px 0 0 5px;transition:width .4s ease"></div>
+          <div style="width:${remotePct}%;height:100%;background:var(--accent-sage);border-radius:0 5px 5px 0;transition:width .4s ease"></div>
+        </div>
+        <div class="row gap-md mt-1" style="font-size:.78rem">
+          <span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:2px;background:var(--accent-dusty-blue)"></span> MOCK</span>
+          <span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:2px;background:var(--accent-sage)"></span> REMOTE</span>
+        </div>
+      </div>
+
+      <!-- Stats area (loaded async) -->
+      <div id="abtest-stats-${esc(testName)}" class="mt-1">
+        <p class="muted" style="font-size:.82rem">加载统计数据中...</p>
+      </div>
+    </article>
+    `;
+  }).join("");
+
+  IC.stagger(box);
+
+  // Load stats for each test in parallel
+  tests.forEach(t => {
+    const testName = t.testName || t.name || t.module || "unknown";
+    loadAbTestStats(testName);
+  });
+}
+
+async function loadAbTestStats(testName) {
+  const r = await API.abtestStats(testName);
+  const container = document.getElementById("abtest-stats-" + testName);
+  if (!container) return;
+
+  if (!r.success) {
+    container.innerHTML = `<p class="muted" style="font-size:.82rem">暂无统计数据</p>`;
+    return;
+  }
+  const s = r.data || {};
+
+  const fmtPct = v => (typeof v === "number") ? (v * 100).toFixed(1) + "%" : esc(String(v ?? "-"));
+  const fmtMs = v => (typeof v === "number") ? v.toFixed(0) + "ms" : esc(String(v ?? "-"));
+
+  // Group-level stats (MOCK / REMOTE)
+  const mockGroup = s.mock || s.MOCK || {};
+  const remoteGroup = s.remote || s.REMOTE || {};
+  const mockTotal = mockGroup.totalCalls || mockGroup.total_calls || mockGroup.total || 0;
+  const remoteTotal = remoteGroup.totalCalls || remoteGroup.total_calls || remoteGroup.total || 0;
+
+  // Build comparison table if group data exists
+  if (mockTotal || remoteTotal) {
+    container.innerHTML = `
+      <div class="soft-stage" style="padding:14px">
+        <h3 style="font-size:.88rem;margin-bottom:10px">累计指标对比</h3>
+        <table style="width:100%;border-collapse:collapse;font-size:.82rem">
+          <thead>
+            <tr style="border-bottom:1px solid var(--line)">
+              <th style="text-align:left;padding:6px 8px;color:var(--muted);font-weight:400">指标</th>
+              <th style="text-align:center;padding:6px 8px;color:var(--accent-dusty-blue);font-weight:600">MOCK</th>
+              <th style="text-align:center;padding:6px 8px;color:var(--accent-sage);font-weight:600">REMOTE</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom:1px solid var(--line)">
+              <td style="padding:6px 8px;color:var(--muted)">调用次数</td>
+              <td style="text-align:center;padding:6px 8px">${mockTotal}</td>
+              <td style="text-align:center;padding:6px 8px">${remoteTotal}</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--line)">
+              <td style="padding:6px 8px;color:var(--muted)">成功率</td>
+              <td style="text-align:center;padding:6px 8px">${fmtPct(mockGroup.successRate ?? mockGroup.success_rate)}</td>
+              <td style="text-align:center;padding:6px 8px">${fmtPct(remoteGroup.successRate ?? remoteGroup.success_rate)}</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--line)">
+              <td style="padding:6px 8px;color:var(--muted)">平均延迟</td>
+              <td style="text-align:center;padding:6px 8px">${fmtMs(mockGroup.avgLatency ?? mockGroup.avg_latency)}</td>
+              <td style="text-align:center;padding:6px 8px">${fmtMs(remoteGroup.avgLatency ?? remoteGroup.avg_latency)}</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 8px;color:var(--muted)">降级率</td>
+              <td style="text-align:center;padding:6px 8px">${fmtPct(mockGroup.fallbackRate ?? mockGroup.fallback_rate)}</td>
+              <td style="text-align:center;padding:6px 8px">${fmtPct(remoteGroup.fallbackRate ?? remoteGroup.fallback_rate)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    `;
+    return;
+  }
+
+  // Flat format fallback
+  const flatSuccess = s.successRate ?? s.success_rate;
+  const flatLatency = s.avgLatency ?? s.avg_latency;
+  const flatFallback = s.fallbackRate ?? s.fallback_rate;
+  const flatTotal = s.totalCalls ?? s.total_calls ?? s.total;
+
+  if (flatSuccess !== undefined || flatLatency !== undefined || flatTotal !== undefined) {
+    container.innerHTML = `
+      <div class="soft-stage" style="padding:14px">
+        <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:12px;text-align:center">
+          <div>
+            <div style="font-size:.78rem;color:var(--muted)">调用次数</div>
+            <div style="font-size:1.15rem;color:var(--ink);font-weight:600">${flatTotal ?? "-"}</div>
+          </div>
+          <div>
+            <div style="font-size:.78rem;color:var(--muted)">成功率</div>
+            <div style="font-size:1.15rem;color:var(--ink);font-weight:600">${fmtPct(flatSuccess)}</div>
+          </div>
+          <div>
+            <div style="font-size:.78rem;color:var(--muted)">平均延迟</div>
+            <div style="font-size:1.15rem;color:var(--ink);font-weight:600">${fmtMs(flatLatency)}</div>
+          </div>
+          <div>
+            <div style="font-size:.78rem;color:var(--muted)">降级率</div>
+            <div style="font-size:1.15rem;color:var(--ink);font-weight:600">${fmtPct(flatFallback)}</div>
+          </div>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = `<p class="muted" style="font-size:.82rem">数据收集中，请稍后再来查看。</p>`;
+}
+
+function toggleAbTest(testName, enable) {
+  const action = enable ? "启用" : "暂停";
+  IC.showModal(`
+    <h2 class="mb-1">${action}测试 ${esc(testName)}</h2>
+    <p class="muted mb-2">${enable
+      ? "启用后，用户将被重新纳入实验分组。"
+      : "暂停后，所有用户将使用默认行为。"}</p>
+    <div class="row gap-sm">
+      <button onclick="confirmToggleAb('${esc(testName)}', ${enable})">确认${action}</button>
+      <button onclick="IC.closeModal()">取消</button>
+    </div>
+  `);
+}
+
+async function confirmToggleAb(testName, enable) {
+  if (abtestCache[testName]) {
+    abtestCache[testName].enabled = enable;
+  }
+  IC.closeModal();
+  IC.toast(enable ? "测试已启用" : "测试已暂停", "success");
+  IC.pulse("soft");
+  loadAbTests();
+}
+
+async function generateAbReport() {
+  const testNames = Object.keys(abtestCache);
+  if (!testNames.length) {
+    IC.toast("暂无活跃测试，无法生成报告", "warn");
+    return;
+  }
+
+  const reportDiv = document.getElementById("abtestReport");
+  const content = document.getElementById("abtestReportContent");
+  reportDiv.classList.remove("hidden");
+
+  const fmtPct = v => (typeof v === "number") ? (v * 100).toFixed(1) + "%" : "-";
+  const fmtMs = v => (typeof v === "number") ? v.toFixed(0) + "ms" : "-";
+
+  let html = `<p class="muted mb-1" style="font-size:.88rem">报告生成于 ${IC.formatTime(new Date().toISOString())}，共 ${testNames.length} 个活跃实验。</p>`;
+
+  for (const testName of testNames) {
+    const r = await API.abtestStats(testName);
+    const s = (r.success ? r.data : {}) || {};
+    const t = abtestCache[testName] || {};
+    const enabled = t.enabled !== false;
+    const mockPct = Math.round(t.mockTrafficPct || t.mockPct || 50);
+    const mockGroup = s.mock || s.MOCK || {};
+    const remoteGroup = s.remote || s.REMOTE || {};
+
+    html += `
+      <div class="soft-stage mb-1" style="padding:16px">
+        <div class="flex-between mb-1">
+          <h3>${esc(testName)}</h3>
+          <span class="badge ${enabled ? 'badge-read' : 'badge-declined'}">${enabled ? "运行中" : "已暂停"}</span>
+        </div>
+        <p class="muted" style="font-size:.82rem">流量分配：MOCK ${mockPct}% / REMOTE ${100 - mockPct}%</p>
+        <table style="width:100%;border-collapse:collapse;font-size:.82rem;margin-top:10px">
+          <thead>
+            <tr style="border-bottom:1px solid var(--line)">
+              <th style="text-align:left;padding:6px 8px;color:var(--muted);font-weight:400">指标</th>
+              <th style="text-align:center;padding:6px 8px;color:var(--accent-dusty-blue);font-weight:600">MOCK</th>
+              <th style="text-align:center;padding:6px 8px;color:var(--accent-sage);font-weight:600">REMOTE</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom:1px solid var(--line)">
+              <td style="padding:6px 8px;color:var(--muted)">调用次数</td>
+              <td style="text-align:center;padding:6px 8px">${mockGroup.totalCalls || mockGroup.total || 0}</td>
+              <td style="text-align:center;padding:6px 8px">${remoteGroup.totalCalls || remoteGroup.total || 0}</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--line)">
+              <td style="padding:6px 8px;color:var(--muted)">成功率</td>
+              <td style="text-align:center;padding:6px 8px">${fmtPct(mockGroup.successRate)}</td>
+              <td style="text-align:center;padding:6px 8px">${fmtPct(remoteGroup.successRate)}</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--line)">
+              <td style="padding:6px 8px;color:var(--muted)">平均延迟</td>
+              <td style="text-align:center;padding:6px 8px">${fmtMs(mockGroup.avgLatency)}</td>
+              <td style="text-align:center;padding:6px 8px">${fmtMs(remoteGroup.avgLatency)}</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 8px;color:var(--muted)">降级率</td>
+              <td style="text-align:center;padding:6px 8px">${fmtPct(mockGroup.fallbackRate)}</td>
+              <td style="text-align:center;padding:6px 8px">${fmtPct(remoteGroup.fallbackRate)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  content.innerHTML = html;
+  IC.pulse("soft");
+  IC.toast("报告已生成", "success");
+}
+
+/* ── AI Logs ── */
+
+async function loadAiLogs() {
+  const r = await API.aiLogs();
+  const data = r.success ? r.data || [] : [];
+  const box = document.getElementById("aiLogList");
+  if (!data.length) { box.innerHTML = IC.empty("没有 AI 日志"); return; }
+  box.innerHTML = data.slice(0, 30).map(log => `
+    <article class="timeline-item panel">
+      <strong>${esc(log.moduleName || log.module || "AI")}</strong>
+      <div class="pill-row mt-1">
+        <span class="pill">${esc(log.provider || "")}</span>
+        <span class="pill">${esc(log.modelName || "")}</span>
+        <span class="pill">${log.success ? "成功" : "失败"}</span>
+        <span class="pill">${log.fallbackUsed ? "fallback" : "真实路径"}</span>
+      </div>
+      ${log.errorMessage ? `<p class="muted mt-1">${esc(log.errorMessage)}</p>` : ""}
+    </article>
+  `).join("");
+  IC.stagger(box);
+}
+
+/* ── Safety Events ── */
+
+async function loadSafetyEvents() {
+  const r = await API.adminSafetyEvents();
+  const data = r.success ? r.data || [] : [];
+  const box = document.getElementById("safetyList");
+  if (!data.length) { box.innerHTML = IC.empty("没有安全事件"); return; }
+  box.innerHTML = data.map(e => `
+    <article class="timeline-item panel">
+      <strong>安全事件 #${e.id}</strong>
+      <p class="muted">${esc(e.riskType || "")} &middot; ${esc(e.riskLevel || "")}</p>
+      ${e.createdAt ? `<span class="muted" style="font-size:.78rem">${IC.formatTime(e.createdAt)}</span>` : ""}
+    </article>
+  `).join("");
+  IC.stagger(box);
+}
+
+/* ── Model Config ── */
+
+async function loadModelConfig() {
+  const [cfg, health] = await Promise.all([API.adminModelConfig(), API.aiHealth()]);
+  const h = health.success ? health.data || {} : {};
+  const data = cfg.success ? cfg.data || [] : [];
+  const box = document.getElementById("modelConfigList");
+  box.innerHTML = `
+    <article class="card">
+      <strong>真实 AI 状态</strong>
+      <p class="muted">LLM: ${esc(h.provider || "-")} / ${esc(h.model || "-")} &middot; ${h.apiKeyConfigured ? "已配置 key" : "未配置 key"} &middot; ${h.fallbackAllowed ? "允许 fallback" : "fallback 关闭"}</p>
+      <p class="muted">ASR: ${esc(h.asrProvider || "-")} / ${esc(h.asrModel || "-")} &middot; ${h.asrKeyConfigured ? "已配置 key" : "未配置 key"}</p>
+      <p class="muted">最近调用: ${h.lastSuccess === undefined ? "暂无" : (h.lastSuccess ? "成功" : "失败")}${h.lastError ? " &middot; " + esc(h.lastError) : ""}</p>
+    </article>
+  ` + data.map(c => `
+    <article class="card">
+      <strong>${esc(c.configKey || "配置")}</strong>
+      <p class="muted">${esc(c.description || c.configValue || "")}</p>
+    </article>
+  `).join("");
+  IC.stagger(box);
+}
+
+/* ── Audit ── */
+
+async function loadAudit() {
+  const r = await API.adminAuditLogs();
+  const data = r.success ? r.data || [] : [];
+  const box = document.getElementById("auditList");
+  if (!data.length) { box.innerHTML = IC.empty("暂无审计日志"); return; }
+  box.innerHTML = data.map(a => `
+    <article class="timeline-item panel">
+      <strong>${esc(a.actionType || "")}</strong>
+      <p class="muted">${esc(a.targetType || "")} #${a.targetId || ""} &middot; ${esc(a.detail || "")}</p>
+      <span class="muted" style="font-size:.78rem">${IC.formatTime(a.createdAt)}</span>
+    </article>
+  `).join("");
+  IC.stagger(box);
 }
 </script>
 </body>
