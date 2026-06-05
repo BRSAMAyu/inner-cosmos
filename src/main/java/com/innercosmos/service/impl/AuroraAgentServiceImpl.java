@@ -1,6 +1,8 @@
 package com.innercosmos.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.innercosmos.ai.context.AgentContext;
+import com.innercosmos.ai.context.AgentContextAssembler;
 import com.innercosmos.ai.prompt.PromptBuilder;
 import com.innercosmos.ai.structured.StructuredAiResults;
 import com.innercosmos.ai.structured.StructuredAiService;
@@ -50,6 +52,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     private final DialogSessionMapper sessionMapper;
     private final LlmConfig llmConfig;
     private final Executor aiExecutor;
+    private final AgentContextAssembler agentContextAssembler;
 
     public AuroraAgentServiceImpl(StructuredAiService structuredAiService,
                                   DialogService dialogService,
@@ -60,7 +63,8 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                                   UserProfileMapper userProfileMapper,
                                   DialogSessionMapper sessionMapper,
                                   LlmConfig llmConfig,
-                                  Executor aiExecutor) {
+                                  Executor aiExecutor,
+                                  AgentContextAssembler agentContextAssembler) {
         this.structuredAiService = structuredAiService;
         this.dialogService = dialogService;
         this.safetyService = safetyService;
@@ -71,6 +75,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         this.sessionMapper = sessionMapper;
         this.llmConfig = llmConfig;
         this.aiExecutor = aiExecutor;
+        this.agentContextAssembler = agentContextAssembler;
     }
 
     @Override
@@ -90,6 +95,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         UserProfile profile = loadProfile(userId);
         String mode = normalizeMode(request.mode);
         boolean allowMemory = allowMemory(profile);
+        AgentContext agentContext = agentContextAssembler.assemble(userId, request.sessionId, request.message, allowMemory);
         List<String> gravityMemories = allowMemory ? memoryService.topGravitySummaries(userId, 5) : List.of();
         AuroraMemoryContextVO memoryContext = allowMemory
                 ? memoryContextService.buildContext(userId, request.sessionId, request.message, 8, 6)
@@ -119,13 +125,25 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                         "mode", mode,
                         "modeGuide", modeGuide(mode),
                         "memoryRecallAllowed", allowMemory,
+                        "unifiedAgentContext", agentContext,
                         "providerPolicy", providerPolicy(),
-                        "agentLoopPolicy", "你可以选择只说一条，也可以继续补充第二条或第三条。不要固定数量。"
+                        "agentLoopPolicy", Boolean.FALSE.equals(agentContext.multiMessageAllowed)
+                                ? "用户关闭了多条消息，本轮只能输出 1 条 segments。"
+                                : "你可以选择只说一条，也可以继续补充第二条或第三条。不要固定数量。"
                 ),
                 StructuredAiResults.AuroraResult.class,
                 () -> fallbackAuroraResult(request.message, mode, gravityMemories, memoryContext, allowMemory));
 
         AuroraReplyVO vo = toReply(profile, ai, request, mode, memoryContext, gravityMemories, allowMemory);
+        if (Boolean.FALSE.equals(agentContext.multiMessageAllowed) && vo.messages.size() > 1) {
+            vo.messages = List.of(vo.messages.get(0));
+            vo.agentLoop = Map.of(
+                    "speakCount", 1,
+                    "continueReason", "用户设置为单条消息模式",
+                    "mode", mode,
+                    "modeLabel", modeLabel(mode)
+            );
+        }
         for (String msg : vo.messages) {
             dialogService.saveAuroraMessage(userId, request.sessionId, msg);
         }
@@ -165,6 +183,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         UserProfile profile = loadProfile(userId);
         String normalizedMode = normalizeMode(mode);
         boolean allowMemory = allowMemory(profile);
+        AgentContext agentContext = agentContextAssembler.assemble(userId, sessionId, "", allowMemory);
         List<String> gravityMemories = allowMemory ? memoryService.topGravitySummaries(userId, 3) : List.of();
         AuroraMemoryContextVO memoryContext = allowMemory
                 ? memoryContextService.buildContext(userId, sessionId, "", 6, 4)
@@ -188,6 +207,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                         "mode", normalizedMode,
                         "timeLabel", timeLabel,
                         "memoryRecallAllowed", allowMemory,
+                        "unifiedAgentContext", agentContext,
                         "providerPolicy", providerPolicy()
                 ),
                 StructuredAiResults.AuroraResult.class,
@@ -347,6 +367,10 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                   "referencedMemoryIds": [],
                   "riskFlags": []
                 }
+                referencedMemoryIds 只能是数字数组，例如 [7, 1]，不要写 "#7" 或字符串。
+                如果 unifiedAgentContext.focusPolicy 提示当前处于专注时段，你要优先考虑用户长期 well-being：任务相关就帮助拆行动，明显闲聊就温柔提醒回到专注。
+                如果用户关闭多条消息，只能输出 1 条 segments。
+                若引用记忆、待办、周报或关系线索，必须自然说明“我想到一个线索”，不要装作凭空知道。
                 segments 必须是 %s 条中文聊天气泡，具体条数由上下文决定，不要固定。
                 第一条必须贴着用户刚刚说的话；后续消息是 Aurora 的 agent loop：补充想法、关心、记忆连接或温和功能邀请。
                 不要模板化，不要诊断，不要口号，不要长文。

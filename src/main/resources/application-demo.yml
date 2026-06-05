@@ -1,0 +1,6 @@
+llm:
+  mode: demo
+  provider: mock
+  api-key: ""
+  model: mock-inner-cosmos
+  allow-fallback: true

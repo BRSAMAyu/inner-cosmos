@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="/css/app.css">
+  <title>关系温度图 · Inner Cosmos</title>
+  <style>
+    .rel-canvas-wrap { position: relative; width: 100%; height: 540px; }
+    .rel-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .rel-node {
+      cursor: pointer;
+      transition: transform .3s var(--ease-bloom, ease);
+    }
+    .rel-node:hover { transform: scale(1.1); }
+    .rel-line { stroke: rgba(143,163,148,.42); stroke-width: 1.4; transition: stroke .3s, stroke-width .3s; }
+    .rel-line:hover, .rel-node:hover + .rel-line { stroke: rgba(191,150,152,.6); stroke-width: 2.4; }
+    .rel-center {
+      fill: rgba(143,163,148,.6);
+      stroke: rgba(255,255,255,.85);
+      stroke-width: 2;
+    }
+    .rel-legend { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); margin-top: 18px; }
+    .rel-legend .row-card { padding: 14px; border-radius: var(--radius); background: rgba(255,250,243,.6); border: 1px solid var(--line); cursor: pointer; }
+    .rel-legend .row-card:hover { background: rgba(229,235,228,.6); }
+    .rel-type-CONFLICT { border-left: 4px solid rgba(200,147,145,.65); }
+    .rel-type-SUPPORT { border-left: 4px solid rgba(143,163,148,.65); }
+    .rel-type-DISTANCE { border-left: 4px solid rgba(151,169,186,.65); }
+    .rel-type-GENERAL { border-left: 4px solid rgba(184,194,168,.65); }
+  </style>
+</head>
+<body>
+<main class="shell">
+  <div class="topbar" data-topbar></div>
+  <span class="route-hint">你与他人</span>
+  <h1>关系温度图</h1>
+  <p class="muted mb-2">你在 Inner Cosmos 中提到过的人会在这里浮现。中心是"我"，每条连线的温度来自你提到这个人时的情绪强度。</p>
+
+  <section class="panel">
+    <div class="rel-canvas-wrap">
+      <svg class="rel-svg" id="relSvg" viewBox="0 0 800 540" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+  </section>
+
+  <section class="rel-legend" id="legend"></section>
+
+  <section class="panel mt-2" id="detail" style="display:none">
+    <h2 id="detailTitle"></h2>
+    <div id="detailBody"></div>
+  </section>
+</main>
+
+<script src="/js/app.js"></script>
+<script src="/js/time-system.js"></script>
+<script src="/js/motion.js"></script>
+<script src="/js/weather-system.js"></script>
+<script src="/js/api.js"></script>
+<script>
+IC.mountShell("关系温度图");
+IC.ensureDemoLogin().then(load);
+
+let allRelations = [];
+let allStats = {};
+
+function esc(t) { return IC.esc(t); }
+
+async function load() {
+  const [relRes, statRes] = await Promise.all([API.relationList(), API.relationStats()]);
+  allRelations = (relRes.success ? relRes.data : []) || [];
+  allStats = (statRes.success ? statRes.data : {}) || {};
+  renderGraph();
+  renderLegend();
+}
+
+function renderGraph() {
+  const svg = document.getElementById("relSvg");
+  const w = 800, h = 540, cx = w/2, cy = h/2;
+  if (!allRelations.length) {
+    svg.innerHTML = `<text x="${cx}" y="${cy}" text-anchor="middle" fill="var(--muted)">还没有关系网络。在 Aurora 对话中提到的人，会在这里出现。</text>`;
+    return;
+  }
+  // Aggregate by label
+  const groups = {};
+  allRelations.forEach(r => {
+    const k = r.relationLabel || r.label || "未命名";
+    if (!groups[k]) groups[k] = { label: k, count: 0, intensity: 0, type: r.relationType || "GENERAL", triggers: [] };
+    groups[k].count += 1;
+    groups[k].intensity = Math.max(groups[k].intensity, r.emotionScore || 0);
+    groups[k].triggers.push(r);
+  });
+  const items = Object.values(groups);
+  const N = items.length;
+  const radius = Math.min(w, h) * 0.38;
+  const angleStep = (Math.PI * 2) / Math.max(1, N);
+  // Center node
+  let svgHtml = `<circle class="rel-center" cx="${cx}" cy="${cy}" r="28" />`;
+  svgHtml += `<text x="${cx}" y="${cy + 5}" text-anchor="middle" fill="white" font-size="14" font-weight="600">我</text>`;
+  // Lines + nodes
+  items.forEach((it, i) => {
+    const a = -Math.PI/2 + i * angleStep;
+    const x = cx + Math.cos(a) * radius;
+    const y = cy + Math.sin(a) * radius;
+    const r = 14 + Math.min(28, it.count * 4);
+    const color = it.type === "CONFLICT" ? "rgba(200,147,145,.85)"
+              : it.type === "SUPPORT" ? "rgba(143,163,148,.85)"
+              : it.type === "DISTANCE" ? "rgba(151,169,186,.85)"
+              : "rgba(184,194,168,.85)";
+    const lineW = 1.4 + Math.min(4.5, it.intensity / 2.0);
+    svgHtml += `<line class="rel-line" x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke-width="${lineW}" />`;
+    svgHtml += `<circle class="rel-node" cx="${x}" cy="${y}" r="${r}" fill="${color}" data-label="${esc(it.label)}" onclick="selectNode('${esc(it.label)}')" />`;
+    svgHtml += `<text x="${x}" y="${y + 4}" text-anchor="middle" fill="white" font-size="${r > 26 ? 13 : 11}" font-weight="600" pointer-events="none">${esc(it.label).slice(0, 6)}</text>`;
+  });
+  svg.innerHTML = svgHtml;
+}
+
+function renderLegend() {
+  const legend = document.getElementById("legend");
+  if (!allRelations.length) { legend.innerHTML = ""; return; }
+  const groups = {};
+  allRelations.forEach(r => {
+    const k = r.relationLabel || r.label || "未命名";
+    if (!groups[k]) groups[k] = { label: k, type: r.relationType || "GENERAL", count: 0, intensity: 0 };
+    groups[k].count += 1;
+    groups[k].intensity = Math.max(groups[k].intensity, r.emotionScore || 0);
+  });
+  legend.innerHTML = Object.values(groups).map(g => `
+    <article class="row-card rel-type-${g.type}" onclick="selectNode('${esc(g.label)}')">
+      <strong>${esc(g.label)}</strong>
+      <p class="muted" style="font-size:.82rem;margin:4px 0 0">${g.count} 次提及 · 强度 ${g.intensity.toFixed(1)} · ${typeLabel(g.type)}</p>
+    </article>
+  `).join("");
+}
+
+function typeLabel(t) {
+  return ({ CONFLICT: "冲突", SUPPORT: "支持", DISTANCE: "疏远", GENERAL: "一般" })[t] || t;
+}
+
+async function selectNode(label) {
+  const detail = document.getElementById("detail");
+  detail.style.display = "block";
+  document.getElementById("detailTitle").textContent = label;
+  const triggers = allRelations.filter(r => (r.relationLabel || r.label) === label);
+  const healthResp = await API.relationHealth(label);
+  const health = (healthResp.success ? healthResp.data : null);
+  document.getElementById("detailBody").innerHTML = `
+    ${health ? `<p class="muted">关系健康度 <strong>${(health.healthScore * 100).toFixed(0)}%</strong>（0=消耗、100=滋养）</p>` : ""}
+    <h3 class="mt-2">最近 5 次提及</h3>
+    <div class="timeline">
+      ${triggers.slice(0, 5).map(t => `
+        <article class="timeline-item">
+          <strong>${esc(t.triggerSummary || t.scene || "提及")}</strong>
+          <p class="muted">${esc((t.emotionTags || []).join(" · ") || "未分类情绪")}</p>
+        </article>
+      `).join("") || "<p class='muted'>尚无触发记录</p>"}
+    </div>
+  `;
+  IC.pulse("soft");
+}
+</script>
+</body>
+</html>

@@ -19,6 +19,13 @@ public class UserProfileVO {
     public Boolean allowMemoryRecall;
     public String quietHoursStart;
     public String quietHoursEnd;
+    public Integer proactiveSensitivity;
+    public Boolean allowMultiMessage;
+    public Boolean focusModeEnabled;
+    public String focusWindowsJson;
+    public String currentEnvironmentLabel;
+    public Boolean weatherAwarenessEnabled;
+    public Boolean timeAwarenessEnabled;
 
     public static UserProfileVO from(User user) {
         UserProfileVO vo = new UserProfileVO();
@@ -41,6 +48,13 @@ public class UserProfileVO {
             vo.allowMemoryRecall = profile.allowMemoryRecall;
             vo.quietHoursStart = profile.quietHoursStart;
             vo.quietHoursEnd = profile.quietHoursEnd;
+            vo.proactiveSensitivity = profile.proactiveSensitivity;
+            vo.allowMultiMessage = profile.allowMultiMessage;
+            vo.focusModeEnabled = profile.focusModeEnabled;
+            vo.focusWindowsJson = profile.focusWindowsJson;
+            vo.currentEnvironmentLabel = profile.currentEnvironmentLabel;
+            vo.weatherAwarenessEnabled = profile.weatherAwarenessEnabled;
+            vo.timeAwarenessEnabled = profile.timeAwarenessEnabled;
         }
         return vo;
     }

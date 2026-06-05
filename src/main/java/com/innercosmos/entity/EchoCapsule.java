@@ -18,4 +18,9 @@ public class EchoCapsule extends BaseEntity {
     public String visibilityStatus;
     public Boolean isPublic;
     public LocalDateTime lastMemoryUpdateAt;
+    public String ownerContextNote;
+    public String styleProfileJson;
+    public String contextPreviewJson;
+    public Boolean standInEnabled;
+    public String realContactPolicy;
 }

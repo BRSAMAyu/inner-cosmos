@@ -3,12 +3,15 @@ package com.innercosmos.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.innercosmos.entity.*;
 import com.innercosmos.mapper.*;
+import com.innercosmos.service.CapsuleService;
 import com.innercosmos.service.DashboardService;
 import com.innercosmos.vo.DashboardVO;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class DashboardServiceImpl implements DashboardService {
@@ -19,6 +22,7 @@ public class DashboardServiceImpl implements DashboardService {
     private final AiInteractionLogMapper aiLogMapper;
     private final EmotionTraceMapper emotionTraceMapper;
     private final DailyRecordMapper dailyRecordMapper;
+    private final CapsuleService capsuleService;
 
     public DashboardServiceImpl(MemoryCardMapper memoryCardMapper,
                                 TodoItemMapper todoItemMapper,
@@ -26,7 +30,8 @@ public class DashboardServiceImpl implements DashboardService {
                                 SlowLetterMapper letterMapper,
                                 AiInteractionLogMapper aiLogMapper,
                                 EmotionTraceMapper emotionTraceMapper,
-                                DailyRecordMapper dailyRecordMapper) {
+                                DailyRecordMapper dailyRecordMapper,
+                                CapsuleService capsuleService) {
         this.memoryCardMapper = memoryCardMapper;
         this.todoItemMapper = todoItemMapper;
         this.capsuleMapper = capsuleMapper;
@@ -34,6 +39,7 @@ public class DashboardServiceImpl implements DashboardService {
         this.aiLogMapper = aiLogMapper;
         this.emotionTraceMapper = emotionTraceMapper;
         this.dailyRecordMapper = dailyRecordMapper;
+        this.capsuleService = capsuleService;
     }
 
     @Override
@@ -46,7 +52,16 @@ public class DashboardServiceImpl implements DashboardService {
         vo.aiLogCount = aiLogMapper.selectCount(new QueryWrapper<AiInteractionLog>().eq("user_id", userId));
         vo.highGravityMemories = memoryCardMapper.selectList(new QueryWrapper<MemoryCard>().eq("user_id", userId).orderByDesc("emotional_gravity").last("LIMIT 3"));
         vo.todos = todoItemMapper.selectList(new QueryWrapper<TodoItem>().eq("user_id", userId).ne("status", "DONE").orderByDesc("id").last("LIMIT 5"));
-        vo.recommendations = capsuleMapper.selectList(new QueryWrapper<EchoCapsule>().eq("is_public", true).eq("visibility_status", "PUBLIC").orderByDesc("echo_energy").last("LIMIT 3"));
+        vo.recommendations = new ArrayList<>();
+        for (Map<String, Object> item : capsuleService.matchedCapsules(userId).stream().limit(3).toList()) {
+            Object capsule = item.get("capsule");
+            if (capsule instanceof EchoCapsule echoCapsule) {
+                vo.recommendations.add(echoCapsule);
+            }
+        }
+        if (vo.recommendations.isEmpty()) {
+            vo.recommendations = capsuleMapper.selectList(new QueryWrapper<EchoCapsule>().eq("is_public", true).eq("visibility_status", "PUBLIC").orderByDesc("echo_energy").last("LIMIT 3"));
+        }
 
         EmotionTrace trace = emotionTraceMapper.selectOne(new QueryWrapper<EmotionTrace>().eq("user_id", userId).orderByDesc("id").last("LIMIT 1"));
         vo.emotionWeather = trace == null ? "尚未记录天气" : trace.weatherType + " / " + trace.emotionName;

@@ -67,6 +67,23 @@ public class CapsuleController extends BaseController {
         return ApiResponse.ok(dataMaskingService.previewFromMemory(userId, memoryIds, privacyLevel, allowTopics, blockedTopics));
     }
 
+    @PostMapping("/user-mirror/preview")
+    public ApiResponse<CapsulePreviewVO> previewUserMirror(HttpSession session) {
+        return ApiResponse.ok(capsuleService.previewUserMirror(currentUserId(session)));
+    }
+
+    @PostMapping("/{id}/context")
+    public ApiResponse<EchoCapsule> updateContext(@PathVariable Long id,
+                                                  @RequestBody Map<String, Object> body,
+                                                  HttpSession session) {
+        return ApiResponse.ok(capsuleService.updateContext(currentUserId(session), id, body));
+    }
+
+    @GetMapping("/{id}/context-preview")
+    public ApiResponse<Map<String, Object>> contextPreview(@PathVariable Long id, HttpSession session) {
+        return ApiResponse.ok(capsuleService.contextPreview(currentUserId(session), id));
+    }
+
     @GetMapping("/{id}/boundary")
     public ApiResponse<CapsuleBoundary> getBoundary(@PathVariable Long id, HttpSession session) {
         return ApiResponse.ok(capsuleService.getBoundary(id));

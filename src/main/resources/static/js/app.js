@@ -41,6 +41,7 @@ const IC = {
   },
 
   mountShell(activeLabel = "") {
+    IC.applyTimeClass();
     IC.applyTheme();
     const topbar = document.querySelector("[data-topbar]");
     if (topbar) {
@@ -58,6 +59,21 @@ const IC = {
 
   applyTheme() {
     document.body.classList.toggle("dark-star", !!IC.darkTheme);
+  },
+
+  applyTimeClass() {
+    const hour = new Date().getHours();
+    const names = ["time-dawn", "time-morning", "time-noon", "time-evening", "time-dusk", "time-night", "time-deep-night"];
+    document.body.classList.remove(...names);
+    let cls = "time-morning";
+    if (hour < 5) cls = "time-deep-night";
+    else if (hour < 7) cls = "time-dawn";
+    else if (hour < 11) cls = "time-morning";
+    else if (hour < 15) cls = "time-noon";
+    else if (hour < 18) cls = "time-evening";
+    else if (hour < 21) cls = "time-dusk";
+    else cls = "time-night";
+    document.body.classList.add(cls);
   },
 
   toggleTheme() {

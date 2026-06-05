@@ -14,6 +14,9 @@ const API = {
   async dashboardSummary() {
     return IC.api("/api/dashboard/summary");
   },
+  async understandingOverview(range = 7) {
+    return IC.api(`/api/understanding/overview?range=${range}`);
+  },
 
   /* Aurora Chat */
   async auroraModes() {
@@ -206,8 +209,17 @@ const API = {
   async previewCapsuleFromMemory(data) {
     return IC.api("/api/capsule/preview-from-memory", { method: "POST", body: JSON.stringify(data) });
   },
+  async previewUserMirrorCapsule() {
+    return IC.api("/api/capsule/user-mirror/preview", { method: "POST" });
+  },
   async capsuleBoundary(id) {
     return IC.api(`/api/capsule/${id}/boundary`);
+  },
+  async capsuleContextPreview(id) {
+    return IC.api(`/api/capsule/${id}/context-preview`);
+  },
+  async updateCapsuleContext(id, data) {
+    return IC.api(`/api/capsule/${id}/context`, { method: "POST", body: JSON.stringify(data) });
   },
   async updateCapsuleBoundary(id, data) {
     return IC.api(`/api/capsule/${id}/boundary`, { method: "POST", body: JSON.stringify(data) });
@@ -219,6 +231,9 @@ const API = {
   /* Plaza */
   async plazaCapsules() {
     return IC.api("/api/plaza/capsules");
+  },
+  async plazaMatches() {
+    return IC.api("/api/plaza/matches");
   },
 
   /* Persona Chat */

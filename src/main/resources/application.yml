@@ -38,7 +38,7 @@ llm:
   prompt:
     language: ${LLM_PROMPT_LANGUAGE:zh-CN}  # zh-CN for Chinese, en-US for English
   mimo:
-    api-key: ${MIMO_API_KEY:}
+    api-key: ${MIMO_API_KEY:tp-cgqfqmlacq35o53s29s6ce5r6qn57cdw717s1n7fi4up27ds}
     asr-model: ${MIMO_ASR_MODEL:mimo-v2.5-asr}
     asr-base-url: ${MIMO_ASR_BASE_URL:https://token-plan-cn.xiaomimimo.com/v1}
     asr-language: ${MIMO_ASR_LANGUAGE:auto}

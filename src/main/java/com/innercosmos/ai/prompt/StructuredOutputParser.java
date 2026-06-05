@@ -22,9 +22,19 @@ public final class StructuredOutputParser {
             return null;
         }
 
+        String normalized = normalizeCommonModelJson(json);
+
         try {
-            return objectMapper.readValue(json, clazz);
+            return objectMapper.readValue(normalized, clazz);
         } catch (Exception e) {
+            String sanitized = escapeBareQuotesInsideStrings(normalized);
+            if (!sanitized.equals(normalized)) {
+                try {
+                    return objectMapper.readValue(sanitized, clazz);
+                } catch (Exception ignored) {
+                    log.warn("Failed to parse sanitized structured output as {}: {}", clazz.getSimpleName(), ignored.getMessage());
+                }
+            }
             log.warn("Failed to parse structured output as {}: {}", clazz.getSimpleName(), e.getMessage());
             return null;
         }
@@ -131,5 +141,60 @@ public final class StructuredOutputParser {
         }
 
         return -1;
+    }
+
+    /**
+     * Some reasoning models produce otherwise valid JSON but use raw ASCII quotes
+     * inside Chinese strings. Convert those inner quotes to escaped quotes while
+     * preserving real JSON delimiters.
+     */
+    private static String escapeBareQuotesInsideStrings(String json) {
+        StringBuilder out = new StringBuilder(json.length() + 16);
+        boolean inString = false;
+        boolean escaped = false;
+        for (int i = 0; i < json.length(); i++) {
+            char c = json.charAt(i);
+            if (escaped) {
+                out.append(c);
+                escaped = false;
+                continue;
+            }
+            if (c == '\\' && inString) {
+                out.append(c);
+                escaped = true;
+                continue;
+            }
+            if (c == '"') {
+                if (!inString) {
+                    inString = true;
+                    out.append(c);
+                    continue;
+                }
+                char next = nextSignificant(json, i + 1);
+                if (next == ':' || next == ',' || next == '}' || next == ']' || next == '\0') {
+                    inString = false;
+                    out.append(c);
+                } else {
+                    out.append("\\\"");
+                }
+                continue;
+            }
+            out.append(c);
+        }
+        return out.toString();
+    }
+
+    private static char nextSignificant(String text, int start) {
+        for (int i = start; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (!Character.isWhitespace(c)) {
+                return c;
+            }
+        }
+        return '\0';
+    }
+
+    private static String normalizeCommonModelJson(String json) {
+        return json.replaceAll("\"#(\\d+)\"", "$1");
     }
 }

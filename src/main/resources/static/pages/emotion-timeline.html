@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="/css/app.css">
+  <title>情绪时间线 · Inner Cosmos</title>
+  <style>
+    .et-canvas-wrap { position: relative; width: 100%; height: 360px; }
+    .et-svg { width: 100%; height: 100%; }
+    .et-line { fill: none; stroke: rgba(143,163,148,.65); stroke-width: 2; }
+    .et-dot { fill: rgba(143,163,148,.9); }
+    .et-dot-key { fill: rgba(191,150,152,.95); r: 5; }
+    .et-axis { stroke: rgba(160,155,180,.32); stroke-width: 1; }
+    .et-label { fill: var(--muted); font-size: 11px; }
+    .et-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-top: 20px; }
+    .et-stat { padding: 16px; border-radius: var(--radius); background: rgba(255,250,243,.6); border: 1px solid var(--line); }
+    .et-stat .num { font-size: 2rem; line-height: 1; color: var(--ink); }
+    .et-pattern { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+    .et-pattern .pill { background: rgba(229,235,228,.6); }
+  </style>
+</head>
+<body>
+<main class="shell">
+  <div class="topbar" data-topbar></div>
+  <span class="route-hint">情绪天气</span>
+  <h1>情绪时间线</h1>
+  <p class="muted mb-2">从 Daily Record 汇总出来的情绪曲线。粉色的点是高 gravity 记忆出现的日子 —— 那往往是值得回看的转折。</p>
+
+  <div class="row gap-sm mb-2">
+    <button onclick="loadRange(7)" class="active" id="r-7">7 天</button>
+    <button onclick="loadRange(30)" id="r-30">30 天</button>
+    <button onclick="loadRange(90)" id="r-90">90 天</button>
+  </div>
+
+  <section class="panel">
+    <div class="et-canvas-wrap">
+      <svg class="et-svg" id="etSvg" viewBox="0 0 800 360" preserveAspectRatio="none"></svg>
+    </div>
+  </section>
+
+  <div class="et-stats" id="stats"></div>
+  <div class="panel mt-2">
+    <h2>主导模式</h2>
+    <p class="muted">系统在最近这段日子里识别出的反复模式：</p>
+    <div class="et-pattern" id="patterns"></div>
+  </div>
+</main>
+
+<script src="/js/app.js"></script>
+<script src="/js/time-system.js"></script>
+<script src="/js/motion.js"></script>
+<script src="/js/weather-system.js"></script>
+<script src="/js/api.js"></script>
+<script>
+IC.mountShell("情绪时间线");
+IC.ensureDemoLogin().then(() => loadRange(7));
+
+let currentRange = 7;
+let trendData = [];
+
+function esc(t) { return IC.esc(t); }
+
+async function loadRange(days) {
+  currentRange = days;
+  document.querySelectorAll(".row button").forEach(b => b.classList.remove("active"));
+  document.getElementById("r-" + days).classList.add("active");
+  const tRes = await API.emotionTrend(days);
+  const pRes = await API.emotionPatterns(days);
+  const sRes = await API.emotionStability(days);
+  trendData = (tRes.success ? tRes.data : []) || [];
+  renderChart();
+  renderStats(sRes, pRes);
+  renderPatterns(pRes);
+}
+
+function renderChart() {
+  const svg = document.getElementById("etSvg");
+  const w = 800, h = 360, padding = { top: 30, right: 20, bottom: 30, left: 30 };
+  if (!trendData.length) {
+    svg.innerHTML = `<text x="${w/2}" y="${h/2}" text-anchor="middle" fill="var(--muted)">还没有情绪数据。多和 Aurora 聊几次，时间线会逐渐浮现。</text>`;
+    return;
+  }
+  const innerW = w - padding.left - padding.right;
+  const innerH = h - padding.top - padding.bottom;
+  const scores = trendData.map(d => d.score || 5);
+  const max = 10, min = 0;
+  const stepX = trendData.length > 1 ? innerW / (trendData.length - 1) : 0;
+  let pathD = "";
+  trendData.forEach((d, i) => {
+    const x = padding.left + i * stepX;
+    const y = padding.top + innerH - ((d.score - min) / (max - min)) * innerH;
+    pathD += (i === 0 ? "M" : "L") + x.toFixed(1) + "," + y.toFixed(1) + " ";
+  });
+  let html = `<line class="et-axis" x1="${padding.left}" y1="${padding.top + innerH}" x2="${w - padding.right}" y2="${padding.top + innerH}" />`;
+  // X-axis labels (every ~7 days)
+  trendData.forEach((d, i) => {
+    if (i % Math.max(1, Math.floor(trendData.length / 6)) !== 0) return;
+    const x = padding.left + i * stepX;
+    html += `<text class="et-label" x="${x}" y="${h - 6}" text-anchor="middle">${esc((d.date || "").slice(5))}</text>`;
+  });
+  // Path
+  html += `<path class="et-line" d="${pathD}" />`;
+  // Dots (key = high gravity day)
+  trendData.forEach((d, i) => {
+    const x = padding.left + i * stepX;
+    const y = padding.top + innerH - ((d.score - min) / (max - min)) * innerH;
+    const isKey = d.keyDay;
+    html += `<circle class="${isKey ? "et-dot-key" : "et-dot"}" cx="${x}" cy="${y}" r="${isKey ? 5 : 3}" />`;
+  });
+  svg.innerHTML = html;
+}
+
+function renderStats(sRes, pRes) {
+  const stats = document.getElementById("stats");
+  const stability = (sRes.success && sRes.data) ? sRes.data.stabilityScore : null;
+  const avgScore = trendData.length ? (trendData.reduce((s,d) => s + (d.score || 0), 0) / trendData.length).toFixed(1) : "-";
+  const peakDay = trendData.reduce((m, d) => (!m || d.score > m.score) ? d : m, null);
+  stats.innerHTML = `
+    <div class="et-stat"><span class="muted">最近 ${currentRange} 天</span><div class="num">${currentRange}</div><span class="muted" style="font-size:.78rem">情绪样本</span></div>
+    <div class="et-stat"><span class="muted">平均强度</span><div class="num">${avgScore}</div><span class="muted" style="font-size:.78rem">0-10 量表</span></div>
+    <div class="et-stat"><span class="muted">最强烈的一天</span><div class="num" style="font-size:1.4rem">${peakDay ? (peakDay.score || "-") : "-"}</div><span class="muted" style="font-size:.78rem">${peakDay ? esc((peakDay.date || "").slice(5)) : ""}</span></div>
+    <div class="et-stat"><span class="muted">稳定性</span><div class="num">${stability != null ? Math.round(stability * 100) + "%" : "-"}</div><span class="muted" style="font-size:.78rem">越高越稳</span></div>
+  `;
+}
+
+function renderPatterns(pRes) {
+  const el = document.getElementById("patterns");
+  const patterns = (pRes.success ? pRes.data : []) || [];
+  if (!patterns.length) { el.innerHTML = `<span class="muted">最近还没有识别出明显的反复模式。</span>`; return; }
+  el.innerHTML = patterns.map(p => `<span class="pill">${esc(p)}</span>`).join("");
+}
+</script>
+</body>
+</html>

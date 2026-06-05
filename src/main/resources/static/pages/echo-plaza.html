@@ -45,19 +45,36 @@
 IC.mountShell("星海广场");
 
 let capsules = [];
+let matchById = new Map();
 let currentTab = "seed";
 let allTags = [];
 
 IC.ensureDemoLogin().then(load);
 
 async function load() {
-  const r = await API.plazaCapsules();
-  if (r.success) capsules = r.data || [];
+  const matchRes = await API.plazaMatches();
+  if (matchRes.success) {
+    const rows = matchRes.data || [];
+    capsules = rows.map(x => x.capsule || x);
+    matchById = new Map(rows.map(x => [String((x.capsule || x).id), x]));
+  } else {
+    const r = await API.plazaCapsules();
+    if (r.success) capsules = r.data || [];
+  }
   buildTagFilters();
   filterCapsules();
 }
 
 function esc(text) { return IC.esc(text); }
+function tagsOf(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed)) return parsed;
+  } catch (e) {}
+  return String(value).split(",").map(t => t.replace(/["\[\]]/g, "").trim()).filter(Boolean);
+}
 
 function switchTab(tab) {
   currentTab = tab;
@@ -68,7 +85,7 @@ function switchTab(tab) {
 }
 
 function buildTagFilters() {
-  allTags = [...new Set(capsules.flatMap(c => (c.publicTags || "").split(",").map(t => t.trim()).filter(Boolean)))];
+  allTags = [...new Set(capsules.flatMap(c => tagsOf(c.publicTags)))];
   document.getElementById("tagFilters").innerHTML = allTags.slice(0, 8).map(t =>
     `<span class="pill" style="cursor:pointer" onclick="toggleTagFilter(this, '${esc(t)}')">${esc(t)}</span>`
   ).join("");
@@ -94,7 +111,7 @@ function filterCapsules() {
     if (currentTab === "user" && c.capsuleType === "SEED_CAPSULE") return false;
     if (search && !(c.pseudonym || "").toLowerCase().includes(search) && !(c.intro || "").toLowerCase().includes(search)) return false;
     if (activeTagFilters.size > 0) {
-      const tags = (c.publicTags || "").split(",").map(t => t.trim());
+      const tags = tagsOf(c.publicTags);
       for (const ft of activeTagFilters) { if (!tags.includes(ft)) return false; }
     }
     return true;
@@ -118,6 +135,8 @@ function renderList(data) {
   }
   list.innerHTML = data.map(c => {
     const personality = CapsulePersonality.getPersonality(c.pseudonym);
+    const match = matchById.get(String(c.id)) || {};
+    const tags = tagsOf(c.publicTags);
     return `
     <article class="card capsule-card" style="cursor:pointer" onclick="openCapsule(${c.id})"
              data-pseudonym="${esc(c.pseudonym)}">
@@ -133,9 +152,12 @@ function renderList(data) {
       </div>
       <p class="muted">${esc(c.intro || "")}</p>
       <div class="pill-row mt-1">
-        ${(c.publicTags || "").split(",").filter(Boolean).map(t => `<span class="pill">${esc(t.trim())}</span>`).join("")}
+        ${tags.map(t => `<span class="pill">${esc(t)}</span>`).join("")}
       </div>
-      <p class="gold mt-1" style="font-size:.88rem">回声能量 ${(c.echoEnergy || 0).toFixed(2)} / 每日 ${c.conversationLimitPerDay || 5} 轮</p>
+      <p class="gold mt-1" style="font-size:.88rem">
+        匹配 ${(match.matchScore || c.echoEnergy || 0).toFixed(2)} / 回声能量 ${(c.echoEnergy || 0).toFixed(2)} / 每日 ${c.conversationLimitPerDay || 5} 轮
+      </p>
+      ${match.matchSummary ? `<p class="muted" style="font-size:.86rem">${esc(match.matchSummary)}</p>` : ""}
     </article>
   `}).join("");
 
@@ -155,6 +177,8 @@ function openCapsule(id) {
   if (!c) return;
 
   const personality = CapsulePersonality.getPersonality(c.pseudonym);
+  const match = matchById.get(String(c.id)) || {};
+  const tags = tagsOf(c.publicTags);
 
   IC.showModal(`
     <div class="flex-between mb-2">
@@ -169,8 +193,9 @@ function openCapsule(id) {
     </div>
     <p class="muted mb-2">${esc(c.intro || "")}</p>
     <div class="pill-row mb-2">
-      ${(c.publicTags || "").split(",").filter(Boolean).map(t => `<span class="pill">${esc(t.trim())}</span>`).join("")}
+      ${tags.map(t => `<span class="pill">${esc(t)}</span>`).join("")}
     </div>
+    ${match.matchSummary ? `<div class="soft-stage mb-2"><h3>为什么推荐</h3><p class="muted">${esc(match.matchSummary)}</p></div>` : ""}
     <div class="soft-stage mb-2" style="border-left: 3px solid ${personality.color}">
       <h3>边界</h3>
       <p class="muted">每日对话轮数：${c.conversationLimitPerDay || 5}</p>

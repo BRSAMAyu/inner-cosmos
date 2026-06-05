@@ -14,4 +14,11 @@ public class UserProfile extends BaseEntity {
     public Boolean allowMemoryRecall;
     public String quietHoursStart;
     public String quietHoursEnd;
+    public Integer proactiveSensitivity;
+    public Boolean allowMultiMessage;
+    public Boolean focusModeEnabled;
+    public String focusWindowsJson;
+    public String currentEnvironmentLabel;
+    public Boolean weatherAwarenessEnabled;
+    public Boolean timeAwarenessEnabled;
 }
