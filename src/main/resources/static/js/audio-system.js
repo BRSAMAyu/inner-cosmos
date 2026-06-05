@@ -7,10 +7,11 @@ window.ICAudio = {
   interactionPlayer: null,
 
   // Current state
-  isMuted: false,
+  isMuted: true,
   currentBGM: null,
   currentWeather: null,
-  masterVolume: 0.3,
+  masterVolume: 0.12,
+  ambientFallbackEnabled: false,
 
   // BGM tracks for different times
   bgmTracks: {
@@ -87,7 +88,6 @@ window.ICAudio = {
   // Initialize
   init() {
     this.loadSettings();
-    this.initAudioContext();
 
     // Listen for user interaction to unlock audio
     document.addEventListener('click', () => this.unlockAudio(), { once: true });
@@ -104,6 +104,7 @@ window.ICAudio = {
   loadSettings() {
     const savedMuted = localStorage.getItem('ic_audio_muted');
     const savedVolume = localStorage.getItem('ic_audio_volume');
+    const savedAmbientFallback = localStorage.getItem('ic_audio_ambient_fallback');
 
     if (savedMuted !== null) {
       this.isMuted = savedMuted === 'true';
@@ -111,6 +112,7 @@ window.ICAudio = {
     if (savedVolume !== null) {
       this.masterVolume = parseFloat(savedVolume);
     }
+    this.ambientFallbackEnabled = savedAmbientFallback === 'true';
   },
 
   // Save settings
@@ -121,15 +123,19 @@ window.ICAudio = {
 
   // Initialize audio context
   initAudioContext() {
+    if (this.audioCtx) return this.audioCtx;
     try {
       this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     } catch (e) {
       console.warn('Web Audio API not supported:', e);
     }
+    return this.audioCtx;
   },
 
   // Unlock audio (required for user interaction)
   unlockAudio() {
+    if (this.isMuted) return;
+    this.initAudioContext();
     if (this.audioCtx && this.audioCtx.state === 'suspended') {
       this.audioCtx.resume();
     }
@@ -144,8 +150,7 @@ window.ICAudio = {
       this.stopBGM();
       this.stopWeatherSound();
     } else {
-      this.playCurrentBGM();
-      this.playWeatherSound(this.currentWeather);
+      this.unlockAudio();
     }
 
     return this.isMuted;
@@ -205,7 +210,9 @@ window.ICAudio = {
 
   // Play BGM by track key
   playBGM(trackKey) {
-    if (!this.audioCtx || this.isMuted) return;
+    if (this.isMuted) return;
+    this.initAudioContext();
+    if (!this.audioCtx) return;
 
     this.stopBGM();
     this.currentBGM = trackKey;
@@ -213,15 +220,16 @@ window.ICAudio = {
     const track = this.bgmTracks[trackKey];
     if (!track) return;
 
-    // Try to load audio file, fallback to generated tones
+    // Try to load audio file. Synthetic ambient fallback stays opt-in because
+    // continuous oscillators can sound like a low hum on laptop speakers.
     this.loadAudioFile(track.url).then(audioBuffer => {
       if (audioBuffer) {
         this.playAudioBuffer(audioBuffer, true);
-      } else {
+      } else if (this.ambientFallbackEnabled) {
         this.generateAmbientTones(track);
       }
     }).catch(() => {
-      this.generateAmbientTones(track);
+      if (this.ambientFallbackEnabled) this.generateAmbientTones(track);
     });
   },
 
@@ -257,7 +265,7 @@ window.ICAudio = {
 
   // Generate ambient tones (fallback)
   generateAmbientTones(track) {
-    if (!this.audioCtx || !track.tones) return;
+    if (!this.ambientFallbackEnabled || !this.audioCtx || !track.tones) return;
 
     const { tones, tempo } = track;
     const now = this.audioCtx.currentTime;
@@ -317,7 +325,7 @@ window.ICAudio = {
     };
     const trackKey = bgmMap[timeKey] || 'morning';
 
-    if (this.currentBGM !== trackKey && !this.isMuted) {
+    if (this.currentBGM !== trackKey && !this.isMuted && this.bgmPlayer) {
       this.playBGM(trackKey);
     }
   },
@@ -334,7 +342,9 @@ window.ICAudio = {
   playWeatherSound(weatherType) {
     this.stopWeatherSound();
 
-    if (!this.audioCtx || this.isMuted) return;
+    if (this.isMuted) return;
+    this.initAudioContext();
+    if (!this.audioCtx) return;
 
     const soundUrl = this.weatherSounds[weatherType];
     if (!soundUrl) return;
@@ -361,7 +371,9 @@ window.ICAudio = {
 
   // Play interaction sound
   playInteractionSound(soundName) {
-    if (!this.audioCtx || this.isMuted) return;
+    if (this.isMuted) return;
+    this.initAudioContext();
+    if (!this.audioCtx) return;
 
     const sound = this.interactionSounds[soundName];
     if (!sound) return;
@@ -375,7 +387,7 @@ window.ICAudio = {
     osc.type = 'sine';
     osc.frequency.setValueAtTime(freq, now);
 
-    gain.gain.setValueAtTime(this.masterVolume * 0.3, now);
+    gain.gain.setValueAtTime(this.masterVolume * 0.12, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
 
     osc.connect(gain);
@@ -383,6 +395,10 @@ window.ICAudio = {
 
     osc.start(now);
     osc.stop(now + duration);
+  },
+
+  playInteraction(soundName) {
+    this.playInteractionSound(soundName);
   },
 
   // Crossfade between tracks

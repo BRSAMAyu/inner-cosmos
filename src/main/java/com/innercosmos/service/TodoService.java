@@ -9,4 +9,10 @@ public interface TodoService {
     TodoItem updateStatus(Long userId, Long id, String status);
 
     void delete(Long userId, Long id);
+
+    TodoItem create(Long userId, TodoItem item);
+
+    TodoItem update(Long userId, Long id, TodoItem item);
+
+    TodoItem splitFirstStep(Long userId, Long id);
 }

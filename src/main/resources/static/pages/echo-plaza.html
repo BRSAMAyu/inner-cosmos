@@ -90,8 +90,8 @@ function filterCapsules() {
   const search = (document.getElementById("search").value || "").toLowerCase();
   const sort = document.getElementById("sortSelect").value;
   let filtered = capsules.filter(c => {
-    if (currentTab === "seed" && c.capsuleType !== "SEED") return false;
-    if (currentTab === "user" && c.capsuleType === "SEED") return false;
+    if (currentTab === "seed" && c.capsuleType !== "SEED_CAPSULE") return false;
+    if (currentTab === "user" && c.capsuleType === "SEED_CAPSULE") return false;
     if (search && !(c.pseudonym || "").toLowerCase().includes(search) && !(c.intro || "").toLowerCase().includes(search)) return false;
     if (activeTagFilters.size > 0) {
       const tags = (c.publicTags || "").split(",").map(t => t.trim());
@@ -128,7 +128,7 @@ function renderList(data) {
         </div>
         <div class="flex-row gap-sm">
           ${CapsulePersonality.createBadge(c.pseudonym)}
-          <span class="badge badge-read">${c.capsuleType === "SEED" ? "种子" : "用户"}</span>
+          <span class="badge badge-read">${c.capsuleType === "SEED_CAPSULE" ? "种子" : "用户"}</span>
         </div>
       </div>
       <p class="muted">${esc(c.intro || "")}</p>

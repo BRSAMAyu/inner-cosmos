@@ -33,4 +33,19 @@ public class TodoController extends BaseController {
         todoService.delete(currentUserId(session), id);
         return ApiResponse.ok(true);
     }
+
+    @PostMapping
+    public ApiResponse<TodoItem> create(@RequestBody TodoItem item, HttpSession session) {
+        return ApiResponse.ok(todoService.create(currentUserId(session), item));
+    }
+
+    @PutMapping("/{id}")
+    public ApiResponse<TodoItem> update(@PathVariable Long id, @RequestBody TodoItem item, HttpSession session) {
+        return ApiResponse.ok(todoService.update(currentUserId(session), id, item));
+    }
+
+    @PostMapping("/{id}/split")
+    public ApiResponse<TodoItem> split(@PathVariable Long id, HttpSession session) {
+        return ApiResponse.ok(todoService.splitFirstStep(currentUserId(session), id));
+    }
 }

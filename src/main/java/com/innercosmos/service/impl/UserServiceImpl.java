@@ -30,6 +30,11 @@ public class UserServiceImpl implements UserService {
     private final TodoItemMapper todoItemMapper;
     private final SlowLetterMapper slowLetterMapper;
     private final EchoCapsuleMapper echoCapsuleMapper;
+    private final DialogSessionMapper dialogSessionMapper;
+    private final DialogMessageMapper dialogMessageMapper;
+    private final EmotionTraceMapper emotionTraceMapper;
+    private final EmotionTimelineMapper emotionTimelineMapper;
+    private final ThoughtFragmentMapper thoughtFragmentMapper;
 
     public UserServiceImpl(UserMapper userMapper,
                            UserProfileMapper userProfileMapper,
@@ -37,7 +42,12 @@ public class UserServiceImpl implements UserService {
                            DailyRecordMapper dailyRecordMapper,
                            TodoItemMapper todoItemMapper,
                            SlowLetterMapper slowLetterMapper,
-                           EchoCapsuleMapper echoCapsuleMapper) {
+                           EchoCapsuleMapper echoCapsuleMapper,
+                           DialogSessionMapper dialogSessionMapper,
+                           DialogMessageMapper dialogMessageMapper,
+                           EmotionTraceMapper emotionTraceMapper,
+                           EmotionTimelineMapper emotionTimelineMapper,
+                           ThoughtFragmentMapper thoughtFragmentMapper) {
         this.userMapper = userMapper;
         this.userProfileMapper = userProfileMapper;
         this.memoryCardMapper = memoryCardMapper;
@@ -45,6 +55,11 @@ public class UserServiceImpl implements UserService {
         this.todoItemMapper = todoItemMapper;
         this.slowLetterMapper = slowLetterMapper;
         this.echoCapsuleMapper = echoCapsuleMapper;
+        this.dialogSessionMapper = dialogSessionMapper;
+        this.dialogMessageMapper = dialogMessageMapper;
+        this.emotionTraceMapper = emotionTraceMapper;
+        this.emotionTimelineMapper = emotionTimelineMapper;
+        this.thoughtFragmentMapper = thoughtFragmentMapper;
     }
 
     @Override
@@ -125,30 +140,76 @@ public class UserServiceImpl implements UserService {
     public Map<String, Object> exportData(Long userId) {
         Map<String, Object> data = new HashMap<>();
 
+        // User profile
+        QueryWrapper<UserProfile> upQuery = new QueryWrapper<>();
+        upQuery.eq("user_id", userId);
+        UserProfile userProfile = userProfileMapper.selectOne(upQuery);
+        data.put("userProfile", userProfile);
+
+        // Dialog sessions and messages
+        QueryWrapper<DialogSession> dsQuery = new QueryWrapper<>();
+        dsQuery.eq("user_id", userId);
+        List<DialogSession> dialogSessions = dialogSessionMapper.selectList(dsQuery);
+        data.put("dialogSessions", dialogSessions);
+
+        // Get all dialog message IDs from sessions
+        List<Long> sessionIds = dialogSessions.stream().map(session -> session.id).toList();
+        if (!sessionIds.isEmpty()) {
+            QueryWrapper<DialogMessage> dmQuery = new QueryWrapper<>();
+            dmQuery.in("session_id", sessionIds);
+            List<DialogMessage> dialogMessages = dialogMessageMapper.selectList(dmQuery);
+            data.put("dialogMessages", dialogMessages);
+        } else {
+            data.put("dialogMessages", List.of());
+        }
+
+        // Memory cards
         QueryWrapper<MemoryCard> mcQuery = new QueryWrapper<>();
         mcQuery.eq("user_id", userId);
         List<MemoryCard> memoryCards = memoryCardMapper.selectList(mcQuery);
         data.put("memoryCards", memoryCards);
 
+        // Daily records
         QueryWrapper<DailyRecord> drQuery = new QueryWrapper<>();
         drQuery.eq("user_id", userId);
         List<DailyRecord> dailyRecords = dailyRecordMapper.selectList(drQuery);
         data.put("dailyRecords", dailyRecords);
 
+        // Todo items
         QueryWrapper<TodoItem> tiQuery = new QueryWrapper<>();
         tiQuery.eq("user_id", userId);
         List<TodoItem> todos = todoItemMapper.selectList(tiQuery);
         data.put("todos", todos);
 
+        // Slow letters
         QueryWrapper<SlowLetter> slQuery = new QueryWrapper<>();
         slQuery.eq("sender_user_id", userId).or().eq("receiver_user_id", userId);
         List<SlowLetter> letters = slowLetterMapper.selectList(slQuery);
         data.put("letters", letters);
 
+        // Echo capsules
         QueryWrapper<EchoCapsule> ecQuery = new QueryWrapper<>();
         ecQuery.eq("owner_user_id", userId);
         List<EchoCapsule> capsules = echoCapsuleMapper.selectList(ecQuery);
         data.put("capsules", capsules);
+
+        // Emotion traces
+        QueryWrapper<EmotionTrace> etQuery = new QueryWrapper<>();
+        etQuery.eq("user_id", userId);
+        List<EmotionTrace> emotionTraces = emotionTraceMapper.selectList(etQuery);
+        data.put("emotionTraces", emotionTraces);
+
+        // Emotion timeline
+        QueryWrapper<EmotionTimeline> etlQuery = new QueryWrapper<>();
+        etlQuery.eq("user_id", userId);
+        List<EmotionTimeline> emotionTimeline = emotionTimelineMapper.selectList(etlQuery);
+        data.put("emotionTimeline", emotionTimeline);
+
+        // Thought fragments
+        QueryWrapper<ThoughtFragment> tfQuery = new QueryWrapper<>();
+        tfQuery.eq("user_id", userId);
+        List<ThoughtFragment> thoughtFragments = thoughtFragmentMapper.selectList(tfQuery);
+        data.put("thoughtFragments", thoughtFragments);
 
         return data;
     }
@@ -156,30 +217,65 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public void deleteAccount(Long userId) {
+        // Delete thought fragments
+        QueryWrapper<ThoughtFragment> tfQuery = new QueryWrapper<>();
+        tfQuery.eq("user_id", userId);
+        thoughtFragmentMapper.delete(tfQuery);
+
+        // Delete emotion timeline
+        QueryWrapper<EmotionTimeline> etlQuery = new QueryWrapper<>();
+        etlQuery.eq("user_id", userId);
+        emotionTimelineMapper.delete(etlQuery);
+
+        // Delete emotion traces
+        QueryWrapper<EmotionTrace> etQuery = new QueryWrapper<>();
+        etQuery.eq("user_id", userId);
+        emotionTraceMapper.delete(etQuery);
+
+        // Delete dialog messages first (foreign key constraint)
+        QueryWrapper<DialogSession> dsQuery = new QueryWrapper<>();
+        dsQuery.eq("user_id", userId);
+        List<DialogSession> sessions = dialogSessionMapper.selectList(dsQuery);
+        for (DialogSession session : sessions) {
+            QueryWrapper<DialogMessage> dmQuery = new QueryWrapper<>();
+            dmQuery.eq("session_id", session.id);
+            dialogMessageMapper.delete(dmQuery);
+        }
+
+        // Delete dialog sessions
+        dialogSessionMapper.delete(dsQuery);
+
+        // Delete memory cards
         QueryWrapper<MemoryCard> mcQuery = new QueryWrapper<>();
         mcQuery.eq("user_id", userId);
         memoryCardMapper.delete(mcQuery);
 
+        // Delete daily records
         QueryWrapper<DailyRecord> drQuery = new QueryWrapper<>();
         drQuery.eq("user_id", userId);
         dailyRecordMapper.delete(drQuery);
 
+        // Delete todos
         QueryWrapper<TodoItem> tiQuery = new QueryWrapper<>();
         tiQuery.eq("user_id", userId);
         todoItemMapper.delete(tiQuery);
 
+        // Delete slow letters
         QueryWrapper<SlowLetter> slQuery = new QueryWrapper<>();
         slQuery.eq("sender_user_id", userId).or().eq("receiver_user_id", userId);
         slowLetterMapper.delete(slQuery);
 
+        // Delete echo capsules
         QueryWrapper<EchoCapsule> ecQuery = new QueryWrapper<>();
         ecQuery.eq("owner_user_id", userId);
         echoCapsuleMapper.delete(ecQuery);
 
+        // Delete user profile
         QueryWrapper<UserProfile> upQuery = new QueryWrapper<>();
         upQuery.eq("user_id", userId);
         userProfileMapper.delete(upQuery);
 
+        // Finally delete user account
         userMapper.deleteById(userId);
     }
 

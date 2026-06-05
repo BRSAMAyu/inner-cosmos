@@ -44,10 +44,14 @@ public class MockLlmClient implements LlmClient {
             textToAnalyze = extractLetterText(request.requestJson);
         }
 
+        if (module.contains("AURORA") && request.requestJson != null) {
+            textToAnalyze = extractAuroraUserText(request.requestJson, text);
+        }
+
         // Analyze input for semantic understanding
         AnalysisResult analysis = PseudoSemanticAnalyzer.analyze(textToAnalyze);
 
-        if (module.contains("AURORA_CHAT")) {
+        if (module.contains("AURORA_CHAT") || module.contains("AURORA_GREETING")) {
             return buildAuroraChatJson(text, analysis);
         }
         if (module.contains("THOUGHT_SHREDDER")) {
@@ -73,73 +77,59 @@ public class MockLlmClient implements LlmClient {
      * Now produces input-dependent responses.
      */
     private String buildAuroraChatJson(String text, AnalysisResult analysis) {
-        // Generate dynamic segments based on sentiment and themes
         List<String> segments = new ArrayList<>();
-
-        // Segment 1: Reflective opening based on sentiment
-        if ("CRISIS".equals(analysis.sentimentLabel)) {
-            segments.add("我听见你现在很不容易.我们先停一停,不急着处理任何事,先把呼吸找回来.");
-        } else if ("NEGATIVE".equals(analysis.sentimentLabel)) {
-            String theme = analysis.detectedThemes.isEmpty() ? "这件事" : analysis.detectedThemes.get(0);
-            segments.add("我听见" + theme + "对你有重量,尤其是此刻这种感觉.");
-        } else if ("POSITIVE".equals(analysis.sentimentLabel)) {
-            segments.add("我感觉到今天有一些明亮的东西在.");
+        boolean greeting = text.contains("主动发起对话") || text.contains("AURORA_GREETING");
+        if (greeting) {
+            segments.add("我先来找你一下。今天不用等到想清楚再开口，我们可以从一句很小的话开始。");
+            if (random.nextBoolean()) {
+                segments.add("如果你愿意，我可以陪你聊今天最占心的位置，也可以只是陪你把脑子里的噪音放下来。");
+            }
+        } else if ("CRISIS".equals(analysis.sentimentLabel)) {
+            segments.add("我先把安全放在最前面。你现在不需要一个人扛着，请尽快联系身边可信任的人或当地紧急支持。");
+        } else if ("NEGATIVE".equals(analysis.sentimentLabel) || containsAny(text, List.of("累", "焦虑", "烦", "崩"))) {
+            segments.add("我听见这件事对你不是轻轻掠过的那种影响。它像是在你心里占了一块位置，而且已经待了一阵子。");
+            segments.add("我们先不急着把它解释成你哪里做得不够好，可以先把事实、感受和真正想要的东西分开。");
+        } else if ("POSITIVE".equals(analysis.sentimentLabel) || containsAny(text, List.of("开心", "高兴", "顺利"))) {
+            segments.add("这个瞬间我想先替你接住。不是所有好的感受都要立刻进入下一步，它本身就值得被看见。");
+            segments.add("也许你可以把这件事存成一张记忆卡，让以后低落的时候还能回头看到它。");
+        } else if (containsAny(text, List.of("关系", "朋友", "家人", "同事"))) {
+            segments.add("关系里的事经常不是一句对错能说清的。我更想陪你先分清：发生了什么、你有什么反应、你真正希望被理解的是什么。");
+        } else if (containsAny(text, List.of("任务", "工作", "拖延"))) {
+            segments.add("这听起来像是任务已经在脑子里变得太大了。我们可以先不碰完整计划，只找一个十分钟内能开始的小动作。");
         } else {
-            segments.add("我听见这件事现在对你有重量.");
+            segments.add("我在。你可以不用把话组织得很漂亮，先把现在最真实的那一句放到这里。");
+            if (random.nextBoolean()) {
+                segments.add("我会根据你说的内容，帮你慢慢整理成记忆、情绪线索或一个很小的下一步。");
+            }
+        }
+        if (segments.size() == 1 && random.nextInt(3) == 0) {
+            segments.add("如果这句话后面还有一点没说完的地方，我也想听。");
         }
 
-        // Segment 2: Clarification/reframing based on detected themes
-        if (analysis.detectedThemes.contains("任务压力")) {
-            segments.add("我们先把'这件事'和'你这个人'分开来看,压力是一件事,你的价值是另一件事.");
-        } else if (analysis.detectedThemes.contains("关系牵动")) {
-            segments.add("关系里的事总是牵动很多层.我们先看看你的感受和对方的说法,各是什么.");
-        } else if (analysis.detectedThemes.contains("情绪承压")) {
-            segments.add("我们先不急着把情绪推开,允许它存在一会儿,也许能看到它背后在说什么.");
-        } else if (analysis.detectedThemes.contains("认知探索")) {
-            segments.add("这团东西现在还模糊,我们可以把它拆开,看看事实、感受和想法各是什么.");
-        } else {
-            segments.add("我们先把事实、感受和下一步分开看.");
-        }
-
-        // Segment 3: Small step suggestion based on intent
-        if ("TASK_STRESS".equals(analysis.primaryIntent)) {
-            segments.add("现在可以只留下一个很小的动作--也许只是打开那个文件,看十分钟.");
-        } else if ("RELATION_ISSUE".equals(analysis.primaryIntent)) {
-            segments.add("现在可以只做一件事:写下对方说了什么,以及你实际感受到什么.");
-        } else if ("SELF_HARM".equals(analysis.primaryIntent)) {
-            segments.add("现在最小的一步,是先让自己活下来,其他的明天再说.");
-        } else {
-            segments.add("现在可以只留下一个很小的动作.");
-        }
-
-        // Dynamic theme detection
-        String detectedTheme = analysis.detectedThemes.isEmpty() ? "日常" : analysis.detectedThemes.get(0);
-
-        // Dynamic next question based on intent
+        String detectedTheme = analysis.detectedThemes.isEmpty() ? "日常倾诉" : analysis.detectedThemes.get(0);
         String nextQuestion;
         if ("SELF_HARM".equals(analysis.primaryIntent)) {
-            nextQuestion = "你能答应我现在先不做任何伤害自己的决定,给自己五分钟吗?";
+            nextQuestion = "你身边现在有没有一个可以立刻联系到的可信任的人？";
         } else if ("TASK_STRESS".equals(analysis.primaryIntent)) {
-            nextQuestion = "如果只选一个最需要被看见的部分,会是哪一步最让你卡住?";
+            nextQuestion = "如果只允许做十分钟，第一步可以小到什么程度？";
         } else if ("RELATION_ISSUE".equals(analysis.primaryIntent)) {
-            nextQuestion = "这段关系里,你最不想被看见但又最想说出来的是什么?";
+            nextQuestion = "这段关系里，你最希望对方真正听懂哪一句话？";
         } else {
-            nextQuestion = "如果只选一个最需要被看见的部分,会是哪一个?";
+            nextQuestion = "此刻最需要被我听见的是哪一部分？";
         }
 
-        // Dynamic small step
         String smallStep;
         if ("TASK_STRESS".equals(analysis.primaryIntent)) {
-            smallStep = "把任务打开,只做十分钟.";
+            smallStep = "只打开任务入口，不要求完成。";
         } else if ("RELATION_ISSUE".equals(analysis.primaryIntent)) {
-            smallStep = "写下关系里最重的一句话.";
+            smallStep = "写下事实和感受各一句。";
         } else {
-            smallStep = "写下最重的一句话.";
+            smallStep = "写下一句最真实的话。";
         }
 
         return String.format("""
                 {
-                  "segments": ["%s", "%s", "%s"],
+                  "segments": %s,
                   "detectedTheme": "%s",
                   "nextQuestion": "%s",
                   "smallStep": "%s",
@@ -147,9 +137,7 @@ public class MockLlmClient implements LlmClient {
                   "referencedMemoryIds": []
                 }
                 """,
-            escapeJson(segments.get(0)),
-            escapeJson(segments.get(1)),
-            escapeJson(segments.get(2)),
+            toJsonArray(segments),
             escapeJson(detectedTheme),
             escapeJson(nextQuestion),
             escapeJson(smallStep)
@@ -382,6 +370,81 @@ public class MockLlmClient implements LlmClient {
                 .replace("\n", "\\n")
                 .replace("\r", "\\r")
                 .replace("\t", "\\t");
+    }
+
+    private String toJsonArray(List<String> values) {
+        List<String> safe = values == null || values.isEmpty()
+                ? List.of("我在。你可以先从最真实的一句话开始。")
+                : values;
+        StringBuilder builder = new StringBuilder("[");
+        for (int i = 0; i < safe.size(); i++) {
+            if (i > 0) builder.append(",");
+            builder.append("\"").append(escapeJson(safe.get(i))).append("\"");
+        }
+        builder.append("]");
+        return builder.toString();
+    }
+
+    private String extractAuroraUserText(String requestJson, String fallback) {
+        requestJson = decodeUnicodeEscapes(requestJson);
+        String direct = extractJsonString(requestJson, "userMessage");
+        if (direct != null && !direct.isBlank()) return direct;
+        String marker = "=== 用户刚刚说的话 ===";
+        int start = requestJson.indexOf(marker);
+        if (start < 0) return fallback == null ? "" : fallback;
+        start += marker.length();
+        int end = requestJson.indexOf("=== 结束 ===", start);
+        String raw = end > start ? requestJson.substring(start, end) : requestJson.substring(start);
+        return raw.replace("\\n", "\n")
+                .replace("\\\"", "\"")
+                .replace("\\r", "\r")
+                .trim();
+    }
+
+    private String extractJsonString(String json, String key) {
+        if (json == null || key == null) return null;
+        String marker = "\"" + key + "\":";
+        int start = json.indexOf(marker);
+        if (start < 0) return null;
+        start += marker.length();
+        while (start < json.length() && Character.isWhitespace(json.charAt(start))) start++;
+        if (start >= json.length() || json.charAt(start) != '"') return null;
+        start++;
+        StringBuilder builder = new StringBuilder();
+        boolean escaping = false;
+        for (int i = start; i < json.length(); i++) {
+            char c = json.charAt(i);
+            if (escaping) {
+                builder.append(c == 'n' ? '\n' : c == 'r' ? '\r' : c == 't' ? '\t' : c);
+                escaping = false;
+            } else if (c == '\\') {
+                escaping = true;
+            } else if (c == '"') {
+                return builder.toString();
+            } else {
+                builder.append(c);
+            }
+        }
+        return null;
+    }
+
+    private String decodeUnicodeEscapes(String value) {
+        if (value == null || !value.contains("\\u")) return value == null ? "" : value;
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < value.length(); i++) {
+            if (i + 5 < value.length() && value.charAt(i) == '\\' && value.charAt(i + 1) == 'u') {
+                String hex = value.substring(i + 2, i + 6);
+                try {
+                    builder.append((char) Integer.parseInt(hex, 16));
+                    i += 5;
+                    continue;
+                } catch (NumberFormatException ignored) {
+                    // fall through and keep the original characters
+                }
+            }
+            builder.append(value.charAt(i));
+        }
+        return builder.toString();
     }
 
     /**

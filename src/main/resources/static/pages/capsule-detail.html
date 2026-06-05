@@ -124,7 +124,7 @@ async function init() {
 function renderDetail(c) {
   document.getElementById("capsuleName").textContent = c.pseudonym || "未命名回声";
   document.getElementById("capsuleIntro").textContent = c.intro || "一枚数字回声。";
-  document.getElementById("capsuleType").textContent = c.capsuleType === "SEED" ? "种子" : "用户";
+  document.getElementById("capsuleType").textContent = c.capsuleType === "SEED_CAPSULE" || c.capsuleType === "SEED" ? "种子" : "用户";
   document.getElementById("echoEnergy").textContent = (c.echoEnergy || 0).toFixed(2);
   document.getElementById("dailyLimit").textContent = c.conversationLimitPerDay || 5;
   document.getElementById("letterAllowed").textContent = c.allowLetterRequest ? "允许" : "不允许";

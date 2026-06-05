@@ -7,6 +7,8 @@ import com.innercosmos.entity.CapsuleBoundary;
 import com.innercosmos.entity.EchoCapsule;
 import com.innercosmos.mapper.CapsuleBoundaryMapper;
 import com.innercosmos.mapper.EchoCapsuleMapper;
+import com.innercosmos.mapper.MemoryCardMapper;
+import com.innercosmos.entity.MemoryCard;
 import com.innercosmos.service.CapsuleService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,11 +21,16 @@ public class CapsuleServiceImpl implements CapsuleService {
     private final EchoCapsuleMapper capsuleMapper;
     private final CapsuleBoundaryMapper boundaryMapper;
     private final CapsuleAgent capsuleAgent;
+    private final MemoryCardMapper memoryCardMapper;
 
-    public CapsuleServiceImpl(EchoCapsuleMapper capsuleMapper, CapsuleBoundaryMapper boundaryMapper, CapsuleAgent capsuleAgent) {
+    public CapsuleServiceImpl(EchoCapsuleMapper capsuleMapper, 
+                              CapsuleBoundaryMapper boundaryMapper, 
+                              CapsuleAgent capsuleAgent,
+                              MemoryCardMapper memoryCardMapper) {
         this.capsuleMapper = capsuleMapper;
         this.boundaryMapper = boundaryMapper;
         this.capsuleAgent = capsuleAgent;
+        this.memoryCardMapper = memoryCardMapper;
     }
 
     @Override
@@ -34,7 +41,27 @@ public class CapsuleServiceImpl implements CapsuleService {
         capsule.capsuleType = "USER_CAPSULE";
         capsule.pseudonym = request.pseudonym == null || request.pseudonym.isBlank() ? "未命名回声" : request.pseudonym;
         capsule.intro = request.intro == null ? "一枚从脱敏记忆中编织出的数字回声." : request.intro;
-        capsule.personaPrompt = capsuleAgent.buildPersonaPrompt(capsule.pseudonym, capsule.intro);
+
+        // Fetch selected memory cards to synthesize user persona
+        List<String> memorySummaries = new java.util.ArrayList<>();
+        if (request.memoryIds != null && !request.memoryIds.isEmpty()) {
+            for (Long mid : request.memoryIds) {
+                MemoryCard card = memoryCardMapper.selectById(mid);
+                if (card != null && userId.equals(card.userId)) {
+                    memorySummaries.add(card.title + ": " + card.summary);
+                }
+            }
+        }
+        if (memorySummaries.isEmpty()) {
+            QueryWrapper<MemoryCard> q = new QueryWrapper<>();
+            q.eq("user_id", userId).eq("status", "ACTIVE").orderByDesc("emotional_gravity").last("LIMIT 5");
+            List<MemoryCard> cards = memoryCardMapper.selectList(q);
+            for (MemoryCard card : cards) {
+                memorySummaries.add(card.title + ": " + card.summary);
+            }
+        }
+        capsule.personaPrompt = capsuleAgent.generateUserPersona(userId, memorySummaries, capsule.pseudonym, capsule.intro);
+
         capsule.publicTags = toJsonArray(request.publicTags, "self-resonance");
         capsule.authorizedMemoryIds = toJsonArray(request.memoryIds != null ? request.memoryIds.stream().map(String::valueOf).toList() : null);
         capsule.echoEnergy = 0.72;

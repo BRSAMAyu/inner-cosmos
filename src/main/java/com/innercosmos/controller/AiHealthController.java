@@ -29,6 +29,10 @@ public class AiHealthController {
         vo.apiKeyConfigured = llmConfig.hasActiveApiKey();
         vo.fallbackAllowed = llmConfig.isEffectiveFallbackAllowed();
         vo.mockProvider = "mock".equalsIgnoreCase(vo.provider);
+        vo.asrProvider = llmConfig.activeAsrProvider();
+        vo.asrModel = llmConfig.activeAsrModel();
+        vo.asrKeyConfigured = llmConfig.hasActiveAsrKey();
+        vo.asrMockProvider = "mock".equalsIgnoreCase(vo.asrProvider);
 
         AiInteractionLog latest = aiLogService.latest();
         if (latest != null) {

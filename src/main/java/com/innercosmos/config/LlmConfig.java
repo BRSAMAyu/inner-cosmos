@@ -22,7 +22,9 @@ public class LlmConfig {
     public String baseUrl;
     public String model;
     public boolean allowFallback = true;
+    public String asrProvider = "mimo";
     public GlmProperties glm = new GlmProperties();
+    public MimoProperties mimo = new MimoProperties();
     public MinimaxProperties minimax = new MinimaxProperties();
     public DeepSeekProperties deepseek = new DeepSeekProperties();
 
@@ -88,6 +90,14 @@ public class LlmConfig {
         return allowFallback && !isProdMode();
     }
 
+    public String getAsrProvider() {
+        return asrProvider;
+    }
+
+    public void setAsrProvider(String asrProvider) {
+        this.asrProvider = asrProvider;
+    }
+
     public String activeProvider() {
         return (provider != null && !provider.isBlank()) ? provider : "minimax";
     }
@@ -109,12 +119,39 @@ public class LlmConfig {
         return !resolveKey(apiKey).isBlank();
     }
 
+    public String activeAsrProvider() {
+        return (asrProvider != null && !asrProvider.isBlank()) ? asrProvider : "mimo";
+    }
+
+    public String activeAsrModel() {
+        String provider = activeAsrProvider().toLowerCase();
+        if ("mimo".equals(provider)) return mimo.asrModel;
+        if ("glm".equals(provider)) return glm.asrModel;
+        return "mock-asr";
+    }
+
+    public boolean hasActiveAsrKey() {
+        String provider = activeAsrProvider().toLowerCase();
+        if ("mock".equals(provider)) return false;
+        if ("mimo".equals(provider)) return !resolveKey(mimo.apiKey).isBlank();
+        if ("glm".equals(provider)) return !resolveKey(glm.asrApiKey).isBlank() || !resolveKey(glm.apiKey).isBlank();
+        return false;
+    }
+
     public GlmProperties getGlm() {
         return glm;
     }
 
     public void setGlm(GlmProperties glm) {
         this.glm = glm;
+    }
+
+    public MimoProperties getMimo() {
+        return mimo;
+    }
+
+    public void setMimo(MimoProperties mimo) {
+        this.mimo = mimo;
     }
 
     public MinimaxProperties getMinimax() {
@@ -141,6 +178,8 @@ public class LlmConfig {
         public String baseUrl = "https://open.bigmodel.cn/api/paas/v4/chat/completions";
         public int timeoutMs = 20000;
         public String asrApiKey = "";
+        public String asrModel = "glm-asr-2512";
+        public String asrBaseUrl = "https://open.bigmodel.cn/api/paas/v4/audio/transcriptions";
 
         public String getApiKey() { return apiKey; }
         public void setApiKey(String apiKey) { this.apiKey = apiKey; }
@@ -152,6 +191,29 @@ public class LlmConfig {
         public void setTimeoutMs(int timeoutMs) { this.timeoutMs = timeoutMs; }
         public String getAsrApiKey() { return asrApiKey; }
         public void setAsrApiKey(String asrApiKey) { this.asrApiKey = asrApiKey; }
+        public String getAsrModel() { return asrModel; }
+        public void setAsrModel(String asrModel) { this.asrModel = asrModel; }
+        public String getAsrBaseUrl() { return asrBaseUrl; }
+        public void setAsrBaseUrl(String asrBaseUrl) { this.asrBaseUrl = asrBaseUrl; }
+    }
+
+    public static class MimoProperties {
+        public String apiKey = "";
+        public String asrModel = "mimo-v2.5-asr";
+        public String asrBaseUrl = "https://token-plan-cn.xiaomimimo.com/v1";
+        public String asrLanguage = "auto";
+        public int timeoutMs = 30000;
+
+        public String getApiKey() { return apiKey; }
+        public void setApiKey(String apiKey) { this.apiKey = apiKey; }
+        public String getAsrModel() { return asrModel; }
+        public void setAsrModel(String asrModel) { this.asrModel = asrModel; }
+        public String getAsrBaseUrl() { return asrBaseUrl; }
+        public void setAsrBaseUrl(String asrBaseUrl) { this.asrBaseUrl = asrBaseUrl; }
+        public String getAsrLanguage() { return asrLanguage; }
+        public void setAsrLanguage(String asrLanguage) { this.asrLanguage = asrLanguage; }
+        public int getTimeoutMs() { return timeoutMs; }
+        public void setTimeoutMs(int timeoutMs) { this.timeoutMs = timeoutMs; }
     }
 
     public static class MinimaxProperties {

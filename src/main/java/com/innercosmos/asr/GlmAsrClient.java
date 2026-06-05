@@ -9,6 +9,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 
 public class GlmAsrClient implements AsrClient {
@@ -17,19 +18,26 @@ public class GlmAsrClient implements AsrClient {
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     private static final String DEFAULT_ASR_URL = "https://open.bigmodel.cn/api/paas/v4/audio/transcriptions";
+    private static final String DEFAULT_MODEL = "glm-asr-2512";
     private static final int TIMEOUT_MS = 30_000;
 
     private final String apiKey;
     private final String asrUrl;
+    private final String model;
     private final MockAsrClient fallback = new MockAsrClient();
 
     public GlmAsrClient(String apiKey) {
-        this(apiKey, DEFAULT_ASR_URL);
+        this(apiKey, DEFAULT_ASR_URL, DEFAULT_MODEL);
     }
 
     public GlmAsrClient(String apiKey, String asrUrl) {
+        this(apiKey, asrUrl, DEFAULT_MODEL);
+    }
+
+    public GlmAsrClient(String apiKey, String asrUrl, String model) {
         this.apiKey = apiKey;
         this.asrUrl = asrUrl;
+        this.model = (model == null || model.isBlank()) ? DEFAULT_MODEL : model;
     }
 
     @Override
@@ -61,21 +69,35 @@ public class GlmAsrClient implements AsrClient {
 
         String modelPart = "--" + boundary + "\r\n"
                 + "Content-Disposition: form-data; name=\"model\"\r\n\r\n"
-                + "whisper-1\r\n";
+                + model + "\r\n";
+
+        String streamPart = "--" + boundary + "\r\n"
+                + "Content-Disposition: form-data; name=\"stream\"\r\n\r\n"
+                + "false\r\n";
 
         String closingBoundary = "--" + boundary + "--\r\n";
 
-        byte[] headerBytes = audioPartHeader.getBytes("UTF-8");
-        byte[] modelPartBytes = modelPart.getBytes("UTF-8");
-        byte[] closingBytes = closingBoundary.getBytes("UTF-8");
+        byte[] headerBytes = audioPartHeader.getBytes(StandardCharsets.UTF_8);
+        byte[] separatorBytes = "\r\n".getBytes(StandardCharsets.UTF_8);
+        byte[] modelPartBytes = modelPart.getBytes(StandardCharsets.UTF_8);
+        byte[] streamPartBytes = streamPart.getBytes(StandardCharsets.UTF_8);
+        byte[] closingBytes = closingBoundary.getBytes(StandardCharsets.UTF_8);
 
-        byte[] multipartBody = new byte[headerBytes.length + audioBytes.length
-                + modelPartBytes.length + closingBytes.length];
+        byte[] multipartBody = new byte[headerBytes.length + audioBytes.length + separatorBytes.length
+                + modelPartBytes.length + streamPartBytes.length + closingBytes.length];
         System.arraycopy(headerBytes, 0, multipartBody, 0, headerBytes.length);
         System.arraycopy(audioBytes, 0, multipartBody, headerBytes.length, audioBytes.length);
-        System.arraycopy(modelPartBytes, 0, multipartBody, headerBytes.length + audioBytes.length, modelPartBytes.length);
+        System.arraycopy(separatorBytes, 0, multipartBody,
+                headerBytes.length + audioBytes.length, separatorBytes.length);
+        System.arraycopy(modelPartBytes, 0, multipartBody,
+                headerBytes.length + audioBytes.length + separatorBytes.length, modelPartBytes.length);
+        System.arraycopy(streamPartBytes, 0, multipartBody,
+                headerBytes.length + audioBytes.length + separatorBytes.length + modelPartBytes.length,
+                streamPartBytes.length);
         System.arraycopy(closingBytes, 0, multipartBody,
-                headerBytes.length + audioBytes.length + modelPartBytes.length, closingBytes.length);
+                headerBytes.length + audioBytes.length + separatorBytes.length
+                        + modelPartBytes.length + streamPartBytes.length,
+                closingBytes.length);
 
         HttpClient client = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofMillis(TIMEOUT_MS))

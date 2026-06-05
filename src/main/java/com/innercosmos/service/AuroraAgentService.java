@@ -9,5 +9,7 @@ public interface AuroraAgentService {
 
     AuroraReplyVO replyRich(Long userId, ChatRequest request);
 
-    SseEmitter stream(Long userId, Long sessionId, String message);
+    SseEmitter stream(Long userId, Long sessionId, String message, String mode);
+
+    AuroraReplyVO generateGreeting(Long userId, Long sessionId, String mode);
 }

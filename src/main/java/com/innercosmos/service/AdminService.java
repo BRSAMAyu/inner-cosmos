@@ -1,6 +1,7 @@
 package com.innercosmos.service;
 
 import com.innercosmos.entity.ABTestConfig;
+import com.innercosmos.entity.AdminActionLog;
 import com.innercosmos.entity.EchoCapsule;
 import com.innercosmos.entity.ModelConfig;
 import com.innercosmos.entity.ReportRecord;
@@ -24,11 +25,13 @@ public interface AdminService {
 
     AdminOverviewVO overview();
 
-    void hideCapsule(Long id);
+    void hideCapsule(Long adminUserId, Long id, String reason);
 
-    void restoreCapsule(Long id);
+    void restoreCapsule(Long adminUserId, Long id, String reason);
 
-    void resolveReport(Long id, String action);
+    void resolveReport(Long adminUserId, Long id, String action, String reason);
+
+    List<AdminActionLog> auditLogs();
 
     List<SafetyEvent> safetyEvents();
 
@@ -52,4 +55,3 @@ public interface AdminService {
 
     ABTestService.ABTestReport completeABTest(Long configId);
 }
-

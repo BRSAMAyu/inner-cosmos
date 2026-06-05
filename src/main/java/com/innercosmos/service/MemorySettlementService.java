@@ -8,4 +8,6 @@ public interface MemorySettlementService {
     DailyRecordVO generateDailyRecord(Long userId, Long sessionId);
 
     void updateThemeAggregation(Long userId);
+
+    void settleDiary(Long userId, String diaryText);
 }

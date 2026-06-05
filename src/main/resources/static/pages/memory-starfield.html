@@ -3,205 +3,159 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>记忆星图 - Inner Cosmos</title>
   <link rel="stylesheet" href="/css/app.css">
+  <style>
+    .map-shell { position:relative; min-height:620px; overflow:hidden; touch-action:none; }
+    .map-canvas { position:absolute; inset:0; transform-origin:0 0; }
+    .map-hint { position:absolute; left:16px; bottom:16px; z-index:4; background:rgba(255,250,243,.82); border:1px solid var(--line); border-radius:12px; padding:8px 10px; font-size:.82rem; color:var(--muted); }
+    .star-label { pointer-events:none; transform:translate(-50%, 18px); max-width:120px; text-align:center; }
+    .star.selected { outline:2px solid rgba(191,150,152,.8); outline-offset:5px; }
+    .star-connections { pointer-events:none; opacity:.42; }
+  </style>
 </head>
 <body>
 <main class="shell">
   <div class="topbar" data-topbar></div>
-
   <section class="flex-between mb-2" style="flex-wrap:wrap;gap:12px">
     <div>
-      <span class="route-hint">柔和内在星图</span>
+      <span class="route-hint">可拖拽的内在星图</span>
       <h1>记忆星图</h1>
-      <p class="muted">星体大小来自情感重力，亮度来自最近触发。你可以先看见它，不必立刻处理它。</p>
+      <p class="muted">星体大小来自情感重力，连线来自主题关系。拖动画面、滚轮缩放，点击星体查看真实依据。</p>
     </div>
     <div class="row gap-sm">
       <select id="filter" onchange="render()">
-        <option value="">全部主题</option>
+        <option value="">全部类型</option>
         <option value="EMOTION">情绪</option>
         <option value="RELATION">关系</option>
         <option value="TODO">行动</option>
         <option value="COGNITION">认知</option>
         <option value="THEME">主题</option>
       </select>
-      <select id="sortFilter" onchange="render()">
-        <option value="gravity">按重力排序</option>
-        <option value="freshness">按新鲜度排序</option>
-      </select>
+      <button onclick="resetView()">归位</button>
     </div>
   </section>
-
-  <!-- Theme filter chips -->
   <div id="themeChips" class="pill-row mb-2"></div>
-
-  <!-- Star field -->
-  <section id="field" class="panel starfield" style="min-height:520px;position:relative">
-    <svg id="connections" class="star-connections" style="position:absolute;inset:0;width:100%;height:100%"></svg>
-  </section>
-
-  <!-- Detail drawer -->
-  <div id="drawer" class="drawer-right hidden">
-    <div class="flex-between mb-2">
-      <h3 id="drawerTitle">记忆详情</h3>
-      <button onclick="closeDrawer()">关闭</button>
+  <section id="field" class="panel starfield map-shell">
+    <div id="canvas" class="map-canvas">
+      <svg id="connections" class="star-connections" style="position:absolute;inset:0;width:1600px;height:1000px"></svg>
     </div>
+    <div class="map-hint">拖拽移动 · 滚轮缩放 · 点击星体查看依据</div>
+  </section>
+  <div id="drawer" class="drawer-right hidden">
+    <div class="flex-between mb-2"><h3 id="drawerTitle">记忆详情</h3><button onclick="closeDrawer()">关闭</button></div>
     <div id="drawerContent"></div>
   </div>
 </main>
-
 <script src="/js/app.js"></script>
-<script src="/js/time-system.js"></script>
 <script src="/js/motion.js"></script>
-<script src="/js/weather-system.js"></script>
-<script src="/js/audio-system.js"></script>
 <script src="/js/api.js"></script>
 <script>
 IC.mountShell("记忆星图");
-
-let stars = [];
-let selectedStar = null;
-let activeTheme = "";
-
 IC.ensureDemoLogin().then(load);
+let stars = [], activeTheme = "", selectedId = null;
+let view = { x: 0, y: 0, scale: 1 }, drag = null;
+const esc = IC.esc;
 
 async function load() {
   const r = await API.memoryStarfield();
-  stars = r.data || [];
+  stars = r.success ? r.data || [] : [];
   buildThemeChips();
+  bindMap();
   render();
 }
 
 function buildThemeChips() {
   const themes = [...new Set(stars.map(s => s.theme || s.memoryType).filter(Boolean))];
-  const container = document.getElementById("themeChips");
-  container.innerHTML = `<span class="pill" style="cursor:pointer;${!activeTheme ? 'background:rgba(143,163,148,.32)' : ''}" onclick="activeTheme='';render()">全部</span>` +
-    themes.map(t => `<span class="pill" style="cursor:pointer;${activeTheme === t ? 'background:rgba(143,163,148,.32)' : ''}" onclick="activeTheme='${IC.esc(t)}';render()">${IC.esc(t)}</span>`).join("");
+  document.getElementById("themeChips").innerHTML = `<span class="pill" onclick="activeTheme='';render()">全部</span>` +
+    themes.map(t => `<span class="pill" onclick="activeTheme='${esc(t)}';render()">${esc(t)}</span>`).join("");
 }
 
-function esc(text) { return IC.esc(text); }
+function bindMap() {
+  const field = document.getElementById("field");
+  field.onpointerdown = e => { if (e.target.classList.contains("star")) return; drag = { x: e.clientX, y: e.clientY, ox: view.x, oy: view.y }; field.setPointerCapture(e.pointerId); };
+  field.onpointermove = e => { if (!drag) return; view.x = drag.ox + e.clientX - drag.x; view.y = drag.oy + e.clientY - drag.y; applyView(); };
+  field.onpointerup = () => drag = null;
+  field.onwheel = e => {
+    e.preventDefault();
+    const next = Math.max(.55, Math.min(1.8, view.scale + (e.deltaY > 0 ? -.08 : .08)));
+    view.scale = next;
+    applyView();
+  };
+}
+
+function resetView() { view = { x: 0, y: 0, scale: 1 }; applyView(); }
+function applyView() { document.getElementById("canvas").style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.scale})`; }
 
 function render() {
-  let data = stars;
-
-  /* Filter by type */
-  if (document.getElementById("filter").value) {
-    data = data.filter(s => s.memoryType === document.getElementById("filter").value);
-  }
-  /* Filter by theme */
-  if (activeTheme) {
-    data = data.filter(s => (s.theme || s.memoryType) === activeTheme);
-  }
-  /* Sort */
-  const sortKey = document.getElementById("sortFilter").value;
-  data = [...data].sort((a, b) => (b[sortKey] || 0) - (a[sortKey] || 0));
-
-  const field = document.getElementById("field");
+  const canvas = document.getElementById("canvas");
   const svg = document.getElementById("connections");
-  field.innerHTML = "";
-  field.appendChild(svg);
+  canvas.querySelectorAll(".star,.star-label").forEach(n => n.remove());
   svg.innerHTML = "";
-
-  if (!data.length) {
-    field.insertAdjacentHTML("beforeend", IC.empty("结束一次 Aurora 对话后，这里会出现记忆星体。"));
-    return;
-  }
-
-  /* Place stars */
-  function pseudoRandom(seed) {
-    let x = Math.sin(seed * 12.9898) * 43758.5453;
-    return x - Math.floor(x);
-  }
-  data.forEach((s, i) => {
-    const x = Math.max(6, Math.min(88, 10 + (i % 8) * 11 + pseudoRandom(s.id || i) * 6));
-    const y = Math.max(8, Math.min(86, 10 + Math.floor(i / 8) * 18 + pseudoRandom((s.id || i) + 1000) * 8));
-    const size = Math.max(24, Math.min(96, 22 + s.gravity * 15));
-    const starEl = document.createElement("button");
-    starEl.className = "star";
-    starEl.onclick = () => showDetail(s.id);
-    starEl.title = s.title;
-    starEl.style.cssText = `--size:${size}px;--x:${x}%;--y:${y}%;--star-color:${s.color || "#9caf9f"};--star-glow:${s.glow || .7};`;
-    field.appendChild(starEl);
-
+  let data = stars;
+  const filter = document.getElementById("filter").value;
+  if (filter) data = data.filter(s => s.memoryType === filter);
+  if (activeTheme) data = data.filter(s => (s.theme || s.memoryType) === activeTheme);
+  if (!data.length) { canvas.insertAdjacentHTML("beforeend", IC.empty("完成一次 Aurora 对话或心声日记后，这里会出现记忆星体。")); return; }
+  const placed = data.map((s, i) => {
+    const angle = i * 2.399;
+    const radius = 90 + Math.sqrt(i + 1) * 72;
+    return { s, x: 800 + Math.cos(angle) * radius, y: 500 + Math.sin(angle) * radius };
+  });
+  drawConnections(placed);
+  placed.forEach(({s,x,y}) => {
+    const size = Math.max(26, Math.min(96, 24 + (s.gravity || 0.4) * 48));
+    const star = document.createElement("button");
+    star.className = "star" + (s.id === selectedId ? " selected" : "");
+    star.title = s.title || s.theme || "记忆";
+    star.style.cssText = `--size:${size}px;left:${x}px;top:${y}px;--star-color:${s.color || "#9caf9f"};--star-glow:${s.glow || .72};`;
+    star.onclick = () => showDetail(s.id);
+    canvas.appendChild(star);
     const label = document.createElement("span");
     label.className = "star-label";
-    label.style.cssText = `left:${x}%;top:${y}%;color:${s.color || "var(--muted)"}`;
-    label.textContent = s.theme || s.memoryType;
-    field.appendChild(label);
+    label.style.cssText = `left:${x}px;top:${y}px;color:${s.color || "var(--muted)"}`;
+    label.textContent = s.theme || s.memoryType || "";
+    canvas.appendChild(label);
   });
+  applyView();
+}
 
-  /* Draw connection lines between same-theme stars */
-  const themeGroups = {};
-  data.forEach((s, i) => {
-    const t = s.theme || s.memoryType;
-    if (!themeGroups[t]) themeGroups[t] = [];
-    themeGroups[t].push(s);
-  });
-  /* (simplified SVG lines - would need actual positions for real connections) */
-
-  IC.stagger(field);
+function drawConnections(placed) {
+  const svg = document.getElementById("connections");
+  for (let i = 0; i < placed.length; i++) {
+    for (let j = i + 1; j < placed.length; j++) {
+      const a = placed[i], b = placed[j];
+      if ((a.s.theme || a.s.memoryType) !== (b.s.theme || b.s.memoryType)) continue;
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      line.setAttribute("x1", a.x); line.setAttribute("y1", a.y);
+      line.setAttribute("x2", b.x); line.setAttribute("y2", b.y);
+      line.setAttribute("stroke", a.s.color || "#9caf9f");
+      line.setAttribute("stroke-width", "1");
+      svg.appendChild(line);
+    }
+  }
 }
 
 async function showDetail(id) {
-  selectedStar = stars.find(x => x.id === id);
-  if (!selectedStar) return;
-
-  /* Try to get rich detail */
-  let detail = selectedStar;
-  try {
-    const r = await API.memoryStarfieldDetail(id);
-    if (r.success && r.data) detail = { ...selectedStar, ...r.data };
-  } catch(e) {}
-
-  const drawer = document.getElementById("drawer");
-  drawer.classList.remove("hidden");
-
-  const s = detail;
-  document.getElementById("drawerTitle").textContent = s.title || "记忆星体";
+  selectedId = id;
+  let detail = stars.find(x => x.id === id) || {};
+  try { const r = await API.memoryStarfieldDetail(id); if (r.success && r.data) detail = { ...detail, ...r.data }; } catch(e) {}
+  document.getElementById("drawer").classList.remove("hidden");
+  document.getElementById("drawerTitle").textContent = detail.title || "记忆星体";
   document.getElementById("drawerContent").innerHTML = `
-    <div class="mb-2"><span class="route-hint">${esc(s.theme || s.memoryType)}</span></div>
-    <p class="muted mb-2">${esc(s.summary || "")}</p>
-    <div class="soft-stage mb-2">
-      <p class="gold">${esc(s.detail || "这是一颗仍在成形的记忆星体。")}</p>
-    </div>
-    <h3>为什么这颗星在发光</h3>
-    <div class="pill-row mb-2">
-      <span class="pill">情感重力 ${Number(s.gravity || 0).toFixed(2)}</span>
-      <span class="pill">新鲜度 ${Math.round((s.freshness || 0) * 100)}%</span>
-      <span class="pill">${s.suggestedForCapsule ? "适合脱敏预览" : "建议先私人保存"}</span>
-    </div>
-    <div class="soft-stage mb-2">
-      <p class="muted">${esc(s.gravityExplanation || "这颗星由情绪强度、重要性、和出现次数共同决定。")}</p>
-    </div>
-    <div class="field-group mb-2">
-      <label>调整重要性</label>
-      <input type="range" min="0" max="1" step="0.1" value="${s.gravity || 0.5}" onchange="adjustImportance(${s.id}, this.value)" style="background:transparent;border:none;padding:0">
-    </div>
-    ${s.fragments ? `<h3>认知碎片</h3><div class="timeline mb-2">${(s.fragments||[]).map(f => `<div class="timeline-item"><p>${esc(f)}</p></div>`).join("")}</div>` : ""}
-    ${s.relatedTodos ? `<h3>相关待办</h3><div class="timeline mb-2">${(s.relatedTodos||[]).map(t => `<div class="timeline-item"><strong>${esc(t.taskName || t)}</strong></div>`).join("")}</div>` : ""}
-    <div class="row gap-sm mt-2">
-      <a class="button" href="/pages/capsule-create.html?memoryId=${s.id}">编织共鸣体</a>
-      <button onclick="archiveCard(${s.id})">归档</button>
-    </div>
+    <span class="route-hint">${esc(detail.theme || detail.memoryType || "")}</span>
+    <p class="muted mt-1">${esc(detail.summary || "")}</p>
+    <div class="pill-row mt-2"><span class="pill">情感重力 ${Number(detail.gravity || 0).toFixed(2)}</span><span class="pill">新鲜度 ${Math.round((detail.freshness || 0) * 100)}%</span></div>
+    <div class="soft-stage mt-2"><p class="muted">${esc(detail.gravityExplanation || "这颗星由情绪强度、重要性、出现次数和最近触发共同决定。")}</p></div>
+    ${(detail.fragments || []).length ? `<h3>认知碎片</h3><div class="timeline">${detail.fragments.map(f => `<div class="timeline-item"><p>${esc(f)}</p></div>`).join("")}</div>` : ""}
+    ${(detail.relatedTodos || []).length ? `<h3>相关待办</h3><div class="timeline">${detail.relatedTodos.map(t => `<div class="timeline-item"><strong>${esc(t.taskName || t)}</strong></div>`).join("")}</div>` : ""}
+    <div class="row gap-sm mt-2"><a class="button" href="/pages/capsule-create.html?memoryId=${detail.id}">编织共鸣体</a><button onclick="archiveCard(${detail.id})">归档</button></div>
   `;
-  IC.pulse("open");
+  render();
 }
 
-function closeDrawer() {
-  document.getElementById("drawer").classList.add("hidden");
-  selectedStar = null;
-}
-
-async function adjustImportance(id, value) {
-  await API.updateMemoryImportance(id, parseFloat(value));
-  IC.toast("重要性已更新", "success");
-}
-
-async function archiveCard(id) {
-  await API.archiveMemoryCard(id);
-  IC.toast("记忆已归档", "success");
-  closeDrawer();
-  load();
-}
+function closeDrawer() { document.getElementById("drawer").classList.add("hidden"); selectedId = null; render(); }
+async function archiveCard(id) { await API.archiveMemoryCard(id); IC.toast("记忆已归档", "success"); closeDrawer(); load(); }
 </script>
 </body>
 </html>

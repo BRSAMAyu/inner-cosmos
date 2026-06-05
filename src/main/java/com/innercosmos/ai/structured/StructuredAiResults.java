@@ -9,11 +9,16 @@ public final class StructuredAiResults {
 
     public static class AuroraResult {
         public List<String> segments = new ArrayList<>();
+        public Integer speakCount;
+        public String continueReason;
         public String detectedTheme;
         public String nextQuestion;
         public String smallStep;
+        public String featureSuggestion;
+        public String featureTarget;
         public Boolean memoryReferenced;
         public List<Long> referencedMemoryIds = new ArrayList<>();
+        public List<String> riskFlags = new ArrayList<>();
     }
 
     public static class ShredderResult {

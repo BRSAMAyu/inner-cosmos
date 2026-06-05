@@ -7,6 +7,10 @@ public class AiHealthVO {
     public Boolean apiKeyConfigured;
     public Boolean fallbackAllowed;
     public Boolean mockProvider;
+    public String asrProvider;
+    public String asrModel;
+    public Boolean asrKeyConfigured;
+    public Boolean asrMockProvider;
     public Boolean lastSuccess;
     public Boolean lastFallbackUsed;
     public String lastModule;
