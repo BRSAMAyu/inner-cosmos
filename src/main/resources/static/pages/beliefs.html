@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="/css/app.css">
+  <title>信念画廊 · Inner Cosmos</title>
+  <style>
+    .belief-card {
+      padding: 18px;
+      border-radius: var(--radius-flow);
+      background: rgba(255,250,243,.55);
+      border: 1px solid var(--line);
+      margin-bottom: 14px;
+      position: relative;
+    }
+    .belief-card.strong { background: rgba(229,235,228,.6); border-color: var(--line-strong); }
+    .belief-card.contradiction { border-left: 4px solid rgba(200,147,145,.7); background: rgba(241,230,227,.6); }
+    .belief-text { font-size: 1.05rem; color: var(--ink); line-height: 1.6; margin: 8px 0 10px; }
+    .belief-meta { display: flex; flex-wrap: wrap; gap: 8px; font-size: .78rem; }
+    .belief-strength {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 2px 8px; border-radius: 999px;
+      background: rgba(143,163,148,.22); color: var(--accent-sage);
+    }
+    .belief-strength.low { background: rgba(184,194,168,.22); color: rgba(120,140,108,.85); }
+    .belief-strength.high { background: rgba(200,147,145,.22); color: rgba(180,90,90,.85); }
+    .belief-category { padding: 2px 8px; border-radius: 999px; background: rgba(151,169,186,.18); color: rgba(90,110,135,.85); }
+    .contradiction-pair { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: center; padding: 16px; border-radius: var(--radius); background: rgba(241,230,227,.5); border: 1px solid rgba(200,147,145,.3); margin-bottom: 12px; }
+    .contradiction-pair .vs { font-weight: 700; color: rgba(180,90,90,.7); }
+  </style>
+</head>
+<body>
+<main class="shell">
+  <div class="topbar" data-topbar></div>
+  <span class="route-hint">你的潜在信念</span>
+  <h1>信念画廊</h1>
+  <p class="muted mb-2">系统从你的记忆里识别出反复出现的潜在信念 —— 那些你以为只是"想法"，但其实在悄悄影响你决策的模式。互相矛盾的信念会用红色高亮。</p>
+
+  <section class="panel mb-2" id="contradictionsPanel" style="display:none">
+    <h2>🔍 矛盾信念</h2>
+    <p class="muted" style="font-size:.88rem">以下信念在你的表达中同时出现 —— 它们在拉扯你。</p>
+    <div id="contradictionsList"></div>
+  </section>
+
+  <div class="row gap-sm mb-2">
+    <button onclick="load('all')" class="active" id="f-all">全部</button>
+    <button onclick="load('strong')" id="f-strong">强信念（强度 &gt; 0.5）</button>
+    <button onclick="load('byCategory')" id="f-byCategory">按类别</button>
+  </div>
+
+  <section id="beliefList"></section>
+</main>
+
+<script src="/js/app.js"></script>
+<script src="/js/time-system.js"></script>
+<script src="/js/motion.js"></script>
+<script src="/js/weather-system.js"></script>
+<script src="/js/api.js"></script>
+<script>
+IC.mountShell("信念画廊");
+IC.ensureDemoLogin().then(() => load('all'));
+
+let currentFilter = 'all';
+
+function esc(t) { return IC.esc(t); }
+
+async function load(filter) {
+  currentFilter = filter;
+  document.querySelectorAll(".row button").forEach(b => b.classList.remove("active"));
+  document.getElementById("f-" + filter).classList.add("active");
+
+  // Always load contradictions for the top panel
+  const contraRes = await API.beliefContradictions();
+  const contradictions = (contraRes.success ? contraRes.data : []) || [];
+  if (contradictions.length) {
+    document.getElementById("contradictionsPanel").style.display = "block";
+    document.getElementById("contradictionsList").innerHTML = contradictions.map(p => `
+      <div class="contradiction-pair">
+        <div class="belief-card contradiction" style="margin:0">
+          <div class="belief-text">"${esc(p.beliefA?.beliefText || '')}"</div>
+          <div class="belief-meta"><span class="belief-strength">强度 ${(p.beliefA?.strengthScore || 0).toFixed(2)}</span></div>
+        </div>
+        <div class="vs">⚡ vs ⚡</div>
+        <div class="belief-card contradiction" style="margin:0">
+          <div class="belief-text">"${esc(p.beliefB?.beliefText || '')}"</div>
+          <div class="belief-meta"><span class="belief-strength">强度 ${(p.beliefB?.strengthScore || 0).toFixed(2)}</span></div>
+        </div>
+        <div style="grid-column:1 / -1;font-size:.82rem;color:var(--muted);text-align:center">${esc(p.contradictionReason || "这两个信念在拉扯你")}</div>
+      </div>
+    `).join("");
+  } else {
+    document.getElementById("contradictionsPanel").style.display = "none";
+  }
+
+  // Load beliefs based on filter
+  let res;
+  if (filter === 'strong') {
+    res = await API.beliefStrong(0.5);
+  } else {
+    res = await API.beliefList();
+  }
+  const beliefs = (res.success ? res.data : []) || [];
+  renderList(beliefs, filter);
+}
+
+function renderList(beliefs, filter) {
+  const list = document.getElementById("beliefList");
+  if (!beliefs.length) {
+    list.innerHTML = IC.empty("还没有识别出明显的信念模式。聊更多几次，Aurora 会逐渐看到你的底层想法。");
+    return;
+  }
+  list.innerHTML = beliefs.map(b => {
+    const s = b.strengthScore || 0;
+    const cls = s > 0.7 ? "strong" : (s > 0.5 ? "" : "low");
+    const strengthCls = s > 0.6 ? "high" : (s > 0.3 ? "" : "low");
+    return `
+      <article class="belief-card ${cls}">
+        <div class="belief-text">"${esc(b.beliefText || b.text || '（未命名信念）')}"</div>
+        <div class="belief-meta">
+          <span class="belief-strength ${strengthCls}">强度 ${s.toFixed(2)}</span>
+          ${b.category ? `<span class="belief-category">${esc(b.category)}</span>` : ""}
+          ${b.occurrenceCount ? `<span class="muted">出现 ${b.occurrenceCount} 次</span>` : ""}
+        </div>
+        ${b.evidenceExcerpt ? `<p class="muted mt-1" style="font-size:.84rem">支撑记忆：${esc(b.evidenceExcerpt)}</p>` : ""}
+      </article>
+    `;
+  }).join("");
+  IC.stagger(list);
+}
+</script>
+</body>
+</html>

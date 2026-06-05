@@ -128,6 +128,13 @@ public class UserServiceImpl implements UserService {
         if (profile.allowMemoryRecall != null) existing.allowMemoryRecall = profile.allowMemoryRecall;
         if (profile.quietHoursStart != null) existing.quietHoursStart = profile.quietHoursStart;
         if (profile.quietHoursEnd != null) existing.quietHoursEnd = profile.quietHoursEnd;
+        if (profile.proactiveSensitivity != null) existing.proactiveSensitivity = Math.max(1, Math.min(5, profile.proactiveSensitivity));
+        if (profile.allowMultiMessage != null) existing.allowMultiMessage = profile.allowMultiMessage;
+        if (profile.focusModeEnabled != null) existing.focusModeEnabled = profile.focusModeEnabled;
+        if (profile.focusWindowsJson != null) existing.focusWindowsJson = profile.focusWindowsJson;
+        if (profile.currentEnvironmentLabel != null) existing.currentEnvironmentLabel = profile.currentEnvironmentLabel;
+        if (profile.weatherAwarenessEnabled != null) existing.weatherAwarenessEnabled = profile.weatherAwarenessEnabled;
+        if (profile.timeAwarenessEnabled != null) existing.timeAwarenessEnabled = profile.timeAwarenessEnabled;
 
         if (existing.id == null) {
             userProfileMapper.insert(existing);

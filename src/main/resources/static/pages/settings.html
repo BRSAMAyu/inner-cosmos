@@ -318,6 +318,26 @@
         <span class="toggle-slider"></span>
       </div>
     </div>
+
+    <div class="toggle-row">
+      <div>
+        <label>允许多条消息</label>
+        <p class="hint">Aurora 可以像朋友一样在必要时连续补充 2-3 条短消息</p>
+      </div>
+      <div class="toggle-switch">
+        <input id="allowMultiMessage" type="checkbox" checked>
+        <span class="toggle-slider"></span>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>主动关心频率</label>
+      <div class="slider-field">
+        <input id="proactiveSensitivity" type="range" min="1" max="5" value="3" oninput="document.getElementById('proactiveLabel').textContent=this.value">
+        <span id="proactiveLabel" class="slider-value">3</span>
+      </div>
+      <p class="hint">1 表示尽量不打扰，5 表示更主动地来找你。</p>
+    </div>
   </section>
 
   <!-- Social reachability -->
@@ -347,6 +367,60 @@
         <label for="quietHoursEnd">结束时间</label>
         <input id="quietHoursEnd" type="time" value="07:00">
       </div>
+    </div>
+  </section>
+
+  <section class="settings-section">
+    <h2>时间、天气与专注</h2>
+    <div class="field">
+      <label for="currentEnvironmentLabel">当前环境标签</label>
+      <input id="currentEnvironmentLabel" type="text" placeholder="例如：期末备考、课程项目收尾、关系复盘期">
+      <p class="hint">Aurora 会把它当成当前背景，而不是每次都从零猜。</p>
+    </div>
+
+    <div class="toggle-row">
+      <div>
+        <label>时间感知</label>
+        <p class="hint">允许 Aurora 感知早晨、夜晚、睡前等时间语境。</p>
+      </div>
+      <div class="toggle-switch">
+        <input id="timeAwarenessEnabled" type="checkbox" checked>
+        <span class="toggle-slider"></span>
+      </div>
+    </div>
+
+    <div class="toggle-row">
+      <div>
+        <label>天气/情绪天气感知</label>
+        <p class="hint">允许 Aurora 使用情绪天气和当前天气氛围调整表达。</p>
+      </div>
+      <div class="toggle-switch">
+        <input id="weatherAwarenessEnabled" type="checkbox" checked>
+        <span class="toggle-slider"></span>
+      </div>
+    </div>
+
+    <div class="toggle-row">
+      <div>
+        <label>专注模式</label>
+        <p class="hint">在学习/项目时段，Aurora 会优先帮你回到行动。</p>
+      </div>
+      <div class="toggle-switch">
+        <input id="focusModeEnabled" type="checkbox">
+        <span class="toggle-slider"></span>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="focusWindowsJson">专注时段</label>
+      <input id="focusWindowsJson" type="text" placeholder='例如 ["09:00-11:30","14:00-17:30"]'>
+    </div>
+  </section>
+
+  <section class="settings-section">
+    <h2>Aurora 现在看见什么</h2>
+    <div id="auroraVisibleContext" class="soft-stage">
+      <p class="muted">保存设置或完成一次对话后，这里会显示 Aurora 当前可见的记忆、待办与环境线索。</p>
     </div>
   </section>
 
@@ -419,9 +493,21 @@ async function loadProfile() {
   if (p.allowMemoryRecall !== null && p.allowMemoryRecall !== undefined) {
     document.getElementById("allowMemoryRecall").checked = p.allowMemoryRecall;
   }
+  if (p.allowMultiMessage !== null && p.allowMultiMessage !== undefined) document.getElementById("allowMultiMessage").checked = p.allowMultiMessage;
+  if (p.proactiveSensitivity) {
+    document.getElementById("proactiveSensitivity").value = p.proactiveSensitivity;
+    document.getElementById("proactiveLabel").textContent = p.proactiveSensitivity;
+  }
   if (p.socialReachabilityStatus) document.getElementById("socialReachabilityStatus").value = p.socialReachabilityStatus;
   if (p.quietHoursStart) document.getElementById("quietHoursStart").value = p.quietHoursStart;
   if (p.quietHoursEnd) document.getElementById("quietHoursEnd").value = p.quietHoursEnd;
+  if (p.currentEnvironmentLabel) document.getElementById("currentEnvironmentLabel").value = p.currentEnvironmentLabel;
+  if (p.timeAwarenessEnabled !== null && p.timeAwarenessEnabled !== undefined) document.getElementById("timeAwarenessEnabled").checked = p.timeAwarenessEnabled;
+  if (p.weatherAwarenessEnabled !== null && p.weatherAwarenessEnabled !== undefined) document.getElementById("weatherAwarenessEnabled").checked = p.weatherAwarenessEnabled;
+  if (p.focusModeEnabled !== null && p.focusModeEnabled !== undefined) document.getElementById("focusModeEnabled").checked = p.focusModeEnabled;
+  if (p.focusWindowsJson) document.getElementById("focusWindowsJson").value = p.focusWindowsJson;
+
+  loadVisibleContext();
 
   IC.stagger(document);
 }
@@ -436,9 +522,16 @@ async function saveProfile() {
     auroraTone: document.getElementById("auroraTone").value || null,
     reflectionDepth: parseInt(document.getElementById("reflectionDepth").value),
     allowMemoryRecall: document.getElementById("allowMemoryRecall").checked,
+    allowMultiMessage: document.getElementById("allowMultiMessage").checked,
+    proactiveSensitivity: parseInt(document.getElementById("proactiveSensitivity").value),
     socialReachabilityStatus: document.getElementById("socialReachabilityStatus").value,
     quietHoursStart: document.getElementById("quietHoursStart").value || null,
-    quietHoursEnd: document.getElementById("quietHoursEnd").value || null
+    quietHoursEnd: document.getElementById("quietHoursEnd").value || null,
+    currentEnvironmentLabel: document.getElementById("currentEnvironmentLabel").value.trim() || null,
+    timeAwarenessEnabled: document.getElementById("timeAwarenessEnabled").checked,
+    weatherAwarenessEnabled: document.getElementById("weatherAwarenessEnabled").checked,
+    focusModeEnabled: document.getElementById("focusModeEnabled").checked,
+    focusWindowsJson: document.getElementById("focusWindowsJson").value.trim() || null
   };
 
   const r = await IC.api("/api/user/profile", {
@@ -452,7 +545,23 @@ async function saveProfile() {
   if (r.success) {
     IC.toast("设置已保存");
     IC.pulse("soft");
+    loadVisibleContext();
   }
+}
+
+async function loadVisibleContext() {
+  const r = await API.understandingOverview(7);
+  if (!r.success || !r.data) return;
+  const d = r.data;
+  document.getElementById("auroraVisibleContext").innerHTML = `
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
+      <div><span class="muted">近 7 天记忆</span><br><strong>${(d.newMemories || []).length}</strong></div>
+      <div><span class="muted">活跃待办</span><br><strong>${d.todoStats?.active || 0}</strong></div>
+      <div><span class="muted">关系线索</span><br><strong>${(d.relationSignals || []).length}</strong></div>
+      <div><span class="muted">被记住字数</span><br><strong>${d.systemLearning?.rememberedChars || 0}</strong></div>
+    </div>
+    <p class="muted mt-1">${IC.esc(d.systemLearning?.auroraObservation || "Aurora 正在形成观察。")}</p>
+  `;
 }
 
 async function exportData() {

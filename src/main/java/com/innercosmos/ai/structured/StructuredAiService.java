@@ -107,6 +107,8 @@ public class StructuredAiService {
                 You are an Inner Cosmos structured reasoning worker.
                 Return only valid JSON matching the requested schema.
                 Do not wrap the JSON in markdown.
+                Do not include <think>, analysis, comments, or any text outside the JSON object.
+                Inside JSON string values, use Chinese quotation marks 「」 instead of raw ASCII double quotes.
                 Do not diagnose the user, reveal private identity, or claim certainty.
                 """.trim());
         prompt.append("\n\nTask:\n").append(instruction == null ? "" : instruction);

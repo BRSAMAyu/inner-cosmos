@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="/css/app.css">
+  <title>主题云 · Inner Cosmos</title>
+  <style>
+    .theme-cloud { position: relative; min-height: 380px; padding: 24px 8px; }
+    .theme-pill {
+      display: inline-block;
+      padding: 12px 22px;
+      margin: 8px;
+      border-radius: 28px;
+      background: rgba(143, 163, 148, 0.16);
+      border: 1px solid var(--line-strong);
+      color: var(--ink);
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: transform .35s var(--ease-bloom, ease), background .3s, box-shadow .3s;
+    }
+    .theme-pill:hover { transform: translateY(-2px) scale(1.04); box-shadow: 0 12px 28px rgba(143,163,148,.22); }
+    .theme-pill.size-1 { font-size: 0.82rem; padding: 8px 14px; }
+    .theme-pill.size-2 { font-size: 0.95rem; padding: 10px 18px; }
+    .theme-pill.size-3 { font-size: 1.1rem; padding: 12px 22px; }
+    .theme-pill.size-4 { font-size: 1.32rem; padding: 16px 28px; font-weight: 600; }
+    .theme-pill.size-5 { font-size: 1.6rem; padding: 20px 34px; font-weight: 700; background: rgba(191,150,152,.22); }
+    .theme-detail-card { margin-top: 18px; }
+  </style>
+</head>
+<body>
+<main class="shell">
+  <div class="topbar" data-topbar></div>
+  <span class="route-hint">你的内在主题</span>
+  <h1>主题云</h1>
+  <p class="muted mb-2">系统从你的记忆中聚类出反复出现的主题。点击任意一个，查看它背后的故事。</p>
+
+  <section class="theme-cloud panel" id="cloud"></section>
+  <section id="detail" class="theme-detail-card"></section>
+</main>
+
+<script src="/js/app.js"></script>
+<script src="/js/time-system.js"></script>
+<script src="/js/motion.js"></script>
+<script src="/js/weather-system.js"></script>
+<script src="/js/api.js"></script>
+<script>
+IC.mountShell("主题云");
+IC.ensureDemoLogin().then(load);
+
+let allThemes = [];
+let allMemories = [];
+let activeTheme = null;
+
+function esc(t) { return IC.esc(t); }
+
+async function load() {
+  const [tRes, mRes] = await Promise.all([
+    API.memoryThemes(),
+    API.memoryCards()
+  ]);
+  allThemes = (tRes.success ? tRes.data : []) || [];
+  allMemories = (mRes.success ? mRes.data : []) || [];
+  renderCloud();
+}
+
+function renderCloud() {
+  const cloud = document.getElementById("cloud");
+  if (!allThemes.length) {
+    cloud.innerHTML = IC.empty("还没有聚类出主题。先和 Aurora 聊聊几次，让主题浮现。");
+    return;
+  }
+  const max = Math.max(...allThemes.map(t => t.memoryCount || t.cardCount || 1), 1);
+  cloud.innerHTML = allThemes.map(t => {
+    const count = t.memoryCount || t.cardCount || 1;
+    const size = Math.min(5, Math.max(1, Math.round(count / max * 5)));
+    return `<button class="theme-pill size-${size}" onclick="selectTheme('${esc(t.themeName || t.name || "主题")}', ${t.id || 0})">${esc(t.themeName || t.name || "主题")} <span class="muted" style="font-size:0.7em;margin-left:6px">${count}</span></button>`;
+  }).join("");
+  IC.stagger(cloud);
+}
+
+function selectTheme(name, id) {
+  activeTheme = name;
+  const detail = document.getElementById("detail");
+  const matched = allMemories.filter(m => (m.title || "").includes(name) || (m.summary || "").includes(name));
+  if (!matched.length) {
+    detail.innerHTML = `<div class="panel"><h2>${esc(name)}</h2><p class="muted">这个主题下的记忆还没具体条目，但 Aurora 会在未来对话中持续沉淀。</p></div>`;
+    return;
+  }
+  detail.innerHTML = `
+    <div class="panel">
+      <h2>${esc(name)}</h2>
+      <p class="muted mb-1">这个主题目前关联 ${matched.length} 条记忆。</p>
+      <div class="timeline">
+        ${matched.slice(0, 8).map(m => `
+          <article class="timeline-item">
+            <strong>${esc(m.title || "未命名记忆")}</strong>
+            <p class="muted">${esc((m.summary || "").slice(0, 200))}</p>
+            <a class="route-hint" href="/pages/memory-starfield.html?focus=${m.id}">查看星图</a>
+          </article>
+        `).join("")}
+      </div>
+    </div>
+  `;
+  IC.stagger(detail);
+}
+</script>
+</body>
+</html>

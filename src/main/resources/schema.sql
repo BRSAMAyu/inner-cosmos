@@ -24,6 +24,13 @@ CREATE TABLE IF NOT EXISTS tb_user_profile (
   allow_memory_recall BOOLEAN DEFAULT TRUE,
   quiet_hours_start VARCHAR(8),
   quiet_hours_end VARCHAR(8),
+  proactive_sensitivity INT DEFAULT 3,
+  allow_multi_message BOOLEAN DEFAULT TRUE,
+  focus_mode_enabled BOOLEAN DEFAULT FALSE,
+  focus_windows_json TEXT,
+  current_environment_label VARCHAR(160),
+  weather_awareness_enabled BOOLEAN DEFAULT TRUE,
+  time_awareness_enabled BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -138,6 +145,11 @@ CREATE TABLE IF NOT EXISTS tb_echo_capsule (
   visibility_status VARCHAR(32),
   is_public BOOLEAN DEFAULT TRUE,
   last_memory_update_at TIMESTAMP NULL,
+  owner_context_note TEXT,
+  style_profile_json TEXT,
+  context_preview_json TEXT,
+  stand_in_enabled BOOLEAN DEFAULT FALSE,
+  real_contact_policy VARCHAR(32),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_capsule_public (is_public, visibility_status)

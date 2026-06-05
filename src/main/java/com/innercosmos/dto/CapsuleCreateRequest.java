@@ -15,4 +15,9 @@ public class CapsuleCreateRequest {
     public String privacyLevel;
     public String visibilityStatus;
     public Boolean isPublic;
+    public String ownerContextNote;
+    public String styleProfileJson;
+    public String contextPreviewJson;
+    public Boolean standInEnabled;
+    public String realContactPolicy;
 }
