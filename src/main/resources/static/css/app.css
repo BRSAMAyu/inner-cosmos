@@ -4439,3 +4439,149 @@ body.dark-star .model-picker {
   background: rgba(40, 34, 30, .55);
   border-color: rgba(200, 192, 187, .16);
 }
+
+/* ── Aurora Self Panel (M6) ── */
+.aurora-self-panel {
+  border: 1px solid rgba(255,255,255,.56);
+  background: linear-gradient(160deg, rgba(255,255,255,.70), rgba(255,250,243,.50)),
+              rgba(255,250,243,.60);
+  border-radius: var(--radius-flow);
+  margin-bottom: 20px;
+  overflow: hidden;
+  backdrop-filter: blur(20px) saturate(108%);
+  -webkit-backdrop-filter: blur(20px) saturate(108%);
+  box-shadow: 0 1px 0 rgba(255,255,255,.75) inset,
+              0 10px 28px rgba(83,73,62,.055);
+}
+.aurora-self-panel .panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 11px 16px;
+  background: linear-gradient(135deg, #7c6a4f, #9a8a6f);
+  color: #faf3ea;
+  cursor: pointer;
+  font-size: .92rem;
+  font-weight: 600;
+  letter-spacing: .02em;
+  user-select: none;
+}
+.aurora-self-panel .panel-header:hover {
+  background: linear-gradient(135deg, #8a7860, #a89a80);
+}
+.aurora-self-panel .panel-title { font-size: .94rem; }
+.aurora-self-panel .panel-content { padding: 0; }
+.aurora-self-panel .self-section {
+  border-bottom: 1px solid rgba(92,82,72,.08);
+}
+.aurora-self-panel .self-section:last-child { border-bottom: none; }
+.aurora-self-panel .section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 9px 16px;
+  background: rgba(229,235,228,.35);
+  cursor: pointer;
+  font-size: .84rem;
+  color: var(--muted, #746e67);
+  user-select: none;
+  gap: 8px;
+}
+.aurora-self-panel .section-header:hover {
+  background: rgba(229,235,228,.55);
+}
+.aurora-self-panel .section-header .toggle-icon {
+  font-size: .7rem;
+  color: var(--faint, #9b938a);
+  flex-shrink: 0;
+}
+.aurora-self-panel .section-body {
+  padding: 10px 16px 12px;
+}
+.aurora-self-panel .badge-count {
+  background: var(--accent-sage, #9caf9a);
+  color: white;
+  border-radius: 999px;
+  padding: 1px 7px;
+  font-size: .7rem;
+  font-weight: 600;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.aurora-self-panel .self-item {
+  padding: 7px 0;
+  border-bottom: 1px solid rgba(92,82,72,.06);
+}
+.aurora-self-panel .self-item:last-child { border-bottom: none; }
+.aurora-self-panel .self-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 3px;
+}
+.aurora-self-panel .self-item-dim {
+  font-weight: 600;
+  color: var(--ink, #34302b);
+  font-size: .83rem;
+}
+.aurora-self-panel .self-item-confidence {
+  font-size: .72rem;
+  color: var(--faint, #9b938a);
+}
+.aurora-self-panel .self-item-belief {
+  font-size: .86rem;
+  color: var(--muted, #746e67);
+  line-height: 1.55;
+}
+.aurora-self-panel .candidate-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+.aurora-self-panel .btn-confirm {
+  background: #6b8e5a;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 3px 11px;
+  font-size: .76rem;
+  cursor: pointer;
+  min-height: 28px;
+  transition: background .18s;
+}
+.aurora-self-panel .btn-confirm:hover { background: #5a7a4a; }
+.aurora-self-panel .btn-reject {
+  background: #b08080;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 3px 11px;
+  font-size: .76rem;
+  cursor: pointer;
+  min-height: 28px;
+  transition: background .18s;
+}
+.aurora-self-panel .btn-reject:hover { background: #a06060; }
+.aurora-self-panel .loading {
+  color: var(--faint, #9b938a);
+  font-size: .8rem;
+  text-align: center;
+  padding: 6px;
+}
+.aurora-self-panel .self-item-trigger {
+  font-size: .72rem;
+  color: var(--faint, #9b938a);
+  margin-left: 6px;
+}
+body.dark-star .aurora-self-panel {
+  background: linear-gradient(160deg, rgba(42,38,34,.68), rgba(30,27,24,.58)),
+              rgba(30,30,54,.72);
+  border-color: rgba(200,192,187,.14);
+  box-shadow: 0 8px 24px rgba(0,0,0,.22);
+}
+body.dark-star .aurora-self-panel .section-header {
+  background: rgba(143,163,148,.12);
+}
+body.dark-star .aurora-self-panel .section-header:hover {
+  background: rgba(143,163,148,.20);
+}
