@@ -1,0 +1,23 @@
+package com.innercosmos.entity;
+
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import java.time.LocalDateTime;
+
+@TableName("tb_aurora_self_reflection")
+public class AuroraSelfReflection extends BaseEntity {
+    @TableId(type = IdType.AUTO)
+    public Long id;
+    public Long userId;
+    public String trigger;
+    public String depth;
+    public String summary;
+    public Long relatedStatementId;
+    public String dimension;
+    public String proposedBelief;
+    public Double confidence;
+    public String status;
+    public String riskFlags;
+    public LocalDateTime createdAt;
+}
