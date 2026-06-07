@@ -5,7 +5,7 @@ import com.innercosmos.entity.DailyRecord;
 import com.innercosmos.entity.WeeklyReview;
 import com.innercosmos.service.MemoryService;
 import com.innercosmos.service.WeeklyReviewService;
-import com.innercosmos.service.WeeklyReviewV2Service;
+import com.innercosmos.service.impl.WeeklyReviewV2Service;
 import com.innercosmos.vo.DailyRecordVO;
 import com.innercosmos.vo.WeeklyReviewV2VO;
 import jakarta.servlet.http.HttpSession;

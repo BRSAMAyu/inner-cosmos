@@ -59,11 +59,18 @@ public class EmotionPatternServiceImpl implements EmotionPatternService {
             }
         }
 
-        // Detect weekly recurring patterns
-        patterns.addAll(detectWeeklyPatterns(userId, startDate, endDate));
+        // Detect weekly recurring patterns (inline — method defined in interface)
+        try {
+            var weekly = detectWeeklyPatterns(userId, startDate, endDate);
+            patterns.addAll(weekly);
+        } catch (Exception ignored) { /* non-critical */ }
 
         // Sort by count descending
-        patterns.sort(Comparator.comparing(p -> p.count, Comparator.nullsLast(Comparator.naturalOrder())).reversed());
+        patterns.sort((a, b) -> {
+            int ca = a.count != null ? a.count : 0;
+            int cb = b.count != null ? b.count : 0;
+            return Integer.compare(cb, ca);
+        });
 
         return patterns;
     }
@@ -118,6 +125,36 @@ public class EmotionPatternServiceImpl implements EmotionPatternService {
         summary.triggerScenes = triggers;
 
         return summary;
+    }
+
+    @Override
+    public List<EmotionPatternVO> detectWeeklyPatterns(Long userId, LocalDate startDate, LocalDate endDate) {
+        List<EmotionTimeline> timelines = getTimeline(userId, startDate, endDate);
+        if (timelines.size() < 3) return List.of();
+
+        Map<DayOfWeek, List<EmotionTimeline>> byDow = timelines.stream()
+                .collect(Collectors.groupingBy(t -> t.recordDate.getDayOfWeek()));
+
+        List<EmotionPatternVO> weekly = new ArrayList<>();
+        for (Map.Entry<DayOfWeek, List<EmotionTimeline>> dow : byDow.entrySet()) {
+            if (dow.getValue().size() >= 2) {
+                String dowLabel = dow.getKey().getDisplayName(TextStyle.SHORT, Locale.CHINA);
+                EmotionPatternVO p = new EmotionPatternVO();
+                p.patternType = "WEEKLY";
+                p.label = dowLabel + "情绪模式（每周规律）";
+                p.emotion = dow.getValue().get(0).dominantEmotion;
+                p.count = dow.getValue().size();
+                p.intensityAverage = dow.getValue().stream()
+                        .filter(t -> t.intensityAverage != null)
+                        .mapToDouble(t -> t.intensityAverage).average().orElse(0.5);
+                p.dateRange = startDate + " ~ " + endDate;
+                p.startDate = startDate;
+                p.endDate = endDate;
+                p.confidence = Math.min(0.9, 0.5 + dow.getValue().size() * 0.05);
+                weekly.add(p);
+            }
+        }
+        return weekly;
     }
 
     private List<EmotionTimeline> getTimeline(Long userId, LocalDate startDate, LocalDate endDate) {
