@@ -3,15 +3,31 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>星海广场 · Inner Cosmos</title>
   <link rel="stylesheet" href="/css/app.css">
 </head>
 <body>
-<main class="shell">
+<main id="main" class="shell">
+  <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
 
   <span class="route-hint">数字回声花园</span>
-  <h1>星海广场</h1>
+  <h1 id="page-title">星海广场</h1>
   <p class="muted mb-2">这里不是交友信息流。你先遇见的是一部分被授权的数字回声。</p>
+
+  <!-- Pending sync banner -->
+  <div id="syncBanner" class="soft-stage mb-2" style="display:none; border-left: 3px solid #b8a96e">
+    <div class="flex-between">
+      <div>
+        <strong style="color:#b8a96e">你的共鸣体正在更新</strong>
+        <p class="muted" style="font-size:.86rem; margin:4px 00">有新的同步请求等待确认</p>
+      </div>
+      <div class="flex-row gap-sm">
+        <button class="button" onclick="showSyncPending()">查看</button>
+        <button class="button" onclick="dismissSyncBanner()" style="opacity:.6">暂不处理</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Tab bar: Seed / User -->
   <div class="tab-bar mb-2">
@@ -66,6 +82,12 @@ async function load() {
 }
 
 function esc(text) { return IC.esc(text); }
+function formatCapsuleTurns(c) {
+  if (!c || c.capsuleType === "SEED_CAPSULE" || c.capsuleType === "SEED" || Number(c.conversationLimitPerDay) <= 0) {
+    return "不限轮次";
+  }
+  return `每日 ${c.conversationLimitPerDay || 30} 轮`;
+}
 function tagsOf(value) {
   if (!value) return [];
   if (Array.isArray(value)) return value;
@@ -155,7 +177,7 @@ function renderList(data) {
         ${tags.map(t => `<span class="pill">${esc(t)}</span>`).join("")}
       </div>
       <p class="gold mt-1" style="font-size:.88rem">
-        匹配 ${(match.matchScore || c.echoEnergy || 0).toFixed(2)} / 回声能量 ${(c.echoEnergy || 0).toFixed(2)} / 每日 ${c.conversationLimitPerDay || 5} 轮
+        匹配 ${(match.matchScore || c.echoEnergy || 0).toFixed(2)} / 回声能量 ${(c.echoEnergy || 0).toFixed(2)} / ${formatCapsuleTurns(c)}
       </p>
       ${match.matchSummary ? `<p class="muted" style="font-size:.86rem">${esc(match.matchSummary)}</p>` : ""}
     </article>
@@ -198,7 +220,7 @@ function openCapsule(id) {
     ${match.matchSummary ? `<div class="soft-stage mb-2"><h3>为什么推荐</h3><p class="muted">${esc(match.matchSummary)}</p></div>` : ""}
     <div class="soft-stage mb-2" style="border-left: 3px solid ${personality.color}">
       <h3>边界</h3>
-      <p class="muted">每日对话轮数：${c.conversationLimitPerDay || 5}</p>
+      <p class="muted">对话轮数：${formatCapsuleTurns(c)}</p>
       <p class="muted">回声能量：${(c.echoEnergy || 0).toFixed(2)}</p>
       <p class="muted">对话特质：${CapsulePersonality.getMoodLabel(personality.mood)}</p>
       <p class="muted">它只是一段回声，不是一个人。</p>
@@ -210,6 +232,71 @@ function openCapsule(id) {
   `);
   IC.pulse("open");
 }
+
+async function checkSyncPending() {
+  try {
+    const r = await API.syncPending();
+    if (r.success && r.data && r.data.length > 0) {
+      document.getElementById("syncBanner").style.display = "block";
+    }
+  } catch (e) {}
+}
+
+function showSyncPending() {
+  IC.showModal(`
+    <h2>共鸣体同步请求</h2>
+    <p class="muted mb-2">以下共鸣体的人格上下文即将更新，请确认：</p>
+    <div id="syncPendingList"></div>
+  `);
+  loadSyncPendingList();
+}
+
+async function loadSyncPendingList() {
+  const r = await API.syncPending();
+  const list = document.getElementById("syncPendingList");
+  if (!r.success || !r.data || r.data.length === 0) {
+    list.innerHTML = '<p class="muted">暂无待处理的同步请求。</p>';
+    return;
+  }
+  list.innerHTML = r.data.map(q => `
+    <div class="soft-stage mb-2">
+      <p class="muted">胶囊 #${q.capsuleId}</p>
+      <pre class="muted" style="font-size:.82rem; white-space:pre-wrap">${esc(q.proposedContextDiff || "{}")}</pre>
+      <div class="flex-row gap-sm mt-1">
+        <button class="button" onclick="decideSync(${q.id}, 'ALLOW')">允许</button>
+        <button class="button" onclick="decideSync(${q.id}, 'ALLOW_PARTIAL')">部分允许</button>
+        <button class="button" style="opacity:.6" onclick="decideSync(${q.id}, 'REJECT')">拒绝</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+async function decideSync(queueId, decision) {
+  const body = { decision };
+  if (decision === "ALLOW_PARTIAL") {
+    const allowed = prompt("请输入允许的字段，用逗号分隔（如 real_name,values）：");
+    if (allowed) body.allowedFields = allowed.split(",").map(s => s.trim()).filter(Boolean);
+    else return;
+  }
+  const r = await IC.api("/api/capsule/sync/" + queueId + "/decide", {
+    method: "POST",
+    body: JSON.stringify(body)
+  });
+  if (r.success) {
+    IC.toast(decision === "REJECT" ? "已拒绝更新" : "已确认更新", "info");
+    IC.closeModal();
+    document.getElementById("syncBanner").style.display = "none";
+  } else {
+    IC.toast(r.message || "操作失败", "warn");
+  }
+}
+
+function dismissSyncBanner() {
+  document.getElementById("syncBanner").style.display = "none";
+}
+
+IC.ensureDemoLogin().then(load).then(checkSyncPending);
+IC.hideLoading();
 </script>
 </body>
 </html>

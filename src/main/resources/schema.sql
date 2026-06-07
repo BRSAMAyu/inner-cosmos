@@ -83,7 +83,8 @@ CREATE TABLE IF NOT EXISTS tb_dialog_session (
   token_estimate INT DEFAULT 0,
   started_at TIMESTAMP NULL,
   ended_at TIMESTAMP NULL,
-  goodbye_trigger VARCHAR(32),
+ goodbye_trigger VARCHAR(32),
+  current_mode VARCHAR(32) DEFAULT 'DAILY_TALK',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_dialog_user (user_id)
@@ -689,4 +690,18 @@ CREATE TABLE IF NOT EXISTS tb_admin_action_log (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_admin_action_admin (admin_user_id)
+);
+
+-- Phase 7: Capsule Sync + PII Filter
+
+CREATE TABLE IF NOT EXISTS tb_capsule_sync_queue (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  capsule_id BIGINT NOT NULL,
+  status VARCHAR(32) NOT NULL DEFAULT 'PENDING',
+  proposed_context_diff TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  decided_at TIMESTAMP NULL,
+  INDEX idx_sync_user (user_id),
+  INDEX idx_sync_status (status)
 );
