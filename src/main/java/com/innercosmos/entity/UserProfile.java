@@ -21,4 +21,25 @@ public class UserProfile extends BaseEntity {
     public String currentEnvironmentLabel;
     public Boolean weatherAwarenessEnabled;
     public Boolean timeAwarenessEnabled;
+    /**
+     * Default LLM provider for this user (MINIMAX, MIMO, GLM, DEEPSEEK, MOCK).
+     * null = use the system default from {@code llm.provider}.
+     */
+    public String preferredModel;
+    /**
+     * Proactive push intensity: OFF, WHISPER, LIGHT, ACTIVE, COMPANION, ALIVE.
+     */
+    public String proactiveIntensity;
+    /**
+     * Sleep window start time (e.g., "23:00:00").
+     */
+    public String sleepWindowStart;
+    /**
+     * Sleep window end time (e.g., "07:00:00").
+     */
+    public String sleepWindowEnd;
+    /**
+     * Temporary boost expiration timestamp (null = no boost).
+     */
+    public java.time.LocalDateTime boostUntil;
 }

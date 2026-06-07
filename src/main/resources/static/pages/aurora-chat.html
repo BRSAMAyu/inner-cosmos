@@ -79,6 +79,7 @@
 <script src="/js/weather-system.js"></script>
 <script src="/js/audio-system.js"></script>
 <script src="/js/api.js"></script>
+<script src="/js/ic-proactive-client.js"></script>
 <script>
 IC.mountShell("Aurora");
 
@@ -313,7 +314,18 @@ async function onModelChange() {
   IC.toast(provider ? "已切换到 " + provider : "已切回系统默认", "success");
 }
 
+// Handle proactive Aurora messages
+function addAuroraProactive(data) {
+  addBubble(data.content, "ai");
+}
+
+window.addEventListener("aurora-proactive", function(e) {
+  addAuroraProactive(e.detail);
+});
+
 init();
+// Start proactive SSE connection if available
+if (window.ICProactive) ICProactive.start();
 IC.hideLoading();
 </script>
 </body>
