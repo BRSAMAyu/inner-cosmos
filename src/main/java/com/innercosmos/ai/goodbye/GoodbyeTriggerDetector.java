@@ -24,17 +24,27 @@ public class GoodbyeTriggerDetector {
     public record Detection(String trigger, double confidence, boolean needsConfirm) {}
     public static final Detection NONE = new Detection(null, 0.0, false);
 
+    private String lastStrength = "NONE";
+
     public Detection detect(String userMessage) {
         if (userMessage == null || userMessage.isBlank()) {
+            lastStrength = "NONE";
             return NONE;
         }
         String m = userMessage.trim();
         if (HIGH.stream().anyMatch(m::contains)) {
+            lastStrength = "HIGH";
             return new Detection("LANGUAGE_HIGH", 0.95, false);
         }
         if (MEDIUM.stream().anyMatch(m::contains)) {
+            lastStrength = "MEDIUM";
             return new Detection("LANGUAGE_MEDIUM", 0.65, true);
         }
+        lastStrength = "NONE";
         return NONE;
+    }
+
+    public String getLastStrength() {
+        return lastStrength;
     }
 }

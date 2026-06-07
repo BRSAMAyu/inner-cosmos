@@ -1,7 +1,10 @@
 package com.innercosmos.ai.goodbye;
 
-import com.innercosmos.entity.DialogSession;
+import com.innercosmos.ai.client.LlmClient;
+import com.innercosmos.ai.client.LlmRequest;
+import com.innercosmos.entity.DialogMessage;
 import com.innercosmos.mapper.DialogSessionMapper;
+import com.innercosmos.service.MemoryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,6 +33,9 @@ public class GoodbyeOrchestrator {
     @Autowired
     private DialogSessionMapper sessionMapper;
 
+    @Autowired
+    private GoodbyeTriggerDetector goodbyeTriggerDetector;
+
     public GoodbyeResult start(Long userId, Long sessionId, String trigger) {
         // 0) Mark session with goodbye trigger
         if (sessionId != null) {
@@ -54,11 +60,16 @@ public class GoodbyeOrchestrator {
             line = templates.forTrigger(trigger);
         }
 
+        // Get goodbye strength for self-reflection trigger
+        String goodbyeStrength = goodbyeTriggerDetector.getLastStrength();
+
         // 2-7) Async pipeline
         if (sessionId != null) {
-            closer.runAfterGoodbye(userId, sessionId);
+            closer.runAfterGoodbye(userId, sessionId, goodbyeStrength);
         }
 
-        return new GoodbyeResult(true, line, java.util.List.of(), false, false, 0.95);
+        GoodbyeResult result = new GoodbyeResult(true, line, java.util.List.of(), false, false, 0.95);
+        result.goodbyeStrength = goodbyeStrength;
+        return result;
     }
 }
