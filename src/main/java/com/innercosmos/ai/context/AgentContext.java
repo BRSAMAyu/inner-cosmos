@@ -33,4 +33,9 @@ public class AgentContext {
     public List<Long> evidenceMemoryIds = new ArrayList<>();
     /** 3-model block: Aurora identity + Relationship state + User portrait */
     public String threeModelBlock = "";
+    // Aurora subjectivity — Constitution + Continuity Anchors
+    /** 【Aurora 存在宪法】... (from AuroraConstitutionService) */
+    public String constitutionBlock;
+    /** 【Aurora 身份锚点】... (from AuroraSelfContinuityService) */
+    public String continuityAnchors;
 }

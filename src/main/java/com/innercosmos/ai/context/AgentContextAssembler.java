@@ -10,6 +10,8 @@ import com.innercosmos.ai.perception.dto.WeatherForecast;
 import com.innercosmos.ai.portrait.AgentUserRelationshipService;
 import com.innercosmos.ai.portrait.AuroraSelfProfileService;
 import com.innercosmos.ai.portrait.UserPortraitService;
+import com.innercosmos.service.AuroraConstitutionService;
+import com.innercosmos.service.AuroraSelfContinuityService;
 import com.innercosmos.entity.DailyRecord;
 import com.innercosmos.entity.DialogMessage;
 import com.innercosmos.entity.EmotionTrace;
@@ -56,6 +58,8 @@ public class AgentContextAssembler {
     @Autowired(required = false) private AuroraSelfProfileService auroraSelfProfileService;
     @Autowired(required = false) private AgentUserRelationshipService relationshipService;
     @Autowired(required = false) private UserPortraitService userPortraitService;
+    @Autowired(required = false) private AuroraConstitutionService auroraConstitutionService;
+    @Autowired(required = false) private AuroraSelfContinuityService auroraSelfContinuityService;
 
     public AgentContextAssembler(UserProfileMapper userProfileMapper,
                                  DialogMessageMapper dialogMessageMapper,
@@ -150,6 +154,19 @@ public class AgentContextAssembler {
         }
         // 3-model block: Aurora identity + Relationship state + User portrait
         context.threeModelBlock = buildThreeModelBlock(userId);
+        // M5: Aurora subjectivity — Constitution + Continuity Anchors
+        if (auroraConstitutionService != null) {
+            String constitution = auroraConstitutionService.toPromptBlock();
+            if (constitution != null && !constitution.isBlank()) {
+                context.constitutionBlock = constitution;
+            }
+        }
+        if (auroraSelfContinuityService != null) {
+            String anchors = auroraSelfContinuityService.getContinuityAnchors(userId);
+            if (anchors != null && !anchors.isBlank()) {
+                context.continuityAnchors = "【Aurora 身份锚点】\n" + anchors;
+            }
+        }
         return context;
     }
 
@@ -373,7 +390,15 @@ public class AgentContextAssembler {
         if (portraitLines.isEmpty()) {
             portraitLines = "暂无画像数据";
         }
-        return String.format("""
+        StringBuilder sb = new StringBuilder();
+        // M5: Aurora Constitution (prepended)
+        if (auroraConstitutionService != null) {
+            String constitution = auroraConstitutionService.toPromptBlock();
+            if (constitution != null && !constitution.isBlank()) {
+                sb.append(constitution).append("\n");
+            }
+        }
+        sb.append(String.format("""
                 【Aurora Identity】
                 %s
 
@@ -385,6 +410,7 @@ public class AgentContextAssembler {
                 """,
                 self == null ? "" : self.identityJson,
                 rel == null ? "" : rel.toPromptString(),
-                portraitLines);
+                portraitLines));
+        return sb.toString();
     }
 }
