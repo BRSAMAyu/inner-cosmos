@@ -18,4 +18,11 @@ public class ChatRequest {
     public String clientMessageId;
     public String timezone;
     public String localTimeLabel;
+    public String weatherType;
+    public String weatherDescription;
+    public Double temperature;
+    public String locationLabel;
+    public Double latitude;
+    public Double longitude;
+    public String aiProviderPreference;
 }

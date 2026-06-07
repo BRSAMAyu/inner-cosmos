@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.innercosmos.ai.context.AgentContext;
 import com.innercosmos.ai.context.AgentContextAssembler;
 import com.innercosmos.ai.prompt.PromptBuilder;
+import com.innercosmos.ai.router.ResolvedModel;
+import com.innercosmos.ai.router.SessionModelRouter;
 import com.innercosmos.ai.structured.StructuredAiResults;
 import com.innercosmos.ai.structured.StructuredAiService;
 import com.innercosmos.config.LlmConfig;
@@ -29,6 +31,8 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -53,6 +57,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     private final LlmConfig llmConfig;
     private final Executor aiExecutor;
     private final AgentContextAssembler agentContextAssembler;
+    private final SessionModelRouter modelRouter;
 
     public AuroraAgentServiceImpl(StructuredAiService structuredAiService,
                                   DialogService dialogService,
@@ -64,7 +69,8 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                                   DialogSessionMapper sessionMapper,
                                   LlmConfig llmConfig,
                                   Executor aiExecutor,
-                                  AgentContextAssembler agentContextAssembler) {
+                                  AgentContextAssembler agentContextAssembler,
+                                  SessionModelRouter modelRouter) {
         this.structuredAiService = structuredAiService;
         this.dialogService = dialogService;
         this.safetyService = safetyService;
@@ -76,6 +82,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         this.llmConfig = llmConfig;
         this.aiExecutor = aiExecutor;
         this.agentContextAssembler = agentContextAssembler;
+        this.modelRouter = modelRouter;
     }
 
     @Override
@@ -95,13 +102,18 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         UserProfile profile = loadProfile(userId);
         String mode = normalizeMode(request.mode);
         boolean allowMemory = allowMemory(profile);
-        AgentContext agentContext = agentContextAssembler.assemble(userId, request.sessionId, request.message, allowMemory);
+        AgentContext agentContext = agentContextAssembler.assemble(
+                userId, request.sessionId, request.message, allowMemory,
+                request.latitude, request.longitude);
+        Map<String, Object> clientWeather = clientWeather(request);
+        mergeClientWeather(agentContext, clientWeather);
         List<String> gravityMemories = allowMemory ? memoryService.topGravitySummaries(userId, 5) : List.of();
         AuroraMemoryContextVO memoryContext = allowMemory
                 ? memoryContextService.buildContext(userId, request.sessionId, request.message, 8, 6)
                 : null;
         DialogSession session = request.sessionId == null ? null : sessionMapper.selectById(request.sessionId);
         String rhythm = rhythmGuardService.checkRhythm(userId, request.sessionId);
+        ResolvedModel resolved = modelRouter.resolve(userId, request.sessionId);
 
         String prompt = new PromptBuilder()
                 .withSystemBoundary()
@@ -117,33 +129,45 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 .withOutputSchema()
                 .build();
 
-        StructuredAiResults.AuroraResult ai = structuredAiService.call(userId, "AURORA_AGENT_LOOP_" + mode,
-                auroraInstruction(false),
-                Map.of(
-                        "auroraPrompt", prompt,
-                        "userMessage", request.message == null ? "" : request.message,
-                        "mode", mode,
-                        "modeGuide", modeGuide(mode),
-                        "memoryRecallAllowed", allowMemory,
-                        "unifiedAgentContext", agentContext,
-                        "providerPolicy", providerPolicy(),
-                        "agentLoopPolicy", Boolean.FALSE.equals(agentContext.multiMessageAllowed)
-                                ? "用户关闭了多条消息，本轮只能输出 1 条 segments。"
-                                : "你可以选择只说一条，也可以继续补充第二条或第三条。不要固定数量。"
-                ),
-                StructuredAiResults.AuroraResult.class,
-                () -> fallbackAuroraResult(request.message, mode, gravityMemories, memoryContext, allowMemory));
+        Map<String, Object> turnContext = new LinkedHashMap<>();
+        turnContext.put("auroraPrompt", prompt);
+        turnContext.put("userMessage", request.message == null ? "" : request.message);
+        turnContext.put("mode", mode);
+        turnContext.put("modeGuide", modeGuide(mode));
+        turnContext.put("memoryRecallAllowed", allowMemory);
+        turnContext.put("unifiedAgentContext", agentContext);
+        turnContext.put("clientWeather", clientWeather);
+        turnContext.put("preferredProvider", resolved.provider());
+        turnContext.put("recentAuroraMessages", recentAuroraMessages(request.sessionId, 6));
+        turnContext.put("providerPolicy", providerPolicy(resolved));
+        turnContext.put("agentLoopPolicy", Boolean.FALSE.equals(agentContext.multiMessageAllowed)
+                ? "用户关闭了多条消息，本轮只能输出 1 条 segments。"
+                : "你可以选择只说一条，也可以继续补充第二条或第三条。若某个后续想法不值得说，写 [[SILENCE]]，系统不会展示。不要固定数量。");
 
-        AuroraReplyVO vo = toReply(profile, ai, request, mode, memoryContext, gravityMemories, allowMemory);
-        if (Boolean.FALSE.equals(agentContext.multiMessageAllowed) && vo.messages.size() > 1) {
-            vo.messages = List.of(vo.messages.get(0));
-            vo.agentLoop = Map.of(
-                    "speakCount", 1,
-                    "continueReason", "用户设置为单条消息模式",
-                    "mode", mode,
-                    "modeLabel", modeLabel(mode)
-            );
+        AuroraReplyVO vo;
+        try {
+            StructuredAiResults.AuroraResult ai = structuredAiService.call(userId, "AURORA_AGENT_LOOP_" + mode,
+                    auroraInstruction(false),
+                    turnContext,
+                    StructuredAiResults.AuroraResult.class,
+                    () -> fallbackAuroraResult(request.message, mode, gravityMemories, memoryContext, allowMemory),
+                    resolved.client());
+            vo = toReply(profile, ai, request, mode, memoryContext, gravityMemories, allowMemory);
+            if (Boolean.FALSE.equals(agentContext.multiMessageAllowed) && vo.messages.size() > 1) {
+                vo.messages = List.of(vo.messages.get(0));
+                vo.agentLoop = Map.of(
+                        "speakCount", 1,
+                        "continueReason", "用户设置为单条消息模式",
+                        "mode", mode,
+                        "modeLabel", modeLabel(mode)
+                );
+            }
+        } catch (Exception e) {
+            log.error("Aurora agent call failed, using emergency fallback: {}", e.getMessage(), e);
+            vo = emergencyFallback(request.message, mode);
         }
+        // Tag the response with the resolved provider/model for the UI
+        vo.aiState = aiState(resolved);
         for (String msg : vo.messages) {
             dialogService.saveAuroraMessage(userId, request.sessionId, msg);
         }
@@ -200,20 +224,25 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 .build()
                 + "\n\n现在是" + timeLabel + "。请 Aurora 主动发起对话，像朋友轻轻来找用户，而不是等待用户提问。";
 
-        StructuredAiResults.AuroraResult ai = structuredAiService.call(userId, "AURORA_PROACTIVE_GREETING_" + normalizedMode,
-                auroraInstruction(true),
-                Map.of(
-                        "auroraPrompt", prompt,
-                        "mode", normalizedMode,
-                        "timeLabel", timeLabel,
-                        "memoryRecallAllowed", allowMemory,
-                        "unifiedAgentContext", agentContext,
-                        "providerPolicy", providerPolicy()
-                ),
-                StructuredAiResults.AuroraResult.class,
-                () -> fallbackGreeting(normalizedMode, timeLabel, gravityMemories, allowMemory));
-
-        AuroraReplyVO vo = toReply(profile, ai, null, normalizedMode, memoryContext, gravityMemories, allowMemory);
+        AuroraReplyVO vo;
+        try {
+            StructuredAiResults.AuroraResult ai = structuredAiService.call(userId, "AURORA_PROACTIVE_GREETING_" + normalizedMode,
+                    auroraInstruction(true),
+                    Map.of(
+                            "auroraPrompt", prompt,
+                            "mode", normalizedMode,
+                            "timeLabel", timeLabel,
+                            "memoryRecallAllowed", allowMemory,
+                            "unifiedAgentContext", agentContext,
+                            "providerPolicy", providerPolicy(null)
+                    ),
+                    StructuredAiResults.AuroraResult.class,
+                    () -> fallbackGreeting(normalizedMode, timeLabel, gravityMemories, allowMemory));
+            vo = toReply(profile, ai, null, normalizedMode, memoryContext, gravityMemories, allowMemory);
+        } catch (Exception e) {
+            log.error("Aurora greeting call failed, using emergency fallback: {}", e.getMessage(), e);
+            vo = emergencyFallback("", normalizedMode);
+        }
         vo.suggestSettle = false;
         if (sessionId != null) {
             for (String msg : vo.messages) {
@@ -240,7 +269,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         blocked.memoryContext = null;
         blocked.riskFlags = List.of(safety.riskType == null ? "SAFETY" : safety.riskType);
         blocked.agentLoop = Map.of("speakCount", 1, "continueReason", "safety-first");
-        blocked.aiState = aiState();
+        blocked.aiState = aiState(null);
         dialogService.saveAuroraMessage(userId, request.sessionId, blocked.messages.get(0));
         return blocked;
     }
@@ -253,7 +282,8 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                                   List<String> gravityMemories,
                                   boolean allowMemory) {
         StructuredAiResults.AuroraResult safeAi = ai == null ? new StructuredAiResults.AuroraResult() : ai;
-        List<String> messages = cleanSegments(safeAi.segments);
+        List<String> recentAurora = request == null ? List.of() : recentAuroraMessages(request.sessionId, 8);
+        List<String> messages = cleanSegments(safeAi.segments, recentAurora);
         if (messages.isEmpty()) {
             String userText = request == null ? "" : request.message;
             messages = fallbackAuroraResult(userText, mode, gravityMemories, memoryContext, allowMemory).segments;
@@ -278,7 +308,26 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 "mode", mode,
                 "modeLabel", modeLabel(mode)
         );
-        vo.aiState = aiState();
+        vo.aiState = aiState(null);
+        return vo;
+    }
+
+    private AuroraReplyVO emergencyFallback(String message, String mode) {
+        AuroraReplyVO vo = new AuroraReplyVO();
+        vo.messages = List.of("我听到了。刚才处理有些慢，但你的话已经在我这里了。你可以再说一遍，或者继续说下一件。");
+        vo.replyTone = "温柔、具体、像朋友";
+        vo.detectedTheme = modeLabel(mode);
+        vo.nextQuestion = "";
+        vo.smallStep = "";
+        vo.featureSuggestion = "";
+        vo.featureTarget = "";
+        vo.suggestSettle = false;
+        vo.memoryReferenced = false;
+        vo.referencedMemoryIds = List.of();
+        vo.memoryContext = null;
+        vo.riskFlags = List.of("EMERGENCY_FALLBACK");
+        vo.agentLoop = Map.of("speakCount", 1, "continueReason", "emergency-fallback", "mode", mode, "modeLabel", modeLabel(mode));
+        vo.aiState = aiState(null);
         return vo;
     }
 
@@ -371,39 +420,124 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 如果 unifiedAgentContext.focusPolicy 提示当前处于专注时段，你要优先考虑用户长期 well-being：任务相关就帮助拆行动，明显闲聊就温柔提醒回到专注。
                 如果用户关闭多条消息，只能输出 1 条 segments。
                 若引用记忆、待办、周报或关系线索，必须自然说明“我想到一个线索”，不要装作凭空知道。
-                segments 必须是 %s 条中文聊天气泡，具体条数由上下文决定，不要固定。
+                segments 最多 %s 条中文聊天气泡，具体条数由上下文决定，不要固定；如果第二/第三条只是重复、客套或没有必要，请写成 [[SILENCE]]。
                 第一条必须贴着用户刚刚说的话；后续消息是 Aurora 的 agent loop：补充想法、关心、记忆连接或温和功能邀请。
+                你能看到 recentAuroraMessages 和短期对话窗口：不要重复自己刚刚说过的开场白、天气、待办提醒或“我想到一个线索”。
+                clientWeather 是真实环境天气。只有在天气对当下有实际帮助时才提及，例如下雨提醒带伞、晴天建议短暂散步；不要每轮都拿天气开场。
                 不要模板化，不要诊断，不要口号，不要长文。
                 """.formatted(segmentCount);
     }
 
-    private String providerPolicy() {
-        return "当前主模型=" + llmConfig.activeProvider() + "/" + llmConfig.activeModel()
+    private String providerPolicy(ResolvedModel resolved) {
+        String provider = resolved == null || resolved.provider() == null ? llmConfig.activeProvider() : resolved.provider();
+        String model = resolved == null || resolved.model() == null ? llmConfig.activeModel() : resolved.model();
+        return "当前主模型=" + provider + "/" + model
                 + "，mode=" + llmConfig.getMode()
                 + "，fallbackAllowed=" + llmConfig.isEffectiveFallbackAllowed()
                 + "。正式路径必须优先使用真实模型。";
     }
 
-    private Map<String, Object> aiState() {
+    private Map<String, Object> aiState(ResolvedModel resolved) {
+        String provider = resolved == null || resolved.provider() == null ? llmConfig.activeProvider() : resolved.provider();
+        String model = resolved == null || resolved.model() == null ? llmConfig.activeModel() : resolved.model();
         return Map.of(
-                "provider", llmConfig.activeProvider(),
-                "model", llmConfig.activeModel(),
+                "provider", provider,
+                "model", model,
                 "mode", llmConfig.getMode() == null ? "" : llmConfig.getMode(),
                 "apiKeyConfigured", llmConfig.hasActiveApiKey(),
                 "fallbackAllowed", llmConfig.isEffectiveFallbackAllowed()
         );
     }
 
-    private List<String> cleanSegments(List<String> raw) {
+    private List<String> cleanSegments(List<String> raw, List<String> recentAuroraMessages) {
         if (raw == null) return List.of();
         Set<String> unique = new LinkedHashSet<>();
         for (String item : raw) {
             if (item == null) continue;
-            String text = item.trim();
+            String text = normalizeSegment(item);
+            if (text.isBlank() || "[[SILENCE]]".equalsIgnoreCase(text) || "SILENCE".equalsIgnoreCase(text)) {
+                continue;
+            }
+            if (isTooSimilarToRecent(text, recentAuroraMessages) || isTooSimilarInside(text, unique)) {
+                continue;
+            }
+            if (!unique.isEmpty() && repeatsOpening(text, unique)) {
+                text = stripRepeatedOpening(text);
+            }
             if (!text.isBlank()) unique.add(text.length() > 260 ? text.substring(0, 260) : text);
             if (unique.size() >= 3) break;
         }
         return new ArrayList<>(unique);
+    }
+
+    private String normalizeSegment(String item) {
+        String text = item == null ? "" : item.trim();
+        text = text.replaceAll("^「|」$", "").trim();
+        text = text.replaceAll("^(Aurora[:：]|我[:：])", "").trim();
+        return text;
+    }
+
+    private boolean isTooSimilarInside(String text, Set<String> existing) {
+        for (String old : existing) {
+            if (similarity(text, old) >= 0.58 || sameLeadingClause(text, old)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isTooSimilarToRecent(String text, List<String> recent) {
+        if (recent == null) return false;
+        return recent.stream().anyMatch(old -> similarity(text, old) >= 0.66 || sameLeadingClause(text, old));
+    }
+
+    private boolean sameLeadingClause(String a, String b) {
+        String left = firstClause(a);
+        String right = firstClause(b);
+        return left.length() >= 6 && left.equals(right);
+    }
+
+    private String firstClause(String value) {
+        if (value == null) return "";
+        String cleaned = value.replaceAll("[\\s「」“”]", "");
+        int cut = cleaned.length();
+        for (String mark : List.of("，", "。", "；", "、", "?", "？", "！", "!")) {
+            int idx = cleaned.indexOf(mark);
+            if (idx >= 0) cut = Math.min(cut, idx);
+        }
+        return cleaned.substring(0, Math.min(cut, 18));
+    }
+
+    private double similarity(String a, String b) {
+        Set<String> left = bigramSet(a);
+        Set<String> right = bigramSet(b);
+        if (left.isEmpty() || right.isEmpty()) return 0;
+        long overlap = left.stream().filter(right::contains).count();
+        return overlap / (double) Math.max(left.size(), right.size());
+    }
+
+    private Set<String> bigramSet(String value) {
+        Set<String> set = new LinkedHashSet<>();
+        if (value == null) return set;
+        String cleaned = value.replaceAll("[\\p{Punct}\\s，。！？；：“”‘’（）【】《》、~～]", "");
+        for (int i = 0; i < cleaned.length() - 1; i++) {
+            set.add(cleaned.substring(i, i + 2));
+        }
+        return set;
+    }
+
+    private boolean repeatsOpening(String text, Set<String> existing) {
+        String normalized = text.replaceAll("\\s+", "");
+        if (!normalized.matches("^(早安|上午好|中午好|下午好|晚上好|夜里好|深夜好|我想到一个线索|想到一个线索).*")) {
+            return false;
+        }
+        return existing.stream().anyMatch(old -> old.contains("好") || old.contains("想到一个线索"));
+    }
+
+    private String stripRepeatedOpening(String text) {
+        return text.replaceFirst("^(早安|上午好|中午好|下午好|晚上好|夜里好|深夜好)[呀啊～~，,。\\s]*", "")
+                .replaceFirst("^(我想到一个线索|想到一个线索)[：:，,。\\s-]*", "")
+                .trim();
     }
 
     private void streamText(SseEmitter emitter, String response) throws Exception {
@@ -448,6 +582,44 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             result.add(speaker + ": " + abbreviate(message.textContent, 160));
         }
         return result;
+    }
+
+    private List<String> recentAuroraMessages(Long sessionId, int limit) {
+        if (sessionId == null) return List.of();
+        List<DialogMessage> messages = dialogService.messages(sessionId).stream()
+                .filter(m -> "AURORA".equals(m.speaker))
+                .sorted(Comparator.comparing(m -> m.id == null ? 0L : m.id))
+                .toList();
+        int start = Math.max(0, messages.size() - limit);
+        List<String> result = new ArrayList<>();
+        for (DialogMessage message : messages.subList(start, messages.size())) {
+            result.add(abbreviate(message.textContent, 180));
+        }
+        return result;
+    }
+
+    private Map<String, Object> clientWeather(ChatRequest request) {
+        if (request == null) return Map.of();
+        return Map.of(
+                "type", request.weatherType == null ? "" : request.weatherType,
+                "description", request.weatherDescription == null ? "" : request.weatherDescription,
+                "temperature", request.temperature == null ? "" : request.temperature,
+                "location", request.locationLabel == null ? "" : request.locationLabel,
+                "localTime", request.localTimeLabel == null ? "" : request.localTimeLabel
+        );
+    }
+
+    private void mergeClientWeather(AgentContext context, Map<String, Object> weather) {
+        if (context == null || weather == null || weather.isEmpty()) return;
+        String description = String.valueOf(weather.getOrDefault("description", "")).trim();
+        String type = String.valueOf(weather.getOrDefault("type", "")).trim();
+        String temp = String.valueOf(weather.getOrDefault("temperature", "")).trim();
+        String location = String.valueOf(weather.getOrDefault("location", "")).trim();
+        if (description.isBlank() && type.isBlank()) return;
+        String realWeather = "真实环境天气=" + firstNotBlank(description, type)
+                + (temp.isBlank() ? "" : "，温度=" + temp)
+                + (location.isBlank() ? "" : "，位置=" + location);
+        context.weatherLabel = realWeather + "；情绪天气=" + firstNotBlank(context.weatherLabel, "暂无");
     }
 
     private String profileBrief(UserProfile profile) {
@@ -540,6 +712,13 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         return value == null ? "未记录" : value.toString();
     }
 
+    private String firstNotBlank(String... values) {
+        for (String value : values) {
+            if (!isBlank(value)) return value;
+        }
+        return "";
+    }
+
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
     }
@@ -552,3 +731,4 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 .replace("\t", "\\t");
     }
 }
+

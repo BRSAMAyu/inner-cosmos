@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
@@ -7,18 +7,30 @@
   <link rel="stylesheet" href="/css/app.css">
 </head>
 <body>
-<main class="shell aurora-page">
+<main id="main" class="shell aurora-page">
+  <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
 
   <section class="panel aurora-hero mb-2">
     <div class="flex-between" style="align-items:flex-start;gap:16px;flex-wrap:wrap">
       <div>
         <span class="route-hint">共享内核的朋友型 Agent</span>
-        <h1>Aurora</h1>
+        <h1 id="page-title" data-aurora-name>Aurora</h1>
         <p class="muted">Aurora 会根据上下文决定说一条、两条或三条消息。不同模式不是换机器人，而是同一个朋友换一种陪伴方式。</p>
         <p id="aiStatus" class="muted" style="font-size:.84rem;margin-top:8px">正在检查真实 AI 状态...</p>
       </div>
       <div class="row gap-sm">
+        <label class="model-picker">
+          模型
+          <select id="modelPicker" onchange="onModelChange()">
+            <option value="">系统默认</option>
+            <option value="MINIMAX">MiniMax M3</option>
+            <option value="MIMO">MiMo v2.5</option>
+            <option value="GLM">GLM-4 Flash</option>
+            <option value="DEEPSEEK">DeepSeek v4 Flash</option>
+            <option value="MOCK">Mock (本地)</option>
+          </select>
+        </label>
         <button onclick="rhythmCheck()">节律检查</button>
         <button onclick="finish()">沉淀今天</button>
       </div>
@@ -27,9 +39,14 @@
     <p id="modeNote" class="mode-note"></p>
     <div id="loopState" class="soft-stage mt-2" style="display:none"></div>
     <div id="memoryLens" class="soft-stage mt-2" style="display:none">
-      <div class="flex-between"><strong>记忆镜头</strong><span id="memoryPolicy" class="route-hint"></span></div>
-      <div id="memoryChips" class="pill-row mt-1"></div>
-      <p id="memoryContinuity" class="muted" style="font-size:.84rem"></p>
+      <div class="flex-between">
+        <div><strong>记忆镜头</strong><span id="memoryPolicy" class="route-hint" style="margin-left:8px"></span></div>
+        <button id="memoryToggle" class="ghost" onclick="toggleMemoryLens()" type="button">展开</button>
+      </div>
+      <div id="memoryLensBody" style="display:none">
+        <div id="memoryChips" class="pill-row mt-1"></div>
+        <p id="memoryContinuity" class="muted" style="font-size:.84rem"></p>
+      </div>
     </div>
   </section>
 
@@ -40,10 +57,11 @@
 
   <section class="panel aurora-composer" style="position:sticky;bottom:0;z-index:5;margin-top:12px">
     <div class="row" style="flex-wrap:nowrap">
-      <input id="msg" placeholder="把现在最想说的一句话放在这里" onkeydown="if(event.key==='Enter')send()">
+      <input id="msg" class="voice-input-target" data-voice-bound="true" placeholder="把现在最想说的一句话放在这里" onkeydown="if(event.key==='Enter')send()">
+      <button class="voice-mini" onclick="IC.recordToField(document.getElementById('msg'), this)" title="语音输入">🎙</button>
       <button onclick="send()">发送</button>
     </div>
-    <p id="voiceState" class="muted" style="font-size:.82rem;margin-top:6px">语音日记请从“心声日记”进入，Aurora 会共享同一套长期记忆。</p>
+    <p id="voiceState" class="muted" style="font-size:.82rem;margin-top:6px">语音会尽量尊重原文转写，你可以继续手动修改后再发送。</p>
   </section>
 
   <div id="settleOverlay" class="modal-overlay hidden">
@@ -56,7 +74,10 @@
 </main>
 
 <script src="/js/app.js"></script>
+<script src="/js/time-system.js"></script>
 <script src="/js/motion.js"></script>
+<script src="/js/weather-system.js"></script>
+<script src="/js/audio-system.js"></script>
 <script src="/js/api.js"></script>
 <script>
 IC.mountShell("Aurora");
@@ -64,6 +85,7 @@ IC.mountShell("Aurora");
 let sid = null;
 let mode = "DAILY_TALK";
 let messageCount = 0;
+let auroraSending = false;
 
 const modeCopy = {
   DAILY_TALK: { label: "今日倾诉", icon: "听", desc: "先像朋友一样接住当下，不急着分析。" },
@@ -87,7 +109,7 @@ function buildModes() {
       container.querySelectorAll("button").forEach(x => x.classList.remove("active"));
       btn.classList.add("active");
       document.getElementById("modeNote").textContent = modeCopy[mode].desc;
-      await proactiveGreeting(false);
+      document.getElementById("loopState").style.display = "none";
     };
   });
 }
@@ -141,8 +163,18 @@ function renderMemoryLens(context) {
   document.getElementById("memoryLens").style.display = "block";
 }
 
+function toggleMemoryLens() {
+  const body = document.getElementById("memoryLensBody");
+  const btn = document.getElementById("memoryToggle");
+  const open = body.style.display === "none";
+  body.style.display = open ? "block" : "none";
+  btn.textContent = open ? "收起" : "展开";
+}
+
 async function proactiveGreeting(save = true) {
   if (!sid) return;
+  const onceKey = `aurora_greeting_${sid}`;
+  if (save && sessionStorage.getItem(onceKey) === "done") return;
   document.getElementById("typing").style.display = "block";
   const gr = await API.auroraGreeting({ sessionId: save ? sid : null, mode });
   document.getElementById("typing").style.display = "none";
@@ -150,41 +182,102 @@ async function proactiveGreeting(save = true) {
     addAurora(gr.data.messages || []);
     renderAgentLoop(gr.data);
     renderMemoryLens(gr.data.memoryContext);
+    if (save) sessionStorage.setItem(onceKey, "done");
   }
 }
 
 async function init() {
   await IC.ensureDemoLogin();
   buildModes();
-  const r = await API.createSession({ title: "Aurora 对话", sessionType: "AURORA_CHAT" });
-  if (r.success && r.data) sid = r.data.id;
+  const params = new URLSearchParams(location.search);
+  sid = params.get("sessionId");
+  if (!sid) {
+    const r = await API.createSession({ title: "Aurora 对话", sessionType: "AURORA_CHAT" });
+    if (r.success && r.data) {
+      sid = r.data.id;
+      history.replaceState(null, "", `${location.pathname}?sessionId=${sid}`);
+    }
+  }
+  const restored = await loadHistory();
   await loadAiStatus();
-  await proactiveGreeting(true);
+  if (!restored) await proactiveGreeting(true);
+}
+
+async function loadHistory() {
+  if (!sid) return false;
+  const r = await API.sessionMessages(sid);
+  if (!r.success || !Array.isArray(r.data) || !r.data.length) return false;
+  r.data.forEach(m => addBubble(m.textContent || "", m.speaker === "AURORA" ? "ai" : "user"));
+  return true;
 }
 
 async function send() {
   const input = document.getElementById("msg");
+  const typing = document.getElementById("typing");
   const text = input.value.trim();
   if (!text || !sid) return;
+  if (auroraSending) {
+    IC.toast("Aurora 还在整理上一句话，请稍等一下。", "warn");
+    return;
+  }
+  auroraSending = true;
   addBubble(text, "user");
   input.value = "";
   messageCount++;
-  document.getElementById("typing").style.display = "block";
-  const r = await API.auroraMessageRich({ sessionId: sid, message: text, inputType: "TEXT", mode });
-  document.getElementById("typing").style.display = "none";
-  if (r.success && r.data) {
-    addAurora(r.data.messages || []);
-    renderAgentLoop(r.data);
-    renderMemoryLens(r.data.memoryContext);
-    if (r.data.suggestSettle) {
-      IC.toast("Aurora 建议把今天先沉淀下来。", "warn");
+  typing.style.display = "block";
+
+  try {
+    const weather = window.ICWeather?.getWeatherState ? window.ICWeather.getWeatherState() : {};
+    const localNow = new Date();
+    // Prefer the city-level label resolved by GeocodingService / Nominatim
+    // (cached in localStorage by ICTimeSystem). Fall back to the weather
+    // widget's coarse label or a literal "未知".
+    const cityLabel = window.ICLocation?.getCityLabel
+        ? window.ICLocation.getCityLabel()
+        : (localStorage.getItem("ic_location_label") || "");
+    const latLon = window.ICLocation?.getLatLon ? window.ICLocation.getLatLon() : null;
+    const body = {
+      sessionId: sid,
+      message: text,
+      inputType: "TEXT",
+      mode,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "",
+      localTimeLabel: localNow.toLocaleString("zh-CN"),
+      weatherType: weather.type || "",
+      weatherDescription: weather.description || "",
+      temperature: weather.temperature ?? null,
+      locationLabel: cityLabel || weather.locationLabel || "",
+      latitude: latLon ? latLon.lat : null,
+      longitude: latLon ? latLon.lon : null,
+      aiProviderPreference: localStorage.getItem("ic_ai_provider_preference") || ""
+    };
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+    const res = await fetch("/api/aurora/message-rich", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+      body: JSON.stringify(body),
+      signal: controller.signal
+    });
+    clearTimeout(timeout);
+    const r = await res.json();
+    if (r.success && r.data) {
+      addAurora(r.data.messages || []);
+      renderAgentLoop(r.data);
+      renderMemoryLens(r.data.memoryContext);
+      if (r.data.suggestSettle) IC.toast("Aurora 建议先把今天沉淀下来。", "warn");
+    } else {
+      IC.toast(r.message || "Aurora 暂时没有回应", "warn");
     }
-  } else {
-    IC.toast(r.message || "Aurora 暂时没有回应", "warn");
+  } catch (error) {
+    IC.toast(error.name === "AbortError" ? "这次回应超时了，可以重新发一次。" : "Aurora 连接暂时不稳定。", "warn");
+  } finally {
+    typing.style.display = "none";
+    auroraSending = false;
   }
   if (messageCount % 4 === 0) rhythmCheck();
 }
-
 async function rhythmCheck() {
   const r = await API.auroraRhythmCheck();
   if (r.success && r.data && r.data.advice) IC.toast(r.data.advice, "warn");
@@ -207,7 +300,22 @@ async function loadAiStatus() {
   document.getElementById("aiStatus").textContent = `${h.provider || "-"} / ${h.model || "-"} · ${state} · ${fallback} · ASR ${h.asrProvider || "-"} / ${h.asrModel || "-"}`;
 }
 
+async function onModelChange() {
+  const picker = document.getElementById("modelPicker");
+  if (!picker) return;
+  const provider = picker.value;
+  const r = await API.setPreferredModel({ provider: provider || null });
+  if (!r || !r.success) {
+    IC.toast("切换模型失败，请稍后再试。", "warn");
+    return;
+  }
+  if (window.sid) await API.setSessionModel(sid, provider);
+  IC.toast(provider ? "已切换到 " + provider : "已切回系统默认", "success");
+}
+
 init();
+IC.hideLoading();
 </script>
 </body>
 </html>
+
