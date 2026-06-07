@@ -6,6 +6,7 @@ import com.innercosmos.ai.portrait.PortraitReflectionService;
 import com.innercosmos.ai.portrait.UserPortraitService;
 import com.innercosmos.ai.portrait.AgentUserRelationshipService;
 import com.innercosmos.ai.portrait.dto.PortraitDeltas;
+import com.innercosmos.ai.self.SelfReflectionTrigger;
 import com.innercosmos.entity.AgentUserRelationship;
 import com.innercosmos.entity.DialogMessage;
 import com.innercosmos.entity.DialogSession;
@@ -57,11 +58,14 @@ public class SessionCloser {
     private DialogMessageMapper messageMapper;
     @Autowired
     private UserLongTermMemoryMapper ltmMapper;
-    @Autowired
+ @Autowired
     private LlmClient llm;
 
+    @Autowired
+    private SelfReflectionTrigger selfReflectionTrigger;
+
     @Async
-    public void runAfterGoodbye(Long userId, Long sessionId) {
+    public void runAfterGoodbye(Long userId, Long sessionId, String goodbyeStrength) {
         try {
             // Guard: if session already closed, abort
             var sess = sessionMapper.selectById(sessionId);
@@ -102,6 +106,14 @@ public class SessionCloser {
             // Step 6: Close session row
             sess.endedAt = LocalDateTime.now();
             sessionMapper.updateById(sess);
+
+            // Step 7: Trigger self reflection (async)
+            List<DialogMessage> recentMessages = messageMapper.selectList(
+                    new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<DialogMessage>()
+                            .eq("session_id", sessionId)
+                            .orderByDesc("id")
+                            .last("LIMIT 20"));
+            selfReflectionTrigger.onGoodbye(userId, sessionId, goodbyeStrength, recentMessages);
 
             log.info("Goodbye closer completed for session {}", sessionId);
         } catch (Exception e) {
