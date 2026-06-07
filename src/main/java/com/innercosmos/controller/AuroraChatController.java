@@ -1,8 +1,12 @@
 package com.innercosmos.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.innercosmos.ai.router.SessionModelRouter;
+import com.innercosmos.ai.self.UserTriggeredSelfReflection;
 import com.innercosmos.common.ApiResponse;
 import com.innercosmos.dto.ChatRequest;
+import com.innercosmos.entity.DialogMessage;
+import com.innercosmos.mapper.DialogMessageMapper;
 import com.innercosmos.service.AuroraAgentService;
 import com.innercosmos.service.MemoryService;
 import com.innercosmos.service.MemorySettlementService;
@@ -32,22 +36,37 @@ public class AuroraChatController extends BaseController {
     private final MemorySettlementService memorySettlementService;
     private final RhythmGuardService rhythmGuardService;
     private final SessionModelRouter modelRouter;
+    private final UserTriggeredSelfReflection selfReflection;
+    private final DialogMessageMapper dialogMessageMapper;
 
     public AuroraChatController(AuroraAgentService auroraAgentService,
                                 MemoryService memoryService,
                                 MemorySettlementService memorySettlementService,
                                 RhythmGuardService rhythmGuardService,
-                                SessionModelRouter modelRouter) {
+                                SessionModelRouter modelRouter,
+                                UserTriggeredSelfReflection selfReflection,
+                                DialogMessageMapper dialogMessageMapper) {
         this.auroraAgentService = auroraAgentService;
         this.memoryService = memoryService;
         this.memorySettlementService = memorySettlementService;
         this.rhythmGuardService = rhythmGuardService;
         this.modelRouter = modelRouter;
+        this.selfReflection = selfReflection;
+        this.dialogMessageMapper = dialogMessageMapper;
     }
 
     @PostMapping("/message")
-    public ApiResponse<String> message(@Valid @RequestBody ChatRequest request, HttpSession session) {
-        return ApiResponse.ok(auroraAgentService.reply(currentUserId(session), request));
+    public ApiResponse<Map<String, Object>> message(@Valid @RequestBody ChatRequest request, HttpSession session) {
+        Long userId = currentUserId(session);
+
+        // M4: Route self-reflection questions to UserTriggeredSelfReflection
+        if (isSelfReflectionQuestion(request.message)) {
+            Long lastMsgId = getLastMessageId(request.sessionId);
+            String response = selfReflection.onUserQuestion(userId, request.message, request.sessionId, lastMsgId);
+            return ApiResponse.ok(Map.of("reply", response, "type", "self_reflection"));
+        }
+
+        return ApiResponse.ok(Map.of("reply", auroraAgentService.reply(userId, request), "type", "normal"));
     }
 
     @PostMapping("/message-rich")
@@ -110,5 +129,28 @@ public class AuroraChatController extends BaseController {
         String provider = body == null ? null : body.get("provider");
         modelRouter.setSessionPreference(sessionId, provider);
         return ApiResponse.ok(true);
+    }
+
+    // M4: Self-reflection question detection
+    private boolean isSelfReflectionQuestion(String message) {
+        if (message == null || message.isBlank()) return false;
+        String lower = message.toLowerCase();
+        return (lower.contains("aurora") && lower.contains("怎么") && lower.contains("看自己")) ||
+               (lower.contains("aurora") && lower.contains("是谁")) ||
+               lower.contains("你觉得自己") ||
+               (lower.contains("你是什么") && lower.contains("角色")) ||
+               (lower.contains("自我") && lower.contains("认知")) ||
+               (lower.contains("你是") && lower.contains("谁"));
+    }
+
+    // M4: Get the last message ID for the session
+    private Long getLastMessageId(Long sessionId) {
+        if (sessionId == null) return null;
+        QueryWrapper<DialogMessage> q = new QueryWrapper<>();
+        q.eq("session_id", sessionId)
+         .orderByDesc("id")
+         .last("LIMIT 1");
+        DialogMessage msg = dialogMessageMapper.selectOne(q);
+        return msg != null ? msg.id : null;
     }
 }
