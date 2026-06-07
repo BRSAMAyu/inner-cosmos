@@ -5,6 +5,7 @@ import com.innercosmos.asr.AsrResult;
 import com.innercosmos.common.ApiResponse;
 import com.innercosmos.common.ErrorCode;
 import com.innercosmos.exception.BusinessException;
+import jakarta.servlet.http.HttpSession;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -14,7 +15,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/asr")
-public class AsrController {
+public class AsrController extends BaseController {
     private final AsrClient asrClient;
 
     public AsrController(AsrClient asrClient) {
@@ -22,13 +23,15 @@ public class AsrController {
     }
 
     @PostMapping("/mock-transcribe")
-    public ApiResponse<AsrResult> mockTranscribe(@RequestBody Map<String, String> body) {
+    public ApiResponse<AsrResult> mockTranscribe(@RequestBody Map<String, String> body, HttpSession session) {
+        currentUserId(session);
         String hint = body.getOrDefault("hintText", "");
         return ApiResponse.ok(asrClient.transcribe(hint.getBytes(StandardCharsets.UTF_8), hint));
     }
 
     @PostMapping("/transcribe")
-    public ApiResponse<AsrResult> transcribe(@RequestParam("file") MultipartFile file) throws IOException {
+    public ApiResponse<AsrResult> transcribe(@RequestParam("file") MultipartFile file, HttpSession session) throws IOException {
+        currentUserId(session);
         if (file == null || file.isEmpty()) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "音频文件不能为空");
         }

@@ -1,0 +1,85 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - link "跳到主要内容" [ref=e3] [cursor=pointer]:
+      - /url: "#main"
+    - generic [ref=e4]:
+      - link "Inner Cosmos" [ref=e5] [cursor=pointer]:
+        - /url: /pages/dashboard.html
+        - generic [ref=e6]: Inner Cosmos
+      - navigation "主导航" [ref=e7]:
+        - link "核心" [ref=e8] [cursor=pointer]:
+          - /url: /pages/dashboard.html
+        - link "Aurora" [ref=e9] [cursor=pointer]:
+          - /url: /pages/aurora-chat.html
+        - link "记录" [ref=e10] [cursor=pointer]:
+          - /url: /pages/daily-record.html
+        - link "日记" [ref=e11] [cursor=pointer]:
+          - /url: /pages/heart-diary.html
+        - link "星图" [ref=e12] [cursor=pointer]:
+          - /url: /pages/memory-starfield.html
+        - link "待办" [ref=e13] [cursor=pointer]:
+          - /url: /pages/todo.html
+        - link "星海" [ref=e14] [cursor=pointer]:
+          - /url: /pages/echo-plaza.html
+        - link "好友" [ref=e15] [cursor=pointer]:
+          - /url: /pages/social.html
+        - link "慢信" [ref=e16] [cursor=pointer]:
+          - /url: /pages/slow-letter.html
+        - link "信箱" [ref=e17] [cursor=pointer]:
+          - /url: /pages/inbox.html
+        - link "时间轴" [ref=e18] [cursor=pointer]:
+          - /url: /pages/timeline.html
+        - link "情绪" [ref=e19] [cursor=pointer]:
+          - /url: /pages/emotion-timeline.html
+        - link "主题" [ref=e20] [cursor=pointer]:
+          - /url: /pages/themes.html
+        - link "关系" [ref=e21] [cursor=pointer]:
+          - /url: /pages/relations.html
+        - link "信念" [ref=e22] [cursor=pointer]:
+          - /url: /pages/beliefs.html
+        - link "避风港" [ref=e23] [cursor=pointer]:
+          - /url: /pages/safety-harbor.html
+        - link "设置" [ref=e24] [cursor=pointer]:
+          - /url: /pages/settings.html
+        - link "管理" [ref=e25] [cursor=pointer]:
+          - /url: /pages/admin.html
+      - button "主题：自动跟随系统" [ref=e26] [cursor=pointer]: ◐
+    - generic [ref=e27]: 慢社交连接
+    - heading "好友与群组" [level=1] [ref=e28]
+    - paragraph [ref=e29]: 先通过共鸣体认识一个人的轮廓，再由慢信、好友和群组走向真实连接。
+    - generic [ref=e30]:
+      - article [ref=e31]:
+        - heading "可能认识的人" [level=2] [ref=e32]
+        - generic [ref=e33]:
+          - generic [ref=e35]:
+            - generic [ref=e36]:
+              - strong [ref=e37]: 管理员
+              - paragraph [ref=e38]: "@admin · NONE"
+            - button "加好友" [ref=e39] [cursor=pointer]
+          - generic [ref=e41]:
+            - generic [ref=e42]:
+              - strong [ref=e43]: 河岸来信
+              - paragraph [ref=e44]: "@river · NONE"
+            - button "加好友" [ref=e45] [cursor=pointer]
+          - generic [ref=e47]:
+            - generic [ref=e48]:
+              - strong [ref=e49]: 云杉
+              - paragraph [ref=e50]: "@cloud · NONE"
+            - button "加好友" [ref=e51] [cursor=pointer]
+      - article [ref=e52]:
+        - heading "好友申请" [level=2] [ref=e53]
+        - paragraph [ref=e57]: 暂无好友申请。
+    - generic [ref=e59]:
+      - article [ref=e60]:
+        - heading "我的好友" [level=2] [ref=e61]
+        - paragraph [ref=e65]: 还没有好友。可以先从星海广场或共鸣体开始。
+      - article [ref=e66]:
+        - heading "我的群组" [level=2] [ref=e67]
+        - generic [ref=e68]:
+          - textbox "创建一个小群组" [ref=e69]
+          - button "🎙" [ref=e70] [cursor=pointer]
+          - button "创建" [ref=e71] [cursor=pointer]
+        - paragraph [ref=e75]: 还没有群组。
+  - generic [ref=e76]:
+    - button "❚❚" [ref=e77] [cursor=pointer]
+    - button "◐" [ref=e78] [cursor=pointer]

@@ -7,11 +7,12 @@
   <title>待办清单 - Inner Cosmos</title>
 </head>
 <body>
-<main class="shell">
+<main id="main" class="shell">
+  <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
 
   <span class="route-hint">下一步变小</span>
-  <h1>待办清单</h1>
+  <h1 id="page-title">待办清单</h1>
   <p class="muted mb-2">待办不是自我审判，而是把下一步变小。</p>
 
   <!-- Today's progress -->
@@ -63,11 +64,14 @@
   </div>
 
   <!-- Todo list -->
-  <section id="todoList" class="grid"></section>
+  <section id="todoList" class="todo-board"></section>
 </main>
 
 <script src="/js/app.js"></script>
+<script src="/js/time-system.js"></script>
 <script src="/js/motion.js"></script>
+<script src="/js/weather-system.js"></script>
+<script src="/js/audio-system.js"></script>
 <script src="/js/api.js"></script>
 <script>
 IC.mountShell("待办清单");
@@ -106,6 +110,7 @@ function renderTab() {
   document.getElementById("todoProgress").style.width = totalCount ? Math.round(doneCount / totalCount * 100) + "%" : "0%";
   document.getElementById("progressLabel").textContent = `${doneCount} / ${totalCount} 完成`;
 
+  filtered = filtered.sort(todoSort);
   const list = document.getElementById("todoList");
   if (!filtered.length) {
     const emptyMsgs = {
@@ -121,34 +126,79 @@ function renderTab() {
   const priorityColors = { HIGH: "badge-new", MEDIUM: "badge-read", LOW: "badge-declined" };
   const priorityLabels = { HIGH: "优先", MEDIUM: "中等", LOW: "不急" };
 
-  list.innerHTML = filtered.map(t => `
-    <article class="card">
-      <div class="flex-between mb-1">
-        <strong>${esc(t.taskName)}</strong>
-        <span class="badge ${priorityColors[t.priority] || 'badge-read'}">${priorityLabels[t.priority] || t.priority || "中等"}</span>
+  const doing = todos.filter(t => t.status === "DOING").length;
+  const active = todos.filter(t => t.status === "TODO" || t.status === "DOING").length;
+  const overdue = todos.filter(t => isOverdue(t)).length;
+  list.innerHTML = `
+    <div class="todo-summary-strip">
+      <div><span class="muted">正在推进</span><strong>${doing}</strong></div>
+      <div><span class="muted">未完成</span><strong>${active}</strong></div>
+      <div><span class="muted">已过期</span><strong>${overdue}</strong></div>
+    </div>
+    <div class="todo-stack">
+      ${filtered.map(t => `
+      <article class="todo-card status-${String(t.status || "TODO").toLowerCase()} priority-${String(t.priority || "MEDIUM").toLowerCase()}">
+        <div class="todo-main">
+          <span class="todo-status-dot"></span>
+          <div>
+            <div class="flex-between mb-1">
+              <strong>${esc(t.taskName)}</strong>
+              <span class="badge ${priorityColors[t.priority] || 'badge-read'}">${priorityLabels[t.priority] || t.priority || "中等"}</span>
+            </div>
+            <p class="muted">${esc(shortDescription(t.description || ""))}</p>
+            <div class="pill-row mt-1">
+              <span class="pill">${statusLabel(t.status)}</span>
+              ${t.deadline ? `<span class="pill ${isOverdue(t) ? "urgent" : ""}">截止 ${IC.formatTime(t.deadline)}</span>` : ""}
+              ${t.sourceMemoryCardId ? `<a class="route-hint" href="/pages/memory-starfield.html">来源记忆</a>` : ""}
+            </div>
+          </div>
+        </div>
+        <div class="todo-actions">
+          ${currentTab === "today" || currentTab === "week" ? `
+            <button onclick="updateStatus(${t.id},'DOING')">开始</button>
+            <button onclick="updateStatus(${t.id},'DONE')">完成</button>
+            <button onclick="splitTodo(${t.id})">拆第一步</button>
+            <button onclick="editTodo(${t.id})">编辑</button>
+            <button class="ghost" onclick="updateStatus(${t.id},'CANCELLED')">放下</button>
+          ` : ""}
+          ${currentTab === "done" ? `
+            <button onclick="updateStatus(${t.id},'TODO')">重新打开</button>
+            <button onclick="editTodo(${t.id})">编辑</button>
+          ` : ""}
+          ${currentTab === "letgo" ? `
+            <button onclick="updateStatus(${t.id},'TODO')">重新拾起</button>
+            <button class="ghost" onclick="deleteTodo(${t.id})">删除</button>
+          ` : ""}
+        </div>
+      </article>
+      `).join("")}
       </div>
-      <p class="muted">${esc(t.description || "")}</p>
-      ${t.deadline ? `<p class="muted mt-1" style="font-size:.82rem">截止：${IC.formatTime(t.deadline)}</p>` : ""}
-      ${t.sourceMemoryCardId ? `<a class="route-hint mt-1" href="/pages/memory-starfield.html">来源记忆</a>` : ""}
-      <div class="row gap-sm mt-2">
-        ${currentTab === "today" || currentTab === "week" ? `
-          <button onclick="updateStatus(${t.id},'DOING')">开始</button>
-          <button onclick="updateStatus(${t.id},'DONE')">完成</button>
-          <button onclick="updateStatus(${t.id},'CANCELLED')">放下</button>
-          <button onclick="editTodo(${t.id})">修改</button>
-        ` : ""}
-        ${currentTab === "done" ? `
-          <button onclick="updateStatus(${t.id},'TODO')">重新打开</button>
-          <button onclick="editTodo(${t.id})">修改</button>
-        ` : ""}
-        ${currentTab === "letgo" ? `
-          <button onclick="updateStatus(${t.id},'TODO')">重新拾起</button>
-          <button onclick="deleteTodo(${t.id})">彻底删除</button>
-        ` : ""}
-      </div>
-    </article>
-  `).join("");
+    `;
   IC.stagger(list);
+}
+
+function todoSort(a, b) {
+  const statusRank = { DOING: 0, TODO: 1, DONE: 2, CANCELLED: 3 };
+  const priorityRank = { HIGH: 0, MEDIUM: 1, LOW: 2 };
+  const deadlineA = a.deadline ? new Date(a.deadline).getTime() : Number.MAX_SAFE_INTEGER;
+  const deadlineB = b.deadline ? new Date(b.deadline).getTime() : Number.MAX_SAFE_INTEGER;
+  return (statusRank[a.status] ?? 9) - (statusRank[b.status] ?? 9)
+      || (priorityRank[a.priority] ?? 1) - (priorityRank[b.priority] ?? 1)
+      || deadlineA - deadlineB
+      || (b.id || 0) - (a.id || 0);
+}
+
+function isOverdue(t) {
+  return t.deadline && !["DONE", "CANCELLED"].includes(t.status) && new Date(t.deadline).getTime() < Date.now();
+}
+
+function statusLabel(status) {
+  return ({ TODO: "待开始", DOING: "正在做", DONE: "已完成", CANCELLED: "已放下" })[status] || status || "待开始";
+}
+
+function shortDescription(text) {
+  const clean = String(text || "").trim();
+  return clean.length > 160 ? clean.slice(0, 160) + "..." : clean;
 }
 
 async function createTodo(event) {
@@ -238,11 +288,20 @@ async function updateStatus(id, status) {
   load();
 }
 
+async function splitTodo(id) {
+  const r = await API.todoSplit(id);
+  if (r.success) {
+    IC.toast("Aurora 已把它拆成更小的第一步", "success");
+    load();
+  }
+}
+
 async function deleteTodo(id) {
   await API.todoDelete(id);
   IC.toast("已删除", "success");
   load();
 }
+IC.hideLoading();
 </script>
 </body>
 </html>

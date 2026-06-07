@@ -21,10 +21,11 @@
   </style>
 </head>
 <body>
-<main class="shell">
+<main id="main" class="shell">
+  <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
   <span class="route-hint">情绪天气</span>
-  <h1>情绪时间线</h1>
+  <h1 id="page-title">情绪时间线</h1>
   <p class="muted mb-2">从 Daily Record 汇总出来的情绪曲线。粉色的点是高 gravity 记忆出现的日子 —— 那往往是值得回看的转折。</p>
 
   <div class="row gap-sm mb-2">
@@ -58,6 +59,8 @@ IC.ensureDemoLogin().then(() => loadRange(7));
 
 let currentRange = 7;
 let trendData = [];
+let todayData = null;
+let rangeData = [];
 
 function esc(t) { return IC.esc(t); }
 
@@ -68,7 +71,13 @@ async function loadRange(days) {
   const tRes = await API.emotionTrend(days);
   const pRes = await API.emotionPatterns(days);
   const sRes = await API.emotionStability(days);
+  const todayRes = await API.emotionToday();
+  const end = new Date();
+  const start = new Date(Date.now() - (days - 1) * 86400000);
+  const rangeRes = await API.emotionRange(start.toISOString().slice(0, 10), end.toISOString().slice(0, 10));
   trendData = (tRes.success ? tRes.data : []) || [];
+  todayData = todayRes.success ? todayRes.data : null;
+  rangeData = (rangeRes.success ? rangeRes.data : []) || [];
   renderChart();
   renderStats(sRes, pRes);
   renderPatterns(pRes);
@@ -118,6 +127,8 @@ function renderStats(sRes, pRes) {
   const peakDay = trendData.reduce((m, d) => (!m || d.score > m.score) ? d : m, null);
   stats.innerHTML = `
     <div class="et-stat"><span class="muted">最近 ${currentRange} 天</span><div class="num">${currentRange}</div><span class="muted" style="font-size:.78rem">情绪样本</span></div>
+    <div class="et-stat"><span class="muted">今日情绪</span><div class="num" style="font-size:1.4rem">${esc(todayData?.primaryEmotion || todayData?.emotionWeather || "-")}</div><span class="muted" style="font-size:.78rem">${todayData?.date || "今日"}</span></div>
+    <div class="et-stat"><span class="muted">范围原始记录</span><div class="num">${rangeData.length}</div><span class="muted" style="font-size:.78rem">来自 emotion/range</span></div>
     <div class="et-stat"><span class="muted">平均强度</span><div class="num">${avgScore}</div><span class="muted" style="font-size:.78rem">0-10 量表</span></div>
     <div class="et-stat"><span class="muted">最强烈的一天</span><div class="num" style="font-size:1.4rem">${peakDay ? (peakDay.score || "-") : "-"}</div><span class="muted" style="font-size:.78rem">${peakDay ? esc((peakDay.date || "").slice(5)) : ""}</span></div>
     <div class="et-stat"><span class="muted">稳定性</span><div class="num">${stability != null ? Math.round(stability * 100) + "%" : "-"}</div><span class="muted" style="font-size:.78rem">越高越稳</span></div>
@@ -130,6 +141,7 @@ function renderPatterns(pRes) {
   if (!patterns.length) { el.innerHTML = `<span class="muted">最近还没有识别出明显的反复模式。</span>`; return; }
   el.innerHTML = patterns.map(p => `<span class="pill">${esc(p)}</span>`).join("");
 }
+IC.hideLoading();
 </script>
 </body>
 </html>

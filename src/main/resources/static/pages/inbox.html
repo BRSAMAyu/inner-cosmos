@@ -3,14 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>信箱 · Inner Cosmos</title>
   <link rel="stylesheet" href="/css/app.css">
 </head>
 <body>
-<main class="shell">
+<main id="main" class="shell">
+  <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
 
   <span class="route-hint">慢连接信箱</span>
-  <h1>慢信箱</h1>
+  <h1 id="page-title">慢信箱</h1>
   <p class="muted mb-2">每一封信都穿过了一段宇宙距离。</p>
 
   <!-- Tab bar -->
@@ -208,6 +210,7 @@ async function submitReport(id) {
   closeLetterDetail();
   load();
 }
+IC.hideLoading();
 </script>
 </body>
 </html>

@@ -1,0 +1,106 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - link "跳到主要内容" [ref=e3] [cursor=pointer]:
+      - /url: "#main"
+    - generic [ref=e4]:
+      - link "Inner Cosmos" [ref=e5] [cursor=pointer]:
+        - /url: /pages/dashboard.html
+        - generic [ref=e6]: Inner Cosmos
+      - navigation "主导航" [ref=e7]:
+        - link "核心" [ref=e8] [cursor=pointer]:
+          - /url: /pages/dashboard.html
+        - link "Aurora" [ref=e9] [cursor=pointer]:
+          - /url: /pages/aurora-chat.html
+        - link "记录" [ref=e10] [cursor=pointer]:
+          - /url: /pages/daily-record.html
+        - link "日记" [ref=e11] [cursor=pointer]:
+          - /url: /pages/heart-diary.html
+        - link "星图" [ref=e12] [cursor=pointer]:
+          - /url: /pages/memory-starfield.html
+        - link "待办" [ref=e13] [cursor=pointer]:
+          - /url: /pages/todo.html
+        - link "星海" [ref=e14] [cursor=pointer]:
+          - /url: /pages/echo-plaza.html
+        - link "好友" [ref=e15] [cursor=pointer]:
+          - /url: /pages/social.html
+        - link "慢信" [ref=e16] [cursor=pointer]:
+          - /url: /pages/slow-letter.html
+        - link "信箱" [ref=e17] [cursor=pointer]:
+          - /url: /pages/inbox.html
+        - link "时间轴" [ref=e18] [cursor=pointer]:
+          - /url: /pages/timeline.html
+        - link "情绪" [ref=e19] [cursor=pointer]:
+          - /url: /pages/emotion-timeline.html
+        - link "主题" [ref=e20] [cursor=pointer]:
+          - /url: /pages/themes.html
+        - link "关系" [ref=e21] [cursor=pointer]:
+          - /url: /pages/relations.html
+        - link "信念" [ref=e22] [cursor=pointer]:
+          - /url: /pages/beliefs.html
+        - link "避风港" [ref=e23] [cursor=pointer]:
+          - /url: /pages/safety-harbor.html
+        - link "设置" [ref=e24] [cursor=pointer]:
+          - /url: /pages/settings.html
+        - link "管理" [ref=e25] [cursor=pointer]:
+          - /url: /pages/admin.html
+      - button "主题：自动跟随系统" [ref=e26] [cursor=pointer]: ◐
+    - generic [ref=e27]:
+      - generic [ref=e29]: 你先安全，其他都先等等
+      - heading "安全避风港" [level=1] [ref=e30]
+      - paragraph [ref=e31]: 这里没有任务、没有进度。你可以先停下来。
+    - generic [ref=e32]:
+      - heading "紧急资源" [level=2] [ref=e33]
+      - paragraph [ref=e34]: 如果你或身边的人正经历危机，请拨打以下电话。
+      - generic [ref=e35]:
+        - article [ref=e36]:
+          - paragraph [ref=e37]: 如果你正处于紧急危险中,请立即联系当地急救或可信赖的现实支持者.
+        - article [ref=e38]:
+          - paragraph [ref=e39]: Inner Cosmos 不提供心理诊断,也不替代医生、咨询师或热线.
+        - article [ref=e40]:
+          - paragraph [ref=e41]: 你可以先离开屏幕,喝水,呼吸,并联系一个真实的人.
+    - generic [ref=e42]:
+      - heading "呼吸练习" [level=2] [ref=e43]
+      - paragraph [ref=e44]: 跟着圆圈呼吸。吸气时圆圈变大，呼气时变小。
+      - paragraph [ref=e47]: 吸气... 呼气...
+    - generic [ref=e48]:
+      - heading "着陆练习 (5-4-3-2-1)" [level=2] [ref=e49]
+      - paragraph [ref=e50]: 当你觉得不真实或焦虑上升时，试着找到：
+      - generic [ref=e51]:
+        - generic [ref=e52]:
+          - strong [ref=e53]: 5 件你能看到的东西
+          - paragraph [ref=e54]: 慢慢环顾四周，数出来。
+        - generic [ref=e55]:
+          - strong [ref=e56]: 4 件你能摸到的东西
+          - paragraph [ref=e57]: 感受它们的温度和质地。
+        - generic [ref=e58]:
+          - strong [ref=e59]: 3 件你能听到的声音
+          - paragraph [ref=e60]: 闭上眼睛，专注倾听。
+        - generic [ref=e61]:
+          - strong [ref=e62]: 2 件你能闻到的气味
+          - paragraph [ref=e63]: 即使很淡的味道也算。
+        - generic [ref=e64]:
+          - strong [ref=e65]: 1 件你能尝到的味道
+          - paragraph [ref=e66]: 可以喝一口水，感受它。
+    - generic [ref=e67]:
+      - heading "你可以先做的事" [level=2] [ref=e68]
+      - generic [ref=e69]:
+        - article [ref=e70]:
+          - strong [ref=e71]: 喝一杯温水
+          - paragraph [ref=e72]: 慢慢喝，感受水的温度。
+        - article [ref=e73]:
+          - strong [ref=e74]: 打开窗户
+          - paragraph [ref=e75]: 让新鲜空气进来。
+        - article [ref=e76]:
+          - strong [ref=e77]: 给信任的人发一条消息
+          - paragraph [ref=e78]: 不需要说太多，"我需要你"就够了。
+        - article [ref=e79]:
+          - strong [ref=e80]: 放下手机五分钟
+          - paragraph [ref=e81]: 什么都不要做，只是坐着。
+    - generic [ref=e82]:
+      - link "和 Aurora 聊聊" [ref=e83] [cursor=pointer]:
+        - /url: /pages/aurora-chat.html
+      - link "返回核心" [ref=e84] [cursor=pointer]:
+        - /url: /pages/dashboard.html
+  - generic [ref=e85]:
+    - button "❚❚" [ref=e86] [cursor=pointer]
+    - button "◐" [ref=e87] [cursor=pointer]

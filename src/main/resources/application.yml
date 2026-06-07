@@ -1,28 +1,96 @@
+# Inner Cosmos — Production Configuration
+# Environment variable overrides (use -D or system env):
+#   SPRING_PROFILES_ACTIVE=prod
+#   DATABASE_URL=jdbc:mysql://host:3306/innercosmos
+#   CORS_ALLOWED_ORIGINS=https://yourdomain.com
+
 server:
-  port: 8080
+  port: ${SERVER_PORT:8080}
+  # Graceful shutdown: wait 30s for in-flight requests
+  shutdown: graceful
+  tomcat:
+    threads:
+      max: 200
+      min-spare: 10
+    connection-timeout: 15000
 
 spring:
   application:
     name: inner-cosmos
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  # ── Development (H2, no auth) ────────────────────────────
   datasource:
     driver-class-name: org.h2.Driver
-    url: jdbc:h2:mem:innercosmos;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+    url: jdbc:h2:file:./data/innercosmos;MODE=MySQL;DATABASE_TO_LOWER=TRUE;AUTO_RECONNECT=TRUE;DB_CLOSE_DELAY=-1
     username: sa
     password:
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      idle-timeout: 300000
+      max-lifetime: 600000
+      connection-timeout: 15000
+      leak-detection-threshold: 60000
+
+  # ── Production (MySQL) — uncomment spring.profiles.active=prod ──
+  # datasource:
+  #   url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:innercosmos}?useSSL=true&requireSSL=true&serverTimezone=UTC
+  #   username: ${DB_USER}
+  #   password: ${DB_PASSWORD}
+  #   driver-class-name: com.mysql.cj.jdbc.Driver
+  #   hikari:
+  #     maximum-pool-size: 20
+  #     minimum-idle: 5
+  #     idle-timeout: 600000
+  #     max-lifetime: 1800000
+  #     connection-timeout: 20000
+  #     leak-detection-threshold: 120000
+
   sql:
     init:
-      mode: always
+      mode: ${SQL_INIT_MODE:always}
       encoding: UTF-8
   h2:
     console:
-      enabled: false # Enable for development only
-      path: /h2-console
+      enabled: false  # Never enable in production
   jackson:
     default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+  # Graceful shutdown: wait for async tasks
+  task:
+    execution:
+      pool:
+        core-size: 4
+        max-size: 20
+        queue-capacity: 100
+      thread-name-prefix: async-
+    shutdown:
+      await-termination: true
+      await-termination-period: 30s
+
+# ── Actuator (production monitoring) ──────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus,info
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when_authorized
+      show-components: when_authorized
+  health:
+    db:
+      enabled: true
+    diskspace:
+      enabled: true
 
 mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
   global-config:
     db-config:
       id-type: auto
@@ -30,21 +98,24 @@ mybatis-plus:
 llm:
   mode: ${LLM_MODE:prod}
   provider: ${LLM_PROVIDER:minimax}
-  api-key: ${LLM_API_KEY:REMOVED_FROM_HISTORY}
+  api-key: ${LLM_API_KEY}
   base-url: ${LLM_BASE_URL:}
   model: ${LLM_MODEL:MiniMax-M2.7}
-  allow-fallback: ${LLM_ALLOW_FALLBACK:false}
+  allow-fallback: ${LLM_ALLOW_FALLBACK:true}
   asr-provider: ${ASR_PROVIDER:mimo}
+  failover-providers: ${LLM_FAILOVER_PROVIDERS:minimax,mimo,glm,deepseek}
   prompt:
-    language: ${LLM_PROMPT_LANGUAGE:zh-CN}  # zh-CN for Chinese, en-US for English
+    language: ${LLM_PROMPT_LANGUAGE:zh-CN}
   mimo:
-    api-key: ${MIMO_API_KEY:tp-cgqfqmlacq35o53s29s6ce5r6qn57cdw717s1n7fi4up27ds}
+    api-key: ${MIMO_API_KEY}
+    model: ${MIMO_MODEL:mimo-v2.5}
+    base-url: ${MIMO_BASE_URL:https://api.xiaomimimo.com/v1/chat/completions}
     asr-model: ${MIMO_ASR_MODEL:mimo-v2.5-asr}
     asr-base-url: ${MIMO_ASR_BASE_URL:https://token-plan-cn.xiaomimimo.com/v1}
     asr-language: ${MIMO_ASR_LANGUAGE:auto}
     timeout-ms: ${MIMO_TIMEOUT_MS:30000}
   glm:
-    api-key: ${GLM_API_KEY:}
+    api-key: ${GLM_API_KEY}
     model: ${GLM_MODEL:glm-4-flash}
     base-url: ${GLM_BASE_URL:https://open.bigmodel.cn/api/paas/v4/chat/completions}
     timeout-ms: ${GLM_TIMEOUT_MS:20000}
@@ -52,18 +123,19 @@ llm:
     asr-model: ${GLM_ASR_MODEL:glm-asr-2512}
     asr-base-url: ${GLM_ASR_BASE_URL:https://open.bigmodel.cn/api/paas/v4/audio/transcriptions}
   minimax:
-    api-key: ${MINIMAX_API_KEY:${LLM_API_KEY:REMOVED_FROM_HISTORY}}
+    api-key: ${MINIMAX_API_KEY:${LLM_API_KEY}}
     model: ${MINIMAX_MODEL:MiniMax-M2.7}
     base-url: ${MINIMAX_BASE_URL:https://api.minimaxi.com/v1/chat/completions}
     timeout-ms: ${MINIMAX_TIMEOUT_MS:30000}
   deepseek:
-    api-key: ${DEEPSEEK_API_KEY:}
+    api-key: ${DEEPSEEK_API_KEY}
     model: ${DEEPSEEK_MODEL:deepseek-chat}
     base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
     timeout-ms: ${DEEPSEEK_TIMEOUT_MS:30000}
 
 inner-cosmos:
   demo:
-    seed-enabled: true
+    seed-enabled: ${SEED_ENABLED:false}
   security:
     session-user-key: LOGIN_USER_ID
+    cors-origins: ${CORS_ALLOWED_ORIGINS:}

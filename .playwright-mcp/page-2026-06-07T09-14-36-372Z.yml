@@ -1,0 +1,111 @@
+- generic [ref=e1]:
+  - main [ref=e2]:
+    - link "跳到主要内容" [ref=e3] [cursor=pointer]:
+      - /url: "#main"
+    - generic [ref=e4]:
+      - link "Inner Cosmos" [ref=e5] [cursor=pointer]:
+        - /url: /pages/dashboard.html
+        - generic [ref=e6]: Inner Cosmos
+      - navigation "主导航" [ref=e7]:
+        - link "核心" [ref=e8] [cursor=pointer]:
+          - /url: /pages/dashboard.html
+        - link "Aurora" [ref=e9] [cursor=pointer]:
+          - /url: /pages/aurora-chat.html
+        - link "记录" [ref=e10] [cursor=pointer]:
+          - /url: /pages/daily-record.html
+        - link "日记" [ref=e11] [cursor=pointer]:
+          - /url: /pages/heart-diary.html
+        - link "星图" [ref=e12] [cursor=pointer]:
+          - /url: /pages/memory-starfield.html
+        - link "待办" [ref=e13] [cursor=pointer]:
+          - /url: /pages/todo.html
+        - link "星海" [ref=e14] [cursor=pointer]:
+          - /url: /pages/echo-plaza.html
+        - link "好友" [ref=e15] [cursor=pointer]:
+          - /url: /pages/social.html
+        - link "慢信" [ref=e16] [cursor=pointer]:
+          - /url: /pages/slow-letter.html
+        - link "信箱" [ref=e17] [cursor=pointer]:
+          - /url: /pages/inbox.html
+        - link "时间轴" [ref=e18] [cursor=pointer]:
+          - /url: /pages/timeline.html
+        - link "情绪" [ref=e19] [cursor=pointer]:
+          - /url: /pages/emotion-timeline.html
+        - link "主题" [ref=e20] [cursor=pointer]:
+          - /url: /pages/themes.html
+        - link "关系" [ref=e21] [cursor=pointer]:
+          - /url: /pages/relations.html
+        - link "信念" [ref=e22] [cursor=pointer]:
+          - /url: /pages/beliefs.html
+        - link "避风港" [ref=e23] [cursor=pointer]:
+          - /url: /pages/safety-harbor.html
+        - link "设置" [ref=e24] [cursor=pointer]:
+          - /url: /pages/settings.html
+        - link "管理" [ref=e25] [cursor=pointer]:
+          - /url: /pages/admin.html
+      - button "主题：自动跟随系统" [ref=e26] [cursor=pointer]: ◐
+    - generic [ref=e27]:
+      - generic [ref=e28]:
+        - generic [ref=e29]:
+          - generic [ref=e30]: 共享内核的朋友型 Agent
+          - heading "Aurora" [level=1] [ref=e31]
+          - paragraph [ref=e32]: Aurora 会根据上下文决定说一条、两条或三条消息。不同模式不是换机器人，而是同一个朋友换一种陪伴方式。
+          - paragraph [ref=e33]: minimax / MiniMax-M2.7 · 真实模型已配置 · fallback 关闭 · ASR mimo / mimo-v2.5-asr
+        - generic [ref=e34]:
+          - button "节律检查" [ref=e35] [cursor=pointer]
+          - button "沉淀今天" [ref=e36] [cursor=pointer]
+      - generic [ref=e37]:
+        - button "听 今日倾诉" [ref=e38] [cursor=pointer]:
+          - generic [ref=e39]: 听
+          - text: 今日倾诉
+        - button "理 思维整理" [ref=e40] [cursor=pointer]:
+          - generic [ref=e41]: 理
+          - text: 思维整理
+        - button "夜 睡前复盘" [ref=e42] [cursor=pointer]:
+          - generic [ref=e43]: 夜
+          - text: 睡前复盘
+        - button "问 苏格拉底追问" [ref=e44] [cursor=pointer]:
+          - generic [ref=e45]: 问
+          - text: 苏格拉底追问
+        - button "行 行动拆解" [ref=e46] [cursor=pointer]:
+          - generic [ref=e47]: 行
+          - text: 行动拆解
+        - button "人 关系复盘" [ref=e48] [cursor=pointer]:
+          - generic [ref=e49]: 人
+          - text: 关系复盘
+      - paragraph [ref=e50]: 先像朋友一样接住当下，不急着分析。
+      - generic [ref=e63]:
+        - generic [ref=e64]:
+          - generic [ref=e65]: 本轮 2 条
+          - generic [ref=e66]: 今日倾诉
+          - generic [ref=e67]: minimax / MiniMax-M2.7
+          - generic [ref=e68]: 真实模型优先
+        - paragraph [ref=e69]: 下午主动问候，连接疲惫天气和活跃待办，营造朋友般自然的陪伴感
+      - generic [ref=e71]:
+        - generic [ref=e72]:
+          - strong [ref=e73]: 记忆镜头
+          - generic [ref=e74]: short_window_plus_salient_long_term_memory
+        - button "展开" [ref=e75] [cursor=pointer]
+    - generic [ref=e52]:
+      - generic [ref=e76]:
+        - generic [ref=e77]:
+          - generic [ref=e78]: ✦
+          - generic [ref=e79]: Aurora
+        - generic [ref=e80]: 下午好呀。这几天课程项目收尾加上考试压力，应该挺累的吧。
+      - generic [ref=e81]:
+        - generic [ref=e82]:
+          - generic [ref=e83]: ✦
+          - generic [ref=e84]: Aurora
+        - generic [ref=e85]: 有什么想聊聊的，或者就想有个人陪着也行。
+      - generic [ref=e86]: 今天挺累的, 写代码感觉没进展
+    - generic [ref=e53]:
+      - generic [ref=e54]:
+        - textbox "把现在最想说的一句话放在这里" [ref=e55]
+        - button "🎙" [ref=e56] [cursor=pointer]
+        - button "发送" [active] [ref=e57] [cursor=pointer]
+      - paragraph [ref=e58]: 语音会尽量尊重原文转写，你可以继续手动修改后再发送。
+  - generic [ref=e87]:
+    - generic: 服务器内部错误，请稍后重试
+  - generic [ref=e59]:
+    - button "❚❚" [ref=e60] [cursor=pointer]
+    - button "◐" [ref=e61] [cursor=pointer]

@@ -15,12 +15,13 @@
   </style>
 </head>
 <body>
-<main class="shell">
+<main id="main" class="shell">
+  <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
   <section class="flex-between mb-2" style="flex-wrap:wrap;gap:12px">
     <div>
       <span class="route-hint">可拖拽的内在星图</span>
-      <h1>记忆星图</h1>
+      <h1 id="page-title">记忆星图</h1>
       <p class="muted">星体大小来自情感重力，连线来自主题关系。拖动画面、滚轮缩放，点击星体查看真实依据。</p>
     </div>
     <div class="row gap-sm">
@@ -48,7 +49,10 @@
   </div>
 </main>
 <script src="/js/app.js"></script>
+<script src="/js/time-system.js"></script>
 <script src="/js/motion.js"></script>
+<script src="/js/weather-system.js"></script>
+<script src="/js/audio-system.js"></script>
 <script src="/js/api.js"></script>
 <script>
 IC.mountShell("记忆星图");
@@ -146,6 +150,14 @@ async function showDetail(id) {
     <span class="route-hint">${esc(detail.theme || detail.memoryType || "")}</span>
     <p class="muted mt-1">${esc(detail.summary || "")}</p>
     <div class="pill-row mt-2"><span class="pill">情感重力 ${Number(detail.gravity || 0).toFixed(2)}</span><span class="pill">新鲜度 ${Math.round((detail.freshness || 0) * 100)}%</span></div>
+    <div class="soft-stage mt-2">
+      <label class="muted" style="display:grid;gap:8px">
+        <span>重要度：<strong id="importanceValue">${Number(detail.importance || 1).toFixed(1)}</strong></span>
+        <input id="importanceSlider" type="range" min="0.5" max="2" step="0.1" value="${Number(detail.importance || 1)}"
+          oninput="document.getElementById('importanceValue').textContent=Number(this.value).toFixed(1)">
+      </label>
+      <button class="mt-1" onclick="saveImportance(${detail.id})">保存重要度</button>
+    </div>
     <div class="soft-stage mt-2"><p class="muted">${esc(detail.gravityExplanation || "这颗星由情绪强度、重要性、出现次数和最近触发共同决定。")}</p></div>
     ${(detail.fragments || []).length ? `<h3>认知碎片</h3><div class="timeline">${detail.fragments.map(f => `<div class="timeline-item"><p>${esc(f)}</p></div>`).join("")}</div>` : ""}
     ${(detail.relatedTodos || []).length ? `<h3>相关待办</h3><div class="timeline">${detail.relatedTodos.map(t => `<div class="timeline-item"><strong>${esc(t.taskName || t)}</strong></div>`).join("")}</div>` : ""}
@@ -156,6 +168,16 @@ async function showDetail(id) {
 
 function closeDrawer() { document.getElementById("drawer").classList.add("hidden"); selectedId = null; render(); }
 async function archiveCard(id) { await API.archiveMemoryCard(id); IC.toast("记忆已归档", "success"); closeDrawer(); load(); }
+async function saveImportance(id) {
+  const importance = Number(document.getElementById("importanceSlider")?.value || 1);
+  const r = await API.updateMemoryImportance(id, importance);
+  if (r.success) {
+    IC.toast("重要度已更新，情感重力会随之调整。", "success");
+    await load();
+    await showDetail(id);
+  }
+}
+IC.hideLoading();
 </script>
 </body>
 </html>

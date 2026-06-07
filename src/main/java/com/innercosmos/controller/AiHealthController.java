@@ -5,13 +5,14 @@ import com.innercosmos.config.LlmConfig;
 import com.innercosmos.entity.AiInteractionLog;
 import com.innercosmos.service.AiLogService;
 import com.innercosmos.vo.AiHealthVO;
+import jakarta.servlet.http.HttpSession;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/ai")
-public class AiHealthController {
+public class AiHealthController extends BaseController {
     private final LlmConfig llmConfig;
     private final AiLogService aiLogService;
 
@@ -21,8 +22,11 @@ public class AiHealthController {
     }
 
     @GetMapping("/health")
-    public ApiResponse<AiHealthVO> health() {
+    public ApiResponse<AiHealthVO> health(HttpSession session) {
+        currentUserId(session);
         AiHealthVO vo = new AiHealthVO();
+        vo.failoverProviders = llmConfig.orderedProviderNames();
+        vo.failoverModels = llmConfig.orderedProviderModels();
         vo.mode = llmConfig.getMode();
         vo.provider = llmConfig.activeProvider();
         vo.model = llmConfig.activeModel();

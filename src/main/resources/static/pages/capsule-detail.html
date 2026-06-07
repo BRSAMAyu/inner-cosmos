@@ -3,10 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>共鸣体详情 · Inner Cosmos</title>
   <link rel="stylesheet" href="/css/app.css">
 </head>
 <body>
-<main class="shell">
+<main id="main" class="shell">
+  <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
 
   <!-- Capsule detail header -->
@@ -29,7 +31,7 @@
         <p class="muted">回声能量</p>
       </div>
       <div class="soft-stage text-center">
-        <strong id="dailyLimit">5</strong>
+        <strong id="dailyLimit">30</strong>
         <p class="muted">每日对话轮数</p>
       </div>
       <div class="soft-stage text-center">
@@ -57,6 +59,13 @@
     </div>
   </section>
 
+  <section class="panel mb-2">
+    <h2>共鸣体知道什么</h2>
+    <div id="contextPreview" class="soft-stage">
+      <p class="muted">正在读取授权上下文...</p>
+    </div>
+  </section>
+
   <!-- Actions -->
   <section class="panel mb-2">
     <h2>互动</h2>
@@ -71,6 +80,7 @@
     <h2>管理我的共鸣体</h2>
     <div class="row gap-sm">
       <button onclick="toggleVisibility()">切换可见性</button>
+      <button onclick="openContextEditor()">编辑上下文与边界</button>
       <button onclick="archiveMyCapsule()" style="color:var(--accent-coral)">归档</button>
     </div>
   </section>
@@ -88,6 +98,7 @@ IC.ensureDemoLogin();
 
 const capsuleId = new URLSearchParams(window.location.search).get("id");
 let capsuleData = null;
+let boundaryData = null;
 let isOwner = false;
 
 function esc(text) { return IC.esc(text); }
@@ -110,8 +121,12 @@ async function init() {
   /* Check boundary info */
   try {
     const br = await API.capsuleBoundary(Number(capsuleId));
-    if (br.success && br.data) renderBoundary(br.data);
+    if (br.success && br.data) {
+      boundaryData = br.data;
+      renderBoundary(br.data);
+    }
   } catch(e) {}
+  await loadContextPreview();
 
   /* Check if owner */
   const myCaps = await API.myCapsules();
@@ -126,7 +141,10 @@ function renderDetail(c) {
   document.getElementById("capsuleIntro").textContent = c.intro || "一枚数字回声。";
   document.getElementById("capsuleType").textContent = c.capsuleType === "SEED_CAPSULE" || c.capsuleType === "SEED" ? "种子" : "用户";
   document.getElementById("echoEnergy").textContent = (c.echoEnergy || 0).toFixed(2);
-  document.getElementById("dailyLimit").textContent = c.conversationLimitPerDay || 5;
+  document.getElementById("dailyLimit").textContent =
+    (c.capsuleType === "SEED_CAPSULE" || c.capsuleType === "SEED" || Number(c.conversationLimitPerDay) <= 0)
+      ? "不限"
+      : (c.conversationLimitPerDay || 30);
   document.getElementById("letterAllowed").textContent = c.allowLetterRequest ? "允许" : "不允许";
 
   const tags = (c.publicTags || "").split(",").filter(Boolean);
@@ -139,8 +157,8 @@ function renderDetail(c) {
 }
 
 function renderBoundary(b) {
-  const allow = (b.allowTopics || "").split(",").filter(Boolean);
-  const block = (b.blockedTopics || "").split(",").filter(Boolean);
+  const allow = parseList(b.allowTopics);
+  const block = parseList(b.blockedTopics);
 
   document.getElementById("allowTopics").innerHTML = allow.map(t =>
     `<span class="pill">${esc(t.trim())}</span>`
@@ -174,6 +192,74 @@ async function archiveMyCapsule() {
   `);
 }
 
+function parseList(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value.filter(Boolean);
+  const text = String(value);
+  try {
+    const parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) return parsed.filter(Boolean);
+  } catch(e) {}
+  return text.split(",").map(x => x.trim()).filter(Boolean);
+}
+
+async function loadContextPreview() {
+  const box = document.getElementById("contextPreview");
+  try {
+    const r = await API.capsuleContextPreview(Number(capsuleId));
+    if (!r.success || !r.data) return;
+    const d = r.data;
+    const ids = d.authorizedMemoryIds || [];
+    box.innerHTML = `
+      <p class="muted">${esc(d.desensitizedSummary || d.contextPreview || d.visibleSummary || "当前共鸣体只会读取授权后的脱敏摘要。")}</p>
+      <div class="pill-row mt-1">
+        ${ids.map(id => `<span class="pill">memory #${esc(id)}</span>`).join("")}
+        ${d.styleProfile ? `<span class="pill">风格画像已生成</span>` : ""}
+        ${d.privacy ? `<span class="pill">${esc(d.privacy)}</span>` : ""}
+      </div>
+    `;
+  } catch (e) {
+    box.innerHTML = '<p class="muted">上下文预览暂时不可用。</p>';
+  }
+}
+
+function openContextEditor() {
+  if (!capsuleData) return;
+  const b = boundaryData || {};
+  IC.showModal(`
+    <h2>编辑共鸣体</h2>
+    <label class="muted">补充经历/说明<textarea id="ctxNote" rows="4">${esc(capsuleData.ownerContextNote || "")}</textarea></label>
+    <label class="muted">公开标签<input id="ctxTags" value="${esc(capsuleData.publicTags || "")}"></label>
+    <label class="muted">允许话题<input id="allowEdit" value="${esc(parseList(b.allowTopics).join(","))}"></label>
+    <label class="muted">禁止话题<input id="blockEdit" value="${esc(parseList(b.blockedTopics).join(","))}"></label>
+    <label class="muted">轮次上限<input id="turnEdit" type="number" min="1" max="50" value="${Number(b.maxConversationTurns || capsuleData.conversationLimitPerDay || 30)}"></label>
+    <label class="muted"><input id="standInEdit" type="checkbox" ${capsuleData.standInEnabled ? "checked" : ""}> 允许离线代回声</label>
+    <div class="row gap-sm mt-2"><button onclick="saveContextEditor()">保存</button><button onclick="IC.closeModal()">取消</button></div>
+  `);
+}
+
+async function saveContextEditor() {
+  const contextBody = {
+    ownerContextNote: document.getElementById("ctxNote").value.trim(),
+    publicTags: document.getElementById("ctxTags").value.trim(),
+    standInEnabled: document.getElementById("standInEdit").checked
+  };
+  const boundaryBody = {
+    allowTopics: JSON.stringify(document.getElementById("allowEdit").value.split(",").map(x => x.trim()).filter(Boolean)),
+    blockedTopics: JSON.stringify(document.getElementById("blockEdit").value.split(",").map(x => x.trim()).filter(Boolean)),
+    maxConversationTurns: Math.min(50, Math.max(1, Number(document.getElementById("turnEdit").value || 30))),
+    allowLetterRequest: true,
+    privacyLevel: boundaryData?.privacyLevel || "STRICT"
+  };
+  const cr = await API.updateCapsuleContext(capsuleData.id, contextBody);
+  const br = await API.updateCapsuleBoundary(capsuleData.id, boundaryBody);
+  if (cr.success && br.success) {
+    IC.closeModal();
+    IC.toast("共鸣体上下文与边界已更新。", "success");
+    await init();
+  }
+}
+
 async function confirmArchive() {
   await API.archiveCapsule(capsuleData.id);
   IC.closeModal();
@@ -182,6 +268,7 @@ async function confirmArchive() {
 }
 
 init();
+IC.hideLoading();
 </script>
 </body>
 </html>

@@ -1,5 +1,6 @@
 param(
     [string]$Profile = "",
+    [int]$Port = 8081,
     [switch]$DownloadOnly
 )
 
@@ -27,5 +28,6 @@ $args = @("spring-boot:run")
 if ($Profile) {
     $args += "-Dspring-boot.run.profiles=$Profile"
 }
+$args += "-Dspring-boot.run.arguments=--server.port=$Port"
 
 & $mavenCmd @args

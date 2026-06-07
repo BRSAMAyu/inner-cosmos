@@ -91,11 +91,12 @@
   </style>
 </head>
 <body>
-<main class="shell">
+<main id="main" class="shell">
+  <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
 
   <span class="route-hint">记录流淌的内在</span>
-  <h1>心声日记</h1>
+  <h1 id="page-title">心声日记</h1>
   <p class="muted mb-2">不必有逻辑地去写，甚至可以直接用麦克风倾诉。我们为你提取意义。</p>
 
   <div class="letter-layout">
@@ -146,7 +147,10 @@
 </main>
 
 <script src="/js/app.js"></script>
+<script src="/js/time-system.js"></script>
 <script src="/js/motion.js"></script>
+<script src="/js/weather-system.js"></script>
+<script src="/js/audio-system.js"></script>
 <script src="/js/api.js"></script>
 <script>
 IC.mountShell("心声日记");
@@ -377,9 +381,37 @@ async function switchPolish(level) {
   document.getElementById("btnSubmit").disabled = false;
 
   if (pr.success && pr.data) {
-    polishedTexts[level] = pr.data.polishedText;
+    polishedTexts[level] = cleanPolishedDisplay(pr.data.polishedText);
     area.value = polishedTexts[level];
   }
+}
+
+function cleanPolishedDisplay(text) {
+  let value = String(text || "").trim();
+  value = value.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+  value = value.replace(/^```(?:json|markdown|text)?\s*/i, "").replace(/```\s*$/i, "").trim();
+  const jsonMatch = value.match(/"(?:polishedText|polished|result|content|text)"\s*:\s*"((?:\\.|[^"\\])*)"/is);
+  if (jsonMatch) {
+    value = jsonMatch[1].replace(/\\n/g, "\n").replace(/\\"/g, "\"").replace(/\\\\/g, "\\").trim();
+  }
+  const markers = ["润色后的正文：", "润色后正文：", "最终正文：", "最终结果：", "输出：", "正文："];
+  for (const marker of markers) {
+    const idx = value.lastIndexOf(marker);
+    if (idx >= 0) value = value.slice(idx + marker.length).trim();
+  }
+  return value.split(/\r?\n/)
+    .filter(line => {
+      const t = line.trim();
+      if (!t) return true;
+      return !t.startsWith("你是 Inner Cosmos")
+        && !t.startsWith("只返回")
+        && !t.startsWith("不要添加")
+        && !t.startsWith("原文：")
+        && !t.toLowerCase().includes("prompt");
+    })
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 async function submitDiary() {
@@ -440,6 +472,7 @@ function createStarParticles() {
     setTimeout(() => star.remove(), 1500);
   }
 }
+IC.hideLoading();
 </script>
 </body>
 </html>

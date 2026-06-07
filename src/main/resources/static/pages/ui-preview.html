@@ -73,11 +73,12 @@
   </style>
 </head>
 <body>
-<main class="shell">
+<main id="main" class="shell">
+  <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
 
   <span class="route-hint">展示用控制台</span>
-  <h1>视觉体验中心</h1>
+  <h1 id="page-title">视觉体验中心</h1>
   <p class="muted mb-2">Inner Cosmos 的 UI 会随时间和天气动态变化。在这里可以主动切换所有状态组合，让评委看到 7 个时段 × 6 种天气 = 42 种不同的内在宇宙。</p>
 
   <div class="preview-grid">
@@ -410,6 +411,7 @@ document.querySelectorAll("#timePicker button").forEach(b => b.classList.toggle(
 document.querySelectorAll("#weatherPicker button").forEach(b => b.classList.toggle("active", b.dataset.weather === currentWeather));
 buildFullPalette();
 applyVisuals();
+IC.hideLoading();
 </script>
 </body>
 </html>

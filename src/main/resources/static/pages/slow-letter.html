@@ -3,10 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>慢信 · Inner Cosmos</title>
   <link rel="stylesheet" href="/css/app.css">
 </head>
 <body>
-<main class="shell">
+<main id="main" class="shell">
+  <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
 
   <section class="letter-layout">
@@ -108,7 +110,7 @@ const urlParams = new URLSearchParams(window.location.search);
 const capsuleIdParam = urlParams.get("capsuleId");
 
 if (!capsuleIdParam) {
-  document.querySelector(".letter-paper").innerHTML = '<div style="text-align:center;padding:40px 20px"><h2>请先选择一个共鸣体作为收信人</h2><p class="muted mt-1">你需要先在星海广场选择一个共鸣体，再写慢信。</p><a class="button mt-2" href="/pages/echo-plaza.html">前往星海广场</a></div>';
+  document.querySelector(".letter-paper-texture").innerHTML = '<div style="text-align:center;padding:40px 20px"><h2>请先选择一个共鸣体作为收信人</h2><p class="muted mt-1">你需要先在星海广场选择一个共鸣体，再写慢信。</p><a class="button mt-2" href="/pages/echo-plaza.html">前往星海广场</a></div>';
 }
 
 /* Pre-fill from URL */
@@ -236,6 +238,7 @@ async function sendLetter() {
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
+IC.hideLoading();
 </script>
 </body>
 </html>

@@ -1,6 +1,8 @@
 package com.innercosmos.vo;
 
 public class AiHealthVO {
+    public java.util.List<String> failoverProviders;
+    public java.util.List<String> failoverModels;
     public String mode;
     public String provider;
     public String model;

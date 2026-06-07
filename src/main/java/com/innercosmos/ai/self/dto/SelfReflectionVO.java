@@ -15,5 +15,6 @@ public class SelfReflectionVO {
     private Double confidence;
     private String status;
     private String riskFlags;
+    private String evidenceRefs;
     private String createdAt;
 }

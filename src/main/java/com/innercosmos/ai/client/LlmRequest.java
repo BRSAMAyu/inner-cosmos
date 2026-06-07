@@ -8,6 +8,7 @@ public class LlmRequest {
     public String moduleName;
     public String prompt;
     public String requestJson;
+    public String preferredProvider;
     public List<String> recentMessages = new ArrayList<>();
     public Boolean forceMock; // Force mock mode for A/B testing
 

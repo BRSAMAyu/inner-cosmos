@@ -87,7 +87,8 @@ public class EmotionTimelineServiceImpl implements EmotionTimelineService {
             }
 
         } catch (Exception e) {
-            // Silently fail - emotion aggregation is not critical
+            org.slf4j.LoggerFactory.getLogger(getClass()).error(
+                    "Emotion aggregation failed for user {} date {}: {}", userId, date, e.getMessage(), e);
         }
     }
 

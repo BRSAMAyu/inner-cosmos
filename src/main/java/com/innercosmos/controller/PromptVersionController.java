@@ -3,6 +3,7 @@ package com.innercosmos.controller;
 import com.innercosmos.common.ApiResponse;
 import com.innercosmos.entity.PromptTemplateEntity;
 import com.innercosmos.service.PromptVersionService;
+import jakarta.servlet.http.HttpSession;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -14,7 +15,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/prompt")
-public class PromptVersionController {
+public class PromptVersionController extends BaseController {
 
     private final PromptVersionService promptVersionService;
 
@@ -23,14 +24,17 @@ public class PromptVersionController {
     }
 
     @GetMapping("/active")
-    public ApiResponse<Map<String, String>> active(@RequestParam String key) {
+    public ApiResponse<Map<String, String>> active(@RequestParam String key, HttpSession session) {
+        currentUserId(session);
         return ApiResponse.ok(Map.of("key", key, "content", promptVersionService.getActivePrompt(key)));
     }
 
     @PostMapping("/create")
     public ApiResponse<PromptTemplateEntity> create(@RequestParam String key,
                                                     @RequestParam String content,
-                                                    @RequestParam(required = false, defaultValue = "") String description) {
+                                                    @RequestParam(required = false, defaultValue = "") String description,
+                                                    HttpSession session) {
+        requireAdmin(session);
         return ApiResponse.ok(promptVersionService.createPrompt(key, content, description));
     }
 
@@ -40,12 +44,14 @@ public class PromptVersionController {
     }
 
     @PostMapping("/rollback")
-    public ApiResponse<PromptTemplateEntity> rollback(@RequestParam String key, @RequestParam int version) {
+    public ApiResponse<PromptTemplateEntity> rollback(@RequestParam String key, @RequestParam int version, HttpSession session) {
+        requireAdmin(session);
         return ApiResponse.ok(promptVersionService.rollbackToVersion(key, version));
     }
 
     @PostMapping("/{id}/toggle")
-    public ApiResponse<Void> toggle(@PathVariable Long id, @RequestParam boolean enabled) {
+    public ApiResponse<Void> toggle(@PathVariable Long id, @RequestParam boolean enabled, HttpSession session) {
+        requireAdmin(session);
         promptVersionService.toggleVersion(id, enabled);
         return ApiResponse.<Void>ok(null);
     }
@@ -59,7 +65,9 @@ public class PromptVersionController {
     public ApiResponse<Void> recordMetrics(@RequestParam String key,
                                            @RequestParam int version,
                                            @RequestParam double successRate,
-                                           @RequestParam double avgLatency) {
+                                           @RequestParam double avgLatency,
+                                           HttpSession session) {
+        requireAdmin(session);
         promptVersionService.recordMetrics(key, version, successRate, avgLatency);
         return ApiResponse.<Void>ok(null);
     }

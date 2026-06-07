@@ -36,11 +36,17 @@ public class NightlyMemorySettlementJob {
     public void nightlyRecalculation() {
         log.info("Nightly memory settlement started");
         List<User> users = userMapper.selectList(null);
+        int failed = 0;
         for (User user : users) {
-            recalculateGravity(user.id);
-            settlementService.updateThemeAggregation(user.id);
+            try {
+                recalculateGravity(user.id);
+                settlementService.updateThemeAggregation(user.id);
+            } catch (Exception e) {
+                failed++;
+                log.error("Nightly settlement failed for user {}: {}", user.id, e.getMessage(), e);
+            }
         }
-        log.info("Nightly memory settlement completed for {} users", users.size());
+        log.info("Nightly memory settlement completed for {} users ({} failed)", users.size(), failed);
     }
 
     private void recalculateGravity(Long userId) {

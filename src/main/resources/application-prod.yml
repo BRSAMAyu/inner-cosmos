@@ -1,22 +1,46 @@
+# Inner Cosmos — Production Profile
+spring.config.activate.on-profile: prod
+
+# Override dev defaults for production
 spring:
   sql:
     init:
-      mode: never
+      mode: never  # Use proper migrations in prod, not schema.sql
   h2:
     console:
       enabled: false
 
+# Production logging — JSON format for ELK stack
+logging:
+  level:
+    root: INFO
+    com.innercosmos: INFO
+    com.innercosmos.ai: WARN
+    com.innercosmos.mapper: WARN
+    org.springframework.web: WARN
+    org.springframework.security: WARN
+  pattern:
+    console: '{"time":"%d{yyyy-MM-dd HH:mm:ss.SSS}","level":"%level","logger":"%logger{36}","msg":"%msg","thread":"%thread"}%n'
+  file:
+    name: /var/log/inner-cosmos/app.log
+    max-size: 100MB
+    max-history: 30
+
+# Actuator — prod specific
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus,info,env,beans
+  endpoint:
+    health:
+      show-details: when_authorized
+
+# Production LLM config — no demo seeds
 llm:
-  mode: ${LLM_MODE:prod}
-  provider: ${LLM_PROVIDER:minimax}
-  api-key: ${LLM_API_KEY:}
-  allow-fallback: ${LLM_ALLOW_FALLBACK:false}
-  minimax:
-    api-key: ${MINIMAX_API_KEY:${LLM_API_KEY:}}
-    model: ${MINIMAX_MODEL:MiniMax-M2.7}
-    base-url: ${MINIMAX_BASE_URL:https://api.minimaxi.com/v1/chat/completions}
-    timeout-ms: ${MINIMAX_TIMEOUT_MS:30000}
+  mode: prod
+  allow-fallback: true
 
 inner-cosmos:
   demo:
-    seed-enabled: ${DEMO_SEED_ENABLED:false}
+    seed-enabled: false

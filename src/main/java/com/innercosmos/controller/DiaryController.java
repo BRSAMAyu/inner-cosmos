@@ -11,7 +11,6 @@ import com.innercosmos.exception.BusinessException;
 import com.innercosmos.mapper.VoiceTranscriptionMapper;
 import com.innercosmos.service.MemorySettlementService;
 import jakarta.servlet.http.HttpSession;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -88,6 +87,10 @@ public class DiaryController extends BaseController {
         if (polished == null || polished.isBlank()) {
             polished = fallbackPolish(level, text);
         }
+        polished = cleanPolishOutput(polished, text);
+        if (polished.isBlank()) {
+            polished = fallbackPolish(level, text);
+        }
         return ApiResponse.ok(Map.of("polishedText", polished.trim()));
     }
 
@@ -108,7 +111,6 @@ public class DiaryController extends BaseController {
     }
 
     @PostMapping("/submit")
-    @Transactional(rollbackFor = Exception.class)
     public ApiResponse<Boolean> submit(@RequestBody Map<String, Object> body, HttpSession session) {
         Long userId = currentUserId(session);
         if (body.get("id") == null) {
@@ -185,5 +187,64 @@ public class DiaryController extends BaseController {
         if (level == 1) return cleaned;
         if (level == 2) return cleaned.replace("。", "。\n");
         return "今天的心声：\n\n" + cleaned.replace("。", "。\n\n");
+    }
+
+    private String cleanPolishOutput(String raw, String originalText) {
+        if (raw == null) return "";
+        String text = raw.trim();
+        text = text.replaceAll("(?is)<think>.*?</think>", "").trim();
+        text = text.replaceAll("(?is)<analysis>.*?</analysis>", "").trim();
+        text = text.replaceAll("(?is)^```(?:json|markdown|text)?\\s*", "")
+                .replaceAll("(?is)```\\s*$", "")
+                .trim();
+
+        java.util.regex.Matcher jsonMatcher = java.util.regex.Pattern
+                .compile("(?is)\"(?:polishedText|polished|result|content|text)\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\"")
+                .matcher(text);
+        String lastJsonValue = null;
+        while (jsonMatcher.find()) {
+            lastJsonValue = jsonMatcher.group(1);
+        }
+        if (lastJsonValue != null) {
+            text = lastJsonValue
+                    .replace("\\n", "\n")
+                    .replace("\\\"", "\"")
+                    .replace("\\\\", "\\")
+                    .trim();
+        }
+
+        for (String marker : new String[]{
+                "润色后的正文：", "润色后正文：", "最终正文：", "最终结果：", "输出：", "正文：",
+                "polishedText:", "result:", "content:"
+        }) {
+            int index = text.lastIndexOf(marker);
+            if (index >= 0) {
+                text = text.substring(index + marker.length()).trim();
+            }
+        }
+
+        StringBuilder cleaned = new StringBuilder();
+        for (String line : text.split("\\R")) {
+            String trimmed = line.trim();
+            if (trimmed.isEmpty()) {
+                if (!cleaned.isEmpty() && cleaned.charAt(cleaned.length() - 1) != '\n') cleaned.append('\n');
+                continue;
+            }
+            if (looksLikePromptLeak(trimmed, originalText)) continue;
+            cleaned.append(line.stripTrailing()).append('\n');
+        }
+        return cleaned.toString()
+                .replaceAll("(?m)^\\s*[-*]\\s*(只返回|不要|原文|任务|要求).*$", "")
+                .replaceAll("\\n{3,}", "\n\n")
+                .trim();
+    }
+
+    private boolean looksLikePromptLeak(String line, String originalText) {
+        String original = originalText == null ? "" : originalText.trim();
+        if (line.startsWith("你是 Inner Cosmos") || line.startsWith("你是Inner Cosmos")) return true;
+        if (line.startsWith("只返回") || line.startsWith("不要解释") || line.startsWith("不要添加")) return true;
+        if (line.startsWith("原文：") || line.startsWith("用户原文：") || (!original.isBlank() && line.equals(original))) return true;
+        if (line.contains("润色助手") || line.contains("档位") || line.toLowerCase().contains("prompt")) return true;
+        return line.startsWith("{") || line.endsWith("}");
     }
 }

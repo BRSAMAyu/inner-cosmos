@@ -23,12 +23,14 @@ public class ABTestController extends BaseController {
     }
 
     @GetMapping("/active")
-    public ApiResponse<ABTestConfig> activeConfig() {
+    public ApiResponse<ABTestConfig> activeConfig(HttpSession session) {
+        currentUserId(session);
         return ApiResponse.ok(abTestService.getActiveConfig());
     }
 
     @PostMapping("/config")
-    public ApiResponse<ABTestConfig> saveConfig(@RequestBody ABTestConfig config) {
+    public ApiResponse<ABTestConfig> saveConfig(@RequestBody ABTestConfig config, HttpSession session) {
+        requireAdmin(session);
         return ApiResponse.ok(abTestService.saveConfig(config));
     }
 
@@ -50,18 +52,21 @@ public class ABTestController extends BaseController {
     }
 
     @GetMapping("/stats")
-    public ApiResponse<Map<String, ABTestService.ABTestStats>> stats(@RequestParam String testName) {
+    public ApiResponse<Map<String, ABTestService.ABTestStats>> stats(@RequestParam String testName, HttpSession session) {
+        currentUserId(session);
         return ApiResponse.ok(abTestService.getAggregatedStats(testName));
     }
 
     @PostMapping("/{id}/toggle")
-    public ApiResponse<Void> toggle(@PathVariable Long id, @RequestParam boolean enabled) {
+    public ApiResponse<Void> toggle(@PathVariable Long id, @RequestParam boolean enabled, HttpSession session) {
+        requireAdmin(session);
         abTestService.toggleTest(id, enabled);
         return ApiResponse.<Void>ok(null);
     }
 
     @PostMapping("/{id}/complete")
-    public ApiResponse<ABTestService.ABTestReport> complete(@PathVariable Long id) {
+    public ApiResponse<ABTestService.ABTestReport> complete(@PathVariable Long id, HttpSession session) {
+        requireAdmin(session);
         return ApiResponse.ok(abTestService.completeTest(id));
     }
 }

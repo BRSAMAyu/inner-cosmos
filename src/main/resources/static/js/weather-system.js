@@ -9,7 +9,9 @@ window.ICWeather = {
     temperature: 22,
     humidity: 60,
     windSpeed: 10,
-    description: '晴朗'
+    description: '晴朗',
+    locationLabel: localStorage.getItem('ic_location_label') || '当前位置',
+    isReal: false
   },
 
   // Weather API configuration
@@ -33,8 +35,11 @@ window.ICWeather = {
 
   // Initialize
   init() {
+    if (this.__icInitialized) return;
+    this.__icInitialized = true;
     this.loadWeatherPreference();
     this.fetchWeather();
+    window.addEventListener('locationChanged', () => this.fetchWeather());
     // Update weather every 30 minutes
     setInterval(() => this.fetchWeather(), 30 * 60 * 1000);
   },
@@ -89,7 +94,11 @@ window.ICWeather = {
           temperature: Math.round(data.current.temperature_2m),
           humidity: data.current.relative_humidity_2m,
           windSpeed: Math.round(data.current.wind_speed_10m),
-          description: this.getWeatherDescription(weatherType)
+          description: this.getWeatherDescription(weatherType),
+          latitude: lat,
+          longitude: lon,
+          locationLabel: localStorage.getItem('ic_location_label') || '当前位置',
+          isReal: true
         };
 
         // Cache the results
@@ -102,6 +111,12 @@ window.ICWeather = {
     } catch (error) {
       console.warn('Failed to fetch weather, using mock:', error);
       this.useMockWeather();
+      this._notifiedOffline = this._notifiedOffline || false;
+      if (!this._notifiedOffline && window.IC && window.IC.toast) {
+        window.IC.toast('网络受限，暂以本地节奏呈现天气。', 'info');
+        this._notifiedOffline = true;
+        setTimeout(() => { this._notifiedOffline = false; }, 12000);
+      }
     }
   },
 
@@ -173,7 +188,9 @@ window.ICWeather = {
     this.mockWeather.type = mockType;
     this.currentWeather = {
       ...this.mockWeather,
-      description: this.getWeatherDescription(mockType)
+      description: this.getWeatherDescription(mockType),
+      locationLabel: localStorage.getItem('ic_location_label') || '演示位置',
+      isReal: false
     };
 
     this.applyWeather(mockType);
@@ -248,7 +265,9 @@ window.ICWeather = {
 
     this.currentWeather = {
       ...this.mockWeather,
-      description: this.getWeatherDescription(type)
+      description: this.getWeatherDescription(type),
+      locationLabel: localStorage.getItem('ic_location_label') || '手动天气',
+      isReal: false
     };
 
     this.applyWeather(type);

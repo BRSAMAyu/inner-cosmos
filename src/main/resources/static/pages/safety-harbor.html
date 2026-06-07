@@ -3,16 +3,18 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>避风港 · Inner Cosmos</title>
   <link rel="stylesheet" href="/css/app.css">
 </head>
 <body>
-<main class="shell">
+<main id="main" class="shell">
+  <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
 
   <div class="text-center" style="padding:24px 0 32px">
     <div class="breathing-circle" style="margin:0 auto 20px"></div>
     <span class="route-hint">你先安全，其他都先等等</span>
-    <h1>安全避风港</h1>
+    <h1 id="page-title">安全避风港</h1>
     <p class="muted">这里没有任务、没有进度。你可以先停下来。</p>
   </div>
 
@@ -99,6 +101,7 @@ setInterval(() => {
   const el = document.getElementById("breathHint");
   if (el) el.textContent = hints[hintIndex];
 }, 3000);
+IC.hideLoading();
 </script>
 </body>
 </html>

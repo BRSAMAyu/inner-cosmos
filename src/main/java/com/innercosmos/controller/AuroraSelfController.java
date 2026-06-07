@@ -74,6 +74,7 @@ public class AuroraSelfController {
             vo.setConfidence(r.confidence);
             vo.setStatus(r.status);
             vo.setRiskFlags(r.riskFlags);
+            vo.setEvidenceRefs(r.evidenceRefs);
             vo.setCreatedAt(r.createdAt != null ? r.createdAt.toString() : null);
             return vo;
         }).collect(Collectors.toList());
@@ -114,6 +115,7 @@ public class AuroraSelfController {
             vo.setConfidence(r.confidence);
             vo.setStatus(r.status);
             vo.setRiskFlags(r.riskFlags);
+            vo.setEvidenceRefs(r.evidenceRefs);
             vo.setCreatedAt(r.createdAt != null ? r.createdAt.toString() : null);
             return vo;
         }).collect(Collectors.toList());
@@ -136,6 +138,21 @@ public class AuroraSelfController {
 
     @PostMapping("/retire")
     public ResponseEntity<?> retireModel(@RequestParam Long userId, @RequestParam Long modelId) {
-        return ResponseEntity.ok(java.util.Map.of("status", "not_implemented_yet"));
+        try {
+            continuityService.retireModel(userId, modelId);
+            return ResponseEntity.ok(java.util.Map.of("status", "retired"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/dismiss")
+    public ResponseEntity<?> dismissCandidate(@RequestParam Long userId, @RequestParam Long candidateId) {
+        try {
+            continuityService.dismissCandidate(userId, candidateId);
+            return ResponseEntity.ok(java.util.Map.of("status", "dismissed"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("error", e.getMessage()));
+        }
     }
 }

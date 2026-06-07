@@ -29,10 +29,11 @@
   </style>
 </head>
 <body>
-<main class="shell">
+<main id="main" class="shell">
+  <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
   <span class="route-hint">你的内在主题</span>
-  <h1>主题云</h1>
+  <h1 id="page-title">主题云</h1>
   <p class="muted mb-2">系统从你的记忆中聚类出反复出现的主题。点击任意一个，查看它背后的故事。</p>
 
   <section class="theme-cloud panel" id="cloud"></section>
@@ -104,6 +105,7 @@ function selectTheme(name, id) {
   `;
   IC.stagger(detail);
 }
+IC.hideLoading();
 </script>
 </body>
 </html>

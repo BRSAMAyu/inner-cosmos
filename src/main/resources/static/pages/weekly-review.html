@@ -51,10 +51,11 @@
   </style>
 </head>
 <body>
-<main class="shell">
+<main id="main" class="shell">
+  <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
   <span class="route-hint">一周的内在总结</span>
-  <h1>成长周报</h1>
+  <h1 id="page-title">成长周报</h1>
   <p class="muted mb-2">过去 7 天你的内在宇宙发生了什么。系统会从记忆、情绪、待办、主题等多个维度生成一份只属于你的总结。</p>
 
   <button class="regenerate-btn mb-2" onclick="generate()">重新生成这一周</button>
@@ -89,7 +90,7 @@ async function generate() {
 }
 
 function showEmpty() {
-  document.getElementById("content").innerHTML = IC.empty("还没有生成过周报。点击"重新生成"开始整理过去 7 天的内在轨迹。");
+  document.getElementById("content").innerHTML = IC.empty("还没有生成过周报。点击「重新生成」开始整理过去 7 天的内在轨迹。");
 }
 
 function render(data) {
@@ -146,6 +147,7 @@ function render(data) {
   `;
   IC.stagger(container);
 }
+IC.hideLoading();
 </script>
 </body>
 </html>

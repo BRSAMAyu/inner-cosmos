@@ -101,7 +101,7 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
         card.emotionTags = jsonArray(ai.memoryCard.emotionTags, List.of("self-observation"));
         card.keywordTags = jsonArray(ai.memoryCard.keywordTags, fallbackKeywords(raw));
         card.peopleTags = jsonArray(ai.memoryCard.peopleTags, List.of());
-        card.intensityScore = ai.memoryCard.intensityScore == null ? inferIntensity(raw) : ai.memoryCard.intensityScore;
+        card.intensityScore = clamp(ai.memoryCard.intensityScore == null ? inferIntensity(raw) : ai.memoryCard.intensityScore, 0, 10);
         card.recurrenceCount = 1;
         card.userImportance = ai.memoryCard.userImportance == null ? 4.0 : ai.memoryCard.userImportance;
         card.triggerCount = 1;
@@ -138,7 +138,7 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
         trace.userId = userId;
         trace.sourceSessionId = sessionId;
         trace.emotionName = blank(ai.emotionTrace.emotionName, inferEmotionName(raw));
-        trace.emotionScore = ai.emotionTrace.emotionScore == null ? card.intensityScore : ai.emotionTrace.emotionScore;
+        trace.emotionScore = clamp(ai.emotionTrace.emotionScore == null ? card.intensityScore : ai.emotionTrace.emotionScore, 0, 10);
         trace.weatherType = blank(ai.emotionTrace.weatherType, inferWeather(card.intensityScore));
         trace.triggerScene = blank(ai.emotionTrace.triggerScene, firstSentence(raw));
         trace.recordDate = LocalDate.now();
@@ -312,6 +312,10 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
         result.emotionTrace.weatherType = inferWeather(result.emotionTrace.emotionScore);
         result.emotionTrace.triggerScene = firstSentence(raw);
         return result;
+    }
+
+    private double clamp(double value, double min, double max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     private String blank(String value, String fallback) {
@@ -584,7 +588,7 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
         trace.userId = userId;
         trace.sourceSessionId = null;
         trace.emotionName = blank(ai.emotionTrace.emotionName, inferEmotionName(diaryText));
-        trace.emotionScore = ai.emotionTrace.emotionScore == null ? card.intensityScore : ai.emotionTrace.emotionScore;
+        trace.emotionScore = clamp(ai.emotionTrace.emotionScore == null ? card.intensityScore : ai.emotionTrace.emotionScore, 0, 10);
         trace.weatherType = blank(ai.emotionTrace.weatherType, inferWeather(card.intensityScore));
         trace.triggerScene = blank(ai.emotionTrace.triggerScene, firstSentence(diaryText));
         trace.recordDate = LocalDate.now();

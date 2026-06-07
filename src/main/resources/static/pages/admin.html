@@ -3,16 +3,18 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>管理后台 · Inner Cosmos</title>
   <link rel="stylesheet" href="/css/app.css">
 </head>
 <body>
-<main class="shell">
+<main id="main" class="shell">
+  <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
 
   <section class="flex-between mb-2" style="flex-wrap:wrap;gap:12px">
     <div>
       <span class="route-hint">守护星空的秩序</span>
-      <h1>管理后台</h1>
+      <h1 id="page-title">管理后台</h1>
       <p class="muted">所有影响用户内容的操作都需要理由，并写入审计日志。技术而温暖。</p>
     </div>
     <button onclick="refreshAll()">刷新全部</button>
@@ -666,6 +668,7 @@ async function loadAudit() {
   `).join("");
   IC.stagger(box);
 }
+IC.hideLoading();
 </script>
 </body>
 </html>

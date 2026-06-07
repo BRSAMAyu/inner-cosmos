@@ -3,10 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>与回声对话 · Inner Cosmos</title>
   <link rel="stylesheet" href="/css/app.css">
 </head>
 <body>
-<main class="shell">
+<main id="main" class="shell">
+  <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
 
   <!-- Capsule info header -->
@@ -68,7 +70,6 @@ const params = new URLSearchParams(location.search);
 const capsuleId = params.get("capsuleId");
 if (!capsuleId) {
   document.body.innerHTML = '<div style="text-align:center;padding:80px 20px"><h2>请先选择一个共鸣体</h2><p><a href="/pages/echo-plaza.html">前往星海广场</a></p></div>';
-  throw new Error('No capsuleId');
 }
 
 let sid = null;
@@ -86,7 +87,7 @@ async function init() {
     const c = capsuleResp.data;
     document.getElementById("capsuleName").textContent = c.pseudonym || "数字回声";
     document.getElementById("capsuleIntro").textContent = c.intro || "一枚从脱敏记忆中编织出的数字回声。";
-    totalTurns = c.conversationLimitPerDay || 5;
+    totalTurns = (c.capsuleType === "SEED_CAPSULE" || c.capsuleType === "SEED") ? 0 : (c.conversationLimitPerDay || 30);
     updateTurnsDisplay();
 
     const tags = (c.publicTags || "").split(",").filter(Boolean);
@@ -95,18 +96,42 @@ async function init() {
     ).join("");
 
     document.getElementById("letterLink").href = `/pages/slow-letter.html?capsuleId=${c.id}`;
+    const policy = c.realContactPolicy || "LETTER_ONLY";
+    const standIn = c.standInEnabled ? "它被允许在主人离线时先做有限代回声。" : "它不会代替主人承诺或决定。";
+    document.querySelector(".soft-stage.mt-2 .muted").textContent =
+      `这是授权共鸣体，不是真人实时回复。${standIn} 真人联系策略：${policy === "NO_REAL_CONTACT" ? "不开放真人联系" : policy === "DIRECT_REQUEST" ? "可发送会话邀请" : "优先写慢信"}。`;
   }
 
-  /* Create chat session */
-  const r = await API.createPersonaChat(Number(capsuleId));
-  if (r.success && r.data) {
-    sid = r.data.id;
-    addBubble("我只是一个有限的数字回声。你可以先问一个真正让你停下来的问题。", "ai");
-  } else {
-    addBubble("对话建立失败，请稍后再试。", "ai");
+  /* Restore or create chat session */
+  const key = `capsule_chat_session_${capsuleId}`;
+  sid = sessionStorage.getItem(key);
+  let restored = false;
+  if (sid) restored = await loadPersonaHistory();
+  if (!restored) {
+    const r = await API.createPersonaChat(Number(capsuleId));
+    if (r.success && r.data) {
+      sid = r.data.id;
+      sessionStorage.setItem(key, sid);
+      addBubble("我只是一个有限的数字回声。你可以先问一个真正让你停下来的问题。", "ai");
+    } else {
+      addBubble("对话建立失败，请稍后再试。", "ai");
+    }
   }
 }
 
+async function loadPersonaHistory() {
+  const r = await API.personaChatMessages(sid);
+  if (!r.success || !Array.isArray(r.data) || !r.data.length) return false;
+  usedTurns = 0;
+  r.data.forEach(m => {
+    const speaker = m.speaker || m.role || "";
+    const kind = speaker === "USER" ? "user" : "ai";
+    if (kind === "user") usedTurns++;
+    addBubble(m.textContent || m.content || "", kind);
+  });
+  updateTurnsDisplay();
+  return true;
+}
 function addBubble(content, kind) {
   const chat = document.getElementById("chat");
   const div = document.createElement("div");
@@ -122,6 +147,11 @@ function addBubble(content, kind) {
 
 function updateTurnsDisplay() {
   const remaining = Math.max(0, totalTurns - usedTurns);
+  if (totalTurns <= 0) {
+    document.getElementById("turnsFill").style.width = "100%";
+    document.getElementById("turnsLabel").textContent = "不限";
+    return;
+  }
   document.getElementById("turnsFill").style.width = (remaining / totalTurns * 100) + "%";
   document.getElementById("turnsLabel").textContent = `${remaining} / ${totalTurns}`;
 
@@ -190,6 +220,7 @@ function closeSession() {
 }
 
 init();
+IC.hideLoading();
 </script>
 </body>
 </html>

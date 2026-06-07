@@ -13,6 +13,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
@@ -36,7 +37,7 @@ public class MiniMaxLlmClient implements LlmClient {
         this.apiKey = apiKey;
         this.baseUrl = baseUrl == null || baseUrl.isBlank()
                 ? "https://api.minimaxi.com/v1/chat/completions" : baseUrl;
-        this.model = model == null || model.isBlank() ? "MiniMax-M2.7" : model;
+        this.model = model == null || model.isBlank() ? "MiniMax-M3" : model;
         this.timeoutMs = timeoutMs <= 0 ? 30000 : timeoutMs;
         this.allowFallback = allowFallback;
         this.aiLogService = aiLogService;
@@ -108,12 +109,19 @@ public class MiniMaxLlmClient implements LlmClient {
     }
 
     private String doChat(LlmRequest request) throws Exception {
+        List<Map<String, String>> messages = new ArrayList<>();
+        messages.add(Map.of("role", "system", "content", systemPrompt()));
+        if (request.recentMessages != null) {
+            for (String recent : request.recentMessages) {
+                if (recent != null && !recent.isBlank()) {
+                    messages.add(Map.of("role", "user", "content", "Context note: " + recent));
+                }
+            }
+        }
+        messages.add(Map.of("role", "user", "content", request.prompt == null ? "" : request.prompt));
         Map<String, Object> body = Map.of(
                 "model", model,
-                "messages", List.of(
-                        Map.of("role", "system", "content", systemPrompt()),
-                        Map.of("role", "user", "content", request.prompt == null ? "" : request.prompt)
-                ),
+                "messages", messages,
                 "temperature", 0.72,
                 "max_tokens", 900
         );

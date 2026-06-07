@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="/css/app.css">
+  <title>好友与群组 - Inner Cosmos</title>
+</head>
+<body>
+<main id="main" class="shell">
+  <a class="skip-link" href="#main">跳到主要内容</a>
+  <div class="topbar" data-topbar></div>
+  <span class="route-hint">慢社交连接</span>
+  <h1 id="page-title">好友与群组</h1>
+  <p class="muted mb-2">先通过共鸣体认识一个人的轮廓，再由慢信、好友和群组走向真实连接。</p>
+
+  <section class="grid">
+    <article class="panel">
+      <h2>可能认识的人</h2>
+      <div id="people" class="timeline"></div>
+    </article>
+    <article class="panel">
+      <h2>好友申请</h2>
+      <div id="requests" class="timeline"></div>
+    </article>
+  </section>
+
+  <div class="spacer"></div>
+
+  <section class="grid">
+    <article class="panel">
+      <h2>我的好友</h2>
+      <div id="friends" class="timeline"></div>
+    </article>
+    <article class="panel">
+      <h2>我的群组</h2>
+      <div class="row gap-sm mb-2">
+        <input id="groupName" class="voice-input-target" placeholder="创建一个小群组">
+        <button onclick="createGroup()">创建</button>
+      </div>
+      <div id="groups" class="timeline"></div>
+    </article>
+  </section>
+</main>
+
+<script src="/js/app.js"></script>
+<script src="/js/time-system.js"></script>
+<script src="/js/motion.js"></script>
+<script src="/js/weather-system.js"></script>
+<script src="/js/audio-system.js"></script>
+<script src="/js/api.js"></script>
+<script>
+IC.mountShell("好友");
+IC.ensureDemoLogin().then(load);
+
+function esc(v) { return IC.esc(v); }
+
+async function load() {
+  const [people, friends, reqs, groups] = await Promise.all([
+    API.socialPeople(), API.socialFriends(), API.socialRequests(), API.socialGroups()
+  ]);
+  renderPeople(people.data || []);
+  renderFriends(friends.data || []);
+  renderRequests(reqs.data || {});
+  renderGroups(groups.data || []);
+}
+
+function renderPeople(items) {
+  document.getElementById("people").innerHTML = items.map(u => `
+    <div class="timeline-item">
+      <div class="flex-between">
+        <div><strong>${esc(u.nickname)}</strong><p class="muted">@${esc(u.username)} · ${esc(u.relationStatus)}</p></div>
+        <button ${u.relationStatus !== "NONE" ? "disabled" : ""} onclick="requestFriend(${u.id})">加好友</button>
+      </div>
+    </div>
+  `).join("") || IC.empty("暂无可推荐用户。");
+}
+
+function renderFriends(items) {
+  document.getElementById("friends").innerHTML = items.map(u => `
+    <div class="timeline-item"><strong>${esc(u.nickname)}</strong><p class="muted">@${esc(u.username)}</p></div>
+  `).join("") || IC.empty("还没有好友。可以先从星海广场或共鸣体开始。");
+}
+
+function renderRequests(data) {
+  const incoming = data.incoming || [];
+  const outgoing = data.outgoing || [];
+  document.getElementById("requests").innerHTML = [
+    ...incoming.map(r => `<div class="timeline-item"><div class="flex-between"><span>${esc(r.nickname)} 想加你为好友</span><button onclick="acceptFriend(${r.id})">接受</button></div></div>`),
+    ...outgoing.map(r => `<div class="timeline-item"><span class="muted">已向 ${esc(r.nickname)} 发出申请</span></div>`)
+  ].join("") || IC.empty("暂无好友申请。");
+}
+
+function renderGroups(items) {
+  document.getElementById("groups").innerHTML = items.map(g => `
+    <div class="timeline-item"><strong>${esc(g.groupName)}</strong><p class="muted">${esc(g.intro || "一个安静的小群组")}</p></div>
+  `).join("") || IC.empty("还没有群组。");
+}
+
+async function requestFriend(id) {
+  const r = await API.socialRequestFriend(id);
+  if (r.success) { IC.toast("好友申请已发送", "success"); load(); }
+}
+
+async function acceptFriend(id) {
+  const r = await API.socialAcceptFriend(id);
+  if (r.success) { IC.toast("已成为好友", "success"); load(); }
+}
+
+async function createGroup() {
+  const name = document.getElementById("groupName").value.trim();
+  if (!name) return IC.toast("请输入群组名", "warn");
+  const r = await API.socialCreateGroup({ groupName: name, intro: "一个围绕真实共鸣慢慢靠近的小群组。" });
+  if (r.success) { document.getElementById("groupName").value = ""; IC.toast("群组已创建", "success"); load(); }
+}
+IC.hideLoading();
+</script>
+</body>
+</html>

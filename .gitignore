@@ -3,3 +3,9 @@ target/
 .idea/
 *.iml
 *.log
+/data/
+.env
+application-local.yml
+application-dev.yml
+*.db
+*.mv.db

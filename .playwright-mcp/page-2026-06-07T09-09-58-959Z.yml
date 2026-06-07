@@ -1,0 +1,7 @@
+- main [ref=e2]:
+  - link "跳到主要内容" [ref=e3] [cursor=pointer]:
+    - /url: "#main"
+  - generic [ref=e5]: 一周的内在总结
+  - heading "成长周报" [level=1] [ref=e6]
+  - paragraph [ref=e7]: 过去 7 天你的内在宇宙发生了什么。系统会从记忆、情绪、待办、主题等多个维度生成一份只属于你的总结。
+  - button "重新生成这一周" [ref=e8] [cursor=pointer]
