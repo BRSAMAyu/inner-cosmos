@@ -2,7 +2,9 @@ package com.innercosmos.controller;
 
 import com.innercosmos.common.ApiResponse;
 import com.innercosmos.entity.EmotionTimeline;
+import com.innercosmos.service.EmotionPatternService;
 import com.innercosmos.service.EmotionTimelineService;
+import com.innercosmos.vo.EmotionPatternVO;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,9 +21,12 @@ import java.util.Map;
 public class EmotionTimelineController extends BaseController {
 
     private final EmotionTimelineService emotionTimelineService;
+    private final EmotionPatternService emotionPatternService;
 
-    public EmotionTimelineController(EmotionTimelineService emotionTimelineService) {
+    public EmotionTimelineController(EmotionTimelineService emotionTimelineService,
+                                    EmotionPatternService emotionPatternService) {
         this.emotionTimelineService = emotionTimelineService;
+        this.emotionPatternService = emotionPatternService;
     }
 
     @GetMapping("/today")
@@ -62,5 +67,30 @@ public class EmotionTimelineController extends BaseController {
     public ApiResponse<Void> aggregate(@RequestParam String date, HttpSession session) {
         emotionTimelineService.aggregateForDate(currentUserId(session), LocalDate.parse(date));
         return ApiResponse.<Void>ok(null);
+    }
+
+    // ── EmotionPattern endpoints (M4) ─────────────────────────────────────
+
+    @GetMapping("/patterns/v2")
+    public ApiResponse<List<EmotionPatternVO>> patternsV2(@RequestParam(defaultValue = "30") int days,
+                                                          HttpSession session) {
+        return ApiResponse.ok(emotionPatternService.detectPatterns(currentUserId(session), days));
+    }
+
+    @GetMapping("/patterns/dominant")
+    public ApiResponse<EmotionPatternVO> dominantPattern(@RequestParam(defaultValue = "30") int days,
+                                                          HttpSession session) {
+        EmotionPatternVO pattern = emotionPatternService.getDominantPattern(currentUserId(session), days);
+        return ApiResponse.ok(pattern);
+    }
+
+    @GetMapping("/patterns/range")
+    public ApiResponse<EmotionPatternVO> patternRange(@RequestParam String start,
+                                                      @RequestParam String end,
+                                                      HttpSession session) {
+        return ApiResponse.ok(emotionPatternService.getRangeSummary(
+                currentUserId(session),
+                LocalDate.parse(start),
+                LocalDate.parse(end)));
     }
 }

@@ -98,7 +98,7 @@ public class QuietWindowResolver {
         try {
             // Simple regex-based parser
             java.util.regex.Pattern p = java.util.regex.Pattern.compile(
-                "\\{\"start\":\"(\\d{2}:\\d{2})\", java.util.regex.Pattern.MULTILINE);
+                "\\{\"start\":\"(\\d{2}:\\d{2})\"\\}", java.util.regex.Pattern.MULTILINE);
             java.util.regex.Matcher m = p.matcher(json);
             java.util.regex.Pattern p2 = java.util.regex.Pattern.compile("\"end\":\"(\\d{2}:\\d{2})\"");
             java.util.regex.Matcher m2 = p2.matcher(json);
