@@ -46,7 +46,7 @@ public class UserPortraitService {
             row.userId = userId;
             row.dim = d.dim();
             row.valueJson = d.valueJson();
-            row.score = d.confidence();
+            row.score = d.score();
             row.confidence = d.confidence();
             row.evidenceRefs = d.evidenceTurnIds() != null ? String.join(",", d.evidenceTurnIds()) : null;
             if (existing == null) {

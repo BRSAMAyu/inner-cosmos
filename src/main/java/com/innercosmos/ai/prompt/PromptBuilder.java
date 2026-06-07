@@ -7,6 +7,7 @@ import java.util.List;
 
 public class PromptBuilder {
     private final List<String> parts = new ArrayList<>();
+    private String modeTemperatureHint;
 
     public PromptBuilder withSystemBoundary() {
         parts.add("""
@@ -31,6 +32,25 @@ public class PromptBuilder {
             parts.add("当前陪伴方式：" + mode + "\n" + modeGuide(mode));
         }
         return this;
+    }
+
+    /**
+     * Inject mode-specific segment (friend-style, structured collaborator, Socratic questioning).
+     * Also sets temperature hint for LLM.
+     */
+    public PromptBuilder withModeSegment(com.innercosmos.ai.mode.ModeStrategy strategy) {
+        if (strategy != null) {
+            parts.add("陪伴角色定位：" + strategy.segment());
+            this.modeTemperatureHint = "当前温度系数：" + strategy.temperature();
+        }
+        return this;
+    }
+
+    /**
+     * Returns the temperature hint set by withModeSegment, or empty string if none.
+     */
+    public String temperatureHint() {
+        return modeTemperatureHint != null ? modeTemperatureHint : "";
     }
 
     public PromptBuilder withUserProfile(String profile) {

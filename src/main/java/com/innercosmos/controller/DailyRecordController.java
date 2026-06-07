@@ -5,7 +5,9 @@ import com.innercosmos.entity.DailyRecord;
 import com.innercosmos.entity.WeeklyReview;
 import com.innercosmos.service.MemoryService;
 import com.innercosmos.service.WeeklyReviewService;
+import com.innercosmos.service.WeeklyReviewV2Service;
 import com.innercosmos.vo.DailyRecordVO;
+import com.innercosmos.vo.WeeklyReviewV2VO;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.web.bind.annotation.*;
 import java.util.Map;
@@ -15,10 +17,14 @@ import java.util.Map;
 public class DailyRecordController extends BaseController {
     private final MemoryService memoryService;
     private final WeeklyReviewService weeklyReviewService;
+    private final WeeklyReviewV2Service weeklyReviewV2Service;
 
-    public DailyRecordController(MemoryService memoryService, WeeklyReviewService weeklyReviewService) {
+    public DailyRecordController(MemoryService memoryService,
+                                 WeeklyReviewService weeklyReviewService,
+                                 WeeklyReviewV2Service weeklyReviewV2Service) {
         this.memoryService = memoryService;
         this.weeklyReviewService = weeklyReviewService;
+        this.weeklyReviewV2Service = weeklyReviewV2Service;
     }
 
     @GetMapping("/latest")
@@ -46,5 +52,23 @@ public class DailyRecordController extends BaseController {
     @PostMapping("/weekly/generate")
     public ApiResponse<WeeklyReview> weeklyGenerate(HttpSession session) {
         return ApiResponse.ok(weeklyReviewService.generateWeeklyReview(currentUserId(session)));
+    }
+
+    // ── V2 endpoints ─────────────────────────────────────────────────────────
+
+    @GetMapping("/weekly/v2/latest")
+    public ApiResponse<WeeklyReviewV2VO> weeklyV2Latest(HttpSession session) {
+        WeeklyReviewV2VO vo = weeklyReviewV2Service.latest(currentUserId(session));
+        if (vo == null) {
+            return ApiResponse.<WeeklyReviewV2VO>ok(null);
+        }
+        return ApiResponse.ok(vo);
+    }
+
+    @PostMapping("/weekly/v2/generate")
+    public ApiResponse<WeeklyReviewV2VO> weeklyV2Generate(HttpSession session) {
+        WeeklyReviewV2VO vo = weeklyReviewV2Service.generate(currentUserId(session));
+        weeklyReviewV2Service.save(vo);
+        return ApiResponse.ok(vo);
     }
 }

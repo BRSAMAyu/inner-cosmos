@@ -24,4 +24,8 @@ public class DialogSession extends BaseEntity {
      * Set when session closing begins.
      */
     public String goodbyeTrigger;
+    /**
+     * Current mode for Aurora conversation (DAILY_TALK, THOUGHT_CLARIFY, SOCRATIC).
+     */
+    public String currentMode;
 }

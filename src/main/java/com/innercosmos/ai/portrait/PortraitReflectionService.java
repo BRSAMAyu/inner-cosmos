@@ -31,7 +31,7 @@ public class PortraitReflectionService {
                 INNER_DRIVE / VALUES / SELF_NARRATIVE / COMMUNICATION_STYLE /
                 ABSTRACT_VS_CONCRETE / EMOTION_PATTERN / ENERGY_RHYTHM /
                 CURRENT_STATE / RELATIONSHIP_CONTEXT / AGENCY_BOUNDARY
-                confidence必须在0..1，evidenceTurnIds至少1个。
+                confidence必须在0..1，score必须在0..1，evidenceTurnIds至少1个。
                 只有确实有变化才输出delta。
                 当前画像: %s
                 对话: %s

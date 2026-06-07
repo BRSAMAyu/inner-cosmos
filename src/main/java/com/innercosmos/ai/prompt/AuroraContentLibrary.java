@@ -689,4 +689,30 @@ public class AuroraContentLibrary {
         }
         return "DAILY_TALK";
     }
+
+    // ================================================================
+    //  WeeklyReviewV2 mock stubs (M4)
+    // ================================================================
+
+    /** Return a mock weekly review V2 recommendation for MockLlmClient. */
+    public static String mockWeeklyReviewRecommendation() {
+        return pick(List.of(
+            "这一周你保持着稳定的内心节奏。建议继续保持，同时留意是否有未完成的情绪需要被看见。",
+            "本周留下了不少内心痕迹。不用急着整理，让它们自然沉淀就好。",
+            "你的情绪在慢慢变得更清晰。继续给自己留出安静的时刻。",
+            "这一周的主题是'回归平静'。Aurora 会继续在这里陪你。",
+            "本周你经历了一些值得记住的感受。无论是清晰还是模糊的，都值得被保留。"
+        ));
+    }
+
+    /** Return a mock aurora observation for weekly review. */
+    public static String mockAuroraWeeklyObservation(int activeDays) {
+        if (activeDays == 0) {
+            return "本周你较少主动分享内心状态。Aurora 会继续在这里等你，随时可以来说说。";
+        } else if (activeDays <= 2) {
+            return "本周" + activeDays + "天你分享了内心状态。Aurora 记住了这些时刻。";
+        } else {
+            return "本周" + activeDays + "天你持续分享内心状态。你的声音值得被听见。";
+        }
+    }
 }

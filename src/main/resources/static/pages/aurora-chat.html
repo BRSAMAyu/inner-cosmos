@@ -92,10 +92,7 @@ let auroraSending = false;
 const modeCopy = {
   DAILY_TALK: { label: "今日倾诉", icon: "听", desc: "先像朋友一样接住当下，不急着分析。" },
   THOUGHT_CLARIFY: { label: "思维整理", icon: "理", desc: "把混乱内容拆成事实、感受、担心、需要和下一步。" },
-  SLEEP_REVIEW: { label: "睡前复盘", icon: "夜", desc: "低声收束今天，让没完成的事先被放下。" },
-  SOCRATIC: { label: "苏格拉底追问", icon: "问", desc: "温和追问一个关键假设，而不是直接给结论。" },
-  ACTION_SPLIT: { label: "行动拆解", icon: "行", desc: "把压力拆成十分钟内能开始的第一步。" },
-  RELATION_REVIEW: { label: "关系复盘", icon: "人", desc: "区分事实、感受、需要和边界。" }
+  SOCRATIC: { label: "苏格拉底追问", icon: "问", desc: "温和追问一个关键假设，而不是直接给结论。" }
 };
 
 function buildModes() {
@@ -107,11 +104,21 @@ function buildModes() {
   container.querySelectorAll("button").forEach(btn => {
     btn.onclick = async () => {
       if (btn.dataset.mode === mode) return;
-      mode = btn.dataset.mode;
-      container.querySelectorAll("button").forEach(x => x.classList.remove("active"));
-      btn.classList.add("active");
-      document.getElementById("modeNote").textContent = modeCopy[mode].desc;
-      document.getElementById("loopState").style.display = "none";
+      const newMode = btn.dataset.mode;
+      try {
+        const r = await API.auroraModeSwitch(sid, newMode);
+        if (r.success) {
+          mode = newMode;
+          container.querySelectorAll("button").forEach(x => x.classList.remove("active"));
+          btn.classList.add("active");
+          document.getElementById("modeNote").textContent = modeCopy[mode].desc;
+          document.getElementById("loopState").style.display = "none";
+        } else {
+          IC.toast(r.message || "切换模式失败，请稍后再试。", "warn");
+        }
+      } catch (e) {
+        IC.toast("切换模式失败：" + e.message, "warn");
+      }
     };
   });
 }
@@ -336,8 +343,12 @@ async function onModelChange() {
   IC.toast(provider ? "已切换到 " + provider : "已切回系统默认", "success");
 }
 
-// Handle proactive Aurora messages
+// Handle proactive Aurora messages (greetings, mode acknowledgements, etc.)
 function addAuroraProactive(data) {
+  if (data.type === "MODE_ACK") {
+    // Mode transition acknowledgement — show as system notification + optional bubble
+    IC.toast("陪伴模式已切换：" + (modeCopy[mode]?.label || mode), "success");
+  }
   addBubble(data.content, "ai");
 }
 
