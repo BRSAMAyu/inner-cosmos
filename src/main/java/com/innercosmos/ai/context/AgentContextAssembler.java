@@ -1,6 +1,12 @@
 package com.innercosmos.ai.context;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.innercosmos.ai.perception.GeocodingService;
+import com.innercosmos.ai.perception.TimeContextService;
+import com.innercosmos.ai.perception.TimeContextService.TimeContext;
+import com.innercosmos.ai.perception.WeatherContextService;
+import com.innercosmos.ai.perception.dto.LocationInfo;
+import com.innercosmos.ai.perception.dto.WeatherForecast;
 import com.innercosmos.entity.DailyRecord;
 import com.innercosmos.entity.DialogMessage;
 import com.innercosmos.entity.EmotionTrace;
@@ -36,6 +42,9 @@ public class AgentContextAssembler {
     private final EmotionTraceMapper emotionTraceMapper;
     private final RelationMentionMapper relationMentionMapper;
     private final MemoryThemeMapper memoryThemeMapper;
+    private final GeocodingService geocodingService;
+    private final WeatherContextService weatherContextService;
+    private final TimeContextService timeContextService;
 
     public AgentContextAssembler(UserProfileMapper userProfileMapper,
                                  DialogMessageMapper dialogMessageMapper,
@@ -45,7 +54,10 @@ public class AgentContextAssembler {
                                  WeeklyReviewMapper weeklyReviewMapper,
                                  EmotionTraceMapper emotionTraceMapper,
                                  RelationMentionMapper relationMentionMapper,
-                                 MemoryThemeMapper memoryThemeMapper) {
+                                 MemoryThemeMapper memoryThemeMapper,
+                                 GeocodingService geocodingService,
+                                 WeatherContextService weatherContextService,
+                                 TimeContextService timeContextService) {
         this.userProfileMapper = userProfileMapper;
         this.dialogMessageMapper = dialogMessageMapper;
         this.memoryCardMapper = memoryCardMapper;
@@ -55,16 +67,38 @@ public class AgentContextAssembler {
         this.emotionTraceMapper = emotionTraceMapper;
         this.relationMentionMapper = relationMentionMapper;
         this.memoryThemeMapper = memoryThemeMapper;
+        this.geocodingService = geocodingService;
+        this.weatherContextService = weatherContextService;
+        this.timeContextService = timeContextService;
     }
 
     public AgentContext assemble(Long userId, Long sessionId, String currentMessage, boolean includeMemory) {
+        return assemble(userId, sessionId, currentMessage, includeMemory, null, null);
+    }
+
+    /**
+     * Full assemble with optional lat/lon — when the client has already
+     * collected geolocation we use it to enrich the context with city-level
+     * location and real-world weather. Either may be null.
+     */
+    public AgentContext assemble(Long userId, Long sessionId, String currentMessage,
+                                 boolean includeMemory, Double lat, Double lon) {
         AgentContext context = new AgentContext();
         context.userId = userId;
         UserProfile profile = profile(userId);
         context.memoryRecallAllowed = includeMemory && allowMemory(profile);
         context.multiMessageAllowed = profile == null || profile.allowMultiMessage == null || Boolean.TRUE.equals(profile.allowMultiMessage);
         context.proactiveSensitivity = profile == null || profile.proactiveSensitivity == null ? 3 : profile.proactiveSensitivity;
-        context.timeLabel = Boolean.FALSE.equals(profile == null ? null : profile.timeAwarenessEnabled) ? "用户关闭了时间感知" : timeLabel();
+        // Perception: real time, sleep inference, nearest todo.
+        TimeContext time = timeContextService.now(
+                focusWindowActive(profile == null ? null : profile.focusWindowsJson),
+                nearestTodoTitle(userId)
+        );
+        context.timeLabel = Boolean.FALSE.equals(profile == null ? null : profile.timeAwarenessEnabled)
+                ? "用户关闭了时间感知"
+                : time.label() + "（" + time.dateLabel() + "）";
+        context.sleepInferred = time.isSleep();
+        context.nearestTodo = time.nearestTodo();
         context.weatherLabel = weatherLabel(userId, profile);
         context.environmentLabel = profile == null || blank(profile.currentEnvironmentLabel)
                 ? inferEnvironment(currentMessage)
@@ -72,6 +106,18 @@ public class AgentContextAssembler {
         context.profileSummary = profileSummary(profile);
         context.quietPolicy = quietPolicy(profile);
         context.focusPolicy = focusPolicy(profile, currentMessage);
+        // Perception: real-world location + real weather, only when client supplied lat/lon
+        // and the user has not opted out. Falls back to "未知" / CLEAR if anything fails.
+        boolean latLonProvided = lat != null && lon != null;
+        boolean weatherEnabled = !Boolean.FALSE.equals(profile == null ? null : profile.weatherAwarenessEnabled);
+        if (latLonProvided) {
+            LocationInfo loc = geocodingService.resolve(lat, lon);
+            context.cityLabel = loc.label();
+            if (weatherEnabled) {
+                WeatherForecast forecast = weatherContextService.get(lat, lon);
+                context.realWeatherLabel = forecast.label();
+            }
+        }
         context.recentMessages = recentMessages(sessionId);
         context.activeTodos = activeTodos(userId);
         context.completedTodoLessons = completedTodoLessons(userId);
@@ -124,6 +170,22 @@ public class AgentContextAssembler {
                 .stream()
                 .map(t -> safe(t.taskName) + "（" + safe(t.priority) + "/" + safe(t.status) + deadlineText(t) + "）")
                 .toList();
+    }
+
+    /**
+     * Title of the most urgent open todo, or null if the user has none.
+     * Used by the time context to give the agent a "nearest todo" hint
+     * without enumerating the whole list in the prompt.
+     */
+    private String nearestTodoTitle(Long userId) {
+        if (userId == null) return null;
+        TodoItem top = todoItemMapper.selectOne(new QueryWrapper<TodoItem>()
+                .eq("user_id", userId)
+                .notIn("status", List.of("DONE", "CANCELLED"))
+                .orderByDesc("priority")
+                .orderByAsc("deadline")
+                .last("LIMIT 1"));
+        return top == null ? null : top.taskName;
     }
 
     private List<String> completedTodoLessons(Long userId) {
@@ -252,17 +314,6 @@ public class AgentContextAssembler {
         if (containsAny(text, List.of("项目", "代码", "论文", "科研"))) return "项目推进期";
         if (containsAny(text, List.of("朋友", "关系", "恋爱", "同学"))) return "关系复盘期";
         return "日常自我照顾";
-    }
-
-    private String timeLabel() {
-        int hour = LocalTime.now().getHour();
-        if (hour < 5) return "深夜";
-        if (hour < 9) return "早晨";
-        if (hour < 12) return "上午";
-        if (hour < 14) return "中午";
-        if (hour < 18) return "下午";
-        if (hour < 22) return "晚上";
-        return "夜里";
     }
 
     private boolean containsAny(String text, List<String> words) {

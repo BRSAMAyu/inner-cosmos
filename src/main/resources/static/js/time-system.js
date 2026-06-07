@@ -43,6 +43,8 @@ window.ICTimeSystem = {
 
   // Initialize
   init() {
+    if (this.__icInitialized) return;
+    this.__icInitialized = true;
     this.loadUserLocation();
     this.fetchSunsetTimes().then(() => {
       this.startClock();
@@ -59,6 +61,7 @@ window.ICTimeSystem = {
     if (savedLat && savedLon) {
       this.userLocation.lat = parseFloat(savedLat);
       this.userLocation.lon = parseFloat(savedLon);
+      this.resolveLocationLabel();
     } else {
       // Request geolocation
       if (navigator.geolocation) {
@@ -68,6 +71,7 @@ window.ICTimeSystem = {
             this.userLocation.lon = pos.coords.longitude;
             localStorage.setItem('userLat', this.userLocation.lat.toString());
             localStorage.setItem('userLon', this.userLocation.lon.toString());
+            this.resolveLocationLabel();
             // Re-fetch sunset times with new location
             this.fetchSunsetTimes();
           },
@@ -76,6 +80,24 @@ window.ICTimeSystem = {
           }
         );
       }
+    }
+  },
+
+  async resolveLocationLabel() {
+    try {
+      const url = `https://nominatim.openstreetmap.org/reverse?lat=${this.userLocation.lat}&lon=${this.userLocation.lon}&format=json&accept-language=zh-CN`;
+      const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
+      if (!response.ok) return;
+      const data = await response.json();
+      const a = data?.address || {};
+      const parts = [a.city || a.town || a.village || a.county, a.state, a.country].filter(Boolean);
+      const label = Array.from(new Set(parts)).join(" · ");
+      if (label) {
+        localStorage.setItem('ic_location_label', label);
+        window.dispatchEvent(new CustomEvent('locationChanged', { detail: { label, lat: this.userLocation.lat, lon: this.userLocation.lon } }));
+      }
+    } catch (error) {
+      console.warn('Failed to resolve location label:', error);
     }
   },
 
@@ -229,11 +251,11 @@ window.ICTimeSystem = {
     const now = date.getTime();
 
     if (now >= dawnStart && now < dawnEnd) return 'time-dawn';
-    if (now >= dawnEnd && now < 11 * 3600 * 1000) return 'time-morning';
-    if (now >= 11 * 3600 * 1000 && now < 15 * 3600 * 1000) return 'time-noon';
-    if (now >= 15 * 3600 * 1000 && now < duskStart) return 'time-afternoon';
+    if (hourDecimal >= 7 && hourDecimal < 11) return 'time-morning';
+    if (hourDecimal >= 11 && hourDecimal < 15) return 'time-noon';
+    if (hourDecimal >= 15 && now < duskStart) return 'time-afternoon';
     if (now >= duskStart && now < duskEnd) return 'time-dusk';
-    if (now >= duskEnd && now < 23 * 3600 * 1000) return 'time-night';
+    if (hourDecimal >= 21 && hourDecimal < 23) return 'time-night';
     return 'time-deep-night';
   },
 
@@ -251,6 +273,16 @@ window.ICTimeSystem = {
 
   // Update time-based UI
   updateTime() {
+    const fixed = localStorage.getItem('ic_fixed_theme');
+    if (fixed && localStorage.getItem('ic_visual_auto') === 'false') {
+      this.currentTimeState.timeClass = fixed;
+      this.currentTimeState.isDay = fixed !== 'time-night' && fixed !== 'time-deep-night';
+      document.body.classList.remove(...this.timeClasses);
+      document.body.classList.add(fixed);
+      this.applyTimeColors(fixed);
+      return;
+    }
+
     const timeClass = this.getTimeClass();
     this.currentTimeState.timeClass = timeClass;
     this.currentTimeState.isDay = timeClass !== 'time-night' && timeClass !== 'time-deep-night';
@@ -288,6 +320,7 @@ window.ICTimeSystem = {
 
   // Update transition progress for smooth color blending
   updateTransition() {
+    if (localStorage.getItem('ic_visual_auto') === 'false') return;
     if (!this.currentTimeState.sunset || !this.currentTimeState.sunrise) return;
 
     const now = new Date();
@@ -396,6 +429,58 @@ window.ICTimeSystem = {
   // Check if it's currently daytime
   isDay() {
     return this.currentTimeState.isDay;
+  }
+};
+
+// ── Inner Cosmos Location (city label exposed to chat payloads) ──
+// ICLocation wraps the city-level label resolved by ICLocation/ICTimeSystem and
+// exposes a stable, chat-friendly getter. Pages and the API client call
+// `ICLocation.getCityLabel()` instead of reading localStorage directly so the
+// lookup policy lives in one place. Falls back to "未知" on a cold cache.
+window.ICLocation = {
+  /**
+   * @returns {string} e.g. "北京 · 海淀区" or "未知" when the browser has
+   *   not yet resolved a location.
+   */
+  getCityLabel() {
+    try {
+      const label = localStorage.getItem('ic_location_label');
+      if (label && label.trim()) return label.trim();
+    } catch (_) {
+      // localStorage can be unavailable (Safari private mode etc.) — fall through.
+    }
+    return '未知';
+  },
+
+  /**
+   * Convenience: just the city part, e.g. "北京" (or "未知"). Strips the
+   * " · " street segment that {@link #getCityLabel} returns.
+   */
+  getCityOnly() {
+    const label = this.getCityLabel();
+    if (!label || label === '未知') return '未知';
+    const cut = label.indexOf(' · ');
+    return cut > 0 ? label.substring(0, cut) : label;
+  },
+
+  /**
+   * Current lat/lon (rounded to 4 decimals ≈ 11m) or null when not yet known.
+   */
+  getLatLon() {
+    const lat = window.ICTimeSystem?.userLocation?.lat;
+    const lon = window.ICTimeSystem?.userLocation?.lon;
+    if (typeof lat !== 'number' || typeof lon !== 'number') return null;
+    return { lat: Math.round(lat * 10000) / 10000, lon: Math.round(lon * 10000) / 10000 };
+  },
+
+  /**
+   * Force a re-resolve. Useful right after a manual location change.
+   */
+  refresh() {
+    if (window.ICTimeSystem && typeof window.ICTimeSystem.resolveLocationLabel === 'function') {
+      return window.ICTimeSystem.resolveLocationLabel();
+    }
+    return Promise.resolve();
   }
 };
 
