@@ -31,4 +31,6 @@ public class AgentContext {
     public List<String> relationSignals = new ArrayList<>();
     public List<String> themeSignals = new ArrayList<>();
     public List<Long> evidenceMemoryIds = new ArrayList<>();
+    /** 3-model block: Aurora identity + Relationship state + User portrait */
+    public String threeModelBlock = "";
 }

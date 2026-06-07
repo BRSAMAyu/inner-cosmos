@@ -14,7 +14,7 @@ public class AuroraSelfProfileService {
         AuroraSelfProfile p = mapper.selectById(1);
         if (p == null) {
             p = new AuroraSelfProfile();
-            p.setId(1);
+            p.id = 1;
             mapper.insert(p);
         }
         return p;

@@ -1,6 +1,6 @@
 package com.innercosmos.ai.portrait;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.innercosmos.entity.UserPortrait;
 import com.innercosmos.entity.UserPortraitHistory;
 import com.innercosmos.mapper.UserPortraitHistoryMapper;
@@ -20,14 +20,12 @@ public class UserPortraitService {
     private UserPortraitHistoryMapper historyMapper;
 
     public List<UserPortrait> getAll(Long userId) {
-        return mapper.selectList(new LambdaQueryWrapper<UserPortrait>()
-                .eq(UserPortrait::getUserId, userId));
+        return mapper.selectList(new QueryWrapper<UserPortrait>().eq("user_id", userId));
     }
 
     public UserPortrait get(Long userId, String dim) {
-        return mapper.selectOne(new LambdaQueryWrapper<UserPortrait>()
-                .eq(UserPortrait::getUserId, userId)
-                .eq(UserPortrait::getDim, dim));
+        return mapper.selectOne(new QueryWrapper<UserPortrait>()
+                .eq("user_id", userId).eq("dim", dim));
     }
 
     @Transactional
@@ -36,21 +34,21 @@ public class UserPortraitService {
             UserPortrait existing = get(userId, d.dim());
             if (existing != null) {
                 UserPortraitHistory hist = new UserPortraitHistory();
-                hist.setUserId(userId);
-                hist.setDim(d.dim());
-                hist.setValueJson(existing.getValueJson());
-                hist.setScore(existing.getScore());
-                hist.setConfidence(existing.getConfidence());
-                hist.setEvidenceRefs(existing.getEvidenceRefs());
+                hist.userId = userId;
+                hist.dim = d.dim();
+                hist.valueJson = existing.valueJson;
+                hist.score = existing.score;
+                hist.confidence = existing.confidence;
+                hist.evidenceRefs = existing.evidenceRefs;
                 historyMapper.insert(hist);
             }
             UserPortrait row = existing != null ? existing : new UserPortrait();
-            row.setUserId(userId);
-            row.setDim(d.dim());
-            row.setValueJson(d.valueJson());
-            row.setScore(d.confidence());
-            row.setConfidence(d.confidence());
-            row.setEvidenceRefs(d.evidenceTurnIds() != null ? String.join(",", d.evidenceTurnIds()) : null);
+            row.userId = userId;
+            row.dim = d.dim();
+            row.valueJson = d.valueJson();
+            row.score = d.confidence();
+            row.confidence = d.confidence();
+            row.evidenceRefs = d.evidenceTurnIds() != null ? String.join(",", d.evidenceTurnIds()) : null;
             if (existing == null) {
                 mapper.insert(row);
             } else {
