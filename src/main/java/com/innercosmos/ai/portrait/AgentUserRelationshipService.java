@@ -16,14 +16,14 @@ public class AgentUserRelationshipService {
         AgentUserRelationship r = mapper.selectById(userId);
         if (r == null) {
             r = new AgentUserRelationship();
-            r.setUserId(userId);
-            r.setRelationshipStage("new_user");
-            r.setIntimacyLevel(0);
-            r.setTrustLevel(0);
-            r.setFamiliarityLevel(0);
-            r.setUserDisclosureLevel(0);
-            r.setAuroraRoleInUserLife("[\"assistant\"]");
-            r.setPreferredAddressing("你");
+            r.userId = userId;
+            r.relationshipStage = "new_user";
+            r.intimacyLevel = 0;
+            r.trustLevel = 0;
+            r.familiarityLevel = 0;
+            r.userDisclosureLevel = 0;
+            r.auroraRoleInUserLife = "[\"assistant\"]";
+            r.preferredAddressing = "你";
             mapper.insert(r);
         }
         return r;

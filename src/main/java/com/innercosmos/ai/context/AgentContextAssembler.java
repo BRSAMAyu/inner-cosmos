@@ -7,6 +7,9 @@ import com.innercosmos.ai.perception.TimeContextService.TimeContext;
 import com.innercosmos.ai.perception.WeatherContextService;
 import com.innercosmos.ai.perception.dto.LocationInfo;
 import com.innercosmos.ai.perception.dto.WeatherForecast;
+import com.innercosmos.ai.portrait.AgentUserRelationshipService;
+import com.innercosmos.ai.portrait.AuroraSelfProfileService;
+import com.innercosmos.ai.portrait.UserPortraitService;
 import com.innercosmos.entity.DailyRecord;
 import com.innercosmos.entity.DialogMessage;
 import com.innercosmos.entity.EmotionTrace;
@@ -14,8 +17,11 @@ import com.innercosmos.entity.MemoryCard;
 import com.innercosmos.entity.MemoryTheme;
 import com.innercosmos.entity.RelationMention;
 import com.innercosmos.entity.TodoItem;
+import com.innercosmos.entity.UserPortrait;
 import com.innercosmos.entity.UserProfile;
 import com.innercosmos.entity.WeeklyReview;
+import com.innercosmos.entity.AuroraSelfProfile;
+import com.innercosmos.entity.AgentUserRelationship;
 import com.innercosmos.mapper.DailyRecordMapper;
 import com.innercosmos.mapper.DialogMessageMapper;
 import com.innercosmos.mapper.EmotionTraceMapper;
@@ -25,11 +31,13 @@ import com.innercosmos.mapper.RelationMentionMapper;
 import com.innercosmos.mapper.TodoItemMapper;
 import com.innercosmos.mapper.UserProfileMapper;
 import com.innercosmos.mapper.WeeklyReviewMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Component
 public class AgentContextAssembler {
@@ -45,6 +53,9 @@ public class AgentContextAssembler {
     private final GeocodingService geocodingService;
     private final WeatherContextService weatherContextService;
     private final TimeContextService timeContextService;
+    @Autowired(required = false) private AuroraSelfProfileService auroraSelfProfileService;
+    @Autowired(required = false) private AgentUserRelationshipService relationshipService;
+    @Autowired(required = false) private UserPortraitService userPortraitService;
 
     public AgentContextAssembler(UserProfileMapper userProfileMapper,
                                  DialogMessageMapper dialogMessageMapper,
@@ -70,6 +81,7 @@ public class AgentContextAssembler {
         this.geocodingService = geocodingService;
         this.weatherContextService = weatherContextService;
         this.timeContextService = timeContextService;
+        // auroraSelfProfileService, relationshipService, userPortraitService injected via @Autowired
     }
 
     public AgentContext assemble(Long userId, Long sessionId, String currentMessage, boolean includeMemory) {
@@ -136,6 +148,8 @@ public class AgentContextAssembler {
                 context.evidenceMemoryIds.add(card.id);
             }
         }
+        // 3-model block: Aurora identity + Relationship state + User portrait
+        context.threeModelBlock = buildThreeModelBlock(userId);
         return context;
     }
 
@@ -346,5 +360,31 @@ public class AgentContextAssembler {
 
     private boolean blank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private String buildThreeModelBlock(Long userId) {
+        if (auroraSelfProfileService == null || relationshipService == null) return "";
+        AuroraSelfProfile self = auroraSelfProfileService.get();
+        AgentUserRelationship rel = relationshipService.getOrInit(userId);
+        List<UserPortrait> portrait = userPortraitService == null ? List.of() : userPortraitService.getAll(userId);
+        String portraitLines = portrait.stream()
+                .map(p -> p.dim + ":" + p.valueJson)
+                .collect(Collectors.joining("\n"));
+        if (portraitLines.isEmpty()) {
+            portraitLines = "暂无画像数据";
+        }
+        return String.format("""
+                【Aurora Identity】
+                %s
+
+                【Relationship State】
+                %s
+
+                【User Portrait】
+                %s
+                """,
+                self == null ? "" : self.identityJson,
+                rel == null ? "" : rel.toPromptString(),
+                portraitLines);
     }
 }

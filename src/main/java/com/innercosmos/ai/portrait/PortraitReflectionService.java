@@ -1,6 +1,6 @@
 package com.innercosmos.ai.portrait;
 
-import com.innercosmos.ai.client.GlmLlmClient;
+import com.innercosmos.ai.client.LlmClient;
 import com.innercosmos.ai.client.LlmRequest;
 import com.innercosmos.ai.portrait.dto.PortraitDeltas;
 import com.innercosmos.entity.DialogMessage;
@@ -14,14 +14,14 @@ import java.util.stream.Collectors;
 @Service
 public class PortraitReflectionService {
     @Autowired
-    private GlmLlmClient llm;
+    private LlmClient llm;
     @Autowired
     private UserPortraitService portraitSvc;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public PortraitDeltas reflectOnTurn(Long userId, List<DialogMessage> recent) {
         String existingJson = portraitSvc.getAll(userId).stream()
-                .map(p -> p.getDim() + ":" + p.getValueJson())
+                .map(p -> p.dim + ":" + p.valueJson)
                 .collect(Collectors.joining(", ", "[", "]"));
         String prompt = """
                 你是一个用户画像分析师。下面是用户的最近对话和当前10维画像。
@@ -37,7 +37,7 @@ public class PortraitReflectionService {
                 对话: %s
                 """.formatted(existingJson, formatMessages(recent));
         try {
-            String raw = llm.chat(new LlmRequest("PORTRAIT_REFLECTION", prompt, true)).content();
+            String raw = llm.chat(new LlmRequest(userId, "PORTRAIT_REFLECTION", prompt));
             return objectMapper.readValue(raw, PortraitDeltas.class);
         } catch (Exception e) {
             return new PortraitDeltas(List.of(), List.of(), List.of());
