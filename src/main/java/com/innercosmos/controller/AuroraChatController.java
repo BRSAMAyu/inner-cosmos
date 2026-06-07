@@ -1,5 +1,6 @@
 package com.innercosmos.controller;
 
+import com.innercosmos.ai.router.SessionModelRouter;
 import com.innercosmos.common.ApiResponse;
 import com.innercosmos.dto.ChatRequest;
 import com.innercosmos.service.AuroraAgentService;
@@ -11,7 +12,9 @@ import com.innercosmos.vo.DailyRecordVO;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -28,15 +31,18 @@ public class AuroraChatController extends BaseController {
     private final MemoryService memoryService;
     private final MemorySettlementService memorySettlementService;
     private final RhythmGuardService rhythmGuardService;
+    private final SessionModelRouter modelRouter;
 
     public AuroraChatController(AuroraAgentService auroraAgentService,
                                 MemoryService memoryService,
                                 MemorySettlementService memorySettlementService,
-                                RhythmGuardService rhythmGuardService) {
+                                RhythmGuardService rhythmGuardService,
+                                SessionModelRouter modelRouter) {
         this.auroraAgentService = auroraAgentService;
         this.memoryService = memoryService;
         this.memorySettlementService = memorySettlementService;
         this.rhythmGuardService = rhythmGuardService;
+        this.modelRouter = modelRouter;
     }
 
     @PostMapping("/message")
@@ -89,5 +95,20 @@ public class AuroraChatController extends BaseController {
         Long userId = currentUserId(session);
         String advice = rhythmGuardService.getSessionAdvice(userId);
         return ApiResponse.ok(Map.of("advice", advice));
+    }
+
+    /**
+     * Set (or clear, when {@code provider} is null/blank) the LLM provider for a
+     * specific dialog session. M6 — model router.
+     */
+    @PutMapping("/session/{id}/model")
+    public ApiResponse<Boolean> setSessionModel(@PathVariable("id") Long sessionId,
+                                                @RequestBody Map<String, String> body,
+                                                HttpSession session) {
+        // session is required only to ensure the caller is logged in.
+        currentUserId(session);
+        String provider = body == null ? null : body.get("provider");
+        modelRouter.setSessionPreference(sessionId, provider);
+        return ApiResponse.ok(true);
     }
 }

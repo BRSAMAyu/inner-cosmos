@@ -52,6 +52,15 @@ const API = {
   async auroraRhythmCheck() {
     return IC.api("/api/aurora/rhythm-check", { method: "POST" });
   },
+  async setPreferredModel(body) {
+    return IC.api("/api/user/preferred-model", { method: "PUT", body: JSON.stringify(body) });
+  },
+  async setSessionModel(sessionId, provider) {
+    return IC.api(
+      "/api/aurora/session/" + sessionId + "/model",
+      { method: "PUT", body: JSON.stringify({ provider }) }
+    );
+  },
 
   /* Dialog Sessions */
   async createSession(data) {
@@ -234,6 +243,29 @@ const API = {
   },
   async plazaMatches() {
     return IC.api("/api/plaza/matches");
+  },
+
+  /* Social */
+  async socialPeople() {
+    return IC.api("/api/social/people");
+  },
+  async socialFriends() {
+    return IC.api("/api/social/friends");
+  },
+  async socialRequests() {
+    return IC.api("/api/social/requests");
+  },
+  async socialRequestFriend(userId, source = "SOCIAL_PAGE") {
+    return IC.api("/api/social/friends/request", { method: "POST", body: JSON.stringify({ userId, source }) });
+  },
+  async socialAcceptFriend(id) {
+    return IC.api(`/api/social/friends/${id}/accept`, { method: "POST" });
+  },
+  async socialGroups() {
+    return IC.api("/api/social/groups");
+  },
+  async socialCreateGroup(data) {
+    return IC.api("/api/social/groups", { method: "POST", body: JSON.stringify(data) });
   },
 
   /* Persona Chat */
