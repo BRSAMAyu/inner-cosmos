@@ -423,6 +423,11 @@ const API = {
     return IC.api("/api/ai/health");
   },
 
+  /* Aurora Goodbye */
+  async goodbye(body) {
+    return IC.api("/api/aurora/goodbye", { method: "POST", body: JSON.stringify(body) });
+  },
+
   /* Weekly Review */
   async weeklyReviewLatest() {
     return IC.api("/api/daily-record/weekly/latest");

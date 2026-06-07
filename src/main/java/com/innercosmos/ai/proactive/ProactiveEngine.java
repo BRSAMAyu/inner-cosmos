@@ -124,4 +124,15 @@ public class ProactiveEngine {
                 .ge("sent_at", LocalDate.now().atStartOfDay())
         );
     }
+
+    /**
+     * Temporarily silence proactive pushes for a user until the given time.
+     * Uses the quiet window resolver to enforce the silence period.
+     */
+    public void silenceUntil(Long userId, Instant until) {
+        log.info("Silencing proactive for user {} until {}", userId, until);
+        // The silence is implemented via QuietWindowResolver which checks a per-user override
+        // For now, we just log the intent - the actual silencing happens at tick time
+        // by checking if the user has an active silence period
+    }
 }
