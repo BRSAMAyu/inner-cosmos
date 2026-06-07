@@ -22,6 +22,12 @@ const API = {
   async auroraModes() {
     return IC.api("/api/aurora/modes");
   },
+  async auroraModeSwitch(sessionId, mode) {
+    return IC.api("/api/aurora/mode/switch", {
+      method: "POST",
+      body: JSON.stringify({ sessionId, mode })
+    });
+  },
   async auroraGreeting(data) {
     return IC.api("/api/aurora/greeting", { method: "POST", body: JSON.stringify(data) });
   },
@@ -235,6 +241,9 @@ const API = {
   },
   async archiveCapsule(id) {
     return IC.api(`/api/capsule/${id}/archive`, { method: "POST" });
+  },
+  async syncPending() {
+    return IC.api("/api/capsule/sync/pending");
   },
 
   /* Plaza */
