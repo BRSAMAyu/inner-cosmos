@@ -138,20 +138,20 @@ public class AliveDecisionEngine {
 
     private int recentPushCountInHour(Long userId) {
         LocalDateTime since = LocalDateTime.now().minusHours(1);
-        return (int) eventLogMapper.selectCount(
+        return Math.toIntExact(eventLogMapper.selectCount(
             new QueryWrapper<ProactiveEventLog>()
                 .eq("user_id", userId)
                 .eq("event_type", "alive_push")
                 .ge("sent_at", since)
-        );
+        ));
     }
 
     private int todayPushCount(Long userId) {
-        return (int) eventLogMapper.selectCount(
+        return Math.toIntExact(eventLogMapper.selectCount(
             new QueryWrapper<ProactiveEventLog>()
                 .eq("user_id", userId)
                 .ge("sent_at", LocalDate.now().atStartOfDay())
-        );
+        ));
     }
 
     private void ensureMinDailyPush(Long userId) {

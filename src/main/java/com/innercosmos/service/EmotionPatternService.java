@@ -13,6 +13,8 @@ public interface EmotionPatternService {
      */
     List<EmotionPatternVO> detectPatterns(Long userId, int days);
 
+    List<EmotionPatternVO> detectWeeklyPatterns(Long userId, LocalDate startDate, LocalDate endDate);
+
     /**
      * Get the most dominant pattern type for a user.
      */

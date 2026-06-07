@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.TextStyle;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -179,11 +180,11 @@ public class WeeklyReviewV2Service {
         }
 
         // Check if existing review already has V2 fields populated
-        if (existing.weekStartDate != null && isNotBlank(existing.title)) {
+        if (existing.weekStartDate != null && isNotBlank(existing.dominantTheme)) {
             WeeklyReviewV2VO vo = new WeeklyReviewV2VO();
             vo.id = existing.id;
             vo.userId = existing.userId;
-            vo.title = existing.title;
+            vo.title = existing.dominantTheme;
             vo.weekStartDate = existing.weekStartDate.toString();
             vo.weekEndDate = existing.weekEndDate.toString();
             vo.dateRange = existing.weekStartDate + " ~ " + existing.weekEndDate;
@@ -214,7 +215,6 @@ public class WeeklyReviewV2Service {
         review.userId = vo.userId;
         review.weekStartDate = weekStartDate;
         review.weekEndDate = weekEndDate;
-        review.title = vo.title;
         review.dominantTheme = vo.dominantEmotion;
         review.themeSummary = vo.topThemes;
         review.emotionTrend = vo.emotionSpectrum;
@@ -288,7 +288,7 @@ public class WeeklyReviewV2Service {
         }
         Map<String, Long> counts = timelines.stream()
                 .filter(t -> t.dominantEmotion != null)
-                .collect(Collectors.groupingBy(EmotionTimeline::getDominantEmotion, Collectors.counting()));
+                .collect(Collectors.groupingBy(t -> t.dominantEmotion, Collectors.counting()));
 
         int total = timelines.size();
         return counts.entrySet().stream()

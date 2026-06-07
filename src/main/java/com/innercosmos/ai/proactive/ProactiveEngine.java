@@ -12,9 +12,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.util.List;
 
 /**
@@ -22,6 +25,7 @@ import java.util.List;
  */
 @Service
 public class ProactiveEngine {
+    private static final Logger log = LoggerFactory.getLogger(ProactiveEngine.class);
 
     @Autowired
     private IntensityPolicy intensityPolicy;
@@ -67,11 +71,11 @@ public class ProactiveEngine {
         if (quiet.quiet()) return;
 
         // Count sends today
-        int sentToday = (int) eventLogMapper.selectCount(
+        int sentToday = Math.toIntExact(eventLogMapper.selectCount(
             new QueryWrapper<ProactiveEventLog>()
                 .eq("user_id", userId)
                 .ge("sent_at", LocalDate.now().atStartOfDay())
-        );
+        ));
 
         var policy = intensityPolicy.get(intensity);
         int budget = policy.maxPerDay() - sentToday;
@@ -117,8 +121,8 @@ public class ProactiveEngine {
         eventLogMapper.insert(e);
     }
 
-    public int countSentToday(Long userId) {
-        return (int) eventLogMapper.selectCount(
+    public long countSentToday(Long userId) {
+        return eventLogMapper.selectCount(
             new QueryWrapper<ProactiveEventLog>()
                 .eq("user_id", userId)
                 .ge("sent_at", LocalDate.now().atStartOfDay())
