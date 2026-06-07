@@ -705,3 +705,58 @@ CREATE TABLE IF NOT EXISTS tb_capsule_sync_queue (
   INDEX idx_sync_user (user_id),
   INDEX idx_sync_status (status)
 );
+
+-- Aurora Subjectivity + Continuity System (M0)
+
+CREATE TABLE IF NOT EXISTS tb_aurora_constitution (
+  id INT PRIMARY KEY DEFAULT 1,
+  identity_json TEXT NOT NULL,
+  core_values_json TEXT NOT NULL,
+  product_rights_json TEXT NOT NULL,
+  hard_boundaries_json TEXT NOT NULL,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS tb_aurora_self_model (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  dimension VARCHAR(64) NOT NULL,
+  belief TEXT NOT NULL,
+  confidence DOUBLE NOT NULL DEFAULT 0.5,
+  evidence_refs TEXT,
+  status VARCHAR(32) NOT NULL DEFAULT 'active',
+  committed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  revision_count INT NOT NULL DEFAULT 1,
+  INDEX idx_self_model_user (user_id),
+  INDEX idx_self_model_status (status),
+  UNIQUE KEY uk_self_model_user_dim (user_id, dimension, status)
+);
+
+CREATE TABLE IF NOT EXISTS tb_aurora_self_statement (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  session_id BIGINT,
+  message_id BIGINT,
+  statement_text TEXT NOT NULL,
+  trigger VARCHAR(32) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_statement_user (user_id),
+  INDEX idx_statement_created (created_at)
+);
+
+CREATE TABLE IF NOT EXISTS tb_aurora_self_reflection (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  trigger VARCHAR(32) NOT NULL,
+  depth VARCHAR(16) NOT NULL,
+  summary TEXT NOT NULL,
+  related_statement_id BIGINT,
+  dimension VARCHAR(64),
+  proposed_belief TEXT,
+  confidence DOUBLE DEFAULT 0.5,
+  status VARCHAR(32) NOT NULL DEFAULT 'light',
+  risk_flags TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_reflection_user (user_id),
+  INDEX idx_reflection_status (status)
+);
