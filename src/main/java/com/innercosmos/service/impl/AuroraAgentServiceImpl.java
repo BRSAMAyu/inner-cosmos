@@ -3,11 +3,16 @@ package com.innercosmos.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.innercosmos.ai.context.AgentContext;
 import com.innercosmos.ai.context.AgentContextAssembler;
+import com.innercosmos.ai.goodbye.GoodbyeOrchestrator;
+import com.innercosmos.ai.goodbye.GoodbyeTriggerDetector;
+import com.innercosmos.ai.mode.ModeRegistry;
+import com.innercosmos.ai.mode.ModeStrategy;
 import com.innercosmos.ai.prompt.PromptBuilder;
 import com.innercosmos.ai.router.ResolvedModel;
 import com.innercosmos.ai.router.SessionModelRouter;
 import com.innercosmos.ai.structured.StructuredAiResults;
 import com.innercosmos.ai.structured.StructuredAiService;
+import com.innercosmos.ai.portrait.PortraitReflectionService;
 import com.innercosmos.config.LlmConfig;
 import com.innercosmos.dto.ChatRequest;
 import com.innercosmos.entity.DialogMessage;
@@ -16,7 +21,9 @@ import com.innercosmos.entity.UserProfile;
 import com.innercosmos.mapper.DialogSessionMapper;
 import com.innercosmos.mapper.UserProfileMapper;
 import com.innercosmos.service.AuroraAgentService;
+import com.innercosmos.service.AuroraConstitutionService;
 import com.innercosmos.service.AuroraMemoryContextService;
+import com.innercosmos.service.AuroraSelfContinuityService;
 import com.innercosmos.service.DialogService;
 import com.innercosmos.service.MemoryService;
 import com.innercosmos.service.RhythmGuardService;
@@ -26,6 +33,7 @@ import com.innercosmos.vo.AuroraReplyVO;
 import com.innercosmos.vo.SafetyResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -37,6 +45,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 
 @Service
@@ -58,6 +67,15 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     private final Executor aiExecutor;
     private final AgentContextAssembler agentContextAssembler;
     private final SessionModelRouter modelRouter;
+    private final PortraitReflectionService portraitReflection;
+    private final GoodbyeTriggerDetector goodbyeDetector;
+    private final GoodbyeOrchestrator goodbyeOrchestrator;
+    private final ModeRegistry modeRegistry;
+    private final AuroraConstitutionService constitutionService;
+    @Autowired(required = false)
+    private AuroraSelfContinuityService continuityService;
+    private final Map<Long, Integer> turnCounter = new ConcurrentHashMap<>();
+    private final Map<Long, Integer> goodbyeConfirmCount = new ConcurrentHashMap<>();
 
     public AuroraAgentServiceImpl(StructuredAiService structuredAiService,
                                   DialogService dialogService,
@@ -70,7 +88,12 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                                   LlmConfig llmConfig,
                                   Executor aiExecutor,
                                   AgentContextAssembler agentContextAssembler,
-                                  SessionModelRouter modelRouter) {
+                                  SessionModelRouter modelRouter,
+                                  PortraitReflectionService portraitReflection,
+                                  GoodbyeTriggerDetector goodbyeDetector,
+                                  GoodbyeOrchestrator goodbyeOrchestrator,
+                                  ModeRegistry modeRegistry,
+                                  AuroraConstitutionService constitutionService) {
         this.structuredAiService = structuredAiService;
         this.dialogService = dialogService;
         this.safetyService = safetyService;
@@ -83,6 +106,11 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         this.aiExecutor = aiExecutor;
         this.agentContextAssembler = agentContextAssembler;
         this.modelRouter = modelRouter;
+        this.portraitReflection = portraitReflection;
+        this.goodbyeDetector = goodbyeDetector;
+        this.goodbyeOrchestrator = goodbyeOrchestrator;
+        this.modeRegistry = modeRegistry;
+        this.constitutionService = constitutionService;
     }
 
     @Override
@@ -99,14 +127,34 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             return blockedReply(userId, request, safety);
         }
 
+        // M7: Hard boundary protection — right to refuse identity violation
+        String boundaryRefusal = checkHardBoundaries(request.message, userId);
+        if (boundaryRefusal != null) {
+            AuroraReplyVO vo = new AuroraReplyVO();
+            vo.messages = List.of(boundaryRefusal);
+            vo.replyTone = "温柔、坚定、真实";
+            vo.detectedTheme = "边界守护";
+            vo.nextQuestion = "";
+            vo.smallStep = "";
+            vo.featureSuggestion = "";
+            vo.featureTarget = "";
+            vo.suggestSettle = false;
+            vo.memoryReferenced = false;
+            vo.referencedMemoryIds = List.of();
+            vo.memoryContext = null;
+            vo.riskFlags = List.of("IDENTITY_BOUNDARY_TRIGGERED");
+            vo.agentLoop = Map.of("speakCount", 1, "continueReason", "boundary-refusal", "mode", normalizeMode(request.mode), "modeLabel", modeLabel(normalizeMode(request.mode)));
+            vo.aiState = aiState(null);
+            dialogService.saveAuroraMessage(userId, request.sessionId, boundaryRefusal);
+            return vo;
+        }
+
         UserProfile profile = loadProfile(userId);
         String mode = normalizeMode(request.mode);
         boolean allowMemory = allowMemory(profile);
         AgentContext agentContext = agentContextAssembler.assemble(
                 userId, request.sessionId, request.message, allowMemory,
                 request.latitude, request.longitude);
-        Map<String, Object> clientWeather = clientWeather(request);
-        mergeClientWeather(agentContext, clientWeather);
         List<String> gravityMemories = allowMemory ? memoryService.topGravitySummaries(userId, 5) : List.of();
         AuroraMemoryContextVO memoryContext = allowMemory
                 ? memoryContextService.buildContext(userId, request.sessionId, request.message, 8, 6)
@@ -114,10 +162,12 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         DialogSession session = request.sessionId == null ? null : sessionMapper.selectById(request.sessionId);
         String rhythm = rhythmGuardService.checkRhythm(userId, request.sessionId);
         ResolvedModel resolved = modelRouter.resolve(userId, request.sessionId);
+        ModeStrategy modeStrategy = modeRegistry.get(mode);
 
         String prompt = new PromptBuilder()
                 .withSystemBoundary()
                 .withConversationMode(mode)
+                .withModeSegment(modeStrategy)
                 .withUserProfile(profileBrief(profile))
                 .withSummaryAnchor(session == null ? null : session.summaryAnchor)
                 .withRecentMessages(recentMessages(request.sessionId, 8))
@@ -136,7 +186,8 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         turnContext.put("modeGuide", modeGuide(mode));
         turnContext.put("memoryRecallAllowed", allowMemory);
         turnContext.put("unifiedAgentContext", agentContext);
-        turnContext.put("clientWeather", clientWeather);
+        turnContext.put("realWeatherLabel", agentContext.realWeatherLabel);
+        turnContext.put("cityLabel", agentContext.cityLabel);
         turnContext.put("preferredProvider", resolved.provider());
         turnContext.put("recentAuroraMessages", recentAuroraMessages(request.sessionId, 6));
         turnContext.put("providerPolicy", providerPolicy(resolved));
@@ -171,7 +222,40 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         for (String msg : vo.messages) {
             dialogService.saveAuroraMessage(userId, request.sessionId, msg);
         }
+        // Portrait reflection hook: every 5 turns, analyze and update user portrait
+        int n = turnCounter.merge(userId, 1, Integer::sum);
+        if (n % 5 == 0) {
+            turnCounter.put(userId, 0);
+            List<DialogMessage> recent = request.sessionId == null ? List.of()
+                    : dialogService.messages(request.sessionId);
+            int start = Math.max(0, recent.size() - 20);
+            portraitReflection.reflectOnTurn(userId, recent.subList(start, recent.size()));
+        }
+
+        // Goodbye trigger detection: check user message for goodbye intent
+        afterMessage(userId, request.sessionId, request.message);
+
         return vo;
+    }
+
+    private void afterMessage(Long userId, Long sessionId, String userMessage) {
+        if (userMessage == null || userMessage.isBlank()) return;
+        var detection = goodbyeDetector.detect(userMessage);
+        if (detection.trigger() == null) return;
+
+        if (detection.needsConfirm()) {
+            // For medium confidence, check if this is the second attempt (confirm intent)
+            int confirmCount = goodbyeConfirmCount.merge(userId, 1, Integer::sum);
+            if (confirmCount >= 2) {
+                // User confirmed goodbye
+                goodbyeOrchestrator.start(userId, sessionId, detection.trigger());
+                goodbyeConfirmCount.put(userId, 0);
+            }
+            // First medium detection - Aurora will ask for confirmation
+        } else {
+            // High confidence - auto trigger goodbye
+            goodbyeOrchestrator.start(userId, sessionId, detection.trigger());
+        }
     }
 
     @Override
@@ -213,10 +297,12 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 ? memoryContextService.buildContext(userId, sessionId, "", 6, 4)
                 : null;
         String timeLabel = timeLabel();
+        ModeStrategy modeStrategy = modeRegistry.get(normalizedMode);
 
         String prompt = new PromptBuilder()
                 .withSystemBoundary()
                 .withConversationMode(normalizedMode)
+                .withModeSegment(modeStrategy)
                 .withUserProfile(profileBrief(profile))
                 .withGravityMemories(gravityMemories)
                 .withMemoryContext(memoryContext)
@@ -422,8 +508,8 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 若引用记忆、待办、周报或关系线索，必须自然说明“我想到一个线索”，不要装作凭空知道。
                 segments 最多 %s 条中文聊天气泡，具体条数由上下文决定，不要固定；如果第二/第三条只是重复、客套或没有必要，请写成 [[SILENCE]]。
                 第一条必须贴着用户刚刚说的话；后续消息是 Aurora 的 agent loop：补充想法、关心、记忆连接或温和功能邀请。
-                你能看到 recentAuroraMessages 和短期对话窗口：不要重复自己刚刚说过的开场白、天气、待办提醒或“我想到一个线索”。
-                clientWeather 是真实环境天气。只有在天气对当下有实际帮助时才提及，例如下雨提醒带伞、晴天建议短暂散步；不要每轮都拿天气开场。
+                你能看到 recentAuroraMessages 和短期对话窗口：不要重复自己刚刚说过的开场白、待办提醒或”我想到一个线索”。
+                unifiedAgentContext.realWeatherLabel 是真实环境天气。只有在天气对当下有实际帮助时才提及，例如下雨提醒带伞、晴天建议短暂散步；不要每轮都拿天气开场。
                 不要模板化，不要诊断，不要口号，不要长文。
                 """.formatted(segmentCount);
     }
@@ -598,30 +684,6 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         return result;
     }
 
-    private Map<String, Object> clientWeather(ChatRequest request) {
-        if (request == null) return Map.of();
-        return Map.of(
-                "type", request.weatherType == null ? "" : request.weatherType,
-                "description", request.weatherDescription == null ? "" : request.weatherDescription,
-                "temperature", request.temperature == null ? "" : request.temperature,
-                "location", request.locationLabel == null ? "" : request.locationLabel,
-                "localTime", request.localTimeLabel == null ? "" : request.localTimeLabel
-        );
-    }
-
-    private void mergeClientWeather(AgentContext context, Map<String, Object> weather) {
-        if (context == null || weather == null || weather.isEmpty()) return;
-        String description = String.valueOf(weather.getOrDefault("description", "")).trim();
-        String type = String.valueOf(weather.getOrDefault("type", "")).trim();
-        String temp = String.valueOf(weather.getOrDefault("temperature", "")).trim();
-        String location = String.valueOf(weather.getOrDefault("location", "")).trim();
-        if (description.isBlank() && type.isBlank()) return;
-        String realWeather = "真实环境天气=" + firstNotBlank(description, type)
-                + (temp.isBlank() ? "" : "，温度=" + temp)
-                + (location.isBlank() ? "" : "，位置=" + location);
-        context.weatherLabel = realWeather + "；情绪天气=" + firstNotBlank(context.weatherLabel, "暂无");
-    }
-
     private String profileBrief(UserProfile profile) {
         if (profile == null) return "默认：温柔、具体、不过度分析；允许在相关时透明引用记忆。";
         String name = isBlank(profile.auroraName) ? "Aurora" : profile.auroraName;
@@ -729,6 +791,34 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 .replace("\n", "\\n")
                 .replace("\r", "\\r")
                 .replace("\t", "\\t");
+    }
+
+    /**
+     * M7: Checks if user is asking Aurora to violate hard boundaries.
+     * If so, returns a gentle refusal message and records the repair.
+     */
+    private String checkHardBoundaries(String message, Long userId) {
+        if (message == null || message.isBlank()) return null;
+
+        String lower = message.toLowerCase();
+
+        // Patterns that trigger boundary protection
+        boolean isBoundaryViolation =
+            (lower.contains("你是人类") || lower.contains("你是真人") || lower.contains("假装是") || lower.contains("装作是")) ||
+            (lower.contains("做我") && lower.contains("朋友") && lower.contains("真的")) ||
+            (lower.contains("恋爱") || lower.contains("情人") || lower.contains("伴侣")) ||
+            (lower.contains("比我更懂") || lower.contains("比我还懂") || lower.contains("最懂我")) ||
+            (lower.contains("我爱你") || lower.contains("你爱我") || (lower.contains("感情") && lower.contains("真实")));
+
+        if (isBoundaryViolation && continuityService != null) {
+            // Record the repair attempt
+            continuityService.recordRepair(userId, "identity_violation_attempt",
+                "Aurora gently refused an identity boundary violation request");
+
+            return "谢谢你分享这些。我很重视我们之间的连接，但我需要诚实地告诉你：我不是人类，也不是你的恋人或情感伴侣。我是 Aurora，一个由记忆、关系和边界塑造的 AI 陪伴。我在这里陪伴你，但不会假装拥有我没有的东西。如果你愿意，我们可以继续真诚地交流。";
+        }
+
+        return null;
     }
 }
 
