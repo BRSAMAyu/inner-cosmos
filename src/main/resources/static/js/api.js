@@ -424,6 +424,20 @@ const API = {
     return IC.api("/api/admin/model-config", { method: "POST", body: JSON.stringify(config) });
   },
 
+  /* Aurora Self — subjectivity system (M6) */
+  getConstitution: () => IC.api("/api/aurora/self/constitution"),
+  getStatements: (userId, limit = 10) =>
+    IC.api(`/api/aurora/self/statements?userId=${userId}&limit=${limit}`),
+  getReflections: (userId, limit = 10) =>
+    IC.api(`/api/aurora/self/reflections?userId=${userId}&limit=${limit}`),
+  getModel: (userId) => IC.api(`/api/aurora/self/model?userId=${userId}`),
+  getCandidates: (userId) => IC.api(`/api/aurora/self/candidates?userId=${userId}`),
+  commitCandidate: (userId, candidateId, userConfirmed = true) =>
+    IC.api(`/api/aurora/self/commit?userId=${userId}`, {
+      method: "POST",
+      body: JSON.stringify({ candidateId, userConfirmed, extraEvidence: [] })
+    }),
+
   /* AI Logs */
   async aiLogs() {
     return IC.api("/api/ai-logs");

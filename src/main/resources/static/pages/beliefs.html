@@ -31,11 +31,57 @@
   </style>
 </head>
 <body>
-<main class="shell">
+<main id="main" class="shell">
+  <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
   <span class="route-hint">你的潜在信念</span>
-  <h1>信念画廊</h1>
+  <h1 id="page-title">信念画廊</h1>
   <p class="muted mb-2">系统从你的记忆里识别出反复出现的潜在信念 —— 那些你以为只是"想法"，但其实在悄悄影响你决策的模式。互相矛盾的信念会用红色高亮。</p>
+
+  <!-- Aurora Self Panel (M6) -->
+  <div class="aurora-self-panel" id="auroraSelfPanel" style="display:none">
+    <div class="panel-header" onclick="toggleAuroraSelfPanel()">
+      <span class="panel-title">Aurora 主体性</span>
+      <span class="toggle-icon" id="auroraSelfPanelIcon">&#9660;</span>
+    </div>
+    <div class="panel-content" id="auroraSelfContent">
+      <!-- Constitution -->
+      <div class="self-section" id="constitutionSection">
+        <div class="section-header" onclick="toggleSection('constitution')">
+          <span>【Aurora 存在宪法】</span>
+          <span class="toggle-icon" id="constitutionIcon">&#9660;</span>
+        </div>
+        <div class="section-body" id="constitutionBody"><div class="loading">加载中...</div></div>
+      </div>
+      <!-- Self Model -->
+      <div class="self-section" id="modelSection">
+        <div class="section-header" onclick="toggleSection('model')">
+          <span>【Aurora 自我模型】</span>
+          <span class="badge-count" id="modelCount">0</span>
+          <span class="toggle-icon" id="modelIcon">&#9660;</span>
+        </div>
+        <div class="section-body" id="modelBody"><div class="loading">加载中...</div></div>
+      </div>
+      <!-- Candidates -->
+      <div class="self-section" id="candidatesSection">
+        <div class="section-header" onclick="toggleSection('candidates')">
+          <span>【候选更新】</span>
+          <span class="badge-count" id="candidateCount">0</span>
+          <span class="toggle-icon" id="candidatesIcon">&#9660;</span>
+        </div>
+        <div class="section-body" id="candidatesBody"><div class="loading">加载中...</div></div>
+      </div>
+      <!-- Public Statements -->
+      <div class="self-section" id="statementsSection">
+        <div class="section-header" onclick="toggleSection('statements')">
+          <span>【Aurora 公开自我陈述】</span>
+          <span class="badge-count" id="statementCount">0</span>
+          <span class="toggle-icon" id="statementsIcon">&#9660;</span>
+        </div>
+        <div class="section-body" id="statementsBody"><div class="loading">加载中...</div></div>
+      </div>
+    </div>
+  </div>
 
   <section class="panel mb-2" id="contradictionsPanel" style="display:none">
     <h2>🔍 矛盾信念</h2>
@@ -62,6 +108,7 @@ IC.mountShell("信念画廊");
 IC.ensureDemoLogin().then(() => load('all'));
 
 let currentFilter = 'all';
+let allBeliefsCache = [];
 
 function esc(t) { return IC.esc(t); }
 
@@ -97,11 +144,42 @@ async function load(filter) {
   let res;
   if (filter === 'strong') {
     res = await API.beliefStrong(0.5);
+  } else if (filter === 'byCategory') {
+    const all = await API.beliefList();
+    allBeliefsCache = (all.success ? all.data : []) || [];
+    renderCategoryPicker(allBeliefsCache);
+    return;
   } else {
     res = await API.beliefList();
   }
   const beliefs = (res.success ? res.data : []) || [];
+  if (filter === 'all') allBeliefsCache = beliefs;
   renderList(beliefs, filter);
+}
+
+function renderCategoryPicker(beliefs) {
+  const list = document.getElementById("beliefList");
+  const categories = [...new Set((beliefs || []).map(b => b.category).filter(Boolean))];
+  if (!categories.length) {
+    list.innerHTML = IC.empty("还没有可分类的信念。");
+    return;
+  }
+  list.innerHTML = `
+    <section class="panel">
+      <h2>选择信念分类</h2>
+      <div class="pill-row">${categories.map(c => `<button class="pill" onclick="loadCategory('${encodeURIComponent(c)}')">${esc(c)}</button>`).join("")}</div>
+    </section>
+    <section id="categoryResult" class="mt-2"></section>
+  `;
+}
+
+async function loadCategory(category) {
+  category = decodeURIComponent(category);
+  const r = await API.beliefByCategory(category);
+  const result = document.getElementById("categoryResult");
+  const beliefs = (r.success ? r.data : []) || [];
+  result.innerHTML = beliefs.length ? beliefs.map(b => renderBeliefCard(b)).join("") : IC.empty("这个分类下暂时没有信念。");
+  IC.stagger(result);
 }
 
 function renderList(beliefs, filter) {
@@ -110,7 +188,11 @@ function renderList(beliefs, filter) {
     list.innerHTML = IC.empty("还没有识别出明显的信念模式。聊更多几次，Aurora 会逐渐看到你的底层想法。");
     return;
   }
-  list.innerHTML = beliefs.map(b => {
+  list.innerHTML = beliefs.map(b => renderBeliefCard(b)).join("");
+  IC.stagger(list);
+}
+
+function renderBeliefCard(b) {
     const s = b.strengthScore || 0;
     const cls = s > 0.7 ? "strong" : (s > 0.5 ? "" : "low");
     const strengthCls = s > 0.6 ? "high" : (s > 0.3 ? "" : "low");
@@ -125,9 +207,131 @@ function renderList(beliefs, filter) {
         ${b.evidenceExcerpt ? `<p class="muted mt-1" style="font-size:.84rem">支撑记忆：${esc(b.evidenceExcerpt)}</p>` : ""}
       </article>
     `;
-  }).join("");
-  IC.stagger(list);
 }
-</script>
+IC.hideLoading();
+
+// ── Aurora Self Panel (M6) ──
+let auroraSelfUserId = null;
+
+function toggleAuroraSelfPanel() {
+  const content = document.getElementById('auroraSelfContent');
+  const icon = document.getElementById('auroraSelfPanelIcon');
+  if (content.style.display === 'none') {
+    content.style.display = '';
+    icon.innerHTML = '&#9660;';
+  } else {
+    content.style.display = 'none';
+    icon.innerHTML = '&#9654;';
+  }
+}
+
+function toggleSection(name) {
+  const body = document.getElementById(name + 'Body');
+  const icon = document.getElementById(name + 'Icon');
+  if (!body || !icon) return;
+  if (body.style.display === 'none') {
+    body.style.display = '';
+    icon.innerHTML = '&#9660;';
+  } else {
+    body.style.display = 'none';
+    icon.innerHTML = '&#9654;';
+  }
+}
+
+async function loadAuroraSelfPanel(userId) {
+  auroraSelfUserId = userId;
+  document.getElementById('auroraSelfPanel').style.display = '';
+  try {
+    const [constitution, model, candidates, statements] = await Promise.all([
+      API.getConstitution(),
+      API.getModel(userId),
+      API.getCandidates(userId),
+      API.getStatements(userId, 5)
+    ]);
+    renderConstitution(constitution);
+    renderModel(Array.isArray(model) ? model : []);
+    renderCandidates(Array.isArray(candidates) ? candidates : []);
+    renderStatements(Array.isArray(statements) ? statements : []);
+  } catch (e) {
+    console.warn('Aurora self panel load failed:', e);
+  }
+}
+
+function renderConstitution(c) {
+  const body = document.getElementById('constitutionBody');
+  if (!c || c.status === 'not_initialized' || c.success === false) {
+    body.innerHTML = '<div class="loading">Aurora 宪法尚未初始化</div>';
+    return;
+  }
+  try {
+    const identity = JSON.parse(c.identityJson || '{}');
+    const coreValues = JSON.parse(c.coreValuesJson || '[]');
+    const rights = JSON.parse(c.productRightsJson || '[]');
+    const boundaries = JSON.parse(c.hardBoundariesJson || '[]');
+    body.innerHTML =
+      '<div class="self-item"><div class="self-item-header"><span class="self-item-dim">身份定义</span></div><div class="self-item-belief">' + esc(identity.self_definition || '-') + '</div></div>' +
+      '<div class="self-item"><div class="self-item-header"><span class="self-item-dim">核心价值</span></div><div class="self-item-belief">' + esc(coreValues.join('、')) + '</div></div>' +
+      '<div class="self-item"><div class="self-item-header"><span class="self-item-dim">产品权利</span></div><div class="self-item-belief">' + esc(rights.map(function(r){return r.replace(/_/g,' ');}).join('、')) + '</div></div>' +
+      '<div class="self-item"><div class="self-item-header"><span class="self-item-dim">硬边界</span></div><div class="self-item-belief">' + esc(boundaries.map(function(b){return b.replace(/_/g,' ');}).join('、')) + '</div></div>';
+  } catch (e) {
+    body.innerHTML = '<div class="loading">宪法数据解析失败</div>';
+  }
+}
+
+function renderModel(models) {
+  var body = document.getElementById('modelBody');
+  document.getElementById('modelCount').textContent = models.length;
+  if (!models.length) { body.innerHTML = '<div class="loading">暂无自我模型记录</div>'; return; }
+  var html = '';
+  for (var i = 0; i < models.length; i++) {
+    var m = models[i];
+    html += '<div class="self-item"><div class="self-item-header"><span class="self-item-dim">' + esc(m.dimension || '-') + '</span><span class="self-item-confidence">置信度 ' + ((m.confidence || 0) * 100).toFixed(0) + '%</span></div><div class="self-item-belief">' + esc(m.belief || '-') + '</div></div>';
+  }
+  body.innerHTML = html;
+}
+
+function renderCandidates(candidates) {
+  var body = document.getElementById('candidatesBody');
+  document.getElementById('candidateCount').textContent = candidates.length;
+  if (!candidates.length) { body.innerHTML = '<div class="loading">暂无候选更新</div>'; return; }
+  var html = '';
+  for (var i = 0; i < candidates.length; i++) {
+    var c = candidates[i];
+    html += '<div class="self-item"><div class="self-item-header"><span class="self-item-dim">' + esc(c.dimension || '待定维度') + '</span><span class="self-item-confidence">置信度 ' + ((c.confidence || 0.5) * 100).toFixed(0) + '%</span></div><div class="self-item-belief">' + esc(c.proposedBelief || c.summary || '-') + '</div><div class="candidate-actions"><button class="btn-confirm" onclick="commitCandidate(' + c.id + ')">确认</button><button class="btn-reject" onclick="dismissCandidate(' + c.id + ')">拒绝</button></div></div>';
+  }
+  body.innerHTML = html;
+}
+
+function renderStatements(statements) {
+  var body = document.getElementById('statementsBody');
+  document.getElementById('statementCount').textContent = statements.length;
+  if (!statements.length) { body.innerHTML = '<div class="loading">暂无公开自我陈述</div>'; return; }
+  var html = '';
+  for (var i = 0; i < statements.length; i++) {
+    var s = statements[i];
+    html += '<div class="self-item"><div class="self-item-header"><span class="self-item-confidence">' + (s.createdAt ? s.createdAt.split('T')[0] : '-') + '</span><span class="self-item-trigger">' + esc(s.trigger || '-') + '</span></div><div class="self-item-belief">' + esc(s.statementText || '-') + '</div></div>';
+  }
+  body.innerHTML = html;
+}
+
+async function commitCandidate(candidateId) {
+  try {
+    await API.commitCandidate(auroraSelfUserId, candidateId, true);
+    loadAuroraSelfPanel(auroraSelfUserId);
+  } catch (e) {
+    alert('提交失败：' + (e.message || '未知错误'));
+  }
+}
+
+function dismissCandidate(candidateId) {
+  loadAuroraSelfPanel(auroraSelfUserId);
+}
+
+(function initAuroraSelf() {
+  API.userProfile().then(function(p) {
+    var userId = p && p.data && p.data.id;
+    if (userId) loadAuroraSelfPanel(userId);
+  }).catch(function(){});
+})();
 </body>
 </html>
