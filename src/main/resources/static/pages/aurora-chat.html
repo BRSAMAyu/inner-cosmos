@@ -33,6 +33,7 @@
         </label>
         <button onclick="rhythmCheck()">节律检查</button>
         <button onclick="finish()">沉淀今天</button>
+        <button class="ghost" onclick="goodbye()">温柔告别</button>
       </div>
     </div>
     <div id="modes" class="segmented mt-2"></div>
@@ -290,6 +291,27 @@ async function finish() {
   await API.finishSession(sid);
   await API.auroraSettle(sid);
   setTimeout(() => location.href = "/pages/daily-record.html", 900);
+}
+
+async function goodbye() {
+  if (!sid) return;
+  if (!confirm("确定要结束这次对话吗？")) return;
+  try {
+    const r = await API.goodbye({ sessionId: sid, trigger: "BUTTON" });
+    if (r.success && r.data && r.data.line) {
+      addBubble(r.data.line, "ai");
+      // After goodbye, redirect to daily record after a short delay
+      setTimeout(() => {
+        if (confirm("Aurora 已经道别。要去沉淀今天的记录吗？")) {
+          location.href = "/pages/daily-record.html";
+        }
+      }, 1500);
+    } else {
+      IC.toast("结束对话失败，请稍后再试。", "warn");
+    }
+  } catch (error) {
+    IC.toast("连接暂时不稳定，请稍后再试。", "warn");
+  }
 }
 
 async function loadAiStatus() {

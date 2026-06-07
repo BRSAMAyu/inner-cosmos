@@ -83,6 +83,7 @@ CREATE TABLE IF NOT EXISTS tb_dialog_session (
   token_estimate INT DEFAULT 0,
   started_at TIMESTAMP NULL,
   ended_at TIMESTAMP NULL,
+  goodbye_trigger VARCHAR(32),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_dialog_user (user_id)
