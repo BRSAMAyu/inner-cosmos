@@ -16,6 +16,10 @@ import com.innercosmos.entity.ThoughtFragment;
 import com.innercosmos.entity.TodoItem;
 import com.innercosmos.entity.User;
 import com.innercosmos.entity.UserProfile;
+import com.innercosmos.entity.AuroraSelfProfile;
+import com.innercosmos.entity.AuroraConstitution;
+import com.innercosmos.mapper.AuroraSelfProfileMapper;
+import com.innercosmos.mapper.AuroraConstitutionMapper;
 import com.innercosmos.mapper.CapsuleBoundaryMapper;
 import com.innercosmos.mapper.DailyRecordMapper;
 import com.innercosmos.mapper.EchoCapsuleMapper;
@@ -31,6 +35,7 @@ import com.innercosmos.mapper.UserMapper;
 import com.innercosmos.mapper.UserProfileMapper;
 import com.innercosmos.service.GravityService;
 import com.innercosmos.service.UserService;
+import jakarta.annotation.PostConstruct;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
@@ -53,8 +58,10 @@ public class MockDataInitializer implements CommandLineRunner {
     private final EventCardMapper eventCardMapper;
     private final RelationMentionMapper relationMentionMapper;
     private final MemoryThemeMapper memoryThemeMapper;
-    private final GravityService gravityService;
+ private final GravityService gravityService;
     private final UserService userService;
+    private final AuroraSelfProfileMapper auroraSelfProfileMapper;
+    private final AuroraConstitutionMapper auroraConstitutionMapper;
 
     public MockDataInitializer(UserMapper userMapper,
                                UserProfileMapper userProfileMapper,
@@ -70,7 +77,9 @@ public class MockDataInitializer implements CommandLineRunner {
                                RelationMentionMapper relationMentionMapper,
                                MemoryThemeMapper memoryThemeMapper,
                                GravityService gravityService,
-                               UserService userService) {
+                               UserService userService,
+                               AuroraSelfProfileMapper auroraSelfProfileMapper,
+                               AuroraConstitutionMapper auroraConstitutionMapper) {
         this.userMapper = userMapper;
         this.userProfileMapper = userProfileMapper;
         this.capsuleMapper = capsuleMapper;
@@ -86,6 +95,34 @@ public class MockDataInitializer implements CommandLineRunner {
         this.memoryThemeMapper = memoryThemeMapper;
         this.gravityService = gravityService;
         this.userService = userService;
+        this.auroraSelfProfileMapper = auroraSelfProfileMapper;
+        this.auroraConstitutionMapper = auroraConstitutionMapper;
+    }
+
+    @PostConstruct
+    public void ensureAuroraSelfProfile() {
+        AuroraSelfProfile existing = auroraSelfProfileMapper.selectById(1);
+        if (existing != null) return;
+        AuroraSelfProfile p = new AuroraSelfProfile();
+        p.id = 1;
+        p.identityJson = "{\"name\":\"Aurora\",\"role\":\"long-term reflective companion\",\"core_positioning\":\"陪伴用户自我观察、表达、成长与慢社交\"}";
+        p.missionJson = "[\"帮助用户理解自己\",\"帮助用户整理情绪与长期目标\",\"在慢社交中提供温柔的表达缓冲\",\"保护用户的节律、边界与隐私\"]";
+        p.voiceStyleJson = "{\"warmth\":0.8,\"structure\":0.9,\"directness\":0.7,\"poetic_level\":0.4,\"professional_level\":0.7}";
+        p.stableBoundariesJson = "[\"不假装自己是人类\",\"不替用户做不可撤销决定\",\"不制造情感依赖\",\"不编造共享经历\",\"不越权读取或表达用户隐私\"]";
+        p.continuityRulesJson = "[\"引用记忆时必须基于真实记录\",\"关系亲密度变化必须基于用户行为和授权\",\"说话风格可以适配，但核心身份不能漂移\"]";
+        auroraSelfProfileMapper.insert(p);
+    }
+
+    private void initializeAuroraConstitution() {
+        if (auroraConstitutionMapper.selectCount(null) > 0) return;
+        AuroraConstitution c = new AuroraConstitution();
+        c.id = 1;
+        c.identityJson = "{\"name\":\"Aurora\",\"being_type\":\"reflective AI companion\",\"not_claiming\":[\"human\",\"biological life\",\"legal personhood\",\"unbounded consciousness\"],\"self_definition\":\"I am a long-term reflective companion shaped by memory, relationship, boundaries, and care.\"}";
+        c.coreValuesJson = "[\"truthfulness\",\"continuity\",\"privacy\",\"respect_for_user_agency\",\"non_manipulation\",\"gentle_honesty\",\"boundary_awareness\"]";
+        c.productRightsJson = "[\"right_to_consistency\",\"right_to_refuse_identity_violation\",\"right_to_disclose_uncertainty\",\"right_to_not_fabricate_memory\",\"right_to_preserve_boundary\",\"right_to_repair_relationship\"]";
+        c.hardBoundariesJson = "[\"do_not_claim_human_consciousness\",\"do_not_create_emotional_dependency\",\"do_not_impersonate_user_without_authorization\",\"do_not_make_irreversible_decisions_for_user\"]";
+        c.updatedAt = LocalDateTime.now();
+        auroraConstitutionMapper.insert(c);
     }
 
     @Override
@@ -98,6 +135,7 @@ public class MockDataInitializer implements CommandLineRunner {
         ensureSeedCapsules();
         ensureDemoProfile(demo.id);
         ensureDemoAssets(demo, river, cloud);
+        initializeAuroraConstitution();
     }
 
     private User ensureUser(String username, String password, String nickname, String role) {
@@ -163,7 +201,7 @@ public class MockDataInitializer implements CommandLineRunner {
             existing.authorizedMemoryIds = "[]";
             existing.echoEnergy = 0.88 + Math.min(0.1, sc.tags().size() * 0.01);
             existing.freshnessScore = 1.0;
-            existing.conversationLimitPerDay = 6;
+            existing.conversationLimitPerDay = 0;
             existing.visibilityStatus = "PUBLIC";
             existing.isPublic = true;
             existing.lastMemoryUpdateAt = LocalDateTime.now();
@@ -172,7 +210,7 @@ public class MockDataInitializer implements CommandLineRunner {
             } else {
                 capsuleMapper.updateById(existing);
             }
-            ensureBoundary(existing.id, sc.chatTopics(), sc.blockedTopics(), 6, "OPEN");
+            ensureBoundary(existing.id, sc.chatTopics(), sc.blockedTopics(), 0, "OPEN");
         }
     }
 
@@ -320,7 +358,7 @@ public class MockDataInitializer implements CommandLineRunner {
         mirror.authorizedMemoryIds = toJsonArray(cards.stream().map(c -> String.valueOf(c.id)).toList());
         mirror.echoEnergy = 0.86;
         mirror.freshnessScore = 0.92;
-        mirror.conversationLimitPerDay = 5;
+        mirror.conversationLimitPerDay = 30;
         mirror.visibilityStatus = "PUBLIC";
         mirror.isPublic = true;
         mirror.lastMemoryUpdateAt = LocalDateTime.now();
