@@ -32,7 +32,44 @@ CREATE TABLE IF NOT EXISTS tb_user_profile (
   weather_awareness_enabled BOOLEAN DEFAULT TRUE,
   time_awareness_enabled BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE INDEX uk_user_profile_user (user_id)
+);
+
+CREATE TABLE IF NOT EXISTS tb_friend_relation (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  requester_id BIGINT NOT NULL,
+  addressee_id BIGINT NOT NULL,
+  status VARCHAR(32) NOT NULL,
+  source VARCHAR(64),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_friend_pair (requester_id, addressee_id),
+  INDEX idx_friend_requester (requester_id),
+  INDEX idx_friend_addressee (addressee_id)
+);
+
+CREATE TABLE IF NOT EXISTS tb_social_group (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  owner_user_id BIGINT NOT NULL,
+  group_name VARCHAR(120) NOT NULL,
+  intro TEXT,
+  visibility VARCHAR(32) DEFAULT 'PRIVATE',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_social_group_owner (owner_user_id)
+);
+
+CREATE TABLE IF NOT EXISTS tb_social_group_member (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  group_id BIGINT NOT NULL,
+  user_id BIGINT NOT NULL,
+  member_role VARCHAR(32) DEFAULT 'MEMBER',
+  status VARCHAR(32) DEFAULT 'ACTIVE',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_group_member (group_id, user_id),
+  INDEX idx_group_member_user (user_id)
 );
 
 CREATE TABLE IF NOT EXISTS tb_dialog_session (
@@ -66,7 +103,9 @@ CREATE TABLE IF NOT EXISTS tb_dialog_message (
   safety_level VARCHAR(32),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_message_session (session_id)
+  INDEX idx_message_session (session_id),
+  INDEX idx_message_user (user_id),
+  CONSTRAINT fk_message_session FOREIGN KEY (session_id) REFERENCES tb_dialog_session(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS tb_memory_card (
@@ -89,7 +128,8 @@ CREATE TABLE IF NOT EXISTS tb_memory_card (
   status VARCHAR(32),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_memory_user (user_id)
+  INDEX idx_memory_user (user_id),
+  CONSTRAINT fk_memory_session FOREIGN KEY (source_session_id) REFERENCES tb_dialog_session(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS tb_thought_fragment (
@@ -101,7 +141,9 @@ CREATE TABLE IF NOT EXISTS tb_thought_fragment (
   ai_analysis TEXT,
   reframe_text TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_fragment_user (user_id),
+  CONSTRAINT fk_fragment_memory FOREIGN KEY (memory_card_id) REFERENCES tb_memory_card(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS tb_emotion_trace (
@@ -114,7 +156,8 @@ CREATE TABLE IF NOT EXISTS tb_emotion_trace (
   trigger_scene TEXT,
   record_date DATE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_emotion_trace_user (user_id)
 );
 
 CREATE TABLE IF NOT EXISTS tb_todo_item (
@@ -127,7 +170,9 @@ CREATE TABLE IF NOT EXISTS tb_todo_item (
   status VARCHAR(32),
   deadline TIMESTAMP NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_todo_memory FOREIGN KEY (source_memory_card_id) REFERENCES tb_memory_card(id) ON DELETE SET NULL,
+  INDEX idx_todo_user_status (user_id, status)
 );
 
 CREATE TABLE IF NOT EXISTS tb_echo_capsule (
@@ -152,7 +197,8 @@ CREATE TABLE IF NOT EXISTS tb_echo_capsule (
   real_contact_policy VARCHAR(32),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_capsule_public (is_public, visibility_status)
+  INDEX idx_capsule_public (is_public, visibility_status),
+  INDEX idx_capsule_owner (owner_user_id)
 );
 
 CREATE TABLE IF NOT EXISTS tb_capsule_boundary (
@@ -164,7 +210,8 @@ CREATE TABLE IF NOT EXISTS tb_capsule_boundary (
   allow_letter_request BOOLEAN DEFAULT TRUE,
   privacy_level VARCHAR(32),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_boundary_capsule FOREIGN KEY (capsule_id) REFERENCES tb_echo_capsule(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS tb_persona_chat_session (
@@ -175,7 +222,9 @@ CREATE TABLE IF NOT EXISTS tb_persona_chat_session (
   turn_count INT DEFAULT 0,
   daily_limit INT DEFAULT 5,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_persona_session_visitor (visitor_user_id),
+  CONSTRAINT fk_persona_session_capsule FOREIGN KEY (capsule_id) REFERENCES tb_echo_capsule(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS tb_persona_chat_message (
@@ -184,7 +233,8 @@ CREATE TABLE IF NOT EXISTS tb_persona_chat_message (
   sender_type VARCHAR(32),
   text_content TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_persona_message_session FOREIGN KEY (session_id) REFERENCES tb_persona_chat_session(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS tb_slow_letter (
@@ -202,7 +252,10 @@ CREATE TABLE IF NOT EXISTS tb_slow_letter (
   read_at TIMESTAMP NULL,
   replied_at TIMESTAMP NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_letter_sender (sender_user_id),
+  INDEX idx_letter_receiver (receiver_user_id),
+  INDEX idx_letter_status (status)
 );
 
 CREATE TABLE IF NOT EXISTS tb_letter_status_log (
@@ -213,7 +266,8 @@ CREATE TABLE IF NOT EXISTS tb_letter_status_log (
   operator_user_id BIGINT,
   reason TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_status_log_letter FOREIGN KEY (letter_id) REFERENCES tb_slow_letter(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS tb_ai_interaction_log (
@@ -246,8 +300,10 @@ CREATE TABLE IF NOT EXISTS tb_safety_event (
   risk_level VARCHAR(32),
   matched_rule VARCHAR(160),
   handled_action VARCHAR(64),
+  trigger_scene TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_safety_event_user (user_id)
 );
 
 CREATE TABLE IF NOT EXISTS tb_report_record (
@@ -258,7 +314,8 @@ CREATE TABLE IF NOT EXISTS tb_report_record (
   reason TEXT,
   status VARCHAR(32),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_report_status (status)
 );
 
 -- Phase 1: Memory System Deepening
@@ -279,7 +336,8 @@ CREATE TABLE IF NOT EXISTS tb_daily_record (
   status VARCHAR(32) DEFAULT 'DRAFT',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_daily_record_user_date (user_id, record_date)
+  INDEX idx_daily_record_user_date (user_id, record_date),
+  UNIQUE KEY uk_daily_record_user_date (user_id, record_date)
 );
 
 CREATE TABLE IF NOT EXISTS tb_event_card (
@@ -373,7 +431,8 @@ CREATE TABLE IF NOT EXISTS tb_dialog_summary (
   message_count_at_summary INT DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_dialog_summary_session (session_id)
+  INDEX idx_dialog_summary_session (session_id),
+  INDEX idx_dialog_summary_user (user_id)
 );
 
 CREATE TABLE IF NOT EXISTS tb_voice_transcription (
@@ -390,7 +449,8 @@ CREATE TABLE IF NOT EXISTS tb_voice_transcription (
   status VARCHAR(32) DEFAULT 'RAW',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_voice_transcription_user (user_id)
+  INDEX idx_voice_transcription_user (user_id),
+  INDEX idx_voice_transcription_session (session_id)
 );
 
 -- Phase 4: Capsule Authorization
@@ -403,7 +463,9 @@ CREATE TABLE IF NOT EXISTS tb_authorized_memory_ref (
   authorization_status VARCHAR(32) DEFAULT 'AUTHORIZED',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_auth_mem_capsule (capsule_id)
+  INDEX idx_auth_mem_capsule (capsule_id),
+  CONSTRAINT fk_auth_mem_capsule FOREIGN KEY (capsule_id) REFERENCES tb_echo_capsule(id) ON DELETE CASCADE,
+  CONSTRAINT fk_auth_mem_memory FOREIGN KEY (memory_card_id) REFERENCES tb_memory_card(id) ON DELETE CASCADE
 );
 
 -- Phase 5: Slow Letter Maturation
@@ -499,6 +561,98 @@ CREATE TABLE IF NOT EXISTS tb_ab_test_metrics (
   INDEX idx_ab_metrics_user (user_id),
   INDEX idx_ab_metrics_test (test_name),
   INDEX idx_ab_metrics_group (assigned_group)
+);
+
+CREATE TABLE IF NOT EXISTS tb_user_portrait (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  dim VARCHAR(64) NOT NULL,
+  value_json TEXT NOT NULL,
+  score DOUBLE DEFAULT 0.5,
+  confidence DOUBLE DEFAULT 0.0,
+  evidence_refs TEXT,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_user_dim (user_id, dim)
+);
+
+CREATE TABLE IF NOT EXISTS tb_user_portrait_history (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  dim VARCHAR(64) NOT NULL,
+  value_json TEXT,
+  score DOUBLE,
+  confidence DOUBLE,
+  evidence_refs TEXT,
+  recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS tb_aurora_self_profile (
+  id INT PRIMARY KEY,
+  identity_json TEXT NOT NULL,
+  mission_json TEXT,
+  voice_style_json TEXT,
+  stable_boundaries_json TEXT,
+  continuity_rules_json TEXT,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS tb_agent_user_relationship (
+  user_id BIGINT PRIMARY KEY,
+  relationship_stage VARCHAR(32) DEFAULT 'new_user',
+  intimacy_level INT DEFAULT 0,
+  trust_level INT DEFAULT 0,
+  familiarity_level INT DEFAULT 0,
+  user_disclosure_level INT DEFAULT 0,
+  aurora_role_in_user_life TEXT,
+  shared_history_refs TEXT,
+  interaction_rituals TEXT,
+  preferred_addressing VARCHAR(32),
+  relationship_boundaries TEXT,
+  continuity_anchors TEXT,
+  last_stage_change_at TIMESTAMP NULL,
+  last_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS tb_relationship_event (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  event_type VARCHAR(64) NOT NULL,
+  evidence_turn_ids TEXT,
+  delta_proposed TEXT,
+  applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS tb_rupture_repair_log (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  event TEXT,
+  user_feedback TEXT,
+  repair_action TEXT,
+  status VARCHAR(16) DEFAULT 'open',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS tb_user_long_term_memory (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  fact_type VARCHAR(32) NOT NULL,
+  fact_value TEXT NOT NULL,
+  source_session_id BIGINT,
+  confidence DOUBLE DEFAULT 0.7,
+  privacy_level VARCHAR(16) DEFAULT 'INNER',
+  user_approved BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS tb_session_summary (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  session_id BIGINT,
+  summary_2_sentences TEXT,
+  key_topics TEXT,
+  emotional_arc VARCHAR(32),
+  started_at TIMESTAMP,
+  closed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Phase 6: Admin
