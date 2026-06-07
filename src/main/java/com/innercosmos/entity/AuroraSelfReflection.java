@@ -19,5 +19,6 @@ public class AuroraSelfReflection extends BaseEntity {
     public Double confidence;
     public String status;
     public String riskFlags;
+    public String evidenceRefs;  // JSON array of evidence ids
     public LocalDateTime createdAt;
 }

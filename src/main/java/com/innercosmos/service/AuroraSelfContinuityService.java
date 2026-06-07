@@ -46,6 +46,12 @@ public interface AuroraSelfContinuityService {
     // Right to repair — record a repair action
     void recordRepair(Long userId, String ruptureType, String repairAction);
 
+    // User-facing: retire an active belief
+    void retireModel(Long userId, Long modelId);
+
+    // User-facing: dismiss a candidate
+    void dismissCandidate(Long userId, Long candidateId);
+
     // Check if a belief is allowed (hard boundary check)
     boolean isAllowedBelief(String belief);
 }

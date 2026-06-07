@@ -53,7 +53,8 @@ public class BeliefExtractServiceImpl implements BeliefExtractService {
             processBeliefs(userId, memoryCardId, result);
 
         } catch (Exception e) {
-            // Silently fail - belief extraction is not critical
+            org.slf4j.LoggerFactory.getLogger(getClass()).error(
+                    "Belief extraction failed for user {} card {}: {}", userId, memoryCardId, e.getMessage(), e);
         }
     }
 

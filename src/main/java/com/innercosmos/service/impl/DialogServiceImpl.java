@@ -64,6 +64,7 @@ public class DialogServiceImpl implements DialogService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public DialogMessage saveAuroraMessage(Long userId, Long sessionId, String reply) {
         DialogMessage message = new DialogMessage();
         message.sessionId = sessionId;

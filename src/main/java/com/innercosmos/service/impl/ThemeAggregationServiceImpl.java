@@ -61,8 +61,8 @@ public class ThemeAggregationServiceImpl implements ThemeAggregationService {
             processThemes(userId, result, cards);
 
         } catch (Exception e) {
-            // Fallback to simple clustering
-            fallbackClustering(cards);
+            org.slf4j.LoggerFactory.getLogger(getClass()).error(
+                    "Theme clustering failed for user {}, using fallback: {}", userId, e.getMessage(), e);
             ThemeClusteringResult result = fallbackClustering(cards);
             processThemes(userId, result, cards);
         }

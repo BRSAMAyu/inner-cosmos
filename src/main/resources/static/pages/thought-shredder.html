@@ -3,14 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>思维碎纸机 · Inner Cosmos</title>
   <link rel="stylesheet" href="/css/app.css">
 </head>
 <body>
-<main class="shell">
+<main id="main" class="shell">
+  <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
 
   <span class="route-hint">思维碎纸机</span>
-  <h1>思维碎纸机</h1>
+  <h1 id="page-title">思维碎纸机</h1>
   <p class="muted mb-2">把混乱、愤怒、焦虑、碎碎念一次性倒进来。它会帮你把噪音和真正的需求分开。</p>
   <p id="aiStatus" class="muted mb-2" style="font-size:.82rem">正在检查结构化 AI 状态...</p>
 
@@ -163,6 +165,7 @@ async function deleteShred(id) {
   IC.toast("记录已删除", "success");
   loadHistory();
 }
+IC.hideLoading();
 </script>
 </body>
 </html>

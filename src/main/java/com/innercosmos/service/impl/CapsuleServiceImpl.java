@@ -79,7 +79,7 @@ public class CapsuleServiceImpl implements CapsuleService {
         capsule.realContactPolicy = request.realContactPolicy == null ? "LETTER_ONLY" : request.realContactPolicy;
         capsule.echoEnergy = 0.72;
         capsule.freshnessScore = 0.86;
-        capsule.conversationLimitPerDay = safeTurns(request.maxConversationTurns);
+        capsule.conversationLimitPerDay = safeTurns(request.maxConversationTurns, false);
         capsule.visibilityStatus = safeVisibility(request.visibilityStatus);
         capsule.isPublic = request.isPublic == null ? !"PRIVATE".equals(capsule.visibilityStatus) : request.isPublic;
         capsule.lastMemoryUpdateAt = LocalDateTime.now();
@@ -89,7 +89,7 @@ public class CapsuleServiceImpl implements CapsuleService {
         boundary.capsuleId = capsule.id;
         boundary.allowTopics = toJsonArray(request.allowTopics, "自我观察", "温柔建议", "日常支持");
         boundary.blockedTopics = toJsonArray(request.blockedTopics, "隐私身份", "诊断承诺", "强迫即时回应");
-        boundary.maxConversationTurns = safeTurns(request.maxConversationTurns);
+        boundary.maxConversationTurns = safeTurns(request.maxConversationTurns, false);
         boundary.allowLetterRequest = request.allowLetterRequest == null ? true : request.allowLetterRequest;
         boundary.privacyLevel = safePrivacy(request.privacyLevel);
         boundaryMapper.insert(boundary);
@@ -311,9 +311,10 @@ public class CapsuleServiceImpl implements CapsuleService {
         capsuleMapper.updateById(capsule);
     }
 
-    private Integer safeTurns(Integer turns) {
-        if (turns == null) return 5;
-        return Math.max(2, Math.min(12, turns));
+    private Integer safeTurns(Integer turns, boolean seedCapsule) {
+        if (seedCapsule) return 0;
+        if (turns == null) return 30;
+        return Math.max(2, Math.min(50, turns));
     }
 
     private String safeVisibility(String value) {

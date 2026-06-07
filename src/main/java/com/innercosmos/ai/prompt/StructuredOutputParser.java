@@ -17,7 +17,7 @@ public final class StructuredOutputParser {
             return null;
         }
 
-        String json = extractJson(raw);
+        String json = extractJson(stripReasoningBlocks(raw));
         if (json == null) {
             return null;
         }
@@ -27,6 +27,14 @@ public final class StructuredOutputParser {
         try {
             return objectMapper.readValue(normalized, clazz);
         } catch (Exception e) {
+            String unwrapped = unwrapSingleObjectArray(normalized);
+            if (!unwrapped.equals(normalized)) {
+                try {
+                    return objectMapper.readValue(unwrapped, clazz);
+                } catch (Exception ignored) {
+                    log.warn("Failed to parse unwrapped structured output as {}: {}", clazz.getSimpleName(), ignored.getMessage());
+                }
+            }
             String sanitized = escapeBareQuotesInsideStrings(normalized);
             if (!sanitized.equals(normalized)) {
                 try {
@@ -43,6 +51,12 @@ public final class StructuredOutputParser {
     public static <T> T parseWithFallback(String raw, Class<T> clazz, T fallback) {
         T result = parse(raw, clazz);
         return result != null ? result : fallback;
+    }
+
+    private static String stripReasoningBlocks(String raw) {
+        String cleaned = raw.replaceAll("(?is)<think>.*?</think>", " ");
+        cleaned = cleaned.replaceAll("(?is)<analysis>.*?</analysis>", " ");
+        return cleaned.trim();
     }
 
     private static String extractJson(String raw) {
@@ -192,6 +206,23 @@ public final class StructuredOutputParser {
             }
         }
         return '\0';
+    }
+
+    private static String unwrapSingleObjectArray(String json) {
+        String trimmed = json == null ? "" : json.trim();
+        if (!trimmed.startsWith("[") || !trimmed.endsWith("]")) {
+            return trimmed;
+        }
+        int firstObject = trimmed.indexOf('{');
+        if (firstObject < 0) {
+            return trimmed;
+        }
+        int end = findMatchingClose(trimmed, firstObject);
+        if (end <= firstObject) {
+            return trimmed;
+        }
+        String tail = trimmed.substring(end + 1, trimmed.length() - 1).trim();
+        return tail.isBlank() ? trimmed.substring(firstObject, end + 1) : trimmed;
     }
 
     private static String normalizeCommonModelJson(String json) {

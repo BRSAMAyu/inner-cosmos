@@ -3,16 +3,18 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>每日记录 · Inner Cosmos</title>
   <link rel="stylesheet" href="/css/app.css">
 </head>
 <body>
-<main class="shell">
+<main id="main" class="shell">
+  <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
 
   <div class="flex-between mb-2" style="flex-wrap:wrap;gap:12px">
     <div>
       <span class="route-hint">我被整理清楚了</span>
-      <h1>今日记录卡</h1>
+      <h1 id="page-title">今日记录卡</h1>
       <p class="muted">它不是诊断，也不是给你贴标签。它只是在帮你把今天摊平。</p>
     </div>
     <div class="row gap-sm">
@@ -256,6 +258,7 @@ function nextRecord() {
     document.getElementById("prevBtn").disabled = (recordIndex >= records.length - 1);
   }
 }
+IC.hideLoading();
 </script>
 </body>
 </html>

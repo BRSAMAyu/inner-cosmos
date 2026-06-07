@@ -130,7 +130,7 @@
 <body>
   <div class="login-shell">
     <div class="login-card">
-      <h1>Inner Cosmos</h1>
+      <h1 id="page-title">Inner Cosmos</h1>
       <p class="subtitle">温柔的自我整理空间</p>
 
       <div id="error" class="error-box" role="alert"></div>
@@ -146,9 +146,10 @@
       </div>
 
       <button id="loginBtn" class="login-btn" onclick="doLogin()">进入内宇宙</button>
+      <button id="guestBtn" class="login-btn" style="background:var(--accent-dusty-blue)" onclick="guestLogin()">游客体验 Demo</button>
 
       <div class="demo-hint">
-        演示账号：<code>demo</code> / <code>demo123</code>
+        游客体验会进入演示账号：<code>demo</code> / <code>demo123</code>
       </div>
 
       <div class="link-row">
@@ -204,6 +205,18 @@
         errBox.classList.add("visible");
         btn.disabled = false;
         btn.textContent = "进入内宇宙";
+      }
+    }
+
+    async function guestLogin() {
+      const btn = document.getElementById("guestBtn");
+      btn.disabled = true;
+      btn.innerHTML = '<span class="loader"></span>正在进入游客宇宙...';
+      const r = await IC.guestLogin();
+      if (r.success) location.href = "/pages/dashboard.html";
+      else {
+        btn.disabled = false;
+        btn.textContent = "游客体验 Demo";
       }
     }
   </script>

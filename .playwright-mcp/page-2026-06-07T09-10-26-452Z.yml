@@ -1,0 +1,1093 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - link "跳到主要内容" [ref=e3] [cursor=pointer]:
+      - /url: "#main"
+    - generic [ref=e4]:
+      - link "Inner Cosmos" [ref=e5] [cursor=pointer]:
+        - /url: /pages/dashboard.html
+        - generic [ref=e6]: Inner Cosmos
+      - navigation "主导航" [ref=e7]:
+        - link "核心" [ref=e8] [cursor=pointer]:
+          - /url: /pages/dashboard.html
+        - link "Aurora" [ref=e9] [cursor=pointer]:
+          - /url: /pages/aurora-chat.html
+        - link "记录" [ref=e10] [cursor=pointer]:
+          - /url: /pages/daily-record.html
+        - link "日记" [ref=e11] [cursor=pointer]:
+          - /url: /pages/heart-diary.html
+        - link "星图" [ref=e12] [cursor=pointer]:
+          - /url: /pages/memory-starfield.html
+        - link "待办" [ref=e13] [cursor=pointer]:
+          - /url: /pages/todo.html
+        - link "星海" [ref=e14] [cursor=pointer]:
+          - /url: /pages/echo-plaza.html
+        - link "好友" [ref=e15] [cursor=pointer]:
+          - /url: /pages/social.html
+        - link "慢信" [ref=e16] [cursor=pointer]:
+          - /url: /pages/slow-letter.html
+        - link "信箱" [ref=e17] [cursor=pointer]:
+          - /url: /pages/inbox.html
+        - link "时间轴" [ref=e18] [cursor=pointer]:
+          - /url: /pages/timeline.html
+        - link "情绪" [ref=e19] [cursor=pointer]:
+          - /url: /pages/emotion-timeline.html
+        - link "主题" [ref=e20] [cursor=pointer]:
+          - /url: /pages/themes.html
+        - link "关系" [ref=e21] [cursor=pointer]:
+          - /url: /pages/relations.html
+        - link "信念" [ref=e22] [cursor=pointer]:
+          - /url: /pages/beliefs.html
+        - link "避风港" [ref=e23] [cursor=pointer]:
+          - /url: /pages/safety-harbor.html
+        - link "设置" [ref=e24] [cursor=pointer]:
+          - /url: /pages/settings.html
+        - link "管理" [ref=e25] [cursor=pointer]:
+          - /url: /pages/admin.html
+      - button "主题：自动跟随系统" [ref=e26] [cursor=pointer]: ◐
+    - generic [ref=e27]: 下一步变小
+    - heading "待办清单" [level=1] [ref=e28]
+    - paragraph [ref=e29]: 待办不是自我审判，而是把下一步变小。
+    - generic [ref=e30]:
+      - generic [ref=e31]:
+        - heading "今日进度" [level=2] [ref=e32]
+        - generic [ref=e33]: 0 / 67 完成
+      - paragraph [ref=e35]: 这不是判断，只是下一步。做不完也没关系。
+    - generic [ref=e36]:
+      - heading "新建待办" [level=2] [ref=e37]
+      - generic [ref=e38]:
+        - generic [ref=e39]:
+          - generic [ref=e40]:
+            - textbox "你想轻轻推进什么事？" [ref=e41]
+            - button "🎙" [ref=e42] [cursor=pointer]
+          - combobox [ref=e44]:
+            - option "优先"
+            - option "中等" [selected]
+            - option "不急"
+          - textbox [ref=e46]
+        - generic [ref=e47]:
+          - textbox "任务备注（可选，建议拆到十分钟内能开始）" [ref=e48]
+          - button "🎙" [ref=e49] [cursor=pointer]
+        - button "添加待办" [ref=e51] [cursor=pointer]
+    - generic [ref=e52]:
+      - button "今天" [ref=e53] [cursor=pointer]
+      - button "本周" [ref=e54] [cursor=pointer]
+      - button "已完成" [ref=e55] [cursor=pointer]
+      - button "已放下" [ref=e56] [cursor=pointer]
+    - generic [ref=e57]:
+      - generic [ref=e58]:
+        - generic [ref=e59]:
+          - text: 正在推进
+          - strong [ref=e60]: "1"
+        - generic [ref=e61]:
+          - text: 未完成
+          - strong [ref=e62]: "67"
+        - generic [ref=e63]:
+          - text: 已过期
+          - strong [ref=e64]: "0"
+      - generic [ref=e65]:
+        - article [ref=e66]:
+          - generic [ref=e69]:
+            - generic [ref=e70]:
+              - strong [ref=e71]: 整理考试范围第一章
+              - generic [ref=e72]: 优先
+            - paragraph [ref=e73]: 只列标题，不要求立刻背。
+            - generic [ref=e74]:
+              - generic [ref=e75]: 正在做
+              - generic [ref=e76]: 截止 06/10 15:43
+              - link "来源记忆" [ref=e77] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e78]:
+            - button "开始" [ref=e79] [cursor=pointer]
+            - button "完成" [ref=e80] [cursor=pointer]
+            - button "拆第一步" [ref=e81] [cursor=pointer]
+            - button "编辑" [ref=e82] [cursor=pointer]
+            - button "放下" [ref=e83] [cursor=pointer]
+        - article [ref=e84]:
+          - generic [ref=e87]:
+            - generic [ref=e88]:
+              - strong [ref=e89]: 验证 Aurora 是否真实调用 MiniMax
+              - generic [ref=e90]: 优先
+            - paragraph [ref=e91]: 发一条对话并查看 aiState.provider，不再用感觉判断。
+            - generic [ref=e92]:
+              - generic [ref=e93]: 待开始
+              - generic [ref=e94]: 截止 06/08 15:43
+              - link "来源记忆" [ref=e95] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e96]:
+            - button "开始" [ref=e97] [cursor=pointer]
+            - button "完成" [ref=e98] [cursor=pointer]
+            - button "拆第一步" [ref=e99] [cursor=pointer]
+            - button "编辑" [ref=e100] [cursor=pointer]
+            - button "放下" [ref=e101] [cursor=pointer]
+        - article [ref=e102]:
+          - generic [ref=e105]:
+            - generic [ref=e106]:
+              - strong [ref=e107]: 把今天提到的任务拆成第一步
+              - generic [ref=e108]: 优先
+            - paragraph [ref=e109]: 由 Aurora 对话自动提取,建议从一个十分钟动作开始.
+            - generic [ref=e110]:
+              - generic [ref=e111]: 待开始
+              - link "来源记忆" [ref=e112] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e113]:
+            - button "开始" [ref=e114] [cursor=pointer]
+            - button "完成" [ref=e115] [cursor=pointer]
+            - button "拆第一步" [ref=e116] [cursor=pointer]
+            - button "编辑" [ref=e117] [cursor=pointer]
+            - button "放下" [ref=e118] [cursor=pointer]
+        - article [ref=e119]:
+          - generic [ref=e122]:
+            - generic [ref=e123]:
+              - strong [ref=e124]: 把今天提到的任务拆成第一步
+              - generic [ref=e125]: 优先
+            - paragraph [ref=e126]: 由 Aurora 对话自动提取,建议从一个十分钟动作开始.
+            - generic [ref=e127]:
+              - generic [ref=e128]: 待开始
+              - link "来源记忆" [ref=e129] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e130]:
+            - button "开始" [ref=e131] [cursor=pointer]
+            - button "完成" [ref=e132] [cursor=pointer]
+            - button "拆第一步" [ref=e133] [cursor=pointer]
+            - button "编辑" [ref=e134] [cursor=pointer]
+            - button "放下" [ref=e135] [cursor=pointer]
+        - article [ref=e136]:
+          - generic [ref=e139]:
+            - generic [ref=e140]:
+              - strong [ref=e141]: 把今天提到的任务拆成第一步
+              - generic [ref=e142]: 优先
+            - paragraph [ref=e143]: 由 Aurora 对话自动提取,建议从一个十分钟动作开始.
+            - generic [ref=e144]:
+              - generic [ref=e145]: 待开始
+              - link "来源记忆" [ref=e146] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e147]:
+            - button "开始" [ref=e148] [cursor=pointer]
+            - button "完成" [ref=e149] [cursor=pointer]
+            - button "拆第一步" [ref=e150] [cursor=pointer]
+            - button "编辑" [ref=e151] [cursor=pointer]
+            - button "放下" [ref=e152] [cursor=pointer]
+        - article [ref=e153]:
+          - generic [ref=e156]:
+            - generic [ref=e157]:
+              - strong [ref=e158]: 把今天提到的任务拆成第一步
+              - generic [ref=e159]: 优先
+            - paragraph [ref=e160]: 由 Aurora 对话自动提取,建议从一个十分钟动作开始.
+            - generic [ref=e161]:
+              - generic [ref=e162]: 待开始
+              - link "来源记忆" [ref=e163] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e164]:
+            - button "开始" [ref=e165] [cursor=pointer]
+            - button "完成" [ref=e166] [cursor=pointer]
+            - button "拆第一步" [ref=e167] [cursor=pointer]
+            - button "编辑" [ref=e168] [cursor=pointer]
+            - button "放下" [ref=e169] [cursor=pointer]
+        - article [ref=e170]:
+          - generic [ref=e173]:
+            - generic [ref=e174]:
+              - strong [ref=e175]: 把今天提到的任务拆成第一步
+              - generic [ref=e176]: 优先
+            - paragraph [ref=e177]: 由 Aurora 对话自动提取,建议从一个十分钟动作开始.
+            - generic [ref=e178]:
+              - generic [ref=e179]: 待开始
+              - link "来源记忆" [ref=e180] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e181]:
+            - button "开始" [ref=e182] [cursor=pointer]
+            - button "完成" [ref=e183] [cursor=pointer]
+            - button "拆第一步" [ref=e184] [cursor=pointer]
+            - button "编辑" [ref=e185] [cursor=pointer]
+            - button "放下" [ref=e186] [cursor=pointer]
+        - article [ref=e187]:
+          - generic [ref=e190]:
+            - generic [ref=e191]:
+              - strong [ref=e192]: 把今天提到的任务拆成第一步
+              - generic [ref=e193]: 优先
+            - paragraph [ref=e194]: 由 Aurora 对话自动提取,建议从一个十分钟动作开始.
+            - generic [ref=e195]:
+              - generic [ref=e196]: 待开始
+              - link "来源记忆" [ref=e197] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e198]:
+            - button "开始" [ref=e199] [cursor=pointer]
+            - button "完成" [ref=e200] [cursor=pointer]
+            - button "拆第一步" [ref=e201] [cursor=pointer]
+            - button "编辑" [ref=e202] [cursor=pointer]
+            - button "放下" [ref=e203] [cursor=pointer]
+        - article [ref=e204]:
+          - generic [ref=e207]:
+            - generic [ref=e208]:
+              - strong [ref=e209]: 把今天提到的任务拆成第一步
+              - generic [ref=e210]: 优先
+            - paragraph [ref=e211]: 由 Aurora 对话自动提取,建议从一个十分钟动作开始.
+            - generic [ref=e212]:
+              - generic [ref=e213]: 待开始
+              - link "来源记忆" [ref=e214] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e215]:
+            - button "开始" [ref=e216] [cursor=pointer]
+            - button "完成" [ref=e217] [cursor=pointer]
+            - button "拆第一步" [ref=e218] [cursor=pointer]
+            - button "编辑" [ref=e219] [cursor=pointer]
+            - button "放下" [ref=e220] [cursor=pointer]
+        - article [ref=e221]:
+          - generic [ref=e224]:
+            - generic [ref=e225]:
+              - strong [ref=e226]: 把今天提到的任务拆成第一步
+              - generic [ref=e227]: 优先
+            - paragraph [ref=e228]: 由 Aurora 对话自动提取,建议从一个十分钟动作开始.
+            - generic [ref=e229]:
+              - generic [ref=e230]: 待开始
+              - link "来源记忆" [ref=e231] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e232]:
+            - button "开始" [ref=e233] [cursor=pointer]
+            - button "完成" [ref=e234] [cursor=pointer]
+            - button "拆第一步" [ref=e235] [cursor=pointer]
+            - button "编辑" [ref=e236] [cursor=pointer]
+            - button "放下" [ref=e237] [cursor=pointer]
+        - article [ref=e238]:
+          - generic [ref=e241]:
+            - generic [ref=e242]:
+              - strong [ref=e243]: 给朋友发一条不指责的澄清消息
+              - generic [ref=e244]: 中等
+            - paragraph [ref=e245]: 只描述感受和具体事件，不上升到人格判断。
+            - generic [ref=e246]:
+              - generic [ref=e247]: 待开始
+              - generic [ref=e248]: 截止 06/09 15:43
+              - link "来源记忆" [ref=e249] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e250]:
+            - button "开始" [ref=e251] [cursor=pointer]
+            - button "完成" [ref=e252] [cursor=pointer]
+            - button "拆第一步" [ref=e253] [cursor=pointer]
+            - button "编辑" [ref=e254] [cursor=pointer]
+            - button "放下" [ref=e255] [cursor=pointer]
+        - article [ref=e256]:
+          - generic [ref=e259]:
+            - generic [ref=e260]:
+              - strong [ref=e261]: 把最重的一句话写下来
+              - generic [ref=e262]: 中等
+            - paragraph [ref=e263]: 由思维碎纸机从混乱输入中提取.
+            - generic [ref=e264]:
+              - generic [ref=e265]: 待开始
+              - link "来源记忆" [ref=e266] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e267]:
+            - button "开始" [ref=e268] [cursor=pointer]
+            - button "完成" [ref=e269] [cursor=pointer]
+            - button "拆第一步" [ref=e270] [cursor=pointer]
+            - button "编辑" [ref=e271] [cursor=pointer]
+            - button "放下" [ref=e272] [cursor=pointer]
+        - article [ref=e273]:
+          - generic [ref=e276]:
+            - generic [ref=e277]:
+              - strong [ref=e278]: 推进 Java 作业的第一步
+              - generic [ref=e279]: 中等
+            - paragraph [ref=e280]: 由 Aurora 对话自动提取,建议从一个十分钟动作开始.
+            - generic [ref=e281]:
+              - generic [ref=e282]: 待开始
+              - link "来源记忆" [ref=e283] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e284]:
+            - button "开始" [ref=e285] [cursor=pointer]
+            - button "完成" [ref=e286] [cursor=pointer]
+            - button "拆第一步" [ref=e287] [cursor=pointer]
+            - button "编辑" [ref=e288] [cursor=pointer]
+            - button "放下" [ref=e289] [cursor=pointer]
+        - article [ref=e290]:
+          - generic [ref=e293]:
+            - generic [ref=e294]:
+              - strong [ref=e295]: 今天有点累，作业也拖延了
+              - generic [ref=e296]: 中等
+            - paragraph [ref=e297]: 从对话中自动提取
+            - generic [ref=e299]: 待开始
+          - generic [ref=e300]:
+            - button "开始" [ref=e301] [cursor=pointer]
+            - button "完成" [ref=e302] [cursor=pointer]
+            - button "拆第一步" [ref=e303] [cursor=pointer]
+            - button "编辑" [ref=e304] [cursor=pointer]
+            - button "放下" [ref=e305] [cursor=pointer]
+        - article [ref=e306]:
+          - generic [ref=e309]:
+            - generic [ref=e310]:
+              - strong [ref=e311]: 考试快到了，一直没复习
+              - generic [ref=e312]: 中等
+            - paragraph [ref=e313]: 从对话中自动提取
+            - generic [ref=e315]: 待开始
+          - generic [ref=e316]:
+            - button "开始" [ref=e317] [cursor=pointer]
+            - button "完成" [ref=e318] [cursor=pointer]
+            - button "拆第一步" [ref=e319] [cursor=pointer]
+            - button "编辑" [ref=e320] [cursor=pointer]
+            - button "放下" [ref=e321] [cursor=pointer]
+        - article [ref=e322]:
+          - generic [ref=e325]:
+            - generic [ref=e326]:
+              - strong [ref=e327]: 把今天提到的任务拆成第一步
+              - generic [ref=e328]: 中等
+            - paragraph [ref=e329]: 由 Aurora 对话自动提取,建议从一个十分钟动作开始.
+            - generic [ref=e330]:
+              - generic [ref=e331]: 待开始
+              - link "来源记忆" [ref=e332] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e333]:
+            - button "开始" [ref=e334] [cursor=pointer]
+            - button "完成" [ref=e335] [cursor=pointer]
+            - button "拆第一步" [ref=e336] [cursor=pointer]
+            - button "编辑" [ref=e337] [cursor=pointer]
+            - button "放下" [ref=e338] [cursor=pointer]
+        - article [ref=e339]:
+          - generic [ref=e342]:
+            - generic [ref=e343]:
+              - strong [ref=e344]: 推进 Java 作业的第一步
+              - generic [ref=e345]: 中等
+            - paragraph [ref=e346]: 由 Aurora 对话自动提取,建议从一个十分钟动作开始.
+            - generic [ref=e347]:
+              - generic [ref=e348]: 待开始
+              - link "来源记忆" [ref=e349] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e350]:
+            - button "开始" [ref=e351] [cursor=pointer]
+            - button "完成" [ref=e352] [cursor=pointer]
+            - button "拆第一步" [ref=e353] [cursor=pointer]
+            - button "编辑" [ref=e354] [cursor=pointer]
+            - button "放下" [ref=e355] [cursor=pointer]
+        - article [ref=e356]:
+          - generic [ref=e359]:
+            - generic [ref=e360]:
+              - strong [ref=e361]: 今天作业又没写完，压力很大
+              - generic [ref=e362]: 中等
+            - paragraph [ref=e363]: 从对话中自动提取
+            - generic [ref=e365]: 待开始
+          - generic [ref=e366]:
+            - button "开始" [ref=e367] [cursor=pointer]
+            - button "完成" [ref=e368] [cursor=pointer]
+            - button "拆第一步" [ref=e369] [cursor=pointer]
+            - button "编辑" [ref=e370] [cursor=pointer]
+            - button "放下" [ref=e371] [cursor=pointer]
+        - article [ref=e372]:
+          - generic [ref=e375]:
+            - generic [ref=e376]:
+              - strong [ref=e377]: 把最重的一句话写下来
+              - generic [ref=e378]: 中等
+            - paragraph [ref=e379]: 由思维碎纸机从混乱输入中提取.
+            - generic [ref=e380]:
+              - generic [ref=e381]: 待开始
+              - link "来源记忆" [ref=e382] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e383]:
+            - button "开始" [ref=e384] [cursor=pointer]
+            - button "完成" [ref=e385] [cursor=pointer]
+            - button "拆第一步" [ref=e386] [cursor=pointer]
+            - button "编辑" [ref=e387] [cursor=pointer]
+            - button "放下" [ref=e388] [cursor=pointer]
+        - article [ref=e389]:
+          - generic [ref=e392]:
+            - generic [ref=e393]:
+              - strong [ref=e394]: 推进 Java 作业的第一步
+              - generic [ref=e395]: 中等
+            - paragraph [ref=e396]: 由 Aurora 对话自动提取,建议从一个十分钟动作开始.
+            - generic [ref=e397]:
+              - generic [ref=e398]: 待开始
+              - link "来源记忆" [ref=e399] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e400]:
+            - button "开始" [ref=e401] [cursor=pointer]
+            - button "完成" [ref=e402] [cursor=pointer]
+            - button "拆第一步" [ref=e403] [cursor=pointer]
+            - button "编辑" [ref=e404] [cursor=pointer]
+            - button "放下" [ref=e405] [cursor=pointer]
+        - article [ref=e406]:
+          - generic [ref=e409]:
+            - generic [ref=e410]:
+              - strong [ref=e411]: 今天有点累，作业也拖延了
+              - generic [ref=e412]: 中等
+            - paragraph [ref=e413]: 从对话中自动提取
+            - generic [ref=e415]: 待开始
+          - generic [ref=e416]:
+            - button "开始" [ref=e417] [cursor=pointer]
+            - button "完成" [ref=e418] [cursor=pointer]
+            - button "拆第一步" [ref=e419] [cursor=pointer]
+            - button "编辑" [ref=e420] [cursor=pointer]
+            - button "放下" [ref=e421] [cursor=pointer]
+        - article [ref=e422]:
+          - generic [ref=e425]:
+            - generic [ref=e426]:
+              - strong [ref=e427]: 考试快到了，一直没复习
+              - generic [ref=e428]: 中等
+            - paragraph [ref=e429]: 从对话中自动提取
+            - generic [ref=e431]: 待开始
+          - generic [ref=e432]:
+            - button "开始" [ref=e433] [cursor=pointer]
+            - button "完成" [ref=e434] [cursor=pointer]
+            - button "拆第一步" [ref=e435] [cursor=pointer]
+            - button "编辑" [ref=e436] [cursor=pointer]
+            - button "放下" [ref=e437] [cursor=pointer]
+        - article [ref=e438]:
+          - generic [ref=e441]:
+            - generic [ref=e442]:
+              - strong [ref=e443]: 把今天提到的任务拆成第一步
+              - generic [ref=e444]: 中等
+            - paragraph [ref=e445]: 由 Aurora 对话自动提取,建议从一个十分钟动作开始.
+            - generic [ref=e446]:
+              - generic [ref=e447]: 待开始
+              - link "来源记忆" [ref=e448] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e449]:
+            - button "开始" [ref=e450] [cursor=pointer]
+            - button "完成" [ref=e451] [cursor=pointer]
+            - button "拆第一步" [ref=e452] [cursor=pointer]
+            - button "编辑" [ref=e453] [cursor=pointer]
+            - button "放下" [ref=e454] [cursor=pointer]
+        - article [ref=e455]:
+          - generic [ref=e458]:
+            - generic [ref=e459]:
+              - strong [ref=e460]: 推进 Java 作业的第一步
+              - generic [ref=e461]: 中等
+            - paragraph [ref=e462]: 由 Aurora 对话自动提取,建议从一个十分钟动作开始.
+            - generic [ref=e463]:
+              - generic [ref=e464]: 待开始
+              - link "来源记忆" [ref=e465] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e466]:
+            - button "开始" [ref=e467] [cursor=pointer]
+            - button "完成" [ref=e468] [cursor=pointer]
+            - button "拆第一步" [ref=e469] [cursor=pointer]
+            - button "编辑" [ref=e470] [cursor=pointer]
+            - button "放下" [ref=e471] [cursor=pointer]
+        - article [ref=e472]:
+          - generic [ref=e475]:
+            - generic [ref=e476]:
+              - strong [ref=e477]: 今天作业又没写完，压力很大
+              - generic [ref=e478]: 中等
+            - paragraph [ref=e479]: 从对话中自动提取
+            - generic [ref=e481]: 待开始
+          - generic [ref=e482]:
+            - button "开始" [ref=e483] [cursor=pointer]
+            - button "完成" [ref=e484] [cursor=pointer]
+            - button "拆第一步" [ref=e485] [cursor=pointer]
+            - button "编辑" [ref=e486] [cursor=pointer]
+            - button "放下" [ref=e487] [cursor=pointer]
+        - article [ref=e488]:
+          - generic [ref=e491]:
+            - generic [ref=e492]:
+              - strong [ref=e493]: 把最重的一句话写下来
+              - generic [ref=e494]: 中等
+            - paragraph [ref=e495]: 由思维碎纸机从混乱输入中提取.
+            - generic [ref=e496]:
+              - generic [ref=e497]: 待开始
+              - link "来源记忆" [ref=e498] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e499]:
+            - button "开始" [ref=e500] [cursor=pointer]
+            - button "完成" [ref=e501] [cursor=pointer]
+            - button "拆第一步" [ref=e502] [cursor=pointer]
+            - button "编辑" [ref=e503] [cursor=pointer]
+            - button "放下" [ref=e504] [cursor=pointer]
+        - article [ref=e505]:
+          - generic [ref=e508]:
+            - generic [ref=e509]:
+              - strong [ref=e510]: 推进 Java 作业的第一步
+              - generic [ref=e511]: 中等
+            - paragraph [ref=e512]: 由 Aurora 对话自动提取,建议从一个十分钟动作开始.
+            - generic [ref=e513]:
+              - generic [ref=e514]: 待开始
+              - link "来源记忆" [ref=e515] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e516]:
+            - button "开始" [ref=e517] [cursor=pointer]
+            - button "完成" [ref=e518] [cursor=pointer]
+            - button "拆第一步" [ref=e519] [cursor=pointer]
+            - button "编辑" [ref=e520] [cursor=pointer]
+            - button "放下" [ref=e521] [cursor=pointer]
+        - article [ref=e522]:
+          - generic [ref=e525]:
+            - generic [ref=e526]:
+              - strong [ref=e527]: 今天有点累，作业也拖延了
+              - generic [ref=e528]: 中等
+            - paragraph [ref=e529]: 从对话中自动提取
+            - generic [ref=e531]: 待开始
+          - generic [ref=e532]:
+            - button "开始" [ref=e533] [cursor=pointer]
+            - button "完成" [ref=e534] [cursor=pointer]
+            - button "拆第一步" [ref=e535] [cursor=pointer]
+            - button "编辑" [ref=e536] [cursor=pointer]
+            - button "放下" [ref=e537] [cursor=pointer]
+        - article [ref=e538]:
+          - generic [ref=e541]:
+            - generic [ref=e542]:
+              - strong [ref=e543]: 考试快到了，一直没复习
+              - generic [ref=e544]: 中等
+            - paragraph [ref=e545]: 从对话中自动提取
+            - generic [ref=e547]: 待开始
+          - generic [ref=e548]:
+            - button "开始" [ref=e549] [cursor=pointer]
+            - button "完成" [ref=e550] [cursor=pointer]
+            - button "拆第一步" [ref=e551] [cursor=pointer]
+            - button "编辑" [ref=e552] [cursor=pointer]
+            - button "放下" [ref=e553] [cursor=pointer]
+        - article [ref=e554]:
+          - generic [ref=e557]:
+            - generic [ref=e558]:
+              - strong [ref=e559]: 把今天提到的任务拆成第一步
+              - generic [ref=e560]: 中等
+            - paragraph [ref=e561]: 由 Aurora 对话自动提取,建议从一个十分钟动作开始.
+            - generic [ref=e562]:
+              - generic [ref=e563]: 待开始
+              - link "来源记忆" [ref=e564] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e565]:
+            - button "开始" [ref=e566] [cursor=pointer]
+            - button "完成" [ref=e567] [cursor=pointer]
+            - button "拆第一步" [ref=e568] [cursor=pointer]
+            - button "编辑" [ref=e569] [cursor=pointer]
+            - button "放下" [ref=e570] [cursor=pointer]
+        - article [ref=e571]:
+          - generic [ref=e574]:
+            - generic [ref=e575]:
+              - strong [ref=e576]: 推进 Java 作业的第一步
+              - generic [ref=e577]: 中等
+            - paragraph [ref=e578]: 由 Aurora 对话自动提取,建议从一个十分钟动作开始.
+            - generic [ref=e579]:
+              - generic [ref=e580]: 待开始
+              - link "来源记忆" [ref=e581] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e582]:
+            - button "开始" [ref=e583] [cursor=pointer]
+            - button "完成" [ref=e584] [cursor=pointer]
+            - button "拆第一步" [ref=e585] [cursor=pointer]
+            - button "编辑" [ref=e586] [cursor=pointer]
+            - button "放下" [ref=e587] [cursor=pointer]
+        - article [ref=e588]:
+          - generic [ref=e591]:
+            - generic [ref=e592]:
+              - strong [ref=e593]: 今天作业又没写完，压力很大
+              - generic [ref=e594]: 中等
+            - paragraph [ref=e595]: 从对话中自动提取
+            - generic [ref=e597]: 待开始
+          - generic [ref=e598]:
+            - button "开始" [ref=e599] [cursor=pointer]
+            - button "完成" [ref=e600] [cursor=pointer]
+            - button "拆第一步" [ref=e601] [cursor=pointer]
+            - button "编辑" [ref=e602] [cursor=pointer]
+            - button "放下" [ref=e603] [cursor=pointer]
+        - article [ref=e604]:
+          - generic [ref=e607]:
+            - generic [ref=e608]:
+              - strong [ref=e609]: 把最重的一句话写下来
+              - generic [ref=e610]: 中等
+            - paragraph [ref=e611]: 由思维碎纸机从混乱输入中提取.
+            - generic [ref=e612]:
+              - generic [ref=e613]: 待开始
+              - link "来源记忆" [ref=e614] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e615]:
+            - button "开始" [ref=e616] [cursor=pointer]
+            - button "完成" [ref=e617] [cursor=pointer]
+            - button "拆第一步" [ref=e618] [cursor=pointer]
+            - button "编辑" [ref=e619] [cursor=pointer]
+            - button "放下" [ref=e620] [cursor=pointer]
+        - article [ref=e621]:
+          - generic [ref=e624]:
+            - generic [ref=e625]:
+              - strong [ref=e626]: 推进 Java 作业的第一步
+              - generic [ref=e627]: 中等
+            - paragraph [ref=e628]: 由 Aurora 对话自动提取,建议从一个十分钟动作开始.
+            - generic [ref=e629]:
+              - generic [ref=e630]: 待开始
+              - link "来源记忆" [ref=e631] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e632]:
+            - button "开始" [ref=e633] [cursor=pointer]
+            - button "完成" [ref=e634] [cursor=pointer]
+            - button "拆第一步" [ref=e635] [cursor=pointer]
+            - button "编辑" [ref=e636] [cursor=pointer]
+            - button "放下" [ref=e637] [cursor=pointer]
+        - article [ref=e638]:
+          - generic [ref=e641]:
+            - generic [ref=e642]:
+              - strong [ref=e643]: 今天有点累，作业也拖延了
+              - generic [ref=e644]: 中等
+            - paragraph [ref=e645]: 从对话中自动提取
+            - generic [ref=e647]: 待开始
+          - generic [ref=e648]:
+            - button "开始" [ref=e649] [cursor=pointer]
+            - button "完成" [ref=e650] [cursor=pointer]
+            - button "拆第一步" [ref=e651] [cursor=pointer]
+            - button "编辑" [ref=e652] [cursor=pointer]
+            - button "放下" [ref=e653] [cursor=pointer]
+        - article [ref=e654]:
+          - generic [ref=e657]:
+            - generic [ref=e658]:
+              - strong [ref=e659]: 考试快到了，一直没复习
+              - generic [ref=e660]: 中等
+            - paragraph [ref=e661]: 从对话中自动提取
+            - generic [ref=e663]: 待开始
+          - generic [ref=e664]:
+            - button "开始" [ref=e665] [cursor=pointer]
+            - button "完成" [ref=e666] [cursor=pointer]
+            - button "拆第一步" [ref=e667] [cursor=pointer]
+            - button "编辑" [ref=e668] [cursor=pointer]
+            - button "放下" [ref=e669] [cursor=pointer]
+        - article [ref=e670]:
+          - generic [ref=e673]:
+            - generic [ref=e674]:
+              - strong [ref=e675]: 把今天提到的任务拆成第一步
+              - generic [ref=e676]: 中等
+            - paragraph [ref=e677]: 由 Aurora 对话自动提取,建议从一个十分钟动作开始.
+            - generic [ref=e678]:
+              - generic [ref=e679]: 待开始
+              - link "来源记忆" [ref=e680] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e681]:
+            - button "开始" [ref=e682] [cursor=pointer]
+            - button "完成" [ref=e683] [cursor=pointer]
+            - button "拆第一步" [ref=e684] [cursor=pointer]
+            - button "编辑" [ref=e685] [cursor=pointer]
+            - button "放下" [ref=e686] [cursor=pointer]
+        - article [ref=e687]:
+          - generic [ref=e690]:
+            - generic [ref=e691]:
+              - strong [ref=e692]: 推进 Java 作业的第一步
+              - generic [ref=e693]: 中等
+            - paragraph [ref=e694]: 由 Aurora 对话自动提取,建议从一个十分钟动作开始.
+            - generic [ref=e695]:
+              - generic [ref=e696]: 待开始
+              - link "来源记忆" [ref=e697] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e698]:
+            - button "开始" [ref=e699] [cursor=pointer]
+            - button "完成" [ref=e700] [cursor=pointer]
+            - button "拆第一步" [ref=e701] [cursor=pointer]
+            - button "编辑" [ref=e702] [cursor=pointer]
+            - button "放下" [ref=e703] [cursor=pointer]
+        - article [ref=e704]:
+          - generic [ref=e707]:
+            - generic [ref=e708]:
+              - strong [ref=e709]: 今天作业又没写完，压力很大
+              - generic [ref=e710]: 中等
+            - paragraph [ref=e711]: 从对话中自动提取
+            - generic [ref=e713]: 待开始
+          - generic [ref=e714]:
+            - button "开始" [ref=e715] [cursor=pointer]
+            - button "完成" [ref=e716] [cursor=pointer]
+            - button "拆第一步" [ref=e717] [cursor=pointer]
+            - button "编辑" [ref=e718] [cursor=pointer]
+            - button "放下" [ref=e719] [cursor=pointer]
+        - article [ref=e720]:
+          - generic [ref=e723]:
+            - generic [ref=e724]:
+              - strong [ref=e725]: 把最重的一句话写下来
+              - generic [ref=e726]: 中等
+            - paragraph [ref=e727]: 由思维碎纸机从混乱输入中提取.
+            - generic [ref=e728]:
+              - generic [ref=e729]: 待开始
+              - link "来源记忆" [ref=e730] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e731]:
+            - button "开始" [ref=e732] [cursor=pointer]
+            - button "完成" [ref=e733] [cursor=pointer]
+            - button "拆第一步" [ref=e734] [cursor=pointer]
+            - button "编辑" [ref=e735] [cursor=pointer]
+            - button "放下" [ref=e736] [cursor=pointer]
+        - article [ref=e737]:
+          - generic [ref=e740]:
+            - generic [ref=e741]:
+              - strong [ref=e742]: 推进 Java 作业的第一步
+              - generic [ref=e743]: 中等
+            - paragraph [ref=e744]: 由 Aurora 对话自动提取,建议从一个十分钟动作开始.
+            - generic [ref=e745]:
+              - generic [ref=e746]: 待开始
+              - link "来源记忆" [ref=e747] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e748]:
+            - button "开始" [ref=e749] [cursor=pointer]
+            - button "完成" [ref=e750] [cursor=pointer]
+            - button "拆第一步" [ref=e751] [cursor=pointer]
+            - button "编辑" [ref=e752] [cursor=pointer]
+            - button "放下" [ref=e753] [cursor=pointer]
+        - article [ref=e754]:
+          - generic [ref=e757]:
+            - generic [ref=e758]:
+              - strong [ref=e759]: 今天有点累，作业也拖延了
+              - generic [ref=e760]: 中等
+            - paragraph [ref=e761]: 从对话中自动提取
+            - generic [ref=e763]: 待开始
+          - generic [ref=e764]:
+            - button "开始" [ref=e765] [cursor=pointer]
+            - button "完成" [ref=e766] [cursor=pointer]
+            - button "拆第一步" [ref=e767] [cursor=pointer]
+            - button "编辑" [ref=e768] [cursor=pointer]
+            - button "放下" [ref=e769] [cursor=pointer]
+        - article [ref=e770]:
+          - generic [ref=e773]:
+            - generic [ref=e774]:
+              - strong [ref=e775]: 考试快到了，一直没复习
+              - generic [ref=e776]: 中等
+            - paragraph [ref=e777]: 从对话中自动提取
+            - generic [ref=e779]: 待开始
+          - generic [ref=e780]:
+            - button "开始" [ref=e781] [cursor=pointer]
+            - button "完成" [ref=e782] [cursor=pointer]
+            - button "拆第一步" [ref=e783] [cursor=pointer]
+            - button "编辑" [ref=e784] [cursor=pointer]
+            - button "放下" [ref=e785] [cursor=pointer]
+        - article [ref=e786]:
+          - generic [ref=e789]:
+            - generic [ref=e790]:
+              - strong [ref=e791]: 把今天提到的任务拆成第一步
+              - generic [ref=e792]: 中等
+            - paragraph [ref=e793]: 由 Aurora 对话自动提取,建议从一个十分钟动作开始.
+            - generic [ref=e794]:
+              - generic [ref=e795]: 待开始
+              - link "来源记忆" [ref=e796] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e797]:
+            - button "开始" [ref=e798] [cursor=pointer]
+            - button "完成" [ref=e799] [cursor=pointer]
+            - button "拆第一步" [ref=e800] [cursor=pointer]
+            - button "编辑" [ref=e801] [cursor=pointer]
+            - button "放下" [ref=e802] [cursor=pointer]
+        - article [ref=e803]:
+          - generic [ref=e806]:
+            - generic [ref=e807]:
+              - strong [ref=e808]: 推进 Java 作业的第一步
+              - generic [ref=e809]: 中等
+            - paragraph [ref=e810]: 由 Aurora 对话自动提取,建议从一个十分钟动作开始.
+            - generic [ref=e811]:
+              - generic [ref=e812]: 待开始
+              - link "来源记忆" [ref=e813] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e814]:
+            - button "开始" [ref=e815] [cursor=pointer]
+            - button "完成" [ref=e816] [cursor=pointer]
+            - button "拆第一步" [ref=e817] [cursor=pointer]
+            - button "编辑" [ref=e818] [cursor=pointer]
+            - button "放下" [ref=e819] [cursor=pointer]
+        - article [ref=e820]:
+          - generic [ref=e823]:
+            - generic [ref=e824]:
+              - strong [ref=e825]: 今天作业又没写完，压力很大
+              - generic [ref=e826]: 中等
+            - paragraph [ref=e827]: 从对话中自动提取
+            - generic [ref=e829]: 待开始
+          - generic [ref=e830]:
+            - button "开始" [ref=e831] [cursor=pointer]
+            - button "完成" [ref=e832] [cursor=pointer]
+            - button "拆第一步" [ref=e833] [cursor=pointer]
+            - button "编辑" [ref=e834] [cursor=pointer]
+            - button "放下" [ref=e835] [cursor=pointer]
+        - article [ref=e836]:
+          - generic [ref=e839]:
+            - generic [ref=e840]:
+              - strong [ref=e841]: 把最重的一句话写下来
+              - generic [ref=e842]: 中等
+            - paragraph [ref=e843]: 由思维碎纸机从混乱输入中提取.
+            - generic [ref=e844]:
+              - generic [ref=e845]: 待开始
+              - link "来源记忆" [ref=e846] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e847]:
+            - button "开始" [ref=e848] [cursor=pointer]
+            - button "完成" [ref=e849] [cursor=pointer]
+            - button "拆第一步" [ref=e850] [cursor=pointer]
+            - button "编辑" [ref=e851] [cursor=pointer]
+            - button "放下" [ref=e852] [cursor=pointer]
+        - article [ref=e853]:
+          - generic [ref=e856]:
+            - generic [ref=e857]:
+              - strong [ref=e858]: 推进 Java 作业的第一步
+              - generic [ref=e859]: 中等
+            - paragraph [ref=e860]: 由 Aurora 对话自动提取,建议从一个十分钟动作开始.
+            - generic [ref=e861]:
+              - generic [ref=e862]: 待开始
+              - link "来源记忆" [ref=e863] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e864]:
+            - button "开始" [ref=e865] [cursor=pointer]
+            - button "完成" [ref=e866] [cursor=pointer]
+            - button "拆第一步" [ref=e867] [cursor=pointer]
+            - button "编辑" [ref=e868] [cursor=pointer]
+            - button "放下" [ref=e869] [cursor=pointer]
+        - article [ref=e870]:
+          - generic [ref=e873]:
+            - generic [ref=e874]:
+              - strong [ref=e875]: 今天有点累，作业也拖延了
+              - generic [ref=e876]: 中等
+            - paragraph [ref=e877]: 从对话中自动提取
+            - generic [ref=e879]: 待开始
+          - generic [ref=e880]:
+            - button "开始" [ref=e881] [cursor=pointer]
+            - button "完成" [ref=e882] [cursor=pointer]
+            - button "拆第一步" [ref=e883] [cursor=pointer]
+            - button "编辑" [ref=e884] [cursor=pointer]
+            - button "放下" [ref=e885] [cursor=pointer]
+        - article [ref=e886]:
+          - generic [ref=e889]:
+            - generic [ref=e890]:
+              - strong [ref=e891]: 考试快到了，一直没复习
+              - generic [ref=e892]: 中等
+            - paragraph [ref=e893]: 从对话中自动提取
+            - generic [ref=e895]: 待开始
+          - generic [ref=e896]:
+            - button "开始" [ref=e897] [cursor=pointer]
+            - button "完成" [ref=e898] [cursor=pointer]
+            - button "拆第一步" [ref=e899] [cursor=pointer]
+            - button "编辑" [ref=e900] [cursor=pointer]
+            - button "放下" [ref=e901] [cursor=pointer]
+        - article [ref=e902]:
+          - generic [ref=e905]:
+            - generic [ref=e906]:
+              - strong [ref=e907]: 把今天提到的任务拆成第一步
+              - generic [ref=e908]: 中等
+            - paragraph [ref=e909]: 由 Aurora 对话自动提取,建议从一个十分钟动作开始.
+            - generic [ref=e910]:
+              - generic [ref=e911]: 待开始
+              - link "来源记忆" [ref=e912] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e913]:
+            - button "开始" [ref=e914] [cursor=pointer]
+            - button "完成" [ref=e915] [cursor=pointer]
+            - button "拆第一步" [ref=e916] [cursor=pointer]
+            - button "编辑" [ref=e917] [cursor=pointer]
+            - button "放下" [ref=e918] [cursor=pointer]
+        - article [ref=e919]:
+          - generic [ref=e922]:
+            - generic [ref=e923]:
+              - strong [ref=e924]: 推进 Java 作业的第一步
+              - generic [ref=e925]: 中等
+            - paragraph [ref=e926]: 由 Aurora 对话自动提取,建议从一个十分钟动作开始.
+            - generic [ref=e927]:
+              - generic [ref=e928]: 待开始
+              - link "来源记忆" [ref=e929] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e930]:
+            - button "开始" [ref=e931] [cursor=pointer]
+            - button "完成" [ref=e932] [cursor=pointer]
+            - button "拆第一步" [ref=e933] [cursor=pointer]
+            - button "编辑" [ref=e934] [cursor=pointer]
+            - button "放下" [ref=e935] [cursor=pointer]
+        - article [ref=e936]:
+          - generic [ref=e939]:
+            - generic [ref=e940]:
+              - strong [ref=e941]: 今天作业又没写完，压力很大
+              - generic [ref=e942]: 中等
+            - paragraph [ref=e943]: 从对话中自动提取
+            - generic [ref=e945]: 待开始
+          - generic [ref=e946]:
+            - button "开始" [ref=e947] [cursor=pointer]
+            - button "完成" [ref=e948] [cursor=pointer]
+            - button "拆第一步" [ref=e949] [cursor=pointer]
+            - button "编辑" [ref=e950] [cursor=pointer]
+            - button "放下" [ref=e951] [cursor=pointer]
+        - article [ref=e952]:
+          - generic [ref=e955]:
+            - generic [ref=e956]:
+              - strong [ref=e957]: 把最重的一句话写下来
+              - generic [ref=e958]: 中等
+            - paragraph [ref=e959]: 由思维碎纸机从混乱输入中提取.
+            - generic [ref=e960]:
+              - generic [ref=e961]: 待开始
+              - link "来源记忆" [ref=e962] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e963]:
+            - button "开始" [ref=e964] [cursor=pointer]
+            - button "完成" [ref=e965] [cursor=pointer]
+            - button "拆第一步" [ref=e966] [cursor=pointer]
+            - button "编辑" [ref=e967] [cursor=pointer]
+            - button "放下" [ref=e968] [cursor=pointer]
+        - article [ref=e969]:
+          - generic [ref=e972]:
+            - generic [ref=e973]:
+              - strong [ref=e974]: 推进 Java 作业的第一步
+              - generic [ref=e975]: 中等
+            - paragraph [ref=e976]: 由 Aurora 对话自动提取,建议从一个十分钟动作开始.
+            - generic [ref=e977]:
+              - generic [ref=e978]: 待开始
+              - link "来源记忆" [ref=e979] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e980]:
+            - button "开始" [ref=e981] [cursor=pointer]
+            - button "完成" [ref=e982] [cursor=pointer]
+            - button "拆第一步" [ref=e983] [cursor=pointer]
+            - button "编辑" [ref=e984] [cursor=pointer]
+            - button "放下" [ref=e985] [cursor=pointer]
+        - article [ref=e986]:
+          - generic [ref=e989]:
+            - generic [ref=e990]:
+              - strong [ref=e991]: 今天有点累，作业也拖延了
+              - generic [ref=e992]: 中等
+            - paragraph [ref=e993]: 从对话中自动提取
+            - generic [ref=e995]: 待开始
+          - generic [ref=e996]:
+            - button "开始" [ref=e997] [cursor=pointer]
+            - button "完成" [ref=e998] [cursor=pointer]
+            - button "拆第一步" [ref=e999] [cursor=pointer]
+            - button "编辑" [ref=e1000] [cursor=pointer]
+            - button "放下" [ref=e1001] [cursor=pointer]
+        - article [ref=e1002]:
+          - generic [ref=e1005]:
+            - generic [ref=e1006]:
+              - strong [ref=e1007]: 考试快到了，一直没复习
+              - generic [ref=e1008]: 中等
+            - paragraph [ref=e1009]: 从对话中自动提取
+            - generic [ref=e1011]: 待开始
+          - generic [ref=e1012]:
+            - button "开始" [ref=e1013] [cursor=pointer]
+            - button "完成" [ref=e1014] [cursor=pointer]
+            - button "拆第一步" [ref=e1015] [cursor=pointer]
+            - button "编辑" [ref=e1016] [cursor=pointer]
+            - button "放下" [ref=e1017] [cursor=pointer]
+        - article [ref=e1018]:
+          - generic [ref=e1021]:
+            - generic [ref=e1022]:
+              - strong [ref=e1023]: 把今天提到的任务拆成第一步
+              - generic [ref=e1024]: 中等
+            - paragraph [ref=e1025]: 由 Aurora 对话自动提取,建议从一个十分钟动作开始.
+            - generic [ref=e1026]:
+              - generic [ref=e1027]: 待开始
+              - link "来源记忆" [ref=e1028] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e1029]:
+            - button "开始" [ref=e1030] [cursor=pointer]
+            - button "完成" [ref=e1031] [cursor=pointer]
+            - button "拆第一步" [ref=e1032] [cursor=pointer]
+            - button "编辑" [ref=e1033] [cursor=pointer]
+            - button "放下" [ref=e1034] [cursor=pointer]
+        - article [ref=e1035]:
+          - generic [ref=e1038]:
+            - generic [ref=e1039]:
+              - strong [ref=e1040]: 推进 Java 作业的第一步
+              - generic [ref=e1041]: 中等
+            - paragraph [ref=e1042]: 由 Aurora 对话自动提取,建议从一个十分钟动作开始.
+            - generic [ref=e1043]:
+              - generic [ref=e1044]: 待开始
+              - link "来源记忆" [ref=e1045] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e1046]:
+            - button "开始" [ref=e1047] [cursor=pointer]
+            - button "完成" [ref=e1048] [cursor=pointer]
+            - button "拆第一步" [ref=e1049] [cursor=pointer]
+            - button "编辑" [ref=e1050] [cursor=pointer]
+            - button "放下" [ref=e1051] [cursor=pointer]
+        - article [ref=e1052]:
+          - generic [ref=e1055]:
+            - generic [ref=e1056]:
+              - strong [ref=e1057]: 今天作业又没写完，压力很大
+              - generic [ref=e1058]: 中等
+            - paragraph [ref=e1059]: 从对话中自动提取
+            - generic [ref=e1061]: 待开始
+          - generic [ref=e1062]:
+            - button "开始" [ref=e1063] [cursor=pointer]
+            - button "完成" [ref=e1064] [cursor=pointer]
+            - button "拆第一步" [ref=e1065] [cursor=pointer]
+            - button "编辑" [ref=e1066] [cursor=pointer]
+            - button "放下" [ref=e1067] [cursor=pointer]
+        - article [ref=e1068]:
+          - generic [ref=e1071]:
+            - generic [ref=e1072]:
+              - strong [ref=e1073]: 把最重的一句话写下来
+              - generic [ref=e1074]: 中等
+            - paragraph [ref=e1075]: 由思维碎纸机从混乱输入中提取.
+            - generic [ref=e1076]:
+              - generic [ref=e1077]: 待开始
+              - link "来源记忆" [ref=e1078] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e1079]:
+            - button "开始" [ref=e1080] [cursor=pointer]
+            - button "完成" [ref=e1081] [cursor=pointer]
+            - button "拆第一步" [ref=e1082] [cursor=pointer]
+            - button "编辑" [ref=e1083] [cursor=pointer]
+            - button "放下" [ref=e1084] [cursor=pointer]
+        - article [ref=e1085]:
+          - generic [ref=e1088]:
+            - generic [ref=e1089]:
+              - strong [ref=e1090]: 推进 Java 作业的第一步
+              - generic [ref=e1091]: 中等
+            - paragraph [ref=e1092]: 由 Aurora 对话自动提取,建议从一个十分钟动作开始.
+            - generic [ref=e1093]:
+              - generic [ref=e1094]: 待开始
+              - link "来源记忆" [ref=e1095] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e1096]:
+            - button "开始" [ref=e1097] [cursor=pointer]
+            - button "完成" [ref=e1098] [cursor=pointer]
+            - button "拆第一步" [ref=e1099] [cursor=pointer]
+            - button "编辑" [ref=e1100] [cursor=pointer]
+            - button "放下" [ref=e1101] [cursor=pointer]
+        - article [ref=e1102]:
+          - generic [ref=e1105]:
+            - generic [ref=e1106]:
+              - strong [ref=e1107]: 今天有点累，作业也拖延了
+              - generic [ref=e1108]: 中等
+            - paragraph [ref=e1109]: 从对话中自动提取
+            - generic [ref=e1111]: 待开始
+          - generic [ref=e1112]:
+            - button "开始" [ref=e1113] [cursor=pointer]
+            - button "完成" [ref=e1114] [cursor=pointer]
+            - button "拆第一步" [ref=e1115] [cursor=pointer]
+            - button "编辑" [ref=e1116] [cursor=pointer]
+            - button "放下" [ref=e1117] [cursor=pointer]
+        - article [ref=e1118]:
+          - generic [ref=e1121]:
+            - generic [ref=e1122]:
+              - strong [ref=e1123]: 考试快到了，一直没复习
+              - generic [ref=e1124]: 中等
+            - paragraph [ref=e1125]: 从对话中自动提取
+            - generic [ref=e1127]: 待开始
+          - generic [ref=e1128]:
+            - button "开始" [ref=e1129] [cursor=pointer]
+            - button "完成" [ref=e1130] [cursor=pointer]
+            - button "拆第一步" [ref=e1131] [cursor=pointer]
+            - button "编辑" [ref=e1132] [cursor=pointer]
+            - button "放下" [ref=e1133] [cursor=pointer]
+        - article [ref=e1134]:
+          - generic [ref=e1137]:
+            - generic [ref=e1138]:
+              - strong [ref=e1139]: 把今天提到的任务拆成第一步
+              - generic [ref=e1140]: 中等
+            - paragraph [ref=e1141]: 由 Aurora 对话自动提取,建议从一个十分钟动作开始.
+            - generic [ref=e1142]:
+              - generic [ref=e1143]: 待开始
+              - link "来源记忆" [ref=e1144] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e1145]:
+            - button "开始" [ref=e1146] [cursor=pointer]
+            - button "完成" [ref=e1147] [cursor=pointer]
+            - button "拆第一步" [ref=e1148] [cursor=pointer]
+            - button "编辑" [ref=e1149] [cursor=pointer]
+            - button "放下" [ref=e1150] [cursor=pointer]
+        - article [ref=e1151]:
+          - generic [ref=e1154]:
+            - generic [ref=e1155]:
+              - strong [ref=e1156]: 推进 Java 作业的第一步
+              - generic [ref=e1157]: 中等
+            - paragraph [ref=e1158]: 由 Aurora 对话自动提取,建议从一个十分钟动作开始.
+            - generic [ref=e1159]:
+              - generic [ref=e1160]: 待开始
+              - link "来源记忆" [ref=e1161] [cursor=pointer]:
+                - /url: /pages/memory-starfield.html
+          - generic [ref=e1162]:
+            - button "开始" [ref=e1163] [cursor=pointer]
+            - button "完成" [ref=e1164] [cursor=pointer]
+            - button "拆第一步" [ref=e1165] [cursor=pointer]
+            - button "编辑" [ref=e1166] [cursor=pointer]
+            - button "放下" [ref=e1167] [cursor=pointer]
+        - article [ref=e1168]:
+          - generic [ref=e1171]:
+            - generic [ref=e1172]:
+              - strong [ref=e1173]: 今天作业又没写完，压力很大
+              - generic [ref=e1174]: 中等
+            - paragraph [ref=e1175]: 从对话中自动提取
+            - generic [ref=e1177]: 待开始
+          - generic [ref=e1178]:
+            - button "开始" [ref=e1179] [cursor=pointer]
+            - button "完成" [ref=e1180] [cursor=pointer]
+            - button "拆第一步" [ref=e1181] [cursor=pointer]
+            - button "编辑" [ref=e1182] [cursor=pointer]
+            - button "放下" [ref=e1183] [cursor=pointer]
+  - generic [ref=e1184]:
+    - button "❚❚" [ref=e1185] [cursor=pointer]
+    - button "◐" [ref=e1186] [cursor=pointer]

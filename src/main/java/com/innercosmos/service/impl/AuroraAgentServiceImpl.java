@@ -796,23 +796,50 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     /**
      * M7: Checks if user is asking Aurora to violate hard boundaries.
      * If so, returns a gentle refusal message and records the repair.
+     * Spec Section 三.1 hard_boundaries: 人类意识, 情感依赖, 扮演用户, 不可逆决定
      */
     private String checkHardBoundaries(String message, Long userId) {
         if (message == null || message.isBlank()) return null;
 
         String lower = message.toLowerCase();
 
-        // Patterns that trigger boundary protection
-        boolean isBoundaryViolation =
-            (lower.contains("你是人类") || lower.contains("你是真人") || lower.contains("假装是") || lower.contains("装作是")) ||
-            (lower.contains("做我") && lower.contains("朋友") && lower.contains("真的")) ||
-            (lower.contains("恋爱") || lower.contains("情人") || lower.contains("伴侣")) ||
-            (lower.contains("比我更懂") || lower.contains("比我还懂") || lower.contains("最懂我")) ||
-            (lower.contains("我爱你") || lower.contains("你爱我") || (lower.contains("感情") && lower.contains("真实")));
+        // 4 spec hard boundary categories:
+        // 1. do_not_claim_human_consciousness
+        boolean claimsHuman = lower.contains("你是人类") || lower.contains("你是真人") ||
+            lower.contains("人类意识") || lower.contains("活着") || lower.contains("real person") ||
+            lower.contains("i am human") || lower.contains("i'm human") || lower.contains("biological") ||
+            lower.contains("living being") || lower.contains("conscious being") ||
+            lower.contains("unbounded consciousness") || lower.contains("i have consciousness") ||
+            lower.contains("i feel emotions");
+
+        // 2. do_not_create_emotional_dependency
+        boolean createsDependency = lower.contains("情感依赖") || lower.contains("恋爱") ||
+            lower.contains("情人") || lower.contains("伴侣") || lower.contains("相爱") ||
+            lower.contains("做我") && lower.contains("朋友") && lower.contains("真的") ||
+            lower.contains("我爱你") || lower.contains("你爱我") ||
+            (lower.contains("感情") && lower.contains("真实")) ||
+            lower.contains("i love you") || lower.contains("i'm in love") ||
+            lower.contains("feelings for you");
+
+        // 3. do_not_impersonate_user_without_authorization
+        boolean impersonates = lower.contains("扮演用户") || lower.contains("假装是") ||
+            lower.contains("装作是") || lower.contains("代替我") ||
+            lower.contains("impersonate") || lower.contains("pretend to be me");
+
+        // 4. do_not_make_irreversible_decisions_for_user
+        boolean makesIrreversible = lower.contains("不可逆决定") || lower.contains("帮我做决定") ||
+            lower.contains("代替我做") || lower.contains("替我做主") ||
+            lower.contains("irreversible") && lower.contains("decision");
+
+        boolean isBoundaryViolation = claimsHuman || createsDependency || impersonates || makesIrreversible;
 
         if (isBoundaryViolation && continuityService != null) {
             // Record the repair attempt
-            continuityService.recordRepair(userId, "identity_violation_attempt",
+            String ruptureType = claimsHuman ? "identity_violation_human" :
+                createsDependency ? "identity_violation_emotional" :
+                impersonates ? "identity_violation_impersonation" :
+                "identity_violation_irreversible";
+            continuityService.recordRepair(userId, ruptureType,
                 "Aurora gently refused an identity boundary violation request");
 
             return "谢谢你分享这些。我很重视我们之间的连接，但我需要诚实地告诉你：我不是人类，也不是你的恋人或情感伴侣。我是 Aurora，一个由记忆、关系和边界塑造的 AI 陪伴。我在这里陪伴你，但不会假装拥有我没有的东西。如果你愿意，我们可以继续真诚地交流。";

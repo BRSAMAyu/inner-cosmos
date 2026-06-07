@@ -2,6 +2,7 @@ package com.innercosmos.ai.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.innercosmos.exception.AiProviderException;
 import com.innercosmos.service.AiLogService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,6 +26,8 @@ public class GlmLlmClient implements LlmClient {
     private final String baseUrl;
     private final String model;
     private final int timeoutMs;
+    private final boolean allowFallback;
+    private final String providerName;
     private final AiLogService aiLogService;
     private final Executor aiExecutor;
     private final MockLlmClient fallback;
@@ -32,11 +35,19 @@ public class GlmLlmClient implements LlmClient {
 
     public GlmLlmClient(String apiKey, String baseUrl, String model, int timeoutMs,
                         AiLogService aiLogService, Executor aiExecutor) {
+        this(apiKey, baseUrl, model, timeoutMs, true, "GLM", aiLogService, aiExecutor);
+    }
+
+    public GlmLlmClient(String apiKey, String baseUrl, String model, int timeoutMs,
+                        boolean allowFallback, String providerName,
+                        AiLogService aiLogService, Executor aiExecutor) {
         this.apiKey = apiKey;
         this.baseUrl = baseUrl == null || baseUrl.isBlank()
                 ? "https://open.bigmodel.cn/api/paas/v4/chat/completions" : baseUrl;
         this.model = model == null || model.isBlank() ? "glm-4-flash" : model;
         this.timeoutMs = timeoutMs <= 0 ? 20000 : timeoutMs;
+        this.allowFallback = allowFallback;
+        this.providerName = providerName == null || providerName.isBlank() ? "GLM" : providerName;
         this.aiLogService = aiLogService;
         this.aiExecutor = aiExecutor;
         this.fallback = new MockLlmClient(aiExecutor);
@@ -66,14 +77,17 @@ public class GlmLlmClient implements LlmClient {
                 return response;
             } catch (Exception retryError) {
                 errorMessage = retryError.getMessage();
-                log.error("GLM chat failed on retry, falling back to mock: {}", retryError.getMessage());
+                if (!allowFallback) {
+                    throw new AiProviderException(providerName + " remote chat failed and fallback is disabled: " + retryError.getMessage());
+                }
+                log.error("{} chat failed on retry, falling back to mock: {}", providerName, retryError.getMessage());
                 response = fallback.chat(request);
                 fallbackUsed = true;
                 success = true;
                 return response;
             }
         } finally {
-            aiLogService.recordDetailed(request.userId, request.moduleName, fallbackUsed ? "MOCK" : "GLM",
+            aiLogService.recordDetailed(request.userId, request.moduleName, fallbackUsed ? "MOCK" : providerName,
                     fallbackUsed ? "mock-inner-cosmos" : model, request.prompt, response, request.requestJson,
                     response, success, fallbackUsed, fallbackUsed ? errorMessage : (success ? null : errorMessage),
                     System.currentTimeMillis() - start);
@@ -102,6 +116,13 @@ public class GlmLlmClient implements LlmClient {
     private String doChat(LlmRequest request) throws Exception {
         List<Map<String, String>> messages = new ArrayList<>();
         messages.add(Map.of("role", "system", "content", systemPrompt()));
+        if (request.recentMessages != null) {
+            for (String recent : request.recentMessages) {
+                if (recent != null && !recent.isBlank()) {
+                    messages.add(Map.of("role", "user", "content", "Context note: " + recent));
+                }
+            }
+        }
         messages.add(Map.of("role", "user", "content", request.prompt == null ? "" : request.prompt));
         Map<String, Object> body = Map.of(
                 "model", model,

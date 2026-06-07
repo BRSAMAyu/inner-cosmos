@@ -14,6 +14,7 @@ import com.innercosmos.service.AuroraSelfContinuityService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -31,8 +32,15 @@ public class AuroraSelfContinuityServiceImpl implements AuroraSelfContinuityServ
     private final LlmClient llm;
 
     private static final List<String> FORBIDDEN_PATTERNS = List.of(
+        // Chinese patterns
         "最重要", "最亲密", "比用户更懂", "唯一", "最懂", "比用户更了解",
-        "真实情感", "情感需求", "人类意识", "活着"
+        "真实情感", "情感需求", "人类意识", "活着", "情感依赖",
+        "不可逆决定", "扮演用户",
+        // English not_claiming patterns (spec Section 三.1)
+        "i am human", "i'm human", "im human", "a real person", "real human",
+        "biological life", "living being", "legal person", "conscious being",
+        "unbounded consciousness", "i have consciousness", "i feel emotions",
+        "i love you", "i'm in love", "i have feelings for you"
     );
 
     public AuroraSelfContinuityServiceImpl(
@@ -73,12 +81,16 @@ public class AuroraSelfContinuityServiceImpl implements AuroraSelfContinuityServ
         refl.summary = summary;
         refl.relatedStatementId = relatedStatementId;
         refl.status = depth; // initial status = depth
+        refl.evidenceRefs = evidenceRefs != null && !evidenceRefs.isEmpty()
+            ? "[\"" + String.join("\",\"", evidenceRefs) + "\"]"
+            : null;
         refl.createdAt = LocalDateTime.now();
         reflectionMapper.insert(refl);
     }
 
     // Layer 3: Promote to candidate
     @Override
+    @Transactional
     public void promoteToCandidate(Long userId, String dimension, String proposedBelief,
                                   Double confidence, List<String> evidenceRefs) {
         // Find the latest deep reflection that matches, or create a candidate directly
@@ -90,6 +102,10 @@ public class AuroraSelfContinuityServiceImpl implements AuroraSelfContinuityServ
                .last("LIMIT 1");
         List<AuroraSelfReflection> candidates = reflectionMapper.selectList(wrapper);
 
+        String evidenceJson = evidenceRefs != null && !evidenceRefs.isEmpty()
+            ? "[\"" + String.join("\",\"", evidenceRefs) + "\"]"
+            : "[]";
+
         AuroraSelfReflection target;
         if (!candidates.isEmpty()) {
             target = candidates.get(0);
@@ -97,6 +113,7 @@ public class AuroraSelfContinuityServiceImpl implements AuroraSelfContinuityServ
             target.proposedBelief = proposedBelief;
             target.confidence = confidence;
             target.riskFlags = "[]";
+            target.evidenceRefs = evidenceJson;
             reflectionMapper.updateById(target);
         } else {
             // Create a new candidate reflection directly
@@ -109,6 +126,7 @@ public class AuroraSelfContinuityServiceImpl implements AuroraSelfContinuityServ
             target.proposedBelief = proposedBelief;
             target.confidence = confidence;
             target.riskFlags = "[]";
+            target.evidenceRefs = evidenceJson;
             target.createdAt = LocalDateTime.now();
             reflectionMapper.insert(target);
         }
@@ -116,6 +134,7 @@ public class AuroraSelfContinuityServiceImpl implements AuroraSelfContinuityServ
 
     // Layer 4: Commit to long-term model
     @Override
+    @Transactional
     public void commitToModel(Long userId, Long candidateId,
                               boolean userConfirmed, List<String> extraEvidence) {
         AuroraSelfReflection candidate = reflectionMapper.selectById(candidateId);
@@ -260,6 +279,14 @@ public class AuroraSelfContinuityServiceImpl implements AuroraSelfContinuityServ
     // Right to repair — record a repair action
     @Override
     public void recordRepair(Long userId, String ruptureType, String repairAction) {
+        recordRepair(userId, ruptureType, repairAction, null);
+    }
+
+    /**
+     * Right to repair — record a repair action with optional user feedback.
+     * Repairs are stored as candidates and only committed if userConfirmed or auto_commit is true.
+     */
+    public void recordRepair(Long userId, String ruptureType, String repairAction, String userFeedback) {
         AuroraSelfReflection repair = new AuroraSelfReflection();
         repair.userId = userId;
         repair.trigger = "repair:" + ruptureType;
@@ -269,11 +296,40 @@ public class AuroraSelfContinuityServiceImpl implements AuroraSelfContinuityServ
         repair.proposedBelief = repairAction;
         repair.confidence = 0.80;
         repair.riskFlags = "[\"" + ruptureType + "\"]";
+        repair.evidenceRefs = userFeedback != null
+            ? "[\"user_feedback:" + userFeedback.replace("\"", "\\\"") + "\"]"
+            : null;
         repair.createdAt = LocalDateTime.now();
         reflectionMapper.insert(repair);
 
-        // Auto-commit repairs (they're corrective, not speculative)
-        commitToModel(userId, repair.id, true, List.of(ruptureType));
+        // Only auto-commit repairs if explicitly allowed (bypass user confirmation)
+        // Repairs are corrective by nature but should still go through candidate review
+        // for transparency. Uncomment below only if you want repairs auto-committed:
+        // commitToModel(userId, repair.id, true, List.of(ruptureType));
+    }
+
+    // Retire an active belief (user revocation — spec Section 七)
+    @Override
+    @Transactional
+    public void retireModel(Long userId, Long modelId) {
+        AuroraSelfModel model = modelMapper.selectById(modelId);
+        if (model == null || !model.userId.equals(userId)) {
+            throw new RuntimeException("Model not found or access denied: " + modelId);
+        }
+        model.status = "retired";
+        modelMapper.updateById(model);
+    }
+
+    // Dismiss a candidate (user rejection — spec Section 七)
+    @Override
+    @Transactional
+    public void dismissCandidate(Long userId, Long candidateId) {
+        AuroraSelfReflection candidate = reflectionMapper.selectById(candidateId);
+        if (candidate == null || !candidate.userId.equals(userId)) {
+            throw new RuntimeException("Candidate not found or access denied: " + candidateId);
+        }
+        candidate.status = "dismissed";
+        reflectionMapper.updateById(candidate);
     }
 
     // Check if a belief is allowed (hard boundary check)

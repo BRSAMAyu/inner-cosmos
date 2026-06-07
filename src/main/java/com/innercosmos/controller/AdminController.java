@@ -1,17 +1,12 @@
 package com.innercosmos.controller;
 
 import com.innercosmos.common.ApiResponse;
-import com.innercosmos.common.Constants;
-import com.innercosmos.common.ErrorCode;
 import com.innercosmos.entity.AdminActionLog;
 import com.innercosmos.entity.EchoCapsule;
 import com.innercosmos.entity.ModelConfig;
 import com.innercosmos.entity.ReportRecord;
 import com.innercosmos.entity.SafetyEvent;
-import com.innercosmos.entity.User;
-import com.innercosmos.exception.BusinessException;
 import com.innercosmos.service.AdminService;
-import com.innercosmos.service.UserService;
 import com.innercosmos.vo.AdminOverviewVO;
 import com.innercosmos.vo.UserProfileVO;
 import jakarta.servlet.http.HttpSession;
@@ -25,19 +20,9 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/admin")
 public class AdminController extends BaseController {
     private final AdminService adminService;
-    private final UserService userService;
 
-    public AdminController(AdminService adminService, UserService userService) {
+    public AdminController(AdminService adminService) {
         this.adminService = adminService;
-        this.userService = userService;
-    }
-
-    private void requireAdmin(HttpSession session) {
-        Long userId = currentUserId(session);
-        User user = userService.current(userId);
-        if (!Constants.ROLE_ADMIN.equals(user.role)) {
-            throw new BusinessException(ErrorCode.UNAUTHORIZED, "需要管理员权限");
-        }
     }
 
     @GetMapping("/users")

@@ -3,14 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>编织共鸣体 · Inner Cosmos</title>
   <link rel="stylesheet" href="/css/app.css">
 </head>
 <body>
-<main class="shell">
+<main id="main" class="shell">
+  <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
 
   <span class="route-hint">脱敏预览与边界设置</span>
-  <h1>共鸣体编织</h1>
+  <h1 id="page-title">共鸣体编织</h1>
   <p class="muted mb-2">共鸣体只携带被你允许的主题。真实身份、诊断承诺和强迫回应会被边界挡住。</p>
 
   <!-- Wizard steps -->
@@ -101,7 +103,39 @@
       </div>
       <div class="field-group mb-2">
         <label for="turns">每日对话轮数限制</label>
-        <input id="turns" type="number" min="2" max="12" value="5">
+        <input id="turns" type="number" min="2" max="50" value="30">
+      </div>
+      <div class="grid">
+        <div class="field-group mb-2">
+          <label for="ownerNote">你想补充给共鸣体的经历或边界</label>
+          <textarea id="ownerNote" placeholder="例如：可以保留我对项目收尾的焦虑，也可以表达我不喜欢被完美化。不要包含手机号、真实姓名等敏感信息。" style="min-height:108px"></textarea>
+        </div>
+        <div class="field-group mb-2">
+          <label for="styleProfile">说话风格画像</label>
+          <textarea id="styleProfile" placeholder='例如：{"voice":"直接、温柔、在意真实反馈","notBeautified":true}' style="min-height:108px"></textarea>
+        </div>
+      </div>
+      <div class="grid">
+        <label class="toggle-row">
+          <span>
+            <strong>允许离线代回声</strong>
+            <small>访问者会被明确告知这不是本人实时回复。</small>
+          </span>
+          <input id="standInEnabled" type="checkbox">
+        </label>
+        <div class="field-group">
+          <label for="realContactPolicy">真人联系策略</label>
+          <select id="realContactPolicy">
+            <option value="LETTER_ONLY">先写慢信</option>
+            <option value="STAND_IN_FIRST">先与共鸣体交流</option>
+            <option value="DIRECT_REQUEST">允许发送会话邀请</option>
+            <option value="NO_REAL_CONTACT">不开放真人联系</option>
+          </select>
+        </div>
+      </div>
+      <div class="soft-stage mt-2">
+        <h3>它将知道什么</h3>
+        <div id="contextPreviewDraft" class="muted">选择记忆并填写边界后，这里会展示脱敏后的可见上下文。</div>
       </div>
     </div>
 
@@ -230,6 +264,16 @@ async function buildPreview() {
 }
 
 function buildFinalPreview() {
+  const selected = memories.filter(m => selectedMemoryIds.includes(m.id));
+  const visibleSummary = selected.slice(0, 5).map(m => `${m.title || "记忆"}：${m.summary || ""}`).join(" / ");
+  const ownerNote = document.getElementById("ownerNote").value;
+  const contextPreviewJson = JSON.stringify({
+    visibleSummary: visibleSummary.slice(0, 420),
+    ownerNote,
+    privacy: "不包含原始对话全文、联系方式、真实身份和未授权记忆",
+    authorizedMemoryIds: selectedMemoryIds
+  });
+  document.getElementById("contextPreviewDraft").textContent = contextPreviewJson;
   document.getElementById("finalPreview").innerHTML = `
     <strong>${esc(document.getElementById("capsuleName").value || "未命名回声")}</strong>
     <p class="muted">${esc(document.getElementById("intro").value || "")}</p>
@@ -237,9 +281,11 @@ function buildFinalPreview() {
       <span class="pill">${document.getElementById("privacy").value}</span>
       <span class="pill">${document.getElementById("visibility").value}</span>
       <span class="pill">每日 ${document.getElementById("turns").value} 轮</span>
+      <span class="pill">${document.getElementById("standInEnabled").checked ? "允许代回声" : "不代回声"}</span>
     </div>
     <p class="muted mt-1" style="font-size:.82rem">允许：${esc(document.getElementById("allow").value)}</p>
     <p class="muted" style="font-size:.82rem">避开：${esc(document.getElementById("block").value)}</p>
+    <p class="muted" style="font-size:.82rem">真人联系：${esc(document.getElementById("realContactPolicy").value)}</p>
   `;
 }
 
@@ -262,7 +308,12 @@ async function create() {
     allowLetterRequest: true,
     privacyLevel: document.getElementById("privacy").value,
     visibilityStatus,
-    isPublic: visibilityStatus === "PUBLIC"
+    isPublic: visibilityStatus === "PUBLIC",
+    ownerContextNote: document.getElementById("ownerNote").value,
+    styleProfileJson: document.getElementById("styleProfile").value,
+    contextPreviewJson: document.getElementById("contextPreviewDraft").textContent,
+    standInEnabled: document.getElementById("standInEnabled").checked,
+    realContactPolicy: document.getElementById("realContactPolicy").value
   });
 
   if (r.success && r.data) {
@@ -274,7 +325,7 @@ async function create() {
         <p class="muted">${esc(r.data.intro || "")}</p>
         <div class="pill-row">
           <span class="pill">${r.data.visibilityStatus}</span>
-          <span class="pill">每日 ${r.data.conversationLimitPerDay || 5} 轮</span>
+          <span class="pill">每日 ${r.data.conversationLimitPerDay || 30} 轮</span>
           <span class="pill">能量 ${Math.round((r.data.echoEnergy || 0) * 100)}%</span>
         </div>
       </div>
@@ -294,6 +345,7 @@ if (urlParams.get("memoryId")) {
   selectedMemoryIds.push(Number(urlParams.get("memoryId")));
   document.getElementById("selectedCount").textContent = `已选 ${selectedMemoryIds.length} 条记忆`;
 }
+IC.hideLoading();
 </script>
 </body>
 </html>

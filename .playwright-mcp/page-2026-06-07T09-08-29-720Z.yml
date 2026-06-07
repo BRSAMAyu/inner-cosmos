@@ -1,0 +1,31 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - heading "Inner Cosmos" [level=1] [ref=e4]
+    - paragraph [ref=e5]: 温柔的自我整理空间
+    - generic [ref=e6]:
+      - generic [ref=e7] [cursor=pointer]: 用户名
+      - textbox "用户名" [ref=e8]:
+        - /placeholder: 输入用户名
+        - text: demo
+      - button "🎙" [ref=e9] [cursor=pointer]
+    - generic [ref=e10]:
+      - generic [ref=e11] [cursor=pointer]: 密码
+      - textbox "密码" [ref=e12]:
+        - /placeholder: 输入密码
+        - text: demo123
+    - button "进入内宇宙" [ref=e13] [cursor=pointer]
+    - button "游客体验 Demo" [ref=e14] [cursor=pointer]
+    - generic [ref=e15]:
+      - text: 游客体验会进入演示账号：
+      - code [ref=e16]: demo
+      - text: /
+      - code [ref=e17]: demo123
+    - generic [ref=e18]:
+      - text: 还没有账号？
+      - link "创建一个" [ref=e19] [cursor=pointer]:
+        - /url: /pages/register.html
+  - generic [ref=e20]:
+    - button "❚❚" [ref=e21] [cursor=pointer]
+    - button "◐" [ref=e22] [cursor=pointer]
+  - status [ref=e23]:
+    - paragraph [ref=e29]: 正在慢慢呈现…

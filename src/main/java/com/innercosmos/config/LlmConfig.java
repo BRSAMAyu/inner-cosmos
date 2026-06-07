@@ -8,7 +8,11 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.concurrent.Executor;
+import java.util.ArrayList;
+import java.util.List;
 
 @Configuration
 @ConfigurationProperties(prefix = "llm")
@@ -27,6 +31,7 @@ public class LlmConfig {
     public MimoProperties mimo = new MimoProperties();
     public MinimaxProperties minimax = new MinimaxProperties();
     public DeepSeekProperties deepseek = new DeepSeekProperties();
+    public String failoverProviders = "minimax,mimo,glm,deepseek";
 
     // --- Getters / Setters for top-level fields ---
 
@@ -98,6 +103,14 @@ public class LlmConfig {
         this.asrProvider = asrProvider;
     }
 
+    public String getFailoverProviders() {
+        return failoverProviders;
+    }
+
+    public void setFailoverProviders(String failoverProviders) {
+        this.failoverProviders = failoverProviders;
+    }
+
     public String activeProvider() {
         return (provider != null && !provider.isBlank()) ? provider : "minimax";
     }
@@ -107,6 +120,7 @@ public class LlmConfig {
         if ("minimax".equals(activeProvider)) return minimax.model;
         if ("deepseek".equals(activeProvider)) return deepseek.model;
         if ("glm".equals(activeProvider)) return glm.model;
+        if ("mimo".equals(activeProvider)) return mimo.model;
         return model;
     }
 
@@ -116,6 +130,7 @@ public class LlmConfig {
         if ("minimax".equals(activeProvider)) return !resolveKey(minimax.apiKey).isBlank();
         if ("deepseek".equals(activeProvider)) return !resolveKey(deepseek.apiKey).isBlank();
         if ("glm".equals(activeProvider)) return !resolveKey(glm.apiKey).isBlank();
+        if ("mimo".equals(activeProvider)) return !resolveKey(mimo.apiKey).isBlank();
         return !resolveKey(apiKey).isBlank();
     }
 
@@ -199,6 +214,8 @@ public class LlmConfig {
 
     public static class MimoProperties {
         public String apiKey = "";
+        public String model = "mimo-v2.5";
+        public String baseUrl = "https://api.xiaomimimo.com/v1/chat/completions";
         public String asrModel = "mimo-v2.5-asr";
         public String asrBaseUrl = "https://token-plan-cn.xiaomimimo.com/v1";
         public String asrLanguage = "auto";
@@ -206,6 +223,10 @@ public class LlmConfig {
 
         public String getApiKey() { return apiKey; }
         public void setApiKey(String apiKey) { this.apiKey = apiKey; }
+        public String getModel() { return model; }
+        public void setModel(String model) { this.model = model; }
+        public String getBaseUrl() { return baseUrl; }
+        public void setBaseUrl(String baseUrl) { this.baseUrl = baseUrl; }
         public String getAsrModel() { return asrModel; }
         public void setAsrModel(String asrModel) { this.asrModel = asrModel; }
         public String getAsrBaseUrl() { return asrBaseUrl; }
@@ -218,7 +239,7 @@ public class LlmConfig {
 
     public static class MinimaxProperties {
         public String apiKey = "";
-        public String model = "MiniMax-M2.7";
+        public String model = "MiniMax-M3";
         public String baseUrl = "https://api.minimaxi.com/v1/chat/completions";
         public int timeoutMs = 20000;
 
@@ -257,13 +278,38 @@ public class LlmConfig {
                 activeProvider, mode, isEffectiveFallbackAllowed());
 
         LlmClient actualClient;
-        switch (activeProvider.toLowerCase()) {
+        String minimaxKey = resolveKey(minimax.apiKey);
+        String mimoKey = resolveKey(mimo.apiKey);
+        String glmKey = resolveKey(glm.apiKey);
+        String deepseekKey = resolveKey(deepseek.apiKey);
+        log.info("Resolved LLM keys: minimax={}, mimo={}, glm={}, deepseek={}, topLevelApiKey={}",
+                mask(minimaxKey), mask(mimoKey), mask(glmKey), mask(deepseekKey), mask(apiKey));
+        if ("mock".equalsIgnoreCase(activeProvider)) {
+            actualClient = new MockLlmClient(aiExecutor);
+        } else if (isProdMode()) {
+            actualClient = failoverClient(activeProvider, aiLogService, aiExecutor);
+        } else {
+            switch (activeProvider.toLowerCase()) {
             case "glm":
                 actualClient = new GlmLlmClient(
                         resolveKey(glm.apiKey),
                         glm.baseUrl,
                         glm.model,
                         glm.timeoutMs,
+                        isEffectiveFallbackAllowed(),
+                        "GLM",
+                        aiLogService,
+                        aiExecutor
+                );
+                break;
+            case "mimo":
+                actualClient = new GlmLlmClient(
+                        resolveKey(mimo.apiKey),
+                        mimo.baseUrl,
+                        mimo.model,
+                        mimo.timeoutMs,
+                        isEffectiveFallbackAllowed(),
+                        "MIMO",
                         aiLogService,
                         aiExecutor
                 );
@@ -296,6 +342,8 @@ public class LlmConfig {
                         baseUrl,
                         model,
                         20000,
+                        isEffectiveFallbackAllowed(),
+                        "OPENAI_COMPATIBLE",
                         aiLogService,
                         aiExecutor
                 );
@@ -303,13 +351,112 @@ public class LlmConfig {
             case "mock":
             default:
                 actualClient = new MockLlmClient(aiExecutor);
+            }
         }
 
         // Wrap with A/B test handler
         return new ABTestLlmClientWrapper(actualClient, aiLogService, aiExecutor);
     }
 
+    private LlmClient failoverClient(String activeProvider, AiLogService aiLogService, Executor aiExecutor) {
+        List<String> orderedProviders = orderedProviders(activeProvider);
+        List<FailoverLlmClient.ProviderCandidate> candidates = new ArrayList<>();
+        for (String providerName : orderedProviders) {
+            LlmClient client = createProviderClient(providerName, false, aiLogService, aiExecutor);
+            if (client != null) {
+                candidates.add(new FailoverLlmClient.ProviderCandidate(providerName.toUpperCase(), activeModelFor(providerName), client));
+            }
+        }
+        return new FailoverLlmClient(candidates, aiExecutor);
+    }
+
+    public LlmClient createProviderClient(String providerName, boolean fallbackAllowed,
+                                          AiLogService aiLogService, Executor aiExecutor) {
+        return switch (providerName.toLowerCase()) {
+            case "minimax" -> new MiniMaxLlmClient(resolveKey(minimax.apiKey), minimax.baseUrl, minimax.model,
+                    minimax.timeoutMs, fallbackAllowed, aiLogService, aiExecutor);
+            case "mimo" -> new GlmLlmClient(resolveKey(mimo.apiKey), mimo.baseUrl, mimo.model,
+                    mimo.timeoutMs, fallbackAllowed, "MIMO", aiLogService, aiExecutor);
+            case "glm" -> new GlmLlmClient(resolveKey(glm.apiKey), glm.baseUrl, glm.model,
+                    glm.timeoutMs, fallbackAllowed, "GLM", aiLogService, aiExecutor);
+            case "deepseek" -> new DeepSeekLlmClient(resolveKey(deepseek.apiKey), deepseek.baseUrl, deepseek.model,
+                    deepseek.timeoutMs, fallbackAllowed, aiLogService, aiExecutor);
+            default -> null;
+        };
+    }
+
+    /**
+     * Map of {@code providerName -> LlmClient} for the M6 model selector. Keys are upper-case
+     * (MINIMAX, MIMO, GLM, DEEPSEEK, MOCK). The Map is intentionally a {@link LinkedHashMap}
+     * so that iteration order matches the natural reading order in the UI.
+     *
+     * <p>The default {@link #llmClient} bean is left untouched and continues to be the
+     * fallback used by callers that have not been wired through the model router.
+     */
+    @Bean(name = "namedLlmClients")
+    public Map<String, LlmClient> namedLlmClients(AiLogService aiLogService, Executor aiExecutor) {
+        Map<String, LlmClient> m = new LinkedHashMap<>();
+        LlmClient minimaxClient = createProviderClient("minimax", false, aiLogService, aiExecutor);
+        if (minimaxClient != null) m.put("MINIMAX", minimaxClient);
+        LlmClient mimoClient = createProviderClient("mimo", false, aiLogService, aiExecutor);
+        if (mimoClient != null) m.put("MIMO", mimoClient);
+        LlmClient glmClient = createProviderClient("glm", false, aiLogService, aiExecutor);
+        if (glmClient != null) m.put("GLM", glmClient);
+        LlmClient deepseekClient = createProviderClient("deepseek", false, aiLogService, aiExecutor);
+        if (deepseekClient != null) m.put("DEEPSEEK", deepseekClient);
+        m.put("MOCK", new MockLlmClient(aiExecutor));
+        return m;
+    }
+
+    public List<String> orderedProviderNames() {
+        return orderedProviders(activeProvider());
+    }
+
+    public List<String> orderedProviderModels() {
+        return orderedProviderNames().stream()
+                .map(providerName -> providerName.toUpperCase() + "/" + activeModelFor(providerName))
+                .toList();
+    }
+
+    private List<String> orderedProviders(String activeProvider) {
+        List<String> providers = new ArrayList<>();
+        addProvider(providers, activeProvider);
+        if (failoverProviders != null) {
+            for (String item : failoverProviders.split(",")) {
+                addProvider(providers, item);
+            }
+        }
+        if (providers.isEmpty()) {
+            providers.add("minimax");
+        }
+        return providers;
+    }
+
+    private void addProvider(List<String> providers, String provider) {
+        if (provider == null || provider.isBlank() || "mock".equalsIgnoreCase(provider)) return;
+        String normalized = provider.trim().toLowerCase();
+        if (providers.stream().noneMatch(p -> p.equalsIgnoreCase(normalized))) {
+            providers.add(normalized);
+        }
+    }
+
+    private String activeModelFor(String providerName) {
+        return switch (providerName.toLowerCase()) {
+            case "minimax" -> minimax.model;
+            case "mimo" -> mimo.model;
+            case "glm" -> glm.model;
+            case "deepseek" -> deepseek.model;
+            default -> model;
+        };
+    }
+
     private String resolveKey(String key) {
         return (key != null && !key.isBlank()) ? key : (apiKey != null ? apiKey : "");
+    }
+
+    private String mask(String key) {
+        if (key == null || key.isBlank()) return "<EMPTY>";
+        if (key.length() <= 8) return "***";
+        return key.substring(0, 4) + "***" + key.substring(key.length() - 4);
     }
 }

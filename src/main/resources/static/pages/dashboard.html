@@ -160,7 +160,8 @@
   </style>
 </head>
 <body>
-<main class="shell">
+<main id="main" class="shell">
+  <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
 
   <!-- Dashboard Hero with time-aware greeting -->
@@ -181,7 +182,7 @@
       <div class="weather-label" id="weatherLabel">多云</div>
       <div class="weather-desc" id="weatherDesc">平静的一天</div>
       <div class="row gap-sm mt-2" style="justify-content:center">
-        <a class="button" href="/pages/aurora-chat.html">和 Aurora 聊聊今天</a>
+        <a class="button" href="/pages/aurora-chat.html">和 <span data-aurora-name>Aurora</span> 聊聊今天</a>
       </div>
     </article>
 
@@ -251,9 +252,21 @@
       <a class="button mt-2" href="/pages/weekly-review.html">查看完整周报</a>
     </article>
     <article class="aurora-note" id="auroraNote">
-      <strong>Aurora 的观察：</strong>
+      <strong><span data-aurora-name>Aurora</span> 的观察：</strong>
       <p class="muted mt-1" id="auroraObservation">正在观察你的内在宇宙...</p>
     </article>
+  </section>
+
+  <div class="spacer"></div>
+
+  <section class="panel">
+    <div class="flex-between mb-1">
+      <h2>7 天理解概览</h2>
+      <a href="/pages/timeline.html" class="muted" style="font-size:.88rem">查看依据 →</a>
+    </div>
+    <div id="understandingOverview" class="grid">
+      <p class="muted">正在汇总日记、对话、待办与记忆线索...</p>
+    </div>
   </section>
 </main>
 
@@ -285,8 +298,11 @@ async function load() {
   document.getElementById("guidingText").textContent = d.greeting || "让自己先回到身体里";
 
   // Update emotion weather
-  document.getElementById("weatherIcon").textContent = IC.weatherIcon(d.emotionWeather || "CLOUD");
-  document.getElementById("weatherLabel").textContent = d.emotionWeather || "多云";
+  const realWeather = window.ICWeather?.getWeatherState ? window.ICWeather.getWeatherState() : null;
+  updateWeatherCard(realWeather, d.emotionWeather);
+  window.addEventListener("weatherChanged", e => updateWeatherCard(e.detail.weather, d.emotionWeather));
+  document.body.dataset.emotionWeather = d.emotionWeather || "";
+  /*
   const weatherDescs = {
     "SUN": "晴朗的一天",
     "CLOUD": "平静的一天",
@@ -296,6 +312,7 @@ async function load() {
     "SNOW": "安静沉淀"
   };
   document.getElementById("weatherDesc").textContent = weatherDescs[d.emotionWeather] || "平静的一天";
+  */
 
   // Update todos
   const todos = d.todos || [];
@@ -338,14 +355,97 @@ async function load() {
       const review = wr.data;
       document.getElementById("auroraObservation").textContent = review.auroraObservation || review.themeSummary || "Aurora 正在观察你的内在宇宙...";
       document.getElementById("weeklySummary").innerHTML = `
-        <p class="muted" style="font-size:.88rem;margin-bottom:8px">${esc(review.dateRange || "本周"}</p>
+        <p class="muted" style="font-size:.88rem;margin-bottom:8px">${esc(review.dateRange || "本周")}</p>
         <p style="font-size:.92rem;line-height:1.6">${esc(review.title || "本周回顾")}</p>
         <p class="muted" style="font-size:.82rem;margin-top:8px">${(d.memoryCount || 0)} 条记忆 · ${done} 个待办完成</p>
       `;
     }
   } catch(e) {}
 
+  await loadUnderstandingOverview();
+  checkAuroraProactive();
+
   IC.stagger(document);
+}
+
+async function checkAuroraProactive() {
+  if (sessionStorage.getItem("aurora_proactive_dismissed") === "1") return;
+  try {
+    const r = await requestAuroraProactiveWithTimeout(8000);
+    if (!r.success || !r.data || !r.data.shouldGreet) return;
+    const note = document.createElement("div");
+    note.className = "proactive-greeting visible";
+    note.innerHTML = `
+      <div class="greeting-content">
+        <strong><span data-aurora-name>Aurora</span> 想起你了</strong>
+        <p>${IC.esc(r.data.greeting || "我在这里。要不要先和我说一句今天最真实的话？")}</p>
+      </div>
+      <div class="greeting-actions">
+        <a class="greeting-btn primary" href="/pages/aurora-chat.html">去聊聊</a>
+        <button class="greeting-btn secondary" type="button" onclick="dismissAuroraProactive(this)">稍后</button>
+      </div>
+    `;
+    document.body.appendChild(note);
+  } catch (e) {}
+}
+
+async function requestAuroraProactiveWithTimeout(timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch("/api/aurora/proactive/check", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+      signal: controller.signal
+    });
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function dismissAuroraProactive(button) {
+  sessionStorage.setItem("aurora_proactive_dismissed", "1");
+  const node = button.closest(".proactive-greeting");
+  node?.classList.add("hiding");
+  setTimeout(() => node?.remove(), 260);
+  API.auroraProactiveDismiss(0).catch(() => {});
+}
+
+function updateWeatherCard(realWeather, emotionWeather) {
+  const w = realWeather || {};
+  const type = w.type || "CLOUD";
+  const location = w.locationLabel || localStorage.getItem("ic_location_label") || "当前位置";
+  document.getElementById("weatherIcon").textContent = window.ICWeather?.getWeatherIcon ? ICWeather.getWeatherIcon(type) : IC.weatherIcon(type);
+  document.getElementById("weatherLabel").textContent = `${location} · ${w.description || "真实天气"}${w.temperature !== undefined ? " · " + w.temperature + "℃" : ""}`;
+  document.getElementById("weatherDesc").textContent = `情绪天气：${emotionWeather || "尚未记录"}${w.isAuto === false ? " · 手动天气" : " · 自动定位天气"}`;
+}
+
+async function loadUnderstandingOverview() {
+  const box = document.getElementById("understandingOverview");
+  try {
+    const r = await API.understandingOverview(7);
+    if (!r.success || !r.data) return;
+    const o = r.data;
+    const todo = o.todoStats || {};
+    const learning = o.systemLearning || {};
+    const themes = (o.themeEvolution || []).slice(0, 4).map(t => t.themeName || t.name).filter(Boolean);
+    box.innerHTML = `
+      <article class="card">
+        <strong>用户自身变化</strong>
+        <p class="muted">情绪记录 ${(o.emotionTraces || []).length} 条，重要事件 ${(o.importantEvents || []).length} 个，关系线索 ${(o.relationSignals || []).length} 条。</p>
+        <div class="pill-row">${themes.map(t => `<span class="pill">${esc(t)}</span>`).join("") || '<span class="pill">主题沉淀中</span>'}</div>
+      </article>
+      <article class="card">
+        <strong><span data-aurora-name>Aurora</span> 学到了什么</strong>
+        <p class="muted">新增记忆 ${(o.newMemories || []).length} 条，依据节点 ${(o.evidence || []).length} 个，被记住的片段约 ${Number(learning.rememberedWords || 0)} 字。</p>
+        <p class="muted">活跃待办 ${Number(todo.active || 0)} 个，已完成 ${Number(todo.done || 0)} 个。</p>
+      </article>
+    `;
+  } catch (e) {
+    box.innerHTML = '<p class="muted">理解概览暂时不可用。</p>';
+  }
 }
 
 function updateDateTime() {
@@ -390,6 +490,7 @@ async function loadAiHealth() {
   const h = r.data;
   // Could show a small indicator if needed
 }
+IC.hideLoading();
 </script>
 </body>
 </html>

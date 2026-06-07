@@ -7,63 +7,22 @@ window.ICAudio = {
   interactionPlayer: null,
 
   // Current state
-  isMuted: true,
+  isMuted: false,
   currentBGM: null,
   currentWeather: null,
   masterVolume: 0.12,
   ambientFallbackEnabled: false,
 
-  // BGM tracks for different times
+  // BGM tracks for different times. These are real local FLAC assets; no
+  // oscillator fallback is used by default because it can sound like a hum.
   bgmTracks: {
-    dawn: {
-      name: '黎明',
-      url: '/audio/dawn.mp3',
-      fallback: 'generate-tones',
-      tones: [261.63, 329.63, 392.00, 523.25], // C4, E4, G4, C5
-      tempo: 0.8
-    },
-    morning: {
-      name: '早晨',
-      url: '/audio/morning.mp3',
-      fallback: 'generate-tones',
-      tones: [293.66, 369.99, 440.00, 587.33], // D4, F#4, A4, D5
-      tempo: 1.0
-    },
-    noon: {
-      name: '正午',
-      url: '/audio/noon.mp3',
-      fallback: 'generate-tones',
-      tones: [329.63, 415.30, 493.88, 659.25], // E4, G#4, B4, E5
-      tempo: 1.2
-    },
-    afternoon: {
-      name: '下午',
-      url: '/audio/afternoon.mp3',
-      fallback: 'generate-tones',
-      tones: [349.23, 440.00, 523.25, 698.46], // F4, A4, C5, F5
-      tempo: 1.0
-    },
-    dusk: {
-      name: '黄昏',
-      url: '/audio/dusk.mp3',
-      fallback: 'generate-tones',
-      tones: [293.66, 349.23, 440.00, 587.33], // D4, F4, A4, D5
-      tempo: 0.7
-    },
-    night: {
-      name: '夜晚',
-      url: '/audio/night.mp3',
-      fallback: 'generate-tones',
-      tones: [261.63, 311.13, 392.00, 523.25], // C4, Eb4, G4, C5
-      tempo: 0.5
-    },
-    deepNight: {
-      name: '深夜',
-      url: '/audio/deep-night.mp3',
-      fallback: 'generate-tones',
-      tones: [246.94, 293.66, 369.99, 493.88], // B4, D4, F#4, B4
-      tempo: 0.4
-    }
+    dawn: { name: 'Chopin Nocturne Op.9 No.2', url: '/audio/music/chopin-nocturne-op9-no2.flac' },
+    morning: { name: 'Mozart K.282 Adagio', url: '/audio/music/mozart-k282-adagio.flac' },
+    noon: { name: 'Mozart K.282 Menuetto', url: '/audio/music/mozart-k282-menuetto.flac' },
+    afternoon: { name: 'Mozart K.282 Allegro', url: '/audio/music/mozart-k282-allegro.flac' },
+    dusk: { name: 'Chopin Nocturne Op.55 No.1', url: '/audio/music/chopin-nocturne-op55-no1.flac' },
+    night: { name: 'Chopin Nocturne Op.62 No.2', url: '/audio/music/chopin-nocturne-op62-no2.flac' },
+    deepNight: { name: 'Chopin Nocturne Op.55 No.1', url: '/audio/music/chopin-nocturne-op55-no1.flac' }
   },
 
   // Weather sound effects
@@ -88,6 +47,7 @@ window.ICAudio = {
   // Initialize
   init() {
     this.loadSettings();
+    if (window.IC?.refreshMusicButton) window.IC.refreshMusicButton();
 
     // Listen for user interaction to unlock audio
     document.addEventListener('click', () => this.unlockAudio(), { once: true });
@@ -108,6 +68,9 @@ window.ICAudio = {
 
     if (savedMuted !== null) {
       this.isMuted = savedMuted === 'true';
+    } else {
+      this.isMuted = false;
+      localStorage.setItem('ic_audio_muted', 'false');
     }
     if (savedVolume !== null) {
       this.masterVolume = parseFloat(savedVolume);
@@ -139,6 +102,7 @@ window.ICAudio = {
     if (this.audioCtx && this.audioCtx.state === 'suspended') {
       this.audioCtx.resume();
     }
+    if (!this.bgmPlayer) this.playCurrentBGM();
   },
 
   // Toggle mute
@@ -371,6 +335,7 @@ window.ICAudio = {
 
   // Play interaction sound
   playInteractionSound(soundName) {
+    if (localStorage.getItem('ic_audio_interaction') !== 'true') return;
     if (this.isMuted) return;
     this.initAudioContext();
     if (!this.audioCtx) return;

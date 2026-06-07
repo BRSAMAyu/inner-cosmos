@@ -35,6 +35,25 @@ public class UserServiceImpl implements UserService {
     private final EmotionTraceMapper emotionTraceMapper;
     private final EmotionTimelineMapper emotionTimelineMapper;
     private final ThoughtFragmentMapper thoughtFragmentMapper;
+    private final PersonaChatSessionMapper personaChatSessionMapper;
+    private final PersonaChatMessageMapper personaChatMessageMapper;
+    private final BeliefPatternMapper beliefPatternMapper;
+    private final RelationMentionMapper relationMentionMapper;
+    private final EventCardMapper eventCardMapper;
+    private final MemoryThemeMapper memoryThemeMapper;
+    private final VoiceTranscriptionMapper voiceTranscriptionMapper;
+    private final WeeklyReviewMapper weeklyReviewMapper;
+    private final FriendRelationMapper friendRelationMapper;
+    private final LetterThreadMapper letterThreadMapper;
+    private final SocialGroupMapper socialGroupMapper;
+    private final SocialGroupMemberMapper socialGroupMemberMapper;
+    private final BlockRelationMapper blockRelationMapper;
+    private final SafetyEventMapper safetyEventMapper;
+    private final AiInteractionLogMapper aiInteractionLogMapper;
+    private final UserCorrectionMapper userCorrectionMapper;
+    private final DialogSummaryMapper dialogSummaryMapper;
+    private final ABTestMetricsMapper abTestMetricsMapper;
+    private final ReportRecordMapper reportRecordMapper;
 
     public UserServiceImpl(UserMapper userMapper,
                            UserProfileMapper userProfileMapper,
@@ -47,7 +66,26 @@ public class UserServiceImpl implements UserService {
                            DialogMessageMapper dialogMessageMapper,
                            EmotionTraceMapper emotionTraceMapper,
                            EmotionTimelineMapper emotionTimelineMapper,
-                           ThoughtFragmentMapper thoughtFragmentMapper) {
+                           ThoughtFragmentMapper thoughtFragmentMapper,
+                           PersonaChatSessionMapper personaChatSessionMapper,
+                           PersonaChatMessageMapper personaChatMessageMapper,
+                           BeliefPatternMapper beliefPatternMapper,
+                           RelationMentionMapper relationMentionMapper,
+                           EventCardMapper eventCardMapper,
+                           MemoryThemeMapper memoryThemeMapper,
+                           VoiceTranscriptionMapper voiceTranscriptionMapper,
+                           WeeklyReviewMapper weeklyReviewMapper,
+                           FriendRelationMapper friendRelationMapper,
+                           LetterThreadMapper letterThreadMapper,
+                           SocialGroupMapper socialGroupMapper,
+                           SocialGroupMemberMapper socialGroupMemberMapper,
+                           BlockRelationMapper blockRelationMapper,
+                           SafetyEventMapper safetyEventMapper,
+                           AiInteractionLogMapper aiInteractionLogMapper,
+                           UserCorrectionMapper userCorrectionMapper,
+                           DialogSummaryMapper dialogSummaryMapper,
+                           ABTestMetricsMapper abTestMetricsMapper,
+                           ReportRecordMapper reportRecordMapper) {
         this.userMapper = userMapper;
         this.userProfileMapper = userProfileMapper;
         this.memoryCardMapper = memoryCardMapper;
@@ -60,9 +98,29 @@ public class UserServiceImpl implements UserService {
         this.emotionTraceMapper = emotionTraceMapper;
         this.emotionTimelineMapper = emotionTimelineMapper;
         this.thoughtFragmentMapper = thoughtFragmentMapper;
+        this.personaChatSessionMapper = personaChatSessionMapper;
+        this.personaChatMessageMapper = personaChatMessageMapper;
+        this.beliefPatternMapper = beliefPatternMapper;
+        this.relationMentionMapper = relationMentionMapper;
+        this.eventCardMapper = eventCardMapper;
+        this.memoryThemeMapper = memoryThemeMapper;
+        this.voiceTranscriptionMapper = voiceTranscriptionMapper;
+        this.weeklyReviewMapper = weeklyReviewMapper;
+        this.friendRelationMapper = friendRelationMapper;
+        this.letterThreadMapper = letterThreadMapper;
+        this.socialGroupMapper = socialGroupMapper;
+        this.socialGroupMemberMapper = socialGroupMemberMapper;
+        this.blockRelationMapper = blockRelationMapper;
+        this.safetyEventMapper = safetyEventMapper;
+        this.aiInteractionLogMapper = aiInteractionLogMapper;
+        this.userCorrectionMapper = userCorrectionMapper;
+        this.dialogSummaryMapper = dialogSummaryMapper;
+        this.abTestMetricsMapper = abTestMetricsMapper;
+        this.reportRecordMapper = reportRecordMapper;
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public User register(RegisterRequest request) {
         QueryWrapper<User> query = new QueryWrapper<>();
         query.eq("username", request.username);
@@ -109,6 +167,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void updateProfile(Long userId, UserProfileVO profile) {
         QueryWrapper<UserProfile> query = new QueryWrapper<>();
         query.eq("user_id", userId);
@@ -222,65 +281,95 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void deleteAccount(Long userId) {
-        // Delete thought fragments
-        QueryWrapper<ThoughtFragment> tfQuery = new QueryWrapper<>();
-        tfQuery.eq("user_id", userId);
-        thoughtFragmentMapper.delete(tfQuery);
+        // Persona chat messages and sessions
+        List<PersonaChatSession> personaSessions = personaChatSessionMapper.selectList(
+                new QueryWrapper<PersonaChatSession>().eq("visitor_user_id", userId));
+        for (PersonaChatSession ps : personaSessions) {
+            personaChatMessageMapper.delete(new QueryWrapper<PersonaChatMessage>().eq("session_id", ps.id));
+        }
+        personaChatSessionMapper.delete(new QueryWrapper<PersonaChatSession>().eq("visitor_user_id", userId));
 
-        // Delete emotion timeline
-        QueryWrapper<EmotionTimeline> etlQuery = new QueryWrapper<>();
-        etlQuery.eq("user_id", userId);
-        emotionTimelineMapper.delete(etlQuery);
+        // Belief patterns
+        beliefPatternMapper.delete(new QueryWrapper<BeliefPattern>().eq("user_id", userId));
 
-        // Delete emotion traces
-        QueryWrapper<EmotionTrace> etQuery = new QueryWrapper<>();
-        etQuery.eq("user_id", userId);
-        emotionTraceMapper.delete(etQuery);
+        // Relation mentions
+        relationMentionMapper.delete(new QueryWrapper<RelationMention>().eq("user_id", userId));
 
-        // Delete dialog messages first (foreign key constraint)
-        QueryWrapper<DialogSession> dsQuery = new QueryWrapper<>();
-        dsQuery.eq("user_id", userId);
-        List<DialogSession> sessions = dialogSessionMapper.selectList(dsQuery);
+        // Event cards
+        eventCardMapper.delete(new QueryWrapper<EventCard>().eq("user_id", userId));
+
+        // Memory themes
+        memoryThemeMapper.delete(new QueryWrapper<MemoryTheme>().eq("user_id", userId));
+
+        // Voice transcriptions
+        voiceTranscriptionMapper.delete(new QueryWrapper<VoiceTranscription>().eq("user_id", userId));
+
+        // Weekly reviews
+        weeklyReviewMapper.delete(new QueryWrapper<WeeklyReview>().eq("user_id", userId));
+
+        // User corrections
+        userCorrectionMapper.delete(new QueryWrapper<UserCorrection>().eq("user_id", userId));
+
+        // Dialog summaries (by session)
+        List<DialogSession> sessions = dialogSessionMapper.selectList(
+                new QueryWrapper<DialogSession>().eq("user_id", userId));
         for (DialogSession session : sessions) {
-            QueryWrapper<DialogMessage> dmQuery = new QueryWrapper<>();
-            dmQuery.eq("session_id", session.id);
-            dialogMessageMapper.delete(dmQuery);
+            dialogSummaryMapper.delete(new QueryWrapper<DialogSummary>().eq("session_id", session.id));
         }
 
-        // Delete dialog sessions
-        dialogSessionMapper.delete(dsQuery);
+        // Thought fragments, emotion timeline, emotion traces
+        thoughtFragmentMapper.delete(new QueryWrapper<ThoughtFragment>().eq("user_id", userId));
+        emotionTimelineMapper.delete(new QueryWrapper<EmotionTimeline>().eq("user_id", userId));
+        emotionTraceMapper.delete(new QueryWrapper<EmotionTrace>().eq("user_id", userId));
 
-        // Delete memory cards
-        QueryWrapper<MemoryCard> mcQuery = new QueryWrapper<>();
-        mcQuery.eq("user_id", userId);
-        memoryCardMapper.delete(mcQuery);
+        // Dialog messages then sessions (FK cascade also covers messages)
+        for (DialogSession session : sessions) {
+            dialogMessageMapper.delete(new QueryWrapper<DialogMessage>().eq("session_id", session.id));
+        }
+        dialogSessionMapper.delete(new QueryWrapper<DialogSession>().eq("user_id", userId));
 
-        // Delete daily records
-        QueryWrapper<DailyRecord> drQuery = new QueryWrapper<>();
-        drQuery.eq("user_id", userId);
-        dailyRecordMapper.delete(drQuery);
+        // Memory cards (FK cascade deletes thought fragments, but already cleaned above)
+        memoryCardMapper.delete(new QueryWrapper<MemoryCard>().eq("user_id", userId));
 
-        // Delete todos
-        QueryWrapper<TodoItem> tiQuery = new QueryWrapper<>();
-        tiQuery.eq("user_id", userId);
-        todoItemMapper.delete(tiQuery);
+        // Daily records, todos
+        dailyRecordMapper.delete(new QueryWrapper<DailyRecord>().eq("user_id", userId));
+        todoItemMapper.delete(new QueryWrapper<TodoItem>().eq("user_id", userId));
 
-        // Delete slow letters
-        QueryWrapper<SlowLetter> slQuery = new QueryWrapper<>();
-        slQuery.eq("sender_user_id", userId).or().eq("receiver_user_id", userId);
-        slowLetterMapper.delete(slQuery);
+        // Slow letters (FK cascade deletes letter_status_log)
+        slowLetterMapper.delete(new QueryWrapper<SlowLetter>()
+                .eq("sender_user_id", userId).or().eq("receiver_user_id", userId));
 
-        // Delete echo capsules
-        QueryWrapper<EchoCapsule> ecQuery = new QueryWrapper<>();
-        ecQuery.eq("owner_user_id", userId);
-        echoCapsuleMapper.delete(ecQuery);
+        // Letter threads
+        letterThreadMapper.delete(new QueryWrapper<LetterThread>()
+                .eq("participant_a", userId).or().eq("participant_b", userId));
 
-        // Delete user profile
-        QueryWrapper<UserProfile> upQuery = new QueryWrapper<>();
-        upQuery.eq("user_id", userId);
-        userProfileMapper.delete(upQuery);
+        // Echo capsules (FK cascade deletes capsule_boundary, authorized_memory_ref)
+        echoCapsuleMapper.delete(new QueryWrapper<EchoCapsule>().eq("owner_user_id", userId));
+
+        // Friend relations
+        friendRelationMapper.delete(new QueryWrapper<FriendRelation>()
+                .eq("requester_id", userId).or().eq("addressee_id", userId));
+
+        // Block relations
+        blockRelationMapper.delete(new QueryWrapper<BlockRelation>()
+                .eq("blocker_user_id", userId).or().eq("blocked_user_id", userId));
+
+        // Social groups and memberships
+        socialGroupMemberMapper.delete(new QueryWrapper<SocialGroupMember>().eq("user_id", userId));
+        socialGroupMapper.delete(new QueryWrapper<SocialGroup>().eq("owner_user_id", userId));
+
+        // Safety events, AI logs, A/B test metrics
+        safetyEventMapper.delete(new QueryWrapper<SafetyEvent>().eq("user_id", userId));
+        aiInteractionLogMapper.delete(new QueryWrapper<AiInteractionLog>().eq("user_id", userId));
+        abTestMetricsMapper.delete(new QueryWrapper<ABTestMetrics>().eq("user_id", userId));
+
+        // Report records (filed by this user)
+        reportRecordMapper.delete(new QueryWrapper<ReportRecord>().eq("reporter_user_id", userId));
+
+        // User profile
+        userProfileMapper.delete(new QueryWrapper<UserProfile>().eq("user_id", userId));
 
         // Finally delete user account
         userMapper.deleteById(userId);

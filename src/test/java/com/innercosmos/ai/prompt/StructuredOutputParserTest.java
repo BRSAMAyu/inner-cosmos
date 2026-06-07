@@ -10,9 +10,13 @@ class StructuredOutputParserTest {
     void parsesJsonFromMarkdownAndDirtyText() {
         Sample markdown = StructuredOutputParser.parse("```json\n{\"value\":\"ok\"}\n```", Sample.class);
         Sample dirty = StructuredOutputParser.parse("before {\"value\":\"wrapped\"} after", Sample.class);
+        Sample reasoning = StructuredOutputParser.parse("<think>hidden</think>{\"value\":\"clean\"}", Sample.class);
+        Sample arrayWrapped = StructuredOutputParser.parse("[{\"value\":\"single\"}]", Sample.class);
 
         assertEquals("ok", markdown.value);
         assertEquals("wrapped", dirty.value);
+        assertEquals("clean", reasoning.value);
+        assertEquals("single", arrayWrapped.value);
     }
 
     @Test

@@ -1,0 +1,113 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - link "跳到主要内容" [ref=e3] [cursor=pointer]:
+      - /url: "#main"
+    - generic [ref=e4]:
+      - link "Inner Cosmos" [ref=e5] [cursor=pointer]:
+        - /url: /pages/dashboard.html
+        - generic [ref=e6]: Inner Cosmos
+      - navigation "主导航" [ref=e7]:
+        - link "核心" [ref=e8] [cursor=pointer]:
+          - /url: /pages/dashboard.html
+        - link "Aurora" [ref=e9] [cursor=pointer]:
+          - /url: /pages/aurora-chat.html
+        - link "记录" [ref=e10] [cursor=pointer]:
+          - /url: /pages/daily-record.html
+        - link "日记" [ref=e11] [cursor=pointer]:
+          - /url: /pages/heart-diary.html
+        - link "星图" [ref=e12] [cursor=pointer]:
+          - /url: /pages/memory-starfield.html
+        - link "待办" [ref=e13] [cursor=pointer]:
+          - /url: /pages/todo.html
+        - link "星海" [ref=e14] [cursor=pointer]:
+          - /url: /pages/echo-plaza.html
+        - link "好友" [ref=e15] [cursor=pointer]:
+          - /url: /pages/social.html
+        - link "慢信" [ref=e16] [cursor=pointer]:
+          - /url: /pages/slow-letter.html
+        - link "信箱" [ref=e17] [cursor=pointer]:
+          - /url: /pages/inbox.html
+        - link "时间轴" [ref=e18] [cursor=pointer]:
+          - /url: /pages/timeline.html
+        - link "情绪" [ref=e19] [cursor=pointer]:
+          - /url: /pages/emotion-timeline.html
+        - link "主题" [ref=e20] [cursor=pointer]:
+          - /url: /pages/themes.html
+        - link "关系" [ref=e21] [cursor=pointer]:
+          - /url: /pages/relations.html
+        - link "信念" [ref=e22] [cursor=pointer]:
+          - /url: /pages/beliefs.html
+        - link "避风港" [ref=e23] [cursor=pointer]:
+          - /url: /pages/safety-harbor.html
+        - link "设置" [ref=e24] [cursor=pointer]:
+          - /url: /pages/settings.html
+        - link "管理" [ref=e25] [cursor=pointer]:
+          - /url: /pages/admin.html
+      - button "主题：自动跟随系统" [ref=e26] [cursor=pointer]: ◐
+    - generic [ref=e27]:
+      - generic [ref=e28]:
+        - generic [ref=e29]: 成长轨迹
+        - heading "成长时间轴" [level=1] [ref=e30]
+        - paragraph [ref=e31]: 这里不是列表，而是 Aurora 和你的日记、对话、记忆共同沉淀出的时间轨迹。
+      - generic [ref=e32]:
+        - textbox [ref=e33]
+        - button "全部" [ref=e34] [cursor=pointer]
+    - generic [ref=e35]:
+      - heading "主题迁移" [level=2] [ref=e36]
+      - generic [ref=e37]:
+        - generic "真实 AI 与非模板体验" [ref=e38]
+        - generic "任务压力与行动入口" [ref=e39]
+        - generic "被认真理解的关系" [ref=e40]
+      - paragraph [ref=e41]: 真实 AI / 任务压力与行 / 被认真理解的
+    - generic [ref=e42]:
+      - article [ref=e43]:
+        - generic [ref=e44]: 2026-06-07
+        - generic [ref=e46]:
+          - generic [ref=e47]:
+            - heading "把模板感改成真实感" [level=3] [ref=e48]
+            - generic [ref=e49]: 云
+          - paragraph [ref=e50]: Aurora 观察到你今天更需要一个可验证的真实闭环，而不是新的概念。
+          - generic [ref=e51]:
+            - generic [ref=e52]: CLOUDY
+            - generic [ref=e53]: 待办线索
+            - generic [ref=e54]: 适合编织共鸣体
+          - generic [ref=e55]:
+            - link "查看当日" [ref=e56] [cursor=pointer]:
+              - /url: /pages/daily-record.html
+            - link "跳到星图" [ref=e57] [cursor=pointer]:
+              - /url: /pages/memory-starfield.html
+      - article [ref=e58]:
+        - generic [ref=e59]: 2026-06-06
+        - generic [ref=e61]:
+          - generic [ref=e62]:
+            - heading "关系里的未说出口" [level=3] [ref=e63]
+            - generic [ref=e64]: 雨
+          - paragraph [ref=e65]: Aurora 建议先把话写下来，不急着发送。
+          - generic [ref=e66]:
+            - generic [ref=e67]: RAINY
+            - generic [ref=e68]: 待办线索
+            - generic [ref=e69]: 适合编织共鸣体
+          - generic [ref=e70]:
+            - link "查看当日" [ref=e71] [cursor=pointer]:
+              - /url: /pages/daily-record.html
+            - link "跳到星图" [ref=e72] [cursor=pointer]:
+              - /url: /pages/memory-starfield.html
+      - article [ref=e73]:
+        - generic [ref=e74]: 2026-06-05
+        - generic [ref=e76]:
+          - generic [ref=e77]:
+            - heading "黄昏让身体先恢复" [level=3] [ref=e78]
+            - generic [ref=e79]: 晴
+          - paragraph [ref=e80]: Aurora 记住了黄昏散步对你有用。
+          - generic [ref=e81]:
+            - generic [ref=e82]: CLEAR
+            - generic [ref=e83]: 待办线索
+            - generic [ref=e84]: 适合编织共鸣体
+          - generic [ref=e85]:
+            - link "查看当日" [ref=e86] [cursor=pointer]:
+              - /url: /pages/daily-record.html
+            - link "跳到星图" [ref=e87] [cursor=pointer]:
+              - /url: /pages/memory-starfield.html
+  - generic [ref=e88]:
+    - button "❚❚" [ref=e89] [cursor=pointer]
+    - button "◐" [ref=e90] [cursor=pointer]

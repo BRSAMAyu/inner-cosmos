@@ -30,10 +30,11 @@
   </style>
 </head>
 <body>
-<main class="shell">
+<main id="main" class="shell">
+  <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
   <span class="route-hint">你与他人</span>
-  <h1>关系温度图</h1>
+  <h1 id="page-title">关系温度图</h1>
   <p class="muted mb-2">你在 Inner Cosmos 中提到过的人会在这里浮现。中心是"我"，每条连线的温度来自你提到这个人时的情绪强度。</p>
 
   <section class="panel">
@@ -43,6 +44,11 @@
   </section>
 
   <section class="rel-legend" id="legend"></section>
+
+  <section class="panel mt-2" id="highEmotionPanel" style="display:none">
+    <h2>高情绪关系</h2>
+    <div id="highEmotionList" class="timeline"></div>
+  </section>
 
   <section class="panel mt-2" id="detail" style="display:none">
     <h2 id="detailTitle"></h2>
@@ -61,15 +67,31 @@ IC.ensureDemoLogin().then(load);
 
 let allRelations = [];
 let allStats = {};
+let highEmotionRelations = [];
 
 function esc(t) { return IC.esc(t); }
 
 async function load() {
-  const [relRes, statRes] = await Promise.all([API.relationList(), API.relationStats()]);
+  const [relRes, statRes, highRes] = await Promise.all([API.relationList(), API.relationStats(), API.relationHighEmotion()]);
   allRelations = (relRes.success ? relRes.data : []) || [];
   allStats = (statRes.success ? statRes.data : {}) || {};
+  highEmotionRelations = (highRes.success ? highRes.data : []) || [];
   renderGraph();
   renderLegend();
+  renderHighEmotion();
+}
+
+function renderHighEmotion() {
+  const panel = document.getElementById("highEmotionPanel");
+  const list = document.getElementById("highEmotionList");
+  if (!highEmotionRelations.length) { panel.style.display = "none"; return; }
+  panel.style.display = "block";
+  list.innerHTML = highEmotionRelations.slice(0, 6).map(r => `
+    <article class="timeline-item" onclick="selectNode('${esc(r.relationLabel || r.label || "")}')">
+      <strong>${esc(r.relationLabel || r.label || "未命名关系")}</strong>
+      <p class="muted">强度 ${Number(r.emotionScore || r.intensity || 0).toFixed(1)} · ${esc(r.triggerSummary || r.scene || "最近触发")}</p>
+    </article>
+  `).join("");
 }
 
 function renderGraph() {
@@ -141,7 +163,9 @@ async function selectNode(label) {
   document.getElementById("detailTitle").textContent = label;
   const triggers = allRelations.filter(r => (r.relationLabel || r.label) === label);
   const healthResp = await API.relationHealth(label);
+  const timelineResp = await API.relationTimeline(label);
   const health = (healthResp.success ? healthResp.data : null);
+  const timeline = (timelineResp.success ? timelineResp.data : []) || [];
   document.getElementById("detailBody").innerHTML = `
     ${health ? `<p class="muted">关系健康度 <strong>${(health.healthScore * 100).toFixed(0)}%</strong>（0=消耗、100=滋养）</p>` : ""}
     <h3 class="mt-2">最近 5 次提及</h3>
@@ -153,9 +177,19 @@ async function selectNode(label) {
         </article>
       `).join("") || "<p class='muted'>尚无触发记录</p>"}
     </div>
+    <h3 class="mt-2">关系时间线</h3>
+    <div class="timeline">
+      ${timeline.slice(0, 8).map(t => `
+        <article class="timeline-item">
+          <strong>${esc(t.date || t.createdAt || "时间线节点")}</strong>
+          <p class="muted">${esc(t.summary || t.triggerSummary || t.scene || "")}</p>
+        </article>
+      `).join("") || "<p class='muted'>暂无关系时间线</p>"}
+    </div>
   `;
   IC.pulse("soft");
 }
+IC.hideLoading();
 </script>
 </body>
 </html>

@@ -26,11 +26,19 @@ public class LetterDeliveryJob {
         query.eq("status", "SENT")
                 .le("estimated_arrival_at", LocalDateTime.now());
         List<SlowLetter> letters = letterMapper.selectList(query);
+        int delivered = 0;
         for (SlowLetter letter : letters) {
-            letter.status = "DELIVERED";
-            letter.deliveredAt = LocalDateTime.now();
-            letterMapper.updateById(letter);
-            log.info("Slow letter {} delivered", letter.id);
+            try {
+                letter.status = "DELIVERED";
+                letter.deliveredAt = LocalDateTime.now();
+                letterMapper.updateById(letter);
+                delivered++;
+            } catch (Exception e) {
+                log.error("Failed to deliver letter {}: {}", letter.id, e.getMessage(), e);
+            }
+        }
+        if (delivered > 0) {
+            log.info("Delivered {} of {} letters", delivered, letters.size());
         }
     }
 }

@@ -7,6 +7,7 @@ import com.innercosmos.ai.portrait.UserPortraitService;
 import com.innercosmos.ai.portrait.AgentUserRelationshipService;
 import com.innercosmos.ai.portrait.dto.PortraitDeltas;
 import com.innercosmos.ai.self.SelfReflectionTrigger;
+import com.innercosmos.service.AuroraSelfContinuityService;
 import com.innercosmos.entity.AgentUserRelationship;
 import com.innercosmos.entity.DialogMessage;
 import com.innercosmos.entity.DialogSession;
@@ -63,6 +64,8 @@ public class SessionCloser {
 
     @Autowired
     private SelfReflectionTrigger selfReflectionTrigger;
+    @Autowired(required = false)
+    private com.innercosmos.service.AuroraSelfContinuityService continuityService;
 
     @Async
     public void runAfterGoodbye(Long userId, Long sessionId, String goodbyeStrength) {
@@ -161,6 +164,9 @@ public class SessionCloser {
     private void updateRelationship(Long userId, List<DialogMessage> messages, PortraitDeltas portraitDeltas) {
         try {
             var rel = relSvc.getOrInit(userId);
+            int prevIntimacy = rel.intimacyLevel;
+            int prevTrust = rel.trustLevel;
+
             // Update based on session characteristics
             long userMsgCount = messages.stream().filter(m -> "USER".equals(m.speaker)).count();
             long auroraMsgCount = messages.stream().filter(m -> "AURORA".equals(m.speaker)).count();
@@ -177,6 +183,24 @@ public class SessionCloser {
                 rel.userDisclosureLevel = Math.min(100, rel.userDisclosureLevel + 2);
             }
             relMapper.updateById(rel);
+
+            // M0-M7 Fix: trigger relationship milestone on threshold crossing
+            if (continuityService != null) {
+                // Detect intimacy milestone (every 20 points)
+                int intimacyStep = prevIntimacy / 20;
+                int newIntimacyStep = rel.intimacyLevel / 20;
+                if (newIntimacyStep > intimacyStep && newIntimacyStep > 0) {
+                    continuityService.onRelationshipMilestone(userId,
+                        "intimacy_level_" + rel.intimacyLevel);
+                }
+                // Detect trust milestone (every 20 points)
+                int trustStep = prevTrust / 20;
+                int newTrustStep = rel.trustLevel / 20;
+                if (newTrustStep > trustStep && newTrustStep > 0) {
+                    continuityService.onRelationshipMilestone(userId,
+                        "trust_level_" + rel.trustLevel);
+                }
+            }
         } catch (Exception e) {
             log.warn("Failed to update relationship: {}", e.getMessage());
         }

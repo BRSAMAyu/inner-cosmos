@@ -354,6 +354,28 @@ window.ICMotion = {
   // Initialize motion system
   init() {
     if (this.initialized) return;
+    /* ════════ Respect prefers-reduced-motion (P3-2) ════════ */
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      window.__icMotionDisabled = true;
+      this.initialized = true;  // mark loaded so we don't re-check
+      return;
+    }
+    /* Live toggle: if user changes preference mid-session, reactivate */
+    if (window.matchMedia) {
+      const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+      const onChange = (e) => {
+        if (e.matches) {
+          window.__icMotionDisabled = true;
+          this.teardownMotion();
+        } else if (window.__icMotionDisabled) {
+          window.__icMotionDisabled = false;
+          this.initialized = false;
+          this.init();
+        }
+      };
+      if (mq.addEventListener) mq.addEventListener('change', onChange);
+      else if (mq.addListener) mq.addListener(onChange);
+    }
     this.initialized = true;
     // Add motion CSS
     this.injectMotionCSS();
@@ -410,6 +432,15 @@ window.ICMotion = {
         });
       }
     };
+  },
+
+  /* Teardown: stop all RAF loops and remove injected DOM. Used by prefers-reduced-motion. */
+  teardownMotion() {
+    if (this.cursorDot) { this.cursorDot.remove(); this.cursorDot = null; }
+    if (this.cursorRing) { this.cursorRing.remove(); this.cursorRing = null; }
+    if (this.cursorTrails) { this.cursorTrails.forEach(t => t.remove && t.remove()); this.cursorTrails = []; }
+    document.querySelectorAll('.flowing-inkwash, .scroll-progress, .flow-cursor-dot, .flow-cursor-ring').forEach(el => el.remove());
+    document.body.classList.remove('cursor-active', 'flow-page-enter', 'flow-page-ready', 'flow-page-leave');
   },
 
   // Initialize scroll progress indicator

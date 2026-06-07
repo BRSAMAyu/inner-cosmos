@@ -756,6 +756,7 @@ CREATE TABLE IF NOT EXISTS tb_aurora_self_reflection (
   confidence DOUBLE DEFAULT 0.5,
   status VARCHAR(32) NOT NULL DEFAULT 'light',
   risk_flags TEXT,
+  evidence_refs TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_reflection_user (user_id),
   INDEX idx_reflection_status (status)

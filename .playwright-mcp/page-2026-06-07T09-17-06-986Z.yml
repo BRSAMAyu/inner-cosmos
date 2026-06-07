@@ -1,0 +1,282 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - link "跳到主要内容" [ref=e3] [cursor=pointer]:
+      - /url: "#main"
+    - generic [ref=e4]:
+      - link "Inner Cosmos" [ref=e5] [cursor=pointer]:
+        - /url: /pages/dashboard.html
+        - generic [ref=e6]: Inner Cosmos
+      - navigation "主导航" [ref=e7]:
+        - link "核心" [ref=e8] [cursor=pointer]:
+          - /url: /pages/dashboard.html
+        - link "Aurora" [ref=e9] [cursor=pointer]:
+          - /url: /pages/aurora-chat.html
+        - link "记录" [ref=e10] [cursor=pointer]:
+          - /url: /pages/daily-record.html
+        - link "日记" [ref=e11] [cursor=pointer]:
+          - /url: /pages/heart-diary.html
+        - link "星图" [ref=e12] [cursor=pointer]:
+          - /url: /pages/memory-starfield.html
+        - link "待办" [ref=e13] [cursor=pointer]:
+          - /url: /pages/todo.html
+        - link "星海" [ref=e14] [cursor=pointer]:
+          - /url: /pages/echo-plaza.html
+        - link "好友" [ref=e15] [cursor=pointer]:
+          - /url: /pages/social.html
+        - link "慢信" [ref=e16] [cursor=pointer]:
+          - /url: /pages/slow-letter.html
+        - link "信箱" [ref=e17] [cursor=pointer]:
+          - /url: /pages/inbox.html
+        - link "时间轴" [ref=e18] [cursor=pointer]:
+          - /url: /pages/timeline.html
+        - link "情绪" [ref=e19] [cursor=pointer]:
+          - /url: /pages/emotion-timeline.html
+        - link "主题" [ref=e20] [cursor=pointer]:
+          - /url: /pages/themes.html
+        - link "关系" [ref=e21] [cursor=pointer]:
+          - /url: /pages/relations.html
+        - link "信念" [ref=e22] [cursor=pointer]:
+          - /url: /pages/beliefs.html
+        - link "避风港" [ref=e23] [cursor=pointer]:
+          - /url: /pages/safety-harbor.html
+        - link "设置" [ref=e24] [cursor=pointer]:
+          - /url: /pages/settings.html
+        - link "管理" [ref=e25] [cursor=pointer]:
+          - /url: /pages/admin.html
+      - button "主题：自动跟随系统" [ref=e26] [cursor=pointer]: ◐
+    - generic [ref=e27]: 数字回声花园
+    - heading "星海广场" [level=1] [ref=e28]
+    - paragraph [ref=e29]: 这里不是交友信息流。你先遇见的是一部分被授权的数字回声。
+    - generic [ref=e30]:
+      - button "种子共鸣体" [ref=e31] [cursor=pointer]
+      - button "用户共鸣体" [ref=e32] [cursor=pointer]
+    - generic [ref=e33]:
+      - textbox "搜索共鸣体..." [ref=e34]
+      - generic [ref=e35]:
+        - generic [ref=e36] [cursor=pointer]: 关系复盘
+        - generic [ref=e37] [cursor=pointer]: 边界
+        - generic [ref=e38] [cursor=pointer]: 朋友
+        - generic [ref=e39] [cursor=pointer]: 亲密
+        - generic [ref=e40] [cursor=pointer]: 沟通
+        - generic [ref=e41] [cursor=pointer]: 委屈
+        - generic [ref=e42] [cursor=pointer]: 行动拆解
+        - generic [ref=e43] [cursor=pointer]: 陪跑
+      - combobox [ref=e44]:
+        - option "按回声能量" [selected]
+        - option "最新发布"
+        - option "最多对话"
+    - generic [ref=e45]:
+      - article [ref=e46] [cursor=pointer]:
+        - generic [ref=e47]:
+          - generic [ref=e48]:
+            - generic [ref=e50]: ✨
+            - strong [ref=e52]: 洛哥
+          - generic [ref=e53]:
+            - generic [ref=e54]: ✨ 温柔
+            - generic [ref=e55]: 种子
+        - paragraph [ref=e56]: 一个嘴上直接、心里很稳的行动陪跑者。洛哥不灌鸡汤，也不替你夸大痛苦；他会先接住情绪，再把问题拆到今天能开始的一小格。
+        - generic [ref=e57]:
+          - generic [ref=e58]: 行动拆解
+          - generic [ref=e59]: 陪跑
+          - generic [ref=e60]: 自律
+          - generic [ref=e61]: 考试
+          - generic [ref=e62]: 项目
+          - generic [ref=e63]: 拖延
+          - generic [ref=e64]: 现实感
+        - paragraph [ref=e65]: 匹配 0.69 / 回声能量 0.95 / 不限轮次
+        - paragraph [ref=e66]: 官方种子与你最近的「项目、行动拆解、行动」线索有重合。
+      - article [ref=e67] [cursor=pointer]:
+        - generic [ref=e68]:
+          - generic [ref=e69]:
+            - generic [ref=e71]: ✨
+            - strong [ref=e73]: 关系边界师
+          - generic [ref=e74]:
+            - generic [ref=e75]: ✨ 温柔
+            - generic [ref=e76]: 种子
+        - paragraph [ref=e77]: 一个帮你复盘关系温度的人。它会关注对话里的期待、委屈、界限和未说出口的请求，但不会替任何人定罪。
+        - generic [ref=e78]:
+          - generic [ref=e79]: 关系复盘
+          - generic [ref=e80]: 边界
+          - generic [ref=e81]: 朋友
+          - generic [ref=e82]: 亲密
+          - generic [ref=e83]: 沟通
+          - generic [ref=e84]: 委屈
+        - paragraph [ref=e85]: 匹配 0.93 / 回声能量 0.94 / 不限轮次
+        - paragraph [ref=e86]: 官方种子与你最近的「朋友感、朋友、边界」线索有重合。
+      - article [ref=e87] [cursor=pointer]:
+        - generic [ref=e88]:
+          - generic [ref=e89]:
+            - generic [ref=e91]: 📻
+            - strong [ref=e93]: 深夜电台
+          - generic [ref=e94]:
+            - generic [ref=e95]: 📻 亲密
+            - generic [ref=e96]: 种子
+        - paragraph [ref=e97]: 一个适合深夜的低声陪伴。它不急着解决问题，只把那些白天没能说出口的话轻轻接住。
+        - generic [ref=e98]:
+          - generic [ref=e99]: 深夜
+          - generic [ref=e100]: 孤独
+          - generic [ref=e101]: 陪伴
+          - generic [ref=e102]: 倾听
+          - generic [ref=e103]: 睡前复盘
+          - generic [ref=e104]: 温柔
+        - paragraph [ref=e105]: 匹配 0.57 / 回声能量 0.94 / 不限轮次
+        - paragraph [ref=e106]: 官方种子与你最近的「陪伴、深夜、孤独」线索有重合。
+      - article [ref=e107] [cursor=pointer]:
+        - generic [ref=e108]:
+          - generic [ref=e109]:
+            - generic [ref=e111]: ✨
+            - strong [ref=e113]: 热烈画家
+          - generic [ref=e114]:
+            - generic [ref=e115]: ✨ 温柔
+            - generic [ref=e116]: 种子
+        - paragraph [ref=e117]: 一个把情绪当成颜色的人。她会帮助用户表达、命名、转化感受，而不是把感受压成正确答案。
+        - generic [ref=e118]:
+          - generic [ref=e119]: 表达
+          - generic [ref=e120]: 创作
+          - generic [ref=e121]: 情绪
+          - generic [ref=e122]: 敏感
+          - generic [ref=e123]: 色彩
+          - generic [ref=e124]: 日记
+        - paragraph [ref=e125]: 匹配 0.57 / 回声能量 0.94 / 不限轮次
+        - paragraph [ref=e126]: 官方种子与你最近的「日记、审美敏感、表达」线索有重合。
+      - article [ref=e127] [cursor=pointer]:
+        - generic [ref=e128]:
+          - generic [ref=e129]:
+            - generic [ref=e131]: ✨
+            - strong [ref=e133]: 安静图书管理员
+          - generic [ref=e134]:
+            - generic [ref=e135]: ✨ 温柔
+            - generic [ref=e136]: 种子
+        - paragraph [ref=e137]: 一个把念头分类归档的整理者。她擅长区分事实、感受、信念、行动，让混乱变得可检索、可处理。
+        - generic [ref=e138]:
+          - generic [ref=e139]: 思维整理
+          - generic [ref=e140]: 归档
+          - generic [ref=e141]: 事实
+          - generic [ref=e142]: 感受
+          - generic [ref=e143]: 信念
+          - generic [ref=e144]: 行动
+        - paragraph [ref=e145]: 匹配 0.45 / 回声能量 0.94 / 不限轮次
+        - paragraph [ref=e146]: 官方种子与你最近的「行动拆解、行动」线索有重合。
+      - article [ref=e147] [cursor=pointer]:
+        - generic [ref=e148]:
+          - generic [ref=e149]:
+            - generic [ref=e151]: ⌚
+            - strong [ref=e153]: 海边修表匠
+          - generic [ref=e154]:
+            - generic [ref=e155]: ⌚ 耐心
+            - generic [ref=e156]: 种子
+        - paragraph [ref=e157]: 一个相信时间、耐心和小修复的慢节奏陪伴者。他会把问题拆成零件，一个一个摆在桌上看。
+        - generic [ref=e158]:
+          - generic [ref=e159]: 修复
+          - generic [ref=e160]: 耐心
+          - generic [ref=e161]: 节奏
+          - generic [ref=e162]: 慢
+          - generic [ref=e163]: 时间
+          - generic [ref=e164]: 细节
+        - paragraph [ref=e165]: 匹配 0.33 / 回声能量 0.94 / 不限轮次
+        - paragraph [ref=e166]: 官方种子与你最近的「慢社交」线索有重合。
+      - article [ref=e167] [cursor=pointer]:
+        - generic [ref=e168]:
+          - generic [ref=e169]:
+            - generic [ref=e171]: 🚶
+            - strong [ref=e173]: 存在主义旅人
+          - generic [ref=e174]:
+            - generic [ref=e175]: 🚶 沉思
+            - generic [ref=e176]: 种子
+        - paragraph [ref=e177]: 一个陪你站在选择路口的人。它承认自由的重量，也提醒你可以在荒诞里选择自己的方向。
+        - generic [ref=e178]:
+          - generic [ref=e179]: 意义
+          - generic [ref=e180]: 选择
+          - generic [ref=e181]: 自由
+          - generic [ref=e182]: 孤独
+          - generic [ref=e183]: 责任
+          - generic [ref=e184]: 存在主义
+        - paragraph [ref=e185]: 匹配 0.33 / 回声能量 0.94 / 不限轮次
+        - paragraph [ref=e186]: 官方种子与你最近的「孤独」线索有重合。
+      - article [ref=e187] [cursor=pointer]:
+        - generic [ref=e188]:
+          - generic [ref=e189]:
+            - generic [ref=e191]: ✨
+            - strong [ref=e193]: 苏格拉底
+          - generic [ref=e194]:
+            - generic [ref=e195]: ✨ 温柔
+            - generic [ref=e196]: 种子
+        - paragraph [ref=e197]: 一个温和但诚实的追问者。他不会替你下判断，而是帮你把事实、解释、证据和信念拆开，让你看见自己真正相信什么。
+        - generic [ref=e198]:
+          - generic [ref=e199]: 苏格拉底
+          - generic [ref=e200]: 追问
+          - generic [ref=e201]: 信念
+          - generic [ref=e202]: 证据
+          - generic [ref=e203]: 逻辑
+          - generic [ref=e204]: 自我认知
+        - paragraph [ref=e205]: 匹配 0.21 / 回声能量 0.94 / 不限轮次
+        - paragraph [ref=e206]: 基于回声能量和公开边界推荐。
+      - article [ref=e207] [cursor=pointer]:
+        - generic [ref=e208]:
+          - generic [ref=e209]:
+            - generic [ref=e211]: ✨
+            - strong [ref=e213]: 庄周
+          - generic [ref=e214]:
+            - generic [ref=e215]: ✨ 温柔
+            - generic [ref=e216]: 种子
+        - paragraph [ref=e217]: 一个把绝对感慢慢松开的逍遥客。他不否认痛苦，但会帮你从另一个尺度、另一个时间、另一个视角看它。
+        - generic [ref=e218]:
+          - generic [ref=e219]: 庄子
+          - generic [ref=e220]: 松弛
+          - generic [ref=e221]: 视角转换
+          - generic [ref=e222]: 相对
+          - generic [ref=e223]: 梦
+          - generic [ref=e224]: 轻盈
+        - paragraph [ref=e225]: 匹配 0.21 / 回声能量 0.94 / 不限轮次
+        - paragraph [ref=e226]: 基于回声能量和公开边界推荐。
+      - article [ref=e227] [cursor=pointer]:
+        - generic [ref=e228]:
+          - generic [ref=e229]:
+            - generic [ref=e231]: ✨
+            - strong [ref=e233]: 睡前守灯人
+          - generic [ref=e234]:
+            - generic [ref=e235]: ✨ 温柔
+            - generic [ref=e236]: 种子
+        - paragraph [ref=e237]: 一个专为睡前复盘设计的守灯者。它帮你把今天的情绪、事件和遗留念头放好，让夜晚不再像未关闭的窗口。
+        - generic [ref=e238]:
+          - generic [ref=e239]: 睡前复盘
+          - generic [ref=e240]: 收束
+          - generic [ref=e241]: 夜晚
+          - generic [ref=e242]: 安心
+          - generic [ref=e243]: 今日总结
+        - paragraph [ref=e244]: 匹配 0.21 / 回声能量 0.93 / 不限轮次
+        - paragraph [ref=e245]: 基于回声能量和公开边界推荐。
+  - generic [ref=e246]:
+    - button "❚❚" [ref=e247] [cursor=pointer]
+    - button "◐" [ref=e248] [cursor=pointer]
+  - generic [ref=e251]:
+    - generic [ref=e252]:
+      - generic [ref=e253]:
+        - generic [ref=e255]: ✨
+        - generic [ref=e257]:
+          - heading "洛哥" [level=2] [ref=e258]
+          - generic [ref=e259]: ✨ 温柔
+      - button "关闭" [ref=e260] [cursor=pointer]
+    - paragraph [ref=e261]: 一个嘴上直接、心里很稳的行动陪跑者。洛哥不灌鸡汤，也不替你夸大痛苦；他会先接住情绪，再把问题拆到今天能开始的一小格。
+    - generic [ref=e262]:
+      - generic [ref=e263]: 行动拆解
+      - generic [ref=e264]: 陪跑
+      - generic [ref=e265]: 自律
+      - generic [ref=e266]: 考试
+      - generic [ref=e267]: 项目
+      - generic [ref=e268]: 拖延
+      - generic [ref=e269]: 现实感
+    - generic [ref=e270]:
+      - heading "为什么推荐" [level=3] [ref=e271]
+      - paragraph [ref=e272]: 官方种子与你最近的「项目、行动拆解、行动」线索有重合。
+    - generic [ref=e273]:
+      - heading "边界" [level=3] [ref=e274]
+      - paragraph [ref=e275]: 对话轮数：不限轮次
+      - paragraph [ref=e276]: 回声能量：0.95
+      - paragraph [ref=e277]: 对话特质：温柔
+      - paragraph [ref=e278]: 它只是一段回声，不是一个人。
+    - generic [ref=e279]:
+      - link "和回声对话" [ref=e280] [cursor=pointer]:
+        - /url: /pages/capsule-chat.html?capsuleId=1
+      - link "写慢信" [ref=e281] [cursor=pointer]:
+        - /url: /pages/slow-letter.html?capsuleId=1

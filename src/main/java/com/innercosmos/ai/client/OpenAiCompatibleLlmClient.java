@@ -4,15 +4,19 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.innercosmos.config.LlmConfig;
 import com.innercosmos.exception.AiProviderException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
 
 public class OpenAiCompatibleLlmClient implements LlmClient {
+    private static final Logger log = LoggerFactory.getLogger(OpenAiCompatibleLlmClient.class);
     private final LlmConfig config;
     private final RestClient restClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -32,12 +36,19 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
             return mockFallback.reply(request.prompt);
         }
         try {
+            List<Map<String, String>> messages = new ArrayList<>();
+            messages.add(Map.of("role", "system", "content", "你是 Inner Cosmos 的 Aurora.保持温柔、克制、安全边界."));
+            if (request.recentMessages != null) {
+                for (String recent : request.recentMessages) {
+                    if (recent != null && !recent.isBlank()) {
+                        messages.add(Map.of("role", "user", "content", "Context note: " + recent));
+                    }
+                }
+            }
+            messages.add(Map.of("role", "user", "content", request.prompt == null ? "" : request.prompt));
             Map<String, Object> payload = Map.of(
                     "model", config.model == null || config.model.isBlank() ? defaultModel(config.provider) : config.model,
-                    "messages", List.of(
-                            Map.of("role", "system", "content", "你是 Inner Cosmos 的 Aurora.保持温柔、克制、安全边界."),
-                            Map.of("role", "user", "content", request.prompt == null ? "" : request.prompt)
-                    ),
+                    "messages", messages,
                     "temperature", 0.7,
                     "stream", false
             );
@@ -52,6 +63,7 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
             JsonNode content = root.path("choices").path(0).path("message").path("content");
             return content.isMissingNode() ? mockFallback.reply(request.prompt) : content.asText();
         } catch (Exception exception) {
+            log.warn("OpenAI-compatible client ({}) chat failed, falling back to mock: {}", config.provider, exception.getMessage());
             return mockFallback.reply(request.prompt);
         }
     }
@@ -90,7 +102,8 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
     }
 
     private String escape(String token) {
-        return token.replace("\\", "\\\\").replace("\"", "\\\"");
+        return token.replace("\\", "\\\\").replace("\"", "\\\"")
+                .replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t");
     }
 
     private static class MockFallback {

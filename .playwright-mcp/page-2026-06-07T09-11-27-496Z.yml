@@ -1,0 +1,134 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - link "跳到主要内容" [ref=e3] [cursor=pointer]:
+      - /url: "#main"
+    - generic [ref=e4]:
+      - link "Inner Cosmos" [ref=e5] [cursor=pointer]:
+        - /url: /pages/dashboard.html
+        - generic [ref=e6]: Inner Cosmos
+      - navigation "主导航" [ref=e7]:
+        - link "核心" [ref=e8] [cursor=pointer]:
+          - /url: /pages/dashboard.html
+        - link "Aurora" [ref=e9] [cursor=pointer]:
+          - /url: /pages/aurora-chat.html
+        - link "记录" [ref=e10] [cursor=pointer]:
+          - /url: /pages/daily-record.html
+        - link "日记" [ref=e11] [cursor=pointer]:
+          - /url: /pages/heart-diary.html
+        - link "星图" [ref=e12] [cursor=pointer]:
+          - /url: /pages/memory-starfield.html
+        - link "待办" [ref=e13] [cursor=pointer]:
+          - /url: /pages/todo.html
+        - link "星海" [ref=e14] [cursor=pointer]:
+          - /url: /pages/echo-plaza.html
+        - link "好友" [ref=e15] [cursor=pointer]:
+          - /url: /pages/social.html
+        - link "慢信" [ref=e16] [cursor=pointer]:
+          - /url: /pages/slow-letter.html
+        - link "信箱" [ref=e17] [cursor=pointer]:
+          - /url: /pages/inbox.html
+        - link "时间轴" [ref=e18] [cursor=pointer]:
+          - /url: /pages/timeline.html
+        - link "情绪" [ref=e19] [cursor=pointer]:
+          - /url: /pages/emotion-timeline.html
+        - link "主题" [ref=e20] [cursor=pointer]:
+          - /url: /pages/themes.html
+        - link "关系" [ref=e21] [cursor=pointer]:
+          - /url: /pages/relations.html
+        - link "信念" [ref=e22] [cursor=pointer]:
+          - /url: /pages/beliefs.html
+        - link "避风港" [ref=e23] [cursor=pointer]:
+          - /url: /pages/safety-harbor.html
+        - link "设置" [ref=e24] [cursor=pointer]:
+          - /url: /pages/settings.html
+        - link "管理" [ref=e25] [cursor=pointer]:
+          - /url: /pages/admin.html
+      - button "主题：自动跟随系统" [ref=e26] [cursor=pointer]: ◐
+    - generic [ref=e27]:
+      - generic [ref=e28]: 人机协作过程
+      - heading "AI 共创记录" [level=1] [ref=e29]
+      - paragraph [ref=e30]: 这个项目的每一步，都是人类构思与 AI 执行共同完成的结果。
+    - generic [ref=e31]:
+      - heading "项目概述" [level=2] [ref=e32]
+      - paragraph [ref=e34]:
+        - strong [ref=e35]: Inner Cosmos 内宇宙
+        - text: — 一个 AI 自我共鸣与慢社交平台。帮助年轻人通过温和的自我整理，把混乱的内心体验沉淀成清晰的记忆星图。
+      - generic [ref=e36]:
+        - generic [ref=e37]: Spring Boot 3.3.6
+        - generic [ref=e38]: Java 17
+        - generic [ref=e39]: MyBatis-Plus 3.5.9
+        - generic [ref=e40]: H2 / MySQL
+        - generic [ref=e41]: Vanilla JS
+        - generic [ref=e42]: Morandi Design
+    - generic [ref=e43]:
+      - heading "6 种设计模式的落地" [level=2] [ref=e44]
+      - generic [ref=e45]:
+        - article [ref=e46]:
+          - strong [ref=e47]: Adapter 适配器
+          - paragraph [ref=e48]: LlmClient 接口统一 MiniMax、DeepSeek、GLM 三家模型，上层只看一个接口。
+          - generic [ref=e49]: ai/client/
+        - article [ref=e50]:
+          - strong [ref=e51]: Observer 观察者
+          - paragraph [ref=e52]: DialogFinishedEvent 发布后，MemoryExtractService 和 ThoughtShredder 各自独立响应。
+          - generic [ref=e53]: event/
+        - article [ref=e54]:
+          - strong [ref=e55]: State 状态机
+          - paragraph [ref=e56]: SlowLetter 的 10 种状态（DRAFT→SENT→FLYING→DELIVERED→READ→...），用 LetterState 接口严格约束转移。
+          - generic [ref=e57]: letterstate/
+        - article [ref=e58]:
+          - strong [ref=e59]: Builder 建造者
+          - paragraph [ref=e60]: PromptBuilder 链式构建 Aurora 的 system prompt，把系统边界、用户画像、记忆上下文分层叠加。
+          - generic [ref=e61]: ai/prompt/PromptBuilder.java
+        - article [ref=e62]:
+          - strong [ref=e63]: Strategy 策略
+          - paragraph [ref=e64]: AgentReplyStrategy 根据对话模式（日常聊天、认知梳理、行动拆解等）选择不同的回复策略。
+          - generic [ref=e65]: ai/agent/
+        - article [ref=e66]:
+          - strong [ref=e67]: Chain 责任链
+          - paragraph [ref=e68]: SafetyRule 链式检查用户输入，三级响应：LOW/MEDIUM/HIGH，高危输入直接阻断模型调用。
+          - generic [ref=e69]: safety/
+    - generic [ref=e70]:
+      - heading "关键工程决策" [level=2] [ref=e71]
+      - generic [ref=e72]:
+        - generic [ref=e73]:
+          - strong [ref=e74]: Mock-first AI 架构
+          - paragraph [ref=e75]: 课程环境无稳定 API Key，所有 AI 调用默认走 Mock 模板，配置真实 Key 后自动切换真实模型。Mock 内容经过精心撰写，不是占位符。
+        - generic [ref=e76]:
+          - strong [ref=e77]: MVC 严格分层
+          - paragraph [ref=e78]: Controller 只做参数校验和路由，Service 包含全部业务逻辑，Mapper 继承 MyBatis-Plus BaseMapper。VO/DTO 隔离内外数据结构。
+        - generic [ref=e79]:
+          - strong [ref=e80]: 安全边界设计
+          - paragraph [ref=e81]: AI 是镜子不是医生。SafetyBoundaryFilter 在模型调用前拦截；共鸣体是授权回声不是真人替代；慢信延迟机制防止即时情绪冲动。
+        - generic [ref=e82]:
+          - strong [ref=e83]: 情感重力算法
+          - paragraph [ref=e84]: MemoryCard 的 emotionalGravity = intensity * recurrence^0.7 * importance * (1 + triggers*0.1)，综合情绪强度、重复次数、用户评分、触发次数。不是简单计数。
+        - generic [ref=e85]:
+          - strong [ref=e86]: H2 演示 + MySQL 生产
+          - paragraph [ref=e87]: 默认 H2 内存数据库零配置启动，application.yml 中提供 MySQL 配置模板，切换只需改 spring.datasource.url。
+    - generic [ref=e88]:
+      - article [ref=e89]:
+        - heading "设计理念" [level=2] [ref=e90]
+        - generic [ref=e91]:
+          - paragraph [ref=e92]: 不是要让用户「变好」，而是提供一个安全的空间，让混乱的感受可以先被看见、被命名、被整理。
+          - paragraph [ref=e93]: 暖雾 Morandi 色系、缓慢的信件传递、非即时回复 — 每一个设计选择都在降低情绪压力。
+      - article [ref=e94]:
+        - heading "技术亮点" [level=2] [ref=e95]
+        - generic [ref=e96]:
+          - generic [ref=e97]:
+            - strong [ref=e98]: 31 张数据库表
+            - paragraph [ref=e99]: 完整的用户、记忆、情绪、信件、共鸣体、安全事件全表设计。
+          - generic [ref=e100]:
+            - strong [ref=e101]: 22 个页面
+            - paragraph [ref=e102]: 从首页到管理后台，统一 Morandi 设计语言，无框架依赖。
+          - generic [ref=e103]:
+            - strong [ref=e104]: 7 个集成测试
+            - paragraph [ref=e105]: 覆盖注册登录、对话、信件、共鸣体、安全检查、星图详情、LLM 回退全流程。
+          - generic [ref=e106]:
+            - strong [ref=e107]: 200+ AI 回复模板
+            - paragraph [ref=e108]: 6 种对话模式各有开场、承接、澄清模板，节律保护和现实引导独立模板。
+    - paragraph [ref=e110]: Built with Spring Boot 3 + Java 17 + MyBatis-Plus 3.5 + Vanilla JS
+  - generic [ref=e111]:
+    - button "❚❚" [ref=e112] [cursor=pointer]
+    - button "◐" [ref=e113] [cursor=pointer]
+  - status [ref=e114]:
+    - paragraph [ref=e120]: 正在慢慢呈现…

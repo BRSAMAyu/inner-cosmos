@@ -261,11 +261,12 @@
   </style>
 </head>
 <body>
-<main class="shell">
+<main id="main" class="shell">
+  <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
 
   <span class="route-hint">关于你</span>
-  <h1>设置</h1>
+  <h1 id="page-title">设置</h1>
   <p class="muted mb-2">调整你的内宇宙，让它更适合你。</p>
 
   <section class="settings-section">
@@ -601,6 +602,7 @@ async function doDelete() {
     setTimeout(() => { location.href = "/pages/login.html"; }, 1200);
   }
 }
+IC.hideLoading();
 </script>
 </body>
 </html>

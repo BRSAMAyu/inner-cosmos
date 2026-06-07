@@ -21,8 +21,11 @@ import com.innercosmos.service.PersonaChatService;
 import com.innercosmos.service.SafetyService;
 import com.innercosmos.vo.SafetyResult;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class PersonaChatServiceImpl implements PersonaChatService {
@@ -70,12 +73,15 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         session.capsuleId = capsuleId;
         session.status = "ACTIVE";
         session.turnCount = 0;
-        session.dailyLimit = capsule.conversationLimitPerDay != null ? capsule.conversationLimitPerDay : 5;
+        session.dailyLimit = ("SEED_CAPSULE".equals(capsule.capsuleType) || "SEED".equals(capsule.capsuleType))
+                ? 0
+                : Math.max(2, Math.min(50, capsule.conversationLimitPerDay != null ? capsule.conversationLimitPerDay : 30));
         sessionMapper.insert(session);
         return session;
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public PersonaChatMessage reply(Long userId, Long sessionId, String message) {
         PersonaChatSession session = sessionMapper.selectById(sessionId);
         if (session == null) {
@@ -99,7 +105,8 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         if (Boolean.TRUE.equals(safety.blockModelCall)) {
             capsuleMessage.textContent = safety.safeMessage;
             session.status = "SAFETY_GUIDED";
-        } else if (session.turnCount != null && session.turnCount >= session.dailyLimit) {
+        } else if (session.dailyLimit != null && session.dailyLimit > 0
+                && session.turnCount != null && session.turnCount >= session.dailyLimit) {
             capsuleMessage.textContent = "今天的回声已经足够深了.如果你愿意,可以把想继续说的话写成一封慢信.";
             session.status = "LETTER_GUIDED";
         } else {
@@ -113,6 +120,23 @@ public class PersonaChatServiceImpl implements PersonaChatService {
             String authorizedSummary = authorizedMemorySummary(capsule);
             AgentContext visitorContext = agentContextAssembler.assemble(userId, null, message, true);
             List<String> history = recentHistory(sessionId);
+            Map<String, Object> aiContext = new LinkedHashMap<>();
+            aiContext.put("personaPrompt", personaPrompt);
+            aiContext.put("authorizedMemorySummary", authorizedSummary);
+            aiContext.put("styleProfile", capsule == null ? "" : nullToEmpty(capsule.styleProfileJson));
+            aiContext.put("contextPreview", capsule == null ? "" : nullToEmpty(capsule.contextPreviewJson));
+            aiContext.put("ownerContextNote", capsule == null ? "" : nullToEmpty(capsule.ownerContextNote));
+            aiContext.put("standInEnabled", capsule != null && Boolean.TRUE.equals(capsule.standInEnabled));
+            aiContext.put("realContactPolicy", capsule == null ? "LETTER_ONLY" : nullToDefault(capsule.realContactPolicy, "LETTER_ONLY"));
+            aiContext.put("boundary", boundary == null ? "" : java.util.Map.of(
+                    "allowTopics", nullToEmpty(boundary.allowTopics),
+                    "blockedTopics", nullToEmpty(boundary.blockedTopics),
+                    "privacyLevel", nullToEmpty(boundary.privacyLevel)));
+            aiContext.put("recentPersonaChat", history);
+            aiContext.put("visitorContext", visitorContext);
+            aiContext.put("visitorMessage", message);
+            aiContext.put("turnCount", session.turnCount);
+            aiContext.put("dailyLimit", session.dailyLimit);
             String prefix = "MEDIUM".equals(safety.riskLevel) ? "我会先把这段话放回到安全和尊重的边界里. " : "";
             StructuredAiResults.PersonaResult ai = structuredAiService.call(userId, "PERSONA_CHAT",
                     """
@@ -123,30 +147,14 @@ public class PersonaChatServiceImpl implements PersonaChatService {
                     不要美化原用户；保留真实困惑、表达习惯、价值偏好和边界。
                     不要泄露真实身份、联系方式、原始对话全文和未授权记忆。
                     """,
-                    java.util.Map.of(
-                            "personaPrompt", personaPrompt,
-                            "authorizedMemorySummary", authorizedSummary,
-                            "styleProfile", capsule == null ? "" : nullToEmpty(capsule.styleProfileJson),
-                            "contextPreview", capsule == null ? "" : nullToEmpty(capsule.contextPreviewJson),
-                            "ownerContextNote", capsule == null ? "" : nullToEmpty(capsule.ownerContextNote),
-                            "standInEnabled", capsule != null && Boolean.TRUE.equals(capsule.standInEnabled),
-                            "realContactPolicy", capsule == null ? "LETTER_ONLY" : nullToDefault(capsule.realContactPolicy, "LETTER_ONLY"),
-                            "boundary", boundary == null ? "" : java.util.Map.of(
-                                    "allowTopics", nullToEmpty(boundary.allowTopics),
-                                    "blockedTopics", nullToEmpty(boundary.blockedTopics),
-                                    "privacyLevel", nullToEmpty(boundary.privacyLevel)),
-                            "recentPersonaChat", history,
-                            "visitorContext", visitorContext,
-                            "visitorMessage", message,
-                            "turnCount", session.turnCount,
-                            "dailyLimit", session.dailyLimit),
+                    aiContext,
                     StructuredAiResults.PersonaResult.class,
-                    () -> fallbackPersona(personaPrompt, message));
+                    () -> unavailablePersona());
             String boundaryText = ai.boundaryNotice == null || ai.boundaryNotice.isBlank() ? "" : ai.boundaryNotice + " ";
             String identityNotice = capsule != null && "USER_CAPSULE".equals(capsule.capsuleType)
                     ? "（这是授权共鸣体的回应，不是真人实时在线。）"
                     : "";
-            capsuleMessage.textContent = prefix + boundaryText + blank(ai.reply, generateContextualReply(personaPrompt, message)) + identityNotice;
+            capsuleMessage.textContent = prefix + boundaryText + blank(ai.reply, "真实模型暂时不可用，我不想用模板伪装成这个共鸣体。请稍后再试，或者写一封慢信。") + identityNotice;
             session.turnCount = session.turnCount == null ? 1 : session.turnCount + 1;
         }
         messageMapper.insert(capsuleMessage);
@@ -154,28 +162,12 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         return capsuleMessage;
     }
 
-    private String generateContextualReply(String personaPrompt, String visitorMessage) {
-        if (visitorMessage.contains("难过") || visitorMessage.contains("痛苦")) {
-            return "我能感受到这份沉重.你的感受是真实的,我在这里陪你看清它.";
-        }
-        if (visitorMessage.contains("开心") || visitorMessage.contains("高兴")) {
-            return "这份喜悦值得被记住.是什么让它发生的?";
-        }
-        if (visitorMessage.contains("迷茫") || visitorMessage.contains("不知道")) {
-            return "不知道本身也是一种诚实.我们一起慢慢看,不急着下结论.";
-        }
-        if (visitorMessage.contains("孤独") || visitorMessage.contains("一个人")) {
-            return "你现在的孤独感,不需要被否定.我在这里,虽然只是一道回声.";
-        }
-        return "我听见了这个片段.作为一枚有限的数字回声,我只能陪你看见其中一部分:你最想继续靠近的是什么?";
-    }
-
-    private StructuredAiResults.PersonaResult fallbackPersona(String personaPrompt, String visitorMessage) {
+    private StructuredAiResults.PersonaResult unavailablePersona() {
         StructuredAiResults.PersonaResult result = new StructuredAiResults.PersonaResult();
-        result.reply = generateContextualReply(personaPrompt, visitorMessage);
-        result.boundaryNotice = "";
-        result.letterSuggested = false;
-        result.riskFlags = List.of();
+        result.reply = "真实模型暂时不可用，我不想用模板伪装成这个共鸣体。请稍后再试，或者写一封慢信。";
+        result.boundaryNotice = "模型状态提示：";
+        result.letterSuggested = true;
+        result.riskFlags = List.of("REMOTE_UNAVAILABLE");
         return result;
     }
 

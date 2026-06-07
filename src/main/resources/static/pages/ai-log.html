@@ -3,16 +3,18 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>AI 协作日志 · Inner Cosmos</title>
   <link rel="stylesheet" href="/css/app.css">
 </head>
 <body>
-<main class="shell">
+<main id="main" class="shell">
+  <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
 
   <div class="flex-between mb-2" style="flex-wrap:wrap;gap:12px">
     <div>
       <span class="route-hint">模型调用追踪</span>
-      <h1>AI 交互日志</h1>
+      <h1 id="page-title">AI 交互日志</h1>
       <p class="muted">每一次 Aurora 对话背后，都有一笔模型调用记录。这里是透明的技术追踪。</p>
     </div>
     <div class="row gap-sm">
@@ -117,6 +119,7 @@ function renderLogs(logs) {
   }).join("");
   IC.stagger(container);
 }
+IC.hideLoading();
 </script>
 </body>
 </html>
