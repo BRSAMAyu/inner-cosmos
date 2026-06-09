@@ -56,6 +56,28 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
         }
 
+        // Also try session-based auth (primary mechanism)
+        if (SecurityContextHolder.getContext().getAuthentication() == null) {
+            var httpSession = request.getSession(false);
+            if (httpSession != null) {
+                Object uid = httpSession.getAttribute("userId");
+                if (uid instanceof Long userId && userId > 0) {
+                    User user = userMapper.selectById(userId);
+                    if (user != null && "ACTIVE".equals(user.status)) {
+                        var authorities = List.of(new SimpleGrantedAuthority("ROLE_USER"));
+                        if ("ADMIN".equals(user.role)) {
+                            authorities = List.of(
+                                new SimpleGrantedAuthority("ROLE_USER"),
+                                new SimpleGrantedAuthority("ROLE_ADMIN")
+                            );
+                        }
+                        var auth = new UsernamePasswordAuthenticationToken(user, null, authorities);
+                        SecurityContextHolder.getContext().setAuthentication(auth);
+                    }
+                }
+            }
+        }
+
         filterChain.doFilter(request, response);
     }
 

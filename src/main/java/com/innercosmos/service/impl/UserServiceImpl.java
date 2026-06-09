@@ -10,12 +10,10 @@ import com.innercosmos.exception.BusinessException;
 import com.innercosmos.mapper.*;
 import com.innercosmos.service.UserService;
 import com.innercosmos.vo.UserProfileVO;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -54,6 +52,7 @@ public class UserServiceImpl implements UserService {
     private final DialogSummaryMapper dialogSummaryMapper;
     private final ABTestMetricsMapper abTestMetricsMapper;
     private final ReportRecordMapper reportRecordMapper;
+    private final PasswordEncoder passwordEncoder;
 
     public UserServiceImpl(UserMapper userMapper,
                            UserProfileMapper userProfileMapper,
@@ -85,7 +84,8 @@ public class UserServiceImpl implements UserService {
                            UserCorrectionMapper userCorrectionMapper,
                            DialogSummaryMapper dialogSummaryMapper,
                            ABTestMetricsMapper abTestMetricsMapper,
-                           ReportRecordMapper reportRecordMapper) {
+                           ReportRecordMapper reportRecordMapper,
+                           PasswordEncoder passwordEncoder) {
         this.userMapper = userMapper;
         this.userProfileMapper = userProfileMapper;
         this.memoryCardMapper = memoryCardMapper;
@@ -117,6 +117,7 @@ public class UserServiceImpl implements UserService {
         this.dialogSummaryMapper = dialogSummaryMapper;
         this.abTestMetricsMapper = abTestMetricsMapper;
         this.reportRecordMapper = reportRecordMapper;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Override
@@ -129,7 +130,7 @@ public class UserServiceImpl implements UserService {
         }
         User user = new User();
         user.username = request.username;
-        user.passwordHash = hash(request.password);
+        user.passwordHash = passwordEncoder.encode(request.password);
         user.nickname = request.nickname == null || request.nickname.isBlank() ? request.username : request.nickname;
         user.email = request.email;
         user.role = Constants.ROLE_USER;
@@ -143,7 +144,7 @@ public class UserServiceImpl implements UserService {
         QueryWrapper<User> query = new QueryWrapper<>();
         query.eq("username", request.username);
         User user = userMapper.selectOne(query);
-        if (user == null || !verify(request.password, user.passwordHash)) {
+        if (user == null || !passwordEncoder.matches(request.password, user.passwordHash)) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED, "invalid username or password");
         }
         if (!Constants.STATUS_ACTIVE.equals(user.status)) {
@@ -375,41 +376,4 @@ public class UserServiceImpl implements UserService {
         userMapper.deleteById(userId);
     }
 
-    private String hash(String input) {
-        if (input == null) throw new BusinessException(ErrorCode.BAD_REQUEST, "密码不能为空");
-        SecureRandom random = new SecureRandom();
-        byte[] salt = new byte[16];
-        random.nextBytes(salt);
-        String saltHex = bytesToHex(salt);
-        String hashHex = sha256(saltHex + input);
-        return saltHex + ":" + hashHex;
-    }
-
-    private boolean verify(String input, String stored) {
-        if (input == null || stored == null) return false;
-        if (!stored.contains(":")) {
-            // Legacy format - plain SHA-256
-            return sha256(input).equals(stored);
-        }
-        String[] parts = stored.split(":");
-        String salt = parts[0];
-        String expectedHash = parts[1];
-        return sha256(salt + input).equals(expectedHash);
-    }
-
-    private String sha256(String input) {
-        try {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            byte[] hash = md.digest(input.getBytes(StandardCharsets.UTF_8));
-            return bytesToHex(hash);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private String bytesToHex(byte[] bytes) {
-        StringBuilder sb = new StringBuilder();
-        for (byte b : bytes) sb.append(String.format("%02x", b));
-        return sb.toString();
-    }
 }

@@ -240,20 +240,33 @@ function toggleSection(name) {
 
 async function loadAuroraSelfPanel(userId) {
   auroraSelfUserId = userId;
-  document.getElementById('auroraSelfPanel').style.display = '';
+  var panel = document.getElementById('auroraSelfPanel');
+  panel.style.display = '';
   try {
-    const [constitution, model, candidates, statements] = await Promise.all([
+    var results = await Promise.allSettled([
       API.getConstitution(),
       API.getModel(userId),
       API.getCandidates(userId),
       API.getStatements(userId, 5)
     ]);
+    // Handle each result individually — partial failures are OK
+    var constitution = results[0].status === 'fulfilled' ? results[0].value : null;
+    var model = results[1].status === 'fulfilled' ? results[1].value : [];
+    var candidates = results[2].status === 'fulfilled' ? results[2].value : [];
+    var statements = results[3].status === 'fulfilled' ? results[3].value : [];
+
+    if (results[0].status === 'rejected') console.warn('Constitution load failed:', results[0].reason);
+    if (results[1].status === 'rejected') console.warn('Model load failed:', results[1].reason);
+    if (results[2].status === 'rejected') console.warn('Candidates load failed:', results[2].reason);
+    if (results[3].status === 'rejected') console.warn('Statements load failed:', results[3].reason);
+
     renderConstitution(constitution);
     renderModel(Array.isArray(model) ? model : []);
     renderCandidates(Array.isArray(candidates) ? candidates : []);
     renderStatements(Array.isArray(statements) ? statements : []);
   } catch (e) {
-    console.warn('Aurora self panel load failed:', e);
+    console.error('Aurora self panel critical failure:', e);
+    document.getElementById('constitutionBody').innerHTML = '<div class="loading" style="color:#b46b6b">面板加载失败，请刷新页面重试。</div>';
   }
 }
 
@@ -323,15 +336,26 @@ async function commitCandidate(candidateId) {
   }
 }
 
-function dismissCandidate(candidateId) {
-  loadAuroraSelfPanel(auroraSelfUserId);
+async function dismissCandidate(candidateId) {
+  try {
+    await API.dismissCandidate(auroraSelfUserId, candidateId);
+    loadAuroraSelfPanel(auroraSelfUserId);
+  } catch (e) {
+    alert('拒绝失败：' + (e.message || '未知错误'));
+  }
 }
 
 (function initAuroraSelf() {
   API.userProfile().then(function(p) {
-    var userId = p && p.data && p.data.id;
-    if (userId) loadAuroraSelfPanel(userId);
-  }).catch(function(){});
+    var userId = p && p.success !== false && p.data && p.data.id;
+    if (userId) {
+      loadAuroraSelfPanel(userId);
+    } else {
+      document.getElementById('auroraSelfPanel').style.display = 'none';
+    }
+  }).catch(function() {
+    document.getElementById('auroraSelfPanel').style.display = 'none';
+  });
 })();
 </body>
 </html>

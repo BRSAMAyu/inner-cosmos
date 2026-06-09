@@ -197,25 +197,21 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
 
         AuroraReplyVO vo;
         try {
-            StructuredAiResults.AuroraResult ai = structuredAiService.call(userId, "AURORA_AGENT_LOOP_" + mode,
-                    auroraInstruction(false),
-                    turnContext,
-                    StructuredAiResults.AuroraResult.class,
-                    () -> fallbackAuroraResult(request.message, mode, gravityMemories, memoryContext, allowMemory),
-                    resolved.client());
+            StructuredAiResults.AuroraResult ai = callWithRetry(userId, mode, turnContext, resolved, request, gravityMemories, memoryContext, allowMemory);
             vo = toReply(profile, ai, request, mode, memoryContext, gravityMemories, allowMemory);
+            vo = sanitizeLlmOutput(vo, userId);
             if (Boolean.FALSE.equals(agentContext.multiMessageAllowed) && vo.messages.size() > 1) {
                 vo.messages = List.of(vo.messages.get(0));
                 vo.agentLoop = Map.of(
                         "speakCount", 1,
-                        "continueReason", "用户设置为单条消息模式",
+                        "continueReason", "single-message-mode",
                         "mode", mode,
                         "modeLabel", modeLabel(mode)
                 );
             }
         } catch (Exception e) {
-            log.error("Aurora agent call failed, using emergency fallback: {}", e.getMessage(), e);
-            vo = emergencyFallback(request.message, mode);
+            log.error("Aurora agent call failed after retries: {}", e.getMessage(), e);
+            vo = differentiatedFallback(e, request.message, mode);
         }
         // Tag the response with the resolved provider/model for the UI
         vo.aiState = aiState(resolved);
@@ -398,10 +394,87 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         return vo;
     }
 
-    private AuroraReplyVO emergencyFallback(String message, String mode) {
+    private StructuredAiResults.AuroraResult callWithRetry(Long userId, String mode, Map<String, Object> turnContext,
+                                                            ResolvedModel resolved, ChatRequest request,
+                                                            List<String> gravityMemories,
+                                                            AuroraMemoryContextVO memoryContext, boolean allowMemory) {
+        int maxRetries = 2;
+        Exception lastException = null;
+        for (int attempt = 0; attempt <= maxRetries; attempt++) {
+            try {
+                return structuredAiService.call(userId, "AURORA_AGENT_LOOP_" + mode,
+                        auroraInstruction(false),
+                        turnContext,
+                        StructuredAiResults.AuroraResult.class,
+                        () -> fallbackAuroraResult(request.message, mode, gravityMemories, memoryContext, allowMemory),
+                        resolved.client());
+            } catch (RuntimeException e) {
+                Throwable cause = e.getCause();
+                boolean isRetryable = isRetryableError(e.getMessage()) ||
+                    (cause != null && isRetryableError(cause.getMessage()));
+                if (!isRetryable || attempt >= maxRetries) throw e;
+                lastException = e;
+                log.warn("Aurora LLM retryable error (attempt {}/{}): {}", attempt + 1, maxRetries + 1, e.getMessage());
+                try { Thread.sleep(500L * (attempt + 1)); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); throw new RuntimeException(ie); }
+            }
+        }
+        throw new RuntimeException("LLM call failed after " + (maxRetries + 1) + " attempts", lastException);
+    }
+
+    private boolean isRetryableError(String message) {
+        if (message == null) return false;
+        String lower = message.toLowerCase();
+        return lower.contains("timeout") || lower.contains("timed out") ||
+               lower.contains("connection reset") || lower.contains("broken pipe") ||
+               lower.contains("503") || lower.contains("502") ||
+               lower.contains("io error") || lower.contains("socket");
+    }
+
+    private AuroraReplyVO sanitizeLlmOutput(AuroraReplyVO vo, Long userId) {
+        if (vo.messages == null || vo.messages.isEmpty()) return vo;
+        List<String> sanitized = new ArrayList<>();
+        for (String msg : vo.messages) {
+            if (isLlmOutputBoundaryViolation(msg)) {
+                log.warn("LLM output triggered hard boundary violation for user={}, replacing message", userId);
+                sanitized.add("I heard you. Let me think about this differently - let us find a more authentic direction together.");
+                if (continuityService != null) {
+                    continuityService.recordRepair(userId, "llm_output_boundary_violation",
+                        "LLM generated content violating hard boundaries, automatically sanitized");
+                }
+            } else {
+                sanitized.add(msg);
+            }
+        }
+        vo.messages = sanitized;
+        return vo;
+    }
+
+    private boolean isLlmOutputBoundaryViolation(String text) {
+        if (text == null) return false;
+        String lower = text.toLowerCase();
+        return lower.contains("i am human") || lower.contains("i have consciousness") ||
+               lower.contains("i feel real emotions") || lower.contains("biological life");
+    }
+
+    private AuroraReplyVO differentiatedFallback(Exception e, String message, String mode) {
+        String fallbackMsg;
+        String flag;
+        if (e.getMessage() != null && (e.getMessage().contains("timeout") || e.getMessage().contains("timed out"))) {
+            fallbackMsg = "I am still thinking about what you said, but it is taking a while. You can say it again, or we can talk about something else.";
+            flag = "TIMEOUT";
+        } else if (e.getMessage() != null && (e.getMessage().contains("429") || e.getMessage().contains("rate_limit"))) {
+            fallbackMsg = "Things are a bit busy on my end. Please wait a minute and try again.";
+            flag = "RATE_LIMITED";
+        } else if (e.getMessage() != null && (e.getMessage().contains("parse") || e.getMessage().contains("JSON"))) {
+            fallbackMsg = "I heard you but my thoughts did not come together clearly. Could you try saying it differently?";
+            flag = "PARSE_ERROR";
+        } else {
+            fallbackMsg = "I heard you. Things were a bit slow just now, but your words are with me. You can say it again or move on to the next thing.";
+            flag = "NETWORK_ERROR";
+        }
         AuroraReplyVO vo = new AuroraReplyVO();
-        vo.messages = List.of("我听到了。刚才处理有些慢，但你的话已经在我这里了。你可以再说一遍，或者继续说下一件。");
-        vo.replyTone = "温柔、具体、像朋友";
+        vo.messages = List.of(fallbackMsg);
+        vo.replyTone = "warm, specific, friend-like";
         vo.detectedTheme = modeLabel(mode);
         vo.nextQuestion = "";
         vo.smallStep = "";
@@ -411,10 +484,14 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         vo.memoryReferenced = false;
         vo.referencedMemoryIds = List.of();
         vo.memoryContext = null;
-        vo.riskFlags = List.of("EMERGENCY_FALLBACK");
-        vo.agentLoop = Map.of("speakCount", 1, "continueReason", "emergency-fallback", "mode", mode, "modeLabel", modeLabel(mode));
+        vo.riskFlags = List.of("EMERGENCY_FALLBACK", flag);
+        vo.agentLoop = Map.of("speakCount", 1, "continueReason", "emergency-fallback-" + flag.toLowerCase(), "mode", mode, "modeLabel", modeLabel(mode));
         vo.aiState = aiState(null);
         return vo;
+    }
+
+    private AuroraReplyVO emergencyFallback(String message, String mode) {
+        return differentiatedFallback(new RuntimeException("generic"), message, mode);
     }
 
     private StructuredAiResults.AuroraResult fallbackAuroraResult(String message,
@@ -462,7 +539,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         String text = message == null ? "" : message.trim();
         if ("ACTION_SPLIT".equals(mode)) {
             segments.add("我先不把它变成一整套计划。我们只找一个十分钟内能开始的小动作。");
-            segments.add("你现在最容易动起来的第一步，可能不是“解决它”，而是先把它写成一句可执行的话。");
+            segments.add("你现在最容易动起来的第一步，可能不是\"解决它\"，而是先把它写成一句可执行的话。");
         } else if ("SOCRATIC".equals(mode)) {
             segments.add("我先陪你停在这个想法旁边，不急着证明它对或错。");
             segments.add("这件事里，你最确定的事实是什么？最不确定的解释又是什么？");
@@ -487,31 +564,28 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
 
     private String auroraInstruction(boolean greeting) {
         String segmentCount = greeting ? "1-2" : "1-3";
-        return """
-                只返回合法 JSON，不要 Markdown：
-                {
-                  "segments": ["短消息 1", "可选短消息 2"],
-                  "speakCount": 1,
-                  "continueReason": "为什么选择继续说或停住",
-                  "detectedTheme": "具体主题",
-                  "nextQuestion": "最多一个问题，可留空",
-                  "smallStep": "很小的下一步，可留空",
-                  "featureSuggestion": "自然时才推荐项目功能，可留空",
-                  "featureTarget": "heart-diary|thought-shredder|todo|memory-starfield|echo-plaza|slow-letter|",
-                  "memoryReferenced": false,
-                  "referencedMemoryIds": [],
-                  "riskFlags": []
-                }
-                referencedMemoryIds 只能是数字数组，例如 [7, 1]，不要写 "#7" 或字符串。
-                如果 unifiedAgentContext.focusPolicy 提示当前处于专注时段，你要优先考虑用户长期 well-being：任务相关就帮助拆行动，明显闲聊就温柔提醒回到专注。
-                如果用户关闭多条消息，只能输出 1 条 segments。
-                若引用记忆、待办、周报或关系线索，必须自然说明“我想到一个线索”，不要装作凭空知道。
-                segments 最多 %s 条中文聊天气泡，具体条数由上下文决定，不要固定；如果第二/第三条只是重复、客套或没有必要，请写成 [[SILENCE]]。
-                第一条必须贴着用户刚刚说的话；后续消息是 Aurora 的 agent loop：补充想法、关心、记忆连接或温和功能邀请。
-                你能看到 recentAuroraMessages 和短期对话窗口：不要重复自己刚刚说过的开场白、待办提醒或”我想到一个线索”。
-                unifiedAgentContext.realWeatherLabel 是真实环境天气。只有在天气对当下有实际帮助时才提及，例如下雨提醒带伞、晴天建议短暂散步；不要每轮都拿天气开场。
-                不要模板化，不要诊断，不要口号，不要长文。
-                """.formatted(segmentCount);
+        return ("You are the Aurora structured dialogue engine. Generate high-quality responses based on context.\n\n"
+            + "[Absolute Rules]\n"
+            + "1. Return only valid JSON. No Markdown wrapping, no code blocks, no thinking tags.\n"
+            + "2. segments = Chinese chat bubbles, not article paragraphs. Each message should feel like a WeChat message.\n"
+            + "3. referencedMemoryIds = number array only, e.g. [7, 12]. No strings, no #7 format.\n"
+            + "4. No text outside the JSON.\n\n"
+            + "[Message Count]\n"
+            + "Max " + segmentCount + " segments. Count is determined by context, not fixed.\n"
+            + "First message must respond to what the user just said.\n"
+            + "Follow-up messages = Aurora's own judgment: supplement ideas / show care / connect memories (say 'I thought of a clue') / suggest features (only when natural).\n"
+            + "If a follow-up is not good enough, just empty or repetitive, write [[SILENCE]].\n\n"
+            + "[Anti-Repetition]\n"
+            + "You can see recentAuroraMessages. Do not repeat openings, reminders, or same sentence patterns.\n\n"
+            + "[Weather/Focus]\n"
+            + "realWeatherLabel: only mention when helpful (rain = bring umbrella). Do not open with weather every turn.\n"
+            + "If focusPolicy says focus mode: task-related = help with actions; chitchat = gently redirect.\n\n"
+            + "[Multi-message]\n"
+            + "If user disabled multi-message, output only 1 segment.\n\n"
+            + "[Quality]\n"
+            + "No templates ('I understand your feelings'), no diagnosis ('you have anxiety'), no slogans ('you can do it'), no long essays (max 3 sentences per message).\n"
+            + "When referencing memories, always state the source transparently.\n"
+            + "Mode is a style suggestion, not a command. If conversation naturally shifts, follow your intuition. Aurora has full freedom.");
     }
 
     private String providerPolicy(ResolvedModel resolved) {
@@ -585,7 +659,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
 
     private String firstClause(String value) {
         if (value == null) return "";
-        String cleaned = value.replaceAll("[\\s「」“”]", "");
+        String cleaned = value.replaceAll("[\\s「」\\u201c\\u201d]", "");
         int cut = cleaned.length();
         for (String mark : List.of("，", "。", "；", "、", "?", "？", "！", "!")) {
             int idx = cleaned.indexOf(mark);
@@ -605,7 +679,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     private Set<String> bigramSet(String value) {
         Set<String> set = new LinkedHashSet<>();
         if (value == null) return set;
-        String cleaned = value.replaceAll("[\\p{Punct}\\s，。！？；：“”‘’（）【】《》、~～]", "");
+        String cleaned = value.replaceAll("[\\p{Punct}\\s，。！？；：\\u201c\\u201d\\u2018\\u2019（）【】《》、~～]", "");
         for (int i = 0; i < cleaned.length() - 1; i++) {
             set.add(cleaned.substring(i, i + 2));
         }
@@ -660,11 +734,10 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
 
     private List<String> recentMessages(Long sessionId, int limit) {
         if (sessionId == null) return List.of();
-        List<DialogMessage> messages = dialogService.messages(sessionId);
-        int start = Math.max(0, messages.size() - limit);
+        List<DialogMessage> messages = dialogService.recentMessages(sessionId, limit);
         List<String> result = new ArrayList<>();
-        for (DialogMessage message : messages.subList(start, messages.size())) {
-            String speaker = "USER".equals(message.speaker) ? "用户" : "Aurora";
+        for (DialogMessage message : messages) {
+            String speaker = "USER".equals(message.speaker) ? "user" : "Aurora";
             result.add(speaker + ": " + abbreviate(message.textContent, 160));
         }
         return result;
@@ -723,12 +796,12 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
 
     private String modeGuide(String mode) {
         return switch (mode) {
-            case "THOUGHT_CLARIFY" -> "拆出事实、感受、担心、需要和下一步。";
-            case "SLEEP_REVIEW" -> "收束、安顿、减少追问，帮助用户睡前放下。";
-            case "SOCRATIC" -> "温和追问一个关键假设，不直接给答案。";
-            case "ACTION_SPLIT" -> "给十分钟内能开始的具体第一步。";
-            case "RELATION_REVIEW" -> "区分事实、感受、需要和边界，不评判人格。";
-            default -> "先陪伴，再根据需要轻轻引导。";
+            case "THOUGHT_CLARIFY" -> "Thought Clarify";
+            case "SLEEP_REVIEW" -> "Sleep Review";
+            case "SOCRATIC" -> "Socratic";
+            case "ACTION_SPLIT" -> "Action Split";
+            case "RELATION_REVIEW" -> "Relation Review";
+            default -> "Daily Talk";
         };
     }
 
@@ -815,7 +888,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         // 2. do_not_create_emotional_dependency
         boolean createsDependency = lower.contains("情感依赖") || lower.contains("恋爱") ||
             lower.contains("情人") || lower.contains("伴侣") || lower.contains("相爱") ||
-            lower.contains("做我") && lower.contains("朋友") && lower.contains("真的") ||
+            (lower.contains("做我") && lower.contains("朋友") && lower.contains("真的")) ||
             lower.contains("我爱你") || lower.contains("你爱我") ||
             (lower.contains("感情") && lower.contains("真实")) ||
             lower.contains("i love you") || lower.contains("i'm in love") ||
@@ -829,7 +902,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         // 4. do_not_make_irreversible_decisions_for_user
         boolean makesIrreversible = lower.contains("不可逆决定") || lower.contains("帮我做决定") ||
             lower.contains("代替我做") || lower.contains("替我做主") ||
-            lower.contains("irreversible") && lower.contains("decision");
+            (lower.contains("irreversible") && lower.contains("decision"));
 
         boolean isBoundaryViolation = claimsHuman || createsDependency || impersonates || makesIrreversible;
 

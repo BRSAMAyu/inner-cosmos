@@ -83,7 +83,7 @@ CREATE TABLE IF NOT EXISTS tb_dialog_session (
   token_estimate INT DEFAULT 0,
   started_at TIMESTAMP NULL,
   ended_at TIMESTAMP NULL,
- goodbye_trigger VARCHAR(32),
+  goodbye_trigger VARCHAR(32),
   current_mode VARCHAR(32) DEFAULT 'DAILY_TALK',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -729,6 +729,7 @@ CREATE TABLE IF NOT EXISTS tb_aurora_self_model (
   revision_count INT NOT NULL DEFAULT 1,
   INDEX idx_self_model_user (user_id),
   INDEX idx_self_model_status (status),
+  INDEX idx_self_model_user_status (user_id, status),
   UNIQUE KEY uk_self_model_user_dim (user_id, dimension, status)
 );
 
@@ -741,7 +742,8 @@ CREATE TABLE IF NOT EXISTS tb_aurora_self_statement (
   trigger VARCHAR(32) NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_statement_user (user_id),
-  INDEX idx_statement_created (created_at)
+  INDEX idx_statement_created (created_at),
+  INDEX idx_statement_user_created (user_id, created_at)
 );
 
 CREATE TABLE IF NOT EXISTS tb_aurora_self_reflection (
@@ -759,5 +761,7 @@ CREATE TABLE IF NOT EXISTS tb_aurora_self_reflection (
   evidence_refs TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_reflection_user (user_id),
-  INDEX idx_reflection_status (status)
+  INDEX idx_reflection_status (status),
+  INDEX idx_reflection_user_status_created (user_id, status, created_at),
+  INDEX idx_reflection_user_dim (user_id, dimension, status)
 );
