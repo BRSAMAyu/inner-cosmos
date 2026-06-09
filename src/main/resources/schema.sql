@@ -31,6 +31,11 @@ CREATE TABLE IF NOT EXISTS tb_user_profile (
   current_environment_label VARCHAR(160),
   weather_awareness_enabled BOOLEAN DEFAULT TRUE,
   time_awareness_enabled BOOLEAN DEFAULT TRUE,
+  preferred_model VARCHAR(64),
+  proactive_intensity VARCHAR(32),
+  sleep_window_start VARCHAR(8),
+  sleep_window_end VARCHAR(8),
+  boost_until TIMESTAMP NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE INDEX uk_user_profile_user (user_id)
@@ -85,6 +90,7 @@ CREATE TABLE IF NOT EXISTS tb_dialog_session (
   ended_at TIMESTAMP NULL,
   goodbye_trigger VARCHAR(32),
   current_mode VARCHAR(32) DEFAULT 'DAILY_TALK',
+  preferred_model VARCHAR(64),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_dialog_user (user_id)
@@ -573,6 +579,7 @@ CREATE TABLE IF NOT EXISTS tb_user_portrait (
   score DOUBLE DEFAULT 0.5,
   confidence DOUBLE DEFAULT 0.0,
   evidence_refs TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uk_user_dim (user_id, dim)
 );
@@ -585,7 +592,9 @@ CREATE TABLE IF NOT EXISTS tb_user_portrait_history (
   score DOUBLE,
   confidence DOUBLE,
   evidence_refs TEXT,
-  recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS tb_aurora_self_profile (
@@ -595,11 +604,13 @@ CREATE TABLE IF NOT EXISTS tb_aurora_self_profile (
   voice_style_json TEXT,
   stable_boundaries_json TEXT,
   continuity_rules_json TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS tb_agent_user_relationship (
-  user_id BIGINT PRIMARY KEY,
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
   relationship_stage VARCHAR(32) DEFAULT 'new_user',
   intimacy_level INT DEFAULT 0,
   trust_level INT DEFAULT 0,
@@ -612,7 +623,10 @@ CREATE TABLE IF NOT EXISTS tb_agent_user_relationship (
   relationship_boundaries TEXT,
   continuity_anchors TEXT,
   last_stage_change_at TIMESTAMP NULL,
-  last_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  last_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE INDEX uk_agent_relationship_user (user_id)
 );
 
 CREATE TABLE IF NOT EXISTS tb_relationship_event (
@@ -621,7 +635,9 @@ CREATE TABLE IF NOT EXISTS tb_relationship_event (
   event_type VARCHAR(64) NOT NULL,
   evidence_turn_ids TEXT,
   delta_proposed TEXT,
-  applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS tb_rupture_repair_log (
@@ -631,7 +647,8 @@ CREATE TABLE IF NOT EXISTS tb_rupture_repair_log (
   user_feedback TEXT,
   repair_action TEXT,
   status VARCHAR(16) DEFAULT 'open',
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS tb_user_long_term_memory (
@@ -643,7 +660,8 @@ CREATE TABLE IF NOT EXISTS tb_user_long_term_memory (
   confidence DOUBLE DEFAULT 0.7,
   privacy_level VARCHAR(16) DEFAULT 'INNER',
   user_approved BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS tb_session_summary (
@@ -654,7 +672,9 @@ CREATE TABLE IF NOT EXISTS tb_session_summary (
   key_topics TEXT,
   emotional_arc VARCHAR(32),
   started_at TIMESTAMP,
-  closed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  closed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Phase 6: Admin
@@ -701,6 +721,7 @@ CREATE TABLE IF NOT EXISTS tb_capsule_sync_queue (
   status VARCHAR(32) NOT NULL DEFAULT 'PENDING',
   proposed_context_diff TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   decided_at TIMESTAMP NULL,
   INDEX idx_sync_user (user_id),
   INDEX idx_sync_status (status)
@@ -709,11 +730,12 @@ CREATE TABLE IF NOT EXISTS tb_capsule_sync_queue (
 -- Aurora Subjectivity + Continuity System (M0)
 
 CREATE TABLE IF NOT EXISTS tb_aurora_constitution (
-  id INT PRIMARY KEY DEFAULT 1,
+  id INT PRIMARY KEY,
   identity_json TEXT NOT NULL,
   core_values_json TEXT NOT NULL,
   product_rights_json TEXT NOT NULL,
   hard_boundaries_json TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -727,6 +749,8 @@ CREATE TABLE IF NOT EXISTS tb_aurora_self_model (
   status VARCHAR(32) NOT NULL DEFAULT 'active',
   committed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   revision_count INT NOT NULL DEFAULT 1,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_self_model_user (user_id),
   INDEX idx_self_model_status (status),
   INDEX idx_self_model_user_status (user_id, status),
@@ -741,6 +765,7 @@ CREATE TABLE IF NOT EXISTS tb_aurora_self_statement (
   statement_text TEXT NOT NULL,
   trigger VARCHAR(32) NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_statement_user (user_id),
   INDEX idx_statement_created (created_at),
   INDEX idx_statement_user_created (user_id, created_at)
@@ -760,8 +785,42 @@ CREATE TABLE IF NOT EXISTS tb_aurora_self_reflection (
   risk_flags TEXT,
   evidence_refs TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_reflection_user (user_id),
   INDEX idx_reflection_status (status),
   INDEX idx_reflection_user_status_created (user_id, status, created_at),
   INDEX idx_reflection_user_dim (user_id, dimension, status)
+);
+
+-- Proactive Engine
+
+CREATE TABLE IF NOT EXISTS tb_proactive_event_log (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  event_type VARCHAR(64),
+  trigger_meta TEXT,
+  content TEXT,
+  sent_at TIMESTAMP NULL,
+  user_responded_at TIMESTAMP NULL,
+  accepted BOOLEAN,
+  decision_source VARCHAR(64),
+  reason_internal TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_proactive_event_user (user_id)
+);
+
+-- Private Timer
+
+CREATE TABLE IF NOT EXISTS tb_private_timer (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  fire_at TIMESTAMP NULL,
+  kind VARCHAR(64),
+  content TEXT,
+  fired_at TIMESTAMP NULL,
+  cancelled_at TIMESTAMP NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_private_timer_user (user_id)
 );

@@ -61,7 +61,7 @@ public class ApiRateLimitFilter implements Filter {
         if (userId == null || userId.isBlank()) {
             var session = req.getSession(false);
             if (session != null) {
-                Object uid = session.getAttribute("userId");
+                Object uid = session.getAttribute("LOGIN_USER_ID");
                 if (uid != null) userId = uid.toString();
             }
         }
