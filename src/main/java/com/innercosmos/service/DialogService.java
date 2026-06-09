@@ -17,5 +17,7 @@ public interface DialogService {
 
     List<DialogMessage> messages(Long sessionId);
 
+    List<DialogMessage> recentMessages(Long sessionId, int limit);
+
     void verifyOwnership(Long userId, Long sessionId);
 }

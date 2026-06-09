@@ -281,11 +281,19 @@ async function saveTodo(event, id) {
 }
 
 async function updateStatus(id, status) {
-  await API.todoStatus(id, status);
-  const labels = { DOING: "已开始", DONE: "已完成", CANCELLED: "已放下", TODO: "已重新打开" };
-  IC.toast(labels[status] || "状态已更新", "success");
-  IC.pulse("soft");
-  load();
+  try {
+    const r = await API.todoStatus(id, status);
+    if (r.success) {
+      const labels = { DOING: "已开始", DONE: "已完成", CANCELLED: "已放下", TODO: "已重新打开" };
+      IC.toast(labels[status] || "状态已更新", "success");
+      IC.pulse("soft");
+      load();
+    } else {
+      IC.toast(r.message || "操作失败", "warn");
+    }
+  } catch (e) {
+    IC.toast("操作失败，请稍后再试。", "warn");
+  }
 }
 
 async function splitTodo(id) {
@@ -297,9 +305,17 @@ async function splitTodo(id) {
 }
 
 async function deleteTodo(id) {
-  await API.todoDelete(id);
-  IC.toast("已删除", "success");
-  load();
+  try {
+    const r = await API.todoDelete(id);
+    if (r.success) {
+      IC.toast("已删除", "success");
+      load();
+    } else {
+      IC.toast(r.message || "删除失败", "warn");
+    }
+  } catch (e) {
+    IC.toast("删除失败，请稍后再试。", "warn");
+  }
 }
 IC.hideLoading();
 </script>

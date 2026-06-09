@@ -8,6 +8,7 @@ import com.innercosmos.entity.AuroraSelfReflection;
 import com.innercosmos.service.AuroraConstitutionService;
 import com.innercosmos.service.AuroraSelfContinuityService;
 import com.innercosmos.ai.self.AuroraConstitutionVO;
+import jakarta.servlet.http.HttpSession;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,7 +17,7 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/aurora/self")
-public class AuroraSelfController {
+public class AuroraSelfController extends BaseController {
 
     private final AuroraSelfContinuityService continuityService;
     private final AuroraConstitutionService constitutionService;
@@ -39,8 +40,11 @@ public class AuroraSelfController {
 
     @GetMapping("/statements")
     public ResponseEntity<List<SelfStatementVO>> getStatements(
-            @RequestParam Long userId,
+            HttpSession session,
             @RequestParam(defaultValue = "10") int limit) {
+        Long userId = currentUserId(session);
+        if (userId == null || userId <= 0) return ResponseEntity.status(401).build();
+        if (limit <= 0 || limit > 100) limit = 10;
         List<AuroraSelfStatement> stmts = continuityService.getRecentStatements(userId, limit);
         List<SelfStatementVO> vos = stmts.stream().map(s -> {
             SelfStatementVO vo = new SelfStatementVO();
@@ -58,8 +62,11 @@ public class AuroraSelfController {
 
     @GetMapping("/reflections")
     public ResponseEntity<List<SelfReflectionVO>> getReflections(
-            @RequestParam Long userId,
+            HttpSession session,
             @RequestParam(defaultValue = "10") int limit) {
+        Long userId = currentUserId(session);
+        if (userId == null || userId <= 0) return ResponseEntity.status(401).build();
+        if (limit <= 0 || limit > 100) limit = 10;
         List<AuroraSelfReflection> refs = continuityService.getRecentReflections(userId, limit);
         List<SelfReflectionVO> vos = refs.stream().map(r -> {
             SelfReflectionVO vo = new SelfReflectionVO();
@@ -82,7 +89,9 @@ public class AuroraSelfController {
     }
 
     @GetMapping("/model")
-    public ResponseEntity<List<SelfModelVO>> getModel(@RequestParam Long userId) {
+    public ResponseEntity<List<SelfModelVO>> getModel(HttpSession session) {
+        Long userId = currentUserId(session);
+        if (userId == null || userId <= 0) return ResponseEntity.status(401).build();
         List<AuroraSelfModel> models = continuityService.getActiveModel(userId);
         List<SelfModelVO> vos = models.stream().map(m -> {
             SelfModelVO vo = new SelfModelVO();
@@ -101,7 +110,9 @@ public class AuroraSelfController {
     }
 
     @GetMapping("/candidates")
-    public ResponseEntity<List<SelfReflectionVO>> getCandidates(@RequestParam Long userId) {
+    public ResponseEntity<List<SelfReflectionVO>> getCandidates(HttpSession session) {
+        Long userId = currentUserId(session);
+        if (userId == null || userId <= 0) return ResponseEntity.status(401).build();
         List<AuroraSelfReflection> candidates = continuityService.getCandidates(userId);
         List<SelfReflectionVO> vos = candidates.stream().map(r -> {
             SelfReflectionVO vo = new SelfReflectionVO();
@@ -124,8 +135,13 @@ public class AuroraSelfController {
 
     @PostMapping("/commit")
     public ResponseEntity<?> commitCandidate(
-            @RequestParam Long userId,
+            HttpSession session,
             @RequestBody CommitRequest req) {
+        Long userId = currentUserId(session);
+        if (userId == null || userId <= 0) return ResponseEntity.status(401).body(java.util.Map.of("error", "Not authenticated"));
+        if (req == null || req.getCandidateId() == null || req.getCandidateId() <= 0) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("error", "Invalid candidateId"));
+        }
         try {
             continuityService.commitToModel(userId, req.getCandidateId(),
                 req.getUserConfirmed() != null && req.getUserConfirmed(),
@@ -137,7 +153,10 @@ public class AuroraSelfController {
     }
 
     @PostMapping("/retire")
-    public ResponseEntity<?> retireModel(@RequestParam Long userId, @RequestParam Long modelId) {
+    public ResponseEntity<?> retireModel(HttpSession session, @RequestParam Long modelId) {
+        Long userId = currentUserId(session);
+        if (userId == null || userId <= 0) return ResponseEntity.status(401).body(java.util.Map.of("error", "Not authenticated"));
+        if (modelId == null || modelId <= 0) return ResponseEntity.badRequest().body(java.util.Map.of("error", "Invalid modelId"));
         try {
             continuityService.retireModel(userId, modelId);
             return ResponseEntity.ok(java.util.Map.of("status", "retired"));
@@ -147,7 +166,10 @@ public class AuroraSelfController {
     }
 
     @PostMapping("/dismiss")
-    public ResponseEntity<?> dismissCandidate(@RequestParam Long userId, @RequestParam Long candidateId) {
+    public ResponseEntity<?> dismissCandidate(HttpSession session, @RequestParam Long candidateId) {
+        Long userId = currentUserId(session);
+        if (userId == null || userId <= 0) return ResponseEntity.status(401).body(java.util.Map.of("error", "Not authenticated"));
+        if (candidateId == null || candidateId <= 0) return ResponseEntity.badRequest().body(java.util.Map.of("error", "Invalid candidateId"));
         try {
             continuityService.dismissCandidate(userId, candidateId);
             return ResponseEntity.ok(java.util.Map.of("status", "dismissed"));

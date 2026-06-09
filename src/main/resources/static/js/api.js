@@ -437,6 +437,10 @@ const API = {
       method: "POST",
       body: JSON.stringify({ candidateId, userConfirmed, extraEvidence: [] })
     }),
+  dismissCandidate: (userId, candidateId) =>
+    IC.api(`/api/aurora/self/dismiss?userId=${userId}&candidateId=${candidateId}`, {
+      method: "POST"
+    }),
 
   /* AI Logs */
   async aiLogs() {

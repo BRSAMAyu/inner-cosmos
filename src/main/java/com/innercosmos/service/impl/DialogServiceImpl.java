@@ -106,6 +106,15 @@ public class DialogServiceImpl implements DialogService {
     }
 
     @Override
+    public List<DialogMessage> recentMessages(Long sessionId, int limit) {
+        QueryWrapper<DialogMessage> query = new QueryWrapper<>();
+        query.eq("session_id", sessionId).orderByDesc("id").last("LIMIT " + limit);
+        List<DialogMessage> result = messageMapper.selectList(query);
+        java.util.Collections.reverse(result);
+        return result;
+    }
+
+    @Override
     public void verifyOwnership(Long userId, Long sessionId) {
         DialogSession session = sessionMapper.selectById(sessionId);
         if (session == null) {

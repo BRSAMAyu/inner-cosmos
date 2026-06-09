@@ -182,17 +182,20 @@ public class PersonaChatServiceImpl implements PersonaChatService {
 
     private String authorizedMemorySummary(EchoCapsule capsule) {
         if (capsule == null || capsule.authorizedMemoryIds == null || capsule.authorizedMemoryIds.isBlank()) return "";
-        StringBuilder sb = new StringBuilder();
+        // Batch fetch: collect IDs first, then single query instead of N+1
+        java.util.List<Long> ids = new java.util.ArrayList<>();
         for (String raw : capsule.authorizedMemoryIds.replace("[", "").replace("]", "").replace("\"", "").split(",")) {
             try {
                 Long id = Long.parseLong(raw.trim());
-                MemoryCard card = memoryCardMapper.selectById(id);
-                if (card != null) {
-                    sb.append("#").append(card.id).append(" ").append(card.title).append("：")
-                            .append(card.summary == null ? "" : card.summary.substring(0, Math.min(card.summary.length(), 180))).append("\n");
-                }
-            } catch (Exception ignored) {
-            }
+                ids.add(id);
+            } catch (Exception ignored) {}
+        }
+        if (ids.isEmpty()) return "";
+        java.util.List<MemoryCard> cards = memoryCardMapper.selectBatchIds(ids);
+        StringBuilder sb = new StringBuilder();
+        for (MemoryCard card : cards) {
+            sb.append("#").append(card.id).append(" ").append(card.title).append("：")
+                    .append(card.summary == null ? "" : card.summary.substring(0, Math.min(card.summary.length(), 180))).append("\n");
         }
         return sb.toString();
     }

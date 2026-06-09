@@ -222,12 +222,16 @@ async function saveEdit(field) {
   if (field === "theme") body.theme = value;
   if (field === "event") body.cognitiveSummary = value;
 
-  await IC.api("/api/daily-record/" + currentRecordId + "/edit", {
+  const r = await IC.api("/api/daily-record/" + currentRecordId + "/edit", {
     method: "POST",
     body: JSON.stringify(body)
   });
-  IC.toast("已保存", "success");
-  IC.pulse("settle");
+  if (r.success) {
+    IC.toast("已保存", "success");
+    IC.pulse("settle");
+  } else {
+    IC.toast(r.message || "保存失败", "warn");
+  }
   loadCurrent();
 }
 

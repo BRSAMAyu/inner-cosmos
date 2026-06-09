@@ -158,10 +158,6 @@ function updateTurnsDisplay() {
   if (remaining <= 0) {
     document.getElementById("composerArea").style.display = "none";
     document.getElementById("exhaustedHint").style.display = "block";
-    // Auto redirect to slow letter with pre-filled template after 2 seconds
-    setTimeout(() => {
-      window.location.href = `/pages/slow-letter.html?capsuleId=${capsuleId}&prefill=continue`;
-    }, 2000);
   }
 
   // Show warning when 1 round remains
@@ -190,21 +186,25 @@ function updateTurnsDisplay() {
 async function send() {
   const input = document.getElementById("msg");
   if (!input.value.trim() || !sid) return;
-
   const text = input.value.trim();
   addBubble(text, "user");
   input.value = "";
   usedTurns++;
   updateTurnsDisplay();
   IC.pulse("send");
-
   document.getElementById("typing").style.display = "block";
-  const r = await API.personaChatMessage(sid, text);
-  document.getElementById("typing").style.display = "none";
-
-  if (r.success && r.data) {
-    addBubble(r.data.textContent || r.data.content || "...", "ai");
-    IC.stagger(document.getElementById("chat"));
+  try {
+    const r = await API.personaChatMessage(sid, text);
+    document.getElementById("typing").style.display = "none";
+    if (r.success && r.data) {
+      addBubble(r.data.textContent || r.data.content || "...", "ai");
+      IC.stagger(document.getElementById("chat"));
+    } else {
+      IC.toast(r.message || "回声没有回应", "warn");
+    }
+  } catch (e) {
+    document.getElementById("typing").style.display = "none";
+    IC.toast("连接暂时不稳定，请稍后再试。", "warn");
   }
 }
 

@@ -209,29 +209,37 @@ async function sendLetter() {
   messageEl.textContent = "即将到达接收者的内宇宙...";
   statusEl.textContent = "请等待对方在安静的时刻打开";
 
-  const r = await API.letterSend(letterId);
-  if (r.success && r.data) {
-    await sleep(800);
+  try {
+    const r = await API.letterSend(letterId);
+    if (r.success && r.data) {
+      await sleep(800);
 
-    deliveryAnim.style.display = "none";
-    const out = document.getElementById("out");
-    out.style.display = "grid";
-    out.innerHTML = `
-      <div class="letter-result-success">
-        <div class="result-icon">✉</div>
-        <strong>慢信已投递</strong>
-        <p class="muted">状态：${r.data.status}。它会穿过一小段宇宙距离，而不是立刻打扰对方。</p>
-        <p class="muted">预计送达：${r.data.estimatedArrivalAt || "2-24 小时内"}</p>
-        <p class="gold">感谢你用文字传递了一份真诚的共鸣。</p>
-      </div>
-    `;
-    IC.toast("慢信已投递", "success");
-    IC.pulse("letter");
+      deliveryAnim.style.display = "none";
+      const out = document.getElementById("out");
+      out.style.display = "grid";
+      out.innerHTML = `
+        <div class="letter-result-success">
+          <div class="result-icon">✉</div>
+          <strong>慢信已投递</strong>
+          <p class="muted">状态：${r.data.status}。它会穿过一小段宇宙距离，而不是立刻打扰对方。</p>
+          <p class="muted">预计送达：${r.data.estimatedArrivalAt || "2-24 小时内"}</p>
+          <p class="gold">感谢你用文字传递了一份真诚的共鸣。</p>
+        </div>
+      `;
+      IC.toast("慢信已投递", "success");
+      IC.pulse("letter");
 
-    // Play completion sound
-    if (window.ICAudio && ICAudio.playInteraction) {
-      ICAudio.playInteraction("letter_sent");
+      // Play completion sound
+      if (window.ICAudio && ICAudio.playInteraction) {
+        ICAudio.playInteraction("letter_sent");
+      }
+    } else {
+      deliveryAnim.style.display = "none";
+      IC.toast(r.message || "投递失败，请稍后再试。", "warn");
     }
+  } catch (e) {
+    deliveryAnim.style.display = "none";
+    IC.toast("连接暂时不稳定，请稍后再试。", "warn");
   }
 }
 

@@ -11,6 +11,8 @@ import com.innercosmos.mapper.AuroraSelfReflectionMapper;
 import com.innercosmos.mapper.AuroraSelfStatementMapper;
 import com.innercosmos.service.AuroraConstitutionService;
 import com.innercosmos.service.AuroraSelfContinuityService;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -30,6 +32,7 @@ public class AuroraSelfContinuityServiceImpl implements AuroraSelfContinuityServ
     private final AuroraSelfModelMapper modelMapper;
     private final AuroraConstitutionService constitutionService;
     private final LlmClient llm;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     private static final List<String> FORBIDDEN_PATTERNS = List.of(
         // Chinese patterns
@@ -58,6 +61,7 @@ public class AuroraSelfContinuityServiceImpl implements AuroraSelfContinuityServ
 
     // Layer 1: Record public self statement
     @Override
+    @Transactional
     public void recordStatement(Long userId, Long sessionId, Long messageId,
                                 String statement, String trigger) {
         AuroraSelfStatement stmt = new AuroraSelfStatement();
@@ -72,6 +76,7 @@ public class AuroraSelfContinuityServiceImpl implements AuroraSelfContinuityServ
 
     // Layer 2: Log a self reflection event
     @Override
+    @Transactional
     public void logReflection(Long userId, String trigger, String depth, String summary,
                               Long relatedStatementId, List<String> evidenceRefs) {
         AuroraSelfReflection refl = new AuroraSelfReflection();
@@ -82,7 +87,7 @@ public class AuroraSelfContinuityServiceImpl implements AuroraSelfContinuityServ
         refl.relatedStatementId = relatedStatementId;
         refl.status = depth; // initial status = depth
         refl.evidenceRefs = evidenceRefs != null && !evidenceRefs.isEmpty()
-            ? "[\"" + String.join("\",\"", evidenceRefs) + "\"]"
+            ? writeJson(evidenceRefs)
             : null;
         refl.createdAt = LocalDateTime.now();
         reflectionMapper.insert(refl);
@@ -103,7 +108,7 @@ public class AuroraSelfContinuityServiceImpl implements AuroraSelfContinuityServ
         List<AuroraSelfReflection> candidates = reflectionMapper.selectList(wrapper);
 
         String evidenceJson = evidenceRefs != null && !evidenceRefs.isEmpty()
-            ? "[\"" + String.join("\",\"", evidenceRefs) + "\"]"
+            ? writeJson(evidenceRefs)
             : "[]";
 
         AuroraSelfReflection target;
@@ -164,7 +169,7 @@ public class AuroraSelfContinuityServiceImpl implements AuroraSelfContinuityServ
         model.dimension = candidate.dimension;
         model.belief = belief;
         model.confidence = candidate.confidence;
-        model.evidenceRefs = "[\"" + candidate.id + "\"]";
+        model.evidenceRefs = writeJson(List.of(String.valueOf(candidate.id)));
         model.status = "active";
         model.committedAt = LocalDateTime.now();
         model.revisionCount = existing.isEmpty() ? 1 : existing.size() + 1;
@@ -295,9 +300,9 @@ public class AuroraSelfContinuityServiceImpl implements AuroraSelfContinuityServ
         repair.dimension = "repair_history";
         repair.proposedBelief = repairAction;
         repair.confidence = 0.80;
-        repair.riskFlags = "[\"" + ruptureType + "\"]";
+        repair.riskFlags = writeJson(List.of(ruptureType));
         repair.evidenceRefs = userFeedback != null
-            ? "[\"user_feedback:" + userFeedback.replace("\"", "\\\"") + "\"]"
+            ? writeJson(List.of("user_feedback:" + userFeedback))
             : null;
         repair.createdAt = LocalDateTime.now();
         reflectionMapper.insert(repair);
@@ -341,5 +346,14 @@ public class AuroraSelfContinuityServiceImpl implements AuroraSelfContinuityServ
             if (lower.contains(pattern)) return false;
         }
         return true;
+    }
+
+    private String writeJson(List<String> values) {
+        try {
+            return objectMapper.writeValueAsString(values);
+        } catch (JsonProcessingException e) {
+            log.warn("Failed to serialize JSON: {}", e.getMessage());
+            return "[]";
+        }
     }
 }
