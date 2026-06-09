@@ -60,7 +60,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (SecurityContextHolder.getContext().getAuthentication() == null) {
             var httpSession = request.getSession(false);
             if (httpSession != null) {
-                Object uid = httpSession.getAttribute("userId");
+                Object uid = httpSession.getAttribute("LOGIN_USER_ID");
                 if (uid instanceof Long userId && userId > 0) {
                     User user = userMapper.selectById(userId);
                     if (user != null && "ACTIVE".equals(user.status)) {
