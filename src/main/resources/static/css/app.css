@@ -3253,7 +3253,7 @@ body.time-deep-night {
 /* ── Time-Period Color Variables (Morandi Day / Nebula Night) ── */
 /* These variables override :root values when specific time classes are applied */
 
-/* Dawn (晨曦) - Warm orange to rice white transition */
+/* Dawn (晨曦) - Restrained warm orange, gentle morning */
 body.time-dawn {
   --surface-warm: #faf2e4;
   --surface-mist: #f5ebe0;
@@ -3261,11 +3261,11 @@ body.time-dawn {
   --surface-blush: #f9eee0;
   --surface-blue: #f0ece4;
   --surface-sage: #f3ebe4;
-  --accent-sage: #c8b89a;
-  --accent-dusty-blue: #b8c4d0;
-  --accent-rose: #e0c8b8;
-  --accent-lavender: #c8c0d8;
-  --accent-coral: #d8b0a0;
+  --accent-sage: #b8aa90;
+  --accent-dusty-blue: #b0b8c4;
+  --accent-rose: #c8b4a8;
+  --accent-lavender: #b8b0c4;
+  --accent-coral: #c8a898;
   --ink: #3a342e;
   --text: #453f38;
   --muted: #787268;
@@ -3341,7 +3341,7 @@ body.time-afternoon {
   --glow-soft: 0 20px 58px rgba(200, 180, 140, .16), 0 7px 22px rgba(204, 168, 156, .09);
 }
 
-/* Dusk (暮色) - Golden purple transition */
+/* Dusk (暮色) - Restrained golden-purple, elegant transition */
 body.time-dusk {
   --surface-warm: #f5eee7;
   --surface-mist: #eee8e0;
@@ -3351,16 +3351,16 @@ body.time-dusk {
   --surface-sage: #e9ede2;
   --accent-sage: #a0a890;
   --accent-dusty-blue: #98a8b8;
-  --accent-rose: #c89888;
-  --accent-lavender: #a898b0;
-  --accent-coral: #c88070;
+  --accent-rose: #b89490;
+  --accent-lavender: #9a94a8;
+  --accent-coral: #b88a80;
   --ink: #3a3630;
   --text: #464038;
   --muted: #766d68;
   --line: rgba(130, 110, 80, .14);
   --line-strong: rgba(144, 128, 100, .32);
   --shadow: 0 16px 48px rgba(128, 110, 80, .11);
-  --glow-soft: 0 22px 62px rgba(184, 144, 96, .18), 0 8px 26px rgba(168, 128, 128, .10);
+  --glow-soft: 0 22px 62px rgba(184, 144, 96, .12), 0 8px 26px rgba(168, 128, 128, .08);
 }
 
 /* Night (夜色) - Warm nebula with candle glow */
@@ -4270,6 +4270,26 @@ textarea {
 
 .ambient-panel select {
   max-width: 150px;
+}
+
+/* Dark mode adaptation for ambient controls */
+body.dark-star .ambient-btn,
+body.dark-star .voice-mini {
+  background: rgba(42, 38, 34, .9);
+  border-color: rgba(163, 153, 143, .28);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .2);
+  color: var(--text);
+}
+body.dark-star .ambient-panel {
+  background: rgba(42, 38, 34, .94);
+  border-color: rgba(163, 153, 143, .2);
+  color: var(--text);
+}
+body.dark-star .ambient-panel select,
+body.dark-star .ambient-panel input {
+  background: rgba(30, 27, 24, .8);
+  border-color: rgba(163, 153, 143, .22);
+  color: var(--text);
 }
 
 @keyframes modal-rise {
