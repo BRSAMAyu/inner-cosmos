@@ -372,6 +372,40 @@
   </section>
 
   <section class="settings-section">
+    <h2>视觉主题</h2>
+    <p class="muted" style="font-size:.88rem;margin-bottom:12px">内宇宙的界面会随时间和天气自动变化。你可以选择跟随自然节奏，或固定为某种模式。</p>
+    <div class="theme-options">
+      <button class="theme-opt active" id="themeAuto" onclick="setThemeMode('auto')">
+        <span style="font-size:1.4rem">🌅</span>
+        <strong>自然节奏</strong>
+        <span class="muted" style="font-size:.78rem">白天暖色莫兰迪，夜晚温暖暗色</span>
+      </button>
+      <button class="theme-opt" id="themeLight" onclick="setThemeMode('light')">
+        <span style="font-size:1.4rem">☀️</span>
+        <strong>始终白昼</strong>
+        <span class="muted" style="font-size:.78rem">固定温暖莫兰迪，不受时间影响</span>
+      </button>
+      <button class="theme-opt" id="themeDark" onclick="setThemeMode('dark')">
+        <span style="font-size:1.4rem">🌙</span>
+        <strong>始终夜色</strong>
+        <span class="muted" style="font-size:.78rem">固定温暖暗色，烛光 + 星尘</span>
+      </button>
+    </div>
+    <style>
+      .theme-options { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:16px; }
+      .theme-opt {
+        display:flex; flex-direction:column; align-items:center; gap:6px;
+        padding:18px 14px; border-radius:var(--radius-card);
+        background:rgba(255,250,243,.55); border:2px solid var(--line);
+        cursor:pointer; transition:all .25s var(--ease-flow);
+      }
+      .theme-opt:hover { background:rgba(255,250,243,.85); transform:translateY(-1px); }
+      .theme-opt.active { border-color:var(--accent-sage); background:rgba(143,163,148,.12); }
+      .theme-opt strong { font-size:.92rem; color:var(--ink); }
+    </style>
+  </section>
+
+  <section class="settings-section">
     <h2>时间、天气与专注</h2>
     <div class="field">
       <label for="currentEnvironmentLabel">当前环境标签</label>
@@ -463,7 +497,36 @@ IC.mountShell("设置");
 IC.ensureDemoLogin().then(() => {
   loadAiHealth();
   loadProfile();
+  initThemeButtons();
 });
+
+function initThemeButtons() {
+  var mode = localStorage.getItem('ic_theme_mode') || 'auto';
+  document.querySelectorAll('.theme-opt').forEach(function(btn) { btn.classList.remove('active'); });
+  var map = { auto: 'themeAuto', light: 'themeLight', dark: 'themeDark' };
+  var el = document.getElementById(map[mode] || 'themeAuto');
+  if (el) el.classList.add('active');
+}
+
+function setThemeMode(mode) {
+  localStorage.setItem('ic_theme_mode', mode);
+  if (mode === 'auto') {
+    localStorage.setItem('ic_auto_theme', 'true');
+    localStorage.removeItem('ic_fixed_theme');
+    localStorage.removeItem('ic_visual_auto');
+  } else if (mode === 'light') {
+    localStorage.setItem('ic_auto_theme', 'false');
+    localStorage.setItem('ic_visual_auto', 'false');
+    localStorage.removeItem('ic_fixed_theme');
+  } else if (mode === 'dark') {
+    localStorage.setItem('ic_auto_theme', 'false');
+    localStorage.setItem('ic_visual_auto', 'false');
+    localStorage.setItem('ic_fixed_theme', 'time-night');
+  }
+  initThemeButtons();
+  if (window.ICTimeSystem) ICTimeSystem.updateTime();
+  IC.toast(mode === 'auto' ? '已切换为自然节奏模式' : mode === 'light' ? '已切换为白昼模式' : '已切换为夜色模式', 'success');
+}
 
 async function loadAiHealth() {
   const r = await API.aiHealth();
