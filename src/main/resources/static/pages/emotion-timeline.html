@@ -42,6 +42,23 @@
     .et-stat .num { font-size: 2rem; line-height: 1; color: var(--ink); }
     .et-pattern { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
     .et-pattern .pill { background: rgba(229,235,228,.6); }
+    /* ── Dark mode ── */
+    body.dark-star .et-hero {
+      background: linear-gradient(135deg, rgba(42,38,34,.68), rgba(37,33,29,.52));
+      border-color: rgba(163,153,143,.10);
+    }
+    body.dark-star .et-hero::before {
+      background: radial-gradient(circle at 65% 40%, rgba(166,122,124,.06), transparent 50%);
+    }
+    body.dark-star .et-stat {
+      background: rgba(42,38,34,.56);
+      border-color: rgba(163,153,143,.10);
+    }
+    body.dark-star .et-line { stroke: rgba(122,142,127,.55); }
+    body.dark-star .et-dot { fill: rgba(122,142,127,.75); }
+    body.dark-star .et-dot-key { fill: rgba(166,122,124,.80); }
+    body.dark-star .et-axis { stroke: rgba(163,153,143,.20); }
+    body.dark-star .et-label { fill: var(--muted); }
   </style>
 </head>
 <body>

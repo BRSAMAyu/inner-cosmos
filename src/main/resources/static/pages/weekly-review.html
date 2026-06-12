@@ -6,6 +6,13 @@
   <link rel="stylesheet" href="/css/app.css">
   <title>成长周报 · Inner Cosmos</title>
   <style>
+    /* Page hero */
+    .weekly-hero { padding: 0 0 28px; margin-bottom: 24px;
+      background: radial-gradient(ellipse 50% 60% at 30% 30%, rgba(184,194,174,.10), transparent),
+                  radial-gradient(ellipse 40% 50% at 70% 40%, rgba(165,179,194,.08), transparent); }
+    .weekly-hero h1 { font-family: var(--font-hero); font-size: clamp(1.8rem,4vw,2.6rem); margin: 0 0 8px; }
+    .weekly-hero p { color: var(--muted); line-height: 1.7; }
+    /* Content hero */
     .wr-hero {
       padding: 36px 32px;
       border-radius: var(--radius-flow);
@@ -48,15 +55,25 @@
       background: rgba(143,163,148,.22);
       border-color: var(--line-strong);
     }
+    /* Dark mode */
+    body.dark-star .weekly-hero { background: radial-gradient(ellipse 50% 60% at 30% 30%, rgba(122,142,127,.06), transparent); }
+    body.dark-star .wr-hero { background: rgba(30,35,40,.6); border-color: rgba(60,70,80,.4); }
+    body.dark-star .wr-stat { background: rgba(30,35,40,.7); border-color: rgba(60,70,80,.4); }
+    body.dark-star .wr-section { background: rgba(30,35,40,.7); border-color: rgba(60,70,80,.4); }
+    body.dark-star .wr-day { background: rgba(30,35,40,.6); border-color: rgba(60,70,80,.35); }
+    body.dark-star .wr-aurora-note { background: linear-gradient(135deg, rgba(120,90,100,.2), rgba(100,120,100,.15)); border-color: rgba(60,70,80,.4); }
+    body.dark-star .regenerate-btn { background: rgba(143,163,148,.15); border-color: rgba(60,70,80,.4); }
   </style>
 </head>
 <body>
 <main id="main" class="shell">
   <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
-  <span class="route-hint">一周的内在总结</span>
-  <h1 id="page-title">成长周报</h1>
-  <p class="muted mb-2">过去 7 天你的内在宇宙发生了什么。系统会从记忆、情绪、待办、主题等多个维度生成一份只属于你的总结。</p>
+  <section class="weekly-hero">
+    <span class="route-hint">一周的内在总结</span>
+    <h1 id="page-title">成长周报</h1>
+    <p>过去 7 天你的内在宇宙发生了什么。系统会从记忆、情绪、待办、主题等多个维度生成一份只属于你的总结。</p>
+  </section>
 
   <button class="regenerate-btn mb-2" onclick="generate()">重新生成这一周</button>
 

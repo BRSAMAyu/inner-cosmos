@@ -5,17 +5,28 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>AI 架构演进 · Inner Cosmos</title>
   <link rel="stylesheet" href="/css/app.css">
+  <style>
+    .dev-hero { padding: 0 0 28px; margin-bottom: 24px;
+      background: radial-gradient(ellipse 50% 60% at 30% 30%, rgba(184,194,174,.10), transparent),
+                  radial-gradient(ellipse 40% 50% at 70% 40%, rgba(165,179,194,.08), transparent); }
+    .dev-hero h1 { font-family: var(--font-hero); font-size: clamp(1.8rem,4vw,2.6rem); margin: 0 0 8px; }
+    .dev-hero p { color: var(--muted); line-height: 1.7; }
+    body.dark-star .dev-hero { background: radial-gradient(ellipse 50% 60% at 30% 30%, rgba(122,142,127,.06), transparent); }
+    body.dark-star .panel { background: rgba(30,35,40,.88); border-color: rgba(60,70,80,.4); }
+    body.dark-star .card { background: rgba(30,35,40,.82); border-color: rgba(60,70,80,.35); }
+    body.dark-star .soft-stage { background: rgba(30,35,40,.6); border-color: rgba(60,70,80,.35); }
+  </style>
 </head>
 <body>
 <main id="main" class="shell">
   <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
 
-  <div class="text-center mb-2" style="padding:16px 0">
+  <section class="dev-hero">
     <span class="route-hint">人机协作过程</span>
     <h1 id="page-title">AI 共创记录</h1>
-    <p class="muted">这个项目的每一步，都是人类构思与 AI 执行共同完成的结果。</p>
-  </div>
+    <p>这个项目的每一步，都是人类构思与 AI 执行共同完成的结果。</p>
+  </section>
 
   <!-- Project overview -->
   <section class="panel mb-2">

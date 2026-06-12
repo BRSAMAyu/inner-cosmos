@@ -12,103 +12,195 @@
       align-items: center;
       justify-content: center;
       padding: 24px;
+      position: relative;
     }
+    /* Ambient background */
+    .login-shell::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 50% 60% at 20% 25%, rgba(184,194,174,.10), transparent),
+        radial-gradient(ellipse 40% 50% at 80% 70%, rgba(168,161,184,.08), transparent),
+        radial-gradient(ellipse 30% 40% at 50% 50%, rgba(200,144,96,.05), transparent);
+      pointer-events: none;
+      z-index: 0;
+    }
+    /* Floating stardust */
+    .login-shell::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(1px 1px at 15% 30%, rgba(184,194,174,.36), transparent),
+        radial-gradient(1px 1px at 40% 60%, rgba(200,192,187,.28), transparent),
+        radial-gradient(1.2px 1.2px at 65% 20%, rgba(184,194,174,.24), transparent),
+        radial-gradient(1px 1px at 85% 75%, rgba(168,161,184,.30), transparent),
+        radial-gradient(1px 1px at 30% 85%, rgba(200,192,187,.22), transparent);
+      pointer-events: none;
+      z-index: 0;
+      animation: login-stardust 20s var(--ease-drift) infinite alternate;
+    }
+    @keyframes login-stardust {
+      0% { opacity: .5; transform: translateY(0); }
+      100% { opacity: .8; transform: translateY(-6px); }
+    }
+
     .login-card {
+      position: relative;
+      z-index: 1;
       width: 100%;
-      max-width: 420px;
-      background: var(--surface-paper);
+      max-width: 440px;
+      background:
+        linear-gradient(180deg, rgba(255,250,243,.78), rgba(247,242,236,.62)),
+        rgba(255,250,243,.56);
+      border: 1px solid rgba(255,255,255,.32);
       border-radius: var(--radius-flow);
-      box-shadow: var(--glow-soft);
-      padding: 48px 36px 40px;
+      backdrop-filter: blur(28px) saturate(120%);
+      box-shadow:
+        0 4px 16px rgba(0,0,0,.04),
+        0 24px 64px rgba(0,0,0,.10),
+        inset 0 1px 0 rgba(255,255,255,.40);
+      padding: 48px 40px 40px;
+      animation: card-enter 800ms var(--ease-bloom) both;
     }
-    .login-card h1 {
-      font-size: 1.6rem;
-      margin: 0 0 4px;
+    @keyframes card-enter {
+      from { opacity: 0; transform: translateY(20px) scale(.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .login-brand {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+    .login-brand-mark {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background:
+        linear-gradient(135deg, var(--accent-sage), var(--accent-dusty-blue) 52%, var(--accent-rose));
+      box-shadow: 0 0 0 6px rgba(143,163,148,.12), 0 0 24px rgba(143,163,148,.18);
+      margin-bottom: 16px;
+    }
+    .login-brand h1 {
+      font-family: var(--font-hero);
+      font-size: 2rem;
+      margin: 0 0 8px;
       color: var(--ink);
       letter-spacing: .02em;
     }
-    .login-card .subtitle {
-      font-size: .88rem;
+    .login-brand .subtitle {
+      font-size: .9375rem;
       color: var(--muted);
-      margin-bottom: 32px;
+      line-height: 1.6;
     }
+
     .field {
       margin-bottom: 20px;
     }
     .field label {
       display: block;
-      font-size: .82rem;
+      font-size: .8125rem;
       color: var(--muted);
       margin-bottom: 6px;
+      letter-spacing: .02em;
     }
     .field input {
       width: 100%;
-      padding: 12px 14px;
-      font-size: .95rem;
+      padding: 12px 16px;
+      font-size: .9375rem;
+      font-family: var(--font-body);
       border: 1px solid var(--line);
       border-radius: var(--radius);
-      background: var(--surface-warm);
+      background: rgba(247,242,236,.48);
       color: var(--text);
-      transition: border-color .2s;
+      transition: border-color 260ms var(--ease-flow), box-shadow 260ms var(--ease-flow);
     }
     .field input:focus {
       outline: none;
       border-color: var(--accent-sage);
-      box-shadow: 0 0 0 3px rgba(143, 163, 148, .15);
+      box-shadow: 0 0 0 3px rgba(143,163,148,.12);
+      background: rgba(247,242,236,.64);
     }
+
     .login-btn {
       width: 100%;
       padding: 14px;
       font-size: 1rem;
+      font-family: var(--font-body);
       font-weight: 600;
       color: #fff;
-      background: var(--accent-sage);
+      background: linear-gradient(135deg, var(--accent-sage), var(--accent-dusty-blue));
       border: none;
       border-radius: var(--radius);
       cursor: pointer;
-      transition: opacity .2s, transform .1s;
+      transition: opacity 260ms var(--ease-flow), transform 180ms var(--ease-flow), box-shadow 260ms var(--ease-flow);
       margin-top: 8px;
+      box-shadow: 0 4px 16px rgba(143,163,148,.24);
     }
-    .login-btn:hover { opacity: .9; }
+    .login-btn:hover {
+      opacity: .92;
+      box-shadow: 0 6px 20px rgba(143,163,148,.32);
+    }
     .login-btn:active { transform: scale(.98); }
     .login-btn:disabled {
       opacity: .5;
       cursor: not-allowed;
     }
+    .login-btn.secondary {
+      background: linear-gradient(135deg, var(--accent-dusty-blue), var(--accent-lavender));
+      box-shadow: 0 4px 16px rgba(165,179,194,.20);
+    }
+    .login-btn.secondary:hover {
+      box-shadow: 0 6px 20px rgba(165,179,194,.28);
+    }
+
     .demo-hint {
-      font-size: .78rem;
+      font-size: .8125rem;
       color: var(--faint);
       text-align: center;
-      margin-top: 20px;
-      padding-top: 16px;
+      margin-top: 24px;
+      padding-top: 20px;
       border-top: 1px solid var(--line);
+      line-height: 1.6;
     }
     .demo-hint code {
-      background: var(--surface-mist);
-      padding: 2px 6px;
+      background: rgba(160,155,180,.08);
+      padding: 2px 8px;
       border-radius: 4px;
-      font-size: .76rem;
+      font-size: .8125rem;
+      font-family: var(--font-mono);
     }
+
     .error-box {
-      padding: 10px 14px;
-      margin-bottom: 16px;
+      padding: 12px 16px;
+      margin-bottom: 20px;
       border-radius: var(--radius);
-      background: rgba(200, 147, 145, .12);
+      background: rgba(200,147,145,.10);
+      border: 1px solid rgba(200,147,145,.16);
       color: var(--accent-coral);
-      font-size: .88rem;
+      font-size: .875rem;
       display: none;
+      line-height: 1.5;
     }
     .error-box.visible { display: block; }
+
     .link-row {
       text-align: center;
-      margin-top: 16px;
-      font-size: .88rem;
+      margin-top: 20px;
+      font-size: .875rem;
+      color: var(--muted);
     }
     .link-row a {
       color: var(--accent-dusty-blue);
       text-decoration: none;
+      transition: color 260ms var(--ease-flow);
     }
-    .link-row a:hover { text-decoration: underline; }
+    .link-row a:hover { color: var(--ink); text-decoration: underline; }
+
     .loader {
       display: inline-block;
       width: 16px;
@@ -121,17 +213,59 @@
       margin-right: 6px;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Dark mode ── */
+    body.dark-star .login-shell::before {
+      background:
+        radial-gradient(ellipse 50% 60% at 20% 25%, rgba(122,142,127,.08), transparent),
+        radial-gradient(ellipse 40% 50% at 80% 70%, rgba(154,144,167,.06), transparent),
+        radial-gradient(ellipse 30% 40% at 50% 50%, rgba(192,144,96,.04), transparent);
+    }
+    body.dark-star .login-shell::after {
+      background:
+        radial-gradient(1px 1px at 15% 30%, rgba(200,144,96,.24), transparent),
+        radial-gradient(1px 1px at 40% 60%, rgba(207,201,193,.16), transparent),
+        radial-gradient(1.2px 1.2px at 65% 20%, rgba(134,152,169,.20), transparent),
+        radial-gradient(1px 1px at 85% 75%, rgba(192,144,96,.18), transparent);
+    }
+    body.dark-star .login-card {
+      background:
+        linear-gradient(180deg, rgba(42,38,34,.76), rgba(37,33,29,.60)),
+        rgba(42,38,34,.52);
+      border-color: rgba(163,153,143,.14);
+      box-shadow:
+        0 4px 16px rgba(0,0,0,.12),
+        0 24px 64px rgba(0,0,0,.24),
+        inset 0 1px 0 rgba(255,255,255,.04);
+    }
+    body.dark-star .field input {
+      background: rgba(30,27,24,.56);
+      border-color: rgba(163,153,143,.18);
+    }
+    body.dark-star .field input:focus {
+      background: rgba(30,27,24,.72);
+      border-color: rgba(143,163,148,.40);
+      box-shadow: 0 0 0 3px rgba(143,163,148,.08);
+    }
+
     @media (prefers-reduced-motion: reduce) {
       .loader { animation: none; }
       .login-btn { transition: none; }
+      .login-card { animation: none; }
+    }
+    @media (max-width: 480px) {
+      .login-card { padding: 36px 24px 32px; }
     }
   </style>
 </head>
 <body>
   <div class="login-shell">
     <div class="login-card">
-      <h1 id="page-title">Inner Cosmos</h1>
-      <p class="subtitle">温柔的自我整理空间</p>
+      <div class="login-brand">
+        <div class="login-brand-mark"></div>
+        <h1 id="page-title">Inner Cosmos</h1>
+        <p class="subtitle">温柔的自我整理空间</p>
+      </div>
 
       <div id="error" class="error-box" role="alert"></div>
 
@@ -146,7 +280,7 @@
       </div>
 
       <button id="loginBtn" class="login-btn" onclick="doLogin()">进入内宇宙</button>
-      <button id="guestBtn" class="login-btn" style="background:var(--accent-dusty-blue)" onclick="guestLogin()">游客体验 Demo</button>
+      <button id="guestBtn" class="login-btn secondary" onclick="guestLogin()">游客体验 Demo</button>
 
       <div class="demo-hint">
         游客体验会进入演示账号：<code>demo</code> / <code>demo123</code>
@@ -167,10 +301,10 @@
     });
 
     async function doLogin() {
-      const btn = document.getElementById("loginBtn");
-      const errBox = document.getElementById("error");
-      const user = document.getElementById("username").value.trim();
-      const pass = document.getElementById("password").value;
+      var btn = document.getElementById("loginBtn");
+      var errBox = document.getElementById("error");
+      var user = document.getElementById("username").value.trim();
+      var pass = document.getElementById("password").value;
 
       if (!user || !pass) {
         errBox.textContent = "请输入用户名和密码。";
@@ -183,7 +317,7 @@
       errBox.classList.remove("visible");
 
       try {
-        const r = await IC.api("/api/auth/login", {
+        var r = await IC.api("/api/auth/login", {
           method: "POST",
           body: JSON.stringify({ username: user, password: pass })
         });
@@ -205,10 +339,10 @@
     }
 
     async function guestLogin() {
-      const btn = document.getElementById("guestBtn");
+      var btn = document.getElementById("guestBtn");
       btn.disabled = true;
       btn.innerHTML = '<span class="loader"></span>正在进入游客宇宙...';
-      const r = await IC.guestLogin();
+      var r = await IC.guestLogin();
       if (r.success) location.href = "/pages/dashboard.html";
       else {
         btn.disabled = false;

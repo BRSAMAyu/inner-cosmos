@@ -6,6 +6,12 @@
   <link rel="stylesheet" href="/css/app.css">
   <title>心声日记 - Inner Cosmos</title>
   <style>
+    /* Hero */
+    .diary-hero { padding: 0 0 28px; margin-bottom: 24px;
+      background: radial-gradient(ellipse 50% 60% at 30% 30%, rgba(184,194,174,.10), transparent),
+                  radial-gradient(ellipse 40% 50% at 70% 40%, rgba(165,179,194,.08), transparent); }
+    .diary-hero h1 { font-family: var(--font-hero); font-size: clamp(1.8rem,4vw,2.6rem); margin: 0 0 8px; }
+    .diary-hero p { color: var(--muted); line-height: 1.7; }
     /* Hand-written paper theme styling */
     .diary-paper {
       background: linear-gradient(rgba(255, 255, 255, 0.82), rgba(255, 250, 243, 0.72)), var(--surface-paper);
@@ -88,6 +94,13 @@
       0% { transform: translateY(0) scale(1); opacity: 1; }
       100% { transform: translateY(-300px) scale(0); opacity: 0; }
     }
+    /* Dark mode */
+    body.dark-star .diary-hero { background: radial-gradient(ellipse 50% 60% at 30% 30%, rgba(122,142,127,.06), transparent); }
+    body.dark-star .diary-paper { background: linear-gradient(rgba(30,35,40,.82), rgba(35,40,48,.72)); border-color: rgba(60,70,80,.4); }
+    body.dark-star .diary-textarea { color: var(--ink); }
+    body.dark-star .diary-paper::before { background: rgba(191,150,152,.12); }
+    body.dark-star .polish-btn-group button { background: rgba(30,35,40,.5); border-color: rgba(60,70,80,.4); }
+    body.dark-star .polish-btn-group button.active { background: rgba(143,163,148,.22); border-color: rgba(60,70,80,.5); }
   </style>
 </head>
 <body>
@@ -95,9 +108,11 @@
   <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
 
-  <span class="route-hint">记录流淌的内在</span>
-  <h1 id="page-title">心声日记</h1>
-  <p class="muted mb-2">不必有逻辑地去写，甚至可以直接用麦克风倾诉。我们为你提取意义。</p>
+  <section class="diary-hero">
+    <span class="route-hint">记录流淌的内在</span>
+    <h1 id="page-title">心声日记</h1>
+    <p>不必有逻辑地去写，甚至可以直接用麦克风倾诉。我们为你提取意义。</p>
+  </section>
 
   <div class="letter-layout">
     <!-- Writing section -->

@@ -5,18 +5,220 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>信箱 · Inner Cosmos</title>
   <link rel="stylesheet" href="/css/app.css">
+  <style>
+    /* ── Inbox — slow connection mailbox ── */
+    .inbox-hero {
+      position: relative;
+      min-height: 28vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 0 0 40px;
+      background:
+        radial-gradient(ellipse 55% 70% at 30% 25%, rgba(165,179,194,.10), transparent),
+        radial-gradient(ellipse 45% 55% at 70% 35%, rgba(184,194,174,.08), transparent),
+        linear-gradient(180deg, var(--surface-warm) 0%, transparent 100%);
+      overflow: hidden;
+    }
+    .inbox-hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(1px 1px at 18% 35%, rgba(165,179,194,.30), transparent),
+        radial-gradient(1px 1px at 45% 60%, rgba(184,194,174,.24), transparent),
+        radial-gradient(1.2px 1.2px at 72% 22%, rgba(165,179,194,.20), transparent),
+        radial-gradient(1px 1px at 88% 70%, rgba(184,194,174,.26), transparent);
+      pointer-events: none;
+      animation: inbox-drift 18s var(--ease-drift) infinite alternate;
+    }
+    @keyframes inbox-drift {
+      0% { opacity: .5; transform: translateY(0); }
+      100% { opacity: .8; transform: translateY(-5px); }
+    }
+    .inbox-hero-title {
+      font-family: var(--font-hero);
+      font-size: clamp(2rem, 4.5vw, 3.2rem);
+      color: var(--ink);
+      margin: 0 0 10px;
+      position: relative;
+      z-index: 1;
+    }
+    .inbox-hero-sub {
+      font-size: 1rem;
+      color: var(--muted);
+      line-height: 1.7;
+      max-width: 480px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── Tab bar ── */
+    .inbox-tabs {
+      display: flex;
+      gap: 4px;
+      background: rgba(160,155,180,.05);
+      border-radius: var(--radius);
+      padding: 4px;
+      margin-bottom: 24px;
+    }
+    .inbox-tabs button {
+      flex: 1;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--muted);
+      font-family: var(--font-body);
+      font-size: .875rem;
+      cursor: pointer;
+      transition: all 260ms var(--ease-flow);
+    }
+    .inbox-tabs button:hover { color: var(--ink); }
+    .inbox-tabs button.active {
+      background: var(--surface-paper);
+      color: var(--ink);
+      box-shadow: 0 2px 8px rgba(0,0,0,.05);
+    }
+
+    /* ── Letter list ── */
+    .inbox-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* ── Letter card ── */
+    .letter-card {
+      position: relative;
+      background:
+        linear-gradient(180deg, rgba(255,250,243,.68), rgba(247,242,236,.44)),
+        var(--surface-paper);
+      border: 1px solid rgba(255,255,255,.20);
+      border-radius: var(--radius-card);
+      padding: 20px 24px;
+      cursor: pointer;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 2px 8px rgba(0,0,0,.03), 0 8px 32px rgba(0,0,0,.05);
+      transition: transform 400ms var(--ease-bloom), box-shadow 400ms var(--ease-bloom);
+      opacity: 0;
+      transform: translateY(12px);
+      animation: card-reveal 600ms var(--ease-bloom) forwards;
+    }
+    .letter-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 16px rgba(0,0,0,.06), 0 16px 48px rgba(0,0,0,.08);
+    }
+    @keyframes card-reveal {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .letter-card.unread {
+      border-left: 3px solid var(--accent-dusty-blue);
+    }
+    .letter-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .letter-card-title {
+      font-size: 1rem;
+      font-weight: 500;
+      color: var(--ink);
+    }
+    .letter-card-preview {
+      color: var(--muted);
+      font-size: .875rem;
+      line-height: 1.6;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+    .letter-card-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: .8125rem;
+    }
+
+    /* ── Empty state ── */
+    .inbox-empty {
+      text-align: center;
+      padding: 56px 24px;
+      color: var(--faint);
+    }
+    .inbox-empty-icon {
+      font-size: 2rem;
+      margin-bottom: 12px;
+      opacity: .35;
+    }
+
+    /* ── Modal ── */
+    .letter-paper-reading {
+      background:
+        linear-gradient(180deg, rgba(255,250,243,.72), rgba(247,242,236,.52));
+      border: 1px solid rgba(255,255,255,.18);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 16px;
+      line-height: 1.8;
+      white-space: pre-wrap;
+    }
+
+    /* ── Dark mode ── */
+    body.dark-star .inbox-hero {
+      background:
+        radial-gradient(ellipse 55% 70% at 30% 25%, rgba(134,152,169,.06), transparent),
+        radial-gradient(ellipse 45% 55% at 70% 35%, rgba(122,142,127,.05), transparent),
+        linear-gradient(180deg, var(--surface-warm) 0%, transparent 100%);
+    }
+    body.dark-star .inbox-hero::before {
+      background:
+        radial-gradient(1px 1px at 18% 35%, rgba(134,152,169,.18), transparent),
+        radial-gradient(1px 1px at 45% 60%, rgba(192,144,96,.16), transparent),
+        radial-gradient(1px 1px at 72% 22%, rgba(134,152,169,.14), transparent);
+    }
+    body.dark-star .inbox-tabs button.active {
+      background: rgba(42,38,34,.80);
+    }
+    body.dark-star .letter-card {
+      background:
+        linear-gradient(180deg, rgba(42,38,34,.68), rgba(37,33,29,.48)),
+        rgba(42,38,34,.40);
+      border-color: rgba(163,153,143,.10);
+      box-shadow: 0 2px 8px rgba(0,0,0,.08), 0 8px 32px rgba(0,0,0,.16);
+    }
+    body.dark-star .letter-card:hover {
+      box-shadow: 0 4px 16px rgba(0,0,0,.12), 0 16px 48px rgba(0,0,0,.22);
+    }
+    body.dark-star .letter-paper-reading {
+      background: rgba(42,38,34,.60);
+      border-color: rgba(163,153,143,.12);
+    }
+
+    @media (max-width: 640px) {
+      .inbox-hero { min-height: 22vh; padding-bottom: 28px; }
+      .letter-card { padding: 16px; }
+    }
+  </style>
 </head>
 <body>
 <main id="main" class="shell">
   <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
 
-  <span class="route-hint">慢连接信箱</span>
-  <h1 id="page-title">慢信箱</h1>
-  <p class="muted mb-2">每一封信都穿过了一段宇宙距离。</p>
+  <!-- Hero -->
+  <section class="inbox-hero">
+    <span class="route-hint">慢连接信箱</span>
+    <h1 class="inbox-hero-title" id="page-title">慢信箱</h1>
+    <p class="inbox-hero-sub">每一封信都穿过了一段宇宙距离。不催促，不焦虑。</p>
+  </section>
 
   <!-- Tab bar -->
-  <div class="tab-bar">
+  <div class="inbox-tabs">
     <button class="active" onclick="switchTab('inbox', this)">收信</button>
     <button onclick="switchTab('outbox', this)">寄出</button>
     <button onclick="switchTab('drafts', this)">草稿</button>
@@ -24,13 +226,13 @@
   </div>
 
   <!-- Letter list -->
-  <section id="letterList" class="timeline"></section>
+  <section id="letterList" class="inbox-list"></section>
 
   <!-- Letter detail modal -->
   <div id="letterModal" class="modal-overlay hidden">
     <div class="modal-box">
-      <div class="flex-between mb-2">
-        <h2 id="modalTitle">信件详情</h2>
+      <div class="flex-between" style="margin-bottom:20px">
+        <h2 id="modalTitle" style="font-family:var(--font-hero)">信件详情</h2>
         <button onclick="closeLetterDetail()">关闭</button>
       </div>
       <div id="modalContent"></div>
@@ -48,43 +250,37 @@
 IC.mountShell("慢信箱");
 IC.ensureDemoLogin().then(load);
 
-let allInbox = [];
-let allOutbox = [];
-let currentTab = "inbox";
+var allInbox = [];
+var allOutbox = [];
+var currentTab = "inbox";
 
 function esc(text) { return IC.esc(text); }
 
 async function load() {
-  const [inboxResp, outboxResp] = await Promise.all([API.letterInbox(), API.letterOutbox()]);
-  allInbox = (inboxResp.success ? inboxResp.data : []) || [];
-  allOutbox = (outboxResp.success ? outboxResp.data : []) || [];
+  var results = await Promise.all([API.letterInbox(), API.letterOutbox()]);
+  allInbox = (results[0].success ? results[0].data : []) || [];
+  allOutbox = (results[1].success ? results[1].data : []) || [];
   renderTab();
 }
 
 function switchTab(tab, el) {
   currentTab = tab;
-  document.querySelectorAll(".tab-bar button").forEach(btn => btn.classList.remove("active"));
+  document.querySelectorAll(".inbox-tabs button").forEach(function(btn) { btn.classList.remove("active"); });
   if (el) el.classList.add("active");
   renderTab();
 }
 
 function statusBadge(status) {
-  const map = {
-    DRAFT: "badge-read",
-    SENT: "badge-read",
-    DELIVERED: "badge-new",
-    READ: "badge-replied",
-    REPLIED: "badge-replied",
-    DECLINED: "badge-declined",
-    BLOCKED: "badge-declined",
-    ARCHIVED: "badge-read",
-    NEW: "badge-new"
+  var map = {
+    DRAFT: "badge-read", SENT: "badge-read", DELIVERED: "badge-new",
+    READ: "badge-replied", REPLIED: "badge-replied", DECLINED: "badge-declined",
+    BLOCKED: "badge-declined", ARCHIVED: "badge-read", NEW: "badge-new"
   };
   return map[status] || "badge-read";
 }
 
 function statusLabel(status) {
-  const map = {
+  var map = {
     DRAFT: "草稿", SENT: "已发送", DELIVERED: "已送达", READ: "已读",
     REPLIED: "已回复", DECLINED: "已婉拒", BLOCKED: "已屏蔽", ARCHIVED: "已归档", NEW: "新信"
   };
@@ -92,82 +288,69 @@ function statusLabel(status) {
 }
 
 function renderTab() {
-  let letters = [];
+  var letters = [];
   switch (currentTab) {
-    case "inbox": letters = allInbox.filter(l => l.status !== "ARCHIVED"); break;
-    case "outbox": letters = allOutbox.filter(l => l.status !== "ARCHIVED"); break;
-    case "drafts": letters = allOutbox.filter(l => l.status === "DRAFT"); break;
-    case "archived": letters = [...allInbox, ...allOutbox].filter(l => l.status === "ARCHIVED"); break;
+    case "inbox": letters = allInbox.filter(function(l) { return l.status !== "ARCHIVED"; }); break;
+    case "outbox": letters = allOutbox.filter(function(l) { return l.status !== "ARCHIVED"; }); break;
+    case "drafts": letters = allOutbox.filter(function(l) { return l.status === "DRAFT"; }); break;
+    case "archived": letters = [].concat(allInbox, allOutbox).filter(function(l) { return l.status === "ARCHIVED"; }); break;
   }
 
-  const list = document.getElementById("letterList");
+  var list = document.getElementById("letterList");
   if (!letters.length) {
-    const emptyMsgs = {
-      inbox: "暂时没有收信。",
-      outbox: "还没有寄出的慢信。",
-      drafts: "没有草稿。",
-      archived: "没有归档的信件。"
-    };
-    list.innerHTML = IC.empty(emptyMsgs[currentTab]);
+    var msgs = { inbox: "暂时没有收信。", outbox: "还没有寄出的慢信。", drafts: "没有草稿。", archived: "没有归档的信件。" };
+    list.innerHTML = '<div class="inbox-empty"><div class="inbox-empty-icon">~</div><p>' + IC.empty(msgs[currentTab]) + '</p></div>';
     return;
   }
 
-  list.innerHTML = letters.map(l => `
-    <article class="panel timeline-item" style="cursor:pointer" onclick="openLetter(${l.id}, '${currentTab === 'inbox' ? 'in' : 'out'}')">
-      <div class="flex-between mb-1">
-        <strong>${esc(l.title || "无标题")}</strong>
-        <span class="badge ${statusBadge(l.status)}">${statusLabel(l.status)}</span>
-      </div>
-      <p class="muted">${esc((l.letterBody || "").substring(0, 100))}${(l.letterBody || "").length > 100 ? "..." : ""}</p>
-      <div class="row gap-sm mt-1">
-        <span class="muted" style="font-size:.78rem">${IC.formatTime(l.createdAt)}</span>
-        ${l.status === "DELIVERED" ? '<span class="badge badge-new">新</span>' : ""}
-      </div>
-    </article>
-  `).join("");
-  IC.stagger(list);
+  list.innerHTML = letters.map(function(l, idx) {
+    var delay = Math.min(idx * 60, 480);
+    var isUnread = l.status === "DELIVERED" || l.status === "NEW";
+    return '<article class="letter-card' + (isUnread ? ' unread' : '') + '" style="animation-delay:' + delay + 'ms" onclick="openLetter(' + l.id + ',\'' + (currentTab === "inbox" ? "in" : "out") + '\')">' +
+      '<div class="letter-card-header">' +
+        '<strong class="letter-card-title">' + esc(l.title || "无标题") + '</strong>' +
+        '<span class="badge ' + statusBadge(l.status) + '">' + statusLabel(l.status) + '</span>' +
+      '</div>' +
+      '<p class="letter-card-preview">' + esc((l.letterBody || "").substring(0, 120)) + ((l.letterBody || "").length > 120 ? "..." : "") + '</p>' +
+      '<div class="letter-card-footer">' +
+        '<span class="muted">' + IC.formatTime(l.createdAt) + '</span>' +
+        (isUnread ? '<span class="badge badge-new">新</span>' : '') +
+      '</div>' +
+    '</article>';
+  }).join("");
 }
 
 async function openLetter(id, direction) {
-  const r = await API.letterDetail(id);
+  var r = await API.letterDetail(id);
   if (!r.success || !r.data) { IC.toast("无法加载信件", "warn"); return; }
-  const l = r.data;
+  var l = r.data;
 
   document.getElementById("modalTitle").textContent = l.title || "信件详情";
-  document.getElementById("modalContent").innerHTML = `
-    <div class="letter-paper soft-stage mb-2" style="padding:18px;border-radius:var(--radius)">
-      <p style="white-space:pre-wrap;line-height:1.8">${esc(l.letterBody || "")}</p>
-    </div>
-    <div class="soft-stage mb-2">
-      <h3>送达时间线</h3>
-      <div class="timeline mt-1">
-        <div class="timeline-item"><strong>创建</strong><p class="muted">${IC.formatTime(l.createdAt)}</p></div>
-        ${l.sentAt ? `<div class="timeline-item"><strong>发送</strong><p class="muted">${IC.formatTime(l.sentAt)}</p></div>` : ""}
-        ${l.deliveredAt ? `<div class="timeline-item"><strong>送达</strong><p class="muted">${IC.formatTime(l.deliveredAt)}</p></div>` : ""}
-        ${l.readAt ? `<div class="timeline-item"><strong>已读</strong><p class="muted">${IC.formatTime(l.readAt)}</p></div>` : ""}
-      </div>
-      <div class="pill-row mt-1"><span class="badge ${statusBadge(l.status)}">${statusLabel(l.status)}</span></div>
-    </div>
-    <div class="row gap-sm">
-      ${direction === "in" && (l.status === "DELIVERED" || l.status === "READ") ? `
-        <button onclick="letterAction(${l.id}, 'read')">标记已读</button>
-        <button onclick="letterAction(${l.id}, 'reply')">回复慢信</button>
-        <button onclick="letterAction(${l.id}, 'decline')">婉拒</button>
-      ` : ""}
-      <button onclick="letterAction(${l.id}, 'archive')">归档</button>
-      ${direction === "in" ? `
-        <button onclick="letterAction(${l.id}, 'block')" style="color:var(--accent-coral)">屏蔽</button>
-        <button onclick="reportLetter(${l.id})" style="color:var(--accent-coral)">举报</button>
-      ` : ""}
-    </div>
-  `;
+  document.getElementById("modalContent").innerHTML =
+    '<div class="letter-paper-reading">' + esc(l.letterBody || "") + '</div>' +
+    '<div style="padding:16px;background:rgba(160,155,180,.04);border-radius:var(--radius);margin-bottom:16px">' +
+      '<h3 style="font-size:.9375rem;margin-bottom:10px">送达时间线</h3>' +
+      '<div style="display:flex;flex-direction:column;gap:6px;font-size:.875rem">' +
+        '<div class="muted"><strong>创建</strong> ' + IC.formatTime(l.createdAt) + '</div>' +
+        (l.sentAt ? '<div class="muted"><strong>发送</strong> ' + IC.formatTime(l.sentAt) + '</div>' : '') +
+        (l.deliveredAt ? '<div class="muted"><strong>送达</strong> ' + IC.formatTime(l.deliveredAt) + '</div>' : '') +
+        (l.readAt ? '<div class="muted"><strong>已读</strong> ' + IC.formatTime(l.readAt) + '</div>' : '') +
+      '</div>' +
+      '<div style="margin-top:10px"><span class="badge ' + statusBadge(l.status) + '">' + statusLabel(l.status) + '</span></div>' +
+    '</div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+      (direction === "in" && (l.status === "DELIVERED" || l.status === "READ") ?
+        '<button onclick="letterAction(' + l.id + ',\'read\')">标记已读</button>' +
+        '<button onclick="letterAction(' + l.id + ',\'reply\')">回复慢信</button>' +
+        '<button onclick="letterAction(' + l.id + ',\'decline\')">婉拒</button>' : '') +
+      '<button onclick="letterAction(' + l.id + ',\'archive\')">归档</button>' +
+      (direction === "in" ?
+        '<button onclick="letterAction(' + l.id + ',\'block\')" style="color:var(--accent-coral)">屏蔽</button>' +
+        '<button onclick="reportLetter(' + l.id + ')" style="color:var(--accent-coral)">举报</button>' : '') +
+    '</div>';
 
   document.getElementById("letterModal").classList.remove("hidden");
-
-  /* Mark as read if new */
-  if (l.status === "DELIVERED") {
-    await API.letterRead(id);
-  }
+  if (l.status === "DELIVERED") await API.letterRead(id);
 }
 
 function closeLetterDetail() {
@@ -175,12 +358,12 @@ function closeLetterDetail() {
 }
 
 async function letterAction(id, action) {
-  const actionMap = {
-    read: () => API.letterRead(id),
-    reply: () => API.letterReply(id),
-    decline: () => API.letterDecline(id),
-    block: () => API.letterBlock(id),
-    archive: () => API.letterArchive(id)
+  var actionMap = {
+    read: function() { return API.letterRead(id); },
+    reply: function() { return API.letterReply(id); },
+    decline: function() { return API.letterDecline(id); },
+    block: function() { return API.letterBlock(id); },
+    archive: function() { return API.letterArchive(id); }
   };
   if (actionMap[action]) {
     await actionMap[action]();
@@ -191,19 +374,19 @@ async function letterAction(id, action) {
 }
 
 function reportLetter(id) {
-  IC.showModal(`
-    <h2>举报信件</h2>
-    <p class="muted mb-2">请描述你觉得不适的内容。</p>
-    <textarea id="reportReason" placeholder="请描述举报原因..." style="min-height:100px"></textarea>
-    <div class="row gap-sm mt-2">
-      <button onclick="submitReport(${id})">提交举报</button>
-      <button onclick="IC.closeModal()">取消</button>
-    </div>
-  `);
+  IC.showModal(
+    '<h2>举报信件</h2>' +
+    '<p class="muted" style="margin-bottom:16px">请描述你觉得不适的内容。</p>' +
+    '<textarea id="reportReason" placeholder="请描述举报原因..." style="min-height:100px;width:100%;padding:12px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface-paper);color:var(--text);font-family:var(--font-body)"></textarea>' +
+    '<div style="display:flex;gap:8px;margin-top:16px">' +
+      '<button onclick="submitReport(' + id + ')">提交举报</button>' +
+      '<button onclick="IC.closeModal()">取消</button>' +
+    '</div>'
+  );
 }
 
 async function submitReport(id) {
-  const reason = document.getElementById("reportReason").value;
+  var reason = document.getElementById("reportReason").value;
   await API.letterReport(id, reason);
   IC.closeModal();
   IC.toast("举报已提交", "success");

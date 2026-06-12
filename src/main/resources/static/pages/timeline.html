@@ -6,6 +6,13 @@
   <title>成长时间轴 - Inner Cosmos</title>
   <link rel="stylesheet" href="/css/app.css">
   <style>
+    /* ── Timeline hero ── */
+    .timeline-hero { padding: 0 0 28px; margin-bottom: 24px;
+      background: radial-gradient(ellipse 50% 60% at 30% 30%, rgba(184,194,174,.10), transparent),
+                  radial-gradient(ellipse 40% 50% at 70% 40%, rgba(165,179,194,.08), transparent); }
+    .timeline-hero h1 { font-family: var(--font-hero); font-size: clamp(1.8rem,4vw,2.6rem); margin: 0 0 8px; }
+    .timeline-hero p { color: var(--muted); max-width: 560px; line-height: 1.7; }
+    /* ── Timeline ── */
     .cosmos-timeline { position: relative; padding: 12px 0 40px; }
     .cosmos-timeline::before { content:""; position:absolute; left:160px; top:0; bottom:0; width:2px; background:linear-gradient(#d8cbb9,#9caf9f,#c7b7a3); }
     .axis-item { display:grid; grid-template-columns:130px 34px 1fr; gap:14px; align-items:start; margin:0 0 24px; }
@@ -15,21 +22,26 @@
     .axis-card { border-left:4px solid rgba(156,175,154,.45); animation:slideIn .42s ease both; }
     @keyframes slideIn { from { opacity:0; transform:translateX(18px); } to { opacity:1; transform:none; } }
     @media (max-width:720px){ .cosmos-timeline::before{left:18px}.axis-item{grid-template-columns:34px 1fr}.axis-date{grid-column:2;text-align:left;padding:0}.axis-node{grid-column:1;grid-row:1 / span 2}.axis-card{grid-column:2} }
+    body.dark-star .timeline-hero { background: radial-gradient(ellipse 50% 60% at 30% 30%, rgba(122,142,127,.06), transparent), radial-gradient(ellipse 40% 50% at 70% 40%, rgba(134,152,169,.04), transparent); }
+    body.dark-star .axis-node { border-color: rgba(42,38,34,.95); box-shadow: 0 0 0 1px var(--line), 0 0 28px rgba(122,142,127,.24); }
   </style>
 </head>
 <body>
 <main id="main" class="shell">
   <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
-  <section class="flex-between mb-2" style="flex-wrap:wrap;gap:12px">
-    <div>
-      <span class="route-hint">成长轨迹</span>
-      <h1 id="page-title">成长时间轴</h1>
-      <p class="muted">这里不是列表，而是 Aurora 和你的日记、对话、记忆共同沉淀出的时间轨迹。</p>
-    </div>
-    <div class="row gap-sm">
-      <input type="date" id="datePicker" onchange="loadByDate()">
-      <button onclick="loadAll()">全部</button>
+  <!-- Hero -->
+  <section class="timeline-hero">
+    <div class="flex-between" style="flex-wrap:wrap;gap:12px">
+      <div>
+        <span class="route-hint">成长轨迹</span>
+        <h1 id="page-title">成长时间轴</h1>
+        <p>Aurora 和你的日记、对话、记忆共同沉淀出的时间轨迹。</p>
+      </div>
+      <div class="row gap-sm">
+        <input type="date" id="datePicker" onchange="loadByDate()">
+        <button onclick="loadAll()">全部</button>
+      </div>
     </div>
   </section>
 

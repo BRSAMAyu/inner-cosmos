@@ -5,62 +5,315 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>慢信 · Inner Cosmos</title>
   <link rel="stylesheet" href="/css/app.css">
+  <style>
+    /* ── Slow Letter — letter-writing ceremony ── */
+    .letter-hero {
+      position: relative;
+      min-height: 24vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 0 0 36px;
+      background:
+        radial-gradient(ellipse 50% 65% at 30% 30%, rgba(165,179,194,.10), transparent),
+        radial-gradient(ellipse 40% 50% at 70% 40%, rgba(184,194,174,.08), transparent),
+        linear-gradient(180deg, var(--surface-warm) 0%, transparent 100%);
+      overflow: hidden;
+    }
+    .letter-hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(1px 1px at 20% 25%, rgba(165,179,194,.26), transparent),
+        radial-gradient(1px 1px at 55% 60%, rgba(184,194,174,.22), transparent),
+        radial-gradient(1.2px 1.2px at 80% 18%, rgba(165,179,194,.18), transparent);
+      pointer-events: none;
+    }
+    .letter-hero-title {
+      font-family: var(--font-hero);
+      font-size: clamp(2rem, 4vw, 3rem);
+      color: var(--ink);
+      margin: 0 0 8px;
+      position: relative;
+      z-index: 1;
+    }
+    .letter-hero-sub {
+      font-size: .9375rem;
+      color: var(--muted);
+      line-height: 1.6;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── Letter layout ── */
+    .letter-layout {
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 24px;
+      align-items: start;
+    }
+    @media (max-width: 800px) {
+      .letter-layout { grid-template-columns: 1fr; }
+    }
+
+    /* ── Writing panel ── */
+    .letter-write-panel {
+      background:
+        linear-gradient(180deg, rgba(255,250,243,.72), rgba(247,242,236,.52)),
+        var(--surface-paper);
+      border: 1px solid rgba(255,255,255,.22);
+      border-radius: var(--radius-card);
+      backdrop-filter: blur(16px);
+      box-shadow: 0 4px 16px rgba(0,0,0,.04), 0 16px 48px rgba(0,0,0,.06);
+      padding: 32px;
+    }
+    .letter-write-panel h2 {
+      font-family: var(--font-hero);
+      font-size: 1.4rem;
+      margin-bottom: 8px;
+    }
+
+    /* ── Letter paper texture ── */
+    .letter-paper-area {
+      background:
+        linear-gradient(180deg, rgba(255,250,243,.56), rgba(247,242,236,.32));
+      border: 1px solid rgba(255,255,255,.16);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+
+    /* ── Form fields ── */
+    .letter-field {
+      margin-bottom: 20px;
+    }
+    .letter-field label {
+      display: block;
+      font-size: .8125rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+      letter-spacing: .02em;
+    }
+    .letter-input {
+      width: 100%;
+      padding: 12px 16px;
+      font-size: .9375rem;
+      font-family: var(--font-body);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(247,242,236,.48);
+      color: var(--text);
+      transition: border-color 260ms var(--ease-flow), box-shadow 260ms var(--ease-flow);
+    }
+    .letter-input:focus {
+      outline: none;
+      border-color: var(--accent-sage);
+      box-shadow: 0 0 0 3px rgba(143,163,148,.10);
+    }
+    .letter-textarea {
+      min-height: 200px;
+      resize: vertical;
+      line-height: 1.8;
+    }
+    .letter-textarea-wrapper {
+      position: relative;
+    }
+    .writing-guidance {
+      padding: 8px 0;
+    }
+    .guidance-tip {
+      font-size: .8125rem;
+      color: var(--faint);
+      font-style: italic;
+      transition: color 300ms var(--ease-flow);
+    }
+    .char-count {
+      font-size: .8125rem;
+      color: var(--faint);
+      text-align: right;
+      margin-top: 4px;
+    }
+
+    /* ── Actions ── */
+    .letter-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 24px;
+    }
+    .letter-actions .send-primary {
+      background: linear-gradient(135deg, var(--accent-dusty-blue), var(--accent-sage));
+      color: #fff;
+      border: none;
+      box-shadow: 0 4px 12px rgba(143,163,148,.20);
+    }
+
+    /* ── Delivery animation ── */
+    .delivery-animation {
+      text-align: center;
+      padding: 40px 20px;
+    }
+    .delivery-message {
+      font-family: var(--font-hero);
+      font-size: 1.2rem;
+      margin-top: 16px;
+    }
+    .delivery-status {
+      font-size: .875rem;
+      margin-top: 8px;
+    }
+    .envelope-wrapper {
+      display: inline-block;
+      animation: envelope-float 3s var(--ease-flow) infinite;
+    }
+    @keyframes envelope-float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+
+    /* ── Guide sidebar ── */
+    .letter-guide {
+      background:
+        linear-gradient(180deg, rgba(255,250,243,.56), rgba(247,242,236,.40)),
+        var(--surface-paper);
+      border: 1px solid rgba(255,255,255,.18);
+      border-radius: var(--radius-card);
+      backdrop-filter: blur(12px);
+      box-shadow: 0 2px 8px rgba(0,0,0,.03), 0 8px 24px rgba(0,0,0,.04);
+      padding: 24px;
+      position: sticky;
+      top: 80px;
+    }
+    .letter-guide h2 {
+      font-family: var(--font-hero);
+      font-size: 1.2rem;
+      margin-bottom: 16px;
+    }
+    .letter-guide h3 {
+      font-size: .9375rem;
+      margin-bottom: 8px;
+    }
+    .guide-questions {
+      background: rgba(160,155,180,.04);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .guide-questions p {
+      color: var(--muted);
+      font-size: .875rem;
+      line-height: 1.7;
+      margin-bottom: 4px;
+    }
+
+    /* ── Result success ── */
+    .letter-result-success {
+      text-align: center;
+      padding: 32px 20px;
+    }
+    .result-icon {
+      font-size: 2rem;
+      margin-bottom: 12px;
+      opacity: .6;
+    }
+
+    /* ── No capsule state ── */
+    .letter-no-receiver {
+      text-align: center;
+      padding: 64px 24px;
+    }
+    .letter-no-receiver h2 {
+      font-family: var(--font-hero);
+      font-size: 1.4rem;
+      margin-bottom: 12px;
+    }
+
+    /* ── Dark mode ── */
+    body.dark-star .letter-hero {
+      background:
+        radial-gradient(ellipse 50% 65% at 30% 30%, rgba(134,152,169,.06), transparent),
+        radial-gradient(ellipse 40% 50% at 70% 40%, rgba(122,142,127,.05), transparent),
+        linear-gradient(180deg, var(--surface-warm) 0%, transparent 100%);
+    }
+    body.dark-star .letter-write-panel {
+      background:
+        linear-gradient(180deg, rgba(42,38,34,.68), rgba(37,33,29,.48)),
+        rgba(42,38,34,.36);
+      border-color: rgba(163,153,143,.10);
+      box-shadow: 0 4px 16px rgba(0,0,0,.08), 0 16px 48px rgba(0,0,0,.16);
+    }
+    body.dark-star .letter-paper-area {
+      background: rgba(42,38,34,.40);
+      border-color: rgba(163,153,143,.08);
+    }
+    body.dark-star .letter-input,
+    body.dark-star .letter-textarea {
+      background: rgba(30,27,24,.56);
+      border-color: rgba(163,153,143,.16);
+    }
+    body.dark-star .letter-input:focus,
+    body.dark-star .letter-textarea:focus {
+      border-color: rgba(143,163,148,.36);
+      box-shadow: 0 0 0 3px rgba(143,163,148,.06);
+    }
+    body.dark-star .letter-guide {
+      background: rgba(42,38,34,.52);
+      border-color: rgba(163,153,143,.10);
+      box-shadow: 0 2px 8px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.12);
+    }
+    body.dark-star .guide-questions {
+      background: rgba(30,27,24,.40);
+    }
+  </style>
 </head>
 <body>
 <main id="main" class="shell">
   <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
 
-  <section class="letter-layout">
-    <!-- Writing area with enhanced paper texture -->
-    <article class="panel letter-paper-texture">
-      <span class="route-hint">慢连接 · 穿过宇宙距离的对话</span>
-      <div class="letter-header">
-        <h2>写一封慢信</h2>
-        <p class="muted mb-2">你不需要索取回应，只要真诚表达是哪一句话让你停下来了。</p>
+  <!-- Hero -->
+  <section class="letter-hero">
+    <span class="route-hint">慢连接 · 穿过宇宙距离的对话</span>
+    <h1 class="letter-hero-title">写一封慢信</h1>
+    <p class="letter-hero-sub">你不需要索取回应，只要真诚表达是哪一句话让你停下来了。</p>
+  </section>
+
+  <section class="letter-layout" id="letterContent">
+    <!-- Writing area -->
+    <article class="letter-write-panel">
+      <div class="letter-field">
+        <label for="receiverName">收信人（回声化名）</label>
+        <input id="receiverName" class="letter-input" placeholder="例如：柔雾回声" readonly>
+        <input type="hidden" id="receiverCapsuleId">
       </div>
 
-      <div class="letter-body-wrapper">
-        <div class="field-group mb-2">
-          <label for="receiverName">收信人（回声化名）</label>
-          <input id="receiverName" placeholder="例如：柔雾回声" readonly class="letter-input">
-          <input type="hidden" id="receiverCapsuleId">
-        </div>
+      <div class="letter-field">
+        <label for="title">给这封信一个标题</label>
+        <input id="title" class="letter-input" placeholder="例如：关于那一次共鸣">
+      </div>
 
-        <div class="field-group mb-2">
-          <label for="title">给这封信一个标题</label>
-          <input id="title" placeholder="例如：关于那一次共鸣" class="letter-input">
-        </div>
-
-        <div class="field-group mb-2">
-          <label for="letterBody">信的内容</label>
-          <div class="letter-textarea-wrapper">
-            <textarea id="letterBody" placeholder="你可以写：我在哪一点上感到共鸣；我希望对方知道什么；我不急着得到回复。" style="min-height:200px" oninput="updateCount()" class="letter-textarea"></textarea>
-            <div class="writing-guidance">
-              <span class="guidance-tip" id="guidanceTip">开始写下你的感受...</span>
-            </div>
+      <div class="letter-field">
+        <label for="letterBody">信的内容</label>
+        <div class="letter-textarea-wrapper">
+          <textarea id="letterBody" class="letter-input letter-textarea" placeholder="你可以写：我在哪一点上感到共鸣；我希望对方知道什么；我不急着得到回复。" oninput="updateCount()"></textarea>
+          <div class="writing-guidance">
+            <span class="guidance-tip" id="guidanceTip">开始写下你的感受...</span>
           </div>
-          <span id="charCount" class="muted" style="font-size:.82rem">0 / 2000 字</span>
         </div>
+        <div class="char-count" id="charCount">0 / 2000 字</div>
       </div>
 
-      <div class="row gap-sm mb-2">
+      <div class="letter-actions">
         <button onclick="draft()">保存草稿</button>
-        <button onclick="sendLetter()">投递慢信</button>
+        <button class="send-primary" onclick="sendLetter()">投递慢信</button>
         <a class="button" href="/pages/inbox.html">查看信箱</a>
       </div>
 
-      <!-- Enhanced delivery animation with star trail -->
+      <!-- Delivery animation -->
       <div id="deliveryAnim" class="delivery-animation" style="display:none">
-        <div class="delivery-path">
-          <div class="envelope-wrapper">
-            <div class="envelope">
-              <div class="envelope-flap"></div>
-              <div class="envelope-body"></div>
-              <div class="star-trail"></div>
-            </div>
-          </div>
-          <div class="destination-star"></div>
+        <div class="envelope-wrapper">
+          <div style="font-size:3rem;opacity:.5">✉</div>
         </div>
         <p class="gold delivery-message">慢信正在穿过宇宙距离...</p>
         <p class="muted delivery-status">正在寻找接收者的坐标...</p>
@@ -70,23 +323,23 @@
       <div id="out" class="soft-stage" style="display:none"></div>
     </article>
 
-    <!-- Letter guide -->
-    <aside class="panel letter-guide">
+    <!-- Guide sidebar -->
+    <aside class="letter-guide">
       <h2>写信引导</h2>
-      <div class="soft-stage mb-2">
+      <div class="guide-questions">
         <p>是哪句话让你停下来了？</p>
         <p>你在哪一点上感到共鸣？</p>
         <p>你希望对方知道你怎样的经历？</p>
       </div>
-      <p class="gold">慢信不是搭讪，它是一种郑重的靠近。</p>
+      <p class="gold" style="font-size:.9375rem;line-height:1.6">慢信不是搭讪，它是一种郑重的靠近。</p>
 
-      <h3 class="mt-2">安全提示</h3>
-      <p class="muted">不要在信中暴露真实身份信息。如果收到让你不适的内容，可以婉拒或举报。</p>
+      <h3 style="margin-top:20px">安全提示</h3>
+      <p class="muted" style="font-size:.875rem;line-height:1.6">不要在信中暴露真实身份信息。如果收到让你不适的内容，可以婉拒或举报。</p>
 
-      <h3 class="mt-2">预计送达时间</h3>
-      <p class="muted" id="deliveryEstimate">慢信会在 2-24 小时内送达，而不是立刻打扰对方。</p>
+      <h3 style="margin-top:20px">预计送达时间</h3>
+      <p class="muted" id="deliveryEstimate" style="font-size:.875rem">慢信会在 2-24 小时内送达，而不是立刻打扰对方。</p>
 
-      <div class="mt-2">
+      <div style="margin-top:24px">
         <a class="button w-full text-center" href="/pages/safety-harbor.html">需要帮助？安全避风港</a>
       </div>
     </aside>
@@ -101,23 +354,25 @@
 <script src="/js/api.js"></script>
 <script>
 IC.mountShell("写慢信");
-
 IC.ensureDemoLogin();
 
-let letterId = null;
-let receiverUserId = null;
-const urlParams = new URLSearchParams(window.location.search);
-const capsuleIdParam = urlParams.get("capsuleId");
+var letterId = null;
+var receiverUserId = null;
+var urlParams = new URLSearchParams(window.location.search);
+var capsuleIdParam = urlParams.get("capsuleId");
 
 if (!capsuleIdParam) {
-  document.querySelector(".letter-paper-texture").innerHTML = '<div style="text-align:center;padding:40px 20px"><h2>请先选择一个共鸣体作为收信人</h2><p class="muted mt-1">你需要先在星海广场选择一个共鸣体，再写慢信。</p><a class="button mt-2" href="/pages/echo-plaza.html">前往星海广场</a></div>';
+  document.getElementById("letterContent").innerHTML =
+    '<div class="letter-no-receiver">' +
+      '<h2>请先选择一个共鸣体作为收信人</h2>' +
+      '<p class="muted" style="margin-bottom:16px">你需要先在星海广场选择一个共鸣体，再写慢信。</p>' +
+      '<a class="button" href="/pages/echo-plaza.html">前往星海广场</a>' +
+    '</div>';
 }
 
-/* Pre-fill from URL */
 if (capsuleIdParam) {
   document.getElementById("receiverCapsuleId").value = capsuleIdParam;
-  /* Try to load capsule name and owner info */
-  API.capsuleDetail(Number(capsuleIdParam)).then(r => {
+  API.capsuleDetail(Number(capsuleIdParam)).then(function(r) {
     if (r.success && r.data) {
       document.getElementById("receiverName").value = r.data.pseudonym;
       receiverUserId = r.data.ownerId || r.data.userId || null;
@@ -125,114 +380,82 @@ if (capsuleIdParam) {
   });
 }
 
-function esc(text) { return IC.esc(text); }
-
 function updateCount() {
-  const len = document.getElementById("letterBody").value.length;
-  document.getElementById("charCount").textContent = `${len} / 2000 字`;
-  if (len > 2000) {
-    document.getElementById("charCount").style.color = "var(--accent-coral)";
-  } else {
-    document.getElementById("charCount").style.color = "";
-  }
-
-  // Update guidance based on content
+  var len = document.getElementById("letterBody").value.length;
+  document.getElementById("charCount").textContent = len + " / 2000 字";
+  document.getElementById("charCount").style.color = len > 2000 ? "var(--accent-coral)" : "";
   updateGuidance(len);
 }
 
 function updateGuidance(length) {
-  const tip = document.getElementById("guidanceTip");
-  if (length === 0) {
-    tip.textContent = "开始写下你的感受...";
-  } else if (length < 50) {
-    tip.textContent = "很好，继续表达你在哪一点上产生了共鸣...";
-  } else if (length < 150) {
-    tip.textContent = "你可以写写希望对方知道你怎样的经历...";
-  } else if (length < 300) {
-    tip.textContent = "慢慢来，不急着得到回复，真诚表达就好...";
-  } else {
-    tip.textContent = "你的话语正在沉淀，准备好再检查一遍...";
-  }
+  var tip = document.getElementById("guidanceTip");
+  if (length === 0) tip.textContent = "开始写下你的感受...";
+  else if (length < 50) tip.textContent = "很好，继续表达你在哪一点上产生了共鸣...";
+  else if (length < 150) tip.textContent = "你可以写写希望对方知道你怎样的经历...";
+  else if (length < 300) tip.textContent = "慢慢来，不急着得到回复，真诚表达就好...";
+  else tip.textContent = "你的话语正在沉淀，准备好再检查一遍...";
 }
 
 async function draft() {
-  const capsuleId = Number(document.getElementById("receiverCapsuleId").value);
+  var capsuleId = Number(document.getElementById("receiverCapsuleId").value);
   if (!capsuleId) { IC.toast("请先选择收信人", "warn"); return; }
-  const data = {
+  var data = {
     receiverUserId: receiverUserId,
     receiverCapsuleId: capsuleId,
     title: document.getElementById("title").value,
     letterBody: document.getElementById("letterBody").value
   };
-
-  const r = await API.letterDraft(data);
+  var r = await API.letterDraft(data);
   if (r.success && r.data) {
     letterId = r.data.id;
-    const out = document.getElementById("out");
+    var out = document.getElementById("out");
     out.style.display = "grid";
-    out.innerHTML = `<strong>草稿已保存</strong><p class="muted">预计送达：${r.data.estimatedArrivalAt || "稍后"}</p><p class="muted">状态：${r.data.status || "草稿"}</p>`;
+    out.innerHTML = "<strong>草稿已保存</strong><p class='muted'>预计送达：" + (r.data.estimatedArrivalAt || "稍后") + "</p><p class='muted'>状态：" + (r.data.status || "草稿") + "</p>";
     IC.toast("草稿已保存", "success");
     IC.pulse("letter");
   }
 }
 
+function sleep(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
+
 async function sendLetter() {
   if (!letterId) await draft();
   if (!letterId) { IC.toast("请先写一些内容", "warn"); return; }
 
-  /* Show enhanced delivery animation with ceremony */
-  const deliveryAnim = document.getElementById("deliveryAnim");
+  var deliveryAnim = document.getElementById("deliveryAnim");
   deliveryAnim.style.display = "block";
+  var messageEl = deliveryAnim.querySelector(".delivery-message");
+  var statusEl = deliveryAnim.querySelector(".delivery-status");
 
-  // Animate the delivery stages
-  const messageEl = deliveryAnim.querySelector(".delivery-message");
-  const statusEl = deliveryAnim.querySelector(".delivery-status");
-
-  // Stage 1: Seal envelope
   messageEl.textContent = "正在封缄这封信...";
   statusEl.textContent = "你的话语正在被保存";
-
   await sleep(800);
 
-  // Stage 2: Launch into cosmos
   messageEl.textContent = "慢信正在穿过宇宙距离...";
   statusEl.textContent = "正在寻找接收者的坐标";
-
-  const envelope = deliveryAnim.querySelector(".envelope");
-  if (envelope) {
-    envelope.classList.add("launching");
-  }
-
   await sleep(1200);
 
-  // Stage 3: Arriving
   messageEl.textContent = "即将到达接收者的内宇宙...";
   statusEl.textContent = "请等待对方在安静的时刻打开";
 
   try {
-    const r = await API.letterSend(letterId);
+    var r = await API.letterSend(letterId);
     if (r.success && r.data) {
       await sleep(800);
-
       deliveryAnim.style.display = "none";
-      const out = document.getElementById("out");
+      var out = document.getElementById("out");
       out.style.display = "grid";
-      out.innerHTML = `
-        <div class="letter-result-success">
-          <div class="result-icon">✉</div>
-          <strong>慢信已投递</strong>
-          <p class="muted">状态：${r.data.status}。它会穿过一小段宇宙距离，而不是立刻打扰对方。</p>
-          <p class="muted">预计送达：${r.data.estimatedArrivalAt || "2-24 小时内"}</p>
-          <p class="gold">感谢你用文字传递了一份真诚的共鸣。</p>
-        </div>
-      `;
+      out.innerHTML =
+        '<div class="letter-result-success">' +
+          '<div class="result-icon">✉</div>' +
+          '<strong>慢信已投递</strong>' +
+          '<p class="muted" style="margin-top:8px">状态：' + r.data.status + '。它会穿过一小段宇宙距离，而不是立刻打扰对方。</p>' +
+          '<p class="muted">预计送达：' + (r.data.estimatedArrivalAt || "2-24 小时内") + '</p>' +
+          '<p class="gold" style="margin-top:12px">感谢你用文字传递了一份真诚的共鸣。</p>' +
+        '</div>';
       IC.toast("慢信已投递", "success");
       IC.pulse("letter");
-
-      // Play completion sound
-      if (window.ICAudio && ICAudio.playInteraction) {
-        ICAudio.playInteraction("letter_sent");
-      }
+      if (window.ICAudio && ICAudio.playInteraction) ICAudio.playInteraction("letter_sent");
     } else {
       deliveryAnim.style.display = "none";
       IC.toast(r.message || "投递失败，请稍后再试。", "warn");
@@ -241,10 +464,6 @@ async function sendLetter() {
     deliveryAnim.style.display = "none";
     IC.toast("连接暂时不稳定，请稍后再试。", "warn");
   }
-}
-
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
 }
 IC.hideLoading();
 </script>

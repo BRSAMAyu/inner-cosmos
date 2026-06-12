@@ -6,7 +6,13 @@
   <link rel="stylesheet" href="/css/app.css">
   <title>信念画廊 · Inner Cosmos</title>
   <style>
-    .belief-card {
+    /* Hero */
+    .beliefs-hero { padding: 0 0 28px; margin-bottom: 24px;
+      background: radial-gradient(ellipse 50% 60% at 30% 30%, rgba(184,194,174,.10), transparent),
+                  radial-gradient(ellipse 40% 50% at 70% 40%, rgba(165,179,194,.08), transparent); }
+    .beliefs-hero h1 { font-family: var(--font-hero); font-size: clamp(1.8rem,4vw,2.6rem); margin: 0 0 8px; }
+    .beliefs-hero p { color: var(--muted); line-height: 1.7; }
+    /* Belief cards */
       padding: 18px;
       border-radius: var(--radius-flow);
       background: rgba(255,250,243,.55);
@@ -28,15 +34,25 @@
     .belief-category { padding: 2px 8px; border-radius: 999px; background: rgba(151,169,186,.18); color: rgba(90,110,135,.85); }
     .contradiction-pair { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: center; padding: 16px; border-radius: var(--radius); background: rgba(241,230,227,.5); border: 1px solid rgba(200,147,145,.3); margin-bottom: 12px; }
     .contradiction-pair .vs { font-weight: 700; color: rgba(180,90,90,.7); }
+    /* Dark mode */
+    body.dark-star .beliefs-hero { background: radial-gradient(ellipse 50% 60% at 30% 30%, rgba(122,142,127,.06), transparent); }
+    body.dark-star .belief-card { background: rgba(30,35,40,.7); border-color: rgba(60,70,80,.4); }
+    body.dark-star .belief-card.strong { background: rgba(30,45,35,.6); border-color: rgba(60,80,60,.35); }
+    body.dark-star .belief-card.contradiction { background: rgba(50,30,30,.6); border-left-color: rgba(200,147,145,.5); }
+    body.dark-star .contradiction-pair { background: rgba(40,30,30,.5); border-color: rgba(80,50,50,.35); }
+    body.dark-star .belief-text { color: var(--ink); }
+    body.dark-star .panel { background: rgba(30,35,40,.88); border-color: rgba(60,70,80,.4); }
   </style>
 </head>
 <body>
 <main id="main" class="shell">
   <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
-  <span class="route-hint">你的潜在信念</span>
-  <h1 id="page-title">信念画廊</h1>
-  <p class="muted mb-2">系统从你的记忆里识别出反复出现的潜在信念 —— 那些你以为只是"想法"，但其实在悄悄影响你决策的模式。互相矛盾的信念会用红色高亮。</p>
+  <section class="beliefs-hero">
+    <span class="route-hint">你的潜在信念</span>
+    <h1 id="page-title">信念画廊</h1>
+    <p>系统从你的记忆里识别出反复出现的潜在信念 -- 那些你以为只是"想法"，但其实在悄悄影响你决策的模式。互相矛盾的信念会用红色高亮。</p>
+  </section>
 
   <!-- Aurora Self Panel (M6) -->
   <div class="aurora-self-panel" id="auroraSelfPanel" style="display:none">

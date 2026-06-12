@@ -1,25 +1,342 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Aurora - Inner Cosmos</title>
   <link rel="stylesheet" href="/css/app.css">
+  <style>
+    /* ── Aurora Chat — quiet conversation cabin ── */
+    .aurora-hero {
+      position: relative;
+      padding: 28px 0 24px;
+      background:
+        radial-gradient(ellipse 45% 60% at 20% 30%, rgba(143,163,148,.10), transparent),
+        radial-gradient(ellipse 35% 50% at 80% 40%, rgba(168,161,184,.08), transparent);
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 24px;
+    }
+    .aurora-hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(1px 1px at 12% 25%, rgba(143,163,148,.28), transparent),
+        radial-gradient(1px 1px at 45% 60%, rgba(168,161,184,.22), transparent),
+        radial-gradient(1.2px 1.2px at 78% 18%, rgba(143,163,148,.20), transparent);
+      pointer-events: none;
+      animation: aurora-shimmer 16s var(--ease-drift) infinite alternate;
+    }
+    @keyframes aurora-shimmer {
+      0% { opacity: .4; }
+      100% { opacity: .7; }
+    }
+    .aurora-hero-inner {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      flex-wrap: wrap;
+      position: relative;
+      z-index: 1;
+    }
+    .aurora-hero-text h1 {
+      font-family: var(--font-hero);
+      font-size: clamp(1.8rem, 3.5vw, 2.6rem);
+      margin: 0 0 6px;
+      color: var(--ink);
+    }
+    .aurora-hero-text .subtitle {
+      font-size: .9375rem;
+      color: var(--muted);
+      line-height: 1.6;
+      max-width: 480px;
+    }
+    .aurora-hero-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .model-picker {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: .8125rem;
+      color: var(--muted);
+    }
+    .model-picker select {
+      padding: 6px 10px;
+      font-size: .8125rem;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface-paper);
+      color: var(--text);
+      font-family: var(--font-body);
+    }
+
+    /* ── Mode selector ── */
+    .aurora-modes {
+      display: flex;
+      gap: 4px;
+      background: rgba(160,155,180,.05);
+      border-radius: var(--radius);
+      padding: 4px;
+      margin-top: 16px;
+      position: relative;
+      z-index: 1;
+    }
+    .aurora-modes button {
+      flex: 1;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--muted);
+      font-family: var(--font-body);
+      font-size: .875rem;
+      cursor: pointer;
+      transition: all 260ms var(--ease-flow);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .aurora-modes button:hover { color: var(--ink); }
+    .aurora-modes button.active {
+      background: var(--surface-paper);
+      color: var(--ink);
+      box-shadow: 0 2px 8px rgba(0,0,0,.05);
+    }
+    .mode-note {
+      font-size: .8125rem;
+      color: var(--faint);
+      margin-top: 8px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── AI status ── */
+    .ai-status {
+      font-size: .8125rem;
+      color: var(--faint);
+      margin-top: 10px;
+      position: relative;
+      z-index: 1;
+    }
+    .ai-status-dot {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent-sage);
+      margin-right: 6px;
+      vertical-align: middle;
+      animation: ai-pulse 2.5s var(--ease-flow) infinite;
+    }
+    @keyframes ai-pulse {
+      0%, 100% { opacity: .4; }
+      50% { opacity: 1; }
+    }
+
+    /* ── Context panels ── */
+    .aurora-context {
+      padding: 16px 20px;
+      background: rgba(160,155,180,.04);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      margin-bottom: 20px;
+      font-size: .875rem;
+    }
+
+    /* ── Chat area ── */
+    .aurora-chat-panel {
+      background:
+        linear-gradient(180deg, rgba(255,250,243,.48), rgba(247,242,236,.28)),
+        var(--surface-paper);
+      border: 1px solid rgba(255,255,255,.16);
+      border-radius: var(--radius-card);
+      backdrop-filter: blur(12px);
+      box-shadow: 0 2px 8px rgba(0,0,0,.03), 0 12px 40px rgba(0,0,0,.06);
+      padding: 24px;
+      margin-bottom: 16px;
+    }
+    .aurora-chat-panel .chat {
+      min-height: 400px;
+      max-height: 60vh;
+      overflow-y: auto;
+      padding-right: 8px;
+    }
+
+    /* ── Composer ── */
+    .aurora-composer {
+      position: sticky;
+      bottom: 0;
+      z-index: 5;
+      background:
+        linear-gradient(180deg, transparent, var(--surface-warm) 20%);
+      backdrop-filter: blur(16px);
+      padding: 16px 0 8px;
+    }
+    .aurora-composer-inner {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .aurora-composer input {
+      flex: 1;
+      padding: 14px 20px;
+      font-size: .9375rem;
+      font-family: var(--font-body);
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      background: var(--surface-paper);
+      color: var(--text);
+      transition: border-color 260ms var(--ease-flow), box-shadow 260ms var(--ease-flow);
+    }
+    .aurora-composer input:focus {
+      outline: none;
+      border-color: var(--accent-sage);
+      box-shadow: 0 0 0 3px rgba(143,163,148,.10);
+    }
+    .aurora-composer .send-btn {
+      padding: 14px 24px;
+      border: none;
+      border-radius: 28px;
+      background: linear-gradient(135deg, var(--accent-sage), var(--accent-dusty-blue));
+      color: #fff;
+      font-family: var(--font-body);
+      font-size: .9375rem;
+      cursor: pointer;
+      transition: opacity 260ms var(--ease-flow), transform 180ms var(--ease-flow);
+      box-shadow: 0 4px 12px rgba(143,163,148,.20);
+      white-space: nowrap;
+    }
+    .aurora-composer .send-btn:hover { opacity: .9; }
+    .aurora-composer .send-btn:active { transform: scale(.97); }
+
+    .voice-hint {
+      font-size: .8125rem;
+      color: var(--faint);
+      margin-top: 8px;
+    }
+
+    /* ── Typing indicator ── */
+    .typing-indicator {
+      display: none;
+      padding: 12px 0;
+      color: var(--faint);
+      font-size: .875rem;
+    }
+    .typing-indicator.visible { display: block; }
+    .typing-dots {
+      display: inline-flex;
+      gap: 4px;
+      margin-left: 6px;
+    }
+    .typing-dots span {
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: var(--accent-sage);
+      opacity: .3;
+      animation: typing-bounce 1.2s var(--ease-flow) infinite;
+    }
+    .typing-dots span:nth-child(2) { animation-delay: .15s; }
+    .typing-dots span:nth-child(3) { animation-delay: .3s; }
+    @keyframes typing-bounce {
+      0%, 60%, 100% { opacity: .3; transform: translateY(0); }
+      30% { opacity: 1; transform: translateY(-3px); }
+    }
+
+    /* ── Settle overlay ── */
+    .settle-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(42,38,34,.60);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .settle-box {
+      text-align: center;
+      padding: 48px;
+      background:
+        linear-gradient(180deg, rgba(255,250,243,.80), rgba(247,242,236,.64));
+      border-radius: var(--radius-modal);
+      box-shadow: 0 24px 80px rgba(0,0,0,.20);
+      max-width: 400px;
+    }
+    .settle-box h2 {
+      font-family: var(--font-hero);
+      font-size: 1.5rem;
+      margin-bottom: 12px;
+    }
+
+    /* ── Dark mode ── */
+    body.dark-star .aurora-hero {
+      background:
+        radial-gradient(ellipse 45% 60% at 20% 30%, rgba(122,142,127,.06), transparent),
+        radial-gradient(ellipse 35% 50% at 80% 40%, rgba(154,144,167,.05), transparent);
+      border-bottom-color: var(--line);
+    }
+    body.dark-star .aurora-modes button.active {
+      background: rgba(42,38,34,.80);
+    }
+    body.dark-star .aurora-chat-panel {
+      background:
+        linear-gradient(180deg, rgba(42,38,34,.56), rgba(37,33,29,.36)),
+        rgba(42,38,34,.32);
+      border-color: rgba(163,153,143,.10);
+      box-shadow: 0 2px 8px rgba(0,0,0,.08), 0 12px 40px rgba(0,0,0,.16);
+    }
+    body.dark-star .aurora-composer input {
+      background: rgba(30,27,24,.60);
+      border-color: rgba(163,153,143,.16);
+    }
+    body.dark-star .aurora-composer input:focus {
+      border-color: rgba(143,163,148,.36);
+      box-shadow: 0 0 0 3px rgba(143,163,148,.06);
+    }
+    body.dark-star .aurora-context {
+      background: rgba(42,38,34,.48);
+      border-color: rgba(163,153,143,.10);
+    }
+    body.dark-star .settle-overlay {
+      background: rgba(20,18,16,.70);
+    }
+    body.dark-star .settle-box {
+      background:
+        linear-gradient(180deg, rgba(42,38,34,.82), rgba(37,33,29,.68));
+      box-shadow: 0 24px 80px rgba(0,0,0,.40);
+    }
+
+    @media (max-width: 640px) {
+      .aurora-hero-inner { flex-direction: column; }
+      .aurora-hero-actions { width: 100%; }
+      .aurora-composer-inner { flex-wrap: wrap; }
+      .aurora-composer input { border-radius: var(--radius); min-width: 0; }
+      .aurora-composer .send-btn { border-radius: var(--radius); width: 100%; }
+    }
+  </style>
 </head>
 <body>
 <main id="main" class="shell aurora-page">
   <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
 
-  <section class="panel aurora-hero mb-2">
-    <div class="flex-between" style="align-items:flex-start;gap:16px;flex-wrap:wrap">
-      <div>
+  <!-- Hero header -->
+  <section class="aurora-hero">
+    <div class="aurora-hero-inner">
+      <div class="aurora-hero-text">
         <span class="route-hint">共享内核的朋友型 Agent</span>
         <h1 id="page-title" data-aurora-name>Aurora</h1>
-        <p class="muted">Aurora 会根据上下文决定说一条、两条或三条消息。不同模式不是换机器人，而是同一个朋友换一种陪伴方式。</p>
-        <p id="aiStatus" class="muted" style="font-size:.84rem;margin-top:8px">正在检查真实 AI 状态...</p>
+        <p class="subtitle">不同模式不是换机器人，而是同一个朋友换一种陪伴方式。</p>
+        <p id="aiStatus" class="ai-status"><span class="ai-status-dot"></span>正在检查真实 AI 状态...</p>
       </div>
-      <div class="row gap-sm">
+      <div class="aurora-hero-actions">
         <label class="model-picker">
           模型
           <select id="modelPicker" onchange="onModelChange()">
@@ -36,37 +353,42 @@
         <button class="ghost" onclick="goodbye()">温柔告别</button>
       </div>
     </div>
-    <div id="modes" class="segmented mt-2"></div>
+
+    <div id="modes" class="aurora-modes"></div>
     <p id="modeNote" class="mode-note"></p>
-    <div id="loopState" class="soft-stage mt-2" style="display:none"></div>
-    <div id="memoryLens" class="soft-stage mt-2" style="display:none">
+
+    <div id="loopState" class="aurora-context" style="display:none"></div>
+    <div id="memoryLens" class="aurora-context" style="display:none">
       <div class="flex-between">
         <div><strong>记忆镜头</strong><span id="memoryPolicy" class="route-hint" style="margin-left:8px"></span></div>
         <button id="memoryToggle" class="ghost" onclick="toggleMemoryLens()" type="button">展开</button>
       </div>
       <div id="memoryLensBody" style="display:none">
-        <div id="memoryChips" class="pill-row mt-1"></div>
+        <div id="memoryChips" class="pill-row" style="margin-top:8px"></div>
         <p id="memoryContinuity" class="muted" style="font-size:.84rem"></p>
       </div>
     </div>
   </section>
 
-  <section class="panel aurora-chat-panel" style="padding-bottom:0">
+  <!-- Chat -->
+  <section class="aurora-chat-panel">
     <div id="chat" class="chat" aria-live="polite" style="min-height:420px"></div>
-    <p id="typing" class="muted" style="display:none;padding:8px 0">Aurora 正在想下一句话...</p>
+    <p id="typing" class="typing-indicator">Aurora 正在想下一句话<span class="typing-dots"><span></span><span></span><span></span></span></p>
   </section>
 
-  <section class="panel aurora-composer" style="position:sticky;bottom:0;z-index:5;margin-top:12px">
-    <div class="row" style="flex-wrap:nowrap">
+  <!-- Composer -->
+  <section class="aurora-composer">
+    <div class="aurora-composer-inner">
       <input id="msg" class="voice-input-target" data-voice-bound="true" placeholder="把现在最想说的一句话放在这里" onkeydown="if(event.key==='Enter')send()">
       <button class="voice-mini" onclick="IC.recordToField(document.getElementById('msg'), this)" title="语音输入">🎙</button>
-      <button onclick="send()">发送</button>
+      <button class="send-btn" onclick="send()">发送</button>
     </div>
-    <p id="voiceState" class="muted" style="font-size:.82rem;margin-top:6px">语音会尽量尊重原文转写，你可以继续手动修改后再发送。</p>
+    <p class="voice-hint">语音会尽量尊重原文转写，你可以继续手动修改后再发送。</p>
   </section>
 
-  <div id="settleOverlay" class="modal-overlay hidden">
-    <div class="modal-box text-center">
+  <!-- Settle overlay -->
+  <div id="settleOverlay" style="display:none" class="settle-overlay">
+    <div class="settle-box">
       <div class="empty-star" style="margin:0 auto 16px"></div>
       <h2>正在沉淀今天</h2>
       <p class="muted">Aurora 会把这次对话整理成记忆、情绪线索和可能的下一步。</p>
@@ -84,109 +406,118 @@
 <script>
 IC.mountShell("Aurora");
 
-let sid = null;
-let mode = "DAILY_TALK";
-let messageCount = 0;
-let auroraSending = false;
+var sid = null;
+var mode = "DAILY_TALK";
+var messageCount = 0;
+var auroraSending = false;
 
-const modeCopy = {
+var modeCopy = {
   DAILY_TALK: { label: "今日倾诉", icon: "听", desc: "先像朋友一样接住当下，不急着分析。" },
   THOUGHT_CLARIFY: { label: "思维整理", icon: "理", desc: "把混乱内容拆成事实、感受、担心、需要和下一步。" },
   SOCRATIC: { label: "苏格拉底追问", icon: "问", desc: "温和追问一个关键假设，而不是直接给结论。" }
 };
 
 function buildModes() {
-  const container = document.getElementById("modes");
-  container.innerHTML = Object.entries(modeCopy).map(([key, m]) =>
-    `<button data-mode="${key}" class="${key === mode ? "active" : ""}"><span class="mode-icon">${m.icon}</span>${m.label}</button>`
-  ).join("");
+  var container = document.getElementById("modes");
+  var html = "";
+  for (var key in modeCopy) {
+    var m = modeCopy[key];
+    html += '<button data-mode="' + key + '" class="' + (key === mode ? "active" : "") + '">' +
+      '<span class="mode-icon">' + m.icon + '</span>' + m.label + '</button>';
+  }
+  container.innerHTML = html;
   document.getElementById("modeNote").textContent = modeCopy[mode].desc;
-  container.querySelectorAll("button").forEach(btn => {
-    btn.onclick = async () => {
+  container.querySelectorAll("button").forEach(function(btn) {
+    btn.onclick = function() {
       if (btn.dataset.mode === mode) return;
-      const newMode = btn.dataset.mode;
-      try {
-        const r = await API.auroraModeSwitch(sid, newMode);
+      var newMode = btn.dataset.mode;
+      API.auroraModeSwitch(sid, newMode).then(function(r) {
         if (r.success) {
           mode = newMode;
-          container.querySelectorAll("button").forEach(x => x.classList.remove("active"));
+          container.querySelectorAll("button").forEach(function(x) { x.classList.remove("active"); });
           btn.classList.add("active");
           document.getElementById("modeNote").textContent = modeCopy[mode].desc;
           document.getElementById("loopState").style.display = "none";
         } else {
           IC.toast(r.message || "切换模式失败，请稍后再试。", "warn");
         }
-      } catch (e) {
-        IC.toast("切换模式失败：" + e.message, "warn");
-      }
+      }).catch(function() {
+        IC.toast("切换模式失败", "warn");
+      });
     };
   });
 }
 
 function addBubble(content, kind) {
-  const chat = document.getElementById("chat");
-  const div = document.createElement("div");
-  div.className = `bubble ${kind === "ai" ? "aurora" : "user"}`;
+  var chat = document.getElementById("chat");
+  var div = document.createElement("div");
+  div.className = "bubble " + (kind === "ai" ? "aurora" : "user");
+  div.style.opacity = "0";
+  div.style.transform = "translateY(8px)";
+  div.style.transition = "opacity 500ms var(--ease-bloom), transform 500ms var(--ease-bloom)";
   div.innerHTML = kind === "ai"
-    ? `<div class="row gap-sm" style="align-items:flex-start;margin-bottom:4px"><span style="font-size:1.1rem;color:var(--accent-sage)">✦</span><span class="muted" style="font-size:.78rem">Aurora</span></div><div>${IC.esc(content)}</div>`
+    ? '<div class="row gap-sm" style="align-items:flex-start;margin-bottom:4px"><span style="font-size:1.1rem;color:var(--accent-sage)">✦</span><span class="muted" style="font-size:.78rem">Aurora</span></div><div>' + IC.esc(content) + '</div>'
     : IC.esc(content);
   chat.appendChild(div);
+  requestAnimationFrame(function() {
+    div.style.opacity = "1";
+    div.style.transform = "translateY(0)";
+  });
   chat.scrollTop = chat.scrollHeight;
 }
 
 function addAurora(messages) {
-  const parts = Array.isArray(messages) ? messages : [String(messages || "")];
-  parts.filter(Boolean).slice(0, 3).forEach((part, index) => {
-    setTimeout(() => addBubble(part, "ai"), index * 520);
+  var parts = Array.isArray(messages) ? messages : [String(messages || "")];
+  parts.filter(Boolean).slice(0, 3).forEach(function(part, index) {
+    setTimeout(function() { addBubble(part, "ai"); }, index * 520);
   });
 }
 
 function renderAgentLoop(reply) {
-  const box = document.getElementById("loopState");
-  const loop = reply.agentLoop || {};
-  const ai = reply.aiState || {};
+  var box = document.getElementById("loopState");
+  var loop = reply.agentLoop || {};
+  var ai = reply.aiState || {};
   box.style.display = "block";
-  box.innerHTML = `
-    <div class="pill-row">
-      <span class="pill">本轮 ${loop.speakCount || (reply.messages || []).length || 1} 条</span>
-      <span class="pill">${IC.esc(loop.modeLabel || modeCopy[mode].label)}</span>
-      <span class="pill">${IC.esc(ai.provider || "-")} / ${IC.esc(ai.model || "-")}</span>
-      <span class="pill">${ai.fallbackAllowed ? "fallback 可用" : "真实模型优先"}</span>
-    </div>
-    <p class="muted" style="font-size:.84rem;margin-top:8px">${IC.esc(loop.continueReason || "")}</p>
-    ${reply.featureSuggestion ? `<p class="gold" style="font-size:.86rem;margin-top:8px">${IC.esc(reply.featureSuggestion)}</p>` : ""}
-  `;
+  box.innerHTML =
+    '<div class="pill-row">' +
+      '<span class="pill">本轮 ' + (loop.speakCount || (reply.messages || []).length || 1) + ' 条</span>' +
+      '<span class="pill">' + IC.esc(loop.modeLabel || modeCopy[mode].label) + '</span>' +
+      '<span class="pill">' + IC.esc(ai.provider || "-") + ' / ' + IC.esc(ai.model || "-") + '</span>' +
+      '<span class="pill">' + (ai.fallbackAllowed ? "fallback 可用" : "真实模型优先") + '</span>' +
+    '</div>' +
+    '<p class="muted" style="font-size:.84rem;margin-top:8px">' + IC.esc(loop.continueReason || "") + '</p>' +
+    (reply.featureSuggestion ? '<p class="gold" style="font-size:.86rem;margin-top:8px">' + IC.esc(reply.featureSuggestion) + '</p>' : '');
 }
 
 function renderMemoryLens(context) {
   if (!context) return;
-  const notes = [
-    ...(context.longTermMemoryNotes || []).slice(0, 2),
-    ...(context.activeThemeNotes || []).slice(0, 2),
-    context.emotionWeather ? `情绪天气：${context.emotionWeather}` : ""
-  ].filter(Boolean);
+  var notes = [].concat(
+    (context.longTermMemoryNotes || []).slice(0, 2),
+    (context.activeThemeNotes || []).slice(0, 2),
+    context.emotionWeather ? ["情绪天气：" + context.emotionWeather] : []
+  ).filter(Boolean);
   if (!notes.length && !context.continuityHypothesis) return;
   document.getElementById("memoryPolicy").textContent = context.memoryPolicy || "memory context";
-  document.getElementById("memoryChips").innerHTML = notes.map(note => `<span class="tag">${IC.esc(note).slice(0, 96)}</span>`).join("");
+  document.getElementById("memoryChips").innerHTML = notes.map(function(note) { return '<span class="tag">' + IC.esc(note).slice(0, 96) + '</span>'; }).join("");
   document.getElementById("memoryContinuity").textContent = context.continuityHypothesis || "";
   document.getElementById("memoryLens").style.display = "block";
 }
 
 function toggleMemoryLens() {
-  const body = document.getElementById("memoryLensBody");
-  const btn = document.getElementById("memoryToggle");
-  const open = body.style.display === "none";
+  var body = document.getElementById("memoryLensBody");
+  var btn = document.getElementById("memoryToggle");
+  var open = body.style.display === "none";
   body.style.display = open ? "block" : "none";
   btn.textContent = open ? "收起" : "展开";
 }
 
-async function proactiveGreeting(save = true) {
+async function proactiveGreeting(save) {
   if (!sid) return;
-  const onceKey = `aurora_greeting_${sid}`;
+  var onceKey = "aurora_greeting_" + sid;
   if (save && sessionStorage.getItem(onceKey) === "done") return;
-  document.getElementById("typing").style.display = "block";
-  const gr = await API.auroraGreeting({ sessionId: save ? sid : null, mode });
-  document.getElementById("typing").style.display = "none";
+  document.getElementById("typing").classList.add("visible");
+  var gr = await API.auroraGreeting({ sessionId: save ? sid : null, mode: mode });
+  document.getElementById("typing").classList.remove("visible");
   if (gr.success && gr.data) {
     addAurora(gr.data.messages || []);
     renderAgentLoop(gr.data);
@@ -198,32 +529,32 @@ async function proactiveGreeting(save = true) {
 async function init() {
   await IC.ensureDemoLogin();
   buildModes();
-  const params = new URLSearchParams(location.search);
+  var params = new URLSearchParams(location.search);
   sid = params.get("sessionId");
   if (!sid) {
-    const r = await API.createSession({ title: "Aurora 对话", sessionType: "AURORA_CHAT" });
+    var r = await API.createSession({ title: "Aurora 对话", sessionType: "AURORA_CHAT" });
     if (r.success && r.data) {
       sid = r.data.id;
-      history.replaceState(null, "", `${location.pathname}?sessionId=${sid}`);
+      history.replaceState(null, "", location.pathname + "?sessionId=" + sid);
     }
   }
-  const restored = await loadHistory();
+  var restored = await loadHistory();
   await loadAiStatus();
   if (!restored) await proactiveGreeting(true);
 }
 
 async function loadHistory() {
   if (!sid) return false;
-  const r = await API.sessionMessages(sid);
+  var r = await API.sessionMessages(sid);
   if (!r.success || !Array.isArray(r.data) || !r.data.length) return false;
-  r.data.forEach(m => addBubble(m.textContent || "", m.speaker === "AURORA" ? "ai" : "user"));
+  r.data.forEach(function(m) { addBubble(m.textContent || "", m.speaker === "AURORA" ? "ai" : "user"); });
   return true;
 }
 
 async function send() {
-  const input = document.getElementById("msg");
-  const typing = document.getElementById("typing");
-  const text = input.value.trim();
+  var input = document.getElementById("msg");
+  var typingEl = document.getElementById("typing");
+  var text = input.value.trim();
   if (!text || !sid) return;
   if (auroraSending) {
     IC.toast("Aurora 还在整理上一句话，请稍等一下。", "warn");
@@ -233,36 +564,31 @@ async function send() {
   addBubble(text, "user");
   input.value = "";
   messageCount++;
-  typing.style.display = "block";
+  typingEl.classList.add("visible");
 
   try {
-    const weather = window.ICWeather?.getWeatherState ? window.ICWeather.getWeatherState() : {};
-    const localNow = new Date();
-    // Prefer the city-level label resolved by GeocodingService / Nominatim
-    // (cached in localStorage by ICTimeSystem). Fall back to the weather
-    // widget's coarse label or a literal "未知".
-    const cityLabel = window.ICLocation?.getCityLabel
-        ? window.ICLocation.getCityLabel()
-        : (localStorage.getItem("ic_location_label") || "");
-    const latLon = window.ICLocation?.getLatLon ? window.ICLocation.getLatLon() : null;
-    const body = {
+    var weather = window.ICWeather && ICWeather.getWeatherState ? ICWeather.getWeatherState() : {};
+    var localNow = new Date();
+    var cityLabel = window.ICLocation && ICLocation.getCityLabel ? ICLocation.getCityLabel() : (localStorage.getItem("ic_location_label") || "");
+    var latLon = window.ICLocation && ICLocation.getLatLon ? ICLocation.getLatLon() : null;
+    var body = {
       sessionId: sid,
       message: text,
       inputType: "TEXT",
-      mode,
+      mode: mode,
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "",
       localTimeLabel: localNow.toLocaleString("zh-CN"),
       weatherType: weather.type || "",
       weatherDescription: weather.description || "",
-      temperature: weather.temperature ?? null,
+      temperature: weather.temperature || null,
       locationLabel: cityLabel || weather.locationLabel || "",
       latitude: latLon ? latLon.lat : null,
       longitude: latLon ? latLon.lon : null,
       aiProviderPreference: localStorage.getItem("ic_ai_provider_preference") || ""
     };
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30000);
-    const res = await fetch("/api/aurora/message-rich", {
+    var controller = new AbortController();
+    var timeout = setTimeout(function() { controller.abort(); }, 30000);
+    var res = await fetch("/api/aurora/message-rich", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json; charset=utf-8" },
@@ -270,7 +596,7 @@ async function send() {
       signal: controller.signal
     });
     clearTimeout(timeout);
-    const r = await res.json();
+    var r = await res.json();
     if (r.success && r.data) {
       addAurora(r.data.messages || []);
       renderAgentLoop(r.data);
@@ -282,33 +608,33 @@ async function send() {
   } catch (error) {
     IC.toast(error.name === "AbortError" ? "这次回应超时了，可以重新发一次。" : "Aurora 连接暂时不稳定。", "warn");
   } finally {
-    typing.style.display = "none";
+    typingEl.classList.remove("visible");
     auroraSending = false;
   }
   if (messageCount % 4 === 0) rhythmCheck();
 }
+
 async function rhythmCheck() {
-  const r = await API.auroraRhythmCheck();
+  var r = await API.auroraRhythmCheck();
   if (r.success && r.data && r.data.advice) IC.toast(r.data.advice, "warn");
 }
 
 async function finish() {
   if (!sid) return;
-  document.getElementById("settleOverlay").classList.remove("hidden");
+  document.getElementById("settleOverlay").style.display = "flex";
   await API.finishSession(sid);
   await API.auroraSettle(sid);
-  setTimeout(() => location.href = "/pages/daily-record.html", 900);
+  setTimeout(function() { location.href = "/pages/daily-record.html"; }, 900);
 }
 
 async function goodbye() {
   if (!sid) return;
   if (!confirm("确定要结束这次对话吗？")) return;
   try {
-    const r = await API.goodbye({ sessionId: sid, trigger: "BUTTON" });
+    var r = await API.goodbye({ sessionId: sid, trigger: "BUTTON" });
     if (r.success && r.data && r.data.line) {
       addBubble(r.data.line, "ai");
-      // After goodbye, redirect to daily record after a short delay
-      setTimeout(() => {
+      setTimeout(function() {
         if (confirm("Aurora 已经道别。要去沉淀今天的记录吗？")) {
           location.href = "/pages/daily-record.html";
         }
@@ -322,19 +648,21 @@ async function goodbye() {
 }
 
 async function loadAiStatus() {
-  const r = await API.aiHealth();
+  var r = await API.aiHealth();
   if (!r.success || !r.data) return;
-  const h = r.data;
-  const state = h.apiKeyConfigured ? "真实模型已配置" : "未配置真实模型密钥";
-  const fallback = h.fallbackAllowed ? "fallback 开启" : "fallback 关闭";
-  document.getElementById("aiStatus").textContent = `${h.provider || "-"} / ${h.model || "-"} · ${state} · ${fallback} · ASR ${h.asrProvider || "-"} / ${h.asrModel || "-"}`;
+  var h = r.data;
+  var state = h.apiKeyConfigured ? "真实模型已配置" : "未配置真实模型密钥";
+  var fallback = h.fallbackAllowed ? "fallback 开启" : "fallback 关闭";
+  document.getElementById("aiStatus").innerHTML = '<span class="ai-status-dot"></span>' +
+    IC.esc(h.provider || "-") + " / " + IC.esc(h.model || "-") + " · " + state + " · " + fallback +
+    " · ASR " + IC.esc(h.asrProvider || "-") + " / " + IC.esc(h.asrModel || "-");
 }
 
 async function onModelChange() {
-  const picker = document.getElementById("modelPicker");
+  var picker = document.getElementById("modelPicker");
   if (!picker) return;
-  const provider = picker.value;
-  const r = await API.setPreferredModel({ provider: provider || null });
+  var provider = picker.value;
+  var r = await API.setPreferredModel({ provider: provider || null });
   if (!r || !r.success) {
     IC.toast("切换模型失败，请稍后再试。", "warn");
     return;
@@ -343,11 +671,9 @@ async function onModelChange() {
   IC.toast(provider ? "已切换到 " + provider : "已切回系统默认", "success");
 }
 
-// Handle proactive Aurora messages (greetings, mode acknowledgements, etc.)
 function addAuroraProactive(data) {
   if (data.type === "MODE_ACK") {
-    // Mode transition acknowledgement — show as system notification + optional bubble
-    IC.toast("陪伴模式已切换：" + (modeCopy[mode]?.label || mode), "success");
+    IC.toast("陪伴模式已切换：" + (modeCopy[mode] ? modeCopy[mode].label : mode), "success");
   }
   addBubble(data.content, "ai");
 }
@@ -357,10 +683,8 @@ window.addEventListener("aurora-proactive", function(e) {
 });
 
 init();
-// Start proactive SSE connection if available
 if (window.ICProactive) ICProactive.start();
 IC.hideLoading();
 </script>
 </body>
 </html>
-
