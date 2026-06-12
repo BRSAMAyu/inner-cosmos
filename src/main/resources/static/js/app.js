@@ -371,9 +371,11 @@ const IC = {
       <button class="ambient-btn" title="视觉与天气" onclick="IC.toggleVisualPanel()">◐</button>
       <div id="visualPanel" class="ambient-panel" style="display:none">
         <strong>视觉流动</strong>
-        <label><span>自动跟随时间/天气</span><input id="visualAuto" type="checkbox" checked onchange="IC.setVisualAuto(this.checked)"></label>
-        <label><span>固定主题</span><select id="fixedTheme" onchange="IC.setFixedTheme(this.value)">
-          <option value="">自动</option><option value="time-morning">白天莫兰迪</option><option value="time-afternoon">午后暖光</option><option value="time-dusk">黄昏</option><option value="time-night">夜色</option>
+        <label><span>主题模式</span><select id="themeMode" onchange="IC.setThemeMode(this.value)">
+          <option value="auto">自然节奏</option><option value="light">始终白昼</option><option value="dark">始终夜色</option>
+        </select></label>
+        <label><span>固定时段</span><select id="fixedTheme" onchange="IC.setFixedTheme(this.value)">
+          <option value="">跟随时间</option><option value="time-dawn">晨曦</option><option value="time-morning">上午</option><option value="time-noon">正午</option><option value="time-afternoon">午后</option><option value="time-dusk">暮色</option><option value="time-night">夜色</option><option value="time-deep-night">深夜</option>
         </select></label>
         <label><span>天气</span><select id="manualWeather" onchange="IC.setManualWeather(this.value)">
           <option value="">真实天气</option><option value="CLEAR">晴</option><option value="CLOUD">云</option><option value="RAIN">雨</option><option value="STORM">雷雨</option><option value="FOG">雾</option><option value="SNOW">雪</option>
@@ -390,6 +392,8 @@ const IC = {
     const manualWeather = document.getElementById("manualWeather");
     const aiProviderPreference = document.getElementById("aiProviderPreference");
     if (visualAuto) visualAuto.checked = localStorage.getItem("ic_visual_auto") !== "false";
+    const themeModeEl = document.getElementById("themeMode");
+    if (themeModeEl) themeModeEl.value = localStorage.getItem("ic_theme_mode") || "auto";
     if (fixedTheme) fixedTheme.value = localStorage.getItem("ic_fixed_theme") || "";
     if (manualWeather) manualWeather.value = localStorage.getItem("ic_preferred_weather") || "";
     if (aiProviderPreference) aiProviderPreference.value = localStorage.getItem("ic_ai_provider_preference") || "";
@@ -435,14 +439,45 @@ const IC = {
     }
   },
 
+  setThemeMode(mode) {
+    localStorage.setItem("ic_theme_mode", mode);
+    if (mode === "auto") {
+      localStorage.setItem("ic_auto_theme", "true");
+      localStorage.removeItem("ic_fixed_theme");
+      localStorage.removeItem("ic_visual_auto");
+      if (window.ICTimeSystem) window.ICTimeSystem.updateTime();
+      if (window.ICWeather) window.ICWeather.setAutoWeather();
+      const fixedTheme = document.getElementById("fixedTheme");
+      if (fixedTheme) fixedTheme.value = "";
+    } else if (mode === "light") {
+      localStorage.setItem("ic_auto_theme", "false");
+      localStorage.setItem("ic_visual_auto", "false");
+      localStorage.removeItem("ic_fixed_theme");
+      if (window.ICTimeSystem) window.ICTimeSystem.updateTime();
+    } else if (mode === "dark") {
+      localStorage.setItem("ic_auto_theme", "false");
+      localStorage.setItem("ic_visual_auto", "false");
+      localStorage.setItem("ic_fixed_theme", "time-night");
+      if (window.ICTimeSystem) window.ICTimeSystem.updateTime();
+    }
+    IC.toast(mode === "auto" ? "自然节奏模式" : mode === "light" ? "白昼模式" : "夜色模式", "info");
+  },
+
   setFixedTheme(value) {
     if (!value) {
       localStorage.removeItem("ic_fixed_theme");
+      localStorage.setItem("ic_theme_mode", "auto");
+      const themeModeEl = document.getElementById("themeMode");
+      if (themeModeEl) themeModeEl.value = "auto";
       IC.applyTimeClass();
+      if (window.ICTimeSystem) window.ICTimeSystem.updateTime();
       return;
     }
     localStorage.setItem("ic_visual_auto", "false");
     localStorage.setItem("ic_fixed_theme", value);
+    localStorage.setItem("ic_theme_mode", "auto");
+    const themeModeEl = document.getElementById("themeMode");
+    if (themeModeEl) themeModeEl.value = "auto";
     const visualAuto = document.getElementById("visualAuto");
     if (visualAuto) visualAuto.checked = false;
     document.body.classList.remove("time-dawn", "time-morning", "time-noon", "time-afternoon", "time-evening", "time-dusk", "time-night", "time-deep-night");
