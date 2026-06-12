@@ -2,11 +2,13 @@ package com.innercosmos.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.innercosmos.config.TestRateLimitConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
@@ -25,9 +27,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "llm.provider=minimax",
         "llm.api-key=",
         "llm.minimax.api-key=",
-        "llm.allow-fallback=true"
+        "llm.allow-fallback=true",
+        "spring.main.allow-bean-definition-overriding=true",
+        "spring.datasource.url=jdbc:h2:mem:testdialog;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1",
+        "spring.sql.init.mode=always"
 })
 @AutoConfigureMockMvc
+@Import(TestRateLimitConfig.class)
 class DialogControllerTest {
 
     @Autowired

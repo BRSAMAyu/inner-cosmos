@@ -23,11 +23,11 @@ class JsonUtilsTest {
         assertTrue(json.contains("\"value\":7"));
     }
 
-    // toJson handles null by returning "{}" (actual API behaviour)
+    // toJson handles null -- Jackson serializes null as the string "null"
     @Test
     void toJsonHandlesNull() {
         String json = JsonUtils.toJson(null);
-        assertEquals("{}", json);
+        assertEquals("null", json);
     }
 
     // toJson handles a Map

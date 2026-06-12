@@ -7,11 +7,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TokenEstimateUtilsTest {
 
-    // estimate with normal text returns at least 1 (actual API returns max(1, length/2))
+    // estimate with normal text returns max(1, length/2)
     @Test
     void estimateNormalText() {
-        assertEquals(5, TokenEstimateUtils.estimate("abcdefgh")); // length 8, 8/2 = 4, but max(1,4) = 4
-        assertEquals(3, TokenEstimateUtils.estimate("abcdef")); // length 6, 6/2 = 3
+        assertEquals(4, TokenEstimateUtils.estimate("abcdefgh")); // length 8, max(1, 8/2) = 4
+        assertEquals(3, TokenEstimateUtils.estimate("abcdef")); // length 6, max(1, 6/2) = 3
     }
 
     // estimate with null returns 0

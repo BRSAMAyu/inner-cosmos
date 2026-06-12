@@ -24,38 +24,32 @@ class ModeStrategyTest {
 
     @Test
     void dailyTalkName() {
-        ModeStrategy strategy = new DailyTalkStrategy();
-        assertEquals("DAILY_TALK", strategy.name());
+        assertEquals("DAILY_TALK", new DailyTalkStrategy().name());
     }
 
     @Test
     void socraticName() {
-        ModeStrategy strategy = new SocraticStrategy();
-        assertEquals("SOCRATIC", strategy.name());
+        assertEquals("SOCRATIC", new SocraticStrategy().name());
     }
 
     @Test
     void thoughtClarifyName() {
-        ModeStrategy strategy = new ThoughtClarifyStrategy();
-        assertEquals("THOUGHT_CLARIFY", strategy.name());
+        assertEquals("THOUGHT_CLARIFY", new ThoughtClarifyStrategy().name());
     }
 
     @Test
     void actionSplitName() {
-        ModeStrategy strategy = new ActionSplitStrategy();
-        assertEquals("ACTION_SPLIT", strategy.name());
+        assertEquals("ACTION_SPLIT", new ActionSplitStrategy().name());
     }
 
     @Test
     void relationReviewName() {
-        ModeStrategy strategy = new RelationReviewStrategy();
-        assertEquals("RELATION_REVIEW", strategy.name());
+        assertEquals("RELATION_REVIEW", new RelationReviewStrategy().name());
     }
 
     @Test
     void sleepReviewName() {
-        ModeStrategy strategy = new SleepReviewStrategy();
-        assertEquals("SLEEP_REVIEW", strategy.name());
+        assertEquals("SLEEP_REVIEW", new SleepReviewStrategy().name());
     }
 
     // --- segment() is non-null and non-empty ---
