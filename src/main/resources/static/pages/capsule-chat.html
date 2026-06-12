@@ -5,6 +5,137 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>与回声对话 · Inner Cosmos</title>
   <link rel="stylesheet" href="/css/app.css">
+  <style>
+    .capsule-header {
+      padding: 20px 24px;
+      border-radius: var(--radius-flow);
+      background: linear-gradient(135deg, rgba(143,163,148,.1), rgba(165,179,194,.08));
+      border: 1px solid var(--line);
+      position: relative;
+      overflow: hidden;
+    }
+    .capsule-header::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 80% 20%, rgba(191,150,152,.08), transparent 50%);
+      pointer-events: none;
+    }
+    .capsule-header .capsule-identity {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      position: relative;
+    }
+    .capsule-header h2 {
+      font-family: var(--font-hero);
+      font-size: 1.3rem;
+      color: var(--ink);
+      margin: 0;
+    }
+    .capsule-header .capsule-intro {
+      font-size: .88rem;
+      color: var(--muted);
+      line-height: 1.5;
+      margin-top: 8px;
+      position: relative;
+    }
+    .capsule-header .turns-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 14px;
+      position: relative;
+    }
+    .capsule-header .energy-bar {
+      flex: 1;
+      max-width: 200px;
+      height: 6px;
+      border-radius: 3px;
+      background: var(--line);
+      overflow: hidden;
+    }
+    .capsule-header .energy-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      background: var(--accent-sage);
+      transition: width .4s var(--ease-flow);
+    }
+    .chat-area {
+      min-height: 340px;
+      padding: 16px 0;
+    }
+    .chat-area .bubble {
+      max-width: 85%;
+      padding: 12px 16px;
+      border-radius: var(--radius-card);
+      margin-bottom: 12px;
+      line-height: 1.6;
+      font-size: .95rem;
+      animation: bubbleIn .4s var(--ease-bloom);
+    }
+    .chat-area .bubble.user {
+      margin-left: auto;
+      background: rgba(143,163,148,.18);
+      border: 1px solid rgba(143,163,148,.24);
+      color: var(--ink);
+    }
+    .chat-area .bubble.ai {
+      margin-right: auto;
+      background: rgba(255,250,243,.7);
+      border: 1px solid var(--line);
+      color: var(--ink);
+    }
+    .chat-area .bubble .speaker {
+      font-size: .78rem;
+      color: var(--accent-lavender);
+      margin-bottom: 4px;
+    }
+    @keyframes bubbleIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .composer {
+      position: sticky;
+      bottom: 0;
+      z-index: 5;
+      margin-top: 12px;
+      padding: 14px 16px;
+      border-radius: var(--radius-flow);
+      background: rgba(255,250,243,.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--line);
+    }
+    .composer .input-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .composer input {
+      flex: 1;
+      padding: 10px 14px;
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      background: var(--surface-paper);
+      font-size: .92rem;
+      transition: border-color .2s;
+    }
+    .composer input:focus {
+      outline: none;
+      border-color: var(--accent-sage);
+    }
+    .composer button {
+      padding: 10px 20px;
+      border-radius: var(--radius);
+      border: none;
+      background: var(--accent-sage);
+      color: #fff;
+      font-size: .9rem;
+      cursor: pointer;
+      transition: filter .2s;
+    }
+    .composer button:hover { filter: brightness(1.08); }
+  </style>
 </head>
 <body>
 <main id="main" class="shell">
@@ -12,49 +143,54 @@
   <div class="topbar" data-topbar></div>
 
   <!-- Capsule info header -->
-  <section class="panel mb-2">
-    <div class="flex-between mb-1">
+  <section class="capsule-header mb-2">
+    <div class="capsule-identity mb-1">
+      <div id="capsuleAvatar"></div>
       <div>
         <span class="route-hint">数字回声对话</span>
         <h2 id="capsuleName">加载中...</h2>
       </div>
-      <button onclick="closeSession()">结束对话</button>
+      <div style="margin-left:auto">
+        <button class="btn-sm" onclick="closeSession()">结束对话</button>
+      </div>
     </div>
-    <p id="capsuleIntro" class="muted"></p>
+    <p id="capsuleIntro" class="capsule-intro"></p>
     <div class="pill-row mt-1" id="capsuleTags"></div>
 
     <!-- Remaining turns -->
-    <div class="row gap-sm mt-2" style="align-items:center">
+    <div class="turns-row">
       <span class="muted" style="font-size:.82rem">剩余轮数</span>
-      <div class="energy-bar" style="flex:1;max-width:200px">
+      <div class="energy-bar">
         <div id="turnsFill" class="energy-bar-fill" style="width:100%"></div>
       </div>
       <span id="turnsLabel" class="muted" style="font-size:.82rem">5 / 5</span>
     </div>
 
     <!-- Disclaimer -->
-    <div class="soft-stage mt-2">
+    <div class="soft-stage mt-2" style="position:relative">
       <p class="muted">它只是一段回声，不是一个人。如果产生真实共鸣，请写慢信。</p>
     </div>
   </section>
 
   <!-- Chat area -->
   <section class="panel" style="padding-bottom:0">
-    <div id="chat" class="chat" aria-live="polite" style="min-height:320px"></div>
-    <p id="typing" class="muted" style="display:none;padding:8px 0">回声正在回应...</p>
+    <div id="chat" class="chat-area" aria-live="polite"></div>
+    <p id="typing" class="muted" style="display:none;padding:8px 0">
+      <span style="animation:pulse 1.4s infinite;display:inline-block">回声正在回应</span>...
+    </p>
   </section>
 
   <!-- Composer -->
-  <section class="panel" style="position:sticky;bottom:0;z-index:5;margin-top:12px">
-    <div id="composerArea" class="row" style="flex-wrap:nowrap">
+  <div class="composer">
+    <div id="composerArea" class="input-row">
       <input id="msg" placeholder="向这枚数字回声提一个问题" onkeydown="if(event.key==='Enter')send()">
       <button onclick="send()">发送</button>
     </div>
-    <div id="exhaustedHint" style="display:none" class="soft-stage mt-1">
-      <p class="gold">今日对话轮数已用完。它只是一段回声，也许你可以写一封慢信？</p>
+    <div id="exhaustedHint" style="display:none" class="mt-1">
+      <p class="gold" style="font-size:.88rem">今日对话轮数已用完。它只是一段回声，也许你可以写一封慢信？</p>
       <a class="button mt-1" id="letterLink" href="/pages/slow-letter.html">写一封慢信</a>
     </div>
-  </section>
+  </div>
 </main>
 
 <script src="/js/app.js"></script>
@@ -63,6 +199,7 @@
 <script src="/js/weather-system.js"></script>
 <script src="/js/audio-system.js"></script>
 <script src="/js/api.js"></script>
+<script src="/js/capsule-personality.js"></script>
 <script>
 IC.mountShell("共鸣体对话");
 
@@ -89,6 +226,16 @@ async function init() {
     document.getElementById("capsuleIntro").textContent = c.intro || "一枚从脱敏记忆中编织出的数字回声。";
     totalTurns = (c.capsuleType === "SEED_CAPSULE" || c.capsuleType === "SEED") ? 0 : (c.conversationLimitPerDay || 30);
     updateTurnsDisplay();
+
+    /* CapsulePersonality avatar */
+    var avatarBox = document.getElementById("capsuleAvatar");
+    if (typeof CapsulePersonality !== "undefined" && avatarBox) {
+      avatarBox.innerHTML = CapsulePersonality.generateAvatar(c.pseudonym, "medium");
+      var personality = CapsulePersonality.getPersonality(c.pseudonym);
+      if (personality) {
+        document.getElementById("capsuleName").style.color = personality.color;
+      }
+    }
 
     const tags = (c.publicTags || "").split(",").filter(Boolean);
     document.getElementById("capsuleTags").innerHTML = tags.map(t =>
@@ -135,9 +282,9 @@ async function loadPersonaHistory() {
 function addBubble(content, kind) {
   const chat = document.getElementById("chat");
   const div = document.createElement("div");
-  div.className = `bubble ${kind}`;
+  div.className = "bubble " + kind;
   if (kind === "ai") {
-    div.innerHTML = `<div class="row gap-sm" style="align-items:flex-start;margin-bottom:4px"><span style="font-size:1rem;color:var(--accent-lavender)">✦</span><span class="muted" style="font-size:.78rem">回声</span></div><div>${esc(content)}</div>`;
+    div.innerHTML = '<div class="speaker">' + (typeof CapsulePersonality !== "undefined" ? CapsulePersonality.getMoodLabel(CapsulePersonality.getPersonality(document.getElementById("capsuleName").textContent || "").mood) : "回声") + '</div><div>' + esc(content) + '</div>';
   } else {
     div.textContent = content;
   }

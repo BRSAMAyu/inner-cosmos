@@ -5,18 +5,64 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>编织共鸣体 · Inner Cosmos</title>
   <link rel="stylesheet" href="/css/app.css">
+  <style>
+    .create-hero {
+      padding: 24px 20px;
+      border-radius: var(--radius-flow);
+      background: linear-gradient(135deg, rgba(143,163,148,.1), rgba(191,150,152,.08));
+      border: 1px solid var(--line);
+      margin-bottom: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+    .create-hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 70% 30%, rgba(216,181,181,.08), transparent 50%);
+      pointer-events: none;
+    }
+    .create-hero h1 {
+      font-size: clamp(1.4rem, 3.5vw, 2rem);
+      font-family: var(--font-hero);
+      color: var(--ink);
+      margin: 0 0 8px;
+      position: relative;
+    }
+    .create-hero .muted { position: relative; }
+    .wizard-bar {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 20px;
+      padding: 4px;
+      border-radius: var(--radius);
+      background: rgba(143,163,148,.08);
+      border: 1px solid var(--line);
+    }
+    .wizard-step {
+      flex: 1;
+      height: 6px;
+      border-radius: 3px;
+      background: var(--line);
+      transition: background .4s var(--ease-flow);
+    }
+    .wizard-step.active { background: var(--accent-sage); }
+    .wizard-step.done { background: var(--accent-sage); opacity: .5; }
+  </style>
 </head>
 <body>
 <main id="main" class="shell">
   <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
 
-  <span class="route-hint">脱敏预览与边界设置</span>
-  <h1 id="page-title">共鸣体编织</h1>
-  <p class="muted mb-2">共鸣体只携带被你允许的主题。真实身份、诊断承诺和强迫回应会被边界挡住。</p>
+  <!-- Hero -->
+  <section class="create-hero">
+    <h1>共鸣体编织</h1>
+    <p class="muted">共鸣体只携带被你允许的主题。真实身份、诊断承诺和强迫回应会被边界挡住。</p>
+  </section>
 
   <!-- Wizard steps -->
-  <div class="wizard-steps">
+  <div class="wizard-bar">
     <div id="step1Bar" class="wizard-step active"></div>
     <div id="step2Bar" class="wizard-step"></div>
     <div id="step3Bar" class="wizard-step"></div>

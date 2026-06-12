@@ -5,20 +5,86 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>AI 协作日志 · Inner Cosmos</title>
   <link rel="stylesheet" href="/css/app.css">
+  <style>
+    .log-hero {
+      padding: 24px 20px;
+      border-radius: var(--radius-flow);
+      background: linear-gradient(135deg, rgba(165,179,194,.12), rgba(143,163,148,.08));
+      border: 1px solid var(--line);
+      margin-bottom: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+    .log-hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 70% 30%, rgba(165,179,194,.08), transparent 50%);
+      pointer-events: none;
+    }
+    .log-hero h1 {
+      font-size: clamp(1.4rem, 3.5vw, 2rem);
+      font-family: var(--font-hero);
+      color: var(--ink);
+      margin: 0 0 8px;
+      position: relative;
+    }
+    .log-hero .muted { position: relative; }
+    .log-filters {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      position: relative;
+    }
+    .log-filters input, .log-filters select {
+      padding: 8px 12px;
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      background: var(--surface-paper);
+      font-size: .88rem;
+      transition: border-color .2s;
+    }
+    .log-filters input:focus, .log-filters select:focus {
+      outline: none;
+      border-color: var(--accent-sage);
+    }
+    .metric-card {
+      padding: 18px;
+      border-radius: var(--radius-card);
+      background: rgba(255,250,243,.55);
+      border: 1px solid var(--line);
+      text-align: center;
+      transition: transform .2s var(--ease-flow);
+    }
+    .metric-card:hover {
+      transform: translateY(-1px);
+      background: rgba(255,250,243,.8);
+    }
+    .metric-card .value {
+      font-size: 1.8rem;
+      font-weight: 600;
+      color: var(--ink);
+      line-height: 1;
+    }
+    .metric-card .label {
+      font-size: .82rem;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+  </style>
 </head>
 <body>
 <main id="main" class="shell">
   <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
 
-  <div class="flex-between mb-2" style="flex-wrap:wrap;gap:12px">
-    <div>
-      <span class="route-hint">模型调用追踪</span>
-      <h1 id="page-title">AI 交互日志</h1>
-      <p class="muted">每一次 Aurora 对话背后，都有一笔模型调用记录。这里是透明的技术追踪。</p>
-    </div>
-    <div class="row gap-sm">
-      <input type="text" id="searchInput" placeholder="搜索模块名..." oninput="filterLogs()" style="width:160px">
+  <!-- Hero -->
+  <section class="log-hero">
+    <h1>AI 交互日志</h1>
+    <p class="muted">每一次 Aurora 对话背后，都有一笔模型调用记录。这里是透明的技术追踪。</p>
+    <div class="log-filters mt-2">
+      <input type="text" id="searchInput" placeholder="搜索模块名..." oninput="filterLogs()" style="width:180px">
       <select id="providerFilter" onchange="filterLogs()">
         <option value="">全部 Provider</option>
         <option value="minimax">MiniMax</option>
@@ -27,21 +93,21 @@
         <option value="mock">Mock</option>
       </select>
     </div>
-  </div>
+  </section>
 
   <!-- Stats row -->
-  <section class="grid mb-2">
-    <article class="card metric">
-      <span>总调用次数</span>
-      <strong id="totalCount">0</strong>
+  <section class="grid mb-2" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
+    <article class="metric-card">
+      <div class="value" id="totalCount">0</div>
+      <div class="label">总调用次数</div>
     </article>
-    <article class="card metric">
-      <span>平均延迟</span>
-      <strong id="avgLatency">-</strong>
+    <article class="metric-card">
+      <div class="value" id="avgLatency">-</div>
+      <div class="label">平均延迟</div>
     </article>
-    <article class="card metric">
-      <span>使用的 Provider</span>
-      <strong id="providerList">-</strong>
+    <article class="metric-card">
+      <div class="value" id="providerList" style="font-size:1.2rem">-</div>
+      <div class="label">使用的 Provider</div>
     </article>
   </section>
 

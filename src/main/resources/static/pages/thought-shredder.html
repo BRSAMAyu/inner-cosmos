@@ -5,30 +5,131 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>思维碎纸机 · Inner Cosmos</title>
   <link rel="stylesheet" href="/css/app.css">
+  <style>
+    .shred-hero {
+      padding: 24px 20px;
+      border-radius: var(--radius-flow);
+      background: linear-gradient(135deg, rgba(184,194,168,.12), rgba(191,150,152,.1));
+      border: 1px solid var(--line);
+      margin-bottom: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+    .shred-hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 60% 50%, rgba(184,194,168,.1), transparent 50%);
+      pointer-events: none;
+    }
+    .shred-hero h1 {
+      font-size: clamp(1.4rem, 3.5vw, 2rem);
+      font-family: var(--font-hero);
+      color: var(--ink);
+      margin: 0 0 8px;
+      position: relative;
+    }
+    .shred-hero .muted { position: relative; }
+    .shred-paper {
+      background: rgba(247,242,236,.85);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-flow);
+      position: relative;
+    }
+    .shred-paper textarea {
+      background: transparent;
+      border: none;
+      resize: vertical;
+    }
+    .shred-paper textarea:focus {
+      outline: none;
+    }
+    .intensity-track {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .intensity-track input[type="range"] {
+      flex: 1;
+      -webkit-appearance: none;
+      height: 4px;
+      border-radius: 2px;
+      background: linear-gradient(90deg, var(--accent-sage), var(--accent-rose));
+      outline: none;
+    }
+    .intensity-track input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--ink);
+      cursor: pointer;
+      border: 2px solid var(--surface-paper);
+      box-shadow: 0 2px 6px rgba(0,0,0,.15);
+    }
+    .shred-btn {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: var(--radius);
+      background: linear-gradient(135deg, var(--accent-sage), rgba(143,163,148,.8));
+      color: #fff;
+      font-size: 1rem;
+      font-family: var(--font-hero);
+      cursor: pointer;
+      transition: filter .2s, transform .15s var(--ease-flow);
+    }
+    .shred-btn:hover:not(:disabled) { filter: brightness(1.06); }
+    .shred-btn:active:not(:disabled) { transform: scale(.98); }
+    .shred-btn:disabled { opacity: .6; cursor: default; }
+    .result-section h3 {
+      font-size: .95rem;
+      color: var(--ink);
+      margin: 16px 0 6px;
+    }
+    .result-section h3:first-child { margin-top: 0; }
+    .result-section .gold { font-size: .95rem; line-height: 1.6; color: var(--ink); font-weight: 500; }
+    .result-section .teal { font-size: .95rem; line-height: 1.6; color: var(--ink); font-weight: 500; font-style: italic; }
+    /* Shred animation strips */
+    @keyframes shredFall {
+      0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+      60% { opacity: .6; }
+      100% { transform: translateY(120px) rotate(15deg); opacity: 0; }
+    }
+    .shred-strip {
+      position: absolute;
+      background: rgba(247,242,236,.9);
+      border: 1px solid var(--line);
+      animation: shredFall 1.2s var(--ease-settle) forwards;
+    }
+  </style>
 </head>
 <body>
 <main id="main" class="shell">
   <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
 
-  <span class="route-hint">思维碎纸机</span>
-  <h1 id="page-title">思维碎纸机</h1>
-  <p class="muted mb-2">把混乱、愤怒、焦虑、碎碎念一次性倒进来。它会帮你把噪音和真正的需求分开。</p>
+  <!-- Hero -->
+  <section class="shred-hero">
+    <h1>思维碎纸机</h1>
+    <p class="muted">把混乱、愤怒、焦虑、碎碎念一次性倒进来。它会帮你把噪音和真正的需求分开。</p>
+  </section>
+
   <p id="aiStatus" class="muted mb-2" style="font-size:.82rem">正在检查结构化 AI 状态...</p>
 
   <section class="grid">
     <!-- Input area -->
-    <article class="panel">
+    <article class="shred-paper" style="padding:20px">
       <div class="field-group mb-2">
         <label for="shredText">把想法倒进来</label>
-        <textarea id="shredText" placeholder="把混乱、愤怒、焦虑、碎碎念一次性倒进来..." style="min-height:200px"></textarea>
+        <textarea id="shredText" placeholder="把混乱、愤怒、焦虑、碎碎念一次性倒进来..." style="min-height:200px;width:100%"></textarea>
       </div>
 
       <div class="field-group mb-2">
         <label>情绪强度</label>
-        <div class="row gap-sm" style="align-items:center">
+        <div class="intensity-track">
           <span class="muted" style="font-size:.82rem">温和</span>
-          <input type="range" id="intensity" min="1" max="10" value="5" style="flex:1;background:transparent;border:none;padding:0">
+          <input type="range" id="intensity" min="1" max="10" value="5">
           <span class="muted" style="font-size:.82rem">强烈</span>
         </div>
       </div>
@@ -42,13 +143,13 @@
         </select>
       </div>
 
-      <button onclick="shred()" id="shredBtn" style="width:100%">粉碎并沉淀</button>
+      <button class="shred-btn" onclick="shred()" id="shredBtn">粉碎并沉淀</button>
     </article>
 
     <!-- Result area -->
-    <article class="panel">
+    <article class="panel" style="position:relative;overflow:hidden">
       <h2>粉碎结果</h2>
-      <div id="result" class="soft-stage">
+      <div id="result" class="result-section soft-stage">
         <p class="muted">粉碎后，结果会出现在这里。</p>
       </div>
       <div id="shredAnim" style="display:none;padding:24px 0" class="text-center">
@@ -99,7 +200,28 @@ async function shred() {
   document.getElementById("shredAnim").style.display = "block";
   document.getElementById("result").style.display = "none";
 
+  /* Animate strips falling */
+  var resultPanel = document.getElementById("result").closest("article");
+  var existing = resultPanel.querySelectorAll(".shred-strip");
+  for (var si = 0; si < existing.length; si++) existing[si].remove();
+  var charLen = text.length;
+  var stripCount = Math.min(12, Math.max(4, Math.floor(charLen / 20)));
+  for (var si = 0; si < stripCount; si++) {
+    var strip = document.createElement("div");
+    strip.className = "shred-strip";
+    strip.style.left = (10 + Math.random() * 80) + "%";
+    strip.style.top = (10 + Math.random() * 30) + "%";
+    strip.style.width = (30 + Math.random() * 50) + "px";
+    strip.style.height = (8 + Math.random() * 14) + "px";
+    strip.style.animationDelay = (si * 80) + "ms";
+    resultPanel.appendChild(strip);
+  }
+
   const r = await API.shredderProcess(text, document.getElementById("saveMode").value);
+
+  /* Clean up strips */
+  var strips = resultPanel.querySelectorAll(".shred-strip");
+  for (var si = 0; si < strips.length; si++) strips[si].remove();
 
   document.getElementById("shredAnim").style.display = "none";
   document.getElementById("result").style.display = "grid";

@@ -4,43 +4,428 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="stylesheet" href="/css/app.css">
-  <title>好友与群组 - Inner Cosmos</title>
+  <title>慢社交 - Inner Cosmos</title>
+  <style>
+    .social-hero {
+      padding: 28px 24px;
+      border-radius: var(--radius-flow);
+      background: linear-gradient(135deg, rgba(191,150,152,.14), rgba(143,163,148,.14));
+      border: 1px solid var(--line);
+      margin-bottom: 24px;
+      position: relative;
+      overflow: hidden;
+    }
+    .social-hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 75% 30%, rgba(216,181,181,.12), transparent 50%);
+      pointer-events: none;
+    }
+    .social-hero h1 {
+      font-size: clamp(1.5rem, 4vw, 2.2rem);
+      font-family: var(--font-hero);
+      color: var(--ink);
+      margin: 0 0 8px;
+      position: relative;
+    }
+    .social-hero .subtitle {
+      font-size: .95rem;
+      color: var(--muted);
+      line-height: 1.6;
+      position: relative;
+    }
+    .social-tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 20px;
+      padding: 4px;
+      border-radius: var(--radius);
+      background: rgba(143,163,148,.08);
+      border: 1px solid var(--line);
+      flex-wrap: wrap;
+    }
+    .social-tab {
+      flex: 1;
+      min-width: 100px;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--muted);
+      font-size: .9rem;
+      cursor: pointer;
+      transition: all .2s var(--ease-flow);
+      text-align: center;
+    }
+    .social-tab:hover {
+      color: var(--ink);
+      background: rgba(255,250,243,.5);
+    }
+    .social-tab.active {
+      background: var(--surface-paper);
+      color: var(--ink);
+      box-shadow: 0 2px 8px rgba(91,82,73,.08);
+    }
+    .social-tab .tab-count {
+      display: inline-block;
+      min-width: 18px;
+      padding: 1px 6px;
+      border-radius: 999px;
+      background: rgba(191,150,152,.2);
+      font-size: .78rem;
+      margin-left: 4px;
+    }
+    .social-tab.active .tab-count {
+      background: var(--accent-rose);
+      color: #fff;
+    }
+    .social-section { display: none; }
+    .social-section.active { display: block; }
+
+    /* Person / friend card */
+    .person-card {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 16px 20px;
+      border-radius: var(--radius-card);
+      background: rgba(255,250,243,.55);
+      border: 1px solid var(--line);
+      transition: all .25s var(--ease-flow);
+      cursor: default;
+      margin-bottom: 10px;
+    }
+    .person-card:hover {
+      background: rgba(255,250,243,.85);
+      border-color: var(--line-strong);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(91,82,73,.06);
+    }
+    .person-avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #fff;
+      flex-shrink: 0;
+      position: relative;
+    }
+    .person-avatar .status-dot {
+      position: absolute;
+      bottom: 0;
+      right: 0;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 2px solid var(--surface-paper);
+    }
+    .person-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .person-info .name {
+      font-weight: 600;
+      color: var(--ink);
+      font-size: .95rem;
+    }
+    .person-info .meta {
+      font-size: .82rem;
+      color: var(--muted);
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .person-action {
+      flex-shrink: 0;
+    }
+    .btn-sm {
+      padding: 6px 16px;
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      background: var(--surface-paper);
+      color: var(--ink);
+      font-size: .84rem;
+      cursor: pointer;
+      transition: all .2s var(--ease-flow);
+    }
+    .btn-sm:hover:not(:disabled) {
+      background: rgba(143,163,148,.18);
+      border-color: var(--line-strong);
+    }
+    .btn-sm:disabled {
+      opacity: .45;
+      cursor: default;
+    }
+    .btn-sm.primary {
+      background: var(--accent-sage);
+      color: #fff;
+      border-color: var(--accent-sage);
+    }
+    .btn-sm.primary:hover:not(:disabled) {
+      filter: brightness(1.08);
+    }
+    .btn-sm.rose {
+      background: var(--accent-rose);
+      color: #fff;
+      border-color: var(--accent-rose);
+    }
+    .btn-sm.rose:hover:not(:disabled) {
+      filter: brightness(1.08);
+    }
+
+    /* Request card */
+    .request-card {
+      padding: 16px 20px;
+      border-radius: var(--radius-card);
+      background: rgba(255,250,243,.55);
+      border: 1px solid var(--line);
+      margin-bottom: 10px;
+      transition: all .25s var(--ease-flow);
+    }
+    .request-card:hover {
+      background: rgba(255,250,243,.85);
+      transform: translateY(-1px);
+    }
+    .request-card .request-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .request-card .request-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+    .request-card.outgoing {
+      border-left: 3px solid var(--accent-sage);
+      opacity: .8;
+    }
+    .request-card.incoming {
+      border-left: 3px solid var(--accent-rose);
+    }
+
+    /* Group card */
+    .group-card {
+      padding: 20px;
+      border-radius: var(--radius-card);
+      background: rgba(255,250,243,.55);
+      border: 1px solid var(--line);
+      transition: all .25s var(--ease-flow);
+      margin-bottom: 12px;
+    }
+    .group-card:hover {
+      background: rgba(255,250,243,.85);
+      border-color: var(--line-strong);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(91,82,73,.06);
+    }
+    .group-card .group-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 8px;
+    }
+    .group-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+      flex-shrink: 0;
+    }
+    .group-card .group-name {
+      font-weight: 600;
+      color: var(--ink);
+      font-size: 1rem;
+    }
+    .group-card .group-intro {
+      font-size: .86rem;
+      color: var(--muted);
+      line-height: 1.5;
+      margin-bottom: 10px;
+    }
+    .group-card .group-meta {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: .82rem;
+      color: var(--faint);
+    }
+    .group-card .member-avatars {
+      display: flex;
+      margin-left: auto;
+    }
+    .group-card .member-avatars .person-avatar {
+      width: 26px;
+      height: 26px;
+      font-size: .68rem;
+      margin-left: -8px;
+      border: 2px solid var(--surface-paper);
+    }
+    .group-card .member-avatars .person-avatar:first-child {
+      margin-left: 0;
+    }
+
+    /* Create group form */
+    .create-group-form {
+      padding: 20px;
+      border-radius: var(--radius-card);
+      background: linear-gradient(135deg, rgba(143,163,148,.08), rgba(191,150,152,.06));
+      border: 1px dashed var(--line-strong);
+      margin-bottom: 16px;
+    }
+    .create-group-form h3 {
+      font-size: .95rem;
+      color: var(--ink);
+      margin: 0 0 12px;
+    }
+    .create-group-form .form-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .create-group-form input {
+      flex: 1;
+      min-width: 180px;
+      padding: 10px 14px;
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      background: var(--surface-paper);
+      font-size: .9rem;
+      transition: border-color .2s;
+    }
+    .create-group-form input:focus {
+      outline: none;
+      border-color: var(--accent-sage);
+    }
+
+    /* Stats bar */
+    .stats-bar {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .stat-chip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: rgba(255,250,243,.55);
+      border: 1px solid var(--line);
+      font-size: .84rem;
+      color: var(--muted);
+    }
+    .stat-chip .stat-value {
+      font-weight: 600;
+      color: var(--ink);
+    }
+
+    /* Connection philosophy */
+    .connection-note {
+      padding: 16px 20px;
+      border-radius: var(--radius-flow);
+      background: linear-gradient(135deg, rgba(184,194,168,.1), rgba(216,181,181,.08));
+      border: 1px solid var(--line);
+      font-style: italic;
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: .9rem;
+      margin-top: 20px;
+    }
+
+    /* Responsive */
+    @media (max-width: 640px) {
+      .person-card { gap: 10px; padding: 12px 14px; }
+      .person-avatar { width: 36px; height: 36px; font-size: .9rem; }
+      .social-tabs { gap: 4px; }
+      .social-tab { padding: 8px 10px; font-size: .84rem; min-width: 80px; }
+      .stats-bar { gap: 8px; }
+    }
+  </style>
 </head>
 <body>
 <main id="main" class="shell">
   <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
-  <span class="route-hint">慢社交连接</span>
-  <h1 id="page-title">好友与群组</h1>
-  <p class="muted mb-2">先通过共鸣体认识一个人的轮廓，再由慢信、好友和群组走向真实连接。</p>
 
-  <section class="grid">
-    <article class="panel">
-      <h2>可能认识的人</h2>
-      <div id="people" class="timeline"></div>
-    </article>
-    <article class="panel">
-      <h2>好友申请</h2>
-      <div id="requests" class="timeline"></div>
-    </article>
+  <!-- Hero -->
+  <section class="social-hero">
+    <h1>慢社交</h1>
+    <p class="subtitle">先通过共鸣体认识一个人的轮廓，再由慢信和好友走向真实连接。这里没有即时消息，只有认真的靠近。</p>
   </section>
 
-  <div class="spacer"></div>
+  <!-- Stats bar -->
+  <div class="stats-bar" id="statsBar">
+    <div class="stat-chip">
+      <span class="stat-value" id="friendCount">0</span> 好友
+    </div>
+    <div class="stat-chip">
+      <span class="stat-value" id="pendingCount">0</span> 待处理
+    </div>
+    <div class="stat-chip">
+      <span class="stat-value" id="groupCount">0</span> 群组
+    </div>
+  </div>
 
-  <section class="grid">
-    <article class="panel">
-      <h2>我的好友</h2>
-      <div id="friends" class="timeline"></div>
-    </article>
-    <article class="panel">
-      <h2>我的群组</h2>
-      <div class="row gap-sm mb-2">
-        <input id="groupName" class="voice-input-target" placeholder="创建一个小群组">
-        <button onclick="createGroup()">创建</button>
+  <!-- Tab navigation -->
+  <div class="social-tabs" role="tablist">
+    <button class="social-tab active" role="tab" onclick="switchSection('discover')" data-section="discover">
+      发现
+    </button>
+    <button class="social-tab" role="tab" onclick="switchSection('requests')" data-section="requests">
+      好友申请<span class="tab-count" id="reqCount" style="display:none">0</span>
+    </button>
+    <button class="social-tab" role="tab" onclick="switchSection('friends')" data-section="friends">
+      我的好友
+    </button>
+    <button class="social-tab" role="tab" onclick="switchSection('groups')" data-section="groups">
+      群组
+    </button>
+  </div>
+
+  <!-- Section: Discover -->
+  <section id="sec-discover" class="social-section active">
+    <div id="peopleList"></div>
+  </section>
+
+  <!-- Section: Requests -->
+  <section id="sec-requests" class="social-section">
+    <div id="requestsList"></div>
+  </section>
+
+  <!-- Section: Friends -->
+  <section id="sec-friends" class="social-section">
+    <div id="friendsList"></div>
+  </section>
+
+  <!-- Section: Groups -->
+  <section id="sec-groups" class="social-section">
+    <div class="create-group-form">
+      <h3>创建一个围绕真实共鸣的小群组</h3>
+      <div class="form-row">
+        <input id="groupName" placeholder="给群组起一个温柔的名字" maxlength="30">
+        <input id="groupIntro" placeholder="一句话描述（可选）" maxlength="100">
+        <button class="btn-sm primary" onclick="createGroup()">创建</button>
       </div>
-      <div id="groups" class="timeline"></div>
-    </article>
+    </div>
+    <div id="groupsList"></div>
   </section>
+
+  <!-- Connection philosophy -->
+  <div class="connection-note">
+    Inner Cosmos 的社交不是即时聊天。它是从共鸣体到慢信，从慢信到好友，从好友到真实连接的温柔路径。你不需要在这里"社交"——你只需要在准备好时，真诚地靠近。
+  </div>
 </main>
 
 <script src="/js/app.js"></script>
@@ -55,64 +440,287 @@ IC.ensureDemoLogin().then(load);
 
 function esc(v) { return IC.esc(v); }
 
+/* ---- Color utility for avatars ---- */
+const AVATAR_COLORS = [
+  "#8FA39A","#B5C2B0","#D8B5B5","#A5B3C2","#B8A96E",
+  "#A89B8C","#9B8EA0","#C4A882","#8BA5A0","#A0A8B8"
+];
+function avatarColor(name) {
+  var h = 0;
+  for (var i = 0; i < (name || "").length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
+  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
+}
+function avatarInitial(name) {
+  if (!name) return "?";
+  return name.charAt(0).toUpperCase();
+}
+
+/* ---- Data ---- */
+var peopleData = [];
+var friendsData = [];
+var requestsData = {};
+var groupsData = [];
+
 async function load() {
-  const [people, friends, reqs, groups] = await Promise.all([
-    API.socialPeople(), API.socialFriends(), API.socialRequests(), API.socialGroups()
+  var results = await Promise.allSettled([
+    API.socialPeople(),
+    API.socialFriends(),
+    API.socialRequests(),
+    API.socialGroups()
   ]);
-  renderPeople(people.data || []);
-  renderFriends(friends.data || []);
-  renderRequests(reqs.data || {});
-  renderGroups(groups.data || []);
+
+  if (results[0].status === "fulfilled" && results[0].value.success) {
+    peopleData = results[0].value.data || [];
+  }
+  if (results[1].status === "fulfilled" && results[1].value.success) {
+    friendsData = results[1].value.data || [];
+  }
+  if (results[2].status === "fulfilled" && results[2].value.success) {
+    requestsData = results[2].value.data || {};
+  }
+  if (results[3].status === "fulfilled" && results[3].value.success) {
+    groupsData = results[3].value.data || [];
+  }
+
+  updateStats();
+  renderDiscover();
+  renderRequests();
+  renderFriends();
+  renderGroups();
+  IC.stagger(document);
 }
 
-function renderPeople(items) {
-  document.getElementById("people").innerHTML = items.map(u => `
-    <div class="timeline-item">
-      <div class="flex-between">
-        <div><strong>${esc(u.nickname)}</strong><p class="muted">@${esc(u.username)} · ${esc(u.relationStatus)}</p></div>
-        <button ${u.relationStatus !== "NONE" ? "disabled" : ""} onclick="requestFriend(${u.id})">加好友</button>
-      </div>
-    </div>
-  `).join("") || IC.empty("暂无可推荐用户。");
+function updateStats() {
+  var incoming = (requestsData.incoming || []).length;
+  var outgoing = (requestsData.outgoing || []).length;
+  var totalPending = incoming + outgoing;
+
+  document.getElementById("friendCount").textContent = friendsData.length;
+  document.getElementById("pendingCount").textContent = totalPending;
+  document.getElementById("groupCount").textContent = groupsData.length;
+
+  var reqEl = document.getElementById("reqCount");
+  if (incoming > 0) {
+    reqEl.textContent = incoming;
+    reqEl.style.display = "inline-block";
+  } else {
+    reqEl.style.display = "none";
+  }
 }
 
-function renderFriends(items) {
-  document.getElementById("friends").innerHTML = items.map(u => `
-    <div class="timeline-item"><strong>${esc(u.nickname)}</strong><p class="muted">@${esc(u.username)}</p></div>
-  `).join("") || IC.empty("还没有好友。可以先从星海广场或共鸣体开始。");
+/* ---- Tab switching ---- */
+function switchSection(name) {
+  document.querySelectorAll(".social-tab").forEach(function(tab) {
+    tab.classList.toggle("active", tab.dataset.section === name);
+  });
+  document.querySelectorAll(".social-section").forEach(function(sec) {
+    sec.classList.toggle("active", sec.id === "sec-" + name);
+  });
 }
 
-function renderRequests(data) {
-  const incoming = data.incoming || [];
-  const outgoing = data.outgoing || [];
-  document.getElementById("requests").innerHTML = [
-    ...incoming.map(r => `<div class="timeline-item"><div class="flex-between"><span>${esc(r.nickname)} 想加你为好友</span><button onclick="acceptFriend(${r.id})">接受</button></div></div>`),
-    ...outgoing.map(r => `<div class="timeline-item"><span class="muted">已向 ${esc(r.nickname)} 发出申请</span></div>`)
-  ].join("") || IC.empty("暂无好友申请。");
+/* ---- Render: Discover ---- */
+function renderDiscover() {
+  var box = document.getElementById("peopleList");
+  if (!peopleData.length) {
+    box.innerHTML = IC.empty("暂无推荐用户。可以先去星海广场遇见共鸣体，再从这里开始。");
+    return;
+  }
+  box.innerHTML = peopleData.map(function(u, i) {
+    var color = avatarColor(u.nickname || u.username);
+    var statusLabel = friendStatusLabel(u.relationStatus);
+    var canRequest = u.relationStatus === "NONE" || !u.relationStatus;
+    return '<div class="person-card reveal" style="animation-delay:' + (i * 80) + 'ms">' +
+      '<div class="person-avatar" style="background:' + color + '">' +
+        avatarInitial(u.nickname || u.username) +
+      '</div>' +
+      '<div class="person-info">' +
+        '<div class="name">' + esc(u.nickname || u.username) + '</div>' +
+        '<div class="meta">@' + esc(u.username) + (statusLabel ? ' &middot; ' + statusLabel : '') + '</div>' +
+      '</div>' +
+      '<div class="person-action">' +
+        '<button class="btn-sm' + (canRequest ? ' primary' : '') + '"' +
+          (canRequest ? '' : ' disabled') +
+          ' onclick="requestFriend(' + u.id + ')">' +
+          (canRequest ? '加好友' : statusLabel) +
+        '</button>' +
+      '</div>' +
+    '</div>';
+  }).join("");
 }
 
-function renderGroups(items) {
-  document.getElementById("groups").innerHTML = items.map(g => `
-    <div class="timeline-item"><strong>${esc(g.groupName)}</strong><p class="muted">${esc(g.intro || "一个安静的小群组")}</p></div>
-  `).join("") || IC.empty("还没有群组。");
+function friendStatusLabel(status) {
+  var map = {
+    "NONE": "",
+    "PENDING": "申请中",
+    "FRIEND": "已好友",
+    "BLOCKED": "已屏蔽"
+  };
+  return map[status] || status || "";
 }
 
+/* ---- Render: Requests ---- */
+function renderRequests() {
+  var box = document.getElementById("requestsList");
+  var incoming = requestsData.incoming || [];
+  var outgoing = requestsData.outgoing || [];
+
+  if (!incoming.length && !outgoing.length) {
+    box.innerHTML = IC.empty("暂无好友申请。去星海广场遇见更多共鸣体吧。");
+    return;
+  }
+
+  var html = "";
+
+  if (incoming.length) {
+    html += '<h2 style="font-size:1rem;color:var(--ink);margin-bottom:12px">收到的申请</h2>';
+    html += incoming.map(function(r, i) {
+      var color = avatarColor(r.nickname || r.username);
+      return '<div class="request-card incoming reveal" style="animation-delay:' + (i * 80) + 'ms">' +
+        '<div class="request-header">' +
+          '<div class="person-avatar" style="background:' + color + ';width:36px;height:36px;font-size:.9rem">' +
+            avatarInitial(r.nickname || r.username) +
+          '</div>' +
+          '<div class="person-info">' +
+            '<div class="name">' + esc(r.nickname || r.username) + '</div>' +
+            '<div class="meta">想和你成为好友</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="request-actions">' +
+          '<button class="btn-sm primary" onclick="acceptFriend(' + r.id + ')">接受</button>' +
+          '<button class="btn-sm" onclick="declineFriend(' + r.id + ')" style="opacity:.6">暂时不了</button>' +
+        '</div>' +
+      '</div>';
+    }).join("");
+  }
+
+  if (outgoing.length) {
+    if (incoming.length) html += '<div class="spacer" style="height:20px"></div>';
+    html += '<h2 style="font-size:1rem;color:var(--ink);margin-bottom:12px">发出的申请</h2>';
+    html += outgoing.map(function(r, i) {
+      var color = avatarColor(r.nickname || r.username);
+      return '<div class="request-card outgoing reveal" style="animation-delay:' + ((incoming.length + i) * 80) + 'ms">' +
+        '<div class="request-header">' +
+          '<div class="person-avatar" style="background:' + color + ';width:36px;height:36px;font-size:.9rem">' +
+            avatarInitial(r.nickname || r.username) +
+          '</div>' +
+          '<div class="person-info">' +
+            '<div class="name">' + esc(r.nickname || r.username) + '</div>' +
+            '<div class="meta">等待对方回应</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    }).join("");
+  }
+
+  box.innerHTML = html;
+}
+
+/* ---- Render: Friends ---- */
+function renderFriends() {
+  var box = document.getElementById("friendsList");
+  if (!friendsData.length) {
+    box.innerHTML = IC.empty("还没有好友。可以先从星海广场或共鸣体开始，用慢信慢慢靠近。");
+    return;
+  }
+  box.innerHTML = friendsData.map(function(u, i) {
+    var color = avatarColor(u.nickname || u.username);
+    return '<div class="person-card reveal" style="animation-delay:' + (i * 80) + 'ms">' +
+      '<div class="person-avatar" style="background:' + color + '">' +
+        avatarInitial(u.nickname || u.username) +
+        '<span class="status-dot" style="background:' + (u.online ? 'var(--accent-sage)' : 'var(--faint)') + '"></span>' +
+      '</div>' +
+      '<div class="person-info">' +
+        '<div class="name">' + esc(u.nickname || u.username) + '</div>' +
+        '<div class="meta">@' + esc(u.username) + '</div>' +
+      '</div>' +
+      '<div class="person-action">' +
+        '<a class="btn-sm" href="/pages/slow-letter.html?to=' + u.id + '">写慢信</a>' +
+      '</div>' +
+    '</div>';
+  }).join("");
+}
+
+/* ---- Render: Groups ---- */
+var GROUP_ICONS = ["🌿","🌙","🌊","🌸","🪐","✨","🔮","🦋","🍃","💫"];
+var GROUP_COLORS = [
+  "rgba(143,163,148,.25)","rgba(165,179,194,.25)","rgba(216,181,181,.25)",
+  "rgba(184,194,168,.25)","rgba(184,169,110,.25)","rgba(155,142,160,.25)"
+];
+
+function renderGroups() {
+  var box = document.getElementById("groupsList");
+  if (!groupsData.length) {
+    box.innerHTML = IC.empty("还没有群组。可以创建一个围绕共同主题的小群组。");
+    return;
+  }
+  box.innerHTML = groupsData.map(function(g, i) {
+    var icon = GROUP_ICONS[i % GROUP_ICONS.length];
+    var color = GROUP_COLORS[i % GROUP_COLORS.length];
+    var memberCount = g.memberCount || g.members?.length || 1;
+    var intro = g.intro || "一个围绕真实共鸣慢慢靠近的小群组";
+    return '<div class="group-card reveal" style="animation-delay:' + (i * 80) + 'ms">' +
+      '<div class="group-header">' +
+        '<div class="group-icon" style="background:' + color + '">' + icon + '</div>' +
+        '<div style="flex:1">' +
+          '<div class="group-name">' + esc(g.groupName) + '</div>' +
+          '<div class="group-meta">' +
+            '<span>' + memberCount + ' 人</span>' +
+            '<span>' + esc(g.createdAt ? formatDate(g.createdAt) : "刚刚") + '</span>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="group-intro">' + esc(intro) + '</div>' +
+    '</div>';
+  }).join("");
+}
+
+function formatDate(d) {
+  if (!d) return "";
+  var dt = new Date(d);
+  if (isNaN(dt.getTime())) return d;
+  return dt.getFullYear() + "-" + String(dt.getMonth()+1).padStart(2,"0") + "-" + String(dt.getDate()).padStart(2,"0");
+}
+
+/* ---- Actions ---- */
 async function requestFriend(id) {
-  const r = await API.socialRequestFriend(id);
-  if (r.success) { IC.toast("好友申请已发送", "success"); load(); }
+  var r = await API.socialRequestFriend(id);
+  if (r.success) {
+    IC.toast("好友申请已发送", "success");
+    load();
+  } else {
+    IC.toast(r.message || "操作失败", "warn");
+  }
 }
 
 async function acceptFriend(id) {
-  const r = await API.socialAcceptFriend(id);
-  if (r.success) { IC.toast("已成为好友", "success"); load(); }
+  var r = await API.socialAcceptFriend(id);
+  if (r.success) {
+    IC.toast("已成为好友", "success");
+    load();
+  } else {
+    IC.toast(r.message || "操作失败", "warn");
+  }
+}
+
+async function declineFriend(id) {
+  IC.toast("已忽略该申请", "info");
 }
 
 async function createGroup() {
-  const name = document.getElementById("groupName").value.trim();
+  var name = document.getElementById("groupName").value.trim();
   if (!name) return IC.toast("请输入群组名", "warn");
-  const r = await API.socialCreateGroup({ groupName: name, intro: "一个围绕真实共鸣慢慢靠近的小群组。" });
-  if (r.success) { document.getElementById("groupName").value = ""; IC.toast("群组已创建", "success"); load(); }
+  var intro = document.getElementById("groupIntro").value.trim() || "一个围绕真实共鸣慢慢靠近的小群组。";
+  var r = await API.socialCreateGroup({ groupName: name, intro: intro });
+  if (r.success) {
+    document.getElementById("groupName").value = "";
+    document.getElementById("groupIntro").value = "";
+    IC.toast("群组已创建", "success");
+    load();
+  } else {
+    IC.toast(r.message || "创建失败", "warn");
+  }
 }
+
 IC.hideLoading();
 </script>
 </body>

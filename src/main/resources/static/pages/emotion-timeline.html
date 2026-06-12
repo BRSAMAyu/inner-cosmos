@@ -6,6 +6,30 @@
   <link rel="stylesheet" href="/css/app.css">
   <title>情绪时间线 · Inner Cosmos</title>
   <style>
+    .et-hero {
+      padding: 24px 20px;
+      border-radius: var(--radius-flow);
+      background: linear-gradient(135deg, rgba(191,150,152,.12), rgba(143,163,148,.1));
+      border: 1px solid var(--line);
+      margin-bottom: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+    .et-hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 65% 40%, rgba(216,181,181,.1), transparent 50%);
+      pointer-events: none;
+    }
+    .et-hero h1 {
+      font-size: clamp(1.4rem, 3.5vw, 2rem);
+      font-family: var(--font-hero);
+      color: var(--ink);
+      margin: 0 0 8px;
+      position: relative;
+    }
+    .et-hero .muted { position: relative; }
     .et-canvas-wrap { position: relative; width: 100%; height: 360px; }
     .et-svg { width: 100%; height: 100%; }
     .et-line { fill: none; stroke: rgba(143,163,148,.65); stroke-width: 2; }
@@ -24,14 +48,16 @@
 <main id="main" class="shell">
   <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
-  <span class="route-hint">情绪天气</span>
-  <h1 id="page-title">情绪时间线</h1>
-  <p class="muted mb-2">从 Daily Record 汇总出来的情绪曲线。粉色的点是高 gravity 记忆出现的日子 —— 那往往是值得回看的转折。</p>
+  <!-- Hero -->
+  <section class="et-hero">
+    <h1>情绪时间线</h1>
+    <p class="muted">从 Daily Record 汇总出来的情绪曲线。粉色的点是高 gravity 记忆出现的日子 -- 那往往是值得回看的转折。</p>
+  </section>
 
-  <div class="row gap-sm mb-2">
-    <button onclick="loadRange(7)" class="active" id="r-7">7 天</button>
-    <button onclick="loadRange(30)" id="r-30">30 天</button>
-    <button onclick="loadRange(90)" id="r-90">90 天</button>
+  <div class="social-tabs" style="max-width:320px;margin-bottom:20px">
+    <button class="social-tab active" onclick="loadRange(7)" id="r-7">7 天</button>
+    <button class="social-tab" onclick="loadRange(30)" id="r-30">30 天</button>
+    <button class="social-tab" onclick="loadRange(90)" id="r-90">90 天</button>
   </div>
 
   <section class="panel">
@@ -108,6 +134,13 @@ function renderChart() {
     const x = padding.left + i * stepX;
     html += `<text class="et-label" x="${x}" y="${h - 6}" text-anchor="middle">${esc((d.date || "").slice(5))}</text>`;
   });
+  // Area fill (gradient)
+  var areaD = pathD;
+  var lastX = padding.left + (trendData.length - 1) * stepX;
+  var baseY = padding.top + innerH;
+  areaD += `L${lastX},${baseY} L${padding.left},${baseY} Z`;
+  html += `<defs><linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(143,163,148,.32)"/><stop offset="100%" stop-color="rgba(143,163,148,.02)"/></linearGradient></defs>`;
+  html += `<path d="${areaD}" fill="url(#areaGrad)" />`;
   // Path
   html += `<path class="et-line" d="${pathD}" />`;
   // Dots (key = high gravity day)
