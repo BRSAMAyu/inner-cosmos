@@ -273,6 +273,33 @@ window.ICTimeSystem = {
 
   // Update time-based UI
   updateTime() {
+    // Check unified theme mode setting
+    const themeMode = localStorage.getItem('ic_theme_mode') || 'auto';
+
+    if (themeMode === 'dark') {
+      // Force dark mode
+      document.body.classList.add('dark-star');
+      this.currentTimeState.timeClass = 'time-night';
+      this.currentTimeState.isDay = false;
+      document.body.classList.remove(...this.timeClasses);
+      document.body.classList.add('time-night');
+      return;
+    }
+
+    if (themeMode === 'light') {
+      // Force light mode
+      document.body.classList.remove('dark-star');
+      const timeClass = this.getTimeClass();
+      this.currentTimeState.timeClass = timeClass;
+      this.currentTimeState.isDay = true;
+      document.body.classList.remove(...this.timeClasses);
+      document.body.classList.add(timeClass);
+      this.applyTimeColors(timeClass);
+      if (window.ICMotion) ICMotion.applyTimeBasedMotion();
+      return;
+    }
+
+    // Auto mode: follow natural rhythm
     const fixed = localStorage.getItem('ic_fixed_theme');
     if (fixed && localStorage.getItem('ic_visual_auto') === 'false') {
       this.currentTimeState.timeClass = fixed;
@@ -300,13 +327,13 @@ window.ICTimeSystem = {
     else if (hour >= 17 && hour < 21) document.body.classList.add('time-dusk');
     else if (hour >= 21 || hour < 5) document.body.classList.add('time-night');
 
-    // Time changes tune the ambient palette only. Theme ownership stays in app.js
-    // so the default product remains the requested white-day Morandi experience.
-    const autoTheme = JSON.parse(localStorage.getItem('ic_auto_theme') || 'false');
+    // Auto dark mode: switch to warm dark theme at dusk/night
+    const autoTheme = JSON.parse(localStorage.getItem('ic_auto_theme') || 'true');
     if (autoTheme) {
       const isNightPeriod = timeClass === 'time-night' || timeClass === 'time-deep-night';
+      const isDuskPeriod = timeClass === 'time-dusk';
       const isNightHour = new Date().getHours() >= 18 || new Date().getHours() < 6;
-      document.body.classList.toggle('dark-star', isNightPeriod || isNightHour);
+      document.body.classList.toggle('dark-star', isNightPeriod || isDuskPeriod || isNightHour);
     }
 
     // Update CSS variables for time-based colors
