@@ -2,11 +2,13 @@ package com.innercosmos.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.innercosmos.config.TestRateLimitConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
@@ -30,9 +32,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "llm.provider=minimax",
         "llm.api-key=",
         "llm.minimax.api-key=",
-        "llm.allow-fallback=true"
+        "llm.allow-fallback=true",
+        "spring.main.allow-bean-definition-overriding=true",
+        "spring.datasource.url=jdbc:h2:mem:testtodo;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1",
+        "spring.sql.init.mode=always"
 })
 @AutoConfigureMockMvc
+@Import(TestRateLimitConfig.class)
 class TodoControllerTest {
 
     @Autowired
@@ -98,7 +104,7 @@ class TodoControllerTest {
         long todoId = createTodo("Status test task", "LOW");
 
         Map<String, String> statusBody = new HashMap<>();
-        statusBody.put("status", "IN_PROGRESS");
+        statusBody.put("status", "DOING");
 
         mockMvc.perform(post("/api/todos/" + todoId + "/status")
                         .session(session)
@@ -106,7 +112,7 @@ class TodoControllerTest {
                         .content(objectMapper.writeValueAsString(statusBody)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.status").value("IN_PROGRESS"));
+                .andExpect(jsonPath("$.data.status").value("DOING"));
     }
 
     @Test
@@ -202,7 +208,7 @@ class TodoControllerTest {
         todo.put("taskName", taskName);
         todo.put("description", "Description for " + taskName);
         todo.put("priority", priority);
-        todo.put("status", "PENDING");
+        todo.put("status", "TODO");
         return todo;
     }
 

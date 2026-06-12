@@ -9,7 +9,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -117,12 +120,7 @@ class AgentReplyStrategyTest {
         response.reply = "capsule reply";
 
         when(capsuleAgentMock.converse(
-            any(),
-            any(),
-            any(),
-            eq(1),
-            eq("hello"),
-            any()
+            any(), any(), any(), eq(1), eq("hello"), any()
         )).thenReturn(response);
 
         CapsuleChatStrategy strategy = new CapsuleChatStrategy(capsuleAgentMock);
@@ -136,17 +134,11 @@ class AgentReplyStrategyTest {
         response.reply = null;
 
         when(capsuleAgentMock.converse(
-            any(),
-            any(),
-            any(),
-            anyInt(),
-            anyString(),
-            any()
+            any(), any(), any(), anyInt(), anyString(), any()
         )).thenReturn(response);
 
         CapsuleChatStrategy strategy = new CapsuleChatStrategy(capsuleAgentMock);
         String result = strategy.reply("hello");
-        // Source: response.reply != null ? response.reply : "我听见了."
         assertNotNull(result);
     }
 
@@ -156,12 +148,7 @@ class AgentReplyStrategyTest {
         response.reply = "default reply";
 
         when(capsuleAgentMock.converse(
-            any(),
-            any(),
-            any(),
-            anyInt(),
-            anyString(),
-            any()
+            any(), any(), any(), anyInt(), any(), any()
         )).thenReturn(response);
 
         CapsuleChatStrategy strategy = new CapsuleChatStrategy(capsuleAgentMock);
@@ -175,12 +162,7 @@ class AgentReplyStrategyTest {
         response.reply = "heard nothing";
 
         when(capsuleAgentMock.converse(
-            any(),
-            any(),
-            any(),
-            anyInt(),
-            anyString(),
-            any()
+            any(), any(), any(), anyInt(), anyString(), any()
         )).thenReturn(response);
 
         CapsuleChatStrategy strategy = new CapsuleChatStrategy(capsuleAgentMock);
@@ -207,59 +189,51 @@ class AgentReplyStrategyTest {
         ThoughtShredderStrategy shredder = new ThoughtShredderStrategy(memoryExtractAgentMock);
         CapsuleChatStrategy capsule = new CapsuleChatStrategy(capsuleAgentMock);
 
-        String a = aurora.strategyCode();
-        String s = shredder.strategyCode();
-        String c = capsule.strategyCode();
-
-        org.junit.jupiter.api.Assertions.assertNotEquals(a, s);
-        org.junit.jupiter.api.Assertions.assertNotEquals(a, c);
-        org.junit.jupiter.api.Assertions.assertNotEquals(s, c);
+        assertNotEquals(aurora.strategyCode(), shredder.strategyCode());
+        assertNotEquals(aurora.strategyCode(), capsule.strategyCode());
+        assertNotEquals(shredder.strategyCode(), capsule.strategyCode());
     }
 
     @Test
     void allStrategiesImplementInterface() {
+        assertTrue(new AuroraCompanionStrategy(auroraAgentMock) instanceof AgentReplyStrategy);
+        assertTrue(new ThoughtShredderStrategy(memoryExtractAgentMock) instanceof AgentReplyStrategy);
+        assertTrue(new CapsuleChatStrategy(capsuleAgentMock) instanceof AgentReplyStrategy);
+    }
+
+    @Test
+    void strategyCodesMatchUpperSnakeCasePattern() {
         AuroraCompanionStrategy aurora = new AuroraCompanionStrategy(auroraAgentMock);
         ThoughtShredderStrategy shredder = new ThoughtShredderStrategy(memoryExtractAgentMock);
         CapsuleChatStrategy capsule = new CapsuleChatStrategy(capsuleAgentMock);
 
-        org.junit.jupiter.api.Assertions.assertTrue(aurora instanceof AgentReplyStrategy);
-        org.junit.jupiter.api.Assertions.assertTrue(shredder instanceof AgentReplyStrategy);
-        org.junit.jupiter.api.Assertions.assertTrue(capsule instanceof AgentReplyStrategy);
+        assertTrue(aurora.strategyCode().matches("[A-Z_]+"));
+        assertTrue(shredder.strategyCode().matches("[A-Z_]+"));
+        assertTrue(capsule.strategyCode().matches("[A-Z_]+"));
     }
 
     @Test
-    void strategyCodesMatchExpectedPattern() {
+    void allStrategyCodesAreUpperCase() {
         AuroraCompanionStrategy aurora = new AuroraCompanionStrategy(auroraAgentMock);
         ThoughtShredderStrategy shredder = new ThoughtShredderStrategy(memoryExtractAgentMock);
         CapsuleChatStrategy capsule = new CapsuleChatStrategy(capsuleAgentMock);
 
-        org.junit.jupiter.api.Assertions.assertTrue(aurora.strategyCode().matches("[A-Z_]+"));
-        org.junit.jupiter.api.Assertions.assertTrue(shredder.strategyCode().matches("[A-Z_]+"));
-        org.junit.jupiter.api.Assertions.assertTrue(capsule.strategyCode().matches("[A-Z_]+"));
+        assertEquals(aurora.strategyCode(), aurora.strategyCode().toUpperCase());
+        assertEquals(shredder.strategyCode(), shredder.strategyCode().toUpperCase());
+        assertEquals(capsule.strategyCode(), capsule.strategyCode().toUpperCase());
     }
 
     @Test
-    void auroraCompanionStrategyCodeFollowsUpperSnakeCase() {
-        AuroraCompanionStrategy strategy = new AuroraCompanionStrategy(auroraAgentMock);
-        String code = strategy.strategyCode();
-        org.junit.jupiter.api.Assertions.assertTrue(code.equals(code.toUpperCase()));
-        org.junit.jupiter.api.Assertions.assertFalse(code.contains(" "));
-        org.junit.jupiter.api.Assertions.assertFalse(code.contains("-"));
-    }
+    void noStrategyCodeContainsSpacesOrDashes() {
+        AuroraCompanionStrategy aurora = new AuroraCompanionStrategy(auroraAgentMock);
+        ThoughtShredderStrategy shredder = new ThoughtShredderStrategy(memoryExtractAgentMock);
+        CapsuleChatStrategy capsule = new CapsuleChatStrategy(capsuleAgentMock);
 
-    @Test
-    void thoughtShredderStrategyCodeFollowsUpperSnakeCase() {
-        ThoughtShredderStrategy strategy = new ThoughtShredderStrategy(memoryExtractAgentMock);
-        String code = strategy.strategyCode();
-        org.junit.jupiter.api.Assertions.assertTrue(code.equals(code.toUpperCase()));
-        org.junit.jupiter.api.Assertions.assertFalse(code.contains(" "));
-    }
-
-    @Test
-    void capsuleChatStrategyCodeFollowsUpperSnakeCase() {
-        CapsuleChatStrategy strategy = new CapsuleChatStrategy(capsuleAgentMock);
-        String code = strategy.strategyCode();
-        org.junit.jupiter.api.Assertions.assertTrue(code.equals(code.toUpperCase()));
-        org.junit.jupiter.api.Assertions.assertFalse(code.contains(" "));
+        assertFalse(aurora.strategyCode().contains(" "));
+        assertFalse(aurora.strategyCode().contains("-"));
+        assertFalse(shredder.strategyCode().contains(" "));
+        assertFalse(shredder.strategyCode().contains("-"));
+        assertFalse(capsule.strategyCode().contains(" "));
+        assertFalse(capsule.strategyCode().contains("-"));
     }
 }
