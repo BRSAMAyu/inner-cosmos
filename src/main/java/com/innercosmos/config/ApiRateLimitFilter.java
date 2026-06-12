@@ -52,7 +52,12 @@ public class ApiRateLimitFilter implements Filter {
         HttpServletResponse res = (HttpServletResponse) response;
 
         String path = req.getServletPath();
-        if (path.startsWith("/actuator/") || path.startsWith("/static/")) {
+        // Only rate-limit API endpoints — static pages, CSS, JS are never limited
+        if (!path.startsWith("/api/")) {
+            chain.doFilter(request, response);
+            return;
+        }
+        if (path.startsWith("/api/auth/guest") || path.startsWith("/actuator/")) {
             chain.doFilter(request, response);
             return;
         }
