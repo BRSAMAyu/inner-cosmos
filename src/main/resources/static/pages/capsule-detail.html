@@ -5,38 +5,106 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>共鸣体详情 · Inner Cosmos</title>
   <link rel="stylesheet" href="/css/app.css">
+  <style>
+    .detail-hero {
+      padding: 28px 24px;
+      border-radius: var(--radius-flow);
+      background: linear-gradient(135deg, rgba(143,163,148,.12), rgba(191,150,152,.1));
+      border: 1px solid var(--line);
+      margin-bottom: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+    .detail-hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 75% 25%, rgba(216,181,181,.1), transparent 50%);
+      pointer-events: none;
+    }
+    .detail-hero .hero-identity {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      position: relative;
+    }
+    .detail-hero h1 {
+      font-size: clamp(1.5rem, 4vw, 2rem);
+      font-family: var(--font-hero);
+      color: var(--ink);
+      margin: 0;
+    }
+    .detail-hero .intro {
+      font-size: .92rem;
+      color: var(--muted);
+      line-height: 1.6;
+      margin-top: 12px;
+      position: relative;
+    }
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-top: 16px;
+      position: relative;
+    }
+    .stat-card {
+      padding: 14px;
+      border-radius: var(--radius);
+      background: rgba(255,250,243,.6);
+      border: 1px solid var(--line);
+      text-align: center;
+    }
+    .stat-card .value {
+      font-size: 1.4rem;
+      font-weight: 600;
+      color: var(--ink);
+    }
+    .stat-card .label {
+      font-size: .78rem;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    @media (max-width: 540px) {
+      .stat-grid { grid-template-columns: 1fr; }
+    }
+  </style>
 </head>
 <body>
 <main id="main" class="shell">
   <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
 
-  <!-- Capsule detail header -->
-  <section class="panel mb-2">
-    <div class="flex-between mb-2">
-      <div>
-        <span class="route-hint">数字回声</span>
-        <h1 id="capsuleName">加载中...</h1>
+  <!-- Hero -->
+  <section class="detail-hero">
+    <div class="hero-identity">
+      <div id="capsuleAvatar"></div>
+      <div style="flex:1">
+        <div class="flex-between" style="align-items:center">
+          <div>
+            <span class="route-hint">数字回声</span>
+            <h1 id="capsuleName">加载中...</h1>
+          </div>
+          <span id="capsuleType" class="badge badge-read">用户</span>
+        </div>
       </div>
-      <span id="capsuleType" class="badge badge-read">用户</span>
     </div>
-    <p id="capsuleIntro" class="muted mb-2"></p>
-
-    <div class="pill-row mb-2" id="capsuleTags"></div>
+    <p id="capsuleIntro" class="intro"></p>
+    <div class="pill-row mt-1" id="capsuleTags" style="position:relative"></div>
 
     <!-- Stats -->
-    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))">
-      <div class="soft-stage text-center">
-        <strong id="echoEnergy" class="teal">0.00</strong>
-        <p class="muted">回声能量</p>
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="value" id="echoEnergy">0.00</div>
+        <div class="label">回声能量</div>
       </div>
-      <div class="soft-stage text-center">
-        <strong id="dailyLimit">30</strong>
-        <p class="muted">每日对话轮数</p>
+      <div class="stat-card">
+        <div class="value" id="dailyLimit">30</div>
+        <div class="label">每日对话轮数</div>
       </div>
-      <div class="soft-stage text-center">
-        <strong id="letterAllowed">允许</strong>
-        <p class="muted">慢信请求</p>
+      <div class="stat-card">
+        <div class="value" id="letterAllowed">允许</div>
+        <div class="label">慢信请求</div>
       </div>
     </div>
   </section>
@@ -92,6 +160,7 @@
 <script src="/js/weather-system.js"></script>
 <script src="/js/audio-system.js"></script>
 <script src="/js/api.js"></script>
+<script src="/js/capsule-personality.js"></script>
 <script>
 IC.mountShell("共鸣体详情");
 IC.ensureDemoLogin();
@@ -146,6 +215,16 @@ function renderDetail(c) {
       ? "不限"
       : (c.conversationLimitPerDay || 30);
   document.getElementById("letterAllowed").textContent = c.allowLetterRequest ? "允许" : "不允许";
+
+  /* CapsulePersonality avatar */
+  var avatarBox = document.getElementById("capsuleAvatar");
+  if (typeof CapsulePersonality !== "undefined" && avatarBox) {
+    avatarBox.innerHTML = CapsulePersonality.generateAvatar(c.pseudonym, "large");
+    var personality = CapsulePersonality.getPersonality(c.pseudonym);
+    if (personality) {
+      document.getElementById("capsuleName").style.color = personality.color;
+    }
+  }
 
   const tags = (c.publicTags || "").split(",").filter(Boolean);
   document.getElementById("capsuleTags").innerHTML = tags.map(t =>

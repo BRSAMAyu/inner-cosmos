@@ -6,7 +6,31 @@
   <link rel="stylesheet" href="/css/app.css">
   <title>关系温度图 · Inner Cosmos</title>
   <style>
-    .rel-canvas-wrap { position: relative; width: 100%; height: 540px; }
+    .rel-hero {
+      padding: 24px 20px;
+      border-radius: var(--radius-flow);
+      background: linear-gradient(135deg, rgba(143,163,148,.12), rgba(165,179,194,.12));
+      border: 1px solid var(--line);
+      margin-bottom: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+    .rel-hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 70% 30%, rgba(165,179,194,.1), transparent 50%);
+      pointer-events: none;
+    }
+    .rel-hero h1 {
+      font-size: clamp(1.4rem, 3.5vw, 2rem);
+      font-family: var(--font-hero);
+      color: var(--ink);
+      margin: 0 0 8px;
+      position: relative;
+    }
+    .rel-hero .muted { position: relative; }
+    .rel-canvas-wrap { position: relative; width: 100%; height: 540px; border-radius: var(--radius-flow); overflow: hidden; }
     .rel-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
     .rel-node {
       cursor: pointer;
@@ -33,9 +57,11 @@
 <main id="main" class="shell">
   <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
-  <span class="route-hint">你与他人</span>
-  <h1 id="page-title">关系温度图</h1>
-  <p class="muted mb-2">你在 Inner Cosmos 中提到过的人会在这里浮现。中心是"我"，每条连线的温度来自你提到这个人时的情绪强度。</p>
+  <!-- Hero -->
+  <section class="rel-hero">
+    <h1>关系温度图</h1>
+    <p class="muted">你在 Inner Cosmos 中提到过的人会在这里浮现。中心是"我"，每条连线的温度来自你提到这个人时的情绪强度。</p>
+  </section>
 
   <section class="panel">
     <div class="rel-canvas-wrap">
