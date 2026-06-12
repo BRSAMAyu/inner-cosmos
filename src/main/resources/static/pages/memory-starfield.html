@@ -6,22 +6,258 @@
   <title>记忆星图 - Inner Cosmos</title>
   <link rel="stylesheet" href="/css/app.css">
   <style>
-    .map-shell { position:relative; min-height:620px; overflow:hidden; touch-action:none; }
-    .map-canvas { position:absolute; inset:0; transform-origin:0 0; }
-    .map-hint { position:absolute; left:16px; bottom:16px; z-index:4; background:rgba(255,250,243,.82); border:1px solid var(--line); border-radius:12px; padding:8px 10px; font-size:.82rem; color:var(--muted); }
-    .star-label { pointer-events:none; transform:translate(-50%, 18px); max-width:120px; text-align:center; }
-    .star.selected { outline:2px solid rgba(191,150,152,.8); outline-offset:5px; }
-    .star-connections { pointer-events:none; opacity:.42; }
+    /* ── Full-immersion starfield shell ── */
+    .starfield-shell {
+      position: relative;
+      min-height: calc(100vh - 180px);
+      border-radius: var(--radius-flow);
+      overflow: hidden;
+      touch-action: none;
+      background:
+        radial-gradient(ellipse 800px 600px at 20% 30%, rgba(143,163,148,.06), transparent),
+        radial-gradient(ellipse 600px 500px at 80% 60%, rgba(165,179,194,.05), transparent),
+        radial-gradient(ellipse 900px 400px at 50% 80%, rgba(191,150,152,.04), transparent),
+        var(--surface-warm);
+    }
+    /* Ambient dust particles via CSS */
+    .starfield-shell::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        radial-gradient(1px 1px at 10% 15%, rgba(143,163,148,.4), transparent),
+        radial-gradient(1px 1px at 25% 70%, rgba(191,150,152,.35), transparent),
+        radial-gradient(1.5px 1.5px at 45% 20%, rgba(165,179,194,.3), transparent),
+        radial-gradient(1px 1px at 60% 85%, rgba(184,194,168,.4), transparent),
+        radial-gradient(1px 1px at 78% 35%, rgba(143,163,148,.35), transparent),
+        radial-gradient(1.2px 1.2px at 90% 60%, rgba(191,150,152,.3), transparent),
+        radial-gradient(1px 1px at 15% 90%, rgba(165,179,194,.35), transparent),
+        radial-gradient(1px 1px at 55% 50%, rgba(184,194,168,.3), transparent),
+        radial-gradient(1.5px 1.5px at 35% 40%, rgba(143,163,148,.25), transparent),
+        radial-gradient(1px 1px at 70% 10%, rgba(191,150,152,.3), transparent),
+        radial-gradient(1px 1px at 5% 55%, rgba(165,179,194,.35), transparent),
+        radial-gradient(1px 1px at 85% 80%, rgba(143,163,148,.3), transparent);
+      animation: dust-drift 120s linear infinite;
+      pointer-events: none;
+      z-index: 1;
+    }
+    @keyframes dust-drift {
+      from { transform: translateY(0); }
+      to { transform: translateY(-40px); }
+    }
+    .starfield-canvas {
+      position: absolute;
+      inset: 0;
+      transform-origin: 0 0;
+      z-index: 2;
+    }
+    .starfield-svg {
+      position: absolute;
+      inset: 0;
+      width: 1600px;
+      height: 1100px;
+      pointer-events: none;
+      opacity: .38;
+      z-index: 1;
+    }
+    /* ── Star body ── */
+    .star {
+      position: absolute;
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      transform: translate(-50%, -50%);
+      transition: transform .35s var(--ease-bloom), box-shadow .35s;
+      z-index: 3;
+      background: radial-gradient(circle at 35% 35%,
+        var(--star-core, rgba(255,250,240,.92)),
+        var(--star-color, rgba(143,163,148,.7)) 40%,
+        transparent 70%);
+      box-shadow:
+        0 0 calc(var(--size, 40px) * .5) rgba(143,163,148,.12),
+        0 0 calc(var(--size, 40px) * .25) rgba(191,150,152,.08);
+      animation: star-breathe var(--breath-dur, 6s) var(--ease-flow) infinite;
+      animation-delay: var(--breath-delay, 0s);
+    }
+    .star::after {
+      content: "";
+      position: absolute;
+      inset: -40%;
+      border-radius: 50%;
+      background: radial-gradient(circle, var(--star-color, rgba(143,163,148,.15)), transparent 65%);
+      opacity: .5;
+      pointer-events: none;
+    }
+    .star:hover {
+      transform: translate(-50%, -50%) scale(1.15);
+      box-shadow:
+        0 0 calc(var(--size, 40px) * .8) rgba(143,163,148,.2),
+        0 0 calc(var(--size, 40px) * .4) rgba(191,150,152,.12);
+    }
+    .star.selected {
+      outline: 2px solid rgba(191,150,152,.6);
+      outline-offset: 6px;
+      transform: translate(-50%, -50%) scale(1.08);
+    }
+    /* Black hole: extremely high gravity */
+    .star.black-hole {
+      background: radial-gradient(circle at 40% 40%,
+        rgba(60,45,38,.95),
+        rgba(42,31,24,.85) 45%,
+        transparent 72%);
+      box-shadow:
+        0 0 60px rgba(42,31,24,.25),
+        0 0 30px rgba(192,144,96,.1);
+    }
+    .star.black-hole::after {
+      background: radial-gradient(circle, rgba(192,144,96,.12), transparent 55%);
+    }
+    @keyframes star-breathe {
+      0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: .92; }
+      50% { transform: translate(-50%, -50%) scale(1.03); opacity: 1; }
+    }
+    .star.selected { animation: none; }
+    /* ── Star label ── */
+    .star-label {
+      position: absolute;
+      pointer-events: none;
+      transform: translate(-50%, calc(var(--size, 40px) * .55 + 6px));
+      max-width: 110px;
+      text-align: center;
+      font-size: .72rem;
+      color: var(--muted);
+      letter-spacing: .02em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      z-index: 3;
+    }
+    /* ── Click ripple ── */
+    .star-ripple {
+      position: absolute;
+      border-radius: 50%;
+      border: 1.5px solid rgba(191,150,152,.5);
+      transform: translate(-50%, -50%) scale(0);
+      pointer-events: none;
+      z-index: 4;
+      animation: ripple-out .8s var(--ease-settle) forwards;
+    }
+    @keyframes ripple-out {
+      to { transform: translate(-50%, -50%) scale(3); opacity: 0; }
+    }
+    /* ── Hint badge ── */
+    .map-hint {
+      position: absolute;
+      left: 16px;
+      bottom: 16px;
+      z-index: 5;
+      background: rgba(255,250,243,.78);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 6px 12px;
+      font-size: .78rem;
+      color: var(--muted);
+      transition: opacity .4s;
+    }
+    /* ── Connection lines ── */
+    .starfield-svg line {
+      stroke-dasharray: 4 4;
+      animation: orbit-flow 20s linear infinite;
+    }
+    @keyframes orbit-flow {
+      to { stroke-dashoffset: -80; }
+    }
+    /* ── Detail drawer ── */
+    .star-drawer {
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: min(380px, 90vw);
+      height: 100vh;
+      background: rgba(255,250,243,.92);
+      backdrop-filter: blur(24px);
+      border-left: 1px solid var(--line);
+      box-shadow: -8px 0 32px rgba(91,82,73,.08);
+      z-index: 90;
+      padding: 28px 24px;
+      overflow-y: auto;
+      transform: translateX(100%);
+      transition: transform .45s var(--ease-drift);
+    }
+    .star-drawer.open { transform: translateX(0); }
+    body.dark-star .star-drawer {
+      background: rgba(42,38,34,.94);
+      border-color: rgba(163,153,143,.2);
+    }
+    .drawer-close {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 1px solid var(--line);
+      background: var(--surface-paper);
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      font-size: .9rem;
+      color: var(--muted);
+      transition: all .2s var(--ease-flow);
+    }
+    .drawer-close:hover {
+      background: rgba(143,163,148,.12);
+      border-color: var(--line-strong);
+    }
+    /* ── Stat bar in drawer ── */
+    .gravity-bar {
+      height: 4px;
+      border-radius: 2px;
+      background: var(--line);
+      overflow: hidden;
+      margin-top: 4px;
+    }
+    .gravity-bar-fill {
+      height: 100%;
+      border-radius: 2px;
+      background: linear-gradient(90deg, var(--accent-sage), var(--accent-rose));
+      transition: width .6s var(--ease-bloom);
+    }
+    /* ── Empty state ── */
+    .starfield-empty {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      z-index: 5;
+    }
+    .starfield-empty .empty-orb {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, rgba(255,250,240,.9), rgba(143,163,148,.3) 50%, transparent 70%);
+      animation: star-breathe 5s var(--ease-flow) infinite;
+      opacity: .6;
+    }
+    /* ── Responsive ── */
+    @media (max-width: 640px) {
+      .starfield-shell { min-height: calc(100vh - 140px); }
+      .star-drawer { width: 100vw; }
+      .map-hint { font-size: .72rem; padding: 5px 10px; }
+    }
   </style>
 </head>
 <body>
 <main id="main" class="shell">
   <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
+
+  <!-- Header with gentle hero feel -->
   <section class="flex-between mb-2" style="flex-wrap:wrap;gap:12px">
     <div>
       <span class="route-hint">可拖拽的内在星图</span>
-      <h1 id="page-title">记忆星图</h1>
+      <h1 id="page-title" style="font-family:var(--font-hero);font-size:clamp(1.4rem,3.5vw,2rem)">记忆星图</h1>
       <p class="muted">星体大小来自情感重力，连线来自主题关系。拖动画面、滚轮缩放，点击星体查看真实依据。</p>
     </div>
     <div class="row gap-sm">
@@ -37,17 +273,25 @@
     </div>
   </section>
   <div id="themeChips" class="pill-row mb-2"></div>
-  <section id="field" class="panel starfield map-shell">
-    <div id="canvas" class="map-canvas">
-      <svg id="connections" class="star-connections" style="position:absolute;inset:0;width:1600px;height:1000px"></svg>
+
+  <!-- The starfield -->
+  <section id="field" class="starfield-shell">
+    <div id="canvas" class="starfield-canvas">
+      <svg id="connections" class="starfield-svg"></svg>
     </div>
-    <div class="map-hint">拖拽移动 · 滚轮缩放 · 点击星体查看依据</div>
+    <div class="map-hint">拖拽移动 · 滚轮缩放 · 点击星体</div>
   </section>
-  <div id="drawer" class="drawer-right hidden">
-    <div class="flex-between mb-2"><h3 id="drawerTitle">记忆详情</h3><button onclick="closeDrawer()">关闭</button></div>
+
+  <!-- Detail drawer -->
+  <div id="drawer" class="star-drawer">
+    <div class="flex-between mb-2">
+      <h3 id="drawerTitle" style="font-family:var(--font-hero);font-size:1.15rem">记忆详情</h3>
+      <button class="drawer-close" onclick="closeDrawer()">&times;</button>
+    </div>
     <div id="drawerContent"></div>
   </div>
 </main>
+
 <script src="/js/app.js"></script>
 <script src="/js/time-system.js"></script>
 <script src="/js/motion.js"></script>
@@ -57,126 +301,284 @@
 <script>
 IC.mountShell("记忆星图");
 IC.ensureDemoLogin().then(load);
-let stars = [], activeTheme = "", selectedId = null;
-let view = { x: 0, y: 0, scale: 1 }, drag = null;
-const esc = IC.esc;
+
+var stars = [], activeTheme = "", selectedId = null;
+var view = { x: 0, y: 0, scale: 1 }, drag = null;
+var esc = IC.esc;
+
+// ── Memory type color mapping ──
+var TYPE_COLORS = {
+  EMOTION:   { core: "rgba(216,181,181,.9)",  mid: "rgba(216,181,181,.6)",  line: "rgba(216,181,181,.35)" },
+  RELATION:  { core: "rgba(165,179,194,.9)",  mid: "rgba(165,179,194,.6)",  line: "rgba(165,179,194,.35)" },
+  TODO:      { core: "rgba(184,194,168,.9)",  mid: "rgba(184,194,168,.6)",  line: "rgba(184,194,168,.35)" },
+  COGNITION: { core: "rgba(170,161,184,.9)",  mid: "rgba(170,161,184,.6)",  line: "rgba(170,161,184,.35)" },
+  THEME:     { core: "rgba(192,184,158,.9)",  mid: "rgba(192,184,158,.6)",  line: "rgba(192,184,158,.35)" }
+};
+function typeColor(type, field) {
+  var c = TYPE_COLORS[type || "THEME"] || TYPE_COLORS.THEME;
+  return c[field] || c.core;
+}
 
 async function load() {
-  const r = await API.memoryStarfield();
+  var r = await API.memoryStarfield();
   stars = r.success ? r.data || [] : [];
   buildThemeChips();
   bindMap();
   render();
+  IC.stagger(document.getElementById("field"));
 }
 
 function buildThemeChips() {
-  const themes = [...new Set(stars.map(s => s.theme || s.memoryType).filter(Boolean))];
-  document.getElementById("themeChips").innerHTML = `<span class="pill" onclick="activeTheme='';render()">全部</span>` +
-    themes.map(t => `<span class="pill" onclick="activeTheme='${esc(t)}';render()">${esc(t)}</span>`).join("");
+  var themes = [];
+  var seen = {};
+  for (var i = 0; i < stars.length; i++) {
+    var t = stars[i].theme || stars[i].memoryType;
+    if (t && !seen[t]) { seen[t] = true; themes.push(t); }
+  }
+  var html = '<span class="pill" style="cursor:pointer" onclick="activeTheme=\'\';render()">全部</span>';
+  for (var i = 0; i < themes.length; i++) {
+    html += '<span class="pill" style="cursor:pointer" onclick="activeTheme=\'' + esc(themes[i]) + '\';render()">' + esc(themes[i]) + '</span>';
+  }
+  document.getElementById("themeChips").innerHTML = html;
 }
 
+// ── Map interaction ──
 function bindMap() {
-  const field = document.getElementById("field");
-  field.onpointerdown = e => { if (e.target.classList.contains("star")) return; drag = { x: e.clientX, y: e.clientY, ox: view.x, oy: view.y }; field.setPointerCapture(e.pointerId); };
-  field.onpointermove = e => { if (!drag) return; view.x = drag.ox + e.clientX - drag.x; view.y = drag.oy + e.clientY - drag.y; applyView(); };
-  field.onpointerup = () => drag = null;
-  field.onwheel = e => {
+  var field = document.getElementById("field");
+  field.onpointerdown = function(e) {
+    if (e.target.classList.contains("star")) return;
+    drag = { x: e.clientX, y: e.clientY, ox: view.x, oy: view.y };
+    field.setPointerCapture(e.pointerId);
+  };
+  field.onpointermove = function(e) {
+    if (!drag) return;
+    view.x = drag.ox + e.clientX - drag.x;
+    view.y = drag.oy + e.clientY - drag.y;
+    applyView();
+  };
+  field.onpointerup = function() { drag = null; };
+  field.onwheel = function(e) {
     e.preventDefault();
-    const next = Math.max(.55, Math.min(1.8, view.scale + (e.deltaY > 0 ? -.08 : .08)));
+    var next = Math.max(.4, Math.min(2.2, view.scale + (e.deltaY > 0 ? -.06 : .06)));
     view.scale = next;
     applyView();
   };
 }
 
-function resetView() { view = { x: 0, y: 0, scale: 1 }; applyView(); }
-function applyView() { document.getElementById("canvas").style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.scale})`; }
+function resetView() {
+  view = { x: 0, y: 0, scale: 1 };
+  applyView();
+}
+function applyView() {
+  document.getElementById("canvas").style.transform = "translate(" + view.x + "px," + view.y + "px) scale(" + view.scale + ")";
+}
 
+// ── Star rendering ──
 function render() {
-  const canvas = document.getElementById("canvas");
-  const svg = document.getElementById("connections");
-  canvas.querySelectorAll(".star,.star-label").forEach(n => n.remove());
+  var canvas = document.getElementById("canvas");
+  var svg = document.getElementById("connections");
+  // Clear old stars and labels (keep SVG)
+  var old = canvas.querySelectorAll(".star,.star-label,.star-ripple,.starfield-empty");
+  for (var i = 0; i < old.length; i++) old[i].remove();
   svg.innerHTML = "";
-  let data = stars;
-  const filter = document.getElementById("filter").value;
-  if (filter) data = data.filter(s => s.memoryType === filter);
-  if (activeTheme) data = data.filter(s => (s.theme || s.memoryType) === activeTheme);
-  if (!data.length) { canvas.insertAdjacentHTML("beforeend", IC.empty("完成一次 Aurora 对话或心声日记后，这里会出现记忆星体。")); return; }
-  const placed = data.map((s, i) => {
-    const angle = i * 2.399;
-    const radius = 90 + Math.sqrt(i + 1) * 72;
-    return { s, x: 800 + Math.cos(angle) * radius, y: 500 + Math.sin(angle) * radius };
-  });
+
+  var data = stars;
+  var filterVal = document.getElementById("filter").value;
+  if (filterVal) data = data.filter(function(s) { return s.memoryType === filterVal; });
+  if (activeTheme) data = data.filter(function(s) { return (s.theme || s.memoryType) === activeTheme; });
+
+  if (!data.length) {
+    canvas.insertAdjacentHTML("beforeend",
+      '<div class="starfield-empty">' +
+        '<div class="empty-orb"></div>' +
+        '<p class="muted" style="font-size:.92rem">完成一次 Aurora 对话后</p>' +
+        '<p class="muted" style="font-size.82rem">这里会出现属于你的记忆星体</p>' +
+      '</div>');
+    return;
+  }
+
+  // Place stars in golden-angle spiral
+  var placed = [];
+  for (var i = 0; i < data.length; i++) {
+    var angle = i * 2.39996; // golden angle
+    var radius = 80 + Math.sqrt(i + 1) * 68;
+    var x = 800 + Math.cos(angle) * radius;
+    var y = 550 + Math.sin(angle) * radius;
+    placed.push({ s: data[i], x: x, y: y });
+  }
+
   drawConnections(placed);
-  placed.forEach(({s,x,y}) => {
-    const size = Math.max(26, Math.min(96, 24 + (s.gravity || 0.4) * 48));
-    const star = document.createElement("button");
-    star.className = "star" + (s.id === selectedId ? " selected" : "");
+
+  for (var i = 0; i < placed.length; i++) {
+    var p = placed[i];
+    var s = p.s;
+    var gravity = s.gravity || 0.4;
+    var size = Math.max(24, Math.min(90, 22 + gravity * 50));
+    var isBlackHole = gravity >= 0.85;
+    var breathDur = (5 + Math.random() * 3).toFixed(1);
+    var breathDelay = (Math.random() * -6).toFixed(1);
+    var colors = TYPE_COLORS[s.memoryType || "THEME"] || TYPE_COLORS.THEME;
+
+    var star = document.createElement("button");
+    star.className = "star" + (isBlackHole ? " black-hole" : "") + (s.id === selectedId ? " selected" : "");
     star.title = s.title || s.theme || "记忆";
-    star.style.cssText = `--size:${size}px;left:${x}px;top:${y}px;--star-color:${s.color || "#9caf9f"};--star-glow:${s.glow || .72};`;
-    star.onclick = () => showDetail(s.id);
+    star.setAttribute("aria-label", (s.title || s.theme || "记忆") + " - 情感重力 " + gravity.toFixed(2));
+    star.style.cssText =
+      "width:" + size + "px;height:" + size + "px;" +
+      "left:" + p.x + "px;top:" + p.y + "px;" +
+      "--size:" + size + "px;" +
+      "--breath-dur:" + breathDur + "s;" +
+      "--breath-delay:" + breathDelay + "s;" +
+      "--star-core:" + colors.core + ";" +
+      "--star-color:" + colors.mid + ";";
+    star.dataset.id = s.id;
+    star.onclick = (function(id) { return function() { showDetail(id); }; })(s.id);
     canvas.appendChild(star);
-    const label = document.createElement("span");
+
+    // Label
+    var label = document.createElement("span");
     label.className = "star-label";
-    label.style.cssText = `left:${x}px;top:${y}px;color:${s.color || "var(--muted)"}`;
+    label.style.cssText = "left:" + p.x + "px;top:" + p.y + "px;--size:" + size + "px;color:" + colors.line;
     label.textContent = s.theme || s.memoryType || "";
     canvas.appendChild(label);
-  });
+  }
   applyView();
 }
 
+// ── Connection lines with gentle curves ──
 function drawConnections(placed) {
-  const svg = document.getElementById("connections");
-  for (let i = 0; i < placed.length; i++) {
-    for (let j = i + 1; j < placed.length; j++) {
-      const a = placed[i], b = placed[j];
-      if ((a.s.theme || a.s.memoryType) !== (b.s.theme || b.s.memoryType)) continue;
-      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-      line.setAttribute("x1", a.x); line.setAttribute("y1", a.y);
-      line.setAttribute("x2", b.x); line.setAttribute("y2", b.y);
-      line.setAttribute("stroke", a.s.color || "#9caf9f");
+  var svg = document.getElementById("connections");
+  for (var i = 0; i < placed.length; i++) {
+    for (var j = i + 1; j < placed.length; j++) {
+      var a = placed[i], b = placed[j];
+      var themeA = a.s.theme || a.s.memoryType;
+      var themeB = b.s.theme || b.s.memoryType;
+      if (themeA !== themeB) continue;
+      // Skip if too far apart (max 500px)
+      var dx = a.x - b.x, dy = a.y - b.y;
+      if (dx * dx + dy * dy > 250000) continue;
+      var colors = TYPE_COLORS[themeA || "THEME"] || TYPE_COLORS.THEME;
+      var line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      line.setAttribute("x1", a.x);
+      line.setAttribute("y1", a.y);
+      line.setAttribute("x2", b.x);
+      line.setAttribute("y2", b.y);
+      line.setAttribute("stroke", colors.line);
       line.setAttribute("stroke-width", "1");
       svg.appendChild(line);
     }
   }
 }
 
+// ── Click ripple effect ──
+function spawnRipple(x, y) {
+  var canvas = document.getElementById("canvas");
+  var ripple = document.createElement("div");
+  ripple.className = "star-ripple";
+  ripple.style.cssText = "left:" + x + "px;top:" + y + "px;width:40px;height:40px;";
+  canvas.appendChild(ripple);
+  setTimeout(function() { ripple.remove(); }, 850);
+}
+
+// ── Detail drawer ──
 async function showDetail(id) {
   selectedId = id;
-  let detail = stars.find(x => x.id === id) || {};
-  try { const r = await API.memoryStarfieldDetail(id); if (r.success && r.data) detail = { ...detail, ...r.data }; } catch(e) {}
-  document.getElementById("drawer").classList.remove("hidden");
+  // Ripple on click
+  var starEl = document.querySelector('.star[data-id="' + id + '"]');
+  if (starEl) spawnRipple(parseFloat(starEl.style.left), parseFloat(starEl.style.top));
+
+  var detail = {};
+  for (var i = 0; i < stars.length; i++) {
+    if (stars[i].id === id) { detail = stars[i]; break; }
+  }
+  try {
+    var r = await API.memoryStarfieldDetail(id);
+    if (r.success && r.data) {
+      for (var k in r.data) detail[k] = r.data[k];
+    }
+  } catch(e) {}
+
+  document.getElementById("drawer").classList.add("open");
   document.getElementById("drawerTitle").textContent = detail.title || "记忆星体";
-  document.getElementById("drawerContent").innerHTML = `
-    <span class="route-hint">${esc(detail.theme || detail.memoryType || "")}</span>
-    <p class="muted mt-1">${esc(detail.summary || "")}</p>
-    <div class="pill-row mt-2"><span class="pill">情感重力 ${Number(detail.gravity || 0).toFixed(2)}</span><span class="pill">新鲜度 ${Math.round((detail.freshness || 0) * 100)}%</span></div>
-    <div class="soft-stage mt-2">
-      <label class="muted" style="display:grid;gap:8px">
-        <span>重要度：<strong id="importanceValue">${Number(detail.importance || 1).toFixed(1)}</strong></span>
-        <input id="importanceSlider" type="range" min="0.5" max="2" step="0.1" value="${Number(detail.importance || 1)}"
-          oninput="document.getElementById('importanceValue').textContent=Number(this.value).toFixed(1)">
-      </label>
-      <button class="mt-1" onclick="saveImportance(${detail.id})">保存重要度</button>
-    </div>
-    <div class="soft-stage mt-2"><p class="muted">${esc(detail.gravityExplanation || "这颗星由情绪强度、重要性、出现次数和最近触发共同决定。")}</p></div>
-    ${(detail.fragments || []).length ? `<h3>认知碎片</h3><div class="timeline">${detail.fragments.map(f => `<div class="timeline-item"><p>${esc(f)}</p></div>`).join("")}</div>` : ""}
-    ${(detail.relatedTodos || []).length ? `<h3>相关待办</h3><div class="timeline">${detail.relatedTodos.map(t => `<div class="timeline-item"><strong>${esc(t.taskName || t)}</strong></div>`).join("")}</div>` : ""}
-    <div class="row gap-sm mt-2"><a class="button" href="/pages/capsule-create.html?memoryId=${detail.id}">编织共鸣体</a><button onclick="archiveCard(${detail.id})">归档</button></div>
-  `;
+
+  var gravity = Number(detail.gravity || 0);
+  var freshness = Math.round((detail.freshness || 0) * 100);
+  var colors = TYPE_COLORS[detail.memoryType || "THEME"] || TYPE_COLORS.THEME;
+
+  document.getElementById("drawerContent").innerHTML =
+    '<span class="route-hint">' + esc(detail.theme || detail.memoryType || "") + '</span>' +
+    '<p class="muted mt-1" style="font-size:.92rem;line-height:1.65">' + esc(detail.summary || "") + '</p>' +
+    '<div class="pill-row mt-2">' +
+      '<span class="pill">重力 ' + gravity.toFixed(2) + '</span>' +
+      '<span class="pill">新鲜度 ' + freshness + '%</span>' +
+    '</div>' +
+    '<div class="gravity-bar mt-2" style="max-width:200px">' +
+      '<div class="gravity-bar-fill" style="width:' + Math.min(100, gravity * 100) + '%"></div>' +
+    '</div>' +
+    '<div class="soft-stage mt-3">' +
+      '<label class="muted" style="display:grid;gap:8px">' +
+        '<span>重要度: <strong id="importanceValue">' + Number(detail.importance || 1).toFixed(1) + '</strong></span>' +
+        '<input id="importanceSlider" type="range" min="0.5" max="2" step="0.1" value="' + Number(detail.importance || 1) + '"' +
+          ' oninput="document.getElementById(\'importanceValue\').textContent=Number(this.value).toFixed(1)"' +
+          ' style="width:100%">' +
+      '</label>' +
+      '<button class="mt-1" onclick="saveImportance(' + detail.id + ')">保存重要度</button>' +
+    '</div>' +
+    '<div class="soft-stage mt-2"><p class="muted" style="font-size:.84rem">' +
+      esc(detail.gravityExplanation || "这颗星由情绪强度、重要性、出现次数和最近触发共同决定。") +
+    '</p></div>' +
+    renderFragments(detail.fragments) +
+    renderTodos(detail.relatedTodos) +
+    '<div class="row gap-sm mt-3">' +
+      '<a class="button" href="/pages/capsule-create.html?memoryId=' + detail.id + '">编织共鸣体</a>' +
+      '<button onclick="archiveCard(' + detail.id + ')" style="opacity:.6">归档</button>' +
+    '</div>';
+
+  render();
+  IC.pulse("soft");
+}
+
+function renderFragments(fragments) {
+  if (!fragments || !fragments.length) return "";
+  var html = '<h3 style="font-size:.92rem;margin-top:20px">认知碎片</h3><div class="timeline">';
+  for (var i = 0; i < fragments.length; i++) {
+    html += '<div class="timeline-item"><p style="font-size:.88rem">' + esc(fragments[i]) + '</p></div>';
+  }
+  return html + '</div>';
+}
+
+function renderTodos(todos) {
+  if (!todos || !todos.length) return "";
+  var html = '<h3 style="font-size:.92rem;margin-top:20px">相关待办</h3><div class="timeline">';
+  for (var i = 0; i < todos.length; i++) {
+    html += '<div class="timeline-item"><strong style="font-size:.88rem">' + esc(todos[i].taskName || todos[i]) + '</strong></div>';
+  }
+  return html + '</div>';
+}
+
+function closeDrawer() {
+  document.getElementById("drawer").classList.remove("open");
+  selectedId = null;
   render();
 }
 
-function closeDrawer() { document.getElementById("drawer").classList.add("hidden"); selectedId = null; render(); }
-async function archiveCard(id) { await API.archiveMemoryCard(id); IC.toast("记忆已归档", "success"); closeDrawer(); load(); }
+async function archiveCard(id) {
+  await API.archiveMemoryCard(id);
+  IC.toast("记忆已归档", "success");
+  closeDrawer();
+  load();
+}
+
 async function saveImportance(id) {
-  const importance = Number(document.getElementById("importanceSlider")?.value || 1);
-  const r = await API.updateMemoryImportance(id, importance);
+  var importance = Number(document.getElementById("importanceSlider") ? document.getElementById("importanceSlider").value : 1);
+  var r = await API.updateMemoryImportance(id, importance);
   if (r.success) {
-    IC.toast("重要度已更新，情感重力会随之调整。", "success");
+    IC.toast("重要度已更新", "success");
     await load();
     await showDetail(id);
   }
 }
+
 IC.hideLoading();
 </script>
 </body>

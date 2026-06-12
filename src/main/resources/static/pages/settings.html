@@ -258,6 +258,18 @@
     @media (prefers-reduced-motion: reduce) {
       .loader { animation: none; }
     }
+    /* ── Dark mode ── */
+    body.dark-star .settings-section {
+      background: rgba(42,38,34,.60);
+      border-color: rgba(163,153,143,.10);
+      box-shadow: 0 4px 16px rgba(0,0,0,.10);
+    }
+    body.dark-star .field input,
+    body.dark-star .field select,
+    body.dark-star .field textarea {
+      background: rgba(30,27,24,.60);
+      border-color: rgba(163,153,143,.16);
+    }
   </style>
 </head>
 <body>

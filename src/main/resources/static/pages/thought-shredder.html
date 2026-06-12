@@ -102,6 +102,15 @@
       border: 1px solid var(--line);
       animation: shredFall 1.2s var(--ease-settle) forwards;
     }
+    /* Dark mode */
+    body.dark-star .shred-hero { background: linear-gradient(135deg, rgba(122,132,108,.08), rgba(120,90,100,.06)); border-color: rgba(60,70,80,.4); }
+    body.dark-star .shred-hero::before { background: radial-gradient(circle at 60% 50%, rgba(122,132,108,.06), transparent 50%); }
+    body.dark-star .shred-hero h1 { color: var(--ink); }
+    body.dark-star .shred-paper { background: rgba(30,35,40,.8); border-color: rgba(60,70,80,.4); }
+    body.dark-star .shred-btn { background: linear-gradient(135deg, var(--accent-sage), rgba(143,163,148,.6)); }
+    body.dark-star .result-section .gold,
+    body.dark-star .result-section .teal { color: var(--ink); }
+    body.dark-star .shred-strip { background: rgba(30,35,40,.8); border-color: rgba(60,70,80,.3); }
   </style>
 </head>
 <body>

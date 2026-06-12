@@ -72,6 +72,23 @@
       color: var(--muted);
       margin-top: 6px;
     }
+    /* ── Dark mode ── */
+    body.dark-star .log-hero {
+      background: linear-gradient(135deg, rgba(42,38,34,.68), rgba(37,33,29,.52));
+      border-color: rgba(163,153,143,.10);
+    }
+    body.dark-star .log-hero::before {
+      background: radial-gradient(circle at 70% 30%, rgba(134,152,169,.06), transparent 50%);
+    }
+    body.dark-star .log-filters input,
+    body.dark-star .log-filters select {
+      background: rgba(30,27,24,.60);
+      border-color: rgba(163,153,143,.16);
+    }
+    body.dark-star .metric-card {
+      background: rgba(42,38,34,.56);
+      border-color: rgba(163,153,143,.10);
+    }
   </style>
 </head>
 <body>

@@ -5,62 +5,258 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>避风港 · Inner Cosmos</title>
   <link rel="stylesheet" href="/css/app.css">
+  <style>
+    /* ── Safety Harbor — clear, warm, serious ── */
+    .safety-hero {
+      text-align: center;
+      padding: 32px 0 36px;
+    }
+    .safety-hero h1 {
+      font-family: var(--font-hero);
+      font-size: clamp(1.8rem, 3.5vw, 2.4rem);
+      color: var(--ink);
+      margin: 0 0 10px;
+    }
+    .safety-hero-sub {
+      font-size: .9375rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    /* ── Breathing circle ── */
+    .breath-area {
+      text-align: center;
+      padding: 28px 0;
+    }
+    .breathing-circle {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle, rgba(143,163,148,.18), rgba(143,163,148,.04));
+      border: 2px solid rgba(143,163,148,.24);
+      margin: 0 auto 16px;
+      animation: safety-breathe 8s var(--ease-flow) infinite;
+    }
+    @keyframes safety-breathe {
+      0% { transform: scale(1); border-color: rgba(143,163,148,.24); }
+      25% { transform: scale(1.18); border-color: rgba(143,163,148,.40); }
+      50% { transform: scale(1); border-color: rgba(143,163,148,.24); }
+      75% { transform: scale(.88); border-color: rgba(143,163,148,.16); }
+      100% { transform: scale(1); border-color: rgba(143,163,148,.24); }
+    }
+    .breath-label {
+      font-size: .9375rem;
+      color: var(--muted);
+      transition: color 600ms var(--ease-flow);
+    }
+
+    /* ── Resource cards ── */
+    .safety-section {
+      margin-bottom: 24px;
+    }
+    .safety-section > h2 {
+      font-family: var(--font-hero);
+      font-size: 1.25rem;
+      margin-bottom: 12px;
+      color: var(--ink);
+    }
+    .safety-section > p {
+      color: var(--muted);
+      font-size: .875rem;
+      line-height: 1.6;
+      margin-bottom: 14px;
+    }
+
+    .safety-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 12px;
+    }
+    .safety-card {
+      padding: 16px 20px;
+      background: var(--surface-paper);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      transition: box-shadow 300ms var(--ease-flow);
+    }
+    .safety-card:hover {
+      box-shadow: 0 4px 16px rgba(0,0,0,.06);
+    }
+    .safety-card p {
+      font-size: .875rem;
+      line-height: 1.6;
+      color: var(--text);
+    }
+    .safety-card .phone-link {
+      display: inline-block;
+      margin-top: 6px;
+      font-size: .8125rem;
+      color: var(--accent-dusty-blue);
+      text-decoration: none;
+    }
+    .safety-card .phone-link:hover { text-decoration: underline; }
+
+    /* ── Grounding exercise ── */
+    .grounding-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .grounding-item {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      padding: 14px 18px;
+      background: rgba(160,155,180,.04);
+      border-radius: var(--radius);
+      border-left: 3px solid var(--accent-sage);
+    }
+    .grounding-num {
+      font-family: var(--font-hero);
+      font-size: 1.4rem;
+      color: var(--accent-sage);
+      line-height: 1;
+      min-width: 24px;
+    }
+    .grounding-text strong {
+      font-size: .9375rem;
+      display: block;
+      margin-bottom: 2px;
+    }
+    .grounding-text p {
+      font-size: .8125rem;
+      color: var(--muted);
+    }
+
+    /* ── Self-care ── */
+    .care-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
+    }
+    .care-card {
+      padding: 16px;
+      background:
+        linear-gradient(180deg, rgba(255,250,243,.56), rgba(247,242,236,.36));
+      border: 1px solid rgba(255,255,255,.18);
+      border-radius: var(--radius);
+    }
+    .care-card strong {
+      font-size: .875rem;
+      display: block;
+      margin-bottom: 4px;
+      color: var(--ink);
+    }
+    .care-card p {
+      font-size: .8125rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    /* ── Actions ── */
+    .safety-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 28px;
+      padding-top: 20px;
+      border-top: 1px solid var(--line);
+    }
+
+    /* ── Dark mode ── */
+    body.dark-star .safety-card {
+      background: rgba(42,38,34,.60);
+      border-color: rgba(163,153,143,.12);
+    }
+    body.dark-star .grounding-item {
+      background: rgba(42,38,34,.48);
+      border-left-color: var(--accent-sage);
+    }
+    body.dark-star .care-card {
+      background:
+        linear-gradient(180deg, rgba(42,38,34,.52), rgba(37,33,29,.36));
+      border-color: rgba(163,153,143,.10);
+    }
+
+    @media (max-width: 640px) {
+      .safety-grid, .care-grid { grid-template-columns: 1fr; }
+    }
+  </style>
 </head>
 <body>
 <main id="main" class="shell">
   <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
 
-  <div class="text-center" style="padding:24px 0 32px">
-    <div class="breathing-circle" style="margin:0 auto 20px"></div>
+  <!-- Hero -->
+  <section class="safety-hero">
+    <div class="breath-area">
+      <div class="breathing-circle"></div>
+    </div>
     <span class="route-hint">你先安全，其他都先等等</span>
     <h1 id="page-title">安全避风港</h1>
-    <p class="muted">这里没有任务、没有进度。你可以先停下来。</p>
-  </div>
+    <p class="safety-hero-sub">这里没有任务、没有进度。你可以先停下来。</p>
+  </section>
 
   <!-- Emergency resources -->
-  <section class="panel mb-2">
+  <section class="safety-section">
     <h2>紧急资源</h2>
-    <p class="muted mb-1">如果你或身边的人正经历危机，请拨打以下电话。</p>
-    <div id="resources" class="grid"></div>
+    <p>如果你或身边的人正经历危机，请拨打以下电话。</p>
+    <div id="resources" class="safety-grid"></div>
   </section>
 
   <!-- Breathing exercise -->
-  <section class="panel mb-2">
+  <section class="safety-section">
     <h2>呼吸练习</h2>
-    <p class="muted mb-1">跟着圆圈呼吸。吸气时圆圈变大，呼气时变小。</p>
-    <div class="text-center" style="padding:24px 0">
-      <div class="breathing-circle" style="margin:0 auto;width:100px;height:100px"></div>
-      <p id="breathHint" class="muted mt-1">吸气... 呼气...</p>
+    <p>跟着圆圈呼吸。吸气时圆圈变大，呼气时变小。</p>
+    <div class="breath-area">
+      <div class="breathing-circle" style="width:100px;height:100px"></div>
+      <p id="breathHint" class="breath-label">吸气... 呼气...</p>
     </div>
   </section>
 
   <!-- Grounding exercise -->
-  <section class="panel mb-2">
+  <section class="safety-section">
     <h2>着陆练习 (5-4-3-2-1)</h2>
-    <p class="muted mb-1">当你觉得不真实或焦虑上升时，试着找到：</p>
-    <div class="timeline">
-      <div class="timeline-item"><strong>5 件你能看到的东西</strong><p class="muted">慢慢环顾四周，数出来。</p></div>
-      <div class="timeline-item"><strong>4 件你能摸到的东西</strong><p class="muted">感受它们的温度和质地。</p></div>
-      <div class="timeline-item"><strong>3 件你能听到的声音</strong><p class="muted">闭上眼睛，专注倾听。</p></div>
-      <div class="timeline-item"><strong>2 件你能闻到的气味</strong><p class="muted">即使很淡的味道也算。</p></div>
-      <div class="timeline-item"><strong>1 件你能尝到的味道</strong><p class="muted">可以喝一口水，感受它。</p></div>
+    <p>当你觉得不真实或焦虑上升时，试着找到：</p>
+    <div class="grounding-list">
+      <div class="grounding-item">
+        <span class="grounding-num">5</span>
+        <div class="grounding-text"><strong>你能看到的东西</strong><p>慢慢环顾四周，数出来。</p></div>
+      </div>
+      <div class="grounding-item">
+        <span class="grounding-num">4</span>
+        <div class="grounding-text"><strong>你能摸到的东西</strong><p>感受它们的温度和质地。</p></div>
+      </div>
+      <div class="grounding-item">
+        <span class="grounding-num">3</span>
+        <div class="grounding-text"><strong>你能听到的声音</strong><p>闭上眼睛，专注倾听。</p></div>
+      </div>
+      <div class="grounding-item">
+        <span class="grounding-num">2</span>
+        <div class="grounding-text"><strong>你能闻到的气味</strong><p>即使很淡的味道也算。</p></div>
+      </div>
+      <div class="grounding-item">
+        <span class="grounding-num">1</span>
+        <div class="grounding-text"><strong>你能尝到的味道</strong><p>可以喝一口水，感受它。</p></div>
+      </div>
     </div>
   </section>
 
   <!-- Self-care suggestions -->
-  <section class="panel mb-2">
+  <section class="safety-section">
     <h2>你可以先做的事</h2>
-    <div class="grid">
-      <article class="card"><strong>喝一杯温水</strong><p class="muted">慢慢喝，感受水的温度。</p></article>
-      <article class="card"><strong>打开窗户</strong><p class="muted">让新鲜空气进来。</p></article>
-      <article class="card"><strong>给信任的人发一条消息</strong><p class="muted">不需要说太多，"我需要你"就够了。</p></article>
-      <article class="card"><strong>放下手机五分钟</strong><p class="muted">什么都不要做，只是坐着。</p></article>
+    <div class="care-grid">
+      <article class="care-card"><strong>喝一杯温水</strong><p>慢慢喝，感受水的温度。</p></article>
+      <article class="care-card"><strong>打开窗户</strong><p>让新鲜空气进来。</p></article>
+      <article class="care-card"><strong>给信任的人发一条消息</strong><p>不需要说太多，"我需要你"就够了。</p></article>
+      <article class="care-card"><strong>放下手机五分钟</strong><p>什么都不要做，只是坐着。</p></article>
     </div>
   </section>
 
   <!-- Actions -->
-  <div class="row gap-sm">
+  <div class="safety-actions">
     <a class="button" href="/pages/aurora-chat.html">和 Aurora 聊聊</a>
     <a class="button" href="/pages/dashboard.html">返回核心</a>
   </div>
@@ -74,31 +270,27 @@
 <script src="/js/api.js"></script>
 <script>
 IC.mountShell("安全避风港");
-
 IC.ensureDemoLogin().then(load);
 
 async function load() {
-  const r = await API.safetyResources();
+  var r = await API.safetyResources();
   if (r.success && r.data) {
-    const resources = r.data;
-    document.getElementById("resources").innerHTML = resources.map(x => {
-      /* Try to parse phone numbers for quick-dial links */
-      const phoneMatch = x.match(/\d{3,4}[-\s]?\d{7,8}/);
-      return `<article class="card">
-        <p>${IC.esc(x)}</p>
-        ${phoneMatch ? `<a class="route-hint mt-1" href="tel:${phoneMatch[0].replace(/\s|-/g, '')}">拨打 ${IC.esc(phoneMatch[0])}</a>` : ""}
-      </article>`;
+    var resources = r.data;
+    document.getElementById("resources").innerHTML = resources.map(function(x) {
+      var phoneMatch = x.match(/\d{3,4}[-\s]?\d{7,8}/);
+      return '<article class="safety-card">' +
+        '<p>' + IC.esc(x) + '</p>' +
+        (phoneMatch ? '<a class="phone-link" href="tel:' + phoneMatch[0].replace(/\s|-/g, "") + '">拨打 ' + IC.esc(phoneMatch[0]) + '</a>' : '') +
+      '</article>';
     }).join("") || IC.empty("安全资源加载中...");
-    IC.stagger(document.getElementById("resources"));
   }
 }
 
-/* Breathing hint animation */
-const hints = ["吸气...", "屏住...", "呼气...", "休息..."];
-let hintIndex = 0;
-setInterval(() => {
+var hints = ["吸气...", "屏住...", "呼气...", "休息..."];
+var hintIndex = 0;
+setInterval(function() {
   hintIndex = (hintIndex + 1) % hints.length;
-  const el = document.getElementById("breathHint");
+  var el = document.getElementById("breathHint");
   if (el) el.textContent = hints[hintIndex];
 }, 3000);
 IC.hideLoading();

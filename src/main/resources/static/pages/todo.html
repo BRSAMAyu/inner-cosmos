@@ -5,15 +5,26 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="stylesheet" href="/css/app.css">
   <title>待办清单 - Inner Cosmos</title>
+  <style>
+    .todo-hero { padding: 0 0 28px; margin-bottom: 24px;
+      background: radial-gradient(ellipse 50% 60% at 35% 30%, rgba(184,194,174,.10), transparent),
+                  radial-gradient(ellipse 40% 50% at 70% 45%, rgba(200,147,145,.06), transparent); }
+    .todo-hero h1 { font-family: var(--font-hero); font-size: clamp(1.8rem,4vw,2.6rem); margin: 0 0 8px; }
+    .todo-hero p { color: var(--muted); line-height: 1.7; }
+    body.dark-star .todo-hero { background: radial-gradient(ellipse 50% 60% at 35% 30%, rgba(122,142,127,.06), transparent); }
+  </style>
 </head>
 <body>
 <main id="main" class="shell">
   <a class="skip-link" href="#main">跳到主要内容</a>
   <div class="topbar" data-topbar></div>
 
-  <span class="route-hint">下一步变小</span>
-  <h1 id="page-title">待办清单</h1>
-  <p class="muted mb-2">待办不是自我审判，而是把下一步变小。</p>
+  <!-- Hero -->
+  <section class="todo-hero">
+    <span class="route-hint">下一步变小</span>
+    <h1 id="page-title">待办清单</h1>
+    <p>待办不是自我审判，而是把下一步变小。</p>
+  </section>
 
   <!-- Today's progress -->
   <section class="panel mb-2">

@@ -8,9 +8,13 @@
   <style>
     .dashboard-hero {
       padding: 32px 28px;
-      border-radius: var(--radius-flow);
-      background: linear-gradient(135deg, rgba(143,163,148,.18), rgba(151,169,186,.18));
-      border: 1px solid var(--line);
+      border-radius: var(--radius-card);
+      background:
+        linear-gradient(135deg, rgba(143,163,148,.12), rgba(151,169,186,.10)),
+        var(--surface-paper);
+      border: 1px solid rgba(255,255,255,.20);
+      backdrop-filter: blur(16px);
+      box-shadow: 0 4px 16px rgba(0,0,0,.04), 0 16px 48px rgba(0,0,0,.06);
       margin-bottom: 24px;
       position: relative;
       overflow: hidden;
@@ -156,6 +160,28 @@
       font-style: italic;
       color: var(--ink);
       line-height: 1.7;
+    }
+    /* ── Dark mode ── */
+    body.dark-star .dashboard-hero {
+      background: linear-gradient(135deg, rgba(42,38,34,.68), rgba(37,33,29,.52)),
+        rgba(42,38,34,.40);
+      border-color: rgba(163,153,143,.10);
+      box-shadow: 0 4px 16px rgba(0,0,0,.08), 0 16px 48px rgba(0,0,0,.16);
+    }
+    body.dark-star .dashboard-hero::before {
+      background: radial-gradient(circle at 80% 20%, rgba(192,144,96,.08), transparent 50%);
+    }
+    body.dark-star .emotion-weather-card {
+      background: rgba(42,38,34,.56);
+      border-color: rgba(163,153,143,.10);
+    }
+    body.dark-star .quick-action {
+      background: rgba(42,38,34,.56);
+      border-color: rgba(163,153,143,.10);
+    }
+    body.dark-star .aurora-note-card {
+      background: rgba(42,38,34,.56);
+      border-color: rgba(163,153,143,.10);
     }
   </style>
 </head>
