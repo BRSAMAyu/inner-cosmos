@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Prompt 版本管理 · 内宇宙</title>
+  <link rel="stylesheet" href="/css/app.css">
+  <style>
+    .ops-hero { padding: 0 0 24px; margin-bottom: 20px;
+      background: radial-gradient(ellipse 50% 60% at 30% 30%, rgba(143,163,148,.10), transparent),
+                  radial-gradient(ellipse 40% 50% at 70% 40%, rgba(151,169,186,.08), transparent); }
+    .ops-hero h1 { font-family: var(--font-hero); font-size: clamp(1.7rem,4vw,2.4rem); margin: 0 0 8px; }
+    .ops-hero p { color: var(--muted); line-height: 1.7; max-width: 48ch; }
+    body.dark-star .ops-hero { background: radial-gradient(ellipse 50% 60% at 30% 30%, rgba(122,142,127,.06), transparent); }
+    body.dark-star .panel { background: rgba(30,35,40,.88); border-color: rgba(60,70,80,.4); }
+    body.dark-star .card { background: rgba(30,35,40,.82); border-color: rgba(60,70,80,.35); }
+    body.dark-star .soft-stage { background: rgba(30,35,40,.6); border-color: rgba(60,70,80,.35); }
+    .key-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 18px; }
+    .key-bar input, .key-bar select {
+      padding: 9px 14px; font-size: .9rem; border: 1px solid var(--line); border-radius: var(--radius);
+      background: var(--surface-warm); color: var(--text);
+    }
+    .key-bar input { flex: 1; min-width: 200px; }
+    .key-bar input:focus, .key-bar select:focus { outline: none; border-color: var(--accent-sage); box-shadow: 0 0 0 3px rgba(143,163,148,.15); }
+    .version-list { display: flex; flex-direction: column; gap: 10px; }
+    .version-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-warm); }
+    .version-row.active { border-color: var(--accent-sage); box-shadow: 0 0 0 2px rgba(143,163,148,.14); }
+    .version-row .v-num { font-family: var(--font-hero); font-size: 1.1rem; color: var(--ink); min-width: 54px; }
+    .version-row .v-meta { flex: 1; min-width: 0; }
+    .version-row .v-desc { font-size: .82rem; color: var(--muted); margin-top: 2px; }
+    .version-row .v-stats { font-size: .78rem; color: var(--muted); }
+    .prompt-pre { white-space: pre-wrap; word-break: break-word; line-height: 1.7; font-size: .86rem; color: var(--text);
+      max-height: 340px; overflow: auto; }
+    .gate { padding: 32px; text-align: center; }
+    .gate .muted { max-width: 38ch; margin: 8px auto 0; line-height: 1.7; }
+  </style>
+</head>
+<body>
+<main id="ic-main" class="shell">
+  <a class="skip-link ic-skip-link" href="#ic-main">跳到主内容</a>
+  <div class="topbar" data-topbar></div>
+
+  <section class="ops-hero flex-between" style="flex-wrap:wrap;gap:12px">
+    <div>
+      <span class="route-hint">每一版语言，都是一次温柔的修订</span>
+      <h1>Prompt 版本管理</h1>
+      <p>同一个角色的语气，可以有许多种写法。这里并排放着历次修订，让你随时回到更合适的那一版。</p>
+    </div>
+    <button type="button" onclick="reload()" aria-label="刷新版本列表">刷新</button>
+  </section>
+
+  <section id="gate" class="panel hidden" aria-label="权限提示">
+    <div class="gate">
+      <strong>这部分需要管理员视角</strong>
+      <p class="muted">Prompt 版本管理会影响所有用户的对话语气，目前仅向管理员开放。</p>
+    </div>
+  </section>
+
+  <section id="content" aria-label="Prompt 版本">
+    <div class="key-bar">
+      <label for="keyInput" class="muted" style="font-size:.84rem">Prompt Key</label>
+      <input id="keyInput" list="keyList" placeholder="例如 aurora_system / letter_guard…" aria-label="Prompt key">
+      <datalist id="keyList"></datalist>
+      <button type="button" onclick="searchKey()">查看版本</button>
+    </div>
+
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px;align-items:start">
+      <section class="panel" aria-label="版本列表">
+        <div class="flex-between mb-1"><h2 style="margin:0">版本时间线</h2><span id="keyBadge" class="muted" style="font-size:.8rem"></span></div>
+        <div id="versionList" class="version-list"></div>
+      </section>
+
+      <section class="panel" aria-label="版本内容">
+        <div class="flex-between mb-1" style="flex-wrap:wrap;gap:8px">
+          <h2 id="contentTitle" style="margin:0">内容预览</h2>
+          <span id="contentBadge" class="badge badge-read hidden"></span>
+        </div>
+        <div id="versionContent"><p class="muted">选择左侧某一版本，可以查看它的完整内容。</p></div>
+      </section>
+    </div>
+
+    <section class="panel mt-2" aria-label="表现不佳的 Prompt">
+      <div class="flex-between mb-1"><h2 style="margin:0">需要关注</h2><span class="muted" style="font-size:.8rem">成功率低于阈值的 Prompt</span></div>
+      <div id="lowList"></div>
+    </section>
+  </section>
+</main>
+
+<script src="/js/app.js?v=final-20260612"></script>
+<script src="/js/time-system.js?v=final-20260612"></script>
+<script src="/js/motion.js"></script>
+<script src="/js/weather-system.js"></script>
+<script src="/js/api.js"></script>
+<script>
+IC.mountShell("Prompt 版本管理");
+const esc = IC.esc;
+let currentKey = "";
+
+IC.ensureDemoLogin().then(async () => {
+  const cur = await API.current();
+  const role = (cur.success && cur.data && cur.data.role) || "USER";
+  if (role !== "ADMIN") {
+    document.getElementById("gate").classList.remove("hidden");
+    document.getElementById("content").classList.add("hidden");
+    IC.hideLoading();
+    return;
+  }
+  document.getElementById("gate").classList.add("hidden");
+  document.getElementById("content").classList.remove("hidden");
+  loadLowPerforming();
+  IC.hideLoading();
+});
+
+function reload() {
+  if (currentKey) loadVersions(currentKey);
+  loadLowPerforming();
+}
+
+function searchKey() {
+  const key = document.getElementById("keyInput").value.trim();
+  if (!key) { IC.toast("先填一个 Prompt Key", "warn"); return; }
+  currentKey = key;
+  loadVersions(key);
+}
+
+async function loadVersions(key) {
+  const list = document.getElementById("versionList");
+  const badge = document.getElementById("keyBadge");
+  badge.textContent = `Key: ${key}`;
+  list.innerHTML = `<p class="muted">正在读取版本…</p>`;
+  const r = await IC.api(`/api/prompt/versions?key=${encodeURIComponent(key)}`);
+  if (!r.success) { list.innerHTML = `<p class="muted">${esc(r.message || "读取失败")}</p>`; return; }
+  const data = r.data || [];
+  if (!data.length) { list.innerHTML = IC.empty(`还没有「${key}」的版本记录。`); return; }
+
+  // populate datalist suggestions
+  const dl = document.getElementById("keyList");
+  if (!dl.querySelector(`option[value="${esc(key)}"]`)) dl.insertAdjacentHTML("beforeend", `<option value="${esc(key)}">`);
+
+  // try to fetch performance map for richer rows
+  let perf = {};
+  try {
+    const pr = await IC.api(`/api/prompt/performance?key=${encodeURIComponent(key)}`);
+    if (pr.success) perf = pr.data || {};
+  } catch (e) {}
+
+  // versions come newest-first typically; sort descending by version
+  data.sort((a, b) => (b.version || 0) - (a.version || 0));
+  const hasEnabled = data.some(v => v.enabled);
+  list.innerHTML = data.map(v => {
+    const isActive = v.enabled === true || (!hasEnabled && v === data[0]);
+    const m = perf[v.version] || {};
+    return `
+      <div class="version-row ${isActive ? "active" : ""}" data-vid="${esc(v.id)}" data-ver="${esc(v.version)}">
+        <span class="v-num">v${esc(v.version)}</span>
+        <div class="v-meta">
+          <div>${isActive ? `<span class="badge badge-read">当前</span>` : `<span class="badge badge-replied">历史</span>`} ${v.usageCount != null || m.usageCount != null ? `<span class="v-stats">&middot; 调用 ${esc(m.usageCount ?? v.usageCount ?? 0)} 次</span>` : ""}</div>
+          ${v.description ? `<div class="v-desc">${esc(v.description)}</div>` : ""}
+          ${(m.successRate != null || v.successRate != null) ? `<div class="v-stats">成功率 ${fmtPct(m.successRate ?? v.successRate)} &middot; 平均延迟 ${fmtMs(m.avgLatency ?? v.avgLatency)}</div>` : ""}
+        </div>
+        <div class="row gap-sm" style="flex-shrink:0">
+          <button type="button" class="ghost" onclick="viewVersion('${esc(key)}', ${esc(v.version)})">查看</button>
+          ${!isActive ? `<button type="button" onclick="confirmRollback('${esc(key)}', ${esc(v.version)})">设为当前</button>` : ""}
+        </div>
+      </div>`;
+  }).join("");
+  // auto-show the active version content
+  viewVersion(key, data.find(v => (v.enabled === true))?.version ?? data[0].version);
+}
+
+async function viewVersion(key, version) {
+  const box = document.getElementById("versionContent");
+  const title = document.getElementById("contentTitle");
+  const badge = document.getElementById("contentBadge");
+  box.innerHTML = `<p class="muted">正在呈现内容…</p>`;
+  badge.classList.add("hidden");
+  const r = await IC.api(`/api/prompt/versions?key=${encodeURIComponent(key)}`);
+  if (!r.success) { box.innerHTML = `<p class="muted">${esc(r.message || "读取失败")}</p>`; return; }
+  const v = (r.data || []).find(x => Number(x.version) === Number(version));
+  if (!v) { box.innerHTML = `<p class="muted">未找到该版本。</p>`; return; }
+  title.textContent = `v${v.version} 内容`;
+  const isActive = v.enabled === true;
+  if (isActive) { badge.textContent = "当前版本"; badge.className = "badge badge-read"; badge.classList.remove("hidden"); }
+  box.innerHTML = `
+    ${v.description ? `<p class="muted" style="font-size:.84rem;margin:0 0 10px">${esc(v.description)}</p>` : ""}
+    <div class="soft-stage" style="padding:16px"><pre class="prompt-pre">${esc(v.content || "(空)")}</pre></div>
+    ${v.createdAt ? `<p class="muted mt-1" style="font-size:.78rem">更新于 ${IC.formatTime(v.createdAt)}</p>` : ""}`;
+}
+
+function confirmRollback(key, version) {
+  IC.showModal(`
+    <h2 class="mb-1">设为当前版本</h2>
+    <p class="muted mb-2">把「${esc(key)}」回滚到 <strong>v${esc(version)}</strong>？此操作会影响后续所有对话的语气。</p>
+    <div class="row gap-sm">
+      <button type="button" onclick="doRollback('${esc(key)}', ${esc(version)})">确认回滚</button>
+      <button type="button" onclick="IC.closeModal()">取消</button>
+    </div>`);
+}
+
+async function doRollback(key, version) {
+  IC.closeModal();
+  const r = await IC.api(`/api/prompt/rollback?key=${encodeURIComponent(key)}&version=${version}`, { method: "POST" });
+  if (r.success) IC.toast(`已回滚到 v${version}`, "success");
+  loadVersions(key);
+}
+
+async function loadLowPerforming() {
+  const box = document.getElementById("lowList");
+  box.innerHTML = `<p class="muted">检查中…</p>`;
+  const r = await IC.api(`/api/prompt/low-performing?threshold=0.5`);
+  if (!r.success) { box.innerHTML = `<p class="muted">${esc(r.message || "读取失败")}</p>`; return; }
+  const data = r.data || [];
+  if (!data.length) { box.innerHTML = `<p class="muted">目前没有表现明显偏低的 Prompt，整体语气都保持在温和的轨道上。</p>`; return; }
+  box.innerHTML = data.map(p => `
+    <article class="card">
+      <div class="flex-between mb-1" style="flex-wrap:wrap;gap:6px">
+        <strong>${esc(p.promptKey || "未命名")} <span class="muted" style="font-weight:400">v${esc(p.version)}</span></strong>
+        <span class="badge badge-new">建议关注</span>
+      </div>
+      <p class="muted" style="font-size:.84rem">${esc(p.description || "可考虑回到更稳定的版本，或在语气上再温柔一点。")}</p>
+      <button type="button" class="ghost mt-1" onclick="openKey('${esc(p.promptKey)}')">前往查看</button>
+    </article>`).join("");
+}
+
+function openKey(key) {
+  document.getElementById("keyInput").value = key;
+  searchKey();
+  document.getElementById("content").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function fmtPct(v) { const n = Number(v); return Number.isFinite(n) ? (n <= 1 ? n * 100 : n).toFixed(1) + "%" : "—"; }
+function fmtMs(v) { const n = Number(v); return Number.isFinite(n) ? n.toFixed(0) + " ms" : "—"; }
+</script>
+</body>
+</html>

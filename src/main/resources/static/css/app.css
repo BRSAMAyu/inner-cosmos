@@ -218,6 +218,9 @@ button:active,
 .nav a:active {
   transform: translateY(0) scale(.99);
 }
+/* Admin-only nav entries are hidden until the body is flagged is-admin (after profile load). */
+.nav a[data-admin-nav="true"] { display: none; }
+body.is-admin .nav a[data-admin-nav="true"] { display: revert; }
 
 button:focus-visible,
 .button:focus-visible,

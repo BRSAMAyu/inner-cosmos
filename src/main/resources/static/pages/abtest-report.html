@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>A/B 实验报告 · 内宇宙</title>
+  <link rel="stylesheet" href="/css/app.css">
+  <style>
+    .ops-hero { padding: 0 0 24px; margin-bottom: 20px;
+      background: radial-gradient(ellipse 50% 60% at 30% 30%, rgba(143,163,148,.10), transparent),
+                  radial-gradient(ellipse 40% 50% at 70% 40%, rgba(151,169,186,.08), transparent); }
+    .ops-hero h1 { font-family: var(--font-hero); font-size: clamp(1.7rem,4vw,2.4rem); margin: 0 0 8px; }
+    .ops-hero p { color: var(--muted); line-height: 1.7; max-width: 48ch; }
+    body.dark-star .ops-hero { background: radial-gradient(ellipse 50% 60% at 30% 30%, rgba(122,142,127,.06), transparent); }
+    body.dark-star .panel { background: rgba(30,35,40,.88); border-color: rgba(60,70,80,.4); }
+    body.dark-star .card { background: rgba(30,35,40,.82); border-color: rgba(60,70,80,.35); }
+    body.dark-star .soft-stage { background: rgba(30,35,40,.6); border-color: rgba(60,70,80,.35); }
+    .split-bar { width: 100%; height: 12px; border-radius: 6px; background: rgba(160,155,180,.14); overflow: hidden; display: flex; }
+    .split-bar .seg-a { background: var(--accent-dusty-blue); transition: width .4s ease; }
+    .split-bar .seg-b { background: var(--accent-sage); transition: width .4s ease; }
+    table.cmp { width: 100%; border-collapse: collapse; font-size: .86rem; }
+    table.cmp th, table.cmp td { padding: 8px 10px; }
+    table.cmp thead th { border-bottom: 1px solid var(--line); color: var(--muted); font-weight: 400; text-align: left; }
+    table.cmp tbody td { border-bottom: 1px solid var(--line); }
+    table.cmp tbody tr:last-child td { border-bottom: none; }
+    .legend-dot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+    .gate { padding: 32px; text-align: center; }
+    .gate .muted { max-width: 38ch; margin: 8px auto 0; line-height: 1.7; }
+  </style>
+</head>
+<body>
+<main id="ic-main" class="shell">
+  <a class="skip-link ic-skip-link" href="#ic-main">跳到主内容</a>
+  <div class="topbar" data-topbar></div>
+
+  <section class="ops-hero flex-between" style="flex-wrap:wrap;gap:12px">
+    <div>
+      <span class="route-hint">让每一组数据，都成为更懂你的尝试</span>
+      <h1>A/B 实验报告</h1>
+      <p>这里并排摆放着两种可能：一组更稳妥，一组更真实。看到差异，是为了把更好的那一种留给你。</p>
+    </div>
+    <div class="row gap-sm">
+      <button type="button" onclick="loadReport()" aria-label="刷新实验数据">刷新</button>
+    </div>
+  </section>
+
+  <section id="gate" class="panel hidden" aria-label="权限提示">
+    <div class="gate">
+      <strong>这部分需要管理员视角</strong>
+      <p class="muted">A/B 实验数据牵涉到模型路由的整体判断，目前仅向管理员开放。</p>
+    </div>
+  </section>
+
+  <section id="content" aria-label="实验报告">
+    <div id="activeCard" class="grid mb-2" style="grid-template-columns:1fr"></div>
+    <section class="panel" aria-label="分组指标对比">
+      <div class="flex-between mb-1" style="flex-wrap:wrap;gap:8px">
+        <h2 style="margin:0">分组指标对比</h2>
+        <span class="muted" style="font-size:.82rem" id="statsMeta"></span>
+      </div>
+      <div id="statsBody"></div>
+    </section>
+  </section>
+</main>
+
+<script src="/js/app.js?v=final-20260612"></script>
+<script src="/js/time-system.js?v=final-20260612"></script>
+<script src="/js/motion.js"></script>
+<script src="/js/weather-system.js"></script>
+<script src="/js/api.js"></script>
+<script>
+IC.mountShell("A/B 实验报告");
+const esc = IC.esc;
+
+IC.ensureDemoLogin().then(async () => {
+  const cur = await API.current();
+  const role = (cur.success && cur.data && cur.data.role) || "USER";
+  if (role !== "ADMIN") {
+    document.getElementById("gate").classList.remove("hidden");
+    document.getElementById("content").classList.add("hidden");
+    IC.hideLoading();
+    return;
+  }
+  document.getElementById("gate").classList.add("hidden");
+  document.getElementById("content").classList.remove("hidden");
+  loadReport();
+});
+
+async function loadReport() {
+  await loadActive();
+  IC.hideLoading();
+}
+
+function fmtPct(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "—";
+  return (n <= 1 ? n * 100 : n).toFixed(1) + "%";
+}
+function fmtMs(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n.toFixed(0) + " ms" : "—";
+}
+
+async function loadActive() {
+  const box = document.getElementById("activeCard");
+  box.innerHTML = skeletonCard();
+  const r = await API.abtestActive();
+  if (!r.success) { box.innerHTML = fullError(r.message || "暂时无法读取实验配置"); return; }
+  const c = r.data || {};
+  if (!c || (!c.testName && !c.id)) {
+    box.innerHTML = `<article class="card">${IC.empty("当前没有正在运行的实验，星空正以默认的方式陪伴你。")}</article>`;
+    document.getElementById("statsBody").innerHTML = `<p class="muted">无活跃实验，暂无对比数据。</p>`;
+    document.getElementById("statsMeta").textContent = "";
+    return;
+  }
+  const mockPct = Math.max(0, Math.min(100, Math.round(c.mockPercentage != null ? c.mockPercentage : 50)));
+  const remotePct = 100 - mockPct;
+  const enabled = c.enabled !== false;
+  const status = c.status || (enabled ? "ACTIVE" : "PAUSED");
+  const badgeCls = enabled ? "badge-read" : "badge-new";
+  box.innerHTML = `
+    <article class="card">
+      <div class="flex-between mb-1" style="flex-wrap:wrap;gap:8px">
+        <div style="min-width:0">
+          <h2 style="margin:0 0 4px">${esc(c.testName || "未命名实验")}</h2>
+          <p class="muted" style="margin:0;font-size:.86rem">${esc(c.description || "Mock 与真实模型之间的流量分配实验。")}</p>
+        </div>
+        <div class="row gap-sm" style="flex-shrink:0">
+          <span class="badge ${badgeCls}">${esc(status)}</span>
+          ${c.id != null ? `<button type="button" class="ghost" onclick="toggleTest(${c.id}, ${!enabled})">${enabled ? "暂停" : "启用"}</button>` : ""}
+        </div>
+      </div>
+      <div class="mt-1">
+        <div class="flex-between" style="font-size:.84rem;margin-bottom:8px">
+          <span class="muted">流量分配</span>
+          <span class="muted">MOCK ${mockPct}% &middot; REMOTE ${remotePct}%</span>
+        </div>
+        <div class="split-bar" role="img" aria-label="流量分配：MOCK ${mockPct}%，REMOTE ${remotePct}%">
+          <div class="seg-a" style="width:${mockPct}%"></div>
+          <div class="seg-b" style="width:${remotePct}%"></div>
+        </div>
+        <div class="row gap-md mt-1" style="font-size:.8rem">
+          <span><span class="legend-dot" style="background:var(--accent-dusty-blue)"></span>MOCK（本地模型）</span>
+          <span><span class="legend-dot" style="background:var(--accent-sage)"></span>REMOTE（真实模型）</span>
+          ${c.totalParticipants != null ? `<span class="muted">参与 ${esc(c.totalParticipants)} 人</span>` : ""}
+        </div>
+      </div>
+    </article>`;
+  IC.stagger(box);
+  loadStats(c.testName || c.module || "default");
+}
+
+async function loadStats(testName) {
+  const body = document.getElementById("statsBody");
+  const meta = document.getElementById("statsMeta");
+  body.innerHTML = `<p class="muted">正在汇总两组的表现…</p>`;
+  const r = await API.abtestStats(testName);
+  if (!r.success) { body.innerHTML = `<p class="muted">${esc(r.message || "暂无统计数据")}</p>`; meta.textContent = ""; return; }
+  const data = r.data || {};
+  const groups = Object.keys(data);
+  if (!groups.length) {
+    body.innerHTML = `<p class="muted">数据收集中，请稍后再来查看。</p>`;
+    meta.textContent = "";
+    return;
+  }
+  meta.textContent = `共 ${groups.length} 组`;
+  body.innerHTML = renderStatsTable(data);
+}
+
+function statOf(data, key) {
+  return data[key] || data[key.toUpperCase()] || data[key.toLowerCase()] || {};
+}
+
+function renderStatsTable(data) {
+  const mock = statOf(data, "MOCK");
+  const remote = statOf(data, "REMOTE");
+  const pick = (g, ...fields) => {
+    for (const f of fields) if (g[f] != null) return g[f];
+    return null;
+  };
+  const rows = [
+    { label: "调用次数", m: pick(mock, "totalRequests", "totalCalls", "total"), r: pick(remote, "totalRequests", "totalCalls", "total") },
+    { label: "成功次数", m: pick(mock, "successCount"), r: pick(remote, "successCount") },
+    { label: "成功率", m: pick(mock, "successRate", "success_rate"), r: pick(remote, "successRate", "success_rate"), fmt: fmtPct },
+    { label: "平均延迟", m: pick(mock, "avgLatency", "avg_latency"), r: pick(remote, "avgLatency", "avg_latency"), fmt: fmtMs },
+    { label: "降级次数", m: pick(mock, "fallbackCount"), r: pick(remote, "fallbackCount") },
+    { label: "降级率", m: pick(mock, "fallbackRate", "fallback_rate"), r: pick(remote, "fallbackRate", "fallback_rate"), fmt: fmtPct }
+  ];
+  const cell = (v, fmt) => {
+    if (v == null) return "—";
+    return fmt ? fmt(v) : esc(String(v));
+  };
+  const hasMock = rows.some(r => r.m != null);
+  const hasRemote = rows.some(r => r.r != null);
+  if (!hasMock && !hasRemote) return `<p class="muted">暂无可对比的指标。</p>`;
+  return `
+    <table class="cmp">
+      <thead>
+        <tr>
+          <th>指标</th>
+          ${hasMock ? `<th style="text-align:center"><span class="legend-dot" style="background:var(--accent-dusty-blue)"></span>MOCK</th>` : ""}
+          ${hasRemote ? `<th style="text-align:center"><span class="legend-dot" style="background:var(--accent-sage)"></span>REMOTE</th>` : ""}
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map(r => `
+          <tr>
+            <td class="muted">${esc(r.label)}</td>
+            ${hasMock ? `<td style="text-align:center">${cell(r.m, r.fmt)}</td>` : ""}
+            ${hasRemote ? `<td style="text-align:center">${cell(r.r, r.fmt)}</td>` : ""}
+          </tr>`).join("")}
+      </tbody>
+    </table>
+    <p class="muted mt-1" style="font-size:.8rem">提示：成功率与延迟综合判断更可靠；降级率高，往往说明这一组需要更温柔的兜底。</p>`;
+}
+
+async function toggleTest(id, enable) {
+  const action = enable ? "启用" : "暂停";
+  IC.showModal(`
+    <h2 class="mb-1">${action}实验</h2>
+    <p class="muted mb-2">${enable ? "启用后，用户会重新被纳入实验分组。" : "暂停后，所有用户将回到默认的模型路径。"}</p>
+    <div class="row gap-sm">
+      <button type="button" onclick="confirmToggle(${id}, ${enable})">确认${esc(action)}</button>
+      <button type="button" onclick="IC.closeModal()">取消</button>
+    </div>`);
+}
+
+async function confirmToggle(id, enable) {
+  IC.closeModal();
+  const r = await IC.api(`/api/abtest/${id}/toggle?enabled=${enable}`, { method: "POST" });
+  if (r.success) IC.toast(enable ? "实验已启用" : "实验已暂停", "success");
+  loadReport();
+}
+
+function skeletonCard() {
+  return `<article class="card" aria-hidden="true"><strong style="opacity:.4">···</strong><p class="muted" style="opacity:.4">正在加载实验…</p></article>`;
+}
+function fullError(msg) {
+  return `<article class="card"><p class="muted">${esc(msg)}，请稍后再试。</p></article>`;
+}
+</script>
+</body>
+</html>
