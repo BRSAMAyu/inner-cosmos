@@ -88,16 +88,72 @@ class AuroraStreamControllerTest {
                 "crisis must NOT stream any chat token; got:\n" + body);
     }
 
-    private String performStream(String message) throws Exception {
-        MvcResult started = mockMvc.perform(get("/api/aurora/stream")
+    @Test
+    @DisplayName("VS-003b: staged rich context (voice/weather/location/timezone) is carried on the SSE meta event")
+    void stream_stagedContext_carriedInMeta() throws Exception {
+        // 1) POST the rich context to /stream-stage -> get a token.
+        String stageJson = "{\"sessionId\":" + sessionId + ","
+                + "\"message\":\"今天有点累\","
+                + "\"weatherType\":\"RAINY\","
+                + "\"weatherDescription\":\"小雨\","
+                + "\"locationLabel\":\"上海\","
+                + "\"timezone\":\"Asia/Shanghai\","
+                + "\"localTimeLabel\":\"晚上\","
+                + "\"inputType\":\"VOICE\","
+                + "\"audioDurationSec\":12,"
+                + "\"speechRate\":0.8,"
+                + "\"pauseCount\":3,"
+                + "\"longPauseCount\":1}";
+        MvcResult stage = mockMvc.perform(post("/api/aurora/stream-stage")
                         .session(session)
-                        .param("sessionId", String.valueOf(sessionId))
-                        .param("message", message)
-                        .param("mode", "DAILY_TALK"))
-                .andExpect(request().asyncStarted())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(stageJson))
+                .andExpect(status().isOk())
                 .andReturn();
+        String stageResp = stage.getResponse().getContentAsString();
+        int tIdx = stageResp.indexOf("\"token\":\"");
+        assertNotEquals(-1, tIdx, "stream-stage must return a token: " + stageResp);
+        int ts = tIdx + "\"token\":\"".length();
+        int te = stageResp.indexOf("\"", ts);
+        String token = stageResp.substring(ts, te);
+        assertFalse(token.isEmpty(), "token must be non-empty");
 
-        // Drive the async dispatch to completion.
+        // 2) Open the GET stream WITH the token and capture the SSE bytes.
+        String body = performStreamWithToken("今天有点累", token);
+
+        // The meta event must now carry the parity metadata (voice/weather/location/timezone).
+        // NOTE: MockMvc reads the SSE body as ISO-8859-1, so Chinese values arrive as
+        // mojibake in the test — assert on the ASCII-stable keys instead (the fields
+        // are present and populated; the Chinese rendering is a test-harness artifact).
+        assertTrue(body.contains("event:meta"), "meta event expected; got:\n" + body);
+        assertTrue(body.contains("\"weatherType\":\"RAINY\""),
+                "meta must carry staged weatherType (parity); got:\n" + body);
+        assertTrue(body.contains("\"locationLabel\""),
+                "meta must carry staged locationLabel field (parity); got:\n" + body);
+        assertTrue(body.contains("\"timezone\":\"Asia/Shanghai\""),
+                "meta must carry staged timezone (parity); got:\n" + body);
+        assertTrue(body.contains("\"inputType\":\"VOICE\""),
+                "meta must carry staged inputType (parity); got:\n" + body);
+        // The agentLoop block (perception panel source) must be present on the stream path now.
+        assertTrue(body.contains("\"agentLoop\""),
+                "meta must carry agentLoop for the perception panel on stream; got:\n" + body);
+    }
+
+    private String performStream(String message) throws Exception {
+        return performStreamWithToken(message, null);
+    }
+
+    private String performStreamWithToken(String message, String token) throws Exception {
+        org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder req = get("/api/aurora/stream")
+                .session(session)
+                .param("sessionId", String.valueOf(sessionId))
+                .param("message", message)
+                .param("mode", "DAILY_TALK");
+        if (token != null) {
+            req.param("token", token);
+        }
+        MvcResult started = mockMvc.perform(req).andExpect(request().asyncStarted()).andReturn();
+
         mockMvc.perform(asyncDispatch(started))
                 .andExpect(status().isOk());
 

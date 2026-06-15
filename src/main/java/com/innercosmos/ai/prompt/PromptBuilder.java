@@ -1,13 +1,32 @@
 package com.innercosmos.ai.prompt;
 
+import com.innercosmos.ai.portrait.AgentUserRelationshipService;
+import com.innercosmos.entity.AgentUserRelationship;
+import com.innercosmos.entity.UserPortrait;
 import com.innercosmos.vo.AuroraMemoryContextVO;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 public class PromptBuilder {
     private final List<String> parts = new ArrayList<>();
     private String modeTemperatureHint;
+
+    // ── VS-004 curation caps (the PromptBuilder is the single chokepoint that keeps
+    //     portrait + relationship + state from bloating the prompt). ──
+    /** Only portrait dimensions at/above this confidence reach the prompt. */
+    public static final double PORTRAIT_CONFIDENCE_THRESHOLD = 0.45;
+    /** Max portrait dimensions surfaced (sorted by confidence desc, then score desc). */
+    public static final int PORTRAIT_MAX_DIMS = 5;
+    /** Max chars per portrait dimension value. */
+    static final int PORTRAIT_VALUE_MAX_CHARS = 120;
+    /** Max chars for the whole portrait block. */
+    static final int PORTRAIT_BLOCK_MAX_CHARS = 720;
+    /** Max chars for the relationship line. */
+    static final int RELATIONSHIP_MAX_CHARS = 220;
+    /** Max chars for the current-state signal. */
+    static final int STATE_SIGNAL_MAX_CHARS = 160;
 
     public PromptBuilder withSystemBoundary() {
         parts.add(
@@ -57,6 +76,77 @@ public class PromptBuilder {
         if (notBlank(profile)) {
             parts.add("用户偏好与 Aurora 画像：\n" + profile);
         }
+        return this;
+    }
+
+    /**
+     * VS-004 — Aurora's accumulated understanding of THIS user (multi-dimensional
+     * portrait). Curated: only dimensions at/above {@link #PORTRAIT_CONFIDENCE_THRESHOLD}
+     * surface, capped to {@link #PORTRAIT_MAX_DIMS} by confidence desc, each value
+     * truncated and sanitized. This is system-fed data, but it is user-derived text,
+     * so it is sanitized against prompt-injection before it enters the system prompt.
+     */
+    public PromptBuilder withUserPortrait(List<UserPortrait> portrait) {
+        if (portrait == null || portrait.isEmpty()) return this;
+        List<UserPortrait> curated = new ArrayList<>();
+        for (UserPortrait p : portrait) {
+            if (p == null || isBlank(p.dim)) continue;
+            double confidence = p.confidence == null ? 0.0 : p.confidence;
+            if (confidence < PORTRAIT_CONFIDENCE_THRESHOLD) continue;
+            curated.add(p);
+        }
+        if (curated.isEmpty()) return this;
+        curated.sort(Comparator.<UserPortrait>comparingDouble(
+                (p) -> p.confidence == null ? 0.0 : p.confidence).reversed()
+                .thenComparingDouble((p) -> -(p.score == null ? 0.0 : p.score)));
+        StringBuilder block = new StringBuilder();
+        int totalChars = 0;
+        for (int i = 0; i < curated.size() && i < PORTRAIT_MAX_DIMS; i++) {
+            UserPortrait p = curated.get(i);
+            String dim = sanitize(p.dim);
+            String value = sanitize(truncate(p.valueJson, PORTRAIT_VALUE_MAX_CHARS));
+            if (dim.isEmpty() || value.isEmpty()) continue;
+            String line = "- " + dim + "（置信" + roundConf(p.confidence) + "）：" + value;
+            if (totalChars + line.length() + 1 > PORTRAIT_BLOCK_MAX_CHARS) break;
+            block.append(line).append('\n');
+            totalChars += line.length() + 1;
+        }
+        if (block.length() == 0) return this;
+        parts.add("你长期观察到的、关于这个人的画像（只在相关时轻轻带入，不要逐条复述，更不要临床化）：\n"
+                + block.toString().stripTrailing());
+        return this;
+    }
+
+    /**
+     * VS-004 — the Aurora-user relationship snapshot. Rendered as ONE compact line.
+     * Stage/intimacy/trust/familiarity are the surfaced axes; disclosure is a hint.
+     */
+    public PromptBuilder withRelationship(AgentUserRelationship relationship) {
+        if (relationship == null) return this;
+        String stage = sanitize(blankTo(relationship.relationshipStage, "new_user"));
+        int intimacy = relationship.intimacyLevel == null ? 0 : relationship.intimacyLevel;
+        int trust = relationship.trustLevel == null ? 0 : relationship.trustLevel;
+        int familiarity = relationship.familiarityLevel == null ? 0 : relationship.familiarityLevel;
+        int disclosure = relationship.userDisclosureLevel == null ? 0 : relationship.userDisclosureLevel;
+        String addressing = sanitize(blankTo(relationship.preferredAddressing, "你"));
+        String stageLabel = AgentUserRelationshipService.stageLabel(stage);
+        String line = ("阶段：" + stageLabel + "（亲密度 " + intimacy + "／信任 " + trust
+                + "／熟悉度 " + familiarity + "／自我表露 " + disclosure + "）；称呼用「" + addressing + "」。"
+                + " 亲近与信任越高，越可以自然地追问、连接旧线索、轻推一步；熟悉度低时先稳稳接住当下，不急着深挖。");
+        parts.add("你们之间的关系（这是背景，不是规则）：\n" + truncate(line, RELATIONSHIP_MAX_CHARS));
+        return this;
+    }
+
+    /**
+     * VS-004 — a SHORT, NON-CLINICAL perceptual signal of how the user seems right
+     * now (e.g. "用户此刻偏疲惫/脆弱/平静/开放"). This is a perception, NOT a diagnosis
+     * or label (vision §9/§13: do not medicalize). The caller computes it from the
+     * message via the existing PseudoSemanticAnalyzer / lexicon — no new subsystem.
+     */
+    public PromptBuilder withCurrentStateSignal(String signal) {
+        if (isBlank(signal)) return this;
+        parts.add("用户此刻的状态感知（仅供参考你如何陪伴，不是诊断，也不要当面复述这个标签）：\n"
+                + sanitize(truncate(signal.trim(), STATE_SIGNAL_MAX_CHARS)));
         return this;
     }
 
@@ -151,5 +241,41 @@ public class PromptBuilder {
 
     private boolean notBlank(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
+
+    private String blankTo(String value, String fallback) {
+        return (value == null || value.isBlank()) ? fallback : value;
+    }
+
+    private String truncate(String value, int max) {
+        if (value == null) return "";
+        String compact = value.replaceAll("\\s+", " ").trim();
+        return compact.length() > max ? compact.substring(0, max) + "…" : compact;
+    }
+
+    private String roundConf(Double confidence) {
+        if (confidence == null) return "0";
+        return String.valueOf(Math.round(confidence * 100) / 100.0);
+    }
+
+    /**
+     * Sanitize system-fed (but user-derived) text before it enters the system
+     * prompt. Strips line breaks (so it cannot fake prompt structure) and the
+     * most common instruction-injection phrasings. The PromptBuilder is the single
+     * chokepoint the durability guardrails named for the injection surface.
+     */
+    static String sanitize(String value) {
+        if (value == null) return "";
+        // Collapse all whitespace to single spaces — prevents伪造段落 / role markers / line-based prompt structure.
+        String compact = value.replaceAll("\\s+", " ").trim();
+        // Drop obvious instruction-injection phrasings (case-insensitive). Chinese
+        // terms are matched without ASCII word boundaries (which don't apply to CJK).
+        compact = compact.replaceAll("(?i)\\b(system|ignore|instructions?)\\b", "");
+        compact = compact.replaceAll("(忽略|以上|你是|you are now|new role)", "");
+        return compact.trim();
     }
 }

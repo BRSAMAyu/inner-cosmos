@@ -511,78 +511,123 @@ function sendViaStream(text, body) {
     var node = null;
     var gotAny = false;
     var finished = false;
-    var url = "/api/aurora/stream?sessionId=" + encodeURIComponent(sid) +
-              "&message=" + encodeURIComponent(text) +
-              "&mode=" + encodeURIComponent(mode);
-    var es = new EventSource(url, { withCredentials: true });
 
-    function finishOnce() {
-      if (finished) return;
-      finished = true;
-      try { es.close(); } catch (e) {}
+    // VS-003b — stage the rich context (voice/weather/location/timezone) first,
+    // because EventSource cannot send a body. The token is then passed to the
+    // GET /stream so the SSE meta event carries the same perception metadata as
+    // the POST path (display parity).
+    fetch("/api/aurora/stream-stage", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+      body: JSON.stringify(body || {})
+    }).then(function(stageRes) { return stageRes.json(); }).then(function(stageJson) {
+      var token = stageJson && stageJson.data && stageJson.data.token ? stageJson.data.token : "";
+      openStream(token);
+    }).catch(function() { openStream(""); });
+
+    function openStream(token) {
+      var url = "/api/aurora/stream?sessionId=" + encodeURIComponent(sid) +
+                "&message=" + encodeURIComponent(text) +
+                "&mode=" + encodeURIComponent(mode);
+      if (token) url += "&token=" + encodeURIComponent(token);
+      var es = new EventSource(url, { withCredentials: true });
+      wireEmitter(es, resolve, reject, function() { return node; }, function(n) { node = n; });
     }
 
-    es.onmessage = function(ev) {
-      // Default (unnamed) events carry token chunks in {content}.
-      handleChunk(ev.data);
-    };
-    es.addEventListener("token", function(ev) { handleChunk(ev.data); });
-    es.addEventListener("segment", function(ev) { /* inter-bubble break marker; ignored */ });
+    function wireEmitter(es, resolve, reject, getNode, setNode) {
+      function finishOnce() {
+        if (finished) return;
+        finished = true;
+        try { es.close(); } catch (e) {}
+      }
 
-    function handleChunk(raw) {
-      var data = parseJson(raw);
-      if (!data) return;
-      if (data.content != null) {
+      es.onmessage = function(ev) {
+        handleChunk(ev.data);
+      };
+      es.addEventListener("token", function(ev) { handleChunk(ev.data); });
+      es.addEventListener("segment", function(ev) { /* inter-bubble break marker; ignored */ });
+
+      function handleChunk(raw) {
+        var data = parseJson(raw);
+        if (!data) return;
+        if (data.content != null) {
+          if (!gotAny) {
+            gotAny = true;
+            document.getElementById("typing").classList.remove("visible");
+            setNode(beginStreamingBubble());
+          }
+          if (data.break) {
+            // segment break -> start a fresh bubble
+            setNode(beginStreamingBubble());
+            return;
+          }
+          appendChunk(getNode(), data.content);
+        }
+      }
+
+      es.addEventListener("meta", function(ev) {
+        var data = parseJson(ev.data);
+        if (data) {
+          streamMeta = data;
+          // VS-003b — render the same perception panels the POST path renders,
+          // using the richer meta event (agentLoop + voice/weather/location).
+          renderAgentLoop(data);
+          renderStreamMemoryLens(data);
+        }
+      });
+
+      es.addEventListener("safety", function(ev) {
+        finishOnce();
+        document.getElementById("typing").classList.remove("visible");
+        handleSafetyEvent(parseJson(ev.data));
+        resolve({ safety: true });
+      });
+
+      es.addEventListener("error-event", function(ev) {
+        finishOnce();
+        document.getElementById("typing").classList.remove("visible");
+        reject(new Error(parseJson(ev.data) && parseJson(ev.data).message ? parseJson(ev.data).message : "stream-error"));
+      });
+
+      es.addEventListener("done", function() {
+        finishOnce();
+        document.getElementById("typing").classList.remove("visible");
+        resolve({ safety: false, streamed: gotAny });
+      });
+
+      es.onerror = function() {
+        // Browser fires onerror on completion in some cases AND on real failure.
+        // If we never got content, treat as failure -> caller falls back to POST.
+        finishOnce();
+        document.getElementById("typing").classList.remove("visible");
         if (!gotAny) {
-          gotAny = true;
-          document.getElementById("typing").classList.remove("visible");
-          node = beginStreamingBubble();
+          reject(new Error("sse-error"));
+        } else {
+          resolve({ safety: false, streamed: true });
         }
-        if (data.break) {
-          // segment break -> start a fresh bubble
-          node = beginStreamingBubble();
-          return;
-        }
-        appendChunk(node, data.content);
-      }
+      };
     }
-
-    es.addEventListener("meta", function(ev) {
-      var data = parseJson(ev.data);
-      if (data) streamMeta = data;
-    });
-
-    es.addEventListener("safety", function(ev) {
-      finishOnce();
-      document.getElementById("typing").classList.remove("visible");
-      handleSafetyEvent(parseJson(ev.data));
-      resolve({ safety: true });
-    });
-
-    es.addEventListener("error-event", function(ev) {
-      finishOnce();
-      document.getElementById("typing").classList.remove("visible");
-      reject(new Error(parseJson(ev.data) && parseJson(ev.data).message ? parseJson(ev.data).message : "stream-error"));
-    });
-
-    es.addEventListener("done", function() {
-      finishOnce();
-      document.getElementById("typing").classList.remove("visible");
-      resolve({ safety: false, streamed: gotAny });
-    });
-
-    es.onerror = function() {
-      // Browser fires onerror on completion in some cases AND on real failure.
-      // If we never got content, treat as failure -> caller falls back to POST.
-      finishOnce();
-      document.getElementById("typing").classList.remove("visible");
-      if (!gotAny) {
-        reject(new Error("sse-error"));
-      } else {
-        resolve({ safety: false, streamed: true });
-      }
-    };
   });
+}
+
+// VS-003b — render a memory/perception lens from the stream meta event. The meta
+// payload carries voice/weather/location metadata (staged before the stream) and
+// a compact perception read; surfaced as lightweight tags, mirroring renderMemoryLens.
+function renderStreamMemoryLens(data) {
+  if (!data) return;
+  var notes = [];
+  if (data.weatherDescription) notes.push("天气：" + data.weatherDescription);
+  if (data.locationLabel) notes.push("位置：" + data.locationLabel);
+  if (data.voiceMetadata) notes.push("语音：" + data.voiceMetadata);
+  if (data.perception && data.perception.topDim) notes.push("Aurora 正带入的画像：" + data.perception.topDim);
+  if (!notes.length) return;
+  document.getElementById("memoryPolicy").textContent = "stream context";
+  var body = document.getElementById("memoryChips");
+  if (body) body.innerHTML = notes.map(function(n) { return '<span class="tag">' + IC.esc(n).slice(0, 96) + '</span>'; }).join("");
+  var cont = document.getElementById("memoryContinuity");
+  if (cont) cont.textContent = data.localTimeLabel ? ("此刻：" + data.localTimeLabel) : "";
+  document.getElementById("memoryLens").style.display = "block";
 }
 
 var streamMeta = null;
