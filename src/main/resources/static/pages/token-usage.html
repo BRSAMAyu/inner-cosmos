@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Token 用量 · 内宇宙</title>
+  <link rel="stylesheet" href="/css/app.css">
+  <style>
+    .ops-hero { padding: 0 0 24px; margin-bottom: 20px;
+      background: radial-gradient(ellipse 50% 60% at 30% 30%, rgba(143,163,148,.10), transparent),
+                  radial-gradient(ellipse 40% 50% at 70% 40%, rgba(151,169,186,.08), transparent); }
+    .ops-hero h1 { font-family: var(--font-hero); font-size: clamp(1.7rem,4vw,2.4rem); margin: 0 0 8px; }
+    .ops-hero p { color: var(--muted); line-height: 1.7; max-width: 46ch; }
+    body.dark-star .ops-hero { background: radial-gradient(ellipse 50% 60% at 30% 30%, rgba(122,142,127,.06), transparent); }
+    body.dark-star .panel { background: rgba(30,35,40,.88); border-color: rgba(60,70,80,.4); }
+    body.dark-star .card { background: rgba(30,35,40,.82); border-color: rgba(60,70,80,.35); }
+    body.dark-star .soft-stage { background: rgba(30,35,40,.6); border-color: rgba(60,70,80,.35); }
+    body.dark-star .ops-hero p { color: var(--muted); }
+    .estimate-box { display: flex; flex-direction: column; gap: 10px; }
+    .estimate-box textarea {
+      width: 100%; min-height: 84px; resize: vertical;
+      padding: 12px 14px; font-size: .92rem; line-height: 1.6;
+      border: 1px solid var(--line); border-radius: var(--radius);
+      background: var(--surface-warm); color: var(--text);
+    }
+    .estimate-box textarea:focus { outline: none; border-color: var(--accent-sage); box-shadow: 0 0 0 3px rgba(143,163,148,.15); }
+    .usage-bar { width: 100%; height: 10px; border-radius: 5px; background: rgba(160,155,180,.14); overflow: hidden; margin-top: 8px; }
+    .usage-bar > span { display: block; height: 100%; background: linear-gradient(90deg, var(--accent-sage), var(--accent-dusty-blue)); border-radius: 5px; transition: width .5s ease; }
+    .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 14px; }
+    .stat-cell { text-align: center; }
+    .stat-cell .num { font-size: 1.4rem; font-weight: 600; color: var(--ink); font-family: var(--font-hero); }
+    .stat-cell .label { font-size: .78rem; color: var(--muted); margin-top: 4px; }
+    .legend-dot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
+  </style>
+</head>
+<body>
+<main id="ic-main" class="shell">
+  <a class="skip-link ic-skip-link" href="#ic-main">跳到主内容</a>
+  <div class="topbar" data-topbar></div>
+
+  <section class="ops-hero flex-between" style="flex-wrap:wrap;gap:12px">
+    <div>
+      <span class="route-hint">每一次对话的轻盈程度</span>
+      <h1>Token 用量</h1>
+      <p>这里记录你和 Aurora 之间这段日子里，语言的体积与节奏。看见用量，也是看见自己表达的方式。</p>
+    </div>
+    <button type="button" onclick="loadAll()" aria-label="刷新用量数据">刷新</button>
+  </section>
+
+  <section id="summary" class="grid metrics-grid mb-2" aria-label="今日用量概览"></section>
+
+  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px;align-items:start">
+    <section class="panel" aria-label="本月用量预测">
+      <div class="flex-between mb-1" style="flex-wrap:wrap;gap:8px">
+        <h2 style="margin:0">本月节奏预测</h2>
+        <span id="budgetBadge" class="badge badge-read">—</span>
+      </div>
+      <div id="forecastBody"></div>
+    </section>
+
+    <section class="panel" aria-label="Token 估算器">
+      <h2 style="margin:0 0 12px">轻声估算</h2>
+      <p class="muted" style="font-size:.84rem;margin:0 0 12px">把一段想说的话放进来，看看它大约占用多少 Token。</p>
+      <div class="estimate-box">
+        <textarea id="estText" placeholder="写一句话，看看它的体积…" aria-label="待估算文本"></textarea>
+        <div class="row gap-sm">
+          <button type="button" onclick="estimateText()">估算 Token</button>
+          <button type="button" class="ghost" onclick="document.getElementById('estText').value='';document.getElementById('estResult').innerHTML=''">清空</button>
+        </div>
+        <div id="estResult" aria-live="polite"></div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script src="/js/app.js?v=final-20260612"></script>
+<script src="/js/time-system.js?v=final-20260612"></script>
+<script src="/js/motion.js"></script>
+<script src="/js/weather-system.js"></script>
+<script src="/js/api.js"></script>
+<script>
+IC.mountShell("Token 用量");
+const esc = IC.esc;
+
+IC.ensureDemoLogin().then(loadAll);
+
+async function loadAll() {
+  await Promise.all([loadSummary(), loadForecast()]);
+  IC.hideLoading();
+}
+
+function fmtNum(v) {
+  const n = Number(v || 0);
+  return Number.isFinite(n) ? n.toLocaleString("zh-CN") : "0";
+}
+
+async function loadSummary() {
+  const box = document.getElementById("summary");
+  box.innerHTML = skeletonMetrics();
+  const r = await API.tokenDailyUsage();
+  if (!r.success) { box.innerHTML = errorCard(r.message || "暂时无法读取用量"); return; }
+  const d = r.data || {};
+  const items = [
+    { label: "今日总 Token", value: fmtNum(d.totalTokens), icon: "总" },
+    { label: "输入 Token", value: fmtNum(d.promptTokens), icon: "入" },
+    { label: "输出 Token", value: fmtNum(d.responseTokens), icon: "出" },
+    { label: "请求次数", value: fmtNum(d.requestCount), icon: "次" },
+    { label: "预估花费", value: "¥" + (Number(d.estimatedCost || 0)).toFixed(4), icon: "费" }
+  ];
+  box.innerHTML = items.map(s => `
+    <article class="card metric">
+      <span class="muted" style="font-size:.78rem">${esc(s.icon)}</span>
+      <strong>${esc(s.value)}</strong>
+      <span>${esc(s.label)}</span>
+    </article>`).join("");
+  IC.stagger(box);
+}
+
+async function loadForecast() {
+  const body = document.getElementById("forecastBody");
+  const badge = document.getElementById("budgetBadge");
+  body.innerHTML = `<p class="muted">正在描绘本月的节奏…</p>`;
+  const r = await API.tokenForecast();
+  if (!r.success) { body.innerHTML = `<p class="muted">${esc(r.message || "暂时无法预测")}</p>`; return; }
+  const f = r.data || {};
+  const within = f.withinBudget;
+  badge.textContent = within ? "预算之内" : "接近预算";
+  badge.className = "badge " + (within ? "badge-read" : "badge-new");
+  const daily = Number(f.projectedDailyTokens || 0);
+  const month = Number(f.projectedMonthlyTotal || 0);
+  const days = Number(f.remainingDaysInMonth || 0);
+  const pct = month > 0 ? Math.min(100, Math.round((daily / (month || 1)) * 100)) : 0;
+  body.innerHTML = `
+    <div class="stat-grid mb-1">
+      <div class="stat-cell"><div class="num">${fmtNum(daily)}</div><div class="label">预计每日 Token</div></div>
+      <div class="stat-cell"><div class="num">${fmtNum(month)}</div><div class="label">本月预计总量</div></div>
+      <div class="stat-cell"><div class="num">${days}</div><div class="label">本月剩余天数</div></div>
+    </div>
+    <p class="muted" style="font-size:.84rem;margin:10px 0 0">${within
+      ? "目前的节奏平稳，无需刻意节流。"
+      : "节奏偏快，可以试着让表达更简洁一点，把空间留给真正想说的话。"}</p>`;
+}
+
+async function estimateText() {
+  const text = document.getElementById("estText").value.trim();
+  const out = document.getElementById("estResult");
+  if (!text) { out.innerHTML = `<p class="muted" style="font-size:.84rem">先写一句话再估算吧。</p>`; return; }
+  out.innerHTML = `<p class="muted" style="font-size:.84rem">估算中…</p>`;
+  const r = await API.tokenEstimate(text);
+  if (!r.success) { out.innerHTML = `<p class="muted" style="font-size:.84rem">${esc(r.message || "估算失败")}</p>`; return; }
+  const tokens = (r.data && (r.data.text != null ? r.data.text : r.data.total)) || 0;
+  out.innerHTML = `<div class="soft-stage" style="padding:12px 14px">
+    <span class="muted" style="font-size:.8rem">约</span>
+    <strong style="font-size:1.3rem;margin:0 6px">${fmtNum(tokens)}</strong>
+    <span class="muted" style="font-size:.8rem">Token</span>
+  </div>`;
+}
+
+function skeletonMetrics() {
+  return [0,1,2,3,4].map(() => `
+    <article class="card metric" aria-hidden="true">
+      <span class="muted" style="font-size:.78rem">···</span>
+      <strong style="opacity:.4">···</strong>
+      <span class="muted" style="opacity:.4">···</span>
+    </article>`).join("");
+}
+
+function errorCard(msg) {
+  return `<article class="card" style="grid-column:1/-1"><p class="muted">${esc(msg)}，请稍后再试。</p></article>`;
+}
+</script>
+</body>
+</html>

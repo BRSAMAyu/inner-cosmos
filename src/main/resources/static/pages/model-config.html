@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>模型配置 · 内宇宙</title>
+  <link rel="stylesheet" href="/css/app.css">
+  <style>
+    .ops-hero { padding: 0 0 24px; margin-bottom: 20px;
+      background: radial-gradient(ellipse 50% 60% at 30% 30%, rgba(143,163,148,.10), transparent),
+                  radial-gradient(ellipse 40% 50% at 70% 40%, rgba(151,169,186,.08), transparent); }
+    .ops-hero h1 { font-family: var(--font-hero); font-size: clamp(1.7rem,4vw,2.4rem); margin: 0 0 8px; }
+    .ops-hero p { color: var(--muted); line-height: 1.7; max-width: 48ch; }
+    body.dark-star .ops-hero { background: radial-gradient(ellipse 50% 60% at 30% 30%, rgba(122,142,127,.06), transparent); }
+    body.dark-star .panel { background: rgba(30,35,40,.88); border-color: rgba(60,70,80,.4); }
+    body.dark-star .card { background: rgba(30,35,40,.82); border-color: rgba(60,70,80,.35); }
+    body.dark-star .soft-stage { background: rgba(30,35,40,.6); border-color: rgba(60,70,80,.35); }
+    .cfg-row { display: grid; grid-template-columns: 1fr; gap: 10px; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-warm); }
+    .cfg-row .cfg-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+    .cfg-row .cfg-key { font-family: var(--font-hero); color: var(--ink); font-size: 1rem; }
+    .cfg-row input, .cfg-row textarea {
+      width: 100%; padding: 9px 12px; font-size: .9rem; border: 1px solid var(--line); border-radius: var(--radius);
+      background: var(--bg, transparent); color: var(--text);
+    }
+    .cfg-row input:focus, .cfg-row textarea:focus { outline: none; border-color: var(--accent-sage); box-shadow: 0 0 0 3px rgba(143,163,148,.15); }
+    .gate { padding: 32px; text-align: center; }
+    .gate .muted { max-width: 38ch; margin: 8px auto 0; line-height: 1.7; }
+    .new-form { display: grid; gap: 10px; }
+  </style>
+</head>
+<body>
+<main id="ic-main" class="shell">
+  <a class="skip-link ic-skip-link" href="#ic-main">跳到主内容</a>
+  <div class="topbar" data-topbar></div>
+
+  <section class="ops-hero flex-between" style="flex-wrap:wrap;gap:12px">
+    <div>
+      <span class="route-hint">为星空选择一种声音</span>
+      <h1>模型配置</h1>
+      <p>这里决定 Aurora 用哪一种模型说话、是否允许在异常时退回更稳妥的声音。每一处改动都会记录在审计日志里。</p>
+    </div>
+    <div class="row gap-sm">
+      <button type="button" onclick="loadAll()" aria-label="刷新配置">刷新</button>
+      <button type="button" onclick="openCreate()">新增配置项</button>
+    </div>
+  </section>
+
+  <section id="gate" class="panel hidden" aria-label="权限提示">
+    <div class="gate">
+      <strong>这部分需要管理员视角</strong>
+      <p class="muted">模型配置影响整体的对话路径与成本，目前仅向管理员开放。</p>
+    </div>
+  </section>
+
+  <section id="content" aria-label="模型配置">
+    <section class="panel mb-2" aria-label="实时 AI 状态">
+      <h2 style="margin:0 0 10px">实时 AI 状态</h2>
+      <div id="healthBox"></div>
+    </section>
+
+    <section class="panel" aria-label="配置项">
+      <div class="flex-between mb-1"><h2 style="margin:0">配置项</h2><span id="cfgCount" class="muted" style="font-size:.8rem"></span></div>
+      <div id="cfgList" style="display:flex;flex-direction:column;gap:12px"></div>
+    </section>
+  </section>
+</main>
+
+<script src="/js/app.js?v=final-20260612"></script>
+<script src="/js/time-system.js?v=final-20260612"></script>
+<script src="/js/motion.js"></script>
+<script src="/js/weather-system.js"></script>
+<script src="/js/api.js"></script>
+<script>
+IC.mountShell("模型配置");
+const esc = IC.esc;
+
+IC.ensureDemoLogin().then(async () => {
+  const cur = await API.current();
+  const role = (cur.success && cur.data && cur.data.role) || "USER";
+  if (role !== "ADMIN") {
+    document.getElementById("gate").classList.remove("hidden");
+    document.getElementById("content").classList.add("hidden");
+    IC.hideLoading();
+    return;
+  }
+  document.getElementById("gate").classList.add("hidden");
+  document.getElementById("content").classList.remove("hidden");
+  loadAll();
+});
+
+async function loadAll() {
+  await Promise.all([loadHealth(), loadConfigs()]);
+  IC.hideLoading();
+}
+
+async function loadHealth() {
+  const box = document.getElementById("healthBox");
+  box.innerHTML = `<p class="muted">正在读取当前模型状态…</p>`;
+  const r = await API.aiHealth();
+  if (!r.success) { box.innerHTML = `<p class="muted">${esc(r.message || "暂时无法读取")}</p>`; return; }
+  const h = r.data || {};
+  box.innerHTML = `
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px">
+      <div class="soft-stage" style="padding:14px">
+        <div class="muted" style="font-size:.78rem">LLM 提供方</div>
+        <strong>${esc(h.provider || "-")} / ${esc(h.model || "-")}</strong>
+        <div class="muted" style="font-size:.78rem;margin-top:4px">${h.apiKeyConfigured ? "已配置 key" : "未配置 key"} &middot; ${h.fallbackAllowed ? "允许 fallback" : "fallback 关闭"}</div>
+      </div>
+      <div class="soft-stage" style="padding:14px">
+        <div class="muted" style="font-size:.78rem">ASR</div>
+        <strong>${esc(h.asrProvider || "-")} / ${esc(h.asrModel || "-")}</strong>
+        <div class="muted" style="font-size:.78rem;margin-top:4px">${h.asrKeyConfigured ? "已配置 key" : "未配置 key"}</div>
+      </div>
+      <div class="soft-stage" style="padding:14px">
+        <div class="muted" style="font-size:.78rem">最近一次调用</div>
+        <strong>${h.lastSuccess === undefined ? "暂无" : (h.lastSuccess ? "成功" : "失败")}</strong>
+        ${h.lastError ? `<div class="muted" style="font-size:.78rem;margin-top:4px">${esc(h.lastError)}</div>` : ""}
+      </div>
+    </div>`;
+}
+
+async function loadConfigs() {
+  const box = document.getElementById("cfgList");
+  const count = document.getElementById("cfgCount");
+  box.innerHTML = `<p class="muted">正在读取配置…</p>`;
+  count.textContent = "";
+  const r = await API.adminModelConfig();
+  if (!r.success) { box.innerHTML = `<p class="muted">${esc(r.message || "读取失败")}</p>`; return; }
+  const data = r.data || [];
+  count.textContent = `共 ${data.length} 项`;
+  if (!data.length) {
+    box.innerHTML = IC.empty("还没有配置项。可以点右上角「新增配置项」来设定提供方、模型或 fallback 模式。");
+    return;
+  }
+  box.innerHTML = data.map(c => `
+    <div class="cfg-row" data-id="${esc(c.id)}" data-key="${esc(c.configKey || "")}" data-original="${esc(c.configValue || "")}">
+      <div class="cfg-head">
+        <span class="cfg-key">${esc(c.configKey || "未命名配置")}</span>
+        <span class="muted" style="font-size:.78rem">${c.updatedAt ? "更新于 " + IC.formatTime(c.updatedAt) : ""}</span>
+      </div>
+      ${c.description ? `<p class="muted" style="margin:0;font-size:.82rem">${esc(c.description)}</p>` : ""}
+      <input type="text" data-role="value" value="${esc(c.configValue || "")}" aria-label="${esc(c.configKey)} 的值">
+      <div class="row gap-sm">
+        <button type="button" onclick="saveCfg(${esc(c.id)})">保存</button>
+        <button type="button" class="ghost" onclick="resetCfg(${esc(c.id)})">还原</button>
+      </div>
+    </div>`).join("");
+}
+
+async function saveCfg(id) {
+  const row = document.querySelector(`.cfg-row[data-id="${id}"]`);
+  if (!row) return;
+  const key = row.dataset.key;
+  const value = row.querySelector('[data-role="value"]').value;
+  const r = await API.adminUpdateModelConfig({ id, configKey: key, configValue: value });
+  if (r.success) IC.toast(`已保存「${key}」`, "success");
+  loadAll();
+}
+
+function resetCfg(id) {
+  const row = document.querySelector(`.cfg-row[data-id="${id}"]`);
+  if (row) row.querySelector('[data-role="value"]').value = row.dataset.original || "";
+}
+
+function openCreate() {
+  IC.showModal(`
+    <h2 class="mb-1">新增配置项</h2>
+    <p class="muted mb-2" style="font-size:.84rem">常用 key：<code>llm.provider</code>、<code>llm.model</code>、<code>llm.allow-fallback</code>。</p>
+    <div class="new-form">
+      <div>
+        <label style="display:block;font-size:.82rem;color:var(--muted);margin-bottom:6px">Key</label>
+        <input type="text" id="newKey" placeholder="例如 llm.model" aria-label="配置 key">
+      </div>
+      <div>
+        <label style="display:block;font-size:.82rem;color:var(--muted);margin-bottom:6px">值</label>
+        <input type="text" id="newValue" placeholder="例如 glm-5.1" aria-label="配置值">
+      </div>
+      <div>
+        <label style="display:block;font-size:.82rem;color:var(--muted);margin-bottom:6px">说明（可选）</label>
+        <input type="text" id="newDesc" placeholder="这个配置的作用…" aria-label="配置说明">
+      </div>
+    </div>
+    <div class="row gap-sm mt-2">
+      <button type="button" onclick="doCreate()">创建</button>
+      <button type="button" onclick="IC.closeModal()">取消</button>
+    </div>`);
+}
+
+async function doCreate() {
+  const key = document.getElementById("newKey").value.trim();
+  const value = document.getElementById("newValue").value;
+  const desc = document.getElementById("newDesc").value.trim();
+  if (!key) { IC.toast("请填写 Key", "warn"); return; }
+  const r = await API.adminUpdateModelConfig({ configKey: key, configValue: value, description: desc });
+  if (r.success) { IC.toast("配置已新增", "success"); IC.closeModal(); loadAll(); }
+}
+</script>
+</body>
+</html>

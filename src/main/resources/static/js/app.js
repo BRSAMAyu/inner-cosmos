@@ -43,9 +43,13 @@ const IC = {
       ["/pages/relations.html", "关系"],
       ["/pages/beliefs.html", "信念"],
       ["/pages/safety-harbor.html", "避风港"],
+      ["/pages/token-usage.html", "用量"],
       ["/pages/settings.html", "设置"],
-      ["/pages/admin.html", "管理"]
-    ].map(([href, label]) => `<a href="${href}" data-route="${href}">${IC.esc(label)}</a>`).join("");
+      ["/pages/admin.html", "管理", true],
+      ["/pages/abtest-report.html", "实验", true],
+      ["/pages/prompt-versions.html", "Prompt", true],
+      ["/pages/model-config.html", "模型", true]
+    ].map(([href, label, adminOnly]) => `<a href="${href}" data-route="${href}"${adminOnly ? ' data-admin-nav="true"' : ''}>${IC.esc(label)}</a>`).join("");
   },
 
   mountShell(activeLabel = "") {
@@ -79,6 +83,7 @@ const IC = {
     /* Asynchronously load user profile so P1-3 cross-page state (auroraName, etc.) renders. */
     IC.loadUserProfile().then(() => {
       IC.applyAuroraNameToDom();
+      IC.applyAdminNav();
     }).catch(() => {});
   },
 
@@ -278,6 +283,12 @@ const IC = {
     const subtitle = document.querySelector("[data-aurora-subtitle]");
     if (subtitle) subtitle.textContent = name;
     document.documentElement.style.setProperty("--aurora-name", name);
+  },
+
+  /* Reveal admin-only nav entries when the signed-in user is an admin. */
+  applyAdminNav() {
+    const isAdmin = IC.userProfile && (IC.userProfile.role === "ADMIN" || IC.userProfile.role === "admin");
+    document.body.classList.toggle("is-admin", !!isAdmin);
   },
 
   /* ════════ Loading State (P1-2) ════════
