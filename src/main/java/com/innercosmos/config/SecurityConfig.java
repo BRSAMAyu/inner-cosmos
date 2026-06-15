@@ -34,6 +34,7 @@ public class SecurityConfig {
                 // Public endpoints
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/api/public/**").permitAll()
+                .requestMatchers("/api/plaza/capsules").permitAll()
                 .requestMatchers("/h2-console/**").denyAll()
                 // Actuator — health/metrics open, write ops require admin
                 .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()

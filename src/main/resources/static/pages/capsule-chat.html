@@ -202,8 +202,8 @@
   </div>
 </main>
 
-<script src="/js/app.js"></script>
-<script src="/js/time-system.js"></script>
+<script src="/js/app.js?v=final-20260612"></script>
+<script src="/js/time-system.js?v=final-20260612"></script>
 <script src="/js/motion.js"></script>
 <script src="/js/weather-system.js"></script>
 <script src="/js/audio-system.js"></script>
@@ -215,7 +215,12 @@ IC.mountShell("共鸣体对话");
 const params = new URLSearchParams(location.search);
 const capsuleId = params.get("capsuleId");
 if (!capsuleId) {
-  document.body.innerHTML = '<div style="text-align:center;padding:80px 20px"><h2>请先选择一个共鸣体</h2><p><a href="/pages/echo-plaza.html">前往星海广场</a></p></div>';
+  document.getElementById("main").innerHTML = `
+    <section class="soft-stage" style="text-align:center;padding:72px 20px">
+      <h1>请先选择一个共鸣体</h1>
+      <p class="muted mb-2">从星海广场进入对话舱后，这里会加载对应的数字回声。</p>
+      <a class="button" href="/pages/echo-plaza.html">前往星海广场</a>
+    </section>`;
 }
 
 let sid = null;
@@ -290,10 +295,14 @@ async function loadPersonaHistory() {
 }
 function addBubble(content, kind) {
   const chat = document.getElementById("chat");
+  if (!chat) return;
   const div = document.createElement("div");
   div.className = "bubble " + kind;
   if (kind === "ai") {
-    div.innerHTML = '<div class="speaker">' + (typeof CapsulePersonality !== "undefined" ? CapsulePersonality.getMoodLabel(CapsulePersonality.getPersonality(document.getElementById("capsuleName").textContent || "").mood) : "回声") + '</div><div>' + esc(content) + '</div>';
+    const capsuleName = document.getElementById("capsuleName")?.textContent || "";
+    const personality = typeof CapsulePersonality !== "undefined" ? CapsulePersonality.getPersonality(capsuleName) : null;
+    const speaker = personality ? CapsulePersonality.getMoodLabel(personality.mood) : "回声";
+    div.innerHTML = '<div class="speaker">' + esc(speaker) + '</div><div>' + esc(content) + '</div>';
   } else {
     div.textContent = content;
   }
@@ -375,7 +384,7 @@ function closeSession() {
   `);
 }
 
-init();
+if (capsuleId) init();
 IC.hideLoading();
 </script>
 </body>

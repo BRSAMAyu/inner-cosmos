@@ -116,6 +116,7 @@ public class AuroraSelfContinuityServiceImpl implements AuroraSelfContinuityServ
             target = candidates.get(0);
             target.status = "candidate";
             target.proposedBelief = proposedBelief;
+            target.summary = proposedBelief;
             target.confidence = confidence;
             target.riskFlags = "[]";
             target.evidenceRefs = evidenceJson;
@@ -129,6 +130,7 @@ public class AuroraSelfContinuityServiceImpl implements AuroraSelfContinuityServ
             target.status = "candidate";
             target.dimension = dimension;
             target.proposedBelief = proposedBelief;
+            target.summary = proposedBelief;
             target.confidence = confidence;
             target.riskFlags = "[]";
             target.evidenceRefs = evidenceJson;
@@ -299,6 +301,7 @@ public class AuroraSelfContinuityServiceImpl implements AuroraSelfContinuityServ
         repair.status = "candidate";
         repair.dimension = "repair_history";
         repair.proposedBelief = repairAction;
+        repair.summary = repairAction;
         repair.confidence = 0.80;
         repair.riskFlags = writeJson(List.of(ruptureType));
         repair.evidenceRefs = userFeedback != null

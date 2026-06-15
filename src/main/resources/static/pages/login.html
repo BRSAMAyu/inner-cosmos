@@ -292,9 +292,10 @@
     </div>
   </div>
 
-  <script src="/js/app.js"></script>
+  <script src="/js/app.js?v=final-20260612"></script>
   <script>
     IC.mountShell("登录");
+    IC.hideLoading();
 
     document.getElementById("password").addEventListener("keydown", function(e) {
       if (e.key === "Enter") doLogin();

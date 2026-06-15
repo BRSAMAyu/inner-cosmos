@@ -57,7 +57,16 @@ public class ApiRateLimitFilter implements Filter {
             chain.doFilter(request, response);
             return;
         }
-        if (path.startsWith("/api/auth/guest") || path.startsWith("/actuator/")) {
+        if (path.startsWith("/api/auth/") || path.startsWith("/actuator/")) {
+            chain.doFilter(request, response);
+            return;
+        }
+
+        boolean isAuroraLlm = path.startsWith("/api/aurora/chat") ||
+                              path.startsWith("/api/aurora/stream") ||
+                              path.startsWith("/api/aurora/greeting") ||
+                              path.startsWith("/api/aurora/message");
+        if ("GET".equalsIgnoreCase(req.getMethod()) && !isAuroraLlm) {
             chain.doFilter(request, response);
             return;
         }
@@ -70,9 +79,6 @@ public class ApiRateLimitFilter implements Filter {
                 if (uid != null) userId = uid.toString();
             }
         }
-        boolean isAuroraLlm = path.startsWith("/api/aurora/chat") ||
-                              path.startsWith("/api/aurora/stream") ||
-                              path.startsWith("/api/aurora/greeting");
 
         Bucket bucket;
         if (userId != null && !userId.isBlank()) {

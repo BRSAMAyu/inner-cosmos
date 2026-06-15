@@ -283,9 +283,10 @@
     </div>
   </div>
 
-  <script src="/js/app.js"></script>
+  <script src="/js/app.js?v=final-20260612"></script>
   <script>
     IC.mountShell("注册");
+    IC.hideLoading();
 
     document.getElementById("password2").addEventListener("keydown", function(e) {
       if (e.key === "Enter") doRegister();
