@@ -39,13 +39,25 @@ public class FailoverLlmClient implements LlmClient {
 
     @Override
     public SseEmitter streamChat(LlmRequest request) {
-        SseEmitter emitter = new SseEmitter(60_000L);
+        // Delegate to the first usable candidate's own streamChat so real provider
+        // SSE streaming flows through failover (VS-003 §2). If every candidate's
+        // streamChat fails synchronously (rare), fall back to a single full-text drip.
+        SseEmitter emitter = new SseEmitter(120_000L);
+        for (ProviderCandidate candidate : orderedCandidates(request)) {
+            if (candidate.client == null) continue;
+            try {
+                log.info("LLM stream attempt provider={} model={} module={}", candidate.provider, candidate.model, request.moduleName);
+                return candidate.client.streamChat(request);
+            } catch (Exception exception) {
+                log.warn("LLM provider stream attempt failed: {}/{}: {}", candidate.provider, candidate.model, exception.getMessage());
+            }
+        }
+        // No candidate produced an emitter; emit a single error via a fresh drip.
         aiExecutor.execute(() -> {
             try {
                 String response = chat(request);
                 for (String token : response.split("")) {
                     emitter.send(SseEmitter.event().name("token").data("{\"content\":\"" + escape(token) + "\"}"));
-                    Thread.sleep(18);
                 }
                 emitter.send(SseEmitter.event().name("done").data("{\"message\":\"done\"}"));
                 emitter.complete();

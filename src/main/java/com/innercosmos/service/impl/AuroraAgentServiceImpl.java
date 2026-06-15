@@ -121,12 +121,23 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
 
     @Override
     public AuroraReplyVO replyRich(Long userId, ChatRequest request) {
+        // SAFETY FIRST (VS-003 §1): synchronous safety gate before any model call.
+        // recheckSync for distress-bearing messages also completes here, synchronously.
         SafetyResult safety = safetyService.check(request.message, userId, request.sessionId);
         dialogService.saveUserMessage(userId, request);
         if (Boolean.TRUE.equals(safety.blockModelCall)) {
             return blockedReply(userId, request, safety);
         }
+        return produceReply(userId, request, safety);
+    }
 
+    /**
+     * Shared reply-production path used by both the POST (replyRich) and the SSE
+     * (stream) entrypoints. The synchronous safety gate has ALREADY run by the time
+     * this is called — do not re-run it here. Saves Aurora's messages and runs the
+     * portrait/goodbye post-hooks exactly as before.
+     */
+    private AuroraReplyVO produceReply(Long userId, ChatRequest request, SafetyResult safety) {
         // M7: Hard boundary protection — right to refuse identity violation
         String boundaryRefusal = checkHardBoundaries(request.message, userId);
         if (boundaryRefusal != null) {
@@ -256,30 +267,111 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
 
     @Override
     public SseEmitter stream(Long userId, Long sessionId, String message, String mode) {
-        SseEmitter emitter = new SseEmitter(60_000L);
+        SseEmitter emitter = new SseEmitter(120_000L);
         emitter.onTimeout(emitter::complete);
+        emitter.onError(throwable -> log.warn("Aurora stream client error: {}", String.valueOf(throwable.getMessage())));
+
+        // VS-003 §1 — SAFETY FIRST, synchronously, before ANY chat token streams.
+        // recheckSync for distress-bearing messages also completes here. Crisis must
+        // never stream as free-form consolation (vision §8.5).
+        SafetyResult safety;
+        try {
+            safety = safetyService.check(message, userId, sessionId);
+        } catch (Exception e) {
+            log.error("Aurora stream safety check failed: {}", e.getMessage(), e);
+            sendOnce(emitter, "error", "{\"message\":\"safety check failed\"}");
+            completeQuietly(emitter);
+            return emitter;
+        }
+        if (Boolean.TRUE.equals(safety.blockModelCall)) {
+            // Emit ONE safety/resource event asynchronously (uniform SSE contract).
+            // Do NOT stream chat — crisis must never arrive as free-form consolation.
+            aiExecutor.execute(() -> {
+                saveUserAndBlockedAurora(userId, sessionId, message, mode, safety);
+                sendOnce(emitter, "safety", jsonSafety(safety));
+                sendOnce(emitter, "done", "{\"message\":\"done\"}");
+                completeQuietly(emitter);
+            });
+            return emitter;
+        }
+
+        // Non-blocked: save the user turn, then build + persist the full reply exactly
+        // as the POST path does, and finally drip the (already-persisted) segments
+        // server-side over real SSE transport — no client-side fake typewriter.
         aiExecutor.execute(() -> {
             try {
                 ChatRequest request = new ChatRequest();
                 request.sessionId = sessionId;
                 request.message = message;
                 request.mode = normalizeMode(mode);
-                AuroraReplyVO reply = replyRich(userId, request);
+                dialogService.saveUserMessage(userId, request);
+                AuroraReplyVO reply = produceReply(userId, request, safety);
+
                 for (int i = 0; i < reply.messages.size(); i++) {
                     if (i > 0) {
                         emitter.send(SseEmitter.event().name("segment").data("{\"break\":true}"));
-                        Thread.sleep(260);
+                        Thread.sleep(220);
                     }
                     streamText(emitter, reply.messages.get(i));
                 }
                 emitter.send(SseEmitter.event().name("meta").data(jsonMeta(reply)));
+                emitter.send(SseEmitter.event().name("done").data("{\"message\":\"done\"}"));
                 emitter.complete();
             } catch (Exception e) {
                 log.error("Aurora stream failed: {}", e.getMessage(), e);
-                emitter.completeWithError(e);
+                // Best-effort error event so the client can fall back, then close.
+                sendOnce(emitter, "error", "{\"message\":\"stream failed\"}");
+                completeQuietly(emitter);
             }
         });
         return emitter;
+    }
+
+    /**
+     * Persist the user turn + the single crisis safe-message as a DialogMessage so the
+     * record is captured even on the blocked path (VS-003 §4). The safe message is
+     * saved but NOT streamed as chat — the frontend routes to the safety-harbor UX.
+     */
+    private void saveUserAndBlockedAurora(Long userId, Long sessionId, String message, String mode, SafetyResult safety) {
+        try {
+            ChatRequest request = new ChatRequest();
+            request.sessionId = sessionId;
+            request.message = message;
+            request.mode = normalizeMode(mode);
+            dialogService.saveUserMessage(userId, request);
+            String safe = safety.safeMessage == null
+                    ? "我先陪你把安全放在第一位。现在请联系一个现实中可信任的人，或使用当地紧急支持资源。"
+                    : safety.safeMessage;
+            dialogService.saveAuroraMessage(userId, sessionId, safe);
+        } catch (Exception e) {
+            log.warn("Blocked-path persist failed (non-fatal): {}", e.getMessage());
+        }
+    }
+
+    private void sendOnce(SseEmitter emitter, String name, String data) {
+        try {
+            emitter.send(SseEmitter.event().name(name).data(data));
+        } catch (Exception ignored) {
+            // Client may already be gone; nothing to do.
+        }
+    }
+
+    private void completeQuietly(SseEmitter emitter) {
+        try {
+            emitter.complete();
+        } catch (Exception ignored) {
+        }
+    }
+
+    private String jsonSafety(SafetyResult safety) {
+        String safe = safety.safeMessage == null
+                ? "我先陪你把安全放在第一位。现在请联系一个现实中可信任的人，或使用当地紧急支持资源。"
+                : safety.safeMessage;
+        return "{\"riskLevel\":\"" + escape(safety.riskLevel) + "\""
+                + ",\"riskType\":\"" + escape(safety.riskType) + "\""
+                + ",\"handledAction\":\"" + escape(safety.handledAction) + "\""
+                + ",\"featureTarget\":\"safety-harbor\""
+                + ",\"safeMessage\":\"" + escape(safe) + "\"}";
     }
 
     @Override

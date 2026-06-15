@@ -10,6 +10,9 @@ import org.springframework.http.MediaType;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -22,6 +25,7 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final MockFallback mockFallback = new MockFallback();
     private final Executor executor;
+    private final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(20)).build();
 
     public OpenAiCompatibleLlmClient(LlmConfig config, Executor executor) {
         this.config = config;
@@ -70,21 +74,99 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
 
     @Override
     public SseEmitter streamChat(LlmRequest request) {
-        SseEmitter emitter = new SseEmitter(60_000L);
+        SseEmitter emitter = new SseEmitter(120_000L);
         executor.execute(() -> {
             try {
-                String text = chat(request);
-                for (String token : text.split("")) {
-                    emitter.send(SseEmitter.event().name("token").data("{\"content\":\"" + escape(token) + "\"}"));
-                    Thread.sleep(15);
+                if (config.apiKey == null || config.apiKey.isBlank()) {
+                    // No key: drip the mock fallback over real SSE transport.
+                    drip(emitter, mockFallback.reply(request.prompt));
+                    return;
                 }
-                emitter.send(SseEmitter.event().name("done").data("{\"message\":\"done\"}"));
-                emitter.complete();
+                String aggregated = streamRemote(request, emitter);
+                dripTail(emitter, aggregated);
             } catch (Exception exception) {
                 emitter.completeWithError(new AiProviderException("remote stream failed and fallback stream failed"));
             }
         });
         return emitter;
+    }
+
+    /**
+     * Real provider SSE streaming (VS-003 §2). OpenAI-compatible providers stream via
+     * {@code stream:true} with {@code delta.content} chunks. Falls back to a single
+     * full-text drip (real SSE transport) on any provider failure.
+     */
+    private String streamRemote(LlmRequest request, SseEmitter emitter) {
+        String baseUrl = config.baseUrl == null || config.baseUrl.isBlank() ? defaultBaseUrl(config.provider) : config.baseUrl;
+        String url = baseUrl.replaceAll("/+$", "") + "/chat/completions";
+        List<Map<String, String>> messages = new ArrayList<>();
+        messages.add(Map.of("role", "system", "content", "你是 Inner Cosmos 的 Aurora.保持温柔、克制、安全边界."));
+        if (request.recentMessages != null) {
+            for (String recent : request.recentMessages) {
+                if (recent != null && !recent.isBlank()) {
+                    messages.add(Map.of("role", "user", "content", "Context note: " + recent));
+                }
+            }
+        }
+        messages.add(Map.of("role", "user", "content", request.prompt == null ? "" : request.prompt));
+        Map<String, Object> payload = Map.of(
+                "model", config.model == null || config.model.isBlank() ? defaultModel(config.provider) : config.model,
+                "messages", messages,
+                "temperature", 0.7,
+                "stream", true
+        );
+        try {
+            java.net.http.HttpRequest httpRequest = java.net.http.HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header("Content-Type", "application/json")
+                    .header("Authorization", "Bearer " + config.apiKey)
+                    .header("Accept", "text/event-stream")
+                    .timeout(Duration.ofSeconds(30))
+                    .POST(java.net.http.HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
+                    .build();
+            java.util.stream.Stream<String> lines = httpClient.send(httpRequest,
+                    java.net.http.HttpResponse.BodyHandlers.ofLines()).body();
+            StringBuilder aggregated = new StringBuilder();
+            lines.forEach(line -> {
+                if (line == null || !line.startsWith("data:")) return;
+                String data = line.substring(5).trim();
+                if (data.isEmpty() || "[DONE]".equals(data)) return;
+                try {
+                    JsonNode delta = objectMapper.readTree(data)
+                            .path("choices").path(0).path("delta").path("content");
+                    if (!delta.isMissingNode() && !delta.asText().isEmpty()) {
+                        String token = delta.asText();
+                        aggregated.append(token);
+                        emitter.send(SseEmitter.event().name("token")
+                                .data("{\"content\":\"" + escape(token) + "\"}"));
+                    }
+                } catch (Exception parseEx) {
+                    log.debug("OpenAI-compat ({}) stream parse skip: {}", config.provider, parseEx.getMessage());
+                }
+            });
+            return aggregated.toString();
+        } catch (Exception remoteError) {
+            log.warn("OpenAI-compatible client ({}) stream failed, falling back to chat drip: {}", config.provider, remoteError.getMessage());
+            return chat(request);
+        }
+    }
+
+    /** If nothing streamed (empty/missing), drip the full text so the client still sees content. */
+    private void dripTail(SseEmitter emitter, String text) throws Exception {
+        if (text != null && !text.isEmpty()) {
+            drip(emitter, text);
+            return;
+        }
+        emitter.send(SseEmitter.event().name("done").data("{\"message\":\"done\"}"));
+        emitter.complete();
+    }
+
+    private void drip(SseEmitter emitter, String text) throws Exception {
+        for (String token : (text == null ? "" : text).split("")) {
+            emitter.send(SseEmitter.event().name("token").data("{\"content\":\"" + escape(token) + "\"}"));
+        }
+        emitter.send(SseEmitter.event().name("done").data("{\"message\":\"done\"}"));
+        emitter.complete();
     }
 
     private String defaultBaseUrl(String provider) {
