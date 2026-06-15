@@ -44,9 +44,10 @@ const API = {
     const qs = params.toString();
     return IC.api(`/api/aurora/memory-context${qs ? "?" + qs : ""}`);
   },
-  async auroraStream(sessionId, message) {
-    return IC.api(`/api/aurora/stream?sessionId=${sessionId}&message=${encodeURIComponent(message)}`);
-  },
+  // NOTE: `auroraStream` (the IC.api-based SSE wrapper) was pruned in VS-007 —
+  // aurora-chat.html builds the EventSource URL inline (with a stream-stage
+  // token) since VS-003, so nothing calls it. Keep `auroraStreamUrl` below as a
+  // pure URL-builder utility (currently unused; retained for future SSE callers).
   auroraStreamUrl(sessionId, message, mode) {
     const params = new URLSearchParams({ sessionId, message });
     if (mode) params.set("mode", mode);
@@ -296,6 +297,8 @@ const API = {
     return IC.api(`/api/letters/${id}/send`, { method: "POST" });
   },
   async letterDeliver(id) {
+    // FEATURE-STUB #33 (slow-letter reply-with-letter + threads): no caller yet;
+    // kept to preserve the API contract for the upcoming slow-letter delivery control.
     return IC.api(`/api/letters/${id}/deliver`, { method: "POST" });
   },
   async letterRead(id) {
@@ -323,9 +326,13 @@ const API = {
     return IC.api(`/api/letters/${id}`);
   },
   async letterReplyWithLetter(id, data) {
+    // FEATURE-STUB #33 (slow-letter reply-with-letter + threads): awaits the
+    // slow-letter "reply with a letter of your own" feature; no caller yet.
     return IC.api(`/api/letters/${id}/reply-with-letter`, { method: "POST", body: JSON.stringify(data) });
   },
   async letterThreads() {
+    // FEATURE-STUB #33 (slow-letter reply-with-letter + threads): awaits the
+    // slow-letter conversation-threads view; no caller yet.
     return IC.api("/api/letters/threads");
   },
   async letterReport(id, reason) {
