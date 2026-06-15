@@ -89,13 +89,15 @@ public class DeepSeekLlmClient implements LlmClient {
 
     @Override
     public SseEmitter streamChat(LlmRequest request) {
-        SseEmitter emitter = new SseEmitter(60_000L);
+        SseEmitter emitter = new SseEmitter(120_000L);
         aiExecutor.execute(() -> {
             try {
-                String response = chat(request);
-                for (String token : response.split("")) {
-                    emitter.send(SseEmitter.event().name("token").data("{\"content\":\"" + escape(token) + "\"}"));
-                    Thread.sleep(16);
+                if (apiKey == null || apiKey.isBlank()) {
+                    throw new IllegalStateException("DeepSeek API key is empty");
+                }
+                String aggregated = streamRemote(request, emitter);
+                if (aggregated == null) {
+                    return;
                 }
                 emitter.send(SseEmitter.event().name("done").data("{\"message\":\"done\"}"));
                 emitter.complete();
@@ -104,6 +106,72 @@ public class DeepSeekLlmClient implements LlmClient {
             }
         });
         return emitter;
+    }
+
+    /**
+     * Real provider SSE streaming (VS-003 §2). DeepSeek is OpenAI-compatible.
+     */
+    private String streamRemote(LlmRequest request, SseEmitter emitter) throws Exception {
+        List<Map<String, String>> messages = buildMessages(request);
+        Map<String, Object> body = Map.of(
+                "model", model,
+                "messages", messages,
+                "temperature", 0.72,
+                "max_tokens", 900,
+                "stream", true
+        );
+        HttpRequest httpRequest = HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl))
+                .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + apiKey)
+                .header("Accept", "text/event-stream")
+                .timeout(Duration.ofMillis(timeoutMs))
+                .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
+                .build();
+        try {
+            java.util.stream.Stream<String> lines = httpClient.send(httpRequest,
+                    HttpResponse.BodyHandlers.ofLines()).body();
+            StringBuilder aggregated = new StringBuilder();
+            lines.forEach(line -> {
+                if (line == null || !line.startsWith("data:")) return;
+                String payload = line.substring(5).trim();
+                if (payload.isEmpty() || "[DONE]".equals(payload)) return;
+                try {
+                    JsonNode delta = objectMapper.readTree(payload)
+                            .path("choices").path(0).path("delta").path("content");
+                    if (!delta.isMissingNode() && !delta.asText().isEmpty()) {
+                        String token = delta.asText();
+                        aggregated.append(token);
+                        emitter.send(SseEmitter.event().name("token")
+                                .data("{\"content\":\"" + escape(token) + "\"}"));
+                    }
+                } catch (Exception parseEx) {
+                    log.debug("DeepSeek stream parse skip: {}", parseEx.getMessage());
+                }
+            });
+            return aggregated.toString();
+        } catch (Exception remoteError) {
+            log.warn("DeepSeek stream failed, falling back to chat drip: {}", remoteError.getMessage());
+            String full = chat(request);
+            for (String token : full.split("")) {
+                emitter.send(SseEmitter.event().name("token").data("{\"content\":\"" + escape(token) + "\"}"));
+            }
+            return full;
+        }
+    }
+
+    private List<Map<String, String>> buildMessages(LlmRequest request) {
+        List<Map<String, String>> messages = new ArrayList<>();
+        messages.add(Map.of("role", "system", "content", systemPrompt()));
+        if (request.recentMessages != null) {
+            for (String recent : request.recentMessages) {
+                if (recent != null && !recent.isBlank()) {
+                    messages.add(Map.of("role", "user", "content", "Context note: " + recent));
+                }
+            }
+        }
+        messages.add(Map.of("role", "user", "content", request.prompt == null ? "" : request.prompt));
+        return messages;
     }
 
     private String doChat(LlmRequest request) throws Exception {

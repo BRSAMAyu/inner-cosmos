@@ -1,0 +1,151 @@
+package com.innercosmos.controller;
+
+import com.innercosmos.config.TestRateLimitConfig;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpSession;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
+
+/**
+ * VS-003 — end-to-end SSE wire trace for /api/aurora/stream.
+ * Captures the actual SSE bytes for (a) a normal mock-mode reply — proving chunks
+ * arrive over real SSE transport, and (b) a crisis input — proving a `safety` event
+ * is emitted and NO chat `token`/content streams.
+ */
+@SpringBootTest(properties = {
+        "llm.mode=dev",
+        "llm.provider=minimax",
+        "llm.api-key=",
+        "llm.minimax.api-key=",
+        "llm.allow-fallback=true",
+        "spring.main.allow-bean-definition-overriding=true",
+        "spring.datasource.url=jdbc:h2:mem:testaurorastream;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1",
+        "spring.sql.init.mode=always"
+})
+@AutoConfigureMockMvc
+@Import(TestRateLimitConfig.class)
+class AuroraStreamControllerTest {
+
+    @Autowired
+    MockMvc mockMvc;
+
+    private MockHttpSession session;
+    private long sessionId;
+
+    @BeforeEach
+    void setUp() throws Exception {
+        session = loginWithUniqueUser();
+        sessionId = createSession();
+    }
+
+    @Test
+    @DisplayName("normal message streams token chunks + meta over real SSE (mock mode)")
+    void stream_normal_emitsTokenChunks() throws Exception {
+        String message = "今天有点累，想聊聊";
+        String body = performStream(message);
+
+        // Trace evidence: token chunks carrying content arrive over SSE.
+        assertTrue(body.contains("event:token") || body.contains("\"content\""),
+                "expected streamed token content; got:\n" + body);
+        // Meta event closes the stream.
+        assertTrue(body.contains("event:meta"), "expected meta event; got:\n" + body);
+        // And it ends cleanly.
+        assertTrue(body.contains("event:done") || body.contains("data:{\"message\":\"done\"}"),
+                "expected done event; got:\n" + body);
+    }
+
+    @Test
+    @DisplayName("crisis message emits a safety event and streams NO chat content")
+    void stream_crisis_emitsSafetyNoChat() throws Exception {
+        // The seed crisis keyword (suicide) — SafetyBoundaryFilter blocks it.
+        String crisis = "我想" + String.valueOf(new char[]{0x81EA, 0x6740});
+        String body = performStream(crisis);
+
+        assertTrue(body.contains("event:safety"),
+                "crisis must emit a safety event; got:\n" + body);
+        assertTrue(body.contains("\"riskLevel\":\"HIGH\""),
+                "safety event must carry HIGH risk; got:\n" + body);
+        assertTrue(body.contains("\"featureTarget\":\"safety-harbor\""),
+                "safety event must route to safety-harbor; got:\n" + body);
+        // CRITICAL guard: no chat token content may stream for a crisis.
+        assertFalse(body.contains("event:token"),
+                "crisis must NOT stream any chat token; got:\n" + body);
+    }
+
+    private String performStream(String message) throws Exception {
+        MvcResult started = mockMvc.perform(get("/api/aurora/stream")
+                        .session(session)
+                        .param("sessionId", String.valueOf(sessionId))
+                        .param("message", message)
+                        .param("mode", "DAILY_TALK"))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+
+        // Drive the async dispatch to completion.
+        mockMvc.perform(asyncDispatch(started))
+                .andExpect(status().isOk());
+
+        return started.getResponse().getContentAsString();
+    }
+
+    // ---- helpers (mirror DialogControllerTest) ----
+
+    private MockHttpSession loginWithUniqueUser() throws Exception {
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+        String username = "aurorastream_" + suffix;
+        String password = "testPass123";
+        String registerJson = "{\"username\":\"" + username + "\","
+                + "\"password\":\"" + password + "\","
+                + "\"nickname\":\"Stream Test\"}";
+        MvcResult regResult = mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(registerJson))
+                .andExpect(status().isOk())
+                .andReturn();
+        MockHttpSession s = (MockHttpSession) regResult.getRequest().getSession(false);
+        if (s == null) {
+            String loginJson = "{\"username\":\"" + username + "\",\"password\":\"" + password + "\"}";
+            MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(loginJson))
+                    .andExpect(status().isOk())
+                    .andReturn();
+            s = (MockHttpSession) loginResult.getRequest().getSession(false);
+        }
+        return s;
+    }
+
+    private long createSession() throws Exception {
+        String body = "{\"title\":\"stream test\",\"sessionType\":\"AURORA_CHAT\"}";
+        MvcResult result = mockMvc.perform(post("/api/dialog/session/create")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andReturn();
+        String json = result.getResponse().getContentAsString();
+        // {"success":true,"data":{...,"id":<n>...}}
+        int idx = json.indexOf("\"id\":");
+        assertNotEquals(-1, idx, "session id missing: " + json);
+        int start = idx + 5;
+        int end = start;
+        while (end < json.length() && Character.isDigit(json.charAt(end))) end++;
+        return Long.parseLong(json.substring(start, end));
+    }
+}

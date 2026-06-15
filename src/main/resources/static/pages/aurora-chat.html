@@ -473,6 +473,139 @@ function addAurora(messages) {
   });
 }
 
+// ── Real SSE streaming (VS-003) ──
+// Opens a streaming bubble, appends token chunks live, and finalizes it. Keeps the
+// gentle "Aurora 正在想" indicator visible until the first token arrives.
+function beginStreamingBubble() {
+  var chat = document.getElementById("chat");
+  var div = document.createElement("div");
+  div.className = "bubble aurora streaming";
+  div.innerHTML =
+    '<div class="row gap-sm" style="align-items:flex-start;margin-bottom:4px">' +
+      '<span style="font-size:1.1rem;color:var(--accent-sage)">✦</span>' +
+      '<span class="muted" style="font-size:.78rem">Aurora</span>' +
+    '</div>' +
+    '<div class="stream-text"></div>';
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+  return div.querySelector(".stream-text");
+}
+
+function appendChunk(node, chunk) {
+  // Chunks are server-controlled text; escape before injection (XSS hardening).
+  node.innerHTML += IC.esc(chunk);
+  var chat = document.getElementById("chat");
+  chat.scrollTop = chat.scrollHeight;
+}
+
+// Route a blocked safety/resource event to the existing safety-harbor UX — never as a chat bubble.
+function handleSafetyEvent(payload) {
+  IC.toast("你提到的内容触发了安全边界，先去看看支持资源。", "warn");
+  if (payload && payload.featureTarget === "safety-harbor") {
+    setTimeout(function() { location.href = "/pages/safety-harbor.html"; }, 600);
+  }
+}
+
+function sendViaStream(text, body) {
+  return new Promise(function(resolve, reject) {
+    var node = null;
+    var gotAny = false;
+    var finished = false;
+    var url = "/api/aurora/stream?sessionId=" + encodeURIComponent(sid) +
+              "&message=" + encodeURIComponent(text) +
+              "&mode=" + encodeURIComponent(mode);
+    var es = new EventSource(url, { withCredentials: true });
+
+    function finishOnce() {
+      if (finished) return;
+      finished = true;
+      try { es.close(); } catch (e) {}
+    }
+
+    es.onmessage = function(ev) {
+      // Default (unnamed) events carry token chunks in {content}.
+      handleChunk(ev.data);
+    };
+    es.addEventListener("token", function(ev) { handleChunk(ev.data); });
+    es.addEventListener("segment", function(ev) { /* inter-bubble break marker; ignored */ });
+
+    function handleChunk(raw) {
+      var data = parseJson(raw);
+      if (!data) return;
+      if (data.content != null) {
+        if (!gotAny) {
+          gotAny = true;
+          document.getElementById("typing").classList.remove("visible");
+          node = beginStreamingBubble();
+        }
+        if (data.break) {
+          // segment break -> start a fresh bubble
+          node = beginStreamingBubble();
+          return;
+        }
+        appendChunk(node, data.content);
+      }
+    }
+
+    es.addEventListener("meta", function(ev) {
+      var data = parseJson(ev.data);
+      if (data) streamMeta = data;
+    });
+
+    es.addEventListener("safety", function(ev) {
+      finishOnce();
+      document.getElementById("typing").classList.remove("visible");
+      handleSafetyEvent(parseJson(ev.data));
+      resolve({ safety: true });
+    });
+
+    es.addEventListener("error-event", function(ev) {
+      finishOnce();
+      document.getElementById("typing").classList.remove("visible");
+      reject(new Error(parseJson(ev.data) && parseJson(ev.data).message ? parseJson(ev.data).message : "stream-error"));
+    });
+
+    es.addEventListener("done", function() {
+      finishOnce();
+      document.getElementById("typing").classList.remove("visible");
+      resolve({ safety: false, streamed: gotAny });
+    });
+
+    es.onerror = function() {
+      // Browser fires onerror on completion in some cases AND on real failure.
+      // If we never got content, treat as failure -> caller falls back to POST.
+      finishOnce();
+      document.getElementById("typing").classList.remove("visible");
+      if (!gotAny) {
+        reject(new Error("sse-error"));
+      } else {
+        resolve({ safety: false, streamed: true });
+      }
+    };
+  });
+}
+
+var streamMeta = null;
+function parseJson(raw) {
+  if (raw == null) return null;
+  try { return JSON.parse(raw); } catch (e) { return null; }
+}
+
+// POST /message-rich fallback (unchanged behavior) for non-stream clients or SSE failure.
+async function sendViaPost(body) {
+  var controller = new AbortController();
+  var timeout = setTimeout(function() { controller.abort(); }, 30000);
+  var res = await fetch("/api/aurora/message-rich", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json; charset=utf-8" },
+    body: JSON.stringify(body),
+    signal: controller.signal
+  });
+  clearTimeout(timeout);
+  return await res.json();
+}
+
 function renderAgentLoop(reply) {
   var box = document.getElementById("loopState");
   var loop = reply.agentLoop || {};
@@ -564,46 +697,57 @@ async function send() {
   addBubble(text, "user");
   input.value = "";
   messageCount++;
+  streamMeta = null;
   typingEl.classList.add("visible");
 
+  var weather = window.ICWeather && ICWeather.getWeatherState ? ICWeather.getWeatherState() : {};
+  var localNow = new Date();
+  var cityLabel = window.ICLocation && ICLocation.getCityLabel ? ICLocation.getCityLabel() : (localStorage.getItem("ic_location_label") || "");
+  var latLon = window.ICLocation && ICLocation.getLatLon ? ICLocation.getLatLon() : null;
+  var body = {
+    sessionId: sid,
+    message: text,
+    inputType: "TEXT",
+    mode: mode,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "",
+    localTimeLabel: localNow.toLocaleString("zh-CN"),
+    weatherType: weather.type || "",
+    weatherDescription: weather.description || "",
+    temperature: weather.temperature || null,
+    locationLabel: cityLabel || weather.locationLabel || "",
+    latitude: latLon ? latLon.lat : null,
+    longitude: latLon ? latLon.lon : null,
+    aiProviderPreference: localStorage.getItem("ic_ai_provider_preference") || ""
+  };
+
   try {
-    var weather = window.ICWeather && ICWeather.getWeatherState ? ICWeather.getWeatherState() : {};
-    var localNow = new Date();
-    var cityLabel = window.ICLocation && ICLocation.getCityLabel ? ICLocation.getCityLabel() : (localStorage.getItem("ic_location_label") || "");
-    var latLon = window.ICLocation && ICLocation.getLatLon ? ICLocation.getLatLon() : null;
-    var body = {
-      sessionId: sid,
-      message: text,
-      inputType: "TEXT",
-      mode: mode,
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "",
-      localTimeLabel: localNow.toLocaleString("zh-CN"),
-      weatherType: weather.type || "",
-      weatherDescription: weather.description || "",
-      temperature: weather.temperature || null,
-      locationLabel: cityLabel || weather.locationLabel || "",
-      latitude: latLon ? latLon.lat : null,
-      longitude: latLon ? latLon.lon : null,
-      aiProviderPreference: localStorage.getItem("ic_ai_provider_preference") || ""
-    };
-    var controller = new AbortController();
-    var timeout = setTimeout(function() { controller.abort(); }, 30000);
-    var res = await fetch("/api/aurora/message-rich", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json; charset=utf-8" },
-      body: JSON.stringify(body),
-      signal: controller.signal
-    });
-    clearTimeout(timeout);
-    var r = await res.json();
-    if (r.success && r.data) {
-      addAurora(r.data.messages || []);
-      renderAgentLoop(r.data);
-      renderMemoryLens(r.data.memoryContext);
-      if (r.data.suggestSettle) IC.toast("Aurora 建议先把今天沉淀下来。", "warn");
-    } else {
-      IC.toast(r.message || "Aurora 暂时没有回应", "warn");
+    // PREFERRED: real SSE streaming. Falls back to POST /message-rich if SSE is
+    // unsupported or fails before any token arrives.
+    var usedStream = false;
+    if (window.EventSource) {
+      try {
+        var out = await sendViaStream(text, body);
+        usedStream = true;
+        if (out && out.safety) {
+          // safety event already routed to safety-harbor UX; no chat bubble to render.
+        } else if (!out || !out.streamed) {
+          // No tokens streamed (e.g. empty reply) — fall back to POST to render meta.
+          usedStream = false;
+        }
+      } catch (streamErr) {
+        usedStream = false; // SSE failed -> POST fallback below
+      }
+    }
+    if (!usedStream) {
+      var r = await sendViaPost(body);
+      if (r.success && r.data) {
+        addAurora(r.data.messages || []);
+        renderAgentLoop(r.data);
+        renderMemoryLens(r.data.memoryContext);
+        if (r.data.suggestSettle) IC.toast("Aurora 建议先把今天沉淀下来。", "warn");
+      } else {
+        IC.toast(r.message || "Aurora 暂时没有回应", "warn");
+      }
     }
   } catch (error) {
     IC.toast(error.name === "AbortError" ? "这次回应超时了，可以重新发一次。" : "Aurora 连接暂时不稳定。", "warn");
