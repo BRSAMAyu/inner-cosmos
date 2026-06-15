@@ -211,7 +211,10 @@ public class PiiPrivacyFilter {
         if (lower.contains("工程") || lower.contains("开发") || lower.contains("技术") || lower.contains("程序")) {
             return "互联网/技术";
         }
-        if (lower.contains("设计") || lower.contains("产品") || lower.contains("运营") || lower.contains("市场")) {
+        if (lower.contains("设计") || lower.contains("产品")) {
+            return "互联网/技术";
+        }
+        if (lower.contains("运营") || lower.contains("市场")) {
             return "互联网/产品运营";
         }
         if (lower.contains("金融") || lower.contains("银行") || lower.contains("投资") || lower.contains("财务")) {

@@ -311,6 +311,8 @@ const IC = {
       if (cur.success) return cur;
     } catch (e) {}
     if (!location.pathname.endsWith("/login.html") && !location.pathname.endsWith("/register.html")) {
+      const login = await IC.guestLogin();
+      if (login.success) return login;
       location.href = "/pages/login.html";
     }
     return { success: false };
@@ -426,7 +428,10 @@ const IC = {
 
   toggleVisualPanel() {
     const panel = document.getElementById("visualPanel");
-    if (panel) panel.style.display = panel.style.display === "none" ? "grid" : "none";
+    if (!panel) return;
+    const isOpen = panel.dataset.open === "true" || getComputedStyle(panel).display !== "none";
+    panel.dataset.open = isOpen ? "false" : "true";
+    panel.style.display = isOpen ? "none" : "grid";
   },
 
   setVisualAuto(enabled) {

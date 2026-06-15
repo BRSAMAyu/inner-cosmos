@@ -9,3 +9,6 @@ application-local.yml
 application-dev.yml
 *.db
 *.mv.db
+
+# BAGEL governance state — kept on disk for cross-session resume, not in product history
+.bagel/

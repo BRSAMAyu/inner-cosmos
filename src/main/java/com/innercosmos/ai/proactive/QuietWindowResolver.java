@@ -26,6 +26,9 @@ public class QuietWindowResolver {
     public record Reason(boolean quiet, String cause) {}
 
     public Reason canPushNow(Long userId, ZonedDateTime now) {
+        if (userId == null || now == null || profileMapper == null) {
+            return new Reason(false, "");
+        }
         var p = profileMapper.selectById(userId);
         if (p == null) return new Reason(false, "");
         LocalTime nowL = now.toLocalTime();
@@ -41,17 +44,19 @@ public class QuietWindowResolver {
         }
 
         // 3) todo time block
-        var todos = todoMapper.selectList(
-            new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<com.innercosmos.entity.TodoItem>()
-                .eq("user_id", userId)
-                .eq("status", "PENDING")
-        );
-        for (var t : todos) {
-            if (t.deadline != null) {
-                LocalTime start = t.deadline.toLocalTime().minusMinutes(30);
-                LocalTime end = t.deadline.toLocalTime();
-                if (!nowL.isBefore(start) && nowL.isBefore(end)) {
-                    return new Reason(true, "todo:" + t.id);
+        if (todoMapper != null) {
+            var todos = todoMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<com.innercosmos.entity.TodoItem>()
+                    .eq("user_id", userId)
+                    .eq("status", "PENDING")
+            );
+            for (var t : todos) {
+                if (t.deadline != null) {
+                    LocalTime start = t.deadline.toLocalTime().minusMinutes(30);
+                    LocalTime end = t.deadline.toLocalTime();
+                    if (!nowL.isBefore(start) && nowL.isBefore(end)) {
+                        return new Reason(true, "todo:" + t.id);
+                    }
                 }
             }
         }

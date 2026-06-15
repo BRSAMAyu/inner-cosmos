@@ -2,7 +2,9 @@ package com.innercosmos.ai.portrait;
 
 import com.innercosmos.entity.AgentUserRelationship;
 import com.innercosmos.mapper.AgentUserRelationshipMapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,7 +15,9 @@ public class AgentUserRelationshipService {
 
     @Transactional
     public AgentUserRelationship getOrInit(Long userId) {
-        AgentUserRelationship r = mapper.selectById(userId);
+        AgentUserRelationship r = mapper.selectOne(new QueryWrapper<AgentUserRelationship>()
+                .eq("user_id", userId)
+                .last("LIMIT 1"));
         if (r == null) {
             r = new AgentUserRelationship();
             r.userId = userId;
@@ -24,7 +28,13 @@ public class AgentUserRelationshipService {
             r.userDisclosureLevel = 0;
             r.auroraRoleInUserLife = "[\"assistant\"]";
             r.preferredAddressing = "你";
-            mapper.insert(r);
+            try {
+                mapper.insert(r);
+            } catch (DuplicateKeyException ignored) {
+                r = mapper.selectOne(new QueryWrapper<AgentUserRelationship>()
+                        .eq("user_id", userId)
+                        .last("LIMIT 1"));
+            }
         }
         return r;
     }

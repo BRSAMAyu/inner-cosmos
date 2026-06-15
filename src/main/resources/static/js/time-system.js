@@ -38,7 +38,8 @@ window.ICTimeSystem = {
     afternoon: { warm: '#F7F2EC', secondary: '#EFE6DA', glow: 'rgba(216, 181, 181, 0.16)' },
     dusk: { warm: '#F5EEE7', secondary: '#E8DDE4', glow: 'rgba(144, 128, 160, 0.16)' },
     night: { warm: '#F4EFE8', secondary: '#E7E2DA', glow: 'rgba(156, 175, 154, 0.14)' },
-    deepNight: { warm: '#F2ECE4', secondary: '#E4DFD8', glow: 'rgba(156, 175, 154, 0.14)' }
+    deepNight: { warm: '#F2ECE4', secondary: '#E4DFD8', glow: 'rgba(156, 175, 154, 0.14)' },
+    'deep-night': { warm: '#F2ECE4', secondary: '#E4DFD8', glow: 'rgba(156, 175, 154, 0.14)' }
   },
 
   // Initialize
@@ -384,6 +385,10 @@ window.ICTimeSystem = {
 
     const from = this.colorPalettes[fromPalette];
     const to = this.colorPalettes[toPalette];
+    if (!from || !to) {
+      this.applyTimeColors(this.currentTimeState.timeClass || 'time-morning');
+      return;
+    }
 
     const root = document.documentElement;
 

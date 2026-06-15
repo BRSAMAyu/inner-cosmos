@@ -9,9 +9,12 @@
     /* ── Full-immersion starfield shell ── */
     .starfield-shell {
       position: relative;
+      width: 100%;
+      max-width: 100%;
       min-height: calc(100vh - 180px);
       border-radius: var(--radius-flow);
       overflow: hidden;
+      contain: layout paint;
       touch-action: none;
       background:
         radial-gradient(ellipse 800px 600px at 20% 30%, rgba(143,163,148,.06), transparent),
@@ -54,8 +57,8 @@
     .starfield-svg {
       position: absolute;
       inset: 0;
-      width: 1600px;
-      height: 1100px;
+      width: 100%;
+      height: 100%;
       pointer-events: none;
       opacity: .38;
       z-index: 1;
@@ -182,10 +185,9 @@
       z-index: 90;
       padding: 28px 24px;
       overflow-y: auto;
-      transform: translateX(100%);
-      transition: transform .45s var(--ease-drift);
+      display: none;
     }
-    .star-drawer.open { transform: translateX(0); }
+    .star-drawer.open { display: block; }
     body.dark-star .star-drawer {
       background: rgba(42,38,34,.94);
       border-color: rgba(163,153,143,.2);
@@ -292,8 +294,8 @@
   </div>
 </main>
 
-<script src="/js/app.js"></script>
-<script src="/js/time-system.js"></script>
+<script src="/js/app.js?v=final-20260612"></script>
+<script src="/js/time-system.js?v=final-20260612"></script>
 <script src="/js/motion.js"></script>
 <script src="/js/weather-system.js"></script>
 <script src="/js/audio-system.js"></script>
