@@ -56,17 +56,19 @@ const IC = {
     IC.ensureAmbientSystems();
     const topbar = document.querySelector("[data-topbar]");
     if (topbar) {
+      topbar.setAttribute("role", "banner");
       const themeIcon = IC.themeMode === "auto" ? "◐" : (IC.darkTheme ? "☾" : "☼");
       const themeTip = IC.themeMode === "auto" ? "主题：自动跟随系统" : (IC.darkTheme ? "主题：星空（深色）" : "主题：莫兰迪（浅色）");
       topbar.innerHTML = `
-        <a class="brand" href="/pages/dashboard.html"><span class="brand-mark"></span><span>Inner Cosmos</span></a>
+        <a class="brand" href="/pages/dashboard.html" aria-label="Inner Cosmos · 返回首页"><span class="brand-mark" aria-hidden="true"></span><span>Inner Cosmos</span></a>
         <nav class="nav" aria-label="主导航">${IC.nav()}</nav>
-        <button class="icon-button" aria-label="${themeTip}" title="${themeTip}" onclick="IC.toggleTheme()">${themeIcon}</button>
+        <button class="icon-button" type="button" aria-label="${themeTip}" title="${themeTip}" onclick="IC.toggleTheme()">${themeIcon}</button>
       `;
       topbar.querySelectorAll("a").forEach(a => {
         if (a.textContent === activeLabel || location.pathname === new URL(a.href).pathname) a.classList.add("active");
       });
     }
+    IC.ensureSkipLink();
     IC.ensureToastRoot();
     IC.ensureAmbientControls();
     IC.attachVoiceInputs();
@@ -201,6 +203,26 @@ const IC = {
       root.className = "toast-root";
       document.body.appendChild(root);
     }
+  },
+
+  /* ════════ Skip Link (a11y) ════════
+     Ensures a "跳到主内容" link is the first focusable element, targeting the
+     page main landmark (#ic-main or #main). Idempotent — safe to call on every page. */
+  ensureSkipLink() {
+    if (document.querySelector(".ic-skip-link")) return;
+    const target = document.getElementById("ic-main") || document.getElementById("main");
+    if (!target) return;
+    if (!target.id) target.id = "ic-main";
+    /* Make main focusable for the skip target without a visible focus ring. */
+    if (target.id !== "ic-main") {
+      target.id = "ic-main";
+    }
+    target.setAttribute("tabindex", "-1");
+    const link = document.createElement("a");
+    link.className = "skip-link ic-skip-link";
+    link.href = "#ic-main";
+    link.textContent = "跳到主内容";
+    document.body.prepend(link);
   },
 
   toast(message, type = "info") {
@@ -352,15 +374,48 @@ const IC = {
 
   showModal(html) {
     IC.closeModal();
+    /* Remember the element that opened the modal so focus can return on close. */
+    IC._modalTrigger = document.activeElement;
     const wrap = document.createElement("div");
     wrap.id = "icModalRoot";
     wrap.className = "modal-root";
-    wrap.innerHTML = `<div class="modal-backdrop" onclick="IC.closeModal()"></div><div class="modal-panel">${html}</div>`;
+    wrap.innerHTML = `<div class="modal-backdrop" onclick="IC.closeModal()"></div><div class="modal-panel" tabindex="-1">${html}</div>`;
     document.body.appendChild(wrap);
+    /* Dialog semantics: role + modal, label from the first heading if present. */
+    const panel = wrap.querySelector(".modal-panel");
+    const heading = panel && panel.querySelector("h1,h2,h3,h4");
+    if (panel) {
+      panel.setAttribute("role", "dialog");
+      panel.setAttribute("aria-modal", "true");
+      if (heading) {
+        if (!heading.id) heading.id = "ic-modal-title";
+        panel.setAttribute("aria-labelledby", heading.id);
+      } else {
+        panel.setAttribute("aria-label", "对话框");
+      }
+    }
+    /* Move focus into the dialog. Prefer the first focusable control, else the panel. */
+    const focusables = panel ? panel.querySelectorAll("button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])") : [];
+    const firstFocus = focusables && focusables.length ? focusables[0] : panel;
+    if (firstFocus) firstFocus.focus({ preventScroll: true });
+    /* Bind Esc-to-close once per modal. */
+    IC._modalKeyHandler = (e) => { if (e.key === "Escape") { e.preventDefault(); IC.closeModal(); } };
+    wrap.addEventListener("keydown", IC._modalKeyHandler);
   },
 
   closeModal() {
-    document.getElementById("icModalRoot")?.remove();
+    const wrap = document.getElementById("icModalRoot");
+    if (wrap) {
+      if (IC._modalKeyHandler) wrap.removeEventListener("keydown", IC._modalKeyHandler);
+      wrap.remove();
+    }
+    IC._modalKeyHandler = null;
+    /* Return focus to the trigger if it is still in the document. */
+    const trigger = IC._modalTrigger;
+    if (trigger && document.body.contains(trigger) && typeof trigger.focus === "function") {
+      try { trigger.focus({ preventScroll: true }); } catch (e) {}
+    }
+    IC._modalTrigger = null;
   },
 
   ensureAmbientControls() {
@@ -369,8 +424,8 @@ const IC = {
     root.id = "ambientControls";
     root.className = "ambient-controls";
     root.innerHTML = `
-      <button class="ambient-btn" id="musicToggle" title="播放/暂停音乐" onclick="IC.toggleMusic()">♫</button>
-      <button class="ambient-btn" title="视觉与天气" onclick="IC.toggleVisualPanel()">◐</button>
+      <button class="ambient-btn" id="musicToggle" type="button" aria-label="播放或暂停背景音乐" title="播放/暂停音乐" onclick="IC.toggleMusic()">♫</button>
+      <button class="ambient-btn" type="button" aria-label="视觉与天气设置" title="视觉与天气" onclick="IC.toggleVisualPanel()">◐</button>
       <div id="visualPanel" class="ambient-panel" style="display:none">
         <strong>视觉流动</strong>
         <label><span>主题模式</span><select id="themeMode" onchange="IC.setThemeMode(this.value)">
@@ -524,6 +579,7 @@ const IC = {
       btn.type = "button";
       btn.className = "voice-mini";
       btn.title = "语音输入";
+      btn.setAttribute("aria-label", "语音输入");
       btn.textContent = "🎙";
       btn.onclick = () => IC.recordToField(field, btn);
       field.insertAdjacentElement("afterend", btn);

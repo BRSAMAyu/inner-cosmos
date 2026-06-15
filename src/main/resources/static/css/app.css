@@ -4324,7 +4324,8 @@ body.dark-star .ambient-panel input {
 }
 
 /* ════════ Skip Link (a11y P1-1) ════════ */
-.skip-link {
+.skip-link,
+.ic-skip-link {
   position: absolute;
   top: -100px;
   left: 16px;
@@ -4340,12 +4341,29 @@ body.dark-star .ambient-panel input {
   transition: top .2s ease;
 }
 .skip-link:focus,
-.skip-link:focus-visible {
+.skip-link:focus-visible,
+.ic-skip-link:focus,
+.ic-skip-link:focus-visible {
   top: 12px;
   outline: none;
 }
-main#main:focus {
+main#main:focus,
+main#ic-main:focus {
   outline: none;
+}
+
+/* ════════ Visually-hidden header (a11y landmark, no visual change) ════════ */
+.visually-hidden-header {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* ════════ Loading State (P1-2) ════════ */

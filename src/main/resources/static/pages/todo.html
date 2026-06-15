@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="stylesheet" href="/css/app.css">
-  <title>待办清单 - Inner Cosmos</title>
+  <title>待办清单 · 内宇宙</title>
   <style>
     .todo-hero { padding: 0 0 28px; margin-bottom: 24px;
       background: radial-gradient(ellipse 50% 60% at 35% 30%, rgba(184,194,174,.10), transparent),
@@ -15,8 +15,8 @@
   </style>
 </head>
 <body>
-<main id="main" class="shell">
-  <a class="skip-link" href="#main">跳到主要内容</a>
+<main id="ic-main" class="shell">
+  <a class="skip-link ic-skip-link" href="#ic-main">跳到主内容</a>
   <div class="topbar" data-topbar></div>
 
   <!-- Hero -->
@@ -243,7 +243,7 @@ function editTodo(id) {
     <form onsubmit="saveTodo(event, ${t.id})" class="form" style="margin-top: 10px;">
       <div class="field-group mb-1">
         <label style="font-size:.88rem;" class="muted">任务名称</label>
-        <input type="text" id="edit_taskName" value="${esc(t.taskName)}" required>
+        <input type="text" id="edit_taskName" value="${esc(t.taskName)}" aria-label="任务名称" required>
       </div>
       <div class="field-group mb-1">
         <label style="font-size:.88rem;" class="muted">优先级</label>

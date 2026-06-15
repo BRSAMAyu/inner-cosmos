@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Aurora - Inner Cosmos</title>
+  <title>和 Aurora 聊聊今天 · 内宇宙</title>
   <link rel="stylesheet" href="/css/app.css">
   <style>
     /* ── Aurora Chat — quiet conversation cabin ── */
@@ -323,8 +323,8 @@
   </style>
 </head>
 <body>
-<main id="main" class="shell aurora-page">
-  <a class="skip-link" href="#main">跳到主要内容</a>
+<main id="ic-main" class="shell aurora-page">
+  <a class="skip-link ic-skip-link" href="#ic-main">跳到主内容</a>
   <div class="topbar" data-topbar></div>
 
   <!-- Hero header -->
@@ -379,8 +379,8 @@
   <!-- Composer -->
   <section class="aurora-composer">
     <div class="aurora-composer-inner">
-      <input id="msg" class="voice-input-target" data-voice-bound="true" placeholder="把现在最想说的一句话放在这里" onkeydown="if(event.key==='Enter')send()">
-      <button class="voice-mini" onclick="IC.recordToField(document.getElementById('msg'), this)" title="语音输入">🎙</button>
+      <input id="msg" class="voice-input-target" data-voice-bound="true" aria-label="和 Aurora 说说今天" placeholder="把现在最想说的一句话放在这里" onkeydown="if(event.key==='Enter')send()">
+      <button class="voice-mini" onclick="IC.recordToField(document.getElementById('msg'), this)" title="语音输入" aria-label="语音输入">🎙</button>
       <button class="send-btn" onclick="send()">发送</button>
     </div>
     <p class="voice-hint">语音会尽量尊重原文转写，你可以继续手动修改后再发送。</p>
