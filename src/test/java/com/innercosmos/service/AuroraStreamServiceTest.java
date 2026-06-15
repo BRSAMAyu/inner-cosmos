@@ -77,8 +77,11 @@ class AuroraStreamServiceTest {
                 memoryService, rhythmGuardService, memoryContextService, userProfileMapper,
                 sessionMapper, llmConfig, aiExecutor, agentContextAssembler, modelRouter,
                 portraitReflection, goodbyeDetector, goodbyeOrchestrator, modeRegistry,
-                null);
+                null, portraitService, relationshipService);
     }
+
+    @Mock private com.innercosmos.ai.portrait.UserPortraitService portraitService;
+    @Mock private com.innercosmos.ai.portrait.AgentUserRelationshipService relationshipService;
 
     private SafetyResult blocked() {
         SafetyResult r = new SafetyResult();

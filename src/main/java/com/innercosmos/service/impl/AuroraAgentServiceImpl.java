@@ -7,16 +7,21 @@ import com.innercosmos.ai.goodbye.GoodbyeOrchestrator;
 import com.innercosmos.ai.goodbye.GoodbyeTriggerDetector;
 import com.innercosmos.ai.mode.ModeRegistry;
 import com.innercosmos.ai.mode.ModeStrategy;
+import com.innercosmos.ai.portrait.AgentUserRelationshipService;
+import com.innercosmos.ai.portrait.UserPortraitService;
 import com.innercosmos.ai.prompt.PromptBuilder;
 import com.innercosmos.ai.router.ResolvedModel;
 import com.innercosmos.ai.router.SessionModelRouter;
+import com.innercosmos.ai.semantic.PseudoSemanticAnalyzer;
 import com.innercosmos.ai.structured.StructuredAiResults;
 import com.innercosmos.ai.structured.StructuredAiService;
 import com.innercosmos.ai.portrait.PortraitReflectionService;
 import com.innercosmos.config.LlmConfig;
 import com.innercosmos.dto.ChatRequest;
+import com.innercosmos.entity.AgentUserRelationship;
 import com.innercosmos.entity.DialogMessage;
 import com.innercosmos.entity.DialogSession;
+import com.innercosmos.entity.UserPortrait;
 import com.innercosmos.entity.UserProfile;
 import com.innercosmos.mapper.DialogSessionMapper;
 import com.innercosmos.mapper.UserProfileMapper;
@@ -72,10 +77,21 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     private final GoodbyeOrchestrator goodbyeOrchestrator;
     private final ModeRegistry modeRegistry;
     private final AuroraConstitutionService constitutionService;
+    private final UserPortraitService userPortraitService;
+    private final AgentUserRelationshipService relationshipService;
     @Autowired(required = false)
     private AuroraSelfContinuityService continuityService;
     private final Map<Long, Integer> turnCounter = new ConcurrentHashMap<>();
     private final Map<Long, Integer> goodbyeConfirmCount = new ConcurrentHashMap<>();
+    /**
+     * VS-003b — staging cache for rich SSE context. The browser opens the SSE
+     * stream via a GET EventSource, which cannot carry a JSON body. The frontend
+     * first POSTs the rich context (voice/weather/location/timezone) to
+     * /stream-stage, then opens the GET stream with the returned token. The token
+     * is consumed once and expires within {@link #STREAM_STAGE_TTL_MS}.
+     */
+    private final Map<String, ChatRequest> streamStage = new ConcurrentHashMap<>();
+    private static final long STREAM_STAGE_TTL_MS = 60_000L;
 
     public AuroraAgentServiceImpl(StructuredAiService structuredAiService,
                                   DialogService dialogService,
@@ -93,7 +109,9 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                                   GoodbyeTriggerDetector goodbyeDetector,
                                   GoodbyeOrchestrator goodbyeOrchestrator,
                                   ModeRegistry modeRegistry,
-                                  AuroraConstitutionService constitutionService) {
+                                  AuroraConstitutionService constitutionService,
+                                  UserPortraitService userPortraitService,
+                                  AgentUserRelationshipService relationshipService) {
         this.structuredAiService = structuredAiService;
         this.dialogService = dialogService;
         this.safetyService = safetyService;
@@ -111,6 +129,8 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         this.goodbyeOrchestrator = goodbyeOrchestrator;
         this.modeRegistry = modeRegistry;
         this.constitutionService = constitutionService;
+        this.userPortraitService = userPortraitService;
+        this.relationshipService = relationshipService;
     }
 
     @Override
@@ -175,11 +195,21 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         ResolvedModel resolved = modelRouter.resolve(userId, request.sessionId);
         ModeStrategy modeStrategy = modeRegistry.get(mode);
 
+        // VS-004 — feed Aurora's understanding of THIS user + the relationship + a
+        // lightweight current-state read into the prompt, so the response style
+        // emerges from them instead of being mode-driven.
+        List<UserPortrait> portrait = safePortrait(userId);
+        AgentUserRelationship relationship = safeRelationship(userId);
+        String stateSignal = currentStateSignal(request.message);
+
         String prompt = new PromptBuilder()
                 .withSystemBoundary()
                 .withConversationMode(mode)
                 .withModeSegment(modeStrategy)
                 .withUserProfile(profileBrief(profile))
+                .withUserPortrait(portrait)
+                .withRelationship(relationship)
+                .withCurrentStateSignal(stateSignal)
                 .withSummaryAnchor(session == null ? null : session.summaryAnchor)
                 .withRecentMessages(recentMessages(request.sessionId, 8))
                 .withGravityMemories(gravityMemories)
@@ -195,6 +225,11 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         turnContext.put("userMessage", request.message == null ? "" : request.message);
         turnContext.put("mode", mode);
         turnContext.put("modeGuide", modeGuide(mode));
+        turnContext.put("userPortrait", portraitBriefForContext(portrait));
+        turnContext.put("relationship", relationship == null ? "" : relationship.toPromptString());
+        turnContext.put("relationshipStageLabel",
+                relationship == null ? "" : AgentUserRelationshipService.stageLabel(relationship.relationshipStage));
+        turnContext.put("currentStateSignal", stateSignal);
         turnContext.put("memoryRecallAllowed", allowMemory);
         turnContext.put("unifiedAgentContext", agentContext);
         turnContext.put("realWeatherLabel", agentContext.realWeatherLabel);
@@ -208,7 +243,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
 
         AuroraReplyVO vo;
         try {
-            StructuredAiResults.AuroraResult ai = callWithRetry(userId, mode, turnContext, resolved, request, gravityMemories, memoryContext, allowMemory);
+            StructuredAiResults.AuroraResult ai = callWithRetry(userId, mode, turnContext, resolved, request, gravityMemories, memoryContext, allowMemory, stateSignal);
             vo = toReply(profile, ai, request, mode, memoryContext, gravityMemories, allowMemory);
             vo = sanitizeLlmOutput(vo, userId);
             if (Boolean.FALSE.equals(agentContext.multiMessageAllowed) && vo.messages.size() > 1) {
@@ -222,7 +257,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             }
         } catch (Exception e) {
             log.error("Aurora agent call failed after retries: {}", e.getMessage(), e);
-            vo = differentiatedFallback(e, request.message, mode);
+            vo = differentiatedFallback(e, request.message, mode, stateSignal);
         }
         // Tag the response with the resolved provider/model for the UI
         vo.aiState = aiState(resolved);
@@ -267,6 +302,17 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
 
     @Override
     public SseEmitter stream(Long userId, Long sessionId, String message, String mode) {
+        return stream(userId, sessionId, message, mode, null);
+    }
+
+    /**
+     * VS-003b — stream with an optional rich context (voice/weather/location/
+     * timezone) staged by the frontend. When non-null, the SSE meta event carries
+     * the same perception metadata the POST path returns, so the frontend can
+     * render the agent-loop + memory-lens panels on parity with the POST path.
+     */
+    @Override
+    public SseEmitter stream(Long userId, Long sessionId, String message, String mode, ChatRequest richContext) {
         SseEmitter emitter = new SseEmitter(120_000L);
         emitter.onTimeout(emitter::complete);
         emitter.onError(throwable -> log.warn("Aurora stream client error: {}", String.valueOf(throwable.getMessage())));
@@ -304,6 +350,25 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 request.sessionId = sessionId;
                 request.message = message;
                 request.mode = normalizeMode(mode);
+                // VS-003b — fold the staged rich context into the request so the
+                // voice metadata, weather, location and timezone reach the prompt
+                // and the SSE meta event (parity with the POST path).
+                if (richContext != null) {
+                    request.inputType = richContext.inputType == null ? "TEXT" : richContext.inputType;
+                    request.audioDurationSec = richContext.audioDurationSec;
+                    request.speechRate = richContext.speechRate;
+                    request.pauseCount = richContext.pauseCount;
+                    request.longPauseCount = richContext.longPauseCount;
+                    request.timezone = richContext.timezone;
+                    request.localTimeLabel = richContext.localTimeLabel;
+                    request.weatherType = richContext.weatherType;
+                    request.weatherDescription = richContext.weatherDescription;
+                    request.temperature = richContext.temperature;
+                    request.locationLabel = richContext.locationLabel;
+                    request.latitude = richContext.latitude;
+                    request.longitude = richContext.longitude;
+                    request.aiProviderPreference = richContext.aiProviderPreference;
+                }
                 dialogService.saveUserMessage(userId, request);
                 AuroraReplyVO reply = produceReply(userId, request, safety);
 
@@ -314,7 +379,10 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                     }
                     streamText(emitter, reply.messages.get(i));
                 }
-                emitter.send(SseEmitter.event().name("meta").data(jsonMeta(reply)));
+                // VS-003b — meta now carries the full perception payload (agentLoop,
+                // aiState, voice/weather/location/timezone) so the frontend can render
+                // the same panels on stream as on the POST fallback path.
+                emitter.send(SseEmitter.event().name("meta").data(jsonMeta(reply, request, null)));
                 emitter.send(SseEmitter.event().name("done").data("{\"message\":\"done\"}"));
                 emitter.complete();
             } catch (Exception e) {
@@ -325,6 +393,32 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             }
         });
         return emitter;
+    }
+
+    /**
+     * VS-003b — stage rich SSE context for a soon-to-open stream. The browser's
+     * EventSource can only GET, so the frontend POSTs the rich body here, gets a
+     * token, then opens GET /stream?token=…. Returns the token. Best-effort: a
+     * self-expiring entry, consumed once by {@link #consumeStage(String)}.
+     */
+    @Override
+    public String stageStreamContext(ChatRequest request) {
+        if (request == null) return null;
+        String token = java.util.UUID.randomUUID().toString().replace("-", "");
+        streamStage.put(token, request);
+        // TTL sweep — fire-and-forget; the map is bounded by active streams.
+        aiExecutor.execute(() -> {
+            try { Thread.sleep(STREAM_STAGE_TTL_MS); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); return; }
+            streamStage.remove(token);
+        });
+        return token;
+    }
+
+    /** VS-003b — consume (once) the staged rich context for a stream token. */
+    @Override
+    public ChatRequest consumeStage(String token) {
+        if (token == null || token.isBlank()) return null;
+        return streamStage.remove(token);
     }
 
     /**
@@ -460,7 +554,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         List<String> messages = cleanSegments(safeAi.segments, recentAurora);
         if (messages.isEmpty()) {
             String userText = request == null ? "" : request.message;
-            messages = fallbackAuroraResult(userText, mode, gravityMemories, memoryContext, allowMemory).segments;
+            messages = fallbackAuroraResult(userText, mode, gravityMemories, memoryContext, allowMemory, null).segments;
         }
 
         AuroraReplyVO vo = new AuroraReplyVO();
@@ -489,7 +583,8 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     private StructuredAiResults.AuroraResult callWithRetry(Long userId, String mode, Map<String, Object> turnContext,
                                                             ResolvedModel resolved, ChatRequest request,
                                                             List<String> gravityMemories,
-                                                            AuroraMemoryContextVO memoryContext, boolean allowMemory) {
+                                                            AuroraMemoryContextVO memoryContext, boolean allowMemory,
+                                                            String stateSignal) {
         int maxRetries = 2;
         Exception lastException = null;
         for (int attempt = 0; attempt <= maxRetries; attempt++) {
@@ -498,7 +593,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                         auroraInstruction(false),
                         turnContext,
                         StructuredAiResults.AuroraResult.class,
-                        () -> fallbackAuroraResult(request.message, mode, gravityMemories, memoryContext, allowMemory),
+                        () -> fallbackAuroraResult(request.message, mode, gravityMemories, memoryContext, allowMemory, stateSignal),
                         resolved.client());
             } catch (RuntimeException e) {
                 Throwable cause = e.getCause();
@@ -548,7 +643,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                lower.contains("i feel real emotions") || lower.contains("biological life");
     }
 
-    private AuroraReplyVO differentiatedFallback(Exception e, String message, String mode) {
+    private AuroraReplyVO differentiatedFallback(Exception e, String message, String mode, String stateSignal) {
         String fallbackMsg;
         String flag;
         if (e.getMessage() != null && (e.getMessage().contains("timeout") || e.getMessage().contains("timed out"))) {
@@ -561,7 +656,11 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             fallbackMsg = "I heard you but my thoughts did not come together clearly. Could you try saying it differently?";
             flag = "PARSE_ERROR";
         } else {
-            fallbackMsg = "I heard you. Things were a bit slow just now, but your words are with me. You can say it again or move on to the next thing.";
+            // VS-004 mock-fallback coherence: when the LLM path failed, the
+            // fallback still gently reflects the perceptual state signal so the
+            // response stays coherent with the richer context. Perception only,
+            // not a clinical label (vision §9/§13).
+            fallbackMsg = fallbackAwareMessage(stateSignal);
             flag = "NETWORK_ERROR";
         }
         AuroraReplyVO vo = new AuroraReplyVO();
@@ -583,16 +682,17 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     }
 
     private AuroraReplyVO emergencyFallback(String message, String mode) {
-        return differentiatedFallback(new RuntimeException("generic"), message, mode);
+        return differentiatedFallback(new RuntimeException("generic"), message, mode, null);
     }
 
     private StructuredAiResults.AuroraResult fallbackAuroraResult(String message,
                                                                   String mode,
                                                                   List<String> gravityMemories,
                                                                   AuroraMemoryContextVO memoryContext,
-                                                                  boolean allowMemory) {
+                                                                  boolean allowMemory,
+                                                                  String stateSignal) {
         StructuredAiResults.AuroraResult result = new StructuredAiResults.AuroraResult();
-        result.segments = fallbackSegments(message, mode, allowMemory && gravityMemories != null && !gravityMemories.isEmpty());
+        result.segments = fallbackSegments(message, mode, allowMemory && gravityMemories != null && !gravityMemories.isEmpty(), stateSignal);
         result.speakCount = result.segments.size();
         result.continueReason = "fallback-explicit";
         result.detectedTheme = modeLabel(mode);
@@ -626,9 +726,13 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         return result;
     }
 
-    private List<String> fallbackSegments(String message, String mode, boolean hasMemory) {
+    private List<String> fallbackSegments(String message, String mode, boolean hasMemory, String stateSignal) {
         List<String> segments = new ArrayList<>();
         String text = message == null ? "" : message.trim();
+        // VS-004 — the fallback gently reflects the perceptual state signal so the
+        // deterministic path stays coherent with the richer prompt context. The
+        // signal is a perception ("此刻偏疲惫/脆弱/平静/开放"), never a clinical label.
+        String state = stateSignal == null ? "" : stateSignal.trim();
         if ("ACTION_SPLIT".equals(mode)) {
             segments.add("我先不把它变成一整套计划。我们只找一个十分钟内能开始的小动作。");
             segments.add("你现在最容易动起来的第一步，可能不是\"解决它\"，而是先把它写成一句可执行的话。");
@@ -643,6 +747,10 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             segments.add("在这段关系里，你最想被对方理解的需要是什么？");
         } else if ("THOUGHT_CLARIFY".equals(mode)) {
             segments.add("我听见这里面有好几股线缠在一起。我们可以先把事实、感受和担心拆开。");
+        } else if (state.contains("疲惫") || state.contains("脆弱") || state.contains("承压")) {
+            // Fallback coherence with the state signal: when the user seems tired /
+            // fragile right now, lead by steadying the moment, not by digging.
+            segments.add("我看你这一刻像是承着一点分量。先不用讲得很完整，我会陪你把最重的那一块慢慢拨出来。");
         } else if (text.length() > 80) {
             segments.add("我听见你一下子承着很多东西。先不用讲得很完整，我会陪你把最重的那一块慢慢拨出来。");
         } else {
@@ -667,6 +775,11 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             + "First message must respond to what the user just said.\n"
             + "Follow-up messages = Aurora's own judgment: supplement ideas / show care / connect memories (say 'I thought of a clue') / suggest features (only when natural).\n"
             + "If a follow-up is not good enough, just empty or repetitive, write [[SILENCE]].\n\n"
+            + "[Emergence — how you are with THIS person]\n"
+            + "你与这个人相处的方式——安静陪着 / 轻轻追问 / 帮忙整理 / 先共情再轻指一步——应从你对TA的了解（画像）、你们的关系、TA此刻的状态、以及共享的记忆里自然长出来。"
+            + "你们越亲近、越信任，越可以自然地追问、连接旧线索、轻推一步；熟悉度低时先稳稳接住当下。"
+            + "用户此刻的状态感知只是一个轻提示，帮你知道这一刻该放慢还是可以多说一句；不要当面复述这个标签。"
+            + "模式（mode）只是一个建议，不是规则。不要套固定模板。\n\n"
             + "[Anti-Repetition]\n"
             + "You can see recentAuroraMessages. Do not repeat openings, reminders, or same sentence patterns.\n\n"
             + "[Weather/Focus]\n"
@@ -676,6 +789,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             + "If user disabled multi-message, output only 1 segment.\n\n"
             + "[Quality]\n"
             + "No templates ('I understand your feelings'), no diagnosis ('you have anxiety'), no slogans ('you can do it'), no long essays (max 3 sentences per message).\n"
+            + "用户画像与状态感知仅供参考你如何陪伴，绝不是诊断、标签，也不要逐条复述画像。\n"
             + "When referencing memories, always state the source transparently.\n"
             + "Mode is a style suggestion, not a command. If conversation naturally shifts, follow your intuition. Aurora has full freedom.");
     }
@@ -808,9 +922,93 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     }
 
     private String jsonMeta(AuroraReplyVO reply) {
-        return "{\"speakCount\":" + (reply.messages == null ? 0 : reply.messages.size())
-                + ",\"detectedTheme\":\"" + escape(reply.detectedTheme) + "\""
-                + ",\"featureTarget\":\"" + escape(reply.featureTarget) + "\"}";
+        return jsonMeta(reply, null, null);
+    }
+
+    /**
+     * VS-003b — the SSE meta event must carry the SAME context the POST path
+     * returns, so the frontend can render the agent-loop + memory-lens perception
+     * panels during/after streaming (not only on the POST fallback). The richCtx
+     * carries the client-supplied voice/weather/location/timezone metadata that
+     * the POST path got via the request body but the GET /stream path could not.
+     */
+    private String jsonMeta(AuroraReplyVO reply, ChatRequest richCtx, List<UserPortrait> portrait) {
+        int speakCount = reply.messages == null ? 0 : reply.messages.size();
+        StringBuilder sb = new StringBuilder("{");
+        sb.append("\"speakCount\":").append(speakCount);
+        sb.append(",\"detectedTheme\":\"").append(escape(reply.detectedTheme)).append("\"");
+        sb.append(",\"featureTarget\":\"").append(escape(reply.featureTarget)).append("\"");
+        sb.append(",\"replyTone\":\"").append(escape(reply.replyTone)).append("\"");
+        sb.append(",\"nextQuestion\":\"").append(escape(reply.nextQuestion)).append("\"");
+        sb.append(",\"smallStep\":\"").append(escape(reply.smallStep)).append("\"");
+        sb.append(",\"featureSuggestion\":\"").append(escape(reply.featureSuggestion)).append("\"");
+        sb.append(",\"suggestSettle\":").append(Boolean.TRUE.equals(reply.suggestSettle));
+        sb.append(",\"memoryReferenced\":").append(Boolean.TRUE.equals(reply.memoryReferenced));
+        sb.append(",\"riskFlags\":").append(jsonStringArray(reply.riskFlags));
+        // agentLoop block: same shape as the POST path returns.
+        Map<String, Object> loop = reply.agentLoop;
+        int loopSpeak = loop != null && loop.get("speakCount") instanceof Number n ? n.intValue() : speakCount;
+        String loopReason = loop != null && loop.get("continueReason") instanceof String s ? s : "";
+        String loopMode = loop != null && loop.get("mode") instanceof String m ? m : "";
+        String loopModeLabel = loop != null && loop.get("modeLabel") instanceof String ml ? ml : "";
+        sb.append(",\"agentLoop\":{\"speakCount\":").append(loopSpeak)
+                .append(",\"continueReason\":\"").append(escape(loopReason)).append("\"")
+                .append(",\"mode\":\"").append(escape(loopMode)).append("\"")
+                .append(",\"modeLabel\":\"").append(escape(loopModeLabel)).append("\"}");
+        // aiState block.
+        if (reply.aiState != null) {
+            sb.append(",\"aiState\":").append(jsonObject(reply.aiState));
+        }
+        // VS-003b — rich client context (voice/weather/location/timezone) that the
+        // GET /stream path otherwise could not receive. The frontend uses it to
+        // show the perception panels on parity with the POST path.
+        if (richCtx != null) {
+            sb.append(",\"voiceMetadata\":\"").append(escape(voiceMetadata(richCtx))).append("\"");
+            sb.append(",\"timezone\":\"").append(escape(richCtx.timezone == null ? "" : richCtx.timezone)).append("\"");
+            sb.append(",\"localTimeLabel\":\"").append(escape(richCtx.localTimeLabel == null ? "" : richCtx.localTimeLabel)).append("\"");
+            sb.append(",\"weatherType\":\"").append(escape(richCtx.weatherType == null ? "" : richCtx.weatherType)).append("\"");
+            sb.append(",\"weatherDescription\":\"").append(escape(richCtx.weatherDescription == null ? "" : richCtx.weatherDescription)).append("\"");
+            sb.append(",\"temperature\":").append(richCtx.temperature == null ? "null" : richCtx.temperature);
+            sb.append(",\"locationLabel\":\"").append(escape(richCtx.locationLabel == null ? "" : richCtx.locationLabel)).append("\"");
+            sb.append(",\"inputType\":\"").append(escape(richCtx.inputType == null ? "" : richCtx.inputType)).append("\"");
+        }
+        // VS-004 — surface a compact perception read so the stream path shows the
+        // same "Aurora 是怎么理解这一刻的" lens as the POST path.
+        if (portrait != null && !portrait.isEmpty()) {
+            sb.append(",\"perception\":{\"portraitDims\":").append(portrait.size())
+                    .append(",\"topDim\":\"").append(escape(portrait.get(0).dim == null ? "" : portrait.get(0).dim)).append("\"}");
+        }
+        sb.append("}");
+        return sb.toString();
+    }
+
+    private String jsonStringArray(List<String> items) {
+        if (items == null || items.isEmpty()) return "[]";
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < items.size(); i++) {
+            if (i > 0) sb.append(",");
+            sb.append("\"").append(escape(items.get(i))).append("\"");
+        }
+        sb.append("]");
+        return sb.toString();
+    }
+
+    private String jsonObject(Map<String, Object> map) {
+        if (map == null || map.isEmpty()) return "{}";
+        StringBuilder sb = new StringBuilder("{");
+        boolean first = true;
+        for (Map.Entry<String, Object> e : map.entrySet()) {
+            if (!first) sb.append(",");
+            first = false;
+            sb.append("\"").append(escape(e.getKey())).append("\":");
+            Object v = e.getValue();
+            if (v == null) sb.append("null");
+            else if (v instanceof Number) sb.append(v);
+            else if (v instanceof Boolean) sb.append(v);
+            else sb.append("\"").append(escape(v.toString())).append("\"");
+        }
+        sb.append("}");
+        return sb.toString();
     }
 
     private UserProfile loadProfile(Long userId) {
@@ -822,6 +1020,88 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
 
     private boolean allowMemory(UserProfile profile) {
         return profile == null || profile.allowMemoryRecall == null || Boolean.TRUE.equals(profile.allowMemoryRecall);
+    }
+
+    /**
+     * VS-004 — read the accumulated multi-dim portrait for THIS user. Defensive:
+     * portrait/relationship are populated by background reflection, so for a fresh
+     * user they may be empty; that is fine — Aurora simply has less to go on.
+     */
+    private List<UserPortrait> safePortrait(Long userId) {
+        if (userId == null || userPortraitService == null) return List.of();
+        try {
+            List<UserPortrait> all = userPortraitService.getAll(userId);
+            return all == null ? List.of() : all;
+        } catch (Exception e) {
+            log.warn("Portrait read failed (non-fatal): {}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    private AgentUserRelationship safeRelationship(Long userId) {
+        if (userId == null || relationshipService == null) return null;
+        try {
+            return relationshipService.getOrInit(userId);
+        } catch (Exception e) {
+            log.warn("Relationship read failed (non-fatal): {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * VS-004 — a SHORT, NON-CLINICAL perceptual signal of how the user seems right
+     * now, derived from the existing PseudoSemanticAnalyzer / lexicon on the user's
+     * message. This is a perception ("用户此刻偏疲惫/脆弱/平静/开放"), NOT a diagnosis
+     * or label (vision §9/§13: do not medicalize). Reuses the existing analyzer —
+     * no new emotion-modeling subsystem.
+     */
+    private String currentStateSignal(String userMessage) {
+        if (userMessage == null || userMessage.isBlank()) return "";
+        try {
+            PseudoSemanticAnalyzer.AnalysisResult a = PseudoSemanticAnalyzer.analyze(userMessage);
+            double score = a.sentimentScore;
+            double intensity = a.intensityScore;
+            String signal;
+            if (score <= -4) {
+                signal = "用户此刻像是承着很重的东西，先稳稳陪着，不要追问";
+            } else if (score <= -2 || intensity >= 6.5) {
+                signal = "用户此刻偏疲惫或脆弱，可以放慢、少追问，先接住当下";
+            } else if (score >= 3) {
+                signal = "用户此刻偏开放或轻盈，可以自然地多说一句，甚至轻轻追问";
+            } else if (a.detectedThemes != null && a.detectedThemes.contains("认知探索")) {
+                signal = "用户此刻像是在试着理清什么，可以帮 TA 把事实和感受分开";
+            } else {
+                signal = "用户此刻偏平静，可以像朋友一样自然地接住";
+            }
+            return signal;
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    /** Compact portrait summary for the turnContext map (mock fallback / observability). */
+    private String portraitBriefForContext(List<UserPortrait> portrait) {
+        if (portrait == null || portrait.isEmpty()) return "";
+        StringBuilder sb = new StringBuilder();
+        int n = 0;
+        for (UserPortrait p : portrait) {
+            if (p == null || isBlank(p.dim)) continue;
+            if (p.confidence != null && p.confidence < PromptBuilder.PORTRAIT_CONFIDENCE_THRESHOLD) continue;
+            if (n > 0) sb.append("；");
+            sb.append(p.dim).append(":").append(p.valueJson == null ? "" : p.valueJson);
+            if (++n >= PromptBuilder.PORTRAIT_MAX_DIMS) break;
+        }
+        return sb.toString();
+    }
+
+    /** VS-004 fallback coherence: the generic-failure message reflects the state signal. */
+    private String fallbackAwareMessage(String stateSignal) {
+        String base = "I heard you. Things were a bit slow just now, but your words are with me. You can say it again or move on to the next thing.";
+        if (stateSignal == null) return base;
+        if (stateSignal.contains("疲惫") || stateSignal.contains("脆弱") || stateSignal.contains("承着")) {
+            return "我听见你了。刚才这边慢了一下，但你不用现在就把话说全——我先把这一刻稳稳接住。";
+        }
+        return base;
     }
 
     private List<String> recentMessages(Long sessionId, int limit) {

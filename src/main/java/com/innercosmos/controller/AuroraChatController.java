@@ -74,12 +74,28 @@ public class AuroraChatController extends BaseController {
         return ApiResponse.ok(auroraAgentService.replyRich(currentUserId(session), request));
     }
 
+    /**
+     * VS-003b — stage rich SSE context (voice/weather/location/timezone) before
+     * opening the GET /stream. EventSource cannot send a body, so the frontend
+     * POSTs the rich context here and opens the stream with the returned token.
+     * The token is consumed once and expires shortly.
+     */
+    @PostMapping("/stream-stage")
+    public ApiResponse<java.util.Map<String, String>> stageStream(@RequestBody ChatRequest request, HttpSession session) {
+        currentUserId(session); // ensure logged in
+        String token = auroraAgentService.stageStreamContext(request);
+        return ApiResponse.ok(java.util.Map.of("token", token == null ? "" : token));
+    }
+
     @GetMapping("/stream")
     public SseEmitter stream(@RequestParam Long sessionId,
                              @RequestParam String message,
                              @RequestParam(required = false) String mode,
+                             @RequestParam(required = false) String token,
                              HttpSession session) {
-        return auroraAgentService.stream(currentUserId(session), sessionId, message, mode);
+        Long userId = currentUserId(session);
+        ChatRequest staged = auroraAgentService.consumeStage(token);
+        return auroraAgentService.stream(userId, sessionId, message, mode, staged);
     }
 
     @PostMapping("/greeting")
