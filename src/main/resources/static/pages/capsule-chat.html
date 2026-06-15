@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>与回声对话 · Inner Cosmos</title>
+  <title>与回声对话 · 内宇宙</title>
   <link rel="stylesheet" href="/css/app.css">
   <style>
     .capsule-header {
@@ -147,8 +147,8 @@
   </style>
 </head>
 <body>
-<main id="main" class="shell">
-  <a class="skip-link" href="#main">跳到主要内容</a>
+<main id="ic-main" class="shell">
+  <a class="skip-link ic-skip-link" href="#ic-main">跳到主内容</a>
   <div class="topbar" data-topbar></div>
 
   <!-- Capsule info header -->
@@ -215,7 +215,7 @@ IC.mountShell("共鸣体对话");
 const params = new URLSearchParams(location.search);
 const capsuleId = params.get("capsuleId");
 if (!capsuleId) {
-  document.getElementById("main").innerHTML = `
+  document.getElementById("ic-main").innerHTML = `
     <section class="soft-stage" style="text-align:center;padding:72px 20px">
       <h1>请先选择一个共鸣体</h1>
       <p class="muted mb-2">从星海广场进入对话舱后，这里会加载对应的数字回声。</p>
