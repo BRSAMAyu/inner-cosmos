@@ -139,3 +139,9 @@ inner-cosmos:
   security:
     session-user-key: LOGIN_USER_ID
     cors-origins: ${CORS_ALLOWED_ORIGINS:}
+  safety:
+    semantic-recheck:
+      # Synchronous LLM re-check for implicit-crisis distress signals that did not
+      # trip an explicit crisis keyword. When disabled, distress-without-keyword flows
+      # as LOW (pre-existing behavior). Mock mode uses the conservative fallback.
+      enabled: ${SAFETY_SEMANTIC_RECHECK_ENABLED:true}
