@@ -75,7 +75,7 @@ public class EmotionTraceListener {
             trace.userId = event.userId;
             trace.sourceSessionId = event.sessionId;
             trace.emotionName = bestEmotion;
-            trace.emotionScore = Math.min(10.0, bestCount * 2.0);
+            trace.emotionScore = EmotionTrace.clampScore(bestCount * 2.0);
             trace.weatherType = EMOTION_WEATHER.getOrDefault(bestEmotion, "CLOUDY");
             trace.triggerScene = "对话关键词提取";
             trace.recordDate = LocalDate.now();

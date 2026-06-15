@@ -138,7 +138,7 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
         trace.userId = userId;
         trace.sourceSessionId = sessionId;
         trace.emotionName = blank(ai.emotionTrace.emotionName, inferEmotionName(raw));
-        trace.emotionScore = clamp(ai.emotionTrace.emotionScore == null ? card.intensityScore : ai.emotionTrace.emotionScore, 0, 10);
+        trace.emotionScore = EmotionTrace.clampScore(ai.emotionTrace.emotionScore == null ? card.intensityScore : ai.emotionTrace.emotionScore);
         trace.weatherType = blank(ai.emotionTrace.weatherType, inferWeather(card.intensityScore));
         trace.triggerScene = blank(ai.emotionTrace.triggerScene, firstSentence(raw));
         trace.recordDate = LocalDate.now();
@@ -276,7 +276,7 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
         record.capsuleSuggested = vo.capsuleSuggested;
         record.userAccepted = false;
         record.status = "ACTIVE";
-        dailyRecordMapper.insert(record);
+        upsertDailyRecord(record);
 
         return vo;
     }
@@ -588,7 +588,7 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
         trace.userId = userId;
         trace.sourceSessionId = null;
         trace.emotionName = blank(ai.emotionTrace.emotionName, inferEmotionName(diaryText));
-        trace.emotionScore = clamp(ai.emotionTrace.emotionScore == null ? card.intensityScore : ai.emotionTrace.emotionScore, 0, 10);
+        trace.emotionScore = EmotionTrace.clampScore(ai.emotionTrace.emotionScore == null ? card.intensityScore : ai.emotionTrace.emotionScore);
         trace.weatherType = blank(ai.emotionTrace.weatherType, inferWeather(card.intensityScore));
         trace.triggerScene = blank(ai.emotionTrace.triggerScene, firstSentence(diaryText));
         trace.recordDate = LocalDate.now();
@@ -655,9 +655,31 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
         record.capsuleSuggested = card.emotionalGravity != null && card.emotionalGravity > 1.1;
         record.userAccepted = true; // Auto accepted for diary
         record.status = "ACTIVE";
-        dailyRecordMapper.insert(record);
+        upsertDailyRecord(record);
 
         // Update themes
         themeAggregationService.aggregateThemes(userId);
+    }
+
+    /**
+     * Insert-or-update a DailyRecord keyed by the (user_id, record_date) UNIQUE
+     * constraint (VS-006). If a record already exists for the user/day, its
+     * mutable content is updated in place rather than raising a constraint
+     * violation — so finishing a second session on the same day never crashes
+     * the conversation flow.
+     */
+    private void upsertDailyRecord(DailyRecord record) {
+        QueryWrapper<DailyRecord> existing = new QueryWrapper<>();
+        existing.eq("user_id", record.userId).eq("record_date", record.recordDate);
+        DailyRecord prior = dailyRecordMapper.selectOne(existing);
+        if (prior != null) {
+            record.id = prior.id;
+            if (record.createdAt == null) {
+                record.createdAt = prior.createdAt;
+            }
+            dailyRecordMapper.updateById(record);
+        } else {
+            dailyRecordMapper.insert(record);
+        }
     }
 }
