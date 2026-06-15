@@ -121,7 +121,7 @@ public class BeliefExtractServiceImpl implements BeliefExtractService {
             recencyBoost = Math.max(0, 0.3 - (daysSince * 0.01));
         }
 
-        belief.strengthScore = Math.min(1.0, baseStrength + confirmationBoost + recencyBoost);
+        belief.strengthScore = BeliefPattern.clampStrength(baseStrength + confirmationBoost + recencyBoost);
         beliefPatternMapper.updateById(belief);
     }
 
@@ -186,7 +186,7 @@ public class BeliefExtractServiceImpl implements BeliefExtractService {
                 belief.beliefContent = desc.content;
                 belief.beliefType = desc.type != null ? desc.type : "SELF";
                 belief.beliefCategory = desc.category != null ? desc.category : "未分类";
-                belief.strengthScore = 0.5;
+                belief.strengthScore = BeliefPattern.clampStrength(0.5);
                 belief.supportingMemoryIds = memoryCardId.toString();
                 belief.contradictingMemoryIds = "";
                 belief.firstDetectedAt = LocalDateTime.now();
