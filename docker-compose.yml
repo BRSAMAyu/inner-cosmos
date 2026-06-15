@@ -1,5 +1,8 @@
 # Inner Cosmos — Docker Compose for Production
-# Usage: docker-compose -f docker-compose.yml up -d
+# Usage:
+#   docker compose up -d                      # local-prod (defaults below; override for real prod)
+#   DB_PASSWORD=... MYSQL_ROOT_PASSWORD=... docker compose up -d
+# App connects to MySQL via SPRING_DATASOURCE_* env (read by application-prod.yml).
 
 services:
   app:
@@ -13,20 +16,21 @@ services:
       - "8080:8080"
     environment:
       - SPRING_PROFILES_ACTIVE=prod
-      - DATABASE_URL=jdbc:mysql://db:3306/innercosmos
-      - DB_HOST=db
+      # 12-factor datasource (read by application-prod.yml). Defaults point at the
+      # compose `mysql` service so `docker compose up` works with no extra env.
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/${DB_NAME:-inner_cosmos}?useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
+      - SPRING_DATASOURCE_USERNAME=${DB_USER:-innercosmos}
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-innercosmos}
+      - DB_HOST=mysql
       - DB_PORT=3306
-      - DB_NAME=innercosmos
-      - DB_USER=${DB_USER:-innercosmos}
-      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME:-inner_cosmos}
       - LLM_MODE=prod
-      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_API_KEY=${LLM_API_KEY:-}
       - CORS_ALLOWED_ORIGINS=${CORS_ORIGINS:-}
     depends_on:
-      db:
+      mysql:
         condition: service_healthy
     volumes:
-      - ./data:/app/data
       - app-logs:/var/log/inner-cosmos
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
@@ -41,19 +45,19 @@ services:
         reservations:
           memory: 512M
 
-  db:
+  mysql:
     image: mysql:8.4
-    container_name: inner-cosmos-db
+    container_name: inner-cosmos-mysql
     restart: unless-stopped
     environment:
-      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
-      - MYSQL_DATABASE=innercosmos
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-rootpass-change-me}
+      - MYSQL_DATABASE=${DB_NAME:-inner_cosmos}
       - MYSQL_USER=${DB_USER:-innercosmos}
-      - MYSQL_PASSWORD=${DB_PASSWORD}
+      - MYSQL_PASSWORD=${DB_PASSWORD:-innercosmos}
     ports:
       - "127.0.0.1:3306:3306"
     volumes:
-      - db-data:/var/lib/mysql
+      - mysql-data:/var/lib/mysql
       - ./scripts/backup:/backup  # For automated backups
     command: >
       --character-set-server=utf8mb4
@@ -65,7 +69,8 @@ services:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
 
   # Prometheus for metrics collection
   prometheus:
@@ -92,7 +97,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:?GRAFANA_PASSWORD must be set}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin-change-me}
       - GF_USERS_ALLOW_SIGN_UP=false
     volumes:
       - grafana-data:/var/lib/grafana
@@ -100,7 +105,7 @@ services:
       - prometheus
 
 volumes:
-  db-data:
+  mysql-data:
   app-logs:
   prometheus-data:
   grafana-data:

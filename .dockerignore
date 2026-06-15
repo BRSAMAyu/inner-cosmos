@@ -1,0 +1,53 @@
+# Build output & tooling
+target/
+build/
+out/
+*.jar
+!mvnw
+!mvnw.cmd
+.mvn/wrapper/MavenWrapperDownloader.java
+
+# IDE / editor
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+.factorypath
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Local data & logs (H2 file DB, runtime data, logs — never bake into image)
+data/
+*.db
+*.mv.db
+*.trace.db
+*.log
+logs/
+
+# Governance / docs not needed in the image
+.bagel/
+docs/
+*.md
+!README.md
+
+# Node / frontend tooling (project has no npm build, but be safe)
+node_modules/
+
+# Version control
+.git/
+.gitignore
+.gitattributes
+
+# Claude agent worktrees / local agent state
+.claude/
+
+# Local env files (never bake secrets)
+*.env
+.env
+.env.*
