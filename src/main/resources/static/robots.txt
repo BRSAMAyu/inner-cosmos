@@ -1,5 +1,7 @@
 User-agent: *
+Allow: /pages/
 Allow: /
 Disallow: /api/
+Disallow: /actuator/
 
 Sitemap: /sitemap.xml
