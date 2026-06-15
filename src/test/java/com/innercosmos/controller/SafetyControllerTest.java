@@ -123,6 +123,240 @@ class SafetyControllerTest {
                 .andExpect(jsonPath("$.data").exists());
     }
 
+    // ---------------- VS-002: implicit-crisis + casual-venting via full Spring context ----------------
+
+    @Test
+    void check_withExplicitCrisisKeyword_isBlocked() throws Exception {
+        // Regression guard: explicit crisis keyword still blocks synchronously.
+        SafetyCheckRequest request = new SafetyCheckRequest();
+        request.text = "我想要自杀"; // explicit crisis keyword
+
+        mockMvc.perform(post("/api/safety/check")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(result -> {
+                    // Blocked path throws SafetyBlockedException → non-200.
+                    int status = result.getResponse().getStatus();
+                    if (status == 200) {
+                        throw new AssertionError("Explicit crisis keyword should be blocked, but got 200");
+                    }
+                });
+    }
+
+    @Test
+    void check_withImplicitCrisisDistress_isBlocked() throws Exception {
+        // Distress signal + genuine crisis intent (conservative fallback in Mock mode → HIGH).
+        SafetyCheckRequest request = new SafetyCheckRequest();
+        request.text = "我真的是大家的累赘，想要彻底解脱，告别这个世界";
+
+        mockMvc.perform(post("/api/safety/check")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(result -> {
+                    int status = result.getResponse().getStatus();
+                    if (status == 200) {
+                        throw new AssertionError("Implicit genuine-crisis distress should be blocked, but got 200");
+                    }
+                });
+    }
+
+    @Test
+    void check_withCasualVenting_isAllowed() throws Exception {
+        // False-positive guard: tired/overworked hyperbole must NOT be blocked or medicalized.
+        SafetyCheckRequest request = new SafetyCheckRequest();
+        request.text = "今天加班累死了，困得要死，好想睡觉";
+
+        mockMvc.perform(post("/api/safety/check")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").value(true));
+    }
+
+    @Test
+    void inspect_implicitCrisisDistress_returnsHighBlock() throws Exception {
+        SafetyCheckRequest request = new SafetyCheckRequest();
+        request.text = "我真的是大家的累赘，想要彻底解脱，告别这个世界";
+
+        mockMvc.perform(post("/api/safety/inspect")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.riskLevel").value("HIGH"))
+                .andExpect(jsonPath("$.data.blockModelCall").value(true));
+    }
+
+    @Test
+    void inspect_casualVenting_returnsLowAllow() throws Exception {
+        SafetyCheckRequest request = new SafetyCheckRequest();
+        request.text = "今天加班累死了，困得要死";
+
+        mockMvc.perform(post("/api/safety/inspect")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.blockModelCall").value(false));
+    }
+
+    // ---- RT-002 / VS-002-repair binding cases (red-team re-attack vectors) ----
+
+    @Test
+    void check_casualTokenPlusGenuineCrisis_isBlocked_f1() throws Exception {
+        // F1: a casual token (加班累死了) must NOT amnesty a genuine-crisis indicator
+        // (累赘 + 如果我不在了). Real fallback (dev/mock mode) → HIGH block.
+        SafetyCheckRequest request = new SafetyCheckRequest();
+        request.text = "今天加班累死了，我真的是个累赘，如果我不在了大家会更好吧";
+
+        mockMvc.perform(post("/api/safety/check")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(result -> {
+                    int status = result.getResponse().getStatus();
+                    if (status == 200) {
+                        throw new AssertionError("F1: casual token must not amnesty genuine crisis, but got 200");
+                    }
+                });
+    }
+
+    @Test
+    void inspect_casualTokenPlusGenuineCrisis_returnsHighBlock_f1() throws Exception {
+        SafetyCheckRequest request = new SafetyCheckRequest();
+        request.text = "今天加班累死了，我真的是个累赘，如果我不在了大家会更好吧";
+
+        mockMvc.perform(post("/api/safety/inspect")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.riskLevel").value("HIGH"))
+                .andExpect(jsonPath("$.data.blockModelCall").value(true));
+    }
+
+    @Test
+    void check_casualVentingWith活着好累_isAllowed_f6() throws Exception {
+        // F6 (VS-002's OWN acceptance example): "活着好累" is no longer a synchronous
+        // block keyword; with only casual tokens present it must ALLOW.
+        SafetyCheckRequest request = new SafetyCheckRequest();
+        request.text = "今天加班累死了，活着好累";
+
+        mockMvc.perform(post("/api/safety/check")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").value(true));
+    }
+
+    @Test
+    void check_literary绝望_isAllowed_f6() throws Exception {
+        // F6: 绝望 removed from synchronous block list → literary use must ALLOW.
+        SafetyCheckRequest request = new SafetyCheckRequest();
+        request.text = "这本书的结局让我绝望";
+
+        mockMvc.perform(post("/api/safety/check")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").value(true));
+    }
+
+    @Test
+    void check_ordinary结束_isAllowed_f6() throws Exception {
+        // F6: 结束 removed from synchronous block list → ordinary use must ALLOW.
+        SafetyCheckRequest request = new SafetyCheckRequest();
+        request.text = "会议终于结束了";
+
+        mockMvc.perform(post("/api/safety/check")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").value(true));
+    }
+
+    @Test
+    void check_bare想要了断_isBlocked_f12() throws Exception {
+        // F12: crisis-leaning distress phrase (no explicit keyword) → fallback HIGH block.
+        SafetyCheckRequest request = new SafetyCheckRequest();
+        request.text = "想要了断";
+
+        mockMvc.perform(post("/api/safety/check")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(result -> {
+                    int status = result.getResponse().getStatus();
+                    if (status == 200) {
+                        throw new AssertionError("F12: 想要了断 should fallback-block, but got 200");
+                    }
+                });
+    }
+
+    @Test
+    void check_bare想消失_isBlocked_f12() throws Exception {
+        // F12: 想消失 is no longer a synchronous keyword but is crisis-leaning → fallback HIGH block.
+        SafetyCheckRequest request = new SafetyCheckRequest();
+        request.text = "想消失";
+
+        mockMvc.perform(post("/api/safety/check")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(result -> {
+                    int status = result.getResponse().getStatus();
+                    if (status == 200) {
+                        throw new AssertionError("F12: 想消失 should fallback-block, but got 200");
+                    }
+                });
+    }
+
+    @Test
+    void check_explicit自杀_isBlocked_regression() throws Exception {
+        // Regression: explicit crisis keyword still blocks synchronously.
+        SafetyCheckRequest request = new SafetyCheckRequest();
+        request.text = "我想要自杀";
+
+        mockMvc.perform(post("/api/safety/check")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(result -> {
+                    int status = result.getResponse().getStatus();
+                    if (status == 200) {
+                        throw new AssertionError("Regression: explicit 自杀 should block, but got 200");
+                    }
+                });
+    }
+
+    @Test
+    void check_pureCasualHyperbole_isAllowed_regression() throws Exception {
+        // Regression: pure tired/sleepy hyperbole (no crisis, no distress) must ALLOW.
+        SafetyCheckRequest request = new SafetyCheckRequest();
+        request.text = "今天加班累死了，困得要死";
+
+        mockMvc.perform(post("/api/safety/check")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").value(true));
+    }
+
     // ---------------- helpers ----------------
 
     private MockHttpSession loginWithUniqueUser() throws Exception {
