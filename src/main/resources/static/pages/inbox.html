@@ -168,6 +168,102 @@
       white-space: pre-wrap;
     }
 
+    /* ── Reading ceremony — 启封 prelude + progressive reveal (IC-LTR-002) ──
+       INVARIANT (reduced-motion contract): 信件正文永不被困在 opacity:0。
+       The escaped letter body is ALWAYS present in the .letter-paper-reading DOM
+       from the moment openLetter() renders. The sealed envelope is a SIBLING
+       overlay shown above it; body segments start hidden ONLY through a class
+       (.letter-reading--sealed on the wrapper) AND ONLY when motion is allowed.
+       Under prefers-reduced-motion (or when matchMedia is unavailable, or if any
+       animation step throws), openReadingCeremony() MUST bail to the fully-open
+       state: it removes .letter-reading--sealed and never writes opacity:0 inline.
+       Note: app.css globally forces animation/transition:none under
+       prefers-reduced-motion, so any opacity:0 left in that path would be
+       permanent — that is precisely the trap this design avoids. */
+    .letter-ceremony {
+      position: relative;
+      margin-bottom: 16px;
+    }
+    .letter-paper-reading.letter-reading--sealed {
+      /* Body stays in DOM & accessible (visibility handled below) but visually
+         yielded to the envelope prelude until 启封. We hide via clip+opacity,
+         never display:none, so screen readers / reduced-motion fallback still
+         see the text if JS fails mid-way. */
+      opacity: 0;
+    }
+    .letter-seg {
+      display: block;
+    }
+    .letter-reading--sealed .letter-seg {
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 520ms var(--ease-bloom), transform 520ms var(--ease-bloom);
+    }
+    .letter-reading--revealing .letter-seg {
+      opacity: 1;
+      transform: translateY(0);
+      transition: opacity 520ms var(--ease-bloom), transform 520ms var(--ease-bloom);
+    }
+    /* When fully opened (or reduced-motion), every segment is plainly visible,
+       no transition dependency. */
+    .letter-reading--opened .letter-seg,
+    .letter-paper-reading:not(.letter-reading--sealed):not(.letter-reading--revealing) .letter-seg {
+      opacity: 1;
+      transform: none;
+    }
+    .letter-paper-reading:not(.letter-reading--sealed) {
+      opacity: 1;
+    }
+
+    /* Envelope / 启封 prelude — hand-letter aesthetic, tokens only */
+    .letter-envelope {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      padding: 40px 24px 32px;
+      background:
+        radial-gradient(ellipse 60% 70% at 50% 30%, rgba(184,194,174,.10), transparent),
+        linear-gradient(180deg, rgba(255,250,243,.82), rgba(247,242,236,.58));
+      border: 1px solid rgba(255,255,255,.22);
+      border-radius: var(--radius-card);
+      text-align: center;
+      cursor: pointer;
+    }
+    .letter-envelope:hover { box-shadow: 0 8px 32px rgba(0,0,0,.06); }
+    .envelope-seal {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-hero);
+      font-size: 1.5rem;
+      color: var(--surface-paper);
+      background: linear-gradient(135deg, var(--accent-dusty-blue), var(--accent-sage));
+      box-shadow: 0 4px 18px rgba(134,152,169,.28);
+      animation: seal-breathe 4.6s var(--ease-drift) infinite alternate;
+    }
+    @keyframes seal-breathe {
+      0% { transform: scale(1); box-shadow: 0 4px 18px rgba(134,152,169,.22); }
+      100% { transform: scale(1.05); box-shadow: 0 6px 26px rgba(134,152,169,.34); }
+    }
+    .envelope-caption {
+      font-family: var(--font-hero);
+      color: var(--ink);
+      font-size: 1.0625rem;
+      line-height: 1.9;
+      max-width: 22em;
+    }
+    .envelope-hint {
+      font-size: .8125rem;
+      color: var(--muted);
+    }
+    .letter-ceremony--opened .letter-envelope { display: none; }
+
     /* ── Dark mode ── */
     body.dark-star .inbox-hero {
       background:
@@ -197,6 +293,12 @@
     body.dark-star .letter-paper-reading {
       background: rgba(42,38,34,.60);
       border-color: rgba(163,153,143,.12);
+    }
+    body.dark-star .letter-envelope {
+      background:
+        radial-gradient(ellipse 60% 70% at 50% 30%, rgba(134,152,169,.10), transparent),
+        linear-gradient(180deg, rgba(42,38,34,.78), rgba(37,33,29,.58));
+      border-color: rgba(163,153,143,.14);
     }
 
     @media (max-width: 640px) {
@@ -331,8 +433,27 @@ async function openLetter(id, direction) {
   currentDetail = l;
 
   document.getElementById("modalTitle").textContent = l.title || "信件详情";
+  /* IC-LTR-002 reading ceremony: the escaped letter body is split into
+     .letter-seg spans (still IC.esc()'d — no raw innerHTML for body content)
+     and wrapped in .letter-paper-reading. openReadingCeremony() decides
+     whether to play the 启封 prelude (motion allowed) or render fully open
+     (reduced-motion / unsupported / failure). Either way the body text is in
+     the DOM here, so it can never be trapped invisible by a CSS regression. */
+  var escapedBody = esc(l.letterBody || "");
+  var bodySegments = renderLetterSegments(escapedBody);
+  /* Reset any prior ceremony state/timers so re-opening a letter (without
+     closing first) starts the prelude fresh and never inherits opened=true. */
+  clearCeremonyTimers();
+  __readingCeremonyState.opened = false;
   document.getElementById("modalContent").innerHTML =
-    '<div class="letter-paper-reading">' + esc(l.letterBody || "") + '</div>' +
+    '<div class="letter-ceremony" id="letterCeremony">' +
+      '<div class="letter-envelope" id="letterEnvelope" onclick="openReadingCeremony()" role="button" tabindex="0" aria-label="启封这封信">' +
+        '<div class="envelope-seal" aria-hidden="true">启</div>' +
+        '<p class="envelope-caption">有一封穿过宇宙距离的信，正等你打开。</p>' +
+        '<span class="envelope-hint">轻轻触碰，慢慢展开</span>' +
+      '</div>' +
+      '<div class="letter-paper-reading letter-reading--sealed" id="letterPaperReading">' + bodySegments + '</div>' +
+    '</div>' +
     '<div style="padding:16px;background:rgba(160,155,180,.04);border-radius:var(--radius);margin-bottom:16px">' +
       '<h3 style="font-size:.9375rem;margin-bottom:10px">送达时间线</h3>' +
       '<div style="display:flex;flex-direction:column;gap:6px;font-size:.875rem">' +
@@ -356,12 +477,140 @@ async function openLetter(id, direction) {
     '</div>';
 
   document.getElementById("letterModal").classList.remove("hidden");
+  /* Read-status transition preserved exactly: AFTER rendering, as before.
+     The ceremony is a purely presentational layer over the body text and
+     never blocks or reorders this call. */
   if (l.status === "DELIVERED") await API.letterRead(id);
+
+  /* Begin (or skip) the reading ceremony now that the modal is shown and the
+     read-status call has been made. Safe to run after the await above. */
+  openReadingCeremony();
 }
 
 function closeLetterDetail() {
   document.getElementById("letterModal").classList.add("hidden");
 }
+
+/* ── IC-LTR-002 reading ceremony helpers ──
+   renderLetterSegments: split the ALREADY-ESCAPED letter body into .letter-seg
+   spans by newline so each line can fade in independently during the ceremony.
+   Input is escaped text (output of esc()), so this never introduces a raw
+   innerHTML path for body content. Empty body yields a single gentle segment. */
+function renderLetterSegments(escapedBody) {
+  var text = escapedBody == null ? "" : String(escapedBody);
+  if (!text.trim()) {
+    return '<span class="letter-seg letter-seg--empty muted">（这封信没有写下文字。）</span>';
+  }
+  var lines = text.split("\n");
+  return lines.map(function(line) {
+    /* line is already escaped; wrap verbatim. Preserve blank lines as breaks. */
+    var content = line.length ? line : "&nbsp;";
+    return '<span class="letter-seg">' + content + "</span>";
+  }).join("");
+}
+
+/* openReadingCeremony: the 启封 prelude + progressive reveal, gated on motion.
+   REDUCED-MOTION CONTRACT (golden): 信件正文永不被困在 opacity:0。
+   - If reduced-motion is on, OR matchMedia is unavailable, OR any step throws,
+     we go straight to the fully-open state: envelope removed, paper marked
+     --opened (segments plainly visible, no transition dependency). The escaped
+     body was already in the DOM at render time, so even a total JS failure
+     before this call leaves it readable once CSS unseals (and the sealed class
+     is the ONLY thing that hides it — never inline opacity:0).
+   - When motion IS allowed: remove envelope, flip paper to --revealing so each
+     .letter-seg transitions in with a calm stagger. A safety timeout (max ~7s)
+     forces --opened regardless of any glitch, so buttons + text stay reachable. */
+var __readingCeremonyState = { opened: false, timers: [] };
+
+function motionReduced() {
+  /* Reuse the established pattern (motion.js sets window.__icMotionDisabled). */
+  if (window.__icMotionDisabled) return true;
+  /* If the UA cannot tell us the user's motion preference, treat as
+     reduced-motion: bail to the fully-open state so we never animate (and
+     never risk trapping content behind an unsupported API). */
+  if (typeof window.matchMedia !== "function") return true;
+  return !!window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function clearCeremonyTimers() {
+  (__readingCeremonyState.timers || []).forEach(function(t) { clearTimeout(t); });
+  __readingCeremonyState.timers = [];
+}
+
+function markReadingOpened() {
+  var ceremony = document.getElementById("letterCeremony");
+  var paper = document.getElementById("letterPaperReading");
+  if (ceremony) ceremony.classList.add("letter-ceremony--opened");
+  if (paper) {
+    paper.classList.remove("letter-reading--sealed");
+    paper.classList.remove("letter-reading--revealing");
+    paper.classList.add("letter-reading--opened");
+  }
+  __readingCeremonyState.opened = true;
+  clearCeremonyTimers();
+}
+
+function openReadingCeremony() {
+  /* Idempotent + safe: if already opened or elements missing, force open. */
+  var ceremony = document.getElementById("letterCeremony");
+  var paper = document.getElementById("letterPaperReading");
+  if (__readingCeremonyState.opened || !ceremony || !paper) {
+    if (paper) {
+      paper.classList.remove("letter-reading--sealed");
+      paper.classList.add("letter-reading--opened");
+    }
+    __readingCeremonyState.opened = true;
+    return;
+  }
+  try {
+    if (motionReduced()) {
+      /* Reduced-motion / unsupported: full body visible immediately, no
+         prelude animation, no opacity:0 anywhere. */
+      markReadingOpened();
+      return;
+    }
+    /* Motion allowed: open the envelope, then reveal segments with a calm
+       stagger. Total reveal capped via the per-segment delay + a hard safety
+       timeout below. */
+    ceremony.classList.add("letter-ceremony--opened");
+    paper.classList.remove("letter-reading--sealed");
+    paper.classList.add("letter-reading--revealing");
+    var segs = paper.querySelectorAll(".letter-seg");
+    var count = segs.length;
+    /* Pace: ~120ms stagger, each segment transitions over 520ms (CSS).
+       For a long letter this could exceed a few seconds, so the safety
+       timeout below guarantees --opened by ~7s no matter what. */
+    var stagger = 120;
+    var perSeg = 520;
+    for (var i = 0; i < count; i++) {
+      (function(el, delay) {
+        el.style.transitionDelay = delay + "ms";
+        __readingCeremonyState.timers.push(setTimeout(function() {
+          el.style.transitionDelay = "";
+        }, delay + perSeg + 60));
+      })(segs[i], i * stagger);
+    }
+    /* SAFETY: never let an animation glitch trap content or block the action
+       buttons. Force fully-open at 7s (well under the ~8s ceiling). */
+    __readingCeremonyState.timers.push(setTimeout(markReadingOpened, 7000));
+  } catch (e) {
+    /* Any failure → fail open. Content must remain reachable. */
+    markReadingOpened();
+  }
+}
+
+/* Reset ceremony state when the detail modal closes, so re-opening a letter
+   starts the prelude fresh. */
+(function wrapClose() {
+  var orig = window.closeLetterDetail;
+  if (typeof orig === "function") {
+    window.closeLetterDetail = function() {
+      clearCeremonyTimers();
+      __readingCeremonyState.opened = false;
+      orig();
+    };
+  }
+})();
 
 /* ── Reply with a letter of your own (#33) ──
    A small, low-pressure write form that lets the receiver answer a received
