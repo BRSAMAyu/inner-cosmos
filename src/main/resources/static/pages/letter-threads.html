@@ -222,12 +222,12 @@ function renderThreads(threads, byId) {
     /* Prefer linking to the inbox copy of the anchor letter (the received one),
        falling back to outbox. If neither is visible to this user, point to inbox. */
     var href = "/pages/inbox.html";
-    if (anchor && anchor.id) href = "/pages/inbox.html?letter=" + anchor.id;
+    if (anchor && anchor.id != null) href = "/pages/inbox.html?letter=" + encodeURIComponent(anchor.id);
 
     return '<a class="thread-card" href="' + href + '" style="animation-delay:' + delay + 'ms">' +
       '<div class="thread-card-header">' +
         '<strong class="thread-card-title">' + esc(title) + '</strong>' +
-        '<span class="badge ' + threadStatusBadge(t.status) + '">' + threadStatusLabel(t.status) + '</span>' +
+        '<span class="badge ' + threadStatusBadge(t.status) + '">' + esc(threadStatusLabel(t.status)) + '</span>' +
       '</div>' +
       '<p class="thread-card-preview">' + esc(preview.substring(0, 120)) + (preview.length > 120 ? "..." : "") + '</p>' +
       '<div class="thread-card-footer">' +
