@@ -244,8 +244,8 @@ async function init() {
     /* CapsulePersonality avatar */
     var avatarBox = document.getElementById("capsuleAvatar");
     if (typeof CapsulePersonality !== "undefined" && avatarBox) {
-      avatarBox.innerHTML = CapsulePersonality.generateAvatar(c.pseudonym, "medium");
-      var personality = CapsulePersonality.getPersonality(c.pseudonym);
+      avatarBox.innerHTML = CapsulePersonality.generateAvatar(c.pseudonym, "medium", c.id);
+      var personality = CapsulePersonality.getPersonality(c.pseudonym, c.id);
       if (personality) {
         document.getElementById("capsuleName").style.color = personality.color;
       }

@@ -522,18 +522,18 @@ function renderList(data) {
     return;
   }
   list.innerHTML = data.map(function(c, idx) {
-    var personality = CapsulePersonality.getPersonality(c.pseudonym);
+    var personality = CapsulePersonality.getPersonality(c.pseudonym, c.id);
     var match = matchById.get(String(c.id)) || {};
     var tags = tagsOf(c.publicTags);
     var delay = Math.min(idx * 80, 640);
-    return '<article class="capsule-card" style="cursor:pointer;animation-delay:' + delay + 'ms" onclick="openCapsule(' + c.id + ')" data-pseudonym="' + esc(c.pseudonym) + '">' +
+    return '<article class="capsule-card" style="cursor:pointer;animation-delay:' + delay + 'ms" onclick="openCapsule(' + c.id + ')" data-pseudonym="' + esc(c.pseudonym) + '" data-capsule-id="' + c.id + '">' +
       '<div class="capsule-card-header">' +
         '<div class="capsule-card-identity">' +
-          CapsulePersonality.generateAvatar(c.pseudonym, "small") +
+          CapsulePersonality.generateAvatar(c.pseudonym, "small", c.id) +
           '<strong class="capsule-card-name" style="color:' + personality.color + '">' + esc(c.pseudonym) + '</strong>' +
         '</div>' +
         '<div class="capsule-card-badges">' +
-          CapsulePersonality.createBadge(c.pseudonym) +
+          CapsulePersonality.createBadge(c.pseudonym, c.id) +
           '<span class="badge badge-read">' + (c.capsuleType === "SEED_CAPSULE" ? "种子" : "用户") + '</span>' +
         '</div>' +
       '</div>' +
@@ -550,24 +550,25 @@ function renderList(data) {
   // Apply personality styles
   list.querySelectorAll('.capsule-card').forEach(function(card) {
     var pseudonym = card.dataset.pseudonym;
-    if (pseudonym) CapsulePersonality.applyPersonality(pseudonym, card);
+    var id = card.dataset.capsuleId;
+    if (pseudonym) CapsulePersonality.applyPersonality(pseudonym, card, id);
   });
 }
 
 function openCapsule(id) {
   var c = capsules.find(function(x) { return x.id === id; });
   if (!c) return;
-  var personality = CapsulePersonality.getPersonality(c.pseudonym);
+  var personality = CapsulePersonality.getPersonality(c.pseudonym, c.id);
   var match = matchById.get(String(c.id)) || {};
   var tags = tagsOf(c.publicTags);
 
   IC.showModal(
     '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px">' +
       '<div style="display:flex;align-items:center;gap:12px">' +
-        CapsulePersonality.generateAvatar(c.pseudonym, "medium") +
+        CapsulePersonality.generateAvatar(c.pseudonym, "medium", c.id) +
         '<div>' +
           '<h2 style="color:' + personality.color + ';margin-bottom:4px">' + esc(c.pseudonym) + '</h2>' +
-          CapsulePersonality.createBadge(c.pseudonym) +
+          CapsulePersonality.createBadge(c.pseudonym, c.id) +
         '</div>' +
       '</div>' +
       '<button onclick="IC.closeModal()">关闭</button>' +
