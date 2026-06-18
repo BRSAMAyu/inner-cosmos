@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>慢信往来 · 内宇宙</title>
+  <link rel="stylesheet" href="/css/app.css">
+  <style>
+    /* ── Letter threads — a slow correspondence index ── */
+    .threads-hero {
+      position: relative;
+      min-height: 26vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 0 0 36px;
+      background:
+        radial-gradient(ellipse 55% 70% at 30% 25%, rgba(165,179,194,.10), transparent),
+        radial-gradient(ellipse 45% 55% at 70% 35%, rgba(184,194,174,.08), transparent),
+        linear-gradient(180deg, var(--surface-warm) 0%, transparent 100%);
+      overflow: hidden;
+    }
+    .threads-hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(1px 1px at 22% 30%, rgba(165,179,194,.28), transparent),
+        radial-gradient(1px 1px at 48% 62%, rgba(184,194,174,.22), transparent),
+        radial-gradient(1.2px 1.2px at 78% 20%, rgba(165,179,194,.18), transparent);
+      pointer-events: none;
+      animation: threads-drift 20s var(--ease-drift, var(--ease-flow)) infinite alternate;
+    }
+    @keyframes threads-drift {
+      0% { opacity: .5; transform: translateY(0); }
+      100% { opacity: .8; transform: translateY(-5px); }
+    }
+    .threads-hero-title {
+      font-family: var(--font-hero);
+      font-size: clamp(2rem, 4.2vw, 3rem);
+      color: var(--ink);
+      margin: 0 0 10px;
+      position: relative;
+      z-index: 1;
+    }
+    .threads-hero-sub {
+      font-size: .9375rem;
+      color: var(--muted);
+      line-height: 1.7;
+      max-width: 480px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .threads-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* ── Thread card ── */
+    .thread-card {
+      display: block;
+      text-decoration: none;
+      background:
+        linear-gradient(180deg, rgba(255,250,243,.68), rgba(247,242,236,.44)),
+        var(--surface-paper);
+      border: 1px solid rgba(255,255,255,.20);
+      border-radius: var(--radius-card);
+      padding: 20px 24px;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 2px 8px rgba(0,0,0,.03), 0 8px 32px rgba(0,0,0,.05);
+      transition: transform 400ms var(--ease-bloom), box-shadow 400ms var(--ease-bloom);
+      opacity: 0;
+      transform: translateY(12px);
+      animation: thread-reveal 600ms var(--ease-bloom) forwards;
+    }
+    .thread-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 16px rgba(0,0,0,.06), 0 16px 48px rgba(0,0,0,.08);
+    }
+    @keyframes thread-reveal {
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .thread-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+    .thread-card-title {
+      font-size: 1rem;
+      font-weight: 500;
+      color: var(--ink);
+    }
+    .thread-card-preview {
+      color: var(--muted);
+      font-size: .875rem;
+      line-height: 1.6;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+    .thread-card-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: .8125rem;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .threads-empty {
+      text-align: center;
+      padding: 56px 24px;
+      color: var(--faint);
+    }
+    .threads-empty-icon {
+      font-size: 2rem;
+      margin-bottom: 12px;
+      opacity: .35;
+    }
+
+    /* ── Dark mode ── */
+    body.dark-star .threads-hero {
+      background:
+        radial-gradient(ellipse 55% 70% at 30% 25%, rgba(134,152,169,.06), transparent),
+        radial-gradient(ellipse 45% 55% at 70% 35%, rgba(122,142,127,.05), transparent),
+        linear-gradient(180deg, var(--surface-warm) 0%, transparent 100%);
+    }
+    body.dark-star .thread-card {
+      background:
+        linear-gradient(180deg, rgba(42,38,34,.68), rgba(37,33,29,.48)),
+        rgba(42,38,34,.40);
+      border-color: rgba(163,153,143,.10);
+      box-shadow: 0 2px 8px rgba(0,0,0,.08), 0 8px 32px rgba(0,0,0,.16);
+    }
+    body.dark-star .thread-card:hover {
+      box-shadow: 0 4px 16px rgba(0,0,0,.12), 0 16px 48px rgba(0,0,0,.22);
+    }
+
+    @media (max-width: 640px) {
+      .threads-hero { min-height: 22vh; padding-bottom: 28px; }
+      .thread-card { padding: 16px; }
+    }
+  </style>
+</head>
+<body>
+<main id="ic-main" class="shell">
+  <a class="skip-link ic-skip-link" href="#ic-main">跳到主内容</a>
+  <div class="topbar" data-topbar></div>
+
+  <!-- Hero -->
+  <section class="threads-hero">
+    <span class="route-hint">慢连接 · 往来</span>
+    <h1 class="threads-hero-title">慢信往来</h1>
+    <p class="threads-hero-sub">这里记录你和他人之间，用一封封慢信慢慢靠近的脉络。每一封都值得慢慢回头读。</p>
+  </section>
+
+  <section id="threadsList" class="threads-list"></section>
+</main>
+
+<script src="/js/app.js?v=final-20260612"></script>
+<script src="/js/time-system.js?v=final-20260612"></script>
+<script src="/js/motion.js"></script>
+<script src="/js/weather-system.js"></script>
+<script src="/js/audio-system.js"></script>
+<script src="/js/api.js"></script>
+<script>
+IC.mountShell("慢信往来");
+IC.ensureDemoLogin().then(load);
+
+function esc(text) { return IC.esc(text); }
+
+function threadStatusLabel(status) {
+  var map = { ACTIVE: "往来中", CLOSED: "已结束", ARCHIVED: "已归档" };
+  return map[status] || status || "往来中";
+}
+
+function threadStatusBadge(status) {
+  var map = { ACTIVE: "badge-replied", CLOSED: "badge-read", ARCHIVED: "badge-read" };
+  return map[status] || "badge-read";
+}
+
+async function load() {
+  var results = await Promise.all([
+    API.letterThreads(),
+    API.letterInbox(),
+    API.letterOutbox()
+  ]);
+  var threads = (results[0].success ? results[0].data : []) || [];
+  var inbox = (results[1].success ? results[1].data : []) || [];
+  var outbox = (results[2].success ? results[2].data : []) || [];
+
+  /* Index every known letter by id so we can resolve each thread's anchor
+     letter (firstLetterId) into a title + a link to read it. listThreads does
+     not return the individual letters, so we stitch against inbox/outbox. */
+  var byId = {};
+  [].concat(inbox, outbox).forEach(function(l) { if (l && l.id) byId[l.id] = l; });
+
+  renderThreads(threads, byId);
+}
+
+function renderThreads(threads, byId) {
+  var list = document.getElementById("threadsList");
+  if (!threads.length) {
+    list.innerHTML =
+      '<div class="threads-empty">' +
+        '<div class="threads-empty-icon">~</div>' +
+        IC.empty("还没有慢信往来。当你用一封慢信回复他人，这里会留下脉络。") +
+      '</div>';
+    return;
+  }
+
+  list.innerHTML = threads.map(function(t, idx) {
+    var delay = Math.min(idx * 60, 480);
+    var anchor = byId[t.firstLetterId] || null;
+    var title = anchor ? (anchor.title || "无标题") : "一封慢信";
+    var preview = anchor ? (anchor.letterBody || "") : "";
+    /* Prefer linking to the inbox copy of the anchor letter (the received one),
+       falling back to outbox. If neither is visible to this user, point to inbox. */
+    var href = "/pages/inbox.html";
+    if (anchor && anchor.id) href = "/pages/inbox.html?letter=" + anchor.id;
+
+    return '<a class="thread-card" href="' + href + '" style="animation-delay:' + delay + 'ms">' +
+      '<div class="thread-card-header">' +
+        '<strong class="thread-card-title">' + esc(title) + '</strong>' +
+        '<span class="badge ' + threadStatusBadge(t.status) + '">' + threadStatusLabel(t.status) + '</span>' +
+      '</div>' +
+      '<p class="thread-card-preview">' + esc(preview.substring(0, 120)) + (preview.length > 120 ? "..." : "") + '</p>' +
+      '<div class="thread-card-footer">' +
+        '<span class="muted">' + (t.lastLetterAt ? ("最近一封 · " + IC.formatTime(t.lastLetterAt)) : "尚未投递") + '</span>' +
+        '<span class="muted">共鸣体 #' + esc(t.capsuleId) + '</span>' +
+      '</div>' +
+    '</a>';
+  }).join("");
+}
+IC.hideLoading();
+</script>
+</body>
+</html>

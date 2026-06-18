@@ -326,13 +326,14 @@ const API = {
     return IC.api(`/api/letters/${id}`);
   },
   async letterReplyWithLetter(id, data) {
-    // FEATURE-STUB #33 (slow-letter reply-with-letter + threads): awaits the
-    // slow-letter "reply with a letter of your own" feature; no caller yet.
+    // FEATURE #33 (slow-letter reply-with-letter): wired from inbox.html
+    // (openReplyWithLetter). Creates a reply slow letter + thread; the
+    // LetterGuardAgent safety gate runs server-side before any insert.
     return IC.api(`/api/letters/${id}/reply-with-letter`, { method: "POST", body: JSON.stringify(data) });
   },
   async letterThreads() {
-    // FEATURE-STUB #33 (slow-letter reply-with-letter + threads): awaits the
-    // slow-letter conversation-threads view; no caller yet.
+    // FEATURE #33 (slow-letter conversation-threads): wired from
+    // letter-threads.html, which renders the user's slow-letter threads.
     return IC.api("/api/letters/threads");
   },
   async letterReport(id, reason) {
