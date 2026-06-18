@@ -67,15 +67,20 @@ public final class CapsuleIdentityUtils {
             // Encode code points < 0x10000 as a single char; for BMP this is UTF-16 == UTF-8 byte sum
             // For determinism we sum the UTF-8 bytes of the char (JS encodeURIComponent-style not used;
             // JS mirrors this exact byte expansion).
+            //
+            // Wrap the accumulator to 32 bits EACH iteration so this is provably identical to the JS
+            // twin, which applies `| 0` (int32 wrap) on every step. Without this mid-iteration wrap a
+            // 64-bit long would let high bits accumulate and could diverge from JS for long non-ASCII
+            // pseudonym fallbacks. The low-32 result is the same either way for ASCII `id:N` seeds.
             if (c < 0x80) {
-                hash = ((hash << 5) + hash) + c;
+                hash = (((hash << 5) + hash) + c) & 0xFFFFFFFFL;
             } else if (c < 0x800) {
-                hash = ((hash << 5) + hash) + (0xC0 | (c >> 6));
-                hash = ((hash << 5) + hash) + (0x80 | (c & 0x3F));
+                hash = (((hash << 5) + hash) + (0xC0 | (c >> 6))) & 0xFFFFFFFFL;
+                hash = (((hash << 5) + hash) + (0x80 | (c & 0x3F))) & 0xFFFFFFFFL;
             } else {
-                hash = ((hash << 5) + hash) + (0xE0 | (c >> 12));
-                hash = ((hash << 5) + hash) + (0x80 | ((c >> 6) & 0x3F));
-                hash = ((hash << 5) + hash) + (0x80 | (c & 0x3F));
+                hash = (((hash << 5) + hash) + (0xE0 | (c >> 12))) & 0xFFFFFFFFL;
+                hash = (((hash << 5) + hash) + (0x80 | ((c >> 6) & 0x3F))) & 0xFFFFFFFFL;
+                hash = (((hash << 5) + hash) + (0x80 | (c & 0x3F))) & 0xFFFFFFFFL;
             }
         }
         // Normalize to unsigned 32-bit range, matching JS bitwise | 0 wraparound.

@@ -134,11 +134,30 @@ window.CapsulePersonality = {
   },
 
   // Spread bits so palette/mood/avatar indices are decorrelated.
+  // Salt term MUST equal `salt * 0x9E3779B1` mod 2^32 — the signed int32 form of
+  // 0x9E3779B1 is -1640531535 (2654435761 - 2^32). Mirrors Java exactly:
+  // CapsuleIdentityUtils.index: `(hash * 2654435761L + salt * 0x9E3779B1L) & 0xFFFFFFFFL`.
   _index(hash, modulus, salt) {
     // Use Math.imul for 32-bit multiply semantics identical to Java long*int low bits.
-    let mixed = (Math.imul(hash >>> 0, 2654435761) + Math.imul(salt | 0, -1640531527)) >>> 0;
+    let mixed = (Math.imul(hash >>> 0, 2654435761) + Math.imul(salt | 0, 0x9E3779B1)) >>> 0;
     return mixed % modulus;
   },
+
+  // ── Golden vectors (must match CapsuleIdentityUtilsGoldenVectorTest) ──
+  // These lock the Java↔JS contract. If you ever edit the hash, palette table,
+  // mood table, salts, or this _index derivation, RE-DERIVE these from the Java
+  // source-of-truth (CapsuleIdentityUtils) and update both sides together.
+  //
+  //   seed                paletteIndex  moodIndex  starPoints
+  //   "id:0"              -> 9,  6, 6
+  //   "id:1"              -> 6,  7, 6
+  //   "id:2"              -> 7,  2, 6
+  //   "id:7"              -> 0,  9, 8
+  //   "id:42"             -> 3,  4, 8
+  //   "id:100"            -> 10, 5, 5
+  //   "id:9999"           -> 9,  2, 7
+  //   "深夜写作者"          -> 11, 8, 7
+  //   "风筝的线"            -> 10, 1, 5
 
   paletteIndex(seed) {
     return this._index(this.hashSeed(seed), this._PALETTES.length, 1);
