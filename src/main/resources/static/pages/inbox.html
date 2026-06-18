@@ -215,6 +215,7 @@
     <span class="route-hint">慢连接信箱</span>
     <h1 class="inbox-hero-title" id="page-title">慢信箱</h1>
     <p class="inbox-hero-sub">每一封信都穿过了一段宇宙距离。不催促，不焦虑。</p>
+    <p style="margin-top:14px;position:relative;z-index:1"><a class="muted" href="/pages/letter-threads.html" style="font-size:.875rem;border-bottom:1px solid var(--line);text-decoration:none;color:var(--muted)">查看慢信往来 →</a></p>
   </section>
 
   <!-- Tab bar -->
@@ -253,6 +254,9 @@ IC.ensureDemoLogin().then(load);
 var allInbox = [];
 var allOutbox = [];
 var currentTab = "inbox";
+/* The most recently opened letter detail, kept so the reply-with-letter form
+   can read the original sender / capsule without an extra round-trip. */
+var currentDetail = null;
 
 function esc(text) { return IC.esc(text); }
 
@@ -324,6 +328,7 @@ async function openLetter(id, direction) {
   var r = await API.letterDetail(id);
   if (!r.success || !r.data) { IC.toast("无法加载信件", "warn"); return; }
   var l = r.data;
+  currentDetail = l;
 
   document.getElementById("modalTitle").textContent = l.title || "信件详情";
   document.getElementById("modalContent").innerHTML =
@@ -342,6 +347,7 @@ async function openLetter(id, direction) {
       (direction === "in" && (l.status === "DELIVERED" || l.status === "READ") ?
         '<button onclick="letterAction(' + l.id + ',\'read\')">标记已读</button>' +
         '<button onclick="letterAction(' + l.id + ',\'reply\')">回复慢信</button>' +
+        '<button onclick="openReplyWithLetter(' + l.id + ')">用一封慢信回复</button>' +
         '<button onclick="letterAction(' + l.id + ',\'decline\')">婉拒</button>' : '') +
       '<button onclick="letterAction(' + l.id + ',\'archive\')">归档</button>' +
       (direction === "in" ?
@@ -355,6 +361,71 @@ async function openLetter(id, direction) {
 
 function closeLetterDetail() {
   document.getElementById("letterModal").classList.add("hidden");
+}
+
+/* ── Reply with a letter of your own (#33) ──
+   A small, low-pressure write form that lets the receiver answer a received
+   letter with a new slow letter, instead of just flipping the status. */
+function openReplyWithLetter(id) {
+  var l = currentDetail;
+  if (!l || (l.id !== id)) {
+    IC.toast("请先重新打开这封信再回复。", "warn");
+    return;
+  }
+  /* The reply is addressed to the original sender, routed via the original capsule. */
+  IC.showModal(
+    '<h2>用一封慢信回复</h2>' +
+    '<p class="muted" style="margin-bottom:16px;line-height:1.7">不必急着回应，慢慢写下你想让对方知道的那一句。</p>' +
+    '<div class="letter-field">' +
+      '<label for="replyTitle" style="display:block;font-size:.8125rem;color:var(--muted);margin-bottom:6px">给这封回信一个标题</label>' +
+      '<input id="replyTitle" class="letter-input" placeholder="例如：关于那一段共鸣" style="width:100%;padding:12px 16px;font-size:.9375rem;border:1px solid var(--line);border-radius:var(--radius);background:rgba(247,242,236,.48);color:var(--text);box-sizing:border-box">' +
+    '</div>' +
+    '<div class="letter-field">' +
+      '<label for="replyBody" style="display:block;font-size:.8125rem;color:var(--muted);margin-bottom:6px">信的内容</label>' +
+      '<textarea id="replyBody" placeholder="你可以写：我在哪一点上停了下来；我希望对方知道什么。" style="min-height:160px;width:100%;padding:12px 16px;font-size:.9375rem;line-height:1.8;border:1px solid var(--line);border-radius:var(--radius);background:rgba(247,242,236,.48);color:var(--text);resize:vertical;box-sizing:border-box"></textarea>' +
+    '</div>' +
+    '<div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">' +
+      '<button onclick="submitReplyWithLetter(' + id + ')">投递回信</button>' +
+      '<button onclick="IC.closeModal()">稍后再写</button>' +
+    '</div>'
+  );
+}
+
+async function submitReplyWithLetter(id) {
+  var l = currentDetail;
+  if (!l) { IC.toast("请先重新打开这封信再回复。", "warn"); return; }
+  var title = document.getElementById("replyTitle").value.trim();
+  var body = document.getElementById("replyBody").value.trim();
+  if (!title) { IC.toast("给回信起一个标题吧。", "warn"); return; }
+  if (!body) { IC.toast("先写下一点点内容再投递。", "warn"); return; }
+
+  /* Reply is addressed to the original sender, routed through the original capsule. */
+  var payload = {
+    receiverUserId: l.senderUserId,
+    receiverCapsuleId: l.receiverCapsuleId,
+    title: title,
+    letterBody: body
+  };
+  try {
+    var r = await API.letterReplyWithLetter(id, payload);
+    if (r.success && r.data) {
+      IC.closeModal();
+      closeLetterDetail();
+      IC.showModalText(
+        "回信已作为一封新的慢信保存为草稿。它会穿过一小段宇宙距离，在对方安静的时刻抵达。",
+        { title: "回信已封缄", confirmText: "好的" }
+      );
+      IC.pulse("letter");
+      load();
+    } else if (r && r.message && r.message.indexOf("SAFETY") >= 0) {
+      /* Guard blocked the content — keep it warm, never expose raw detail. */
+      IC.toast("这封信暂时没有被送出，可以换一种更温和的表达再试试。", "warn");
+    } else {
+      IC.toast("回信暂时没有被保存，请稍后再试。", "warn");
+    }
+  } catch (e) {
+    IC.toast("连接暂时没有响应，请稍后再试。", "warn");
+  }
 }
 
 async function letterAction(id, action) {
