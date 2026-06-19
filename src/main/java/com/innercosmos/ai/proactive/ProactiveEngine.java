@@ -103,10 +103,17 @@ public class ProactiveEngine {
 
     private String generateContent(Long userId, String triggerType) {
         String prompt = "你是 Aurora，用户开启了" + triggerType + "模式。请写一句温柔的主动问候，不超过50字。";
+        LlmRequest req = new LlmRequest(userId, "PROACTIVE", prompt);
         try {
-            return llm.chat(new LlmRequest(userId, "PROACTIVE", prompt));
+            return llm.chat(req);
         } catch (Exception e) {
-            return "你好，今天过得怎么样？";
+            log.warn("LLM call failed for userId {} triggerType {}, retrying...", userId, triggerType, e);
+            try {
+                return llm.chat(req);
+            } catch (Exception retryEx) {
+                log.info("using fallback prompt for userId {}", userId);
+                return "你好，今天过得怎么样？";
+            }
         }
     }
 

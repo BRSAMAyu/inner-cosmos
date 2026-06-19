@@ -70,8 +70,20 @@ public class AliveDecisionEngine {
         }
 
         String prompt = buildPrompt(userId);
+        LlmRequest req = new LlmRequest(userId, "ALIVE_DECISION", prompt);
+        String raw;
         try {
-            String raw = llm.chat(new LlmRequest(userId, "ALIVE_DECISION", prompt));
+            raw = llm.chat(req);
+        } catch (Exception e) {
+            log.warn("ALIVE decision failed for user {}: {}", userId, e.getMessage(), e);
+            try {
+                raw = llm.chat(req);
+            } catch (Exception retryEx) {
+                log.warn("ALIVE decision retry also failed for user {}: {}", userId, retryEx.getMessage(), retryEx);
+                return;
+            }
+        }
+        try {
             var decision = parse(raw);
 
             switch (decision.decide()) {
@@ -92,7 +104,7 @@ public class AliveDecisionEngine {
                 }
             }
         } catch (Exception e) {
-            log.warn("ALIVE decision failed for user {}: {}", userId, e.getMessage());
+            log.warn("ALIVE decision processing failed for user {}: {}", userId, e.getMessage(), e);
         }
     }
 
