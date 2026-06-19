@@ -70,14 +70,28 @@ public class SessionCloser {
     @Async
     public void runAfterGoodbye(Long userId, Long sessionId, String goodbyeStrength) {
         try {
-            // Guard: if session already closed, abort
+            // Guard: if session row is missing, abort early
             var sess = sessionMapper.selectById(sessionId);
             if (sess == null) {
                 log.warn("Session {} not found for goodbye closer", sessionId);
                 return;
             }
             if (sess.endedAt != null) {
-                log.info("Session {} already closed, skipping goodbye closer", sessionId);
+                log.debug("Session {} already closed, skipping goodbye closer", sessionId);
+                return;
+            }
+
+            // Atomically claim the session close: update endedAt WHERE endedAt IS NULL.
+            // If 0 rows affected, another concurrent call already won — skip.
+            DialogSession update = new DialogSession();
+            update.id = sess.id;
+            update.endedAt = LocalDateTime.now();
+            int rows = sessionMapper.update(update,
+                    new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<DialogSession>()
+                            .eq("id", sessionId)
+                            .isNull("endedAt"));
+            if (rows == 0) {
+                log.debug("Session {} already closed by concurrent closer, skipping", sessionId);
                 return;
             }
 
@@ -106,9 +120,7 @@ public class SessionCloser {
             // Step 5: Relationship update (evidence-driven)
             updateRelationship(userId, messages, portraitDeltas);
 
-            // Step 6: Close session row
-            sess.endedAt = LocalDateTime.now();
-            sessionMapper.updateById(sess);
+            // Step 6: session row already closed atomically above — no updateById needed here
 
             // Step 7: Trigger self reflection (async)
             List<DialogMessage> recentMessages = messageMapper.selectList(
