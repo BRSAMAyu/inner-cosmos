@@ -163,6 +163,8 @@ CREATE TABLE IF NOT EXISTS tb_emotion_trace (
   weather_type VARCHAR(32),
   trigger_scene TEXT,
   record_date DATE,
+  emotion_spectrum TEXT,
+  analysis_source VARCHAR(32),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_emotion_trace_user (user_id)
