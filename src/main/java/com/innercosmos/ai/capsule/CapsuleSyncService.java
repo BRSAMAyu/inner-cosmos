@@ -11,6 +11,7 @@ import com.innercosmos.mapper.EchoCapsuleMapper;
 import com.innercosmos.mapper.UserLongTermMemoryMapper;
 import com.innercosmos.service.MemoryService;
 import com.innercosmos.service.NotificationService;
+import com.innercosmos.util.JsonUtils;
 import com.google.common.util.concurrent.RateLimiter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,7 +22,6 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Capsule Sync Service manages the privacy-preserving synchronization
@@ -52,9 +52,6 @@ public class CapsuleSyncService {
 
     // Rate limiter to prevent LLM spam during bulk updates
     private final RateLimiter rateLimiter = RateLimiter.create(5.0); // 5 capsule updates per second max
-
-    // In-memory cache of recent themes per user
-    private final Map<Long, List<String>> recentThemesCache = new ConcurrentHashMap<>();
 
     public CapsuleSyncService(PiiPrivacyFilter piiFilter,
                                CapsuleContextRegenerator regenerator,
@@ -102,12 +99,6 @@ public class CapsuleSyncService {
             log.info("User {} has no capsules to sync", userId);
             return;
         }
-
-        // 4. Build recent themes from LTM
-        List<String> recentThemes = buildRecentThemes(ltmEntries);
-
-        // Cache themes so an approved decide() can reuse them
-        recentThemesCache.put(userId, recentThemes);
 
         // 5. Create or update queue entries (deduped) and async regenerate
         for (EchoCapsule capsule : capsules) {
@@ -308,10 +299,12 @@ public class CapsuleSyncService {
     }
 
     /**
-     * IC-CAP-002 FIX-4: durable theme resolution. Queries the user's approved LTM (the same
-     * source {@link #buildSnapshot} uses) and derives themes via {@link #buildRecentThemes}.
-     * Falls back to the in-memory {@link #recentThemesCache} only when LTM produces nothing,
-     * so the retry/approval paths no longer silently degrade after a restart.
+     * IC-CAP-002 FIX-4 / RUN-003 polish (FIX-E): durable theme resolution. Queries the user's
+     * approved LTM (the same source {@link #buildSnapshot} uses) and derives themes via
+     * {@link #buildRecentThemes}. LTM is the single durable source — the former in-memory
+     * recentThemesCache was vestigial (it was only ever populated from this exact same LTM
+     * query, so it could never hold themes that LTM lacked) and has been removed. When LTM
+     * yields nothing, this returns an empty list and regeneration proceeds without theme hints.
      */
     private List<String> resolveRecentThemes(Long userId) {
         List<UserLongTermMemory> ltm = ltmMapper.selectList(
@@ -321,11 +314,7 @@ public class CapsuleSyncService {
                         .orderByDesc("created_at")
                         .last("LIMIT 50")
         );
-        List<String> themes = buildRecentThemes(ltm);
-        if (themes.isEmpty()) {
-            return recentThemesCache.getOrDefault(userId, List.of());
-        }
-        return themes;
+        return buildRecentThemes(ltm);
     }
 
     private long backoffMinutes(int attempt) {
@@ -350,14 +339,23 @@ public class CapsuleSyncService {
         return themes.stream().limit(10).toList();
     }
 
-    private String buildDiffSummary(PiiPrivacyFilter.FilteredPortrait filtered, EchoCapsule capsule) {
+    /**
+     * Build the proposed-context diff as JSON. FIX-C: every interpolated string value is routed
+     * through {@link JsonUtils#escapeJsonString} so a {@code "} or {@code \} in a PII-filtered
+     * value produces well-formed (parseable) JSON, consistent with the sibling escaping in
+     * CapsuleServiceImpl / CapsuleContextRegenerator. Package-private for direct unit testing.
+     */
+    String buildDiffSummary(PiiPrivacyFilter.FilteredPortrait filtered, EchoCapsule capsule) {
+        String valuesArray = filtered.values().stream()
+                .map(v -> "\"" + JsonUtils.escapeJsonString(v) + "\"")
+                .collect(java.util.stream.Collectors.joining(","));
         return String.format(
-                "{\"pseudonym\":\"%s\",\"ageRange\":\"%s\",\"occupation\":\"%s\",\"city\":\"%s\",\"values\":[\"%s\"],\"dropped\":%s}",
-                filtered.pseudonym() != null ? filtered.pseudonym() : "",
-                filtered.ageRange() != null ? filtered.ageRange() : "",
-                filtered.occupationCategory() != null ? filtered.occupationCategory() : "",
-                filtered.city() != null ? filtered.city() : "",
-                String.join("\",\"", filtered.values()),
+                "{\"pseudonym\":\"%s\",\"ageRange\":\"%s\",\"occupation\":\"%s\",\"city\":\"%s\",\"values\":[%s],\"dropped\":%s}",
+                JsonUtils.escapeJsonString(filtered.pseudonym()),
+                JsonUtils.escapeJsonString(filtered.ageRange()),
+                JsonUtils.escapeJsonString(filtered.occupationCategory()),
+                JsonUtils.escapeJsonString(filtered.city()),
+                valuesArray,
                 filtered.droppedFields()
         );
     }

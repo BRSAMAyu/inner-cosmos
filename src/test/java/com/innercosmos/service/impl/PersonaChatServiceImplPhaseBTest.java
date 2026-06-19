@@ -164,6 +164,15 @@ class PersonaChatServiceImplPhaseBTest {
         when(agentContextAssembler.assemble(any(), any(), any(), anyBoolean())).thenReturn(new AgentContext());
         when(structuredAiService.call(any(), any(), any(), any(), any(), any())).thenReturn(unavailable());
         when(boundaryMapper.selectOne(any())).thenReturn(null);
+        // Simulate MyBatis writing back the generated key on insert of the VISITOR message,
+        // so the AI-unavailable cleanup can delete it by id.
+        when(messageMapper.insert(any(PersonaChatMessage.class))).thenAnswer(inv -> {
+            PersonaChatMessage m = inv.getArgument(0);
+            if ("VISITOR".equals(m.senderType)) {
+                m.id = 7777L;
+            }
+            return 1;
+        });
 
         service.reply(userId, sessionId, "hi");
 
@@ -172,6 +181,11 @@ class PersonaChatServiceImplPhaseBTest {
                 any(Object.class), any(Object.class), any(Object.class));
         // Energy must NOT be bumped on the unavailable path.
         verify(capsuleMapper, never()).updateById(any(EchoCapsule.class));
+
+        // FIX-B: symmetry with the over-limit branch — an AI-unavailable turn must leave NO
+        // visitor message behind to pollute the next turn's recentHistory. The inserted VISITOR
+        // message is deleted by its id.
+        verify(messageMapper).deleteById(7777L);
 
         // IC-CAP-002 FIX-3: an unanswered turn un-charges the day quota, so session.turnCount
         // must NOT advance — otherwise the session counter and the day quota diverge.

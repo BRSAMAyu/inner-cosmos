@@ -10,6 +10,7 @@ import com.innercosmos.mapper.CapsuleSyncQueueMapper;
 import com.innercosmos.mapper.EchoCapsuleMapper;
 import com.innercosmos.mapper.UserLongTermMemoryMapper;
 import com.innercosmos.service.NotificationService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -174,6 +175,32 @@ class CapsuleSyncServiceFailureTest {
     // the regenerator caught the exception / treated blank output as a no-op and returned
     // normally, so regenerateOne reported SYNCED + SYNC_DONE (these assertions would fail).
     // ---------------------------------------------------------------------------------
+
+    // ---------------------------------------------------------------------------------
+    // FIX-C (JSON escaping): buildDiffSummary interpolates PII-filtered values into a JSON
+    // string. A value containing a double-quote or backslash must NOT produce malformed JSON.
+    // ---------------------------------------------------------------------------------
+
+    @Test
+    @DisplayName("FIX-C: a value containing a double-quote yields parseable JSON (no malformed diff)")
+    void buildDiffSummary_escapesQuotesIntoParseableJson() throws Exception {
+        // pseudonym + a value both carry characters that would break raw String.format JSON.
+        PiiPrivacyFilter.FilteredPortrait dirty = new PiiPrivacyFilter.FilteredPortrait(
+                "TA\"同学\\", "上\"海", "25-30", "互联网/\"技术",
+                List.of("真\"实", "back\\slash"), null, List.of("倾听者"), List.of());
+        EchoCapsule capsule = existingCapsule(100L, 1L);
+
+        String json = service.buildDiffSummary(dirty, capsule);
+
+        // Must round-trip through a strict JSON parser without throwing.
+        ObjectMapper mapper = new ObjectMapper();
+        var node = mapper.readTree(json);
+        assertEquals("TA\"同学\\", node.get("pseudonym").asText(), "pseudonym must round-trip exactly");
+        assertEquals("上\"海", node.get("city").asText(), "city must round-trip exactly");
+        assertTrue(node.get("values").isArray(), "values must parse as a JSON array");
+        assertEquals("真\"实", node.get("values").get(0).asText(), "value with quote must round-trip");
+        assertEquals("back\\slash", node.get("values").get(1).asText(), "value with backslash must round-trip");
+    }
 
     private CapsuleSyncService serviceWithRealRegenerator(LlmClient llmClient,
                                                           EchoCapsuleMapper realCapsuleMapper) {

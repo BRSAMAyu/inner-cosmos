@@ -214,6 +214,14 @@ public class PersonaChatServiceImpl implements PersonaChatService {
 
                 if (aiUnavailable) {
                     compensateQuota(userId, session.capsuleId, today);
+                    // IC-CAP RUN-003 polish (FIX-B): make AI-unavailable symmetric with the
+                    // over-limit (LETTER_GUIDED) branch — an unanswered turn must leave NO
+                    // conversation trace. The visitor message was inserted above to feed the
+                    // (now-failed) AI call; delete it by id so it does not pollute the next
+                    // turn's recentHistory. The quota was already compensated.
+                    if (userMessage.id != null) {
+                        messageMapper.deleteById(userMessage.id);
+                    }
                     // Do NOT bump echo energy on the unavailable path.
                     // IC-CAP-002 FIX-3: an unanswered turn un-charges the day quota, so it must
                     // NOT advance session.turnCount either — otherwise the session counter and the
@@ -306,7 +314,9 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         double freshness = capsule.freshnessScore == null ? 0.0 : capsule.freshnessScore;
         capsule.echoEnergy = Math.min(1.0, energy + 0.02);
         capsule.freshnessScore = Math.max(freshness, 0.9);
-        capsule.lastActivityAt = LocalDateTime.now();
+        // IC-CAP RUN-003 polish (FIX-D): use the same fixed zone as all quota-date arithmetic
+        // so a capsule's activity timestamp is consistent with its daily-quota boundary.
+        capsule.lastActivityAt = LocalDateTime.now(QUOTA_ZONE);
         capsuleMapper.updateById(capsule);
     }
 
