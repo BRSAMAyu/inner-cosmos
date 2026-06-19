@@ -63,6 +63,7 @@ public class AgentContextAssembler {
     @Autowired(required = false) private AuroraConstitutionService auroraConstitutionService;
     @Autowired(required = false) private AuroraSelfContinuityService auroraSelfContinuityService;
     @Autowired(required = false) private EmotionInsightService emotionInsightService;
+    @Autowired(required = false) private com.innercosmos.service.EmotionBaselineService emotionBaselineService;
 
     public AgentContextAssembler(UserProfileMapper userProfileMapper,
                                  DialogMessageMapper dialogMessageMapper,
@@ -447,6 +448,10 @@ public class AgentContextAssembler {
         if (portraitLines.isEmpty()) {
             portraitLines = "暂无画像数据";
         }
+        // IC-EMO-003: mid-term emotion baseline line — the long-term timescale that
+        // coexists with the Phase-2 real-time "此刻情绪". Null-guarded so lightweight
+        // tests that omit the bean still build a valid block.
+        portraitLines = portraitLines + "\n情绪基线：" + emotionBaselineLine(userId);
         StringBuilder sb = new StringBuilder();
         // M5: Aurora Constitution (prepended)
         if (auroraConstitutionService != null) {
@@ -455,6 +460,7 @@ public class AgentContextAssembler {
                 sb.append(constitution).append("\n");
             }
         }
+        // (baseline appended into portraitLines above)
         sb.append(String.format("""
                 【Aurora Identity】
                 %s
@@ -469,5 +475,28 @@ public class AgentContextAssembler {
                 rel == null ? "" : rel.toPromptString(),
                 portraitLines));
         return sb.toString();
+    }
+
+    /**
+     * IC-EMO-003: render the mid-term emotion-baseline line for the User Portrait
+     * block. Returns the baseline's human-readable label when a baseline exists,
+     * else "暂无情绪基线". Null-safe: when the {@code emotionBaselineService} bean is
+     * unavailable (lightweight tests) or anything fails, returns "暂无情绪基线"
+     * rather than breaking block assembly.
+     */
+    private String emotionBaselineLine(Long userId) {
+        if (emotionBaselineService == null) {
+            return "暂无情绪基线";
+        }
+        try {
+            com.innercosmos.ai.semantic.EmotionBaseline baseline =
+                    emotionBaselineService.computeBaseline(userId);
+            if (baseline == null || !baseline.present || blank(baseline.baselineLabel)) {
+                return "暂无情绪基线";
+            }
+            return baseline.baselineLabel;
+        } catch (Exception e) {
+            return "暂无情绪基线";
+        }
     }
 }

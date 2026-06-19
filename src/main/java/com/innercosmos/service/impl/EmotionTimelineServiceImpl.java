@@ -1,11 +1,15 @@
 package com.innercosmos.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.innercosmos.ai.semantic.EmotionBaseline;
 import com.innercosmos.ai.structured.StructuredAiService;
 import com.innercosmos.entity.EmotionTimeline;
+import com.innercosmos.entity.EmotionTrace;
 import com.innercosmos.entity.MemoryCard;
 import com.innercosmos.mapper.EmotionTimelineMapper;
+import com.innercosmos.mapper.EmotionTraceMapper;
 import com.innercosmos.mapper.MemoryCardMapper;
+import com.innercosmos.service.EmotionBaselineService;
 import com.innercosmos.service.EmotionTimelineService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,14 +27,20 @@ public class EmotionTimelineServiceImpl implements EmotionTimelineService {
     private final StructuredAiService structuredAiService;
     private final EmotionTimelineMapper emotionTimelineMapper;
     private final MemoryCardMapper memoryCardMapper;
+    private final EmotionTraceMapper emotionTraceMapper;
+    private final EmotionBaselineService emotionBaselineService;
 
     public EmotionTimelineServiceImpl(
             StructuredAiService structuredAiService,
             EmotionTimelineMapper emotionTimelineMapper,
-            MemoryCardMapper memoryCardMapper) {
+            MemoryCardMapper memoryCardMapper,
+            EmotionTraceMapper emotionTraceMapper,
+            EmotionBaselineService emotionBaselineService) {
         this.structuredAiService = structuredAiService;
         this.emotionTimelineMapper = emotionTimelineMapper;
         this.memoryCardMapper = memoryCardMapper;
+        this.emotionTraceMapper = emotionTraceMapper;
+        this.emotionBaselineService = emotionBaselineService;
     }
 
     @Override
@@ -169,6 +179,79 @@ public class EmotionTimelineServiceImpl implements EmotionTimelineService {
 
         // Convert variance to stability score (lower variance = higher stability)
         return Math.max(0, Math.min(1, 1 - variance));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void aggregateFromTraces(Long userId, LocalDate date) {
+        QueryWrapper<EmotionTrace> q = new QueryWrapper<>();
+        q.eq("user_id", userId).eq("record_date", date);
+        List<EmotionTrace> traces = emotionTraceMapper.selectList(q);
+        if (traces == null || traces.isEmpty()) {
+            return;
+        }
+
+        // Deterministic, no LLM: dominant = most frequent emotion (ties -> name asc);
+        // intensity average = arithmetic mean; spectrum = normalized emotion frequency.
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        double totalIntensity = 0;
+        int withScore = 0;
+        for (EmotionTrace t : traces) {
+            String emotion = (t.emotionName == null || t.emotionName.isBlank()) ? "平静" : t.emotionName.trim();
+            counts.merge(emotion, 1, Integer::sum);
+            if (t.emotionScore != null) {
+                totalIntensity += EmotionTrace.clampScore(t.emotionScore);
+                withScore++;
+            }
+        }
+        String dominant = counts.entrySet().stream()
+                .sorted((a, b) -> {
+                    int c = Integer.compare(b.getValue(), a.getValue());
+                    return c != 0 ? c : a.getKey().compareTo(b.getKey());
+                })
+                .map(Map.Entry::getKey)
+                .findFirst()
+                .orElse("平静");
+        double intensityAvg = withScore == 0 ? 0.0 : totalIntensity / withScore;
+        int total = traces.size();
+        String spectrum = counts.entrySet().stream()
+                .map(e -> String.format("{\"emotion\":\"%s\",\"ratio\":%.2f}",
+                        e.getKey(), (double) e.getValue() / total))
+                .collect(Collectors.joining(",", "[", "]"));
+
+        QueryWrapper<EmotionTimeline> tq = new QueryWrapper<>();
+        tq.eq("user_id", userId).eq("record_date", date);
+        EmotionTimeline existing = emotionTimelineMapper.selectOne(tq);
+        if (existing != null) {
+            existing.dominantEmotion = dominant;
+            existing.emotionSpectrum = spectrum;
+            existing.intensityAverage = intensityAvg;
+            existing.triggerSummary = String.format("来自%d条情绪轨迹的聚合", total);
+            existing.memoryCount = total;
+            emotionTimelineMapper.updateById(existing);
+        } else {
+            EmotionTimeline timeline = new EmotionTimeline();
+            timeline.userId = userId;
+            timeline.recordDate = date;
+            timeline.dominantEmotion = dominant;
+            timeline.emotionSpectrum = spectrum;
+            timeline.intensityAverage = intensityAvg;
+            timeline.triggerSummary = String.format("来自%d条情绪轨迹的聚合", total);
+            timeline.memoryCount = total;
+            emotionTimelineMapper.insert(timeline);
+        }
+    }
+
+    @Override
+    public EmotionTimelineView getTimelineView(Long userId, int days) {
+        EmotionTimelineView view = new EmotionTimelineView();
+        view.trend = getTrend(userId, days);
+        EmotionBaseline baseline = emotionBaselineService == null
+                ? EmotionBaseline.absent(days)
+                : emotionBaselineService.computeBaseline(userId, days);
+        view.baseline = baseline;
+        view.stabilityScore = baseline.stabilityScore;
+        return view;
     }
 
     private String buildEmotionAggregationPrompt(List<MemoryCard> cards) {

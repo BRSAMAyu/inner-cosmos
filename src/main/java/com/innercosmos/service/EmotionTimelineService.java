@@ -38,4 +38,30 @@ public interface EmotionTimelineService {
      * Calculate emotion stability score (0-1, higher = more stable).
      */
     double calculateStability(Long userId, int days);
+
+    /**
+     * IC-EMO-003 (additive): aggregate a day's emotion from enriched
+     * {@link com.innercosmos.entity.EmotionTrace} rows (deterministic, no LLM) and
+     * upsert the timeline row for that date. Complements — does not replace — the
+     * MemoryCard-based {@link #aggregateForDate}. No traces for the day => no-op.
+     */
+    void aggregateFromTraces(Long userId, LocalDate date);
+
+    /**
+     * IC-EMO-003 (additive): the visualization view — trend points plus the
+     * mid-term emotion baseline and a stability score derived from enriched trace
+     * data. Backward-compatible; existing getters are unchanged.
+     */
+    EmotionTimelineView getTimelineView(Long userId, int days);
+
+    /**
+     * View VO for the enriched timeline visualization: the trend series for the
+     * chart, the computed {@link com.innercosmos.ai.semantic.EmotionBaseline}, and a
+     * convenience {@code stabilityScore} mirror of {@code baseline.stabilityScore}.
+     */
+    class EmotionTimelineView {
+        public List<EmotionTimeline.TrendPoint> trend;
+        public com.innercosmos.ai.semantic.EmotionBaseline baseline;
+        public double stabilityScore;
+    }
 }
