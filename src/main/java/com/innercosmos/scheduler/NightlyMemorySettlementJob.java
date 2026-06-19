@@ -1,6 +1,7 @@
 package com.innercosmos.scheduler;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.innercosmos.entity.EchoCapsule;
 import com.innercosmos.entity.MemoryCard;
 import com.innercosmos.entity.User;
@@ -27,6 +28,16 @@ public class NightlyMemorySettlementJob {
     private final EmotionBaselineService emotionBaselineService;
     private final EchoCapsuleMapper echoCapsuleMapper;
 
+    // IC-DATA-001: paginate user iteration to avoid full-table OOM on large datasets.
+    private static final int BATCH_SIZE = 200;
+
+    /**
+     * Package-private override for tests — allows forcing a smaller page size
+     * (e.g., 2) so that multi-batch iteration can be exercised without 200+ rows.
+     * Production code never touches this field; it remains equal to BATCH_SIZE.
+     */
+    int batchSizeForTest = BATCH_SIZE;
+
     // IC-CAP-002 B-4: nightly multiplicative decay toward floors.
     private static final double ENERGY_DECAY = 0.97;
     private static final double ENERGY_FLOOR = 0.3;
@@ -50,25 +61,36 @@ public class NightlyMemorySettlementJob {
     @Scheduled(cron = "0 0 2 * * ?")
     public void nightlyRecalculation() {
         log.info("Nightly memory settlement started");
-        List<User> users = userMapper.selectList(null);
+        long offset = 0;
+        List<User> batch;
+        int batchNum = 0;
+        int processed = 0;
         int failed = 0;
-        for (User user : users) {
-            try {
-                recalculateGravity(user.id);
-                settlementService.updateThemeAggregation(user.id);
-                // IC-EMO-003: recompute the N-day emotion baseline and bridge it
-                // (buffered) into the portrait. This is the cadence at which the
-                // mid-term baseline — never an individual real-time trace — is
-                // allowed to move the emotion portrait dims (anti-thrash, Spec §2).
-                emotionBaselineService.bridgeToPortrait(user.id);
-                // IC-CAP-002 B-4: decay this user's capsule energy/freshness toward floors.
-                decayEnergyForUser(user.id);
-            } catch (Exception e) {
-                failed++;
-                log.error("Nightly settlement failed for user {}: {}", user.id, e.getMessage(), e);
+        do {
+            Page<User> page = new Page<>(offset / batchSizeForTest + 1, batchSizeForTest);
+            batch = userMapper.selectPage(page, null).getRecords();
+            batchNum++;
+            log.info("NightlySettlement: processing batch {}, offset {}, size {}", batchNum, offset, batch.size());
+            for (User user : batch) {
+                try {
+                    recalculateGravity(user.id);
+                    settlementService.updateThemeAggregation(user.id);
+                    // IC-EMO-003: recompute the N-day emotion baseline and bridge it
+                    // (buffered) into the portrait. This is the cadence at which the
+                    // mid-term baseline — never an individual real-time trace — is
+                    // allowed to move the emotion portrait dims (anti-thrash, Spec §2).
+                    emotionBaselineService.bridgeToPortrait(user.id);
+                    // IC-CAP-002 B-4: decay this user's capsule energy/freshness toward floors.
+                    decayEnergyForUser(user.id);
+                    processed++;
+                } catch (Exception e) {
+                    failed++;
+                    log.error("Nightly settlement failed for user {}: {}", user.id, e.getMessage(), e);
+                }
             }
-        }
-        log.info("Nightly memory settlement completed for {} users ({} failed)", users.size(), failed);
+            offset += batch.size();
+        } while (batch.size() == batchSizeForTest);
+        log.info("Nightly memory settlement completed for {} users ({} failed)", processed, failed);
     }
 
     /**
