@@ -2,6 +2,7 @@ package com.innercosmos.ai.prompt;
 
 import com.innercosmos.ai.portrait.AgentUserRelationshipService;
 import com.innercosmos.entity.AgentUserRelationship;
+import com.innercosmos.entity.UserCorrection;
 import com.innercosmos.entity.UserPortrait;
 import com.innercosmos.vo.AuroraMemoryContextVO;
 
@@ -29,6 +30,10 @@ public class PromptBuilder {
     static final int STATE_SIGNAL_MAX_CHARS = 160;
     /** Max chars for the IC-EMO-002 "此刻情绪" perception. */
     static final int MOMENT_EMOTION_MAX_CHARS = 120;
+    /** Max user corrections surfaced (most-recent-first). */
+    public static final int CORRECTION_MAX = 5;
+    /** Max chars per correction field value. */
+    static final int CORRECTION_VALUE_MAX_CHARS = 120;
 
     public PromptBuilder withSystemBoundary() {
         parts.add(
@@ -169,6 +174,37 @@ public class PromptBuilder {
         if (trimmed.startsWith("暂无") || trimmed.contains("关闭了")) return this;
         parts.add("用户此刻的情绪感知（轻轻体会，像朋友一样自然回应，不要夸张，不要复述或宣布这个分析，也不要因此换一副语气）：\n"
                 + sanitize(truncate(trimmed, MOMENT_EMOTION_MAX_CHARS)));
+        return this;
+    }
+
+    /**
+     * RUN-005 — the disruptive feedback loop: corrections the USER made to Aurora's
+     * model of them. Unlike the portrait (Aurora's own inference) these are the user's
+     * own authoritative word about who they are, so the wrapper gives them precedence:
+     * when a portrait dimension or memory conflicts with a correction, the correction
+     * wins. Input is expected most-recent-first; capped to {@link #CORRECTION_MAX},
+     * each field truncated and sanitized (user-derived text → injection chokepoint).
+     * Entries with no new value carry nothing to apply and are skipped.
+     */
+    public PromptBuilder withUserCorrections(List<UserCorrection> corrections) {
+        if (corrections == null || corrections.isEmpty()) return this;
+        StringBuilder block = new StringBuilder();
+        int n = 0;
+        for (UserCorrection c : corrections) {
+            if (c == null) continue;
+            String now = sanitize(truncate(c.newValue, CORRECTION_VALUE_MAX_CHARS));
+            if (now.isEmpty()) continue;
+            String was = sanitize(truncate(c.oldValue, CORRECTION_VALUE_MAX_CHARS));
+            String why = sanitize(truncate(c.reason, CORRECTION_VALUE_MAX_CHARS));
+            StringBuilder line = new StringBuilder("- TA 说：" + now);
+            if (!was.isEmpty()) line.append("（你之前以为：").append(was).append("）");
+            if (!why.isEmpty()) line.append(" 缘由：").append(why);
+            block.append(line).append('\n');
+            if (++n >= CORRECTION_MAX) break;
+        }
+        if (block.length() == 0) return this;
+        parts.add("用户亲自做过的更正（这是 TA 本人对你理解的纠正，权威性高于你自己的任何画像推断或记忆——当画像／记忆与这里冲突时，一律以这里为准；请安静地把旧理解换掉，不要旧调重弹，也不要当面逐条复述）：\n"
+                + block.toString().stripTrailing());
         return this;
     }
 

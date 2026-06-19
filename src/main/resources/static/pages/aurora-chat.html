@@ -364,6 +364,78 @@
       .aurora-composer input { border-radius: var(--radius); min-width: 0; }
       .aurora-composer .send-btn { border-radius: var(--radius); width: 100%; }
     }
+
+    /* ── RUN-005 — "这不太是我" correction affordance ── */
+    .bubble.aurora .correct-affordance {
+      margin-top: 8px;
+      opacity: 0;
+      transition: opacity 320ms var(--ease-bloom);
+    }
+    .bubble.aurora:hover .correct-affordance,
+    .bubble.aurora:focus-within .correct-affordance { opacity: 1; }
+    .correct-link {
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      font-size: .74rem;
+      color: var(--muted);
+      border-bottom: 1px dotted var(--line);
+      transition: color 200ms ease;
+    }
+    .correct-link:hover { color: var(--accent-sage); }
+    .bubble.aurora.corrected { box-shadow: inset 2px 0 0 var(--accent-sage); }
+    .bubble.aurora.corrected .correct-affordance { opacity: 1; }
+    .corrected-note { font-size: .74rem; color: var(--accent-sage); }
+
+    .correct-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(42,38,34,.55);
+      backdrop-filter: blur(8px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 120;
+      padding: 20px;
+    }
+    .correct-overlay.open { display: flex; }
+    .correct-sheet {
+      width: 100%;
+      max-width: 460px;
+      background: linear-gradient(180deg, rgba(255,250,243,.94), rgba(247,242,236,.88));
+      border-radius: var(--radius-modal);
+      box-shadow: 0 24px 80px rgba(0,0,0,.22);
+      padding: 28px;
+    }
+    .correct-sheet h2 { font-family: var(--font-hero); font-size: 1.3rem; margin: 0 0 6px; }
+    .correct-sheet .sub { font-size: .86rem; color: var(--muted); line-height: 1.6; margin-bottom: 16px; }
+    .correct-sheet .was {
+      font-size: .82rem; color: var(--muted); font-style: italic;
+      border-left: 2px solid var(--line); padding-left: 10px; margin-bottom: 14px;
+      max-height: 4.8em; overflow: hidden;
+    }
+    .correct-sheet textarea {
+      width: 100%; min-height: 96px; resize: vertical;
+      border: 1px solid var(--line); border-radius: var(--radius);
+      padding: 12px; font: inherit; font-size: .92rem; background: rgba(255,255,255,.6);
+      box-sizing: border-box;
+    }
+    .correct-sheet textarea:focus { outline: none; border-color: var(--accent-sage); box-shadow: 0 0 0 3px rgba(143,163,148,.10); }
+    .correct-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+    .correct-actions button { border-radius: var(--radius); padding: 10px 18px; font: inherit; font-size: .9rem; cursor: pointer; border: 1px solid transparent; transition: opacity .2s ease, transform .1s ease; }
+    .correct-actions button:active { transform: scale(.97); }
+    .correct-actions .btn-ghost { background: none; border-color: var(--line); color: var(--muted); }
+    .correct-actions .btn-ghost:hover { color: var(--ink); }
+    .correct-actions .send-btn { background: var(--accent-sage); color: #fff; }
+    .correct-actions .send-btn:hover { opacity: .9; }
+    .correct-actions .send-btn:disabled { opacity: .5; cursor: default; }
+    body.dark-star .correct-overlay { background: rgba(20,18,16,.66); }
+    body.dark-star .correct-sheet {
+      background: linear-gradient(180deg, rgba(42,38,34,.92), rgba(37,33,29,.82));
+      box-shadow: 0 24px 80px rgba(0,0,0,.42);
+    }
+    body.dark-star .correct-sheet textarea { background: rgba(30,27,24,.6); border-color: rgba(163,153,143,.16); }
   </style>
 </head>
 <body>
@@ -443,6 +515,20 @@
       <p class="muted">Aurora 会把这次对话整理成记忆、情绪线索和可能的下一步。</p>
     </div>
   </div>
+
+  <!-- RUN-005 — correction sheet: the user authoritatively re-tells Aurora who they are -->
+  <div id="correctOverlay" class="correct-overlay" role="dialog" aria-modal="true" aria-labelledby="correctTitle">
+    <div class="correct-sheet">
+      <h2 id="correctTitle">这不太是我</h2>
+      <p class="sub">把真实的你告诉 Aurora。它会把这句话当作你本人的更正，优先于它自己的任何猜测——以后不再那样理解你。</p>
+      <div id="correctWas" class="was" style="display:none"></div>
+      <textarea id="correctInput" placeholder="例如：我换工作是因为想成长，不是在逃避。" maxlength="280"></textarea>
+      <div class="correct-actions">
+        <button type="button" class="btn-ghost" id="correctCancel">先不用</button>
+        <button type="button" class="send-btn" id="correctSave">让 Aurora 记住</button>
+      </div>
+    </div>
+  </div>
 </main>
 
 <script src="/js/app.js?v=final-20260612"></script>
@@ -505,14 +591,97 @@ function addBubble(content, kind) {
   div.style.transform = "translateY(8px)";
   div.style.transition = "opacity 500ms var(--ease-bloom), transform 500ms var(--ease-bloom)";
   div.innerHTML = kind === "ai"
-    ? '<div class="row gap-sm" style="align-items:flex-start;margin-bottom:4px"><span style="font-size:1.1rem;color:var(--accent-sage)">✦</span><span class="muted" style="font-size:.78rem">Aurora</span></div><div>' + IC.esc(content) + '</div>'
+    ? '<div class="row gap-sm" style="align-items:flex-start;margin-bottom:4px"><span style="font-size:1.1rem;color:var(--accent-sage)">✦</span><span class="muted" style="font-size:.78rem">Aurora</span></div><div class="bubble-text">' + IC.esc(content) + '</div>'
     : IC.esc(content);
+  if (kind === "ai") attachCorrectionAffordance(div, content);
   chat.appendChild(div);
   requestAnimationFrame(function() {
     div.style.opacity = "1";
     div.style.transform = "translateY(0)";
   });
   chat.scrollTop = chat.scrollHeight;
+}
+
+// RUN-005 — every settled Aurora bubble carries a quiet "这不太是我" affordance, so
+// the user can authoritatively correct Aurora's read of them. The correction is
+// stored and re-enters the prompt with precedence over Aurora's own inferences.
+function attachCorrectionAffordance(bubbleDiv, auroraText) {
+  if (!bubbleDiv || bubbleDiv.querySelector(".correct-affordance")) return;
+  var wrap = document.createElement("div");
+  wrap.className = "correct-affordance";
+  var btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "correct-link";
+  btn.textContent = "这不太是我";
+  btn.onclick = function() { openCorrection(bubbleDiv, auroraText); };
+  wrap.appendChild(btn);
+  bubbleDiv.appendChild(wrap);
+}
+
+// After an SSE stream completes, settle every streamed Aurora bubble: drop the
+// streaming class and give it the same correction affordance as POST-path bubbles.
+function finalizeStreamingBubbles() {
+  var streaming = document.querySelectorAll("#chat .bubble.aurora.streaming");
+  streaming.forEach(function(div) {
+    div.classList.remove("streaming");
+    var textNode = div.querySelector(".stream-text");
+    var text = textNode ? textNode.textContent : "";
+    if (text && text.trim()) attachCorrectionAffordance(div, text);
+  });
+}
+
+// ── RUN-005 correction modal ──
+var correctTarget = null; // the bubble being corrected
+function openCorrection(bubbleDiv, auroraText) {
+  correctTarget = bubbleDiv;
+  var overlay = document.getElementById("correctOverlay");
+  var was = document.getElementById("correctWas");
+  var input = document.getElementById("correctInput");
+  if (auroraText && auroraText.trim()) {
+    was.textContent = "Aurora 刚才说：" + auroraText.trim().slice(0, 140);
+    was.style.display = "block";
+  } else {
+    was.style.display = "none";
+  }
+  input.value = "";
+  overlay.classList.add("open");
+  setTimeout(function() { input.focus(); }, 40);
+}
+
+function closeCorrection() {
+  document.getElementById("correctOverlay").classList.remove("open");
+  correctTarget = null;
+}
+
+async function saveCorrection() {
+  var input = document.getElementById("correctInput");
+  var newValue = (input.value || "").trim();
+  if (!newValue) { IC.toast("写一句真实的你，Aurora 才能记住。", "warn"); input.focus(); return; }
+  var wasNode = document.getElementById("correctWas");
+  var oldValue = "";
+  if (wasNode && wasNode.style.display !== "none") {
+    oldValue = wasNode.textContent.replace(/^Aurora 刚才说：/, "");
+  }
+  var saveBtn = document.getElementById("correctSave");
+  saveBtn.disabled = true;
+  try {
+    var r = await API.auroraCorrect(newValue, oldValue, "");
+    if (r && r.success) {
+      if (correctTarget) {
+        correctTarget.classList.add("corrected");
+        var aff = correctTarget.querySelector(".correct-affordance");
+        if (aff) aff.innerHTML = '<span class="corrected-note">✓ Aurora 记住了，会重新理解你</span>';
+      }
+      IC.toast("记住了。我会带着这份理解继续陪你。", "success");
+      closeCorrection();
+    } else {
+      IC.toast((r && r.message) || "没能记下来，待会儿再试一次。", "warn");
+    }
+  } catch (e) {
+    IC.toast("没能记下来，待会儿再试一次。", "warn");
+  } finally {
+    saveBtn.disabled = false;
+  }
 }
 
 function addAurora(messages) {
@@ -642,6 +811,7 @@ function sendViaStream(text, body) {
       es.addEventListener("done", function() {
         finishOnce();
         document.getElementById("typing").classList.remove("visible");
+        finalizeStreamingBubbles();
         resolve({ safety: false, streamed: gotAny });
       });
 
@@ -961,6 +1131,18 @@ function addAuroraProactive(data) {
 window.addEventListener("aurora-proactive", function(e) {
   addAuroraProactive(e.detail);
 });
+
+// RUN-005 — correction modal wiring (cancel / save / backdrop / Esc).
+(function wireCorrectionModal() {
+  var overlay = document.getElementById("correctOverlay");
+  if (!overlay) return;
+  document.getElementById("correctCancel").onclick = closeCorrection;
+  document.getElementById("correctSave").onclick = saveCorrection;
+  overlay.addEventListener("click", function(e) { if (e.target === overlay) closeCorrection(); });
+  document.addEventListener("keydown", function(e) {
+    if (e.key === "Escape" && overlay.classList.contains("open")) closeCorrection();
+  });
+})();
 
 init();
 if (window.ICProactive) ICProactive.start();

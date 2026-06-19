@@ -81,6 +81,8 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     private final AgentUserRelationshipService relationshipService;
     @Autowired(required = false)
     private AuroraSelfContinuityService continuityService;
+    @Autowired(required = false)
+    private com.innercosmos.service.UserCorrectionService userCorrectionService;
     private final Map<Long, Integer> turnCounter = new ConcurrentHashMap<>();
     private final Map<Long, Integer> goodbyeConfirmCount = new ConcurrentHashMap<>();
     /**
@@ -208,6 +210,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 .withModeSegment(modeStrategy)
                 .withUserProfile(profileBrief(profile))
                 .withUserPortrait(portrait)
+                .withUserCorrections(safeCorrections(userId))
                 .withRelationship(relationship)
                 .withCurrentStateSignal(stateSignal)
                 .withMomentEmotion(agentContext.momentEmotionLabel)
@@ -487,6 +490,8 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 .withConversationMode(normalizedMode)
                 .withModeSegment(modeStrategy)
                 .withUserProfile(profileBrief(profile))
+                .withUserPortrait(safePortrait(userId))
+                .withUserCorrections(safeCorrections(userId))
                 .withGravityMemories(gravityMemories)
                 .withMemoryContext(memoryContext)
                 .withOutputSchema()
@@ -1035,6 +1040,23 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             return all == null ? List.of() : all;
         } catch (Exception e) {
             log.warn("Portrait read failed (non-fatal): {}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    /**
+     * RUN-005 — the user's own most-recent corrections to Aurora's understanding.
+     * Non-fatal: if the service is absent (unit tests) or read fails, return empty so
+     * the prompt simply omits the segment rather than breaking the turn.
+     */
+    private List<com.innercosmos.entity.UserCorrection> safeCorrections(Long userId) {
+        if (userId == null || userCorrectionService == null) return List.of();
+        try {
+            List<com.innercosmos.entity.UserCorrection> recent =
+                    userCorrectionService.recentCorrections(userId, PromptBuilder.CORRECTION_MAX);
+            return recent == null ? List.of() : recent;
+        } catch (Exception e) {
+            log.warn("Correction read failed (non-fatal): {}", e.getMessage());
             return List.of();
         }
     }
