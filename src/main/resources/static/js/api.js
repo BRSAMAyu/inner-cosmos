@@ -480,6 +480,19 @@ const API = {
     return IC.api("/api/aurora/mood");
   },
 
+  /* RUN-005 — Aurora correction feedback loop: the user authoritatively corrects
+     Aurora's model of them ("这不太是我"); corrections re-enter the prompt with
+     precedence over inferences, so Aurora visibly adapts. */
+  async auroraCorrect(newValue, oldValue, reason) {
+    const body = { newValue };
+    if (oldValue) body.oldValue = oldValue;
+    if (reason) body.reason = reason;
+    return IC.api("/api/aurora/corrections", { method: "POST", body: JSON.stringify(body) });
+  },
+  async auroraCorrections() {
+    return IC.api("/api/aurora/corrections");
+  },
+
   /* Aurora Goodbye */
   async goodbye(body) {
     return IC.api("/api/aurora/goodbye", { method: "POST", body: JSON.stringify(body) });

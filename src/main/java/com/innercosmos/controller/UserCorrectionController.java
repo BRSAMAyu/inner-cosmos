@@ -1,0 +1,67 @@
+package com.innercosmos.controller;
+
+import com.innercosmos.common.ApiResponse;
+import com.innercosmos.common.ErrorCode;
+import com.innercosmos.entity.UserCorrection;
+import com.innercosmos.exception.BusinessException;
+import com.innercosmos.service.UserCorrectionService;
+import jakarta.servlet.http.HttpSession;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Map;
+
+/**
+ * RUN-005 — the disruptive feedback loop: let the user authoritatively correct
+ * Aurora's understanding of them ("这不太是我"). Corrections are stored and re-enter
+ * the Aurora prompt with precedence over inferences, so the model visibly adapts.
+ *
+ * Free-form self-understanding corrections default to a fixed target so they satisfy
+ * the NOT NULL columns (target_id, field_name) without forcing the client to know the
+ * schema: targetType=AURORA_UNDERSTANDING, targetId=0, fieldName=self_understanding.
+ */
+@RestController
+@RequestMapping("/api/aurora/corrections")
+public class UserCorrectionController extends BaseController {
+    private static final String DEFAULT_TARGET_TYPE = "AURORA_UNDERSTANDING";
+    private static final Long DEFAULT_TARGET_ID = 0L;
+    private static final String DEFAULT_FIELD = "self_understanding";
+    private static final int LIST_LIMIT = 20;
+
+    private final UserCorrectionService userCorrectionService;
+
+    public UserCorrectionController(UserCorrectionService userCorrectionService) {
+        this.userCorrectionService = userCorrectionService;
+    }
+
+    @PostMapping
+    public ApiResponse<UserCorrection> record(@RequestBody Map<String, String> body, HttpSession session) {
+        Long userId = currentUserId(session);
+        String newValue = trimToNull(body.get("newValue"));
+        if (newValue == null) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "请告诉我哪里说得不对");
+        }
+        String oldValue = trimToNull(body.get("oldValue"));
+        String reason = trimToNull(body.get("reason"));
+        String fieldName = orDefault(trimToNull(body.get("fieldName")), DEFAULT_FIELD);
+        UserCorrection saved = userCorrectionService.recordCorrection(
+                userId, DEFAULT_TARGET_TYPE, DEFAULT_TARGET_ID, fieldName, oldValue, newValue, reason);
+        return ApiResponse.ok(saved);
+    }
+
+    @GetMapping
+    public ApiResponse<List<UserCorrection>> recent(HttpSession session) {
+        Long userId = currentUserId(session);
+        return ApiResponse.ok(userCorrectionService.recentCorrections(userId, LIST_LIMIT));
+    }
+
+    private static String trimToNull(String value) {
+        if (value == null) return null;
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private static String orDefault(String value, String fallback) {
+        return value == null ? fallback : value;
+    }
+}
