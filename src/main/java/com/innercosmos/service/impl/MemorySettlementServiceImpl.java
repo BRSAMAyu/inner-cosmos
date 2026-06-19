@@ -7,6 +7,9 @@ import com.innercosmos.ai.semantic.PseudoSemanticAnalyzer;
 import com.innercosmos.ai.semantic.PseudoSemanticAnalyzer.AnalysisResult;
 import com.innercosmos.entity.*;
 import com.innercosmos.mapper.*;
+import com.innercosmos.ai.semantic.EmotionInsight;
+import com.innercosmos.ai.semantic.EmotionWeatherMapper;
+import com.innercosmos.service.EmotionInsightService;
 import com.innercosmos.service.GravityService;
 import com.innercosmos.service.MemorySettlementService;
 import com.innercosmos.service.ThemeAggregationService;
@@ -35,6 +38,7 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
     private final GravityService gravityService;
     private final ThemeAggregationService themeAggregationService;
     private final StructuredAiService structuredAiService;
+    private final EmotionInsightService emotionInsightService;
 
     public MemorySettlementServiceImpl(MemoryCardMapper memoryCardMapper,
                                        ThoughtFragmentMapper thoughtFragmentMapper,
@@ -48,7 +52,8 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
                                        DialogSessionMapper dialogSessionMapper,
                                        GravityService gravityService,
                                        ThemeAggregationService themeAggregationService,
-                                       StructuredAiService structuredAiService) {
+                                       StructuredAiService structuredAiService,
+                                       EmotionInsightService emotionInsightService) {
         this.memoryCardMapper = memoryCardMapper;
         this.thoughtFragmentMapper = thoughtFragmentMapper;
         this.emotionTraceMapper = emotionTraceMapper;
@@ -62,6 +67,7 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
         this.gravityService = gravityService;
         this.themeAggregationService = themeAggregationService;
         this.structuredAiService = structuredAiService;
+        this.emotionInsightService = emotionInsightService;
     }
 
     @Override
@@ -133,16 +139,15 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
             createFragment(userId, card.id, "WORRY", inferWorry(raw), "来自用户的担忧.", "先承认这个担心是合理的.");
         }
 
-        // Create EmotionTrace
-        EmotionTrace trace = new EmotionTrace();
-        trace.userId = userId;
-        trace.sourceSessionId = sessionId;
-        trace.emotionName = blank(ai.emotionTrace.emotionName, inferEmotionName(raw));
-        trace.emotionScore = EmotionTrace.clampScore(ai.emotionTrace.emotionScore == null ? card.intensityScore : ai.emotionTrace.emotionScore);
-        trace.weatherType = blank(ai.emotionTrace.weatherType, inferWeather(card.intensityScore));
-        trace.triggerScene = blank(ai.emotionTrace.triggerScene, firstSentence(raw));
-        trace.recordDate = LocalDate.now();
-        emotionTraceMapper.insert(trace);
+        // IC-EMO-001: upsert the SINGLE enriched EmotionTrace for this session via
+        // the unified service (enhancing/overwriting the listener's row — no double
+        // write). Backfill blanks from deterministic inference before adapting.
+        ai.emotionTrace.emotionName = blank(ai.emotionTrace.emotionName, inferEmotionName(raw));
+        ai.emotionTrace.emotionScore = ai.emotionTrace.emotionScore == null ? card.intensityScore : ai.emotionTrace.emotionScore;
+        ai.emotionTrace.weatherType = blank(ai.emotionTrace.weatherType, EmotionWeatherMapper.weatherFor(ai.emotionTrace.emotionName, card.intensityScore));
+        ai.emotionTrace.triggerScene = blank(ai.emotionTrace.triggerScene, firstSentence(raw));
+        EmotionInsight insight = emotionInsightService.fromSettlement(ai);
+        emotionInsightService.writeTrace(userId, sessionId, insight);
 
         // Create TodoItems if task-related
         if (ai.todos != null && !ai.todos.isEmpty()) {
@@ -309,7 +314,7 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
         result.memoryCard.userImportance = 4.0;
         result.emotionTrace.emotionName = inferEmotionName(raw);
         result.emotionTrace.emotionScore = inferIntensity(raw);
-        result.emotionTrace.weatherType = inferWeather(result.emotionTrace.emotionScore);
+        result.emotionTrace.weatherType = EmotionWeatherMapper.weatherFor(result.emotionTrace.emotionName, result.emotionTrace.emotionScore);
         result.emotionTrace.triggerScene = firstSentence(raw);
         return result;
     }
@@ -492,11 +497,8 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
     }
 
     private String inferWeather(Double intensity) {
-        double value = intensity == null ? 0 : intensity;
-        if (value >= 7) return "STORM";
-        if (value >= 5) return "RAINY";
-        if (value >= 3) return "CLOUDY";
-        return "SUNNY";
+        // IC-EMO-001: route intensity-only weather through the canonical mapper.
+        return EmotionWeatherMapper.weatherForIntensity(intensity);
     }
 
     private String inferTimeLabel(String raw) {
@@ -583,16 +585,14 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
             createFragment(userId, card.id, "WORRY", inferWorry(diaryText), "来自日记的担忧.", "先承认这个担心是合理的.");
         }
 
-        // Create EmotionTrace
-        EmotionTrace trace = new EmotionTrace();
-        trace.userId = userId;
-        trace.sourceSessionId = null;
-        trace.emotionName = blank(ai.emotionTrace.emotionName, inferEmotionName(diaryText));
-        trace.emotionScore = EmotionTrace.clampScore(ai.emotionTrace.emotionScore == null ? card.intensityScore : ai.emotionTrace.emotionScore);
-        trace.weatherType = blank(ai.emotionTrace.weatherType, inferWeather(card.intensityScore));
-        trace.triggerScene = blank(ai.emotionTrace.triggerScene, firstSentence(diaryText));
-        trace.recordDate = LocalDate.now();
-        emotionTraceMapper.insert(trace);
+        // IC-EMO-001: diary has no session — insert a null-session enriched trace
+        // via the unified service (avoids a second LLM call).
+        ai.emotionTrace.emotionName = blank(ai.emotionTrace.emotionName, inferEmotionName(diaryText));
+        ai.emotionTrace.emotionScore = ai.emotionTrace.emotionScore == null ? card.intensityScore : ai.emotionTrace.emotionScore;
+        ai.emotionTrace.weatherType = blank(ai.emotionTrace.weatherType, EmotionWeatherMapper.weatherFor(ai.emotionTrace.emotionName, card.intensityScore));
+        ai.emotionTrace.triggerScene = blank(ai.emotionTrace.triggerScene, firstSentence(diaryText));
+        EmotionInsight diaryInsight = emotionInsightService.fromSettlement(ai);
+        emotionInsightService.writeTrace(userId, null, diaryInsight);
 
         // Create TodoItems
         if (ai.todos != null && !ai.todos.isEmpty()) {

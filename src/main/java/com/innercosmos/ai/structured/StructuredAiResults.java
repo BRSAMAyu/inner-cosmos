@@ -93,6 +93,14 @@ public final class StructuredAiResults {
         public Double emotionScore;
         public String weatherType;
         public String triggerScene;
+        /** IC-EMO-001: optional emotion spectrum so settlement LLM can emit it directly. */
+        public List<SpectrumEntry> spectrum = new ArrayList<>();
+    }
+
+    /** IC-EMO-001: a single {emotion, ratio} pair in an emotion spectrum. */
+    public static class SpectrumEntry {
+        public String emotion;
+        public double ratio;
     }
 
     public static class Event {

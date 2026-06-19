@@ -27,6 +27,11 @@ public class EmotionTrace extends BaseEntity {
     public String triggerScene;
     public LocalDate recordDate;
 
+    /** IC-EMO-001: JSON-serialized emotion spectrum (List of {emotion, ratio}). */
+    public String emotionSpectrum;
+    /** IC-EMO-001: producer of this trace — "LLM" | "LEXICON" | "SETTLEMENT". */
+    public String analysisSource;
+
     /**
      * Clamp a raw emotion score into the valid [0,10] range, logging a warning
      * when the input was out of range. Use this at every write site instead of
