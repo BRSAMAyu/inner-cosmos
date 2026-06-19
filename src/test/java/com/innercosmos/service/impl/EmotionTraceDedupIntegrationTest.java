@@ -2,6 +2,7 @@ package com.innercosmos.service.impl;
 
 import com.innercosmos.event.DialogFinishedEvent;
 import com.innercosmos.event.EmotionTraceListener;
+import com.innercosmos.service.MemoryService;
 import com.innercosmos.service.MemorySettlementService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -39,6 +40,8 @@ class EmotionTraceDedupIntegrationTest {
     private EmotionTraceListener emotionTraceListener;
     @Autowired
     private MemorySettlementService memorySettlementService;
+    @Autowired
+    private MemoryService memoryService;
 
     private Long seedUser() {
         String username = "emo-it-" + System.nanoTime();
@@ -110,6 +113,34 @@ class EmotionTraceDedupIntegrationTest {
         assertEquals("SETTLEMENT", afterSettle.get("analysis_source"),
                 "settlement must upgrade the source on the SAME row");
         assertNotNull(afterSettle.get("emotion_spectrum"), "settled trace must carry a spectrum");
+    }
+
+    @Test
+    @DisplayName("Both DialogFinished listeners on same session -> exactly one enriched trace (no double-write)")
+    void bothListeners_sameSession_noDoubleWrite() {
+        Long userId = seedUser();
+        Long sessionId = seedSession(userId);
+        seedUserMessage(sessionId, "今天作业堆得太多了，我很焦虑也很累，撑不住了。");
+
+        // Simulate the real DialogFinished fan-out: EmotionTraceListener AND
+        // MemoryExtractListener (via memoryService.extractFromSession) both fire
+        // for the SAME session. Before FIX 1, extractFromSession raw-inserted a
+        // second, un-enriched (null-source) trace -> two rows. After FIX 1 both
+        // converge on writeTrace upsert -> exactly one enriched row.
+        emotionTraceListener.onDialogFinished(new DialogFinishedEvent(userId, sessionId));
+        awaitTrace(userId, sessionId);
+        memoryService.extractFromSession(userId, sessionId);
+
+        assertEquals(1, traceCount(userId, sessionId),
+                "both listeners on the same session must yield exactly one trace (de-dup)");
+
+        Map<String, Object> trace = jdbc.queryForMap(
+                "SELECT analysis_source, emotion_spectrum FROM tb_emotion_trace "
+                        + "WHERE user_id = ? AND source_session_id = ?", userId, sessionId);
+        assertNotNull(trace.get("analysis_source"),
+                "the surviving trace must be enriched (non-null analysis_source), not the old raw row");
+        assertNotNull(trace.get("emotion_spectrum"),
+                "the surviving trace must carry a spectrum");
     }
 
     @Test

@@ -123,10 +123,40 @@ public class EmotionInsightServiceImpl implements EmotionInsightService {
             } else {
                 trace.createdAt = LocalDateTime.now();
                 trace.updatedAt = LocalDateTime.now();
-                emotionTraceMapper.insert(trace);
+                insertWithRaceFallback(userId, sessionId, trace);
             }
         } catch (Exception e) {
             log.error("writeTrace failed for user={} session={}: {}", userId, sessionId, e.getMessage());
+        }
+    }
+
+    /**
+     * Insert the trace, but recover from the concurrent-insert race: if two
+     * DialogFinished listeners both observed no prior row and race to insert, the
+     * unique (user_id, source_session_id) guard makes the loser's insert fail with
+     * a duplicate-key error. Instead of leaking that error (or, worse, retrying the
+     * insert), re-query the winner's row and update it in place so we still end up
+     * with exactly one enriched trace. Diary rows (sessionId == null) never hit
+     * this path — callers pass a fresh row straight to insert below.
+     */
+    private void insertWithRaceFallback(Long userId, Long sessionId, EmotionTrace trace) {
+        try {
+            emotionTraceMapper.insert(trace);
+        } catch (org.springframework.dao.DuplicateKeyException dup) {
+            if (sessionId == null) {
+                // Diary inserts must not collide on session; rethrow to outer log.
+                throw dup;
+            }
+            log.warn("writeTrace lost insert race for user={} session={}, recovering via update: {}",
+                    userId, sessionId, dup.getMessage());
+            EmotionTrace winner = findBySession(userId, sessionId);
+            if (winner == null || winner.id == null) {
+                // No row to recover onto — propagate so the outer guard logs it.
+                throw dup;
+            }
+            trace.id = winner.id;
+            trace.updatedAt = LocalDateTime.now();
+            emotionTraceMapper.updateById(trace);
         }
     }
 

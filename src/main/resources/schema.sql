@@ -167,7 +167,13 @@ CREATE TABLE IF NOT EXISTS tb_emotion_trace (
   analysis_source VARCHAR(32),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_emotion_trace_user (user_id)
+  INDEX idx_emotion_trace_user (user_id),
+  -- IC-EMO-001 de-dup: one trace per (user, session). Both DialogFinished
+  -- listeners upsert on this key. Diary rows have source_session_id = NULL;
+  -- MySQL and H2(MODE=MySQL) treat multiple NULLs as distinct under a UNIQUE
+  -- index, so multiple null-session diary rows remain allowed. This is the
+  -- belt-and-suspenders guard behind the app-level upsert + race fallback.
+  CONSTRAINT uk_emotion_trace_user_session UNIQUE (user_id, source_session_id)
 );
 
 CREATE TABLE IF NOT EXISTS tb_todo_item (

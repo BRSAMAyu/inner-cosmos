@@ -15,6 +15,8 @@ import com.innercosmos.mapper.MemoryCardMapper;
 import com.innercosmos.mapper.RelationMentionMapper;
 import com.innercosmos.mapper.ThoughtFragmentMapper;
 import com.innercosmos.mapper.TodoItemMapper;
+import com.innercosmos.ai.semantic.EmotionInsight;
+import com.innercosmos.service.EmotionInsightService;
 import com.innercosmos.service.GravityService;
 import com.innercosmos.service.MemoryService;
 import com.innercosmos.service.ThemeAggregationService;
@@ -24,7 +26,6 @@ import com.innercosmos.vo.StarfieldVO;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -42,6 +43,7 @@ public class MemoryServiceImpl implements MemoryService {
     private final RelationMentionMapper relationMentionMapper;
     private final ThemeAggregationService themeAggregationService;
     private final DailyRecordMapper dailyRecordMapper;
+    private final EmotionInsightService emotionInsightService;
 
     public MemoryServiceImpl(MemoryCardMapper memoryCardMapper,
                              DialogMessageMapper messageMapper,
@@ -52,7 +54,8 @@ public class MemoryServiceImpl implements MemoryService {
                              MemoryExtractAgent extractAgent,
                              RelationMentionMapper relationMentionMapper,
                              ThemeAggregationService themeAggregationService,
-                             DailyRecordMapper dailyRecordMapper) {
+                             DailyRecordMapper dailyRecordMapper,
+                             EmotionInsightService emotionInsightService) {
         this.memoryCardMapper = memoryCardMapper;
         this.messageMapper = messageMapper;
         this.thoughtFragmentMapper = thoughtFragmentMapper;
@@ -63,6 +66,7 @@ public class MemoryServiceImpl implements MemoryService {
         this.relationMentionMapper = relationMentionMapper;
         this.themeAggregationService = themeAggregationService;
         this.dailyRecordMapper = dailyRecordMapper;
+        this.emotionInsightService = emotionInsightService;
     }
 
     @Override
@@ -192,15 +196,15 @@ public class MemoryServiceImpl implements MemoryService {
         createFragment(userId, card.id, "BELIEF", inferBelief(raw), "可能影响用户自我评价的信念.", "把事件和自我价值暂时分开看.");
         createFragment(userId, card.id, "ACTION", inferAction(raw), "可以轻轻推进的一步.", "把下一步压缩到十分钟内能开始.");
 
-        EmotionTrace trace = new EmotionTrace();
-        trace.userId = userId;
-        trace.sourceSessionId = sessionId;
-        trace.emotionName = inferEmotionName(raw);
-        trace.emotionScore = card.intensityScore;
-        trace.weatherType = inferWeather(card.intensityScore);
-        trace.triggerScene = firstSentence(raw);
-        trace.recordDate = LocalDate.now();
-        emotionTraceMapper.insert(trace);
+        // IC-EMO-001 de-dup: route the session's emotion trace through the
+        // de-dup service (upsert keyed on user_id + source_session_id) instead of
+        // raw-inserting a second, un-enriched row. The EmotionTraceListener also
+        // calls writeTrace for the same session, so both DialogFinished listeners
+        // now converge on exactly ONE enriched trace. The raw text is a richer
+        // signal than the old keyword inference, and canonical weather/emotion
+        // derivation lives in EmotionInsightService (+ EmotionWeatherMapper).
+        EmotionInsight insight = emotionInsightService.analyze(userId, raw);
+        emotionInsightService.writeTrace(userId, sessionId, insight);
 
         if (raw.contains("作业") || raw.contains("考试") || raw.contains("任务") || raw.contains("明天") || raw.contains("拖延")) {
             TodoItem todo = new TodoItem();
@@ -241,14 +245,6 @@ public class MemoryServiceImpl implements MemoryService {
         return "还没有被命名的复杂感受";
     }
 
-    private String inferEmotionName(String raw) {
-        if (raw.contains("开心") || raw.contains("高兴")) return "开心";
-        if (raw.contains("孤独")) return "孤独";
-        if (raw.contains("烦")) return "烦躁";
-        if (raw.contains("累")) return "疲惫";
-        return "复杂";
-    }
-
     private String inferBelief(String raw) {
         if (raw.contains("没做好") || raw.contains("不行")) {
             return "如果一件事没做好,就说明我这个人不行.";
@@ -267,14 +263,6 @@ public class MemoryServiceImpl implements MemoryService {
             return "先写下对方说了什么,以及我实际感受到什么.";
         }
         return "把今天最重的一句话保存下来,明天再看一次.";
-    }
-
-    private String inferWeather(Double intensity) {
-        double value = intensity == null ? 0 : intensity;
-        if (value >= 7) return "STORM";
-        if (value >= 5) return "RAINY";
-        if (value >= 3) return "CLOUDY";
-        return "SUNNY";
     }
 
     private String starTheme(String memoryType) {
