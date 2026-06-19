@@ -131,10 +131,17 @@ public class SlowLetterServiceImpl implements SlowLetterService {
         if (!guardAgent.allow(request.letterBody)) {
             throw new SafetyBlockedException("letter contains unsafe content");
         }
+
+        // Resolve the conversation BEFORE inserting so the reply (and, on first reply,
+        // the original) can be stamped with the shared thread id. Replies join an
+        // existing thread instead of orphaning a fresh one each round.
+        LetterThread thread = resolveThread(original, userId);
+
         SlowLetter reply = new SlowLetter();
         reply.senderUserId = userId;
         reply.receiverUserId = original.senderUserId;
         reply.receiverCapsuleId = original.receiverCapsuleId;
+        reply.threadId = thread.id;
         reply.title = request.title == null ? "回复:" + original.title : request.title;
         reply.letterBody = request.letterBody;
         reply.status = "DRAFT";
@@ -142,15 +149,54 @@ public class SlowLetterServiceImpl implements SlowLetterService {
         reply.estimatedArrivalAt = LocalDateTime.now().plusMinutes(3);
         letterMapper.insert(reply);
 
+        // Back-fill the original so the whole conversation is walkable by thread id.
+        if (original.threadId == null) {
+            original.threadId = thread.id;
+            letterMapper.updateById(original);
+        }
+
+        thread.lastLetterAt = LocalDateTime.now();
+        threadMapper.updateById(thread);
+        return reply;
+    }
+
+    /**
+     * Find-or-create the {@link LetterThread} a reply belongs to. Reuse precedence:
+     *  1. the original letter's own thread id, if already set;
+     *  2. an existing thread for the SAME unordered participant pair + capsule;
+     *  3. otherwise a brand-new ACTIVE thread.
+     */
+    private LetterThread resolveThread(SlowLetter original, Long replier) {
+        if (original.threadId != null) {
+            LetterThread existing = threadMapper.selectById(original.threadId);
+            if (existing != null) {
+                return existing;
+            }
+        }
+        Long a = original.senderUserId;
+        Long b = replier;
+        QueryWrapper<LetterThread> q = new QueryWrapper<>();
+        q.and(w -> w.eq("participant_a", a).eq("participant_b", b)
+                .or(o -> o.eq("participant_a", b).eq("participant_b", a)));
+        if (original.receiverCapsuleId != null) {
+            q.eq("capsule_id", original.receiverCapsuleId);
+        } else {
+            q.isNull("capsule_id");
+        }
+        q.last("LIMIT 1");
+        List<LetterThread> found = threadMapper.selectList(q);
+        if (found != null && !found.isEmpty()) {
+            return found.get(0);
+        }
         LetterThread thread = new LetterThread();
         thread.firstLetterId = original.id;
-        thread.participantA = original.senderUserId;
-        thread.participantB = userId;
+        thread.participantA = a;
+        thread.participantB = b;
         thread.capsuleId = original.receiverCapsuleId;
         thread.status = "ACTIVE";
         thread.lastLetterAt = LocalDateTime.now();
         threadMapper.insert(thread);
-        return reply;
+        return thread;
     }
 
     @Override
@@ -158,6 +204,22 @@ public class SlowLetterServiceImpl implements SlowLetterService {
         QueryWrapper<LetterThread> query = new QueryWrapper<>();
         query.eq("participant_a", userId).or().eq("participant_b", userId).orderByDesc("id");
         return threadMapper.selectList(query);
+    }
+
+    @Override
+    public List<SlowLetter> getThreadLetters(Long userId, Long threadId) {
+        LetterThread thread = threadMapper.selectById(threadId);
+        if (thread == null) {
+            throw new com.innercosmos.exception.BusinessException(com.innercosmos.common.ErrorCode.NOT_FOUND, "对话不存在");
+        }
+        if (!userId.equals(thread.participantA) && !userId.equals(thread.participantB)) {
+            throw new com.innercosmos.exception.BusinessException(com.innercosmos.common.ErrorCode.UNAUTHORIZED, "无权查看此对话");
+        }
+        QueryWrapper<SlowLetter> query = new QueryWrapper<>();
+        // thread_id matches every reply; the anchor (first) letter may predate the back-fill.
+        query.and(w -> w.eq("thread_id", threadId).or().eq("id", thread.firstLetterId));
+        query.orderByAsc("id");
+        return letterMapper.selectList(query);
     }
 
     @Override
@@ -189,6 +251,11 @@ public class SlowLetterServiceImpl implements SlowLetterService {
         if (!result.passed) {
             return "信件内容未通过安全检查,建议修改:" + result.reason;
         }
-        return null;
+        // The letter is safe — still offer gentle coaching rather than a bare null,
+        // so the "请帮我润色" affordance always returns something usable to the writer.
+        if (result.suggestion != null && !result.suggestion.isBlank()) {
+            return result.suggestion;
+        }
+        return "这封信读起来已经足够真诚了。如果想再打磨,可以把最在意的那句话放到结尾,让它慢慢落进对方心里。";
     }
 }

@@ -141,9 +141,77 @@
       box-shadow: 0 4px 16px rgba(0,0,0,.12), 0 16px 48px rgba(0,0,0,.22);
     }
 
+    /* ── Conversation overlay — read a whole back-and-forth in one place ── */
+    .convo-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(20,17,14,.46);
+      backdrop-filter: blur(8px);
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+      z-index: 90;
+      opacity: 0;
+      transition: opacity 320ms var(--ease-flow);
+    }
+    .convo-overlay.open { display: flex; opacity: 1; }
+    .convo-sheet {
+      width: min(640px, 100%);
+      max-height: 88vh;
+      background:
+        linear-gradient(180deg, rgba(255,250,243,.94), rgba(247,242,236,.92)),
+        var(--surface-paper);
+      border-radius: var(--radius-card) var(--radius-card) 0 0;
+      box-shadow: 0 -8px 48px rgba(0,0,0,.18);
+      display: flex;
+      flex-direction: column;
+      transform: translateY(24px);
+      transition: transform 420ms var(--ease-bloom);
+    }
+    .convo-overlay.open .convo-sheet { transform: translateY(0); }
+    .convo-head {
+      padding: 22px 26px 14px;
+      border-bottom: 1px solid rgba(0,0,0,.06);
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .convo-head h2 { font-family: var(--font-hero); font-size: 1.25rem; color: var(--ink); margin: 0 0 4px; }
+    .convo-head .muted { font-size: .8125rem; }
+    .convo-close {
+      background: none; border: none; cursor: pointer;
+      font-size: 1.4rem; color: var(--muted); line-height: 1; padding: 4px;
+    }
+    .convo-body { overflow-y: auto; padding: 18px 26px 28px; display: flex; flex-direction: column; gap: 16px; }
+    /* Each letter is a parallax bubble; mine lean right, theirs lean left. */
+    .convo-letter {
+      max-width: 86%;
+      padding: 16px 18px;
+      border-radius: 16px;
+      background: var(--surface-warm);
+      border: 1px solid rgba(0,0,0,.05);
+      opacity: 0;
+      transform: translateY(10px);
+      animation: thread-reveal 520ms var(--ease-bloom) forwards;
+    }
+    .convo-letter.mine { align-self: flex-end; background: linear-gradient(180deg, rgba(184,194,174,.26), rgba(184,194,174,.14)); }
+    .convo-letter.theirs { align-self: flex-start; }
+    .convo-letter-meta { display: flex; justify-content: space-between; gap: 10px; font-size: .75rem; color: var(--faint); margin-bottom: 8px; }
+    .convo-letter-title { font-weight: 500; color: var(--ink); margin-bottom: 6px; font-size: .9375rem; }
+    .convo-letter-body { color: var(--ink); font-size: .9375rem; line-height: 1.75; white-space: pre-wrap; }
+    .convo-empty { text-align: center; color: var(--faint); padding: 40px 0; }
+
+    body.dark-star .convo-sheet {
+      background: linear-gradient(180deg, rgba(42,38,34,.96), rgba(37,33,29,.94)), rgba(42,38,34,.6);
+    }
+    body.dark-star .convo-letter { background: rgba(52,47,42,.6); border-color: rgba(163,153,143,.10); }
+    body.dark-star .convo-letter.mine { background: linear-gradient(180deg, rgba(122,142,127,.28), rgba(122,142,127,.14)); }
+
     @media (max-width: 640px) {
       .threads-hero { min-height: 22vh; padding-bottom: 28px; }
       .thread-card { padding: 16px; }
+      .convo-letter { max-width: 94%; }
     }
   </style>
 </head>
@@ -161,6 +229,20 @@
 
   <section id="threadsList" class="threads-list"></section>
 </main>
+
+<!-- Conversation overlay -->
+<div id="convoOverlay" class="convo-overlay" role="dialog" aria-modal="true" aria-labelledby="convoTitle">
+  <div class="convo-sheet">
+    <div class="convo-head">
+      <div>
+        <h2 id="convoTitle">慢信往来</h2>
+        <span class="muted" id="convoMeta"></span>
+      </div>
+      <button class="convo-close" id="convoClose" aria-label="关闭">×</button>
+    </div>
+    <div class="convo-body" id="convoBody"></div>
+  </div>
+</div>
 
 <script src="/js/app.js?v=final-20260612"></script>
 <script src="/js/time-system.js?v=final-20260612"></script>
@@ -188,8 +270,11 @@ async function load() {
   var results = await Promise.all([
     API.letterThreads(),
     API.letterInbox(),
-    API.letterOutbox()
+    API.letterOutbox(),
+    IC.api("/api/auth/current")
   ]);
+  var cur = results[3];
+  MY_ID = (cur && cur.success && cur.data) ? cur.data.id : null;
   var threads = (results[0].success ? results[0].data : []) || [];
   var inbox = (results[1].success ? results[1].data : []) || [];
   var outbox = (results[2].success ? results[2].data : []) || [];
@@ -219,12 +304,9 @@ function renderThreads(threads, byId) {
     var anchor = byId[t.firstLetterId] || null;
     var title = anchor ? (anchor.title || "无标题") : "一封慢信";
     var preview = anchor ? (anchor.letterBody || "") : "";
-    /* Prefer linking to the inbox copy of the anchor letter (the received one),
-       falling back to outbox. If neither is visible to this user, point to inbox. */
-    var href = "/pages/inbox.html";
-    if (anchor && anchor.id != null) href = "/pages/inbox.html?letter=" + encodeURIComponent(anchor.id);
 
-    return '<a class="thread-card" href="' + href + '" style="animation-delay:' + delay + 'ms">' +
+    return '<a class="thread-card" href="#" data-thread="' + esc(t.id) + '" data-title="' + esc(title) +
+        '" style="animation-delay:' + delay + 'ms">' +
       '<div class="thread-card-header">' +
         '<strong class="thread-card-title">' + esc(title) + '</strong>' +
         '<span class="badge ' + threadStatusBadge(t.status) + '">' + esc(threadStatusLabel(t.status)) + '</span>' +
@@ -236,7 +318,64 @@ function renderThreads(threads, byId) {
       '</div>' +
     '</a>';
   }).join("");
+
+  list.querySelectorAll(".thread-card").forEach(function(card) {
+    card.addEventListener("click", function(e) {
+      e.preventDefault();
+      openConversation(card.getAttribute("data-thread"), card.getAttribute("data-title"));
+    });
+  });
 }
+
+/* ── Conversation overlay ── */
+var MY_ID = null;
+
+function closeConversation() {
+  document.getElementById("convoOverlay").classList.remove("open");
+}
+
+async function openConversation(threadId, title) {
+  if (threadId == null) return;
+  var overlay = document.getElementById("convoOverlay");
+  var body = document.getElementById("convoBody");
+  document.getElementById("convoTitle").textContent = title || "慢信往来";
+  document.getElementById("convoMeta").textContent = "正在展开这段往来…";
+  body.innerHTML = '<div class="convo-empty">' + IC.empty("正在取信…") + '</div>';
+  overlay.classList.add("open");
+
+  var res = await API.letterThreadLetters(threadId);
+  if (!res.success) {
+    body.innerHTML = '<div class="convo-empty">' + IC.empty("无法读取这段往来。") + '</div>';
+    document.getElementById("convoMeta").textContent = "";
+    return;
+  }
+  var letters = res.data || [];
+  document.getElementById("convoMeta").textContent = "共 " + letters.length + " 封 · 按时间慢慢读";
+  if (!letters.length) {
+    body.innerHTML = '<div class="convo-empty">' + IC.empty("这段往来还没有信。") + '</div>';
+    return;
+  }
+  body.innerHTML = letters.map(function(l) {
+    var mine = (MY_ID != null && l.senderUserId === MY_ID);
+    var when = l.sentAt || l.deliveredAt || l.createdAt || l.estimatedArrivalAt;
+    return '<div class="convo-letter ' + (mine ? "mine" : "theirs") + '">' +
+      '<div class="convo-letter-meta">' +
+        '<span>' + (mine ? "我写的" : "对方写的") + '</span>' +
+        '<span>' + (when ? IC.formatTime(when) : "草稿") + '</span>' +
+      '</div>' +
+      (l.title ? '<div class="convo-letter-title">' + esc(l.title) + '</div>' : '') +
+      '<div class="convo-letter-body">' + esc(l.letterBody || "") + '</div>' +
+    '</div>';
+  }).join("");
+  body.scrollTop = body.scrollHeight;
+}
+
+document.getElementById("convoClose").addEventListener("click", closeConversation);
+document.getElementById("convoOverlay").addEventListener("click", function(e) {
+  if (e.target === this) closeConversation();
+});
+document.addEventListener("keydown", function(e) { if (e.key === "Escape") closeConversation(); });
+
 IC.hideLoading();
 </script>
 </body>

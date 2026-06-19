@@ -259,6 +259,43 @@
       opacity: .7;
     }
 
+    /* ── Resonance signal (RUN-003 matching, made visible) ── */
+    .badge-resonant {
+      background: linear-gradient(135deg, rgba(184,194,174,.40), rgba(154,144,167,.34));
+      color: var(--ink);
+      border: 1px solid rgba(154,144,167,.30);
+    }
+    .capsule-card-reasons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 4px 0 10px;
+    }
+    .reason-chip {
+      font-size: .75rem;
+      color: var(--muted);
+      background: rgba(184,194,174,.16);
+      border: 1px solid rgba(184,194,174,.22);
+      border-radius: 999px;
+      padding: 2px 10px;
+      line-height: 1.5;
+    }
+    .match-score {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--accent-plum, #9a90a7);
+      font-variant-numeric: tabular-nums;
+    }
+    body.dark-star .reason-chip {
+      background: rgba(122,142,127,.16);
+      border-color: rgba(122,142,127,.20);
+    }
+    body.dark-star .badge-resonant {
+      background: linear-gradient(135deg, rgba(122,142,127,.34), rgba(154,144,167,.28));
+      border-color: rgba(154,144,167,.24);
+    }
+
     /* ── Dark mode ── */
     body.dark-star .echo-hero {
       background:
@@ -534,15 +571,19 @@ function renderList(data) {
         '</div>' +
         '<div class="capsule-card-badges">' +
           CapsulePersonality.createBadge(c.pseudonym, c.id) +
+          (match.resonant ? '<span class="badge badge-resonant" title="它与你此刻的状态有共鸣">共鸣</span>' : '') +
           '<span class="badge badge-read">' + (c.capsuleType === "SEED_CAPSULE" ? "种子" : "用户") + '</span>' +
         '</div>' +
       '</div>' +
       '<p class="capsule-card-intro">' + esc(c.intro || "") + '</p>' +
+      (match.resonant && match.matchReasons && match.matchReasons.length
+        ? '<div class="capsule-card-reasons">' + match.matchReasons.slice(0, 2).map(function(r) { return '<span class="reason-chip">' + esc(r) + '</span>'; }).join("") + '</div>'
+        : '') +
       (tags.length ? '<div class="capsule-card-tags">' + tags.map(function(t) { return '<span class="pill">' + esc(t) + '</span>'; }).join("") + '</div>' : '') +
       '<div class="capsule-card-meta">' +
         '<span class="capsule-card-energy"><span class="energy-dot"></span> ' + (c.echoEnergy || 0).toFixed(2) + '</span>' +
         '<span>' + formatCapsuleTurns(c) + '</span>' +
-        (match.matchScore ? '<span>' + (match.matchScore).toFixed(2) + ' 匹配</span>' : '') +
+        (match.matchScore ? '<span class="match-score">' + (match.matchScore).toFixed(2) + ' 匹配</span>' : '') +
       '</div>' +
     '</article>';
   }).join("");
@@ -577,7 +618,14 @@ function openCapsule(id) {
     (tags.length ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px">' +
       tags.map(function(t) { return '<span class="pill">' + esc(t) + '</span>'; }).join("") +
     '</div>' : '') +
-    (match.matchSummary ? '<div class="echo-modal-section"><h3>为什么推荐</h3><p class="muted">' + esc(match.matchSummary) + '</p></div>' : '') +
+    (match.matchSummary || (match.matchReasons && match.matchReasons.length)
+      ? '<div class="echo-modal-section"><h3>' + (match.resonant ? "为什么与你共鸣" : "为什么推荐") + '</h3>' +
+          (match.matchSummary ? '<p class="muted">' + esc(match.matchSummary) + '</p>' : '') +
+          (match.matchReasons && match.matchReasons.length
+            ? '<div class="capsule-card-reasons" style="margin-top:8px">' + match.matchReasons.map(function(r) { return '<span class="reason-chip">' + esc(r) + '</span>'; }).join("") + '</div>'
+            : '') +
+        '</div>'
+      : '') +
     '<div class="echo-modal-section" style="border-left:3px solid ' + personality.color + '">' +
       '<h3>边界</h3>' +
       '<p class="muted">对话轮数：' + formatCapsuleTurns(c) + '</p>' +

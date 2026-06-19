@@ -345,6 +345,14 @@ const API = {
     // letter-threads.html, which renders the user's slow-letter threads.
     return IC.api("/api/letters/threads");
   },
+  async letterThreadLetters(threadId) {
+    // FEATURE #33: walk a single conversation (ownership-checked server-side).
+    return IC.api(`/api/letters/threads/${threadId}/letters`);
+  },
+  async letterRequestRewrite(id) {
+    // FEATURE #33: gentle rewrite coaching for a draft the writer owns.
+    return IC.api(`/api/letters/${id}/request-rewrite`, { method: "POST" });
+  },
   async letterReport(id, reason) {
     return IC.api(`/api/letters/${id}/report`, { method: "POST", body: JSON.stringify({ reason }) });
   },

@@ -8,6 +8,7 @@ public class SlowLetter extends BaseEntity {
     public Long senderUserId;
     public Long receiverUserId;
     public Long receiverCapsuleId;
+    public Long threadId;
     public String title;
     public String letterBody;
     public String status;
