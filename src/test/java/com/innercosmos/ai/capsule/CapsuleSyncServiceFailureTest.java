@@ -185,9 +185,12 @@ class CapsuleSyncServiceFailureTest {
     @DisplayName("FIX-C: a value containing a double-quote yields parseable JSON (no malformed diff)")
     void buildDiffSummary_escapesQuotesIntoParseableJson() throws Exception {
         // pseudonym + a value both carry characters that would break raw String.format JSON.
+        // droppedFields is NON-EMPTY: emitted as List.toString() ([city, real_name]) it would be
+        // unquoted, comma-space — invalid JSON — and break the whole blob's parse (FIX-C complete).
         PiiPrivacyFilter.FilteredPortrait dirty = new PiiPrivacyFilter.FilteredPortrait(
                 "TA\"同学\\", "上\"海", "25-30", "互联网/\"技术",
-                List.of("真\"实", "back\\slash"), null, List.of("倾听者"), List.of());
+                List.of("真\"实", "back\\slash"), null, List.of("倾听者"),
+                List.of("city", "real_name"));
         EchoCapsule capsule = existingCapsule(100L, 1L);
 
         String json = service.buildDiffSummary(dirty, capsule);
@@ -200,6 +203,11 @@ class CapsuleSyncServiceFailureTest {
         assertTrue(node.get("values").isArray(), "values must parse as a JSON array");
         assertEquals("真\"实", node.get("values").get(0).asText(), "value with quote must round-trip");
         assertEquals("back\\slash", node.get("values").get(1).asText(), "value with backslash must round-trip");
+        // dropped must be a well-formed JSON array carrying the dropped field names.
+        assertTrue(node.get("dropped").isArray(), "dropped must parse as a JSON array");
+        assertEquals(2, node.get("dropped").size(), "dropped must contain both dropped fields");
+        assertEquals("city", node.get("dropped").get(0).asText(), "dropped[0] must round-trip");
+        assertEquals("real_name", node.get("dropped").get(1).asText(), "dropped[1] must round-trip");
     }
 
     private CapsuleSyncService serviceWithRealRegenerator(LlmClient llmClient,
