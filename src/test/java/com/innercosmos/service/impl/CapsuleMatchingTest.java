@@ -266,6 +266,84 @@ class CapsuleMatchingTest {
                 "higher dynamic energy => higher matchScore");
     }
 
+    /**
+     * FIX-A: a zero-overlap, high-energy capsule must NEVER outrank a low-energy but
+     * genuinely relevant (theme-overlapping) capsule. relevance = themeOverlap + portraitSignal;
+     * seed/energy are NOT relevance. Relevant capsules always sort before irrelevant ones.
+     */
+    @Test
+    void relevantCapsulesRankAboveIrrelevant() {
+        // user themes: 任务压力 + 情绪承压
+        stubMemories(memory(1, "复习", "考试 作业 拖延 压力 累", "考试,拖延", "焦虑"));
+
+        // relevant but LOW energy: shares 任务压力 / 情绪承压, energy 0.10
+        EchoCapsule relevant = capsule(801L, 999L, "USER_CAPSULE", "同路",
+                "考试复习的拖延和压力", "[\"考试\",\"压力\"]", 0.10);
+        // irrelevant but VERY HIGH energy + SEED boost: 希望期待 only, zero family overlap
+        EchoCapsule irrelevant = capsule(802L, 999L, "SEED_CAPSULE", "梦想家",
+                "梦想 期待 憧憬 开心", "[\"希望\",\"梦想\"]", 0.99);
+        stubPlaza(irrelevant, relevant); // intentionally irrelevant first in plaza order
+
+        List<Map<String, Object>> result = service.matchedCapsules(USER_ID);
+
+        assertEquals(801L, idOf(result.get(0)),
+                "relevant low-energy capsule must rank above zero-overlap high-energy capsule");
+        assertTrue((Boolean) result.get(0).get("resonant"), "relevant capsule flagged resonant=true");
+        assertFalse((Boolean) result.get(1).get("resonant"), "irrelevant capsule flagged resonant=false");
+    }
+
+    /**
+     * FIX-A: with >=12 genuinely relevant capsules, a zero-relevance capsule must NOT appear —
+     * irrelevant capsules only backfill remaining slots, never crowd out relevant ones.
+     */
+    @Test
+    void irrelevantOnlyBackfillsRemainingSlots() {
+        stubMemories(memory(1, "复习", "考试 作业 拖延 压力 累", "考试,拖延", "焦虑"));
+
+        List<EchoCapsule> all = new ArrayList<>();
+        // 12 relevant capsules (share 任务压力 / 情绪承压)
+        for (int i = 0; i < 12; i++) {
+            all.add(capsule(900 + i, 999L, "USER_CAPSULE", "同路" + i,
+                    "考试复习的拖延和压力", "[\"考试\",\"压力\"]", 0.5));
+        }
+        // 1 zero-relevance capsule with maximal energy + seed boost
+        EchoCapsule irrelevant = capsule(999L, 998L, "SEED_CAPSULE", "梦想家",
+                "梦想 期待 憧憬 开心", "[\"希望\",\"梦想\"]", 0.99);
+        all.add(irrelevant);
+        stubPlaza(all.toArray(new EchoCapsule[0]));
+
+        List<Map<String, Object>> result = service.matchedCapsules(USER_ID);
+
+        assertEquals(12, result.size(), "top-12 cap");
+        assertTrue(result.stream().noneMatch(it -> idOf(it) == 999L),
+                "with 12 relevant capsules, the zero-relevance capsule must NOT backfill");
+        assertTrue(result.stream().allMatch(it -> (Boolean) it.get("resonant")),
+                "every returned capsule must be resonant when 12 relevant exist");
+    }
+
+    /**
+     * FIX-A: graceful cold-start — a user with ZERO overlap against every capsule still gets a
+     * non-empty list (irrelevant capsules backfill so the plaza is never empty).
+     */
+    @Test
+    void sparseUser_stillGetsResults() {
+        // user themes: 希望期待 only
+        stubMemories(memory(1, "憧憬", "梦想 期待 憧憬 开心 希望", "梦想", "开心"));
+
+        // capsules share ZERO families with the user (all 任务压力 / 情绪承压)
+        EchoCapsule a = capsule(1001L, 999L, "USER_CAPSULE", "压力1",
+                "考试复习的拖延和压力", "[\"考试\"]", 0.6);
+        EchoCapsule b = capsule(1002L, 999L, "USER_CAPSULE", "压力2",
+                "工作任务的截止和焦虑", "[\"任务\"]", 0.4);
+        stubPlaza(a, b);
+
+        List<Map<String, Object>> result = service.matchedCapsules(USER_ID);
+
+        assertFalse(result.isEmpty(), "sparse/cold-start user must still get a non-empty list");
+        assertTrue(result.stream().noneMatch(it -> (Boolean) it.get("resonant")),
+                "all results are non-resonant backfill for a zero-overlap user");
+    }
+
     /** 6. matchReasons are human theme families, not raw keywords. */
     @Test
     void matchReasons_areHumanThemes() {

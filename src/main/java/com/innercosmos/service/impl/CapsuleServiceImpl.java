@@ -263,7 +263,11 @@ public class CapsuleServiceImpl implements CapsuleService {
 
             double energyScore = (capsule.echoEnergy == null ? 0.5 : capsule.echoEnergy) * ENERGY_WEIGHT;
             double seedBoost = "SEED_CAPSULE".equals(capsule.capsuleType) ? SEED_BOOST : USER_BOOST;
-            // NO FLOOR. Zero overlap => ~seedBoost + energy only => naturally drops out of top 12.
+            // FIX-A: relevance is ONLY the genuinely user-specific signal (themeOverlap +
+            // portraitSignal). seedBoost/energyScore are NOT relevance — they break ties and
+            // shape ordering, but must never make a zero-overlap capsule count as a match.
+            double relevance = themeOverlap + portraitSignal;
+            boolean resonant = relevance > 0.0;
             double score = Math.min(0.99, themeOverlap + portraitSignal + energyScore + seedBoost);
 
             shared.sort(Comparator
@@ -276,13 +280,25 @@ public class CapsuleServiceImpl implements CapsuleService {
             item.put("matchScore", Math.round(score * 100.0) / 100.0);
             item.put("matchReasons", matchReasons);
             item.put("matchSummary", buildMatchSummary(capsule, matchReasons));
+            // FIX-A: frontend MAY use this to distinguish a genuine resonance match from a
+            // cold-start backfill; existing keys (matchScore/matchSummary/matchReasons/capsule)
+            // are unchanged so no frontend change is required.
+            item.put("resonant", resonant);
             scored.add(item);
         }
-        // Deterministic sort: matchScore desc, then echoEnergy desc, then capsule.id asc.
-        scored.sort(Comparator
+        // FIX-A relevance gate: relevant capsules (resonant=true) ALWAYS sort before
+        // non-relevant ones, so a zero-overlap high-energy/seed capsule can never outrank or
+        // crowd out a genuinely relevant one. Within each group, the prior deterministic order
+        // applies: matchScore desc, then echoEnergy desc, then capsule.id asc. After limit(12),
+        // non-relevant capsules only occupy slots left over once every relevant capsule is in —
+        // i.e. they merely backfill, guaranteeing the plaza is never empty for a sparse user.
+        Comparator<Map<String, Object>> withinGroup = Comparator
                 .comparingDouble((Map<String, Object> v) -> -((Number) v.get("matchScore")).doubleValue())
                 .thenComparingDouble(v -> -energyOf(v))
-                .thenComparingLong(CapsuleServiceImpl::idOf));
+                .thenComparingLong(CapsuleServiceImpl::idOf);
+        scored.sort(Comparator
+                .comparingInt((Map<String, Object> v) -> Boolean.TRUE.equals(v.get("resonant")) ? 0 : 1)
+                .thenComparing(withinGroup));
         return scored.stream().limit(12).toList();
     }
 

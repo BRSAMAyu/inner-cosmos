@@ -15,4 +15,14 @@ public final class JsonUtils {
             return "{}";
         }
     }
+
+    /**
+     * Escape a raw string for safe interpolation inside a JSON string literal.
+     * Shared helper so hand-built JSON (e.g. CapsuleSyncService.buildDiffSummary) does not
+     * produce malformed output when a value contains a double-quote or backslash.
+     * Backslash MUST be escaped before the double-quote.
+     */
+    public static String escapeJsonString(String value) {
+        return value == null ? "" : value.replace("\\", "\\\\").replace("\"", "\\\"");
+    }
 }
