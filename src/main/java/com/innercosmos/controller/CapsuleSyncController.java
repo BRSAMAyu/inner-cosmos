@@ -60,8 +60,8 @@ public class CapsuleSyncController extends BaseController {
      */
     @PostMapping("/{id}/retry")
     public ApiResponse<Void> retry(@PathVariable Long id, HttpSession session) {
-        currentUserId(session); // require auth
-        syncService.retryFailed(id);
+        Long userId = currentUserId(session);
+        syncService.retryFailed(userId, id);
         return ApiResponse.<Void>ok(null);
     }
 }

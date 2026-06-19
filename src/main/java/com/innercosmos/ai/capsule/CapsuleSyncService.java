@@ -260,12 +260,40 @@ public class CapsuleSyncService {
      * IC-CAP-002 B-2: re-run regeneration for a single FAILED queue row (used by the
      * retry job and the manual /retry endpoint). Rebuilds the filtered portrait from
      * the user's current data. No-op if the row has exhausted its attempt budget.
+     *
+     * IC-CAP-002 FIX-1 (IDOR): the manual /retry endpoint supplies the caller's userId,
+     * which must own the row; a mismatch throws UNAUTHORIZED so user B cannot trigger LLM
+     * regeneration of user A's FAILED row (resource burn + a misdirected notification).
+     * Mirrors the authz check in {@link #decide}. The internal retry sweep uses
+     * {@link #retryFailed(Long)}.
+     */
+    public void retryFailed(Long userId, Long queueId) {
+        CapsuleSyncQueue queue = syncQueueMapper.selectById(queueId);
+        if (queue == null) {
+            throw new com.innercosmos.exception.BusinessException(
+                    com.innercosmos.common.ErrorCode.NOT_FOUND, "同步队列记录不存在");
+        }
+        if (!userId.equals(queue.userId)) {
+            throw new com.innercosmos.exception.BusinessException(
+                    com.innercosmos.common.ErrorCode.UNAUTHORIZED, "无权操作此记录");
+        }
+        retryFailedInternal(queue);
+    }
+
+    /**
+     * IC-CAP-002 B-2: trusted internal retry used by the scheduled sweep
+     * ({@link com.innercosmos.scheduler.CapsuleSyncRetryJob}). The sweep already selects
+     * only rows owned by their user, so no per-caller ownership check applies here.
      */
     public void retryFailed(Long queueId) {
         CapsuleSyncQueue queue = syncQueueMapper.selectById(queueId);
         if (queue == null) return;
+        retryFailedInternal(queue);
+    }
+
+    private void retryFailedInternal(CapsuleSyncQueue queue) {
         if (queue.attemptCount != null && queue.attemptCount >= MAX_ATTEMPTS) {
-            log.info("Queue {} reached MAX_ATTEMPTS ({}); not retrying", queueId, MAX_ATTEMPTS);
+            log.info("Queue {} reached MAX_ATTEMPTS ({}); not retrying", queue.id, MAX_ATTEMPTS);
             return;
         }
         PiiPrivacyFilter.PortraitSnapshot snapshot = buildSnapshot(queue.userId);

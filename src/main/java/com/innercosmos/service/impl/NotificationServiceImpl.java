@@ -42,9 +42,16 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Override
-    public void markRead(Long id) {
+    public void markRead(Long userId, Long id) {
         Notification n = notificationMapper.selectById(id);
         if (n == null) return;
+        // IC-CAP-002 FIX-1 (IDOR): verify ownership before mutating. Without this any
+        // logged-in user could mark another user's notification read. Mirrors the authz
+        // pattern in CapsuleSyncService.decide().
+        if (!userId.equals(n.userId)) {
+            throw new com.innercosmos.exception.BusinessException(
+                    com.innercosmos.common.ErrorCode.UNAUTHORIZED, "无权操作此通知");
+        }
         n.read = true;
         notificationMapper.updateById(n);
     }
