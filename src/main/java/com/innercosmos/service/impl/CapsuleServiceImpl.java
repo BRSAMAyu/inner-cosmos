@@ -8,7 +8,10 @@ import com.innercosmos.entity.EchoCapsule;
 import com.innercosmos.mapper.CapsuleBoundaryMapper;
 import com.innercosmos.mapper.EchoCapsuleMapper;
 import com.innercosmos.mapper.MemoryCardMapper;
+import com.innercosmos.mapper.UserPortraitMapper;
 import com.innercosmos.entity.MemoryCard;
+import com.innercosmos.entity.UserPortrait;
+import com.innercosmos.ai.semantic.PseudoSemanticAnalyzer;
 import com.innercosmos.service.CapsuleService;
 import com.innercosmos.vo.CapsulePreviewVO;
 import org.springframework.stereotype.Service;
@@ -30,15 +33,18 @@ public class CapsuleServiceImpl implements CapsuleService {
     private final CapsuleBoundaryMapper boundaryMapper;
     private final CapsuleAgent capsuleAgent;
     private final MemoryCardMapper memoryCardMapper;
+    private final UserPortraitMapper userPortraitMapper;
 
-    public CapsuleServiceImpl(EchoCapsuleMapper capsuleMapper, 
-                              CapsuleBoundaryMapper boundaryMapper, 
+    public CapsuleServiceImpl(EchoCapsuleMapper capsuleMapper,
+                              CapsuleBoundaryMapper boundaryMapper,
                               CapsuleAgent capsuleAgent,
-                              MemoryCardMapper memoryCardMapper) {
+                              MemoryCardMapper memoryCardMapper,
+                              UserPortraitMapper userPortraitMapper) {
         this.capsuleMapper = capsuleMapper;
         this.boundaryMapper = boundaryMapper;
         this.capsuleAgent = capsuleAgent;
         this.memoryCardMapper = memoryCardMapper;
+        this.userPortraitMapper = userPortraitMapper;
     }
 
     @Override
@@ -184,6 +190,23 @@ public class CapsuleServiceImpl implements CapsuleService {
         return capsuleMapper.selectList(query);
     }
 
+    // IC-CAP-003 smart-matching constants. Deterministic, no LLM.
+    // The 6 real theme families produced by PseudoSemanticAnalyzer; "日常分享" (default) is ignored.
+    private static final Set<String> THEME_FAMILIES = Set.of(
+            "任务压力", "关系牵动", "情绪承压", "认知探索", "自我评价", "希望期待");
+    // Stable tie-break order for matchReasons when min-frequencies are equal.
+    private static final List<String> FAMILY_ORDER = List.of(
+            "任务压力", "关系牵动", "情绪承压", "认知探索", "自我评价", "希望期待");
+    // themeOverlap = min(0.55, rawOverlap * 0.18), rawOverlap = sum over shared families of min(userFreq, capFreq).
+    private static final double THEME_OVERLAP_UNIT = 0.18;
+    private static final double THEME_OVERLAP_CAP = 0.55;
+    // portraitSignal: each portrait-dim family also present in the capsule profile adds a fixed increment, capped.
+    private static final double PORTRAIT_INCREMENT = 0.07;
+    private static final double PORTRAIT_CAP = 0.20;
+    private static final double ENERGY_WEIGHT = 0.18;
+    private static final double SEED_BOOST = 0.12;
+    private static final double USER_BOOST = 0.06;
+
     @Override
     public List<Map<String, Object>> matchedCapsules(Long userId) {
         List<MemoryCard> memories = memoryCardMapper.selectList(new QueryWrapper<MemoryCard>()
@@ -191,13 +214,18 @@ public class CapsuleServiceImpl implements CapsuleService {
                 .eq("status", "ACTIVE")
                 .orderByDesc("emotional_gravity")
                 .last("LIMIT 24"));
-        Set<String> userSignals = new LinkedHashSet<>();
+
+        // userThemeProfile: family -> frequency aggregated over up to 24 memories.
+        Map<String, Integer> userThemeProfile = new HashMap<>();
         for (MemoryCard memory : memories) {
-            userSignals.addAll(parseTags(memory.keywordTags));
-            userSignals.addAll(parseTags(memory.emotionTags));
-            addTerms(userSignals, memory.title);
-            addTerms(userSignals, memory.summary);
+            String text = joinText(memory.title, memory.summary,
+                    String.join(" ", parseTags(memory.keywordTags)),
+                    String.join(" ", parseTags(memory.emotionTags)));
+            mergeThemes(userThemeProfile, themesOf(text));
         }
+
+        // portrait families (CURRENT_STATE / EMOTION_PATTERN / INNER_DRIVE) for this user.
+        Set<String> portraitFamilies = fetchPortraitFamilies(userId);
 
         List<EchoCapsule> all = plazaCapsules();
         List<Map<String, Object>> scored = new ArrayList<>();
@@ -205,33 +233,113 @@ public class CapsuleServiceImpl implements CapsuleService {
             if (userId.equals(capsule.ownerUserId)) {
                 continue;
             }
-            Set<String> capsuleSignals = new LinkedHashSet<>(parseTags(capsule.publicTags));
-            addTerms(capsuleSignals, capsule.pseudonym);
-            addTerms(capsuleSignals, capsule.intro);
+            String capText = joinText(capsule.intro,
+                    String.join(" ", parseTags(capsule.publicTags)), capsule.pseudonym);
+            Map<String, Integer> capsuleThemeProfile = new HashMap<>();
+            mergeThemes(capsuleThemeProfile, themesOf(capText));
 
-            Set<String> overlap = new LinkedHashSet<>();
-            for (String signal : userSignals) {
-                if (containsSimilar(capsuleSignals, signal)) {
-                    overlap.add(signal);
+            // themeOverlap: weighted intersection. More shared families + higher min-freq => higher score.
+            int rawOverlap = 0;
+            // matchReasons sorted by descending min-frequency, then stable family order.
+            List<Map.Entry<String, Integer>> shared = new ArrayList<>();
+            for (Map.Entry<String, Integer> e : userThemeProfile.entrySet()) {
+                Integer capFreq = capsuleThemeProfile.get(e.getKey());
+                if (capFreq != null) {
+                    int minFreq = Math.min(e.getValue(), capFreq);
+                    rawOverlap += minFreq;
+                    shared.add(Map.entry(e.getKey(), minFreq));
                 }
             }
-            double semanticScore = Math.min(0.72, overlap.size() * 0.12);
-            double energyScore = Math.min(0.18, (capsule.echoEnergy == null ? 0.5 : capsule.echoEnergy) * 0.18);
-            double seedBoost = "SEED_CAPSULE".equals(capsule.capsuleType) ? 0.04 : 0.08;
-            double score = Math.min(0.99, semanticScore + energyScore + seedBoost);
-            if (score < 0.16) {
-                score = 0.16 + energyScore;
+            double themeOverlap = Math.min(THEME_OVERLAP_CAP, rawOverlap * THEME_OVERLAP_UNIT);
+
+            // portraitSignal: portrait families that also appear in the capsule profile.
+            double portraitSignal = 0.0;
+            for (String fam : portraitFamilies) {
+                if (capsuleThemeProfile.containsKey(fam)) {
+                    portraitSignal += PORTRAIT_INCREMENT;
+                }
             }
+            portraitSignal = Math.min(PORTRAIT_CAP, portraitSignal);
+
+            double energyScore = (capsule.echoEnergy == null ? 0.5 : capsule.echoEnergy) * ENERGY_WEIGHT;
+            double seedBoost = "SEED_CAPSULE".equals(capsule.capsuleType) ? SEED_BOOST : USER_BOOST;
+            // NO FLOOR. Zero overlap => ~seedBoost + energy only => naturally drops out of top 12.
+            double score = Math.min(0.99, themeOverlap + portraitSignal + energyScore + seedBoost);
+
+            shared.sort(Comparator
+                    .comparingInt((Map.Entry<String, Integer> en) -> -en.getValue())
+                    .thenComparingInt(en -> FAMILY_ORDER.indexOf(en.getKey())));
+            List<String> matchReasons = shared.stream().limit(5).map(Map.Entry::getKey).toList();
 
             Map<String, Object> item = new HashMap<>();
             item.put("capsule", capsule);
             item.put("matchScore", Math.round(score * 100.0) / 100.0);
-            item.put("matchReasons", overlap.stream().limit(5).toList());
-            item.put("matchSummary", buildMatchSummary(capsule, overlap));
+            item.put("matchReasons", matchReasons);
+            item.put("matchSummary", buildMatchSummary(capsule, matchReasons));
             scored.add(item);
         }
-        scored.sort(Comparator.comparingDouble(v -> -((Number) v.get("matchScore")).doubleValue()));
+        // Deterministic sort: matchScore desc, then echoEnergy desc, then capsule.id asc.
+        scored.sort(Comparator
+                .comparingDouble((Map<String, Object> v) -> -((Number) v.get("matchScore")).doubleValue())
+                .thenComparingDouble(v -> -energyOf(v))
+                .thenComparingLong(CapsuleServiceImpl::idOf));
         return scored.stream().limit(12).toList();
+    }
+
+    private static double energyOf(Map<String, Object> item) {
+        EchoCapsule c = (EchoCapsule) item.get("capsule");
+        return c.echoEnergy == null ? 0.5 : c.echoEnergy;
+    }
+
+    private static long idOf(Map<String, Object> item) {
+        EchoCapsule c = (EchoCapsule) item.get("capsule");
+        return c.id == null ? Long.MAX_VALUE : c.id;
+    }
+
+    private String joinText(String... parts) {
+        StringBuilder sb = new StringBuilder();
+        for (String p : parts) {
+            if (p != null && !p.isBlank()) {
+                if (sb.length() > 0) sb.append(' ');
+                sb.append(p);
+            }
+        }
+        return sb.toString();
+    }
+
+    /** Run the pseudo-semantic analyzer and keep only the 6 real theme families (drop "日常分享"). */
+    private Set<String> themesOf(String text) {
+        Set<String> families = new LinkedHashSet<>();
+        if (text == null || text.isBlank()) {
+            return families;
+        }
+        for (String theme : PseudoSemanticAnalyzer.analyze(text).detectedThemes) {
+            if (THEME_FAMILIES.contains(theme)) {
+                families.add(theme);
+            }
+        }
+        return families;
+    }
+
+    private void mergeThemes(Map<String, Integer> profile, Set<String> families) {
+        for (String fam : families) {
+            profile.merge(fam, 1, Integer::sum);
+        }
+    }
+
+    /** Collect 6-family themes from the user's CURRENT_STATE / EMOTION_PATTERN / INNER_DRIVE portrait rows. */
+    private Set<String> fetchPortraitFamilies(Long userId) {
+        Set<String> families = new LinkedHashSet<>();
+        List<UserPortrait> rows = userPortraitMapper.selectList(new QueryWrapper<UserPortrait>()
+                .eq("user_id", userId)
+                .in("dim", "CURRENT_STATE", "EMOTION_PATTERN", "INNER_DRIVE"));
+        if (rows == null) {
+            return families;
+        }
+        for (UserPortrait p : rows) {
+            families.addAll(themesOf(p.valueJson));
+        }
+        return families;
     }
 
     @Override
@@ -357,35 +465,12 @@ public class CapsuleServiceImpl implements CapsuleService {
         return tags;
     }
 
-    private void addTerms(Set<String> target, String text) {
-        if (text == null || text.isBlank()) {
-            return;
-        }
-        for (String term : List.of("项目", "考试", "关系", "朋友", "边界", "孤独", "日记", "真实AI", "Aurora", "行动", "拖延", "深夜", "睡前", "产品", "理解", "慢社交")) {
-            if (text.contains(term)) {
-                target.add(term);
-            }
-        }
-    }
-
-    private boolean containsSimilar(Set<String> haystack, String needle) {
-        if (needle == null || needle.isBlank()) {
-            return false;
-        }
-        for (String item : haystack) {
-            if (item.equals(needle) || item.contains(needle) || needle.contains(item)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private String buildMatchSummary(EchoCapsule capsule, Set<String> overlap) {
-        if (overlap.isEmpty()) {
+    private String buildMatchSummary(EchoCapsule capsule, List<String> themeFamilies) {
+        if (themeFamilies == null || themeFamilies.isEmpty()) {
             return "基于回声能量和公开边界推荐。";
         }
         String type = "SEED_CAPSULE".equals(capsule.capsuleType) ? "官方种子" : "用户回声";
-        return type + "与你最近的「" + String.join("、", overlap.stream().limit(3).toList()) + "」线索有重合。";
+        return type + "与你最近的「" + String.join("、", themeFamilies.stream().limit(3).toList()) + "」主题有重合。";
     }
 
     private String inferStyleProfile(List<String> memorySummaries) {
