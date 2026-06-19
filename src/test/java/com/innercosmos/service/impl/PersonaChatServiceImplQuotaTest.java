@@ -122,7 +122,7 @@ class PersonaChatServiceImplQuotaTest {
 
     @Test
     @DisplayName("Bug 1 fix: SEED_CAPSULE type gets dailyLimit=50, not 0 (unlimited)")
-    void create_seedCapsule_gets10DailyLimit() {
+    void create_seedCapsule_gets50DailyLimit() {
         Long userId = 1L;
         Long capsuleId = 100L;
         EchoCapsule capsule = publicCapsule(capsuleId, "SEED_CAPSULE");
@@ -138,7 +138,7 @@ class PersonaChatServiceImplQuotaTest {
 
     @Test
     @DisplayName("Bug 1 fix: SEED type (alias) also gets dailyLimit=50")
-    void create_seedTypeAlias_gets10DailyLimit() {
+    void create_seedTypeAlias_gets50DailyLimit() {
         Long userId = 2L;
         Long capsuleId = 101L;
         EchoCapsule capsule = publicCapsule(capsuleId, "SEED");
@@ -172,7 +172,7 @@ class PersonaChatServiceImplQuotaTest {
 
     @Test
     @DisplayName("Fix 2: SEED capsule with conversationLimitPerDay set still gets dailyLimit=50 (effective cap)")
-    void create_seedCapsuleWithExplicitLimit_stillGets10() {
+    void create_seedCapsuleWithExplicitLimit_stillGets50() {
         Long userId = 4L;
         Long capsuleId = 103L;
         // Even though conversationLimitPerDay is set to 99, SEED effective cap is 50
@@ -360,7 +360,7 @@ class PersonaChatServiceImplQuotaTest {
 
     @Test
     @DisplayName("SEED capsule: resolveDailyLimit uses 50 when no conversationLimitPerDay set")
-    void reply_seedCapsuleNoLimit_uses10AsDefault() {
+    void reply_seedCapsuleNoLimit_uses50AsDefault() {
         Long userId = 14L;
         Long sessionId = 205L;
         Long capsuleId = 304L;

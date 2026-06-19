@@ -211,6 +211,7 @@ CREATE TABLE IF NOT EXISTS tb_echo_capsule (
   context_preview_json TEXT,
   stand_in_enabled BOOLEAN DEFAULT FALSE,
   real_contact_policy VARCHAR(32),
+  last_activity_at TIMESTAMP NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_capsule_public (is_public, visibility_status),
@@ -739,11 +740,30 @@ CREATE TABLE IF NOT EXISTS tb_capsule_sync_queue (
   capsule_id BIGINT NOT NULL,
   status VARCHAR(32) NOT NULL DEFAULT 'PENDING',
   proposed_context_diff TEXT,
+  attempt_count INT DEFAULT 0,
+  last_error TEXT NULL,
+  failed_at TIMESTAMP NULL,
+  next_retry_at TIMESTAMP NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   decided_at TIMESTAMP NULL,
   INDEX idx_sync_user (user_id),
   INDEX idx_sync_status (status)
+);
+
+-- IC-CAP-002 B-3: system notifications (distinct from slow letters)
+CREATE TABLE IF NOT EXISTS tb_notification (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  type VARCHAR(64),
+  title VARCHAR(255),
+  body TEXT,
+  ref_id BIGINT NULL,
+  ref_type VARCHAR(64) NULL,
+  is_read BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_notification_user (user_id)
 );
 
 -- Aurora Subjectivity + Continuity System (M0)

@@ -13,4 +13,16 @@ public interface EchoCapsuleMapper extends BaseMapper<EchoCapsule> {
         return selectList(new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<EchoCapsule>()
                 .eq("owner_user_id", userId));
     }
+
+    /**
+     * IC-CAP-002 B-4 (FIX-3): the user's PUBLIC capsules only. "Public" matches the
+     * PersonaChatServiceImpl semantic: is_public = TRUE AND visibility_status = 'PUBLIC'.
+     * Used by nightly echo-energy decay, which Spec §4 B-4 scopes to public capsules.
+     */
+    default List<EchoCapsule> findPublicByOwner(Long userId) {
+        return selectList(new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<EchoCapsule>()
+                .eq("owner_user_id", userId)
+                .eq("is_public", true)
+                .eq("visibility_status", "PUBLIC"));
+    }
 }

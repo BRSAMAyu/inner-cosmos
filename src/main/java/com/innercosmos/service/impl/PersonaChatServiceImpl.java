@@ -28,6 +28,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,6 +46,12 @@ public class PersonaChatServiceImpl implements PersonaChatService {
      *     else (the old session-based bypass is already closed).
      */
     private static final int SEED_EFFECTIVE_DAILY_LIMIT = 50;
+
+    /**
+     * IC-CAP-002 MAJOR-4: all quota-date arithmetic uses a single fixed zone so a
+     * user's daily boundary is stable regardless of server TZ.
+     */
+    private static final ZoneId QUOTA_ZONE = ZoneId.of("Asia/Shanghai");
 
     private final PersonaChatSessionMapper sessionMapper;
     private final PersonaChatMessageMapper messageMapper;
@@ -119,14 +127,14 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         }
         SafetyResult safety = safetyService.check(message, userId, null);
 
-        // NOTE: user message is recorded before quota check intentionally — the visitor
-        // did compose and send the message. LETTER_GUIDED responses are excluded from
-        // meaningful history by downstream filtering (tracked as follow-up IC-CAP-002).
+        // IC-CAP-002 MAJOR-2: the visitor message is persisted ONLY when the turn is
+        // actually engaged (safety-guided or quota-reserved). In the over-limit
+        // (LETTER_GUIDED) branch we must NOT persist it — otherwise an over-limit
+        // message pollutes the next turn's recentHistory with un-answered content.
         PersonaChatMessage userMessage = new PersonaChatMessage();
         userMessage.sessionId = sessionId;
         userMessage.senderType = "VISITOR";
         userMessage.textContent = message;
-        messageMapper.insert(userMessage);
 
         PersonaChatMessage capsuleMessage = new PersonaChatMessage();
         capsuleMessage.sessionId = sessionId;
@@ -137,17 +145,22 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         int dailyLimit = resolveDailyLimit(capsule);
 
         if (Boolean.TRUE.equals(safety.blockModelCall)) {
+            // Safety path: preserve prior behavior — the visitor message is recorded.
+            messageMapper.insert(userMessage);
             capsuleMessage.textContent = safety.safeMessage;
             session.status = "SAFETY_GUIDED";
         } else {
             // Atomically try to reserve a turn before calling AI
-            LocalDate today = LocalDate.now();
+            LocalDate today = LocalDate.now(QUOTA_ZONE);
             boolean reserved = tryReserveQuota(userId, session.capsuleId, today, dailyLimit);
 
             if (!reserved) {
+                // IC-CAP-002 MAJOR-2: over-limit → do NOT persist the visitor message.
                 capsuleMessage.textContent = "今天的回声已经足够深了.如果你愿意,可以把想继续说的话写成一封慢信.";
                 session.status = "LETTER_GUIDED";
             } else {
+                // Reserved a turn → the visitor message is now part of the conversation.
+                messageMapper.insert(userMessage);
                 String personaName = capsule != null && capsule.pseudonym != null ? capsule.pseudonym : "数字回声";
                 String personaIntro = capsule != null && capsule.intro != null ? capsule.intro : "一个有限的共鸣体";
                 String personaPrompt = capsule != null && capsule.personaPrompt != null && !capsule.personaPrompt.isBlank()
@@ -193,7 +206,20 @@ public class PersonaChatServiceImpl implements PersonaChatService {
                         : "";
                 capsuleMessage.textContent = prefix + boundaryText + blank(ai.reply, "真实模型暂时不可用，我不想用模板伪装成这个共鸣体。请稍后再试，或者写一封慢信。") + identityNotice;
 
-                // Quota already atomically incremented in tryReserveQuota
+                // IC-CAP-002 MAJOR-1: detect the AI-unavailable fallback. The quota was
+                // already atomically reserved; if the model is unavailable we COMPENSATE
+                // (decrement the reserved turn) so an unanswered turn never costs the user.
+                boolean aiUnavailable = ai.riskFlags != null && ai.riskFlags.contains("REMOTE_UNAVAILABLE")
+                        || ai.reply == null || ai.reply.isBlank();
+
+                if (aiUnavailable) {
+                    compensateQuota(userId, session.capsuleId, today);
+                    // Do NOT bump echo energy on the unavailable path.
+                } else {
+                    // Genuine success: quota stays consumed; bump capsule activity (B-4).
+                    bumpCapsuleActivity(capsule);
+                }
+
                 session.status = "ACTIVE"; // reset from any prior LETTER_GUIDED
                 session.turnCount = session.turnCount == null ? 1 : session.turnCount + 1;
             }
@@ -242,9 +268,41 @@ public class PersonaChatServiceImpl implements PersonaChatService {
                     userId, capsuleId, today);
             return true; // inserted first turn
         } catch (org.springframework.dao.DuplicateKeyException e) {
-            // Row exists but turn_count >= dailyLimit
-            return false;
+            // IC-CAP-002 MAJOR-3: first-day race — a concurrent first-insert won the race,
+            // so a row now exists. Retry the conditional UPDATE ONCE: if still under limit
+            // this loser still reserves a turn instead of being falsely rejected.
+            int retried = jdbcTemplate.update(
+                    "UPDATE tb_capsule_usage_quota SET turn_count = turn_count + 1, updated_at = CURRENT_TIMESTAMP " +
+                    "WHERE visitor_user_id = ? AND capsule_id = ? AND quota_date = ? AND turn_count < ?",
+                    userId, capsuleId, today, dailyLimit);
+            return retried == 1;
         }
+    }
+
+    /**
+     * IC-CAP-002 MAJOR-1: undo a previously-reserved quota turn (used when the AI is
+     * unavailable so the user is not charged for an unanswered turn). Conditional so it
+     * never drives turn_count negative.
+     */
+    private void compensateQuota(Long userId, Long capsuleId, LocalDate today) {
+        jdbcTemplate.update(
+                "UPDATE tb_capsule_usage_quota SET turn_count = turn_count - 1, updated_at = CURRENT_TIMESTAMP " +
+                "WHERE visitor_user_id = ? AND capsule_id = ? AND quota_date = ? AND turn_count > 0",
+                userId, capsuleId, today);
+    }
+
+    /**
+     * IC-CAP-002 B-4: bump a capsule's activity signals after a genuinely successful turn.
+     * echoEnergy += 0.02 (cap 1.0); freshnessScore = max(current, 0.9); lastActivityAt = now.
+     */
+    private void bumpCapsuleActivity(EchoCapsule capsule) {
+        if (capsule == null) return;
+        double energy = capsule.echoEnergy == null ? 0.0 : capsule.echoEnergy;
+        double freshness = capsule.freshnessScore == null ? 0.0 : capsule.freshnessScore;
+        capsule.echoEnergy = Math.min(1.0, energy + 0.02);
+        capsule.freshnessScore = Math.max(freshness, 0.9);
+        capsule.lastActivityAt = LocalDateTime.now();
+        capsuleMapper.updateById(capsule);
     }
 
     private StructuredAiResults.PersonaResult unavailablePersona() {
@@ -327,7 +385,7 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         int dailyLimit = resolveDailyLimit(capsule);
         boolean seed = capsule != null
                 && ("SEED_CAPSULE".equals(capsule.capsuleType) || "SEED".equals(capsule.capsuleType));
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(QUOTA_ZONE);
         CapsuleUsageQuota row = quotaMapper.selectOne(
                 new QueryWrapper<CapsuleUsageQuota>()
                         .eq("visitor_user_id", userId)

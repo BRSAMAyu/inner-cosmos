@@ -23,4 +23,6 @@ public class EchoCapsule extends BaseEntity {
     public String contextPreviewJson;
     public Boolean standInEnabled;
     public String realContactPolicy;
+    // IC-CAP-002 B-4: last time this capsule had a genuinely successful chat turn.
+    public LocalDateTime lastActivityAt;
 }

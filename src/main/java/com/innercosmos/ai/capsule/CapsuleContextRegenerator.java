@@ -41,25 +41,26 @@ public class CapsuleContextRegenerator {
                            List<String> recentThemes) {
         EchoCapsule capsule = capsuleMapper.selectById(capsuleId);
         if (capsule == null) {
-            log.warn("Capsule {} not found for context regeneration", capsuleId);
-            return;
+            // IC-CAP-002 FIX-1: a missing capsule is a real failure — propagate so the
+            // caller records FAILED rather than a phantom SYNCED for a row that never synced.
+            throw new IllegalStateException("Capsule " + capsuleId + " not found for context regeneration");
         }
 
+        // IC-CAP-002 FIX-1: do NOT swallow LLM failures. Any exception from llmClient.chat
+        // must propagate to CapsuleSyncService.regenerateOne so the queue row is marked
+        // FAILED (with retry bookkeeping + SYNC_FAILED notification), instead of falling
+        // through to the success branch (which reported SYNCED for every real LLM outage).
         String personaPrompt = buildRegenerationPrompt(capsule, portrait, recentThemes);
-        try {
-            LlmRequest req = new LlmRequest(capsule.ownerUserId, "CAPSULE_CONTEXT_REGENERATE", personaPrompt);
-            String newPrompt = llmClient.chat(req);
-            if (newPrompt != null && !newPrompt.isBlank()) {
-                capsule.personaPrompt = newPrompt.trim();
-                capsule.contextPreviewJson = buildContextPreviewJson(portrait, capsule);
-                capsuleMapper.updateById(capsule);
-                log.info("Capsule {} context regenerated successfully", capsuleId);
-            } else {
-                log.warn("LLM returned empty response for capsule {} regeneration", capsuleId);
-            }
-        } catch (Exception e) {
-            log.error("Failed to regenerate capsule {} context: {}", capsuleId, e.getMessage());
+        LlmRequest req = new LlmRequest(capsule.ownerUserId, "CAPSULE_CONTEXT_REGENERATE", personaPrompt);
+        String newPrompt = llmClient.chat(req);
+        if (newPrompt == null || newPrompt.isBlank()) {
+            // Empty/blank LLM output is a failure, not a silent no-op.
+            throw new IllegalStateException("LLM returned empty response for capsule " + capsuleId);
         }
+        capsule.personaPrompt = newPrompt.trim();
+        capsule.contextPreviewJson = buildContextPreviewJson(portrait, capsule);
+        capsuleMapper.updateById(capsule);
+        log.info("Capsule {} context regenerated successfully", capsuleId);
     }
 
     private String buildRegenerationPrompt(EchoCapsule capsule,
