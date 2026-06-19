@@ -226,8 +226,31 @@ if (!capsuleId) {
 let sid = null;
 let totalTurns = 5;
 let usedTurns = 0;
+let capsuleIsSeed = false;
+let currentCapsuleId = null;
 
 function esc(text) { return IC.esc(text); }
+
+/**
+ * IC-CAP-001: fetch authoritative per-day quota from the backend and refresh the
+ * turns display. The backend (tb_capsule_usage_quota) is the source of truth —
+ * the old client-side usedTurns++ counter could be bypassed by opening new sessions.
+ * SEED capsules (dailyLimit reported as 50 but seed=true) render as "不限".
+ */
+async function refreshQuotaFromBackend() {
+  if (!currentCapsuleId) return;
+  try {
+    const r = await API.personaChatQuota(currentCapsuleId);
+    if (r.success && r.data) {
+      capsuleIsSeed = !!r.data.seed;
+      totalTurns = r.data.dailyLimit;
+      usedTurns = r.data.turnCount;
+      updateTurnsDisplay();
+    }
+  } catch (e) {
+    // best-effort: leave previous display as-is if the endpoint is unreachable
+  }
+}
 
 async function init() {
   await IC.ensureDemoLogin();
@@ -236,10 +259,15 @@ async function init() {
   const capsuleResp = await API.capsuleDetail(capsuleId);
   if (capsuleResp.success && capsuleResp.data) {
     const c = capsuleResp.data;
+    currentCapsuleId = c.id;
     document.getElementById("capsuleName").textContent = c.pseudonym || "数字回声";
     document.getElementById("capsuleIntro").textContent = c.intro || "一枚从脱敏记忆中编织出的数字回声。";
-    totalTurns = (c.capsuleType === "SEED_CAPSULE" || c.capsuleType === "SEED") ? 0 : (c.conversationLimitPerDay || 30);
+    capsuleIsSeed = (c.capsuleType === "SEED_CAPSULE" || c.capsuleType === "SEED");
+    // IC-CAP-001: totalTurns/usedTurns now come from the authoritative /quota endpoint.
+    // Seed type is provisional until /quota confirms; refreshQuotaFromBackend overrides both.
+    totalTurns = capsuleIsSeed ? 0 : (c.conversationLimitPerDay || 30);
     updateTurnsDisplay();
+    await refreshQuotaFromBackend();
 
     /* CapsulePersonality avatar */
     var avatarBox = document.getElementById("capsuleAvatar");
@@ -311,12 +339,14 @@ function addBubble(content, kind) {
 }
 
 function updateTurnsDisplay() {
-  const remaining = Math.max(0, totalTurns - usedTurns);
-  if (totalTurns <= 0) {
+  // IC-CAP-001: SEED capsules render as "不限" (effective limit 50 is high enough
+  // to feel unlimited in practice; the backend still enforces the hard cap).
+  if (capsuleIsSeed || totalTurns <= 0) {
     document.getElementById("turnsFill").style.width = "100%";
     document.getElementById("turnsLabel").textContent = "不限";
     return;
   }
+  const remaining = Math.max(0, totalTurns - usedTurns);
   document.getElementById("turnsFill").style.width = (remaining / totalTurns * 100) + "%";
   document.getElementById("turnsLabel").textContent = `${remaining} / ${totalTurns}`;
 
@@ -364,6 +394,10 @@ async function send() {
     if (r.success && r.data) {
       addBubble(r.data.textContent || r.data.content || "...", "ai");
       IC.stagger(document.getElementById("chat"));
+      // IC-CAP-001: refresh authoritative remaining-turns from the backend after each reply.
+      // (the optimistic usedTurns++ above gives instant feedback; this reconciles with the
+      //  server's per-day quota, which is what actually decides whether the next turn is allowed)
+      await refreshQuotaFromBackend();
     } else {
       IC.toast(r.message || "回声没有回应", "warn");
     }

@@ -288,6 +288,15 @@ const API = {
   async personaChatMessages(sessionId) {
     return IC.api(`/api/persona-chat/session/${sessionId}/messages`);
   },
+  /**
+   * IC-CAP-001: authoritative per-day quota state for the current visitor on a capsule.
+   * Returns { turnCount, dailyLimit, remaining, seed, quotaDate }.
+   * The frontend should treat this as the source of truth (the old client-side
+   * usedTurns++ counter could be bypassed by opening new sessions).
+   */
+  async personaChatQuota(capsuleId) {
+    return IC.api(`/api/persona-chat/quota?capsuleId=${capsuleId}`);
+  },
 
   /* Letters */
   async letterDraft(data) {

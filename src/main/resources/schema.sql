@@ -230,6 +230,17 @@ CREATE TABLE IF NOT EXISTS tb_capsule_boundary (
   CONSTRAINT fk_boundary_capsule FOREIGN KEY (capsule_id) REFERENCES tb_echo_capsule(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS tb_capsule_usage_quota (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  visitor_user_id BIGINT NOT NULL,
+  capsule_id BIGINT NOT NULL,
+  quota_date DATE NOT NULL,
+  turn_count INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_quota (visitor_user_id, capsule_id, quota_date)
+);
+
 CREATE TABLE IF NOT EXISTS tb_persona_chat_session (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   visitor_user_id BIGINT,
