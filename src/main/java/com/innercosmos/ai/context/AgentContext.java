@@ -8,6 +8,14 @@ public class AgentContext {
     public String profileSummary;
     public String timeLabel;
     public String weatherLabel;
+    /**
+     * IC-EMO-002: the richer "此刻情绪" perception — primary emotion + 0..10 intensity
+     * + a brief top-2/3 spectrum (e.g. "平静（平静 60% · 期待 30%）"), read from the
+     * latest enriched EmotionTrace. Falls back to "暂无此刻情绪" with no trace and to
+     * "用户关闭了情绪感知" when the weather/emotion opt-out is set. Distinct from
+     * {@link #weatherLabel}, which stays the compact weather/emotion pair.
+     */
+    public String momentEmotionLabel;
     public String environmentLabel;
     public String quietPolicy;
     public String focusPolicy;

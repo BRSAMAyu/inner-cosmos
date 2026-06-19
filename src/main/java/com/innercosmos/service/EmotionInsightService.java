@@ -1,6 +1,7 @@
 package com.innercosmos.service;
 
 import com.innercosmos.ai.semantic.EmotionInsight;
+import com.innercosmos.ai.semantic.MomentMood;
 import com.innercosmos.ai.structured.StructuredAiResults;
 
 /**
@@ -40,4 +41,20 @@ public interface EmotionInsightService {
      * "SETTLEMENT".
      */
     EmotionInsight fromSettlement(StructuredAiResults.SettlementResult result);
+
+    /**
+     * IC-EMO-002: read the user's "此刻情绪" (current-moment mood) from the LATEST
+     * enriched EmotionTrace (ordered by record_date desc, id desc) and shape it into
+     * a {@link MomentMood} for real-time perception (Aurora prompt) and the mood API.
+     *
+     * <p>Defensive by contract: parses {@code emotionSpectrum} JSON tolerantly (old
+     * Phase-1 rows may have null/blank/malformed spectrum — those degrade to an
+     * emotion-only label, never an error), and returns a well-formed
+     * {@link MomentMood#absent} read (never null) when the user has no trace at all.
+     * DB errors are swallowed and reported as the absent read.
+     *
+     * @param userId the user (may be null -> absent read)
+     * @return a non-null MomentMood
+     */
+    MomentMood latestMood(Long userId);
 }

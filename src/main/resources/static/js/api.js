@@ -458,6 +458,11 @@ const API = {
     return IC.api("/api/ai/health");
   },
 
+  /* IC-EMO-002 — real-time "此刻情绪" for the Aurora mood energy-orb. */
+  async auroraMood() {
+    return IC.api("/api/aurora/mood");
+  },
+
   /* Aurora Goodbye */
   async goodbye(body) {
     return IC.api("/api/aurora/goodbye", { method: "POST", body: JSON.stringify(body) });

@@ -3,14 +3,20 @@ package com.innercosmos.controller;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.innercosmos.ai.router.SessionModelRouter;
 import com.innercosmos.ai.self.UserTriggeredSelfReflection;
+import com.innercosmos.ai.semantic.EmotionInsight;
+import com.innercosmos.ai.semantic.MomentMood;
 import com.innercosmos.common.ApiResponse;
 import com.innercosmos.dto.ChatRequest;
 import com.innercosmos.entity.DialogMessage;
+import com.innercosmos.entity.UserProfile;
 import com.innercosmos.mapper.DialogMessageMapper;
+import com.innercosmos.mapper.UserProfileMapper;
 import com.innercosmos.service.AuroraAgentService;
+import com.innercosmos.service.EmotionInsightService;
 import com.innercosmos.service.MemoryService;
 import com.innercosmos.service.MemorySettlementService;
 import com.innercosmos.service.RhythmGuardService;
+import com.innercosmos.vo.AuroraMoodVO;
 import com.innercosmos.vo.AuroraReplyVO;
 import com.innercosmos.vo.DailyRecordVO;
 import jakarta.servlet.http.HttpSession;
@@ -38,6 +44,8 @@ public class AuroraChatController extends BaseController {
     private final SessionModelRouter modelRouter;
     private final UserTriggeredSelfReflection selfReflection;
     private final DialogMessageMapper dialogMessageMapper;
+    private final EmotionInsightService emotionInsightService;
+    private final UserProfileMapper userProfileMapper;
 
     public AuroraChatController(AuroraAgentService auroraAgentService,
                                 MemoryService memoryService,
@@ -45,7 +53,9 @@ public class AuroraChatController extends BaseController {
                                 RhythmGuardService rhythmGuardService,
                                 SessionModelRouter modelRouter,
                                 UserTriggeredSelfReflection selfReflection,
-                                DialogMessageMapper dialogMessageMapper) {
+                                DialogMessageMapper dialogMessageMapper,
+                                EmotionInsightService emotionInsightService,
+                                UserProfileMapper userProfileMapper) {
         this.auroraAgentService = auroraAgentService;
         this.memoryService = memoryService;
         this.memorySettlementService = memorySettlementService;
@@ -53,6 +63,8 @@ public class AuroraChatController extends BaseController {
         this.modelRouter = modelRouter;
         this.selfReflection = selfReflection;
         this.dialogMessageMapper = dialogMessageMapper;
+        this.emotionInsightService = emotionInsightService;
+        this.userProfileMapper = userProfileMapper;
     }
 
     @PostMapping("/message")
@@ -130,6 +142,61 @@ public class AuroraChatController extends BaseController {
         Long userId = currentUserId(session);
         String advice = rhythmGuardService.getSessionAdvice(userId);
         return ApiResponse.ok(Map.of("advice", advice));
+    }
+
+    /**
+     * IC-EMO-002 — real-time "此刻情绪" for the Aurora mood energy-orb on aurora-chat.
+     * Sourced from the same latest-enriched-trace read the prompt uses. Always returns a
+     * well-formed {@link AuroraMoodVO}: when the user has no trace (or opted out of
+     * emotion/weather perception) the payload is neutral with a gentle label —
+     * never null data, never a 500. Auth required via {@link #currentUserId}.
+     */
+    @GetMapping("/mood")
+    public ApiResponse<AuroraMoodVO> mood(HttpSession session) {
+        Long userId = currentUserId(session);
+        if (!emotionAwarenessEnabled(userId)) {
+            return ApiResponse.ok(neutralMood("情绪感知已关闭"));
+        }
+        MomentMood moment = emotionInsightService.latestMood(userId);
+        if (moment == null || !moment.present) {
+            return ApiResponse.ok(neutralMood("此刻还没有读到你的情绪"));
+        }
+        return ApiResponse.ok(toMoodVo(moment));
+    }
+
+    /** Whether the user has emotion/weather perception enabled (default: enabled). */
+    private boolean emotionAwarenessEnabled(Long userId) {
+        UserProfile profile = userProfileMapper.selectOne(
+                new QueryWrapper<UserProfile>().eq("user_id", userId).last("LIMIT 1"));
+        return profile == null || !Boolean.FALSE.equals(profile.weatherAwarenessEnabled);
+    }
+
+    private AuroraMoodVO neutralMood(String gentleLabel) {
+        AuroraMoodVO vo = new AuroraMoodVO();
+        vo.present = false;
+        vo.primaryEmotion = "";
+        vo.intensity = 0.0;
+        vo.weatherType = MomentMood.NEUTRAL_WEATHER;
+        vo.gentleLabel = gentleLabel;
+        return vo;
+    }
+
+    private AuroraMoodVO toMoodVo(MomentMood moment) {
+        AuroraMoodVO vo = new AuroraMoodVO();
+        vo.present = true;
+        vo.primaryEmotion = moment.primaryEmotion == null ? "" : moment.primaryEmotion;
+        vo.intensity = moment.intensity;
+        vo.weatherType = moment.weatherType == null ? MomentMood.NEUTRAL_WEATHER : moment.weatherType;
+        if (moment.spectrum != null) {
+            for (EmotionInsight.SpectrumEntry e : moment.spectrum) {
+                if (e == null || e.emotion == null || e.emotion.isBlank()) continue;
+                vo.spectrum.add(new AuroraMoodVO.Entry(e.emotion, e.ratio));
+            }
+        }
+        vo.gentleLabel = moment.momentLabel == null || moment.momentLabel.isBlank()
+                ? vo.primaryEmotion
+                : moment.momentLabel;
+        return vo;
     }
 
     /**

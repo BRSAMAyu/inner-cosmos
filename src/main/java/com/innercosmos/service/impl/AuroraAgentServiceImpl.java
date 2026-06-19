@@ -210,6 +210,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 .withUserPortrait(portrait)
                 .withRelationship(relationship)
                 .withCurrentStateSignal(stateSignal)
+                .withMomentEmotion(agentContext.momentEmotionLabel)
                 .withSummaryAnchor(session == null ? null : session.summaryAnchor)
                 .withRecentMessages(recentMessages(request.sessionId, 8))
                 .withGravityMemories(gravityMemories)

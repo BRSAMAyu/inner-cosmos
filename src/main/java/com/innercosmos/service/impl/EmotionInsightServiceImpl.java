@@ -1,9 +1,12 @@
 package com.innercosmos.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.innercosmos.ai.semantic.EmotionInsight;
 import com.innercosmos.ai.semantic.EmotionSpectrumDeriver;
 import com.innercosmos.ai.semantic.EmotionWeatherMapper;
+import com.innercosmos.ai.semantic.MomentMood;
 import com.innercosmos.ai.semantic.PseudoSemanticAnalyzer;
 import com.innercosmos.ai.semantic.PseudoSemanticAnalyzer.AnalysisResult;
 import com.innercosmos.ai.structured.StructuredAiResults;
@@ -30,6 +33,12 @@ public class EmotionInsightServiceImpl implements EmotionInsightService {
     private static final Logger log = LoggerFactory.getLogger(EmotionInsightServiceImpl.class);
 
     private static final String SCENE_KEY = "EMOTION_INSIGHT";
+
+    /** IC-EMO-002: how many spectrum entries the "此刻情绪" label surfaces (top N by ratio). */
+    private static final int MOMENT_SPECTRUM_TOP_N = 3;
+
+    /** Reused for defensive spectrum-JSON parsing — same Jackson lib as JsonUtils. */
+    private static final ObjectMapper MOMENT_MAPPER = new ObjectMapper();
 
     private final StructuredAiService structuredAiService;
     private final EmotionTraceMapper emotionTraceMapper;
@@ -91,6 +100,99 @@ public class EmotionInsightServiceImpl implements EmotionInsightService {
         String seed = emotion.triggerScene == null ? "" : emotion.triggerScene;
         AnalysisResult analysis = PseudoSemanticAnalyzer.analyze(seed);
         return toInsight(emotion, analysis, EmotionInsight.SOURCE_SETTLEMENT);
+    }
+
+    @Override
+    public MomentMood latestMood(Long userId) {
+        if (userId == null) {
+            return MomentMood.absent("此刻还没有读到你的情绪");
+        }
+        EmotionTrace trace;
+        try {
+            trace = emotionTraceMapper.selectOne(new QueryWrapper<EmotionTrace>()
+                    .eq("user_id", userId)
+                    .orderByDesc("record_date")
+                    .orderByDesc("id")
+                    .last("LIMIT 1"));
+        } catch (Exception e) {
+            log.warn("latestMood read failed for user={}: {}", userId, e.getMessage());
+            return MomentMood.absent("此刻还没有读到你的情绪");
+        }
+        if (trace == null) {
+            return MomentMood.absent("此刻还没有读到你的情绪");
+        }
+
+        MomentMood mood = new MomentMood();
+        mood.present = true;
+        mood.primaryEmotion = blank(trace.emotionName) ? "平静" : trace.emotionName.trim();
+        mood.intensity = trace.emotionScore == null ? 0.0 : EmotionInsight.clampScore(trace.emotionScore);
+        mood.weatherType = blank(trace.weatherType) ? MomentMood.NEUTRAL_WEATHER : trace.weatherType.trim();
+        mood.spectrum = parseTopSpectrum(trace.emotionSpectrum);
+        mood.momentLabel = buildMomentLabel(mood);
+        return mood;
+    }
+
+    /**
+     * Defensively parse the stored {@code emotionSpectrum} JSON (a list of
+     * {emotion, ratio}) into the top-N entries by ratio. Tolerates null / blank /
+     * malformed JSON (old Phase-1 rows) by returning an empty list — never throws.
+     */
+    private List<EmotionInsight.SpectrumEntry> parseTopSpectrum(String json) {
+        List<EmotionInsight.SpectrumEntry> out = new ArrayList<>();
+        if (blank(json)) {
+            return out;
+        }
+        try {
+            JsonNode root = MOMENT_MAPPER.readTree(json);
+            if (root == null || !root.isArray()) {
+                return out;
+            }
+            for (JsonNode node : root) {
+                String emotion = node.path("emotion").asText(null);
+                if (blank(emotion)) {
+                    continue;
+                }
+                double ratio = node.path("ratio").asDouble(0.0);
+                out.add(new EmotionInsight.SpectrumEntry(emotion.trim(), ratio));
+            }
+        } catch (Exception e) {
+            // Malformed spectrum -> graceful degrade to emotion-only.
+            return new ArrayList<>();
+        }
+        out.sort((a, b) -> Double.compare(b.ratio, a.ratio));
+        if (out.size() > MOMENT_SPECTRUM_TOP_N) {
+            return new ArrayList<>(out.subList(0, MOMENT_SPECTRUM_TOP_N));
+        }
+        return out;
+    }
+
+    /**
+     * Build the compact "此刻情绪" label: primary emotion, then a brief top-2/3
+     * spectrum ("平静 60% · 期待 30%") when available, else emotion-only.
+     */
+    private String buildMomentLabel(MomentMood mood) {
+        String emotion = blank(mood.primaryEmotion) ? "平静" : mood.primaryEmotion;
+        if (mood.spectrum == null || mood.spectrum.isEmpty()) {
+            return emotion;
+        }
+        StringBuilder sb = new StringBuilder();
+        int shown = 0;
+        for (EmotionInsight.SpectrumEntry e : mood.spectrum) {
+            if (e == null || blank(e.emotion)) {
+                continue;
+            }
+            if (shown > 0) {
+                sb.append(" · ");
+            }
+            sb.append(e.emotion).append(' ').append(Math.round(e.ratio * 100)).append('%');
+            if (++shown >= 2) {
+                break;
+            }
+        }
+        if (shown == 0) {
+            return emotion;
+        }
+        return emotion + "（" + sb + "）";
     }
 
     @Override
