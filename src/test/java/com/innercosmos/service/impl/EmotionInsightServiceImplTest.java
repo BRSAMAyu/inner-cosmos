@@ -143,6 +143,33 @@ class EmotionInsightServiceImplTest {
     }
 
     @Test
+    @DisplayName("writeTrace(): concurrent-insert race -> on duplicate-key, re-query + updateById (no duplicate, no throw)")
+    void writeTrace_raceFallbackRecoversViaUpdate() {
+        // First lookup sees no row (both listeners observed null concurrently).
+        // The insert then loses the race and the DB rejects it with a dup-key error.
+        // A re-query now finds the winner's row, so we must recover via updateById.
+        EmotionTrace winner = new EmotionTrace();
+        winner.id = 909L;
+        winner.userId = USER_ID;
+        winner.sourceSessionId = SESSION_ID;
+        when(emotionTraceMapper.selectOne(any()))
+                .thenReturn(null)      // initial upsert lookup
+                .thenReturn(winner);   // re-query after duplicate-key failure
+        when(emotionTraceMapper.insert(any(EmotionTrace.class)))
+                .thenThrow(new org.springframework.dao.DuplicateKeyException("Unique index violation"));
+
+        EmotionInsight insight = sampleInsight("LEXICON");
+        assertDoesNotThrow(() -> service.writeTrace(USER_ID, SESSION_ID, insight));
+
+        ArgumentCaptor<EmotionTrace> captor = ArgumentCaptor.forClass(EmotionTrace.class);
+        verify(emotionTraceMapper, times(1)).insert(any(EmotionTrace.class));
+        verify(emotionTraceMapper, times(1)).updateById(captor.capture());
+        assertEquals(909L, captor.getValue().id, "recovery update must target the winner row id");
+        assertEquals("LEXICON", captor.getValue().analysisSource);
+        assertNotNull(captor.getValue().emotionSpectrum);
+    }
+
+    @Test
     @DisplayName("writeTrace(): DB failure is swallowed (never throws out)")
     void writeTrace_swallowsDbError() {
         when(emotionTraceMapper.selectOne(any())).thenThrow(new RuntimeException("db down"));
