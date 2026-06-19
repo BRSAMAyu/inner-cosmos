@@ -75,6 +75,50 @@
       font-family: var(--font-body);
     }
 
+    /* ── Mood energy-orb (IC-EMO-002) ── */
+    /* A soft glowing orb that reflects Aurora's real-time read of the user's mood.
+       Distinct from the capsule/共鸣体 energy-bar; reuses Morandi accent tokens.
+       Color is driven by weatherType, glow/scale by intensity. */
+    .mood-orb {
+      position: relative;
+      flex: 0 0 auto;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      /* --mood-color (solid Morandi token) + --mood-glow-color (rgba) set by JS. */
+      background: radial-gradient(circle at 35% 30%,
+        rgba(255,255,255,.55),
+        var(--mood-color, var(--accent-sage)) 72%);
+      box-shadow: 0 0 calc(8px + var(--mood-glow, 8px))
+        var(--mood-glow-color, rgba(143,163,148,.5));
+      cursor: default;
+      animation: mood-orb-pulse 4.2s var(--ease-flow) infinite;
+      transition: background 600ms var(--ease-flow), box-shadow 600ms var(--ease-flow);
+    }
+    .mood-orb::after {
+      content: "";
+      position: absolute;
+      inset: -6px;
+      border-radius: 50%;
+      border: 1px solid var(--mood-glow-color, rgba(143,163,148,.5));
+      opacity: .5;
+      pointer-events: none;
+    }
+    .mood-orb.is-empty {
+      animation: none;
+      background: radial-gradient(circle at 35% 30%, rgba(154,146,138,.28), rgba(154,146,138,.16));
+      box-shadow: none;
+      opacity: .7;
+    }
+    @keyframes mood-orb-pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.06); }
+    }
+    /* Scoped reduced-motion guard (in addition to the global app.css reset). */
+    @media (prefers-reduced-motion: reduce) {
+      .mood-orb { animation: none; }
+    }
+
     /* ── Mode selector ── */
     .aurora-modes {
       display: flex;
@@ -332,7 +376,12 @@
     <div class="aurora-hero-inner">
       <div class="aurora-hero-text">
         <span class="route-hint">共享内核的朋友型 Agent</span>
-        <h1 id="page-title" data-aurora-name>Aurora</h1>
+        <div class="row gap-sm" style="align-items:center">
+          <span id="moodOrb" class="mood-orb is-empty" role="img"
+                tabindex="0" aria-label="此刻还没有读到你的情绪"
+                title="此刻还没有读到你的情绪"></span>
+          <h1 id="page-title" data-aurora-name style="margin:0">Aurora</h1>
+        </div>
         <p class="subtitle">不同模式不是换机器人，而是同一个朋友换一种陪伴方式。</p>
         <p id="aiStatus" class="ai-status"><span class="ai-status-dot"></span>正在检查真实 AI 状态...</p>
       </div>
@@ -718,6 +767,7 @@ async function init() {
   }
   var restored = await loadHistory();
   await loadAiStatus();
+  loadMood();
   if (!restored) await proactiveGreeting(true);
 }
 
@@ -800,6 +850,7 @@ async function send() {
     typingEl.classList.remove("visible");
     auroraSending = false;
   }
+  loadMood(); // refresh the mood orb after the reply settles
   if (messageCount % 4 === 0) rhythmCheck();
 }
 
@@ -834,6 +885,46 @@ async function goodbye() {
   } catch (error) {
     IC.toast("连接暂时不稳定，请稍后再试。", "warn");
   }
+}
+
+// ── Mood energy-orb (IC-EMO-002) ──
+// Reflects Aurora's real-time read of the user's mood. Color is driven by the
+// emotion weatherType (mapped to existing Morandi accent tokens), glow + scale by
+// intensity (0..10). Falls back to a quiet neutral orb on no-data / opt-out / error.
+// weatherType -> [Morandi accent token, rgba glow]. Tokens are already defined in
+// app.css (light + dark-star); glow rgbas mirror their base hues at low alpha.
+var MOOD_WEATHER_TOKENS = {
+  SUNNY:  ["--accent-sage",       "rgba(181,194,176,.55)"],
+  CLEAR:  ["--accent-sage",       "rgba(181,194,176,.55)"],
+  CLOUDY: ["--accent-dusty-blue", "rgba(151,169,186,.50)"],
+  RAINY:  ["--accent-lavender",   "rgba(170,161,184,.50)"],
+  FOGGY:  ["--accent-rose",       "rgba(191,150,152,.45)"],
+  STORM:  ["--accent-coral",      "rgba(200,147,145,.55)"]
+};
+
+async function loadMood() {
+  var orb = document.getElementById("moodOrb");
+  if (!orb) return;
+  var r = await API.auroraMood();
+  if (!r || !r.success || !r.data) return;
+  var m = r.data;
+  var label = m.gentleLabel || "此刻还没有读到你的情绪";
+  orb.setAttribute("aria-label", label);
+  orb.setAttribute("title", label);
+  if (!m.present) {
+    orb.classList.add("is-empty");
+    orb.style.removeProperty("--mood-color");
+    orb.style.removeProperty("--mood-glow-color");
+    orb.style.removeProperty("--mood-glow");
+    return;
+  }
+  orb.classList.remove("is-empty");
+  var pair = MOOD_WEATHER_TOKENS[m.weatherType] || MOOD_WEATHER_TOKENS.CLEAR;
+  orb.style.setProperty("--mood-color", "var(" + pair[0] + ")");
+  orb.style.setProperty("--mood-glow-color", pair[1]);
+  // Map 0..10 intensity to an 8..28px extra glow radius.
+  var intensity = Math.max(0, Math.min(10, Number(m.intensity) || 0));
+  orb.style.setProperty("--mood-glow", (8 + intensity * 2) + "px");
 }
 
 async function loadAiStatus() {

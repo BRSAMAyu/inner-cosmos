@@ -10,8 +10,10 @@ import com.innercosmos.ai.perception.dto.WeatherForecast;
 import com.innercosmos.ai.portrait.AgentUserRelationshipService;
 import com.innercosmos.ai.portrait.AuroraSelfProfileService;
 import com.innercosmos.ai.portrait.UserPortraitService;
+import com.innercosmos.ai.semantic.MomentMood;
 import com.innercosmos.service.AuroraConstitutionService;
 import com.innercosmos.service.AuroraSelfContinuityService;
+import com.innercosmos.service.EmotionInsightService;
 import com.innercosmos.entity.DailyRecord;
 import com.innercosmos.entity.DialogMessage;
 import com.innercosmos.entity.EmotionTrace;
@@ -60,6 +62,7 @@ public class AgentContextAssembler {
     @Autowired(required = false) private UserPortraitService userPortraitService;
     @Autowired(required = false) private AuroraConstitutionService auroraConstitutionService;
     @Autowired(required = false) private AuroraSelfContinuityService auroraSelfContinuityService;
+    @Autowired(required = false) private EmotionInsightService emotionInsightService;
 
     public AgentContextAssembler(UserProfileMapper userProfileMapper,
                                  DialogMessageMapper dialogMessageMapper,
@@ -116,6 +119,7 @@ public class AgentContextAssembler {
         context.sleepInferred = time.isSleep();
         context.nearestTodo = time.nearestTodo();
         context.weatherLabel = weatherLabel(userId, profile);
+        context.momentEmotionLabel = momentEmotionLabel(userId, profile);
         context.environmentLabel = profile == null || blank(profile.currentEnvironmentLabel)
                 ? inferEnvironment(currentMessage)
                 : profile.currentEnvironmentLabel;
@@ -282,6 +286,59 @@ public class AgentContextAssembler {
                 .orderByDesc("id")
                 .last("LIMIT 1"));
         return trace == null ? "暂无情绪天气" : safe(trace.weatherType) + " / " + safe(trace.emotionName);
+    }
+
+    /**
+     * IC-EMO-002: build the richer "此刻情绪" perception from the latest enriched
+     * EmotionTrace — primary emotion + intensity + a brief spectrum. Respects the same
+     * weather/emotion opt-out as {@link #weatherLabel}; degrades to "暂无此刻情绪" when
+     * there is no trace, and to emotion-only when the spectrum is missing/malformed
+     * (handled inside {@link EmotionInsightService#latestMood}). If the service bean is
+     * unavailable (e.g. lightweight tests), returns "暂无此刻情绪" rather than failing.
+     */
+    private String momentEmotionLabel(Long userId, UserProfile profile) {
+        if (Boolean.FALSE.equals(profile == null ? null : profile.weatherAwarenessEnabled)) {
+            return "用户关闭了情绪感知";
+        }
+        if (emotionInsightService == null) {
+            return "暂无此刻情绪";
+        }
+        MomentMood mood = emotionInsightService.latestMood(userId);
+        if (mood == null || !mood.present) {
+            return "暂无此刻情绪";
+        }
+        String emotion = safe(mood.primaryEmotion);
+        String intensity = "强度 " + formatIntensity(mood.intensity) + "/10";
+        String spectrum = spectrumInner(mood.momentLabel);
+        if (blank(spectrum)) {
+            return emotion + "（" + intensity + "）";
+        }
+        return emotion + "（" + intensity + " · " + spectrum + "）";
+    }
+
+    /**
+     * Pull the inner spectrum text out of a momentLabel like
+     * {@code 平静（平静 60% · 期待 30%）} → {@code 平静 60% · 期待 30%}. Returns "" when
+     * the label is blank or has no parenthesised spectrum group (e.g. a bare emotion).
+     */
+    private String spectrumInner(String momentLabel) {
+        if (blank(momentLabel)) {
+            return "";
+        }
+        int open = momentLabel.indexOf('（');
+        int close = momentLabel.lastIndexOf('）');
+        if (open >= 0 && close > open + 1) {
+            return momentLabel.substring(open + 1, close).trim();
+        }
+        return "";
+    }
+
+    /** Render the 0..10 intensity compactly (drop a trailing ".0"). */
+    private String formatIntensity(double intensity) {
+        if (intensity == Math.floor(intensity)) {
+            return String.valueOf((long) intensity);
+        }
+        return String.valueOf(Math.round(intensity * 10) / 10.0);
     }
 
     private String quietPolicy(UserProfile profile) {

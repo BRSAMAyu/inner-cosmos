@@ -1,6 +1,7 @@
 package com.innercosmos.service.impl;
 
 import com.innercosmos.ai.semantic.EmotionInsight;
+import com.innercosmos.ai.semantic.MomentMood;
 import com.innercosmos.ai.structured.StructuredAiResults;
 import com.innercosmos.ai.structured.StructuredAiService;
 import com.innercosmos.entity.EmotionTrace;
@@ -193,6 +194,111 @@ class EmotionInsightServiceImplTest {
         assertNotNull(insight.spectrum);
         assertFalse(insight.spectrum.isEmpty());
         assertNotNull(insight.weatherType);
+    }
+
+    // ── IC-EMO-002: latestMood() ──
+
+    @Test
+    @DisplayName("latestMood(): no trace -> well-formed absent read (never null)")
+    void latestMood_noTrace() {
+        when(emotionTraceMapper.selectOne(any())).thenReturn(null);
+
+        MomentMood mood = service.latestMood(USER_ID);
+
+        assertNotNull(mood);
+        assertFalse(mood.present);
+        assertEquals(MomentMood.NEUTRAL_WEATHER, mood.weatherType);
+        assertNotNull(mood.spectrum);
+        assertTrue(mood.spectrum.isEmpty());
+        assertNotNull(mood.momentLabel);
+        assertFalse(mood.momentLabel.isBlank());
+    }
+
+    @Test
+    @DisplayName("latestMood(): null userId -> absent read, no DB call")
+    void latestMood_nullUser() {
+        MomentMood mood = service.latestMood(null);
+
+        assertNotNull(mood);
+        assertFalse(mood.present);
+        verify(emotionTraceMapper, never()).selectOne(any());
+    }
+
+    @Test
+    @DisplayName("latestMood(): enriched trace -> primary emotion + intensity + top spectrum")
+    void latestMood_enrichedTrace() {
+        EmotionTrace trace = new EmotionTrace();
+        trace.id = 11L;
+        trace.userId = USER_ID;
+        trace.emotionName = "平静";
+        trace.emotionScore = 4.0;
+        trace.weatherType = "SUNNY";
+        trace.emotionSpectrum = "[{\"emotion\":\"平静\",\"ratio\":0.6},"
+                + "{\"emotion\":\"期待\",\"ratio\":0.3},"
+                + "{\"emotion\":\"疲惫\",\"ratio\":0.1}]";
+        when(emotionTraceMapper.selectOne(any())).thenReturn(trace);
+
+        MomentMood mood = service.latestMood(USER_ID);
+
+        assertTrue(mood.present);
+        assertEquals("平静", mood.primaryEmotion);
+        assertEquals(4.0, mood.intensity, 0.0001);
+        assertEquals("SUNNY", mood.weatherType);
+        assertFalse(mood.spectrum.isEmpty());
+        assertEquals("平静", mood.spectrum.get(0).emotion, "spectrum is sorted by ratio desc");
+        assertTrue(mood.momentLabel.contains("平静"));
+        assertTrue(mood.momentLabel.contains("60%"), "brief spectrum percent surfaced");
+    }
+
+    @Test
+    @DisplayName("latestMood(): malformed spectrum JSON -> emotion-only label, no throw")
+    void latestMood_malformedSpectrum() {
+        EmotionTrace trace = new EmotionTrace();
+        trace.id = 12L;
+        trace.userId = USER_ID;
+        trace.emotionName = "焦虑";
+        trace.emotionScore = 6.0;
+        trace.weatherType = "FOGGY";
+        trace.emotionSpectrum = "not-json{{{";
+        when(emotionTraceMapper.selectOne(any())).thenReturn(trace);
+
+        MomentMood mood = service.latestMood(USER_ID);
+
+        assertTrue(mood.present);
+        assertEquals("焦虑", mood.primaryEmotion);
+        assertTrue(mood.spectrum.isEmpty(), "malformed spectrum degrades to empty");
+        assertEquals("焦虑", mood.momentLabel, "label falls back to emotion only");
+    }
+
+    @Test
+    @DisplayName("latestMood(): null/blank spectrum (old Phase-1 row) -> emotion-only, no throw")
+    void latestMood_nullSpectrum() {
+        EmotionTrace trace = new EmotionTrace();
+        trace.id = 13L;
+        trace.userId = USER_ID;
+        trace.emotionName = "喜悦";
+        trace.emotionScore = 5.0;
+        trace.weatherType = "SUNNY";
+        trace.emotionSpectrum = null;
+        when(emotionTraceMapper.selectOne(any())).thenReturn(trace);
+
+        MomentMood mood = service.latestMood(USER_ID);
+
+        assertTrue(mood.present);
+        assertEquals("喜悦", mood.primaryEmotion);
+        assertTrue(mood.spectrum.isEmpty());
+        assertEquals("喜悦", mood.momentLabel);
+    }
+
+    @Test
+    @DisplayName("latestMood(): DB error -> absent read (swallowed, never throws)")
+    void latestMood_dbErrorSwallowed() {
+        when(emotionTraceMapper.selectOne(any())).thenThrow(new RuntimeException("db down"));
+
+        MomentMood mood = service.latestMood(USER_ID);
+
+        assertNotNull(mood);
+        assertFalse(mood.present);
     }
 
     private StructuredAiResults.SpectrumEntry spectrum(String emotion, double ratio) {

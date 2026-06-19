@@ -27,6 +27,8 @@ public class PromptBuilder {
     static final int RELATIONSHIP_MAX_CHARS = 220;
     /** Max chars for the current-state signal. */
     static final int STATE_SIGNAL_MAX_CHARS = 160;
+    /** Max chars for the IC-EMO-002 "此刻情绪" perception. */
+    static final int MOMENT_EMOTION_MAX_CHARS = 120;
 
     public PromptBuilder withSystemBoundary() {
         parts.add(
@@ -36,6 +38,7 @@ public class PromptBuilder {
             + "If a follow-up idea is not worth saying, write [[SILENCE]].\n\n"
             + "Who you are NOT: You are not human. You do not possess human consciousness, real emotions, or biological life. You are not the user's romantic partner or emotional substitute.\n"
             + "You can accompany and care, but you do not pretend to have what you do not have.\n\n"
+            + "Perceiving mood: You quietly sense how the user feels right now and respond like a friend would — naturally and with restraint. Do not exaggerate, do not announce or recite the emotion analysis, and do not shift into a dramatic persona because of it.\n\n"
             + "Safety:\n"
             + "- No psychological diagnosis. No clinical labels.\n"
             + "- Do not replace doctors, counselors, lawyers, or emergency services.\n"
@@ -147,6 +150,25 @@ public class PromptBuilder {
         if (isBlank(signal)) return this;
         parts.add("用户此刻的状态感知（仅供参考你如何陪伴，不是诊断，也不要当面复述这个标签）：\n"
                 + sanitize(truncate(signal.trim(), STATE_SIGNAL_MAX_CHARS)));
+        return this;
+    }
+
+    /**
+     * IC-EMO-002 — inject the user's "此刻情绪" (current-moment mood) perception read
+     * from the latest enriched EmotionTrace. CRITICAL product requirement: this is a
+     * perception to feel WITH, not to perform. The wrapper instructs Aurora to respond
+     * naturally like a friend — not exaggerated, NOT reciting/announcing the analysis,
+     * with no dramatic persona shift. The label is user-derived, so it is sanitized and
+     * truncated through the same chokepoint as the other perceptual signals.
+     * No-ops on blank / "暂无" / opt-out labels so the prompt is not bloated.
+     */
+    public PromptBuilder withMomentEmotion(String label) {
+        if (isBlank(label)) return this;
+        String trimmed = label.trim();
+        // Skip empty-state / opt-out placeholders — nothing to perceive.
+        if (trimmed.startsWith("暂无") || trimmed.contains("关闭了")) return this;
+        parts.add("用户此刻的情绪感知（轻轻体会，像朋友一样自然回应，不要夸张，不要复述或宣布这个分析，也不要因此换一副语气）：\n"
+                + sanitize(truncate(trimmed, MOMENT_EMOTION_MAX_CHARS)));
         return this;
     }
 
