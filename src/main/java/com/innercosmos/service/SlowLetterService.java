@@ -20,6 +20,8 @@ public interface SlowLetterService {
 
     List<LetterThread> listThreads(Long userId);
 
+    List<SlowLetter> getThreadLetters(Long userId, Long threadId);
+
     void reportLetter(Long userId, Long id, String reason);
 
     String requestRewrite(Long userId, Long id);

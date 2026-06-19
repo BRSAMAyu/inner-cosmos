@@ -270,6 +270,7 @@ CREATE TABLE IF NOT EXISTS tb_slow_letter (
   sender_user_id BIGINT,
   receiver_user_id BIGINT,
   receiver_capsule_id BIGINT,
+  thread_id BIGINT NULL,
   title VARCHAR(160),
   letter_body TEXT,
   status VARCHAR(32),

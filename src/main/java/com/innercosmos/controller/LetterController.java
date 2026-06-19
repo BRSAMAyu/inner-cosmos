@@ -89,6 +89,12 @@ public class LetterController extends BaseController {
         return ApiResponse.ok(slowLetterService.listThreads(userId));
     }
 
+    @GetMapping("/threads/{threadId}/letters")
+    public ApiResponse<List<SlowLetter>> threadLetters(@PathVariable Long threadId, HttpSession session) {
+        Long userId = currentUserId(session);
+        return ApiResponse.ok(slowLetterService.getThreadLetters(userId, threadId));
+    }
+
     @PostMapping("/{id}/report")
     public ApiResponse<Void> reportLetter(@PathVariable Long id, @RequestBody Map<String, String> body, HttpSession session) {
         Long userId = currentUserId(session);
