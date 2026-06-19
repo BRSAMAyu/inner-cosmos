@@ -53,4 +53,15 @@ public class CapsuleSyncController extends BaseController {
         CapsuleSyncQueue result = syncService.decide(userId, id, decision, allowedFields);
         return ApiResponse.ok(result);
     }
+
+    /**
+     * POST /api/capsule/sync/{id}/retry
+     * IC-CAP-002 B-2: manually re-run a single FAILED sync row.
+     */
+    @PostMapping("/{id}/retry")
+    public ApiResponse<Void> retry(@PathVariable Long id, HttpSession session) {
+        currentUserId(session); // require auth
+        syncService.retryFailed(id);
+        return ApiResponse.<Void>ok(null);
+    }
 }

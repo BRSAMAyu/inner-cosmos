@@ -20,9 +20,12 @@ import com.innercosmos.service.EmotionInsightService;
 import com.innercosmos.service.GravityService;
 import com.innercosmos.service.MemoryService;
 import com.innercosmos.service.ThemeAggregationService;
+import com.innercosmos.event.CapsuleSyncTriggerEvent;
 import com.innercosmos.vo.DailyRecordVO;
 import com.innercosmos.vo.StarfieldDetailVO;
 import com.innercosmos.vo.StarfieldVO;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,6 +47,8 @@ public class MemoryServiceImpl implements MemoryService {
     private final ThemeAggregationService themeAggregationService;
     private final DailyRecordMapper dailyRecordMapper;
     private final EmotionInsightService emotionInsightService;
+    @Autowired(required = false)
+    private ApplicationEventPublisher eventPublisher;
 
     public MemoryServiceImpl(MemoryCardMapper memoryCardMapper,
                              DialogMessageMapper messageMapper,
@@ -95,6 +100,10 @@ public class MemoryServiceImpl implements MemoryService {
         card.status = "ACTIVE";
         memoryCardMapper.insert(card);
         createStructuredAssets(userId, sessionId, card, raw);
+        // IC-CAP-002 B-1: memory changed → trigger a deduped capsule sync proposal.
+        if (eventPublisher != null) {
+            eventPublisher.publishEvent(new CapsuleSyncTriggerEvent(userId));
+        }
         return card;
     }
 

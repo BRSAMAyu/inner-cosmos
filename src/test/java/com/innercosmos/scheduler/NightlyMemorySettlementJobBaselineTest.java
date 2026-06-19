@@ -1,6 +1,8 @@
 package com.innercosmos.scheduler;
 
+import com.innercosmos.entity.EchoCapsule;
 import com.innercosmos.entity.User;
+import com.innercosmos.mapper.EchoCapsuleMapper;
 import com.innercosmos.mapper.MemoryCardMapper;
 import com.innercosmos.mapper.UserMapper;
 import com.innercosmos.service.EmotionBaselineService;
@@ -32,6 +34,7 @@ class NightlyMemorySettlementJobBaselineTest {
     @Mock private GravityService gravityService;
     @Mock private MemorySettlementService settlementService;
     @Mock private EmotionBaselineService emotionBaselineService;
+    @Mock private EchoCapsuleMapper echoCapsuleMapper;
 
     private User user(long id) {
         User u = new User();
@@ -44,10 +47,11 @@ class NightlyMemorySettlementJobBaselineTest {
     void bridgesBaselinePerUser() {
         when(userMapper.selectList(any())).thenReturn(List.of(user(1L), user(2L), user(3L)));
         lenient().when(memoryCardMapper.selectList(any())).thenReturn(List.of());
+        lenient().when(echoCapsuleMapper.selectList(any())).thenReturn(List.<EchoCapsule>of());
 
         NightlyMemorySettlementJob job = new NightlyMemorySettlementJob(
                 userMapper, memoryCardMapper, gravityService, settlementService,
-                emotionBaselineService);
+                emotionBaselineService, echoCapsuleMapper);
 
         job.nightlyRecalculation();
 
@@ -62,11 +66,12 @@ class NightlyMemorySettlementJobBaselineTest {
     void baselineFailureIsolated() {
         when(userMapper.selectList(any())).thenReturn(List.of(user(1L), user(2L)));
         lenient().when(memoryCardMapper.selectList(any())).thenReturn(List.of());
+        lenient().when(echoCapsuleMapper.selectList(any())).thenReturn(List.<EchoCapsule>of());
         when(emotionBaselineService.bridgeToPortrait(1L)).thenThrow(new RuntimeException("boom"));
 
         NightlyMemorySettlementJob job = new NightlyMemorySettlementJob(
                 userMapper, memoryCardMapper, gravityService, settlementService,
-                emotionBaselineService);
+                emotionBaselineService, echoCapsuleMapper);
 
         job.nightlyRecalculation();
 

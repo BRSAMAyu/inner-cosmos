@@ -6,7 +6,9 @@ import com.innercosmos.entity.UserPortraitHistory;
 import com.innercosmos.mapper.UserPortraitHistoryMapper;
 import com.innercosmos.mapper.UserPortraitMapper;
 import com.innercosmos.ai.portrait.dto.PortraitDeltas;
+import com.innercosmos.event.CapsuleSyncTriggerEvent;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +20,8 @@ public class UserPortraitService {
     private UserPortraitMapper mapper;
     @Autowired
     private UserPortraitHistoryMapper historyMapper;
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
 
     public List<UserPortrait> getAll(Long userId) {
         return mapper.selectList(new QueryWrapper<UserPortrait>().eq("user_id", userId));
@@ -54,6 +58,11 @@ public class UserPortraitService {
             } else {
                 mapper.updateById(row);
             }
+        }
+        // IC-CAP-002 B-1: portrait changed (also the nightly bridgeToPortrait path,
+        // which routes through here) → trigger a deduped capsule sync proposal.
+        if (!deltas.isEmpty() && eventPublisher != null) {
+            eventPublisher.publishEvent(new CapsuleSyncTriggerEvent(userId));
         }
     }
 }
