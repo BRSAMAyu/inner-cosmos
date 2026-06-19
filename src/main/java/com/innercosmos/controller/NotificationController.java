@@ -31,8 +31,8 @@ public class NotificationController extends BaseController {
     /** POST /api/notifications/{id}/read — mark a notification as read. */
     @PostMapping("/{id}/read")
     public ApiResponse<Void> markRead(@PathVariable Long id, HttpSession session) {
-        currentUserId(session); // require auth
-        notificationService.markRead(id);
+        Long userId = currentUserId(session);
+        notificationService.markRead(userId, id);
         return ApiResponse.<Void>ok(null);
     }
 }

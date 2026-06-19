@@ -141,6 +141,13 @@ class PersonaChatServiceImplPhaseBTest {
         assertEquals(0.52, saved.echoEnergy, 1e-9, "echoEnergy bumped by 0.02");
         assertTrue(saved.freshnessScore >= 0.9, "freshness pulled up to >= 0.9");
         assertNotNull(saved.lastActivityAt, "lastActivityAt must be set on success");
+
+        // IC-CAP-002 FIX-3: a genuinely answered turn DOES advance session.turnCount
+        // (0 → 1), staying in lock-step with the consumed day quota.
+        ArgumentCaptor<PersonaChatSession> sCap = ArgumentCaptor.forClass(PersonaChatSession.class);
+        verify(sessionMapper).updateById(sCap.capture());
+        assertEquals(1, sCap.getValue().turnCount,
+                "a successful turn must increment session.turnCount");
     }
 
     @Test
@@ -148,7 +155,9 @@ class PersonaChatServiceImplPhaseBTest {
     void aiUnavailable_doesNotConsumeQuota() {
         Long userId = 2L, sessionId = 11L, capsuleId = 101L;
         EchoCapsule c = capsule(capsuleId);
-        when(sessionMapper.selectById(sessionId)).thenReturn(session(sessionId, userId, capsuleId));
+        PersonaChatSession s = session(sessionId, userId, capsuleId);
+        s.turnCount = 3; // pre-existing count; must NOT advance on an unanswered turn
+        when(sessionMapper.selectById(sessionId)).thenReturn(s);
         when(safetyService.check(any(), any(), any())).thenReturn(safePassed());
         when(capsuleMapper.selectById(capsuleId)).thenReturn(c);
         reserveViaUpdate();
@@ -163,6 +172,13 @@ class PersonaChatServiceImplPhaseBTest {
                 any(Object.class), any(Object.class), any(Object.class));
         // Energy must NOT be bumped on the unavailable path.
         verify(capsuleMapper, never()).updateById(any(EchoCapsule.class));
+
+        // IC-CAP-002 FIX-3: an unanswered turn un-charges the day quota, so session.turnCount
+        // must NOT advance — otherwise the session counter and the day quota diverge.
+        ArgumentCaptor<PersonaChatSession> sCap = ArgumentCaptor.forClass(PersonaChatSession.class);
+        verify(sessionMapper).updateById(sCap.capture());
+        assertEquals(3, sCap.getValue().turnCount,
+                "AI-unavailable turn must NOT increment session.turnCount");
     }
 
     @Test

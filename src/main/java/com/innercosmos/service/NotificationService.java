@@ -15,6 +15,10 @@ public interface NotificationService {
     /** Unread notifications for a user, newest first. */
     List<Notification> unread(Long userId);
 
-    /** Mark a single notification as read. */
-    void markRead(Long id);
+    /**
+     * Mark a single notification as read.
+     * IC-CAP-002 FIX-1 (IDOR): the caller's userId is required and must own the
+     * notification; a mismatch throws UNAUTHORIZED so user B cannot mark user A's row read.
+     */
+    void markRead(Long userId, Long id);
 }

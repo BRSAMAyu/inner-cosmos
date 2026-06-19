@@ -215,13 +215,18 @@ public class PersonaChatServiceImpl implements PersonaChatService {
                 if (aiUnavailable) {
                     compensateQuota(userId, session.capsuleId, today);
                     // Do NOT bump echo energy on the unavailable path.
+                    // IC-CAP-002 FIX-3: an unanswered turn un-charges the day quota, so it must
+                    // NOT advance session.turnCount either — otherwise the session counter and the
+                    // day quota diverge (the session would over-count vs. what the user was charged).
                 } else {
                     // Genuine success: quota stays consumed; bump capsule activity (B-4).
                     bumpCapsuleActivity(capsule);
+                    // IC-CAP-002 FIX-3: only a genuinely answered turn advances the session counter,
+                    // keeping it in lock-step with the (consumed) day quota.
+                    session.turnCount = session.turnCount == null ? 1 : session.turnCount + 1;
                 }
 
                 session.status = "ACTIVE"; // reset from any prior LETTER_GUIDED
-                session.turnCount = session.turnCount == null ? 1 : session.turnCount + 1;
             }
         }
         messageMapper.insert(capsuleMessage);

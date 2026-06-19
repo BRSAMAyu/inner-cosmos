@@ -3,9 +3,10 @@ package com.innercosmos.event;
 import com.innercosmos.ai.capsule.CapsuleSyncService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
  * IC-CAP-002 B-1: consumes {@link CapsuleSyncTriggerEvent} and drives the capsule
@@ -15,6 +16,13 @@ import org.springframework.stereotype.Component;
  * Decoupling via the event bus (rather than direct injection) is required: CapsuleSyncService
  * already injects UserPortraitService, so injecting CapsuleSyncService back into the portrait
  * write path would create a circular dependency. The event bus breaks that cycle.
+ *
+ * IC-CAP-002 FIX-2 (event ordering): the publish sites (UserPortraitService.applyDeltas,
+ * MemoryServiceImpl.extractFromSession) are @Transactional. With a plain @EventListener the
+ * @Async handler could start BEFORE the publisher's transaction commits and then read
+ * half-written / uncommitted rows. Binding to AFTER_COMMIT guarantees the sync only runs
+ * once the triggering write is durably committed. @Async is retained so the (now post-commit)
+ * sync still runs off the request thread.
  */
 @Component
 public class CapsuleRegenerateListener {
@@ -27,7 +35,7 @@ public class CapsuleRegenerateListener {
     }
 
     @Async("taskExecutor")
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onSyncTrigger(CapsuleSyncTriggerEvent event) {
         if (event == null || event.userId == null) return;
         try {

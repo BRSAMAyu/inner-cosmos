@@ -116,6 +116,57 @@ class CapsuleSyncServiceFailureTest {
     }
 
     // ---------------------------------------------------------------------------------
+    // IC-CAP-002 FIX-1 (IDOR): the manual /retry endpoint routes through the user-scoped
+    // overload retryFailed(userId, queueId). User B must NOT be able to trigger LLM
+    // regeneration of user A's FAILED row. Before the fix retryFailed took only queueId,
+    // so ANY logged-in user could burn LLM resources on (and misdirect a notification for)
+    // another user's row.
+    // ---------------------------------------------------------------------------------
+
+    @Test
+    @DisplayName("FIX-1: user B cannot retry user A's FAILED row (UNAUTHORIZED, no regeneration fired)")
+    void retry_rejectsOtherUsersQueueRow() {
+        // Row 50 is owned by user A (1L). User B (2L) attempts the retry.
+        CapsuleSyncQueue rowOfA = queue(50L, 1L, 500L);
+        rowOfA.status = "FAILED";
+        rowOfA.attemptCount = 1;
+        when(syncQueueMapper.selectById(50L)).thenReturn(rowOfA);
+
+        com.innercosmos.exception.BusinessException ex = assertThrows(
+                com.innercosmos.exception.BusinessException.class,
+                () -> service.retryFailed(2L, 50L),
+                "user B retrying user A's row must throw");
+        assertEquals(com.innercosmos.common.ErrorCode.UNAUTHORIZED, ex.code,
+                "ownership mismatch must surface as UNAUTHORIZED");
+
+        // CRITICAL: no LLM regeneration, no portrait rebuild, no notification — the resource
+        // burn and misdirected notification are exactly what this hole leaked.
+        verify(regenerator, never()).regenerate(any(), any(), any());
+        verify(piiFilter, never()).filter(any(), any());
+        verify(notificationService, never()).notify(any(), any(), any(), any(), any(), any());
+        verify(syncQueueMapper, never()).updateById(any(CapsuleSyncQueue.class));
+    }
+
+    @Test
+    @DisplayName("FIX-1: the owner can still retry their own FAILED row (regeneration runs)")
+    void retry_ownerSucceeds() {
+        CapsuleSyncQueue rowOfA = queue(51L, 1L, 501L);
+        rowOfA.status = "FAILED";
+        rowOfA.attemptCount = 1;
+        when(syncQueueMapper.selectById(51L)).thenReturn(rowOfA);
+        when(ltmMapper.selectList(any())).thenReturn(List.of());
+        // createSnapshot returns null (its value only flows into filter, which we stub); filter
+        // yields a concrete FilteredPortrait so regenerate() receives valid input.
+        when(piiFilter.filter(any(), any())).thenReturn(portrait());
+
+        service.retryFailed(1L, 51L);
+
+        // Owner path: regeneration runs and the row is updated to SYNCED (regenerator is a no-op mock).
+        verify(regenerator, times(1)).regenerate(eq(501L), any(), any());
+        assertEquals("SYNCED", rowOfA.status);
+    }
+
+    // ---------------------------------------------------------------------------------
     // IC-CAP-002 FIX-1: the above tests mock the regenerator. These two drive the REAL
     // CapsuleContextRegenerator (only LlmClient + EchoCapsuleMapper are mocked) to prove
     // that a failing/empty LLM PROPAGATES out of regenerate() and surfaces as FAILED +
