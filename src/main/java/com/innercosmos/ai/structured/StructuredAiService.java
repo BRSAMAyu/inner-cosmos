@@ -11,11 +11,15 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
 @Service
 public class StructuredAiService {
     private static final Logger log = LoggerFactory.getLogger(StructuredAiService.class);
+
+    /** In-memory counter incremented on every [BAD_AI_OUTPUT] path for test observability. */
+    public static final AtomicLong badOutputCounter = new AtomicLong(0);
 
     private final LlmClient llmClient;
     private final ABTestService abTestService;
@@ -59,6 +63,11 @@ public class StructuredAiService {
             }
 
             String raw = active.chat(request);
+            if (raw == null || raw.isBlank()) {
+                log.warn("[BAD_AI_OUTPUT] Structured AI returned blank/null for module {}", moduleName);
+                badOutputCounter.incrementAndGet();
+                return fallback.get();
+            }
             T parsed = StructuredOutputParser.parse(raw, resultType);
             if (parsed != null) {
                 success = true;
@@ -80,15 +89,19 @@ public class StructuredAiService {
                 return parsed;
             }
 
-            log.error("Structured AI output for {} was not valid JSON after repair; returning explicit business fallback", moduleName);
+            log.warn("[BAD_AI_OUTPUT] Structured AI output for {} was not valid JSON after repair (raw truncated): {}",
+                    moduleName, truncate(repaired, 500));
+            badOutputCounter.incrementAndGet();
             return fallback.get();
         } catch (Exception exception) {
+            badOutputCounter.incrementAndGet();
             if (llmConfig.isProdMode()) {
                 log.error("Structured AI call for {} failed in prod; returning explicit business fallback: {}",
                         moduleName, exception.getMessage(), exception);
                 return fallback.get();
             }
-            log.warn("Structured AI call for {} fell back to deterministic extraction: {}", moduleName, exception.getMessage());
+            log.warn("Structured AI call for {} fell back to deterministic extraction: {}",
+                    moduleName, exception.getMessage(), exception);
             return fallback.get();
         } finally {
             double latency = System.currentTimeMillis() - startTime;
@@ -113,6 +126,11 @@ public class StructuredAiService {
 
     public String getCurrentTestGroup(Long userId) {
         return abTestService.getUserGroup(userId, null);
+    }
+
+    private static String truncate(String s, int max) {
+        if (s == null) return "<null>";
+        return s.length() <= max ? s : s.substring(0, max) + "...";
     }
 
     private String buildPrompt(String instruction, String contextJson, String invalidOutput) {
