@@ -349,14 +349,20 @@ public class CapsuleSyncService {
         String valuesArray = filtered.values().stream()
                 .map(v -> "\"" + JsonUtils.escapeJsonString(v) + "\"")
                 .collect(java.util.stream.Collectors.joining(","));
+        // FIX-C: emit dropped as a proper JSON array of escaped strings (mirroring valuesArray),
+        // not Java List.toString() which produces unquoted, comma-space output that is not valid JSON.
+        List<String> droppedFields = filtered.droppedFields();
+        String droppedArray = droppedFields == null ? "" : droppedFields.stream()
+                .map(v -> "\"" + JsonUtils.escapeJsonString(v) + "\"")
+                .collect(java.util.stream.Collectors.joining(","));
         return String.format(
-                "{\"pseudonym\":\"%s\",\"ageRange\":\"%s\",\"occupation\":\"%s\",\"city\":\"%s\",\"values\":[%s],\"dropped\":%s}",
+                "{\"pseudonym\":\"%s\",\"ageRange\":\"%s\",\"occupation\":\"%s\",\"city\":\"%s\",\"values\":[%s],\"dropped\":[%s]}",
                 JsonUtils.escapeJsonString(filtered.pseudonym()),
                 JsonUtils.escapeJsonString(filtered.ageRange()),
                 JsonUtils.escapeJsonString(filtered.occupationCategory()),
                 JsonUtils.escapeJsonString(filtered.city()),
                 valuesArray,
-                filtered.droppedFields()
+                droppedArray
         );
     }
 
