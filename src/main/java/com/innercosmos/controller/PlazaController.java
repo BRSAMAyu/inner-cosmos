@@ -3,6 +3,7 @@ package com.innercosmos.controller;
 import com.innercosmos.common.ApiResponse;
 import com.innercosmos.entity.EchoCapsule;
 import com.innercosmos.service.CapsuleService;
+import com.innercosmos.vo.EchoCapsuleVO;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,8 +20,10 @@ public class PlazaController extends BaseController {
     }
 
     @GetMapping("/capsules")
-    public ApiResponse<List<EchoCapsule>> capsules() {
-        return ApiResponse.ok(capsuleService.plazaCapsules());
+    public ApiResponse<List<EchoCapsuleVO>> capsules() {
+        // M-004: project to a public-safe VO — never expose personaPrompt/ownerContextNote/
+        // style*/context*/authorizedMemoryIds on the unauthenticated plaza list.
+        return ApiResponse.ok(capsuleService.plazaCapsules().stream().map(EchoCapsuleVO::fromPublic).toList());
     }
 
     @GetMapping("/matches")
