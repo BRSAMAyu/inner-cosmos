@@ -263,6 +263,39 @@
       opacity: .7;
     }
 
+    /* ── M-067 "接住了♡" resonance signal ── */
+    .landed-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 10px;
+      border: 1px solid rgba(143,163,148,.32);
+      border-radius: 999px;
+      background: rgba(143,163,148,.12);
+      color: var(--muted);
+      font-family: var(--font-body);
+      font-size: .78rem;
+      cursor: pointer;
+      transition: all 260ms var(--ease-flow);
+    }
+    .landed-btn:hover {
+      background: rgba(143,163,148,.24);
+      color: var(--ink);
+      transform: translateY(-1px);
+    }
+    .landed-btn[disabled] {
+      opacity: .6;
+      cursor: default;
+      transform: none;
+    }
+    body.dark-star .landed-btn {
+      background: rgba(122,142,127,.16);
+      border-color: rgba(122,142,127,.24);
+    }
+    body.dark-star .landed-btn:hover {
+      background: rgba(122,142,127,.28);
+    }
+
     /* ── Resonance signal (RUN-003 matching, made visible) ── */
     .badge-resonant {
       background: linear-gradient(135deg, rgba(184,194,174,.40), rgba(154,144,167,.34));
@@ -587,6 +620,7 @@ function renderList(data) {
       '<div class="capsule-card-meta">' +
         '<span class="capsule-card-energy"><span class="energy-dot"></span> ' + (c.echoEnergy || 0).toFixed(2) + '</span>' +
         '<span>' + formatCapsuleTurns(c) + '</span>' +
+        '<button class="landed-btn" data-capsule-id="' + c.id + '" onclick="markLanded(event, ' + c.id + ', this)">接住了♡</button>' +
         (match.matchScore ? '<span class="match-score">' + (match.matchScore).toFixed(2) + ' 匹配</span>' : '') +
       '</div>' +
     '</article>';
@@ -597,6 +631,32 @@ function renderList(data) {
     var pseudonym = card.dataset.pseudonym;
     var id = card.dataset.capsuleId;
     if (pseudonym) CapsulePersonality.applyPersonality(pseudonym, card, id);
+  });
+}
+
+function markLanded(event, id, btn) {
+  if (event && event.stopPropagation) event.stopPropagation();
+  if (btn && btn.disabled) return;
+  if (btn) { btn.disabled = true; }
+  IC.api("/api/echo/" + id + "/landed", { method: "POST" }).then(function(r) {
+    if (r && r.success) {
+      var energy = r.data && typeof r.data.echoEnergy === "number" ? r.data.echoEnergy : null;
+      var c = capsules.find(function(x) { return x.id === id; });
+      if (c && energy !== null) {
+        c.echoEnergy = energy;
+        var card = document.querySelector('.capsule-card[data-capsule-id="' + id + '"]');
+        if (card) {
+          var dot = card.querySelector('.capsule-card-energy');
+          if (dot) dot.innerHTML = '<span class="energy-dot"></span> ' + energy.toFixed(2);
+        }
+      }
+      IC.toast("已让 ta 知道这束回声接住了你", "info");
+    } else {
+      // IC.api already toasted the server message; just re-enable the button.
+      if (btn) btn.disabled = false;
+    }
+  }).catch(function() {
+    if (btn) btn.disabled = false;
   });
 }
 

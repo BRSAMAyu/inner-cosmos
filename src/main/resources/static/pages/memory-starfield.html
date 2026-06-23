@@ -428,6 +428,8 @@ function render() {
     var star = document.createElement("button");
     star.className = "star" + (isBlackHole ? " black-hole" : "") + (s.id === selectedId ? " selected" : "");
     star.title = s.title || s.theme || "记忆";
+    star.setAttribute("role", "button");
+    star.setAttribute("tabindex", "0");
     star.setAttribute("aria-label", (s.title || s.theme || "记忆") + " - 情感重力 " + gravity.toFixed(2));
     star.style.cssText =
       "width:" + size + "px;height:" + size + "px;" +
@@ -439,6 +441,14 @@ function render() {
       "--star-color:" + colors.mid + ";";
     star.dataset.id = s.id;
     star.onclick = (function(id) { return function() { showDetail(id); }; })(s.id);
+    star.onkeydown = (function(id) {
+      return function(e) {
+        if (e.key === "Enter" || e.key === " " || e.key === "Spacebar") {
+          e.preventDefault();
+          showDetail(id);
+        }
+      };
+    })(s.id);
     canvas.appendChild(star);
 
     // Label
