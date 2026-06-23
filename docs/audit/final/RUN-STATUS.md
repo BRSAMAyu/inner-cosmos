@@ -58,9 +58,12 @@ Experts 1–4 must NOT see each other's output. Expert 5 sees all four and criti
 - `M-077` — scheduler letter delivery writes the audit log. `05d95c5`.
 - `M-033` — account deletion requires password re-auth (FE+BE). `8c39e21`.
 - `M-078` — belief recalculate + reportLetter enforce ownership. `d91ceab`.
-- `M-008` — UNIQUE(user_id, source_session_id) on tb_memory_card (starfield integrity backstop).
+- `M-008` — UNIQUE(user_id, source_session_id) on tb_memory_card (starfield integrity backstop). `b0960f3`.
+- `M-032` — password change (requires old password) BE+FE. `d094bcc`.
+- `M-043` — proactive job logs failures + retries failed timers. `c934503`.
+- `M-045` — per-thread goodbye strength (shared-singleton race fixed).
 
-**29 fixes done & verified; full suite green (621 tests, 0 failures). All P0s (safety/trust/data-integrity) + all 4 signature no-ops (M-011/M-014/M-015/M-017) + many P1/P2/P3 done.**
+**32 fixes done & verified; full suite green (621 tests, 0 failures).**
 
 **Remaining (lower priority / bigger):** `M-018` CSRF + cookie hardening, `M-010` signed JWT (replace X-User-Id), `M-032` password change/reset, `M-006` retention job for redacted logs, plus P2/P3 polish (M-045/M-043/M-039/M-051/M-052/M-075/M-076) and Group-C wow (M-067/M-068/M-069/M-070/M-072). **After Phase 3:** 3 experts inspect (P4) → fix (P5) → 2 final agents + browser verify (P6) → END.
 
