@@ -169,6 +169,21 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    public void changePassword(Long userId, String oldPassword, String newPassword) {
+        // M-032: change the current user's password, requiring the old one.
+        User user = userMapper.selectById(userId);
+        if (user == null || !passwordEncoder.matches(oldPassword, user.passwordHash)) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "原密码不正确");
+        }
+        if (newPassword == null || newPassword.length() < 8) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "新密码至少 8 位");
+        }
+        user.passwordHash = passwordEncoder.encode(newPassword);
+        userMapper.updateById(user);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
     public void updateProfile(Long userId, UserProfileVO profile) {
         QueryWrapper<UserProfile> query = new QueryWrapper<>();
         query.eq("user_id", userId);

@@ -485,6 +485,13 @@
 
     <div class="toggle-row">
       <div>
+        <label>修改密码</label>
+        <p class="hint">更换你的登录密码（需先输入当前密码）</p>
+      </div>
+      <button class="btn-outline" onclick="confirmChangePassword()">修改密码</button>
+    </div>
+    <div class="toggle-row">
+      <div>
         <label>删除账户</label>
         <p class="hint">永久删除你的账户和所有数据，此操作不可撤销</p>
       </div>
@@ -656,6 +663,36 @@ async function exportData() {
   URL.revokeObjectURL(url);
   IC.toast("数据已导出");
   IC.pulse("soft");
+}
+
+function confirmChangePassword() {
+  IC.showModal(`
+    <h2 style="margin:0 0 12px">修改密码</h2>
+    <input id="cp-old" type="password" class="modal-input" placeholder="当前密码" autocomplete="current-password" style="width:100%;box-sizing:border-box;margin-bottom:10px">
+    <input id="cp-new" type="password" class="modal-input" placeholder="新密码（至少 8 位）" autocomplete="new-password" style="width:100%;box-sizing:border-box;margin-bottom:10px">
+    <input id="cp-new2" type="password" class="modal-input" placeholder="再次输入新密码" autocomplete="new-password" style="width:100%;box-sizing:border-box;margin-bottom:12px">
+    <div class="modal-actions">
+      <button class="modal-btn-cancel" onclick="IC.closeModal()">取消</button>
+      <button class="modal-btn-confirm" onclick="doChangePassword()">确认修改</button>
+    </div>
+  `);
+}
+
+async function doChangePassword() {
+  const oldP = (document.getElementById("cp-old") || {}).value || "";
+  const newP = (document.getElementById("cp-new") || {}).value || "";
+  const newP2 = (document.getElementById("cp-new2") || {}).value || "";
+  if (!oldP || !newP) { IC.toast("请填写当前密码和新密码", "warn"); return; }
+  if (newP.length < 8) { IC.toast("新密码至少 8 位", "warn"); return; }
+  if (newP !== newP2) { IC.toast("两次输入的新密码不一致", "warn"); return; }
+  const r = await IC.api("/api/user/password", {
+    method: "PUT",
+    body: JSON.stringify({ oldPassword: oldP, newPassword: newP }) // M-032
+  });
+  if (r.success) {
+    IC.closeModal();
+    IC.toast("密码已更新");
+  }
 }
 
 function confirmDelete() {

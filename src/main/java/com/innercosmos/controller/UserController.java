@@ -52,6 +52,12 @@ public class UserController extends BaseController {
         return ApiResponse.ok(userService.exportData(currentUserId(session)));
     }
 
+    @PutMapping("/password")
+    public ApiResponse<Void> changePassword(@RequestBody Map<String, String> body, HttpSession session) {
+        userService.changePassword(currentUserId(session), body.get("oldPassword"), body.get("newPassword")); // M-032
+        return ApiResponse.ok(null);
+    }
+
     @DeleteMapping("/account")
     public ApiResponse<Void> deleteAccount(@RequestBody(required = false) Map<String, String> body, HttpSession session) {
         Long userId = currentUserId(session);
