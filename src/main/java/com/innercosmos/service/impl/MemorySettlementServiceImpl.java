@@ -115,7 +115,17 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
         card.lastTouchedAt = LocalDateTime.now();
         card.visibilityLevel = "PRIVATE";
         card.status = "ACTIVE";
-        memoryCardMapper.insert(card);
+        // M-008 (Phase-6 fix): idempotent on (user_id, source_session_id) — settle may run after
+        // the finish() listener already inserted a card for this session (would trip the UNIQUE).
+        MemoryCard existing = memoryCardMapper.selectOne(
+                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<MemoryCard>()
+                        .eq("user_id", userId).eq("source_session_id", sessionId).last("LIMIT 1"));
+        if (existing != null) {
+            card.id = existing.id;
+            memoryCardMapper.updateById(card);
+        } else {
+            memoryCardMapper.insert(card);
+        }
 
         // Create structured assets: fragments
         if (ai.fragments != null && !ai.fragments.isEmpty()) {
