@@ -73,12 +73,28 @@ public class SlowLetterServiceImpl implements SlowLetterService {
         }
         stateRegistry.validate(letter.status, targetStatus);
         String from = letter.status;
+        // M-022: atomic conditional UPDATE — only applies if status is still `from`, so a concurrent
+        // transition (e.g. user /read racing the scheduler SENT->DELIVERED) cannot both pass
+        // validate() and clobber each other. rowsAffected==0 means we lost the race.
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<SlowLetter> w =
+                new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<SlowLetter>()
+                        .eq("id", id).eq("status", from)
+                        .set("status", targetStatus);
+        if ("SENT".equals(targetStatus)) w.set("sent_at", now);
+        if ("DELIVERED".equals(targetStatus)) w.set("delivered_at", now);
+        if ("READ".equals(targetStatus)) w.set("read_at", now);
+        if ("REPLIED".equals(targetStatus)) w.set("replied_at", now);
+        int updated = letterMapper.update(null, w);
+        if (updated == 0) {
+            throw new com.innercosmos.exception.BusinessException(
+                    com.innercosmos.common.ErrorCode.LETTER_STATE_INVALID, "信件状态刚刚变化，请刷新后重试");
+        }
         letter.status = targetStatus;
-        if ("SENT".equals(targetStatus)) letter.sentAt = LocalDateTime.now();
-        if ("DELIVERED".equals(targetStatus)) letter.deliveredAt = LocalDateTime.now();
-        if ("READ".equals(targetStatus)) letter.readAt = LocalDateTime.now();
-        if ("REPLIED".equals(targetStatus)) letter.repliedAt = LocalDateTime.now();
-        letterMapper.updateById(letter);
+        if ("SENT".equals(targetStatus)) letter.sentAt = now;
+        if ("DELIVERED".equals(targetStatus)) letter.deliveredAt = now;
+        if ("READ".equals(targetStatus)) letter.readAt = now;
+        if ("REPLIED".equals(targetStatus)) letter.repliedAt = now;
 
         LetterStatusLog log = new LetterStatusLog();
         log.letterId = id;
