@@ -26,7 +26,7 @@ public class TodoExtractListener {
 
     private static final String[] TODO_KEYWORDS = {"作业", "考试", "截止", "提交", "复习", "完成", "计划", "打算", "准备"};
 
-    @EventListener
+    @org.springframework.transaction.event.TransactionalEventListener(phase = org.springframework.transaction.event.TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     @Async("taskExecutor")
     public void onDialogFinished(DialogFinishedEvent event) {
         try {
