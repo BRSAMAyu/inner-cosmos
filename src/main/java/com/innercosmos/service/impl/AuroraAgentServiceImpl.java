@@ -277,17 +277,25 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         int n = turnCounter.merge(userId, 1, Integer::sum);
         if (n % 5 == 0) {
             turnCounter.put(userId, 0);
-            List<DialogMessage> recent = request.sessionId == null ? List.of()
-                    : dialogService.messages(request.sessionId);
-            int start = Math.max(0, recent.size() - 20);
-            // M-011: persist the 5-turn portrait reflection — apply the deltas so Aurora's
-            // portrait of the user updates mid-session (not only on goodbye/nightly). This is
-            // the literal point of RUN-006; previously the result was discarded (a billed no-op).
-            var portraitDeltas = portraitReflection.reflectOnTurn(userId, recent.subList(start, recent.size()));
-            if (portraitDeltas != null && portraitDeltas.deltas() != null
-                    && !portraitDeltas.deltas().isEmpty()) {
-                userPortraitService.applyDeltas(userId, portraitDeltas.deltas());
-            }
+            // M-011/Phase-5: run the reflection (an extra LLM call) ASYNC on aiExecutor so the
+            // 1-in-5 POST reply is never blocked by it. The portrait updates a moment later, which
+            // is fine for a mid-session refresh; an async failure must never break the reply path.
+            final Long uid = userId;
+            final Long sid = request.sessionId;
+            aiExecutor.execute(() -> {
+                try {
+                    List<DialogMessage> recent = sid == null ? List.<DialogMessage>of()
+                            : dialogService.messages(sid);
+                    int start = Math.max(0, recent.size() - 20);
+                    var portraitDeltas = portraitReflection.reflectOnTurn(uid, recent.subList(start, recent.size()));
+                    if (portraitDeltas != null && portraitDeltas.deltas() != null
+                            && !portraitDeltas.deltas().isEmpty()) {
+                        userPortraitService.applyDeltas(uid, portraitDeltas.deltas());
+                    }
+                } catch (Exception ignore) {
+                    // async reflection failure is non-fatal
+                }
+            });
         }
 
         // Goodbye trigger detection: check user message for goodbye intent
