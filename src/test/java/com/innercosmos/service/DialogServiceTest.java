@@ -130,8 +130,7 @@ class DialogServiceTest {
         request.message = "Hello Aurora";
 
         when(messageMapper.insert(any(DialogMessage.class))).thenReturn(1);
-        when(sessionMapper.selectById(SESSION_ID)).thenReturn(session);
-        when(sessionMapper.updateById(any(DialogSession.class))).thenReturn(1);
+        when(sessionMapper.update(any(), any())).thenReturn(1); // M-021: increment = atomic update
 
         DialogMessage result = dialogService.saveUserMessage(USER_ID, request);
 
@@ -142,7 +141,7 @@ class DialogServiceTest {
         assertEquals("TEXT", result.inputType);
         assertEquals("LOW", result.safetyLevel);
         verify(messageMapper).insert(any(DialogMessage.class));
-        verify(sessionMapper).updateById(any(DialogSession.class));
+        verify(sessionMapper).update(any(), any()); // M-021: atomic increment
     }
 
     @Test
@@ -156,8 +155,7 @@ class DialogServiceTest {
         request.audioDurationSec = 30;
 
         when(messageMapper.insert(any(DialogMessage.class))).thenReturn(1);
-        when(sessionMapper.selectById(SESSION_ID)).thenReturn(session);
-        when(sessionMapper.updateById(any(DialogSession.class))).thenReturn(1);
+        when(sessionMapper.update(any(), any())).thenReturn(1); // M-021: increment = atomic update
 
         DialogMessage result = dialogService.saveUserMessage(USER_ID, request);
 
@@ -172,8 +170,7 @@ class DialogServiceTest {
     void saveAuroraMessage_createsAuroraMessage() {
         DialogSession session = buildOwnedSession();
         when(messageMapper.insert(any(DialogMessage.class))).thenReturn(1);
-        when(sessionMapper.selectById(SESSION_ID)).thenReturn(session);
-        when(sessionMapper.updateById(any(DialogSession.class))).thenReturn(1);
+        when(sessionMapper.update(any(), any())).thenReturn(1); // M-021: increment = atomic update
 
         DialogMessage result = dialogService.saveAuroraMessage(USER_ID, SESSION_ID, "Hi there!");
 
