@@ -28,8 +28,9 @@
       color: var(--ink);
       margin: 0 0 8px;
       position: relative;
+      text-wrap: balance;
     }
-    .create-hero .muted { position: relative; }
+    .create-hero .muted { position: relative; text-wrap: pretty; }
     .wizard-bar {
       display: flex;
       gap: 4px;
@@ -46,7 +47,7 @@
       background: var(--line);
       transition: background .4s var(--ease-flow);
     }
-    .wizard-step.active { background: var(--accent-sage); }
+    .wizard-step.active { background: var(--accent-sage); box-shadow: 0 0 0 1px rgba(143,163,148,.25), 0 2px 8px rgba(143,163,148,.28); }
     .wizard-step.done { background: var(--accent-sage); opacity: .5; }
     /* ── Dark mode ── */
     body.dark-star .create-hero {

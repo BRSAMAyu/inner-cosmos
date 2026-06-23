@@ -9,12 +9,13 @@
     .ops-hero { padding: 0 0 24px; margin-bottom: 20px;
       background: radial-gradient(ellipse 50% 60% at 30% 30%, rgba(143,163,148,.10), transparent),
                   radial-gradient(ellipse 40% 50% at 70% 40%, rgba(151,169,186,.08), transparent); }
-    .ops-hero h1 { font-family: var(--font-hero); font-size: clamp(1.7rem,4vw,2.4rem); margin: 0 0 8px; }
-    .ops-hero p { color: var(--muted); line-height: 1.7; max-width: 48ch; }
+    .ops-hero h1 { font-family: var(--font-hero); font-size: clamp(1.7rem,4vw,2.4rem); margin: 0 0 8px; text-wrap: balance; }
+    .ops-hero p { color: var(--muted); line-height: 1.7; max-width: 48ch; text-wrap: pretty; }
+    /* Dark mode — warm Morandi dark-star palette (was cold navy rgb(30,35,40)/rgb(60,70,80)) */
     body.dark-star .ops-hero { background: radial-gradient(ellipse 50% 60% at 30% 30%, rgba(122,142,127,.06), transparent); }
-    body.dark-star .panel { background: rgba(30,35,40,.88); border-color: rgba(60,70,80,.4); }
-    body.dark-star .card { background: rgba(30,35,40,.82); border-color: rgba(60,70,80,.35); }
-    body.dark-star .soft-stage { background: rgba(30,35,40,.6); border-color: rgba(60,70,80,.35); }
+    body.dark-star .panel { background: rgba(42,38,34,.88); border-color: rgba(163,153,143,.16); }
+    body.dark-star .card { background: rgba(52,47,42,.82); border-color: rgba(163,153,143,.14); }
+    body.dark-star .soft-stage { background: rgba(42,38,34,.6); border-color: rgba(163,153,143,.14); }
     .split-bar { width: 100%; height: 12px; border-radius: 6px; background: rgba(160,155,180,.14); overflow: hidden; display: flex; }
     .split-bar .seg-a { background: var(--accent-dusty-blue); transition: width .4s ease; }
     .split-bar .seg-b { background: var(--accent-sage); transition: width .4s ease; }

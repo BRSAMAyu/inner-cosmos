@@ -208,6 +208,59 @@ public class PromptBuilder {
         return this;
     }
 
+    /**
+     * RUN-006 — calibrations the user made on a specific PORTRAIT dimension via the
+     * "Aurora 眼中的你" page. Unlike {@link #withUserCorrections} (the user's authoritative
+     * word, which OVERRIDES Aurora's inference), these are rendered with SOFT-COEXIST
+     * framing: Aurora keeps its own observation AND hears the user's differing view, and
+     * weighs them itself — it must neither bluntly negate its own read nor ignore the
+     * user's voice. Input expected most-recent-first; capped to {@link #CORRECTION_MAX},
+     * each field truncated and sanitized (user-derived text → injection chokepoint).
+     * Entries with no new value carry nothing and are skipped.
+     */
+    public PromptBuilder withPortraitCalibrations(List<UserCorrection> calibrations) {
+        if (calibrations == null || calibrations.isEmpty()) return this;
+        StringBuilder block = new StringBuilder();
+        int n = 0;
+        for (UserCorrection c : calibrations) {
+            if (c == null) continue;
+            String now = sanitize(truncate(c.newValue, CORRECTION_VALUE_MAX_CHARS));
+            if (now.isEmpty()) continue;
+            String was = sanitize(truncate(c.oldValue, CORRECTION_VALUE_MAX_CHARS));
+            String why = sanitize(truncate(c.reason, CORRECTION_VALUE_MAX_CHARS));
+            String dim = sanitize(truncate(c.fieldName, CORRECTION_VALUE_MAX_CHARS));
+            StringBuilder line = new StringBuilder("- ");
+            if (!dim.isEmpty()) line.append("关于「").append(dim).append("」，");
+            line.append("TA 觉得：").append(now);
+            if (!was.isEmpty()) line.append("（你画像里写的是：").append(was).append("）");
+            if (!why.isEmpty()) line.append(" 缘由：").append(why);
+            block.append(line).append('\n');
+            if (++n >= CORRECTION_MAX) break;
+        }
+        if (block.length() == 0) return this;
+        parts.add("TA 对你画像里的一些理解有不同看法（请把这看作 TA 的自我补充，与你自己的判断并存、由你自行权衡：既不要生硬否定自己的观察，也不要无视 TA 的声音；更不要当面逐条复述）：\n"
+                + block.toString().stripTrailing());
+        return this;
+    }
+
+    /**
+     * RUN-006 — the user's mid/long-term emotional baseline as an explicit TONE cue
+     * (complements {@link #withMomentEmotion}, which is the jittery real-time read).
+     * The baseline says how Aurora's overall register should sit over weeks, not how to
+     * react to this single message. No-ops on blank / "暂无" placeholders. The label is
+     * user-derived (rendered from EmotionTrace data), so it is sanitized + truncated.
+     */
+    public PromptBuilder withEmotionBaseline(String baselineLabel, double stabilityScore) {
+        if (isBlank(baselineLabel)) return this;
+        String trimmed = baselineLabel.trim();
+        if (trimmed.startsWith("暂无")) return this;
+        String steadiness = stabilityScore >= 0.6 ? "整体较稳" : "近期起伏较大";
+        parts.add("TA 近期的情绪基线：" + sanitize(truncate(trimmed, MOMENT_EMOTION_MAX_CHARS))
+                + "（" + steadiness + "）。请让你的语气与这一长期状态相称：基线偏低或起伏大时更稳、更托底、不强行打气；平稳偏积极时可以更轻盈自在。"
+                + "这是长期背景，不要直接复述，也不要凌驾于 TA 此刻的真实表达。");
+        return this;
+    }
+
     public PromptBuilder withSummaryAnchor(String summaryAnchor) {
         if (notBlank(summaryAnchor)) {
             parts.add("本次会话摘要锚点：\n" + summaryAnchor);

@@ -10,8 +10,8 @@
     .weekly-hero { padding: 0 0 28px; margin-bottom: 24px;
       background: radial-gradient(ellipse 50% 60% at 30% 30%, rgba(184,194,174,.10), transparent),
                   radial-gradient(ellipse 40% 50% at 70% 40%, rgba(165,179,194,.08), transparent); }
-    .weekly-hero h1 { font-family: var(--font-hero); font-size: clamp(1.8rem,4vw,2.6rem); margin: 0 0 8px; }
-    .weekly-hero p { color: var(--muted); line-height: 1.7; }
+    .weekly-hero h1 { font-family: var(--font-hero); font-size: clamp(1.8rem,4vw,2.6rem); margin: 0 0 8px; text-wrap: balance; }
+    .weekly-hero p { color: var(--muted); line-height: 1.7; text-wrap: pretty; }
     /* Content hero */
     .wr-hero {
       padding: 36px 32px;
@@ -20,7 +20,7 @@
       border: 1px solid var(--line);
       margin-bottom: 24px;
     }
-    .wr-hero h2 { font-size: 1.6rem; margin: 0 0 12px; line-height: 1.3; }
+    .wr-hero h2 { font-size: 1.6rem; margin: 0 0 12px; line-height: 1.3; text-wrap: balance; }
     .wr-theme { display: inline-block; padding: 4px 14px; border-radius: 999px; background: rgba(255,250,243,.5); margin: 4px 4px 0 0; font-size: .82rem; }
     .wr-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
     .wr-stat { padding: 18px; border-radius: var(--radius); background: rgba(255,250,243,.55); border: 1px solid var(--line); }
@@ -55,14 +55,14 @@
       background: rgba(143,163,148,.22);
       border-color: var(--line-strong);
     }
-    /* Dark mode */
+    /* Dark mode — warm Morandi dark-star palette (was cold navy rgb(30–120,...) blue-greys) */
     body.dark-star .weekly-hero { background: radial-gradient(ellipse 50% 60% at 30% 30%, rgba(122,142,127,.06), transparent); }
-    body.dark-star .wr-hero { background: rgba(30,35,40,.6); border-color: rgba(60,70,80,.4); }
-    body.dark-star .wr-stat { background: rgba(30,35,40,.7); border-color: rgba(60,70,80,.4); }
-    body.dark-star .wr-section { background: rgba(30,35,40,.7); border-color: rgba(60,70,80,.4); }
-    body.dark-star .wr-day { background: rgba(30,35,40,.6); border-color: rgba(60,70,80,.35); }
-    body.dark-star .wr-aurora-note { background: linear-gradient(135deg, rgba(120,90,100,.2), rgba(100,120,100,.15)); border-color: rgba(60,70,80,.4); }
-    body.dark-star .regenerate-btn { background: rgba(143,163,148,.15); border-color: rgba(60,70,80,.4); }
+    body.dark-star .wr-hero { background: rgba(42,38,34,.6); border-color: rgba(163,153,143,.16); }
+    body.dark-star .wr-stat { background: rgba(52,47,42,.7); border-color: rgba(163,153,143,.14); }
+    body.dark-star .wr-section { background: rgba(52,47,42,.7); border-color: rgba(163,153,143,.14); }
+    body.dark-star .wr-day { background: rgba(42,38,34,.6); border-color: rgba(163,153,143,.12); }
+    body.dark-star .wr-aurora-note { background: linear-gradient(135deg, rgba(191,150,152,.16), rgba(122,142,127,.12)); border-color: rgba(163,153,143,.18); }
+    body.dark-star .regenerate-btn { background: rgba(143,163,148,.15); border-color: rgba(163,153,143,.16); }
   </style>
 </head>
 <body>

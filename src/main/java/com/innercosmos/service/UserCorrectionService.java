@@ -15,4 +15,13 @@ public interface UserCorrectionService {
      * Aurora prompt so the model visibly adapts after a "这不太是我" correction.
      */
     List<UserCorrection> recentCorrections(Long userId, int limit);
+
+    /**
+     * RUN-006 — the N most recent corrections of a specific {@code targetType}, newest
+     * first. Lets the Aurora prompt route authoritative free-form corrections
+     * (AURORA_UNDERSTANDING) and soft portrait calibrations (PORTRAIT_DIM) into their
+     * own blocks with different precedence. A null/blank targetType behaves like
+     * {@link #recentCorrections(Long, int)}.
+     */
+    List<UserCorrection> recentCorrectionsByType(Long userId, String targetType, int limit);
 }

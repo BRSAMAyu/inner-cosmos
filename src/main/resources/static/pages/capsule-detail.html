@@ -14,7 +14,7 @@
         var(--surface-paper);
       border: 1px solid rgba(255,255,255,.20);
       backdrop-filter: blur(16px);
-      box-shadow: 0 4px 16px rgba(0,0,0,.04), 0 16px 48px rgba(0,0,0,.06);
+      box-shadow: var(--elev-2, 0 4px 16px rgba(0,0,0,.04), 0 16px 48px rgba(0,0,0,.06));
       margin-bottom: 24px;
       position: relative;
       overflow: hidden;
@@ -39,6 +39,7 @@
       font-family: var(--font-hero);
       color: var(--ink);
       margin: 0;
+      text-wrap: balance;
     }
     .detail-hero .intro {
       font-size: .92rem;
@@ -46,6 +47,7 @@
       line-height: 1.6;
       margin-top: 12px;
       position: relative;
+      text-wrap: pretty;
     }
     .stat-grid {
       display: grid;
@@ -62,10 +64,11 @@
       border: 1px solid rgba(255,255,255,.18);
       backdrop-filter: blur(12px);
       text-align: center;
-      transition: box-shadow 300ms var(--ease-flow);
+      transition: box-shadow 300ms var(--ease-flow), translate 300ms var(--ease-flow);
     }
     .stat-card:hover {
-      box-shadow: 0 4px 12px rgba(0,0,0,.06);
+      box-shadow: var(--elev-1, 0 4px 12px rgba(0,0,0,.06));
+      translate: 0 -2px;
     }
     .stat-card .value {
       font-size: 1.4rem;

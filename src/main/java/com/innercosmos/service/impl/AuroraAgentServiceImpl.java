@@ -83,6 +83,8 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     private AuroraSelfContinuityService continuityService;
     @Autowired(required = false)
     private com.innercosmos.service.UserCorrectionService userCorrectionService;
+    @Autowired(required = false)
+    private com.innercosmos.service.EmotionBaselineService emotionBaselineService;
     private final Map<Long, Integer> turnCounter = new ConcurrentHashMap<>();
     private final Map<Long, Integer> goodbyeConfirmCount = new ConcurrentHashMap<>();
     /**
@@ -203,6 +205,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         List<UserPortrait> portrait = safePortrait(userId);
         AgentUserRelationship relationship = safeRelationship(userId);
         String stateSignal = currentStateSignal(request.message);
+        com.innercosmos.ai.semantic.EmotionBaseline baseline = safeBaseline(userId);
 
         String prompt = new PromptBuilder()
                 .withSystemBoundary()
@@ -211,9 +214,11 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 .withUserProfile(profileBrief(profile))
                 .withUserPortrait(portrait)
                 .withUserCorrections(safeCorrections(userId))
+                .withPortraitCalibrations(safePortraitCalibrations(userId))
                 .withRelationship(relationship)
                 .withCurrentStateSignal(stateSignal)
                 .withMomentEmotion(agentContext.momentEmotionLabel)
+                .withEmotionBaseline(baseline.baselineLabel, baseline.stabilityScore)
                 .withSummaryAnchor(session == null ? null : session.summaryAnchor)
                 .withRecentMessages(recentMessages(request.sessionId, 8))
                 .withGravityMemories(gravityMemories)
@@ -492,6 +497,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 .withUserProfile(profileBrief(profile))
                 .withUserPortrait(safePortrait(userId))
                 .withUserCorrections(safeCorrections(userId))
+                .withPortraitCalibrations(safePortraitCalibrations(userId))
                 .withGravityMemories(gravityMemories)
                 .withMemoryContext(memoryContext)
                 .withOutputSchema()
@@ -1052,12 +1058,51 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     private List<com.innercosmos.entity.UserCorrection> safeCorrections(Long userId) {
         if (userId == null || userCorrectionService == null) return List.of();
         try {
+            // RUN-006: only the authoritative free-form corrections (AURORA_UNDERSTANDING)
+            // belong in the override block; portrait-dim calibrations route to the soft block.
             List<com.innercosmos.entity.UserCorrection> recent =
-                    userCorrectionService.recentCorrections(userId, PromptBuilder.CORRECTION_MAX);
+                    userCorrectionService.recentCorrectionsByType(
+                            userId, "AURORA_UNDERSTANDING", PromptBuilder.CORRECTION_MAX);
             return recent == null ? List.of() : recent;
         } catch (Exception e) {
             log.warn("Correction read failed (non-fatal): {}", e.getMessage());
             return List.of();
+        }
+    }
+
+    /**
+     * RUN-006 — the user's soft, per-dimension portrait calibrations (PORTRAIT_DIM) from
+     * the "Aurora 眼中的你" page. Non-fatal: empty on missing service / read failure so
+     * the prompt just omits the segment.
+     */
+    private List<com.innercosmos.entity.UserCorrection> safePortraitCalibrations(Long userId) {
+        if (userId == null || userCorrectionService == null) return List.of();
+        try {
+            List<com.innercosmos.entity.UserCorrection> recent =
+                    userCorrectionService.recentCorrectionsByType(
+                            userId, "PORTRAIT_DIM", PromptBuilder.CORRECTION_MAX);
+            return recent == null ? List.of() : recent;
+        } catch (Exception e) {
+            log.warn("Portrait calibration read failed (non-fatal): {}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    /**
+     * RUN-006 — the user's mid/long-term emotional baseline, for the explicit tone cue.
+     * Non-fatal: returns a well-formed absent baseline when the service is unavailable
+     * (unit tests) or the read fails, so {@code withEmotionBaseline} simply no-ops.
+     */
+    private com.innercosmos.ai.semantic.EmotionBaseline safeBaseline(Long userId) {
+        if (userId == null || emotionBaselineService == null) {
+            return com.innercosmos.ai.semantic.EmotionBaseline.absent(14);
+        }
+        try {
+            com.innercosmos.ai.semantic.EmotionBaseline b = emotionBaselineService.computeBaseline(userId);
+            return b == null ? com.innercosmos.ai.semantic.EmotionBaseline.absent(14) : b;
+        } catch (Exception e) {
+            log.warn("Emotion baseline read failed (non-fatal): {}", e.getMessage());
+            return com.innercosmos.ai.semantic.EmotionBaseline.absent(14);
         }
     }
 

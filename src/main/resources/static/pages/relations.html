@@ -28,8 +28,9 @@
       color: var(--ink);
       margin: 0 0 8px;
       position: relative;
+      text-wrap: balance;
     }
-    .rel-hero .muted { position: relative; }
+    .rel-hero .muted { position: relative; text-wrap: pretty; }
     .rel-canvas-wrap { position: relative; width: 100%; height: 540px; border-radius: var(--radius-flow); overflow: hidden; }
     .rel-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
     .rel-node {
@@ -51,17 +52,17 @@
     .rel-type-SUPPORT { border-left: 4px solid rgba(143,163,148,.65); }
     .rel-type-DISTANCE { border-left: 4px solid rgba(151,169,186,.65); }
     .rel-type-GENERAL { border-left: 4px solid rgba(184,194,168,.65); }
-    /* Dark mode */
-    body.dark-star .rel-hero { background: linear-gradient(135deg, rgba(80,100,80,.08), rgba(80,90,110,.08)); border-color: rgba(60,70,80,.4); }
-    body.dark-star .rel-hero::before { background: radial-gradient(circle at 70% 30%, rgba(80,90,110,.06), transparent 50%); }
+    /* Dark mode — warm Morandi dark-star palette (was cold navy rgb(20–80,...) blue-greys) */
+    body.dark-star .rel-hero { background: linear-gradient(135deg, rgba(42,38,34,.68), rgba(37,33,29,.52)); border-color: rgba(163,153,143,.16); }
+    body.dark-star .rel-hero::before { background: radial-gradient(circle at 70% 30%, rgba(134,152,169,.06), transparent 50%); }
     body.dark-star .rel-hero h1 { color: var(--ink); }
-    body.dark-star .rel-svg { background: rgba(20,25,30,.4); }
+    body.dark-star .rel-svg { background: rgba(42,38,34,.4); }
     body.dark-star .rel-line { stroke: rgba(143,163,148,.28); }
     body.dark-star .rel-line:hover { stroke: rgba(191,150,152,.4); }
-    body.dark-star .rel-center { fill: rgba(143,163,148,.45); stroke: rgba(60,70,80,.6); }
-    body.dark-star .row-card { background: rgba(30,35,40,.7); border-color: rgba(60,70,80,.35); }
-    body.dark-star .row-card:hover { background: rgba(35,40,48,.8); }
-    body.dark-star .panel { background: rgba(30,35,40,.88); border-color: rgba(60,70,80,.4); }
+    body.dark-star .rel-center { fill: rgba(143,163,148,.45); stroke: rgba(163,153,143,.5); }
+    body.dark-star .row-card { background: rgba(52,47,42,.7); border-color: rgba(163,153,143,.14); }
+    body.dark-star .row-card:hover { background: rgba(52,47,42,.85); }
+    body.dark-star .panel { background: rgba(42,38,34,.88); border-color: rgba(163,153,143,.16); }
   </style>
 </head>
 <body>

@@ -54,4 +54,18 @@ public class UserCorrectionServiceImpl implements UserCorrectionService {
         query.eq("user_id", userId).orderByDesc("id").last("LIMIT " + limit);
         return userCorrectionMapper.selectList(query);
     }
+
+    @Override
+    public List<UserCorrection> recentCorrectionsByType(Long userId, String targetType, int limit) {
+        if (userId == null || limit <= 0) {
+            return List.of();
+        }
+        QueryWrapper<UserCorrection> query = new QueryWrapper<>();
+        query.eq("user_id", userId);
+        if (targetType != null && !targetType.isBlank()) {
+            query.eq("target_type", targetType);
+        }
+        query.orderByDesc("id").last("LIMIT " + limit);
+        return userCorrectionMapper.selectList(query);
+    }
 }

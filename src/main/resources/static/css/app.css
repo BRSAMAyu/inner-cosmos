@@ -86,6 +86,29 @@
   --font-mono: "JetBrains Mono", monospace;
   --font-display: "Cormorant Garamond", serif;
 
+  /* Modular type scale (~1.22 ratio, anchored at the 17px body) — gives every
+     page one shared vertical rhythm instead of ad-hoc inline font-sizes. */
+  --fs-xs: 0.76rem;
+  --fs-sm: 0.86rem;
+  --fs-base: 1rem;
+  --fs-md: 1.18rem;
+  --fs-lg: 1.46rem;
+  --fs-xl: 1.95rem;
+  --fs-2xl: 2.6rem;
+  --fs-hero: clamp(2.6rem, 5.2vw, 4.2rem);
+  --lh-tight: 1.18;
+  --lh-snug: 1.4;
+  --lh-body: 1.72;
+
+  /* Elevation system — resting → hover → raised. A single tasteful ladder so
+     surfaces feel layered, not flat. (--shadow kept below as a back-compat alias.) */
+  --elev-1: 0 2px 10px rgba(91, 82, 73, .06), 0 1px 3px rgba(91, 82, 73, .05);
+  --elev-2: 0 16px 40px rgba(91, 82, 73, .11), 0 5px 14px rgba(151, 169, 186, .08);
+  --elev-3: 0 30px 66px rgba(91, 82, 73, .17), 0 12px 30px rgba(151, 169, 186, .12);
+
+  /* Focus ring — one soft, accessible halo reused everywhere. */
+  --ring: 0 0 0 3px rgba(143, 163, 148, .32);
+
   font-family: var(--font-body);
   font-size: 1.0625rem; /* 17px - slightly larger for readability */
   line-height: 1.7;
@@ -225,12 +248,81 @@ body.is-admin .nav a[data-admin-nav="true"] { display: revert; }
 button:focus-visible,
 .button:focus-visible,
 .nav a:focus-visible,
+a:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
-select:focus-visible {
+select:focus-visible,
+[tabindex]:focus-visible {
   outline: 2px solid rgba(143, 163, 148, .78);
   outline-offset: 3px;
+  border-radius: var(--radius);
 }
+
+/* ════════════════════════════════════════════════════════════════════
+   Artist-level craft — shared micro-details every page inherits.
+   Scrollbars, selection on dark, placeholders, prose links, dividers,
+   skeletons, and a resting→hover elevation lift for surfaces.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* Custom scrollbar — thin, morandi, unobtrusive (Firefox + WebKit). */
+html { scrollbar-width: thin; scrollbar-color: rgba(143, 163, 148, .42) transparent; }
+::-webkit-scrollbar { width: 11px; height: 11px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(143, 163, 148, .32);
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+  transition: background .25s ease;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(143, 163, 148, .52); background-clip: padding-box; }
+body.dark-star { scrollbar-color: rgba(163, 153, 143, .40) transparent; }
+body.dark-star ::-webkit-scrollbar-thumb { background: rgba(163, 153, 143, .30); background-clip: padding-box; }
+body.dark-star ::-webkit-scrollbar-thumb:hover { background: rgba(163, 153, 143, .50); background-clip: padding-box; }
+
+/* Placeholders — quieter than body text, never shouting. */
+::placeholder { color: var(--faint); opacity: 1; }
+
+/* Prose links — a slow underline that grows on hover, like ink settling. */
+.prose a,
+a.link {
+  color: var(--ink);
+  background-image: linear-gradient(var(--accent-sage), var(--accent-sage));
+  background-size: 0% 1.5px;
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  transition: background-size .32s var(--ease-flow), color .2s ease;
+}
+.prose a:hover,
+a.link:hover { background-size: 100% 1.5px; color: var(--accent-sage); }
+
+/* Hairline divider — a gradient line that fades at both ends. */
+.hr,
+.divider {
+  height: 1px;
+  border: 0;
+  margin: var(--gap-lg) 0;
+  background: linear-gradient(90deg, transparent, var(--line-strong) 18%, var(--line-strong) 82%, transparent);
+}
+
+/* Skeleton shimmer — for loading states (add .skeleton to a sized box). */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: rgba(143, 163, 148, .10);
+  border-radius: var(--radius);
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .42), transparent);
+  animation: skeleton-sweep 1.5s var(--ease-flow) infinite;
+}
+body.dark-star .skeleton { background: rgba(163, 153, 143, .12); }
+body.dark-star .skeleton::after { background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .08), transparent); }
+@keyframes skeleton-sweep { to { transform: translateX(100%); } }
 
 .hero {
   min-height: 50vh;
@@ -289,9 +381,17 @@ pre {
     rgba(255, 250, 243, .80);
   border-radius: var(--radius);
   padding: 18px;
-  box-shadow: var(--shadow);
+  box-shadow: var(--elev-1);
   backdrop-filter: blur(18px);
   animation: rise .38s ease both;
+  transition: box-shadow .4s var(--ease-flow), transform .4s var(--ease-flow), border-color .4s var(--ease-flow);
+}
+
+/* Cards lift gently toward the reader on hover — surfaces feel alive, not static. */
+.card:hover {
+  box-shadow: var(--elev-2);
+  border-color: var(--line-strong);
+  transform: translateY(-2px);
 }
 
 .panel::before,
@@ -745,139 +845,10 @@ textarea {
   border: 1px solid var(--line);
 }
 
-/* ── Dark star theme overrides ── */
-body.dark-star {
-  color-scheme: dark;
-  --surface-warm: #1a1a2e;
-  --surface-mist: #16213e;
-  --surface-paper: #1e1e36;
-  --surface-blush: #2a1f2d;
-  --surface-blue: #1a2240;
-  --surface-sage: #1c2a24;
-  --accent-sage: #8fa394;
-  --accent-dusty-blue: #97a9ba;
-  --accent-rose: #bf9698;
-  --accent-lavender: #aaa1b8;
-  --accent-coral: #c89391;
-  --ink: #e8e4df;
-  --text: #e8e4df;
-  --muted: #a8a0a0;
-  --faint: #7a7272;
-  --line: rgba(160, 155, 180, .16);
-  --line-strong: rgba(143, 163, 148, .36);
-  --glow-soft: 0 18px 56px rgba(97, 169, 186, .14), 0 8px 24px rgba(191, 150, 152, .08);
-  --shadow: 0 18px 46px rgba(0, 0, 0, .28);
-  background:
-    linear-gradient(132deg, #1a1a2e 0%, #16213e 50%, #1a1a2e 100%);
-}
-
-body.dark-star::before {
-  background-image:
-    radial-gradient(1px 1px at 10% 20%, rgba(255,255,255,.35), transparent),
-    radial-gradient(1px 1px at 30% 70%, rgba(255,255,255,.25), transparent),
-    radial-gradient(1.5px 1.5px at 50% 10%, rgba(255,255,255,.3), transparent),
-    radial-gradient(1px 1px at 70% 50%, rgba(255,255,255,.2), transparent),
-    radial-gradient(1px 1px at 90% 80%, rgba(255,255,255,.3), transparent),
-    radial-gradient(1.2px 1.2px at 15% 90%, rgba(255,255,255,.25), transparent),
-    radial-gradient(1px 1px at 85% 15%, rgba(255,255,255,.28), transparent),
-    linear-gradient(rgba(255,255,255,.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,.02) 1px, transparent 1px);
-  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 64px 64px, 64px 64px;
-  mask-image: none;
-}
-
-body.dark-star .panel,
-body.dark-star .card {
-  background:
-    linear-gradient(180deg, rgba(30,30,54,.88), rgba(26,26,46,.78)),
-    rgba(30, 30, 54, .82);
-  border-color: rgba(160, 155, 180, .18);
-}
-
-body.dark-star .panel::before,
-body.dark-star .card::before {
-  border-top-color: rgba(255,255,255,.08);
-}
-
-body.dark-star input,
-body.dark-star textarea,
-body.dark-star select {
-  background: rgba(30, 30, 54, .86);
-  border-color: rgba(160, 155, 180, .22);
-  color: var(--text);
-}
-
-body.dark-star input:focus,
-body.dark-star textarea:focus,
-body.dark-star select:focus {
-  background: rgba(30, 30, 54, .96);
-  border-color: rgba(143, 163, 148, .58);
-  box-shadow: 0 0 0 4px rgba(143, 163, 148, .10);
-}
-
-body.dark-star .bubble.user {
-  border-color: rgba(151, 169, 186, .28);
-  background: linear-gradient(180deg, rgba(26, 34, 64, .96), rgba(30, 30, 54, .84));
-}
-
-body.dark-star .bubble.ai {
-  border-color: rgba(143, 163, 148, .28);
-  background: linear-gradient(180deg, rgba(28, 42, 36, .94), rgba(30, 30, 54, .78));
-}
-
-body.dark-star .nav a,
-body.dark-star button,
-body.dark-star .button {
-  background: rgba(30, 30, 54, .72);
-  border-color: rgba(160, 155, 180, .18);
-  color: var(--muted);
-}
-
-body.dark-star .nav a:hover,
-body.dark-star button:hover,
-body.dark-star .button:hover {
-  background: rgba(40, 40, 68, .95);
-  border-color: rgba(143, 163, 148, .36);
-  color: var(--ink);
-}
-
-body.dark-star .composer {
-  background: linear-gradient(180deg, transparent, rgba(26, 26, 46, .96) 28%);
-}
-
-body.dark-star .pill {
-  background: rgba(143, 163, 148, .18);
-  border-color: rgba(143, 163, 148, .22);
-  color: var(--muted);
-}
-
-body.dark-star .letter-paper {
-  background:
-    linear-gradient(90deg, rgba(28,42,36,.24), transparent 20%),
-    linear-gradient(180deg, rgba(30,30,54,.72), rgba(26,26,46,.62)),
-    var(--surface-paper);
-}
-
-body.dark-star .toast {
-  background: rgba(30, 30, 54, .96);
-  border-color: rgba(143, 163, 148, .36);
-}
-
-body.dark-star .starfield {
-  background:
-    linear-gradient(135deg, rgba(26,26,46,.94), rgba(22,33,62,.28) 45%),
-    linear-gradient(35deg, rgba(42,31,45,.52), rgba(26,34,64,.58));
-}
-
-body.dark-star .segmented button.active {
-  background: rgba(143, 163, 148, .22);
-  border-color: rgba(143, 163, 148, .42);
-}
-
-body.dark-star .soft-stage {
-  background: rgba(30, 30, 54, .48);
-  border-color: rgba(160, 155, 180, .18);
-}
+/* Dark theme lives in ONE consolidated warm block below ("Warm Dark Theme").
+   The earlier cool/navy override was removed: its tokens, background and ::before
+   were fully shadowed by the warm block, while its element rules were leaking
+   navy backgrounds into the warm theme (the dark-mode Frankenstein). */
 
 /* ── Extra layout utilities ── */
 .flex-center { display: flex; align-items: center; justify-content: center; }
@@ -998,11 +969,12 @@ body.dark-star .soft-stage {
   position: fixed;
   inset: 0;
   z-index: 20;
-  background: rgba(0,0,0,.48);
+  background: rgba(48, 42, 36, .42);
+  backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
   justify-content: center;
-  animation: fade-in .24s ease;
+  animation: fade-in .28s var(--ease-flow);
 }
 .modal-overlay.hidden { display: none; }
 .modal-box {
@@ -1011,10 +983,14 @@ body.dark-star .soft-stage {
   overflow-y: auto;
   background: var(--surface-paper);
   border: 1px solid var(--line);
-  border-radius: var(--radius-flow);
-  padding: 24px;
-  box-shadow: var(--shadow);
-  animation: rise .32s ease;
+  border-radius: var(--radius-modal);
+  padding: 26px;
+  box-shadow: var(--elev-3);
+  animation: modal-bloom .42s var(--ease-bloom) both;
+}
+@keyframes modal-bloom {
+  from { opacity: 0; transform: translateY(10px) scale(.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 /* ── Drawer ── */
@@ -1703,6 +1679,7 @@ body.dark-star .guidance-tip {
 
 /* ── Warm Dark Theme (activates at sunset) ── */
 body.dark-star {
+  color-scheme: dark;
   --surface-warm: #2a2622;
   --surface-mist: #25211d;
   --surface-paper: #1e1b18;
@@ -1800,6 +1777,61 @@ body.dark-star .modal-box {
 body.dark-star .toast {
   background: rgba(42, 38, 34, .96);
   box-shadow: 0 12px 34px rgba(0, 0, 0, .38);
+}
+
+/* Element rules carried over from the removed navy block, rebased onto the
+   warm palette so the dark theme is internally consistent (no navy leakage). */
+body.dark-star .panel,
+body.dark-star .card {
+  border-color: rgba(163, 153, 143, .18);
+}
+body.dark-star .panel::before,
+body.dark-star .card::before {
+  border-top-color: rgba(255, 255, 255, .06);
+}
+body.dark-star input,
+body.dark-star textarea,
+body.dark-star select {
+  border-color: rgba(163, 153, 143, .22);
+}
+body.dark-star input:focus,
+body.dark-star textarea:focus,
+body.dark-star select:focus {
+  background: rgba(30, 27, 24, .92);
+  border-color: rgba(122, 142, 127, .58);
+  box-shadow: 0 0 0 4px rgba(122, 142, 127, .14);
+}
+/* Some chat surfaces tag the agent bubble .ai rather than .aurora — keep parity. */
+body.dark-star .bubble.ai {
+  background: rgba(34, 36, 40, .72);
+  border-color: rgba(134, 152, 169, .38);
+}
+body.dark-star .composer {
+  background: linear-gradient(180deg, transparent, rgba(37, 33, 29, .96) 28%);
+}
+body.dark-star .pill {
+  background: rgba(122, 142, 127, .18);
+  border-color: rgba(122, 142, 127, .24);
+  color: var(--muted);
+}
+body.dark-star .letter-paper {
+  background:
+    linear-gradient(90deg, rgba(33, 36, 33, .26), transparent 20%),
+    linear-gradient(180deg, rgba(42, 38, 34, .74), rgba(37, 33, 29, .64)),
+    var(--surface-paper);
+}
+body.dark-star .starfield {
+  background:
+    linear-gradient(135deg, rgba(37, 33, 29, .94), rgba(34, 36, 40, .30) 45%),
+    linear-gradient(35deg, rgba(42, 31, 37, .50), rgba(34, 36, 40, .58));
+}
+body.dark-star .segmented button.active {
+  background: rgba(122, 142, 127, .22);
+  border-color: rgba(122, 142, 127, .42);
+}
+body.dark-star .soft-stage {
+  background: rgba(42, 38, 34, .50);
+  border-color: rgba(163, 153, 143, .18);
 }
 
 @media (max-width: 920px) {

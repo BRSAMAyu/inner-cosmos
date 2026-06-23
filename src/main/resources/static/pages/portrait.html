@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Aurora 眼中的你 · 内宇宙</title>
+  <link rel="stylesheet" href="/css/app.css">
+  <style>
+    /* ── Aurora 眼中的你 — a calm, readable daily-layer page (暖雾 Morandi). ── */
+    .portrait-hero {
+      position: relative;
+      min-height: 24vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 0 0 32px;
+      background:
+        radial-gradient(ellipse 55% 70% at 28% 25%, rgba(165,179,194,.10), transparent),
+        radial-gradient(ellipse 45% 55% at 72% 35%, rgba(184,194,174,.08), transparent),
+        linear-gradient(180deg, var(--surface-warm) 0%, transparent 100%);
+      overflow: hidden;
+    }
+    .portrait-hero-title {
+      font-family: var(--font-hero);
+      font-size: clamp(2rem, 4.2vw, 3rem);
+      color: var(--ink);
+      margin: 0 0 10px;
+      letter-spacing: .01em;
+      text-wrap: balance;
+    }
+    .portrait-hero-sub {
+      font-size: .9375rem;
+      color: var(--muted);
+      line-height: 1.75;
+      max-width: 520px;
+      text-wrap: pretty;
+    }
+
+    .portrait-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    .dim-card {
+      background:
+        linear-gradient(180deg, rgba(255,250,243,.66), rgba(247,242,236,.42)),
+        var(--surface-paper);
+      border: 1px solid rgba(255,255,255,.20);
+      border-radius: var(--radius-card);
+      padding: 20px 22px;
+      box-shadow: var(--elev-1);
+      opacity: 0;
+      transform: translateY(12px);
+      animation: dim-reveal 600ms var(--ease-bloom) forwards;
+      transition: box-shadow .4s var(--ease-flow), translate .4s var(--ease-flow), border-color .4s var(--ease-flow);
+    }
+    @keyframes dim-reveal { to { opacity: 1; transform: translateY(0); } }
+    /* `translate` composes past the dim-reveal entry animation (which pins `transform`). */
+    .dim-card:hover { box-shadow: var(--elev-2); border-color: var(--line-strong); translate: 0 -2px; }
+    .dim-card.calibrated { border-color: rgba(143,163,148,.34); }
+
+    .dim-card-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .dim-name { font-size: 1rem; font-weight: 500; color: var(--ink); }
+    .dim-conf {
+      font-size: .75rem;
+      color: var(--faint);
+      white-space: nowrap;
+    }
+    .dim-conf-bar {
+      height: 4px;
+      border-radius: 2px;
+      background: rgba(160,155,180,.16);
+      overflow: hidden;
+      margin: 0 0 12px;
+    }
+    .dim-conf-fill {
+      height: 100%;
+      border-radius: 2px;
+      background: linear-gradient(90deg, rgba(184,194,174,.85), rgba(165,179,194,.85));
+      width: 0;
+      transition: width 700ms var(--ease-bloom);
+    }
+    .dim-value {
+      color: var(--ink);
+      font-size: .9375rem;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      margin-bottom: 12px;
+    }
+    .dim-foot {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      border-top: 1px solid var(--line);
+      padding-top: 10px;
+    }
+    .dim-updated { font-size: .75rem; color: var(--faint); }
+    .dim-actions { display: flex; gap: 14px; }
+    .dim-link {
+      background: none; border: none; cursor: pointer; padding: 0;
+      font-size: .8125rem; color: var(--muted);
+      border-bottom: 1px dashed rgba(140,135,160,.4);
+      transition: color 200ms ease;
+    }
+    .dim-link:hover { color: var(--ink); }
+    .dim-note {
+      margin-top: 10px;
+      font-size: .8125rem;
+      color: #6f8a72;
+      opacity: 0;
+      animation: dim-reveal 400ms ease forwards;
+    }
+    .dim-history {
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px dashed var(--line);
+      font-size: .8125rem;
+      color: var(--muted);
+      display: none;
+    }
+    .dim-history.open { display: block; }
+    .dim-history-row { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; }
+    .dim-history-row .muted { color: var(--faint); white-space: nowrap; }
+
+    .portrait-empty {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 64px 24px;
+      color: var(--faint);
+    }
+    .portrait-empty-icon { font-size: 2.2rem; margin-bottom: 14px; opacity: .35; }
+
+    /* ── Dark (star) mode ── */
+    body.dark-star .dim-card {
+      background:
+        linear-gradient(180deg, rgba(42,38,34,.68), rgba(37,33,29,.48)),
+        rgba(42,38,34,.40);
+      border-color: rgba(163,153,143,.10);
+      box-shadow: 0 2px 8px rgba(0,0,0,.08), 0 8px 28px rgba(0,0,0,.16);
+    }
+    body.dark-star .dim-note { color: #9bbb9f; }
+
+    /* ── Calibration overlay ── */
+    .cal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(20,17,14,.46);
+      backdrop-filter: blur(8px);
+      display: none; align-items: flex-end; justify-content: center;
+      z-index: 90; opacity: 0;
+      transition: opacity 320ms var(--ease-flow);
+    }
+    .cal-overlay.open { display: flex; opacity: 1; }
+    .cal-sheet {
+      width: min(560px, 100%);
+      background:
+        linear-gradient(180deg, rgba(255,250,243,.95), rgba(247,242,236,.93)),
+        var(--surface-paper);
+      border-radius: var(--radius-card) var(--radius-card) 0 0;
+      box-shadow: 0 -8px 48px rgba(0,0,0,.18);
+      padding: 24px 26px 26px;
+      transform: translateY(24px);
+      transition: transform 420ms var(--ease-bloom);
+    }
+    .cal-overlay.open .cal-sheet { transform: translateY(0); }
+    .cal-sheet h2 { font-family: var(--font-hero); font-size: 1.25rem; color: var(--ink); margin: 0 0 6px; }
+    .cal-sheet .cal-was { font-size: .8125rem; color: var(--muted); line-height: 1.6; margin: 0 0 14px; }
+    .cal-sheet textarea {
+      width: 100%; min-height: 96px; resize: vertical;
+      border: 1px solid var(--line); border-radius: 12px;
+      padding: 12px 14px; font: inherit; color: var(--ink);
+      background: var(--surface-warm); line-height: 1.7;
+    }
+    .cal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+    .cal-btn {
+      border: none; cursor: pointer; border-radius: 999px;
+      padding: 9px 20px; font: inherit; font-size: .875rem;
+    }
+    .cal-btn.ghost { background: none; color: var(--muted); }
+    .cal-btn.save {
+      background: linear-gradient(180deg, rgba(143,163,148,.9), rgba(122,142,127,.9));
+      color: #fff;
+    }
+    .cal-btn.save:disabled { opacity: .5; cursor: default; }
+    body.dark-star .cal-sheet {
+      background: linear-gradient(180deg, rgba(42,38,34,.96), rgba(37,33,29,.94)), rgba(42,38,34,.6);
+    }
+
+    @media (max-width: 640px) {
+      .portrait-hero { min-height: 20vh; padding-bottom: 24px; }
+      .portrait-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<main id="ic-main" class="shell">
+  <a class="skip-link ic-skip-link" href="#ic-main">跳到主内容</a>
+  <div class="topbar" data-topbar></div>
+
+  <section class="portrait-hero">
+    <span class="route-hint">Aurora · 自我之镜</span>
+    <h1 class="portrait-hero-title">Aurora 眼中的你</h1>
+    <p class="portrait-hero-sub">这是 Aurora 一点点观察后，对你形成的理解。它不一定都对——你可以在任何一条上告诉它「这不太是我」，补上你自己的看法。Aurora 会把你的声音和它的观察并在一起，慢慢更懂你。</p>
+  </section>
+
+  <section id="dimGrid" class="portrait-grid"></section>
+</main>
+
+<!-- Calibration overlay -->
+<div id="calOverlay" class="cal-overlay" role="dialog" aria-modal="true" aria-labelledby="calTitle">
+  <div class="cal-sheet">
+    <h2 id="calTitle">补充你自己的看法</h2>
+    <p class="cal-was" id="calWas"></p>
+    <textarea id="calInput" maxlength="280" placeholder="比如：我其实不是外向，只是在熟人面前才放得开…"></textarea>
+    <div class="cal-actions">
+      <button class="cal-btn ghost" id="calCancel" type="button">先不</button>
+      <button class="cal-btn save" id="calSave" type="button">告诉 Aurora</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/app.js?v=final-20260612"></script>
+<script src="/js/time-system.js?v=final-20260612"></script>
+<script src="/js/motion.js"></script>
+<script src="/js/weather-system.js"></script>
+<script src="/js/audio-system.js"></script>
+<script src="/js/api.js"></script>
+<script>
+IC.mountShell("画像");
+IC.ensureDemoLogin().then(load);
+
+function esc(text) { return IC.esc(text); }
+
+/* Friendly Chinese names for the portrait dimension codes. Unknown dims fall back
+   to the raw code so nothing is hidden. */
+var DIM_LABELS = {
+  EMOTION_PATTERN: "情绪底色",
+  CURRENT_STATE: "近期状态",
+  ENERGY_RHYTHM: "精力节律",
+  SOCIAL_STYLE: "与人相处",
+  VALUES: "在意的事",
+  INTEREST: "兴趣所在",
+  COMMUNICATION_STYLE: "表达方式",
+  COPING_STYLE: "面对压力的方式",
+  SELF_NARRATIVE: "自我叙事",
+  GROWTH_FOCUS: "成长方向"
+};
+
+function dimLabel(dim) {
+  return DIM_LABELS[dim] || dim;
+}
+
+/* valueJson may be plain text or a JSON value — render it readably either way. */
+function readableValue(valueJson) {
+  if (valueJson == null || valueJson === "") return "";
+  var s = String(valueJson).trim();
+  try {
+    var parsed = JSON.parse(s);
+    if (typeof parsed === "string") return parsed;
+    if (Array.isArray(parsed)) return parsed.map(function(x) {
+      return (x && typeof x === "object") ? (x.value || x.label || JSON.stringify(x)) : String(x);
+    }).join("、");
+    if (parsed && typeof parsed === "object") {
+      return (parsed.value || parsed.summary || parsed.label || Object.values(parsed).join("、"));
+    }
+    return String(parsed);
+  } catch (e) {
+    return s;
+  }
+}
+
+async function load() {
+  var res = await API.portrait();
+  var grid = document.getElementById("dimGrid");
+  var dims = (res && res.success ? res.data : []) || [];
+  // Surface the most confident dimensions first — that's what Aurora leans on most.
+  dims = dims.filter(function(d) { return d && d.dim; });
+  dims.sort(function(a, b) { return (b.confidence || 0) - (a.confidence || 0); });
+
+  if (!dims.length) {
+    grid.innerHTML =
+      '<div class="portrait-empty">' +
+        '<div class="portrait-empty-icon">◌</div>' +
+        IC.empty("Aurora 还没有形成对你的理解。多和它聊聊，这里会慢慢长出你的轮廓。") +
+      '</div>';
+    IC.hideLoading();
+    return;
+  }
+
+  grid.innerHTML = dims.map(function(d, idx) {
+    var delay = Math.min(idx * 60, 480);
+    var conf = Math.max(0, Math.min(1, d.confidence || 0));
+    var value = readableValue(d.valueJson);
+    return '<article class="dim-card" data-dim="' + esc(d.dim) + '" data-value="' + esc(value) +
+        '" style="animation-delay:' + delay + 'ms">' +
+      '<div class="dim-card-head">' +
+        '<span class="dim-name">' + esc(dimLabel(d.dim)) + '</span>' +
+        '<span class="dim-conf">把握 ' + Math.round(conf * 100) + '%</span>' +
+      '</div>' +
+      '<div class="dim-conf-bar"><div class="dim-conf-fill" data-w="' + Math.round(conf * 100) + '"></div></div>' +
+      '<p class="dim-value">' + (value ? esc(value) : '<span class="muted">还很模糊</span>') + '</p>' +
+      '<div class="dim-foot">' +
+        '<span class="dim-updated">' + (d.updatedAt ? ("更新于 " + IC.formatTime(d.updatedAt)) : "") + '</span>' +
+        '<div class="dim-actions">' +
+          '<button class="dim-link" data-act="history">看它怎么变的</button>' +
+          '<button class="dim-link" data-act="calibrate">这不太是我</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="dim-history" data-history></div>' +
+    '</article>';
+  }).join("");
+
+  // Animate confidence bars in after layout.
+  requestAnimationFrame(function() {
+    grid.querySelectorAll(".dim-conf-fill").forEach(function(el) {
+      el.style.width = el.getAttribute("data-w") + "%";
+    });
+  });
+
+  grid.querySelectorAll(".dim-card").forEach(function(card) {
+    var dim = card.getAttribute("data-dim");
+    var value = card.getAttribute("data-value");
+    card.querySelector('[data-act="calibrate"]').addEventListener("click", function() {
+      openCalibration(dim, value);
+    });
+    card.querySelector('[data-act="history"]').addEventListener("click", function() {
+      toggleHistory(card, dim);
+    });
+  });
+
+  IC.hideLoading();
+}
+
+async function toggleHistory(card, dim) {
+  var box = card.querySelector("[data-history]");
+  if (box.classList.contains("open")) { box.classList.remove("open"); return; }
+  box.classList.add("open");
+  if (box.getAttribute("data-loaded")) return;
+  box.innerHTML = '<div class="muted">正在回看…</div>';
+  var res = await API.portraitHistory(dim);
+  box.setAttribute("data-loaded", "1");
+  var rows = (res && res.success ? res.data : []) || [];
+  if (!rows.length) { box.innerHTML = '<div class="muted">这一面还没有变化记录。</div>'; return; }
+  box.innerHTML = rows.map(function(h) {
+    return '<div class="dim-history-row">' +
+      '<span>' + esc(readableValue(h.valueJson) || "—") + '</span>' +
+      '<span class="muted">' + (h.recordedAt ? IC.formatTime(h.recordedAt) : "") + '</span>' +
+    '</div>';
+  }).join("");
+}
+
+/* ── Calibration overlay ── */
+var calDim = null, calOldValue = "";
+
+function openCalibration(dim, currentValue) {
+  calDim = dim;
+  calOldValue = currentValue || "";
+  document.getElementById("calTitle").textContent = "关于「" + dimLabel(dim) + "」";
+  document.getElementById("calWas").textContent = calOldValue
+    ? ("Aurora 现在的理解是：" + calOldValue)
+    : "Aurora 对这一面还很模糊。";
+  var input = document.getElementById("calInput");
+  input.value = "";
+  document.getElementById("calOverlay").classList.add("open");
+  setTimeout(function() { input.focus(); }, 80);
+}
+
+function closeCalibration() {
+  document.getElementById("calOverlay").classList.remove("open");
+  calDim = null;
+}
+
+async function saveCalibration() {
+  var input = document.getElementById("calInput");
+  var view = input.value.trim();
+  if (!view || !calDim) { closeCalibration(); return; }
+  var saveBtn = document.getElementById("calSave");
+  saveBtn.disabled = true;
+  var res = await API.auroraCorrect(view, calOldValue, null, { targetType: "PORTRAIT_DIM", fieldName: calDim });
+  saveBtn.disabled = false;
+  if (!res || !res.success) {
+    IC.toast("没能存下，待会儿再试一次。", "warn");
+    return;
+  }
+  var card = document.querySelector('.dim-card[data-dim="' + cssEscape(calDim) + '"]');
+  if (card) {
+    card.classList.add("calibrated");
+    if (!card.querySelector(".dim-note")) {
+      var note = document.createElement("div");
+      note.className = "dim-note";
+      note.textContent = "✓ Aurora 会把你的看法和它的观察并在一起。";
+      card.appendChild(note);
+    }
+  }
+  closeCalibration();
+  IC.toast("记下了。我会带着你这份看法继续理解你。", "success");
+}
+
+function cssEscape(s) {
+  return String(s).replace(/["\\]/g, "\\$&");
+}
+
+document.getElementById("calCancel").addEventListener("click", closeCalibration);
+document.getElementById("calSave").addEventListener("click", saveCalibration);
+document.getElementById("calOverlay").addEventListener("click", function(e) {
+  if (e.target === this) closeCalibration();
+});
+document.addEventListener("keydown", function(e) { if (e.key === "Escape") closeCalibration(); });
+</script>
+</body>
+</html>
