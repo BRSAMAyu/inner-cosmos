@@ -12,6 +12,7 @@ import com.innercosmos.entity.UserProfile;
 import com.innercosmos.mapper.DialogMessageMapper;
 import com.innercosmos.mapper.UserProfileMapper;
 import com.innercosmos.service.AuroraAgentService;
+import com.innercosmos.service.DialogService;
 import com.innercosmos.service.EmotionInsightService;
 import com.innercosmos.service.MemoryService;
 import com.innercosmos.service.MemorySettlementService;
@@ -46,6 +47,7 @@ public class AuroraChatController extends BaseController {
     private final DialogMessageMapper dialogMessageMapper;
     private final EmotionInsightService emotionInsightService;
     private final UserProfileMapper userProfileMapper;
+    private final DialogService dialogService;
 
     public AuroraChatController(AuroraAgentService auroraAgentService,
                                 MemoryService memoryService,
@@ -55,7 +57,8 @@ public class AuroraChatController extends BaseController {
                                 UserTriggeredSelfReflection selfReflection,
                                 DialogMessageMapper dialogMessageMapper,
                                 EmotionInsightService emotionInsightService,
-                                UserProfileMapper userProfileMapper) {
+                                UserProfileMapper userProfileMapper,
+                                DialogService dialogService) {
         this.auroraAgentService = auroraAgentService;
         this.memoryService = memoryService;
         this.memorySettlementService = memorySettlementService;
@@ -65,11 +68,13 @@ public class AuroraChatController extends BaseController {
         this.dialogMessageMapper = dialogMessageMapper;
         this.emotionInsightService = emotionInsightService;
         this.userProfileMapper = userProfileMapper;
+        this.dialogService = dialogService;
     }
 
     @PostMapping("/message")
     public ApiResponse<Map<String, Object>> message(@Valid @RequestBody ChatRequest request, HttpSession session) {
         Long userId = currentUserId(session);
+        assertOwnsSession(userId, request.sessionId); // M-001: block cross-user session access
 
         // M4: Route self-reflection questions to UserTriggeredSelfReflection
         if (isSelfReflectionQuestion(request.message)) {
@@ -83,7 +88,9 @@ public class AuroraChatController extends BaseController {
 
     @PostMapping("/message-rich")
     public ApiResponse<AuroraReplyVO> messageRich(@Valid @RequestBody ChatRequest request, HttpSession session) {
-        return ApiResponse.ok(auroraAgentService.replyRich(currentUserId(session), request));
+        Long userId = currentUserId(session);
+        assertOwnsSession(userId, request.sessionId); // M-001
+        return ApiResponse.ok(auroraAgentService.replyRich(userId, request));
     }
 
     /**
@@ -106,21 +113,25 @@ public class AuroraChatController extends BaseController {
                              @RequestParam(required = false) String token,
                              HttpSession session) {
         Long userId = currentUserId(session);
+        assertOwnsSession(userId, sessionId); // M-001
         ChatRequest staged = auroraAgentService.consumeStage(token);
         return auroraAgentService.stream(userId, sessionId, message, mode, staged);
     }
 
     @PostMapping("/greeting")
     public ApiResponse<AuroraReplyVO> greeting(@RequestBody Map<String, Object> body, HttpSession session) {
+        Long userId = currentUserId(session);
         Object rawSessionId = body.get("sessionId");
         Long sessionId = rawSessionId == null ? null : Long.valueOf(rawSessionId.toString());
+        assertOwnsSession(userId, sessionId); // M-001 (no-op when sessionId is null)
         String mode = body.get("mode") == null ? "DAILY_TALK" : body.get("mode").toString();
-        return ApiResponse.ok(auroraAgentService.generateGreeting(currentUserId(session), sessionId, mode));
+        return ApiResponse.ok(auroraAgentService.generateGreeting(userId, sessionId, mode));
     }
 
     @PostMapping("/settle")
     public ApiResponse<DailyRecordVO> settleSession(@RequestParam Long sessionId, HttpSession session) {
         Long userId = currentUserId(session);
+        assertOwnsSession(userId, sessionId); // M-001
         memorySettlementService.settleSession(userId, sessionId);
         return ApiResponse.ok(memoryService.latestDailyRecord(userId));
     }
@@ -212,6 +223,14 @@ public class AuroraChatController extends BaseController {
         String provider = body == null ? null : body.get("provider");
         modelRouter.setSessionPreference(sessionId, provider);
         return ApiResponse.ok(true);
+    }
+
+    /** M-001: assert the caller owns the dialog session. Null-safe (greeting may send no session). */
+    private void assertOwnsSession(Long userId, Long sessionId) {
+        if (sessionId == null) {
+            return;
+        }
+        dialogService.verifyOwnership(userId, sessionId);
     }
 
     // M4: Self-reflection question detection
