@@ -8,6 +8,16 @@ server:
   port: ${SERVER_PORT:8080}
   # Graceful shutdown: wait 30s for in-flight requests
   shutdown: graceful
+  servlet:
+    session:
+      cookie:
+        http-only: true
+        # M-018: SameSite=Lax is the primary CSRF defense — it stops the browser from sending
+        # the session cookie on cross-site POSTs, without needing a CSRF token (which would
+        # require .with(csrf()) across ~76 MockMvc test sites + FE token wiring). Full token
+        # CSRF is a follow-up for fresh context.
+        same-site: lax
+        secure: ${COOKIE_SECURE:false}  # set COOKIE_SECURE=true behind HTTPS (prod)
   tomcat:
     threads:
       max: 200
