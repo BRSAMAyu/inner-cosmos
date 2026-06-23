@@ -239,19 +239,20 @@ IC.ensureDemoLogin().then(load);
 
 function esc(text) { return IC.esc(text); }
 
-/* Friendly Chinese names for the portrait dimension codes. Unknown dims fall back
-   to the raw code so nothing is hidden. */
+/* Friendly Chinese names for the portrait dimension codes. These keys MUST stay
+   in sync with the 10 dims the reflection writes (PortraitReflectionService) —
+   unknown dims fall back to the raw code so nothing is hidden. */
 var DIM_LABELS = {
-  EMOTION_PATTERN: "情绪底色",
-  CURRENT_STATE: "近期状态",
-  ENERGY_RHYTHM: "精力节律",
-  SOCIAL_STYLE: "与人相处",
+  INNER_DRIVE: "内驱力",
   VALUES: "在意的事",
-  INTEREST: "兴趣所在",
-  COMMUNICATION_STYLE: "表达方式",
-  COPING_STYLE: "面对压力的方式",
   SELF_NARRATIVE: "自我叙事",
-  GROWTH_FOCUS: "成长方向"
+  COMMUNICATION_STYLE: "表达方式",
+  ABSTRACT_VS_CONCRETE: "抽象与具体",
+  EMOTION_PATTERN: "情绪底色",
+  ENERGY_RHYTHM: "精力节律",
+  CURRENT_STATE: "近期状态",
+  RELATIONSHIP_CONTEXT: "关系处境",
+  AGENCY_BOUNDARY: "自主边界"
 };
 
 function dimLabel(dim) {

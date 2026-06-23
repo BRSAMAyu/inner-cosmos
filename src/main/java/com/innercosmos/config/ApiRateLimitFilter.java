@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -34,6 +35,15 @@ public class ApiRateLimitFilter implements Filter {
 
     private final Map<String, BucketEntry> userBuckets = new ConcurrentHashMap<>();
     private final Bucket anonBucket;
+
+    /**
+     * M-019: Only trust the X-Forwarded-For header when a trusted reverse proxy is
+     * actually fronting the app. Default false — otherwise an attacker rotating the
+     * XFF header gets a fresh login bucket per fake IP. When false, clientIp() falls
+     * back to the servlet container's req.getRemoteAddr().
+     */
+    @Value("${inner-cosmos.security.trusted-proxy-enabled:false}")
+    private boolean trustedProxyConfigured;
 
     public ApiRateLimitFilter() {
         this.anonBucket = Bucket.builder()
@@ -151,9 +161,13 @@ public class ApiRateLimitFilter implements Filter {
         return entry.bucket;
     }
 
-    private static String clientIp(HttpServletRequest req) {
-        String xff = req.getHeader("X-Forwarded-For");
-        if (xff != null && !xff.isBlank()) return xff.split(",")[0].trim();
+    private String clientIp(HttpServletRequest req) {
+        // M-019: only honor X-Forwarded-For when a trusted proxy is configured; otherwise
+        // return the raw remote address so attackers can't spoof fresh buckets.
+        if (trustedProxyConfigured) {
+            String xff = req.getHeader("X-Forwarded-For");
+            if (xff != null && !xff.isBlank()) return xff.split(",")[0].trim();
+        }
         return req.getRemoteAddr();
     }
 
