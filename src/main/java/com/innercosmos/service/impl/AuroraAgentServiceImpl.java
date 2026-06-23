@@ -84,6 +84,8 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     @Autowired(required = false)
     private com.innercosmos.service.UserCorrectionService userCorrectionService;
     @Autowired(required = false)
+    private com.innercosmos.service.PromptVersionService promptVersionService; // M-052
+    @Autowired(required = false)
     private com.innercosmos.service.EmotionBaselineService emotionBaselineService;
     private final Map<Long, Integer> turnCounter = new ConcurrentHashMap<>();
     private final Map<Long, Integer> goodbyeConfirmCount = new ConcurrentHashMap<>();
@@ -207,7 +209,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         String stateSignal = currentStateSignal(request.message);
         com.innercosmos.ai.semantic.EmotionBaseline baseline = safeBaseline(userId);
 
-        String prompt = new PromptBuilder()
+        String prompt = new PromptBuilder().withPromptVersionService(promptVersionService)
                 .withSystemBoundary()
                 .withConversationMode(mode)
                 .withModeSegment(modeStrategy)
@@ -511,7 +513,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         String timeLabel = timeLabel();
         ModeStrategy modeStrategy = modeRegistry.get(normalizedMode);
 
-        String prompt = new PromptBuilder()
+        String prompt = new PromptBuilder().withPromptVersionService(promptVersionService)
                 .withSystemBoundary()
                 .withConversationMode(normalizedMode)
                 .withModeSegment(modeStrategy)
