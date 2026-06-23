@@ -172,7 +172,8 @@ public class UserServiceImpl implements UserService {
     public void changePassword(Long userId, String oldPassword, String newPassword) {
         // M-032: change the current user's password, requiring the old one.
         User user = userMapper.selectById(userId);
-        if (user == null || !passwordEncoder.matches(oldPassword, user.passwordHash)) {
+        if (user == null || oldPassword == null || oldPassword.isBlank()
+                || !passwordEncoder.matches(oldPassword, user.passwordHash)) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED, "原密码不正确");
         }
         if (newPassword == null || newPassword.length() < 8) {

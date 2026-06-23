@@ -28,6 +28,18 @@ public class PlazaController extends BaseController {
 
     @GetMapping("/matches")
     public ApiResponse<List<Map<String, Object>>> matches(HttpSession session) {
-        return ApiResponse.ok(capsuleService.matchedCapsules(currentUserId(session)));
+        // M-004: project each capsule to a public-safe VO at the egress boundary (the service
+        // keeps the full entity internally for scoring/sorting; only the response is projected).
+        List<Map<String, Object>> items = capsuleService.matchedCapsules(currentUserId(session));
+        List<Map<String, Object>> safe = new java.util.ArrayList<>();
+        for (Map<String, Object> item : items) {
+            Map<String, Object> copy = new java.util.LinkedHashMap<>(item);
+            Object c = item.get("capsule");
+            if (c instanceof EchoCapsule ec) {
+                copy.put("capsule", EchoCapsuleVO.fromPublic(ec));
+            }
+            safe.add(copy);
+        }
+        return ApiResponse.ok(safe);
     }
 }

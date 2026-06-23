@@ -280,8 +280,6 @@ class PersonaChatServiceImplQuotaTest {
         when(capsuleMapper.selectById(capsuleId)).thenReturn(capsule);
         mockQuotaReservedViaUpdate();
 
-        when(agentContextAssembler.assemble(any(), any(), any(), anyBoolean()))
-                .thenReturn(new AgentContext());
         when(structuredAiService.call(any(), any(), any(), any(), any(), any()))
                 .thenReturn(aiResult("回声回应"));
         when(boundaryMapper.selectOne(any())).thenReturn(null);
@@ -320,8 +318,6 @@ class PersonaChatServiceImplQuotaTest {
         when(capsuleMapper.selectById(capsuleId)).thenReturn(capsule);
         mockQuotaReservedViaInsert(); // UPDATE returns 0 (no row), INSERT succeeds
 
-        when(agentContextAssembler.assemble(any(), any(), any(), anyBoolean()))
-                .thenReturn(new AgentContext());
         when(structuredAiService.call(any(), any(), any(), any(), any(), any()))
                 .thenReturn(aiResult("新的回声"));
         when(boundaryMapper.selectOne(any())).thenReturn(null);
@@ -397,8 +393,6 @@ class PersonaChatServiceImplQuotaTest {
         when(capsuleMapper.selectById(capsuleId)).thenReturn(capsule);
         mockQuotaReservedViaUpdate(); // below limit this time
 
-        when(agentContextAssembler.assemble(any(), any(), any(), anyBoolean()))
-                .thenReturn(new AgentContext());
         when(structuredAiService.call(any(), any(), any(), any(), any(), any()))
                 .thenReturn(aiResult("回声回应"));
         when(boundaryMapper.selectOne(any())).thenReturn(null);

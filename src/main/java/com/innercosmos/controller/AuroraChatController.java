@@ -218,8 +218,8 @@ public class AuroraChatController extends BaseController {
     public ApiResponse<Boolean> setSessionModel(@PathVariable("id") Long sessionId,
                                                 @RequestBody Map<String, String> body,
                                                 HttpSession session) {
-        // session is required only to ensure the caller is logged in.
-        currentUserId(session);
+        Long userId = currentUserId(session);
+        assertOwnsSession(userId, sessionId); // M-024: only the session owner can rebind its model
         String provider = body == null ? null : body.get("provider");
         modelRouter.setSessionPreference(sessionId, provider);
         return ApiResponse.ok(true);
