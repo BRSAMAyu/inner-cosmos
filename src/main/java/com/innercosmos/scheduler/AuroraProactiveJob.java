@@ -8,6 +8,8 @@ import com.innercosmos.entity.UserProfile;
 import com.innercosmos.mapper.PrivateTimerMapper;
 import com.innercosmos.mapper.UserProfileMapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -21,6 +23,8 @@ import java.util.List;
  */
 @Component
 public class AuroraProactiveJob {
+
+    private static final Logger log = LoggerFactory.getLogger(AuroraProactiveJob.class);
 
     @Autowired
     private ProactiveEngine engine;
@@ -49,7 +53,8 @@ public class AuroraProactiveJob {
                     engine.tick(u.id);
                 }
             } catch (Exception e) {
-                // Log and continue with next user
+                // M-043: actually log (was silently swallowed), then continue with the next user.
+                log.warn("Proactive tick failed for user {}: {}", u.id, e.getMessage());
             }
         }
 
@@ -68,9 +73,9 @@ public class AuroraProactiveJob {
                 t.firedAt = LocalDateTime.now();
                 timerMapper.updateById(t);
             } catch (Exception e) {
-                // Mark as fired anyway to prevent repeated attempts
-                t.firedAt = LocalDateTime.now();
-                timerMapper.updateById(t);
+                // M-043: a transient delivery failure should NOT permanently lose the timer —
+                // leave firedAt null so the next tick retries it. Log instead of swallowing.
+                log.warn("Private timer {} delivery failed (will retry next tick): {}", t.id, e.getMessage());
             }
         }
     }
