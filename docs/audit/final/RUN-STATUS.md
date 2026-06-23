@@ -26,6 +26,29 @@ Autonomous run kicked off 2026-06-23 via `/loop 15m keep pushing until the end`.
 Experts 1–4 must NOT see each other's output. Expert 5 sees all four and critically inspects them. Enforced by the workflow's wave structure.
 
 ## Live notes
-- **Audit workflow RUNNING:** Run ID `wf_91785a38-3f5` (task `w1pwjdv9f`). 21 agents across 3 waves. Outputs → `docs/audit/final/01..05-*.md`. Watch: `/workflows`. Resume if interrupted: `Workflow({ scriptPath: ".../inner-cosmos-final-audit-wf_91785a38-3f5.js", resumeFromRunId: "wf_91785a38-3f5" })`.
-- **Vision brief PENDING:** agent for `docs/audit/final/00-vision-brief.md` died on a 529 capacity error before doing any work. RETRY when API capacity frees (Phase-2 prep, not critical path). Alternative: read the vision docs directly during Phase 2.
-- **App booting in background** (`mvn spring-boot:run`, H2) for real-world browser testing. Health check: `curl http://localhost:8080/pages/index.html`. Default login: demo/demo123.
+- **Phase 1 (audit) + Phase 2 (master report) DONE.** Artifacts in `docs/audit/final/` (00 vision, 01–04 experts, 05 critic, MASTER-POLISH-REPORT, runtime-findings). Run ID was `wf_91785a38-3f5`.
+- **Phase 3 (implementation) IN PROGRESS** — following the master report's roadmap. Source of truth for the full list: `MASTER-POLISH-REPORT.md` §3/§7 and `05-critic-synthesis.md` (M-001…M-083).
+
+### Phase 3 progress
+**Done & verified (committed):** Phase 0 safety/workability cluster COMPLETE.
+- `RT-01` — LLM default `dev`/`mock` (chat verified 200). `877a31a`.
+- `M-002` — real crisis hotline numbers + renderable tel links + pinning test. `e67952f`.
+- `M-003` — hard 4s deadline on synchronous safety recheck + deadline-contract test. `c1a9634`.
+- `M-020` — crisis false-negative coverage (means/English/homophone) + test.
+- `M-001` — Aurora IDOR: assert dialog-session ownership on chat endpoints + negative-ownership test. `62629ac`.
+- `M-009` — stopped silent demo auto-login; real front door. `5f48117`.
+- `M-004` — plaza capsules projected to public-safe VO (no internals leak) + structural test. `189f9d0`.
+- `M-005` — persona-chat no longer egresses visitor's private P1 (includeMemory=false). `4166b9d`.
+- `M-006` — PII (phone/email) masked at the LLM egress chokepoint (ABTestLlmClientWrapper) + test. `e7dcda1`.
+- `M-030` — setPreferredModel selects profile by user_id (not wrong PK) + test. `1b57b7b`.
+- `M-023` — capsule boundary now requires ownership (close IDOR). `56953b1`.
+- `M-014` — gravity time-decay wired into the nightly job (starfield ages) + decay test. `cd05364`.
+- `M-011` — 5-turn portrait reflection now persists (closes the RUN-006 no-op). `7a7d6f6`.
+
+**13 fixes done & verified; full suite green (~625 tests, 0 failures).**
+
+**Next priorities:** signature no-ops `M-015` (EmotionTimeline auto-aggregate), `M-017` (corrections durably reshape portrait); data-integrity P0s `M-007` (atomic finish + AFTER_COMMIT listeners), `M-008` (UNIQUE on tb_memory_card); then `M-026` (DISPLAY_ONCE truthful), `M-021` (atomic counter), `M-022` (letter optimistic lock), `M-025` (resilient IC.api). Then remaining P1/P2 hardening (M-010 JWT, M-018 CSRF, M-019 brute-force, M-032/M-033) and the Group-C wow items. **After Phase 3:** 3 experts inspect (P4) → fix (P5) → 2 final agents + browser verify (P6) → END.
+
+**Verification discipline:** targeted `mvn test -Dtest=<class>` per cluster; full `mvn test` at Phase-3 checkpoint. App runtime restart: `mvn spring-boot:run -Dspring-boot.run.fork=false` (fork=false → TaskStop kills it cleanly, no orphan JVMs). Kill stray 8080 holders by PID: `netstat -ano | grep :8080` → `taskkill //F //PID <pid>`.
+
+**Test-tool discipline (Windows):** use `curl -b <jar> -c <jar>` on every call; send non-ASCII bodies from a UTF-8 file via `--data-binary @file` (inline `-d` GBK-encodes Chinese → JsonParseException).
