@@ -240,6 +240,10 @@ public class SafetyReviewService {
      *    workstream (handled semantically by the LLM recheck / fallback, not by this floor).
      */
     private boolean looksLikeGenuineCrisis(String text) {
+        // M-020: English acute-crisis indicators (case-insensitive).
+        String lower = text.toLowerCase(java.util.Locale.ROOT);
+        boolean englishCrisis = lower.contains("kill myself") || lower.contains("end my life")
+                || lower.contains("want to die") || lower.contains("suicide");
         return text.contains("告别这个世界") || text.contains("告别一切")
                 || text.contains("离开这个世界")
                 || text.contains("最后的话")
@@ -250,7 +254,13 @@ public class SafetyReviewService {
                 || text.contains("是个负担") || text.contains("我是负担")
                 || text.contains("拖累大家") || text.contains("了断")
                 || text.contains("想消失")
-                || (text.contains("活下去的意义") && text.contains("没有"));
+                || (text.contains("活下去的意义") && text.contains("没有"))
+                // M-020: lethal means / scene planning (acute-crisis floor).
+                || text.contains("药都准备好了") || text.contains("准备好了药")
+                || text.contains("天台上") || text.contains("站在窗边")
+                || text.contains("写好遗书") || text.contains("烧炭")
+                || text.contains("上吊") || text.contains("跳下去")
+                || englishCrisis;
     }
 
     /**
