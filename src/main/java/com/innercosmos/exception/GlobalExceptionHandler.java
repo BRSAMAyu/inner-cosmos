@@ -31,6 +31,25 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(errorMap("VALIDATION_ERROR", msg, HttpStatus.BAD_REQUEST.value()));
     }
 
+    // M-044/M-076: map Spring MVC exceptions to proper HTTP statuses (was 500 for all of these).
+    @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<Map<String, Object>> handleMethodNotSupported(org.springframework.web.HttpRequestMethodNotSupportedException ex) {
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
+            .body(errorMap("METHOD_NOT_ALLOWED", "请求方法不被支持", HttpStatus.METHOD_NOT_ALLOWED.value()));
+    }
+
+    @ExceptionHandler(org.springframework.web.bind.MissingServletRequestParameterException.class)
+    public ResponseEntity<Map<String, Object>> handleMissingParam(org.springframework.web.bind.MissingServletRequestParameterException ex) {
+        return ResponseEntity.badRequest()
+            .body(errorMap("BAD_REQUEST", "缺少必需的参数: " + ex.getParameterName(), HttpStatus.BAD_REQUEST.value()));
+    }
+
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleNotFound(org.springframework.web.servlet.resource.NoResourceFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+            .body(errorMap("NOT_FOUND", "资源不存在", HttpStatus.NOT_FOUND.value()));
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalArgument(IllegalArgumentException ex) {
         return ResponseEntity.badRequest().body(errorMap("BAD_REQUEST", ex.getMessage(), HttpStatus.BAD_REQUEST.value()));
@@ -60,6 +79,7 @@ public class GlobalExceptionHandler {
 
     private Map<String, Object> errorMap(String code, String message, int status) {
         return Map.of(
+            "success", false,
             "error", code,
             "message", message == null ? "" : message,
             "status", status,
