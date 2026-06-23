@@ -32,25 +32,26 @@ public class LetterDeliveryJob {
 
     @Scheduled(fixedRate = 60000)
     public void deliverArrivedLetters() {
-        QueryWrapper<SlowLetter> query = new QueryWrapper<>();
-        query.eq("status", "SENT")
-                .le("estimated_arrival_at", LocalDateTime.now());
-        List<SlowLetter> letters = letterMapper.selectList(query);
+        java.time.LocalDateTime now = LocalDateTime.now();
+        // M-068: two-stage delivery with a visible FLYING (in-transit) state.
+        // Stage 1: SENT letters whose arrival time has come -> FLYING.
+        QueryWrapper<SlowLetter> sentQuery = new QueryWrapper<>();
+        sentQuery.eq("status", "SENT").le("estimated_arrival_at", now);
+        List<SlowLetter> sentLetters = letterMapper.selectList(sentQuery);
+        int flown = 0;
+        for (SlowLetter letter : sentLetters) {
+            if (advanceWithRetry(letter, "SENT", "FLYING", false)) flown++;
+        }
+        // Stage 2: FLYING letters -> DELIVERED (completes the journey).
+        QueryWrapper<SlowLetter> flyingQuery = new QueryWrapper<>();
+        flyingQuery.eq("status", "FLYING");
+        List<SlowLetter> flyingLetters = letterMapper.selectList(flyingQuery);
         int delivered = 0;
-        int failed = 0;
-        for (SlowLetter letter : letters) {
-            if (advanceWithRetry(letter)) {
-                delivered++;
-            } else {
-                failed++;
-            }
+        for (SlowLetter letter : flyingLetters) {
+            if (advanceWithRetry(letter, "FLYING", "DELIVERED", true)) delivered++;
         }
-        if (delivered > 0) {
-            log.info("Delivered {} of {} letters", delivered, letters.size());
-        }
-        if (failed > 0) {
-            log.warn("Failed to deliver {} of {} letters after {} attempts; will retry on next tick",
-                    failed, letters.size(), MAX_ATTEMPTS);
+        if (flown > 0 || delivered > 0) {
+            log.info("Letters: {} flown (SENT->FLYING), {} delivered (FLYING->DELIVERED)", flown, delivered);
         }
     }
 
@@ -63,28 +64,22 @@ public class LetterDeliveryJob {
      *
      * @return true if the letter reached DELIVERED, false if all attempts failed
      */
-    private boolean advanceWithRetry(SlowLetter letter) {
+    private boolean advanceWithRetry(SlowLetter letter, String fromStatus, String toStatus, boolean setDeliveredAt) {
         for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
             try {
                 SlowLetter fresh = letterMapper.selectById(letter.id);
-                // Only advance a letter that is still SENT — never violate the
-                // state machine by transitioning from another state.
-                if (fresh == null || !"SENT".equals(fresh.status)) {
-                    log.info("Letter {} no longer SENT (state={}); skipping delivery",
-                            letter.id, fresh == null ? "DELETED" : fresh.status);
-                    return true;
+                if (fresh == null || !fromStatus.equals(fresh.status)) {
+                    return true; // already advanced or deleted
                 }
-                fresh.status = "DELIVERED";
-                fresh.deliveredAt = LocalDateTime.now();
+                fresh.status = toStatus;
+                if (setDeliveredAt) fresh.deliveredAt = LocalDateTime.now();
                 letterMapper.updateById(fresh);
-                // M-077: write the audit-log entry for scheduler-driven delivery so the letter
-                // lifecycle trail is complete (was API-transition-only before).
                 try {
                     LetterStatusLog entry = new LetterStatusLog();
                     entry.letterId = fresh.id;
-                    entry.fromStatus = "SENT";
-                    entry.toStatus = "DELIVERED";
-                    entry.operatorUserId = null; // system / scheduler
+                    entry.fromStatus = fromStatus;
+                    entry.toStatus = toStatus;
+                    entry.operatorUserId = null;
                     entry.reason = "scheduled delivery";
                     logMapper.insert(entry);
                 } catch (Exception logEx) {

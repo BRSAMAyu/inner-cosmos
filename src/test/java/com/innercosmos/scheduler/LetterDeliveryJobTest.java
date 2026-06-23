@@ -71,7 +71,7 @@ class LetterDeliveryJobTest {
 
         job.deliverArrivedLetters();
 
-        verify(letterMapper, times(1)).updateById(any(SlowLetter.class));
+        verify(letterMapper, times(2)).updateById(any(SlowLetter.class)); // M-068: SENT→FLYING + FLYING→DELIVERED
         assertEquals("DELIVERED", letter.status);
     }
 
