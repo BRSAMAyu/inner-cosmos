@@ -441,14 +441,8 @@ function render() {
       "--star-color:" + colors.mid + ";";
     star.dataset.id = s.id;
     star.onclick = (function(id) { return function() { showDetail(id); }; })(s.id);
-    star.onkeydown = (function(id) {
-      return function(e) {
-        if (e.key === "Enter" || e.key === " " || e.key === "Spacebar") {
-          e.preventDefault();
-          showDetail(id);
-        }
-      };
-    })(s.id);
+    // Native <button> already activates onclick on Enter/Space — no separate onkeydown needed
+    // (an explicit handler here double-fires showDetail; Phase-4 inspection P1).
     canvas.appendChild(star);
 
     // Label
