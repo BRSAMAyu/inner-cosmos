@@ -244,6 +244,10 @@ public class SlowLetterServiceImpl implements SlowLetterService {
         if (letter == null) {
             throw new com.innercosmos.exception.BusinessException(com.innercosmos.common.ErrorCode.NOT_FOUND, "信件不存在");
         }
+        // M-078: only a party to the letter (sender or receiver) may report it.
+        if (!userId.equals(letter.senderUserId) && !userId.equals(letter.receiverUserId)) {
+            throw new com.innercosmos.exception.BusinessException(com.innercosmos.common.ErrorCode.UNAUTHORIZED, "无权举报此信件");
+        }
         ReportRecord report = new ReportRecord();
         report.reporterUserId = userId;
         report.targetType = "LETTER";

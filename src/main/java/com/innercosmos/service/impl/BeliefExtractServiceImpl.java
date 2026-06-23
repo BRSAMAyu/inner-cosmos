@@ -106,9 +106,13 @@ public class BeliefExtractServiceImpl implements BeliefExtractService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void recalculateStrength(Long beliefId) {
+    public void recalculateStrength(Long userId, Long beliefId) {
         BeliefPattern belief = beliefPatternMapper.selectById(beliefId);
         if (belief == null) return;
+        // M-078: only the belief's owner may recalculate it.
+        if (!userId.equals(belief.userId)) {
+            throw new com.innercosmos.exception.BusinessException(com.innercosmos.common.ErrorCode.UNAUTHORIZED, "无权操作此信念");
+        }
 
         // Simple strength calculation: based on confirmation count and recency
         double baseStrength = 0.3;
