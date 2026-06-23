@@ -86,7 +86,7 @@ public class CapsuleController extends BaseController {
 
     @GetMapping("/{id}/boundary")
     public ApiResponse<CapsuleBoundary> getBoundary(@PathVariable Long id, HttpSession session) {
-        return ApiResponse.ok(capsuleService.getBoundary(id));
+        return ApiResponse.ok(capsuleService.getBoundary(currentUserId(session), id)); // M-023
     }
 
     @PostMapping("/{id}/boundary")

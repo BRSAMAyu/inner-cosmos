@@ -397,7 +397,13 @@ public class CapsuleServiceImpl implements CapsuleService {
     }
 
     @Override
-    public CapsuleBoundary getBoundary(Long capsuleId) {
+    public CapsuleBoundary getBoundary(Long userId, Long capsuleId) {
+        // M-023: boundary (allowTopics/blockedTopics/visibility) is owner-private config —
+        // verify ownership before returning it.
+        if (getOwnedCapsule(userId, capsuleId) == null) {
+            throw new com.innercosmos.exception.BusinessException(
+                    com.innercosmos.common.ErrorCode.NOT_FOUND, "共鸣体不存在或无权访问");
+        }
         QueryWrapper<CapsuleBoundary> query = new QueryWrapper<>();
         query.eq("capsule_id", capsuleId).last("LIMIT 1");
         return boundaryMapper.selectOne(query);
@@ -410,7 +416,7 @@ public class CapsuleServiceImpl implements CapsuleService {
             throw new com.innercosmos.exception.BusinessException(
                     com.innercosmos.common.ErrorCode.UNAUTHORIZED, "无权操作此共鸣体");
         }
-        CapsuleBoundary existing = getBoundary(capsuleId);
+        CapsuleBoundary existing = getBoundary(userId, capsuleId);
         if (existing == null) {
             throw new com.innercosmos.exception.BusinessException(
                     com.innercosmos.common.ErrorCode.NOT_FOUND, "边界配置不存在");
