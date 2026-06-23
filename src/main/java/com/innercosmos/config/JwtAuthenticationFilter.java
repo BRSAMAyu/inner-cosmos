@@ -35,10 +35,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
 
-        String userIdHeader = request.getHeader("X-User-Id");
-        if (userIdHeader != null && !userIdHeader.isBlank()) {
-            try {
-                Long userId = Long.parseLong(userIdHeader);
+        // M-010: session-based auth is the ONLY mechanism. The X-User-Id header previously
+        // granted full Spring Security auth (incl. ROLE_ADMIN) from an unsigned, client-set
+        // header — a latent risk the moment any @PreAuthorize is added. Removed; the session
+        // bridge (LOGIN_USER_ID) is sufficient since every controller reads the session.
+        var httpSession = request.getSession(false);
+        if (httpSession != null) {
+            Object uid = httpSession.getAttribute("LOGIN_USER_ID");
+            if (uid instanceof Long userId && userId > 0) {
                 User user = userMapper.selectById(userId);
                 if (user != null && "ACTIVE".equals(user.status)) {
                     var authorities = List.of(new SimpleGrantedAuthority("ROLE_USER"));
@@ -50,30 +54,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     }
                     var auth = new UsernamePasswordAuthenticationToken(user, null, authorities);
                     SecurityContextHolder.getContext().setAuthentication(auth);
-                }
-            } catch (NumberFormatException ignored) {
-                // Invalid userId header — continue as anonymous
-            }
-        }
-
-        // Also try session-based auth (primary mechanism)
-        if (SecurityContextHolder.getContext().getAuthentication() == null) {
-            var httpSession = request.getSession(false);
-            if (httpSession != null) {
-                Object uid = httpSession.getAttribute("LOGIN_USER_ID");
-                if (uid instanceof Long userId && userId > 0) {
-                    User user = userMapper.selectById(userId);
-                    if (user != null && "ACTIVE".equals(user.status)) {
-                        var authorities = List.of(new SimpleGrantedAuthority("ROLE_USER"));
-                        if ("ADMIN".equals(user.role)) {
-                            authorities = List.of(
-                                new SimpleGrantedAuthority("ROLE_USER"),
-                                new SimpleGrantedAuthority("ROLE_ADMIN")
-                            );
-                        }
-                        var auth = new UsernamePasswordAuthenticationToken(user, null, authorities);
-                        SecurityContextHolder.getContext().setAuthentication(auth);
-                    }
                 }
             }
         }
