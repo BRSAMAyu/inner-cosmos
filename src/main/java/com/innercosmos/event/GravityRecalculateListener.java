@@ -20,7 +20,7 @@ public class GravityRecalculateListener {
         this.memoryCardMapper = memoryCardMapper;
     }
 
-    @EventListener
+    @org.springframework.transaction.event.TransactionalEventListener(phase = org.springframework.transaction.event.TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     @Async("taskExecutor")
     public void onDialogFinished(DialogFinishedEvent event) {
         try {

@@ -14,7 +14,7 @@ public class MemoryExtractListener {
     }
 
     @Async("taskExecutor")
-    @EventListener
+    @org.springframework.transaction.event.TransactionalEventListener(phase = org.springframework.transaction.event.TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onDialogFinished(DialogFinishedEvent event) {
         memoryService.extractFromSession(event.userId, event.sessionId);
     }
