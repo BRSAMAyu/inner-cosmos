@@ -50,8 +50,21 @@ Experts 1–4 must NOT see each other's output. Expert 5 sees all four and criti
 - `M-025` — IC.api status-aware (401/403→login) + GET-only retry. `fb2614d`.
 - `M-022` — atomic conditional letter transition (optimistic lock).
 - `M-027` — wired orphan pages into nav (thought-shredder main; ai-log/ai-dev-history admin).
+- `M-029` — calligraphic typography loaded app-wide via mountShell (was 1/35 pages).
+- `M-015` — EmotionTimeline auto-aggregates from traces on dialog finish (spectrum no longer fictional).
+- `M-017` — PORTRAIT_DIM corrections durably reshape the portrait (no more 'forgot'). `947c487`.
+- `M-019` — per-IP brute-force protection on /api/auth/login. `b712ec0`.
+- `M-074` — requireAdmin on prompt-version reads (content/versions/metrics).
+- `M-077` — scheduler letter delivery writes the audit log. `05d95c5`.
+- `M-033` — account deletion requires password re-auth (FE+BE). `8c39e21`.
+- `M-078` — belief recalculate + reportLetter enforce ownership. `d91ceab`.
+- `M-008` — UNIQUE(user_id, source_session_id) on tb_memory_card (starfield integrity backstop).
 
-**18 fixes done & verified; full suite green (~630 tests, 0 failures).**
+**29 fixes done & verified; full suite green (621 tests, 0 failures). All P0s (safety/trust/data-integrity) + all 4 signature no-ops (M-011/M-014/M-015/M-017) + many P1/P2/P3 done.**
+
+**Remaining (lower priority / bigger):** `M-018` CSRF + cookie hardening, `M-010` signed JWT (replace X-User-Id), `M-032` password change/reset, `M-006` retention job for redacted logs, plus P2/P3 polish (M-045/M-043/M-039/M-051/M-052/M-075/M-076) and Group-C wow (M-067/M-068/M-069/M-070/M-072). **After Phase 3:** 3 experts inspect (P4) → fix (P5) → 2 final agents + browser verify (P6) → END.
+
+**Next priorities:** `M-008` (UNIQUE on tb_memory_card), `M-078` (belief/reportLetter ownership), `M-075`/`M-076` (validation/error-envelope), `M-029` typography-app-wide is DONE — pick from remaining P2/P3 + Group-C wow, then the bigger coordinated items (`M-018` CSRF, `M-010` JWT, `M-032` password change/reset). **After Phase 3:** 3 experts inspect (P4) → fix (P5) → 2 final agents + browser verify (P6) → END.
 
 **Next priorities:** data-integrity P0s `M-007` (atomic finish + AFTER_COMMIT listeners), `M-008` (UNIQUE on tb_memory_card(user_id, source_session_id)); signature no-ops `M-015` (EmotionTimeline auto-aggregate), `M-017` (corrections durably reshape portrait); then `M-022` (letter optimistic lock), `M-025` (resilient IC.api), then remaining P1/P2 hardening (M-010 JWT, M-018 CSRF, M-019 brute-force, M-032/M-033) and Group-C wow. **After Phase 3:** 3 experts inspect (P4) → fix (P5) → 2 final agents + browser verify (P6) → END.
 
