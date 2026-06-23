@@ -43,6 +43,7 @@
       margin: 0 0 10px;
       position: relative;
       z-index: 1;
+      text-wrap: balance;
     }
     .inbox-hero-sub {
       font-size: 1rem;
@@ -51,6 +52,7 @@
       max-width: 480px;
       position: relative;
       z-index: 1;
+      text-wrap: pretty;
     }
 
     /* ── Tab bar ── */
@@ -99,15 +101,17 @@
       padding: 20px 24px;
       cursor: pointer;
       backdrop-filter: blur(16px);
-      box-shadow: 0 2px 8px rgba(0,0,0,.03), 0 8px 32px rgba(0,0,0,.05);
-      transition: transform 400ms var(--ease-bloom), box-shadow 400ms var(--ease-bloom);
+      box-shadow: var(--elev-1, 0 2px 8px rgba(0,0,0,.03), 0 8px 32px rgba(0,0,0,.05));
+      /* hover lift uses `translate` (not transform) so it composes past the
+         card-reveal entry animation, whose `forwards` pins `transform`. */
+      transition: translate 400ms var(--ease-bloom), box-shadow 400ms var(--ease-bloom), border-color 400ms var(--ease-bloom);
       opacity: 0;
       transform: translateY(12px);
       animation: card-reveal 600ms var(--ease-bloom) forwards;
     }
     .letter-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 16px rgba(0,0,0,.06), 0 16px 48px rgba(0,0,0,.08);
+      translate: 0 -2px;
+      box-shadow: var(--elev-2, 0 4px 16px rgba(0,0,0,.06), 0 16px 48px rgba(0,0,0,.08));
     }
     @keyframes card-reveal {
       to { opacity: 1; transform: translateY(0); }

@@ -28,8 +28,9 @@
       color: var(--ink);
       margin: 0 0 8px;
       position: relative;
+      text-wrap: balance;
     }
-    .shred-hero .muted { position: relative; }
+    .shred-hero .muted { position: relative; text-wrap: pretty; }
     .shred-paper {
       background: rgba(247,242,236,.85);
       border: 1px solid var(--line);
@@ -102,15 +103,15 @@
       border: 1px solid var(--line);
       animation: shredFall 1.2s var(--ease-settle) forwards;
     }
-    /* Dark mode */
-    body.dark-star .shred-hero { background: linear-gradient(135deg, rgba(122,132,108,.08), rgba(120,90,100,.06)); border-color: rgba(60,70,80,.4); }
+    /* Dark mode — warm Morandi dark-star palette (was cold navy rgb(30–120,...) blue-greys) */
+    body.dark-star .shred-hero { background: linear-gradient(135deg, rgba(122,132,108,.08), rgba(191,150,152,.06)); border-color: rgba(163,153,143,.16); }
     body.dark-star .shred-hero::before { background: radial-gradient(circle at 60% 50%, rgba(122,132,108,.06), transparent 50%); }
     body.dark-star .shred-hero h1 { color: var(--ink); }
-    body.dark-star .shred-paper { background: rgba(30,35,40,.8); border-color: rgba(60,70,80,.4); }
+    body.dark-star .shred-paper { background: rgba(42,38,34,.8); border-color: rgba(163,153,143,.16); }
     body.dark-star .shred-btn { background: linear-gradient(135deg, var(--accent-sage), rgba(143,163,148,.6)); }
     body.dark-star .result-section .gold,
     body.dark-star .result-section .teal { color: var(--ink); }
-    body.dark-star .shred-strip { background: rgba(30,35,40,.8); border-color: rgba(60,70,80,.3); }
+    body.dark-star .shred-strip { background: rgba(52,47,42,.8); border-color: rgba(163,153,143,.14); }
   </style>
 </head>
 <body>

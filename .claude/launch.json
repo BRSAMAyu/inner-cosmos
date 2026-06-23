@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "ic-static",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8123", "--directory", "src/main/resources/static"],
+      "port": 8123
+    },
+    {
+      "name": "ic-app",
+      "runtimeExecutable": "./mvnw",
+      "runtimeArgs": ["spring-boot:run", "-Dspring-boot.run.arguments=--server.port=8090"],
+      "port": 8090
+    }
+  ]
+}

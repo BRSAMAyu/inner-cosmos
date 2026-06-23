@@ -78,6 +78,24 @@ class UserCorrectionControllerTest {
     }
 
     @Test
+    void record_withPortraitDimTargetType_persistsThatType() throws Exception {
+        mockMvc.perform(post("/api/aurora/corrections")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"newValue\":\"我其实更喜欢独处\",\"oldValue\":\"你以为我很外向\","
+                                + "\"targetType\":\"PORTRAIT_DIM\",\"fieldName\":\"SOCIAL_STYLE\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.targetType").value("PORTRAIT_DIM"))
+                .andExpect(jsonPath("$.data.fieldName").value("SOCIAL_STYLE"));
+
+        mockMvc.perform(get("/api/aurora/corrections").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].newValue").value("我其实更喜欢独处"))
+                .andExpect(jsonPath("$.data[0].targetType").value("PORTRAIT_DIM"));
+    }
+
+    @Test
     void record_blankNewValue_isRejected() throws Exception {
         mockMvc.perform(post("/api/aurora/corrections")
                         .session(session)

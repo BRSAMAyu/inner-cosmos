@@ -45,6 +45,7 @@
       margin: 0 0 12px;
       position: relative;
       z-index: 1;
+      text-wrap: balance;
     }
     .echo-hero-sub {
       font-size: 1.0625rem;
@@ -53,6 +54,7 @@
       max-width: 560px;
       position: relative;
       z-index: 1;
+      text-wrap: pretty;
     }
     .echo-hero-sub strong {
       color: var(--ink);
@@ -190,7 +192,9 @@
       pointer-events: none;
     }
     .capsule-card:hover {
-      transform: translateY(-4px);
+      /* `translate` (not `transform`) so the lift composes past the card-reveal
+         entry animation, which pins `transform` via fill-mode: forwards. */
+      translate: 0 -4px;
       box-shadow:
         0 8px 24px rgba(0,0,0,.06),
         0 28px 64px rgba(0,0,0,.10);

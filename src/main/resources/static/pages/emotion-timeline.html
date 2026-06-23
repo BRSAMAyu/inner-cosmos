@@ -28,8 +28,9 @@
       color: var(--ink);
       margin: 0 0 8px;
       position: relative;
+      text-wrap: balance;
     }
-    .et-hero .muted { position: relative; }
+    .et-hero .muted { position: relative; text-wrap: pretty; }
     .et-canvas-wrap { position: relative; width: 100%; height: 360px; }
     .et-svg { width: 100%; height: 100%; }
     .et-line { fill: none; stroke: rgba(143,163,148,.65); stroke-width: 2; }
@@ -38,7 +39,8 @@
     .et-axis { stroke: rgba(160,155,180,.32); stroke-width: 1; }
     .et-label { fill: var(--muted); font-size: 11px; }
     .et-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-top: 20px; }
-    .et-stat { padding: 16px; border-radius: var(--radius); background: rgba(255,250,243,.6); border: 1px solid var(--line); }
+    .et-stat { padding: 16px; border-radius: var(--radius); background: rgba(255,250,243,.6); border: 1px solid var(--line); transition: box-shadow 300ms var(--ease-flow), translate 300ms var(--ease-flow), border-color 300ms var(--ease-flow); }
+    .et-stat:hover { box-shadow: var(--elev-1); translate: 0 -2px; border-color: var(--line-strong); }
     .et-stat .num { font-size: 2rem; line-height: 1; color: var(--ink); }
     .et-pattern { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
     .et-pattern .pill { background: rgba(229,235,228,.6); }

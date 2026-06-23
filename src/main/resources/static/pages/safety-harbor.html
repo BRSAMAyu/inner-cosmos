@@ -16,11 +16,13 @@
       font-size: clamp(1.8rem, 3.5vw, 2.4rem);
       color: var(--ink);
       margin: 0 0 10px;
+      text-wrap: balance;
     }
     .safety-hero-sub {
       font-size: .9375rem;
       color: var(--muted);
       line-height: 1.6;
+      text-wrap: pretty;
     }
 
     /* ── Breathing circle ── */
@@ -81,7 +83,7 @@
       transition: box-shadow 300ms var(--ease-flow);
     }
     .safety-card:hover {
-      box-shadow: 0 4px 16px rgba(0,0,0,.06);
+      box-shadow: var(--elev-2, 0 4px 16px rgba(0,0,0,.06));
     }
     .safety-card p {
       font-size: .875rem;

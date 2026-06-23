@@ -483,14 +483,34 @@ const API = {
   /* RUN-005 — Aurora correction feedback loop: the user authoritatively corrects
      Aurora's model of them ("这不太是我"); corrections re-enter the prompt with
      precedence over inferences, so Aurora visibly adapts. */
-  async auroraCorrect(newValue, oldValue, reason) {
+  async auroraCorrect(newValue, oldValue, reason, opts) {
     const body = { newValue };
     if (oldValue) body.oldValue = oldValue;
     if (reason) body.reason = reason;
+    // RUN-006 — opts.targetType/fieldName let the portrait page tag a per-dimension
+    // calibration (PORTRAIT_DIM) so it routes into Aurora's soft-coexist prompt block.
+    if (opts && opts.targetType) body.targetType = opts.targetType;
+    if (opts && opts.fieldName) body.fieldName = opts.fieldName;
     return IC.api("/api/aurora/corrections", { method: "POST", body: JSON.stringify(body) });
   },
   async auroraCorrections() {
     return IC.api("/api/aurora/corrections");
+  },
+
+  /* RUN-006 — Aurora's portrait of the user ("Aurora 眼中的你"), now visible & calibratable. */
+  async portrait() {
+    return IC.api("/api/portrait");
+  },
+  async portraitHistory(dim) {
+    return IC.api("/api/portrait/history?dim=" + encodeURIComponent(dim));
+  },
+
+  /* RUN-006 — system notifications (capsule sync done/failed), now surfaced on the dashboard. */
+  async notifications() {
+    return IC.api("/api/notifications");
+  },
+  async markNotificationRead(id) {
+    return IC.api("/api/notifications/" + encodeURIComponent(id) + "/read", { method: "POST" });
   },
 
   /* Aurora Goodbye */

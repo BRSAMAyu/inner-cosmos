@@ -44,8 +44,12 @@ public class UserCorrectionController extends BaseController {
         String oldValue = trimToNull(body.get("oldValue"));
         String reason = trimToNull(body.get("reason"));
         String fieldName = orDefault(trimToNull(body.get("fieldName")), DEFAULT_FIELD);
+        // RUN-006: a portrait-dimension calibration ("Aurora 眼中的你" page) tags itself
+        // PORTRAIT_DIM so the prompt routes it into the soft-coexist block; free-form
+        // chat corrections keep the authoritative AURORA_UNDERSTANDING default.
+        String targetType = orDefault(trimToNull(body.get("targetType")), DEFAULT_TARGET_TYPE);
         UserCorrection saved = userCorrectionService.recordCorrection(
-                userId, DEFAULT_TARGET_TYPE, DEFAULT_TARGET_ID, fieldName, oldValue, newValue, reason);
+                userId, targetType, DEFAULT_TARGET_ID, fieldName, oldValue, newValue, reason);
         return ApiResponse.ok(saved);
     }
 

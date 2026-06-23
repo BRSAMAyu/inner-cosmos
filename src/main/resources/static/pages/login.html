@@ -63,6 +63,15 @@
         inset 0 1px 0 rgba(255,255,255,.40);
       padding: 48px 40px 40px;
       animation: card-enter 800ms var(--ease-bloom) both;
+      transition: box-shadow 600ms var(--ease-flow), transform 600ms var(--ease-flow);
+    }
+    /* The card leans in faintly while you're filling it out. */
+    .login-card:focus-within {
+      box-shadow:
+        0 6px 20px rgba(0,0,0,.05),
+        0 30px 76px rgba(0,0,0,.12),
+        inset 0 1px 0 rgba(255,255,255,.46);
+      transform: translateY(-2px);
     }
     @keyframes card-enter {
       from { opacity: 0; transform: translateY(20px) scale(.98); }
@@ -84,6 +93,12 @@
         linear-gradient(135deg, var(--accent-sage), var(--accent-dusty-blue) 52%, var(--accent-rose));
       box-shadow: 0 0 0 6px rgba(143,163,148,.12), 0 0 24px rgba(143,163,148,.18);
       margin-bottom: 16px;
+      animation: brand-breathe 5.6s var(--ease-flow, ease-in-out) infinite;
+    }
+    /* A slow living glow — the mark breathes like the rest of the cosmos. */
+    @keyframes brand-breathe {
+      0%, 100% { box-shadow: 0 0 0 6px rgba(143,163,148,.12), 0 0 24px rgba(143,163,148,.18); transform: scale(1); }
+      50% { box-shadow: 0 0 0 8px rgba(143,163,148,.10), 0 0 36px rgba(143,163,148,.28); transform: scale(1.03); }
     }
     .login-brand h1 {
       font-family: var(--font-hero);

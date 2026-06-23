@@ -14,7 +14,7 @@
         var(--surface-paper);
       border: 1px solid rgba(255,255,255,.20);
       backdrop-filter: blur(16px);
-      box-shadow: 0 4px 16px rgba(0,0,0,.04), 0 16px 48px rgba(0,0,0,.06);
+      box-shadow: var(--elev-2);
       margin-bottom: 24px;
       position: relative;
       overflow: hidden;
@@ -25,6 +25,12 @@
       inset: 0;
       background: radial-gradient(circle at 80% 20%, rgba(240,216,176,.15), transparent 50%);
       pointer-events: none;
+      animation: hero-glow-drift 16s var(--ease-drift, ease-in-out) infinite alternate;
+    }
+    /* The dawn light over the hero shifts slowly, like a sky that is never quite still. */
+    @keyframes hero-glow-drift {
+      0%   { opacity: .7; transform: translate(0, 0) scale(1); }
+      100% { opacity: 1; transform: translate(-3%, 2%) scale(1.08); }
     }
     .time-badge {
       display: inline-flex;
@@ -42,6 +48,7 @@
       color: var(--ink);
       margin: 16px 0 8px;
       line-height: 1.2;
+      text-wrap: balance;
     }
     .guiding-text {
       font-size: 1.05rem;
@@ -60,6 +67,12 @@
     .emotion-weather-card .weather-icon {
       font-size: 3rem;
       margin-bottom: 8px;
+      display: inline-block;
+      animation: weather-float 6.5s var(--ease-flow, ease-in-out) infinite;
+    }
+    @keyframes weather-float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-5px); }
     }
     .emotion-weather-card .weather-label {
       font-size: 1.1rem;
@@ -183,6 +196,30 @@
       background: rgba(42,38,34,.56);
       border-color: rgba(163,153,143,.10);
     }
+
+    /* RUN-006 — unread notifications strip */
+    .notif-strip { display: flex; flex-direction: column; gap: 10px; margin: 0 0 8px; }
+    .notif-card {
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 14px;
+      padding: 14px 18px; border-radius: 14px;
+      background: linear-gradient(180deg, rgba(255,250,243,.7), rgba(247,242,236,.5)), var(--surface-paper);
+      border: 1px solid var(--line);
+      box-shadow: 0 2px 10px rgba(0,0,0,.04);
+      animation: notif-in 420ms var(--ease-bloom, ease) both;
+    }
+    @keyframes notif-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+    .notif-card.warn { border-color: rgba(176,124,108,.34); }
+    .notif-card .notif-body strong { display: block; font-size: .95rem; color: var(--ink); margin-bottom: 3px; }
+    .notif-card .notif-body p { margin: 0; font-size: .84rem; color: var(--muted); line-height: 1.6; }
+    .notif-card .notif-dismiss {
+      flex: none; background: none; border: none; cursor: pointer;
+      color: var(--faint); font-size: 1.1rem; line-height: 1; padding: 2px 4px;
+      transition: color 200ms ease;
+    }
+    .notif-card .notif-dismiss:hover { color: var(--ink); }
+    body.dark-star .notif-card {
+      background: rgba(42,38,34,.56); border-color: rgba(163,153,143,.12);
+    }
   </style>
 </head>
 <body>
@@ -199,6 +236,9 @@
     <h1 class="greeting-large" id="greetingText">正在读取你的内宇宙...</h1>
     <p class="guiding-text" id="guidingText">让自己先回到身体里</p>
   </section>
+
+  <!-- RUN-006 — unread system notifications (e.g. capsule sync done/failed), finally surfaced. -->
+  <section id="notifStrip" class="notif-strip" hidden></section>
 
   <!-- Main Grid -->
   <section class="grid">
@@ -390,8 +430,48 @@ async function load() {
 
   await loadUnderstandingOverview();
   checkAuroraProactive();
+  loadNotifications();
 
   IC.stagger(document);
+}
+
+// RUN-006 — surface unread system notifications (e.g. capsule sync done/failed) that the
+// backend has been writing to tb_notification but the UI never consumed. Each card is
+// dismissible; dismissing marks it read so it won't reappear.
+async function loadNotifications() {
+  const strip = document.getElementById("notifStrip");
+  if (!strip) return;
+  let items = [];
+  try {
+    const res = await API.notifications();
+    items = (res && res.success ? res.data : []) || [];
+  } catch (e) { return; }
+  if (!items.length) { strip.hidden = true; return; }
+  strip.hidden = false;
+  strip.innerHTML = items.map(n => {
+    const warn = (n.type === "SYNC_FAILED");
+    return `<article class="notif-card${warn ? " warn" : ""}" data-id="${n.id}">
+        <div class="notif-body">
+          <strong>${IC.esc(n.title || "提醒")}</strong>
+          <p>${IC.esc(n.body || "")}</p>
+        </div>
+        <button class="notif-dismiss" type="button" aria-label="知道了" title="知道了" data-id="${n.id}">×</button>
+      </article>`;
+  }).join("");
+  strip.querySelectorAll(".notif-dismiss").forEach(btn => {
+    btn.addEventListener("click", () => dismissNotification(btn.getAttribute("data-id")));
+  });
+}
+
+async function dismissNotification(id) {
+  const card = document.querySelector(`.notif-card[data-id="${id}"]`);
+  if (card) { card.style.transition = "opacity .25s ease"; card.style.opacity = "0"; }
+  try { await API.markNotificationRead(id); } catch (e) {}
+  setTimeout(() => {
+    card?.remove();
+    const strip = document.getElementById("notifStrip");
+    if (strip && !strip.querySelector(".notif-card")) strip.hidden = true;
+  }, 260);
 }
 
 async function checkAuroraProactive() {
