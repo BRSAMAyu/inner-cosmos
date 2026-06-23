@@ -344,9 +344,12 @@ const IC = {
       const cur = await res.json();
       if (cur.success) return cur;
     } catch (e) {}
-    if (!location.pathname.endsWith("/login.html") && !location.pathname.endsWith("/register.html")) {
-      const login = await IC.guestLogin();
-      if (login.success) return login;
+    // M-009: do NOT silently auto-log every visitor into the shared demo account — that
+    // exposed demo's private memories/letters to anyone who opened the app. Route to the
+    // real login page instead. (Demo creds demo/demo123 stay pre-filled on login.html for
+    // convenience; index.html remains a public landing.)
+    const path = location.pathname;
+    if (!path.endsWith("/login.html") && !path.endsWith("/register.html") && !path.endsWith("/index.html")) {
       location.href = "/pages/login.html";
     }
     return { success: false };
