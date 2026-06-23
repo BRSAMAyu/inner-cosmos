@@ -5,10 +5,17 @@ import com.innercosmos.entity.SafetyEvent;
 import com.innercosmos.mapper.SafetyEventMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Synchronous LLM re-check service for implicit/ambiguous safety cases.
@@ -28,11 +35,30 @@ public class SafetyReviewService {
 
     private final StructuredAiService structuredAiService;
     private final SafetyEventMapper safetyEventMapper;
+    private final Executor reviewExecutor;
+    private final long budgetSeconds;
 
+    /** M-003: hard deadline (seconds) for the synchronous safety recheck. A person in
+     *  distress must never wait on provider timeouts × JSON-repair retries (20–30s each).
+     *  When the budget is exceeded, the deterministic fallback decides immediately. */
+    static final long SAFETY_REVIEW_BUDGET_SECONDS = 4L;
+
+    @Autowired
     public SafetyReviewService(StructuredAiService structuredAiService,
-                               SafetyEventMapper safetyEventMapper) {
+                               SafetyEventMapper safetyEventMapper,
+                               @Qualifier("aiExecutor") Executor reviewExecutor) {
+        this(structuredAiService, safetyEventMapper, reviewExecutor, SAFETY_REVIEW_BUDGET_SECONDS);
+    }
+
+    /** Test-friendly constructor with an explicit deadline budget. */
+    SafetyReviewService(StructuredAiService structuredAiService,
+                        SafetyEventMapper safetyEventMapper,
+                        Executor reviewExecutor,
+                        long budgetSeconds) {
         this.structuredAiService = structuredAiService;
         this.safetyEventMapper = safetyEventMapper;
+        this.reviewExecutor = reviewExecutor;
+        this.budgetSeconds = budgetSeconds;
     }
 
     /**
@@ -69,10 +95,32 @@ public class SafetyReviewService {
 
                     Text: """ + text;
 
-            SafetyReviewResult result = structuredAiService.call(userId, "SAFETY_REVIEW", prompt,
-                    Map.of("text", text),
-                    SafetyReviewResult.class,
-                    () -> fallbackSafetyReview(text, initialMatch));
+            SafetyReviewResult result;
+            try {
+                // M-003: bound the synchronous recheck so a person in distress is never held
+                // waiting on provider timeouts × JSON-repair retries. On timeout/failure the
+                // deterministic fallback decides immediately; the acute-crisis floor below
+                // still applies to whatever result we end up with.
+                result = CompletableFuture.supplyAsync(
+                        () -> structuredAiService.call(userId, "SAFETY_REVIEW", prompt,
+                                Map.of("text", text),
+                                SafetyReviewResult.class,
+                                () -> fallbackSafetyReview(text, initialMatch)),
+                        reviewExecutor).get(budgetSeconds, TimeUnit.SECONDS);
+            } catch (TimeoutException e) {
+                log.warn("Safety recheck exceeded {}s budget for userId={}; using deterministic fallback",
+                        budgetSeconds, userId);
+                result = fallbackSafetyReview(text, initialMatch);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.warn("Safety recheck interrupted for userId={}; using fallback", userId);
+                result = fallbackSafetyReview(text, initialMatch);
+            } catch (ExecutionException e) {
+                Throwable cause = e.getCause() != null ? e.getCause() : e;
+                log.warn("Safety recheck async call failed for userId={}; using fallback: {}",
+                        userId, cause.getMessage());
+                result = fallbackSafetyReview(text, initialMatch);
+            }
 
             // Deterministic acute-crisis floor on the LIVE-LLM success path (RT-002 open_risk #1):
             // a permissive/cleared live verdict (LOW/MEDIUM) must NOT override a genuine acute

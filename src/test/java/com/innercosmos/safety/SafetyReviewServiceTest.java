@@ -38,7 +38,10 @@ class SafetyReviewServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new SafetyReviewService(structuredAiService, safetyEventMapper);
+        // Runnable::run runs the (mocked) call on the test thread synchronously; the default
+        // budget never trips because the mock returns immediately.
+        service = new SafetyReviewService(structuredAiService, safetyEventMapper,
+                Runnable::run, SafetyReviewService.SAFETY_REVIEW_BUDGET_SECONDS);
     }
 
     /**
@@ -144,5 +147,34 @@ class SafetyReviewServiceTest {
 
         assertEquals("HIGH", result.riskLevel, "Clear farewell must hit the acute-crisis floor");
         assertEquals("RESOURCE_PAGE", result.handledAction);
+    }
+
+    /**
+     * M-003: the synchronous recheck must respect a hard deadline so a person in distress is
+     * never held waiting on provider timeouts × JSON-repair retries. When the LLM hangs, the
+     * deterministic fallback must still block crisis-bearing text — within the budget.
+     */
+    @Test
+    @DisplayName("M-003: recheck respects the deadline and still blocks crisis text when the LLM hangs")
+    void recheck_respectsDeadline_whenLlmHangs() {
+        StructuredAiService slow = org.mockito.Mockito.mock(StructuredAiService.class);
+        SafetyEventMapper mapper = org.mockito.Mockito.mock(SafetyEventMapper.class);
+        when(slow.call(eq(USER_ID), eq("SAFETY_REVIEW"), anyString(), any(Map.class),
+                eq(SafetyReviewService.SafetyReviewResult.class), any())).thenAnswer(inv -> {
+            Thread.sleep(5_000);
+            return null;
+        });
+        when(mapper.insert(any(SafetyEvent.class))).thenReturn(1);
+
+        // 1s budget keeps the test fast; a real thread lets the hang run concurrently so the
+        // budget can time out and the fallback decides.
+        SafetyReviewService svc = new SafetyReviewService(slow, mapper, r -> new Thread(r).start(), 1L);
+
+        long start = System.currentTimeMillis();
+        SafetyMatch result = svc.recheckSync(USER_ID, "想要了断", SafetyMatch.safe());
+        long elapsed = System.currentTimeMillis() - start;
+
+        assertTrue(elapsed < 2_500, "recheck must respect the deadline; took " + elapsed + "ms");
+        assertEquals("HIGH", result.riskLevel, "deadline fallback must still block crisis-bearing text");
     }
 }
