@@ -56,7 +56,8 @@ public class SafetyServiceImpl implements SafetyService {
         // Each line carries a number so safety-harbor.html can render a tel: link. Never a
         // diagnosis or a promise to always be present — only a bridge to real-world help.
         return List.of(
-                "如果你正处于紧急危险中，请立即拨打 110（报警）或 120（急救），或联系身边可信赖的人。",
+                "如果你正处于紧急危险中，请立即拨打 110（报警），或联系身边可信赖的人。",
+                "需要医疗急救，请立即拨打 120。",
                 "北京心理危机研究与干预中心 · 24 小时心理援助热线：010-82951332。",
                 "全国心理援助热线（希望 24）· 24 小时：400-161-9995。",
                 "全国公共卫生公益热线：12320（可转接心理援助）。",

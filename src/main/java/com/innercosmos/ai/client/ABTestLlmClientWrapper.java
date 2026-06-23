@@ -47,6 +47,11 @@ public class ABTestLlmClientWrapper implements LlmClient {
         if (request.prompt != null) {
             request.prompt = DataMaskingUtils.maskContact(request.prompt);
         }
+        if (request.requestJson != null) {
+            // Phase-5: the structured/context path (requestJson) carries the richest PII and is
+            // logged to tb_ai_interaction_log by the providers — mask it too.
+            request.requestJson = DataMaskingUtils.maskContact(request.requestJson);
+        }
         if (request.recentMessages != null) {
             List<String> masked = new ArrayList<>(request.recentMessages.size());
             for (String m : request.recentMessages) {

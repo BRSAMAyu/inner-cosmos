@@ -168,10 +168,11 @@ public class PersonaChatServiceImpl implements PersonaChatService {
                         : capsuleAgent.buildPersonaPrompt(personaName, personaIntro);
                 CapsuleBoundary boundary = boundary(capsule == null ? null : capsule.id);
                 String authorizedSummary = authorizedMemorySummary(capsule);
-                // M-005: do NOT egress the visitor's private memories/todos into a stranger's
-                // capsule prompt. The capsule speaks from its own persona + authorized memory
-                // (authorizedSummary) + the visitor's current message — never the visitor's P1.
-                AgentContext visitorContext = agentContextAssembler.assemble(userId, null, message, false);
+                // M-005: do NOT egress the visitor's private context (todos/records/portrait/
+                // relationship) into a stranger's capsule prompt. assemble(includeMemory=false)
+                // still populates those, so we deliberately do NOT assemble a visitor agent-context
+                // here — the capsule speaks from its own persona + authorized memory + the visitor's
+                // current message (visitorMessage below).
                 List<String> history = recentHistory(sessionId);
                 Map<String, Object> aiContext = new LinkedHashMap<>();
                 aiContext.put("personaPrompt", personaPrompt);
@@ -186,7 +187,6 @@ public class PersonaChatServiceImpl implements PersonaChatService {
                         "blockedTopics", nullToEmpty(boundary.blockedTopics),
                         "privacyLevel", nullToEmpty(boundary.privacyLevel)));
                 aiContext.put("recentPersonaChat", history);
-                aiContext.put("visitorContext", visitorContext);
                 aiContext.put("visitorMessage", message);
                 aiContext.put("turnCount", session.turnCount);
                 aiContext.put("dailyLimit", dailyLimit);

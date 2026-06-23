@@ -129,7 +129,6 @@ class PersonaChatServiceImplPhaseBTest {
         when(safetyService.check(any(), any(), any())).thenReturn(safePassed());
         when(capsuleMapper.selectById(capsuleId)).thenReturn(c);
         reserveViaUpdate();
-        when(agentContextAssembler.assemble(any(), any(), any(), anyBoolean())).thenReturn(new AgentContext());
         when(structuredAiService.call(any(), any(), any(), any(), any(), any())).thenReturn(goodReply());
         when(boundaryMapper.selectOne(any())).thenReturn(null);
 
@@ -161,7 +160,6 @@ class PersonaChatServiceImplPhaseBTest {
         when(safetyService.check(any(), any(), any())).thenReturn(safePassed());
         when(capsuleMapper.selectById(capsuleId)).thenReturn(c);
         reserveViaUpdate();
-        when(agentContextAssembler.assemble(any(), any(), any(), anyBoolean())).thenReturn(new AgentContext());
         when(structuredAiService.call(any(), any(), any(), any(), any(), any())).thenReturn(unavailable());
         when(boundaryMapper.selectOne(any())).thenReturn(null);
         // Simulate MyBatis writing back the generated key on insert of the VISITOR message,
@@ -260,7 +258,6 @@ class PersonaChatServiceImplPhaseBTest {
         when(jdbcTemplate.update(contains("INSERT INTO tb_capsule_usage_quota"),
                 any(Object.class), any(Object.class), any(Object.class)))
                 .thenThrow(new DuplicateKeyException("dup"));
-        when(agentContextAssembler.assemble(any(), any(), any(), anyBoolean())).thenReturn(new AgentContext());
         when(structuredAiService.call(any(), any(), any(), any(), any(), any())).thenReturn(goodReply());
         when(boundaryMapper.selectOne(any())).thenReturn(null);
 
