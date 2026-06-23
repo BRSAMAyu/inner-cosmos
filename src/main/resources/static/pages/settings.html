@@ -665,6 +665,8 @@ function confirmDelete() {
       这将永久删除你的账户和所有数据，包括记忆星体、每日记录、待办事项、慢信和共鸣体。<br>
       <strong>此操作不可撤销。</strong>
     </p>
+    <p class="muted" style="margin:0 0 8px">请输入你的密码以确认：</p>
+    <input id="delete-password" type="password" class="modal-input" placeholder="密码" autocomplete="current-password" style="width:100%;box-sizing:border-box;margin-bottom:12px">
     <div class="modal-actions">
       <button class="modal-btn-cancel" onclick="IC.closeModal()">取消</button>
       <button class="modal-btn-danger" onclick="doDelete()">确认删除</button>
@@ -673,7 +675,12 @@ function confirmDelete() {
 }
 
 async function doDelete() {
-  const r = await IC.api("/api/user/account", { method: "DELETE" });
+  const pwd = (document.getElementById("delete-password") || {}).value || "";
+  if (!pwd) { IC.toast("请输入密码以确认", "warn"); return; }
+  const r = await IC.api("/api/user/account", {
+    method: "DELETE",
+    body: JSON.stringify({ password: pwd }) // M-033: re-auth required server-side
+  });
   IC.closeModal();
   if (r.success) {
     IC.toast("账户已删除");

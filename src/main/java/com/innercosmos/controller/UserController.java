@@ -17,10 +17,13 @@ import java.util.Map;
 public class UserController extends BaseController {
     private final UserService userService;
     private final UserProfileMapper userProfileMapper;
+    private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
-    public UserController(UserService userService, UserProfileMapper userProfileMapper) {
+    public UserController(UserService userService, UserProfileMapper userProfileMapper,
+                          org.springframework.security.crypto.password.PasswordEncoder passwordEncoder) {
         this.userService = userService;
         this.userProfileMapper = userProfileMapper;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @GetMapping("/profile")
@@ -50,8 +53,17 @@ public class UserController extends BaseController {
     }
 
     @DeleteMapping("/account")
-    public ApiResponse<Void> deleteAccount(HttpSession session) {
-        userService.deleteAccount(currentUserId(session));
+    public ApiResponse<Void> deleteAccount(@RequestBody(required = false) Map<String, String> body, HttpSession session) {
+        Long userId = currentUserId(session);
+        // M-033: require password re-auth before destructive account deletion — with CSRF off,
+        // a forged call must not be able to destroy ~25 tables without the password.
+        String password = body == null ? null : body.get("password");
+        User user = userService.current(userId);
+        if (password == null || password.isBlank() || !passwordEncoder.matches(password, user.passwordHash)) {
+            throw new com.innercosmos.exception.BusinessException(
+                    com.innercosmos.common.ErrorCode.UNAUTHORIZED, "密码不正确，无法注销账号");
+        }
+        userService.deleteAccount(userId);
         session.invalidate();
         return ApiResponse.ok(null);
     }
