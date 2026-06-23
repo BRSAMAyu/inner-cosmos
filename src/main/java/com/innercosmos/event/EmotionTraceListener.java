@@ -21,11 +21,14 @@ public class EmotionTraceListener {
     private static final Logger log = LoggerFactory.getLogger(EmotionTraceListener.class);
     private final DialogMessageMapper messageMapper;
     private final EmotionInsightService emotionInsightService;
+    private final com.innercosmos.service.EmotionTimelineService emotionTimelineService;
 
     public EmotionTraceListener(DialogMessageMapper messageMapper,
-                                EmotionInsightService emotionInsightService) {
+                                EmotionInsightService emotionInsightService,
+                                com.innercosmos.service.EmotionTimelineService emotionTimelineService) {
         this.messageMapper = messageMapper;
         this.emotionInsightService = emotionInsightService;
+        this.emotionTimelineService = emotionTimelineService;
     }
 
     @EventListener
@@ -46,6 +49,14 @@ public class EmotionTraceListener {
 
             EmotionInsight insight = emotionInsightService.analyze(event.userId, text);
             emotionInsightService.writeTrace(event.userId, event.sessionId, insight);
+            // M-015: aggregate today's emotion timeline from the freshly-written trace so the
+            // emotion spectrum/pattern views render real data (aggregateFromTraces previously
+            // had no production caller — the timeline stayed empty/fictional).
+            try {
+                emotionTimelineService.aggregateFromTraces(event.userId, java.time.LocalDate.now());
+            } catch (Exception aggEx) {
+                log.warn("EmotionTimeline aggregation failed for user {}: {}", event.userId, aggEx.getMessage());
+            }
         } catch (Exception e) {
             log.error("Event processing failed", e);
         }
