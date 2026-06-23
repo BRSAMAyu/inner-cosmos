@@ -24,27 +24,30 @@ public class GoodbyeTriggerDetector {
     public record Detection(String trigger, double confidence, boolean needsConfirm) {}
     public static final Detection NONE = new Detection(null, 0.0, false);
 
-    private String lastStrength = "NONE";
+    // M-045: per-thread strength. The detector is a singleton shared across concurrent
+    // requests, so a plain field would let one user's detect() clobber another's strength
+    // before getLastStrength() is read. detect() always sets before the same-thread read.
+    private final ThreadLocal<String> lastStrength = ThreadLocal.withInitial(() -> "NONE");
 
     public Detection detect(String userMessage) {
         if (userMessage == null || userMessage.isBlank()) {
-            lastStrength = "NONE";
+            lastStrength.set("NONE");
             return NONE;
         }
         String m = userMessage.trim();
         if (HIGH.stream().anyMatch(m::contains)) {
-            lastStrength = "HIGH";
+            lastStrength.set("HIGH");
             return new Detection("LANGUAGE_HIGH", 0.95, false);
         }
         if (MEDIUM.stream().anyMatch(m::contains)) {
-            lastStrength = "MEDIUM";
+            lastStrength.set("MEDIUM");
             return new Detection("LANGUAGE_MEDIUM", 0.65, true);
         }
-        lastStrength = "NONE";
+        lastStrength.set("NONE");
         return NONE;
     }
 
     public String getLastStrength() {
-        return lastStrength;
+        return lastStrength.get();
     }
 }
