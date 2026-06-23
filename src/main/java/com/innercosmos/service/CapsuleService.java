@@ -26,7 +26,7 @@ public interface CapsuleService {
 
     Map<String, Object> contextPreview(Long userId, Long capsuleId);
 
-    CapsuleBoundary getBoundary(Long capsuleId);
+    CapsuleBoundary getBoundary(Long userId, Long capsuleId);
 
     void updateBoundary(Long userId, Long capsuleId, CapsuleBoundary boundary);
 
