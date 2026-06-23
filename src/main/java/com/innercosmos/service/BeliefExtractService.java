@@ -37,7 +37,7 @@ public interface BeliefExtractService {
     /**
      * Recalculate belief strength based on all supporting memories.
      */
-    void recalculateStrength(Long beliefId);
+    void recalculateStrength(Long userId, Long beliefId);
 
     /**
      * Data class for contradiction pairs.

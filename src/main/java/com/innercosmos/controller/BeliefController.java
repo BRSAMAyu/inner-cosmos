@@ -51,7 +51,7 @@ public class BeliefController extends BaseController {
 
     @PostMapping("/{beliefId}/recalculate")
     public ApiResponse<Void> recalculate(@PathVariable Long beliefId, HttpSession session) {
-        beliefExtractService.recalculateStrength(beliefId);
+        beliefExtractService.recalculateStrength(currentUserId(session), beliefId); // M-078
         return ApiResponse.<Void>ok(null);
     }
 }
