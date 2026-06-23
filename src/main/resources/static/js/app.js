@@ -48,6 +48,7 @@ const IC = {
       ["/pages/dashboard.html", "核心"],
       ["/pages/aurora-chat.html", "Aurora"],
       ["/pages/portrait.html", "画像"],
+      ["/pages/corrections.html", "我的更正"],
       ["/pages/daily-record.html", "记录"],
       ["/pages/heart-diary.html", "日记"],
       ["/pages/memory-starfield.html", "星图"],
