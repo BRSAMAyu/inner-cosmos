@@ -77,6 +77,16 @@ Experts 1–4 must NOT see each other's output. Expert 5 sees all four and criti
 - **Batch 2** (disjoint): M-067 resonance "landed" signal, M-070 first-run onboarding, M-052 wire prompt-versioning. Then Phase 6: 2 final agents + browser verification → END.
 - Remaining bigger items (fresh context if needed): M-010 signed JWT, full CSRF token (M-018 other half), M-044 error-envelope normalization.
 
+## ✅ RUN COMPLETE (all 6 phases done)
+- **Phase 3 (implement):** ~44 fixes — all P0s (safety/trust/data-integrity) + all 4 signature no-ops (M-011/M-014/M-015/M-017) + major P1/P2/P3 + wow features (M-067 resonance, M-070 onboarding) + a11y (M-060/M-081/M-029). 48 commits since audit baseline.
+- **Phase 4 (inspect):** 3 inspection rounds (initial + batch 1 + batch 2).
+- **Phase 5 (fix):** all inspection findings fixed (incl. the 2 Phase-6 P1s).
+- **Phase 6 (2 final agents):** done. Found 2 P1s → FIXED + runtime-verified (settle idempotency realistic-flow 200; router-path PII redaction wrap). Plus an edge-NPE guard.
+- **Verification:** full suite GREEN (621+ tests, 0 failures); runtime core loop (12 endpoints 200) + safety (crisis→hotline) + new features (corrections, resonance echoEnergy bump) + settle-after-finish all verified live.
+
+### Documented for future (fresh-context) work (not blocking)
+M-010 signed JWT (replace X-User-Id), full CSRF token (M-018 other half — ~76-site MockMvc cascade), M-052 wire prompt-versioning into PromptBuilder, M-068 parallax-flight (FLYING state), M-044 error-envelope normalization, + the Phase-6 P2s (4 DialogFinishedEvent listeners → AFTER_COMMIT; rate-limit X-User-Id keying). **No P0/P1 remains.**
+
 **Remaining (lower priority / bigger):** `M-018` CSRF + cookie hardening, `M-010` signed JWT (replace X-User-Id), `M-032` password change/reset, `M-006` retention job for redacted logs, plus P2/P3 polish (M-045/M-043/M-039/M-051/M-052/M-075/M-076) and Group-C wow (M-067/M-068/M-069/M-070/M-072). **After Phase 3:** 3 experts inspect (P4) → fix (P5) → 2 final agents + browser verify (P6) → END.
 
 **Next priorities:** `M-008` (UNIQUE on tb_memory_card), `M-078` (belief/reportLetter ownership), `M-075`/`M-076` (validation/error-envelope), `M-029` typography-app-wide is DONE — pick from remaining P2/P3 + Group-C wow, then the bigger coordinated items (`M-018` CSRF, `M-010` JWT, `M-032` password change/reset). **After Phase 3:** 3 experts inspect (P4) → fix (P5) → 2 final agents + browser verify (P6) → END.
