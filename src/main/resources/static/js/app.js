@@ -4,6 +4,10 @@ const IC = {
   _darkMedia: null,
 
   async api(path, options = {}, retries = 1) {
+    const method = (options.method || "GET").toUpperCase();
+    // M-025: only retry idempotent GETs — never re-send POSTs (letter/capsule/account) on a
+    // transient timeout, which would double side-effects.
+    const maxRetries = method === "GET" ? retries : 0;
     for (let attempt = 0; ; attempt++) {
       try {
         const res = await fetch(path, {
@@ -11,11 +15,25 @@ const IC = {
           headers: { "Content-Type": "application/json; charset=utf-8", ...(options.headers || {}) },
           ...options
         });
-        const json = await res.json();
+        // M-025: an expired/invalid session (Spring Security 401/403 on /api/**) should send the
+        // user to the login page instead of stranding them with a cryptic toast. (Don't redirect
+        // from login/register/index themselves.)
+        if (res.status === 401 || res.status === 403) {
+          const p = location.pathname;
+          if (!p.endsWith("/login.html") && !p.endsWith("/register.html") && !p.endsWith("/index.html")) {
+            location.href = "/pages/login.html";
+          }
+        }
+        let json;
+        try {
+          json = await res.json();
+        } catch (e) {
+          json = { success: false, message: "连接暂时没有回应，请稍后再试。" };
+        }
         if (!json.success && json.message) IC.toast(json.message, "warn");
         return json;
       } catch (error) {
-        if (attempt < retries) {
+        if (attempt < maxRetries) {
           await new Promise(r => setTimeout(r, 800 * (attempt + 1)));
           continue;
         }
