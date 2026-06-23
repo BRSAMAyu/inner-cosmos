@@ -59,6 +59,13 @@ public class UserCorrectionController extends BaseController {
         return ApiResponse.ok(userCorrectionService.recentCorrections(userId, LIST_LIMIT));
     }
 
+    @DeleteMapping("/{id}")
+    public ApiResponse<Void> delete(@PathVariable Long id, HttpSession session) {
+        Long userId = currentUserId(session);
+        userCorrectionService.deleteCorrection(userId, id);
+        return ApiResponse.ok(null);
+    }
+
     private static String trimToNull(String value) {
         if (value == null) return null;
         String trimmed = value.trim();

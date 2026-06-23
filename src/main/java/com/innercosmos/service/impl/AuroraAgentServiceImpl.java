@@ -273,10 +273,16 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         for (String msg : vo.messages) {
             dialogService.saveAuroraMessage(userId, request.sessionId, msg);
         }
-        // Portrait reflection hook: every 5 turns, analyze and update user portrait
-        int n = turnCounter.merge(userId, 1, Integer::sum);
-        if (n % 5 == 0) {
-            turnCounter.put(userId, 0);
+        // Portrait reflection hook: every 5 turns, analyze and update user portrait.
+        // M-045: atomic compute — increment, threshold check, and reset in one op so concurrent
+        // turns for the same user can't double-fire or skip the reflection.
+        boolean[] shouldReflect = {false};
+        turnCounter.compute(userId, (k, cur) -> {
+            int c = (cur == null ? 0 : cur) + 1;
+            if (c >= 5) { shouldReflect[0] = true; return 0; }
+            return c;
+        });
+        if (shouldReflect[0]) {
             // M-011/Phase-5: run the reflection (an extra LLM call) ASYNC on aiExecutor so the
             // 1-in-5 POST reply is never blocked by it. The portrait updates a moment later, which
             // is fine for a mid-session refresh; an async failure must never break the reply path.

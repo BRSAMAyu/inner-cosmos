@@ -3,7 +3,9 @@ package com.innercosmos.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.innercosmos.ai.portrait.UserPortraitService;
 import com.innercosmos.ai.portrait.dto.PortraitDeltas;
+import com.innercosmos.common.ErrorCode;
 import com.innercosmos.entity.UserCorrection;
+import com.innercosmos.exception.BusinessException;
 import com.innercosmos.mapper.UserCorrectionMapper;
 import com.innercosmos.service.UserCorrectionService;
 import org.slf4j.Logger;
@@ -91,5 +93,17 @@ public class UserCorrectionServiceImpl implements UserCorrectionService {
         }
         query.orderByDesc("id").last("LIMIT " + limit);
         return userCorrectionMapper.selectList(query);
+    }
+
+    @Override
+    public void deleteCorrection(Long userId, Long id) {
+        if (userId == null || id == null) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "无权操作该更正");
+        }
+        UserCorrection correction = userCorrectionMapper.selectById(id);
+        if (correction == null || !userId.equals(correction.userId)) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "无权操作该更正");
+        }
+        userCorrectionMapper.deleteById(id);
     }
 }

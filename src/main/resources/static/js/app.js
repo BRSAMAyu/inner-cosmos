@@ -355,6 +355,10 @@ const IC = {
         <p class="ic-loading-text">${IC.esc(message || "正在慢慢呈现…")}</p>
       </div>`;
     document.body.appendChild(mask);
+    // M-082: let a stuck loading mask be dismissed by clicking it (recovery), in addition to
+    // the 3.5s auto-hide.
+    mask.title = "点击关闭";
+    mask.addEventListener("click", () => IC.hideLoading());
     if (IC._loadingAutoHide) clearTimeout(IC._loadingAutoHide);
     IC._loadingAutoHide = setTimeout(() => IC.hideLoading(), 3500);
   },

@@ -24,4 +24,11 @@ public interface UserCorrectionService {
      * {@link #recentCorrections(Long, int)}.
      */
     List<UserCorrection> recentCorrectionsByType(Long userId, String targetType, int limit);
+
+    /**
+     * M-069 — retire (hard-delete) one of the user's own corrections. Loads by id and
+     * throws UNAUTHORIZED if the correction does not exist or belongs to another user,
+     * so a forged id can never touch someone else's data.
+     */
+    void deleteCorrection(Long userId, Long id);
 }

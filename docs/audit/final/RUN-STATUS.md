@@ -65,6 +65,18 @@ Experts 1–4 must NOT see each other's output. Expert 5 sees all four and criti
 
 **32 fixes done & verified; full suite green (621 tests, 0 failures).**
 
+### Phase 4 (inspection) + Phase 5 (fixes) — DONE / IN PROGRESS
+- **Phase 4:** 3 independent inspectors ran over the 33-fix diff. Verdict: most fixes sound; found real issues.
+- **Phase 5 P1 fixes (committed, suite green):** M-032 changePassword null-guard · M-006 redact requestJson · M-004 /api/plaza/matches projection · M-001/M-024 setSessionModel ownership · M-002 split 110/120 hotlines · M-005 remove visitor agent-context (was still leaking) · M-011 async reflection (latency) · M-008 migration initializer (retrofit UNIQUE) · M-019 trusted-proxy flag · M-053 portrait dims synced · M-069 editable corrections + page · M-045 atomic turnCounter · M-051 (skipped — referenced by test) · M-082 loading-mask dismiss.
+- **Approach switched to parallel + background tests** (per user): batch implementations on disjoint files via Workflow; full suite run in background (non-blocking); independent inspection agent per batch.
+
+### In flight
+- Background full suite (verifying batch-1 + M-045/M-082) + independent inspection agent on batch 1.
+
+### Next
+- **Batch 2** (disjoint): M-067 resonance "landed" signal, M-070 first-run onboarding, M-052 wire prompt-versioning. Then Phase 6: 2 final agents + browser verification → END.
+- Remaining bigger items (fresh context if needed): M-010 signed JWT, full CSRF token (M-018 other half), M-044 error-envelope normalization.
+
 **Remaining (lower priority / bigger):** `M-018` CSRF + cookie hardening, `M-010` signed JWT (replace X-User-Id), `M-032` password change/reset, `M-006` retention job for redacted logs, plus P2/P3 polish (M-045/M-043/M-039/M-051/M-052/M-075/M-076) and Group-C wow (M-067/M-068/M-069/M-070/M-072). **After Phase 3:** 3 experts inspect (P4) → fix (P5) → 2 final agents + browser verify (P6) → END.
 
 **Next priorities:** `M-008` (UNIQUE on tb_memory_card), `M-078` (belief/reportLetter ownership), `M-075`/`M-076` (validation/error-envelope), `M-029` typography-app-wide is DONE — pick from remaining P2/P3 + Group-C wow, then the bigger coordinated items (`M-018` CSRF, `M-010` JWT, `M-032` password change/reset). **After Phase 3:** 3 experts inspect (P4) → fix (P5) → 2 final agents + browser verify (P6) → END.
