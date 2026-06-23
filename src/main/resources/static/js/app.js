@@ -76,6 +76,7 @@ const IC = {
 
   mountShell(activeLabel = "") {
     IC.initSystemThemeListener();
+    IC.ensureFonts(); // M-029: app-wide typography (was loaded only by index.html)
     IC.applyTimeClass();
     IC.applyTheme();
     IC.ensureFlowStage();
@@ -142,6 +143,31 @@ const IC = {
       <div class="flow-plane flow-plane-c"></div>
     `;
     document.body.prepend(stage);
+  },
+
+  /* M-029: app-wide calligraphic typography (Noto Serif SC / Cormorant / LXGW WenKai). Was
+     loaded only by index.html; mounting once here applies it to all pages. Idempotent. */
+  ensureFonts() {
+    if (document.getElementById("ic-fonts")) return;
+    const frag = document.createDocumentFragment();
+    [["https://fonts.googleapis.com", false], ["https://fonts.gstatic.com", true]].forEach(([href, cross]) => {
+      const l = document.createElement("link");
+      l.rel = "preconnect"; l.href = href; if (cross) l.crossOrigin = "anonymous";
+      frag.appendChild(l);
+    });
+    const g = document.createElement("link");
+    g.rel = "stylesheet";
+    g.href = "https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;600&family=Cormorant+Garamond:wght@300;400;600&family=Cormorant+It:wght@400&display=swap";
+    frag.appendChild(g);
+    const mono = document.createElement("link");
+    mono.rel = "stylesheet";
+    mono.href = "https://cdn.jsdelivr.net/npm/jetbrains-mono@2.0.0/fonts/jetbrains-mono.css";
+    frag.appendChild(mono);
+    const s = document.createElement("style");
+    s.id = "ic-fonts";
+    s.textContent = "@font-face{font-family:'LXGW WenKai';src:local('LXGW WenKai'),local('STKaiti'),local('KaiTi');font-display:swap;}";
+    frag.appendChild(s);
+    document.head.appendChild(frag);
   },
 
   enterPage() {
