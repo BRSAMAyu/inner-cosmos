@@ -255,6 +255,9 @@ const IC = {
       const root = document.createElement("div");
       root.id = "toastRoot";
       root.className = "toast-root";
+      root.setAttribute("role", "status");      // M-081: announce toasts to assistive tech
+      root.setAttribute("aria-live", "polite");
+      root.setAttribute("aria-atomic", "true");
       document.body.appendChild(root);
     }
   },
