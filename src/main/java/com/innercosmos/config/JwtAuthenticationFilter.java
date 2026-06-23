@@ -16,10 +16,9 @@ import java.io.IOException;
 import java.util.List;
 
 /**
- * JWT-like authentication filter.
- * Reads userId from custom header (X-User-Id) for now.
- * In production, replace with actual JWT validation.
- * All API requests must have valid X-User-Id header.
+ * Session-based authentication filter. Reads LOGIN_USER_ID from the HttpSession and
+ * establishes the Spring Security context with ROLE_USER / ROLE_ADMIN. The X-User-Id
+ * header trust was removed (M-010) — session is the sole auth mechanism.
  */
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
