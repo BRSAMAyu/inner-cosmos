@@ -62,12 +62,15 @@ const IC = {
       ["/pages/relations.html", "关系"],
       ["/pages/beliefs.html", "信念"],
       ["/pages/safety-harbor.html", "避风港"],
+      ["/pages/thought-shredder.html", "碎纸机"],
       ["/pages/token-usage.html", "用量"],
       ["/pages/settings.html", "设置"],
       ["/pages/admin.html", "管理", true],
       ["/pages/abtest-report.html", "实验", true],
       ["/pages/prompt-versions.html", "Prompt", true],
-      ["/pages/model-config.html", "模型", true]
+      ["/pages/model-config.html", "模型", true],
+      ["/pages/ai-log.html", "AI 日志", true],
+      ["/pages/ai-dev-history.html", "开发记录", true]
     ].map(([href, label, adminOnly]) => `<a href="${href}" data-route="${href}"${adminOnly ? ' data-admin-nav="true"' : ''}>${IC.esc(label)}</a>`).join("");
   },
 

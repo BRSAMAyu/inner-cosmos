@@ -46,8 +46,12 @@ Experts 1–4 must NOT see each other's output. Expert 5 sees all four and criti
 - `M-011` — 5-turn portrait reflection now persists (closes the RUN-006 no-op). `7a7d6f6`.
 - `M-026` — DISPLAY_ONCE shred is TRANSIENT + zero gravity (no resurface) + test. `60769ae`.
 - `M-021` — atomic session counter (was inert @Transactional self-call + lost updates). `cefa03a` + test `a747a83`.
+- `M-007` — atomic conditional finish (no more double-fired memory events / duplicate cards). + test. `fbcf40a`.
+- `M-025` — IC.api status-aware (401/403→login) + GET-only retry. `fb2614d`.
+- `M-022` — atomic conditional letter transition (optimistic lock).
+- `M-027` — wired orphan pages into nav (thought-shredder main; ai-log/ai-dev-history admin).
 
-**15 fixes done & verified; full suite green (~630 tests, 0 failures).**
+**18 fixes done & verified; full suite green (~630 tests, 0 failures).**
 
 **Next priorities:** data-integrity P0s `M-007` (atomic finish + AFTER_COMMIT listeners), `M-008` (UNIQUE on tb_memory_card(user_id, source_session_id)); signature no-ops `M-015` (EmotionTimeline auto-aggregate), `M-017` (corrections durably reshape portrait); then `M-022` (letter optimistic lock), `M-025` (resilient IC.api), then remaining P1/P2 hardening (M-010 JWT, M-018 CSRF, M-019 brute-force, M-032/M-033) and Group-C wow. **After Phase 3:** 3 experts inspect (P4) → fix (P5) → 2 final agents + browser verify (P6) → END.
 
