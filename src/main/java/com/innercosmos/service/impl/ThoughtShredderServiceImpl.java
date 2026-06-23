@@ -85,10 +85,13 @@ public class ThoughtShredderServiceImpl implements ThoughtShredderService {
         card.recurrenceCount = 1;
         card.userImportance = 3.0;
         card.triggerCount = 1;
-        card.emotionalGravity = gravityService.calculateGravity(intensity, 1, 3, 1, 0);
+        // M-026: DISPLAY_ONCE (TRANSIENT) cards are a one-time vent, not a weighted memory —
+        // give them zero gravity so they never surface in the starfield.
+        boolean displayOnce = "DISPLAY_ONCE".equals(mode);
+        card.emotionalGravity = displayOnce ? 0.0 : gravityService.calculateGravity(intensity, 1, 3, 1, 0);
         card.lastTouchedAt = LocalDateTime.now();
         card.visibilityLevel = "PRIVATE";
-        card.status = "DISPLAY_ONCE".equals(mode) ? "TRANSIENT" : "ACTIVE";
+        card.status = displayOnce ? "TRANSIENT" : "ACTIVE";
         memoryCardMapper.insert(card);
 
         List<ThoughtFragment> fragments = new ArrayList<>();
@@ -124,7 +127,7 @@ public class ThoughtShredderServiceImpl implements ThoughtShredderService {
     @Override
     public List<MemoryCard> history(Long userId) {
         QueryWrapper<MemoryCard> query = new QueryWrapper<>();
-        query.eq("user_id", userId).eq("memory_type", "SHREDDER").orderByDesc("id");
+        query.eq("user_id", userId).eq("memory_type", "SHREDDER").ne("status", "TRANSIENT").orderByDesc("id");
         return memoryCardMapper.selectList(query);
     }
 
