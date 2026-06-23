@@ -382,7 +382,7 @@ function switchTab(tab, el) {
 
 function statusBadge(status) {
   var map = {
-    DRAFT: "badge-read", SENT: "badge-read", DELIVERED: "badge-new",
+    DRAFT: "badge-read", SENT: "badge-read", FLYING: "badge-new", DELIVERED: "badge-new",
     READ: "badge-replied", REPLIED: "badge-replied", DECLINED: "badge-declined",
     BLOCKED: "badge-declined", ARCHIVED: "badge-read", NEW: "badge-new"
   };
@@ -391,7 +391,7 @@ function statusBadge(status) {
 
 function statusLabel(status) {
   var map = {
-    DRAFT: "草稿", SENT: "已发送", DELIVERED: "已送达", READ: "已读",
+    DRAFT: "草稿", SENT: "已发送", FLYING: "在路上", DELIVERED: "已送达", READ: "已读",
     REPLIED: "已回复", DECLINED: "已婉拒", BLOCKED: "已屏蔽", ARCHIVED: "已归档", NEW: "新信"
   };
   return map[status] || status;
