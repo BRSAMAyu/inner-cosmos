@@ -279,7 +279,7 @@ async function load() {
   if (r.success && r.data) {
     var resources = r.data;
     document.getElementById("resources").innerHTML = resources.map(function(x) {
-      var phoneMatch = x.match(/\d{3,4}[-\s]?\d{7,8}/);
+      var phoneMatch = x.match(/\d{3,4}[-\s]?\d{7,8}|\d{3}[-\s]?\d{3}[-\s]?\d{4}|\b(?:110|120|119|12320|12355|988)\b/);
       return '<article class="safety-card">' +
         '<p>' + IC.esc(x) + '</p>' +
         (phoneMatch ? '<a class="phone-link" href="tel:' + phoneMatch[0].replace(/\s|-/g, "") + '">拨打 ' + IC.esc(phoneMatch[0]) + '</a>' : '') +

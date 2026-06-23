@@ -196,6 +196,19 @@ class SafetyServiceTest {
         }
     }
 
+    @Test
+    @DisplayName("resources includes at least one dialable crisis hotline number (M-002)")
+    void resources_containsHotlineNumber() {
+        // Safety-of-life contract: the crisis funnel must surface a real, dialable number,
+        // and it must match the tel-link regex in safety-harbor.html so it renders clickable.
+        List<String> result = safetyService.resources();
+        boolean hasPhone = result.stream().anyMatch(r ->
+                r.matches(".*\\d{3,4}[-\\s]?\\d{7,8}.*")              // e.g. 010-82951332
+                        || r.matches(".*\\d{3}[-\\s]?\\d{3}[-\\s]?\\d{4}.*")  // e.g. 400-161-9995
+                        || r.matches(".*\\b(?:110|120|119|12320|12355|988)\\b.*")); // short codes
+        assertTrue(hasPhone, "resources() must include at least one dialable crisis hotline number");
+    }
+
     // --- safety event recording ---
 
     @Test
