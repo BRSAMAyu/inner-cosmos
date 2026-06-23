@@ -19,4 +19,7 @@ public interface UserService {
     Map<String, Object> exportData(Long userId);
 
     void deleteAccount(Long userId);
+
+    /** M-032: change the current user's password (requires the old password). */
+    void changePassword(Long userId, String oldPassword, String newPassword);
 }
