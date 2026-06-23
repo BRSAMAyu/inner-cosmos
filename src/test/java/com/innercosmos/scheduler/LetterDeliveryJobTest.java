@@ -2,6 +2,7 @@ package com.innercosmos.scheduler;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.innercosmos.entity.SlowLetter;
+import com.innercosmos.mapper.LetterStatusLogMapper;
 import com.innercosmos.mapper.SlowLetterMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -30,12 +31,15 @@ class LetterDeliveryJobTest {
     @Mock
     private SlowLetterMapper letterMapper;
 
+    @Mock
+    private LetterStatusLogMapper logMapper;
+
     private LetterDeliveryJob job;
 
     @BeforeEach
     void setUp() {
         // Use a near-zero backoff so the retry test stays fast.
-        job = new LetterDeliveryJob(letterMapper);
+        job = new LetterDeliveryJob(letterMapper, logMapper); // M-077: audit-log mapper
     }
 
     private SlowLetter sentLetter(long id) {
