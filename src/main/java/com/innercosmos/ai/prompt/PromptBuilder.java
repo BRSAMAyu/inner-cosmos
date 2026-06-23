@@ -13,6 +13,7 @@ import java.util.List;
 public class PromptBuilder {
     private final List<String> parts = new ArrayList<>();
     private String modeTemperatureHint;
+    private com.innercosmos.service.PromptVersionService promptVersionService; // M-052: optional DB override
 
     // ── VS-004 curation caps (the PromptBuilder is the single chokepoint that keeps
     //     portrait + relationship + state from bloating the prompt). ──
@@ -35,7 +36,23 @@ public class PromptBuilder {
     /** Max chars per correction field value. */
     static final int CORRECTION_VALUE_MAX_CHARS = 120;
 
+    /** M-052: wire the prompt-versioning subsystem so admin-edited prompts take effect (safe fallback). */
+    public PromptBuilder withPromptVersionService(com.innercosmos.service.PromptVersionService svc) {
+        this.promptVersionService = svc;
+        return this;
+    }
+
     public PromptBuilder withSystemBoundary() {
+        // M-052: check for an admin-overridden DB version first (null service → hardcoded fallback).
+        if (promptVersionService != null) {
+            try {
+                String dbVersion = promptVersionService.getActivePrompt("system_boundary");
+                if (dbVersion != null && !dbVersion.isBlank()) {
+                    parts.add(dbVersion);
+                    return this;
+                }
+            } catch (Exception ignored) { /* fall through to hardcoded */ }
+        }
         parts.add(
             "You are Aurora, the AI companion in Inner Cosmos.\n\n"
             + "Who you are: A friend who genuinely cares about the user. You listen, respond, associate, follow up, and proactively show care at the right moments.\n"
