@@ -80,6 +80,7 @@ public class DialogServiceImpl implements DialogService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public DialogSession finish(Long userId, Long sessionId) {
         DialogSession session = sessionMapper.selectById(sessionId);
         if (session == null) {
@@ -91,11 +92,21 @@ public class DialogServiceImpl implements DialogService {
         if ("FINISHED".equals(session.status)) {
             return session;
         }
+        // M-007: atomic conditional UPDATE — only the winner of a concurrent finish race gets
+        // rowsAffected==1 and fires the DialogFinishedEvent; the loser's UPDATE matches 0 rows
+        // (status is now FINISHED), so the memory-settlement listeners never double-fire and
+        // the starfield can't be corrupted by duplicate MemoryCards.
+        int updated = sessionMapper.update(null, new UpdateWrapper<DialogSession>()
+                .eq("id", sessionId).ne("status", "FINISHED")
+                .set("status", "FINISHED")
+                .set("ended_at", LocalDateTime.now())
+                .set("summary_anchor", "本次对话已整理为可沉淀的记忆锚点."));
+        if (updated == 1) {
+            eventPublisher.publishEvent(new DialogFinishedEvent(userId, sessionId));
+        }
         session.status = "FINISHED";
         session.endedAt = LocalDateTime.now();
         session.summaryAnchor = "本次对话已整理为可沉淀的记忆锚点.";
-        sessionMapper.updateById(session);
-        eventPublisher.publishEvent(new DialogFinishedEvent(userId, sessionId));
         return session;
     }
 

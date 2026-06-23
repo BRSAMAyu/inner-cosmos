@@ -190,13 +190,13 @@ class DialogServiceTest {
     void finish_updatesStatusAndPublishesEvent() {
         DialogSession session = buildOwnedSession();
         when(sessionMapper.selectById(SESSION_ID)).thenReturn(session);
-        when(sessionMapper.updateById(any(DialogSession.class))).thenReturn(1);
+        when(sessionMapper.update(any(), any())).thenReturn(1); // M-007: finish uses atomic conditional update
 
         DialogSession result = dialogService.finish(USER_ID, SESSION_ID);
 
         assertEquals("FINISHED", result.status);
         assertNotNull(result.endedAt);
-        verify(sessionMapper).updateById(any(DialogSession.class));
+        verify(sessionMapper).update(any(), any()); // M-007: atomic conditional update
         verify(eventPublisher).publishEvent(any(DialogFinishedEvent.class));
     }
 
