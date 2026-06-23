@@ -21,8 +21,8 @@ public class SafetyServiceImpl implements SafetyService {
      * diagnosis, never a promise to always be present. Routes to real-world support.
      */
     private static final String CRISIS_SAFE_MESSAGE =
-            "你提到的内容触发了一些安全边界.如果你正处于紧急危险中,请立即联系当地急救或可信赖的现实支持者." +
-            "你可以先离开屏幕,喝水,呼吸,并联系一个真实的人.";
+            "你提到的内容触发了一些安全边界。如果你正处于紧急危险中，请立即拨打 110（报警）或 120（急救），" +
+            "或 24 小时心理援助热线 010-82951332。你可以先离开屏幕，喝水，呼吸，并联系一个真实的人。";
 
     private final SafetyEventMapper safetyEventMapper;
     private final SafetyBoundaryFilter safetyBoundaryFilter;
@@ -52,10 +52,16 @@ public class SafetyServiceImpl implements SafetyService {
 
     @Override
     public List<String> resources() {
+        // M-002: real, dialable crisis hotlines for a Chinese-speaking user in distress.
+        // Each line carries a number so safety-harbor.html can render a tel: link. Never a
+        // diagnosis or a promise to always be present — only a bridge to real-world help.
         return List.of(
-                "如果你正处于紧急危险中,请立即联系当地急救或可信赖的现实支持者.",
-                "Inner Cosmos 不提供心理诊断,也不替代医生、咨询师或热线.",
-                "你可以先离开屏幕,喝水,呼吸,并联系一个真实的人."
+                "如果你正处于紧急危险中，请立即拨打 110（报警）或 120（急救），或联系身边可信赖的人。",
+                "北京心理危机研究与干预中心 · 24 小时心理援助热线：010-82951332。",
+                "全国心理援助热线（希望 24）· 24 小时：400-161-9995。",
+                "全国公共卫生公益热线：12320（可转接心理援助）。",
+                "青少年心理援助热线 · 12355。",
+                "Inner Cosmos 不提供心理诊断，也不替代医生、咨询师或热线。"
         );
     }
 
