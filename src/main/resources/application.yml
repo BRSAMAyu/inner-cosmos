@@ -96,8 +96,8 @@ mybatis-plus:
       id-type: auto
 
 llm:
-  mode: ${LLM_MODE:prod}
-  provider: ${LLM_PROVIDER:minimax}
+  mode: ${LLM_MODE:dev}
+  provider: ${LLM_PROVIDER:mock}
   api-key: ${LLM_API_KEY}
   base-url: ${LLM_BASE_URL:}
   model: ${LLM_MODEL:MiniMax-M2.7}
