@@ -25,7 +25,7 @@ public class PromptVersionController extends BaseController {
 
     @GetMapping("/active")
     public ApiResponse<Map<String, String>> active(@RequestParam String key, HttpSession session) {
-        currentUserId(session);
+        requireAdmin(session); // M-074: prompt content is admin-only
         return ApiResponse.ok(Map.of("key", key, "content", promptVersionService.getActivePrompt(key)));
     }
 
@@ -39,7 +39,8 @@ public class PromptVersionController extends BaseController {
     }
 
     @GetMapping("/versions")
-    public ApiResponse<List<PromptTemplateEntity>> versions(@RequestParam String key) {
+    public ApiResponse<List<PromptTemplateEntity>> versions(@RequestParam String key, HttpSession session) {
+        requireAdmin(session); // M-074
         return ApiResponse.ok(promptVersionService.listVersions(key));
     }
 
@@ -57,7 +58,8 @@ public class PromptVersionController extends BaseController {
     }
 
     @GetMapping("/variant")
-    public ApiResponse<PromptTemplateEntity> variant(@RequestParam String key, @RequestParam String variant) {
+    public ApiResponse<PromptTemplateEntity> variant(@RequestParam String key, @RequestParam String variant, HttpSession session) {
+        requireAdmin(session); // M-074
         return ApiResponse.ok(promptVersionService.getPromptVariant(key, variant));
     }
 
@@ -73,12 +75,14 @@ public class PromptVersionController extends BaseController {
     }
 
     @GetMapping("/performance")
-    public ApiResponse<Map<Integer, PromptVersionService.PromptMetrics>> performance(@RequestParam String key) {
+    public ApiResponse<Map<Integer, PromptVersionService.PromptMetrics>> performance(@RequestParam String key, HttpSession session) {
+        requireAdmin(session); // M-074
         return ApiResponse.ok(promptVersionService.getPerformanceMetrics(key));
     }
 
     @GetMapping("/low-performing")
-    public ApiResponse<List<PromptTemplateEntity>> lowPerforming(@RequestParam(defaultValue = "0.5") double threshold) {
+    public ApiResponse<List<PromptTemplateEntity>> lowPerforming(@RequestParam(defaultValue = "0.5") double threshold, HttpSession session) {
+        requireAdmin(session); // M-074
         return ApiResponse.ok(promptVersionService.findLowPerformingPrompts(threshold));
     }
 }
