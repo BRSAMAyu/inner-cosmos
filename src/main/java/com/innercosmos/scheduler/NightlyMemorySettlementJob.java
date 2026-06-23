@@ -115,10 +115,18 @@ public class NightlyMemorySettlementJob {
         QueryWrapper<MemoryCard> query = new QueryWrapper<>();
         query.eq("user_id", userId).eq("status", "ACTIVE");
         List<MemoryCard> cards = memoryCardMapper.selectList(query);
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
         for (MemoryCard card : cards) {
+            // M-014: apply real time-decay — gravity fades with days since the card was last
+            // touched (falling back to createdAt when never re-touched), so the starfield ages
+            // instead of freezing at creation-time ordering. Card-creation paths still pass 0.
+            java.time.LocalDateTime anchor = card.lastTouchedAt != null
+                    ? card.lastTouchedAt : card.createdAt;
+            long daysSince = anchor == null ? 0L
+                    : java.time.temporal.ChronoUnit.DAYS.between(anchor, now);
             card.emotionalGravity = gravityService.calculateGravity(
                     card.intensityScore, card.recurrenceCount,
-                    card.userImportance, card.triggerCount, 0);
+                    card.userImportance, card.triggerCount, daysSince);
             memoryCardMapper.updateById(card);
         }
     }
