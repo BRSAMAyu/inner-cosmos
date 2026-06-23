@@ -137,6 +137,121 @@
       .landing-hero .hero-actions { flex-direction: column; }
       .landing-hero .hero-actions .button { text-align: center; }
     }
+
+    /* ── First-run onboarding tour (M-070) ── */
+    .ic-onboard-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: radial-gradient(ellipse at center, rgba(20,18,16,.46), rgba(20,18,16,.66));
+      backdrop-filter: blur(6px);
+      opacity: 0;
+      animation: ic-onboard-fade .42s var(--ease-bloom) forwards;
+    }
+    @keyframes ic-onboard-fade {
+      to { opacity: 1; }
+    }
+    .ic-onboard-card {
+      width: min(420px, 92vw);
+      background: linear-gradient(180deg, rgba(255,250,243,.96), rgba(247,242,236,.92));
+      border: 1px solid rgba(255,255,255,.30);
+      border-radius: var(--radius-card);
+      box-shadow: var(--elev-2);
+      padding: 32px 28px 24px;
+      text-align: center;
+      color: var(--ink);
+      transform: translateY(12px) scale(.98);
+      animation: ic-onboard-bloom .48s var(--ease-bloom) forwards;
+    }
+    @keyframes ic-onboard-bloom {
+      to { transform: translateY(0) scale(1); }
+    }
+    .ic-onboard-card .ic-onboard-step {
+      display: inline-block;
+      font-family: var(--font-hero);
+      font-size: .8rem;
+      letter-spacing: .12em;
+      color: var(--accent-sage);
+      margin-bottom: 14px;
+    }
+    .ic-onboard-card .ic-onboard-glyph {
+      font-size: 2.4rem;
+      line-height: 1;
+      margin-bottom: 14px;
+      animation: landing-stardust 6s var(--ease-drift, var(--ease-flow)) infinite alternate;
+    }
+    .ic-onboard-card h3 {
+      font-family: var(--font-hero);
+      font-size: 1.5rem;
+      color: var(--ink);
+      margin: 0 0 12px;
+      line-height: 1.3;
+      text-wrap: balance;
+    }
+    .ic-onboard-card p {
+      font-size: .96rem;
+      color: var(--muted);
+      line-height: 1.7;
+      margin: 0 0 22px;
+      text-wrap: pretty;
+    }
+    .ic-onboard-dots {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+    .ic-onboard-dots span {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: rgba(143,163,148,.30);
+      transition: background .28s var(--ease-flow), transform .28s var(--ease-flow);
+    }
+    .ic-onboard-dots span.active {
+      background: var(--accent-sage);
+      transform: scale(1.25);
+    }
+    .ic-onboard-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      align-items: center;
+    }
+    .ic-onboard-actions .button {
+      padding: 12px 28px;
+      font-size: .98rem;
+      border-radius: 26px;
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      background: linear-gradient(135deg, var(--accent-sage), var(--accent-dusty-blue));
+      color: #fff;
+      box-shadow: 0 4px 16px rgba(143,163,148,.24);
+      transition: opacity .26s var(--ease-flow), transform .18s var(--ease-flow);
+    }
+    .ic-onboard-actions .button:hover { opacity: .9; transform: translateY(-2px); }
+    .ic-onboard-actions .ic-onboard-skip {
+      background: transparent;
+      color: var(--muted);
+      box-shadow: none;
+      padding: 12px 16px;
+      font-size: .9rem;
+    }
+    .ic-onboard-actions .ic-onboard-skip:hover { color: var(--ink); transform: none; opacity: 1; }
+    /* ── Dark mode ── */
+    body.dark-star .ic-onboard-card {
+      background: linear-gradient(180deg, rgba(42,38,34,.92), rgba(37,33,29,.88));
+      border-color: rgba(163,153,143,.14);
+    }
+    @media (max-width: 640px) {
+      .ic-onboard-card { padding: 26px 22px 20px; }
+      .ic-onboard-card h3 { font-size: 1.3rem; }
+    }
   </style>
 </head>
 <body>
@@ -233,5 +348,89 @@
   <script src="/js/audio-system.js"></script>
   <script src="/js/app.js?v=final-20260612"></script>
   <script>IC.mountShell("首页"); IC.stagger(document);</script>
+
+  <!-- M-070: first-run onboarding tour (guarded by localStorage ic_onboarded_v1) -->
+  <script>
+  (function () {
+    var FLAG = 'ic_onboarded_v1';
+    try { if (localStorage.getItem(FLAG)) return; } catch (e) { return; }
+
+    var steps = [
+      { glyph: '💬', title: '说一句今天最真实的话', desc: '不用想清楚，混乱也没关系。把此刻心里那句还没整理好的话，轻轻放下来。' },
+      { glyph: '✨', title: '看它变成一颗属于你的星', desc: 'Aurora 会陪你慢慢看清其中的事件、感受和念头，让这句话沉淀为一颗温柔的星。' },
+      { glyph: '🌌', title: '再决定要不要把它放进星海', desc: '每一步都是自愿的。你可以保留、整理，或轻轻放下 — 这里没有催促，只有陪伴。' }
+    ];
+
+    var overlay = document.createElement('div');
+    overlay.className = 'ic-onboard-overlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+
+    var card = document.createElement('div');
+    card.className = 'ic-onboard-card';
+    overlay.appendChild(card);
+
+    var dotsWrap = document.createElement('div');
+    dotsWrap.className = 'ic-onboard-dots';
+    steps.forEach(function () {
+      var d = document.createElement('span');
+      dotsWrap.appendChild(d);
+    });
+    card.appendChild(dotsWrap);
+
+    var glyph = document.createElement('div');
+    glyph.className = 'ic-onboard-glyph';
+    card.appendChild(glyph);
+
+    var stepLabel = document.createElement('span');
+    stepLabel.className = 'ic-onboard-step';
+    card.appendChild(stepLabel);
+
+    var heading = document.createElement('h3');
+    card.appendChild(heading);
+
+    var body = document.createElement('p');
+    card.appendChild(body);
+
+    var actions = document.createElement('div');
+    actions.className = 'ic-onboard-actions';
+    var skipBtn = document.createElement('button');
+    skipBtn.className = 'button ic-onboard-skip';
+    skipBtn.type = 'button';
+    skipBtn.textContent = '跳过';
+    var nextBtn = document.createElement('button');
+    nextBtn.className = 'button';
+    nextBtn.type = 'button';
+    actions.appendChild(skipBtn);
+    actions.appendChild(nextBtn);
+    card.appendChild(actions);
+
+    var i = 0;
+    function finish() {
+      try { localStorage.setItem(FLAG, '1'); } catch (e) {}
+      try { overlay.remove(); } catch (e) {}
+      window.location.href = '/pages/login.html';
+    }
+    function render() {
+      var s = steps[i];
+      glyph.textContent = s.glyph;
+      stepLabel.textContent = '第 ' + (i + 1) + ' / ' + steps.length + ' 步';
+      heading.textContent = s.title;
+      body.textContent = s.desc;
+      nextBtn.textContent = (i === steps.length - 1) ? '进入内宇宙' : '下一步';
+      for (var k = 0; k < dotsWrap.children.length; k++) {
+        dotsWrap.children[k].classList.toggle('active', k === i);
+      }
+    }
+    nextBtn.addEventListener('click', function () {
+      if (i < steps.length - 1) { i++; render(); }
+      else { finish(); }
+    });
+    skipBtn.addEventListener('click', finish);
+
+    render();
+    document.body.appendChild(overlay);
+  })();
+  </script>
 </body>
 </html>

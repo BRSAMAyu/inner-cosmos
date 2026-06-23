@@ -31,4 +31,6 @@ public interface CapsuleService {
     void updateBoundary(Long userId, Long capsuleId, CapsuleBoundary boundary);
 
     void archiveCapsule(Long userId, Long capsuleId);
+
+    Double markLanded(Long userId, Long capsuleId);
 }

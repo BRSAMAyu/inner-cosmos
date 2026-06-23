@@ -1,6 +1,7 @@
 package com.innercosmos.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.innercosmos.ai.agent.CapsuleAgent;
 import com.innercosmos.dto.CapsuleCreateRequest;
 import com.innercosmos.entity.CapsuleBoundary;
@@ -439,6 +440,22 @@ public class CapsuleServiceImpl implements CapsuleService {
         capsule.visibilityStatus = "ARCHIVED";
         capsule.isPublic = false;
         capsuleMapper.updateById(capsule);
+    }
+
+    @Override
+    public Double markLanded(Long userId, Long capsuleId) {
+        // M-067: "this landed for me" — a closed resonance signal. Verify the capsule is public,
+        // then atomically bump echoEnergy by 0.02 (capped at 1.0) in a single SQL statement.
+        EchoCapsule capsule = capsuleMapper.selectById(capsuleId);
+        if (capsule == null || !Boolean.TRUE.equals(capsule.isPublic)) {
+            throw new com.innercosmos.exception.BusinessException(
+                    com.innercosmos.common.ErrorCode.NOT_FOUND, "共鸣体不存在或不可见");
+        }
+        capsuleMapper.update(null, new UpdateWrapper<EchoCapsule>()
+                .eq("id", capsuleId)
+                .setSql("echo_energy = LEAST(1.0, COALESCE(echo_energy, 0) + 0.02)"));
+        Double updated = capsuleMapper.selectById(capsuleId).echoEnergy;
+        return updated == null ? 1.0 : updated;
     }
 
     private Integer safeTurns(Integer turns, boolean seedCapsule) {
