@@ -94,13 +94,13 @@ public class ApiRateLimitFilter implements Filter {
             return;
         }
 
-        String userId = req.getHeader("X-User-Id");
-        if (userId == null || userId.isBlank()) {
-            var session = req.getSession(false);
-            if (session != null) {
-                Object uid = session.getAttribute("LOGIN_USER_ID");
-                if (uid != null) userId = uid.toString();
-            }
+        // M-010: key per-user buckets off the session only — the X-User-Id header is no longer a
+        // trusted auth mechanism (it was spoofable to farm fresh buckets).
+        String userId = null;
+        var session = req.getSession(false);
+        if (session != null) {
+            Object uid = session.getAttribute("LOGIN_USER_ID");
+            if (uid != null) userId = uid.toString();
         }
 
         Bucket bucket;
