@@ -117,12 +117,8 @@ function renderCard(c) {
 
 async function retire(id) {
   if (!confirm("确定让这条更正退休吗？Aurora 将不再据此调整对你的理解。")) return;
-  try {
-    await IC.api("/api/aurora/corrections/" + id, { method: "DELETE" });
-    await load();
-  } catch (e) {
-    alert("删除失败：" + (e && e.message ? e.message : "未知错误"));
-  }
+  const r = await IC.api("/api/aurora/corrections/" + id, { method: "DELETE" });
+  if (r && r.success) { await load(); }  // only reload on actual success (IC.api toasts the error otherwise)
 }
 
 IC.hideLoading();
