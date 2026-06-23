@@ -168,7 +168,10 @@ public class PersonaChatServiceImpl implements PersonaChatService {
                         : capsuleAgent.buildPersonaPrompt(personaName, personaIntro);
                 CapsuleBoundary boundary = boundary(capsule == null ? null : capsule.id);
                 String authorizedSummary = authorizedMemorySummary(capsule);
-                AgentContext visitorContext = agentContextAssembler.assemble(userId, null, message, true);
+                // M-005: do NOT egress the visitor's private memories/todos into a stranger's
+                // capsule prompt. The capsule speaks from its own persona + authorized memory
+                // (authorizedSummary) + the visitor's current message — never the visitor's P1.
+                AgentContext visitorContext = agentContextAssembler.assemble(userId, null, message, false);
                 List<String> history = recentHistory(sessionId);
                 Map<String, Object> aiContext = new LinkedHashMap<>();
                 aiContext.put("personaPrompt", personaPrompt);
