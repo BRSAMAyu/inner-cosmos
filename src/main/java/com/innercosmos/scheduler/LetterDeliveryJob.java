@@ -1,7 +1,9 @@
 package com.innercosmos.scheduler;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.innercosmos.entity.LetterStatusLog;
 import com.innercosmos.entity.SlowLetter;
+import com.innercosmos.mapper.LetterStatusLogMapper;
 import com.innercosmos.mapper.SlowLetterMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,9 +23,11 @@ public class LetterDeliveryJob {
     static final long RETRY_BACKOFF_MS = 200L;
 
     private final SlowLetterMapper letterMapper;
+    private final LetterStatusLogMapper logMapper;
 
-    public LetterDeliveryJob(SlowLetterMapper letterMapper) {
+    public LetterDeliveryJob(SlowLetterMapper letterMapper, LetterStatusLogMapper logMapper) {
         this.letterMapper = letterMapper;
+        this.logMapper = logMapper;
     }
 
     @Scheduled(fixedRate = 60000)
@@ -73,6 +77,19 @@ public class LetterDeliveryJob {
                 fresh.status = "DELIVERED";
                 fresh.deliveredAt = LocalDateTime.now();
                 letterMapper.updateById(fresh);
+                // M-077: write the audit-log entry for scheduler-driven delivery so the letter
+                // lifecycle trail is complete (was API-transition-only before).
+                try {
+                    LetterStatusLog entry = new LetterStatusLog();
+                    entry.letterId = fresh.id;
+                    entry.fromStatus = "SENT";
+                    entry.toStatus = "DELIVERED";
+                    entry.operatorUserId = null; // system / scheduler
+                    entry.reason = "scheduled delivery";
+                    logMapper.insert(entry);
+                } catch (Exception logEx) {
+                    log.warn("Failed to record delivery audit log for letter {}: {}", fresh.id, logEx.getMessage());
+                }
                 return true;
             } catch (Exception e) {
                 log.warn("Delivery attempt {}/{} failed for letter {}: {}",
