@@ -98,7 +98,16 @@ public class MemoryServiceImpl implements MemoryService {
         card.lastTouchedAt = LocalDateTime.now();
         card.visibilityLevel = "PRIVATE";
         card.status = "ACTIVE";
-        memoryCardMapper.insert(card);
+        // M-008 (Phase-6 fix): idempotent on (user_id, source_session_id) — a session that is
+        // both finished (listener) and explicitly settled must not trip the UNIQUE -> 500.
+        MemoryCard existing = memoryCardMapper.selectOne(new QueryWrapper<MemoryCard>()
+                .eq("user_id", userId).eq("source_session_id", sessionId).last("LIMIT 1"));
+        if (existing != null) {
+            card.id = existing.id;
+            memoryCardMapper.updateById(card);
+        } else {
+            memoryCardMapper.insert(card);
+        }
         createStructuredAssets(userId, sessionId, card, raw);
         // IC-CAP-002 B-1: memory changed → trigger a deduped capsule sync proposal.
         if (eventPublisher != null) {

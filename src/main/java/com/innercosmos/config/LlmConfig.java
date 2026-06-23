@@ -396,14 +396,17 @@ public class LlmConfig {
     @Bean(name = "namedLlmClients")
     public Map<String, LlmClient> namedLlmClients(AiLogService aiLogService, Executor aiExecutor) {
         Map<String, LlmClient> m = new LinkedHashMap<>();
+        // M-006 (Phase-6 fix): wrap each routed client with the PII-redacting wrapper so the
+        // model-router path (Aurora chat with a real provider active) redacts too — previously
+        // these were raw clients, bypassing redaction entirely.
         LlmClient minimaxClient = createProviderClient("minimax", false, aiLogService, aiExecutor);
-        if (minimaxClient != null) m.put("MINIMAX", minimaxClient);
+        if (minimaxClient != null) m.put("MINIMAX", new ABTestLlmClientWrapper(minimaxClient, aiLogService, aiExecutor));
         LlmClient mimoClient = createProviderClient("mimo", false, aiLogService, aiExecutor);
-        if (mimoClient != null) m.put("MIMO", mimoClient);
+        if (mimoClient != null) m.put("MIMO", new ABTestLlmClientWrapper(mimoClient, aiLogService, aiExecutor));
         LlmClient glmClient = createProviderClient("glm", false, aiLogService, aiExecutor);
-        if (glmClient != null) m.put("GLM", glmClient);
+        if (glmClient != null) m.put("GLM", new ABTestLlmClientWrapper(glmClient, aiLogService, aiExecutor));
         LlmClient deepseekClient = createProviderClient("deepseek", false, aiLogService, aiExecutor);
-        if (deepseekClient != null) m.put("DEEPSEEK", deepseekClient);
+        if (deepseekClient != null) m.put("DEEPSEEK", new ABTestLlmClientWrapper(deepseekClient, aiLogService, aiExecutor));
         m.put("MOCK", new MockLlmClient(aiExecutor));
         return m;
     }
