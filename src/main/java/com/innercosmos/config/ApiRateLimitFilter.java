@@ -29,6 +29,7 @@ public class ApiRateLimitFilter implements Filter {
     private static final int USER_LIMIT_PER_MINUTE = 60;
     private static final int ANON_LIMIT_PER_MINUTE = 20;
     private static final int AURORA_LLM_LIMIT_PER_MINUTE = 20;
+    private static final int LOGIN_LIMIT_PER_MINUTE = 10; // M-019: per-IP login attempt cap
     private static final int BURST_CAPACITY = 10;
 
     private final Map<String, BucketEntry> userBuckets = new ConcurrentHashMap<>();
@@ -56,6 +57,18 @@ public class ApiRateLimitFilter implements Filter {
         if (!path.startsWith("/api/")) {
             chain.doFilter(request, response);
             return;
+        }
+        // M-019: brute-force protection on /api/auth/login — per-IP bucket (the username isn't
+        // known until the body is parsed; IP-only is the standard first line of defense).
+        if ("POST".equalsIgnoreCase(req.getMethod()) && path.equals("/api/auth/login")) {
+            Bucket loginBucket = loginBucketFor(clientIp(req));
+            if (!loginBucket.tryConsume(1)) {
+                res.setStatus(429);
+                res.setContentType("application/json");
+                res.getWriter().write("{\"error\":\"rate_limit_exceeded\",\"message\":\"登录尝试过于频繁，请稍后再试。\",\"retry_after\":60}");
+                res.setHeader("Retry-After", "60");
+                return;
+            }
         }
         if (path.startsWith("/api/auth/") || path.startsWith("/actuator/")) {
             chain.doFilter(request, response);
@@ -124,6 +137,24 @@ public class ApiRateLimitFilter implements Filter {
                 .refillGreedy(5, Duration.ofMinutes(1))
                 .build())
             .build());
+    }
+
+    /** M-019: per-IP login attempt bucket (evicted by the cleanup thread like other buckets). */
+    private Bucket loginBucketFor(String ip) {
+        BucketEntry entry = userBuckets.compute("login:" + ip, (k, existing) -> {
+            if (existing == null) return new BucketEntry(Bucket.builder()
+                    .addLimit(Bandwidth.simple(LOGIN_LIMIT_PER_MINUTE, Duration.ofMinutes(1)))
+                    .build());
+            existing.lastAccess = System.currentTimeMillis();
+            return existing;
+        });
+        return entry.bucket;
+    }
+
+    private static String clientIp(HttpServletRequest req) {
+        String xff = req.getHeader("X-Forwarded-For");
+        if (xff != null && !xff.isBlank()) return xff.split(",")[0].trim();
+        return req.getRemoteAddr();
     }
 
     @Override
