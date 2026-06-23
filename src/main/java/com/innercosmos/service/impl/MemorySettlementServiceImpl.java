@@ -370,9 +370,10 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
     }
 
     private String inferType(String raw) {
-        AnalysisResult analysis = analyze(raw);
-        // Use primary intent from semantic analysis
-        switch (analysis.primaryIntent) {
+        AnalysisResult analysis = analyze(raw == null ? "" : raw);
+        // Use primary intent from semantic analysis (guard null — empty/edge sessions)
+        String intent = analysis.primaryIntent == null ? "" : analysis.primaryIntent;
+        switch (intent) {
             case "TASK_STRESS":
                 return "TODO";
             case "RELATION_ISSUE":
