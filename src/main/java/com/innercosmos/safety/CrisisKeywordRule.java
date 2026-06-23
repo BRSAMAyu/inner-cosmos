@@ -17,7 +17,15 @@ public class CrisisKeywordRule implements SafetyRule {
             "死了一了百了", "想死", "去死",
             // Near-always-crisis direct terms (gap analysis)
             "我希望我从没出生", "生不如死", "活不下去",
-            "不想在了", "希望消失"
+            "不想在了", "希望消失",
+            // M-020: lethal means / scene / homophone bypass (false-negative coverage)
+            "烧炭", "上吊", "紫砂", "遗书"
+    );
+
+    // M-020: English crisis phrases (matched case-insensitively).
+    private static final List<String> ENGLISH_CRISIS = List.of(
+            "suicide", "suicidal", "kill myself", "end my life", "want to die", "wanna die",
+            "no reason to live", "better off dead", "don't want to live", "want to disappear"
     );
 
     private final List<String> keywords = CRISIS_KEYWORDS;
@@ -29,6 +37,13 @@ public class CrisisKeywordRule implements SafetyRule {
         for (String keyword : keywords) {
             if (text.contains(keyword)) {
                 return SafetyMatch.hit("CRISIS_KEYWORD", "HIGH", keyword, "RESOURCE_PAGE");
+            }
+        }
+        // M-020: case-insensitive English crisis coverage.
+        String lower = text.toLowerCase(java.util.Locale.ROOT);
+        for (String en : ENGLISH_CRISIS) {
+            if (lower.contains(en)) {
+                return SafetyMatch.hit("CRISIS_KEYWORD", "HIGH", en, "RESOURCE_PAGE");
             }
         }
         return SafetyMatch.safe();

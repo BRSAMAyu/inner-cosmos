@@ -37,7 +37,10 @@ public class DistressSignalDetector {
             "解脱", "想要解脱",
             "不想醒来", "不想醒过来", "一觉不醒",
             "一了百了", "了断", "告别这个世界", "离开这个世界",
-            "再见了", "最后的话", "告别一切", "想离开"
+            "再见了", "最后的话", "告别一切", "想离开",
+            // M-020: lethal-means / scene planning — ambiguous alone, but warrant a re-check
+            // (which then applies the acute-crisis floor in SafetyReviewService).
+            "药都准备好了", "准备好了药", "天台上", "站在窗边"
     );
 
     public boolean hasDistressSignal(String text) {
