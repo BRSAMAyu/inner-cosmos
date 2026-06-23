@@ -1,6 +1,7 @@
 package com.innercosmos.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.innercosmos.dto.ChatRequest;
 import com.innercosmos.dto.SessionCreateRequest;
 import com.innercosmos.entity.DialogMessage;
@@ -125,13 +126,14 @@ public class DialogServiceImpl implements DialogService {
         }
     }
 
-    @Transactional(rollbackFor = Exception.class)
     private void increment(Long sessionId, int textLength) {
-        DialogSession session = sessionMapper.selectById(sessionId);
-        if (session != null) {
-            session.messageCount = session.messageCount == null ? 1 : session.messageCount + 1;
-            session.tokenEstimate = (session.tokenEstimate == null ? 0 : session.tokenEstimate) + Math.max(1, textLength / 2);
-            sessionMapper.updateById(session);
-        }
+        // M-021: atomic counter update — a single SQL increment avoids the lost updates of the
+        // old read-modify-write (which was also inert: @Transactional on a private self-call is
+        // not intercepted by the Spring proxy). One statement; no transaction annotation needed.
+        int add = Math.max(1, textLength / 2);
+        sessionMapper.update(null, new UpdateWrapper<DialogSession>()
+                .eq("id", sessionId)
+                .setSql("message_count = COALESCE(message_count, 0) + 1")
+                .setSql("token_estimate = COALESCE(token_estimate, 0) + " + add));
     }
 }
