@@ -280,7 +280,14 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             List<DialogMessage> recent = request.sessionId == null ? List.of()
                     : dialogService.messages(request.sessionId);
             int start = Math.max(0, recent.size() - 20);
-            portraitReflection.reflectOnTurn(userId, recent.subList(start, recent.size()));
+            // M-011: persist the 5-turn portrait reflection — apply the deltas so Aurora's
+            // portrait of the user updates mid-session (not only on goodbye/nightly). This is
+            // the literal point of RUN-006; previously the result was discarded (a billed no-op).
+            var portraitDeltas = portraitReflection.reflectOnTurn(userId, recent.subList(start, recent.size()));
+            if (portraitDeltas != null && portraitDeltas.deltas() != null
+                    && !portraitDeltas.deltas().isEmpty()) {
+                userPortraitService.applyDeltas(userId, portraitDeltas.deltas());
+            }
         }
 
         // Goodbye trigger detection: check user message for goodbye intent
