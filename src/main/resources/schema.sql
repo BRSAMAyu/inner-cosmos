@@ -137,7 +137,11 @@ CREATE TABLE IF NOT EXISTS tb_memory_card (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_memory_user (user_id),
-  CONSTRAINT fk_memory_session FOREIGN KEY (source_session_id) REFERENCES tb_dialog_session(id) ON DELETE SET NULL
+  CONSTRAINT fk_memory_session FOREIGN KEY (source_session_id) REFERENCES tb_dialog_session(id) ON DELETE SET NULL,
+  -- M-008: one settlement MemoryCard per (user, session) — defense-in-depth against the
+  -- duplicate-card race (M-007 prevents the double-fire at the source). NULL source_session_id
+  -- (e.g. shredder cards) stays multi-allowed (H2/MySQL treat NULLs as distinct under UNIQUE).
+  CONSTRAINT uk_memory_card_user_session UNIQUE (user_id, source_session_id)
 );
 
 CREATE TABLE IF NOT EXISTS tb_thought_fragment (
