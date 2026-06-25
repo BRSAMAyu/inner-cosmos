@@ -13,16 +13,17 @@ window.ICAudio = {
   masterVolume: 0.12,
   ambientFallbackEnabled: false,
 
-  // BGM tracks for different times. These are real local FLAC assets; no
-  // oscillator fallback is used by default because it can sound like a hum.
+  // BGM tracks for different times. Real local public-domain classical
+  // recordings, transcoded to 128k MP3 (universal browser support, ~10x smaller
+  // than the source FLAC). No oscillator fallback by default — it can sound like a hum.
   bgmTracks: {
-    dawn: { name: 'Chopin Nocturne Op.9 No.2', url: '/audio/music/chopin-nocturne-op9-no2.flac' },
-    morning: { name: 'Mozart K.282 Adagio', url: '/audio/music/mozart-k282-adagio.flac' },
-    noon: { name: 'Mozart K.282 Menuetto', url: '/audio/music/mozart-k282-menuetto.flac' },
-    afternoon: { name: 'Mozart K.282 Allegro', url: '/audio/music/mozart-k282-allegro.flac' },
-    dusk: { name: 'Chopin Nocturne Op.55 No.1', url: '/audio/music/chopin-nocturne-op55-no1.flac' },
-    night: { name: 'Chopin Nocturne Op.62 No.2', url: '/audio/music/chopin-nocturne-op62-no2.flac' },
-    deepNight: { name: 'Chopin Nocturne Op.55 No.1', url: '/audio/music/chopin-nocturne-op55-no1.flac' }
+    dawn: { name: 'Chopin Nocturne Op.9 No.2', url: '/audio/music/chopin-nocturne-op9-no2.mp3' },
+    morning: { name: 'Mozart K.282 Adagio', url: '/audio/music/mozart-k282-adagio.mp3' },
+    noon: { name: 'Mozart K.282 Menuetto', url: '/audio/music/mozart-k282-menuetto.mp3' },
+    afternoon: { name: 'Mozart K.282 Allegro', url: '/audio/music/mozart-k282-allegro.mp3' },
+    dusk: { name: 'Chopin Nocturne Op.55 No.1', url: '/audio/music/chopin-nocturne-op55-no1.mp3' },
+    night: { name: 'Chopin Nocturne Op.62 No.2', url: '/audio/music/chopin-nocturne-op62-no2.mp3' },
+    deepNight: { name: 'Chopin Nocturne Op.55 No.1', url: '/audio/music/chopin-nocturne-op55-no1.mp3' }
   },
 
   // Weather sound effects
