@@ -53,7 +53,7 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
             Map<String, Object> payload = Map.of(
                     "model", config.model == null || config.model.isBlank() ? defaultModel(config.provider) : config.model,
                     "messages", messages,
-                    "temperature", 0.7,
+                    "temperature", request.temperature != null ? request.temperature : 0.7,
                     "stream", false
             );
             String body = restClient.post()
@@ -112,7 +112,7 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
         Map<String, Object> payload = Map.of(
                 "model", config.model == null || config.model.isBlank() ? defaultModel(config.provider) : config.model,
                 "messages", messages,
-                "temperature", 0.7,
+                "temperature", request.temperature != null ? request.temperature : 0.7,
                 "stream", true
         );
         try {

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.innercosmos.entity.AiInteractionLog;
 import com.innercosmos.mapper.AiInteractionLogMapper;
 import com.innercosmos.service.AiLogService;
+import com.innercosmos.util.DataMaskingUtils;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -32,9 +33,14 @@ public class AiLogServiceImpl implements AiLogService {
         log.provider = provider == null || provider.isBlank() ? "UNKNOWN" : provider;
         log.modelName = modelName == null || modelName.isBlank() ? "unknown" : modelName;
         log.requestPrompt = prompt;
-        log.responseText = response;
+        // M4: redact the model RESPONSE (text + json) before it is persisted to
+        // tb_ai_interaction_log. The prompt/requestJson are already masked upstream by
+        // ABTestLlmClientWrapper.redact(); the response was not, so if the model echoed a
+        // phone/email it landed at rest unmasked. Reuse the SAME masking helper here.
+        // Only the LOGGED copy is masked — the live response returned to the caller is unaffected.
+        log.responseText = response == null ? null : DataMaskingUtils.maskContact(response);
         log.requestJson = requestJson;
-        log.responseJson = responseJson;
+        log.responseJson = responseJson == null ? null : DataMaskingUtils.maskContact(responseJson);
         log.success = success;
         log.fallbackUsed = fallbackUsed;
         log.errorMessage = errorMessage;

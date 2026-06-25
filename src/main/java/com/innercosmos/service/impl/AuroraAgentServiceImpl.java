@@ -235,6 +235,13 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         turnContext.put("auroraPrompt", prompt);
         turnContext.put("userMessage", request.message == null ? "" : request.message);
         turnContext.put("mode", mode);
+        // M-012: thread the active mode's sampling temperature so it actually reaches the
+        // model (StructuredAiService reads "modeTemperature" → LlmRequest.temperature →
+        // provider body). Null-safe: when the mode has no strategy, the key is absent and
+        // the provider client falls back to its existing hardcoded default.
+        if (modeStrategy != null) {
+            turnContext.put("modeTemperature", modeStrategy.temperature());
+        }
         turnContext.put("modeGuide", modeGuide(mode));
         turnContext.put("userPortrait", portraitBriefForContext(portrait));
         turnContext.put("relationship", relationship == null ? "" : relationship.toPromptString());
@@ -527,18 +534,24 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 .build()
                 + "\n\n现在是" + timeLabel + "。请 Aurora 主动发起对话，像朋友轻轻来找用户，而不是等待用户提问。";
 
+        Map<String, Object> greetingContext = new LinkedHashMap<>();
+        greetingContext.put("auroraPrompt", prompt);
+        greetingContext.put("mode", normalizedMode);
+        greetingContext.put("timeLabel", timeLabel);
+        greetingContext.put("memoryRecallAllowed", allowMemory);
+        greetingContext.put("unifiedAgentContext", agentContext);
+        greetingContext.put("providerPolicy", providerPolicy(null));
+        // M-012: the proactive greeting also samples at the active mode's temperature
+        // (null-safe — absent key keeps the provider client's hardcoded default).
+        if (modeStrategy != null) {
+            greetingContext.put("modeTemperature", modeStrategy.temperature());
+        }
+
         AuroraReplyVO vo;
         try {
             StructuredAiResults.AuroraResult ai = structuredAiService.call(userId, "AURORA_PROACTIVE_GREETING_" + normalizedMode,
                     auroraInstruction(true),
-                    Map.of(
-                            "auroraPrompt", prompt,
-                            "mode", normalizedMode,
-                            "timeLabel", timeLabel,
-                            "memoryRecallAllowed", allowMemory,
-                            "unifiedAgentContext", agentContext,
-                            "providerPolicy", providerPolicy(null)
-                    ),
+                    greetingContext,
                     StructuredAiResults.AuroraResult.class,
                     () -> fallbackGreeting(normalizedMode, timeLabel, gravityMemories, allowMemory));
             vo = toReply(profile, ai, null, normalizedMode, memoryContext, gravityMemories, allowMemory);
