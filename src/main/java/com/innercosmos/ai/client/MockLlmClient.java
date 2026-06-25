@@ -51,8 +51,14 @@ public class MockLlmClient implements LlmClient {
         // Analyze input for semantic understanding
         AnalysisResult analysis = PseudoSemanticAnalyzer.analyze(textToAnalyze);
 
-        if (module.contains("AURORA_CHAT") || module.contains("AURORA_GREETING")) {
-            return buildAuroraChatJson(text, analysis);
+        // Aurora structured dispatch. The real service uses module names
+        // "AURORA_AGENT_LOOP_<mode>" (chat reply) and "AURORA_PROACTIVE_GREETING_<mode>"
+        // (proactive greeting); the legacy "AURORA_CHAT"/"AURORA_GREETING" names are kept
+        // for back-compat. buildAuroraChatJson self-distinguishes greeting vs chat via the
+        // "主动发起对话" marker embedded in the prompt text, so all Aurora modules route here.
+        if (module.contains("AURORA")) {
+            boolean greeting = module.contains("GREETING");
+            return buildAuroraChatJson(text, analysis, greeting);
         }
         if (module.contains("THOUGHT_SHREDDER")) {
             return buildThoughtShredderJson(text, analysis);
@@ -76,9 +82,9 @@ public class MockLlmClient implements LlmClient {
      * Build dynamic AURORA_CHAT JSON based on semantic analysis.
      * Now produces input-dependent responses.
      */
-    private String buildAuroraChatJson(String text, AnalysisResult analysis) {
+    private String buildAuroraChatJson(String text, AnalysisResult analysis, boolean greetingHint) {
         List<String> segments = new ArrayList<>();
-        boolean greeting = text.contains("主动发起对话") || text.contains("AURORA_GREETING");
+        boolean greeting = greetingHint || text.contains("主动发起对话") || text.contains("AURORA_GREETING");
         if (greeting) {
             segments.add("我先来找你一下。今天不用等到想清楚再开口，我们可以从一句很小的话开始。");
             if (random.nextBoolean()) {
