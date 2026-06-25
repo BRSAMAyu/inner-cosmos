@@ -16,6 +16,7 @@ import com.innercosmos.mapper.RelationMentionMapper;
 import com.innercosmos.mapper.ThoughtFragmentMapper;
 import com.innercosmos.mapper.TodoItemMapper;
 import com.innercosmos.ai.semantic.EmotionInsight;
+import com.innercosmos.service.DialogService;
 import com.innercosmos.service.EmotionInsightService;
 import com.innercosmos.service.GravityService;
 import com.innercosmos.service.MemoryService;
@@ -47,6 +48,7 @@ public class MemoryServiceImpl implements MemoryService {
     private final ThemeAggregationService themeAggregationService;
     private final DailyRecordMapper dailyRecordMapper;
     private final EmotionInsightService emotionInsightService;
+    private final DialogService dialogService;
     @Autowired(required = false)
     private ApplicationEventPublisher eventPublisher;
 
@@ -60,7 +62,8 @@ public class MemoryServiceImpl implements MemoryService {
                              RelationMentionMapper relationMentionMapper,
                              ThemeAggregationService themeAggregationService,
                              DailyRecordMapper dailyRecordMapper,
-                             EmotionInsightService emotionInsightService) {
+                             EmotionInsightService emotionInsightService,
+                             DialogService dialogService) {
         this.memoryCardMapper = memoryCardMapper;
         this.messageMapper = messageMapper;
         this.thoughtFragmentMapper = thoughtFragmentMapper;
@@ -72,11 +75,18 @@ public class MemoryServiceImpl implements MemoryService {
         this.themeAggregationService = themeAggregationService;
         this.dailyRecordMapper = dailyRecordMapper;
         this.emotionInsightService = emotionInsightService;
+        this.dialogService = dialogService;
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public MemoryCard extractFromSession(Long userId, Long sessionId) {
+        // SECURITY (IDOR): dialog messages are queried by session_id only, so without an
+        // ownership check user A could extract user B's private session into A's memory card.
+        // Verify the caller owns the session BEFORE reading any messages — throws the project's
+        // standard NOT_FOUND (session missing) / UNAUTHORIZED (foreign owner). The event-driven
+        // MemoryExtractListener passes the session's own verified userId, so it still passes.
+        dialogService.verifyOwnership(userId, sessionId);
         QueryWrapper<DialogMessage> query = new QueryWrapper<>();
         query.eq("session_id", sessionId).eq("speaker", "USER").orderByAsc("id");
         List<DialogMessage> messages = messageMapper.selectList(query);

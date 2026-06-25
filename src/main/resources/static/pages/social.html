@@ -719,7 +719,13 @@ async function acceptFriend(id) {
 }
 
 async function declineFriend(id) {
-  IC.toast("已忽略该申请", "info");
+  var r = await API.socialDeclineFriend(id);
+  if (r.success) {
+    IC.toast("已忽略该申请", "info");
+    load();
+  } else {
+    IC.toast(r.message || "操作失败", "warn");
+  }
 }
 
 async function createGroup() {

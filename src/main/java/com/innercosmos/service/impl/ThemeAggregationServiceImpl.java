@@ -125,7 +125,7 @@ public class ThemeAggregationServiceImpl implements ThemeAggregationService {
         if (themeCluster.keywords != null) {
             for (MemoryCard card : allCards) {
                 for (String keyword : themeCluster.keywords) {
-                    if (card.title.contains(keyword) || (card.summary != null && card.summary.contains(keyword))) {
+                    if ((card.title != null && card.title.contains(keyword)) || (card.summary != null && card.summary.contains(keyword))) {
                         matched.add(card);
                         break;
                     }

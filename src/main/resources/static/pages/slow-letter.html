@@ -308,7 +308,7 @@
 
       <div class="letter-actions">
         <button onclick="draft()">保存草稿</button>
-        <button class="send-primary" onclick="sendLetter()">投递慢信</button>
+        <button class="send-primary" onclick="sendLetter(this)">投递慢信</button>
         <a class="button" href="/pages/inbox.html">查看信箱</a>
       </div>
 
@@ -420,7 +420,11 @@ async function draft() {
 
 function sleep(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
 
-async function sendLetter() {
+async function sendLetter(btn) {
+  // Double-submit guard: ignore re-entry while a send is already in flight.
+  if (btn && btn.disabled) return;
+  if (btn) btn.disabled = true;
+  try {
   if (!letterId) await draft();
   if (!letterId) { IC.toast("请先写一些内容", "warn"); return; }
 
@@ -465,6 +469,9 @@ async function sendLetter() {
   } catch (e) {
     deliveryAnim.style.display = "none";
     IC.toast("连接暂时不稳定，请稍后再试。", "warn");
+  }
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 IC.hideLoading();
