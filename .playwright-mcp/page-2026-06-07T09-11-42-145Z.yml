@@ -1,5 +1,0 @@
-- generic [ref=e2]:
-  - heading "请先选择一个共鸣体" [level=2] [ref=e3]
-  - paragraph [ref=e4]:
-    - link "前往星海广场" [ref=e5] [cursor=pointer]:
-      - /url: /pages/echo-plaza.html

@@ -12,3 +12,8 @@ application-dev.yml
 
 # BAGEL governance state — kept on disk for cross-session resume, not in product history
 .bagel/
+
+# accidental junk (curl cookies, playwright session dumps)
+-s
+.cookies.txt
+.playwright-mcp/
