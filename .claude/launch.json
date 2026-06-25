@@ -12,6 +12,12 @@
       "runtimeExecutable": "./mvnw",
       "runtimeArgs": ["spring-boot:run", "-Dspring-boot.run.arguments=--server.port=8090"],
       "port": 8090
+    },
+    {
+      "name": "ic-jar",
+      "runtimeExecutable": "C:/Program Files/Java/jdk-21.0.10/bin/java.exe",
+      "runtimeArgs": ["-jar", "target/inner-cosmos-0.1.0.jar"],
+      "port": 8080
     }
   ]
 }

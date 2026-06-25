@@ -136,6 +136,18 @@ class TodoControllerTest {
                 });
     }
 
+    // ---------------- Type mismatch (non-numeric path variable) ----------------
+
+    @Test
+    void delete_withNonNumericId_returns400NotFromCatchAll() throws Exception {
+        // A fat-fingered URL like /api/todos/abc must map to 400 (BAD_REQUEST),
+        // not fall through to the RuntimeException catch-all returning 500.
+        mockMvc.perform(delete("/api/todos/abc").session(session))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error").value("BAD_REQUEST"));
+    }
+
     // ---------------- Delete ----------------
 
     @Test
