@@ -44,6 +44,12 @@ public class GlobalExceptionHandler {
             .body(errorMap("BAD_REQUEST", "缺少必需的参数: " + ex.getParameterName(), HttpStatus.BAD_REQUEST.value()));
     }
 
+    @ExceptionHandler(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<Map<String, Object>> handleTypeMismatch(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException ex) {
+        return ResponseEntity.badRequest()
+            .body(errorMap("BAD_REQUEST", "参数类型不正确: " + ex.getName(), HttpStatus.BAD_REQUEST.value()));
+    }
+
     @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
     public ResponseEntity<Map<String, Object>> handleNotFound(org.springframework.web.servlet.resource.NoResourceFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
