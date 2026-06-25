@@ -16,6 +16,8 @@ import java.util.List;
 
 @Service
 public class UserPortraitService {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(UserPortraitService.class);
+
     @Autowired
     private UserPortraitMapper mapper;
     @Autowired
@@ -35,6 +37,16 @@ public class UserPortraitService {
     @Transactional
     public void applyDeltas(Long userId, List<PortraitDeltas.Delta> deltas) {
         for (PortraitDeltas.Delta d : deltas) {
+            // IC-DATA-003: data hygiene — the LLM is asked for valueJson + score/confidence
+            // in [0,1] but nothing enforces it. Guard before persisting so garbage
+            // (out-of-range / NaN / null valueJson against a NOT NULL column) never
+            // reaches the DB and never silently kills the whole delta batch.
+            if (d.valueJson() == null || d.valueJson().isBlank()) {
+                // value_json is TEXT NOT NULL — a null/blank insert throws and the
+                // async try/catch upstream would swallow the WHOLE batch. Skip instead.
+                log.debug("Skipping portrait delta dim={} for user {}: blank valueJson", d.dim(), userId);
+                continue;
+            }
             UserPortrait existing = get(userId, d.dim());
             if (existing != null) {
                 UserPortraitHistory hist = new UserPortraitHistory();
@@ -50,8 +62,9 @@ public class UserPortraitService {
             row.userId = userId;
             row.dim = d.dim();
             row.valueJson = d.valueJson();
-            row.score = d.score();
-            row.confidence = d.confidence();
+            // clamp NaN/infinite/out-of-range into [0,1]; NaN → 0.0 default
+            row.score = clamp01(d.score());
+            row.confidence = clamp01(d.confidence());
             row.evidenceRefs = d.evidenceTurnIds() != null ? String.join(",", d.evidenceTurnIds()) : null;
             if (existing == null) {
                 mapper.insert(row);
@@ -64,5 +77,13 @@ public class UserPortraitService {
         if (!deltas.isEmpty() && eventPublisher != null) {
             eventPublisher.publishEvent(new CapsuleSyncTriggerEvent(userId));
         }
+    }
+
+    /** Clamp a score/confidence into [0.0, 1.0]; NaN/infinite → 0.0 safe default. */
+    private static double clamp01(double v) {
+        if (Double.isNaN(v) || Double.isInfinite(v)) {
+            return 0.0;
+        }
+        return Math.max(0.0, Math.min(1.0, v));
     }
 }
