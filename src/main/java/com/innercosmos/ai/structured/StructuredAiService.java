@@ -58,6 +58,7 @@ public class StructuredAiService {
             LlmRequest request = new LlmRequest(userId, moduleName, prompt);
             request.requestJson = contextJson;
             request.preferredProvider = preferredProvider(context);
+            request.temperature = modeTemperature(context);
             if ("MOCK".equals(assignedGroup)) {
                 request.forceMock = true;
             }
@@ -78,6 +79,7 @@ public class StructuredAiService {
                     buildPrompt(instruction, contextJson, raw));
             retry.requestJson = contextJson;
             retry.preferredProvider = preferredProvider(context);
+            retry.temperature = modeTemperature(context);
             if ("MOCK".equals(assignedGroup)) {
                 retry.forceMock = true;
             }
@@ -122,6 +124,23 @@ public class StructuredAiService {
             value = map.get("aiProviderPreference");
         }
         return value == null ? null : String.valueOf(value);
+    }
+
+    /**
+     * M-012: read the optional per-mode sampling temperature the caller folded into the
+     * context map under {@code "modeTemperature"}. Returns null when absent or
+     * non-numeric, so the provider client keeps its existing hardcoded default and
+     * non-Aurora calls (whose context carries no such key) stay byte-identical.
+     */
+    private Double modeTemperature(Object context) {
+        if (!(context instanceof Map<?, ?> map)) {
+            return null;
+        }
+        Object value = map.get("modeTemperature");
+        if (value instanceof Number n) {
+            return n.doubleValue();
+        }
+        return null;
     }
 
     public String getCurrentTestGroup(Long userId) {

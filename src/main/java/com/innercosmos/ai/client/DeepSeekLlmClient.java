@@ -116,7 +116,7 @@ public class DeepSeekLlmClient implements LlmClient {
         Map<String, Object> body = Map.of(
                 "model", model,
                 "messages", messages,
-                "temperature", 0.72,
+                "temperature", request.temperature != null ? request.temperature : 0.72,
                 "max_tokens", LlmClient.RESPONSE_MAX_TOKENS,
                 "stream", true
         );
@@ -188,7 +188,7 @@ public class DeepSeekLlmClient implements LlmClient {
         Map<String, Object> body = Map.of(
                 "model", model,
                 "messages", messages,
-                "temperature", 0.72,
+                "temperature", request.temperature != null ? request.temperature : 0.72,
                 "max_tokens", LlmClient.RESPONSE_MAX_TOKENS,
                 "stream", false
         );

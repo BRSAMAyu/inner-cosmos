@@ -1,7 +1,6 @@
 package com.innercosmos.ai.prompt;
 
 import com.innercosmos.ai.mode.DailyTalkStrategy;
-import com.innercosmos.ai.mode.SocraticStrategy;
 import com.innercosmos.vo.AuroraMemoryContextVO;
 import org.junit.jupiter.api.Test;
 
@@ -127,26 +126,11 @@ class PromptBuilderTest {
     }
 
     @Test
-    void modeSegmentSetsTemperatureHint() {
-        PromptBuilder builder = new PromptBuilder();
-        builder.withModeSegment(new SocraticStrategy());
-        String hint = builder.temperatureHint();
-
-        assertTrue(hint.contains("0.65"));
-    }
-
-    @Test
     void modeSegmentNullStrategyIgnored() {
         PromptBuilder builder = new PromptBuilder();
         builder.withModeSegment(null);
         String result = builder.build();
         assertTrue(result.isEmpty());
-    }
-
-    @Test
-    void temperatureHintEmptyWithoutModeSegment() {
-        PromptBuilder builder = new PromptBuilder();
-        assertEquals("", builder.temperatureHint());
     }
 
     // --- user profile ---

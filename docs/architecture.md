@@ -35,7 +35,7 @@ flowchart TD
 2. Observer：`DialogFinishedEvent` 触发记忆、情绪、待办、重力、共鸣体建议监听器。
 3. State：`LetterState` 管理慢信生命周期。
 4. Builder：`PromptBuilder` 组合系统边界、最近消息、记忆和输出要求。
-5. Strategy：`AgentReplyStrategy` 区分 Aurora、碎纸机、共鸣体回应策略。
+5. Strategy：`ModeStrategy`（`ai/mode/`，日常/苏格拉底/思维整理/行动拆解/睡前/关系六种模式，各自 `segment()`+`temperature()`）+ `FailoverLlmClient` 供应商优选顺序。
 
 ## 数据分层
 
