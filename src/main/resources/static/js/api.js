@@ -271,6 +271,9 @@ const API = {
   async socialAcceptFriend(id) {
     return IC.api(`/api/social/friends/${id}/accept`, { method: "POST" });
   },
+  async socialDeclineFriend(id) {
+    return IC.api(`/api/social/friends/${id}/decline`, { method: "POST" });
+  },
   async socialGroups() {
     return IC.api("/api/social/groups");
   },

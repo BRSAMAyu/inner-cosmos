@@ -110,6 +110,18 @@ public class SocialController extends BaseController {
         return ApiResponse.ok(relation);
     }
 
+    @PostMapping("/friends/{id}/decline")
+    public ApiResponse<FriendRelation> decline(@PathVariable Long id, HttpSession session) {
+        Long me = currentUserId(session);
+        FriendRelation relation = friendMapper.selectById(id);
+        if (relation == null || !me.equals(relation.addresseeId)) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "无权处理这条好友申请");
+        }
+        relation.status = "DECLINED";
+        friendMapper.updateById(relation);
+        return ApiResponse.ok(relation);
+    }
+
     @GetMapping("/groups")
     public ApiResponse<List<SocialGroup>> groups(HttpSession session) {
         Long me = currentUserId(session);
