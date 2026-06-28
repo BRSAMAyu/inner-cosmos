@@ -19,17 +19,17 @@ public class PromptBuilder {
     /** Only portrait dimensions at/above this confidence reach the prompt. */
     public static final double PORTRAIT_CONFIDENCE_THRESHOLD = 0.45;
     /** Max portrait dimensions surfaced (sorted by confidence desc, then score desc). */
-    public static final int PORTRAIT_MAX_DIMS = 5;
+    public static final int PORTRAIT_MAX_DIMS = 10;
     /** Max chars per portrait dimension value. */
-    static final int PORTRAIT_VALUE_MAX_CHARS = 120;
+    static final int PORTRAIT_VALUE_MAX_CHARS = 200;
     /** Max chars for the whole portrait block. */
-    static final int PORTRAIT_BLOCK_MAX_CHARS = 720;
+    static final int PORTRAIT_BLOCK_MAX_CHARS = 1400;
     /** Max chars for the relationship line. */
-    static final int RELATIONSHIP_MAX_CHARS = 220;
+    static final int RELATIONSHIP_MAX_CHARS = 400;
     /** Max chars for the current-state signal. */
-    static final int STATE_SIGNAL_MAX_CHARS = 160;
+    static final int STATE_SIGNAL_MAX_CHARS = 260;
     /** Max chars for the IC-EMO-002 "此刻情绪" perception. */
-    static final int MOMENT_EMOTION_MAX_CHARS = 120;
+    static final int MOMENT_EMOTION_MAX_CHARS = 200;
     /** Max user corrections surfaced (most-recent-first). */
     public static final int CORRECTION_MAX = 5;
     /** Max chars per correction field value. */

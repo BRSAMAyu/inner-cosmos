@@ -126,7 +126,7 @@ public class UserServiceImpl implements UserService {
         QueryWrapper<User> query = new QueryWrapper<>();
         query.eq("username", request.username);
         if (userMapper.selectCount(query) > 0) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "username already exists");
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "该用户名已被注册");
         }
         User user = new User();
         user.username = request.username;
@@ -145,10 +145,10 @@ public class UserServiceImpl implements UserService {
         query.eq("username", request.username);
         User user = userMapper.selectOne(query);
         if (user == null || !passwordEncoder.matches(request.password, user.passwordHash)) {
-            throw new BusinessException(ErrorCode.UNAUTHORIZED, "invalid username or password");
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "用户名或密码不正确");
         }
         if (!Constants.STATUS_ACTIVE.equals(user.status)) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "account disabled");
+            throw new BusinessException(ErrorCode.FORBIDDEN, "该账户已被停用");
         }
         user.lastLoginAt = LocalDateTime.now();
         userMapper.updateById(user);
@@ -158,11 +158,11 @@ public class UserServiceImpl implements UserService {
     @Override
     public User current(Long userId) {
         if (userId == null) {
-            throw new BusinessException(ErrorCode.UNAUTHORIZED, "not logged in");
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "尚未登录");
         }
         User user = userMapper.selectById(userId);
         if (user == null) {
-            throw new BusinessException(ErrorCode.UNAUTHORIZED, "not logged in");
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "尚未登录");
         }
         return user;
     }
@@ -204,7 +204,19 @@ public class UserServiceImpl implements UserService {
         if (profile.allowMemoryRecall != null) existing.allowMemoryRecall = profile.allowMemoryRecall;
         if (profile.quietHoursStart != null) existing.quietHoursStart = profile.quietHoursStart;
         if (profile.quietHoursEnd != null) existing.quietHoursEnd = profile.quietHoursEnd;
-        if (profile.proactiveSensitivity != null) existing.proactiveSensitivity = Math.max(1, Math.min(5, profile.proactiveSensitivity));
+        if (profile.proactiveSensitivity != null) {
+            int sens = Math.max(1, Math.min(5, profile.proactiveSensitivity));
+            existing.proactiveSensitivity = sens;
+            // Make the 1-5 slider actually drive the proactive engine: it was a dead signal
+            // (stored but never read). Map it onto the intensity level the engine consumes.
+            existing.proactiveIntensity = switch (sens) {
+                case 1 -> "WHISPER";
+                case 2 -> "LIGHT";
+                case 3 -> "ACTIVE";
+                case 4 -> "COMPANION";
+                default -> "ALIVE"; // 5
+            };
+        }
         if (profile.allowMultiMessage != null) existing.allowMultiMessage = profile.allowMultiMessage;
         if (profile.focusModeEnabled != null) existing.focusModeEnabled = profile.focusModeEnabled;
         if (profile.focusWindowsJson != null) existing.focusWindowsJson = profile.focusWindowsJson;

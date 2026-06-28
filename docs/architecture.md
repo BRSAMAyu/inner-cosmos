@@ -22,7 +22,7 @@ flowchart TD
 - `service` / `service.impl`：业务编排。
 - `mapper`：MyBatis-Plus 数据访问。
 - `entity`：数据库实体。
-- `ai.client`：LLM Adapter，默认 `MockLlmClient`。
+- `ai.client`：LLM Adapter，默认接入真实大模型 GLM glm-4.7（失败转移 GLM → MiniMax → `MockLlmClient` 兜底）。
 - `ai.prompt`：Prompt Builder 与模板注册。
 - `ai.agent` / `ai.strategy`：Agent 能力与策略模式落点。
 - `event`：对话结束后的观察者模式整理链路。

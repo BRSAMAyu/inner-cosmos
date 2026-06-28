@@ -17,6 +17,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -34,7 +35,7 @@ import java.util.regex.Pattern;
 public class AliveDecisionEngine {
 
     private static final Logger log = LoggerFactory.getLogger(AliveDecisionEngine.class);
-    private static final int MAX_CONSECUTIVE_PUSHES_PER_HOUR = 4;
+    private static final int MAX_CONSECUTIVE_PUSHES_PER_HOUR = 10;
 
     @Autowired
     private LlmClient llm;
@@ -167,11 +168,27 @@ public class AliveDecisionEngine {
     }
 
     private void ensureMinDailyPush(Long userId) {
-        if (todayPushCount(userId) == 0 && ZonedDateTime.now().getHour() >= 19) {
-            // Force a gentle evening push
-            deliveryChannel.push(userId, "今天要结束了，你还好吗？", "alive_minimum");
-            logEvent(userId, "ALIVE_MINIMUM", "今天要结束了，你还好吗？", "forced_evening");
+        // No daytime gate: any time of day, if nothing has gone out today and the last
+        // push was more than 2h ago, send a gentle check-in so the demo always shows life.
+        if (todayPushCount(userId) == 0 && hoursSinceLastPush(userId) >= 2) {
+            deliveryChannel.push(userId, "嘿，我突然想起你，今天过得还好吗？", "alive_minimum");
+            logEvent(userId, "ALIVE_MINIMUM", "嘿，我突然想起你，今天过得还好吗？", "forced_checkin");
         }
+    }
+
+    /**
+     * Hours since the user's most recent proactive push of any kind.
+     * Returns a large number (effectively "long ago") if there has never been one.
+     */
+    private long hoursSinceLastPush(Long userId) {
+        var last = eventLogMapper.selectList(
+            new QueryWrapper<ProactiveEventLog>()
+                .eq("user_id", userId)
+                .orderByDesc("sent_at")
+                .last("LIMIT 1")
+        );
+        if (last.isEmpty() || last.get(0).sentAt == null) return Long.MAX_VALUE;
+        return Duration.between(last.get(0).sentAt, LocalDateTime.now()).toHours();
     }
 
     private String summary(Object obj) {

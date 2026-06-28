@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS tb_user_profile (
   weather_awareness_enabled BOOLEAN DEFAULT TRUE,
   time_awareness_enabled BOOLEAN DEFAULT TRUE,
   preferred_model VARCHAR(64),
-  proactive_intensity VARCHAR(32),
+  proactive_intensity VARCHAR(32) DEFAULT 'COMPANION',
   sleep_window_start VARCHAR(8),
   sleep_window_end VARCHAR(8),
   boost_until TIMESTAMP NULL,

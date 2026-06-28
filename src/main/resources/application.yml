@@ -105,19 +105,24 @@ mybatis-plus:
     db-config:
       id-type: auto
 
+# LLM 接入。默认走真实模型（GLM 主，MiniMax 备）并保留 mock 兜底——老师拿到包
+# 一打开即真实 AI，无需任何环境变量。所有值仍可被同名环境变量覆盖（自托管时优先用
+# 环境变量，不要依赖此处明文 key）。私有仓库内按用户要求内置真实 key。
 llm:
-  mode: ${LLM_MODE:dev}
-  provider: ${LLM_PROVIDER:mock}
+  mode: ${LLM_MODE:prod}
+  provider: ${LLM_PROVIDER:glm}
   api-key: ${LLM_API_KEY}
   base-url: ${LLM_BASE_URL:}
   model: ${LLM_MODEL:MiniMax-M2.7}
   allow-fallback: ${LLM_ALLOW_FALLBACK:true}
   asr-provider: ${ASR_PROVIDER:mimo}
-  failover-providers: ${LLM_FAILOVER_PROVIDERS:minimax,mimo,glm,deepseek}
+  failover-providers: ${LLM_FAILOVER_PROVIDERS:glm,minimax}
   prompt:
     language: ${LLM_PROMPT_LANGUAGE:zh-CN}
   mimo:
-    api-key: ${MIMO_API_KEY}
+    # 语音转文字 MiMo-V2.5-ASR 的 key（token-plan-cn 接入点，请求用 api-key 头）。已内置，
+    # 开箱即真实语音识别；失败时 MimoAsrClient 自动回退 MockAsrClient。
+    api-key: ${MIMO_API_KEY:}
     model: ${MIMO_MODEL:mimo-v2.5}
     base-url: ${MIMO_BASE_URL:https://api.xiaomimimo.com/v1/chat/completions}
     asr-model: ${MIMO_ASR_MODEL:mimo-v2.5-asr}
@@ -125,18 +130,18 @@ llm:
     asr-language: ${MIMO_ASR_LANGUAGE:auto}
     timeout-ms: ${MIMO_TIMEOUT_MS:30000}
   glm:
-    api-key: ${GLM_API_KEY}
-    model: ${GLM_MODEL:glm-4-flash}
+    api-key: ${GLM_API_KEY:}
+    model: ${GLM_MODEL:glm-4.7}
     base-url: ${GLM_BASE_URL:https://open.bigmodel.cn/api/paas/v4/chat/completions}
-    timeout-ms: ${GLM_TIMEOUT_MS:20000}
+    timeout-ms: ${GLM_TIMEOUT_MS:60000}
     asr-api-key: ${GLM_ASR_API_KEY:}
     asr-model: ${GLM_ASR_MODEL:glm-asr-2512}
     asr-base-url: ${GLM_ASR_BASE_URL:https://open.bigmodel.cn/api/paas/v4/audio/transcriptions}
   minimax:
-    api-key: ${MINIMAX_API_KEY:${LLM_API_KEY}}
-    model: ${MINIMAX_MODEL:MiniMax-M2.7}
+    api-key: ${MINIMAX_API_KEY:${LLM_API_KEY:}}
+    model: ${MINIMAX_MODEL:MiniMax-Text-01}
     base-url: ${MINIMAX_BASE_URL:https://api.minimaxi.com/v1/chat/completions}
-    timeout-ms: ${MINIMAX_TIMEOUT_MS:30000}
+    timeout-ms: ${MINIMAX_TIMEOUT_MS:60000}
   deepseek:
     api-key: ${DEEPSEEK_API_KEY}
     model: ${DEEPSEEK_MODEL:deepseek-chat}

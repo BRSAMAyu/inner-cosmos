@@ -41,7 +41,7 @@ public class AuroraProactiveJob {
     @Autowired
     private PrivateTimerMapper timerMapper;
 
-    @Scheduled(fixedDelay = 5 * 60 * 1000) // every 5 minutes
+    @Scheduled(fixedDelay = 90 * 1000) // every 90 seconds
     public void run() {
         // 1) Iterate active users and tick each
         var users = userMapper.selectList(new QueryWrapper<UserProfile>());

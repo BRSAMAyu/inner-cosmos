@@ -25,7 +25,7 @@ public class SchemaM2Initializer implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         // ALTER tb_user_profile for proactive settings
-        migrate("tb_user_profile", "proactive_intensity VARCHAR(16) DEFAULT 'LIGHT'");
+        migrate("tb_user_profile", "proactive_intensity VARCHAR(16) DEFAULT 'COMPANION'");
         migrate("tb_user_profile", "sleep_window_start TIME DEFAULT '23:00:00'");
         migrate("tb_user_profile", "sleep_window_end TIME DEFAULT '07:00:00'");
         migrate("tb_user_profile", "boost_until TIMESTAMP NULL");

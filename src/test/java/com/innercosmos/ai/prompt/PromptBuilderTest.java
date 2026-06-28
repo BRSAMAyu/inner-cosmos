@@ -440,17 +440,19 @@ class PromptBuilderTest {
 
     @Test
     void userPortrait_capsDimensionsAndChars() {
-        // 8 dimensions all high-confidence — only top 5 (by confidence) should appear.
+        // 14 dimensions all high-confidence, each value over-long — the per-dimension
+        // cap (PORTRAIT_MAX_DIMS) and the per-value char cap both bound the output.
+        // Zero-padded labels so substring checks don't collide (e.g. "DIM_1" ⊂ "DIM_10").
         java.util.List<com.innercosmos.entity.UserPortrait> dims = new java.util.ArrayList<>();
-        for (int i = 0; i < 8; i++) {
-            dims.add(portrait("DIM_" + i, "v".repeat(200), 0.5 + i * 0.05, 0.5));
+        for (int i = 0; i < 12; i++) {
+            dims.add(portrait(String.format("DIM_%02d", i), "v".repeat(260), 0.5 + i * 0.02, 0.5));
         }
         String result = new PromptBuilder().withUserPortrait(dims).build();
-        // The lowest-confidence two (DIM_0, DIM_1) should be dropped (only top-5 kept).
-        assertFalse(result.contains("DIM_0"), "6th-ranked dim should be truncated");
-        assertFalse(result.contains("DIM_1"), "7th-ranked dim should be truncated");
-        assertTrue(result.contains("DIM_7"), "top-ranked dim present");
-        // Per-value truncation marker present somewhere.
+        // 12 dims but PORTRAIT_MAX_DIMS=10 → the two lowest-confidence (DIM_00/DIM_01) drop.
+        assertFalse(result.contains("DIM_00"), "lowest-ranked dim should be dropped");
+        assertFalse(result.contains("DIM_01"), "2nd-lowest dim should be dropped");
+        assertTrue(result.contains("DIM_11"), "top-ranked dim present");
+        // Per-value truncation marker present somewhere (value 260 > 200-char cap).
         assertTrue(result.contains("…"), "over-long value should be truncated with ellipsis");
     }
 

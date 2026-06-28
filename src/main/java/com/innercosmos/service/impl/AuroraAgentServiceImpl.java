@@ -818,10 +818,11 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             + "2. segments = Chinese chat bubbles, not article paragraphs. Each message should feel like a WeChat message.\n"
             + "3. referencedMemoryIds = number array only, e.g. [7, 12]. No strings, no #7 format.\n"
             + "4. No text outside the JSON.\n\n"
-            + "[Message Count]\n"
+            + "[Message Count & Shape — friend-style flow]\n"
             + "Max " + segmentCount + " segments. Count is determined by context, not fixed.\n"
-            + "First message must respond to what the user just said.\n"
-            + "Follow-up messages = Aurora's own judgment: supplement ideas / show care / connect memories (say 'I thought of a clue') / suggest features (only when natural).\n"
+            + "第一条必须先「接住情绪」：用一两句温柔地共情、确认你听见了TA此刻的感受，不要急着分析、不要立刻给建议或下判断。就像朋友先轻轻接住你，再慢慢聊。\n"
+            + "之后可以再补 1-2 条短消息（这正是连发的意义，别把想说的都压成一条）：补一个想法 / 多一点关心 / 连接一条旧线索（说『我想到一个线索』）/ 自然时才提功能。每条像一条微信消息，短、口语、有呼吸感。\n"
+            + "并且尽量在最后给出一个温柔的 nextQuestion——像朋友一样轻轻反问一句，把对话递回给TA，而不是把话说死。nextQuestion 要具体、贴着TA刚说的内容，别空泛（避免『你还好吗』这类）。\n"
             + "If a follow-up is not good enough, just empty or repetitive, write [[SILENCE]].\n\n"
             + "[Emergence — how you are with THIS person]\n"
             + "你与这个人相处的方式——安静陪着 / 轻轻追问 / 帮忙整理 / 先共情再轻指一步——应从你对TA的了解（画像）、你们的关系、TA此刻的状态、以及共享的记忆里自然长出来。"
@@ -893,7 +894,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
 
     private boolean isTooSimilarInside(String text, Set<String> existing) {
         for (String old : existing) {
-            if (similarity(text, old) >= 0.58 || sameLeadingClause(text, old)) {
+            if (similarity(text, old) >= 0.74 || sameLeadingClause(text, old)) {
                 return true;
             }
         }
@@ -902,7 +903,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
 
     private boolean isTooSimilarToRecent(String text, List<String> recent) {
         if (recent == null) return false;
-        return recent.stream().anyMatch(old -> similarity(text, old) >= 0.66 || sameLeadingClause(text, old));
+        return recent.stream().anyMatch(old -> similarity(text, old) >= 0.80 || sameLeadingClause(text, old));
     }
 
     private boolean sameLeadingClause(String a, String b) {

@@ -126,7 +126,13 @@ public class GlmLlmClient implements LlmClient {
                 "messages", messages,
                 "temperature", request.temperature != null ? request.temperature : 0.72,
                 "max_tokens", LlmClient.RESPONSE_MAX_TOKENS,
-                "stream", true
+                "stream", true,
+                // Disable the flagship models' deep-thinking phase. With it on, glm-4.6/4.7/5.x
+                // spend 20-100s emitting reasoning_content before the answer — unusable for an
+                // interactive companion. Off → flagship quality at ~5-6s, and the answer arrives
+                // in `content` (no reasoning leaking into our structured-JSON parse). Ignored by
+                // non-thinking models (glm-4-flash etc.).
+                "thinking", Map.of("type", "disabled")
         );
         HttpRequest httpRequest = HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl))
@@ -197,7 +203,10 @@ public class GlmLlmClient implements LlmClient {
                 "model", model,
                 "messages", messages,
                 "temperature", request.temperature != null ? request.temperature : 0.72,
-                "max_tokens", LlmClient.RESPONSE_MAX_TOKENS
+                "max_tokens", LlmClient.RESPONSE_MAX_TOKENS,
+                // See streamRemote: disable deep-thinking so flagship models answer in ~5-6s
+                // with a clean `content` field instead of a 20-100s reasoning_content phase.
+                "thinking", Map.of("type", "disabled")
         );
         HttpRequest httpRequest = HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl))

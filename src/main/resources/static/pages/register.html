@@ -288,7 +288,7 @@
 
       <div class="field">
         <label for="password">密码</label>
-        <input id="password" type="password" placeholder="设置密码" autocomplete="new-password">
+        <input id="password" type="password" placeholder="设置密码（至少 8 位）" autocomplete="new-password">
       </div>
 
       <div class="field">
@@ -330,8 +330,8 @@
         errBox.classList.add("visible");
         return;
       }
-      if (pass.length < 4) {
-        errBox.textContent = "密码至少 4 个字符。";
+      if (pass.length < 8) {
+        errBox.textContent = "密码至少 8 位。";
         errBox.classList.add("visible");
         return;
       }
@@ -351,9 +351,9 @@
         });
 
         if (r.success) {
-          sucBox.textContent = "账号创建成功，正在跳转到登录页...";
+          sucBox.textContent = "注册成功，正在进入你的内宇宙…";
           sucBox.classList.add("visible");
-          setTimeout(function() { location.href = "/pages/login.html"; }, 1500);
+          setTimeout(function() { location.href = "/pages/dashboard.html"; }, 1500);
         } else {
           errBox.textContent = r.message || "注册失败，请换个用户名试试。";
           errBox.classList.add("visible");
