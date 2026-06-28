@@ -367,6 +367,13 @@ public class LlmConfig {
                 candidates.add(new FailoverLlmClient.ProviderCandidate(providerName.toUpperCase(), activeModelFor(providerName), client));
             }
         }
+        // Final safety net for the degradation circuit: Mock is always available, so once a
+        // real provider (GLM) is down the chain tries the next real one (MiniMax) and, only if
+        // every real provider fails, the keyword-aware Mock — the user never sees a hard error.
+        // Gated on allow-fallback so a strict deployment can opt out.
+        if (allowFallback) {
+            candidates.add(new FailoverLlmClient.ProviderCandidate("MOCK", "mock-inner-cosmos", new MockLlmClient(aiExecutor)));
+        }
         return new FailoverLlmClient(candidates, aiExecutor);
     }
 
@@ -399,14 +406,22 @@ public class LlmConfig {
         // M-006 (Phase-6 fix): wrap each routed client with the PII-redacting wrapper so the
         // model-router path (Aurora chat with a real provider active) redacts too — previously
         // these were raw clients, bypassing redaction entirely.
-        LlmClient minimaxClient = createProviderClient("minimax", false, aiLogService, aiExecutor);
-        if (minimaxClient != null) m.put("MINIMAX", new ABTestLlmClientWrapper(minimaxClient, aiLogService, aiExecutor));
-        LlmClient mimoClient = createProviderClient("mimo", false, aiLogService, aiExecutor);
-        if (mimoClient != null) m.put("MIMO", new ABTestLlmClientWrapper(mimoClient, aiLogService, aiExecutor));
-        LlmClient glmClient = createProviderClient("glm", false, aiLogService, aiExecutor);
-        if (glmClient != null) m.put("GLM", new ABTestLlmClientWrapper(glmClient, aiLogService, aiExecutor));
-        LlmClient deepseekClient = createProviderClient("deepseek", false, aiLogService, aiExecutor);
-        if (deepseekClient != null) m.put("DEEPSEEK", new ABTestLlmClientWrapper(deepseekClient, aiLogService, aiExecutor));
+        // Only register providers that actually have an API key. Otherwise a stale per-user/
+        // per-session preferred_model (e.g. a seeded "DEEPSEEK") would route real calls to a
+        // keyless provider and 401 every time; with keyless providers absent from the map the
+        // SessionModelRouter cleanly falls back to the system default (see resolve()).
+        if (!resolveKey(minimax.apiKey).isBlank()) {
+            m.put("MINIMAX", new ABTestLlmClientWrapper(createProviderClient("minimax", false, aiLogService, aiExecutor), aiLogService, aiExecutor));
+        }
+        if (!resolveKey(mimo.apiKey).isBlank()) {
+            m.put("MIMO", new ABTestLlmClientWrapper(createProviderClient("mimo", false, aiLogService, aiExecutor), aiLogService, aiExecutor));
+        }
+        if (!resolveKey(glm.apiKey).isBlank()) {
+            m.put("GLM", new ABTestLlmClientWrapper(createProviderClient("glm", false, aiLogService, aiExecutor), aiLogService, aiExecutor));
+        }
+        if (!resolveKey(deepseek.apiKey).isBlank()) {
+            m.put("DEEPSEEK", new ABTestLlmClientWrapper(createProviderClient("deepseek", false, aiLogService, aiExecutor), aiLogService, aiExecutor));
+        }
         m.put("MOCK", new MockLlmClient(aiExecutor));
         return m;
     }

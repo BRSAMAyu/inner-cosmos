@@ -18,20 +18,20 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Per-user API rate limiting filter.
- * Limits each user to 60 requests/minute and burst of 10.
- * For anonymous users, limits to 20 requests/minute.
- * Aurora LLM endpoints limited to 20 requests/minute per user.
+ * Limits each user to 240 requests/minute and burst of 40.
+ * For anonymous users, limits to 60 requests/minute.
+ * Aurora LLM endpoints limited to 120 requests/minute per user.
  * Uses Bucket4j with in-memory storage (swap to Redis for multi-instance).
  */
 @Component
 public class ApiRateLimitFilter implements Filter {
     private static final Logger log = LoggerFactory.getLogger(ApiRateLimitFilter.class);
 
-    private static final int USER_LIMIT_PER_MINUTE = 60;
-    private static final int ANON_LIMIT_PER_MINUTE = 20;
-    private static final int AURORA_LLM_LIMIT_PER_MINUTE = 20;
+    private static final int USER_LIMIT_PER_MINUTE = 240;
+    private static final int ANON_LIMIT_PER_MINUTE = 60;
+    private static final int AURORA_LLM_LIMIT_PER_MINUTE = 120;
     private static final int LOGIN_LIMIT_PER_MINUTE = 10; // M-019: per-IP login attempt cap
-    private static final int BURST_CAPACITY = 10;
+    private static final int BURST_CAPACITY = 40;
 
     private final Map<String, BucketEntry> userBuckets = new ConcurrentHashMap<>();
     private final Bucket anonBucket;

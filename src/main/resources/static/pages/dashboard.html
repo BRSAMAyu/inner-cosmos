@@ -196,6 +196,13 @@
       background: rgba(42,38,34,.56);
       border-color: rgba(163,153,143,.10);
     }
+    /* Frosted light surfaces that were missing a dark counterpart (the "灰色框"
+       in 夜色 mode): badge, quick-action hover, and the notification cards. */
+    body.dark-star .time-badge { background: rgba(42,38,34,.55); }
+    body.dark-star .quick-action:hover { background: rgba(42,38,34,.82); }
+    body.dark-star .notif-card {
+      background: linear-gradient(180deg, rgba(42,38,34,.72), rgba(37,33,29,.5)), var(--surface-paper);
+    }
 
     /* RUN-006 — unread notifications strip */
     .notif-strip { display: flex; flex-direction: column; gap: 10px; margin: 0 0 8px; }

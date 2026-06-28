@@ -49,7 +49,7 @@ public class EmotionBaselineServiceImpl implements EmotionBaselineService {
     public static final double EWMA_ALPHA = 0.3;
 
     /** Default rolling window in days for {@link #computeBaseline(Long)}. */
-    public static final int DEFAULT_WINDOW_DAYS = 14;
+    public static final int DEFAULT_WINDOW_DAYS = 30;
 
     /** Emotion portrait dims the baseline buffers into (Spec §2 / IC-EMO-003). */
     public static final String DIM_EMOTION_PATTERN = "EMOTION_PATTERN";

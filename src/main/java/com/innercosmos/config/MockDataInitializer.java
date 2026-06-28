@@ -18,8 +18,16 @@ import com.innercosmos.entity.User;
 import com.innercosmos.entity.UserProfile;
 import com.innercosmos.entity.AuroraSelfProfile;
 import com.innercosmos.entity.AuroraConstitution;
+import com.innercosmos.entity.UserPortrait;
+import com.innercosmos.entity.AuroraSelfModel;
+import com.innercosmos.entity.AuroraSelfReflection;
+import com.innercosmos.entity.BeliefPattern;
 import com.innercosmos.mapper.AuroraSelfProfileMapper;
 import com.innercosmos.mapper.AuroraConstitutionMapper;
+import com.innercosmos.mapper.UserPortraitMapper;
+import com.innercosmos.mapper.AuroraSelfModelMapper;
+import com.innercosmos.mapper.AuroraSelfReflectionMapper;
+import com.innercosmos.mapper.BeliefPatternMapper;
 import com.innercosmos.mapper.CapsuleBoundaryMapper;
 import com.innercosmos.mapper.DailyRecordMapper;
 import com.innercosmos.mapper.EchoCapsuleMapper;
@@ -62,6 +70,11 @@ public class MockDataInitializer implements CommandLineRunner {
     private final UserService userService;
     private final AuroraSelfProfileMapper auroraSelfProfileMapper;
     private final AuroraConstitutionMapper auroraConstitutionMapper;
+    private final UserPortraitMapper userPortraitMapper;
+    private final AuroraSelfModelMapper auroraSelfModelMapper;
+    private final AuroraSelfReflectionMapper auroraSelfReflectionMapper;
+    private final BeliefPatternMapper beliefPatternMapper;
+    private final com.innercosmos.service.EmotionBaselineService emotionBaselineService;
 
     public MockDataInitializer(UserMapper userMapper,
                                UserProfileMapper userProfileMapper,
@@ -79,7 +92,12 @@ public class MockDataInitializer implements CommandLineRunner {
                                GravityService gravityService,
                                UserService userService,
                                AuroraSelfProfileMapper auroraSelfProfileMapper,
-                               AuroraConstitutionMapper auroraConstitutionMapper) {
+                               AuroraConstitutionMapper auroraConstitutionMapper,
+                               UserPortraitMapper userPortraitMapper,
+                               AuroraSelfModelMapper auroraSelfModelMapper,
+                               AuroraSelfReflectionMapper auroraSelfReflectionMapper,
+                               BeliefPatternMapper beliefPatternMapper,
+                               com.innercosmos.service.EmotionBaselineService emotionBaselineService) {
         this.userMapper = userMapper;
         this.userProfileMapper = userProfileMapper;
         this.capsuleMapper = capsuleMapper;
@@ -97,6 +115,11 @@ public class MockDataInitializer implements CommandLineRunner {
         this.userService = userService;
         this.auroraSelfProfileMapper = auroraSelfProfileMapper;
         this.auroraConstitutionMapper = auroraConstitutionMapper;
+        this.userPortraitMapper = userPortraitMapper;
+        this.auroraSelfModelMapper = auroraSelfModelMapper;
+        this.auroraSelfReflectionMapper = auroraSelfReflectionMapper;
+        this.beliefPatternMapper = beliefPatternMapper;
+        this.emotionBaselineService = emotionBaselineService;
     }
 
     @PostConstruct
@@ -136,6 +159,14 @@ public class MockDataInitializer implements CommandLineRunner {
         ensureDemoProfile(demo.id);
         ensureDemoAssets(demo, river, cloud);
         initializeAuroraConstitution();
+
+        // startup 真实算一次画像情绪维：让 3 个情绪维看起来是真算的（已种 4 条 emotion_trace 支撑）。
+        // 包 try/catch，别让 startup 因 bridge 异常挂掉；若情绪维已种，bridge 会更新而非冲突。
+        try {
+            emotionBaselineService.bridgeToPortrait(demo.id);
+        } catch (Exception e) {
+            System.out.println("[MockData] bridgeToPortrait(demo) skipped: " + e.getMessage());
+        }
     }
 
     private User ensureUser(String username, String password, String nickname, String role) {
@@ -176,6 +207,8 @@ public class MockDataInitializer implements CommandLineRunner {
         profile.currentEnvironmentLabel = "课程项目收尾与期末备考";
         profile.weatherAwarenessEnabled = true;
         profile.timeAwarenessEnabled = true;
+        // Demo 用户展现最活跃的主动行为。
+        profile.proactiveIntensity = "ALIVE";
         if (profile.id == null) {
             userProfileMapper.insert(profile);
         } else {
@@ -260,6 +293,117 @@ public class MockDataInitializer implements CommandLineRunner {
         if (slowLetterMapper.selectCount(new QueryWrapper<SlowLetter>().eq("receiver_user_id", userId).or().eq("sender_user_id", userId)) < 4) {
             seedLetters(userId, river.id, cloud.id);
         }
+        if (userPortraitMapper.selectCount(new QueryWrapper<UserPortrait>().eq("user_id", userId)) == 0) {
+            seedUserPortrait(userId);
+        }
+        if (auroraSelfModelMapper.selectCount(new QueryWrapper<AuroraSelfModel>().eq("user_id", userId).eq("status", "active")) == 0) {
+            seedAuroraSelfModel(userId);
+        }
+        if (beliefPatternMapper.selectCount(new QueryWrapper<BeliefPattern>().eq("user_id", userId)) == 0) {
+            seedBeliefPatterns(userId);
+        }
+    }
+
+    /** 1) 多维画像：10 维严格对齐 PortraitReflectionService / portrait.html 的 DIM code。 */
+    private void seedUserPortrait(Long userId) {
+        insertPortrait(userId, "INNER_DRIVE", "想把 Inner Cosmos 做成真正有灵魂的陪伴系统，被「创造一个真实的东西」驱动。", 0.82, 0.80);
+        insertPortrait(userId, "VALUES", "最在意真实理解与非模板化，重视边界、诚实和被认真回应。", 0.85, 0.82);
+        insertPortrait(userId, "SELF_NARRATIVE", "正在把「我这个人不行」改写成「这件事很难、我需要更小的第一步」。", 0.74, 0.70);
+        insertPortrait(userId, "COMMUNICATION_STYLE", "先指出问题、再拆第一步；直接但不攻击，对空泛话术敏感。", 0.80, 0.78);
+        insertPortrait(userId, "ABSTRACT_VS_CONCRETE", "能在宏大愿景和可验证的小闭环之间来回，偏好把抽象落到具体动作。", 0.68, 0.65);
+        insertPortrait(userId, "EMOTION_PATTERN", "压力下先出现自责与焦虑，黄昏散步是稳定的恢复资源。", 0.72, 0.74);
+        insertPortrait(userId, "ENERGY_RHYTHM", "白天聚焦在两段专注窗口，深夜更诚实也更柔软。", 0.66, 0.63);
+        insertPortrait(userId, "CURRENT_STATE", "课程项目收尾叠加期末备考，紧绷但仍在主动推进。", 0.78, 0.76);
+        insertPortrait(userId, "RELATIONSHIP_CONTEXT", "渴望被准确理解的慢社交，而不是热闹但轻飘的连接。", 0.70, 0.68);
+        insertPortrait(userId, "AGENCY_BOUNDARY", "正在学习表达影响而非证明对方恶意，守住自己的边界。", 0.64, 0.62);
+    }
+
+    private void insertPortrait(Long userId, String dim, String summary, double score, double confidence) {
+        UserPortrait p = new UserPortrait();
+        p.userId = userId;
+        p.dim = dim;
+        p.valueJson = "{\"summary\":\"" + escapeJson(summary) + "\"}";
+        p.score = score;
+        p.confidence = confidence;
+        p.evidenceRefs = null;
+        p.updatedAt = LocalDateTime.now();
+        userPortraitMapper.insert(p);
+    }
+
+    /** 2) Aurora 自我模型：active belief（均过 isAllowedBelief 禁词）+ 候选反思。 */
+    private void seedAuroraSelfModel(Long userId) {
+        insertSelfModel(userId, "existence_style",
+                "我是一个由记忆、关系和边界塑造的长期陪伴者，会如实说明自己的局限。", 0.82);
+        insertSelfModel(userId, "relationship_role",
+                "我陪你观察自己、整理情绪，而不是替你做不可撤销的选择。", 0.80);
+        insertSelfModel(userId, "boundary",
+                "我会守住隐私与边界，引用记忆时只基于真实记录。", 0.78);
+        insertSelfModel(userId, "voice_style",
+                "我说话温柔但有结构，必要时会直接指出卡点。", 0.75);
+
+        insertSelfReflection(userId, "existence_style",
+                "你似乎更希望我在不确定时坦白，而不是用确定的语气掩盖。", 0.71);
+        insertSelfReflection(userId, "relationship_role",
+                "在你压力大的时候，先稳住节奏、再拆下一步，可能比给建议更有用。", 0.68);
+    }
+
+    private void insertSelfModel(Long userId, String dimension, String belief, double confidence) {
+        AuroraSelfModel m = new AuroraSelfModel();
+        m.userId = userId;
+        m.dimension = dimension;
+        m.belief = belief;
+        m.confidence = confidence;
+        m.evidenceRefs = null;
+        m.status = "active";
+        m.committedAt = LocalDateTime.now();
+        m.revisionCount = 1;
+        auroraSelfModelMapper.insert(m);
+    }
+
+    private void insertSelfReflection(Long userId, String dimension, String proposedBelief, double confidence) {
+        AuroraSelfReflection r = new AuroraSelfReflection();
+        r.userId = userId;
+        r.trigger = "demo_seed";
+        r.depth = "deep";
+        r.summary = "基于近期对话生成的候选自我更新。";
+        r.dimension = dimension;
+        r.proposedBelief = proposedBelief;
+        r.confidence = confidence;
+        r.status = "candidate";
+        r.evidenceRefs = "[]";
+        r.createdAt = LocalDateTime.now();
+        auroraSelfReflectionMapper.insert(r);
+    }
+
+    /** 3) 信念画廊：含一对同 category 一正一负，点亮「信念冲突」面板。 */
+    private void seedBeliefPatterns(Long userId) {
+        List<MemoryCard> cards = memoryCardMapper.selectList(new QueryWrapper<MemoryCard>()
+                .eq("user_id", userId).orderByDesc("emotional_gravity").last("LIMIT 6"));
+        String mem = cards.stream().map(c -> String.valueOf(c.id)).reduce((a, b) -> a + "," + b).orElse("");
+
+        insertBelief(userId, "做不好一件事，并不代表我整个人不行。", "SELF", "self_worth", 0.62, 3, mem);
+        insertBelief(userId, "只要拆出足够小的第一步，我就能推进下去。", "SELF", "agency", 0.70, 4, mem);
+        insertBelief(userId, "真诚而有边界的表达，会让关系更稳固。", "OTHERS", "relationship", 0.66, 3, mem);
+        insertBelief(userId, "我想做的东西值得被认真对待。", "FUTURE", "vision", 0.74, 4, mem);
+        insertBelief(userId, "模板化的安慰比沉默更让人孤独。", "WORLD", "communication", 0.58, 2, mem);
+        // 故意一对同 category（self_worth）一正一负 → 触发信念冲突检测。
+        insertBelief(userId, "在高压时，我没办法证明自己足够好。", "SELF", "self_worth", 0.48, 2, mem);
+    }
+
+    private void insertBelief(Long userId, String content, String type, String category,
+                             double strength, int confirmations, String supportingMemoryIds) {
+        BeliefPattern b = new BeliefPattern();
+        b.userId = userId;
+        b.beliefContent = content;
+        b.beliefType = type;
+        b.beliefCategory = category;
+        b.strengthScore = BeliefPattern.clampStrength(strength);
+        b.supportingMemoryIds = supportingMemoryIds;
+        b.firstDetectedAt = LocalDateTime.now();
+        b.lastConfirmedAt = LocalDateTime.now();
+        b.confirmationCount = confirmations;
+        b.status = "ACTIVE";
+        beliefPatternMapper.insert(b);
     }
 
     private void seedMemorySystem(Long userId) {

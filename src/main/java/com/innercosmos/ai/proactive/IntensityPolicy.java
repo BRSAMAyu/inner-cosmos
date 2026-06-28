@@ -16,9 +16,9 @@ public class IntensityPolicy {
     private static final Map<String, Policy> TABLE = Map.of(
         "OFF",       new Policy(0, Duration.ZERO),
         "WHISPER",   new Policy(0, Duration.ZERO),
-        "LIGHT",     new Policy(1, Duration.ofHours(8)),
-        "ACTIVE",    new Policy(3, Duration.ofHours(3)),
-        "COMPANION", new Policy(6, Duration.ofMinutes(90)),
+        "LIGHT",     new Policy(3, Duration.ofHours(2)),
+        "ACTIVE",    new Policy(8, Duration.ofMinutes(30)),
+        "COMPANION", new Policy(12, Duration.ofMinutes(15)),
         "ALIVE",     new Policy(Integer.MAX_VALUE, Duration.ofMinutes(15))
     );
 

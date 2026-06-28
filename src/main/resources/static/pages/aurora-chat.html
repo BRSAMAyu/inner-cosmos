@@ -390,6 +390,32 @@
     .bubble.aurora.corrected .correct-affordance { opacity: 1; }
     .corrected-note { font-size: .74rem; color: var(--accent-sage); }
 
+    /* gentle "要不要试试" small-step chip — a soft, low-key suggestion, not a loud component */
+    .step-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      align-self: flex-start;
+      max-width: 88%;
+      margin: 2px 0 6px;
+      padding: 7px 14px;
+      border-radius: 999px;
+      font-size: .82rem;
+      line-height: 1.5;
+      color: var(--accent-sage);
+      background: rgba(143,163,148,.10);
+      border: 1px solid rgba(143,163,148,.24);
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 500ms var(--ease-bloom), transform 500ms var(--ease-bloom);
+    }
+    .step-chip .step-spark { font-size: .9rem; }
+    body.dark-star .step-chip {
+      color: var(--accent-sage);
+      background: rgba(143,163,148,.12);
+      border-color: rgba(143,163,148,.22);
+    }
+
     .correct-overlay {
       position: fixed;
       inset: 0;
@@ -694,6 +720,60 @@ function addAurora(messages) {
   });
 }
 
+// ── Friend-style proactive tail ──
+// After all message bubbles settle, render the backend's nextQuestion as a final
+// Aurora bubble ("像朋友一样反问一句") and smallStep as a gentle "要不要试试" chip.
+// Both already-shown messages are checked so a nextQuestion already spoken inside a
+// bubble is not duplicated. `afterCount` is how many message bubbles precede this so
+// the tail appears once they have animated in.
+function addProactiveTail(reply, afterCount) {
+  if (!reply) return;
+  var messages = (reply.messages || reply.segments || []).filter(Boolean);
+  // Stream path: meta carries no messages[]; fall back to the on-screen bubble text
+  // so we still dedup nextQuestion/smallStep against what Aurora just streamed.
+  if (!messages.length) {
+    messages = Array.prototype.map.call(
+      document.querySelectorAll("#chat .bubble.aurora .bubble-text, #chat .bubble.aurora .stream-text"),
+      function(n) { return n.textContent || ""; }
+    ).filter(Boolean);
+  }
+  var precede = (typeof afterCount === "number") ? afterCount : messages.length;
+  var delay = Math.max(0, precede) * 520 + 360;
+  var nq = (reply.nextQuestion || "").trim();
+  var step = (reply.smallStep || "").trim();
+  if (nq && !alreadySpoken(nq, messages)) {
+    setTimeout(function() { addBubble(nq, "ai"); }, delay);
+    delay += 520;
+  }
+  if (step && !alreadySpoken(step, messages)) {
+    setTimeout(function() { addStepChip(step); }, delay);
+  }
+}
+
+// A small-step suggestion as a soft chip, reusing the gentle visual language.
+function addStepChip(step) {
+  var chat = document.getElementById("chat");
+  var div = document.createElement("div");
+  div.className = "step-chip";
+  div.innerHTML = '<span class="step-spark">✦</span><span>要不要试试：' + IC.esc(step) + '</span>';
+  chat.appendChild(div);
+  requestAnimationFrame(function() {
+    div.style.opacity = "1";
+    div.style.transform = "translateY(0)";
+  });
+  chat.scrollTop = chat.scrollHeight;
+}
+
+// Dedup guard: true if `text` is already substantially contained in any shown message.
+function alreadySpoken(text, messages) {
+  var t = (text || "").replace(/\s+/g, "");
+  if (!t) return true;
+  return (messages || []).some(function(m) {
+    var mm = String(m || "").replace(/\s+/g, "");
+    return mm.indexOf(t) >= 0 || (t.length >= 8 && mm.indexOf(t.slice(0, Math.ceil(t.length * 0.7))) >= 0);
+  });
+}
+
 // ── Real SSE streaming (VS-003) ──
 // Opens a streaming bubble, appends token chunks live, and finalizes it. Keeps the
 // gentle "Aurora 正在想" indicator visible until the first token arrives.
@@ -815,6 +895,9 @@ function sendViaStream(text, body) {
         finishOnce();
         document.getElementById("typing").classList.remove("visible");
         finalizeStreamingBubbles();
+        // Friend-style tail: nextQuestion + smallStep arrive in the meta event; render
+        // them once the streamed bubbles have settled. afterCount=0 → near-immediate.
+        if (streamMeta && gotAny) addProactiveTail(streamMeta, 0);
         resolve({ safety: false, streamed: gotAny });
       });
 
@@ -1010,6 +1093,7 @@ async function send() {
       var r = await sendViaPost(body);
       if (r.success && r.data) {
         addAurora(r.data.messages || []);
+        addProactiveTail(r.data, (r.data.messages || []).length);
         renderAgentLoop(r.data);
         renderMemoryLens(r.data.memoryContext);
         if (r.data.suggestSettle) IC.toast("Aurora 建议先把今天沉淀下来。", "warn");

@@ -64,6 +64,13 @@ public class SessionModelRouter {
             chosen = llmConfig.activeProvider().toUpperCase();
         }
         String normalized = chosen.toUpperCase();
+        // A stored preference may point at a provider that is no longer wired (no API key,
+        // e.g. a seeded "DEEPSEEK"). namedLlmClients only contains keyed providers + MOCK, so
+        // if the preference isn't available, resolve to the system default provider cleanly —
+        // both the reported provider name and the model name then match the client actually used.
+        if (named == null || !named.containsKey(normalized)) {
+            normalized = llmConfig.activeProvider().toUpperCase();
+        }
         LlmClient client = pick(normalized);
         if (client == null) {
             log.warn("SessionModelRouter: no client found for provider {}, falling back to system default", normalized);

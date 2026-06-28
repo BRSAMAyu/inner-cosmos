@@ -1677,8 +1677,15 @@ body.dark-star .guidance-tip {
   50% { opacity: 1; transform: scale(1.2); }
 }
 
-/* ── Warm Dark Theme (activates at sunset) ── */
-body.dark-star {
+/* ── Warm Dark Theme (activates at sunset) ──
+   Selector is `html body.dark-star` (specificity 0,1,2) NOT `body.dark-star`
+   (0,1,1) on purpose: the time-of-day palette blocks below (body.time-night …)
+   also set --ink/--text/--surface-* at 0,1,1 and appear LATER in the file, so an
+   equal-specificity `body.dark-star` would lose the cascade whenever both classes
+   are on <body> (which is exactly the night/auto case). The extra `html` makes the
+   dark tokens win over any time palette regardless of source order — this is the
+   root fix for "dark-brown text on dark surface" invisibility in 夜色 mode. */
+html body.dark-star {
   color-scheme: dark;
   --surface-warm: #2a2622;
   --surface-mist: #25211d;
@@ -1686,17 +1693,19 @@ body.dark-star {
   --surface-blush: #262220;
   --surface-blue: #222428;
   --surface-sage: #212421;
-  --accent-sage: #7a8e7f;
-  --accent-dusty-blue: #8698a9;
-  --accent-rose: #a67a7c;
-  --accent-lavender: #9a90a7;
-  --accent-coral: #b07d7b;
-  --ink: #d4cfc7;
-  --text: #cfc9c1;
-  --muted: #a9a49c;
-  --faint: #7a7570;
-  --line: rgba(163, 153, 143, .18);
-  --line-strong: rgba(163, 153, 143, .44);
+  --accent-sage: #8aa090;
+  --accent-dusty-blue: #96a8b9;
+  --accent-rose: #c08e90;
+  --accent-lavender: #aa9fb7;
+  --accent-coral: #c08d8b;
+  /* Text tokens brightened for WCAG-AA on the warm-dark surfaces: ink #e8e3db /
+     body #d8d2ca clear 9:1+, muted #bdb7af stays a readable ~5:1 secondary. */
+  --ink: #e8e3db;
+  --text: #d8d2ca;
+  --muted: #bdb7af;
+  --faint: #8a857f;
+  --line: rgba(180, 170, 160, .20);
+  --line-strong: rgba(180, 170, 160, .46);
   --glow-soft: 0 18px 56px rgba(58, 54, 50, .34), 0 8px 24px rgba(90, 82, 78, .24);
   --shadow: 0 18px 46px rgba(0, 0, 0, .42);
 }
@@ -2371,17 +2380,25 @@ body.dark-star .soft-stage {
   transition: opacity 2s ease;
 }
 
-/* CLEAR - Sunny/Clear */
+/* CLEAR - Sunny/Clear. Not empty: a faint warm sun-glow so a clear sky reads as
+   bright and warm, clearly different from cloud's flat grey. */
 body.weather-clear {
-  /* Clear skies, minimal effects */
+  --weather-opacity: 0.7;
 }
 body.weather-clear .weather-overlay {
-  background: transparent;
+  background:
+    radial-gradient(ellipse 50% 50% at 82% 8%, rgba(240, 214, 168, 0.34), transparent 60%),
+    radial-gradient(ellipse 120% 60% at 50% -10%, rgba(248, 236, 210, 0.18), transparent 60%);
+  animation: sun-bask 14s ease-in-out infinite alternate;
+}
+@keyframes sun-bask {
+  from { opacity: .82; transform: translateY(0); }
+  to   { opacity: 1;   transform: translateY(1.5%); }
 }
 
 /* CLOUD - Cloudy/Overcast */
 body.weather-cloud {
-  --weather-opacity: 0.12;
+  --weather-opacity: 0.22;
 }
 body.weather-cloud .weather-overlay {
   background:
@@ -2396,10 +2413,12 @@ body.weather-cloud .weather-overlay {
 
 /* RAIN - Rainy */
 body.weather-rain {
-  --weather-opacity: 0.25;
+  --weather-opacity: 0.4;
 }
 body.weather-rain .weather-overlay {
-  background: linear-gradient(180deg, rgba(134, 152, 169, 0.1), transparent);
+  background:
+    radial-gradient(ellipse 120% 50% at 50% 0%, rgba(120, 138, 158, 0.30), transparent 62%),
+    linear-gradient(180deg, rgba(134, 152, 169, 0.18), rgba(134, 152, 169, 0.04));
 }
 body.weather-rain .flowing-particles::after {
   content: "";
@@ -2509,6 +2528,104 @@ body.weather-fog .glass-panel {
   box-shadow:
     0 4px 12px rgba(0, 0, 0, 0.06),
     inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+/* ── Dark-mode weather tuning ──
+   The wash colours above are tuned for the light scene; on the warm-dark surface
+   they'd glow too bright. Re-skin the washes cooler/dimmer at night so weather is
+   still legible-as-atmosphere without lifting the dark background or hurting text. */
+body.dark-star.weather-clear .weather-overlay {
+  background:
+    radial-gradient(ellipse 50% 50% at 82% 8%, rgba(200, 168, 110, 0.20), transparent 60%),
+    radial-gradient(ellipse 120% 60% at 50% -10%, rgba(150, 132, 96, 0.12), transparent 60%);
+}
+body.dark-star.weather-cloud .weather-overlay {
+  background:
+    radial-gradient(ellipse 60% 40% at 20% 30%, rgba(120, 124, 134, 0.26), transparent 55%),
+    radial-gradient(ellipse 80% 50% at 70% 60%, rgba(96, 100, 112, 0.22), transparent 55%);
+}
+body.dark-star.weather-rain .weather-overlay {
+  background:
+    radial-gradient(ellipse 120% 50% at 50% 0%, rgba(96, 116, 140, 0.30), transparent 62%),
+    linear-gradient(180deg, rgba(96, 116, 140, 0.18), transparent);
+}
+body.dark-star.weather-storm .weather-overlay {
+  background:
+    radial-gradient(ellipse 100% 50% at 50% 0%, rgba(40, 50, 70, 0.55), transparent 60%),
+    linear-gradient(180deg, rgba(50, 60, 82, 0.28), transparent);
+}
+body.dark-star.weather-fog .weather-overlay {
+  background: radial-gradient(ellipse 100% 60% at 50% 50%, rgba(120, 126, 134, 0.34), transparent 70%);
+}
+body.dark-star.weather-snow .weather-overlay {
+  background: radial-gradient(ellipse 100% 50% at 50% 0%, rgba(150, 162, 178, 0.22), transparent);
+}
+
+/* ── Time-of-day sky glow ──
+   A fixed, slowly-breathing wash keyed to the time class ICTimeSystem puts on
+   <body>. Sits behind all content (z-index:-1, pointer-events:none) so it only
+   colours the air. Each period gets a distinct hue + corner so dawn→noon→dusk→
+   night visibly *flows* through the day, in both light and dark themes. */
+.sky-glow {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 3s ease, background 3s ease;
+  background: transparent;
+  animation: sky-breathe 18s ease-in-out infinite alternate;
+}
+@keyframes sky-breathe {
+  from { transform: translateY(0) scale(1); }
+  to   { transform: translateY(-1.2%) scale(1.04); }
+}
+body.time-dawn .sky-glow {
+  opacity: .9;
+  background:
+    radial-gradient(ellipse 90% 50% at 30% 0%, rgba(244, 198, 156, 0.30), transparent 60%),
+    radial-gradient(ellipse 80% 40% at 85% 12%, rgba(216, 168, 168, 0.18), transparent 60%);
+}
+body.time-morning .sky-glow {
+  opacity: .8;
+  background: radial-gradient(ellipse 100% 55% at 60% 0%, rgba(196, 214, 196, 0.22), transparent 62%);
+}
+body.time-noon .sky-glow {
+  opacity: .85;
+  background:
+    radial-gradient(ellipse 40% 40% at 50% -8%, rgba(214, 226, 232, 0.30), transparent 60%),
+    radial-gradient(ellipse 120% 50% at 50% 0%, rgba(190, 210, 220, 0.16), transparent 64%);
+}
+body.time-afternoon .sky-glow {
+  opacity: .85;
+  background: radial-gradient(ellipse 100% 55% at 70% 5%, rgba(232, 200, 150, 0.26), transparent 62%);
+}
+body.time-dusk .sky-glow {
+  opacity: .95;
+  background:
+    radial-gradient(ellipse 100% 55% at 75% 8%, rgba(224, 158, 120, 0.30), transparent 60%),
+    radial-gradient(ellipse 90% 50% at 20% 0%, rgba(154, 132, 168, 0.24), transparent 62%);
+}
+body.time-night .sky-glow,
+body.time-deep-night .sky-glow {
+  opacity: .9;
+  background:
+    radial-gradient(ellipse 90% 50% at 50% -6%, rgba(70, 84, 120, 0.26), transparent 62%),
+    radial-gradient(ellipse 22% 22% at 80% 16%, rgba(200, 192, 187, 0.10), transparent 60%);
+}
+/* In warm-dark theme the night/dusk glow leans deeper-blue and a touch stronger
+   so the "night sky" reads, while day-period glows soften (sun is down). */
+body.dark-star.time-night .sky-glow,
+body.dark-star.time-deep-night .sky-glow {
+  opacity: 1;
+  background:
+    radial-gradient(ellipse 95% 55% at 50% -6%, rgba(58, 74, 116, 0.36), transparent 64%),
+    radial-gradient(ellipse 20% 20% at 82% 14%, rgba(210, 202, 196, 0.12), transparent 58%);
+}
+body.dark-star.time-dawn .sky-glow,
+body.dark-star.time-dusk .sky-glow { opacity: .7; }
+@media (prefers-reduced-motion: reduce) {
+  .sky-glow, body.weather-clear .weather-overlay { animation: none; }
 }
 
 /* Weather icon display */
@@ -3518,6 +3635,14 @@ body.time-dusk {
   box-shadow: 0 10px 36px rgba(83,73,62,.045);
   backdrop-filter: blur(24px) saturate(112%);
   -webkit-backdrop-filter: blur(24px) saturate(112%);
+}
+
+/* The frosted topbar had no dark counterpart — in 夜色 mode it rendered as a
+   light bar across every page (brand text washed out on it). Re-skin it dark. */
+html body.dark-star .topbar {
+  border-color: rgba(180,170,160,.16);
+  background: rgba(30,27,24,.62);
+  box-shadow: 0 10px 36px rgba(0,0,0,.34);
 }
 
 .brand {

@@ -16,7 +16,7 @@
     {
       "name": "ic-jar",
       "runtimeExecutable": "C:/Program Files/Java/jdk-21.0.10/bin/java.exe",
-      "runtimeArgs": ["-jar", "target/inner-cosmos-0.1.0.jar"],
+      "runtimeArgs": ["-jar", "D:/code/inner cosmos/target/inner-cosmos-0.1.0.jar"],
       "port": 8080
     }
   ]

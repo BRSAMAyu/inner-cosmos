@@ -10,7 +10,7 @@ public interface LlmClient {
      * truncation — the user asked for a more generous per-response budget for a
      * better experience. Single source of truth so providers stay consistent.
      */
-    int RESPONSE_MAX_TOKENS = 1600;
+    int RESPONSE_MAX_TOKENS = 4096;
 
     String chat(LlmRequest request);
 

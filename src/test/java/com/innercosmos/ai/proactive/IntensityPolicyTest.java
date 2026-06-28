@@ -18,18 +18,18 @@ class IntensityPolicyTest {
     }
 
     @Test
-    void lightHasOnePerDay() {
-        assertEquals(1, policy.get("LIGHT").maxPerDay());
+    void lightHasThreePerDay() {
+        assertEquals(3, policy.get("LIGHT").maxPerDay());
     }
 
     @Test
-    void activeHasThreePerDay() {
-        assertEquals(3, policy.get("ACTIVE").maxPerDay());
+    void activeHasEightPerDay() {
+        assertEquals(8, policy.get("ACTIVE").maxPerDay());
     }
 
     @Test
-    void companionHasSixPerDay() {
-        assertEquals(6, policy.get("COMPANION").maxPerDay());
+    void companionHasTwelvePerDay() {
+        assertEquals(12, policy.get("COMPANION").maxPerDay());
     }
 
     @Test
@@ -39,7 +39,8 @@ class IntensityPolicyTest {
 
     @Test
     void unknownDefaultsToLight() {
-        assertEquals("LIGHT", policy.get("UNKNOWN").maxPerDay() == 1 ? "LIGHT" : "OTHER");
+        // Unknown intensities fall back to the LIGHT policy.
+        assertEquals(policy.get("LIGHT").maxPerDay(), policy.get("UNKNOWN").maxPerDay());
     }
 
     @Test

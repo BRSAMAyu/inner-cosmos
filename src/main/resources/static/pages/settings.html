@@ -414,6 +414,8 @@
       .theme-opt:hover { background:rgba(255,250,243,.85); transform:translateY(-1px); }
       .theme-opt.active { border-color:var(--accent-sage); background:rgba(143,163,148,.12); }
       .theme-opt strong { font-size:.92rem; color:var(--ink); }
+      body.dark-star .theme-opt { background:rgba(42,38,34,.55); border-color:rgba(180,170,160,.14); }
+      body.dark-star .theme-opt:hover { background:rgba(42,38,34,.85); }
     </style>
   </section>
 
@@ -492,6 +494,13 @@
     </div>
     <div class="toggle-row">
       <div>
+        <label>退出登录</label>
+        <p class="hint" id="logoutHint">结束当前登录，返回登录页</p>
+      </div>
+      <button class="btn-outline" onclick="doLogout()">退出登录</button>
+    </div>
+    <div class="toggle-row">
+      <div>
         <label>删除账户</label>
         <p class="hint">永久删除你的账户和所有数据，此操作不可撤销</p>
       </div>
@@ -566,6 +575,9 @@ async function loadProfile() {
   const r = await IC.api("/api/user/profile");
   if (!r.success || !r.data) return;
   const p = r.data;
+
+  var who = p.nickname || p.username;
+  if (who) document.getElementById("logoutHint").textContent = "当前登录：" + who + " · 退出后返回登录页";
 
   if (p.auroraName) document.getElementById("auroraName").value = p.auroraName;
   if (p.auroraTone) document.getElementById("auroraTone").value = p.auroraTone;
@@ -693,6 +705,11 @@ async function doChangePassword() {
     IC.closeModal();
     IC.toast("密码已更新");
   }
+}
+
+function doLogout() {
+  if (!confirm("确定要退出登录吗？")) return;
+  IC.logout();
 }
 
 function confirmDelete() {

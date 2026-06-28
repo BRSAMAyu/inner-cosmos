@@ -90,6 +90,7 @@ const IC = {
       topbar.innerHTML = `
         <a class="brand" href="/pages/dashboard.html" aria-label="Inner Cosmos · 返回首页"><span class="brand-mark" aria-hidden="true"></span><span>Inner Cosmos</span></a>
         <nav class="nav" aria-label="主导航">${IC.nav()}</nav>
+        <span class="topbar-user" data-current-user hidden style="font-size:.8125rem;color:var(--muted);max-width:9em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 4px"></span>
         <button class="icon-button" type="button" aria-label="${themeTip}" title="${themeTip}" onclick="IC.toggleTheme()">${themeIcon}</button>
       `;
       topbar.querySelectorAll("a").forEach(a => {
@@ -108,7 +109,45 @@ const IC = {
     IC.loadUserProfile().then(() => {
       IC.applyAuroraNameToDom();
       IC.applyAdminNav();
+      IC.applyCurrentUserToDom();
+      IC.ensureProactiveStream();
     }).catch(() => {});
+  },
+
+  /* App-wide proactive (SSE) subscription. Previously only aurora-chat.html subscribed,
+     so Aurora's proactive toasts were invisible everywhere else. Mounting it here makes
+     any logged-in page able to surface a proactive greeting. Fully fault-tolerant:
+     no EventSource support / not logged in / already started -> no-op, never throws. */
+  ensureProactiveStream() {
+    try {
+      if (typeof EventSource === "undefined") return; // unsupported browser
+      // Never start on public/unauthenticated entry pages.
+      const path = location.pathname;
+      if (path.endsWith("/login.html") || path.endsWith("/register.html") || path.endsWith("/index.html")) return;
+      // Only when we actually have a loaded profile (i.e. a live session).
+      if (!IC.userProfile) return;
+      if (window.__icProactiveStarted) return;
+
+      const begin = () => {
+        try {
+          if (window.__icProactiveStarted) return;
+          if (window.ICProactive && typeof window.ICProactive.start === "function") {
+            window.ICProactive.start();
+            window.__icProactiveStarted = true;
+          }
+        } catch (e) { /* never let proactive wiring break the page */ }
+      };
+
+      if (window.ICProactive) { begin(); return; }
+      // Avoid double-injection if another mount already queued the script.
+      if (window.__icProactiveScriptLoading) return;
+      window.__icProactiveScriptLoading = true;
+      const s = document.createElement("script");
+      s.src = "/js/ic-proactive-client.js";
+      s.onload = begin;
+      s.onerror = () => { window.__icProactiveScriptLoading = false; };
+      document.head.appendChild(s);
+    } catch (e) { /* fault-tolerant: ignore */ }
   },
 
   ensureAmbientSystems() {
@@ -337,6 +376,22 @@ const IC = {
     document.documentElement.style.setProperty("--aurora-name", name);
   },
 
+  /* Show the signed-in user's nickname in the topbar so "logged in" is visible. */
+  applyCurrentUserToDom() {
+    const p = IC.userProfile || {};
+    const name = p.nickname || p.username;
+    document.querySelectorAll("[data-current-user]").forEach(el => {
+      if (name) {
+        el.textContent = name;
+        el.title = "已登录：" + name;
+        el.hidden = false;
+      } else {
+        el.textContent = "";
+        el.hidden = true;
+      }
+    });
+  },
+
   /* Reveal admin-only nav entries when the signed-in user is an admin. */
   applyAdminNav() {
     const isAdmin = IC.userProfile && (IC.userProfile.role === "ADMIN" || IC.userProfile.role === "admin");
@@ -401,8 +456,8 @@ const IC = {
     } catch (e) {}
     // M-009: do NOT silently auto-log every visitor into the shared demo account — that
     // exposed demo's private memories/letters to anyone who opened the app. Route to the
-    // real login page instead. (Demo creds demo/demo123 stay pre-filled on login.html for
-    // convenience; index.html remains a public landing.)
+    // real login page instead. (The "游客体验 Demo" button on login.html still uses
+    // demo/demo123 for convenience; index.html remains a public landing.)
     const path = location.pathname;
     if (!path.endsWith("/login.html") && !path.endsWith("/register.html") && !path.endsWith("/index.html")) {
       location.href = "/pages/login.html";
@@ -412,6 +467,21 @@ const IC = {
 
   async guestLogin() {
     return IC.api("/api/auth/login", { method: "POST", body: JSON.stringify({ username: "demo", password: "demo123" }) });
+  },
+
+  /* Sign the user out: invalidate the server session, clear local login-related state,
+     then return to the login page. Always navigates to login even if the call fails. */
+  async logout() {
+    try {
+      await IC.api("/api/auth/logout", { method: "POST" });
+    } catch (e) { /* fall through — we still want to leave the session behind */ }
+    try {
+      IC.userProfile = null;
+      IC.userProfilePromise = null;
+      ["ic_user", "ic_user_id", "ic_username", "ic_nickname", "ic_role", "ic_logged_in", "ic_session"]
+        .forEach(key => localStorage.removeItem(key));
+    } catch (e) {}
+    location.href = "/pages/login.html";
   },
 
   formatTime(value) {

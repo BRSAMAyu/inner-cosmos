@@ -58,7 +58,7 @@ public class ProactiveEngine {
         var profile = profileMapper.selectById(userId);
         if (profile == null) return;
 
-        String intensity = profile.proactiveIntensity == null ? "LIGHT" : profile.proactiveIntensity;
+        String intensity = profile.proactiveIntensity == null ? "COMPANION" : profile.proactiveIntensity;
         if ("OFF".equals(intensity) || "WHISPER".equals(intensity)) return;
 
         if (intensityPolicy.isAlive(intensity)) {
@@ -82,7 +82,7 @@ public class ProactiveEngine {
         if (budget <= 0) return;
 
         // Get event candidates
-        var events = eventMatcher.candidates(userId, Duration.ofMinutes(5));
+        var events = eventMatcher.candidates(userId, Duration.ofMinutes(45));
         if (events.isEmpty() && budget > 0) {
             // Random scheduled push
             String content = generateContent(userId, "scheduled");

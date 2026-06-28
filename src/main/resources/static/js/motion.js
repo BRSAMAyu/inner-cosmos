@@ -349,6 +349,20 @@ window.ICMotion = {
     const inkwash = document.createElement('div');
     inkwash.className = 'flowing-inkwash';
     bg.appendChild(inkwash);
+
+    // Weather wash layer. The whole `body.weather-* .weather-overlay` CSS stack
+    // (cloud drift, rain wash, storm + lightning, fog blur, snow) targets this
+    // element — it was never created, so every atmospheric wash was dead. Create
+    // it once here so weather actually changes the scene, not just a label.
+    const weather = document.createElement('div');
+    weather.className = 'weather-overlay';
+    bg.appendChild(weather);
+
+    // Sky-glow layer keyed to the time-of-day class on <body>; gives each period
+    // (dawn/noon/dusk/night) a distinct, slowly-breathing wash so time visibly flows.
+    const sky = document.createElement('div');
+    sky.className = 'sky-glow';
+    bg.appendChild(sky);
   },
 
   // Initialize motion system
