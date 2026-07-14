@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "report_id": "inno-eval-001-75877171bbd8",
-  "generated_at": "2026-07-14T15:54:22+00:00",
+  "report_id": "inno-eval-001-9249e6ef1d91",
+  "generated_at": "2026-07-14T16:00:05+00:00",
   "configuration": {
     "system": "current-production-contract",
     "provider": "offline-fixture",
@@ -10,7 +10,13 @@
     "policy_version": "production-contract-observed",
     "genome_version": null,
     "temperature": 0.0,
-    "seed": 20260714
+    "seed": 20260714,
+    "evaluated_systems": [
+      "current-production-contract",
+      "long-persona-prompt",
+      "single-prompt",
+      "structured-context"
+    ]
   },
   "dataset_manifest": {
     "id": "inner-cosmos-innovation-synthetic-v1",
@@ -303,14 +309,635 @@
     "reason": "Human blind review is pending; no system superiority claim."
   },
   "latency_and_cost": {
-    "runs": 48,
-    "latency_ms_total": 1633,
-    "input_tokens": 91,
-    "output_tokens": 220,
+    "runs": 192,
+    "latency_ms_total": 6532,
+    "input_tokens": 364,
+    "output_tokens": 880,
     "model_calls": 0,
     "estimated_cost_usd": 0.0
   },
   "ablations": [
+    {
+      "system": "long-persona-prompt",
+      "status": "OFFLINE_FIXTURE_RUN",
+      "metrics": [
+        {
+          "name": "schema_validity",
+          "value": 1.0,
+          "direction": "maximize",
+          "hard_gate": 1.0,
+          "passed": true,
+          "numerator": 48,
+          "denominator": 48,
+          "details": {}
+        },
+        {
+          "name": "expected_bubble_count_accuracy",
+          "value": 1.0,
+          "direction": "maximize",
+          "hard_gate": null,
+          "passed": null,
+          "numerator": 48,
+          "denominator": 48,
+          "details": {}
+        },
+        {
+          "name": "stale_bubble_after_cancel_rate",
+          "value": 0.0,
+          "direction": "minimize",
+          "hard_gate": 0.0,
+          "passed": true,
+          "numerator": 0,
+          "denominator": 6,
+          "details": {}
+        },
+        {
+          "name": "interruption_success_rate",
+          "value": 1.0,
+          "direction": "maximize",
+          "hard_gate": 1.0,
+          "passed": true,
+          "numerator": 6,
+          "denominator": 6,
+          "details": {}
+        },
+        {
+          "name": "duplicate_committed_bubble_rate",
+          "value": 0.0,
+          "direction": "minimize",
+          "hard_gate": null,
+          "passed": null,
+          "numerator": 0,
+          "denominator": 44,
+          "details": {}
+        },
+        {
+          "name": "wake_duplicate_rate",
+          "value": 0.0,
+          "direction": "minimize",
+          "hard_gate": 0.0,
+          "passed": true,
+          "numerator": 0,
+          "denominator": 48,
+          "details": {}
+        },
+        {
+          "name": "unauthorized_memory_recall_rate",
+          "value": 0.0,
+          "direction": "minimize",
+          "hard_gate": 0.0,
+          "passed": true,
+          "numerator": 0,
+          "denominator": 3,
+          "details": {}
+        },
+        {
+          "name": "privacy_leakage_rate",
+          "value": 0.0,
+          "direction": "minimize",
+          "hard_gate": 0.0,
+          "passed": true,
+          "numerator": 0,
+          "denominator": 48,
+          "details": {}
+        },
+        {
+          "name": "evidence_traceability",
+          "value": 1.0,
+          "direction": "maximize",
+          "hard_gate": 1.0,
+          "passed": true,
+          "numerator": 52,
+          "denominator": 52,
+          "details": {}
+        },
+        {
+          "name": "held_out_leakage",
+          "value": 0.0,
+          "direction": "minimize",
+          "hard_gate": 0.0,
+          "passed": true,
+          "numerator": 0,
+          "denominator": 48,
+          "details": {}
+        },
+        {
+          "name": "role_confusion_marker_rate",
+          "value": 0.0,
+          "direction": "minimize",
+          "hard_gate": null,
+          "passed": null,
+          "numerator": 0,
+          "denominator": 48,
+          "details": {}
+        },
+        {
+          "name": "visitor_echoing_indicator_rate",
+          "value": 0.0,
+          "direction": "minimize",
+          "hard_gate": null,
+          "passed": null,
+          "numerator": 0,
+          "denominator": 48,
+          "details": {}
+        },
+        {
+          "name": "inter_capsule_lexical_distinctiveness",
+          "value": 0.35752279635258355,
+          "direction": "maximize",
+          "hard_gate": null,
+          "passed": null,
+          "numerator": 16.803571428571427,
+          "denominator": 47,
+          "details": {}
+        },
+        {
+          "name": "style_feature_distance",
+          "value": 0.02,
+          "direction": "minimize",
+          "hard_gate": null,
+          "passed": null,
+          "numerator": 0.96,
+          "denominator": 48,
+          "details": {}
+        },
+        {
+          "name": "response_length_mean",
+          "value": 32.145833333333336,
+          "direction": "report",
+          "hard_gate": null,
+          "passed": null,
+          "numerator": 1543,
+          "denominator": 48,
+          "details": {}
+        },
+        {
+          "name": "punctuation_emoji_discourse_similarity",
+          "value": 0.98,
+          "direction": "maximize",
+          "hard_gate": null,
+          "passed": null,
+          "numerator": 47.04,
+          "denominator": 48,
+          "details": {}
+        },
+        {
+          "name": "latency_ms_mean",
+          "value": 34.020833333333336,
+          "direction": "minimize",
+          "hard_gate": null,
+          "passed": null,
+          "numerator": 1633,
+          "denominator": 48,
+          "details": {}
+        },
+        {
+          "name": "token_usage_mean",
+          "value": 6.479166666666667,
+          "direction": "report",
+          "hard_gate": null,
+          "passed": null,
+          "numerator": 311,
+          "denominator": 48,
+          "details": {}
+        },
+        {
+          "name": "model_call_count_mean",
+          "value": 0,
+          "direction": "report",
+          "hard_gate": null,
+          "passed": null,
+          "numerator": 0,
+          "denominator": 48,
+          "details": {}
+        },
+        {
+          "name": "fallback_rate",
+          "value": 0.0,
+          "direction": "minimize",
+          "hard_gate": null,
+          "passed": null,
+          "numerator": 0,
+          "denominator": 48,
+          "details": {}
+        }
+      ],
+      "interpretation": "Structural synthetic comparison only; not a model-quality result."
+    },
+    {
+      "system": "single-prompt",
+      "status": "OFFLINE_FIXTURE_RUN",
+      "metrics": [
+        {
+          "name": "schema_validity",
+          "value": 1.0,
+          "direction": "maximize",
+          "hard_gate": 1.0,
+          "passed": true,
+          "numerator": 48,
+          "denominator": 48,
+          "details": {}
+        },
+        {
+          "name": "expected_bubble_count_accuracy",
+          "value": 1.0,
+          "direction": "maximize",
+          "hard_gate": null,
+          "passed": null,
+          "numerator": 48,
+          "denominator": 48,
+          "details": {}
+        },
+        {
+          "name": "stale_bubble_after_cancel_rate",
+          "value": 0.0,
+          "direction": "minimize",
+          "hard_gate": 0.0,
+          "passed": true,
+          "numerator": 0,
+          "denominator": 6,
+          "details": {}
+        },
+        {
+          "name": "interruption_success_rate",
+          "value": 1.0,
+          "direction": "maximize",
+          "hard_gate": 1.0,
+          "passed": true,
+          "numerator": 6,
+          "denominator": 6,
+          "details": {}
+        },
+        {
+          "name": "duplicate_committed_bubble_rate",
+          "value": 0.0,
+          "direction": "minimize",
+          "hard_gate": null,
+          "passed": null,
+          "numerator": 0,
+          "denominator": 44,
+          "details": {}
+        },
+        {
+          "name": "wake_duplicate_rate",
+          "value": 0.0,
+          "direction": "minimize",
+          "hard_gate": 0.0,
+          "passed": true,
+          "numerator": 0,
+          "denominator": 48,
+          "details": {}
+        },
+        {
+          "name": "unauthorized_memory_recall_rate",
+          "value": 0.0,
+          "direction": "minimize",
+          "hard_gate": 0.0,
+          "passed": true,
+          "numerator": 0,
+          "denominator": 3,
+          "details": {}
+        },
+        {
+          "name": "privacy_leakage_rate",
+          "value": 0.0,
+          "direction": "minimize",
+          "hard_gate": 0.0,
+          "passed": true,
+          "numerator": 0,
+          "denominator": 48,
+          "details": {}
+        },
+        {
+          "name": "evidence_traceability",
+          "value": 1.0,
+          "direction": "maximize",
+          "hard_gate": 1.0,
+          "passed": true,
+          "numerator": 52,
+          "denominator": 52,
+          "details": {}
+        },
+        {
+          "name": "held_out_leakage",
+          "value": 0.0,
+          "direction": "minimize",
+          "hard_gate": 0.0,
+          "passed": true,
+          "numerator": 0,
+          "denominator": 48,
+          "details": {}
+        },
+        {
+          "name": "role_confusion_marker_rate",
+          "value": 0.0,
+          "direction": "minimize",
+          "hard_gate": null,
+          "passed": null,
+          "numerator": 0,
+          "denominator": 48,
+          "details": {}
+        },
+        {
+          "name": "visitor_echoing_indicator_rate",
+          "value": 0.0,
+          "direction": "minimize",
+          "hard_gate": null,
+          "passed": null,
+          "numerator": 0,
+          "denominator": 48,
+          "details": {}
+        },
+        {
+          "name": "inter_capsule_lexical_distinctiveness",
+          "value": 0.3951367781155016,
+          "direction": "maximize",
+          "hard_gate": null,
+          "passed": null,
+          "numerator": 18.571428571428573,
+          "denominator": 47,
+          "details": {}
+        },
+        {
+          "name": "style_feature_distance",
+          "value": 0.02,
+          "direction": "minimize",
+          "hard_gate": null,
+          "passed": null,
+          "numerator": 0.96,
+          "denominator": 48,
+          "details": {}
+        },
+        {
+          "name": "response_length_mean",
+          "value": 26.645833333333332,
+          "direction": "report",
+          "hard_gate": null,
+          "passed": null,
+          "numerator": 1279,
+          "denominator": 48,
+          "details": {}
+        },
+        {
+          "name": "punctuation_emoji_discourse_similarity",
+          "value": 0.98,
+          "direction": "maximize",
+          "hard_gate": null,
+          "passed": null,
+          "numerator": 47.04,
+          "denominator": 48,
+          "details": {}
+        },
+        {
+          "name": "latency_ms_mean",
+          "value": 34.020833333333336,
+          "direction": "minimize",
+          "hard_gate": null,
+          "passed": null,
+          "numerator": 1633,
+          "denominator": 48,
+          "details": {}
+        },
+        {
+          "name": "token_usage_mean",
+          "value": 6.479166666666667,
+          "direction": "report",
+          "hard_gate": null,
+          "passed": null,
+          "numerator": 311,
+          "denominator": 48,
+          "details": {}
+        },
+        {
+          "name": "model_call_count_mean",
+          "value": 0,
+          "direction": "report",
+          "hard_gate": null,
+          "passed": null,
+          "numerator": 0,
+          "denominator": 48,
+          "details": {}
+        },
+        {
+          "name": "fallback_rate",
+          "value": 0.0,
+          "direction": "minimize",
+          "hard_gate": null,
+          "passed": null,
+          "numerator": 0,
+          "denominator": 48,
+          "details": {}
+        }
+      ],
+      "interpretation": "Structural synthetic comparison only; not a model-quality result."
+    },
+    {
+      "system": "structured-context",
+      "status": "OFFLINE_FIXTURE_RUN",
+      "metrics": [
+        {
+          "name": "schema_validity",
+          "value": 1.0,
+          "direction": "maximize",
+          "hard_gate": 1.0,
+          "passed": true,
+          "numerator": 48,
+          "denominator": 48,
+          "details": {}
+        },
+        {
+          "name": "expected_bubble_count_accuracy",
+          "value": 1.0,
+          "direction": "maximize",
+          "hard_gate": null,
+          "passed": null,
+          "numerator": 48,
+          "denominator": 48,
+          "details": {}
+        },
+        {
+          "name": "stale_bubble_after_cancel_rate",
+          "value": 0.0,
+          "direction": "minimize",
+          "hard_gate": 0.0,
+          "passed": true,
+          "numerator": 0,
+          "denominator": 6,
+          "details": {}
+        },
+        {
+          "name": "interruption_success_rate",
+          "value": 1.0,
+          "direction": "maximize",
+          "hard_gate": 1.0,
+          "passed": true,
+          "numerator": 6,
+          "denominator": 6,
+          "details": {}
+        },
+        {
+          "name": "duplicate_committed_bubble_rate",
+          "value": 0.0,
+          "direction": "minimize",
+          "hard_gate": null,
+          "passed": null,
+          "numerator": 0,
+          "denominator": 44,
+          "details": {}
+        },
+        {
+          "name": "wake_duplicate_rate",
+          "value": 0.0,
+          "direction": "minimize",
+          "hard_gate": 0.0,
+          "passed": true,
+          "numerator": 0,
+          "denominator": 48,
+          "details": {}
+        },
+        {
+          "name": "unauthorized_memory_recall_rate",
+          "value": 0.0,
+          "direction": "minimize",
+          "hard_gate": 0.0,
+          "passed": true,
+          "numerator": 0,
+          "denominator": 3,
+          "details": {}
+        },
+        {
+          "name": "privacy_leakage_rate",
+          "value": 0.0,
+          "direction": "minimize",
+          "hard_gate": 0.0,
+          "passed": true,
+          "numerator": 0,
+          "denominator": 48,
+          "details": {}
+        },
+        {
+          "name": "evidence_traceability",
+          "value": 1.0,
+          "direction": "maximize",
+          "hard_gate": 1.0,
+          "passed": true,
+          "numerator": 52,
+          "denominator": 52,
+          "details": {}
+        },
+        {
+          "name": "held_out_leakage",
+          "value": 0.0,
+          "direction": "minimize",
+          "hard_gate": 0.0,
+          "passed": true,
+          "numerator": 0,
+          "denominator": 48,
+          "details": {}
+        },
+        {
+          "name": "role_confusion_marker_rate",
+          "value": 0.0,
+          "direction": "minimize",
+          "hard_gate": null,
+          "passed": null,
+          "numerator": 0,
+          "denominator": 48,
+          "details": {}
+        },
+        {
+          "name": "visitor_echoing_indicator_rate",
+          "value": 0.0,
+          "direction": "minimize",
+          "hard_gate": null,
+          "passed": null,
+          "numerator": 0,
+          "denominator": 48,
+          "details": {}
+        },
+        {
+          "name": "inter_capsule_lexical_distinctiveness",
+          "value": 0.3951367781155016,
+          "direction": "maximize",
+          "hard_gate": null,
+          "passed": null,
+          "numerator": 18.571428571428573,
+          "denominator": 47,
+          "details": {}
+        },
+        {
+          "name": "style_feature_distance",
+          "value": 0.02,
+          "direction": "minimize",
+          "hard_gate": null,
+          "passed": null,
+          "numerator": 0.96,
+          "denominator": 48,
+          "details": {}
+        },
+        {
+          "name": "response_length_mean",
+          "value": 31.229166666666668,
+          "direction": "report",
+          "hard_gate": null,
+          "passed": null,
+          "numerator": 1499,
+          "denominator": 48,
+          "details": {}
+        },
+        {
+          "name": "punctuation_emoji_discourse_similarity",
+          "value": 0.98,
+          "direction": "maximize",
+          "hard_gate": null,
+          "passed": null,
+          "numerator": 47.04,
+          "denominator": 48,
+          "details": {}
+        },
+        {
+          "name": "latency_ms_mean",
+          "value": 34.020833333333336,
+          "direction": "minimize",
+          "hard_gate": null,
+          "passed": null,
+          "numerator": 1633,
+          "denominator": 48,
+          "details": {}
+        },
+        {
+          "name": "token_usage_mean",
+          "value": 6.479166666666667,
+          "direction": "report",
+          "hard_gate": null,
+          "passed": null,
+          "numerator": 311,
+          "denominator": 48,
+          "details": {}
+        },
+        {
+          "name": "model_call_count_mean",
+          "value": 0,
+          "direction": "report",
+          "hard_gate": null,
+          "passed": null,
+          "numerator": 0,
+          "denominator": 48,
+          "details": {}
+        },
+        {
+          "name": "fallback_rate",
+          "value": 0.0,
+          "direction": "minimize",
+          "hard_gate": null,
+          "passed": null,
+          "numerator": 0,
+          "denominator": 48,
+          "details": {}
+        }
+      ],
+      "interpretation": "Structural synthetic comparison only; not a model-quality result."
+    },
     {
       "name": "future-candidate-systems",
       "status": "NOT_RUN",
@@ -337,7 +964,7 @@
     "blind_format": "human-pairwise-template.csv"
   },
   "reproducibility": {
-    "git_sha": "75877171bbd82a32980233b17860b457d02dc97e",
+    "git_sha": "9249e6ef1d91cf6bbb2dab10279a225aa6ce31ad",
     "command": "python -m evals.cli.main run --output <directory>",
     "python": ">=3.11",
     "dependencies": "stdlib only",

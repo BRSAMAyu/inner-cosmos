@@ -2,7 +2,7 @@
 
 ## Result
 
-The isolated evaluation harness is implemented. Its first reproducible run covers 48 synthetic scenarios, seven scenario families, four protected splits, 20 deterministic metrics, schema validation, blind human-review exchange, optional Judge metadata, and current-production source contracts.
+The isolated evaluation harness is implemented. Its first reproducible comparison executes four systems across 48 synthetic scenarios (192 runs), seven scenario families, four protected splits and 20 deterministic metrics per system (80 results), plus schema validation, blind human-review exchange, optional Judge metadata, and current-production source contracts.
 
 This result does **not** establish model quality or system superiority. All sample responses are deterministic contract fixtures with zero Provider calls.
 
@@ -26,7 +26,7 @@ Baseline capture types are deliberately distinct:
 | historical fixture | REGISTERED_NOT_RUN | No approved redacted historical fixture was available |
 | real Provider | BLOCKED_BY_CREDENTIAL_GATE | External credential revocation/rotation is not signed |
 
-The single-prompt, long-persona-prompt and structured-context offline baseline slots are registered. Structured Genome, Planner/Speaker, Critics and full Compiler systems are registered as `UNAVAILABLE`; no results are fabricated.
+The single-prompt, long-persona-prompt and structured-context offline baselines are runnable as synthetic structural comparators. Structured Genome, Planner/Speaker, Critics and full Compiler systems are registered as `UNAVAILABLE`; no results are fabricated.
 
 ## Sample result interpretation
 

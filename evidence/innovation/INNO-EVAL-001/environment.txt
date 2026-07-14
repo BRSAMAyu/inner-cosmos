@@ -7,6 +7,6 @@ Spring Boot production baseline: 3.3.6
 Python: CPython 3.12.7
 Python runtime dependencies: standard library only
 Branch: feat/run006-aurora-self-understanding
-Harness source SHA: 75877171bbd82a32980233b17860b457d02dc97e
+Harness source SHA: 9249e6ef1d91cf6bbb2dab10279a225aa6ce31ad
 Provider credentials used: none
 Real user data used: none

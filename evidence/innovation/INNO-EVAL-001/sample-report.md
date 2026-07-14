@@ -1,6 +1,6 @@
 # INNO-EVAL-001 sample report
 
-- Report: `inno-eval-001-75877171bbd8`
+- Report: `inno-eval-001-9249e6ef1d91`
 - System: `current-production-contract`
 - Provider/model: offline fixture / none
 - Human pairwise: NOT_RUN
@@ -31,7 +31,7 @@
 
 ## Latency and cost
 
-- Runs: 48
+- Runs: 192
 - Model calls: 0
 - Estimated provider cost: USD 0.0000
 
@@ -45,4 +45,4 @@ Future candidates and human blind review are NOT_RUN. This contract fixture prov
 
 ## Reproducibility
 
-`python -m evals.cli.main run --output <directory>` at Git `75877171bbd82a32980233b17860b457d02dc97e`.
+`python -m evals.cli.main run --output <directory>` at Git `9249e6ef1d91cf6bbb2dab10279a225aa6ce31ad`.
