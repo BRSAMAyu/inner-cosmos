@@ -1,0 +1,39 @@
+schema_version: 1
+milestone: M1
+allowed_statuses: [NOT_STARTED, IN_PROGRESS, PASS, FAIL, BLOCKED]
+authority: "对齐文档/07-H0H1决策表与M1执行包.md"
+entries:
+  - {id: P-01, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
+  - {id: P-02, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
+  - {id: P-03, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
+  - {id: P-04, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
+  - {id: P-05, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
+  - {id: P-06, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
+  - {id: S-01, status: BLOCKED, evidence: [], reviewer: UNASSIGNED, note: "External provider credential rotation requires human confirmation."}
+  - {id: S-02, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
+  - {id: S-03, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
+  - {id: S-04, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
+  - {id: S-05, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
+  - {id: S-06, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
+  - {id: D-01, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
+  - {id: D-02, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
+  - {id: D-03, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
+  - {id: D-04, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
+  - {id: D-05, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
+  - {id: D-06, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
+  - {id: R-01, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
+  - {id: R-02, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
+  - {id: R-03, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
+  - {id: R-04, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
+  - {id: K-01, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
+  - {id: K-02, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
+  - {id: K-03, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
+  - {id: K-04, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
+  - {id: K-05, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
+  - {id: O-01, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
+  - {id: O-02, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
+  - {id: O-03, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
+  - {id: V-01, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
+  - {id: V-02, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
+  - {id: V-03, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
+  - {id: V-04, status: IN_PROGRESS, evidence: [], reviewer: UNASSIGNED, note: "Unmodified 613-test baseline passed; W0 changes still require full verification."}
