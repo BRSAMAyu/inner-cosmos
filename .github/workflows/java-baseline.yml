@@ -24,6 +24,8 @@ jobs:
         run: ./mvnw -v
       - name: Clean verify
         run: ./mvnw -B clean verify
+      - name: PostgreSQL pgvector contract and 100k retrieval gate
+        run: ./mvnw -B -f poc/postgres-pgvector/pom.xml -Pbenchmark verify
       - name: Enforce executed test baseline
         shell: pwsh
         run: ./scripts/assert-test-baseline.ps1 -MinimumTests 613
@@ -71,3 +73,5 @@ jobs:
             target/surefire-reports/
             target/sbom/
             target/spotbugsXml.xml
+            poc/postgres-pgvector/target/surefire-reports/
+            poc/postgres-pgvector/target/failsafe-reports/

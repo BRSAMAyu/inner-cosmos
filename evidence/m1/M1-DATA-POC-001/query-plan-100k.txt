@@ -1,0 +1,25 @@
+100k EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) verified facts
+Source: generated failsafe XML from the 2026-07-15T03:00:09+08:00 PASS run
+
+Top node: Limit; actual rows 20; execution time 0.181 ms; shared hit blocks 166; shared read blocks 0
+Join: Hash Join on me.memory_id = mi.id; actual rows 56
+
+Embedding access:
+  Node Type: Bitmap Index Scan
+  Index Name: idx_embedding_owner_type
+  Actual Rows: 100
+  Index Cond: user_id = 42 AND embedding_type = semantic AND model_id = fixture-8d AND model_version = v1
+
+Memory policy access:
+  Node Type: Bitmap Index Scan via BitmapOr
+  Index Name: idx_memory_owner_policy
+  Actual Rows: 56 for the non-expired branch
+  Index Cond: user_id = 42 AND consent_scope = ANY(AURORA,CAPSULE) AND status = ACTIVE AND retention_until > CURRENT_TIMESTAMP
+  Rows Removed by Filter: 0
+
+Conclusion:
+  Owner, consent, lifecycle, retention, embedding kind, model, and model version predicates execute inside PostgreSQL. There is no application-side authorization post-filter.
+
+Reproduction:
+  .\mvnw.cmd -B -f poc\postgres-pgvector\pom.xml -Pbenchmark verify
+  Read POC_QUERY_PLAN in poc/postgres-pgvector/target/failsafe-reports/TEST-com.innercosmos.poc.PostgresVectorBenchmarkIT.xml.

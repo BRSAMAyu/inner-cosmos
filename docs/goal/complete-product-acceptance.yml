@@ -2,8 +2,8 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 authority: goal-objective.md
 status: IN_PROGRESS
-last_reconciled_at: 2026-07-15T02:30:00+08:00
-last_reconciled_commit: 1d91517922801fff87fcccd30c4601819061ab41
+last_reconciled_at: 2026-07-15T02:50:00+08:00
+last_reconciled_commit: 2c6e78fbd2134e816e17f40de8ef52a30c11354b
 
 status_semantics:
   UNASSESSED: current HEAD and target environment have not been verified
@@ -79,13 +79,13 @@ gates:
 
   - id: G2
     name: Contracts, data, and runtime roles
-    status: UNASSESSED
+    status: IN_PROGRESS
     required: true
     acceptance:
       - {id: ARCH-MODULES, target: "Module boundaries are executable through Spring Modulith and architecture tests.", status: UNASSESSED, evidence: []}
       - {id: AUTH-OIDC, target: "Spring Security protects secure web sessions and mobile OIDC PKCE flows.", status: UNASSESSED, evidence: []}
       - {id: API-CONTRACT, target: "Versioned OpenAPI, typed errors, idempotency, concurrency, and resumable SSE are verified.", status: UNASSESSED, evidence: []}
-      - {id: DATA-POSTGRES, target: "PostgreSQL and Flyway are production truth with Testcontainers and migration reconciliation.", status: UNASSESSED, evidence: []}
+      - {id: DATA-POSTGRES, target: "PostgreSQL and Flyway are production truth with Testcontainers and migration reconciliation.", status: IN_PROGRESS, evidence: [evidence/m1/M1-DATA-POC-001/, docs/adr/0002-postgresql-system-of-record.md]}
       - {id: DATA-REDIS, target: "Sessions, short state, limits, and leases are externalized to Redis where required.", status: UNASSESSED, evidence: []}
       - {id: EVENT-RELIABLE, target: "Transactional outbox, SQS, idempotent consumers, retries, and DLQ replay are verified.", status: UNASSESSED, evidence: []}
       - {id: RUNTIME-ROLES, target: "API, AI worker, event worker, scheduler, and migration roles run and scale independently.", status: UNASSESSED, evidence: []}

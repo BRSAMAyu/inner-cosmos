@@ -1,11 +1,12 @@
 # M1-DATA-POC-001 — PostgreSQL + pgvector 48 小时 PoC
 
 ```yaml
-status: BLOCKED_BY_BASE
+status: EVALUATED
 workstream: backend-data-architecture
 depends_on: [M1-BASE-001]
 timebox: 48h
-human_gate: choose-single-source-database
+base_sha: 2c6e78fbd2134e816e17f40de8ef52a30c11354b
+human_gate: not-required-current-L1-authority-selects-postgresql
 evidence_dir: evidence/m1/M1-DATA-POC-001/
 ```
 
@@ -58,3 +59,12 @@ docker compose -f poc/postgres-pgvector/compose.yml down -v
 ## 回滚
 
 PoC 可整体删除。若不采用 PostgreSQL，保留 ADR 与性能证据，删除运行资源；现有 MySQL 继续作为唯一事实源。
+
+## 执行结论（2026-07-15）
+
+- 隔离 PoC 已完成，未修改现有生产 schema、Mapper 或产品语义；
+- 空库、V1 到 V2 升级、重复启动、事务回滚、MyBatis 类型与批处理契约均通过；
+- 10k 与 100k 数据集的所有者、同意范围、状态与保留期过滤均在 PostgreSQL 内执行，100k p95 低于 150 ms 门禁；
+- `docs/adr/0002-postgresql-system-of-record.md` 单选 PostgreSQL 16 + pgvector 为目标生产事实源，禁止双写；
+- 该结论只关闭选型 PoC。现有 60 表的 Flyway 基线、全量迁移、核对和生产切换仍是 DATA-POSTGRES 的后续工作，因此总验收保持 `IN_PROGRESS`；
+- 原包的人工选型门禁已被当前 L1 权威目标中明确的 PostgreSQL 目标取代；外部 RDS 创建和费用批准仍受 `HG-PRODUCTION-ACCOUNTS` 约束。
