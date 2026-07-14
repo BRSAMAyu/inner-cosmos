@@ -2,6 +2,13 @@ schema_version: 1
 milestone: M1
 allowed_statuses: [NOT_STARTED, IN_PROGRESS, PASS, FAIL, BLOCKED]
 authority: "对齐文档/07-H0H1决策表与M1执行包.md"
+direction_statuses: [SUPERSEDED_PENDING_INNOVATION_ADR]
+direction_overrides:
+  - {id: INNOV-01, status: SUPERSEDED_PENDING_INNOVATION_ADR, direction: "Aurora Self, Constitution, Emergence, personality, relationship state, and evolution may remain user-facing innovation capabilities."}
+  - {id: INNOV-02, status: SUPERSEDED_PENDING_INNOVATION_ADR, direction: "Aurora proactive agency is preserved; a permanently minimal fixed message budget is not frozen."}
+  - {id: INNOV-03, status: SUPERSEDED_PENDING_INNOVATION_ADR, direction: "Echo Capsule dynamic dialogue and persona capability are preserved; static-card-first is not irreversible."}
+  - {id: INNOV-04, status: SUPERSEDED_PENDING_INNOVATION_ADR, direction: "User portrait, psychological modeling, slow letters, starfield, matching, and related domain models are preserved."}
+  - {id: INNOV-05, status: SUPERSEDED_PENDING_INNOVATION_ADR, direction: "Post-M1 product direction must not default to conservative innovation reduction."}
 entries:
   - {id: P-01, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
   - {id: P-02, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
