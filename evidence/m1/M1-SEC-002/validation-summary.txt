@@ -1,0 +1,22 @@
+M1-SEC-002 validation summary
+Recorded at: 2026-07-14T22:55:00+08:00
+Branch: feat/run006-aurora-self-understanding
+Source SHA: fd80ffdad0d6f015ea62a95f55f7df551a4d15f4
+
+Commands and results:
+1. .\.tools\apache-maven-3.9.9\bin\mvn.cmd test '-Dtest=*Goodbye*,*Ownership*'
+   Result: PASS; 20 tests, 0 failures, 0 errors, 0 skipped
+2. .\.tools\apache-maven-3.9.9\bin\mvn.cmd test
+   Result: PASS; 631 tests, 0 failures, 0 errors, 0 skipped
+3. git diff --check
+   Result: PASS
+
+Protected cases:
+- Owner atomically claims an active session before LLM or async work.
+- Non-owner, admin without explicit P0 authorization, and missing IDs receive the same opaque error.
+- Authorization failures perform no session update, LLM call, async close, event, or downstream write.
+- Duplicate requests and a concurrent FINISHED transition are idempotent.
+- Unexplained concurrent state changes fail closed.
+- SessionCloser revalidates owner at the asynchronous boundary and uses the correct ended_at column.
+
+Independent reviewer approval remains pending; acceptance entries are not marked PASS.

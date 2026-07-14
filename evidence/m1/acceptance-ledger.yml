@@ -10,8 +10,8 @@ entries:
   - {id: P-05, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
   - {id: P-06, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
   - {id: S-01, status: BLOCKED, evidence: ["evidence/m1/M1-SEC-001/"], reviewer: UNASSIGNED, note: "Current tree is clean; historical exposure and external provider rotation require human confirmation."}
-  - {id: S-02, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
-  - {id: S-03, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
+  - {id: S-02, status: IN_PROGRESS, evidence: ["evidence/m1/M1-SEC-002/"], reviewer: UNASSIGNED, note: "Goodbye fixed; Aurora Self and independent review remain."}
+  - {id: S-03, status: IN_PROGRESS, evidence: ["evidence/m1/M1-SEC-002/"], reviewer: UNASSIGNED, note: "Goodbye service and async boundaries enforce ownership; broader matrix remains."}
   - {id: S-04, status: IN_PROGRESS, evidence: ["evidence/m1/M1-SEC-001/"], reviewer: UNASSIGNED, note: "Implementation and automated tests pass; independent review is pending."}
   - {id: S-05, status: IN_PROGRESS, evidence: ["evidence/m1/M1-SEC-001/"], reviewer: UNASSIGNED, note: "Database TLS and production configuration guard implemented; broader HTTP security acceptance remains pending."}
   - {id: S-06, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
