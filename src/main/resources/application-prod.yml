@@ -1,17 +1,19 @@
-# Inner Cosmos — Production Profile
-# Connects to MySQL via environment variables (12-factor). The `mysql` profile is
-# NOT activated here on purpose — this profile carries the prod datasource wiring
-# directly so a single SPRING_PROFILES_ACTIVE=prod is sufficient in containers.
-# Defaults point at the compose `mysql` service for local `docker compose up`.
+# Production has no usable credential, database, provider, or fallback defaults.
 spring.config.activate.on-profile: prod
+
+server:
+  servlet:
+    session:
+      cookie:
+        secure: true
+        http-only: true
+        same-site: strict
 
 spring:
   datasource:
-    # 12-factor: override via SPRING_DATASOURCE_URL / USERNAME / PASSWORD (or DB_*).
-    # Compose default: jdbc:mysql://mysql:3306/inner_cosmos
-    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://${DB_HOST:mysql}:${DB_PORT:3306}/${DB_NAME:inner_cosmos}?useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai}
-    username: ${SPRING_DATASOURCE_USERNAME:${DB_USER:innercosmos}}
-    password: ${SPRING_DATASOURCE_PASSWORD:${DB_PASSWORD:innercosmos}}
+    url: ${SPRING_DATASOURCE_URL:}
+    username: ${SPRING_DATASOURCE_USERNAME:}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       maximum-pool-size: 20
@@ -20,10 +22,6 @@ spring:
       max-lifetime: 1800000
       connection-timeout: 20000
       leak-detection-threshold: 120000
-  # schema.sql is NOT run in prod (prod tables are pre-created / migrated). The
-  # additive SchemaM{n}Initializer ApplicationRunners still execute and are
-  # idempotent (information_schema-guarded), so additive schema migrations
-  # (e.g. M5 daily-record unique constraint) apply without dropping data.
   sql:
     init:
       mode: never
@@ -31,7 +29,6 @@ spring:
     console:
       enabled: false
 
-# Production logging — JSON format for ELK stack
 logging:
   level:
     root: INFO
@@ -47,20 +44,20 @@ logging:
     max-size: 100MB
     max-history: 30
 
-# Actuator — prod specific
 management:
   endpoints:
     web:
       exposure:
-        include: health,metrics,prometheus,info
+        include: health,info
   endpoint:
     health:
       show-details: when_authorized
 
-# Production LLM config — no demo seeds
 llm:
   mode: prod
-  allow-fallback: true
+  provider: ${LLM_PROVIDER:}
+  api-key: ${LLM_API_KEY:}
+  allow-fallback: false
 
 inner-cosmos:
   demo:

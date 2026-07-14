@@ -282,8 +282,9 @@ public class LlmConfig {
         String mimoKey = resolveKey(mimo.apiKey);
         String glmKey = resolveKey(glm.apiKey);
         String deepseekKey = resolveKey(deepseek.apiKey);
-        log.info("Resolved LLM keys: minimax={}, mimo={}, glm={}, deepseek={}, topLevelApiKey={}",
-                mask(minimaxKey), mask(mimoKey), mask(glmKey), mask(deepseekKey), mask(apiKey));
+        log.info("Resolved LLM credential configuration: minimax={}, mimo={}, glm={}, deepseek={}, topLevelApiKey={}",
+                configured(minimaxKey), configured(mimoKey), configured(glmKey),
+                configured(deepseekKey), configured(apiKey));
         if ("mock".equalsIgnoreCase(activeProvider)) {
             actualClient = new MockLlmClient(aiExecutor);
         } else if (isProdMode()) {
@@ -472,9 +473,7 @@ public class LlmConfig {
         return (key != null && !key.isBlank()) ? key : (apiKey != null ? apiKey : "");
     }
 
-    private String mask(String key) {
-        if (key == null || key.isBlank()) return "<EMPTY>";
-        if (key.length() <= 8) return "***";
-        return key.substring(0, 4) + "***" + key.substring(key.length() - 4);
+    private String configured(String key) {
+        return key == null || key.isBlank() ? "not configured" : "configured";
     }
 }

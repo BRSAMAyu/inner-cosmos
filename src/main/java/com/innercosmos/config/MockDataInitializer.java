@@ -45,13 +45,11 @@ import com.innercosmos.service.GravityService;
 import com.innercosmos.service.UserService;
 import jakarta.annotation.PostConstruct;
 import org.springframework.boot.CommandLineRunner;
-import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
-@Component
 public class MockDataInitializer implements CommandLineRunner {
     private final UserMapper userMapper;
     private final UserProfileMapper userProfileMapper;
