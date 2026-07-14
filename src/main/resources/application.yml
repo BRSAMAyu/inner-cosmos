@@ -105,9 +105,9 @@ mybatis-plus:
     db-config:
       id-type: auto
 
-# LLM 接入。默认走真实模型（GLM 主，MiniMax 备）并保留 mock 兜底——老师拿到包
-# 一打开即真实 AI，无需任何环境变量。所有值仍可被同名环境变量覆盖（自托管时优先用
-# 环境变量，不要依赖此处明文 key）。私有仓库内按用户要求内置真实 key。
+# LLM 接入。默认走真实模型（GLM 主，MiniMax 备）并保留 mock 兜底。端点、模型名、
+# 网关等配置均已内置；API key 不入库，通过同名环境变量注入（见 .env.example）。
+# 未配置 key 时自动回退 mock，保证开箱可运行。
 llm:
   mode: ${LLM_MODE:prod}
   provider: ${LLM_PROVIDER:glm}
@@ -120,8 +120,8 @@ llm:
   prompt:
     language: ${LLM_PROMPT_LANGUAGE:zh-CN}
   mimo:
-    # 语音转文字 MiMo-V2.5-ASR 的 key（token-plan-cn 接入点，请求用 api-key 头）。已内置，
-    # 开箱即真实语音识别；失败时 MimoAsrClient 自动回退 MockAsrClient。
+    # 语音转文字 MiMo-V2.5-ASR（token-plan-cn 接入点，请求用 api-key 头）。
+    # key 通过 MIMO_API_KEY 环境变量注入；未配置时回退 MockAsrClient。
     api-key: ${MIMO_API_KEY:}
     model: ${MIMO_MODEL:mimo-v2.5}
     base-url: ${MIMO_BASE_URL:https://api.xiaomimimo.com/v1/chat/completions}
