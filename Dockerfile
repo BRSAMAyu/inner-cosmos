@@ -3,7 +3,7 @@
 # Builder uses the project's bundled Maven Wrapper (./mvnw) so the build inside
 # the container matches `./mvnw` locally — no system Maven install required.
 
-FROM eclipse-temurin:21-jdk-alpine AS builder
+FROM eclipse-temurin:21-jdk-alpine@sha256:1ff763083f2993d57d0bf374ab10bb3e2cb873af6c13a04458ebbd3e0337dc76 AS builder
 WORKDIR /app
 # apk cache + .m2 cache via buildkit mounts (no cross-layer pollution)
 RUN apk add --no-cache bash
@@ -16,7 +16,7 @@ COPY src src
 RUN ./mvnw -B -q -DskipTests package
 
 # Runtime image — JRE only (not full JDK)
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:21-jre-alpine@sha256:3f08b13888f595cc49edabea7250ba69499ba25602b267da591720769400e08c
 WORKDIR /app
 
 # Pull fixed Alpine packages into the selected runtime base before release scanning.

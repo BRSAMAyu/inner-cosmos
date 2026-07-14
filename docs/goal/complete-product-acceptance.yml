@@ -2,8 +2,8 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 authority: goal-objective.md
 status: IN_PROGRESS
-last_reconciled_at: 2026-07-15T00:34:00+08:00
-last_reconciled_commit: e903776f372070dd09cc99bbfa226bc704697cfb
+last_reconciled_at: 2026-07-15T02:30:00+08:00
+last_reconciled_commit: 1d91517922801fff87fcccd30c4601819061ab41
 
 status_semantics:
   UNASSESSED: current HEAD and target environment have not been verified
@@ -75,7 +75,7 @@ gates:
       - {id: BASE-JAVA, target: "Java 21 is both compile and runtime baseline.", status: IN_PROGRESS, evidence: [evidence/m1/M1-BASE-001/]}
       - {id: BASE-BOOT, target: "Spring Boot 3.5 supported patch baseline passes the full suite.", status: IN_PROGRESS, evidence: [evidence/m1/M1-BASE-001/]}
       - {id: BASE-SUPPLY, target: "SBOM, dependency, SAST, secret, IaC, and container scans are gated.", status: IN_PROGRESS, evidence: [evidence/m1/M1-BASE-001/]}
-      - {id: BASE-IMAGE, target: "Signed non-root minimal OCI image passes production-profile smoke.", status: IN_PROGRESS, evidence: [evidence/m1/M1-BASE-001/]}
+      - {id: BASE-IMAGE, target: "Signed non-root minimal OCI image passes production-profile smoke.", status: IN_PROGRESS, evidence: [evidence/m1/M1-BASE-001/image-release-summary.txt]}
 
   - id: G2
     name: Contracts, data, and runtime roles

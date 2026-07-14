@@ -1,0 +1,83 @@
+name: Release signed OCI image
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Immutable release tag to publish
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+jobs:
+  build-sign:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - name: Resolve immutable release coordinates
+        id: coordinates
+        shell: bash
+        env:
+          REQUESTED_TAG: ${{ inputs.tag }}
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          tag="${REQUESTED_TAG:-${GITHUB_REF_NAME}}"
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Release tag must be a semantic v-prefixed version." >&2
+            exit 1
+          fi
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.0.6
+      - name: Build and push digest-addressed image with SBOM and provenance
+        id: build
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.coordinates.outputs.image }}:${{ steps.coordinates.outputs.tag }}
+          sbom: true
+          provenance: mode=max
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Keyless-sign the immutable digest
+        env:
+          IMAGE: ${{ steps.coordinates.outputs.image }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: cosign sign --yes "$IMAGE@$DIGEST"
+      - name: Verify release identity and signature
+        env:
+          IMAGE: ${{ steps.coordinates.outputs.image }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: >-
+          cosign verify
+          --certificate-identity "https://github.com/${GITHUB_WORKFLOW_REF}"
+          --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
+          "$IMAGE@$DIGEST"
+      - name: Record immutable release evidence
+        env:
+          IMAGE: ${{ steps.coordinates.outputs.image }}
+          TAG: ${{ steps.coordinates.outputs.tag }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          echo "### Signed OCI release" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Tag: \`$IMAGE:$TAG\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Digest: \`$IMAGE@$DIGEST\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- SBOM: attached by BuildKit" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Provenance: mode=max, bound to the signed image index" >> "$GITHUB_STEP_SUMMARY"

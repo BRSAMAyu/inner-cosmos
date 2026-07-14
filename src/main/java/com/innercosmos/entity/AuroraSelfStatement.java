@@ -1,6 +1,7 @@
 package com.innercosmos.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 
@@ -12,5 +13,6 @@ public class AuroraSelfStatement extends BaseEntity {
     public Long sessionId;
     public Long messageId;
     public String statementText;
+    @TableField("trigger_type")
     public String trigger;
 }

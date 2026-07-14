@@ -913,7 +913,7 @@ CREATE TABLE IF NOT EXISTS tb_aurora_self_statement (
   session_id BIGINT,
   message_id BIGINT,
   statement_text TEXT NOT NULL,
-  trigger VARCHAR(32) NOT NULL,
+  trigger_type VARCHAR(32) NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_statement_user (user_id),
@@ -924,7 +924,7 @@ CREATE TABLE IF NOT EXISTS tb_aurora_self_statement (
 CREATE TABLE IF NOT EXISTS tb_aurora_self_reflection (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT NOT NULL,
-  trigger VARCHAR(32) NOT NULL,
+  trigger_type VARCHAR(32) NOT NULL,
   depth VARCHAR(16) NOT NULL,
   summary TEXT NOT NULL,
   related_statement_id BIGINT,

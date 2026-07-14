@@ -1,0 +1,50 @@
+M1-BASE-001 production image and release gate evaluation
+Recorded: 2026-07-15 Asia/Shanghai
+Evaluated base SHA: 1d91517922801fff87fcccd30c4601819061ab41
+Branch: feat/run006-aurora-self-understanding
+
+Outcome
+- Builder and runtime images are pinned by immutable SHA-256 digest. The runtime
+  remains non-root appuser and contains the Java 21 JRE rather than a JDK.
+- CI production smoke now starts pinned MySQL 8.4, loads the production schema,
+  generates an ephemeral CA truststore, and boots the image with the prod Profile
+  and JDBC sslMode=VERIFY_CA. Demo seeding, Mock LLM, and fallback remain disabled.
+- Local Cosign 3.0.6 verification pushes the exact image digest to an ephemeral
+  registry, signs it, attaches SLSA provenance, verifies both, and deletes its
+  ephemeral private key.
+- The release workflow builds amd64/arm64 GHCR images with BuildKit SBOM and max
+  provenance, then signs the pushed digest keylessly through GitHub OIDC.
+
+Verification
+1. .\mvnw.cmd -B clean verify
+   PASS: 83 suites, 649 tests, 0 failures, 0 errors, 0 skipped; SpotBugs 0.
+2. docker build --pull -t inner-cosmos:m1-image .
+   PASS: image sha256:0f19b90d474e38ce02c187814230a2699f96d3872c81b23ad87780a802aaf48b;
+   size 144839342 bytes; runtime user appuser.
+3. .\scripts\verify-production-image.ps1 -Image inner-cosmos:m1-image
+   PASS: prod health UP; MySQL TLS VERIFY_CA; 60 schema tables; 0 demo users;
+   runtime user appuser.
+4. .\scripts\verify-image-signature.ps1 -Image inner-cosmos:m1-image
+   PASS: signature VERIFIED; SLSA provenance VERIFIED; Cosign 3.0.6;
+   PrivateKeyPersisted False.
+5. Pinned Trivy SBOM, config, and image scans at HIGH,CRITICAL with exit-code 1
+   PASS: Java dependencies 0; IaC 0; Alpine 0; application JAR 0.
+6. .\scripts\assert-test-baseline.ps1 -MinimumTests 613
+   PASS: Surefire XML confirms 649/0/0/0.
+7. .\scripts\scan-secrets.ps1
+   PASS: 0 findings; values were never printed.
+8. .\scripts\run-innovation-eval.ps1
+   PASS: 48 scenarios, 4 splits, 11 production contracts, hard gates PASS.
+
+Database compatibility
+- MySQL 8.4 treats trigger as reserved syntax. The two Aurora Self tables now use
+  trigger_type at the storage boundary, with explicit MyBatis field mappings.
+  Java domain fields, Self/Constitution/Emergence behavior, and user experience are
+  unchanged.
+
+Scope and review
+- No Aurora proactive, Self/Constitution/Emergence, personality, relationship,
+  portrait, Capsule, slow-letter, starfield, matching, or psychology semantics
+  were deleted, downgraded, or reclassified as background-only behavior.
+- Builder evaluation is complete. BASE-IMAGE remains IN_PROGRESS pending a hosted
+  GHCR release/OIDC signing run and independent review; neither is claimed here.

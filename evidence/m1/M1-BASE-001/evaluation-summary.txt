@@ -42,8 +42,8 @@ Verification
    Initial gate: FAIL, correctly finding fixed High/Critical issues in Alpine,
    Tomcat 10.1.54, and Jackson 2.21.2.
    Remediation: runtime apk upgrade, Tomcat 10.1.55, Jackson Databind 2.21.4.
-   Final gate: PASS; Alpine packages 0 and application JAR 0 fixed
-   HIGH/CRITICAL findings under --ignore-unfixed.
+   Final gate: PASS; Alpine packages 0 and application JAR 0 HIGH/CRITICAL
+   findings, without --ignore-unfixed.
 
 5. Innovation preservation
    No prompt, model routing, Aurora proactive behavior, Self/Constitution/Emergence,
@@ -58,6 +58,8 @@ Acceptance scope
 - BASE-SUPPLY builder evaluation is complete: SBOM dependency, SAST, secret, IaC,
   and container High/Critical gates all pass without ignore-unfixed. The ledger
   remains IN_PROGRESS until independent review and a hosted CI run.
-- BASE-IMAGE remains IN_PROGRESS: non-root build and dev smoke pass, but OCI signing
-  and production-profile smoke against its real database are not yet closed.
+- BASE-IMAGE builder evaluation is complete: the non-root image passes prod Profile
+  smoke against MySQL 8.4 with VERIFY_CA; exact-digest Cosign signature and SLSA
+  provenance verify locally. It remains IN_PROGRESS until the GHCR multi-architecture
+  OIDC signing workflow runs on a hosted runner and independent review completes.
 - Package status is EVALUATED, not independent VERIFIED.

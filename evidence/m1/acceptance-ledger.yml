@@ -43,4 +43,4 @@ entries:
   - {id: V-01, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
   - {id: V-02, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
   - {id: V-03, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
-  - {id: V-04, status: IN_PROGRESS, evidence: ["evidence/m1/M1-BASE-001/"], reviewer: UNASSIGNED, note: "Java 21 / Boot 3.5 clean verify passes 649/0/0/0; dependency, SAST, secret, IaC, and container High/Critical gates pass. Independent review remains; external secret rotation is tracked separately in S-01."}
+  - {id: V-04, status: IN_PROGRESS, evidence: ["evidence/m1/M1-BASE-001/"], reviewer: UNASSIGNED, note: "Java 21 / Boot 3.5 clean verify passes 649/0/0/0; production Profile passes MySQL VERIFY_CA smoke; dependency, SAST, secret, IaC, container, local Cosign signature, and SLSA provenance gates pass. Hosted GHCR OIDC release and independent review remain; external secret rotation is tracked separately in S-01."}

@@ -1,9 +1,9 @@
 schema_version: 1
 package_id: M1-BASE-001
 status: EVALUATED
-base_sha: a0654fcd31c07edeaf5cca2b3d08fb9d8c913ec3
+base_sha: 1d91517922801fff87fcccd30c4601819061ab41
 branch: feat/run006-aurora-self-understanding
-recorded_at: 2026-07-15T01:57:00+08:00
+recorded_at: 2026-07-15T02:30:00+08:00
 environment:
   os: Windows 11 10.0 amd64; Docker Desktop Linux amd64
   java_build: Oracle JDK 21.0.10; class major 65
@@ -21,7 +21,7 @@ commands:
   - command: .\\scripts\\assert-test-baseline.ps1 -MinimumTests 613
     result: PASS; Surefire XML baseline enforced
   - command: docker build --pull -t inner-cosmos:m1-supply .
-    result: PASS
+    result: PASS; final image sha256:0f19b90d474e38ce02c187814230a2699f96d3872c81b23ad87780a802aaf48b; non-root appuser
   - command: docker run dev smoke plus GET /actuator/health
     result: PASS; HTTP 200; status UP; non-root appuser
   - command: pinned Trivy SBOM scan --severity HIGH,CRITICAL --exit-code 1
@@ -34,6 +34,10 @@ commands:
     result: PASS; 48 scenarios; 4 protected splits; 11 production contracts
   - command: .\\scripts\\scan-secrets.ps1
     result: PASS; 0 current-tree findings; values never printed
+  - command: .\\scripts\\verify-production-image.ps1 -Image inner-cosmos:m1-image
+    result: PASS; prod Profile; health UP; MySQL VERIFY_CA; 60 tables; 0 demo users; appuser
+  - command: .\\scripts\\verify-image-signature.ps1 -Image inner-cosmos:m1-image
+    result: PASS; exact digest signature VERIFIED; SLSA provenance VERIFIED; ephemeral private key removed
 artifacts:
   - target/surefire-reports/ (generated, ignored)
   - target/sbom/inner-cosmos-0.1.0.json (generated, ignored)
@@ -41,24 +45,27 @@ artifacts:
   - target/inner-cosmos-0.1.0.jar (generated, ignored)
   - evaluation-summary.txt
   - supply-chain-summary.txt
+  - image-release-summary.txt
   - validation-summary.txt (historical blocked-gate snapshot)
 evidence_artifact:
   path: evidence/m1/M1-BASE-001/supply-chain-summary.txt
   sha256: 477a954291b4289a22e38197dd2c03339155473ff86c39033a3cdeeeb17f304a
+image_evidence_artifact:
+  path: evidence/m1/M1-BASE-001/image-release-summary.txt
+  sha256: de3c40a082de44887a0adc9cea7b44c97bb056882fb3decfb4a42efda57d2ad7
 acceptance:
   BASE-JAVA: IN_PROGRESS_PENDING_INDEPENDENT_REVIEW
   BASE-BOOT: IN_PROGRESS_PENDING_INDEPENDENT_REVIEW
   BASE-SUPPLY: IN_PROGRESS_PENDING_INDEPENDENT_REVIEW
-  BASE-IMAGE: IN_PROGRESS
+  BASE-IMAGE: IN_PROGRESS_PENDING_HOSTED_RELEASE_AND_INDEPENDENT_REVIEW
 human_gates:
   - External credential rotation remains BLOCKED in M1-SEC-001; it did not block this reversible migration.
   - Independent reviewer is required before this package becomes VERIFIED.
 known_limitations:
-  - OCI signing and production-profile database smoke are not complete.
   - BASE-SUPPLY builder gates are complete; hosted CI execution and independent review remain pending.
-  - OCI signing/provenance belongs to BASE-IMAGE and remains incomplete.
-  - The checked-in workflow is locally inspected but has not yet run on a hosted GitHub runner.
+  - Local OCI signing/provenance and production-profile MySQL TLS smoke pass.
+  - The GHCR multi-architecture release, GitHub OIDC keyless signature, and checked-in workflows have not yet run on a hosted GitHub runner.
 review:
   status: PENDING
   reviewer: UNASSIGNED
-rollback: Revert the package commit; no domain schema or innovation semantics changed.
+rollback: Revert the package commit; the MySQL column rename is storage-boundary compatibility only and no innovation semantics changed.

@@ -44,6 +44,8 @@ evidence_dir: evidence/m1/M1-BASE-001/
 ```powershell
 .\.tools\apache-maven-3.9.9\bin\mvn.cmd clean verify
 docker build -t inner-cosmos:m1-base .
+.\scripts\verify-production-image.ps1 -Image inner-cosmos:m1-base
+.\scripts\verify-image-signature.ps1 -Image inner-cosmos:m1-base
 git diff --check
 ```
 

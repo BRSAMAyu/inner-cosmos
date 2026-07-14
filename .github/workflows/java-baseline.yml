@@ -48,6 +48,12 @@ jobs:
           --exit-code 1 /workspace
       - name: Build Java 21 non-root image
         run: docker build -t inner-cosmos:ci .
+      - name: Production profile smoke with certificate-verified MySQL
+        shell: pwsh
+        run: ./scripts/verify-production-image.ps1 -Image inner-cosmos:ci
+      - name: Verify local image signature and provenance round trip
+        shell: pwsh
+        run: ./scripts/verify-image-signature.ps1 -Image inner-cosmos:ci
       - name: Gate High and Critical image vulnerabilities
         run: >-
           docker run --rm
