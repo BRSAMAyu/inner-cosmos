@@ -7,6 +7,7 @@ public class AuroraReplyVO {
     /** Durable choreography identity (INNO-CONV-001). */
     public Long turnId;
     public Long planId;
+    public Boolean cancelled;
     public List<String> messages;
     public String replyTone;
     public String detectedTheme;

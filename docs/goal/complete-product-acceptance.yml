@@ -108,7 +108,7 @@ gates:
     required: true
     acceptance:
       - {id: AURORA-DUAL-KERNEL, target: "Fast and slow kernels plus context assembly show measured benefit over the single-pass baseline.", status: UNASSESSED, evidence: []}
-      - {id: AURORA-CHOREOGRAPHY, target: "Typed multi-message, pause, stop, interrupt, replan, and reconnect behavior works end to end.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CONV-001/]}
+      - {id: AURORA-CHOREOGRAPHY, target: "Typed multi-message, pause, stop, interrupt, replan, and reconnect behavior works end to end.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CONV-001/, evidence/innovation/INNO-CONV-002/]}
       - {id: AURORA-TEMPORAL, target: "Durable WakeIntent scheduling respects timezone, quiet hours, relevance, risk, and user controls.", status: UNASSESSED, evidence: []}
       - {id: AURORA-SELF, target: "Self, Constitution, Relationship State, and Emergence are versioned, evaluated, observable, and rollbackable.", status: UNASSESSED, evidence: []}
       - {id: AURORA-QUALITY, target: "Blind longitudinal evaluation passes empathy, continuity, proactive appropriateness, and recovery thresholds.", status: UNASSESSED, evidence: []}

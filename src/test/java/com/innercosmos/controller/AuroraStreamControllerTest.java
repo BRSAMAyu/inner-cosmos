@@ -68,6 +68,7 @@ class AuroraStreamControllerTest {
         // INNO-CONV-001: explicit lifecycle types and replay/correlation IDs are
         // additive; unnamed content deltas above remain for the existing client.
         assertTrue(body.contains("event:turn.plan"), "expected durable turn plan event; got:\n" + body);
+        assertTrue(body.contains("event:turn.started"), "expected cancellable generation event; got:\n" + body);
         assertTrue(body.contains("event:bubble.started"), "expected bubble start event; got:\n" + body);
         assertTrue(body.contains("event:bubble.completed"), "expected bubble completion event; got:\n" + body);
         assertTrue(body.contains("event:turn.completed"), "expected turn completion event; got:\n" + body);

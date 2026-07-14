@@ -16,6 +16,7 @@ import com.innercosmos.vo.AuroraReplyVO;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -94,6 +95,107 @@ class ConversationChoreographyIntegrationTest {
         assertThatThrownBy(() -> choreography.timeline(999999L, committed.turn.id))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("不存在或不可访问");
+    }
+
+    @Test
+    void stopDuringProviderGenerationDiscardsAttemptAndCommitsNoPlanOrBubble() {
+        Fixture fixture = fixture(81005L, List.of("这条模型结果不应落库"));
+        TurnTimelineVO started = choreography.beginTurn(
+                fixture.userId, fixture.session.id, fixture.userMessage.id);
+
+        TurnTimelineVO stopped = choreography.cancelTurn(
+                fixture.userId, started.turn.id, "USER_STOPPED");
+        TurnTimelineVO lateProviderResult = choreography.commitPlan(
+                fixture.userId, started.turn.id, fixture.reply);
+
+        assertThat(stopped.turn.status).isEqualTo("CANCELLED");
+        assertThat(lateProviderResult.activePlan).isNull();
+        assertThat(lateProviderResult.bubbles).isEmpty();
+        assertThat(lateProviderResult.generationAttempts).singleElement()
+                .extracting(a -> a.status).isEqualTo("DISCARDED");
+        assertThat(lateProviderResult.events).extracting(e -> e.eventType)
+                .contains("GENERATION_DISCARDED", "TURN_INTERRUPTED");
+    }
+
+    @Test
+    void stopAfterFirstBubbleKeepsDeliveredContextAndCancelsEveryPendingBubble() {
+        Fixture fixture = fixture(81006L, List.of("已经说出的第一条", "不再发送的第二条", "不再发送的第三条"));
+        TurnTimelineVO started = choreography.beginTurn(
+                fixture.userId, fixture.session.id, fixture.userMessage.id);
+        TurnTimelineVO planned = choreography.commitPlan(fixture.userId, started.turn.id, fixture.reply);
+        choreography.commitBubble(fixture.userId, started.turn.id, 1, fixture.auroraMessages.get(0));
+        choreography.recordBubbleProgress(fixture.userId, started.turn.id, 2, 4);
+
+        TurnTimelineVO stopped = choreography.cancelTurn(fixture.userId, started.turn.id, "USER_INTERRUPTED");
+
+        assertThat(planned.bubbles).hasSize(3);
+        assertThat(stopped.turn.status).isEqualTo("INTERRUPTED");
+        assertThat(stopped.bubbles).extracting(b -> b.status)
+                .containsExactly("COMMITTED", "CANCELLED", "CANCELLED");
+        assertThat(stopped.bubbles).extracting(b -> b.content)
+                .containsExactlyElementsOf(fixture.reply.messages);
+        assertThat(stopped.events).extracting(e -> e.eventType)
+                .contains("BUBBLE_COMMITTED", "BUBBLE_CANCELLED", "TURN_INTERRUPTED");
+        assertThat(choreography.latestInterruptionContext(fixture.userId, fixture.session.id))
+                .contains("已说出的内容：已经说出的第一条 / 不再发送")
+                .contains("原计划但未发送的内容：的第二条 / 不再发送的第三条")
+                .contains("不要重复已说内容");
+    }
+
+    @Test
+    void newMessageCancelsPriorActiveTurnBeforeBeginningReplanTurn() {
+        Fixture fixture = fixture(81007L, List.of("旧计划"));
+        TurnTimelineVO first = choreography.beginTurn(
+                fixture.userId, fixture.session.id, fixture.userMessage.id);
+        choreography.commitPlan(fixture.userId, first.turn.id, fixture.reply);
+
+        choreography.cancelActiveTurns(fixture.userId, fixture.session.id, "USER_INTERRUPTED_BY_NEW_MESSAGE");
+        DialogMessage nextUserMessage = message(fixture.session.id, fixture.userId, "USER", "等等，我真正想说的是另一件事");
+        messageMapper.insert(nextUserMessage);
+        TurnTimelineVO replanned = choreography.beginTurn(fixture.userId, fixture.session.id, nextUserMessage.id);
+
+        assertThat(choreography.timeline(fixture.userId, first.turn.id).turn.status).isEqualTo("INTERRUPTED");
+        assertThat(replanned.turn.status).isEqualTo("GENERATING");
+        assertThat(replanned.turn.id).isNotEqualTo(first.turn.id);
+    }
+
+    @Test
+    void cancelledTurnNeverInvokesAtomicMessagePersistence() {
+        Fixture fixture = fixture(81008L, List.of("停止后绝不能写入"));
+        TurnTimelineVO started = choreography.beginTurn(
+                fixture.userId, fixture.session.id, fixture.userMessage.id);
+        choreography.commitPlan(fixture.userId, started.turn.id, fixture.reply);
+        choreography.cancelTurn(fixture.userId, started.turn.id, "USER_STOPPED");
+        AtomicBoolean invoked = new AtomicBoolean(false);
+
+        TurnTimelineVO result = choreography.deliverBubble(fixture.userId, started.turn.id, 1, () -> {
+            invoked.set(true);
+            DialogMessage message = message(fixture.session.id, fixture.userId, "AURORA", "不应出现");
+            messageMapper.insert(message);
+            return message;
+        });
+
+        assertThat(invoked).isFalse();
+        assertThat(result.turn.status).isEqualTo("INTERRUPTED");
+        assertThat(result.bubbles).singleElement().extracting(b -> b.status).isEqualTo("CANCELLED");
+    }
+
+    @Test
+    void committedBubbleRetryNeverInvokesPersistenceTwice() {
+        Fixture fixture = fixture(81009L, List.of("只能写入一次"));
+        TurnTimelineVO started = choreography.beginTurn(
+                fixture.userId, fixture.session.id, fixture.userMessage.id);
+        choreography.commitPlan(fixture.userId, started.turn.id, fixture.reply);
+        choreography.commitBubble(fixture.userId, started.turn.id, 1, fixture.auroraMessages.get(0));
+        AtomicBoolean invoked = new AtomicBoolean(false);
+
+        TurnTimelineVO result = choreography.deliverBubble(fixture.userId, started.turn.id, 1, () -> {
+            invoked.set(true);
+            throw new AssertionError("duplicate persistence must not run");
+        });
+
+        assertThat(invoked).isFalse();
+        assertThat(result.bubbles).singleElement().extracting(b -> b.status).isEqualTo("COMMITTED");
     }
 
     private Fixture fixture(Long userId, List<String> replies) {

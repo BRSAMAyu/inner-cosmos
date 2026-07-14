@@ -15,6 +15,7 @@ public class MessageBubble extends BaseEntity {
     public String content;
     public String status;
     public Integer sendAfterMs;
+    public Integer deliveredChars;
     public Boolean requiresNoInterruption;
     public LocalDateTime plannedAt;
     public LocalDateTime sentAt;

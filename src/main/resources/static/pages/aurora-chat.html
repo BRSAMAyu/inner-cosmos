@@ -531,6 +531,7 @@
     <div class="aurora-composer-inner">
       <input id="msg" class="voice-input-target" data-voice-bound="true" aria-label="和 Aurora 说说今天" placeholder="把现在最想说的一句话放在这里" onkeydown="if(event.key==='Enter')send()">
       <button class="voice-mini" onclick="IC.recordToField(document.getElementById('msg'), this)" title="语音输入" aria-label="语音输入">🎙</button>
+      <button id="stopTurnBtn" class="ghost" style="display:none" onclick="stopCurrentTurn()" type="button" aria-label="停止 Aurora 当前回应">停止</button>
       <button class="send-btn" onclick="send()">发送</button>
     </div>
     <p class="voice-hint">语音会尽量尊重原文转写，你可以继续手动修改后再发送。</p>
@@ -833,6 +834,8 @@ function sendViaStream(text, body) {
                 "&mode=" + encodeURIComponent(mode);
       if (token) url += "&token=" + encodeURIComponent(token);
       var es = new EventSource(url, { withCredentials: true });
+      activeEventSource = es;
+      activeStopResolver = function() { resolve({ safety: false, streamed: gotAny, stopped: true }); };
       wireEmitter(es, resolve, reject, function() { return node; }, function(n) { node = n; });
     }
 
@@ -848,6 +851,23 @@ function sendViaStream(text, body) {
       };
       es.addEventListener("token", function(ev) { handleChunk(ev.data); });
       es.addEventListener("segment", function(ev) { /* inter-bubble break marker; ignored */ });
+      function captureTurn(ev) {
+        var data = parseJson(ev.data);
+        activeTurnId = data && data.turnId ? data.turnId : null;
+        document.getElementById("stopTurnBtn").style.display = activeTurnId ? "inline-flex" : "none";
+      }
+      es.addEventListener("turn.started", captureTurn);
+      es.addEventListener("turn.plan", captureTurn);
+      es.addEventListener("turn.interrupted", function() {
+        finishOnce();
+        activeEventSource = null;
+        activeStopResolver = null;
+        activeTurnId = null;
+        document.getElementById("stopTurnBtn").style.display = "none";
+        document.getElementById("typing").classList.remove("visible");
+        finalizeStreamingBubbles();
+        resolve({ safety: false, streamed: gotAny, stopped: true });
+      });
 
       function handleChunk(raw) {
         var data = parseJson(raw);
@@ -893,6 +913,10 @@ function sendViaStream(text, body) {
 
       es.addEventListener("done", function() {
         finishOnce();
+        activeEventSource = null;
+        activeStopResolver = null;
+        activeTurnId = null;
+        document.getElementById("stopTurnBtn").style.display = "none";
         document.getElementById("typing").classList.remove("visible");
         finalizeStreamingBubbles();
         // Friend-style tail: nextQuestion + smallStep arrive in the meta event; render
@@ -936,6 +960,30 @@ function renderStreamMemoryLens(data) {
 }
 
 var streamMeta = null;
+var activeTurnId = null;
+var activeEventSource = null;
+var activeStopResolver = null;
+
+async function stopCurrentTurn() {
+  if (!activeTurnId) return;
+  var turnId = activeTurnId;
+  try {
+    await fetch("/api/aurora/turns/" + encodeURIComponent(turnId) + "/stop", {
+      method: "POST", credentials: "include"
+    });
+  } finally {
+    if (activeEventSource) { try { activeEventSource.close(); } catch (e) {} }
+    if (activeStopResolver) activeStopResolver();
+    activeEventSource = null;
+    activeStopResolver = null;
+    activeTurnId = null;
+    auroraSending = false;
+    document.getElementById("stopTurnBtn").style.display = "none";
+    document.getElementById("typing").classList.remove("visible");
+    finalizeStreamingBubbles();
+    IC.toast("已停在这里，你可以直接接着说。", "info");
+  }
+}
 function parseJson(raw) {
   if (raw == null) return null;
   try { return JSON.parse(raw); } catch (e) { return null; }
@@ -1041,8 +1089,8 @@ async function send() {
   var text = input.value.trim();
   if (!text || !sid) return;
   if (auroraSending) {
-    IC.toast("Aurora 还在整理上一句话，请稍等一下。", "warn");
-    return;
+    // A new message is a normal interruption and becomes the replanning input.
+    await stopCurrentTurn();
   }
   auroraSending = true;
   addBubble(text, "user");

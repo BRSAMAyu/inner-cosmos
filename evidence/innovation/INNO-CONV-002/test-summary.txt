@@ -1,0 +1,25 @@
+INNO-CONV-002 builder verification summary
+Date: 2026-07-15 Asia/Shanghai
+Base SHA: 558efee0089472351b5578262898004f5160e2f1
+Branch: feat/run006-aurora-self-understanding
+
+Focused choreography, UI, SSE and innovation regression:
+Command: .\.tools\apache-maven-3.9.9\bin\mvn.cmd -q "-Dtest=ConversationChoreographyIntegrationTest,ConversationInterruptionUiContractTest,AuroraStreamControllerTest,AuroraStreamServiceTest,AuroraEmergenceTest" test
+Result: PASS; 19 tests; 0 failures; 0 errors; 0 skipped
+
+Full Java baseline:
+Command: .\.tools\apache-maven-3.9.9\bin\mvn.cmd -q test
+Runtime: Java 21.0.10 LTS
+Result: PASS; 82 suites; 648 tests; 0 failures; 0 errors; 0 skipped
+
+Innovation source-contract validation:
+Working directory: ai-lab
+Command: python -m evals.cli.main validate
+Result: PASS; 48 scenarios; 4 protected splits; 11 production contracts
+
+AI behavior/cost statement:
+- Provider calls added: 0
+- Prompt, sampling and Aurora identity semantics changed: 0
+- Additional model cost: USD 0.00 by construction
+- Replanning adds owner-scoped prior interruption context only when an interruption exists
+- Runtime overhead: durable state writes plus cancellation polling capped to once per 100 ms while streaming

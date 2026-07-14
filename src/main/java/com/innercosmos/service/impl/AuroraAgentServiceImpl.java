@@ -152,14 +152,16 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
 
     @Override
     public AuroraReplyVO replyRich(Long userId, ChatRequest request) {
+        cancelPreviousTurn(userId, request.sessionId);
         // SAFETY FIRST (VS-003 §1): synchronous safety gate before any model call.
         // recheckSync for distress-bearing messages also completes here, synchronously.
         SafetyResult safety = safetyService.check(request.message, userId, request.sessionId);
         DialogMessage userMessage = dialogService.saveUserMessage(userId, request);
+        Long turnId = beginChoreography(userId, request.sessionId, userMessage);
         if (Boolean.TRUE.equals(safety.blockModelCall)) {
-            return blockedReply(userId, request, safety, userMessage == null ? null : userMessage.id);
+            return blockedReply(userId, request, safety, userMessage == null ? null : userMessage.id, turnId);
         }
-        return produceReply(userId, request, safety, userMessage == null ? null : userMessage.id);
+        return produceReply(userId, request, safety, userMessage == null ? null : userMessage.id, turnId, true);
     }
 
     /**
@@ -168,7 +170,8 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
      * this is called — do not re-run it here. Saves Aurora's messages and runs the
      * portrait/goodbye post-hooks exactly as before.
      */
-    private AuroraReplyVO produceReply(Long userId, ChatRequest request, SafetyResult safety, Long userMessageId) {
+    private AuroraReplyVO produceReply(Long userId, ChatRequest request, SafetyResult safety,
+                                       Long userMessageId, Long turnId, boolean persistImmediately) {
         // M7: Hard boundary protection — right to refuse identity violation
         String boundaryRefusal = checkHardBoundaries(request.message, userId);
         if (boundaryRefusal != null) {
@@ -187,9 +190,19 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             vo.riskFlags = List.of("IDENTITY_BOUNDARY_TRIGGERED");
             vo.agentLoop = Map.of("speakCount", 1, "continueReason", "boundary-refusal", "mode", normalizeMode(request.mode), "modeLabel", modeLabel(normalizeMode(request.mode)));
             vo.aiState = aiState(null);
-            DialogMessage saved = dialogService.saveAuroraMessage(userId, request.sessionId, boundaryRefusal);
-            recordChoreography(userId, request.sessionId, userMessageId, vo,
-                    saved == null ? List.of() : List.of(saved));
+            vo.turnId = turnId;
+            if (turnId != null && choreographyService != null) choreographyService.commitPlan(userId, turnId, vo);
+            if (persistImmediately) {
+                if (turnId != null && choreographyService != null) {
+                    choreographyService.deliverBubble(userId, turnId, 1,
+                            () -> dialogService.saveAuroraMessage(userId, request.sessionId, boundaryRefusal));
+                    choreographyService.completeTurn(userId, turnId);
+                } else {
+                    DialogMessage saved = dialogService.saveAuroraMessage(userId, request.sessionId, boundaryRefusal);
+                    recordChoreography(userId, request.sessionId, userMessageId, vo,
+                            saved == null ? List.of() : List.of(saved));
+                }
+            }
             return vo;
         }
 
@@ -262,6 +275,12 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         turnContext.put("preferredProvider", resolved.provider());
         turnContext.put("recentAuroraMessages", recentAuroraMessages(request.sessionId, 6));
         turnContext.put("providerPolicy", providerPolicy(resolved));
+        if (choreographyService != null && request.sessionId != null) {
+            String interruptionContext = choreographyService.latestInterruptionContext(userId, request.sessionId);
+            if (interruptionContext != null && !interruptionContext.isBlank()) {
+                turnContext.put("interruptionContext", interruptionContext);
+            }
+        }
         turnContext.put("agentLoopPolicy", Boolean.FALSE.equals(agentContext.multiMessageAllowed)
                 ? "用户关闭了多条消息，本轮只能输出 1 条 segments。"
                 : "你可以选择只说一条，也可以继续补充第二条或第三条。若某个后续想法不值得说，写 [[SILENCE]]，系统不会展示。不要固定数量。");
@@ -286,11 +305,36 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         }
         // Tag the response with the resolved provider/model for the UI
         vo.aiState = aiState(resolved);
-        List<DialogMessage> persistedBubbles = new ArrayList<>();
-        for (String msg : vo.messages) {
-            persistedBubbles.add(dialogService.saveAuroraMessage(userId, request.sessionId, msg));
+        vo.turnId = turnId;
+        if (turnId != null && choreographyService != null) {
+            TurnTimelineVO planned = choreographyService.commitPlan(userId, turnId, vo);
+            if (planned.activePlan == null) {
+                vo.cancelled = true;
+                vo.messages = List.of();
+                return vo;
+            }
+            vo.planId = planned.activePlan.id;
         }
-        recordChoreography(userId, request.sessionId, userMessageId, vo, persistedBubbles);
+        if (persistImmediately) {
+            List<DialogMessage> persistedBubbles = new ArrayList<>();
+            for (int i = 0; i < vo.messages.size(); i++) {
+                if (turnId != null && choreographyService != null && choreographyService.isCancelled(userId, turnId)) break;
+                if (turnId != null && choreographyService != null) {
+                    int bubbleOrder = i + 1;
+                    String bubbleText = vo.messages.get(i);
+                    choreographyService.deliverBubble(userId, turnId, bubbleOrder,
+                            () -> dialogService.saveAuroraMessage(userId, request.sessionId, bubbleText));
+                } else {
+                    persistedBubbles.add(dialogService.saveAuroraMessage(
+                            userId, request.sessionId, vo.messages.get(i)));
+                }
+            }
+            if (turnId != null && choreographyService != null) {
+                choreographyService.completeTurn(userId, turnId);
+            } else {
+                recordChoreography(userId, request.sessionId, userMessageId, vo, persistedBubbles);
+            }
+        }
         // Portrait reflection hook: every 5 turns, analyze and update user portrait.
         // M-045: atomic compute — increment, threshold check, and reset in one op so concurrent
         // turns for the same user can't double-fire or skip the reflection.
@@ -361,6 +405,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
      */
     @Override
     public SseEmitter stream(Long userId, Long sessionId, String message, String mode, ChatRequest richContext) {
+        cancelPreviousTurn(userId, sessionId);
         SseEmitter emitter = new SseEmitter(120_000L);
         emitter.onTimeout(emitter::complete);
         emitter.onError(throwable -> log.warn("Aurora stream client error: {}", String.valueOf(throwable.getMessage())));
@@ -418,8 +463,20 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                     request.aiProviderPreference = richContext.aiProviderPreference;
                 }
                 DialogMessage userMessage = dialogService.saveUserMessage(userId, request);
+                Long turnId = beginChoreography(userId, sessionId, userMessage);
+                if (turnId != null) {
+                    emitter.send(SseEmitter.event().id(turnId + ":0").name("turn.started")
+                            .data("{\"turnId\":" + turnId + "}"));
+                }
                 AuroraReplyVO reply = produceReply(userId, request, safety,
-                        userMessage == null ? null : userMessage.id);
+                        userMessage == null ? null : userMessage.id, turnId, false);
+
+                if (Boolean.TRUE.equals(reply.cancelled)) {
+                    emitter.send(SseEmitter.event().id(sseId(reply, 1)).name("turn.interrupted")
+                            .data("{\"reason\":\"USER_INTERRUPTED\"}"));
+                    emitter.complete();
+                    return;
+                }
 
                 long eventSequence = 1L;
                 emitter.send(SseEmitter.event().id(sseId(reply, eventSequence++))
@@ -427,6 +484,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                                 + ",\"planId\":" + numeric(reply.planId) + "}"));
 
                 for (int i = 0; i < reply.messages.size(); i++) {
+                    if (isTurnCancelled(userId, reply.turnId)) break;
                     if (i > 0) {
                         emitter.send(SseEmitter.event().id(sseId(reply, eventSequence++))
                                 .name("segment").data("{\"break\":true}"));
@@ -434,9 +492,31 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                     }
                     emitter.send(SseEmitter.event().id(sseId(reply, eventSequence++))
                             .name("bubble.started").data("{\"order\":" + (i + 1) + "}"));
-                    eventSequence = streamText(emitter, reply.messages.get(i), reply, eventSequence);
+                    StreamProgress progress = streamText(emitter, reply.messages.get(i), reply, eventSequence, userId);
+                    eventSequence = progress.nextEventSequence();
+                    if (choreographyService != null && reply.turnId != null) {
+                        choreographyService.recordBubbleProgress(userId, reply.turnId, i + 1, progress.deliveredChars());
+                    }
+                    if (isTurnCancelled(userId, reply.turnId)) break;
+                    if (choreographyService != null && reply.turnId != null) {
+                        int bubbleOrder = i + 1;
+                        String bubbleText = reply.messages.get(i);
+                        choreographyService.deliverBubble(userId, reply.turnId, bubbleOrder,
+                                () -> dialogService.saveAuroraMessage(userId, sessionId, bubbleText));
+                    } else {
+                        dialogService.saveAuroraMessage(userId, sessionId, reply.messages.get(i));
+                    }
                     emitter.send(SseEmitter.event().id(sseId(reply, eventSequence++))
                             .name("bubble.completed").data("{\"order\":" + (i + 1) + "}"));
+                }
+                if (isTurnCancelled(userId, reply.turnId)) {
+                    emitter.send(SseEmitter.event().id(sseId(reply, eventSequence))
+                            .name("turn.interrupted").data("{\"reason\":\"USER_STOPPED\"}"));
+                    emitter.complete();
+                    return;
+                }
+                if (choreographyService != null && reply.turnId != null) {
+                    choreographyService.completeTurn(userId, reply.turnId);
                 }
                 // VS-003b — meta now carries the full perception payload (agentLoop,
                 // aiState, voice/weather/location/timezone) so the frontend can render
@@ -592,7 +672,8 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         return vo;
     }
 
-    private AuroraReplyVO blockedReply(Long userId, ChatRequest request, SafetyResult safety, Long userMessageId) {
+    private AuroraReplyVO blockedReply(Long userId, ChatRequest request, SafetyResult safety,
+                                       Long userMessageId, Long turnId) {
         AuroraReplyVO blocked = new AuroraReplyVO();
         blocked.messages = List.of(safety.safeMessage == null
                 ? "我先陪你把安全放在第一位。现在请联系一个现实中可信任的人，或使用当地紧急支持资源。"
@@ -610,9 +691,17 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         blocked.riskFlags = List.of(safety.riskType == null ? "SAFETY" : safety.riskType);
         blocked.agentLoop = Map.of("speakCount", 1, "continueReason", "safety-first");
         blocked.aiState = aiState(null);
-        DialogMessage saved = dialogService.saveAuroraMessage(userId, request.sessionId, blocked.messages.get(0));
-        recordChoreography(userId, request.sessionId, userMessageId, blocked,
-                saved == null ? List.of() : List.of(saved));
+        blocked.turnId = turnId;
+        if (turnId != null && choreographyService != null) {
+            choreographyService.commitPlan(userId, turnId, blocked);
+            choreographyService.deliverBubble(userId, turnId, 1,
+                    () -> dialogService.saveAuroraMessage(userId, request.sessionId, blocked.messages.get(0)));
+            choreographyService.completeTurn(userId, turnId);
+        } else {
+            DialogMessage saved = dialogService.saveAuroraMessage(userId, request.sessionId, blocked.messages.get(0));
+            recordChoreography(userId, request.sessionId, userMessageId, blocked,
+                    saved == null ? List.of() : List.of(saved));
+        }
         return blocked;
     }
 
@@ -981,9 +1070,17 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 .trim();
     }
 
-    private long streamText(SseEmitter emitter, String response, AuroraReplyVO reply, long eventSequence) throws Exception {
+    private StreamProgress streamText(SseEmitter emitter, String response, AuroraReplyVO reply,
+                                      long eventSequence, Long userId) throws Exception {
         StringBuilder token = new StringBuilder();
+        int deliveredChars = 0;
+        long nextCancellationCheck = 0L;
         for (char c : response.toCharArray()) {
+            long now = System.nanoTime();
+            if (now >= nextCancellationCheck) {
+                if (isTurnCancelled(userId, reply.turnId)) return new StreamProgress(eventSequence, deliveredChars);
+                nextCancellationCheck = now + 100_000_000L; // cross-replica DB poll, <=100 ms stop latency
+            }
             token.append(c);
             if (token.length() >= 2 || c == '。' || c == '，' || c == '\n') {
                 // The current frontend already listens to both `token` and the legacy
@@ -991,6 +1088,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 // without changing the rendered experience.
                 emitter.send(SseEmitter.event().id(sseId(reply, eventSequence++))
                         .name("token").data("{\"content\":\"" + escape(token.toString()) + "\"}"));
+                deliveredChars += token.length();
                 token.setLength(0);
                 Thread.sleep(30);
             }
@@ -998,17 +1096,44 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         if (!token.isEmpty()) {
             emitter.send(SseEmitter.event().id(sseId(reply, eventSequence++))
                     .name("token").data("{\"content\":\"" + escape(token.toString()) + "\"}"));
+            deliveredChars += token.length();
         }
-        return eventSequence;
+        return new StreamProgress(eventSequence, deliveredChars);
     }
+
+    private record StreamProgress(long nextEventSequence, int deliveredChars) {}
 
     private void recordChoreography(Long userId, Long sessionId, Long userMessageId,
                                     AuroraReplyVO reply, List<DialogMessage> persistedBubbles) {
         if (choreographyService == null || sessionId == null || userMessageId == null) return;
-        TurnTimelineVO timeline = choreographyService.recordCompletedTurn(
-                userId, sessionId, userMessageId, reply, persistedBubbles);
+        TurnTimelineVO timeline;
+        if (reply.turnId != null) {
+            timeline = choreographyService.commitPlan(userId, reply.turnId, reply);
+            for (int i = 0; i < persistedBubbles.size(); i++) {
+                choreographyService.commitBubble(userId, reply.turnId, i + 1, persistedBubbles.get(i));
+            }
+            timeline = choreographyService.completeTurn(userId, reply.turnId);
+        } else {
+            timeline = choreographyService.recordCompletedTurn(
+                    userId, sessionId, userMessageId, reply, persistedBubbles);
+        }
         reply.turnId = timeline.turn.id;
         reply.planId = timeline.activePlan == null ? null : timeline.activePlan.id;
+    }
+
+    private Long beginChoreography(Long userId, Long sessionId, DialogMessage userMessage) {
+        if (choreographyService == null || sessionId == null || userMessage == null || userMessage.id == null) return null;
+        return choreographyService.beginTurn(userId, sessionId, userMessage.id).turn.id;
+    }
+
+    private void cancelPreviousTurn(Long userId, Long sessionId) {
+        if (choreographyService != null && sessionId != null) {
+            choreographyService.cancelActiveTurns(userId, sessionId, "USER_INTERRUPTED_BY_NEW_MESSAGE");
+        }
+    }
+
+    private boolean isTurnCancelled(Long userId, Long turnId) {
+        return choreographyService != null && turnId != null && choreographyService.isCancelled(userId, turnId);
     }
 
     private String sseId(AuroraReplyVO reply, long sequence) {

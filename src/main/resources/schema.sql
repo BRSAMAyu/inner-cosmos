@@ -169,6 +169,7 @@ CREATE TABLE IF NOT EXISTS tb_message_bubble (
   content TEXT NOT NULL,
   status VARCHAR(32) NOT NULL,
   send_after_ms INT NOT NULL DEFAULT 0,
+  delivered_chars INT NOT NULL DEFAULT 0,
   requires_no_interruption BOOLEAN NOT NULL DEFAULT FALSE,
   planned_at TIMESTAMP NULL,
   sent_at TIMESTAMP NULL,
@@ -205,7 +206,7 @@ CREATE TABLE IF NOT EXISTS tb_conversation_event (
 CREATE TABLE IF NOT EXISTS tb_generation_attempt (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   turn_id BIGINT NOT NULL,
-  plan_id BIGINT NOT NULL,
+  plan_id BIGINT,
   user_id BIGINT NOT NULL,
   attempt_number INT NOT NULL,
   status VARCHAR(32) NOT NULL,
