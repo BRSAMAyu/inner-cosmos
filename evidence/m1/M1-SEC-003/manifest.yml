@@ -1,0 +1,32 @@
+schema_version: 1
+package_id: M1-SEC-003
+status: IMPLEMENTED
+source_sha: 92f086f8a0a41a72568f2d2d55393f090a6791a2
+branch: feat/run006-aurora-self-understanding
+recorded_at: 2026-07-14T23:02:00+08:00
+environment:
+  os: Windows 11 10.0 amd64
+  java: Oracle JDK 21.0.10
+  maven: Apache Maven 3.9.9
+  spring_boot: 3.3.6
+commands:
+  - command: .\\.tools\\apache-maven-3.9.9\\bin\\mvn.cmd test -Dtest=*AuroraSelf*,*Ownership*
+    result: PASS
+    artifact: validation-summary.txt
+    sha256: 5e90383d724879e0ea5160a216abe6b2a9ae16f4a6b2fbef1f3af1aae94c4cc6
+  - command: .\\.tools\\apache-maven-3.9.9\\bin\\mvn.cmd test
+    result: PASS
+    artifact: validation-summary.txt
+    sha256: 5e90383d724879e0ea5160a216abe6b2a9ae16f4a6b2fbef1f3af1aae94c4cc6
+changes:
+  - Unified commit, dismiss, and retire ownership errors.
+  - Added user-scoped conditional state transitions and transaction rollback on races.
+  - Added owner, non-owner, admin, missing, duplicate, and concurrency tests.
+  - Preserved all existing innovation capabilities and product semantics.
+human_gates: []
+known_limitations:
+  - Independent reviewer approval is pending.
+review:
+  status: PENDING
+  reviewer: UNASSIGNED
+rollback: Preserve service-layer ownership checks; only API presentation may be adjusted for compatibility.

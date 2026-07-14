@@ -1,0 +1,28 @@
+M1-SEC-003 validation summary
+Recorded at: 2026-07-14T23:02:00+08:00
+Branch: feat/run006-aurora-self-understanding
+Source SHA: 92f086f8a0a41a72568f2d2d55393f090a6791a2
+
+Commands and results:
+1. .\.tools\apache-maven-3.9.9\bin\mvn.cmd test '-Dtest=*AuroraSelf*,*Ownership*'
+   Result: PASS; 27 tests, 0 failures, 0 errors, 0 skipped
+2. .\.tools\apache-maven-3.9.9\bin\mvn.cmd test
+   Result: PASS; 638 tests, 0 failures, 0 errors, 0 skipped
+3. git diff --check
+   Result: PASS
+
+Protected cases:
+- commit validates candidate ownership before model reads, inserts, candidate updates, or other dependencies.
+- dismiss and retire apply the same opaque non-owner/missing error policy.
+- Admin has no implicit access to another user's Aurora Self state.
+- Owner writes use user-scoped conditional updates; duplicate dismiss/retire are idempotent.
+- A concurrent candidate state change fails the transaction instead of committing stale state.
+- Non-owner paths create no Aurora Self model, change no candidate/model, call no LLM,
+  and cannot trigger Capsule sync or events because they return before all downstream work.
+
+Innovation preservation:
+- No Aurora Self, Constitution, Emergence, personality, relationship, proactive, Capsule,
+  portrait, psychological model, slow-letter, starfield, or matching capability was removed,
+  disabled, or reduced. This package changes ownership and write predicates only.
+
+Independent reviewer approval remains pending; acceptance entries are not marked PASS.
