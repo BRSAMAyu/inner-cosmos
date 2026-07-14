@@ -1,0 +1,23 @@
+M1-SEC-001 validation summary
+Recorded at: 2026-07-14T22:48:00+08:00
+Branch: feat/run006-aurora-self-understanding
+Source SHA: 1a2b9b37379369385e0f87eba78649553df412f7
+
+Commands and results:
+1. .\.tools\apache-maven-3.9.9\bin\mvn.cmd test '-Dtest=*Config*,*Initializer*,ProductionStartupGuardTest,DemoDataConfigurationTest'
+   Result: PASS; 9 tests, 0 failures, 0 errors, 0 skipped
+2. .\.tools\apache-maven-3.9.9\bin\mvn.cmd test
+   Result: PASS; 622 tests, 0 failures, 0 errors, 0 skipped
+3. .\scripts\scan-secrets.ps1
+   Result: PASS; current tree 0 findings
+4. Redacted git history inspection of application configuration files
+   Result: 7 historical literal credential additions detected; no values printed
+5. git diff --check
+   Result: PASS
+
+Conclusion:
+- Repository current tree contains no scanner-detected literal credentials.
+- Production startup rejects Mock LLM, fallback, demo seeding, missing credentials,
+  insecure cookies, and MySQL URLs without certificate verification.
+- External credential revocation and rotation are not verifiable from this repository;
+  S-01 and this package remain BLOCKED on the human gate.

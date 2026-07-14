@@ -1,0 +1,42 @@
+schema_version: 1
+package_id: M1-SEC-001
+status: BLOCKED
+source_sha: 1a2b9b37379369385e0f87eba78649553df412f7
+branch: feat/run006-aurora-self-understanding
+recorded_at: 2026-07-14T22:48:00+08:00
+environment:
+  os: Windows 11 10.0 amd64
+  java: Oracle JDK 21.0.10
+  maven: Apache Maven 3.9.9
+  spring_boot: 3.3.6
+commands:
+  - command: .\\.tools\\apache-maven-3.9.9\\bin\\mvn.cmd test -Dtest=*Config*,*Initializer*
+    result: PASS
+    artifact: validation-summary.txt
+    sha256: 0e99cf62eb9a9f0717cbf541549cc6501a64554b9d15d9fb7169354604c0d6ef
+  - command: .\\.tools\\apache-maven-3.9.9\\bin\\mvn.cmd test
+    result: PASS
+    artifact: validation-summary.txt
+    sha256: 0e99cf62eb9a9f0717cbf541549cc6501a64554b9d15d9fb7169354604c0d6ef
+  - command: .\\scripts\\scan-secrets.ps1
+    result: PASS
+    artifact: validation-summary.txt
+    sha256: 0e99cf62eb9a9f0717cbf541549cc6501a64554b9d15d9fb7169354604c0d6ef
+changes:
+  - Removed literal Provider credentials from tracked runtime configuration.
+  - Added a fail-closed production startup guard and positive/negative tests.
+  - Made demo data opt-in and structurally unavailable under the prod profile.
+  - Removed reversible credential fragments from configuration logs.
+  - Required externally supplied production database TLS and passwords.
+human_gates:
+  - External Provider credential revocation and rotation is PENDING; see human-rotation-checklist.md.
+known_limitations:
+  - Git history still contains historical exposure and was not rewritten.
+  - Container image scanning awaits the later build gate.
+review:
+  status: PENDING
+  reviewer: UNASSIGNED
+rollback: Fix deployment configuration when rejected; do not restore literal secrets, Mock fallback, demo seeds, or insecure TLS.
+artifacts:
+  - path: human-rotation-checklist.md
+    sha256: 144d255eb6995843aa07573ccae56794bada0e69608cc244a3bf24a2609ca119
