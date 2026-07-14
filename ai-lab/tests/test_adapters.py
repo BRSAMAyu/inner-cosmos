@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from evals.adapters import CurrentProductionContractAdapter, build_registry
+from evals.adapters import CurrentProductionContractAdapter, OfflineBaselineAdapter, build_registry
 from evals.datasets import load_scenarios
 
 
@@ -37,6 +37,14 @@ class AdapterTest(unittest.TestCase):
         self.assertEqual(7, run.seed)
         self.assertEqual(scenario.split, run.input_split)
         self.assertEqual(0, run.cost.model_calls)
+
+    def test_three_offline_baselines_are_runnable(self):
+        scenario = load_scenarios(ROOT / "evals/datasets/scenarios.jsonl")[0]
+        for baseline_id in OfflineBaselineAdapter.SUPPORTED:
+            with self.subTest(baseline_id=baseline_id):
+                run = OfflineBaselineAdapter(REPO, baseline_id).run(scenario, "a" * 40, 7)
+                self.assertEqual(baseline_id, run.system.id)
+                self.assertEqual(0, run.cost.model_calls)
 
 
 if __name__ == "__main__":

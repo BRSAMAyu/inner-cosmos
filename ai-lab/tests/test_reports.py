@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from evals.adapters import CurrentProductionContractAdapter
+from evals.adapters import CurrentProductionContractAdapter, OfflineBaselineAdapter
 from evals.datasets import load_manifest, load_scenarios
 from evals.metrics import evaluate_runs
 from evals.reports import build_report, write_report
@@ -42,7 +42,14 @@ class ReportTest(unittest.TestCase):
             payload = json.loads((output / "sample-report.json").read_text(encoding="utf-8"))
             self.assertEqual(1, payload["schema_version"])
 
+    def test_comparative_offline_baseline_is_recorded(self):
+        adapter = OfflineBaselineAdapter(ROOT.parent, "single-prompt")
+        baseline_runs = [adapter.run(item, "d" * 40, 20260714) for item in self.scenarios]
+        comparison = {"single-prompt": evaluate_runs(self.scenarios, baseline_runs)}
+        report = build_report(self.manifest, self.runs + baseline_runs, evaluate_runs(self.scenarios, self.runs), "d" * 40, comparison)
+        self.assertEqual("OFFLINE_FIXTURE_RUN", report.ablations[0]["status"])
+        self.assertIn("single-prompt", report.configuration["evaluated_systems"])
+
 
 if __name__ == "__main__":
     unittest.main()
-

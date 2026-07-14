@@ -7,7 +7,13 @@ from pathlib import Path
 from evals.models import DatasetManifest, EvaluationReport, MetricResult, SystemRun, utc_now
 
 
-def build_report(manifest: DatasetManifest, runs: list[SystemRun], metrics: list[MetricResult], git_sha: str) -> EvaluationReport:
+def build_report(
+    manifest: DatasetManifest,
+    runs: list[SystemRun],
+    metrics: list[MetricResult],
+    git_sha: str,
+    comparative_metrics: dict[str, list[MetricResult]] | None = None,
+) -> EvaluationReport:
     total_cost = sum(run.cost.estimated_cost_usd for run in runs)
     hard_gates = {metric.name: metric.passed for metric in metrics if metric.hard_gate is not None}
     return EvaluationReport(
@@ -18,6 +24,7 @@ def build_report(manifest: DatasetManifest, runs: list[SystemRun], metrics: list
             "system": "current-production-contract", "provider": "offline-fixture", "model": "none",
             "prompt_version": "production-contract-observed", "policy_version": "production-contract-observed",
             "genome_version": None, "temperature": 0.0, "seed": 20260714,
+            "evaluated_systems": sorted({run.system.id for run in runs}),
         },
         dataset_manifest=asdict(manifest),
         aggregate_metrics=[asdict(metric) for metric in metrics],
@@ -28,7 +35,15 @@ def build_report(manifest: DatasetManifest, runs: list[SystemRun], metrics: list
             "output_tokens": sum(run.cost.output_tokens for run in runs),
             "model_calls": sum(run.cost.model_calls for run in runs), "estimated_cost_usd": total_cost,
         },
-        ablations=[{"name": "future-candidate-systems", "status": "NOT_RUN", "reason": "candidate systems unavailable"}],
+        ablations=[
+            {
+                "system": system_id,
+                "status": "OFFLINE_FIXTURE_RUN",
+                "metrics": [asdict(metric) for metric in system_metrics],
+                "interpretation": "Structural synthetic comparison only; not a model-quality result.",
+            }
+            for system_id, system_metrics in sorted((comparative_metrics or {}).items())
+        ] + [{"name": "future-candidate-systems", "status": "NOT_RUN", "reason": "candidate systems unavailable"}],
         failure_cases=[],
         privacy_and_safety={"hard_gates": hard_gates, "real_user_data_used": False, "provider_called": False},
         human_review={"status": "PENDING", "blind_format": "human-pairwise-template.csv"},
@@ -75,4 +90,3 @@ Future candidates and human blind review are NOT_RUN. This contract fixture prov
 `{report.reproducibility['command']}` at Git `{report.reproducibility['git_sha']}`.
 """
     (output / "sample-report.md").write_text(markdown, encoding="utf-8")
-

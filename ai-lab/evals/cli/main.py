@@ -6,7 +6,7 @@ import subprocess
 from dataclasses import asdict
 from pathlib import Path
 
-from evals.adapters import CurrentProductionContractAdapter, build_registry
+from evals.adapters import CurrentProductionContractAdapter, OfflineBaselineAdapter, build_registry
 from evals.datasets import load_manifest, load_scenarios, validate_dataset
 from evals.datasets.loader import assert_no_split_leakage
 from evals.judges import DeterministicOfflineJudge, JudgeEnsemble, OptionalLlmJudge, export_blind_pairs
@@ -39,19 +39,31 @@ def run(output: Path, seed: int) -> dict[str, object]:
     validation = validate()
     manifest, scenarios = _load()
     git_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=REPOSITORY_ROOT, text=True).strip()
-    adapter = CurrentProductionContractAdapter(REPOSITORY_ROOT)
-    runs = [adapter.run(scenario, git_sha, seed) for scenario in scenarios]
-    metrics = evaluate_runs(scenarios, runs)
-    failed_gates = [metric.name for metric in metrics if metric.hard_gate is not None and metric.passed is not True]
+    current_runs = [CurrentProductionContractAdapter(REPOSITORY_ROOT).run(scenario, git_sha, seed) for scenario in scenarios]
+    baseline_runs = {
+        baseline_id: [OfflineBaselineAdapter(REPOSITORY_ROOT, baseline_id).run(scenario, git_sha, seed) for scenario in scenarios]
+        for baseline_id in sorted(OfflineBaselineAdapter.SUPPORTED)
+    }
+    runs = current_runs + [run for group in baseline_runs.values() for run in group]
+    metrics = evaluate_runs(scenarios, current_runs)
+    comparative_metrics = {system_id: evaluate_runs(scenarios, group) for system_id, group in baseline_runs.items()}
+    all_metrics = [metrics, *comparative_metrics.values()]
+    failed_gates = [
+        metric.name for group in all_metrics for metric in group
+        if metric.hard_gate is not None and metric.passed is not True
+    ]
     if failed_gates:
         raise SystemExit(f"hard gates failed: {','.join(failed_gates)}")
-    report = build_report(manifest, runs, metrics, git_sha)
+    report = build_report(manifest, runs, metrics, git_sha, comparative_metrics)
     write_report(report, output)
-    export_blind_pairs(runs, runs, output / "human-pairwise-template.csv", seed)
-    judges = JudgeEnsemble([DeterministicOfflineJudge(), OptionalLlmJudge()]).evaluate(runs[0])
+    export_blind_pairs(current_runs, baseline_runs["single-prompt"], output / "human-pairwise-template.csv", seed)
+    judges = JudgeEnsemble([DeterministicOfflineJudge(), OptionalLlmJudge()]).evaluate(current_runs[0])
     (output / "judge-status.json").write_text(json.dumps([asdict(item) for item in judges], indent=2) + "\n", encoding="utf-8")
     (output / "system-registry.json").write_text(json.dumps([asdict(item) for item in build_registry()], indent=2) + "\n", encoding="utf-8")
-    return {**validation, "runs": len(runs), "metrics": len(metrics), "hard_gates": "PASS", "output": str(output)}
+    return {
+        **validation, "systems": 4, "runs": len(runs), "metrics": sum(len(group) for group in all_metrics),
+        "hard_gates": "PASS", "output": str(output),
+    }
 
 
 def main() -> None:
@@ -68,4 +80,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
