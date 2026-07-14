@@ -1,0 +1,31 @@
+schema_version: 1
+package_id: M1-GOV-001
+status: IMPLEMENTED
+source_sha: 48e7795a77989d7c65193ef4c82cd916492fa417
+branch: feat/run006-aurora-self-understanding
+recorded_at: 2026-07-14T22:36:00+08:00
+environment:
+  os: Windows 11 10.0 amd64
+  java: Oracle JDK 21.0.10
+  maven: Apache Maven 3.9.9
+  spring_boot: 3.3.6
+commands:
+  - command: compare authority acceptance IDs with evidence/m1/acceptance-ledger.yml
+    result: PASS
+    artifact: validation-summary.txt
+    sha256: 6b53339c4aaceb2fa1afd8e8ce51a608b97077b6928f76724f611c674ac1f901
+  - command: git diff --check
+    result: PASS
+    artifact: validation-summary.txt
+    sha256: 6b53339c4aaceb2fa1afd8e8ce51a608b97077b6928f76724f611c674ac1f901
+changes:
+  - Added the ADR lifecycle and complete decision template.
+  - Added the M1 evidence manifest protocol.
+  - Added a machine-readable ledger for all 34 M1 acceptance IDs.
+human_gates: []
+known_limitations:
+  - Builder verification is recorded, but independent reviewer approval remains pending.
+review:
+  status: PENDING
+  reviewer: UNASSIGNED
+rollback: Revert only the governance commit before downstream packages reference it; accepted ADRs must instead be superseded.

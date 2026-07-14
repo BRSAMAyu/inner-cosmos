@@ -1,0 +1,14 @@
+M1-GOV-001 validation summary
+Recorded at: 2026-07-14T22:36:00+08:00
+Branch: feat/run006-aurora-self-understanding
+Source SHA: 48e7795a77989d7c65193ef4c82cd916492fa417
+
+Commands and results:
+1. Acceptance ID comparison between 07 authority and acceptance-ledger.yml
+   Result: PASS; authority_count=34, ledger_count=34, unique_count=34, missing=none
+2. rg -n "P-0|S-0|D-0|R-0|K-0|O-0|V-0" 对齐文档 docs/work-packages/m1
+   Result: PASS; 65 references found
+3. git diff --check
+   Result: PASS
+
+No secrets, P0 content, production data, or raw test logs are included.
