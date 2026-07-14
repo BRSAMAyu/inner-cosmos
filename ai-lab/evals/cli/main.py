@@ -1,0 +1,71 @@
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+from dataclasses import asdict
+from pathlib import Path
+
+from evals.adapters import CurrentProductionContractAdapter, build_registry
+from evals.datasets import load_manifest, load_scenarios, validate_dataset
+from evals.datasets.loader import assert_no_split_leakage
+from evals.judges import DeterministicOfflineJudge, JudgeEnsemble, OptionalLlmJudge, export_blind_pairs
+from evals.metrics import evaluate_runs
+from evals.reports import build_report, write_report
+from evals.schemas.validator import validate_schema_documents
+
+LAB_ROOT = Path(__file__).resolve().parents[2]
+REPOSITORY_ROOT = LAB_ROOT.parent
+DATASET_DIR = LAB_ROOT / "evals" / "datasets"
+
+
+def _load():
+    return load_manifest(DATASET_DIR / "manifest.json"), load_scenarios(DATASET_DIR / "scenarios.jsonl")
+
+
+def validate() -> dict[str, object]:
+    manifest, scenarios = _load()
+    errors = validate_dataset(manifest, scenarios)
+    errors.extend(validate_schema_documents(LAB_ROOT / "evals" / "schemas"))
+    train = [scenario for scenario in scenarios if scenario.split == "compiler_train"]
+    assert_no_split_leakage(scenarios, [scenario.id + " " + scenario.title for scenario in train])
+    contracts = CurrentProductionContractAdapter(REPOSITORY_ROOT).verify_contracts()
+    if errors:
+        raise SystemExit("\n".join(errors))
+    return {"status": "PASS", "scenarios": len(scenarios), "splits": {k: len(v) for k, v in manifest.splits.items()}, "contracts": contracts}
+
+
+def run(output: Path, seed: int) -> dict[str, object]:
+    validation = validate()
+    manifest, scenarios = _load()
+    git_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=REPOSITORY_ROOT, text=True).strip()
+    adapter = CurrentProductionContractAdapter(REPOSITORY_ROOT)
+    runs = [adapter.run(scenario, git_sha, seed) for scenario in scenarios]
+    metrics = evaluate_runs(scenarios, runs)
+    failed_gates = [metric.name for metric in metrics if metric.hard_gate is not None and metric.passed is not True]
+    if failed_gates:
+        raise SystemExit(f"hard gates failed: {','.join(failed_gates)}")
+    report = build_report(manifest, runs, metrics, git_sha)
+    write_report(report, output)
+    export_blind_pairs(runs, runs, output / "human-pairwise-template.csv", seed)
+    judges = JudgeEnsemble([DeterministicOfflineJudge(), OptionalLlmJudge()]).evaluate(runs[0])
+    (output / "judge-status.json").write_text(json.dumps([asdict(item) for item in judges], indent=2) + "\n", encoding="utf-8")
+    (output / "system-registry.json").write_text(json.dumps([asdict(item) for item in build_registry()], indent=2) + "\n", encoding="utf-8")
+    return {**validation, "runs": len(runs), "metrics": len(metrics), "hard_gates": "PASS", "output": str(output)}
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Inner Cosmos innovation evaluation harness")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    subparsers.add_parser("validate")
+    run_parser = subparsers.add_parser("run")
+    run_parser.add_argument("--output", type=Path, required=True)
+    run_parser.add_argument("--seed", type=int, default=20260714)
+    args = parser.parse_args()
+    result = validate() if args.command == "validate" else run(args.output, args.seed)
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+
+
+if __name__ == "__main__":
+    main()
+

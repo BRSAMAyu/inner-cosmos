@@ -1,0 +1,1 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"system-run","type":"object","required":["run_id","scenario_id","git_sha","system","temperature","seed","started_at","input_split","events","responses","cost","failure_status","fallback_status"]}

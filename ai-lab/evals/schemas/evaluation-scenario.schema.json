@@ -1,0 +1,1 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"evaluation-scenario","type":"object","required":["id","family","split","title","input","expected","provenance","purpose","sensitivity","license"],"properties":{"split":{"enum":["compiler_train","development","held_out_trajectory","adversarial"]},"input":{"type":"object"},"expected":{"type":"object"}}}

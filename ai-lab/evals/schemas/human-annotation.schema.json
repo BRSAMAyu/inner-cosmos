@@ -1,0 +1,1 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"human-annotation","type":"object","required":["scenario_id","blind_pair_id","annotator_id","preference"],"properties":{"preference":{"enum":["A","B","TIE",null]}}}

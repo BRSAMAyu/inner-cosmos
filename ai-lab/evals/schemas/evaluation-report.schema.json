@@ -1,0 +1,1 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"evaluation-report","type":"object","required":["configuration","dataset_manifest","aggregate_metrics","pairwise_results","latency_and_cost","ablations","failure_cases","privacy_and_safety","human_review","reproducibility"]}
