@@ -1,0 +1,52 @@
+M1-BASE-001 supply-chain gate evaluation
+Recorded: 2026-07-15 Asia/Shanghai
+Evaluated base SHA: a0654fcd31c07edeaf5cca2b3d08fb9d8c913ec3
+Branch: feat/run006-aurora-self-understanding
+
+Outcome
+- Maven verify now runs SpotBugs 4.10.2.0 with Max effort and High threshold.
+  Any qualifying finding or analysis error fails the build.
+- CI scans the CycloneDX SBOM for dependency vulnerabilities, the repository for
+  IaC misconfiguration, the current tree for credentials, and the final image for
+  OS and JAR vulnerabilities. High and Critical findings fail without silently
+  ignoring vulnerabilities that do not yet have a fix.
+- Trivy 0.70.0 is pinned by image digest. All GitHub Actions are pinned by full
+  commit SHA. Generated Surefire, SBOM, and SpotBugs evidence is retained by CI.
+
+Initial SAST findings and remediation
+- Initial SpotBugs gate correctly failed with 8 High findings: six inherited
+  timestamp fields were shadowed, one unused local was dead, and Math.abs on an
+  Integer.MIN_VALUE hash could remain negative.
+- The timestamp declarations now use the existing BaseEntity fields, the dead
+  local was removed, and A/B assignment uses floorMod. A regression test covers
+  the Integer.MIN_VALUE hash case.
+- Final SpotBugs result: 492 classes analyzed, 0 bugs, 0 analysis errors.
+
+Verification
+1. .\mvnw.cmd -B clean verify
+   PASS: 83 suites, 649 tests, 0 failures, 0 errors, 0 skipped; SpotBugs 0.
+2. .\scripts\assert-test-baseline.ps1 -MinimumTests 613
+   PASS: Surefire XML confirms 649/0/0/0.
+3. .\scripts\scan-secrets.ps1
+   PASS: 0 findings; values were never printed.
+4. Pinned Trivy SBOM scan, severity HIGH,CRITICAL, exit-code 1
+   PASS: Java dependencies 0; no ignore-unfixed option.
+5. Pinned Trivy config scan, severity HIGH,CRITICAL, exit-code 1
+   PASS: 0 findings in the authoritative checkout.
+6. docker build --pull -t inner-cosmos:m1-supply .
+   PASS: image sha256:6e39ad34af5428e192fc010a9d8f154a515d37baf13b5cbc010db8cd00eaafa8.
+7. Pinned Trivy image scan, severity HIGH,CRITICAL, exit-code 1
+   PASS: Alpine 3.23.5 packages 0; app.jar 0; no ignore-unfixed option.
+8. Container smoke plus GET /actuator/health
+   PASS: status UP; runtime user appuser.
+9. .\scripts\run-innovation-eval.ps1
+   PASS: 48 scenarios, 4 splits, 11 production contracts, hard gates PASS.
+
+Scope and review
+- No Aurora proactive, Self/Constitution/Emergence, personality, relationship,
+  portrait, Capsule, slow-letter, starfield, matching, or psychology semantics
+  were deleted or downgraded.
+- Builder evaluation is complete. Independent review and a hosted GitHub Actions
+  run remain required before the work package is independently VERIFIED.
+- OCI signing/provenance and production-profile database smoke remain BASE-IMAGE
+  work; they are not claimed by this BASE-SUPPLY evaluation.

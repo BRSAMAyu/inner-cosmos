@@ -203,7 +203,6 @@ public final class PseudoSemanticAnalyzer {
      * Detect themes based on keyword matching.
      */
     private static List<String> detectThemes(List<String> tokens) {
-        Set<String> tokensSet = new HashSet<>(tokens);
         List<String> detectedThemes = new ArrayList<>();
 
         for (Map.Entry<String, Set<String>> entry : THEME_KEYWORDS.entrySet()) {

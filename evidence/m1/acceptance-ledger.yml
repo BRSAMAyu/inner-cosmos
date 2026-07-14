@@ -43,4 +43,4 @@ entries:
   - {id: V-01, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
   - {id: V-02, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
   - {id: V-03, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
-  - {id: V-04, status: IN_PROGRESS, evidence: ["evidence/m1/M1-BASE-001/"], reviewer: UNASSIGNED, note: "Post-W0 clean test passes 638/0/0/0, but the Boot 3.5 baseline package is blocked by the unclosed secret-rotation human gate and independent review."}
+  - {id: V-04, status: IN_PROGRESS, evidence: ["evidence/m1/M1-BASE-001/"], reviewer: UNASSIGNED, note: "Java 21 / Boot 3.5 clean verify passes 649/0/0/0; dependency, SAST, secret, IaC, and container High/Critical gates pass. Independent review remains; external secret rotation is tracked separately in S-01."}

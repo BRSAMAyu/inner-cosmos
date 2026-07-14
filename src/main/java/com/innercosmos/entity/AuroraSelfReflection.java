@@ -3,7 +3,6 @@ package com.innercosmos.entity;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
-import java.time.LocalDateTime;
 
 @TableName("tb_aurora_self_reflection")
 public class AuroraSelfReflection extends BaseEntity {
@@ -20,5 +19,4 @@ public class AuroraSelfReflection extends BaseEntity {
     public String status;
     public String riskFlags;
     public String evidenceRefs;  // JSON array of evidence ids
-    public LocalDateTime createdAt;
 }

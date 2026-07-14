@@ -1,9 +1,9 @@
 schema_version: 1
 package_id: M1-BASE-001
 status: EVALUATED
-base_sha: dea0b02f
+base_sha: a0654fcd31c07edeaf5cca2b3d08fb9d8c913ec3
 branch: feat/run006-aurora-self-understanding
-recorded_at: 2026-07-15T01:35:00+08:00
+recorded_at: 2026-07-15T01:57:00+08:00
 environment:
   os: Windows 11 10.0 amd64; Docker Desktop Linux amd64
   java_build: Oracle JDK 21.0.10; class major 65
@@ -16,15 +16,19 @@ environment:
     version: 0.70.0
     image_digest: sha256:be1190afcb28352bfddc4ddeb71470835d16462af68d310f9f4bca710961a41e
 commands:
-  - command: .\\.tools\\apache-maven-3.9.9\\bin\\mvn.cmd -q clean verify
-    result: PASS; 82 suites; 648 tests; 0 failures; 0 errors; 0 skipped
+  - command: .\\mvnw.cmd -B clean verify
+    result: PASS; 83 suites; 649 tests; 0 failures; 0 errors; 0 skipped; SpotBugs 0 findings and 0 errors
   - command: .\\scripts\\assert-test-baseline.ps1 -MinimumTests 613
     result: PASS; Surefire XML baseline enforced
-  - command: docker build --progress=plain -t inner-cosmos:m1-base .
+  - command: docker build --pull -t inner-cosmos:m1-supply .
     result: PASS
   - command: docker run dev smoke plus GET /actuator/health
     result: PASS; HTTP 200; status UP; non-root appuser
-  - command: pinned Trivy image scan --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1
+  - command: pinned Trivy SBOM scan --severity HIGH,CRITICAL --exit-code 1
+    result: PASS; Java dependencies 0; no ignore-unfixed
+  - command: pinned Trivy config scan --severity HIGH,CRITICAL --exit-code 1
+    result: PASS; 0 IaC misconfigurations
+  - command: pinned Trivy image scan --severity HIGH,CRITICAL --exit-code 1
     result: PASS; Alpine 0; application JAR 0
   - command: python -m evals.cli.main validate
     result: PASS; 48 scenarios; 4 protected splits; 11 production contracts
@@ -36,18 +40,23 @@ artifacts:
   - target/sbom/inner-cosmos-0.1.0.xml (generated, ignored)
   - target/inner-cosmos-0.1.0.jar (generated, ignored)
   - evaluation-summary.txt
+  - supply-chain-summary.txt
   - validation-summary.txt (historical blocked-gate snapshot)
+evidence_artifact:
+  path: evidence/m1/M1-BASE-001/supply-chain-summary.txt
+  sha256: 477a954291b4289a22e38197dd2c03339155473ff86c39033a3cdeeeb17f304a
 acceptance:
   BASE-JAVA: IN_PROGRESS_PENDING_INDEPENDENT_REVIEW
   BASE-BOOT: IN_PROGRESS_PENDING_INDEPENDENT_REVIEW
-  BASE-SUPPLY: IN_PROGRESS
+  BASE-SUPPLY: IN_PROGRESS_PENDING_INDEPENDENT_REVIEW
   BASE-IMAGE: IN_PROGRESS
 human_gates:
   - External credential rotation remains BLOCKED in M1-SEC-001; it did not block this reversible migration.
   - Independent reviewer is required before this package becomes VERIFIED.
 known_limitations:
   - OCI signing and production-profile database smoke are not complete.
-  - The complete supply gate still needs dependency, SAST, IaC, and provenance/signature closure beyond the current SBOM, secret, and image scan gates.
+  - BASE-SUPPLY builder gates are complete; hosted CI execution and independent review remain pending.
+  - OCI signing/provenance belongs to BASE-IMAGE and remains incomplete.
   - The checked-in workflow is locally inspected but has not yet run on a hosted GitHub runner.
 review:
   status: PENDING

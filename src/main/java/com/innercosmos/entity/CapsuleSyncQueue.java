@@ -9,7 +9,6 @@ public class CapsuleSyncQueue extends BaseEntity {
     public Long capsuleId;
     public String status;          // PENDING, APPROVED, REJECTED, FAILED, SYNCED
     public String proposedContextDiff;  // TEXT - JSON describing the proposed changes
-    public LocalDateTime createdAt;
     public LocalDateTime decidedAt;
 
     // IC-CAP-002 B-2: failure-visible sync + retry bookkeeping

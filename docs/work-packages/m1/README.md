@@ -10,7 +10,7 @@
 | [M1-SEC-001](M1-SEC-001.md) | READY | 无；外部密钥轮换需人类 | 平台/安全 |
 | [M1-SEC-002](M1-SEC-002.md) | READY | 无 | 后端/安全 |
 | [M1-SEC-003](M1-SEC-003.md) | READY | 无 | 后端/安全 |
-| [M1-BASE-001](M1-BASE-001.md) | BLOCKED_BY_W0 | GOV、SEC-001/2/3 | 验证/集成 |
+| [M1-BASE-001](M1-BASE-001.md) | EVALUATED_REVIEW_PENDING | GOV、SEC-001/2/3 | 验证/集成 |
 | [M1-DATA-POC-001](M1-DATA-POC-001.md) | BLOCKED_BY_BASE | BASE | 数据/架构 |
 
 同一时间最多四个包处于 `CLAIMED`。领取时必须填写 owner、worktree/branch、base SHA、开始时间；完成时填写证据路径、验证者和集成 SHA。

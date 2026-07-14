@@ -67,7 +67,7 @@ public class ABTestServiceImpl implements ABTestService {
         }
 
         // Hash-based assignment
-        int hash = Math.abs(userId.hashCode());
+        int hash = Math.floorMod(userId.hashCode(), Integer.MAX_VALUE);
         int threshold = (int) (Integer.MAX_VALUE * (config.mockPercentage / 100.0));
         String group = hash < threshold ? "MOCK" : "REMOTE";
 

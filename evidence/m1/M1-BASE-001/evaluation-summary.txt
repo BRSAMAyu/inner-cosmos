@@ -17,8 +17,9 @@ Outcome
 
 Verification
 1. Clean Maven verification
-   Command: .\.tools\apache-maven-3.9.9\bin\mvn.cmd -q clean verify
-   Result: PASS; 82 suites; 648 tests; 0 failures; 0 errors; 0 skipped.
+   Command: .\mvnw.cmd -B clean verify
+   Result: PASS; 83 suites; 649 tests; 0 failures; 0 errors; 0 skipped;
+   SpotBugs High-threshold gate 0 findings and 0 analysis errors.
    Runtime: Oracle JDK 21.0.10; Spring Boot 3.5.14.
 
 2. Produced artifacts
@@ -54,8 +55,9 @@ Verification
 Acceptance scope
 - BASE-JAVA and BASE-BOOT behavior passes reproducible builder checks, while the
   complete-product ledger remains IN_PROGRESS until independent review.
-- BASE-SUPPLY remains IN_PROGRESS: SBOM, secret scan and pinned container scan are
-  gated, while full dependency/SAST/IaC closure remains.
+- BASE-SUPPLY builder evaluation is complete: SBOM dependency, SAST, secret, IaC,
+  and container High/Critical gates all pass without ignore-unfixed. The ledger
+  remains IN_PROGRESS until independent review and a hosted CI run.
 - BASE-IMAGE remains IN_PROGRESS: non-root build and dev smoke pass, but OCI signing
   and production-profile smoke against its real database are not yet closed.
 - Package status is EVALUATED, not independent VERIFIED.

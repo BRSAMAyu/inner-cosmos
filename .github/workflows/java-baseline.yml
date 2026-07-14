@@ -14,8 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4
         with:
           distribution: temurin
           java-version: '21'
@@ -30,21 +30,38 @@ jobs:
       - name: Scan current tree for credentials
         shell: pwsh
         run: ./scripts/scan-secrets.ps1
+      - name: Gate High and Critical dependency vulnerabilities from SBOM
+        run: >-
+          docker run --rm
+          -v "$PWD:/workspace:ro"
+          aquasec/trivy@sha256:be1190afcb28352bfddc4ddeb71470835d16462af68d310f9f4bca710961a41e
+          sbom --skip-version-check --severity HIGH,CRITICAL
+          --exit-code 1
+          /workspace/target/sbom/inner-cosmos-0.1.0.json
+      - name: Gate High and Critical infrastructure misconfigurations
+        run: >-
+          docker run --rm
+          -v "$PWD:/workspace:ro"
+          aquasec/trivy@sha256:be1190afcb28352bfddc4ddeb71470835d16462af68d310f9f4bca710961a41e
+          config --skip-version-check --severity HIGH,CRITICAL
+          --skip-dirs /workspace/.git --skip-dirs /workspace/target
+          --exit-code 1 /workspace
       - name: Build Java 21 non-root image
         run: docker build -t inner-cosmos:ci .
-      - name: Gate fixed High and Critical image vulnerabilities
+      - name: Gate High and Critical image vulnerabilities
         run: >-
           docker run --rm
           -v /var/run/docker.sock:/var/run/docker.sock
           aquasec/trivy@sha256:be1190afcb28352bfddc4ddeb71470835d16462af68d310f9f4bca710961a41e
           image --skip-version-check --scanners vuln --severity HIGH,CRITICAL
-          --ignore-unfixed --exit-code 1 inner-cosmos:ci
+          --exit-code 1 inner-cosmos:ci
       - name: Upload test and SBOM evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: java-baseline-evidence
           if-no-files-found: error
           path: |
             target/surefire-reports/
             target/sbom/
+            target/spotbugsXml.xml
