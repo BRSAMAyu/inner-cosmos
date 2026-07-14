@@ -1,0 +1,61 @@
+M1-BASE-001 builder evaluation
+Recorded: 2026-07-15 Asia/Shanghai
+Base SHA: dea0b02f
+Branch: feat/run006-aurora-self-understanding
+
+Outcome
+- Java 21 is now enforced for compilation and verification. The compiled application
+  class uses major version 65.
+- Spring Boot moved from 3.3.6 to the supported 3.5.14 patch line.
+- Maven 3.9.9 and Java 21 are enforced by Maven Enforcer, while the official Maven
+  Wrapper 3.3.4 scripts resolve Maven 3.9.9 consistently on Windows and Linux.
+- Test execution cannot silently disappear: Surefire fails on no tests and CI parses
+  the XML reports, requiring at least 613 tests and zero failure/error/skipped.
+- Verify generates CycloneDX JSON and XML SBOMs plus the executable Boot JAR.
+- Mockito uses an explicit test JVM agent; Boot's generated in-memory user was removed
+  so JWT plus application user tables remain the only identity authority.
+
+Verification
+1. Clean Maven verification
+   Command: .\.tools\apache-maven-3.9.9\bin\mvn.cmd -q clean verify
+   Result: PASS; 82 suites; 648 tests; 0 failures; 0 errors; 0 skipped.
+   Runtime: Oracle JDK 21.0.10; Spring Boot 3.5.14.
+
+2. Produced artifacts
+   - target/inner-cosmos-0.1.0.jar: 74,447,692 bytes
+   - target/sbom/inner-cosmos-0.1.0.json: 225,938 bytes
+   - target/sbom/inner-cosmos-0.1.0.xml: 200,330 bytes
+
+3. Container build and runtime
+   Command: docker build --progress=plain -t inner-cosmos:m1-base .
+   Result: PASS with Eclipse Temurin Java 21 builder and runtime.
+   Image: sha256:e584ee39feeae41d6b12a32e6dc2ce6db97deccdd632482979bbe719ecb9a00f
+   Runtime identity: uid/gid 1001, appuser/appgroup.
+   Dev smoke: GET /actuator/health returned HTTP 200 and {"status":"UP"}; Docker
+   reported healthy. The container ran as appuser and wrote H2 data only to its
+   explicitly owned /app/data directory.
+
+4. Vulnerability closure
+   Scanner: Trivy 0.70.0 container pinned by digest
+   sha256:be1190afcb28352bfddc4ddeb71470835d16462af68d310f9f4bca710961a41e.
+   Initial gate: FAIL, correctly finding fixed High/Critical issues in Alpine,
+   Tomcat 10.1.54, and Jackson 2.21.2.
+   Remediation: runtime apk upgrade, Tomcat 10.1.55, Jackson Databind 2.21.4.
+   Final gate: PASS; Alpine packages 0 and application JAR 0 fixed
+   HIGH/CRITICAL findings under --ignore-unfixed.
+
+5. Innovation preservation
+   No prompt, model routing, Aurora proactive behavior, Self/Constitution/Emergence,
+   personality/relationship evolution, portrait, Capsule, slow-letter, starfield,
+   matching, or psychology product semantics were removed or downgraded.
+   Innovation validation passed 48 scenarios, 4 protected splits and 11 production
+   contracts. Current-tree secret scanning passed with 0 findings.
+
+Acceptance scope
+- BASE-JAVA and BASE-BOOT behavior passes reproducible builder checks, while the
+  complete-product ledger remains IN_PROGRESS until independent review.
+- BASE-SUPPLY remains IN_PROGRESS: SBOM, secret scan and pinned container scan are
+  gated, while full dependency/SAST/IaC closure remains.
+- BASE-IMAGE remains IN_PROGRESS: non-root build and dev smoke pass, but OCI signing
+  and production-profile smoke against its real database are not yet closed.
+- Package status is EVALUATED, not independent VERIFIED.

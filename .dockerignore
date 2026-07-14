@@ -2,7 +2,6 @@
 target/
 build/
 out/
-*.jar
 !mvnw
 !mvnw.cmd
 .mvn/wrapper/MavenWrapperDownloader.java

@@ -1,37 +1,55 @@
 schema_version: 1
 package_id: M1-BASE-001
-status: BLOCKED
-source_sha: 37fdd048a9544458636df50467d60f54d4f2b3c6
+status: EVALUATED
+base_sha: dea0b02f
 branch: feat/run006-aurora-self-understanding
-recorded_at: 2026-07-14T23:06:00+08:00
+recorded_at: 2026-07-15T01:35:00+08:00
 environment:
-  os: Windows 11 10.0 amd64
-  java: Oracle JDK 21.0.10 runtime; Maven compiler release 17
-  maven: Apache Maven 3.9.9
-  spring_boot: 3.3.6
+  os: Windows 11 10.0 amd64; Docker Desktop Linux amd64
+  java_build: Oracle JDK 21.0.10; class major 65
+  java_image: Eclipse Temurin JRE 21.0.11 LTS
+  maven: Apache Maven Wrapper 3.9.9
+  spring_boot: 3.5.14
+  tomcat: 10.1.55
+  jackson_databind: 2.21.4
+  trivy:
+    version: 0.70.0
+    image_digest: sha256:be1190afcb28352bfddc4ddeb71470835d16462af68d310f9f4bca710961a41e
 commands:
-  - command: .\\.tools\\apache-maven-3.9.9\\bin\\mvn.cmd clean test
+  - command: .\\.tools\\apache-maven-3.9.9\\bin\\mvn.cmd -q clean verify
+    result: PASS; 82 suites; 648 tests; 0 failures; 0 errors; 0 skipped
+  - command: .\\scripts\\assert-test-baseline.ps1 -MinimumTests 613
+    result: PASS; Surefire XML baseline enforced
+  - command: docker build --progress=plain -t inner-cosmos:m1-base .
     result: PASS
-    artifact: validation-summary.txt
-    sha256: 9613c7fc23791643018b1677597bf246de530ebf382337ef28947714e2c2007c
+  - command: docker run dev smoke plus GET /actuator/health
+    result: PASS; HTTP 200; status UP; non-root appuser
+  - command: pinned Trivy image scan --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1
+    result: PASS; Alpine 0; application JAR 0
+  - command: python -m evals.cli.main validate
+    result: PASS; 48 scenarios; 4 protected splits; 11 production contracts
   - command: .\\scripts\\scan-secrets.ps1
-    result: PASS
-    artifact: validation-summary.txt
-    sha256: 9613c7fc23791643018b1677597bf246de530ebf382337ef28947714e2c2007c
-  - command: git diff --check
-    result: PASS
-    artifact: validation-summary.txt
-    sha256: 9613c7fc23791643018b1677597bf246de530ebf382337ef28947714e2c2007c
-changes:
-  - Recorded the dependency-gate result without starting the blocked framework upgrade.
-  - Preserved the current passing security baseline and all innovation capabilities.
+    result: PASS; 0 current-tree findings; values never printed
+artifacts:
+  - target/surefire-reports/ (generated, ignored)
+  - target/sbom/inner-cosmos-0.1.0.json (generated, ignored)
+  - target/sbom/inner-cosmos-0.1.0.xml (generated, ignored)
+  - target/inner-cosmos-0.1.0.jar (generated, ignored)
+  - evaluation-summary.txt
+  - validation-summary.txt (historical blocked-gate snapshot)
+acceptance:
+  BASE-JAVA: IN_PROGRESS_PENDING_INDEPENDENT_REVIEW
+  BASE-BOOT: IN_PROGRESS_PENDING_INDEPENDENT_REVIEW
+  BASE-SUPPLY: IN_PROGRESS
+  BASE-IMAGE: IN_PROGRESS
 human_gates:
-  - Authorized provider credential rotation and independent confirmation remain pending in M1-SEC-001.
-  - Independent W0 security review remains pending.
+  - External credential rotation remains BLOCKED in M1-SEC-001; it did not block this reversible migration.
+  - Independent reviewer is required before this package becomes VERIFIED.
 known_limitations:
-  - Spring Boot remains 3.3.6 and Maven compiler release remains Java 17.
-  - No SBOM, dependency vulnerability report, jar, Docker, or container smoke evidence was generated because this package did not start.
+  - OCI signing and production-profile database smoke are not complete.
+  - The complete supply gate still needs dependency, SAST, IaC, and provenance/signature closure beyond the current SBOM, secret, and image scan gates.
+  - The checked-in workflow is locally inspected but has not yet run on a hosted GitHub runner.
 review:
   status: PENDING
   reviewer: UNASSIGNED
-rollback: No baseline implementation change was made; preserve the verified security commits.
+rollback: Revert the package commit; no domain schema or innovation semantics changed.

@@ -1,0 +1,50 @@
+name: Java baseline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Validate Maven wrapper
+        run: ./mvnw -v
+      - name: Clean verify
+        run: ./mvnw -B clean verify
+      - name: Enforce executed test baseline
+        shell: pwsh
+        run: ./scripts/assert-test-baseline.ps1 -MinimumTests 613
+      - name: Scan current tree for credentials
+        shell: pwsh
+        run: ./scripts/scan-secrets.ps1
+      - name: Build Java 21 non-root image
+        run: docker build -t inner-cosmos:ci .
+      - name: Gate fixed High and Critical image vulnerabilities
+        run: >-
+          docker run --rm
+          -v /var/run/docker.sock:/var/run/docker.sock
+          aquasec/trivy@sha256:be1190afcb28352bfddc4ddeb71470835d16462af68d310f9f4bca710961a41e
+          image --skip-version-check --scanners vuln --severity HIGH,CRITICAL
+          --ignore-unfixed --exit-code 1 inner-cosmos:ci
+      - name: Upload test and SBOM evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: java-baseline-evidence
+          if-no-files-found: error
+          path: |
+            target/surefire-reports/
+            target/sbom/

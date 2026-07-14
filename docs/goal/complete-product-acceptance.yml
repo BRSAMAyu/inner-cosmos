@@ -69,14 +69,13 @@ gates:
 
   - id: G1
     name: Modern platform baseline
-    status: BLOCKED
+    status: IN_PROGRESS
     required: true
-    blocker: HG-SECRET-ROTATION
     acceptance:
-      - {id: BASE-JAVA, target: "Java 21 is both compile and runtime baseline.", status: UNASSESSED, evidence: []}
-      - {id: BASE-BOOT, target: "Spring Boot 3.5 supported patch baseline passes the full suite.", status: UNASSESSED, evidence: []}
-      - {id: BASE-SUPPLY, target: "SBOM, dependency, SAST, secret, IaC, and container scans are gated.", status: UNASSESSED, evidence: []}
-      - {id: BASE-IMAGE, target: "Signed non-root minimal OCI image passes production-profile smoke.", status: UNASSESSED, evidence: []}
+      - {id: BASE-JAVA, target: "Java 21 is both compile and runtime baseline.", status: IN_PROGRESS, evidence: [evidence/m1/M1-BASE-001/]}
+      - {id: BASE-BOOT, target: "Spring Boot 3.5 supported patch baseline passes the full suite.", status: IN_PROGRESS, evidence: [evidence/m1/M1-BASE-001/]}
+      - {id: BASE-SUPPLY, target: "SBOM, dependency, SAST, secret, IaC, and container scans are gated.", status: IN_PROGRESS, evidence: [evidence/m1/M1-BASE-001/]}
+      - {id: BASE-IMAGE, target: "Signed non-root minimal OCI image passes production-profile smoke.", status: IN_PROGRESS, evidence: [evidence/m1/M1-BASE-001/]}
 
   - id: G2
     name: Contracts, data, and runtime roles
