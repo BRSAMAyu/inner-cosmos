@@ -1,11 +1,14 @@
 package com.innercosmos.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
+import com.innercosmos.common.ErrorCode;
 import com.innercosmos.ai.client.LlmClient;
 import com.innercosmos.ai.client.LlmRequest;
 import com.innercosmos.entity.AuroraSelfModel;
 import com.innercosmos.entity.AuroraSelfReflection;
 import com.innercosmos.entity.AuroraSelfStatement;
+import com.innercosmos.exception.BusinessException;
 import com.innercosmos.mapper.AuroraSelfModelMapper;
 import com.innercosmos.mapper.AuroraSelfReflectionMapper;
 import com.innercosmos.mapper.AuroraSelfStatementMapper;
@@ -145,13 +148,16 @@ public class AuroraSelfContinuityServiceImpl implements AuroraSelfContinuityServ
     public void commitToModel(Long userId, Long candidateId,
                               boolean userConfirmed, List<String> extraEvidence) {
         AuroraSelfReflection candidate = reflectionMapper.selectById(candidateId);
-        if (candidate == null) {
-            throw new RuntimeException("Candidate not found: " + candidateId);
+        if (candidate == null || userId == null || !userId.equals(candidate.userId)) {
+            throw opaqueSelfResourceNotFound();
+        }
+        if (!"candidate".equalsIgnoreCase(candidate.status)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "候选状态不可提交");
         }
 
         String belief = candidate.proposedBelief;
         if (!isAllowedBelief(belief)) {
-            throw new RuntimeException("Belief violates hard boundaries: " + belief);
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "候选内容违反 Aurora Self 安全边界");
         }
 
         // If dimension already has active belief, retire it
@@ -178,8 +184,14 @@ public class AuroraSelfContinuityServiceImpl implements AuroraSelfContinuityServ
         modelMapper.insert(model);
 
         // Update candidate status to committed
-        candidate.status = "committed";
-        reflectionMapper.updateById(candidate);
+        int committed = reflectionMapper.update(null, new UpdateWrapper<AuroraSelfReflection>()
+                .eq("id", candidateId)
+                .eq("user_id", userId)
+                .eq("status", "candidate")
+                .set("status", "committed"));
+        if (committed != 1) {
+            throw opaqueSelfResourceNotFound();
+        }
     }
 
     // Read: Active self model
@@ -321,11 +333,16 @@ public class AuroraSelfContinuityServiceImpl implements AuroraSelfContinuityServ
     @Transactional
     public void retireModel(Long userId, Long modelId) {
         AuroraSelfModel model = modelMapper.selectById(modelId);
-        if (model == null || !model.userId.equals(userId)) {
-            throw new RuntimeException("Model not found or access denied: " + modelId);
+        if (model == null || userId == null || !userId.equals(model.userId)) {
+            throw opaqueSelfResourceNotFound();
         }
-        model.status = "retired";
-        modelMapper.updateById(model);
+        if ("retired".equalsIgnoreCase(model.status)) return;
+        int retired = modelMapper.update(null, new UpdateWrapper<AuroraSelfModel>()
+                .eq("id", modelId)
+                .eq("user_id", userId)
+                .eq("status", "active")
+                .set("status", "retired"));
+        if (retired != 1) throw opaqueSelfResourceNotFound();
     }
 
     // Dismiss a candidate (user rejection — spec Section 七)
@@ -333,11 +350,16 @@ public class AuroraSelfContinuityServiceImpl implements AuroraSelfContinuityServ
     @Transactional
     public void dismissCandidate(Long userId, Long candidateId) {
         AuroraSelfReflection candidate = reflectionMapper.selectById(candidateId);
-        if (candidate == null || !candidate.userId.equals(userId)) {
-            throw new RuntimeException("Candidate not found or access denied: " + candidateId);
+        if (candidate == null || userId == null || !userId.equals(candidate.userId)) {
+            throw opaqueSelfResourceNotFound();
         }
-        candidate.status = "dismissed";
-        reflectionMapper.updateById(candidate);
+        if ("dismissed".equalsIgnoreCase(candidate.status)) return;
+        int dismissed = reflectionMapper.update(null, new UpdateWrapper<AuroraSelfReflection>()
+                .eq("id", candidateId)
+                .eq("user_id", userId)
+                .eq("status", "candidate")
+                .set("status", "dismissed"));
+        if (dismissed != 1) throw opaqueSelfResourceNotFound();
     }
 
     // Check if a belief is allowed (hard boundary check)
@@ -358,5 +380,9 @@ public class AuroraSelfContinuityServiceImpl implements AuroraSelfContinuityServ
             log.warn("Failed to serialize JSON: {}", e.getMessage());
             return "[]";
         }
+    }
+
+    private BusinessException opaqueSelfResourceNotFound() {
+        return new BusinessException(ErrorCode.NOT_FOUND, "Aurora Self 资源不存在或不可访问");
     }
 }
