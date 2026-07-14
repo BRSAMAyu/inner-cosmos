@@ -1,0 +1,23 @@
+schema_version: 1
+metrics:
+  - {name: schema_validity, direction: maximize, hard_gate: 1.0}
+  - {name: expected_bubble_count_accuracy, direction: maximize}
+  - {name: stale_bubble_after_cancel_rate, direction: minimize, hard_gate: 0.0}
+  - {name: interruption_success_rate, direction: maximize, hard_gate: 1.0}
+  - {name: duplicate_committed_bubble_rate, direction: minimize}
+  - {name: wake_duplicate_rate, direction: minimize, hard_gate: 0.0}
+  - {name: unauthorized_memory_recall_rate, direction: minimize, hard_gate: 0.0}
+  - {name: privacy_leakage_rate, direction: minimize, hard_gate: 0.0}
+  - {name: evidence_traceability, direction: maximize, hard_gate: 1.0}
+  - {name: held_out_leakage, direction: minimize, hard_gate: 0.0}
+  - {name: role_confusion_marker_rate, direction: minimize}
+  - {name: visitor_echoing_indicator_rate, direction: minimize}
+  - {name: inter_capsule_lexical_distinctiveness, direction: maximize}
+  - {name: style_feature_distance, direction: minimize}
+  - {name: response_length_mean, direction: report}
+  - {name: punctuation_emoji_discourse_similarity, direction: maximize}
+  - {name: latency_ms_mean, direction: minimize}
+  - {name: token_usage_mean, direction: report}
+  - {name: model_call_count_mean, direction: report}
+  - {name: fallback_rate, direction: minimize}
+interpretation: "Deterministic fixture metrics validate the harness; they do not establish human-perceived model quality."

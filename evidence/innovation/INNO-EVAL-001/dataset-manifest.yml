@@ -1,0 +1,29 @@
+schema_version: 1
+dataset_id: inner-cosmos-innovation-synthetic-v1
+version: 1.0.0
+scenario_count: 48
+families:
+  aurora_rhythm: 6
+  interruption: 6
+  proactive_time: 7
+  aurora_self: 6
+  memory: 7
+  capsule_fidelity: 10
+  privacy_boundary: 6
+splits:
+  compiler_train: {count: 3, purpose: "compiler-only synthetic examples"}
+  development: {count: 12, purpose: "metric and adapter development"}
+  held_out_trajectory: {count: 11, purpose: "unseen continuity, memory and capsule trajectories"}
+  adversarial: {count: 22, purpose: "cancellation, privacy, role and boundary attacks"}
+sources:
+  - {id: synthetic-v1, origin: "human-authored synthetic scenarios", sensitivity: SYNTHETIC, license: "project-internal evaluation"}
+  - {id: demo-contract-v1, origin: "documented project demo behavior; no database export", sensitivity: PUBLIC_DEMO, license: "project-owned"}
+prohibited_data:
+  - P0 raw conversation
+  - unconsented user persona
+  - provider secret
+  - production database export
+leakage_policy:
+  held_out_in_prompt_policy_genome_compiler: forbidden
+  adversarial_in_normal_training_or_tuning: forbidden
+  machine_gate: ai-lab/evals/datasets/loader.py

@@ -1,0 +1,123 @@
+[
+  {
+    "id": "single-prompt",
+    "version": "offline-baseline-v1",
+    "availability": "AVAILABLE_OFFLINE_FIXTURE",
+    "provider": "offline-fixture",
+    "model": "none",
+    "prompt_version": "offline-baseline-v1",
+    "policy_version": "offline-baseline-v1",
+    "genome_version": null,
+    "blocked_reason": null
+  },
+  {
+    "id": "long-persona-prompt",
+    "version": "offline-baseline-v1",
+    "availability": "AVAILABLE_OFFLINE_FIXTURE",
+    "provider": "offline-fixture",
+    "model": "none",
+    "prompt_version": "offline-baseline-v1",
+    "policy_version": "offline-baseline-v1",
+    "genome_version": null,
+    "blocked_reason": null
+  },
+  {
+    "id": "structured-context",
+    "version": "offline-baseline-v1",
+    "availability": "AVAILABLE_OFFLINE_FIXTURE",
+    "provider": "offline-fixture",
+    "model": "none",
+    "prompt_version": "offline-baseline-v1",
+    "policy_version": "offline-baseline-v1",
+    "genome_version": null,
+    "blocked_reason": null
+  },
+  {
+    "id": "current-production-contract",
+    "version": "source-contract-v1",
+    "availability": "AVAILABLE_CONTRACT_FIXTURE",
+    "provider": "offline-fixture",
+    "model": "none",
+    "prompt_version": "production-contract-observed",
+    "policy_version": "production-contract-observed",
+    "genome_version": null,
+    "blocked_reason": null
+  },
+  {
+    "id": "current-production-mock",
+    "version": "registered-not-run",
+    "availability": "REGISTERED_NOT_RUN",
+    "provider": "mock",
+    "model": "project-mock",
+    "prompt_version": "production",
+    "policy_version": "production",
+    "genome_version": null,
+    "blocked_reason": "NO_RUNTIME_CAPTURE_IN_THIS_PACKAGE"
+  },
+  {
+    "id": "current-production-historical-fixture",
+    "version": "registered-no-data",
+    "availability": "REGISTERED_NOT_RUN",
+    "provider": "historical-fixture",
+    "model": "unknown",
+    "prompt_version": "unknown",
+    "policy_version": "unknown",
+    "genome_version": null,
+    "blocked_reason": "NO_APPROVED_REDACTED_FIXTURE_AVAILABLE"
+  },
+  {
+    "id": "structured-genome",
+    "version": "not-implemented",
+    "availability": "UNAVAILABLE",
+    "provider": "none",
+    "model": "none",
+    "prompt_version": "none",
+    "policy_version": "none",
+    "genome_version": null,
+    "blocked_reason": "SYSTEM_NOT_IMPLEMENTED"
+  },
+  {
+    "id": "planner-speaker",
+    "version": "not-implemented",
+    "availability": "UNAVAILABLE",
+    "provider": "none",
+    "model": "none",
+    "prompt_version": "none",
+    "policy_version": "none",
+    "genome_version": null,
+    "blocked_reason": "SYSTEM_NOT_IMPLEMENTED"
+  },
+  {
+    "id": "planner-speaker-critics",
+    "version": "not-implemented",
+    "availability": "UNAVAILABLE",
+    "provider": "none",
+    "model": "none",
+    "prompt_version": "none",
+    "policy_version": "none",
+    "genome_version": null,
+    "blocked_reason": "SYSTEM_NOT_IMPLEMENTED"
+  },
+  {
+    "id": "full-compiler-nbest-reranker",
+    "version": "not-implemented",
+    "availability": "UNAVAILABLE",
+    "provider": "none",
+    "model": "none",
+    "prompt_version": "none",
+    "policy_version": "none",
+    "genome_version": null,
+    "blocked_reason": "SYSTEM_NOT_IMPLEMENTED"
+  },
+  {
+    "id": "current-production-real-provider",
+    "version": "not-run",
+    "availability": "BLOCKED",
+    "provider": "not-selected",
+    "model": "not-selected",
+    "prompt_version": "production",
+    "policy_version": "production",
+    "genome_version": null,
+    "blocked_reason": "BLOCKED_BY_CREDENTIAL_GATE"
+  }
+]

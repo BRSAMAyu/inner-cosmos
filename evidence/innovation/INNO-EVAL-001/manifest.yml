@@ -1,0 +1,44 @@
+schema_version: 1
+package_id: INNO-EVAL-001
+status: IMPLEMENTED
+source_sha: 75877171bbd82a32980233b17860b457d02dc97e
+branch: feat/run006-aurora-self-understanding
+recorded_at: 2026-07-14T23:55:00+08:00
+configuration:
+  provider: offline-fixture
+  model: none
+  prompt_version: production-contract-observed
+  policy_version: production-contract-observed
+  genome_version: null
+  temperature: 0.0
+  seed: 20260714
+  input_splits: [compiler_train, development, held_out_trajectory, adversarial]
+commands:
+  - {command: "python -m unittest discover -s tests -v", result: PASS, summary: "35 tests"}
+  - {command: "python -m evals.cli.main validate", result: PASS, summary: "48 scenarios; 4 splits; schema and leakage gates"}
+  - {command: "python -m evals.cli.main run --output ../evidence/innovation/INNO-EVAL-001", result: PASS, summary: "48 runs; 20 metrics; hard gates pass"}
+  - {command: ".\\.tools\\apache-maven-3.9.9\\bin\\mvn.cmd test", result: PASS, summary: "638 tests; 0 failures; 0 errors; 0 skipped"}
+artifacts:
+  - {path: environment.txt, sha256: a886b972756f2774443e440439f7c7eb9a55f37552b1d51a490c65a46843f82c}
+  - {path: baseline-summary.md, sha256: 5480d44c218e2dd783428ceabd8c53e5695921074fc9ce315fc8523e00800978}
+  - {path: dataset-manifest.yml, sha256: 00339e1bb667af35a2b1d422a768d0ab9771ed1c2b52aec83d9049b7abecf05e}
+  - {path: metric-definition.yml, sha256: 39733aea970185d5dbb32a564badf0dfbc193e933012768dd629532aa59ccbd7}
+  - {path: test-summary.txt, sha256: 8b5d426b345669b3f1936b55740337e739b1a75ee609e65fa832db4dd06c31c6}
+  - {path: sample-report.json, sha256: 724358e81056f0c0bbf0b55d6558ff8ff47ce09edf5ece635a5201cb43ec5832}
+  - {path: sample-report.md, sha256: c7443ff2eecabb116b5079756255d223c9a1cdf48b8999fb5bf4ab79965fb7b8}
+  - {path: known-limitations.md, sha256: 15f7d6202f9bd45b647f41404f721716e49cdd91f6e48ac34dcc12fea30b2015}
+  - {path: human-review-status.md, sha256: d158b78bc865a888fc1ba55db617392ec0f9c564257f93b9b2b704716faa9054}
+  - {path: human-pairwise-template.csv, sha256: 41fd16418897562986eda6133c4fab447b4fc443f0e99ce6f84b5aa8d0f32ca5}
+  - {path: judge-status.json, sha256: 196504ee03430ff23305c064490d5dbd284bb58eba8398cc59ada3f425ab87f1}
+  - {path: system-registry.json, sha256: d08f8bf82ed0a4e80afa503a4594ab8311f2535aec279e905c478ec4695f8d11}
+review:
+  status: PENDING
+  reviewer: UNASSIGNED
+human_gates:
+  - Provider credential revocation and rotation remains BLOCKED in M1-SEC-001.
+  - Real persona authorization and blind human review remain pending.
+claims_not_made:
+  - real Provider quality baseline
+  - real-user Persona fidelity
+  - candidate system superiority
+  - dual-kernel or Psychology Skill effect

@@ -1,0 +1,12 @@
+INNO-EVAL-001 environment
+Recorded at: 2026-07-14T23:55:00+08:00
+OS: Windows 11 10.0.26200 amd64
+Java runtime: Oracle JDK 21.0.10
+Maven: Apache Maven 3.9.9
+Spring Boot production baseline: 3.3.6
+Python: CPython 3.12.7
+Python runtime dependencies: standard library only
+Branch: feat/run006-aurora-self-understanding
+Harness source SHA: 75877171bbd82a32980233b17860b457d02dc97e
+Provider credentials used: none
+Real user data used: none

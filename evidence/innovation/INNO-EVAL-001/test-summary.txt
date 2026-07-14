@@ -1,0 +1,20 @@
+INNO-EVAL-001 validation summary
+Branch: feat/run006-aurora-self-understanding
+Harness source SHA: 75877171bbd82a32980233b17860b457d02dc97e
+
+Pre-implementation W0 gate:
+- mvn clean test: PASS; 638 tests, 0 failures, 0 errors, 0 skipped
+- current-tree secret scan: PASS; 0 findings
+- git diff --check: PASS
+
+Harness validation:
+- python -m unittest discover -s tests -v: PASS; 35 tests
+- python -m evals.cli.main validate: PASS; 48 scenarios, 4 splits, 11 production contracts
+- python -m evals.cli.main run: PASS; 48 runs, 20 metrics, all deterministic hard gates PASS
+- Provider calls: 0
+- Estimated Provider cost: USD 0.00
+
+Final regression and repository checks:
+- .\.tools\apache-maven-3.9.9\bin\mvn.cmd test: PASS; 638 tests, 0 failures, 0 errors, 0 skipped
+- .\scripts\scan-secrets.ps1: PASS; 0 findings
+- git diff --check: PASS

@@ -1,0 +1,25 @@
+[
+  {
+    "scenario_id": "A01",
+    "judge_type": "deterministic-offline",
+    "status": "COMPLETED",
+    "judge_model": null,
+    "judge_version": "offline-rules-v1",
+    "prompt_version": null,
+    "scores": {
+      "has_committed_output_or_silence": 1.0,
+      "evidence_traceability": 1.0
+    },
+    "rationale": "Rule-based structural checks only; not a quality preference judgment."
+  },
+  {
+    "scenario_id": "A01",
+    "judge_type": "optional-llm",
+    "status": "NOT_RUN",
+    "judge_model": null,
+    "judge_version": "llm-judge-interface-v1",
+    "prompt_version": "judge-rubric-v1",
+    "scores": {},
+    "rationale": "No approved provider adapter/credential; no Mock fallback was used."
+  }
+]

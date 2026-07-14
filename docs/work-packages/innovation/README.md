@@ -2,7 +2,7 @@
 
 > Authority: `对齐文档/08-Aurora生命感与共鸣智能创新架构.md`  
 > Purpose: 将 Aurora、记忆、画像、共鸣体、心理 Skill 与 Wow Demo 拆成可被 Coding Agent 领取的实现单元。  
-> Status: PROPOSED；W0 安全基线完成后逐包进入 READY。  
+> Status: Registry PROPOSED；`INNO-EVAL-001` 已 IMPLEMENTED、待独立复核，其余包按依赖逐包进入 READY。
 > Concurrency: 同时最多 4 个 Builder，且 Owned Paths 不重叠。
 
 ---
@@ -57,6 +57,9 @@ PROPOSED → READY → CLAIMED → IMPLEMENTED → EVALUATED → VERIFIED → IN
 ## 3. Package Definitions
 
 ### INNO-EVAL-001 — Innovation Evaluation Harness
+
+**Status**：`IMPLEMENTED`（Builder 自测完成；`VERIFIED` 需要不同 reviewer）
+**Evidence**：`evidence/innovation/INNO-EVAL-001/`
 
 **Objective**：在重构前冻结 Aurora 与共鸣体真实行为，并建立可重复比较的质量基线。
 
