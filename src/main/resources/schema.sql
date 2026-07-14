@@ -116,6 +116,111 @@ CREATE TABLE IF NOT EXISTS tb_dialog_message (
   CONSTRAINT fk_message_session FOREIGN KEY (session_id) REFERENCES tb_dialog_session(id) ON DELETE CASCADE
 );
 
+-- INNO-CONV-001: durable, replayable Aurora turn choreography.  The unique
+-- user-message and turn/version keys are the database authority across replicas.
+CREATE TABLE IF NOT EXISTS tb_conversation_turn (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  session_id BIGINT NOT NULL,
+  user_id BIGINT NOT NULL,
+  user_message_id BIGINT NOT NULL,
+  active_plan_id BIGINT,
+  status VARCHAR(32) NOT NULL,
+  next_event_sequence INT NOT NULL DEFAULT 1,
+  started_at TIMESTAMP NULL,
+  completed_at TIMESTAMP NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_conversation_turn_user_message (user_message_id),
+  INDEX idx_conversation_turn_owner (user_id, id),
+  INDEX idx_conversation_turn_session (session_id),
+  CONSTRAINT fk_conversation_turn_session FOREIGN KEY (session_id) REFERENCES tb_dialog_session(id) ON DELETE CASCADE,
+  CONSTRAINT fk_conversation_turn_user_message FOREIGN KEY (user_message_id) REFERENCES tb_dialog_message(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS tb_turn_plan (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  turn_id BIGINT NOT NULL,
+  user_id BIGINT NOT NULL,
+  plan_version INT NOT NULL,
+  commit_slot INT,
+  status VARCHAR(32) NOT NULL,
+  intent VARCHAR(160),
+  posture VARCHAR(160),
+  stop_condition VARCHAR(64),
+  committed_at TIMESTAMP NULL,
+  cancelled_at TIMESTAMP NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_turn_plan_version (turn_id, plan_version),
+  UNIQUE KEY uk_turn_plan_single_commit (turn_id, commit_slot),
+  INDEX idx_turn_plan_owner (user_id, turn_id),
+  CONSTRAINT ck_turn_plan_commit_slot CHECK ((status = 'COMMITTED' AND commit_slot = 1) OR (status <> 'COMMITTED' AND commit_slot IS NULL)),
+  CONSTRAINT fk_turn_plan_turn FOREIGN KEY (turn_id) REFERENCES tb_conversation_turn(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS tb_message_bubble (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  turn_id BIGINT NOT NULL,
+  plan_id BIGINT NOT NULL,
+  user_id BIGINT NOT NULL,
+  dialog_message_id BIGINT,
+  bubble_order INT NOT NULL,
+  purpose VARCHAR(64) NOT NULL,
+  content TEXT NOT NULL,
+  status VARCHAR(32) NOT NULL,
+  send_after_ms INT NOT NULL DEFAULT 0,
+  requires_no_interruption BOOLEAN NOT NULL DEFAULT FALSE,
+  planned_at TIMESTAMP NULL,
+  sent_at TIMESTAMP NULL,
+  cancelled_at TIMESTAMP NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_message_bubble_order (plan_id, bubble_order),
+  UNIQUE KEY uk_message_bubble_dialog (dialog_message_id),
+  INDEX idx_message_bubble_owner (user_id, turn_id),
+  CONSTRAINT fk_message_bubble_turn FOREIGN KEY (turn_id) REFERENCES tb_conversation_turn(id) ON DELETE CASCADE,
+  CONSTRAINT fk_message_bubble_plan FOREIGN KEY (plan_id) REFERENCES tb_turn_plan(id) ON DELETE CASCADE,
+  CONSTRAINT fk_message_bubble_dialog FOREIGN KEY (dialog_message_id) REFERENCES tb_dialog_message(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS tb_conversation_event (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  turn_id BIGINT NOT NULL,
+  plan_id BIGINT,
+  bubble_id BIGINT,
+  user_id BIGINT NOT NULL,
+  event_sequence INT NOT NULL,
+  event_type VARCHAR(64) NOT NULL,
+  causation_id VARCHAR(96),
+  payload_json TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_conversation_event_sequence (turn_id, event_sequence),
+  INDEX idx_conversation_event_owner (user_id, turn_id),
+  CONSTRAINT fk_conversation_event_turn FOREIGN KEY (turn_id) REFERENCES tb_conversation_turn(id) ON DELETE CASCADE,
+  CONSTRAINT fk_conversation_event_plan FOREIGN KEY (plan_id) REFERENCES tb_turn_plan(id) ON DELETE CASCADE,
+  CONSTRAINT fk_conversation_event_bubble FOREIGN KEY (bubble_id) REFERENCES tb_message_bubble(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS tb_generation_attempt (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  turn_id BIGINT NOT NULL,
+  plan_id BIGINT NOT NULL,
+  user_id BIGINT NOT NULL,
+  attempt_number INT NOT NULL,
+  status VARCHAR(32) NOT NULL,
+  provider VARCHAR(64),
+  model_name VARCHAR(128),
+  started_at TIMESTAMP NULL,
+  completed_at TIMESTAMP NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_generation_attempt (turn_id, attempt_number),
+  INDEX idx_generation_attempt_owner (user_id, turn_id),
+  CONSTRAINT fk_generation_attempt_turn FOREIGN KEY (turn_id) REFERENCES tb_conversation_turn(id) ON DELETE CASCADE,
+  CONSTRAINT fk_generation_attempt_plan FOREIGN KEY (plan_id) REFERENCES tb_turn_plan(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS tb_memory_card (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT NOT NULL,

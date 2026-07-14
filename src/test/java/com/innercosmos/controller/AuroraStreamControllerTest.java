@@ -65,6 +65,13 @@ class AuroraStreamControllerTest {
                 "expected streamed token content; got:\n" + body);
         // Meta event closes the stream.
         assertTrue(body.contains("event:meta"), "expected meta event; got:\n" + body);
+        // INNO-CONV-001: explicit lifecycle types and replay/correlation IDs are
+        // additive; unnamed content deltas above remain for the existing client.
+        assertTrue(body.contains("event:turn.plan"), "expected durable turn plan event; got:\n" + body);
+        assertTrue(body.contains("event:bubble.started"), "expected bubble start event; got:\n" + body);
+        assertTrue(body.contains("event:bubble.completed"), "expected bubble completion event; got:\n" + body);
+        assertTrue(body.contains("event:turn.completed"), "expected turn completion event; got:\n" + body);
+        assertTrue(body.contains("id:"), "every lifecycle stream must expose event IDs; got:\n" + body);
         // And it ends cleanly.
         assertTrue(body.contains("event:done") || body.contains("data:{\"message\":\"done\"}"),
                 "expected done event; got:\n" + body);

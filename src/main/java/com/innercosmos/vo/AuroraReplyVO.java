@@ -4,6 +4,9 @@ import java.util.Map;
 import java.util.List;
 
 public class AuroraReplyVO {
+    /** Durable choreography identity (INNO-CONV-001). */
+    public Long turnId;
+    public Long planId;
     public List<String> messages;
     public String replyTone;
     public String detectedTheme;

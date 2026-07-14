@@ -1,0 +1,44 @@
+INNO-CONV-001 builder verification summary
+Date: 2026-07-15 Asia/Shanghai
+Base SHA: e903776f372070dd09cc99bbfa226bc704697cfb
+Branch: feat/run006-aurora-self-understanding
+
+1. Compile
+   Command: .\.tools\apache-maven-3.9.9\bin\mvn.cmd -q -DskipTests compile
+   Result: PASS
+
+2. Focused choreography and innovation regression
+   Command: .\.tools\apache-maven-3.9.9\bin\mvn.cmd -q "-Dtest=ConversationChoreographyIntegrationTest,AuroraStreamServiceTest,AuroraEmergenceTest" test
+   Result: PASS; 10 tests; 0 failures; 0 errors; 0 skipped
+
+3. HTTP/SSE and core-flow regression
+   Command: .\.tools\apache-maven-3.9.9\bin\mvn.cmd -q "-Dtest=ConversationChoreographyIntegrationTest,AuroraStreamControllerTest,ApplicationFlowTest" test
+   Result: PASS; 14 tests; 0 failures; 0 errors; 0 skipped
+   Note: Surefire reported its pre-existing 30-second fork-JVM shutdown warning after successful test completion; Maven exit code was 0 and all three reports were green.
+
+4. Full Java baseline
+   Command: .\.tools\apache-maven-3.9.9\bin\mvn.cmd -q test
+   Runtime: Java 21.0.10 LTS
+   Result: PASS; 81 suites; 642 tests; 0 failures; 0 errors; 0 skipped
+
+5. Innovation source-contract validation
+   Working directory: ai-lab
+   Command: python -m evals.cli.main validate
+   Result: PASS; 48 scenarios; 4 protected splits; 11 production contracts
+   Preserved contracts include multi-message, proactive, PrivateTimer, Constitution,
+   Reflection, Self Model, Emergence trigger, User Portrait and Capsule Agent.
+
+6. Repository whitespace check
+   Command: git diff --check
+   Result: PASS (line-ending conversion notices only)
+
+7. Current-tree secret scan
+   Command: .\scripts\scan-secrets.ps1
+   Result: PASS; 0 findings; values not printed
+
+AI behavior/cost statement:
+- Provider calls added by this package: 0
+- Prompt or sampling changes: 0
+- Additional model cost: USD 0.00 by construction
+- Quality semantics: unchanged adapter path; source-contract and full regression gates pass
+- Added runtime work: transactional relational writes per completed turn and owner-scoped reads on demand; no production latency benchmark is claimed yet

@@ -2,8 +2,8 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 authority: goal-objective.md
 status: IN_PROGRESS
-last_reconciled_at: null
-last_reconciled_commit: null
+last_reconciled_at: 2026-07-15T00:34:00+08:00
+last_reconciled_commit: e903776f372070dd09cc99bbfa226bc704697cfb
 
 status_semantics:
   UNASSESSED: current HEAD and target environment have not been verified
@@ -104,11 +104,11 @@ gates:
 
   - id: G4
     name: Aurora living mind
-    status: UNASSESSED
+    status: IN_PROGRESS
     required: true
     acceptance:
       - {id: AURORA-DUAL-KERNEL, target: "Fast and slow kernels plus context assembly show measured benefit over the single-pass baseline.", status: UNASSESSED, evidence: []}
-      - {id: AURORA-CHOREOGRAPHY, target: "Typed multi-message, pause, stop, interrupt, replan, and reconnect behavior works end to end.", status: UNASSESSED, evidence: []}
+      - {id: AURORA-CHOREOGRAPHY, target: "Typed multi-message, pause, stop, interrupt, replan, and reconnect behavior works end to end.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CONV-001/]}
       - {id: AURORA-TEMPORAL, target: "Durable WakeIntent scheduling respects timezone, quiet hours, relevance, risk, and user controls.", status: UNASSESSED, evidence: []}
       - {id: AURORA-SELF, target: "Self, Constitution, Relationship State, and Emergence are versioned, evaluated, observable, and rollbackable.", status: UNASSESSED, evidence: []}
       - {id: AURORA-QUALITY, target: "Blind longitudinal evaluation passes empathy, continuity, proactive appropriateness, and recovery thresholds.", status: UNASSESSED, evidence: []}

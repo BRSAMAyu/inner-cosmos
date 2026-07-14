@@ -17,6 +17,8 @@ import com.innercosmos.ai.structured.StructuredAiResults;
 import com.innercosmos.ai.structured.StructuredAiService;
 import com.innercosmos.ai.portrait.PortraitReflectionService;
 import com.innercosmos.config.LlmConfig;
+import com.innercosmos.conversation.service.ConversationChoreographyService;
+import com.innercosmos.conversation.vo.TurnTimelineVO;
 import com.innercosmos.dto.ChatRequest;
 import com.innercosmos.entity.AgentUserRelationship;
 import com.innercosmos.entity.DialogMessage;
@@ -87,6 +89,9 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     private com.innercosmos.service.PromptVersionService promptVersionService; // M-052
     @Autowired(required = false)
     private com.innercosmos.service.EmotionBaselineService emotionBaselineService;
+    /** Optional only for constructor-level legacy unit tests; Spring always wires it. */
+    @Autowired(required = false)
+    private ConversationChoreographyService choreographyService;
     private final Map<Long, Integer> turnCounter = new ConcurrentHashMap<>();
     private final Map<Long, Integer> goodbyeConfirmCount = new ConcurrentHashMap<>();
     /**
@@ -150,11 +155,11 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         // SAFETY FIRST (VS-003 §1): synchronous safety gate before any model call.
         // recheckSync for distress-bearing messages also completes here, synchronously.
         SafetyResult safety = safetyService.check(request.message, userId, request.sessionId);
-        dialogService.saveUserMessage(userId, request);
+        DialogMessage userMessage = dialogService.saveUserMessage(userId, request);
         if (Boolean.TRUE.equals(safety.blockModelCall)) {
-            return blockedReply(userId, request, safety);
+            return blockedReply(userId, request, safety, userMessage == null ? null : userMessage.id);
         }
-        return produceReply(userId, request, safety);
+        return produceReply(userId, request, safety, userMessage == null ? null : userMessage.id);
     }
 
     /**
@@ -163,7 +168,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
      * this is called — do not re-run it here. Saves Aurora's messages and runs the
      * portrait/goodbye post-hooks exactly as before.
      */
-    private AuroraReplyVO produceReply(Long userId, ChatRequest request, SafetyResult safety) {
+    private AuroraReplyVO produceReply(Long userId, ChatRequest request, SafetyResult safety, Long userMessageId) {
         // M7: Hard boundary protection — right to refuse identity violation
         String boundaryRefusal = checkHardBoundaries(request.message, userId);
         if (boundaryRefusal != null) {
@@ -182,7 +187,9 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             vo.riskFlags = List.of("IDENTITY_BOUNDARY_TRIGGERED");
             vo.agentLoop = Map.of("speakCount", 1, "continueReason", "boundary-refusal", "mode", normalizeMode(request.mode), "modeLabel", modeLabel(normalizeMode(request.mode)));
             vo.aiState = aiState(null);
-            dialogService.saveAuroraMessage(userId, request.sessionId, boundaryRefusal);
+            DialogMessage saved = dialogService.saveAuroraMessage(userId, request.sessionId, boundaryRefusal);
+            recordChoreography(userId, request.sessionId, userMessageId, vo,
+                    saved == null ? List.of() : List.of(saved));
             return vo;
         }
 
@@ -279,9 +286,11 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         }
         // Tag the response with the resolved provider/model for the UI
         vo.aiState = aiState(resolved);
+        List<DialogMessage> persistedBubbles = new ArrayList<>();
         for (String msg : vo.messages) {
-            dialogService.saveAuroraMessage(userId, request.sessionId, msg);
+            persistedBubbles.add(dialogService.saveAuroraMessage(userId, request.sessionId, msg));
         }
+        recordChoreography(userId, request.sessionId, userMessageId, vo, persistedBubbles);
         // Portrait reflection hook: every 5 turns, analyze and update user portrait.
         // M-045: atomic compute — increment, threshold check, and reset in one op so concurrent
         // turns for the same user can't double-fire or skip the reflection.
@@ -408,20 +417,35 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                     request.longitude = richContext.longitude;
                     request.aiProviderPreference = richContext.aiProviderPreference;
                 }
-                dialogService.saveUserMessage(userId, request);
-                AuroraReplyVO reply = produceReply(userId, request, safety);
+                DialogMessage userMessage = dialogService.saveUserMessage(userId, request);
+                AuroraReplyVO reply = produceReply(userId, request, safety,
+                        userMessage == null ? null : userMessage.id);
+
+                long eventSequence = 1L;
+                emitter.send(SseEmitter.event().id(sseId(reply, eventSequence++))
+                        .name("turn.plan").data("{\"turnId\":" + numeric(reply.turnId)
+                                + ",\"planId\":" + numeric(reply.planId) + "}"));
 
                 for (int i = 0; i < reply.messages.size(); i++) {
                     if (i > 0) {
-                        emitter.send(SseEmitter.event().name("segment").data("{\"break\":true}"));
+                        emitter.send(SseEmitter.event().id(sseId(reply, eventSequence++))
+                                .name("segment").data("{\"break\":true}"));
                         Thread.sleep(220);
                     }
-                    streamText(emitter, reply.messages.get(i));
+                    emitter.send(SseEmitter.event().id(sseId(reply, eventSequence++))
+                            .name("bubble.started").data("{\"order\":" + (i + 1) + "}"));
+                    eventSequence = streamText(emitter, reply.messages.get(i), reply, eventSequence);
+                    emitter.send(SseEmitter.event().id(sseId(reply, eventSequence++))
+                            .name("bubble.completed").data("{\"order\":" + (i + 1) + "}"));
                 }
                 // VS-003b — meta now carries the full perception payload (agentLoop,
                 // aiState, voice/weather/location/timezone) so the frontend can render
                 // the same panels on stream as on the POST fallback path.
-                emitter.send(SseEmitter.event().name("meta").data(jsonMeta(reply, request, null)));
+                emitter.send(SseEmitter.event().id(sseId(reply, eventSequence++))
+                        .name("meta").data(jsonMeta(reply, request, null)));
+                emitter.send(SseEmitter.event().id(sseId(reply, eventSequence))
+                        .name("turn.completed").data("{\"message\":\"done\"}"));
+                // Preserve the original done contract used by the current frontend.
                 emitter.send(SseEmitter.event().name("done").data("{\"message\":\"done\"}"));
                 emitter.complete();
             } catch (Exception e) {
@@ -568,7 +592,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         return vo;
     }
 
-    private AuroraReplyVO blockedReply(Long userId, ChatRequest request, SafetyResult safety) {
+    private AuroraReplyVO blockedReply(Long userId, ChatRequest request, SafetyResult safety, Long userMessageId) {
         AuroraReplyVO blocked = new AuroraReplyVO();
         blocked.messages = List.of(safety.safeMessage == null
                 ? "我先陪你把安全放在第一位。现在请联系一个现实中可信任的人，或使用当地紧急支持资源。"
@@ -586,7 +610,9 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         blocked.riskFlags = List.of(safety.riskType == null ? "SAFETY" : safety.riskType);
         blocked.agentLoop = Map.of("speakCount", 1, "continueReason", "safety-first");
         blocked.aiState = aiState(null);
-        dialogService.saveAuroraMessage(userId, request.sessionId, blocked.messages.get(0));
+        DialogMessage saved = dialogService.saveAuroraMessage(userId, request.sessionId, blocked.messages.get(0));
+        recordChoreography(userId, request.sessionId, userMessageId, blocked,
+                saved == null ? List.of() : List.of(saved));
         return blocked;
     }
 
@@ -955,19 +981,42 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 .trim();
     }
 
-    private void streamText(SseEmitter emitter, String response) throws Exception {
+    private long streamText(SseEmitter emitter, String response, AuroraReplyVO reply, long eventSequence) throws Exception {
         StringBuilder token = new StringBuilder();
         for (char c : response.toCharArray()) {
             token.append(c);
             if (token.length() >= 2 || c == '。' || c == '，' || c == '\n') {
-                emitter.send(SseEmitter.event().data("{\"content\":\"" + escape(token.toString()) + "\"}"));
+                // The current frontend already listens to both `token` and the legacy
+                // onmessage path, so naming deltas makes the wire contract explicit
+                // without changing the rendered experience.
+                emitter.send(SseEmitter.event().id(sseId(reply, eventSequence++))
+                        .name("token").data("{\"content\":\"" + escape(token.toString()) + "\"}"));
                 token.setLength(0);
                 Thread.sleep(30);
             }
         }
         if (!token.isEmpty()) {
-            emitter.send(SseEmitter.event().data("{\"content\":\"" + escape(token.toString()) + "\"}"));
+            emitter.send(SseEmitter.event().id(sseId(reply, eventSequence++))
+                    .name("token").data("{\"content\":\"" + escape(token.toString()) + "\"}"));
         }
+        return eventSequence;
+    }
+
+    private void recordChoreography(Long userId, Long sessionId, Long userMessageId,
+                                    AuroraReplyVO reply, List<DialogMessage> persistedBubbles) {
+        if (choreographyService == null || sessionId == null || userMessageId == null) return;
+        TurnTimelineVO timeline = choreographyService.recordCompletedTurn(
+                userId, sessionId, userMessageId, reply, persistedBubbles);
+        reply.turnId = timeline.turn.id;
+        reply.planId = timeline.activePlan == null ? null : timeline.activePlan.id;
+    }
+
+    private String sseId(AuroraReplyVO reply, long sequence) {
+        return (reply.turnId == null ? "legacy" : reply.turnId.toString()) + ":" + sequence;
+    }
+
+    private String numeric(Long value) {
+        return value == null ? "null" : value.toString();
     }
 
     private String jsonMeta(AuroraReplyVO reply) {
