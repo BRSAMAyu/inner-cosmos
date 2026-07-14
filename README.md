@@ -2,6 +2,8 @@
 
 Inner Cosmos 是基于 Java Web 的 AI 自我共鸣与慢社交平台原型。当前版本按 `inner_cosmos_工程总纲_v_1_0.md` 搭建第一轮工程骨架，默认使用 Mock LLM，可在无 API Key 的情况下演示核心闭环。
 
+> 本 README 说明当前可运行基线。长期自主产品化工作的唯一入口是 [`goal-objective.md`](goal-objective.md)，完整文档权威关系见 [`对齐文档/README.md`](对齐文档/README.md)。Java 17、Boot 3.3、H2/MySQL 与物理 HTML 等均不是完全体目标架构。
+
 ## 技术栈
 
 - Java 17 target，当前机器 Java 21 可运行
