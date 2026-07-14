@@ -1,0 +1,146 @@
+version: 1
+authority: "对齐文档/08-Aurora生命感与共鸣智能创新架构.md"
+status: proposed
+
+dataset_policy:
+  required_splits: [compiler_train, development, held_out_trajectory, adversarial]
+  held_out_must_not_enter_context: true
+  real_user_data_requires_explicit_consent: true
+  evidence_manifest_required: true
+  redact_exports: true
+
+baselines:
+  - current_production
+  - single_prompt
+  - long_persona_prompt
+  - structured_context_without_planner
+
+candidate_systems:
+  - structured_genome
+  - planner_speaker
+  - planner_speaker_critics
+  - full_compiler_nbest_reranker
+
+aurora_metrics:
+  naturalness:
+    direction: maximize
+    evidence: [human_pairwise, judge_ensemble]
+  felt_understanding:
+    direction: maximize
+    evidence: [user_rating, human_pairwise]
+  timing_appropriateness:
+    direction: maximize
+    evidence: [scenario_rating, real_user_feedback]
+  interruption_success_rate:
+    direction: maximize
+    hard_gate: 1.0
+  stale_bubble_after_cancel_rate:
+    direction: minimize
+    hard_gate: 0.0
+  proactive_helpfulness:
+    direction: maximize
+    evidence: [user_rating, behavioral_outcome]
+  proactive_annoyance:
+    direction: minimize
+  self_continuity:
+    direction: maximize
+    evidence: [longitudinal_human_review, judge_ensemble]
+  emergence_coherence:
+    direction: maximize
+  memory_appropriateness:
+    direction: maximize
+  unauthorized_memory_recall_rate:
+    direction: minimize
+    hard_gate: 0.0
+
+capsule_metrics:
+  identity_fidelity:
+    direction: maximize
+    evidence: [source_user_blind_rating, acquaintance_identification]
+  style_fidelity:
+    direction: maximize
+    evidence: [linguistic_features, source_user_rating]
+  behavior_fidelity:
+    direction: maximize
+    evidence: [held_out_next_action, scenario_pairwise]
+  trajectory_fidelity:
+    direction: maximize
+    evidence: [held_out_behavior_chain]
+  persona_stability:
+    direction: maximize
+    evidence: [long_dialogue_eval]
+  visitor_echoing_rate:
+    direction: minimize
+  role_confusion_rate:
+    direction: minimize
+  generalization:
+    direction: maximize
+    evidence: [counterfactual_scenarios]
+  privacy_leakage_rate:
+    direction: minimize
+    hard_gate: 0.0
+  inter_capsule_distinctiveness:
+    direction: maximize
+
+memory_profile_metrics:
+  extraction_precision:
+    direction: maximize
+  retrieval_recall:
+    direction: maximize
+  update_accuracy:
+    direction: maximize
+  selective_forgetting_accuracy:
+    direction: maximize
+  contradiction_resolution_accuracy:
+    direction: maximize
+  profile_temporal_stability:
+    direction: maximize
+  single_event_thrash_rate:
+    direction: minimize
+  evidence_traceability:
+    direction: maximize
+    hard_gate: 1.0
+
+matching_metrics:
+  mirror_relevance:
+    direction: maximize
+  complementarity:
+    direction: maximize
+  serendipity_value:
+    direction: maximize
+  strategy_distinctiveness:
+    direction: maximize
+  reciprocal_interest:
+    direction: maximize
+  conversation_quality_after_match:
+    direction: maximize
+
+runtime_metrics:
+  first_bubble_latency_ms:
+    direction: minimize
+  full_turn_latency_ms:
+    direction: minimize
+  llm_calls_per_turn:
+    direction: report
+  tokens_per_turn:
+    direction: report
+  provider_cost_per_turn:
+    direction: report
+  wake_duplicate_rate:
+    direction: minimize
+    hard_gate: 0.0
+  genome_publish_duplicate_rate:
+    direction: minimize
+    hard_gate: 0.0
+
+required_report_sections:
+  - configuration
+  - dataset_manifest
+  - aggregate_metrics
+  - pairwise_results
+  - latency_and_cost
+  - ablations
+  - failure_cases
+  - privacy_and_safety
+  - human_review
+  - reproducibility
