@@ -183,6 +183,20 @@ class SessionCloserIdempotencyTest {
         verify(portraitSvc, never()).reflectOnTurn(anyLong(), anyList());
     }
 
+    @Test
+    @DisplayName("M1-SEC-002: mismatched owner is rejected again at the async boundary")
+    void nonOwner_skipsAllWork() {
+        DialogSession otherUsersSession = openSession();
+        otherUsersSession.userId = 999L;
+        when(sessionMapper.selectById(SESSION_ID)).thenReturn(otherUsersSession);
+
+        sessionCloser.runAfterGoodbye(USER_ID, SESSION_ID, "LANGUAGE_HIGH");
+
+        verify(sessionMapper, never()).update(any(DialogSession.class), any(UpdateWrapper.class));
+        verifyNoInteractions(proactiveEngine, summarySvc, portraitSvc, relSvc, messageMapper,
+                ltmMapper, llm, selfReflectionTrigger, continuityService);
+    }
+
     // ─────────────────────────────────────────────────────────
     // Test 4: First and only call — does full work and closes session atomically
     // ─────────────────────────────────────────────────────────

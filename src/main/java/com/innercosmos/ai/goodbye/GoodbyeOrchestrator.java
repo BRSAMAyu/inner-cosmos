@@ -3,7 +3,6 @@ package com.innercosmos.ai.goodbye;
 import com.innercosmos.ai.client.LlmClient;
 import com.innercosmos.ai.client.LlmRequest;
 import com.innercosmos.entity.DialogMessage;
-import com.innercosmos.mapper.DialogSessionMapper;
 import com.innercosmos.service.MemoryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,20 +30,21 @@ public class GoodbyeOrchestrator {
     private SessionCloser closer;
 
     @Autowired
-    private DialogSessionMapper sessionMapper;
+    private GoodbyeSessionAccess sessionAccess;
 
     @Autowired
     private GoodbyeTriggerDetector goodbyeTriggerDetector;
 
     public GoodbyeResult start(Long userId, Long sessionId, String trigger) {
-        // 0) Mark session with goodbye trigger
+        // 0) Claim the owned session in a short transaction before any LLM or async work.
         if (sessionId != null) {
-            var sess = sessionMapper.selectById(sessionId);
-            if (sess == null) {
-                return new GoodbyeResult(false, "no session", java.util.List.of(), false, false, 0);
+            GoodbyeSessionAccess.ClaimResult claim = sessionAccess.claim(userId, sessionId, trigger);
+            if (claim == GoodbyeSessionAccess.ClaimResult.ALREADY_STARTED) {
+                GoodbyeResult duplicate = new GoodbyeResult(true, templates.forTrigger(trigger),
+                        java.util.List.of(), false, false, 1.0);
+                duplicate.goodbyeStrength = goodbyeTriggerDetector.getLastStrength();
+                return duplicate;
             }
-            sess.goodbyeTrigger = trigger;
-            sessionMapper.updateById(sess);
         }
 
         // 1) Sync goodbye line (3s budget)

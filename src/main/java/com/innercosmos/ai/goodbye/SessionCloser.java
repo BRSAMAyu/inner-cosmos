@@ -70,10 +70,10 @@ public class SessionCloser {
     @Async
     public void runAfterGoodbye(Long userId, Long sessionId, String goodbyeStrength) {
         try {
-            // Guard: if session row is missing, abort early
+            // Defense in depth: the asynchronous boundary revalidates ownership.
             var sess = sessionMapper.selectById(sessionId);
-            if (sess == null) {
-                log.warn("Session {} not found for goodbye closer", sessionId);
+            if (sess == null || userId == null || !userId.equals(sess.userId)) {
+                log.warn("Goodbye closer rejected an unavailable session");
                 return;
             }
             if (sess.endedAt != null) {
@@ -89,7 +89,8 @@ public class SessionCloser {
             int rows = sessionMapper.update(update,
                     new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<DialogSession>()
                             .eq("id", sessionId)
-                            .isNull("endedAt"));
+                            .eq("user_id", userId)
+                            .isNull("ended_at"));
             if (rows == 0) {
                 log.debug("Session {} already closed by concurrent closer, skipping", sessionId);
                 return;
