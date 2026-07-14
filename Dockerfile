@@ -26,7 +26,7 @@ RUN apk upgrade --no-cache
 RUN addgroup -g 1001 appgroup && adduser -u 1001 -G appgroup -D appuser
 
 # Create writable runtime directories (owned by non-root user). Production uses an
-# external database; the local/dev smoke still needs its H2 data directory.
+# external PostgreSQL database; local development still uses its H2 data directory.
 RUN mkdir -p /var/log/inner-cosmos /app/data \
     && chown -R appuser:appgroup /var/log/inner-cosmos /app/data
 

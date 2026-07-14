@@ -1,0 +1,19 @@
+spring.config.activate.on-profile: postgres
+
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/inner_cosmos}
+    username: ${SPRING_DATASOURCE_USERNAME:inner_cosmos}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+  sql:
+    init:
+      mode: never
+  flyway:
+    enabled: true
+    locations: classpath:db/migration/postgresql
+    validate-migration-naming: true
+    clean-disabled: true
+  h2:
+    console:
+      enabled: false

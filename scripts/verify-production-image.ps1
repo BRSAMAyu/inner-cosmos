@@ -6,17 +6,14 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$mysqlImage = "mysql:8.4@sha256:c831a0f11348d402b43d77453e17d770be2eef356615a2823fe0f5a0d6c8b9af"
-$jdkImage = "eclipse-temurin:21-jdk-alpine@sha256:1ff763083f2993d57d0bf374ab10bb3e2cb873af6c13a04458ebbd3e0337dc76"
+$postgresImage = "pgvector/pgvector:0.8.1-pg16@sha256:33198da2828a14c30348d2ccb4750833d5ed9a44c88d840a0e523d7417120337"
 $runId = [Guid]::NewGuid().ToString("N").Substring(0, 12)
 $network = "inner-cosmos-prod-smoke-$runId"
-$mysqlName = "inner-cosmos-mysql-$runId"
+$postgresName = "inner-cosmos-postgres-$runId"
 $appName = "inner-cosmos-app-$runId"
 $database = "inner_cosmos"
 $databaseUser = "inner_cosmos"
 $databasePassword = [Guid]::NewGuid().ToString("N")
-$rootPassword = [Guid]::NewGuid().ToString("N")
-$trustPassword = [Guid]::NewGuid().ToString("N")
 $tempRoot = Join-Path ([IO.Path]::GetTempPath()) "inner-cosmos-prod-smoke-$runId"
 $resolvedTempBase = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
 $resolvedTempRoot = [IO.Path]::GetFullPath($tempRoot)
@@ -33,95 +30,58 @@ function Invoke-Docker {
     }
 }
 
-function Invoke-KeytoolImport {
-    param(
-        [string]$CertificatePath,
-        [string]$TruststorePath,
-        [string]$Password
-    )
-
-    $command = Get-Command keytool -ErrorAction SilentlyContinue
-    if ($command) {
-        & $command.Source -importcert -noprompt -storetype PKCS12 -alias mysql-ca `
-            -file $CertificatePath -keystore $TruststorePath -storepass $Password | Out-Null
-        if ($LASTEXITCODE -ne 0) {
-            throw "Failed to create the MySQL truststore with host keytool."
-        }
-        return
+function Wait-Postgres {
+    param([DateTimeOffset]$Deadline)
+    while ([DateTimeOffset]::UtcNow -lt $Deadline) {
+        $savedPreference = $ErrorActionPreference
+        $ErrorActionPreference = "SilentlyContinue"
+        & docker exec $postgresName pg_isready -U $databaseUser -d $database 2>$null | Out-Null
+        $ready = $LASTEXITCODE -eq 0
+        $ErrorActionPreference = $savedPreference
+        if ($ready) { return }
+        Start-Sleep -Seconds 2
     }
-    if ($env:JAVA_HOME) {
-        $candidate = Join-Path $env:JAVA_HOME "bin/keytool.exe"
-        if (Test-Path -LiteralPath $candidate) {
-            & $candidate -importcert -noprompt -storetype PKCS12 -alias mysql-ca `
-                -file $CertificatePath -keystore $TruststorePath -storepass $Password | Out-Null
-            if ($LASTEXITCODE -ne 0) {
-                throw "Failed to create the MySQL truststore with JAVA_HOME keytool."
-            }
-            return
-        }
-    }
-
-    Invoke-Docker -DockerArguments @(
-        "run", "--rm", "-v", "${resolvedTempRoot}:/work", $jdkImage,
-        "keytool", "-importcert", "-noprompt", "-storetype", "PKCS12",
-        "-alias", "mysql-ca", "-file", "/work/mysql-ca.pem",
-        "-keystore", "/work/mysql-truststore.p12", "-storepass", $Password
-    ) | Out-Null
+    & docker logs $postgresName --tail 120
+    throw "PostgreSQL did not become ready before the timeout."
 }
 
 New-Item -ItemType Directory -Path $resolvedTempRoot | Out-Null
 
 try {
     Invoke-Docker -DockerArguments @("network", "create", $network) | Out-Null
-    $mysqlArguments = @(
-        "run", "-d", "--name", $mysqlName, "--network", $network,
-        "-e", "MYSQL_ROOT_PASSWORD=$rootPassword",
-        "-e", "MYSQL_DATABASE=$database",
-        "-e", "MYSQL_USER=$databaseUser",
-        "-e", "MYSQL_PASSWORD=$databasePassword",
-        $mysqlImage,
-        "--character-set-server=utf8mb4",
-        "--collation-server=utf8mb4_unicode_ci"
-    )
-    Invoke-Docker -DockerArguments $mysqlArguments | Out-Null
+    Invoke-Docker -DockerArguments @(
+        "run", "-d", "--name", $postgresName, "--network", $network,
+        "-e", "POSTGRES_DB=$database",
+        "-e", "POSTGRES_USER=$databaseUser",
+        "-e", "POSTGRES_PASSWORD=$databasePassword",
+        $postgresImage
+    ) | Out-Null
 
     $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSeconds)
-    $mysqlReady = $false
-    while ([DateTimeOffset]::UtcNow -lt $deadline) {
-        $probeErrorPreference = $ErrorActionPreference
-        $ErrorActionPreference = "SilentlyContinue"
-        & docker exec -e "MYSQL_PWD=$rootPassword" $mysqlName `
-            mysql -uroot -Nse "SELECT 1" 2>$null | Out-Null
-        $probeExitCode = $LASTEXITCODE
-        $ErrorActionPreference = $probeErrorPreference
-        if ($probeExitCode -eq 0) {
-            $mysqlReady = $true
-            break
-        }
-        Start-Sleep -Seconds 2
-    }
-    if (-not $mysqlReady) {
-        & docker logs $mysqlName --tail 120
-        throw "MySQL did not become ready before the timeout."
-    }
+    Wait-Postgres -Deadline $deadline
 
-    $caPath = Join-Path $resolvedTempRoot "mysql-ca.pem"
-    $truststorePath = Join-Path $resolvedTempRoot "mysql-truststore.p12"
-    Invoke-Docker -DockerArguments @("cp", "${mysqlName}:/var/lib/mysql/ca.pem", $caPath)
-    Invoke-KeytoolImport -CertificatePath $caPath -TruststorePath $truststorePath `
-        -Password $trustPassword
+    $certificateScript = @"
+set -eu
+cd /var/lib/postgresql/data
+openssl req -x509 -newkey rsa:2048 -sha256 -days 1 -nodes -subj '/CN=inner-cosmos-smoke-ca' -keyout ca.key -out ca.crt >/dev/null 2>&1
+openssl req -newkey rsa:2048 -sha256 -nodes -subj '/CN=$postgresName' -addext 'subjectAltName=DNS:$postgresName' -keyout server.key -out server.csr >/dev/null 2>&1
+openssl x509 -req -sha256 -days 1 -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -copy_extensions copy -out server.crt >/dev/null 2>&1
+chmod 600 server.key ca.key
+"@
+    Invoke-Docker -DockerArguments @("exec", "-u", "postgres", $postgresName, "sh", "-c", $certificateScript)
+    Invoke-Docker -DockerArguments @("exec", "-u", "postgres", $postgresName, "psql", "-U", $databaseUser, "-d", $database, "-v", "ON_ERROR_STOP=1", "-c", "ALTER SYSTEM SET ssl = 'on'")
+    Invoke-Docker -DockerArguments @("exec", "-u", "postgres", $postgresName, "psql", "-U", $databaseUser, "-d", $database, "-v", "ON_ERROR_STOP=1", "-c", "ALTER SYSTEM SET ssl_cert_file = 'server.crt'")
+    Invoke-Docker -DockerArguments @("exec", "-u", "postgres", $postgresName, "psql", "-U", $databaseUser, "-d", $database, "-v", "ON_ERROR_STOP=1", "-c", "ALTER SYSTEM SET ssl_key_file = 'server.key'")
+    Invoke-Docker -DockerArguments @("cp", "${postgresName}:/var/lib/postgresql/data/ca.crt", (Join-Path $resolvedTempRoot "postgres-ca.crt"))
+    Invoke-Docker -DockerArguments @("restart", $postgresName) | Out-Null
+    Wait-Postgres -Deadline $deadline
 
-    Invoke-Docker -DockerArguments @("cp", "src/main/resources/schema.sql", "${mysqlName}:/tmp/schema.sql")
+    $caPath = Join-Path $resolvedTempRoot "postgres-ca.crt"
+    $jdbcUrl = "jdbc:postgresql://${postgresName}:5432/${database}?sslmode=verify-full&sslrootcert=/run/secrets/postgres-ca.crt"
     Invoke-Docker -DockerArguments @(
-        "exec", "-e", "MYSQL_PWD=$rootPassword", $mysqlName, "sh", "-c",
-        'mysql -uroot "$MYSQL_DATABASE" < /tmp/schema.sql'
-    )
-
-    $jdbcUrl = "jdbc:mysql://${mysqlName}:3306/${database}?sslMode=VERIFY_CA&trustCertificateKeyStoreUrl=file:/run/secrets/mysql-truststore.p12&trustCertificateKeyStorePassword=$trustPassword&serverTimezone=Asia/Shanghai"
-    $runArguments = @(
         "run", "-d", "--name", $appName, "--network", $network,
         "-p", "127.0.0.1::8080",
-        "-v", "${truststorePath}:/run/secrets/mysql-truststore.p12:ro",
+        "-v", "${caPath}:/run/secrets/postgres-ca.crt:ro",
         "-e", "SPRING_PROFILES_ACTIVE=prod",
         "-e", "SPRING_DATASOURCE_URL=$jdbcUrl",
         "-e", "SPRING_DATASOURCE_USERNAME=$databaseUser",
@@ -134,52 +94,46 @@ try {
         "-e", "COOKIE_SECURE=true",
         "-e", "CORS_ALLOWED_ORIGINS=https://smoke.inner-cosmos.invalid",
         $Image
-    )
-    Invoke-Docker -DockerArguments $runArguments | Out-Null
+    ) | Out-Null
 
     $portLine = (& docker port $appName "8080/tcp" | Select-Object -First 1)
-    if (-not $portLine) {
-        throw "Docker did not publish the application port."
-    }
+    if (-not $portLine) { throw "Docker did not publish the application port." }
     $hostPort = [int]($portLine -replace '^.*:', '')
     $health = $null
     while ([DateTimeOffset]::UtcNow -lt $deadline) {
         try {
             $health = Invoke-RestMethod -Uri "http://127.0.0.1:$hostPort/actuator/health" -TimeoutSec 3
-            if ($health.status -eq "UP") {
-                break
-            }
+            if ($health.status -eq "UP") { break }
         } catch {
-            # Expected while the application is starting.
+            # Expected while Flyway and the application are starting.
         }
         Start-Sleep -Seconds 2
     }
     if ($null -eq $health -or $health.status -ne "UP") {
-        & docker logs $appName --tail 160
+        & docker logs $appName --tail 180
         throw "Production-profile application health did not become UP before the timeout."
     }
 
-    $tableCount = (& docker exec -e "MYSQL_PWD=$rootPassword" $mysqlName mysql `
-        -uroot $database -Nse "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()").Trim()
-    $seededUsers = (& docker exec -e "MYSQL_PWD=$rootPassword" $mysqlName mysql `
-        -uroot $database -Nse "SELECT COUNT(*) FROM tb_user").Trim()
+    $tableCount = (& docker exec -e "PGPASSWORD=$databasePassword" $postgresName psql `
+        -U $databaseUser -d $database -Atc "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public' AND table_name LIKE 'tb_%'").Trim()
+    $seededUsers = (& docker exec -e "PGPASSWORD=$databasePassword" $postgresName psql `
+        -U $databaseUser -d $database -Atc "SELECT COUNT(*) FROM tb_user").Trim()
+    $flywayVersion = (& docker exec -e "PGPASSWORD=$databasePassword" $postgresName psql `
+        -U $databaseUser -d $database -Atc 'SELECT MAX(version) FROM flyway_schema_history WHERE success').Trim()
     $runtimeUser = (& docker inspect $appName --format '{{.Config.User}}').Trim()
 
-    if ([int]$tableCount -lt 1) {
-        throw "Production schema was not loaded."
-    }
-    if ([int]$seededUsers -ne 0) {
-        throw "Production smoke unexpectedly seeded demo users."
-    }
-    if ($runtimeUser -ne "appuser") {
-        throw "Production image is not running as appuser."
-    }
+    if ([int]$tableCount -ne 60) { throw "Production Flyway schema did not create exactly 60 application tables." }
+    if ([int]$seededUsers -ne 0) { throw "Production smoke unexpectedly seeded demo users." }
+    if ($flywayVersion -ne "1") { throw "Production Flyway schema version is not 1." }
+    if ($runtimeUser -ne "appuser") { throw "Production image is not running as appuser." }
 
     [pscustomobject]@{
         Status = "PASS"
         Profile = "prod"
         Health = $health.status
-        DatabaseTls = "VERIFY_CA"
+        Database = "PostgreSQL 16 + pgvector"
+        DatabaseTls = "VERIFY_FULL"
+        FlywayVersion = $flywayVersion
         SchemaTables = [int]$tableCount
         DemoUsers = [int]$seededUsers
         RuntimeUser = $runtimeUser
@@ -187,11 +141,11 @@ try {
     } | Format-List
 }
 finally {
-    $cleanupErrorPreference = $ErrorActionPreference
+    $savedPreference = $ErrorActionPreference
     $ErrorActionPreference = "SilentlyContinue"
-    & docker rm -f $appName $mysqlName 2>$null | Out-Null
+    & docker rm -f $appName $postgresName 2>$null | Out-Null
     & docker network rm $network 2>$null | Out-Null
-    $ErrorActionPreference = $cleanupErrorPreference
+    $ErrorActionPreference = $savedPreference
     if (Test-Path -LiteralPath $resolvedTempRoot) {
         Remove-Item -LiteralPath $resolvedTempRoot -Recurse -Force
     }

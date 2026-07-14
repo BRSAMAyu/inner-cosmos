@@ -1,0 +1,27 @@
+M1-DATA-APP-001 validation summary
+Recorded: 2026-07-15T03:26:01+08:00
+
+Main application clean verify:
+  command=.\mvnw.cmd -B clean verify
+  tests=655 failures=0 errors=0 skipped=0
+  spotbugs_findings=0 spotbugs_errors=0
+  result=PASS
+
+Test baseline assertion:
+  suites=85 tests=655 failures=0 errors=0 skipped=0
+  minimum=613
+  result=PASS
+
+PostgreSQL pgvector PoC:
+  command=.\mvnw.cmd -B -f poc\postgres-pgvector\pom.xml -Pbenchmark verify
+  contract_tests=7 failures=0 errors=0 skipped=0
+  benchmark_tests=1 failures=0 errors=0 skipped=0
+  rows_10000_p50_ms=0.793 p95_ms=1.039 p99_ms=1.161
+  rows_100000_p50_ms=1.074 p95_ms=1.286 p99_ms=1.333
+  result=PASS
+
+Repository gates:
+  secret_scan=PASS findings=0
+  backup_shell_syntax=PASS
+  generated_schema_reproducible=PASS
+  git_diff_check=PASS

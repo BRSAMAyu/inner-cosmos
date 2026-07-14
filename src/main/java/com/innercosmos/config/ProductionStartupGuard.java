@@ -49,14 +49,17 @@ public final class ProductionStartupGuard implements ApplicationRunner {
 
         String jdbcUrl = required("spring.datasource.url", "production datasource URL")
                 .toLowerCase(Locale.ROOT);
-        if (!jdbcUrl.startsWith("jdbc:mysql:")) {
-            throw unsafe("production datasource must use MySQL");
+        if (!jdbcUrl.startsWith("jdbc:postgresql:")) {
+            throw unsafe("production datasource must use PostgreSQL");
         }
-        if (!(jdbcUrl.contains("sslmode=verify_identity") || jdbcUrl.contains("sslmode=verify_ca"))) {
+        if (!(jdbcUrl.contains("sslmode=verify-full") || jdbcUrl.contains("sslmode=verify-ca"))) {
             throw unsafe("production datasource TLS must verify the server certificate");
         }
-        if (jdbcUrl.contains("allowpublickeyretrieval=true")) {
-            throw unsafe("production datasource must not allow public key retrieval");
+        if (!environment.getProperty("spring.flyway.enabled", Boolean.class, false)) {
+            throw unsafe("Flyway must own production schema migration");
+        }
+        if (!"never".equalsIgnoreCase(environment.getProperty("spring.sql.init.mode", ""))) {
+            throw unsafe("legacy SQL initialization must be disabled in production");
         }
         required("spring.datasource.username", "production datasource username");
         required("spring.datasource.password", "production datasource password");

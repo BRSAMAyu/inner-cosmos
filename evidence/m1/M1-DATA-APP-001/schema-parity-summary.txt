@@ -1,0 +1,22 @@
+M1-DATA-APP-001 PostgreSQL Flyway schema parity
+Recorded: 2026-07-15T03:26:01+08:00
+Source: src/main/resources/schema.sql
+Target: src/main/resources/db/migration/postgresql/V1__application_baseline.sql
+
+source_tables=60
+target_tables=60
+source_foreign_keys=21
+target_foreign_keys=21
+target_identity_columns=58
+target_explicit_indexes=65
+pgvector_extension=required
+flyway_empty_install=PASS
+flyway_repeat_migrate=PASS
+table_name_inventory=PASS
+declared_index_inventory=PASS
+foreign_key_inventory=PASS
+identity_inventory=PASS
+unique_constraint_negative_test=PASS
+
+Command: .\mvnw.cmd -B -Dtest=PostgresFlywayBaselineTest test
+Result: 2 tests, 0 failures, 0 errors, 0 skipped

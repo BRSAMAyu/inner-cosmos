@@ -50,7 +50,7 @@ jobs:
           --exit-code 1 /workspace
       - name: Build Java 21 non-root image
         run: docker build -t inner-cosmos:ci .
-      - name: Production profile smoke with certificate-verified MySQL
+      - name: Production profile smoke with certificate-verified PostgreSQL and Flyway
         shell: pwsh
         run: ./scripts/verify-production-image.ps1 -Image inner-cosmos:ci
       - name: Verify local image signature and provenance round trip

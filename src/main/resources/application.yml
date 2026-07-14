@@ -35,6 +35,8 @@ spring:
     init:
       mode: ${SQL_INIT_MODE:always}
       encoding: UTF-8
+  flyway:
+    enabled: false
   h2:
     console:
       enabled: false

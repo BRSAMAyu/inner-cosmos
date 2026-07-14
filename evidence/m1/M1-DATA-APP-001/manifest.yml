@@ -1,0 +1,71 @@
+schema_version: 1
+package_id: M1-DATA-APP-001
+status: EVALUATED
+base_sha: f1aad5903b826637ea9768849df30a7f97cd6afa
+branch: feat/run006-aurora-self-understanding
+recorded_at: 2026-07-15T03:26:01+08:00
+environment:
+  os: Windows 11 amd64
+  java: Oracle JDK 21.0.10
+  maven: Apache Maven Wrapper 3.9.9
+  docker: 28.5.1 linux/amd64
+  postgres: 16.12
+  pgvector: 0.8.1
+  application_image: inner-cosmos@sha256:ff0fec2de8845c359135b1f03bdef29f3d718309dfb322fba7ed44ad6b282b3e
+commands:
+  - command: .\\mvnw.cmd -B clean verify
+    result: PASS; 655 tests; 0 failures; 0 errors; 0 skipped; SpotBugs 0 findings and 0 errors
+  - command: .\\mvnw.cmd -B -f poc\\postgres-pgvector\\pom.xml -Pbenchmark verify
+    result: PASS; contract 7/0/0/0; benchmark 1/0/0/0
+  - command: .\\scripts\\verify-production-image.ps1 -Image inner-cosmos:postgres-main
+    result: PASS; prod; PostgreSQL TLS VERIFY_FULL; Flyway v1; 60 tables; 0 demo users; runtime user appuser
+  - command: .\\scripts\\assert-test-baseline.ps1 -MinimumTests 613
+    result: PASS; 85 suites; 655 tests
+  - command: .\\scripts\\scan-secrets.ps1
+    result: PASS; 0 findings
+  - command: bash -n scripts/backup/backup.sh
+    result: PASS
+schema_contract:
+  source_tables: 60
+  target_tables: 60
+  source_foreign_keys: 21
+  target_foreign_keys: 21
+  target_identity_columns: 58
+  target_explicit_indexes: 65
+  baseline_sha256: a957050df364854024570977f31fc05476817a8787a0a945e3fa766e3f723b51
+production_smoke:
+  profile: prod
+  health: UP
+  database_tls: VERIFY_FULL
+  flyway_version: 1
+  schema_tables: 60
+  demo_users: 0
+  runtime_user: appuser
+benchmark:
+  rows_10000: {p50_ms: 0.793, p95_ms: 1.039, p99_ms: 1.161, result: PASS}
+  rows_100000: {p50_ms: 1.074, p95_ms: 1.286, p99_ms: 1.333, p95_gate_ms: 150, result: PASS}
+artifacts:
+  - {path: schema-parity-summary.txt, sha256: fd54b99c7a128d4fadcd0aec2db450a6656c35601cd52a08f180214a9655ac9f}
+  - {path: production-smoke-summary.txt, sha256: 8f8231ddb327bfa656c0ae94be5ed9759a41e509b3aeabd7840f932552bc3173}
+  - {path: validation-summary.txt, sha256: 98f154ea3fcf6c5a397cf1ec6bd0ff17150c9aa70fc2ab20f7398aeb9e3e2beb}
+  - {path: migration-reconciliation-status.md, sha256: 46ce6805485e25b3baca31db387a175b782639b447c8cace09ae1d610fd2b96a}
+  - {path: src/main/resources/db/migration/postgresql/V1__application_baseline.sql, sha256: a957050df364854024570977f31fc05476817a8787a0a945e3fa766e3f723b51}
+  - {path: scripts/convert-schema-to-postgres.ps1, sha256: 7dc841c2e64ddd47eec39910c91c200d16de2e9029bef3a422df49b7a94a9765}
+  - {path: scripts/verify-production-image.ps1, sha256: 5cebe3384e9cec48b284f2fbfac835041d5b686fb187e5bc77e09875da5afbae}
+generated_raw_reports:
+  - target/surefire-reports/
+  - target/spotbugsXml.xml
+  - poc/postgres-pgvector/target/surefire-reports/
+  - poc/postgres-pgvector/target/failsafe-reports/
+  - note: Generated reports are ignored locally, reproducible by the commands, and uploaded by CI.
+acceptance:
+  DATA-POSTGRES: IN_PROGRESS_ACTUAL_DATA_MIGRATION_RECONCILIATION_PENDING
+  D-01: IN_PROGRESS
+  D-02: IN_PROGRESS
+  D-03: IN_PROGRESS_PENDING_INDEPENDENT_REVIEW
+known_limitations:
+  - No authorized actual MySQL snapshot was migrated or reconciled in this package.
+  - Backup script syntax passed, but restore against retained external backup storage was not exercised.
+  - Synthetic local latency is not a production capacity claim.
+  - Independent review remains pending.
+innovation_semantics: PRESERVED_UNCHANGED

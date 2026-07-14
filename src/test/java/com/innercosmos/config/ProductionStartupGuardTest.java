@@ -18,9 +18,11 @@ class ProductionStartupGuardTest {
                     "llm.allow-fallback=false",
                     "inner-cosmos.demo.seed-enabled=false",
                     "server.servlet.session.cookie.secure=true",
-                    "spring.datasource.url=jdbc:mysql://db.example/inner_cosmos?sslMode=VERIFY_IDENTITY",
+                    "spring.datasource.url=jdbc:postgresql://db.example/inner_cosmos?sslmode=verify-full",
                     "spring.datasource.username=app",
-                    "spring.datasource.password=test-only-placeholder");
+                    "spring.datasource.password=test-only-placeholder",
+                    "spring.flyway.enabled=true",
+                    "spring.sql.init.mode=never");
 
     @Test
     void acceptsCompleteFailClosedProductionConfiguration() {
@@ -61,7 +63,25 @@ class ProductionStartupGuardTest {
 
     @Test
     void rejectsDatasourceWithoutCertificateVerification() {
-        runner.withPropertyValues("spring.datasource.url=jdbc:mysql://db.example/inner_cosmos?useSSL=true")
+        runner.withPropertyValues("spring.datasource.url=jdbc:postgresql://db.example/inner_cosmos?sslmode=require")
+                .run(context -> assertRejected(context.getBean(ProductionStartupGuard.class)));
+    }
+
+    @Test
+    void rejectsLegacyMysqlDatasource() {
+        runner.withPropertyValues("spring.datasource.url=jdbc:mysql://db.example/inner_cosmos?sslMode=VERIFY_IDENTITY")
+                .run(context -> assertRejected(context.getBean(ProductionStartupGuard.class)));
+    }
+
+    @Test
+    void rejectsProductionWithoutFlyway() {
+        runner.withPropertyValues("spring.flyway.enabled=false")
+                .run(context -> assertRejected(context.getBean(ProductionStartupGuard.class)));
+    }
+
+    @Test
+    void rejectsLegacySqlInitializer() {
+        runner.withPropertyValues("spring.sql.init.mode=always")
                 .run(context -> assertRejected(context.getBean(ProductionStartupGuard.class)));
     }
 

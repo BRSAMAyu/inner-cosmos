@@ -1,0 +1,16 @@
+M1-DATA-APP-001 certificate-verified production image smoke
+Recorded: 2026-07-15T03:26:01+08:00
+Image: inner-cosmos@sha256:ff0fec2de8845c359135b1f03bdef29f3d718309dfb322fba7ed44ad6b282b3e
+PostgreSQL image: pgvector/pgvector:0.8.1-pg16 (digest pinned by script/test configuration)
+
+Profile=prod
+Health=UP
+Database=PostgreSQL 16 + pgvector
+DatabaseTls=VERIFY_FULL
+FlywayVersion=1
+SchemaTables=60
+DemoUsers=0
+RuntimeUser=appuser
+Result=PASS
+
+The smoke created an ephemeral CA and server certificate, mounted only the CA into the application container, and connected with JDBC sslmode=verify-full. It did not use H2, MySQL, trust-all TLS, or demo-data initialization.

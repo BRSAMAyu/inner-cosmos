@@ -22,9 +22,9 @@ entries:
   - {id: S-04, status: IN_PROGRESS, evidence: ["evidence/m1/M1-SEC-001/"], reviewer: UNASSIGNED, note: "Implementation and automated tests pass; independent review is pending."}
   - {id: S-05, status: IN_PROGRESS, evidence: ["evidence/m1/M1-SEC-001/"], reviewer: UNASSIGNED, note: "Database TLS and production configuration guard implemented; broader HTTP security acceptance remains pending."}
   - {id: S-06, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
-  - {id: D-01, status: IN_PROGRESS, evidence: ["evidence/m1/M1-DATA-POC-001/", "docs/adr/0002-postgresql-system-of-record.md"], reviewer: UNASSIGNED, note: "Target PostgreSQL schema is Flyway-only in the isolated PoC; production 60-table baseline and cutover remain."}
-  - {id: D-02, status: IN_PROGRESS, evidence: ["evidence/m1/M1-DATA-POC-001/"], reviewer: UNASSIGNED, note: "PoC empty install, V1-to-V2 upgrade, and repeat startup pass in pinned Testcontainers; main application migration reconciliation remains."}
-  - {id: D-03, status: IN_PROGRESS, evidence: ["evidence/m1/M1-DATA-POC-001/", "docs/adr/0002-postgresql-system-of-record.md"], reviewer: UNASSIGNED, note: "Builder PoC passes four data families and 10k/100k policy-bound vector gates; independent review remains."}
+  - {id: D-01, status: IN_PROGRESS, evidence: ["evidence/m1/M1-DATA-POC-001/", "evidence/m1/M1-DATA-APP-001/", "docs/adr/0002-postgresql-system-of-record.md"], reviewer: UNASSIGNED, note: "Main production profile now uses PostgreSQL and Flyway v1 for the complete 60-table baseline; authorized actual-data migration and reconciliation remain."}
+  - {id: D-02, status: IN_PROGRESS, evidence: ["evidence/m1/M1-DATA-POC-001/", "evidence/m1/M1-DATA-APP-001/"], reviewer: UNASSIGNED, note: "PoC and main application empty install, repeat migration, persistence, and certificate-verified production startup pass; live-source migration reconciliation remains."}
+  - {id: D-03, status: IN_PROGRESS, evidence: ["evidence/m1/M1-DATA-POC-001/", "evidence/m1/M1-DATA-APP-001/", "docs/adr/0002-postgresql-system-of-record.md"], reviewer: UNASSIGNED, note: "Builder PoC reruns pass all contracts and 10k/100k policy-bound vector gates; independent review remains."}
   - {id: D-04, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
   - {id: D-05, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
   - {id: D-06, status: NOT_STARTED, evidence: [], reviewer: UNASSIGNED}
