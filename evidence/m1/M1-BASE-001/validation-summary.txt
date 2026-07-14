@@ -1,0 +1,36 @@
+M1-BASE-001 blocked-gate validation summary
+Recorded at: 2026-07-14T23:06:00+08:00
+Branch: feat/run006-aurora-self-understanding
+Source SHA: 37fdd048a9544458636df50467d60f54d4f2b3c6
+
+Gate result:
+- BLOCKED_BY_W0. M1-SEC-001 cannot pass until authorized humans confirm that every
+  historically exposed provider credential has been revoked, replaced, and independently reviewed.
+- The prescribed dependency gate requires M1-GOV-001, M1-SEC-001, M1-SEC-002, and
+  M1-SEC-003 to pass before M1-BASE-001 begins. That condition is not met.
+- No Spring Boot, Java release, dependency, CI, SBOM, or container baseline change was attempted.
+
+Current verified baseline:
+- Oracle JDK runtime: 21.0.10
+- Apache Maven: 3.9.9
+- Spring Boot parent: 3.3.6
+- Maven compiler release / java.version: 17
+
+Commands and results:
+1. .\.tools\apache-maven-3.9.9\bin\mvn.cmd clean test
+   Result: PASS; 638 tests, 0 failures, 0 errors, 0 skipped
+2. .\scripts\scan-secrets.ps1
+   Result: PASS; 0 current-tree findings; credential values are never printed
+3. git diff --check
+   Result: PASS
+
+Human action required:
+- Complete evidence/m1/M1-SEC-001/human-rotation-checklist.md without recording any secret value.
+- Obtain independent review for the W0 security packages.
+- Re-evaluate the M1-BASE-001 start gate only after all four dependencies are accepted.
+
+Innovation preservation:
+- The gate did not remove, disable, downgrade, or refactor Aurora proactive agency,
+  Aurora Self/Constitution/Emergence, internal personality/relationship/evolution,
+  user portrait or psychological modeling, Echo Capsule dynamic persona/dialogue,
+  slow-letter, starfield, matching, or related domain models.
