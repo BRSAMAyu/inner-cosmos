@@ -5,14 +5,18 @@ import com.innercosmos.ai.agent.CapsuleAgent;
 import com.innercosmos.entity.EchoCapsule;
 import com.innercosmos.entity.MemoryCard;
 import com.innercosmos.entity.UserPortrait;
+import com.innercosmos.entity.AuthorizedMemoryRef;
+import com.innercosmos.dto.CapsuleCreateRequest;
 import com.innercosmos.mapper.CapsuleBoundaryMapper;
 import com.innercosmos.mapper.EchoCapsuleMapper;
 import com.innercosmos.mapper.MemoryCardMapper;
 import com.innercosmos.mapper.UserPortraitMapper;
+import com.innercosmos.mapper.AuthorizedMemoryRefMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.ArrayList;
@@ -23,8 +27,7 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 /**
  * IC-CAP-003 smart-matching tests. Deterministic, no LLM.
@@ -38,6 +41,7 @@ class CapsuleMatchingTest {
     @Mock CapsuleAgent capsuleAgent;
     @Mock MemoryCardMapper memoryCardMapper;
     @Mock UserPortraitMapper userPortraitMapper;
+    @Mock AuthorizedMemoryRefMapper authorizedMemoryRefMapper;
 
     CapsuleServiceImpl service;
 
@@ -48,7 +52,7 @@ class CapsuleMatchingTest {
     @BeforeEach
     void setUp() {
         service = new CapsuleServiceImpl(echoCapsuleMapper, boundaryMapper, capsuleAgent,
-                memoryCardMapper, userPortraitMapper);
+                memoryCardMapper, userPortraitMapper, authorizedMemoryRefMapper);
         // default: no portrait rows unless a test overrides
         lenient().when(userPortraitMapper.selectList(any())).thenReturn(new ArrayList<>());
     }
@@ -360,5 +364,56 @@ class CapsuleMatchingTest {
             assertTrue(FAMILIES.contains(r),
                     "matchReason '" + r + "' must be one of the 6 theme families, not a raw keyword");
         }
+    }
+
+    @Test
+    void emptyMemorySelectionNeverImplicitlyConsumesTopMemories() {
+        CapsuleCreateRequest request = new CapsuleCreateRequest();
+        request.pseudonym = "无记忆回声";
+        request.memoryIds = List.of();
+        request.visibilityStatus = "PRIVATE";
+        when(echoCapsuleMapper.insert(any(EchoCapsule.class))).thenAnswer(invocation -> {
+            ((EchoCapsule) invocation.getArgument(0)).id = 3001L; return 1;
+        });
+
+        service.createFromMemory(USER_ID, request);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<String>> summaries = ArgumentCaptor.forClass(List.class);
+        verify(capsuleAgent).generateUserPersona(eq(USER_ID), summaries.capture(), eq("无记忆回声"), any());
+        assertTrue(summaries.getValue().isEmpty());
+        verify(memoryCardMapper, never()).selectList(any());
+        verifyNoInteractions(authorizedMemoryRefMapper);
+    }
+
+    @Test
+    void explicitCurrentOwnerMemoryCreatesAuditableAuthorizationAndArchiveWithdrawsIt() {
+        MemoryCard card = memory(77L, "允许的片段", "只授权这段抽象经历", "", "");
+        when(memoryCardMapper.selectById(77L)).thenReturn(card);
+        when(echoCapsuleMapper.insert(any(EchoCapsule.class))).thenAnswer(invocation -> {
+            ((EchoCapsule) invocation.getArgument(0)).id = 3002L; return 1;
+        });
+        CapsuleCreateRequest request = new CapsuleCreateRequest();
+        request.memoryIds = List.of(77L);
+        request.visibilityStatus = "PUBLIC";
+
+        EchoCapsule created = service.createFromMemory(USER_ID, request);
+
+        ArgumentCaptor<AuthorizedMemoryRef> inserted = ArgumentCaptor.forClass(AuthorizedMemoryRef.class);
+        verify(authorizedMemoryRefMapper).insert(inserted.capture());
+        assertEquals(3002L, inserted.getValue().capsuleId);
+        assertEquals(77L, inserted.getValue().memoryCardId);
+        assertEquals("AUTHORIZED", inserted.getValue().authorizationStatus);
+        assertEquals("[\"77\"]", created.authorizedMemoryIds);
+
+        when(echoCapsuleMapper.selectOne(any())).thenReturn(created);
+        when(authorizedMemoryRefMapper.selectList(any())).thenReturn(List.of(inserted.getValue()));
+        service.archiveCapsule(USER_ID, created.id);
+
+        assertFalse(created.isPublic);
+        assertEquals("ARCHIVED", created.visibilityStatus);
+        assertEquals("[]", created.authorizedMemoryIds);
+        assertEquals("WITHDRAWN", inserted.getValue().authorizationStatus);
+        verify(authorizedMemoryRefMapper).updateById(inserted.getValue());
     }
 }

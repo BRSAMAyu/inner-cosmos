@@ -14,6 +14,7 @@ import com.innercosmos.mapper.EchoCapsuleMapper;
 import com.innercosmos.mapper.MemoryCardMapper;
 import com.innercosmos.mapper.PersonaChatMessageMapper;
 import com.innercosmos.mapper.PersonaChatSessionMapper;
+import com.innercosmos.mapper.AuthorizedMemoryRefMapper;
 import com.innercosmos.service.SafetyService;
 import com.innercosmos.vo.SafetyResult;
 import org.junit.jupiter.api.BeforeEach;
@@ -53,6 +54,7 @@ class PersonaChatServiceImplPhaseBTest {
     @Mock private AgentContextAssembler agentContextAssembler;
     @Mock private CapsuleUsageQuotaMapper quotaMapper;
     @Mock private JdbcTemplate jdbcTemplate;
+    @Mock private AuthorizedMemoryRefMapper authorizedMemoryRefMapper;
 
     private PersonaChatServiceImpl service;
 
@@ -62,7 +64,7 @@ class PersonaChatServiceImplPhaseBTest {
                 sessionMapper, messageMapper, capsuleMapper,
                 capsuleAgent, safetyService, structuredAiService,
                 boundaryMapper, memoryCardMapper, agentContextAssembler,
-                quotaMapper, jdbcTemplate);
+                quotaMapper, jdbcTemplate, authorizedMemoryRefMapper);
     }
 
     private EchoCapsule capsule(Long id) {
@@ -269,5 +271,22 @@ class PersonaChatServiceImplPhaseBTest {
         // The conditional UPDATE ran twice (initial + retry).
         verify(jdbcTemplate, times(2)).update(contains("UPDATE tb_capsule_usage_quota SET turn_count = turn_count + 1"),
                 any(Object.class), any(Object.class), any(Object.class), any(Object.class));
+    }
+
+    @Test
+    void archivedCapsuleStopsAnExistingSessionBeforeSafetyOrAi() {
+        Long userId = 8L, sessionId = 18L, capsuleId = 108L;
+        EchoCapsule withdrawn = capsule(capsuleId);
+        withdrawn.visibilityStatus = "ARCHIVED";
+        withdrawn.isPublic = false;
+        when(sessionMapper.selectById(sessionId)).thenReturn(session(sessionId, userId, capsuleId));
+        when(capsuleMapper.selectById(capsuleId)).thenReturn(withdrawn);
+
+        var error = assertThrows(com.innercosmos.exception.BusinessException.class,
+                () -> service.reply(userId, sessionId, "are you still there?"));
+
+        assertEquals("CAPSULE_WITHDRAWN", error.code);
+        verifyNoInteractions(safetyService, structuredAiService);
+        verify(messageMapper, never()).insert(any(PersonaChatMessage.class));
     }
 }

@@ -17,6 +17,8 @@ import com.innercosmos.mapper.ClaimPropagationMapper;
 import com.innercosmos.mapper.MemoryCardMapper;
 import com.innercosmos.mapper.UnderstandingClaimMapper;
 import com.innercosmos.mapper.UserCorrectionMapper;
+import com.innercosmos.mapper.EchoCapsuleMapper;
+import com.innercosmos.entity.EchoCapsule;
 import com.innercosmos.service.UserCorrectionService;
 import com.innercosmos.vo.CorrectionConfirmationVO;
 import com.innercosmos.vo.CorrectionImpactVO;
@@ -38,6 +40,7 @@ public class UserCorrectionServiceImpl implements UserCorrectionService {
     private final MemoryCardMapper memoryCardMapper;
     private final AuthorizedMemoryRefMapper authorizedMemoryRefMapper;
     private final ApplicationEventPublisher eventPublisher;
+    private final EchoCapsuleMapper capsuleMapper;
 
     public UserCorrectionServiceImpl(UserCorrectionMapper userCorrectionMapper,
                                      UserPortraitService userPortraitService,
@@ -45,7 +48,8 @@ public class UserCorrectionServiceImpl implements UserCorrectionService {
                                      ClaimPropagationMapper propagationMapper,
                                      MemoryCardMapper memoryCardMapper,
                                      AuthorizedMemoryRefMapper authorizedMemoryRefMapper,
-                                     ApplicationEventPublisher eventPublisher) {
+                                     ApplicationEventPublisher eventPublisher,
+                                     EchoCapsuleMapper capsuleMapper) {
         this.userCorrectionMapper = userCorrectionMapper;
         this.userPortraitService = userPortraitService;
         this.claimMapper = claimMapper;
@@ -53,6 +57,7 @@ public class UserCorrectionServiceImpl implements UserCorrectionService {
         this.memoryCardMapper = memoryCardMapper;
         this.authorizedMemoryRefMapper = authorizedMemoryRefMapper;
         this.eventPublisher = eventPublisher;
+        this.capsuleMapper = capsuleMapper;
     }
 
     @Override
@@ -161,6 +166,12 @@ public class UserCorrectionServiceImpl implements UserCorrectionService {
             for (AuthorizedMemoryRef ref : refs) {
                 ref.authorizationStatus = "NEEDS_REVIEW";
                 authorizedMemoryRefMapper.updateById(ref);
+                EchoCapsule capsule = capsuleMapper.selectById(ref.capsuleId);
+                if (capsule != null && userId.equals(capsule.ownerUserId)) {
+                    capsule.visibilityStatus = "NEEDS_REVIEW";
+                    capsule.isPublic = false;
+                    capsuleMapper.updateById(capsule);
+                }
                 propagated.add(propagate(userId, correction.id, claim.id, "CAPSULE_CONTEXT", ref.id,
                         "REVIEW_REQUIRED", "已授权摘要受影响，等待用户复核"));
             }

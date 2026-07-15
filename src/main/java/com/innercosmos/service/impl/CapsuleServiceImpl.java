@@ -10,6 +10,8 @@ import com.innercosmos.mapper.CapsuleBoundaryMapper;
 import com.innercosmos.mapper.EchoCapsuleMapper;
 import com.innercosmos.mapper.MemoryCardMapper;
 import com.innercosmos.mapper.UserPortraitMapper;
+import com.innercosmos.mapper.AuthorizedMemoryRefMapper;
+import com.innercosmos.entity.AuthorizedMemoryRef;
 import com.innercosmos.entity.MemoryCard;
 import com.innercosmos.entity.UserPortrait;
 import com.innercosmos.ai.semantic.PseudoSemanticAnalyzer;
@@ -35,17 +37,20 @@ public class CapsuleServiceImpl implements CapsuleService {
     private final CapsuleAgent capsuleAgent;
     private final MemoryCardMapper memoryCardMapper;
     private final UserPortraitMapper userPortraitMapper;
+    private final AuthorizedMemoryRefMapper authorizedMemoryRefMapper;
 
     public CapsuleServiceImpl(EchoCapsuleMapper capsuleMapper,
                               CapsuleBoundaryMapper boundaryMapper,
                               CapsuleAgent capsuleAgent,
                               MemoryCardMapper memoryCardMapper,
-                              UserPortraitMapper userPortraitMapper) {
+                              UserPortraitMapper userPortraitMapper,
+                              AuthorizedMemoryRefMapper authorizedMemoryRefMapper) {
         this.capsuleMapper = capsuleMapper;
         this.boundaryMapper = boundaryMapper;
         this.capsuleAgent = capsuleAgent;
         this.memoryCardMapper = memoryCardMapper;
         this.userPortraitMapper = userPortraitMapper;
+        this.authorizedMemoryRefMapper = authorizedMemoryRefMapper;
     }
 
     @Override
@@ -59,26 +64,21 @@ public class CapsuleServiceImpl implements CapsuleService {
 
         // Fetch selected memory cards to synthesize user persona
         List<String> memorySummaries = new java.util.ArrayList<>();
+        List<MemoryCard> authorizedCards = new java.util.ArrayList<>();
         if (request.memoryIds != null && !request.memoryIds.isEmpty()) {
             for (Long mid : request.memoryIds) {
                 MemoryCard card = memoryCardMapper.selectById(mid);
-                if (card != null && userId.equals(card.userId)) {
+                if (card != null && userId.equals(card.userId) && "ACTIVE".equalsIgnoreCase(card.status)) {
                     memorySummaries.add(card.title + ": " + card.summary);
+                    authorizedCards.add(card);
                 }
             }
         }
-        if (memorySummaries.isEmpty()) {
-            QueryWrapper<MemoryCard> q = new QueryWrapper<>();
-            q.eq("user_id", userId).eq("status", "ACTIVE").orderByDesc("emotional_gravity").last("LIMIT 5");
-            List<MemoryCard> cards = memoryCardMapper.selectList(q);
-            for (MemoryCard card : cards) {
-                memorySummaries.add(card.title + ": " + card.summary);
-            }
-        }
+        // Empty selection means a generic capsule, never implicit consent to the owner's top memories.
         capsule.personaPrompt = capsuleAgent.generateUserPersona(userId, memorySummaries, capsule.pseudonym, capsule.intro);
 
         capsule.publicTags = toJsonArray(request.publicTags, "self-resonance");
-        capsule.authorizedMemoryIds = toJsonArray(request.memoryIds != null ? request.memoryIds.stream().map(String::valueOf).toList() : null);
+        capsule.authorizedMemoryIds = toJsonArray(authorizedCards.stream().map(card -> String.valueOf(card.id)).toList());
         capsule.ownerContextNote = request.ownerContextNote;
         capsule.styleProfileJson = request.styleProfileJson == null ? inferStyleProfile(memorySummaries) : request.styleProfileJson;
         capsule.contextPreviewJson = request.contextPreviewJson == null ? buildContextPreview(memorySummaries, capsule.publicTags, capsule.ownerContextNote) : request.contextPreviewJson;
@@ -100,6 +100,7 @@ public class CapsuleServiceImpl implements CapsuleService {
         boundary.allowLetterRequest = request.allowLetterRequest == null ? true : request.allowLetterRequest;
         boundary.privacyLevel = safePrivacy(request.privacyLevel);
         boundaryMapper.insert(boundary);
+        for (MemoryCard card : authorizedCards) authorize(capsule.id, card);
         return capsule;
     }
 
@@ -116,7 +117,12 @@ public class CapsuleServiceImpl implements CapsuleService {
         if (body.containsKey("standInEnabled")) capsule.standInEnabled = Boolean.TRUE.equals(body.get("standInEnabled"));
         if (body.containsKey("realContactPolicy")) capsule.realContactPolicy = safeContactPolicy(stringValue(body.get("realContactPolicy")));
         if (body.containsKey("publicTags")) capsule.publicTags = toJsonArray(castStringList(body.get("publicTags")), "self-resonance");
-        if (body.containsKey("authorizedMemoryIds")) capsule.authorizedMemoryIds = toJsonArray(castStringList(body.get("authorizedMemoryIds")));
+        if (body.containsKey("authorizedMemoryIds")) {
+            List<Long> requested = parseLongIds(toJsonArray(castStringList(body.get("authorizedMemoryIds"))));
+            replaceAuthorizations(userId, capsule, requested);
+            capsule.visibilityStatus = "NEEDS_REVIEW";
+            capsule.isPublic = false;
+        }
         capsule.lastMemoryUpdateAt = LocalDateTime.now();
         if (capsule.contextPreviewJson == null || capsule.contextPreviewJson.isBlank()) {
             capsule.contextPreviewJson = buildContextPreview(List.of(capsule.intro), capsule.publicTags, capsule.ownerContextNote);
@@ -170,6 +176,12 @@ public class CapsuleServiceImpl implements CapsuleService {
         EchoCapsule capsule = getOwnedCapsule(userId, capsuleId);
         if (capsule == null) {
             return null;
+        }
+        if ("PUBLIC".equals(visibilityStatus) && authorizedMemoryRefMapper.selectCount(
+                new QueryWrapper<AuthorizedMemoryRef>().eq("capsule_id", capsuleId)
+                        .ne("authorization_status", "AUTHORIZED")) > 0) {
+            throw new com.innercosmos.exception.BusinessException(
+                    com.innercosmos.common.ErrorCode.BAD_REQUEST, "授权记忆需要复核后才能重新公开");
         }
         capsule.visibilityStatus = safeVisibility(visibilityStatus);
         capsule.isPublic = isPublic == null ? !"PRIVATE".equals(capsule.visibilityStatus) : isPublic;
@@ -439,7 +451,40 @@ public class CapsuleServiceImpl implements CapsuleService {
         }
         capsule.visibilityStatus = "ARCHIVED";
         capsule.isPublic = false;
+        capsule.authorizedMemoryIds = "[]";
         capsuleMapper.updateById(capsule);
+        for (AuthorizedMemoryRef ref : authorizedMemoryRefMapper.selectList(
+                new QueryWrapper<AuthorizedMemoryRef>().eq("capsule_id", capsuleId))) {
+            ref.authorizationStatus = "WITHDRAWN";
+            authorizedMemoryRefMapper.updateById(ref);
+        }
+    }
+
+    private void replaceAuthorizations(Long userId, EchoCapsule capsule, List<Long> requestedIds) {
+        for (AuthorizedMemoryRef ref : authorizedMemoryRefMapper.selectList(
+                new QueryWrapper<AuthorizedMemoryRef>().eq("capsule_id", capsule.id))) {
+            ref.authorizationStatus = "WITHDRAWN";
+            authorizedMemoryRefMapper.updateById(ref);
+        }
+        List<MemoryCard> accepted = new ArrayList<>();
+        for (Long id : requestedIds) {
+            MemoryCard card = memoryCardMapper.selectById(id);
+            if (card != null && userId.equals(card.userId) && "ACTIVE".equalsIgnoreCase(card.status)) {
+                accepted.add(card);
+                authorize(capsule.id, card);
+            }
+        }
+        capsule.authorizedMemoryIds = toJsonArray(accepted.stream().map(card -> String.valueOf(card.id)).toList());
+    }
+
+    private void authorize(Long capsuleId, MemoryCard card) {
+        AuthorizedMemoryRef ref = new AuthorizedMemoryRef();
+        ref.capsuleId = capsuleId;
+        ref.memoryCardId = card.id;
+        String summary = card.summary == null ? "" : card.summary;
+        ref.abstractExcerpt = summary.substring(0, Math.min(180, summary.length()));
+        ref.authorizationStatus = "AUTHORIZED";
+        authorizedMemoryRefMapper.insert(ref);
     }
 
     @Override

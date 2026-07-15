@@ -19,6 +19,8 @@ import com.innercosmos.mapper.EchoCapsuleMapper;
 import com.innercosmos.mapper.MemoryCardMapper;
 import com.innercosmos.mapper.PersonaChatMessageMapper;
 import com.innercosmos.mapper.PersonaChatSessionMapper;
+import com.innercosmos.mapper.AuthorizedMemoryRefMapper;
+import com.innercosmos.entity.AuthorizedMemoryRef;
 import com.innercosmos.service.PersonaChatService;
 import com.innercosmos.service.SafetyService;
 import com.innercosmos.vo.CapsuleQuotaVO;
@@ -68,6 +70,7 @@ public class PersonaChatServiceImpl implements PersonaChatService {
     // (read via mapper, write via jdbcTemplate) is intentional.
     private final CapsuleUsageQuotaMapper quotaMapper;
     private final JdbcTemplate jdbcTemplate;
+    private final AuthorizedMemoryRefMapper authorizedMemoryRefMapper;
 
     public PersonaChatServiceImpl(PersonaChatSessionMapper sessionMapper,
                                   PersonaChatMessageMapper messageMapper,
@@ -79,7 +82,8 @@ public class PersonaChatServiceImpl implements PersonaChatService {
                                   MemoryCardMapper memoryCardMapper,
                                   AgentContextAssembler agentContextAssembler,
                                   CapsuleUsageQuotaMapper quotaMapper,
-                                  JdbcTemplate jdbcTemplate) {
+                                  JdbcTemplate jdbcTemplate,
+                                  AuthorizedMemoryRefMapper authorizedMemoryRefMapper) {
         this.sessionMapper = sessionMapper;
         this.messageMapper = messageMapper;
         this.capsuleMapper = capsuleMapper;
@@ -91,6 +95,7 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         this.agentContextAssembler = agentContextAssembler;
         this.quotaMapper = quotaMapper;
         this.jdbcTemplate = jdbcTemplate;
+        this.authorizedMemoryRefMapper = authorizedMemoryRefMapper;
     }
 
     @Override
@@ -125,6 +130,8 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         if (!userId.equals(session.visitorUserId)) {
             throw new BusinessException("UNAUTHORIZED", "无权操作此会话");
         }
+        EchoCapsule capsule = capsuleMapper.selectById(session.capsuleId);
+        requireRunnableCapsule(capsule);
         SafetyResult safety = safetyService.check(message, userId, null);
 
         // IC-CAP-002 MAJOR-2: the visitor message is persisted ONLY when the turn is
@@ -141,7 +148,6 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         capsuleMessage.senderType = "CAPSULE";
 
         // Fetch capsule once, before any branch
-        EchoCapsule capsule = capsuleMapper.selectById(session.capsuleId);
         int dailyLimit = resolveDailyLimit(capsule);
 
         if (Boolean.TRUE.equals(safety.blockModelCall)) {
@@ -343,22 +349,36 @@ public class PersonaChatServiceImpl implements PersonaChatService {
 
     private String authorizedMemorySummary(EchoCapsule capsule) {
         if (capsule == null || capsule.authorizedMemoryIds == null || capsule.authorizedMemoryIds.isBlank()) return "";
-        // Batch fetch: collect IDs first, then single query instead of N+1
-        java.util.List<Long> ids = new java.util.ArrayList<>();
-        for (String raw : capsule.authorizedMemoryIds.replace("[", "").replace("]", "").replace("\"", "").split(",")) {
-            try {
-                Long id = Long.parseLong(raw.trim());
-                ids.add(id);
-            } catch (Exception ignored) {}
-        }
+        java.util.List<Long> ids = authorizedMemoryRefMapper.selectList(
+                        new QueryWrapper<AuthorizedMemoryRef>().eq("capsule_id", capsule.id)
+                                .eq("authorization_status", "AUTHORIZED"))
+                .stream().map(ref -> ref.memoryCardId).toList();
         if (ids.isEmpty()) return "";
         java.util.List<MemoryCard> cards = memoryCardMapper.selectBatchIds(ids);
         StringBuilder sb = new StringBuilder();
         for (MemoryCard card : cards) {
+            if (!java.util.Objects.equals(capsule.ownerUserId, card.userId)
+                    || !"ACTIVE".equalsIgnoreCase(card.status)) continue;
             sb.append("#").append(card.id).append(" ").append(card.title).append("：")
                     .append(card.summary == null ? "" : card.summary.substring(0, Math.min(card.summary.length(), 180))).append("\n");
         }
         return sb.toString();
+    }
+
+    private void requireRunnableCapsule(EchoCapsule capsule) {
+        if (capsule == null || !Boolean.TRUE.equals(capsule.isPublic)
+                || !"PUBLIC".equals(capsule.visibilityStatus)) {
+            throw new BusinessException("CAPSULE_WITHDRAWN", "这个共鸣体已撤回，不能继续代表原用户回应");
+        }
+        if (!"USER_CAPSULE".equals(capsule.capsuleType)) return;
+        List<AuthorizedMemoryRef> refs = authorizedMemoryRefMapper.selectList(
+                new QueryWrapper<AuthorizedMemoryRef>().eq("capsule_id", capsule.id));
+        boolean claimsAuthorization = capsule.authorizedMemoryIds != null
+                && !capsule.authorizedMemoryIds.replace("[", "").replace("]", "").isBlank();
+        if ((claimsAuthorization && refs.isEmpty())
+                || refs.stream().anyMatch(ref -> !"AUTHORIZED".equals(ref.authorizationStatus))) {
+            throw new BusinessException("CAPSULE_REVIEW_REQUIRED", "这个共鸣体的授权记忆已变化，需由主人复核后再继续");
+        }
     }
 
     private List<String> recentHistory(Long sessionId) {

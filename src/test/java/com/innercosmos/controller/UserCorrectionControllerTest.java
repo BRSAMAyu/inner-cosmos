@@ -5,6 +5,10 @@ import com.innercosmos.config.TestRateLimitConfig;
 import com.innercosmos.common.Constants;
 import com.innercosmos.entity.MemoryCard;
 import com.innercosmos.mapper.MemoryCardMapper;
+import com.innercosmos.mapper.EchoCapsuleMapper;
+import com.innercosmos.mapper.AuthorizedMemoryRefMapper;
+import com.innercosmos.entity.EchoCapsule;
+import com.innercosmos.entity.AuthorizedMemoryRef;
 import com.innercosmos.service.MemoryService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -58,6 +62,9 @@ class UserCorrectionControllerTest {
 
     @Autowired
     MemoryService memoryService;
+
+    @Autowired EchoCapsuleMapper capsuleMapper;
+    @Autowired AuthorizedMemoryRefMapper authorizedMemoryRefMapper;
 
     private MockHttpSession session;
 
@@ -196,6 +203,35 @@ class UserCorrectionControllerTest {
         org.junit.jupiter.api.Assertions.assertEquals("SUPERSEDED", memoryCardMapper.selectById(card.id).status);
         org.junit.jupiter.api.Assertions.assertTrue(memoryService.starfield(userId).stream()
                 .noneMatch(star -> card.id.equals(star.id)));
+    }
+
+    @Test
+    void correctionImmediatelyUnpublishesAffectedCapsuleAndRequiresAuthorizationReview() throws Exception {
+        Long userId = (Long) session.getAttribute(Constants.SESSION_USER_KEY);
+        MemoryCard card = new MemoryCard();
+        card.userId = userId; card.title = "旧的关系判断"; card.summary = "我不需要任何陪伴";
+        card.status = "ACTIVE"; memoryCardMapper.insert(card);
+        EchoCapsule capsule = new EchoCapsule();
+        capsule.ownerUserId = userId; capsule.capsuleType = "USER_CAPSULE"; capsule.pseudonym = "待复核回声";
+        capsule.visibilityStatus = "PUBLIC"; capsule.isPublic = true;
+        capsule.authorizedMemoryIds = "[\"" + card.id + "\"]"; capsuleMapper.insert(capsule);
+        AuthorizedMemoryRef ref = new AuthorizedMemoryRef();
+        ref.capsuleId = capsule.id; ref.memoryCardId = card.id;
+        ref.authorizationStatus = "AUTHORIZED"; ref.abstractExcerpt = card.summary;
+        authorizedMemoryRefMapper.insert(ref);
+
+        String body = "{\"targetType\":\"MEMORY_CARD\",\"targetId\":" + card.id
+                + ",\"fieldName\":\"summary\",\"oldValue\":\"我不需要任何陪伴\","
+                + "\"newValue\":\"我珍惜稳定但低压力的陪伴\"}";
+        mockMvc.perform(post("/api/aurora/corrections/confirm").session(session)
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk());
+
+        EchoCapsule changed = capsuleMapper.selectById(capsule.id);
+        org.junit.jupiter.api.Assertions.assertFalse(changed.isPublic);
+        org.junit.jupiter.api.Assertions.assertEquals("NEEDS_REVIEW", changed.visibilityStatus);
+        org.junit.jupiter.api.Assertions.assertEquals("NEEDS_REVIEW",
+                authorizedMemoryRefMapper.selectById(ref.id).authorizationStatus);
     }
 
     @Test
