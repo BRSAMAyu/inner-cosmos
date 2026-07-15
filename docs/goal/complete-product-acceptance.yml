@@ -64,8 +64,8 @@ gates:
         evidence: [evidence/m1/M1-SEC-001/, evidence/m1/M1-AUTH-WEB-001/, evidence/m1/M1-AUTH-OIDC-001/]
       - id: GOV-INNOVATION
         target: Innovation semantics remain authoritative and are governed by versioning, evaluation, consent, and rollback rather than deletion.
-        status: UNASSESSED
-        evidence: []
+        status: IN_PROGRESS
+        evidence: [evidence/innovation/INNO-SELF-001/, evidence/innovation/INNO-INNER-003/, evidence/innovation/INNO-CAP-002/]
 
   - id: G1
     name: Modern platform baseline
@@ -153,11 +153,11 @@ gates:
     status: IN_PROGRESS
     required: true
     acceptance:
-      - {id: CAPSULE-COMPILER, target: "Authorized data compiles into a versioned Genome with coverage, conflicts, sandbox, and withdrawal.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CAP-001/]}
+      - {id: CAPSULE-COMPILER, target: "Authorized data compiles into a versioned Genome with coverage, conflicts, sandbox, and withdrawal.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CAP-001/, evidence/innovation/INNO-CAP-002/]}
       - {id: CAPSULE-RUNTIME, target: "Planner, retrieval, speaker, critics, and reranker produce materially better fidelity than a long-prompt baseline.", status: UNASSESSED, evidence: []}
-      - {id: CAPSULE-SAFETY, target: "Fact, style, habit, boundary, leakage, adversarial, and longitudinal evaluations pass.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CAP-001/]}
+      - {id: CAPSULE-SAFETY, target: "Fact, style, habit, boundary, leakage, adversarial, and longitudinal evaluations pass.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CAP-001/, evidence/innovation/INNO-CAP-002/]}
       - {id: MATCH-MULTI, target: "Mirror, Complement, Growth Edge, Serendipity, and Contextual matching are explainable and user-controllable.", status: UNASSESSED, evidence: []}
-      - {id: SOCIAL-CLOSED-LOOP, target: "Discovery, capsule conversation, slow letter, mutual connection, refusal, report, and withdrawal work end to end.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CAP-001/]}
+      - {id: SOCIAL-CLOSED-LOOP, target: "Discovery, capsule conversation, slow letter, mutual connection, refusal, report, and withdrawal work end to end.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CAP-001/, evidence/innovation/INNO-CAP-002/]}
       - {id: SIMULATOR-ASSET, target: "An isolated consent-bound simulator demo proves reusable fidelity technology without covert personal-data training.", status: UNASSESSED, evidence: []}
 
   - id: G7

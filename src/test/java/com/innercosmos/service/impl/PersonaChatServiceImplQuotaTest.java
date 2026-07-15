@@ -16,6 +16,7 @@ import com.innercosmos.mapper.MemoryCardMapper;
 import com.innercosmos.mapper.PersonaChatMessageMapper;
 import com.innercosmos.mapper.PersonaChatSessionMapper;
 import com.innercosmos.mapper.AuthorizedMemoryRefMapper;
+import com.innercosmos.service.CapsuleGenomeService;
 import com.innercosmos.service.SafetyService;
 import com.innercosmos.vo.SafetyResult;
 import org.junit.jupiter.api.BeforeEach;
@@ -59,6 +60,7 @@ class PersonaChatServiceImplQuotaTest {
     @Mock private CapsuleUsageQuotaMapper quotaMapper;
     @Mock private JdbcTemplate jdbcTemplate;
     @Mock private AuthorizedMemoryRefMapper authorizedMemoryRefMapper;
+    @Mock private CapsuleGenomeService genomeService;
 
     private PersonaChatServiceImpl service;
 
@@ -68,7 +70,7 @@ class PersonaChatServiceImplQuotaTest {
                 sessionMapper, messageMapper, capsuleMapper,
                 capsuleAgent, safetyService, structuredAiService,
                 boundaryMapper, memoryCardMapper, agentContextAssembler,
-                quotaMapper, jdbcTemplate, authorizedMemoryRefMapper);
+                quotaMapper, jdbcTemplate, authorizedMemoryRefMapper, genomeService);
     }
 
     // ──────────────────────────────────────────────────────

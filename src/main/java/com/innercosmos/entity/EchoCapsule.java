@@ -25,4 +25,5 @@ public class EchoCapsule extends BaseEntity {
     public String realContactPolicy;
     // IC-CAP-002 B-4: last time this capsule had a genuinely successful chat turn.
     public LocalDateTime lastActivityAt;
+    public Long activeGenomeVersionId;
 }

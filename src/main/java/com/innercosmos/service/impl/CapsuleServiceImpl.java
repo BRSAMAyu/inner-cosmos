@@ -16,6 +16,7 @@ import com.innercosmos.entity.MemoryCard;
 import com.innercosmos.entity.UserPortrait;
 import com.innercosmos.ai.semantic.PseudoSemanticAnalyzer;
 import com.innercosmos.service.CapsuleService;
+import com.innercosmos.service.CapsuleGenomeService;
 import com.innercosmos.vo.CapsulePreviewVO;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,19 +39,22 @@ public class CapsuleServiceImpl implements CapsuleService {
     private final MemoryCardMapper memoryCardMapper;
     private final UserPortraitMapper userPortraitMapper;
     private final AuthorizedMemoryRefMapper authorizedMemoryRefMapper;
+    private final CapsuleGenomeService genomeService;
 
     public CapsuleServiceImpl(EchoCapsuleMapper capsuleMapper,
                               CapsuleBoundaryMapper boundaryMapper,
                               CapsuleAgent capsuleAgent,
                               MemoryCardMapper memoryCardMapper,
                               UserPortraitMapper userPortraitMapper,
-                              AuthorizedMemoryRefMapper authorizedMemoryRefMapper) {
+                              AuthorizedMemoryRefMapper authorizedMemoryRefMapper,
+                              CapsuleGenomeService genomeService) {
         this.capsuleMapper = capsuleMapper;
         this.boundaryMapper = boundaryMapper;
         this.capsuleAgent = capsuleAgent;
         this.memoryCardMapper = memoryCardMapper;
         this.userPortraitMapper = userPortraitMapper;
         this.authorizedMemoryRefMapper = authorizedMemoryRefMapper;
+        this.genomeService = genomeService;
     }
 
     @Override
@@ -68,7 +72,9 @@ public class CapsuleServiceImpl implements CapsuleService {
         if (request.memoryIds != null && !request.memoryIds.isEmpty()) {
             for (Long mid : request.memoryIds) {
                 MemoryCard card = memoryCardMapper.selectById(mid);
-                if (card != null && userId.equals(card.userId) && "ACTIVE".equalsIgnoreCase(card.status)) {
+                if (card != null && userId.equals(card.userId) && "ACTIVE".equalsIgnoreCase(card.status)
+                        && !"LOCAL_ONLY".equalsIgnoreCase(card.consentScope)
+                        && !"NO_EXTERNAL_PROCESSING".equalsIgnoreCase(card.consentScope)) {
                     memorySummaries.add(card.title + ": " + card.summary);
                     authorizedCards.add(card);
                 }
@@ -101,6 +107,7 @@ public class CapsuleServiceImpl implements CapsuleService {
         boundary.privacyLevel = safePrivacy(request.privacyLevel);
         boundaryMapper.insert(boundary);
         for (MemoryCard card : authorizedCards) authorize(capsule.id, card);
+        genomeService.compile(capsule, authorizedCards, "initial explicit capsule compilation");
         return capsule;
     }
 
@@ -122,6 +129,7 @@ public class CapsuleServiceImpl implements CapsuleService {
             replaceAuthorizations(userId, capsule, requested);
             capsule.visibilityStatus = "NEEDS_REVIEW";
             capsule.isPublic = false;
+            genomeService.markNeedsReview(capsule.id, "owner changed authorized memories");
         }
         capsule.lastMemoryUpdateAt = LocalDateTime.now();
         if (capsule.contextPreviewJson == null || capsule.contextPreviewJson.isBlank()) {
@@ -177,9 +185,8 @@ public class CapsuleServiceImpl implements CapsuleService {
         if (capsule == null) {
             return null;
         }
-        if ("PUBLIC".equals(visibilityStatus) && authorizedMemoryRefMapper.selectCount(
-                new QueryWrapper<AuthorizedMemoryRef>().eq("capsule_id", capsuleId)
-                        .ne("authorization_status", "AUTHORIZED")) > 0) {
+        if ("PUBLIC".equals(visibilityStatus) && (!currentAuthorizationsValid(capsule)
+                || (capsule.activeGenomeVersionId != null && genomeService.current(capsuleId) == null))) {
             throw new com.innercosmos.exception.BusinessException(
                     com.innercosmos.common.ErrorCode.BAD_REQUEST, "授权记忆需要复核后才能重新公开");
         }
@@ -453,6 +460,7 @@ public class CapsuleServiceImpl implements CapsuleService {
         capsule.isPublic = false;
         capsule.authorizedMemoryIds = "[]";
         capsuleMapper.updateById(capsule);
+        genomeService.withdraw(capsuleId, "owner archived capsule");
         for (AuthorizedMemoryRef ref : authorizedMemoryRefMapper.selectList(
                 new QueryWrapper<AuthorizedMemoryRef>().eq("capsule_id", capsuleId))) {
             ref.authorizationStatus = "WITHDRAWN";
@@ -460,7 +468,7 @@ public class CapsuleServiceImpl implements CapsuleService {
         }
     }
 
-    private void replaceAuthorizations(Long userId, EchoCapsule capsule, List<Long> requestedIds) {
+    private List<MemoryCard> replaceAuthorizations(Long userId, EchoCapsule capsule, List<Long> requestedIds) {
         for (AuthorizedMemoryRef ref : authorizedMemoryRefMapper.selectList(
                 new QueryWrapper<AuthorizedMemoryRef>().eq("capsule_id", capsule.id))) {
             ref.authorizationStatus = "WITHDRAWN";
@@ -469,12 +477,24 @@ public class CapsuleServiceImpl implements CapsuleService {
         List<MemoryCard> accepted = new ArrayList<>();
         for (Long id : requestedIds) {
             MemoryCard card = memoryCardMapper.selectById(id);
-            if (card != null && userId.equals(card.userId) && "ACTIVE".equalsIgnoreCase(card.status)) {
+            if (card != null && userId.equals(card.userId) && "ACTIVE".equalsIgnoreCase(card.status)
+                    && !"LOCAL_ONLY".equalsIgnoreCase(card.consentScope)
+                    && !"NO_EXTERNAL_PROCESSING".equalsIgnoreCase(card.consentScope)) {
                 accepted.add(card);
                 authorize(capsule.id, card);
             }
         }
         capsule.authorizedMemoryIds = toJsonArray(accepted.stream().map(card -> String.valueOf(card.id)).toList());
+        return accepted;
+    }
+
+    private boolean currentAuthorizationsValid(EchoCapsule capsule) {
+        Set<Long> ids = new LinkedHashSet<>(parseLongIds(capsule.authorizedMemoryIds));
+        if (ids.isEmpty()) return true;
+        long authorized = authorizedMemoryRefMapper.selectCount(new QueryWrapper<AuthorizedMemoryRef>()
+                .eq("capsule_id", capsule.id).in("memory_card_id", ids)
+                .eq("authorization_status", "AUTHORIZED"));
+        return authorized >= ids.size();
     }
 
     private void authorize(Long capsuleId, MemoryCard card) {
@@ -501,6 +521,36 @@ public class CapsuleServiceImpl implements CapsuleService {
                 .setSql("echo_energy = LEAST(1.0, COALESCE(echo_energy, 0) + 0.02)"));
         Double updated = capsuleMapper.selectById(capsuleId).echoEnergy;
         return updated == null ? 1.0 : updated;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public com.innercosmos.entity.CapsuleGenomeVersion recompileGenome(Long userId, Long capsuleId,
+                                                                       List<Long> memoryIds) {
+        EchoCapsule capsule = getOwnedCapsule(userId, capsuleId);
+        if (capsule == null) throw new com.innercosmos.exception.BusinessException(
+                com.innercosmos.common.ErrorCode.UNAUTHORIZED, "无权重新编译此共鸣体");
+        Set<Long> requested = new LinkedHashSet<>(memoryIds == null ? List.of() : memoryIds);
+        requested.remove(null);
+        List<MemoryCard> cards = replaceAuthorizations(userId, capsule,
+                new ArrayList<>(requested));
+        if (cards.size() != requested.size()) {
+            throw new com.innercosmos.exception.BusinessException(
+                    com.innercosmos.common.ErrorCode.BAD_REQUEST,
+                    "所选记忆包含已撤回、非本人或禁止用于共鸣体的内容");
+        }
+        List<String> summaries = cards.stream().map(card ->
+                (card.title == null ? "" : card.title) + ": " + (card.summary == null ? "" : card.summary)).toList();
+        capsule.personaPrompt = capsuleAgent.generateUserPersona(
+                userId, summaries, capsule.pseudonym, capsule.intro);
+        capsule.styleProfileJson = inferStyleProfile(summaries);
+        capsule.contextPreviewJson = buildContextPreview(
+                summaries, capsule.publicTags, capsule.ownerContextNote);
+        capsule.visibilityStatus = "PRIVATE";
+        capsule.isPublic = false;
+        capsule.lastMemoryUpdateAt = LocalDateTime.now();
+        capsuleMapper.updateById(capsule);
+        return genomeService.compile(capsule, cards, "owner reviewed and recompiled authorization");
     }
 
     private Integer safeTurns(Integer turns, boolean seedCapsule) {

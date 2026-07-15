@@ -20,6 +20,7 @@ import com.innercosmos.mapper.UserCorrectionMapper;
 import com.innercosmos.mapper.EchoCapsuleMapper;
 import com.innercosmos.entity.EchoCapsule;
 import com.innercosmos.service.UserCorrectionService;
+import com.innercosmos.service.CapsuleGenomeService;
 import com.innercosmos.vo.CorrectionConfirmationVO;
 import com.innercosmos.vo.CorrectionImpactVO;
 import org.springframework.context.ApplicationEventPublisher;
@@ -41,6 +42,7 @@ public class UserCorrectionServiceImpl implements UserCorrectionService {
     private final AuthorizedMemoryRefMapper authorizedMemoryRefMapper;
     private final ApplicationEventPublisher eventPublisher;
     private final EchoCapsuleMapper capsuleMapper;
+    private final CapsuleGenomeService genomeService;
 
     public UserCorrectionServiceImpl(UserCorrectionMapper userCorrectionMapper,
                                      UserPortraitService userPortraitService,
@@ -49,7 +51,8 @@ public class UserCorrectionServiceImpl implements UserCorrectionService {
                                      MemoryCardMapper memoryCardMapper,
                                      AuthorizedMemoryRefMapper authorizedMemoryRefMapper,
                                      ApplicationEventPublisher eventPublisher,
-                                     EchoCapsuleMapper capsuleMapper) {
+                                     EchoCapsuleMapper capsuleMapper,
+                                     CapsuleGenomeService genomeService) {
         this.userCorrectionMapper = userCorrectionMapper;
         this.userPortraitService = userPortraitService;
         this.claimMapper = claimMapper;
@@ -58,6 +61,7 @@ public class UserCorrectionServiceImpl implements UserCorrectionService {
         this.authorizedMemoryRefMapper = authorizedMemoryRefMapper;
         this.eventPublisher = eventPublisher;
         this.capsuleMapper = capsuleMapper;
+        this.genomeService = genomeService;
     }
 
     @Override
@@ -171,6 +175,7 @@ public class UserCorrectionServiceImpl implements UserCorrectionService {
                     capsule.visibilityStatus = "NEEDS_REVIEW";
                     capsule.isPublic = false;
                     capsuleMapper.updateById(capsule);
+                    genomeService.markNeedsReview(capsule.id, "authorized memory was explicitly corrected");
                 }
                 propagated.add(propagate(userId, correction.id, claim.id, "CAPSULE_CONTEXT", ref.id,
                         "REVIEW_REQUIRED", "已授权摘要受影响，等待用户复核"));

@@ -7,6 +7,8 @@ import com.innercosmos.entity.CapsuleBoundary;
 import com.innercosmos.entity.EchoCapsule;
 import com.innercosmos.service.CapsuleService;
 import com.innercosmos.service.DataMaskingService;
+import com.innercosmos.service.CapsuleGenomeService;
+import com.innercosmos.entity.CapsuleGenomeVersion;
 import com.innercosmos.vo.CapsulePreviewVO;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.web.bind.annotation.*;
@@ -20,10 +22,13 @@ import java.util.stream.Collectors;
 public class CapsuleController extends BaseController {
     private final CapsuleService capsuleService;
     private final DataMaskingService dataMaskingService;
+    private final CapsuleGenomeService genomeService;
 
-    public CapsuleController(CapsuleService capsuleService, DataMaskingService dataMaskingService) {
+    public CapsuleController(CapsuleService capsuleService, DataMaskingService dataMaskingService,
+                             CapsuleGenomeService genomeService) {
         this.capsuleService = capsuleService;
         this.dataMaskingService = dataMaskingService;
+        this.genomeService = genomeService;
     }
 
     @GetMapping("/my")
@@ -101,5 +106,22 @@ public class CapsuleController extends BaseController {
         Long userId = currentUserId(session);
         capsuleService.archiveCapsule(userId, id);
         return ApiResponse.ok(null);
+    }
+
+    @GetMapping("/{id}/genome-history")
+    public ApiResponse<List<CapsuleGenomeVersion>> genomeHistory(@PathVariable Long id, HttpSession session) {
+        return ApiResponse.ok(genomeService.history(currentUserId(session), id));
+    }
+
+    @PostMapping("/{id}/genome/recompile")
+    public ApiResponse<CapsuleGenomeVersion> recompileGenome(@PathVariable Long id,
+                                                              @RequestBody Map<String, Object> body,
+                                                              HttpSession session) {
+        Object raw = body.get("memoryIds");
+        if (!(raw instanceof List<?> values)) return ApiResponse.fail("BAD_REQUEST", "memoryIds不能为空");
+        List<Long> ids = values.stream().filter(Number.class::isInstance)
+                .map(Number.class::cast).map(Number::longValue).toList();
+        if (ids.size() != values.size()) return ApiResponse.fail("BAD_REQUEST", "memoryIds必须全部为数字");
+        return ApiResponse.ok(capsuleService.recompileGenome(currentUserId(session), id, ids));
     }
 }

@@ -46,13 +46,16 @@ class PostgresFlywayBaselineTest {
                 .locations("classpath:db/migration/postgresql")
                 .load();
 
-        assertEquals(10, flyway.migrate().migrationsExecuted);
+        assertEquals(11, flyway.migrate().migrationsExecuted);
         assertEquals(0, flyway.migrate().migrationsExecuted);
 
         String source = readClasspath("schema.sql");
         Set<String> expectedTables = matches(source, SOURCE_TABLE);
         Set<String> expectedIndexes = matches(source, SOURCE_INDEX);
         Set<String> expectedForeignKeys = matches(source, SOURCE_FOREIGN_KEY);
+        // The active-version pointer is a deliberate PostgreSQL-only cyclic FK: schema.sql
+        // creates echo capsules before genome versions for H2/MySQL portability.
+        expectedForeignKeys.add("fk_echo_capsule_active_genome");
 
         try (Connection connection = connection()) {
             Set<String> actualTables = values(connection, """
@@ -68,12 +71,12 @@ class PostgresFlywayBaselineTest {
                     WHERE constraint_schema='public' AND constraint_type='FOREIGN KEY'
                     """);
 
-            assertEquals(73, expectedTables.size(), "source schema table inventory changed");
+            assertEquals(74, expectedTables.size(), "source schema table inventory changed");
             assertEquals(expectedTables, actualTables, "PostgreSQL baseline table drift");
             assertTrue(actualIndexes.containsAll(expectedIndexes),
                     () -> "missing PostgreSQL indexes: " + difference(expectedIndexes, actualIndexes));
             assertEquals(expectedForeignKeys, actualForeignKeys, "PostgreSQL foreign-key drift");
-            assertEquals(71, scalar(connection, """
+            assertEquals(72, scalar(connection, """
                     SELECT COUNT(*) FROM information_schema.columns
                     WHERE table_schema='public' AND is_identity='YES'
                     """));

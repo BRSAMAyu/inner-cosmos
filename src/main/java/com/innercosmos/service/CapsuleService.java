@@ -3,6 +3,7 @@ package com.innercosmos.service;
 import com.innercosmos.dto.CapsuleCreateRequest;
 import com.innercosmos.entity.CapsuleBoundary;
 import com.innercosmos.entity.EchoCapsule;
+import com.innercosmos.entity.CapsuleGenomeVersion;
 import com.innercosmos.vo.CapsulePreviewVO;
 import java.util.List;
 import java.util.Map;
@@ -33,4 +34,6 @@ public interface CapsuleService {
     void archiveCapsule(Long userId, Long capsuleId);
 
     Double markLanded(Long userId, Long capsuleId);
+
+    CapsuleGenomeVersion recompileGenome(Long userId, Long capsuleId, List<Long> memoryIds);
 }

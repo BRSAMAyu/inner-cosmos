@@ -22,6 +22,8 @@ import com.innercosmos.mapper.PersonaChatSessionMapper;
 import com.innercosmos.mapper.AuthorizedMemoryRefMapper;
 import com.innercosmos.entity.AuthorizedMemoryRef;
 import com.innercosmos.service.PersonaChatService;
+import com.innercosmos.service.CapsuleGenomeService;
+import com.innercosmos.entity.CapsuleGenomeVersion;
 import com.innercosmos.service.SafetyService;
 import com.innercosmos.vo.CapsuleQuotaVO;
 import com.innercosmos.vo.SafetyResult;
@@ -33,8 +35,12 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class PersonaChatServiceImpl implements PersonaChatService {
@@ -71,6 +77,7 @@ public class PersonaChatServiceImpl implements PersonaChatService {
     private final CapsuleUsageQuotaMapper quotaMapper;
     private final JdbcTemplate jdbcTemplate;
     private final AuthorizedMemoryRefMapper authorizedMemoryRefMapper;
+    private final CapsuleGenomeService genomeService;
 
     public PersonaChatServiceImpl(PersonaChatSessionMapper sessionMapper,
                                   PersonaChatMessageMapper messageMapper,
@@ -83,7 +90,8 @@ public class PersonaChatServiceImpl implements PersonaChatService {
                                   AgentContextAssembler agentContextAssembler,
                                   CapsuleUsageQuotaMapper quotaMapper,
                                   JdbcTemplate jdbcTemplate,
-                                  AuthorizedMemoryRefMapper authorizedMemoryRefMapper) {
+                                  AuthorizedMemoryRefMapper authorizedMemoryRefMapper,
+                                  CapsuleGenomeService genomeService) {
         this.sessionMapper = sessionMapper;
         this.messageMapper = messageMapper;
         this.capsuleMapper = capsuleMapper;
@@ -96,6 +104,7 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         this.quotaMapper = quotaMapper;
         this.jdbcTemplate = jdbcTemplate;
         this.authorizedMemoryRefMapper = authorizedMemoryRefMapper;
+        this.genomeService = genomeService;
     }
 
     @Override
@@ -107,6 +116,7 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         if (!Boolean.TRUE.equals(capsule.isPublic) || !"PUBLIC".equals(capsule.visibilityStatus)) {
             throw new BusinessException("FORBIDDEN", "该共鸣体未公开,无法发起对话");
         }
+        requireRunnableCapsule(capsule);
         PersonaChatSession session = new PersonaChatSession();
         session.visitorUserId = userId;
         session.capsuleId = capsuleId;
@@ -131,7 +141,7 @@ public class PersonaChatServiceImpl implements PersonaChatService {
             throw new BusinessException("UNAUTHORIZED", "无权操作此会话");
         }
         EchoCapsule capsule = capsuleMapper.selectById(session.capsuleId);
-        requireRunnableCapsule(capsule);
+        CapsuleGenomeVersion genome = requireRunnableCapsule(capsule);
         SafetyResult safety = safetyService.check(message, userId, null);
 
         // IC-CAP-002 MAJOR-2: the visitor message is persisted ONLY when the turn is
@@ -169,7 +179,10 @@ public class PersonaChatServiceImpl implements PersonaChatService {
                 messageMapper.insert(userMessage);
                 String personaName = capsule != null && capsule.pseudonym != null ? capsule.pseudonym : "数字回声";
                 String personaIntro = capsule != null && capsule.intro != null ? capsule.intro : "一个有限的共鸣体";
-                String personaPrompt = capsule != null && capsule.personaPrompt != null && !capsule.personaPrompt.isBlank()
+                String compiledPrompt = genome == null ? null : genome.compiledPersonaPrompt;
+                String personaPrompt = compiledPrompt != null && !compiledPrompt.isBlank()
+                        ? compiledPrompt
+                        : capsule != null && capsule.personaPrompt != null && !capsule.personaPrompt.isBlank()
                         ? capsule.personaPrompt
                         : capsuleAgent.buildPersonaPrompt(personaName, personaIntro);
                 CapsuleBoundary boundary = boundary(capsule == null ? null : capsule.id);
@@ -365,20 +378,32 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         return sb.toString();
     }
 
-    private void requireRunnableCapsule(EchoCapsule capsule) {
+    private CapsuleGenomeVersion requireRunnableCapsule(EchoCapsule capsule) {
         if (capsule == null || !Boolean.TRUE.equals(capsule.isPublic)
                 || !"PUBLIC".equals(capsule.visibilityStatus)) {
             throw new BusinessException("CAPSULE_WITHDRAWN", "这个共鸣体已撤回，不能继续代表原用户回应");
         }
-        if (!"USER_CAPSULE".equals(capsule.capsuleType)) return;
-        List<AuthorizedMemoryRef> refs = authorizedMemoryRefMapper.selectList(
-                new QueryWrapper<AuthorizedMemoryRef>().eq("capsule_id", capsule.id));
-        boolean claimsAuthorization = capsule.authorizedMemoryIds != null
-                && !capsule.authorizedMemoryIds.replace("[", "").replace("]", "").isBlank();
-        if ((claimsAuthorization && refs.isEmpty())
-                || refs.stream().anyMatch(ref -> !"AUTHORIZED".equals(ref.authorizationStatus))) {
+        if (!"USER_CAPSULE".equals(capsule.capsuleType)) return null;
+        CapsuleGenomeVersion genome = genomeService.current(capsule.id);
+        if (capsule.activeGenomeVersionId != null && genome == null) {
+            throw new BusinessException("CAPSULE_REVIEW_REQUIRED", "这个共鸣体的当前版本需要主人复核");
+        }
+        Set<Long> selectedIds = selectedMemoryIds(capsule.authorizedMemoryIds);
+        long authorizedCount = selectedIds.isEmpty() ? 0 : authorizedMemoryRefMapper.selectCount(
+                new QueryWrapper<AuthorizedMemoryRef>().eq("capsule_id", capsule.id)
+                        .in("memory_card_id", selectedIds).eq("authorization_status", "AUTHORIZED"));
+        if (authorizedCount < selectedIds.size()) {
             throw new BusinessException("CAPSULE_REVIEW_REQUIRED", "这个共鸣体的授权记忆已变化，需由主人复核后再继续");
         }
+        return genome;
+    }
+
+    private Set<Long> selectedMemoryIds(String json) {
+        Set<Long> ids = new LinkedHashSet<>();
+        if (json == null || json.isBlank()) return ids;
+        Matcher matcher = Pattern.compile("\\d+").matcher(json);
+        while (matcher.find()) ids.add(Long.parseLong(matcher.group()));
+        return ids;
     }
 
     private List<String> recentHistory(Long sessionId) {

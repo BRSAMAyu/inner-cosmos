@@ -12,6 +12,7 @@ import com.innercosmos.mapper.EchoCapsuleMapper;
 import com.innercosmos.mapper.MemoryCardMapper;
 import com.innercosmos.mapper.UserPortraitMapper;
 import com.innercosmos.mapper.AuthorizedMemoryRefMapper;
+import com.innercosmos.service.CapsuleGenomeService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -42,6 +43,7 @@ class CapsuleMatchingTest {
     @Mock MemoryCardMapper memoryCardMapper;
     @Mock UserPortraitMapper userPortraitMapper;
     @Mock AuthorizedMemoryRefMapper authorizedMemoryRefMapper;
+    @Mock CapsuleGenomeService genomeService;
 
     CapsuleServiceImpl service;
 
@@ -52,7 +54,7 @@ class CapsuleMatchingTest {
     @BeforeEach
     void setUp() {
         service = new CapsuleServiceImpl(echoCapsuleMapper, boundaryMapper, capsuleAgent,
-                memoryCardMapper, userPortraitMapper, authorizedMemoryRefMapper);
+                memoryCardMapper, userPortraitMapper, authorizedMemoryRefMapper, genomeService);
         // default: no portrait rows unless a test overrides
         lenient().when(userPortraitMapper.selectList(any())).thenReturn(new ArrayList<>());
     }

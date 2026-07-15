@@ -421,6 +421,7 @@ CREATE TABLE IF NOT EXISTS tb_echo_capsule (
   stand_in_enabled BOOLEAN DEFAULT FALSE,
   real_contact_policy VARCHAR(32),
   last_activity_at TIMESTAMP NULL,
+  active_genome_version_id BIGINT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_capsule_public (is_public, visibility_status),
@@ -1085,6 +1086,28 @@ CREATE TABLE IF NOT EXISTS tb_aurora_self_reflection (
   INDEX idx_reflection_status (status),
   INDEX idx_reflection_user_status_created (user_id, status, created_at),
   INDEX idx_reflection_user_dim (user_id, dimension, status)
+);
+
+CREATE TABLE IF NOT EXISTS tb_capsule_genome_version (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  capsule_id BIGINT NOT NULL,
+  owner_user_id BIGINT NOT NULL,
+  version_no INT NOT NULL,
+  parent_version_id BIGINT,
+  compiler_version VARCHAR(64) NOT NULL,
+  status VARCHAR(32) NOT NULL,
+  authorization_snapshot_json TEXT NOT NULL,
+  compiled_persona_prompt TEXT NOT NULL,
+  style_profile_json TEXT,
+  context_preview_json TEXT,
+  evaluation_json TEXT NOT NULL,
+  change_reason VARCHAR(255),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (capsule_id, version_no),
+  INDEX idx_capsule_genome_status (capsule_id, status),
+  CONSTRAINT fk_capsule_genome_capsule FOREIGN KEY (capsule_id) REFERENCES tb_echo_capsule(id) ON DELETE CASCADE,
+  CONSTRAINT fk_capsule_genome_parent FOREIGN KEY (parent_version_id) REFERENCES tb_capsule_genome_version(id)
 );
 
 CREATE TABLE IF NOT EXISTS tb_aurora_self_version (
