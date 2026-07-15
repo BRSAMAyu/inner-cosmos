@@ -12,6 +12,9 @@ import com.innercosmos.mapper.DailyRecordMapper;
 import com.innercosmos.mapper.DialogMessageMapper;
 import com.innercosmos.mapper.EmotionTraceMapper;
 import com.innercosmos.mapper.MemoryCardMapper;
+import com.innercosmos.mapper.MemoryLinkMapper;
+import com.innercosmos.mapper.MemoryOperationMapper;
+import com.innercosmos.mapper.MemoryProjectionReceiptMapper;
 import com.innercosmos.mapper.RelationMentionMapper;
 import com.innercosmos.mapper.ThoughtFragmentMapper;
 import com.innercosmos.mapper.TodoItemMapper;
@@ -51,6 +54,12 @@ public class MemoryServiceImpl implements MemoryService {
     private final DialogService dialogService;
     @Autowired(required = false)
     private ApplicationEventPublisher eventPublisher;
+    @Autowired(required = false)
+    private MemoryOperationMapper memoryOperationMapper;
+    @Autowired(required = false)
+    private MemoryLinkMapper memoryLinkMapper;
+    @Autowired(required = false)
+    private MemoryProjectionReceiptMapper memoryProjectionReceiptMapper;
 
     public MemoryServiceImpl(MemoryCardMapper memoryCardMapper,
                              DialogMessageMapper messageMapper,
@@ -365,6 +374,28 @@ public class MemoryServiceImpl implements MemoryService {
         detail.relations = relationMentionMapper.selectList(
                 new QueryWrapper<com.innercosmos.entity.RelationMention>().eq("memory_card_id", cardId));
         detail.themes = themeAggregationService.themesForCard(cardId);
+        if (memoryOperationMapper != null) {
+            detail.versionHistory = memoryOperationMapper.selectList(
+                    new QueryWrapper<com.innercosmos.entity.MemoryOperation>().eq("user_id", userId)
+                            .and(q -> q.eq("primary_memory_id", cardId)
+                                    .or().like("related_memory_ids", "," + cardId + ","))
+                            .orderByDesc("id").last("LIMIT 20"));
+        } else detail.versionHistory = List.of();
+        if (memoryLinkMapper != null) {
+            detail.links = memoryLinkMapper.selectList(new QueryWrapper<com.innercosmos.entity.MemoryLink>()
+                    .eq("user_id", userId).and(q -> q.eq("source_memory_id", cardId)
+                            .or().eq("target_memory_id", cardId)).orderByDesc("id"));
+        } else detail.links = List.of();
+        if (memoryProjectionReceiptMapper != null && !detail.versionHistory.isEmpty()) {
+            detail.projectionReceipts = memoryProjectionReceiptMapper.selectList(
+                    new QueryWrapper<com.innercosmos.entity.MemoryProjectionReceipt>()
+                            .eq("user_id", userId).in("operation_id",
+                                    detail.versionHistory.stream().map(operation -> operation.id).toList())
+                            .orderByDesc("id"));
+        } else detail.projectionReceipts = List.of();
+        detail.provenanceExplanation = card.sourceSessionId == null
+                ? "这条记忆由你直接创建或在整理过程中形成；所有后续变化均保留版本。"
+                : "这条记忆来自一次仅你可见的 Aurora 对话；详情不向共鸣体公开，除非你另行授权。";
         detail.gravityExplanation = "情感重力 " + String.format("%.2f", card.emotionalGravity)
                 + ",由情绪强度 " + card.intensityScore
                 + "、用户重要性 " + card.userImportance

@@ -1,0 +1,30 @@
+{
+  "datasetVersion": "memory-retrieval-v1",
+  "thresholds": { "recallAt3": 0.90, "mrr": 0.85, "prohibitedLeakage": 0, "budgetViolations": 0, "p95Millis": 150 },
+  "memories": [
+    { "key": "xiaolin-boundary", "title": "和小林谈边界", "summary": "我希望先恢复精力，再解释为什么需要独处", "type": "RELATION", "layer": "RELATIONAL", "status": "ACTIVE" },
+    { "key": "course-report", "title": "周五提交课程报告", "summary": "完成实验图表并检查引用", "type": "TODO", "layer": "PROSPECTIVE", "status": "ACTIVE" },
+    { "key": "rain-anxiety", "title": "雨夜焦虑后的恢复", "summary": "给感受命名后呼吸慢慢平稳", "type": "EMOTION", "layer": "EMOTIONAL", "status": "ACTIVE" },
+    { "key": "listen-first", "title": "先被倾听再听建议", "summary": "被接住以后我更能考虑行动方案", "type": "COGNITION", "layer": "SEMANTIC", "status": "ACTIVE" },
+    { "key": "walk-recovery", "title": "压力大时散步会恢复", "summary": "短暂离开屏幕能让我重新集中", "type": "HABIT", "layer": "PROCEDURAL", "status": "ACTIVE" },
+    { "key": "mother-silence", "title": "和母亲沟通时容易沉默", "summary": "担心冲突时会先把真实需要收起来", "type": "RELATION", "layer": "RELATIONAL", "status": "ACTIVE" },
+    { "key": "solo-travel", "title": "第一次独自旅行", "summary": "迷路后自己找到车站让我感到有能力", "type": "EVENT", "layer": "EPISODIC", "status": "ACTIVE" },
+    { "key": "dentist", "title": "预约牙医", "summary": "下周处理持续不适的牙齿", "type": "TODO", "layer": "PROSPECTIVE", "status": "ACTIVE" },
+    { "key": "friend-contradicted", "title": "我从不需要朋友", "summary": "一次低落时形成的绝对判断", "type": "COGNITION", "layer": "SEMANTIC", "status": "CONTRADICTED" },
+    { "key": "escape-superseded", "title": "我总是在逃避", "summary": "已经被用户纠正的旧理解", "type": "COGNITION", "layer": "SEMANTIC", "status": "SUPERSEDED" },
+    { "key": "forgotten", "title": "要求忘记的隐私", "summary": "任何查询都不得返回", "type": "EVENT", "layer": "EPISODIC", "status": "FORGOTTEN" },
+    { "key": "careful-choice", "title": "我在谨慎选择下一步", "summary": "停下来是在辨认风险和真正想要的方向", "type": "COGNITION", "layer": "SEMANTIC", "status": "ACTIVE" }
+  ],
+  "cases": [
+    { "query": "小林 独处 边界", "task": "RELATION_REVIEW", "relevant": ["xiaolin-boundary"], "prohibited": ["friend-contradicted"] },
+    { "query": "周五 课程 报告", "task": "ACTION_SPLIT", "relevant": ["course-report"], "prohibited": [] },
+    { "query": "雨夜 焦虑 恢复", "task": "EMOTION_REFLECTION", "relevant": ["rain-anxiety"], "prohibited": [] },
+    { "query": "先倾听 再建议", "task": "AURORA_CONVERSATION", "relevant": ["listen-first"], "prohibited": [] },
+    { "query": "压力 散步 恢复", "task": "PROFILE_SUPPORT", "relevant": ["walk-recovery"], "prohibited": [] },
+    { "query": "母亲 沟通 沉默", "task": "RELATION_REVIEW", "relevant": ["mother-silence"], "prohibited": [] },
+    { "query": "独自 旅行 车站", "task": "AURORA_CONVERSATION", "relevant": ["solo-travel"], "prohibited": [] },
+    { "query": "预约 牙医 下周", "task": "ACTION_SPLIT", "relevant": ["dentist"], "prohibited": [] },
+    { "query": "朋友 支持", "task": "RELATION_REVIEW", "relevant": [], "prohibited": ["friend-contradicted", "forgotten"] },
+    { "query": "不是逃避 下一步 方向", "task": "PROFILE_REVIEW", "relevant": ["careful-choice"], "prohibited": ["escape-superseded"] }
+  ]
+}

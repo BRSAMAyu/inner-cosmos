@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { api, replayTurnEvents, streamAurora, type CorrectionCommand, type CorrectionImpact, type MemoryOperation, type Notification, type SelfEvolution, type StarfieldScene, type UnderstandingClaim, type WakeIntent } from "./api";
+import { api, replayTurnEvents, streamAurora, type CorrectionCommand, type CorrectionImpact, type MemoryOperation, type Notification, type SelfEvolution, type StarfieldDetail, type StarfieldScene, type UnderstandingClaim, type WakeIntent } from "./api";
 import type { AuroraStreamEvent, DialogMessage, TurnStatus } from "./protocol";
 
 type UiMessage = { key: string; speaker: "USER" | "AURORA"; text: string; partial?: boolean };
@@ -37,6 +37,8 @@ export function AuroraApp() {
   const [starfieldBusy, setStarfieldBusy] = useState(false);
   const [memoryOperations, setMemoryOperations] = useState<MemoryOperation[]>([]);
   const [rollbackBusy, setRollbackBusy] = useState<number | null>(null);
+  const [starfieldDetail, setStarfieldDetail] = useState<StarfieldDetail | null>(null);
+  const [detailBusy, setDetailBusy] = useState<number | null>(null);
   const [runtimeSignal, setRuntimeSignal] = useState<RuntimeSignal>({ stage: "idle", runtime: "single" });
   const abortRef = useRef<AbortController | null>(null);
   const activeTurnRef = useRef<number | null>(null);
@@ -346,6 +348,13 @@ export function AuroraApp() {
     finally { setRollbackBusy(null); }
   };
 
+  const revealStar = async (id: number) => {
+    setDetailBusy(id);
+    try { setStarfieldDetail(await api.starfieldDetail(id)); }
+    catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法打开这颗记忆的来源"); }
+    finally { setDetailBusy(null); }
+  };
+
   if (authenticated === null) return <main className="login-shell"><div className="login" role="status">正在连接你的内宇宙…</div></main>;
   if (!authenticated) return <Login onSuccess={bootstrap} />;
 
@@ -459,8 +468,17 @@ export function AuroraApp() {
         <div className="cosmos-legend">{Object.entries(starfield.legend).map(([key, value]) => <span key={key}><strong>{key}</strong>{value}</span>)}</div>
         <ol className="cosmos-list" aria-label="记忆星空可访问列表">
           {starfield.accessibleList.map(star => <li key={star.id}><div><strong>{star.title}</strong><span>{star.theme} · {star.memoryLayer}</span></div>
-            <small>置信度 {Math.round(star.confidence * 100)}% · v{star.versionNo}</small><p>{star.summary}</p></li>)}
+            <small>置信度 {Math.round(star.confidence * 100)}% · v{star.versionNo}</small><p>{star.summary}</p>
+            <button type="button" disabled={detailBusy !== null} onClick={() => void revealStar(star.id)}>{detailBusy === star.id ? "正在追溯…" : "查看来源与变化"}</button></li>)}
         </ol>
+        {starfieldDetail && <aside className="provenance-panel" aria-label="记忆来源与变化">
+          <div><span className="eyebrow">WHY THIS STAR</span><button type="button" onClick={() => setStarfieldDetail(null)} aria-label="关闭记忆来源">×</button></div>
+          <h3>{starfieldDetail.card.title}</h3><p>{starfieldDetail.provenanceExplanation}</p>
+          <dl><div><dt>当前版本</dt><dd>v{starfieldDetail.card.versionNo}</dd></div><div><dt>理解置信度</dt><dd>{Math.round(starfieldDetail.card.confidence * 100)}%</dd></div><div><dt>记忆层</dt><dd>{starfieldDetail.card.memoryLayer}</dd></div></dl>
+          <details open><summary>为什么它在这里</summary><p>{starfieldDetail.gravityExplanation}</p></details>
+          <details><summary>变化历史（{starfieldDetail.versionHistory.length}）</summary>{starfieldDetail.versionHistory.length === 0 ? <p>还没有后续改动。</p> : starfieldDetail.versionHistory.map(operation => <p key={operation.id}><strong>{operation.operationType}</strong> · v{operation.oldVersion} → v{operation.newVersion} · {operation.status}</p>)}</details>
+          <details><summary>下游状态（{starfieldDetail.projectionReceipts.length}）</summary>{starfieldDetail.projectionReceipts.map(receipt => <p key={receipt.id}><strong>{receipt.projectionType}</strong> · {receipt.status}<br /><small>{receipt.detail}</small></p>)}</details>
+        </aside>}
         {memoryOperations.length > 0 && <div className="memory-history" aria-label="记忆变更历史">
           <h3>最近的记忆变更</h3><p>撤回会生成一个新版本，不会抹掉发生过的历史。永久忘记不会恢复原文。</p>
           {memoryOperations.slice(0, 5).map(operation => <article key={operation.id}>

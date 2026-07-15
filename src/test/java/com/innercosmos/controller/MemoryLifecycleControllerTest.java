@@ -167,6 +167,11 @@ class MemoryLifecycleControllerTest {
         assertEquals("这是一次过度概括", restored.summary);
         assertEquals(3, restored.versionNo);
         assertEquals("ROLLED_BACK", operationMapper.selectById(operationId).status);
+        mockMvc.perform(get("/api/memory/starfield/{id}/detail", card.id).session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.versionHistory.length()").value(2))
+                .andExpect(jsonPath("$.data.projectionReceipts.length()").value(6))
+                .andExpect(jsonPath("$.data.provenanceExplanation").isNotEmpty());
 
         mockMvc.perform(post("/api/memory/operations/{id}/rollback", operationId).session(session))
                 .andExpect(status().isBadRequest());

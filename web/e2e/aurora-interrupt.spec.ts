@@ -151,6 +151,11 @@ test("memory starfield switches between time, theme and people without losing it
   await expect(cosmos.getByRole("heading", { name: "你的记忆不是档案柜" })).toBeVisible();
   const accessible = cosmos.getByRole("list", { name: "记忆星空可访问列表" });
   await expect(accessible.locator("li").first()).toBeVisible();
+  await accessible.locator("li").first().getByRole("button", { name: "查看来源与变化" }).click();
+  const provenance = cosmos.getByLabel("记忆来源与变化");
+  await expect(provenance).toContainText("为什么它在这里");
+  await expect(provenance).toContainText("当前版本");
+  await provenance.getByRole("button", { name: "关闭记忆来源" }).click();
   await expect(cosmos.getByRole("button", { name: "时间" })).toHaveAttribute("aria-pressed", "true");
   await cosmos.getByRole("button", { name: "主题" }).click();
   await expect(cosmos.locator(".cosmos-explanation")).toContainText("相近主题聚成星座");
@@ -186,6 +191,19 @@ test("user can roll back a memory change while permanent forgetting stays irreve
   await expect(history).toContainText("UPDATE");
   await history.getByRole("button", { name: "撤回这次变更" }).first().click();
   await expect(page.getByRole("status")).toContainText("已撤回这次UPDATE");
-  await expect(page.getByRole("list", { name: "记忆星空可访问列表" }).locator("li strong").first()).toHaveText(originalTitle);
+  await expect(page.getByRole("list", { name: "记忆星空可访问列表" }).getByText(originalTitle, { exact: true })).toBeVisible();
   await expect(history).toContainText("已撤回");
+});
+
+test("Inner Cosmos remains operable on a narrow mobile viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/app/aurora/index.html");
+  await loginIfNeeded(page);
+  const cosmos = page.getByRole("region", { name: "记忆星空" });
+  await expect(cosmos).toBeVisible();
+  await cosmos.getByRole("button", { name: "人物" }).click();
+  await cosmos.getByRole("list", { name: "记忆星空可访问列表" }).locator("li").first()
+    .getByRole("button", { name: "查看来源与变化" }).click();
+  await expect(cosmos.getByLabel("记忆来源与变化")).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });

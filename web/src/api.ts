@@ -63,6 +63,14 @@ export type MemoryOperationResult = {
   memories: StarfieldStar[];
   projectionReceipts: Array<{ id: number; projectionType: string; status: string; generation: number; detail: string }>;
 };
+export type StarfieldDetail = {
+  card: { id: number; title: string; summary: string | null; sourceSessionId: number | null;
+    versionNo: number; memoryLayer: string; confidence: number; provenanceRefs: string | null };
+  gravityExplanation: string; auroraObservation: string; provenanceExplanation: string;
+  versionHistory: MemoryOperation[];
+  links: Array<{ id: number; sourceMemoryId: number; targetMemoryId: number; linkType: string; status: string }>;
+  projectionReceipts: Array<{ id: number; projectionType: string; status: string; detail: string }>;
+};
 export type CorrectionConfirmation = {
   correction: { id: number; newValue: string; status: string; impactSummary: string };
   activeClaim: UnderstandingClaim;
@@ -148,6 +156,7 @@ export const api = {
   }),
   understandingClaims: () => request<UnderstandingClaim[]>("/api/aurora/corrections/claims"),
   starfield: (mode: StarfieldScene["mode"]) => request<StarfieldScene>(`/api/memory/starfield/v2?mode=${mode}`),
+  starfieldDetail: (id: number) => request<StarfieldDetail>(`/api/memory/starfield/${id}/detail`),
   memoryOperations: () => request<MemoryOperation[]>("/api/memory/operations"),
   rollbackMemoryOperation: (id: number) => request<MemoryOperationResult>(`/api/memory/operations/${id}/rollback`, { method: "POST" })
 };
