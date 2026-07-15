@@ -20,9 +20,16 @@ import java.util.Map;
 @Service
 public class CapsuleGenomeServiceImpl implements CapsuleGenomeService {
     // v2: contextPreviewJson now carries real scene indexing (per-theme grouping,
-    // highest-gravity representative excerpt) and conflict handling (opposing-sentiment
-    // memories in the same scene flagged rather than blended) instead of a flat 420-char
-    // truncation — see CapsuleServiceImpl.buildContextPreview/inferStyleProfile.
+    // highest-gravity representative excerpt) and tension surfacing (co-occurring positive and
+    // negative memories in the same scene are flagged as emotional complexity, not blended into
+    // one flat voice) instead of a flat 420-char truncation — see
+    // CapsuleServiceImpl.buildContextPreview/inferStyleProfile.
+    // This is a deterministic STRUCTURAL SCAFFOLD, not a claim of a finished "real compiler":
+    // there is still no sourced intermediate representation (each feature does not yet carry its
+    // own memoryId/sourceVersion/evidence/confidence), no critic pass, and fixed theme-to-voice
+    // mappings can inject a personality descriptor the evidence doesn't fully support. See
+    // docs/goal/single-session-state.yml's CAMPAIGN-C-QUALITY entry for the tracked next steps
+    // (a provenance-carrying Genome IR, LLM-assisted candidate features + critic review).
     static final String COMPILER_VERSION = "capsule-genome.v2";
     private final CapsuleGenomeVersionMapper genomeMapper;
     private final EchoCapsuleMapper capsuleMapper;
@@ -142,25 +149,25 @@ public class CapsuleGenomeServiceImpl implements CapsuleGenomeService {
     }
 
     /**
-     * Reads the scene-indexing/conflict-handling output CapsuleServiceImpl already computed
+     * Reads the scene-indexing/tension-surfacing output CapsuleServiceImpl already computed
      * into contextPreviewJson. Defaults to zero rather than throwing when contextPreviewJson
      * predates the v2 compiler or was hand-supplied by a caller in a different shape.
      */
     private Map<String, Object> sceneMetrics(String contextPreviewJson) {
         int sceneCount = 0;
-        int conflictCount = 0;
+        int tensionCount = 0;
         try {
             if (contextPreviewJson != null && !contextPreviewJson.isBlank()) {
                 JsonNode root = objectMapper.readTree(contextPreviewJson);
                 if (root.hasNonNull("scenes")) sceneCount = root.get("scenes").size();
-                if (root.hasNonNull("conflicts")) conflictCount = root.get("conflicts").size();
+                if (root.hasNonNull("tensions")) tensionCount = root.get("tensions").size();
             }
         } catch (Exception notV2Shape) {
             // Older/foreign contextPreviewJson shape — metrics stay 0, not a compile failure.
         }
         Map<String, Object> metrics = new LinkedHashMap<>();
         metrics.put("sceneCount", sceneCount);
-        metrics.put("conflictCount", conflictCount);
+        metrics.put("tensionCount", tensionCount);
         return metrics;
     }
 

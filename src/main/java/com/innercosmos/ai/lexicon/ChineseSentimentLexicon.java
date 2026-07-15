@@ -327,4 +327,12 @@ public final class ChineseSentimentLexicon {
     public static int size() {
         return LEXICON.size();
     }
+
+    /**
+     * All (word, score) entries, for callers that scan raw text for substring occurrences
+     * rather than looking up individual pre-tokenized words.
+     */
+    public static java.util.Set<Map.Entry<String, Integer>> entries() {
+        return java.util.Collections.unmodifiableSet(LEXICON.entrySet());
+    }
 }

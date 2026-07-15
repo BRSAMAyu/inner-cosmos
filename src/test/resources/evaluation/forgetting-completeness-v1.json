@@ -8,6 +8,7 @@
     { "key": "with-todo", "marker": "永久保密痕迹CHARLIE", "artifact": "TODO" },
     { "key": "with-relation", "marker": "永久保密痕迹DELTA", "artifact": "RELATION" },
     { "key": "with-link", "marker": "永久保密痕迹ECHO", "artifact": "LINK" },
-    { "key": "with-embedding", "marker": "永久保密痕迹FOXTROT", "artifact": "EMBEDDING" }
+    { "key": "with-embedding", "marker": "永久保密痕迹FOXTROT", "artifact": "EMBEDDING" },
+    { "key": "with-capsule", "marker": "永久保密痕迹GOLF", "artifact": "CAPSULE" }
   ]
 }

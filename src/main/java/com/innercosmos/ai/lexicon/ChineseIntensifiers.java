@@ -118,4 +118,12 @@ public final class ChineseIntensifiers {
     public static int size() {
         return INTENSIFIERS.size();
     }
+
+    /**
+     * All (word, multiplier) entries, for callers that scan raw text for substring occurrences
+     * rather than looking up individual pre-tokenized words.
+     */
+    public static Map<String, Double> entries() {
+        return java.util.Collections.unmodifiableMap(INTENSIFIERS);
+    }
 }

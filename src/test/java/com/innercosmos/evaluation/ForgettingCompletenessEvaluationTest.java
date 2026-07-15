@@ -2,8 +2,10 @@ package com.innercosmos.evaluation;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.innercosmos.dto.CapsuleCreateRequest;
 import com.innercosmos.dto.MemoryOperationCommand;
 import com.innercosmos.dto.MemoryRetrievalQuery;
+import com.innercosmos.entity.EchoCapsule;
 import com.innercosmos.entity.MemoryCard;
 import com.innercosmos.entity.MemoryEmbedding;
 import com.innercosmos.entity.MemoryLink;
@@ -11,12 +13,15 @@ import com.innercosmos.entity.RelationMention;
 import com.innercosmos.entity.ThoughtFragment;
 import com.innercosmos.entity.TodoItem;
 import com.innercosmos.exception.BusinessException;
+import com.innercosmos.mapper.EchoCapsuleMapper;
 import com.innercosmos.mapper.MemoryCardMapper;
 import com.innercosmos.mapper.MemoryEmbeddingMapper;
 import com.innercosmos.mapper.MemoryLinkMapper;
 import com.innercosmos.mapper.RelationMentionMapper;
 import com.innercosmos.mapper.ThoughtFragmentMapper;
 import com.innercosmos.mapper.TodoItemMapper;
+import com.innercosmos.service.CapsuleGenomeService;
+import com.innercosmos.service.CapsuleService;
 import com.innercosmos.service.MemoryLifecycleService;
 import com.innercosmos.service.MemoryRetrievalService;
 import com.innercosmos.service.StarfieldExplorerService;
@@ -33,6 +38,8 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -61,6 +68,9 @@ class ForgettingCompletenessEvaluationTest {
     @Autowired MemoryLifecycleService lifecycleService;
     @Autowired StarfieldExplorerService starfieldService;
     @Autowired MemoryRetrievalService retrievalService;
+    @Autowired CapsuleService capsuleService;
+    @Autowired CapsuleGenomeService genomeService;
+    @Autowired EchoCapsuleMapper capsuleMapper;
 
     @Test
     void syntheticAnnotatedForgetGateLeavesNoRecoverableTrace() throws Exception {
@@ -82,6 +92,7 @@ class ForgettingCompletenessEvaluationTest {
             memoryMapper.insert(card);
 
             MemoryCard companion = null;
+            Long capsuleId = null;
             switch (artifact) {
                 case "FRAGMENT" -> {
                     ThoughtFragment fragment = new ThoughtFragment();
@@ -117,6 +128,17 @@ class ForgettingCompletenessEvaluationTest {
                     embedding.dimensions = 4; embedding.embeddingJson = "[1,0,0,0]"; embedding.status = "ACTIVE";
                     embeddingMapper.insert(embedding);
                 }
+                case "CAPSULE" -> {
+                    // A real, publicly-reachable capsule compiled from this memory via the real
+                    // CapsuleService — the marker ends up baked into personaPrompt/styleProfileJson/
+                    // contextPreviewJson by the actual feature-extraction compiler, not a fixture.
+                    CapsuleCreateRequest request = new CapsuleCreateRequest();
+                    request.memoryIds = List.of(card.id);
+                    request.visibilityStatus = "PUBLIC";
+                    request.isPublic = true;
+                    EchoCapsule capsule = capsuleService.createFromMemory(userId, request);
+                    capsuleId = capsule.id;
+                }
                 default -> { /* NONE: only the memory row itself carries the marker */ }
             }
 
@@ -135,6 +157,22 @@ class ForgettingCompletenessEvaluationTest {
             // (those legitimately contain the marker because this test put it in the query).
             String retrievalJson = objectMapper.writeValueAsString(evidence.evidence());
             if (retrievalJson.contains(marker)) leaks.add("retrieval");
+
+            if (capsuleId != null) {
+                Long finalCapsuleId = capsuleId;
+                EchoCapsule reloadedCapsule = capsuleMapper.selectById(finalCapsuleId);
+                String capsuleJson = objectMapper.writeValueAsString(reloadedCapsule);
+                if (capsuleJson.contains(marker)) leaks.add("capsule-derivatives");
+                assertFalse(Boolean.TRUE.equals(reloadedCapsule.isPublic),
+                        "a capsule built from a forgotten memory must be delisted immediately, not left public");
+                assertEquals("NEEDS_REVIEW", reloadedCapsule.visibilityStatus,
+                        "forgetting an authorized memory must force the dependent capsule back to owner review");
+                assertNull(genomeService.current(finalCapsuleId),
+                        "the active Genome compiled from a now-forgotten memory must be withdrawn, "
+                                + "not left servable to real visitor chat");
+                assertFalse(capsuleService.plazaCapsules().stream().anyMatch(c -> c.id.equals(finalCapsuleId)),
+                        "a capsule dependent on a forgotten memory must disappear from the public plaza");
+            }
 
             int residual = fragmentMapper.selectCount(new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<ThoughtFragment>().eq("memory_card_id", card.id)).intValue()
                     + todoMapper.selectCount(new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<TodoItem>().eq("source_memory_card_id", card.id)).intValue()

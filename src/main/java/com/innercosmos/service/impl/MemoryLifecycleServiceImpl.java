@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.innercosmos.common.ErrorCode;
 import com.innercosmos.dto.MemoryOperationCommand;
 import com.innercosmos.entity.AuthorizedMemoryRef;
+import com.innercosmos.entity.EchoCapsule;
 import com.innercosmos.entity.MemoryCard;
 import com.innercosmos.entity.MemoryLink;
 import com.innercosmos.entity.MemoryOperation;
@@ -15,6 +16,7 @@ import com.innercosmos.entity.MemoryProjectionReceipt;
 import com.innercosmos.event.CapsuleSyncTriggerEvent;
 import com.innercosmos.exception.BusinessException;
 import com.innercosmos.mapper.AuthorizedMemoryRefMapper;
+import com.innercosmos.mapper.EchoCapsuleMapper;
 import com.innercosmos.mapper.MemoryCardMapper;
 import com.innercosmos.mapper.MemoryLinkMapper;
 import com.innercosmos.mapper.MemoryEmbeddingMapper;
@@ -23,6 +25,7 @@ import com.innercosmos.mapper.MemoryProjectionReceiptMapper;
 import com.innercosmos.mapper.RelationMentionMapper;
 import com.innercosmos.mapper.ThoughtFragmentMapper;
 import com.innercosmos.mapper.TodoItemMapper;
+import com.innercosmos.service.CapsuleGenomeService;
 import com.innercosmos.service.MemoryLifecycleService;
 import com.innercosmos.vo.MemoryOperationPreviewVO;
 import com.innercosmos.vo.MemoryOperationResultVO;
@@ -54,6 +57,8 @@ public class MemoryLifecycleServiceImpl implements MemoryLifecycleService {
     private final RelationMentionMapper relationMentionMapper;
     private final ObjectMapper objectMapper;
     private final ApplicationEventPublisher eventPublisher;
+    private final EchoCapsuleMapper capsuleMapper;
+    private final CapsuleGenomeService genomeService;
 
     public MemoryLifecycleServiceImpl(MemoryCardMapper memoryMapper,
                                       MemoryOperationMapper operationMapper,
@@ -65,7 +70,9 @@ public class MemoryLifecycleServiceImpl implements MemoryLifecycleService {
                                       TodoItemMapper todoItemMapper,
                                       RelationMentionMapper relationMentionMapper,
                                       ObjectMapper objectMapper,
-                                      ApplicationEventPublisher eventPublisher) {
+                                      ApplicationEventPublisher eventPublisher,
+                                      EchoCapsuleMapper capsuleMapper,
+                                      CapsuleGenomeService genomeService) {
         this.memoryMapper = memoryMapper;
         this.operationMapper = operationMapper;
         this.projectionReceiptMapper = projectionReceiptMapper;
@@ -77,6 +84,8 @@ public class MemoryLifecycleServiceImpl implements MemoryLifecycleService {
         this.relationMentionMapper = relationMentionMapper;
         this.objectMapper = objectMapper;
         this.eventPublisher = eventPublisher;
+        this.capsuleMapper = capsuleMapper;
+        this.genomeService = genomeService;
     }
 
     @Override
@@ -319,6 +328,13 @@ public class MemoryLifecycleServiceImpl implements MemoryLifecycleService {
     }
 
     private void forgetDerived(MemoryCard card) {
+        // Capture which capsules were built from this memory BEFORE the authorization refs are
+        // deleted below — a Capsule Genome is a derived artifact of the memory being forgotten,
+        // and simply severing the authorization ref leaves it as a lingering, still-public copy.
+        List<Long> affectedCapsuleIds = authorizedMemoryRefMapper.selectList(
+                        new QueryWrapper<AuthorizedMemoryRef>().eq("memory_card_id", card.id))
+                .stream().map(ref -> ref.capsuleId).distinct().toList();
+
         authorizedMemoryRefMapper.delete(new QueryWrapper<AuthorizedMemoryRef>().eq("memory_card_id", card.id));
         thoughtFragmentMapper.delete(new QueryWrapper<com.innercosmos.entity.ThoughtFragment>().eq("memory_card_id", card.id));
         todoItemMapper.delete(new QueryWrapper<com.innercosmos.entity.TodoItem>().eq("source_memory_card_id", card.id));
@@ -327,6 +343,27 @@ public class MemoryLifecycleServiceImpl implements MemoryLifecycleService {
                 .and(q -> q.eq("source_memory_id", card.id).or().eq("target_memory_id", card.id)));
         embeddingMapper.delete(new QueryWrapper<com.innercosmos.entity.MemoryEmbedding>()
                 .eq("user_id", card.userId).eq("memory_id", card.id));
+
+        for (Long capsuleId : affectedCapsuleIds) {
+            withdrawCapsuleForForgottenMemory(capsuleId);
+        }
+    }
+
+    /**
+     * A forgotten memory's compiled derivatives (persona prompt, style profile, context preview)
+     * may still paraphrase content the owner just asked to erase, and the capsule itself may
+     * still be sitting in the public plaza. Immediately delist it and redact those derivatives —
+     * markNeedsReview then withdraws the active Genome version so runtime chat can no longer
+     * read the old compiled prompt either.
+     */
+    private void withdrawCapsuleForForgottenMemory(Long capsuleId) {
+        capsuleMapper.update(null, new UpdateWrapper<EchoCapsule>()
+                .eq("id", capsuleId)
+                .set("visibility_status", "NEEDS_REVIEW")
+                .set("is_public", false)
+                .set("style_profile_json", null)
+                .set("context_preview_json", null));
+        genomeService.markNeedsReview(capsuleId, "source-authorized memory forgotten by owner");
     }
 
     private void invalidateEmbeddings(List<MemoryCard> source, String operation) {

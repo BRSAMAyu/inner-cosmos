@@ -224,10 +224,59 @@ class CapsuleGenomeServiceIntegrationTest {
 
     @Test
     @Transactional
-    void compilerIndexesDistinctScenesAndFlagsOpposingSentimentAsConflict() throws Exception {
+    void simulatorPurposeGrantCannotLeakIntoNormalCapsuleOrBeSwappedOutLater() {
+        // A user-review finding: SIMULATOR_AUTHORIZED was only enforced at
+        // createSimulatorCapsule time. createFromMemory and the shared replaceAuthorizations
+        // path (updateContext/recompileGenome) did not exclude/require it, so a memory marked
+        // "simulator testing only" could end up in a normal, potentially-public capsule, and a
+        // Simulator capsule could later be recompiled with ordinary memories.
+        Long owner = seedUser("purpose-grant-owner");
+        Long normalMemory = seedMemory(owner, "普通授权记忆", "AURORA_PRIVATE");
+        Long simulatorMemory = seedMemory(owner, "仅供模拟器使用的记忆", "SIMULATOR_AUTHORIZED");
+
+        // (1) createFromMemory must silently exclude a SIMULATOR_AUTHORIZED memory, exactly like
+        // it already does for LOCAL_ONLY/NO_EXTERNAL_PROCESSING.
+        CapsuleCreateRequest normalRequest = new CapsuleCreateRequest();
+        normalRequest.memoryIds = List.of(normalMemory, simulatorMemory);
+        normalRequest.visibilityStatus = "PRIVATE";
+        normalRequest.isPublic = false;
+        EchoCapsule normalCapsule = capsuleService.createFromMemory(owner, normalRequest);
+        assertEquals(List.of(normalMemory), parseAuthorizedIds(normalCapsule.authorizedMemoryIds),
+                "a SIMULATOR_AUTHORIZED memory must never enter a normal capsule's authorization set");
+
+        // (2) recompileGenome on that same normal capsule must reject a SIMULATOR_AUTHORIZED
+        // memoryId outright (mirrors the existing LOCAL_ONLY rejection contract).
+        assertThrows(BusinessException.class,
+                () -> capsuleService.recompileGenome(owner, normalCapsule.id, List.of(simulatorMemory)),
+                "a normal capsule must not be recompilable with a simulator-only memory");
+
+        // (3) The reverse direction: a Simulator capsule's authorization must not be swappable
+        // for an ordinary memory via recompile — it may ONLY ever hold SIMULATOR_AUTHORIZED memories.
+        CapsuleCreateRequest simulatorRequest = new CapsuleCreateRequest();
+        simulatorRequest.memoryIds = List.of(simulatorMemory);
+        EchoCapsule simulator = capsuleService.createSimulatorCapsule(owner, simulatorRequest);
+        assertThrows(BusinessException.class,
+                () -> capsuleService.recompileGenome(owner, simulator.id, List.of(normalMemory)),
+                "a Simulator capsule must not be recompilable with an ordinary, non-simulator memory");
+    }
+
+    private List<Long> parseAuthorizedIds(String authorizedMemoryIdsJson) {
+        try {
+            JsonNode node = objectMapper.readTree(authorizedMemoryIdsJson);
+            return StreamSupport.stream(node.spliterator(), false).map(JsonNode::asLong).toList();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Test
+    @Transactional
+    void compilerIndexesDistinctScenesAndSurfacesOpposingSentimentAsTension() throws Exception {
         // Campaign C punch-list item 2: the compiler must do real feature extraction (scene
-        // indexing by theme, not a flat 420-char truncation) and real conflict handling
-        // (opposing-sentiment memories on the same theme surfaced, not silently blended).
+        // indexing by theme, not a flat 420-char truncation) and real tension surfacing
+        // (opposing-sentiment memories on the same theme surfaced as emotional complexity —
+        // NOT labeled a "conflict"/contradiction, since one warm and one difficult memory about
+        // the same relationship is normal, not a logical inconsistency).
         // Keyword-style summaries (not natural prose) — the same convention CapsuleMatchingTest
         // already relies on, since PseudoSemanticAnalyzer's theme detection runs on individual
         // Chinese characters and free prose collides across families far too easily (e.g. any
@@ -235,14 +284,14 @@ class CapsuleGenomeServiceIntegrationTest {
         Long owner = seedUser("compiler-quality-owner");
         Long warmMemory = seedMemory(owner, "片段",
                 "朋友 顺利 轻松", "AURORA_PRIVATE");
-        Long conflictMemory = seedMemory(owner, "片段",
+        Long tenseMemory = seedMemory(owner, "片段",
                 "朋友 吵架 难过 委屈", "AURORA_PRIVATE");
         Long unrelatedMemory = seedMemory(owner, "片段",
                 "项目 任务 截止", "AURORA_PRIVATE");
 
         CapsuleCreateRequest request = new CapsuleCreateRequest();
         request.pseudonym = "编译质量样本";
-        request.memoryIds = List.of(warmMemory, conflictMemory, unrelatedMemory);
+        request.memoryIds = List.of(warmMemory, tenseMemory, unrelatedMemory);
         request.visibilityStatus = "PRIVATE";
         request.isPublic = false;
         EchoCapsule capsule = capsuleService.createFromMemory(owner, request);
@@ -256,17 +305,17 @@ class CapsuleGenomeServiceIntegrationTest {
         JsonNode relationshipScene = findScene(scenes, "关系牵动");
         assertNotNull(relationshipScene, "关系牵动 theme must be indexed as its own scene");
         assertEquals(2, relationshipScene.get("memoryCount").asInt());
-        assertTrue(relationshipScene.get("conflict").asBoolean(),
-                "a warm and a distressing memory about the same relationship must be flagged, not blended");
+        assertTrue(relationshipScene.get("hasTension").asBoolean(),
+                "a warm and a distressing memory about the same relationship must be surfaced as tension, not blended");
 
         JsonNode taskScene = findScene(scenes, "任务压力");
         assertNotNull(taskScene, "任务压力 theme must be indexed as its own scene");
         assertEquals(1, taskScene.get("memoryCount").asInt());
-        assertFalse(taskScene.get("conflict").asBoolean());
+        assertFalse(taskScene.get("hasTension").asBoolean());
 
-        JsonNode conflicts = preview.get("conflicts");
-        assertEquals(1, conflicts.size());
-        assertEquals("关系牵动", conflicts.get(0).get("theme").asText());
+        JsonNode tensions = preview.get("tensions");
+        assertEquals(1, tensions.size());
+        assertEquals("关系牵动", tensions.get(0).get("theme").asText());
 
         JsonNode styleProfile = objectMapper.readTree(capsule.styleProfileJson);
         assertTrue(styleProfile.get("voice").asText().contains("在关系中重视被认真回应"),
@@ -276,7 +325,7 @@ class CapsuleGenomeServiceIntegrationTest {
         JsonNode evaluation = objectMapper.readTree(genome.evaluationJson);
         assertEquals(2, evaluation.get("sceneCount").asInt(),
                 "compiler-evaluation must expose the same structural scene count the preview computed");
-        assertEquals(1, evaluation.get("conflictCount").asInt());
+        assertEquals(1, evaluation.get("tensionCount").asInt());
     }
 
     private JsonNode findScene(JsonNode scenes, String theme) {

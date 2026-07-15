@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-16T04:12:00+08:00
+updated_at: 2026-07-16T04:55:00+08:00
 authority:
   - goal-objective.md
   - 对齐文档/17-单会话持续Goal模式执行协议.md
@@ -27,9 +27,9 @@ resume_policy:
   finish_inflight_work_before_new_front: true
   update_this_file_at_every_checkpoint: true
 
-active_front:
+closed_front_pseudo_semantic_sentiment_bug:
   id: PSEUDO-SEMANTIC-SENTIMENT-BUG
-  state: DISCOVERED_DURING_CAMPAIGN_C_ITEM_2_NOT_YET_FIXED
+  state: CLOSED_THIS_SESSION_FIX_VERIFIED_ACROSS_ALL_CONSUMERS
   intent: |
     While closing Campaign C punch-list item 2 (Genome compiler feature extraction), discovered
     and worked around a real, verified bug in PseudoSemanticAnalyzer (ai/semantic) shared by ~10
@@ -63,36 +63,131 @@ active_front:
     sceneSentiment() classifier (POSITIVE_WORDS/NEGATIVE_WORDS sets, whole-text String.contains),
     deliberately independent of PseudoSemanticAnalyzer, so the new feature works correctly today.
     This is a properly scoped local fix, not a fix of the shared root cause.
+  resolution: |
+    FIXED (this checkpoint): calculateSentiment and checkSafetyRisk's severe-word fallback now
+    scan the raw text via substring containment (mirroring detectThemes/detectIntent) instead of
+    exact-match against single-character tokens. Added entries()/getMultiplier-style accessors to
+    ChineseSentimentLexicon/ChineseIntensifiers for this. Full consumer test surface re-ran green
+    with no expectation changes needed: MockLlmClientAuroraDispatchTest, ThoughtShredderServiceImplTest,
+    EmotionInsightServiceImplTest, EmotionSpectrumDeriverTest, EmotionWeatherMapperTest,
+    AuroraChatOwnershipTest, NightlyMemorySettlementJobPaginationTest,
+    NightlyMemorySettlementJobBaselineTest, CapsuleEnergyDecayTest, EmotionTraceDedupIntegrationTest,
+    AuroraStreamServiceTest, AuroraEmergenceTest, DataMaskingServiceTest, plus a full `mvn test`
+    cross-domain run (793/793).
+
+active_front:
+  id: CAMPAIGN-C-QUALITY
+  state: TWO_P1S_CLOSED_THIS_CHECKPOINT_GENOME_IR_NEXT
+  intent: |
+    An independent review of this session's uncommitted Genome v2 work (Campaign C item 2) found
+    two real P1 gaps and one valid conceptual overclaim. All three addressed this checkpoint; see
+    done_this_front_summary below.
+  done_this_front_summary:
+    - "[P1 FIXED] Simulator purpose-grant bypass: createFromMemory's inline filter and the shared
+      replaceAuthorizations (used by both updateContext and recompileGenome) did not exclude
+      SIMULATOR_AUTHORIZED, and did not require it for a simulatorOnly capsule either — so a
+      memory explicitly marked simulator-testing-only could end up in a normal, potentially-
+      public capsule, and a Simulator capsule could later be recompiled with ordinary
+      AURORA_PRIVATE memories. Fixed both directions: createFromMemory now also excludes
+      SIMULATOR_AUTHORIZED; replaceAuthorizations now branches on capsule.simulatorOnly (true ->
+      accept ONLY SIMULATOR_AUTHORIZED, false -> reject it same as LOCAL_ONLY/
+      NO_EXTERNAL_PROCESSING). New test
+      CapsuleGenomeServiceIntegrationTest.simulatorPurposeGrantCannotLeakIntoNormalCapsuleOrBeSwappedOutLater
+      covers all 3 directions. NOTE (not yet done): this is still a consentScope string value on
+      MemoryCard, not the versioned, revocable, purpose-specific DataUseGrant entity the review
+      recommended (purpose=CAPSULE_PUBLIC|SIMULATOR|AURORA|RESEARCH, granted_at/revoked_at/
+      expires_at) — flagged as a follow-up, not done this checkpoint."
+    - "[P1 FIXED] FORGET did not propagate to dependent capsules: MemoryLifecycleServiceImpl.forgetDerived
+      deleted the AuthorizedMemoryRef row but left the capsule's compiledPersonaPrompt/
+      styleProfileJson/contextPreviewJson (and the capsule's own copies of those fields) intact,
+      and did not delist an already-public capsule or withdraw its Genome — so a capsule built
+      from a just-forgotten memory could still sit in the public plaza. Fixed: forgetDerived now
+      captures affected capsule IDs before deleting the refs, then immediately sets
+      visibility_status=NEEDS_REVIEW/is_public=false, redacts style_profile_json/
+      context_preview_json to null, and calls genomeService.markNeedsReview — all in the same
+      FORGET transaction. New scenario 'with-capsule' added to ForgettingCompletenessEvaluationTest/
+      forgetting-completeness-v1.json using a REAL capsule compiled via
+      CapsuleService.createFromMemory (not a fixture), asserting delisting + Genome withdrawal +
+      plaza removal. Verified via git-stash-revert: reverting the fix made the new assertion fail
+      with the exact predicted message, confirming the test is real. NOTE (not yet done): prompt
+      cache, sync-queue/event backlog, analytics, and backup lifecycle for a forgotten memory are
+      still unaudited — review's ask, not yet closed."
+    - "[Reframed] 'conflict'/'conflicts' renamed to 'hasTension'/'tensions' throughout
+      CapsuleServiceImpl.buildContextPreview and CapsuleGenomeServiceImpl's evaluationJson
+      (conflictCount -> tensionCount): a happy and a difficult memory about the same relationship
+      is normal emotional complexity, not a detected logical contradiction, and the old field
+      name was overclaiming. COMPILER_VERSION's Javadoc now explicitly frames v2 as a
+      'structural compiler scaffold' — no sourced intermediate representation yet (no per-feature
+      memoryId/sourceVersion/evidence/confidence), no critic pass, fixed theme->voice mappings
+      can inject unsupported personality claims. Genome IR (claims/values/style
+      examples/habits/scenes/temporal state/tensions/unknowns, each with provenance) is the next
+      real step for Campaign C item 2, not yet started."
+    - "State-file honesty pass (this edit): last_full_gate's summary fields (784/17/11, baseline
+      4c14ef9) had drifted from its own narrative bullets (which already said 33/33, 13/13) —
+      fixed to the independently-reverified 792/792 @ 5bcc649 baseline, now 793/793 after this
+      checkpoint's new tests. CAMPAIGN-B-EXPERIENCE's 'only dataset growth remaining' claim
+      walked back to IN_PROGRESS with the real gaps listed (no automatic claim-extraction
+      pipeline; forgetting-completeness eval still doesn't cover cache/queue/analytics/backup)."
   next_machine_actions:
-    - NEXT — fix PseudoSemanticAnalyzer.calculateSentiment (and the checkSafetyRisk severe-word
-      fallback) to match via substring containment against the ORIGINAL text (mirroring how
-      detectThemes/detectIntent already correctly work) instead of exact-match against
-      single-character tokens. This is a shared, widely-consumed file — after fixing, re-run
-      the full consumer test surface before committing — EmotionSpectrumDeriverTest,
-      MockLlmClientAuroraDispatchTest, ThoughtShredderServiceImplTest,
-      EmotionInsightServiceImplTest, MemorySettlementServiceImpl's tests (check for one),
-      AuroraMemoryContextServiceImpl tests, plus any test asserting a specific NEUTRAL score that
-      might have been silently relying on the broken behavior. Expect some existing tests may
-      have encoded the CURRENT (broken) NEUTRAL-everything behavior as their expected value —
-      those need judgment — fix the test's expectation to the now-correct sentiment, don't revert
-      the fix to keep a stale test green.
-    - AFTER that — return to Campaign C priority_queue below (item 1 real fidelity signal is
-      already partially addressed by the RUN prior to this — re-check; items 5/7 remain lower
-      priority; item 6 remains human-gated).
+    - "NEXT — commit this checkpoint (Simulator fix + FORGET fix + tension rename + state-file
+      honesty pass), all already full-suite verified (793/793 green)."
+    - "THEN — start the Genome IR scaffold: a versioned intermediate representation where every
+      extracted feature (claim, style example, habit, scene, tension, unknown) carries
+      memoryId/sourceVersion/evidence/confidence, replacing the current flat voice-string +
+      scene-list output. Deterministic extractor stays a scaffold (themes/sentiment/scenes); an
+      LLM path can propose candidate features when a real provider is available (human gate),
+      with a critic pass reviewing evidence support, leakage, and unknowns — but the structural
+      IR (provenance fields, versioning) is machine-buildable now, independent of that human gate."
+    - "THEN — add the three eval dimensions the review asked for beyond structural scene/tension
+      counts: fact/style fidelity (does the compiled voice match held-out memories not used to
+      compile it), unfamiliar-scenario stability (does the persona degrade gracefully on
+      questions outside its authorized memories), and counter-prompt/leakage resistance
+      (adversarial attempts to extract unauthorized content or override boundaries)."
+    - "Also queued, lower priority than the above: DataUseGrant entity to replace the
+      consentScope-string purpose enforcement; FORGET propagation to prompt cache/sync-queue/
+      analytics/backup; Campaign B automatic claim-extraction pipeline; eval dataset growth."
 
 priority_queue:
   - id: CAMPAIGN-C-QUALITY
     reason: |
       Explore-agent punch list, ranked by user-visible fidelity/trust impact — updated as items close:
       1. OPEN — No real fidelity signal exists. CapsuleGenomeServiceImpl.compile()'s evaluationJson is a structural-eligibility checklist (ownerBound/currentOnly/authorizedMemoryCount), not a fidelity/leakage score. Blocks the whole Campaign C acceptance scenario (same user's long-prompt baseline vs compiled Genome, blind-tested). NOTE: evaluationJson now ALSO carries sceneCount/conflictCount (item 2 below) — still not a fidelity/leakage score, this item is still open.
-      2. DONE this checkpoint — CapsuleServiceImpl.inferStyleProfile()/buildContextPreview() were a thin pass-through (keyword-substring voice guess + 420-char truncation). Rewrote both as real feature extraction: theme-family frequency aggregation (reusing themesOf/PseudoSemanticAnalyzer theme detection, which is NOT affected by the sentiment bug above) drives voice descriptors with a sample-size confidence score; buildContextPreview now does real scene indexing (groups authorized memories by dominant theme family, deterministic FAMILY_ORDER tie-break for multi-family cards, highest-gravity representative excerpt per scene) and real conflict handling (a scene with both a POSITIVE and a NEGATIVE memory — via the new local sceneSentiment() classifier — is flagged in a `conflicts` array instead of being silently blended into one voice). CapsuleGenomeServiceImpl bumped to compiler-genome.v2 and evaluationJson now exposes sceneCount/conflictCount as measurable structural-quality metrics. New test: CapsuleGenomeServiceIntegrationTest.compilerIndexesDistinctScenesAndFlagsOpposingSentimentAsConflict (real SpringBootTest, real H2, asserts distinct scenes, conflict flag, evaluationJson metrics). 6/6 green in that class; CapsuleMatchingTest 16/16, CapsuleQuotaIntegrationTest 5/5, DataMaskingService(ConsentScope)Test unaffected, full compile clean.
+      2. IN_PROGRESS, scaffold done — CapsuleServiceImpl.inferStyleProfile()/buildContextPreview() were a thin pass-through (keyword-substring voice guess + 420-char truncation). Rewrote both as real feature extraction: theme-family frequency aggregation (reusing themesOf/PseudoSemanticAnalyzer theme detection) drives voice descriptors with a sample-size confidence score; buildContextPreview now does real scene indexing (groups authorized memories by dominant theme family, deterministic FAMILY_ORDER tie-break for multi-family cards, highest-gravity representative excerpt per scene) and tension surfacing (a scene with both a POSITIVE and a NEGATIVE memory — via the local sceneSentiment() classifier — is flagged in a `tensions` array as emotional complexity, deliberately NOT labeled a contradiction, instead of being silently blended into one voice). CapsuleGenomeServiceImpl bumped to compiler-genome.v2 and evaluationJson now exposes sceneCount/tensionCount as measurable structural-quality metrics. Test: CapsuleGenomeServiceIntegrationTest.compilerIndexesDistinctScenesAndSurfacesOpposingSentimentAsTension. Independent review correctly flagged this as still a STRUCTURAL SCAFFOLD, not a finished compiler — no per-feature memoryId/sourceVersion/evidence/confidence, no critic pass, fixed theme->voice mappings can inject unsupported personality claims. Genome IR (provenance-carrying claims/values/style/habits/scenes/tensions/unknowns) is the tracked next step, see active_front above.
       3. DONE (prior checkpoint) — CapsuleSandboxServiceImpl feedback is no longer write-only; aggregated per-Genome-version and surfaced in CapsuleWorkbench (fidelitySummary/CapsuleFidelitySummaryVO). Does not gate publish (kept as a visible signal, matching "反馈只成为下一版的改进信号" rather than a hard block).
-      4. DONE (prior checkpoint) — Simulator capability contract (CapsuleService.createSimulatorCapsule + EchoCapsule.simulatorOnly) requires a distinct SIMULATOR_AUTHORIZED consent scope per memory and is permanently excluded from publish/plaza/matching/real persona chat.
+      4. DONE (prior checkpoint), gap CLOSED this checkpoint — Simulator capability contract (CapsuleService.createSimulatorCapsule + EchoCapsule.simulatorOnly) requires a distinct SIMULATOR_AUTHORIZED consent scope at creation, but an independent review found the invariant wasn't held elsewhere: createFromMemory and the shared replaceAuthorizations (updateContext/recompileGenome) neither excluded SIMULATOR_AUTHORIZED from normal capsules nor required it for a simulatorOnly capsule. Both directions fixed this checkpoint (see active_front done_this_front_summary). Still open: this is a consentScope string value, not a versioned/revocable purpose-specific DataUseGrant entity.
       5. OPEN — Matching (CapsuleServiceImpl matchedCapsules/strategySignal, ResonanceMatchStrategy enum) is a real, explainable, switchable lexical/theme-family heuristic (16 passing tests in CapsuleMatchingTest) but not similarity/embedding-based and has no diversity/safety-filter stage baked into scoring.
       6. OPEN, HUMAN-GATED — No real LLM provider is ever exercised for capsule work in tests/evidence — INNO-EVAL-001/known-limitations.md explicitly says real-Provider comparison is BLOCKED_BY_CREDENTIAL_GATE (human gate: REAL-PROVIDER-CREDENTIALS-AND-BLIND-REVIEW). Items 1/2's TRUE fidelity delta can't be proven without this.
       7. OPEN — No adversarial/boundary Java tests (counter-prompt-attack, unfamiliar-scenario stability) exist — only structural/version-chain/matching tests.
   - id: CAMPAIGN-B-EXPERIENCE
-    reason: The correction Experience Contract's propagation promise (star/memory -> preview -> confirm -> starfield/capsule sync) was not reliably reachable through the real UI, the UI did not actually refetch synced state, and demo seed data never populated the AuthorizedMemoryRef rows needed for the capsule NEEDS_REVIEW path to be reachable at all. All three fixed and E2E-verified. All four doc-16-mandated eval dimensions (retrieval relevance, correction-targeting precision, forgetting completeness, conflict handling) now have scored/labeled harnesses with honestly-calibrated thresholds. Remaining work is dataset growth only.
+    reason: |
+      The correction Experience Contract's propagation promise (star/memory -> preview -> confirm
+      -> starfield/capsule sync) was not reliably reachable through the real UI, the UI did not
+      actually refetch synced state, and demo seed data never populated the AuthorizedMemoryRef
+      rows needed for the capsule NEEDS_REVIEW path to be reachable at all. All three fixed and
+      E2E-verified.
+      CORRECTED (independent-review finding, previously overstated as "just dataset growth
+      remaining" — that claim is walked back here): four scored/labeled harnesses exist
+      (MemoryRetrievalEvaluationTest, CorrectionTargetingEvaluationTest,
+      ForgettingCompletenessEvaluationTest, CorrectionConflictEvaluationTest), but two are
+      mislabeled relative to what doc-16 actually asks for:
+        - There is still NO automatic claim-extraction pipeline. Every UnderstandingClaim today
+          is produced only by an explicit user correction action — CorrectionTargetingEvaluationTest
+          measures targeting precision (does a correction land on the right claim/memory), which
+          is a real and useful metric, but it is NOT claim-extraction precision (can the system
+          derive claims from conversation on its own). Doc-16's automatic-user-modeling pipeline
+          (conversation evidence -> claim candidate extraction -> entity/time/relation
+          normalization -> provenance+confidence -> conflict/uncertainty -> user
+          confirm/correct -> propagation) does not exist yet.
+        - ForgettingCompletenessEvaluationTest (6, now 7, scenarios) covers memory-row/fragment/
+          todo/relation/link/embedding and, as of this checkpoint, one capsule-propagation
+          scenario (visibility/genome-withdrawal/plaza-removal) — a real fix for a real P1 gap an
+          independent review found (a forgotten memory's compiled capsule Genome, and its public
+          reachability, previously survived FORGET untouched). Still not yet covered: prompt
+          cache, sync-queue/event backlog, analytics, and backup lifecycle for a forgotten memory.
+        - All four datasets remain small (9-10 correction/retrieval scenarios, 6-7
+          forgetting scenarios, 4 conflict scenarios) — fine as smoke/regression gates, not yet
+          proof of portrait/conflict/forgetting quality at the scale doc-16 implies.
+      Campaign B status is IN_PROGRESS, not "down to dataset growth."
   - id: UNIFIED-FIVE-SPACE-APPSHELL
     reason: Existing capabilities are concentrated in a single oversized Aurora page and do not yet form the specified product information architecture. Largely converged this session (1210 -> ~1000 lines, 8 domain components extracted with tests); only orchestration/hero/login remain inline.
   - id: CAMPAIGN-D-TRUST
@@ -114,10 +209,19 @@ known_human_gates:
   - REAL-ANDROID-IOS-APNS-FCM-AND-SIGNING
 
 last_full_gate:
-  baseline_commit: 4c14ef9
-  claimed_java: 784/784
-  claimed_playwright: 11/11 plus Living Aurora 1/1
-  claimed_vitest: 17/17
+  # CORRECTED (independent-review finding): these summary fields had drifted from the narrative
+  # bullets below them (which already said Vitest 33/33, Playwright 13/13) — a real
+  # internal-consistency bug in this file, not just a stale-vs-HEAD problem. An independent
+  # reviewer's own re-verification at commit 5bcc649 found Maven 792/792, Vitest 33/33,
+  # Playwright 13/13 + Living Aurora 1/1 — those are now the trusted baseline numbers, not the
+  # 784/17/11 this block previously (and wrongly) claimed.
+  baseline_commit: 5bcc649 (independently re-verified); HEAD as of this checkpoint is e9e6c2a
+    plus this checkpoint's uncommitted Simulator-purpose-grant fix, FORGET-capsule-propagation
+    fix, and conflict-to-tension rename
+  claimed_java: 793/793 (full `mvn test` re-run after this checkpoint's fixes, 2m12s, exit 0 —
+    see next_machine_actions for the commit that will make this the new committed baseline)
+  claimed_playwright: 13/13 plus Living Aurora 1/1 (no frontend change this checkpoint)
+  claimed_vitest: 33/33 (no frontend change this checkpoint)
   independent_reverification: BUILDER_VERIFIED_WITH_HUMAN_AND_PRODUCTION_GATES
   independently_verified:
     - Full `mvn test` re-run again this checkpoint after adding CorrectionTargetingEvaluationTest: exit code 0, no [ERROR] markers, across the full Spring context suite. The new eval itself: 1/1, precision/recall thresholds calibrated just below the honestly-measured baseline (see active_front notes).

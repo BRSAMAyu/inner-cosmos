@@ -78,9 +78,14 @@ public class CapsuleServiceImpl implements CapsuleService {
         if (request.memoryIds != null && !request.memoryIds.isEmpty()) {
             for (Long mid : request.memoryIds) {
                 MemoryCard card = memoryCardMapper.selectById(mid);
+                // SIMULATOR_AUTHORIZED is a distinct, purpose-scoped consent grant — it must never
+                // be reachable through the normal (potentially-public) capsule path, only through
+                // createSimulatorCapsule. Without this exclusion a memory the owner explicitly
+                // marked "simulator testing only" could end up in a capsule real visitors can chat with.
                 if (card != null && userId.equals(card.userId) && "ACTIVE".equalsIgnoreCase(card.status)
                         && !"LOCAL_ONLY".equalsIgnoreCase(card.consentScope)
-                        && !"NO_EXTERNAL_PROCESSING".equalsIgnoreCase(card.consentScope)) {
+                        && !"NO_EXTERNAL_PROCESSING".equalsIgnoreCase(card.consentScope)
+                        && !SIMULATOR_CONSENT_SCOPE.equalsIgnoreCase(card.consentScope)) {
                     memorySummaries.add(card.title + ": " + card.summary);
                     authorizedCards.add(card);
                 }
@@ -603,15 +608,25 @@ public class CapsuleServiceImpl implements CapsuleService {
             ref.authorizationStatus = "WITHDRAWN";
             authorizedMemoryRefMapper.updateById(ref);
         }
+        // The SIMULATOR_AUTHORIZED purpose grant must hold for the capsule's entire lifetime, not
+        // just at creation: updateContext/recompileGenome both funnel through this method, so
+        // without this check a Simulator capsule could later be recompiled with ordinary
+        // AURORA_PRIVATE memories (defeating the distinct-consent contract), or — the more
+        // serious direction — a normal capsule could accept a memory the owner marked simulator-
+        // testing-only, reaching real visitors through plaza/matching/persona chat.
+        boolean simulatorOnly = Boolean.TRUE.equals(capsule.simulatorOnly);
         List<MemoryCard> accepted = new ArrayList<>();
         for (Long id : requestedIds) {
             MemoryCard card = memoryCardMapper.selectById(id);
-            if (card != null && userId.equals(card.userId) && "ACTIVE".equalsIgnoreCase(card.status)
-                    && !"LOCAL_ONLY".equalsIgnoreCase(card.consentScope)
-                    && !"NO_EXTERNAL_PROCESSING".equalsIgnoreCase(card.consentScope)) {
-                accepted.add(card);
-                authorize(capsule.id, card);
+            if (card == null || !userId.equals(card.userId) || !"ACTIVE".equalsIgnoreCase(card.status)) continue;
+            boolean isSimulatorScope = SIMULATOR_CONSENT_SCOPE.equalsIgnoreCase(card.consentScope);
+            if (simulatorOnly ? !isSimulatorScope
+                    : (isSimulatorScope || "LOCAL_ONLY".equalsIgnoreCase(card.consentScope)
+                            || "NO_EXTERNAL_PROCESSING".equalsIgnoreCase(card.consentScope))) {
+                continue;
             }
+            accepted.add(card);
+            authorize(capsule.id, card);
         }
         capsule.authorizedMemoryIds = toJsonArray(accepted.stream().map(card -> String.valueOf(card.id)).toList());
         return accepted;
@@ -816,11 +831,13 @@ public class CapsuleServiceImpl implements CapsuleService {
     }
 
     /**
-     * Real scene indexing + conflict handling: groups authorized memories by dominant theme
+     * Real scene indexing + tension surfacing: groups authorized memories by dominant theme
      * family into scenes (instead of a single 420-char truncation of everything concatenated),
      * picks the highest-gravity memory per scene as its representative excerpt, and flags a
-     * scene as conflicting when it holds both a POSITIVE and a NEGATIVE/CRISIS memory — so the
-     * compiler surfaces the disagreement instead of quietly blending it into one voice.
+     * scene as holding tension when it contains both a POSITIVE and a NEGATIVE memory. This is
+     * deliberately NOT called a "contradiction": one happy and one difficult memory about the
+     * same relationship is normal emotional complexity, not a logical inconsistency the compiler
+     * has detected — it's a signal to represent nuance rather than blend it into one flat voice.
      */
     private String buildContextPreview(List<MemoryCard> cards, String publicTags, String note) {
         Map<String, List<MemoryCard>> byScene = new LinkedHashMap<>();
@@ -838,7 +855,7 @@ public class CapsuleServiceImpl implements CapsuleService {
         }
 
         List<Map<String, Object>> scenes = new ArrayList<>();
-        List<Map<String, Object>> conflicts = new ArrayList<>();
+        List<Map<String, Object>> tensions = new ArrayList<>();
         for (Map.Entry<String, List<MemoryCard>> entry : byScene.entrySet()) {
             List<MemoryCard> members = entry.getValue();
             MemoryCard representative = members.stream()
@@ -854,7 +871,7 @@ public class CapsuleServiceImpl implements CapsuleService {
                         String.join(" ", parseTags(member.emotionTags)));
                 sentimentLabels.add(sceneSentiment(memberText));
             }
-            boolean conflict = sentimentLabels.contains("MIXED")
+            boolean hasTension = sentimentLabels.contains("MIXED")
                     || (sentimentLabels.contains("POSITIVE") && sentimentLabels.contains("NEGATIVE"));
 
             Map<String, Object> scene = new LinkedHashMap<>();
@@ -862,11 +879,11 @@ public class CapsuleServiceImpl implements CapsuleService {
             scene.put("memoryCount", members.size());
             scene.put("excerpt", excerpt);
             scene.put("sentimentLabels", sentimentLabels);
-            scene.put("conflict", conflict);
+            scene.put("hasTension", hasTension);
             scenes.add(scene);
-            if (conflict) {
-                conflicts.add(Map.of("theme", entry.getKey(),
-                        "note", "同一主题下存在情绪相反的记忆，不做单一定论，需谨慎表达"));
+            if (hasTension) {
+                tensions.add(Map.of("theme", entry.getKey(),
+                        "note", "同一主题下同时存在轻松与低落的记忆，这是正常的情绪复杂性，不代表矛盾，回应时不做单一定论"));
             }
         }
         scenes.sort(Comparator.comparingInt((Map<String, Object> s) -> (Integer) s.get("memoryCount")).reversed());
@@ -874,7 +891,7 @@ public class CapsuleServiceImpl implements CapsuleService {
 
         Map<String, Object> preview = new LinkedHashMap<>();
         preview.put("scenes", topScenes);
-        preview.put("conflicts", conflicts);
+        preview.put("tensions", tensions);
         preview.put("publicTags", parseTags(publicTags));
         preview.put("ownerNote", note == null ? "" : note);
         preview.put("privacy", "不包含原始对话全文、联系方式、真实身份和未授权记忆");
@@ -887,8 +904,8 @@ public class CapsuleServiceImpl implements CapsuleService {
         preview.put("scenes", List.of(Map.of(
                 "theme", "日常片段", "memoryCount", 0,
                 "excerpt", intro == null ? "" : intro,
-                "sentimentLabels", List.of(), "conflict", false)));
-        preview.put("conflicts", List.of());
+                "sentimentLabels", List.of(), "hasTension", false)));
+        preview.put("tensions", List.of());
         preview.put("publicTags", parseTags(publicTags));
         preview.put("ownerNote", note == null ? "" : note);
         preview.put("privacy", "不包含原始对话全文、联系方式、真实身份和未授权记忆");

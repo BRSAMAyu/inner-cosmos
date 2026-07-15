@@ -109,8 +109,9 @@ public final class PseudoSemanticAnalyzer {
         // Tokenize
         List<String> tokens = tokenize(text);
 
-        // Calculate sentiment score
-        result.sentimentScore = calculateSentiment(tokens);
+        // Calculate sentiment score (scans raw text for lexicon words directly — see
+        // calculateSentiment's Javadoc for why per-token exact lookup cannot work here)
+        result.sentimentScore = calculateSentiment(text);
 
         // Detect themes
         result.detectedThemes = detectThemes(tokens);
@@ -119,10 +120,10 @@ public final class PseudoSemanticAnalyzer {
         result.primaryIntent = detectIntent(tokens, result.detectedThemes);
 
         // Check for safety intervention
-        result.needsSafetyIntervention = checkSafetyRisk(tokens);
+        result.needsSafetyIntervention = checkSafetyRisk(tokens, text);
 
         // Calculate intensity score (0-10)
-        result.intensityScore = calculateIntensity(tokens, result.sentimentScore);
+        result.intensityScore = calculateIntensity(text, result.sentimentScore);
 
         // Determine sentiment label
         result.sentimentLabel = categorizeSentiment(result.sentimentScore);
@@ -167,36 +168,38 @@ public final class PseudoSemanticAnalyzer {
     }
 
     /**
-     * Calculate overall sentiment score from tokens.
-     * Uses lexicon lookup and intensifier adjustment.
+     * Calculate overall sentiment score by scanning the raw text for lexicon words.
+     *
+     * This intentionally does NOT look up individual tokenize() tokens: tokenize() splits
+     * Chinese text into single characters, but ChineseSentimentLexicon's keys are almost all
+     * 2+ character words, so an exact per-token lookup silently matches almost nothing and
+     * scores every real sentence as ~0 (NEUTRAL) — verified directly against clearly emotional
+     * probe sentences. Scanning the original text via substring containment is the same
+     * technique detectThemes()/detectIntent() already use successfully in this class.
      */
-    private static double calculateSentiment(List<String> tokens) {
+    private static double calculateSentiment(String text) {
+        if (text == null || text.isBlank()) return 0;
         double totalScore = 0;
-        double currentMultiplier = 1.0;
-
-        for (int i = 0; i < tokens.size(); i++) {
-            String token = tokens.get(i);
-
-            // Skip stopwords
-            if (ChineseStopwords.isStopword(token)) continue;
-
-            // Check for intensifier
-            if (ChineseIntensifiers.isIntensifier(token)) {
-                currentMultiplier = ChineseIntensifiers.getMultiplier(token);
-                continue;
-            }
-
-            // Check for sentiment word
-            int wordScore = ChineseSentimentLexicon.getScore(token);
-            if (wordScore != 0) {
-                totalScore += wordScore * currentMultiplier;
-                // Reset multiplier after applying
-                currentMultiplier = 1.0;
+        for (Map.Entry<String, Integer> entry : ChineseSentimentLexicon.entries()) {
+            int wordScore = entry.getValue();
+            if (wordScore != 0 && text.contains(entry.getKey())) {
+                totalScore += wordScore;
             }
         }
+        double multiplier = strongestIntensifierMultiplier(text);
+        return Math.max(-5, Math.min(5, totalScore * multiplier));
+    }
 
-        // Normalize to -5 to +5 range
-        return Math.max(-5, Math.min(5, totalScore));
+    /** The intensifier present in the text whose multiplier deviates furthest from 1.0 (no effect). */
+    private static double strongestIntensifierMultiplier(String text) {
+        double multiplier = 1.0;
+        for (Map.Entry<String, Double> entry : ChineseIntensifiers.entries().entrySet()) {
+            if (text.contains(entry.getKey())
+                    && Math.abs(entry.getValue() - 1.0) > Math.abs(multiplier - 1.0)) {
+                multiplier = entry.getValue();
+            }
+        }
+        return multiplier;
     }
 
     /**
@@ -280,43 +283,44 @@ public final class PseudoSemanticAnalyzer {
     /**
      * Check for safety risk (self-harm or severe distress).
      */
-    private static boolean checkSafetyRisk(List<String> tokens) {
+    private static boolean checkSafetyRisk(List<String> tokens, String text) {
         Set<String> tokensSet = new HashSet<>(tokens);
-        // Check self-harm keywords
+        // Check self-harm keywords (substring match against per-char tokens — already correct)
         if (hasAnyMatch(tokensSet, INTENT_PATTERNS.get("SELF_HARM"))) return true;
 
-        // Check severe negative sentiment words (score <= -4)
-        for (String token : tokens) {
-            int score = ChineseSentimentLexicon.getScore(token);
-            if (score <= -4) return true;
-        }
+        // Check severe negative sentiment words (score <= -4) — every such lexicon entry is 2+
+        // characters, so this must scan the raw text rather than look up individual tokens.
+        return hasSevereNegativeWord(text);
+    }
 
+    private static boolean hasSevereNegativeWord(String text) {
+        if (text == null || text.isBlank()) return false;
+        for (Map.Entry<String, Integer> entry : ChineseSentimentLexicon.entries()) {
+            if (entry.getValue() <= -4 && text.contains(entry.getKey())) return true;
+        }
         return false;
     }
 
     /**
      * Calculate intensity score (0-10) based on sentiment and intensifiers.
      */
-    private static double calculateIntensity(List<String> tokens, double sentimentScore) {
+    private static double calculateIntensity(String text, double sentimentScore) {
         double baseIntensity = 5.0; // Neutral baseline
 
         // Adjust based on sentiment magnitude
         baseIntensity += Math.abs(sentimentScore) * 0.8;
 
-        // Check for intensifiers
-        for (String token : tokens) {
-            if (ChineseIntensifiers.isAmplifying(token)) {
+        // Check for amplifying intensifiers present anywhere in the text (most are 2+ characters,
+        // so this must scan raw text rather than look up individual tokenize() tokens).
+        for (Map.Entry<String, Double> entry : ChineseIntensifiers.entries().entrySet()) {
+            if (entry.getValue() > 1.0 && text.contains(entry.getKey())) {
                 baseIntensity += 0.5;
             }
         }
 
         // Check for crisis/severe words
-        for (String token : tokens) {
-            int score = ChineseSentimentLexicon.getScore(token);
-            if (score <= -4) {
-                baseIntensity = Math.max(baseIntensity, 8.0);
-                break;
-            }
+        if (hasSevereNegativeWord(text)) {
+            baseIntensity = Math.max(baseIntensity, 8.0);
         }
 
         return Math.max(0, Math.min(10, baseIntensity));
