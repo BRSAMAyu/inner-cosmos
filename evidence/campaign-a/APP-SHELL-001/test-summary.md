@@ -10,6 +10,7 @@ Date: 2026-07-15
 | `scripts/run-living-aurora-experience.ps1` | PASS, 1/1 | Scheduler -> durable notification -> SSE -> deep link -> feedback |
 | Focused packaged-JAR Playwright | PASS, 3/3 | Interrupt/replan, durable SSE recovery and mobile offline recovery after conversation extraction |
 | Focused packaged-JAR Playwright | PASS, 1/1 | Aurora Self proposal, evaluation, consented activation and rollback after Self extraction |
+| Focused packaged-JAR Playwright | PASS, 1/1 | Understanding correction preview, authoritative confirmation and visible replacement |
 
 The first browser run correctly failed because domain content and action status had become hidden
 behind the selected space. The final implementation makes navigation explicit in the tests, keeps

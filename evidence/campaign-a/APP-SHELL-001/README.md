@@ -37,7 +37,8 @@ The URL contract, navigation and `我的` control surface have been extracted in
 a controlled component contract that preserves partial replies, stop and interrupt/replan actions.
 Aurora Self has its own component boundary while proposal, evaluation, consented activation and
 rollback remain caller-owned API actions. `AuroraApp.tsx` remains oversized and the domain-heavy
-spaces still need extraction. Visual
+spaces still need extraction. The Campaign B understanding-correction surface is now isolated as a
+controlled component without moving authority or persistence into view code. Visual
 regression, automated accessibility, complete i18n and
 performance budgets also remain open. The next machine front continues domain component decomposition
 with state and API contracts kept stable.

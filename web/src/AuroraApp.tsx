@@ -7,6 +7,7 @@ import type { AuroraStreamEvent, DialogMessage, TurnStatus } from "./protocol";
 import { initialProductSpace, MeSpace, ProductShellNavigation, type ProductSpace } from "./components/ProductShell";
 import { AuroraConversation, type AuroraUiMessage } from "./components/AuroraConversation";
 import { AuroraSelfSpace } from "./components/AuroraSelfSpace";
+import { UnderstandingCorrection } from "./components/UnderstandingCorrection";
 
 type RuntimeSignal = { stage: "idle" | "understanding" | "composing" | "speaking"; runtime: "single" | "dual"; relationshipMove?: string; repaired?: boolean };
 const terminal = new Set<TurnStatus>(["COMPLETED", "INTERRUPTED", "CANCELLED"]);
@@ -936,24 +937,9 @@ export function AuroraApp() {
       </div>
 
       <div className="product-space" hidden={productSpace !== "cosmos"}>
-      <section className="understanding-space" aria-label="校准 Aurora 对我的理解">
-        <div className="understanding-heading"><div><span className="eyebrow">YOUR INNER COSMOS</span><h2>如果这不太是你</h2></div>
-          <span>{claims.filter(claim => claim.status === "ACTIVE").length} 条由你确认的理解</span></div>
-        <p>先预览影响，再决定是否让 Aurora 记住。旧理解不会消失，只会退出“当前事实”。</p>
-        <div className="correction-fields">
-          <label>Aurora 原先怎样理解（可选）<textarea value={correctionOld} onChange={event => { setCorrectionOld(event.target.value); setCorrectionImpact(null); }} placeholder="例如：你更喜欢独处" /></label>
-          <label>更准确的你是<textarea value={correctionNew} onChange={event => { setCorrectionNew(event.target.value); setCorrectionImpact(null); }} placeholder="例如：我不是喜欢独处，只是需要先恢复精力" /></label>
-        </div>
-        {!correctionImpact ? <button className="understanding-action" disabled={correctionBusy || !correctionNew.trim()} onClick={() => void previewCorrection()}>预览会改变什么</button> :
-          <div className="impact-preview" role="region" aria-label="纠正影响预览">
-            <strong>确认后会发生</strong>
-            <ul>{correctionImpact.impacts.map((impact, index) => <li key={`${impact.kind}-${impact.targetId ?? index}`}><span>{impact.label}</span><small>{impact.action}</small></li>)}</ul>
-            <div className="impact-actions"><button disabled={correctionBusy} onClick={() => setCorrectionImpact(null)}>返回修改</button><button disabled={correctionBusy} onClick={() => void confirmCorrection()}>确认，这是更准确的我</button></div>
-          </div>}
-        {claims.filter(claim => claim.status === "ACTIVE").slice(0, 3).map(claim => <article className="claim-card" key={claim.id}>
-          <span>由你确认 · v{claim.version}</span><p>{claim.valueJson.replace(/^"|"$/g, "")}</p>
-        </article>)}
-      </section>
+      <UnderstandingCorrection claims={claims} oldValue={correctionOld} newValue={correctionNew} impact={correctionImpact} busy={correctionBusy}
+        onOldValue={value => { setCorrectionOld(value); setCorrectionImpact(null); }} onNewValue={value => { setCorrectionNew(value); setCorrectionImpact(null); }}
+        onPreview={() => void previewCorrection()} onCancelPreview={() => setCorrectionImpact(null)} onConfirm={() => void confirmCorrection()} />
 
       {starfield && <section className="cosmos-space" aria-label="记忆星空">
         <div className="cosmos-heading"><div><span className="eyebrow">MEMORY, ALIVE</span><h2>你的记忆不是档案柜</h2></div>
