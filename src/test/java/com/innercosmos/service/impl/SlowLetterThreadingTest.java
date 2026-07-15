@@ -54,6 +54,9 @@ class SlowLetterThreadingTest {
     @Mock private BlockRelationMapper blockRelationMapper;
 
     private SlowLetterServiceImpl newService() {
+        LetterSafetyFilter.FilterResult safe = new LetterSafetyFilter.FilterResult();
+        safe.passed = true;
+        org.mockito.Mockito.lenient().when(letterSafetyFilter.filter(any(), any(), any())).thenReturn(safe);
         return new SlowLetterServiceImpl(letterMapper, logMapper, stateRegistry,
                 guardAgent, threadMapper, reportRecordMapper, letterSafetyFilter, capsuleMapper, blockRelationMapper);
     }
@@ -170,6 +173,20 @@ class SlowLetterThreadingTest {
         String sql = query.getValue().getSqlSegment();
         assertTrue(sql.contains("status IN"));
         assertTrue(sql.contains("receiver_user_id"));
+    }
+
+    @Test
+    @DisplayName("transition: users cannot impersonate delivery or sender/receiver-only actions")
+    void transition_enforcesActorAndSystemBoundaries() {
+        SlowLetter letter = original(1L, 10L, 20L, 77L);
+        letter.status = "FLYING";
+        when(letterMapper.selectById(1L)).thenReturn(letter);
+
+        assertEquals("UNAUTHORIZED", assertThrows(BusinessException.class,
+                () -> newService().transition(10L, 1L, "DELIVERED")).code);
+        assertEquals("UNAUTHORIZED", assertThrows(BusinessException.class,
+                () -> newService().transition(10L, 1L, "READ")).code);
+        verify(letterMapper, never()).update(any(), any());
     }
 
     @Test

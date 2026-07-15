@@ -118,6 +118,13 @@ export type SlowLetter = {
   id: number; senderUserId: number; receiverUserId: number; receiverCapsuleId: number; title: string; letterBody: string; status: string;
   parallaxDistance: number; estimatedArrivalAt: string;
 };
+export type SocialConnection = {
+  id: number; status: string; userId: number; nickname: string; username: string; source: string;
+};
+export type FriendRelation = {
+  id: number; requesterId: number; addresseeId: number; status: string; source: string;
+};
+export type ConnectionRequests = { incoming: SocialConnection[]; outgoing: SocialConnection[] };
 let csrf: Csrf | null = null;
 
 async function request<T>(url: string, init: RequestInit = {}, retriedCsrf = false): Promise<T> {
@@ -241,13 +248,21 @@ export const api = {
   draftSlowLetter: (receiverCapsuleId: number, title: string, letterBody: string) => request<SlowLetter>("/api/letters/draft", {
     method: "POST", body: JSON.stringify({ receiverCapsuleId, title, letterBody })
   }),
-  sendSlowLetter: (id: number) => request<SlowLetter>(`/api/letters/${id}/send`, { method: "POST" })
-  ,letterInbox: () => request<SlowLetter[]>("/api/letters/inbox")
-  ,transitionLetter: (id: number, action: "read" | "decline" | "block" | "archive") =>
-    request<SlowLetter>(`/api/letters/${id}/${action}`, { method: "POST" })
-  ,reportLetter: (id: number, reason: string) => request<void>(`/api/letters/${id}/report`, {
+  sendSlowLetter: (id: number) => request<SlowLetter>(`/api/letters/${id}/send`, { method: "POST" }),
+  letterInbox: () => request<SlowLetter[]>("/api/letters/inbox"),
+  transitionLetter: (id: number, action: "read" | "reply" | "decline" | "block" | "archive") =>
+    request<SlowLetter>(`/api/letters/${id}/${action}`, { method: "POST" }),
+  reportLetter: (id: number, reason: string) => request<void>(`/api/letters/${id}/report`, {
     method: "POST", body: JSON.stringify({ reason })
-  })
+  }),
+  replyWithSlowLetter: (id: number, title: string, letterBody: string) => request<SlowLetter>(`/api/letters/${id}/reply-with-letter`, {
+    method: "POST", body: JSON.stringify({ title, letterBody })
+  }),
+  connectionRequests: () => request<ConnectionRequests>("/api/social/requests"),
+  friends: () => request<SocialConnection[]>("/api/social/friends"),
+  requestConnectionFromLetter: (letterId: number) => request<FriendRelation>(`/api/social/connections/from-letter/${letterId}`, { method: "POST" }),
+  decideConnection: (id: number, decision: "accept" | "decline") => request<FriendRelation>(`/api/social/friends/${id}/${decision}`, { method: "POST" }),
+  leaveConnection: (id: number) => request<FriendRelation>(`/api/social/friends/${id}/leave`, { method: "POST" })
 };
 
 export async function streamAurora(

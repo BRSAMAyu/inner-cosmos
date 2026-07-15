@@ -266,6 +266,29 @@ test("owner publishes, a visitor sends a slow letter, then withdrawal stops the 
   await ownerSpace.getByRole("tab", { name: new RegExp(capsuleName) }).click();
   await ownerSpace.getByRole("button", { name: "撤回这个共鸣体" }).click();
   await expect(page.getByRole("status")).toContainText("已撤回");
+
+  const consent = inbox.getByLabel("双向连接同意");
+  const existingLeave = consent.getByRole("button", { name: "退出连接" }).first();
+  if (await existingLeave.isVisible().catch(() => false)) await existingLeave.click();
+  const arrivedFromRiver = inbox.locator(".inbox-list article").filter({ hasText: "你写的黄昏让我停了一下" });
+  const markRead = arrivedFromRiver.getByRole("button", { name: "标记已读" });
+  if (await markRead.isVisible().catch(() => false)) await markRead.click();
+  await arrivedFromRiver.getByLabel("回复「你写的黄昏让我停了一下」").fill("我愿意认真回你：真实理解不是一句确认，而是愿意让对方纠正，并在之后真的改变。 ");
+  await arrivedFromRiver.getByRole("button", { name: "让回复慢信启程" }).click();
+  await expect(page.getByRole("status")).toContainText("回复慢信已启程");
+  await arrivedFromRiver.getByRole("button", { name: "愿意认识对方" }).click();
+  await expect(consent).toContainText("尚未同意，不会提前开放真人连接");
+
+  await page.getByRole("button", { name: "安全退出" }).click();
+  await page.getByLabel("用户名").fill("river");
+  await page.getByLabel("密码").fill("demo123");
+  await page.getByRole("button", { name: "登录" }).click();
+  const riverConsent = page.getByLabel("双向连接同意");
+  await riverConsent.getByRole("button", { name: "我也愿意" }).click();
+  await expect(riverConsent).toContainText("双方已同意");
+  await riverConsent.screenshot({ path: "../evidence/innovation/INNO-CAP-007/mutual-connection-consent.png" });
+  await riverConsent.getByRole("button", { name: "退出连接" }).click();
+  await expect(riverConsent).toContainText("还没有建立真人连接");
 });
 
 test("Inner Cosmos remains operable on a narrow mobile viewport", async ({ page }) => {

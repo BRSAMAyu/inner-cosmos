@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { api, replayTurnEvents, streamAurora, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type Notification, type PersonaMessage, type PersonaSession, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type StarfieldDetail, type StarfieldScene, type UnderstandingClaim, type WakeIntent } from "./api";
+import { api, replayTurnEvents, streamAurora, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type ConnectionRequests, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type Notification, type PersonaMessage, type PersonaSession, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type SocialConnection, type StarfieldDetail, type StarfieldScene, type UnderstandingClaim, type WakeIntent } from "./api";
 import type { AuroraStreamEvent, DialogMessage, TurnStatus } from "./protocol";
 
 type UiMessage = { key: string; speaker: "USER" | "AURORA"; text: string; partial?: boolean };
@@ -62,6 +62,9 @@ export function AuroraApp() {
   const [letterBody, setLetterBody] = useState("");
   const [sentLetter, setSentLetter] = useState<SlowLetter | null>(null);
   const [letterInbox, setLetterInbox] = useState<SlowLetter[]>([]);
+  const [connectionRequests, setConnectionRequests] = useState<ConnectionRequests>({ incoming: [], outgoing: [] });
+  const [friends, setFriends] = useState<SocialConnection[]>([]);
+  const [replyDrafts, setReplyDrafts] = useState<Record<number, string>>({});
   const [visitorBusy, setVisitorBusy] = useState(false);
   const [runtimeSignal, setRuntimeSignal] = useState<RuntimeSignal>({ stage: "idle", runtime: "single" });
   const abortRef = useRef<AbortController | null>(null);
@@ -96,7 +99,9 @@ export function AuroraApp() {
         api.memoryCards().then(rows => { setMemories(rows); return rows; }),
         api.myCapsules().then(rows => { setCapsules(rows); return rows; }),
         api.resonanceMatches().then(rows => { setResonanceMatches(rows); return rows; }),
-        api.letterInbox().then(rows => { setLetterInbox(rows); return rows; })
+        api.letterInbox().then(rows => { setLetterInbox(rows); return rows; }),
+        api.connectionRequests().then(rows => { setConnectionRequests(rows); return rows; }),
+        api.friends().then(rows => { setFriends(rows); return rows; })
       ]);
       const loadedCapsules = loaded[8] as EchoCapsule[];
       const loadedMatches = loaded[9] as CapsuleMatch[];
@@ -588,6 +593,44 @@ export function AuroraApp() {
     } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法提交举报"); }
   };
 
+  const replyWithLetter = async (letter: SlowLetter) => {
+    const body = replyDrafts[letter.id]?.trim();
+    if (!body) return;
+    try {
+      const draft = await api.replyWithSlowLetter(letter.id, `回复：${letter.title}`, body);
+      await api.sendSlowLetter(draft.id);
+      const updated = letter.status === "READ" ? await api.transitionLetter(letter.id, "reply") : letter;
+      setLetterInbox(rows => rows.map(row => row.id === updated.id ? updated : row));
+      setReplyDrafts(drafts => ({ ...drafts, [letter.id]: "" }));
+      setStatus("回复慢信已启程。它仍会经过时间，而不是变成即时聊天。 ");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "回复慢信没有启程"); }
+  };
+
+  const refreshConnections = async () => {
+    const [requests, accepted] = await Promise.all([api.connectionRequests(), api.friends()]);
+    setConnectionRequests(requests); setFriends(accepted);
+  };
+
+  const requestConnection = async (letter: SlowLetter) => {
+    try {
+      await api.requestConnectionFromLetter(letter.id); await refreshConnections();
+      setStatus("连接邀请已发出。只有对方明确接受后，双方才会成为真实连接。 ");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法发出连接邀请"); }
+  };
+
+  const decideConnection = async (id: number, decision: "accept" | "decline") => {
+    try {
+      await api.decideConnection(id, decision); await refreshConnections();
+      setStatus(decision === "accept" ? "双方都已同意这段连接。" : "已婉拒；不会自动建立任何关系。 ");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法处理连接邀请"); }
+  };
+
+  const leaveConnection = async (id: number) => {
+    try {
+      await api.leaveConnection(id); await refreshConnections(); setStatus("已退出这段连接。 ");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法退出连接"); }
+  };
+
   if (authenticated === null) return <main className="login-shell"><div className="login" role="status">正在连接你的内宇宙…</div></main>;
   if (!authenticated) return <Login onSuccess={bootstrap} />;
 
@@ -832,13 +875,24 @@ export function AuroraApp() {
         <p className="resonance-intro">飞行中的信不会提前泄露正文。抵达后你可以阅读、婉拒、举报或屏蔽；屏蔽会阻断同一来信者之后的慢信。</p>
         {letterInbox.length === 0 ? <div className="network-empty">此刻没有已经抵达的慢信。</div> : <div className="inbox-list">
           {letterInbox.map(letter => <article key={letter.id}><header><strong>{letter.title}</strong><span>{letter.status}</span></header>
-            <p>{letter.letterBody}</p><div>
+            <p>{letter.letterBody}</p>
+            {["READ", "REPLIED"].includes(letter.status) && <div className="letter-reply"><textarea aria-label={`回复「${letter.title}」`}
+              value={replyDrafts[letter.id] ?? ""} onChange={event => setReplyDrafts(drafts => ({ ...drafts, [letter.id]: event.target.value }))}
+              placeholder="写下你愿意负责的回应；它仍会慢慢抵达。" /><button disabled={!replyDrafts[letter.id]?.trim()} onClick={() => void replyWithLetter(letter)}>让回复慢信启程</button></div>}
+            <div>
               {letter.status === "DELIVERED" && <button onClick={() => void actOnLetter(letter, "read")}>标记已读</button>}
               {["DELIVERED", "READ"].includes(letter.status) && <button onClick={() => void actOnLetter(letter, "decline")}>温和婉拒</button>}
+              {["READ", "REPLIED"].includes(letter.status) && <button onClick={() => void requestConnection(letter)}>愿意认识对方</button>}
               {letter.status !== "BLOCKED" && <button onClick={() => void actOnLetter(letter, "block")}>屏蔽后续来信</button>}
               <button onClick={() => void reportLetter(letter)}>举报这封信</button>
             </div></article>)}
         </div>}
+        <div className="connection-consent" aria-label="双向连接同意">
+          <div><strong>等待你决定</strong>{connectionRequests.incoming.length === 0 ? <small>没有新的连接邀请</small> : connectionRequests.incoming.map(item =>
+            <article key={item.id}><span>{item.nickname} 想在慢信之后认识你</span><div><button onClick={() => void decideConnection(item.id, "accept")}>我也愿意</button><button onClick={() => void decideConnection(item.id, "decline")}>暂不连接</button></div></article>)}</div>
+          <div><strong>等待对方决定</strong>{connectionRequests.outgoing.length === 0 ? <small>没有等待中的邀请</small> : connectionRequests.outgoing.map(item => <article key={item.id}><span>{item.nickname}</span><small>尚未同意，不会提前开放真人连接</small></article>)}</div>
+          <div><strong>双方已同意</strong>{friends.length === 0 ? <small>还没有建立真人连接</small> : friends.map(item => <article key={item.id}><span>{item.nickname}</span><button onClick={() => void leaveConnection(item.id)}>退出连接</button></article>)}</div>
+        </div>
       </section>
 
       <section className="conversation" aria-live="polite" aria-label="与 Aurora 的对话">

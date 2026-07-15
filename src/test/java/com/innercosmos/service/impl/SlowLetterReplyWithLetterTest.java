@@ -60,6 +60,9 @@ class SlowLetterReplyWithLetterTest {
 
     // Constructed per-test so lenient stubs don't leak across cases.
     private SlowLetterServiceImpl newService() {
+        LetterSafetyFilter.FilterResult safe = new LetterSafetyFilter.FilterResult();
+        safe.passed = true;
+        org.mockito.Mockito.lenient().when(letterSafetyFilter.filter(any(), any(), any())).thenReturn(safe);
         return new SlowLetterServiceImpl(letterMapper, logMapper, stateRegistry,
                 guardAgent, threadMapper, reportRecordMapper, letterSafetyFilter, capsuleMapper, blockRelationMapper);
     }

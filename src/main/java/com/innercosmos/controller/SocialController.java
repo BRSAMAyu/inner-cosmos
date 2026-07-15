@@ -4,11 +4,15 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.innercosmos.common.ApiResponse;
 import com.innercosmos.common.ErrorCode;
 import com.innercosmos.entity.FriendRelation;
+import com.innercosmos.entity.BlockRelation;
+import com.innercosmos.entity.SlowLetter;
 import com.innercosmos.entity.SocialGroup;
 import com.innercosmos.entity.SocialGroupMember;
 import com.innercosmos.entity.User;
 import com.innercosmos.exception.BusinessException;
 import com.innercosmos.mapper.FriendRelationMapper;
+import com.innercosmos.mapper.BlockRelationMapper;
+import com.innercosmos.mapper.SlowLetterMapper;
 import com.innercosmos.mapper.SocialGroupMapper;
 import com.innercosmos.mapper.SocialGroupMemberMapper;
 import com.innercosmos.mapper.UserMapper;
@@ -26,15 +30,21 @@ public class SocialController extends BaseController {
     private final FriendRelationMapper friendMapper;
     private final SocialGroupMapper groupMapper;
     private final SocialGroupMemberMapper memberMapper;
+    private final SlowLetterMapper letterMapper;
+    private final BlockRelationMapper blockMapper;
 
     public SocialController(UserMapper userMapper,
                             FriendRelationMapper friendMapper,
                             SocialGroupMapper groupMapper,
-                            SocialGroupMemberMapper memberMapper) {
+                            SocialGroupMemberMapper memberMapper,
+                            SlowLetterMapper letterMapper,
+                            BlockRelationMapper blockMapper) {
         this.userMapper = userMapper;
         this.friendMapper = friendMapper;
         this.groupMapper = groupMapper;
         this.memberMapper = memberMapper;
+        this.letterMapper = letterMapper;
+        this.blockMapper = blockMapper;
     }
 
     @GetMapping("/people")
@@ -82,6 +92,27 @@ public class SocialController extends BaseController {
         Long me = currentUserId(session);
         Long target = Long.valueOf(String.valueOf(body.get("userId")));
         if (me.equals(target)) throw new BusinessException(ErrorCode.BAD_REQUEST, "不能添加自己");
+        return ApiResponse.ok(createOrResumeRequest(me, target,
+                String.valueOf(body.getOrDefault("source", "SOCIAL_PAGE"))));
+    }
+
+    @PostMapping("/connections/from-letter/{letterId}")
+    public ApiResponse<FriendRelation> requestFromLetter(@PathVariable Long letterId, HttpSession session) {
+        Long me = currentUserId(session);
+        SlowLetter letter = letterMapper.selectById(letterId);
+        if (letter == null || !me.equals(letter.receiverUserId)) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "只有这封慢信的收件人可以发起连接");
+        }
+        if (!List.of("READ", "REPLIED").contains(letter.status)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "请在慢信抵达并阅读后再决定是否认识对方");
+        }
+        if (isBlocked(me, letter.senderUserId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "双方存在屏蔽关系，不能发起连接");
+        }
+        return ApiResponse.ok(createOrResumeRequest(me, letter.senderUserId, "SLOW_LETTER:" + letterId));
+    }
+
+    private FriendRelation createOrResumeRequest(Long me, Long target, String source) {
         FriendRelation relation = friendMapper.selectOne(new QueryWrapper<FriendRelation>()
                 .and(q -> q.eq("requester_id", me).eq("addressee_id", target)
                         .or()
@@ -92,17 +123,23 @@ public class SocialController extends BaseController {
             relation.requesterId = me;
             relation.addresseeId = target;
             relation.status = "PENDING";
-            relation.source = String.valueOf(body.getOrDefault("source", "SOCIAL_PAGE"));
+            relation.source = source;
             friendMapper.insert(relation);
+        } else if (List.of("DECLINED", "WITHDRAWN").contains(relation.status)) {
+            relation.requesterId = me;
+            relation.addresseeId = target;
+            relation.status = "PENDING";
+            relation.source = source;
+            friendMapper.updateById(relation);
         }
-        return ApiResponse.ok(relation);
+        return relation;
     }
 
     @PostMapping("/friends/{id}/accept")
     public ApiResponse<FriendRelation> accept(@PathVariable Long id, HttpSession session) {
         Long me = currentUserId(session);
         FriendRelation relation = friendMapper.selectById(id);
-        if (relation == null || !me.equals(relation.addresseeId)) {
+        if (relation == null || !me.equals(relation.addresseeId) || !"PENDING".equals(relation.status)) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED, "无权处理这条好友申请");
         }
         relation.status = "ACCEPTED";
@@ -114,10 +151,23 @@ public class SocialController extends BaseController {
     public ApiResponse<FriendRelation> decline(@PathVariable Long id, HttpSession session) {
         Long me = currentUserId(session);
         FriendRelation relation = friendMapper.selectById(id);
-        if (relation == null || !me.equals(relation.addresseeId)) {
+        if (relation == null || !me.equals(relation.addresseeId) || !"PENDING".equals(relation.status)) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED, "无权处理这条好友申请");
         }
         relation.status = "DECLINED";
+        friendMapper.updateById(relation);
+        return ApiResponse.ok(relation);
+    }
+
+    @PostMapping("/friends/{id}/leave")
+    public ApiResponse<FriendRelation> leave(@PathVariable Long id, HttpSession session) {
+        Long me = currentUserId(session);
+        FriendRelation relation = friendMapper.selectById(id);
+        if (relation == null || !"ACCEPTED".equals(relation.status)
+                || (!me.equals(relation.requesterId) && !me.equals(relation.addresseeId))) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "无权退出这段连接");
+        }
+        relation.status = "WITHDRAWN";
         friendMapper.updateById(relation);
         return ApiResponse.ok(relation);
     }
@@ -165,6 +215,13 @@ public class SocialController extends BaseController {
         return relation.status;
     }
 
+    private boolean isBlocked(Long first, Long second) {
+        Long count = blockMapper.selectCount(new QueryWrapper<BlockRelation>()
+                .and(q -> q.eq("blocker_user_id", first).eq("blocked_user_id", second)
+                        .or().eq("blocker_user_id", second).eq("blocked_user_id", first)));
+        return count != null && count > 0;
+    }
+
     private Map<String, Object> friendView(Long me, FriendRelation relation) {
         Long otherId = me.equals(relation.requesterId) ? relation.addresseeId : relation.requesterId;
         User other = userMapper.selectById(otherId);
@@ -174,6 +231,7 @@ public class SocialController extends BaseController {
         item.put("userId", otherId);
         item.put("nickname", other == null ? "未知用户" : (other.nickname == null ? other.username : other.nickname));
         item.put("username", other == null ? "" : other.username);
+        item.put("source", relation.source);
         return item;
     }
 }

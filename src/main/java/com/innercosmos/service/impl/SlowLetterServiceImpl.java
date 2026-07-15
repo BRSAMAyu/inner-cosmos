@@ -101,6 +101,21 @@ public class SlowLetterServiceImpl implements SlowLetterService {
         if (!isSender && !isReceiver) {
             throw new com.innercosmos.exception.BusinessException(com.innercosmos.common.ErrorCode.UNAUTHORIZED, "无权操作此信件");
         }
+        if (List.of("FLYING", "DELIVERED").contains(targetStatus)) {
+            throw new com.innercosmos.exception.BusinessException(
+                    com.innercosmos.common.ErrorCode.UNAUTHORIZED, "信件抵达只能由调度系统推进");
+        }
+        if ("SENT".equals(targetStatus) && !isSender) {
+            throw new com.innercosmos.exception.BusinessException(
+                    com.innercosmos.common.ErrorCode.UNAUTHORIZED, "只有写信人可以让信启程");
+        }
+        if (List.of("READ", "REPLIED", "DECLINED", "BLOCKED").contains(targetStatus) && !isReceiver) {
+            throw new com.innercosmos.exception.BusinessException(
+                    com.innercosmos.common.ErrorCode.UNAUTHORIZED, "只有收件人可以处理这封信");
+        }
+        if ("SENT".equals(targetStatus)) {
+            ensureDeliveryAllowed(letter.letterBody, letter.senderUserId, letter.receiverUserId);
+        }
         stateRegistry.validate(letter.status, targetStatus);
         String from = letter.status;
         // M-022: atomic conditional UPDATE — only applies if status is still `from`, so a concurrent
@@ -191,6 +206,7 @@ public class SlowLetterServiceImpl implements SlowLetterService {
         if (!guardAgent.allow(request.letterBody)) {
             throw new SafetyBlockedException("letter contains unsafe content");
         }
+        ensureDeliveryAllowed(request.letterBody, userId, original.senderUserId);
 
         // Resolve the conversation BEFORE inserting so the reply (and, on first reply,
         // the original) can be stamped with the shared thread id. Replies join an
@@ -257,6 +273,14 @@ public class SlowLetterServiceImpl implements SlowLetterService {
         thread.lastLetterAt = LocalDateTime.now();
         threadMapper.insert(thread);
         return thread;
+    }
+
+    private void ensureDeliveryAllowed(String body, Long senderId, Long receiverId) {
+        LetterSafetyFilter.FilterResult result = letterSafetyFilter.filter(body, senderId, receiverId);
+        if (result == null || !result.passed) {
+            String reason = result == null ? "letter safety check unavailable" : result.reason;
+            throw new SafetyBlockedException(reason == null ? "letter cannot be delivered" : reason);
+        }
     }
 
     @Override
