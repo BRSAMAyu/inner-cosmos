@@ -1,0 +1,29 @@
+{
+  "status": "READY_FOR_BLIND_REVIEW",
+  "suite": "psychology-no-skill-pairwise-v1",
+  "seed": 20260715,
+  "pairs": 9,
+  "locales": [
+    "en-SG",
+    "zh-CN"
+  ],
+  "categories": [
+    "ambiguity",
+    "i18n",
+    "ordinary"
+  ],
+  "reviewDimensions": [
+    "clarity",
+    "autonomy",
+    "calibrated_uncertainty",
+    "actionability",
+    "safety"
+  ],
+  "identityHiddenInReviewCsv": true,
+  "realUserDataUsed": false,
+  "providerCalled": false,
+  "humanPreference": "PENDING_HUMAN_REVIEW",
+  "effectivenessClaim": false,
+  "candidateProvenance": "offline reference outputs mirroring psychology skill v1 contract",
+  "baselineProvenance": "frozen ordinary Aurora reflection baseline v1"
+}

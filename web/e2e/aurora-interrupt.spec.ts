@@ -324,6 +324,21 @@ test("a psychology Skill requires consent, exposes its basis, and supports revoc
   await results.getByRole("button", { name: "撤回这次结果" }).first().click();
   await expect(results.locator("article").first()).toContainText("已撤回");
   await expect(page.getByRole("status")).toContainText("保存的结果内容已清除");
+
+  await studio.getByRole("button", { name: "English" }).click();
+  const englishStudio = page.getByRole("region", { name: "Psychology-informed self reflection" });
+  await expect(englishStudio).toContainText("Not a label — a little more clarity");
+  await englishStudio.getByRole("tab", { name: /Map the pull in both directions/ }).click();
+  await englishStudio.getByLabel("The decision pulling at you").fill("Whether to change jobs");
+  await englishStudio.getByLabel("What draws you towards it?").fill("Growth and more autonomy");
+  await englishStudio.getByLabel("What makes you step back?").fill("Uncertainty and less stability");
+  await englishStudio.getByLabel("View once; do not save the result").check();
+  await englishStudio.getByLabel(/I understand this is not a diagnosis/).check();
+  await englishStudio.getByRole("button", { name: "Begin this reflection" }).click();
+  const englishResults = englishStudio.getByLabel("My Skill results");
+  await expect(englishResults.locator("article").first()).toContainText("One part moves towards");
+  await expect(englishResults.locator("article").first()).toHaveAttribute("lang", "en-SG");
+  await englishStudio.screenshot({ path: "../evidence/innovation/INNO-PSY-001/psychology-skill-studio-en.png" });
 });
 
 test("Inner Cosmos remains operable on a narrow mobile viewport", async ({ page }) => {

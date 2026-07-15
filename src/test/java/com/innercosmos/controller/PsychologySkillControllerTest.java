@@ -159,6 +159,14 @@ class PsychologySkillControllerTest {
 
         mockMvc.perform(post("/api/psychology/skills/suggestions").session(demo)
                         .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\":\"I feel conflicted about this decision\",\"locale\":\"en-SG\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.title").value("Map the pull in both directions"))
+                .andExpect(jsonPath("$.data.reason").value(org.hamcrest.Matchers.containsString("will not read other memories or run automatically")));
+        assertThat(runMapper.selectCount(new QueryWrapper<PsychologySkillRun>())).isEqualTo(before);
+
+        mockMvc.perform(post("/api/psychology/skills/suggestions").session(demo)
+                        .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"text\":\"今天天气不错\",\"locale\":\"zh-CN\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data").doesNotExist());
         mockMvc.perform(post("/api/psychology/skills/suggestions").session(demo)

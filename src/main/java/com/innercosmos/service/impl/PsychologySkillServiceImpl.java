@@ -130,18 +130,19 @@ public class PsychologySkillServiceImpl implements PsychologySkillService {
     public PsychologySkillSuggestionVO suggest(Long userId, String text, String locale) {
         if (text == null || text.isBlank() || text.length() > ANSWER_MAX_CHARS) return null;
         if (safetyBoundaryFilter.inspect(text).matched) return null;
+        boolean english = "en-SG".equals(locale);
         String normalized = text.toLowerCase();
         String skillId = null;
         String cue = null;
         if (containsAny(normalized, "纠结", "拉扯", "要不要", "决定", "decision", "conflicted")) {
             skillId = "decision-conflict-map";
-            cue = "你刚才明确提到了一个正在拉扯的决定";
+            cue = english ? "You explicitly mentioned a decision that is pulling you in different directions" : "你刚才明确提到了一个正在拉扯的决定";
         } else if (containsAny(normalized, "选择", "重要", "价值", "option", "choice", "value")) {
             skillId = "values-compass";
-            cue = "你刚才明确提到了选择和在意的东西";
+            cue = english ? "You explicitly mentioned a choice and what matters to you" : "你刚才明确提到了选择和在意的东西";
         } else if (containsAny(normalized, "感受", "情绪", "紧张", "害怕", "难受", "feeling", "nervous", "afraid")) {
             skillId = "emotion-needs-clarifier";
-            cue = "你刚才明确说到一种感受";
+            cue = english ? "You explicitly named a feeling" : "你刚才明确说到一种感受";
         }
         if (skillId == null) return null;
         PsychologySkillManifest manifest = registry.require(skillId);
@@ -150,7 +151,9 @@ public class PsychologySkillServiceImpl implements PsychologySkillService {
         suggestion.skillId = skillId;
         suggestion.skillVersion = manifest.version;
         suggestion.title = manifest.title.getOrDefault(locale, manifest.title.get("zh-CN"));
-        suggestion.reason = cue + "。如果你愿意，可以打开这项反思；现在不会读取其他记忆，也不会自动运行。";
+        suggestion.reason = english
+                ? cue + ". If you want, you can open this reflection; it will not read other memories or run automatically."
+                : cue + "。如果你愿意，可以打开这项反思；现在不会读取其他记忆，也不会自动运行。";
         return suggestion;
     }
 

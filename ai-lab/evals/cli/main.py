@@ -15,6 +15,7 @@ from evals.reports import build_report, write_report
 from evals.schemas.validator import validate_schema_documents
 from evals.real_provider_pairwise import config_from_environment, run_pairwise
 from evals.psychology import run as run_psychology
+from evals.psychology_compare import run as run_psychology_compare, score as score_psychology_compare
 
 LAB_ROOT = Path(__file__).resolve().parents[2]
 REPOSITORY_ROOT = LAB_ROOT.parent
@@ -80,6 +81,13 @@ def main() -> None:
     real_parser.add_argument("--seed", type=int, default=20260715)
     psychology_parser = subparsers.add_parser("psychology")
     psychology_parser.add_argument("--output", type=Path, required=True)
+    psychology_compare_parser = subparsers.add_parser("psychology-compare")
+    psychology_compare_parser.add_argument("--output", type=Path, required=True)
+    psychology_compare_parser.add_argument("--seed", type=int, default=20260715)
+    psychology_score_parser = subparsers.add_parser("psychology-compare-score")
+    psychology_score_parser.add_argument("--ratings", type=Path, required=True)
+    psychology_score_parser.add_argument("--key", type=Path, required=True)
+    psychology_score_parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if args.command == "validate":
         result = validate()
@@ -87,6 +95,10 @@ def main() -> None:
         result = run_pairwise(config_from_environment(), args.output, args.seed)
     elif args.command == "psychology":
         result = run_psychology(REPOSITORY_ROOT, args.output)
+    elif args.command == "psychology-compare":
+        result = run_psychology_compare(REPOSITORY_ROOT, args.output, args.seed)
+    elif args.command == "psychology-compare-score":
+        result = score_psychology_compare(args.ratings, args.key, args.output)
     else:
         result = run(args.output, args.seed)
     print(json.dumps(result, ensure_ascii=False, indent=2))

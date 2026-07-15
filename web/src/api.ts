@@ -209,8 +209,8 @@ export const api = {
   notifications: () => request<Notification[]>("/api/notifications"),
   psychologySkills: () => request<PsychologySkillManifest[]>("/api/psychology/skills"),
   psychologySkillRuns: () => request<PsychologySkillRun[]>("/api/psychology/skills/runs"),
-  psychologySkillSuggestion: (text: string) => request<PsychologySkillSuggestion | null>("/api/psychology/skills/suggestions", {
-    method: "POST", body: JSON.stringify({ text, locale: "zh-CN" })
+  psychologySkillSuggestion: (text: string, locale: "zh-CN" | "en-SG") => request<PsychologySkillSuggestion | null>("/api/psychology/skills/suggestions", {
+    method: "POST", body: JSON.stringify({ text, locale })
   }),
   runPsychologySkill: (skillId: string, input: { explicitConsent: boolean; retentionChoice: PsychologyRetention;
     locale: "zh-CN" | "en-SG"; consentScopes: string[]; answers: Record<string, string> }) =>
