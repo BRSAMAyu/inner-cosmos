@@ -147,6 +147,26 @@ inner-cosmos:
     csrf-enabled: ${CSRF_ENABLED:true}
     session-user-key: LOGIN_USER_ID
     cors-origins: ${CORS_ALLOWED_ORIGINS:}
+    rate-limit:
+      redis:
+        enabled: ${REDIS_RATE_LIMIT_ENABLED:false}
+        namespace: ${REDIS_RATE_LIMIT_NAMESPACE:inner-cosmos:rate-limit:v1}
+      user:
+        capacity: ${RATE_LIMIT_USER_CAPACITY:40}
+        refill-per-minute: ${RATE_LIMIT_USER_REFILL_PER_MINUTE:40}
+        advertised-limit: ${RATE_LIMIT_USER_ADVERTISED:240}
+      anonymous:
+        capacity: ${RATE_LIMIT_ANON_CAPACITY:20}
+        refill-per-minute: ${RATE_LIMIT_ANON_REFILL_PER_MINUTE:20}
+        advertised-limit: ${RATE_LIMIT_ANON_ADVERTISED:60}
+      aurora:
+        capacity: ${RATE_LIMIT_AURORA_CAPACITY:5}
+        refill-per-minute: ${RATE_LIMIT_AURORA_REFILL_PER_MINUTE:5}
+        advertised-limit: ${RATE_LIMIT_AURORA_ADVERTISED:120}
+      login:
+        capacity: ${RATE_LIMIT_LOGIN_CAPACITY:10}
+        refill-per-minute: ${RATE_LIMIT_LOGIN_REFILL_PER_MINUTE:10}
+        advertised-limit: ${RATE_LIMIT_LOGIN_ADVERTISED:10}
   demo:
     seed-enabled: ${SEED_ENABLED:false}
   safety:

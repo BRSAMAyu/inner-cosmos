@@ -1,0 +1,62 @@
+schema_version: 1
+package_id: M1-DATA-REDIS-002
+status: IMPLEMENTED
+base_sha: 0039edf12f00dbc3a141f773626a1bd4670b12f0
+branch: feat/run006-aurora-self-understanding
+recorded_at: 2026-07-15T10:20:49+08:00
+environment:
+  os: Windows 11 amd64
+  java: Oracle JDK 21.0.10
+  maven: Apache Maven 3.9.9
+  spring_boot: 3.5.14
+  redis: 7.4.2
+commands:
+  - command: .\\mvnw.cmd -Dtest=OidcBearerIntegrationTest,ApiRateLimitFilterTest,RedisRateLimitStoreIntegrationTest,RedisRateLimitStoreFailureTest,ProductionStartupGuardTest test
+    result: PASS
+    detail: 29 tests, 0 failures/errors/skips
+  - command: .\\mvnw.cmd -Dtest=ApplicationFlowTest test
+    result: PASS
+    detail: 7 business-journey tests, 0 failures/errors/skips
+  - command: .\\mvnw.cmd verify
+    result: PASS
+    detail: 94 suites, 685 tests, 0 failures/errors/skips; SpotBugs 0 findings; SBOM generated
+  - command: docker build -t inner-cosmos:m1-redis-limit .
+    result: PASS
+    image_digest: sha256:02e70b8559d9f4c27c2b40bd24f20622d52b9285711b92219d145c372bcc29df
+  - command: .\\scripts\\verify-production-image.ps1 -Image inner-cosmos:m1-redis-limit -TimeoutSeconds 240
+    result: PASS
+    artifact: production-smoke-summary.txt
+  - command: .\\scripts\\assert-test-baseline.ps1 -MinimumTests 613
+    result: PASS
+    detail: 94 suites, 685 tests
+  - command: .\\scripts\\scan-secrets.ps1
+    result: PASS
+    detail: 0 current-tree findings
+  - command: git diff --check
+    result: PASS
+changes:
+  - Added a Redis-server-time Lua token bucket shared atomically by every application pod.
+  - Moved API limiting into the Spring Security chain after verified Bearer/session authentication.
+  - Unified browser-session and OIDC Bearer quotas on the server-owned local user identity.
+  - Isolated anonymous and login callers by trusted remote address and hashed every Redis subject key.
+  - Added fail-closed 503 behavior for unavailable or malformed Redis limit operations.
+  - Added production startup rejection of pod-local rate limiting and configurable policy thresholds.
+  - Added unit, OIDC security-chain, dual-instance Redis Testcontainers, failure, and production TLS evidence.
+  - Preserved all Aurora, portrait, capsule, matching, starfield, and slow-social innovation semantics.
+human_gates: []
+known_limitations:
+  - Short agent/stream state, Redis Stream resumability, and distributed leases remain pending.
+  - Provider-specific distributed quota coordination remains pending where required.
+  - Independent security review remains pending.
+  - DATA-REDIS remains IN_PROGRESS and this package is not whole-product completion evidence.
+review:
+  status: PENDING
+  reviewer: UNASSIGNED
+rollback: Preserve distributed limits and repair Redis infrastructure instead of falling back to pod-local enforcement in production.
+artifacts:
+  - path: distributed-rate-limit-summary.txt
+    sha256: dbf410eaf48935932e939711592e9d24a5c601d581d9631e97cf967e90673515
+  - path: production-smoke-summary.txt
+    sha256: e87dd6c3b180469e1c572ebc220664f50fa6384dfe216d8cda2d00b4ddb5857a
+  - path: validation-summary.txt
+    sha256: fb6a7a7a406d3895afab5b423ae039b401b8aea5466a5b5fefecedf241053c7a

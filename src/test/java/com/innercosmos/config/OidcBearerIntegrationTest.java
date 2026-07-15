@@ -6,6 +6,9 @@ import com.innercosmos.entity.UserIdentity;
 import com.innercosmos.entity.User;
 import com.innercosmos.mapper.UserIdentityMapper;
 import com.innercosmos.mapper.UserMapper;
+import com.innercosmos.ratelimit.RateLimitDecision;
+import com.innercosmos.ratelimit.RateLimitKey;
+import com.innercosmos.ratelimit.RateLimitStore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,7 +27,11 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -52,11 +59,13 @@ class OidcBearerIntegrationTest {
     @Autowired UserIdentityMapper identityMapper;
     @Autowired UserMapper userMapper;
     @MockitoBean JwtDecoder jwtDecoder;
+    @MockitoBean RateLimitStore rateLimitStore;
 
     @BeforeEach
     void decodeFixtures() {
         identityMapper.delete(null);
         userMapper.delete(new QueryWrapper<User>().likeRight("username", "oidc_"));
+        when(rateLimitStore.consume(anyString(), any())).thenReturn(new RateLimitDecision(true, 10));
         when(jwtDecoder.decode(anyString())).thenAnswer(invocation -> switch (invocation.getArgument(0, String.class)) {
             case "valid-user" -> jwt("valid-user", "subject-123", true);
             case "valid-user-again" -> jwt("valid-user-again", "subject-123", true);
@@ -131,6 +140,7 @@ class OidcBearerIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn().getRequest().getSession(false);
         Long sessionUserId = (Long) session.getAttribute(com.innercosmos.common.Constants.SESSION_USER_KEY);
+        clearInvocations(rateLimitStore);
 
         mockMvc.perform(post("/api/todos")
                         .session(session)
@@ -139,6 +149,10 @@ class OidcBearerIntegrationTest {
                         .content("{\"taskName\":\"Bearer identity wins\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.userId").value(org.hamcrest.Matchers.not(sessionUserId.intValue())));
+
+        UserIdentity bearerIdentity = identityMapper.selectList(null).stream()
+                .filter(value -> "subject-123".equals(value.subject)).findFirst().orElseThrow();
+        verify(rateLimitStore).consume(eq(RateLimitKey.forSubject("user", bearerIdentity.userId.toString())), any());
     }
 
     @Test

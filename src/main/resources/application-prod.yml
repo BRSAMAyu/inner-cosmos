@@ -97,5 +97,9 @@ inner-cosmos:
       redirect-uri: ${OIDC_MOBILE_REDIRECT_URI:}
   security:
     csrf-enabled: true
+    rate-limit:
+      redis:
+        enabled: ${REDIS_RATE_LIMIT_ENABLED:true}
+        namespace: ${REDIS_RATE_LIMIT_NAMESPACE:inner-cosmos:rate-limit:v1}
   demo:
     seed-enabled: false

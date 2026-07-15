@@ -28,6 +28,8 @@ class ProductionStartupGuardTest {
                     "inner-cosmos.auth.oidc.client-id=inner-cosmos-mobile",
                     "inner-cosmos.auth.oidc.redirect-uri=innercosmos://auth/callback",
                     "inner-cosmos.session.redis.enabled=true",
+                    "inner-cosmos.security.rate-limit.redis.enabled=true",
+                    "inner-cosmos.security.rate-limit.redis.namespace=inner-cosmos:rate-limit:v1",
                     "spring.data.redis.ssl.enabled=true",
                     "spring.data.redis.host=redis.example",
                     "spring.data.redis.password=test-only-redis-placeholder",
@@ -86,6 +88,12 @@ class ProductionStartupGuardTest {
     @Test
     void rejectsRedisWithoutTls() {
         runner.withPropertyValues("spring.data.redis.ssl.enabled=false")
+                .run(context -> assertRejected(context.getBean(ProductionStartupGuard.class)));
+    }
+
+    @Test
+    void rejectsInProcessProductionRateLimits() {
+        runner.withPropertyValues("inner-cosmos.security.rate-limit.redis.enabled=false")
                 .run(context -> assertRejected(context.getBean(ProductionStartupGuard.class)));
     }
 

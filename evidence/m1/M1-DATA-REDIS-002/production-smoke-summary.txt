@@ -1,0 +1,22 @@
+M1-DATA-REDIS-002 production image smoke
+
+Status: PASS
+Image: inner-cosmos:m1-redis-limit
+Image digest: sha256:02e70b8559d9f4c27c2b40bd24f20622d52b9285711b92219d145c372bcc29df
+Profile: prod
+Health: UP
+Database: PostgreSQL 16 + pgvector
+Database TLS: VERIFY_FULL
+Session store: Redis 7.4.2
+Redis TLS: VERIFIED_CA
+Redis session keys observed: 1
+Redis rate-limit keys observed: 1
+Flyway version: 2
+Application tables: 61
+Demo users: 0
+Runtime user: appuser
+
+The rate-limit proof used the server-issued CSRF token and the same Redis-backed
+Secure session cookie for an invalid login probe. The request materialized a
+hashed inner-cosmos:rate-limit:v1:login:* bucket in the TLS-only Redis instance.
+No production cookie, CSRF, Redis authentication, or TLS setting was weakened.

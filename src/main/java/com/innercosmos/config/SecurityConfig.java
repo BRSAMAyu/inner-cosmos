@@ -16,6 +16,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.csrf.CsrfException;
 import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository;
 import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.web.util.matcher.RequestMatcher;
@@ -44,6 +45,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http,
                                            SessionAuthenticationFilter authFilter,
+                                           ApiRateLimitFilter rateLimitFilter,
                                            Environment environment,
                                            ObjectProvider<JwtDecoder> jwtDecoder,
                                            @Qualifier("oidcAuthenticationConverter")
@@ -100,6 +102,7 @@ public class SecurityConfig {
                     writeError(response, 403, code, message);
                 }))
             .addFilterBefore(authFilter, org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class)
+            .addFilterAfter(rateLimitFilter, BearerTokenAuthenticationFilter.class)
             .headers(headers -> headers
                 .frameOptions(f -> f.deny())
                 .contentTypeOptions(c -> {})

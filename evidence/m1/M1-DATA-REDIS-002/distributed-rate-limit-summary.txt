@@ -1,0 +1,24 @@
+M1-DATA-REDIS-002 distributed rate-limit summary
+
+PASS - Redis Lua token bucket is atomic and uses Redis server TIME.
+PASS - two independently constructed application stores consume one shared bucket.
+PASS - authenticated OIDC Bearer identity overrides an unrelated browser session identity.
+PASS - browser sessions and OIDC Bearer requests converge on the verified local user ID key.
+PASS - anonymous and login buckets use the direct remote address unless a trusted proxy is configured.
+PASS - rate-limit subjects are SHA-256 hashed before entering Redis key names.
+PASS - Redis access or malformed script results fail closed as HTTP 503 with Retry-After.
+PASS - production startup rejects pod-local rate limiting.
+
+Policies remain configurable without changing product behavior:
+- ordinary authenticated API: capacity/refill 40 per minute; advertised compatibility limit 240
+- anonymous mutation: capacity/refill 20 per minute; advertised compatibility limit 60
+- Aurora model paths: capacity/refill 5 per minute; advertised compatibility limit 120
+- login attempts: capacity/refill 10 per minute; advertised limit 10
+
+Implementation boundary:
+- This slice externalizes application HTTP abuse limits only.
+- It does not reduce Aurora proactive behavior, Aurora Self/Constitution/Emergence,
+  internal personality or relationship evolution, portraits, capsule dialogue,
+  matching, starfield, or slow-letter product semantics.
+- Provider-specific model quotas, short agent/stream state, Redis Stream replay,
+  and distributed leases remain separate acceptance work.

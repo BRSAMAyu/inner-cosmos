@@ -1,222 +1,167 @@
 package com.innercosmos.config;
 
-import io.github.bucket4j.Bandwidth;
-import io.github.bucket4j.Bucket;
-import jakarta.servlet.*;
+import com.innercosmos.common.Constants;
+import com.innercosmos.entity.User;
+import com.innercosmos.ratelimit.RateLimitDecision;
+import com.innercosmos.ratelimit.RateLimitKey;
+import com.innercosmos.ratelimit.RateLimitPolicy;
+import com.innercosmos.ratelimit.RateLimitProperties;
+import com.innercosmos.ratelimit.RateLimitStore;
+import com.innercosmos.ratelimit.RateLimitStoreUnavailableException;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.time.Duration;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.nio.charset.StandardCharsets;
 
 /**
- * Per-user API rate limiting filter.
- * Limits each user to 240 requests/minute and burst of 40.
- * For anonymous users, limits to 60 requests/minute.
- * Aurora LLM endpoints limited to 120 requests/minute per user.
- * Uses Bucket4j with in-memory storage (swap to Redis for multi-instance).
+ * Application-level abuse protection. The filter runs after bearer/session authentication,
+ * so every verified identity shares one quota across pods and authentication mechanisms.
  */
 @Component
-public class ApiRateLimitFilter implements Filter {
-    private static final Logger log = LoggerFactory.getLogger(ApiRateLimitFilter.class);
+public final class ApiRateLimitFilter extends OncePerRequestFilter {
 
-    private static final int USER_LIMIT_PER_MINUTE = 240;
-    private static final int ANON_LIMIT_PER_MINUTE = 60;
-    private static final int AURORA_LLM_LIMIT_PER_MINUTE = 120;
-    private static final int LOGIN_LIMIT_PER_MINUTE = 10; // M-019: per-IP login attempt cap
-    private static final int BURST_CAPACITY = 40;
+    private final RateLimitStore store;
+    private final RateLimitProperties properties;
 
-    private final Map<String, BucketEntry> userBuckets = new ConcurrentHashMap<>();
-    private final Bucket anonBucket;
-
-    /**
-     * M-019: Only trust the X-Forwarded-For header when a trusted reverse proxy is
-     * actually fronting the app. Default false — otherwise an attacker rotating the
-     * XFF header gets a fresh login bucket per fake IP. When false, clientIp() falls
-     * back to the servlet container's req.getRemoteAddr().
-     */
     @Value("${inner-cosmos.security.trusted-proxy-enabled:false}")
     private boolean trustedProxyConfigured;
 
-    public ApiRateLimitFilter() {
-        this.anonBucket = Bucket.builder()
-            .addLimit(Bandwidth.simple(ANON_LIMIT_PER_MINUTE, Duration.ofMinutes(1)))
-            .addLimit(Bandwidth.builder()
-                .capacity(BURST_CAPACITY / 2)
-                .refillGreedy(BURST_CAPACITY / 2, Duration.ofMinutes(1))
-                .build())
-            .build();
+    public ApiRateLimitFilter(RateLimitStore store, RateLimitProperties properties) {
+        this.store = store;
+        this.properties = properties;
     }
 
     @Override
-    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
-            throws IOException, ServletException {
-
-        HttpServletRequest req = (HttpServletRequest) request;
-        HttpServletResponse res = (HttpServletResponse) response;
-
-        String path = req.getServletPath();
-        // Only rate-limit API endpoints — static pages, CSS, JS are never limited
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain chain) throws IOException, ServletException {
+        String path = requestPath(request);
         if (!path.startsWith("/api/")) {
             chain.doFilter(request, response);
             return;
         }
-        // M-019: brute-force protection on /api/auth/login — per-IP bucket (the username isn't
-        // known until the body is parsed; IP-only is the standard first line of defense).
-        if ("POST".equalsIgnoreCase(req.getMethod()) && path.equals("/api/auth/login")) {
-            Bucket loginBucket = loginBucketFor(clientIp(req));
-            if (!loginBucket.tryConsume(1)) {
-                res.setStatus(429);
-                res.setContentType("application/json");
-                res.getWriter().write("{\"error\":\"rate_limit_exceeded\",\"message\":\"登录尝试过于频繁，请稍后再试。\",\"retry_after\":60}");
-                res.setHeader("Retry-After", "60");
-                return;
-            }
-        }
-        if (path.startsWith("/api/auth/") || path.startsWith("/actuator/")) {
-            chain.doFilter(request, response);
-            return;
-        }
 
-        boolean isAuroraLlm = path.startsWith("/api/aurora/chat") ||
-                              path.startsWith("/api/aurora/stream") ||
-                              path.startsWith("/api/aurora/greeting") ||
-                              path.startsWith("/api/aurora/message");
-        if ("GET".equalsIgnoreCase(req.getMethod()) && !isAuroraLlm) {
-            chain.doFilter(request, response);
-            return;
-        }
-
-        // M-010: key per-user buckets off the session only — the X-User-Id header is no longer a
-        // trusted auth mechanism (it was spoofable to farm fresh buckets).
-        String userId = null;
-        var session = req.getSession(false);
-        if (session != null) {
-            Object uid = session.getAttribute("LOGIN_USER_ID");
-            if (uid != null) userId = uid.toString();
-        }
-
-        Bucket bucket;
-        if (userId != null && !userId.isBlank()) {
-            String key = isAuroraLlm ? "llm:" + userId : userId;
-            BucketEntry entry = userBuckets.compute(key, (k, existing) -> {
-                if (existing == null) return isAuroraLlm ? createAuroraBucket() : createUserBucket();
-                existing.lastAccess = System.currentTimeMillis();
-                return existing;
-            });
-            bucket = entry.bucket;
-        } else {
-            bucket = anonBucket;
-        }
-
-        if (bucket.tryConsume(1)) {
-            res.setHeader("X-RateLimit-Remaining", String.valueOf(bucket.getAvailableTokens()));
-            res.setHeader("X-RateLimit-Limit", String.valueOf(
-                isAuroraLlm ? AURORA_LLM_LIMIT_PER_MINUTE : (userId != null ? USER_LIMIT_PER_MINUTE : ANON_LIMIT_PER_MINUTE)));
-            chain.doFilter(request, response);
-        } else {
-            res.setStatus(429);
-            res.setContentType("application/json");
-            res.getWriter().write("{\"error\":\"rate_limit_exceeded\",\"message\":\"请求过于频繁，请稍后再试。\",\"retry_after\":60}");
-            res.setHeader("Retry-After", "60");
-        }
-    }
-
-    private BucketEntry createUserBucket() {
-        return new BucketEntry(Bucket.builder()
-            .addLimit(Bandwidth.simple(USER_LIMIT_PER_MINUTE, Duration.ofMinutes(1)))
-            .addLimit(Bandwidth.builder()
-                .capacity(BURST_CAPACITY)
-                .refillGreedy(BURST_CAPACITY, Duration.ofMinutes(1))
-                .build())
-            .build());
-    }
-
-    private BucketEntry createAuroraBucket() {
-        return new BucketEntry(Bucket.builder()
-            .addLimit(Bandwidth.simple(AURORA_LLM_LIMIT_PER_MINUTE, Duration.ofMinutes(1)))
-            .addLimit(Bandwidth.builder()
-                .capacity(5)
-                .refillGreedy(5, Duration.ofMinutes(1))
-                .build())
-            .build());
-    }
-
-    /** M-019: per-IP login attempt bucket (evicted by the cleanup thread like other buckets). */
-    private Bucket loginBucketFor(String ip) {
-        BucketEntry entry = userBuckets.compute("login:" + ip, (k, existing) -> {
-            if (existing == null) return new BucketEntry(Bucket.builder()
-                    .addLimit(Bandwidth.simple(LOGIN_LIMIT_PER_MINUTE, Duration.ofMinutes(1)))
-                    .build());
-            existing.lastAccess = System.currentTimeMillis();
-            return existing;
-        });
-        return entry.bucket;
-    }
-
-    private String clientIp(HttpServletRequest req) {
-        // M-019: only honor X-Forwarded-For when a trusted proxy is configured; otherwise
-        // return the raw remote address so attackers can't spoof fresh buckets.
-        if (trustedProxyConfigured) {
-            String xff = req.getHeader("X-Forwarded-For");
-            if (xff != null && !xff.isBlank()) return xff.split(",")[0].trim();
-        }
-        return req.getRemoteAddr();
-    }
-
-    @Override
-    public void init(FilterConfig filterConfig) {
-        // Start background cleanup thread to evict stale buckets
-        Thread cleanup = new Thread(() -> {
-            while (!Thread.currentThread().isInterrupted()) {
-                try {
-                    Thread.sleep(300_000); // Run every 5 minutes
-                    evictStaleBuckets();
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    break;
+        try {
+            if (isLoginAttempt(request, path)) {
+                if (!consume(response, "login", clientIp(request), properties.login())) {
+                    writeExceeded(response, "登录尝试过于频繁，请稍后再试。");
+                    return;
                 }
             }
-        }, "rate-limit-cleanup");
-        cleanup.setDaemon(true);
-        cleanup.start();
+
+            if (path.startsWith("/api/auth/")) {
+                chain.doFilter(request, response);
+                return;
+            }
+
+            boolean aurora = isAuroraLlm(path);
+            if ("GET".equalsIgnoreCase(request.getMethod()) && !aurora) {
+                chain.doFilter(request, response);
+                return;
+            }
+
+            String userId = authenticatedUserId(request);
+            RateLimitPolicy policy;
+            String scope;
+            String subject;
+            if (userId != null) {
+                policy = aurora ? properties.aurora() : properties.user();
+                scope = aurora ? "aurora" : "user";
+                subject = userId;
+            } else {
+                policy = properties.anonymous();
+                scope = aurora ? "anonymous-aurora" : "anonymous";
+                subject = clientIp(request);
+            }
+
+            if (!consume(response, scope, subject, policy)) {
+                writeExceeded(response, "请求过于频繁，请稍后再试。");
+                return;
+            }
+            chain.doFilter(request, response);
+        } catch (RateLimitStoreUnavailableException unavailable) {
+            response.setHeader("Retry-After", "5");
+            writeJson(response, 503,
+                    "{\"error\":\"rate_limit_unavailable\",\"message\":\"请求保护服务暂时不可用，请稍后重试。\",\"retry_after\":5}");
+        }
     }
 
-    private void evictStaleBuckets() {
-        long threshold = System.currentTimeMillis() - 3_600_000; // 1 hour
-        int evicted = 0;
-        Iterator<Map.Entry<String, BucketEntry>> it = userBuckets.entrySet().iterator();
-        while (it.hasNext()) {
-            Map.Entry<String, BucketEntry> entry = it.next();
-            if (entry.getValue().lastAccess < threshold) {
-                it.remove();
-                evicted++;
+    private boolean consume(HttpServletResponse response,
+                            String scope,
+                            String subject,
+                            RateLimitPolicy policy) {
+        RateLimitDecision decision = store.consume(RateLimitKey.forSubject(scope, subject), policy);
+        response.setHeader("X-RateLimit-Limit", String.valueOf(policy.advertisedLimit()));
+        response.setHeader("X-RateLimit-Remaining", String.valueOf(decision.remainingTokens()));
+        return decision.allowed();
+    }
+
+    private String authenticatedUserId(HttpServletRequest request) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.isAuthenticated()
+                && authentication.getPrincipal() instanceof User user && user.id != null) {
+            return user.id.toString();
+        }
+        var session = request.getSession(false);
+        if (session != null) {
+            Object userId = session.getAttribute(Constants.SESSION_USER_KEY);
+            if (userId instanceof Long value && value > 0) {
+                return value.toString();
             }
         }
-        if (evicted > 0) {
-            log.debug("Evicted {} stale rate limit buckets", evicted);
-        }
+        return null;
     }
 
-    @Override
-    public void destroy() {
-        userBuckets.clear();
+    private boolean isLoginAttempt(HttpServletRequest request, String path) {
+        return "POST".equalsIgnoreCase(request.getMethod()) && "/api/auth/login".equals(path);
     }
 
-    private static class BucketEntry {
-        final Bucket bucket;
-        volatile long lastAccess;
-
-        BucketEntry(Bucket bucket) {
-            this.bucket = bucket;
-            this.lastAccess = System.currentTimeMillis();
+    private String requestPath(HttpServletRequest request) {
+        String uri = request.getRequestURI();
+        String contextPath = request.getContextPath();
+        if (uri == null) {
+            return "";
         }
+        return contextPath != null && !contextPath.isEmpty() && uri.startsWith(contextPath)
+                ? uri.substring(contextPath.length()) : uri;
+    }
+
+    private boolean isAuroraLlm(String path) {
+        return path.startsWith("/api/aurora/chat")
+                || path.startsWith("/api/aurora/stream")
+                || path.startsWith("/api/aurora/greeting")
+                || path.startsWith("/api/aurora/message");
+    }
+
+    private String clientIp(HttpServletRequest request) {
+        if (trustedProxyConfigured) {
+            String forwarded = request.getHeader("X-Forwarded-For");
+            if (forwarded != null && !forwarded.isBlank()) {
+                return forwarded.split(",", 2)[0].trim();
+            }
+        }
+        String remote = request.getRemoteAddr();
+        return remote == null || remote.isBlank() ? "unknown" : remote;
+    }
+
+    private void writeExceeded(HttpServletResponse response, String message) throws IOException {
+        response.setHeader("Retry-After", "60");
+        writeJson(response, 429, "{\"error\":\"rate_limit_exceeded\",\"message\":\""
+                + message + "\",\"retry_after\":60}");
+    }
+
+    private void writeJson(HttpServletResponse response, int status, String body) throws IOException {
+        response.setStatus(status);
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        response.setContentType("application/json");
+        response.getWriter().write(body);
     }
 }

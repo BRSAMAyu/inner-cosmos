@@ -1,0 +1,30 @@
+M1-DATA-REDIS-002 validation summary
+
+PASS - targeted rate-limit/security tests: 29 tests, 0 failures/errors/skips
+PASS - business journey isolation check: 7 tests, 0 failures/errors/skips
+PASS - full Java 21 regression: 94 suites, 685 tests, 0 failures/errors/skips
+PASS - PostgreSQL/Flyway and Redis Testcontainers contracts remain green
+PASS - Aurora Self, Constitution, Emergence, proactive, choreography, Goodbye,
+       capsule, portrait, matching, starfield and slow-social suites remain green
+PASS - SpotBugs high-confidence gate: 0 findings
+PASS - CycloneDX SBOM generated with 113 components
+PASS - current-tree secret scan: 0 findings
+PASS - test baseline gate: 685 >= 613
+PASS - git diff --check
+PASS - production image smoke: PostgreSQL TLS VERIFY_FULL + Redis TLS VERIFIED_CA,
+       external session key and distributed login-limit key materialized,
+       health UP, Flyway V2, 61 tables, 0 demo users, runtime appuser
+
+Runtime baseline:
+- Oracle JDK 21.0.10
+- Spring Boot 3.5.14
+- Spring Data Redis 3.5.11 / Lettuce 6.6.0
+- Redis 7.4.2
+- Maven Wrapper / Apache Maven 3.9.9
+
+Known remaining DATA-REDIS acceptance scope:
+- Short-lived Aurora/stream state and resumable Redis Stream token relay remain pending.
+- Cross-pod leases/locks and their failure/recovery contracts remain pending.
+- Provider-specific distributed quota coordination remains pending where required.
+- Independent security review remains pending.
+- DATA-REDIS remains IN_PROGRESS; this is not whole-product completion evidence.

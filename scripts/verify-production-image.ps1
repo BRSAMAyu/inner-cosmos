@@ -173,12 +173,41 @@ chmod 644 redis-server.key redis-server.crt ca.crt
 
     # The public CSRF bootstrap materializes an HttpSession. Its key must be in
     # external Redis, proving the production request path is not using pod memory.
-    Invoke-RestMethod -Uri "http://127.0.0.1:$hostPort/api/auth/csrf" -TimeoutSec 5 | Out-Null
+    $csrfResponse = Invoke-WebRequest -UseBasicParsing `
+        -Uri "http://127.0.0.1:$hostPort/api/auth/csrf" -TimeoutSec 5
+    $csrfPayload = $csrfResponse.Content | ConvertFrom-Json
+    $csrfToken = $csrfPayload.data.token
+    $csrfHeaderName = $csrfPayload.data.headerName
+    $setCookie = [string]$csrfResponse.Headers["Set-Cookie"]
+    if (-not $csrfToken -or $setCookie -notmatch '(?:^|,\s*)SESSION=([^;]+)') {
+        throw "CSRF bootstrap did not return a token and Redis session cookie."
+    }
+    $sessionCookie = $Matches[1]
     $sessionKeys = @(& docker exec $redisName redis-cli --tls --cacert /certs/redis-ca.crt `
         --no-auth-warning -a $redisPassword --scan --pattern 'inner-cosmos:session:sessions:*')
     if ($LASTEXITCODE -ne 0) { throw "Unable to inspect Redis session keys." }
     $sessionKeyCount = @($sessionKeys | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count
     if ($sessionKeyCount -lt 1) { throw "Production request did not materialize a Redis-backed session." }
+
+    # A valid session-bound CSRF token lets the login request reach the security-chain
+    # limiter. The failed credential check is intentional; the Redis key proves the
+    # production filter path is shared and atomic rather than pod-local.
+    $loginStatus = & curl.exe --silent --show-error --output NUL --write-out "%{http_code}" `
+        --request POST "http://127.0.0.1:$hostPort/api/auth/login" `
+        --header "${csrfHeaderName}: $csrfToken" `
+        --header "Cookie: SESSION=$sessionCookie" `
+        --header "Content-Type: application/json" `
+        --data '{"username":"missing-user","password":"missing-password"}'
+    if ($LASTEXITCODE -ne 0) { throw "Unable to execute production login rate-limit probe." }
+    $rateLimitKeys = @(& docker exec $redisName redis-cli --tls --cacert /certs/redis-ca.crt `
+        --no-auth-warning -a $redisPassword --scan --pattern 'inner-cosmos:rate-limit:v1:login:*')
+    if ($LASTEXITCODE -ne 0) { throw "Unable to inspect Redis rate-limit keys." }
+    $rateLimitKeyCount = @($rateLimitKeys | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count
+    if ($rateLimitKeyCount -lt 1) {
+        $observedKeys = @(& docker exec $redisName redis-cli --tls --cacert /certs/redis-ca.crt `
+            --no-auth-warning -a $redisPassword --scan)
+        throw "Production request (HTTP $loginStatus) did not materialize a Redis-backed rate-limit bucket. Observed Redis keys: $($observedKeys -join ', ')"
+    }
 
     $tableCount = (& docker exec -e "PGPASSWORD=$databasePassword" $postgresName psql `
         -U $databaseUser -d $database -Atc "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public' AND table_name LIKE 'tb_%'").Trim()
@@ -202,6 +231,7 @@ chmod 644 redis-server.key redis-server.crt ca.crt
         SessionStore = "Redis 7.4.2"
         RedisTls = "VERIFIED_CA"
         RedisSessionKeys = $sessionKeyCount
+        RedisRateLimitKeys = $rateLimitKeyCount
         FlywayVersion = $flywayVersion
         SchemaTables = [int]$tableCount
         DemoUsers = [int]$seededUsers
