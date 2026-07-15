@@ -116,6 +116,20 @@ CREATE TABLE IF NOT EXISTS tb_dialog_message (
   CONSTRAINT fk_message_session FOREIGN KEY (session_id) REFERENCES tb_dialog_session(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS tb_user_identity (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  issuer VARCHAR(255) NOT NULL,
+  subject VARCHAR(255) NOT NULL,
+  email_snapshot VARCHAR(128),
+  last_authenticated_at TIMESTAMP NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uk_user_identity_issuer_subject UNIQUE (issuer, subject),
+  CONSTRAINT fk_user_identity_user FOREIGN KEY (user_id) REFERENCES tb_user(id) ON DELETE CASCADE,
+  INDEX idx_user_identity_user (user_id)
+);
+
 -- INNO-CONV-001: durable, replayable Aurora turn choreography.  The unique
 -- user-message and turn/version keys are the database authority across replicas.
 CREATE TABLE IF NOT EXISTS tb_conversation_turn (

@@ -37,6 +37,14 @@ public final class ProductionStartupGuard implements ApplicationRunner {
         requireFalse("inner-cosmos.demo.seed-enabled", "demo data seeding");
         requireTrue("server.servlet.session.cookie.secure", "secure session cookies");
         requireTrue("inner-cosmos.security.csrf-enabled", "CSRF protection");
+        requireTrue("inner-cosmos.auth.oidc.enabled", "OIDC resource-server authentication");
+        requireHttps("inner-cosmos.auth.oidc.issuer-uri", "OIDC issuer URI");
+        requireHttps("inner-cosmos.auth.oidc.jwk-set-uri", "OIDC JWK set URI");
+        required("inner-cosmos.auth.oidc.audience", "OIDC API audience");
+        requireHttps("inner-cosmos.auth.oidc.authorization-uri", "OIDC authorization endpoint");
+        requireHttps("inner-cosmos.auth.oidc.token-uri", "OIDC token endpoint");
+        required("inner-cosmos.auth.oidc.client-id", "OIDC mobile public-client ID");
+        required("inner-cosmos.auth.oidc.redirect-uri", "OIDC mobile redirect URI");
 
         String provider = required("llm.provider", "LLM provider").toLowerCase(Locale.ROOT);
         if (!REAL_PROVIDERS.contains(provider)) {
@@ -90,6 +98,12 @@ public final class ProductionStartupGuard implements ApplicationRunner {
             throw unsafe(description + " is not configured");
         }
         return value;
+    }
+
+    private void requireHttps(String property, String description) {
+        if (!required(property, description).toLowerCase(Locale.ROOT).startsWith("https://")) {
+            throw unsafe(description + " must use HTTPS");
+        }
     }
 
     private IllegalStateException unsafe(String reason) {

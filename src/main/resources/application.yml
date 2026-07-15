@@ -118,6 +118,18 @@ llm:
     timeout-ms: ${DEEPSEEK_TIMEOUT_MS:30000}
 
 inner-cosmos:
+  auth:
+    oidc:
+      enabled: ${OIDC_ENABLED:false}
+      auto-provision: ${OIDC_AUTO_PROVISION:true}
+      issuer-uri: ${OIDC_ISSUER_URI:}
+      jwk-set-uri: ${OIDC_JWK_SET_URI:}
+      audience: ${OIDC_AUDIENCE:}
+      authorization-uri: ${OIDC_AUTHORIZATION_URI:}
+      token-uri: ${OIDC_TOKEN_URI:}
+      client-id: ${OIDC_MOBILE_CLIENT_ID:}
+      redirect-uri: ${OIDC_MOBILE_REDIRECT_URI:}
+      scopes: ${OIDC_MOBILE_SCOPES:openid,profile,email}
   security:
     csrf-enabled: ${CSRF_ENABLED:true}
     session-user-key: LOGIN_USER_ID

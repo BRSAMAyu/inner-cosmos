@@ -1,0 +1,16 @@
+M1-AUTH-OIDC-001 production image smoke: PASS
+
+Image: inner-cosmos:m1-oidc
+Image digest: sha256:d76e4d6fe22335283662faeeb1179cd8e711824f5c8d95484db1d1661a12d5a7
+Profile: prod
+Health: UP
+Database: PostgreSQL 16 + pgvector
+Database TLS: VERIFY_FULL
+Flyway version: 2
+Application schema tables: 61
+Demo users: 0
+Runtime user: appuser
+
+The smoke uses non-secret placeholder OIDC public metadata and an unreachable .invalid JWK URL.
+NimbusJwtDecoder does not fetch keys during startup; real signing and rejection behavior is covered
+separately by OidcJwtDecoderSignatureTest against a local JWK endpoint.

@@ -1,0 +1,22 @@
+M1-AUTH-OIDC-001 validation summary
+
+PASS - OIDC integration and validator tests: 9 tests, 0 failures/errors/skips
+PASS - production startup guard tests: 13 tests, 0 failures/errors/skips
+PASS - PostgreSQL Flyway baseline: V1 + V2, 61 application tables
+PASS - full Java 21 regression: 90 suites, 673 tests, 0 failures/errors/skips
+PASS - SpotBugs high-confidence gate: 0 findings
+PASS - current-tree secret scan: 0 findings
+PASS - git diff --check
+PASS - production image build: inner-cosmos:m1-oidc
+PASS - production image smoke: prod, health UP, PostgreSQL TLS VERIFY_FULL,
+       Flyway V2, 61 tables, 0 demo users, runtime user appuser
+
+Runtime baseline:
+- Oracle JDK 21.0.10
+- Spring Boot 3.5.14
+- Maven Wrapper / Apache Maven 3.9.9
+
+Known remaining acceptance scope:
+- Native Capacitor Authorization Code callback and OS secure token storage are not in this package.
+- Refresh, revoke, device-session management, and real external IdP tenant integration remain pending.
+- Independent security review remains pending; AUTH-OIDC remains IN_PROGRESS.

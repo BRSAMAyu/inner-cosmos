@@ -65,6 +65,17 @@ llm:
   allow-fallback: false
 
 inner-cosmos:
+  auth:
+    oidc:
+      enabled: ${OIDC_ENABLED:true}
+      auto-provision: ${OIDC_AUTO_PROVISION:true}
+      issuer-uri: ${OIDC_ISSUER_URI:}
+      jwk-set-uri: ${OIDC_JWK_SET_URI:}
+      audience: ${OIDC_AUDIENCE:}
+      authorization-uri: ${OIDC_AUTHORIZATION_URI:}
+      token-uri: ${OIDC_TOKEN_URI:}
+      client-id: ${OIDC_MOBILE_CLIENT_ID:}
+      redirect-uri: ${OIDC_MOBILE_REDIRECT_URI:}
   security:
     csrf-enabled: true
   demo:

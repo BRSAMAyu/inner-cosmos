@@ -2,15 +2,22 @@ package com.innercosmos.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.core.env.Environment;
+import org.springframework.core.convert.converter.Converter;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.csrf.CsrfException;
 import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -19,6 +26,7 @@ import java.nio.charset.StandardCharsets;
  * Spring Security configuration for browser/API traffic.
  * - Server-side sessions bridged into Spring Security
  * - Session-bound synchronizer CSRF protection for every unsafe request
+ * - External OIDC JWT bearer tokens for native clients; bearer requests do not use cookie CSRF
  * - BCrypt password encoding
  * - H2 console denied in production
  * - Actuator endpoints restricted to admin
@@ -35,12 +43,23 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http,
                                            SessionAuthenticationFilter authFilter,
-                                           Environment environment) throws Exception {
+                                           Environment environment,
+                                           ObjectProvider<JwtDecoder> jwtDecoder,
+                                           @Qualifier("oidcAuthenticationConverter")
+                                           ObjectProvider<Converter<Jwt, AbstractAuthenticationToken>> jwtConverter)
+            throws Exception {
         boolean csrfEnabled = environment.getProperty(
                 "inner-cosmos.security.csrf-enabled", Boolean.class, true);
+        boolean oidcEnabled = environment.getProperty(
+                "inner-cosmos.auth.oidc.enabled", Boolean.class, false);
         if (csrfEnabled) {
             HttpSessionCsrfTokenRepository repository = new HttpSessionCsrfTokenRepository();
-            http.csrf(csrf -> csrf.csrfTokenRepository(repository));
+            RequestMatcher bearerRequest = request -> {
+                String authorization = request.getHeader("Authorization");
+                return authorization != null && authorization.regionMatches(true, 0, "Bearer ", 0, 7);
+            };
+            http.csrf(csrf -> csrf.csrfTokenRepository(repository)
+                    .ignoringRequestMatchers(bearerRequest));
         } else {
             http.csrf(csrf -> csrf.disable());
         }
@@ -79,6 +98,11 @@ public class SecurityConfig {
                 .frameOptions(f -> f.deny())
                 .contentTypeOptions(c -> {})
             );
+        if (oidcEnabled) {
+            http.oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt
+                    .decoder(jwtDecoder.getObject())
+                    .jwtAuthenticationConverter(jwtConverter.getObject())));
+        }
         return http.build();
     }
 

@@ -1,0 +1,64 @@
+schema_version: 1
+package_id: M1-AUTH-OIDC-001
+status: IMPLEMENTED
+base_sha: 723fffa
+branch: feat/run006-aurora-self-understanding
+recorded_at: 2026-07-15T09:25:00+08:00
+environment:
+  os: Windows 11 amd64
+  java: Oracle JDK 21.0.10
+  maven: Apache Maven 3.9.9
+  spring_boot: 3.5.14
+commands:
+  - command: .\\mvnw.cmd -Dtest=OidcBearerIntegrationTest,OidcTokenValidatorTest test
+    result: PASS
+    detail: 7 tests, 0 failures/errors/skips
+  - command: .\\mvnw.cmd -Dtest=OidcJwtDecoderSignatureTest test
+    result: PASS
+    detail: 2 tests with a local JWK endpoint and real RSA signatures
+  - command: .\\mvnw.cmd -Dtest=ProductionStartupGuardTest test
+    result: PASS
+    detail: 13 fail-closed production configuration tests
+  - command: .\\mvnw.cmd test
+    result: PASS
+    detail: 90 suites, 673 tests, 0 failures/errors/skips
+  - command: .\\mvnw.cmd -DskipTests verify
+    result: PASS
+    detail: SpotBugs 0 findings; SBOM generated
+  - command: docker build --tag inner-cosmos:m1-oidc .
+    result: PASS
+    image_digest: sha256:d76e4d6fe22335283662faeeb1179cd8e711824f5c8d95484db1d1661a12d5a7
+  - command: .\\scripts\\verify-production-image.ps1 -Image inner-cosmos:m1-oidc
+    result: PASS
+    artifact: production-smoke-summary.txt
+  - command: .\\scripts\\assert-test-baseline.ps1 -MinimumTests 613
+    result: PASS
+    detail: 90 suites, 673 tests
+  - command: .\\scripts\\scan-secrets.ps1
+    result: PASS
+    detail: 0 current-tree findings
+  - command: git diff --check
+    result: PASS
+changes:
+  - Added external OIDC JWT resource-server verification and removed unused self-issued JWT libraries.
+  - Added issuer + subject local identity binding with server-owned roles and verified-email handling.
+  - Added bearer-aware CSRF and mixed-session identity precedence protections.
+  - Added public Authorization Code + PKCE S256 bootstrap metadata without a client secret.
+  - Added PostgreSQL Flyway V2 and production fail-closed OIDC configuration.
+  - Preserved every existing innovation capability and product semantic.
+human_gates: []
+known_limitations:
+  - Native Capacitor callback, OS secure token storage, refresh/revoke, and device UI remain pending.
+  - Real external IdP tenant integration and independent security review remain pending.
+  - AUTH-OIDC remains IN_PROGRESS and this package is not whole-product completion evidence.
+review:
+  status: PENDING
+  reviewer: UNASSIGNED
+rollback: Preserve signature, issuer, audience, CSRF, server-role, and issuer-subject controls; repair provider/client configuration instead of weakening them.
+artifacts:
+  - path: oidc-security-summary.txt
+    sha256: 0dde7cfbdbc15ece2d7a03deea311faa825638f2f0062571933d12e68ce39cd9
+  - path: production-smoke-summary.txt
+    sha256: 81b4691c2bfda7746c4b126b40b8413a128dc0fdce7976d26323684fcaef512d
+  - path: validation-summary.txt
+    sha256: 56633689c9b059434092c5db4c0e22123d1ab76b619f8a89034edea346249a87

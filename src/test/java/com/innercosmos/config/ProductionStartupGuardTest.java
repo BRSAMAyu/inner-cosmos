@@ -19,6 +19,14 @@ class ProductionStartupGuardTest {
                     "inner-cosmos.demo.seed-enabled=false",
                     "server.servlet.session.cookie.secure=true",
                     "inner-cosmos.security.csrf-enabled=true",
+                    "inner-cosmos.auth.oidc.enabled=true",
+                    "inner-cosmos.auth.oidc.issuer-uri=https://identity.example/",
+                    "inner-cosmos.auth.oidc.jwk-set-uri=https://identity.example/jwks",
+                    "inner-cosmos.auth.oidc.audience=inner-cosmos-api",
+                    "inner-cosmos.auth.oidc.authorization-uri=https://identity.example/authorize",
+                    "inner-cosmos.auth.oidc.token-uri=https://identity.example/token",
+                    "inner-cosmos.auth.oidc.client-id=inner-cosmos-mobile",
+                    "inner-cosmos.auth.oidc.redirect-uri=innercosmos://auth/callback",
                     "spring.datasource.url=jdbc:postgresql://db.example/inner_cosmos?sslmode=verify-full",
                     "spring.datasource.username=app",
                     "spring.datasource.password=test-only-placeholder",
@@ -55,6 +63,18 @@ class ProductionStartupGuardTest {
     @Test
     void rejectsDisabledCsrfProtection() {
         runner.withPropertyValues("inner-cosmos.security.csrf-enabled=false")
+                .run(context -> assertRejected(context.getBean(ProductionStartupGuard.class)));
+    }
+
+    @Test
+    void rejectsDisabledOidcResourceServer() {
+        runner.withPropertyValues("inner-cosmos.auth.oidc.enabled=false")
+                .run(context -> assertRejected(context.getBean(ProductionStartupGuard.class)));
+    }
+
+    @Test
+    void rejectsOidcJwkEndpointWithoutTls() {
+        runner.withPropertyValues("inner-cosmos.auth.oidc.jwk-set-uri=http://identity.example/jwks")
                 .run(context -> assertRejected(context.getBean(ProductionStartupGuard.class)));
     }
 

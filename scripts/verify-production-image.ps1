@@ -93,6 +93,14 @@ chmod 600 server.key ca.key
         "-e", "SEED_ENABLED=false",
         "-e", "COOKIE_SECURE=true",
         "-e", "CORS_ALLOWED_ORIGINS=https://smoke.inner-cosmos.invalid",
+        "-e", "OIDC_ENABLED=true",
+        "-e", "OIDC_ISSUER_URI=https://identity.inner-cosmos.invalid/",
+        "-e", "OIDC_JWK_SET_URI=https://identity.inner-cosmos.invalid/jwks",
+        "-e", "OIDC_AUDIENCE=inner-cosmos-api",
+        "-e", "OIDC_AUTHORIZATION_URI=https://identity.inner-cosmos.invalid/authorize",
+        "-e", "OIDC_TOKEN_URI=https://identity.inner-cosmos.invalid/token",
+        "-e", "OIDC_MOBILE_CLIENT_ID=inner-cosmos-mobile",
+        "-e", "OIDC_MOBILE_REDIRECT_URI=innercosmos://auth/callback",
         $Image
     ) | Out-Null
 
@@ -122,9 +130,9 @@ chmod 600 server.key ca.key
         -U $databaseUser -d $database -Atc 'SELECT MAX(version) FROM flyway_schema_history WHERE success').Trim()
     $runtimeUser = (& docker inspect $appName --format '{{.Config.User}}').Trim()
 
-    if ([int]$tableCount -ne 60) { throw "Production Flyway schema did not create exactly 60 application tables." }
+    if ([int]$tableCount -ne 61) { throw "Production Flyway schema did not create exactly 61 application tables." }
     if ([int]$seededUsers -ne 0) { throw "Production smoke unexpectedly seeded demo users." }
-    if ($flywayVersion -ne "1") { throw "Production Flyway schema version is not 1." }
+    if ($flywayVersion -ne "2") { throw "Production Flyway schema version is not 2." }
     if ($runtimeUser -ne "appuser") { throw "Production image is not running as appuser." }
 
     [pscustomobject]@{

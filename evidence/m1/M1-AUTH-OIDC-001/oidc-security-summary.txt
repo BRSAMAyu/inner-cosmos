@@ -1,0 +1,15 @@
+M1-AUTH-OIDC-001 OIDC resource-server security result: PASS
+
+- Real RSA/JWKS verification accepts the trusted signing key and rejects an untrusted key.
+- JWT issuer, audience, expiration, and not-before validation is configured by the resource server.
+- Local identity is keyed only by issuer + subject; verified email is an informational snapshot.
+- Client role claims cannot elevate the server-owned USER role.
+- A valid bearer token can perform an unsafe API request without browser CSRF.
+- An invalid bearer token receives 401 and cannot borrow a valid cookie session to bypass CSRF.
+- A valid bearer principal takes precedence over an unrelated browser session on the same request.
+- Public mobile bootstrap metadata requires Authorization Code + PKCE S256 and exposes no client secret.
+- Production startup fails closed when required OIDC public configuration is absent.
+
+Innovation preservation:
+- No Aurora, Self/Constitution/Emergence, portrait, relationship, capsule, slow-letter,
+  starfield, matching, proactive, or conversation semantics were deleted or reduced.
