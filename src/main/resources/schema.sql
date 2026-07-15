@@ -550,9 +550,53 @@ CREATE TABLE IF NOT EXISTS tb_user_correction (
   old_value TEXT,
   new_value TEXT,
   reason TEXT,
+  status VARCHAR(32) DEFAULT 'CONFIRMED',
+  impact_summary TEXT,
+  confirmed_at TIMESTAMP NULL,
+  retired_at TIMESTAMP NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_correction_user (user_id)
+);
+
+-- Campaign B: relational authority for user-understanding claims and their derived propagation.
+CREATE TABLE IF NOT EXISTS tb_understanding_claim (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  claim_key VARCHAR(192) NOT NULL,
+  claim_type VARCHAR(32) NOT NULL,
+  value_json TEXT NOT NULL,
+  authority_level VARCHAR(32) NOT NULL,
+  confidence DOUBLE DEFAULT 0,
+  status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
+  source_type VARCHAR(32),
+  source_id BIGINT,
+  version INT NOT NULL,
+  supersedes_claim_id BIGINT,
+  correction_id BIGINT,
+  evidence_refs TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_understanding_claim_version (user_id, claim_key, version),
+  INDEX idx_understanding_claim_current (user_id, status),
+  CONSTRAINT fk_claim_previous FOREIGN KEY (supersedes_claim_id) REFERENCES tb_understanding_claim(id) ON DELETE SET NULL,
+  CONSTRAINT fk_claim_correction FOREIGN KEY (correction_id) REFERENCES tb_user_correction(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS tb_claim_propagation (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  correction_id BIGINT NOT NULL,
+  claim_id BIGINT NOT NULL,
+  target_kind VARCHAR(48) NOT NULL,
+  target_id BIGINT,
+  status VARCHAR(32) NOT NULL,
+  detail TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_claim_propagation_correction (user_id, correction_id),
+  CONSTRAINT fk_propagation_correction FOREIGN KEY (correction_id) REFERENCES tb_user_correction(id) ON DELETE CASCADE,
+  CONSTRAINT fk_propagation_claim FOREIGN KEY (claim_id) REFERENCES tb_understanding_claim(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS tb_weekly_review (

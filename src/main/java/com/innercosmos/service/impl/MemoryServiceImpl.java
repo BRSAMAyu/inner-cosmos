@@ -135,7 +135,10 @@ public class MemoryServiceImpl implements MemoryService {
 
     @Override
     public List<StarfieldVO> starfield(Long userId) {
-        List<MemoryCard> cards = listCards(userId);
+        // The starfield is a current-understanding projection. Superseded cards remain
+        // available in audit/history APIs but must not masquerade as current facts here.
+        List<MemoryCard> cards = memoryCardMapper.selectList(new QueryWrapper<MemoryCard>()
+                .eq("user_id", userId).eq("status", "ACTIVE").orderByDesc("emotional_gravity"));
         List<StarfieldVO> result = new ArrayList<>();
         int i = 0;
         for (MemoryCard card : cards) {

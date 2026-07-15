@@ -127,3 +127,19 @@ test("Aurora Self changes stay visible, evaluated, consented and rollbackable", 
     await expect(selfSpace.locator(".self-version")).toContainText(/v(?:[2-9]|\d{2,})/);
   }
 });
+
+test("user previews and confirms an authoritative understanding correction", async ({ page }) => {
+  await page.goto("/app/aurora/index.html");
+  await loginIfNeeded(page);
+  const space = page.getByRole("region", { name: "校准 Aurora 对我的理解" });
+  await expect(space.getByRole("heading", { name: "如果这不太是你" })).toBeVisible();
+  await space.getByLabel("Aurora 原先怎样理解（可选）").fill("我总是在逃避");
+  await space.getByLabel("更准确的你是").fill("我是在谨慎选择下一步");
+  await space.getByRole("button", { name: "预览会改变什么" }).click();
+  const preview = space.getByRole("region", { name: "纠正影响预览" });
+  await expect(preview).toContainText("Aurora 对你的当前理解");
+  await expect(space.locator(".claim-card")).toHaveCount(0);
+  await preview.getByRole("button", { name: "确认，这是更准确的我" }).click();
+  await expect(space.locator(".claim-card").first()).toContainText("我是在谨慎选择下一步");
+  await expect(page.getByRole("status")).toContainText("已校准");
+});

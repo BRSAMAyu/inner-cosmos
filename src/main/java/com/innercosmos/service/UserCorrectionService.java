@@ -1,10 +1,23 @@
 package com.innercosmos.service;
 
 import com.innercosmos.entity.UserCorrection;
+import com.innercosmos.entity.ClaimPropagation;
+import com.innercosmos.entity.UnderstandingClaim;
+import com.innercosmos.dto.CorrectionCommand;
+import com.innercosmos.vo.CorrectionConfirmationVO;
+import com.innercosmos.vo.CorrectionImpactVO;
 
 import java.util.List;
 
 public interface UserCorrectionService {
+    CorrectionImpactVO preview(Long userId, CorrectionCommand command);
+
+    CorrectionConfirmationVO confirm(Long userId, CorrectionCommand command);
+
+    List<UnderstandingClaim> claimHistory(Long userId, String claimKey);
+
+    List<ClaimPropagation> propagation(Long userId, Long correctionId);
+
     UserCorrection recordCorrection(Long userId, String targetType, Long targetId,
                                      String fieldName, String oldValue, String newValue, String reason);
 
@@ -26,7 +39,7 @@ public interface UserCorrectionService {
     List<UserCorrection> recentCorrectionsByType(Long userId, String targetType, int limit);
 
     /**
-     * M-069 — retire (hard-delete) one of the user's own corrections. Loads by id and
+     * M-069 — retire one of the user's own corrections without destroying audit history. Loads by id and
      * throws UNAUTHORIZED if the correction does not exist or belongs to another user,
      * so a forged id can never touch someone else's data.
      */

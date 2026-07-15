@@ -3,8 +3,13 @@ package com.innercosmos.controller;
 import com.innercosmos.common.ApiResponse;
 import com.innercosmos.common.ErrorCode;
 import com.innercosmos.entity.UserCorrection;
+import com.innercosmos.entity.ClaimPropagation;
+import com.innercosmos.entity.UnderstandingClaim;
+import com.innercosmos.dto.CorrectionCommand;
 import com.innercosmos.exception.BusinessException;
 import com.innercosmos.service.UserCorrectionService;
+import com.innercosmos.vo.CorrectionConfirmationVO;
+import com.innercosmos.vo.CorrectionImpactVO;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.web.bind.annotation.*;
 
@@ -32,6 +37,29 @@ public class UserCorrectionController extends BaseController {
 
     public UserCorrectionController(UserCorrectionService userCorrectionService) {
         this.userCorrectionService = userCorrectionService;
+    }
+
+    @PostMapping("/preview")
+    public ApiResponse<CorrectionImpactVO> preview(@RequestBody CorrectionCommand command,
+                                                   HttpSession session) {
+        return ApiResponse.ok(userCorrectionService.preview(currentUserId(session), command));
+    }
+
+    @PostMapping("/confirm")
+    public ApiResponse<CorrectionConfirmationVO> confirm(@RequestBody CorrectionCommand command,
+                                                         HttpSession session) {
+        return ApiResponse.ok(userCorrectionService.confirm(currentUserId(session), command));
+    }
+
+    @GetMapping("/claims")
+    public ApiResponse<List<UnderstandingClaim>> claims(@RequestParam(required = false) String claimKey,
+                                                        HttpSession session) {
+        return ApiResponse.ok(userCorrectionService.claimHistory(currentUserId(session), claimKey));
+    }
+
+    @GetMapping("/{id}/propagation")
+    public ApiResponse<List<ClaimPropagation>> propagation(@PathVariable Long id, HttpSession session) {
+        return ApiResponse.ok(userCorrectionService.propagation(currentUserId(session), id));
     }
 
     @PostMapping

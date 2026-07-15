@@ -2,6 +2,10 @@ package com.innercosmos.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.innercosmos.config.TestRateLimitConfig;
+import com.innercosmos.common.Constants;
+import com.innercosmos.entity.MemoryCard;
+import com.innercosmos.mapper.MemoryCardMapper;
+import com.innercosmos.service.MemoryService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +20,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -47,6 +52,12 @@ class UserCorrectionControllerTest {
 
     @Autowired
     ObjectMapper objectMapper;
+
+    @Autowired
+    MemoryCardMapper memoryCardMapper;
+
+    @Autowired
+    MemoryService memoryService;
 
     private MockHttpSession session;
 
@@ -107,6 +118,108 @@ class UserCorrectionControllerTest {
         mockMvc.perform(get("/api/aurora/corrections").session(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(0));
+    }
+
+    @Test
+    void preview_isReadOnly_thenConfirmCreatesVersionedClaimAndPropagation() throws Exception {
+        String body = "{\"targetType\":\"AURORA_UNDERSTANDING\",\"targetId\":0,"
+                + "\"fieldName\":\"self_understanding\",\"oldValue\":\"我总是在逃避\","
+                + "\"newValue\":\"我是在谨慎选择下一步\",\"reason\":\"这是我的明确纠正\"}";
+
+        mockMvc.perform(post("/api/aurora/corrections/preview").session(session)
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.confirmationRequired").value(true))
+                .andExpect(jsonPath("$.data.impacts[0].kind").value("AURORA_RETRIEVAL"));
+        mockMvc.perform(get("/api/aurora/corrections").session(session))
+                .andExpect(jsonPath("$.data.length()").value(0));
+
+        MvcResult result = mockMvc.perform(post("/api/aurora/corrections/confirm").session(session)
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.correction.status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.data.activeClaim.authorityLevel").value("USER_CORRECTION"))
+                .andExpect(jsonPath("$.data.activeClaim.version").value(1))
+                .andExpect(jsonPath("$.data.propagation[0].status").value("APPLIED"))
+                .andReturn();
+        long correctionId = objectMapper.readTree(result.getResponse().getContentAsString())
+                .path("data").path("correction").path("id").asLong();
+
+        mockMvc.perform(get("/api/aurora/corrections/claims").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].status").value("ACTIVE"));
+        mockMvc.perform(get("/api/aurora/corrections/" + correctionId + "/propagation").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].targetKind").value("AURORA_RETRIEVAL"));
+    }
+
+    @Test
+    void repeatedConfirmationSupersedesOldClaimWithoutDeletingHistory() throws Exception {
+        String first = "{\"newValue\":\"我需要独处恢复\"}";
+        String second = "{\"newValue\":\"我需要独处恢复，但也珍惜稳定陪伴\"}";
+        mockMvc.perform(post("/api/aurora/corrections/confirm").session(session)
+                .contentType(MediaType.APPLICATION_JSON).content(first)).andExpect(status().isOk());
+        mockMvc.perform(post("/api/aurora/corrections/confirm").session(session)
+                        .contentType(MediaType.APPLICATION_JSON).content(second))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.activeClaim.version").value(2));
+        mockMvc.perform(get("/api/aurora/corrections/claims").session(session))
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[0].status").value("ACTIVE"))
+                .andExpect(jsonPath("$.data[1].status").value("SUPERSEDED"));
+    }
+
+    @Test
+    void targetedMemoryCorrectionSupersedesCardAndRemovesItFromCurrentStarfield() throws Exception {
+        Long userId = (Long) session.getAttribute(Constants.SESSION_USER_KEY);
+        MemoryCard card = new MemoryCard();
+        card.userId = userId;
+        card.title = "我总是在逃避";
+        card.summary = "旧的单一判断";
+        card.status = "ACTIVE";
+        card.emotionalGravity = 2.0;
+        memoryCardMapper.insert(card);
+        org.junit.jupiter.api.Assertions.assertTrue(memoryService.starfield(userId).stream()
+                .anyMatch(star -> card.id.equals(star.id)));
+
+        String body = "{\"targetType\":\"MEMORY_CARD\",\"targetId\":" + card.id
+                + ",\"fieldName\":\"summary\",\"oldValue\":\"我总是在逃避\","
+                + "\"newValue\":\"我是在谨慎选择下一步\"}";
+        mockMvc.perform(post("/api/aurora/corrections/preview").session(session)
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.affectedMemoryCount").value(1))
+                .andExpect(jsonPath("$.data.impacts[?(@.kind == 'STARFIELD')]").exists());
+        mockMvc.perform(post("/api/aurora/corrections/confirm").session(session)
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk());
+
+        org.junit.jupiter.api.Assertions.assertEquals("SUPERSEDED", memoryCardMapper.selectById(card.id).status);
+        org.junit.jupiter.api.Assertions.assertTrue(memoryService.starfield(userId).stream()
+                .noneMatch(star -> card.id.equals(star.id)));
+    }
+
+    @Test
+    void retiringLatestCorrectionRestoresPreviousClaimAndKeepsAuditHistory() throws Exception {
+        MvcResult first = mockMvc.perform(post("/api/aurora/corrections/confirm").session(session)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"newValue\":\"第一版理解\"}"))
+                .andExpect(status().isOk()).andReturn();
+        long firstId = objectMapper.readTree(first.getResponse().getContentAsString())
+                .path("data").path("activeClaim").path("id").asLong();
+        MvcResult second = mockMvc.perform(post("/api/aurora/corrections/confirm").session(session)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"newValue\":\"第二版理解\"}"))
+                .andExpect(status().isOk()).andReturn();
+        long correctionId = objectMapper.readTree(second.getResponse().getContentAsString())
+                .path("data").path("correction").path("id").asLong();
+
+        mockMvc.perform(delete("/api/aurora/corrections/" + correctionId).session(session))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/aurora/corrections/claims").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[?(@.id == " + firstId + ")].status").value("ACTIVE"))
+                .andExpect(jsonPath("$.data[?(@.correctionId == " + correctionId + ")].status").value("RETIRED"));
+        mockMvc.perform(get("/api/aurora/corrections/" + correctionId + "/propagation").session(session))
+                .andExpect(jsonPath("$.data[?(@.status == 'WITHDRAWN')]").exists())
+                .andExpect(jsonPath("$.data[?(@.status == 'REVIEW_REQUIRED')]").exists());
     }
 
     // ---------------- helpers ----------------

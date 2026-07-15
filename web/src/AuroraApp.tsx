@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { api, replayTurnEvents, streamAurora, type Notification, type SelfEvolution, type WakeIntent } from "./api";
+import { api, replayTurnEvents, streamAurora, type CorrectionCommand, type CorrectionImpact, type Notification, type SelfEvolution, type UnderstandingClaim, type WakeIntent } from "./api";
 import type { AuroraStreamEvent, DialogMessage, TurnStatus } from "./protocol";
 
 type UiMessage = { key: string; speaker: "USER" | "AURORA"; text: string; partial?: boolean };
@@ -28,6 +28,11 @@ export function AuroraApp() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [selfEvolution, setSelfEvolution] = useState<SelfEvolution | null>(null);
   const [selfBusy, setSelfBusy] = useState(false);
+  const [correctionOld, setCorrectionOld] = useState("");
+  const [correctionNew, setCorrectionNew] = useState("");
+  const [correctionImpact, setCorrectionImpact] = useState<CorrectionImpact | null>(null);
+  const [correctionBusy, setCorrectionBusy] = useState(false);
+  const [claims, setClaims] = useState<UnderstandingClaim[]>([]);
   const [runtimeSignal, setRuntimeSignal] = useState<RuntimeSignal>({ stage: "idle", runtime: "single" });
   const abortRef = useRef<AbortController | null>(null);
   const activeTurnRef = useRef<number | null>(null);
@@ -54,6 +59,7 @@ export function AuroraApp() {
         replaceFromHistory(created.id),
         api.wakeIntents().then(setWakeIntents),
         api.selfEvolution().then(setSelfEvolution),
+        api.understandingClaims().then(setClaims),
         api.notifications().then(setNotifications)
       ]);
       if (call !== bootstrapCallRef.current) return;
@@ -290,6 +296,32 @@ export function AuroraApp() {
     } finally { setSelfBusy(false); }
   };
 
+  const correctionCommand = (): CorrectionCommand => ({
+    targetType: "AURORA_UNDERSTANDING", targetId: 0, fieldName: "self_understanding",
+    oldValue: correctionOld.trim() || null, newValue: correctionNew.trim(), reason: "用户在 Inner Cosmos 中主动校准"
+  });
+
+  const previewCorrection = async () => {
+    setCorrectionBusy(true);
+    try {
+      setCorrectionImpact(await api.previewCorrection(correctionCommand()));
+      setStatus("先看清影响范围；只有确认后，Aurora 的理解才会改变。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法预览这次纠正"); }
+    finally { setCorrectionBusy(false); }
+  };
+
+  const confirmCorrection = async () => {
+    setCorrectionBusy(true);
+    try {
+      const result = await api.confirmCorrection(correctionCommand());
+      setClaims(current => [result.activeClaim, ...current.map(claim =>
+        claim.claimKey === result.activeClaim.claimKey && claim.status === "ACTIVE" ? { ...claim, status: "SUPERSEDED" as const } : claim)]);
+      setCorrectionImpact(null); setCorrectionOld(""); setCorrectionNew("");
+      setStatus("已校准。旧理解仍可追溯，Aurora、星空与共鸣体上下文会按确认结果同步。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "这次纠正没有保存，任何下游都未改变"); }
+    finally { setCorrectionBusy(false); }
+  };
+
   if (authenticated === null) return <main className="login-shell"><div className="login" role="status">正在连接你的内宇宙…</div></main>;
   if (!authenticated) return <Login onSuccess={bootstrap} />;
 
@@ -364,6 +396,25 @@ export function AuroraApp() {
             回到 v{version.versionNo} · {version.publicNarrative}
           </button>)}
       </section>}
+
+      <section className="understanding-space" aria-label="校准 Aurora 对我的理解">
+        <div className="understanding-heading"><div><span className="eyebrow">YOUR INNER COSMOS</span><h2>如果这不太是你</h2></div>
+          <span>{claims.filter(claim => claim.status === "ACTIVE").length} 条由你确认的理解</span></div>
+        <p>先预览影响，再决定是否让 Aurora 记住。旧理解不会消失，只会退出“当前事实”。</p>
+        <div className="correction-fields">
+          <label>Aurora 原先怎样理解（可选）<textarea value={correctionOld} onChange={event => { setCorrectionOld(event.target.value); setCorrectionImpact(null); }} placeholder="例如：你更喜欢独处" /></label>
+          <label>更准确的你是<textarea value={correctionNew} onChange={event => { setCorrectionNew(event.target.value); setCorrectionImpact(null); }} placeholder="例如：我不是喜欢独处，只是需要先恢复精力" /></label>
+        </div>
+        {!correctionImpact ? <button className="understanding-action" disabled={correctionBusy || !correctionNew.trim()} onClick={() => void previewCorrection()}>预览会改变什么</button> :
+          <div className="impact-preview" role="region" aria-label="纠正影响预览">
+            <strong>确认后会发生</strong>
+            <ul>{correctionImpact.impacts.map((impact, index) => <li key={`${impact.kind}-${impact.targetId ?? index}`}><span>{impact.label}</span><small>{impact.action}</small></li>)}</ul>
+            <div className="impact-actions"><button disabled={correctionBusy} onClick={() => setCorrectionImpact(null)}>返回修改</button><button disabled={correctionBusy} onClick={() => void confirmCorrection()}>确认，这是更准确的我</button></div>
+          </div>}
+        {claims.filter(claim => claim.status === "ACTIVE").slice(0, 3).map(claim => <article className="claim-card" key={claim.id}>
+          <span>由你确认 · v{claim.version}</span><p>{claim.valueJson.replace(/^"|"$/g, "")}</p>
+        </article>)}
+      </section>
 
       <section className="conversation" aria-live="polite" aria-label="与 Aurora 的对话">
         {messages.length === 0 && <div className="empty"><span>✦</span><p>把现在最真实的一句话放在这里。</p></div>}

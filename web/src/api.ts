@@ -26,6 +26,28 @@ export type SelfEvolution = {
     status: "ACTIVE" | "RETIRED"; activatedAt: string;
   }>;
 };
+export type CorrectionCommand = {
+  targetType: "AURORA_UNDERSTANDING" | "PORTRAIT_DIM" | "MEMORY_CARD";
+  targetId: number;
+  fieldName: string;
+  oldValue: string | null;
+  newValue: string;
+  reason: string | null;
+};
+export type CorrectionImpact = {
+  claimKey: string; newValue: string; affectedMemoryCount: number;
+  authorizedCapsuleContextCount: number; confirmationRequired: boolean;
+  impacts: Array<{ kind: string; targetId: number | null; label: string; action: string }>;
+};
+export type UnderstandingClaim = {
+  id: number; claimKey: string; valueJson: string; authorityLevel: string;
+  status: "ACTIVE" | "SUPERSEDED" | "RETIRED"; version: number; createdAt: string;
+};
+export type CorrectionConfirmation = {
+  correction: { id: number; newValue: string; status: string; impactSummary: string };
+  activeClaim: UnderstandingClaim;
+  propagation: Array<{ id: number; targetKind: string; status: string; detail: string }>;
+};
 let csrf: Csrf | null = null;
 
 async function request<T>(url: string, init: RequestInit = {}, retriedCsrf = false): Promise<T> {
@@ -97,7 +119,14 @@ export const api = {
   activateSelfEvolution: (id: number) => request<SelfEvolution>(`/api/aurora/self/evolution/proposals/${id}/activate`, { method: "POST" }),
   rollbackSelfEvolution: (targetVersionId: number) => request<SelfEvolution>("/api/aurora/self/evolution/rollback", {
     method: "POST", body: JSON.stringify({ targetVersionId, restoreRelationship: false })
-  })
+  }),
+  previewCorrection: (input: CorrectionCommand) => request<CorrectionImpact>("/api/aurora/corrections/preview", {
+    method: "POST", body: JSON.stringify(input)
+  }),
+  confirmCorrection: (input: CorrectionCommand) => request<CorrectionConfirmation>("/api/aurora/corrections/confirm", {
+    method: "POST", body: JSON.stringify(input)
+  }),
+  understandingClaims: () => request<UnderstandingClaim[]>("/api/aurora/corrections/claims")
 };
 
 export async function streamAurora(

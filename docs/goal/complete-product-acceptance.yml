@@ -139,14 +139,14 @@ gates:
 
   - id: G5
     name: Memory, profile, and Inner Cosmos
-    status: UNASSESSED
+    status: IN_PROGRESS
     required: true
     acceptance:
-      - {id: MEMORY-LIFECYCLE, target: "Memories support consolidation, reinforcement, contradiction, supersession, decay, archive, and forgetting.", status: UNASSESSED, evidence: []}
-      - {id: PROFILE-MODEL, target: "High-dimensional claims retain source, confidence, time, consent, conflict, and correction history.", status: UNASSESSED, evidence: []}
+      - {id: MEMORY-LIFECYCLE, target: "Memories support consolidation, reinforcement, contradiction, supersession, decay, archive, and forgetting.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-INNER-001/]}
+      - {id: PROFILE-MODEL, target: "High-dimensional claims retain source, confidence, time, consent, conflict, and correction history.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-INNER-001/]}
       - {id: RETRIEVAL-QUALITY, target: "Task-aware hybrid retrieval meets precision, relevance, contradiction, privacy, latency, and budget thresholds.", status: UNASSESSED, evidence: []}
-      - {id: PROFILE-PROPAGATION, target: "Correction and withdrawal re-evaluate downstream insights, vectors, caches, capsules, and matching.", status: UNASSESSED, evidence: []}
-      - {id: STARFIELD-V2, target: "Starfield visual semantics, time/topic/person exploration, provenance detail, accessible alternative, and mobile performance pass.", status: UNASSESSED, evidence: []}
+      - {id: PROFILE-PROPAGATION, target: "Correction and withdrawal re-evaluate downstream insights, vectors, caches, capsules, and matching.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-INNER-001/]}
+      - {id: STARFIELD-V2, target: "Starfield visual semantics, time/topic/person exploration, provenance detail, accessible alternative, and mobile performance pass.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-INNER-001/]}
 
   - id: G6
     name: Capsule intelligence and resonance
