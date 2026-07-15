@@ -9,8 +9,9 @@
 | L0 | `/goal-objective.md` | 唯一总目标、完成定义、自主权限与人类门禁 |
 | L1 | `09`—`12` | 完全体产品、工程、UIUX、实施与验收的目标规范 |
 | L1-AI | `08-Aurora生命感与共鸣智能创新架构.md` | Aurora、记忆画像、共鸣体、心理 Skill 的详细创新架构 |
+| L1-DEPLOY | `14-AWS-Academy-EKS约束与双轨部署架构.md` | 课程 Learner Lab 与商业新加坡环境的边界、替代适配器和双轨演示合同 |
 | L2 | `00`、`02`—`07` | 项目理解、EKS、移动端、新加坡、Agent 流程、技术演进、近期决策与执行基线 |
-| L3 | `01`、`docs/audit`、`docs/gap_analysis`、现有 specs | 某一时点的评估、缺口和专题设计；用于事实发现，不自动决定最终方向 |
+| L3 | `01`、`13`、`15`、`docs/audit`、`docs/gap_analysis`、现有 specs | 某一时点的评估、连接指南、进展审查、缺口和专题设计；用于事实发现，不自动决定最终方向 |
 | L4 | work package、ADR、research、evidence、测试报告 | 实施契约、局部决策与可复现证据 |
 | 历史 | 根目录旧总纲、旧推进书、旧 UIUX 资产 | 设计来源与历史上下文；未被上层吸收的内容不具有目标裁决权 |
 
@@ -33,6 +34,7 @@
 | 10 | `10-完全体系统架构与工程规格.md` | 用什么架构实现，模块、数据、AI、API、云和移动端怎样协作 |
 | 11 | `11-完全体UIUX与交互设计规格.md` | 用户如何感知和操作产品，视觉、交互、响应式和可访问性怎样统一 |
 | 12 | `12-完全体实现路线与最终验收规约.md` | Agent 怎样自主推进，什么证据代表真正完成 |
+| 14 | `14-AWS-Academy-EKS约束与双轨部署架构.md` | 如何在受限 Academy EKS 中真实展示云原生，同时保留本地完整体和商业新加坡目标 |
 
 机器可读对应物：`docs/goal/complete-product-acceptance.yml`。
 
@@ -40,6 +42,7 @@
 
 - Aurora、主动性、连续自我、共鸣体、心理建模：先读 `08`，再读 `06` 的 AI 章节和对应 innovation work packages。
 - Kubernetes、EKS、运行角色、Day-2：先读 `10`，再读 `02`、`06`。
+- AWS Academy Learner Lab、SQS/存储/IAM 限制和课程演示：先读 `14` 与 `docs/goal/aws-academy-capabilities.yml`；`13` 只作为连接操作参考。
 - App、PWA、Capacitor、推送与移动权限：先读 `11`，再读 `03`。
 - 新加坡发行、PDPA、跨境 LLM、商店、HSA、税务和支付：先读 `04`，最终由 `12` 的发布门禁验收。
 - 近期安全和基线工作：读 `07`、`evidence/m1` 及最新 Git/CI 结果。

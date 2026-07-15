@@ -23,7 +23,8 @@
 6. `对齐文档/12-完全体实现路线与最终验收规约.md`。
 7. `对齐文档/08-Aurora生命感与共鸣智能创新架构.md`。
 8. `docs/goal/complete-product-acceptance.yml`。
-9. 再按任务需要阅读 `00`—`07`、ADR、work package、研究与 evidence。
+9. `对齐文档/14-AWS-Academy-EKS约束与双轨部署架构.md`。
+10. 再按任务需要阅读 `00`—`07`、`13`、`15`、ADR、work package、研究与 evidence。
 
 不得只读本文件便开始大规模编码；不得只读旧 README、旧总纲或单个 work package 推断最终方向。
 
@@ -39,6 +40,7 @@
 - 美观、连贯、有情绪质感的跨端体验：流动、呼吸、星尘、涟漪和半透明构成统一视觉语言；白天温暖、夜晚深邃；移动端是一等公民。
 - 面向真实生产的工程系统：Java 21、Spring Boot 3.5、PostgreSQL/pgvector、Redis、异步事件、React/TypeScript PWA、Capacitor、EKS、IaC、可观测、灾备和安全供应链。
 - 面向新加坡发布的产品能力：英文优先可用、中英国际化、时区与本地资源、PDPA 数据权利、跨境数据治理、商店和运营准备。
+- 面向课程与商业的双轨部署：`local-complete` 保证完整产品效果，`academy-eks` 证明受限教学环境中的 Kubernetes 能力，`commercial-sg` 保留真实新加坡生产架构；不得把三者的证据混为一谈。
 
 上述创新能力不得因“更容易实现”被删除、静态化或改成普通聊天壳。安全与治理应通过授权、分层、可观测、可撤销、评测和 fail-safe 实现，而不是用无意义的体验阉割代替工程治理。
 

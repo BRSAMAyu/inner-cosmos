@@ -1,0 +1,76 @@
+schema_version: 1
+profile: academy-eks
+authority: 对齐文档/14-AWS-Academy-EKS约束与双轨部署架构.md
+observed_at: 2026-07-15T10:40:00+08:00
+evidence: evidence/academy/AWS-ACADEMY-CAP-001/summary.md
+freshness: rerun_on_every_learner_lab_session
+
+constraints:
+  region:
+    value: us-east-1
+    status: DOCUMENTED
+  credential_lifetime:
+    value: approximately_4_hours
+    status: DOCUMENTED
+  cluster:
+    value_source: environment_or_runtime_discovery
+    status: PREPROVISIONED
+  infrastructure_identifiers_in_git:
+    allowed: false
+
+capabilities:
+  aws_cli_identity:
+    status: PASS_CURRENT_SESSION
+  eks_api:
+    status: PASS_CURRENT_SESSION
+  kubernetes_nodes:
+    status: PASS
+    observed_count: 2
+  ecr:
+    status: DOCUMENTED_SUPPORTED
+  gateway_api:
+    status: PASS
+    observed_gateway_classes: 1
+  metrics_api:
+    status: PASS
+  kubernetes_workload_rbac:
+    status: PASS
+    resources: [Deployment, StatefulSet, PersistentVolume, PodDisruptionBudget, HorizontalPodAutoscaler, NetworkPolicy, CustomResourceDefinition]
+  storage_class:
+    status: ABSENT
+    observed_count: 0
+  ebs_csi:
+    status: ABSENT_IAM_RESTRICTED
+  sqs_user_role:
+    status: PASS_CREATE_SEND_RECEIVE_DELETE
+  sqs_workload_identity:
+    status: FAIL_NO_CREDENTIALS_OR_DENIED
+  irsa_or_pod_identity:
+    status: NOT_AVAILABLE_OR_NOT_CONFIGURED
+  rds_create:
+    status: UNVERIFIED
+  elasticache_create:
+    status: UNVERIFIED
+  secrets_manager_runtime:
+    status: UNVERIFIED
+  s3_runtime:
+    status: UNVERIFIED
+  route53_acm_waf:
+    status: UNVERIFIED
+  terraform_full_stack:
+    status: NOT_APPLICABLE_TO_PREPROVISIONED_ACADEMY_PROFILE
+
+required_adapters:
+  event_dispatcher: jdbc_outbox
+  database: in_cluster_postgresql_static_pv_or_approved_external_test_database
+  short_state: in_cluster_redis_disposable
+  secrets: ephemeral_kubernetes_secret_from_operator_environment
+  ingress: envoy_gateway_http_route
+
+forbidden_assumptions:
+  - SQS user-role access implies Pod access
+  - hostPath PV is durable across worker replacement
+  - Academy us-east-1 proves Singapore residency
+  - Service type LoadBalancer specifically proves ALB support
+  - Fargate, RDS, ElastiCache, Secrets Manager, IRSA, Route53, ACM, or WAF are available without a fresh probe
+  - temporary learner credentials may be committed or injected as long-lived Pod credentials
