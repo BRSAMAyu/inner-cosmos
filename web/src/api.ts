@@ -323,6 +323,15 @@ export const api = {
     csrf = null;
     return result;
   },
+  changePassword: (oldPassword: string, newPassword: string) => request<void>("/api/user/password", {
+    method: "PUT", body: JSON.stringify({ oldPassword, newPassword })
+  }),
+  deleteAccount: async (password: string) => {
+    const result = await request<void>("/api/user/account", { method: "DELETE", body: JSON.stringify({ password }) });
+    csrf = null;
+    return result;
+  },
+  exportData: () => request<Record<string, unknown>>("/api/user/export"),
   createSession: () => request<{ id: number }>("/api/dialog/session/create", {
     method: "POST", body: JSON.stringify({ title: "Aurora 对话", sessionType: "AURORA_CHAT" })
   }),

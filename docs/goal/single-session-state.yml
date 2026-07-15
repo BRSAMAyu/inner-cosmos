@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-16T06:31:00+08:00
+updated_at: 2026-07-16T06:43:00+08:00
 authority:
   - goal-objective.md
   - 对齐文档/17-单会话持续Goal模式执行协议.md
@@ -383,7 +383,7 @@ closed_front_g3_ux_shell_real_parity:
       verified to have real parity (same rigor as this checkpoint's verification, not just
       'a component with a similar name exists')."
 
-active_front:
+closed_front_g3_portrait_port:
   id: G3-PORTRAIT-PORT
   state: DONE_VERIFIED_LIVE_END_TO_END
   intent: |
@@ -436,6 +436,52 @@ active_front:
     - "Corrections history/retire (corrections.html's gap, item 8 in the parity list) shares the
       same GET/DELETE /api/aurora/corrections backend this checkpoint's work touched — a
       natural, small follow-up extension to UnderstandingCorrection.tsx if picked up next."
+
+active_front:
+  id: G3-ACCOUNT-SETTINGS-SAFETY-FIELDS
+  state: DONE_VERIFIED_LIVE_END_TO_END
+  intent: |
+    Executed the next priority item from the ranked port list: settings' data-rights/safety
+    fields (change-password, delete-account, data export) — all three backends
+    (PUT /api/user/password, DELETE /api/user/account with password re-auth, GET /api/user/export)
+    already existed; another pure frontend port, no backend changes.
+  done_this_front_summary:
+    - "Added web/src/components/AccountSettings.tsx: three actions rendered in MeSpace — export
+      (direct download, no confirmation needed), change-password (inline form with the same
+      client-side validation the legacy page had: both fields required, new password >= 8 chars,
+      confirmation must match), and delete-account (inline form with the exact legacy warning
+      text, requires the current password re-entered, matching the backend's M-033 re-auth gate)."
+    - "web/src/api.ts: added changePassword/deleteAccount/exportData. deleteAccount also clears
+      the cached CSRF token (mirroring logout()), since the session is invalidated server-side on
+      success. On successful deletion, AuroraApp.tsx resets local auth state directly
+      (setAuthenticated(false) etc.) rather than calling api.logout() again — there is no valid
+      session left to log out of, and this correctly drops the SPA straight to its own Login
+      screen instead of a hard-redirect to a legacy page."
+    - "New AccountSettings.test.tsx: 4 Vitest cases (export fires immediately without a
+      confirmation step, password-form validates length and confirmation match before calling
+      onChangePassword, delete-form requires a password and shows the irreversibility warning,
+      busy-state disables the acting button and shows the status message). 42/42 green across
+      the whole web suite."
+    - "Verified live end-to-end against a real packaged jar on a throwaway database: registered a
+      test user, changed the password through the actual UI, then independently confirmed via
+      direct login calls that the OLD password now fails and the NEW one succeeds; called the
+      real export endpoint and confirmed it returns real structured data (dailyRecords,
+      memoryCards, capsules, letters, etc., not a stub); attempted deletion with the WRONG
+      password first and confirmed the account survives with the correct 'password incorrect'
+      message, then deleted with the CORRECT password, confirmed the SPA drops to its own Login
+      screen, and confirmed via a direct database query that the account row is genuinely gone
+      (COUNT(*)=0) — not just hidden client-side."
+  next_machine_actions:
+    - "NEXT — the safety/rights-relevant settings fields are done. Remaining settings items are
+      lower-priority preference toggles (persona tone, proactive intensity, quiet hours, theme,
+      social reachability, memory-recall/multi-message toggles) — cosmetic/UX depth, not
+      data-rights-relevant. Consider these next, or pick a different acceptance-ledger front:
+      relations/social (entire relationship-temperature/discovery feature, zero API-client
+      presence), corrections history/retire (small, shares this checkpoint's backend), or
+      memory-starfield's importance/archive actions."
+    - "Once settings + corrections + starfield reach real parity, portrait.html/settings.html/
+      corrections.html/memory-starfield.html become genuinely safe to redirect per the
+      G3-UX-SHELL-REAL-PARITY rule (verify parity first, same rigor, before retiring)."
 
 priority_queue:
   - id: CAMPAIGN-C-QUALITY

@@ -13,6 +13,7 @@ import { CapsuleWorkbench } from "./components/CapsuleWorkbench";
 import { ResonanceNetwork } from "./components/ResonanceNetwork";
 import { LettersInbox } from "./components/LettersInbox";
 import { PortraitView } from "./components/PortraitView";
+import { AccountSettings, type AccountBusy } from "./components/AccountSettings";
 import { PsychologySkillStudio, SkillSuggestionBanner, type SkillLocale } from "./components/PsychologySkillStudio";
 
 type RuntimeSignal = { stage: "idle" | "understanding" | "composing" | "speaking"; runtime: "single" | "dual"; relationshipMove?: string; repaired?: boolean };
@@ -50,6 +51,8 @@ export function AuroraApp() {
   const [portraitHistory, setPortraitHistory] = useState<Record<string, PortraitHistoryEntry[]>>({});
   const [portraitCalibrated, setPortraitCalibrated] = useState<Record<string, boolean>>({});
   const [portraitBusy, setPortraitBusy] = useState<string | null>(null);
+  const [accountBusy, setAccountBusy] = useState<AccountBusy>(null);
+  const [accountMessage, setAccountMessage] = useState<string | null>(null);
   const [starfield, setStarfield] = useState<StarfieldScene | null>(null);
   const [starfieldBusy, setStarfieldBusy] = useState(false);
   const [memoryOperations, setMemoryOperations] = useState<MemoryOperation[]>([]);
@@ -574,6 +577,38 @@ export function AuroraApp() {
     finally { setPortraitBusy(null); }
   };
 
+  const changeAccountPassword = async (oldPassword: string, newPassword: string) => {
+    setAccountBusy("password");
+    try { await api.changePassword(oldPassword, newPassword); setAccountMessage("密码已更新"); }
+    catch (error) { setAccountMessage(error instanceof Error ? error.message : "密码修改失败"); }
+    finally { setAccountBusy(null); }
+  };
+
+  const exportAccountData = async () => {
+    setAccountBusy("export");
+    try {
+      const data = await api.exportData();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url; anchor.download = `inner-cosmos-export-${new Date().toISOString().slice(0, 10)}.json`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      setAccountMessage("数据已导出");
+    } catch (error) { setAccountMessage(error instanceof Error ? error.message : "导出失败"); }
+    finally { setAccountBusy(null); }
+  };
+
+  const deleteAccount = async (password: string) => {
+    setAccountBusy("delete");
+    try {
+      await api.deleteAccount(password);
+      setAuthenticated(false); setSessionId(null); setMessages([]); setPersonaSession(null); setPersonaMessages([]);
+      setAccountMessage(null);
+    } catch (error) { setAccountMessage(error instanceof Error ? error.message : "账户删除失败"); }
+    finally { setAccountBusy(null); }
+  };
+
   const changeStarfieldMode = async (nextMode: StarfieldScene["mode"]) => {
     setStarfieldBusy(true);
     try { setStarfield(await api.starfield(nextMode)); }
@@ -1013,6 +1048,8 @@ export function AuroraApp() {
           onRequestMicrophone={() => void requestMobileMicrophone()} onLogout={() => void logout()} />
         <PortraitView dimensions={portrait} history={portraitHistory} calibrated={portraitCalibrated} busyDim={portraitBusy}
           onLoadHistory={dim => void loadPortraitHistory(dim)} onCalibrate={(dim, oldValue, newValue) => void submitPortraitCalibration(dim, oldValue, newValue)} />
+        <AccountSettings busy={accountBusy} message={accountMessage} onChangePassword={(oldPassword, newPassword) => void changeAccountPassword(oldPassword, newPassword)}
+          onExportData={() => void exportAccountData()} onDeleteAccount={password => void deleteAccount(password)} />
       </div>
       <div className="state global-state" role="status"><i className={activeTurnId ? "pulse" : ""} />{status}</div>
       <footer><a href="/pages/dashboard.html">尚未迁移的工具</a><span>五空间 AppShell · 数据与能力持续保留</span><button type="button" onClick={() => void logout()}>安全退出</button></footer>

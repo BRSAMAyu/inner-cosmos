@@ -106,15 +106,20 @@ gates:
           chat send/modes/interrupt, memory starfield visualization, capsule creation, letters
           inbox, portrait claims), but a systematic per-page parity check against the legacy
           static implementation found REAL, substantial missing depth, not cosmetic gaps.
-          UPDATE (this checkpoint): portrait viewing/calibration is DONE — PortraitView.tsx now
-          renders every dimension (sorted by confidence) with a lazy-loaded history view and a
-          calibration form reusing the existing confirmCorrection(targetType=PORTRAIT_DIM) path;
-          verified live end-to-end against a real jar (seed data -> render -> calibrate -> DB row
-          confirmed with the correct targetType/fieldName/status). This closes the #1-ranked gap
-          below; it is no longer true that portrait has zero AppShell presence. Still open: no
-          settings surface at all (persona/tone/proactive-intensity/quiet-hours/theme/data-export/
-          change-password/delete-account — MeSpace is a read-only summary + logout button only);
-          no correction history/retire action (only top-3 active claims); memory starfield has no
+          UPDATE (a checkpoint prior to this one): portrait viewing/calibration is DONE —
+          PortraitView.tsx renders every dimension sorted by confidence with a lazy-loaded history
+          view and a calibration form; verified live end-to-end. This closed the #1-ranked gap;
+          portrait no longer has zero AppShell presence.
+          UPDATE (this checkpoint): settings' data-rights/safety fields are DONE —
+          AccountSettings.tsx now covers change-password, delete-account (with password re-auth),
+          and data export, all reusing existing backend endpoints; verified live end-to-end
+          (old password rejected after change, new one works; wrong delete-password rejected with
+          the correct error; correct delete-password genuinely removes the account row, confirmed
+          by direct database query, not just a UI state change). MeSpace is no longer read-only —
+          it is still missing the cosmetic preference toggles (persona tone, proactive intensity,
+          quiet hours, theme, social reachability), which remain queued as lower priority since
+          they are not data-rights-relevant. Still open: no correction history/retire action (only
+          top-3 active claims); memory starfield has no
           importance-tuning or archive action; capsule creation hardcodes privacy/boundary fields
           the legacy wizard exposes; no way to chat with an arbitrary discovered capsule outside a
           curated match; letters has no outbox/drafts/archive/thread view; and relations/social's
