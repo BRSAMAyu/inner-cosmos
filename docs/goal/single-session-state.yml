@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-15T23:15:00+08:00
+updated_at: 2026-07-15T23:11:00+08:00
 authority:
   - goal-objective.md
   - 对齐文档/17-单会话持续Goal模式执行协议.md
@@ -28,13 +28,13 @@ resume_policy:
   update_this_file_at_every_checkpoint: true
 
 active_front:
-  id: CAMPAIGN-A-EXPERIENCE-CLOSURE
-  state: IN_PROGRESS_WORKTREE
-  intent: Close the audited mobile production P1 trust boundary while preserving the verified Campaign A experience.
+  id: UNIFIED-FIVE-SPACE-APPSHELL
+  state: BUILDER_VERIFIED_FOUNDATION
+  intent: Decompose the verified five-space information architecture into maintainable domain components without changing capability or data semantics.
   next_machine_actions:
-    - Commit the verified-link configuration and executable domain-owner handoff without claiming live ownership.
-    - Begin the five-space AppShell decomposition while real IdP, signing and domain publication remain human gates.
-    - Commit only the current front's files, then update acceptance evidence without claiming human reviews.
+    - Extract AppShell navigation and each product space from the oversized AuroraApp while preserving URL, state and API contracts.
+    - Add automated accessibility and visual-regression coverage for desktop and narrow mobile shell states.
+    - Continue Campaign B's correction, provenance and propagation experience after the component boundary is stable.
 
 priority_queue:
   - id: UNIFIED-FIVE-SPACE-APPSHELL
@@ -62,17 +62,17 @@ known_human_gates:
   - REAL-ANDROID-IOS-APNS-FCM-AND-SIGNING
 
 last_full_gate:
-  baseline_commit: d6bf5b518c4e8904056413feadf0d51420ac28a0
-  claimed_java: 783/783
-  claimed_playwright: 11/11
-  claimed_vitest: 6/6
-  independent_reverification: PASS_WITH_MOBILE_PRODUCTION_GAPS
+  baseline_commit: 4c14ef9
+  claimed_java: 784/784
+  claimed_playwright: 11/11 plus Living Aurora 1/1
+  claimed_vitest: 12/12
+  independent_reverification: BUILDER_VERIFIED_WITH_HUMAN_AND_PRODUCTION_GATES
   independently_verified:
-    - Maven clean verify passed with 783 tests, Jar, SBOM, and zero SpotBugs findings.
-    - Vitest passed 6/6 and the production React bundle compiled.
-    - Packaged-Jar Playwright passed 11/11.
-    - Secret scan passed with zero findings.
-    - Capacitor sync and Android debug APK assembly passed after supplying the local Android SDK path.
-  review: evidence/innovation/INNO-MOBILE-001/independent-review-2026-07-15.md
+    - Maven clean verify passed with 784 tests, Jar, SBOM, and zero SpotBugs findings at the mobile-auth checkpoint.
+    - Vitest passed 12/12 and the five-space production React bundle compiled.
+    - Packaged-Jar Playwright passed 11/11 through explicit product-space navigation.
+    - Living Aurora scheduler-to-feedback browser contract passed 1/1 through the new shell.
+    - Android app and instrumentation APK assembly passed; live domain ownership remains a human publication gate.
+  review: evidence/campaign-a/APP-SHELL-001/README.md
 
 handoff_rule: Do not return a final answer at commits or campaign checkpoints; continue with the next machine-actionable gap.

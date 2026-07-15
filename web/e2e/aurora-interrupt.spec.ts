@@ -3,14 +3,20 @@ import { expect, test } from "@playwright/test";
 async function loginIfNeeded(page: import("@playwright/test").Page) {
   const login = page.getByRole("heading", { name: "回到你的内宇宙" });
   const composer = page.getByLabel("写给 Aurora");
-  await expect(login.or(composer)).toBeVisible();
+  const appShell = page.getByRole("navigation", { name: "Inner Cosmos 五个空间" });
+  await expect(login.or(appShell)).toBeVisible();
   if (await login.isVisible()) {
     await page.getByLabel("用户名").fill(process.env.E2E_USERNAME ?? "demo");
     await page.getByLabel("密码").fill(process.env.E2E_PASSWORD ?? "demo123");
     await page.getByRole("button", { name: "登录" }).click();
   }
-  await expect(composer).toBeVisible();
+  await expect(appShell).toBeVisible();
   return composer;
+}
+
+async function openProductSpace(page: import("@playwright/test").Page, name: "今天" | "内宇宙" | "共鸣" | "连接" | "我的") {
+  const navigation = page.getByRole("navigation", { name: "Inner Cosmos 五个空间" });
+  await navigation.getByRole("button", { name: new RegExp(`^${name}`) }).click();
 }
 
 test("Aurora supports multi-bubble streaming, stop, interrupt and replanning", async ({ page }) => {
@@ -131,6 +137,7 @@ test("Aurora Self changes stay visible, evaluated, consented and rollbackable", 
 test("user previews and confirms an authoritative understanding correction", async ({ page }) => {
   await page.goto("/app/aurora/index.html");
   await loginIfNeeded(page);
+  await openProductSpace(page, "内宇宙");
   const space = page.getByRole("region", { name: "校准 Aurora 对我的理解" });
   await expect(space.getByRole("heading", { name: "如果这不太是你" })).toBeVisible();
   await space.getByLabel("Aurora 原先怎样理解（可选）").fill("我总是在逃避");
@@ -147,6 +154,7 @@ test("user previews and confirms an authoritative understanding correction", asy
 test("memory starfield switches between time, theme and people without losing its accessible view", async ({ page }) => {
   await page.goto("/app/aurora/index.html");
   await loginIfNeeded(page);
+  await openProductSpace(page, "内宇宙");
   const cosmos = page.getByRole("region", { name: "记忆星空" });
   await expect(cosmos.getByRole("heading", { name: "你的记忆不是档案柜" })).toBeVisible();
   const accessible = cosmos.getByRole("list", { name: "记忆星空可访问列表" });
@@ -168,6 +176,7 @@ test("memory starfield switches between time, theme and people without losing it
 test("user can roll back a memory change while permanent forgetting stays irreversible", async ({ page }) => {
   await page.goto("/app/aurora/index.html");
   await loginIfNeeded(page);
+  await openProductSpace(page, "内宇宙");
   const originalTitle = await page.getByRole("list", { name: "记忆星空可访问列表" }).locator("li strong").first().innerText();
   await page.evaluate(async title => {
     const sceneEnvelope = await fetch("/api/memory/starfield/v2?mode=TIME", { credentials: "include" }).then(response => response.json());
@@ -187,6 +196,7 @@ test("user can roll back a memory change while permanent forgetting stays irreve
   }, originalTitle);
   await page.reload();
   await loginIfNeeded(page);
+  await openProductSpace(page, "内宇宙");
   const history = page.getByLabel("记忆变更历史");
   await expect(history).toContainText("UPDATE");
   await history.getByRole("button", { name: "撤回这次变更" }).first().click();
@@ -198,6 +208,7 @@ test("user can roll back a memory change while permanent forgetting stays irreve
 test("owner publishes, a visitor sends a slow letter, then withdrawal stops the resonance", async ({ page }) => {
   await page.goto("/app/aurora/index.html");
   await loginIfNeeded(page);
+  await openProductSpace(page, "共鸣");
   const resonance = page.getByRole("region", { name: "共鸣体创建与像不像我沙盒" });
   await expect(resonance.getByRole("heading", { name: "先确认像不像你，再让别人遇见" })).toBeVisible();
   const newCapsule = resonance.getByRole("tab", { name: /新建一个侧面/ });
@@ -230,7 +241,8 @@ test("owner publishes, a visitor sends a slow letter, then withdrawal stops the 
   await page.getByLabel("用户名").fill("river");
   await page.getByLabel("密码").fill("demo123");
   await page.getByRole("button", { name: "登录" }).click();
-  await expect(page.getByLabel("写给 Aurora")).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Inner Cosmos 五个空间" })).toBeVisible();
+  await openProductSpace(page, "共鸣");
 
   const network = page.getByRole("region", { name: "发现共鸣并写一封慢信" });
   await expect(network.getByRole("heading", { name: "不是刷卡片，是理解为什么会相遇" })).toBeVisible();
@@ -259,14 +271,17 @@ test("owner publishes, a visitor sends a slow letter, then withdrawal stops the 
   await page.getByLabel("用户名").fill("demo");
   await page.getByLabel("密码").fill("demo123");
   await page.getByRole("button", { name: "登录" }).click();
+  await openProductSpace(page, "连接");
   const inbox = page.getByRole("region", { name: "抵达我的慢信" });
   await expect(inbox.getByRole("heading", { name: "只在抵达之后，才由你决定关系往哪里走" })).toBeVisible();
   await page.screenshot({ path: "../evidence/innovation/INNO-CAP-006/owner-letter-inbox.png", fullPage: true });
+  await openProductSpace(page, "共鸣");
   const ownerSpace = page.getByRole("region", { name: "共鸣体创建与像不像我沙盒" });
   await ownerSpace.getByRole("tab", { name: new RegExp(capsuleName) }).click();
   await ownerSpace.getByRole("button", { name: "撤回这个共鸣体" }).click();
   await expect(page.getByRole("status")).toContainText("已撤回");
 
+  await openProductSpace(page, "连接");
   const consent = inbox.getByLabel("双向连接同意");
   const existingLeave = consent.getByRole("button", { name: "退出连接" }).first();
   if (await existingLeave.isVisible().catch(() => false)) await existingLeave.click();
@@ -283,6 +298,7 @@ test("owner publishes, a visitor sends a slow letter, then withdrawal stops the 
   await page.getByLabel("用户名").fill("river");
   await page.getByLabel("密码").fill("demo123");
   await page.getByRole("button", { name: "登录" }).click();
+  await openProductSpace(page, "连接");
   const riverConsent = page.getByLabel("双向连接同意");
   await riverConsent.getByRole("button", { name: "我也愿意" }).click();
   await expect(riverConsent).toContainText("双方已同意");
@@ -345,6 +361,7 @@ test("Inner Cosmos remains operable on a narrow mobile viewport", async ({ page 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/app/aurora/index.html");
   await loginIfNeeded(page);
+  await openProductSpace(page, "内宇宙");
   const cosmos = page.getByRole("region", { name: "记忆星空" });
   await expect(cosmos).toBeVisible();
   await cosmos.getByRole("button", { name: "人物" }).click();

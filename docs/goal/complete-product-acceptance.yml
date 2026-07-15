@@ -96,7 +96,7 @@ gates:
     status: IN_PROGRESS
     required: true
     acceptance:
-      - {id: UX-SHELL, target: "React TypeScript PWA implements the five-space information architecture and shared component system.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CONV-003/]}
+      - {id: UX-SHELL, target: "React TypeScript PWA implements the five-space information architecture and shared component system.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CONV-003/, evidence/campaign-a/APP-SHELL-001/]}
       - {id: UX-CONTRACTS, target: "Generated typed API client and unified auth, errors, tasks, offline, and telemetry are used.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CONV-003/]}
       - {id: UX-QUALITY, target: "Core routes pass Playwright, visual regression, accessibility, i18n, and performance budgets.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CONV-003/]}
       - {id: UX-LEGACY, target: "Migrated journeys have no competing legacy physical-page implementation.", status: UNASSESSED, evidence: []}

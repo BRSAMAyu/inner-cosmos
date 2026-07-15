@@ -7,6 +7,16 @@ import type { AuroraStreamEvent, DialogMessage, TurnStatus } from "./protocol";
 
 type UiMessage = { key: string; speaker: "USER" | "AURORA"; text: string; partial?: boolean };
 type RuntimeSignal = { stage: "idle" | "understanding" | "composing" | "speaking"; runtime: "single" | "dual"; relationshipMove?: string; repaired?: boolean };
+type ProductSpace = "aurora" | "cosmos" | "resonance" | "letters" | "me";
+const productSpaces: Array<[ProductSpace, string, string]> = [
+  ["aurora", "今天", "Aurora"], ["cosmos", "内宇宙", "记忆与自我理解"],
+  ["resonance", "共鸣", "共鸣体与相遇"], ["letters", "连接", "慢信与关系"], ["me", "我的", "控制与边界"]
+];
+
+function initialProductSpace(): ProductSpace {
+  const value = new URLSearchParams(window.location.search).get("space");
+  return productSpaces.some(([space]) => space === value) ? value as ProductSpace : "aurora";
+}
 const terminal = new Set<TurnStatus>(["COMPLETED", "INTERRUPTED", "CANCELLED"]);
 const modes = [
   ["DAILY_TALK", "倾诉"], ["THOUGHT_CLARIFY", "整理"], ["SOCRATIC", "追问"],
@@ -61,6 +71,7 @@ function toUi(rows: DialogMessage[]): UiMessage[] {
 }
 
 export function AuroraApp() {
+  const [productSpace, setProductSpace] = useState<ProductSpace>(initialProductSpace);
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [messages, setMessages] = useState<UiMessage[]>([]);
@@ -131,6 +142,20 @@ export function AuroraApp() {
   const reconnectingRef = useRef(false);
   const bootstrappedRef = useRef(false);
   const bootstrapCallRef = useRef(0);
+
+  const navigateSpace = useCallback((space: ProductSpace) => {
+    setProductSpace(space);
+    const url = new URL(window.location.href);
+    url.searchParams.set("space", space);
+    window.history.pushState({}, "", `${url.pathname}${url.search}${url.hash}`);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
+
+  useEffect(() => {
+    const restoreSpace = () => setProductSpace(initialProductSpace());
+    window.addEventListener("popstate", restoreSpace);
+    return () => window.removeEventListener("popstate", restoreSpace);
+  }, []);
 
   const replaceFromHistory = useCallback(async (sid: number) => {
     setMessages(toUi(await api.messages(sid)));
@@ -831,7 +856,8 @@ export function AuroraApp() {
     const summary = String(run.result.summary ?? (english ? "I just completed a reflection" : "我刚做完一项自我反思"));
     setDraft(english ? `I just completed a reflection. It said: ${summary}\nI'd like to continue, but please don't treat it as a diagnosis.`
       : `我刚做完一项反思，结果说：${summary}\n我想继续谈谈，但请不要把它当成诊断。`);
-    document.querySelector(".conversation")?.scrollIntoView({ behavior: "smooth" });
+    navigateSpace("aurora");
+    window.setTimeout(() => document.querySelector(".conversation")?.scrollIntoView({ behavior: "smooth" }), 0);
   };
 
   const openSuggestedSkill = () => {
@@ -839,7 +865,8 @@ export function AuroraApp() {
     setSelectedSkillId(skillSuggestion.skillId);
     setSkillAnswers({});
     setSkillConsent(false);
-    document.querySelector(".skill-studio")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    navigateSpace("cosmos");
+    window.setTimeout(() => document.querySelector(".skill-studio")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
   };
 
   if (mobileState.native && (!hasConfiguredApiBase || apiConfigurationError)) return <main className="login-shell"><div className="login mobile-gate" role="alert">
@@ -852,7 +879,17 @@ export function AuroraApp() {
   if (!authenticated) return <Login native={mobileState.native} onSuccess={bootstrap} />;
 
   return (
-    <main className="shell">
+    <main className="shell" data-product-space={productSpace}>
+      <nav className="app-shell-nav" aria-label="Inner Cosmos 五个空间">
+        <div className="app-mark"><span aria-hidden="true">✦</span><strong>Inner Cosmos</strong></div>
+        <div className="space-tabs">{productSpaces.map(([value, label, description]) =>
+          <button type="button" key={value} className={productSpace === value ? "active" : ""}
+            aria-current={productSpace === value ? "page" : undefined} onClick={() => navigateSpace(value)}>
+            <strong>{label}</strong><small>{description}</small>
+          </button>)}</div>
+      </nav>
+
+      <div className="product-space" hidden={productSpace !== "aurora"}>
       <header className="hero">
         <div>
           <span className="eyebrow">INNER COSMOS · AURORA</span>
@@ -936,7 +973,9 @@ export function AuroraApp() {
             回到 v{version.versionNo} · {version.publicNarrative}
           </button>)}
       </section>}
+      </div>
 
+      <div className="product-space" hidden={productSpace !== "cosmos"}>
       <section className="understanding-space" aria-label="校准 Aurora 对我的理解">
         <div className="understanding-heading"><div><span className="eyebrow">YOUR INNER COSMOS</span><h2>如果这不太是你</h2></div>
           <span>{claims.filter(claim => claim.status === "ACTIVE").length} 条由你确认的理解</span></div>
@@ -1038,7 +1077,9 @@ export function AuroraApp() {
                 <button type="button" disabled={skillBusy} onClick={() => void revokePsychologyRun(run.id)}>{skillText.revoke}</button></div></>}
           </article>)}</div>}
       </section>
+      </div>
 
+      <div className="product-space" hidden={productSpace !== "resonance"}>
       <section className="resonance-space" aria-label="共鸣体创建与像不像我沙盒">
         <div className="resonance-heading"><div><span className="eyebrow">YOUR RESONANCE</span><h2>先确认像不像你，再让别人遇见</h2></div>
           <span>{capsules.filter(capsule => capsule.visibilityStatus !== "ARCHIVED").length} 个共鸣体</span></div>
@@ -1142,7 +1183,9 @@ export function AuroraApp() {
           </div>}
         </>}
       </section>
+      </div>
 
+      <div className="product-space" hidden={productSpace !== "letters"}>
       <section className="letter-inbox" aria-label="抵达我的慢信">
         <div className="resonance-heading"><div><span className="eyebrow">LETTERS, ARRIVED</span><h2>只在抵达之后，才由你决定关系往哪里走</h2></div><span>{letterInbox.length} 封已抵达</span></div>
         <p className="resonance-intro">飞行中的信不会提前泄露正文。抵达后你可以阅读、婉拒、举报或屏蔽；屏蔽会阻断同一来信者之后的慢信。</p>
@@ -1167,7 +1210,9 @@ export function AuroraApp() {
           <div><strong>双方已同意</strong>{friends.length === 0 ? <small>还没有建立真人连接</small> : friends.map(item => <article key={item.id}><span>{item.nickname}</span><button onClick={() => void leaveConnection(item.id)}>退出连接</button></article>)}</div>
         </div>
       </section>
+      </div>
 
+      <div className="product-space" hidden={productSpace !== "aurora"}>
       {skillSuggestion && <aside className="skill-suggestion" aria-label={skillLocale === "en-SG" ? "Aurora optional reflection suggestion" : "Aurora 的可选反思建议"} lang={skillLocale === "en-SG" ? "en-SG" : "zh-CN"}>
         <div><span>{skillLocale === "en-SG" ? "AURORA SUGGESTS · Will not run automatically" : "AURORA SUGGESTS · 不会自动运行"}</span><strong>{skillSuggestion.title}</strong><p>{skillSuggestion.reason}</p></div>
         <div><button type="button" onClick={openSuggestedSkill}>{skillLocale === "en-SG" ? "I decide whether to open it" : "由我决定是否打开"}</button>
@@ -1185,7 +1230,6 @@ export function AuroraApp() {
         ))}
       </section>
 
-      <div className="state" role="status"><i className={activeTurnId ? "pulse" : ""} />{status}</div>
       <form className="composer" onSubmit={send}>
         <textarea value={draft} onChange={e => setDraft(e.target.value)} placeholder={activeTurnId ? "直接说出新的想法，Aurora 会停下并重新理解…" : "此刻，你想从哪里说起？"} aria-label="写给 Aurora" onKeyDown={e => {
           if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); e.currentTarget.form?.requestSubmit(); }
@@ -1195,7 +1239,24 @@ export function AuroraApp() {
           <button type="submit" className="send" disabled={!draft.trim() || !sessionId}>{activeTurnId ? "打断并发送" : "发送"}</button>
         </div>
       </form>
-      <footer><a href="/pages/aurora-chat.html">返回经典界面</a><span>渐进迁移 · 原有能力完整保留</span><button type="button" onClick={() => void logout()}>安全退出</button></footer>
+      </div>
+
+      <div className="product-space" hidden={productSpace !== "me"}>
+        <section className="controls-space" aria-label="我的控制与边界">
+          <span className="eyebrow">ME · CONTROL & BOUNDARIES</span><h1>由你决定，Aurora 怎样参与。</h1>
+          <p>身份、设备权限、主动回来和数据边界都集中在这里。关闭一项能力不会删除你的创新体验，也不会暗中改写已有记忆。</p>
+          <div className="control-grid">
+            <article><strong>登录与设备</strong><span>{Capacitor.isNativePlatform() ? "OIDC + PKCE · 安全存储" : "安全 Web Session"}</span><small>{mobileState.connected ? "当前在线" : "当前离线，时间线会在恢复后续接"}</small></article>
+            <article><strong>主动回来</strong><span>{wakeIntents.length} 个有效约定</span><button type="button" onClick={() => navigateSpace("aurora")}>查看和调整</button></article>
+            <article><strong>理解与记忆</strong><span>{claims.filter(claim => claim.status === "ACTIVE").length} 条已确认理解</span><button type="button" onClick={() => navigateSpace("cosmos")}>纠正、追溯或撤回</button></article>
+            <article><strong>共鸣与连接</strong><span>{capsules.filter(capsule => capsule.visibilityStatus === "PUBLIC").length} 个公开共鸣体 · {friends.length} 个双向连接</span><button type="button" onClick={() => navigateSpace("resonance")}>管理授权</button></article>
+          </div>
+          {mobileState.native && <div className="mobile-actions"><button type="button" onClick={() => void requestMobilePush()}>管理通知权限</button><button type="button" onClick={() => void requestMobileMicrophone()}>管理麦克风权限</button></div>}
+          <button type="button" className="danger-quiet" onClick={() => void logout()}>安全退出这台设备</button>
+        </section>
+      </div>
+      <div className="state global-state" role="status"><i className={activeTurnId ? "pulse" : ""} />{status}</div>
+      <footer><a href="/pages/aurora-chat.html">经典界面</a><span>五空间 AppShell · 数据与能力持续保留</span><button type="button" onClick={() => void logout()}>安全退出</button></footer>
     </main>
   );
 }
