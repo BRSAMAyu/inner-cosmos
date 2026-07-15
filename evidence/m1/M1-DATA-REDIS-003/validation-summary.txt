@@ -1,0 +1,30 @@
+M1-DATA-REDIS-003 validation summary
+
+PASS - targeted lease and affected scheduler tests: 41 tests, 0 failures/errors/skips
+PASS - full Java 21 regression: 98 suites, 693 tests, 0 failures/errors/skips
+PASS - PostgreSQL/Flyway, Redis session/rate-limit, and scheduler contracts green
+PASS - dual-provider contention, explicit unlock, expiry recovery, Spring advisor,
+       and Redis failure-does-not-fail-open contracts green
+PASS - Aurora Self, Constitution, Emergence, proactive, choreography, Goodbye,
+       capsule, portrait, matching, starfield and slow-social suites remain green
+PASS - SpotBugs high-confidence gate: 0 findings
+PASS - CycloneDX SBOM generated with 117 components
+PASS - current-tree secret scan: 0 findings
+PASS - test baseline gate: 693 >= 613
+PASS - git diff --check
+PASS - production image smoke: PostgreSQL TLS VERIFY_FULL + Redis TLS VERIFIED_CA,
+       external session/rate-limit keys and 4 scheduler lease keys materialized,
+       health UP, Flyway V2, 61 tables, 0 demo users, runtime appuser
+
+Runtime baseline
+- Oracle JDK 21.0.10
+- Spring Boot 3.5.14
+- ShedLock 7.7.0
+- Redis 7.4.2
+- Maven Wrapper / Apache Maven 3.9.9
+
+Known remaining DATA-REDIS acceptance scope
+- Short-lived Aurora/stream state and resumable Redis Stream relay remain pending.
+- Provider-specific distributed quota coordination remains pending where required.
+- Redis master-failover resilience and independent security review remain pending.
+- DATA-REDIS remains IN_PROGRESS; this is not whole-product completion evidence.

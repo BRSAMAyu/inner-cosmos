@@ -209,6 +209,24 @@ chmod 644 redis-server.key redis-server.crt ca.crt
         throw "Production request (HTTP $loginStatus) did not materialize a Redis-backed rate-limit bucket. Observed Redis keys: $($observedKeys -join ', ')"
     }
 
+    # Fixed-delay jobs execute once after startup and retain short minimum leases.
+    # Observe a real key to prove the production advisor uses the authenticated,
+    # TLS-only Redis connection rather than merely loading configuration classes.
+    $schedulerLeaseKeys = @()
+    $leaseDeadline = [DateTimeOffset]::UtcNow.AddSeconds(20)
+    while ([DateTimeOffset]::UtcNow -lt $leaseDeadline) {
+        $schedulerLeaseKeys = @(& docker exec $redisName redis-cli --tls --cacert /certs/redis-ca.crt `
+            --no-auth-warning -a $redisPassword --scan --pattern '*inner-cosmos-scheduler-v1*')
+        if ($LASTEXITCODE -ne 0) { throw "Unable to inspect Redis scheduler lease keys." }
+        if (@($schedulerLeaseKeys | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count -gt 0) { break }
+        Start-Sleep -Seconds 1
+    }
+    $schedulerLeaseKeyCount = @($schedulerLeaseKeys |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count
+    if ($schedulerLeaseKeyCount -lt 1) {
+        throw "Production startup did not materialize a Redis-backed scheduler lease."
+    }
+
     $tableCount = (& docker exec -e "PGPASSWORD=$databasePassword" $postgresName psql `
         -U $databaseUser -d $database -Atc "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public' AND table_name LIKE 'tb_%'").Trim()
     $seededUsers = (& docker exec -e "PGPASSWORD=$databasePassword" $postgresName psql `
@@ -232,6 +250,7 @@ chmod 644 redis-server.key redis-server.crt ca.crt
         RedisTls = "VERIFIED_CA"
         RedisSessionKeys = $sessionKeyCount
         RedisRateLimitKeys = $rateLimitKeyCount
+        RedisSchedulerLeaseKeys = $schedulerLeaseKeyCount
         FlywayVersion = $flywayVersion
         SchemaTables = [int]$tableCount
         DemoUsers = [int]$seededUsers

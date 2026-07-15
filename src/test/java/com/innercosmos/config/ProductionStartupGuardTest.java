@@ -30,6 +30,8 @@ class ProductionStartupGuardTest {
                     "inner-cosmos.session.redis.enabled=true",
                     "inner-cosmos.security.rate-limit.redis.enabled=true",
                     "inner-cosmos.security.rate-limit.redis.namespace=inner-cosmos:rate-limit:v1",
+                    "inner-cosmos.scheduler.redis-lock.enabled=true",
+                    "inner-cosmos.scheduler.redis-lock.namespace=inner-cosmos-scheduler-v1",
                     "spring.data.redis.ssl.enabled=true",
                     "spring.data.redis.host=redis.example",
                     "spring.data.redis.password=test-only-redis-placeholder",
@@ -94,6 +96,12 @@ class ProductionStartupGuardTest {
     @Test
     void rejectsInProcessProductionRateLimits() {
         runner.withPropertyValues("inner-cosmos.security.rate-limit.redis.enabled=false")
+                .run(context -> assertRejected(context.getBean(ProductionStartupGuard.class)));
+    }
+
+    @Test
+    void rejectsProductionWithoutDistributedSchedulerLeases() {
+        runner.withPropertyValues("inner-cosmos.scheduler.redis-lock.enabled=false")
                 .run(context -> assertRejected(context.getBean(ProductionStartupGuard.class)));
     }
 

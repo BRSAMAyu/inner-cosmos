@@ -13,6 +13,7 @@ import com.innercosmos.service.GravityService;
 import com.innercosmos.service.MemorySettlementService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -59,6 +60,7 @@ public class NightlyMemorySettlementJob {
     }
 
     @Scheduled(cron = "0 0 2 * * ?")
+    @SchedulerLock(name = "nightly-memory-settlement", lockAtMostFor = "PT26H", lockAtLeastFor = "PT23H")
     public void nightlyRecalculation() {
         log.info("Nightly memory settlement started");
         long offset = 0;

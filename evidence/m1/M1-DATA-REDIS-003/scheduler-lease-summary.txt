@@ -1,0 +1,39 @@
+M1-DATA-REDIS-003 distributed scheduler lease summary
+
+Implemented scope
+- Production-only Redis-backed ShedLock configuration with namespace
+  inner-cosmos-scheduler-v1; local development remains Redis-independent.
+- Production startup fails closed when distributed scheduler leasing is disabled
+  or its namespace is blank.
+- Five business-side-effect schedules retain their existing cadence and behavior
+  while gaining unique cross-pod leases:
+  - letter-delivery: at most 5m, at least 55s
+  - capsule-sync-retry: at most 5m, at least 55s
+  - aurora-proactive: at most 10m, at least 85s
+  - nightly-memory-settlement: at most 26h, at least 23h
+  - session-idle-goodbye: at most 30m, at least 4m55s
+- InMemoryRateLimitStore cleanup remains intentionally pod-local because it has
+  no shared business side effect.
+
+Verified behavior
+- Two independent Redis lock providers cannot hold the same lease concurrently.
+- Releasing a lease permits another pod to acquire it.
+- An abandoned lease expires and another pod recovers execution.
+- The real Spring ShedLock advisor skips a concurrent annotated invocation.
+- Redis connection failure propagates instead of running a leased job fail-open.
+- Production TLS smoke observed four live scheduler lease keys in Redis.
+
+Product-semantics boundary
+- No Aurora proactive decision logic, Self/Constitution/Emergence state,
+  personality/relationship evolution, user portrait, capsule dialogue, matching,
+  starfield, slow-letter, or Goodbye semantics were removed or narrowed.
+- This change coordinates duplicate execution only; it does not reduce proactive
+  budgets, message capability, scheduling cadence, or user-visible innovation.
+
+Known limitation
+- ShedLock's classical Redis provider is an at-most-once coordination mechanism;
+  Redis master failover guarantees require later infrastructure resilience work.
+- Short-lived Aurora/stream state and resumable Redis Stream relay remain pending.
+- Provider-specific distributed quota coordination remains pending where required.
+- Independent security review remains pending.
+- DATA-REDIS remains IN_PROGRESS; this is not whole-product completion evidence.

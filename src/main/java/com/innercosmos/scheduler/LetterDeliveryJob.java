@@ -7,6 +7,7 @@ import com.innercosmos.mapper.LetterStatusLogMapper;
 import com.innercosmos.mapper.SlowLetterMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -31,6 +32,7 @@ public class LetterDeliveryJob {
     }
 
     @Scheduled(fixedRate = 60000)
+    @SchedulerLock(name = "letter-delivery", lockAtMostFor = "PT5M", lockAtLeastFor = "PT55S")
     public void deliverArrivedLetters() {
         java.time.LocalDateTime now = LocalDateTime.now();
         // M-068: two-stage delivery with a visible FLYING (in-transit) state.

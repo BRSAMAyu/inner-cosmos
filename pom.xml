@@ -23,6 +23,7 @@
         <tomcat.version>10.1.55</tomcat.version>
         <jackson-bom.version>2.21.4</jackson-bom.version>
         <mybatis-plus.version>3.5.9</mybatis-plus.version>
+        <shedlock.version>7.7.0</shedlock.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <maven.compiler.encoding>UTF-8</maven.compiler.encoding>
@@ -121,6 +122,16 @@
         <dependency>
             <groupId>org.springframework.session</groupId>
             <artifactId>spring-session-data-redis</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>net.javacrumbs.shedlock</groupId>
+            <artifactId>shedlock-spring</artifactId>
+            <version>${shedlock.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>net.javacrumbs.shedlock</groupId>
+            <artifactId>shedlock-provider-redis-spring</artifactId>
+            <version>${shedlock.version}</version>
         </dependency>
         <!-- For generating secure random numbers -->
         <dependency>

@@ -169,6 +169,10 @@ inner-cosmos:
         advertised-limit: ${RATE_LIMIT_LOGIN_ADVERTISED:10}
   demo:
     seed-enabled: ${SEED_ENABLED:false}
+  scheduler:
+    redis-lock:
+      enabled: ${REDIS_SCHEDULER_LOCK_ENABLED:false}
+      namespace: ${REDIS_SCHEDULER_LOCK_NAMESPACE:inner-cosmos-scheduler-v1}
   safety:
     semantic-recheck:
       enabled: ${SAFETY_SEMANTIC_RECHECK_ENABLED:true}

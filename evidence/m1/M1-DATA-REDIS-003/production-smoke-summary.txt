@@ -1,0 +1,25 @@
+M1-DATA-REDIS-003 production image smoke
+
+Status: PASS
+Image: inner-cosmos:m1-scheduler-lease
+Image digest: sha256:e25413a0debd7c623264a36f230a06a2fdd11417069074d12363839f16b27edf
+Profile: prod
+Health: UP
+Database: PostgreSQL 16 + pgvector
+Database TLS: VERIFY_FULL
+Session store: Redis 7.4.2
+Redis TLS: VERIFIED_CA
+Redis session keys observed: 1
+Redis rate-limit keys observed: 1
+Redis scheduler lease keys observed: 4
+Flyway version: 2
+Application tables: 61
+Demo users: 0
+Runtime user: appuser
+
+The smoke ran the production image against TLS-only PostgreSQL and Redis
+containers. It materialized a secure Redis session, a distributed login quota,
+and scheduler leases in namespace inner-cosmos-scheduler-v1. Four leases were
+observable during the sampling window; every scheduled method is separately
+covered by the annotation contract test. No production cookie, CSRF, Redis
+authentication, TLS, or innovation-product setting was weakened.

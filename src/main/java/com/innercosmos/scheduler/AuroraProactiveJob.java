@@ -10,6 +10,7 @@ import com.innercosmos.mapper.UserProfileMapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -42,6 +43,7 @@ public class AuroraProactiveJob {
     private PrivateTimerMapper timerMapper;
 
     @Scheduled(fixedDelay = 90 * 1000) // every 90 seconds
+    @SchedulerLock(name = "aurora-proactive", lockAtMostFor = "PT10M", lockAtLeastFor = "PT85S")
     public void run() {
         // 1) Iterate active users and tick each
         var users = userMapper.selectList(new QueryWrapper<UserProfile>());

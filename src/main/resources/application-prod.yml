@@ -103,3 +103,7 @@ inner-cosmos:
         namespace: ${REDIS_RATE_LIMIT_NAMESPACE:inner-cosmos:rate-limit:v1}
   demo:
     seed-enabled: false
+  scheduler:
+    redis-lock:
+      enabled: ${REDIS_SCHEDULER_LOCK_ENABLED:true}
+      namespace: ${REDIS_SCHEDULER_LOCK_NAMESPACE:inner-cosmos-scheduler-v1}

@@ -5,6 +5,7 @@ import com.innercosmos.entity.CapsuleSyncQueue;
 import com.innercosmos.mapper.CapsuleSyncQueueMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -31,6 +32,7 @@ public class CapsuleSyncRetryJob {
     }
 
     @Scheduled(fixedDelay = 60000)
+    @SchedulerLock(name = "capsule-sync-retry", lockAtMostFor = "PT5M", lockAtLeastFor = "PT55S")
     public void retryFailedSyncs() {
         List<CapsuleSyncQueue> retryable =
                 syncQueueMapper.findRetryable(LocalDateTime.now(), CapsuleSyncService.MAX_ATTEMPTS);

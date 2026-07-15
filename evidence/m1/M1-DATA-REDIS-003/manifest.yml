@@ -1,0 +1,58 @@
+schema_version: 1
+package_id: M1-DATA-REDIS-003
+status: IMPLEMENTED
+base_sha: 854524e729a6814f5eed26c36451a8af287cb876
+branch: feat/run006-aurora-self-understanding
+recorded_at: 2026-07-15T10:44:27+08:00
+environment:
+  os: Windows 11 amd64
+  java: Oracle JDK 21.0.10
+  maven: Apache Maven 3.9.9
+  spring_boot: 3.5.14
+  shedlock: 7.7.0
+  redis: 7.4.2
+commands:
+  - command: .\\mvnw.cmd -Dtest=SchedulerLeaseAnnotationContractTest,SchedulerLeaseConfigurationTest,RedisSchedulerLeaseIntegrationTest,RedisSchedulerLeaseFailureTest,ProductionStartupGuardTest,LetterDeliveryJobTest,CapsuleSyncRetryJobTest,NightlyMemorySettlementJobBaselineTest,NightlyMemorySettlementJobPaginationTest,CapsuleEnergyDecayTest test
+    result: PASS
+    detail: 41 tests, 0 failures/errors/skips
+  - command: .\\mvnw.cmd verify
+    result: PASS
+    detail: 98 suites, 693 tests, 0 failures/errors/skips; SpotBugs 0 findings; SBOM generated
+  - command: docker build -t inner-cosmos:m1-scheduler-lease .
+    result: PASS
+    image_digest: sha256:e25413a0debd7c623264a36f230a06a2fdd11417069074d12363839f16b27edf
+  - command: .\\scripts\\verify-production-image.ps1 -Image inner-cosmos:m1-scheduler-lease -TimeoutSeconds 240
+    result: PASS
+    artifact: production-smoke-summary.txt
+  - command: .\\scripts\\assert-test-baseline.ps1 -MinimumTests 613
+    result: PASS
+    detail: 98 suites, 693 tests
+  - command: .\\scripts\\scan-secrets.ps1
+    result: PASS
+    detail: 0 current-tree findings
+  - command: git diff --check
+    result: PASS
+changes:
+  - Added conditional Redis ShedLock configuration and a production fail-closed startup contract.
+  - Leased every business-side-effect scheduler with explicit, unique at-most and at-least windows.
+  - Proved dual-instance exclusion, explicit release, abandoned-lease recovery, and real Spring advisor behavior.
+  - Proved Redis failure does not fail open and materialized live lease keys through the production TLS smoke.
+  - Preserved scheduler cadence and all Aurora, portrait, capsule, matching, starfield, and slow-social semantics.
+human_gates: []
+known_limitations:
+  - Short-lived Aurora/stream state and resumable Redis Stream relay remain pending.
+  - Provider-specific distributed quota coordination remains pending where required.
+  - Classical Redis lease behavior during Redis master failover needs later infrastructure resilience validation.
+  - Independent security review remains pending.
+  - DATA-REDIS remains IN_PROGRESS and this package is not whole-product completion evidence.
+review:
+  status: PENDING
+  reviewer: UNASSIGNED
+rollback: Preserve distributed scheduler coordination and repair Redis infrastructure instead of allowing production jobs to run pod-locally.
+artifacts:
+  - path: scheduler-lease-summary.txt
+    sha256: a3dcab9226e4b5ed5400881bfb5f6a823487e0138950edf599ad440a8bc1d48d
+  - path: production-smoke-summary.txt
+    sha256: 92033b803e40629d7dfddb1ba402eb12d1454fc5783475a57c496707a23633fd
+  - path: validation-summary.txt
+    sha256: 19401dced388b86fa39aea01acbe65c9635c1614aeff5dbb225711f2d349b862
