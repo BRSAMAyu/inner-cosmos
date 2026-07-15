@@ -1,0 +1,13 @@
+{
+  "datasetVersion": "forgetting-completeness-v1",
+  "notes": "Scores whether MemoryLifecycleService FORGET leaves zero recoverable trace of the original content across every public read surface (the memory row itself, starfield, and retrieval evidence) and every derived-artifact table, and that rollback is refused. Each scenario embeds a unique marker string in a different kind of derived artifact so a gap in forgetDerived()'s per-table scrubbing would surface as a real leak, not a guess.",
+  "thresholds": { "leakedSurfaces": 0, "residualDerivedRows": 0, "rollbackAccepted": 0 },
+  "scenarios": [
+    { "key": "plain-diary", "marker": "永久保密痕迹ALPHA", "artifact": "NONE" },
+    { "key": "with-fragment", "marker": "永久保密痕迹BRAVO", "artifact": "FRAGMENT" },
+    { "key": "with-todo", "marker": "永久保密痕迹CHARLIE", "artifact": "TODO" },
+    { "key": "with-relation", "marker": "永久保密痕迹DELTA", "artifact": "RELATION" },
+    { "key": "with-link", "marker": "永久保密痕迹ECHO", "artifact": "LINK" },
+    { "key": "with-embedding", "marker": "永久保密痕迹FOXTROT", "artifact": "EMBEDDING" }
+  ]
+}
