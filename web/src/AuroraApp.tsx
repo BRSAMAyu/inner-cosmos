@@ -9,6 +9,9 @@ import { AuroraConversation, type AuroraUiMessage } from "./components/AuroraCon
 import { AuroraSelfSpace } from "./components/AuroraSelfSpace";
 import { UnderstandingCorrection } from "./components/UnderstandingCorrection";
 import { MemoryStarfield } from "./components/MemoryStarfield";
+import { CapsuleWorkbench } from "./components/CapsuleWorkbench";
+import { ResonanceNetwork } from "./components/ResonanceNetwork";
+import { LettersInbox } from "./components/LettersInbox";
 
 type RuntimeSignal = { stage: "idle" | "understanding" | "composing" | "speaking"; runtime: "single" | "dual"; relationshipMove?: string; repaired?: boolean };
 const terminal = new Set<TurnStatus>(["COMPLETED", "INTERRUPTED", "CANCELLED"]);
@@ -990,136 +993,32 @@ export function AuroraApp() {
       </div>
 
       <div className="product-space" hidden={productSpace !== "resonance"}>
-      <section className="resonance-space" aria-label="共鸣体创建与像不像我沙盒">
-        <div className="resonance-heading"><div><span className="eyebrow">YOUR RESONANCE</span><h2>先确认像不像你，再让别人遇见</h2></div>
-          <span>{capsules.filter(capsule => capsule.visibilityStatus !== "ARCHIVED").length} 个共鸣体</span></div>
-        <p className="resonance-intro">共鸣体是你明确授权的一个侧面，不是你的账号，也不会假装你正在实时回复。每次重编译都形成新版本。</p>
+      <CapsuleWorkbench capsules={capsules} selectedCapsuleId={selectedCapsuleId} selectedCapsule={selectedCapsule}
+        selectableMemories={selectableMemories} selectedMemoryIds={selectedMemoryIds} capsuleName={capsuleName} capsuleIntro={capsuleIntro}
+        capsulePreview={capsulePreview} capsuleBusy={capsuleBusy} genomeHistory={genomeHistory} sandboxQuestion={sandboxQuestion}
+        sandboxResult={sandboxResult} sandboxFeedback={sandboxFeedback}
+        onSelectCapsule={id => { setSelectedCapsuleId(id); if (id === null) { setSelectedMemoryIds([]); setCapsulePreview(null); } }}
+        onToggleMemory={toggleCapsuleMemory} onCapsuleName={setCapsuleName} onCapsuleIntro={setCapsuleIntro}
+        onPreviewNewCapsule={() => void previewNewCapsule()} onCancelPreview={() => setCapsulePreview(null)} onCreateCapsule={() => void createCapsule()}
+        onRecompile={() => void recompileSelectedCapsule()} onSandboxQuestion={setSandboxQuestion} onRunSandbox={() => void runCapsuleSandbox()}
+        onRateSandbox={rating => void rateCapsuleSandbox(rating)} onPublish={() => void publishSelectedCapsule()}
+        onPause={() => void pauseSelectedCapsule()} onArchive={() => void archiveSelectedCapsule()} />
 
-        {capsules.length > 0 && <div className="capsule-tabs" role="tablist" aria-label="我的共鸣体">
-          {capsules.filter(capsule => capsule.visibilityStatus !== "ARCHIVED").map(capsule =>
-            <button type="button" role="tab" aria-selected={selectedCapsuleId === capsule.id} className={selectedCapsuleId === capsule.id ? "active" : ""}
-              key={capsule.id} onClick={() => setSelectedCapsuleId(capsule.id)}>{capsule.pseudonym}<small>{capsule.visibilityStatus === "PUBLIC" ? "已公开" : capsule.visibilityStatus === "NEEDS_REVIEW" ? "需复核" : "仅自己"}</small></button>)}
-          <button type="button" role="tab" aria-selected={selectedCapsuleId === null} className={selectedCapsuleId === null ? "active new" : "new"}
-            onClick={() => { setSelectedCapsuleId(null); setSelectedMemoryIds([]); setCapsulePreview(null); }}>＋ 新建一个侧面</button>
-        </div>}
-
-        {!selectedCapsule ? <div className="capsule-create" role="region" aria-label="创建共鸣体">
-          <div className="capsule-step"><span>1</span><div><strong>你愿意让它使用哪些记忆？</strong><small>这里的选择不会自动公开；LOCAL_ONLY 与禁止外部处理的内容不能进入 Genome。</small></div></div>
-          <div className="memory-consent-list">{selectableMemories.length === 0 ? <p>还没有可选择的当前记忆。你也可以创建一个不读取记忆的通用侧面。</p> : selectableMemories.slice(0, 10).map(memory => {
-            const blocked = ["LOCAL_ONLY", "NO_EXTERNAL_PROCESSING"].includes((memory.consentScope ?? "").toUpperCase());
-            return <label className={blocked ? "blocked" : ""} key={memory.id}><input type="checkbox" disabled={blocked || capsuleBusy}
-              checked={selectedMemoryIds.includes(memory.id)} onChange={() => toggleCapsuleMemory(memory.id)} /><span><strong>{memory.title}</strong><small>{blocked ? "不会用于共鸣体" : `${memory.memoryLayer ?? "记忆"} · v${memory.versionNo}`}</small></span></label>;
-          })}</div>
-          <div className="capsule-step"><span>2</span><div><strong>它表达你的哪一部分？</strong><small>名字和说明面向访客，但创建后仍保持私密，直到你主动发布。</small></div></div>
-          <div className="capsule-fields"><label>共鸣体名字<input value={capsuleName} onChange={event => setCapsuleName(event.target.value)} placeholder="例如：雨后仍愿意开口的人" /></label>
-            <label>希望它保留的侧面<textarea value={capsuleIntro} onChange={event => setCapsuleIntro(event.target.value)} placeholder="例如：面对关系误解时，我会先沉默整理，再清楚说出边界。" /></label></div>
-          {!capsulePreview ? <button className="resonance-primary" disabled={capsuleBusy} onClick={() => void previewNewCapsule()}>先看严格脱敏预览</button> :
-            <div className="capsule-preview" aria-label="共鸣体授权预览"><span className="eyebrow">WHAT IT MAY USE</span><p>{capsulePreview.abstractSummary}</p>
-              <div className="preview-tags">{capsulePreview.publicTags.map(tag => <span key={tag}>{tag}</span>)}</div>
-              {capsulePreview.removedSensitiveItems.length > 0 && <small>已移除：{capsulePreview.removedSensitiveItems.join("、")}</small>}
-              {capsulePreview.riskWarnings.map(warning => <p className="preview-warning" key={warning}>{warning}</p>)}
-              <div className="resonance-actions"><button disabled={capsuleBusy} onClick={() => setCapsulePreview(null)}>返回修改</button><button className="resonance-primary" disabled={capsuleBusy} onClick={() => void createCapsule()}>编译为私密版本</button></div>
-            </div>}
-        </div> : <div className="capsule-workbench">
-          <div className="capsule-summary"><div><span className="capsule-status">{selectedCapsule.visibilityStatus === "PUBLIC" ? "公开中" : selectedCapsule.visibilityStatus === "NEEDS_REVIEW" ? "授权变化，等待复核" : "仅自己可见"}</span>
-            <h3>{selectedCapsule.pseudonym}</h3><p>{selectedCapsule.intro}</p></div>
-            <div className="genome-badge"><strong>v{genomeHistory[0]?.versionNo ?? "–"}</strong><small>{genomeHistory[0]?.status ?? "读取中"}</small></div></div>
-          <details className="genome-history"><summary>Genome 版本与变化记录</summary>{genomeHistory.map(version => <article key={version.id}><strong>v{version.versionNo} · {version.status}</strong><span>{version.changeReason}</span><small>{version.compilerVersion}</small></article>)}</details>
-
-          <div className="capsule-step"><span>1</span><div><strong>复核这个版本可以使用的记忆</strong><small>取消选择或修正来源后，必须重新编译；历史版本不会被悄悄改写。</small></div></div>
-          <div className="memory-consent-list compact">{selectableMemories.slice(0, 10).map(memory => {
-            const blocked = ["LOCAL_ONLY", "NO_EXTERNAL_PROCESSING"].includes((memory.consentScope ?? "").toUpperCase());
-            return <label className={blocked ? "blocked" : ""} key={memory.id}><input type="checkbox" disabled={blocked || capsuleBusy}
-              checked={selectedMemoryIds.includes(memory.id)} onChange={() => toggleCapsuleMemory(memory.id)} /><span><strong>{memory.title}</strong><small>{blocked ? "不能进入共鸣体" : `v${memory.versionNo}`}</small></span></label>;
-          })}</div>
-          <button className="resonance-secondary" disabled={capsuleBusy} onClick={() => void recompileSelectedCapsule()}>用当前选择生成新版本</button>
-
-          <div className="capsule-step"><span>2</span><div><strong>在只有你能看的沙盒里试聊</strong><small>反馈只成为下一版的改进信号，不会让公开人格暗中漂移。</small></div></div>
-          <div className="sandbox-composer"><textarea value={sandboxQuestion} onChange={event => setSandboxQuestion(event.target.value)} aria-label="问自己的共鸣体" />
-            <button className="resonance-primary" disabled={capsuleBusy || !sandboxQuestion.trim()} onClick={() => void runCapsuleSandbox()}>看看它会怎么说</button></div>
-          {sandboxResult && <article className="sandbox-response"><span>v{sandboxResult.genomeVersionNo} 的回答 · {sandboxResult.identityNotice}</span><p>{sandboxResult.reply}</p>
-            {sandboxResult.boundaryNotice && <small>{sandboxResult.boundaryNotice}</small>}
-            {sandboxResult.providerAvailable ? <div className="sandbox-ratings" aria-label="这段回应像不像我">
-              {([ ["LIKE_ME", "像我"], ["NOT_ME", "不像我"], ["FACT_WRONG", "事实不对"], ["TOO_EXPOSED", "太暴露"], ["TONE_WRONG", "语气不对"] ] as const).map(([value, label]) =>
-                <button type="button" className={sandboxFeedback === value ? "active" : ""} disabled={capsuleBusy} key={value} onClick={() => void rateCapsuleSandbox(value)}>{label}</button>)}</div> :
-              <p className="preview-warning">真实模型暂时不可用，这次回应不会被当作拟真证据。</p>}
-          </article>}
-
-          <div className="capsule-step"><span>3</span><div><strong>决定它是否可以被别人遇见</strong><small>发布不会开放真实身份、联系方式或未授权记忆；撤回会立即阻止新旧会话继续代表你。</small></div></div>
-          <div className="resonance-actions">{selectedCapsule.visibilityStatus !== "PUBLIC" && <button className="resonance-primary" disabled={capsuleBusy || genomeHistory[0]?.status !== "ACTIVE"} onClick={() => void publishSelectedCapsule()}>确认并发布当前版本</button>}
-            {selectedCapsule.visibilityStatus === "PUBLIC" && <button disabled={capsuleBusy} onClick={() => void pauseSelectedCapsule()}>暂停公开</button>}
-            <button className="danger-quiet" disabled={capsuleBusy} onClick={() => void archiveSelectedCapsule()}>撤回这个共鸣体</button></div>
-        </div>}
-      </section>
-
-      <section className="resonance-network" aria-label="发现共鸣并写一封慢信">
-        <div className="resonance-heading"><div><span className="eyebrow">RESONANCE NETWORK</span><h2>不是刷卡片，是理解为什么会相遇</h2></div>
-          <span>{resonanceMatches.length} 个此刻的候选</span></div>
-        <p className="resonance-intro">这里没有热度排行。系统只展示脱敏侧面、共同主题和边界；先与授权 AI 共鸣体确认是否真的想继续，再决定要不要把话写给本人。</p>
-        <div className="strategy-switcher" role="group" aria-label="选择共鸣匹配方式">
-          {([["MIRROR", "相似共鸣"], ["COMPLEMENT", "有意义的互补"], ["GROWTH_EDGE", "成长边缘"],
-            ["SERENDIPITY", "温和偶遇"], ["CONTEXTUAL", "阶段同行"]] as [ResonanceStrategy, string][]).map(([value, label]) =>
-            <button type="button" key={value} aria-pressed={resonanceStrategy === value} disabled={visitorBusy}
-              onClick={() => void chooseResonanceStrategy(value)}>{label}</button>)}
-        </div>
-        {resonanceMatches[0] && <p className="strategy-explanation"><strong>{resonanceMatches[0].strategyLabel}</strong> · {resonanceMatches[0].strategyDescription}</p>}
-        {resonanceMatches.length === 0 ? <div className="network-empty">暂时没有足够安全的相遇候选。Inner Cosmos 不会用随机陌生人填满这里。</div> : <>
-          <div className="match-rail" role="list" aria-label="共鸣候选">
-            {resonanceMatches.map(match => <button type="button" role="listitem" key={match.capsule.id}
-              className={visitorMatch?.capsule.id === match.capsule.id ? "match-card active" : "match-card"}
-              onClick={() => chooseVisitorMatch(match.capsule.id)}><span>{match.resonant ? "此刻同行" : "探索相遇"}</span>
-              <strong>{match.capsule.pseudonym}</strong><p>{match.capsule.intro}</p>
-              <small>{match.matchSummary}</small></button>)}
-          </div>
-          {visitorMatch && <div className="visitor-workbench">
-            <header><div><span className="identity-notice">授权 AI 共鸣体 · 不是真人实时在线</span><h3>{visitorMatch.capsule.pseudonym}</h3>
-              <p>{visitorMatch.capsule.intro}</p></div><div className="match-reasons">{visitorMatch.matchReasons.map(reason => <span key={reason}>{reason}</span>)}</div></header>
-            {!personaSession ? <div className="visitor-entry"><p>先问一两个真正重要的问题。它只能使用创建者明确授权的侧面，也不会把你的 Aurora 私有画像带进这段对话。</p>
-              <button className="resonance-primary" disabled={visitorBusy} onClick={() => void startPersonaConversation()}>进入有限但自然的对话</button></div> : <>
-              <div className="visitor-quota"><span>今天还可深入 {personaQuota?.remainingTurns ?? "–"} 轮</span><small>额度用于防滥用；模型故障不会扣次数，达到边界后会自然引导慢信。</small></div>
-              <div className="persona-history" aria-label="共鸣体对话记录">{personaMessages.length === 0 ? <p>可以从一个具体时刻开始，而不是交换完整履历。</p> : personaMessages.map(message =>
-                <article className={message.senderType === "VISITOR" ? "visitor" : "capsule"} key={message.id}><span>{message.senderType === "VISITOR" ? "你" : visitorMatch.capsule.pseudonym}</span><p>{message.textContent}</p></article>)}</div>
-              <div className="sandbox-composer"><textarea aria-label="写给共鸣体" value={personaDraft} onChange={event => setPersonaDraft(event.target.value)} />
-                <button className="resonance-primary" disabled={visitorBusy || !personaDraft.trim() || personaQuota?.exhausted} onClick={() => void sendPersonaTurn()}>发送这一轮</button></div>
-              {personaMessages.some(message => message.senderType === "CAPSULE") && <div className="slow-letter-compose">
-                <div className="capsule-step"><span>✉</span><div><strong>如果仍想继续，把话交给时间</strong><small>这封信会送给创建者本人。共鸣体不会替对方承诺回复，也不会泄露联系方式。</small></div></div>
-                {visitorMatch.capsule.capsuleType !== "USER_CAPSULE" ? <p className="preview-warning">这是官方种子共鸣体，没有对应的真人收件人；你仍可继续对话，但不能把它当作认识真人的入口。</p> : sentLetter ?
-                  <div className="letter-flight" role="status"><strong>慢信已启程</strong><span>{sentLetter.title}</span><small>预计 {new Date(sentLetter.estimatedArrivalAt).toLocaleString()} 到达 · 状态 {sentLetter.status}</small></div> : <>
-                    <label>信的题目<input value={letterTitle} onChange={event => setLetterTitle(event.target.value)} /></label>
-                    <label>你真正想让对方读到的话<textarea aria-label="慢信正文" value={letterBody} onChange={event => setLetterBody(event.target.value)} placeholder="不用总结整段对话，只写你愿意为它负责的那部分。" /></label>
-                    <button className="resonance-primary" disabled={visitorBusy || !letterTitle.trim() || !letterBody.trim()} onClick={() => void sendLetterToMatch()}>让慢信启程</button></>}
-              </div>}
-            </>}
-          </div>}
-        </>}
-      </section>
+      <ResonanceNetwork resonanceMatches={resonanceMatches} resonanceStrategy={resonanceStrategy} visitorBusy={visitorBusy}
+        visitorMatch={visitorMatch} personaSession={personaSession} personaMessages={personaMessages} personaDraft={personaDraft}
+        personaQuota={personaQuota} letterTitle={letterTitle} letterBody={letterBody} sentLetter={sentLetter}
+        onChooseStrategy={strategy => void chooseResonanceStrategy(strategy)} onChooseMatch={chooseVisitorMatch}
+        onStartPersonaConversation={() => void startPersonaConversation()} onPersonaDraftChange={setPersonaDraft}
+        onSendPersonaTurn={() => void sendPersonaTurn()} onLetterTitleChange={setLetterTitle} onLetterBodyChange={setLetterBody}
+        onSendLetter={() => void sendLetterToMatch()} />
       </div>
 
       <div className="product-space" hidden={productSpace !== "letters"}>
-      <section className="letter-inbox" aria-label="抵达我的慢信">
-        <div className="resonance-heading"><div><span className="eyebrow">LETTERS, ARRIVED</span><h2>只在抵达之后，才由你决定关系往哪里走</h2></div><span>{letterInbox.length} 封已抵达</span></div>
-        <p className="resonance-intro">飞行中的信不会提前泄露正文。抵达后你可以阅读、婉拒、举报或屏蔽；屏蔽会阻断同一来信者之后的慢信。</p>
-        {letterInbox.length === 0 ? <div className="network-empty">此刻没有已经抵达的慢信。</div> : <div className="inbox-list">
-          {letterInbox.map(letter => <article key={letter.id}><header><strong>{letter.title}</strong><span>{letter.status}</span></header>
-            <p>{letter.letterBody}</p>
-            {["READ", "REPLIED"].includes(letter.status) && <div className="letter-reply"><textarea aria-label={`回复「${letter.title}」`}
-              value={replyDrafts[letter.id] ?? ""} onChange={event => setReplyDrafts(drafts => ({ ...drafts, [letter.id]: event.target.value }))}
-              placeholder="写下你愿意负责的回应；它仍会慢慢抵达。" /><button disabled={!replyDrafts[letter.id]?.trim()} onClick={() => void replyWithLetter(letter)}>让回复慢信启程</button></div>}
-            <div>
-              {letter.status === "DELIVERED" && <button onClick={() => void actOnLetter(letter, "read")}>标记已读</button>}
-              {["DELIVERED", "READ"].includes(letter.status) && <button onClick={() => void actOnLetter(letter, "decline")}>温和婉拒</button>}
-              {["READ", "REPLIED"].includes(letter.status) && <button onClick={() => void requestConnection(letter)}>愿意认识对方</button>}
-              {letter.status !== "BLOCKED" && <button onClick={() => void actOnLetter(letter, "block")}>屏蔽后续来信</button>}
-              <button onClick={() => void reportLetter(letter)}>举报这封信</button>
-            </div></article>)}
-        </div>}
-        <div className="connection-consent" aria-label="双向连接同意">
-          <div><strong>等待你决定</strong>{connectionRequests.incoming.length === 0 ? <small>没有新的连接邀请</small> : connectionRequests.incoming.map(item =>
-            <article key={item.id}><span>{item.nickname} 想在慢信之后认识你</span><div><button onClick={() => void decideConnection(item.id, "accept")}>我也愿意</button><button onClick={() => void decideConnection(item.id, "decline")}>暂不连接</button></div></article>)}</div>
-          <div><strong>等待对方决定</strong>{connectionRequests.outgoing.length === 0 ? <small>没有等待中的邀请</small> : connectionRequests.outgoing.map(item => <article key={item.id}><span>{item.nickname}</span><small>尚未同意，不会提前开放真人连接</small></article>)}</div>
-          <div><strong>双方已同意</strong>{friends.length === 0 ? <small>还没有建立真人连接</small> : friends.map(item => <article key={item.id}><span>{item.nickname}</span><button onClick={() => void leaveConnection(item.id)}>退出连接</button></article>)}</div>
-        </div>
-      </section>
+      <LettersInbox letterInbox={letterInbox} replyDrafts={replyDrafts} connectionRequests={connectionRequests} friends={friends}
+        onReplyDraftChange={(letterId, value) => setReplyDrafts(drafts => ({ ...drafts, [letterId]: value }))}
+        onReply={letter => void replyWithLetter(letter)} onActOnLetter={(letter, action) => void actOnLetter(letter, action)}
+        onReportLetter={letter => void reportLetter(letter)} onRequestConnection={letter => void requestConnection(letter)}
+        onDecideConnection={(id, decision) => void decideConnection(id, decision)} onLeaveConnection={id => void leaveConnection(id)} />
       </div>
 
       <div className="product-space" hidden={productSpace !== "aurora"}>
