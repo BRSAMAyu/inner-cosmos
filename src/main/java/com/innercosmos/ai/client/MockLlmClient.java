@@ -75,7 +75,7 @@ public class MockLlmClient implements LlmClient {
         if (module.contains("WEEKLY_REVIEW")) {
             return buildWeeklyReviewJson(analysis);
         }
-        if (module.contains("PERSONA_CHAT")) {
+        if (module.contains("PERSONA_CHAT") || module.contains("CAPSULE_SANDBOX")) {
             return buildPersonaChatJson(text, analysis);
         }
         if (module.contains("LETTER_GUARD")) {

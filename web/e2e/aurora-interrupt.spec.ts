@@ -195,6 +195,38 @@ test("user can roll back a memory change while permanent forgetting stays irreve
   await expect(history).toContainText("已撤回");
 });
 
+test("owner previews, compiles, sandboxes, publishes and withdraws a versioned resonance capsule", async ({ page }) => {
+  await page.goto("/app/aurora/index.html");
+  await loginIfNeeded(page);
+  const resonance = page.getByRole("region", { name: "共鸣体创建与像不像我沙盒" });
+  await expect(resonance.getByRole("heading", { name: "先确认像不像你，再让别人遇见" })).toBeVisible();
+  const newCapsule = resonance.getByRole("tab", { name: /新建一个侧面/ });
+  if (await newCapsule.isVisible().catch(() => false)) await newCapsule.click();
+
+  const eligibleMemory = resonance.locator(".memory-consent-list label:not(.blocked) input").first();
+  if (await eligibleMemory.isVisible().catch(() => false)) await eligibleMemory.check();
+  await resonance.getByLabel("共鸣体名字").fill(`盲体验回声-${Date.now()}`);
+  await resonance.getByLabel("希望它保留的侧面").fill("遇到误解时先停一下，再温和但清楚地说出边界。");
+  await resonance.getByRole("button", { name: "先看严格脱敏预览" }).click();
+  await expect(resonance.getByLabel("共鸣体授权预览")).toContainText("WHAT IT MAY USE");
+  await resonance.getByRole("button", { name: "编译为私密版本" }).click();
+
+  await expect(resonance.locator(".genome-badge")).toContainText("v1");
+  await expect(resonance).toContainText("仅自己可见");
+  await resonance.getByRole("button", { name: "看看它会怎么说" }).click();
+  const sandbox = resonance.locator(".sandbox-response");
+  await expect(sandbox).toContainText("不会发送给其他人");
+  await expect(sandbox).toContainText(/.+/);
+  await sandbox.getByRole("button", { name: "像我", exact: true }).click();
+  await expect(page.getByRole("status")).toContainText("没有暗中漂移");
+
+  await resonance.getByRole("button", { name: "确认并发布当前版本" }).click();
+  await expect(resonance).toContainText("公开中");
+  await page.screenshot({ path: "../evidence/innovation/INNO-CAP-003/resonance-owner-journey.png", fullPage: true });
+  await resonance.getByRole("button", { name: "撤回这个共鸣体" }).click();
+  await expect(page.getByRole("status")).toContainText("已撤回");
+});
+
 test("Inner Cosmos remains operable on a narrow mobile viewport", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/app/aurora/index.html");

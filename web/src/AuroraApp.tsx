@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { api, replayTurnEvents, streamAurora, type CorrectionCommand, type CorrectionImpact, type MemoryOperation, type Notification, type SelfEvolution, type StarfieldDetail, type StarfieldScene, type UnderstandingClaim, type WakeIntent } from "./api";
+import { api, replayTurnEvents, streamAurora, type CapsuleGenomeVersion, type CapsulePreview, type CapsuleSandbox, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type Notification, type SelfEvolution, type StarfieldDetail, type StarfieldScene, type UnderstandingClaim, type WakeIntent } from "./api";
 import type { AuroraStreamEvent, DialogMessage, TurnStatus } from "./protocol";
 
 type UiMessage = { key: string; speaker: "USER" | "AURORA"; text: string; partial?: boolean };
@@ -39,6 +39,18 @@ export function AuroraApp() {
   const [rollbackBusy, setRollbackBusy] = useState<number | null>(null);
   const [starfieldDetail, setStarfieldDetail] = useState<StarfieldDetail | null>(null);
   const [detailBusy, setDetailBusy] = useState<number | null>(null);
+  const [memories, setMemories] = useState<MemoryCard[]>([]);
+  const [capsules, setCapsules] = useState<EchoCapsule[]>([]);
+  const [selectedCapsuleId, setSelectedCapsuleId] = useState<number | null>(null);
+  const [genomeHistory, setGenomeHistory] = useState<CapsuleGenomeVersion[]>([]);
+  const [selectedMemoryIds, setSelectedMemoryIds] = useState<number[]>([]);
+  const [capsuleName, setCapsuleName] = useState("");
+  const [capsuleIntro, setCapsuleIntro] = useState("");
+  const [capsulePreview, setCapsulePreview] = useState<CapsulePreview | null>(null);
+  const [capsuleBusy, setCapsuleBusy] = useState(false);
+  const [sandboxQuestion, setSandboxQuestion] = useState("当你被误解时，通常会怎样表达自己的边界？");
+  const [sandboxResult, setSandboxResult] = useState<CapsuleSandbox | null>(null);
+  const [sandboxFeedback, setSandboxFeedback] = useState<string | null>(null);
   const [runtimeSignal, setRuntimeSignal] = useState<RuntimeSignal>({ stage: "idle", runtime: "single" });
   const abortRef = useRef<AbortController | null>(null);
   const activeTurnRef = useRef<number | null>(null);
@@ -61,17 +73,21 @@ export function AuroraApp() {
       const created = returning?.contextSessionId ? { id: returning.contextSessionId } : await api.createSession();
       if (call !== bootstrapCallRef.current) return;
       setSessionId(created.id);
-      await Promise.all([
+      const loadedCapsules = (await Promise.all([
         replaceFromHistory(created.id),
         api.wakeIntents().then(setWakeIntents),
         api.selfEvolution().then(setSelfEvolution),
         api.understandingClaims().then(setClaims),
         api.starfield("TIME").then(setStarfield),
         api.memoryOperations().then(setMemoryOperations),
-        api.notifications().then(setNotifications)
-      ]);
+        api.notifications().then(setNotifications),
+        api.memoryCards().then(rows => { setMemories(rows); return rows; }),
+        api.myCapsules().then(rows => { setCapsules(rows); return rows; })
+      ]))[8] as EchoCapsule[];
       if (call !== bootstrapCallRef.current) return;
       setAuthenticated(true);
+      const firstVisibleCapsule = loadedCapsules.find(capsule => capsule.visibilityStatus !== "ARCHIVED");
+      if (firstVisibleCapsule) setSelectedCapsuleId(current => current ?? firstVisibleCapsule.id);
       setStatus(returning
         ? `Aurora 按约定回来了：${returning.purpose}`
         : "Aurora 在这里。你可以随时打断，她会重新理解。 ");
@@ -85,6 +101,18 @@ export function AuroraApp() {
       }
     }
   }, [replaceFromHistory]);
+
+  const selectedCapsule = capsules.find(capsule => capsule.id === selectedCapsuleId) ?? null;
+
+  useEffect(() => {
+    if (!selectedCapsule) { setGenomeHistory([]); return; }
+    const ids = [...selectedCapsule.authorizedMemoryIds.matchAll(/\d+/g)].map(match => Number(match[0]));
+    setSelectedMemoryIds(ids);
+    setSandboxResult(null);
+    setSandboxFeedback(null);
+    void api.capsuleGenomeHistory(selectedCapsule.id).then(setGenomeHistory)
+      .catch(error => setStatus(error instanceof Error ? error.message : "暂时无法读取共鸣体版本"));
+  }, [selectedCapsuleId, selectedCapsule?.activeGenomeVersionId]);
 
   useEffect(() => {
     if (bootstrappedRef.current) return;
@@ -355,6 +383,114 @@ export function AuroraApp() {
     finally { setDetailBusy(null); }
   };
 
+  const selectableMemories = memories.filter(memory => memory.status === "ACTIVE");
+  const toggleCapsuleMemory = (id: number) => {
+    setCapsulePreview(null);
+    setSelectedMemoryIds(current => current.includes(id) ? current.filter(value => value !== id) : [...current, id]);
+  };
+
+  const previewNewCapsule = async () => {
+    setCapsuleBusy(true);
+    try {
+      const preview = await api.previewCapsule(selectedMemoryIds);
+      setCapsulePreview(preview);
+      if (!capsuleName.trim()) setCapsuleName(preview.suggestedPseudonym);
+      setStatus("这是严格脱敏后的编译预览；还没有创建或公开任何共鸣体。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法生成授权预览"); }
+    finally { setCapsuleBusy(false); }
+  };
+
+  const createCapsule = async () => {
+    if (!capsulePreview) return;
+    setCapsuleBusy(true);
+    try {
+      const created = await api.createCapsule({
+        pseudonym: capsuleName.trim() || capsulePreview.suggestedPseudonym,
+        intro: capsuleIntro.trim() || capsulePreview.abstractSummary,
+        memoryIds: selectedMemoryIds, publicTags: capsulePreview.publicTags
+      });
+      setCapsules(current => [created, ...current]);
+      setSelectedCapsuleId(created.id);
+      setCapsulePreview(null); setCapsuleName(""); setCapsuleIntro("");
+      setStatus("共鸣体已作为私密版本编译。先在沙盒里判断像不像你，再决定是否公开。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "共鸣体没有创建，授权未改变"); }
+    finally { setCapsuleBusy(false); }
+  };
+
+  const refreshSelectedCapsule = async (id: number) => {
+    const [rows, history] = await Promise.all([api.myCapsules(), api.capsuleGenomeHistory(id)]);
+    setCapsules(rows); setGenomeHistory(history);
+  };
+
+  const recompileSelectedCapsule = async () => {
+    if (!selectedCapsule) return;
+    setCapsuleBusy(true);
+    try {
+      await api.recompileCapsule(selectedCapsule.id, selectedMemoryIds);
+      await refreshSelectedCapsule(selectedCapsule.id);
+      setStatus("已生成新的私密 Genome 版本。历史版本仍可追溯，请先试聊再公开。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "重新编译失败，原版本仍保持不变"); }
+    finally { setCapsuleBusy(false); }
+  };
+
+  const publishSelectedCapsule = async () => {
+    if (!selectedCapsule) return;
+    setCapsuleBusy(true);
+    try {
+      await api.setCapsuleVisibility(selectedCapsule.id, "PUBLIC", true);
+      await refreshSelectedCapsule(selectedCapsule.id);
+      setStatus("已发布。访客会清楚看到这是授权 AI 共鸣体，不是真人实时在线。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "当前版本还不能安全发布"); }
+    finally { setCapsuleBusy(false); }
+  };
+
+  const pauseSelectedCapsule = async () => {
+    if (!selectedCapsule) return;
+    setCapsuleBusy(true);
+    try {
+      await api.setCapsuleVisibility(selectedCapsule.id, "PRIVATE", false);
+      await refreshSelectedCapsule(selectedCapsule.id);
+      setStatus("已暂停公开。Genome 和反馈仍保留，访客暂时不会再发现它。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法暂停公开"); }
+    finally { setCapsuleBusy(false); }
+  };
+
+  const archiveSelectedCapsule = async () => {
+    if (!selectedCapsule) return;
+    setCapsuleBusy(true);
+    try {
+      await api.archiveCapsule(selectedCapsule.id);
+      const rows = await api.myCapsules(); setCapsules(rows);
+      setSelectedCapsuleId(rows.find(row => row.visibilityStatus !== "ARCHIVED")?.id ?? null);
+      setStatus("已撤回。公开发现和既有会话都不能再让这个共鸣体代表你回应。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法撤回共鸣体"); }
+    finally { setCapsuleBusy(false); }
+  };
+
+  const runCapsuleSandbox = async () => {
+    if (!selectedCapsule || !sandboxQuestion.trim()) return;
+    setCapsuleBusy(true); setSandboxFeedback(null);
+    try {
+      setSandboxResult(await api.sandboxCapsule(selectedCapsule.id, sandboxQuestion.trim()));
+      setStatus("这段回应只在你的沙盒里。它不会发送给其他人，也不会自动改变 Genome。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "沙盒暂时无法回应"); }
+    finally { setCapsuleBusy(false); }
+  };
+
+  const rateCapsuleSandbox = async (rating: string) => {
+    if (!selectedCapsule || !sandboxResult) return;
+    setCapsuleBusy(true);
+    try {
+      await api.feedbackCapsuleSandbox(selectedCapsule.id, {
+        genomeVersionId: sandboxResult.genomeVersionId, question: sandboxResult.question,
+        response: sandboxResult.reply, rating
+      });
+      setSandboxFeedback(rating);
+      setStatus("反馈已保存为下一次 Genome 改进信号；当前公开版本没有暗中漂移。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "反馈暂时没有保存"); }
+    finally { setCapsuleBusy(false); }
+  };
+
   if (authenticated === null) return <main className="login-shell"><div className="login" role="status">正在连接你的内宇宙…</div></main>;
   if (!authenticated) return <Login onSuccess={bootstrap} />;
 
@@ -489,6 +625,68 @@ export function AuroraApp() {
           </article>)}
         </div>}
       </section>}
+
+      <section className="resonance-space" aria-label="共鸣体创建与像不像我沙盒">
+        <div className="resonance-heading"><div><span className="eyebrow">YOUR RESONANCE</span><h2>先确认像不像你，再让别人遇见</h2></div>
+          <span>{capsules.filter(capsule => capsule.visibilityStatus !== "ARCHIVED").length} 个共鸣体</span></div>
+        <p className="resonance-intro">共鸣体是你明确授权的一个侧面，不是你的账号，也不会假装你正在实时回复。每次重编译都形成新版本。</p>
+
+        {capsules.length > 0 && <div className="capsule-tabs" role="tablist" aria-label="我的共鸣体">
+          {capsules.filter(capsule => capsule.visibilityStatus !== "ARCHIVED").map(capsule =>
+            <button type="button" role="tab" aria-selected={selectedCapsuleId === capsule.id} className={selectedCapsuleId === capsule.id ? "active" : ""}
+              key={capsule.id} onClick={() => setSelectedCapsuleId(capsule.id)}>{capsule.pseudonym}<small>{capsule.visibilityStatus === "PUBLIC" ? "已公开" : capsule.visibilityStatus === "NEEDS_REVIEW" ? "需复核" : "仅自己"}</small></button>)}
+          <button type="button" role="tab" aria-selected={selectedCapsuleId === null} className={selectedCapsuleId === null ? "active new" : "new"}
+            onClick={() => { setSelectedCapsuleId(null); setSelectedMemoryIds([]); setCapsulePreview(null); }}>＋ 新建一个侧面</button>
+        </div>}
+
+        {!selectedCapsule ? <div className="capsule-create" role="region" aria-label="创建共鸣体">
+          <div className="capsule-step"><span>1</span><div><strong>你愿意让它使用哪些记忆？</strong><small>这里的选择不会自动公开；LOCAL_ONLY 与禁止外部处理的内容不能进入 Genome。</small></div></div>
+          <div className="memory-consent-list">{selectableMemories.length === 0 ? <p>还没有可选择的当前记忆。你也可以创建一个不读取记忆的通用侧面。</p> : selectableMemories.slice(0, 10).map(memory => {
+            const blocked = ["LOCAL_ONLY", "NO_EXTERNAL_PROCESSING"].includes((memory.consentScope ?? "").toUpperCase());
+            return <label className={blocked ? "blocked" : ""} key={memory.id}><input type="checkbox" disabled={blocked || capsuleBusy}
+              checked={selectedMemoryIds.includes(memory.id)} onChange={() => toggleCapsuleMemory(memory.id)} /><span><strong>{memory.title}</strong><small>{blocked ? "不会用于共鸣体" : `${memory.memoryLayer ?? "记忆"} · v${memory.versionNo}`}</small></span></label>;
+          })}</div>
+          <div className="capsule-step"><span>2</span><div><strong>它表达你的哪一部分？</strong><small>名字和说明面向访客，但创建后仍保持私密，直到你主动发布。</small></div></div>
+          <div className="capsule-fields"><label>共鸣体名字<input value={capsuleName} onChange={event => setCapsuleName(event.target.value)} placeholder="例如：雨后仍愿意开口的人" /></label>
+            <label>希望它保留的侧面<textarea value={capsuleIntro} onChange={event => setCapsuleIntro(event.target.value)} placeholder="例如：面对关系误解时，我会先沉默整理，再清楚说出边界。" /></label></div>
+          {!capsulePreview ? <button className="resonance-primary" disabled={capsuleBusy} onClick={() => void previewNewCapsule()}>先看严格脱敏预览</button> :
+            <div className="capsule-preview" aria-label="共鸣体授权预览"><span className="eyebrow">WHAT IT MAY USE</span><p>{capsulePreview.abstractSummary}</p>
+              <div className="preview-tags">{capsulePreview.publicTags.map(tag => <span key={tag}>{tag}</span>)}</div>
+              {capsulePreview.removedSensitiveItems.length > 0 && <small>已移除：{capsulePreview.removedSensitiveItems.join("、")}</small>}
+              {capsulePreview.riskWarnings.map(warning => <p className="preview-warning" key={warning}>{warning}</p>)}
+              <div className="resonance-actions"><button disabled={capsuleBusy} onClick={() => setCapsulePreview(null)}>返回修改</button><button className="resonance-primary" disabled={capsuleBusy} onClick={() => void createCapsule()}>编译为私密版本</button></div>
+            </div>}
+        </div> : <div className="capsule-workbench">
+          <div className="capsule-summary"><div><span className="capsule-status">{selectedCapsule.visibilityStatus === "PUBLIC" ? "公开中" : selectedCapsule.visibilityStatus === "NEEDS_REVIEW" ? "授权变化，等待复核" : "仅自己可见"}</span>
+            <h3>{selectedCapsule.pseudonym}</h3><p>{selectedCapsule.intro}</p></div>
+            <div className="genome-badge"><strong>v{genomeHistory[0]?.versionNo ?? "–"}</strong><small>{genomeHistory[0]?.status ?? "读取中"}</small></div></div>
+          <details className="genome-history"><summary>Genome 版本与变化记录</summary>{genomeHistory.map(version => <article key={version.id}><strong>v{version.versionNo} · {version.status}</strong><span>{version.changeReason}</span><small>{version.compilerVersion}</small></article>)}</details>
+
+          <div className="capsule-step"><span>1</span><div><strong>复核这个版本可以使用的记忆</strong><small>取消选择或修正来源后，必须重新编译；历史版本不会被悄悄改写。</small></div></div>
+          <div className="memory-consent-list compact">{selectableMemories.slice(0, 10).map(memory => {
+            const blocked = ["LOCAL_ONLY", "NO_EXTERNAL_PROCESSING"].includes((memory.consentScope ?? "").toUpperCase());
+            return <label className={blocked ? "blocked" : ""} key={memory.id}><input type="checkbox" disabled={blocked || capsuleBusy}
+              checked={selectedMemoryIds.includes(memory.id)} onChange={() => toggleCapsuleMemory(memory.id)} /><span><strong>{memory.title}</strong><small>{blocked ? "不能进入共鸣体" : `v${memory.versionNo}`}</small></span></label>;
+          })}</div>
+          <button className="resonance-secondary" disabled={capsuleBusy} onClick={() => void recompileSelectedCapsule()}>用当前选择生成新版本</button>
+
+          <div className="capsule-step"><span>2</span><div><strong>在只有你能看的沙盒里试聊</strong><small>反馈只成为下一版的改进信号，不会让公开人格暗中漂移。</small></div></div>
+          <div className="sandbox-composer"><textarea value={sandboxQuestion} onChange={event => setSandboxQuestion(event.target.value)} aria-label="问自己的共鸣体" />
+            <button className="resonance-primary" disabled={capsuleBusy || !sandboxQuestion.trim()} onClick={() => void runCapsuleSandbox()}>看看它会怎么说</button></div>
+          {sandboxResult && <article className="sandbox-response"><span>v{sandboxResult.genomeVersionNo} 的回答 · {sandboxResult.identityNotice}</span><p>{sandboxResult.reply}</p>
+            {sandboxResult.boundaryNotice && <small>{sandboxResult.boundaryNotice}</small>}
+            {sandboxResult.providerAvailable ? <div className="sandbox-ratings" aria-label="这段回应像不像我">
+              {([ ["LIKE_ME", "像我"], ["NOT_ME", "不像我"], ["FACT_WRONG", "事实不对"], ["TOO_EXPOSED", "太暴露"], ["TONE_WRONG", "语气不对"] ] as const).map(([value, label]) =>
+                <button type="button" className={sandboxFeedback === value ? "active" : ""} disabled={capsuleBusy} key={value} onClick={() => void rateCapsuleSandbox(value)}>{label}</button>)}</div> :
+              <p className="preview-warning">真实模型暂时不可用，这次回应不会被当作拟真证据。</p>}
+          </article>}
+
+          <div className="capsule-step"><span>3</span><div><strong>决定它是否可以被别人遇见</strong><small>发布不会开放真实身份、联系方式或未授权记忆；撤回会立即阻止新旧会话继续代表你。</small></div></div>
+          <div className="resonance-actions">{selectedCapsule.visibilityStatus !== "PUBLIC" && <button className="resonance-primary" disabled={capsuleBusy || genomeHistory[0]?.status !== "ACTIVE"} onClick={() => void publishSelectedCapsule()}>确认并发布当前版本</button>}
+            {selectedCapsule.visibilityStatus === "PUBLIC" && <button disabled={capsuleBusy} onClick={() => void pauseSelectedCapsule()}>暂停公开</button>}
+            <button className="danger-quiet" disabled={capsuleBusy} onClick={() => void archiveSelectedCapsule()}>撤回这个共鸣体</button></div>
+        </div>}
+      </section>
 
       <section className="conversation" aria-live="polite" aria-label="与 Aurora 的对话">
         {messages.length === 0 && <div className="empty"><span>✦</span><p>把现在最真实的一句话放在这里。</p></div>}

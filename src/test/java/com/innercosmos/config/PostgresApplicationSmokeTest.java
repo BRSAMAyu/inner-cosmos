@@ -74,7 +74,7 @@ class PostgresApplicationSmokeTest {
         assertEquals(created.id, userService.login(login).id);
 
         // V10 adds versioned provider embeddings as rebuildable pgvector derivatives.
-        assertEquals(74L, jdbcTemplate.queryForObject("""
+        assertEquals(75L, jdbcTemplate.queryForObject("""
                 SELECT COUNT(*) FROM information_schema.tables
                 WHERE table_schema='public' AND table_name LIKE 'tb_%'
                 """, Long.class));

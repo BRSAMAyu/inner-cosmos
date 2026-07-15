@@ -76,6 +76,32 @@ export type CorrectionConfirmation = {
   activeClaim: UnderstandingClaim;
   propagation: Array<{ id: number; targetKind: string; status: string; detail: string }>;
 };
+export type MemoryCard = {
+  id: number; title: string; summary: string | null; status: string; versionNo: number;
+  consentScope: string | null; memoryLayer: string | null; confidence: number | null;
+};
+export type EchoCapsule = {
+  id: number; pseudonym: string; intro: string; authorizedMemoryIds: string;
+  visibilityStatus: "PRIVATE" | "PUBLIC" | "NEEDS_REVIEW" | "HIDDEN" | "ARCHIVED";
+  isPublic: boolean; activeGenomeVersionId: number | null; publicTags: string;
+};
+export type CapsuleGenomeVersion = {
+  id: number; versionNo: number; parentVersionId: number | null; compilerVersion: string;
+  status: "ACTIVE" | "NEEDS_REVIEW" | "SUPERSEDED" | "WITHDRAWN";
+  evaluationJson: string; changeReason: string; createdAt: string;
+};
+export type CapsulePreview = {
+  abstractSummary: string; removedSensitiveItems: string[]; publicTags: string[];
+  suggestedPseudonym: string; personaPromptDraft: string; riskWarnings: string[];
+};
+export type CapsuleSandbox = {
+  capsuleId: number; genomeVersionId: number; genomeVersionNo: number; genomeStatus: string;
+  question: string; reply: string; boundaryNotice: string; riskFlags: string[];
+  providerAvailable: boolean; identityNotice: string;
+};
+export type CapsuleSandboxFeedback = {
+  id: number; genomeVersionId: number; rating: string; ownerComment: string | null; status: string;
+};
 let csrf: Csrf | null = null;
 
 async function request<T>(url: string, init: RequestInit = {}, retriedCsrf = false): Promise<T> {
@@ -158,7 +184,29 @@ export const api = {
   starfield: (mode: StarfieldScene["mode"]) => request<StarfieldScene>(`/api/memory/starfield/v2?mode=${mode}`),
   starfieldDetail: (id: number) => request<StarfieldDetail>(`/api/memory/starfield/${id}/detail`),
   memoryOperations: () => request<MemoryOperation[]>("/api/memory/operations"),
-  rollbackMemoryOperation: (id: number) => request<MemoryOperationResult>(`/api/memory/operations/${id}/rollback`, { method: "POST" })
+  rollbackMemoryOperation: (id: number) => request<MemoryOperationResult>(`/api/memory/operations/${id}/rollback`, { method: "POST" }),
+  memoryCards: () => request<MemoryCard[]>("/api/memory/cards"),
+  myCapsules: () => request<EchoCapsule[]>("/api/capsule/my"),
+  capsuleGenomeHistory: (id: number) => request<CapsuleGenomeVersion[]>(`/api/capsule/${id}/genome-history`),
+  previewCapsule: (memoryIds: number[]) => request<CapsulePreview>("/api/capsule/preview-from-memory", {
+    method: "POST", body: JSON.stringify({ memoryIds, privacyLevel: "STRICT", allowTopics: [], blockedTopics: [] })
+  }),
+  createCapsule: (input: { pseudonym: string; intro: string; memoryIds: number[]; publicTags: string[] }) =>
+    request<EchoCapsule>("/api/capsule/create-from-memory", { method: "POST", body: JSON.stringify({
+      ...input, visibilityStatus: "PRIVATE", isPublic: false, privacyLevel: "STRICT",
+      allowTopics: ["自我观察", "日常支持"], blockedTopics: ["真实身份", "联系方式", "心理诊断"]
+    }) }),
+  recompileCapsule: (id: number, memoryIds: number[]) => request<CapsuleGenomeVersion>(`/api/capsule/${id}/genome/recompile`, {
+    method: "POST", body: JSON.stringify({ memoryIds })
+  }),
+  setCapsuleVisibility: (id: number, visibilityStatus: "PRIVATE" | "PUBLIC", isPublic: boolean) =>
+    request<EchoCapsule>(`/api/capsule/${id}/visibility`, { method: "POST", body: JSON.stringify({ visibilityStatus, isPublic }) }),
+  archiveCapsule: (id: number) => request<unknown>(`/api/capsule/${id}/archive`, { method: "POST" }),
+  sandboxCapsule: (id: number, question: string) => request<CapsuleSandbox>(`/api/capsule/${id}/sandbox/respond`, {
+    method: "POST", body: JSON.stringify({ question })
+  }),
+  feedbackCapsuleSandbox: (id: number, input: { genomeVersionId: number; question: string; response: string; rating: string; comment?: string }) =>
+    request<CapsuleSandboxFeedback>(`/api/capsule/${id}/sandbox/feedback`, { method: "POST", body: JSON.stringify(input) })
 };
 
 export async function streamAurora(

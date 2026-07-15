@@ -3,14 +3,20 @@ package com.innercosmos.controller;
 import com.innercosmos.common.ApiResponse;
 import com.innercosmos.dto.CapsuleCreateRequest;
 import com.innercosmos.dto.CapsuleVisibilityRequest;
+import com.innercosmos.dto.CapsuleSandboxRequest;
+import com.innercosmos.dto.CapsuleSandboxFeedbackRequest;
 import com.innercosmos.entity.CapsuleBoundary;
 import com.innercosmos.entity.EchoCapsule;
 import com.innercosmos.service.CapsuleService;
 import com.innercosmos.service.DataMaskingService;
 import com.innercosmos.service.CapsuleGenomeService;
+import com.innercosmos.service.CapsuleSandboxService;
 import com.innercosmos.entity.CapsuleGenomeVersion;
+import com.innercosmos.entity.CapsuleSandboxFeedback;
 import com.innercosmos.vo.CapsulePreviewVO;
+import com.innercosmos.vo.CapsuleSandboxVO;
 import jakarta.servlet.http.HttpSession;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -23,12 +29,14 @@ public class CapsuleController extends BaseController {
     private final CapsuleService capsuleService;
     private final DataMaskingService dataMaskingService;
     private final CapsuleGenomeService genomeService;
+    private final CapsuleSandboxService sandboxService;
 
     public CapsuleController(CapsuleService capsuleService, DataMaskingService dataMaskingService,
-                             CapsuleGenomeService genomeService) {
+                             CapsuleGenomeService genomeService, CapsuleSandboxService sandboxService) {
         this.capsuleService = capsuleService;
         this.dataMaskingService = dataMaskingService;
         this.genomeService = genomeService;
+        this.sandboxService = sandboxService;
     }
 
     @GetMapping("/my")
@@ -123,5 +131,26 @@ public class CapsuleController extends BaseController {
                 .map(Number.class::cast).map(Number::longValue).toList();
         if (ids.size() != values.size()) return ApiResponse.fail("BAD_REQUEST", "memoryIds必须全部为数字");
         return ApiResponse.ok(capsuleService.recompileGenome(currentUserId(session), id, ids));
+    }
+
+    @PostMapping("/{id}/sandbox/respond")
+    public ApiResponse<CapsuleSandboxVO> sandbox(@PathVariable Long id,
+                                                  @Valid @RequestBody CapsuleSandboxRequest request,
+                                                  HttpSession session) {
+        return ApiResponse.ok(sandboxService.respond(currentUserId(session), id, request.question.trim()));
+    }
+
+    @PostMapping("/{id}/sandbox/feedback")
+    public ApiResponse<CapsuleSandboxFeedback> sandboxFeedback(
+            @PathVariable Long id,
+            @Valid @RequestBody CapsuleSandboxFeedbackRequest request,
+            HttpSession session) {
+        return ApiResponse.ok(sandboxService.recordFeedback(currentUserId(session), id, request));
+    }
+
+    @GetMapping("/{id}/sandbox/feedback")
+    public ApiResponse<List<CapsuleSandboxFeedback>> sandboxFeedback(
+            @PathVariable Long id, HttpSession session) {
+        return ApiResponse.ok(sandboxService.feedback(currentUserId(session), id));
     }
 }

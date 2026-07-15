@@ -1110,6 +1110,23 @@ CREATE TABLE IF NOT EXISTS tb_capsule_genome_version (
   CONSTRAINT fk_capsule_genome_parent FOREIGN KEY (parent_version_id) REFERENCES tb_capsule_genome_version(id)
 );
 
+CREATE TABLE IF NOT EXISTS tb_capsule_sandbox_feedback (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  capsule_id BIGINT NOT NULL,
+  genome_version_id BIGINT NOT NULL,
+  owner_user_id BIGINT NOT NULL,
+  question TEXT NOT NULL,
+  response_text TEXT NOT NULL,
+  rating VARCHAR(32) NOT NULL,
+  owner_comment TEXT,
+  status VARCHAR(32) NOT NULL DEFAULT 'OPEN',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_capsule_sandbox_feedback (capsule_id, genome_version_id, created_at),
+  CONSTRAINT fk_capsule_sandbox_feedback_capsule FOREIGN KEY (capsule_id) REFERENCES tb_echo_capsule(id) ON DELETE CASCADE,
+  CONSTRAINT fk_capsule_sandbox_feedback_genome FOREIGN KEY (genome_version_id) REFERENCES tb_capsule_genome_version(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS tb_aurora_self_version (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT NOT NULL,

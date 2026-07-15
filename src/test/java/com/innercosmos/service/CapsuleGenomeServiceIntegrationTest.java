@@ -1,9 +1,11 @@
 package com.innercosmos.service;
 
 import com.innercosmos.dto.CapsuleCreateRequest;
+import com.innercosmos.dto.CapsuleSandboxFeedbackRequest;
 import com.innercosmos.entity.CapsuleGenomeVersion;
 import com.innercosmos.entity.EchoCapsule;
 import com.innercosmos.exception.BusinessException;
+import com.innercosmos.vo.CapsuleSandboxVO;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -25,6 +27,7 @@ class CapsuleGenomeServiceIntegrationTest {
     @Autowired CapsuleService capsuleService;
     @Autowired CapsuleGenomeService genomeService;
     @Autowired PersonaChatService personaChatService;
+    @Autowired CapsuleSandboxService sandboxService;
 
     @Test
     @Transactional
@@ -96,6 +99,40 @@ class CapsuleGenomeServiceIntegrationTest {
         assertNotNull(stillActive);
         assertEquals(original.id, stillActive.id);
         assertEquals(1, genomeService.history(owner, capsule.id).size());
+    }
+
+    @Test
+    @Transactional
+    void ownerSandboxIsIsolatedAndFeedbackDoesNotMutateGenome() {
+        Long owner = seedUser("sandbox-owner");
+        Long stranger = seedUser("sandbox-stranger");
+        Long memory = seedMemory(owner, "遇到压力时会先把问题拆小，再慢慢说明自己的边界", "AURORA_PRIVATE");
+        CapsuleCreateRequest request = new CapsuleCreateRequest();
+        request.pseudonym = "慢慢说的人";
+        request.memoryIds = List.of(memory);
+        request.visibilityStatus = "PRIVATE";
+        request.isPublic = false;
+        EchoCapsule capsule = capsuleService.createFromMemory(owner, request);
+        CapsuleGenomeVersion before = genomeService.current(capsule.id);
+
+        CapsuleSandboxVO response = sandboxService.respond(owner, capsule.id, "你遇到误解时会怎么说？");
+        assertEquals(before.id, response.genomeVersionId());
+        assertTrue(response.providerAvailable());
+        assertFalse(response.reply().isBlank());
+        assertTrue(response.identityNotice().contains("不会发送"));
+        assertThrows(BusinessException.class,
+                () -> sandboxService.respond(stranger, capsule.id, "越权试聊"));
+
+        CapsuleSandboxFeedbackRequest feedback = new CapsuleSandboxFeedbackRequest();
+        feedback.genomeVersionId = before.id;
+        feedback.question = response.question();
+        feedback.response = response.reply();
+        feedback.rating = "TONE_WRONG";
+        feedback.comment = "更克制一点";
+        assertEquals("OPEN", sandboxService.recordFeedback(owner, capsule.id, feedback).status);
+        assertEquals(1, sandboxService.feedback(owner, capsule.id).size());
+        assertEquals(before.id, genomeService.current(capsule.id).id,
+                "sandbox feedback is a proposal signal and must not drift the live Genome");
     }
 
     private Long seedUser(String prefix) {
