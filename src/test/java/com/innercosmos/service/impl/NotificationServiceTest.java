@@ -91,4 +91,19 @@ class NotificationServiceTest {
         assertFalse(notificationService.unread(userId).stream().anyMatch(x -> x.id.equals(n.id)),
                 "owner markRead must clear the notification from unread()");
     }
+
+    @Test
+    @DisplayName("retryable worker notification is idempotent by owner and reference")
+    @Transactional
+    void notifyOnceReturnsTheExistingDelivery() {
+        Long userId = 777_005L;
+        Notification first = notificationService.notifyOnce(userId, "AURORA_RETURN",
+            "Aurora 回来了", "第一次内容", 88L, "WAKE_INTENT");
+        Notification retry = notificationService.notifyOnce(userId, "AURORA_RETURN",
+            "Aurora 回来了", "重试不应覆盖或重复", 88L, "WAKE_INTENT");
+
+        assertEquals(first.id, retry.id);
+        assertEquals(1L, notificationService.unread(userId).stream()
+            .filter(row -> Long.valueOf(88L).equals(row.refId) && "WAKE_INTENT".equals(row.refType)).count());
+    }
 }

@@ -87,3 +87,16 @@ test("Aurora resumes from the durable timeline after the live SSE connection bre
   await expect(page.getByRole("status")).toContainText(/已从时间线恢复完整回应|已恢复到打断发生的位置/);
   await expect(page.locator("article.aurora").last()).toContainText(/.+/);
 });
+
+test("user can create, postpone and cancel an explainable Aurora return", async ({ page }) => {
+  await page.goto("/app/aurora/index.html");
+  await loginIfNeeded(page);
+  await page.getByRole("button", { name: "约一小时后回来" }).click();
+  const card = page.locator(".return-card").last();
+  await expect(card).toContainText("Aurora 会在你选择的时间回来");
+  await card.getByRole("button", { name: "晚一小时" }).click();
+  await expect(page.getByRole("status")).toContainText("已为你推迟一小时");
+  await card.getByRole("button", { name: "取消" }).click();
+  await expect(card).toHaveCount(0);
+  await expect(page.getByRole("status")).toContainText("已取消");
+});

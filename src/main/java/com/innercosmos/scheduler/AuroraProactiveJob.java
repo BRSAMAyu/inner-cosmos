@@ -51,14 +51,15 @@ public class AuroraProactiveJob {
         var users = userMapper.selectList(new QueryWrapper<UserProfile>());
         for (var u : users) {
             try {
+                Long userId = u.userId == null ? u.id : u.userId;
                 if ("ALIVE".equalsIgnoreCase(u.proactiveIntensity)) {
-                    aliveEngine.tick(u.id);
+                    aliveEngine.tick(userId);
                 } else {
-                    engine.tick(u.id);
+                    engine.tick(userId);
                 }
             } catch (Exception e) {
                 // M-043: actually log (was silently swallowed), then continue with the next user.
-                log.warn("Proactive tick failed for user {}: {}", u.id, e.getMessage());
+                log.warn("Proactive tick failed for user {}: {}", u.userId, e.getMessage());
             }
         }
 

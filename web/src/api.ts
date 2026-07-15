@@ -1,10 +1,14 @@
 import { SseDecoder, toTypedEvent, type AuroraStreamEvent, type DialogMessage, type TurnTimeline } from "./protocol";
 
-type ApiEnvelope<T> = { success: boolean; data: T; message?: string; code?: string };
+type ApiEnvelope<T> = { success: boolean; data: T; message?: string; code?: string; error?: string };
 type Csrf = { token: string; headerName: string };
+export type WakeIntent = {
+  id: number; purpose: string; reasonForUser: string; content: string;
+  earliestAt: string; preferredAt: string; latestAt: string; timezone: string; status: "PLANNED" | "CLAIMED";
+};
 let csrf: Csrf | null = null;
 
-async function request<T>(url: string, init: RequestInit = {}): Promise<T> {
+async function request<T>(url: string, init: RequestInit = {}, retriedCsrf = false): Promise<T> {
   const method = (init.method ?? "GET").toUpperCase();
   const headers = new Headers(init.headers);
   if (!headers.has("Content-Type") && init.body) headers.set("Content-Type", "application/json");
@@ -13,10 +17,11 @@ async function request<T>(url: string, init: RequestInit = {}): Promise<T> {
     headers.set(csrf.headerName, csrf.token);
   }
   const response = await fetch(url, { ...init, headers, credentials: "include" });
-  if (response.status === 403 && csrf) {
-    csrf = null;
-  }
   const body = await response.json() as ApiEnvelope<T>;
+  if (response.status === 403 && (body.code === "CSRF_INVALID" || body.error === "CSRF_INVALID") && !retriedCsrf) {
+    csrf = null;
+    return request<T>(url, init, true);
+  }
   if (!response.ok || !body.success) throw new Error(body.message ?? `HTTP ${response.status}`);
   return body.data;
 }
@@ -31,13 +36,25 @@ async function getCsrf(): Promise<Csrf> {
 export const api = {
   login: (username: string, password: string) => request<unknown>("/api/auth/login", {
     method: "POST", body: JSON.stringify({ username, password })
+  }).then(result => {
+    // Spring rotates the session on authentication; the anonymous CSRF token is no
+    // longer valid for the authenticated session.
+    csrf = null;
+    return result;
   }),
   createSession: () => request<{ id: number }>("/api/dialog/session/create", {
     method: "POST", body: JSON.stringify({ title: "Aurora 对话", sessionType: "AURORA_CHAT" })
   }),
   messages: (sessionId: number) => request<DialogMessage[]>(`/api/dialog/session/${sessionId}/messages`),
   timeline: (turnId: number) => request<TurnTimeline>(`/api/aurora/turns/${turnId}/timeline`),
-  stop: (turnId: number) => request<TurnTimeline>(`/api/aurora/turns/${turnId}/stop`, { method: "POST" })
+  stop: (turnId: number) => request<TurnTimeline>(`/api/aurora/turns/${turnId}/stop`, { method: "POST" }),
+  wakeIntents: () => request<WakeIntent[]>("/api/aurora/wake-intents"),
+  scheduleWakeIntent: (input: Omit<WakeIntent, "id" | "status">) => request<WakeIntent>("/api/aurora/wake-intents", {
+    method: "POST", body: JSON.stringify(input)
+  }),
+  rescheduleWakeIntent: (id: number, input: Pick<WakeIntent, "earliestAt" | "preferredAt" | "latestAt">) =>
+    request<WakeIntent>(`/api/aurora/wake-intents/${id}/schedule`, { method: "PUT", body: JSON.stringify(input) }),
+  cancelWakeIntent: (id: number) => request<WakeIntent>(`/api/aurora/wake-intents/${id}/cancel`, { method: "POST" })
 };
 
 export async function streamAurora(

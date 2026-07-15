@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { api, replayTurnEvents, streamAurora } from "./api";
+import { api, replayTurnEvents, streamAurora, type WakeIntent } from "./api";
 import type { AuroraStreamEvent, DialogMessage, TurnStatus } from "./protocol";
 
 type UiMessage = { key: string; speaker: "USER" | "AURORA"; text: string; partial?: boolean };
@@ -21,6 +21,8 @@ export function AuroraApp() {
   const [mode, setMode] = useState("DAILY_TALK");
   const [status, setStatus] = useState("正在连接你的内宇宙…");
   const [activeTurnId, setActiveTurnId] = useState<number | null>(null);
+  const [wakeIntents, setWakeIntents] = useState<WakeIntent[]>([]);
+  const [wakeBusy, setWakeBusy] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const activeTurnRef = useRef<number | null>(null);
   const bubbleKeyRef = useRef<string | null>(null);
@@ -40,7 +42,7 @@ export function AuroraApp() {
       const created = await api.createSession();
       if (call !== bootstrapCallRef.current) return;
       setSessionId(created.id);
-      await replaceFromHistory(created.id);
+      await Promise.all([replaceFromHistory(created.id), api.wakeIntents().then(setWakeIntents)]);
       if (call !== bootstrapCallRef.current) return;
       setAuthenticated(true);
       setStatus("Aurora 在这里。你可以随时打断，她会重新理解。 ");
@@ -194,6 +196,50 @@ export function AuroraApp() {
     }
   };
 
+  const scheduleReturn = async () => {
+    setWakeBusy(true);
+    try {
+      const preferred = new Date(Date.now() + 60 * 60 * 1000);
+      const earliest = new Date(preferred.getTime() - 5 * 60 * 1000);
+      const latest = new Date(preferred.getTime() + 6 * 60 * 60 * 1000);
+      const local = (value: Date) => new Date(value.getTime() - value.getTimezoneOffset() * 60000).toISOString().slice(0, 19);
+      const created = await api.scheduleWakeIntent({
+        purpose: "继续这一刻未说完的话", reasonForUser: "Aurora 会在你选择的时间回来",
+        content: "我回来了。刚才没有说完的部分，我们可以慢慢接着说。",
+        earliestAt: local(earliest), preferredAt: local(preferred), latestAt: local(latest),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Shanghai"
+      });
+      setWakeIntents(current => [...current, created].sort((a, b) => a.preferredAt.localeCompare(b.preferredAt)));
+      setStatus("约好了。你随时可以改期或取消，不需要迁就 Aurora。");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "暂时无法保存约定");
+    } finally { setWakeBusy(false); }
+  };
+
+  const postponeReturn = async (intent: WakeIntent) => {
+    setWakeBusy(true);
+    try {
+      const shift = (iso: string) => {
+        const value = new Date(iso); value.setHours(value.getHours() + 1);
+        return new Date(value.getTime() - value.getTimezoneOffset() * 60000).toISOString().slice(0, 19);
+      };
+      const changed = await api.rescheduleWakeIntent(intent.id, {
+        earliestAt: shift(intent.earliestAt), preferredAt: shift(intent.preferredAt), latestAt: shift(intent.latestAt)
+      });
+      setWakeIntents(current => current.map(row => row.id === intent.id ? changed : row));
+      setStatus("已为你推迟一小时。这个约定由你掌控。");
+    } finally { setWakeBusy(false); }
+  };
+
+  const cancelReturn = async (intent: WakeIntent) => {
+    setWakeBusy(true);
+    try {
+      await api.cancelWakeIntent(intent.id);
+      setWakeIntents(current => current.filter(row => row.id !== intent.id));
+      setStatus("已取消。Aurora 不会按这个约定主动回来。");
+    } finally { setWakeBusy(false); }
+  };
+
   if (authenticated === null) return <main className="login-shell"><div className="login" role="status">正在连接你的内宇宙…</div></main>;
   if (!authenticated) return <Login onSuccess={bootstrap} />;
 
@@ -211,6 +257,16 @@ export function AuroraApp() {
       <nav className="modes" aria-label="对话模式">
         {modes.map(([value, label]) => <button key={value} className={mode === value ? "active" : ""} onClick={() => setMode(value)}>{label}</button>)}
       </nav>
+
+      <section className="returns" aria-label="Aurora 的回来约定">
+        <div className="returns-head"><div><span className="eyebrow">AURORA RETURNS</span><h2>回来约定</h2></div>
+          <button type="button" disabled={wakeBusy} onClick={() => void scheduleReturn()}>约一小时后回来</button></div>
+        {wakeIntents.length === 0 ? <p className="returns-empty">现在没有约定。需要时，你可以邀请 Aurora 在合适的时候回来。</p> :
+          <div className="return-list">{wakeIntents.map(intent => <article key={intent.id} className="return-card">
+            <div><strong>{intent.reasonForUser}</strong><span>{new Date(intent.preferredAt).toLocaleString("zh-CN", { dateStyle: "short", timeStyle: "short" })}</span><small>{intent.purpose}</small></div>
+            <div className="return-actions"><button type="button" disabled={wakeBusy} onClick={() => void postponeReturn(intent)}>晚一小时</button><button type="button" disabled={wakeBusy} onClick={() => void cancelReturn(intent)}>取消</button></div>
+          </article>)}</div>}
+      </section>
 
       <section className="conversation" aria-live="polite" aria-label="与 Aurora 的对话">
         {messages.length === 0 && <div className="empty"><span>✦</span><p>把现在最真实的一句话放在这里。</p></div>}

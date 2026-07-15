@@ -29,7 +29,10 @@ public class QuietWindowResolver {
         if (userId == null || now == null || profileMapper == null) {
             return new Reason(false, "");
         }
-        var p = profileMapper.selectById(userId);
+        var profiles = profileMapper.selectList(
+            new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<UserProfile>()
+                .eq("user_id", userId).last("LIMIT 1"));
+        var p = profiles.isEmpty() ? null : profiles.getFirst();
         if (p == null) return new Reason(false, "");
         LocalTime nowL = now.toLocalTime();
 

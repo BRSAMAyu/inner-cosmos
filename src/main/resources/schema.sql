@@ -989,6 +989,39 @@ CREATE TABLE IF NOT EXISTS tb_private_timer (
   INDEX idx_private_timer_user (user_id)
 );
 
+-- Durable Aurora return intent. Private timers remain for backward compatibility.
+CREATE TABLE IF NOT EXISTS tb_wake_intent (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  purpose VARCHAR(160) NOT NULL,
+  reason_for_user VARCHAR(240) NOT NULL,
+  earliest_at TIMESTAMP NOT NULL,
+  preferred_at TIMESTAMP NOT NULL,
+  latest_at TIMESTAMP NOT NULL,
+  timezone VARCHAR(64) NOT NULL,
+  preconditions_json TEXT NOT NULL DEFAULT '{}',
+  cancel_conditions_json TEXT NOT NULL DEFAULT '{}',
+  payload_ref VARCHAR(240),
+  content TEXT NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'PLANNED',
+  decision_policy_version VARCHAR(80) NOT NULL,
+  claim_token VARCHAR(64),
+  claimed_by VARCHAR(128),
+  claim_until TIMESTAMP NULL,
+  outcome VARCHAR(40),
+  outcome_reason VARCHAR(240),
+  fired_at TIMESTAMP NULL,
+  cancelled_at TIMESTAMP NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT ck_wake_intent_status CHECK (status IN ('PLANNED','CLAIMED','FIRED','CANCELLED','EXPIRED')),
+  CONSTRAINT ck_wake_intent_window CHECK (earliest_at <= preferred_at AND preferred_at <= latest_at)
+);
+CREATE INDEX IF NOT EXISTS idx_wake_intent_owner ON tb_wake_intent (user_id, status, preferred_at);
+CREATE INDEX IF NOT EXISTS idx_wake_intent_claim ON tb_wake_intent (status, preferred_at, claim_until, id);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_notification_owner_reference
+  ON tb_notification (user_id, type, ref_type, ref_id);
+
 -- Reliable cross-process event delivery (H2 development/test representation).
 CREATE TABLE IF NOT EXISTS tb_outbox_event (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,

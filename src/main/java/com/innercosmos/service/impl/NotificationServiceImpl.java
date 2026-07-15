@@ -34,6 +34,19 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Override
+    public Notification notifyOnce(Long userId, String type, String title, String body, Long refId, String refType) {
+        Notification existing = notificationMapper.selectOne(new QueryWrapper<Notification>()
+            .eq("user_id", userId).eq("type", type).eq("ref_type", refType).eq("ref_id", refId).last("LIMIT 1"));
+        if (existing != null) return existing;
+        try {
+            return notify(userId, type, title, body, refId, refType);
+        } catch (org.springframework.dao.DuplicateKeyException concurrentWriter) {
+            return notificationMapper.selectOne(new QueryWrapper<Notification>()
+                .eq("user_id", userId).eq("type", type).eq("ref_type", refType).eq("ref_id", refId).last("LIMIT 1"));
+        }
+    }
+
+    @Override
     public List<Notification> unread(Long userId) {
         return notificationMapper.selectList(new QueryWrapper<Notification>()
                 .eq("user_id", userId)

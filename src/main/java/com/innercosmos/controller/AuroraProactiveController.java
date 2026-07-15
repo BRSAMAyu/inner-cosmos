@@ -1,8 +1,11 @@
 package com.innercosmos.controller;
 
 import com.innercosmos.common.ApiResponse;
+import com.innercosmos.common.ErrorCode;
+import com.innercosmos.exception.BusinessException;
 import com.innercosmos.service.AuroraAgentService;
 import com.innercosmos.service.AuroraProactiveService;
+import com.innercosmos.service.WakeIntentService;
 import com.innercosmos.vo.AuroraReplyVO;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.web.bind.annotation.*;
@@ -21,11 +24,14 @@ public class AuroraProactiveController extends BaseController {
 
     private final AuroraProactiveService proactiveService;
     private final AuroraAgentService auroraAgentService;
+    private final WakeIntentService wakeIntentService;
 
     public AuroraProactiveController(AuroraProactiveService proactiveService,
-                                     AuroraAgentService auroraAgentService) {
+                                     AuroraAgentService auroraAgentService,
+                                     WakeIntentService wakeIntentService) {
         this.proactiveService = proactiveService;
         this.auroraAgentService = auroraAgentService;
+        this.wakeIntentService = wakeIntentService;
     }
 
     @PostMapping("/check")
@@ -52,8 +58,14 @@ public class AuroraProactiveController extends BaseController {
 
     @PostMapping("/{id}/dismiss")
     public ApiResponse<Void> dismiss(@PathVariable Long id, HttpSession session) {
-        // In a real system we'd persist a "dismissed_at" timestamp so Aurora doesn't
-        // re-greet for some time. For now we just acknowledge.
+        try {
+            wakeIntentService.cancel(currentUserId(session), id);
+        } catch (BusinessException missingLegacyRow) {
+            // This legacy route historically acknowledged proactive event-log IDs as well.
+            // Preserve that contract without mutating or revealing another owner's intent;
+            // the first-class WakeIntent cancel route remains strict and owner-scoped.
+            if (!ErrorCode.NOT_FOUND.equals(missingLegacyRow.code)) throw missingLegacyRow;
+        }
         return ApiResponse.ok(null);
     }
 }

@@ -115,7 +115,13 @@ gates:
         reviewer: unassigned
         evidence: [evidence/innovation/INNO-CONV-001/, evidence/innovation/INNO-CONV-002/, evidence/innovation/INNO-CONV-003/]
         remaining: Builder browser evidence now covers live SSE fault recovery; independent review is still required before PASS.
-      - {id: AURORA-TEMPORAL, target: "Durable WakeIntent scheduling respects timezone, quiet hours, relevance, risk, and user controls.", status: UNASSESSED, evidence: []}
+      - id: AURORA-TEMPORAL
+        target: Durable WakeIntent scheduling respects timezone, quiet hours, relevance, risk, and user controls.
+        status: IN_PROGRESS
+        verified_at: 2026-07-15T13:35:00+08:00
+        reviewer: unassigned
+        evidence: [evidence/innovation/INNO-TEMP-001/]
+        remaining: v1 proves durable UTC scheduling, multi-worker lease recovery, deterministic boundary/risk decisions and owner controls; general evidence-backed relevance/cancel predicates, delivery feedback learning and independent review remain.
       - {id: AURORA-SELF, target: "Self, Constitution, Relationship State, and Emergence are versioned, evaluated, observable, and rollbackable.", status: UNASSESSED, evidence: []}
       - {id: AURORA-QUALITY, target: "Blind longitudinal evaluation passes empathy, continuity, proactive appropriateness, and recovery thresholds.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-EVAL-001/, evidence/innovation/INNO-EVAL-002/]}
 

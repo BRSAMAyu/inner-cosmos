@@ -46,7 +46,7 @@ class PostgresFlywayBaselineTest {
                 .locations("classpath:db/migration/postgresql")
                 .load();
 
-        assertEquals(3, flyway.migrate().migrationsExecuted);
+        assertEquals(4, flyway.migrate().migrationsExecuted);
         assertEquals(0, flyway.migrate().migrationsExecuted);
 
         String source = readClasspath("schema.sql");
@@ -68,12 +68,12 @@ class PostgresFlywayBaselineTest {
                     WHERE constraint_schema='public' AND constraint_type='FOREIGN KEY'
                     """);
 
-            assertEquals(63, expectedTables.size(), "source schema table inventory changed");
+            assertEquals(64, expectedTables.size(), "source schema table inventory changed");
             assertEquals(expectedTables, actualTables, "PostgreSQL baseline table drift");
             assertTrue(actualIndexes.containsAll(expectedIndexes),
                     () -> "missing PostgreSQL indexes: " + difference(expectedIndexes, actualIndexes));
             assertEquals(expectedForeignKeys, actualForeignKeys, "PostgreSQL foreign-key drift");
-            assertEquals(61, scalar(connection, """
+            assertEquals(62, scalar(connection, """
                     SELECT COUNT(*) FROM information_schema.columns
                     WHERE table_schema='public' AND is_identity='YES'
                     """));

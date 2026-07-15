@@ -1,0 +1,29 @@
+INNO-TEMP-001 verification summary — 2026-07-15
+
+PASS  focused WakeIntent and proactive tests
+      owner-scoped HTTP create/list/reschedule/cancel and negative IDOR
+      UTC/IANA timezone round trip, expiration, competing worker CAS claim
+      abandoned lease recovery, cancellation race rollback, quiet-window delay, risk drop, ALIVE opt-out
+      offline durable conversion, live persisted-before-fanout, profile-owner routing
+
+PASS  PostgreSQL 16 / Flyway production truth
+      Testcontainers pgvector PostgreSQL 16.12
+      V1 through V4 migrated and revalidated; 64 application tables
+      V4 durable WakeIntent table/index/check constraints present
+
+PASS  React/TypeScript
+      Vitest: 1 file, 3 typed SSE protocol tests
+      TypeScript strict compile and Vite production build
+      Playwright: 3/3 real browser journeys
+        interrupt/replan/stop
+        live SSE disconnect and durable recovery
+        explainable return create/postpone/cancel
+
+PASS  full Java 21 verification
+      Maven verify; 106 suites, 721 tests, 0 failures, 0 errors, 0 skipped
+      SpotBugs high-confidence gate: 0 findings
+
+PASS  current-tree secret scan
+      scripts/scan-secrets.ps1; 0 findings; values not printed
+
+External push provider and real-provider longitudinal quality are not claimed here.

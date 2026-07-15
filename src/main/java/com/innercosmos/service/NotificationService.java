@@ -12,6 +12,9 @@ public interface NotificationService {
     /** Create + persist a notification for a user. Returns the saved row. */
     Notification notify(Long userId, String type, String title, String body, Long refId, String refType);
 
+    /** Idempotent variant for retryable workers; uniqueness is keyed by owner/type/reference. */
+    Notification notifyOnce(Long userId, String type, String title, String body, Long refId, String refType);
+
     /** Unread notifications for a user, newest first. */
     List<Notification> unread(Long userId);
 

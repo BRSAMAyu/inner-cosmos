@@ -8,6 +8,7 @@ import com.innercosmos.entity.PrivateTimer;
 import com.innercosmos.entity.ProactiveEventLog;
 import com.innercosmos.mapper.PrivateTimerMapper;
 import com.innercosmos.mapper.ProactiveEventLogMapper;
+import com.innercosmos.service.WakeIntentService;
 import com.innercosmos.ai.proactive.dto.AliveDecision;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -45,6 +46,9 @@ public class AliveDecisionEngine {
 
     @Autowired
     private PrivateTimerMapper timerMapper;
+
+    @Autowired(required = false)
+    private WakeIntentService wakeIntentService;
 
     @Autowired
     private ProactiveEventLogMapper eventLogMapper;
@@ -93,11 +97,21 @@ public class AliveDecisionEngine {
                     logEvent(userId, "ALIVE_LLM", decision.contentForUser(), decision.reasonInternal());
                 }
                 case "schedule" -> {
-                    PrivateTimer timer = new PrivateTimer();
-                    timer.userId = userId;
-                    timer.fireAt = LocalDateTime.now().plusMinutes(decision.waitMinutes());
-                    timer.kind = "ALIVE_INTERNAL";
-                    timerMapper.insert(timer);
+                    LocalDateTime preferred = LocalDateTime.now().plusMinutes(decision.waitMinutes());
+                    if (wakeIntentService != null && decision.contentForUser() != null
+                            && !decision.contentForUser().isBlank()) {
+                        wakeIntentService.schedule(userId, "Aurora 想在合适的时候继续这段陪伴",
+                            "Aurora 计划回来看看你", decision.contentForUser(), preferred.minusMinutes(5),
+                            preferred, preferred.plusHours(6), "Asia/Shanghai", "alive-decision");
+                    } else {
+                        // Compatibility path for old tests/data and malformed provider output.
+                        PrivateTimer timer = new PrivateTimer();
+                        timer.userId = userId;
+                        timer.fireAt = preferred;
+                        timer.kind = "ALIVE_INTERNAL";
+                        timer.content = decision.contentForUser();
+                        timerMapper.insert(timer);
+                    }
                 }
                 case "wait" -> {
                     // Ensure minimum daily push
