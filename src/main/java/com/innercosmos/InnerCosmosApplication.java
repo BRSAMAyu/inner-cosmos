@@ -4,7 +4,6 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration;
 import org.springframework.boot.autoconfigure.session.SessionAutoConfiguration;
-import org.springframework.scheduling.annotation.EnableScheduling;
 
 // Authentication is owned by SessionAuthenticationFilter and the application user tables.
 // Excluding Boot's generated in-memory user prevents a misleading development password
@@ -13,7 +12,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         UserDetailsServiceAutoConfiguration.class,
         SessionAutoConfiguration.class
 })
-@EnableScheduling
 public class InnerCosmosApplication {
     public static void main(String[] args) {
         SpringApplication.run(InnerCosmosApplication.class, args);

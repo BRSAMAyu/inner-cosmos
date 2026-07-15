@@ -10,14 +10,15 @@ $renderedLines | & kubectl apply --dry-run=client --validate=false -f - -o name 
 if ($LASTEXITCODE -ne 0) { throw "Kubernetes client-side schema dry-run failed." }
 
 $required = @(
-    'kind: Deployment', 'kind: StatefulSet', 'kind: PersistentVolume',
+    'kind: Deployment', 'kind: StatefulSet', 'kind: Job', 'kind: PersistentVolume',
     'kind: PersistentVolumeClaim', 'kind: PodDisruptionBudget',
     'kind: HorizontalPodAutoscaler', 'kind: NetworkPolicy',
     'kind: Gateway', 'kind: HTTPRoute', 'startupProbe:', 'readinessProbe:',
     'livenessProbe:', 'preStop:', 'topologySpreadConstraints:',
     'runAsNonRoot: true', 'automountServiceAccountToken: false',
     'key: inner-cosmos.academy/storage', 'hostPath:',
-    'inner-cosmos/runtime-role: all-in-one-transition'
+    'inner-cosmos/runtime-role: api', 'inner-cosmos/runtime-role: worker',
+    'inner-cosmos/runtime-role: scheduler', 'inner-cosmos/runtime-role: migration'
 )
 $missing = @($required | Where-Object { $rendered -notmatch [Regex]::Escape($_) })
 if ($missing.Count -gt 0) { throw "Academy manifest contract is missing $($missing.Count) required controls." }

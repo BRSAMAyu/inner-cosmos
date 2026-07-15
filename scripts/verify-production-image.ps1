@@ -12,6 +12,8 @@ $runId = [Guid]::NewGuid().ToString("N").Substring(0, 12)
 $network = "inner-cosmos-prod-smoke-$runId"
 $postgresName = "inner-cosmos-postgres-$runId"
 $redisName = "inner-cosmos-redis-$runId"
+$migrationName = "inner-cosmos-migration-$runId"
+$workerName = "inner-cosmos-worker-$runId"
 $appName = "inner-cosmos-app-$runId"
 $database = "inner_cosmos"
 $databaseUser = "inner_cosmos"
@@ -119,6 +121,79 @@ chmod 644 redis-server.key redis-server.crt ca.crt
     $caPath = Join-Path $resolvedTempRoot "postgres-ca.crt"
     $redisCaPath = Join-Path $resolvedTempRoot "redis-ca.crt"
     $jdbcUrl = "jdbc:postgresql://${postgresName}:5432/${database}?sslmode=verify-full&sslrootcert=/run/secrets/postgres-ca.crt"
+    $migrationArguments = @(
+        "run", "--name", $migrationName, "--network", $network,
+        "-v", "${caPath}:/run/secrets/postgres-ca.crt:ro",
+        "-e", "SPRING_PROFILES_ACTIVE=prod",
+        "-e", "SPRING_DATASOURCE_URL=$jdbcUrl",
+        "-e", "SPRING_DATASOURCE_USERNAME=$databaseUser",
+        "-e", "SPRING_DATASOURCE_PASSWORD=$databasePassword",
+        "-e", "INNER_COSMOS_RUNTIME_ROLE=migration",
+        "-e", "INNER_COSMOS_RUNTIME_EXIT_AFTER_STARTUP=true",
+        "-e", "SPRING_MAIN_WEB_APPLICATION_TYPE=none",
+        "-e", "SPRING_MAIN_LAZY_INITIALIZATION=true",
+        "-e", "SPRING_AUTOCONFIGURE_EXCLUDE=org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration,org.springframework.boot.actuate.autoconfigure.data.redis.RedisHealthContributorAutoConfiguration",
+        "-e", "REDIS_SESSION_ENABLED=false",
+        "-e", "REDIS_RATE_LIMIT_ENABLED=false",
+        "-e", "REDIS_SCHEDULER_LOCK_ENABLED=false",
+        "-e", "LLM_MODE=prod",
+        "-e", "LLM_ALLOW_FALLBACK=false",
+        "-e", "SEED_ENABLED=false",
+        $Image
+    )
+    & docker @migrationArguments | Out-Null
+    $migrationExitCode = $LASTEXITCODE
+    if ($migrationExitCode -ne 0) {
+        & docker logs $migrationName --tail 180
+        throw "Production migration runtime role failed with exit code $migrationExitCode."
+    }
+
+    $outboxEventId = [Guid]::NewGuid().ToString()
+    $outboxDedupKey = "production-smoke-$runId"
+    & docker exec -e "PGPASSWORD=$databasePassword" $postgresName psql `
+        -U $databaseUser -d $database -v ON_ERROR_STOP=1 -c `
+        "INSERT INTO tb_outbox_event(event_id,dedup_key,aggregate_type,aggregate_id,event_type,schema_version,payload,status,available_at) VALUES ('$outboxEventId','$outboxDedupKey','smoke','1','dialog.finished.v1',1,jsonb_build_object('userId',1,'sessionId',1),'PENDING',CURRENT_TIMESTAMP)" | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "Unable to seed the production outbox delivery probe." }
+
+    Invoke-Docker -DockerArguments @(
+        "run", "-d", "--name", $workerName, "--network", $network,
+        "-v", "${caPath}:/run/secrets/postgres-ca.crt:ro",
+        "-e", "SPRING_PROFILES_ACTIVE=prod",
+        "-e", "SPRING_DATASOURCE_URL=$jdbcUrl",
+        "-e", "SPRING_DATASOURCE_USERNAME=$databaseUser",
+        "-e", "SPRING_DATASOURCE_PASSWORD=$databasePassword",
+        "-e", "SPRING_FLYWAY_ENABLED=false",
+        "-e", "INNER_COSMOS_RUNTIME_ROLE=worker",
+        "-e", "JDBC_OUTBOX_ENABLED=true",
+        "-e", "SPRING_MAIN_WEB_APPLICATION_TYPE=none",
+        "-e", "SPRING_MAIN_LAZY_INITIALIZATION=true",
+        "-e", "SPRING_AUTOCONFIGURE_EXCLUDE=org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration,org.springframework.boot.actuate.autoconfigure.data.redis.RedisHealthContributorAutoConfiguration",
+        "-e", "REDIS_SESSION_ENABLED=false",
+        "-e", "REDIS_RATE_LIMIT_ENABLED=false",
+        "-e", "REDIS_SCHEDULER_LOCK_ENABLED=false",
+        "-e", "LLM_MODE=prod",
+        "-e", "LLM_PROVIDER=glm",
+        "-e", "LLM_API_KEY=prod-smoke-$runId",
+        "-e", "LLM_ALLOW_FALLBACK=false",
+        "-e", "SEED_ENABLED=false",
+        $Image
+    ) | Out-Null
+
+    $outboxDelivered = $false
+    $outboxDeadline = [DateTimeOffset]::UtcNow.AddSeconds(45)
+    while ([DateTimeOffset]::UtcNow -lt $outboxDeadline) {
+        $outboxState = (& docker exec -e "PGPASSWORD=$databasePassword" $postgresName psql `
+            -U $databaseUser -d $database -Atc `
+            "SELECT status || ':' || (SELECT COUNT(*) FROM tb_inbox_receipt WHERE event_id='$outboxEventId') FROM tb_outbox_event WHERE event_id='$outboxEventId'").Trim()
+        if ($outboxState -eq "PUBLISHED:1") { $outboxDelivered = $true; break }
+        Start-Sleep -Seconds 2
+    }
+    if (-not $outboxDelivered) {
+        & docker logs $workerName --tail 180
+        throw "Production worker did not complete the JDBC outbox/inbox probe."
+    }
+    Invoke-Docker -DockerArguments @("rm", "-f", $workerName) | Out-Null
+
     Invoke-Docker -DockerArguments @(
         "run", "-d", "--name", $appName, "--network", $network,
         "-p", "127.0.0.1::8080",
@@ -235,9 +310,9 @@ chmod 644 redis-server.key redis-server.crt ca.crt
         -U $databaseUser -d $database -Atc 'SELECT MAX(version) FROM flyway_schema_history WHERE success').Trim()
     $runtimeUser = (& docker inspect $appName --format '{{.Config.User}}').Trim()
 
-    if ([int]$tableCount -ne 61) { throw "Production Flyway schema did not create exactly 61 application tables." }
+    if ([int]$tableCount -ne 63) { throw "Production Flyway schema did not create exactly 63 application tables." }
     if ([int]$seededUsers -ne 0) { throw "Production smoke unexpectedly seeded demo users." }
-    if ($flywayVersion -ne "2") { throw "Production Flyway schema version is not 2." }
+    if ($flywayVersion -ne "3") { throw "Production Flyway schema version is not 3." }
     if ($runtimeUser -ne "appuser") { throw "Production image is not running as appuser." }
 
     [pscustomobject]@{
@@ -255,13 +330,15 @@ chmod 644 redis-server.key redis-server.crt ca.crt
         SchemaTables = [int]$tableCount
         DemoUsers = [int]$seededUsers
         RuntimeUser = $runtimeUser
+        MigrationRole = "PASS"
+        JdbcOutboxWorker = "PASS"
         Image = $Image
     } | Format-List
 }
 finally {
     $savedPreference = $ErrorActionPreference
     $ErrorActionPreference = "SilentlyContinue"
-    & docker rm -f $appName $redisName $postgresName 2>$null | Out-Null
+    & docker rm -f $appName $workerName $migrationName $redisName $postgresName 2>$null | Out-Null
     & docker network rm $network 2>$null | Out-Null
     $ErrorActionPreference = $savedPreference
     if (Test-Path -LiteralPath $resolvedTempRoot) {

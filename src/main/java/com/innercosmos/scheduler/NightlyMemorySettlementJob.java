@@ -14,12 +14,14 @@ import com.innercosmos.service.MemorySettlementService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
 @Component
+@ConditionalOnExpression("'${inner-cosmos.runtime.role:all}' == 'all' or '${inner-cosmos.runtime.role:all}' == 'scheduler'")
 public class NightlyMemorySettlementJob {
     private static final Logger log = LoggerFactory.getLogger(NightlyMemorySettlementJob.class);
     private final UserMapper userMapper;

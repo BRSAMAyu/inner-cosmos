@@ -5,6 +5,7 @@ import com.innercosmos.entity.DialogSession;
 import com.innercosmos.mapper.DialogSessionMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -15,6 +16,7 @@ import java.time.LocalDateTime;
  * and triggers goodbye flow automatically.
  */
 @Component
+@ConditionalOnExpression("'${inner-cosmos.runtime.role:all}' == 'all' or '${inner-cosmos.runtime.role:all}' == 'scheduler'")
 public class SessionIdleWatcher {
 
     @Autowired

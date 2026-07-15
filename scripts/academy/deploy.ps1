@@ -121,7 +121,10 @@ try {
 
     Invoke-Checked kubectl @("-n", $Namespace, "rollout", "status", "statefulset/inner-cosmos-postgres", "--timeout=240s")
     Invoke-Checked kubectl @("-n", $Namespace, "rollout", "status", "deployment/inner-cosmos-redis", "--timeout=180s")
+    Invoke-Checked kubectl @("-n", $Namespace, "wait", "--for=condition=complete", "job/inner-cosmos-migration", "--timeout=300s")
     Invoke-Checked kubectl @("-n", $Namespace, "rollout", "status", "deployment/inner-cosmos-api", "--timeout=300s")
+    Invoke-Checked kubectl @("-n", $Namespace, "rollout", "status", "deployment/inner-cosmos-worker", "--timeout=300s")
+    Invoke-Checked kubectl @("-n", $Namespace, "rollout", "status", "deployment/inner-cosmos-scheduler", "--timeout=300s")
 
     [pscustomobject]@{
         Status = "PASS"

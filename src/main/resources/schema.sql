@@ -988,3 +988,36 @@ CREATE TABLE IF NOT EXISTS tb_private_timer (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_private_timer_user (user_id)
 );
+
+-- Reliable cross-process event delivery (H2 development/test representation).
+CREATE TABLE IF NOT EXISTS tb_outbox_event (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  event_id UUID NOT NULL,
+  dedup_key VARCHAR(200) NOT NULL UNIQUE,
+  aggregate_type VARCHAR(80) NOT NULL,
+  aggregate_id VARCHAR(120) NOT NULL,
+  event_type VARCHAR(120) NOT NULL,
+  schema_version INT NOT NULL DEFAULT 1,
+  payload TEXT NOT NULL,
+  trace_id VARCHAR(128),
+  status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+  attempts INT NOT NULL DEFAULT 0,
+  available_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  locked_until TIMESTAMP NULL,
+  locked_by VARCHAR(128),
+  last_error VARCHAR(500),
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  published_at TIMESTAMP NULL,
+  UNIQUE (event_id)
+);
+CREATE INDEX IF NOT EXISTS idx_outbox_claim ON tb_outbox_event (status, available_at, locked_until, id);
+
+CREATE TABLE IF NOT EXISTS tb_inbox_receipt (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  consumer_name VARCHAR(120) NOT NULL,
+  event_id UUID NOT NULL,
+  event_type VARCHAR(120) NOT NULL,
+  processed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (consumer_name, event_id)
+);
+CREATE INDEX IF NOT EXISTS idx_inbox_processed_at ON tb_inbox_receipt (processed_at);

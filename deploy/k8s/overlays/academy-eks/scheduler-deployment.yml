@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inner-cosmos-scheduler
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: inner-cosmos, app.kubernetes.io/component: scheduler}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: inner-cosmos
+        app.kubernetes.io/component: scheduler
+        inner-cosmos/runtime-role: scheduler
+    spec:
+      serviceAccountName: inner-cosmos
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 45
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+        seccompProfile: {type: RuntimeDefault}
+      initContainers:
+        - name: wait-for-schema-v3
+          image: pgvector/pgvector:0.8.1-pg16@sha256:33198da2828a14c30348d2ccb4750833d5ed9a44c88d840a0e523d7417120337
+          command: ["sh", "-c", "until [ \"$(psql -h inner-cosmos-postgres -U inner_cosmos -d inner_cosmos -Atc \"SELECT COALESCE(MAX(version::integer),0) FROM flyway_schema_history WHERE success\" 2>/dev/null)\" -ge 3 ]; do sleep 2; done"]
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef: {name: inner-cosmos-runtime, key: SPRING_DATASOURCE_PASSWORD}
+            - {name: PGSSLMODE, value: verify-full}
+            - {name: PGSSLROOTCERT, value: /run/secrets/postgres/ca.crt}
+          volumeMounts:
+            - {name: postgres-ca, mountPath: /run/secrets/postgres, readOnly: true}
+      containers:
+        - name: scheduler
+          image: inner-cosmos:academy-placeholder
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef: {name: inner-cosmos-config}
+            - secretRef: {name: inner-cosmos-runtime}
+          env:
+            - {name: INNER_COSMOS_RUNTIME_ROLE, value: scheduler}
+            - {name: SERVER_PORT, value: "8082"}
+          ports:
+            - {name: health, containerPort: 8082}
+          resources:
+            requests: {cpu: 150m, memory: 384Mi}
+            limits: {cpu: "1", memory: 768Mi}
+          startupProbe:
+            httpGet: {path: /actuator/health, port: health}
+            periodSeconds: 5
+            failureThreshold: 24
+          readinessProbe:
+            httpGet: {path: /actuator/health, port: health}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /actuator/health, port: health}
+            periodSeconds: 20
+          lifecycle:
+            preStop:
+              exec: {command: ["sh", "-c", "sleep 15"]}
+          volumeMounts:
+            - {name: postgres-ca, mountPath: /run/secrets/postgres, readOnly: true}
+            - {name: redis-ca, mountPath: /run/secrets/redis, readOnly: true}
+            - {name: logs, mountPath: /var/log/inner-cosmos}
+      volumes:
+        - name: postgres-ca
+          secret: {secretName: inner-cosmos-postgres-client-ca, defaultMode: 0444}
+        - name: redis-ca
+          secret: {secretName: inner-cosmos-redis-client-ca, defaultMode: 0444}
+        - name: logs
+          emptyDir: {}

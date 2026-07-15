@@ -1,6 +1,11 @@
 spring.config.activate.on-profile: commercial-sg
 
 inner-cosmos:
+  runtime:
+    role: ${INNER_COSMOS_RUNTIME_ROLE:api}
+  events:
+    outbox:
+      enabled: true
   infrastructure:
     profile: commercial-sg
     region: ap-southeast-1

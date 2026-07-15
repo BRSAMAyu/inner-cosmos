@@ -3,12 +3,16 @@ kind: Kustomization
 resources:
   - ../../base
   - service-account.yml
+  - worker-deployment.yml
+  - scheduler-deployment.yml
+  - migration-job.yml
   - postgres-storage.yml
   - postgres-statefulset.yml
   - postgres-service.yml
   - redis-deployment.yml
   - redis-service.yml
   - data-network-policy.yml
+  - runtime-network-policy.yml
   - gateway.yml
   - http-route.yml
 labels:

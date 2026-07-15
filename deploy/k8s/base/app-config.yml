@@ -6,6 +6,7 @@ data:
   SPRING_PROFILES_ACTIVE: prod,academy-eks
   SPRING_DATASOURCE_URL: jdbc:postgresql://inner-cosmos-postgres:5432/inner_cosmos?sslmode=verify-full&sslrootcert=/run/secrets/postgres/ca.crt
   SPRING_DATASOURCE_USERNAME: inner_cosmos
+  SPRING_FLYWAY_ENABLED: "false"
   REDIS_HOST: inner-cosmos-redis
   REDIS_PORT: "6379"
   REDIS_SSL_ENABLED: "true"

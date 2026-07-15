@@ -128,6 +128,12 @@ llm:
     timeout-ms: ${DEEPSEEK_TIMEOUT_MS:30000}
 
 inner-cosmos:
+  runtime:
+    role: ${INNER_COSMOS_RUNTIME_ROLE:all}
+  events:
+    outbox:
+      enabled: ${JDBC_OUTBOX_ENABLED:false}
+      poll-delay-ms: ${JDBC_OUTBOX_POLL_DELAY_MS:1000}
   session:
     redis:
       enabled: ${REDIS_SESSION_ENABLED:false}

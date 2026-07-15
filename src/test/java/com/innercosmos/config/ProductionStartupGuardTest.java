@@ -106,6 +106,60 @@ class ProductionStartupGuardTest {
     }
 
     @Test
+    void apiRoleRequiresJdbcOutbox() {
+        runner.withPropertyValues(
+                        "inner-cosmos.runtime.role=api",
+                        "inner-cosmos.events.outbox.enabled=false")
+                .run(context -> assertRejected(context.getBean(ProductionStartupGuard.class)));
+    }
+
+    @Test
+    void migrationRoleRequiresOnlyDatabaseProductionControls() {
+        runner.withPropertyValues(
+                        "inner-cosmos.runtime.role=migration",
+                        "llm.provider=",
+                        "llm.api-key=",
+                        "inner-cosmos.auth.oidc.enabled=false",
+                        "inner-cosmos.session.redis.enabled=false",
+                        "inner-cosmos.security.rate-limit.redis.enabled=false",
+                        "inner-cosmos.scheduler.redis-lock.enabled=false",
+                        "spring.data.redis.ssl.enabled=false",
+                        "spring.data.redis.host=",
+                        "spring.data.redis.password=")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    context.getBean(ProductionStartupGuard.class).validate();
+                });
+    }
+
+    @Test
+    void apiRoleRejectsFlywayOwnership() {
+        runner.withPropertyValues(
+                        "inner-cosmos.runtime.role=api",
+                        "inner-cosmos.events.outbox.enabled=true",
+                        "spring.flyway.enabled=true")
+                .run(context -> assertRejected(context.getBean(ProductionStartupGuard.class)));
+    }
+
+    @Test
+    void apiRoleAcceptsCompletedExternallyMigratedSchemaConfiguration() {
+        runner.withPropertyValues(
+                        "inner-cosmos.runtime.role=api",
+                        "inner-cosmos.events.outbox.enabled=true",
+                        "spring.flyway.enabled=false")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    context.getBean(ProductionStartupGuard.class).validate();
+                });
+    }
+
+    @Test
+    void rejectsUnknownRuntimeRole() {
+        runner.withPropertyValues("inner-cosmos.runtime.role=unknown")
+                .run(context -> assertRejected(context.getBean(ProductionStartupGuard.class)));
+    }
+
+    @Test
     void rejectsMissingRedisCredentialWithoutEchoingConfiguration() {
         runner.withPropertyValues("spring.data.redis.password=")
                 .run(context -> assertThatThrownBy(

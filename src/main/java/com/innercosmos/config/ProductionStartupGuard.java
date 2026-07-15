@@ -19,6 +19,8 @@ public final class ProductionStartupGuard implements ApplicationRunner {
 
     private static final Set<String> REAL_PROVIDERS =
             Set.of("glm", "mimo", "minimax", "deepseek", "openai-compatible");
+    private static final Set<String> RUNTIME_ROLES =
+            Set.of("all", "api", "worker", "scheduler", "migration");
 
     private final Environment environment;
 
@@ -32,21 +34,42 @@ public final class ProductionStartupGuard implements ApplicationRunner {
     }
 
     void validate() {
+        String role = environment.getProperty("inner-cosmos.runtime.role", "all").toLowerCase(Locale.ROOT);
+        if (!RUNTIME_ROLES.contains(role)) {
+            throw unsafe("runtime role is invalid");
+        }
         requireEquals("llm.mode", "prod", "production LLM mode");
         requireFalse("llm.allow-fallback", "Mock fallback");
         requireFalse("inner-cosmos.demo.seed-enabled", "demo data seeding");
+
+        if (role.equals("all") || role.equals("api")) {
+            validateApiSecurity();
+        }
+        if (role.equals("all") || role.equals("api") || role.equals("worker") || role.equals("scheduler")) {
+            validateLlm();
+        }
+        if (role.equals("all") || role.equals("api") || role.equals("scheduler")) {
+            validateRedisConnection();
+        }
+        if (role.equals("all") || role.equals("scheduler")) {
+            requireTrue("inner-cosmos.scheduler.redis-lock.enabled", "Redis-backed scheduler leases");
+            required("inner-cosmos.scheduler.redis-lock.namespace", "Redis scheduler lease namespace");
+        }
+        if (role.equals("api") || role.equals("worker")) {
+            requireTrue("inner-cosmos.events.outbox.enabled", "JDBC outbox delivery");
+        }
+
+        validateDatabase(role);
+    }
+
+    private void validateApiSecurity() {
         requireTrue("server.servlet.session.cookie.secure", "secure session cookies");
         requireTrue("inner-cosmos.security.csrf-enabled", "CSRF protection");
         requireTrue("inner-cosmos.auth.oidc.enabled", "OIDC resource-server authentication");
         requireTrue("inner-cosmos.session.redis.enabled", "Redis-backed HTTP sessions");
         requireTrue("inner-cosmos.security.rate-limit.redis.enabled", "Redis-backed distributed rate limiting");
-        requireTrue("inner-cosmos.scheduler.redis-lock.enabled", "Redis-backed scheduler leases");
-        requireTrue("spring.data.redis.ssl.enabled", "Redis transport TLS");
-        required("spring.data.redis.host", "Redis host");
-        required("spring.data.redis.password", "Redis credential");
         required("spring.session.redis.namespace", "Redis session namespace");
         required("inner-cosmos.security.rate-limit.redis.namespace", "Redis rate-limit namespace");
-        required("inner-cosmos.scheduler.redis-lock.namespace", "Redis scheduler lease namespace");
         requireHttps("inner-cosmos.auth.oidc.issuer-uri", "OIDC issuer URI");
         requireHttps("inner-cosmos.auth.oidc.jwk-set-uri", "OIDC JWK set URI");
         required("inner-cosmos.auth.oidc.audience", "OIDC API audience");
@@ -54,7 +77,15 @@ public final class ProductionStartupGuard implements ApplicationRunner {
         requireHttps("inner-cosmos.auth.oidc.token-uri", "OIDC token endpoint");
         required("inner-cosmos.auth.oidc.client-id", "OIDC mobile public-client ID");
         required("inner-cosmos.auth.oidc.redirect-uri", "OIDC mobile redirect URI");
+    }
 
+    private void validateRedisConnection() {
+        requireTrue("spring.data.redis.ssl.enabled", "Redis transport TLS");
+        required("spring.data.redis.host", "Redis host");
+        required("spring.data.redis.password", "Redis credential");
+    }
+
+    private void validateLlm() {
         String provider = required("llm.provider", "LLM provider").toLowerCase(Locale.ROOT);
         if (!REAL_PROVIDERS.contains(provider)) {
             throw unsafe("LLM provider must be a supported non-Mock provider");
@@ -64,7 +95,9 @@ public final class ProductionStartupGuard implements ApplicationRunner {
         if (providerKey.isBlank() && topLevelKey.isBlank()) {
             throw unsafe("active LLM provider credential is not configured");
         }
+    }
 
+    private void validateDatabase(String role) {
         String jdbcUrl = required("spring.datasource.url", "production datasource URL")
                 .toLowerCase(Locale.ROOT);
         if (!jdbcUrl.startsWith("jdbc:postgresql:")) {
@@ -73,8 +106,12 @@ public final class ProductionStartupGuard implements ApplicationRunner {
         if (!(jdbcUrl.contains("sslmode=verify-full") || jdbcUrl.contains("sslmode=verify-ca"))) {
             throw unsafe("production datasource TLS must verify the server certificate");
         }
-        if (!environment.getProperty("spring.flyway.enabled", Boolean.class, false)) {
-            throw unsafe("Flyway must own production schema migration");
+        boolean flywayEnabled = environment.getProperty("spring.flyway.enabled", Boolean.class, false);
+        if ((role.equals("all") || role.equals("migration")) && !flywayEnabled) {
+            throw unsafe("Flyway must own production schema migration for this runtime role");
+        }
+        if (!(role.equals("all") || role.equals("migration")) && flywayEnabled) {
+            throw unsafe("Flyway must be disabled outside the migration runtime role");
         }
         if (!"never".equalsIgnoreCase(environment.getProperty("spring.sql.init.mode", ""))) {
             throw unsafe("legacy SQL initialization must be disabled in production");

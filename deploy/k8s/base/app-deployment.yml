@@ -18,7 +18,7 @@ spec:
       labels:
         app.kubernetes.io/name: inner-cosmos
         app.kubernetes.io/component: api
-        inner-cosmos/runtime-role: all-in-one-transition
+        inner-cosmos/runtime-role: api
     spec:
       serviceAccountName: inner-cosmos
       automountServiceAccountToken: false
@@ -38,6 +38,18 @@ spec:
             matchLabels:
               app.kubernetes.io/name: inner-cosmos
               app.kubernetes.io/component: api
+      initContainers:
+        - name: wait-for-schema-v3
+          image: pgvector/pgvector:0.8.1-pg16@sha256:33198da2828a14c30348d2ccb4750833d5ed9a44c88d840a0e523d7417120337
+          command: ["sh", "-c", "until [ \"$(psql -h inner-cosmos-postgres -U inner_cosmos -d inner_cosmos -Atc \"SELECT COALESCE(MAX(version::integer),0) FROM flyway_schema_history WHERE success\" 2>/dev/null)\" -ge 3 ]; do sleep 2; done"]
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef: {name: inner-cosmos-runtime, key: SPRING_DATASOURCE_PASSWORD}
+            - {name: PGSSLMODE, value: verify-full}
+            - {name: PGSSLROOTCERT, value: /run/secrets/postgres/ca.crt}
+          volumeMounts:
+            - {name: postgres-ca, mountPath: /run/secrets/postgres, readOnly: true}
       containers:
         - name: app
           image: inner-cosmos:academy-placeholder
@@ -50,6 +62,8 @@ spec:
                 name: inner-cosmos-config
             - secretRef:
                 name: inner-cosmos-runtime
+          env:
+            - {name: INNER_COSMOS_RUNTIME_ROLE, value: api}
           resources:
             requests:
               cpu: 250m

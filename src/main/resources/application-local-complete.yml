@@ -1,6 +1,11 @@
 spring.config.activate.on-profile: local-complete
 
 inner-cosmos:
+  runtime:
+    role: ${INNER_COSMOS_RUNTIME_ROLE:all}
+  events:
+    outbox:
+      enabled: true
   infrastructure:
     profile: local-complete
     region: developer-controlled
