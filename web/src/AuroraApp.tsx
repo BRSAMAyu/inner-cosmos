@@ -4,19 +4,10 @@ import { api, apiConfigurationError, configureBearerAuth, hasConfiguredApiBase, 
 import { initialMobileState, mobileRuntime, type MobileRuntimeState } from "./mobile";
 import { mobileOidc } from "./mobile-auth";
 import type { AuroraStreamEvent, DialogMessage, TurnStatus } from "./protocol";
+import { initialProductSpace, MeSpace, ProductShellNavigation, type ProductSpace } from "./components/ProductShell";
 
 type UiMessage = { key: string; speaker: "USER" | "AURORA"; text: string; partial?: boolean };
 type RuntimeSignal = { stage: "idle" | "understanding" | "composing" | "speaking"; runtime: "single" | "dual"; relationshipMove?: string; repaired?: boolean };
-type ProductSpace = "aurora" | "cosmos" | "resonance" | "letters" | "me";
-const productSpaces: Array<[ProductSpace, string, string]> = [
-  ["aurora", "今天", "Aurora"], ["cosmos", "内宇宙", "记忆与自我理解"],
-  ["resonance", "共鸣", "共鸣体与相遇"], ["letters", "连接", "慢信与关系"], ["me", "我的", "控制与边界"]
-];
-
-function initialProductSpace(): ProductSpace {
-  const value = new URLSearchParams(window.location.search).get("space");
-  return productSpaces.some(([space]) => space === value) ? value as ProductSpace : "aurora";
-}
 const terminal = new Set<TurnStatus>(["COMPLETED", "INTERRUPTED", "CANCELLED"]);
 const modes = [
   ["DAILY_TALK", "倾诉"], ["THOUGHT_CLARIFY", "整理"], ["SOCRATIC", "追问"],
@@ -880,14 +871,7 @@ export function AuroraApp() {
 
   return (
     <main className="shell" data-product-space={productSpace}>
-      <nav className="app-shell-nav" aria-label="Inner Cosmos 五个空间">
-        <div className="app-mark"><span aria-hidden="true">✦</span><strong>Inner Cosmos</strong></div>
-        <div className="space-tabs">{productSpaces.map(([value, label, description]) =>
-          <button type="button" key={value} className={productSpace === value ? "active" : ""}
-            aria-current={productSpace === value ? "page" : undefined} onClick={() => navigateSpace(value)}>
-            <strong>{label}</strong><small>{description}</small>
-          </button>)}</div>
-      </nav>
+      <ProductShellNavigation active={productSpace} onNavigate={navigateSpace} />
 
       <div className="product-space" hidden={productSpace !== "aurora"}>
       <header className="hero">
@@ -1242,18 +1226,11 @@ export function AuroraApp() {
       </div>
 
       <div className="product-space" hidden={productSpace !== "me"}>
-        <section className="controls-space" aria-label="我的控制与边界">
-          <span className="eyebrow">ME · CONTROL & BOUNDARIES</span><h1>由你决定，Aurora 怎样参与。</h1>
-          <p>身份、设备权限、主动回来和数据边界都集中在这里。关闭一项能力不会删除你的创新体验，也不会暗中改写已有记忆。</p>
-          <div className="control-grid">
-            <article><strong>登录与设备</strong><span>{Capacitor.isNativePlatform() ? "OIDC + PKCE · 安全存储" : "安全 Web Session"}</span><small>{mobileState.connected ? "当前在线" : "当前离线，时间线会在恢复后续接"}</small></article>
-            <article><strong>主动回来</strong><span>{wakeIntents.length} 个有效约定</span><button type="button" onClick={() => navigateSpace("aurora")}>查看和调整</button></article>
-            <article><strong>理解与记忆</strong><span>{claims.filter(claim => claim.status === "ACTIVE").length} 条已确认理解</span><button type="button" onClick={() => navigateSpace("cosmos")}>纠正、追溯或撤回</button></article>
-            <article><strong>共鸣与连接</strong><span>{capsules.filter(capsule => capsule.visibilityStatus === "PUBLIC").length} 个公开共鸣体 · {friends.length} 个双向连接</span><button type="button" onClick={() => navigateSpace("resonance")}>管理授权</button></article>
-          </div>
-          {mobileState.native && <div className="mobile-actions"><button type="button" onClick={() => void requestMobilePush()}>管理通知权限</button><button type="button" onClick={() => void requestMobileMicrophone()}>管理麦克风权限</button></div>}
-          <button type="button" className="danger-quiet" onClick={() => void logout()}>安全退出这台设备</button>
-        </section>
+        <MeSpace native={mobileState.native} connected={mobileState.connected} wakeIntentCount={wakeIntents.length}
+          activeClaimCount={claims.filter(claim => claim.status === "ACTIVE").length}
+          publicCapsuleCount={capsules.filter(capsule => capsule.visibilityStatus === "PUBLIC").length}
+          friendCount={friends.length} onNavigate={navigateSpace} onRequestPush={() => void requestMobilePush()}
+          onRequestMicrophone={() => void requestMobileMicrophone()} onLogout={() => void logout()} />
       </div>
       <div className="state global-state" role="status"><i className={activeTurnId ? "pulse" : ""} />{status}</div>
       <footer><a href="/pages/aurora-chat.html">经典界面</a><span>五空间 AppShell · 数据与能力持续保留</span><button type="button" onClick={() => void logout()}>安全退出</button></footer>

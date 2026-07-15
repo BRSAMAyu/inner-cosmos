@@ -4,7 +4,7 @@ Date: 2026-07-15
 
 | Gate | Result | Scope |
 |---|---:|---|
-| `pnpm test -- --run` | PASS, 12/12 | API-origin, mobile-auth and frontend unit contracts |
+| `pnpm test -- --run` | PASS, 15/15 | API-origin, mobile-auth, URL restoration and five-space navigation contracts |
 | `pnpm run build` | PASS | TypeScript project build and Vite production bundle |
 | `scripts/run-living-aurora-e2e.ps1` | PASS, 11/11 | Packaged-JAR browser journeys across all five spaces and narrow viewport |
 | `scripts/run-living-aurora-experience.ps1` | PASS, 1/1 | Scheduler -> durable notification -> SSE -> deep link -> feedback |

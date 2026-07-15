@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-15T23:11:00+08:00
+updated_at: 2026-07-15T23:16:00+08:00
 authority:
   - goal-objective.md
   - 对齐文档/17-单会话持续Goal模式执行协议.md
@@ -29,10 +29,10 @@ resume_policy:
 
 active_front:
   id: UNIFIED-FIVE-SPACE-APPSHELL
-  state: BUILDER_VERIFIED_FOUNDATION
+  state: COMPONENT_DECOMPOSITION_IN_PROGRESS
   intent: Decompose the verified five-space information architecture into maintainable domain components without changing capability or data semantics.
   next_machine_actions:
-    - Extract AppShell navigation and each product space from the oversized AuroraApp while preserving URL, state and API contracts.
+    - Continue extracting the four domain-heavy product spaces from AuroraApp; ProductShell navigation and MeSpace are already isolated and tested.
     - Add automated accessibility and visual-regression coverage for desktop and narrow mobile shell states.
     - Continue Campaign B's correction, provenance and propagation experience after the component boundary is stable.
 
@@ -65,11 +65,11 @@ last_full_gate:
   baseline_commit: 4c14ef9
   claimed_java: 784/784
   claimed_playwright: 11/11 plus Living Aurora 1/1
-  claimed_vitest: 12/12
+  claimed_vitest: 15/15
   independent_reverification: BUILDER_VERIFIED_WITH_HUMAN_AND_PRODUCTION_GATES
   independently_verified:
     - Maven clean verify passed with 784 tests, Jar, SBOM, and zero SpotBugs findings at the mobile-auth checkpoint.
-    - Vitest passed 12/12 and the five-space production React bundle compiled.
+    - Vitest passed 15/15 including isolated ProductShell URL and navigation contracts; the production React bundle compiled.
     - Packaged-Jar Playwright passed 11/11 through explicit product-space navigation.
     - Living Aurora scheduler-to-feedback browser contract passed 1/1 through the new shell.
     - Android app and instrumentation APK assembly passed; live domain ownership remains a human publication gate.

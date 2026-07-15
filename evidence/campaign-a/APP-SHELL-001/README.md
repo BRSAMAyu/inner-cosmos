@@ -32,7 +32,8 @@ continuation and feedback still work through the new shell.
 ## Honest boundary
 
 This is the information-architecture and navigation foundation, not closure of `UX-SHELL` or G3.
-`AuroraApp.tsx` remains oversized and domain sections have not yet been extracted into a shared
-component system. Visual regression, automated accessibility, complete i18n and performance budgets
-also remain open. The next machine front is component decomposition with state and API contracts kept
-stable.
+The URL contract, navigation and `我的` control surface have been extracted into a tested
+`ProductShell` component boundary, but `AuroraApp.tsx` remains oversized and the four domain-heavy
+spaces still need extraction. Visual regression, automated accessibility, complete i18n and
+performance budgets also remain open. The next machine front continues domain component decomposition
+with state and API contracts kept stable.
