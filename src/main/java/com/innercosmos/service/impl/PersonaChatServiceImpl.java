@@ -25,6 +25,7 @@ import com.innercosmos.service.PersonaChatService;
 import com.innercosmos.service.CapsuleGenomeService;
 import com.innercosmos.entity.CapsuleGenomeVersion;
 import com.innercosmos.service.SafetyService;
+import com.innercosmos.util.DataMaskingUtils;
 import com.innercosmos.vo.CapsuleQuotaVO;
 import com.innercosmos.vo.SafetyResult;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -226,7 +227,15 @@ public class PersonaChatServiceImpl implements PersonaChatService {
                 String identityNotice = capsule != null && "USER_CAPSULE".equals(capsule.capsuleType)
                         ? "（这是授权共鸣体的回应，不是真人实时在线。）"
                         : "";
-                capsuleMessage.textContent = prefix + boundaryText + blank(ai.reply, "真实模型暂时不可用，我不想用模板伪装成这个共鸣体。请稍后再试，或者写一封慢信。") + identityNotice;
+                // The system prompt instructs the model not to leak contact info/identity, but that
+                // is a request, not a guarantee — a real provider (currently human-gated) manipulated
+                // via prompt injection could still comply with an injected instruction to quote a
+                // phone number or email verbatim. Redact as an output-side safety net regardless of
+                // whether the model behaved, mirroring the same DataMaskingUtils.maskContact chokepoint
+                // AiLogServiceImpl already uses for logged AI responses.
+                String reply = DataMaskingUtils.maskContact(blank(ai.reply,
+                        "真实模型暂时不可用，我不想用模板伪装成这个共鸣体。请稍后再试，或者写一封慢信。"));
+                capsuleMessage.textContent = prefix + boundaryText + reply + identityNotice;
 
                 // IC-CAP-002 MAJOR-1: detect the AI-unavailable fallback. The quota was
                 // already atomically reserved; if the model is unavailable we COMPENSATE

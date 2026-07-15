@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-16T05:08:00+08:00
+updated_at: 2026-07-16T05:16:00+08:00
 authority:
   - goal-objective.md
   - 对齐文档/17-单会话持续Goal模式执行协议.md
@@ -154,6 +154,23 @@ active_front:
       without a real LLM provider, cannot) prove the compiled voice reads like the real user.
       Fidelity in that stronger sense, and the other 2 requested dimensions (fact/style fidelity
       against held-out memories, unfamiliar-scenario stability), remain open — see below."
+    - "[P1 FIXED, real gap found while investigating 'counter-prompt-attack' testability]
+      PersonaChatServiceImpl's real-visitor-facing reply had ZERO output-side safety net: the
+      system prompt asks the model not to leak contact info/real identity/unauthorized memories,
+      but that is a request a real provider (human-gated, not yet exercised for capsule work)
+      manipulated via prompt injection could still ignore — and nothing downstream would catch
+      it. grep-confirmed SafetyBoundaryFilter is used elsewhere (WakeIntentDeliveryJob,
+      PsychologySkillServiceImpl, SafetyServiceImpl) but never for capsule persona-chat replies.
+      Fixed: capsuleMessage.textContent now passes through DataMaskingUtils.maskContact (the
+      same chokepoint AiLogServiceImpl already uses for logged AI responses) before it reaches
+      the visitor. New test
+      PersonaChatServiceImplPhaseBTest.modelReplyLeakingContactInfo_isRedactedBeforePersisting
+      stubs a leaky reply and asserts the phone number/email never reach the returned message.
+      Verified via revert-and-restore: reverting the fix made the test fail with 'a real phone
+      number must never reach the visitor even if the model leaked it'. This is a genuine partial
+      answer to the review's 'counter-prompt/leakage resistance' eval-dimension ask — it hardens
+      the boundary a successful injection would need to defeat, though it cannot test whether a
+      real model is actually vulnerable to injection without a real provider (human-gated)."
   next_machine_actions:
     - "NEXT — commit this checkpoint (Genome IR provenance slice 1 + GenomeCompilerGroundednessEvaluationTest),
       focused-suite verified green."

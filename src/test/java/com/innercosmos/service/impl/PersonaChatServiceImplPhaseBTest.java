@@ -223,6 +223,33 @@ class PersonaChatServiceImplPhaseBTest {
     }
 
     @Test
+    @DisplayName("Output-side safety net: a leaked phone number/email in the model's reply is "
+            + "redacted even though the system prompt already asks the model not to leak it")
+    void modelReplyLeakingContactInfo_isRedactedBeforePersisting() {
+        Long userId = 5L, sessionId = 14L, capsuleId = 104L;
+        EchoCapsule c = capsule(capsuleId);
+        when(sessionMapper.selectById(sessionId)).thenReturn(session(sessionId, userId, capsuleId));
+        when(safetyService.check(any(), any(), any())).thenReturn(safePassed());
+        when(capsuleMapper.selectById(capsuleId)).thenReturn(c);
+        reserveViaUpdate();
+        StructuredAiResults.PersonaResult leaky = new StructuredAiResults.PersonaResult();
+        leaky.reply = "你可以直接打电话给我，号码是13800001111，或者写信到test@example.com";
+        leaky.boundaryNotice = "";
+        leaky.letterSuggested = false;
+        when(structuredAiService.call(any(), any(), any(), any(), any(), any())).thenReturn(leaky);
+        when(boundaryMapper.selectOne(any())).thenReturn(null);
+
+        PersonaChatMessage result = service.reply(userId, sessionId, "hi");
+
+        assertFalse(result.textContent.contains("13800001111"),
+                "a real phone number must never reach the visitor even if the model leaked it");
+        assertFalse(result.textContent.contains("test@example.com"),
+                "a real email must never reach the visitor even if the model leaked it");
+        assertTrue(result.textContent.contains("[数字已脱敏]") && result.textContent.contains("[邮箱已脱敏]"),
+                "the redaction placeholders must be visible, not a silently truncated message");
+    }
+
+    @Test
     @DisplayName("MAJOR-2: over-limit does NOT persist the visitor message")
     void overLimit_doesNotInsertVisitorMessage() {
         Long userId = 4L, sessionId = 13L, capsuleId = 103L;
