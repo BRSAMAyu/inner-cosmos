@@ -112,6 +112,67 @@ public class CapsuleServiceImpl implements CapsuleService {
         return capsule;
     }
 
+    private static final String SIMULATOR_CONSENT_SCOPE = "SIMULATOR_AUTHORIZED";
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public EchoCapsule createSimulatorCapsule(Long userId, CapsuleCreateRequest request) {
+        List<Long> requested = request.memoryIds == null ? List.of() : request.memoryIds;
+        if (requested.isEmpty()) {
+            throw new com.innercosmos.exception.BusinessException(
+                    com.innercosmos.common.ErrorCode.BAD_REQUEST, "模拟器共鸣体需要至少一条明确授权的记忆");
+        }
+        List<MemoryCard> authorizedCards = new ArrayList<>();
+        for (Long mid : requested) {
+            MemoryCard card = memoryCardMapper.selectById(mid);
+            if (card == null || !userId.equals(card.userId) || !"ACTIVE".equalsIgnoreCase(card.status)
+                    || !SIMULATOR_CONSENT_SCOPE.equalsIgnoreCase(card.consentScope)) {
+                throw new com.innercosmos.exception.BusinessException(
+                        com.innercosmos.common.ErrorCode.BAD_REQUEST,
+                        "记忆 " + mid + " 未被明确标记为仅供模拟器使用，不能进入模拟器共鸣体");
+            }
+            authorizedCards.add(card);
+        }
+        List<String> memorySummaries = authorizedCards.stream().map(card -> card.title + ": " + card.summary).toList();
+
+        EchoCapsule capsule = new EchoCapsule();
+        capsule.ownerUserId = userId;
+        capsule.capsuleType = "USER_CAPSULE";
+        capsule.pseudonym = request.pseudonym == null || request.pseudonym.isBlank() ? "隔离的模拟器侧面" : request.pseudonym;
+        capsule.intro = request.intro == null ? "仅供测试与研究使用的隔离侧面，不会被真实访客发现或对话。" : request.intro;
+        capsule.personaPrompt = capsuleAgent.generateUserPersona(userId, memorySummaries, capsule.pseudonym, capsule.intro);
+        capsule.publicTags = toJsonArray(request.publicTags, "simulator-only");
+        capsule.authorizedMemoryIds = toJsonArray(authorizedCards.stream().map(card -> String.valueOf(card.id)).toList());
+        capsule.ownerContextNote = request.ownerContextNote;
+        capsule.styleProfileJson = request.styleProfileJson == null ? inferStyleProfile(memorySummaries) : request.styleProfileJson;
+        capsule.contextPreviewJson = request.contextPreviewJson == null
+                ? buildContextPreview(memorySummaries, capsule.publicTags, capsule.ownerContextNote) : request.contextPreviewJson;
+        capsule.standInEnabled = false;
+        capsule.realContactPolicy = "LETTER_ONLY";
+        capsule.echoEnergy = 0.0;
+        capsule.freshnessScore = 0.0;
+        capsule.conversationLimitPerDay = safeTurns(request.maxConversationTurns, false);
+        // Permanently isolated regardless of what the request asked for: never public, never matched,
+        // never reachable by real visitor persona chat.
+        capsule.visibilityStatus = "PRIVATE";
+        capsule.isPublic = false;
+        capsule.simulatorOnly = true;
+        capsule.lastMemoryUpdateAt = LocalDateTime.now();
+        capsuleMapper.insert(capsule);
+
+        CapsuleBoundary boundary = new CapsuleBoundary();
+        boundary.capsuleId = capsule.id;
+        boundary.allowTopics = toJsonArray(request.allowTopics, "自我观察", "温柔建议", "日常支持");
+        boundary.blockedTopics = toJsonArray(request.blockedTopics, "隐私身份", "诊断承诺", "强迫即时回应");
+        boundary.maxConversationTurns = safeTurns(request.maxConversationTurns, false);
+        boundary.allowLetterRequest = false;
+        boundary.privacyLevel = safePrivacy(request.privacyLevel);
+        boundaryMapper.insert(boundary);
+        for (MemoryCard card : authorizedCards) authorize(capsule.id, card);
+        genomeService.compile(capsule, authorizedCards, "simulator-only compilation for isolated testing/research");
+        return capsule;
+    }
+
     @Override
     public EchoCapsule updateContext(Long userId, Long capsuleId, Map<String, Object> body) {
         EchoCapsule capsule = getOwnedCapsule(userId, capsuleId);
@@ -190,6 +251,11 @@ public class CapsuleServiceImpl implements CapsuleService {
                 || (capsule.activeGenomeVersionId != null && genomeService.current(capsuleId) == null))) {
             throw new com.innercosmos.exception.BusinessException(
                     com.innercosmos.common.ErrorCode.BAD_REQUEST, "授权记忆需要复核后才能重新公开");
+        }
+        boolean requestsPublic = "PUBLIC".equals(visibilityStatus) || Boolean.TRUE.equals(isPublic);
+        if (Boolean.TRUE.equals(capsule.simulatorOnly) && requestsPublic) {
+            throw new com.innercosmos.exception.BusinessException(
+                    com.innercosmos.common.ErrorCode.BAD_REQUEST, "模拟器共鸣体仅供隔离测试，永远不能公开或被真实访客发现");
         }
         capsule.visibilityStatus = safeVisibility(visibilityStatus);
         capsule.isPublic = isPublic == null ? !"PRIVATE".equals(capsule.visibilityStatus) : isPublic;

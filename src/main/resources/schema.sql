@@ -422,6 +422,7 @@ CREATE TABLE IF NOT EXISTS tb_echo_capsule (
   real_contact_policy VARCHAR(32),
   last_activity_at TIMESTAMP NULL,
   active_genome_version_id BIGINT,
+  simulator_only BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_capsule_public (is_public, visibility_status),

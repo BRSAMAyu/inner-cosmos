@@ -50,6 +50,11 @@ public class CapsuleController extends BaseController {
         return ApiResponse.ok(capsuleService.createFromMemory(currentUserId(session), request));
     }
 
+    @PostMapping("/create-simulator")
+    public ApiResponse<EchoCapsule> createSimulator(@RequestBody CapsuleCreateRequest request, HttpSession session) {
+        return ApiResponse.ok(capsuleService.createSimulatorCapsule(currentUserId(session), request));
+    }
+
     @GetMapping("/{id}")
     public ApiResponse<EchoCapsule> detail(@PathVariable Long id, HttpSession session) {
         return ApiResponse.ok(capsuleService.getOwnedCapsule(currentUserId(session), id));

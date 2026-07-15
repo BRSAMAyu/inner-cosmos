@@ -46,7 +46,7 @@ class PostgresFlywayBaselineTest {
                 .locations("classpath:db/migration/postgresql")
                 .load();
 
-        assertEquals(14, flyway.migrate().migrationsExecuted);
+        assertEquals(15, flyway.migrate().migrationsExecuted);
         assertEquals(0, flyway.migrate().migrationsExecuted);
 
         String source = readClasspath("schema.sql");

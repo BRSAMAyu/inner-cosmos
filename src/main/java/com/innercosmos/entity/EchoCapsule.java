@@ -26,4 +26,8 @@ public class EchoCapsule extends BaseEntity {
     // IC-CAP-002 B-4: last time this capsule had a genuinely successful chat turn.
     public LocalDateTime lastActivityAt;
     public Long activeGenomeVersionId;
+    // Isolated Simulator capability contract (对齐文档/16 Campaign C): true only for capsules
+    // compiled from explicitly SIMULATOR_AUTHORIZED memories for testing/research. Permanently
+    // excluded from publish, plaza listing, matching and real visitor persona chat.
+    public Boolean simulatorOnly;
 }

@@ -11,6 +11,16 @@ import java.util.Map;
 public interface CapsuleService {
     EchoCapsule createFromMemory(Long userId, CapsuleCreateRequest request);
 
+    /**
+     * The isolated Simulator capability contract (对齐文档/16 Campaign C): compiles a Genome
+     * for testing/research purposes only, from memories the owner has explicitly marked
+     * SIMULATOR_AUTHORIZED (a distinct consent scope from normal capsule authorization — no
+     * default reuse of a personal capsule's already-authorized memories). The result is
+     * permanently private: it can never be published, matched, or reached by real visitor
+     * persona chat (enforced in updateVisibility/plazaCapsules/PersonaChatService).
+     */
+    EchoCapsule createSimulatorCapsule(Long userId, CapsuleCreateRequest request);
+
     EchoCapsule getOwnedCapsule(Long userId, Long capsuleId);
 
     EchoCapsule updateVisibility(Long userId, Long capsuleId, String visibilityStatus, Boolean isPublic);

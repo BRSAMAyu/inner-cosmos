@@ -137,6 +137,50 @@ class CapsuleGenomeServiceIntegrationTest {
 
     @Test
     @Transactional
+    void simulatorCapsuleRequiresExplicitAuthorizationAndIsPermanentlyIsolated() {
+        Long owner = seedUser("simulator-owner");
+        Long visitor = seedUser("simulator-visitor");
+        Long personalMemory = seedMemory(owner, "已授权给真实共鸣体的记忆", "AURORA_PRIVATE");
+        Long simulatorMemory = seedMemory(owner, "明确只授权给模拟器的记忆", "SIMULATOR_AUTHORIZED");
+
+        // A personal capsule's own normally-authorized memory must not be silently reusable
+        // for the Simulator — the contract requires an explicit, distinct authorization.
+        CapsuleCreateRequest reusesPersonalConsent = new CapsuleCreateRequest();
+        reusesPersonalConsent.memoryIds = List.of(personalMemory);
+        assertThrows(BusinessException.class,
+                () -> capsuleService.createSimulatorCapsule(owner, reusesPersonalConsent));
+
+        CapsuleCreateRequest request = new CapsuleCreateRequest();
+        request.pseudonym = "模拟器侧面";
+        request.memoryIds = List.of(simulatorMemory);
+        // Even if the caller asks for PUBLIC, the Simulator capsule must come back private.
+        request.visibilityStatus = "PUBLIC";
+        request.isPublic = true;
+        EchoCapsule simulator = capsuleService.createSimulatorCapsule(owner, request);
+        assertTrue(simulator.simulatorOnly);
+        assertEquals("PRIVATE", simulator.visibilityStatus);
+        assertFalse(simulator.isPublic);
+        assertNotNull(genomeService.current(simulator.id), "the Simulator still gets a real compiled Genome");
+
+        assertThrows(BusinessException.class,
+                () -> capsuleService.updateVisibility(owner, simulator.id, "PUBLIC", true),
+                "a Simulator capsule can never be published");
+        assertThrows(BusinessException.class,
+                () -> capsuleService.updateVisibility(owner, simulator.id, null, true),
+                "isPublic alone must not bypass the Simulator publish guard either");
+
+        assertTrue(capsuleService.plazaCapsules().stream().noneMatch(row -> row.id.equals(simulator.id)),
+                "Simulator capsules must never appear in the public plaza");
+        assertThrows(BusinessException.class, () -> personaChatService.create(visitor, simulator.id),
+                "real visitors can never reach a Simulator capsule through persona chat");
+
+        // The isolation does not block the actual purpose: the owner can still sandbox-test it.
+        CapsuleSandboxVO response = sandboxService.respond(owner, simulator.id, "在陌生场景下你会怎么回应？");
+        assertTrue(response.providerAvailable());
+    }
+
+    @Test
+    @Transactional
     void fidelitySummaryAggregatesFeedbackPerVersionAndIsOwnerIsolated() {
         Long owner = seedUser("fidelity-owner");
         Long stranger = seedUser("fidelity-stranger");
