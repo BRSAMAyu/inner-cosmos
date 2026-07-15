@@ -255,6 +255,14 @@ CREATE TABLE IF NOT EXISTS tb_memory_card (
   last_touched_at TIMESTAMP NULL,
   visibility_level VARCHAR(32),
   status VARCHAR(32),
+  version_no INT DEFAULT 1,
+  memory_layer VARCHAR(32) DEFAULT 'EPISODIC',
+  confidence DOUBLE DEFAULT 0.5,
+  consent_scope VARCHAR(32) DEFAULT 'AURORA_PRIVATE',
+  superseded_by_id BIGINT,
+  provenance_refs TEXT,
+  archived_at TIMESTAMP NULL,
+  forgotten_at TIMESTAMP NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_memory_user (user_id),
@@ -263,6 +271,49 @@ CREATE TABLE IF NOT EXISTS tb_memory_card (
   -- duplicate-card race (M-007 prevents the double-fire at the source). NULL source_session_id
   -- (e.g. shredder cards) stays multi-allowed (H2/MySQL treat NULLs as distinct under UNIQUE).
   CONSTRAINT uk_memory_card_user_session UNIQUE (user_id, source_session_id)
+);
+
+CREATE TABLE IF NOT EXISTS tb_memory_operation (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  operation_type VARCHAR(32) NOT NULL,
+  primary_memory_id BIGINT,
+  related_memory_ids TEXT,
+  old_version INT,
+  new_version INT,
+  before_snapshot TEXT,
+  after_snapshot TEXT,
+  evidence_refs TEXT,
+  model_name VARCHAR(128),
+  prompt_version VARCHAR(64),
+  reason_code VARCHAR(128),
+  confidence DOUBLE,
+  actor_type VARCHAR(32) NOT NULL,
+  rollback_of_operation_id BIGINT,
+  status VARCHAR(32) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_memory_operation_user (user_id, created_at),
+  INDEX idx_memory_operation_primary (user_id, primary_memory_id),
+  CONSTRAINT fk_memory_operation_rollback FOREIGN KEY (rollback_of_operation_id) REFERENCES tb_memory_operation(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS tb_memory_link (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  source_memory_id BIGINT NOT NULL,
+  target_memory_id BIGINT NOT NULL,
+  link_type VARCHAR(32) NOT NULL,
+  strength DOUBLE DEFAULT 0.5,
+  evidence_refs TEXT,
+  status VARCHAR(32) DEFAULT 'ACTIVE',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_memory_link (user_id, source_memory_id, target_memory_id, link_type),
+  INDEX idx_memory_link_source (user_id, source_memory_id),
+  INDEX idx_memory_link_target (user_id, target_memory_id),
+  CONSTRAINT fk_memory_link_source FOREIGN KEY (source_memory_id) REFERENCES tb_memory_card(id) ON DELETE CASCADE,
+  CONSTRAINT fk_memory_link_target FOREIGN KEY (target_memory_id) REFERENCES tb_memory_card(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS tb_thought_fragment (

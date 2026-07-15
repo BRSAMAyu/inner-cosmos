@@ -143,3 +143,19 @@ test("user previews and confirms an authoritative understanding correction", asy
   await expect(space.locator(".claim-card").first()).toContainText("我是在谨慎选择下一步");
   await expect(page.getByRole("status")).toContainText("已校准");
 });
+
+test("memory starfield switches between time, theme and people without losing its accessible view", async ({ page }) => {
+  await page.goto("/app/aurora/index.html");
+  await loginIfNeeded(page);
+  const cosmos = page.getByRole("region", { name: "记忆星空" });
+  await expect(cosmos.getByRole("heading", { name: "你的记忆不是档案柜" })).toBeVisible();
+  const accessible = cosmos.getByRole("list", { name: "记忆星空可访问列表" });
+  await expect(accessible.locator("li").first()).toBeVisible();
+  await expect(cosmos.getByRole("button", { name: "时间" })).toHaveAttribute("aria-pressed", "true");
+  await cosmos.getByRole("button", { name: "主题" }).click();
+  await expect(cosmos.locator(".cosmos-explanation")).toContainText("相近主题聚成星座");
+  await expect(cosmos.getByRole("button", { name: "主题" })).toHaveAttribute("aria-pressed", "true");
+  await cosmos.getByRole("button", { name: "人物" }).click();
+  await expect(cosmos.locator(".cosmos-explanation")).toContainText("人物标签形成共同轨道");
+  await expect(accessible.locator("li").first()).toBeVisible();
+});

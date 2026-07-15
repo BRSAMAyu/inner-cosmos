@@ -142,11 +142,11 @@ gates:
     status: IN_PROGRESS
     required: true
     acceptance:
-      - {id: MEMORY-LIFECYCLE, target: "Memories support consolidation, reinforcement, contradiction, supersession, decay, archive, and forgetting.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-INNER-001/]}
+      - {id: MEMORY-LIFECYCLE, target: "Memories support consolidation, reinforcement, contradiction, supersession, decay, archive, and forgetting.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-INNER-001/, evidence/innovation/INNO-INNER-002/]}
       - {id: PROFILE-MODEL, target: "High-dimensional claims retain source, confidence, time, consent, conflict, and correction history.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-INNER-001/]}
-      - {id: RETRIEVAL-QUALITY, target: "Task-aware hybrid retrieval meets precision, relevance, contradiction, privacy, latency, and budget thresholds.", status: UNASSESSED, evidence: []}
+      - {id: RETRIEVAL-QUALITY, target: "Task-aware hybrid retrieval meets precision, relevance, contradiction, privacy, latency, and budget thresholds.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-INNER-002/]}
       - {id: PROFILE-PROPAGATION, target: "Correction and withdrawal re-evaluate downstream insights, vectors, caches, capsules, and matching.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-INNER-001/]}
-      - {id: STARFIELD-V2, target: "Starfield visual semantics, time/topic/person exploration, provenance detail, accessible alternative, and mobile performance pass.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-INNER-001/]}
+      - {id: STARFIELD-V2, target: "Starfield visual semantics, time/topic/person exploration, provenance detail, accessible alternative, and mobile performance pass.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-INNER-001/, evidence/innovation/INNO-INNER-002/]}
 
   - id: G6
     name: Capsule intelligence and resonance

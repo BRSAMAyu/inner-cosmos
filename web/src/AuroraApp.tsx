@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { api, replayTurnEvents, streamAurora, type CorrectionCommand, type CorrectionImpact, type Notification, type SelfEvolution, type UnderstandingClaim, type WakeIntent } from "./api";
+import { api, replayTurnEvents, streamAurora, type CorrectionCommand, type CorrectionImpact, type Notification, type SelfEvolution, type StarfieldScene, type UnderstandingClaim, type WakeIntent } from "./api";
 import type { AuroraStreamEvent, DialogMessage, TurnStatus } from "./protocol";
 
 type UiMessage = { key: string; speaker: "USER" | "AURORA"; text: string; partial?: boolean };
@@ -33,6 +33,8 @@ export function AuroraApp() {
   const [correctionImpact, setCorrectionImpact] = useState<CorrectionImpact | null>(null);
   const [correctionBusy, setCorrectionBusy] = useState(false);
   const [claims, setClaims] = useState<UnderstandingClaim[]>([]);
+  const [starfield, setStarfield] = useState<StarfieldScene | null>(null);
+  const [starfieldBusy, setStarfieldBusy] = useState(false);
   const [runtimeSignal, setRuntimeSignal] = useState<RuntimeSignal>({ stage: "idle", runtime: "single" });
   const abortRef = useRef<AbortController | null>(null);
   const activeTurnRef = useRef<number | null>(null);
@@ -60,6 +62,7 @@ export function AuroraApp() {
         api.wakeIntents().then(setWakeIntents),
         api.selfEvolution().then(setSelfEvolution),
         api.understandingClaims().then(setClaims),
+        api.starfield("TIME").then(setStarfield),
         api.notifications().then(setNotifications)
       ]);
       if (call !== bootstrapCallRef.current) return;
@@ -322,6 +325,13 @@ export function AuroraApp() {
     finally { setCorrectionBusy(false); }
   };
 
+  const changeStarfieldMode = async (nextMode: StarfieldScene["mode"]) => {
+    setStarfieldBusy(true);
+    try { setStarfield(await api.starfield(nextMode)); }
+    catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法切换星空视角"); }
+    finally { setStarfieldBusy(false); }
+  };
+
   if (authenticated === null) return <main className="login-shell"><div className="login" role="status">正在连接你的内宇宙…</div></main>;
   if (!authenticated) return <Login onSuccess={bootstrap} />;
 
@@ -415,6 +425,29 @@ export function AuroraApp() {
           <span>由你确认 · v{claim.version}</span><p>{claim.valueJson.replace(/^"|"$/g, "")}</p>
         </article>)}
       </section>
+
+      {starfield && <section className="cosmos-space" aria-label="记忆星空">
+        <div className="cosmos-heading"><div><span className="eyebrow">MEMORY, ALIVE</span><h2>你的记忆不是档案柜</h2></div>
+          <span>{starfield.stars.length} 颗当前记忆</span></div>
+        <div className="cosmos-modes" aria-label="星空视角">
+          {([ ["TIME", "时间"], ["THEME", "主题"], ["PEOPLE", "人物"] ] as const).map(([value, label]) =>
+            <button type="button" disabled={starfieldBusy} aria-pressed={starfield.mode === value} key={value}
+              className={starfield.mode === value ? "active" : ""} onClick={() => void changeStarfieldMode(value)}>{label}</button>)}
+        </div>
+        <p className="cosmos-explanation">{starfield.modeExplanation}</p>
+        <div className="cosmos-map" aria-hidden="true">
+          {starfield.stars.map(star => <span className="cosmos-star" key={star.id} title={star.ariaLabel} style={{
+            left: `${50 + Math.max(-46, Math.min(46, star.x / 2))}%`, top: `${50 + Math.max(-42, Math.min(42, star.y / 2))}%`,
+            width: `${Math.max(8, Math.min(24, 8 + star.gravity * 3))}px`, height: `${Math.max(8, Math.min(24, 8 + star.gravity * 3))}px`,
+            background: star.color, opacity: Math.max(.45, star.glow ?? .7)
+          }} />)}
+        </div>
+        <div className="cosmos-legend">{Object.entries(starfield.legend).map(([key, value]) => <span key={key}><strong>{key}</strong>{value}</span>)}</div>
+        <ol className="cosmos-list" aria-label="记忆星空可访问列表">
+          {starfield.accessibleList.map(star => <li key={star.id}><div><strong>{star.title}</strong><span>{star.theme} · {star.memoryLayer}</span></div>
+            <small>置信度 {Math.round(star.confidence * 100)}% · v{star.versionNo}</small><p>{star.summary}</p></li>)}
+        </ol>
+      </section>}
 
       <section className="conversation" aria-live="polite" aria-label="与 Aurora 的对话">
         {messages.length === 0 && <div className="empty"><span>✦</span><p>把现在最真实的一句话放在这里。</p></div>}

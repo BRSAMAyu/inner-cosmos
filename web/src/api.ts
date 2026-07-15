@@ -43,6 +43,16 @@ export type UnderstandingClaim = {
   id: number; claimKey: string; valueJson: string; authorityLevel: string;
   status: "ACTIVE" | "SUPERSEDED" | "RETIRED"; version: number; createdAt: string;
 };
+export type StarfieldStar = {
+  id: number; title: string; summary: string | null; theme: string; color: string;
+  gravity: number; glow: number; freshness: number; x: number; y: number;
+  memoryLayer: string; confidence: number; versionNo: number; peopleTags: string | null;
+  status: string; occurredAt: string | null; ariaLabel: string; connectedMemoryIds: number[];
+};
+export type StarfieldScene = {
+  mode: "TIME" | "THEME" | "PEOPLE"; modeExplanation: string;
+  stars: StarfieldStar[]; accessibleList: StarfieldStar[]; legend: Record<string, string>; generatedAt: string;
+};
 export type CorrectionConfirmation = {
   correction: { id: number; newValue: string; status: string; impactSummary: string };
   activeClaim: UnderstandingClaim;
@@ -126,7 +136,8 @@ export const api = {
   confirmCorrection: (input: CorrectionCommand) => request<CorrectionConfirmation>("/api/aurora/corrections/confirm", {
     method: "POST", body: JSON.stringify(input)
   }),
-  understandingClaims: () => request<UnderstandingClaim[]>("/api/aurora/corrections/claims")
+  understandingClaims: () => request<UnderstandingClaim[]>("/api/aurora/corrections/claims"),
+  starfield: (mode: StarfieldScene["mode"]) => request<StarfieldScene>(`/api/memory/starfield/v2?mode=${mode}`)
 };
 
 export async function streamAurora(

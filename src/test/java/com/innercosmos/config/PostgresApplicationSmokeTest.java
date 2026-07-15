@@ -69,8 +69,8 @@ class PostgresApplicationSmokeTest {
         login.password = register.password;
         assertEquals(created.id, userService.login(login).id);
 
-        // V7 adds the relational understanding-claim authority and propagation ledger.
-        assertEquals(69L, jdbcTemplate.queryForObject("""
+        // V8 adds the memory operation authority and typed relation ledger.
+        assertEquals(71L, jdbcTemplate.queryForObject("""
                 SELECT COUNT(*) FROM information_schema.tables
                 WHERE table_schema='public' AND table_name LIKE 'tb_%'
                 """, Long.class));

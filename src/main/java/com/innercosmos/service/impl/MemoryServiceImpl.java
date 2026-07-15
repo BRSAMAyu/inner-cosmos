@@ -156,6 +156,17 @@ public class MemoryServiceImpl implements MemoryService {
             vo.freshness = freshness(card.lastTouchedAt);
             vo.suggestedForCapsule = vo.gravity > 1.1;
             vo.detail = buildStarDetail(card, vo);
+            vo.memoryLayer = card.memoryLayer == null ? "EPISODIC" : card.memoryLayer;
+            vo.confidence = card.confidence == null ? 0.5 : card.confidence;
+            vo.versionNo = card.versionNo == null ? 1 : card.versionNo;
+            vo.peopleTags = card.peopleTags;
+            vo.provenanceRefs = card.provenanceRefs;
+            vo.status = card.status;
+            vo.occurredAt = card.lastTouchedAt == null ? card.createdAt : card.lastTouchedAt;
+            vo.ariaLabel = card.title + "，" + vo.theme + "，情感重力 "
+                    + String.format("%.1f", vo.gravity) + "，置信度 "
+                    + Math.round(vo.confidence * 100) + "%";
+            vo.connectedMemoryIds = List.of();
             result.add(vo);
             i++;
         }

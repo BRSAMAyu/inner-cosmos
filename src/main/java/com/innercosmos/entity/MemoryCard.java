@@ -21,4 +21,12 @@ public class MemoryCard extends BaseEntity {
     public LocalDateTime lastTouchedAt;
     public String visibilityLevel;
     public String status;
+    public Integer versionNo;
+    public String memoryLayer;
+    public Double confidence;
+    public String consentScope;
+    public Long supersededById;
+    public String provenanceRefs;
+    public LocalDateTime archivedAt;
+    public LocalDateTime forgottenAt;
 }
