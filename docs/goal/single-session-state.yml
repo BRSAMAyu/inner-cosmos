@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-16T06:05:00+08:00
+updated_at: 2026-07-16T06:31:00+08:00
 authority:
   - goal-objective.md
   - 对齐文档/17-单会话持续Goal模式执行协议.md
@@ -325,7 +325,7 @@ closed_front_local_dev_schema_drift:
     - "Full `mvn test` re-verified after adding SchemaM8Initializer/SchemaM9Initializer: 796/796,
       BUILD SUCCESS. Committed."
 
-active_front:
+closed_front_g3_ux_shell_real_parity:
   id: G3-UX-SHELL-REAL-PARITY
   state: RETIREMENT_PLAN_CORRECTED_TO_PORTING_PLAN_BEFORE_ANY_FILE_WAS_TOUCHED
   intent: |
@@ -382,6 +382,60 @@ active_front:
     - "Do NOT retire/redirect any of the 13 legacy pages until the corresponding AppShell port is
       verified to have real parity (same rigor as this checkpoint's verification, not just
       'a component with a similar name exists')."
+
+active_front:
+  id: G3-PORTRAIT-PORT
+  state: DONE_VERIFIED_LIVE_END_TO_END
+  intent: |
+    Executed priority item 1 from the prior checkpoint's ranked port list: portrait viewing +
+    calibration, since the backend (GET /api/portrait, GET /api/portrait/history?dim=, and
+    POST /api/aurora/corrections/confirm with targetType=PORTRAIT_DIM) already existed per
+    RUN-006 — a pure frontend port, no backend work needed.
+  done_this_front_summary:
+    - "Added web/src/components/PortraitView.tsx: renders each portrait dimension sorted by
+      confidence (highest first), with a confidence bar, the human-readable current value
+      (JSON-or-plain-text via the same parsing logic legacy portrait.html used), a lazy-loaded
+      'view history' toggle, and a 'this isn't quite me' calibration form. Confirming a
+      calibration reuses the EXISTING api.confirmCorrection (already used by
+      UnderstandingCorrection.tsx for AURORA_UNDERSTANDING) with targetType=PORTRAIT_DIM — the
+      backend already handles this identically (UserCorrectionServiceImpl checks
+      \"PORTRAIT_DIM\".equals(command.targetType()) in 4 places), so no new backend code was
+      needed. Matches legacy semantics: the correction coexists alongside Aurora's own
+      observation (a visible 'calibrated' note) rather than overwriting the displayed value."
+    - "Added to web/src/api.ts: PortraitDimension/PortraitHistoryEntry types, api.portrait(),
+      api.portraitHistory(dim). Wired into AuroraApp.tsx's existing bootstrap Promise.all
+      (appended at the END of the array, not inserted in the middle — the array is consumed by
+      positional index (loaded[8], loaded[9], loaded[13]) elsewhere in this function, and an
+      earlier attempt to insert in the middle silently broke those three casts by shifting every
+      later index by one; tsc caught it immediately as a real compile error, not a runtime
+      surprise)."
+    - "New web/src/components/PortraitView.test.tsx: 5 Vitest cases (empty state, confidence
+      sort + value rendering, lazy history load/collapse, calibration form open/submit/close,
+      busy-disables-save + calibrated-note-appears). 38/38 green across the whole web suite."
+    - "Verified live end-to-end against a real packaged jar on a throwaway database (not the
+      persistent dev DB): registered a user, confirmed the empty state renders correctly with
+      zero portrait rows, then seeded 2 dimensions + 1 history row directly via H2 shell,
+      restarted, and confirmed in a real browser: both dimensions render sorted by confidence
+      with the correct value/percentage; history expand/collapse loads and displays the seeded
+      row; the calibration form opens with the current value shown, submits, and the persisted
+      tb_user_correction row was confirmed via read-only H2 query to have exactly
+      targetType=PORTRAIT_DIM, fieldName=INNER_DRIVE, status=CONFIRMED — the full loop is real,
+      not just a UI mockup."
+    - "Unrelated environment note: the Browser pane's 'computer' click tool intermittently failed
+      to trigger click handlers in this session (login button, history/calibrate buttons) with
+      no error — worked around via direct DOM .click()/fetch() calls through javascript_tool.
+      This looks like a tool/environment flakiness (same class of issue as the
+      previously-documented preview_screenshot timeout), not an app bug — the same buttons work
+      correctly when actually clicked (proven via the .click() workaround), and the Vitest
+      fireEvent.click tests (which don't depend on this tool) also pass."
+  next_machine_actions:
+    - "NEXT — continue down the priority-ordered port list: settings (change-password,
+      delete-account, data export first — data-rights-relevant and currently only reachable via
+      a 2-hop detour through the legacy dashboard nav; then the cosmetic preference toggles), or
+      pick a different acceptance-ledger front if a fresher gap surfaces."
+    - "Corrections history/retire (corrections.html's gap, item 8 in the parity list) shares the
+      same GET/DELETE /api/aurora/corrections backend this checkpoint's work touched — a
+      natural, small follow-up extension to UnderstandingCorrection.tsx if picked up next."
 
 priority_queue:
   - id: CAMPAIGN-C-QUALITY

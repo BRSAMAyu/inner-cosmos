@@ -1,6 +1,6 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
-import { api, apiConfigurationError, configureBearerAuth, hasConfiguredApiBase, replayTurnEvents, streamAurora, subscribeProactive, type CapsuleFidelitySummary, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type ConnectionRequests, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type Notification, type PersonaMessage, type PersonaSession, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type PsychologySkillSuggestion, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type SocialConnection, type StarfieldDetail, type StarfieldScene, type StarfieldStar, type UnderstandingClaim, type WakeIntent } from "./api";
+import { api, apiConfigurationError, configureBearerAuth, hasConfiguredApiBase, replayTurnEvents, streamAurora, subscribeProactive, type CapsuleFidelitySummary, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type ConnectionRequests, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type Notification, type PersonaMessage, type PersonaSession, type PortraitDimension, type PortraitHistoryEntry, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type PsychologySkillSuggestion, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type SocialConnection, type StarfieldDetail, type StarfieldScene, type StarfieldStar, type UnderstandingClaim, type WakeIntent } from "./api";
 import { initialMobileState, mobileRuntime, type MobileRuntimeState } from "./mobile";
 import { mobileOidc } from "./mobile-auth";
 import type { AuroraStreamEvent, DialogMessage, TurnStatus } from "./protocol";
@@ -12,6 +12,7 @@ import { MemoryStarfield } from "./components/MemoryStarfield";
 import { CapsuleWorkbench } from "./components/CapsuleWorkbench";
 import { ResonanceNetwork } from "./components/ResonanceNetwork";
 import { LettersInbox } from "./components/LettersInbox";
+import { PortraitView } from "./components/PortraitView";
 import { PsychologySkillStudio, SkillSuggestionBanner, type SkillLocale } from "./components/PsychologySkillStudio";
 
 type RuntimeSignal = { stage: "idle" | "understanding" | "composing" | "speaking"; runtime: "single" | "dual"; relationshipMove?: string; repaired?: boolean };
@@ -45,6 +46,10 @@ export function AuroraApp() {
   const [correctionImpact, setCorrectionImpact] = useState<CorrectionImpact | null>(null);
   const [correctionBusy, setCorrectionBusy] = useState(false);
   const [claims, setClaims] = useState<UnderstandingClaim[]>([]);
+  const [portrait, setPortrait] = useState<PortraitDimension[]>([]);
+  const [portraitHistory, setPortraitHistory] = useState<Record<string, PortraitHistoryEntry[]>>({});
+  const [portraitCalibrated, setPortraitCalibrated] = useState<Record<string, boolean>>({});
+  const [portraitBusy, setPortraitBusy] = useState<string | null>(null);
   const [starfield, setStarfield] = useState<StarfieldScene | null>(null);
   const [starfieldBusy, setStarfieldBusy] = useState(false);
   const [memoryOperations, setMemoryOperations] = useState<MemoryOperation[]>([]);
@@ -140,7 +145,8 @@ export function AuroraApp() {
         api.connectionRequests().then(rows => { setConnectionRequests(rows); return rows; }),
         api.friends().then(rows => { setFriends(rows); return rows; }),
         api.psychologySkills().then(rows => { setSkills(rows); return rows; }),
-        api.psychologySkillRuns().then(rows => { setSkillRuns(rows); return rows; })
+        api.psychologySkillRuns().then(rows => { setSkillRuns(rows); return rows; }),
+        api.portrait().then(setPortrait)
       ]);
       const loadedCapsules = loaded[8] as EchoCapsule[];
       const loadedMatches = loaded[9] as CapsuleMatch[];
@@ -541,6 +547,31 @@ export function AuroraApp() {
       setStatus("已校准。旧理解仍可追溯，Aurora、星空与共鸣体上下文会按确认结果同步。");
     } catch (error) { setStatus(error instanceof Error ? error.message : "这次纠正没有保存，任何下游都未改变"); }
     finally { setCorrectionBusy(false); }
+  };
+
+  const loadPortraitHistory = async (dim: string) => {
+    if (portraitHistory[dim]) return;
+    try { setPortraitHistory(current => ({ ...current, [dim]: [] })); // mark as loading/loaded to avoid duplicate fetches
+      const rows = await api.portraitHistory(dim);
+      setPortraitHistory(current => ({ ...current, [dim]: rows }));
+    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法回看这一面的变化"); }
+  };
+
+  const submitPortraitCalibration = async (dim: string, oldValue: string, newValue: string) => {
+    const trimmed = newValue.trim();
+    if (!trimmed) return;
+    setPortraitBusy(dim);
+    try {
+      await api.confirmCorrection({
+        targetType: "PORTRAIT_DIM", targetId: 0, fieldName: dim,
+        oldValue: oldValue || null, newValue: trimmed, reason: "用户在「Aurora 眼中的你」页面校准了这一维度"
+      });
+      // The correction coexists alongside Aurora's own observation rather than overwriting it
+      // (RUN-006 semantics) — mark calibrated locally instead of refetching/replacing the value.
+      setPortraitCalibrated(current => ({ ...current, [dim]: true }));
+      setStatus("记下了。我会带着你这份看法继续理解你。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "没能存下，待会儿再试一次"); }
+    finally { setPortraitBusy(null); }
   };
 
   const changeStarfieldMode = async (nextMode: StarfieldScene["mode"]) => {
@@ -980,6 +1011,8 @@ export function AuroraApp() {
           publicCapsuleCount={capsules.filter(capsule => capsule.visibilityStatus === "PUBLIC").length}
           friendCount={friends.length} onNavigate={navigateSpace} onRequestPush={() => void requestMobilePush()}
           onRequestMicrophone={() => void requestMobileMicrophone()} onLogout={() => void logout()} />
+        <PortraitView dimensions={portrait} history={portraitHistory} calibrated={portraitCalibrated} busyDim={portraitBusy}
+          onLoadHistory={dim => void loadPortraitHistory(dim)} onCalibrate={(dim, oldValue, newValue) => void submitPortraitCalibration(dim, oldValue, newValue)} />
       </div>
       <div className="state global-state" role="status"><i className={activeTurnId ? "pulse" : ""} />{status}</div>
       <footer><a href="/pages/dashboard.html">尚未迁移的工具</a><span>五空间 AppShell · 数据与能力持续保留</span><button type="button" onClick={() => void logout()}>安全退出</button></footer>

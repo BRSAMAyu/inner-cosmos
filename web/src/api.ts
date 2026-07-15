@@ -77,6 +77,8 @@ export type CorrectionConfirmation = {
   activeClaim: UnderstandingClaim;
   propagation: Array<{ id: number; targetKind: string; status: string; detail: string }>;
 };
+export type PortraitDimension = { dim: string; valueJson: string; confidence: number | null; updatedAt: string | null };
+export type PortraitHistoryEntry = { valueJson: string; recordedAt: string };
 export type MemoryCard = {
   id: number; title: string; summary: string | null; status: string; versionNo: number;
   consentScope: string | null; memoryLayer: string | null; confidence: number | null;
@@ -372,6 +374,8 @@ export const api = {
     method: "POST", body: JSON.stringify(input)
   }),
   understandingClaims: () => request<UnderstandingClaim[]>("/api/aurora/corrections/claims"),
+  portrait: () => request<PortraitDimension[]>("/api/portrait"),
+  portraitHistory: (dim: string) => request<PortraitHistoryEntry[]>(`/api/portrait/history?dim=${encodeURIComponent(dim)}`),
   starfield: (mode: StarfieldScene["mode"]) => request<StarfieldScene>(`/api/memory/starfield/v2?mode=${mode}`),
   starfieldDetail: (id: number) => request<StarfieldDetail>(`/api/memory/starfield/${id}/detail`),
   memoryOperations: () => request<MemoryOperation[]>("/api/memory/operations"),
