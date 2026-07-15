@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: inner-cosmos-postgres
+spec:
+  serviceName: inner-cosmos-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: inner-cosmos
+      app.kubernetes.io/component: postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: inner-cosmos
+        app.kubernetes.io/component: postgres
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 60
+      initContainers:
+        - name: prepare-data
+          image: busybox:1.37.0@sha256:37f515cce48d8f7f80f00f90d306f098521cd3758b10d9425e8f8ee45c0ed94d
+          command: ["sh", "-c", "mkdir -p /var/lib/postgresql/data/pgdata && chown -R 999:999 /var/lib/postgresql/data"]
+          securityContext:
+            runAsUser: 0
+            allowPrivilegeEscalation: false
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/postgresql/data}
+        - name: prepare-tls
+          image: busybox:1.37.0@sha256:37f515cce48d8f7f80f00f90d306f098521cd3758b10d9425e8f8ee45c0ed94d
+          command: ["sh", "-c", "cp /input/* /tls/ && chmod 600 /tls/server.key && chmod 644 /tls/server.crt /tls/ca.crt && chown -R 999:999 /tls"]
+          securityContext:
+            runAsUser: 0
+            allowPrivilegeEscalation: false
+          volumeMounts:
+            - {name: tls-input, mountPath: /input, readOnly: true}
+            - {name: tls-runtime, mountPath: /tls}
+      containers:
+        - name: postgres
+          image: pgvector/pgvector:0.8.1-pg16@sha256:33198da2828a14c30348d2ccb4750833d5ed9a44c88d840a0e523d7417120337
+          args:
+            - -c
+            - ssl=on
+            - -c
+            - ssl_cert_file=/tls/server.crt
+            - -c
+            - ssl_key_file=/tls/server.key
+            - -c
+            - ssl_ca_file=/tls/ca.crt
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 999
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+          env:
+            - {name: POSTGRES_DB, value: inner_cosmos}
+            - {name: POSTGRES_USER, value: inner_cosmos}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: inner-cosmos-runtime, key: SPRING_DATASOURCE_PASSWORD}
+            - {name: PGDATA, value: /var/lib/postgresql/data/pgdata}
+          ports:
+            - {name: postgres, containerPort: 5432}
+          resources:
+            requests: {cpu: 250m, memory: 512Mi}
+            limits: {cpu: "1", memory: 1Gi}
+          startupProbe:
+            exec: {command: ["sh", "-c", "pg_isready -U inner_cosmos -d inner_cosmos"]}
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            exec: {command: ["sh", "-c", "pg_isready -U inner_cosmos -d inner_cosmos"]}
+            periodSeconds: 10
+          livenessProbe:
+            exec: {command: ["sh", "-c", "pg_isready -U inner_cosmos -d inner_cosmos"]}
+            periodSeconds: 20
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/postgresql/data}
+            - {name: tls-runtime, mountPath: /tls, readOnly: true}
+      volumes:
+        - name: data
+          persistentVolumeClaim: {claimName: inner-cosmos-postgres}
+        - name: tls-input
+          secret: {secretName: inner-cosmos-postgres-server-tls, defaultMode: 0444}
+        - name: tls-runtime
+          emptyDir: {}

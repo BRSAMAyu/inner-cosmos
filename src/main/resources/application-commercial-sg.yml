@@ -1,0 +1,13 @@
+spring.config.activate.on-profile: commercial-sg
+
+inner-cosmos:
+  infrastructure:
+    profile: commercial-sg
+    region: ap-southeast-1
+    event-dispatcher: sqs-outbox
+    database: rds-postgresql-pgvector
+    redis: elasticache-tls-ha
+    durable-storage-claim: production-target
+    aws-workload-identity: required
+    sqs-runtime: required
+    product-semantics: complete

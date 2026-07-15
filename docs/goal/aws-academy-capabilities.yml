@@ -1,8 +1,8 @@
 schema_version: 1
 profile: academy-eks
 authority: 对齐文档/14-AWS-Academy-EKS约束与双轨部署架构.md
-observed_at: 2026-07-15T10:40:00+08:00
-evidence: evidence/academy/AWS-ACADEMY-CAP-001/summary.md
+observed_at: 2026-07-15T11:02:21+08:00
+evidence: evidence/academy/AWS-ACADEMY-CAP-002/
 freshness: rerun_on_every_learner_lab_session
 
 constraints:
@@ -37,8 +37,9 @@ capabilities:
     status: PASS
     resources: [Deployment, StatefulSet, PersistentVolume, PodDisruptionBudget, HorizontalPodAutoscaler, NetworkPolicy, CustomResourceDefinition]
   storage_class:
-    status: ABSENT
-    observed_count: 0
+    status: PRESENT_LEGACY_NO_CSI_STATIC_PV_REQUIRED
+    observed_count: 1
+    provisioner_class: legacy_aws_ebs
   ebs_csi:
     status: ABSENT_IAM_RESTRICTED
   sqs_user_role:

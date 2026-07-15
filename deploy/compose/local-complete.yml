@@ -1,0 +1,120 @@
+name: inner-cosmos-local-complete
+
+services:
+  tls-init:
+    image: pgvector/pgvector:0.8.1-pg16@sha256:33198da2828a14c30348d2ccb4750833d5ed9a44c88d840a0e523d7417120337
+    entrypoint: ["/bin/sh", "/scripts/init-tls.sh"]
+    volumes:
+      - local-complete-tls:/tls
+      - ./init-tls.sh:/scripts/init-tls.sh:ro
+    restart: "no"
+
+  postgres:
+    image: pgvector/pgvector:0.8.1-pg16@sha256:33198da2828a14c30348d2ccb4750833d5ed9a44c88d840a0e523d7417120337
+    environment:
+      POSTGRES_DB: inner_cosmos
+      POSTGRES_USER: inner_cosmos
+      POSTGRES_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:?set or use scripts/local-complete.ps1}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    command:
+      - -c
+      - ssl=on
+      - -c
+      - ssl_cert_file=/tls/postgres/server.crt
+      - -c
+      - ssl_key_file=/tls/postgres/server.key
+      - -c
+      - ssl_ca_file=/tls/postgres/ca.crt
+    depends_on:
+      tls-init: {condition: service_completed_successfully}
+    volumes:
+      - local-complete-postgres:/var/lib/postgresql/data
+      - local-complete-tls:/tls:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U inner_cosmos -d inner_cosmos"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.4.2-alpine@sha256:02419de7eddf55aa5bcf49efb74e88fa8d931b4d77c07eff8a6b2144472b6952
+    command: ["sh", "-c", "exec redis-server --port 0 --tls-port 6379 --tls-cert-file /tls/redis/server.crt --tls-key-file /tls/redis/server.key --tls-ca-cert-file /tls/redis/ca.crt --tls-auth-clients no --requirepass \"$$REDIS_PASSWORD\""]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?set or use scripts/local-complete.ps1}
+    depends_on:
+      tls-init: {condition: service_completed_successfully}
+    volumes:
+      - local-complete-redis:/data
+      - local-complete-tls:/tls:ro
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --tls --cacert /tls/redis/ca.crt --no-auth-warning -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  app:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    image: ${INNER_COSMOS_IMAGE:-inner-cosmos:local-complete}
+    environment:
+      SPRING_PROFILES_ACTIVE: prod,local-complete
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/inner_cosmos?sslmode=verify-full&sslrootcert=/tls/postgres/ca.crt
+      SPRING_DATASOURCE_USERNAME: inner_cosmos
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:?set or use scripts/local-complete.ps1}
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?set or use scripts/local-complete.ps1}
+      REDIS_SSL_ENABLED: "true"
+      SPRING_DATA_REDIS_SSL_BUNDLE: redis
+      SPRING_SSL_BUNDLE_PEM_REDIS_TRUSTSTORE_CERTIFICATE: file:/tls/redis/ca.crt
+      REDIS_SESSION_ENABLED: "true"
+      REDIS_RATE_LIMIT_ENABLED: "true"
+      REDIS_SCHEDULER_LOCK_ENABLED: "true"
+      LLM_MODE: prod
+      LLM_PROVIDER: ${LLM_PROVIDER:?set a real provider}
+      LLM_API_KEY: ${LLM_API_KEY:?set a low-scope provider key}
+      LLM_ALLOW_FALLBACK: "false"
+      OIDC_ENABLED: "true"
+      OIDC_ISSUER_URI: ${OIDC_ISSUER_URI:?set current IdP issuer}
+      OIDC_JWK_SET_URI: ${OIDC_JWK_SET_URI:?set current IdP JWKS endpoint}
+      OIDC_AUDIENCE: ${OIDC_AUDIENCE:?set API audience}
+      OIDC_AUTHORIZATION_URI: ${OIDC_AUTHORIZATION_URI:?set authorization endpoint}
+      OIDC_TOKEN_URI: ${OIDC_TOKEN_URI:?set token endpoint}
+      OIDC_MOBILE_CLIENT_ID: ${OIDC_MOBILE_CLIENT_ID:?set mobile client id}
+      OIDC_MOBILE_REDIRECT_URI: ${OIDC_MOBILE_REDIRECT_URI:?set mobile redirect URI}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://localhost:8443}
+      SEED_ENABLED: "false"
+      COOKIE_SECURE: "true"
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    volumes:
+      - local-complete-tls:/tls:ro
+      - local-complete-logs:/var/log/inner-cosmos
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+    restart: unless-stopped
+
+  edge:
+    image: nginx:1.27.5-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10
+    depends_on:
+      app: {condition: service_healthy}
+    ports:
+      - "127.0.0.1:8443:8443"
+    volumes:
+      - local-complete-tls:/tls:ro
+      - ./nginx-local-complete.conf:/etc/nginx/nginx.conf:ro
+    restart: unless-stopped
+
+volumes:
+  local-complete-postgres:
+  local-complete-redis:
+  local-complete-tls:
+  local-complete-logs:

@@ -1,0 +1,27 @@
+schema_version: 1
+package_id: AWS-ACADEMY-CAP-002
+status: EVALUATED
+base_sha: 83608ae81b1949a68e14eee3af3346e4c44e7fa7
+branch: feat/run006-aurora-self-understanding
+recorded_at: 2026-07-15T11:14:45+08:00
+profile: academy-eks
+commands:
+  - command: scripts/academy/preflight.ps1 -Mode Offline
+    result: PASS
+  - command: scripts/academy/preflight.ps1 -Mode Live
+    result: PASS
+    detail: Human and Pod identity separated; random namespace and SQS queue cleanup PASS
+  - command: sanitized evidence pattern scan
+    result: PASS
+    detail: No infrastructure identifiers or credentials recorded
+known_limitations:
+  - Capability evidence expires with the current Learner Lab session.
+  - Workload deployment and external Gateway route are not proven by this package.
+review:
+  status: PENDING
+  reviewer: UNASSIGNED
+artifacts:
+  - path: preflight.json
+    sha256: 2443360ef81c9f026735a9d14f6ea54bf41b8232009160be797aab7b915efee4
+  - path: summary.md
+    sha256: 14492c327fbf2635dc3e09289df5a86c12114170304a4631cd89fe831210457f

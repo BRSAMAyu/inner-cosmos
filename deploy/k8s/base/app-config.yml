@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: inner-cosmos-config
+data:
+  SPRING_PROFILES_ACTIVE: prod,academy-eks
+  SPRING_DATASOURCE_URL: jdbc:postgresql://inner-cosmos-postgres:5432/inner_cosmos?sslmode=verify-full&sslrootcert=/run/secrets/postgres/ca.crt
+  SPRING_DATASOURCE_USERNAME: inner_cosmos
+  REDIS_HOST: inner-cosmos-redis
+  REDIS_PORT: "6379"
+  REDIS_SSL_ENABLED: "true"
+  SPRING_DATA_REDIS_SSL_BUNDLE: redis
+  SPRING_SSL_BUNDLE_PEM_REDIS_TRUSTSTORE_CERTIFICATE: file:/run/secrets/redis/ca.crt
+  REDIS_SESSION_ENABLED: "true"
+  REDIS_RATE_LIMIT_ENABLED: "true"
+  REDIS_SCHEDULER_LOCK_ENABLED: "true"
+  REDIS_SESSION_NAMESPACE: inner-cosmos:academy:session
+  REDIS_RATE_LIMIT_NAMESPACE: inner-cosmos:academy:rate-limit:v1
+  REDIS_SCHEDULER_LOCK_NAMESPACE: inner-cosmos-academy-scheduler-v1
+  LLM_MODE: prod
+  LLM_ALLOW_FALLBACK: "false"
+  SEED_ENABLED: "false"
+  COOKIE_SECURE: "true"

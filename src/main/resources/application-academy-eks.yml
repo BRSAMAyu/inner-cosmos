@@ -1,0 +1,13 @@
+spring.config.activate.on-profile: academy-eks
+
+inner-cosmos:
+  infrastructure:
+    profile: academy-eks
+    region: us-east-1
+    event-dispatcher: jdbc-outbox
+    database: in-cluster-postgresql-static-pv
+    redis: in-cluster-disposable-tls
+    durable-storage-claim: false
+    aws-workload-identity: false
+    sqs-runtime: false
+    product-semantics: complete

@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "profile": "academy-eks",
+  "mode": "Live",
+  "recorded_at": "2026-07-15T03:05:49Z",
+  "git_sha": "83608ae81b1949a68e14eee3af3346e4c44e7fa7",
+  "region": "us-east-1",
+  "logical_cluster_alias": "academy-current-session",
+  "sensitive_identifiers_recorded": false,
+  "results": {
+    "tools": {"status": "PASS", "checked": ["aws", "kubectl", "git"]},
+    "academy_kustomize": {"status": "PASS", "resources": 15},
+    "human_lab_role_identity": {"status": "PASS_CURRENT_SESSION"},
+    "eks_api": {"status": "PASS_CURRENT_SESSION"},
+    "kubernetes_api": {"status": "PASS"},
+    "kubernetes_nodes": {"status": "PASS", "count": 2},
+    "kubernetes_workload_rbac": {"status": "PASS", "checked": 7, "denied": 0},
+    "gateway_api": {"status": "PASS", "count": 1},
+    "storage_class": {"status": "PRESENT_LEGACY_NO_CSI_STATIC_PV_REQUIRED", "count": 1, "provisioner_class": "legacy_aws_ebs"},
+    "ebs_csi": {"status": "ABSENT_EXPECTED"},
+    "metrics_api": {"status": "PASS"},
+    "sqs_human_lab_role": {"status": "PASS_CREATE_SEND_RECEIVE"},
+    "sqs_workload_identity_sts": {"status": "NO_CREDENTIALS_OR_DENIED_EXPECTED"},
+    "sqs_workload_identity_data_plane": {"status": "NO_CREDENTIALS_OR_DENIED_EXPECTED"},
+    "deployed_data_services": {"status": "NOT_CHECKED_NO_K8S_NAMESPACE"}
+  },
+  "cleanup": {"namespace": "PASS", "sqs_queue": "PASS", "status": "PASS"},
+  "overall": "PASS"
+}

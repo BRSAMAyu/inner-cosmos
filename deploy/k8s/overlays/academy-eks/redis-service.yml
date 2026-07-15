@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: inner-cosmos-redis
+spec:
+  selector:
+    app.kubernetes.io/name: inner-cosmos
+    app.kubernetes.io/component: redis
+  ports:
+    - {name: redis-tls, port: 6379, targetPort: redis-tls}

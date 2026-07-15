@@ -150,12 +150,12 @@ gates:
     status: UNASSESSED
     required: true
     acceptance:
-      - {id: ACADEMY-CAPABILITY, target: "Every Learner Lab session runs a sanitized capability preflight that distinguishes human LabRole access from Pod workload access and cleans all probes.", status: IN_PROGRESS, evidence: [evidence/academy/AWS-ACADEMY-CAP-001/summary.md, docs/goal/aws-academy-capabilities.yml]}
-      - {id: ACADEMY-WORKLOAD, target: "The same immutable application runs on Academy EKS through Gateway with API, worker, scheduler, static-PV PostgreSQL, disposable Redis, and JDBC outbox without SQS, EBS CSI, or injected learner credentials.", status: UNASSESSED, evidence: []}
+      - {id: ACADEMY-CAPABILITY, target: "Every Learner Lab session runs a sanitized capability preflight that distinguishes human LabRole access from Pod workload access and cleans all probes.", status: IN_PROGRESS, evidence: [evidence/academy/AWS-ACADEMY-CAP-001/summary.md, evidence/academy/AWS-ACADEMY-CAP-002/, docs/goal/aws-academy-capabilities.yml]}
+      - {id: ACADEMY-WORKLOAD, target: "The same immutable application runs on Academy EKS through Gateway with API, worker, scheduler, static-PV PostgreSQL, disposable Redis, and JDBC outbox without SQS, EBS CSI, or injected learner credentials.", status: IN_PROGRESS, evidence: [evidence/academy/PROFILE-FOUNDATION-001/]}
       - {id: ACADEMY-RELIABILITY, target: "Academy evidence exercises probes, resources, PDB, HPA, rolling update, graceful shutdown, multi-replica session/rate/lease, idempotency, and Pod recovery while disclosing storage limits.", status: UNASSESSED, evidence: []}
-      - {id: LOCAL-COMPLETE, target: "A reproducible local-complete profile runs the full AI and product experience with PostgreSQL/pgvector, Redis, real-provider configuration, and core E2E journeys.", status: UNASSESSED, evidence: []}
+      - {id: LOCAL-COMPLETE, target: "A reproducible local-complete profile runs the full AI and product experience with PostgreSQL/pgvector, Redis, real-provider configuration, and core E2E journeys.", status: IN_PROGRESS, evidence: [evidence/academy/PROFILE-FOUNDATION-001/]}
       - {id: EKS-IAC, target: "Terraform reproducibly creates least-privilege Singapore-region platform dependencies and EKS environments.", status: UNASSESSED, evidence: []}
-      - {id: EKS-WORKLOAD, target: "Kustomize workloads enforce probes, resources, PDB, spread, HPA, network policy, secrets, and graceful shutdown.", status: UNASSESSED, evidence: []}
+      - {id: EKS-WORKLOAD, target: "Kustomize workloads enforce probes, resources, PDB, spread, HPA, network policy, secrets, and graceful shutdown.", status: IN_PROGRESS, evidence: [evidence/academy/PROFILE-FOUNDATION-001/]}
       - {id: OPS-OBSERVABILITY, target: "OpenTelemetry dashboards, alerts, traces, AI cost/quality signals, and runbooks are exercised by non-authors.", status: UNASSESSED, evidence: []}
       - {id: OPS-RESILIENCE, target: "Canary, rollback, pod/node/provider failure, queue replay, and database/object restore meet declared SLO/RPO/RTO.", status: UNASSESSED, evidence: []}
       - {id: SG-PRODUCT, target: "English-first Singapore timezone experience and current local safety resources work completely.", status: UNASSESSED, evidence: []}

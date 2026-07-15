@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inner-cosmos-redis
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: inner-cosmos
+      app.kubernetes.io/component: redis
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: inner-cosmos
+        app.kubernetes.io/component: redis
+    spec:
+      automountServiceAccountToken: false
+      initContainers:
+        - name: prepare-tls
+          image: busybox:1.37.0@sha256:37f515cce48d8f7f80f00f90d306f098521cd3758b10d9425e8f8ee45c0ed94d
+          command: ["sh", "-c", "cp /input/* /tls/ && chmod 600 /tls/server.key && chmod 644 /tls/server.crt /tls/ca.crt && chown -R 999:999 /tls"]
+          securityContext:
+            runAsUser: 0
+            allowPrivilegeEscalation: false
+          volumeMounts:
+            - {name: tls-input, mountPath: /input, readOnly: true}
+            - {name: tls-runtime, mountPath: /tls}
+      containers:
+        - name: redis
+          image: redis:7.4.2-alpine@sha256:02419de7eddf55aa5bcf49efb74e88fa8d931b4d77c07eff8a6b2144472b6952
+          command: ["sh", "-c"]
+          args:
+            - exec redis-server --port 0 --tls-port 6379 --tls-cert-file /tls/server.crt --tls-key-file /tls/server.key --tls-ca-cert-file /tls/ca.crt --tls-auth-clients no --requirepass "$REDIS_PASSWORD" --save "" --appendonly no
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 999
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: inner-cosmos-runtime, key: REDIS_PASSWORD}
+          ports:
+            - {name: redis-tls, containerPort: 6379}
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 256Mi}
+          startupProbe:
+            exec: {command: ["sh", "-c", "redis-cli --tls --cacert /tls/ca.crt --no-auth-warning -a \"$REDIS_PASSWORD\" ping | grep -q PONG"]}
+            periodSeconds: 5
+            failureThreshold: 24
+          readinessProbe:
+            exec: {command: ["sh", "-c", "redis-cli --tls --cacert /tls/ca.crt --no-auth-warning -a \"$REDIS_PASSWORD\" ping | grep -q PONG"]}
+            periodSeconds: 10
+          livenessProbe:
+            exec: {command: ["sh", "-c", "redis-cli --tls --cacert /tls/ca.crt --no-auth-warning -a \"$REDIS_PASSWORD\" ping | grep -q PONG"]}
+            periodSeconds: 20
+          volumeMounts:
+            - {name: tls-runtime, mountPath: /tls, readOnly: true}
+      volumes:
+        - name: tls-input
+          secret: {secretName: inner-cosmos-redis-server-tls, defaultMode: 0444}
+        - name: tls-runtime
+          emptyDir: {}

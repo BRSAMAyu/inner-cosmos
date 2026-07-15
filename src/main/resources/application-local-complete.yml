@@ -1,0 +1,11 @@
+spring.config.activate.on-profile: local-complete
+
+inner-cosmos:
+  infrastructure:
+    profile: local-complete
+    region: developer-controlled
+    event-dispatcher: jdbc-outbox
+    database: postgresql-pgvector
+    redis: local-tls
+    durable-storage-claim: local-volume-only
+    product-semantics: complete

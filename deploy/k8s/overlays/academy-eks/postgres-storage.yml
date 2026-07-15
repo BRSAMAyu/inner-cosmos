@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: inner-cosmos-academy-postgres
+  labels:
+    inner-cosmos/profile: academy-eks
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes: [ReadWriteOnce]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  volumeMode: Filesystem
+  hostPath:
+    path: /var/lib/inner-cosmos/postgres
+    type: DirectoryOrCreate
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: inner-cosmos.academy/storage
+              operator: In
+              values: ["true"]
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: inner-cosmos-postgres
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: ""
+  volumeName: inner-cosmos-academy-postgres
+  resources:
+    requests:
+      storage: 10Gi

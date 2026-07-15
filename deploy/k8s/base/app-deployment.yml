@@ -1,0 +1,103 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inner-cosmos-api
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: inner-cosmos
+      app.kubernetes.io/component: api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: inner-cosmos
+        app.kubernetes.io/component: api
+        inner-cosmos/runtime-role: all-in-one-transition
+    spec:
+      serviceAccountName: inner-cosmos
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 45
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: inner-cosmos
+              app.kubernetes.io/component: api
+      containers:
+        - name: app
+          image: inner-cosmos:academy-placeholder
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: inner-cosmos-config
+            - secretRef:
+                name: inner-cosmos-runtime
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 5
+            failureThreshold: 24
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sh", "-c", "sleep 15"]
+          volumeMounts:
+            - name: postgres-ca
+              mountPath: /run/secrets/postgres
+              readOnly: true
+            - name: redis-ca
+              mountPath: /run/secrets/redis
+              readOnly: true
+            - name: logs
+              mountPath: /var/log/inner-cosmos
+      volumes:
+        - name: postgres-ca
+          secret:
+            secretName: inner-cosmos-postgres-client-ca
+            defaultMode: 0444
+        - name: redis-ca
+          secret:
+            secretName: inner-cosmos-redis-client-ca
+            defaultMode: 0444
+        - name: logs
+          emptyDir: {}

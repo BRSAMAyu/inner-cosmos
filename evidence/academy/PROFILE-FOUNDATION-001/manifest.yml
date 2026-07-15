@@ -1,0 +1,35 @@
+schema_version: 1
+package_id: PROFILE-FOUNDATION-001
+status: IMPLEMENTED
+base_sha: 83608ae81b1949a68e14eee3af3346e4c44e7fa7
+branch: feat/run006-aurora-self-understanding
+recorded_at: 2026-07-15T11:14:45+08:00
+profiles: [local-complete, academy-eks, commercial-sg]
+commands:
+  - command: mvnw.cmd verify
+    result: PASS
+    detail: 99 suites, 695 tests, 0 failures/errors/skips; SpotBugs 0
+  - command: scripts/academy/validate-manifests.ps1
+    result: PASS
+    detail: 16 resources, 0 forbidden findings, 0 missing controls
+  - command: docker compose -f deploy/compose/local-complete.yml config --quiet
+    result: PASS
+  - command: scripts/local-complete.ps1 -Action Up and HTTPS/TLS runtime probes
+    result: PASS
+    detail: health UP, PostgreSQL TLS, Redis TLS, non-root app, 4 scheduler leases
+  - command: scripts/scan-secrets.ps1
+    result: PASS
+    detail: 0 findings
+  - command: git diff --check
+    result: PASS
+known_limitations:
+  - Real Provider and IdP behavior were not evaluated by the local configuration smoke.
+  - Academy workload apply, Gateway status, independent runtime roles, and JDBC outbox remain pending.
+  - commercial-sg is an undeployed target configuration boundary.
+  - This package is not complete-product evidence.
+review:
+  status: PENDING
+  reviewer: UNASSIGNED
+artifacts:
+  - path: summary.md
+    sha256: 285b37ea9ec283cf0140e4e1c8e04988067aa3c8e39ebfee2f78e3feb2f390d3
