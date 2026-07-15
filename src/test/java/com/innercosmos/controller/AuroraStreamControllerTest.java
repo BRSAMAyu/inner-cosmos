@@ -145,6 +145,10 @@ class AuroraStreamControllerTest {
         // The agentLoop block (perception panel source) must be present on the stream path now.
         assertTrue(body.contains("\"agentLoop\""),
                 "meta must carry agentLoop for the perception panel on stream; got:\n" + body);
+        assertTrue(body.contains("\"runtime\":\"dual-kernel.v1\""),
+                "meta must expose the observable dual-kernel runtime without internal reasoning; got:\n" + body);
+        assertTrue(body.contains("\"criticRepaired\""),
+                "meta must expose the safe critic outcome field; got:\n" + body);
     }
 
     @Test

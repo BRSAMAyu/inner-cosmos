@@ -21,6 +21,8 @@ test("Aurora supports multi-bubble streaming, stop, interrupt and replanning", a
   await expect(send).toBeEnabled();
   await send.click();
 
+  await expect(page.getByLabel("Aurora 当前回应状态")).toContainText(/正在理解|正在组织|正在回应|在这里/);
+
   const interrupt = page.getByRole("button", { name: "打断并发送" });
   await expect(interrupt).toBeVisible();
   await composer.fill("等等，我不想先分析原因。我想先确认这种害怕是不是可以被接住。 ");
@@ -28,6 +30,7 @@ test("Aurora supports multi-bubble streaming, stop, interrupt and replanning", a
 
   await expect(page.getByText("等等，我不想先分析原因。我想先确认这种害怕是不是可以被接住。 ")).toBeVisible();
   await expect(page.locator("article.aurora").last()).toContainText(/.+/);
+  await expect(page.getByLabel("Aurora 当前回应状态")).toContainText("理解与表达双核协作");
 
   const stop = page.getByRole("button", { name: "停止回应" });
   if (await stop.isVisible().catch(() => false)) await stop.click();

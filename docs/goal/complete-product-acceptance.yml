@@ -106,7 +106,13 @@ gates:
     status: IN_PROGRESS
     required: true
     acceptance:
-      - {id: AURORA-DUAL-KERNEL, target: "Fast and slow kernels plus context assembly show measured benefit over the single-pass baseline.", status: UNASSESSED, evidence: []}
+      - id: AURORA-DUAL-KERNEL
+        target: Fast and slow kernels plus context assembly show measured benefit over the single-pass baseline.
+        status: IN_PROGRESS
+        verified_at: 2026-07-15T15:52:00+08:00
+        reviewer: unassigned
+        evidence: [evidence/innovation/INNO-DUAL-001/, evidence/innovation/INNO-EVAL-002/]
+        remaining: Production now executes planner then speaker with a bounded critic and observable UI state; same-model real-Provider pairwise is executable but credentials, completed blind review, measured benefit and independent review remain required before PASS.
       - id: AURORA-CHOREOGRAPHY
         target: Typed multi-message, pause, stop, interrupt, replan, and reconnect behavior works end to end.
         status: IN_PROGRESS

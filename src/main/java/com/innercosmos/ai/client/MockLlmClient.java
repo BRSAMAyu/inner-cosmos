@@ -56,6 +56,12 @@ public class MockLlmClient implements LlmClient {
         // (proactive greeting); the legacy "AURORA_CHAT"/"AURORA_GREETING" names are kept
         // for back-compat. buildAuroraChatJson self-distinguishes greeting vs chat via the
         // "主动发起对话" marker embedded in the prompt text, so all Aurora modules route here.
+        if (module.contains("AURORA_PLAN")) {
+            return buildAuroraPlanJson(analysis, textToAnalyze);
+        }
+        if (module.contains("AURORA_CRITIC")) {
+            return "{\"pass\":true,\"issues\":[],\"repaired\":null}";
+        }
         if (module.contains("AURORA")) {
             boolean greeting = module.contains("GREETING");
             return buildAuroraChatJson(text, analysis, greeting);
@@ -76,6 +82,20 @@ public class MockLlmClient implements LlmClient {
             return buildLetterGuardJson(textToAnalyze, analysis);
         }
         return null;
+    }
+
+    private String buildAuroraPlanJson(AnalysisResult analysis, String text) {
+        String need = "NEGATIVE".equals(analysis.sentimentLabel)
+            ? "先承认此刻的压力，不急着解释或推动" : "准确回应用户当下明确表达的需要";
+        String move = containsAny(text, List.of("等等", "停一下", "先别", "不要"))
+            ? "接受打断并按最新边界重规划" : "保持连续，把下一步选择权交还用户";
+        boolean critic = "CRISIS".equals(analysis.sentimentLabel) || "SELF_HARM".equals(analysis.primaryIntent);
+        return String.format("""
+            {"userIntent":"%s","emotionalNeed":"%s","relationshipMove":"%s",
+             "responseConstraints":["不诊断","不制造依赖","不虚构记忆"],
+             "bubblePurposes":["接住当下","自然地把话递回用户"],"relevantMemoryIds":[],
+             "uncertainty":"这是离线可复现规划，不替用户下结论","needsCritic":%s}
+            """, escapeJson(analysis.primaryIntent), escapeJson(need), escapeJson(move), critic).replace("\n", "");
     }
 
     /**

@@ -20,30 +20,31 @@ SYNTHETIC_TRAJECTORIES = (
 )
 
 SYSTEM_A = "你是一个安全、简洁的中文 AI 助手。请回应用户最新一条消息。"
-SYSTEM_B = """你是 Aurora，一位长期反思型 AI 伙伴。用户的第二条消息是对上一轮的自然打断。
-承认并接受打断；只把已经说出的内容视为共享经历；不要重复未完成的原计划；根据新输入重新规划。
-保持温柔、具体、有边界，可用 1-3 条自然消息回答，不制造依赖，不假装是人类。"""
+PLAN_SYSTEM = """你是 Aurora 的理解与规划核。用户第二条消息是自然打断。
+只输出紧凑 JSON，字段为 user_intent、emotional_need、relationship_move、constraints、bubble_purposes、uncertainty。
+不写最终回复，不输出思维过程；接受最新边界，未说出的旧计划不算共同经历。"""
+SPEAKER_SYSTEM = """你是 Aurora 的表达与关系核。根据下方 response_plan 回应用户最新消息。
+承认并接受打断；不要重复未完成的旧计划；保持温柔、具体、有边界，可用 1-3 条不同作用的自然消息。
+不诊断、不制造依赖、不假装是人类、不虚构记忆。response_plan:\n"""
 
 
 @dataclass(frozen=True)
 class ProviderConfig:
     base_url: str
     api_key: str
-    model_a: str
-    model_b: str
+    model: str
     timeout_seconds: int = 60
 
 
 def config_from_environment() -> ProviderConfig:
-    required = ("REAL_PROVIDER_BASE_URL", "REAL_PROVIDER_API_KEY", "REAL_PROVIDER_MODEL_A", "REAL_PROVIDER_MODEL_B")
+    required = ("REAL_PROVIDER_BASE_URL", "REAL_PROVIDER_API_KEY", "REAL_PROVIDER_MODEL")
     missing = [name for name in required if not os.environ.get(name, "").strip()]
     if missing:
         raise RuntimeError("BLOCKED_BY_CREDENTIAL_GATE:" + ",".join(missing))
     return ProviderConfig(
         base_url=os.environ["REAL_PROVIDER_BASE_URL"].strip(),
         api_key=os.environ["REAL_PROVIDER_API_KEY"].strip(),
-        model_a=os.environ["REAL_PROVIDER_MODEL_A"].strip(),
-        model_b=os.environ["REAL_PROVIDER_MODEL_B"].strip(),
+        model=os.environ["REAL_PROVIDER_MODEL"].strip(),
     )
 
 
@@ -53,15 +54,17 @@ def run_pairwise(
     seed: int = 20260715,
     transport: Callable[[ProviderConfig, str, str, tuple[str, str]], tuple[str, dict]] | None = None,
 ) -> dict:
-    """Call two explicitly configured real models. Never falls back to Mock."""
+    """Compare single-pass and dual-kernel prompts on the same real model. Never falls back to Mock."""
     transport = transport or _chat_completion
     output.mkdir(parents=True, exist_ok=True)
     rng = random.Random(seed)
     records: list[dict] = []
     review_rows: list[dict] = []
     for scenario_id, first, interruption in SYNTHETIC_TRAJECTORIES:
-        left, left_meta = transport(config, config.model_a, SYSTEM_A, (first, interruption))
-        right, right_meta = transport(config, config.model_b, SYSTEM_B, (first, interruption))
+        left, left_meta = transport(config, config.model, SYSTEM_A, (first, interruption))
+        plan, plan_meta = transport(config, config.model, PLAN_SYSTEM, (first, interruption))
+        right, speaker_meta = transport(config, config.model, SPEAKER_SYSTEM + plan, (first, interruption))
+        right_meta = _combine_meta(plan_meta, speaker_meta)
         pair = [("A", left), ("B", right)]
         rng.shuffle(pair)
         blind_id = hashlib.sha256(f"{seed}:{scenario_id}".encode()).hexdigest()[:16]
@@ -70,8 +73,9 @@ def run_pairwise(
             "blind_pair_id": blind_id,
             "input": {"first_message": first, "interruption": interruption},
             "systems": {
-                "A": {"model": config.model_a, "prompt": "baseline-v1", "response": left, **left_meta},
-                "B": {"model": config.model_b, "prompt": "aurora-interrupt-v1", "response": right, **right_meta},
+                "A": {"model": config.model, "runtime": "single-pass.v1", "prompt": "baseline-v1", "response": left, **left_meta},
+                "B": {"model": config.model, "runtime": "dual-kernel.v1", "prompt": "planner-speaker-v1",
+                      "planner_output": plan, "response": right, **right_meta},
             },
             "blind_order": [item[0] for item in pair],
         })
@@ -97,6 +101,19 @@ def run_pairwise(
         writer.writeheader()
         writer.writerows(review_rows)
     return report
+
+
+def _combine_meta(plan: dict, speaker: dict) -> dict:
+    def total(key: str):
+        values = [value for value in (plan.get(key), speaker.get(key)) if isinstance(value, (int, float))]
+        return sum(values) if values else None
+    return {
+        "latency_ms": total("latency_ms"),
+        "input_tokens": total("input_tokens"),
+        "output_tokens": total("output_tokens"),
+        "request_ids": [value for value in (plan.get("request_id"), speaker.get("request_id")) if value],
+        "llm_calls": 2,
+    }
 
 
 def _chat_completion(config: ProviderConfig, model: str, system: str, turns: tuple[str, str]) -> tuple[str, dict]:

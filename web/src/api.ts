@@ -54,10 +54,16 @@ async function getCsrf(): Promise<Csrf> {
 }
 
 export const api = {
-  login: (username: string, password: string) => request<unknown>("/api/auth/login", {
-    method: "POST", body: JSON.stringify({ username, password,
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Singapore" })
-  }),
+  login: async (username: string, password: string) => {
+    const result = await request<unknown>("/api/auth/login", {
+      method: "POST", body: JSON.stringify({ username, password,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Singapore" })
+    });
+    // AuthController rotates the session ID after login. The pre-authentication
+    // synchronizer token must never be reused with the authenticated session.
+    csrf = null;
+    return result;
+  },
   createSession: () => request<{ id: number }>("/api/dialog/session/create", {
     method: "POST", body: JSON.stringify({ title: "Aurora 对话", sessionType: "AURORA_CHAT" })
   }),

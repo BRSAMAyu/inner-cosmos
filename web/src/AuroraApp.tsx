@@ -3,6 +3,7 @@ import { api, replayTurnEvents, streamAurora, type Notification, type SelfEvolut
 import type { AuroraStreamEvent, DialogMessage, TurnStatus } from "./protocol";
 
 type UiMessage = { key: string; speaker: "USER" | "AURORA"; text: string; partial?: boolean };
+type RuntimeSignal = { stage: "idle" | "understanding" | "composing" | "speaking"; runtime: "single" | "dual"; relationshipMove?: string; repaired?: boolean };
 const terminal = new Set<TurnStatus>(["COMPLETED", "INTERRUPTED", "CANCELLED"]);
 const modes = [
   ["DAILY_TALK", "倾诉"], ["THOUGHT_CLARIFY", "整理"], ["SOCRATIC", "追问"],
@@ -27,6 +28,7 @@ export function AuroraApp() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [selfEvolution, setSelfEvolution] = useState<SelfEvolution | null>(null);
   const [selfBusy, setSelfBusy] = useState(false);
+  const [runtimeSignal, setRuntimeSignal] = useState<RuntimeSignal>({ stage: "idle", runtime: "single" });
   const abortRef = useRef<AbortController | null>(null);
   const activeTurnRef = useRef<number | null>(null);
   const bubbleKeyRef = useRef<string | null>(null);
@@ -81,6 +83,7 @@ export function AuroraApp() {
     activeTurnRef.current = null;
     setActiveTurnId(null);
     bubbleKeyRef.current = null;
+    setRuntimeSignal(current => ({ ...current, stage: "idle" }));
   }, []);
 
   const recover = useCallback(async (turnId: number, sid: number) => {
@@ -144,13 +147,27 @@ export function AuroraApp() {
         const turnId = event.payload.turnId;
         activeTurnRef.current = turnId;
         setActiveTurnId(turnId);
+        setRuntimeSignal(current => ({ ...current, stage: event.type === "turn.started" ? "understanding" : "composing" }));
         setStatus(event.type === "turn.started" ? "Aurora 正在重新理解这一刻…" : "Aurora 已想好怎样回应");
+        break;
+      }
+      case "meta": {
+        const loop = event.payload.agentLoop;
+        if (!loop || typeof loop !== "object") break;
+        const safe = loop as Record<string, unknown>;
+        setRuntimeSignal(current => ({
+          ...current,
+          runtime: typeof safe.runtime === "string" && safe.runtime.startsWith("dual") ? "dual" : "single",
+          relationshipMove: typeof safe.relationshipMove === "string" ? safe.relationshipMove : undefined,
+          repaired: safe.criticRepaired === true
+        }));
         break;
       }
       case "bubble.started": {
         const turnId = activeTurnRef.current ?? 0;
         const key = `live-${turnId}-${event.payload.order}`;
         bubbleKeyRef.current = key;
+        setRuntimeSignal(current => ({ ...current, stage: "speaking" }));
         setMessages(current => current.some(m => m.key === key)
           ? current : [...current, { key, speaker: "AURORA", text: "", partial: true }]);
         break;
@@ -283,6 +300,12 @@ export function AuroraApp() {
           <span className="eyebrow">INNER COSMOS · AURORA</span>
           <h1>可以被打断的陪伴，<br />才是真的在听。</h1>
           <p>你不需要等 Aurora 说完。新消息会成为新的理解输入，而不是错误。</p>
+          <div className={`runtime-signal ${runtimeSignal.stage}`} aria-label="Aurora 当前回应状态">
+            <span>{runtimeSignal.stage === "understanding" ? "正在理解" : runtimeSignal.stage === "composing" ? "正在组织" : runtimeSignal.stage === "speaking" ? "正在回应" : "在这里"}</span>
+            {runtimeSignal.runtime === "dual" && <small>理解与表达双核协作</small>}
+            {runtimeSignal.relationshipMove && <small>关系动作 · {runtimeSignal.relationshipMove}</small>}
+            {runtimeSignal.repaired && <small>回应已通过边界复核</small>}
+          </div>
         </div>
         <div className="orb" aria-hidden="true"><span /></div>
       </header>

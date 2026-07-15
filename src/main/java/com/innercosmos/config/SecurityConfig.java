@@ -68,7 +68,13 @@ public class SecurityConfig {
         }
 
         http
-            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
+            .sessionManagement(s -> s
+                    .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
+                    // AuthController performs the one required ID rotation at login/register.
+                    // The request-scoped authentication bridge rebuilds Authentication on every
+                    // request; framework fixation handling would otherwise rotate again and race
+                    // concurrent SPA bootstrap requests onto different session IDs.
+                    .sessionFixation(fixation -> fixation.none()))
             // SessionAuthenticationFilter rebuilds authentication from the server-owned user ID
             // on every request. Never duplicate the full User entity (including password hash)
             // into HttpSession/Redis via Spring Security's default context repository.

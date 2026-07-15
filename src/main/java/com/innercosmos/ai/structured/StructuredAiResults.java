@@ -21,6 +21,24 @@ public final class StructuredAiResults {
         public List<String> riskFlags = new ArrayList<>();
     }
 
+    /** User-safe plan contract: decisions and constraints, never hidden chain-of-thought. */
+    public static class AuroraPlanResult {
+        public String userIntent;
+        public String emotionalNeed;
+        public String relationshipMove;
+        public List<String> responseConstraints = new ArrayList<>();
+        public List<String> bubblePurposes = new ArrayList<>();
+        public List<Long> relevantMemoryIds = new ArrayList<>();
+        public String uncertainty;
+        public Boolean needsCritic;
+    }
+
+    public static class AuroraCriticResult {
+        public Boolean pass;
+        public List<String> issues = new ArrayList<>();
+        public AuroraResult repaired;
+    }
+
     public static class ShredderResult {
         public String coreFeeling;
         public String hiddenNeed;

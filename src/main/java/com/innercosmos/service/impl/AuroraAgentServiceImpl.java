@@ -11,6 +11,7 @@ import com.innercosmos.ai.portrait.AgentUserRelationshipService;
 import com.innercosmos.ai.portrait.UserPortraitService;
 import com.innercosmos.ai.prompt.PromptBuilder;
 import com.innercosmos.ai.router.ResolvedModel;
+import com.innercosmos.ai.runtime.AuroraDualKernelRuntime;
 import com.innercosmos.ai.router.SessionModelRouter;
 import com.innercosmos.ai.semantic.PseudoSemanticAnalyzer;
 import com.innercosmos.ai.structured.StructuredAiResults;
@@ -93,6 +94,8 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     /** Optional only for constructor-level legacy unit tests; Spring always wires it. */
     @Autowired(required = false)
     private ConversationChoreographyService choreographyService;
+    @Autowired(required = false)
+    private AuroraDualKernelRuntime dualKernelRuntime;
     private final Map<Long, Integer> turnCounter = new ConcurrentHashMap<>();
     private final Map<Long, Integer> goodbyeConfirmCount = new ConcurrentHashMap<>();
     /**
@@ -287,8 +290,22 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 : "你可以选择只说一条，也可以继续补充第二条或第三条。若某个后续想法不值得说，写 [[SILENCE]]，系统不会展示。不要固定数量。");
 
         AuroraReplyVO vo;
+        Map<String, Object> runtimeMeta = new LinkedHashMap<>();
         try {
-            StructuredAiResults.AuroraResult ai = callWithRetry(userId, mode, turnContext, resolved, request, gravityMemories, memoryContext, allowMemory, stateSignal);
+            StructuredAiResults.AuroraResult ai;
+            if (dualKernelRuntime != null && dualKernelRuntime.enabled()) {
+                var generation = dualKernelRuntime.generate(userId, mode, turnContext, resolved.client(),
+                    () -> fallbackAuroraResult(request.message, mode, gravityMemories, memoryContext, allowMemory, stateSignal));
+                ai = generation.result();
+                runtimeMeta.put("runtime", generation.runtime());
+                runtimeMeta.put("relationshipMove", generation.relationshipMove());
+                runtimeMeta.put("criticRepaired", generation.repaired());
+                runtimeMeta.put("criticIssues", generation.criticIssues());
+            } else {
+                ai = callWithRetry(userId, mode, turnContext, resolved, request, gravityMemories,
+                    memoryContext, allowMemory, stateSignal);
+                runtimeMeta.put("runtime", "single-pass.v1");
+            }
             vo = toReply(profile, ai, request, mode, memoryContext, gravityMemories, allowMemory);
             vo = sanitizeLlmOutput(vo, userId);
             if (Boolean.FALSE.equals(agentContext.multiMessageAllowed) && vo.messages.size() > 1) {
@@ -315,6 +332,11 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 return vo;
             }
             vo.planId = planned.activePlan.id;
+        }
+        if (!runtimeMeta.isEmpty()) {
+            Map<String, Object> loop = new LinkedHashMap<>(vo.agentLoop == null ? Map.of() : vo.agentLoop);
+            loop.putAll(runtimeMeta);
+            vo.agentLoop = loop;
         }
         if (persistImmediately) {
             List<DialogMessage> persistedBubbles = new ArrayList<>();
@@ -1212,10 +1234,21 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         String loopReason = loop != null && loop.get("continueReason") instanceof String s ? s : "";
         String loopMode = loop != null && loop.get("mode") instanceof String m ? m : "";
         String loopModeLabel = loop != null && loop.get("modeLabel") instanceof String ml ? ml : "";
+        String loopRuntime = loop != null && loop.get("runtime") instanceof String r ? r : "single";
+        String relationshipMove = loop != null && loop.get("relationshipMove") instanceof String rm ? rm : "";
+        boolean criticRepaired = loop != null && Boolean.TRUE.equals(loop.get("criticRepaired"));
+        @SuppressWarnings("unchecked")
+        List<String> criticIssues = loop != null && loop.get("criticIssues") instanceof List<?> issues
+                ? issues.stream().filter(String.class::isInstance).map(String.class::cast).toList()
+                : List.of();
         sb.append(",\"agentLoop\":{\"speakCount\":").append(loopSpeak)
                 .append(",\"continueReason\":\"").append(escape(loopReason)).append("\"")
                 .append(",\"mode\":\"").append(escape(loopMode)).append("\"")
-                .append(",\"modeLabel\":\"").append(escape(loopModeLabel)).append("\"}");
+                .append(",\"modeLabel\":\"").append(escape(loopModeLabel)).append("\"")
+                .append(",\"runtime\":\"").append(escape(loopRuntime)).append("\"")
+                .append(",\"relationshipMove\":\"").append(escape(relationshipMove)).append("\"")
+                .append(",\"criticRepaired\":").append(criticRepaired)
+                .append(",\"criticIssues\":").append(jsonStringArray(criticIssues)).append("}");
         // aiState block.
         if (reply.aiState != null) {
             sb.append(",\"aiState\":").append(jsonObject(reply.aiState));

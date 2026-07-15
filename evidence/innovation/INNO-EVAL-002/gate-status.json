@@ -1,11 +1,10 @@
 {
   "status": "BLOCKED_BY_CREDENTIAL_GATE",
-  "checked_at": "2026-07-15T12:43:00+08:00",
+  "checked_at": "2026-07-15T15:52:00+08:00",
   "required_environment": [
     "REAL_PROVIDER_BASE_URL",
     "REAL_PROVIDER_API_KEY",
-    "REAL_PROVIDER_MODEL_A",
-    "REAL_PROVIDER_MODEL_B"
+    "REAL_PROVIDER_MODEL"
   ],
   "configured_count": 0,
   "provider_called": false,

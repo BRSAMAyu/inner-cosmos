@@ -113,6 +113,15 @@ class WebSessionSecurityIntegrationTest {
         assertThat(authenticated).isNotNull();
         assertThat(authenticated.getId()).isNotEqualTo(oldId);
         assertThat(authenticated.getAttribute(Constants.SESSION_USER_KEY)).isInstanceOf(Long.class);
+        String authenticatedId = authenticated.getId();
+
+        mockMvc.perform(get("/api/auth/current").session(authenticated))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/user/profile").session(authenticated))
+                .andExpect(status().isOk());
+        assertThat(authenticated.getId())
+                .as("request-scoped authentication must not rotate the already protected session")
+                .isEqualTo(authenticatedId);
 
         MvcResult csrfResult = mockMvc.perform(get("/api/auth/csrf").session(authenticated))
                 .andExpect(status().isOk())
