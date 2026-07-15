@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-15T23:19:00+08:00
+updated_at: 2026-07-15T23:22:00+08:00
 authority:
   - goal-objective.md
   - 对齐文档/17-单会话持续Goal模式执行协议.md
@@ -32,7 +32,7 @@ active_front:
   state: COMPONENT_DECOMPOSITION_IN_PROGRESS
   intent: Decompose the verified five-space information architecture into maintainable domain components without changing capability or data semantics.
   next_machine_actions:
-    - Continue extracting the domain-heavy product spaces from AuroraApp; ProductShell, MeSpace and AuroraConversation are already isolated and tested.
+    - Continue extracting the domain-heavy product spaces from AuroraApp; ProductShell, MeSpace, AuroraConversation and AuroraSelfSpace are isolated and tested.
     - Add automated accessibility and visual-regression coverage for desktop and narrow mobile shell states.
     - Continue Campaign B's correction, provenance and propagation experience after the component boundary is stable.
 
@@ -72,6 +72,7 @@ last_full_gate:
     - Vitest passed 17/17 including isolated ProductShell and controlled AuroraConversation contracts; the production React bundle compiled.
     - Packaged-Jar Playwright passed 11/11 through explicit product-space navigation.
     - Living Aurora scheduler-to-feedback browser contract passed 1/1 through the new shell.
+    - Focused Aurora Self packaged-JAR browser lifecycle passed 1/1 after component extraction.
     - Android app and instrumentation APK assembly passed; live domain ownership remains a human publication gate.
   review: evidence/campaign-a/APP-SHELL-001/README.md
 

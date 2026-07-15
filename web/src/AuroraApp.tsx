@@ -6,6 +6,7 @@ import { mobileOidc } from "./mobile-auth";
 import type { AuroraStreamEvent, DialogMessage, TurnStatus } from "./protocol";
 import { initialProductSpace, MeSpace, ProductShellNavigation, type ProductSpace } from "./components/ProductShell";
 import { AuroraConversation, type AuroraUiMessage } from "./components/AuroraConversation";
+import { AuroraSelfSpace } from "./components/AuroraSelfSpace";
 
 type RuntimeSignal = { stage: "idle" | "understanding" | "composing" | "speaking"; runtime: "single" | "dual"; relationshipMove?: string; repaired?: boolean };
 const terminal = new Set<TurnStatus>(["COMPLETED", "INTERRUPTED", "CANCELLED"]);
@@ -927,36 +928,11 @@ export function AuroraApp() {
             <button disabled={wakeBusy} onClick={() => void respondToReturn(notice, "STOP_SIMILAR")}>不再提醒这类事</button></div>
         </section>)}
 
-      {selfEvolution && <section className="self-space" aria-label="Aurora 的连续自我">
-        <div className="self-heading"><div><span className="eyebrow">AURORA, BECOMING</span><h2>她最近学会了什么</h2></div>
-          <span className="self-version">v{selfEvolution.versions.find(version => version.status === "ACTIVE")?.versionNo ?? 1}</span></div>
-        <p className="self-narrative">{selfEvolution.versions.find(version => version.status === "ACTIVE")?.publicNarrative}</p>
-        {selfEvolution.candidates.filter(candidate => !selfEvolution.proposals.some(proposal => proposal.sourceReflectionId === candidate.id)).map(candidate =>
-          <article className="self-card candidate" key={candidate.id}>
-            <span>正在形成的理解 · {Math.round(candidate.confidence * 100)}%</span>
-            <p>{candidate.proposedBelief}</p>
-            <button disabled={selfBusy} onClick={() => void evolve(
-              () => api.proposeSelfEvolution(candidate.id, "让 Aurora 在相似时刻更连续、更贴近双方已经形成的相处方式"),
-              "这还只是一个提案。你可以先看它会怎样改变 Aurora。")}>预览这次变化</button>
-          </article>)}
-        {selfEvolution.proposals.slice(0, 3).map(proposal => <article className={`self-card ${proposal.status.toLowerCase()}`} key={proposal.id}>
-          <span>{proposal.status === "DRAFT" ? "等待沙盒评测" : proposal.status === "EVALUATED" ? "评测通过，等你确认" : proposal.status === "ACTIVATED" ? "已经成为 Aurora 的一部分" : "没有通过边界评测"}</span>
-          <p>{proposal.proposedBelief}</p>
-          {proposal.evaluation && <details><summary>为什么得到这个结果</summary>
-            <p>{proposal.evaluation.sandboxBefore}</p><p>{proposal.evaluation.sandboxAfter}</p>
-            <small>连续性 {Math.round(proposal.evaluation.continuityScore * 100)} · 质量 {Math.round(proposal.evaluation.qualityScore * 100)} · 安全 {proposal.evaluation.decision}</small>
-          </details>}
-          {proposal.status === "DRAFT" && <button disabled={selfBusy} onClick={() => void evolve(
-            () => api.evaluateSelfEvolution(proposal.id), "沙盒评测完成。变化不会在你确认前生效。")}>运行变化评测</button>}
-          {proposal.status === "EVALUATED" && <button disabled={selfBusy} onClick={() => void evolve(
-            () => api.activateSelfEvolution(proposal.id), "这次变化已经成为新的 Aurora 版本，并且仍然可以回退。")}>允许她记住这次成长</button>}
-        </article>)}
-        {selfEvolution.versions.filter(version => version.status === "RETIRED").slice(0, 2).map(version =>
-          <button className="version-history" disabled={selfBusy} key={version.id} onClick={() => void evolve(
-            () => api.rollbackSelfEvolution(version.id), `已回到第 ${version.versionNo} 版；回退本身也留下了可追溯的新版本。`)}>
-            回到 v{version.versionNo} · {version.publicNarrative}
-          </button>)}
-      </section>}
+      {selfEvolution && <AuroraSelfSpace evolution={selfEvolution} busy={selfBusy}
+        onPropose={candidateId => void evolve(() => api.proposeSelfEvolution(candidateId, "让 Aurora 在相似时刻更连续、更贴近双方已经形成的相处方式"), "这还只是一个提案。你可以先看它会怎样改变 Aurora。")}
+        onEvaluate={proposalId => void evolve(() => api.evaluateSelfEvolution(proposalId), "沙盒评测完成。变化不会在你确认前生效。")}
+        onActivate={proposalId => void evolve(() => api.activateSelfEvolution(proposalId), "这次变化已经成为新的 Aurora 版本，并且仍然可以回退。")}
+        onRollback={(versionId, versionNo) => void evolve(() => api.rollbackSelfEvolution(versionId), `已回到第 ${versionNo} 版；回退本身也留下了可追溯的新版本。`)} />}
       </div>
 
       <div className="product-space" hidden={productSpace !== "cosmos"}>

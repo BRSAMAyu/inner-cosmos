@@ -35,7 +35,9 @@ This is the information-architecture and navigation foundation, not closure of `
 The URL contract, navigation and `我的` control surface have been extracted into a tested
 `ProductShell` component boundary. Aurora's multi-message timeline/composer is also isolated behind
 a controlled component contract that preserves partial replies, stop and interrupt/replan actions.
-`AuroraApp.tsx` remains oversized and the domain-heavy spaces still need extraction. Visual
+Aurora Self has its own component boundary while proposal, evaluation, consented activation and
+rollback remain caller-owned API actions. `AuroraApp.tsx` remains oversized and the domain-heavy
+spaces still need extraction. Visual
 regression, automated accessibility, complete i18n and
 performance budgets also remain open. The next machine front continues domain component decomposition
 with state and API contracts kept stable.
