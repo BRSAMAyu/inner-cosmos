@@ -102,6 +102,20 @@ export type CapsuleSandbox = {
 export type CapsuleSandboxFeedback = {
   id: number; genomeVersionId: number; rating: string; ownerComment: string | null; status: string;
 };
+export type PublicCapsule = {
+  id: number; pseudonym: string; intro: string; capsuleType: string; publicTags: string;
+  echoEnergy: number; freshnessScore: number; conversationLimitPerDay: number; lastActivityAt: string | null;
+};
+export type CapsuleMatch = {
+  capsule: PublicCapsule; matchScore: number; matchReasons: string[]; matchSummary: string; resonant: boolean;
+};
+export type PersonaSession = { id: number; capsuleId: number; status: string; turnCount: number; dailyLimit: number };
+export type PersonaMessage = { id: number; sessionId: number; senderType: "VISITOR" | "CAPSULE"; textContent: string };
+export type CapsuleQuota = { usedTurns: number; remainingTurns: number; dailyLimit: number; exhausted: boolean };
+export type SlowLetter = {
+  id: number; receiverCapsuleId: number; title: string; letterBody: string; status: string;
+  parallaxDistance: number; estimatedArrivalAt: string;
+};
 let csrf: Csrf | null = null;
 
 async function request<T>(url: string, init: RequestInit = {}, retriedCsrf = false): Promise<T> {
@@ -137,6 +151,11 @@ export const api = {
     });
     // AuthController rotates the session ID after login. The pre-authentication
     // synchronizer token must never be reused with the authenticated session.
+    csrf = null;
+    return result;
+  },
+  logout: async () => {
+    const result = await request<boolean>("/api/auth/logout", { method: "POST" });
     csrf = null;
     return result;
   },
@@ -206,7 +225,20 @@ export const api = {
     method: "POST", body: JSON.stringify({ question })
   }),
   feedbackCapsuleSandbox: (id: number, input: { genomeVersionId: number; question: string; response: string; rating: string; comment?: string }) =>
-    request<CapsuleSandboxFeedback>(`/api/capsule/${id}/sandbox/feedback`, { method: "POST", body: JSON.stringify(input) })
+    request<CapsuleSandboxFeedback>(`/api/capsule/${id}/sandbox/feedback`, { method: "POST", body: JSON.stringify(input) }),
+  resonanceMatches: () => request<CapsuleMatch[]>("/api/plaza/matches"),
+  createPersonaSession: (capsuleId: number) => request<PersonaSession>("/api/persona-chat/session/create", {
+    method: "POST", body: JSON.stringify({ capsuleId })
+  }),
+  personaMessages: (sessionId: number) => request<PersonaMessage[]>(`/api/persona-chat/session/${sessionId}/messages`),
+  sendPersonaMessage: (sessionId: number, message: string) => request<PersonaMessage>("/api/persona-chat/message", {
+    method: "POST", body: JSON.stringify({ sessionId, message })
+  }),
+  capsuleQuota: (capsuleId: number) => request<CapsuleQuota>(`/api/persona-chat/quota?capsuleId=${capsuleId}`),
+  draftSlowLetter: (receiverCapsuleId: number, title: string, letterBody: string) => request<SlowLetter>("/api/letters/draft", {
+    method: "POST", body: JSON.stringify({ receiverCapsuleId, title, letterBody })
+  }),
+  sendSlowLetter: (id: number) => request<SlowLetter>(`/api/letters/${id}/send`, { method: "POST" })
 };
 
 export async function streamAurora(

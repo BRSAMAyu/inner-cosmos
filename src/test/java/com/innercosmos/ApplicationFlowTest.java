@@ -70,6 +70,13 @@ class ApplicationFlowTest {
 
     @Test
     void plazaPersonaChatAndLetterFlowWork() throws Exception {
+        MockHttpSession ownerSession = login("admin", "admin123");
+        MvcResult ownerCapsule = mockMvc.perform(withSession(post("/api/capsule/create-from-memory")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"pseudonym\":\"远山回声\",\"intro\":\"允许一封慢信抵达。\",\"memoryIds\":[],\"allowTopics\":[\"自我观察\"],\"blockedTopics\":[\"私人身份\"],\"maxConversationTurns\":7,\"allowLetterRequest\":true,\"privacyLevel\":\"STRICT\",\"visibilityStatus\":\"PUBLIC\",\"isPublic\":true}"), ownerSession))
+                .andExpect(status().isOk())
+                .andReturn();
+        String ownerCapsuleId = readId(ownerCapsule);
         MockHttpSession session = login();
 
         mockMvc.perform(get("/api/plaza/capsules"))
@@ -78,7 +85,7 @@ class ApplicationFlowTest {
 
         MvcResult chatSession = mockMvc.perform(withSession(post("/api/persona-chat/session/create")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"capsuleId\":1}"), session))
+                        .content("{\"capsuleId\":" + ownerCapsuleId + "}"), session))
                 .andExpect(status().isOk())
                 .andReturn();
         String chatSessionId = readId(chatSession);
@@ -91,7 +98,7 @@ class ApplicationFlowTest {
 
         MvcResult letter = mockMvc.perform(withSession(post("/api/letters/draft")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"receiverUserId\":1,\"receiverCapsuleId\":1,\"title\":\"测试慢信\",\"letterBody\":\"我在这里感到一点共鸣。\"}"), session))
+                        .content("{\"receiverCapsuleId\":" + ownerCapsuleId + ",\"title\":\"测试慢信\",\"letterBody\":\"我在这里感到一点共鸣。\"}"), session))
                 .andExpect(status().isOk())
                 .andReturn();
         String letterId = readId(letter);
@@ -265,9 +272,13 @@ class ApplicationFlowTest {
     }
 
     private MockHttpSession login() throws Exception {
+        return login("demo", "demo123");
+    }
+
+    private MockHttpSession login(String username, String password) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"username\":\"demo\",\"password\":\"demo123\"}"))
+                        .content("{\"username\":\"" + username + "\",\"password\":\"" + password + "\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andReturn();

@@ -2,10 +2,12 @@ package com.innercosmos.service.impl;
 
 import com.innercosmos.ai.agent.LetterGuardAgent;
 import com.innercosmos.dto.LetterCreateRequest;
+import com.innercosmos.entity.EchoCapsule;
 import com.innercosmos.entity.LetterThread;
 import com.innercosmos.entity.SlowLetter;
 import com.innercosmos.exception.BusinessException;
 import com.innercosmos.letterstate.LetterStateRegistry;
+import com.innercosmos.mapper.EchoCapsuleMapper;
 import com.innercosmos.mapper.LetterStatusLogMapper;
 import com.innercosmos.mapper.LetterThreadMapper;
 import com.innercosmos.mapper.ReportRecordMapper;
@@ -45,10 +47,11 @@ class SlowLetterThreadingTest {
     @Mock private LetterThreadMapper threadMapper;
     @Mock private ReportRecordMapper reportRecordMapper;
     @Mock private LetterSafetyFilter letterSafetyFilter;
+    @Mock private EchoCapsuleMapper capsuleMapper;
 
     private SlowLetterServiceImpl newService() {
         return new SlowLetterServiceImpl(letterMapper, logMapper, stateRegistry,
-                guardAgent, threadMapper, reportRecordMapper, letterSafetyFilter);
+                guardAgent, threadMapper, reportRecordMapper, letterSafetyFilter, capsuleMapper);
     }
 
     private SlowLetter original(long id, long sender, long receiver, long capsuleId) {
@@ -69,6 +72,67 @@ class SlowLetterThreadingTest {
         request.title = "谢谢你愿意写下这些";
         request.letterBody = "我在第三段停了下来，想慢慢回你一封信。";
         return request;
+    }
+
+    @Test
+    @DisplayName("draft: a public capsule resolves its owner server-side without exposing the owner id")
+    void draftToPublicCapsule_resolvesReceiverOwner() {
+        EchoCapsule capsule = new EchoCapsule();
+        capsule.id = 77L;
+        capsule.ownerUserId = 20L;
+        capsule.isPublic = true;
+        capsule.visibilityStatus = "PUBLIC";
+        when(capsuleMapper.selectById(77L)).thenReturn(capsule);
+        when(guardAgent.allow(any())).thenReturn(true);
+        LetterCreateRequest request = replyRequest();
+        request.receiverUserId = null;
+
+        SlowLetter created = newService().draft(10L, request);
+
+        assertEquals(20L, created.receiverUserId);
+        ArgumentCaptor<SlowLetter> inserted = ArgumentCaptor.forClass(SlowLetter.class);
+        verify(letterMapper).insert(inserted.capture());
+        assertEquals(20L, inserted.getValue().receiverUserId);
+    }
+
+    @Test
+    @DisplayName("draft: a client cannot redirect a public capsule letter to a different owner")
+    void draftToPublicCapsule_rejectsForgedReceiver() {
+        EchoCapsule capsule = new EchoCapsule();
+        capsule.id = 77L;
+        capsule.ownerUserId = 20L;
+        capsule.isPublic = true;
+        capsule.visibilityStatus = "PUBLIC";
+        when(capsuleMapper.selectById(77L)).thenReturn(capsule);
+        when(guardAgent.allow(any())).thenReturn(true);
+        LetterCreateRequest request = replyRequest();
+        request.receiverUserId = 99L;
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> newService().draft(10L, request));
+
+        assertEquals("BAD_REQUEST", ex.code);
+        verify(letterMapper, never()).insert(any(SlowLetter.class));
+    }
+
+    @Test
+    @DisplayName("draft: an official seed without a human owner can never become a real-person route")
+    void draftToOwnerlessSeed_isNeverARealPersonRoute() {
+        EchoCapsule capsule = new EchoCapsule();
+        capsule.id = 77L;
+        capsule.ownerUserId = null;
+        capsule.isPublic = true;
+        capsule.visibilityStatus = "PUBLIC";
+        when(capsuleMapper.selectById(77L)).thenReturn(capsule);
+        when(guardAgent.allow(any())).thenReturn(true);
+        LetterCreateRequest request = replyRequest();
+        request.receiverUserId = 99L;
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> newService().draft(10L, request));
+
+        assertEquals("NOT_FOUND", ex.code);
+        verify(letterMapper, never()).insert(any(SlowLetter.class));
     }
 
     @Test

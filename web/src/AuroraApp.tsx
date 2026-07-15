@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { api, replayTurnEvents, streamAurora, type CapsuleGenomeVersion, type CapsulePreview, type CapsuleSandbox, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type Notification, type SelfEvolution, type StarfieldDetail, type StarfieldScene, type UnderstandingClaim, type WakeIntent } from "./api";
+import { api, replayTurnEvents, streamAurora, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type Notification, type PersonaMessage, type PersonaSession, type SelfEvolution, type SlowLetter, type StarfieldDetail, type StarfieldScene, type UnderstandingClaim, type WakeIntent } from "./api";
 import type { AuroraStreamEvent, DialogMessage, TurnStatus } from "./protocol";
 
 type UiMessage = { key: string; speaker: "USER" | "AURORA"; text: string; partial?: boolean };
@@ -51,6 +51,16 @@ export function AuroraApp() {
   const [sandboxQuestion, setSandboxQuestion] = useState("当你被误解时，通常会怎样表达自己的边界？");
   const [sandboxResult, setSandboxResult] = useState<CapsuleSandbox | null>(null);
   const [sandboxFeedback, setSandboxFeedback] = useState<string | null>(null);
+  const [resonanceMatches, setResonanceMatches] = useState<CapsuleMatch[]>([]);
+  const [visitorMatchId, setVisitorMatchId] = useState<number | null>(null);
+  const [personaSession, setPersonaSession] = useState<PersonaSession | null>(null);
+  const [personaMessages, setPersonaMessages] = useState<PersonaMessage[]>([]);
+  const [personaDraft, setPersonaDraft] = useState("最近有什么让你觉得自己被认真理解了？");
+  const [personaQuota, setPersonaQuota] = useState<CapsuleQuota | null>(null);
+  const [letterTitle, setLetterTitle] = useState("想把刚才的共鸣慢慢写下来");
+  const [letterBody, setLetterBody] = useState("");
+  const [sentLetter, setSentLetter] = useState<SlowLetter | null>(null);
+  const [visitorBusy, setVisitorBusy] = useState(false);
   const [runtimeSignal, setRuntimeSignal] = useState<RuntimeSignal>({ stage: "idle", runtime: "single" });
   const abortRef = useRef<AbortController | null>(null);
   const activeTurnRef = useRef<number | null>(null);
@@ -73,7 +83,7 @@ export function AuroraApp() {
       const created = returning?.contextSessionId ? { id: returning.contextSessionId } : await api.createSession();
       if (call !== bootstrapCallRef.current) return;
       setSessionId(created.id);
-      const loadedCapsules = (await Promise.all([
+      const loaded = await Promise.all([
         replaceFromHistory(created.id),
         api.wakeIntents().then(setWakeIntents),
         api.selfEvolution().then(setSelfEvolution),
@@ -82,12 +92,16 @@ export function AuroraApp() {
         api.memoryOperations().then(setMemoryOperations),
         api.notifications().then(setNotifications),
         api.memoryCards().then(rows => { setMemories(rows); return rows; }),
-        api.myCapsules().then(rows => { setCapsules(rows); return rows; })
-      ]))[8] as EchoCapsule[];
+        api.myCapsules().then(rows => { setCapsules(rows); return rows; }),
+        api.resonanceMatches().then(rows => { setResonanceMatches(rows); return rows; })
+      ]);
+      const loadedCapsules = loaded[8] as EchoCapsule[];
+      const loadedMatches = loaded[9] as CapsuleMatch[];
       if (call !== bootstrapCallRef.current) return;
       setAuthenticated(true);
       const firstVisibleCapsule = loadedCapsules.find(capsule => capsule.visibilityStatus !== "ARCHIVED");
       if (firstVisibleCapsule) setSelectedCapsuleId(current => current ?? firstVisibleCapsule.id);
+      setVisitorMatchId(current => current ?? loadedMatches[0]?.capsule.id ?? null);
       setStatus(returning
         ? `Aurora 按约定回来了：${returning.purpose}`
         : "Aurora 在这里。你可以随时打断，她会重新理解。 ");
@@ -103,6 +117,7 @@ export function AuroraApp() {
   }, [replaceFromHistory]);
 
   const selectedCapsule = capsules.find(capsule => capsule.id === selectedCapsuleId) ?? null;
+  const visitorMatch = resonanceMatches.find(match => match.capsule.id === visitorMatchId) ?? resonanceMatches[0] ?? null;
 
   useEffect(() => {
     if (!selectedCapsule) { setGenomeHistory([]); return; }
@@ -491,6 +506,58 @@ export function AuroraApp() {
     finally { setCapsuleBusy(false); }
   };
 
+  const chooseVisitorMatch = (capsuleId: number) => {
+    setVisitorMatchId(capsuleId);
+    setPersonaSession(null); setPersonaMessages([]); setPersonaQuota(null); setSentLetter(null); setLetterBody("");
+  };
+
+  const startPersonaConversation = async () => {
+    if (!visitorMatch) return;
+    setVisitorBusy(true);
+    try {
+      const [session, quota] = await Promise.all([
+        api.createPersonaSession(visitorMatch.capsule.id), api.capsuleQuota(visitorMatch.capsule.id)
+      ]);
+      setPersonaSession(session); setPersonaQuota(quota); setPersonaMessages([]);
+      setStatus(`你正在和「${visitorMatch.capsule.pseudonym}」的授权 AI 共鸣体对话，不是真人实时在线。`);
+    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法进入这个共鸣体"); }
+    finally { setVisitorBusy(false); }
+  };
+
+  const sendPersonaTurn = async () => {
+    if (!personaSession || !visitorMatch || !personaDraft.trim()) return;
+    setVisitorBusy(true);
+    try {
+      await api.sendPersonaMessage(personaSession.id, personaDraft.trim());
+      const [history, quota] = await Promise.all([
+        api.personaMessages(personaSession.id), api.capsuleQuota(visitorMatch.capsule.id)
+      ]);
+      setPersonaMessages(history); setPersonaQuota(quota); setPersonaDraft("");
+      setStatus("回应来自授权 Genome；你可以继续验证共鸣，也可以把真正想说的内容写成慢信。 ");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "这轮对话没有送达"); }
+    finally { setVisitorBusy(false); }
+  };
+
+  const sendLetterToMatch = async () => {
+    if (!visitorMatch || !letterTitle.trim() || !letterBody.trim()) return;
+    setVisitorBusy(true);
+    try {
+      const draft = await api.draftSlowLetter(visitorMatch.capsule.id, letterTitle.trim(), letterBody.trim());
+      const sent = await api.sendSlowLetter(draft.id);
+      setSentLetter(sent);
+      setStatus("慢信已经启程。收件人看到的是你的原话和安全预览，不是 AI 代写的统一模板。 ");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "慢信没有发送，草稿内容仍在这里"); }
+    finally { setVisitorBusy(false); }
+  };
+
+  const logout = async () => {
+    try {
+      await api.logout();
+      setAuthenticated(false); setSessionId(null); setMessages([]); setPersonaSession(null); setPersonaMessages([]);
+      setStatus("已安全退出");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法退出"); }
+  };
+
   if (authenticated === null) return <main className="login-shell"><div className="login" role="status">正在连接你的内宇宙…</div></main>;
   if (!authenticated) return <Login onSuccess={bootstrap} />;
 
@@ -688,6 +755,41 @@ export function AuroraApp() {
         </div>}
       </section>
 
+      <section className="resonance-network" aria-label="发现共鸣并写一封慢信">
+        <div className="resonance-heading"><div><span className="eyebrow">RESONANCE NETWORK</span><h2>不是刷卡片，是理解为什么会相遇</h2></div>
+          <span>{resonanceMatches.length} 个此刻的候选</span></div>
+        <p className="resonance-intro">这里没有热度排行。系统只展示脱敏侧面、共同主题和边界；先与授权 AI 共鸣体确认是否真的想继续，再决定要不要把话写给本人。</p>
+        {resonanceMatches.length === 0 ? <div className="network-empty">暂时没有足够安全的相遇候选。Inner Cosmos 不会用随机陌生人填满这里。</div> : <>
+          <div className="match-rail" role="list" aria-label="共鸣候选">
+            {resonanceMatches.map(match => <button type="button" role="listitem" key={match.capsule.id}
+              className={visitorMatch?.capsule.id === match.capsule.id ? "match-card active" : "match-card"}
+              onClick={() => chooseVisitorMatch(match.capsule.id)}><span>{match.resonant ? "此刻同行" : "探索相遇"}</span>
+              <strong>{match.capsule.pseudonym}</strong><p>{match.capsule.intro}</p>
+              <small>{match.matchSummary}</small></button>)}
+          </div>
+          {visitorMatch && <div className="visitor-workbench">
+            <header><div><span className="identity-notice">授权 AI 共鸣体 · 不是真人实时在线</span><h3>{visitorMatch.capsule.pseudonym}</h3>
+              <p>{visitorMatch.capsule.intro}</p></div><div className="match-reasons">{visitorMatch.matchReasons.map(reason => <span key={reason}>{reason}</span>)}</div></header>
+            {!personaSession ? <div className="visitor-entry"><p>先问一两个真正重要的问题。它只能使用创建者明确授权的侧面，也不会把你的 Aurora 私有画像带进这段对话。</p>
+              <button className="resonance-primary" disabled={visitorBusy} onClick={() => void startPersonaConversation()}>进入有限但自然的对话</button></div> : <>
+              <div className="visitor-quota"><span>今天还可深入 {personaQuota?.remainingTurns ?? "–"} 轮</span><small>额度用于防滥用；模型故障不会扣次数，达到边界后会自然引导慢信。</small></div>
+              <div className="persona-history" aria-label="共鸣体对话记录">{personaMessages.length === 0 ? <p>可以从一个具体时刻开始，而不是交换完整履历。</p> : personaMessages.map(message =>
+                <article className={message.senderType === "VISITOR" ? "visitor" : "capsule"} key={message.id}><span>{message.senderType === "VISITOR" ? "你" : visitorMatch.capsule.pseudonym}</span><p>{message.textContent}</p></article>)}</div>
+              <div className="sandbox-composer"><textarea aria-label="写给共鸣体" value={personaDraft} onChange={event => setPersonaDraft(event.target.value)} />
+                <button className="resonance-primary" disabled={visitorBusy || !personaDraft.trim() || personaQuota?.exhausted} onClick={() => void sendPersonaTurn()}>发送这一轮</button></div>
+              {personaMessages.some(message => message.senderType === "CAPSULE") && <div className="slow-letter-compose">
+                <div className="capsule-step"><span>✉</span><div><strong>如果仍想继续，把话交给时间</strong><small>这封信会送给创建者本人。共鸣体不会替对方承诺回复，也不会泄露联系方式。</small></div></div>
+                {visitorMatch.capsule.capsuleType !== "USER_CAPSULE" ? <p className="preview-warning">这是官方种子共鸣体，没有对应的真人收件人；你仍可继续对话，但不能把它当作认识真人的入口。</p> : sentLetter ?
+                  <div className="letter-flight" role="status"><strong>慢信已启程</strong><span>{sentLetter.title}</span><small>预计 {new Date(sentLetter.estimatedArrivalAt).toLocaleString()} 到达 · 状态 {sentLetter.status}</small></div> : <>
+                    <label>信的题目<input value={letterTitle} onChange={event => setLetterTitle(event.target.value)} /></label>
+                    <label>你真正想让对方读到的话<textarea aria-label="慢信正文" value={letterBody} onChange={event => setLetterBody(event.target.value)} placeholder="不用总结整段对话，只写你愿意为它负责的那部分。" /></label>
+                    <button className="resonance-primary" disabled={visitorBusy || !letterTitle.trim() || !letterBody.trim()} onClick={() => void sendLetterToMatch()}>让慢信启程</button></>}
+              </div>}
+            </>}
+          </div>}
+        </>}
+      </section>
+
       <section className="conversation" aria-live="polite" aria-label="与 Aurora 的对话">
         {messages.length === 0 && <div className="empty"><span>✦</span><p>把现在最真实的一句话放在这里。</p></div>}
         {messages.map(message => (
@@ -709,7 +811,7 @@ export function AuroraApp() {
           <button type="submit" className="send" disabled={!draft.trim() || !sessionId}>{activeTurnId ? "打断并发送" : "发送"}</button>
         </div>
       </form>
-      <footer><a href="/pages/aurora-chat.html">返回经典界面</a><span>渐进迁移 · 原有能力完整保留</span></footer>
+      <footer><a href="/pages/aurora-chat.html">返回经典界面</a><span>渐进迁移 · 原有能力完整保留</span><button type="button" onClick={() => void logout()}>安全退出</button></footer>
     </main>
   );
 }

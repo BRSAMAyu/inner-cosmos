@@ -3,12 +3,14 @@ package com.innercosmos.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.innercosmos.ai.agent.LetterGuardAgent;
 import com.innercosmos.dto.LetterCreateRequest;
+import com.innercosmos.entity.EchoCapsule;
 import com.innercosmos.entity.LetterStatusLog;
 import com.innercosmos.entity.LetterThread;
 import com.innercosmos.entity.ReportRecord;
 import com.innercosmos.entity.SlowLetter;
 import com.innercosmos.exception.SafetyBlockedException;
 import com.innercosmos.letterstate.LetterStateRegistry;
+import com.innercosmos.mapper.EchoCapsuleMapper;
 import com.innercosmos.mapper.LetterStatusLogMapper;
 import com.innercosmos.mapper.LetterThreadMapper;
 import com.innercosmos.mapper.ReportRecordMapper;
@@ -30,8 +32,9 @@ public class SlowLetterServiceImpl implements SlowLetterService {
     private final LetterThreadMapper threadMapper;
     private final ReportRecordMapper reportRecordMapper;
     private final LetterSafetyFilter letterSafetyFilter;
+    private final EchoCapsuleMapper capsuleMapper;
 
-    public SlowLetterServiceImpl(SlowLetterMapper letterMapper, LetterStatusLogMapper logMapper, LetterStateRegistry stateRegistry, LetterGuardAgent guardAgent, LetterThreadMapper threadMapper, ReportRecordMapper reportRecordMapper, LetterSafetyFilter letterSafetyFilter) {
+    public SlowLetterServiceImpl(SlowLetterMapper letterMapper, LetterStatusLogMapper logMapper, LetterStateRegistry stateRegistry, LetterGuardAgent guardAgent, LetterThreadMapper threadMapper, ReportRecordMapper reportRecordMapper, LetterSafetyFilter letterSafetyFilter, EchoCapsuleMapper capsuleMapper) {
         this.letterMapper = letterMapper;
         this.logMapper = logMapper;
         this.stateRegistry = stateRegistry;
@@ -39,6 +42,7 @@ public class SlowLetterServiceImpl implements SlowLetterService {
         this.threadMapper = threadMapper;
         this.reportRecordMapper = reportRecordMapper;
         this.letterSafetyFilter = letterSafetyFilter;
+        this.capsuleMapper = capsuleMapper;
     }
 
     @Override
@@ -46,9 +50,31 @@ public class SlowLetterServiceImpl implements SlowLetterService {
         if (!guardAgent.allow(request.letterBody)) {
             throw new SafetyBlockedException("letter contains unsafe content");
         }
+        Long receiverUserId = request.receiverUserId;
+        if (request.receiverCapsuleId != null) {
+            EchoCapsule capsule = capsuleMapper.selectById(request.receiverCapsuleId);
+            if (capsule == null || !Boolean.TRUE.equals(capsule.isPublic)
+                    || !"PUBLIC".equals(capsule.visibilityStatus)) {
+                throw new com.innercosmos.exception.BusinessException(
+                        com.innercosmos.common.ErrorCode.NOT_FOUND, "这个共鸣体当前不能接收慢信");
+            }
+            if (capsule.ownerUserId == null) {
+                throw new com.innercosmos.exception.BusinessException(
+                        com.innercosmos.common.ErrorCode.NOT_FOUND, "官方种子共鸣体没有真人收件人");
+            }
+            if (receiverUserId != null && !capsule.ownerUserId.equals(receiverUserId)) {
+                throw new com.innercosmos.exception.BusinessException(
+                        com.innercosmos.common.ErrorCode.BAD_REQUEST, "慢信收件人与共鸣体授权者不一致");
+            }
+            receiverUserId = capsule.ownerUserId;
+        }
+        if (receiverUserId == null || userId.equals(receiverUserId)) {
+            throw new com.innercosmos.exception.BusinessException(
+                    com.innercosmos.common.ErrorCode.BAD_REQUEST, "请选择可以接收慢信的共鸣者");
+        }
         SlowLetter letter = new SlowLetter();
         letter.senderUserId = userId;
-        letter.receiverUserId = request.receiverUserId;
+        letter.receiverUserId = receiverUserId;
         letter.receiverCapsuleId = request.receiverCapsuleId;
         letter.title = request.title;
         letter.letterBody = request.letterBody;

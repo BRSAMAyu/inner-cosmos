@@ -195,7 +195,7 @@ test("user can roll back a memory change while permanent forgetting stays irreve
   await expect(history).toContainText("已撤回");
 });
 
-test("owner previews, compiles, sandboxes, publishes and withdraws a versioned resonance capsule", async ({ page }) => {
+test("owner publishes, a visitor sends a slow letter, then withdrawal stops the resonance", async ({ page }) => {
   await page.goto("/app/aurora/index.html");
   await loginIfNeeded(page);
   const resonance = page.getByRole("region", { name: "共鸣体创建与像不像我沙盒" });
@@ -205,7 +205,8 @@ test("owner previews, compiles, sandboxes, publishes and withdraws a versioned r
 
   const eligibleMemory = resonance.locator(".memory-consent-list label:not(.blocked) input").first();
   if (await eligibleMemory.isVisible().catch(() => false)) await eligibleMemory.check();
-  await resonance.getByLabel("共鸣体名字").fill(`盲体验回声-${Date.now()}`);
+  const capsuleName = `盲体验回声-${Date.now()}`;
+  await resonance.getByLabel("共鸣体名字").fill(capsuleName);
   await resonance.getByLabel("希望它保留的侧面").fill("遇到误解时先停一下，再温和但清楚地说出边界。");
   await resonance.getByRole("button", { name: "先看严格脱敏预览" }).click();
   await expect(resonance.getByLabel("共鸣体授权预览")).toContainText("WHAT IT MAY USE");
@@ -223,7 +224,34 @@ test("owner previews, compiles, sandboxes, publishes and withdraws a versioned r
   await resonance.getByRole("button", { name: "确认并发布当前版本" }).click();
   await expect(resonance).toContainText("公开中");
   await page.screenshot({ path: "../evidence/innovation/INNO-CAP-003/resonance-owner-journey.png", fullPage: true });
-  await resonance.getByRole("button", { name: "撤回这个共鸣体" }).click();
+
+  await page.getByRole("button", { name: "安全退出" }).click();
+  await expect(page.getByRole("heading", { name: "回到你的内宇宙" })).toBeVisible();
+  await page.getByLabel("用户名").fill("river");
+  await page.getByLabel("密码").fill("demo123");
+  await page.getByRole("button", { name: "登录" }).click();
+  await expect(page.getByLabel("写给 Aurora")).toBeVisible();
+
+  const network = page.getByRole("region", { name: "发现共鸣并写一封慢信" });
+  await expect(network.getByRole("heading", { name: "不是刷卡片，是理解为什么会相遇" })).toBeVisible();
+  await network.locator(".match-card").filter({ hasText: capsuleName }).click();
+  await expect(network).toContainText("授权 AI 共鸣体 · 不是真人实时在线");
+  await network.getByRole("button", { name: "进入有限但自然的对话" }).click();
+  await network.getByLabel("写给共鸣体").fill("我也很反感模板化安慰。你会怎样判断一句回应是真的理解，而不是话术？");
+  await network.getByRole("button", { name: "发送这一轮" }).click();
+  await expect(network.getByLabel("共鸣体对话记录").locator("article.capsule")).toBeVisible();
+  await network.getByLabel("慢信正文").fill("你关于真实理解的表达让我停了一下。我不急着认识完整的你，只想先把这份共鸣认真地交给你。 ");
+  await network.getByRole("button", { name: "让慢信启程" }).click();
+  await expect(network.getByRole("status")).toContainText("慢信已启程");
+  await page.screenshot({ path: "../evidence/innovation/INNO-CAP-004/resonance-visitor-letter-journey.png", fullPage: true });
+
+  await page.getByRole("button", { name: "安全退出" }).click();
+  await page.getByLabel("用户名").fill("demo");
+  await page.getByLabel("密码").fill("demo123");
+  await page.getByRole("button", { name: "登录" }).click();
+  const ownerSpace = page.getByRole("region", { name: "共鸣体创建与像不像我沙盒" });
+  await ownerSpace.getByRole("tab", { name: new RegExp(capsuleName) }).click();
+  await ownerSpace.getByRole("button", { name: "撤回这个共鸣体" }).click();
   await expect(page.getByRole("status")).toContainText("已撤回");
 });
 
