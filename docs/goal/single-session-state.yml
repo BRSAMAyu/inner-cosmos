@@ -1,0 +1,79 @@
+schema_version: 1
+goal_id: INNER-COSMOS-COMPLETE-PRODUCT
+mode: SINGLE_SESSION_CONTINUOUS_GOAL
+status: ACTIVE
+updated_at: 2026-07-15T22:20:00+08:00
+authority:
+  - goal-objective.md
+  - 对齐文档/17-单会话持续Goal模式执行协议.md
+  - 对齐文档/16-体验优先的完全体重构策略与产品战役.md
+acceptance_ledger: docs/goal/complete-product-acceptance.yml
+operator_prompt: docs/goal/single-session-codex-prompt.md
+
+audit_baseline:
+  commit: d6bf5b518c4e8904056413feadf0d51420ac28a0
+  meaning: Mobile checkpoint and all earlier builder commits; later working-tree changes must be inventoried before action.
+
+terminal_contract:
+  allowed:
+    - COMPLETE
+    - RELEASE_CANDIDATE_BLOCKED_BY_HUMAN_GATE
+  internal_checkpoint_is_terminal: false
+  continue_while_any_machine_action_remains: true
+
+resume_policy:
+  inspect_live_head_and_worktree_first: true
+  preserve_unrelated_changes: true
+  finish_inflight_work_before_new_front: true
+  update_this_file_at_every_checkpoint: true
+
+active_front:
+  id: CAMPAIGN-A-EXPERIENCE-CLOSURE
+  state: IN_PROGRESS_WORKTREE
+  intent: Finish the in-flight scheduler/deep-link/feedback browser contract, longitudinal pairwise v3, and non-author experience gate without overwriting current changes.
+  next_machine_actions:
+    - Run focused frontend and ai-lab tests for the in-flight work and fix failures.
+    - Run the packaged Living Aurora experience contract and complete reproducible evidence.
+    - Validate mobile API base trust and implement a real Capacitor authentication contract.
+    - Commit only the current front's files, then update acceptance evidence without claiming human reviews.
+
+priority_queue:
+  - id: UNIFIED-FIVE-SPACE-APPSHELL
+    reason: Existing capabilities are concentrated in a single oversized Aurora page and do not yet form the specified product information architecture.
+  - id: CAMPAIGN-B-EXPERIENCE
+    reason: Memory/profile code breadth exists but needs an end-to-end correction, provenance, retrieval, starfield, and propagation experience contract.
+  - id: CAMPAIGN-C-QUALITY
+    reason: Capsule Genome foundations exist; full runtime fidelity comparison and simulator asset remain open.
+  - id: CAMPAIGN-D-TRUST
+    reason: Three skills exist; real quality, expert handoff, risk scenarios, and complete bilingual experience remain open.
+  - id: CAMPAIGN-E-PRODUCTION
+    reason: Mobile, local-complete, Academy reliability, commercial Singapore, observability, resilience, and final demo require closure.
+  - id: G2-CONTRACT-CLOSURE
+    reason: OpenAPI, executable modules, reliable event contract, production roles, reconciliation, and data-right propagation remain incomplete.
+  - id: G9-FINAL-ACCEPTANCE
+    reason: Complete-product E2E, blind usability, operations rehearsal, demo, and traceability have not started.
+
+known_human_gates:
+  - HG-SECRET-ROTATION
+  - HG-PRODUCTION-ACCOUNTS
+  - HG-PRIVACY-LEGAL
+  - HG-PSYCHOLOGY-REVIEW
+  - HG-REAL-USERS
+  - REAL-PROVIDER-CREDENTIALS-AND-BLIND-REVIEW
+  - REAL-ANDROID-IOS-APNS-FCM-AND-SIGNING
+
+last_full_gate:
+  baseline_commit: d6bf5b518c4e8904056413feadf0d51420ac28a0
+  claimed_java: 783/783
+  claimed_playwright: 11/11
+  claimed_vitest: 6/6
+  independent_reverification: PASS_WITH_MOBILE_PRODUCTION_GAPS
+  independently_verified:
+    - Maven clean verify passed with 783 tests, Jar, SBOM, and zero SpotBugs findings.
+    - Vitest passed 6/6 and the production React bundle compiled.
+    - Packaged-Jar Playwright passed 11/11.
+    - Secret scan passed with zero findings.
+    - Capacitor sync and Android debug APK assembly passed after supplying the local Android SDK path.
+  review: evidence/innovation/INNO-MOBILE-001/independent-review-2026-07-15.md
+
+handoff_rule: Do not return a final answer at commits or campaign checkpoints; continue with the next machine-actionable gap.

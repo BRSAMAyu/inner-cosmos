@@ -62,3 +62,12 @@ ignored by Git; its exact size and SHA-256 are recorded in `artifact-sha256.txt`
   a real Android device. iOS was synchronized only: Xcode, Apple signing, associated domains,
   APNs registration, and a real iPhone are external macOS/owner gates.
 - `MOBILE-NATIVE` therefore moves from `UNASSESSED` to `IN_PROGRESS`, never `PASS`.
+
+## Independent review
+
+The 2026-07-15 independent review accepts this commit as a reproducible Capacitor shell and
+durable-recovery checkpoint. It does **not** accept it as a production mobile runtime yet.
+The highest-priority gaps are the missing native OIDC Authorization Code + PKCE client flow,
+the permissive `VITE_API_BASE_URL` trust check, and unverified OS-owned HTTPS links. See
+[`independent-review-2026-07-15.md`](independent-review-2026-07-15.md) for findings and rerun
+evidence. `MOBILE-NATIVE: IN_PROGRESS` remains the truthful status.
