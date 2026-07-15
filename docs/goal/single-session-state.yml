@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-16T05:19:00+08:00
+updated_at: 2026-07-16T05:23:00+08:00
 authority:
   - goal-objective.md
   - 对齐文档/17-单会话持续Goal模式执行协议.md
@@ -172,10 +172,20 @@ active_front:
       the boundary a successful injection would need to defeat, though it cannot test whether a
       real model is actually vulnerable to injection without a real provider (human-gated)."
   checkpoint_closed: |
-    All of the above (Simulator purpose-grant fix, FORGET-capsule-propagation fix,
-    conflict-to-tension rename, Genome IR provenance slice 1, GenomeCompilerGroundednessEvaluationTest,
-    persona-chat output-side redaction) is committed as of HEAD 2ad9683. Full `mvn test`
-    re-verified AT this commit: 795/795, BUILD SUCCESS, 2m12s — see last_full_gate below.
+    Simulator purpose-grant fix, FORGET-capsule-propagation fix, conflict-to-tension rename,
+    Genome IR provenance slice 1, GenomeCompilerGroundednessEvaluationTest, and persona-chat
+    output-side redaction are committed as of HEAD 2ad9683/11ca8d6. Full `mvn test` re-verified
+    AT commit 2ad9683: 795/795, BUILD SUCCESS, 2m12s — see last_full_gate below.
+  genome_ir_unknowns_slice: |
+    Added this checkpoint: inferStyleProfile now emits an honest 'unknowns' array instead of
+    silently presenting a generic fallback voice with the same authority as a real theme-derived
+    one. Two cases: (1) no authorized memory produced any theme signal at all -> voice falls back
+    to "温和、诚实、慢热" AND unknowns explicitly says so ("没有任何授权记忆产生足够强的主题信号...
+    不代表已识别出这个人具体的表达模式"); (2) an authorized memory has blank title+summary -> it's
+    silently skipped from feature extraction, and unknowns now discloses the count. New test
+    CapsuleGenomeServiceIntegrationTest.compilerDisclosesUnknownsInsteadOfPresentingAFallbackVoiceWithFalseConfidence
+    (8/8 green in that class); GenomeCompilerGroundednessEvaluationTest, CapsuleMatchingTest,
+    CapsuleQuotaIntegrationTest, ForgettingCompletenessEvaluationTest unaffected.
   next_machine_actions:
     - "NEXT — continue the Genome IR scaffold: model claims/values/habits/temporal-state/unknowns
       as their own provenance-carrying categories (not just scenes/voice), and a runtime retrieval

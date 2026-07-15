@@ -804,11 +804,12 @@ public class CapsuleServiceImpl implements CapsuleService {
         Map<String, Integer> themeFreq = new LinkedHashMap<>();
         Map<String, List<Long>> themeEvidence = new LinkedHashMap<>();
         Map<String, Double> sentimentWeight = new LinkedHashMap<>();
+        int unreadableCount = 0;
         for (MemoryCard card : cards) {
             String text = joinText(card.title, card.summary,
                     String.join(" ", parseTags(card.keywordTags)),
                     String.join(" ", parseTags(card.emotionTags)));
-            if (text.isBlank()) continue;
+            if (text.isBlank()) { unreadableCount++; continue; }
             Set<String> families = themesOf(text);
             mergeThemes(themeFreq, families);
             for (String family : families) {
@@ -827,7 +828,17 @@ public class CapsuleServiceImpl implements CapsuleService {
                 .map(VOICE_BY_THEME::get)
                 .filter(java.util.Objects::nonNull)
                 .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
-        if (style.isEmpty()) style.add("温和、诚实、慢热");
+        // Genome IR "unknowns": a fallback voice is a real absence of signal, not a low-confidence
+        // match on some signal — say so explicitly instead of presenting a generic phrase with the
+        // same authority as a genuinely theme-derived one.
+        List<String> unknowns = new ArrayList<>();
+        if (style.isEmpty()) {
+            style.add("温和、诚实、慢热");
+            unknowns.add("没有任何授权记忆产生足够强的主题信号，voice 使用了通用默认值，不代表已识别出这个人具体的表达模式");
+        }
+        if (unreadableCount > 0) {
+            unknowns.add(unreadableCount + " 条已授权记忆标题和摘要均为空，未参与特征提取");
+        }
         String dominantSentiment = sentimentWeight.entrySet().stream()
                 .max(Map.Entry.comparingByValue())
                 .map(Map.Entry::getKey).orElse("NEUTRAL");
@@ -842,6 +853,7 @@ public class CapsuleServiceImpl implements CapsuleService {
         profile.put("voiceEvidence", voiceEvidence);
         profile.put("dominantSentiment", dominantSentiment);
         profile.put("themeSignals", themeFreq);
+        profile.put("unknowns", unknowns);
         profile.put("sampleSize", cards.size());
         profile.put("confidence", Math.round(Math.min(1.0, cards.size() / 5.0) * 100.0) / 100.0);
         profile.put("notBeautified", true);

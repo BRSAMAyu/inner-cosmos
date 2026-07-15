@@ -344,6 +344,34 @@ class CapsuleGenomeServiceIntegrationTest {
         assertEquals(2, evaluation.get("sceneCount").asInt(),
                 "compiler-evaluation must expose the same structural scene count the preview computed");
         assertEquals(1, evaluation.get("tensionCount").asInt());
+        assertEquals(0, styleProfile.get("unknowns").size(),
+                "real theme signal exists here, so there must be no 'unknowns' disclaimer");
+    }
+
+    @Test
+    @Transactional
+    void compilerDisclosesUnknownsInsteadOfPresentingAFallbackVoiceWithFalseConfidence() throws Exception {
+        // A capsule compiled from memories with no detectable theme signal (and one with no
+        // readable content at all) must say so honestly via 'unknowns', instead of silently
+        // presenting the generic default voice with the same authority as a real theme match.
+        Long owner = seedUser("unknowns-owner");
+        Long blankMemory = seedMemory(owner, "", "", "AURORA_PRIVATE");
+        Long themelessMemory = seedMemory(owner, "片段", "随便的日常", "AURORA_PRIVATE");
+
+        CapsuleCreateRequest request = new CapsuleCreateRequest();
+        request.memoryIds = List.of(blankMemory, themelessMemory);
+        request.visibilityStatus = "PRIVATE";
+        request.isPublic = false;
+        EchoCapsule capsule = capsuleService.createFromMemory(owner, request);
+
+        JsonNode styleProfile = objectMapper.readTree(capsule.styleProfileJson);
+        assertEquals("温和、诚实、慢热", styleProfile.get("voice").asText());
+        List<String> unknowns = StreamSupport.stream(styleProfile.get("unknowns").spliterator(), false)
+                .map(JsonNode::asText).toList();
+        assertTrue(unknowns.stream().anyMatch(u -> u.contains("通用默认值")),
+                "must disclose that the fallback voice is a real absence of signal, not a match");
+        assertTrue(unknowns.stream().anyMatch(u -> u.contains("1") && u.contains("未参与特征提取")),
+                "must disclose that the blank-content memory could not be read");
     }
 
     private JsonNode findScene(JsonNode scenes, String theme) {
