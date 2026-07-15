@@ -1,0 +1,28 @@
+INNO-CONV-003 verification summary — 2026-07-15
+
+PASS  web npm test
+      1 file, 3 typed SSE protocol tests
+PASS  web npm run build
+      TypeScript strict compile + Vite production build
+PASS  Playwright real browser journey
+      1 test: login -> message -> interrupt -> replan -> Aurora bubble -> Stop
+      Spring Boot 3.5.14, Java 21.0.10, H2 in-memory, project Mock LLM
+PASS  targeted Java tests
+      AuroraSelfProfileServiceTest 1
+      AuroraStreamControllerTest 4
+      ConversationChoreographyIntegrationTest 9
+      total 14, failures 0, errors 0, skipped 0
+PASS  innovation evaluation harness
+      38 Python tests; 48-scenario dataset validation PASS
+
+PASS  full Java 21 verification
+      Maven verify; 102 suites, 707 tests, 0 failures, 0 errors, 0 skipped
+      SpotBugs high-confidence gate: 0 findings
+PASS  packaged React production asset check
+      executable JAR contains /static/app/aurora/index.html, app.js and index.css
+PASS  current-tree secret scan
+      scripts/scan-secrets.ps1; 0 findings; values not printed
+PASS  repository whitespace check
+      git diff --check (line-ending conversion notices only)
+
+Real Provider pairwise: BLOCKED_BY_CREDENTIAL_GATE (see INNO-EVAL-002).

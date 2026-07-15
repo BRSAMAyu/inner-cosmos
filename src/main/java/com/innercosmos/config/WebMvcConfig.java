@@ -4,6 +4,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;
 
 import java.util.List;
 
@@ -34,5 +35,14 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "Idempotency-Key", "Last-Event-ID", "X-Requested-With")
                 .allowCredentials(true)
                 .maxAge(3600); // 1 hour preflight cache
+    }
+
+    @Override
+    public void addViewControllers(ViewControllerRegistry registry) {
+        // React is introduced as a vertical slice beside the legacy pages. Keep a
+        // stable human-facing entry URL while Vite's generated index remains a
+        // normal static resource bundled in the Spring Boot jar.
+        registry.addViewController("/app/aurora").setViewName("forward:/app/aurora/index.html");
+        registry.addViewController("/app/aurora/").setViewName("forward:/app/aurora/index.html");
     }
 }

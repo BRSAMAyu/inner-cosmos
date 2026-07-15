@@ -1,0 +1,34 @@
+:root { font-family: Inter, "Noto Sans SC", system-ui, sans-serif; color: #eaf1ec; background: #0d1412; font-synthesis: none; }
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; min-height: 100vh; background: radial-gradient(circle at 76% 8%, #263d35 0, transparent 30rem), linear-gradient(160deg, #0b1110, #121c19 68%, #0a0e0d); }
+button, textarea, input { font: inherit; }
+button { cursor: pointer; }
+.shell { width: min(920px, calc(100% - 32px)); margin: 0 auto; padding: 50px 0 30px; }
+.hero { display: grid; grid-template-columns: 1fr 210px; gap: 40px; align-items: center; min-height: 245px; }
+.eyebrow { color: #a9c7b9; font-size: .72rem; letter-spacing: .2em; }
+h1 { margin: 14px 0; font-family: Georgia, "Noto Serif SC", serif; font-size: clamp(2.1rem, 5vw, 4.2rem); line-height: 1.08; font-weight: 500; }
+.hero p { color: #aebcb6; line-height: 1.8; max-width: 580px; }
+.orb { width: 180px; aspect-ratio: 1; border-radius: 50%; padding: 28px; background: radial-gradient(circle at 35% 25%, #d9ede0, #6e9e86 25%, #24483a 62%, transparent 68%); filter: drop-shadow(0 0 45px #5b9b7e77); animation: breathe 6s ease-in-out infinite; }
+.orb span { display: block; width: 100%; height: 100%; border: 1px solid #ddf4e477; border-radius: inherit; }
+@keyframes breathe { 50% { transform: scale(1.06); filter: drop-shadow(0 0 60px #75ac9277); } }
+.modes { display: flex; gap: 8px; overflow-x: auto; padding: 18px 0; border-bottom: 1px solid #ffffff14; }
+.modes button { border: 1px solid #ffffff18; color: #a8b4af; background: #ffffff08; border-radius: 999px; padding: 8px 15px; }
+.modes button.active { color: #102019; background: #b8d6c5; border-color: transparent; }
+.conversation { min-height: 360px; max-height: 55vh; overflow-y: auto; padding: 30px 4px; display: flex; flex-direction: column; gap: 18px; scrollbar-color: #51655b transparent; }
+.empty { margin: auto; text-align: center; color: #81928a; }.empty span { font-size: 2rem; color: #9fc3b0; }
+.message { max-width: 76%; padding: 15px 18px; border-radius: 5px 20px 20px 20px; background: #1b2924; border: 1px solid #ffffff10; box-shadow: 0 12px 30px #0003; }
+.message.user { align-self: flex-end; border-radius: 20px 5px 20px 20px; background: #d7e5dc; color: #18241f; }
+.message.partial { border-style: dashed; opacity: .86; }
+.speaker { display: block; margin-bottom: 7px; color: #93b6a5; font-size: .72rem; letter-spacing: .08em; }.user .speaker { color: #597365; }
+.message p { margin: 0; white-space: pre-wrap; line-height: 1.72; }.message small { display: block; margin-top: 8px; color: #91aa9e; }
+.state { min-height: 30px; color: #8ea199; font-size: .86rem; display: flex; align-items: center; gap: 9px; }
+.state i { width: 7px; height: 7px; border-radius: 50%; background: #70857b; }.state i.pulse { background: #afd2bf; box-shadow: 0 0 0 0 #afd2bf77; animation: pulse 1.5s infinite; }
+@keyframes pulse { 70% { box-shadow: 0 0 0 8px transparent; } }
+.composer { padding: 14px; border: 1px solid #ffffff1c; border-radius: 22px; background: #111a17e8; box-shadow: 0 20px 50px #0006; backdrop-filter: blur(18px); }
+.composer textarea { width: 100%; min-height: 76px; resize: vertical; border: 0; outline: 0; color: #edf4ef; background: transparent; padding: 7px; line-height: 1.6; }
+.actions { display: flex; justify-content: flex-end; gap: 10px; }
+.actions button, .login button { border: 0; border-radius: 999px; padding: 10px 18px; }.send { color: #142019; background: #bfdacb; }.send:disabled { opacity: .38; cursor: default; }.stop { color: #f0c8c4; background: #5b302d; }
+footer { padding: 18px 4px; display: flex; justify-content: space-between; color: #72827a; font-size: .78rem; } footer a { color: #a0b5aa; }
+.login-shell { min-height: 100vh; display: grid; place-items: center; padding: 20px; }.login { width: min(420px, 100%); padding: 35px; background: #14201c; border: 1px solid #ffffff18; border-radius: 24px; box-shadow: 0 24px 80px #0007; }.login h1 { font-size: 2.2rem; }.login label { display: grid; gap: 7px; color: #9baca4; margin: 16px 0; }.login input { padding: 12px; color: #eef4f0; background: #0d1512; border: 1px solid #ffffff20; border-radius: 10px; }.error { color: #efaaa4; }
+@media (max-width: 680px) { .shell { width: min(100% - 20px, 920px); padding-top: 25px; }.hero { grid-template-columns: 1fr; min-height: 210px; }.orb { display: none; }.message { max-width: 90%; }.conversation { max-height: 52vh; } footer span { display: none; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; } }

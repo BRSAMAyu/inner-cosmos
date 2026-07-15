@@ -13,6 +13,7 @@ from evals.judges import DeterministicOfflineJudge, JudgeEnsemble, OptionalLlmJu
 from evals.metrics import evaluate_runs
 from evals.reports import build_report, write_report
 from evals.schemas.validator import validate_schema_documents
+from evals.real_provider_pairwise import config_from_environment, run_pairwise
 
 LAB_ROOT = Path(__file__).resolve().parents[2]
 REPOSITORY_ROOT = LAB_ROOT.parent
@@ -73,8 +74,16 @@ def main() -> None:
     run_parser = subparsers.add_parser("run")
     run_parser.add_argument("--output", type=Path, required=True)
     run_parser.add_argument("--seed", type=int, default=20260714)
+    real_parser = subparsers.add_parser("real-pairwise")
+    real_parser.add_argument("--output", type=Path, required=True)
+    real_parser.add_argument("--seed", type=int, default=20260715)
     args = parser.parse_args()
-    result = validate() if args.command == "validate" else run(args.output, args.seed)
+    if args.command == "validate":
+        result = validate()
+    elif args.command == "real-pairwise":
+        result = run_pairwise(config_from_environment(), args.output, args.seed)
+    else:
+        result = run(args.output, args.seed)
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 

@@ -147,6 +147,33 @@ class AuroraStreamControllerTest {
                 "meta must carry agentLoop for the perception panel on stream; got:\n" + body);
     }
 
+    @Test
+    @DisplayName("React reconnect receives owner-scoped typed timeline events with resumable IDs")
+    void replay_typedTimelineEvents() throws Exception {
+        String live = performStream("我想把刚才被打断的想法接起来");
+        int marker = live.indexOf("\"turnId\":");
+        assertTrue(marker >= 0, "live stream must expose turn identity: " + live);
+        int start = marker + "\"turnId\":".length();
+        int end = start;
+        while (end < live.length() && Character.isDigit(live.charAt(end))) end++;
+        long turnId = Long.parseLong(live.substring(start, end));
+
+        MvcResult replay = mockMvc.perform(get("/api/aurora/turns/{turnId}/events", turnId)
+                        .session(session)
+                        .header("Last-Event-ID", turnId + ":0")
+                        .accept(MediaType.TEXT_EVENT_STREAM))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+        mockMvc.perform(asyncDispatch(replay)).andExpect(status().isOk());
+        String body = replay.getResponse().getContentAsString();
+
+        assertTrue(body.contains("event:timeline.event"), body);
+        assertTrue(body.contains("\"sequence\""), body);
+        assertTrue(body.contains("\"eventType\""), body);
+        assertTrue(body.contains("event:replay.completed"), body);
+        assertTrue(body.contains("id:" + turnId + ":"), body);
+    }
+
     private String performStream(String message) throws Exception {
         return performStreamWithToken(message, null);
     }
