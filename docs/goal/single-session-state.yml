@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-16T04:55:00+08:00
+updated_at: 2026-07-16T05:02:00+08:00
 authority:
   - goal-objective.md
   - 对齐文档/17-单会话持续Goal模式执行协议.md
@@ -128,16 +128,28 @@ active_front:
       checkpoint's new tests. CAMPAIGN-B-EXPERIENCE's 'only dataset growth remaining' claim
       walked back to IN_PROGRESS with the real gaps listed (no automatic claim-extraction
       pipeline; forgetting-completeness eval still doesn't cover cache/queue/analytics/backup)."
+  genome_ir_progress:
+    - "Genome IR slice 1 DONE this checkpoint: every scene in contextPreviewJson now carries a
+      'memories' array of {memoryId, sourceVersion, confidence} for the exact authorized memories
+      that produced it (was: an aggregate excerpt with no per-memory traceability). styleProfileJson's
+      dominant voice descriptors now carry a parallel 'voiceEvidence' map (theme -> [memoryIds]) so
+      a reviewer or owner can trace e.g. '在关系中重视被认真回应' back to specific memories instead
+      of trusting an unexplained personality adjective. Covered by new assertions in
+      CapsuleGenomeServiceIntegrationTest.compilerIndexesDistinctScenesAndSurfacesOpposingSentimentAsTension
+      (7/7 green), plus CapsuleMatchingTest 16/16, CapsuleQuotaIntegrationTest 5/5,
+      ForgettingCompletenessEvaluationTest 1/1, DataMaskingServiceTest 21/21, EchoCapsuleVOTest 2/2
+      unaffected. This is ONE bounded slice, not the full IR: still no claims/values/habits/
+      temporal-state/unknowns/runtime-retrieval-policy categories — those remain queued below."
   next_machine_actions:
-    - "NEXT — commit this checkpoint (Simulator fix + FORGET fix + tension rename + state-file
-      honesty pass), all already full-suite verified (793/793 green)."
-    - "THEN — start the Genome IR scaffold: a versioned intermediate representation where every
-      extracted feature (claim, style example, habit, scene, tension, unknown) carries
-      memoryId/sourceVersion/evidence/confidence, replacing the current flat voice-string +
-      scene-list output. Deterministic extractor stays a scaffold (themes/sentiment/scenes); an
-      LLM path can propose candidate features when a real provider is available (human gate),
-      with a critic pass reviewing evidence support, leakage, and unknowns — but the structural
-      IR (provenance fields, versioning) is machine-buildable now, independent of that human gate."
+    - "NEXT — commit this checkpoint (Genome IR provenance slice 1: memories[] on scenes,
+      voiceEvidence on style profile), focused-suite verified green."
+    - "THEN — continue the Genome IR scaffold: model claims/values/habits/temporal-state/unknowns
+      as their own provenance-carrying categories (not just scenes/voice), and a runtime retrieval
+      policy field describing which categories PersonaChatServiceImpl should prioritize per
+      question type. Deterministic extractor stays a scaffold (themes/sentiment/scenes); an LLM
+      path can propose candidate features when a real provider is available (human gate), with a
+      critic pass reviewing evidence support, leakage, and unknowns — but the structural IR
+      (provenance fields, versioning) is machine-buildable now, independent of that human gate."
     - "THEN — add the three eval dimensions the review asked for beyond structural scene/tension
       counts: fact/style fidelity (does the compiled voice match held-out memories not used to
       compile it), unfamiliar-scenario stability (does the persona degrade gracefully on

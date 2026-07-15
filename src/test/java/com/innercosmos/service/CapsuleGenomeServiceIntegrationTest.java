@@ -15,6 +15,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 import java.util.stream.StreamSupport;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -307,11 +308,21 @@ class CapsuleGenomeServiceIntegrationTest {
         assertEquals(2, relationshipScene.get("memoryCount").asInt());
         assertTrue(relationshipScene.get("hasTension").asBoolean(),
                 "a warm and a distressing memory about the same relationship must be surfaced as tension, not blended");
+        // Genome IR slice 1: every scene must cite the exact memoryIds it was built from.
+        Set<Long> relationshipProvenance = StreamSupport.stream(relationshipScene.get("memories").spliterator(), false)
+                .map(ref -> ref.get("memoryId").asLong()).collect(java.util.stream.Collectors.toSet());
+        assertEquals(Set.of(warmMemory, tenseMemory), relationshipProvenance,
+                "scene provenance must name exactly the memories that produced it, not just an aggregate excerpt");
+        for (JsonNode ref : relationshipScene.get("memories")) {
+            assertTrue(ref.has("sourceVersion") && ref.has("confidence"),
+                    "each provenance entry must carry sourceVersion and confidence, not just an id");
+        }
 
         JsonNode taskScene = findScene(scenes, "任务压力");
         assertNotNull(taskScene, "任务压力 theme must be indexed as its own scene");
         assertEquals(1, taskScene.get("memoryCount").asInt());
         assertFalse(taskScene.get("hasTension").asBoolean());
+        assertEquals(unrelatedMemory, taskScene.get("memories").get(0).get("memoryId").asLong());
 
         JsonNode tensions = preview.get("tensions");
         assertEquals(1, tensions.size());
@@ -321,6 +332,13 @@ class CapsuleGenomeServiceIntegrationTest {
         assertTrue(styleProfile.get("voice").asText().contains("在关系中重视被认真回应"),
                 "the dominant theme (2 of 3 memories) must drive the voice descriptor");
         assertEquals(3, styleProfile.get("sampleSize").asInt());
+        // Genome IR slice 1: the voice descriptor must be traceable to specific memoryIds, not an
+        // unexplained personality adjective.
+        JsonNode voiceEvidence = styleProfile.get("voiceEvidence").get("关系牵动");
+        Set<Long> voiceProvenance = StreamSupport.stream(voiceEvidence.spliterator(), false)
+                .map(JsonNode::asLong).collect(java.util.stream.Collectors.toSet());
+        assertEquals(Set.of(warmMemory, tenseMemory), voiceProvenance,
+                "voiceEvidence must cite the memories that actually drove the dominant theme");
 
         JsonNode evaluation = objectMapper.readTree(genome.evaluationJson);
         assertEquals(2, evaluation.get("sceneCount").asInt(),

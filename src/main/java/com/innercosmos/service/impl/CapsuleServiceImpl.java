@@ -793,34 +793,53 @@ public class CapsuleServiceImpl implements CapsuleService {
      * theme families (weighted by frequency) into voice descriptors, and tracks the dominant
      * sentiment plus a sample-size-derived confidence so downstream consumers can see how much
      * signal actually backs the profile, rather than a single keyword-substring guess.
+     *
+     * Genome IR slice 1 (provenance): each voice descriptor now cites the exact memoryIds that
+     * produced it via "voiceEvidence" — a reviewer or the owner can trace "在关系中重视被认真回应"
+     * back to specific authorized memories, rather than trusting an unexplained personality
+     * adjective. This is a first, bounded step toward a fully provenance-carrying Genome IR
+     * (claims/values/habits/temporal state/unknowns), not that whole structure yet.
      */
     private String inferStyleProfile(List<MemoryCard> cards) {
         Map<String, Integer> themeFreq = new LinkedHashMap<>();
+        Map<String, List<Long>> themeEvidence = new LinkedHashMap<>();
         Map<String, Double> sentimentWeight = new LinkedHashMap<>();
         for (MemoryCard card : cards) {
             String text = joinText(card.title, card.summary,
                     String.join(" ", parseTags(card.keywordTags)),
                     String.join(" ", parseTags(card.emotionTags)));
             if (text.isBlank()) continue;
-            mergeThemes(themeFreq, themesOf(text));
+            Set<String> families = themesOf(text);
+            mergeThemes(themeFreq, families);
+            for (String family : families) {
+                themeEvidence.computeIfAbsent(family, k -> new ArrayList<>()).add(card.id);
+            }
             double gravity = card.emotionalGravity == null ? 0.5 : Math.max(0, Math.min(1, card.emotionalGravity));
             sentimentWeight.merge(sceneSentiment(text), 0.5 + gravity * 0.5, Double::sum);
         }
-        List<String> voice = themeFreq.entrySet().stream()
+        List<String> dominantThemes = themeFreq.entrySet().stream()
                 .sorted(Map.Entry.<String, Integer>comparingByValue().reversed()
                         .thenComparingInt(e -> FAMILY_ORDER.indexOf(e.getKey())))
                 .limit(2)
-                .map(e -> VOICE_BY_THEME.get(e.getKey()))
-                .filter(java.util.Objects::nonNull)
+                .map(Map.Entry::getKey)
                 .toList();
-        List<String> style = new ArrayList<>(voice);
+        List<String> style = dominantThemes.stream()
+                .map(VOICE_BY_THEME::get)
+                .filter(java.util.Objects::nonNull)
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
         if (style.isEmpty()) style.add("温和、诚实、慢热");
         String dominantSentiment = sentimentWeight.entrySet().stream()
                 .max(Map.Entry.comparingByValue())
                 .map(Map.Entry::getKey).orElse("NEUTRAL");
 
+        Map<String, Object> voiceEvidence = new LinkedHashMap<>();
+        for (String theme : dominantThemes) {
+            voiceEvidence.put(theme, themeEvidence.getOrDefault(theme, List.of()));
+        }
+
         Map<String, Object> profile = new LinkedHashMap<>();
         profile.put("voice", String.join("，", style));
+        profile.put("voiceEvidence", voiceEvidence);
         profile.put("dominantSentiment", dominantSentiment);
         profile.put("themeSignals", themeFreq);
         profile.put("sampleSize", cards.size());
@@ -874,10 +893,23 @@ public class CapsuleServiceImpl implements CapsuleService {
             boolean hasTension = sentimentLabels.contains("MIXED")
                     || (sentimentLabels.contains("POSITIVE") && sentimentLabels.contains("NEGATIVE"));
 
+            // Genome IR slice 1 (provenance): every scene cites the exact memoryId/sourceVersion/
+            // confidence backing it, instead of just an aggregate excerpt — the owner or a
+            // reviewer can trace a scene back to the specific authorized memories it came from.
+            List<Map<String, Object>> memberProvenance = members.stream()
+                    .map(member -> {
+                        Map<String, Object> ref = new LinkedHashMap<>();
+                        ref.put("memoryId", member.id);
+                        ref.put("sourceVersion", member.versionNo == null ? 1 : member.versionNo);
+                        ref.put("confidence", member.confidence == null ? 1.0 : member.confidence);
+                        return ref;
+                    }).toList();
+
             Map<String, Object> scene = new LinkedHashMap<>();
             scene.put("theme", entry.getKey());
             scene.put("memoryCount", members.size());
             scene.put("excerpt", excerpt);
+            scene.put("memories", memberProvenance);
             scene.put("sentimentLabels", sentimentLabels);
             scene.put("hasTension", hasTension);
             scenes.add(scene);
@@ -903,7 +935,7 @@ public class CapsuleServiceImpl implements CapsuleService {
         Map<String, Object> preview = new LinkedHashMap<>();
         preview.put("scenes", List.of(Map.of(
                 "theme", "日常片段", "memoryCount", 0,
-                "excerpt", intro == null ? "" : intro,
+                "excerpt", intro == null ? "" : intro, "memories", List.of(),
                 "sentimentLabels", List.of(), "hasTension", false)));
         preview.put("tensions", List.of());
         preview.put("publicTags", parseTags(publicTags));
