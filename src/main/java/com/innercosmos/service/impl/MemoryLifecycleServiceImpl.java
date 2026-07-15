@@ -17,6 +17,7 @@ import com.innercosmos.exception.BusinessException;
 import com.innercosmos.mapper.AuthorizedMemoryRefMapper;
 import com.innercosmos.mapper.MemoryCardMapper;
 import com.innercosmos.mapper.MemoryLinkMapper;
+import com.innercosmos.mapper.MemoryEmbeddingMapper;
 import com.innercosmos.mapper.MemoryOperationMapper;
 import com.innercosmos.mapper.MemoryProjectionReceiptMapper;
 import com.innercosmos.mapper.RelationMentionMapper;
@@ -46,6 +47,7 @@ public class MemoryLifecycleServiceImpl implements MemoryLifecycleService {
     private final MemoryOperationMapper operationMapper;
     private final MemoryProjectionReceiptMapper projectionReceiptMapper;
     private final MemoryLinkMapper linkMapper;
+    private final MemoryEmbeddingMapper embeddingMapper;
     private final AuthorizedMemoryRefMapper authorizedMemoryRefMapper;
     private final ThoughtFragmentMapper thoughtFragmentMapper;
     private final TodoItemMapper todoItemMapper;
@@ -57,6 +59,7 @@ public class MemoryLifecycleServiceImpl implements MemoryLifecycleService {
                                       MemoryOperationMapper operationMapper,
                                       MemoryProjectionReceiptMapper projectionReceiptMapper,
                                       MemoryLinkMapper linkMapper,
+                                      MemoryEmbeddingMapper embeddingMapper,
                                       AuthorizedMemoryRefMapper authorizedMemoryRefMapper,
                                       ThoughtFragmentMapper thoughtFragmentMapper,
                                       TodoItemMapper todoItemMapper,
@@ -67,6 +70,7 @@ public class MemoryLifecycleServiceImpl implements MemoryLifecycleService {
         this.operationMapper = operationMapper;
         this.projectionReceiptMapper = projectionReceiptMapper;
         this.linkMapper = linkMapper;
+        this.embeddingMapper = embeddingMapper;
         this.authorizedMemoryRefMapper = authorizedMemoryRefMapper;
         this.thoughtFragmentMapper = thoughtFragmentMapper;
         this.todoItemMapper = todoItemMapper;
@@ -200,6 +204,7 @@ public class MemoryLifecycleServiceImpl implements MemoryLifecycleService {
         }
 
         markAuthorizationsForReview(source, command.operationType());
+        invalidateEmbeddings(source, command.operationType());
         MemoryOperation operation = record(userId, command, source, oldVersion, before,
                 "FORGET".equals(command.operationType()) ? "{\"forgotten\":true}" : snapshot(result));
         List<MemoryProjectionReceipt> receipts = projectionReceipts(userId, operation,
@@ -244,6 +249,7 @@ public class MemoryLifecycleServiceImpl implements MemoryLifecycleService {
         }
         deactivateOperationLinks(userId, sourceIds, after.stream().map(card -> card.id)
                 .filter(id -> !sourceIds.contains(id)).collect(java.util.stream.Collectors.toSet()));
+        invalidateEmbeddings(restored, "ROLLBACK");
 
         target.status = "ROLLED_BACK";
         operationMapper.updateById(target);
@@ -319,6 +325,18 @@ public class MemoryLifecycleServiceImpl implements MemoryLifecycleService {
         relationMentionMapper.delete(new QueryWrapper<com.innercosmos.entity.RelationMention>().eq("memory_card_id", card.id));
         linkMapper.delete(new QueryWrapper<MemoryLink>().eq("user_id", card.userId)
                 .and(q -> q.eq("source_memory_id", card.id).or().eq("target_memory_id", card.id)));
+        embeddingMapper.delete(new QueryWrapper<com.innercosmos.entity.MemoryEmbedding>()
+                .eq("user_id", card.userId).eq("memory_id", card.id));
+    }
+
+    private void invalidateEmbeddings(List<MemoryCard> source, String operation) {
+        if (source.isEmpty() || Set.of("ADD", "LINK", "NO_OP", "FORGET").contains(operation)) return;
+        List<com.innercosmos.entity.MemoryEmbedding> rows = embeddingMapper.selectList(
+                new QueryWrapper<com.innercosmos.entity.MemoryEmbedding>().in("memory_id", ids(source))
+                        .eq("user_id", source.get(0).userId).eq("status", "ACTIVE"));
+        for (com.innercosmos.entity.MemoryEmbedding row : rows) {
+            row.status = "STALE"; embeddingMapper.updateById(row);
+        }
     }
 
     private void markAuthorizationsForReview(List<MemoryCard> source, String operation) {

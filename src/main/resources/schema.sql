@@ -331,6 +331,24 @@ CREATE TABLE IF NOT EXISTS tb_memory_projection_receipt (
   CONSTRAINT fk_memory_projection_operation FOREIGN KEY (operation_id) REFERENCES tb_memory_operation(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS tb_memory_embedding (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  memory_id BIGINT NOT NULL,
+  model_name VARCHAR(128) NOT NULL,
+  model_version VARCHAR(64) NOT NULL,
+  source_version INT NOT NULL,
+  task_scope VARCHAR(64) DEFAULT 'GENERAL',
+  dimensions INT NOT NULL,
+  embedding_json TEXT NOT NULL,
+  status VARCHAR(32) DEFAULT 'ACTIVE',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_memory_embedding_version (memory_id, model_name, model_version, source_version, task_scope),
+  INDEX idx_memory_embedding_user_model (user_id, model_name, model_version, status),
+  CONSTRAINT fk_memory_embedding_memory FOREIGN KEY (memory_id) REFERENCES tb_memory_card(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS tb_thought_fragment (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT NOT NULL,

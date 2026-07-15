@@ -9,6 +9,7 @@ import com.innercosmos.entity.MemoryOperation;
 import com.innercosmos.entity.ThoughtFragment;
 import com.innercosmos.mapper.MemoryCardMapper;
 import com.innercosmos.mapper.MemoryLinkMapper;
+import com.innercosmos.mapper.MemoryEmbeddingMapper;
 import com.innercosmos.mapper.MemoryOperationMapper;
 import com.innercosmos.mapper.ThoughtFragmentMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,6 +46,7 @@ class MemoryLifecycleControllerTest {
     @Autowired MemoryCardMapper memoryMapper;
     @Autowired MemoryOperationMapper operationMapper;
     @Autowired MemoryLinkMapper linkMapper;
+    @Autowired MemoryEmbeddingMapper embeddingMapper;
     @Autowired ThoughtFragmentMapper fragmentMapper;
     private MockHttpSession session;
     private Long userId;
@@ -90,6 +92,11 @@ class MemoryLifecycleControllerTest {
         ThoughtFragment fragment = new ThoughtFragment();
         fragment.userId = userId; fragment.memoryCardId = card.id; fragment.fragmentType = "FACT";
         fragment.rawExcerpt = "非常私密的原始内容"; fragmentMapper.insert(fragment);
+        com.innercosmos.entity.MemoryEmbedding embedding = new com.innercosmos.entity.MemoryEmbedding();
+        embedding.userId = userId; embedding.memoryId = card.id; embedding.modelName = "test-model";
+        embedding.modelVersion = "v1"; embedding.sourceVersion = 1; embedding.taskScope = "GENERAL";
+        embedding.dimensions = 8; embedding.embeddingJson = "[1,0,0,0,0,0,0,0]"; embedding.status = "ACTIVE";
+        embeddingMapper.insert(embedding);
 
         mockMvc.perform(post("/api/memory/operations").session(session)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -102,6 +109,8 @@ class MemoryLifecycleControllerTest {
         assertNull(forgotten.summary);
         assertEquals(0, fragmentMapper.selectCount(new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<ThoughtFragment>()
                 .eq("memory_card_id", card.id)));
+        assertEquals(0, embeddingMapper.selectCount(new QueryWrapper<com.innercosmos.entity.MemoryEmbedding>()
+                .eq("memory_id", card.id)));
         MemoryOperation operation = operationMapper.selectOne(
                 new QueryWrapper<MemoryOperation>()
                         .eq("user_id", userId)

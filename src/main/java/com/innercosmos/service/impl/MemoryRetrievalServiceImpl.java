@@ -5,6 +5,7 @@ import com.innercosmos.dto.MemoryRetrievalQuery;
 import com.innercosmos.entity.MemoryCard;
 import com.innercosmos.mapper.MemoryCardMapper;
 import com.innercosmos.service.MemoryRetrievalService;
+import com.innercosmos.service.MemoryEmbeddingIndexService;
 import com.innercosmos.vo.MemoryEvidencePackVO;
 import org.springframework.stereotype.Service;
 
@@ -30,9 +31,11 @@ import java.util.Set;
 public class MemoryRetrievalServiceImpl implements MemoryRetrievalService {
     private static final Set<String> CURRENT = Set.of("ACTIVE");
     private final MemoryCardMapper memoryMapper;
+    private final MemoryEmbeddingIndexService embeddingIndex;
 
-    public MemoryRetrievalServiceImpl(MemoryCardMapper memoryMapper) {
+    public MemoryRetrievalServiceImpl(MemoryCardMapper memoryMapper, MemoryEmbeddingIndexService embeddingIndex) {
         this.memoryMapper = memoryMapper;
+        this.embeddingIndex = embeddingIndex;
     }
 
     @Override
@@ -49,8 +52,10 @@ public class MemoryRetrievalServiceImpl implements MemoryRetrievalService {
                 .ne("status", "FORGOTTEN").ne("status", "SUPERSEDED").ne("status", "ARCHIVED");
         if (!includeContradicted) db.in("status", CURRENT);
         if (!layers.isEmpty()) db.in("memory_layer", layers);
-        List<Scored> scored = memoryMapper.selectList(db).stream()
-                .map(card -> score(card, text, task)).filter(row -> text.isBlank() || row.score > 0.08)
+        List<MemoryCard> candidates = memoryMapper.selectList(db);
+        Map<Long, Double> providerSemantic = embeddingIndex.similarities(userId, text, candidates);
+        List<Scored> scored = candidates.stream()
+                .map(card -> score(card, text, task, providerSemantic.get(card.id))).filter(row -> text.isBlank() || row.score > 0.08)
                 .sorted(Comparator.comparingDouble(Scored::score).reversed()).toList();
 
         List<MemoryEvidencePackVO.Evidence> selected = new ArrayList<>();
@@ -71,10 +76,11 @@ public class MemoryRetrievalServiceImpl implements MemoryRetrievalService {
                         : List.of("FORGOTTEN", "SUPERSEDED", "ARCHIVED", "CONTRADICTED"));
     }
 
-    private Scored score(MemoryCard card, String query, String task) {
+    private Scored score(MemoryCard card, String query, String task, Double providerSimilarity) {
         String document = String.join(" ", safe(card.title), safe(card.summary), safe(card.keywordTags), safe(card.peopleTags));
         double lexical = lexical(query, document);
-        double semantic = cosine(ngrams(query), ngrams(document));
+        double localSemantic = cosine(ngrams(query), ngrams(document));
+        double semantic = providerSimilarity == null ? localSemantic : Math.max(localSemantic, Math.max(0, providerSimilarity));
         double taskFit = taskFit(task, card);
         double freshness = freshness(card.lastTouchedAt == null ? card.createdAt : card.lastTouchedAt);
         double salience = Math.min(1, value(card.emotionalGravity) / 3.0);
@@ -84,7 +90,8 @@ public class MemoryRetrievalServiceImpl implements MemoryRetrievalService {
                 + freshness * 0.10 + salience * 0.08 + authority * 0.07 - staleness;
         List<String> why = new ArrayList<>();
         if (lexical > 0) why.add("精确词语/人物匹配 " + round(lexical));
-        if (semantic > 0.1) why.add("语义近似 " + round(semantic));
+        if (providerSimilarity != null && providerSimilarity > 0.1) why.add("版本化 provider 向量近似 " + round(providerSimilarity));
+        else if (semantic > 0.1) why.add("本地语义近似 " + round(semantic));
         if (taskFit > 0.4) why.add("适合当前任务 " + round(taskFit));
         if (freshness > 0.6) why.add("近期仍活跃");
         if (authority > 0.8) why.add("高置信或用户确认");

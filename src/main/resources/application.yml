@@ -89,6 +89,15 @@ mybatis-plus:
     db-config:
       id-type: auto
 
+memory:
+  embedding:
+    enabled: ${MEMORY_EMBEDDING_ENABLED:false}
+    api-key: ${MEMORY_EMBEDDING_API_KEY:}
+    base-url: ${MEMORY_EMBEDDING_BASE_URL:https://api.openai.com/v1}
+    model: ${MEMORY_EMBEDDING_MODEL:text-embedding-3-small}
+    version: ${MEMORY_EMBEDDING_VERSION:2026-01}
+    dimensions: ${MEMORY_EMBEDDING_DIMENSIONS:1536}
+
 llm:
   mode: ${LLM_MODE:dev}
   provider: ${LLM_PROVIDER:mock}

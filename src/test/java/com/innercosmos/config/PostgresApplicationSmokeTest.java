@@ -69,8 +69,8 @@ class PostgresApplicationSmokeTest {
         login.password = register.password;
         assertEquals(created.id, userService.login(login).id);
 
-        // V9 adds durable receipts for every derived memory projection.
-        assertEquals(72L, jdbcTemplate.queryForObject("""
+        // V10 adds versioned provider embeddings as rebuildable pgvector derivatives.
+        assertEquals(73L, jdbcTemplate.queryForObject("""
                 SELECT COUNT(*) FROM information_schema.tables
                 WHERE table_schema='public' AND table_name LIKE 'tb_%'
                 """, Long.class));
@@ -80,5 +80,24 @@ class PostgresApplicationSmokeTest {
                 """, Long.class));
         assertEquals(1L, jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM tb_user WHERE username=?", Long.class, register.username));
+        Long memoryId = jdbcTemplate.queryForObject("""
+                INSERT INTO tb_memory_card(user_id,title,status,version_no,memory_layer)
+                VALUES (?,'pgvector contract memory','ACTIVE',1,'SEMANTIC') RETURNING id
+                """, Long.class, created.id);
+        String vector = unitVector(1536);
+        jdbcTemplate.update("""
+                INSERT INTO tb_memory_embedding(user_id,memory_id,model_name,model_version,source_version,
+                  task_scope,dimensions,embedding_json,embedding_vector,status)
+                VALUES (?,?,'contract-model','v1',1,'GENERAL',1536,'[]',?::vector,'ACTIVE')
+                """, created.id, memoryId, vector);
+        assertEquals(1.0, jdbcTemplate.queryForObject("""
+                SELECT 1 - (embedding_vector <=> ?::vector) FROM tb_memory_embedding WHERE memory_id=?
+                """, Double.class, vector, memoryId), 0.000001);
+    }
+
+    private static String unitVector(int dimensions) {
+        StringBuilder result = new StringBuilder("[1");
+        for (int i = 1; i < dimensions; i++) result.append(",0");
+        return result.append(']').toString();
     }
 }
