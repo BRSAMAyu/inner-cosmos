@@ -13,6 +13,7 @@ import com.innercosmos.mapper.MemoryCardMapper;
 import com.innercosmos.mapper.UserPortraitMapper;
 import com.innercosmos.mapper.AuthorizedMemoryRefMapper;
 import com.innercosmos.service.CapsuleGenomeService;
+import com.innercosmos.service.ResonanceMatchStrategy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -366,6 +367,65 @@ class CapsuleMatchingTest {
             assertTrue(FAMILIES.contains(r),
                     "matchReason '" + r + "' must be one of the 6 theme families, not a raw keyword");
         }
+    }
+
+    @Test
+    void complement_surfacesThemesMissingFromCurrentTrajectory() {
+        stubMemories(memory(1, "复习", "考试 作业 拖延 压力", "考试", "焦虑"));
+        EchoCapsule hope = capsule(1101L, 999L, "USER_CAPSULE", "远望",
+                "梦想 希望 期待 憧憬 开心", "[\"希望\"]", 0.5);
+        EchoCapsule same = capsule(1102L, 999L, "USER_CAPSULE", "同路",
+                "考试复习的拖延和压力", "[\"考试\"]", 0.9);
+        stubPlaza(same, hope);
+
+        List<Map<String, Object>> result = service.matchedCapsules(USER_ID, ResonanceMatchStrategy.COMPLEMENT);
+
+        assertEquals(1101L, idOf(result.get(0)));
+        assertEquals("COMPLEMENT", result.get(0).get("strategy"));
+        assertTrue(reasonsOf(result.get(0)).contains("带来·希望期待"));
+    }
+
+    @Test
+    void growthEdge_explainsTheBridgeInsteadOfCallingItSimilarity() {
+        stubMemories(memory(1, "复习", "考试 作业 拖延 压力", "考试", "焦虑"));
+        EchoCapsule hope = capsule(1201L, 999L, "USER_CAPSULE", "远望",
+                "梦想 希望 期待 憧憬 开心", "[\"希望\"]", 0.5);
+        stubPlaza(hope);
+
+        Map<String, Object> item = service.matchedCapsules(USER_ID, ResonanceMatchStrategy.GROWTH_EDGE).get(0);
+
+        assertTrue((Boolean) item.get("resonant"));
+        assertTrue(reasonsOf(item).contains("任务压力 → 希望期待"));
+        assertTrue(String.valueOf(item.get("matchSummary")).contains("成长边缘"));
+    }
+
+    @Test
+    void contextual_prefersPortraitThemesOverGeneralHistory() {
+        stubMemories(memory(1, "复习", "考试 作业 拖延 压力", "考试", "焦虑"));
+        when(userPortraitMapper.selectList(any())).thenReturn(List.of(
+                portrait("CURRENT_STATE", "朋友 关系 沟通 边界")));
+        EchoCapsule relation = capsule(1301L, 999L, "USER_CAPSULE", "边界",
+                "朋友关系里的沟通与边界", "[\"关系\"]", 0.4);
+        EchoCapsule task = capsule(1302L, 999L, "USER_CAPSULE", "任务",
+                "考试作业和拖延压力", "[\"考试\"]", 0.9);
+        stubPlaza(task, relation);
+
+        List<Map<String, Object>> result = service.matchedCapsules(USER_ID, ResonanceMatchStrategy.CONTEXTUAL);
+
+        assertEquals(1301L, idOf(result.get(0)));
+        assertTrue(reasonsOf(result.get(0)).contains("此刻·关系牵动"));
+    }
+
+    @Test
+    void serendipity_isDeterministicAndExplicitlyExploratory() {
+        stubMemories();
+        stubPlaza(capsule(1401L, 999L, "USER_CAPSULE", "偶遇", "梦想与朋友", "[]", 0.5));
+
+        Map<String, Object> first = service.matchedCapsules(USER_ID, ResonanceMatchStrategy.SERENDIPITY).get(0);
+        Map<String, Object> second = service.matchedCapsules(USER_ID, ResonanceMatchStrategy.SERENDIPITY).get(0);
+
+        assertEquals(scoreOf(first), scoreOf(second));
+        assertEquals("为熟悉轨迹留出意外", reasonsOf(first).get(0));
     }
 
     @Test

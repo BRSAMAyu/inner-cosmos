@@ -16,6 +16,7 @@ import com.innercosmos.entity.MemoryCard;
 import com.innercosmos.entity.UserPortrait;
 import com.innercosmos.ai.semantic.PseudoSemanticAnalyzer;
 import com.innercosmos.service.CapsuleService;
+import com.innercosmos.service.ResonanceMatchStrategy;
 import com.innercosmos.service.CapsuleGenomeService;
 import com.innercosmos.vo.CapsulePreviewVO;
 import org.springframework.stereotype.Service;
@@ -229,6 +230,11 @@ public class CapsuleServiceImpl implements CapsuleService {
 
     @Override
     public List<Map<String, Object>> matchedCapsules(Long userId) {
+        return matchedCapsules(userId, ResonanceMatchStrategy.MIRROR);
+    }
+
+    @Override
+    public List<Map<String, Object>> matchedCapsules(Long userId, ResonanceMatchStrategy strategy) {
         List<MemoryCard> memories = memoryCardMapper.selectList(new QueryWrapper<MemoryCard>()
                 .eq("user_id", userId)
                 .eq("status", "ACTIVE")
@@ -286,20 +292,23 @@ public class CapsuleServiceImpl implements CapsuleService {
             // FIX-A: relevance is ONLY the genuinely user-specific signal (themeOverlap +
             // portraitSignal). seedBoost/energyScore are NOT relevance — they break ties and
             // shape ordering, but must never make a zero-overlap capsule count as a match.
-            double relevance = themeOverlap + portraitSignal;
-            boolean resonant = relevance > 0.0;
-            double score = Math.min(0.99, themeOverlap + portraitSignal + energyScore + seedBoost);
-
             shared.sort(Comparator
                     .comparingInt((Map.Entry<String, Integer> en) -> -en.getValue())
                     .thenComparingInt(en -> FAMILY_ORDER.indexOf(en.getKey())));
-            List<String> matchReasons = shared.stream().limit(5).map(Map.Entry::getKey).toList();
+            List<String> mirrorReasons = shared.stream().limit(5).map(Map.Entry::getKey).toList();
+            StrategySignal signal = strategySignal(strategy, userThemeProfile, portraitFamilies,
+                    capsuleThemeProfile.keySet(), capsule.id, themeOverlap + portraitSignal, mirrorReasons);
+            boolean resonant = signal.relevance() > 0.0;
+            double score = Math.min(0.99, signal.relevance() + energyScore + seedBoost);
 
             Map<String, Object> item = new HashMap<>();
             item.put("capsule", capsule);
             item.put("matchScore", Math.round(score * 100.0) / 100.0);
-            item.put("matchReasons", matchReasons);
-            item.put("matchSummary", buildMatchSummary(capsule, matchReasons));
+            item.put("matchReasons", signal.reasons());
+            item.put("matchSummary", buildMatchSummary(capsule, strategy, signal.reasons()));
+            item.put("strategy", strategy.name());
+            item.put("strategyLabel", strategy.label);
+            item.put("strategyDescription", strategy.description);
             // FIX-A: frontend MAY use this to distinguish a genuine resonance match from a
             // cold-start backfill; existing keys (matchScore/matchSummary/matchReasons/capsule)
             // are unchanged so no frontend change is required.
@@ -321,6 +330,55 @@ public class CapsuleServiceImpl implements CapsuleService {
                 .thenComparing(withinGroup));
         return scored.stream().limit(12).toList();
     }
+
+    private StrategySignal strategySignal(ResonanceMatchStrategy strategy,
+                                          Map<String, Integer> userThemes,
+                                          Set<String> portraitThemes,
+                                          Set<String> capsuleThemes,
+                                          Long capsuleId,
+                                          double mirrorRelevance,
+                                          List<String> mirrorReasons) {
+        if (strategy == ResonanceMatchStrategy.MIRROR) {
+            return new StrategySignal(mirrorRelevance, mirrorReasons);
+        }
+        if (strategy == ResonanceMatchStrategy.COMPLEMENT) {
+            List<String> missing = FAMILY_ORDER.stream()
+                    .filter(capsuleThemes::contains).filter(theme -> !userThemes.containsKey(theme)).limit(5)
+                    .map(theme -> "带来·" + theme).toList();
+            return new StrategySignal(Math.min(0.55, missing.size() * 0.18), missing);
+        }
+        if (strategy == ResonanceMatchStrategy.GROWTH_EDGE) {
+            List<String> bridges = new ArrayList<>();
+            addBridge(bridges, userThemes, capsuleThemes, "任务压力", "希望期待");
+            addBridge(bridges, userThemes, capsuleThemes, "情绪承压", "认知探索");
+            addBridge(bridges, userThemes, capsuleThemes, "自我评价", "关系牵动");
+            return new StrategySignal(Math.min(0.60, bridges.size() * 0.28), bridges);
+        }
+        if (strategy == ResonanceMatchStrategy.SERENDIPITY) {
+            List<String> reasons = new ArrayList<>();
+            reasons.add("为熟悉轨迹留出意外");
+            capsuleThemes.stream().limit(2).map(theme -> "可能遇见·" + theme).forEach(reasons::add);
+            double stableVariation = Math.floorMod(capsuleId == null ? 0L : capsuleId, 7L) * 0.02;
+            return new StrategySignal(0.22 + stableVariation, reasons);
+        }
+        Set<String> context = portraitThemes.isEmpty()
+                ? userThemes.entrySet().stream()
+                    .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+                    .limit(2).map(Map.Entry::getKey).collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new))
+                : portraitThemes;
+        List<String> reasons = FAMILY_ORDER.stream().filter(context::contains).filter(capsuleThemes::contains)
+                .limit(5).map(theme -> "此刻·" + theme).toList();
+        return new StrategySignal(Math.min(0.60, reasons.size() * 0.24), reasons);
+    }
+
+    private static void addBridge(List<String> bridges, Map<String, Integer> userThemes,
+                                  Set<String> capsuleThemes, String from, String to) {
+        if (userThemes.containsKey(from) && capsuleThemes.contains(to)) {
+            bridges.add(from + " → " + to);
+        }
+    }
+
+    private record StrategySignal(double relevance, List<String> reasons) {}
 
     private static double energyOf(Map<String, Object> item) {
         EchoCapsule c = (EchoCapsule) item.get("capsule");
@@ -599,12 +657,13 @@ public class CapsuleServiceImpl implements CapsuleService {
         return tags;
     }
 
-    private String buildMatchSummary(EchoCapsule capsule, List<String> themeFamilies) {
+    private String buildMatchSummary(EchoCapsule capsule, ResonanceMatchStrategy strategy,
+                                     List<String> themeFamilies) {
         if (themeFamilies == null || themeFamilies.isEmpty()) {
-            return "基于回声能量和公开边界推荐。";
+            return strategy.label + "暂未找到强信号；这是安全回填，不代表高度契合。";
         }
         String type = "SEED_CAPSULE".equals(capsule.capsuleType) ? "官方种子" : "用户回声";
-        return type + "与你最近的「" + String.join("、", themeFamilies.stream().limit(3).toList()) + "」主题有重合。";
+        return type + " · " + strategy.label + "：" + String.join("、", themeFamilies.stream().limit(3).toList()) + "。";
     }
 
     private String inferStyleProfile(List<String> memorySummaries) {

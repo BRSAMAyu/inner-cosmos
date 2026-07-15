@@ -21,6 +21,8 @@ public interface CapsuleService {
 
     List<Map<String, Object>> matchedCapsules(Long userId);
 
+    List<Map<String, Object>> matchedCapsules(Long userId, ResonanceMatchStrategy strategy);
+
     CapsulePreviewVO previewUserMirror(Long userId);
 
     EchoCapsule updateContext(Long userId, Long capsuleId, Map<String, Object> body);

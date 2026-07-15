@@ -106,8 +106,10 @@ export type PublicCapsule = {
   id: number; pseudonym: string; intro: string; capsuleType: string; publicTags: string;
   echoEnergy: number; freshnessScore: number; conversationLimitPerDay: number; lastActivityAt: string | null;
 };
+export type ResonanceStrategy = "MIRROR" | "COMPLEMENT" | "GROWTH_EDGE" | "SERENDIPITY" | "CONTEXTUAL";
 export type CapsuleMatch = {
   capsule: PublicCapsule; matchScore: number; matchReasons: string[]; matchSummary: string; resonant: boolean;
+  strategy: ResonanceStrategy; strategyLabel: string; strategyDescription: string;
 };
 export type PersonaSession = { id: number; capsuleId: number; status: string; turnCount: number; dailyLimit: number };
 export type PersonaMessage = { id: number; sessionId: number; senderType: "VISITOR" | "CAPSULE"; textContent: string };
@@ -226,7 +228,8 @@ export const api = {
   }),
   feedbackCapsuleSandbox: (id: number, input: { genomeVersionId: number; question: string; response: string; rating: string; comment?: string }) =>
     request<CapsuleSandboxFeedback>(`/api/capsule/${id}/sandbox/feedback`, { method: "POST", body: JSON.stringify(input) }),
-  resonanceMatches: () => request<CapsuleMatch[]>("/api/plaza/matches"),
+  resonanceMatches: (strategy: ResonanceStrategy = "MIRROR") =>
+    request<CapsuleMatch[]>(`/api/plaza/matches?strategy=${encodeURIComponent(strategy)}`),
   createPersonaSession: (capsuleId: number) => request<PersonaSession>("/api/persona-chat/session/create", {
     method: "POST", body: JSON.stringify({ capsuleId })
   }),

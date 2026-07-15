@@ -234,6 +234,16 @@ test("owner publishes, a visitor sends a slow letter, then withdrawal stops the 
 
   const network = page.getByRole("region", { name: "发现共鸣并写一封慢信" });
   await expect(network.getByRole("heading", { name: "不是刷卡片，是理解为什么会相遇" })).toBeVisible();
+  for (const [button, explanation] of [
+    ["有意义的互补", "有意义的互补"], ["成长边缘", "成长边缘"],
+    ["温和偶遇", "温和偶遇"], ["阶段同行", "阶段同行"]
+  ]) {
+    await network.getByRole("button", { name: button, exact: true }).click();
+    await expect(network.locator(".strategy-explanation")).toContainText(explanation);
+  }
+  await network.getByRole("button", { name: "成长边缘", exact: true }).click();
+  await page.screenshot({ path: "../evidence/innovation/INNO-CAP-005/resonance-strategy-switching.png", fullPage: true });
+  await network.getByRole("button", { name: "相似共鸣", exact: true }).click();
   await network.locator(".match-card").filter({ hasText: capsuleName }).click();
   await expect(network).toContainText("授权 AI 共鸣体 · 不是真人实时在线");
   await network.getByRole("button", { name: "进入有限但自然的对话" }).click();

@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { api, replayTurnEvents, streamAurora, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type Notification, type PersonaMessage, type PersonaSession, type SelfEvolution, type SlowLetter, type StarfieldDetail, type StarfieldScene, type UnderstandingClaim, type WakeIntent } from "./api";
+import { api, replayTurnEvents, streamAurora, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type Notification, type PersonaMessage, type PersonaSession, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type StarfieldDetail, type StarfieldScene, type UnderstandingClaim, type WakeIntent } from "./api";
 import type { AuroraStreamEvent, DialogMessage, TurnStatus } from "./protocol";
 
 type UiMessage = { key: string; speaker: "USER" | "AURORA"; text: string; partial?: boolean };
@@ -52,6 +52,7 @@ export function AuroraApp() {
   const [sandboxResult, setSandboxResult] = useState<CapsuleSandbox | null>(null);
   const [sandboxFeedback, setSandboxFeedback] = useState<string | null>(null);
   const [resonanceMatches, setResonanceMatches] = useState<CapsuleMatch[]>([]);
+  const [resonanceStrategy, setResonanceStrategy] = useState<ResonanceStrategy>("MIRROR");
   const [visitorMatchId, setVisitorMatchId] = useState<number | null>(null);
   const [personaSession, setPersonaSession] = useState<PersonaSession | null>(null);
   const [personaMessages, setPersonaMessages] = useState<PersonaMessage[]>([]);
@@ -511,6 +512,18 @@ export function AuroraApp() {
     setPersonaSession(null); setPersonaMessages([]); setPersonaQuota(null); setSentLetter(null); setLetterBody("");
   };
 
+  const chooseResonanceStrategy = async (strategy: ResonanceStrategy) => {
+    setVisitorBusy(true);
+    try {
+      const matches = await api.resonanceMatches(strategy);
+      setResonanceStrategy(strategy); setResonanceMatches(matches);
+      setVisitorMatchId(matches[0]?.capsule.id ?? null);
+      setPersonaSession(null); setPersonaMessages([]); setPersonaQuota(null); setSentLetter(null); setLetterBody("");
+      setStatus(matches[0]?.strategyDescription ?? "已经切换相遇方式");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法切换相遇方式"); }
+    finally { setVisitorBusy(false); }
+  };
+
   const startPersonaConversation = async () => {
     if (!visitorMatch) return;
     setVisitorBusy(true);
@@ -759,6 +772,13 @@ export function AuroraApp() {
         <div className="resonance-heading"><div><span className="eyebrow">RESONANCE NETWORK</span><h2>不是刷卡片，是理解为什么会相遇</h2></div>
           <span>{resonanceMatches.length} 个此刻的候选</span></div>
         <p className="resonance-intro">这里没有热度排行。系统只展示脱敏侧面、共同主题和边界；先与授权 AI 共鸣体确认是否真的想继续，再决定要不要把话写给本人。</p>
+        <div className="strategy-switcher" role="group" aria-label="选择共鸣匹配方式">
+          {([["MIRROR", "相似共鸣"], ["COMPLEMENT", "有意义的互补"], ["GROWTH_EDGE", "成长边缘"],
+            ["SERENDIPITY", "温和偶遇"], ["CONTEXTUAL", "阶段同行"]] as [ResonanceStrategy, string][]).map(([value, label]) =>
+            <button type="button" key={value} aria-pressed={resonanceStrategy === value} disabled={visitorBusy}
+              onClick={() => void chooseResonanceStrategy(value)}>{label}</button>)}
+        </div>
+        {resonanceMatches[0] && <p className="strategy-explanation"><strong>{resonanceMatches[0].strategyLabel}</strong> · {resonanceMatches[0].strategyDescription}</p>}
         {resonanceMatches.length === 0 ? <div className="network-empty">暂时没有足够安全的相遇候选。Inner Cosmos 不会用随机陌生人填满这里。</div> : <>
           <div className="match-rail" role="list" aria-label="共鸣候选">
             {resonanceMatches.map(match => <button type="button" role="listitem" key={match.capsule.id}
