@@ -73,14 +73,18 @@ class PostgresApplicationSmokeTest {
         login.password = register.password;
         assertEquals(created.id, userService.login(login).id);
 
-        // V10 adds versioned provider embeddings as rebuildable pgvector derivatives.
-        assertEquals(75L, jdbcTemplate.queryForObject("""
+        // V10 adds provider embeddings; V13 adds consent-bound Psychology Skill run audit.
+        assertEquals(76L, jdbcTemplate.queryForObject("""
                 SELECT COUNT(*) FROM information_schema.tables
                 WHERE table_schema='public' AND table_name LIKE 'tb_%'
                 """, Long.class));
         assertEquals(1L, jdbcTemplate.queryForObject("""
                 SELECT COUNT(*) FROM information_schema.tables
                 WHERE table_schema='public' AND table_name='tb_wake_intent'
+                """, Long.class));
+        assertEquals(1L, jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM information_schema.tables
+                WHERE table_schema='public' AND table_name='tb_psychology_skill_run'
                 """, Long.class));
         assertEquals(1L, jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM tb_user WHERE username=?", Long.class, register.username));

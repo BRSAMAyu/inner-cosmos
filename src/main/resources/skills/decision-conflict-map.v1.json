@@ -1,0 +1,21 @@
+{
+  "id": "decision-conflict-map",
+  "version": "1.0.0",
+  "owner": "Inner Cosmos Psychology Capability Working Group",
+  "title": {"zh-CN": "把拉扯画成一张图", "en-SG": "Map the pull in both directions"},
+  "description": {"zh-CN": "区分靠近与回避的力量，找一个可逆的小实验。", "en-SG": "Separate approach and avoidance forces, then choose a reversible experiment."},
+  "estimatedMinutes": 5,
+  "riskTier": "L1",
+  "agentInvocation": "SUGGEST_ONLY",
+  "userInvocation": "EXPLICIT_CONSENT",
+  "requiredScopes": ["current-run-input"],
+  "allowedData": ["answers-entered-in-this-run"],
+  "allowedTools": [],
+  "requiredInputs": ["decision", "pullToward", "pullAway"],
+  "evidence": ["Miller 1944, Experimental Studies of Conflict", "Self-Determination Theory, autonomy support"],
+  "limitations": {"zh-CN": "这是决策反思，不预测结果，也不适合替代高风险领域的专业意见。", "en-SG": "This is decision reflection, not outcome prediction or a substitute for professional advice in high-risk domains."},
+  "retentionChoices": ["DISCARD_AFTER_SESSION", "SAVE_RESULT", "PROFILE_ELIGIBLE"],
+  "evaluationSuite": "evals/psychology/decision-conflict-v1",
+  "fallback": "DETERMINISTIC_REFLECTION",
+  "escalation": "LOCAL_CRISIS_RESOURCES"
+}

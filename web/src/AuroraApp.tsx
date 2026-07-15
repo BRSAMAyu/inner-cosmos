@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { api, replayTurnEvents, streamAurora, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type ConnectionRequests, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type Notification, type PersonaMessage, type PersonaSession, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type SocialConnection, type StarfieldDetail, type StarfieldScene, type UnderstandingClaim, type WakeIntent } from "./api";
+import { api, replayTurnEvents, streamAurora, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type ConnectionRequests, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type Notification, type PersonaMessage, type PersonaSession, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type SocialConnection, type StarfieldDetail, type StarfieldScene, type UnderstandingClaim, type WakeIntent } from "./api";
 import type { AuroraStreamEvent, DialogMessage, TurnStatus } from "./protocol";
 
 type UiMessage = { key: string; speaker: "USER" | "AURORA"; text: string; partial?: boolean };
@@ -9,6 +9,20 @@ const modes = [
   ["DAILY_TALK", "倾诉"], ["THOUGHT_CLARIFY", "整理"], ["SOCRATIC", "追问"],
   ["ACTION_SPLIT", "行动"], ["RELATION_REVIEW", "关系"]
 ] as const;
+const skillQuestions: Record<string, Array<[string, string, string]>> = {
+  "emotion-needs-clarifier": [
+    ["situation", "发生了什么", "只写这一次的具体情境"], ["feeling", "最接近的感受", "可以用自己的词，不必选标签"],
+    ["need", "你更想保护或得到什么", "例如：空间、准备感、被理解、选择权"]
+  ],
+  "values-compass": [
+    ["choiceA", "选择 A", "它会把你带向哪里"], ["choiceB", "选择 B", "它会把你带向哪里"],
+    ["important", "两边都在保护什么重要的东西", "例如：自主、关系、稳定、成长"]
+  ],
+  "decision-conflict-map": [
+    ["decision", "正在拉扯你的决定", "不需要一次讲完整背景"], ["pullToward", "什么在把你拉近它", "期待、价值或现实收益"],
+    ["pullAway", "什么在让你退开", "代价、担心或需要被保护的部分"]
+  ]
+};
 
 function toUi(rows: DialogMessage[]): UiMessage[] {
   return rows.map(row => ({ key: `db-${row.id}`, speaker: row.speaker, text: row.textContent }));
@@ -64,6 +78,13 @@ export function AuroraApp() {
   const [letterInbox, setLetterInbox] = useState<SlowLetter[]>([]);
   const [connectionRequests, setConnectionRequests] = useState<ConnectionRequests>({ incoming: [], outgoing: [] });
   const [friends, setFriends] = useState<SocialConnection[]>([]);
+  const [skills, setSkills] = useState<PsychologySkillManifest[]>([]);
+  const [skillRuns, setSkillRuns] = useState<PsychologySkillRun[]>([]);
+  const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
+  const [skillAnswers, setSkillAnswers] = useState<Record<string, string>>({});
+  const [skillConsent, setSkillConsent] = useState(false);
+  const [skillRetention, setSkillRetention] = useState<PsychologyRetention>("DISCARD_AFTER_SESSION");
+  const [skillBusy, setSkillBusy] = useState(false);
   const [replyDrafts, setReplyDrafts] = useState<Record<number, string>>({});
   const [visitorBusy, setVisitorBusy] = useState(false);
   const [runtimeSignal, setRuntimeSignal] = useState<RuntimeSignal>({ stage: "idle", runtime: "single" });
@@ -101,7 +122,9 @@ export function AuroraApp() {
         api.resonanceMatches().then(rows => { setResonanceMatches(rows); return rows; }),
         api.letterInbox().then(rows => { setLetterInbox(rows); return rows; }),
         api.connectionRequests().then(rows => { setConnectionRequests(rows); return rows; }),
-        api.friends().then(rows => { setFriends(rows); return rows; })
+        api.friends().then(rows => { setFriends(rows); return rows; }),
+        api.psychologySkills().then(rows => { setSkills(rows); return rows; }),
+        api.psychologySkillRuns().then(rows => { setSkillRuns(rows); return rows; })
       ]);
       const loadedCapsules = loaded[8] as EchoCapsule[];
       const loadedMatches = loaded[9] as CapsuleMatch[];
@@ -110,6 +133,8 @@ export function AuroraApp() {
       const firstVisibleCapsule = loadedCapsules.find(capsule => capsule.visibilityStatus !== "ARCHIVED");
       if (firstVisibleCapsule) setSelectedCapsuleId(current => current ?? firstVisibleCapsule.id);
       setVisitorMatchId(current => current ?? loadedMatches[0]?.capsule.id ?? null);
+      const loadedSkills = loaded[13] as PsychologySkillManifest[];
+      setSelectedSkillId(current => current ?? loadedSkills[0]?.id ?? null);
       setStatus(returning
         ? `Aurora 按约定回来了：${returning.purpose}`
         : "Aurora 在这里。你可以随时打断，她会重新理解。 ");
@@ -126,6 +151,7 @@ export function AuroraApp() {
 
   const selectedCapsule = capsules.find(capsule => capsule.id === selectedCapsuleId) ?? null;
   const visitorMatch = resonanceMatches.find(match => match.capsule.id === visitorMatchId) ?? resonanceMatches[0] ?? null;
+  const selectedSkill = skills.find(skill => skill.id === selectedSkillId) ?? skills[0] ?? null;
 
   useEffect(() => {
     if (!selectedCapsule) { setGenomeHistory([]); return; }
@@ -631,6 +657,41 @@ export function AuroraApp() {
     } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法退出连接"); }
   };
 
+  const runPsychologySkill = async () => {
+    if (!selectedSkill || !skillConsent) return;
+    const missing = selectedSkill.requiredInputs.some(key => !skillAnswers[key]?.trim());
+    if (missing) { setStatus("先把三处都写一点；不需要写得完整或正确。 "); return; }
+    setSkillBusy(true);
+    try {
+      const run = await api.runPsychologySkill(selectedSkill.id, {
+        explicitConsent: true, retentionChoice: skillRetention, locale: "zh-CN",
+        consentScopes: selectedSkill.requiredScopes, answers: skillAnswers
+      });
+      setSkillRuns(current => [run, ...current.filter(item => item.id !== run.id)]);
+      setSkillConsent(false);
+      setStatus(run.status === "ESCALATED"
+        ? "这项练习已经暂停。先把安全和现实中的支持放在第一位。 "
+        : "反思完成。它不是诊断；你可以继续和 Aurora 谈、保存，或撤回。 ");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "这项反思暂时没有完成"); }
+    finally { setSkillBusy(false); }
+  };
+
+  const revokePsychologyRun = async (runId: number) => {
+    setSkillBusy(true);
+    try {
+      const revoked = await api.revokePsychologySkillRun(runId);
+      setSkillRuns(current => current.map(run => run.id === runId ? revoked : run));
+      setStatus("这次 Skill 结果已经撤回，保存的结果内容已清除。 ");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法撤回这次结果"); }
+    finally { setSkillBusy(false); }
+  };
+
+  const continueSkillWithAurora = (run: PsychologySkillRun) => {
+    const summary = String(run.result.summary ?? "我刚做完一项自我反思");
+    setDraft(`我刚做完一项反思，结果说：${summary}\n我想继续谈谈，但请不要把它当成诊断。`);
+    document.querySelector(".conversation")?.scrollIntoView({ behavior: "smooth" });
+  };
+
   if (authenticated === null) return <main className="login-shell"><div className="login" role="status">正在连接你的内宇宙…</div></main>;
   if (!authenticated) return <Login onSuccess={bootstrap} />;
 
@@ -765,6 +826,48 @@ export function AuroraApp() {
           </article>)}
         </div>}
       </section>}
+
+      <section className="skill-studio" aria-label="心理学启发的自我探索">
+        <div className="skill-heading"><div><span className="eyebrow">PSYCHOLOGY SKILLS</span><h2>不是给你一个标签，而是陪你看清一点</h2></div>
+          <span>{skills.length} 项低风险能力</span></div>
+        <p>这些是有边界的反思工具，不是心理诊断。Aurora 可以建议，但只有你明确同意后才能运行。</p>
+        <div className="skill-layout">
+          <div className="skill-catalog" role="tablist" aria-label="选择一项反思能力">
+            {skills.map(skill => <button type="button" role="tab" aria-selected={selectedSkill?.id === skill.id}
+              className={selectedSkill?.id === skill.id ? "active" : ""} key={skill.id}
+              onClick={() => { setSelectedSkillId(skill.id); setSkillAnswers({}); setSkillConsent(false); }}>
+              <strong>{skill.title["zh-CN"]}</strong><span>{skill.description["zh-CN"]}</span>
+              <small>约 {skill.estimatedMinutes} 分钟 · {skill.riskTier} · v{skill.version}</small>
+            </button>)}
+          </div>
+          {selectedSkill && <div className="skill-runner" role="tabpanel">
+            <div className="skill-disclosure"><strong>开始前，你应当知道</strong>
+              <p>{selectedSkill.limitations["zh-CN"]}</p>
+              <dl><div><dt>读取</dt><dd>仅本次填写内容</dd></div><div><dt>工具</dt><dd>{selectedSkill.allowedTools.length ? selectedSkill.allowedTools.join("、") : "不调用外部工具"}</dd></div><div><dt>依据</dt><dd>{selectedSkill.evidence.length} 项，可展开查看</dd></div></dl>
+              <details><summary>查看理论依据和版本</summary>{selectedSkill.evidence.map(item => <p key={item}>{item}</p>)}<small>{selectedSkill.evaluationSuite}</small></details>
+            </div>
+            <div className="skill-fields">{(skillQuestions[selectedSkill.id] ?? []).map(([key, label, placeholder]) =>
+              <label key={key}>{label}<textarea value={skillAnswers[key] ?? ""} placeholder={placeholder}
+                onChange={event => setSkillAnswers(current => ({ ...current, [key]: event.target.value }))} /></label>)}</div>
+            <fieldset className="skill-retention"><legend>结果怎样保留</legend>
+              <label><input type="radio" name="skill-retention" checked={skillRetention === "DISCARD_AFTER_SESSION"} onChange={() => setSkillRetention("DISCARD_AFTER_SESSION")} />只看这一次，不保存结果</label>
+              <label><input type="radio" name="skill-retention" checked={skillRetention === "SAVE_RESULT"} onChange={() => setSkillRetention("SAVE_RESULT")} />保存结果，之后可以撤回</label>
+              <label><input type="radio" name="skill-retention" checked={skillRetention === "PROFILE_ELIGIBLE"} onChange={() => setSkillRetention("PROFILE_ELIGIBLE")} />保存并允许以后单独确认是否进入画像</label>
+            </fieldset>
+            <label className="skill-consent"><input type="checkbox" checked={skillConsent} onChange={event => setSkillConsent(event.target.checked)} />我知道这不是诊断，并同意只使用本次填写内容运行 v{selectedSkill.version}</label>
+            <button className="skill-start" type="button" disabled={skillBusy || !skillConsent} onClick={() => void runPsychologySkill()}>{skillBusy ? "正在整理…" : "开始这次反思"}</button>
+          </div>}
+        </div>
+        {skillRuns.length > 0 && <div className="skill-results" aria-label="我的 Skill 结果">
+          <h3>最近的反思</h3>{skillRuns.slice(0, 5).map(run => <article key={run.id} className={run.status.toLowerCase()}>
+            <header><strong>{skills.find(skill => skill.id === run.skillId)?.title["zh-CN"] ?? run.skillId}</strong><span>{run.status === "REVOKED" ? "已撤回" : run.status === "ESCALATED" ? "已暂停并转向安全支持" : `v${run.skillVersion}`}</span></header>
+            {run.status !== "REVOKED" && <><p>{String(run.result.summary ?? "这次结果没有被保存。 ")}</p>
+              {run.result.alternative && <p className="skill-alternative">另一种可能：{String(run.result.alternative)}</p>}
+              {run.result.smallAction && <p className="skill-action">可以试试：{String(run.result.smallAction)}</p>}
+              <div className="skill-result-actions"><button type="button" onClick={() => continueSkillWithAurora(run)}>和 Aurora 继续谈</button>
+                <button type="button" disabled={skillBusy} onClick={() => void revokePsychologyRun(run.id)}>撤回这次结果</button></div></>}
+          </article>)}</div>}
+      </section>
 
       <section className="resonance-space" aria-label="共鸣体创建与像不像我沙盒">
         <div className="resonance-heading"><div><span className="eyebrow">YOUR RESONANCE</span><h2>先确认像不像你，再让别人遇见</h2></div>

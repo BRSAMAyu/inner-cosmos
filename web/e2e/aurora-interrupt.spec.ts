@@ -291,6 +291,32 @@ test("owner publishes, a visitor sends a slow letter, then withdrawal stops the 
   await expect(riverConsent).toContainText("还没有建立真人连接");
 });
 
+test("a psychology Skill requires consent, exposes its basis, and supports revocation", async ({ page }) => {
+  await page.goto("/app/aurora/index.html");
+  await loginIfNeeded(page);
+  const studio = page.getByRole("region", { name: "心理学启发的自我探索" });
+  await expect(studio.getByRole("heading", { name: "不是给你一个标签，而是陪你看清一点" })).toBeVisible();
+  await expect(studio).toContainText("Aurora 可以建议，但只有你明确同意后才能运行");
+  await studio.getByRole("tab", { name: /把此刻说得更清楚/ }).click();
+  await studio.getByText("查看理论依据和版本").click();
+  await expect(studio).toContainText("Lieberman et al. 2007");
+  await studio.getByLabel("发生了什么").fill("明天要向团队展示一个还不完美的方案");
+  await studio.getByLabel("最接近的感受").fill("紧张，也有一点期待");
+  await studio.getByLabel("你更想保护或得到什么").fill("准备感和被允许不完美");
+  await studio.getByLabel("保存结果，之后可以撤回").check();
+  const start = studio.getByRole("button", { name: "开始这次反思" });
+  await expect(start).toBeDisabled();
+  await studio.getByLabel(/我知道这不是诊断/).check();
+  await start.click();
+
+  const results = studio.getByLabel("我的 Skill 结果");
+  await expect(results).toContainText("准备感和被允许不完美");
+  await results.screenshot({ path: "../evidence/innovation/INNO-PSY-001/psychology-skill-studio.png" });
+  await results.getByRole("button", { name: "撤回这次结果" }).first().click();
+  await expect(results.locator("article").first()).toContainText("已撤回");
+  await expect(page.getByRole("status")).toContainText("保存的结果内容已清除");
+});
+
 test("Inner Cosmos remains operable on a narrow mobile viewport", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/app/aurora/index.html");

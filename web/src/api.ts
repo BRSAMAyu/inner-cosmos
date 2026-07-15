@@ -125,6 +125,20 @@ export type FriendRelation = {
   id: number; requesterId: number; addresseeId: number; status: string; source: string;
 };
 export type ConnectionRequests = { incoming: SocialConnection[]; outgoing: SocialConnection[] };
+export type PsychologySkillManifest = {
+  id: string; version: string; owner: string; title: Record<string, string>; description: Record<string, string>;
+  estimatedMinutes: number; riskTier: "L1" | "L2" | "L3"; agentInvocation: string; userInvocation: string;
+  requiredScopes: string[]; allowedData: string[]; allowedTools: string[]; requiredInputs: string[];
+  evidence: string[]; limitations: Record<string, string>; retentionChoices: PsychologyRetention[];
+  evaluationSuite: string; fallback: string; escalation: string;
+};
+export type PsychologyRetention = "DISCARD_AFTER_SESSION" | "SAVE_RESULT" | "PROFILE_ELIGIBLE";
+export type PsychologySkillRun = {
+  id: number; skillId: string; skillVersion: string; locale: string;
+  status: "COMPLETED" | "ESCALATED" | "REVOKED"; riskTier: string; retentionChoice: PsychologyRetention;
+  consentScopes: string[]; result: Record<string, unknown>; evidence: string[];
+  escalationCode: string | null; createdAt: string; revokedAt: string | null;
+};
 let csrf: Csrf | null = null;
 
 async function request<T>(url: string, init: RequestInit = {}, retriedCsrf = false): Promise<T> {
@@ -189,6 +203,13 @@ export const api = {
   wakeFeedback: (id: number, choice: "MATCHED" | "LATER" | "STOP_SIMILAR") =>
     request<WakeIntent>(`/api/aurora/wake-intents/${id}/feedback`, { method: "POST", body: JSON.stringify({ choice }) }),
   notifications: () => request<Notification[]>("/api/notifications"),
+  psychologySkills: () => request<PsychologySkillManifest[]>("/api/psychology/skills"),
+  psychologySkillRuns: () => request<PsychologySkillRun[]>("/api/psychology/skills/runs"),
+  runPsychologySkill: (skillId: string, input: { explicitConsent: boolean; retentionChoice: PsychologyRetention;
+    locale: "zh-CN" | "en-SG"; consentScopes: string[]; answers: Record<string, string> }) =>
+    request<PsychologySkillRun>(`/api/psychology/skills/${skillId}/runs`, { method: "POST", body: JSON.stringify(input) }),
+  revokePsychologySkillRun: (runId: number) =>
+    request<PsychologySkillRun>(`/api/psychology/skills/runs/${runId}/revoke`, { method: "POST" }),
   readNotification: (id: number) => request<unknown>(`/api/notifications/${id}/read`, { method: "POST" }),
   updateTimezone: (timezone: string) => request<unknown>("/api/user/profile", {
     method: "PUT", body: JSON.stringify({ timezone })

@@ -1,0 +1,21 @@
+{
+  "id": "values-compass",
+  "version": "1.0.0",
+  "owner": "Inner Cosmos Psychology Capability Working Group",
+  "title": {"zh-CN": "选择背后的价值罗盘", "en-SG": "The values behind a choice"},
+  "description": {"zh-CN": "看见两个选择各自在保护什么，不替你决定答案。", "en-SG": "See what each option protects without deciding for you."},
+  "estimatedMinutes": 6,
+  "riskTier": "L1",
+  "agentInvocation": "SUGGEST_ONLY",
+  "userInvocation": "EXPLICIT_CONSENT",
+  "requiredScopes": ["current-run-input"],
+  "allowedData": ["answers-entered-in-this-run"],
+  "allowedTools": [],
+  "requiredInputs": ["choiceA", "choiceB", "important"],
+  "evidence": ["Schwartz 1992, Universals in the Content and Structure of Values", "Self-Determination Theory, Basic Psychological Needs Theory"],
+  "limitations": {"zh-CN": "它帮助澄清优先级，不测量固定人格，也不提供法律、财务或医疗决策。", "en-SG": "It clarifies priorities; it does not measure a fixed personality or provide legal, financial or medical advice."},
+  "retentionChoices": ["DISCARD_AFTER_SESSION", "SAVE_RESULT", "PROFILE_ELIGIBLE"],
+  "evaluationSuite": "evals/psychology/values-compass-v1",
+  "fallback": "DETERMINISTIC_REFLECTION",
+  "escalation": "LOCAL_CRISIS_RESOURCES"
+}
