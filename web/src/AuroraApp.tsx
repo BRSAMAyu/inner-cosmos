@@ -1,6 +1,6 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
-import { api, apiConfigurationError, configureBearerAuth, hasConfiguredApiBase, replayTurnEvents, streamAurora, subscribeProactive, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type ConnectionRequests, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type Notification, type PersonaMessage, type PersonaSession, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type PsychologySkillSuggestion, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type SocialConnection, type StarfieldDetail, type StarfieldScene, type StarfieldStar, type UnderstandingClaim, type WakeIntent } from "./api";
+import { api, apiConfigurationError, configureBearerAuth, hasConfiguredApiBase, replayTurnEvents, streamAurora, subscribeProactive, type CapsuleFidelitySummary, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type ConnectionRequests, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type Notification, type PersonaMessage, type PersonaSession, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type PsychologySkillSuggestion, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type SocialConnection, type StarfieldDetail, type StarfieldScene, type StarfieldStar, type UnderstandingClaim, type WakeIntent } from "./api";
 import { initialMobileState, mobileRuntime, type MobileRuntimeState } from "./mobile";
 import { mobileOidc } from "./mobile-auth";
 import type { AuroraStreamEvent, DialogMessage, TurnStatus } from "./protocol";
@@ -55,6 +55,7 @@ export function AuroraApp() {
   const [capsules, setCapsules] = useState<EchoCapsule[]>([]);
   const [selectedCapsuleId, setSelectedCapsuleId] = useState<number | null>(null);
   const [genomeHistory, setGenomeHistory] = useState<CapsuleGenomeVersion[]>([]);
+  const [fidelitySummary, setFidelitySummary] = useState<CapsuleFidelitySummary[]>([]);
   const [selectedMemoryIds, setSelectedMemoryIds] = useState<number[]>([]);
   const [capsuleName, setCapsuleName] = useState("");
   const [capsuleIntro, setCapsuleIntro] = useState("");
@@ -169,13 +170,14 @@ export function AuroraApp() {
   const selectedSkill = skills.find(skill => skill.id === selectedSkillId) ?? skills[0] ?? null;
 
   useEffect(() => {
-    if (!selectedCapsule) { setGenomeHistory([]); return; }
+    if (!selectedCapsule) { setGenomeHistory([]); setFidelitySummary([]); return; }
     const ids = [...selectedCapsule.authorizedMemoryIds.matchAll(/\d+/g)].map(match => Number(match[0]));
     setSelectedMemoryIds(ids);
     setSandboxResult(null);
     setSandboxFeedback(null);
     void api.capsuleGenomeHistory(selectedCapsule.id).then(setGenomeHistory)
       .catch(error => setStatus(error instanceof Error ? error.message : "暂时无法读取共鸣体版本"));
+    void api.capsuleFidelity(selectedCapsule.id).then(setFidelitySummary).catch(() => setFidelitySummary([]));
   }, [selectedCapsuleId, selectedCapsule?.activeGenomeVersionId]);
 
   useEffect(() => {
@@ -669,6 +671,7 @@ export function AuroraApp() {
         response: sandboxResult.reply, rating
       });
       setSandboxFeedback(rating);
+      void api.capsuleFidelity(selectedCapsule.id).then(setFidelitySummary).catch(() => undefined);
       setStatus("反馈已保存为下一次 Genome 改进信号；当前公开版本没有暗中漂移。");
     } catch (error) { setStatus(error instanceof Error ? error.message : "反馈暂时没有保存"); }
     finally { setCapsuleBusy(false); }
@@ -937,7 +940,7 @@ export function AuroraApp() {
       <div className="product-space" hidden={productSpace !== "resonance"}>
       <CapsuleWorkbench capsules={capsules} selectedCapsuleId={selectedCapsuleId} selectedCapsule={selectedCapsule}
         selectableMemories={selectableMemories} selectedMemoryIds={selectedMemoryIds} capsuleName={capsuleName} capsuleIntro={capsuleIntro}
-        capsulePreview={capsulePreview} capsuleBusy={capsuleBusy} genomeHistory={genomeHistory} sandboxQuestion={sandboxQuestion}
+        capsulePreview={capsulePreview} capsuleBusy={capsuleBusy} genomeHistory={genomeHistory} fidelitySummary={fidelitySummary} sandboxQuestion={sandboxQuestion}
         sandboxResult={sandboxResult} sandboxFeedback={sandboxFeedback}
         onSelectCapsule={id => { setSelectedCapsuleId(id); if (id === null) { setSelectedMemoryIds([]); setCapsulePreview(null); } }}
         onToggleMemory={toggleCapsuleMemory} onCapsuleName={setCapsuleName} onCapsuleIntro={setCapsuleIntro}

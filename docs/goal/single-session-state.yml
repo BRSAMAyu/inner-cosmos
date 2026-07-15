@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-16T02:14:00+08:00
+updated_at: 2026-07-16T02:42:00+08:00
 authority:
   - goal-objective.md
   - 对齐文档/17-单会话持续Goal模式执行协议.md
@@ -28,31 +28,29 @@ resume_policy:
   update_this_file_at_every_checkpoint: true
 
 active_front:
-  id: P0-CAPSULE-PREVIEW-CONSENT-LEAK
-  state: FIXED_PENDING_FULL_SUITE_VERIFICATION
-  intent: While starting Campaign C reconnaissance (Resonance Network / Capsule Genome), found and fixed a real, previously-unpatched P0 privacy defect — per doc-17's priority order this jumps ahead of new campaign work.
+  id: CAMPAIGN-C-QUALITY
+  state: SANDBOX_FIDELITY_AGGREGATION_DONE_PENDING_FULL_SUITE
+  intent: Work through the Campaign C punch list captured below, starting with items actionable without real-provider credentials.
   done_this_front_summary:
-    - Campaign B closed out (see priority_queue entry below for the compact summary); AuroraApp.tsx AppShell decomposition also converged (1210 -> ~1000 lines, 8 components).
-    - Dispatched an Explore agent to survey Campaign C readiness (Capsule Genome compiler, fidelity eval, Simulator isolation, matching layer, sandbox feedback aggregation) — full punch list captured below in CAMPAIGN-C-QUALITY's reason field so the next front can start implementing immediately instead of re-researching.
-    - While tracing the capsule-preview code path during that research, found DataMaskingServiceImpl.previewFromMemory (the strict de-identified preview shown BEFORE a user confirms capsule creation, hit via POST /api/capsule/preview-from-memory) never filtered by consentScope — unlike createFromMemory and recompileGenome, which both correctly exclude LOCAL_ONLY/NO_EXTERNAL_PROCESSING memories. A user's own memory marked "never process externally" would still have its title/summary (PII-pattern-masked only, not consent-filtered) and keyword tags surfaced in the pre-consent preview. The existing DataMaskingServiceTest is pure Mockito (stubs memoryCardMapper.selectList(any()) to return a fixed list regardless of the query), so it structurally could not have caught this — a real Spring+H2 integration test was needed and didn't exist.
-    - Fixed: filter loaded cards by consentScope before any masking/summary/tag/pseudonym generation, and honestly disclose the exclusion in riskWarnings/removedSensitiveItems (the frontend CapsuleWorkbench already renders both fields generically, so no frontend change was needed). Added DataMaskingServiceConsentScopeIntegrationTest (2 cases) using a real MemoryCardMapper against H2. Verified rigor by temporarily git-stash-reverting the fix and confirming both new tests fail exactly as expected (2/2 failures) against the original code, then restored the fix and re-confirmed green — this is a real, reproduced-and-fixed bug, not a hypothetical.
-    - Full `mvn test` re-running in the background given this touches a shared service used by every capsule-creation entry point.
+    - P0 fix landed first (46bd566): DataMaskingServiceImpl.previewFromMemory leaked LOCAL_ONLY/NO_EXTERNAL_PROCESSING memories into the pre-consent capsule preview; fixed and verified via git-stash-revert rigor check.
+    - Punch-list item 3 (cheapest, fully actionable without real-provider credentials): CapsuleSandboxFeedback (LIKE_ME/NOT_ME/FACT_WRONG/TOO_EXPOSED/TONE_WRONG) was write-only — recorded but never read back anywhere, so an owner had no way to see whether a Genome version was actually landing as "like me". Added CapsuleSandboxService.fidelitySummary(ownerUserId, capsuleId), a new GET /api/capsule/{id}/sandbox/fidelity endpoint, and surfaced it in CapsuleWorkbench as a "N 次反馈 · X% 像我" note next to the active version and inline in the genome-history list, refreshed immediately after rating (not just on reload).
+    - Verified with a new integration test (CapsuleGenomeServiceIntegrationTest.fidelitySummaryAggregatesFeedbackPerVersionAndIsOwnerIsolated: per-version grouping across a recompile, correct score math, owner isolation) and extended the existing Playwright "owner publishes..." journey to assert the note appears with the exact score after a real rating click. Playwright 13/13, Vitest 33/33.
+    - Full `mvn test` re-running in the background given this touches a shared controller/service.
   next_machine_actions:
-    - NEXT once full suite confirms green — commit this P0 fix, then move to CAMPAIGN-C-QUALITY using the punch list already captured in that queue entry below (no further research needed to start).
-    - Campaign B eval dataset growth (MemoryRetrievalEvaluationTest and the three new evals are single-annotator/synthetic) remains queued but lower priority than a new experience/safety gap.
-    - ai-lab/adapters/current_production.py fabricated-adapter fix remains flagged, not active (not cited in the acceptance ledger today); still deferred given its size.
+    - NEXT once full suite confirms green — commit, then continue down the Campaign C punch list (item 4, Simulator isolation, is the next fully-actionable-without-credentials item; item 2, a real compiler, is the deepest but most valuable).
+    - Campaign B eval dataset growth and the ai-lab fabricated-adapter fix remain queued but lower priority than new experience/safety gaps.
 
 priority_queue:
   - id: CAMPAIGN-C-QUALITY
     reason: |
-      Explore-agent punch list from this checkpoint, ranked by user-visible fidelity/trust impact — start here, no re-research needed:
-      1. No real fidelity signal exists. CapsuleGenomeServiceImpl.compile()'s evaluationJson is a structural-eligibility checklist (ownerBound/currentOnly/authorizedMemoryCount), not a fidelity/leakage score. This blocks the whole Campaign C acceptance scenario (same user's long-prompt baseline vs compiled Genome, blind-tested).
-      2. The "compiler" is a thin pass-through: CapsuleServiceImpl.inferStyleProfile() is keyword-substring matching and buildContextPreview() just truncates joined summaries to 420 chars — functionally similar to the "long prompt" baseline it's supposed to beat. No feature extraction, conflict handling, scene indexing, or critic pass exists anywhere.
-      3. CapsuleSandboxServiceImpl feedback (LIKE_ME/NOT_ME/FACT_WRONG/TOO_EXPOSED/TONE_WRONG) is write-only — confirmed via grep nothing else reads CapsuleSandboxFeedback/feedbackMapper. Cheapest high-value fix: aggregate per-Genome-version feedback into a score surfaced in CapsuleWorkbench, optionally gating publish on low-fidelity versions.
-      4. No Simulator capability exists (only referenced in docs) — any adversarial/leakage testing today would have to run against a real user's live capsule, violating the "explicitly-authorized separate data" requirement.
-      5. Matching (CapsuleServiceImpl matchedCapsules/strategySignal, ResonanceMatchStrategy enum) is a real, explainable, switchable lexical/theme-family heuristic (14 passing tests in CapsuleMatchingTest) but not similarity/embedding-based and has no diversity/safety-filter stage baked into scoring.
-      6. No real LLM provider is ever exercised for capsule work in tests/evidence — INNO-EVAL-001/known-limitations.md explicitly says real-Provider comparison is BLOCKED_BY_CREDENTIAL_GATE (human gate: REAL-PROVIDER-CREDENTIALS-AND-BLIND-REVIEW). Items 1/2's TRUE fidelity delta can't be proven without this, but items 3/4 are fully actionable without it — start there.
-      7. No adversarial/boundary Java tests (counter-prompt-attack, unfamiliar-scenario stability) exist — only structural/version-chain/matching tests.
+      Explore-agent punch list, ranked by user-visible fidelity/trust impact — updated as items close:
+      1. OPEN — No real fidelity signal exists. CapsuleGenomeServiceImpl.compile()'s evaluationJson is a structural-eligibility checklist (ownerBound/currentOnly/authorizedMemoryCount), not a fidelity/leakage score. Blocks the whole Campaign C acceptance scenario (same user's long-prompt baseline vs compiled Genome, blind-tested).
+      2. OPEN — The "compiler" is a thin pass-through: CapsuleServiceImpl.inferStyleProfile() is keyword-substring matching and buildContextPreview() just truncates joined summaries to 420 chars — functionally similar to the "long prompt" baseline it's supposed to beat. No feature extraction, conflict handling, scene indexing, or critic pass exists anywhere.
+      3. DONE this checkpoint — CapsuleSandboxServiceImpl feedback is no longer write-only; aggregated per-Genome-version and surfaced in CapsuleWorkbench (fidelitySummary/CapsuleFidelitySummaryVO). Does not gate publish (kept as a visible signal, matching "反馈只成为下一版的改进信号" rather than a hard block).
+      4. OPEN — No Simulator capability exists (only referenced in docs) — any adversarial/leakage testing today would have to run against a real user's live capsule, violating the "explicitly-authorized separate data" requirement.
+      5. OPEN — Matching (CapsuleServiceImpl matchedCapsules/strategySignal, ResonanceMatchStrategy enum) is a real, explainable, switchable lexical/theme-family heuristic (14 passing tests in CapsuleMatchingTest) but not similarity/embedding-based and has no diversity/safety-filter stage baked into scoring.
+      6. OPEN, HUMAN-GATED — No real LLM provider is ever exercised for capsule work in tests/evidence — INNO-EVAL-001/known-limitations.md explicitly says real-Provider comparison is BLOCKED_BY_CREDENTIAL_GATE (human gate: REAL-PROVIDER-CREDENTIALS-AND-BLIND-REVIEW). Items 1/2's TRUE fidelity delta can't be proven without this.
+      7. OPEN — No adversarial/boundary Java tests (counter-prompt-attack, unfamiliar-scenario stability) exist — only structural/version-chain/matching tests.
   - id: CAMPAIGN-B-EXPERIENCE
     reason: The correction Experience Contract's propagation promise (star/memory -> preview -> confirm -> starfield/capsule sync) was not reliably reachable through the real UI, the UI did not actually refetch synced state, and demo seed data never populated the AuthorizedMemoryRef rows needed for the capsule NEEDS_REVIEW path to be reachable at all. All three fixed and E2E-verified. All four doc-16-mandated eval dimensions (retrieval relevance, correction-targeting precision, forgetting completeness, conflict handling) now have scored/labeled harnesses with honestly-calibrated thresholds. Remaining work is dataset growth only.
   - id: UNIFIED-FIVE-SPACE-APPSHELL

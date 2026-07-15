@@ -14,7 +14,7 @@ describe("CapsuleWorkbench", () => {
     const onCapsuleName = vi.fn();
     const onToggleMemory = vi.fn();
     render(<CapsuleWorkbench capsules={[]} selectedCapsuleId={null} selectedCapsule={null} selectableMemories={[memory]}
-      selectedMemoryIds={[]} capsuleName="" capsuleIntro="" capsulePreview={null} capsuleBusy={false} genomeHistory={[]}
+      selectedMemoryIds={[]} capsuleName="" capsuleIntro="" capsulePreview={null} capsuleBusy={false} genomeHistory={[]} fidelitySummary={[]}
       sandboxQuestion="" sandboxResult={null} sandboxFeedback={null} onSelectCapsule={() => undefined}
       onToggleMemory={onToggleMemory} onCapsuleName={onCapsuleName} onCapsuleIntro={() => undefined}
       onPreviewNewCapsule={() => undefined} onCancelPreview={() => undefined} onCreateCapsule={() => undefined}
@@ -31,12 +31,13 @@ describe("CapsuleWorkbench", () => {
     const onPublish = vi.fn();
     const onArchive = vi.fn();
     render(<CapsuleWorkbench capsules={[capsule]} selectedCapsuleId={capsule.id} selectedCapsule={capsule} selectableMemories={[memory]}
-      selectedMemoryIds={[1]} capsuleName="" capsuleIntro="" capsulePreview={null} capsuleBusy={false} genomeHistory={[genomeVersion]}
+      selectedMemoryIds={[1]} capsuleName="" capsuleIntro="" capsulePreview={null} capsuleBusy={false} genomeHistory={[genomeVersion]} fidelitySummary={[{ genomeVersionId: 3, versionNo: 1, totalRatings: 2, likeMeCount: 1, notMeCount: 1, factWrongCount: 0, tooExposedCount: 0, toneWrongCount: 0, fidelityScore: 0.5 }]}
       sandboxQuestion="" sandboxResult={null} sandboxFeedback={null} onSelectCapsule={() => undefined}
       onToggleMemory={() => undefined} onCapsuleName={() => undefined} onCapsuleIntro={() => undefined}
       onPreviewNewCapsule={() => undefined} onCancelPreview={() => undefined} onCreateCapsule={() => undefined}
       onRecompile={onRecompile} onSandboxQuestion={() => undefined} onRunSandbox={() => undefined}
       onRateSandbox={() => undefined} onPublish={onPublish} onPause={() => undefined} onArchive={onArchive} />);
+    expect(screen.getAllByText(/2 次反馈 · 50% 像我/).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("button", { name: "用当前选择生成新版本" }));
     expect(onRecompile).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByRole("button", { name: "确认并发布当前版本" }));

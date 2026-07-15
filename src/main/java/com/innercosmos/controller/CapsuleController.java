@@ -13,6 +13,7 @@ import com.innercosmos.service.CapsuleGenomeService;
 import com.innercosmos.service.CapsuleSandboxService;
 import com.innercosmos.entity.CapsuleGenomeVersion;
 import com.innercosmos.entity.CapsuleSandboxFeedback;
+import com.innercosmos.vo.CapsuleFidelitySummaryVO;
 import com.innercosmos.vo.CapsulePreviewVO;
 import com.innercosmos.vo.CapsuleSandboxVO;
 import jakarta.servlet.http.HttpSession;
@@ -152,5 +153,11 @@ public class CapsuleController extends BaseController {
     public ApiResponse<List<CapsuleSandboxFeedback>> sandboxFeedback(
             @PathVariable Long id, HttpSession session) {
         return ApiResponse.ok(sandboxService.feedback(currentUserId(session), id));
+    }
+
+    @GetMapping("/{id}/sandbox/fidelity")
+    public ApiResponse<List<CapsuleFidelitySummaryVO>> sandboxFidelity(
+            @PathVariable Long id, HttpSession session) {
+        return ApiResponse.ok(sandboxService.fidelitySummary(currentUserId(session), id));
     }
 }

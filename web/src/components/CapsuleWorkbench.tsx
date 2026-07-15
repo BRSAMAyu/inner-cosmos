@@ -1,24 +1,30 @@
-import type { CapsuleGenomeVersion, CapsulePreview, CapsuleSandbox, EchoCapsule, MemoryCard } from "../api";
+import type { CapsuleFidelitySummary, CapsuleGenomeVersion, CapsulePreview, CapsuleSandbox, EchoCapsule, MemoryCard } from "../api";
 
 const sandboxRatings: Array<[string, string]> = [
   ["LIKE_ME", "像我"], ["NOT_ME", "不像我"], ["FACT_WRONG", "事实不对"], ["TOO_EXPOSED", "太暴露"], ["TONE_WRONG", "语气不对"]
 ];
 const blockedScopes = new Set(["LOCAL_ONLY", "NO_EXTERNAL_PROCESSING"]);
 
+function fidelityLabel(summary: CapsuleFidelitySummary | undefined): string | null {
+  if (!summary || summary.totalRatings === 0 || summary.fidelityScore === null) return null;
+  return `${summary.totalRatings} 次反馈 · ${Math.round(summary.fidelityScore * 100)}% 像我`;
+}
+
 export function CapsuleWorkbench({ capsules, selectedCapsuleId, selectedCapsule, selectableMemories, selectedMemoryIds,
-  capsuleName, capsuleIntro, capsulePreview, capsuleBusy, genomeHistory, sandboxQuestion, sandboxResult, sandboxFeedback,
+  capsuleName, capsuleIntro, capsulePreview, capsuleBusy, genomeHistory, fidelitySummary, sandboxQuestion, sandboxResult, sandboxFeedback,
   onSelectCapsule, onToggleMemory, onCapsuleName, onCapsuleIntro, onPreviewNewCapsule, onCancelPreview, onCreateCapsule,
   onRecompile, onSandboxQuestion, onRunSandbox, onRateSandbox, onPublish, onPause, onArchive }: {
   capsules: EchoCapsule[]; selectedCapsuleId: number | null; selectedCapsule: EchoCapsule | null;
   selectableMemories: MemoryCard[]; selectedMemoryIds: number[]; capsuleName: string; capsuleIntro: string;
   capsulePreview: CapsulePreview | null; capsuleBusy: boolean; genomeHistory: CapsuleGenomeVersion[];
-  sandboxQuestion: string; sandboxResult: CapsuleSandbox | null; sandboxFeedback: string | null;
+  fidelitySummary: CapsuleFidelitySummary[]; sandboxQuestion: string; sandboxResult: CapsuleSandbox | null; sandboxFeedback: string | null;
   onSelectCapsule: (id: number | null) => void; onToggleMemory: (id: number) => void;
   onCapsuleName: (value: string) => void; onCapsuleIntro: (value: string) => void;
   onPreviewNewCapsule: () => void; onCancelPreview: () => void; onCreateCapsule: () => void;
   onRecompile: () => void; onSandboxQuestion: (value: string) => void; onRunSandbox: () => void;
   onRateSandbox: (rating: string) => void; onPublish: () => void; onPause: () => void; onArchive: () => void;
 }) {
+  const activeFidelity = fidelityLabel(fidelitySummary.find(summary => summary.genomeVersionId === genomeHistory[0]?.id));
   return <section className="resonance-space" aria-label="共鸣体创建与像不像我沙盒">
     <div className="resonance-heading"><div><span className="eyebrow">YOUR RESONANCE</span><h2>先确认像不像你，再让别人遇见</h2></div>
       <span>{capsules.filter(capsule => capsule.visibilityStatus !== "ARCHIVED").length} 个共鸣体</span></div>
@@ -53,7 +59,11 @@ export function CapsuleWorkbench({ capsules, selectedCapsuleId, selectedCapsule,
       <div className="capsule-summary"><div><span className="capsule-status">{selectedCapsule.visibilityStatus === "PUBLIC" ? "公开中" : selectedCapsule.visibilityStatus === "NEEDS_REVIEW" ? "授权变化，等待复核" : "仅自己可见"}</span>
         <h3>{selectedCapsule.pseudonym}</h3><p>{selectedCapsule.intro}</p></div>
         <div className="genome-badge"><strong>v{genomeHistory[0]?.versionNo ?? "–"}</strong><small>{genomeHistory[0]?.status ?? "读取中"}</small></div></div>
-      <details className="genome-history"><summary>Genome 版本与变化记录</summary>{genomeHistory.map(version => <article key={version.id}><strong>v{version.versionNo} · {version.status}</strong><span>{version.changeReason}</span><small>{version.compilerVersion}</small></article>)}</details>
+      {activeFidelity && <p className="fidelity-note">当前版本 · {activeFidelity}</p>}
+      <details className="genome-history"><summary>Genome 版本与变化记录</summary>{genomeHistory.map(version => {
+        const label = fidelityLabel(fidelitySummary.find(summary => summary.genomeVersionId === version.id));
+        return <article key={version.id}><strong>v{version.versionNo} · {version.status}</strong><span>{version.changeReason}</span><small>{version.compilerVersion}{label ? ` · ${label}` : ""}</small></article>;
+      })}</details>
 
       <div className="capsule-step"><span>1</span><div><strong>复核这个版本可以使用的记忆</strong><small>取消选择或修正来源后，必须重新编译；历史版本不会被悄悄改写。</small></div></div>
       <div className="memory-consent-list compact">{selectableMemories.slice(0, 10).map(memory => {

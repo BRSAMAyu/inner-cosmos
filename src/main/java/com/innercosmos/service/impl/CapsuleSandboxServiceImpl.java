@@ -13,15 +13,19 @@ import com.innercosmos.mapper.CapsuleSandboxFeedbackMapper;
 import com.innercosmos.mapper.EchoCapsuleMapper;
 import com.innercosmos.service.CapsuleSandboxService;
 import com.innercosmos.service.SafetyService;
+import com.innercosmos.vo.CapsuleFidelitySummaryVO;
 import com.innercosmos.vo.CapsuleSandboxVO;
 import com.innercosmos.vo.SafetyResult;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class CapsuleSandboxServiceImpl implements CapsuleSandboxService {
@@ -109,6 +113,33 @@ public class CapsuleSandboxServiceImpl implements CapsuleSandboxService {
         owned(ownerUserId, capsuleId);
         return feedbackMapper.selectList(new QueryWrapper<CapsuleSandboxFeedback>()
                 .eq("capsule_id", capsuleId).orderByDesc("id"));
+    }
+
+    @Override
+    public List<CapsuleFidelitySummaryVO> fidelitySummary(Long ownerUserId, Long capsuleId) {
+        owned(ownerUserId, capsuleId);
+        Map<Long, List<CapsuleSandboxFeedback>> byVersion = feedbackMapper.selectList(
+                new QueryWrapper<CapsuleSandboxFeedback>().eq("capsule_id", capsuleId))
+                .stream().collect(Collectors.groupingBy(row -> row.genomeVersionId));
+        List<CapsuleFidelitySummaryVO> summaries = new ArrayList<>();
+        for (Map.Entry<Long, List<CapsuleSandboxFeedback>> entry : byVersion.entrySet()) {
+            List<CapsuleSandboxFeedback> rows = entry.getValue();
+            int total = rows.size();
+            int likeMe = ratingCount(rows, "LIKE_ME");
+            CapsuleGenomeVersion genome = genomeMapper.selectById(entry.getKey());
+            summaries.add(new CapsuleFidelitySummaryVO(entry.getKey(), genome == null ? null : genome.versionNo,
+                    total, likeMe, ratingCount(rows, "NOT_ME"), ratingCount(rows, "FACT_WRONG"),
+                    ratingCount(rows, "TOO_EXPOSED"), ratingCount(rows, "TONE_WRONG"),
+                    total == 0 ? null : (double) likeMe / total));
+        }
+        summaries.sort(Comparator.comparing(
+                (CapsuleFidelitySummaryVO summary) -> summary.versionNo() == null ? -1 : summary.versionNo())
+                .reversed());
+        return summaries;
+    }
+
+    private static int ratingCount(List<CapsuleSandboxFeedback> rows, String rating) {
+        return (int) rows.stream().filter(row -> rating.equals(row.rating)).count();
     }
 
     private EchoCapsule owned(Long ownerUserId, Long capsuleId) {

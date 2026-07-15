@@ -135,6 +135,54 @@ class CapsuleGenomeServiceIntegrationTest {
                 "sandbox feedback is a proposal signal and must not drift the live Genome");
     }
 
+    @Test
+    @Transactional
+    void fidelitySummaryAggregatesFeedbackPerVersionAndIsOwnerIsolated() {
+        Long owner = seedUser("fidelity-owner");
+        Long stranger = seedUser("fidelity-stranger");
+        Long memory = seedMemory(owner, "遇到冲突时会先冷静下来，再说明具体的边界", "AURORA_PRIVATE");
+        CapsuleCreateRequest request = new CapsuleCreateRequest();
+        request.pseudonym = "先冷静的人";
+        request.memoryIds = List.of(memory);
+        request.visibilityStatus = "PRIVATE";
+        request.isPublic = false;
+        EchoCapsule capsule = capsuleService.createFromMemory(owner, request);
+        CapsuleGenomeVersion v1 = genomeService.current(capsule.id);
+
+        assertTrue(sandboxService.fidelitySummary(owner, capsule.id).isEmpty(),
+                "no fidelity signal before any sandbox feedback exists");
+
+        rate(owner, capsule.id, v1.id, "LIKE_ME");
+        rate(owner, capsule.id, v1.id, "LIKE_ME");
+        rate(owner, capsule.id, v1.id, "NOT_ME");
+
+        CapsuleGenomeVersion v2 = capsuleService.recompileGenome(owner, capsule.id, List.of(memory));
+        rate(owner, capsule.id, v2.id, "LIKE_ME");
+
+        List<com.innercosmos.vo.CapsuleFidelitySummaryVO> summaries = sandboxService.fidelitySummary(owner, capsule.id);
+        assertEquals(2, summaries.size());
+        assertEquals(2, summaries.get(0).versionNo(), "newest version must be first");
+        assertEquals(1, summaries.get(0).totalRatings());
+        assertEquals(1, summaries.get(0).likeMeCount());
+        assertEquals(1.0, summaries.get(0).fidelityScore());
+        assertEquals(1, summaries.get(1).versionNo());
+        assertEquals(3, summaries.get(1).totalRatings());
+        assertEquals(2, summaries.get(1).likeMeCount());
+        assertEquals(1, summaries.get(1).notMeCount());
+        assertEquals(2.0 / 3.0, summaries.get(1).fidelityScore(), 0.0001);
+
+        assertThrows(BusinessException.class, () -> sandboxService.fidelitySummary(stranger, capsule.id));
+    }
+
+    private void rate(Long owner, Long capsuleId, Long genomeVersionId, String rating) {
+        CapsuleSandboxFeedbackRequest feedback = new CapsuleSandboxFeedbackRequest();
+        feedback.genomeVersionId = genomeVersionId;
+        feedback.question = "评测夹具问题";
+        feedback.response = "评测夹具回答";
+        feedback.rating = rating;
+        sandboxService.recordFeedback(owner, capsuleId, feedback);
+    }
+
     private Long seedUser(String prefix) {
         String username = prefix + "-" + System.nanoTime();
         jdbc.update("INSERT INTO tb_user (username, password_hash, role, status) VALUES (?, ?, 'USER', 'ACTIVE')",

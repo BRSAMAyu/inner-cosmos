@@ -292,6 +292,7 @@ test("owner publishes, a visitor sends a slow letter, then withdrawal stops the 
   await expect(sandbox).toContainText(/.+/);
   await sandbox.getByRole("button", { name: "像我", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("没有暗中漂移");
+  await expect(resonance.locator(".fidelity-note")).toContainText("1 次反馈 · 100% 像我");
 
   await resonance.getByRole("button", { name: "确认并发布当前版本" }).click();
   await expect(resonance).toContainText("公开中");

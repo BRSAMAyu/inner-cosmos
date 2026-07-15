@@ -95,6 +95,11 @@ export type CapsulePreview = {
   abstractSummary: string; removedSensitiveItems: string[]; publicTags: string[];
   suggestedPseudonym: string; personaPromptDraft: string; riskWarnings: string[];
 };
+export type CapsuleFidelitySummary = {
+  genomeVersionId: number; versionNo: number | null; totalRatings: number; likeMeCount: number;
+  notMeCount: number; factWrongCount: number; tooExposedCount: number; toneWrongCount: number;
+  fidelityScore: number | null;
+};
 export type CapsuleSandbox = {
   capsuleId: number; genomeVersionId: number; genomeVersionNo: number; genomeStatus: string;
   question: string; reply: string; boundaryNotice: string; riskFlags: string[];
@@ -374,6 +379,7 @@ export const api = {
   memoryCards: () => request<MemoryCard[]>("/api/memory/cards"),
   myCapsules: () => request<EchoCapsule[]>("/api/capsule/my"),
   capsuleGenomeHistory: (id: number) => request<CapsuleGenomeVersion[]>(`/api/capsule/${id}/genome-history`),
+  capsuleFidelity: (id: number) => request<CapsuleFidelitySummary[]>(`/api/capsule/${id}/sandbox/fidelity`),
   previewCapsule: (memoryIds: number[]) => request<CapsulePreview>("/api/capsule/preview-from-memory", {
     method: "POST", body: JSON.stringify({ memoryIds, privacyLevel: "STRICT", allowTopics: [], blockedTopics: [] })
   }),
