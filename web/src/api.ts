@@ -145,11 +145,63 @@ export type PsychologySkillSuggestion = {
   invocation: "SUGGEST_ONLY"; createsRun: false;
 };
 let csrf: Csrf | null = null;
-const configuredApiBase = String(import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
+type AccessTokenProvider = () => Promise<string | null>;
+let accessTokenProvider: AccessTokenProvider | null = null;
+let accessTokenInvalidator: (() => Promise<void>) | null = null;
+let bearerRequired = false;
+
+export function configureBearerAuth(provider: AccessTokenProvider | null, required = false,
+                                    invalidator: (() => Promise<void>) | null = null): void {
+  accessTokenProvider = provider;
+  accessTokenInvalidator = invalidator;
+  bearerRequired = required;
+  csrf = null;
+}
+
+function isNonPublicHost(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.includes(":")) return true;
+  const octets = host.split(".").map(Number);
+  if (octets.length !== 4 || octets.some(value => !Number.isInteger(value) || value < 0 || value > 255)) return false;
+  const [a, b] = octets;
+  return a === 0 || a === 10 || a === 127 || a >= 224 || (a === 100 && b >= 64 && b <= 127)
+    || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31)
+    || (a === 192 && b === 168) || (a === 198 && (b === 18 || b === 19));
+}
+
+export function validateApiBase(raw: string, allowedOrigins: string, production: boolean): string {
+  if (!raw.trim()) return "";
+  let url: URL;
+  try { url = new URL(raw); } catch { throw new Error("VITE_API_BASE_URL must be an absolute URL"); }
+  if (url.username || url.password || url.search || url.hash) throw new Error("API URL cannot contain credentials, query, or fragment");
+  if (url.pathname !== "/" || url.port) throw new Error("API URL must be an origin without a path or custom port");
+  if (production && url.protocol !== "https:") throw new Error("Production API URL must use HTTPS");
+  if (production && isNonPublicHost(url.hostname)) throw new Error("Production API URL cannot use a local or private host");
+  const allowed = new Set(allowedOrigins.split(",").map(value => value.trim()).filter(Boolean).map(value => {
+    const candidate = new URL(value);
+    if (candidate.username || candidate.password || candidate.search || candidate.hash || candidate.pathname !== "/" || candidate.port) {
+      throw new Error("VITE_API_ALLOWED_ORIGINS contains a non-origin value");
+    }
+    return candidate.origin;
+  }));
+  if (production && !allowed.has(url.origin)) throw new Error("Production API origin is not in the signed-build allowlist");
+  return url.origin;
+}
+
+const rawApiBase = String(import.meta.env.VITE_API_BASE_URL ?? "");
+let configuredApiBase = "";
+export let apiConfigurationError: string | null = null;
+try {
+  configuredApiBase = validateApiBase(rawApiBase,
+    String(import.meta.env.VITE_API_ALLOWED_ORIGINS ?? "https://api.innercosmos.sg"), import.meta.env.PROD);
+} catch (error) {
+  apiConfigurationError = error instanceof Error ? error.message : "Invalid production API origin";
+}
 export const hasConfiguredApiBase = configuredApiBase.length > 0;
 
 export function apiUrl(path: string): string {
   if (!path.startsWith("/api/")) throw new Error("Only Inner Cosmos API paths are allowed");
+  if (rawApiBase && apiConfigurationError) throw new Error(apiConfigurationError);
   return configuredApiBase ? `${configuredApiBase}${path}` : path;
 }
 
@@ -157,6 +209,11 @@ export function subscribeProactive(
   onEvent: (event: ProactiveEvent) => void,
   onConnectionChange?: (connected: boolean) => void
 ): () => void {
+  if (accessTokenProvider) {
+    const controller = new AbortController();
+    void subscribeProactiveBearer(controller, onEvent, onConnectionChange);
+    return () => controller.abort();
+  }
   if (typeof EventSource === "undefined") return () => undefined;
   const source = new EventSource(apiUrl("/api/proactive/stream"), { withCredentials: true });
   source.onopen = () => onConnectionChange?.(true);
@@ -174,16 +231,59 @@ export function subscribeProactive(
   return () => source.close();
 }
 
-async function request<T>(url: string, init: RequestInit = {}, retriedCsrf = false): Promise<T> {
+async function subscribeProactiveBearer(controller: AbortController, onEvent: (event: ProactiveEvent) => void,
+                                        onConnectionChange?: (connected: boolean) => void): Promise<void> {
+  while (!controller.signal.aborted) {
+    try {
+      const token = await accessTokenProvider?.();
+      if (!token) throw new Error("Mobile authentication is required");
+      const response = await fetch(apiUrl("/api/proactive/stream"), {
+        signal: controller.signal, headers: { Accept: "text/event-stream", Authorization: `Bearer ${token}` }
+      });
+      if (response.status === 401) await accessTokenInvalidator?.();
+      if (!response.ok || !response.body) throw new Error(`Proactive SSE HTTP ${response.status}`);
+      onConnectionChange?.(true);
+      const decoder = new SseDecoder();
+      const reader = response.body.getReader();
+      const textDecoder = new TextDecoder();
+      while (!controller.signal.aborted) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        for (const frame of decoder.push(textDecoder.decode(value, { stream: true }))) {
+          if (frame.event !== "proactive") continue;
+          try {
+            const event = JSON.parse(frame.data) as Partial<ProactiveEvent>;
+            if (typeof event.type === "string" && typeof event.content === "string" && typeof event.ts === "string") {
+              onEvent(event as ProactiveEvent);
+            }
+          } catch { /* durable notifications remain the source of truth */ }
+        }
+      }
+    } catch (error) {
+      if (controller.signal.aborted) return;
+    }
+    onConnectionChange?.(false);
+    await new Promise(resolve => setTimeout(resolve, 2000));
+  }
+}
+
+async function request<T>(url: string, init: RequestInit = {}, retriedCsrf = false, retriedBearer = false): Promise<T> {
   const method = (init.method ?? "GET").toUpperCase();
   const headers = new Headers(init.headers);
+  const accessToken = await accessTokenProvider?.() ?? null;
+  if (bearerRequired && !accessToken) throw new Error("Mobile OIDC authentication is required");
+  if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
   if (!headers.has("Content-Type") && init.body) headers.set("Content-Type", "application/json");
-  if (!["GET", "HEAD", "OPTIONS"].includes(method)) {
+  if (!accessToken && !["GET", "HEAD", "OPTIONS"].includes(method)) {
     csrf ??= await getCsrf();
     headers.set(csrf.headerName, csrf.token);
   }
-  const response = await fetch(apiUrl(url), { ...init, headers, credentials: "include" });
+  const response = await fetch(apiUrl(url), { ...init, headers, credentials: accessToken ? "omit" : "include" });
   const body = await response.json() as ApiEnvelope<T>;
+  if (response.status === 401 && accessToken && accessTokenInvalidator && !retriedBearer) {
+    await accessTokenInvalidator();
+    return request<T>(url, init, retriedCsrf, true);
+  }
   if (response.status === 403 && (body.code === "CSRF_INVALID" || body.error === "CSRF_INVALID") && !retriedCsrf) {
     csrf = null;
     return request<T>(url, init, true);
@@ -193,6 +293,7 @@ async function request<T>(url: string, init: RequestInit = {}, retriedCsrf = fal
 }
 
 async function getCsrf(): Promise<Csrf> {
+  if (bearerRequired) throw new Error("CSRF session authentication is disabled for native clients");
   const response = await fetch(apiUrl("/api/auth/csrf"), { credentials: "include" });
   const body = await response.json() as ApiEnvelope<Csrf>;
   if (!body.success) throw new Error(body.message ?? "无法建立安全会话");
@@ -330,9 +431,18 @@ export async function streamAurora(
   const query = new URLSearchParams({
     sessionId: String(input.sessionId), message: input.message, mode: input.mode
   });
-  const response = await fetch(apiUrl(`/api/aurora/stream?${query}`), {
-    credentials: "include", headers: { Accept: "text/event-stream" }, signal
+  let token = await accessTokenProvider?.() ?? null;
+  if (bearerRequired && !token) throw new Error("Mobile OIDC authentication is required");
+  let response = await fetch(apiUrl(`/api/aurora/stream?${query}`), {
+    credentials: token ? "omit" : "include", headers: { Accept: "text/event-stream", ...(token ? { Authorization: `Bearer ${token}` } : {}) }, signal
   });
+  if (response.status === 401 && token && accessTokenInvalidator) {
+    await accessTokenInvalidator();
+    token = await accessTokenProvider?.() ?? null;
+    if (token) response = await fetch(apiUrl(`/api/aurora/stream?${query}`), {
+      credentials: "omit", headers: { Accept: "text/event-stream", Authorization: `Bearer ${token}` }, signal
+    });
+  }
   if (!response.ok || !response.body) throw new Error(`SSE HTTP ${response.status}`);
   const decoder = new SseDecoder();
   const reader = response.body.getReader();
@@ -352,10 +462,20 @@ export async function replayTurnEvents(
   lastEventId: string,
   onEvent: (event: AuroraStreamEvent) => void
 ): Promise<string> {
-  const response = await fetch(apiUrl(`/api/aurora/turns/${turnId}/events`), {
-    credentials: "include",
-    headers: { Accept: "text/event-stream", ...(lastEventId ? { "Last-Event-ID": lastEventId } : {}) }
+  let token = await accessTokenProvider?.() ?? null;
+  if (bearerRequired && !token) throw new Error("Mobile OIDC authentication is required");
+  let response = await fetch(apiUrl(`/api/aurora/turns/${turnId}/events`), {
+    credentials: token ? "omit" : "include",
+    headers: { Accept: "text/event-stream", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(lastEventId ? { "Last-Event-ID": lastEventId } : {}) }
   });
+  if (response.status === 401 && token && accessTokenInvalidator) {
+    await accessTokenInvalidator();
+    token = await accessTokenProvider?.() ?? null;
+    if (token) response = await fetch(apiUrl(`/api/aurora/turns/${turnId}/events`), {
+      credentials: "omit",
+      headers: { Accept: "text/event-stream", Authorization: `Bearer ${token}`, ...(lastEventId ? { "Last-Event-ID": lastEventId } : {}) }
+    });
+  }
   if (!response.ok || !response.body) throw new Error(`Replay HTTP ${response.status}`);
   const decoder = new SseDecoder();
   const reader = response.body.getReader();

@@ -1,0 +1,16 @@
+INNO-MOBILE-002 focused verification
+Date: 2026-07-15
+
+PASS  pnpm test                               3 files / 12 tests
+PASS  pnpm run build                         TypeScript + Vite production bundle
+PASS  OidcBearerIntegrationTest              6 tests
+PASS  OidcTokenValidatorTest                 2 tests
+PASS  pnpm exec cap sync                     5 native plugins on Android and iOS
+PASS  gradlew :app:assembleDebug
+PASS  gradlew :app:assembleDebugAndroidTest   instrumentation APK compiled
+PASS  mvnw clean verify                       784 tests / SpotBugs 0 / Jar / SBOM
+PASS  packaged-JAR Playwright                 11/11 in 49.0s
+
+PENDING EXTERNAL
+      Real IdP tenant, device callback/refresh/revoke/process-death run, release signing,
+      Android App Links and iOS Universal Links domain ownership.

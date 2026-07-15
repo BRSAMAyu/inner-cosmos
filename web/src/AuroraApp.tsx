@@ -1,6 +1,8 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { api, hasConfiguredApiBase, replayTurnEvents, streamAurora, subscribeProactive, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type ConnectionRequests, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type Notification, type PersonaMessage, type PersonaSession, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type PsychologySkillSuggestion, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type SocialConnection, type StarfieldDetail, type StarfieldScene, type UnderstandingClaim, type WakeIntent } from "./api";
+import { Capacitor } from "@capacitor/core";
+import { api, apiConfigurationError, configureBearerAuth, hasConfiguredApiBase, replayTurnEvents, streamAurora, subscribeProactive, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type ConnectionRequests, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type Notification, type PersonaMessage, type PersonaSession, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type PsychologySkillSuggestion, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type SocialConnection, type StarfieldDetail, type StarfieldScene, type UnderstandingClaim, type WakeIntent } from "./api";
 import { initialMobileState, mobileRuntime, type MobileRuntimeState } from "./mobile";
+import { mobileOidc } from "./mobile-auth";
 import type { AuroraStreamEvent, DialogMessage, TurnStatus } from "./protocol";
 
 type UiMessage = { key: string; speaker: "USER" | "AURORA"; text: string; partial?: boolean };
@@ -200,7 +202,21 @@ export function AuroraApp() {
   useEffect(() => {
     if (bootstrappedRef.current) return;
     bootstrappedRef.current = true;
-    void bootstrap();
+    const native = Capacitor.isNativePlatform();
+    configureBearerAuth(native ? () => mobileOidc.accessToken() : null, native,
+      native ? () => mobileOidc.expireAccessToken() : null);
+    let dispose: (() => Promise<void>) | undefined;
+    void mobileOidc.initialize(bootstrap, error => {
+      setAuthenticated(false);
+      setStatus(error.message);
+    }).then(cleanup => {
+      dispose = cleanup;
+      return bootstrap();
+    }).catch(error => {
+      setAuthenticated(false);
+      setStatus(error instanceof Error ? error.message : "移动认证初始化失败");
+    });
+    return () => { if (dispose) void dispose(); };
   }, [bootstrap]);
 
   const finishTurn = useCallback(() => {
@@ -716,10 +732,15 @@ export function AuroraApp() {
   };
 
   const logout = async () => {
+    let remoteWarning: string | null = null;
     try {
-      await api.logout();
+      if (Capacitor.isNativePlatform()) {
+        try { await mobileOidc.logout(); }
+        catch (error) { remoteWarning = error instanceof Error ? error.message : "远程撤销未确认"; }
+      }
+      else await api.logout();
       setAuthenticated(false); setSessionId(null); setMessages([]); setPersonaSession(null); setPersonaMessages([]);
-      setStatus("已安全退出");
+      setStatus(remoteWarning ?? "已安全退出");
     } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法退出"); }
   };
 
@@ -821,14 +842,14 @@ export function AuroraApp() {
     document.querySelector(".skill-studio")?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  if (mobileState.native && !hasConfiguredApiBase) return <main className="login-shell"><div className="login mobile-gate" role="alert">
+  if (mobileState.native && (!hasConfiguredApiBase || apiConfigurationError)) return <main className="login-shell"><div className="login mobile-gate" role="alert">
     <span className="eyebrow">MOBILE ENVIRONMENT GATE</span>
     <h1>这台设备还没有安全后端入口</h1>
-    <p>应用壳、深链与恢复能力已经就绪，但本次构建没有注入 <code>VITE_API_BASE_URL</code>。为避免把会话发往错误地址，Aurora 不会尝试登录。</p>
+    <p>{apiConfigurationError ?? <>应用壳、深链与恢复能力已经就绪，但本次构建没有注入 <code>VITE_API_BASE_URL</code>。</>} 为避免把凭据和会话发往错误地址，Aurora 不会尝试登录。</p>
     <small>请使用经过验证的 HTTPS API 域重新构建；推送凭据与商店签名也必须由授权环境提供。</small>
   </div></main>;
   if (authenticated === null) return <main className="login-shell"><div className="login" role="status">正在连接你的内宇宙…</div></main>;
-  if (!authenticated) return <Login onSuccess={bootstrap} />;
+  if (!authenticated) return <Login native={mobileState.native} onSuccess={bootstrap} />;
 
   return (
     <main className="shell">
@@ -1179,10 +1200,17 @@ export function AuroraApp() {
   );
 }
 
-function Login({ onSuccess }: { onSuccess: () => Promise<void> }) {
+function Login({ native, onSuccess }: { native: boolean; onSuccess: () => Promise<void> }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  if (native) return <main className="login-shell"><section className="login">
+    <span className="eyebrow">INNER COSMOS</span><h1>回到你的内宇宙</h1>
+    <p>原生应用使用系统浏览器与 Authorization Code + PKCE 登录。密码不会进入 Aurora 应用。</p>
+    {error && <p className="error" role="alert">{error}</p>}
+    <button className="send" type="button" onClick={() => void mobileOidc.beginLogin()
+      .catch(reason => setError(reason instanceof Error ? reason.message : "无法启动安全登录"))}>使用身份提供方继续</button>
+  </section></main>;
   return <main className="login-shell"><form className="login" onSubmit={async e => {
     e.preventDefault();
     try {

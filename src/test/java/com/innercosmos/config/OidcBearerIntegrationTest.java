@@ -35,7 +35,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -164,6 +166,18 @@ class OidcBearerIntegrationTest {
                 .andExpect(jsonPath("$.data.codeChallengeMethod").value("S256"))
                 .andExpect(jsonPath("$.data.clientId").value("inner-cosmos-mobile"))
                 .andExpect(jsonPath("$.data.clientSecret").doesNotExist());
+    }
+
+    @Test
+    void capacitorOriginCanPreflightBearerRequestsWithoutCookies() throws Exception {
+        mockMvc.perform(options("/api/notifications")
+                        .header("Origin", "https://localhost")
+                        .header("Access-Control-Request-Method", "GET")
+                        .header("Access-Control-Request-Headers", "authorization,last-event-id"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "https://localhost"))
+                .andExpect(header().string("Access-Control-Allow-Headers",
+                        org.hamcrest.Matchers.containsStringIgnoringCase("authorization")));
     }
 
     private static Jwt jwt(String token, String subject, boolean emailVerified) {

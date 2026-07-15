@@ -22,7 +22,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
      */
     private static final String CORS_ORIGINS = System.getenv("CORS_ALLOWED_ORIGINS") != null
         ? System.getenv("CORS_ALLOWED_ORIGINS")
-        : "http://localhost:8080,http://127.0.0.1:8080";
+        : "http://localhost:8080,http://127.0.0.1:8080,https://localhost";
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {

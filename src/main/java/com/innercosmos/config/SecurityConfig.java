@@ -20,6 +20,7 @@ import org.springframework.security.oauth2.server.resource.web.authentication.Be
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.web.util.matcher.RequestMatcher;
+import org.springframework.security.config.Customizer;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -68,6 +69,7 @@ public class SecurityConfig {
         }
 
         http
+            .cors(Customizer.withDefaults())
             .sessionManagement(s -> s
                     .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
                     // AuthController performs the one required ID rotation at login/register.

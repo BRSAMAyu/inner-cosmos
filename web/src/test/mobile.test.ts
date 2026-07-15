@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { apiUrl, subscribeProactive } from "../api";
+import { apiUrl, subscribeProactive, validateApiBase } from "../api";
 import { parseWakeIntentDeepLink } from "../mobile";
 
 describe("mobile deep-link boundary", () => {
@@ -18,6 +18,16 @@ describe("mobile deep-link boundary", () => {
 });
 
 describe("mobile API boundary", () => {
+  it("accepts only the exact trusted HTTPS production origin", () => {
+    expect(validateApiBase("https://api.innercosmos.sg", "https://api.innercosmos.sg", true))
+      .toBe("https://api.innercosmos.sg");
+    for (const value of [
+      "http://api.innercosmos.sg", "https://user@api.innercosmos.sg", "https://api.innercosmos.sg/v1",
+      "https://api.innercosmos.sg?next=evil", "https://api.innercosmos.sg.evil.example",
+      "https://localhost", "https://127.0.0.1", "https://10.0.0.8", "https://[::1]"
+    ]) expect(() => validateApiBase(value, "https://api.innercosmos.sg", true)).toThrow();
+  });
+
   it("keeps API requests scoped to the Inner Cosmos API namespace", () => {
     expect(apiUrl("/api/auth/csrf")).toBe("/api/auth/csrf");
     expect(() => apiUrl("https://evil.example/collect")).toThrow("Only Inner Cosmos API paths are allowed");

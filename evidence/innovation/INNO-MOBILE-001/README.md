@@ -71,3 +71,7 @@ The highest-priority gaps are the missing native OIDC Authorization Code + PKCE 
 the permissive `VITE_API_BASE_URL` trust check, and unverified OS-owned HTTPS links. See
 [`independent-review-2026-07-15.md`](independent-review-2026-07-15.md) for findings and rerun
 evidence. `MOBILE-NATIVE: IN_PROGRESS` remains the truthful status.
+
+Follow-up `INNO-MOBILE-002` implements the native OIDC/PKCE client and strict production API-origin
+boundary. This package remains the historical foundation evidence; consult the later package for the
+current authentication implementation and its real-IdP/device gates.

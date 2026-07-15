@@ -83,7 +83,7 @@ gates:
     required: true
     acceptance:
       - {id: ARCH-MODULES, target: "Module boundaries are executable through Spring Modulith and architecture tests.", status: UNASSESSED, evidence: []}
-      - {id: AUTH-OIDC, target: "Spring Security protects secure web sessions and mobile OIDC PKCE flows.", status: IN_PROGRESS, evidence: [evidence/m1/M1-AUTH-WEB-001/, evidence/m1/M1-AUTH-OIDC-001/]}
+      - {id: AUTH-OIDC, target: "Spring Security protects secure web sessions and mobile OIDC PKCE flows.", status: IN_PROGRESS, evidence: [evidence/m1/M1-AUTH-WEB-001/, evidence/m1/M1-AUTH-OIDC-001/, evidence/innovation/INNO-MOBILE-002/]}
       - {id: API-CONTRACT, target: "Versioned OpenAPI, typed errors, idempotency, concurrency, and resumable SSE are verified.", status: UNASSESSED, evidence: []}
       - {id: DATA-POSTGRES, target: "PostgreSQL and Flyway are production truth with Testcontainers and migration reconciliation.", status: IN_PROGRESS, evidence: [evidence/m1/M1-DATA-POC-001/, evidence/m1/M1-DATA-APP-001/, evidence/m1/M1-AUTH-OIDC-001/, evidence/innovation/INNO-INNER-005/, docs/adr/0002-postgresql-system-of-record.md]}
       - {id: DATA-REDIS, target: "Sessions, short state, limits, and leases are externalized to Redis where required.", status: IN_PROGRESS, evidence: [evidence/m1/M1-DATA-REDIS-001/, evidence/m1/M1-DATA-REDIS-002/, evidence/m1/M1-DATA-REDIS-003/]}
@@ -167,7 +167,7 @@ gates:
     acceptance:
       - {id: SKILL-RUNTIME, target: "Versioned skill manifests enforce schemas, tools, consent, evidence, risk, retention, evaluation, and escalation.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-PSY-001/]}
       - {id: SKILL-PRODUCT, target: "At least three evidence-informed non-diagnostic skills pass quality, safety, i18n, and human review.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-PSY-001/, evidence/innovation/INNO-PSY-002/]}
-      - {id: MOBILE-NATIVE, target: "Capacitor push, microphone, deep links, secure storage, lifecycle, and network recovery pass on real devices.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-MOBILE-001/]}
+      - {id: MOBILE-NATIVE, target: "Capacitor push, microphone, deep links, secure storage, lifecycle, and network recovery pass on real devices.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-MOBILE-001/, evidence/innovation/INNO-MOBILE-002/]}
       - {id: UX-COMPLETE, target: "All five product spaces meet desktop/mobile, bilingual, WCAG 2.2 AA target, reduced-motion, and blind-experience acceptance.", status: UNASSESSED, evidence: []}
 
   - id: G8
