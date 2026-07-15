@@ -7,13 +7,16 @@ param(
 $ErrorActionPreference = "Stop"
 
 $postgresImage = "pgvector/pgvector:0.8.1-pg16@sha256:33198da2828a14c30348d2ccb4750833d5ed9a44c88d840a0e523d7417120337"
+$redisImage = "redis:7.4.2-alpine@sha256:02419de7eddf55aa5bcf49efb74e88fa8d931b4d77c07eff8a6b2144472b6952"
 $runId = [Guid]::NewGuid().ToString("N").Substring(0, 12)
 $network = "inner-cosmos-prod-smoke-$runId"
 $postgresName = "inner-cosmos-postgres-$runId"
+$redisName = "inner-cosmos-redis-$runId"
 $appName = "inner-cosmos-app-$runId"
 $database = "inner_cosmos"
 $databaseUser = "inner_cosmos"
 $databasePassword = [Guid]::NewGuid().ToString("N")
+$redisPassword = [Guid]::NewGuid().ToString("N")
 $tempRoot = Join-Path ([IO.Path]::GetTempPath()) "inner-cosmos-prod-smoke-$runId"
 $resolvedTempBase = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
 $resolvedTempRoot = [IO.Path]::GetFullPath($tempRoot)
@@ -45,6 +48,22 @@ function Wait-Postgres {
     throw "PostgreSQL did not become ready before the timeout."
 }
 
+function Wait-Redis {
+    param([DateTimeOffset]$Deadline)
+    while ([DateTimeOffset]::UtcNow -lt $Deadline) {
+        $savedPreference = $ErrorActionPreference
+        $ErrorActionPreference = "SilentlyContinue"
+        $reply = & docker exec $redisName redis-cli --tls --cacert /certs/redis-ca.crt `
+            --no-auth-warning -a $redisPassword ping 2>$null
+        $ready = $LASTEXITCODE -eq 0 -and $reply -eq "PONG"
+        $ErrorActionPreference = $savedPreference
+        if ($ready) { return }
+        Start-Sleep -Seconds 2
+    }
+    & docker logs $redisName --tail 120
+    throw "Redis did not become ready before the timeout."
+}
+
 New-Item -ItemType Directory -Path $resolvedTempRoot | Out-Null
 
 try {
@@ -66,26 +85,56 @@ cd /var/lib/postgresql/data
 openssl req -x509 -newkey rsa:2048 -sha256 -days 1 -nodes -subj '/CN=inner-cosmos-smoke-ca' -keyout ca.key -out ca.crt >/dev/null 2>&1
 openssl req -newkey rsa:2048 -sha256 -nodes -subj '/CN=$postgresName' -addext 'subjectAltName=DNS:$postgresName' -keyout server.key -out server.csr >/dev/null 2>&1
 openssl x509 -req -sha256 -days 1 -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -copy_extensions copy -out server.crt >/dev/null 2>&1
+openssl req -newkey rsa:2048 -sha256 -nodes -subj '/CN=$redisName' -addext 'subjectAltName=DNS:$redisName' -keyout redis-server.key -out redis-server.csr >/dev/null 2>&1
+openssl x509 -req -sha256 -days 1 -in redis-server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -copy_extensions copy -out redis-server.crt >/dev/null 2>&1
 chmod 600 server.key ca.key
+chmod 644 redis-server.key redis-server.crt ca.crt
 "@
     Invoke-Docker -DockerArguments @("exec", "-u", "postgres", $postgresName, "sh", "-c", $certificateScript)
     Invoke-Docker -DockerArguments @("exec", "-u", "postgres", $postgresName, "psql", "-U", $databaseUser, "-d", $database, "-v", "ON_ERROR_STOP=1", "-c", "ALTER SYSTEM SET ssl = 'on'")
     Invoke-Docker -DockerArguments @("exec", "-u", "postgres", $postgresName, "psql", "-U", $databaseUser, "-d", $database, "-v", "ON_ERROR_STOP=1", "-c", "ALTER SYSTEM SET ssl_cert_file = 'server.crt'")
     Invoke-Docker -DockerArguments @("exec", "-u", "postgres", $postgresName, "psql", "-U", $databaseUser, "-d", $database, "-v", "ON_ERROR_STOP=1", "-c", "ALTER SYSTEM SET ssl_key_file = 'server.key'")
     Invoke-Docker -DockerArguments @("cp", "${postgresName}:/var/lib/postgresql/data/ca.crt", (Join-Path $resolvedTempRoot "postgres-ca.crt"))
+    Invoke-Docker -DockerArguments @("cp", "${postgresName}:/var/lib/postgresql/data/ca.crt", (Join-Path $resolvedTempRoot "redis-ca.crt"))
+    Invoke-Docker -DockerArguments @("cp", "${postgresName}:/var/lib/postgresql/data/redis-server.crt", (Join-Path $resolvedTempRoot "redis-server.crt"))
+    Invoke-Docker -DockerArguments @("cp", "${postgresName}:/var/lib/postgresql/data/redis-server.key", (Join-Path $resolvedTempRoot "redis-server.key"))
     Invoke-Docker -DockerArguments @("restart", $postgresName) | Out-Null
     Wait-Postgres -Deadline $deadline
 
+    Invoke-Docker -DockerArguments @(
+        "run", "-d", "--name", $redisName, "--network", $network,
+        "-v", "${resolvedTempRoot}:/certs:ro",
+        $redisImage,
+        "redis-server",
+        "--port", "0",
+        "--tls-port", "6379",
+        "--tls-cert-file", "/certs/redis-server.crt",
+        "--tls-key-file", "/certs/redis-server.key",
+        "--tls-ca-cert-file", "/certs/redis-ca.crt",
+        "--tls-auth-clients", "no",
+        "--requirepass", $redisPassword
+    ) | Out-Null
+    Wait-Redis -Deadline $deadline
+
     $caPath = Join-Path $resolvedTempRoot "postgres-ca.crt"
+    $redisCaPath = Join-Path $resolvedTempRoot "redis-ca.crt"
     $jdbcUrl = "jdbc:postgresql://${postgresName}:5432/${database}?sslmode=verify-full&sslrootcert=/run/secrets/postgres-ca.crt"
     Invoke-Docker -DockerArguments @(
         "run", "-d", "--name", $appName, "--network", $network,
         "-p", "127.0.0.1::8080",
         "-v", "${caPath}:/run/secrets/postgres-ca.crt:ro",
+        "-v", "${redisCaPath}:/run/secrets/redis-ca.crt:ro",
         "-e", "SPRING_PROFILES_ACTIVE=prod",
         "-e", "SPRING_DATASOURCE_URL=$jdbcUrl",
         "-e", "SPRING_DATASOURCE_USERNAME=$databaseUser",
         "-e", "SPRING_DATASOURCE_PASSWORD=$databasePassword",
+        "-e", "REDIS_SESSION_ENABLED=true",
+        "-e", "REDIS_HOST=$redisName",
+        "-e", "REDIS_PORT=6379",
+        "-e", "REDIS_PASSWORD=$redisPassword",
+        "-e", "REDIS_SSL_ENABLED=true",
+        "-e", "SPRING_DATA_REDIS_SSL_BUNDLE=redis",
+        "-e", "SPRING_SSL_BUNDLE_PEM_REDIS_TRUSTSTORE_CERTIFICATE=file:/run/secrets/redis-ca.crt",
         "-e", "LLM_MODE=prod",
         "-e", "LLM_PROVIDER=glm",
         "-e", "LLM_API_KEY=prod-smoke-$runId",
@@ -122,6 +171,15 @@ chmod 600 server.key ca.key
         throw "Production-profile application health did not become UP before the timeout."
     }
 
+    # The public CSRF bootstrap materializes an HttpSession. Its key must be in
+    # external Redis, proving the production request path is not using pod memory.
+    Invoke-RestMethod -Uri "http://127.0.0.1:$hostPort/api/auth/csrf" -TimeoutSec 5 | Out-Null
+    $sessionKeys = @(& docker exec $redisName redis-cli --tls --cacert /certs/redis-ca.crt `
+        --no-auth-warning -a $redisPassword --scan --pattern 'inner-cosmos:session:sessions:*')
+    if ($LASTEXITCODE -ne 0) { throw "Unable to inspect Redis session keys." }
+    $sessionKeyCount = @($sessionKeys | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count
+    if ($sessionKeyCount -lt 1) { throw "Production request did not materialize a Redis-backed session." }
+
     $tableCount = (& docker exec -e "PGPASSWORD=$databasePassword" $postgresName psql `
         -U $databaseUser -d $database -Atc "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public' AND table_name LIKE 'tb_%'").Trim()
     $seededUsers = (& docker exec -e "PGPASSWORD=$databasePassword" $postgresName psql `
@@ -141,6 +199,9 @@ chmod 600 server.key ca.key
         Health = $health.status
         Database = "PostgreSQL 16 + pgvector"
         DatabaseTls = "VERIFY_FULL"
+        SessionStore = "Redis 7.4.2"
+        RedisTls = "VERIFIED_CA"
+        RedisSessionKeys = $sessionKeyCount
         FlywayVersion = $flywayVersion
         SchemaTables = [int]$tableCount
         DemoUsers = [int]$seededUsers
@@ -151,7 +212,7 @@ chmod 600 server.key ca.key
 finally {
     $savedPreference = $ErrorActionPreference
     $ErrorActionPreference = "SilentlyContinue"
-    & docker rm -f $appName $postgresName 2>$null | Out-Null
+    & docker rm -f $appName $redisName $postgresName 2>$null | Out-Null
     & docker network rm $network 2>$null | Out-Null
     $ErrorActionPreference = $savedPreference
     if (Test-Path -LiteralPath $resolvedTempRoot) {

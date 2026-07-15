@@ -38,6 +38,11 @@ public final class ProductionStartupGuard implements ApplicationRunner {
         requireTrue("server.servlet.session.cookie.secure", "secure session cookies");
         requireTrue("inner-cosmos.security.csrf-enabled", "CSRF protection");
         requireTrue("inner-cosmos.auth.oidc.enabled", "OIDC resource-server authentication");
+        requireTrue("inner-cosmos.session.redis.enabled", "Redis-backed HTTP sessions");
+        requireTrue("spring.data.redis.ssl.enabled", "Redis transport TLS");
+        required("spring.data.redis.host", "Redis host");
+        required("spring.data.redis.password", "Redis credential");
+        required("spring.session.redis.namespace", "Redis session namespace");
         requireHttps("inner-cosmos.auth.oidc.issuer-uri", "OIDC issuer URI");
         requireHttps("inner-cosmos.auth.oidc.jwk-set-uri", "OIDC JWK set URI");
         required("inner-cosmos.auth.oidc.audience", "OIDC API audience");

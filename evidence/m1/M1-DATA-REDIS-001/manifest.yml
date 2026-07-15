@@ -1,0 +1,56 @@
+schema_version: 1
+package_id: M1-DATA-REDIS-001
+status: IMPLEMENTED
+base_sha: ef625e8
+branch: feat/run006-aurora-self-understanding
+recorded_at: 2026-07-15T09:55:00+08:00
+environment:
+  os: Windows 11 amd64
+  java: Oracle JDK 21.0.10
+  maven: Apache Maven 3.9.9
+  spring_boot: 3.5.14
+  redis: 7.4.2
+commands:
+  - command: .\\mvnw.cmd -Dtest=RedisSessionPersistenceIntegrationTest test
+    result: PASS
+    detail: Session key observed in Redis and authenticated session survived application context restart
+  - command: .\\mvnw.cmd verify
+    result: PASS
+    detail: 91 suites, 677 tests, 0 failures/errors/skips; SpotBugs 0 findings; SBOM generated
+  - command: docker build -t inner-cosmos:m1-redis .
+    result: PASS
+    image_digest: sha256:fdf6b3c56e47aa6ae0025e48e788ecde189f833e24d49acb555e0ee7e2660c9d
+  - command: .\\scripts\\verify-production-image.ps1 -Image inner-cosmos:m1-redis -TimeoutSeconds 240
+    result: PASS
+    artifact: production-smoke-summary.txt
+  - command: .\\scripts\\assert-test-baseline.ps1 -MinimumTests 613
+    result: PASS
+    detail: 91 suites, 677 tests
+  - command: .\\scripts\\scan-secrets.ps1
+    result: PASS
+    detail: 0 current-tree findings
+  - command: git diff --check
+    result: PASS
+changes:
+  - Added explicitly conditional Spring Session Data Redis support for short-lived browser sessions.
+  - Added production TLS, authentication, namespace, timeout, and fail-closed Redis configuration.
+  - Prevented full User entities and password hashes from being persisted in session state.
+  - Added Redis Testcontainers coverage proving session persistence across application restart.
+  - Extended production image smoke to verify TLS-only authenticated Redis and an actual session key.
+  - Preserved PostgreSQL as final truth and preserved every existing innovation capability and product semantic.
+human_gates: []
+known_limitations:
+  - Distributed rate limits, short agent state, Redis Stream token replay, and leases remain pending.
+  - Independent security review remains pending.
+  - DATA-REDIS remains IN_PROGRESS and this package is not whole-product completion evidence.
+review:
+  status: PENDING
+  reviewer: UNASSIGNED
+rollback: Preserve external session, TLS, authentication, and minimal-session-state controls; repair Redis infrastructure instead of falling back to pod memory in production.
+artifacts:
+  - path: redis-session-summary.txt
+    sha256: e20c72ff35f83c39e4823265fb1193804bd593bbbee52d12455c0aef7a959d8b
+  - path: production-smoke-summary.txt
+    sha256: 841a7f100e9378dcfee4767b9126505307c0fb82b23d61b2b5f63852a2dacb58
+  - path: validation-summary.txt
+    sha256: 50b4d9e93bf1b1aaa88703940d27124ef4566ce785c4dcb8c7e144de525a2263

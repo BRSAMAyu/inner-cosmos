@@ -27,6 +27,11 @@ class ProductionStartupGuardTest {
                     "inner-cosmos.auth.oidc.token-uri=https://identity.example/token",
                     "inner-cosmos.auth.oidc.client-id=inner-cosmos-mobile",
                     "inner-cosmos.auth.oidc.redirect-uri=innercosmos://auth/callback",
+                    "inner-cosmos.session.redis.enabled=true",
+                    "spring.data.redis.ssl.enabled=true",
+                    "spring.data.redis.host=redis.example",
+                    "spring.data.redis.password=test-only-redis-placeholder",
+                    "spring.session.redis.namespace=inner-cosmos:session",
                     "spring.datasource.url=jdbc:postgresql://db.example/inner_cosmos?sslmode=verify-full",
                     "spring.datasource.username=app",
                     "spring.datasource.password=test-only-placeholder",
@@ -70,6 +75,27 @@ class ProductionStartupGuardTest {
     void rejectsDisabledOidcResourceServer() {
         runner.withPropertyValues("inner-cosmos.auth.oidc.enabled=false")
                 .run(context -> assertRejected(context.getBean(ProductionStartupGuard.class)));
+    }
+
+    @Test
+    void rejectsInProcessProductionSessions() {
+        runner.withPropertyValues("inner-cosmos.session.redis.enabled=false")
+                .run(context -> assertRejected(context.getBean(ProductionStartupGuard.class)));
+    }
+
+    @Test
+    void rejectsRedisWithoutTls() {
+        runner.withPropertyValues("spring.data.redis.ssl.enabled=false")
+                .run(context -> assertRejected(context.getBean(ProductionStartupGuard.class)));
+    }
+
+    @Test
+    void rejectsMissingRedisCredentialWithoutEchoingConfiguration() {
+        runner.withPropertyValues("spring.data.redis.password=")
+                .run(context -> assertThatThrownBy(
+                        () -> context.getBean(ProductionStartupGuard.class).validate())
+                        .isInstanceOf(IllegalStateException.class)
+                        .hasMessageNotContaining("test-only-redis-placeholder"));
     }
 
     @Test

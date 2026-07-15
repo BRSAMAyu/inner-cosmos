@@ -1,0 +1,20 @@
+M1-DATA-REDIS-001 Redis session implementation summary
+
+- Spring Session Data Redis is explicitly enabled by inner-cosmos.session.redis.enabled.
+- Development and normal tests remain offline-safe; session auto-configuration is not allowed
+  to silently connect to localhost Redis.
+- Production defaults to Redis sessions with a dedicated inner-cosmos:session namespace,
+  30-minute inactivity expiry, on-save flushing, and on-set-attribute tracking.
+- Production startup rejects disabled Redis sessions, plaintext Redis transport, missing host,
+  missing credential, or missing session namespace.
+- Redis stores only short-lived session state. PostgreSQL remains authoritative for users,
+  memories, Aurora state, capsules, relationships, slow letters, and all confirmed domain facts.
+- Spring SecurityContext is request-scoped because authentication is rebuilt from the
+  server-owned LOGIN_USER_ID. Full User entities and password hashes are not duplicated into Redis.
+- The Testcontainers contract registers a user, observes the Redis session key, destroys the
+  first application context, starts a second process context, and successfully resolves the same
+  authenticated session and PostgreSQL/H2-backed user.
+
+Innovation semantic impact: none. No Aurora proactive, Self/Constitution/Emergence, portrait,
+psychological modeling, capsule, matching, starfield, or slow-letter behavior was removed,
+degraded, or redefined.

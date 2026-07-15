@@ -15,6 +15,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.csrf.CsrfException;
 import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository;
+import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.web.util.matcher.RequestMatcher;
@@ -66,6 +67,11 @@ public class SecurityConfig {
 
         http
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
+            // SessionAuthenticationFilter rebuilds authentication from the server-owned user ID
+            // on every request. Never duplicate the full User entity (including password hash)
+            // into HttpSession/Redis via Spring Security's default context repository.
+            .securityContext(context -> context.securityContextRepository(
+                    new RequestAttributeSecurityContextRepository()))
             .authorizeHttpRequests(auth -> auth
                 // Public endpoints
                 .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/csrf").permitAll()

@@ -37,6 +37,16 @@ spring:
       encoding: UTF-8
   flyway:
     enabled: false
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      username: ${REDIS_USERNAME:}
+      password: ${REDIS_PASSWORD:}
+      connect-timeout: ${REDIS_CONNECT_TIMEOUT:2s}
+      timeout: ${REDIS_READ_TIMEOUT:2s}
+      ssl:
+        enabled: ${REDIS_SSL_ENABLED:false}
   h2:
     console:
       enabled: false
@@ -118,6 +128,9 @@ llm:
     timeout-ms: ${DEEPSEEK_TIMEOUT_MS:30000}
 
 inner-cosmos:
+  session:
+    redis:
+      enabled: ${REDIS_SESSION_ENABLED:false}
   auth:
     oidc:
       enabled: ${OIDC_ENABLED:false}

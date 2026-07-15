@@ -1,0 +1,21 @@
+M1-DATA-REDIS-001 production image smoke
+
+Status: PASS
+Image: inner-cosmos:m1-redis
+Image digest: sha256:fdf6b3c56e47aa6ae0025e48e788ecde189f833e24d49acb555e0ee7e2660c9d
+Profile: prod
+Health: UP
+Database: PostgreSQL 16 + pgvector
+Database TLS: VERIFY_FULL
+Flyway version: 2
+Application tables: 61
+Demo users: 0
+Session store: Redis 7.4.2
+Redis authentication: required
+Redis TLS: certificate authority verified through a Spring SSL bundle
+Redis session keys after CSRF bootstrap: 1
+Runtime user: appuser
+
+The smoke harness generated a temporary CA and DNS SAN certificates, connected PostgreSQL with
+sslmode=verify-full, connected Redis over its TLS-only port, and failed unless a real Spring
+Session key appeared in external Redis. Temporary credentials and certificates were deleted.

@@ -86,7 +86,7 @@ gates:
       - {id: AUTH-OIDC, target: "Spring Security protects secure web sessions and mobile OIDC PKCE flows.", status: IN_PROGRESS, evidence: [evidence/m1/M1-AUTH-WEB-001/, evidence/m1/M1-AUTH-OIDC-001/]}
       - {id: API-CONTRACT, target: "Versioned OpenAPI, typed errors, idempotency, concurrency, and resumable SSE are verified.", status: UNASSESSED, evidence: []}
       - {id: DATA-POSTGRES, target: "PostgreSQL and Flyway are production truth with Testcontainers and migration reconciliation.", status: IN_PROGRESS, evidence: [evidence/m1/M1-DATA-POC-001/, evidence/m1/M1-DATA-APP-001/, evidence/m1/M1-AUTH-OIDC-001/, docs/adr/0002-postgresql-system-of-record.md]}
-      - {id: DATA-REDIS, target: "Sessions, short state, limits, and leases are externalized to Redis where required.", status: UNASSESSED, evidence: []}
+      - {id: DATA-REDIS, target: "Sessions, short state, limits, and leases are externalized to Redis where required.", status: IN_PROGRESS, evidence: [evidence/m1/M1-DATA-REDIS-001/]}
       - {id: EVENT-RELIABLE, target: "Transactional outbox, SQS, idempotent consumers, retries, and DLQ replay are verified.", status: UNASSESSED, evidence: []}
       - {id: RUNTIME-ROLES, target: "API, AI worker, event worker, scheduler, and migration roles run and scale independently.", status: UNASSESSED, evidence: []}
       - {id: DATA-RIGHTS, target: "Consent, provenance, correction, export, and deletion propagate to all derivatives.", status: UNASSESSED, evidence: []}
