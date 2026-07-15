@@ -353,3 +353,20 @@ test("Inner Cosmos remains operable on a narrow mobile viewport", async ({ page 
   await expect(cosmos.getByLabel("记忆来源与变化")).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
+
+test("Aurora makes an offline mobile interruption explicit and recovers without starting a new conversation", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/app/aurora/index.html");
+  await loginIfNeeded(page);
+
+  await page.context().setOffline(true);
+  await page.evaluate(() => window.dispatchEvent(new Event("offline")));
+  const presence = page.getByRole("region", { name: "移动端连接状态" });
+  await expect(presence).toContainText("网络暂时离开了");
+  await expect(presence).toContainText("重新读取时间线");
+
+  await page.context().setOffline(false);
+  await page.evaluate(() => window.dispatchEvent(new Event("online")));
+  await expect(presence).toBeHidden();
+  await expect(page.getByRole("heading", { name: /可以被打断的陪伴/ })).toBeVisible();
+});

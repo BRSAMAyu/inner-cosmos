@@ -6,15 +6,27 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:mobile": "tsc -b && vite build --mode mobile",
     "test": "vitest run",
     "e2e": "playwright test",
-    "e2e:local": "powershell -NoProfile -ExecutionPolicy Bypass -File ../scripts/run-living-aurora-e2e.ps1"
+    "e2e:local": "powershell -NoProfile -ExecutionPolicy Bypass -File ../scripts/run-living-aurora-e2e.ps1",
+    "mobile:sync": "npm run build:mobile && cap sync",
+    "mobile:android:assemble": "npm run mobile:sync && cd android && gradlew.bat assembleDebug",
+    "mobile:doctor": "cap doctor"
   },
   "dependencies": {
+    "@aparajita/capacitor-secure-storage": "^8.0.0",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/core": "^8.4.2",
+    "@capacitor/network": "^8.0.1",
+    "@capacitor/push-notifications": "^8.1.2",
     "react": "19.2.7",
     "react-dom": "19.2.7"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.4.2",
+    "@capacitor/cli": "^8.4.2",
+    "@capacitor/ios": "^8.4.2",
     "@playwright/test": "1.61.1",
     "@testing-library/jest-dom": "latest",
     "@testing-library/react": "latest",

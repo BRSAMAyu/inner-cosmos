@@ -1,5 +1,6 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { api, replayTurnEvents, streamAurora, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type ConnectionRequests, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type Notification, type PersonaMessage, type PersonaSession, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type PsychologySkillSuggestion, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type SocialConnection, type StarfieldDetail, type StarfieldScene, type UnderstandingClaim, type WakeIntent } from "./api";
+import { api, hasConfiguredApiBase, replayTurnEvents, streamAurora, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type ConnectionRequests, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type Notification, type PersonaMessage, type PersonaSession, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type PsychologySkillSuggestion, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type SocialConnection, type StarfieldDetail, type StarfieldScene, type UnderstandingClaim, type WakeIntent } from "./api";
+import { initialMobileState, mobileRuntime, type MobileRuntimeState } from "./mobile";
 import type { AuroraStreamEvent, DialogMessage, TurnStatus } from "./protocol";
 
 type UiMessage = { key: string; speaker: "USER" | "AURORA"; text: string; partial?: boolean };
@@ -119,6 +120,7 @@ export function AuroraApp() {
   const [replyDrafts, setReplyDrafts] = useState<Record<number, string>>({});
   const [visitorBusy, setVisitorBusy] = useState(false);
   const [runtimeSignal, setRuntimeSignal] = useState<RuntimeSignal>({ stage: "idle", runtime: "single" });
+  const [mobileState, setMobileState] = useState<MobileRuntimeState>(initialMobileState);
   const abortRef = useRef<AbortController | null>(null);
   const activeTurnRef = useRef<number | null>(null);
   const bubbleKeyRef = useRef<string | null>(null);
@@ -246,6 +248,75 @@ export function AuroraApp() {
       reconnectingRef.current = false;
     }
   }, [finishTurn, replaceFromHistory]);
+
+  const openMobileWakeIntent = useCallback(async (wakeIntentId: number) => {
+    try {
+      const intent = await api.wakeIntent(wakeIntentId);
+      const sid = intent.contextSessionId;
+      if (sid) {
+        setSessionId(sid);
+        await replaceFromHistory(sid);
+      }
+      const url = new URL(window.location.href);
+      url.searchParams.set("wakeIntent", String(wakeIntentId));
+      window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+      setStatus(`Aurora 按约定回到这里：${intent.purpose}`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "暂时无法续接这次回来约定");
+    }
+  }, [replaceFromHistory]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let cleanup: (() => Promise<void>) | undefined;
+    const resumeFromDurableState = async () => {
+      if (cancelled) return;
+      const activeTurn = activeTurnRef.current;
+      if (activeTurn && sessionId) await recover(activeTurn, sessionId);
+      else if (sessionId) await replaceFromHistory(sessionId);
+      if (!cancelled) void api.notifications().then(setNotifications).catch(() => undefined);
+    };
+    const browserOffline = () => setMobileState(current => ({ ...current, connected: false, connectionType: "none" }));
+    const browserOnline = () => {
+      setMobileState(current => ({ ...current, connected: true, connectionType: "unknown", lastRecoveryAt: new Date().toISOString() }));
+      void resumeFromDurableState();
+    };
+    window.addEventListener("offline", browserOffline);
+    window.addEventListener("online", browserOnline);
+    void mobileRuntime.start({
+      onState: state => { if (!cancelled) setMobileState(state); },
+      onResume: resumeFromDurableState,
+      onWakeIntent: openMobileWakeIntent,
+      onPushToken: () => {
+        if (!cancelled) setStatus("设备已向系统通知服务注册；真实远程投递仍取决于当前环境的 APNs / FCM 配置。");
+      }
+    }).then(stopRuntime => {
+      if (cancelled) void stopRuntime();
+      else cleanup = stopRuntime;
+    }).catch(error => {
+      if (!cancelled) setStatus(error instanceof Error ? error.message : "移动端运行时暂时不可用");
+    });
+    return () => {
+      cancelled = true;
+      window.removeEventListener("offline", browserOffline);
+      window.removeEventListener("online", browserOnline);
+      if (cleanup) void cleanup();
+    };
+  }, [openMobileWakeIntent, recover, replaceFromHistory, sessionId]);
+
+  const requestMobilePush = async () => {
+    const permission = await mobileRuntime.requestPushRegistration();
+    setStatus(permission === "granted" ? "通知权限已开启，Aurora 可以在真实投递配置就绪后按约定回来。"
+      : permission === "denied" ? "通知权限没有开启；回来约定仍会保留在应用内。"
+        : permission === "unavailable" ? "当前浏览器不使用系统推送；回来约定仍会在应用内出现。" : "暂时无法完成通知注册。");
+  };
+
+  const requestMobileMicrophone = async () => {
+    const permission = await mobileRuntime.requestMicrophonePermission();
+    setStatus(permission === "granted" ? "麦克风已准备好；本次授权检查没有保存任何录音。"
+      : permission === "denied" ? "麦克风权限没有开启，你仍然可以继续打字。"
+        : permission === "unavailable" ? "当前环境不支持麦克风输入，你仍然可以继续打字。" : "暂时无法检查麦克风权限。");
+  };
 
   const stop = useCallback(async () => {
     const turnId = activeTurnRef.current;
@@ -736,6 +807,12 @@ export function AuroraApp() {
     document.querySelector(".skill-studio")?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  if (mobileState.native && !hasConfiguredApiBase) return <main className="login-shell"><div className="login mobile-gate" role="alert">
+    <span className="eyebrow">MOBILE ENVIRONMENT GATE</span>
+    <h1>这台设备还没有安全后端入口</h1>
+    <p>应用壳、深链与恢复能力已经就绪，但本次构建没有注入 <code>VITE_API_BASE_URL</code>。为避免把会话发往错误地址，Aurora 不会尝试登录。</p>
+    <small>请使用经过验证的 HTTPS API 域重新构建；推送凭据与商店签名也必须由授权环境提供。</small>
+  </div></main>;
   if (authenticated === null) return <main className="login-shell"><div className="login" role="status">正在连接你的内宇宙…</div></main>;
   if (!authenticated) return <Login onSuccess={bootstrap} />;
 
@@ -759,6 +836,20 @@ export function AuroraApp() {
       <nav className="modes" aria-label="对话模式">
         {modes.map(([value, label]) => <button key={value} className={mode === value ? "active" : ""} onClick={() => setMode(value)}>{label}</button>)}
       </nav>
+
+      {(mobileState.native || !mobileState.connected) && <section className={`mobile-presence ${mobileState.connected ? "online" : "offline"}`} aria-label="移动端连接状态">
+        <div>
+          <span className="eyebrow">AURORA, WITH YOU</span>
+          <strong>{mobileState.connected ? "移动端已连接" : "网络暂时离开了"}</strong>
+          <p>{mobileState.connected
+            ? `${mobileState.platform.toUpperCase()} · ${mobileState.connectionType} · 回到前台时会从持久化时间线续接`
+            : "你已经看到的内容会留在这里；网络恢复后，Aurora 会重新读取时间线，不会把断线误当成新对话。"}</p>
+        </div>
+        {mobileState.native && <div className="mobile-actions">
+          <button type="button" onClick={() => void requestMobilePush()}>开启回来提醒</button>
+          <button type="button" onClick={() => void requestMobileMicrophone()}>准备语音输入</button>
+        </div>}
+      </section>}
 
       <section className="returns" aria-label="Aurora 的回来约定">
         <div className="returns-head"><div><span className="eyebrow">AURORA RETURNS</span><h2>回来约定</h2></div>

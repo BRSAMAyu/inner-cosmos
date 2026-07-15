@@ -144,6 +144,13 @@ export type PsychologySkillSuggestion = {
   invocation: "SUGGEST_ONLY"; createsRun: false;
 };
 let csrf: Csrf | null = null;
+const configuredApiBase = String(import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
+export const hasConfiguredApiBase = configuredApiBase.length > 0;
+
+export function apiUrl(path: string): string {
+  if (!path.startsWith("/api/")) throw new Error("Only Inner Cosmos API paths are allowed");
+  return configuredApiBase ? `${configuredApiBase}${path}` : path;
+}
 
 async function request<T>(url: string, init: RequestInit = {}, retriedCsrf = false): Promise<T> {
   const method = (init.method ?? "GET").toUpperCase();
@@ -153,7 +160,7 @@ async function request<T>(url: string, init: RequestInit = {}, retriedCsrf = fal
     csrf ??= await getCsrf();
     headers.set(csrf.headerName, csrf.token);
   }
-  const response = await fetch(url, { ...init, headers, credentials: "include" });
+  const response = await fetch(apiUrl(url), { ...init, headers, credentials: "include" });
   const body = await response.json() as ApiEnvelope<T>;
   if (response.status === 403 && (body.code === "CSRF_INVALID" || body.error === "CSRF_INVALID") && !retriedCsrf) {
     csrf = null;
@@ -164,7 +171,7 @@ async function request<T>(url: string, init: RequestInit = {}, retriedCsrf = fal
 }
 
 async function getCsrf(): Promise<Csrf> {
-  const response = await fetch("/api/auth/csrf", { credentials: "include" });
+  const response = await fetch(apiUrl("/api/auth/csrf"), { credentials: "include" });
   const body = await response.json() as ApiEnvelope<Csrf>;
   if (!body.success) throw new Error(body.message ?? "无法建立安全会话");
   return body.data;
@@ -301,7 +308,7 @@ export async function streamAurora(
   const query = new URLSearchParams({
     sessionId: String(input.sessionId), message: input.message, mode: input.mode
   });
-  const response = await fetch(`/api/aurora/stream?${query}`, {
+  const response = await fetch(apiUrl(`/api/aurora/stream?${query}`), {
     credentials: "include", headers: { Accept: "text/event-stream" }, signal
   });
   if (!response.ok || !response.body) throw new Error(`SSE HTTP ${response.status}`);
@@ -323,7 +330,7 @@ export async function replayTurnEvents(
   lastEventId: string,
   onEvent: (event: AuroraStreamEvent) => void
 ): Promise<string> {
-  const response = await fetch(`/api/aurora/turns/${turnId}/events`, {
+  const response = await fetch(apiUrl(`/api/aurora/turns/${turnId}/events`), {
     credentials: "include",
     headers: { Accept: "text/event-stream", ...(lastEventId ? { "Last-Event-ID": lastEventId } : {}) }
   });

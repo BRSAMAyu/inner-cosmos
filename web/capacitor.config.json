@@ -1,0 +1,17 @@
+{
+  "appId": "sg.innercosmos.app",
+  "appName": "Inner Cosmos",
+  "webDir": "../src/main/resources/static/app/aurora",
+  "server": {
+    "androidScheme": "https",
+    "hostname": "localhost"
+  },
+  "plugins": {
+    "App": {
+      "disableBackButtonHandler": true
+    },
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound"]
+    }
+  }
+}
