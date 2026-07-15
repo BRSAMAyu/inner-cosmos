@@ -8,11 +8,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+
+import java.util.Map;
 
 /**
  * IC-CORE-002: StructuredAiService bad-output paths must increment badOutputCounter
@@ -124,5 +127,23 @@ class StructuredAiServiceBadOutputTest {
         assertEquals(5, result.score, "Should parse score from valid JSON");
         assertEquals(0, StructuredAiService.badOutputCounter.get(),
                 "badOutputCounter must be 0 when LLM returns valid JSON");
+    }
+
+    @Test
+    void sendsAuroraBoundaryAsProviderSystemRoleContract() {
+        when(llmClient.chat(any(LlmRequest.class))).thenReturn("{\"score\": 5}");
+
+        service.call(1L, "AURORA_PLAN_TEST", "plan", Map.of(
+                        "auroraSystemPrompt", "AURORA_IDENTITY_AND_SAFETY",
+                        "userMessage", "dynamic user text"),
+                ScoreResult.class, ScoreResult::new);
+
+        ArgumentCaptor<LlmRequest> captor = ArgumentCaptor.forClass(LlmRequest.class);
+        verify(llmClient).chat(captor.capture());
+        LlmRequest request = captor.getValue();
+        assertTrue(request.systemPrompt.contains("AURORA_IDENTITY_AND_SAFETY"));
+        assertTrue(request.systemPrompt.contains("structured reasoning worker"));
+        assertFalse(request.prompt.contains("AURORA_IDENTITY_AND_SAFETY"));
+        assertTrue(request.prompt.contains("dynamic user text"));
     }
 }

@@ -170,7 +170,7 @@ public class MiniMaxLlmClient implements LlmClient {
 
     private List<Map<String, String>> buildMessages(LlmRequest request) {
         List<Map<String, String>> messages = new ArrayList<>();
-        messages.add(Map.of("role", "system", "content", systemPrompt()));
+        messages.add(Map.of("role", "system", "content", request.systemPromptOr(systemPrompt())));
         if (request.recentMessages != null) {
             for (String recent : request.recentMessages) {
                 if (recent != null && !recent.isBlank()) {
@@ -184,7 +184,7 @@ public class MiniMaxLlmClient implements LlmClient {
 
     private String doChat(LlmRequest request) throws Exception {
         List<Map<String, String>> messages = new ArrayList<>();
-        messages.add(Map.of("role", "system", "content", systemPrompt()));
+        messages.add(Map.of("role", "system", "content", request.systemPromptOr(systemPrompt())));
         if (request.recentMessages != null) {
             for (String recent : request.recentMessages) {
                 if (recent != null && !recent.isBlank()) {

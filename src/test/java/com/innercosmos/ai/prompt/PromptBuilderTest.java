@@ -87,6 +87,20 @@ class PromptBuilderTest {
         assertTrue(result.contains("self-harm"));
     }
 
+    @Test
+    void separatesProviderSystemBoundaryFromDynamicUserContext() {
+        PromptBuilder builder = new PromptBuilder()
+                .withSystemBoundary()
+                .withUserProfile("用户偏好夜间安静交流")
+                .withUserInput("今晚只想被听见");
+
+        assertTrue(builder.buildSystemPrompt().contains("You are Aurora"));
+        assertTrue(builder.buildSystemPrompt().contains("No psychological diagnosis"));
+        assertFalse(builder.buildSystemPrompt().contains("今晚只想被听见"));
+        assertTrue(builder.buildUserPrompt().contains("今晚只想被听见"));
+        assertFalse(builder.buildUserPrompt().contains("You are Aurora"));
+    }
+
     // --- conversation mode ---
 
     @Test

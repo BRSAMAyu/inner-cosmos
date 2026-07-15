@@ -6,6 +6,11 @@ import java.util.List;
 public class LlmRequest {
     public Long userId;
     public String moduleName;
+    /**
+     * Provider-level system instruction. When present, clients must send it with
+     * role=system instead of demoting safety and identity boundaries into user text.
+     */
+    public String systemPrompt;
     public String prompt;
     public String requestJson;
     public String preferredProvider;
@@ -23,5 +28,9 @@ public class LlmRequest {
         this.userId = userId;
         this.moduleName = moduleName;
         this.prompt = prompt;
+    }
+
+    public String systemPromptOr(String fallback) {
+        return systemPrompt == null || systemPrompt.isBlank() ? fallback : systemPrompt;
     }
 }

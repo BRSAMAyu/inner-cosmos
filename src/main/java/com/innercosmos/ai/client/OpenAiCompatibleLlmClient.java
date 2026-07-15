@@ -41,7 +41,7 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
         }
         try {
             List<Map<String, String>> messages = new ArrayList<>();
-            messages.add(Map.of("role", "system", "content", "你是 Inner Cosmos 的 Aurora.保持温柔、克制、安全边界."));
+            messages.add(Map.of("role", "system", "content", request.systemPromptOr("你是 Inner Cosmos 的 Aurora.保持温柔、克制、安全边界.")));
             if (request.recentMessages != null) {
                 for (String recent : request.recentMessages) {
                     if (recent != null && !recent.isBlank()) {
@@ -100,7 +100,7 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
         String baseUrl = config.baseUrl == null || config.baseUrl.isBlank() ? defaultBaseUrl(config.provider) : config.baseUrl;
         String url = baseUrl.replaceAll("/+$", "") + "/chat/completions";
         List<Map<String, String>> messages = new ArrayList<>();
-        messages.add(Map.of("role", "system", "content", "你是 Inner Cosmos 的 Aurora.保持温柔、克制、安全边界."));
+        messages.add(Map.of("role", "system", "content", request.systemPromptOr("你是 Inner Cosmos 的 Aurora.保持温柔、克制、安全边界.")));
         if (request.recentMessages != null) {
             for (String recent : request.recentMessages) {
                 if (recent != null && !recent.isBlank()) {

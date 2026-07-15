@@ -11,12 +11,21 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
+import java.util.LinkedHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
 @Service
 public class StructuredAiService {
     private static final Logger log = LoggerFactory.getLogger(StructuredAiService.class);
+    private static final String STRUCTURED_SYSTEM_PROMPT = """
+            You are an Inner Cosmos structured reasoning worker.
+            Return only valid JSON matching the requested schema.
+            Do not wrap the JSON in markdown.
+            Do not include <think>, analysis, comments, or any text outside the JSON object.
+            Inside JSON string values, prefer Chinese corner quotes instead of raw ASCII double quotes.
+            Do not diagnose the user, reveal private identity, or claim certainty.
+            """.trim();
 
     /** In-memory counter incremented on every [BAD_AI_OUTPUT] path for test observability. */
     public static final AtomicLong badOutputCounter = new AtomicLong(0);
@@ -52,10 +61,11 @@ public class StructuredAiService {
         boolean success = false;
 
         try {
-            String contextJson = JsonUtils.toJson(context);
+            String contextJson = JsonUtils.toJson(modelContext(context));
             String prompt = buildPrompt(instruction, contextJson, null);
 
             LlmRequest request = new LlmRequest(userId, moduleName, prompt);
+            request.systemPrompt = systemPrompt(context);
             request.requestJson = contextJson;
             request.preferredProvider = preferredProvider(context);
             request.temperature = modeTemperature(context);
@@ -77,6 +87,7 @@ public class StructuredAiService {
 
             LlmRequest retry = new LlmRequest(userId, moduleName + "_JSON_REPAIR",
                     buildPrompt(instruction, contextJson, raw));
+            retry.systemPrompt = systemPrompt(context);
             retry.requestJson = contextJson;
             retry.preferredProvider = preferredProvider(context);
             retry.temperature = modeTemperature(context);
@@ -154,20 +165,31 @@ public class StructuredAiService {
 
     private String buildPrompt(String instruction, String contextJson, String invalidOutput) {
         StringBuilder prompt = new StringBuilder();
-        prompt.append("""
-                You are an Inner Cosmos structured reasoning worker.
-                Return only valid JSON matching the requested schema.
-                Do not wrap the JSON in markdown.
-                Do not include <think>, analysis, comments, or any text outside the JSON object.
-                Inside JSON string values, prefer Chinese corner quotes instead of raw ASCII double quotes.
-                Do not diagnose the user, reveal private identity, or claim certainty.
-                """.trim());
-        prompt.append("\n\nTask:\n").append(instruction == null ? "" : instruction);
+        prompt.append("Task:\n").append(instruction == null ? "" : instruction);
         prompt.append("\n\nInput JSON:\n").append(contextJson == null ? "{}" : contextJson);
         if (invalidOutput != null && !invalidOutput.isBlank()) {
             prompt.append("\n\nThe previous output was not valid JSON for the schema. Repair it without changing the intended content:\n")
                     .append(invalidOutput);
         }
         return prompt.toString();
+    }
+
+    private String systemPrompt(Object context) {
+        if (context instanceof Map<?, ?> map) {
+            Object auroraBoundary = map.get("auroraSystemPrompt");
+            if (auroraBoundary != null && !String.valueOf(auroraBoundary).isBlank()) {
+                return String.valueOf(auroraBoundary).trim() + "\n\n" + STRUCTURED_SYSTEM_PROMPT;
+            }
+        }
+        return STRUCTURED_SYSTEM_PROMPT;
+    }
+
+    private Object modelContext(Object context) {
+        if (!(context instanceof Map<?, ?> map) || !map.containsKey("auroraSystemPrompt")) {
+            return context;
+        }
+        Map<Object, Object> sanitized = new LinkedHashMap<>(map);
+        sanitized.remove("auroraSystemPrompt");
+        return sanitized;
     }
 }

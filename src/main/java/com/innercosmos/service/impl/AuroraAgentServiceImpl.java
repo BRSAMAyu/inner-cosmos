@@ -233,7 +233,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         String stateSignal = currentStateSignal(request.message);
         com.innercosmos.ai.semantic.EmotionBaseline baseline = safeBaseline(userId);
 
-        String prompt = new PromptBuilder().withPromptVersionService(promptVersionService)
+        PromptBuilder promptBuilder = new PromptBuilder().withPromptVersionService(promptVersionService)
                 .withSystemBoundary()
                 .withConversationMode(mode)
                 .withModeSegment(modeStrategy)
@@ -252,11 +252,13 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 .withRhythmAdvice(rhythm)
                 .withVoiceMetadata(voiceMetadata(request))
                 .withUserInput(request.message)
-                .withOutputSchema()
-                .build();
+                .withOutputSchema();
+        String systemPrompt = promptBuilder.buildSystemPrompt();
+        String prompt = promptBuilder.buildUserPrompt();
 
         Map<String, Object> turnContext = new LinkedHashMap<>();
         turnContext.put("auroraPrompt", prompt);
+        turnContext.put("auroraSystemPrompt", systemPrompt);
         turnContext.put("userMessage", request.message == null ? "" : request.message);
         turnContext.put("mode", mode);
         // M-012: thread the active mode's sampling temperature so it actually reaches the

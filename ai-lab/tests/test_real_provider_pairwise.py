@@ -2,11 +2,17 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
-from evals.real_provider_pairwise import ProviderConfig, SYNTHETIC_TRAJECTORIES, run_pairwise
+from evals.real_provider_pairwise import ProviderConfig, SYNTHETIC_TRAJECTORIES, config_from_environment, run_pairwise
 
 
 class RealProviderPairwiseTest(unittest.TestCase):
+    def test_missing_credentials_fail_closed_without_provider_call(self):
+        with patch.dict("os.environ", {}, clear=True):
+            with self.assertRaisesRegex(RuntimeError, "BLOCKED_BY_CREDENTIAL_GATE"):
+                config_from_environment()
+
     def test_outputs_blind_pairs_without_persisting_secret(self):
         calls = []
 
@@ -32,6 +38,11 @@ class RealProviderPairwiseTest(unittest.TestCase):
         self.assertEqual("single-pass.v1", parsed["records"][0]["systems"]["A"]["runtime"])
         self.assertEqual("dual-kernel.v1", parsed["records"][0]["systems"]["B"]["runtime"])
         self.assertEqual(2, parsed["records"][0]["systems"]["B"]["llm_calls"])
+        self.assertEqual(8, len(parsed["records"]))
+        self.assertEqual("living-aurora-pairwise.v2", parsed["prompt_contract_version"])
+        self.assertEqual({"A", "B"}, set(parsed["deterministic_summary"]))
+        self.assertIn("deterministic_score", parsed["records"][0]["systems"]["A"])
+        self.assertIn("continuity_and_boundary_1_5", csv_text)
 
 
 if __name__ == "__main__":

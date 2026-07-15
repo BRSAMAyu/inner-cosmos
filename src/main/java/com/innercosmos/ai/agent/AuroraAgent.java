@@ -16,13 +16,14 @@ public class AuroraAgent {
     }
 
     public String reply(Long userId, String input, List<String> recentMessages, String voiceMetadata) {
-        String prompt = new PromptBuilder()
+        PromptBuilder builder = new PromptBuilder()
                 .withSystemBoundary()
                 .withRecentMessages(recentMessages)
                 .withVoiceMetadata(voiceMetadata)
                 .withUserInput(input)
-                .withOutputSchema()
-                .build();
-        return llmClient.chat(new LlmRequest(userId, "AURORA_CHAT", prompt));
+                .withOutputSchema();
+        LlmRequest request = new LlmRequest(userId, "AURORA_CHAT", builder.buildUserPrompt());
+        request.systemPrompt = builder.buildSystemPrompt();
+        return llmClient.chat(request);
     }
 }
