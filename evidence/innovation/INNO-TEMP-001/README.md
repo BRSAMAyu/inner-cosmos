@@ -24,5 +24,8 @@ the existing proactive/ALIVE capability:
   decisions are evaluated for `UserProfile.userId`, not the profile row primary key.
 
 The acceptance ledger remains `IN_PROGRESS`: the first policy has deterministic
-boundary/risk checks, but context-evidence preconditions, semantic relevance scoring,
-delivery feedback learning and independent review still remain.
+boundary/risk checks, but context-evidence preconditions, semantic relevance scoring
+and delivery feedback learning still remain. The 2026-07-15 independent review is
+`CHANGES_REQUIRED`: autonomous scheduling mixes the server wall clock with a hard-coded
+zone, and V4 notification uniqueness can break legacy Capsule retries. See
+`independent-review-2026-07-15.md`.
