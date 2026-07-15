@@ -1,0 +1,31 @@
+{
+  "datasetVersion": "correction-conflict-v1",
+  "notes": "Scores whether sequences of confirmed and retracted corrections on the same claimKey always resolve to exactly one ACTIVE claim with the functionally correct value, never zero or multiple. Each scenario uses its own fieldName so claimKeys never collide across scenarios sharing one test user. Steps run in order; a RETRACT step references the 1-indexed position among CONFIRM steps only.",
+  "thresholds": { "violations": 0 },
+  "scenarios": [
+    {
+      "key": "sequential-corrections-single-active",
+      "fieldName": "conflict-seq",
+      "steps": [ { "op": "CONFIRM", "value": "v1" }, { "op": "CONFIRM", "value": "v2" }, { "op": "CONFIRM", "value": "v3" } ],
+      "expected": { "active": 1, "superseded": 2, "retired": 0, "activeValue": "v3" }
+    },
+    {
+      "key": "retract-latest-restores-previous",
+      "fieldName": "conflict-retract-latest",
+      "steps": [ { "op": "CONFIRM", "value": "v1" }, { "op": "CONFIRM", "value": "v2" }, { "op": "RETRACT", "retract": 2 } ],
+      "expected": { "active": 1, "superseded": 0, "retired": 1, "activeValue": "v1" }
+    },
+    {
+      "key": "retract-older-does-not-disturb-active",
+      "fieldName": "conflict-retract-older",
+      "steps": [ { "op": "CONFIRM", "value": "v1" }, { "op": "CONFIRM", "value": "v2" }, { "op": "RETRACT", "retract": 1 } ],
+      "expected": { "active": 1, "superseded": 0, "retired": 1, "activeValue": "v2" }
+    },
+    {
+      "key": "three-corrections-retract-middle-keeps-latest-active",
+      "fieldName": "conflict-retract-middle",
+      "steps": [ { "op": "CONFIRM", "value": "v1" }, { "op": "CONFIRM", "value": "v2" }, { "op": "CONFIRM", "value": "v3" }, { "op": "RETRACT", "retract": 2 } ],
+      "expected": { "active": 1, "superseded": 1, "retired": 1, "activeValue": "v3" }
+    }
+  ]
+}
