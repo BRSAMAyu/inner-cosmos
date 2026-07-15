@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-16T05:40:00+08:00
+updated_at: 2026-07-16T05:53:00+08:00
 authority:
   - goal-objective.md
   - 对齐文档/17-单会话持续Goal模式执行协议.md
@@ -209,7 +209,7 @@ closed_front_campaign_c_quality:
       owner-facing reply for defense-in-depth consistency (lower priority: owner already knows
       their own contact info, so this is not a cross-user leak, just consistency)."
 
-active_front:
+closed_front_g3_ux_legacy:
   id: G3-UX-LEGACY
   state: ENTRY_FLOW_FIXED_SEVEN_DUPLICATE_PAGES_STILL_REACHABLE
   intent: |
@@ -280,6 +280,54 @@ active_front:
       other UNASSESSED acceptance items (ARCH-MODULES, API-CONTRACT, EVENT-RELIABLE,
       RUNTIME-ROLES, CAPSULE-RUNTIME, SIMULATOR-ASSET, UX-COMPLETE) is highest-value and
       genuinely machine-actionable without cloud/device/human gates at that time."
+
+active_front:
+  id: LOCAL-DEV-SCHEMA-DRIFT
+  state: FIXED_AND_APPLIED_TO_REAL_DEV_DB
+  intent: |
+    Followed up the schema-drift finding flagged in the prior checkpoint: the persistent local
+    dev database (./data/innercosmos) was missing real columns, causing genuine 500s on several
+    AppShell API calls (wake-intents, self/evolution, starfield, notifications, memory/cards,
+    capsule/my, plaza/matches). Investigated root cause and fixed properly rather than working
+    around it.
+  done_this_front_summary:
+    - "Root cause: schema.sql's CREATE TABLE definitions had these columns all along (so fresh
+      installs always had them), but no corresponding idempotent ALTER migration existed for
+      pre-existing H2 databases created before those columns were added to schema.sql — a gap in
+      the existing SchemaMxInitializer chain (M2 through M7), not a bug in any of them individually."
+    - "Methodology: rather than fixing columns one at a time as each new 500 surfaced (slow,
+      easy to miss some), did a systematic diff — booted a throwaway fresh H2 database (full
+      schema.sql, zero legacy history), dumped information_schema.columns for every tb_ table
+      from both it and a copy of the real dev DB, and diffed. Found 18 genuinely missing columns
+      across 5 tables (tb_echo_capsule, tb_memory_card, tb_notification, tb_user_correction,
+      tb_wake_intent) — notably tb_user_correction was missing status/confirmed_at/retired_at/
+      impact_summary ENTIRELY, meaning the correction confirm/retract lifecycle this session's
+      own CorrectionConflictEvaluationTest exercises had never actually worked against this dev
+      database. My first-pass manual guess (3 columns) would have missed 15 of the real 18."
+    - "Added SchemaM8Initializer (the 3 I could see from the first page of failed API responses:
+      tb_user_profile.timezone, tb_memory_card.version_no, tb_aurora_self_statement/reflection.
+      trigger_type — 2 of these turned out to already exist, harmlessly skipped) and
+      SchemaM9Initializer (the complete 18-column set from the systematic diff), following the
+      exact same idempotent try-ALTER-catch-and-log-skip pattern as the existing M2-M7 chain."
+    - "Verified end-to-end before touching real data: copied the real dev DB file to a throwaway
+      location, booted the app against the copy with the new migrations, re-diffed (zero missing
+      columns left), then logged in through a real browser and confirmed every previously-500ing
+      endpoint now returns 200 with zero console errors. Only THEN applied the same migration to
+      the real ./data/innercosmos (after taking a timestamped backup copy first) and re-verified
+      row counts were unchanged (no data loss) via a read-only H2 shell query."
+    - "This was a genuine, previously-undiscovered local-dev-environment defect, not a production
+      risk — PostgreSQL/Flyway already has all these columns correctly (verified structurally by
+      the existing PostgresFlywayBaselineTest, which would already be failing if Postgres were
+      missing them). Fixed anyway since a broken local dev environment blocks exactly the kind of
+      live-browser verification this session's protocol calls for, and the same
+      schema.sql-changed-without-H2-migration process gap could recur."
+  next_machine_actions:
+    - "Full `mvn test` re-verified after adding SchemaM8Initializer/SchemaM9Initializer: 796/796,
+      BUILD SUCCESS. Ready to commit."
+    - "NEXT — return to the G3-UX-LEGACY follow-up (retire/redirect the 7 duplicate legacy pages)
+      or another fresh, genuinely machine-actionable acceptance-ledger gap (ARCH-MODULES,
+      API-CONTRACT, EVENT-RELIABLE, Campaign C's Genome IR continuation) — whichever is
+      highest-value at that time."
 
 priority_queue:
   - id: CAMPAIGN-C-QUALITY
