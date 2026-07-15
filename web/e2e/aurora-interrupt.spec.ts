@@ -293,9 +293,18 @@ test("owner publishes, a visitor sends a slow letter, then withdrawal stops the 
 
 test("a psychology Skill requires consent, exposes its basis, and supports revocation", async ({ page }) => {
   await page.goto("/app/aurora/index.html");
-  await loginIfNeeded(page);
+  const composer = await loginIfNeeded(page);
+  await composer.fill("我很纠结要不要换工作，一边想成长，一边担心不稳定");
+  await page.getByRole("button", { name: "发送" }).click();
+  const suggestion = page.getByLabel("Aurora 的可选反思建议");
+  await expect(suggestion).toContainText("不会自动运行");
+  await expect(suggestion).toContainText("把拉扯画成一张图");
+  await suggestion.screenshot({ path: "../evidence/innovation/INNO-PSY-001/aurora-suggest-only.png" });
+  await suggestion.getByRole("button", { name: "由我决定是否打开" }).click();
   const studio = page.getByRole("region", { name: "心理学启发的自我探索" });
   await expect(studio.getByRole("heading", { name: "不是给你一个标签，而是陪你看清一点" })).toBeVisible();
+  await expect(studio.getByRole("tab", { name: /把拉扯画成一张图/ })).toHaveAttribute("aria-selected", "true");
+  await expect(studio.getByRole("button", { name: "开始这次反思" })).toBeDisabled();
   await expect(studio).toContainText("Aurora 可以建议，但只有你明确同意后才能运行");
   await studio.getByRole("tab", { name: /把此刻说得更清楚/ }).click();
   await studio.getByText("查看理论依据和版本").click();

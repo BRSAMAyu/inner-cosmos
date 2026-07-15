@@ -5,6 +5,8 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,28 +18,59 @@ public class PsychologySkillRegistry {
             "skills/values-compass.v1.json",
             "skills/decision-conflict-map.v1.json");
 
-    private final Map<String, PsychologySkillManifest> manifests;
+    private final Map<String, PsychologySkillManifest> currentById;
+    private final Map<String, PsychologySkillManifest> byVersion;
+    private final List<PsychologySkillManifest> current;
+    private final List<PsychologySkillManifest> all;
+    private final ObjectMapper objectMapper;
 
     public PsychologySkillRegistry(ObjectMapper objectMapper) {
-        Map<String, PsychologySkillManifest> loaded = new LinkedHashMap<>();
+        this.objectMapper = objectMapper;
+        Map<String, PsychologySkillManifest> loadedByVersion = new LinkedHashMap<>();
+        Map<String, PsychologySkillManifest> loadedCurrent = new LinkedHashMap<>();
         for (String path : RESOURCES) {
             PsychologySkillManifest manifest = read(objectMapper, path);
             validate(manifest, path);
-            if (loaded.putIfAbsent(manifest.id, manifest) != null) {
-                throw new IllegalStateException("Duplicate Psychology Skill id: " + manifest.id);
+            if (loadedByVersion.putIfAbsent(key(manifest.id, manifest.version), manifest) != null) {
+                throw new IllegalStateException("Duplicate Psychology Skill version: " + manifest.id + "@" + manifest.version);
             }
+            // RESOURCES is an append-only version ledger; the last version for an id is current.
+            loadedCurrent.put(manifest.id, manifest);
         }
-        manifests = Map.copyOf(loaded);
+        byVersion = Map.copyOf(loadedByVersion);
+        currentById = Map.copyOf(loadedCurrent);
+        current = List.copyOf(loadedCurrent.values());
+        all = List.copyOf(loadedByVersion.values());
     }
 
     public List<PsychologySkillManifest> list() {
-        return RESOURCES.stream().map(path -> manifests.get(idFor(path))).toList();
+        return current;
+    }
+
+    public List<PsychologySkillManifest> all() {
+        return all;
     }
 
     public PsychologySkillManifest require(String id) {
-        PsychologySkillManifest manifest = manifests.get(id);
+        PsychologySkillManifest manifest = currentById.get(id);
         if (manifest == null) throw new IllegalArgumentException("Unknown Psychology Skill: " + id);
         return manifest;
+    }
+
+    public PsychologySkillManifest require(String id, String version) {
+        PsychologySkillManifest manifest = byVersion.get(key(id, version));
+        if (manifest == null) throw new IllegalArgumentException("Unknown Psychology Skill version: " + id + "@" + version);
+        return manifest;
+    }
+
+    public String hash(PsychologySkillManifest manifest) {
+        try {
+            byte[] canonical = objectMapper.writer().with(com.fasterxml.jackson.databind.SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
+                    .writeValueAsBytes(manifest);
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(canonical));
+        } catch (Exception exception) {
+            throw new IllegalStateException("Cannot hash Psychology Skill manifest", exception);
+        }
     }
 
     private PsychologySkillManifest read(ObjectMapper mapper, String path) {
@@ -60,9 +93,7 @@ public class PsychologySkillRegistry {
         }
     }
 
-    private String idFor(String path) {
-        return path.substring(path.lastIndexOf('/') + 1, path.indexOf(".v1.json"));
-    }
+    private String key(String id, String version) { return id + "@" + version; }
 
     private boolean blank(String value) { return value == null || value.isBlank(); }
 }

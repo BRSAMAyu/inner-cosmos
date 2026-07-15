@@ -1291,6 +1291,8 @@ CREATE TABLE IF NOT EXISTS tb_psychology_skill_run (
   user_id BIGINT NOT NULL,
   skill_id VARCHAR(100) NOT NULL,
   skill_version VARCHAR(32) NOT NULL,
+  release_id BIGINT,
+  manifest_hash VARCHAR(64),
   locale VARCHAR(16) NOT NULL,
   status VARCHAR(24) NOT NULL,
   risk_tier VARCHAR(8) NOT NULL,
@@ -1307,3 +1309,28 @@ CREATE TABLE IF NOT EXISTS tb_psychology_skill_run (
   CONSTRAINT ck_psychology_skill_retention CHECK (retention_choice IN ('DISCARD_AFTER_SESSION','SAVE_RESULT','PROFILE_ELIGIBLE'))
 );
 CREATE INDEX IF NOT EXISTS idx_psychology_skill_run_owner ON tb_psychology_skill_run (user_id, created_at);
+
+CREATE TABLE IF NOT EXISTS tb_psychology_skill_release (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  skill_id VARCHAR(100) NOT NULL,
+  skill_version VARCHAR(32) NOT NULL,
+  manifest_hash VARCHAR(64) NOT NULL,
+  evaluation_suite VARCHAR(160) NOT NULL,
+  evaluation_status VARCHAR(24) NOT NULL,
+  review_status VARCHAR(24) NOT NULL,
+  review_note TEXT,
+  reviewed_by_user_id BIGINT,
+  reviewed_at TIMESTAMP,
+  release_status VARCHAR(24) NOT NULL,
+  enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  disabled_reason TEXT,
+  published_at TIMESTAMP,
+  supersedes_release_id BIGINT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uq_psychology_skill_release UNIQUE (skill_id, skill_version),
+  CONSTRAINT ck_psychology_release_eval CHECK (evaluation_status IN ('PENDING','PASS','FAIL')),
+  CONSTRAINT ck_psychology_release_review CHECK (review_status IN ('PENDING','HUMAN_REVIEWED','REJECTED')),
+  CONSTRAINT ck_psychology_release_status CHECK (release_status IN ('LIMITED_PREVIEW','PUBLISHED','DISABLED','SUPERSEDED'))
+);
+CREATE INDEX IF NOT EXISTS idx_psychology_skill_release_active ON tb_psychology_skill_release (skill_id, enabled, release_status);

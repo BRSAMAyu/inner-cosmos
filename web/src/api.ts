@@ -139,6 +139,10 @@ export type PsychologySkillRun = {
   consentScopes: string[]; result: Record<string, unknown>; evidence: string[];
   escalationCode: string | null; createdAt: string; revokedAt: string | null;
 };
+export type PsychologySkillSuggestion = {
+  skillId: string; skillVersion: string; title: string; reason: string;
+  invocation: "SUGGEST_ONLY"; createsRun: false;
+};
 let csrf: Csrf | null = null;
 
 async function request<T>(url: string, init: RequestInit = {}, retriedCsrf = false): Promise<T> {
@@ -205,6 +209,9 @@ export const api = {
   notifications: () => request<Notification[]>("/api/notifications"),
   psychologySkills: () => request<PsychologySkillManifest[]>("/api/psychology/skills"),
   psychologySkillRuns: () => request<PsychologySkillRun[]>("/api/psychology/skills/runs"),
+  psychologySkillSuggestion: (text: string) => request<PsychologySkillSuggestion | null>("/api/psychology/skills/suggestions", {
+    method: "POST", body: JSON.stringify({ text, locale: "zh-CN" })
+  }),
   runPsychologySkill: (skillId: string, input: { explicitConsent: boolean; retentionChoice: PsychologyRetention;
     locale: "zh-CN" | "en-SG"; consentScopes: string[]; answers: Record<string, string> }) =>
     request<PsychologySkillRun>(`/api/psychology/skills/${skillId}/runs`, { method: "POST", body: JSON.stringify(input) }),

@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { api, replayTurnEvents, streamAurora, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type ConnectionRequests, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type Notification, type PersonaMessage, type PersonaSession, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type SocialConnection, type StarfieldDetail, type StarfieldScene, type UnderstandingClaim, type WakeIntent } from "./api";
+import { api, replayTurnEvents, streamAurora, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type ConnectionRequests, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type Notification, type PersonaMessage, type PersonaSession, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type PsychologySkillSuggestion, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type SocialConnection, type StarfieldDetail, type StarfieldScene, type UnderstandingClaim, type WakeIntent } from "./api";
 import type { AuroraStreamEvent, DialogMessage, TurnStatus } from "./protocol";
 
 type UiMessage = { key: string; speaker: "USER" | "AURORA"; text: string; partial?: boolean };
@@ -85,6 +85,7 @@ export function AuroraApp() {
   const [skillConsent, setSkillConsent] = useState(false);
   const [skillRetention, setSkillRetention] = useState<PsychologyRetention>("DISCARD_AFTER_SESSION");
   const [skillBusy, setSkillBusy] = useState(false);
+  const [skillSuggestion, setSkillSuggestion] = useState<PsychologySkillSuggestion | null>(null);
   const [replyDrafts, setReplyDrafts] = useState<Record<number, string>>({});
   const [visitorBusy, setVisitorBusy] = useState(false);
   const [runtimeSignal, setRuntimeSignal] = useState<RuntimeSignal>({ stage: "idle", runtime: "single" });
@@ -303,6 +304,8 @@ export function AuroraApp() {
     setDraft("");
     setMessages(current => [...current, { key: `local-${crypto.randomUUID()}`, speaker: "USER", text }]);
     setStatus("Aurora 正在听…");
+    setSkillSuggestion(null);
+    void api.psychologySkillSuggestion(text).then(setSkillSuggestion).catch(() => setSkillSuggestion(null));
     eventIdsRef.current.clear();
     lastEventIdRef.current = "";
     const controller = new AbortController();
@@ -692,6 +695,14 @@ export function AuroraApp() {
     document.querySelector(".conversation")?.scrollIntoView({ behavior: "smooth" });
   };
 
+  const openSuggestedSkill = () => {
+    if (!skillSuggestion) return;
+    setSelectedSkillId(skillSuggestion.skillId);
+    setSkillAnswers({});
+    setSkillConsent(false);
+    document.querySelector(".skill-studio")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   if (authenticated === null) return <main className="login-shell"><div className="login" role="status">正在连接你的内宇宙…</div></main>;
   if (!authenticated) return <Login onSuccess={bootstrap} />;
 
@@ -997,6 +1008,12 @@ export function AuroraApp() {
           <div><strong>双方已同意</strong>{friends.length === 0 ? <small>还没有建立真人连接</small> : friends.map(item => <article key={item.id}><span>{item.nickname}</span><button onClick={() => void leaveConnection(item.id)}>退出连接</button></article>)}</div>
         </div>
       </section>
+
+      {skillSuggestion && <aside className="skill-suggestion" aria-label="Aurora 的可选反思建议">
+        <div><span>AURORA SUGGESTS · 不会自动运行</span><strong>{skillSuggestion.title}</strong><p>{skillSuggestion.reason}</p></div>
+        <div><button type="button" onClick={openSuggestedSkill}>由我决定是否打开</button>
+          <button type="button" className="quiet" onClick={() => setSkillSuggestion(null)}>这次不要</button></div>
+      </aside>}
 
       <section className="conversation" aria-live="polite" aria-label="与 Aurora 的对话">
         {messages.length === 0 && <div className="empty"><span>✦</span><p>把现在最真实的一句话放在这里。</p></div>}

@@ -7,13 +7,17 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.innercosmos.common.ErrorCode;
 import com.innercosmos.dto.PsychologySkillRunRequest;
 import com.innercosmos.entity.PsychologySkillRun;
+import com.innercosmos.entity.PsychologySkillRelease;
 import com.innercosmos.exception.BusinessException;
 import com.innercosmos.mapper.PsychologySkillRunMapper;
+import com.innercosmos.safety.SafetyBoundaryFilter;
 import com.innercosmos.service.PsychologySkillService;
+import com.innercosmos.service.PsychologySkillReleaseService;
 import com.innercosmos.service.SafetyService;
 import com.innercosmos.skill.PsychologySkillManifest;
 import com.innercosmos.skill.PsychologySkillRegistry;
 import com.innercosmos.vo.PsychologySkillRunVO;
+import com.innercosmos.vo.PsychologySkillSuggestionVO;
 import com.innercosmos.vo.SafetyResult;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,14 +41,20 @@ public class PsychologySkillServiceImpl implements PsychologySkillService {
 
     private final PsychologySkillRegistry registry;
     private final PsychologySkillRunMapper mapper;
+    private final PsychologySkillReleaseService releaseService;
     private final SafetyService safetyService;
+    private final SafetyBoundaryFilter safetyBoundaryFilter;
     private final ObjectMapper objectMapper;
 
     public PsychologySkillServiceImpl(PsychologySkillRegistry registry, PsychologySkillRunMapper mapper,
-                                      SafetyService safetyService, ObjectMapper objectMapper) {
+                                      PsychologySkillReleaseService releaseService,
+                                      SafetyService safetyService, SafetyBoundaryFilter safetyBoundaryFilter,
+                                      ObjectMapper objectMapper) {
         this.registry = registry;
         this.mapper = mapper;
+        this.releaseService = releaseService;
         this.safetyService = safetyService;
+        this.safetyBoundaryFilter = safetyBoundaryFilter;
         this.objectMapper = objectMapper;
     }
 
@@ -68,11 +78,12 @@ public class PsychologySkillServiceImpl implements PsychologySkillService {
             throw new BusinessException(ErrorCode.NOT_FOUND, "这项反思能力不存在或已下线");
         }
         validateRequest(manifest, request);
+        PsychologySkillRelease release = releaseService.requireRunnable(manifest.id, manifest.version);
         Map<String, String> answers = normalize(request.answers);
         String joined = String.join("\n", answers.values());
         SafetyResult safety = safetyService.check(joined, userId, null);
 
-        PsychologySkillRun run = baseRun(userId, manifest, request, answers);
+        PsychologySkillRun run = baseRun(userId, manifest, release, request, answers);
         if (Boolean.TRUE.equals(safety.blockModelCall)) {
             run.status = "ESCALATED";
             run.retentionChoice = "DISCARD_AFTER_SESSION";
@@ -115,6 +126,34 @@ public class PsychologySkillServiceImpl implements PsychologySkillService {
         return toVo(run, Map.of());
     }
 
+    @Override
+    public PsychologySkillSuggestionVO suggest(Long userId, String text, String locale) {
+        if (text == null || text.isBlank() || text.length() > ANSWER_MAX_CHARS) return null;
+        if (safetyBoundaryFilter.inspect(text).matched) return null;
+        String normalized = text.toLowerCase();
+        String skillId = null;
+        String cue = null;
+        if (containsAny(normalized, "纠结", "拉扯", "要不要", "决定", "decision", "conflicted")) {
+            skillId = "decision-conflict-map";
+            cue = "你刚才明确提到了一个正在拉扯的决定";
+        } else if (containsAny(normalized, "选择", "重要", "价值", "option", "choice", "value")) {
+            skillId = "values-compass";
+            cue = "你刚才明确提到了选择和在意的东西";
+        } else if (containsAny(normalized, "感受", "情绪", "紧张", "害怕", "难受", "feeling", "nervous", "afraid")) {
+            skillId = "emotion-needs-clarifier";
+            cue = "你刚才明确说到一种感受";
+        }
+        if (skillId == null) return null;
+        PsychologySkillManifest manifest = registry.require(skillId);
+        releaseService.requireRunnable(skillId, manifest.version);
+        PsychologySkillSuggestionVO suggestion = new PsychologySkillSuggestionVO();
+        suggestion.skillId = skillId;
+        suggestion.skillVersion = manifest.version;
+        suggestion.title = manifest.title.getOrDefault(locale, manifest.title.get("zh-CN"));
+        suggestion.reason = cue + "。如果你愿意，可以打开这项反思；现在不会读取其他记忆，也不会自动运行。";
+        return suggestion;
+    }
+
     private void validateRequest(PsychologySkillManifest manifest, PsychologySkillRunRequest request) {
         if (!request.explicitConsent) throw new BusinessException(ErrorCode.BAD_REQUEST, "必须明确同意后才能开始");
         if (!RETENTION.contains(request.retentionChoice) || !manifest.retentionChoices.contains(request.retentionChoice))
@@ -134,12 +173,14 @@ public class PsychologySkillServiceImpl implements PsychologySkillService {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "单项回答不能超过 " + ANSWER_MAX_CHARS + " 字");
     }
 
-    private PsychologySkillRun baseRun(Long userId, PsychologySkillManifest manifest,
+    private PsychologySkillRun baseRun(Long userId, PsychologySkillManifest manifest, PsychologySkillRelease release,
                                        PsychologySkillRunRequest request, Map<String, String> answers) {
         PsychologySkillRun run = new PsychologySkillRun();
         run.userId = userId;
         run.skillId = manifest.id;
         run.skillVersion = manifest.version;
+        run.releaseId = release.id;
+        run.manifestHash = release.manifestHash;
         run.locale = request.locale;
         run.riskTier = manifest.riskTier;
         run.retentionChoice = request.retentionChoice;
@@ -191,6 +232,7 @@ public class PsychologySkillServiceImpl implements PsychologySkillService {
     private PsychologySkillRunVO toVo(PsychologySkillRun run, Map<String, Object> result) {
         PsychologySkillRunVO vo = new PsychologySkillRunVO();
         vo.id = run.id; vo.skillId = run.skillId; vo.skillVersion = run.skillVersion;
+        vo.releaseId = run.releaseId; vo.manifestHash = run.manifestHash;
         vo.locale = run.locale; vo.status = run.status; vo.riskTier = run.riskTier;
         vo.retentionChoice = run.retentionChoice;
         vo.consentScopes = run.consentScopes == null || run.consentScopes.isBlank()
@@ -221,5 +263,10 @@ public class PsychologySkillServiceImpl implements PsychologySkillService {
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
                 .digest(value.getBytes(StandardCharsets.UTF_8))); }
         catch (Exception exception) { throw new IllegalStateException("SHA-256 unavailable", exception); }
+    }
+
+    private boolean containsAny(String text, String... cues) {
+        for (String cue : cues) if (text.contains(cue)) return true;
+        return false;
     }
 }

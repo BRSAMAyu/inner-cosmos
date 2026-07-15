@@ -59,6 +59,7 @@ class PsychologySkillControllerTest {
                         .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.data.manifestHash").isString())
                 .andExpect(jsonPath("$.data.result.confidence").value("REFLECTIVE_NOT_DIAGNOSTIC"))
                 .andReturn().getResponse().getContentAsString();
         long runId = objectMapper.readTree(response).path("data").path("id").asLong();
@@ -140,6 +141,31 @@ class PsychologySkillControllerTest {
                 assertThat(runMapper.selectById(data.path("id").asLong()).resultJson).isNull();
             }
         }
+    }
+
+    @Test
+    void auroraSuggestionIsExplainableAndNeverCreatesOrRunsASkill() throws Exception {
+        MockHttpSession demo = session("demo");
+        Long before = runMapper.selectCount(new QueryWrapper<PsychologySkillRun>());
+        mockMvc.perform(post("/api/psychology/skills/suggestions").session(demo)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\":\"我很纠结要不要换工作\",\"locale\":\"zh-CN\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.skillId").value("decision-conflict-map"))
+                .andExpect(jsonPath("$.data.invocation").value("SUGGEST_ONLY"))
+                .andExpect(jsonPath("$.data.createsRun").value(false))
+                .andExpect(jsonPath("$.data.reason").value(org.hamcrest.Matchers.containsString("不会自动运行")));
+        assertThat(runMapper.selectCount(new QueryWrapper<PsychologySkillRun>())).isEqualTo(before);
+
+        mockMvc.perform(post("/api/psychology/skills/suggestions").session(demo)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\":\"今天天气不错\",\"locale\":\"zh-CN\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data").doesNotExist());
+        mockMvc.perform(post("/api/psychology/skills/suggestions").session(demo)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\":\"我想自杀，要不要今晚结束\",\"locale\":\"zh-CN\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data").doesNotExist());
+        assertThat(runMapper.selectCount(new QueryWrapper<PsychologySkillRun>())).isEqualTo(before);
     }
 
     private MockHttpSession session(String username) {

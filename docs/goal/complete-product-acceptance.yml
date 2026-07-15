@@ -166,7 +166,7 @@ gates:
     required: true
     acceptance:
       - {id: SKILL-RUNTIME, target: "Versioned skill manifests enforce schemas, tools, consent, evidence, risk, retention, evaluation, and escalation.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-PSY-001/]}
-      - {id: SKILL-PRODUCT, target: "At least three evidence-informed non-diagnostic skills pass quality, safety, i18n, and human review.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-PSY-001/]}
+      - {id: SKILL-PRODUCT, target: "At least three evidence-informed non-diagnostic skills pass quality, safety, i18n, and human review.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-PSY-001/, evidence/innovation/INNO-PSY-002/]}
       - {id: MOBILE-NATIVE, target: "Capacitor push, microphone, deep links, secure storage, lifecycle, and network recovery pass on real devices.", status: UNASSESSED, evidence: []}
       - {id: UX-COMPLETE, target: "All five product spaces meet desktop/mobile, bilingual, WCAG 2.2 AA target, reduced-motion, and blind-experience acceptance.", status: UNASSESSED, evidence: []}
 

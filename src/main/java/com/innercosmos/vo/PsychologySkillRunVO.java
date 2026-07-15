@@ -8,6 +8,8 @@ public class PsychologySkillRunVO {
     public Long id;
     public String skillId;
     public String skillVersion;
+    public Long releaseId;
+    public String manifestHash;
     public String locale;
     public String status;
     public String riskTier;

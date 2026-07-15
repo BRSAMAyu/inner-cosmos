@@ -9,6 +9,8 @@ public class PsychologySkillRun extends BaseEntity {
     public Long userId;
     public String skillId;
     public String skillVersion;
+    public Long releaseId;
+    public String manifestHash;
     public String locale;
     public String status;
     public String riskTier;
