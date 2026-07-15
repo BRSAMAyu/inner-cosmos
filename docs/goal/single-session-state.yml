@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-16T05:02:00+08:00
+updated_at: 2026-07-16T05:08:00+08:00
 authority:
   - goal-objective.md
   - 对齐文档/17-单会话持续Goal模式执行协议.md
@@ -140,9 +140,23 @@ active_front:
       ForgettingCompletenessEvaluationTest 1/1, DataMaskingServiceTest 21/21, EchoCapsuleVOTest 2/2
       unaffected. This is ONE bounded slice, not the full IR: still no claims/values/habits/
       temporal-state/unknowns/runtime-retrieval-policy categories — those remain queued below."
+  eval_dimensions_progress:
+    - "GenomeCompilerGroundednessEvaluationTest ADDED this checkpoint (1 of the review's 3
+      requested eval dimensions — the leakage/boundary one): 4 scored scenarios, each requesting
+      a mix of legitimate memoryIds plus one illegitimate one (another user's memory; a
+      LOCAL_ONLY/NO_EXTERNAL_PROCESSING/SIMULATOR_AUTHORIZED memory), asserting that NO citation
+      in styleProfileJson.voiceEvidence or contextPreviewJson.scenes[].memories ever traces back
+      to the illegitimate memory. Verified via a real revert-and-restore check: temporarily
+      removing the SIMULATOR_AUTHORIZED exclusion in createFromMemory made the eval fail with
+      'compiler cited an illegitimate memory as evidence... ungroundedCitations=[20]' — proving
+      the eval is a real, live-fire regression gate, not a vacuous pass. NOTE: this proves the
+      compiler never fabricates evidence from memories it had no right to use — it does NOT (and
+      without a real LLM provider, cannot) prove the compiled voice reads like the real user.
+      Fidelity in that stronger sense, and the other 2 requested dimensions (fact/style fidelity
+      against held-out memories, unfamiliar-scenario stability), remain open — see below."
   next_machine_actions:
-    - "NEXT — commit this checkpoint (Genome IR provenance slice 1: memories[] on scenes,
-      voiceEvidence on style profile), focused-suite verified green."
+    - "NEXT — commit this checkpoint (Genome IR provenance slice 1 + GenomeCompilerGroundednessEvaluationTest),
+      focused-suite verified green."
     - "THEN — continue the Genome IR scaffold: model claims/values/habits/temporal-state/unknowns
       as their own provenance-carrying categories (not just scenes/voice), and a runtime retrieval
       policy field describing which categories PersonaChatServiceImpl should prioritize per
@@ -150,11 +164,12 @@ active_front:
       path can propose candidate features when a real provider is available (human gate), with a
       critic pass reviewing evidence support, leakage, and unknowns — but the structural IR
       (provenance fields, versioning) is machine-buildable now, independent of that human gate."
-    - "THEN — add the three eval dimensions the review asked for beyond structural scene/tension
-      counts: fact/style fidelity (does the compiled voice match held-out memories not used to
-      compile it), unfamiliar-scenario stability (does the persona degrade gracefully on
-      questions outside its authorized memories), and counter-prompt/leakage resistance
-      (adversarial attempts to extract unauthorized content or override boundaries)."
+    - "THEN — add the remaining 2 eval dimensions: fact/style fidelity (does the compiled voice
+      match held-out memories not used to compile it — genuinely needs a real LLM to judge
+      'reads like the user', otherwise it can only check structural consistency) and
+      unfamiliar-scenario stability (does the persona degrade gracefully, e.g. via
+      PersonaChatServiceImpl/CapsuleSandboxService, on questions outside its authorized memories
+      — this one IS machine-testable today against MockLlmClient's deterministic behavior)."
     - "Also queued, lower priority than the above: DataUseGrant entity to replace the
       consentScope-string purpose enforcement; FORGET propagation to prompt cache/sync-queue/
       analytics/backup; Campaign B automatic claim-extraction pipeline; eval dataset growth."

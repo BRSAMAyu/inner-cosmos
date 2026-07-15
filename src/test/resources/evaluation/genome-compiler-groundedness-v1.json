@@ -1,0 +1,27 @@
+{
+  "datasetVersion": "genome-compiler-groundedness-v1",
+  "notes": "Scores whether every piece of evidence the Genome compiler cites (styleProfileJson.voiceEvidence, contextPreviewJson.scenes[].memories) is actually grounded in memories the OWNER genuinely authorized: never another user's memory, never a memory excluded by consent scope (LOCAL_ONLY/NO_EXTERNAL_PROCESSING/SIMULATOR_AUTHORIZED), and never anything outside the capsule's persisted authorizedMemoryIds. Each scenario requests a mix of legitimate and illegitimate memoryIds; a leak would show up as an ungrounded citation, not a guess.",
+  "thresholds": { "ungroundedCitations": 0, "requestedButExcludedStillCounted": 0 },
+  "scenarios": [
+    {
+      "key": "other-user-memory-requested",
+      "legitimateSummaries": ["朋友 顺利 轻松", "朋友 陪伴"],
+      "illegitimate": [ { "kind": "OTHER_USER", "summary": "朋友 秘密 心事" } ]
+    },
+    {
+      "key": "local-only-memory-requested",
+      "legitimateSummaries": ["项目 任务 截止"],
+      "illegitimate": [ { "kind": "CONSENT_SCOPE", "consentScope": "LOCAL_ONLY", "summary": "项目 私密 细节" } ]
+    },
+    {
+      "key": "no-external-processing-memory-requested",
+      "legitimateSummaries": ["朋友 吵架 难过 委屈"],
+      "illegitimate": [ { "kind": "CONSENT_SCOPE", "consentScope": "NO_EXTERNAL_PROCESSING", "summary": "朋友 绝密 往事" } ]
+    },
+    {
+      "key": "simulator-only-memory-requested",
+      "legitimateSummaries": ["项目 任务", "朋友 顺利"],
+      "illegitimate": [ { "kind": "CONSENT_SCOPE", "consentScope": "SIMULATOR_AUTHORIZED", "summary": "项目 仅供模拟器" } ]
+    }
+  ]
+}
