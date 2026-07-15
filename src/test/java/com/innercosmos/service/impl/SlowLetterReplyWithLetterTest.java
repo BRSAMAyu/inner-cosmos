@@ -12,6 +12,7 @@ import com.innercosmos.mapper.LetterThreadMapper;
 import com.innercosmos.mapper.ReportRecordMapper;
 import com.innercosmos.mapper.SlowLetterMapper;
 import com.innercosmos.mapper.EchoCapsuleMapper;
+import com.innercosmos.mapper.BlockRelationMapper;
 import com.innercosmos.service.LetterSafetyFilter;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -52,13 +53,15 @@ class SlowLetterReplyWithLetterTest {
     private LetterSafetyFilter letterSafetyFilter;
     @Mock
     private EchoCapsuleMapper capsuleMapper;
+    @Mock
+    private BlockRelationMapper blockRelationMapper;
 
     private SlowLetterServiceImpl service;
 
     // Constructed per-test so lenient stubs don't leak across cases.
     private SlowLetterServiceImpl newService() {
         return new SlowLetterServiceImpl(letterMapper, logMapper, stateRegistry,
-                guardAgent, threadMapper, reportRecordMapper, letterSafetyFilter, capsuleMapper);
+                guardAgent, threadMapper, reportRecordMapper, letterSafetyFilter, capsuleMapper, blockRelationMapper);
     }
 
     /** An original letter sent by `sender` to `receiver`. */

@@ -61,6 +61,7 @@ export function AuroraApp() {
   const [letterTitle, setLetterTitle] = useState("想把刚才的共鸣慢慢写下来");
   const [letterBody, setLetterBody] = useState("");
   const [sentLetter, setSentLetter] = useState<SlowLetter | null>(null);
+  const [letterInbox, setLetterInbox] = useState<SlowLetter[]>([]);
   const [visitorBusy, setVisitorBusy] = useState(false);
   const [runtimeSignal, setRuntimeSignal] = useState<RuntimeSignal>({ stage: "idle", runtime: "single" });
   const abortRef = useRef<AbortController | null>(null);
@@ -94,7 +95,8 @@ export function AuroraApp() {
         api.notifications().then(setNotifications),
         api.memoryCards().then(rows => { setMemories(rows); return rows; }),
         api.myCapsules().then(rows => { setCapsules(rows); return rows; }),
-        api.resonanceMatches().then(rows => { setResonanceMatches(rows); return rows; })
+        api.resonanceMatches().then(rows => { setResonanceMatches(rows); return rows; }),
+        api.letterInbox().then(rows => { setLetterInbox(rows); return rows; })
       ]);
       const loadedCapsules = loaded[8] as EchoCapsule[];
       const loadedMatches = loaded[9] as CapsuleMatch[];
@@ -571,6 +573,21 @@ export function AuroraApp() {
     } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法退出"); }
   };
 
+  const actOnLetter = async (letter: SlowLetter, action: "read" | "decline" | "block" | "archive") => {
+    try {
+      const updated = await api.transitionLetter(letter.id, action);
+      setLetterInbox(rows => rows.map(row => row.id === updated.id ? updated : row));
+      setStatus(action === "block" ? "已屏蔽来信者；后续慢信也会被阻断。" : "慢信边界已更新。 ");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法更新这封信"); }
+  };
+
+  const reportLetter = async (letter: SlowLetter) => {
+    try {
+      await api.reportLetter(letter.id, "收件人从 Aurora 界面举报慢信");
+      setStatus("已提交举报。举报不会自动公开信件内容，交由受限审核处理。 ");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法提交举报"); }
+  };
+
   if (authenticated === null) return <main className="login-shell"><div className="login" role="status">正在连接你的内宇宙…</div></main>;
   if (!authenticated) return <Login onSuccess={bootstrap} />;
 
@@ -808,6 +825,20 @@ export function AuroraApp() {
             </>}
           </div>}
         </>}
+      </section>
+
+      <section className="letter-inbox" aria-label="抵达我的慢信">
+        <div className="resonance-heading"><div><span className="eyebrow">LETTERS, ARRIVED</span><h2>只在抵达之后，才由你决定关系往哪里走</h2></div><span>{letterInbox.length} 封已抵达</span></div>
+        <p className="resonance-intro">飞行中的信不会提前泄露正文。抵达后你可以阅读、婉拒、举报或屏蔽；屏蔽会阻断同一来信者之后的慢信。</p>
+        {letterInbox.length === 0 ? <div className="network-empty">此刻没有已经抵达的慢信。</div> : <div className="inbox-list">
+          {letterInbox.map(letter => <article key={letter.id}><header><strong>{letter.title}</strong><span>{letter.status}</span></header>
+            <p>{letter.letterBody}</p><div>
+              {letter.status === "DELIVERED" && <button onClick={() => void actOnLetter(letter, "read")}>标记已读</button>}
+              {["DELIVERED", "READ"].includes(letter.status) && <button onClick={() => void actOnLetter(letter, "decline")}>温和婉拒</button>}
+              {letter.status !== "BLOCKED" && <button onClick={() => void actOnLetter(letter, "block")}>屏蔽后续来信</button>}
+              <button onClick={() => void reportLetter(letter)}>举报这封信</button>
+            </div></article>)}
+        </div>}
       </section>
 
       <section className="conversation" aria-live="polite" aria-label="与 Aurora 的对话">

@@ -3,6 +3,7 @@ package com.innercosmos.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.innercosmos.ai.agent.LetterGuardAgent;
 import com.innercosmos.dto.LetterCreateRequest;
+import com.innercosmos.entity.BlockRelation;
 import com.innercosmos.entity.EchoCapsule;
 import com.innercosmos.entity.LetterStatusLog;
 import com.innercosmos.entity.LetterThread;
@@ -10,6 +11,7 @@ import com.innercosmos.entity.ReportRecord;
 import com.innercosmos.entity.SlowLetter;
 import com.innercosmos.exception.SafetyBlockedException;
 import com.innercosmos.letterstate.LetterStateRegistry;
+import com.innercosmos.mapper.BlockRelationMapper;
 import com.innercosmos.mapper.EchoCapsuleMapper;
 import com.innercosmos.mapper.LetterStatusLogMapper;
 import com.innercosmos.mapper.LetterThreadMapper;
@@ -33,8 +35,9 @@ public class SlowLetterServiceImpl implements SlowLetterService {
     private final ReportRecordMapper reportRecordMapper;
     private final LetterSafetyFilter letterSafetyFilter;
     private final EchoCapsuleMapper capsuleMapper;
+    private final BlockRelationMapper blockRelationMapper;
 
-    public SlowLetterServiceImpl(SlowLetterMapper letterMapper, LetterStatusLogMapper logMapper, LetterStateRegistry stateRegistry, LetterGuardAgent guardAgent, LetterThreadMapper threadMapper, ReportRecordMapper reportRecordMapper, LetterSafetyFilter letterSafetyFilter, EchoCapsuleMapper capsuleMapper) {
+    public SlowLetterServiceImpl(SlowLetterMapper letterMapper, LetterStatusLogMapper logMapper, LetterStateRegistry stateRegistry, LetterGuardAgent guardAgent, LetterThreadMapper threadMapper, ReportRecordMapper reportRecordMapper, LetterSafetyFilter letterSafetyFilter, EchoCapsuleMapper capsuleMapper, BlockRelationMapper blockRelationMapper) {
         this.letterMapper = letterMapper;
         this.logMapper = logMapper;
         this.stateRegistry = stateRegistry;
@@ -43,6 +46,7 @@ public class SlowLetterServiceImpl implements SlowLetterService {
         this.reportRecordMapper = reportRecordMapper;
         this.letterSafetyFilter = letterSafetyFilter;
         this.capsuleMapper = capsuleMapper;
+        this.blockRelationMapper = blockRelationMapper;
     }
 
     @Override
@@ -122,6 +126,18 @@ public class SlowLetterServiceImpl implements SlowLetterService {
         if ("READ".equals(targetStatus)) letter.readAt = now;
         if ("REPLIED".equals(targetStatus)) letter.repliedAt = now;
 
+        if ("BLOCKED".equals(targetStatus) && isReceiver) {
+            Long existing = blockRelationMapper.selectCount(new QueryWrapper<BlockRelation>()
+                    .eq("blocker_user_id", userId).eq("blocked_user_id", letter.senderUserId));
+            if (existing == null || existing == 0L) {
+                BlockRelation relation = new BlockRelation();
+                relation.blockerUserId = userId;
+                relation.blockedUserId = letter.senderUserId;
+                relation.reason = "SLOW_LETTER_BLOCK";
+                blockRelationMapper.insert(relation);
+            }
+        }
+
         LetterStatusLog log = new LetterStatusLog();
         log.letterId = id;
         log.fromStatus = from;
@@ -135,7 +151,9 @@ public class SlowLetterServiceImpl implements SlowLetterService {
     @Override
     public List<SlowLetter> inbox(Long userId) {
         QueryWrapper<SlowLetter> query = new QueryWrapper<>();
-        query.eq("receiver_user_id", userId).orderByDesc("id");
+        query.eq("receiver_user_id", userId)
+                .in("status", "DELIVERED", "READ", "REPLIED", "DECLINED", "BLOCKED", "ARCHIVED")
+                .orderByDesc("id");
         return letterMapper.selectList(query);
     }
 

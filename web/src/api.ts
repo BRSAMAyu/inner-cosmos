@@ -115,7 +115,7 @@ export type PersonaSession = { id: number; capsuleId: number; status: string; tu
 export type PersonaMessage = { id: number; sessionId: number; senderType: "VISITOR" | "CAPSULE"; textContent: string };
 export type CapsuleQuota = { usedTurns: number; remainingTurns: number; dailyLimit: number; exhausted: boolean };
 export type SlowLetter = {
-  id: number; receiverCapsuleId: number; title: string; letterBody: string; status: string;
+  id: number; senderUserId: number; receiverUserId: number; receiverCapsuleId: number; title: string; letterBody: string; status: string;
   parallaxDistance: number; estimatedArrivalAt: string;
 };
 let csrf: Csrf | null = null;
@@ -242,6 +242,12 @@ export const api = {
     method: "POST", body: JSON.stringify({ receiverCapsuleId, title, letterBody })
   }),
   sendSlowLetter: (id: number) => request<SlowLetter>(`/api/letters/${id}/send`, { method: "POST" })
+  ,letterInbox: () => request<SlowLetter[]>("/api/letters/inbox")
+  ,transitionLetter: (id: number, action: "read" | "decline" | "block" | "archive") =>
+    request<SlowLetter>(`/api/letters/${id}/${action}`, { method: "POST" })
+  ,reportLetter: (id: number, reason: string) => request<void>(`/api/letters/${id}/report`, {
+    method: "POST", body: JSON.stringify({ reason })
+  })
 };
 
 export async function streamAurora(

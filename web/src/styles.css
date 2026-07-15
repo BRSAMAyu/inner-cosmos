@@ -84,6 +84,8 @@ footer { padding: 18px 4px; display: flex; justify-content: space-between; color
 .strategy-switcher button[aria-pressed="true"] { background: #b1dac7; color: #0a1712; border-color: #b1dac7; }
 .strategy-explanation { margin: 0 0 14px; color: #b6aaa0; font-size: .88rem; }
 .strategy-explanation strong { color: #b1dac7; }
+.letter-inbox { margin: 18px 0 0; padding: 22px; border: 1px solid #c7a16d35; border-radius: 24px; background: linear-gradient(145deg,#201a13e8,#101815e8); }
+.inbox-list { display: grid; gap: 10px; margin-top: 16px; }.inbox-list article { padding: 16px; border: 1px solid #ffffff12; border-radius: 16px; background: #ffffff06; }.inbox-list header { display: flex; justify-content: space-between; gap: 12px; }.inbox-list header span { color: #a9c7b8; font-size: .7rem; }.inbox-list article p { color: #c1bbb3; line-height: 1.6; }.inbox-list article > div { display: flex; flex-wrap: wrap; gap: 7px; }.inbox-list button { padding: 7px 10px; border: 1px solid #ffffff18; border-radius: 999px; color: #d5ccc2; background: #ffffff08; }
 @media (max-width: 900px) { .match-rail { grid-template-columns: 1fr 1fr; }.visitor-workbench > header { flex-direction: column; }.match-reasons { justify-content: flex-start; } }
 @media (max-width: 680px) { .resonance-network { padding: 16px; }.match-rail { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; }.match-card { min-width: 76vw; scroll-snap-align: start; }.visitor-quota { flex-direction: column; }.persona-history article { max-width: 94%; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; } }

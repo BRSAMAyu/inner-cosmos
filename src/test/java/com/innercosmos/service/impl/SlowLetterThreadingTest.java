@@ -1,13 +1,16 @@
 package com.innercosmos.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.innercosmos.ai.agent.LetterGuardAgent;
 import com.innercosmos.dto.LetterCreateRequest;
 import com.innercosmos.entity.EchoCapsule;
+import com.innercosmos.entity.BlockRelation;
 import com.innercosmos.entity.LetterThread;
 import com.innercosmos.entity.SlowLetter;
 import com.innercosmos.exception.BusinessException;
 import com.innercosmos.letterstate.LetterStateRegistry;
 import com.innercosmos.mapper.EchoCapsuleMapper;
+import com.innercosmos.mapper.BlockRelationMapper;
 import com.innercosmos.mapper.LetterStatusLogMapper;
 import com.innercosmos.mapper.LetterThreadMapper;
 import com.innercosmos.mapper.ReportRecordMapper;
@@ -48,10 +51,11 @@ class SlowLetterThreadingTest {
     @Mock private ReportRecordMapper reportRecordMapper;
     @Mock private LetterSafetyFilter letterSafetyFilter;
     @Mock private EchoCapsuleMapper capsuleMapper;
+    @Mock private BlockRelationMapper blockRelationMapper;
 
     private SlowLetterServiceImpl newService() {
         return new SlowLetterServiceImpl(letterMapper, logMapper, stateRegistry,
-                guardAgent, threadMapper, reportRecordMapper, letterSafetyFilter, capsuleMapper);
+                guardAgent, threadMapper, reportRecordMapper, letterSafetyFilter, capsuleMapper, blockRelationMapper);
     }
 
     private SlowLetter original(long id, long sender, long receiver, long capsuleId) {
@@ -133,6 +137,39 @@ class SlowLetterThreadingTest {
 
         assertEquals("NOT_FOUND", ex.code);
         verify(letterMapper, never()).insert(any(SlowLetter.class));
+    }
+
+    @Test
+    @DisplayName("block: a receiver blocking a letter also blocks future delivery from that sender")
+    void blockByReceiver_persistsRelationshipBoundary() {
+        SlowLetter letter = original(1L, 10L, 20L, 77L);
+        letter.status = "DELIVERED";
+        when(letterMapper.selectById(1L)).thenReturn(letter);
+        when(letterMapper.update(any(), any())).thenReturn(1);
+        when(blockRelationMapper.selectCount(any())).thenReturn(0L);
+
+        SlowLetter blocked = newService().transition(20L, 1L, "BLOCKED");
+
+        assertEquals("BLOCKED", blocked.status);
+        ArgumentCaptor<BlockRelation> relation = ArgumentCaptor.forClass(BlockRelation.class);
+        verify(blockRelationMapper).insert(relation.capture());
+        assertEquals(20L, relation.getValue().blockerUserId);
+        assertEquals(10L, relation.getValue().blockedUserId);
+    }
+
+    @Test
+    @DisplayName("inbox: letters still travelling are filtered before their body reaches the receiver")
+    void inbox_excludesPreArrivalStatesAtTheQueryBoundary() {
+        when(letterMapper.selectList(any())).thenReturn(List.of());
+
+        newService().inbox(20L);
+
+        @SuppressWarnings("rawtypes")
+        ArgumentCaptor<QueryWrapper> query = ArgumentCaptor.forClass(QueryWrapper.class);
+        verify(letterMapper).selectList(query.capture());
+        String sql = query.getValue().getSqlSegment();
+        assertTrue(sql.contains("status IN"));
+        assertTrue(sql.contains("receiver_user_id"));
     }
 
     @Test

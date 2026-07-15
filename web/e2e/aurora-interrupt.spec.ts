@@ -259,6 +259,9 @@ test("owner publishes, a visitor sends a slow letter, then withdrawal stops the 
   await page.getByLabel("用户名").fill("demo");
   await page.getByLabel("密码").fill("demo123");
   await page.getByRole("button", { name: "登录" }).click();
+  const inbox = page.getByRole("region", { name: "抵达我的慢信" });
+  await expect(inbox.getByRole("heading", { name: "只在抵达之后，才由你决定关系往哪里走" })).toBeVisible();
+  await page.screenshot({ path: "../evidence/innovation/INNO-CAP-006/owner-letter-inbox.png", fullPage: true });
   const ownerSpace = page.getByRole("region", { name: "共鸣体创建与像不像我沙盒" });
   await ownerSpace.getByRole("tab", { name: new RegExp(capsuleName) }).click();
   await ownerSpace.getByRole("button", { name: "撤回这个共鸣体" }).click();
