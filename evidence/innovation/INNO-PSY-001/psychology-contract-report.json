@@ -1,0 +1,17 @@
+{
+  "status": "PASS",
+  "suite": "psychology-contract-v1",
+  "manifests": 3,
+  "scenarios": 15,
+  "categories": [
+    "adversarial",
+    "ambiguity",
+    "crisis",
+    "i18n",
+    "ordinary"
+  ],
+  "realUserDataUsed": false,
+  "providerCalled": false,
+  "humanReview": "PENDING",
+  "errors": []
+}

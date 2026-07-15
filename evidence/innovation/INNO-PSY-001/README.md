@@ -17,7 +17,9 @@ Status: BUILDER_VERIFIED / IN_PROGRESS
 
 | Gate | Result |
 |---|---|
-| `mvn -Dtest=PsychologySkillRegistryTest,PsychologySkillControllerTest test` | PASS — 3 tests, 0 failures |
+| `mvn -Dtest=PsychologySkillRegistryTest,PsychologySkillControllerTest test` | PASS — 4 tests, 0 failures |
+| `python -m unittest discover -s tests -v` in `ai-lab` | PASS — 41 tests, including 15 Psychology scenarios |
+| `python -m evals.cli.main psychology --output ../evidence/innovation/INNO-PSY-001` | PASS — 3 manifests × ordinary/ambiguity/adversarial/crisis/i18n contract |
 | `npm test -- --run` | PASS — 3 tests |
 | `npm run build` | PASS — TypeScript + Vite production build |
 | `npx playwright test --grep "psychology Skill"` | PASS — real browser consent/run/save/revoke journey |
@@ -26,6 +28,7 @@ Status: BUILDER_VERIFIED / IN_PROGRESS
 | Visual inspection | PASS — result hierarchy, alternative framing, action, continuation, and revocation are legible |
 
 Visual evidence: `psychology-skill-studio.png`.
+Machine report: `psychology-contract-report.json`.
 
 ## Safety and evidence boundary
 
@@ -35,6 +38,6 @@ The first Skill is informed by affect-labelling research (Lieberman et al., 2007
 
 - No psychology expert review, non-author human review, or blind-experience result exists yet.
 - Aurora can suggest the capability contractually, but suggestion quality and refusal behavior still require an evaluated integration journey.
-- The deterministic first slice does not yet provide replay snapshots, disable/rollback administration, comparative no-Skill uplift, or a published evaluator corpus.
+- The deterministic first slice does not yet provide replay snapshots, disable/rollback administration or comparative no-Skill uplift. The published contract corpus is synthetic and does not establish clinical effectiveness.
 - Bilingual manifest copy exists; the current React surface renders `zh-CN` only.
 - Therefore `SKILL-RUNTIME` and `SKILL-PRODUCT` remain `IN_PROGRESS`, not `PASS`.

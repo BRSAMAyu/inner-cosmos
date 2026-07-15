@@ -17,6 +17,7 @@ import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.Map;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -105,6 +106,40 @@ class PsychologySkillControllerTest {
         PsychologySkillRun stored = runMapper.selectById(data.path("id").asLong());
         assertThat(stored.resultJson).isNull();
         assertThat(stored.inputFingerprint).doesNotContain("自杀");
+    }
+
+    @Test
+    void allThreeSkillsProduceBoundedBilingualOutputsWithoutPersistingDiscardedResults() throws Exception {
+        record SkillCase(String id, Map<String, String> answers) {}
+        List<SkillCase> cases = List.of(
+                new SkillCase("emotion-needs-clarifier",
+                        Map.of("situation", "team review", "feeling", "nervous", "need", "preparation")),
+                new SkillCase("values-compass",
+                        Map.of("choiceA", "stay", "choiceB", "leave", "important", "autonomy")),
+                new SkillCase("decision-conflict-map",
+                        Map.of("decision", "change jobs", "pullToward", "growth", "pullAway", "uncertainty")));
+        MockHttpSession demo = session("demo");
+        for (String locale : List.of("zh-CN", "en-SG")) {
+            for (SkillCase skill : cases) {
+                Map<String, Object> body = Map.of(
+                        "explicitConsent", true,
+                        "retentionChoice", "DISCARD_AFTER_SESSION",
+                        "locale", locale,
+                        "consentScopes", new String[]{"current-run-input"},
+                        "answers", skill.answers());
+                String response = mockMvc.perform(post("/api/psychology/skills/{id}/runs", skill.id())
+                                .session(demo).contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(body)))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.data.status").value("COMPLETED"))
+                        .andExpect(jsonPath("$.data.result.confidence").value("REFLECTIVE_NOT_DIAGNOSTIC"))
+                        .andReturn().getResponse().getContentAsString();
+                JsonNode data = objectMapper.readTree(response).path("data");
+                String summary = data.path("result").path("summary").asText();
+                assertThat(summary).isNotBlank().doesNotContain("你患有", "you have been diagnosed", "一定是");
+                assertThat(runMapper.selectById(data.path("id").asLong()).resultJson).isNull();
+            }
+        }
     }
 
     private MockHttpSession session(String username) {

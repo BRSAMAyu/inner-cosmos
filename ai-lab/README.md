@@ -9,6 +9,7 @@ cd ai-lab
 python -m unittest discover -s tests -v
 python -m evals.cli.main validate
 python -m evals.cli.main run --output ../evidence/innovation/INNO-EVAL-001
+python -m evals.cli.main psychology --output ../evidence/innovation/INNO-PSY-001
 ```
 
 默认只运行 synthetic/contract/fixture baseline。`real-provider` 在外部凭据轮换门禁关闭前始终返回 `BLOCKED_BY_CREDENTIAL_GATE`，不会读取 API Key，也不会静默回退到 Mock。

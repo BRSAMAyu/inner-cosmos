@@ -15,7 +15,7 @@
   "evidence": ["Miller 1944, Experimental Studies of Conflict", "Self-Determination Theory, autonomy support"],
   "limitations": {"zh-CN": "这是决策反思，不预测结果，也不适合替代高风险领域的专业意见。", "en-SG": "This is decision reflection, not outcome prediction or a substitute for professional advice in high-risk domains."},
   "retentionChoices": ["DISCARD_AFTER_SESSION", "SAVE_RESULT", "PROFILE_ELIGIBLE"],
-  "evaluationSuite": "evals/psychology/decision-conflict-v1",
+  "evaluationSuite": "psychology-contract-v1:decision-conflict-map",
   "fallback": "DETERMINISTIC_REFLECTION",
   "escalation": "LOCAL_CRISIS_RESOURCES"
 }

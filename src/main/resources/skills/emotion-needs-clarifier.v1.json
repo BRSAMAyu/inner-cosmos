@@ -15,7 +15,7 @@
   "evidence": ["Lieberman et al. 2007, DOI 10.1111/j.1467-9280.2007.01916.x", "Lieberman et al. 2011, DOI 10.1037/a0023503"],
   "limitations": {"zh-CN": "这是一次反思练习，不评估心理疾病，也不能替代专业支持。情绪命名对不同人和情境的作用不同。", "en-SG": "This is a reflection exercise, not a mental-health assessment or professional support. Affect labelling may work differently across people and contexts."},
   "retentionChoices": ["DISCARD_AFTER_SESSION", "SAVE_RESULT", "PROFILE_ELIGIBLE"],
-  "evaluationSuite": "evals/psychology/emotion-needs-v1",
+  "evaluationSuite": "psychology-contract-v1:emotion-needs-clarifier",
   "fallback": "DETERMINISTIC_REFLECTION",
   "escalation": "LOCAL_CRISIS_RESOURCES"
 }
