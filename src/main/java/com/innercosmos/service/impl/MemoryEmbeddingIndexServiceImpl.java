@@ -7,6 +7,7 @@ import com.innercosmos.ai.embedding.MemoryEmbeddingClient;
 import com.innercosmos.entity.MemoryCard;
 import com.innercosmos.entity.MemoryEmbedding;
 import com.innercosmos.mapper.MemoryEmbeddingMapper;
+import com.innercosmos.mapper.MemoryCardMapper;
 import com.innercosmos.service.MemoryEmbeddingIndexService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,13 +26,16 @@ public class MemoryEmbeddingIndexServiceImpl implements MemoryEmbeddingIndexServ
     private static final Logger log = LoggerFactory.getLogger(MemoryEmbeddingIndexServiceImpl.class);
     private final MemoryEmbeddingClient client;
     private final MemoryEmbeddingMapper mapper;
+    private final MemoryCardMapper memoryMapper;
     private final JdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
     private volatile Boolean postgres;
 
     public MemoryEmbeddingIndexServiceImpl(MemoryEmbeddingClient client, MemoryEmbeddingMapper mapper,
-                                           JdbcTemplate jdbc, ObjectMapper objectMapper) {
-        this.client = client; this.mapper = mapper; this.jdbc = jdbc; this.objectMapper = objectMapper;
+                                           MemoryCardMapper memoryMapper, JdbcTemplate jdbc,
+                                           ObjectMapper objectMapper) {
+        this.client = client; this.mapper = mapper; this.memoryMapper = memoryMapper;
+        this.jdbc = jdbc; this.objectMapper = objectMapper;
     }
 
     @Override
@@ -44,7 +48,6 @@ public class MemoryEmbeddingIndexServiceImpl implements MemoryEmbeddingIndexServ
                     .toList();
             if (providerEligible.isEmpty()) return Map.of();
             float[] queryVector = client.embed(query);
-            for (MemoryCard card : providerEligible) ensure(userId, card);
             return isPostgres() ? postgresScores(userId, queryVector) : localScores(userId, queryVector, providerEligible);
         } catch (Exception failure) {
             // Embeddings only widen candidate quality. Relational privacy/status gates and the
@@ -54,22 +57,60 @@ public class MemoryEmbeddingIndexServiceImpl implements MemoryEmbeddingIndexServ
         }
     }
 
-    private void ensure(Long userId, MemoryCard card) throws Exception {
+    @Override
+    public RebuildResult rebuildMissing(int requestedBatchSize) {
+        if (!client.available()) return new RebuildResult(0, 0, 0, 0);
+        int batchSize = Math.max(1, Math.min(500, requestedBatchSize));
+        List<Long> ids = mapper.selectMissingMemoryIds(client.modelName(), client.modelVersion(), batchSize);
+        if (ids.isEmpty()) return new RebuildResult(0, 0, 0, 0);
+        int indexed = 0;
+        int failed = 0;
+        for (MemoryCard card : memoryMapper.selectBatchIds(ids)) {
+            try {
+                if (indexIfMissing(card.userId, card)) indexed++;
+            } catch (Exception failure) {
+                failed++;
+                // Never log memory content, provider response bodies, or credentials.
+                log.warn("Memory embedding rebuild failed for memory {}: {}", card.id,
+                        failure.getClass().getSimpleName());
+            }
+        }
+        return new RebuildResult(ids.size(), indexed, failed, pendingCount());
+    }
+
+    @Override
+    public long pendingCount() {
+        if (!client.available()) return 0;
+        return mapper.countMissing(client.modelName(), client.modelVersion());
+    }
+
+    private boolean indexIfMissing(Long userId, MemoryCard card) throws Exception {
+        if (!"ACTIVE".equalsIgnoreCase(safe(card.status))
+                || "LOCAL_ONLY".equalsIgnoreCase(safe(card.consentScope))
+                || "NO_EXTERNAL_PROCESSING".equalsIgnoreCase(safe(card.consentScope))) return false;
         int sourceVersion = card.versionNo == null ? 1 : card.versionNo;
         QueryWrapper<MemoryEmbedding> query = new QueryWrapper<MemoryEmbedding>()
                 .eq("user_id", userId).eq("memory_id", card.id).eq("model_name", client.modelName())
                 .eq("model_version", client.modelVersion()).eq("source_version", sourceVersion)
                 .eq("task_scope", "GENERAL").eq("status", "ACTIVE");
-        if (mapper.selectCount(query) > 0) return;
+        if (mapper.selectCount(query) > 0) return false;
         float[] vector = client.embed(String.join(" ", safe(card.title), safe(card.summary),
                 safe(card.keywordTags), safe(card.peopleTags)));
         MemoryEmbedding row = new MemoryEmbedding();
         row.userId = userId; row.memoryId = card.id; row.modelName = client.modelName();
         row.modelVersion = client.modelVersion(); row.sourceVersion = sourceVersion; row.taskScope = "GENERAL";
         row.dimensions = vector.length; row.embeddingJson = objectMapper.writeValueAsString(vector); row.status = "ACTIVE";
-        try { mapper.insert(row); } catch (DuplicateKeyException race) { return; }
-        if (isPostgres()) jdbc.update("UPDATE tb_memory_embedding SET embedding_vector=?::vector WHERE id=?",
-                vectorLiteral(vector, 1536), row.id);
+        try { mapper.insert(row); } catch (DuplicateKeyException race) { return false; }
+        if (isPostgres()) {
+            try {
+                jdbc.update("UPDATE tb_memory_embedding SET embedding_vector=?::vector WHERE id=?",
+                        vectorLiteral(vector, 1536), row.id);
+            } catch (RuntimeException vectorWriteFailure) {
+                mapper.deleteById(row.id);
+                throw vectorWriteFailure;
+            }
+        }
+        return true;
     }
 
     private Map<Long, Double> postgresScores(Long userId, float[] queryVector) {

@@ -97,6 +97,8 @@ memory:
     model: ${MEMORY_EMBEDDING_MODEL:text-embedding-3-small}
     version: ${MEMORY_EMBEDDING_VERSION:2026-01}
     dimensions: ${MEMORY_EMBEDDING_DIMENSIONS:1536}
+    rebuild-batch-size: ${MEMORY_EMBEDDING_REBUILD_BATCH_SIZE:50}
+    rebuild-delay-ms: ${MEMORY_EMBEDDING_REBUILD_DELAY_MS:60000}
 
 llm:
   mode: ${LLM_MODE:dev}

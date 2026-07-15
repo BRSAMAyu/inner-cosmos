@@ -37,6 +37,7 @@ Status: `BUILDER_VERIFIED / IN_PROGRESS` on 2026-07-15.
 ## Honest remaining work
 
 The HTTP contract provider is local and deterministic; no external credential was available or
-required for this checkpoint. A real approved provider run, hard-paraphrase/multi-hop dataset,
-provider-vs-local pairwise quality/cost/latency comparison, async bulk rebuild and independent review
-remain required. `RETRIEVAL-QUALITY` stays `IN_PROGRESS`.
+required for this checkpoint. `INNO-INNER-006` subsequently adds the asynchronous rebuild and a
+hard paraphrase/temporal/multi-hop contract pairwise. A real approved Provider run, measured price
+and production latency, larger independent data and independent review remain required.
+`RETRIEVAL-QUALITY` stays `IN_PROGRESS`.

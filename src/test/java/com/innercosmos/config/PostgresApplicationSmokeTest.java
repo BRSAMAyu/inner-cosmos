@@ -3,6 +3,7 @@ package com.innercosmos.config;
 import com.innercosmos.dto.LoginRequest;
 import com.innercosmos.dto.RegisterRequest;
 import com.innercosmos.service.UserService;
+import com.innercosmos.mapper.MemoryEmbeddingMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -53,6 +54,9 @@ class PostgresApplicationSmokeTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private MemoryEmbeddingMapper memoryEmbeddingMapper;
+
     @Test
     void applicationStartsOnFlywayPostgresAndPersistsIdentityBackedEntities() {
         RegisterRequest register = new RegisterRequest();
@@ -84,12 +88,15 @@ class PostgresApplicationSmokeTest {
                 INSERT INTO tb_memory_card(user_id,title,status,version_no,memory_layer)
                 VALUES (?,'pgvector contract memory','ACTIVE',1,'SEMANTIC') RETURNING id
                 """, Long.class, created.id);
+        assertTrue(memoryEmbeddingMapper.selectMissingMemoryIds("contract-model", "v1", 10).contains(memoryId));
+        assertEquals(1L, memoryEmbeddingMapper.countMissing("contract-model", "v1"));
         String vector = unitVector(1536);
         jdbcTemplate.update("""
                 INSERT INTO tb_memory_embedding(user_id,memory_id,model_name,model_version,source_version,
                   task_scope,dimensions,embedding_json,embedding_vector,status)
                 VALUES (?,?,'contract-model','v1',1,'GENERAL',1536,'[]',?::vector,'ACTIVE')
                 """, created.id, memoryId, vector);
+        assertEquals(0L, memoryEmbeddingMapper.countMissing("contract-model", "v1"));
         assertEquals(1.0, jdbcTemplate.queryForObject("""
                 SELECT 1 - (embedding_vector <=> ?::vector) FROM tb_memory_embedding WHERE memory_id=?
                 """, Double.class, vector, memoryId), 0.000001);
