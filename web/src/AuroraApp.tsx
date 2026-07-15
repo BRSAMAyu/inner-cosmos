@@ -982,7 +982,7 @@ export function AuroraApp() {
           onRequestMicrophone={() => void requestMobileMicrophone()} onLogout={() => void logout()} />
       </div>
       <div className="state global-state" role="status"><i className={activeTurnId ? "pulse" : ""} />{status}</div>
-      <footer><a href="/pages/aurora-chat.html">经典界面</a><span>五空间 AppShell · 数据与能力持续保留</span><button type="button" onClick={() => void logout()}>安全退出</button></footer>
+      <footer><a href="/pages/dashboard.html">尚未迁移的工具</a><span>五空间 AppShell · 数据与能力持续保留</span><button type="button" onClick={() => void logout()}>安全退出</button></footer>
     </main>
   );
 }

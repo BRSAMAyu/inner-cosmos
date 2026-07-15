@@ -343,7 +343,7 @@
         });
 
         if (r.success) {
-          location.href = "/pages/dashboard.html";
+          location.href = "/app/aurora/";
         } else {
           errBox.textContent = r.message || "登录失败，请检查用户名和密码。";
           errBox.classList.add("visible");
@@ -363,7 +363,7 @@
       btn.disabled = true;
       btn.innerHTML = '<span class="loader"></span>正在进入游客宇宙...';
       var r = await IC.guestLogin();
-      if (r.success) location.href = "/pages/dashboard.html";
+      if (r.success) location.href = "/app/aurora/";
       else {
         btn.disabled = false;
         btn.textContent = "游客体验 Demo";

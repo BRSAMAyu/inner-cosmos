@@ -353,7 +353,7 @@
         if (r.success) {
           sucBox.textContent = "注册成功，正在进入你的内宇宙…";
           sucBox.classList.add("visible");
-          setTimeout(function() { location.href = "/pages/dashboard.html"; }, 1500);
+          setTimeout(function() { location.href = "/app/aurora/"; }, 1500);
         } else {
           errBox.textContent = r.message || "注册失败，请换个用户名试试。";
           errBox.classList.add("visible");

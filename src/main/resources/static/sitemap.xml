@@ -22,7 +22,6 @@
   <url><loc>/pages/settings.html</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
   <url><loc>/pages/thought-shredder.html</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
   <url><loc>/pages/capsule-create.html</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
-  <url><loc>/pages/capsule-detail.html</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
   <url><loc>/pages/capsule-chat.html</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
   <url><loc>/pages/weekly-review.html</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
   <url><loc>/pages/ui-preview.html</loc><changefreq>monthly</changefreq><priority>0.4</priority></url>

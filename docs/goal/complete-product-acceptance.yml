@@ -99,7 +99,29 @@ gates:
       - {id: UX-SHELL, target: "React TypeScript PWA implements the five-space information architecture and shared component system.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CONV-003/, evidence/campaign-a/APP-SHELL-001/]}
       - {id: UX-CONTRACTS, target: "Generated typed API client and unified auth, errors, tasks, offline, and telemetry are used.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CONV-003/]}
       - {id: UX-QUALITY, target: "Core routes pass Playwright, visual regression, accessibility, i18n, and performance budgets.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CONV-003/]}
-      - {id: UX-LEGACY, target: "Migrated journeys have no competing legacy physical-page implementation.", status: UNASSESSED, evidence: []}
+      - id: UX-LEGACY
+        target: Migrated journeys have no competing legacy physical-page implementation.
+        status: IN_PROGRESS
+        evidence: []
+        remaining: |
+          Explore-agent audit found the root URL and post-login/post-register redirects all
+          funneled users into the legacy static site (/pages/dashboard.html) by default, never
+          the AppShell — the AppShell was reachable only by manually typing /app/aurora/. Fixed
+          this checkpoint: login.html (both password and guest paths), register.html now redirect
+          to /app/aurora/ instead of /pages/dashboard.html; verified end-to-end in a real browser
+          against a fresh database (register -> lands on /app/aurora/ -> five-space UI renders,
+          0 console errors). AuroraApp.tsx's footer link to the legacy site was relabeled from
+          "经典界面" (implying an equivalent alternate skin) to "尚未迁移的工具" (not-yet-migrated
+          tools) and retargeted from the now-duplicated aurora-chat.html to the legacy dashboard.html
+          hub, since 12 legacy pages (daily-record, heart-diary, timeline, weekly-review, todo,
+          safety-harbor, thought-shredder, beliefs, admin pages) have no AppShell equivalent yet
+          and must stay reachable. Two confirmed-dead pages removed (capsule-detail.html html file
+          + its sitemap.xml entry; ui-preview.html deliberately kept as a design-system dev tool,
+          not a competing journey). NOT yet done: the 7 legacy pages that DO duplicate an AppShell
+          journey (aurora-chat, memory-starfield, corrections, echo-plaza, capsule-create,
+          capsule-chat, slow-letter/letter-threads/inbox/relations/social, settings/portrait) still
+          physically exist and are still directly reachable by URL/bookmark/nav — retiring or
+          redirecting those is the remaining work before this can be PASS.
 
   - id: G4
     name: Aurora living mind
