@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-16T03:18:00+08:00
+updated_at: 2026-07-16T04:12:00+08:00
 authority:
   - goal-objective.md
   - 对齐文档/17-单会话持续Goal模式执行协议.md
@@ -28,28 +28,67 @@ resume_policy:
   update_this_file_at_every_checkpoint: true
 
 active_front:
-  id: CAMPAIGN-C-QUALITY
-  state: SIMULATOR_ISOLATION_DONE_PENDING_FULL_SUITE
-  intent: Work through the Campaign C punch list captured below, starting with items actionable without real-provider credentials.
-  done_this_front_summary:
-    - P0 fix (46bd566): DataMaskingServiceImpl.previewFromMemory leaked LOCAL_ONLY/NO_EXTERNAL_PROCESSING memories into the pre-consent capsule preview; fixed and verified via git-stash-revert rigor check.
-    - Punch-list item 3 (bda3ad4): CapsuleSandboxFeedback aggregated into a visible per-Genome-version fidelity score in CapsuleWorkbench, refreshed immediately after rating.
-    - Punch-list item 4, this checkpoint: no isolated Simulator capability existed — any adversarial/leakage/fidelity testing today would have had to run against a real user's live capsule. Added CapsuleService.createSimulatorCapsule(userId, request): requires every memoryId to carry a NEW, distinct consent scope (SIMULATOR_AUTHORIZED) — reusing a memory already authorized for the owner's real personal capsule (e.g. AURORA_PRIVATE) is rejected, so there is no default reuse. The resulting capsule is permanently isolated: EchoCapsule.simulatorOnly=true (new column, schema.sql + SchemaM7Initializer for existing H2 DBs + Postgres V15 migration), forced PRIVATE/non-public regardless of what the request asks for, and updateVisibility rejects any later attempt to publish it. plazaCapsules/matchedCapsules and PersonaChatService.create are already gated on is_public+PUBLIC, so a Simulator capsule can structurally never reach a real visitor — verified directly rather than assumed. The owner's own sandbox chat (the actual purpose) still works normally.
-    - New integration test (CapsuleGenomeServiceIntegrationTest.simulatorCapsuleRequiresExplicitAuthorizationAndIsPermanentlyIsolated) covers: rejection of personal-consent memories, forced-private creation even when PUBLIC is requested, publish-attempt rejection via both visibilityStatus and isPublic-only paths, exclusion from the plaza, persona-chat rejection for a real visitor, and that owner sandbox chat still works. 5/5 in that test class.
-    - Full `mvn test` initially caught a real regression: PostgresFlywayBaselineTest (a genuine Testcontainers-backed Postgres drift-detection test) hardcodes the exact Flyway migration count; V15 correctly bumped it from 14 to 15 and the test's own assertion needed updating. Fixed, reran that test standalone against real Docker Postgres (3/3, including the table/FK/index/identity-column baseline equality checks unaffected by the additive column), then reran the full suite clean.
+  id: PSEUDO-SEMANTIC-SENTIMENT-BUG
+  state: DISCOVERED_DURING_CAMPAIGN_C_ITEM_2_NOT_YET_FIXED
+  intent: |
+    While closing Campaign C punch-list item 2 (Genome compiler feature extraction), discovered
+    and worked around a real, verified bug in PseudoSemanticAnalyzer (ai/semantic) shared by ~10
+    consumers. Campaign C item 2 itself is DONE (see done_this_front_summary); this front is the
+    newly-surfaced, higher-priority gap to pick up next.
+  bug_detail: |
+    PseudoSemanticAnalyzer.tokenize() splits Chinese text into INDIVIDUAL CHARACTERS, but
+    calculateSentiment()/checkSafetyRisk() score via EXACT lookup (ChineseSentimentLexicon.getScore(token))
+    against a lexicon whose keys are almost all 2+ character words. A single Chinese character is
+    almost never itself a lexicon key, so sentimentScore is silently ~0.0 (NEUTRAL) for nearly all
+    real sentences. Verified directly: 4/4 clearly emotional probe sentences ("我今天很开心，很满足，
+    充满希望" etc.) scored 0.0/NEUTRAL. Theme detection (detectThemes) and intent detection
+    (detectIntent/checkSafetyRisk's SELF_HARM branch) are UNAFFECTED because they already do
+    substring containment (token.contains(keyword) || keyword.contains(token)), which works even
+    with single-char tokens — only the exact-match sentiment scoring path is broken.
+    Safety-relevant angle: checkSafetyRisk()'s secondary fallback ("severe negative sentiment
+    words score <= -4") can now NEVER fire via free text, because every severe-negative lexicon
+    entry is 2+ characters (绝望/崩溃/撑不住/活不下去/生不如死 etc.) — only the explicit SELF_HARM
+    keyword substring-match path still catches crisis language. The independently-audited real
+    safety pipeline (CrisisKeywordRule/SafetyBoundaryFilter/SafetyReviewService — see
+    inner-cosmos-project memory "Safety pipeline independently re-audited = SOLID") is a SEPARATE,
+    unaffected system; this bug is in the Mock-mode/demo pseudo-semantic layer used for response
+    flavor selection, emotion visualization, and one CRISIS-label check in
+    AuroraMemoryContextServiceImpl:184 — real but secondary, not the primary safety gate.
+    Consumers (grep-verified): MockLlmClient (response tone + demo-mode safety block flavor),
+    EmotionSpectrumDeriver, MemorySettlementServiceImpl, ThoughtShredderServiceImpl,
+    EmotionInsightServiceImpl, AuroraContentLibrary, AuroraAgentServiceImpl, AuroraMemoryContextServiceImpl.
+  workaround_applied_this_checkpoint: |
+    CapsuleServiceImpl's new scene-conflict detection (Campaign C item 2) does NOT depend on the
+    broken calculateSentiment path — it uses a small self-contained substring-based
+    sceneSentiment() classifier (POSITIVE_WORDS/NEGATIVE_WORDS sets, whole-text String.contains),
+    deliberately independent of PseudoSemanticAnalyzer, so the new feature works correctly today.
+    This is a properly scoped local fix, not a fix of the shared root cause.
   next_machine_actions:
-    - NEXT once full suite confirms green — commit, then continue down the Campaign C punch list. Remaining actionable-without-credentials item: none left that don't need either a real LLM provider (items 1/2/6) or are lower-value polish (item 5, item 7). Consider starting item 2 (a real compiler with feature extraction/conflict handling/scene indexing) since even without a real provider, the compiler's STRUCTURAL quality (which claims/styles/scenes it selects, whether it correctly handles conflicting authorized memories) is measurable and improvable independent of model quality — or pick a different front if a fresher experience/safety gap surfaces first.
-    - Campaign B eval dataset growth and the ai-lab fabricated-adapter fix remain queued but lower priority than new experience/safety gaps.
+    - NEXT — fix PseudoSemanticAnalyzer.calculateSentiment (and the checkSafetyRisk severe-word
+      fallback) to match via substring containment against the ORIGINAL text (mirroring how
+      detectThemes/detectIntent already correctly work) instead of exact-match against
+      single-character tokens. This is a shared, widely-consumed file — after fixing, re-run
+      the full consumer test surface before committing — EmotionSpectrumDeriverTest,
+      MockLlmClientAuroraDispatchTest, ThoughtShredderServiceImplTest,
+      EmotionInsightServiceImplTest, MemorySettlementServiceImpl's tests (check for one),
+      AuroraMemoryContextServiceImpl tests, plus any test asserting a specific NEUTRAL score that
+      might have been silently relying on the broken behavior. Expect some existing tests may
+      have encoded the CURRENT (broken) NEUTRAL-everything behavior as their expected value —
+      those need judgment — fix the test's expectation to the now-correct sentiment, don't revert
+      the fix to keep a stale test green.
+    - AFTER that — return to Campaign C priority_queue below (item 1 real fidelity signal is
+      already partially addressed by the RUN prior to this — re-check; items 5/7 remain lower
+      priority; item 6 remains human-gated).
 
 priority_queue:
   - id: CAMPAIGN-C-QUALITY
     reason: |
       Explore-agent punch list, ranked by user-visible fidelity/trust impact — updated as items close:
-      1. OPEN — No real fidelity signal exists. CapsuleGenomeServiceImpl.compile()'s evaluationJson is a structural-eligibility checklist (ownerBound/currentOnly/authorizedMemoryCount), not a fidelity/leakage score. Blocks the whole Campaign C acceptance scenario (same user's long-prompt baseline vs compiled Genome, blind-tested).
-      2. OPEN — The "compiler" is a thin pass-through: CapsuleServiceImpl.inferStyleProfile() is keyword-substring matching and buildContextPreview() just truncates joined summaries to 420 chars — functionally similar to the "long prompt" baseline it's supposed to beat. No feature extraction, conflict handling, scene indexing, or critic pass exists anywhere.
-      3. DONE this checkpoint — CapsuleSandboxServiceImpl feedback is no longer write-only; aggregated per-Genome-version and surfaced in CapsuleWorkbench (fidelitySummary/CapsuleFidelitySummaryVO). Does not gate publish (kept as a visible signal, matching "反馈只成为下一版的改进信号" rather than a hard block).
-      4. DONE this checkpoint — Simulator capability contract (CapsuleService.createSimulatorCapsule + EchoCapsule.simulatorOnly) requires a distinct SIMULATOR_AUTHORIZED consent scope per memory and is permanently excluded from publish/plaza/matching/real persona chat.
-      5. OPEN — Matching (CapsuleServiceImpl matchedCapsules/strategySignal, ResonanceMatchStrategy enum) is a real, explainable, switchable lexical/theme-family heuristic (14 passing tests in CapsuleMatchingTest) but not similarity/embedding-based and has no diversity/safety-filter stage baked into scoring.
+      1. OPEN — No real fidelity signal exists. CapsuleGenomeServiceImpl.compile()'s evaluationJson is a structural-eligibility checklist (ownerBound/currentOnly/authorizedMemoryCount), not a fidelity/leakage score. Blocks the whole Campaign C acceptance scenario (same user's long-prompt baseline vs compiled Genome, blind-tested). NOTE: evaluationJson now ALSO carries sceneCount/conflictCount (item 2 below) — still not a fidelity/leakage score, this item is still open.
+      2. DONE this checkpoint — CapsuleServiceImpl.inferStyleProfile()/buildContextPreview() were a thin pass-through (keyword-substring voice guess + 420-char truncation). Rewrote both as real feature extraction: theme-family frequency aggregation (reusing themesOf/PseudoSemanticAnalyzer theme detection, which is NOT affected by the sentiment bug above) drives voice descriptors with a sample-size confidence score; buildContextPreview now does real scene indexing (groups authorized memories by dominant theme family, deterministic FAMILY_ORDER tie-break for multi-family cards, highest-gravity representative excerpt per scene) and real conflict handling (a scene with both a POSITIVE and a NEGATIVE memory — via the new local sceneSentiment() classifier — is flagged in a `conflicts` array instead of being silently blended into one voice). CapsuleGenomeServiceImpl bumped to compiler-genome.v2 and evaluationJson now exposes sceneCount/conflictCount as measurable structural-quality metrics. New test: CapsuleGenomeServiceIntegrationTest.compilerIndexesDistinctScenesAndFlagsOpposingSentimentAsConflict (real SpringBootTest, real H2, asserts distinct scenes, conflict flag, evaluationJson metrics). 6/6 green in that class; CapsuleMatchingTest 16/16, CapsuleQuotaIntegrationTest 5/5, DataMaskingService(ConsentScope)Test unaffected, full compile clean.
+      3. DONE (prior checkpoint) — CapsuleSandboxServiceImpl feedback is no longer write-only; aggregated per-Genome-version and surfaced in CapsuleWorkbench (fidelitySummary/CapsuleFidelitySummaryVO). Does not gate publish (kept as a visible signal, matching "反馈只成为下一版的改进信号" rather than a hard block).
+      4. DONE (prior checkpoint) — Simulator capability contract (CapsuleService.createSimulatorCapsule + EchoCapsule.simulatorOnly) requires a distinct SIMULATOR_AUTHORIZED consent scope per memory and is permanently excluded from publish/plaza/matching/real persona chat.
+      5. OPEN — Matching (CapsuleServiceImpl matchedCapsules/strategySignal, ResonanceMatchStrategy enum) is a real, explainable, switchable lexical/theme-family heuristic (16 passing tests in CapsuleMatchingTest) but not similarity/embedding-based and has no diversity/safety-filter stage baked into scoring.
       6. OPEN, HUMAN-GATED — No real LLM provider is ever exercised for capsule work in tests/evidence — INNO-EVAL-001/known-limitations.md explicitly says real-Provider comparison is BLOCKED_BY_CREDENTIAL_GATE (human gate: REAL-PROVIDER-CREDENTIALS-AND-BLIND-REVIEW). Items 1/2's TRUE fidelity delta can't be proven without this.
       7. OPEN — No adversarial/boundary Java tests (counter-prompt-attack, unfamiliar-scenario stability) exist — only structural/version-chain/matching tests.
   - id: CAMPAIGN-B-EXPERIENCE

@@ -2,6 +2,7 @@ package com.innercosmos.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.innercosmos.ai.agent.CapsuleAgent;
 import com.innercosmos.dto.CapsuleCreateRequest;
 import com.innercosmos.entity.CapsuleBoundary;
@@ -26,6 +27,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +43,7 @@ public class CapsuleServiceImpl implements CapsuleService {
     private final UserPortraitMapper userPortraitMapper;
     private final AuthorizedMemoryRefMapper authorizedMemoryRefMapper;
     private final CapsuleGenomeService genomeService;
+    private final ObjectMapper objectMapper;
 
     public CapsuleServiceImpl(EchoCapsuleMapper capsuleMapper,
                               CapsuleBoundaryMapper boundaryMapper,
@@ -48,7 +51,8 @@ public class CapsuleServiceImpl implements CapsuleService {
                               MemoryCardMapper memoryCardMapper,
                               UserPortraitMapper userPortraitMapper,
                               AuthorizedMemoryRefMapper authorizedMemoryRefMapper,
-                              CapsuleGenomeService genomeService) {
+                              CapsuleGenomeService genomeService,
+                              ObjectMapper objectMapper) {
         this.capsuleMapper = capsuleMapper;
         this.boundaryMapper = boundaryMapper;
         this.capsuleAgent = capsuleAgent;
@@ -56,6 +60,7 @@ public class CapsuleServiceImpl implements CapsuleService {
         this.userPortraitMapper = userPortraitMapper;
         this.authorizedMemoryRefMapper = authorizedMemoryRefMapper;
         this.genomeService = genomeService;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -87,8 +92,8 @@ public class CapsuleServiceImpl implements CapsuleService {
         capsule.publicTags = toJsonArray(request.publicTags, "self-resonance");
         capsule.authorizedMemoryIds = toJsonArray(authorizedCards.stream().map(card -> String.valueOf(card.id)).toList());
         capsule.ownerContextNote = request.ownerContextNote;
-        capsule.styleProfileJson = request.styleProfileJson == null ? inferStyleProfile(memorySummaries) : request.styleProfileJson;
-        capsule.contextPreviewJson = request.contextPreviewJson == null ? buildContextPreview(memorySummaries, capsule.publicTags, capsule.ownerContextNote) : request.contextPreviewJson;
+        capsule.styleProfileJson = request.styleProfileJson == null ? inferStyleProfile(authorizedCards) : request.styleProfileJson;
+        capsule.contextPreviewJson = request.contextPreviewJson == null ? buildContextPreview(authorizedCards, capsule.publicTags, capsule.ownerContextNote) : request.contextPreviewJson;
         capsule.standInEnabled = request.standInEnabled == null ? false : request.standInEnabled;
         capsule.realContactPolicy = request.realContactPolicy == null ? "LETTER_ONLY" : request.realContactPolicy;
         capsule.echoEnergy = 0.72;
@@ -144,9 +149,9 @@ public class CapsuleServiceImpl implements CapsuleService {
         capsule.publicTags = toJsonArray(request.publicTags, "simulator-only");
         capsule.authorizedMemoryIds = toJsonArray(authorizedCards.stream().map(card -> String.valueOf(card.id)).toList());
         capsule.ownerContextNote = request.ownerContextNote;
-        capsule.styleProfileJson = request.styleProfileJson == null ? inferStyleProfile(memorySummaries) : request.styleProfileJson;
+        capsule.styleProfileJson = request.styleProfileJson == null ? inferStyleProfile(authorizedCards) : request.styleProfileJson;
         capsule.contextPreviewJson = request.contextPreviewJson == null
-                ? buildContextPreview(memorySummaries, capsule.publicTags, capsule.ownerContextNote) : request.contextPreviewJson;
+                ? buildContextPreview(authorizedCards, capsule.publicTags, capsule.ownerContextNote) : request.contextPreviewJson;
         capsule.standInEnabled = false;
         capsule.realContactPolicy = "LETTER_ONLY";
         capsule.echoEnergy = 0.0;
@@ -195,7 +200,7 @@ public class CapsuleServiceImpl implements CapsuleService {
         }
         capsule.lastMemoryUpdateAt = LocalDateTime.now();
         if (capsule.contextPreviewJson == null || capsule.contextPreviewJson.isBlank()) {
-            capsule.contextPreviewJson = buildContextPreview(List.of(capsule.intro), capsule.publicTags, capsule.ownerContextNote);
+            capsule.contextPreviewJson = buildFallbackContextPreview(capsule.intro, capsule.publicTags, capsule.ownerContextNote);
         }
         capsuleMapper.updateById(capsule);
         return capsule;
@@ -667,9 +672,9 @@ public class CapsuleServiceImpl implements CapsuleService {
                 (card.title == null ? "" : card.title) + ": " + (card.summary == null ? "" : card.summary)).toList();
         capsule.personaPrompt = capsuleAgent.generateUserPersona(
                 userId, summaries, capsule.pseudonym, capsule.intro);
-        capsule.styleProfileJson = inferStyleProfile(summaries);
+        capsule.styleProfileJson = inferStyleProfile(cards);
         capsule.contextPreviewJson = buildContextPreview(
-                summaries, capsule.publicTags, capsule.ownerContextNote);
+                cards, capsule.publicTags, capsule.ownerContextNote);
         capsule.visibilityStatus = "PRIVATE";
         capsule.isPublic = false;
         capsule.lastMemoryUpdateAt = LocalDateTime.now();
@@ -732,21 +737,170 @@ public class CapsuleServiceImpl implements CapsuleService {
         return type + " · " + strategy.label + "：" + String.join("、", themeFamilies.stream().limit(3).toList()) + "。";
     }
 
-    private String inferStyleProfile(List<String> memorySummaries) {
-        String joined = String.join("\n", memorySummaries);
-        List<String> style = new ArrayList<>();
-        if (joined.contains("真实") || joined.contains("模板")) style.add("对空泛话术敏感");
-        if (joined.contains("项目") || joined.contains("行动")) style.add("重视可验证的小行动");
-        if (joined.contains("关系") || joined.contains("朋友")) style.add("在关系中重视被认真回应");
-        if (style.isEmpty()) style.add("温和、诚实、慢热");
-        return "{\"voice\":\"" + String.join("，", style) + "\",\"notBeautified\":true,\"boundary\":\"只呈现授权后的真实片段，不替本人承诺\"}";
+    // Feature-extraction voice descriptors keyed by the 6 real PseudoSemanticAnalyzer theme
+    // families (see THEME_FAMILIES/FAMILY_ORDER above) — generalizes the old 3 hardcoded
+    // substring checks into a signal derived from every authorized memory, not just wording.
+    private static final Map<String, String> VOICE_BY_THEME = Map.of(
+            "任务压力", "重视可验证的小行动，不喜欢空泛的鼓励",
+            "关系牵动", "在关系中重视被认真回应，不喜欢被敷衍",
+            "情绪承压", "对被评判或被催促\"赶紧好起来\"敏感",
+            "认知探索", "喜欢把话说透彻，不喜欢被简化总结",
+            "自我评价", "对自我否定的措辞敏感，需要被谨慎回应",
+            "希望期待", "愿意谈期待和向往，但不喜欢空泛的正能量"
+    );
+
+    // Substring-based sentiment classification, deliberately independent of
+    // PseudoSemanticAnalyzer.calculateSentiment: that method tokenizes Chinese text into single
+    // characters but scores via exact lookup against a mostly multi-character lexicon, so it
+    // silently returns NEUTRAL for nearly all real sentences (verified: 4/4 clearly emotional
+    // probe sentences scored 0.0). Theme detection in the same analyzer is unaffected — it
+    // already matches via substring containment — which is exactly the pattern mirrored here.
+    private static final Set<String> POSITIVE_WORDS = Set.of(
+            "开心", "高兴", "快乐", "幸福", "满足", "欣慰", "喜悦", "愉快", "轻松", "放松",
+            "顺利", "成功", "希望", "期待", "憧憬", "释然", "解脱", "温暖", "感激", "安心");
+    private static final Set<String> NEGATIVE_WORDS = Set.of(
+            "难过", "伤心", "委屈", "失望", "沮丧", "痛苦", "煎熬", "折磨", "焦虑", "崩溃",
+            "绝望", "撑不住", "孤独", "孤单", "没人懂", "害怕", "恐惧", "吵架", "冲突",
+            "分手", "冷战", "闹翻", "生气", "愤怒", "委靡", "累垮");
+
+    private String sceneSentiment(String text) {
+        if (text == null || text.isBlank()) return "NEUTRAL";
+        boolean positive = POSITIVE_WORDS.stream().anyMatch(text::contains);
+        boolean negative = NEGATIVE_WORDS.stream().anyMatch(text::contains);
+        if (positive && negative) return "MIXED";
+        if (positive) return "POSITIVE";
+        if (negative) return "NEGATIVE";
+        return "NEUTRAL";
     }
 
-    private String buildContextPreview(List<String> memorySummaries, String publicTags, String note) {
-        return "{\"visibleSummary\":\"" + escapeJson(String.join(" / ", memorySummaries).replaceAll("\\s+", " ").substring(0, Math.min(420, String.join(" / ", memorySummaries).length()))) +
-                "\",\"publicTags\":" + (publicTags == null || publicTags.isBlank() ? "[]" : publicTags) +
-                ",\"ownerNote\":\"" + escapeJson(note == null ? "" : note) +
-                "\",\"privacy\":\"不包含原始对话全文、联系方式、真实身份和未授权记忆\"}";
+    /**
+     * Real feature extraction over the authorized memory set: aggregates PseudoSemanticAnalyzer
+     * theme families (weighted by frequency) into voice descriptors, and tracks the dominant
+     * sentiment plus a sample-size-derived confidence so downstream consumers can see how much
+     * signal actually backs the profile, rather than a single keyword-substring guess.
+     */
+    private String inferStyleProfile(List<MemoryCard> cards) {
+        Map<String, Integer> themeFreq = new LinkedHashMap<>();
+        Map<String, Double> sentimentWeight = new LinkedHashMap<>();
+        for (MemoryCard card : cards) {
+            String text = joinText(card.title, card.summary,
+                    String.join(" ", parseTags(card.keywordTags)),
+                    String.join(" ", parseTags(card.emotionTags)));
+            if (text.isBlank()) continue;
+            mergeThemes(themeFreq, themesOf(text));
+            double gravity = card.emotionalGravity == null ? 0.5 : Math.max(0, Math.min(1, card.emotionalGravity));
+            sentimentWeight.merge(sceneSentiment(text), 0.5 + gravity * 0.5, Double::sum);
+        }
+        List<String> voice = themeFreq.entrySet().stream()
+                .sorted(Map.Entry.<String, Integer>comparingByValue().reversed()
+                        .thenComparingInt(e -> FAMILY_ORDER.indexOf(e.getKey())))
+                .limit(2)
+                .map(e -> VOICE_BY_THEME.get(e.getKey()))
+                .filter(java.util.Objects::nonNull)
+                .toList();
+        List<String> style = new ArrayList<>(voice);
+        if (style.isEmpty()) style.add("温和、诚实、慢热");
+        String dominantSentiment = sentimentWeight.entrySet().stream()
+                .max(Map.Entry.comparingByValue())
+                .map(Map.Entry::getKey).orElse("NEUTRAL");
+
+        Map<String, Object> profile = new LinkedHashMap<>();
+        profile.put("voice", String.join("，", style));
+        profile.put("dominantSentiment", dominantSentiment);
+        profile.put("themeSignals", themeFreq);
+        profile.put("sampleSize", cards.size());
+        profile.put("confidence", Math.round(Math.min(1.0, cards.size() / 5.0) * 100.0) / 100.0);
+        profile.put("notBeautified", true);
+        profile.put("boundary", "只呈现授权后的真实片段，不替本人承诺");
+        return write(profile);
+    }
+
+    /**
+     * Real scene indexing + conflict handling: groups authorized memories by dominant theme
+     * family into scenes (instead of a single 420-char truncation of everything concatenated),
+     * picks the highest-gravity memory per scene as its representative excerpt, and flags a
+     * scene as conflicting when it holds both a POSITIVE and a NEGATIVE/CRISIS memory — so the
+     * compiler surfaces the disagreement instead of quietly blending it into one voice.
+     */
+    private String buildContextPreview(List<MemoryCard> cards, String publicTags, String note) {
+        Map<String, List<MemoryCard>> byScene = new LinkedHashMap<>();
+        for (MemoryCard card : cards) {
+            String text = joinText(card.title, card.summary, String.join(" ", parseTags(card.keywordTags)));
+            Set<String> families = themesOf(text);
+            // A card can match >1 family (substring-based theme detection over single Chinese
+            // characters can cross-match, e.g. "日期" collides with the "期待" keyword) — break
+            // ties deterministically via the same FAMILY_ORDER convention used elsewhere in this
+            // class, instead of an arbitrary Set iteration order.
+            String scene = families.isEmpty() ? "日常片段"
+                    : FAMILY_ORDER.stream().filter(families::contains).findFirst()
+                            .orElseGet(() -> families.iterator().next());
+            byScene.computeIfAbsent(scene, k -> new ArrayList<>()).add(card);
+        }
+
+        List<Map<String, Object>> scenes = new ArrayList<>();
+        List<Map<String, Object>> conflicts = new ArrayList<>();
+        for (Map.Entry<String, List<MemoryCard>> entry : byScene.entrySet()) {
+            List<MemoryCard> members = entry.getValue();
+            MemoryCard representative = members.stream()
+                    .max(Comparator.comparingDouble(c -> c.emotionalGravity == null ? 0.0 : c.emotionalGravity))
+                    .orElse(members.get(0));
+            String excerpt = ((representative.title == null ? "" : representative.title) + ": "
+                    + (representative.summary == null ? "" : representative.summary)).replaceAll("\\s+", " ").trim();
+            excerpt = excerpt.substring(0, Math.min(160, excerpt.length()));
+
+            Set<String> sentimentLabels = new LinkedHashSet<>();
+            for (MemoryCard member : members) {
+                String memberText = joinText(member.title, member.summary,
+                        String.join(" ", parseTags(member.emotionTags)));
+                sentimentLabels.add(sceneSentiment(memberText));
+            }
+            boolean conflict = sentimentLabels.contains("MIXED")
+                    || (sentimentLabels.contains("POSITIVE") && sentimentLabels.contains("NEGATIVE"));
+
+            Map<String, Object> scene = new LinkedHashMap<>();
+            scene.put("theme", entry.getKey());
+            scene.put("memoryCount", members.size());
+            scene.put("excerpt", excerpt);
+            scene.put("sentimentLabels", sentimentLabels);
+            scene.put("conflict", conflict);
+            scenes.add(scene);
+            if (conflict) {
+                conflicts.add(Map.of("theme", entry.getKey(),
+                        "note", "同一主题下存在情绪相反的记忆，不做单一定论，需谨慎表达"));
+            }
+        }
+        scenes.sort(Comparator.comparingInt((Map<String, Object> s) -> (Integer) s.get("memoryCount")).reversed());
+        List<Map<String, Object>> topScenes = scenes.stream().limit(5).toList();
+
+        Map<String, Object> preview = new LinkedHashMap<>();
+        preview.put("scenes", topScenes);
+        preview.put("conflicts", conflicts);
+        preview.put("publicTags", parseTags(publicTags));
+        preview.put("ownerNote", note == null ? "" : note);
+        preview.put("privacy", "不包含原始对话全文、联系方式、真实身份和未授权记忆");
+        return write(preview);
+    }
+
+    /** No authorized memories exist yet (e.g. a freshly-created capsule) — a single-scene stub. */
+    private String buildFallbackContextPreview(String intro, String publicTags, String note) {
+        Map<String, Object> preview = new LinkedHashMap<>();
+        preview.put("scenes", List.of(Map.of(
+                "theme", "日常片段", "memoryCount", 0,
+                "excerpt", intro == null ? "" : intro,
+                "sentimentLabels", List.of(), "conflict", false)));
+        preview.put("conflicts", List.of());
+        preview.put("publicTags", parseTags(publicTags));
+        preview.put("ownerNote", note == null ? "" : note);
+        preview.put("privacy", "不包含原始对话全文、联系方式、真实身份和未授权记忆");
+        return write(preview);
+    }
+
+    private String write(Object value) {
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (Exception impossible) {
+            throw new IllegalStateException("Unable to serialize capsule compiler output", impossible);
+        }
     }
 
     private String stringValue(Object value) {
@@ -778,9 +932,5 @@ public class CapsuleServiceImpl implements CapsuleService {
             }
         }
         return result;
-    }
-
-    private String escapeJson(String value) {
-        return value == null ? "" : value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 }

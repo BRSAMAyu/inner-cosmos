@@ -55,7 +55,8 @@ class CapsuleMatchingTest {
     @BeforeEach
     void setUp() {
         service = new CapsuleServiceImpl(echoCapsuleMapper, boundaryMapper, capsuleAgent,
-                memoryCardMapper, userPortraitMapper, authorizedMemoryRefMapper, genomeService);
+                memoryCardMapper, userPortraitMapper, authorizedMemoryRefMapper, genomeService,
+                new com.fasterxml.jackson.databind.ObjectMapper());
         // default: no portrait rows unless a test overrides
         lenient().when(userPortraitMapper.selectList(any())).thenReturn(new ArrayList<>());
     }

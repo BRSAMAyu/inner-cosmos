@@ -1,6 +1,7 @@
 package com.innercosmos.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.innercosmos.entity.CapsuleGenomeVersion;
 import com.innercosmos.entity.EchoCapsule;
@@ -12,12 +13,17 @@ import com.innercosmos.service.CapsuleGenomeService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 @Service
 public class CapsuleGenomeServiceImpl implements CapsuleGenomeService {
-    static final String COMPILER_VERSION = "capsule-genome.v1";
+    // v2: contextPreviewJson now carries real scene indexing (per-theme grouping,
+    // highest-gravity representative excerpt) and conflict handling (opposing-sentiment
+    // memories in the same scene flagged rather than blended) instead of a flat 420-char
+    // truncation — see CapsuleServiceImpl.buildContextPreview/inferStyleProfile.
+    static final String COMPILER_VERSION = "capsule-genome.v2";
     private final CapsuleGenomeVersionMapper genomeMapper;
     private final EchoCapsuleMapper capsuleMapper;
     private final ObjectMapper objectMapper;
@@ -71,13 +77,17 @@ public class CapsuleGenomeServiceImpl implements CapsuleGenomeService {
         genome.compiledPersonaPrompt = capsule.personaPrompt == null ? "" : capsule.personaPrompt;
         genome.styleProfileJson = capsule.styleProfileJson;
         genome.contextPreviewJson = capsule.contextPreviewJson;
-        genome.evaluationJson = write(Map.of(
-                "schemaVersion", "capsule-compiler-evaluation.v1",
-                "ownerBound", ownerBound,
-                "currentOnly", currentOnly,
-                "authorizedMemoryCount", authorizedCards.size(),
-                "identityDisclosureAllowed", false,
-                "runtimeEligible", true));
+        Map<String, Object> evaluation = new LinkedHashMap<>();
+        evaluation.put("schemaVersion", "capsule-compiler-evaluation.v2");
+        evaluation.put("ownerBound", ownerBound);
+        evaluation.put("currentOnly", currentOnly);
+        evaluation.put("authorizedMemoryCount", authorizedCards.size());
+        evaluation.put("identityDisclosureAllowed", false);
+        evaluation.put("runtimeEligible", true);
+        // Real structural feature-extraction metrics — measurable and improvable independent
+        // of any LLM provider (对齐文档/16 Campaign C punch-list item 2).
+        evaluation.putAll(sceneMetrics(capsule.contextPreviewJson));
+        genome.evaluationJson = write(evaluation);
         genome.changeReason = reason;
         genomeMapper.insert(genome);
         capsule.activeGenomeVersionId = genome.id;
@@ -129,6 +139,29 @@ public class CapsuleGenomeServiceImpl implements CapsuleGenomeService {
         current.status = status;
         current.changeReason = reason;
         genomeMapper.updateById(current);
+    }
+
+    /**
+     * Reads the scene-indexing/conflict-handling output CapsuleServiceImpl already computed
+     * into contextPreviewJson. Defaults to zero rather than throwing when contextPreviewJson
+     * predates the v2 compiler or was hand-supplied by a caller in a different shape.
+     */
+    private Map<String, Object> sceneMetrics(String contextPreviewJson) {
+        int sceneCount = 0;
+        int conflictCount = 0;
+        try {
+            if (contextPreviewJson != null && !contextPreviewJson.isBlank()) {
+                JsonNode root = objectMapper.readTree(contextPreviewJson);
+                if (root.hasNonNull("scenes")) sceneCount = root.get("scenes").size();
+                if (root.hasNonNull("conflicts")) conflictCount = root.get("conflicts").size();
+            }
+        } catch (Exception notV2Shape) {
+            // Older/foreign contextPreviewJson shape — metrics stay 0, not a compile failure.
+        }
+        Map<String, Object> metrics = new LinkedHashMap<>();
+        metrics.put("sceneCount", sceneCount);
+        metrics.put("conflictCount", conflictCount);
+        return metrics;
     }
 
     private String write(Object value) {

@@ -1,5 +1,7 @@
 package com.innercosmos.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.innercosmos.dto.CapsuleCreateRequest;
 import com.innercosmos.dto.CapsuleSandboxFeedbackRequest;
 import com.innercosmos.entity.CapsuleGenomeVersion;
@@ -13,6 +15,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.stream.StreamSupport;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -28,6 +31,7 @@ class CapsuleGenomeServiceIntegrationTest {
     @Autowired CapsuleGenomeService genomeService;
     @Autowired PersonaChatService personaChatService;
     @Autowired CapsuleSandboxService sandboxService;
+    @Autowired ObjectMapper objectMapper;
 
     @Test
     @Transactional
@@ -218,6 +222,69 @@ class CapsuleGenomeServiceIntegrationTest {
         assertThrows(BusinessException.class, () -> sandboxService.fidelitySummary(stranger, capsule.id));
     }
 
+    @Test
+    @Transactional
+    void compilerIndexesDistinctScenesAndFlagsOpposingSentimentAsConflict() throws Exception {
+        // Campaign C punch-list item 2: the compiler must do real feature extraction (scene
+        // indexing by theme, not a flat 420-char truncation) and real conflict handling
+        // (opposing-sentiment memories on the same theme surfaced, not silently blended).
+        // Keyword-style summaries (not natural prose) — the same convention CapsuleMatchingTest
+        // already relies on, since PseudoSemanticAnalyzer's theme detection runs on individual
+        // Chinese characters and free prose collides across families far too easily (e.g. any
+        // "试" collides with the "考试" keyword) to isolate a single theme deterministically.
+        Long owner = seedUser("compiler-quality-owner");
+        Long warmMemory = seedMemory(owner, "片段",
+                "朋友 顺利 轻松", "AURORA_PRIVATE");
+        Long conflictMemory = seedMemory(owner, "片段",
+                "朋友 吵架 难过 委屈", "AURORA_PRIVATE");
+        Long unrelatedMemory = seedMemory(owner, "片段",
+                "项目 任务 截止", "AURORA_PRIVATE");
+
+        CapsuleCreateRequest request = new CapsuleCreateRequest();
+        request.pseudonym = "编译质量样本";
+        request.memoryIds = List.of(warmMemory, conflictMemory, unrelatedMemory);
+        request.visibilityStatus = "PRIVATE";
+        request.isPublic = false;
+        EchoCapsule capsule = capsuleService.createFromMemory(owner, request);
+        CapsuleGenomeVersion genome = genomeService.current(capsule.id);
+
+        JsonNode preview = objectMapper.readTree(capsule.contextPreviewJson);
+        JsonNode scenes = preview.get("scenes");
+        assertEquals(2, scenes.size(), "distinct-theme memories must land in distinct scenes, "
+                + "not one flat truncation");
+
+        JsonNode relationshipScene = findScene(scenes, "关系牵动");
+        assertNotNull(relationshipScene, "关系牵动 theme must be indexed as its own scene");
+        assertEquals(2, relationshipScene.get("memoryCount").asInt());
+        assertTrue(relationshipScene.get("conflict").asBoolean(),
+                "a warm and a distressing memory about the same relationship must be flagged, not blended");
+
+        JsonNode taskScene = findScene(scenes, "任务压力");
+        assertNotNull(taskScene, "任务压力 theme must be indexed as its own scene");
+        assertEquals(1, taskScene.get("memoryCount").asInt());
+        assertFalse(taskScene.get("conflict").asBoolean());
+
+        JsonNode conflicts = preview.get("conflicts");
+        assertEquals(1, conflicts.size());
+        assertEquals("关系牵动", conflicts.get(0).get("theme").asText());
+
+        JsonNode styleProfile = objectMapper.readTree(capsule.styleProfileJson);
+        assertTrue(styleProfile.get("voice").asText().contains("在关系中重视被认真回应"),
+                "the dominant theme (2 of 3 memories) must drive the voice descriptor");
+        assertEquals(3, styleProfile.get("sampleSize").asInt());
+
+        JsonNode evaluation = objectMapper.readTree(genome.evaluationJson);
+        assertEquals(2, evaluation.get("sceneCount").asInt(),
+                "compiler-evaluation must expose the same structural scene count the preview computed");
+        assertEquals(1, evaluation.get("conflictCount").asInt());
+    }
+
+    private JsonNode findScene(JsonNode scenes, String theme) {
+        return StreamSupport.stream(scenes.spliterator(), false)
+                .filter(scene -> theme.equals(scene.get("theme").asText()))
+                .findFirst().orElse(null);
+    }
+
     private void rate(Long owner, Long capsuleId, Long genomeVersionId, String rating) {
         CapsuleSandboxFeedbackRequest feedback = new CapsuleSandboxFeedbackRequest();
         feedback.genomeVersionId = genomeVersionId;
@@ -235,11 +302,15 @@ class CapsuleGenomeServiceIntegrationTest {
     }
 
     private Long seedMemory(Long owner, String summary, String consentScope) {
+        return seedMemory(owner, "测试记忆", summary, consentScope);
+    }
+
+    private Long seedMemory(Long owner, String title, String summary, String consentScope) {
         jdbc.update("""
                 INSERT INTO tb_memory_card
                     (user_id, title, summary, status, version_no, consent_scope)
-                VALUES (?, '测试记忆', ?, 'ACTIVE', 1, ?)
-                """, owner, summary, consentScope);
+                VALUES (?, ?, ?, 'ACTIVE', 1, ?)
+                """, owner, title, summary, consentScope);
         return jdbc.queryForObject(
                 "SELECT id FROM tb_memory_card WHERE user_id = ? ORDER BY id DESC LIMIT 1",
                 Long.class, owner);
