@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-16T01:12:00+08:00
+updated_at: 2026-07-16T02:14:00+08:00
 authority:
   - goal-objective.md
   - 对齐文档/17-单会话持续Goal模式执行协议.md
@@ -28,26 +28,35 @@ resume_policy:
   update_this_file_at_every_checkpoint: true
 
 active_front:
-  id: CAMPAIGN-B-EXPERIENCE
-  state: EVAL_COVERAGE_COMPLETE_MOVING_TO_DATASET_GROWTH
-  intent: Close the gap between the Campaign B Experience Contract (对齐文档/17-Campaign-B-Inner-Cosmos-Experience-Contract.md) and what a real user can actually trigger through the UI, then extend evaluability beyond CRUD-style tests.
+  id: P0-CAPSULE-PREVIEW-CONSENT-LEAK
+  state: FIXED_PENDING_FULL_SUITE_VERIFICATION
+  intent: While starting Campaign C reconnaissance (Resonance Network / Capsule Genome), found and fixed a real, previously-unpatched P0 privacy defect — per doc-17's priority order this jumps ahead of new campaign work.
   done_this_front_summary:
-    - Fixed the correction form so a "这条不准确了" star button opens UnderstandingCorrection pre-targeted at an exact MEMORY_CARD id (previously only reachable via lucky free-text substring matching), and fixed confirmCorrection never refetching starfield/memories/capsules despite claiming sync. (7472e5f)
-    - Fixed demo seed data never creating real AuthorizedMemoryRef rows, so the capsule-NEEDS_REVIEW propagation path was structurally unreachable even though the backend logic for it was already correct; added a Playwright journey proving the full star->correct->NEEDS_REVIEW path end to end. (b9f61ad)
-    - Built all four doc-16-mandated Campaign B scored/labeled evals (reports under target/evaluation/, each gated on honestly-calibrated thresholds, not rigged-to-pass numbers): retrieval relevance (pre-existing, MemoryRetrievalEvaluationTest), correction-targeting precision (f651c19: MEMORY_CARD 1.0/1.0, free-text 0.778/1.0 — quantifies the exact fragility the star-targeting fix routes around), forgetting completeness (cd3b56c: 0/6 leaked surfaces across memory row/starfield/retrieval + 5 derived tables + rollback-refusal, after fixing a false-positive in the eval's own query-echo design), and conflict handling (this checkpoint: 0/4 violations across sequential-confirm and retract-latest/retract-older/retract-middle interleavings, including a case — retracting an older, already-superseded correction — that no prior structural test covered).
-    - Playwright 13/13 (was 11 at session start), Vitest 33/33, AuroraApp down from 1210 to ~1000 lines with 8 domain components extracted.
+    - Campaign B closed out (see priority_queue entry below for the compact summary); AuroraApp.tsx AppShell decomposition also converged (1210 -> ~1000 lines, 8 components).
+    - Dispatched an Explore agent to survey Campaign C readiness (Capsule Genome compiler, fidelity eval, Simulator isolation, matching layer, sandbox feedback aggregation) — full punch list captured below in CAMPAIGN-C-QUALITY's reason field so the next front can start implementing immediately instead of re-researching.
+    - While tracing the capsule-preview code path during that research, found DataMaskingServiceImpl.previewFromMemory (the strict de-identified preview shown BEFORE a user confirms capsule creation, hit via POST /api/capsule/preview-from-memory) never filtered by consentScope — unlike createFromMemory and recompileGenome, which both correctly exclude LOCAL_ONLY/NO_EXTERNAL_PROCESSING memories. A user's own memory marked "never process externally" would still have its title/summary (PII-pattern-masked only, not consent-filtered) and keyword tags surfaced in the pre-consent preview. The existing DataMaskingServiceTest is pure Mockito (stubs memoryCardMapper.selectList(any()) to return a fixed list regardless of the query), so it structurally could not have caught this — a real Spring+H2 integration test was needed and didn't exist.
+    - Fixed: filter loaded cards by consentScope before any masking/summary/tag/pseudonym generation, and honestly disclose the exclusion in riskWarnings/removedSensitiveItems (the frontend CapsuleWorkbench already renders both fields generically, so no frontend change was needed). Added DataMaskingServiceConsentScopeIntegrationTest (2 cases) using a real MemoryCardMapper against H2. Verified rigor by temporarily git-stash-reverting the fix and confirming both new tests fail exactly as expected (2/2 failures) against the original code, then restored the fix and re-confirmed green — this is a real, reproduced-and-fixed bug, not a hypothetical.
+    - Full `mvn test` re-running in the background given this touches a shared service used by every capsule-creation entry point.
   next_machine_actions:
-    - NEXT — Campaign B's doc-16-mandated eval *dimensions* are now all covered. Remaining eval-quality work is dataset growth: MemoryRetrievalEvaluationTest's dataset is tiny (12 memories/10 cases, one annotator) and the three new evals are also single-annotator/synthetic — grow case counts and add a held-out set once time allows, or move to the next-highest-value Campaign B/C/D gap if dataset growth is judged lower value than a new experience gap.
-    - FLAGGED, NOT YET FIXED — ai-lab/adapters/current_production.py (`CurrentProductionContractAdapter`) is an honestly self-labeled offline fixture (system.availability="AVAILABLE_CONTRACT_FIXTURE") that echoes each scenario's own `expected` block back as the "result" rather than driving the real backend/LLM. Not currently cited in docs/goal/complete-product-acceptance.yml (confirmed via grep), so not an active integrity violation today, but would become one if cited as live verification later. Real fix = a real adapter driving the live backend + a real LLM provider; left unfixed given its size.
-    - Consider whether UNIFIED-FIVE-SPACE-APPSHELL's remaining inline surface (bootstrap wiring, wake-intent Returns section, hero/mode-nav composition, Login in AuroraApp.tsx) needs further decomposition, or whether it's orchestration that doesn't block a real experience gap and can stay as-is.
+    - NEXT once full suite confirms green — commit this P0 fix, then move to CAMPAIGN-C-QUALITY using the punch list already captured in that queue entry below (no further research needed to start).
+    - Campaign B eval dataset growth (MemoryRetrievalEvaluationTest and the three new evals are single-annotator/synthetic) remains queued but lower priority than a new experience/safety gap.
+    - ai-lab/adapters/current_production.py fabricated-adapter fix remains flagged, not active (not cited in the acceptance ledger today); still deferred given its size.
 
 priority_queue:
+  - id: CAMPAIGN-C-QUALITY
+    reason: |
+      Explore-agent punch list from this checkpoint, ranked by user-visible fidelity/trust impact — start here, no re-research needed:
+      1. No real fidelity signal exists. CapsuleGenomeServiceImpl.compile()'s evaluationJson is a structural-eligibility checklist (ownerBound/currentOnly/authorizedMemoryCount), not a fidelity/leakage score. This blocks the whole Campaign C acceptance scenario (same user's long-prompt baseline vs compiled Genome, blind-tested).
+      2. The "compiler" is a thin pass-through: CapsuleServiceImpl.inferStyleProfile() is keyword-substring matching and buildContextPreview() just truncates joined summaries to 420 chars — functionally similar to the "long prompt" baseline it's supposed to beat. No feature extraction, conflict handling, scene indexing, or critic pass exists anywhere.
+      3. CapsuleSandboxServiceImpl feedback (LIKE_ME/NOT_ME/FACT_WRONG/TOO_EXPOSED/TONE_WRONG) is write-only — confirmed via grep nothing else reads CapsuleSandboxFeedback/feedbackMapper. Cheapest high-value fix: aggregate per-Genome-version feedback into a score surfaced in CapsuleWorkbench, optionally gating publish on low-fidelity versions.
+      4. No Simulator capability exists (only referenced in docs) — any adversarial/leakage testing today would have to run against a real user's live capsule, violating the "explicitly-authorized separate data" requirement.
+      5. Matching (CapsuleServiceImpl matchedCapsules/strategySignal, ResonanceMatchStrategy enum) is a real, explainable, switchable lexical/theme-family heuristic (14 passing tests in CapsuleMatchingTest) but not similarity/embedding-based and has no diversity/safety-filter stage baked into scoring.
+      6. No real LLM provider is ever exercised for capsule work in tests/evidence — INNO-EVAL-001/known-limitations.md explicitly says real-Provider comparison is BLOCKED_BY_CREDENTIAL_GATE (human gate: REAL-PROVIDER-CREDENTIALS-AND-BLIND-REVIEW). Items 1/2's TRUE fidelity delta can't be proven without this, but items 3/4 are fully actionable without it — start there.
+      7. No adversarial/boundary Java tests (counter-prompt-attack, unfamiliar-scenario stability) exist — only structural/version-chain/matching tests.
   - id: CAMPAIGN-B-EXPERIENCE
-    reason: The correction Experience Contract's propagation promise (star/memory -> preview -> confirm -> starfield/capsule sync) was not reliably reachable through the real UI, the UI did not actually refetch synced state, and demo seed data never populated the AuthorizedMemoryRef rows needed for the capsule NEEDS_REVIEW path to be reachable at all. All three fixed and E2E-verified this checkpoint. Eval-harness scope decisions and eval dataset growth remain open.
+    reason: The correction Experience Contract's propagation promise (star/memory -> preview -> confirm -> starfield/capsule sync) was not reliably reachable through the real UI, the UI did not actually refetch synced state, and demo seed data never populated the AuthorizedMemoryRef rows needed for the capsule NEEDS_REVIEW path to be reachable at all. All three fixed and E2E-verified. All four doc-16-mandated eval dimensions (retrieval relevance, correction-targeting precision, forgetting completeness, conflict handling) now have scored/labeled harnesses with honestly-calibrated thresholds. Remaining work is dataset growth only.
   - id: UNIFIED-FIVE-SPACE-APPSHELL
     reason: Existing capabilities are concentrated in a single oversized Aurora page and do not yet form the specified product information architecture. Largely converged this session (1210 -> ~1000 lines, 8 domain components extracted with tests); only orchestration/hero/login remain inline.
-  - id: CAMPAIGN-C-QUALITY
-    reason: Capsule Genome foundations exist; full runtime fidelity comparison and simulator asset remain open.
   - id: CAMPAIGN-D-TRUST
     reason: Three skills exist; real quality, expert handoff, risk scenarios, and complete bilingual experience remain open.
   - id: CAMPAIGN-E-PRODUCTION

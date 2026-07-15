@@ -39,12 +39,29 @@ public class DataMaskingServiceImpl implements DataMaskingService {
         // Load MemoryCards
         QueryWrapper<MemoryCard> query = new QueryWrapper<>();
         query.eq("user_id", userId).in("id", memoryIds).eq("status", "ACTIVE");
-        List<MemoryCard> cards = memoryCardMapper.selectList(query);
+        List<MemoryCard> loaded = memoryCardMapper.selectList(query);
 
         CapsulePreviewVO preview = new CapsulePreviewVO();
         preview.removedSensitiveItems = new ArrayList<>();
         preview.publicTags = new ArrayList<>();
         preview.riskWarnings = new ArrayList<>();
+
+        // A capsule preview must never surface content the owner marked LOCAL_ONLY or
+        // NO_EXTERNAL_PROCESSING, even though these are the same ids createFromMemory/
+        // recompileGenome already exclude — this preview must not be the one leak point.
+        List<MemoryCard> cards = new ArrayList<>();
+        boolean anyConsentRestricted = false;
+        for (MemoryCard card : loaded) {
+            if ("LOCAL_ONLY".equalsIgnoreCase(card.consentScope) || "NO_EXTERNAL_PROCESSING".equalsIgnoreCase(card.consentScope)) {
+                anyConsentRestricted = true;
+            } else {
+                cards.add(card);
+            }
+        }
+        if (anyConsentRestricted) {
+            preview.riskWarnings.add("部分选中的记忆标记为仅本地使用/禁止外部处理，不会进入这次预览或共鸣体");
+            preview.removedSensitiveItems.add("仅本地使用的记忆");
+        }
 
         // Generate abstract summary with masking applied
         StringBuilder summaryBuilder = new StringBuilder();
