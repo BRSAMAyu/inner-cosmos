@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { api, replayTurnEvents, streamAurora, type CorrectionCommand, type CorrectionImpact, type Notification, type SelfEvolution, type StarfieldScene, type UnderstandingClaim, type WakeIntent } from "./api";
+import { api, replayTurnEvents, streamAurora, type CorrectionCommand, type CorrectionImpact, type MemoryOperation, type Notification, type SelfEvolution, type StarfieldScene, type UnderstandingClaim, type WakeIntent } from "./api";
 import type { AuroraStreamEvent, DialogMessage, TurnStatus } from "./protocol";
 
 type UiMessage = { key: string; speaker: "USER" | "AURORA"; text: string; partial?: boolean };
@@ -35,6 +35,8 @@ export function AuroraApp() {
   const [claims, setClaims] = useState<UnderstandingClaim[]>([]);
   const [starfield, setStarfield] = useState<StarfieldScene | null>(null);
   const [starfieldBusy, setStarfieldBusy] = useState(false);
+  const [memoryOperations, setMemoryOperations] = useState<MemoryOperation[]>([]);
+  const [rollbackBusy, setRollbackBusy] = useState<number | null>(null);
   const [runtimeSignal, setRuntimeSignal] = useState<RuntimeSignal>({ stage: "idle", runtime: "single" });
   const abortRef = useRef<AbortController | null>(null);
   const activeTurnRef = useRef<number | null>(null);
@@ -63,6 +65,7 @@ export function AuroraApp() {
         api.selfEvolution().then(setSelfEvolution),
         api.understandingClaims().then(setClaims),
         api.starfield("TIME").then(setStarfield),
+        api.memoryOperations().then(setMemoryOperations),
         api.notifications().then(setNotifications)
       ]);
       if (call !== bootstrapCallRef.current) return;
@@ -332,6 +335,17 @@ export function AuroraApp() {
     finally { setStarfieldBusy(false); }
   };
 
+  const rollbackMemoryOperation = async (operation: MemoryOperation) => {
+    setRollbackBusy(operation.id);
+    try {
+      const result = await api.rollbackMemoryOperation(operation.id);
+      setMemoryOperations(await api.memoryOperations());
+      setStarfield(await api.starfield(starfield?.mode ?? "TIME"));
+      setStatus(`已撤回这次${operation.operationType}；${result.projectionReceipts.length} 个下游投影留下了重建或复核回执。`);
+    } catch (error) { setStatus(error instanceof Error ? error.message : "这次记忆变更无法安全撤回"); }
+    finally { setRollbackBusy(null); }
+  };
+
   if (authenticated === null) return <main className="login-shell"><div className="login" role="status">正在连接你的内宇宙…</div></main>;
   if (!authenticated) return <Login onSuccess={bootstrap} />;
 
@@ -447,6 +461,15 @@ export function AuroraApp() {
           {starfield.accessibleList.map(star => <li key={star.id}><div><strong>{star.title}</strong><span>{star.theme} · {star.memoryLayer}</span></div>
             <small>置信度 {Math.round(star.confidence * 100)}% · v{star.versionNo}</small><p>{star.summary}</p></li>)}
         </ol>
+        {memoryOperations.length > 0 && <div className="memory-history" aria-label="记忆变更历史">
+          <h3>最近的记忆变更</h3><p>撤回会生成一个新版本，不会抹掉发生过的历史。永久忘记不会恢复原文。</p>
+          {memoryOperations.slice(0, 5).map(operation => <article key={operation.id}>
+            <div><strong>{operation.operationType}</strong><span>v{operation.oldVersion} → v{operation.newVersion} · {operation.status === "ROLLED_BACK" ? "已撤回" : "已生效"}</span></div>
+            {operation.status === "APPLIED" && !["FORGET", "LINK", "NO_OP", "ROLLBACK"].includes(operation.operationType) &&
+              <button type="button" disabled={rollbackBusy !== null} onClick={() => void rollbackMemoryOperation(operation)}>{rollbackBusy === operation.id ? "正在撤回…" : "撤回这次变更"}</button>}
+            {operation.operationType === "FORGET" && <small>原文已删除，不可恢复</small>}
+          </article>)}
+        </div>}
       </section>}
 
       <section className="conversation" aria-live="polite" aria-label="与 Aurora 的对话">

@@ -3,6 +3,7 @@ package com.innercosmos.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.innercosmos.common.ErrorCode;
 import com.innercosmos.dto.MemoryOperationCommand;
@@ -10,12 +11,14 @@ import com.innercosmos.entity.AuthorizedMemoryRef;
 import com.innercosmos.entity.MemoryCard;
 import com.innercosmos.entity.MemoryLink;
 import com.innercosmos.entity.MemoryOperation;
+import com.innercosmos.entity.MemoryProjectionReceipt;
 import com.innercosmos.event.CapsuleSyncTriggerEvent;
 import com.innercosmos.exception.BusinessException;
 import com.innercosmos.mapper.AuthorizedMemoryRefMapper;
 import com.innercosmos.mapper.MemoryCardMapper;
 import com.innercosmos.mapper.MemoryLinkMapper;
 import com.innercosmos.mapper.MemoryOperationMapper;
+import com.innercosmos.mapper.MemoryProjectionReceiptMapper;
 import com.innercosmos.mapper.RelationMentionMapper;
 import com.innercosmos.mapper.ThoughtFragmentMapper;
 import com.innercosmos.mapper.TodoItemMapper;
@@ -41,6 +44,7 @@ public class MemoryLifecycleServiceImpl implements MemoryLifecycleService {
 
     private final MemoryCardMapper memoryMapper;
     private final MemoryOperationMapper operationMapper;
+    private final MemoryProjectionReceiptMapper projectionReceiptMapper;
     private final MemoryLinkMapper linkMapper;
     private final AuthorizedMemoryRefMapper authorizedMemoryRefMapper;
     private final ThoughtFragmentMapper thoughtFragmentMapper;
@@ -51,6 +55,7 @@ public class MemoryLifecycleServiceImpl implements MemoryLifecycleService {
 
     public MemoryLifecycleServiceImpl(MemoryCardMapper memoryMapper,
                                       MemoryOperationMapper operationMapper,
+                                      MemoryProjectionReceiptMapper projectionReceiptMapper,
                                       MemoryLinkMapper linkMapper,
                                       AuthorizedMemoryRefMapper authorizedMemoryRefMapper,
                                       ThoughtFragmentMapper thoughtFragmentMapper,
@@ -60,6 +65,7 @@ public class MemoryLifecycleServiceImpl implements MemoryLifecycleService {
                                       ApplicationEventPublisher eventPublisher) {
         this.memoryMapper = memoryMapper;
         this.operationMapper = operationMapper;
+        this.projectionReceiptMapper = projectionReceiptMapper;
         this.linkMapper = linkMapper;
         this.authorizedMemoryRefMapper = authorizedMemoryRefMapper;
         this.thoughtFragmentMapper = thoughtFragmentMapper;
@@ -196,8 +202,65 @@ public class MemoryLifecycleServiceImpl implements MemoryLifecycleService {
         markAuthorizationsForReview(source, command.operationType());
         MemoryOperation operation = record(userId, command, source, oldVersion, before,
                 "FORGET".equals(command.operationType()) ? "{\"forgotten\":true}" : snapshot(result));
+        List<MemoryProjectionReceipt> receipts = projectionReceipts(userId, operation,
+                command.operationType(), source.size());
         if (!"NO_OP".equals(command.operationType())) eventPublisher.publishEvent(new CapsuleSyncTriggerEvent(userId));
-        return new MemoryOperationResultVO(operation, result);
+        return new MemoryOperationResultVO(operation, result, receipts);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public MemoryOperationResultVO rollback(Long userId, Long operationId) {
+        MemoryOperation target = operationMapper.selectOne(new QueryWrapper<MemoryOperation>()
+                .eq("id", operationId).eq("user_id", userId));
+        if (target == null) throw new BusinessException(ErrorCode.NOT_FOUND, "找不到这次记忆变更");
+        if (!"APPLIED".equals(target.status))
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "这次变更已撤回或不可再次撤回");
+        if (Set.of("FORGET", "LINK", "NO_OP", "ROLLBACK").contains(target.operationType))
+            throw new BusinessException(ErrorCode.BAD_REQUEST,
+                    "这类变更不能自动撤回；忘记不会恢复原文，关系图变更需要单独确认");
+        if (operationMapper.selectCount(new QueryWrapper<MemoryOperation>()
+                .eq("user_id", userId).eq("rollback_of_operation_id", target.id).eq("status", "APPLIED")) > 0)
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "这次变更已经撤回");
+
+        List<MemoryCard> before = parseCards(target.beforeSnapshot);
+        List<MemoryCard> after = parseCards(target.afterSnapshot);
+        LinkedHashSet<Long> affectedIds = new LinkedHashSet<>();
+        before.forEach(card -> affectedIds.add(card.id));
+        after.forEach(card -> affectedIds.add(card.id));
+        List<MemoryCard> current = affectedIds.isEmpty() ? List.of() : memoryMapper.selectList(
+                new QueryWrapper<MemoryCard>().eq("user_id", userId).in("id", affectedIds));
+        String rollbackBefore = snapshot(current);
+
+        Set<Long> sourceIds = before.stream().map(card -> card.id).collect(java.util.stream.Collectors.toSet());
+        List<MemoryCard> restored = new ArrayList<>();
+        if ("ADD".equals(target.operationType)) {
+            for (MemoryCard created : after) restored.add(retireCreated(userId, created.id));
+        } else {
+            for (MemoryCard old : before) restored.add(restore(userId, old));
+            for (MemoryCard created : after) {
+                if (!sourceIds.contains(created.id)) restored.add(retireCreated(userId, created.id));
+            }
+        }
+        deactivateOperationLinks(userId, sourceIds, after.stream().map(card -> card.id)
+                .filter(id -> !sourceIds.contains(id)).collect(java.util.stream.Collectors.toSet()));
+
+        target.status = "ROLLED_BACK";
+        operationMapper.updateById(target);
+        MemoryOperation rollback = new MemoryOperation();
+        rollback.userId = userId; rollback.operationType = "ROLLBACK";
+        rollback.primaryMemoryId = target.primaryMemoryId; rollback.relatedMemoryIds = target.relatedMemoryIds;
+        rollback.oldVersion = target.newVersion;
+        rollback.newVersion = restored.stream().mapToInt(MemoryLifecycleServiceImpl::version).max().orElse(target.newVersion);
+        rollback.beforeSnapshot = rollbackBefore; rollback.afterSnapshot = snapshot(restored);
+        rollback.evidenceRefs = "rollback-operation:" + target.id;
+        rollback.modelName = "none:user-directed"; rollback.promptVersion = "memory-policy.v1";
+        rollback.reasonCode = "USER_ROLLBACK"; rollback.confidence = 1.0; rollback.actorType = "USER";
+        rollback.rollbackOfOperationId = target.id; rollback.status = "APPLIED";
+        operationMapper.insert(rollback);
+        List<MemoryProjectionReceipt> receipts = projectionReceipts(userId, rollback, "ROLLBACK", restored.size());
+        eventPublisher.publishEvent(new CapsuleSyncTriggerEvent(userId));
+        return new MemoryOperationResultVO(rollback, restored, receipts);
     }
 
     @Override
@@ -263,6 +326,71 @@ public class MemoryLifecycleServiceImpl implements MemoryLifecycleService {
         List<AuthorizedMemoryRef> refs = authorizedMemoryRefMapper.selectList(
                 new QueryWrapper<AuthorizedMemoryRef>().in("memory_card_id", ids(source)));
         for (AuthorizedMemoryRef ref : refs) { ref.authorizationStatus = "NEEDS_REVIEW"; authorizedMemoryRefMapper.updateById(ref); }
+    }
+
+    private List<MemoryProjectionReceipt> projectionReceipts(Long userId, MemoryOperation operation,
+                                                              String operationType, int affectedCount) {
+        if ("NO_OP".equals(operationType)) return List.of();
+        List<MemoryProjectionReceipt> result = new ArrayList<>();
+        result.add(receipt(userId, operation.id, "AURORA_RETRIEVAL", "REBUILT", 1,
+                "权威库按查询即时装配；" + affectedCount + " 条记忆已进入新一代 Evidence Pack"));
+        result.add(receipt(userId, operation.id, "STARFIELD", "REBUILT", 1,
+                "时间、主题、人物投影从当前权威状态重新生成"));
+        result.add(receipt(userId, operation.id, "CAPSULE_CONTEXT", "REVIEW_REQUIRED", 1,
+                "公开共鸣体不静默改写；受影响授权必须重新确认"));
+        return result;
+    }
+
+    private MemoryProjectionReceipt receipt(Long userId, Long operationId, String projection,
+                                              String status, int generation, String detail) {
+        MemoryProjectionReceipt row = new MemoryProjectionReceipt();
+        row.userId = userId; row.operationId = operationId; row.projectionType = projection;
+        row.status = status; row.generation = generation; row.detail = detail;
+        projectionReceiptMapper.insert(row); return row;
+    }
+
+    private List<MemoryCard> parseCards(String json) {
+        if (json == null || json.isBlank() || !json.trim().startsWith("[")) return List.of();
+        try { return objectMapper.readValue(json, new TypeReference<List<MemoryCard>>() {}); }
+        catch (JsonProcessingException e) { throw new BusinessException(ErrorCode.BAD_REQUEST, "这次变更缺少可回退的版本快照"); }
+    }
+
+    private MemoryCard restore(Long userId, MemoryCard old) {
+        MemoryCard current = owned(userId, old.id);
+        int nextVersion = version(current) + 1;
+        memoryMapper.update(null, new UpdateWrapper<MemoryCard>()
+                .eq("id", old.id).eq("user_id", userId)
+                .set("title", old.title).set("summary", old.summary).set("memory_type", old.memoryType)
+                .set("emotion_tags", old.emotionTags).set("keyword_tags", old.keywordTags)
+                .set("people_tags", old.peopleTags).set("intensity_score", old.intensityScore)
+                .set("recurrence_count", old.recurrenceCount).set("user_importance", old.userImportance)
+                .set("trigger_count", old.triggerCount).set("emotional_gravity", old.emotionalGravity)
+                .set("last_touched_at", LocalDateTime.now()).set("visibility_level", old.visibilityLevel)
+                .set("status", old.status).set("version_no", nextVersion).set("memory_layer", old.memoryLayer)
+                .set("confidence", old.confidence).set("consent_scope", old.consentScope)
+                .set("superseded_by_id", old.supersededById).set("provenance_refs", old.provenanceRefs)
+                .set("archived_at", old.archivedAt).set("forgotten_at", old.forgottenAt));
+        return memoryMapper.selectById(old.id);
+    }
+
+    private MemoryCard retireCreated(Long userId, Long id) {
+        MemoryCard current = owned(userId, id);
+        current.status = "ARCHIVED"; current.archivedAt = LocalDateTime.now();
+        current.versionNo = version(current) + 1; memoryMapper.updateById(current); return current;
+    }
+
+    private MemoryCard owned(Long userId, Long id) {
+        MemoryCard card = memoryMapper.selectOne(new QueryWrapper<MemoryCard>().eq("id", id).eq("user_id", userId));
+        if (card == null) throw new BusinessException(ErrorCode.NOT_FOUND, "回退涉及的记忆已不存在");
+        return card;
+    }
+
+    private void deactivateOperationLinks(Long userId, Set<Long> sourceIds, Set<Long> createdIds) {
+        if (sourceIds.isEmpty() || createdIds.isEmpty()) return;
+        List<MemoryLink> links = linkMapper.selectList(new QueryWrapper<MemoryLink>().eq("user_id", userId)
+                .and(q -> q.in("source_memory_id", sourceIds).in("target_memory_id", createdIds)
+                        .or().in("source_memory_id", createdIds).in("target_memory_id", sourceIds)));
+        for (MemoryLink link : links) { link.status = "ROLLED_BACK"; linkMapper.updateById(link); }
     }
 
     private MemoryOperation record(Long userId, MemoryOperationCommand command, List<MemoryCard> source,

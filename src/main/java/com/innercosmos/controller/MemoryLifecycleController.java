@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -35,6 +36,12 @@ public class MemoryLifecycleController extends BaseController {
     public ApiResponse<MemoryOperationResultVO> execute(@RequestBody MemoryOperationCommand command,
                                                        HttpSession session) {
         return ApiResponse.ok(lifecycleService.execute(currentUserId(session), command));
+    }
+
+    @PostMapping("/{operationId}/rollback")
+    public ApiResponse<MemoryOperationResultVO> rollback(@PathVariable Long operationId,
+                                                         HttpSession session) {
+        return ApiResponse.ok(lifecycleService.rollback(currentUserId(session), operationId));
     }
 
     @GetMapping

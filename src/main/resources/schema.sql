@@ -316,6 +316,21 @@ CREATE TABLE IF NOT EXISTS tb_memory_link (
   CONSTRAINT fk_memory_link_target FOREIGN KEY (target_memory_id) REFERENCES tb_memory_card(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS tb_memory_projection_receipt (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  operation_id BIGINT NOT NULL,
+  projection_type VARCHAR(32) NOT NULL,
+  status VARCHAR(32) NOT NULL,
+  generation INT DEFAULT 1,
+  detail TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_memory_projection_receipt (operation_id, projection_type),
+  INDEX idx_memory_projection_user (user_id, created_at),
+  CONSTRAINT fk_memory_projection_operation FOREIGN KEY (operation_id) REFERENCES tb_memory_operation(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS tb_thought_fragment (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT NOT NULL,

@@ -159,3 +159,33 @@ test("memory starfield switches between time, theme and people without losing it
   await expect(cosmos.locator(".cosmos-explanation")).toContainText("人物标签形成共同轨道");
   await expect(accessible.locator("li").first()).toBeVisible();
 });
+
+test("user can roll back a memory change while permanent forgetting stays irreversible", async ({ page }) => {
+  await page.goto("/app/aurora/index.html");
+  await loginIfNeeded(page);
+  const originalTitle = await page.getByRole("list", { name: "记忆星空可访问列表" }).locator("li strong").first().innerText();
+  await page.evaluate(async title => {
+    const sceneEnvelope = await fetch("/api/memory/starfield/v2?mode=TIME", { credentials: "include" }).then(response => response.json());
+    const card = sceneEnvelope.data.stars[0];
+    let response: Response | null = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const csrfEnvelope = await fetch(`/api/auth/csrf?fresh=${Date.now()}-${attempt}`, { credentials: "include", cache: "no-store" }).then(result => result.json());
+      response = await fetch("/api/memory/operations", {
+        method: "POST", credentials: "include", headers: {
+          "Content-Type": "application/json", [csrfEnvelope.data.headerName]: csrfEnvelope.data.token
+        }, body: JSON.stringify({ operationType: "UPDATE", primaryMemoryId: card.id,
+          title: `${title}（正在校准）`, summary: card.summary ?? "一次可撤回的校准" })
+      });
+      if (response.ok || response.status !== 403) break;
+    }
+    if (!response?.ok) throw new Error(`operation setup failed: ${response?.status} ${await response?.text()}`);
+  }, originalTitle);
+  await page.reload();
+  await loginIfNeeded(page);
+  const history = page.getByLabel("记忆变更历史");
+  await expect(history).toContainText("UPDATE");
+  await history.getByRole("button", { name: "撤回这次变更" }).first().click();
+  await expect(page.getByRole("status")).toContainText("已撤回这次UPDATE");
+  await expect(page.getByRole("list", { name: "记忆星空可访问列表" }).locator("li strong").first()).toHaveText(originalTitle);
+  await expect(history).toContainText("已撤回");
+});

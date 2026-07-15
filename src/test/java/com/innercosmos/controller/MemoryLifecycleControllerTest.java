@@ -8,6 +8,7 @@ import com.innercosmos.entity.MemoryCard;
 import com.innercosmos.entity.MemoryOperation;
 import com.innercosmos.entity.ThoughtFragment;
 import com.innercosmos.mapper.MemoryCardMapper;
+import com.innercosmos.mapper.MemoryLinkMapper;
 import com.innercosmos.mapper.MemoryOperationMapper;
 import com.innercosmos.mapper.ThoughtFragmentMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,6 +44,7 @@ class MemoryLifecycleControllerTest {
     @Autowired ObjectMapper objectMapper;
     @Autowired MemoryCardMapper memoryMapper;
     @Autowired MemoryOperationMapper operationMapper;
+    @Autowired MemoryLinkMapper linkMapper;
     @Autowired ThoughtFragmentMapper fragmentMapper;
     private MockHttpSession session;
     private Long userId;
@@ -140,6 +142,71 @@ class MemoryLifecycleControllerTest {
                 .eq("user_id", userId).eq("primary_memory_id", card.id));
         assertEquals("ARCHIVE", operation.operationType);
         assertEquals("USER", operation.actorType);
+    }
+
+    @Test
+    void rollbackRestoresPriorMeaningWithMonotonicVersionAndProjectionReceipts() throws Exception {
+        MemoryCard card = memory("我总是在逃避", "这是一次过度概括");
+        MvcResult changed = mockMvc.perform(post("/api/memory/operations").session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"operationType\":\"UPDATE\",\"primaryMemoryId\":" + card.id
+                                + ",\"title\":\"我在谨慎选择\",\"summary\":\"更准确的新理解\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.projectionReceipts.length()").value(3))
+                .andReturn();
+        long operationId = objectMapper.readTree(changed.getResponse().getContentAsString())
+                .path("data").path("operation").path("id").asLong();
+
+        mockMvc.perform(post("/api/memory/operations/{id}/rollback", operationId).session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.operation.operationType").value("ROLLBACK"))
+                .andExpect(jsonPath("$.data.operation.rollbackOfOperationId").value(operationId))
+                .andExpect(jsonPath("$.data.projectionReceipts[0].status").value("REBUILT"));
+        MemoryCard restored = memoryMapper.selectById(card.id);
+        assertEquals("我总是在逃避", restored.title);
+        assertEquals("这是一次过度概括", restored.summary);
+        assertEquals(3, restored.versionNo);
+        assertEquals("ROLLED_BACK", operationMapper.selectById(operationId).status);
+
+        mockMvc.perform(post("/api/memory/operations/{id}/rollback", operationId).session(session))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void forgetIsCryptographicallyUnavailableToRollbackBecauseNoRawSnapshotRemains() throws Exception {
+        MemoryCard card = memory("不能复原的原文", "明确要求永久忘记");
+        MvcResult forgotten = mockMvc.perform(post("/api/memory/operations").session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"operationType\":\"FORGET\",\"primaryMemoryId\":" + card.id + "}"))
+                .andExpect(status().isOk()).andReturn();
+        long operationId = objectMapper.readTree(forgotten.getResponse().getContentAsString())
+                .path("data").path("operation").path("id").asLong();
+        mockMvc.perform(post("/api/memory/operations/{id}/rollback", operationId).session(session))
+                .andExpect(status().isBadRequest());
+        assertEquals("已按你的请求忘记", memoryMapper.selectById(card.id).title);
+    }
+
+    @Test
+    void rollbackOfMergeRestoresBothSourcesAndRetiresTheGeneratedCardAndLinks() throws Exception {
+        MemoryCard first = memory("第一次边界协商", "我需要一点空间");
+        MemoryCard second = memory("第二次边界协商", "我需要先恢复精力");
+        MvcResult merged = mockMvc.perform(post("/api/memory/operations").session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"operationType\":\"MERGE\",\"primaryMemoryId\":" + first.id
+                                + ",\"relatedMemoryIds\":[" + second.id + "],\"title\":\"边界模式\"}"))
+                .andExpect(status().isOk()).andReturn();
+        var payload = objectMapper.readTree(merged.getResponse().getContentAsString()).path("data");
+        long operationId = payload.path("operation").path("id").asLong();
+        long generatedId = payload.path("memories").get(0).path("id").asLong();
+
+        mockMvc.perform(post("/api/memory/operations/{id}/rollback", operationId).session(session))
+                .andExpect(status().isOk());
+        assertEquals("ACTIVE", memoryMapper.selectById(first.id).status);
+        assertEquals("ACTIVE", memoryMapper.selectById(second.id).status);
+        assertEquals("ARCHIVED", memoryMapper.selectById(generatedId).status);
+        assertEquals(0, linkMapper.selectCount(new QueryWrapper<com.innercosmos.entity.MemoryLink>()
+                .eq("user_id", userId).eq("status", "ACTIVE")
+                .and(q -> q.eq("target_memory_id", generatedId).or().eq("source_memory_id", generatedId))));
     }
 
     @Test

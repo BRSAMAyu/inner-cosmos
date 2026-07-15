@@ -53,6 +53,16 @@ export type StarfieldScene = {
   mode: "TIME" | "THEME" | "PEOPLE"; modeExplanation: string;
   stars: StarfieldStar[]; accessibleList: StarfieldStar[]; legend: Record<string, string>; generatedAt: string;
 };
+export type MemoryOperation = {
+  id: number; operationType: string; primaryMemoryId: number | null; oldVersion: number;
+  newVersion: number; reasonCode: string; actorType: string; rollbackOfOperationId: number | null;
+  status: "APPLIED" | "ROLLED_BACK"; createdAt: string;
+};
+export type MemoryOperationResult = {
+  operation: MemoryOperation;
+  memories: StarfieldStar[];
+  projectionReceipts: Array<{ id: number; projectionType: string; status: string; generation: number; detail: string }>;
+};
 export type CorrectionConfirmation = {
   correction: { id: number; newValue: string; status: string; impactSummary: string };
   activeClaim: UnderstandingClaim;
@@ -137,7 +147,9 @@ export const api = {
     method: "POST", body: JSON.stringify(input)
   }),
   understandingClaims: () => request<UnderstandingClaim[]>("/api/aurora/corrections/claims"),
-  starfield: (mode: StarfieldScene["mode"]) => request<StarfieldScene>(`/api/memory/starfield/v2?mode=${mode}`)
+  starfield: (mode: StarfieldScene["mode"]) => request<StarfieldScene>(`/api/memory/starfield/v2?mode=${mode}`),
+  memoryOperations: () => request<MemoryOperation[]>("/api/memory/operations"),
+  rollbackMemoryOperation: (id: number) => request<MemoryOperationResult>(`/api/memory/operations/${id}/rollback`, { method: "POST" })
 };
 
 export async function streamAurora(
