@@ -106,4 +106,19 @@ class NotificationServiceTest {
         assertEquals(1L, notificationService.unread(userId).stream()
             .filter(row -> Long.valueOf(88L).equals(row.refId) && "WAKE_INTENT".equals(row.refType)).count());
     }
+
+    @Test
+    @DisplayName("ordinary Capsule retry notifications remain repeatable")
+    @Transactional
+    void ordinaryNotificationsWithTheSameReferenceAreNotGloballyDeduplicated() {
+        Long userId = 777_006L;
+        Notification first = notificationService.notify(userId, "SYNC_FAILED",
+            "同步失败", "第一次失败", 99L, "CAPSULE_SYNC");
+        Notification retry = notificationService.notify(userId, "SYNC_FAILED",
+            "同步失败", "第二次重试仍失败", 99L, "CAPSULE_SYNC");
+
+        assertNotEquals(first.id, retry.id);
+        assertEquals(2L, notificationService.unread(userId).stream()
+            .filter(row -> Long.valueOf(99L).equals(row.refId) && "CAPSULE_SYNC".equals(row.refType)).count());
+    }
 }

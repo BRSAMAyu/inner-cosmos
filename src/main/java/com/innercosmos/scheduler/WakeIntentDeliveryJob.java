@@ -7,6 +7,7 @@ import com.innercosmos.entity.UserProfile;
 import com.innercosmos.mapper.UserProfileMapper;
 import com.innercosmos.safety.SafetyBoundaryFilter;
 import com.innercosmos.service.WakeIntentService;
+import com.innercosmos.service.WakeIntentRelevanceEvaluator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
@@ -32,16 +33,19 @@ public class WakeIntentDeliveryJob {
     private final ProactiveDeliveryChannel liveChannel;
     private final SafetyBoundaryFilter safety;
     private final UserProfileMapper profiles;
+    private final WakeIntentRelevanceEvaluator relevance;
     private final String workerId = ManagementFactory.getRuntimeMXBean().getName();
 
     public WakeIntentDeliveryJob(WakeIntentService intents, QuietWindowResolver quietWindow,
                                  ProactiveDeliveryChannel liveChannel,
-                                 SafetyBoundaryFilter safety, UserProfileMapper profiles) {
+                                 SafetyBoundaryFilter safety, UserProfileMapper profiles,
+                                 WakeIntentRelevanceEvaluator relevance) {
         this.intents = intents;
         this.quietWindow = quietWindow;
         this.liveChannel = liveChannel;
         this.safety = safety;
         this.profiles = profiles;
+        this.relevance = relevance;
     }
 
     @Scheduled(fixedDelayString = "${inner-cosmos.wake-intent.poll-delay-ms:30000}")
@@ -58,6 +62,15 @@ public class WakeIntentDeliveryJob {
     }
 
     void decide(WakeIntent intent) {
+        if (intents.isPurposeMuted(intent.userId, intent.purpose)) {
+            intents.finish(intent, "DROP", "user_muted_similar_returns");
+            return;
+        }
+        var current = relevance.evaluate(intent);
+        if (!current.relevant()) {
+            intents.finish(intent, "DROP", current.reason());
+            return;
+        }
         if (intent.content == null || intent.content.isBlank()) {
             intents.finish(intent, "DROP", "empty_payload");
             return;

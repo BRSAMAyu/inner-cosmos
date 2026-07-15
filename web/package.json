@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "test": "vitest run",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "e2e:local": "powershell -NoProfile -ExecutionPolicy Bypass -File ../scripts/run-living-aurora-e2e.ps1"
   },
   "dependencies": {
     "react": "19.2.7",

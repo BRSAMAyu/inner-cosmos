@@ -118,11 +118,17 @@ gates:
       - id: AURORA-TEMPORAL
         target: Durable WakeIntent scheduling respects timezone, quiet hours, relevance, risk, and user controls.
         status: IN_PROGRESS
-        verified_at: 2026-07-15T13:35:00+08:00
+        verified_at: 2026-07-15T15:23:00+08:00
         reviewer: unassigned
         evidence: [evidence/innovation/INNO-TEMP-001/]
-        remaining: v1 proves durable UTC scheduling, multi-worker lease recovery, deterministic boundary/risk decisions and owner controls; general evidence-backed relevance/cancel predicates, delivery feedback learning and independent review remain.
-      - {id: AURORA-SELF, target: "Self, Constitution, Relationship State, and Emergence are versioned, evaluated, observable, and rollbackable.", status: UNASSESSED, evidence: []}
+        remaining: Natural negotiation, persisted IANA timezones/DST, supersession, explicit post-anchor resolution checks, durable in-app delivery, deep-link restoration and three-state feedback are builder-verified; real push receipts, calibrated provider semantic relevance, pairwise and independent re-review remain.
+      - id: AURORA-SELF
+        target: Self, Constitution, Relationship State, and Emergence are versioned, evaluated, observable, and rollbackable.
+        status: IN_PROGRESS
+        verified_at: 2026-07-15T15:23:00+08:00
+        reviewer: unassigned
+        evidence: [evidence/innovation/INNO-SELF-001/]
+        remaining: Builder evidence proves proposal, fail-closed evaluation, consented activation, visible versioning and forward rollback; real dual-core replay pairwise, independent review and longitudinal blind experience remain.
       - {id: AURORA-QUALITY, target: "Blind longitudinal evaluation passes empathy, continuity, proactive appropriateness, and recovery thresholds.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-EVAL-001/, evidence/innovation/INNO-EVAL-002/]}
 
   - id: G5

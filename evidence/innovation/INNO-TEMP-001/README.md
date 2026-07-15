@@ -23,9 +23,11 @@ the existing proactive/ALIVE capability:
 - A previously hidden owner/profile ID mix-up in the proactive scheduler was fixed so
   decisions are evaluated for `UserProfile.userId`, not the profile row primary key.
 
-The acceptance ledger remains `IN_PROGRESS`: the first policy has deterministic
-boundary/risk checks, but context-evidence preconditions, semantic relevance scoring
-and delivery feedback learning still remain. The 2026-07-15 independent review is
-`CHANGES_REQUIRED`: autonomous scheduling mixes the server wall clock with a hard-coded
-zone, and V4 notification uniqueness can break legacy Capsule retries. See
-`independent-review-2026-07-15.md`.
+The acceptance ledger remains `IN_PROGRESS`. The two independent-review P1 findings
+are fixed and tested: autonomous scheduling uses a UTC `Clock` plus the persisted user
+IANA zone (including DST gap/overlap contracts), and notification dedupe is opt-in per
+WakeIntent so legacy repeated Capsule notifications survive V3→V4. Campaign A also now
+adds natural time negotiation, same-purpose supersession, pre-delivery explicit-resolution
+checks, session deep-link anchors and three-state delivery feedback. Real push receipts,
+provider-backed semantic relevance/pairwise evidence and independent re-review still
+remain; see `p1-remediation-and-campaign-a-checkpoint-2026-07-15.md`.

@@ -26,6 +26,7 @@ public class UserProfileVO {
     public String currentEnvironmentLabel;
     public Boolean weatherAwarenessEnabled;
     public Boolean timeAwarenessEnabled;
+    public String timezone;
 
     public static UserProfileVO from(User user) {
         UserProfileVO vo = new UserProfileVO();
@@ -55,6 +56,7 @@ public class UserProfileVO {
             vo.currentEnvironmentLabel = profile.currentEnvironmentLabel;
             vo.weatherAwarenessEnabled = profile.weatherAwarenessEnabled;
             vo.timeAwarenessEnabled = profile.timeAwarenessEnabled;
+            vo.timezone = profile.timezone;
         }
         return vo;
     }

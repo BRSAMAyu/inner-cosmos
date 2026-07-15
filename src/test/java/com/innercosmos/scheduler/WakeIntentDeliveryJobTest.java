@@ -5,6 +5,7 @@ import com.innercosmos.ai.proactive.QuietWindowResolver;
 import com.innercosmos.entity.WakeIntent;
 import com.innercosmos.entity.UserProfile;
 import com.innercosmos.service.WakeIntentService;
+import com.innercosmos.service.WakeIntentRelevanceEvaluator;
 import com.innercosmos.mapper.UserProfileMapper;
 import com.innercosmos.safety.SafetyBoundaryFilter;
 import com.innercosmos.safety.SafetyMatch;
@@ -21,10 +22,12 @@ class WakeIntentDeliveryJobTest {
     private final ProactiveDeliveryChannel live = mock(ProactiveDeliveryChannel.class);
     private final SafetyBoundaryFilter safety = mock(SafetyBoundaryFilter.class);
     private final UserProfileMapper profiles = mock(UserProfileMapper.class);
-    private final WakeIntentDeliveryJob job = new WakeIntentDeliveryJob(intents, quiet, live, safety, profiles);
+    private final WakeIntentRelevanceEvaluator relevance = mock(WakeIntentRelevanceEvaluator.class);
+    private final WakeIntentDeliveryJob job = new WakeIntentDeliveryJob(intents, quiet, live, safety, profiles, relevance);
 
     WakeIntentDeliveryJobTest() {
         when(safety.inspect(anyString())).thenReturn(SafetyMatch.safe());
+        when(relevance.evaluate(any())).thenReturn(WakeIntentRelevanceEvaluator.Decision.keep());
     }
 
     @Test
@@ -93,6 +96,18 @@ class WakeIntentDeliveryJobTest {
         job.decide(intent);
 
         verify(intents).finish(intent, "DROP", "user_proactive_preference_off");
+        verifyNoInteractions(live);
+    }
+
+    @Test
+    void resolvedContextIsDroppedBeforeDelivery() {
+        WakeIntent intent = claimed();
+        when(relevance.evaluate(intent)).thenReturn(
+            new WakeIntentRelevanceEvaluator.Decision(false, "context_resolved_by_new_user_message"));
+
+        job.decide(intent);
+
+        verify(intents).finish(intent, "DROP", "context_resolved_by_new_user_message");
         verifyNoInteractions(live);
     }
 

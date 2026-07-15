@@ -4,7 +4,27 @@ type ApiEnvelope<T> = { success: boolean; data: T; message?: string; code?: stri
 type Csrf = { token: string; headerName: string };
 export type WakeIntent = {
   id: number; purpose: string; reasonForUser: string; content: string;
-  earliestAt: string; preferredAt: string; latestAt: string; timezone: string; status: "PLANNED" | "CLAIMED";
+  earliestAt: string; preferredAt: string; latestAt: string; timezone: string;
+  status: "PLANNED" | "CLAIMED" | "FIRED" | "CANCELLED" | "EXPIRED" | "SUPERSEDED";
+  contextSessionId: number | null; supersedesIntentId: number | null; userFeedback: string | null;
+};
+export type Notification = { id: number; type: string; title: string; body: string; refId: number; refType: string; read: boolean };
+export type SelfEvolution = {
+  candidates: Array<{ id: number; dimension: string; proposedBelief: string; confidence: number; evidenceRefs: string; createdAt: string }>;
+  proposals: Array<{
+    id: number; sourceReflectionId: number; dimension: string; currentBelief: string | null;
+    proposedBelief: string; evidenceRefs: string; counterEvidence: string; expectedImpact: string;
+    changesConstitution: boolean; rollbackTargetVersionId: number; policyVersion: string;
+    status: "DRAFT" | "EVALUATED" | "ACTIVATED" | "REJECTED";
+    evaluation: null | { decision: "PASS" | "FAIL"; reasons: string; sandboxBefore: string; sandboxAfter: string;
+      fidelityScore: number; qualityScore: number; continuityScore: number };
+    createdAt: string;
+  }>;
+  versions: Array<{
+    id: number; versionNo: number; parentVersionId: number | null; rollbackTargetVersionId: number | null;
+    sourceProposalId: number | null; constitutionHash: string; publicNarrative: string;
+    status: "ACTIVE" | "RETIRED"; activatedAt: string;
+  }>;
 };
 let csrf: Csrf | null = null;
 
@@ -35,12 +55,8 @@ async function getCsrf(): Promise<Csrf> {
 
 export const api = {
   login: (username: string, password: string) => request<unknown>("/api/auth/login", {
-    method: "POST", body: JSON.stringify({ username, password })
-  }).then(result => {
-    // Spring rotates the session on authentication; the anonymous CSRF token is no
-    // longer valid for the authenticated session.
-    csrf = null;
-    return result;
+    method: "POST", body: JSON.stringify({ username, password,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Singapore" })
   }),
   createSession: () => request<{ id: number }>("/api/dialog/session/create", {
     method: "POST", body: JSON.stringify({ title: "Aurora 对话", sessionType: "AURORA_CHAT" })
@@ -49,12 +65,33 @@ export const api = {
   timeline: (turnId: number) => request<TurnTimeline>(`/api/aurora/turns/${turnId}/timeline`),
   stop: (turnId: number) => request<TurnTimeline>(`/api/aurora/turns/${turnId}/stop`, { method: "POST" }),
   wakeIntents: () => request<WakeIntent[]>("/api/aurora/wake-intents"),
+  wakeIntent: (id: number) => request<WakeIntent>(`/api/aurora/wake-intents/${id}`),
+  negotiateWakeIntent: (input: { when: string; purpose: string; reasonForUser: string; content: string;
+    timezone: string; contextSessionId: number | null }) => request<WakeIntent>("/api/aurora/wake-intents/negotiate", {
+      method: "POST", body: JSON.stringify(input)
+    }),
   scheduleWakeIntent: (input: Omit<WakeIntent, "id" | "status">) => request<WakeIntent>("/api/aurora/wake-intents", {
     method: "POST", body: JSON.stringify(input)
   }),
   rescheduleWakeIntent: (id: number, input: Pick<WakeIntent, "earliestAt" | "preferredAt" | "latestAt">) =>
     request<WakeIntent>(`/api/aurora/wake-intents/${id}/schedule`, { method: "PUT", body: JSON.stringify(input) }),
-  cancelWakeIntent: (id: number) => request<WakeIntent>(`/api/aurora/wake-intents/${id}/cancel`, { method: "POST" })
+  cancelWakeIntent: (id: number) => request<WakeIntent>(`/api/aurora/wake-intents/${id}/cancel`, { method: "POST" }),
+  wakeFeedback: (id: number, choice: "MATCHED" | "LATER" | "STOP_SIMILAR") =>
+    request<WakeIntent>(`/api/aurora/wake-intents/${id}/feedback`, { method: "POST", body: JSON.stringify({ choice }) }),
+  notifications: () => request<Notification[]>("/api/notifications"),
+  readNotification: (id: number) => request<unknown>(`/api/notifications/${id}/read`, { method: "POST" }),
+  updateTimezone: (timezone: string) => request<unknown>("/api/user/profile", {
+    method: "PUT", body: JSON.stringify({ timezone })
+  }),
+  selfEvolution: () => request<SelfEvolution>("/api/aurora/self/evolution"),
+  proposeSelfEvolution: (candidateId: number, expectedImpact: string) => request<SelfEvolution>("/api/aurora/self/evolution/proposals", {
+    method: "POST", body: JSON.stringify({ candidateId, expectedImpact, counterEvidence: [], changesConstitution: false })
+  }),
+  evaluateSelfEvolution: (id: number) => request<SelfEvolution>(`/api/aurora/self/evolution/proposals/${id}/evaluate`, { method: "POST" }),
+  activateSelfEvolution: (id: number) => request<SelfEvolution>(`/api/aurora/self/evolution/proposals/${id}/activate`, { method: "POST" }),
+  rollbackSelfEvolution: (targetVersionId: number) => request<SelfEvolution>("/api/aurora/self/evolution/rollback", {
+    method: "POST", body: JSON.stringify({ targetVersionId, restoreRelationship: false })
+  })
 };
 
 export async function streamAurora(

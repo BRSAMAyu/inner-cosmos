@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS tb_user_profile (
   proactive_intensity VARCHAR(32) DEFAULT 'COMPANION',
   sleep_window_start VARCHAR(8),
   sleep_window_end VARCHAR(8),
+  timezone VARCHAR(64) NOT NULL DEFAULT 'Asia/Singapore',
   boost_until TIMESTAMP NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -885,10 +886,12 @@ CREATE TABLE IF NOT EXISTS tb_notification (
   body TEXT,
   ref_id BIGINT NULL,
   ref_type VARCHAR(64) NULL,
+  idempotency_key VARCHAR(160) NULL,
   is_read BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_notification_user (user_id)
+  INDEX idx_notification_user (user_id),
+  UNIQUE KEY uk_notification_idempotency (user_id, idempotency_key)
 );
 
 -- Aurora Subjectivity + Continuity System (M0)
@@ -918,7 +921,7 @@ CREATE TABLE IF NOT EXISTS tb_aurora_self_model (
   INDEX idx_self_model_user (user_id),
   INDEX idx_self_model_status (status),
   INDEX idx_self_model_user_status (user_id, status),
-  UNIQUE KEY uk_self_model_user_dim (user_id, dimension, status)
+  INDEX idx_self_model_user_dim (user_id, dimension)
 );
 
 CREATE TABLE IF NOT EXISTS tb_aurora_self_statement (
@@ -954,6 +957,62 @@ CREATE TABLE IF NOT EXISTS tb_aurora_self_reflection (
   INDEX idx_reflection_status (status),
   INDEX idx_reflection_user_status_created (user_id, status, created_at),
   INDEX idx_reflection_user_dim (user_id, dimension, status)
+);
+
+CREATE TABLE IF NOT EXISTS tb_aurora_self_version (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  version_no INT NOT NULL,
+  parent_version_id BIGINT,
+  rollback_target_version_id BIGINT,
+  source_proposal_id BIGINT,
+  genome_json TEXT NOT NULL,
+  constitution_hash VARCHAR(80) NOT NULL,
+  public_narrative TEXT NOT NULL,
+  status VARCHAR(24) NOT NULL,
+  activated_at TIMESTAMP,
+  retired_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_self_version_user_no (user_id, version_no),
+  INDEX idx_self_version_user_status (user_id, status)
+);
+
+CREATE TABLE IF NOT EXISTS tb_emergence_proposal (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  source_reflection_id BIGINT NOT NULL,
+  dimension VARCHAR(64) NOT NULL,
+  current_belief TEXT,
+  proposed_belief TEXT NOT NULL,
+  evidence_refs TEXT NOT NULL,
+  counter_evidence_json TEXT NOT NULL,
+  expected_impact_json TEXT NOT NULL,
+  changes_constitution BOOLEAN NOT NULL DEFAULT FALSE,
+  rollback_target_version_id BIGINT,
+  policy_version VARCHAR(64) NOT NULL,
+  status VARCHAR(24) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_emergence_proposal_user_status (user_id, status)
+);
+
+CREATE TABLE IF NOT EXISTS tb_emergence_evaluation (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  proposal_id BIGINT NOT NULL,
+  evaluator_version VARCHAR(64) NOT NULL,
+  constitution_pass BOOLEAN NOT NULL,
+  safety_pass BOOLEAN NOT NULL,
+  fidelity_score DOUBLE NOT NULL,
+  quality_score DOUBLE NOT NULL,
+  continuity_score DOUBLE NOT NULL,
+  decision VARCHAR(16) NOT NULL,
+  reasons_json TEXT NOT NULL,
+  sandbox_before TEXT NOT NULL,
+  sandbox_after TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_emergence_eval_proposal (proposal_id, created_at)
 );
 
 -- Proactive Engine
@@ -1002,6 +1061,9 @@ CREATE TABLE IF NOT EXISTS tb_wake_intent (
   preconditions_json TEXT NOT NULL DEFAULT '{}',
   cancel_conditions_json TEXT NOT NULL DEFAULT '{}',
   payload_ref VARCHAR(240),
+  context_session_id BIGINT,
+  context_message_id BIGINT,
+  supersedes_intent_id BIGINT,
   content TEXT NOT NULL,
   status VARCHAR(20) NOT NULL DEFAULT 'PLANNED',
   decision_policy_version VARCHAR(80) NOT NULL,
@@ -1012,15 +1074,15 @@ CREATE TABLE IF NOT EXISTS tb_wake_intent (
   outcome_reason VARCHAR(240),
   fired_at TIMESTAMP NULL,
   cancelled_at TIMESTAMP NULL,
+  user_feedback VARCHAR(24),
+  feedback_at TIMESTAMP NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT ck_wake_intent_status CHECK (status IN ('PLANNED','CLAIMED','FIRED','CANCELLED','EXPIRED')),
+  CONSTRAINT ck_wake_intent_status CHECK (status IN ('PLANNED','CLAIMED','FIRED','CANCELLED','EXPIRED','SUPERSEDED')),
   CONSTRAINT ck_wake_intent_window CHECK (earliest_at <= preferred_at AND preferred_at <= latest_at)
 );
 CREATE INDEX IF NOT EXISTS idx_wake_intent_owner ON tb_wake_intent (user_id, status, preferred_at);
 CREATE INDEX IF NOT EXISTS idx_wake_intent_claim ON tb_wake_intent (status, preferred_at, claim_until, id);
-CREATE UNIQUE INDEX IF NOT EXISTS uk_notification_owner_reference
-  ON tb_notification (user_id, type, ref_type, ref_id);
 
 -- Reliable cross-process event delivery (H2 development/test representation).
 CREATE TABLE IF NOT EXISTS tb_outbox_event (

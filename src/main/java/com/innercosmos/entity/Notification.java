@@ -18,6 +18,7 @@ public class Notification extends BaseEntity {
     public String body;
     public Long refId;      // related entity id (e.g. sync queue id)
     public String refType;  // related entity type (e.g. CAPSULE_SYNC)
+    public String idempotencyKey; // opt-in dedupe; null keeps ordinary event semantics
 
     // "read" is reserved-ish in some DBs; map to is_read column for MySQL safety.
     @TableField("is_read")

@@ -154,6 +154,9 @@ public class AuroraSelfContinuityServiceImpl implements AuroraSelfContinuityServ
         if (!"candidate".equalsIgnoreCase(candidate.status)) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "候选状态不可提交");
         }
+        if (!userConfirmed) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "激活 Aurora Self 变化需要用户明确确认");
+        }
 
         String belief = candidate.proposedBelief;
         if (!isAllowedBelief(belief)) {

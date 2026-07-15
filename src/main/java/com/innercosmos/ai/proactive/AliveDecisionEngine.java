@@ -8,6 +8,8 @@ import com.innercosmos.entity.PrivateTimer;
 import com.innercosmos.entity.ProactiveEventLog;
 import com.innercosmos.mapper.PrivateTimerMapper;
 import com.innercosmos.mapper.ProactiveEventLogMapper;
+import com.innercosmos.mapper.UserProfileMapper;
+import com.innercosmos.entity.UserProfile;
 import com.innercosmos.service.WakeIntentService;
 import com.innercosmos.ai.proactive.dto.AliveDecision;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -19,10 +21,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -51,6 +56,9 @@ public class AliveDecisionEngine {
     private WakeIntentService wakeIntentService;
 
     @Autowired
+    private UserProfileMapper profileMapper;
+
+    @Autowired
     private ProactiveEventLogMapper eventLogMapper;
 
     @Autowired
@@ -63,9 +71,11 @@ public class AliveDecisionEngine {
     private AgentUserRelationshipService relationshipService;
 
     private final ObjectMapper om = new ObjectMapper();
+    private Clock clock = Clock.systemUTC();
 
     public void tick(Long userId) {
-        var q = quietResolver.canPushNow(userId, ZonedDateTime.now());
+        ZoneId userZone = resolveUserZone(userId);
+        var q = quietResolver.canPushNow(userId, ZonedDateTime.now(clock).withZoneSameInstant(userZone));
         if (q.quiet()) return;
 
         // Hard cap check
@@ -97,17 +107,17 @@ public class AliveDecisionEngine {
                     logEvent(userId, "ALIVE_LLM", decision.contentForUser(), decision.reasonInternal());
                 }
                 case "schedule" -> {
-                    LocalDateTime preferred = LocalDateTime.now().plusMinutes(decision.waitMinutes());
+                    Instant preferred = clock.instant().plus(Duration.ofMinutes(decision.waitMinutes()));
                     if (wakeIntentService != null && decision.contentForUser() != null
                             && !decision.contentForUser().isBlank()) {
-                        wakeIntentService.schedule(userId, "Aurora 想在合适的时候继续这段陪伴",
-                            "Aurora 计划回来看看你", decision.contentForUser(), preferred.minusMinutes(5),
-                            preferred, preferred.plusHours(6), "Asia/Shanghai", "alive-decision");
+                        wakeIntentService.scheduleAtInstants(userId, "Aurora 想在合适的时候继续这段陪伴",
+                            "Aurora 计划回来看看你", decision.contentForUser(), preferred.minus(Duration.ofMinutes(5)),
+                            preferred, preferred.plus(Duration.ofHours(6)), userZone.getId(), "alive-decision");
                     } else {
                         // Compatibility path for old tests/data and malformed provider output.
                         PrivateTimer timer = new PrivateTimer();
                         timer.userId = userId;
-                        timer.fireAt = preferred;
+                        timer.fireAt = LocalDateTime.ofInstant(preferred, ZoneOffset.UTC);
                         timer.kind = "ALIVE_INTERNAL";
                         timer.content = decision.contentForUser();
                         timerMapper.insert(timer);
@@ -124,7 +134,7 @@ public class AliveDecisionEngine {
     }
 
     private String buildPrompt(Long userId) {
-        String now = Instant.now().toString();
+        String now = clock.instant().toString();
         String portraitSummary = summary(portraitService.getAll(userId));
         String relSummary = summary(relationshipService.getOrInit(userId));
         String recentLogs = recentProactiveLog(userId);
@@ -233,5 +243,23 @@ public class AliveDecisionEngine {
         e.reasonInternal = reason;
         e.sentAt = LocalDateTime.now();
         eventLogMapper.insert(e);
+    }
+
+    private ZoneId resolveUserZone(Long userId) {
+        if (profileMapper != null) {
+            var profiles = profileMapper.selectList(new QueryWrapper<UserProfile>()
+                .eq("user_id", userId).last("LIMIT 1"));
+            if (!profiles.isEmpty() && profiles.getFirst().timezone != null) {
+                try { return ZoneId.of(profiles.getFirst().timezone); }
+                catch (RuntimeException invalid) {
+                    log.warn("Ignoring invalid persisted timezone for user {}", userId);
+                }
+            }
+        }
+        return ZoneId.of("Asia/Singapore");
+    }
+
+    void useClock(Clock fixedClock) {
+        this.clock = fixedClock;
     }
 }

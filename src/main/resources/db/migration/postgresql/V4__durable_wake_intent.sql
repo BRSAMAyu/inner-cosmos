@@ -28,5 +28,8 @@ CREATE TABLE IF NOT EXISTS tb_wake_intent (
 
 CREATE INDEX IF NOT EXISTS idx_wake_intent_owner ON tb_wake_intent (user_id, status, preferred_at);
 CREATE INDEX IF NOT EXISTS idx_wake_intent_claim ON tb_wake_intent (status, preferred_at, claim_until, id);
-CREATE UNIQUE INDEX IF NOT EXISTS uk_notification_owner_reference
-    ON tb_notification (user_id, type, ref_type, ref_id);
+-- Ordinary notifications intentionally allow repeated events (for example every
+-- Capsule sync retry). Only callers that opt into an explicit idempotency key dedupe.
+ALTER TABLE tb_notification ADD COLUMN IF NOT EXISTS idempotency_key VARCHAR(160);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_notification_idempotency
+    ON tb_notification (user_id, idempotency_key);

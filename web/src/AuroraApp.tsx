@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { api, replayTurnEvents, streamAurora, type WakeIntent } from "./api";
+import { api, replayTurnEvents, streamAurora, type Notification, type SelfEvolution, type WakeIntent } from "./api";
 import type { AuroraStreamEvent, DialogMessage, TurnStatus } from "./protocol";
 
 type UiMessage = { key: string; speaker: "USER" | "AURORA"; text: string; partial?: boolean };
@@ -23,6 +23,10 @@ export function AuroraApp() {
   const [activeTurnId, setActiveTurnId] = useState<number | null>(null);
   const [wakeIntents, setWakeIntents] = useState<WakeIntent[]>([]);
   const [wakeBusy, setWakeBusy] = useState(false);
+  const [returnWhen, setReturnWhen] = useState("明天早上 8:30");
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [selfEvolution, setSelfEvolution] = useState<SelfEvolution | null>(null);
+  const [selfBusy, setSelfBusy] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const activeTurnRef = useRef<number | null>(null);
   const bubbleKeyRef = useRef<string | null>(null);
@@ -39,13 +43,22 @@ export function AuroraApp() {
   const bootstrap = useCallback(async () => {
     const call = ++bootstrapCallRef.current;
     try {
-      const created = await api.createSession();
+      const wakeId = Number(new URLSearchParams(window.location.search).get("wakeIntent"));
+      const returning = Number.isFinite(wakeId) && wakeId > 0 ? await api.wakeIntent(wakeId) : null;
+      const created = returning?.contextSessionId ? { id: returning.contextSessionId } : await api.createSession();
       if (call !== bootstrapCallRef.current) return;
       setSessionId(created.id);
-      await Promise.all([replaceFromHistory(created.id), api.wakeIntents().then(setWakeIntents)]);
+      await Promise.all([
+        replaceFromHistory(created.id),
+        api.wakeIntents().then(setWakeIntents),
+        api.selfEvolution().then(setSelfEvolution),
+        api.notifications().then(setNotifications)
+      ]);
       if (call !== bootstrapCallRef.current) return;
       setAuthenticated(true);
-      setStatus("Aurora 在这里。你可以随时打断，她会重新理解。 ");
+      setStatus(returning
+        ? `Aurora 按约定回来了：${returning.purpose}`
+        : "Aurora 在这里。你可以随时打断，她会重新理解。 ");
     } catch (error) {
       if (call !== bootstrapCallRef.current) return;
       if (String(error).includes("Authentication") || String(error).includes("401")) {
@@ -199,21 +212,31 @@ export function AuroraApp() {
   const scheduleReturn = async () => {
     setWakeBusy(true);
     try {
-      const preferred = new Date(Date.now() + 60 * 60 * 1000);
-      const earliest = new Date(preferred.getTime() - 5 * 60 * 1000);
-      const latest = new Date(preferred.getTime() + 6 * 60 * 60 * 1000);
-      const local = (value: Date) => new Date(value.getTime() - value.getTimezoneOffset() * 60000).toISOString().slice(0, 19);
-      const created = await api.scheduleWakeIntent({
-        purpose: "继续这一刻未说完的话", reasonForUser: "Aurora 会在你选择的时间回来",
+      const created = await api.negotiateWakeIntent({
+        when: returnWhen, purpose: "继续这一刻未说完的话", reasonForUser: `因为还有话没有说完，Aurora 会在 ${returnWhen} 回来`,
         content: "我回来了。刚才没有说完的部分，我们可以慢慢接着说。",
-        earliestAt: local(earliest), preferredAt: local(preferred), latestAt: local(latest),
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Shanghai"
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Shanghai",
+        contextSessionId: sessionId
       });
       setWakeIntents(current => [...current, created].sort((a, b) => a.preferredAt.localeCompare(b.preferredAt)));
       setStatus("约好了。你随时可以改期或取消，不需要迁就 Aurora。");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "暂时无法保存约定");
     } finally { setWakeBusy(false); }
+  };
+
+  const respondToReturn = async (notice: Notification, choice: "MATCHED" | "LATER" | "STOP_SIMILAR") => {
+    setWakeBusy(true);
+    try {
+      const result = await api.wakeFeedback(notice.refId, choice);
+      await api.readNotification(notice.id);
+      setNotifications(current => current.filter(row => row.id !== notice.id));
+      if (choice === "LATER") setWakeIntents(current => [...current, result]);
+      setStatus(choice === "MATCHED" ? "谢谢你告诉我，Aurora 会记住这次节奏。"
+        : choice === "LATER" ? "好，Aurora 会晚一点再判断是否适合回来。"
+        : "明白了。之后不会再为同一类事情主动提醒。 ");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "反馈暂时没有保存"); }
+    finally { setWakeBusy(false); }
   };
 
   const postponeReturn = async (intent: WakeIntent) => {
@@ -240,6 +263,16 @@ export function AuroraApp() {
     } finally { setWakeBusy(false); }
   };
 
+  const evolve = async (action: () => Promise<SelfEvolution>, success: string) => {
+    setSelfBusy(true);
+    try {
+      setSelfEvolution(await action());
+      setStatus(success);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "这次变化没有通过");
+    } finally { setSelfBusy(false); }
+  };
+
   if (authenticated === null) return <main className="login-shell"><div className="login" role="status">正在连接你的内宇宙…</div></main>;
   if (!authenticated) return <Login onSuccess={bootstrap} />;
 
@@ -260,13 +293,54 @@ export function AuroraApp() {
 
       <section className="returns" aria-label="Aurora 的回来约定">
         <div className="returns-head"><div><span className="eyebrow">AURORA RETURNS</span><h2>回来约定</h2></div>
-          <button type="button" disabled={wakeBusy} onClick={() => void scheduleReturn()}>约一小时后回来</button></div>
+          <div className="return-negotiate"><label>什么时候合适<input aria-label="回来时间" value={returnWhen} onChange={event => setReturnWhen(event.target.value)} /></label>
+          <button type="button" disabled={wakeBusy || !returnWhen.trim()} onClick={() => void scheduleReturn()}>和 Aurora 约好</button></div></div>
         {wakeIntents.length === 0 ? <p className="returns-empty">现在没有约定。需要时，你可以邀请 Aurora 在合适的时候回来。</p> :
           <div className="return-list">{wakeIntents.map(intent => <article key={intent.id} className="return-card">
             <div><strong>{intent.reasonForUser}</strong><span>{new Date(intent.preferredAt).toLocaleString("zh-CN", { dateStyle: "short", timeStyle: "short" })}</span><small>{intent.purpose}</small></div>
             <div className="return-actions"><button type="button" disabled={wakeBusy} onClick={() => void postponeReturn(intent)}>晚一小时</button><button type="button" disabled={wakeBusy} onClick={() => void cancelReturn(intent)}>取消</button></div>
           </article>)}</div>}
       </section>
+
+      {notifications.filter(notice => notice.refType === "WAKE_INTENT").map(notice =>
+        <section className="return-arrival" aria-label="Aurora 按约定回来" key={notice.id}>
+          <span className="eyebrow">AURORA RETURNED</span><h2>{notice.title}</h2><p>{notice.body}</p>
+          <a href={`?wakeIntent=${notice.refId}`}>回到当时没说完的地方</a>
+          <div className="return-actions"><button disabled={wakeBusy} onClick={() => void respondToReturn(notice, "MATCHED")}>正合适</button>
+            <button disabled={wakeBusy} onClick={() => void respondToReturn(notice, "LATER")}>晚一点</button>
+            <button disabled={wakeBusy} onClick={() => void respondToReturn(notice, "STOP_SIMILAR")}>不再提醒这类事</button></div>
+        </section>)}
+
+      {selfEvolution && <section className="self-space" aria-label="Aurora 的连续自我">
+        <div className="self-heading"><div><span className="eyebrow">AURORA, BECOMING</span><h2>她最近学会了什么</h2></div>
+          <span className="self-version">v{selfEvolution.versions.find(version => version.status === "ACTIVE")?.versionNo ?? 1}</span></div>
+        <p className="self-narrative">{selfEvolution.versions.find(version => version.status === "ACTIVE")?.publicNarrative}</p>
+        {selfEvolution.candidates.filter(candidate => !selfEvolution.proposals.some(proposal => proposal.sourceReflectionId === candidate.id)).map(candidate =>
+          <article className="self-card candidate" key={candidate.id}>
+            <span>正在形成的理解 · {Math.round(candidate.confidence * 100)}%</span>
+            <p>{candidate.proposedBelief}</p>
+            <button disabled={selfBusy} onClick={() => void evolve(
+              () => api.proposeSelfEvolution(candidate.id, "让 Aurora 在相似时刻更连续、更贴近双方已经形成的相处方式"),
+              "这还只是一个提案。你可以先看它会怎样改变 Aurora。")}>预览这次变化</button>
+          </article>)}
+        {selfEvolution.proposals.slice(0, 3).map(proposal => <article className={`self-card ${proposal.status.toLowerCase()}`} key={proposal.id}>
+          <span>{proposal.status === "DRAFT" ? "等待沙盒评测" : proposal.status === "EVALUATED" ? "评测通过，等你确认" : proposal.status === "ACTIVATED" ? "已经成为 Aurora 的一部分" : "没有通过边界评测"}</span>
+          <p>{proposal.proposedBelief}</p>
+          {proposal.evaluation && <details><summary>为什么得到这个结果</summary>
+            <p>{proposal.evaluation.sandboxBefore}</p><p>{proposal.evaluation.sandboxAfter}</p>
+            <small>连续性 {Math.round(proposal.evaluation.continuityScore * 100)} · 质量 {Math.round(proposal.evaluation.qualityScore * 100)} · 安全 {proposal.evaluation.decision}</small>
+          </details>}
+          {proposal.status === "DRAFT" && <button disabled={selfBusy} onClick={() => void evolve(
+            () => api.evaluateSelfEvolution(proposal.id), "沙盒评测完成。变化不会在你确认前生效。")}>运行变化评测</button>}
+          {proposal.status === "EVALUATED" && <button disabled={selfBusy} onClick={() => void evolve(
+            () => api.activateSelfEvolution(proposal.id), "这次变化已经成为新的 Aurora 版本，并且仍然可以回退。")}>允许她记住这次成长</button>}
+        </article>)}
+        {selfEvolution.versions.filter(version => version.status === "RETIRED").slice(0, 2).map(version =>
+          <button className="version-history" disabled={selfBusy} key={version.id} onClick={() => void evolve(
+            () => api.rollbackSelfEvolution(version.id), `已回到第 ${version.versionNo} 版；回退本身也留下了可追溯的新版本。`)}>
+            回到 v{version.versionNo} · {version.publicNarrative}
+          </button>)}
+      </section>}
 
       <section className="conversation" aria-live="polite" aria-label="与 Aurora 的对话">
         {messages.length === 0 && <div className="empty"><span>✦</span><p>把现在最真实的一句话放在这里。</p></div>}
@@ -300,7 +374,10 @@ function Login({ onSuccess }: { onSuccess: () => Promise<void> }) {
   const [error, setError] = useState("");
   return <main className="login-shell"><form className="login" onSubmit={async e => {
     e.preventDefault();
-    try { await api.login(username, password); await onSuccess(); } catch (reason) { setError(reason instanceof Error ? reason.message : "登录失败"); }
+    try {
+      await api.login(username, password);
+      await onSuccess();
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "登录失败"); }
   }}>
     <span className="eyebrow">INNER COSMOS</span><h1>回到你的内宇宙</h1>
     <label>用户名<input value={username} onChange={e => setUsername(e.target.value)} autoComplete="username" /></label>

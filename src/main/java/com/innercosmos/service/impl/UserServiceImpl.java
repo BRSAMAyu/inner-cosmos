@@ -140,6 +140,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public User login(LoginRequest request) {
         QueryWrapper<User> query = new QueryWrapper<>();
         query.eq("username", request.username);
@@ -152,6 +153,11 @@ public class UserServiceImpl implements UserService {
         }
         user.lastLoginAt = LocalDateTime.now();
         userMapper.updateById(user);
+        if (request.timezone != null && !request.timezone.isBlank()) {
+            UserProfileVO timezoneOnly = new UserProfileVO();
+            timezoneOnly.timezone = request.timezone;
+            updateProfile(user.id, timezoneOnly);
+        }
         return user;
     }
 
@@ -223,6 +229,13 @@ public class UserServiceImpl implements UserService {
         if (profile.currentEnvironmentLabel != null) existing.currentEnvironmentLabel = profile.currentEnvironmentLabel;
         if (profile.weatherAwarenessEnabled != null) existing.weatherAwarenessEnabled = profile.weatherAwarenessEnabled;
         if (profile.timeAwarenessEnabled != null) existing.timeAwarenessEnabled = profile.timeAwarenessEnabled;
+        if (profile.timezone != null) {
+            try {
+                existing.timezone = java.time.ZoneId.of(profile.timezone).getId();
+            } catch (java.time.DateTimeException invalid) {
+                throw new BusinessException(ErrorCode.BAD_REQUEST, "timezone 必须是有效的 IANA 时区");
+            }
+        }
 
         if (existing.id == null) {
             userProfileMapper.insert(existing);

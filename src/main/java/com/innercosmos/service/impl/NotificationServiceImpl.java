@@ -35,14 +35,26 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     public Notification notifyOnce(Long userId, String type, String title, String body, Long refId, String refType) {
+        String key = refType + ":" + refId;
         Notification existing = notificationMapper.selectOne(new QueryWrapper<Notification>()
-            .eq("user_id", userId).eq("type", type).eq("ref_type", refType).eq("ref_id", refId).last("LIMIT 1"));
+            .eq("user_id", userId).eq("idempotency_key", key).last("LIMIT 1"));
         if (existing != null) return existing;
         try {
-            return notify(userId, type, title, body, refId, refType);
+            Notification created = new Notification();
+            created.userId = userId;
+            created.type = type;
+            created.title = title;
+            created.body = body;
+            created.refId = refId;
+            created.refType = refType;
+            created.idempotencyKey = key;
+            created.read = false;
+            created.createdAt = LocalDateTime.now();
+            notificationMapper.insert(created);
+            return created;
         } catch (org.springframework.dao.DuplicateKeyException concurrentWriter) {
             return notificationMapper.selectOne(new QueryWrapper<Notification>()
-                .eq("user_id", userId).eq("type", type).eq("ref_type", refType).eq("ref_id", refId).last("LIMIT 1"));
+                .eq("user_id", userId).eq("idempotency_key", key).last("LIMIT 1"));
         }
     }
 

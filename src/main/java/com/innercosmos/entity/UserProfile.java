@@ -38,6 +38,8 @@ public class UserProfile extends BaseEntity {
      * Sleep window end time (e.g., "07:00:00").
      */
     public String sleepWindowEnd;
+    /** Persisted IANA timezone used by temporal/proactive decisions. */
+    public String timezone;
     /**
      * Temporary boost expiration timestamp (null = no boost).
      */

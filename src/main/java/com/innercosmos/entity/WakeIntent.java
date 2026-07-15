@@ -20,6 +20,9 @@ public class WakeIntent extends BaseEntity {
     public String preconditionsJson;
     public String cancelConditionsJson;
     public String payloadRef;
+    public Long contextSessionId;
+    public Long contextMessageId;
+    public Long supersedesIntentId;
     public String content;
     public String status;
     public String decisionPolicyVersion;
@@ -30,4 +33,6 @@ public class WakeIntent extends BaseEntity {
     public String outcomeReason;
     public LocalDateTime firedAt;
     public LocalDateTime cancelledAt;
+    public String userFeedback;
+    public LocalDateTime feedbackAt;
 }

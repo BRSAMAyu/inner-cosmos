@@ -91,12 +91,36 @@ test("Aurora resumes from the durable timeline after the live SSE connection bre
 test("user can create, postpone and cancel an explainable Aurora return", async ({ page }) => {
   await page.goto("/app/aurora/index.html");
   await loginIfNeeded(page);
-  await page.getByRole("button", { name: "约一小时后回来" }).click();
+  await page.getByLabel("回来时间").fill("2 小时后");
+  await page.getByRole("button", { name: "和 Aurora 约好" }).click();
   const card = page.locator(".return-card").last();
-  await expect(card).toContainText("Aurora 会在你选择的时间回来");
+  await expect(card).toContainText("因为还有话没有说完");
   await card.getByRole("button", { name: "晚一小时" }).click();
   await expect(page.getByRole("status")).toContainText("已为你推迟一小时");
   await card.getByRole("button", { name: "取消" }).click();
   await expect(card).toHaveCount(0);
   await expect(page.getByRole("status")).toContainText("已取消");
+});
+
+test("Aurora Self changes stay visible, evaluated, consented and rollbackable", async ({ page }) => {
+  await page.goto("/app/aurora/index.html");
+  await loginIfNeeded(page);
+  const selfSpace = page.getByRole("region", { name: "Aurora 的连续自我" });
+  await expect(selfSpace).toBeVisible();
+  await expect(selfSpace.getByRole("heading", { name: "她最近学会了什么" })).toBeVisible();
+
+  const preview = selfSpace.getByRole("button", { name: "预览这次变化" }).first();
+  if (await preview.isVisible().catch(() => false)) {
+    await preview.click();
+    const draft = selfSpace.locator(".self-card.draft").first();
+    await expect(draft).toContainText("等待沙盒评测");
+    await draft.getByRole("button", { name: "运行变化评测" }).click();
+    const evaluated = selfSpace.locator(".self-card.evaluated").first();
+    await expect(evaluated).toContainText("评测通过，等你确认");
+    await evaluated.getByRole("button", { name: "允许她记住这次成长" }).click();
+    await expect(selfSpace.locator(".self-version")).toContainText(/v(?:[2-9]|\d{2,})/);
+    await expect(selfSpace.getByRole("button", { name: /回到 v1/ })).toBeVisible();
+  } else {
+    await expect(selfSpace.locator(".self-version")).toContainText(/v(?:[2-9]|\d{2,})/);
+  }
 });

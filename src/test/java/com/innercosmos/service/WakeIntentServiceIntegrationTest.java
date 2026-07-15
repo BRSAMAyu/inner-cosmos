@@ -129,4 +129,57 @@ class WakeIntentServiceIntegrationTest {
         assertThat(intent.preferredAt).isEqualTo(expectedUtc);
         assertThat(WakeIntentVO.from(intent).preferredAt()).isEqualTo(newYorkTime);
     }
+
+    @Test
+    void rejectsNonexistentAndAmbiguousDstWallTimes() {
+        LocalDateTime springGap = LocalDateTime.of(2026, 3, 8, 2, 30);
+        assertThatThrownBy(() -> service.schedule(74101L, "DST gap", "DST gap", "not delivered",
+            springGap.minusMinutes(5), springGap, springGap.plusHours(1), "America/New_York", null))
+            .isInstanceOf(BusinessException.class).hasMessageContaining("does not exist");
+
+        LocalDateTime autumnOverlap = LocalDateTime.of(2026, 11, 1, 1, 30);
+        assertThatThrownBy(() -> service.schedule(74102L, "DST overlap", "DST overlap", "not delivered",
+            autumnOverlap.minusMinutes(5), autumnOverlap, autumnOverlap.plusHours(2), "America/New_York", null))
+            .isInstanceOf(BusinessException.class).hasMessageContaining("ambiguous");
+    }
+
+    @Test
+    void instantSchedulingRemainsUnambiguousAcrossDstOverlap() {
+        java.time.Instant preferred = java.time.Instant.parse("2026-11-01T05:30:00Z");
+        WakeIntent intent = service.scheduleAtInstants(74103L, "DST instant", "first 01:30", "delivered once",
+            preferred.minusSeconds(300), preferred, preferred.plusSeconds(3600), "America/New_York", null);
+
+        assertThat(intent.preferredAt).isEqualTo(LocalDateTime.ofInstant(preferred, ZoneOffset.UTC));
+        assertThat(intent.timezone).isEqualTo("America/New_York");
+    }
+
+    @Test
+    void naturalAgreementSupersedesTheOlderSamePurposeIntent() {
+        WakeIntent first = service.scheduleNatural(75001L, "2 小时后", "继续汇报准备",
+            "回来看看是否愿意拆第一步", "我按约回来了。", "Asia/Singapore", null);
+        WakeIntent replacement = service.scheduleNatural(75001L, "tomorrow at 08:30", "继续汇报准备",
+            "按新时间回来", "我们从原来的问题继续。", "Asia/Singapore", null);
+
+        assertThat(mapper.selectById(first.id).status).isEqualTo("SUPERSEDED");
+        assertThat(mapper.selectById(first.id).outcomeReason).isEqualTo("superseded_by_new_agreement");
+        assertThat(replacement.supersedesIntentId).isEqualTo(first.id);
+        assertThat(service.listActive(75001L)).extracting(row -> row.id).containsExactly(replacement.id);
+    }
+
+    @Test
+    void deliveryFeedbackCanDelayOrMuteTheSamePurpose() {
+        LocalDateTime now = LocalDateTime.now();
+        WakeIntent fired = service.schedule(75002L, "继续通勤后的话题", "约定到了", "我回来了。",
+            now.minusMinutes(2), now.minusMinutes(1), now.plusHours(1), "Asia/Singapore", null);
+        WakeIntent claim = service.claimDue("feedback-worker", 1, Duration.ofMinutes(1)).getFirst();
+        assertThat(service.finishWithNotification(claim, "CONVERT_TO_IN_APP", "offline", "约定到了", "我回来了。"))
+            .isTrue();
+
+        WakeIntent later = service.feedback(75002L, fired.id, "LATER");
+        assertThat(later.status).isEqualTo("PLANNED");
+        assertThat(mapper.selectById(fired.id).userFeedback).isEqualTo("LATER");
+
+        service.feedback(75002L, later.id, "STOP_SIMILAR");
+        assertThat(service.isPurposeMuted(75002L, "继续通勤后的话题")).isTrue();
+    }
 }

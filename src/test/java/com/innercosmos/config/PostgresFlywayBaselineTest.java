@@ -46,7 +46,7 @@ class PostgresFlywayBaselineTest {
                 .locations("classpath:db/migration/postgresql")
                 .load();
 
-        assertEquals(4, flyway.migrate().migrationsExecuted);
+        assertEquals(6, flyway.migrate().migrationsExecuted);
         assertEquals(0, flyway.migrate().migrationsExecuted);
 
         String source = readClasspath("schema.sql");
@@ -68,17 +68,50 @@ class PostgresFlywayBaselineTest {
                     WHERE constraint_schema='public' AND constraint_type='FOREIGN KEY'
                     """);
 
-            assertEquals(64, expectedTables.size(), "source schema table inventory changed");
+            assertEquals(67, expectedTables.size(), "source schema table inventory changed");
             assertEquals(expectedTables, actualTables, "PostgreSQL baseline table drift");
             assertTrue(actualIndexes.containsAll(expectedIndexes),
                     () -> "missing PostgreSQL indexes: " + difference(expectedIndexes, actualIndexes));
             assertEquals(expectedForeignKeys, actualForeignKeys, "PostgreSQL foreign-key drift");
-            assertEquals(62, scalar(connection, """
+            assertEquals(65, scalar(connection, """
                     SELECT COUNT(*) FROM information_schema.columns
                     WHERE table_schema='public' AND is_identity='YES'
                     """));
             assertEquals("0.8.1", textScalar(connection,
                     "SELECT extversion FROM pg_extension WHERE extname='vector'"));
+        }
+    }
+
+    @Test
+    void v3ToV4AcceptsLegitimateDuplicateLegacyNotifications() throws Exception {
+        String database = "legacy_notification_" + System.nanoTime();
+        try (Connection admin = connection(); Statement statement = admin.createStatement()) {
+            statement.execute("CREATE DATABASE " + database);
+        }
+        String jdbcUrl = POSTGRES.getJdbcUrl().replace("/inner_cosmos_schema", "/" + database);
+        Flyway v3 = Flyway.configure()
+            .dataSource(jdbcUrl, POSTGRES.getUsername(), POSTGRES.getPassword())
+            .locations("classpath:db/migration/postgresql")
+            .target("3")
+            .load();
+        assertEquals(3, v3.migrate().migrationsExecuted);
+        try (Connection legacy = DriverManager.getConnection(jdbcUrl, POSTGRES.getUsername(), POSTGRES.getPassword());
+             Statement statement = legacy.createStatement()) {
+            statement.executeUpdate("""
+                INSERT INTO tb_notification(user_id,type,title,body,ref_id,ref_type,is_read)
+                VALUES (91,'SYNC_FAILED','retry 1','first',7,'CAPSULE_SYNC',false),
+                       (91,'SYNC_FAILED','retry 2','second',7,'CAPSULE_SYNC',false)
+                """);
+        }
+        Flyway v4 = Flyway.configure()
+            .dataSource(jdbcUrl, POSTGRES.getUsername(), POSTGRES.getPassword())
+            .locations("classpath:db/migration/postgresql")
+            .target("4")
+            .load();
+        assertEquals(1, v4.migrate().migrationsExecuted);
+        try (Connection migrated = DriverManager.getConnection(jdbcUrl, POSTGRES.getUsername(), POSTGRES.getPassword())) {
+            assertEquals(2, scalar(migrated,
+                "SELECT COUNT(*) FROM tb_notification WHERE user_id=91 AND ref_type='CAPSULE_SYNC' AND ref_id=7"));
         }
     }
 
