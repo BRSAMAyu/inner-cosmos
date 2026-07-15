@@ -1,13 +1,13 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
-import { api, apiConfigurationError, configureBearerAuth, hasConfiguredApiBase, replayTurnEvents, streamAurora, subscribeProactive, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type ConnectionRequests, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type Notification, type PersonaMessage, type PersonaSession, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type PsychologySkillSuggestion, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type SocialConnection, type StarfieldDetail, type StarfieldScene, type UnderstandingClaim, type WakeIntent } from "./api";
+import { api, apiConfigurationError, configureBearerAuth, hasConfiguredApiBase, replayTurnEvents, streamAurora, subscribeProactive, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type ConnectionRequests, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type Notification, type PersonaMessage, type PersonaSession, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type PsychologySkillSuggestion, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type SocialConnection, type StarfieldDetail, type StarfieldScene, type StarfieldStar, type UnderstandingClaim, type WakeIntent } from "./api";
 import { initialMobileState, mobileRuntime, type MobileRuntimeState } from "./mobile";
 import { mobileOidc } from "./mobile-auth";
 import type { AuroraStreamEvent, DialogMessage, TurnStatus } from "./protocol";
 import { initialProductSpace, MeSpace, ProductShellNavigation, type ProductSpace } from "./components/ProductShell";
 import { AuroraConversation, type AuroraUiMessage } from "./components/AuroraConversation";
 import { AuroraSelfSpace } from "./components/AuroraSelfSpace";
-import { UnderstandingCorrection } from "./components/UnderstandingCorrection";
+import { UnderstandingCorrection, type CorrectionTarget } from "./components/UnderstandingCorrection";
 import { MemoryStarfield } from "./components/MemoryStarfield";
 import { CapsuleWorkbench } from "./components/CapsuleWorkbench";
 import { ResonanceNetwork } from "./components/ResonanceNetwork";
@@ -41,6 +41,7 @@ export function AuroraApp() {
   const [selfBusy, setSelfBusy] = useState(false);
   const [correctionOld, setCorrectionOld] = useState("");
   const [correctionNew, setCorrectionNew] = useState("");
+  const [correctionTarget, setCorrectionTarget] = useState<CorrectionTarget | null>(null);
   const [correctionImpact, setCorrectionImpact] = useState<CorrectionImpact | null>(null);
   const [correctionBusy, setCorrectionBusy] = useState(false);
   const [claims, setClaims] = useState<UnderstandingClaim[]>([]);
@@ -494,10 +495,22 @@ export function AuroraApp() {
     } finally { setSelfBusy(false); }
   };
 
-  const correctionCommand = (): CorrectionCommand => ({
+  const correctionCommand = (): CorrectionCommand => correctionTarget ? {
+    targetType: "MEMORY_CARD", targetId: correctionTarget.id, fieldName: "summary",
+    oldValue: null, newValue: correctionNew.trim(), reason: "用户在记忆星空中直接纠正这条记忆"
+  } : {
     targetType: "AURORA_UNDERSTANDING", targetId: 0, fieldName: "self_understanding",
     oldValue: correctionOld.trim() || null, newValue: correctionNew.trim(), reason: "用户在 Inner Cosmos 中主动校准"
-  });
+  };
+
+  const beginMemoryCorrection = (star: StarfieldStar) => {
+    setCorrectionTarget({ id: star.id, label: star.title });
+    setCorrectionOld(""); setCorrectionNew(""); setCorrectionImpact(null);
+    navigateSpace("cosmos");
+    window.setTimeout(() => document.querySelector(".understanding-space")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+  };
+
+  const clearCorrectionTarget = () => { setCorrectionTarget(null); setCorrectionImpact(null); };
 
   const previewCorrection = async () => {
     setCorrectionBusy(true);
@@ -514,7 +527,15 @@ export function AuroraApp() {
       const result = await api.confirmCorrection(correctionCommand());
       setClaims(current => [result.activeClaim, ...current.map(claim =>
         claim.claimKey === result.activeClaim.claimKey && claim.status === "ACTIVE" ? { ...claim, status: "SUPERSEDED" as const } : claim)]);
-      setCorrectionImpact(null); setCorrectionOld(""); setCorrectionNew("");
+      const affectedMemory = result.propagation.some(row => row.targetKind === "MEMORY");
+      if (affectedMemory) {
+        await Promise.all([
+          api.starfield(starfield?.mode ?? "TIME").then(setStarfield),
+          api.memoryCards().then(setMemories),
+          api.myCapsules().then(setCapsules)
+        ]);
+      }
+      setCorrectionImpact(null); setCorrectionOld(""); setCorrectionNew(""); setCorrectionTarget(null);
       setStatus("已校准。旧理解仍可追溯，Aurora、星空与共鸣体上下文会按确认结果同步。");
     } catch (error) { setStatus(error instanceof Error ? error.message : "这次纠正没有保存，任何下游都未改变"); }
     finally { setCorrectionBusy(false); }
@@ -897,13 +918,13 @@ export function AuroraApp() {
       </div>
 
       <div className="product-space" hidden={productSpace !== "cosmos"}>
-      <UnderstandingCorrection claims={claims} oldValue={correctionOld} newValue={correctionNew} impact={correctionImpact} busy={correctionBusy}
+      <UnderstandingCorrection claims={claims} oldValue={correctionOld} newValue={correctionNew} impact={correctionImpact} busy={correctionBusy} target={correctionTarget}
         onOldValue={value => { setCorrectionOld(value); setCorrectionImpact(null); }} onNewValue={value => { setCorrectionNew(value); setCorrectionImpact(null); }}
-        onPreview={() => void previewCorrection()} onCancelPreview={() => setCorrectionImpact(null)} onConfirm={() => void confirmCorrection()} />
+        onPreview={() => void previewCorrection()} onCancelPreview={() => setCorrectionImpact(null)} onConfirm={() => void confirmCorrection()} onClearTarget={clearCorrectionTarget} />
 
       {starfield && <MemoryStarfield starfield={starfield} starfieldBusy={starfieldBusy} onChangeMode={mode => void changeStarfieldMode(mode)}
         starfieldDetail={starfieldDetail} detailBusy={detailBusy} onRevealStar={id => void revealStar(id)} onCloseDetail={() => setStarfieldDetail(null)}
-        memoryOperations={memoryOperations} rollbackBusy={rollbackBusy} onRollback={operation => void rollbackMemoryOperation(operation)} />}
+        memoryOperations={memoryOperations} rollbackBusy={rollbackBusy} onRollback={operation => void rollbackMemoryOperation(operation)} onCorrectMemory={beginMemoryCorrection} />}
 
       <PsychologySkillStudio skills={skills} skillRuns={skillRuns} selectedSkill={selectedSkill} skillAnswers={skillAnswers}
         skillConsent={skillConsent} skillRetention={skillRetention} skillBusy={skillBusy} skillLocale={skillLocale}

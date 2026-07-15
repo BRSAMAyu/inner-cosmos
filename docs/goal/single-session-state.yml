@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-16T00:14:00+08:00
+updated_at: 2026-07-16T00:30:00+08:00
 authority:
   - goal-objective.md
   - 对齐文档/17-单会话持续Goal模式执行协议.md
@@ -28,20 +28,22 @@ resume_policy:
   update_this_file_at_every_checkpoint: true
 
 active_front:
-  id: UNIFIED-FIVE-SPACE-APPSHELL
-  state: COMPONENT_DECOMPOSITION_IN_PROGRESS
-  intent: Decompose the verified five-space information architecture into maintainable domain components without changing capability or data semantics.
+  id: CAMPAIGN-B-EXPERIENCE
+  state: CORRECTION_PROPAGATION_HARDENING_IN_PROGRESS
+  intent: Close the gap between the Campaign B Experience Contract (对齐文档/17-Campaign-B-Inner-Cosmos-Experience-Contract.md) and what a real user can actually trigger through the UI, then extend evaluability beyond CRUD-style tests.
   next_machine_actions:
-    - AuroraApp is down from 1210 to 990 lines. Shell, conversation, Self, understanding correction, memory starfield/provenance, capsule workbench, resonance network, letters/connections and the psychology Skill studio (+ suggestion banner) are all isolated into components/*.tsx with matching Vitest specs.
-    - Remaining inline surface in AuroraApp is mostly orchestration: bootstrap/session wiring, the wake-intent negotiate-and-respond "returns" section, the top-level aurora hero/mode-nav/mobile-presence composition, and Login. Extract the wake-intent Returns section next if further decomposition is prioritized; otherwise treat AppShell decomposition as sufficiently converged and move to Campaign B.
-    - Add automated accessibility and visual-regression coverage for desktop and narrow mobile shell states.
-    - Continue Campaign B's correction, provenance and propagation experience (claim precision, retrieval relevance, propagation to Aurora/starfield/capsules) now that the component boundary is stable.
+    - DONE this checkpoint — a real UX/correctness gap was found and fixed, not just a refactor: the correction form previously always sent targetType=AURORA_UNDERSTANDING (fieldName self_understanding); a MemoryCard only got superseded/propagated to capsules if the user's free-typed oldValue happened to text-match an existing memory's title/summary (fragile, undiscoverable). Added a "这条不准确了" button on each MemoryStarfield accessible-list star that opens UnderstandingCorrection pre-targeted at that exact MEMORY_CARD id (guaranteed match, no text-matching luck required). Also fixed a real bug: confirmCorrection never refetched starfield/memories/capsules, so the UI's own promise ("星空与共鸣体上下文会按确认结果同步") wasn't actually kept until a manual reload — now it refetches all three when the correction affected a memory.
+    - NEXT — verify and, if needed, build the capsule NEEDS_REVIEW banner path end-to-end (CapsuleWorkbench should visibly show visibilityStatus NEEDS_REVIEW after a correction affects an authorized memory; confirm this renders correctly and add E2E coverage using a freshly-authorized capsule rather than relying on demo-seed gravity ranking).
+    - NEXT — decide the scope of "claim precision" evaluation given there is no automatic claim-extraction pipeline yet (claims only originate from explicit UserCorrection today); either narrow the doc-16 metric to explicit-correction precision/consistency or build extraction first.
+    - FLAGGED, NOT YET FIXED — ai-lab/adapters/current_production.py (`CurrentProductionContractAdapter`) does not call the real Spring Boot app or an LLM; it greps for marker strings in source files and fabricates SystemRun output by echoing the scenario's own `expected` block back as the "result". Any Campaign B/A claim resting on this harness (aurora_rhythm/aurora_self/capsule_fidelity/interruption/memory/privacy_boundary/proactive_time families) is self-confirming, not measured. This directly risks the goal-objective.md rule against self-scoring as evidence. Needs a real adapter that drives the live backend (and a real LLM provider for AI-quality claims) before citing ai-lab results as verification. Not fixed this checkpoint — flagged for a dedicated follow-up given its size and the need for careful design (do not rush this fix).
+    - Retrieval eval (MemoryRetrievalEvaluationTest + memory-retrieval-v1.json) is a real scored/thresholded eval but tiny (12 memories/10 cases, one annotator) — grow it with more cases and a held-out set once time allows.
+    - Return to UNIFIED-FIVE-SPACE-APPSHELL only if a new experience gap requires it; AuroraApp is down to ~1000 lines with shell/conversation/Self/correction/starfield/capsule-workbench/resonance-network/letters/psychology-skill-studio all isolated into components/*.tsx with matching Vitest specs. Remaining inline surface (bootstrap wiring, wake-intent Returns section, hero/mode-nav composition, Login) is orchestration, not a blocked user experience.
 
 priority_queue:
-  - id: UNIFIED-FIVE-SPACE-APPSHELL
-    reason: Existing capabilities are concentrated in a single oversized Aurora page and do not yet form the specified product information architecture.
   - id: CAMPAIGN-B-EXPERIENCE
-    reason: Memory/profile code breadth exists but needs an end-to-end correction, provenance, retrieval, starfield, and propagation experience contract.
+    reason: The correction Experience Contract's propagation promise (star/memory -> preview -> confirm -> starfield/capsule sync) was not reliably reachable through the real UI and the UI did not actually refetch synced state; fixed this checkpoint. Capsule NEEDS_REVIEW UI verification, eval-harness integrity (ai-lab fabricated adapter), and eval dataset growth remain open.
+  - id: UNIFIED-FIVE-SPACE-APPSHELL
+    reason: Existing capabilities are concentrated in a single oversized Aurora page and do not yet form the specified product information architecture. Largely converged this session (1210 -> ~1000 lines, 8 domain components extracted with tests); only orchestration/hero/login remain inline.
   - id: CAMPAIGN-C-QUALITY
     reason: Capsule Genome foundations exist; full runtime fidelity comparison and simulator asset remain open.
   - id: CAMPAIGN-D-TRUST
@@ -69,9 +71,9 @@ last_full_gate:
   claimed_vitest: 17/17
   independent_reverification: BUILDER_VERIFIED_WITH_HUMAN_AND_PRODUCTION_GATES
   independently_verified:
-    - Maven clean verify passed with 784 tests, Jar, SBOM, and zero SpotBugs findings at the mobile-auth checkpoint.
-    - Vitest passed 29/29 including isolated ProductShell, AuroraConversation, MemoryStarfield, CapsuleWorkbench, ResonanceNetwork, LettersInbox and PsychologySkillStudio/SkillSuggestionBanner contracts; the production React bundle compiled.
-    - Packaged-Jar Playwright passed 11/11 through explicit product-space navigation, including memory-starfield mode-switch/provenance/rollback, owner-publish/visitor-letter/withdrawal, and the psychology-Skill consent/basis/revocation journeys after component extraction.
+    - Maven clean verify passed with 784 tests, Jar, SBOM, and zero SpotBugs findings at the mobile-auth checkpoint (no Java changed this checkpoint).
+    - Vitest passed 33/33 including isolated ProductShell, AuroraConversation, MemoryStarfield (incl. new correct-this-memory case), CapsuleWorkbench, ResonanceNetwork, LettersInbox, PsychologySkillStudio/SkillSuggestionBanner and a new UnderstandingCorrection suite; the production React bundle compiled.
+    - Packaged-Jar Playwright passed 12/12 (was 11), adding "correcting a specific memory star supersedes exactly that memory and clears from the starfield" — a real end-to-end journey through the new star-to-correction entry point and the confirmCorrection refetch fix.
     - Living Aurora scheduler-to-feedback browser contract passed 1/1 through the new shell (unchanged this checkpoint).
     - Focused Aurora Self packaged-JAR browser lifecycle passed 1/1 after component extraction.
     - Focused authoritative understanding-correction browser lifecycle passed 1/1 after component extraction.

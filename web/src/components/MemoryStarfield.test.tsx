@@ -33,7 +33,7 @@ describe("MemoryStarfield", () => {
     const onChangeMode = vi.fn();
     render(<MemoryStarfield starfield={starfield} starfieldBusy={false} onChangeMode={onChangeMode}
       starfieldDetail={null} detailBusy={null} onRevealStar={() => undefined} onCloseDetail={() => undefined}
-      memoryOperations={[]} rollbackBusy={null} onRollback={() => undefined} />);
+      memoryOperations={[]} rollbackBusy={null} onRollback={() => undefined} onCorrectMemory={() => undefined} />);
     fireEvent.click(screen.getByRole("button", { name: "主题" }));
     expect(onChangeMode).toHaveBeenCalledWith("THEME");
   });
@@ -43,7 +43,7 @@ describe("MemoryStarfield", () => {
     const onCloseDetail = vi.fn();
     render(<MemoryStarfield starfield={starfield} starfieldBusy={false} onChangeMode={() => undefined}
       starfieldDetail={detail} detailBusy={null} onRevealStar={onRevealStar} onCloseDetail={onCloseDetail}
-      memoryOperations={[]} rollbackBusy={null} onRollback={() => undefined} />);
+      memoryOperations={[]} rollbackBusy={null} onRollback={() => undefined} onCorrectMemory={() => undefined} />);
     fireEvent.click(screen.getByRole("button", { name: "查看来源与变化" }));
     expect(onRevealStar).toHaveBeenCalledWith(1);
     expect(screen.getByText("来自一次对话")).toBeVisible();
@@ -55,8 +55,17 @@ describe("MemoryStarfield", () => {
     const onRollback = vi.fn();
     render(<MemoryStarfield starfield={starfield} starfieldBusy={false} onChangeMode={() => undefined}
       starfieldDetail={null} detailBusy={null} onRevealStar={() => undefined} onCloseDetail={() => undefined}
-      memoryOperations={[operation]} rollbackBusy={null} onRollback={onRollback} />);
+      memoryOperations={[operation]} rollbackBusy={null} onRollback={onRollback} onCorrectMemory={() => undefined} />);
     fireEvent.click(screen.getByRole("button", { name: "撤回这次变更" }));
     expect(onRollback).toHaveBeenCalledWith(operation);
+  });
+
+  it("lets the user start a correction from a specific memory star", () => {
+    const onCorrectMemory = vi.fn();
+    render(<MemoryStarfield starfield={starfield} starfieldBusy={false} onChangeMode={() => undefined}
+      starfieldDetail={null} detailBusy={null} onRevealStar={() => undefined} onCloseDetail={() => undefined}
+      memoryOperations={[]} rollbackBusy={null} onRollback={() => undefined} onCorrectMemory={onCorrectMemory} />);
+    fireEvent.click(screen.getByRole("button", { name: "这条不准确了" }));
+    expect(onCorrectMemory).toHaveBeenCalledWith(starfield.accessibleList[0]);
   });
 });

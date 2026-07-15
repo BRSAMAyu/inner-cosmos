@@ -1,19 +1,25 @@
 import type { CorrectionImpact, UnderstandingClaim } from "../api";
 
-export function UnderstandingCorrection({ claims, oldValue, newValue, impact, busy, onOldValue,
-  onNewValue, onPreview, onCancelPreview, onConfirm }: {
+export type CorrectionTarget = { id: number; label: string };
+
+export function UnderstandingCorrection({ claims, oldValue, newValue, impact, busy, target, onOldValue,
+  onNewValue, onPreview, onCancelPreview, onConfirm, onClearTarget }: {
   claims: UnderstandingClaim[]; oldValue: string; newValue: string; impact: CorrectionImpact | null; busy: boolean;
-  onOldValue: (value: string) => void; onNewValue: (value: string) => void; onPreview: () => void;
-  onCancelPreview: () => void; onConfirm: () => void;
+  target: CorrectionTarget | null; onOldValue: (value: string) => void; onNewValue: (value: string) => void;
+  onPreview: () => void; onCancelPreview: () => void; onConfirm: () => void; onClearTarget: () => void;
 }) {
   const activeClaims = claims.filter(claim => claim.status === "ACTIVE");
   return <section className="understanding-space" aria-label="校准 Aurora 对我的理解">
     <div className="understanding-heading"><div><span className="eyebrow">YOUR INNER COSMOS</span><h2>如果这不太是你</h2></div>
       <span>{activeClaims.length} 条由你确认的理解</span></div>
     <p>先预览影响，再决定是否让 Aurora 记住。旧理解不会消失，只会退出“当前事实”。</p>
+    {target && <div className="correction-target">
+      <div><span>针对这条具体记忆</span><strong>{target.label}</strong></div>
+      <button type="button" disabled={busy} onClick={onClearTarget}>改为整体理解</button>
+    </div>}
     <div className="correction-fields">
-      <label>Aurora 原先怎样理解（可选）<textarea value={oldValue} onChange={event => onOldValue(event.target.value)} placeholder="例如：你更喜欢独处" /></label>
-      <label>更准确的你是<textarea value={newValue} onChange={event => onNewValue(event.target.value)} placeholder="例如：我不是喜欢独处，只是需要先恢复精力" /></label>
+      {!target && <label>Aurora 原先怎样理解（可选）<textarea value={oldValue} onChange={event => onOldValue(event.target.value)} placeholder="例如：你更喜欢独处" /></label>}
+      <label style={target ? { gridColumn: "1 / -1" } : undefined}>更准确的你是<textarea value={newValue} onChange={event => onNewValue(event.target.value)} placeholder="例如：我不是喜欢独处，只是需要先恢复精力" /></label>
     </div>
     {!impact ? <button className="understanding-action" disabled={busy || !newValue.trim()} onClick={onPreview}>预览会改变什么</button> :
       <div className="impact-preview" role="region" aria-label="纠正影响预览">

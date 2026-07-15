@@ -173,6 +173,31 @@ test("memory starfield switches between time, theme and people without losing it
   await expect(accessible.locator("li").first()).toBeVisible();
 });
 
+test("correcting a specific memory star supersedes exactly that memory and clears from the starfield", async ({ page }) => {
+  await page.goto("/app/aurora/index.html");
+  await loginIfNeeded(page);
+  await openProductSpace(page, "内宇宙");
+  const cosmos = page.getByRole("region", { name: "记忆星空" });
+  const accessible = cosmos.getByRole("list", { name: "记忆星空可访问列表" });
+  const firstStar = accessible.locator("li").first();
+  const targetTitle = await firstStar.locator("strong").innerText();
+  await firstStar.getByRole("button", { name: "这条不准确了" }).click();
+
+  const understanding = page.getByRole("region", { name: "校准 Aurora 对我的理解" });
+  await expect(understanding.getByText(targetTitle, { exact: true })).toBeVisible();
+  await expect(understanding.getByLabel("Aurora 原先怎样理解（可选）")).toHaveCount(0);
+  await understanding.getByLabel("更准确的你是").fill("这条记忆需要被重新理解，不再是当前事实");
+  await understanding.getByRole("button", { name: "预览会改变什么" }).click();
+  const preview = understanding.getByRole("region", { name: "纠正影响预览" });
+  await expect(preview).toContainText(targetTitle);
+  await expect(preview).toContainText("记忆星空");
+  await preview.getByRole("button", { name: "确认，这是更准确的我" }).click();
+  await expect(page.getByRole("status")).toContainText("已校准");
+
+  await expect(accessible.getByText(targetTitle, { exact: true })).toHaveCount(0);
+  await expect(understanding.locator(".correction-target")).toHaveCount(0);
+});
+
 test("user can roll back a memory change while permanent forgetting stays irreversible", async ({ page }) => {
   await page.goto("/app/aurora/index.html");
   await loginIfNeeded(page);

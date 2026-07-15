@@ -1,14 +1,14 @@
-import type { MemoryOperation, StarfieldDetail, StarfieldScene } from "../api";
+import type { MemoryOperation, StarfieldDetail, StarfieldScene, StarfieldStar } from "../api";
 
 const modeOptions: Array<[StarfieldScene["mode"], string]> = [["TIME", "时间"], ["THEME", "主题"], ["PEOPLE", "人物"]];
 const rollbackExcluded = new Set(["FORGET", "LINK", "NO_OP", "ROLLBACK"]);
 
 export function MemoryStarfield({ starfield, starfieldBusy, onChangeMode, starfieldDetail, detailBusy,
-  onRevealStar, onCloseDetail, memoryOperations, rollbackBusy, onRollback }: {
+  onRevealStar, onCloseDetail, memoryOperations, rollbackBusy, onRollback, onCorrectMemory }: {
   starfield: StarfieldScene; starfieldBusy: boolean; onChangeMode: (mode: StarfieldScene["mode"]) => void;
   starfieldDetail: StarfieldDetail | null; detailBusy: number | null; onRevealStar: (id: number) => void;
   onCloseDetail: () => void; memoryOperations: MemoryOperation[]; rollbackBusy: number | null;
-  onRollback: (operation: MemoryOperation) => void;
+  onRollback: (operation: MemoryOperation) => void; onCorrectMemory: (star: StarfieldStar) => void;
 }) {
   return <section className="cosmos-space" aria-label="记忆星空">
     <div className="cosmos-heading"><div><span className="eyebrow">MEMORY, ALIVE</span><h2>你的记忆不是档案柜</h2></div>
@@ -30,7 +30,10 @@ export function MemoryStarfield({ starfield, starfieldBusy, onChangeMode, starfi
     <ol className="cosmos-list" aria-label="记忆星空可访问列表">
       {starfield.accessibleList.map(star => <li key={star.id}><div><strong>{star.title}</strong><span>{star.theme} · {star.memoryLayer}</span></div>
         <small>置信度 {Math.round(star.confidence * 100)}% · v{star.versionNo}</small><p>{star.summary}</p>
-        <button type="button" disabled={detailBusy !== null} onClick={() => onRevealStar(star.id)}>{detailBusy === star.id ? "正在追溯…" : "查看来源与变化"}</button></li>)}
+        <div className="cosmos-list-actions">
+          <button type="button" disabled={detailBusy !== null} onClick={() => onRevealStar(star.id)}>{detailBusy === star.id ? "正在追溯…" : "查看来源与变化"}</button>
+          <button type="button" className="quiet" onClick={() => onCorrectMemory(star)}>这条不准确了</button>
+        </div></li>)}
     </ol>
     {starfieldDetail && <aside className="provenance-panel" aria-label="记忆来源与变化">
       <div><span className="eyebrow">WHY THIS STAR</span><button type="button" onClick={onCloseDetail} aria-label="关闭记忆来源">×</button></div>
