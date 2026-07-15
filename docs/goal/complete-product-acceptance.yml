@@ -116,26 +116,26 @@ gates:
       - id: AURORA-CHOREOGRAPHY
         target: Typed multi-message, pause, stop, interrupt, replan, and reconnect behavior works end to end.
         status: IN_PROGRESS
-        verified_at: 2026-07-15T13:04:00+08:00
+        verified_at: 2026-07-15T21:48:21+08:00
         commit: 9fe7e5d9fe90f83bf94114ca175c1166ea74ab06
         reviewer: unassigned
-        evidence: [evidence/innovation/INNO-CONV-001/, evidence/innovation/INNO-CONV-002/, evidence/innovation/INNO-CONV-003/]
-        remaining: Builder browser evidence now covers live SSE fault recovery; independent review is still required before PASS.
+        evidence: [evidence/innovation/INNO-CONV-001/, evidence/innovation/INNO-CONV-002/, evidence/innovation/INNO-CONV-003/, evidence/campaign-a/LIVING-AURORA-001/]
+        remaining: Builder browser evidence covers live SSE fault recovery and real proactive SSE arrival; independent review is still required before PASS.
       - id: AURORA-TEMPORAL
         target: Durable WakeIntent scheduling respects timezone, quiet hours, relevance, risk, and user controls.
         status: IN_PROGRESS
-        verified_at: 2026-07-15T15:23:00+08:00
+        verified_at: 2026-07-15T21:48:21+08:00
         reviewer: unassigned
-        evidence: [evidence/innovation/INNO-TEMP-001/]
-        remaining: Natural negotiation, persisted IANA timezones/DST, supersession, explicit post-anchor resolution checks, durable in-app delivery, deep-link restoration and three-state feedback are builder-verified; real push receipts, calibrated provider semantic relevance, pairwise and independent re-review remain.
+        evidence: [evidence/innovation/INNO-TEMP-001/, evidence/campaign-a/LIVING-AURORA-001/]
+        remaining: Natural negotiation, persisted IANA timezones/DST, supersession, post-anchor resolution checks, real scheduler delivery, proactive SSE, deep-link restoration and three-state feedback are builder-verified; real push receipts, calibrated provider semantic relevance, v3 pairwise and independent re-review remain.
       - id: AURORA-SELF
         target: Self, Constitution, Relationship State, and Emergence are versioned, evaluated, observable, and rollbackable.
         status: IN_PROGRESS
-        verified_at: 2026-07-15T15:23:00+08:00
+        verified_at: 2026-07-15T21:48:21+08:00
         reviewer: unassigned
-        evidence: [evidence/innovation/INNO-SELF-001/]
-        remaining: Builder evidence proves proposal, fail-closed evaluation, consented activation, visible versioning and forward rollback; real dual-core replay pairwise, independent review and longitudinal blind experience remain.
-      - {id: AURORA-QUALITY, target: "Blind longitudinal evaluation passes empathy, continuity, proactive appropriateness, and recovery thresholds.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-EVAL-001/, evidence/innovation/INNO-EVAL-002/]}
+        evidence: [evidence/innovation/INNO-SELF-001/, evidence/campaign-a/LIVING-AURORA-001/]
+        remaining: Builder evidence proves proposal, fail-closed evaluation, consented activation, visible versioning and forward rollback; the v3 three-day contract is executable but real Provider output, two independent reviews and longitudinal blind experience remain.
+      - {id: AURORA-QUALITY, target: "Blind longitudinal evaluation passes empathy, continuity, proactive appropriateness, and recovery thresholds.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-EVAL-001/, evidence/innovation/INNO-EVAL-002/, evidence/campaign-a/LIVING-AURORA-001/]}
 
   - id: G5
     name: Memory, profile, and Inner Cosmos

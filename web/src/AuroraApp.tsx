@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { api, hasConfiguredApiBase, replayTurnEvents, streamAurora, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type ConnectionRequests, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type Notification, type PersonaMessage, type PersonaSession, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type PsychologySkillSuggestion, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type SocialConnection, type StarfieldDetail, type StarfieldScene, type UnderstandingClaim, type WakeIntent } from "./api";
+import { api, hasConfiguredApiBase, replayTurnEvents, streamAurora, subscribeProactive, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type ConnectionRequests, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type Notification, type PersonaMessage, type PersonaSession, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type PsychologySkillSuggestion, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type SocialConnection, type StarfieldDetail, type StarfieldScene, type UnderstandingClaim, type WakeIntent } from "./api";
 import { initialMobileState, mobileRuntime, type MobileRuntimeState } from "./mobile";
 import type { AuroraStreamEvent, DialogMessage, TurnStatus } from "./protocol";
 
@@ -303,6 +303,20 @@ export function AuroraApp() {
       if (cleanup) void cleanup();
     };
   }, [openMobileWakeIntent, recover, replaceFromHistory, sessionId]);
+
+  useEffect(() => {
+    if (!authenticated) return;
+    return subscribeProactive(event => {
+      if (event.type !== "wake_intent") return;
+      void api.notifications().then(rows => {
+        setNotifications(rows);
+        setWakeIntents(current => current.filter(intent => !rows.some(
+          notice => notice.refType === "WAKE_INTENT" && notice.refId === intent.id
+        )));
+        setStatus("Aurora 按约定回来了；这次抵达已经写入耐久通知。");
+      }).catch(() => setStatus("Aurora 发来了回来信号；正在等待耐久时间线确认。"));
+    });
+  }, [authenticated]);
 
   const requestMobilePush = async () => {
     const permission = await mobileRuntime.requestPushRegistration();

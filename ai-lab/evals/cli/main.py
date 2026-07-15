@@ -13,9 +13,10 @@ from evals.judges import DeterministicOfflineJudge, JudgeEnsemble, OptionalLlmJu
 from evals.metrics import evaluate_runs
 from evals.reports import build_report, write_report
 from evals.schemas.validator import validate_schema_documents
-from evals.real_provider_pairwise import config_from_environment, run_pairwise
+from evals.real_provider_pairwise import config_from_environment, config_from_local_profile, rescore_report, run_pairwise, score_pairwise
 from evals.psychology import run as run_psychology
 from evals.psychology_compare import run as run_psychology_compare, score as score_psychology_compare
+from evals.living_experience import score as score_living_experience
 
 LAB_ROOT = Path(__file__).resolve().parents[2]
 REPOSITORY_ROOT = LAB_ROOT.parent
@@ -79,6 +80,19 @@ def main() -> None:
     real_parser = subparsers.add_parser("real-pairwise")
     real_parser.add_argument("--output", type=Path, required=True)
     real_parser.add_argument("--seed", type=int, default=20260715)
+    real_parser.add_argument("--profile", help="Profile in ~/.config/inner-cosmos/providers.local.json")
+    real_score_parser = subparsers.add_parser("real-pairwise-score")
+    real_score_parser.add_argument("--ratings", type=Path, nargs="+", required=True)
+    real_score_parser.add_argument("--runs", type=Path, required=True)
+    real_score_parser.add_argument("--output", type=Path, required=True)
+    real_score_parser.add_argument("--min-reviewers", type=int, default=2)
+    real_rescore_parser = subparsers.add_parser("real-pairwise-rescore")
+    real_rescore_parser.add_argument("--runs", type=Path, required=True)
+    real_rescore_parser.add_argument("--output", type=Path, required=True)
+    experience_score_parser = subparsers.add_parser("experience-score")
+    experience_score_parser.add_argument("--ratings", type=Path, nargs="+", required=True)
+    experience_score_parser.add_argument("--output", type=Path, required=True)
+    experience_score_parser.add_argument("--min-reviewers", type=int, default=2)
     psychology_parser = subparsers.add_parser("psychology")
     psychology_parser.add_argument("--output", type=Path, required=True)
     psychology_compare_parser = subparsers.add_parser("psychology-compare")
@@ -92,7 +106,14 @@ def main() -> None:
     if args.command == "validate":
         result = validate()
     elif args.command == "real-pairwise":
-        result = run_pairwise(config_from_environment(), args.output, args.seed)
+        config = config_from_local_profile(args.profile) if args.profile else config_from_environment()
+        result = run_pairwise(config, args.output, args.seed)
+    elif args.command == "real-pairwise-score":
+        result = score_pairwise(args.ratings, args.runs, args.output, args.min_reviewers)
+    elif args.command == "real-pairwise-rescore":
+        result = rescore_report(args.runs, args.output)
+    elif args.command == "experience-score":
+        result = score_living_experience(args.ratings, args.output, args.min_reviewers)
     elif args.command == "psychology":
         result = run_psychology(REPOSITORY_ROOT, args.output)
     elif args.command == "psychology-compare":

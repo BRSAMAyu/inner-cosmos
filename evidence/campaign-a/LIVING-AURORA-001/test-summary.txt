@@ -1,0 +1,27 @@
+Campaign A Living Aurora Experience Contract checkpoint
+Date: 2026-07-15
+
+PASS  pnpm test
+      2 files, 7 tests
+
+PASS  pnpm run build
+      TypeScript project build and Vite production bundle
+
+PASS  python -m unittest discover -s tests -v  (ai-lab/)
+      51 tests, including pairwise v3.1 three-day contract, fail-closed pairwise scorer,
+      and fail-closed non-author Experience Contract review scorer
+
+PASS  scripts/run-living-aurora-experience.ps1
+      packaged JAR + real scheduler + relevance + durable notification + proactive SSE
+      + owner deep link + MATCHED feedback: 1/1, 8.8s test / 28.3s total
+
+PASS  scripts/run-living-aurora-e2e.ps1
+      packaged-JAR complete browser regression: 11/11, 42.8s
+
+PASS  complete-product-acceptance.yml PyYAML parse
+PASS  GLM-5.2 real pairwise: 11 observations / 33 calls / fallback=false
+PASS  MiMo v2.5 real pairwise: 11 observations / 33 calls / fallback=false
+
+NOT RUN / HUMAN GATE
+      Two independent blind reviews, APNs/FCM receipts,
+      real-device delivery and non-author longitudinal experience.

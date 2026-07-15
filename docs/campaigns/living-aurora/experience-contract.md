@@ -63,6 +63,7 @@ Deployment: local-complete first; Academy EKS preserves domain semantics without
 
 ## 当前检查点
 
-- 已有：typed SSE、多气泡、stop/interrupt、durable replay；WakeIntent/租约/通知基础；用户 IANA 时区与 DST 严格处理；Self proposal→evaluation→consent→version→forward rollback；四条真实浏览器旅程。
-- 下一闭环：自然时间协商 → 临投递相关性/替代 → 真实通知与深链 → 三态反馈策略；随后接入真实 Provider pairwise 和组员盲体验。
+- 已有：typed SSE、多气泡、stop/interrupt、durable replay；自然时间协商、WakeIntent 租约、临投递相关性/替代、耐久通知、实时 proactive SSE、深链续接与三态反馈；用户 IANA 时区与 DST 严格处理；Self proposal→evaluation→consent→version→forward rollback；真实 scheduler 浏览器旅程。
+- Provider pairwise v3 已覆盖 8 条边界轨迹与 3 个累计跨日观察点，输出左右独立评分的盲表，并以至少两名 reviewer、全量覆盖和无维度回退为 fail-closed 门槛。
+- 下一闭环：在授权真实 Provider 上执行 v3 并冻结双人盲评；由非实现组员按本契约连续体验，补齐真实 Push/设备收据和独立验收。
 - `AURORA-TEMPORAL` 与 `AURORA-SELF` 在上述证据和独立验收完成前保持 `IN_PROGRESS`。

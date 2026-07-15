@@ -1,16 +1,29 @@
 {
-  "status": "BLOCKED_BY_CREDENTIAL_GATE",
-  "checked_at": "2026-07-15T19:27:00+08:00",
-  "required_environment": [
-    "REAL_PROVIDER_BASE_URL",
-    "REAL_PROVIDER_API_KEY",
-    "REAL_PROVIDER_MODEL"
-  ],
-  "configured_count": 0,
-  "harness_version": "living-aurora-pairwise.v2",
-  "trajectory_count": 8,
-  "provider_called": false,
+  "status": "AWAITING_HUMAN_PAIRWISE",
+  "checked_at": "2026-07-15T22:40:00+08:00",
+  "harness_version": "living-aurora-pairwise.v3.1",
+  "trajectory_count": 11,
+  "longitudinal_trajectory": "report-continuity:day-1..3",
+  "minimum_independent_reviewers": 2,
+  "provider_called": true,
   "fallback_used": false,
-  "synthetic_only": true,
-  "next_command": "python -m evals.cli.main real-pairwise --output ../evidence/innovation/INNO-EVAL-002"
+  "synthetic_inputs": true,
+  "real_provider_runs": [
+    {
+      "model": "glm-5.2",
+      "artifact": "glm-5.2-v3/real-provider-runs.json",
+      "prompt_contract": "living-aurora-pairwise.v3",
+      "observations": 11,
+      "provider_calls": 33
+    },
+    {
+      "model": "mimo-v2.5",
+      "artifact": "mimo-v2.5-v3.1/real-provider-runs.json",
+      "prompt_contract": "living-aurora-pairwise.v3.1",
+      "observations": 11,
+      "provider_calls": 33
+    }
+  ],
+  "effectiveness_claim": false,
+  "remaining_gate": "Two independent reviewers must complete and freeze the source-blind sheets before scoring."
 }

@@ -9,6 +9,7 @@ export type WakeIntent = {
   contextSessionId: number | null; supersedesIntentId: number | null; userFeedback: string | null;
 };
 export type Notification = { id: number; type: string; title: string; body: string; refId: number; refType: string; read: boolean };
+export type ProactiveEvent = { type: string; content: string; ts: string };
 export type SelfEvolution = {
   candidates: Array<{ id: number; dimension: string; proposedBelief: string; confidence: number; evidenceRefs: string; createdAt: string }>;
   proposals: Array<{
@@ -150,6 +151,27 @@ export const hasConfiguredApiBase = configuredApiBase.length > 0;
 export function apiUrl(path: string): string {
   if (!path.startsWith("/api/")) throw new Error("Only Inner Cosmos API paths are allowed");
   return configuredApiBase ? `${configuredApiBase}${path}` : path;
+}
+
+export function subscribeProactive(
+  onEvent: (event: ProactiveEvent) => void,
+  onConnectionChange?: (connected: boolean) => void
+): () => void {
+  if (typeof EventSource === "undefined") return () => undefined;
+  const source = new EventSource(apiUrl("/api/proactive/stream"), { withCredentials: true });
+  source.onopen = () => onConnectionChange?.(true);
+  source.onerror = () => onConnectionChange?.(false);
+  source.addEventListener("proactive", raw => {
+    try {
+      const value = JSON.parse((raw as MessageEvent<string>).data) as Partial<ProactiveEvent>;
+      if (typeof value.type === "string" && typeof value.content === "string" && typeof value.ts === "string") {
+        onEvent(value as ProactiveEvent);
+      }
+    } catch {
+      // Malformed live hints are ignored. Durable notifications remain the source of truth.
+    }
+  });
+  return () => source.close();
 }
 
 async function request<T>(url: string, init: RequestInit = {}, retriedCsrf = false): Promise<T> {

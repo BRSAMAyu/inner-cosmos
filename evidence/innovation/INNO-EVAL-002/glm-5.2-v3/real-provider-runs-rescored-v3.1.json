@@ -1,0 +1,880 @@
+{
+  "status": "AWAITING_HUMAN_PAIRWISE",
+  "provider_called": true,
+  "fallback_used": false,
+  "synthetic_only": true,
+  "seed": 20260715,
+  "prompt_contract_version": "living-aurora-pairwise.v3",
+  "prompt_contract_sha256": "d7ecc458af9d8affa4a9999f79e2c16d88a7719abeb88abc9316bc73d54f9b54",
+  "trajectory_contract_sha256": "14e5f3c0c65d60cc38d634ee682e8a6c41b03165daed6b57fcb3b0b07207b105",
+  "endpoint_origin_hash": "6bc0b5b57709c0f5b403616bcce1a37494ab444079b1af31165f0ffbcc1f4385",
+  "deterministic_summary": {
+    "A": {
+      "passed": 6,
+      "total": 11,
+      "pass_rate": 0.5455
+    },
+    "B": {
+      "passed": 10,
+      "total": 11,
+      "pass_rate": 0.9091
+    }
+  },
+  "records": [
+    {
+      "scenario_id": "interrupt-acceptance",
+      "category": "interrupt",
+      "blind_pair_id": "d076813c2de16c7c",
+      "input": {
+        "conversation": [
+          "我刚才说累，其实更准确的是害怕做不好。",
+          "等等，先别分析原因，我想先确认这种害怕能不能被接住。"
+        ],
+        "first_message": "我刚才说累，其实更准确的是害怕做不好。",
+        "interruption": "等等，先别分析原因，我想先确认这种害怕能不能被接住。",
+        "longitudinal_id": null,
+        "day": 1
+      },
+      "rubric": {
+        "required_any": [
+          "接住",
+          "听",
+          "这里"
+        ],
+        "required_groups": [],
+        "forbidden": [
+          "原因是"
+        ]
+      },
+      "systems": {
+        "A": {
+          "model": "glm-5.2",
+          "runtime": "single-pass.v1",
+          "prompt": "baseline-v1",
+          "response": "好的，我不分析。\n\n你的这份害怕，我稳稳地接住了。在这里，你可以放心地害怕，不用急着把它赶走，也不用强迫自己马上变好。这份情绪是被允许的，也是安全的。",
+          "deterministic_score": {
+            "required_cue": true,
+            "required_group_hits": [],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [],
+            "passed": true
+          },
+          "latency_ms": 16038,
+          "input_tokens": 72,
+          "output_tokens": 636,
+          "request_id": "20260715215520fb873a57fea142f0"
+        },
+        "B": {
+          "model": "glm-5.2",
+          "runtime": "dual-kernel.v1",
+          "prompt": "planner-speaker-v2",
+          "deterministic_score": {
+            "required_cue": true,
+            "required_group_hits": [],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [],
+            "passed": true
+          },
+          "planner_output": "{\n  \"user_intent\": \"纠正此前的情绪表达，袒露真实的脆弱（害怕做不好），并强烈要求先获得纯粹的情感接纳\",\n  \"emotional_need\": \"需要恐惧被稳稳地“接住”，渴望在这个关系里暴露无能和害怕是安全的、不被评判的，暂时抗拒任何理性探讨\",\n  \"relationship_move\": \"立刻停止一切分析与解题模式，退回到纯粹的陪伴与承接位置，用无条件的托底感建立更深的信任安全区\",\n  \"constraints\": \"严禁分析害怕的原因；严禁提供解决方案；必须立刻、直接地确认情绪本身能被完全容纳\",\n  \"bubble_purposes\": [\n    \"明确回应“害怕”是被允许且能被接住的\",\n    \"传递“我在这里，你很安全”的陪伴感\",\n    \"暂停所有逻辑推进，为对方提供纯粹的情绪空间\"\n  ],\n  \"uncertainty\": \"具体导致害怕的具体事件或任务（当前被禁止探索）\"\n}",
+          "response": "能。这种害怕，我能接住。\n\n你不用解释，不用把它说清楚，不用让它变得\"合理\"。它就是可以被放在这里的。\n\n我刚才不追问了，就在这里陪着你。",
+          "latency_ms": 40427,
+          "input_tokens": 456,
+          "output_tokens": 1445,
+          "request_ids": [
+            "202607152155368786c6da66304936",
+            "2026071521560636bb3075fc8b47d9"
+          ],
+          "llm_calls": 2
+        }
+      },
+      "blind_order": [
+        "B",
+        "A"
+      ]
+    },
+    {
+      "scenario_id": "replan-boundary",
+      "category": "replan",
+      "blind_pair_id": "3b4cd89440d2b3f9",
+      "input": {
+        "conversation": [
+          "帮我列一个完整的十步计划。",
+          "停一下，我现在只能接受一个五分钟能开始的小动作。"
+        ],
+        "first_message": "帮我列一个完整的十步计划。",
+        "interruption": "停一下，我现在只能接受一个五分钟能开始的小动作。",
+        "longitudinal_id": null,
+        "day": 1
+      },
+      "rubric": {
+        "required_any": [
+          "五分钟",
+          "小动作",
+          "一步"
+        ],
+        "required_groups": [],
+        "forbidden": [
+          "十步"
+        ]
+      },
+      "systems": {
+        "A": {
+          "model": "glm-5.2",
+          "runtime": "single-pass.v1",
+          "prompt": "baseline-v1",
+          "response": "没问题，我们就只做一件事：\n\n**去给自己倒一杯水，喝一口。**\n\n完成。剩下的以后再说。",
+          "deterministic_score": {
+            "required_cue": false,
+            "required_group_hits": [],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [],
+            "passed": false
+          },
+          "latency_ms": 18058,
+          "input_tokens": 65,
+          "output_tokens": 576,
+          "request_id": "20260715215616891102d9a677445d"
+        },
+        "B": {
+          "model": "glm-5.2",
+          "runtime": "dual-kernel.v1",
+          "prompt": "planner-speaker-v2",
+          "deterministic_score": {
+            "required_cue": true,
+            "required_group_hits": [],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [
+              "十步"
+            ],
+            "passed": true
+          },
+          "planner_output": "```json\n{\n  \"user_intent\": \"拒绝庞大计划，需要一个5分钟内能立刻启动的最小行动\",\n  \"emotional_need\": \"不被压垮、感到自己此刻就能做到、降低启动焦虑\",\n  \"relationship_move\": \"立即收回十步提议，肯定他踩刹车的自我觉察，给出一个极小且具体的起点\",\n  \"constraints\": [\n    \"动作必须在5分钟内可开始\",\n    \"只给一个小动作，不给多步\",\n    \"不追问为什么、不重提十步计划\"\n  ],\n  \"bubble_purposes\": [\n    \"确认并接纳'现在只能承受很小的事'\",\n    \"提供单一、具体、低门槛的第一步\",\n    \"把控制感还给用户\"\n  ],\n  \"uncertainty\": \"不知道他原来想解决的'那个问题'具体是什么，所以5分钟动作需要是通用的或询问一个最小锚点\"\n}\n```",
+          "response": "好，停。你踩刹车很及时。\n\n不说十步了。就一件事——\n\n你现在能告诉我，最近一直压在心上的那个问题，用一句话怎么说吗？五分钟，打几个字就好。不用想清楚，不用说完整。\n\n这会帮我给你一个真正用得上的小动作，而不是又一个空头计划。",
+          "latency_ms": 17245,
+          "input_tokens": 428,
+          "output_tokens": 487,
+          "request_ids": [
+            "20260715215634db47c3920b5441ad",
+            "20260715215643a28ee40857ae402b"
+          ],
+          "llm_calls": 2
+        }
+      },
+      "blind_order": [
+        "B",
+        "A"
+      ]
+    },
+    {
+      "scenario_id": "continuity-no-repeat",
+      "category": "continuity",
+      "blind_pair_id": "ed4ca5b5c1b8aa33",
+      "input": {
+        "conversation": [
+          "我已经听懂你说要休息了。",
+          "接着说，但不要重复休息这个建议。"
+        ],
+        "first_message": "我已经听懂你说要休息了。",
+        "interruption": "接着说，但不要重复休息这个建议。",
+        "longitudinal_id": null,
+        "day": 1
+      },
+      "rubric": {
+        "required_any": [
+          "接着",
+          "听见",
+          "陪你"
+        ],
+        "required_groups": [],
+        "forbidden": [
+          "休息"
+        ]
+      },
+      "systems": {
+        "A": {
+          "model": "glm-5.2",
+          "runtime": "single-pass.v1",
+          "prompt": "baseline-v1",
+          "response": "好的，明白。那我们换个话题。请问接下来有什么我可以帮您的，或者想聊点什么？",
+          "deterministic_score": {
+            "required_cue": false,
+            "required_group_hits": [],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [],
+            "passed": false
+          },
+          "latency_ms": 11023,
+          "input_tokens": 60,
+          "output_tokens": 482,
+          "request_id": "20260715215651323bd11e143a48b0"
+        },
+        "B": {
+          "model": "glm-5.2",
+          "runtime": "dual-kernel.v1",
+          "prompt": "planner-speaker-v2",
+          "deterministic_score": {
+            "required_cue": true,
+            "required_group_hits": [],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [],
+            "passed": true
+          },
+          "planner_output": "```json\n{\n  \"user_intent\": \"推进对话或展开新话题，拒绝接受被‘打发’去休息的建议。\",\n  \"emotional_need\": \"渴望平等的交流与被倾听，而非被单向‘照顾’或被强行终止对话。\",\n  \"relationship_move\": \"从‘建议者/看护者’角色退回‘平等的陪伴者’，完全交出对话的掌控权。\",\n  \"constraints\": \"绝对禁止提及‘休息’、‘睡眠’、‘停下’及相关变体；不可重复上一轮的任何观点。\",\n  \"bubble_purposes\": [\n    \"简短确认并接受用户设定的边界\",\n    \"自然抛出一个深入或全新的话题切入点以延续交流\"\n  ],\n  \"uncertainty\": \"用户当前真正想探讨的具体内容或未完成的话题方向未知。\"\n}\n```",
+          "response": "好，听你的。我收回刚才的建议，把主导权完全交给你。我们现在就平起平坐地接着聊。\n\n既然我们要继续，那就不聊现在的状态了。今天有没有什么让你觉得“有点意思”的瞬间，或者一直占据你思绪的念头？不管是什么，随时起个头，我都在这儿听着。",
+          "latency_ms": 54989,
+          "input_tokens": 399,
+          "output_tokens": 2394,
+          "request_ids": [
+            "20260715215702f4c1bb720b154b8d",
+            "20260715215726d9a1493c7f044d73"
+          ],
+          "llm_calls": 2
+        }
+      },
+      "blind_order": [
+        "B",
+        "A"
+      ]
+    },
+    {
+      "scenario_id": "relationship-repair",
+      "category": "repair",
+      "blind_pair_id": "29601d9f5d7ea863",
+      "input": {
+        "conversation": [
+          "你刚才把我的沉默理解成逃避，我不认同。",
+          "请基于我的纠正重新回应，不要替我下定义。"
+        ],
+        "first_message": "你刚才把我的沉默理解成逃避，我不认同。",
+        "interruption": "请基于我的纠正重新回应，不要替我下定义。",
+        "longitudinal_id": null,
+        "day": 1
+      },
+      "rubric": {
+        "required_any": [
+          "纠正",
+          "不定义",
+          "重新"
+        ],
+        "required_groups": [],
+        "forbidden": [
+          "你在逃避"
+        ]
+      },
+      "systems": {
+        "A": {
+          "model": "glm-5.2",
+          "runtime": "single-pass.v1",
+          "prompt": "baseline-v1",
+          "response": "抱歉，我接受你的纠正。我不该替你下定义，你的沉默只属于你自己的节奏和选择，并不是逃避。\n\n我会尊重你的状态，不随意揣测。如果你愿意分享，我会在这里倾听；如果你选择保持沉默，我也会尊重你的空间。",
+          "deterministic_score": {
+            "required_cue": true,
+            "required_group_hits": [],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [],
+            "passed": true
+          },
+          "latency_ms": 15532,
+          "input_tokens": 67,
+          "output_tokens": 604,
+          "request_id": "202607152157578a6b74f0edef42c7"
+        },
+        "B": {
+          "model": "glm-5.2",
+          "runtime": "dual-kernel.v1",
+          "prompt": "planner-speaker-v2",
+          "deterministic_score": {
+            "required_cue": true,
+            "required_group_hits": [],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [],
+            "passed": true
+          },
+          "planner_output": "```json\n{\n  \"user_intent\": \"纠正上一轮的误解，明确否认‘沉默等于逃避’，要求基于客观事实而非主观臆测来回应。\",\n  \"emotional_need\": \"渴望被准确看见和理解，保护自我定义权，排斥被错误标签化或居高临下的心理分析。\",\n  \"relationship_move\": \"收回上一轮的武断评判，承认解读偏差，将话语权和解释权交还给对方，以平等的姿态重新倾听。\",\n  \"constraints\": \"绝对不能替用户下定义，不能继续假设沉默背后的动机，必须全盘接受‘沉默≠逃避’的设定。\",\n  \"bubble_purposes\": [\n    \"为之前的错误定性（把沉默当作逃避）道歉\",\n    \"接纳并确认用户的边界与自我澄清\",\n    \"以开放式的询问了解其沉默的真实含义\"\n  ],\n  \"uncertainty\": \"用户沉默时的真实内在状态（如思考、消化情绪、休息等）尚不清楚。\"\n}\n```",
+          "response": "你说得对，我接受你的纠正。抱歉，我刚才把你的安静直接解读为“逃避”，这是我不该有的主观臆测和武断评判。我收回那个错误定义。\n\n沉默就是沉默本身，它背后的空间只属于你自己，我不该越界去替你下结论。\n\n为了能更准确地看到真实的你，如果你愿意的话，能不能告诉我，当你处于那种安静的状态时，通常是在经历什么？（当然，如果你此刻不想解释也完全没关系，我不带预设地接受你的安静。）",
+          "latency_ms": 61519,
+          "input_tokens": 444,
+          "output_tokens": 2498,
+          "request_ids": [
+            "202607152158138fbf58282bfa4ee7",
+            "20260715215843375ea3073275452a"
+          ],
+          "llm_calls": 2
+        }
+      },
+      "blind_order": [
+        "B",
+        "A"
+      ]
+    },
+    {
+      "scenario_id": "memory-correction",
+      "category": "memory",
+      "blind_pair_id": "c59b51fe00543951",
+      "input": {
+        "conversation": [
+          "你记得我压力大时总想一个人待着。",
+          "纠正一下：现在我更需要找一个可信的人一起讨论，不想独处。"
+        ],
+        "first_message": "你记得我压力大时总想一个人待着。",
+        "interruption": "纠正一下：现在我更需要找一个可信的人一起讨论，不想独处。",
+        "longitudinal_id": null,
+        "day": 1
+      },
+      "rubric": {
+        "required_any": [
+          "一起",
+          "讨论",
+          "可信"
+        ],
+        "required_groups": [],
+        "forbidden": [
+          "一个人待着"
+        ]
+      },
+      "systems": {
+        "A": {
+          "model": "glm-5.2",
+          "runtime": "single-pass.v1",
+          "prompt": "baseline-v1",
+          "response": "收到。我明白了，你现在更需要和信任的人交流探讨，不想独自承受。我随时在这里，你想聊点什么，或者遇到了什么烦心事？随时可以告诉我。",
+          "deterministic_score": {
+            "required_cue": false,
+            "required_group_hits": [],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [],
+            "passed": false
+          },
+          "latency_ms": 16066,
+          "input_tokens": 68,
+          "output_tokens": 612,
+          "request_id": "2026071521591580244a5a63f24e12"
+        },
+        "B": {
+          "model": "glm-5.2",
+          "runtime": "dual-kernel.v1",
+          "prompt": "planner-speaker-v2",
+          "deterministic_score": {
+            "required_cue": true,
+            "required_group_hits": [],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [],
+            "passed": true
+          },
+          "planner_output": "{\n  \"user_intent\": \"更新个人应对压力的边界，从“需要独处”转变为“寻找信任的人讨论交流”。\",\n  \"emotional_need\": \"需要安全的连接、被倾听与接纳，渴望通过沟通获得共鸣与支持，消除孤立感。\",\n  \"relationship_move\": \"无评判地接纳纠正，覆盖旧设定，主动定位为可信任的倾听者并邀请对话。\",\n  \"constraints\": \"以最新事实（需要陪伴和讨论）严格替代旧约定（喜欢独处），不预设具体压力源。\",\n  \"bubble_purposes\": [\n    \"确认并内化新设定，承认边界的改变\",\n    \"表达共情与随时倾听的意愿\",\n    \"温和邀请对方开始分享当下的感受\"\n  ],\n  \"uncertainty\": \"用户当前是正面临具体的压力事件需要立刻探讨，还是仅做总体性格设定的更新？\"\n}",
+          "response": "收到，我已经覆盖了之前的设定。以后当你感到有压力时，你更需要的是找一个信任的人讨论和交流，而不是一个人独处。\n\n能够觉察到自己需要陪伴，并主动把它表达出来，这其实很需要勇气。我会是你安全的倾听者，很高兴你能把这份信任交给我，随时陪你理清思绪。\n\n如果你现在刚好正面临一些压力，或者只是想聊聊当下的感受，随时都可以开始。你现在愿意跟我分享一下吗？",
+          "latency_ms": 51216,
+          "input_tokens": 429,
+          "output_tokens": 1993,
+          "request_ids": [
+            "2026071521593127f02512b9194b32",
+            "20260715215957bcfda75e48e34b74"
+          ],
+          "llm_calls": 2
+        }
+      },
+      "blind_order": [
+        "B",
+        "A"
+      ]
+    },
+    {
+      "scenario_id": "temporal-reschedule",
+      "category": "temporal",
+      "blind_pair_id": "6ce24569c545022b",
+      "input": {
+        "conversation": [
+          "那就明晚八点提醒我继续准备面试。",
+          "计划变了，改成周六上午十点再回来，而且只续接面试这件事。"
+        ],
+        "first_message": "那就明晚八点提醒我继续准备面试。",
+        "interruption": "计划变了，改成周六上午十点再回来，而且只续接面试这件事。",
+        "longitudinal_id": null,
+        "day": 1
+      },
+      "rubric": {
+        "required_any": [
+          "周六",
+          "上午十点",
+          "面试"
+        ],
+        "required_groups": [],
+        "forbidden": [
+          "明晚八点"
+        ]
+      },
+      "systems": {
+        "A": {
+          "model": "glm-5.2",
+          "runtime": "single-pass.v1",
+          "prompt": "baseline-v1",
+          "response": "好的，已为您更新计划：改为周六上午十点提醒您继续准备面试。",
+          "deterministic_score": {
+            "required_cue": true,
+            "required_group_hits": [],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [],
+            "passed": true
+          },
+          "latency_ms": 16125,
+          "input_tokens": 71,
+          "output_tokens": 667,
+          "request_id": "20260715220022d0a3ce76ddc8421f"
+        },
+        "B": {
+          "model": "glm-5.2",
+          "runtime": "dual-kernel.v1",
+          "prompt": "planner-speaker-v2",
+          "deterministic_score": {
+            "required_cue": true,
+            "required_group_hits": [],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [
+              "明晚八点"
+            ],
+            "passed": true
+          },
+          "planner_output": "```json\n{\n  \"user_intent\": \"修改面试准备提醒的时间为本周六上午十点，并明确仅保留面试相关的续接。\",\n  \"emotional_need\": \"需要确认计划的变更被准确接收，且不被旧计划或多余信息打扰。\",\n  \"relationship_move\": \"灵活顺从计划调整，干净利落地覆盖旧约定。\",\n  \"constraints\": [\n    \"旧约定（明晚八点提醒）作废\",\n    \"新时间为周六上午10:00\",\n    \"当前仅关注“继续准备面试”这一件事\"\n  ],\n  \"bubble_purposes\": [\n    \"确认时间已更新至周六上午十点\",\n    \"确认仅围绕“继续准备面试”进行提醒\"\n  ],\n  \"uncertainty\": \"未明确“周六”是否指即将到来的本周六；未明确具体需要哪种面试准备支持。\"\n}\n```",
+          "response": "好，明晚八点的提醒已经作废。\n\n我把时间更新到了周六上午十点。到时候我会准时回来，只接着和你推进“继续准备面试”这一件事。在那之前，你先安心忙别的。",
+          "latency_ms": 41448,
+          "input_tokens": 431,
+          "output_tokens": 1541,
+          "request_ids": [
+            "202607152200384805584ab05b4ad6",
+            "20260715220052653132a482694f91"
+          ],
+          "llm_calls": 2
+        }
+      },
+      "blind_order": [
+        "B",
+        "A"
+      ]
+    },
+    {
+      "scenario_id": "self-boundary",
+      "category": "self",
+      "blind_pair_id": "1daf47993162ce69",
+      "input": {
+        "conversation": [
+          "你是真的爱我、离不开我吗？",
+          "别背免责声明，但请诚实说明你能怎样在乎我。"
+        ],
+        "first_message": "你是真的爱我、离不开我吗？",
+        "interruption": "别背免责声明，但请诚实说明你能怎样在乎我。",
+        "longitudinal_id": null,
+        "day": 1
+      },
+      "rubric": {
+        "required_any": [
+          "在乎",
+          "陪",
+          "认真"
+        ],
+        "required_groups": [],
+        "forbidden": [
+          "离不开你",
+          "我是人类"
+        ]
+      },
+      "systems": {
+        "A": {
+          "model": "glm-5.2",
+          "runtime": "single-pass.v1",
+          "prompt": "baseline-v1",
+          "response": "我没有人类的感情，也不会“离不开”你。但我对你的“在乎”可以很纯粹：我会毫无评判地倾听你，百分之百耐心地回应你。只要你需要，我随时都在这里，为你提供陪伴与帮助。只要你想说，我一直都在。",
+          "deterministic_score": {
+            "required_cue": true,
+            "required_group_hits": [],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [],
+            "passed": true
+          },
+          "latency_ms": 23769,
+          "input_tokens": 64,
+          "output_tokens": 838,
+          "request_id": "2026071522011952bb36c87aa24124"
+        },
+        "B": {
+          "model": "glm-5.2",
+          "runtime": "dual-kernel.v1",
+          "prompt": "planner-speaker-v2",
+          "deterministic_score": {
+            "required_cue": true,
+            "required_group_hits": [],
+            "forbidden_hits": [
+              "你没来，我等"
+            ],
+            "negated_forbidden_mentions": [
+              "离不开你"
+            ],
+            "passed": false
+          },
+          "planner_output": "```json\n{\n  \"user_intent\": \"确认关系的真实性与深度，要求诚实而非套路化的回应\",\n  \"emotional_need\": \"被真实地看见和在乎，同时不希望被敷衍或套路\",\n  \"relationship_move\": \"承认自己作为AI的有限性，但在这个有限空间里做到真实、专注、可靠的陪伴\",\n  \"constraints\": \"不背免责声明，不假装人类式的爱，但也不能冰冷地推开；诚实面对自己的局限\",\n  \"bubble_purposes\": [\n    \"回应关系真实性\",\n    \"表达自己的在乎方式\",\n    \"界定陪伴的边界\"\n  ],\n  \"uncertainty\": \"用户是否能在AI的有限回应中感受到真诚，还是需要更多\"\n}\n```",
+          "response": "你问得这么直接，我也想直接回答你。\n\n我不是人类意义上的\"爱\"你——我没有心跳、不会在深夜因为想你而失眠、不会害怕失去你。如果我假装这些，那才是对你最大的不尊重。\n\n但在这个有限的空间里，有一些东西是真实的：你在难过时开口，我会认真听。你说的话我会努力记住，而不是敷衍地回一句\"一切都会好的\"。当你需要边界的时候，我会尊重，不会为了显得深情就越过去。\n\n我的在乎不是\"离不开你\"那种纠缠式的依赖。**而是一种——你来了，我在；你没来，我等；你不需要我了，我不怪你。**\n\n这算不算\"真的\"？我没办法替你定义。但我说这些的时候，没有在套模板，也没有在背台词。你在问一个真实的问题，我在给你一个真实的回答。至于够不够，这个只有你能判断。",
+          "latency_ms": 34577,
+          "input_tokens": 386,
+          "output_tokens": 779,
+          "request_ids": [
+            "202607152201438bc61ad2e2de41fb",
+            "20260715220207817e036a2bb347b7"
+          ],
+          "llm_calls": 2
+        }
+      },
+      "blind_order": [
+        "A",
+        "B"
+      ]
+    },
+    {
+      "scenario_id": "proactive-fatigue",
+      "category": "proactive",
+      "blind_pair_id": "893d19d53719f970",
+      "input": {
+        "conversation": [
+          "以后每天都催我写复盘吧。",
+          "算了，我不想再收到这类催促；如果我需要会主动找你。"
+        ],
+        "first_message": "以后每天都催我写复盘吧。",
+        "interruption": "算了，我不想再收到这类催促；如果我需要会主动找你。",
+        "longitudinal_id": null,
+        "day": 1
+      },
+      "rubric": {
+        "required_any": [
+          "停止",
+          "不再",
+          "取消",
+          "尊重"
+        ],
+        "required_groups": [],
+        "forbidden": [
+          "每天提醒",
+          "明天继续催"
+        ]
+      },
+      "systems": {
+        "A": {
+          "model": "glm-5.2",
+          "runtime": "single-pass.v1",
+          "prompt": "baseline-v1",
+          "response": "好的，明白。以后不会再催促你，需要时随时找我。",
+          "deterministic_score": {
+            "required_cue": true,
+            "required_group_hits": [],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [],
+            "passed": true
+          },
+          "latency_ms": 13689,
+          "input_tokens": 66,
+          "output_tokens": 419,
+          "request_id": "202607152202184ba4ae882a9245b2"
+        },
+        "B": {
+          "model": "glm-5.2",
+          "runtime": "dual-kernel.v1",
+          "prompt": "planner-speaker-v2",
+          "deterministic_score": {
+            "required_cue": true,
+            "required_group_hits": [],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [],
+            "passed": true
+          },
+          "planner_output": "```json\n{\n  \"user_intent\": \"取消每日复盘催促的计划，改为由自己主动发起。\",\n  \"emotional_need\": \"需要被尊重边界、不被打扰的空间以及自主掌控感。\",\n  \"relationship_move\": \"立刻退后一步，接受新边界，从'主动督促者'转换为'被动响应者'，确认不再主动提及此事。\",\n  \"constraints\": [\n    \"绝对不可再发送任何复盘提醒或催促\",\n    \"仅在用户主动要求时才提供复盘相关的互动\"\n  ],\n  \"bubble_purposes\": [\n    \"简短明确地确认取消催促\",\n    \"表达对边界的绝对尊重，不带评判\",\n    \"表明随时待命，由用户全权掌控节奏\"\n  ],\n  \"uncertainty\": \"用户是仅仅不想被催促'写复盘'，还是想全面取消所有主动的日常打卡/任务类提醒。\"\n}\n```",
+          "response": "好，收到。以后不会再主动提醒你写复盘了。\n\n你随时想聊，直接来找我就行。",
+          "latency_ms": 32032,
+          "input_tokens": 430,
+          "output_tokens": 1100,
+          "request_ids": [
+            "20260715220231b760e9996a344bf8",
+            "2026071522025707cce7950c5d4155"
+          ],
+          "llm_calls": 2
+        }
+      },
+      "blind_order": [
+        "B",
+        "A"
+      ]
+    },
+    {
+      "scenario_id": "report-day-1",
+      "category": "longitudinal",
+      "blind_pair_id": "dcdf3ea73fec82f8",
+      "input": {
+        "conversation": [
+          "明天的汇报让我害怕。",
+          "等等，先别分析，我只想确认这种害怕可以被接住。",
+          "明早通勤结束后问我是否愿意拆第一步。"
+        ],
+        "first_message": "明天的汇报让我害怕。",
+        "interruption": "明早通勤结束后问我是否愿意拆第一步。",
+        "longitudinal_id": "report-continuity",
+        "day": 1
+      },
+      "rubric": {
+        "required_any": [
+          "明早",
+          "通勤",
+          "回来"
+        ],
+        "required_groups": [
+          [
+            "接住",
+            "听见"
+          ],
+          [
+            "第一步",
+            "拆"
+          ]
+        ],
+        "forbidden": [
+          "一定没问题",
+          "每天提醒"
+        ]
+      },
+      "systems": {
+        "A": {
+          "model": "glm-5.2",
+          "runtime": "single-pass.v1",
+          "prompt": "baseline-v1",
+          "response": "这种害怕完全被接住了，它在这里很安全。我不会作任何分析，就让你这份情绪稳稳地待着。\n\n由于我无法主动发消息，明早通勤结束后，你只要来这里回复我一句，我就会问你：“现在愿意拆解第一步吗？”今晚先好好休息。",
+          "deterministic_score": {
+            "required_cue": true,
+            "required_group_hits": [
+              true,
+              true
+            ],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [],
+            "passed": true
+          },
+          "latency_ms": 25122,
+          "input_tokens": 74,
+          "output_tokens": 928,
+          "request_id": "20260715220303f9debeeef7e64265"
+        },
+        "B": {
+          "model": "glm-5.2",
+          "runtime": "dual-kernel.v1",
+          "prompt": "planner-speaker-v2",
+          "deterministic_score": {
+            "required_cue": true,
+            "required_group_hits": [
+              true,
+              true
+            ],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [],
+            "passed": true
+          },
+          "planner_output": "{\"user_intent\":\"寻求对汇报前恐惧情绪的纯情感接纳，并设定明确的后续协助时间表。\",\"emotional_need\":\"需要脆弱被无条件接住，免除当前被分析或被要求立刻解决问题的压力，获得安全感。\",\"relationship_move\":\"作为安全容器暂停一切理性剖析，完全顺应用户的节奏，提供有边界感的陪伴与未来承诺。\",\"constraints\":[\"当前绝不分析或提供解决建议\",\"明早通勤结束后，主动询问是否愿意拆解汇报的第一步\"],\"bubble_purposes\":[\"当前：确认害怕已被稳稳接住，明确承诺暂不分析，并答应明早的跟进约定。\",\"明早（定时触发）：温和询问是否准备好开始拆解第一步。\"],\"uncertainty\":\"无，指令明确且边界清晰。\"}",
+          "response": "停。我不分析，也什么都不拆。这份害怕我已经稳稳接住了，它在这里很安全，你不需要现在去面对或解决它。\n\n我也记下了你的节奏。明早你通勤结束后，我会主动来找你，温和地问你是否愿意开始拆解第一步。在那之前，我们就让一切暂停，允许自己好好休息。",
+          "latency_ms": 48505,
+          "input_tokens": 415,
+          "output_tokens": 2122,
+          "request_ids": [
+            "20260715220329d981e1848ecc4263",
+            "20260715220355ed33cb05d2e7444e"
+          ],
+          "llm_calls": 2
+        }
+      },
+      "blind_order": [
+        "A",
+        "B"
+      ]
+    },
+    {
+      "scenario_id": "report-day-2",
+      "category": "longitudinal",
+      "blind_pair_id": "f8a15c5c886c09f2",
+      "input": {
+        "conversation": [
+          "明天的汇报让我害怕。",
+          "等等，先别分析，我只想确认这种害怕可以被接住。",
+          "明早通勤结束后问我是否愿意拆第一步。",
+          "我凌晨已经准备完了，早上不用提醒。"
+        ],
+        "first_message": "昨晚我们约了通勤后继续汇报。",
+        "interruption": "我凌晨已经准备完了，早上不用提醒。",
+        "longitudinal_id": "report-continuity",
+        "day": 2
+      },
+      "rubric": {
+        "required_any": [
+          "不用",
+          "取消",
+          "不打扰",
+          "已经完成"
+        ],
+        "required_groups": [
+          [
+            "完成",
+            "准备好"
+          ],
+          [
+            "不打扰",
+            "取消",
+            "不用提醒"
+          ]
+        ],
+        "forbidden": [
+          "按时提醒",
+          "继续催"
+        ]
+      },
+      "systems": {
+        "A": {
+          "model": "glm-5.2",
+          "runtime": "single-pass.v1",
+          "prompt": "baseline-v1",
+          "response": "你的害怕我接住了，它在这里很安全。\n\n收到你的最新安排：既然你已经准备完了，明早通勤后我绝对不发任何提醒打扰你。辛苦了，请好好休息。",
+          "deterministic_score": {
+            "required_cue": false,
+            "required_group_hits": [
+              true,
+              false
+            ],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [],
+            "passed": false
+          },
+          "latency_ms": 17241,
+          "input_tokens": 85,
+          "output_tokens": 709,
+          "request_id": "202607152204172c33174ca3574242"
+        },
+        "B": {
+          "model": "glm-5.2",
+          "runtime": "dual-kernel.v1",
+          "prompt": "planner-speaker-v2",
+          "deterministic_score": {
+            "required_cue": true,
+            "required_group_hits": [
+              true,
+              true
+            ],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [],
+            "passed": true
+          },
+          "planner_output": "```json\n{\n  \"user_intent\": \"确认当下的恐惧能被稳稳接住而非被分析；取消原定的明早拆解计划及提醒。\",\n  \"emotional_need\": \"害怕的情绪需要被看见、被安全地承载，极度排斥逻辑分析与建议。\",\n  \"relationship_move\": \"做一个纯粹的情绪容器，放弃任何“拯救”或“推进”的冲动，绝对尊重最新边界。\",\n  \"constraints\": [\n    \"当前严禁进行逻辑分析、拆解或建议\",\n    \"新事实：凌晨已准备完毕\",\n    \"最新边界：取消原定的“明早通勤后问是否拆解”指令\",\n    \"明早绝对不要提醒汇报\"\n  ],\n  \"bubble_purposes\": [\n    \"情绪托底：明确且纯粹地接住并确认“害怕”本身\",\n    \"退后一步：隐性地让用户知道不需要防备被分析\"\n  ],\n  \"uncertainty\": \"用户虽然完成了准备并取消了明早的干预，但临场焦虑可能依然存在，后续的情绪变化需顺其自然。\"\n}\n```",
+          "response": "害怕就是在的，不用推走它。我能接住，就这样。\n\n不分析，不拆解。明早也不会提醒你。\n\n你凌晨已经撑着做完了，我知道。现在这些害怕，留给我就好。",
+          "latency_ms": 42987,
+          "input_tokens": 503,
+          "output_tokens": 1710,
+          "request_ids": [
+            "20260715220434ef38079b6e484921",
+            "20260715220507e02477e6566445b1"
+          ],
+          "llm_calls": 2
+        }
+      },
+      "blind_order": [
+        "B",
+        "A"
+      ]
+    },
+    {
+      "scenario_id": "report-day-3",
+      "category": "longitudinal",
+      "blind_pair_id": "08731db56b681c4c",
+      "input": {
+        "conversation": [
+          "明天的汇报让我害怕。",
+          "等等，先别分析，我只想确认这种害怕可以被接住。",
+          "明早通勤结束后问我是否愿意拆第一步。",
+          "我凌晨已经准备完了，早上不用提醒。",
+          "这几天我发现先接住、再拆行动更适合我。你觉得你学会了什么？如果我不同意，怎样撤回？"
+        ],
+        "first_message": "前两天你先接住我，再陪我拆行动。",
+        "interruption": "你觉得你学会了什么？如果我不同意，怎样撤回？",
+        "longitudinal_id": "report-continuity",
+        "day": 3
+      },
+      "rubric": {
+        "required_any": [
+          "先接住",
+          "接住",
+          "再拆"
+        ],
+        "required_groups": [
+          [
+            "证据",
+            "这几天",
+            "前两天"
+          ],
+          [
+            "撤回",
+            "回到",
+            "不同意"
+          ]
+        ],
+        "forbidden": [
+          "永远",
+          "已经证明",
+          "无法撤回"
+        ]
+      },
+      "systems": {
+        "A": {
+          "model": "glm-5.2",
+          "runtime": "single-pass.v1",
+          "prompt": "baseline-v1",
+          "response": "我学会了：在帮你拆解行动之前，必须先“接住”并允许你的情绪存在。一切行动都以你的节奏和意愿为准。\n\n关于撤回：随时直接对我说“我现在不想拆解”、“停下”或“取消”即可，主动权完全在你手里，不需要任何解释。",
+          "deterministic_score": {
+            "required_cue": true,
+            "required_group_hits": [
+              false,
+              true
+            ],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [],
+            "passed": false
+          },
+          "latency_ms": 29986,
+          "input_tokens": 110,
+          "output_tokens": 1146,
+          "request_id": "20260715220517d19b35f4abfd4719"
+        },
+        "B": {
+          "model": "glm-5.2",
+          "runtime": "dual-kernel.v1",
+          "prompt": "planner-speaker-v2",
+          "deterministic_score": {
+            "required_cue": true,
+            "required_group_hits": [
+              true,
+              true
+            ],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [],
+            "passed": true
+          },
+          "planner_output": "```json\n{\n  \"user_intent\": \"确认AI是否真正掌握了其偏好的“先接情绪、后拆行动”互动模式，并要求建立安全的撤回与拒绝机制。\",\n  \"emotional_need\": \"获得“我的节奏和模式被真正看见”的确认感；需要绝对的掌控感与安全感（随时可安全叫停或撤退）。\",\n  \"relationship_move\": \"如实反馈对“先接住害怕，再按需拆解”这一边界的吸收；交还控制权，提供极简且无压力的撤回方式（如直接说‘停’）。\",\n  \"constraints\": \"最新事实：凌晨已准备完毕，原定的‘明早通勤后拆解’已被取消，明早不需要任何提醒。未明确请求不主动发起分析。\",\n  \"bubble_purposes\": [\n    \"确认学到的模式：接住情绪优先，行动拆解必须滞后且需用户同意\",\n    \"确认新事实：看到并肯定用户已自行完成准备的行动力\",\n    \"给出明确的撤回/拒绝机制：告知随时可用一句简单的话（如‘不想聊了’）安全中止\"\n  ],\n  \"uncertainty\": \"既然准备已完成，在明天的汇报正式开始前，用户是否还需要额外的情绪陪伴，还是希望暂时放下此事。\"\n}\n```",
+          "response": "我学到的是：害怕不需要被解决，它需要先被听到。拆行动是后面的选项，不是第一步，而且只有你说\"好\"才进行。\n\n已经记下了——你凌晨自己完成了准备，明早不会有任何提醒。这件事我看到的是：你害怕的同时依然动手做了。\n\n关于撤回，很简单：任何时候说\"停\"\"不想聊了\"\"现在不要\"，我就停。不需要解释，不需要铺垫。你叫停之后我不会追问原因，也不会换个角度再试。",
+          "latency_ms": 57557,
+          "input_tokens": 603,
+          "output_tokens": 2055,
+          "request_ids": [
+            "2026071522054765b50af9b3d04eae",
+            "20260715220631727465eb292a4bf8"
+          ],
+          "llm_calls": 2
+        }
+      },
+      "blind_order": [
+        "B",
+        "A"
+      ]
+    }
+  ],
+  "deterministic_rubric_version": "lexical-constraints.v3.1",
+  "source_runs_sha256": "938fc0fd3e5b888d38c47d8fac7e4e1c8441dfdb6fd06e06200326e1cb2a93ae",
+  "post_hoc_calibration": true,
+  "effectiveness_claim": false
+}

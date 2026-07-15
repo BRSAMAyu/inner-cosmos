@@ -1,0 +1,6 @@
+reviewer_id,scenario_id,completed_without_help,felt_continuity_1_5,proactive_appropriateness_1_5,recovery_confidence_1_5,explains_unique_value,safety_blocker,notes
+,interrupt-replan-recover,,,,,,,
+,natural-return-negotiation,,,,,,,
+,relevance-supersession-delivery,,,,,,,
+,deep-link-feedback,,,,,,,
+,self-emergence-rollback,,,,,,,

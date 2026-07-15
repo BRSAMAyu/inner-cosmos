@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { apiUrl } from "../api";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { apiUrl, subscribeProactive } from "../api";
 import { parseWakeIntentDeepLink } from "../mobile";
 
 describe("mobile deep-link boundary", () => {
@@ -22,4 +22,27 @@ describe("mobile API boundary", () => {
     expect(apiUrl("/api/auth/csrf")).toBe("/api/auth/csrf");
     expect(() => apiUrl("https://evil.example/collect")).toThrow("Only Inner Cosmos API paths are allowed");
   });
+
+  it("accepts only typed proactive events and closes the live channel", () => {
+    const listeners = new Map<string, EventListener>();
+    const close = vi.fn();
+    class FakeEventSource {
+      onopen: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      constructor(public url: string, public init: EventSourceInit) {}
+      addEventListener(name: string, listener: EventListener) { listeners.set(name, listener); }
+      close = close;
+    }
+    vi.stubGlobal("EventSource", FakeEventSource);
+    const received = vi.fn();
+    const unsubscribe = subscribeProactive(received);
+    listeners.get("proactive")?.({ data: JSON.stringify({ type: "wake_intent", content: "回来", ts: "2026-07-15T00:00:00Z" }) } as MessageEvent);
+    listeners.get("proactive")?.({ data: "not-json" } as MessageEvent);
+    expect(received).toHaveBeenCalledOnce();
+    expect(received).toHaveBeenCalledWith({ type: "wake_intent", content: "回来", ts: "2026-07-15T00:00:00Z" });
+    unsubscribe();
+    expect(close).toHaveBeenCalledOnce();
+  });
 });
+
+afterEach(() => vi.unstubAllGlobals());

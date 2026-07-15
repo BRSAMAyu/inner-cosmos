@@ -10,6 +10,7 @@
     "test": "vitest run",
     "e2e": "playwright test",
     "e2e:local": "powershell -NoProfile -ExecutionPolicy Bypass -File ../scripts/run-living-aurora-e2e.ps1",
+    "e2e:experience": "powershell -NoProfile -ExecutionPolicy Bypass -File ../scripts/run-living-aurora-experience.ps1",
     "mobile:sync": "npm run build:mobile && cap sync",
     "mobile:android:assemble": "npm run mobile:sync && cd android && gradlew.bat assembleDebug",
     "mobile:doctor": "cap doctor"
