@@ -30,7 +30,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
         registry.addMapping("/api/**")
                 .allowedOrigins(origins.toArray(new String[0]))
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")
-                .allowedHeaders("*")
+                .allowedHeaders("Content-Type", "Accept", "Authorization", "X-CSRF-TOKEN", "X-XSRF-TOKEN",
+                        "Idempotency-Key", "Last-Event-ID", "X-Requested-With")
                 .allowCredentials(true)
                 .maxAge(3600); // 1 hour preflight cache
     }

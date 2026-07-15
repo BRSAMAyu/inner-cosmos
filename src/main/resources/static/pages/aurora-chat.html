@@ -818,9 +818,8 @@ function sendViaStream(text, body) {
     // because EventSource cannot send a body. The token is then passed to the
     // GET /stream so the SSE meta event carries the same perception metadata as
     // the POST path (display parity).
-    fetch("/api/aurora/stream-stage", {
+    IC.secureFetch("/api/aurora/stream-stage", {
       method: "POST",
-      credentials: "include",
       headers: { "Content-Type": "application/json; charset=utf-8" },
       body: JSON.stringify(body || {})
     }).then(function(stageRes) { return stageRes.json(); }).then(function(stageJson) {
@@ -968,8 +967,8 @@ async function stopCurrentTurn() {
   if (!activeTurnId) return;
   var turnId = activeTurnId;
   try {
-    await fetch("/api/aurora/turns/" + encodeURIComponent(turnId) + "/stop", {
-      method: "POST", credentials: "include"
+    await IC.secureFetch("/api/aurora/turns/" + encodeURIComponent(turnId) + "/stop", {
+      method: "POST"
     });
   } finally {
     if (activeEventSource) { try { activeEventSource.close(); } catch (e) {} }
@@ -993,9 +992,8 @@ function parseJson(raw) {
 async function sendViaPost(body) {
   var controller = new AbortController();
   var timeout = setTimeout(function() { controller.abort(); }, 30000);
-  var res = await fetch("/api/aurora/message-rich", {
+  var res = await IC.secureFetch("/api/aurora/message-rich", {
     method: "POST",
-    credentials: "include",
     headers: { "Content-Type": "application/json; charset=utf-8" },
     body: JSON.stringify(body),
     signal: controller.signal

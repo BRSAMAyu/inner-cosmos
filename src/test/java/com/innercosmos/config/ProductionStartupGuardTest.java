@@ -18,6 +18,7 @@ class ProductionStartupGuardTest {
                     "llm.allow-fallback=false",
                     "inner-cosmos.demo.seed-enabled=false",
                     "server.servlet.session.cookie.secure=true",
+                    "inner-cosmos.security.csrf-enabled=true",
                     "spring.datasource.url=jdbc:postgresql://db.example/inner_cosmos?sslmode=verify-full",
                     "spring.datasource.username=app",
                     "spring.datasource.password=test-only-placeholder",
@@ -48,6 +49,12 @@ class ProductionStartupGuardTest {
     @Test
     void rejectsDemoSeedingEvenWhenEnvironmentOverridesProfile() {
         runner.withPropertyValues("inner-cosmos.demo.seed-enabled=true")
+                .run(context -> assertRejected(context.getBean(ProductionStartupGuard.class)));
+    }
+
+    @Test
+    void rejectsDisabledCsrfProtection() {
+        runner.withPropertyValues("inner-cosmos.security.csrf-enabled=false")
                 .run(context -> assertRejected(context.getBean(ProductionStartupGuard.class)));
     }
 

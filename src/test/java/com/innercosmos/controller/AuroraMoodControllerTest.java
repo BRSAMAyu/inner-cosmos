@@ -64,10 +64,10 @@ class AuroraMoodControllerTest {
 
     @Test
     void mood_requiresAuth() throws Exception {
-        // Unauthenticated /api/** is rejected by the security chain (403) before the
+        // Unauthenticated /api/** is rejected by the security chain (401) before the
         // controller — the endpoint is auth-required, never anonymously readable.
         mockMvc.perform(get("/api/aurora/mood"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

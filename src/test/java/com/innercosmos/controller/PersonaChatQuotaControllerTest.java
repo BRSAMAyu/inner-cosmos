@@ -57,10 +57,10 @@ class PersonaChatQuotaControllerTest {
     }
 
     @Test
-    @DisplayName("quota requires auth (403 when anonymous)")
+    @DisplayName("quota requires auth (401 when anonymous)")
     void quota_requiresAuth() throws Exception {
         mockMvc.perform(get("/api/persona-chat/quota").param("capsuleId", "1"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

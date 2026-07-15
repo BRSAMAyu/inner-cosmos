@@ -545,9 +545,8 @@ const API = {
 
   async multipart(path, formData) {
     try {
-      const res = await fetch(path, {
+      const res = await IC.secureFetch(path, {
         method: "POST",
-        credentials: "include",
         body: formData
       });
       const json = await res.json();

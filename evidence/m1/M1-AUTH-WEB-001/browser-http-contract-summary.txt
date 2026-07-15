@@ -1,0 +1,18 @@
+M1-AUTH-WEB-001 browser and real HTTP contract: PASS
+
+Static browser contract:
+- app.js exposes ensureCsrfToken and secureFetch.
+- Central IC.api and multipart ASR use secureFetch.
+- Aurora stream-stage, stop, rich-message, and dashboard proactive writes use secureFetch.
+- CORS accepts X-CSRF-TOKEN and a bounded compatibility header set.
+
+Real HTTP process probe against http://127.0.0.1:8080:
+- csrfHeader: X-CSRF-TOKEN
+- registerSessionRotated: true
+- loginSessionRotated: true
+- currentAuthenticated: true
+- protectedMutationAccepted: true
+- missingCsrfRejectedStatus: 403
+
+The in-app browser control attempt was interrupted and is not claimed as evidence;
+the evidence above comes from executable static browser contracts and a real server process.

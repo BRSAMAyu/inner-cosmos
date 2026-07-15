@@ -10,7 +10,10 @@ import com.innercosmos.vo.UserProfileVO;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
+import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -22,8 +25,11 @@ public class AuthController extends BaseController {
     }
 
     @PostMapping("/register")
-    public ApiResponse<UserProfileVO> register(@Valid @RequestBody RegisterRequest request, HttpSession session) {
+    public ApiResponse<UserProfileVO> register(@Valid @RequestBody RegisterRequest request,
+                                                HttpServletRequest httpRequest) {
         User user = userService.register(request);
+        HttpSession session = httpRequest.getSession(true);
+        httpRequest.changeSessionId();
         session.setAttribute(Constants.SESSION_USER_KEY, user.id);
         return ApiResponse.ok(UserProfileVO.from(user));
     }
@@ -31,13 +37,11 @@ public class AuthController extends BaseController {
     @PostMapping("/login")
     public ApiResponse<UserProfileVO> login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
         User user = userService.login(request);
-        // Prevent session fixation: invalidate old session and create a new one
-        HttpSession oldSession = httpRequest.getSession(false);
-        if (oldSession != null) {
-            oldSession.invalidate();
-        }
-        HttpSession newSession = httpRequest.getSession(true);
-        newSession.setAttribute(Constants.SESSION_USER_KEY, user.id);
+        // Rotate the identifier to prevent fixation. The browser reloads after login and
+        // obtains a fresh synchronizer token for the authenticated session.
+        HttpSession session = httpRequest.getSession(true);
+        httpRequest.changeSessionId();
+        session.setAttribute(Constants.SESSION_USER_KEY, user.id);
         return ApiResponse.ok(UserProfileVO.from(user));
     }
 
@@ -45,6 +49,19 @@ public class AuthController extends BaseController {
     public ApiResponse<Boolean> logout(HttpSession session) {
         session.invalidate();
         return ApiResponse.ok(true);
+    }
+
+    /** Materializes the SPA synchronizer token without exposing authenticated data. */
+    @GetMapping("/csrf")
+    public ApiResponse<Map<String, String>> csrf(HttpServletRequest request) {
+        CsrfToken token = (CsrfToken) request.getAttribute(CsrfToken.class.getName());
+        if (token == null) {
+            return ApiResponse.ok(Map.of());
+        }
+        return ApiResponse.ok(Map.of(
+                "token", token.getToken(),
+                "headerName", token.getHeaderName(),
+                "parameterName", token.getParameterName()));
     }
 
     @GetMapping("/current")

@@ -1,0 +1,15 @@
+M1-AUTH-WEB-001 production image smoke: PASS
+
+Image: inner-cosmos:csrf-session
+Image digest: sha256:d152aa768b2b21d49a509fccb2784cb6314c423f8c5cd278a2a475b885cdb206
+Profile: prod
+Health: UP
+Database: PostgreSQL 16 + pgvector
+Database TLS: VERIFY_FULL
+Flyway version: 1
+Application schema tables: 60
+Demo users: 0
+Runtime user: appuser
+
+The production guard requires CSRF protection and rejects mock/fallback/demo/insecure
+database or cookie configuration covered by its automated negative tests.

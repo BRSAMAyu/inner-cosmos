@@ -2,6 +2,28 @@ const IC = {
   soundEnabled: JSON.parse(localStorage.getItem("ic_sound") || "false"),
   themeMode: localStorage.getItem("ic_theme_mode") || "auto",  // "auto" | "light" | "dark"
   _darkMedia: null,
+  _csrf: null,
+
+  async ensureCsrfToken(force = false) {
+    if (IC._csrf && !force) return IC._csrf;
+    const res = await fetch("/api/auth/csrf", { credentials: "include" });
+    const json = await res.json();
+    if (!res.ok || !json.success || !json.data?.token || !json.data?.headerName) {
+      throw new Error("Unable to establish request protection.");
+    }
+    IC._csrf = { token: json.data.token, headerName: json.data.headerName };
+    return IC._csrf;
+  },
+
+  async secureFetch(path, options = {}) {
+    const method = (options.method || "GET").toUpperCase();
+    const headers = new Headers(options.headers || {});
+    if (!["GET", "HEAD", "OPTIONS", "TRACE"].includes(method)) {
+      const csrf = await IC.ensureCsrfToken();
+      headers.set(csrf.headerName, csrf.token);
+    }
+    return fetch(path, { ...options, method, credentials: "include", headers });
+  },
 
   async api(path, options = {}, retries = 1) {
     const method = (options.method || "GET").toUpperCase();
@@ -10,11 +32,9 @@ const IC = {
     const maxRetries = method === "GET" ? retries : 0;
     for (let attempt = 0; ; attempt++) {
       try {
-        const res = await fetch(path, {
-          credentials: "include",
-          headers: { "Content-Type": "application/json; charset=utf-8", ...(options.headers || {}) },
-          ...options
-        });
+        const headers = new Headers(options.headers || {});
+        if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json; charset=utf-8");
+        const res = await IC.secureFetch(path, { ...options, headers });
         // M-025: an expired/invalid session (Spring Security 401/403 on /api/**) should send the
         // user to the login page instead of stranding them with a cryptic toast. (Don't redirect
         // from login/register/index themselves.)
@@ -748,7 +768,7 @@ const IC = {
         const file = await IC.toWavFile(blob, "voice-input.wav");
         const form = new FormData();
         form.append("file", file);
-        const res = await fetch("/api/asr/transcribe", { method: "POST", credentials: "include", body: form });
+        const res = await IC.secureFetch("/api/asr/transcribe", { method: "POST", body: form });
         const json = await res.json();
         if (json.success && json.data?.text) {
           const text = json.data.text.trim();

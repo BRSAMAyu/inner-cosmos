@@ -36,6 +36,7 @@ public final class ProductionStartupGuard implements ApplicationRunner {
         requireFalse("llm.allow-fallback", "Mock fallback");
         requireFalse("inner-cosmos.demo.seed-enabled", "demo data seeding");
         requireTrue("server.servlet.session.cookie.secure", "secure session cookies");
+        requireTrue("inner-cosmos.security.csrf-enabled", "CSRF protection");
 
         String provider = required("llm.provider", "LLM provider").toLowerCase(Locale.ROOT);
         if (!REAL_PROVIDERS.contains(provider)) {

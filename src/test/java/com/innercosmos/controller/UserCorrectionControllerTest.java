@@ -58,7 +58,7 @@ class UserCorrectionControllerTest {
     @Test
     void corrections_requiresAuth() throws Exception {
         mockMvc.perform(get("/api/aurora/corrections"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

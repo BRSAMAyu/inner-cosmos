@@ -19,5 +19,7 @@ llm:
   allow-fallback: true
 
 inner-cosmos:
+  security:
+    csrf-enabled: false
   demo:
     seed-enabled: true

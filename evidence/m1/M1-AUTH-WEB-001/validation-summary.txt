@@ -1,0 +1,21 @@
+M1-AUTH-WEB-001 validation summary
+
+PASS - targeted security regression: 27 tests, 0 failures/errors/skips
+PASS - affected contract regression: 39 tests, 0 failures/errors/skips
+PASS - full clean verify: 662 tests, 0 failures/errors/skips
+PASS - PostgreSQL Testcontainers application smoke and Flyway baseline
+PASS - SpotBugs: 0 high-confidence findings
+PASS - Surefire baseline: 87 suites, 662 tests, minimum 613
+PASS - current-tree secret scan: 0 findings
+PASS - git diff --check
+PASS - production image smoke (prod/PostgreSQL TLS VERIFY_FULL/Flyway/non-root/no demo)
+
+Runtime baseline:
+- Oracle JDK 21.0.10
+- Spring Boot 3.5.14
+- Maven Wrapper / Apache Maven 3.9.9
+
+Known remaining acceptance scope:
+- Mobile OIDC Authorization Code + PKCE is not implemented by this package.
+- Independent security review remains pending.
+- External provider credential rotation remains tracked by HG-SECRET-ROTATION.

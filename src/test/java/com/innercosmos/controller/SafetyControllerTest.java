@@ -62,15 +62,10 @@ class SafetyControllerTest {
 
     @Test
     void resources_isAccessibleWithoutAuth() throws Exception {
-        // Safety resources may require auth depending on SecurityConfig
-        // Just verify the endpoint responds (either 200 or 403 is acceptable)
+        // Crisis resources remain public so a signed-out user can still reach help.
         mockMvc.perform(get("/api/safety/resources"))
-                .andExpect(result -> {
-                    int status = result.getResponse().getStatus();
-                    if (status != 200 && status != 403) {
-                        throw new AssertionError("Expected 200 or 403 but got " + status);
-                    }
-                });
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isArray());
     }
 
     // ---------------- Check ----------------

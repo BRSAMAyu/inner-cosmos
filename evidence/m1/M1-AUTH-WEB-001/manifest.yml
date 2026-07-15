@@ -1,0 +1,61 @@
+schema_version: 1
+package_id: M1-AUTH-WEB-001
+status: IMPLEMENTED
+source_sha: 55c2b1901b2d8f62cfdf24b1d78abc97f9a240bd
+branch: feat/run006-aurora-self-understanding
+recorded_at: 2026-07-15T08:45:00+08:00
+environment:
+  os: Windows 11 amd64
+  java: Oracle JDK 21.0.10
+  maven: Apache Maven 3.9.9
+  spring_boot: 3.5.14
+commands:
+  - command: .\\mvnw.cmd -B -Dtest=WebSessionSecurityIntegrationTest,AuthControllerTest,ProductionStartupGuardTest,StaticCsrfBrowserContractTest test
+    result: PASS
+    detail: 27 tests, 0 failures, 0 errors, 0 skipped
+  - command: real HTTP process probe against http://127.0.0.1:8080
+    result: PASS
+    artifact: browser-http-contract-summary.txt
+  - command: .\\mvnw.cmd -B clean verify
+    result: PASS
+    detail: 662 tests plus SpotBugs, PostgreSQL Testcontainers, and Flyway baseline
+  - command: docker build -t inner-cosmos:csrf-session .
+    result: PASS
+    image_digest: sha256:d152aa768b2b21d49a509fccb2784cb6314c423f8c5cd278a2a475b885cdb206
+  - command: .\\scripts\\verify-production-image.ps1 -Image inner-cosmos:csrf-session
+    result: PASS
+    artifact: production-smoke-summary.txt
+  - command: powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\assert-test-baseline.ps1 -MinimumTests 613
+    result: PASS
+    detail: 87 suites, 662 tests, 0 failures/errors/skips
+  - command: powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\scan-secrets.ps1
+    result: PASS
+    detail: 0 current-tree findings
+  - command: git diff --check
+    result: PASS
+changes:
+  - Replaced the misleading JWT-named filter with an explicit server-session authentication bridge.
+  - Enabled session-bound synchronizer CSRF by default and made it mandatory in prod.
+  - Rotated session identifiers on registration and login.
+  - Added stable JSON 401, 403, and CSRF_INVALID responses.
+  - Routed existing browser mutations through the CSRF-aware transport.
+  - Preserved anonymous crisis resources and tightened CORS request headers.
+  - Preserved all existing innovation capabilities and product semantics.
+human_gates: []
+known_limitations:
+  - Mobile OIDC Authorization Code plus PKCE remains unimplemented; AUTH-OIDC stays IN_PROGRESS.
+  - Independent security review remains pending.
+  - External provider credential rotation remains tracked by HG-SECRET-ROTATION.
+review:
+  status: PENDING
+  reviewer: UNASSIGNED
+rollback: Preserve CSRF, session rotation, and server-side identity. Repair clients or explicit public matchers instead of disabling the controls.
+artifacts:
+  - path: browser-http-contract-summary.txt
+    sha256: 8730c8908ec248e08ec6a4c91a6b705a23a8c0e5ac4096869846befc51093692
+  - path: production-smoke-summary.txt
+    sha256: 68a775bec024173626d470219c36236ed42d8c6da1606d285f0d838421bc4aca
+  - path: validation-summary.txt
+    sha256: 514010d20f0b0c529329654ea02e6789be1df7c92fe51c3de4eb07fe9ee275ac
+  - path: web-session-security-summary.txt
+    sha256: f5c128db2aa09dfd8f8f5cc59ba882f386e5c9cf1755837983b6209856ac83a4

@@ -1,0 +1,13 @@
+M1-AUTH-WEB-001 web session security result: PASS
+
+- Spring Security bridges only the server-side LOGIN_USER_ID session into Authentication.
+- Login and registration rotate JSESSIONID.
+- Unsafe requests require a session-bound synchronizer token via X-CSRF-TOKEN.
+- Missing CSRF is rejected with HTTP 403 and code CSRF_INVALID.
+- Anonymous protected API access is rejected with HTTP 401 and a JSON envelope.
+- A client-controlled X-User-Id header cannot authenticate a request.
+- Logout requires CSRF and invalidates the authenticated session.
+- GET /api/safety/resources remains public for signed-out crisis access.
+- ProductionStartupGuard rejects csrf-enabled=false.
+- Existing Aurora, Self, Constitution, Emergence, profile, capsule, slow-letter,
+  starfield, matching, and proactive product semantics were not removed or reduced.

@@ -2,8 +2,8 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 authority: goal-objective.md
 status: IN_PROGRESS
-last_reconciled_at: 2026-07-15T03:26:01+08:00
-last_reconciled_commit: f1aad5903b826637ea9768849df30a7f97cd6afa
+last_reconciled_at: 2026-07-15T08:45:00+08:00
+last_reconciled_commit: 55c2b1901b2d8f62cfdf24b1d78abc97f9a240bd
 
 status_semantics:
   UNASSESSED: current HEAD and target environment have not been verified
@@ -48,20 +48,20 @@ gates:
     acceptance:
       - id: SEC-CURRENT-TREE
         target: Current-tree secret scan has zero usable credentials and production secrets are externally injected.
-        status: UNASSESSED
-        evidence: []
+        status: IN_PROGRESS
+        evidence: [evidence/m1/M1-SEC-001/, evidence/m1/M1-AUTH-WEB-001/]
       - id: SEC-ROTATION
         target: HG-SECRET-ROTATION is PASS with independent review.
         status: BLOCKED
         evidence: [evidence/m1/M1-SEC-001/human-rotation-checklist.md]
       - id: SEC-OWNERSHIP
         target: All user-domain resources enforce owner, purpose, and consent before content read or AI side effects.
-        status: UNASSESSED
-        evidence: []
+        status: IN_PROGRESS
+        evidence: [evidence/m1/M1-SEC-002/, evidence/m1/M1-SEC-003/]
       - id: SEC-PROD-GUARD
         target: Production fails fast on mock, fallback, demo seed, weak cookies, weak TLS, or missing secrets.
-        status: UNASSESSED
-        evidence: []
+        status: IN_PROGRESS
+        evidence: [evidence/m1/M1-SEC-001/, evidence/m1/M1-AUTH-WEB-001/]
       - id: GOV-INNOVATION
         target: Innovation semantics remain authoritative and are governed by versioning, evaluation, consent, and rollback rather than deletion.
         status: UNASSESSED
@@ -83,7 +83,7 @@ gates:
     required: true
     acceptance:
       - {id: ARCH-MODULES, target: "Module boundaries are executable through Spring Modulith and architecture tests.", status: UNASSESSED, evidence: []}
-      - {id: AUTH-OIDC, target: "Spring Security protects secure web sessions and mobile OIDC PKCE flows.", status: UNASSESSED, evidence: []}
+      - {id: AUTH-OIDC, target: "Spring Security protects secure web sessions and mobile OIDC PKCE flows.", status: IN_PROGRESS, evidence: [evidence/m1/M1-AUTH-WEB-001/]}
       - {id: API-CONTRACT, target: "Versioned OpenAPI, typed errors, idempotency, concurrency, and resumable SSE are verified.", status: UNASSESSED, evidence: []}
       - {id: DATA-POSTGRES, target: "PostgreSQL and Flyway are production truth with Testcontainers and migration reconciliation.", status: IN_PROGRESS, evidence: [evidence/m1/M1-DATA-POC-001/, evidence/m1/M1-DATA-APP-001/, docs/adr/0002-postgresql-system-of-record.md]}
       - {id: DATA-REDIS, target: "Sessions, short state, limits, and leases are externalized to Redis where required.", status: UNASSESSED, evidence: []}

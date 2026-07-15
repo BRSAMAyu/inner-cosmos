@@ -204,7 +204,7 @@ class AuthControllerTest {
     @Test
     void current_requiresAuthentication() throws Exception {
         mockMvc.perform(get("/api/auth/current"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

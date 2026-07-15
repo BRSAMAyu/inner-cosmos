@@ -63,7 +63,7 @@ class NotificationControllerTest {
     @Test
     void notifications_requiresAuth() throws Exception {
         mockMvc.perform(get("/api/notifications"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

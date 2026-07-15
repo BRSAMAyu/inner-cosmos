@@ -506,9 +506,8 @@ async function requestAuroraProactiveWithTimeout(timeoutMs) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch("/api/aurora/proactive/check", {
+    const res = await IC.secureFetch("/api/aurora/proactive/check", {
       method: "POST",
-      credentials: "include",
       headers: { "Content-Type": "application/json; charset=utf-8" },
       signal: controller.signal
     });
