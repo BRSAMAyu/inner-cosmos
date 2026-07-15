@@ -3,6 +3,7 @@ package com.innercosmos.config;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.innercosmos.common.Constants;
 import com.innercosmos.dto.RegisterRequest;
+import com.innercosmos.entity.AuthorizedMemoryRef;
 import com.innercosmos.entity.CapsuleBoundary;
 import com.innercosmos.entity.DailyRecord;
 import com.innercosmos.entity.EchoCapsule;
@@ -27,6 +28,7 @@ import com.innercosmos.mapper.AuroraConstitutionMapper;
 import com.innercosmos.mapper.UserPortraitMapper;
 import com.innercosmos.mapper.AuroraSelfModelMapper;
 import com.innercosmos.mapper.AuroraSelfReflectionMapper;
+import com.innercosmos.mapper.AuthorizedMemoryRefMapper;
 import com.innercosmos.mapper.BeliefPatternMapper;
 import com.innercosmos.mapper.CapsuleBoundaryMapper;
 import com.innercosmos.mapper.DailyRecordMapper;
@@ -73,6 +75,7 @@ public class MockDataInitializer implements CommandLineRunner {
     private final AuroraSelfReflectionMapper auroraSelfReflectionMapper;
     private final BeliefPatternMapper beliefPatternMapper;
     private final com.innercosmos.service.EmotionBaselineService emotionBaselineService;
+    private final AuthorizedMemoryRefMapper authorizedMemoryRefMapper;
 
     public MockDataInitializer(UserMapper userMapper,
                                UserProfileMapper userProfileMapper,
@@ -95,7 +98,8 @@ public class MockDataInitializer implements CommandLineRunner {
                                AuroraSelfModelMapper auroraSelfModelMapper,
                                AuroraSelfReflectionMapper auroraSelfReflectionMapper,
                                BeliefPatternMapper beliefPatternMapper,
-                               com.innercosmos.service.EmotionBaselineService emotionBaselineService) {
+                               com.innercosmos.service.EmotionBaselineService emotionBaselineService,
+                               AuthorizedMemoryRefMapper authorizedMemoryRefMapper) {
         this.userMapper = userMapper;
         this.userProfileMapper = userProfileMapper;
         this.capsuleMapper = capsuleMapper;
@@ -118,6 +122,7 @@ public class MockDataInitializer implements CommandLineRunner {
         this.auroraSelfReflectionMapper = auroraSelfReflectionMapper;
         this.beliefPatternMapper = beliefPatternMapper;
         this.emotionBaselineService = emotionBaselineService;
+        this.authorizedMemoryRefMapper = authorizedMemoryRefMapper;
     }
 
     @PostConstruct
@@ -510,6 +515,14 @@ public class MockDataInitializer implements CommandLineRunner {
         mirror.standInEnabled = true;
         mirror.realContactPolicy = "LETTER_ONLY";
         capsuleMapper.insert(mirror);
+        for (MemoryCard card : cards) {
+            AuthorizedMemoryRef ref = new AuthorizedMemoryRef();
+            ref.capsuleId = mirror.id;
+            ref.memoryCardId = card.id;
+            ref.abstractExcerpt = card.summary;
+            ref.authorizationStatus = "AUTHORIZED";
+            authorizedMemoryRefMapper.insert(ref);
+        }
         ensureBoundary(mirror.id, List.of("真实AI", "产品愿景", "行动拆解", "慢社交", "自我理解"),
                 List.of("真实身份", "联系方式", "医疗诊断", "承诺替本人回应"), 5, "BALANCED");
     }

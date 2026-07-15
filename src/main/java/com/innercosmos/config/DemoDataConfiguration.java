@@ -4,6 +4,7 @@ import com.innercosmos.mapper.AuroraConstitutionMapper;
 import com.innercosmos.mapper.AuroraSelfModelMapper;
 import com.innercosmos.mapper.AuroraSelfProfileMapper;
 import com.innercosmos.mapper.AuroraSelfReflectionMapper;
+import com.innercosmos.mapper.AuthorizedMemoryRefMapper;
 import com.innercosmos.mapper.BeliefPatternMapper;
 import com.innercosmos.mapper.CapsuleBoundaryMapper;
 import com.innercosmos.mapper.DailyRecordMapper;
@@ -61,13 +62,14 @@ public class DemoDataConfiguration {
             AuroraSelfModelMapper auroraSelfModelMapper,
             AuroraSelfReflectionMapper auroraSelfReflectionMapper,
             BeliefPatternMapper beliefPatternMapper,
-            EmotionBaselineService emotionBaselineService) {
+            EmotionBaselineService emotionBaselineService,
+            AuthorizedMemoryRefMapper authorizedMemoryRefMapper) {
         return new MockDataInitializer(userMapper, userProfileMapper, capsuleMapper, boundaryMapper,
                 memoryCardMapper, todoItemMapper, slowLetterMapper, dailyRecordMapper,
                 emotionTraceMapper, thoughtFragmentMapper, eventCardMapper,
                 relationMentionMapper, memoryThemeMapper, gravityService, userService,
                 auroraSelfProfileMapper, auroraConstitutionMapper, userPortraitMapper,
                 auroraSelfModelMapper, auroraSelfReflectionMapper, beliefPatternMapper,
-                emotionBaselineService);
+                emotionBaselineService, authorizedMemoryRefMapper);
     }
 }

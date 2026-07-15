@@ -198,6 +198,42 @@ test("correcting a specific memory star supersedes exactly that memory and clear
   await expect(understanding.locator(".correction-target")).toHaveCount(0);
 });
 
+test("correcting a memory authorized to a capsule flips that capsule to needs-review", async ({ page }) => {
+  await page.goto("/app/aurora/index.html");
+  await loginIfNeeded(page);
+  await openProductSpace(page, "内宇宙");
+
+  const target = await page.evaluate(async () => {
+    const capsules = await fetch("/api/capsule/my", { credentials: "include" }).then(r => r.json()).then(j => j.data);
+    const cards = await fetch("/api/memory/cards", { credentials: "include" }).then(r => r.json()).then(j => j.data);
+    for (const capsule of capsules) {
+      const ids = [...(capsule.authorizedMemoryIds as string).matchAll(/\d+/g)].map(m => Number(m[0]));
+      const card = cards.find((c: { id: number; status: string; title: string }) => ids.includes(c.id) && c.status === "ACTIVE");
+      if (card) return { pseudonym: capsule.pseudonym as string, memoryTitle: card.title as string };
+    }
+    return null;
+  });
+  test.skip(target === null, "no active capsule with an authorized, still-active memory in this environment");
+  if (!target) return;
+
+  const cosmos = page.getByRole("region", { name: "记忆星空" });
+  const accessible = cosmos.getByRole("list", { name: "记忆星空可访问列表" });
+  const star = accessible.locator("li", { hasText: target.memoryTitle });
+  await star.getByRole("button", { name: "这条不准确了" }).click();
+
+  const understanding = page.getByRole("region", { name: "校准 Aurora 对我的理解" });
+  await understanding.getByLabel("更准确的你是").fill("这条记忆需要被重新理解，授权上下文应当先复核");
+  await understanding.getByRole("button", { name: "预览会改变什么" }).click();
+  const preview = understanding.getByRole("region", { name: "纠正影响预览" });
+  await expect(preview).toContainText("共鸣体授权上下文");
+  await preview.getByRole("button", { name: "确认，这是更准确的我" }).click();
+  await expect(page.getByRole("status")).toContainText("已校准");
+
+  await openProductSpace(page, "共鸣");
+  const capsuleTab = page.getByRole("tab", { name: new RegExp(`^${target.pseudonym}`) });
+  await expect(capsuleTab).toContainText("需复核");
+});
+
 test("user can roll back a memory change while permanent forgetting stays irreversible", async ({ page }) => {
   await page.goto("/app/aurora/index.html");
   await loginIfNeeded(page);
