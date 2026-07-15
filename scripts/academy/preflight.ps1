@@ -66,6 +66,18 @@ $criticalFailure = $false
 $queueUrl = $null
 $namespaceCreated = $false
 
+if ([string]::IsNullOrWhiteSpace($Region)) { $Region = "us-east-1" }
+if ([string]::IsNullOrWhiteSpace($ClusterName) -and (Get-Command kubectl -ErrorAction SilentlyContinue)) {
+    $currentContext = Invoke-Captured kubectl @("config", "current-context")
+    if ($currentContext.ExitCode -eq 0) {
+        $contextValue = ($currentContext.Output -join "").Trim()
+        $candidate = ($contextValue -split '/')[-1]
+        if ($candidate -match '^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$') {
+            $ClusterName = $candidate
+        }
+    }
+}
+
 $git = Invoke-Captured git @("rev-parse", "HEAD")
 $gitSha = if ($git.ExitCode -eq 0) { ($git.Output -join "").Trim() } else { "UNKNOWN" }
 
@@ -88,7 +100,8 @@ if ($render.ExitCode -eq 0) {
     )
     $matches = @($forbidden | Where-Object { $rendered -match [Regex]::Escape($_) })
     if ($matches.Count -eq 0) {
-        Set-Result "academy_kustomize" "PASS" @{ resources = Get-NonBlankCount ($render.Output | Where-Object { $_ -eq "---" }) }
+        $resourceCount = @($render.Output | Where-Object { $_.ToString().Trim() -eq "---" }).Count + 1
+        Set-Result "academy_kustomize" "PASS" @{ resources = $resourceCount }
     } else {
         Set-Result "academy_kustomize" "FAIL_FORBIDDEN_DEPENDENCY" @{ finding_count = $matches.Count }
         $criticalFailure = $true

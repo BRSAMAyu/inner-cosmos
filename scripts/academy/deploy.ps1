@@ -37,10 +37,23 @@ if (-not $SkipPreflight) {
 $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("inner-cosmos-academy-" + [Guid]::NewGuid().ToString("N"))
 $tempBase = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath())
 $resolvedTempRoot = [System.IO.Path]::GetFullPath($tempRoot)
+$originalOpenSslConf = $env:OPENSSL_CONF
 if (-not $resolvedTempRoot.StartsWith($tempBase, [System.StringComparison]::OrdinalIgnoreCase)) {
     throw "Refusing to create deployment material outside the system temporary directory."
 }
 New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
+
+if ([string]::IsNullOrWhiteSpace($env:OPENSSL_CONF) -or -not (Test-Path -LiteralPath $env:OPENSSL_CONF)) {
+    $openSslCandidates = @(
+        "C:\Program Files\Git\mingw64\etc\ssl\openssl.cnf",
+        "C:\Program Files\Git\usr\ssl\openssl.cnf"
+    )
+    $detectedOpenSslConf = $openSslCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+    if (-not $detectedOpenSslConf) {
+        throw "OpenSSL configuration could not be located; no certificate material was generated."
+    }
+    $env:OPENSSL_CONF = $detectedOpenSslConf
+}
 
 function Invoke-Checked {
     param([Parameter(Mandatory)][string]$Command, [string[]]$Arguments)
@@ -140,5 +153,10 @@ try {
     if ($resolvedTempRoot.StartsWith($tempBase, [System.StringComparison]::OrdinalIgnoreCase) `
             -and (Test-Path -LiteralPath $resolvedTempRoot)) {
         Remove-Item -Recurse -Force -LiteralPath $resolvedTempRoot
+    }
+    if ([string]::IsNullOrWhiteSpace($originalOpenSslConf)) {
+        Remove-Item Env:OPENSSL_CONF -ErrorAction SilentlyContinue
+    } else {
+        $env:OPENSSL_CONF = $originalOpenSslConf
     }
 }

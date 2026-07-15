@@ -19,7 +19,7 @@ spec:
       terminationGracePeriodSeconds: 60
       initContainers:
         - name: prepare-data
-          image: busybox:1.37.0@sha256:37f515cce48d8f7f80f00f90d306f098521cd3758b10d9425e8f8ee45c0ed94d
+          image: busybox:1.37.0@sha256:9532d8c39891ca2ecde4d30d7710e01fb739c87a8b9299685c63704296b16028
           command: ["sh", "-c", "mkdir -p /var/lib/postgresql/data/pgdata && chown -R 999:999 /var/lib/postgresql/data"]
           securityContext:
             runAsUser: 0
@@ -27,7 +27,7 @@ spec:
           volumeMounts:
             - {name: data, mountPath: /var/lib/postgresql/data}
         - name: prepare-tls
-          image: busybox:1.37.0@sha256:37f515cce48d8f7f80f00f90d306f098521cd3758b10d9425e8f8ee45c0ed94d
+          image: busybox:1.37.0@sha256:9532d8c39891ca2ecde4d30d7710e01fb739c87a8b9299685c63704296b16028
           command: ["sh", "-c", "cp /input/* /tls/ && chmod 600 /tls/server.key && chmod 644 /tls/server.crt /tls/ca.crt && chown -R 999:999 /tls"]
           securityContext:
             runAsUser: 0

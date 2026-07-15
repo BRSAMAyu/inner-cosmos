@@ -1,8 +1,8 @@
 schema_version: 1
 profile: academy-eks
 authority: 对齐文档/14-AWS-Academy-EKS约束与双轨部署架构.md
-observed_at: 2026-07-15T11:02:21+08:00
-evidence: evidence/academy/AWS-ACADEMY-CAP-002/
+observed_at: 2026-07-15T11:46:05+08:00
+evidence: evidence/academy/ACADEMY-LIVE-001/
 freshness: rerun_on_every_learner_lab_session
 
 constraints:
@@ -27,7 +27,7 @@ capabilities:
     status: PASS
     observed_count: 2
   ecr:
-    status: DOCUMENTED_SUPPORTED
+    status: PASS_PUSH_IMMUTABLE_IMAGE_CURRENT_SESSION
   gateway_api:
     status: PASS
     observed_gateway_classes: 1
