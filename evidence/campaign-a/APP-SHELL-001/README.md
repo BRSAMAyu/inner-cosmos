@@ -33,7 +33,9 @@ continuation and feedback still work through the new shell.
 
 This is the information-architecture and navigation foundation, not closure of `UX-SHELL` or G3.
 The URL contract, navigation and `我的` control surface have been extracted into a tested
-`ProductShell` component boundary, but `AuroraApp.tsx` remains oversized and the four domain-heavy
-spaces still need extraction. Visual regression, automated accessibility, complete i18n and
+`ProductShell` component boundary. Aurora's multi-message timeline/composer is also isolated behind
+a controlled component contract that preserves partial replies, stop and interrupt/replan actions.
+`AuroraApp.tsx` remains oversized and the domain-heavy spaces still need extraction. Visual
+regression, automated accessibility, complete i18n and
 performance budgets also remain open. The next machine front continues domain component decomposition
 with state and API contracts kept stable.

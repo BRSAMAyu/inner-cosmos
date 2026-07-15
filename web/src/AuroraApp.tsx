@@ -5,8 +5,8 @@ import { initialMobileState, mobileRuntime, type MobileRuntimeState } from "./mo
 import { mobileOidc } from "./mobile-auth";
 import type { AuroraStreamEvent, DialogMessage, TurnStatus } from "./protocol";
 import { initialProductSpace, MeSpace, ProductShellNavigation, type ProductSpace } from "./components/ProductShell";
+import { AuroraConversation, type AuroraUiMessage } from "./components/AuroraConversation";
 
-type UiMessage = { key: string; speaker: "USER" | "AURORA"; text: string; partial?: boolean };
 type RuntimeSignal = { stage: "idle" | "understanding" | "composing" | "speaking"; runtime: "single" | "dual"; relationshipMove?: string; repaired?: boolean };
 const terminal = new Set<TurnStatus>(["COMPLETED", "INTERRUPTED", "CANCELLED"]);
 const modes = [
@@ -57,7 +57,7 @@ const skillCopy = {
   }
 } as const;
 
-function toUi(rows: DialogMessage[]): UiMessage[] {
+function toUi(rows: DialogMessage[]): AuroraUiMessage[] {
   return rows.map(row => ({ key: `db-${row.id}`, speaker: row.speaker, text: row.textContent }));
 }
 
@@ -65,7 +65,7 @@ export function AuroraApp() {
   const [productSpace, setProductSpace] = useState<ProductSpace>(initialProductSpace);
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [sessionId, setSessionId] = useState<number | null>(null);
-  const [messages, setMessages] = useState<UiMessage[]>([]);
+  const [messages, setMessages] = useState<AuroraUiMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [mode, setMode] = useState("DAILY_TALK");
   const [status, setStatus] = useState("正在连接你的内宇宙…");
@@ -1203,26 +1203,8 @@ export function AuroraApp() {
           <button type="button" className="quiet" onClick={() => setSkillSuggestion(null)}>{skillLocale === "en-SG" ? "Not this time" : "这次不要"}</button></div>
       </aside>}
 
-      <section className="conversation" aria-live="polite" aria-label="与 Aurora 的对话">
-        {messages.length === 0 && <div className="empty"><span>✦</span><p>把现在最真实的一句话放在这里。</p></div>}
-        {messages.map(message => (
-          <article className={`message ${message.speaker.toLowerCase()} ${message.partial ? "partial" : ""}`} key={message.key}>
-            <span className="speaker">{message.speaker === "AURORA" ? "Aurora" : "你"}</span>
-            <p>{message.text || "…"}</p>
-            {message.partial && message.text && <small>停在这里</small>}
-          </article>
-        ))}
-      </section>
-
-      <form className="composer" onSubmit={send}>
-        <textarea value={draft} onChange={e => setDraft(e.target.value)} placeholder={activeTurnId ? "直接说出新的想法，Aurora 会停下并重新理解…" : "此刻，你想从哪里说起？"} aria-label="写给 Aurora" onKeyDown={e => {
-          if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); e.currentTarget.form?.requestSubmit(); }
-        }} />
-        <div className="actions">
-          {activeTurnId && <button type="button" className="stop" onClick={() => void stop()}>停止回应</button>}
-          <button type="submit" className="send" disabled={!draft.trim() || !sessionId}>{activeTurnId ? "打断并发送" : "发送"}</button>
-        </div>
-      </form>
+      <AuroraConversation messages={messages} activeTurnId={activeTurnId} draft={draft} sessionReady={Boolean(sessionId)}
+        onDraftChange={setDraft} onSubmit={send} onStop={() => void stop()} />
       </div>
 
       <div className="product-space" hidden={productSpace !== "me"}>
