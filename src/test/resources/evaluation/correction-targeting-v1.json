@@ -1,0 +1,29 @@
+{
+  "datasetVersion": "correction-targeting-v1",
+  "notes": "Scores how precisely a correction command identifies the memories it will supersede. MEMORY_CARD-targeted commands use a deterministic id and must be perfect. AURORA_UNDERSTANDING free-text commands fall back to case-insensitive substring matching on title/summary and are known to over-match when two memories share a 4+ character phrase; that fragility is measured here, not hidden, and is the reason the UI now offers a star-targeted MEMORY_CARD correction entry point instead of relying on free text alone.",
+  "thresholds": {
+    "memoryCardTargeted": { "precision": 1.0, "recall": 1.0 },
+    "overall": { "precision": 0.75, "recall": 0.95 }
+  },
+  "memories": [
+    { "key": "friend-joke", "title": "朋友一句玩笑后的沉默", "summary": "那一刻让我感到被忽视，不只是玩笑本身" },
+    { "key": "colleague-joke", "title": "同事一句玩笑引发的不安", "summary": "同事的玩笑也让我感到被忽视，很尴尬" },
+    { "key": "exam-avoid", "title": "考试倒计时里的回避感", "summary": "紧张感压住了真正的准备动作" },
+    { "key": "project-avoid", "title": "项目推进时的回避感", "summary": "把任务失败解释成我这个人不行" },
+    { "key": "dusk-walk", "title": "黄昏散步带来的短暂停顿", "summary": "看到夕阳时会停下来几分钟" },
+    { "key": "diary-honest", "title": "深夜写日记时更诚实", "summary": "说出白天没有表达的情绪" },
+    { "key": "ui-taste", "title": "对界面质感的审美要求", "summary": "偏好莫兰迪浅米色的温柔界面" },
+    { "key": "template-reject", "title": "对模板化回复的强烈排斥", "summary": "能敏锐感到固定话术和真实理解的差异" }
+  ],
+  "cases": [
+    { "label": "memory-card id targets dusk-walk exactly", "mode": "MEMORY_CARD", "target": "dusk-walk", "relevant": ["dusk-walk"] },
+    { "label": "memory-card id targets template-reject exactly", "mode": "MEMORY_CARD", "target": "template-reject", "relevant": ["template-reject"] },
+    { "label": "memory-card id targets diary-honest exactly", "mode": "MEMORY_CARD", "target": "diary-honest", "relevant": ["diary-honest"] },
+    { "label": "distinctive free-text phrase matches only its own memory", "mode": "FREE_TEXT", "oldValue": "黄昏散步", "relevant": ["dusk-walk"] },
+    { "label": "distinctive free-text phrase matches only ui-taste", "mode": "FREE_TEXT", "oldValue": "界面质感", "relevant": ["ui-taste"] },
+    { "label": "ambiguous phrase shared by two memories over-matches", "mode": "FREE_TEXT", "oldValue": "感到被忽视", "relevant": ["friend-joke"] },
+    { "label": "ambiguous phrase shared by two other memories over-matches", "mode": "FREE_TEXT", "oldValue": "的回避感", "relevant": ["exam-avoid"] },
+    { "label": "below the 4-char guard matches nothing by design", "mode": "FREE_TEXT", "oldValue": "焦虑", "relevant": [] },
+    { "label": "phrase absent from any memory matches nothing", "mode": "FREE_TEXT", "oldValue": "从未出现过的短语xyz", "relevant": [] }
+  ]
+}
