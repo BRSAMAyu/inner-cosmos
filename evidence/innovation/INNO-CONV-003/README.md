@@ -10,10 +10,16 @@ Builder status: `EVALUATED`.
 - Stop preserves delivered text as partial and prevents later bubbles.
 - Durable owner-scoped `Last-Event-ID` replay is available at
   `/api/aurora/turns/{turnId}/events`; the React client uses it before timeline polling.
+- A browser-level fault test cuts the live SSE body immediately after `turn.started`.
+  Generation now continues against the durable turn even when the HTTP response detaches,
+  and the client restores the committed bubbles from the owner-scoped timeline without
+  duplicating the user message.
+- Authentication/session bootstrap no longer renders an apparently ready composer before
+  the dialog session exists.
 - A fresh database now initializes Aurora's complete stable Self profile before the
   first conversation, fixing the browser-discovered NOT NULL failure without reducing
   Self/Constitution/Emergence semantics.
 
 The acceptance ledger stays honest: G3 and AURORA-CHOREOGRAPHY remain
-`IN_PROGRESS` because this is one migrated journey, not the five-space shell, and a
-network fault has not yet been injected during Playwright reconnect testing.
+`IN_PROGRESS` because this is one migrated journey rather than the five-space shell,
+and the choreography packages still require independent review before verification.

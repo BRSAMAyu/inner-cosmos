@@ -14,7 +14,7 @@ function toUi(rows: DialogMessage[]): UiMessage[] {
 }
 
 export function AuroraApp() {
-  const [authenticated, setAuthenticated] = useState(true);
+  const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [draft, setDraft] = useState("");
@@ -194,6 +194,7 @@ export function AuroraApp() {
     }
   };
 
+  if (authenticated === null) return <main className="login-shell"><div className="login" role="status">正在连接你的内宇宙…</div></main>;
   if (!authenticated) return <Login onSuccess={bootstrap} />;
 
   return (

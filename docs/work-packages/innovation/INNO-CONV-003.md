@@ -15,5 +15,8 @@ SlowLetter, starfield or matching semantics.
 
 Builder evaluation covers a real browser journey through Spring Boot/H2/Mock LLM,
 typed incremental SSE decoding, mid-generation interjection, durable Stop and
-owner-scoped timeline replay. Complete-product choreography remains `IN_PROGRESS`
-until reconnect is fault-injected end to end and real Provider pairwise review runs.
+owner-scoped timeline replay. A second browser journey now cuts the live SSE body
+after durable turn identity and proves that detached generation settles the turn and
+the UI restores committed bubbles without duplicating the user input. Complete-product
+choreography remains `IN_PROGRESS` pending independent review; real Provider pairwise
+quality review is tracked separately by `INNO-EVAL-002`.

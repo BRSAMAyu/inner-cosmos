@@ -1,7 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("Aurora supports multi-bubble streaming, stop, interrupt and replanning", async ({ page }) => {
-  await page.goto("/app/aurora/index.html");
+async function loginIfNeeded(page: import("@playwright/test").Page) {
   const login = page.getByRole("heading", { name: "回到你的内宇宙" });
   const composer = page.getByLabel("写给 Aurora");
   await expect(login.or(composer)).toBeVisible();
@@ -10,8 +9,13 @@ test("Aurora supports multi-bubble streaming, stop, interrupt and replanning", a
     await page.getByLabel("密码").fill(process.env.E2E_PASSWORD ?? "demo123");
     await page.getByRole("button", { name: "登录" }).click();
   }
-
   await expect(composer).toBeVisible();
+  return composer;
+}
+
+test("Aurora supports multi-bubble streaming, stop, interrupt and replanning", async ({ page }) => {
+  await page.goto("/app/aurora/index.html");
+  const composer = await loginIfNeeded(page);
   await composer.fill("我刚才说累，其实更准确的是害怕自己做不好。先陪我理一下。 ");
   const send = page.getByRole("button", { name: "发送" });
   await expect(send).toBeEnabled();
@@ -28,4 +32,58 @@ test("Aurora supports multi-bubble streaming, stop, interrupt and replanning", a
   const stop = page.getByRole("button", { name: "停止回应" });
   if (await stop.isVisible().catch(() => false)) await stop.click();
   await expect(page.getByRole("status")).toContainText(/已停在这里|Aurora 在听|已从时间线恢复/);
+});
+
+test("Aurora resumes from the durable timeline after the live SSE connection breaks", async ({ page }) => {
+  await page.addInitScript(() => {
+    const nativeFetch = window.fetch.bind(window);
+    let injected = false;
+    Object.defineProperty(window, "__auroraSseFaultInjected", { get: () => injected });
+    window.fetch = async (...args) => {
+      const raw = args[0];
+      const url = typeof raw === "string" ? raw : raw instanceof Request ? raw.url : String(raw);
+      const response = await nativeFetch(...args);
+      if (injected || !url.includes("/api/aurora/stream?") || !response.body) return response;
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let observed = "";
+      let failNextRead = false;
+      const body = new ReadableStream<Uint8Array>({
+        async pull(controller) {
+          if (failNextRead) {
+            injected = true;
+            await reader.cancel("playwright injected live-SSE disconnect");
+            controller.error(new TypeError("playwright injected live-SSE disconnect"));
+            return;
+          }
+          const { done, value } = await reader.read();
+          if (done) {
+            controller.close();
+            return;
+          }
+          controller.enqueue(value);
+          observed = (observed + decoder.decode(value, { stream: true })).slice(-1024);
+          if (/event:\s*turn\.started/.test(observed)) failNextRead = true;
+        },
+        cancel(reason) { return reader.cancel(reason); }
+      });
+      return new Response(body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers
+      });
+    };
+  });
+
+  await page.goto("/app/aurora/index.html");
+  const composer = await loginIfNeeded(page);
+  await composer.fill("如果网络突然断开，请仍然把这一刻完整地接回来。 ");
+  await page.getByRole("button", { name: "发送" }).click();
+
+  await expect.poll(() => page.evaluate(() => Boolean(
+    (window as Window & { __auroraSseFaultInjected?: boolean }).__auroraSseFaultInjected
+  ))).toBe(true);
+  await expect(page.getByRole("status")).toContainText(/已从时间线恢复完整回应|已恢复到打断发生的位置/);
+  await expect(page.locator("article.aurora").last()).toContainText(/.+/);
 });

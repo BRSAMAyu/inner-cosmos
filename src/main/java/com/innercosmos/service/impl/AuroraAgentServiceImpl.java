@@ -54,6 +54,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Service
 public class AuroraAgentServiceImpl implements AuroraAgentService {
@@ -407,8 +408,17 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     public SseEmitter stream(Long userId, Long sessionId, String message, String mode, ChatRequest richContext) {
         cancelPreviousTurn(userId, sessionId);
         SseEmitter emitter = new SseEmitter(120_000L);
-        emitter.onTimeout(emitter::complete);
-        emitter.onError(throwable -> log.warn("Aurora stream client error: {}", String.valueOf(throwable.getMessage())));
+        AtomicBoolean clientConnected = new AtomicBoolean(true);
+        emitter.onCompletion(() -> clientConnected.set(false));
+        emitter.onTimeout(() -> {
+            clientConnected.set(false);
+            emitter.complete();
+        });
+        emitter.onError(throwable -> {
+            clientConnected.set(false);
+            log.debug("Aurora live stream detached; durable turn continues: {}",
+                    String.valueOf(throwable.getMessage()));
+        });
 
         // VS-003 §1 — SAFETY FIRST, synchronously, before ANY chat token streams.
         // recheckSync for distress-bearing messages also completes here. Crisis must
@@ -438,6 +448,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         // as the POST path does, and finally drip the (already-persisted) segments
         // server-side over real SSE transport — no client-side fake typewriter.
         aiExecutor.execute(() -> {
+            Long turnId = null;
             try {
                 ChatRequest request = new ChatRequest();
                 request.sessionId = sessionId;
@@ -463,36 +474,37 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                     request.aiProviderPreference = richContext.aiProviderPreference;
                 }
                 DialogMessage userMessage = dialogService.saveUserMessage(userId, request);
-                Long turnId = beginChoreography(userId, sessionId, userMessage);
+                turnId = beginChoreography(userId, sessionId, userMessage);
                 if (turnId != null) {
-                    emitter.send(SseEmitter.event().id(turnId + ":0").name("turn.started")
-                            .data("{\"turnId\":" + turnId + "}"));
+                    sendStream(emitter, clientConnected, SseEmitter.event().id(turnId + ":0")
+                            .name("turn.started").data("{\"turnId\":" + turnId + "}"));
                 }
                 AuroraReplyVO reply = produceReply(userId, request, safety,
                         userMessage == null ? null : userMessage.id, turnId, false);
 
                 if (Boolean.TRUE.equals(reply.cancelled)) {
-                    emitter.send(SseEmitter.event().id(sseId(reply, 1)).name("turn.interrupted")
-                            .data("{\"reason\":\"USER_INTERRUPTED\"}"));
-                    emitter.complete();
+                    sendStream(emitter, clientConnected, SseEmitter.event().id(sseId(reply, 1))
+                            .name("turn.interrupted").data("{\"reason\":\"USER_INTERRUPTED\"}"));
+                    completeQuietly(emitter);
                     return;
                 }
 
                 long eventSequence = 1L;
-                emitter.send(SseEmitter.event().id(sseId(reply, eventSequence++))
+                sendStream(emitter, clientConnected, SseEmitter.event().id(sseId(reply, eventSequence++))
                         .name("turn.plan").data("{\"turnId\":" + numeric(reply.turnId)
                                 + ",\"planId\":" + numeric(reply.planId) + "}"));
 
                 for (int i = 0; i < reply.messages.size(); i++) {
                     if (isTurnCancelled(userId, reply.turnId)) break;
                     if (i > 0) {
-                        emitter.send(SseEmitter.event().id(sseId(reply, eventSequence++))
+                        sendStream(emitter, clientConnected, SseEmitter.event().id(sseId(reply, eventSequence++))
                                 .name("segment").data("{\"break\":true}"));
-                        Thread.sleep(220);
+                        if (clientConnected.get()) Thread.sleep(220);
                     }
-                    emitter.send(SseEmitter.event().id(sseId(reply, eventSequence++))
+                    sendStream(emitter, clientConnected, SseEmitter.event().id(sseId(reply, eventSequence++))
                             .name("bubble.started").data("{\"order\":" + (i + 1) + "}"));
-                    StreamProgress progress = streamText(emitter, reply.messages.get(i), reply, eventSequence, userId);
+                    StreamProgress progress = streamText(emitter, clientConnected,
+                            reply.messages.get(i), reply, eventSequence, userId);
                     eventSequence = progress.nextEventSequence();
                     if (choreographyService != null && reply.turnId != null) {
                         choreographyService.recordBubbleProgress(userId, reply.turnId, i + 1, progress.deliveredChars());
@@ -506,13 +518,13 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                     } else {
                         dialogService.saveAuroraMessage(userId, sessionId, reply.messages.get(i));
                     }
-                    emitter.send(SseEmitter.event().id(sseId(reply, eventSequence++))
+                    sendStream(emitter, clientConnected, SseEmitter.event().id(sseId(reply, eventSequence++))
                             .name("bubble.completed").data("{\"order\":" + (i + 1) + "}"));
                 }
                 if (isTurnCancelled(userId, reply.turnId)) {
-                    emitter.send(SseEmitter.event().id(sseId(reply, eventSequence))
+                    sendStream(emitter, clientConnected, SseEmitter.event().id(sseId(reply, eventSequence))
                             .name("turn.interrupted").data("{\"reason\":\"USER_STOPPED\"}"));
-                    emitter.complete();
+                    completeQuietly(emitter);
                     return;
                 }
                 if (choreographyService != null && reply.turnId != null) {
@@ -521,15 +533,24 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 // VS-003b — meta now carries the full perception payload (agentLoop,
                 // aiState, voice/weather/location/timezone) so the frontend can render
                 // the same panels on stream as on the POST fallback path.
-                emitter.send(SseEmitter.event().id(sseId(reply, eventSequence++))
+                sendStream(emitter, clientConnected, SseEmitter.event().id(sseId(reply, eventSequence++))
                         .name("meta").data(jsonMeta(reply, request, null)));
-                emitter.send(SseEmitter.event().id(sseId(reply, eventSequence))
+                sendStream(emitter, clientConnected, SseEmitter.event().id(sseId(reply, eventSequence))
                         .name("turn.completed").data("{\"message\":\"done\"}"));
                 // Preserve the original done contract used by the current frontend.
-                emitter.send(SseEmitter.event().name("done").data("{\"message\":\"done\"}"));
-                emitter.complete();
+                sendStream(emitter, clientConnected,
+                        SseEmitter.event().name("done").data("{\"message\":\"done\"}"));
+                completeQuietly(emitter);
             } catch (Exception e) {
                 log.error("Aurora stream failed: {}", e.getMessage(), e);
+                if (turnId != null && choreographyService != null) {
+                    try {
+                        choreographyService.cancelTurn(userId, turnId, "STREAM_FAILED");
+                    } catch (Exception stateError) {
+                        log.warn("Aurora stream failure could not settle turn {}: {}",
+                                turnId, stateError.getMessage());
+                    }
+                }
                 // Best-effort error event so the client can fall back, then close.
                 sendOnce(emitter, "error", "{\"message\":\"stream failed\"}");
                 completeQuietly(emitter);
@@ -590,6 +611,20 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             emitter.send(SseEmitter.event().name(name).data(data));
         } catch (Exception ignored) {
             // Client may already be gone; nothing to do.
+        }
+    }
+
+    private boolean sendStream(SseEmitter emitter, AtomicBoolean clientConnected,
+                               SseEmitter.SseEventBuilder event) {
+        if (!clientConnected.get()) return false;
+        try {
+            emitter.send(event);
+            return true;
+        } catch (Exception detached) {
+            clientConnected.set(false);
+            log.debug("Aurora live stream write failed; durable turn continues: {}",
+                    detached.getMessage());
+            return false;
         }
     }
 
@@ -1070,7 +1105,8 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 .trim();
     }
 
-    private StreamProgress streamText(SseEmitter emitter, String response, AuroraReplyVO reply,
+    private StreamProgress streamText(SseEmitter emitter, AtomicBoolean clientConnected,
+                                      String response, AuroraReplyVO reply,
                                       long eventSequence, Long userId) throws Exception {
         StringBuilder token = new StringBuilder();
         int deliveredChars = 0;
@@ -1086,17 +1122,19 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 // The current frontend already listens to both `token` and the legacy
                 // onmessage path, so naming deltas makes the wire contract explicit
                 // without changing the rendered experience.
-                emitter.send(SseEmitter.event().id(sseId(reply, eventSequence++))
-                        .name("token").data("{\"content\":\"" + escape(token.toString()) + "\"}"));
-                deliveredChars += token.length();
+                boolean delivered = sendStream(emitter, clientConnected,
+                        SseEmitter.event().id(sseId(reply, eventSequence++))
+                                .name("token").data("{\"content\":\"" + escape(token.toString()) + "\"}"));
+                if (delivered) deliveredChars += token.length();
                 token.setLength(0);
-                Thread.sleep(30);
+                if (clientConnected.get()) Thread.sleep(30);
             }
         }
         if (!token.isEmpty()) {
-            emitter.send(SseEmitter.event().id(sseId(reply, eventSequence++))
-                    .name("token").data("{\"content\":\"" + escape(token.toString()) + "\"}"));
-            deliveredChars += token.length();
+            boolean delivered = sendStream(emitter, clientConnected,
+                    SseEmitter.event().id(sseId(reply, eventSequence++))
+                            .name("token").data("{\"content\":\"" + escape(token.toString()) + "\"}"));
+            if (delivered) deliveredChars += token.length();
         }
         return new StreamProgress(eventSequence, deliveredChars);
     }

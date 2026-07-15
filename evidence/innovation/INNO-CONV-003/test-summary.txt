@@ -5,13 +5,16 @@ PASS  web npm test
 PASS  web npm run build
       TypeScript strict compile + Vite production build
 PASS  Playwright real browser journey
-      1 test: login -> message -> interrupt -> replan -> Aurora bubble -> Stop
+      2 tests:
+      login -> message -> interrupt -> replan -> Aurora bubble -> Stop
+      live SSE fault after turn.started -> durable replay -> complete restored bubble
       Spring Boot 3.5.14, Java 21.0.10, H2 in-memory, project Mock LLM
 PASS  targeted Java tests
       AuroraSelfProfileServiceTest 1
       AuroraStreamControllerTest 4
       ConversationChoreographyIntegrationTest 9
-      total 14, failures 0, errors 0, skipped 0
+      AuroraStreamServiceTest 3
+      latest reconnect-focused run: 16, failures 0, errors 0, skipped 0
 PASS  innovation evaluation harness
       38 Python tests; 48-scenario dataset validation PASS
 
