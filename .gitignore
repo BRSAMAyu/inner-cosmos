@@ -25,3 +25,8 @@ web/test-results/
 web/*.tsbuildinfo
 web/*.js
 web/*.d.ts
+
+# Local verification output
+__pycache__/
+*.pyc
+build/mobile-domain-association/

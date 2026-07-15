@@ -1,0 +1,10 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "sg.innercosmos.app",
+      "sha256_cert_fingerprints": ["${ANDROID_SHA256_CERT_FINGERPRINT}"]
+    }
+  }
+]

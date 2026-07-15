@@ -1,0 +1,14 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "${APPLE_TEAM_ID}.sg.innercosmos.app",
+        "components": [
+          { "/": "/app/aurora*", "comment": "Living Aurora wake-intent deep links" },
+          { "/": "/oauth/callback*", "comment": "Owned HTTPS OIDC callback option" }
+        ]
+      }
+    ]
+  }
+}

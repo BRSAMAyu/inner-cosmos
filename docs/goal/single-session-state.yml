@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-15T23:00:00+08:00
+updated_at: 2026-07-15T23:15:00+08:00
 authority:
   - goal-objective.md
   - 对齐文档/17-单会话持续Goal模式执行协议.md
@@ -32,8 +32,8 @@ active_front:
   state: IN_PROGRESS_WORKTREE
   intent: Close the audited mobile production P1 trust boundary while preserving the verified Campaign A experience.
   next_machine_actions:
-    - Commit the native authentication checkpoint without claiming real IdP or device acceptance.
-    - Establish Android App Links and iOS Universal Links configuration plus executable domain-association preflight.
+    - Commit the verified-link configuration and executable domain-owner handoff without claiming live ownership.
+    - Begin the five-space AppShell decomposition while real IdP, signing and domain publication remain human gates.
     - Commit only the current front's files, then update acceptance evidence without claiming human reviews.
 
 priority_queue:
