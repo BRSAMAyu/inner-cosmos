@@ -96,7 +96,27 @@ gates:
     status: IN_PROGRESS
     required: true
     acceptance:
-      - {id: UX-SHELL, target: "React TypeScript PWA implements the five-space information architecture and shared component system.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CONV-003/, evidence/campaign-a/APP-SHELL-001/]}
+      - id: UX-SHELL
+        target: React TypeScript PWA implements the five-space information architecture and shared component system.
+        status: IN_PROGRESS
+        evidence: [evidence/innovation/INNO-CONV-003/, evidence/campaign-a/APP-SHELL-001/]
+        remaining: |
+          CORRECTED (this checkpoint, before acting on a wrong plan — see UX-LEGACY): the five
+          spaces exist structurally and the CORE loop of each is real (Aurora chat send/modes/
+          interrupt, memory starfield visualization, capsule creation, letters inbox, portrait
+          claims), but a systematic per-page parity check against the legacy static implementation
+          found REAL, substantial missing depth, not cosmetic gaps: no settings surface at all
+          (persona/tone/proactive-intensity/quiet-hours/theme/data-export/change-password/
+          delete-account — MeSpace is a read-only summary + logout button only); no portrait
+          viewing/calibration UI anywhere (api.ts has no portrait()/portraitHistory() call at all);
+          no correction history/retire action (only top-3 active claims); memory starfield has no
+          importance-tuning or archive action; capsule creation hardcodes privacy/boundary fields
+          the legacy wizard exposes; no way to chat with an arbitrary discovered capsule outside a
+          curated match; letters has no outbox/drafts/archive/thread view; and relations/social's
+          entire relationship-temperature/health/discovery/groups feature set has zero API-client
+          presence. This is a genuinely large, previously-unmeasured gap between "five spaces
+          exist" and "five spaces have real parity with what they're replacing" — do not treat
+          UX-SHELL as near-PASS on the basis of the spaces merely existing.
       - {id: UX-CONTRACTS, target: "Generated typed API client and unified auth, errors, tasks, offline, and telemetry are used.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CONV-003/]}
       - {id: UX-QUALITY, target: "Core routes pass Playwright, visual regression, accessibility, i18n, and performance budgets.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CONV-003/]}
       - id: UX-LEGACY
@@ -117,11 +137,21 @@ gates:
           safety-harbor, thought-shredder, beliefs, admin pages) have no AppShell equivalent yet
           and must stay reachable. Two confirmed-dead pages removed (capsule-detail.html html file
           + its sitemap.xml entry; ui-preview.html deliberately kept as a design-system dev tool,
-          not a competing journey). NOT yet done: the 7 legacy pages that DO duplicate an AppShell
-          journey (aurora-chat, memory-starfield, corrections, echo-plaza, capsule-create,
-          capsule-chat, slow-letter/letter-threads/inbox/relations/social, settings/portrait) still
-          physically exist and are still directly reachable by URL/bookmark/nav — retiring or
-          redirecting those is the remaining work before this can be PASS.
+          not a competing journey).
+          CORRECTED, same checkpoint, BEFORE acting on the wrong plan: the entry-flow fix above is
+          real and stays. But the previously-written "remaining work" here (retire/redirect the 13
+          legacy pages that duplicate an AppShell space) was WRONG and is walked back — a follow-up
+          parity audit (2 Explore-agent passes, all 10 checked page-pairs) found EVERY one of the
+          13 legacy pages (settings, aurora-chat, echo-plaza, memory-starfield, corrections,
+          capsule-create, capsule-chat, slow-letter+letter-threads+inbox, relations+social,
+          portrait) has at least one REAL, non-cosmetic capability the AppShell does not yet have
+          (see UX-SHELL's remaining note for the full list). Redirecting any of them right now
+          would strand real users from real functionality — account deletion, password change,
+          data export, voice input, memory archiving, correction history, arbitrary-capsule chat,
+          letters outbox/drafts, the entire relations/social feature set, and the entire portrait
+          feature most prominently. Retiring/redirecting these pages is NOT safe until the missing
+          functionality is ported into the AppShell first — that porting work, not page retirement,
+          is the actual remaining work before this item (and UX-SHELL) can be PASS.
 
   - id: G4
     name: Aurora living mind
