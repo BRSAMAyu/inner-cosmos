@@ -923,24 +923,39 @@ closed_front_g2_sse_cross_pod:
 
 active_front:
   id: CAMPAIGN-B-AUTO-CLAIM-EXTRACTION
-  state: START_FROM_G2_SSE_CHECKPOINT
+  state: SLICE_1_EXTRACTOR_AND_PRECISION_GATE_DONE_SLICE_2_PERSIST_CONFIRM_PROPAGATE_NEXT
   intent: |
     Build the missing automatic user-modeling pipeline doc-16 specifies. Today every UnderstandingClaim
     is produced only by an explicit user correction; there is no path from conversation evidence to
     claim candidates. Deliver a real extraction pipeline: conversation evidence -> claim candidate
-    extraction -> entity/time/relation normalization -> provenance + confidence -> conflict/uncertainty
-    -> user confirm/correct -> propagation, gated by a labeled evaluation harness (extraction precision,
-    not just correction targeting), with real-provider quality proof left as the documented human gate.
+    extraction -> normalization -> provenance + confidence -> conflict/uncertainty -> user
+    confirm/correct -> propagation, gated by a labeled claim-precision harness, with real-provider
+    quality proof left as the documented human gate.
+  done_slice_1:
+    - "com.innercosmos.ai.claim: ClaimTypes (11 doc-16 dimensions), ClaimAuthority (auto tiers below
+      user-confirm), ClaimCandidate (type/value/authority/confidence/provenanceMessageIds/uncertain),
+      and a deterministic precision-first ClaimCandidateExtractor that rejects questions/hypotheticals/
+      reported-speech/momentary feelings and only emits explicit first-person self-statements."
+    - "ClaimExtractionService/Impl wraps the extractor in the mock-safe StructuredAiService harness
+      (real Provider when configured, deterministic fallback in tests) and SANITIZES every candidate
+      (unknown type dropped, foreign provenance stripped, empty provenance dropped, confidence
+      clamped) so an unreliable Provider cannot fabricate or mislabel a claim."
+    - "RED->GREEN ClaimExtractionEvaluationTest over claim-extraction-v1.json (24 annotated cases;
+      precision 1.0 / recall 1.0 / typeAccuracy 1.0 vs thresholds 0.9/0.7/0.9); ClaimExtractionServiceImplTest
+      (mock-mode fallback + Provider-hallucination sanitization); full H2 context boots. Evidence
+      evidence/innovation/INNO-INNER-007, report target/evaluation/claim-extraction-v1-report.json."
   next_machine_actions:
-    - "Audit UnderstandingClaim, the correction flow, PseudoSemanticAnalyzer/ai.semantic, and the
-      existing evaluation harnesses to fix the exact boundary between correction-targeting and
-      claim-extraction, then write a RED labeled extraction-precision gate over annotated dialogues."
-    - "Implement a deterministic claim-candidate extractor with provenance (source message ids) and
-      calibrated confidence, entity/time/relation normalization and conflict/uncertainty flags; surface
-      candidates for user confirm/correct without auto-committing unverified claims."
-    - "Wire confirmed candidates into the existing claim/propagation machinery (insights, vectors,
-      caches, capsule genome, matching) reusing the DataUseGrant + FORGET tombstone contracts; leave
-      real-provider extraction quality/pairwise as the REAL-PROVIDER-CREDENTIALS human gate."
+    - "Slice 2: persist accepted candidates as status=CANDIDATE UnderstandingClaim rows (sourceType
+      AUTO_EXTRACTION, evidenceRefs = JSON message ids, authorityLevel = auto tier), coexisting with
+      ACTIVE claims without violating the (user_id, claim_key, version) unique index; detect conflicts
+      against existing ACTIVE claims and flag them for review rather than auto-superseding."
+    - "Expose a confirm/correct endpoint so a user can promote a CANDIDATE to an ACTIVE claim through
+      the existing UserCorrection confirm path (reusing preview/impact/propagation), and auto-trigger
+      extraction on the MemoryExtractListener AFTER_COMMIT hook (or session close) so real
+      conversations produce candidates without discarding message ids."
+    - "Propagate confirmed claims downstream (insights, vectors, caches, capsule genome, matching)
+      reusing DataUseGrant + FORGET tombstone contracts; leave real-provider extraction quality,
+      counter-prompt robustness and blind review as the REAL-PROVIDER-CREDENTIALS human gate."
 
 priority_queue:
   - id: CAMPAIGN-C-QUALITY

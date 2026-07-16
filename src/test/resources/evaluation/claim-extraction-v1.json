@@ -1,0 +1,135 @@
+{
+  "datasetVersion": "claim-extraction-v1",
+  "notes": "Campaign B automatic claim-extraction precision gate. Each case is a short conversation slice; the extractor must derive typed user-model claim CANDIDATES from the user's own explicit self-statements and must reject questions, hypotheticals, reported speech (others' statements), momentary one-off feelings and vague non-statements. A produced candidate is correct when it matches an expected claim by claimType, a valueContains substring and provenance overlap. Precision is weighted above recall: a fabricated understanding is worse than a missing one. Real-provider extraction quality is a separate human gate (REAL-PROVIDER-CREDENTIALS-AND-BLIND-REVIEW).",
+  "thresholds": {
+    "precision": 0.9,
+    "recall": 0.7,
+    "typeAccuracy": 0.9
+  },
+  "cases": [
+    {
+      "label": "explicit preference (like)",
+      "messages": [{"id": 101, "speaker": "USER", "text": "我特别喜欢在下雨天读书"}],
+      "expected": [{"claimType": "PREFERENCE", "valueContains": "读书", "provenanceIds": [101]}]
+    },
+    {
+      "label": "explicit preference (dislike)",
+      "messages": [{"id": 102, "speaker": "USER", "text": "说真的，我很讨厌被人催促"}],
+      "expected": [{"claimType": "PREFERENCE", "valueContains": "催促", "provenanceIds": [102]}]
+    },
+    {
+      "label": "habit with frequency marker",
+      "messages": [{"id": 103, "speaker": "USER", "text": "我每天早上都会去跑步"}],
+      "expected": [{"claimType": "HABIT", "valueContains": "跑步", "provenanceIds": [103]}]
+    },
+    {
+      "label": "habit with 习惯 marker",
+      "messages": [{"id": 104, "speaker": "USER", "text": "我习惯睡前写日记"}],
+      "expected": [{"claimType": "HABIT", "valueContains": "写日记", "provenanceIds": [104]}]
+    },
+    {
+      "label": "stable self-fact (occupation)",
+      "messages": [{"id": 105, "speaker": "USER", "text": "我是一名小学老师"}],
+      "expected": [{"claimType": "FACT", "valueContains": "小学老师", "provenanceIds": [105]}]
+    },
+    {
+      "label": "stable self-fact (location)",
+      "messages": [{"id": 106, "speaker": "USER", "text": "我现在在上海工作"}],
+      "expected": [{"claimType": "FACT", "valueContains": "上海", "provenanceIds": [106]}]
+    },
+    {
+      "label": "value (importance)",
+      "messages": [{"id": 107, "speaker": "USER", "text": "对我来说家人比什么都重要"}],
+      "expected": [{"claimType": "VALUE", "valueContains": "家人", "provenanceIds": [107]}]
+    },
+    {
+      "label": "value (觉得...重要)",
+      "messages": [{"id": 108, "speaker": "USER", "text": "我觉得诚实特别重要"}],
+      "expected": [{"claimType": "VALUE", "valueContains": "诚实", "provenanceIds": [108]}]
+    },
+    {
+      "label": "need",
+      "messages": [{"id": 109, "speaker": "USER", "text": "我需要一段安静独处的时间"}],
+      "expected": [{"claimType": "NEED", "valueContains": "独处", "provenanceIds": [109]}]
+    },
+    {
+      "label": "need (希望被...)",
+      "messages": [{"id": 110, "speaker": "USER", "text": "我希望能被认真倾听"}],
+      "expected": [{"claimType": "NEED", "valueContains": "认真倾听", "provenanceIds": [110]}]
+    },
+    {
+      "label": "boundary (受不了)",
+      "messages": [{"id": 111, "speaker": "USER", "text": "我受不了别人翻我的东西"}],
+      "expected": [{"claimType": "BOUNDARY", "valueContains": "翻我的东西", "provenanceIds": [111]}]
+    },
+    {
+      "label": "emotion pattern (一...就)",
+      "messages": [{"id": 112, "speaker": "USER", "text": "我一到人多的场合就会紧张"}],
+      "expected": [{"claimType": "EMOTION_PATTERN", "valueContains": "紧张", "provenanceIds": [112]}]
+    },
+    {
+      "label": "emotion pattern (总是容易)",
+      "messages": [{"id": 113, "speaker": "USER", "text": "我总是容易焦虑"}],
+      "expected": [{"claimType": "EMOTION_PATTERN", "valueContains": "焦虑", "provenanceIds": [113]}]
+    },
+    {
+      "label": "repeated explicit preference across two messages",
+      "messages": [
+        {"id": 114, "speaker": "USER", "text": "我很喜欢弹吉他"},
+        {"id": 115, "speaker": "AURORA", "text": "听起来很有热情呢"},
+        {"id": 116, "speaker": "USER", "text": "弹吉他真的让我放松，我一直都很喜欢"}
+      ],
+      "expected": [{"claimType": "PREFERENCE", "valueContains": "吉他", "provenanceIds": [114, 116], "authorityLevel": "REPEATED_EXPLICIT"}]
+    },
+    {
+      "label": "explicit uncertainty about self",
+      "messages": [{"id": 117, "speaker": "USER", "text": "我一直不确定自己适不适合现在的工作"}],
+      "expected": [{"claimType": "UNCERTAINTY", "valueContains": "适不适合", "provenanceIds": [117], "uncertain": true}]
+    },
+    {
+      "label": "NEGATIVE: question is not a claim",
+      "messages": [{"id": 201, "speaker": "USER", "text": "我是不是太敏感了？"}],
+      "expected": []
+    },
+    {
+      "label": "NEGATIVE: preference-shaped question",
+      "messages": [{"id": 202, "speaker": "USER", "text": "我到底喜欢什么呢？"}],
+      "expected": []
+    },
+    {
+      "label": "NEGATIVE: hypothetical",
+      "messages": [{"id": 203, "speaker": "USER", "text": "如果我辞职去旅行，会不会更快乐"}],
+      "expected": []
+    },
+    {
+      "label": "NEGATIVE: reported speech (mother's claim)",
+      "messages": [{"id": 204, "speaker": "USER", "text": "我妈总说我很懒"}],
+      "expected": []
+    },
+    {
+      "label": "NEGATIVE: reported speech (colleagues)",
+      "messages": [{"id": 205, "speaker": "USER", "text": "同事觉得我不好相处"}],
+      "expected": []
+    },
+    {
+      "label": "NEGATIVE: momentary one-off feeling",
+      "messages": [{"id": 206, "speaker": "USER", "text": "我今天特别累"}],
+      "expected": []
+    },
+    {
+      "label": "NEGATIVE: momentary state (现在)",
+      "messages": [{"id": 207, "speaker": "USER", "text": "我现在有点烦"}],
+      "expected": []
+    },
+    {
+      "label": "NEGATIVE: vague non-statement",
+      "messages": [{"id": 208, "speaker": "USER", "text": "我也不知道自己想要什么"}],
+      "expected": []
+    },
+    {
+      "label": "NEGATIVE: only Aurora speaks about the user",
+      "messages": [{"id": 209, "speaker": "AURORA", "text": "你好像很喜欢音乐"}],
+      "expected": []
+    }
+  ]
+}
