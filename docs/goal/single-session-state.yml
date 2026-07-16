@@ -2,7 +2,17 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-16T15:02:00+08:00
+updated_at: 2026-07-16T15:55:00+08:00
+
+session_2026_07_16_checkpoints:
+  - "7db1a84 feat: cross-Pod live Aurora SSE fan-out/resume/heartbeat + turn.started race fix (G2). 826/826."
+  - "73ed0de feat: auto claim-extraction Slice 1 — deterministic precision-first extractor + provider-ready sanitized service + annotated precision gate (INNO-INNER-007)."
+  - "a145f33 feat: auto claim-extraction Slice 2 — persistence, idempotent auto-staging on session finish, confirm->ACTIVE via correction path, dismiss, owner-scoped HTTP surface. 833/833."
+  - "8cc8787 feat: auto claim-extraction Slice 3 — bilingual-ready web review surface (see->confirm->dismiss). web 66/66."
+  - "71d77f6 feat: resonance matching safety filter (block relation) + MMR diversity re-rank (INNO-CAP-010). 835/835."
+  - "6ba6334 feat: TREND claim extraction (越来越/比以前更); extraction gate 26 cases precision/recall/type 1.0."
+  - "a4bcac9 feat: bilingual zh-CN/en-SG claim review panel. web 67/67."
+  - "Release-candidate health at session end: Java 835/835, web 67/67, vite build OK, kustomize base+academy-eks overlays build offline, secret scan clean."
 authority:
   - goal-objective.md
   - 对齐文档/17-单会话持续Goal模式执行协议.md
