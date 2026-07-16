@@ -2,8 +2,8 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 authority: goal-objective.md
 status: IN_PROGRESS
-last_reconciled_at: 2026-07-16T09:02:00+08:00
-last_reconciled_commit: 9c417ac
+last_reconciled_at: 2026-07-16T10:48:00+08:00
+last_reconciled_commit: f30e0cc
 
 status_semantics:
   UNASSESSED: current HEAD and target environment have not been verified
@@ -133,8 +133,14 @@ gates:
           archive action, both reusing pre-existing backends (POST /importance recomputes gravity,
           POST /archive runs a versioned rollbackable ARCHIVE operation). Verified live end-to-end
           (slider 1.0->1.8 persisted + gravity recomputed via direct H2 query; archive removed the
-          star from UI + API scene and created an ARCHIVE operation, 0 console errors). Still open:
-          capsule creation hardcodes privacy/boundary fields
+          star from UI + API scene and created an ARCHIVE operation, 0 console errors).
+          UPDATE (this checkpoint): the capsule conversation-BOUNDARY editor is DONE — the workbench
+          now edits allow/blocked topics, privacy level, daily turn cap, and the allow-letter toggle
+          via the pre-existing GET/POST /api/capsule/{id}/boundary, between the sandbox and publish
+          steps. Verified live end-to-end (seeded boundary loads; editing topics/turns/privacy/
+          allow-letter persists every field, confirmed via GET; 0 console errors). Still open (lower
+          stakes now the safety-relevant boundary is covered): capsule creation still hardcodes the
+          remaining non-boundary fields
           the legacy wizard exposes; no way to chat with an arbitrary discovered capsule outside a
           curated match; letters has no outbox/drafts/archive/thread view; and relations/social's
           entire relationship-temperature/health/discovery/groups feature set has zero API-client
