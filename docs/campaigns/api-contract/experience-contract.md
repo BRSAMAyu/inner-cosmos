@@ -42,8 +42,14 @@ domain failure as `400`. Stack traces, credentials and private content never ent
 ## Executable source
 
 - Shipped OpenAPI 3.1: `src/main/resources/static/openapi/inner-cosmos-v1.yml`
+- Checked-in generated declarations: `web/src/generated/inner-cosmos-v1.d.ts`
+- Pinned generator workspace: `web/tools/openapi` (`openapi-typescript` 7.13.0 + isolated
+  TypeScript 5.9.3; the application remains on TypeScript 7)
+- Local gates: `pnpm run api:check`, `pnpm run api:diff:test`, `pnpm run api:diff`
 - Runtime URL: `/openapi/inner-cosmos-v1.yml`
-- Drift gate: `OpenApiV1BaselineTest`
+- CI gates: generated-file drift, OpenAPI 3.1 breaking-change comparison against the event base,
+  TypeScript/Vite build and frontend tests in `.github/workflows/java-baseline.yml`
+- Server drift gate: `OpenApiV1BaselineTest`
 - Boundary gates: `ApiContractErrorTest`, `ApiIdempotencyFilterTest`,
   `RedisIdempotencyStoreIntegrationTest`, and the capsule boundary CAS scenario in
   `CapsuleGenomeServiceIntegrationTest`
@@ -53,6 +59,7 @@ domain failure as `400`. Stack traces, credentials and private content never ent
 The repository currently has 48 REST controllers and 237 method-level mappings. This checkpoint
 does not pretend the eight-path external core spec covers all of them. Admin, analytics, psychology,
 memory lifecycle, notifications, social connections and several compatibility endpoints still need
-v1 schema coverage, pagination and generated-client drift checks. The live token stream is recoverable
+v1 schema coverage and cursor pagination. Generated types now govern the external core request slice,
+not those undocumented secondary routes. The live token stream is recoverable
 through its durable timeline but is not yet backed by a cross-Pod Redis Stream fan-out/heartbeat
 transport. Therefore `API-CONTRACT` advances from `UNASSESSED` to `IN_PROGRESS`, not `PASS`.

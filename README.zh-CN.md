@@ -80,7 +80,7 @@ $env:GLM_API_KEY = (Get-Content -Raw "$HOME\.inner-cosmos\glm.key").Trim()
 
 ## API 合同
 
-首个稳定外部纵切面已发布为 [OpenAPI 3.1 v1](src/main/resources/static/openapi/inner-cosmos-v1.yml)，运行时地址为 `/openapi/inner-cosmos-v1.yml`。新客户端应优先使用其中覆盖的 `/api/v1` 认证、Aurora、共鸣体、慢信与 Persona 路由。核心写请求要求 `Idempotency-Key`，共鸣体边界更新还要求 `If-Match`，Aurora 恢复使用 `Last-Event-ID`。迁移期间保留旧 `/api`；在所有公共域、生成客户端、分页和跨 Pod 实时 SSE 完成前，验收账本仍诚实保持 `IN_PROGRESS`。
+首个稳定外部纵切面已发布为 [OpenAPI 3.1 v1](src/main/resources/static/openapi/inner-cosmos-v1.yml)，运行时地址为 `/openapi/inner-cosmos-v1.yml`。签入的 TypeScript 声明通过 `cd web && pnpm run api:generate` 生成，`api:check` 与 `api:diff` 分别阻断漂移和破坏性变更。新客户端应优先使用其中覆盖的 `/api/v1` 认证、Aurora、共鸣体、慢信与 Persona 路由。核心写请求要求 `Idempotency-Key`，共鸣体边界更新还要求 `If-Match`，Aurora 恢复使用 `Last-Event-ID`。迁移期间保留旧 `/api`；在所有公共域、分页和跨 Pod 实时 SSE 完成前，验收账本仍诚实保持 `IN_PROGRESS`。
 
 ## 常用验证
 

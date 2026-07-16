@@ -1,4 +1,14 @@
 import { SseDecoder, toTypedEvent, type AuroraStreamEvent, type DialogMessage, type TurnTimeline } from "./protocol";
+import type { components as CoreApiComponents } from "./generated/inner-cosmos-v1";
+
+type CoreApiSchemas = CoreApiComponents["schemas"];
+type CoreLoginRequest = CoreApiSchemas["LoginRequest"];
+type CoreChatRequest = CoreApiSchemas["ChatRequest"];
+type CoreCapsuleCreateRequest = CoreApiSchemas["CapsuleCreateRequest"];
+type CoreCapsuleBoundaryPatch = CoreApiSchemas["CapsuleBoundaryPatch"];
+type CoreSlowLetterDraftRequest = CoreApiSchemas["SlowLetterDraftRequest"];
+type CorePersonaMessageRequest = CoreApiSchemas["PersonaMessageRequest"];
+type CoreStreamStage = CoreApiSchemas["StreamStageEnvelope"]["data"];
 
 type ApiEnvelope<T> = { success: boolean; data: T; message?: string; code?: string; error?: string };
 type Csrf = { token: string; headerName: string };
@@ -99,11 +109,7 @@ export type CapsuleGenomeVersion = {
   status: "ACTIVE" | "NEEDS_REVIEW" | "SUPERSEDED" | "WITHDRAWN";
   evaluationJson: string; changeReason: string; createdAt: string;
 };
-export type CapsuleBoundary = {
-  capsuleId: number; allowTopics: string | null; blockedTopics: string | null;
-  maxConversationTurns: number | null; allowLetterRequest: boolean | null; privacyLevel: string | null;
-  version: number;
-};
+export type CapsuleBoundary = CoreApiSchemas["CapsuleBoundary"];
 export type CapsulePreview = {
   abstractSummary: string; removedSensitiveItems: string[]; publicTags: string[];
   suggestedPseudonym: string; personaPromptDraft: string; riskWarnings: string[];
@@ -349,9 +355,10 @@ async function getCsrf(): Promise<Csrf> {
 
 export const api = {
   login: async (username: string, password: string) => {
+    const body: CoreLoginRequest = { username, password,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Singapore" };
     const result = await request<unknown>("/api/v1/auth/login", {
-      method: "POST", body: JSON.stringify({ username, password,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Singapore" })
+      method: "POST", body: JSON.stringify(body)
     });
     // AuthController rotates the session ID after login. The pre-authentication
     // synchronizer token must never be reused with the authenticated session.
@@ -441,11 +448,13 @@ export const api = {
   previewCapsule: (memoryIds: number[]) => request<CapsulePreview>("/api/capsule/preview-from-memory", {
     method: "POST", body: JSON.stringify({ memoryIds, privacyLevel: "STRICT", allowTopics: [], blockedTopics: [] })
   }),
-  createCapsule: (input: { pseudonym: string; intro: string; memoryIds: number[]; publicTags: string[] }) =>
-    request<EchoCapsule>("/api/v1/capsule/create-from-memory", { method: "POST", body: JSON.stringify({
+  createCapsule: (input: Required<Pick<CoreCapsuleCreateRequest, "pseudonym" | "intro" | "memoryIds" | "publicTags">>) => {
+    const body: CoreCapsuleCreateRequest = {
       ...input, visibilityStatus: "PRIVATE", isPublic: false, privacyLevel: "STRICT",
       allowTopics: ["自我观察", "日常支持"], blockedTopics: ["真实身份", "联系方式", "心理诊断"]
-    }) }),
+    };
+    return request<EchoCapsule>("/api/v1/capsule/create-from-memory", { method: "POST", body: JSON.stringify(body) });
+  },
   recompileCapsule: (id: number, memoryIds: number[]) => request<CapsuleGenomeVersion>(`/api/capsule/${id}/genome/recompile`, {
     method: "POST", body: JSON.stringify({ memoryIds })
   }),
@@ -453,7 +462,7 @@ export const api = {
     request<EchoCapsule>(`/api/capsule/${id}/visibility`, { method: "POST", body: JSON.stringify({ visibilityStatus, isPublic }) }),
   archiveCapsule: (id: number) => request<unknown>(`/api/capsule/${id}/archive`, { method: "POST" }),
   capsuleBoundary: (id: number) => request<CapsuleBoundary | null>(`/api/v1/capsule/${id}/boundary`),
-  updateCapsuleBoundary: (id: number, boundary: Partial<CapsuleBoundary>) =>
+  updateCapsuleBoundary: (id: number, boundary: CoreCapsuleBoundaryPatch) =>
     request<CapsuleBoundary>(`/api/v1/capsule/${id}/boundary`, { method: "POST", body: JSON.stringify(boundary) }),
   sandboxCapsule: (id: number, question: string) => request<CapsuleSandbox>(`/api/capsule/${id}/sandbox/respond`, {
     method: "POST", body: JSON.stringify({ question })
@@ -467,13 +476,15 @@ export const api = {
     method: "POST", body: JSON.stringify({ capsuleId })
   }),
   personaMessages: (sessionId: number) => request<PersonaMessage[]>(`/api/persona-chat/session/${sessionId}/messages`),
-  sendPersonaMessage: (sessionId: number, message: string) => request<PersonaMessage>("/api/v1/persona-chat/message", {
-    method: "POST", body: JSON.stringify({ sessionId, message })
-  }),
+  sendPersonaMessage: (sessionId: number, message: string) => {
+    const body: CorePersonaMessageRequest = { sessionId, message };
+    return request<PersonaMessage>("/api/v1/persona-chat/message", { method: "POST", body: JSON.stringify(body) });
+  },
   capsuleQuota: (capsuleId: number) => request<CapsuleQuota>(`/api/persona-chat/quota?capsuleId=${capsuleId}`),
-  draftSlowLetter: (receiverCapsuleId: number, title: string, letterBody: string) => request<SlowLetter>("/api/v1/letters/draft", {
-    method: "POST", body: JSON.stringify({ receiverCapsuleId, title, letterBody })
-  }),
+  draftSlowLetter: (receiverCapsuleId: number, title: string, letterBody: string) => {
+    const body: CoreSlowLetterDraftRequest = { receiverCapsuleId, title, letterBody };
+    return request<SlowLetter>("/api/v1/letters/draft", { method: "POST", body: JSON.stringify(body) });
+  },
   sendSlowLetter: (id: number) => request<SlowLetter>(`/api/letters/${id}/send`, { method: "POST" }),
   letterInbox: () => request<SlowLetter[]>("/api/letters/inbox"),
   letterOutbox: () => request<SlowLetter[]>("/api/letters/outbox"),
@@ -497,12 +508,13 @@ export const api = {
 };
 
 export async function streamAurora(
-  input: { sessionId: number; message: string; mode: string },
+  input: Pick<CoreChatRequest, "sessionId" | "message"> & { mode: string },
   signal: AbortSignal,
   onEvent: (event: AuroraStreamEvent) => void
 ): Promise<void> {
-  const staged = await request<{ token: string }>("/api/v1/aurora/stream-stage", {
-    method: "POST", body: JSON.stringify(input)
+  const body: CoreChatRequest = input;
+  const staged = await request<CoreStreamStage>("/api/v1/aurora/stream-stage", {
+    method: "POST", body: JSON.stringify(body)
   });
   const query = new URLSearchParams({ token: staged.token });
   let token = await accessTokenProvider?.() ?? null;

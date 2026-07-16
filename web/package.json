@@ -2,12 +2,17 @@
   "name": "inner-cosmos-web",
   "private": true,
   "version": "0.1.0",
+  "packageManager": "pnpm@11.9.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "build:mobile": "tsc -b && vite build --mode mobile",
     "test": "vitest run",
+    "api:generate": "node scripts/generate-openapi.mjs",
+    "api:check": "node scripts/check-openapi-generated.mjs",
+    "api:diff": "node scripts/check-openapi-breaking.mjs",
+    "api:diff:test": "node --test scripts/openapi-breaking-rules.test.mjs",
     "e2e": "playwright test",
     "e2e:local": "powershell -NoProfile -ExecutionPolicy Bypass -File ../scripts/run-living-aurora-e2e.ps1",
     "e2e:experience": "powershell -NoProfile -ExecutionPolicy Bypass -File ../scripts/run-living-aurora-experience.ps1",
@@ -39,6 +44,7 @@
     "jsdom": "latest",
     "typescript": "7.0.2",
     "vite": "8.1.4",
-    "vitest": "4.1.10"
+    "vitest": "4.1.10",
+    "yaml": "2.9.0"
   }
 }

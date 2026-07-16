@@ -48,7 +48,11 @@ paths:
           application/json:
             schema: {$ref: '#/components/schemas/ChatRequest'}
       responses:
-        '200': {$ref: '#/components/responses/Success'}
+        '200':
+          description: One-use stream staging token.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StreamStageEnvelope'}
         '400': {$ref: '#/components/responses/Error'}
         '409': {$ref: '#/components/responses/Error'}
   /api/v1/aurora/stream-stage:
@@ -145,7 +149,7 @@ paths:
               schema: {type: string}
           content:
             application/json:
-              schema: {$ref: '#/components/schemas/SuccessEnvelope'}
+              schema: {$ref: '#/components/schemas/CapsuleBoundaryEnvelope'}
         '404': {$ref: '#/components/responses/Error'}
     post:
       tags: [Capsule]
@@ -170,7 +174,11 @@ paths:
           application/json:
             schema: {$ref: '#/components/schemas/CapsuleBoundaryPatch'}
       responses:
-        '200': {$ref: '#/components/responses/Success'}
+        '200':
+          description: Updated boundary and incremented version.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CapsuleBoundaryEnvelope'}
         '400': {$ref: '#/components/responses/Error'}
         '409': {$ref: '#/components/responses/Error'}
   /api/v1/letters/draft:
@@ -238,6 +246,26 @@ components:
         code: {type: string, const: OK}
         message: {type: string}
         data: {}
+    StreamStageEnvelope:
+      type: object
+      required: [success, code, message, data]
+      properties:
+        success: {type: boolean, const: true}
+        code: {type: string, const: OK}
+        message: {type: string}
+        data:
+          type: object
+          required: [token]
+          properties:
+            token: {type: string, minLength: 16}
+    CapsuleBoundaryEnvelope:
+      type: object
+      required: [success, code, message, data]
+      properties:
+        success: {type: boolean, const: true}
+        code: {type: string, const: OK}
+        message: {type: string}
+        data: {$ref: '#/components/schemas/CapsuleBoundary'}
     ApiError:
       type: object
       required: [success, code, message, status, traceId, timestamp, details]
@@ -262,17 +290,36 @@ components:
       properties:
         sessionId: {type: integer, format: int64}
         message: {type: string, minLength: 1}
+        inputType: {type: string, default: TEXT}
+        audioDurationSec: {type: integer}
+        speechRate: {type: number, format: double}
+        pauseCount: {type: integer}
+        longPauseCount: {type: integer}
+        emotionHint: {type: string}
         mode: {type: string}
         clientMessageId: {type: string}
         timezone: {type: string}
+        localTimeLabel: {type: string}
         weatherType: {type: string}
+        weatherDescription: {type: string}
+        temperature: {type: number, format: double}
         locationLabel: {type: string}
+        latitude: {type: number, format: double}
+        longitude: {type: number, format: double}
+        aiProviderPreference: {type: string}
     CapsuleCreateRequest:
       type: object
       required: [memoryIds]
       properties:
         pseudonym: {type: string}
         intro: {type: string}
+        boundaryNote: {type: string}
+        publicTags: {type: array, items: {type: string}}
+        allowTopics: {type: array, items: {type: string}}
+        blockedTopics: {type: array, items: {type: string}}
+        maxConversationTurns: {type: integer, minimum: 1, maximum: 100}
+        allowLetterRequest: {type: boolean}
+        privacyLevel: {type: string}
         memoryIds:
           type: array
           minItems: 1
@@ -280,14 +327,33 @@ components:
           items: {type: integer, format: int64}
         visibilityStatus: {type: string, enum: [PRIVATE, PUBLIC]}
         isPublic: {type: boolean}
+        ownerContextNote: {type: string}
+        styleProfileJson: {type: string}
+        contextPreviewJson: {type: string}
+        standInEnabled: {type: boolean}
+        realContactPolicy: {type: string}
     CapsuleBoundaryPatch:
       type: object
       properties:
-        allowTopics: {type: string}
-        blockedTopics: {type: string}
-        maxConversationTurns: {type: integer, minimum: 1, maximum: 100}
-        allowLetterRequest: {type: boolean}
-        privacyLevel: {type: string}
+        allowTopics: {type: [string, 'null']}
+        blockedTopics: {type: [string, 'null']}
+        maxConversationTurns: {type: [integer, 'null'], minimum: 1, maximum: 100}
+        allowLetterRequest: {type: [boolean, 'null']}
+        privacyLevel: {type: [string, 'null']}
+    CapsuleBoundary:
+      type: object
+      required: [capsuleId, allowTopics, blockedTopics, maxConversationTurns, allowLetterRequest, privacyLevel, version]
+      properties:
+        id: {type: integer, format: int64}
+        capsuleId: {type: integer, format: int64}
+        allowTopics: {type: [string, 'null']}
+        blockedTopics: {type: [string, 'null']}
+        maxConversationTurns: {type: [integer, 'null']}
+        allowLetterRequest: {type: [boolean, 'null']}
+        privacyLevel: {type: [string, 'null']}
+        version: {type: integer, minimum: 1}
+        createdAt: {type: [string, 'null'], format: date-time}
+        updatedAt: {type: [string, 'null'], format: date-time}
     SlowLetterDraftRequest:
       type: object
       required: [receiverCapsuleId, title, letterBody]

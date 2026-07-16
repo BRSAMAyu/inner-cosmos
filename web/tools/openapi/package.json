@@ -1,0 +1,10 @@
+{
+  "name": "@inner-cosmos/openapi-toolchain",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "devDependencies": {
+    "openapi-typescript": "7.13.0",
+    "typescript": "5.9.3"
+  }
+}

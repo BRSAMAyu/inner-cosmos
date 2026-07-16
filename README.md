@@ -83,7 +83,7 @@ The exact teammate/Coding Agent runbook, environment contract, validation comman
 
 ## API contract
 
-The first stable external slice is published as [OpenAPI 3.1 v1](src/main/resources/static/openapi/inner-cosmos-v1.yml) and served at `/openapi/inner-cosmos-v1.yml`. New clients should use the `/api/v1` auth, Aurora, capsule, slow-letter, and persona routes covered there. Core writes require `Idempotency-Key`, capsule-boundary writes also require `If-Match`, and Aurora recovery uses `Last-Event-ID`. Legacy `/api` routes remain during migration; the acceptance ledger intentionally keeps the overall API contract `IN_PROGRESS` until all public domains, generated clients, pagination, and cross-Pod live SSE are closed.
+The first stable external slice is published as [OpenAPI 3.1 v1](src/main/resources/static/openapi/inner-cosmos-v1.yml) and served at `/openapi/inner-cosmos-v1.yml`. Its checked-in TypeScript declarations are generated with `cd web && pnpm run api:generate`; `api:check` and `api:diff` enforce drift and compatibility. New clients should use the `/api/v1` auth, Aurora, capsule, slow-letter, and persona routes covered there. Core writes require `Idempotency-Key`, capsule-boundary writes also require `If-Match`, and Aurora recovery uses `Last-Event-ID`. Legacy `/api` routes remain during migration; the acceptance ledger intentionally keeps the overall API contract `IN_PROGRESS` until all public domains, pagination, and cross-Pod live SSE are closed.
 
 ## Verification
 

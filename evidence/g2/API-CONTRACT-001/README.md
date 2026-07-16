@@ -19,6 +19,8 @@ Status: `BUILDER_VERIFIED / IN_PROGRESS` on 2026-07-16.
   sends private text in the staging POST and opens `/api/v1/aurora/stream?token=...`; private text no
   longer appears in the stream URL.
 - React/PWA preserves idempotency keys through CSRF/OIDC retries and carries capsule boundary ETags.
+- Follow-up `API-CONTRACT-002` makes the OpenAPI file the source for checked-in PWA types and CI
+  compatibility enforcement.
 
 Experience semantics: [`experience-contract.md`](../../../docs/campaigns/api-contract/experience-contract.md).
 
@@ -43,7 +45,8 @@ Experience semantics: [`experience-contract.md`](../../../docs/campaigns/api-con
 
 - Only the external high-value slice is specified; many internal/admin and secondary product routes
   are not yet in v1 OpenAPI.
-- A generated TypeScript/mobile client and breaking-change diff gate are not yet checked in.
+- Generated types currently cover the external core slice, not every public/secondary route or a
+  separately packaged mobile SDK.
 - SSE durable replay exists, but live cross-Pod fan-out, heartbeat/load behavior and Redis Stream
   resume are not closed.
 - Pagination/cursor consistency and optimistic concurrency across other mutable resources remain.

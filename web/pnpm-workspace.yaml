@@ -1,3 +1,7 @@
+packages:
+  - '.'
+  - 'tools/*'
+
 minimumReleaseAgeExclude:
   - '@capacitor/android@8.4.2'
   - '@capacitor/app@8.1.1'

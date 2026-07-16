@@ -10,6 +10,36 @@ permissions:
   contents: read
 
 jobs:
+  web-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22.20.0'
+      - name: Activate pinned pnpm
+        run: corepack enable && corepack prepare pnpm@11.9.0 --activate
+      - name: Install frontend and isolated OpenAPI toolchain
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Gate generated OpenAPI types
+        run: pnpm run api:check
+      - name: Verify OpenAPI breaking-change rules
+        run: pnpm run api:diff:test
+      - name: Gate OpenAPI compatibility against the event base
+        env:
+          OPENAPI_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
+        run: pnpm run api:diff
+      - name: Type-check and build the React/PWA client
+        run: pnpm run build
+      - name: Run frontend component and protocol tests
+        run: pnpm test
+
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 30

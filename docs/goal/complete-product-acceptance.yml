@@ -2,8 +2,8 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 authority: goal-objective.md
 status: IN_PROGRESS
-last_reconciled_at: 2026-07-16T13:44:50+08:00
-last_reconciled_commit: d0f0cb6
+last_reconciled_at: 2026-07-16T14:00:16+08:00
+last_reconciled_commit: PENDING_API_GENERATED_CLIENT_CHECKPOINT
 
 status_semantics:
   UNASSESSED: current HEAD and target environment have not been verified
@@ -87,13 +87,14 @@ gates:
       - id: API-CONTRACT
         target: "Versioned OpenAPI, typed errors, idempotency, concurrency, and resumable SSE are verified."
         status: IN_PROGRESS
-        evidence: [evidence/g2/API-CONTRACT-001/, docs/campaigns/api-contract/experience-contract.md]
+        evidence: [evidence/g2/API-CONTRACT-001/, evidence/g2/API-CONTRACT-002/, docs/campaigns/api-contract/experience-contract.md]
         remaining: |
           Builder evidence closes an executable external core slice: shipped OpenAPI 3.1 v1 and real
           controller aliases, one typed error envelope, Redis cross-Pod idempotency, capsule ETag CAS,
           owner-bound private stream staging and durable Last-Event-ID replay. The repository still has
-          public domains outside v1, no checked-in generated client/breaking-diff gate, inconsistent
-          pagination/concurrency beyond the slice, and no Redis Stream live fan-out/heartbeat load proof.
+          public domains outside v1. Generated TypeScript declarations and base-aware OpenAPI 3.1
+          breaking-change CI now govern the documented core slice; consistent cursor pagination and
+          concurrency beyond that slice, plus Redis Stream live fan-out/heartbeat load proof, remain open.
       - {id: DATA-POSTGRES, target: "PostgreSQL and Flyway are production truth with Testcontainers and migration reconciliation.", status: IN_PROGRESS, evidence: [evidence/m1/M1-DATA-POC-001/, evidence/m1/M1-DATA-APP-001/, evidence/m1/M1-AUTH-OIDC-001/, evidence/innovation/INNO-INNER-005/, evidence/g2/API-CONTRACT-001/, docs/adr/0002-postgresql-system-of-record.md]}
       - {id: DATA-REDIS, target: "Sessions, short state, limits, and leases are externalized to Redis where required.", status: IN_PROGRESS, evidence: [evidence/m1/M1-DATA-REDIS-001/, evidence/m1/M1-DATA-REDIS-002/, evidence/m1/M1-DATA-REDIS-003/, evidence/g2/API-CONTRACT-001/]}
       - {id: EVENT-RELIABLE, target: "Transactional outbox, SQS, idempotent consumers, retries, and DLQ replay are verified.", status: UNASSESSED, evidence: []}
