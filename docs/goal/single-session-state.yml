@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-16T22:34:00+08:00
+updated_at: 2026-07-16T23:36:00+08:00
 
 session_2026_07_16_checkpoints:
   - "7db1a84 feat: cross-Pod live Aurora SSE fan-out/resume/heartbeat + turn.started race fix (G2). 826/826."
@@ -944,7 +944,7 @@ closed_front_g2_sse_cross_pod:
 
 active_front:
   id: EXPERIENCE-FLOW-OVERHAUL
-  state: CHECKPOINT_9_STARDUST_MOTIF_DONE_FOUR_OF_FIVE_MOTIFS_IN_NEXT_IS_TOKENIZATION_THEN_LIGHT_BAND
+  state: CHECKPOINT_10_TEXT_TOKENIZATION_BATCH1_DONE_NEXT_IS_NEARCOLOR_NORMALIZE_THEN_SURFACE_ACCENT_THEN_LIGHT_BAND
   intent: |
     Operator directive docs/goal/loop-goal-directive.md §1 raised体验层重造 to the highest priority,
     ahead of the prior CAMPAIGN-B front (now closed below). §1.1 视觉系统重造 (P0): kill the cold
@@ -1097,11 +1097,30 @@ active_front:
       animates. Evidence evidence/experience/EXPERIENCE-VISUAL-P0-stardust/."
     - "Five-motif status: flow ✓ / breathe ✓ / stardust ✓ (this cp) / ripple ✓ / glass ◐ (backdrop-filter
       panels exist, could be unified/strengthened later)."
+  done_checkpoint_10:
+    - "var() tokenization batch 1 (TEXT colors, the light-mode blockers): styles.css component region
+      (line 92+, NOT touching token defs/@property/data-time overrides) — value-preserving swap of the
+      3 exact-match text literals to semantic tokens: #f0e8df->var(--text-primary) x13,
+      #b7aaa0->var(--text-muted) x11, #8c8177->var(--text-faint) x17 (41 total). perl negative-lookahead
+      (?![0-9a-fA-F]) guards alpha variants. Dark render pixel-identical by construction (defs unchanged)."
+    - "Verified: npm test 108/108 (pure CSS refactor, no new tests). npm run build OK, var refs in built
+      index.css. Browser getComputedStyle: tokens intact (#f0e8df/#b7aaa0/#8c8177), var(--text-faint)
+      resolves rgb(140,129,119)=original, .connect-error-title (var(--text-primary)) computes
+      rgb(240,232,223)=original — pixel-identical + var refs resolve with no typo. Evidence
+      evidence/experience/EXPERIENCE-VISUAL-P0-tokenize/checkpoint-10-text-tokens.md."
   next_machine_actions:
-    - "NEXT (§1.1 visual mainline, the big one): full var() tokenization — styles.css still has ~619 literal
-      warm hexes; map the recurring TEXT (#f0e8df->--text-primary, #8c8177/#b7aaa0->--text-muted/faint) and
-      SURFACE hexes to semantic tokens WITHOUT changing their current values (dark render stays pixel-identical),
-      across several careful checkpoints (619-at-once is too high-regression). This unblocks the light band."
+    - "NEXT tokenization batch 2 — NEAR-COLOR NORMALIZATION (needs per-context judgment + before/after
+      computed-style diff, so separate from the pixel-safe batch 1): bright creams #e7dbcc(15)/#efe4d9(6)/
+      #f0e9e3(3)->--text-primary; mids #a99c92(9)/#b3a597(7)/#b0a398(7)->--text-muted; darker #a0948a(5)/
+      #9a8f82(4)->--text-faint. These shift dark render by a few imperceptible RGB points (normalization,
+      not value-preserving) — verify each isn't on a decorative surface before mapping."
+    - "THEN batch 3: surface hexes (#211a18/#2a2220/#2a1f18) + accents (#a9bcae/#9fb0c2/#ddb17f/#7e9281/
+      #74869b/#8d7482/#c7a9c0) + #ffffffXX overlay layers, each a bounded batch."
+    - "THEN add light/morandi tokens (米白 #F7F2EC base) + the light half of seven time-of-day (dawn/morning/
+      noon warm-light), verify WCAG 2.2 AA contrast + capture day+night screenshots per doc-11 §1.1.6."
+    - "THEN local font packaging (LXGW WenKai/Noto Serif SC/Cormorant/JetBrains Mono, CSP-safe offline);
+      glass-motif unify; Lighthouse>85 + mobile breakpoints. Lower value: per-view ERROR states; remaining
+      inline-busy buttons + AuroraSelfSpace/ClaimCandidateReview onto AsyncButton."
     - "THEN add light/morandi tokens (米白 #F7F2EC base) + the light half of seven time-of-day (dawn/morning/
       noon warm-light overrides), verify contrast (WCAG 2.2 AA) + capture day+night screenshots per doc-11 §1.1.6."
     - "THEN local font packaging (LXGW WenKai / Noto Serif SC / Cormorant Garamond / JetBrains Mono,
