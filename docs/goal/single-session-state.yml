@@ -923,7 +923,7 @@ closed_front_g2_sse_cross_pod:
 
 active_front:
   id: CAMPAIGN-B-AUTO-CLAIM-EXTRACTION
-  state: SLICES_1_2_DONE_PIPELINE_LIVE_SLICE_3_CONFLICT_AND_UI_NEXT
+  state: SLICES_1_2_3_DONE_PIPELINE_AND_UI_LIVE_CONFLICT_AND_REALPROVIDER_REMAIN
   intent: |
     Build the missing automatic user-modeling pipeline doc-16 specifies. Today every UnderstandingClaim
     is produced only by an explicit user correction; there is no path from conversation evidence to
@@ -956,15 +956,26 @@ active_front:
     - "Verified: ClaimCandidateServiceImplIntegrationTest (stage/idempotent/confirm-to-ACTIVE/owner
       scope), ClaimCandidateControllerTest (HTTP surface + cross-user NOT_FOUND). Full Java 833/833.
       Evidence INNO-INNER-007 (Slice 2 section)."
+  done_slice_3:
+    - "web/src/components/ClaimCandidateReview.tsx: controlled panel (friendly type name, value,
+      evidence, confidence bar, provenance count, authority + uncertain/already-known badges,
+      confirm/dismiss with inline confirm); renders null when empty. api.ts ClaimCandidate type +
+      claimCandidates/confirmClaimCandidate/dismissClaimCandidate (ungoverned /api/aurora path, no
+      OpenAPI change). AuroraApp loads + renders in Cosmos space and wires confirm/dismiss. styles.css
+      candidate-* dark-theme cards."
+    - "Verified: ClaimCandidateReview.test.tsx 6 cases; tsc clean; web suite 66/66; vite build OK.
+      Live browser screenshot with a seeded backend conversation is the remaining manual visual check."
   next_machine_actions:
-    - "Slice 3: semantic conflict detection against existing ACTIVE claims (candidate that contradicts
-      a confirmed claim flagged for review, not auto-superseded), reusing embeddings/real-provider
-      judgement where available; entity/time/relation normalization beyond value + provenance."
-    - "Slice 3: a real web review surface in AuroraApp (see what Aurora inferred, with provenance;
-      confirm/dismiss) so doc-16's '看懂自己' is provable through the UI, not only the API."
-    - "Leave real-provider extraction quality, counter-prompt robustness and blind review as the
-      REAL-PROVIDER-CREDENTIALS human gate. After Slice 3, reassess whether to advance PROFILE-MODEL
-      toward PASS or pivot to the next-highest priority_queue front."
+    - "Decision point: Campaign B auto-extraction pipeline is end-to-end (extract -> stage -> review UI
+      -> confirm -> propagate) and machine-verified. Remaining Campaign B items (semantic conflict
+      detection, en-SG locale for the panel, scale, real-provider blind review) are either
+      human-gated or lower-value than other open fronts."
+    - "Pivot to the next-highest machine-executable priority_queue front. Candidates: CAMPAIGN-C item 5
+      (matching similarity/embedding + diversity/safety-filter stage, currently lexical/theme only) and
+      CAMPAIGN-E-PRODUCTION (EKS IaC / observability / resilience — much is human/credential-gated but
+      Terraform + runbooks + dashboards-as-code are machine-authorable)."
+    - "Reassess whether to try the academic AWS EKS deploy (temporary credentials, 4h window) once a
+      deployable release candidate + IaC exist; record any external gate that blocks it and continue."
 
 priority_queue:
   - id: CAMPAIGN-C-QUALITY

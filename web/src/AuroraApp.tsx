@@ -1,6 +1,6 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
-import { api, apiConfigurationError, configureBearerAuth, hasConfiguredApiBase, replayTurnEvents, streamAurora, subscribeProactive, type CapsuleBoundary, type CapsuleFidelitySummary, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type ConnectionRequests, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type Notification, type DiscoverablePerson, type PersonaMessage, type PersonaSession, type PortraitDimension, type PublicCapsule, type PortraitHistoryEntry, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type PsychologySkillSuggestion, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type SocialConnection, type StarfieldDetail, type StarfieldScene, type StarfieldStar, type UnderstandingClaim, type UserCorrection, type WakeIntent } from "./api";
+import { api, apiConfigurationError, configureBearerAuth, hasConfiguredApiBase, replayTurnEvents, streamAurora, subscribeProactive, type ClaimCandidate, type CapsuleBoundary, type CapsuleFidelitySummary, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type ConnectionRequests, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type Notification, type DiscoverablePerson, type PersonaMessage, type PersonaSession, type PortraitDimension, type PublicCapsule, type PortraitHistoryEntry, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type PsychologySkillSuggestion, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type SocialConnection, type StarfieldDetail, type StarfieldScene, type StarfieldStar, type UnderstandingClaim, type UserCorrection, type WakeIntent } from "./api";
 import { initialMobileState, mobileRuntime, type MobileRuntimeState } from "./mobile";
 import { mobileOidc } from "./mobile-auth";
 import type { AuroraStreamEvent, DialogMessage, TurnStatus } from "./protocol";
@@ -8,6 +8,7 @@ import { initialProductSpace, MeSpace, ProductShellNavigation, type ProductSpace
 import { AuroraConversation, type AuroraUiMessage } from "./components/AuroraConversation";
 import { AuroraSelfSpace } from "./components/AuroraSelfSpace";
 import { UnderstandingCorrection, type CorrectionTarget } from "./components/UnderstandingCorrection";
+import { ClaimCandidateReview } from "./components/ClaimCandidateReview";
 import { MemoryStarfield } from "./components/MemoryStarfield";
 import { CapsuleWorkbench } from "./components/CapsuleWorkbench";
 import { ResonanceNetwork } from "./components/ResonanceNetwork";
@@ -51,6 +52,8 @@ export function AuroraApp() {
   const [claims, setClaims] = useState<UnderstandingClaim[]>([]);
   const [corrections, setCorrections] = useState<UserCorrection[]>([]);
   const [retiringCorrectionId, setRetiringCorrectionId] = useState<number | null>(null);
+  const [claimCandidates, setClaimCandidates] = useState<ClaimCandidate[]>([]);
+  const [claimCandidateBusyId, setClaimCandidateBusyId] = useState<number | null>(null);
   const [portrait, setPortrait] = useState<PortraitDimension[]>([]);
   const [portraitHistory, setPortraitHistory] = useState<Record<string, PortraitHistoryEntry[]>>({});
   const [portraitCalibrated, setPortraitCalibrated] = useState<Record<string, boolean>>({});
@@ -167,7 +170,8 @@ export function AuroraApp() {
         api.recentCorrections().then(setCorrections),
         api.plazaCapsules().then(setPublicCapsules).catch(() => undefined),
         api.letterOutbox().then(setLetterOutbox).catch(() => undefined),
-        api.discoverPeople().then(setPeople).catch(() => undefined)
+        api.discoverPeople().then(setPeople).catch(() => undefined),
+        api.claimCandidates().then(setClaimCandidates).catch(() => undefined)
       ]);
       const loadedCapsules = loaded[8] as EchoCapsule[];
       const loadedMatches = loaded[9] as CapsuleMatch[];
@@ -608,6 +612,30 @@ export function AuroraApp() {
       setStatus("这条更正已退休。Aurora 不再据此调整对你的理解，之前被它替代的理解会重新成为当前事实。");
     } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法让这条更正退休"); }
     finally { setRetiringCorrectionId(null); }
+  };
+
+  const confirmClaimCandidate = async (id: number) => {
+    setClaimCandidateBusyId(id);
+    try {
+      const result = await api.confirmClaimCandidate(id);
+      // Promotion goes through the correction path, so a new ACTIVE claim now exists and the
+      // candidate leaves the pending list. Refresh claims so the confirmed understanding shows.
+      setClaimCandidates(current => current.filter(candidate => candidate.id !== id));
+      setClaims(current => [result.activeClaim, ...current]);
+      void api.recentCorrections().then(setCorrections).catch(() => undefined);
+      setStatus("已记住。这条理解现在是你确认的事实，会影响以后每次对话。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "这条理解没能保存"); }
+    finally { setClaimCandidateBusyId(null); }
+  };
+
+  const dismissClaimCandidate = async (id: number) => {
+    setClaimCandidateBusyId(id);
+    try {
+      await api.dismissClaimCandidate(id);
+      setClaimCandidates(current => current.filter(candidate => candidate.id !== id));
+      setStatus("好的，我不会把这条当作对你的理解。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法忽略这条理解"); }
+    finally { setClaimCandidateBusyId(null); }
   };
 
   const loadPortraitHistory = async (dim: string) => {
@@ -1098,6 +1126,8 @@ export function AuroraApp() {
       </div>
 
       <div className="product-space" hidden={productSpace !== "cosmos"}>
+      <ClaimCandidateReview candidates={claimCandidates} busyId={claimCandidateBusyId}
+        onConfirm={id => void confirmClaimCandidate(id)} onDismiss={id => void dismissClaimCandidate(id)} />
       <UnderstandingCorrection claims={claims} oldValue={correctionOld} newValue={correctionNew} impact={correctionImpact} busy={correctionBusy} target={correctionTarget}
         corrections={corrections} retiringId={retiringCorrectionId}
         onOldValue={value => { setCorrectionOld(value); setCorrectionImpact(null); }} onNewValue={value => { setCorrectionNew(value); setCorrectionImpact(null); }}

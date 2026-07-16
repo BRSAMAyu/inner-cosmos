@@ -81,14 +81,41 @@ correction *targeting* precision, not claim *extraction* precision.
   from the pending list.
 - Full Java regression 833/833 green (no regression from the new dialog-finish listener).
 
+## Implemented (Slice 3 — web review surface, "看懂自己")
+
+- `web/src/components/ClaimCandidateReview.tsx` — a controlled, presentational panel (same idiom as
+  `UnderstandingCorrection`) that shows each candidate with a friendly Chinese dimension name, the
+  extracted value, the concrete evidence phrase, a confidence bar, how many conversation moments
+  support it, an authority-tier label, and `uncertain` / `already-in-your-understanding` badges. The
+  user confirms ("对，就是我") or dismisses ("不太是我", with an inline confirm). Renders nothing when
+  there are no candidates.
+- `web/src/api.ts` — hand-written `ClaimCandidate` type + `claimCandidates()` / `confirmClaimCandidate(id)`
+  / `dismissClaimCandidate(id)` mirroring the `/api/aurora/corrections` idiom (these endpoints are
+  outside the governed `/api/v1` OpenAPI slice, like corrections, so no contract change).
+- `web/src/AuroraApp.tsx` — loads candidates in bootstrap (append-only, non-breaking to the indexed
+  `Promise.all`), renders the review panel at the top of the Cosmos space, and wires confirm/dismiss:
+  confirm removes the candidate, prepends the new ACTIVE claim and refreshes corrections; dismiss
+  removes it. `web/src/styles.css` adds the dark-theme card styling in the existing token language.
+
+## Verification — Slice 3 (frontend)
+
+- `ClaimCandidateReview.test.tsx` — 6 Vitest cases: empty → renders null; friendly type/value/evidence/
+  confidence/provenance shown; confirm fires `onConfirm(id)`; dismiss requires inline confirm then
+  fires `onDismiss(id)`; busy state disables; uncertain + already-known badges surface.
+- `tsc --noEmit` clean; full web suite **66/66** (was 60); production `vite build` succeeds.
+- The end-to-end data path (session finish → staged candidates with provenance → list/confirm/dismiss
+  API) is proven by the Slice-2 backend integration + controller tests.
+
 ## Honest boundary
 
-Slices 1–2 deliver the extractor, the machine-verifiable claim-precision floor, a provider-ready
-sanitized service, candidate persistence, automatic staging on session finish, and confirm-to-ACTIVE
-promotion that reuses the existing correction propagation. NOT yet done (Slice 3): semantic conflict
-detection against existing ACTIVE claims (needs embeddings/real-provider judgement), a dedicated
-review UI in the web client ("看懂自己" surface), extraction on real long conversations at scale, and
-entity/time/relation normalization beyond value + provenance. Real-provider extraction quality,
-counter-prompt robustness and blind review remain the human gate
-(REAL-PROVIDER-CREDENTIALS-AND-BLIND-REVIEW). The precision floor is deterministic and provider-
-independent by design.
+Slices 1–3 deliver the extractor, the machine-verifiable claim-precision floor, a provider-ready
+sanitized service, candidate persistence, automatic staging on session finish, confirm-to-ACTIVE
+promotion reusing the correction propagation, and the web review surface. NOT yet done: a live browser
+screenshot of the populated panel against a running backend with a seeded conversation (component +
+API paths are covered by tests; the live visual with real data remains a manual/human check);
+semantic conflict detection against existing ACTIVE claims (needs embeddings/real-provider judgement);
+extraction on real long conversations at scale; entity/time/relation normalization beyond value +
+provenance; and an English (en-SG) locale for this panel (currently Chinese-only, matching the app
+default). Real-provider extraction quality, counter-prompt robustness and blind review remain the
+human gate (REAL-PROVIDER-CREDENTIALS-AND-BLIND-REVIEW). The precision floor is deterministic and
+provider-independent by design.

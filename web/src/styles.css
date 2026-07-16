@@ -56,6 +56,23 @@ h1 { margin: 14px 0; font-family: Georgia, "Noto Serif SC", serif; font-size: cl
 .correction-record-reason { margin: 7px 0 0; color: #8fa69d; font-size: .82rem; line-height: 1.5; }
 .correction-record-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 10px; }.correction-record-confirm-hint { margin-right: auto; color: #d8b0a8; font-size: .78rem; }
 .btn-retire,.btn-retire-cancel,.btn-retire-confirm { padding: 6px 14px; border-radius: 999px; font-size: .8rem; cursor: pointer; }.btn-retire { border: 1px solid #d0918d55; background: #d0918d1f; color: #e6b4ac; }.btn-retire-cancel { border: 1px solid #ffffff24; background: transparent; color: #aebdd2; }.btn-retire-confirm { border: 1px solid #d0918d80; background: #d0918d33; color: #f0c4bc; }.btn-retire:disabled,.btn-retire-cancel:disabled,.btn-retire-confirm:disabled { opacity: .45; cursor: default; }
+.candidate-space { margin: 18px 0 0; padding: 20px 22px; border: 1px solid #86a7bc35; border-radius: 22px; background: radial-gradient(circle at 78% 12%,#2b4a6b30,transparent 42%),linear-gradient(145deg,#122230d9,#0f1a1fd9); }
+.candidate-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }.candidate-heading h2 { margin: 4px 0 0; font: 500 1.3rem Georgia,"Noto Serif SC",serif; }.candidate-heading > span { color: #8fb4c8; font-size: .76rem; }
+.candidate-space > p { color: #9dafaa; line-height: 1.65; }
+.candidate-card { margin-top: 14px; padding: 14px 16px; border: 1px solid #ffffff14; border-radius: 16px; background: #0b1620cc; }
+.candidate-card-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.candidate-type { padding: 3px 11px; border-radius: 999px; font-size: .74rem; color: #101827; background: #b9d6ed; }
+.candidate-authority { margin-left: auto; color: #8ba0ac; font-size: .74rem; }
+.candidate-uncertain { padding: 3px 10px; border-radius: 999px; font-size: .72rem; color: #e6cfa2; background: #6b571f33; border: 1px solid #d8b76a44; }
+.candidate-known { padding: 3px 10px; border-radius: 999px; font-size: .72rem; color: #a6d8c0; background: #2f5a4633; border: 1px solid #7bbca644; }
+.candidate-value { margin: 9px 0 6px; font-size: 1.02rem; color: #eaf4ef; line-height: 1.5; }
+.candidate-evidence { margin: 0 0 8px; color: #93a9a0; font-size: .8rem; }
+.candidate-confidence { display: flex; align-items: center; gap: 10px; }.candidate-confidence small { color: #8ba0ac; font-size: .74rem; }
+.candidate-confidence-bar { flex: 1; height: 6px; border-radius: 999px; background: #ffffff14; overflow: hidden; }.candidate-confidence-bar > span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg,#7bbca6,#b9d6ed); }
+.candidate-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 12px; }.candidate-confirm-hint { margin-right: auto; color: #d8b0a8; font-size: .78rem; }
+.btn-candidate-confirm,.btn-candidate-dismiss,.btn-candidate-cancel,.btn-candidate-dismiss-confirm { padding: 6px 15px; border-radius: 999px; font-size: .8rem; cursor: pointer; }
+.btn-candidate-confirm { border: 1px solid #7bbca680; background: #2f5a4644; color: #bfe6d3; }.btn-candidate-dismiss { border: 1px solid #ffffff24; background: transparent; color: #aebdd2; }.btn-candidate-cancel { border: 1px solid #ffffff24; background: transparent; color: #aebdd2; }.btn-candidate-dismiss-confirm { border: 1px solid #d0918d80; background: #d0918d33; color: #f0c4bc; }
+.btn-candidate-confirm:disabled,.btn-candidate-dismiss:disabled,.btn-candidate-cancel:disabled,.btn-candidate-dismiss-confirm:disabled { opacity: .45; cursor: default; }
 .cosmos-space { margin: 18px 0 0; padding: 20px; border: 1px solid #7f9fd035; border-radius: 22px; background: radial-gradient(circle at 72% 18%,#43558638,transparent 43%),linear-gradient(145deg,#101722e8,#101619e8); }
 .cosmos-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }.cosmos-heading h2 { margin: 4px 0 0; font: 500 1.3rem Georgia,"Noto Serif SC",serif; }.cosmos-heading > span { color: #94a9c7; font-size: .76rem; }
 .cosmos-modes { display: flex; gap: 8px; margin-top: 15px; }.cosmos-modes button { padding: 7px 13px; border: 1px solid #ffffff20; border-radius: 999px; color: #aebdd2; background: #ffffff09; }.cosmos-modes button.active { color: #101827; background: #b9cbed; }.cosmos-modes button:disabled { opacity: .5; }

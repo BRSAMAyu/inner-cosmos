@@ -93,6 +93,11 @@ export type CorrectionConfirmation = {
   activeClaim: UnderstandingClaim;
   propagation: Array<{ id: number; targetKind: string; status: string; detail: string }>;
 };
+export type ClaimCandidate = {
+  id: number; claimType: string; value: string; authorityLevel: string; confidence: number;
+  provenanceMessageIds: number[]; evidenceText: string; uncertain: boolean;
+  alreadyActive: boolean; createdAt: string | null;
+};
 export type PortraitDimension = { dim: string; valueJson: string; confidence: number | null; updatedAt: string | null };
 export type PortraitHistoryEntry = { valueJson: string; recordedAt: string };
 export type MemoryCard = {
@@ -432,6 +437,9 @@ export const api = {
   understandingClaims: () => request<UnderstandingClaim[]>("/api/aurora/corrections/claims"),
   recentCorrections: () => request<UserCorrection[]>("/api/aurora/corrections"),
   retireCorrection: (id: number) => request<void>(`/api/aurora/corrections/${id}`, { method: "DELETE" }),
+  claimCandidates: () => request<ClaimCandidate[]>("/api/aurora/claims/candidates"),
+  confirmClaimCandidate: (id: number) => request<CorrectionConfirmation>(`/api/aurora/claims/candidates/${id}/confirm`, { method: "POST" }),
+  dismissClaimCandidate: (id: number) => request<{ dismissed: number }>(`/api/aurora/claims/candidates/${id}`, { method: "DELETE" }),
   portrait: () => request<PortraitDimension[]>("/api/portrait"),
   portraitHistory: (dim: string) => request<PortraitHistoryEntry[]>(`/api/portrait/history?dim=${encodeURIComponent(dim)}`),
   starfield: (mode: StarfieldScene["mode"]) => request<StarfieldScene>(`/api/memory/starfield/v2?mode=${mode}`),
