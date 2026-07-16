@@ -1201,6 +1201,24 @@ blocked_git_push_access:
     (add sangchenyi as collaborator OR point the git credential at the BRSAMAyu account). Local-only
     commits so far: d626504 (EXPERIENCE §1.1 checkpoint 1). Work continues on non-push-dependent fronts.
   human_action_needed: "Grant push access to the authenticated account, or re-auth git as an account with write to BRSAMAyu/inner-cosmos."
+  update_2026_07_16_loop:
+    state: BOTH_PUSH_PATHS_NOW_BLOCKED_IN_THIS_SESSION
+    detail: |
+      This /loop session's environment ALSO blocks the fork push path that prior sessions used:
+      `git push fork HEAD:feat/phase0-visual-token-system` (fork = sangchenyi/inner-cosmos) was denied
+      by the Claude Code auto-mode safety classifier as a "Create Public Surface" action — pushing to a
+      third-party public repo (different owner than the working repo BRSAMAyu/inner-cosmos) that the
+      USER never explicitly named in this session. This is a correct outward-facing-publish gate, not a
+      credential 403. Not worked around. Local commits keep accumulating and are fully recoverable.
+      Local-only commits pending flush on this branch feat/phase0-visual-token-system:
+        d626504 (visual token layer) .. 70121cd, af52a76, 5f53df3, de3f721 (checkpoints 2-5),
+        a554215 (docs: resume protocol -> directive), f31e01d (checkpoint 6: loading four-states).
+      HEAD after checkpoint 6 = f31e01d.
+    human_action_needed: |
+      Tell the agent which push destination is authorized: (a) explicitly authorize pushing to the
+      fork sangchenyi/inner-cosmos (then the classifier allow-lists it), or (b) restore write access to
+      BRSAMAyu/inner-cosmos and push there, or (c) name a different remote you own. Until then all
+      verified checkpoints live only in the local repo.
 
 known_human_gates:
   - HG-GIT-PUSH-ACCESS
