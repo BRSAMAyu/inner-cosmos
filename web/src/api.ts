@@ -143,6 +143,7 @@ export type FriendRelation = {
   id: number; requesterId: number; addresseeId: number; status: string; source: string;
 };
 export type ConnectionRequests = { incoming: SocialConnection[]; outgoing: SocialConnection[] };
+export type DiscoverablePerson = { id: number; username: string; nickname: string; relationStatus: string };
 export type PsychologySkillManifest = {
   id: string; version: string; owner: string; title: Record<string, string>; description: Record<string, string>;
   estimatedMinutes: number; riskTier: "L1" | "L2" | "L3"; agentInvocation: string; userInvocation: string;
@@ -454,6 +455,10 @@ export const api = {
   }),
   replyWithSlowLetter: (id: number, title: string, letterBody: string) => request<SlowLetter>(`/api/letters/${id}/reply-with-letter`, {
     method: "POST", body: JSON.stringify({ title, letterBody })
+  }),
+  discoverPeople: () => request<DiscoverablePerson[]>("/api/social/people"),
+  requestFriend: (userId: number) => request<FriendRelation>("/api/social/friends/request", {
+    method: "POST", body: JSON.stringify({ userId, source: "SOCIAL_PAGE" })
   }),
   connectionRequests: () => request<ConnectionRequests>("/api/social/requests"),
   friends: () => request<SocialConnection[]>("/api/social/friends"),

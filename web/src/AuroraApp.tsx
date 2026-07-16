@@ -1,6 +1,6 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
-import { api, apiConfigurationError, configureBearerAuth, hasConfiguredApiBase, replayTurnEvents, streamAurora, subscribeProactive, type CapsuleBoundary, type CapsuleFidelitySummary, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type ConnectionRequests, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type Notification, type PersonaMessage, type PersonaSession, type PortraitDimension, type PublicCapsule, type PortraitHistoryEntry, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type PsychologySkillSuggestion, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type SocialConnection, type StarfieldDetail, type StarfieldScene, type StarfieldStar, type UnderstandingClaim, type UserCorrection, type WakeIntent } from "./api";
+import { api, apiConfigurationError, configureBearerAuth, hasConfiguredApiBase, replayTurnEvents, streamAurora, subscribeProactive, type CapsuleBoundary, type CapsuleFidelitySummary, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type ConnectionRequests, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type Notification, type DiscoverablePerson, type PersonaMessage, type PersonaSession, type PortraitDimension, type PublicCapsule, type PortraitHistoryEntry, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type PsychologySkillSuggestion, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type SocialConnection, type StarfieldDetail, type StarfieldScene, type StarfieldStar, type UnderstandingClaim, type UserCorrection, type WakeIntent } from "./api";
 import { initialMobileState, mobileRuntime, type MobileRuntimeState } from "./mobile";
 import { mobileOidc } from "./mobile-auth";
 import type { AuroraStreamEvent, DialogMessage, TurnStatus } from "./protocol";
@@ -12,6 +12,7 @@ import { MemoryStarfield } from "./components/MemoryStarfield";
 import { CapsuleWorkbench } from "./components/CapsuleWorkbench";
 import { ResonanceNetwork } from "./components/ResonanceNetwork";
 import { PlazaDirectory } from "./components/PlazaDirectory";
+import { PeopleDiscovery } from "./components/PeopleDiscovery";
 import { LettersInbox } from "./components/LettersInbox";
 import { PortraitView } from "./components/PortraitView";
 import { AccountSettings, type AccountBusy } from "./components/AccountSettings";
@@ -95,6 +96,8 @@ export function AuroraApp() {
   const [letterOutbox, setLetterOutbox] = useState<SlowLetter[]>([]);
   const [connectionRequests, setConnectionRequests] = useState<ConnectionRequests>({ incoming: [], outgoing: [] });
   const [friends, setFriends] = useState<SocialConnection[]>([]);
+  const [people, setPeople] = useState<DiscoverablePerson[]>([]);
+  const [peopleBusy, setPeopleBusy] = useState(false);
   const [skills, setSkills] = useState<PsychologySkillManifest[]>([]);
   const [skillRuns, setSkillRuns] = useState<PsychologySkillRun[]>([]);
   const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
@@ -162,7 +165,8 @@ export function AuroraApp() {
         api.portrait().then(setPortrait),
         api.recentCorrections().then(setCorrections),
         api.plazaCapsules().then(setPublicCapsules).catch(() => undefined),
-        api.letterOutbox().then(setLetterOutbox).catch(() => undefined)
+        api.letterOutbox().then(setLetterOutbox).catch(() => undefined),
+        api.discoverPeople().then(setPeople).catch(() => undefined)
       ]);
       const loadedCapsules = loaded[8] as EchoCapsule[];
       const loadedMatches = loaded[9] as CapsuleMatch[];
@@ -933,8 +937,19 @@ export function AuroraApp() {
   };
 
   const refreshConnections = async () => {
-    const [requests, accepted] = await Promise.all([api.connectionRequests(), api.friends()]);
-    setConnectionRequests(requests); setFriends(accepted);
+    const [requests, accepted, discoverable] = await Promise.all([
+      api.connectionRequests(), api.friends(), api.discoverPeople().catch(() => people)
+    ]);
+    setConnectionRequests(requests); setFriends(accepted); setPeople(discoverable);
+  };
+
+  const requestPersonConnection = async (userId: number) => {
+    setPeopleBusy(true);
+    try {
+      await api.requestFriend(userId); await refreshConnections();
+      setStatus("邀请已发出。对方同意前不会开放任何私密内容，也不会变成即时聊天。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法发出这个邀请"); }
+    finally { setPeopleBusy(false); }
   };
 
   const requestConnection = async (letter: SlowLetter) => {
@@ -1125,6 +1140,8 @@ export function AuroraApp() {
       </div>
 
       <div className="product-space" hidden={productSpace !== "letters"}>
+      <PeopleDiscovery people={people} busy={peopleBusy} onRequest={userId => void requestPersonConnection(userId)} />
+
       <LettersInbox letterInbox={letterInbox} letterOutbox={letterOutbox} replyDrafts={replyDrafts} connectionRequests={connectionRequests} friends={friends}
         onReplyDraftChange={(letterId, value) => setReplyDrafts(drafts => ({ ...drafts, [letterId]: value }))}
         onReply={letter => void replyWithLetter(letter)} onActOnLetter={(letter, action) => void actOnLetter(letter, action)}
