@@ -90,6 +90,16 @@ public final class ClaimCandidateExtractor {
                 return;
             }
         }
+        // TREND before EMOTION: "我最近越来越焦虑" is a change-over-time claim, not a momentary feeling.
+        for (String trigger : List.of("越来越", "比以前更", "比以前", "渐渐变得", "慢慢变得", "越发")) {
+            if ((idx = text.indexOf(trigger)) >= 0) {
+                String value = clean(text.substring(idx + trigger.length()));
+                if (isConcrete(value)) {
+                    add(byKey, ClaimTypes.TREND, value, ClaimAuthority.SINGLE_EXPLICIT, 0.55, messageId, trigger + value, false);
+                }
+                return;
+            }
+        }
         if (hasRecurrence(text) && containsAny(text, EMOTION_WORDS)) {
             String value = clean(stripLeadingSubject(text));
             if (isConcrete(value)) {

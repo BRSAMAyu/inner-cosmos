@@ -87,6 +87,16 @@
       "expected": [{"claimType": "UNCERTAINTY", "valueContains": "适不适合", "provenanceIds": [117], "uncertain": true}]
     },
     {
+      "label": "trend (越来越)",
+      "messages": [{"id": 118, "speaker": "USER", "text": "我最近越来越容易焦虑"}],
+      "expected": [{"claimType": "TREND", "valueContains": "焦虑", "provenanceIds": [118]}]
+    },
+    {
+      "label": "trend (比以前更)",
+      "messages": [{"id": 119, "speaker": "USER", "text": "我比以前更能接受自己了"}],
+      "expected": [{"claimType": "TREND", "valueContains": "接受自己", "provenanceIds": [119]}]
+    },
+    {
       "label": "NEGATIVE: question is not a claim",
       "messages": [{"id": 201, "speaker": "USER", "text": "我是不是太敏感了？"}],
       "expected": []

@@ -37,11 +37,12 @@ correction *targeting* precision, not claim *extraction* precision.
 
 ## Verification (Java 21, offline)
 
-- `ClaimExtractionEvaluationTest` (pure, no Spring) over `claim-extraction-v1.json` (24 annotated
-  cases: 15 genuine claims across nine types + a repeated-explicit + an uncertainty, and 9 hard
-  negatives: questions, preference-shaped questions, hypotheticals, two reported-speech cases, two
-  momentary feelings, a vague non-statement, and an Aurora-only turn). Result: **precision 1.0,
-  recall 1.0, typeAccuracy 1.0 (tp 15 / fp 0 / fn 0)** against published thresholds
+- `ClaimExtractionEvaluationTest` (pure, no Spring) over `claim-extraction-v1.json` (26 annotated
+  cases: 17 genuine claims across FACT/PREFERENCE/VALUE/HABIT/NEED/BOUNDARY/EMOTION_PATTERN/TREND/
+  UNCERTAINTY + a repeated-explicit, and 9 hard negatives: questions, preference-shaped questions,
+  hypotheticals, two reported-speech cases, two momentary feelings, a vague non-statement, and an
+  Aurora-only turn). Result: **precision 1.0, recall 1.0, typeAccuracy 1.0 (tp 17 / fp 0 / fn 0)**
+  against published thresholds
   (precision ≥ 0.9, recall ≥ 0.7, typeAccuracy ≥ 0.9). RED first (stub extractor → recall 0.0).
   Report: `target/evaluation/claim-extraction-v1-report.json`.
 - `ClaimExtractionServiceImplTest` — mock-mode falls back to the deterministic extractor and rejects
