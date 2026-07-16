@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-16T13:41:00+08:00
+updated_at: 2026-07-16T13:44:50+08:00
 authority:
   - goal-objective.md
   - 对齐文档/17-单会话持续Goal模式执行协议.md
@@ -935,7 +935,7 @@ known_human_gates:
   - REAL-ANDROID-IOS-APNS-FCM-AND-SIGNING
 
 last_full_gate:
-  baseline_commit: PENDING_API_CONTRACT_BASELINE_CHECKPOINT
+  baseline_commit: d0f0cb6 (executable v1 API contract baseline)
   executed_at: 2026-07-16T13:39:28+08:00
   java: "PASS — Java 21 full mvn test, 135 suites, 819 tests, 0 failures/errors/skips, 146.7s"
   focused_evaluation: "PASS — OpenAPI drift/error/idempotency/CAS; Redis 7.4.2 two-Pod semantics; PostgreSQL V1-V17 exact contract"
