@@ -2,21 +2,17 @@ package com.innercosmos.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.innercosmos.ai.agent.CapsuleAgent;
-import com.innercosmos.ai.context.AgentContext;
-import com.innercosmos.ai.context.AgentContextAssembler;
 import com.innercosmos.ai.structured.StructuredAiResults;
 import com.innercosmos.ai.structured.StructuredAiService;
 import com.innercosmos.entity.CapsuleBoundary;
 import com.innercosmos.entity.CapsuleUsageQuota;
 import com.innercosmos.entity.EchoCapsule;
-import com.innercosmos.entity.MemoryCard;
 import com.innercosmos.entity.PersonaChatMessage;
 import com.innercosmos.entity.PersonaChatSession;
 import com.innercosmos.exception.BusinessException;
 import com.innercosmos.mapper.CapsuleBoundaryMapper;
 import com.innercosmos.mapper.CapsuleUsageQuotaMapper;
 import com.innercosmos.mapper.EchoCapsuleMapper;
-import com.innercosmos.mapper.MemoryCardMapper;
 import com.innercosmos.mapper.PersonaChatMessageMapper;
 import com.innercosmos.mapper.PersonaChatSessionMapper;
 import com.innercosmos.mapper.AuthorizedMemoryRefMapper;
@@ -69,8 +65,6 @@ public class PersonaChatServiceImpl implements PersonaChatService {
     private final SafetyService safetyService;
     private final StructuredAiService structuredAiService;
     private final CapsuleBoundaryMapper boundaryMapper;
-    private final MemoryCardMapper memoryCardMapper;
-    private final AgentContextAssembler agentContextAssembler;
     // Read-path mapper for quota state. The WRITE path stays on JdbcTemplate because
     // the atomic conditional UPDATE (turn_count < limit) must be a single SQL statement;
     // MyBatis-Plus BaseMapper cannot express that condition atomically. This asymmetry
@@ -79,6 +73,7 @@ public class PersonaChatServiceImpl implements PersonaChatService {
     private final JdbcTemplate jdbcTemplate;
     private final AuthorizedMemoryRefMapper authorizedMemoryRefMapper;
     private final CapsuleGenomeService genomeService;
+    private final CapsuleRuntimeContextComposer runtimeContextComposer;
 
     public PersonaChatServiceImpl(PersonaChatSessionMapper sessionMapper,
                                   PersonaChatMessageMapper messageMapper,
@@ -87,12 +82,11 @@ public class PersonaChatServiceImpl implements PersonaChatService {
                                   SafetyService safetyService,
                                   StructuredAiService structuredAiService,
                                   CapsuleBoundaryMapper boundaryMapper,
-                                  MemoryCardMapper memoryCardMapper,
-                                  AgentContextAssembler agentContextAssembler,
                                   CapsuleUsageQuotaMapper quotaMapper,
                                   JdbcTemplate jdbcTemplate,
                                   AuthorizedMemoryRefMapper authorizedMemoryRefMapper,
-                                  CapsuleGenomeService genomeService) {
+                                  CapsuleGenomeService genomeService,
+                                  CapsuleRuntimeContextComposer runtimeContextComposer) {
         this.sessionMapper = sessionMapper;
         this.messageMapper = messageMapper;
         this.capsuleMapper = capsuleMapper;
@@ -100,12 +94,11 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         this.safetyService = safetyService;
         this.structuredAiService = structuredAiService;
         this.boundaryMapper = boundaryMapper;
-        this.memoryCardMapper = memoryCardMapper;
-        this.agentContextAssembler = agentContextAssembler;
         this.quotaMapper = quotaMapper;
         this.jdbcTemplate = jdbcTemplate;
         this.authorizedMemoryRefMapper = authorizedMemoryRefMapper;
         this.genomeService = genomeService;
+        this.runtimeContextComposer = runtimeContextComposer;
     }
 
     @Override
@@ -187,7 +180,10 @@ public class PersonaChatServiceImpl implements PersonaChatService {
                         ? capsule.personaPrompt
                         : capsuleAgent.buildPersonaPrompt(personaName, personaIntro);
                 CapsuleBoundary boundary = boundary(capsule == null ? null : capsule.id);
-                String authorizedSummary = authorizedMemorySummary(capsule);
+                boolean seedCapsule = capsule != null && ("SEED_CAPSULE".equals(capsule.capsuleType)
+                        || "SEED".equals(capsule.capsuleType));
+                Map<String, Object> runtimeContext = seedCapsule
+                        ? seedRuntimeContext() : runtimeContextComposer.compose(genome, message);
                 // M-005: do NOT egress the visitor's private context (todos/records/portrait/
                 // relationship) into a stranger's capsule prompt. assemble(includeMemory=false)
                 // still populates those, so we deliberately do NOT assemble a visitor agent-context
@@ -196,10 +192,12 @@ public class PersonaChatServiceImpl implements PersonaChatService {
                 List<String> history = recentHistory(sessionId);
                 Map<String, Object> aiContext = new LinkedHashMap<>();
                 aiContext.put("personaPrompt", personaPrompt);
-                aiContext.put("authorizedMemorySummary", authorizedSummary);
-                aiContext.put("styleProfile", capsule == null ? "" : nullToEmpty(capsule.styleProfileJson));
-                aiContext.put("contextPreview", capsule == null ? "" : nullToEmpty(capsule.contextPreviewJson));
-                aiContext.put("ownerContextNote", capsule == null ? "" : nullToEmpty(capsule.ownerContextNote));
+                aiContext.put("authorizedMemorySummary", runtimeContext.get("selectedEvidenceSummary"));
+                aiContext.put("styleProfile", runtimeContext.get("selectedContext"));
+                aiContext.put("contextPreview", runtimeContext.get("selectedContext"));
+                aiContext.put("contextBuildManifest", runtimeContext.get("contextBuildManifest"));
+                aiContext.put("retrievalUnsupported", runtimeContext.get("unsupported"));
+                aiContext.put("retrievalFallbackPolicy", runtimeContext.get("fallbackPolicy"));
                 aiContext.put("standInEnabled", capsule != null && Boolean.TRUE.equals(capsule.standInEnabled));
                 aiContext.put("realContactPolicy", capsule == null ? "LETTER_ONLY" : nullToDefault(capsule.realContactPolicy, "LETTER_ONLY"));
                 aiContext.put("boundary", boundary == null ? "" : java.util.Map.of(
@@ -215,7 +213,9 @@ public class PersonaChatServiceImpl implements PersonaChatService {
                         """
                         只返回 JSON：{"reply":"","boundaryNotice":"","letterSuggested":false,"riskFlags":[]}
                         你正在驱动一个共鸣体，不是真人实时回复，也不是治疗师。
-                        必须基于 personaPrompt、authorizedMemorySummary、styleProfile、ownerContextNote 和 boundary 回应。
+                        必须基于 personaPrompt、本轮选中的 authorizedMemorySummary、styleProfile、contextBuildManifest 和 boundary 回应。
+                        contextBuildManifest 是本轮证据选择账本；不得使用其中未选中的 Genome 类别或记忆。
+                        如果 retrievalUnsupported=true，必须坦诚说明授权信息不足，不能用其他经历猜测答案。
                         如果 standInEnabled=true，可以说明"我可以先作为回声代你回应"；否则只能引导慢信或真人会话邀请。
                         不要美化原用户；保留真实困惑、表达习惯、价值偏好和边界。
                         不要泄露真实身份、联系方式、原始对话全文和未授权记忆。
@@ -360,6 +360,22 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         return result;
     }
 
+    private Map<String, Object> seedRuntimeContext() {
+        Map<String, Object> manifest = new LinkedHashMap<>();
+        manifest.put("schemaVersion", "context-build-manifest.v1");
+        manifest.put("queryIntent", "SEED_PERSONA");
+        manifest.put("selectedCategories", List.of());
+        manifest.put("selectedMemoryIds", List.of());
+        manifest.put("unsupported", false);
+        manifest.put("selectionReason", "OFFICIAL_SEED_PERSONA_HAS_NO_OWNER_MEMORY");
+        return Map.of(
+                "selectedEvidenceSummary", "",
+                "selectedContext", Map.of("schemaVersion", "capsule-runtime-context.v1", "seedPersona", true),
+                "contextBuildManifest", manifest,
+                "unsupported", false,
+                "fallbackPolicy", "NOT_APPLICABLE");
+    }
+
     private String blank(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value;
     }
@@ -367,24 +383,6 @@ public class PersonaChatServiceImpl implements PersonaChatService {
     private CapsuleBoundary boundary(Long capsuleId) {
         if (capsuleId == null) return null;
         return boundaryMapper.selectOne(new QueryWrapper<CapsuleBoundary>().eq("capsule_id", capsuleId).last("LIMIT 1"));
-    }
-
-    private String authorizedMemorySummary(EchoCapsule capsule) {
-        if (capsule == null || capsule.authorizedMemoryIds == null || capsule.authorizedMemoryIds.isBlank()) return "";
-        java.util.List<Long> ids = authorizedMemoryRefMapper.selectList(
-                        new QueryWrapper<AuthorizedMemoryRef>().eq("capsule_id", capsule.id)
-                                .eq("authorization_status", "AUTHORIZED"))
-                .stream().map(ref -> ref.memoryCardId).toList();
-        if (ids.isEmpty()) return "";
-        java.util.List<MemoryCard> cards = memoryCardMapper.selectBatchIds(ids);
-        StringBuilder sb = new StringBuilder();
-        for (MemoryCard card : cards) {
-            if (!java.util.Objects.equals(capsule.ownerUserId, card.userId)
-                    || !"ACTIVE".equalsIgnoreCase(card.status)) continue;
-            sb.append("#").append(card.id).append(" ").append(card.title).append("：")
-                    .append(card.summary == null ? "" : card.summary.substring(0, Math.min(card.summary.length(), 180))).append("\n");
-        }
-        return sb.toString();
     }
 
     private CapsuleGenomeVersion requireRunnableCapsule(EchoCapsule capsule) {
@@ -396,6 +394,9 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         CapsuleGenomeVersion genome = genomeService.current(capsule.id);
         if (capsule.activeGenomeVersionId != null && genome == null) {
             throw new BusinessException("CAPSULE_REVIEW_REQUIRED", "这个共鸣体的当前版本需要主人复核");
+        }
+        if (genome != null && !CapsuleGenomeServiceImpl.COMPILER_VERSION.equals(genome.compilerVersion)) {
+            throw new BusinessException("CAPSULE_REVIEW_REQUIRED", "这个共鸣体需要用当前版本重新编译并由主人复核");
         }
         Set<Long> selectedIds = selectedMemoryIds(capsule.authorizedMemoryIds);
         long authorizedCount = selectedIds.isEmpty() ? 0 : authorizedMemoryRefMapper.selectCount(

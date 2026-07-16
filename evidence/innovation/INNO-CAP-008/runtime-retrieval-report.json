@@ -1,0 +1,11 @@
+{
+  "datasetVersion": "genome-runtime-retrieval.v1",
+  "scenarioCount": 6,
+  "intentAccuracy": 1.0,
+  "selectionAccuracy": 1.0,
+  "evidenceLeakCount": 0,
+  "unsupportedFallbackAccuracy": 1.0,
+  "supportedCases": 4,
+  "unfamiliarCases": 2,
+  "result": "PASS"
+}

@@ -19,18 +19,11 @@ import java.util.Map;
 
 @Service
 public class CapsuleGenomeServiceImpl implements CapsuleGenomeService {
-    // v2: contextPreviewJson now carries real scene indexing (per-theme grouping,
-    // highest-gravity representative excerpt) and tension surfacing (co-occurring positive and
-    // negative memories in the same scene are flagged as emotional complexity, not blended into
-    // one flat voice) instead of a flat 420-char truncation — see
-    // CapsuleServiceImpl.buildContextPreview/inferStyleProfile.
-    // This is a deterministic STRUCTURAL SCAFFOLD, not a claim of a finished "real compiler":
-    // there is still no sourced intermediate representation (each feature does not yet carry its
-    // own memoryId/sourceVersion/evidence/confidence), no critic pass, and fixed theme-to-voice
-    // mappings can inject a personality descriptor the evidence doesn't fully support. See
-    // docs/goal/single-session-state.yml's CAMPAIGN-C-QUALITY entry for the tracked next steps
-    // (a provenance-carrying Genome IR, LLM-assisted candidate features + critic review).
-    static final String COMPILER_VERSION = "capsule-genome.v2";
+    // v3 adds a provenance-carrying structural IR (episode-scoped claims plus explicitly-cued
+    // values, habits and temporal state) and a runtime retrieval policy. It remains a deterministic
+    // evidence floor, not a fidelity claim: candidate generation, critics and real-provider/blind
+    // pairwise evaluation remain separate acceptance work.
+    static final String COMPILER_VERSION = "capsule-genome.v3";
     private final CapsuleGenomeVersionMapper genomeMapper;
     private final EchoCapsuleMapper capsuleMapper;
     private final ObjectMapper objectMapper;
@@ -85,7 +78,7 @@ public class CapsuleGenomeServiceImpl implements CapsuleGenomeService {
         genome.styleProfileJson = capsule.styleProfileJson;
         genome.contextPreviewJson = capsule.contextPreviewJson;
         Map<String, Object> evaluation = new LinkedHashMap<>();
-        evaluation.put("schemaVersion", "capsule-compiler-evaluation.v2");
+        evaluation.put("schemaVersion", "capsule-compiler-evaluation.v3");
         evaluation.put("ownerBound", ownerBound);
         evaluation.put("currentOnly", currentOnly);
         evaluation.put("authorizedMemoryCount", authorizedCards.size());
@@ -93,7 +86,7 @@ public class CapsuleGenomeServiceImpl implements CapsuleGenomeService {
         evaluation.put("runtimeEligible", true);
         // Real structural feature-extraction metrics — measurable and improvable independent
         // of any LLM provider (对齐文档/16 Campaign C punch-list item 2).
-        evaluation.putAll(sceneMetrics(capsule.contextPreviewJson));
+        evaluation.putAll(compilerMetrics(capsule.contextPreviewJson));
         genome.evaluationJson = write(evaluation);
         genome.changeReason = reason;
         genomeMapper.insert(genome);
@@ -149,18 +142,27 @@ public class CapsuleGenomeServiceImpl implements CapsuleGenomeService {
     }
 
     /**
-     * Reads the scene-indexing/tension-surfacing output CapsuleServiceImpl already computed
-     * into contextPreviewJson. Defaults to zero rather than throwing when contextPreviewJson
-     * predates the v2 compiler or was hand-supplied by a caller in a different shape.
+     * Reads scene/tension and v3 IR category metrics already computed into contextPreviewJson.
+     * Defaults to zero rather than throwing when the artifact predates this compiler or was
+     * hand-supplied by a caller in a different shape.
      */
-    private Map<String, Object> sceneMetrics(String contextPreviewJson) {
+    private Map<String, Object> compilerMetrics(String contextPreviewJson) {
         int sceneCount = 0;
         int tensionCount = 0;
+        int claimCount = 0;
+        int valueCount = 0;
+        int habitCount = 0;
+        int temporalStateCount = 0;
         try {
             if (contextPreviewJson != null && !contextPreviewJson.isBlank()) {
                 JsonNode root = objectMapper.readTree(contextPreviewJson);
                 if (root.hasNonNull("scenes")) sceneCount = root.get("scenes").size();
                 if (root.hasNonNull("tensions")) tensionCount = root.get("tensions").size();
+                JsonNode ir = root.path("genomeIr");
+                claimCount = ir.path("claims").size();
+                valueCount = ir.path("values").size();
+                habitCount = ir.path("habits").size();
+                temporalStateCount = ir.path("temporalState").size();
             }
         } catch (Exception notV2Shape) {
             // Older/foreign contextPreviewJson shape — metrics stay 0, not a compile failure.
@@ -168,6 +170,10 @@ public class CapsuleGenomeServiceImpl implements CapsuleGenomeService {
         Map<String, Object> metrics = new LinkedHashMap<>();
         metrics.put("sceneCount", sceneCount);
         metrics.put("tensionCount", tensionCount);
+        metrics.put("claimCount", claimCount);
+        metrics.put("valueCount", valueCount);
+        metrics.put("habitCount", habitCount);
+        metrics.put("temporalStateCount", temporalStateCount);
         return metrics;
     }
 

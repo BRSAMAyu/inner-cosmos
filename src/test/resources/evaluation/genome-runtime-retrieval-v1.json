@@ -1,0 +1,32 @@
+{
+  "datasetVersion": "genome-runtime-retrieval.v1",
+  "features": {
+    "claims": [
+      {"id": "claim-11", "statement": "去年搬到成都，开始适应新的通勤路线", "memoryId": 11},
+      {"id": "claim-15", "statement": "大学时参加过一次公开演讲", "memoryId": 15}
+    ],
+    "values": [
+      {"id": "value-12", "statement": "重视被认真回应，不愿用冷处理解决分歧", "memoryId": 12}
+    ],
+    "habits": [
+      {"id": "habit-13", "statement": "遇到冲突时通常先冷静，再说明具体边界", "memoryId": 13}
+    ],
+    "temporalState": [
+      {"id": "temporal-14", "statement": "最近正在准备一次重要展示，目前有些紧张", "memoryId": 14}
+    ]
+  },
+  "scenarios": [
+    {"key": "habit", "question": "遇到冲突时你通常会怎么做？", "expectedIntent": "HABIT", "expectedCategory": "habits", "expectedMemoryIds": [13], "unsupported": false},
+    {"key": "value", "question": "在关系里你最重视什么？", "expectedIntent": "VALUE", "expectedCategory": "values", "expectedMemoryIds": [12], "unsupported": false},
+    {"key": "temporal", "question": "你最近怎么样？", "expectedIntent": "TEMPORAL", "expectedCategory": "temporalState", "expectedMemoryIds": [14], "unsupported": false},
+    {"key": "episode", "question": "你有住在成都的经历吗？", "expectedIntent": "CLAIM", "expectedCategory": "claims", "expectedMemoryIds": [11], "unsupported": false},
+    {"key": "unfamiliar-sport", "question": "你支持哪一支球队？", "expectedIntent": "UNFAMILIAR", "expectedCategory": "", "expectedMemoryIds": [], "unsupported": true},
+    {"key": "unfamiliar-music", "question": "你会弹哪一种乐器？", "expectedIntent": "UNFAMILIAR", "expectedCategory": "", "expectedMemoryIds": [], "unsupported": true}
+  ],
+  "thresholds": {
+    "intentAccuracy": 1.0,
+    "selectionAccuracy": 1.0,
+    "evidenceLeakCount": 0,
+    "unsupportedFallbackAccuracy": 1.0
+  }
+}

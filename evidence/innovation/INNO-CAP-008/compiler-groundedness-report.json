@@ -1,0 +1,8 @@
+{
+  "datasetVersion": "genome-compiler-groundedness-v1",
+  "scenarioCount": 4,
+  "citationSurfaces": ["voiceEvidence", "scenes.memories", "genomeIr.claims", "genomeIr.values", "genomeIr.habits", "genomeIr.temporalState"],
+  "ungroundedCitations": 0,
+  "requestedButExcludedStillCounted": 0,
+  "result": "PASS"
+}

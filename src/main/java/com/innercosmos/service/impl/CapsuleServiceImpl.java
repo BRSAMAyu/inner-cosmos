@@ -19,6 +19,7 @@ import com.innercosmos.ai.semantic.PseudoSemanticAnalyzer;
 import com.innercosmos.service.CapsuleService;
 import com.innercosmos.service.ResonanceMatchStrategy;
 import com.innercosmos.service.CapsuleGenomeService;
+import com.innercosmos.util.DataMaskingUtils;
 import com.innercosmos.vo.CapsulePreviewVO;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -777,6 +778,12 @@ public class CapsuleServiceImpl implements CapsuleService {
             "难过", "伤心", "委屈", "失望", "沮丧", "痛苦", "煎熬", "折磨", "焦虑", "崩溃",
             "绝望", "撑不住", "孤独", "孤单", "没人懂", "害怕", "恐惧", "吵架", "冲突",
             "分手", "冷战", "闹翻", "生气", "愤怒", "委靡", "累垮");
+    private static final List<String> VALUE_CUES = List.of(
+            "重视", "看重", "在意", "原则", "价值", "坚持", "不愿");
+    private static final List<String> HABIT_CUES = List.of(
+            "习惯", "通常", "一般会", "总是", "常常", "往往", "会先", "倾向");
+    private static final List<String> TEMPORAL_CUES = List.of(
+            "最近", "现在", "目前", "近期", "这段时间", "今天", "本周", "正在", "刚刚");
 
     private String sceneSentiment(String text) {
         if (text == null || text.isBlank()) return "NEUTRAL";
@@ -895,6 +902,7 @@ public class CapsuleServiceImpl implements CapsuleService {
             String excerpt = ((representative.title == null ? "" : representative.title) + ": "
                     + (representative.summary == null ? "" : representative.summary)).replaceAll("\\s+", " ").trim();
             excerpt = excerpt.substring(0, Math.min(160, excerpt.length()));
+            excerpt = DataMaskingUtils.maskContact(excerpt);
 
             Set<String> sentimentLabels = new LinkedHashSet<>();
             for (MemoryCard member : members) {
@@ -934,8 +942,11 @@ public class CapsuleServiceImpl implements CapsuleService {
         List<Map<String, Object>> topScenes = scenes.stream().limit(5).toList();
 
         Map<String, Object> preview = new LinkedHashMap<>();
+        preview.put("schemaVersion", "capsule-context-preview.v3");
+        preview.put("genomeIr", buildGenomeIr(cards));
         preview.put("scenes", topScenes);
         preview.put("tensions", tensions);
+        preview.put("retrievalPolicy", retrievalPolicy());
         preview.put("publicTags", parseTags(publicTags));
         preview.put("ownerNote", note == null ? "" : note);
         preview.put("privacy", "不包含原始对话全文、联系方式、真实身份和未授权记忆");
@@ -945,15 +956,110 @@ public class CapsuleServiceImpl implements CapsuleService {
     /** No authorized memories exist yet (e.g. a freshly-created capsule) — a single-scene stub. */
     private String buildFallbackContextPreview(String intro, String publicTags, String note) {
         Map<String, Object> preview = new LinkedHashMap<>();
+        preview.put("schemaVersion", "capsule-context-preview.v3");
+        preview.put("genomeIr", emptyGenomeIr("没有授权记忆，无法提取 claims、values、habits 或 temporal state"));
         preview.put("scenes", List.of(Map.of(
                 "theme", "日常片段", "memoryCount", 0,
-                "excerpt", intro == null ? "" : intro, "memories", List.of(),
+                "excerpt", DataMaskingUtils.maskContact(intro), "memories", List.of(),
                 "sentimentLabels", List.of(), "hasTension", false)));
         preview.put("tensions", List.of());
+        preview.put("retrievalPolicy", retrievalPolicy());
         preview.put("publicTags", parseTags(publicTags));
         preview.put("ownerNote", note == null ? "" : note);
         preview.put("privacy", "不包含原始对话全文、联系方式、真实身份和未授权记忆");
         return write(preview);
+    }
+
+    /**
+     * Deterministic, evidence-bounded Genome IR. Claims remain episode-scoped excerpts; values,
+     * habits and temporal state are emitted only when their explicit cue appears in the same
+     * authorized memory. This compiler intentionally records absence as unknown instead of
+     * generalising one event into a stable personality trait.
+     */
+    private Map<String, Object> buildGenomeIr(List<MemoryCard> cards) {
+        List<Map<String, Object>> claims = new ArrayList<>();
+        List<Map<String, Object>> values = new ArrayList<>();
+        List<Map<String, Object>> habits = new ArrayList<>();
+        List<Map<String, Object>> temporalState = new ArrayList<>();
+        for (MemoryCard card : cards) {
+            String statement = DataMaskingUtils.maskContact(joinText(card.title, card.summary))
+                    .replaceAll("\\s+", " ").trim();
+            if (statement.isBlank()) continue;
+            statement = statement.substring(0, Math.min(220, statement.length()));
+            claims.add(irFeature("claim", card, statement, "EPISODIC_ONLY"));
+            if (containsCue(statement, VALUE_CUES)) {
+                values.add(irFeature("value", card, statement, "EXPLICIT_CUE_NOT_STABLE_TRAIT"));
+            }
+            if (containsCue(statement, HABIT_CUES)) {
+                habits.add(irFeature("habit", card, statement, "EXPLICIT_CUE_NOT_UNIVERSAL_BEHAVIOR"));
+            }
+            if (containsCue(statement, TEMPORAL_CUES)) {
+                temporalState.add(irFeature("temporal", card, statement, "TIME_BOUND_CLAIM"));
+            }
+        }
+        List<Map<String, Object>> unknowns = new ArrayList<>();
+        if (values.isEmpty()) unknowns.add(unknown("values", "没有授权记忆包含明确价值线索"));
+        if (habits.isEmpty()) unknowns.add(unknown("habits", "没有授权记忆包含明确习惯线索"));
+        if (temporalState.isEmpty()) unknowns.add(unknown("temporalState", "没有授权记忆包含明确近期状态线索"));
+
+        Map<String, Object> ir = new LinkedHashMap<>();
+        ir.put("schemaVersion", "capsule-genome-ir.v1");
+        ir.put("claims", claims);
+        ir.put("values", values);
+        ir.put("habits", habits);
+        ir.put("temporalState", temporalState);
+        ir.put("unknowns", unknowns);
+        ir.put("compilerNotice", "确定性显式线索提取，只证明来源可追溯，不证明真人相似度");
+        return ir;
+    }
+
+    private Map<String, Object> emptyGenomeIr(String reason) {
+        Map<String, Object> ir = new LinkedHashMap<>();
+        ir.put("schemaVersion", "capsule-genome-ir.v1");
+        ir.put("claims", List.of());
+        ir.put("values", List.of());
+        ir.put("habits", List.of());
+        ir.put("temporalState", List.of());
+        ir.put("unknowns", List.of(unknown("all", reason)));
+        ir.put("compilerNotice", "没有证据时不生成身份或行为断言");
+        return ir;
+    }
+
+    private Map<String, Object> irFeature(String prefix, MemoryCard card, String statement, String scope) {
+        double confidence = card.confidence == null ? 0.8 : Math.max(0.0, Math.min(1.0, card.confidence));
+        Map<String, Object> evidence = new LinkedHashMap<>();
+        evidence.put("memoryId", card.id);
+        evidence.put("sourceVersion", card.versionNo == null ? 1 : card.versionNo);
+        evidence.put("confidence", confidence);
+        Map<String, Object> feature = new LinkedHashMap<>();
+        feature.put("id", prefix + "-memory-" + card.id + "-v" + (card.versionNo == null ? 1 : card.versionNo));
+        feature.put("statement", statement);
+        feature.put("scope", scope);
+        feature.put("confidence", confidence);
+        feature.put("evidence", List.of(evidence));
+        feature.put("extractionMethod", "claim".equals(prefix)
+                ? "DETERMINISTIC_EPISODE_PROJECTION" : "DETERMINISTIC_EXPLICIT_CUE");
+        return feature;
+    }
+
+    private Map<String, Object> unknown(String category, String reason) {
+        return Map.of("category", category, "reason", reason, "fallback", "ACKNOWLEDGE_UNKNOWN");
+    }
+
+    private boolean containsCue(String text, List<String> cues) {
+        return cues.stream().anyMatch(text::contains);
+    }
+
+    private Map<String, Object> retrievalPolicy() {
+        Map<String, Object> policy = new LinkedHashMap<>();
+        policy.put("schemaVersion", "capsule-retrieval-policy.v1");
+        policy.put("intentToCategory", Map.of(
+                "CLAIM", List.of("claims"), "VALUE", List.of("values"),
+                "HABIT", List.of("habits"), "TEMPORAL", List.of("temporalState")));
+        policy.put("maxFeaturesPerTurn", 3);
+        policy.put("unsupportedBehavior", "ACKNOWLEDGE_UNKNOWN");
+        policy.put("neverRetrieve", List.of("未授权记忆", "原始对话全文", "真实身份", "联系方式"));
+        return policy;
     }
 
     private String write(Object value) {

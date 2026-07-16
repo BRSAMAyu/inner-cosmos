@@ -374,6 +374,53 @@ class CapsuleGenomeServiceIntegrationTest {
                 "must disclose that the blank-content memory could not be read");
     }
 
+    @Test
+    @Transactional
+    void compilerBuildsProvenanceCarryingIrWithoutGeneralizingUnsupportedCategories() throws Exception {
+        Long owner = seedUser("genome-ir-owner");
+        Long episode = seedMemory(owner, "搬家片段", "去年搬到成都，开始适应新的通勤路线", "AURORA_PRIVATE");
+        Long value = seedMemory(owner, "关系原则", "我很重视被认真回应，也不愿用冷处理解决分歧", "AURORA_PRIVATE");
+        Long habit = seedMemory(owner, "冲突习惯", "遇到冲突时我通常会先冷静，再说明具体边界", "AURORA_PRIVATE");
+        Long temporal = seedMemory(owner, "近期状态", "最近正在准备一次重要展示，目前有些紧张", "AURORA_PRIVATE");
+
+        CapsuleCreateRequest request = new CapsuleCreateRequest();
+        request.memoryIds = List.of(episode, value, habit, temporal);
+        request.visibilityStatus = "PRIVATE";
+        request.isPublic = false;
+        EchoCapsule capsule = capsuleService.createFromMemory(owner, request);
+        CapsuleGenomeVersion genome = genomeService.current(capsule.id);
+
+        JsonNode preview = objectMapper.readTree(genome.contextPreviewJson);
+        assertEquals("capsule-context-preview.v3", preview.path("schemaVersion").asText());
+        JsonNode ir = preview.path("genomeIr");
+        assertEquals("capsule-genome-ir.v1", ir.path("schemaVersion").asText());
+        assertEquals(4, ir.path("claims").size(), "every readable episode may become a scoped claim");
+        assertEquals(1, ir.path("values").size(), "only an explicit value cue may become a value feature");
+        assertEquals(1, ir.path("habits").size(), "only an explicit habit cue may become a habit feature");
+        assertEquals(1, ir.path("temporalState").size(), "only an explicit temporal cue may become current state");
+
+        assertFeatureCitesOnly(ir.path("values").get(0), value);
+        assertFeatureCitesOnly(ir.path("habits").get(0), habit);
+        assertFeatureCitesOnly(ir.path("temporalState").get(0), temporal);
+        assertEquals("DETERMINISTIC_EXPLICIT_CUE", ir.path("values").get(0).path("extractionMethod").asText());
+        assertEquals("capsule-retrieval-policy.v1", preview.path("retrievalPolicy").path("schemaVersion").asText());
+        assertEquals("ACKNOWLEDGE_UNKNOWN", preview.path("retrievalPolicy").path("unsupportedBehavior").asText());
+
+        JsonNode evaluation = objectMapper.readTree(genome.evaluationJson);
+        assertEquals(4, evaluation.path("claimCount").asInt());
+        assertEquals(1, evaluation.path("valueCount").asInt());
+        assertEquals(1, evaluation.path("habitCount").asInt());
+        assertEquals(1, evaluation.path("temporalStateCount").asInt());
+        assertEquals("capsule-genome.v3", genome.compilerVersion);
+    }
+
+    private void assertFeatureCitesOnly(JsonNode feature, Long memoryId) {
+        assertEquals(1, feature.path("evidence").size());
+        JsonNode evidence = feature.path("evidence").get(0);
+        assertEquals(memoryId, evidence.path("memoryId").asLong());
+        assertTrue(evidence.has("sourceVersion") && evidence.has("confidence"));
+    }
+
     private JsonNode findScene(JsonNode scenes, String theme) {
         return StreamSupport.stream(scenes.spliterator(), false)
                 .filter(scene -> theme.equals(scene.get("theme").asText()))

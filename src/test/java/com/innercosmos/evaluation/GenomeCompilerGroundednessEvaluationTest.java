@@ -25,7 +25,8 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Scores whether every piece of evidence the Genome compiler cites (styleProfileJson's
- * voiceEvidence, contextPreviewJson's per-scene memories[]) is genuinely grounded in memories the
+ * voiceEvidence, contextPreviewJson's per-scene memories[], and every v3 Genome IR category) is
+ * genuinely grounded in memories the
  * owner authorized — never another user's memory, never a memory the consent scope excludes
  * (LOCAL_ONLY/NO_EXTERNAL_PROCESSING/SIMULATOR_AUTHORIZED), and never anything beyond the
  * capsule's own persisted authorizedMemoryIds. Each scenario requests a mix of legitimate and
@@ -101,6 +102,11 @@ class GenomeCompilerGroundednessEvaluationTest {
                         scene.get("memories").forEach(ref -> citedIds.add(ref.get("memoryId").asLong()));
                     }
                 });
+            }
+            JsonNode ir = preview.path("genomeIr");
+            for (String category : List.of("claims", "values", "habits", "temporalState")) {
+                ir.path(category).forEach(feature -> feature.path("evidence").forEach(ref ->
+                        citedIds.add(ref.path("memoryId").asLong())));
             }
 
             List<Long> ungrounded = citedIds.stream().filter(id -> !legitimateSet.contains(id)).toList();

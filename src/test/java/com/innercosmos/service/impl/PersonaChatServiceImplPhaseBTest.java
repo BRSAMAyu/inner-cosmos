@@ -1,17 +1,15 @@
 package com.innercosmos.service.impl;
 
 import com.innercosmos.ai.agent.CapsuleAgent;
-import com.innercosmos.ai.context.AgentContext;
-import com.innercosmos.ai.context.AgentContextAssembler;
 import com.innercosmos.ai.structured.StructuredAiResults;
 import com.innercosmos.ai.structured.StructuredAiService;
 import com.innercosmos.entity.EchoCapsule;
+import com.innercosmos.entity.CapsuleGenomeVersion;
 import com.innercosmos.entity.PersonaChatMessage;
 import com.innercosmos.entity.PersonaChatSession;
 import com.innercosmos.mapper.CapsuleBoundaryMapper;
 import com.innercosmos.mapper.CapsuleUsageQuotaMapper;
 import com.innercosmos.mapper.EchoCapsuleMapper;
-import com.innercosmos.mapper.MemoryCardMapper;
 import com.innercosmos.mapper.PersonaChatMessageMapper;
 import com.innercosmos.mapper.PersonaChatSessionMapper;
 import com.innercosmos.mapper.AuthorizedMemoryRefMapper;
@@ -51,12 +49,11 @@ class PersonaChatServiceImplPhaseBTest {
     @Mock private SafetyService safetyService;
     @Mock private StructuredAiService structuredAiService;
     @Mock private CapsuleBoundaryMapper boundaryMapper;
-    @Mock private MemoryCardMapper memoryCardMapper;
-    @Mock private AgentContextAssembler agentContextAssembler;
     @Mock private CapsuleUsageQuotaMapper quotaMapper;
     @Mock private JdbcTemplate jdbcTemplate;
     @Mock private AuthorizedMemoryRefMapper authorizedMemoryRefMapper;
     @Mock private CapsuleGenomeService genomeService;
+    @Mock private CapsuleRuntimeContextComposer runtimeContextComposer;
 
     private PersonaChatServiceImpl service;
 
@@ -65,8 +62,12 @@ class PersonaChatServiceImplPhaseBTest {
         service = new PersonaChatServiceImpl(
                 sessionMapper, messageMapper, capsuleMapper,
                 capsuleAgent, safetyService, structuredAiService,
-                boundaryMapper, memoryCardMapper, agentContextAssembler,
-                quotaMapper, jdbcTemplate, authorizedMemoryRefMapper, genomeService);
+                boundaryMapper, quotaMapper, jdbcTemplate, authorizedMemoryRefMapper,
+                genomeService, runtimeContextComposer);
+        lenient().when(runtimeContextComposer.compose(any(), anyString())).thenReturn(java.util.Map.of(
+                "selectedEvidenceSummary", "", "selectedContext", java.util.Map.of(),
+                "contextBuildManifest", java.util.Map.of(), "unsupported", true,
+                "fallbackPolicy", "ACKNOWLEDGE_UNKNOWN"));
     }
 
     private EchoCapsule capsule(Long id) {
@@ -317,5 +318,54 @@ class PersonaChatServiceImplPhaseBTest {
         assertEquals("CAPSULE_WITHDRAWN", error.code);
         verifyNoInteractions(safetyService, structuredAiService);
         verify(messageMapper, never()).insert(any(PersonaChatMessage.class));
+    }
+
+    @Test
+    void personaTurnUsesOnlyComposerSelectionAndPassesManifestToProvider() {
+        Long userId = 9L, sessionId = 19L, capsuleId = 109L;
+        EchoCapsule c = capsule(capsuleId);
+        c.styleProfileJson = "{\"mutableDraft\":\"must-not-egress\"}";
+        c.contextPreviewJson = "{\"unselectedMemory\":999}";
+        when(sessionMapper.selectById(sessionId)).thenReturn(session(sessionId, userId, capsuleId));
+        when(safetyService.check(any(), any(), any())).thenReturn(safePassed());
+        when(capsuleMapper.selectById(capsuleId)).thenReturn(c);
+        reserveViaUpdate();
+        when(boundaryMapper.selectOne(any())).thenReturn(null);
+        when(structuredAiService.call(any(), any(), any(), any(), any(), any())).thenReturn(goodReply());
+        when(runtimeContextComposer.compose(any(), eq("你最近怎么样？"))).thenReturn(java.util.Map.of(
+                "selectedEvidenceSummary", "#13 最近正在准备展示",
+                "selectedContext", java.util.Map.of("selectedFeatures", java.util.List.of("temporal-13")),
+                "contextBuildManifest", java.util.Map.of("selectedMemoryIds", java.util.List.of(13L)),
+                "unsupported", false, "fallbackPolicy", "ACKNOWLEDGE_UNKNOWN"));
+
+        service.reply(userId, sessionId, "你最近怎么样？");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<java.util.Map<String, Object>> contextCaptor = ArgumentCaptor.forClass(java.util.Map.class);
+        verify(structuredAiService).call(any(), eq("PERSONA_CHAT"), any(), contextCaptor.capture(), any(), any());
+        java.util.Map<String, Object> sent = contextCaptor.getValue();
+        assertEquals("#13 最近正在准备展示", sent.get("authorizedMemorySummary"));
+        assertEquals(java.util.Map.of("selectedMemoryIds", java.util.List.of(13L)), sent.get("contextBuildManifest"));
+        assertFalse(sent.toString().contains("mutableDraft"));
+        assertFalse(sent.toString().contains("unselectedMemory"));
+    }
+
+    @Test
+    void legacyGenomeCannotSilentlyRunWithoutV3Ir() {
+        Long userId = 10L, sessionId = 20L, capsuleId = 110L;
+        EchoCapsule c = capsule(capsuleId);
+        c.activeGenomeVersionId = 700L;
+        CapsuleGenomeVersion legacy = new CapsuleGenomeVersion();
+        legacy.id = 700L;
+        legacy.compilerVersion = "capsule-genome.v2";
+        when(sessionMapper.selectById(sessionId)).thenReturn(session(sessionId, userId, capsuleId));
+        when(capsuleMapper.selectById(capsuleId)).thenReturn(c);
+        when(genomeService.current(capsuleId)).thenReturn(legacy);
+
+        var error = assertThrows(com.innercosmos.exception.BusinessException.class,
+                () -> service.reply(userId, sessionId, "继续聊聊"));
+
+        assertEquals("CAPSULE_REVIEW_REQUIRED", error.code);
+        verifyNoInteractions(safetyService, structuredAiService, runtimeContextComposer);
     }
 }

@@ -1,8 +1,6 @@
 package com.innercosmos.service.impl;
 
 import com.innercosmos.ai.agent.CapsuleAgent;
-import com.innercosmos.ai.context.AgentContext;
-import com.innercosmos.ai.context.AgentContextAssembler;
 import com.innercosmos.ai.structured.StructuredAiResults;
 import com.innercosmos.ai.structured.StructuredAiService;
 import com.innercosmos.entity.CapsuleUsageQuota;
@@ -12,7 +10,6 @@ import com.innercosmos.entity.PersonaChatSession;
 import com.innercosmos.mapper.CapsuleBoundaryMapper;
 import com.innercosmos.mapper.CapsuleUsageQuotaMapper;
 import com.innercosmos.mapper.EchoCapsuleMapper;
-import com.innercosmos.mapper.MemoryCardMapper;
 import com.innercosmos.mapper.PersonaChatMessageMapper;
 import com.innercosmos.mapper.PersonaChatSessionMapper;
 import com.innercosmos.mapper.AuthorizedMemoryRefMapper;
@@ -55,12 +52,11 @@ class PersonaChatServiceImplQuotaTest {
     @Mock private SafetyService safetyService;
     @Mock private StructuredAiService structuredAiService;
     @Mock private CapsuleBoundaryMapper boundaryMapper;
-    @Mock private MemoryCardMapper memoryCardMapper;
-    @Mock private AgentContextAssembler agentContextAssembler;
     @Mock private CapsuleUsageQuotaMapper quotaMapper;
     @Mock private JdbcTemplate jdbcTemplate;
     @Mock private AuthorizedMemoryRefMapper authorizedMemoryRefMapper;
     @Mock private CapsuleGenomeService genomeService;
+    @Mock private CapsuleRuntimeContextComposer runtimeContextComposer;
 
     private PersonaChatServiceImpl service;
 
@@ -69,8 +65,12 @@ class PersonaChatServiceImplQuotaTest {
         service = new PersonaChatServiceImpl(
                 sessionMapper, messageMapper, capsuleMapper,
                 capsuleAgent, safetyService, structuredAiService,
-                boundaryMapper, memoryCardMapper, agentContextAssembler,
-                quotaMapper, jdbcTemplate, authorizedMemoryRefMapper, genomeService);
+                boundaryMapper, quotaMapper, jdbcTemplate, authorizedMemoryRefMapper,
+                genomeService, runtimeContextComposer);
+        lenient().when(runtimeContextComposer.compose(any(), anyString())).thenReturn(java.util.Map.of(
+                "selectedEvidenceSummary", "", "selectedContext", java.util.Map.of(),
+                "contextBuildManifest", java.util.Map.of(), "unsupported", true,
+                "fallbackPolicy", "ACKNOWLEDGE_UNKNOWN"));
     }
 
     // ──────────────────────────────────────────────────────
