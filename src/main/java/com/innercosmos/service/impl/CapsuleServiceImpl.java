@@ -7,6 +7,8 @@ import com.innercosmos.ai.agent.CapsuleAgent;
 import com.innercosmos.dto.CapsuleCreateRequest;
 import com.innercosmos.entity.CapsuleBoundary;
 import com.innercosmos.entity.EchoCapsule;
+import com.innercosmos.entity.BlockRelation;
+import com.innercosmos.mapper.BlockRelationMapper;
 import com.innercosmos.mapper.CapsuleBoundaryMapper;
 import com.innercosmos.mapper.EchoCapsuleMapper;
 import com.innercosmos.mapper.MemoryCardMapper;
@@ -29,6 +31,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -46,6 +49,7 @@ public class CapsuleServiceImpl implements CapsuleService {
     private final AuthorizedMemoryRefMapper authorizedMemoryRefMapper;
     private final CapsuleGenomeService genomeService;
     private final DataUseGrantService dataUseGrantService;
+    private final BlockRelationMapper blockRelationMapper;
     private final ObjectMapper objectMapper;
 
     public CapsuleServiceImpl(EchoCapsuleMapper capsuleMapper,
@@ -56,6 +60,7 @@ public class CapsuleServiceImpl implements CapsuleService {
                               AuthorizedMemoryRefMapper authorizedMemoryRefMapper,
                               CapsuleGenomeService genomeService,
                               DataUseGrantService dataUseGrantService,
+                              BlockRelationMapper blockRelationMapper,
                               ObjectMapper objectMapper) {
         this.capsuleMapper = capsuleMapper;
         this.boundaryMapper = boundaryMapper;
@@ -65,6 +70,7 @@ public class CapsuleServiceImpl implements CapsuleService {
         this.authorizedMemoryRefMapper = authorizedMemoryRefMapper;
         this.genomeService = genomeService;
         this.dataUseGrantService = dataUseGrantService;
+        this.blockRelationMapper = blockRelationMapper;
         this.objectMapper = objectMapper;
     }
 
@@ -336,11 +342,19 @@ public class CapsuleServiceImpl implements CapsuleService {
         // portrait families (CURRENT_STATE / EMOTION_PATTERN / INNER_DRIVE) for this user.
         Set<String> portraitFamilies = fetchPortraitFamilies(userId);
 
+        // SAFETY-FILTER STAGE: a capsule owned by someone in a block relationship with the viewer
+        // (either direction) must never surface as a resonance match. The plaza query only gates
+        // public/visible; block state is a viewer-specific safety signal that belongs in matching.
+        Set<Long> blockedUserIds = blockedCounterparties(userId);
+
         List<EchoCapsule> all = plazaCapsules();
         List<Map<String, Object>> scored = new ArrayList<>();
         for (EchoCapsule capsule : all) {
             if (userId.equals(capsule.ownerUserId)) {
                 continue;
+            }
+            if (capsule.ownerUserId != null && blockedUserIds.contains(capsule.ownerUserId)) {
+                continue; // safety filter: never surface a blocked (either-direction) user's capsule
             }
             String capText = joinText(capsule.intro,
                     String.join(" ", parseTags(capsule.publicTags)), capsule.pseudonym);
@@ -396,6 +410,8 @@ public class CapsuleServiceImpl implements CapsuleService {
             // cold-start backfill; existing keys (matchScore/matchSummary/matchReasons/capsule)
             // are unchanged so no frontend change is required.
             item.put("resonant", resonant);
+            // Transient feature set for the diversity stage; stripped before returning.
+            item.put("__themeKeys", new HashSet<>(capsuleThemeProfile.keySet()));
             scored.add(item);
         }
         // FIX-A relevance gate: relevant capsules (resonant=true) ALWAYS sort before
@@ -408,10 +424,80 @@ public class CapsuleServiceImpl implements CapsuleService {
                 .comparingDouble((Map<String, Object> v) -> -((Number) v.get("matchScore")).doubleValue())
                 .thenComparingDouble(v -> -energyOf(v))
                 .thenComparingLong(CapsuleServiceImpl::idOf);
-        scored.sort(Comparator
-                .comparingInt((Map<String, Object> v) -> Boolean.TRUE.equals(v.get("resonant")) ? 0 : 1)
-                .thenComparing(withinGroup));
-        return scored.stream().limit(12).toList();
+        // DIVERSITY STAGE: within each group (resonant first, then backfill), re-rank with
+        // maximal-marginal-relevance so the top slots are not crowded by near-identical theme
+        // profiles. The resonant-before-non-resonant invariant (FIX-A) is preserved by diversifying
+        // each group independently, and relevance still dominates (lambda 0.72).
+        List<Map<String, Object>> resonantGroup = new ArrayList<>();
+        List<Map<String, Object>> backfillGroup = new ArrayList<>();
+        for (Map<String, Object> v : scored) {
+            (Boolean.TRUE.equals(v.get("resonant")) ? resonantGroup : backfillGroup).add(v);
+        }
+        resonantGroup.sort(withinGroup);
+        backfillGroup.sort(withinGroup);
+        List<Map<String, Object>> ordered = new ArrayList<>();
+        ordered.addAll(diversify(resonantGroup, withinGroup));
+        ordered.addAll(diversify(backfillGroup, withinGroup));
+        return ordered.stream().limit(12)
+                .peek(item -> item.remove("__themeKeys"))
+                .toList();
+    }
+
+    private static final double DIVERSITY_LAMBDA = 0.72;
+
+    /**
+     * Maximal-marginal-relevance re-rank: greedily pick the candidate that best balances relevance
+     * against dissimilarity to what is already selected, so the result set spreads across theme
+     * families instead of returning many near-duplicate capsules. Deterministic — ties fall back to
+     * the caller's stable comparator.
+     */
+    private List<Map<String, Object>> diversify(List<Map<String, Object>> group,
+                                                Comparator<Map<String, Object>> tieBreak) {
+        List<Map<String, Object>> pool = new ArrayList<>(group);
+        List<Map<String, Object>> selected = new ArrayList<>(pool.size());
+        while (!pool.isEmpty()) {
+            Map<String, Object> best = null;
+            double bestScore = Double.NEGATIVE_INFINITY;
+            for (Map<String, Object> candidate : pool) {
+                double relevance = ((Number) candidate.get("matchScore")).doubleValue();
+                double maxSim = 0.0;
+                for (Map<String, Object> chosen : selected) {
+                    maxSim = Math.max(maxSim, jaccard(themeKeysOf(candidate), themeKeysOf(chosen)));
+                }
+                double mmr = DIVERSITY_LAMBDA * relevance - (1.0 - DIVERSITY_LAMBDA) * maxSim;
+                if (best == null || mmr > bestScore + 1e-9
+                        || (Math.abs(mmr - bestScore) <= 1e-9 && tieBreak.compare(candidate, best) < 0)) {
+                    best = candidate;
+                    bestScore = mmr;
+                }
+            }
+            selected.add(best);
+            pool.remove(best);
+        }
+        return selected;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Set<String> themeKeysOf(Map<String, Object> item) {
+        Object keys = item.get("__themeKeys");
+        return keys instanceof Set ? (Set<String>) keys : Set.of();
+    }
+
+    private static double jaccard(Set<String> a, Set<String> b) {
+        if (a.isEmpty() && b.isEmpty()) return 0.0;
+        long intersection = a.stream().filter(b::contains).count();
+        long union = a.size() + b.size() - intersection;
+        return union == 0 ? 0.0 : (double) intersection / union;
+    }
+
+    /** Blocked counterparties (either direction) for the viewer — a viewer-specific safety filter. */
+    private Set<Long> blockedCounterparties(Long userId) {
+        Set<Long> blocked = new HashSet<>();
+        blockRelationMapper.selectList(new QueryWrapper<BlockRelation>().eq("blocker_user_id", userId))
+                .forEach(relation -> { if (relation.blockedUserId != null) blocked.add(relation.blockedUserId); });
+        blockRelationMapper.selectList(new QueryWrapper<BlockRelation>().eq("blocked_user_id", userId))
+                .forEach(relation -> { if (relation.blockerUserId != null) blocked.add(relation.blockerUserId); });
+        return blocked;
     }
 
     private StrategySignal strategySignal(ResonanceMatchStrategy strategy,

@@ -48,6 +48,7 @@ class CapsuleMatchingTest {
     @Mock AuthorizedMemoryRefMapper authorizedMemoryRefMapper;
     @Mock CapsuleGenomeService genomeService;
     @Mock DataUseGrantService dataUseGrantService;
+    @Mock com.innercosmos.mapper.BlockRelationMapper blockRelationMapper;
 
     CapsuleServiceImpl service;
 
@@ -59,9 +60,11 @@ class CapsuleMatchingTest {
     void setUp() {
         service = new CapsuleServiceImpl(echoCapsuleMapper, boundaryMapper, capsuleAgent,
                 memoryCardMapper, userPortraitMapper, authorizedMemoryRefMapper, genomeService, dataUseGrantService,
-                new com.fasterxml.jackson.databind.ObjectMapper());
+                blockRelationMapper, new com.fasterxml.jackson.databind.ObjectMapper());
         // default: no portrait rows unless a test overrides
         lenient().when(userPortraitMapper.selectList(any())).thenReturn(new ArrayList<>());
+        // default: no block relationships unless a test overrides
+        lenient().when(blockRelationMapper.selectList(any())).thenReturn(new ArrayList<>());
         lenient().when(dataUseGrantService.authorize(any(), any())).thenAnswer(invocation -> {
             com.innercosmos.entity.DataUseGrant primary = new com.innercosmos.entity.DataUseGrant();
             primary.id = 7001L;
@@ -156,6 +159,56 @@ class CapsuleMatchingTest {
         assertEquals(12, result.size(), "top-12 cap");
         boolean noisePresent = result.stream().anyMatch(it -> idOf(it) == 500L);
         assertFalse(noisePresent, "zero-overlap noise capsule must NOT be in top-12 (no floor)");
+    }
+
+    /** SAFETY FILTER: a capsule owned by a blocked (either-direction) user must never surface. */
+    @Test
+    void blockedOwnerCapsuleIsExcludedFromMatches() {
+        stubMemories(memory(1, "复习", "考试 作业 拖延 压力 累", "考试,拖延", "焦虑"));
+        EchoCapsule blockedOwners = capsule(300L, 999L, "USER_CAPSULE", "被屏蔽的回声",
+                "考试作业拖延压力", "[\"考试\",\"压力\"]", 0.9);
+        EchoCapsule visible = capsule(301L, 888L, "USER_CAPSULE", "可见回声",
+                "考试作业拖延压力", "[\"考试\",\"压力\"]", 0.7);
+        stubPlaza(blockedOwners, visible);
+        com.innercosmos.entity.BlockRelation relation = new com.innercosmos.entity.BlockRelation();
+        relation.blockerUserId = USER_ID;
+        relation.blockedUserId = 999L;
+        when(blockRelationMapper.selectList(any())).thenReturn(List.of(relation));
+
+        List<Map<String, Object>> result = service.matchedCapsules(USER_ID);
+
+        assertTrue(result.stream().noneMatch(it -> idOf(it) == 300L),
+                "a blocked user's capsule must be filtered out of resonance matches");
+        assertTrue(result.stream().anyMatch(it -> idOf(it) == 301L),
+                "a non-blocked user's capsule still matches");
+    }
+
+    /**
+     * DIVERSITY RE-RANK: three near-duplicate 任务压力 capsules (marginally higher energy) would,
+     * on raw score alone, occupy the top three slots and push the single 情绪承压 capsule last.
+     * MMR must promote the dissimilar capsule into slot two so the result set spreads across
+     * theme families instead of returning near-duplicates.
+     */
+    @Test
+    void diversityRerankPromotesADissimilarCapsuleOverNearDuplicates() {
+        // Clean single-family keywords (作业/考试/拖延 => 任务压力 only; 朋友/同学/吵架 => 关系牵动 only;
+        // avoid 压力/累 which map to two families) so relevance is equal and only energy/diversity vary.
+        stubMemories(memory(1, "记录", "考试 作业 拖延 朋友 同学 吵架", "考试,朋友", "焦虑"));
+        EchoCapsule taskA = capsule(400L, 901L, "USER_CAPSULE", "任务回声A", "考试 作业 拖延", "[\"考试\"]", 0.85);
+        EchoCapsule taskB = capsule(401L, 902L, "USER_CAPSULE", "任务回声B", "考试 作业 拖延", "[\"考试\"]", 0.85);
+        EchoCapsule taskC = capsule(402L, 903L, "USER_CAPSULE", "任务回声C", "考试 作业 拖延", "[\"考试\"]", 0.85);
+        EchoCapsule mood = capsule(410L, 904L, "USER_CAPSULE", "关系回声", "朋友 同学 吵架", "[\"朋友\"]", 0.80);
+        stubPlaza(taskA, taskB, taskC, mood);
+
+        List<Map<String, Object>> result = service.matchedCapsules(USER_ID);
+
+        assertEquals(410L, idOf(result.get(1)),
+                "the dissimilar 关系牵动 capsule must be promoted to slot two by the diversity stage");
+        long moodIndex = result.stream().map(this::idOf).toList().indexOf(410L);
+        long lastTaskIndex = 0;
+        List<Long> ids = result.stream().map(this::idOf).toList();
+        for (int i = 0; i < ids.size(); i++) if (ids.get(i) >= 400L && ids.get(i) <= 402L) lastTaskIndex = i;
+        assertTrue(moodIndex < lastTaskIndex, "the diverse capsule must outrank at least one near-duplicate");
     }
 
     /**
