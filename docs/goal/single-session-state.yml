@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-16T08:52:00+08:00
+updated_at: 2026-07-16T09:02:00+08:00
 authority:
   - goal-objective.md
   - 对齐文档/17-单会话持续Goal模式执行协议.md
@@ -483,7 +483,7 @@ closed_front_g3_account_settings:
       corrections.html/memory-starfield.html become genuinely safe to redirect per the
       G3-UX-SHELL-REAL-PARITY rule (verify parity first, same rigor, before retiring)."
 
-active_front:
+closed_front_g3_correction_history_retire:
   id: G3-CORRECTION-HISTORY-RETIRE
   state: DONE_VERIFIED_LIVE_END_TO_END_PLUS_BACKEND_500_FIX
   intent: |
@@ -550,6 +550,49 @@ active_front:
       retire/redirect per the G3-UX-SHELL-REAL-PARITY rule (verify parity first, same rigor)."
     - "Or pick a different acceptance-ledger front if a fresher, higher-value machine-actionable gap
       surfaces (e.g. Campaign C Genome IR next slice, an UNASSESSED G2 contract item)."
+
+active_front:
+  id: G3-STARFIELD-IMPORTANCE-ARCHIVE
+  state: DONE_VERIFIED_LIVE_END_TO_END
+  intent: |
+    Executed the next ranked port item (memory-starfield.html gap, #7 in the
+    G3-UX-SHELL-REAL-PARITY parity list): the AppShell's star provenance panel could explain a star
+    but not tune its importance or archive it, both of which the legacy page offers. Both backends
+    (POST /api/memory/cards/{id}/importance, POST /api/memory/cards/{id}/archive) already existed —
+    another pure frontend port, no backend change.
+  done_this_front_summary:
+    - "MemoryStarfield.tsx: the revealed-star provenance panel now has an importance slider (0.5–2,
+      step 0.1, seeded from card.userImportance) with a '保存重要度' save and a '归档这颗记忆' archive
+      action, in a small MemoryDetailActions child rendered with key={card.id} so the slider's local
+      state resets per star. api.ts: added userImportance to StarfieldDetail.card, plus
+      updateMemoryImportance(id, importance) and archiveMemory(id). AuroraApp.tsx: saving importance
+      refetches scene+open-detail+cards (importance recomputes gravity); archiving refetches
+      scene+operations+cards and closes the panel (archive is a versioned, rollbackable ARCHIVE
+      memory-operation — reversible via the existing rollback flow, ARCHIVE is not in
+      rollbackExcluded)."
+    - "Tests: 3 new Vitest cases (slider seeds from the current value + saves the tuned value;
+      archive calls onArchive with the card id; busy states disable + relabel both buttons). 49/49
+      Vitest green (was 46), tsc clean, production bundle rebuilt. No Java changed -> no Java gate
+      re-run this front (risk-based)."
+    - "Live end-to-end (packaged jar on a throwaway H2, memory card seeded via H2 shell for user 1):
+      confirmed GET /api/memory/starfield/1/detail exposes userImportance; through the real UI the
+      panel opened with the slider at the card's value (1.0), moving it to 1.8 and saving persisted
+      user_importance=1.8 and recomputed emotional_gravity 1.4 -> ~1.18 (confirmed by direct H2
+      query); archiving removed the star from both the UI list and the API scene (0 stars), created
+      an ARCHIVE operation (confirmed in DOM + /api/memory/operations), closed the panel, showed the
+      status message, 0 console errors."
+  next_machine_actions:
+    - "NEXT — continue the ranked G3-UX-SHELL-REAL-PARITY port list. Remaining by rough weight:
+      capsule-create real user-choice fields (#9, hardcoded privacy/boundary/turn-limit/owner-note/
+      style/stand-in/contact-policy today); arbitrary-capsule persona chat (#5); echo-plaza public
+      directory + landed action + sync review (#4); letters outbox/drafts/archive/thread view (#10);
+      aurora-chat voice input + session rituals (#6); and the largest, relations/social (#3, ZERO
+      API-client presence — needs a backend endpoint audit first to even scope it)."
+    - "Now that corrections + starfield importance/archive have verified parity, the pages
+      corrections.html and memory-starfield.html are closer to safe-to-retire, but portrait/settings
+      still gate the shared retire decision — do NOT retire any until ALL of its duplicated
+      capabilities have verified AppShell parity, per the G3-UX-SHELL-REAL-PARITY rule."
+    - "Or pick a fresher higher-value machine-actionable acceptance front if one surfaces."
 
 priority_queue:
   - id: CAMPAIGN-C-QUALITY
@@ -629,7 +672,10 @@ last_full_gate:
     new UserCorrectionControllerTest.reCorrectingAfterRetiringTheOnlyClaim... (red->green backend
     500 fix). NOTE: earlier gates claimed 795/795 when Docker WAS available; the 4-test delta is
     exactly those Docker-gated integration tests, now un-runnable here — not lost tests.
-  claimed_vitest: 46/46 (was 42; +4 new UnderstandingCorrection history/retire cases this checkpoint)
+  claimed_vitest: |
+    49/49 (was 42 at session resume; +4 UnderstandingCorrection history/retire cases, then +3
+    MemoryStarfield importance/archive cases). The starfield front changed no Java, so no Java gate
+    was re-run for it (risk-based); the 791/791-runnable Java gate above still holds at its baseline.
   claimed_playwright: 13/13 plus Living Aurora 1/1 (not re-run this checkpoint — no change to the
     journeys they cover; the new frontend surface is covered by Vitest + live browser verification)
   independent_reverification: BUILDER_VERIFIED_WITH_HUMAN_AND_PRODUCTION_GATES
