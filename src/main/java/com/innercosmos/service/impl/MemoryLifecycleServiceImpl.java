@@ -26,6 +26,7 @@ import com.innercosmos.mapper.RelationMentionMapper;
 import com.innercosmos.mapper.ThoughtFragmentMapper;
 import com.innercosmos.mapper.TodoItemMapper;
 import com.innercosmos.service.CapsuleGenomeService;
+import com.innercosmos.service.DataUseGrantService;
 import com.innercosmos.service.MemoryLifecycleService;
 import com.innercosmos.vo.MemoryOperationPreviewVO;
 import com.innercosmos.vo.MemoryOperationResultVO;
@@ -59,6 +60,7 @@ public class MemoryLifecycleServiceImpl implements MemoryLifecycleService {
     private final ApplicationEventPublisher eventPublisher;
     private final EchoCapsuleMapper capsuleMapper;
     private final CapsuleGenomeService genomeService;
+    private final DataUseGrantService dataUseGrantService;
 
     public MemoryLifecycleServiceImpl(MemoryCardMapper memoryMapper,
                                       MemoryOperationMapper operationMapper,
@@ -72,7 +74,8 @@ public class MemoryLifecycleServiceImpl implements MemoryLifecycleService {
                                       ObjectMapper objectMapper,
                                       ApplicationEventPublisher eventPublisher,
                                       EchoCapsuleMapper capsuleMapper,
-                                      CapsuleGenomeService genomeService) {
+                                      CapsuleGenomeService genomeService,
+                                      DataUseGrantService dataUseGrantService) {
         this.memoryMapper = memoryMapper;
         this.operationMapper = operationMapper;
         this.projectionReceiptMapper = projectionReceiptMapper;
@@ -86,6 +89,7 @@ public class MemoryLifecycleServiceImpl implements MemoryLifecycleService {
         this.eventPublisher = eventPublisher;
         this.capsuleMapper = capsuleMapper;
         this.genomeService = genomeService;
+        this.dataUseGrantService = dataUseGrantService;
     }
 
     @Override
@@ -335,6 +339,7 @@ public class MemoryLifecycleServiceImpl implements MemoryLifecycleService {
                         new QueryWrapper<AuthorizedMemoryRef>().eq("memory_card_id", card.id))
                 .stream().map(ref -> ref.capsuleId).distinct().toList();
 
+        dataUseGrantService.revokeForMemory(card.id, "source memory forgotten by owner");
         authorizedMemoryRefMapper.delete(new QueryWrapper<AuthorizedMemoryRef>().eq("memory_card_id", card.id));
         thoughtFragmentMapper.delete(new QueryWrapper<com.innercosmos.entity.ThoughtFragment>().eq("memory_card_id", card.id));
         todoItemMapper.delete(new QueryWrapper<com.innercosmos.entity.TodoItem>().eq("source_memory_card_id", card.id));
@@ -381,6 +386,7 @@ public class MemoryLifecycleServiceImpl implements MemoryLifecycleService {
         List<AuthorizedMemoryRef> refs = authorizedMemoryRefMapper.selectList(
                 new QueryWrapper<AuthorizedMemoryRef>().in("memory_card_id", ids(source)));
         for (AuthorizedMemoryRef ref : refs) { ref.authorizationStatus = "NEEDS_REVIEW"; authorizedMemoryRefMapper.updateById(ref); }
+        for (MemoryCard card : source) dataUseGrantService.revokeForMemory(card.id, "memory operation requires renewed consent: " + operation);
     }
 
     private List<MemoryProjectionReceipt> projectionReceipts(Long userId, MemoryOperation operation,

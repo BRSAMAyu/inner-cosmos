@@ -21,6 +21,7 @@ import com.innercosmos.service.PersonaChatService;
 import com.innercosmos.service.CapsuleGenomeService;
 import com.innercosmos.entity.CapsuleGenomeVersion;
 import com.innercosmos.service.SafetyService;
+import com.innercosmos.service.DataUseGrantService;
 import com.innercosmos.util.DataMaskingUtils;
 import com.innercosmos.vo.CapsuleQuotaVO;
 import com.innercosmos.vo.SafetyResult;
@@ -74,6 +75,7 @@ public class PersonaChatServiceImpl implements PersonaChatService {
     private final AuthorizedMemoryRefMapper authorizedMemoryRefMapper;
     private final CapsuleGenomeService genomeService;
     private final CapsuleRuntimeContextComposer runtimeContextComposer;
+    private final DataUseGrantService dataUseGrantService;
 
     public PersonaChatServiceImpl(PersonaChatSessionMapper sessionMapper,
                                   PersonaChatMessageMapper messageMapper,
@@ -86,7 +88,8 @@ public class PersonaChatServiceImpl implements PersonaChatService {
                                   JdbcTemplate jdbcTemplate,
                                   AuthorizedMemoryRefMapper authorizedMemoryRefMapper,
                                   CapsuleGenomeService genomeService,
-                                  CapsuleRuntimeContextComposer runtimeContextComposer) {
+                                  CapsuleRuntimeContextComposer runtimeContextComposer,
+                                  DataUseGrantService dataUseGrantService) {
         this.sessionMapper = sessionMapper;
         this.messageMapper = messageMapper;
         this.capsuleMapper = capsuleMapper;
@@ -99,6 +102,7 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         this.authorizedMemoryRefMapper = authorizedMemoryRefMapper;
         this.genomeService = genomeService;
         this.runtimeContextComposer = runtimeContextComposer;
+        this.dataUseGrantService = dataUseGrantService;
     }
 
     @Override
@@ -404,6 +408,9 @@ public class PersonaChatServiceImpl implements PersonaChatService {
                         .in("memory_card_id", selectedIds).eq("authorization_status", "AUTHORIZED"));
         if (authorizedCount < selectedIds.size()) {
             throw new BusinessException("CAPSULE_REVIEW_REQUIRED", "这个共鸣体的授权记忆已变化，需由主人复核后再继续");
+        }
+        if (!dataUseGrantService.authorizationsValid(capsule, selectedIds)) {
+            throw new BusinessException("CAPSULE_REVIEW_REQUIRED", "这个共鸣体的数据使用授权已变化，需由主人复核后再继续");
         }
         return genome;
     }

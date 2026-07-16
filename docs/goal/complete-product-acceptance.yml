@@ -2,8 +2,8 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 authority: goal-objective.md
 status: IN_PROGRESS
-last_reconciled_at: 2026-07-16T12:40:00+08:00
-last_reconciled_commit: e2b0050
+last_reconciled_at: 2026-07-16T13:02:00+08:00
+last_reconciled_commit: PENDING_DATA_USE_GRANT_CHECKPOINT
 
 status_semantics:
   UNASSESSED: current HEAD and target environment have not been verified
@@ -65,7 +65,7 @@ gates:
       - id: GOV-INNOVATION
         target: Innovation semantics remain authoritative and are governed by versioning, evaluation, consent, and rollback rather than deletion.
         status: IN_PROGRESS
-        evidence: [evidence/innovation/INNO-SELF-001/, evidence/innovation/INNO-INNER-003/, evidence/innovation/INNO-CAP-002/]
+        evidence: [evidence/innovation/INNO-SELF-001/, evidence/innovation/INNO-INNER-003/, evidence/innovation/INNO-CAP-002/, evidence/innovation/INNO-CAP-009/]
 
   - id: G1
     name: Modern platform baseline
@@ -252,12 +252,12 @@ gates:
     status: IN_PROGRESS
     required: true
     acceptance:
-      - {id: CAPSULE-COMPILER, target: "Authorized data compiles into a versioned Genome with coverage, conflicts, sandbox, and withdrawal.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CAP-001/, evidence/innovation/INNO-CAP-002/, evidence/innovation/INNO-CAP-003/, evidence/innovation/INNO-CAP-008/]}
+      - {id: CAPSULE-COMPILER, target: "Authorized data compiles into a versioned Genome with coverage, conflicts, sandbox, and withdrawal.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CAP-001/, evidence/innovation/INNO-CAP-002/, evidence/innovation/INNO-CAP-003/, evidence/innovation/INNO-CAP-008/, evidence/innovation/INNO-CAP-009/]}
       - {id: CAPSULE-RUNTIME, target: "Planner, retrieval, speaker, critics, and reranker produce materially better fidelity than a long-prompt baseline.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CAP-008/]}
-      - {id: CAPSULE-SAFETY, target: "Fact, style, habit, boundary, leakage, adversarial, and longitudinal evaluations pass.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CAP-001/, evidence/innovation/INNO-CAP-002/, evidence/innovation/INNO-CAP-003/, evidence/innovation/INNO-CAP-008/]}
+      - {id: CAPSULE-SAFETY, target: "Fact, style, habit, boundary, leakage, adversarial, and longitudinal evaluations pass.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CAP-001/, evidence/innovation/INNO-CAP-002/, evidence/innovation/INNO-CAP-003/, evidence/innovation/INNO-CAP-008/, evidence/innovation/INNO-CAP-009/]}
       - {id: MATCH-MULTI, target: "Mirror, Complement, Growth Edge, Serendipity, and Contextual matching are explainable and user-controllable.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CAP-005/]}
       - {id: SOCIAL-CLOSED-LOOP, target: "Discovery, capsule conversation, slow letter, mutual connection, refusal, report, and withdrawal work end to end.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CAP-001/, evidence/innovation/INNO-CAP-002/, evidence/innovation/INNO-CAP-003/, evidence/innovation/INNO-CAP-004/, evidence/innovation/INNO-CAP-006/, evidence/innovation/INNO-CAP-007/]}
-      - {id: SIMULATOR-ASSET, target: "An isolated consent-bound simulator demo proves reusable fidelity technology without covert personal-data training.", status: UNASSESSED, evidence: []}
+      - {id: SIMULATOR-ASSET, target: "An isolated consent-bound simulator demo proves reusable fidelity technology without covert personal-data training.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CAP-009/]}
 
   - id: G7
     name: Psychology skills, mobile, and experience completion

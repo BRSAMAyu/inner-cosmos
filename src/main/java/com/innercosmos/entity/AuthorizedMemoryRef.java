@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 public class AuthorizedMemoryRef extends BaseEntity {
     public Long capsuleId;
     public Long memoryCardId;
+    public Long dataUseGrantId;
     public String abstractExcerpt;
     public String authorizationStatus;
 }

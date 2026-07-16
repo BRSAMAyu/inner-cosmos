@@ -9,6 +9,8 @@ import com.innercosmos.entity.MemoryCard;
 import com.innercosmos.exception.BusinessException;
 import com.innercosmos.mapper.CapsuleGenomeVersionMapper;
 import com.innercosmos.mapper.EchoCapsuleMapper;
+import com.innercosmos.mapper.DataUseGrantMapper;
+import com.innercosmos.entity.DataUseGrant;
 import com.innercosmos.service.CapsuleGenomeService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,13 +29,16 @@ public class CapsuleGenomeServiceImpl implements CapsuleGenomeService {
     private final CapsuleGenomeVersionMapper genomeMapper;
     private final EchoCapsuleMapper capsuleMapper;
     private final ObjectMapper objectMapper;
+    private final DataUseGrantMapper grantMapper;
 
     public CapsuleGenomeServiceImpl(CapsuleGenomeVersionMapper genomeMapper,
                                     EchoCapsuleMapper capsuleMapper,
-                                    ObjectMapper objectMapper) {
+                                    ObjectMapper objectMapper,
+                                    DataUseGrantMapper grantMapper) {
         this.genomeMapper = genomeMapper;
         this.capsuleMapper = capsuleMapper;
         this.objectMapper = objectMapper;
+        this.grantMapper = grantMapper;
     }
 
     @Override
@@ -67,13 +72,23 @@ public class CapsuleGenomeServiceImpl implements CapsuleGenomeService {
         genome.parentVersionId = previous == null ? null : previous.id;
         genome.compilerVersion = COMPILER_VERSION;
         genome.status = "ACTIVE";
+        List<Long> memoryIds = authorizedCards.stream().map(card -> card.id).toList();
+        List<DataUseGrant> grants = memoryIds.isEmpty() ? List.of() : grantMapper.selectList(
+                new QueryWrapper<DataUseGrant>().eq("owner_user_id", capsule.ownerUserId)
+                        .eq("consumer_type", "ECHO_CAPSULE").eq("consumer_id", capsule.id)
+                        .eq("resource_type", "MEMORY_CARD").in("resource_id", memoryIds)
+                        .eq("status", "ACTIVE"));
         genome.authorizationSnapshotJson = write(Map.of(
-                "schemaVersion", "capsule-authorization.v1",
+                "schemaVersion", "capsule-authorization.v2",
                 "memories", authorizedCards.stream().map(card -> Map.of(
                         "memoryId", card.id,
                         "sourceVersion", card.versionNo == null ? 1 : card.versionNo,
                         "consentScope", card.consentScope == null ? "EXPLICIT_CAPSULE_SELECTION" : card.consentScope
-                )).toList()));
+                )).toList(),
+                "dataUseGrants", grants.stream().map(grant -> Map.of(
+                        "grantId", grant.id, "grantVersion", grant.grantVersion,
+                        "resourceId", grant.resourceId, "resourceVersion", grant.resourceVersion,
+                        "purpose", grant.purpose, "status", grant.status)).toList()));
         genome.compiledPersonaPrompt = capsule.personaPrompt == null ? "" : capsule.personaPrompt;
         genome.styleProfileJson = capsule.styleProfileJson;
         genome.contextPreviewJson = capsule.contextPreviewJson;

@@ -11,6 +11,8 @@ import com.innercosmos.service.CapsuleService;
 import com.innercosmos.service.DataMaskingService;
 import com.innercosmos.service.CapsuleGenomeService;
 import com.innercosmos.service.CapsuleSandboxService;
+import com.innercosmos.service.DataUseGrantService;
+import com.innercosmos.entity.DataUseGrant;
 import com.innercosmos.entity.CapsuleGenomeVersion;
 import com.innercosmos.entity.CapsuleSandboxFeedback;
 import com.innercosmos.vo.CapsuleFidelitySummaryVO;
@@ -31,13 +33,16 @@ public class CapsuleController extends BaseController {
     private final DataMaskingService dataMaskingService;
     private final CapsuleGenomeService genomeService;
     private final CapsuleSandboxService sandboxService;
+    private final DataUseGrantService dataUseGrantService;
 
     public CapsuleController(CapsuleService capsuleService, DataMaskingService dataMaskingService,
-                             CapsuleGenomeService genomeService, CapsuleSandboxService sandboxService) {
+                             CapsuleGenomeService genomeService, CapsuleSandboxService sandboxService,
+                             DataUseGrantService dataUseGrantService) {
         this.capsuleService = capsuleService;
         this.dataMaskingService = dataMaskingService;
         this.genomeService = genomeService;
         this.sandboxService = sandboxService;
+        this.dataUseGrantService = dataUseGrantService;
     }
 
     @GetMapping("/my")
@@ -125,6 +130,20 @@ public class CapsuleController extends BaseController {
     @GetMapping("/{id}/genome-history")
     public ApiResponse<List<CapsuleGenomeVersion>> genomeHistory(@PathVariable Long id, HttpSession session) {
         return ApiResponse.ok(genomeService.history(currentUserId(session), id));
+    }
+
+    @GetMapping("/{id}/data-use-grants")
+    public ApiResponse<List<DataUseGrant>> dataUseGrants(@PathVariable Long id, HttpSession session) {
+        return ApiResponse.ok(dataUseGrantService.history(currentUserId(session), id));
+    }
+
+    @PostMapping("/{id}/data-use-grants/{grantId}/revoke")
+    public ApiResponse<DataUseGrant> revokeDataUseGrant(@PathVariable Long id, @PathVariable Long grantId,
+                                                        @RequestBody(required = false) Map<String, Object> body,
+                                                        HttpSession session) {
+        Object rawReason = body == null ? null : body.get("reason");
+        String reason = rawReason == null ? "owner revoked" : String.valueOf(rawReason);
+        return ApiResponse.ok(dataUseGrantService.revoke(currentUserId(session), id, grantId, reason));
     }
 
     @PostMapping("/{id}/genome/recompile")

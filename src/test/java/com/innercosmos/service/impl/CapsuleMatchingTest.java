@@ -14,11 +14,13 @@ import com.innercosmos.mapper.UserPortraitMapper;
 import com.innercosmos.mapper.AuthorizedMemoryRefMapper;
 import com.innercosmos.service.CapsuleGenomeService;
 import com.innercosmos.service.ResonanceMatchStrategy;
+import com.innercosmos.service.DataUseGrantService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.ArrayList;
@@ -45,6 +47,7 @@ class CapsuleMatchingTest {
     @Mock UserPortraitMapper userPortraitMapper;
     @Mock AuthorizedMemoryRefMapper authorizedMemoryRefMapper;
     @Mock CapsuleGenomeService genomeService;
+    @Mock DataUseGrantService dataUseGrantService;
 
     CapsuleServiceImpl service;
 
@@ -55,10 +58,18 @@ class CapsuleMatchingTest {
     @BeforeEach
     void setUp() {
         service = new CapsuleServiceImpl(echoCapsuleMapper, boundaryMapper, capsuleAgent,
-                memoryCardMapper, userPortraitMapper, authorizedMemoryRefMapper, genomeService,
+                memoryCardMapper, userPortraitMapper, authorizedMemoryRefMapper, genomeService, dataUseGrantService,
                 new com.fasterxml.jackson.databind.ObjectMapper());
         // default: no portrait rows unless a test overrides
         lenient().when(userPortraitMapper.selectList(any())).thenReturn(new ArrayList<>());
+        lenient().when(dataUseGrantService.authorize(any(), any())).thenAnswer(invocation -> {
+            com.innercosmos.entity.DataUseGrant primary = new com.innercosmos.entity.DataUseGrant();
+            primary.id = 7001L;
+            com.innercosmos.entity.DataUseGrant provider = new com.innercosmos.entity.DataUseGrant();
+            provider.id = 7002L;
+            return List.of(primary, provider);
+        });
+        lenient().when(dataUseGrantService.authorizationsValid(any(), anySet())).thenReturn(true);
     }
 
     // ----- helpers -----
@@ -466,8 +477,12 @@ class CapsuleMatchingTest {
         verify(authorizedMemoryRefMapper).insert(inserted.capture());
         assertEquals(3002L, inserted.getValue().capsuleId);
         assertEquals(77L, inserted.getValue().memoryCardId);
+        assertEquals(7001L, inserted.getValue().dataUseGrantId);
         assertEquals("AUTHORIZED", inserted.getValue().authorizationStatus);
         assertEquals("[\"77\"]", created.authorizedMemoryIds);
+        InOrder egressOrder = inOrder(dataUseGrantService, capsuleAgent);
+        egressOrder.verify(dataUseGrantService).authorize(any(), eq(card));
+        egressOrder.verify(capsuleAgent).generateUserPersona(eq(USER_ID), any(), any(), any());
 
         when(echoCapsuleMapper.selectOne(any())).thenReturn(created);
         when(authorizedMemoryRefMapper.selectList(any())).thenReturn(List.of(inserted.getValue()));

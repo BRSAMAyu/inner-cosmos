@@ -19,6 +19,7 @@ import com.innercosmos.ai.semantic.PseudoSemanticAnalyzer;
 import com.innercosmos.service.CapsuleService;
 import com.innercosmos.service.ResonanceMatchStrategy;
 import com.innercosmos.service.CapsuleGenomeService;
+import com.innercosmos.service.DataUseGrantService;
 import com.innercosmos.util.DataMaskingUtils;
 import com.innercosmos.vo.CapsulePreviewVO;
 import org.springframework.stereotype.Service;
@@ -44,6 +45,7 @@ public class CapsuleServiceImpl implements CapsuleService {
     private final UserPortraitMapper userPortraitMapper;
     private final AuthorizedMemoryRefMapper authorizedMemoryRefMapper;
     private final CapsuleGenomeService genomeService;
+    private final DataUseGrantService dataUseGrantService;
     private final ObjectMapper objectMapper;
 
     public CapsuleServiceImpl(EchoCapsuleMapper capsuleMapper,
@@ -53,6 +55,7 @@ public class CapsuleServiceImpl implements CapsuleService {
                               UserPortraitMapper userPortraitMapper,
                               AuthorizedMemoryRefMapper authorizedMemoryRefMapper,
                               CapsuleGenomeService genomeService,
+                              DataUseGrantService dataUseGrantService,
                               ObjectMapper objectMapper) {
         this.capsuleMapper = capsuleMapper;
         this.boundaryMapper = boundaryMapper;
@@ -61,6 +64,7 @@ public class CapsuleServiceImpl implements CapsuleService {
         this.userPortraitMapper = userPortraitMapper;
         this.authorizedMemoryRefMapper = authorizedMemoryRefMapper;
         this.genomeService = genomeService;
+        this.dataUseGrantService = dataUseGrantService;
         this.objectMapper = objectMapper;
     }
 
@@ -92,9 +96,6 @@ public class CapsuleServiceImpl implements CapsuleService {
                 }
             }
         }
-        // Empty selection means a generic capsule, never implicit consent to the owner's top memories.
-        capsule.personaPrompt = capsuleAgent.generateUserPersona(userId, memorySummaries, capsule.pseudonym, capsule.intro);
-
         capsule.publicTags = toJsonArray(request.publicTags, "self-resonance");
         capsule.authorizedMemoryIds = toJsonArray(authorizedCards.stream().map(card -> String.valueOf(card.id)).toList());
         capsule.ownerContextNote = request.ownerContextNote;
@@ -118,7 +119,11 @@ public class CapsuleServiceImpl implements CapsuleService {
         boundary.allowLetterRequest = request.allowLetterRequest == null ? true : request.allowLetterRequest;
         boundary.privacyLevel = safePrivacy(request.privacyLevel);
         boundaryMapper.insert(boundary);
-        for (MemoryCard card : authorizedCards) authorize(capsule.id, card);
+        for (MemoryCard card : authorizedCards) authorize(capsule, card);
+        // Persist purpose/version grants before any provider can receive derived memory text.
+        // Empty selection still means a generic capsule, never implicit access to top memories.
+        capsule.personaPrompt = capsuleAgent.generateUserPersona(userId, memorySummaries, capsule.pseudonym, capsule.intro);
+        capsuleMapper.updateById(capsule);
         genomeService.compile(capsule, authorizedCards, "initial explicit capsule compilation");
         return capsule;
     }
@@ -151,7 +156,6 @@ public class CapsuleServiceImpl implements CapsuleService {
         capsule.capsuleType = "USER_CAPSULE";
         capsule.pseudonym = request.pseudonym == null || request.pseudonym.isBlank() ? "隔离的模拟器侧面" : request.pseudonym;
         capsule.intro = request.intro == null ? "仅供测试与研究使用的隔离侧面，不会被真实访客发现或对话。" : request.intro;
-        capsule.personaPrompt = capsuleAgent.generateUserPersona(userId, memorySummaries, capsule.pseudonym, capsule.intro);
         capsule.publicTags = toJsonArray(request.publicTags, "simulator-only");
         capsule.authorizedMemoryIds = toJsonArray(authorizedCards.stream().map(card -> String.valueOf(card.id)).toList());
         capsule.ownerContextNote = request.ownerContextNote;
@@ -179,7 +183,9 @@ public class CapsuleServiceImpl implements CapsuleService {
         boundary.allowLetterRequest = false;
         boundary.privacyLevel = safePrivacy(request.privacyLevel);
         boundaryMapper.insert(boundary);
-        for (MemoryCard card : authorizedCards) authorize(capsule.id, card);
+        for (MemoryCard card : authorizedCards) authorize(capsule, card);
+        capsule.personaPrompt = capsuleAgent.generateUserPersona(userId, memorySummaries, capsule.pseudonym, capsule.intro);
+        capsuleMapper.updateById(capsule);
         genomeService.compile(capsule, authorizedCards, "simulator-only compilation for isolated testing/research");
         return capsule;
     }
@@ -596,6 +602,7 @@ public class CapsuleServiceImpl implements CapsuleService {
         capsule.authorizedMemoryIds = "[]";
         capsuleMapper.updateById(capsule);
         genomeService.withdraw(capsuleId, "owner archived capsule");
+        dataUseGrantService.revokeForCapsule(capsuleId, "owner archived capsule");
         for (AuthorizedMemoryRef ref : authorizedMemoryRefMapper.selectList(
                 new QueryWrapper<AuthorizedMemoryRef>().eq("capsule_id", capsuleId))) {
             ref.authorizationStatus = "WITHDRAWN";
@@ -604,6 +611,7 @@ public class CapsuleServiceImpl implements CapsuleService {
     }
 
     private List<MemoryCard> replaceAuthorizations(Long userId, EchoCapsule capsule, List<Long> requestedIds) {
+        dataUseGrantService.revokeForCapsule(capsule.id, "owner replaced capsule authorization set");
         for (AuthorizedMemoryRef ref : authorizedMemoryRefMapper.selectList(
                 new QueryWrapper<AuthorizedMemoryRef>().eq("capsule_id", capsule.id))) {
             ref.authorizationStatus = "WITHDRAWN";
@@ -627,7 +635,7 @@ public class CapsuleServiceImpl implements CapsuleService {
                 continue;
             }
             accepted.add(card);
-            authorize(capsule.id, card);
+            authorize(capsule, card);
         }
         capsule.authorizedMemoryIds = toJsonArray(accepted.stream().map(card -> String.valueOf(card.id)).toList());
         return accepted;
@@ -639,13 +647,15 @@ public class CapsuleServiceImpl implements CapsuleService {
         long authorized = authorizedMemoryRefMapper.selectCount(new QueryWrapper<AuthorizedMemoryRef>()
                 .eq("capsule_id", capsule.id).in("memory_card_id", ids)
                 .eq("authorization_status", "AUTHORIZED"));
-        return authorized >= ids.size();
+        return authorized >= ids.size() && dataUseGrantService.authorizationsValid(capsule, ids);
     }
 
-    private void authorize(Long capsuleId, MemoryCard card) {
+    private void authorize(EchoCapsule capsule, MemoryCard card) {
+        List<com.innercosmos.entity.DataUseGrant> grants = dataUseGrantService.authorize(capsule, card);
         AuthorizedMemoryRef ref = new AuthorizedMemoryRef();
-        ref.capsuleId = capsuleId;
+        ref.capsuleId = capsule.id;
         ref.memoryCardId = card.id;
+        ref.dataUseGrantId = grants.getFirst().id;
         String summary = card.summary == null ? "" : card.summary;
         ref.abstractExcerpt = summary.substring(0, Math.min(180, summary.length()));
         ref.authorizationStatus = "AUTHORIZED";

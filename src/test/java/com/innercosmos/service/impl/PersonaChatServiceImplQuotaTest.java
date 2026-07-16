@@ -15,6 +15,7 @@ import com.innercosmos.mapper.PersonaChatSessionMapper;
 import com.innercosmos.mapper.AuthorizedMemoryRefMapper;
 import com.innercosmos.service.CapsuleGenomeService;
 import com.innercosmos.service.SafetyService;
+import com.innercosmos.service.DataUseGrantService;
 import com.innercosmos.vo.SafetyResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -57,6 +58,7 @@ class PersonaChatServiceImplQuotaTest {
     @Mock private AuthorizedMemoryRefMapper authorizedMemoryRefMapper;
     @Mock private CapsuleGenomeService genomeService;
     @Mock private CapsuleRuntimeContextComposer runtimeContextComposer;
+    @Mock private DataUseGrantService dataUseGrantService;
 
     private PersonaChatServiceImpl service;
 
@@ -66,7 +68,8 @@ class PersonaChatServiceImplQuotaTest {
                 sessionMapper, messageMapper, capsuleMapper,
                 capsuleAgent, safetyService, structuredAiService,
                 boundaryMapper, quotaMapper, jdbcTemplate, authorizedMemoryRefMapper,
-                genomeService, runtimeContextComposer);
+                genomeService, runtimeContextComposer, dataUseGrantService);
+        lenient().when(dataUseGrantService.authorizationsValid(any(), anySet())).thenReturn(true);
         lenient().when(runtimeContextComposer.compose(any(), anyString())).thenReturn(java.util.Map.of(
                 "selectedEvidenceSummary", "", "selectedContext", java.util.Map.of(),
                 "contextBuildManifest", java.util.Map.of(), "unsupported", true,

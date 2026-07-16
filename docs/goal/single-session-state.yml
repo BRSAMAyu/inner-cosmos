@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-16T12:45:00+08:00
+updated_at: 2026-07-16T13:03:00+08:00
 authority:
   - goal-objective.md
   - 对齐文档/17-单会话持续Goal模式执行协议.md
@@ -806,20 +806,47 @@ closed_front_campaign_c_genome_ir_categories:
     long-prompt baseline pairwise, independent blind review and longitudinal adversarial evaluation
     remain open and must not be replaced by Mock or self-scoring.
 
-active_front:
+closed_front_campaign_c_data_use_grants:
   id: CAMPAIGN-C-DATA-USE-GRANTS
-  state: AUDIT_FROM_GENOME_V3_CHECKPOINT
+  state: BUILDER_VERIFIED_CHECKPOINT_READY
   intent: |
     Replace the remaining purpose-consent string convention with versioned, revocable DataUseGrant
     records so normal capsule, simulator, provider egress and withdrawal decisions are explicit,
     queryable and historically auditable without weakening current fail-closed behavior.
+  done_this_front_summary:
+    - "Added versioned tb_data_use_grant authority with owner/resource-version/purpose/consumer,
+      parented grant versions, consent source, status and revocation facts. AuthorizedMemoryRef links
+      to its primary grant; capsule-authorization.v2 snapshots both primary and Provider purposes."
+    - "Normal capsule and isolated simulator grants are purpose-separated; Provider egress is a
+      distinct required grant persisted before generateUserPersona. PersonaChat/publication fail
+      closed on missing, duplicate, stale-version or revoked required purposes."
+    - "Owner history/revoke APIs delist the capsule and require review. Recompile revokes v1 and
+      creates parented v2 grants. Archive, memory mutation and FORGET revoke active grants. FORGET
+      removes excerpts/refs but retains content-free revoked audit tombstones."
+    - "Migration is reproducible: fresh schema, idempotent long-lived H2 backfill and PostgreSQL
+      Flyway V16 all pass. Strict owner FK was deliberately removed after the red gate proved it
+      broke forgotten/deleted-subject audit tombstones; owner_user_id remains an audit snapshot."
+    - "Full Java 21 gate PASS: 131 suites, 810 tests, 0 failures/errors/skips, 140.4s. Evidence:
+      evidence/innovation/INNO-CAP-009 and docs/campaigns/capsule-genome/data-use-grant-contract.md."
+  honest_boundary: |
+    DataUseGrant currently governs capsule/simulator/Provider use of memory cards. Psychology skills,
+    exports, analytics, mobile push and admin processing have not yet migrated to the generalized
+    authority. Legal retention and subprocessor wording remain human gates.
+
+active_front:
+  id: G2-API-CONTRACT-AUDIT
+  state: START_FROM_DATA_USE_GRANT_CHECKPOINT
+  intent: |
+    Audit the currently UNASSESSED API-CONTRACT gate and turn the real external contract into an
+    executable versioned OpenAPI/typed-error/idempotency/concurrency/resumable-SSE baseline without
+    claiming completeness from controller count or generated prose.
   next_machine_actions:
-    - "Audit AuthorizedMemoryRef, MemoryCard.consentScope, simulator creation/recompile, forgetting,
-      schema/Flyway baselines and owner APIs; define the smallest backwards-compatible grant model."
-    - "Add failing integration tests for purpose, subject, resource version, grant version, revoke
-      propagation and historical audit before adding schema/entity/service changes."
-    - "Migrate capsule authorization checks to active grants while preserving existing rows and
-      fail-closed behavior; run H2/PostgreSQL migration plus capsule/privacy/forgetting gates."
+    - "Inventory controller routes, ApiResponse/error codes, SSE endpoints, idempotent writes and
+      optimistic-concurrency surfaces; compare them to the G2 target and deployment profiles."
+    - "Select the smallest vertical contract slice with failing tests, prioritizing externally used
+      auth, Aurora turn streaming and capsule/letter writes over internal/admin-only endpoints."
+    - "Generate or author a versioned OpenAPI artifact from executable contracts, add drift gates,
+      then close typed errors/idempotency/concurrency/resume gaps in risk order."
 
 priority_queue:
   - id: CAMPAIGN-C-QUALITY
@@ -828,7 +855,7 @@ priority_queue:
       1. OPEN — No real fidelity signal exists. CapsuleGenomeServiceImpl.compile()'s evaluationJson is a structural-eligibility checklist (ownerBound/currentOnly/authorizedMemoryCount), not a fidelity/leakage score. Blocks the whole Campaign C acceptance scenario (same user's long-prompt baseline vs compiled Genome, blind-tested). NOTE: evaluationJson now ALSO carries sceneCount/conflictCount (item 2 below) — still not a fidelity/leakage score, this item is still open.
       2. DONE for the machine-verifiable structural slice — capsule-genome.v3 adds provenance-carrying claims/values/habits/temporalState/unknowns; PersonaChat performs feature-level immutable-snapshot retrieval and emits ContextBuildManifest; unfamiliar-scenario evaluation is green. Evidence INNO-CAP-008. Still open under item 1/6: provider candidate generation, critics and blind fidelity proof.
       3. DONE (prior checkpoint) — CapsuleSandboxServiceImpl feedback is no longer write-only; aggregated per-Genome-version and surfaced in CapsuleWorkbench (fidelitySummary/CapsuleFidelitySummaryVO). Does not gate publish (kept as a visible signal, matching "反馈只成为下一版的改进信号" rather than a hard block).
-      4. DONE (prior checkpoint), gap CLOSED this checkpoint — Simulator capability contract (CapsuleService.createSimulatorCapsule + EchoCapsule.simulatorOnly) requires a distinct SIMULATOR_AUTHORIZED consent scope at creation, but an independent review found the invariant wasn't held elsewhere: createFromMemory and the shared replaceAuthorizations (updateContext/recompileGenome) neither excluded SIMULATOR_AUTHORIZED from normal capsules nor required it for a simulatorOnly capsule. Both directions fixed this checkpoint (see active_front done_this_front_summary). Still open: this is a consentScope string value, not a versioned/revocable purpose-specific DataUseGrant entity.
+      4. DONE for capsule/simulator grant authority — INNO-CAP-009 replaces the consentScope-only runtime convention with versioned, revocable, resource-version-bound DataUseGrant purposes and Provider-egress ordering. Broader cross-domain consent-center adoption remains outside this closed slice.
       5. OPEN — Matching (CapsuleServiceImpl matchedCapsules/strategySignal, ResonanceMatchStrategy enum) is a real, explainable, switchable lexical/theme-family heuristic (16 passing tests in CapsuleMatchingTest) but not similarity/embedding-based and has no diversity/safety-filter stage baked into scoring.
       6. OPEN, HUMAN-GATED — No real LLM provider is ever exercised for capsule work in tests/evidence — INNO-EVAL-001/known-limitations.md explicitly says real-Provider comparison is BLOCKED_BY_CREDENTIAL_GATE (human gate: REAL-PROVIDER-CREDENTIALS-AND-BLIND-REVIEW). Items 1/2's TRUE fidelity delta can't be proven without this.
       7. IN_PROGRESS — unfamiliar-scenario stability now has a 6-case annotated machine gate with exact evidence-selection/leakage thresholds (INNO-CAP-008). Real-provider counter-prompt attacks, longitudinal drift and independent adversarial review remain open.
@@ -883,13 +910,13 @@ known_human_gates:
   - REAL-ANDROID-IOS-APNS-FCM-AND-SIGNING
 
 last_full_gate:
-  baseline_commit: e2b0050 (Campaign C Genome IR v3 checkpoint)
-  executed_at: 2026-07-16T12:36:27+08:00
-  java: "PASS — Java 21 full mvn test, 129 suites, 805 tests, 0 failures/errors/skips, 183.1s"
-  focused_evaluation: "PASS — runtime retrieval 6/6 exact; groundedness 4/4; evidence leaks 0"
+  baseline_commit: PENDING_DATA_USE_GRANT_CHECKPOINT
+  executed_at: 2026-07-16T12:59:10+08:00
+  java: "PASS — Java 21 full mvn test, 131 suites, 810 tests, 0 failures/errors/skips, 140.4s"
+  focused_evaluation: "PASS — 4 grant scenarios; long-lived H2 idempotency; PostgreSQL V1-V16 exact contract"
   frontend: "Not rerun: no frontend files changed; prior verified Vitest 60/60 and production build remain the relevant baseline."
   browser_mobile: "Not rerun: no browser/mobile surface changed in this backend/compiler checkpoint."
-  evidence: evidence/innovation/INNO-CAP-008/
-  review: BUILDER_VERIFIED_WITH_REAL_PROVIDER_AND_BLIND_FIDELITY_GATES_REMAINING
+  evidence: evidence/innovation/INNO-CAP-009/
+  review: BUILDER_VERIFIED_WITH_CROSS_DOMAIN_CONSENT_AND_LEGAL_GATES_REMAINING
 
 handoff_rule: Do not return a final answer at commits or campaign checkpoints; continue with the next machine-actionable gap.

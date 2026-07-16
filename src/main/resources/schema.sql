@@ -739,17 +739,42 @@ CREATE TABLE IF NOT EXISTS tb_voice_transcription (
 
 -- Phase 4: Capsule Authorization
 
+CREATE TABLE IF NOT EXISTS tb_data_use_grant (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  owner_user_id BIGINT NOT NULL,
+  resource_type VARCHAR(32) NOT NULL,
+  resource_id BIGINT NOT NULL,
+  resource_version INT NOT NULL,
+  purpose VARCHAR(48) NOT NULL,
+  consumer_type VARCHAR(32) NOT NULL,
+  consumer_id BIGINT NOT NULL,
+  grant_version INT NOT NULL,
+  parent_grant_id BIGINT,
+  status VARCHAR(24) NOT NULL DEFAULT 'ACTIVE',
+  consent_source VARCHAR(64) NOT NULL,
+  granted_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  revoked_at TIMESTAMP NULL,
+  revoke_reason VARCHAR(240),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_data_grant_consumer (consumer_type, consumer_id, status),
+  INDEX idx_data_grant_resource (resource_type, resource_id, status),
+  CONSTRAINT fk_data_grant_parent FOREIGN KEY (parent_grant_id) REFERENCES tb_data_use_grant(id)
+);
+
 CREATE TABLE IF NOT EXISTS tb_authorized_memory_ref (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   capsule_id BIGINT NOT NULL,
   memory_card_id BIGINT NOT NULL,
+  data_use_grant_id BIGINT,
   abstract_excerpt TEXT,
   authorization_status VARCHAR(32) DEFAULT 'AUTHORIZED',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_auth_mem_capsule (capsule_id),
   CONSTRAINT fk_auth_mem_capsule FOREIGN KEY (capsule_id) REFERENCES tb_echo_capsule(id) ON DELETE CASCADE,
-  CONSTRAINT fk_auth_mem_memory FOREIGN KEY (memory_card_id) REFERENCES tb_memory_card(id) ON DELETE CASCADE
+  CONSTRAINT fk_auth_mem_memory FOREIGN KEY (memory_card_id) REFERENCES tb_memory_card(id) ON DELETE CASCADE,
+  CONSTRAINT fk_auth_mem_grant FOREIGN KEY (data_use_grant_id) REFERENCES tb_data_use_grant(id)
 );
 
 -- Phase 5: Slow Letter Maturation

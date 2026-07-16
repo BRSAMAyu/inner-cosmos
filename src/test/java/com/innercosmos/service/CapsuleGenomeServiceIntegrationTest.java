@@ -55,6 +55,10 @@ class CapsuleGenomeServiceIntegrationTest {
         assertEquals(1, v1.versionNo);
         assertEquals("ACTIVE", v1.status);
         assertTrue(v1.authorizationSnapshotJson.contains("\"memoryId\":" + memoryId));
+        assertTrue(v1.authorizationSnapshotJson.contains("\"schemaVersion\":\"capsule-authorization.v2\""));
+        assertTrue(v1.authorizationSnapshotJson.contains("\"dataUseGrants\""));
+        assertTrue(v1.authorizationSnapshotJson.contains("\"purpose\":\"CAPSULE_RUNTIME\""));
+        assertTrue(v1.authorizationSnapshotJson.contains("\"purpose\":\"PROVIDER_EGRESS\""));
         assertFalse(v1.authorizationSnapshotJson.contains(privateSummary));
         assertEquals(v1.id, capsuleService.getOwnedCapsule(owner, capsule.id).activeGenomeVersionId);
         assertThrows(BusinessException.class, () -> genomeService.history(stranger, capsule.id));
