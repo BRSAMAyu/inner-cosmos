@@ -55,7 +55,40 @@
 }
 :root { font-family: var(--font-sans); color: var(--text-primary); background: var(--surface-canvas); font-synthesis: none; }
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; min-height: 100vh; background: radial-gradient(circle at 76% 8%, #3a2a1f 0, transparent 30rem), radial-gradient(circle at 12% 92%, #2c2030 0, transparent 26rem), linear-gradient(160deg, #241b17, #211a18 62%, #1c1512); }
+body { margin: 0; min-width: 320px; min-height: 100vh; background: radial-gradient(circle at 76% 8%, var(--amb-a) 0, transparent 30rem), radial-gradient(circle at 12% 92%, var(--amb-b) 0, transparent 26rem), linear-gradient(160deg, var(--grad-1), var(--grad-2) 62%, var(--grad-3)); }
+
+/* —— 七时段时间感知主题(§1.1 / UIUXdesign §3): 暗暖色系内的色温流动。
+   <html data-time> 由 web/src/theme.ts 按本地时间设定; @property 让颜色 token 可平滑过渡(不跳变)。
+   本版全部落在暗暖区间, 不切浅色, 以免破坏尚未 tokenize 的硬编码暗色文字; 白昼 morandi 浅色主题
+   待全量 var() 化后再接入。 —— */
+@property --amb-a { syntax: "<color>"; inherits: true; initial-value: #3a2a1f; }
+@property --amb-b { syntax: "<color>"; inherits: true; initial-value: #2c2030; }
+@property --grad-1 { syntax: "<color>"; inherits: true; initial-value: #241b17; }
+@property --grad-2 { syntax: "<color>"; inherits: true; initial-value: #211a18; }
+@property --grad-3 { syntax: "<color>"; inherits: true; initial-value: #1c1512; }
+@property --surface-canvas { syntax: "<color>"; inherits: true; initial-value: #211A18; }
+@property --accent-aurora { syntax: "<color>"; inherits: true; initial-value: #C79A68; }
+:root {
+  --amb-a: #3a2a1f; --amb-b: #2c2030; --grad-1: #241b17; --grad-2: #211a18; --grad-3: #1c1512;
+  transition: --amb-a var(--dur-state) var(--ease-drift), --amb-b var(--dur-state) var(--ease-drift),
+    --grad-1 var(--dur-state) var(--ease-drift), --grad-2 var(--dur-state) var(--ease-drift),
+    --grad-3 var(--dur-state) var(--ease-drift), --surface-canvas var(--dur-state) var(--ease-drift),
+    --accent-aurora var(--dur-state) var(--ease-drift);
+}
+/* deep-night 23:00–05:00 最暗最静, 微凉月光但仍暖褐基 */
+:root[data-time="deep-night"] { --surface-canvas: #1B1613; --amb-a: #2b211a; --amb-b: #241c26; --accent-aurora: #B98E5F; --grad-1: #1e1713; --grad-2: #1b1613; --grad-3: #17110f; }
+/* dawn 晨曦 暖橘微亮 */
+:root[data-time="dawn"] { --surface-canvas: #241B15; --amb-a: #4d3520; --amb-b: #33241c; --accent-aurora: #D6A76A; --grad-1: #271d16; --grad-2: #241b15; --grad-3: #1d1611; }
+/* morning 上午 浅暖 */
+:root[data-time="morning"] { --surface-canvas: #26201A; --amb-a: #443121; --amb-b: #2f2a22; --accent-aurora: #CC9C68; --grad-1: #29221b; --grad-2: #26201a; --grad-3: #1f1913; }
+/* noon 正午 暗系内最亮最清晰 */
+:root[data-time="noon"] { --surface-canvas: #2A231C; --amb-a: #4a3a26; --amb-b: #33291f; --accent-aurora: #D0A46E; --grad-1: #2d251d; --grad-2: #2a231c; --grad-3: #221c15; }
+/* evening 午后 暖黄 */
+:root[data-time="evening"] { --surface-canvas: #241C15; --amb-a: #4a3420; --amb-b: #2e2620; --accent-aurora: #D3A468; --grad-1: #271e16; --grad-2: #241c15; --grad-3: #1d1710; }
+/* dusk 暮色 暗金 + 灰紫 */
+:root[data-time="dusk"] { --surface-canvas: #241A1C; --amb-a: #4a2f28; --amb-b: #322036; --accent-aurora: #CD9B67; --grad-1: #271b1d; --grad-2: #241a1c; --grad-3: #1d1517; }
+/* night 19:00–23:00 基准暖褐(与默认一致) */
+:root[data-time="night"] { --surface-canvas: #211A18; --amb-a: #3a2a1f; --amb-b: #2c2030; --accent-aurora: #C79A68; --grad-1: #241b17; --grad-2: #211a18; --grad-3: #1c1512; }
 button, textarea, input { font: inherit; }
 /* —— 微交互(§1.1 母题: 流动/呼吸): 统一走 token 曲线, 禁 ease/linear ——
    点击 scale(.97) 快按下 -> 用 --ease-bloom 带回弹松开; hover 微亮; focus 可见。 */

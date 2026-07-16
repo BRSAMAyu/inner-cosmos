@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-16T20:16:00+08:00
+updated_at: 2026-07-16T20:48:00+08:00
 
 session_2026_07_16_checkpoints:
   - "7db1a84 feat: cross-Pod live Aurora SSE fan-out/resume/heartbeat + turn.started race fix (G2). 826/826."
@@ -944,7 +944,7 @@ closed_front_g2_sse_cross_pod:
 
 active_front:
   id: EXPERIENCE-FLOW-OVERHAUL
-  state: VISUAL_P0_CHECKPOINT_2_MICROINTERACTIONS_AND_UNIFIED_EASING_DONE
+  state: VISUAL_P0_CHECKPOINT_3_SEVEN_TIME_OF_DAY_THEME_DONE
   intent: |
     Operator directive docs/goal/loop-goal-directive.md §1 raised体验层重造 to the highest priority,
     ahead of the prior CAMPAIGN-B front (now closed below). §1.1 视觉系统重造 (P0): kill the cold
@@ -982,6 +982,19 @@ active_front:
       cubic-bezier(0.16,1,0.3,1)=--ease-bloom + rest --ease-flow. Screenshot tool timed out again (known
       env flakiness); numeric computed-style used as equivalent evidence. Evidence
       evidence/experience/EXPERIENCE-VISUAL-P0-microinteractions/. Local commit only (HG-GIT-PUSH-ACCESS)."
+  done_checkpoint_3:
+    - "§1.1 seven time-of-day theming: web/src/theme.ts (timeOfDayForHour pure mapping dawn/morning/noon/
+      evening/dusk/night/deep-night; applyTimeOfDayTheme sets <html data-time>; startTimeOfDayTheme refreshes
+      every 60s; setThemeLock/getLockedTimeOfDay user lock via localStorage). main.tsx calls it pre-render.
+      styles.css: body bg -> --amb-a/--amb-b/--grad-* tokens; @property registers those + --surface-canvas/
+      --accent-aurora as <color> with :root transition (var(--dur-state) var(--ease-drift)) so time-of-day
+      switches interpolate smoothly (no jump); 7 :root[data-time] overrides in the WARM-DARK band only
+      (no light theme yet — would break un-tokenized hardcoded dark text; light morandi deferred)."
+    - "Verified: npm run build OK; npm test 89/89 (was 67; +22 theme tests). Browser on throwaway :8099:
+      page renders, theme.ts auto-set data-time=night (20:40 local), per-time-of-day computed tokens differ
+      correctly (lightness noon 42 > ... > deep-night 27, all r>g>b warm, dusk mauve b>g); smooth 480ms
+      @property transition confirmed. Evidence evidence/experience/EXPERIENCE-VISUAL-P0-time-of-day/.
+      PUSH now works to fork sangchenyi/inner-cosmos (PR path); HG-GIT-PUSH-ACCESS still blocks upstream."
   next_machine_actions:
     - "NEXT (still §1.1, before §1.2): progressively var()-tokenize each space's remaining literal warm
       hexes, THEN add light/morandi tokens + seven time-of-day theming (data-time attr + JS lerp on local
