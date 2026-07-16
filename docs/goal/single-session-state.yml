@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-16T14:00:16+08:00
+updated_at: 2026-07-16T14:04:27+08:00
 authority:
   - goal-objective.md
   - 对齐文档/17-单会话持续Goal模式执行协议.md
@@ -862,7 +862,7 @@ closed_front_g2_api_contract_baseline:
 closed_front_g2_api_generated_client_and_diff:
   id: G2-API-GENERATED-CLIENT-AND-DIFF
   state: DONE_BUILDER_VERIFIED_CHECKPOINT_READY
-  checkpoint_commit: PENDING_API_GENERATED_CLIENT_CHECKPOINT
+  checkpoint_commit: c89615e (generated client and compatibility gate)
   intent: |
     Make OpenAPI the source of client truth rather than parallel documentation by generating a
     checked-in TypeScript contract, adopting it in the PWA core slice and failing CI on drift or
