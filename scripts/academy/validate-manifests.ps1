@@ -1,13 +1,22 @@
 [CmdletBinding()]
-param([string]$Overlay = "deploy/k8s/overlays/academy-eks")
+param(
+    [string]$Overlay = "deploy/k8s/overlays/academy-eks",
+    [switch]$ClusterSchemaDryRun
+)
 
 $ErrorActionPreference = "Stop"
 $renderedLines = @(& kubectl kustomize $Overlay 2>$null)
 if ($LASTEXITCODE -ne 0) { throw "Kustomize render failed." }
 $rendered = $renderedLines -join "`n"
 
-$renderedLines | & kubectl apply --dry-run=client --validate=false -f - -o name | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "Kubernetes client-side schema dry-run failed." }
+# `kubectl apply --dry-run=client` still performs API discovery for resource
+# mapping, including when validation is disabled. Keep the default contract
+# genuinely offline so a stale Academy kubeconfig cannot break manifest
+# validation; opt into the discovery-backed check only in a live session.
+if ($ClusterSchemaDryRun) {
+    $renderedLines | & kubectl apply --dry-run=client --validate=false -f - -o name | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "Kubernetes cluster-schema dry-run failed." }
+}
 
 $required = @(
     'kind: Deployment', 'kind: StatefulSet', 'kind: Job', 'kind: PersistentVolume',
@@ -45,6 +54,8 @@ if ($unpinnedInfrastructureImages.Count -gt 0) { throw "Academy infrastructure i
     Resources = @($renderedLines | Where-Object { $_ -eq '---' }).Count + 1
     ForbiddenFindings = 0
     MissingControls = 0
+    OfflineStructuralValidation = $true
+    ClusterSchemaDryRun = [bool]$ClusterSchemaDryRun
     SecretValuesInGit = $false
     SqsRuntimeDependency = $false
     DynamicStorageDependency = $false

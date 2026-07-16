@@ -5,10 +5,23 @@ target/
 *.log
 /data/
 .env
+.env.*
+!.env.example
+*.env.local
+application-*.local.yml
 application-local.yml
 application-dev.yml
 *.db
 *.mv.db
+
+# Operator credentials and generated deployment identity material
+.aws/
+kubeconfig*
+*.pem
+*.key
+*.p12
+*.jks
+*.mobileprovision
 
 # BAGEL governance state — kept on disk for cross-session resume, not in product history
 .bagel/

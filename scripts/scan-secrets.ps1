@@ -1,13 +1,22 @@
 param(
-    [switch]$History
+    [switch]$History,
+    [switch]$AllRefs
 )
 
 $ErrorActionPreference = 'Stop'
 $rules = @(
-    @{ Name = 'known-token-prefix'; Pattern = '(?i)\b(sk-[A-Za-z0-9_-]{16,}|AIza[0-9A-Za-z_-]{20,}|gh[pousr]_[0-9A-Za-z]{20,}|AKIA[0-9A-Z]{16})\b' },
-    @{ Name = 'literal-sensitive-assignment'; Pattern = '(?im)(api[-_]?key|client[-_]?secret|password)\s*[:=]\s*["'']?([A-Za-z0-9+/_=-]{16,})' }
+    @{
+        Name = 'known-token-prefix'
+        Pattern = '(?i)\b(sk-[A-Za-z0-9_-]{16,}|AIza[0-9A-Za-z_-]{20,}|gh[pousr]_[0-9A-Za-z]{20,}|AKIA[0-9A-Z]{16}|ASIA[0-9A-Z]{16})\b'
+        GitPattern = '(sk-[A-Za-z0-9_-]{16,}|AIza[0-9A-Za-z_-]{20,}|gh[pousr]_[0-9A-Za-z]{20,}|AKIA[0-9A-Z]{16}|ASIA[0-9A-Z]{16})'
+    },
+    @{
+        Name = 'literal-sensitive-assignment'
+        Pattern = '(?im)(api[-_]?key|client[-_]?secret|secret[-_]?access[-_]?key|session[-_]?token|password)[ \t]*[:=][ \t]*["'']?([A-Za-z0-9+/_=-]{16,})'
+        GitPattern = '(api[-_]?key|client[-_]?secret|secret[-_]?access[-_]?key|session[-_]?token|password)[[:blank:]]*[:=][[:blank:]]*["'']?[A-Za-z0-9+/_=-]{16,}'
+    }
 )
-$allowed = '(?i)^(test-only|placeholder|example|configured|not-configured)'
+$allowed = '(?i)^(test-only|placeholder|example|configured|not-configured|your_|change_me|redacted|removed_from_history|\$\{|<)'
 $findings = [System.Collections.Generic.List[string]]::new()
 
 function Test-Content([string]$PathLabel, [string]$Content) {
@@ -24,11 +33,34 @@ function Test-Content([string]$PathLabel, [string]$Content) {
 }
 
 if ($History) {
-    foreach ($commit in (git rev-list --all)) {
-        foreach ($path in (git ls-tree -r --name-only $commit)) {
-            if ($path -match '(^|/)(target|\.git)/') { continue }
-            $content = git show "${commit}:$path" 2>$null
-            if ($LASTEXITCODE -eq 0) { Test-Content "$commit`:$path" ($content -join "`n") }
+    $commits = if ($AllRefs) { @(git rev-list --all) } else { @(git rev-list HEAD) }
+    if ($LASTEXITCODE -ne 0) { throw 'Unable to enumerate Git history.' }
+
+    # `git grep --name-only` narrows the history to candidate blobs without ever
+    # printing a matched credential. The former commit x file nested loop was
+    # safe but prohibitively slow on the long-running Goal branch.
+    $candidateRefs = [System.Collections.Generic.HashSet[string]]::new(
+        [System.StringComparer]::Ordinal)
+    $chunkSize = 40
+    foreach ($rule in $rules) {
+        for ($offset = 0; $offset -lt $commits.Count; $offset += $chunkSize) {
+            $last = [Math]::Min($offset + $chunkSize - 1, $commits.Count - 1)
+            $chunk = @($commits[$offset..$last])
+            $matches = @(& git grep --name-only --full-name -I -E -e $rule.GitPattern @chunk 2>$null)
+            if ($LASTEXITCODE -notin @(0, 1)) { throw "Git history scan failed for $($rule.Name)." }
+            foreach ($candidate in $matches) { [void]$candidateRefs.Add($candidate) }
+        }
+    }
+
+    foreach ($candidateRef in $candidateRefs) {
+        $separator = $candidateRef.IndexOf(':')
+        if ($separator -le 0) { continue }
+        $commit = $candidateRef.Substring(0, $separator)
+        $path = $candidateRef.Substring($separator + 1)
+        if ($path -match '(^|/)(target|\.git)/') { continue }
+        $content = git show "${commit}:$path" 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            Test-Content "$commit`:$path" ($content -join "`n")
         }
     }
 } else {

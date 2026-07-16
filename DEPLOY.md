@@ -1,101 +1,49 @@
-# Deployment Guide / 部署指南
+# Inner Cosmos Deployment Index
 
-Inner Cosmos is a Spring Boot 3.3.6 / Java 17 app (MyBatis-Plus). It ships with
-two databases by profile:
+[English README](README.md) · [中文 README](README.zh-CN.md) · [Executable teammate/Coding Agent handoff](对齐文档/18-组员与Coding-Agent启动部署交接指南.md)
 
-| Profile   | Database | Purpose                  | Schema init                    |
-|-----------|----------|--------------------------|--------------------------------|
-| `dev`     | H2 file  | Local development        | `schema.sql` + seed on demand  |
-| `demo`    | H2 file  | No-API-key demo (mock)   | `schema.sql` + demo seed       |
-| `mysql`   | MySQL 8  | Local MySQL dev          | additive SchemaM runners only  |
-| `prod`    | MySQL 8  | Production (12-factor)   | additive SchemaM runners only  |
+This file is intentionally a short routing page. The handoff guide above is the maintained runbook with prerequisites, environment contracts, exact commands, validation, failure recovery, and AWS Academy cleanup rules.
 
-`dev` / `demo` / `mysql` profiles are unchanged — H2 remains the local default.
+## Supported profiles
 
----
+| Profile | Command entry | Intended evidence |
+|---|---|---|
+| `dev` | `./mvnw spring-boot:run` | Offline-safe H2/Mock development |
+| `demo` | `SEED_ENABLED=true ./mvnw spring-boot:run -Dspring-boot.run.profiles=demo` | Disposable demo data; never production evidence |
+| `local-complete` | `scripts/local-complete.ps1` | Full product semantics with PostgreSQL/pgvector, TLS Redis, real Provider, OIDC, and no Mock fallback |
+| `academy-eks` | `scripts/academy/preflight.ps1`, then `scripts/academy/deploy.ps1` | Teaching-account Kubernetes behavior on the pre-provisioned `us-east-1` EKS cluster |
+| `commercial-sg` | Acceptance/IaC track | Future Singapore production target; not yet a completed deployable claim |
 
-## 1. Local development (H2, mock LLM)
+## Safe quick start
 
-Requirements: Java 17+ (runs on 21), the bundled Maven wrapper.
-
-```bash
-./mvnw spring-boot:run                              # dev profile (H2)
-./mvnw spring-boot:run -Dspring-boot.run.profiles=demo   # demo seed + mock LLM
+```powershell
+.\scripts\scan-secrets.ps1
+.\mvnw.cmd spring-boot:run
 ```
 
-Entry URL: http://localhost:8080/pages/index.html
+Open `http://localhost:8080/app/aurora/` and register a local user.
 
-Default seeded accounts (only when `SEED_ENABLED=true`, default in `demo`):
-- admin / admin123  (ADMIN)
-- demo / demo123    (USER)
+## Pre-publish checks
 
-## 2. Production via Docker Compose (recommended)
+```powershell
+.\scripts\scan-secrets.ps1
+.\scripts\scan-secrets.ps1 -History
+.\mvnw.cmd test
 
-`docker-compose.yml` brings up the app + MySQL 8 (+ optional Prometheus/Grafana)
-and runs the app with `SPRING_PROFILES_ACTIVE=prod`.
+Push-Location web
+npm ci
+npm test
+npm run build
+Pop-Location
 
-```bash
-# Minimum viable local-prod (uses the safe defaults already in compose):
-docker compose up -d --build
-
-# Real deployment — override the secrets/env:
-DB_PASSWORD=$(openssl rand -base64 24) \
-MYSQL_ROOT_PASSWORD=$(openssl rand -base64 24) \
-LLM_API_KEY=sk-... \
-CORS_ORIGINS=https://your-domain.com \
-docker compose up -d --build
+.\scripts\academy\validate-manifests.ps1
+.\scripts\academy\preflight.ps1 -Mode Offline
 ```
 
-Health check (wait for `UP`):
-```bash
-curl http://localhost:8080/actuator/health
-```
+## Non-negotiable boundaries
 
-The MySQL schema is created automatically by Spring Boot's additive
-`SchemaM{n}Initializer` runners (idempotent, `information_schema`-guarded) on
-first boot — no manual `CREATE TABLE` needed. `schema.sql` is NOT run in prod,
-so existing data is never dropped on restart.
-
-## 3. Required / optional environment variables (prod)
-
-The prod profile (`application-prod.yml`) reads standard Spring env vars with
-compose-friendly defaults:
-
-| Variable                       | Default (compose)                                  | Notes                                     |
-|--------------------------------|----------------------------------------------------|-------------------------------------------|
-| `SPRING_DATASOURCE_URL`        | `jdbc:mysql://mysql:3306/inner_cosmos?...`         | Full JDBC URL overrides everything        |
-| `SPRING_DATASOURCE_USERNAME`   | `innercosmos`                                      | Falls back to `DB_USER`                   |
-| `SPRING_DATASOURCE_PASSWORD`   | `innercosmos`                                      | Falls back to `DB_PASSWORD` — **set in real prod** |
-| `DB_HOST` / `DB_PORT` / `DB_NAME` | `mysql` / `3306` / `inner_cosmos`               | Used only to build the default URL        |
-| `LLM_API_KEY`                  | _(empty)_                                          | Required for a real LLM provider          |
-| `LLM_PROVIDER`                 | `minimax`                                          | minimax / glm / deepseek / openai-compatible |
-| `CORS_ALLOWED_ORIGINS`         | _(empty)_                                          | Your frontend origin(s), comma-separated |
-| `SERVER_PORT`                  | `8080`                                             |                                           |
-| `MYSQL_ROOT_PASSWORD`          | `rootpass-change-me`                               | MySQL container root; **change in prod**  |
-
-## 4. Running the fat-jar directly (no Docker)
-
-```bash
-./mvnw -DskipTests package
-SPRING_PROFILES_ACTIVE=prod \
-SPRING_DATASOURCE_URL='jdbc:mysql://localhost:3306/inner_cosmos?useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai' \
-SPRING_DATASOURCE_USERNAME=innercosmos \
-SPRING_DATASOURCE_PASSWORD=... \
-java -jar target/inner-cosmos-0.1.0.jar
-```
-
-## 5. MySQL vs H2 note
-
-- **H2** (`dev`/`demo`): file DB at `./data/innercosmos`, `MODE=MySQL`. Schema is
-  rebuilt/seeded from `schema.sql` per `SQL_INIT_MODE`. Never use in production.
-- **MySQL** (`prod`): driver `com.mysql.cj.jdbc.Driver`, utf8mb4. The additive
-  `SchemaM{n}Initializer` runners apply any column/constraint migrations not yet
-  present and are idempotent, so upgrades are non-destructive.
-
-## 6. Observability
-
-Actuator endpoints (prod exposes `health,metrics,prometheus,info`):
-- Health: `GET /actuator/health`
-- Prometheus: `GET /actuator/prometheus`
-
-Compose includes Prometheus (`:9090`, localhost-bound) and Grafana (`:3000`).
+- Secrets remain in the operator's current process or an approved external secret store; never commit `.env`, kubeconfig, Provider keys, AWS credentials, certificates, or generated Secret YAML.
+- `prod` and `local-complete` fail closed without a real Provider, PostgreSQL, Redis, TLS, and OIDC configuration. Do not enable Mock fallback or demo seeds to make them boot.
+- AWS Academy credentials are short-lived human-session credentials. Never inject them into Pods. The Academy event path uses JDBC outbox because workload SQS identity is not available.
+- Academy static `hostPath` PostgreSQL is rebuildable course storage, not commercial durability. Academy results cannot close Singapore production, managed-service, DR, legal, or owner gates.
+- A passing build, local smoke, or Kubernetes screenshot is a checkpoint. Acceptance status only changes with current reproducible evidence and required independent review.

@@ -39,6 +39,7 @@
 | 14 | `14-AWS-Academy-EKS约束与双轨部署架构.md` | 如何在受限 Academy EKS 中真实展示云原生，同时保留本地完整体和商业新加坡目标 |
 | 16 | `16-体验优先的完全体重构策略与产品战役.md` | 如何摆脱旧原型束缚，以 Living Aurora 等产品战役自主推进并打磨最终体验 |
 | 17 | `17-单会话持续Goal模式执行协议.md` | 如何让 Goal 在同一会话跨提交和上下文压缩持续运行，直到完全体或只剩人类门禁 |
+| 18 | `18-组员与Coding-Agent启动部署交接指南.md` | 如何让组员或 Coding Agent 在不泄密、不混淆三种 profile 证据的前提下快速启动、部署、验证和恢复 |
 
 机器可读对应物：`docs/goal/complete-product-acceptance.yml`。直接启动持续 Goal 时使用
 `docs/goal/single-session-codex-prompt.md`，恢复状态使用 `docs/goal/single-session-state.yml`。
@@ -54,6 +55,7 @@
 - 自主研发流程：读 `12`，再用 `05` 获取更细的 Agent 协作和质量环设计。
 - 当前实现优先级、是否允许推翻旧界面/架构、产品战役与测试频率：读 `16`；其执行裁决优先于旧的微切片或兼容性习惯。
 - 单会话连续自主执行：读 `17` 和 `docs/goal/single-session-state.yml`；内部提交与检查点不得结束顶层 Goal。
+- 组员接管启动、local-complete 或 AWS Academy 部署：读 `18`；其中的操作步骤必须服从 `14` 的环境能力边界。
 
 ## 5. 文档与实现的双向追溯
 
