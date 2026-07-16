@@ -49,3 +49,14 @@ The full Java test suite was not repeated because this checkpoint changes docume
 ## Remote publication contract
 
 Publish only the sanitized `feat/run006-aurora-self-understanding` branch with a normal upstream push. Do not force-push or merge the heavily diverged remote `main` as part of this checkpoint. After pushing, verify the remote branch SHA and rerun the remote-reachable secret scan before recording publication complete.
+
+## Remote publication result
+
+- Status: PASS at `2026-07-16T12:19:04+08:00`.
+- Repository: `BRSAMAyu/inner-cosmos`.
+- Branch: `feat/run006-aurora-self-understanding`.
+- Published checkpoint: `fb1d2e8b9d517f3f7e5a35436cc7331202b795d0`.
+- Local HEAD, `git ls-remote`, and GitHub branch API returned the identical SHA.
+- The branch was created with a normal upstream push. `main` was not merged, rewritten, or force-pushed.
+- Tree and complete HEAD-history scans both passed immediately before publication. Because the remote branch points to the identical commit graph, the published reachable history is the same sanitized graph.
+- GitHub accepted the push and warned that three existing FLAC music assets are above the recommended 50 MB size. They remain below GitHub's hard per-file limit; migration/compression or LFS is a separate portability/performance decision, not a hidden publication or secret-safety failure.

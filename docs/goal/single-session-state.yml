@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-16T12:15:12+08:00
+updated_at: 2026-07-16T12:19:04+08:00
 authority:
   - goal-objective.md
   - 对齐文档/17-单会话持续Goal模式执行协议.md
@@ -735,9 +735,9 @@ closed_front_g3_people_discovery:
       pivoting the next window to a non-UX front (Campaign C Genome IR next slice, or a G2 contract
       item ARCH-MODULES/API-CONTRACT/EVENT-RELIABLE) — remaining UX ports are lower-stakes or heavy."
 
-active_front:
+closed_front_repository_publication_handoff:
   id: REPOSITORY-PUBLICATION-HANDOFF
-  state: READY_FOR_REMOTE_PUSH_SANITIZED_HISTORY
+  state: DONE_PUSHED_AND_REMOTE_VERIFIED
   intent: |
     User-requested bounded side front: publish the accumulated complete-product commits to GitHub,
     replace the obsolete root/deployment documentation with a professional English README plus a
@@ -765,12 +765,33 @@ active_front:
       PASS; Maven JDK21 package PASS; local-complete Compose config PASS with test-only inputs;
       Academy manifest contract PASS (20 resources, zero forbidden/missing); offline preflight PASS
       with cleanup PASS and no sensitive identifiers. Evidence: governance/REPO-HANDOFF-001."
+    - "Remote publication PASS: normal upstream push created origin/feat/run006-aurora-self-understanding;
+      local HEAD, git ls-remote and GitHub branch API all matched fb1d2e8b9d517f3f7e5a35436cc7331202b795d0.
+      main was not merged/rewritten/force-pushed. GitHub warned about three existing FLAC files above
+      its recommended 50 MB size; push was accepted and the portability debt is explicitly recorded."
   next_machine_actions:
-    - "Push sanitized feat/run006-aurora-self-understanding to BRSAMAyu/inner-cosmos with normal
-      upstream tracking, verify the remote SHA and remote-reachable secret history, then record the
-      publication result. Do not merge/force-push the divergent main branch in this side front."
-    - "Immediately resume the highest-value main Goal front: Campaign C Genome IR categories and
-      unfamiliar-scenario stability, unless a newly verified P0/P1 outranks it."
+    - "No further action in this side front. Do not merge or force-push the divergent main branch
+      without a separately reviewed integration plan. Provider-side rotation remains HG-SECRET-ROTATION."
+
+active_front:
+  id: CAMPAIGN-C-GENOME-IR-CATEGORIES
+  state: SCOPING_FROM_SANITIZED_PUBLISHED_HEAD
+  intent: |
+    Resume the highest-ranked complete-product main front after the bounded publication side task.
+    Extend the Capsule Genome structural IR beyond scenes/voice/unknowns into provenance-carrying
+    claims, values, habits and temporal state, then make PersonaChat retrieval policy consume those
+    categories and add the remaining machine-testable unfamiliar-scenario stability evaluation.
+    Do not present deterministic extraction as real-person fidelity; real Provider pairwise and
+    independent blind review remain explicit human/provider gates.
+  next_machine_actions:
+    - "Audit current CapsuleServiceImpl, CapsuleGenomeServiceImpl, PersonaChatServiceImpl, Genome
+      JSON contracts/migrations, tests and INNO-CAP evidence at published sanitized HEAD before
+      selecting the smallest complete provenance-carrying IR slice."
+    - "Define the Campaign C observable contract and failing tests for category provenance,
+      unsupported-feature unknowns and question-type retrieval policy; implement without expanding
+      disclosure beyond AuthorizedMemoryRef purpose/owner/version checks."
+    - "Run focused capsule/forgetting/privacy tests and a packaged scenario smoke; at the next
+      risk checkpoint update evidence, acceptance and state, commit, push, then continue."
 
 priority_queue:
   - id: CAMPAIGN-C-QUALITY
