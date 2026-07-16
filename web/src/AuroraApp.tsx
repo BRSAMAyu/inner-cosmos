@@ -92,6 +92,7 @@ export function AuroraApp() {
   const [letterBody, setLetterBody] = useState("");
   const [sentLetter, setSentLetter] = useState<SlowLetter | null>(null);
   const [letterInbox, setLetterInbox] = useState<SlowLetter[]>([]);
+  const [letterOutbox, setLetterOutbox] = useState<SlowLetter[]>([]);
   const [connectionRequests, setConnectionRequests] = useState<ConnectionRequests>({ incoming: [], outgoing: [] });
   const [friends, setFriends] = useState<SocialConnection[]>([]);
   const [skills, setSkills] = useState<PsychologySkillManifest[]>([]);
@@ -160,7 +161,8 @@ export function AuroraApp() {
         api.psychologySkillRuns().then(rows => { setSkillRuns(rows); return rows; }),
         api.portrait().then(setPortrait),
         api.recentCorrections().then(setCorrections),
-        api.plazaCapsules().then(setPublicCapsules).catch(() => undefined)
+        api.plazaCapsules().then(setPublicCapsules).catch(() => undefined),
+        api.letterOutbox().then(setLetterOutbox).catch(() => undefined)
       ]);
       const loadedCapsules = loaded[8] as EchoCapsule[];
       const loadedMatches = loaded[9] as CapsuleMatch[];
@@ -882,6 +884,7 @@ export function AuroraApp() {
       const draft = await api.draftSlowLetter(visitorMatch.capsule.id, letterTitle.trim(), letterBody.trim());
       const sent = await api.sendSlowLetter(draft.id);
       setSentLetter(sent);
+      void api.letterOutbox().then(setLetterOutbox).catch(() => undefined);
       setStatus("慢信已经启程。收件人看到的是你的原话和安全预览，不是 AI 代写的统一模板。 ");
     } catch (error) { setStatus(error instanceof Error ? error.message : "慢信没有发送，草稿内容仍在这里"); }
     finally { setVisitorBusy(false); }
@@ -923,6 +926,7 @@ export function AuroraApp() {
       await api.sendSlowLetter(draft.id);
       const updated = letter.status === "READ" ? await api.transitionLetter(letter.id, "reply") : letter;
       setLetterInbox(rows => rows.map(row => row.id === updated.id ? updated : row));
+      void api.letterOutbox().then(setLetterOutbox).catch(() => undefined);
       setReplyDrafts(drafts => ({ ...drafts, [letter.id]: "" }));
       setStatus("回复慢信已启程。它仍会经过时间，而不是变成即时聊天。 ");
     } catch (error) { setStatus(error instanceof Error ? error.message : "回复慢信没有启程"); }
@@ -1121,7 +1125,7 @@ export function AuroraApp() {
       </div>
 
       <div className="product-space" hidden={productSpace !== "letters"}>
-      <LettersInbox letterInbox={letterInbox} replyDrafts={replyDrafts} connectionRequests={connectionRequests} friends={friends}
+      <LettersInbox letterInbox={letterInbox} letterOutbox={letterOutbox} replyDrafts={replyDrafts} connectionRequests={connectionRequests} friends={friends}
         onReplyDraftChange={(letterId, value) => setReplyDrafts(drafts => ({ ...drafts, [letterId]: value }))}
         onReply={letter => void replyWithLetter(letter)} onActOnLetter={(letter, action) => void actOnLetter(letter, action)}
         onReportLetter={letter => void reportLetter(letter)} onRequestConnection={letter => void requestConnection(letter)}

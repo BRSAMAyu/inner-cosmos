@@ -446,6 +446,7 @@ export const api = {
   }),
   sendSlowLetter: (id: number) => request<SlowLetter>(`/api/letters/${id}/send`, { method: "POST" }),
   letterInbox: () => request<SlowLetter[]>("/api/letters/inbox"),
+  letterOutbox: () => request<SlowLetter[]>("/api/letters/outbox"),
   transitionLetter: (id: number, action: "read" | "reply" | "decline" | "block" | "archive") =>
     request<SlowLetter>(`/api/letters/${id}/${action}`, { method: "POST" }),
   reportLetter: (id: number, reason: string) => request<void>(`/api/letters/${id}/report`, {

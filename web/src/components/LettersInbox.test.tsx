@@ -28,6 +28,23 @@ describe("LettersInbox", () => {
     expect(onActOnLetter).toHaveBeenCalledWith(letter, "block");
   });
 
+  it("shows letters the user has sent under the outbox tab", () => {
+    const sent: SlowLetter = { id: 12, senderUserId: 1, receiverUserId: 3, receiverCapsuleId: 8,
+      title: "谢谢你愿意在雨里等", letterBody: "我想让你知道那句话我记住了。", status: "IN_FLIGHT",
+      parallaxDistance: 2, estimatedArrivalAt: "2026-07-18T00:00:00Z" };
+    render(<LettersInbox letterInbox={[letter]} letterOutbox={[sent]} replyDrafts={{}}
+      connectionRequests={{ incoming: [], outgoing: [] }} friends={[]}
+      onReplyDraftChange={() => undefined} onReply={() => undefined} onActOnLetter={() => undefined}
+      onReportLetter={() => undefined} onRequestConnection={() => undefined}
+      onDecideConnection={() => undefined} onLeaveConnection={() => undefined} />);
+    // default tab is inbox: the received letter shows, the sent one does not
+    expect(screen.getByText("你写的黄昏让我停了一下")).toBeVisible();
+    expect(screen.queryByText("谢谢你愿意在雨里等")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: /寄出的/ }));
+    expect(screen.getByText("谢谢你愿意在雨里等")).toBeVisible();
+    expect(screen.queryByText("你写的黄昏让我停了一下")).not.toBeInTheDocument();
+  });
+
   it("lets the user accept an incoming connection request", () => {
     const onDecideConnection = vi.fn();
     render(<LettersInbox letterInbox={[]} replyDrafts={{}}
