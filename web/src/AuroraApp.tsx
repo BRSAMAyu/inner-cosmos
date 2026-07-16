@@ -18,6 +18,7 @@ import { LettersInbox } from "./components/LettersInbox";
 import { PortraitView } from "./components/PortraitView";
 import { AccountSettings, type AccountBusy } from "./components/AccountSettings";
 import { PsychologySkillStudio, SkillSuggestionBanner, type SkillLocale } from "./components/PsychologySkillStudio";
+import { LoadingText } from "./loading";
 
 type RuntimeSignal = { stage: "idle" | "understanding" | "composing" | "speaking"; runtime: "single" | "dual"; relationshipMove?: string; repaired?: boolean };
 const terminal = new Set<TurnStatus>(["COMPLETED", "INTERRUPTED", "CANCELLED"]);
@@ -1057,7 +1058,7 @@ export function AuroraApp() {
     <p>{apiConfigurationError ?? <>应用壳、深链与恢复能力已经就绪，但本次构建没有注入 <code>VITE_API_BASE_URL</code>。</>} 为避免把凭据和会话发往错误地址，Aurora 不会尝试登录。</p>
     <small>请使用经过验证的 HTTPS API 域重新构建；推送凭据与商店签名也必须由授权环境提供。</small>
   </div></main>;
-  if (authenticated === null) return <main className="login-shell"><div className="login" role="status">正在连接你的内宇宙…</div></main>;
+  if (authenticated === null) return <main className="login-shell"><div className="login"><LoadingText busy>正在连接你的内宇宙</LoadingText></div></main>;
   if (!authenticated) return <Login native={mobileState.native} onSuccess={bootstrap} />;
 
   return (

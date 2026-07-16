@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-16T21:40:00+08:00
+updated_at: 2026-07-16T21:48:00+08:00
 
 session_2026_07_16_checkpoints:
   - "7db1a84 feat: cross-Pod live Aurora SSE fan-out/resume/heartbeat + turn.started race fix (G2). 826/826."
@@ -944,7 +944,7 @@ closed_front_g2_sse_cross_pod:
 
 active_front:
   id: EXPERIENCE-FLOW-OVERHAUL
-  state: CHECKPOINT_5_CLICK_RIPPLE_MOTIF_DONE_NEXT_IS_LOADING_FOUR_STATES
+  state: CHECKPOINT_6_LOADING_FOUR_STATES_DONE_NEXT_IS_ROLL_ASYNCBUTTON_ACROSS_REMAINING_BUTTONS
   intent: |
     Operator directive docs/goal/loop-goal-directive.md §1 raised体验层重造 to the highest priority,
     ahead of the prior CAMPAIGN-B front (now closed below). §1.1 视觉系统重造 (P0): kill the cold
@@ -1022,9 +1022,35 @@ active_front:
     - "Verified: build OK; npm test 95/95 (+6 ripple tests). Browser throwaway :8098: pointerdown on real
       登录 button -> .ripple at exact (500,503), ripple-expand 0.62s, rgb(199,154,104)=--accent-aurora,
       auto-cleaned after 750ms. Evidence evidence/experience/EXPERIENCE-VISUAL-P0-ripple/. Pushed to fork."
+  done_checkpoint_6:
+    - "§1.1.5 LOADING FOUR-STATES / three-tier delayed loading: web/src/loading.tsx —
+      useDelayedBusy(busy) state machine (idle <1s no flash / text at 1s + static dots / anim at 3s +
+      fading-dots micro-anim, NEVER a spinner), prefers-reduced-motion caps at the text tier (reuses
+      ripple.ts prefersReducedMotion). AsyncButton (busy -> disabled + aria-busy + tiered busy text,
+      default type=button) and LoadingText/LoadingDots (section-level wait). styles.css: .loading-dots
+      (@keyframes loading-dot via --ease-flow token), .loading-text (--text-muted warm), .async-busy;
+      reduced-motion degraded by the existing global block (styles.css:245). Directly closes the
+      checkpoint-4 root cause (missing async-wait feedback; ripple already covered click-instant)."
+    - "Wired: AccountSettings.tsx (Me space) 3 async buttons (export/change-password/delete-account)
+      -> AsyncButton + busy text (正在导出/正在修改/正在删除). AuroraApp.tsx first-connect screen ->
+      LoadingText (正在连接你的内宇宙), spec-compliant <1s-blank."
+    - "Verified: npm test 101/101 (was 95; +6 loading.test.tsx cases — fake-timer three-tier timing,
+      reduced-motion cap, type=button). npm run build OK; loading CSS confirmed present in the built
+      assets/index.css (49.42kB). Browser visual proof via loading-preview-harness.html (inlines the
+      PRODUCTION index.css, data-time=night): getComputedStyle proof (screenshot tool times out on
+      infinite-CSS-animation pages — documented env flakiness, same as prior EXPERIENCE checkpoints,
+      so computed-style/DOM text used as equivalent evidence): text-tier button disabled+aria-busy with
+      static dots (animationName none); anim-tier button running loading-dot 1.2s, dot color
+      rgb(231,219,204) warm (currentColor, not cold blue); <1s button keeps original label; LoadingText
+      color rgb(183,170,160)=--text-muted warm. Evidence evidence/experience/EXPERIENCE-VISUAL-P0-loading-states/."
   next_machine_actions:
-    - "NEXT (§1.1): LOADING FOUR-STATES (<1s hidden / 1-3s text / >3s text+micro-anim, never spinner) +
-      per-async-button busy text — covers the async-wait feedback gap (ripple covers click-instant)."
+    - "NEXT (§1.1): roll AsyncButton across the remaining async action buttons — UnderstandingCorrection
+      (confirm/retire), CapsuleWorkbench (save boundary/compile/publish/archive), PortraitView (calibrate),
+      PeopleDiscovery (request), LettersInbox (act on letter), MemoryStarfield (save importance/archive),
+      ClaimCandidateReview (confirm/dismiss). Each: swap the disabled-only <button> for AsyncButton with a
+      busy text; keep tests green (AsyncButton keeps the same accessible name while <1s / not busy)."
+    - "THEN systematically fill each view's empty/error/recovered states (this checkpoint covered the WAIT
+      state; some empty states already exist e.g. AuroraConversation .empty)."
     - "THEN (still §1.1, before §1.2): progressively var()-tokenize each space's remaining literal warm
       hexes, THEN add light/morandi tokens + seven time-of-day theming (data-time attr + JS lerp on local
       time, prefers-reduced-motion degrade, user lock), and capture day+night screenshots per doc-11 §1.1.6."

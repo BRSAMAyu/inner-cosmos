@@ -242,4 +242,15 @@ footer { padding: 18px 4px; display: flex; justify-content: space-between; color
 /* 点击涟漪(§1.1 涟漪母题): 视口定位, 暖烛光色, 从指针处扩散淡出; JS 在 reduced-motion 时不生成, 此处动画也被下方降级块压零。 */
 .ripple { position: fixed; z-index: 9999; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: var(--accent-aurora); opacity: .5; pointer-events: none; will-change: transform, opacity; animation: ripple-expand 620ms var(--ease-flow) forwards; }
 @keyframes ripple-expand { from { transform: scale(1); opacity: .5; } to { transform: scale(9); opacity: 0; } }
+
+/* 加载四态（§1.1.5）：三点渐隐指示器，绝不用旋转 spinner；reduced-motion 由下方全局块降级为静态。 */
+.loading-dots { display: inline-flex; gap: 3px; margin-left: 5px; align-items: center; vertical-align: baseline; }
+.loading-dots i { width: 4px; height: 4px; border-radius: 50%; background: currentColor; opacity: .3; }
+.loading-dots:not(.static) i { animation: loading-dot 1.2s var(--ease-flow) infinite; }
+.loading-dots:not(.static) i:nth-child(2) { animation-delay: .18s; }
+.loading-dots:not(.static) i:nth-child(3) { animation-delay: .36s; }
+@keyframes loading-dot { 0%, 60%, 100% { opacity: .3; } 30% { opacity: 1; } }
+.loading-text { color: var(--text-muted); font-size: 14px; display: inline-flex; align-items: center; }
+.async-busy { display: inline-flex; align-items: center; }
+
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
