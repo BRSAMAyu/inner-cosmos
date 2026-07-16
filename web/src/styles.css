@@ -253,4 +253,9 @@ footer { padding: 18px 4px; display: flex; justify-content: space-between; color
 .loading-text { color: var(--text-muted); font-size: 14px; display: inline-flex; align-items: center; }
 .async-busy { display: inline-flex; align-items: center; }
 
+/* 四态之"错误 + 恢复"：入口连接失败态（此前会永久卡在加载屏）。暖色，非冷科技告警。 */
+.connect-error { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; max-width: 420px; padding: 24px; border: 1px solid var(--hairline-strong); border-radius: 18px; background: var(--surface-raised); }
+.connect-error-title { color: var(--text-primary); font-size: 17px; margin: 0; }
+.connect-error-detail { color: var(--danger); font-size: 14px; margin: 0; word-break: break-word; }
+
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }

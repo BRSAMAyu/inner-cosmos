@@ -18,7 +18,7 @@ import { LettersInbox } from "./components/LettersInbox";
 import { PortraitView } from "./components/PortraitView";
 import { AccountSettings, type AccountBusy } from "./components/AccountSettings";
 import { PsychologySkillStudio, SkillSuggestionBanner, type SkillLocale } from "./components/PsychologySkillStudio";
-import { LoadingText } from "./loading";
+import { ConnectError, LoadingText } from "./loading";
 
 type RuntimeSignal = { stage: "idle" | "understanding" | "composing" | "speaking"; runtime: "single" | "dual"; relationshipMove?: string; repaired?: boolean };
 const terminal = new Set<TurnStatus>(["COMPLETED", "INTERRUPTED", "CANCELLED"]);
@@ -38,6 +38,7 @@ export function AuroraApp() {
   const [draft, setDraft] = useState("");
   const [mode, setMode] = useState("DAILY_TALK");
   const [status, setStatus] = useState("正在连接你的内宇宙…");
+  const [bootstrapError, setBootstrapError] = useState<string | null>(null);
   const [activeTurnId, setActiveTurnId] = useState<number | null>(null);
   const [wakeIntents, setWakeIntents] = useState<WakeIntent[]>([]);
   const [wakeBusy, setWakeBusy] = useState(false);
@@ -145,6 +146,7 @@ export function AuroraApp() {
 
   const bootstrap = useCallback(async () => {
     const call = ++bootstrapCallRef.current;
+    setBootstrapError(null);
     try {
       const wakeId = Number(new URLSearchParams(window.location.search).get("wakeIntent"));
       const returning = Number.isFinite(wakeId) && wakeId > 0 ? await api.wakeIntent(wakeId) : null;
@@ -192,7 +194,11 @@ export function AuroraApp() {
         setAuthenticated(false);
         setStatus("请先登录");
       } else {
-        setStatus(error instanceof Error ? error.message : "暂时无法连接");
+        // 非鉴权失败：过去只更新 status 却把 authenticated 停在 null，用户会永久卡在连接加载屏。
+        // 现在进入明确的"错误态"，连接屏据此渲染错误 + 重试（恢复态）。
+        const message = error instanceof Error ? error.message : "暂时无法连接你的内宇宙";
+        setBootstrapError(message);
+        setStatus(message);
       }
     }
   }, [replaceFromHistory]);
@@ -1058,7 +1064,11 @@ export function AuroraApp() {
     <p>{apiConfigurationError ?? <>应用壳、深链与恢复能力已经就绪，但本次构建没有注入 <code>VITE_API_BASE_URL</code>。</>} 为避免把凭据和会话发往错误地址，Aurora 不会尝试登录。</p>
     <small>请使用经过验证的 HTTPS API 域重新构建；推送凭据与商店签名也必须由授权环境提供。</small>
   </div></main>;
-  if (authenticated === null) return <main className="login-shell"><div className="login"><LoadingText busy>正在连接你的内宇宙</LoadingText></div></main>;
+  if (authenticated === null) return <main className="login-shell"><div className="login">
+    {bootstrapError
+      ? <ConnectError message={bootstrapError} onRetry={() => void bootstrap()} />
+      : <LoadingText busy>正在连接你的内宇宙</LoadingText>}
+  </div></main>;
   if (!authenticated) return <Login native={mobileState.native} onSuccess={bootstrap} />;
 
   return (

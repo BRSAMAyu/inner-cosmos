@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-16T21:58:00+08:00
+updated_at: 2026-07-16T22:08:00+08:00
 
 session_2026_07_16_checkpoints:
   - "7db1a84 feat: cross-Pod live Aurora SSE fan-out/resume/heartbeat + turn.started race fix (G2). 826/826."
@@ -944,7 +944,7 @@ closed_front_g2_sse_cross_pod:
 
 active_front:
   id: EXPERIENCE-FLOW-OVERHAUL
-  state: CHECKPOINT_7_ASYNCBUTTON_ROLLED_ACROSS_PRIMARY_ACTION_BUTTONS_NEXT_IS_EMPTY_ERROR_STATES_OR_TOKENIZATION
+  state: CHECKPOINT_8_ENTRY_ERROR_RECOVERED_STATE_DONE_NEXT_IS_PER_VIEW_ERROR_STATES_THEN_VISUAL_TOKENIZATION
   intent: |
     Operator directive docs/goal/loop-goal-directive.md §1 raised体验层重造 to the highest priority,
     ahead of the prior CAMPAIGN-B front (now closed below). §1.1 视觉系统重造 (P0): kill the cold
@@ -1062,13 +1062,34 @@ active_front:
     - "Both push paths remain blocked this session (HG-GIT-PUSH-ACCESS + fork-push classifier gate); all
       checkpoints committed locally on feat/phase0-visual-token-system, recoverable, pending an authorized
       push destination from the human."
+  done_checkpoint_8:
+    - "Fixed a real, high-visibility bug while closing the four-state ERROR+RECOVERED requirement:
+      AuroraApp.bootstrap()'s non-auth failure branch only setStatus() but left authenticated=null, and
+      the entry render (authenticated===null) only shows the connecting LoadingText — so ANY bootstrap
+      failure (network/500/non-JSON) left the user PERMANENTLY stuck on the loading screen with the error
+      never rendered. Added bootstrapError state (cleared at bootstrap start, set on non-auth failure);
+      entry now renders <ConnectError message onRetry> instead of hanging."
+    - "loading.tsx: extracted ConnectError({message,onRetry}) (role=alert + detail + 重试 recovery button)
+      into the four-state family for unit-testability. styles.css: .connect-error (--surface-raised warm
+      panel + --hairline-strong), .connect-error-detail (--danger warm red, not cold-tech alert)."
+    - "Verified: npm test 102/102 (+1 ConnectError unit test). npm run build OK. REAL browser end-to-end
+      (strongest evidence — exercises the new path): served the production static app over HTTP with NO
+      backend (127.0.0.1:8124/app/aurora/), bootstrap createSession fetch got 404 HTML not JSON -> error
+      state. getComputedStyle/innerText proof: stillLoading=false (no longer stuck), title 没能连上你的内宇宙,
+      detail color rgb(217,138,114)=--danger warm, panel rgb(42,34,32)=--surface-raised; RECOVERY: DOM-click
+      重试 fired 1 new bootstrap fetch and (backend still absent) correctly returned to the error state
+      rather than hanging. Screenshot tool still times out (documented env flakiness). Evidence
+      checkpoint-8-error-recovered.md."
   next_machine_actions:
-    - "NEXT (§1.1, lower value): unify the remaining inline-busy-text buttons (MemoryStarfield/
-      PsychologySkillStudio/retire) onto AsyncButton's three-tier timing; convert AuroraSelfSpace and
-      ClaimCandidateReview action buttons."
-    - "THEN systematically fill each view's empty/error/recovered states (checkpoints 6-7 covered the WAIT
-      state; some empty states already exist e.g. AuroraConversation .empty, ResonanceNetwork .network-empty,
-      PeopleDiscovery/PlazaDirectory empty). Audit each space for error + recovered states."
+    - "NEXT: extend empty/error/recovered-state coverage to the per-view data loads (starfield, resonance,
+      letters, portrait, etc.). Most already have EMPTY states (AuroraConversation .empty, ResonanceNetwork
+      .network-empty, PeopleDiscovery/PlazaDirectory empty); focus on ERROR + retry per view."
+    - "THEN the §1.1 visual mainline (highest remaining perceivable win): finish var()-tokenizing the
+      remaining literal hexes so a light band is safe, add light/morandi tokens + the light half of the
+      seven time-of-day theming (dawn/morning/noon warm-light), capture day+night screenshots per doc-11.
+      THEN local font packaging (LXGW WenKai/Noto Serif SC/Cormorant/JetBrains Mono, CSP-safe offline)."
+    - "Lower value / consistency: unify the remaining inline-busy-text buttons (MemoryStarfield/
+      PsychologySkillStudio/retire) + AuroraSelfSpace/ClaimCandidateReview action buttons onto AsyncButton."
     - "THEN (still §1.1, before §1.2): progressively var()-tokenize each space's remaining literal warm
       hexes, THEN add light/morandi tokens + seven time-of-day theming (data-time attr + JS lerp on local
       time, prefers-reduced-motion degrade, user lock), and capture day+night screenshots per doc-11 §1.1.6."

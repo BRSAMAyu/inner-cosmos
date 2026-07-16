@@ -70,6 +70,23 @@ export function LoadingText({
   );
 }
 
+/**
+ * 四态之"错误 + 恢复"：入口连接失败态。带一个再试按钮（恢复路径）。
+ * 抽成独立组件以便单测；此前 AuroraApp bootstrap 非鉴权失败会把 authenticated 停在 null，
+ * 用户永久卡在连接加载屏——本组件让失败可见且可恢复。
+ */
+export function ConnectError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div className="connect-error" role="alert">
+      <p className="connect-error-title">没能连上你的内宇宙</p>
+      <p className="connect-error-detail">{message}</p>
+      <button type="button" className="understanding-action" onClick={onRetry}>
+        重试
+      </button>
+    </div>
+  );
+}
+
 type AsyncButtonProps = {
   busy: boolean;
   busyText?: string;

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, render, screen } from "@testing-library/react";
-import { AsyncButton, LoadingText } from "./loading";
+import { AsyncButton, ConnectError, LoadingText } from "./loading";
 
 // 默认：不减少动效（matchMedia reduce=false）。个别用例覆盖。
 function mockReducedMotion(reduce: boolean) {
@@ -87,5 +87,14 @@ describe("加载四态 三档时序", () => {
     const { container } = render(<LoadingText busy={false}>正在加载</LoadingText>);
     act(() => vi.advanceTimersByTime(5000));
     expect(container.querySelector(".loading-text")).toBeNull();
+  });
+
+  it("ConnectError：显示错误详情，重试按钮回调 onRetry（恢复路径）", () => {
+    const onRetry = vi.fn();
+    render(<ConnectError message="暂时无法连接你的内宇宙" onRetry={onRetry} />);
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(screen.getByText("暂时无法连接你的内宇宙")).toBeVisible();
+    screen.getByRole("button", { name: "重试" }).click();
+    expect(onRetry).toHaveBeenCalledOnce();
   });
 });
