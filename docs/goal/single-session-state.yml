@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-16T06:43:00+08:00
+updated_at: 2026-07-16T08:52:00+08:00
 authority:
   - goal-objective.md
   - 对齐文档/17-单会话持续Goal模式执行协议.md
@@ -437,7 +437,7 @@ closed_front_g3_portrait_port:
       same GET/DELETE /api/aurora/corrections backend this checkpoint's work touched — a
       natural, small follow-up extension to UnderstandingCorrection.tsx if picked up next."
 
-active_front:
+closed_front_g3_account_settings:
   id: G3-ACCOUNT-SETTINGS-SAFETY-FIELDS
   state: DONE_VERIFIED_LIVE_END_TO_END
   intent: |
@@ -482,6 +482,74 @@ active_front:
     - "Once settings + corrections + starfield reach real parity, portrait.html/settings.html/
       corrections.html/memory-starfield.html become genuinely safe to redirect per the
       G3-UX-SHELL-REAL-PARITY rule (verify parity first, same rigor, before retiring)."
+
+active_front:
+  id: G3-CORRECTION-HISTORY-RETIRE
+  state: DONE_VERIFIED_LIVE_END_TO_END_PLUS_BACKEND_500_FIX
+  intent: |
+    Executed the next ranked port item (corrections.html gap, #8 in the G3-UX-SHELL-REAL-PARITY
+    parity list, flagged as small + backend-ready): the AppShell's UnderstandingCorrection showed
+    only the top-3 ACTIVE claims — no history of past corrections and no way to retire one, both of
+    which legacy corrections.html has. Backend GET/DELETE /api/aurora/corrections already existed
+    (DELETE is a proper RETIRE: status->RETIRED + reactivates the superseded claim), so this was a
+    pure frontend port — until live verification surfaced a real backend 500 that the port makes
+    much more reachable, which was then fixed in the same checkpoint.
+  done_this_front_summary:
+    - "Frontend port: UnderstandingCorrection.tsx now renders a 'you confirmed corrections' history
+      list (field/type/time, old->new change, reason) with a two-step inline retire action (click
+      '让这条退休' -> inline '确认退休/再想想' -> onRetire), matching legacy corrections.html but in
+      the AppShell design language (no native confirm()). api.ts gained UserCorrection type +
+      recentCorrections()/retireCorrection(id). AuroraApp.tsx loads corrections in bootstrap
+      (appended at the END of the Promise.all to preserve the positional-index casts loaded[8]/
+      [9]/[13]), refetches BOTH the history list and understandingClaims after a retire (retire
+      reactivates the superseded claim, so active claims change too), and also refetches the
+      history after a confirm so a new correction appears immediately. New styles in styles.css."
+    - "Tests: 4 new Vitest cases in UnderstandingCorrection.test.tsx (history renders old->new +
+      reason; retire requires inline confirm then calls onRetire(id); retiring state disables +
+      relabels the confirm; no history section when empty). 46/46 Vitest green (was 42), tsc clean,
+      production bundle rebuilt (vite build into src/main/resources/static/app/aurora)."
+    - "Live end-to-end (packaged jar on a THROWAWAY H2, not the persistent dev DB): registered a
+      user, created a CONFIRMED correction via the real /confirm endpoint, reloaded the SPA and
+      confirmed the history section renders it (heading 你确认过的更正, change 你更喜欢独处→我只是需要
+      先恢复精力, reason/field/time all correct), then drove the real UI retire: '让这条退休' ->
+      inline confirm appeared -> '确认退休' -> DELETE fired through the wired api client -> record
+      disappeared, backend list dropped to 0, status message shown, 0 console errors. (Browser
+      'computer' screenshot tool timed out — the same documented environment flakiness as prior
+      checkpoints; captured the rendered .correction-history outerHTML as textual proof instead.)"
+    - "[BACKEND 500 FIXED — real, deterministic bug the port surfaces] While re-seeding for a
+      screenshot, hit a 500 that reproduced deterministically: confirm a self-understanding
+      correction (understanding-claim version 1) -> retire it (claim -> RETIRED, still occupying
+      (user_id, claim_key, version=1)) -> re-correct the SAME topic -> UserCorrectionServiceImpl
+      computed the new version from the highest ACTIVE claim (null after retire -> version 1) and
+      re-inserted version 1, violating the unique (user_id, claim_key, version) index. Making retire
+      reachable in the AppShell makes this exact sequence (retire, then re-correct the same
+      understanding) materially more likely for real users, so it was fixed here rather than
+      deferred. Fix: version now advances past the highest EXISTING version across ALL statuses
+      (RETIRED/SUPERSEDED/ACTIVE), while the supersession target stays the ACTIVE claim. New
+      UserCorrectionControllerTest.reCorrectingAfterRetiringTheOnlyClaimAdvancesVersionInsteadOf
+      CollidingOnTheRetiredRow: red (500) -> green (200, version 2 ACTIVE, retired v1 kept in
+      history). Re-verified live through the rebuilt running jar: confirm->retire->re-confirm = 200,
+      version 2."
+    - "committed as HEAD b4eb9b4. Full `mvn test` gate run at this checkpoint: 791/791 runnable
+      green, 0 failures; the only 6 errors are Testcontainers integration tests
+      (PostgresApplicationSmokeTest, PostgresFlywayBaselineTest, Redis*, JdbcOutbox*) failing on
+      'Could not find a valid Docker environment' — an infrastructure gate in this sandbox, not a
+      code regression (this change is a pure H2/JPA versioning fix + frontend)."
+  next_machine_actions:
+    - "NEXT — continue the ranked G3-UX-SHELL-REAL-PARITY port list. Remaining, roughly by
+      user-visible weight: memory-starfield importance-tuning + archive action (#7, small, likely
+      backend-ready); capsule-create real user-choice fields (#9); arbitrary-capsule persona chat
+      (#5/capsule-chat.html); echo-plaza public directory + landed action + sync review (#4);
+      letters outbox/drafts/archive/thread view (#10); aurora-chat voice input + session rituals
+      (#6); and the biggest: relations/social (#3) has ZERO API-client presence and needs backend
+      audit first. Settings' remaining cosmetic preference toggles (persona tone, proactive
+      intensity, quiet hours, theme, social reachability) are lower priority (not data-rights-
+      relevant)."
+    - "After enough of the corrections/starfield/settings ports land with verified parity, revisit
+      whether portrait.html/settings.html/corrections.html/memory-starfield.html are safe to
+      retire/redirect per the G3-UX-SHELL-REAL-PARITY rule (verify parity first, same rigor)."
+    - "Or pick a different acceptance-ledger front if a fresher, higher-value machine-actionable gap
+      surfaces (e.g. Campaign C Genome IR next slice, an UNASSESSED G2 contract item)."
 
 priority_queue:
   - id: CAMPAIGN-C-QUALITY
@@ -551,12 +619,19 @@ last_full_gate:
   # reviewer's own re-verification at commit 5bcc649 found Maven 792/792, Vitest 33/33,
   # Playwright 13/13 + Living Aurora 1/1 — those are now the trusted baseline numbers, not the
   # 784/17/11 this block previously (and wrongly) claimed.
-  baseline_commit: 2ad9683 (committed HEAD, full `mvn test` re-run AT this commit, not just before it)
-  claimed_java: 795/795 (full `mvn test`, 2m12s, exit 0, BUILD SUCCESS — includes all of this
-    checkpoint cycle's new tests: Simulator purpose-grant, FORGET-capsule-propagation, Genome IR
-    provenance, GenomeCompilerGroundednessEvaluationTest, persona-chat redaction)
-  claimed_playwright: 13/13 plus Living Aurora 1/1 (no frontend change this checkpoint cycle)
-  claimed_vitest: 33/33 (no frontend change this checkpoint cycle)
+  baseline_commit: b4eb9b4 (committed HEAD; full `mvn test` run AT this commit)
+  claimed_java: |
+    791/791 runnable green, 0 failures, exit 1 ONLY because of 6 Testcontainers integration tests
+    (PostgresApplicationSmokeTest, PostgresFlywayBaselineTest, RedisSessionPersistenceIntegrationTest,
+    JdbcOutboxRepositoryIntegrationTest, RedisRateLimitStoreIntegrationTest,
+    RedisSchedulerLeaseIntegrationTest) erroring on 'Could not find a valid Docker environment' —
+    an infrastructure gate absent in this sandbox, not a code regression. Includes this checkpoint's
+    new UserCorrectionControllerTest.reCorrectingAfterRetiringTheOnlyClaim... (red->green backend
+    500 fix). NOTE: earlier gates claimed 795/795 when Docker WAS available; the 4-test delta is
+    exactly those Docker-gated integration tests, now un-runnable here — not lost tests.
+  claimed_vitest: 46/46 (was 42; +4 new UnderstandingCorrection history/retire cases this checkpoint)
+  claimed_playwright: 13/13 plus Living Aurora 1/1 (not re-run this checkpoint — no change to the
+    journeys they cover; the new frontend surface is covered by Vitest + live browser verification)
   independent_reverification: BUILDER_VERIFIED_WITH_HUMAN_AND_PRODUCTION_GATES
   independently_verified:
     - Full `mvn test` re-run again this checkpoint after adding CorrectionTargetingEvaluationTest: exit code 0, no [ERROR] markers, across the full Spring context suite. The new eval itself: 1/1, precision/recall thresholds calibrated just below the honestly-measured baseline (see active_front notes).

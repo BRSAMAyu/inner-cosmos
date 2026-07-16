@@ -2,8 +2,8 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 authority: goal-objective.md
 status: IN_PROGRESS
-last_reconciled_at: 2026-07-15T13:04:00+08:00
-last_reconciled_commit: 9fe7e5d9fe90f83bf94114ca175c1166ea74ab06
+last_reconciled_at: 2026-07-16T08:52:00+08:00
+last_reconciled_commit: b4eb9b4
 
 status_semantics:
   UNASSESSED: current HEAD and target environment have not been verified
@@ -118,8 +118,17 @@ gates:
           by direct database query, not just a UI state change). MeSpace is no longer read-only —
           it is still missing the cosmetic preference toggles (persona tone, proactive intensity,
           quiet hours, theme, social reachability), which remain queued as lower priority since
-          they are not data-rights-relevant. Still open: no correction history/retire action (only
-          top-3 active claims); memory starfield has no
+          they are not data-rights-relevant.
+          UPDATE (this checkpoint): correction history + retire is DONE — UnderstandingCorrection.tsx
+          now lists the user's confirmed corrections (old->new, reason, field/time) with a two-step
+          inline retire action wired to DELETE /api/aurora/corrections/{id}; the AppShell previously
+          showed only the top-3 active claims. Verified live end-to-end (history renders a seeded
+          correction, retire removes it and the backend list drops to 0, 0 console errors). This also
+          surfaced and fixed a real backend 500 (re-correcting a self-understanding topic after
+          retiring its correction collided on the understanding-claim (user_id, claim_key, version)
+          unique index — version now advances past the highest existing version across all statuses;
+          red->green UserCorrectionControllerTest, 791/791 runnable green). Still open: memory
+          starfield has no
           importance-tuning or archive action; capsule creation hardcodes privacy/boundary fields
           the legacy wizard exposes; no way to chat with an arbitrary discovered capsule outside a
           curated match; letters has no outbox/drafts/archive/thread view; and relations/social's
