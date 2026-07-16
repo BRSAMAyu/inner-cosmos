@@ -1108,7 +1108,21 @@ priority_queue:
   - id: G9-FINAL-ACCEPTANCE
     reason: Complete-product E2E, blind usability, operations rehearsal, demo, and traceability have not started.
 
+blocked_git_push_access:
+  id: HG-GIT-PUSH-ACCESS
+  state: BLOCKED_403_LOCAL_COMMITS_ACCUMULATING
+  detail: |
+    2026-07-16: `git push origin main` returns HTTP 403 — "Permission to BRSAMAyu/inner-cosmos.git
+    denied to sangchenyi." The authenticated git credential (user sangchenyi) lacks write access to
+    the BRSAMAyu-owned repo; prior sessions could push, so credentials/access changed. This is a human
+    gate (account/credential operation) per loop-goal-directive.md §3. Verified checkpoints are being
+    committed LOCALLY and are recoverable; they will flush on `git push` once the human restores access
+    (add sangchenyi as collaborator OR point the git credential at the BRSAMAyu account). Local-only
+    commits so far: d626504 (EXPERIENCE §1.1 checkpoint 1). Work continues on non-push-dependent fronts.
+  human_action_needed: "Grant push access to the authenticated account, or re-auth git as an account with write to BRSAMAyu/inner-cosmos."
+
 known_human_gates:
+  - HG-GIT-PUSH-ACCESS
   - HG-SECRET-ROTATION
   - HG-PRODUCTION-ACCOUNTS
   - HG-PRIVACY-LEGAL
