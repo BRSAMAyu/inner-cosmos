@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-16T23:36:00+08:00
+updated_at: 2026-07-16T23:42:00+08:00
 
 session_2026_07_16_checkpoints:
   - "7db1a84 feat: cross-Pod live Aurora SSE fan-out/resume/heartbeat + turn.started race fix (G2). 826/826."
@@ -944,7 +944,7 @@ closed_front_g2_sse_cross_pod:
 
 active_front:
   id: EXPERIENCE-FLOW-OVERHAUL
-  state: CHECKPOINT_10_TEXT_TOKENIZATION_BATCH1_DONE_NEXT_IS_NEARCOLOR_NORMALIZE_THEN_SURFACE_ACCENT_THEN_LIGHT_BAND
+  state: CHECKPOINT_11_FIXED_ACCENT_TOKENIZATION_BATCH2_DONE_79_LITERALS_TOKENIZED_NEXT_IS_TIMEVARYING_THEN_NEARCOLOR
   intent: |
     Operator directive docs/goal/loop-goal-directive.md §1 raised体验层重造 to the highest priority,
     ahead of the prior CAMPAIGN-B front (now closed below). §1.1 视觉系统重造 (P0): kill the cold
@@ -1108,14 +1108,28 @@ active_front:
       resolves rgb(140,129,119)=original, .connect-error-title (var(--text-primary)) computes
       rgb(240,232,223)=original — pixel-identical + var refs resolve with no typo. Evidence
       evidence/experience/EXPERIENCE-VISUAL-P0-tokenize/checkpoint-10-text-tokens.md."
+  done_checkpoint_11:
+    - "var() tokenization batch 2 (FIXED-value accents/danger, still pixel-identical): styles.css
+      component region — #a9bcae->var(--accent-sage-soft) x19, #9fb0c2->var(--accent-sky-soft) x7,
+      #ddb17f->var(--accent-aurora-soft) x4, #7e9281->var(--accent-sage) x1, #74869b->var(--accent-sky) x3,
+      #8d7482->var(--accent-plum) x1, #c7a9c0->var(--accent-plum-soft) x1, #e9b4ae->var(--danger-soft) x2
+      (38 total). These tokens are NOT time-of-day-overridden so the swap is value-preserving. perl
+      negative-lookahead preserved the alpha variants (#a9bcae4a/#74869b35/#9bb0a24a) untouched."
+    - "Verified: npm test 108/108. npm run build OK, accent var refs in built index.css. Browser
+      getComputedStyle probe: var(--accent-sage-soft)=rgb(169,188,174)=#a9bcae,
+      var(--accent-sky-soft)=rgb(159,176,194)=#9fb0c2, var(--danger-soft)=rgb(233,180,174)=#e9b4ae — all
+      original values, pixel-identical. Evidence checkpoint-11-accent-tokens.md."
+    - "Tokenization running total: cp10 text 41 + cp11 fixed-accent 38 = 79 literals -> semantic tokens."
   next_machine_actions:
-    - "NEXT tokenization batch 2 — NEAR-COLOR NORMALIZATION (needs per-context judgment + before/after
-      computed-style diff, so separate from the pixel-safe batch 1): bright creams #e7dbcc(15)/#efe4d9(6)/
-      #f0e9e3(3)->--text-primary; mids #a99c92(9)/#b3a597(7)/#b0a398(7)->--text-muted; darker #a0948a(5)/
-      #9a8f82(4)->--text-faint. These shift dark render by a few imperceptible RGB points (normalization,
-      not value-preserving) — verify each isn't on a decorative surface before mapping."
-    - "THEN batch 3: surface hexes (#211a18/#2a2220/#2a1f18) + accents (#a9bcae/#9fb0c2/#ddb17f/#7e9281/
-      #74869b/#8d7482/#c7a9c0) + #ffffffXX overlay layers, each a bounded batch."
+    - "NEXT batch 3 — TIME-VARYING token mapping (verify across times, not pixel-identical by design):
+      #c79a68->var(--accent-aurora) and #211a18->var(--surface-canvas). These currently freeze the 'night'
+      value; mapping makes those elements correctly FLOW with seven-time-of-day (the §1.1.2 intent) but
+      changes render at non-night times — load the app at 2-3 data-time values and confirm it looks right."
+    - "THEN NEAR-COLOR NORMALIZATION (per-context judgment + before/after computed-style diff): bright
+      creams #e7dbcc(15)/#efe4d9(6)/#f0e9e3(3)->--text-primary; mids #a99c92(9)/#b3a597(7)/#b0a398(7)->
+      --text-muted; darker #a0948a(5)/#9a8f82(4)->--text-faint. Imperceptible RGB shift; verify not on a
+      decorative surface first."
+    - "THEN #ffffffXX overlay layers (alpha whites -> hairline/color-mix tokens) + remaining stray warm hexes."
     - "THEN add light/morandi tokens (米白 #F7F2EC base) + the light half of seven time-of-day (dawn/morning/
       noon warm-light), verify WCAG 2.2 AA contrast + capture day+night screenshots per doc-11 §1.1.6."
     - "THEN local font packaging (LXGW WenKai/Noto Serif SC/Cormorant/JetBrains Mono, CSP-safe offline);
