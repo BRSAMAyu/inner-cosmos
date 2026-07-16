@@ -32,6 +32,9 @@ class ProductionStartupGuardTest {
                     "inner-cosmos.security.rate-limit.redis.namespace=inner-cosmos:rate-limit:v1",
                     "inner-cosmos.idempotency.redis.enabled=true",
                     "inner-cosmos.idempotency.redis.namespace=inner-cosmos:idempotency:v1",
+                    "inner-cosmos.aurora.stream.redis.enabled=true",
+                    "inner-cosmos.aurora.stream.stage-namespace=inner-cosmos:aurora:stage:v1",
+                    "inner-cosmos.aurora.stream.live-namespace=inner-cosmos:aurora:live:v1",
                     "inner-cosmos.scheduler.redis-lock.enabled=true",
                     "inner-cosmos.scheduler.redis-lock.namespace=inner-cosmos-scheduler-v1",
                     "spring.data.redis.ssl.enabled=true",
@@ -62,6 +65,12 @@ class ProductionStartupGuardTest {
     @Test
     void rejectsFallbackEvenWhenEnvironmentOverridesProfile() {
         runner.withPropertyValues("llm.allow-fallback=true")
+                .run(context -> assertRejected(context.getBean(ProductionStartupGuard.class)));
+    }
+
+    @Test
+    void rejectsProcessLocalAuroraStreamingInProduction() {
+        runner.withPropertyValues("inner-cosmos.aurora.stream.redis.enabled=false")
                 .run(context -> assertRejected(context.getBean(ProductionStartupGuard.class)));
     }
 

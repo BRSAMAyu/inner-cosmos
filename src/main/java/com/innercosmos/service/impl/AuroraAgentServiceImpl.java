@@ -36,6 +36,11 @@ import com.innercosmos.service.DialogService;
 import com.innercosmos.service.MemoryService;
 import com.innercosmos.service.RhythmGuardService;
 import com.innercosmos.service.SafetyService;
+import com.innercosmos.streaming.AuroraLiveEvent;
+import com.innercosmos.streaming.AuroraLiveEventStore;
+import com.innercosmos.streaming.AuroraStreamStageStore;
+import com.innercosmos.streaming.InMemoryAuroraLiveEventStore;
+import com.innercosmos.streaming.InMemoryAuroraStreamStageStore;
 import com.innercosmos.vo.AuroraMemoryContextVO;
 import com.innercosmos.vo.AuroraReplyVO;
 import com.innercosmos.vo.SafetyResult;
@@ -46,6 +51,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.time.LocalTime;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -98,16 +104,19 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     private AuroraDualKernelRuntime dualKernelRuntime;
     private final Map<Long, Integer> turnCounter = new ConcurrentHashMap<>();
     private final Map<Long, Integer> goodbyeConfirmCount = new ConcurrentHashMap<>();
-    /**
-     * VS-003b — staging cache for rich SSE context. The browser opens the SSE
-     * stream via a GET EventSource, which cannot carry a JSON body. The frontend
-     * first POSTs the rich context (voice/weather/location/timezone) to
-     * /stream-stage, then opens the GET stream with the returned token. The token
-     * is consumed once and expires within {@link #STREAM_STAGE_TTL_MS}.
-     */
-    private final Map<String, StagedStream> streamStage = new ConcurrentHashMap<>();
-    private static final long STREAM_STAGE_TTL_MS = 60_000L;
-    private static final int STREAM_STAGE_MAX_ENTRIES = 1024;
+    private AuroraStreamStageStore streamStageStore =
+            new InMemoryAuroraStreamStageStore(Duration.ofMinutes(1), 1024);
+    private AuroraLiveEventStore liveEventStore = new InMemoryAuroraLiveEventStore(1024);
+
+    @Autowired
+    void setStreamStageStore(AuroraStreamStageStore streamStageStore) {
+        this.streamStageStore = streamStageStore;
+    }
+
+    @Autowired
+    void setLiveEventStore(AuroraLiveEventStore liveEventStore) {
+        this.liveEventStore = liveEventStore;
+    }
 
     public AuroraAgentServiceImpl(StructuredAiService structuredAiService,
                                   DialogService dialogService,
@@ -501,33 +510,33 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 DialogMessage userMessage = dialogService.saveUserMessage(userId, request);
                 turnId = beginChoreography(userId, sessionId, userMessage);
                 if (turnId != null) {
-                    sendStream(emitter, clientConnected, SseEmitter.event().id(turnId + ":0")
-                            .name("turn.started").data("{\"turnId\":" + turnId + "}"));
+                    emitLive(emitter, clientConnected, userId, turnId, 0L, "turn.started",
+                            "{\"turnId\":" + turnId + "}", false);
                 }
                 AuroraReplyVO reply = produceReply(userId, request, safety,
                         userMessage == null ? null : userMessage.id, turnId, false);
 
                 if (Boolean.TRUE.equals(reply.cancelled)) {
-                    sendStream(emitter, clientConnected, SseEmitter.event().id(sseId(reply, 1))
-                            .name("turn.interrupted").data("{\"reason\":\"USER_INTERRUPTED\"}"));
+                    emitLive(emitter, clientConnected, userId, reply.turnId, 1L, "turn.interrupted",
+                            "{\"reason\":\"USER_INTERRUPTED\"}", true);
                     completeQuietly(emitter);
                     return;
                 }
 
                 long eventSequence = 1L;
-                sendStream(emitter, clientConnected, SseEmitter.event().id(sseId(reply, eventSequence++))
-                        .name("turn.plan").data("{\"turnId\":" + numeric(reply.turnId)
-                                + ",\"planId\":" + numeric(reply.planId) + "}"));
+                emitLive(emitter, clientConnected, userId, reply.turnId, eventSequence++, "turn.plan",
+                        "{\"turnId\":" + numeric(reply.turnId)
+                                + ",\"planId\":" + numeric(reply.planId) + "}", false);
 
                 for (int i = 0; i < reply.messages.size(); i++) {
                     if (isTurnCancelled(userId, reply.turnId)) break;
                     if (i > 0) {
-                        sendStream(emitter, clientConnected, SseEmitter.event().id(sseId(reply, eventSequence++))
-                                .name("segment").data("{\"break\":true}"));
+                        emitLive(emitter, clientConnected, userId, reply.turnId, eventSequence++, "segment",
+                                "{\"break\":true}", false);
                         if (clientConnected.get()) Thread.sleep(220);
                     }
-                    sendStream(emitter, clientConnected, SseEmitter.event().id(sseId(reply, eventSequence++))
-                            .name("bubble.started").data("{\"order\":" + (i + 1) + "}"));
+                    emitLive(emitter, clientConnected, userId, reply.turnId, eventSequence++, "bubble.started",
+                            "{\"order\":" + (i + 1) + "}", false);
                     StreamProgress progress = streamText(emitter, clientConnected,
                             reply.messages.get(i), reply, eventSequence, userId);
                     eventSequence = progress.nextEventSequence();
@@ -543,12 +552,12 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                     } else {
                         dialogService.saveAuroraMessage(userId, sessionId, reply.messages.get(i));
                     }
-                    sendStream(emitter, clientConnected, SseEmitter.event().id(sseId(reply, eventSequence++))
-                            .name("bubble.completed").data("{\"order\":" + (i + 1) + "}"));
+                    emitLive(emitter, clientConnected, userId, reply.turnId, eventSequence++, "bubble.completed",
+                            "{\"order\":" + (i + 1) + "}", false);
                 }
                 if (isTurnCancelled(userId, reply.turnId)) {
-                    sendStream(emitter, clientConnected, SseEmitter.event().id(sseId(reply, eventSequence))
-                            .name("turn.interrupted").data("{\"reason\":\"USER_STOPPED\"}"));
+                    emitLive(emitter, clientConnected, userId, reply.turnId, eventSequence, "turn.interrupted",
+                            "{\"reason\":\"USER_STOPPED\"}", true);
                     completeQuietly(emitter);
                     return;
                 }
@@ -558,10 +567,10 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 // VS-003b — meta now carries the full perception payload (agentLoop,
                 // aiState, voice/weather/location/timezone) so the frontend can render
                 // the same panels on stream as on the POST fallback path.
-                sendStream(emitter, clientConnected, SseEmitter.event().id(sseId(reply, eventSequence++))
-                        .name("meta").data(jsonMeta(reply, request, null)));
-                sendStream(emitter, clientConnected, SseEmitter.event().id(sseId(reply, eventSequence))
-                        .name("turn.completed").data("{\"message\":\"done\"}"));
+                emitLive(emitter, clientConnected, userId, reply.turnId, eventSequence++, "meta",
+                        jsonMeta(reply, request, null), false);
+                emitLive(emitter, clientConnected, userId, reply.turnId, eventSequence, "turn.completed",
+                        "{\"message\":\"done\"}", true);
                 // Preserve the original done contract used by the current frontend.
                 sendStream(emitter, clientConnected,
                         SseEmitter.event().name("done").data("{\"message\":\"done\"}"));
@@ -592,37 +601,14 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
      */
     @Override
     public String stageStreamContext(Long userId, ChatRequest request) {
-        if (userId == null || request == null) return null;
-        purgeExpiredStages();
-        if (streamStage.size() >= STREAM_STAGE_MAX_ENTRIES) {
-            throw new com.innercosmos.exception.BusinessException(
-                    com.innercosmos.common.ErrorCode.CONFLICT, "too many pending stream stages");
-        }
-        String token = java.util.UUID.randomUUID().toString().replace("-", "");
-        streamStage.put(token, new StagedStream(userId, request,
-                System.currentTimeMillis() + STREAM_STAGE_TTL_MS));
-        return token;
+        return streamStageStore.stage(userId, request);
     }
 
     /** VS-003b — consume (once) the staged rich context for a stream token. */
     @Override
     public ChatRequest consumeStage(Long userId, String token) {
-        if (userId == null || token == null || token.isBlank()) return null;
-        StagedStream staged = streamStage.get(token);
-        if (staged == null || staged.expiresAt <= System.currentTimeMillis()) {
-            if (staged != null) streamStage.remove(token, staged);
-            return null;
-        }
-        if (!userId.equals(staged.userId)) return null;
-        return streamStage.remove(token, staged) ? staged.request : null;
+        return streamStageStore.consume(userId, token);
     }
-
-    private void purgeExpiredStages() {
-        long now = System.currentTimeMillis();
-        streamStage.entrySet().removeIf(entry -> entry.getValue().expiresAt <= now);
-    }
-
-    private record StagedStream(Long userId, ChatRequest request, long expiresAt) {}
 
     /**
      * Persist the user turn + the single crisis safe-message as a DialogMessage so the
@@ -665,6 +651,25 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                     detached.getMessage());
             return false;
         }
+    }
+
+    private boolean emitLive(SseEmitter emitter, AtomicBoolean clientConnected, Long userId, Long turnId,
+                             long sequence, String name, String data, boolean terminal) {
+        if (userId == null || turnId == null) {
+            return sendStream(emitter, clientConnected,
+                    SseEmitter.event().id("legacy:" + sequence).name(name).data(data));
+        }
+        String id = turnId + ":" + sequence;
+        try {
+            liveEventStore.publish(new AuroraLiveEvent(userId, turnId, sequence, id, name, data, terminal));
+        } catch (Exception transportFailure) {
+            // The connected client and PostgreSQL choreography remain available. Redis reconnect
+            // degrades to the durable timeline rather than aborting a safe in-flight response.
+            log.warn("Aurora cross-Pod stream publish unavailable for turn {} sequence {}: {}",
+                    turnId, sequence, transportFailure.getMessage());
+        }
+        return sendStream(emitter, clientConnected,
+                SseEmitter.event().id(id).name(name).data(data));
     }
 
     private void completeQuietly(SseEmitter emitter) {
@@ -1161,18 +1166,18 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 // The current frontend already listens to both `token` and the legacy
                 // onmessage path, so naming deltas makes the wire contract explicit
                 // without changing the rendered experience.
-                boolean delivered = sendStream(emitter, clientConnected,
-                        SseEmitter.event().id(sseId(reply, eventSequence++))
-                                .name("token").data("{\"content\":\"" + escape(token.toString()) + "\"}"));
+                String data = "{\"content\":\"" + escape(token.toString()) + "\"}";
+                boolean delivered = emitLive(emitter, clientConnected, userId, reply.turnId,
+                        eventSequence++, "token", data, false);
                 if (delivered) deliveredChars += token.length();
                 token.setLength(0);
                 if (clientConnected.get()) Thread.sleep(30);
             }
         }
         if (!token.isEmpty()) {
-            boolean delivered = sendStream(emitter, clientConnected,
-                    SseEmitter.event().id(sseId(reply, eventSequence++))
-                            .name("token").data("{\"content\":\"" + escape(token.toString()) + "\"}"));
+            String data = "{\"content\":\"" + escape(token.toString()) + "\"}";
+            boolean delivered = emitLive(emitter, clientConnected, userId, reply.turnId,
+                    eventSequence++, "token", data, false);
             if (delivered) deliveredChars += token.length();
         }
         return new StreamProgress(eventSequence, deliveredChars);
@@ -1211,10 +1216,6 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
 
     private boolean isTurnCancelled(Long userId, Long turnId) {
         return choreographyService != null && turnId != null && choreographyService.isCancelled(userId, turnId);
-    }
-
-    private String sseId(AuroraReplyVO reply, long sequence) {
-        return (reply.turnId == null ? "legacy" : reply.turnId.toString()) + ":" + sequence;
     }
 
     private String numeric(Long value) {

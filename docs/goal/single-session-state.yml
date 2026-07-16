@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-16T14:04:27+08:00
+updated_at: 2026-07-16T15:02:00+08:00
 authority:
   - goal-objective.md
   - 对齐文档/17-单会话持续Goal模式执行协议.md
@@ -883,20 +883,64 @@ closed_front_g2_api_generated_client_and_diff:
     published mobile SDK. Cursor pagination and cross-Pod live SSE transport remain open, so the
     complete API-CONTRACT item remains IN_PROGRESS.
 
-active_front:
+closed_front_g2_sse_cross_pod:
   id: G2-SSE-CROSS-POD-REDIS-STREAM
-  state: START_FROM_GENERATED_CONTRACT_CHECKPOINT
+  state: CLOSED_THIS_CHECKPOINT_CROSS_POD_LIVE_STREAM_BUILDER_VERIFIED
   intent: |
     Make live Aurora streaming correct under multi-replica local-complete/EKS deployment by moving
-    fan-out and resume authority to Redis Streams (or an equivalently proven external transport),
-    with heartbeat, owner isolation, bounded retention and cross-Pod load evidence.
+    fan-out and resume authority to Redis Streams, with heartbeat, owner isolation, bounded retention
+    and cross-Pod evidence.
+  done_this_front_summary:
+    - "com.innercosmos.streaming externalises private stage tokens (AuroraStreamStageStore) and live
+      turn fan-out (AuroraLiveEventStore) behind an in-memory dev backend and a Redis backend selected
+      by inner-cosmos.aurora.stream.redis.enabled. Redis stage uses SET EX + GETDEL (owner-scoped,
+      single-use, any Pod); Redis live uses XADD MAXLEN + XRANGE/blocking XREAD (owner/turn filtered)."
+    - "AuroraAgentServiceImpl publishes every id-carrying lifecycle/token event to the live store
+      before writing the local emitter; publish failure degrades to the durable timeline + connected
+      client rather than aborting a safe in-flight turn. ConversationTimelineController#/{turnId}/events
+      follows the live store from the resume cursor, blocks 1s per read, heartbeats every 10s, completes
+      on terminal/durable-terminal, and falls back to the owner-scoped PostgreSQL timeline on Redis read
+      failure. ProductionStartupGuard refuses prod when Redis Aurora streaming is disabled."
+    - "Fixed the turn.started resume race: the live-vs-durable decision probed afterSequence=0 which
+      excludes the sequence-0 turn.started, so a client resuming in the instant right after it was
+      misread as finished and prematurely replay+completed a non-terminal turn. Now a turn is live when
+      the durable timeline is non-terminal OR any live event (sequence >= 0) is buffered."
+    - "Verification (Java 21): RED->GREEN ConversationTimelineLiveResumeRaceTest;
+      ConversationTimelineRedisOutageTest (Redis probe failure -> PostgreSQL fallback);
+      AuroraLiveEventStoreRetentionTest (cursor no-dup, seq-0 reachable, owner isolation, MAXLEN
+      retention); AuroraStreamControllerTest (full typed lifecycle + original-live-event replay);
+      ProductionStartupGuardTest (prod rejects process-local streaming). Docker WAS available so the
+      Testcontainers redis:7.4.2-alpine two-instance cross-instance proof
+      (RedisAuroraStreamingStoreIntegrationTest) actually ran green. Full Java gate 826/826. Frontend
+      Vitest 60/60 with the reconnect path forwarding original live events to the same handleEvent.
+      Also fixed a pre-existing time-dependent flake in WakeIntentControllerTest (preferredAt string vs
+      parsed compare; failed ~1/60 runs when now().getSecond()==0). Evidence evidence/g2/API-CONTRACT-003."
+  honest_boundary: |
+    Cross-Pod private staging, resumable live fan-out, the turn.started race, heartbeat and Redis-outage
+    degradation are builder-verified with a Docker-gated real-Redis cross-instance proof. Not yet done:
+    a sustained multi-Pod SSE soak with recorded latency/heartbeat percentiles, and Redis Stream
+    consumer groups / claim-based redelivery. API-CONTRACT stays IN_PROGRESS.
+
+active_front:
+  id: CAMPAIGN-B-AUTO-CLAIM-EXTRACTION
+  state: START_FROM_G2_SSE_CHECKPOINT
+  intent: |
+    Build the missing automatic user-modeling pipeline doc-16 specifies. Today every UnderstandingClaim
+    is produced only by an explicit user correction; there is no path from conversation evidence to
+    claim candidates. Deliver a real extraction pipeline: conversation evidence -> claim candidate
+    extraction -> entity/time/relation normalization -> provenance + confidence -> conflict/uncertainty
+    -> user confirm/correct -> propagation, gated by a labeled evaluation harness (extraction precision,
+    not just correction targeting), with real-provider quality proof left as the documented human gate.
   next_machine_actions:
-    - "Audit the live Aurora SSE producer, durable turn event store, Redis facilities and deployment
-      topology; write the failure-mode contract for a client landing on a different API Pod."
-    - "Add a RED two-instance integration proving current live fan-out/resume behavior is not cross-Pod,
-      then implement bounded owner-scoped Redis Stream publication/consumption and heartbeats."
-    - "Verify reconnect, Last-Event-ID, terminal event, disconnect cleanup and Redis outage semantics;
-      keep PostgreSQL durable timeline as final recovery truth unless evidence justifies replacing it."
+    - "Audit UnderstandingClaim, the correction flow, PseudoSemanticAnalyzer/ai.semantic, and the
+      existing evaluation harnesses to fix the exact boundary between correction-targeting and
+      claim-extraction, then write a RED labeled extraction-precision gate over annotated dialogues."
+    - "Implement a deterministic claim-candidate extractor with provenance (source message ids) and
+      calibrated confidence, entity/time/relation normalization and conflict/uncertainty flags; surface
+      candidates for user confirm/correct without auto-committing unverified claims."
+    - "Wire confirmed candidates into the existing claim/propagation machinery (insights, vectors,
+      caches, capsule genome, matching) reusing the DataUseGrant + FORGET tombstone contracts; leave
+      real-provider extraction quality/pairwise as the REAL-PROVIDER-CREDENTIALS human gate."
 
 priority_queue:
   - id: CAMPAIGN-C-QUALITY

@@ -81,6 +81,15 @@ llm:
   allow-fallback: false
 
 inner-cosmos:
+  aurora:
+    stream:
+      redis:
+        enabled: ${REDIS_AURORA_STREAM_ENABLED:true}
+      stage-namespace: ${REDIS_AURORA_STAGE_NAMESPACE:inner-cosmos:aurora:stage:v1}
+      live-namespace: ${REDIS_AURORA_LIVE_NAMESPACE:inner-cosmos:aurora:live:v1}
+      stage-ttl: ${AURORA_STREAM_STAGE_TTL:PT1M}
+      retention: ${AURORA_STREAM_RETENTION:PT15M}
+      max-length: ${AURORA_STREAM_MAX_LENGTH:1024}
   idempotency:
     ttl: ${IDEMPOTENCY_TTL:PT24H}
     max-response-bytes: ${IDEMPOTENCY_MAX_RESPONSE_BYTES:1048576}

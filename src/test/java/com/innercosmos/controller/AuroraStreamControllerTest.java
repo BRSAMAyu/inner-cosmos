@@ -152,7 +152,7 @@ class AuroraStreamControllerTest {
     }
 
     @Test
-    @DisplayName("React reconnect receives owner-scoped typed timeline events with resumable IDs")
+    @DisplayName("React reconnect receives owner-scoped original live events with resumable IDs")
     void replay_typedTimelineEvents() throws Exception {
         String live = performStream("我想把刚才被打断的想法接起来");
         int marker = live.indexOf("\"turnId\":");
@@ -171,9 +171,8 @@ class AuroraStreamControllerTest {
         mockMvc.perform(asyncDispatch(replay)).andExpect(status().isOk());
         String body = replay.getResponse().getContentAsString();
 
-        assertTrue(body.contains("event:timeline.event"), body);
-        assertTrue(body.contains("\"sequence\""), body);
-        assertTrue(body.contains("\"eventType\""), body);
+        assertTrue(body.contains("event:token"), body);
+        assertTrue(body.contains("event:turn.completed"), body);
         assertTrue(body.contains("event:replay.completed"), body);
         assertTrue(body.contains("id:" + turnId + ":"), body);
     }

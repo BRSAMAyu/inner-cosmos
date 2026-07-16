@@ -117,6 +117,7 @@ export function AuroraApp() {
   const eventIdsRef = useRef(new Set<string>());
   const lastEventIdRef = useRef("");
   const reconnectingRef = useRef(false);
+  const handleEventRef = useRef<(event: AuroraStreamEvent) => void>(() => undefined);
   const bootstrappedRef = useRef(false);
   const bootstrapCallRef = useRef(0);
 
@@ -262,6 +263,8 @@ export function AuroraApp() {
       lastEventIdRef.current = await replayTurnEvents(turnId, lastEventIdRef.current, event => {
         if (event.type === "timeline.event") {
           setStatus(`正在恢复：${event.payload.eventType}`);
+        } else {
+          handleEventRef.current(event);
         }
       });
       for (let attempt = 0; attempt < 40; attempt++) {
@@ -454,6 +457,7 @@ export function AuroraApp() {
         break;
     }
   }, [finishTurn]);
+  handleEventRef.current = handleEvent;
 
   const send = async (event: FormEvent) => {
     event.preventDefault();

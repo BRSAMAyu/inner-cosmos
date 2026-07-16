@@ -87,14 +87,19 @@ gates:
       - id: API-CONTRACT
         target: "Versioned OpenAPI, typed errors, idempotency, concurrency, and resumable SSE are verified."
         status: IN_PROGRESS
-        evidence: [evidence/g2/API-CONTRACT-001/, evidence/g2/API-CONTRACT-002/, docs/campaigns/api-contract/experience-contract.md]
+        evidence: [evidence/g2/API-CONTRACT-001/, evidence/g2/API-CONTRACT-002/, evidence/g2/API-CONTRACT-003/, docs/campaigns/api-contract/experience-contract.md]
         remaining: |
           Builder evidence closes an executable external core slice: shipped OpenAPI 3.1 v1 and real
           controller aliases, one typed error envelope, Redis cross-Pod idempotency, capsule ETag CAS,
           owner-bound private stream staging and durable Last-Event-ID replay. The repository still has
           public domains outside v1. Generated TypeScript declarations and base-aware OpenAPI 3.1
-          breaking-change CI now govern the documented core slice; consistent cursor pagination and
-          concurrency beyond that slice, plus Redis Stream live fan-out/heartbeat load proof, remain open.
+          breaking-change CI now govern the documented core slice. Live cross-Pod SSE is now
+          builder-verified (API-CONTRACT-003): Redis Stream owner-scoped live fan-out, resumable
+          Last-Event-ID follow past the sequence-0 turn.started race, 10s heartbeat, terminal-event
+          completion, bounded MAXLEN retention and Redis-outage fallback to the durable PostgreSQL
+          timeline, with a Docker-gated two-instance real-Redis proof. Consistent cursor pagination and
+          concurrency beyond the core slice, plus a sustained multi-Pod SSE soak with recorded
+          latency/heartbeat percentiles and Redis Stream consumer-group redelivery, remain open.
       - {id: DATA-POSTGRES, target: "PostgreSQL and Flyway are production truth with Testcontainers and migration reconciliation.", status: IN_PROGRESS, evidence: [evidence/m1/M1-DATA-POC-001/, evidence/m1/M1-DATA-APP-001/, evidence/m1/M1-AUTH-OIDC-001/, evidence/innovation/INNO-INNER-005/, evidence/g2/API-CONTRACT-001/, docs/adr/0002-postgresql-system-of-record.md]}
       - {id: DATA-REDIS, target: "Sessions, short state, limits, and leases are externalized to Redis where required.", status: IN_PROGRESS, evidence: [evidence/m1/M1-DATA-REDIS-001/, evidence/m1/M1-DATA-REDIS-002/, evidence/m1/M1-DATA-REDIS-003/, evidence/g2/API-CONTRACT-001/]}
       - {id: EVENT-RELIABLE, target: "Transactional outbox, SQS, idempotent consumers, retries, and DLQ replay are verified.", status: UNASSESSED, evidence: []}

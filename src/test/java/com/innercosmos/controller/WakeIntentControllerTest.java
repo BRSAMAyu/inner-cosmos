@@ -17,6 +17,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -58,11 +59,17 @@ class WakeIntentControllerTest {
             .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("NOT_FOUND"));
 
         LocalDateTime moved = preferred.plusDays(1);
-        mockMvc.perform(put("/api/aurora/wake-intents/{id}/schedule", id).session(owner)
+        MvcResult rescheduled = mockMvc.perform(put("/api/aurora/wake-intents/{id}/schedule", id).session(owner)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"earliestAt\":\"%s\",\"preferredAt\":\"%s\",\"latestAt\":\"%s\"}"
                     .formatted(moved.minusMinutes(5), moved, moved.plusHours(2))))
-            .andExpect(status().isOk()).andExpect(jsonPath("$.data.preferredAt").value(moved.toString()));
+            .andExpect(status().isOk()).andReturn();
+        // Compare as parsed instants, not as strings: LocalDateTime.toString() elides the seconds
+        // field when it is :00 (i.e. when now().getSecond()==0), while the server always serializes
+        // HH:mm:ss — a raw string match flakes ~1/60 runs. ISO parse normalizes both forms.
+        String returnedPreferred = objectMapper.readTree(rescheduled.getResponse().getContentAsString())
+            .path("data").path("preferredAt").asText();
+        assertThat(LocalDateTime.parse(returnedPreferred)).isEqualTo(moved);
         mockMvc.perform(post("/api/aurora/wake-intents/{id}/cancel", id).session(owner))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("CANCELLED"));
     }
