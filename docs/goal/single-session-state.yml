@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-16T15:55:00+08:00
+updated_at: 2026-07-16T17:45:00+08:00
 
 session_2026_07_16_checkpoints:
   - "7db1a84 feat: cross-Pod live Aurora SSE fan-out/resume/heartbeat + turn.started race fix (G2). 826/826."
@@ -943,6 +943,46 @@ closed_front_g2_sse_cross_pod:
     consumer groups / claim-based redelivery. API-CONTRACT stays IN_PROGRESS.
 
 active_front:
+  id: EXPERIENCE-FLOW-OVERHAUL
+  state: VISUAL_P0_CHECKPOINT_1_TOKEN_LAYER_AND_WARM_NIGHT_BASE_DONE
+  intent: |
+    Operator directive docs/goal/loop-goal-directive.md §1 raised体验层重造 to the highest priority,
+    ahead of the prior CAMPAIGN-B front (now closed below). §1.1 视觉系统重造 (P0): kill the cold
+    dark-green/blue "AI console" theme that violates 对齐文档/11 §2/§14.1 and root UIUXdesign; build a
+    design-token layer, warm day/dusk/night palettes, seven time-of-day theming, packaged fonts, five
+    motifs, micro-interactions, four loading states. §1.2 死按钮清剿 (P0): Playwright interaction sweep
+    finds+fixes non-responsive controls. §1.3 (P1): port legacy-page capabilities into AppShell.
+    This front must reach zero before returning to the campaign/engineering queue.
+  done_checkpoint_1:
+    - "Design-token layer added at top of web/src/styles.css (@layer tokens): doc-11 §14.1 surface/
+      accent(aurora/sage/sky/plum)/text/danger/hairline + 4 unified easing curves + durations + radius +
+      4x spacing + font families. Night 暖褐 (#211A18/#2A1F18) is the default; no pure black, no cold blue."
+    - ":root + body rewired through tokens and warmed (background var(--surface-canvas)=#211A18, color
+      var(--text-primary)=#F0E8DF, warm 3-layer body gradient). Whole styles.css remapped off the cold
+      theme via scratchpad/recolor.pl + recolor2.pl (365 unique colors -> warm palette, alpha preserved;
+      94 neutral #ffffffXX overlays kept — they warm automatically on the warm base). Only sanctioned
+      sage(#7E9281)/sky(#74869B)/plum accents retained (doc-11 palette). Sole residual #aa8bd3 is plum."
+    - "Verified: npm run build (tsc+vite) OK -> static/app/aurora/assets/index.css 45.5kB; npm test 67/67
+      green; live browser http://localhost:8080/app/aurora/ renders warm; getComputedStyle proof
+      --surface-canvas rgb(33,26,24) r>g>b (warm-side hue) satisfies UIUXdesign §12 '暗色主题不冷'.
+      Evidence evidence/experience/EXPERIENCE-VISUAL-P0-tokens/checkpoint.md."
+    - "Env unblock this checkpoint: Node.js v24.18.0/npm 11.16.0 found already installed at
+      C:\\Program Files\\nodejs (not on Bash PATH — prefix export PATH). web/package-lock.json was out of
+      sync (missing @emnapi/*), npm ci refused; ran npm install to reconcile+install (lockfile +38/-15)."
+  next_machine_actions:
+    - "NEXT (still §1.1, before §1.2): progressively var()-tokenize each space's remaining literal warm
+      hexes, THEN add light/morandi tokens + seven time-of-day theming (data-time attr + JS lerp on local
+      time, prefers-reduced-motion degrade, user lock), and capture day+night screenshots per doc-11 §1.1.6."
+    - "THEN local font packaging (LXGW WenKai/Noto Serif SC/Cormorant/JetBrains Mono, CSP-safe offline,
+      system fallback); five motifs + micro-interactions (btn scale-bounce+ripple, hover, loading four
+      states); §1.2 Playwright dead-button sweep into web/e2e/ with a regression gate."
+    - "Only after §1.1+§1.2 clear zero: §1.3 legacy->AppShell porting, then the priority_queue below."
+  superseded_note: |
+    Prior active_front CAMPAIGN-B-AUTO-CLAIM-EXTRACTION reached end-to-end machine-verified state (extract
+    -> stage -> review UI -> confirm -> propagate; remaining items human-gated or lower-value) and is
+    retained verbatim as closed_front_campaign_b_auto_claim_extraction below.
+
+closed_front_campaign_b_auto_claim_extraction:
   id: CAMPAIGN-B-AUTO-CLAIM-EXTRACTION
   state: SLICES_1_2_3_DONE_PIPELINE_AND_UI_LIVE_CONFLICT_AND_REALPROVIDER_REMAIN
   intent: |
@@ -999,6 +1039,24 @@ active_front:
       deployable release candidate + IaC exist; record any external gate that blocks it and continue."
 
 priority_queue:
+  # —— Operator directive §1 (loop-goal-directive.md) merged per 17号协议 §9 (2026-07-16). These
+  #    outrank everything below and must reach zero before the campaign/engineering queue resumes. ——
+  - id: EXPERIENCE-VISUAL-SYSTEM
+    reason: >-
+      §1.1 P0. Cold-theme violation removed at token/base level (checkpoint 1, see active_front). Remaining:
+      full var() tokenization, light/morandi + seven time-of-day theming with lerp, packaged fonts, five
+      motifs, micro-interactions, four loading states, WCAG contrast + Lighthouse>85 + mobile breakpoints.
+  - id: EXPERIENCE-DEAD-BUTTONS
+    reason: >-
+      §1.2 P0 (parallel to §1.1). Operator reports many buttons do nothing. Write a Playwright interaction
+      sweep in web/e2e/ that logs in, walks every space, clicks every interactive element and asserts an
+      observable response; fix/implement/remove each non-responsive control; freeze the sweep as a
+      regression gate. Not yet started.
+  - id: EXPERIENCE-LEGACY-PORT
+    reason: >-
+      §1.3 P1. Continue the G3-UX-SHELL-REAL-PARITY port list (relations/social, echo-plaza directory,
+      capsule-chat open, letters outbox/drafts/threads, aurora-chat voice+rituals, capsule-create remaining
+      fields) using the NEW design system; retire each legacy page only after verified parity.
   - id: CAMPAIGN-C-QUALITY
     reason: |
       Explore-agent punch list, ranked by user-visible fidelity/trust impact — updated as items close:
