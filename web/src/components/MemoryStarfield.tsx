@@ -1,14 +1,44 @@
+import { useState } from "react";
 import type { MemoryOperation, StarfieldDetail, StarfieldScene, StarfieldStar } from "../api";
 
 const modeOptions: Array<[StarfieldScene["mode"], string]> = [["TIME", "时间"], ["THEME", "主题"], ["PEOPLE", "人物"]];
 const rollbackExcluded = new Set(["FORGET", "LINK", "NO_OP", "ROLLBACK"]);
 
+// Importance/archive controls for a revealed star. Kept as its own component so the slider's
+// local state resets cleanly per card (rendered with key={card.id}) instead of leaking a stale
+// value from a previously-opened star.
+function MemoryDetailActions({ card, importanceBusy, archiveBusy, onUpdateImportance, onArchive }: {
+  card: StarfieldDetail["card"]; importanceBusy: number | null; archiveBusy: number | null;
+  onUpdateImportance?: (id: number, importance: number) => void; onArchive?: (id: number) => void;
+}) {
+  const [importance, setImportance] = useState(card.userImportance ?? 1);
+  const saving = importanceBusy === card.id;
+  const archiving = archiveBusy === card.id;
+  if (!onUpdateImportance && !onArchive) return null;
+  return <div className="memory-detail-actions">
+    {onUpdateImportance && <label className="importance-control">重要度
+      <input type="range" min={0.5} max={2} step={0.1} value={importance} disabled={saving}
+        onChange={event => setImportance(Number(event.target.value))} />
+      <span className="importance-value">{importance.toFixed(1)}</span>
+    </label>}
+    <div className="memory-detail-buttons">
+      {onUpdateImportance && <button type="button" disabled={saving}
+        onClick={() => onUpdateImportance(card.id, importance)}>{saving ? "保存中…" : "保存重要度"}</button>}
+      {onArchive && <button type="button" className="quiet" disabled={archiving}
+        onClick={() => onArchive(card.id)}>{archiving ? "归档中…" : "归档这颗记忆"}</button>}
+    </div>
+  </div>;
+}
+
 export function MemoryStarfield({ starfield, starfieldBusy, onChangeMode, starfieldDetail, detailBusy,
-  onRevealStar, onCloseDetail, memoryOperations, rollbackBusy, onRollback, onCorrectMemory }: {
+  onRevealStar, onCloseDetail, memoryOperations, rollbackBusy, onRollback, onCorrectMemory,
+  onUpdateImportance, onArchive, importanceBusy = null, archiveBusy = null }: {
   starfield: StarfieldScene; starfieldBusy: boolean; onChangeMode: (mode: StarfieldScene["mode"]) => void;
   starfieldDetail: StarfieldDetail | null; detailBusy: number | null; onRevealStar: (id: number) => void;
   onCloseDetail: () => void; memoryOperations: MemoryOperation[]; rollbackBusy: number | null;
   onRollback: (operation: MemoryOperation) => void; onCorrectMemory: (star: StarfieldStar) => void;
+  onUpdateImportance?: (id: number, importance: number) => void; onArchive?: (id: number) => void;
+  importanceBusy?: number | null; archiveBusy?: number | null;
 }) {
   return <section className="cosmos-space" aria-label="记忆星空">
     <div className="cosmos-heading"><div><span className="eyebrow">MEMORY, ALIVE</span><h2>你的记忆不是档案柜</h2></div>
@@ -42,6 +72,9 @@ export function MemoryStarfield({ starfield, starfieldBusy, onChangeMode, starfi
       <details open><summary>为什么它在这里</summary><p>{starfieldDetail.gravityExplanation}</p></details>
       <details><summary>变化历史（{starfieldDetail.versionHistory.length}）</summary>{starfieldDetail.versionHistory.length === 0 ? <p>还没有后续改动。</p> : starfieldDetail.versionHistory.map(operation => <p key={operation.id}><strong>{operation.operationType}</strong> · v{operation.oldVersion} → v{operation.newVersion} · {operation.status}</p>)}</details>
       <details><summary>下游状态（{starfieldDetail.projectionReceipts.length}）</summary>{starfieldDetail.projectionReceipts.map(receipt => <p key={receipt.id}><strong>{receipt.projectionType}</strong> · {receipt.status}<br /><small>{receipt.detail}</small></p>)}</details>
+      <MemoryDetailActions key={starfieldDetail.card.id} card={starfieldDetail.card}
+        importanceBusy={importanceBusy} archiveBusy={archiveBusy}
+        onUpdateImportance={onUpdateImportance} onArchive={onArchive} />
     </aside>}
     {memoryOperations.length > 0 && <div className="memory-history" aria-label="记忆变更历史">
       <h3>最近的记忆变更</h3><p>撤回会生成一个新版本，不会抹掉发生过的历史。永久忘记不会恢复原文。</p>

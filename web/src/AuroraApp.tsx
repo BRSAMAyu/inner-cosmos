@@ -61,6 +61,8 @@ export function AuroraApp() {
   const [rollbackBusy, setRollbackBusy] = useState<number | null>(null);
   const [starfieldDetail, setStarfieldDetail] = useState<StarfieldDetail | null>(null);
   const [detailBusy, setDetailBusy] = useState<number | null>(null);
+  const [importanceBusy, setImportanceBusy] = useState<number | null>(null);
+  const [archiveBusy, setArchiveBusy] = useState<number | null>(null);
   const [memories, setMemories] = useState<MemoryCard[]>([]);
   const [capsules, setCapsules] = useState<EchoCapsule[]>([]);
   const [selectedCapsuleId, setSelectedCapsuleId] = useState<number | null>(null);
@@ -654,6 +656,39 @@ export function AuroraApp() {
     finally { setDetailBusy(null); }
   };
 
+  const updateMemoryImportance = async (id: number, importance: number) => {
+    setImportanceBusy(id);
+    try {
+      await api.updateMemoryImportance(id, importance);
+      // Importance recomputes the card's gravity, so the star's size/position in the field shifts;
+      // refetch the scene, the open detail, and the card list so all three stay consistent.
+      const [scene, detail] = await Promise.all([
+        api.starfield(starfield?.mode ?? "TIME"), api.starfieldDetail(id), api.memoryCards().then(setMemories)
+      ]);
+      setStarfield(scene);
+      setStarfieldDetail(detail);
+      setStatus("重要度已更新，这颗星的引力随之调整。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法调整这颗记忆的重要度"); }
+    finally { setImportanceBusy(null); }
+  };
+
+  const archiveMemory = async (id: number) => {
+    setArchiveBusy(id);
+    try {
+      await api.archiveMemory(id);
+      // Archiving runs a versioned, rollbackable ARCHIVE operation: the star leaves the current
+      // field, the operation appears in the recent-changes list, and the card list updates.
+      const [scene, ops] = await Promise.all([
+        api.starfield(starfield?.mode ?? "TIME"), api.memoryOperations(), api.memoryCards().then(setMemories)
+      ]);
+      setStarfield(scene);
+      setMemoryOperations(ops);
+      setStarfieldDetail(null);
+      setStatus("这颗记忆已归档，不再出现在当前星空；你可以在“最近的记忆变更”里撤回。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法归档这颗记忆"); }
+    finally { setArchiveBusy(null); }
+  };
+
   const selectableMemories = memories.filter(memory => memory.status === "ACTIVE");
   const toggleCapsuleMemory = (id: number) => {
     setCapsulePreview(null);
@@ -1015,7 +1050,9 @@ export function AuroraApp() {
 
       {starfield && <MemoryStarfield starfield={starfield} starfieldBusy={starfieldBusy} onChangeMode={mode => void changeStarfieldMode(mode)}
         starfieldDetail={starfieldDetail} detailBusy={detailBusy} onRevealStar={id => void revealStar(id)} onCloseDetail={() => setStarfieldDetail(null)}
-        memoryOperations={memoryOperations} rollbackBusy={rollbackBusy} onRollback={operation => void rollbackMemoryOperation(operation)} onCorrectMemory={beginMemoryCorrection} />}
+        memoryOperations={memoryOperations} rollbackBusy={rollbackBusy} onRollback={operation => void rollbackMemoryOperation(operation)} onCorrectMemory={beginMemoryCorrection}
+        onUpdateImportance={(id, importance) => void updateMemoryImportance(id, importance)} onArchive={id => void archiveMemory(id)}
+        importanceBusy={importanceBusy} archiveBusy={archiveBusy} />}
 
       <PsychologySkillStudio skills={skills} skillRuns={skillRuns} selectedSkill={selectedSkill} skillAnswers={skillAnswers}
         skillConsent={skillConsent} skillRetention={skillRetention} skillBusy={skillBusy} skillLocale={skillLocale}

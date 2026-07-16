@@ -71,7 +71,8 @@ export type MemoryOperationResult = {
 };
 export type StarfieldDetail = {
   card: { id: number; title: string; summary: string | null; sourceSessionId: number | null;
-    versionNo: number; memoryLayer: string; confidence: number; provenanceRefs: string | null };
+    versionNo: number; memoryLayer: string; confidence: number; provenanceRefs: string | null;
+    userImportance: number | null };
   gravityExplanation: string; auroraObservation: string; provenanceExplanation: string;
   versionHistory: MemoryOperation[];
   links: Array<{ id: number; sourceMemoryId: number; targetMemoryId: number; linkType: string; status: string }>;
@@ -397,6 +398,9 @@ export const api = {
   memoryOperations: () => request<MemoryOperation[]>("/api/memory/operations"),
   rollbackMemoryOperation: (id: number) => request<MemoryOperationResult>(`/api/memory/operations/${id}/rollback`, { method: "POST" }),
   memoryCards: () => request<MemoryCard[]>("/api/memory/cards"),
+  updateMemoryImportance: (id: number, importance: number) =>
+    request<void>(`/api/memory/cards/${id}/importance`, { method: "POST", body: JSON.stringify({ importance }) }),
+  archiveMemory: (id: number) => request<void>(`/api/memory/cards/${id}/archive`, { method: "POST" }),
   myCapsules: () => request<EchoCapsule[]>("/api/capsule/my"),
   capsuleGenomeHistory: (id: number) => request<CapsuleGenomeVersion[]>(`/api/capsule/${id}/genome-history`),
   capsuleFidelity: (id: number) => request<CapsuleFidelitySummary[]>(`/api/capsule/${id}/sandbox/fidelity`),
