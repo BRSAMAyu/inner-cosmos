@@ -126,6 +126,14 @@ public class UserCorrectionServiceImpl implements UserCorrectionService {
             previous.status = "SUPERSEDED";
             claimMapper.updateById(previous);
         }
+        // The version must advance past the HIGHEST existing version for this claim key across
+        // ALL statuses — not just the ACTIVE one. A RETIRED claim (left behind after the user
+        // retired a correction) still occupies its version in the unique (user_id, claim_key,
+        // version) index, so re-correcting a previously-retired understanding must skip past it
+        // instead of re-inserting version 1 and colliding.
+        UnderstandingClaim highestExisting = claimMapper.selectOne(new QueryWrapper<UnderstandingClaim>()
+                .eq("user_id", userId).eq("claim_key", key)
+                .orderByDesc("version").last("LIMIT 1"));
         UnderstandingClaim claim = new UnderstandingClaim();
         claim.userId = userId;
         claim.claimKey = key;
@@ -136,7 +144,7 @@ public class UserCorrectionServiceImpl implements UserCorrectionService {
         claim.status = "ACTIVE";
         claim.sourceType = "USER_CORRECTION";
         claim.sourceId = correction.id;
-        claim.version = previous == null ? 1 : previous.version + 1;
+        claim.version = highestExisting == null ? 1 : highestExisting.version + 1;
         claim.supersedesClaimId = previous == null ? null : previous.id;
         claim.correctionId = correction.id;
         claim.evidenceRefs = command.reason();

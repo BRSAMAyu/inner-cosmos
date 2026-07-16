@@ -44,6 +44,11 @@ export type UnderstandingClaim = {
   id: number; claimKey: string; valueJson: string; authorityLevel: string;
   status: "ACTIVE" | "SUPERSEDED" | "RETIRED"; version: number; createdAt: string;
 };
+export type UserCorrection = {
+  id: number; targetType: string; fieldName: string;
+  oldValue: string | null; newValue: string | null; reason: string | null;
+  status: string | null; createdAt: string;
+};
 export type StarfieldStar = {
   id: number; title: string; summary: string | null; theme: string; color: string;
   gravity: number; glow: number; freshness: number; x: number; y: number;
@@ -383,6 +388,8 @@ export const api = {
     method: "POST", body: JSON.stringify(input)
   }),
   understandingClaims: () => request<UnderstandingClaim[]>("/api/aurora/corrections/claims"),
+  recentCorrections: () => request<UserCorrection[]>("/api/aurora/corrections"),
+  retireCorrection: (id: number) => request<void>(`/api/aurora/corrections/${id}`, { method: "DELETE" }),
   portrait: () => request<PortraitDimension[]>("/api/portrait"),
   portraitHistory: (dim: string) => request<PortraitHistoryEntry[]>(`/api/portrait/history?dim=${encodeURIComponent(dim)}`),
   starfield: (mode: StarfieldScene["mode"]) => request<StarfieldScene>(`/api/memory/starfield/v2?mode=${mode}`),

@@ -1,6 +1,6 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
-import { api, apiConfigurationError, configureBearerAuth, hasConfiguredApiBase, replayTurnEvents, streamAurora, subscribeProactive, type CapsuleFidelitySummary, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type ConnectionRequests, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type Notification, type PersonaMessage, type PersonaSession, type PortraitDimension, type PortraitHistoryEntry, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type PsychologySkillSuggestion, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type SocialConnection, type StarfieldDetail, type StarfieldScene, type StarfieldStar, type UnderstandingClaim, type WakeIntent } from "./api";
+import { api, apiConfigurationError, configureBearerAuth, hasConfiguredApiBase, replayTurnEvents, streamAurora, subscribeProactive, type CapsuleFidelitySummary, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type ConnectionRequests, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type Notification, type PersonaMessage, type PersonaSession, type PortraitDimension, type PortraitHistoryEntry, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type PsychologySkillSuggestion, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type SocialConnection, type StarfieldDetail, type StarfieldScene, type StarfieldStar, type UnderstandingClaim, type UserCorrection, type WakeIntent } from "./api";
 import { initialMobileState, mobileRuntime, type MobileRuntimeState } from "./mobile";
 import { mobileOidc } from "./mobile-auth";
 import type { AuroraStreamEvent, DialogMessage, TurnStatus } from "./protocol";
@@ -47,6 +47,8 @@ export function AuroraApp() {
   const [correctionImpact, setCorrectionImpact] = useState<CorrectionImpact | null>(null);
   const [correctionBusy, setCorrectionBusy] = useState(false);
   const [claims, setClaims] = useState<UnderstandingClaim[]>([]);
+  const [corrections, setCorrections] = useState<UserCorrection[]>([]);
+  const [retiringCorrectionId, setRetiringCorrectionId] = useState<number | null>(null);
   const [portrait, setPortrait] = useState<PortraitDimension[]>([]);
   const [portraitHistory, setPortraitHistory] = useState<Record<string, PortraitHistoryEntry[]>>({});
   const [portraitCalibrated, setPortraitCalibrated] = useState<Record<string, boolean>>({});
@@ -149,7 +151,8 @@ export function AuroraApp() {
         api.friends().then(rows => { setFriends(rows); return rows; }),
         api.psychologySkills().then(rows => { setSkills(rows); return rows; }),
         api.psychologySkillRuns().then(rows => { setSkillRuns(rows); return rows; }),
-        api.portrait().then(setPortrait)
+        api.portrait().then(setPortrait),
+        api.recentCorrections().then(setCorrections)
       ]);
       const loadedCapsules = loaded[8] as EchoCapsule[];
       const loadedMatches = loaded[9] as CapsuleMatch[];
@@ -546,10 +549,27 @@ export function AuroraApp() {
           api.myCapsules().then(setCapsules)
         ]);
       }
+      void api.recentCorrections().then(setCorrections).catch(() => undefined);
       setCorrectionImpact(null); setCorrectionOld(""); setCorrectionNew(""); setCorrectionTarget(null);
       setStatus("已校准。旧理解仍可追溯，Aurora、星空与共鸣体上下文会按确认结果同步。");
     } catch (error) { setStatus(error instanceof Error ? error.message : "这次纠正没有保存，任何下游都未改变"); }
     finally { setCorrectionBusy(false); }
+  };
+
+  const retireCorrection = async (id: number) => {
+    setRetiringCorrectionId(id);
+    try {
+      await api.retireCorrection(id);
+      // Retiring a correction reactivates the understanding it had superseded, so refetch both
+      // the history list and the active claims to reflect the restored "current fact".
+      const [freshCorrections, freshClaims] = await Promise.all([
+        api.recentCorrections(), api.understandingClaims()
+      ]);
+      setCorrections(freshCorrections);
+      setClaims(freshClaims);
+      setStatus("这条更正已退休。Aurora 不再据此调整对你的理解，之前被它替代的理解会重新成为当前事实。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法让这条更正退休"); }
+    finally { setRetiringCorrectionId(null); }
   };
 
   const loadPortraitHistory = async (dim: string) => {
@@ -988,8 +1008,10 @@ export function AuroraApp() {
 
       <div className="product-space" hidden={productSpace !== "cosmos"}>
       <UnderstandingCorrection claims={claims} oldValue={correctionOld} newValue={correctionNew} impact={correctionImpact} busy={correctionBusy} target={correctionTarget}
+        corrections={corrections} retiringId={retiringCorrectionId}
         onOldValue={value => { setCorrectionOld(value); setCorrectionImpact(null); }} onNewValue={value => { setCorrectionNew(value); setCorrectionImpact(null); }}
-        onPreview={() => void previewCorrection()} onCancelPreview={() => setCorrectionImpact(null)} onConfirm={() => void confirmCorrection()} onClearTarget={clearCorrectionTarget} />
+        onPreview={() => void previewCorrection()} onCancelPreview={() => setCorrectionImpact(null)} onConfirm={() => void confirmCorrection()} onClearTarget={clearCorrectionTarget}
+        onRetire={id => void retireCorrection(id)} />
 
       {starfield && <MemoryStarfield starfield={starfield} starfieldBusy={starfieldBusy} onChangeMode={mode => void changeStarfieldMode(mode)}
         starfieldDetail={starfieldDetail} detailBusy={detailBusy} onRevealStar={id => void revealStar(id)} onCloseDetail={() => setStarfieldDetail(null)}

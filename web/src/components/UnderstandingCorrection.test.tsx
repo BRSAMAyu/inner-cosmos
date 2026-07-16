@@ -1,8 +1,15 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { UserCorrection } from "../api";
 import { UnderstandingCorrection } from "./UnderstandingCorrection";
 
 afterEach(cleanup);
+
+const correction = (over: Partial<UserCorrection> = {}): UserCorrection => ({
+  id: 1, targetType: "AURORA_UNDERSTANDING", fieldName: "self_understanding",
+  oldValue: "你更喜欢独处", newValue: "我只是需要先恢复精力", reason: "用户主动校准",
+  status: "CONFIRMED", createdAt: "2026-07-16T09:30:00", ...over
+});
 
 describe("UnderstandingCorrection", () => {
   it("previews and lets a general correction proceed without a specific target", () => {
@@ -36,5 +43,43 @@ describe("UnderstandingCorrection", () => {
     expect(screen.getByText("记忆星空")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "确认，这是更准确的我" }));
     expect(onConfirm).toHaveBeenCalledOnce();
+  });
+
+  it("lists past corrections with their before→after change and reason", () => {
+    render(<UnderstandingCorrection claims={[]} oldValue="" newValue="" impact={null} busy={false} target={null}
+      corrections={[correction({ id: 42, oldValue: "你更喜欢独处", newValue: "我只是需要先恢复精力", reason: "用户主动校准" })]}
+      onOldValue={() => undefined} onNewValue={() => undefined} onPreview={() => undefined}
+      onCancelPreview={() => undefined} onConfirm={() => undefined} onClearTarget={() => undefined} onRetire={() => undefined} />);
+    expect(screen.getByText("你更喜欢独处")).toBeVisible();
+    expect(screen.getByText("我只是需要先恢复精力")).toBeVisible();
+    expect(screen.getByText(/用户主动校准/)).toBeVisible();
+  });
+
+  it("retiring a correction requires an inline confirmation before calling onRetire with its id", () => {
+    const onRetire = vi.fn();
+    render(<UnderstandingCorrection claims={[]} oldValue="" newValue="" impact={null} busy={false} target={null}
+      corrections={[correction({ id: 42 })]} retiringId={null}
+      onOldValue={() => undefined} onNewValue={() => undefined} onPreview={() => undefined}
+      onCancelPreview={() => undefined} onConfirm={() => undefined} onClearTarget={() => undefined} onRetire={onRetire} />);
+    fireEvent.click(screen.getByRole("button", { name: "让这条退休" }));
+    expect(onRetire).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "确认退休" }));
+    expect(onRetire).toHaveBeenCalledExactlyOnceWith(42);
+  });
+
+  it("shows a retiring state and disables the confirm while that correction is being retired", () => {
+    render(<UnderstandingCorrection claims={[]} oldValue="" newValue="" impact={null} busy={false} target={null}
+      corrections={[correction({ id: 42 })]} retiringId={42}
+      onOldValue={() => undefined} onNewValue={() => undefined} onPreview={() => undefined}
+      onCancelPreview={() => undefined} onConfirm={() => undefined} onClearTarget={() => undefined} onRetire={() => undefined} />);
+    expect(screen.getByRole("button", { name: "退休中…" })).toBeDisabled();
+  });
+
+  it("does not render the history section when there are no past corrections", () => {
+    render(<UnderstandingCorrection claims={[]} oldValue="" newValue="" impact={null} busy={false} target={null}
+      corrections={[]}
+      onOldValue={() => undefined} onNewValue={() => undefined} onPreview={() => undefined}
+      onCancelPreview={() => undefined} onConfirm={() => undefined} onClearTarget={() => undefined} onRetire={() => undefined} />);
+    expect(screen.queryByRole("button", { name: "让这条退休" })).not.toBeInTheDocument();
   });
 });

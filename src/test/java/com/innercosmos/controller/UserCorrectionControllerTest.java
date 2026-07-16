@@ -258,6 +258,38 @@ class UserCorrectionControllerTest {
                 .andExpect(jsonPath("$.data[?(@.status == 'REVIEW_REQUIRED')]").exists());
     }
 
+    @Test
+    void reCorrectingAfterRetiringTheOnlyClaimAdvancesVersionInsteadOfCollidingOnTheRetiredRow() throws Exception {
+        // Confirm a self-understanding correction: creates understanding claim version 1 (ACTIVE).
+        MvcResult first = mockMvc.perform(post("/api/aurora/corrections/confirm").session(session)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"newValue\":\"第一次理解\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.activeClaim.version").value(1))
+                .andReturn();
+        long correctionId = objectMapper.readTree(first.getResponse().getContentAsString())
+                .path("data").path("correction").path("id").asLong();
+
+        // Retire it — the claim (version 1) becomes RETIRED but still occupies (user, key, version=1).
+        // There is no previously-superseded claim to restore, so nothing returns to ACTIVE.
+        mockMvc.perform(delete("/api/aurora/corrections/" + correctionId).session(session))
+                .andExpect(status().isOk());
+
+        // Re-correcting the SAME self-understanding must NOT try to re-insert version 1 (which would
+        // violate the unique (user_id, claim_key, version) index and 500) — it must advance to version 2.
+        mockMvc.perform(post("/api/aurora/corrections/confirm").session(session)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"newValue\":\"第二次理解\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.activeClaim.version").value(2))
+                .andExpect(jsonPath("$.data.activeClaim.status").value("ACTIVE"));
+
+        // History retains the retired v1 alongside the fresh active v2 — nothing is destroyed.
+        mockMvc.perform(get("/api/aurora/corrections/claims").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[?(@.version == 1)].status").value("RETIRED"))
+                .andExpect(jsonPath("$.data[?(@.version == 2)].status").value("ACTIVE"));
+    }
+
     // ---------------- helpers ----------------
 
     private void postCorrection(String newValue, String oldValue, String reason) throws Exception {
