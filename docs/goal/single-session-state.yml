@@ -13,6 +13,17 @@ session_2026_07_16_checkpoints:
   - "6ba6334 feat: TREND claim extraction (越来越/比以前更); extraction gate 26 cases precision/recall/type 1.0."
   - "a4bcac9 feat: bilingual zh-CN/en-SG claim review panel. web 67/67."
   - "Release-candidate health at session end: Java 835/835, web 67/67, vite build OK, kustomize base+academy-eks overlays build offline, secret scan clean."
+  - "9d6b10a docs: add accurate root CLAUDE.md (Claude-Code-native onboarding + document map + working norms + autonomous continuation protocol) and flag AGENTS.md body as V0.1 historical."
+  - "ae7aaa8 merge: adopt run006 as the main baseline via `git merge -s ours origin/main` (non-destructive: main's old sanitized snapshot preserved as ancestor, run006 tree kept), then fast-forwarded origin/main to it. origin/main == origin/feat/run006 == ae7aaa8. Teammates now pull a runnable, current version from main. No force-push."
+
+team_handoff_2026_07_16:
+  purpose: "Teammates (and their Claude Code) pull main to collaborate and continue the autonomous Goal."
+  main_baseline: ae7aaa8
+  onboarding_entry: CLAUDE.md
+  runbook: 对齐文档/18-组员与Coding-Agent启动部署交接指南.md
+  run_local: "./mvnw spring-boot:run -> http://localhost:8080/app/aurora/ (dev profile: H2 + Mock AI, no keys). JDK 21 + JAVA_HOME required."
+  keys: "Operator-injected env vars only (LLM_PROVIDER + <PROVIDER>_API_KEY); never committed. Repo/main is secret-clean (scan passes)."
+  continue_goal: "Resume from active_front / priority_queue below; verify from live HEAD + evidence; commit recoverable checkpoints; do not stop until acceptance ledger PASS or only human gates remain."
 authority:
   - goal-objective.md
   - 对齐文档/17-单会话持续Goal模式执行协议.md
