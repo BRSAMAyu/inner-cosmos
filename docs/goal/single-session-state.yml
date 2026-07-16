@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-16T10:56:00+08:00
+updated_at: 2026-07-16T11:02:00+08:00
 authority:
   - goal-objective.md
   - 对齐文档/17-单会话持续Goal模式执行协议.md
@@ -637,7 +637,7 @@ closed_front_g3_capsule_boundary_editor:
     - "Or pick a fresher higher-value machine-actionable acceptance front (Campaign C Genome IR next
       slice; an UNASSESSED G2 contract item) if one outranks the remaining UX ports."
 
-active_front:
+closed_front_g3_plaza_directory_and_open_chat:
   id: G3-PLAZA-DIRECTORY-AND-OPEN-CHAT
   state: DONE_VERIFIED_LIVE_END_TO_END
   intent: |
@@ -673,6 +673,36 @@ active_front:
       slice; an UNASSESSED G2 contract item like ARCH-MODULES/API-CONTRACT/EVENT-RELIABLE) if one
       outranks the remaining UX ports — several UX ports are now closed, so a non-UX front may be
       the higher-value next move."
+
+active_front:
+  id: G3-LETTERS-OUTBOX-TAB
+  state: DONE_VERIFIED_LIVE_END_TO_END
+  intent: |
+    Executed part of ranked port item #10 (slow-letter): the AppShell letters space only showed the
+    inbox — a user could not see any letter they had SENT. Added a sent-letters outbox tab, backed
+    by the pre-existing GET /api/letters/outbox — pure frontend port.
+  done_this_front_summary:
+    - "LettersInbox.tsx: inbox/outbox tab toggle; the outbox is a read-only list of the user's sent
+      letters with a human-readable journey status (草稿/已寄出/飞行中/已抵达/对方已读/对方回信了/…) and an
+      estimated-arrival line for in-flight letters. api.ts: letterOutbox(). AuroraApp loads it in
+      bootstrap (appended at END) and refetches after sending a new letter or a reply-with-letter."
+    - "1 new Vitest case (default inbox tab hides sent letters; switching to 寄出的 shows them, hides
+      received). 56/56 Vitest green (was 55), tsc clean, bundle rebuilt. No backend change -> no Java
+      re-gate."
+    - "Live end-to-end (packaged jar, throwaway H2, two users): A published a capsule, B sent it a
+      slow letter, and B's outbox tab rendered the sent letter with status 已寄出. 0 console errors."
+  next_machine_actions:
+    - "NEXT — the letters space still lacks drafts/archived tabs and thread/conversation grouping
+      (GET /api/letters/threads + /threads/{id}/letters exist) — a natural continuation of #10.
+      Other remaining UX ports: aurora-chat voice input + session rituals (#6, heavier — Web Audio);
+      capsule-create non-boundary creation fields (#9 tail); relations/social (#3, largest, backend
+      /api/social/* exists, ZERO API-client presence)."
+    - "STRONG ALTERNATIVE — with corrections, starfield, capsule-boundary, plaza directory+chat, and
+      letters-outbox now closed, the remaining UX ports are either heavy (voice, relations) or
+      lower-stakes (drafts/threads, creation-field tail). A non-UX front may now be higher value:
+      Campaign C Genome IR next slice (claims/values/habits/temporal categories with provenance —
+      machine-buildable without the real-Provider gate), or an UNASSESSED G2 contract item
+      (ARCH-MODULES / API-CONTRACT / EVENT-RELIABLE / RUNTIME-ROLES). Reassess at next checkpoint."
 
 priority_queue:
   - id: CAMPAIGN-C-QUALITY
@@ -753,11 +783,11 @@ last_full_gate:
     500 fix). NOTE: earlier gates claimed 795/795 when Docker WAS available; the 4-test delta is
     exactly those Docker-gated integration tests, now un-runnable here — not lost tests.
   claimed_vitest: |
-    55/55 (was 42 at session resume; +4 UnderstandingCorrection history/retire, +3 MemoryStarfield
-    importance/archive, +2 CapsuleWorkbench boundary-editor, +4 PlazaDirectory). The starfield,
-    boundary, and plaza fronts changed no Java, so no Java gate was re-run for them (risk-based); the
-    791/791-runnable Java gate above still holds at its baseline (last Java change was the
-    correction-versioning 500 fix).
+    56/56 (was 42 at session resume; +4 UnderstandingCorrection history/retire, +3 MemoryStarfield
+    importance/archive, +2 CapsuleWorkbench boundary-editor, +4 PlazaDirectory, +1 LettersInbox
+    outbox). The starfield, boundary, plaza, and outbox fronts changed no Java, so no Java gate was
+    re-run for them (risk-based); the 791/791-runnable Java gate above still holds at its baseline
+    (last Java change was the correction-versioning 500 fix).
   claimed_playwright: 13/13 plus Living Aurora 1/1 (not re-run this checkpoint — no change to the
     journeys they cover; the new frontend surface is covered by Vitest + live browser verification)
   independent_reverification: BUILDER_VERIFIED_WITH_HUMAN_AND_PRODUCTION_GATES

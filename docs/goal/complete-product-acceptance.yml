@@ -2,8 +2,8 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 authority: goal-objective.md
 status: IN_PROGRESS
-last_reconciled_at: 2026-07-16T10:56:00+08:00
-last_reconciled_commit: 2839a54
+last_reconciled_at: 2026-07-16T11:02:00+08:00
+last_reconciled_commit: 8a49f29
 
 status_semantics:
   UNASSESSED: current HEAD and target environment have not been verified
@@ -146,8 +146,12 @@ gates:
           curated match set (a directory pick is wrapped in a synthetic match so the visitor
           workbench works unchanged). Verified live end-to-end with two real users (A publishes,
           B discovers + chats), 0 console errors. This closes the "no public capsule directory" and
-          "no arbitrary-capsule chat" items. Still open: capsule creation still hardcodes the
-          remaining non-boundary fields
+          "no arbitrary-capsule chat" items.
+          UPDATE (this checkpoint): the letters space now has a sent-letters OUTBOX tab
+          (GET /api/letters/outbox) with human-readable journey status; verified live end-to-end
+          (B sent a letter, B's outbox rendered it as 已寄出). Still open in letters: drafts/archived
+          tabs and thread/conversation grouping. Still open elsewhere: capsule creation still
+          hardcodes the remaining non-boundary fields
           the legacy wizard exposes; no way to chat with an arbitrary discovered capsule outside a
           curated match; letters has no outbox/drafts/archive/thread view; and relations/social's
           entire relationship-temperature/health/discovery/groups feature set has zero API-client
