@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-16T22:08:00+08:00
+updated_at: 2026-07-16T22:34:00+08:00
 
 session_2026_07_16_checkpoints:
   - "7db1a84 feat: cross-Pod live Aurora SSE fan-out/resume/heartbeat + turn.started race fix (G2). 826/826."
@@ -944,7 +944,7 @@ closed_front_g2_sse_cross_pod:
 
 active_front:
   id: EXPERIENCE-FLOW-OVERHAUL
-  state: CHECKPOINT_8_ENTRY_ERROR_RECOVERED_STATE_DONE_NEXT_IS_PER_VIEW_ERROR_STATES_THEN_VISUAL_TOKENIZATION
+  state: CHECKPOINT_9_STARDUST_MOTIF_DONE_FOUR_OF_FIVE_MOTIFS_IN_NEXT_IS_TOKENIZATION_THEN_LIGHT_BAND
   intent: |
     Operator directive docs/goal/loop-goal-directive.md §1 raised体验层重造 to the highest priority,
     ahead of the prior CAMPAIGN-B front (now closed below). §1.1 视觉系统重造 (P0): kill the cold
@@ -1080,16 +1080,34 @@ active_front:
       重试 fired 1 new bootstrap fetch and (backend still absent) correctly returned to the error state
       rather than hanging. Screenshot tool still times out (documented env flakiness). Evidence
       checkpoint-8-error-recovered.md."
+  done_checkpoint_9:
+    - "§1.1.4 五母题 star-dust motif added (was the only fully-missing one; flow/breathe/ripple present,
+      glass partial): web/src/stardust.ts — fixed full-viewport canvas of faint warm particles drifting
+      up + swaying + twinkling. prefers-reduced-motion fully skips (no canvas, no-op stop); no-2D-context
+      (jsdom) safely degrades; tint reads --accent-aurora token (warm, never cold blue); coarse-pointer/
+      mobile particle-count degrade with caps. styles.css .stardust (fixed/z-index 0/pointer-events none)
+      + #root z-index 1 (content always above, dust never intercepts pointer). main.tsx startStardust()."
+    - "Verified: npm test 108/108 (+6 stardust: density degrade, viewport caps, zero-viewport=0, particle
+      bounds+faint-alpha, reduced-motion no-op, no-context safe-degrade). npm run build OK, .stardust in
+      built assets. Real browser (production static app @127.0.0.1:8125, getComputedStyle+getImageData):
+      canvas mounts fixed/z-index0/pointer-events none/1280x720, #root z-index 1; DRAW PIPELINE correct —
+      --accent-aurora resolves rgb(199,154,104), a hand-drawn particle reads back [201,155,103,89] (warm
+      r>g>b, faint alpha ~0.35). Live loop litPixels=0 ONLY because the Browser pane tab is document.hidden
+      (rafFiredWithin300ms=false) — browsers pause rAF on hidden tabs by spec, not a bug; a visible tab
+      animates. Evidence evidence/experience/EXPERIENCE-VISUAL-P0-stardust/."
+    - "Five-motif status: flow ✓ / breathe ✓ / stardust ✓ (this cp) / ripple ✓ / glass ◐ (backdrop-filter
+      panels exist, could be unified/strengthened later)."
   next_machine_actions:
-    - "NEXT: extend empty/error/recovered-state coverage to the per-view data loads (starfield, resonance,
-      letters, portrait, etc.). Most already have EMPTY states (AuroraConversation .empty, ResonanceNetwork
-      .network-empty, PeopleDiscovery/PlazaDirectory empty); focus on ERROR + retry per view."
-    - "THEN the §1.1 visual mainline (highest remaining perceivable win): finish var()-tokenizing the
-      remaining literal hexes so a light band is safe, add light/morandi tokens + the light half of the
-      seven time-of-day theming (dawn/morning/noon warm-light), capture day+night screenshots per doc-11.
-      THEN local font packaging (LXGW WenKai/Noto Serif SC/Cormorant/JetBrains Mono, CSP-safe offline)."
-    - "Lower value / consistency: unify the remaining inline-busy-text buttons (MemoryStarfield/
-      PsychologySkillStudio/retire) + AuroraSelfSpace/ClaimCandidateReview action buttons onto AsyncButton."
+    - "NEXT (§1.1 visual mainline, the big one): full var() tokenization — styles.css still has ~619 literal
+      warm hexes; map the recurring TEXT (#f0e8df->--text-primary, #8c8177/#b7aaa0->--text-muted/faint) and
+      SURFACE hexes to semantic tokens WITHOUT changing their current values (dark render stays pixel-identical),
+      across several careful checkpoints (619-at-once is too high-regression). This unblocks the light band."
+    - "THEN add light/morandi tokens (米白 #F7F2EC base) + the light half of seven time-of-day (dawn/morning/
+      noon warm-light overrides), verify contrast (WCAG 2.2 AA) + capture day+night screenshots per doc-11 §1.1.6."
+    - "THEN local font packaging (LXGW WenKai / Noto Serif SC / Cormorant Garamond / JetBrains Mono,
+      CSP-safe offline, subset + system fallback). THEN glass-motif unify; Lighthouse>85 + mobile breakpoints."
+    - "Lower value / consistency: extend per-view ERROR+retry states; unify remaining inline-busy buttons +
+      AuroraSelfSpace/ClaimCandidateReview onto AsyncButton."
     - "THEN (still §1.1, before §1.2): progressively var()-tokenize each space's remaining literal warm
       hexes, THEN add light/morandi tokens + seven time-of-day theming (data-time attr + JS lerp on local
       time, prefers-reduced-motion degrade, user lock), and capture day+night screenshots per doc-11 §1.1.6."
