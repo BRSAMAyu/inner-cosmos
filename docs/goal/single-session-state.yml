@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-16T12:40:00+08:00
+updated_at: 2026-07-16T12:45:00+08:00
 authority:
   - goal-objective.md
   - 对齐文档/17-单会话持续Goal模式执行协议.md
@@ -883,7 +883,7 @@ known_human_gates:
   - REAL-ANDROID-IOS-APNS-FCM-AND-SIGNING
 
 last_full_gate:
-  baseline_commit: PENDING_CAMPAIGN_C_GENOME_IR_CHECKPOINT
+  baseline_commit: e2b0050 (Campaign C Genome IR v3 checkpoint)
   executed_at: 2026-07-16T12:36:27+08:00
   java: "PASS — Java 21 full mvn test, 129 suites, 805 tests, 0 failures/errors/skips, 183.1s"
   focused_evaluation: "PASS — runtime retrieval 6/6 exact; groundedness 4/4; evidence leaks 0"
