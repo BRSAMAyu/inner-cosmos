@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-16T11:02:00+08:00
+updated_at: 2026-07-16T11:10:00+08:00
 authority:
   - goal-objective.md
   - 对齐文档/17-单会话持续Goal模式执行协议.md
@@ -674,7 +674,7 @@ closed_front_g3_plaza_directory_and_open_chat:
       outranks the remaining UX ports — several UX ports are now closed, so a non-UX front may be
       the higher-value next move."
 
-active_front:
+closed_front_g3_letters_outbox_tab:
   id: G3-LETTERS-OUTBOX-TAB
   state: DONE_VERIFIED_LIVE_END_TO_END
   intent: |
@@ -703,6 +703,37 @@ active_front:
       Campaign C Genome IR next slice (claims/values/habits/temporal categories with provenance —
       machine-buildable without the real-Provider gate), or an UNASSESSED G2 contract item
       (ARCH-MODULES / API-CONTRACT / EVENT-RELIABLE / RUNTIME-ROLES). Reassess at next checkpoint."
+
+active_front:
+  id: G3-PEOPLE-DISCOVERY
+  state: DONE_VERIFIED_LIVE_END_TO_END
+  intent: |
+    Opened ranked port item #3 (relations/social — the entire feature had ZERO API-client presence)
+    with a bounded first slice: people discovery + connection requests, backed by the pre-existing
+    GET /api/social/people + POST /api/social/friends/request — pure frontend port.
+  done_this_front_summary:
+    - "New PeopleDiscovery.tsx in the connect space: lists discoverable users with each person's
+      relationStatus and a '想认识 ta' request button for NONE-state people; PENDING_OUT/PENDING_IN/
+      ACCEPTED render a plain label (accept/decline stays in the existing connection-consent panel).
+      api.ts: DiscoverablePerson + discoverPeople()/requestFriend(). AuroraApp loads people in
+      bootstrap (appended at END); refreshConnections() now also refetches people so relationStatus
+      updates immediately after a request/accept/decline."
+    - "4 new Vitest cases. 60/60 Vitest green (was 56), tsc clean, bundle rebuilt. No backend change
+      -> no Java re-gate."
+    - "Live end-to-end (packaged jar, throwaway H2, two users): B saw A with a '想认识 ta' button;
+      requesting flipped the card to '已发出邀请' (button gone) and the backend recorded 1 outgoing
+      request. 0 console errors. The accept side reuses the already-verified decideConnection flow."
+  next_machine_actions:
+    - "NEXT — remaining relations/social scope (#3): relationship temperature/health/timeline view,
+      and groups (GET/POST /api/social/groups). Other remaining UX ports: letters drafts/threads
+      (#10 tail); aurora-chat voice + rituals (#6, Web Audio, heavier); capsule-create non-boundary
+      creation fields (#9 tail)."
+    - "SESSION SUMMARY (this window): 6 verified parity ports + 1 backend 500 fix — corrections
+      history/retire (+versioning fix), starfield importance/archive, capsule boundary editor, plaza
+      directory + open-chat, letters outbox, people discovery. The highest-value UX-SHELL gaps from
+      the G3-UX-SHELL-REAL-PARITY audit are now closed or substantially closed. STRONGLY consider
+      pivoting the next window to a non-UX front (Campaign C Genome IR next slice, or a G2 contract
+      item ARCH-MODULES/API-CONTRACT/EVENT-RELIABLE) — remaining UX ports are lower-stakes or heavy."
 
 priority_queue:
   - id: CAMPAIGN-C-QUALITY
@@ -783,11 +814,11 @@ last_full_gate:
     500 fix). NOTE: earlier gates claimed 795/795 when Docker WAS available; the 4-test delta is
     exactly those Docker-gated integration tests, now un-runnable here — not lost tests.
   claimed_vitest: |
-    56/56 (was 42 at session resume; +4 UnderstandingCorrection history/retire, +3 MemoryStarfield
+    60/60 (was 42 at session resume; +4 UnderstandingCorrection history/retire, +3 MemoryStarfield
     importance/archive, +2 CapsuleWorkbench boundary-editor, +4 PlazaDirectory, +1 LettersInbox
-    outbox). The starfield, boundary, plaza, and outbox fronts changed no Java, so no Java gate was
-    re-run for them (risk-based); the 791/791-runnable Java gate above still holds at its baseline
-    (last Java change was the correction-versioning 500 fix).
+    outbox, +4 PeopleDiscovery). Every UX port after the correction fix changed no Java, so no Java
+    gate was re-run for them (risk-based); the 791/791-runnable Java gate above still holds at its
+    baseline (last Java change was the correction-versioning 500 fix).
   claimed_playwright: 13/13 plus Living Aurora 1/1 (not re-run this checkpoint — no change to the
     journeys they cover; the new frontend surface is covered by Vitest + live browser verification)
   independent_reverification: BUILDER_VERIFIED_WITH_HUMAN_AND_PRODUCTION_GATES
