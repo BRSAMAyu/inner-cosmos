@@ -1126,7 +1126,7 @@ export function AuroraApp() {
       </div>
 
       <div className="product-space" hidden={productSpace !== "cosmos"}>
-      <ClaimCandidateReview candidates={claimCandidates} busyId={claimCandidateBusyId}
+      <ClaimCandidateReview candidates={claimCandidates} locale={skillLocale} busyId={claimCandidateBusyId}
         onConfirm={id => void confirmClaimCandidate(id)} onDismiss={id => void dismissClaimCandidate(id)} />
       <UnderstandingCorrection claims={claims} oldValue={correctionOld} newValue={correctionNew} impact={correctionImpact} busy={correctionBusy} target={correctionTarget}
         corrections={corrections} retiringId={retiringCorrectionId}

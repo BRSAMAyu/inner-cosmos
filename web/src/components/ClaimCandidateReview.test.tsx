@@ -52,4 +52,14 @@ describe("ClaimCandidateReview", () => {
     expect(screen.getByText("你也还在确认")).toBeVisible();
     expect(screen.getByText("已在你的理解中")).toBeVisible();
   });
+
+  it("renders English (en-SG) copy and type labels when that locale is selected", () => {
+    const onConfirm = vi.fn();
+    render(<ClaimCandidateReview candidates={[candidate()]} locale="en-SG"
+      onConfirm={onConfirm} onDismiss={() => undefined} />);
+    expect(screen.getByText("Preference")).toBeVisible();
+    expect(screen.getByText(/from 1 moments/)).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Yes, that's me" }));
+    expect(onConfirm).toHaveBeenCalledExactlyOnceWith(1);
+  });
 });
