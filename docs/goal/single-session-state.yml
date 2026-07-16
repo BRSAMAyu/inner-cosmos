@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-16T17:45:00+08:00
+updated_at: 2026-07-16T20:16:00+08:00
 
 session_2026_07_16_checkpoints:
   - "7db1a84 feat: cross-Pod live Aurora SSE fan-out/resume/heartbeat + turn.started race fix (G2). 826/826."
@@ -944,7 +944,7 @@ closed_front_g2_sse_cross_pod:
 
 active_front:
   id: EXPERIENCE-FLOW-OVERHAUL
-  state: VISUAL_P0_CHECKPOINT_1_TOKEN_LAYER_AND_WARM_NIGHT_BASE_DONE
+  state: VISUAL_P0_CHECKPOINT_2_MICROINTERACTIONS_AND_UNIFIED_EASING_DONE
   intent: |
     Operator directive docs/goal/loop-goal-directive.md §1 raised体验层重造 to the highest priority,
     ahead of the prior CAMPAIGN-B front (now closed below). §1.1 视觉系统重造 (P0): kill the cold
@@ -969,6 +969,19 @@ active_front:
     - "Env unblock this checkpoint: Node.js v24.18.0/npm 11.16.0 found already installed at
       C:\\Program Files\\nodejs (not on Bash PATH — prefix export PATH). web/package-lock.json was out of
       sync (missing @emnapi/*), npm ci refused; ran npm install to reconcile+install (lockfile +38/-15)."
+  done_checkpoint_2:
+    - "§1.1 micro-interactions + unified easing (pure CSS, additive): global button transition (transform
+      via --ease-bloom bounce, others via --ease-flow, --dur-micro 220ms); button:active scale(.97) fast
+      press; button:hover brightness(1.06); warm-gold :focus-visible outline; .match-card '.2s ease' ->
+      token curves. Real easing hardcode now only the sanctioned .orb breathe ease-in-out infinite.
+      prefers-reduced-motion block extended to also zero transition-duration (NOT transform, to preserve
+      layout transforms like .cosmos-star translate)."
+    - "Verified: npm run build OK (index.css has brightness(1.06)); npm test 67/67; browser on self-started
+      throwaway :8099 (isolated H2, persistent dev DB untouched) — page renders (login button present, not
+      blank), getComputedStyle proves button transition-duration 0.22s + first timing-function
+      cubic-bezier(0.16,1,0.3,1)=--ease-bloom + rest --ease-flow. Screenshot tool timed out again (known
+      env flakiness); numeric computed-style used as equivalent evidence. Evidence
+      evidence/experience/EXPERIENCE-VISUAL-P0-microinteractions/. Local commit only (HG-GIT-PUSH-ACCESS)."
   next_machine_actions:
     - "NEXT (still §1.1, before §1.2): progressively var()-tokenize each space's remaining literal warm
       hexes, THEN add light/morandi tokens + seven time-of-day theming (data-time attr + JS lerp on local
