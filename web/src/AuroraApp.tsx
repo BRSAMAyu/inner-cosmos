@@ -1,6 +1,6 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
-import { api, apiConfigurationError, configureBearerAuth, hasConfiguredApiBase, replayTurnEvents, streamAurora, subscribeProactive, type CapsuleFidelitySummary, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type ConnectionRequests, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type Notification, type PersonaMessage, type PersonaSession, type PortraitDimension, type PortraitHistoryEntry, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type PsychologySkillSuggestion, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type SocialConnection, type StarfieldDetail, type StarfieldScene, type StarfieldStar, type UnderstandingClaim, type UserCorrection, type WakeIntent } from "./api";
+import { api, apiConfigurationError, configureBearerAuth, hasConfiguredApiBase, replayTurnEvents, streamAurora, subscribeProactive, type CapsuleBoundary, type CapsuleFidelitySummary, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type ConnectionRequests, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type Notification, type PersonaMessage, type PersonaSession, type PortraitDimension, type PortraitHistoryEntry, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type PsychologySkillSuggestion, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type SocialConnection, type StarfieldDetail, type StarfieldScene, type StarfieldStar, type UnderstandingClaim, type UserCorrection, type WakeIntent } from "./api";
 import { initialMobileState, mobileRuntime, type MobileRuntimeState } from "./mobile";
 import { mobileOidc } from "./mobile-auth";
 import type { AuroraStreamEvent, DialogMessage, TurnStatus } from "./protocol";
@@ -73,6 +73,8 @@ export function AuroraApp() {
   const [capsuleIntro, setCapsuleIntro] = useState("");
   const [capsulePreview, setCapsulePreview] = useState<CapsulePreview | null>(null);
   const [capsuleBusy, setCapsuleBusy] = useState(false);
+  const [capsuleBoundary, setCapsuleBoundary] = useState<CapsuleBoundary | null>(null);
+  const [boundaryBusy, setBoundaryBusy] = useState(false);
   const [sandboxQuestion, setSandboxQuestion] = useState("当你被误解时，通常会怎样表达自己的边界？");
   const [sandboxResult, setSandboxResult] = useState<CapsuleSandbox | null>(null);
   const [sandboxFeedback, setSandboxFeedback] = useState<string | null>(null);
@@ -184,7 +186,7 @@ export function AuroraApp() {
   const selectedSkill = skills.find(skill => skill.id === selectedSkillId) ?? skills[0] ?? null;
 
   useEffect(() => {
-    if (!selectedCapsule) { setGenomeHistory([]); setFidelitySummary([]); return; }
+    if (!selectedCapsule) { setGenomeHistory([]); setFidelitySummary([]); setCapsuleBoundary(null); return; }
     const ids = [...selectedCapsule.authorizedMemoryIds.matchAll(/\d+/g)].map(match => Number(match[0]));
     setSelectedMemoryIds(ids);
     setSandboxResult(null);
@@ -192,7 +194,19 @@ export function AuroraApp() {
     void api.capsuleGenomeHistory(selectedCapsule.id).then(setGenomeHistory)
       .catch(error => setStatus(error instanceof Error ? error.message : "暂时无法读取共鸣体版本"));
     void api.capsuleFidelity(selectedCapsule.id).then(setFidelitySummary).catch(() => setFidelitySummary([]));
+    void api.capsuleBoundary(selectedCapsule.id).then(setCapsuleBoundary).catch(() => setCapsuleBoundary(null));
   }, [selectedCapsuleId, selectedCapsule?.activeGenomeVersionId]);
+
+  const saveCapsuleBoundary = async (boundary: Partial<CapsuleBoundary>) => {
+    if (!selectedCapsule) return;
+    setBoundaryBusy(true);
+    try {
+      await api.updateCapsuleBoundary(selectedCapsule.id, boundary);
+      setCapsuleBoundary(await api.capsuleBoundary(selectedCapsule.id));
+      setStatus("边界已更新。只有你能改动它，公开人格会按新的边界回应访客。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法保存这个共鸣体的边界"); }
+    finally { setBoundaryBusy(false); }
+  };
 
   useEffect(() => {
     if (bootstrappedRef.current) return;
@@ -1072,7 +1086,8 @@ export function AuroraApp() {
         onPreviewNewCapsule={() => void previewNewCapsule()} onCancelPreview={() => setCapsulePreview(null)} onCreateCapsule={() => void createCapsule()}
         onRecompile={() => void recompileSelectedCapsule()} onSandboxQuestion={setSandboxQuestion} onRunSandbox={() => void runCapsuleSandbox()}
         onRateSandbox={rating => void rateCapsuleSandbox(rating)} onPublish={() => void publishSelectedCapsule()}
-        onPause={() => void pauseSelectedCapsule()} onArchive={() => void archiveSelectedCapsule()} />
+        onPause={() => void pauseSelectedCapsule()} onArchive={() => void archiveSelectedCapsule()}
+        boundary={capsuleBoundary} boundaryBusy={boundaryBusy} onSaveBoundary={boundary => void saveCapsuleBoundary(boundary)} />
 
       <ResonanceNetwork resonanceMatches={resonanceMatches} resonanceStrategy={resonanceStrategy} visitorBusy={visitorBusy}
         visitorMatch={visitorMatch} personaSession={personaSession} personaMessages={personaMessages} personaDraft={personaDraft}

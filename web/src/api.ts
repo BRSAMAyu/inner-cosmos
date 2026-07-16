@@ -99,6 +99,10 @@ export type CapsuleGenomeVersion = {
   status: "ACTIVE" | "NEEDS_REVIEW" | "SUPERSEDED" | "WITHDRAWN";
   evaluationJson: string; changeReason: string; createdAt: string;
 };
+export type CapsuleBoundary = {
+  capsuleId: number; allowTopics: string | null; blockedTopics: string | null;
+  maxConversationTurns: number | null; allowLetterRequest: boolean | null; privacyLevel: string | null;
+};
 export type CapsulePreview = {
   abstractSummary: string; removedSensitiveItems: string[]; publicTags: string[];
   suggestedPseudonym: string; personaPromptDraft: string; riskWarnings: string[];
@@ -418,6 +422,9 @@ export const api = {
   setCapsuleVisibility: (id: number, visibilityStatus: "PRIVATE" | "PUBLIC", isPublic: boolean) =>
     request<EchoCapsule>(`/api/capsule/${id}/visibility`, { method: "POST", body: JSON.stringify({ visibilityStatus, isPublic }) }),
   archiveCapsule: (id: number) => request<unknown>(`/api/capsule/${id}/archive`, { method: "POST" }),
+  capsuleBoundary: (id: number) => request<CapsuleBoundary | null>(`/api/capsule/${id}/boundary`),
+  updateCapsuleBoundary: (id: number, boundary: Partial<CapsuleBoundary>) =>
+    request<void>(`/api/capsule/${id}/boundary`, { method: "POST", body: JSON.stringify(boundary) }),
   sandboxCapsule: (id: number, question: string) => request<CapsuleSandbox>(`/api/capsule/${id}/sandbox/respond`, {
     method: "POST", body: JSON.stringify({ question })
   }),

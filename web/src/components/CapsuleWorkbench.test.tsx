@@ -1,13 +1,14 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CapsuleWorkbench } from "./CapsuleWorkbench";
-import type { CapsuleGenomeVersion, EchoCapsule, MemoryCard } from "../api";
+import type { CapsuleBoundary, CapsuleGenomeVersion, EchoCapsule, MemoryCard } from "../api";
 
 afterEach(cleanup);
 
 const memory: MemoryCard = { id: 1, title: "一次和解", summary: null, status: "ACTIVE", versionNo: 1, consentScope: "SHARED", memoryLayer: "EPISODIC", confidence: .8 };
 const capsule: EchoCapsule = { id: 9, pseudonym: "雨后的人", intro: "先沉默再表达", authorizedMemoryIds: "[1]", visibilityStatus: "PRIVATE", isPublic: false, activeGenomeVersionId: 3, publicTags: "[]" };
 const genomeVersion: CapsuleGenomeVersion = { id: 3, versionNo: 1, parentVersionId: null, compilerVersion: "v1", status: "ACTIVE", evaluationJson: "{}", changeReason: "初始编译", createdAt: "2026-07-15T00:00:00Z" };
+const boundary: CapsuleBoundary = { capsuleId: 9, allowTopics: "自我观察, 日常支持", blockedTopics: "真实姓名, 诊断承诺", maxConversationTurns: 30, allowLetterRequest: true, privacyLevel: "STRICT" };
 
 describe("CapsuleWorkbench", () => {
   it("lets the owner start a new capsule from the create form", () => {
@@ -44,5 +45,38 @@ describe("CapsuleWorkbench", () => {
     expect(onPublish).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByRole("button", { name: "撤回这个共鸣体" }));
     expect(onArchive).toHaveBeenCalledOnce();
+  });
+
+  it("edits and saves the capsule's conversation boundary", () => {
+    const onSaveBoundary = vi.fn();
+    render(<CapsuleWorkbench capsules={[capsule]} selectedCapsuleId={capsule.id} selectedCapsule={capsule} selectableMemories={[memory]}
+      selectedMemoryIds={[1]} capsuleName="" capsuleIntro="" capsulePreview={null} capsuleBusy={false} genomeHistory={[genomeVersion]} fidelitySummary={[]}
+      sandboxQuestion="" sandboxResult={null} sandboxFeedback={null} onSelectCapsule={() => undefined}
+      onToggleMemory={() => undefined} onCapsuleName={() => undefined} onCapsuleIntro={() => undefined}
+      onPreviewNewCapsule={() => undefined} onCancelPreview={() => undefined} onCreateCapsule={() => undefined}
+      onRecompile={() => undefined} onSandboxQuestion={() => undefined} onRunSandbox={() => undefined}
+      onRateSandbox={() => undefined} onPublish={() => undefined} onPause={() => undefined} onArchive={() => undefined}
+      boundary={boundary} boundaryBusy={false} onSaveBoundary={onSaveBoundary} />);
+    const blocked = screen.getByLabelText("明确避开的话题") as HTMLInputElement;
+    expect(blocked.value).toBe("真实姓名, 诊断承诺");
+    fireEvent.change(blocked, { target: { value: "真实姓名, 诊断承诺, 强迫即时回应" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存边界设置" }));
+    expect(onSaveBoundary).toHaveBeenCalledOnce();
+    expect(onSaveBoundary.mock.calls[0][0]).toMatchObject({
+      blockedTopics: "真实姓名, 诊断承诺, 强迫即时回应", allowTopics: "自我观察, 日常支持",
+      maxConversationTurns: 30, allowLetterRequest: true, privacyLevel: "STRICT"
+    });
+  });
+
+  it("disables the boundary save while it is busy", () => {
+    render(<CapsuleWorkbench capsules={[capsule]} selectedCapsuleId={capsule.id} selectedCapsule={capsule} selectableMemories={[memory]}
+      selectedMemoryIds={[1]} capsuleName="" capsuleIntro="" capsulePreview={null} capsuleBusy={false} genomeHistory={[genomeVersion]} fidelitySummary={[]}
+      sandboxQuestion="" sandboxResult={null} sandboxFeedback={null} onSelectCapsule={() => undefined}
+      onToggleMemory={() => undefined} onCapsuleName={() => undefined} onCapsuleIntro={() => undefined}
+      onPreviewNewCapsule={() => undefined} onCancelPreview={() => undefined} onCreateCapsule={() => undefined}
+      onRecompile={() => undefined} onSandboxQuestion={() => undefined} onRunSandbox={() => undefined}
+      onRateSandbox={() => undefined} onPublish={() => undefined} onPause={() => undefined} onArchive={() => undefined}
+      boundary={boundary} boundaryBusy={true} onSaveBoundary={() => undefined} />);
+    expect(screen.getByRole("button", { name: "保存中…" })).toBeDisabled();
   });
 });

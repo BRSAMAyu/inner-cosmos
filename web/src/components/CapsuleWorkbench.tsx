@@ -1,19 +1,68 @@
-import type { CapsuleFidelitySummary, CapsuleGenomeVersion, CapsulePreview, CapsuleSandbox, EchoCapsule, MemoryCard } from "../api";
+import { useState } from "react";
+import type { CapsuleBoundary, CapsuleFidelitySummary, CapsuleGenomeVersion, CapsulePreview, CapsuleSandbox, EchoCapsule, MemoryCard } from "../api";
 
 const sandboxRatings: Array<[string, string]> = [
   ["LIKE_ME", "像我"], ["NOT_ME", "不像我"], ["FACT_WRONG", "事实不对"], ["TOO_EXPOSED", "太暴露"], ["TONE_WRONG", "语气不对"]
 ];
 const blockedScopes = new Set(["LOCAL_ONLY", "NO_EXTERNAL_PROCESSING"]);
+const privacyOptions: Array<[string, string]> = [["STRICT", "严格保护"], ["BALANCED", "均衡保护"], ["OPEN", "开放一点"]];
 
 function fidelityLabel(summary: CapsuleFidelitySummary | undefined): string | null {
   if (!summary || summary.totalRatings === 0 || summary.fidelityScore === null) return null;
   return `${summary.totalRatings} 次反馈 · ${Math.round(summary.fidelityScore * 100)}% 像我`;
 }
 
+// Boundary topics are stored as a free string; the compiler seeds them as a JSON array
+// (["自我观察",…]) while a hand-edited value is plain comma-separated text. Show either cleanly.
+function topicsToText(value: string | null): string {
+  if (!value) return "";
+  const trimmed = value.trim();
+  if (trimmed.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) return parsed.map(String).join("，");
+    } catch { /* not JSON — fall through and show as-is */ }
+  }
+  return value;
+}
+
+// Owner-private boundary editor for a selected capsule: what the public persona may/won't discuss,
+// how strict its masking is, the daily turn cap, and whether visitors can request a slow letter.
+// Local state is seeded from the loaded boundary and reset per capsule via key={capsuleId}.
+function CapsuleBoundaryEditor({ boundary, boundaryBusy, onSaveBoundary }: {
+  boundary: CapsuleBoundary | null; boundaryBusy: boolean;
+  onSaveBoundary: (boundary: Partial<CapsuleBoundary>) => void;
+}) {
+  const [allowTopics, setAllowTopics] = useState(topicsToText(boundary?.allowTopics ?? null));
+  const [blockedTopics, setBlockedTopics] = useState(topicsToText(boundary?.blockedTopics ?? null));
+  const [maxTurns, setMaxTurns] = useState(boundary?.maxConversationTurns ?? 30);
+  const [allowLetter, setAllowLetter] = useState(boundary?.allowLetterRequest ?? true);
+  const [privacy, setPrivacy] = useState(boundary?.privacyLevel ?? "STRICT");
+  return <>
+    <div className="capsule-step"><span>3</span><div><strong>设定它在对话里的边界</strong><small>这些只有你能改：它可以谈什么、要避开什么、每天最多聊几轮、别人能否请求给你写慢信。</small></div></div>
+    <div className="boundary-editor">
+      <label>允许谈论的话题<input value={allowTopics} onChange={event => setAllowTopics(event.target.value)} placeholder="例如：自我观察, 日常支持, 温柔建议" /></label>
+      <label>明确避开的话题<input value={blockedTopics} onChange={event => setBlockedTopics(event.target.value)} placeholder="例如：真实姓名, 诊断承诺, 强迫即时回应" /></label>
+      <div className="boundary-row">
+        <label>隐私等级<select value={privacy} onChange={event => setPrivacy(event.target.value)}>
+          {privacyOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+        <label>每日对话轮数<input type="number" min={2} max={50} value={maxTurns}
+          onChange={event => setMaxTurns(Number(event.target.value))} /></label>
+      </div>
+      <label className="boundary-check"><input type="checkbox" checked={allowLetter}
+        onChange={event => setAllowLetter(event.target.checked)} />允许访客读完后请求给你写一封慢信</label>
+      <button type="button" className="resonance-secondary" disabled={boundaryBusy}
+        onClick={() => onSaveBoundary({ allowTopics, blockedTopics, maxConversationTurns: maxTurns, allowLetterRequest: allowLetter, privacyLevel: privacy })}>
+        {boundaryBusy ? "保存中…" : "保存边界设置"}</button>
+    </div>
+  </>;
+}
+
 export function CapsuleWorkbench({ capsules, selectedCapsuleId, selectedCapsule, selectableMemories, selectedMemoryIds,
   capsuleName, capsuleIntro, capsulePreview, capsuleBusy, genomeHistory, fidelitySummary, sandboxQuestion, sandboxResult, sandboxFeedback,
   onSelectCapsule, onToggleMemory, onCapsuleName, onCapsuleIntro, onPreviewNewCapsule, onCancelPreview, onCreateCapsule,
-  onRecompile, onSandboxQuestion, onRunSandbox, onRateSandbox, onPublish, onPause, onArchive }: {
+  onRecompile, onSandboxQuestion, onRunSandbox, onRateSandbox, onPublish, onPause, onArchive,
+  boundary = null, boundaryBusy = false, onSaveBoundary }: {
   capsules: EchoCapsule[]; selectedCapsuleId: number | null; selectedCapsule: EchoCapsule | null;
   selectableMemories: MemoryCard[]; selectedMemoryIds: number[]; capsuleName: string; capsuleIntro: string;
   capsulePreview: CapsulePreview | null; capsuleBusy: boolean; genomeHistory: CapsuleGenomeVersion[];
@@ -23,6 +72,7 @@ export function CapsuleWorkbench({ capsules, selectedCapsuleId, selectedCapsule,
   onPreviewNewCapsule: () => void; onCancelPreview: () => void; onCreateCapsule: () => void;
   onRecompile: () => void; onSandboxQuestion: (value: string) => void; onRunSandbox: () => void;
   onRateSandbox: (rating: string) => void; onPublish: () => void; onPause: () => void; onArchive: () => void;
+  boundary?: CapsuleBoundary | null; boundaryBusy?: boolean; onSaveBoundary?: (boundary: Partial<CapsuleBoundary>) => void;
 }) {
   const activeFidelity = fidelityLabel(fidelitySummary.find(summary => summary.genomeVersionId === genomeHistory[0]?.id));
   return <section className="resonance-space" aria-label="共鸣体创建与像不像我沙盒">
@@ -84,7 +134,10 @@ export function CapsuleWorkbench({ capsules, selectedCapsuleId, selectedCapsule,
           <p className="preview-warning">真实模型暂时不可用，这次回应不会被当作拟真证据。</p>}
       </article>}
 
-      <div className="capsule-step"><span>3</span><div><strong>决定它是否可以被别人遇见</strong><small>发布不会开放真实身份、联系方式或未授权记忆；撤回会立即阻止新旧会话继续代表你。</small></div></div>
+      {onSaveBoundary && <CapsuleBoundaryEditor key={`${selectedCapsule.id}:${boundary?.capsuleId ?? "loading"}`}
+        boundary={boundary} boundaryBusy={boundaryBusy} onSaveBoundary={onSaveBoundary} />}
+
+      <div className="capsule-step"><span>4</span><div><strong>决定它是否可以被别人遇见</strong><small>发布不会开放真实身份、联系方式或未授权记忆；撤回会立即阻止新旧会话继续代表你。</small></div></div>
       <div className="resonance-actions">{selectedCapsule.visibilityStatus !== "PUBLIC" && <button className="resonance-primary" disabled={capsuleBusy || genomeHistory[0]?.status !== "ACTIVE"} onClick={onPublish}>确认并发布当前版本</button>}
         {selectedCapsule.visibilityStatus === "PUBLIC" && <button disabled={capsuleBusy} onClick={onPause}>暂停公开</button>}
         <button className="danger-quiet" disabled={capsuleBusy} onClick={onArchive}>撤回这个共鸣体</button></div>
