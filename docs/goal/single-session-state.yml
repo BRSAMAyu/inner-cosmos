@@ -923,7 +923,7 @@ closed_front_g2_sse_cross_pod:
 
 active_front:
   id: CAMPAIGN-B-AUTO-CLAIM-EXTRACTION
-  state: SLICE_1_EXTRACTOR_AND_PRECISION_GATE_DONE_SLICE_2_PERSIST_CONFIRM_PROPAGATE_NEXT
+  state: SLICES_1_2_DONE_PIPELINE_LIVE_SLICE_3_CONFLICT_AND_UI_NEXT
   intent: |
     Build the missing automatic user-modeling pipeline doc-16 specifies. Today every UnderstandingClaim
     is produced only by an explicit user correction; there is no path from conversation evidence to
@@ -944,18 +944,27 @@ active_front:
       precision 1.0 / recall 1.0 / typeAccuracy 1.0 vs thresholds 0.9/0.7/0.9); ClaimExtractionServiceImplTest
       (mock-mode fallback + Provider-hallucination sanitization); full H2 context boots. Evidence
       evidence/innovation/INNO-INNER-007, report target/evaluation/claim-extraction-v1-report.json."
+  done_slice_2:
+    - "ClaimCandidateService/Impl persists candidates into tb_understanding_claim (status=CANDIDATE,
+      sourceType=AUTO_EXTRACTION), idempotent per claim key, version past the unique-index max,
+      provenance in evidenceRefs + value JSON — no schema change needed."
+    - "ClaimCandidateExtractListener stages candidates on DialogFinishedEvent (AFTER_COMMIT, async,
+      failure-swallowing), retaining the per-message provenance memory extraction discards."
+    - "confirmCandidate promotes via UserCorrectionService.confirm (inherits impact preview +
+      downstream propagation) then retires the candidate; dismissCandidate marks DISMISSED.
+      ClaimCandidateController exposes owner-scoped list/confirm/dismiss."
+    - "Verified: ClaimCandidateServiceImplIntegrationTest (stage/idempotent/confirm-to-ACTIVE/owner
+      scope), ClaimCandidateControllerTest (HTTP surface + cross-user NOT_FOUND). Full Java 833/833.
+      Evidence INNO-INNER-007 (Slice 2 section)."
   next_machine_actions:
-    - "Slice 2: persist accepted candidates as status=CANDIDATE UnderstandingClaim rows (sourceType
-      AUTO_EXTRACTION, evidenceRefs = JSON message ids, authorityLevel = auto tier), coexisting with
-      ACTIVE claims without violating the (user_id, claim_key, version) unique index; detect conflicts
-      against existing ACTIVE claims and flag them for review rather than auto-superseding."
-    - "Expose a confirm/correct endpoint so a user can promote a CANDIDATE to an ACTIVE claim through
-      the existing UserCorrection confirm path (reusing preview/impact/propagation), and auto-trigger
-      extraction on the MemoryExtractListener AFTER_COMMIT hook (or session close) so real
-      conversations produce candidates without discarding message ids."
-    - "Propagate confirmed claims downstream (insights, vectors, caches, capsule genome, matching)
-      reusing DataUseGrant + FORGET tombstone contracts; leave real-provider extraction quality,
-      counter-prompt robustness and blind review as the REAL-PROVIDER-CREDENTIALS human gate."
+    - "Slice 3: semantic conflict detection against existing ACTIVE claims (candidate that contradicts
+      a confirmed claim flagged for review, not auto-superseded), reusing embeddings/real-provider
+      judgement where available; entity/time/relation normalization beyond value + provenance."
+    - "Slice 3: a real web review surface in AuroraApp (see what Aurora inferred, with provenance;
+      confirm/dismiss) so doc-16's '看懂自己' is provable through the UI, not only the API."
+    - "Leave real-provider extraction quality, counter-prompt robustness and blind review as the
+      REAL-PROVIDER-CREDENTIALS human gate. After Slice 3, reassess whether to advance PROFILE-MODEL
+      toward PASS or pivot to the next-highest priority_queue front."
 
 priority_queue:
   - id: CAMPAIGN-C-QUALITY

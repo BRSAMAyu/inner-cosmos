@@ -50,13 +50,45 @@ correction *targeting* precision, not claim *extraction* precision.
   confidence clamped to 1.0.
 - Full H2 Spring context boots with the new `@Service` (`AuroraStreamControllerTest` green).
 
+## Implemented (Slice 2 — persistence, auto-trigger, confirm-to-ACTIVE, owner scoping)
+
+- `ClaimCandidateService`/`ClaimCandidateServiceImpl` persist candidates into the existing
+  `tb_understanding_claim` table with `status=CANDIDATE` and `sourceType=AUTO_EXTRACTION`, so they
+  coexist with — but are never mistaken for — authoritative `ACTIVE` claims (no schema change; the
+  free-string status/sourceType/authorityLevel/confidence/evidenceRefs columns suffice). Staging is
+  idempotent per claim key (an existing CANDIDATE is refreshed, not duplicated); version advances past
+  the highest existing version for the key to respect the `(user_id, claim_key, version)` unique index;
+  provenance message ids are stored in `evidenceRefs` and the value JSON.
+- `ClaimCandidateExtractListener` stages candidates automatically on `DialogFinishedEvent`
+  (AFTER_COMMIT, async, failure-swallowing) — mirroring `MemoryExtractListener` but retaining the
+  per-message provenance that memory extraction discards.
+- `confirmCandidate` promotes a candidate to an authoritative claim through
+  `UserCorrectionService.confirm`, so the confirmed claim inherits impact preview and the existing
+  downstream propagation (Aurora retrieval, portrait, memory, capsule sync); the candidate row is
+  then marked `CONFIRMED`. `dismissCandidate` marks `DISMISSED` (audit, not hard delete). This honors
+  the authority rule: auto-extraction never writes an `ACTIVE` claim — the user's confirmation does.
+- `ClaimCandidateController` (`/api/aurora/claims/candidates`) exposes owner-scoped list / confirm /
+  dismiss so the user can see what Aurora inferred (with provenance) and accept or reject it.
+
+## Verification — Slice 2 (Java 21, H2)
+
+- `ClaimCandidateServiceImplIntegrationTest` — staging derives one PREFERENCE candidate (a question in
+  the same session is not turned into a claim), carries provenance, and re-staging is idempotent (one
+  CANDIDATE row); confirm promotes to an `ACTIVE` `USER_CORRECTION`-authority claim and retires the
+  candidate; a foreign user can neither list, confirm, dismiss, nor stage from the owner's session.
+- `ClaimCandidateControllerTest` — list/confirm/dismiss over the real DispatcherServlet with session
+  auth; a foreign user gets `NOT_FOUND` on confirm and an empty list; confirm/dismiss remove the item
+  from the pending list.
+- Full Java regression 833/833 green (no regression from the new dialog-finish listener).
+
 ## Honest boundary
 
-Slice 1 delivers the extractor, the machine-verifiable claim-precision floor, and a provider-ready,
-sanitized service. It does NOT yet persist candidates as `CANDIDATE` `UnderstandingClaim` rows,
-expose a confirm/correct endpoint, auto-trigger on session finish, detect conflicts against existing
-ACTIVE claims, or propagate confirmed claims downstream — those are Slice 2, reusing the existing
-correction/propagation + DataUseGrant + FORGET-tombstone machinery. Real-provider extraction quality,
+Slices 1–2 deliver the extractor, the machine-verifiable claim-precision floor, a provider-ready
+sanitized service, candidate persistence, automatic staging on session finish, and confirm-to-ACTIVE
+promotion that reuses the existing correction propagation. NOT yet done (Slice 3): semantic conflict
+detection against existing ACTIVE claims (needs embeddings/real-provider judgement), a dedicated
+review UI in the web client ("看懂自己" surface), extraction on real long conversations at scale, and
+entity/time/relation normalization beyond value + provenance. Real-provider extraction quality,
 counter-prompt robustness and blind review remain the human gate
 (REAL-PROVIDER-CREDENTIALS-AND-BLIND-REVIEW). The precision floor is deterministic and provider-
 independent by design.
