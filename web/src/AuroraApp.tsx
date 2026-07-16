@@ -1,6 +1,6 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
-import { api, apiConfigurationError, configureBearerAuth, hasConfiguredApiBase, replayTurnEvents, streamAurora, subscribeProactive, type CapsuleBoundary, type CapsuleFidelitySummary, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type ConnectionRequests, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type Notification, type PersonaMessage, type PersonaSession, type PortraitDimension, type PortraitHistoryEntry, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type PsychologySkillSuggestion, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type SocialConnection, type StarfieldDetail, type StarfieldScene, type StarfieldStar, type UnderstandingClaim, type UserCorrection, type WakeIntent } from "./api";
+import { api, apiConfigurationError, configureBearerAuth, hasConfiguredApiBase, replayTurnEvents, streamAurora, subscribeProactive, type CapsuleBoundary, type CapsuleFidelitySummary, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type ConnectionRequests, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type Notification, type PersonaMessage, type PersonaSession, type PortraitDimension, type PublicCapsule, type PortraitHistoryEntry, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type PsychologySkillSuggestion, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type SocialConnection, type StarfieldDetail, type StarfieldScene, type StarfieldStar, type UnderstandingClaim, type UserCorrection, type WakeIntent } from "./api";
 import { initialMobileState, mobileRuntime, type MobileRuntimeState } from "./mobile";
 import { mobileOidc } from "./mobile-auth";
 import type { AuroraStreamEvent, DialogMessage, TurnStatus } from "./protocol";
@@ -11,6 +11,7 @@ import { UnderstandingCorrection, type CorrectionTarget } from "./components/Und
 import { MemoryStarfield } from "./components/MemoryStarfield";
 import { CapsuleWorkbench } from "./components/CapsuleWorkbench";
 import { ResonanceNetwork } from "./components/ResonanceNetwork";
+import { PlazaDirectory } from "./components/PlazaDirectory";
 import { LettersInbox } from "./components/LettersInbox";
 import { PortraitView } from "./components/PortraitView";
 import { AccountSettings, type AccountBusy } from "./components/AccountSettings";
@@ -79,6 +80,8 @@ export function AuroraApp() {
   const [sandboxResult, setSandboxResult] = useState<CapsuleSandbox | null>(null);
   const [sandboxFeedback, setSandboxFeedback] = useState<string | null>(null);
   const [resonanceMatches, setResonanceMatches] = useState<CapsuleMatch[]>([]);
+  const [publicCapsules, setPublicCapsules] = useState<PublicCapsule[]>([]);
+  const [directoryPick, setDirectoryPick] = useState<PublicCapsule | null>(null);
   const [resonanceStrategy, setResonanceStrategy] = useState<ResonanceStrategy>("MIRROR");
   const [visitorMatchId, setVisitorMatchId] = useState<number | null>(null);
   const [personaSession, setPersonaSession] = useState<PersonaSession | null>(null);
@@ -156,7 +159,8 @@ export function AuroraApp() {
         api.psychologySkills().then(rows => { setSkills(rows); return rows; }),
         api.psychologySkillRuns().then(rows => { setSkillRuns(rows); return rows; }),
         api.portrait().then(setPortrait),
-        api.recentCorrections().then(setCorrections)
+        api.recentCorrections().then(setCorrections),
+        api.plazaCapsules().then(setPublicCapsules).catch(() => undefined)
       ]);
       const loadedCapsules = loaded[8] as EchoCapsule[];
       const loadedMatches = loaded[9] as CapsuleMatch[];
@@ -182,7 +186,15 @@ export function AuroraApp() {
   }, [replaceFromHistory]);
 
   const selectedCapsule = capsules.find(capsule => capsule.id === selectedCapsuleId) ?? null;
-  const visitorMatch = resonanceMatches.find(match => match.capsule.id === visitorMatchId) ?? resonanceMatches[0] ?? null;
+  // A capsule opened from the public plaza directory (not the curated match set) is wrapped in a
+  // synthetic match so the existing visitor workbench (persona chat + slow letter) works unchanged.
+  const directoryMatch: CapsuleMatch | null = directoryPick && !resonanceMatches.some(match => match.capsule.id === directoryPick.id)
+    ? { capsule: directoryPick, matchScore: 0, matchReasons: [], matchSummary: "你在广场里主动找到了它，而不是被推荐的。",
+        resonant: false, strategy: "SERENDIPITY", strategyLabel: "主动发现", strategyDescription: "你在共鸣广场里主动走近了它。" }
+    : null;
+  const visitorMatch = resonanceMatches.find(match => match.capsule.id === visitorMatchId)
+    ?? (directoryMatch && directoryMatch.capsule.id === visitorMatchId ? directoryMatch : null)
+    ?? resonanceMatches[0] ?? null;
   const selectedSkill = skills.find(skill => skill.id === selectedSkillId) ?? skills[0] ?? null;
 
   useEffect(() => {
@@ -817,6 +829,13 @@ export function AuroraApp() {
     setPersonaSession(null); setPersonaMessages([]); setPersonaQuota(null); setSentLetter(null); setLetterBody("");
   };
 
+  const openDirectoryCapsule = (capsule: PublicCapsule) => {
+    setDirectoryPick(capsule);
+    chooseVisitorMatch(capsule.id);
+    setStatus(`你从广场走近了「${capsule.pseudonym}」。它是授权 AI 共鸣体，不是真人实时在线。`);
+    window.setTimeout(() => document.querySelector(".visitor-workbench, .resonance-network")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+  };
+
   const chooseResonanceStrategy = async (strategy: ResonanceStrategy) => {
     setVisitorBusy(true);
     try {
@@ -1088,6 +1107,9 @@ export function AuroraApp() {
         onRateSandbox={rating => void rateCapsuleSandbox(rating)} onPublish={() => void publishSelectedCapsule()}
         onPause={() => void pauseSelectedCapsule()} onArchive={() => void archiveSelectedCapsule()}
         boundary={capsuleBoundary} boundaryBusy={boundaryBusy} onSaveBoundary={boundary => void saveCapsuleBoundary(boundary)} />
+
+      <PlazaDirectory capsules={publicCapsules} activeCapsuleId={visitorMatch?.capsule.id ?? null} busy={visitorBusy}
+        onOpenCapsule={openDirectoryCapsule} />
 
       <ResonanceNetwork resonanceMatches={resonanceMatches} resonanceStrategy={resonanceStrategy} visitorBusy={visitorBusy}
         visitorMatch={visitorMatch} personaSession={personaSession} personaMessages={personaMessages} personaDraft={personaDraft}

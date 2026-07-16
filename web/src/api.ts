@@ -432,6 +432,7 @@ export const api = {
     request<CapsuleSandboxFeedback>(`/api/capsule/${id}/sandbox/feedback`, { method: "POST", body: JSON.stringify(input) }),
   resonanceMatches: (strategy: ResonanceStrategy = "MIRROR") =>
     request<CapsuleMatch[]>(`/api/plaza/matches?strategy=${encodeURIComponent(strategy)}`),
+  plazaCapsules: () => request<PublicCapsule[]>("/api/plaza/capsules"),
   createPersonaSession: (capsuleId: number) => request<PersonaSession>("/api/persona-chat/session/create", {
     method: "POST", body: JSON.stringify({ capsuleId })
   }),
