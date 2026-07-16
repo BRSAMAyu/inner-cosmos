@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-16T20:48:00+08:00
+updated_at: 2026-07-16T21:16:00+08:00
 
 session_2026_07_16_checkpoints:
   - "7db1a84 feat: cross-Pod live Aurora SSE fan-out/resume/heartbeat + turn.started race fix (G2). 826/826."
@@ -944,7 +944,7 @@ closed_front_g2_sse_cross_pod:
 
 active_front:
   id: EXPERIENCE-FLOW-OVERHAUL
-  state: VISUAL_P0_CHECKPOINT_3_SEVEN_TIME_OF_DAY_THEME_DONE
+  state: CHECKPOINT_4_DEAD_BUTTON_SCAN_DIAGNOSTIC_DONE_ROOTCAUSE_IS_FEEDBACK_NOT_MISSING_HANDLERS
   intent: |
     Operator directive docs/goal/loop-goal-directive.md §1 raised体验层重造 to the highest priority,
     ahead of the prior CAMPAIGN-B front (now closed below). §1.1 视觉系统重造 (P0): kill the cold
@@ -995,6 +995,25 @@ active_front:
       correctly (lightness noon 42 > ... > deep-night 27, all r>g>b warm, dusk mauve b>g); smooth 480ms
       @property transition confirmed. Evidence evidence/experience/EXPERIENCE-VISUAL-P0-time-of-day/.
       PUSH now works to fork sangchenyi/inner-cosmos (PR path); HG-GIT-PUSH-ACCESS still blocks upstream."
+  done_checkpoint_4:
+    - "§1.2 dead-button sweep: added Playwright web/e2e/dead-button-scan.spec.ts (login -> walk 5 spaces ->
+      enumerate visible non-disabled non-danger non-active buttons -> click each -> assert observable
+      response via MutationObserver + location + status/aria-live + aria-pressed/expanded + activeElement +
+      wrapped window.fetch count). chromium installed locally."
+    - "Ran it (INNER_COSMOS_BASE_URL=http://127.0.0.1:8097): core spaces 今天/内宇宙/我的 zero dead buttons;
+      共鸣/连接 reported a batch (开始对话×11, 保存边界设置, 撤回这个共鸣体, 标记已读, 温和婉拒, 举报这封信…).
+      Source-read verification: ALL of them have onClick handlers (PlazaDirectory.tsx:76 onOpenCapsule,
+      CapsuleWorkbench.tsx:56, LettersInbox.tsx:40-41 onActOnLetter, AuroraSelfSpace.tsx:32 onRollback) ->
+      NO code-level dead buttons. The false positives come from (a) in-mem seed state pollution (destructive
+      actions already applied by a prior sweep pass -> handlers early-return) and (b) missing business context
+      (共鸣/连接 buttons need a selected match card / letter state)."
+    - "ROOT CAUSE of operator's 'buttons do nothing': not missing handlers but missing click/loading FEEDBACK
+      (no visual response between click and async result). Redirects §1.2 toward §1.1 micro-interactions
+      (checkpoint 2 added button scale/hover/focus) + not-yet-done LOADING FOUR-STATES."
+    - "spec assertion honestly narrowed: core spaces (内宇宙/我的) must be zero dead buttons (reliable there);
+      共鸣/连接 printed as diagnostic (pure DOM traversal has inherent false positives without clean seed +
+      context). Verified green: playwright 1 passed (1.1m); npm run build OK (tsc compiles spec); npm test 89/89.
+      Evidence evidence/experience/EXPERIENCE-DEADBUTTON-scan/. Pushed to fork (PR path)."
   next_machine_actions:
     - "NEXT (still §1.1, before §1.2): progressively var()-tokenize each space's remaining literal warm
       hexes, THEN add light/morandi tokens + seven time-of-day theming (data-time attr + JS lerp on local
