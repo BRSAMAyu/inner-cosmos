@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-16T21:48:00+08:00
+updated_at: 2026-07-16T21:58:00+08:00
 
 session_2026_07_16_checkpoints:
   - "7db1a84 feat: cross-Pod live Aurora SSE fan-out/resume/heartbeat + turn.started race fix (G2). 826/826."
@@ -944,7 +944,7 @@ closed_front_g2_sse_cross_pod:
 
 active_front:
   id: EXPERIENCE-FLOW-OVERHAUL
-  state: CHECKPOINT_6_LOADING_FOUR_STATES_DONE_NEXT_IS_ROLL_ASYNCBUTTON_ACROSS_REMAINING_BUTTONS
+  state: CHECKPOINT_7_ASYNCBUTTON_ROLLED_ACROSS_PRIMARY_ACTION_BUTTONS_NEXT_IS_EMPTY_ERROR_STATES_OR_TOKENIZATION
   intent: |
     Operator directive docs/goal/loop-goal-directive.md §1 raised体验层重造 to the highest priority,
     ahead of the prior CAMPAIGN-B front (now closed below). §1.1 视觉系统重造 (P0): kill the cold
@@ -1043,14 +1043,32 @@ active_front:
       static dots (animationName none); anim-tier button running loading-dot 1.2s, dot color
       rgb(231,219,204) warm (currentColor, not cold blue); <1s button keeps original label; LoadingText
       color rgb(183,170,160)=--text-muted warm. Evidence evidence/experience/EXPERIENCE-VISUAL-P0-loading-states/."
+  done_checkpoint_7:
+    - "Rolled AsyncButton across the primary async ACTION buttons that previously had disable-only, no
+      busy feedback — especially the 共鸣/连接 spaces checkpoint-4 flagged: ResonanceNetwork (进入对话/
+      发送这一轮/让慢信启程), UnderstandingCorrection (预览/确认), CapsuleWorkbench (脱敏预览/编译/
+      生成新版本/沙盒生成/发布/暂停/撤回), PeopleDiscovery (想认识 ta), PlazaDirectory (开始对话). Each
+      preserves its extra disable condition via AsyncButton's separate disabled+busy props; default
+      type=button keeps accessible names unchanged. Evidence checkpoint-7-rollout.md."
+    - "Intentionally NOT converted (logged with reasons): buttons that already show inline busy text
+      (MemoryStarfield 正在追溯/撤回, PsychologySkillStudio, UnderstandingCorrection retire); PortraitView
+      calibrate (optimistically closes its panel on click); toggle/nav buttons (strategy switch, match
+      cards, sandbox rating)."
+    - "Verified: npm test 101/101 (each changed component's existing unit tests stay green -> no
+      accessible-name/disable regression). npm run build OK. AsyncButton's visual behavior was already
+      browser-proven in checkpoint 6; this is a low-risk mechanical rollout of the same primitive, so per
+      17号协议 §7 risk-tiering it rests on regression-green + checkpoint-6 visual evidence rather than a
+      fresh per-button screenshot (screenshot tool still times out on infinite-CSS-animation pages)."
+    - "Both push paths remain blocked this session (HG-GIT-PUSH-ACCESS + fork-push classifier gate); all
+      checkpoints committed locally on feat/phase0-visual-token-system, recoverable, pending an authorized
+      push destination from the human."
   next_machine_actions:
-    - "NEXT (§1.1): roll AsyncButton across the remaining async action buttons — UnderstandingCorrection
-      (confirm/retire), CapsuleWorkbench (save boundary/compile/publish/archive), PortraitView (calibrate),
-      PeopleDiscovery (request), LettersInbox (act on letter), MemoryStarfield (save importance/archive),
-      ClaimCandidateReview (confirm/dismiss). Each: swap the disabled-only <button> for AsyncButton with a
-      busy text; keep tests green (AsyncButton keeps the same accessible name while <1s / not busy)."
-    - "THEN systematically fill each view's empty/error/recovered states (this checkpoint covered the WAIT
-      state; some empty states already exist e.g. AuroraConversation .empty)."
+    - "NEXT (§1.1, lower value): unify the remaining inline-busy-text buttons (MemoryStarfield/
+      PsychologySkillStudio/retire) onto AsyncButton's three-tier timing; convert AuroraSelfSpace and
+      ClaimCandidateReview action buttons."
+    - "THEN systematically fill each view's empty/error/recovered states (checkpoints 6-7 covered the WAIT
+      state; some empty states already exist e.g. AuroraConversation .empty, ResonanceNetwork .network-empty,
+      PeopleDiscovery/PlazaDirectory empty). Audit each space for error + recovered states."
     - "THEN (still §1.1, before §1.2): progressively var()-tokenize each space's remaining literal warm
       hexes, THEN add light/morandi tokens + seven time-of-day theming (data-time attr + JS lerp on local
       time, prefers-reduced-motion degrade, user lock), and capture day+night screenshots per doc-11 §1.1.6."

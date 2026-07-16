@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { CapsuleBoundary, CapsuleFidelitySummary, CapsuleGenomeVersion, CapsulePreview, CapsuleSandbox, EchoCapsule, MemoryCard } from "../api";
+import { AsyncButton } from "../loading";
 
 const sandboxRatings: Array<[string, string]> = [
   ["LIKE_ME", "像我"], ["NOT_ME", "不像我"], ["FACT_WRONG", "事实不对"], ["TOO_EXPOSED", "太暴露"], ["TONE_WRONG", "语气不对"]
@@ -98,12 +99,12 @@ export function CapsuleWorkbench({ capsules, selectedCapsuleId, selectedCapsule,
       <div className="capsule-step"><span>2</span><div><strong>它表达你的哪一部分？</strong><small>名字和说明面向访客，但创建后仍保持私密，直到你主动发布。</small></div></div>
       <div className="capsule-fields"><label>共鸣体名字<input value={capsuleName} onChange={event => onCapsuleName(event.target.value)} placeholder="例如：雨后仍愿意开口的人" /></label>
         <label>希望它保留的侧面<textarea value={capsuleIntro} onChange={event => onCapsuleIntro(event.target.value)} placeholder="例如：面对关系误解时，我会先沉默整理，再清楚说出边界。" /></label></div>
-      {!capsulePreview ? <button className="resonance-primary" disabled={capsuleBusy} onClick={onPreviewNewCapsule}>先看严格脱敏预览</button> :
+      {!capsulePreview ? <AsyncButton className="resonance-primary" busy={capsuleBusy} busyText="正在脱敏" onClick={onPreviewNewCapsule}>先看严格脱敏预览</AsyncButton> :
         <div className="capsule-preview" aria-label="共鸣体授权预览"><span className="eyebrow">WHAT IT MAY USE</span><p>{capsulePreview.abstractSummary}</p>
           <div className="preview-tags">{capsulePreview.publicTags.map(tag => <span key={tag}>{tag}</span>)}</div>
           {capsulePreview.removedSensitiveItems.length > 0 && <small>已移除：{capsulePreview.removedSensitiveItems.join("、")}</small>}
           {capsulePreview.riskWarnings.map(warning => <p className="preview-warning" key={warning}>{warning}</p>)}
-          <div className="resonance-actions"><button disabled={capsuleBusy} onClick={onCancelPreview}>返回修改</button><button className="resonance-primary" disabled={capsuleBusy} onClick={onCreateCapsule}>编译为私密版本</button></div>
+          <div className="resonance-actions"><button type="button" disabled={capsuleBusy} onClick={onCancelPreview}>返回修改</button><AsyncButton className="resonance-primary" busy={capsuleBusy} busyText="正在编译" onClick={onCreateCapsule}>编译为私密版本</AsyncButton></div>
         </div>}
     </div> : <div className="capsule-workbench">
       <div className="capsule-summary"><div><span className="capsule-status">{selectedCapsule.visibilityStatus === "PUBLIC" ? "公开中" : selectedCapsule.visibilityStatus === "NEEDS_REVIEW" ? "授权变化，等待复核" : "仅自己可见"}</span>
@@ -121,11 +122,11 @@ export function CapsuleWorkbench({ capsules, selectedCapsuleId, selectedCapsule,
         return <label className={blocked ? "blocked" : ""} key={memory.id}><input type="checkbox" disabled={blocked || capsuleBusy}
           checked={selectedMemoryIds.includes(memory.id)} onChange={() => onToggleMemory(memory.id)} /><span><strong>{memory.title}</strong><small>{blocked ? "不能进入共鸣体" : `v${memory.versionNo}`}</small></span></label>;
       })}</div>
-      <button className="resonance-secondary" disabled={capsuleBusy} onClick={onRecompile}>用当前选择生成新版本</button>
+      <AsyncButton className="resonance-secondary" busy={capsuleBusy} busyText="正在生成新版本" onClick={onRecompile}>用当前选择生成新版本</AsyncButton>
 
       <div className="capsule-step"><span>2</span><div><strong>在只有你能看的沙盒里试聊</strong><small>反馈只成为下一版的改进信号，不会让公开人格暗中漂移。</small></div></div>
       <div className="sandbox-composer"><textarea value={sandboxQuestion} onChange={event => onSandboxQuestion(event.target.value)} aria-label="问自己的共鸣体" />
-        <button className="resonance-primary" disabled={capsuleBusy || !sandboxQuestion.trim()} onClick={onRunSandbox}>看看它会怎么说</button></div>
+        <AsyncButton className="resonance-primary" busy={capsuleBusy} disabled={!sandboxQuestion.trim()} busyText="正在生成" onClick={onRunSandbox}>看看它会怎么说</AsyncButton></div>
       {sandboxResult && <article className="sandbox-response"><span>v{sandboxResult.genomeVersionNo} 的回答 · {sandboxResult.identityNotice}</span><p>{sandboxResult.reply}</p>
         {sandboxResult.boundaryNotice && <small>{sandboxResult.boundaryNotice}</small>}
         {sandboxResult.providerAvailable ? <div className="sandbox-ratings" aria-label="这段回应像不像我">
@@ -138,9 +139,9 @@ export function CapsuleWorkbench({ capsules, selectedCapsuleId, selectedCapsule,
         boundary={boundary} boundaryBusy={boundaryBusy} onSaveBoundary={onSaveBoundary} />}
 
       <div className="capsule-step"><span>4</span><div><strong>决定它是否可以被别人遇见</strong><small>发布不会开放真实身份、联系方式或未授权记忆；撤回会立即阻止新旧会话继续代表你。</small></div></div>
-      <div className="resonance-actions">{selectedCapsule.visibilityStatus !== "PUBLIC" && <button className="resonance-primary" disabled={capsuleBusy || genomeHistory[0]?.status !== "ACTIVE"} onClick={onPublish}>确认并发布当前版本</button>}
-        {selectedCapsule.visibilityStatus === "PUBLIC" && <button disabled={capsuleBusy} onClick={onPause}>暂停公开</button>}
-        <button className="danger-quiet" disabled={capsuleBusy} onClick={onArchive}>撤回这个共鸣体</button></div>
+      <div className="resonance-actions">{selectedCapsule.visibilityStatus !== "PUBLIC" && <AsyncButton className="resonance-primary" busy={capsuleBusy} disabled={genomeHistory[0]?.status !== "ACTIVE"} busyText="正在发布" onClick={onPublish}>确认并发布当前版本</AsyncButton>}
+        {selectedCapsule.visibilityStatus === "PUBLIC" && <AsyncButton busy={capsuleBusy} busyText="正在暂停" onClick={onPause}>暂停公开</AsyncButton>}
+        <AsyncButton className="danger-quiet" busy={capsuleBusy} busyText="正在撤回" onClick={onArchive}>撤回这个共鸣体</AsyncButton></div>
     </div>}
   </section>;
 }

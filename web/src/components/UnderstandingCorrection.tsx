@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { CorrectionImpact, UnderstandingClaim, UserCorrection } from "../api";
+import { AsyncButton } from "../loading";
 
 export type CorrectionTarget = { id: number; label: string };
 
@@ -30,11 +31,11 @@ export function UnderstandingCorrection({ claims, oldValue, newValue, impact, bu
       {!target && <label>Aurora 原先怎样理解（可选）<textarea value={oldValue} onChange={event => onOldValue(event.target.value)} placeholder="例如：你更喜欢独处" /></label>}
       <label style={target ? { gridColumn: "1 / -1" } : undefined}>更准确的你是<textarea value={newValue} onChange={event => onNewValue(event.target.value)} placeholder="例如：我不是喜欢独处，只是需要先恢复精力" /></label>
     </div>
-    {!impact ? <button className="understanding-action" disabled={busy || !newValue.trim()} onClick={onPreview}>预览会改变什么</button> :
+    {!impact ? <AsyncButton className="understanding-action" busy={busy} disabled={!newValue.trim()} busyText="正在分析" onClick={onPreview}>预览会改变什么</AsyncButton> :
       <div className="impact-preview" role="region" aria-label="纠正影响预览">
         <strong>确认后会发生</strong>
         <ul>{impact.impacts.map((item, index) => <li key={`${item.kind}-${item.targetId ?? index}`}><span>{item.label}</span><small>{item.action}</small></li>)}</ul>
-        <div className="impact-actions"><button disabled={busy} onClick={onCancelPreview}>返回修改</button><button disabled={busy} onClick={onConfirm}>确认，这是更准确的我</button></div>
+        <div className="impact-actions"><button type="button" disabled={busy} onClick={onCancelPreview}>返回修改</button><AsyncButton busy={busy} busyText="正在保存" onClick={onConfirm}>确认，这是更准确的我</AsyncButton></div>
       </div>}
     {activeClaims.slice(0, 3).map(claim => <article className="claim-card" key={claim.id}>
       <span>由你确认 · v{claim.version}</span><p>{claim.valueJson.replace(/^"|"$/g, "")}</p>

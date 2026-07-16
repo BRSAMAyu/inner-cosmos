@@ -1,4 +1,5 @@
 import type { DiscoverablePerson } from "../api";
+import { AsyncButton } from "../loading";
 
 // Non-actionable relation states get a plain label; only NONE offers a request button. PENDING_IN
 // is intentionally read-only here — the actual accept/decline lives in the connection-consent
@@ -19,7 +20,7 @@ export function PeopleDiscovery({ people, busy, onRequest }: {
       {people.map(person => <article className="person-card" role="listitem" key={person.id}>
         <div><strong>{person.nickname}</strong><small>@{person.username}</small></div>
         {person.relationStatus === "NONE"
-          ? <button type="button" className="resonance-secondary" disabled={busy} onClick={() => onRequest(person.id)}>想认识 ta</button>
+          ? <AsyncButton className="resonance-secondary" busy={busy} busyText="正在邀请" onClick={() => onRequest(person.id)}>想认识 ta</AsyncButton>
           : <span className="person-status">{statusLabel[person.relationStatus] ?? person.relationStatus}</span>}
       </article>)}
     </div>}

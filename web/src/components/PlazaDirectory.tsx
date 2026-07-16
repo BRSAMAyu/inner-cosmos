@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import type { PublicCapsule } from "../api";
+import { AsyncButton } from "../loading";
 
 type SortMode = "ENERGY" | "FRESH" | "RECENT";
 const sortOptions: Array<[SortMode, string]> = [["ENERGY", "回声能量"], ["FRESH", "新鲜度"], ["RECENT", "最近活跃"]];
@@ -72,8 +73,8 @@ export function PlazaDirectory({ capsules, activeCapsuleId, busy, onOpenCapsule 
               <span className="plaza-energy" title="回声能量">✦ {Math.round(capsule.echoEnergy)}</span></div>
             <p>{capsule.intro}</p>
             {tags.length > 0 && <div className="plaza-card-tags">{tags.map(t => <span key={t}>{t}</span>)}</div>}
-            <button type="button" className="resonance-secondary" disabled={busy}
-              onClick={() => onOpenCapsule(capsule)}>开始对话</button>
+            <AsyncButton className="resonance-secondary" busy={busy} busyText="正在打开"
+              onClick={() => onOpenCapsule(capsule)}>开始对话</AsyncButton>
           </article>;
         })}
       </div>}
