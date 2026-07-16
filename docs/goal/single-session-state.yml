@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-16T11:10:00+08:00
+updated_at: 2026-07-16T12:15:12+08:00
 authority:
   - goal-objective.md
   - 对齐文档/17-单会话持续Goal模式执行协议.md
@@ -704,7 +704,7 @@ closed_front_g3_letters_outbox_tab:
       machine-buildable without the real-Provider gate), or an UNASSESSED G2 contract item
       (ARCH-MODULES / API-CONTRACT / EVENT-RELIABLE / RUNTIME-ROLES). Reassess at next checkpoint."
 
-active_front:
+closed_front_g3_people_discovery:
   id: G3-PEOPLE-DISCOVERY
   state: DONE_VERIFIED_LIVE_END_TO_END
   intent: |
@@ -734,6 +734,43 @@ active_front:
       the G3-UX-SHELL-REAL-PARITY audit are now closed or substantially closed. STRONGLY consider
       pivoting the next window to a non-UX front (Campaign C Genome IR next slice, or a G2 contract
       item ARCH-MODULES/API-CONTRACT/EVENT-RELIABLE) — remaining UX ports are lower-stakes or heavy."
+
+active_front:
+  id: REPOSITORY-PUBLICATION-HANDOFF
+  state: READY_FOR_REMOTE_PUSH_SANITIZED_HISTORY
+  intent: |
+    User-requested bounded side front: publish the accumulated complete-product commits to GitHub,
+    replace the obsolete root/deployment documentation with a professional English README plus a
+    Chinese entry, add a teammate/Coding-Agent deployment handoff, and remove historical hardcoded
+    API credentials before any new development branch is uploaded. Return immediately to the
+    complete-product priority queue after remote verification.
+  done_this_front_summary:
+    - "Created the English README, README.zh-CN.md, current DEPLOY index, and alignment doc 18 with
+      exact dev/local-complete/Academy profile contracts, secret boundaries, failure recovery,
+      evidence handoff, and a copyable Coding Agent bootstrap. AGENTS/alignment index route to it."
+    - "Hardened scripts/scan-secrets.ps1: AWS temporary-key recognition, assignment rules that do
+      not cross lines, fast redacted HEAD-history scanning (optional AllRefs), and CI full-history
+      enforcement. Expanded .gitignore for local env/AWS/kubeconfig/private-key/signing material."
+    - "Found one real Provider credential default repeated through 35 snapshots of the unpublished
+      local line. origin/main was independently scanned with zero matching reachable snapshots.
+      Rewrote ONLY feat/run006-aurora-self-understanding before first push; current tree and complete
+      HEAD ancestry now both scan 0 findings. No force-push, no shared remote rewrite, no values
+      printed. External provider revocation/rotation remains HG-SECRET-ROTATION."
+    - "Fixed a portability defect found during verification: Academy validate-manifests previously
+      contacted kube API discovery despite claiming client-only/offline behavior. It is now truly
+      offline by default and exposes -ClusterSchemaDryRun for an authenticated live session. Also
+      repaired two pre-existing plain-scalar colons that made this machine state invalid YAML for
+      strict parsers; both goal YAML files now parse successfully."
+    - "Verification: Markdown links/stale-baseline checks PASS; Vitest 60/60; production React build
+      PASS; Maven JDK21 package PASS; local-complete Compose config PASS with test-only inputs;
+      Academy manifest contract PASS (20 resources, zero forbidden/missing); offline preflight PASS
+      with cleanup PASS and no sensitive identifiers. Evidence: governance/REPO-HANDOFF-001."
+  next_machine_actions:
+    - "Push sanitized feat/run006-aurora-self-understanding to BRSAMAyu/inner-cosmos with normal
+      upstream tracking, verify the remote SHA and remote-reachable secret history, then record the
+      publication result. Do not merge/force-push the divergent main branch in this side front."
+    - "Immediately resume the highest-value main Goal front: Campaign C Genome IR categories and
+      unfamiliar-scenario stability, unless a newly verified P0/P1 outranks it."
 
 priority_queue:
   - id: CAMPAIGN-C-QUALITY
@@ -823,8 +860,8 @@ last_full_gate:
     journeys they cover; the new frontend surface is covered by Vitest + live browser verification)
   independent_reverification: BUILDER_VERIFIED_WITH_HUMAN_AND_PRODUCTION_GATES
   independently_verified:
-    - Full `mvn test` re-run again this checkpoint after adding CorrectionTargetingEvaluationTest: exit code 0, no [ERROR] markers, across the full Spring context suite. The new eval itself: 1/1, precision/recall thresholds calibrated just below the honestly-measured baseline (see active_front notes).
-    - Full `mvn test` also re-run the prior checkpoint (not skipped) after changing MockDataInitializer/DemoDataConfiguration's constructor wiring: exit code 0, no [ERROR] markers (this profile boots MockDataInitializer for nearly every @SpringBootTest).
+    - "Full `mvn test` re-run again this checkpoint after adding CorrectionTargetingEvaluationTest: exit code 0, no [ERROR] markers, across the full Spring context suite. The new eval itself: 1/1, precision/recall thresholds calibrated just below the honestly-measured baseline (see active_front notes)."
+    - "Full `mvn test` also re-run the prior checkpoint (not skipped) after changing MockDataInitializer/DemoDataConfiguration's constructor wiring: exit code 0, no [ERROR] markers (this profile boots MockDataInitializer for nearly every @SpringBootTest)."
     - Vitest passed 33/33 including isolated ProductShell, AuroraConversation, MemoryStarfield (incl. correct-this-memory case), CapsuleWorkbench, ResonanceNetwork, LettersInbox, PsychologySkillStudio/SkillSuggestionBanner and UnderstandingCorrection suites; the production React bundle compiled.
     - Packaged-Jar Playwright passed 13/13 (was 11 at session start), adding the star-to-correction journey and the correction-flips-capsule-to-needs-review journey (the latter's own test-order fragility was found and fixed before counting it as passing).
     - Living Aurora scheduler-to-feedback browser contract passed 1/1 through the new shell (unchanged this checkpoint).

@@ -2,8 +2,8 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 authority: goal-objective.md
 status: IN_PROGRESS
-last_reconciled_at: 2026-07-16T11:10:00+08:00
-last_reconciled_commit: fe0af29
+last_reconciled_at: 2026-07-16T12:15:12+08:00
+last_reconciled_commit: 319d830
 
 status_semantics:
   UNASSESSED: current HEAD and target environment have not been verified
@@ -49,7 +49,7 @@ gates:
       - id: SEC-CURRENT-TREE
         target: Current-tree secret scan has zero usable credentials and production secrets are externally injected.
         status: IN_PROGRESS
-        evidence: [evidence/m1/M1-SEC-001/, evidence/m1/M1-AUTH-WEB-001/, evidence/m1/M1-AUTH-OIDC-001/]
+        evidence: [evidence/m1/M1-SEC-001/, evidence/m1/M1-AUTH-WEB-001/, evidence/m1/M1-AUTH-OIDC-001/, evidence/governance/REPO-HANDOFF-001/]
       - id: SEC-ROTATION
         target: HG-SECRET-ROTATION is PASS with independent review.
         status: BLOCKED
