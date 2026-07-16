@@ -162,7 +162,9 @@ This project is meant to be advanced in a **single continuous session** toward t
 not one ticket at a time. On resuming:
 
 1. Read the document map above; re-derive reality from live `HEAD`, the working tree, and `evidence/`.
-2. Pick up the `active_front` / `priority_queue` in `docs/goal/single-session-state.yml`.
+2. Read the operator's standing directive [`docs/goal/loop-goal-directive.md`](docs/goal/loop-goal-directive.md)
+   (phased roadmap, experience-overhaul priority, agent-handoff protocol for the continuous /loop run),
+   then pick up the `active_front` / `priority_queue` in `docs/goal/single-session-state.yml`.
 3. Implement the next highest-value, machine-executable gap; verify; write evidence; update the
    ledger + state; commit a recoverable checkpoint; push; then immediately continue to the next gap.
 4. A checkpoint, a passing test, or a context compaction is **not** a stopping point. Stop only when
