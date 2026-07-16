@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-16T21:16:00+08:00
+updated_at: 2026-07-16T21:40:00+08:00
 
 session_2026_07_16_checkpoints:
   - "7db1a84 feat: cross-Pod live Aurora SSE fan-out/resume/heartbeat + turn.started race fix (G2). 826/826."
@@ -944,7 +944,7 @@ closed_front_g2_sse_cross_pod:
 
 active_front:
   id: EXPERIENCE-FLOW-OVERHAUL
-  state: CHECKPOINT_4_DEAD_BUTTON_SCAN_DIAGNOSTIC_DONE_ROOTCAUSE_IS_FEEDBACK_NOT_MISSING_HANDLERS
+  state: CHECKPOINT_5_CLICK_RIPPLE_MOTIF_DONE_NEXT_IS_LOADING_FOUR_STATES
   intent: |
     Operator directive docs/goal/loop-goal-directive.md §1 raised体验层重造 to the highest priority,
     ahead of the prior CAMPAIGN-B front (now closed below). §1.1 视觉系统重造 (P0): kill the cold
@@ -1014,8 +1014,18 @@ active_front:
       共鸣/连接 printed as diagnostic (pure DOM traversal has inherent false positives without clean seed +
       context). Verified green: playwright 1 passed (1.1m); npm run build OK (tsc compiles spec); npm test 89/89.
       Evidence evidence/experience/EXPERIENCE-DEADBUTTON-scan/. Pushed to fork (PR path)."
+  done_checkpoint_5:
+    - "§1.1 click-ripple motif: web/src/ripple.ts (interactiveAncestor pure fn, prefersReducedMotion,
+      spawnRipple viewport-positioned + auto-remove, startRipples capture pointerdown skipping
+      reduced-motion); main.tsx starts it; styles.css .ripple (fixed, --accent-aurora, ripple-expand
+      620ms --ease-flow scale1->9). Directly answers checkpoint-4 root cause (missing click feedback)."
+    - "Verified: build OK; npm test 95/95 (+6 ripple tests). Browser throwaway :8098: pointerdown on real
+      登录 button -> .ripple at exact (500,503), ripple-expand 0.62s, rgb(199,154,104)=--accent-aurora,
+      auto-cleaned after 750ms. Evidence evidence/experience/EXPERIENCE-VISUAL-P0-ripple/. Pushed to fork."
   next_machine_actions:
-    - "NEXT (still §1.1, before §1.2): progressively var()-tokenize each space's remaining literal warm
+    - "NEXT (§1.1): LOADING FOUR-STATES (<1s hidden / 1-3s text / >3s text+micro-anim, never spinner) +
+      per-async-button busy text — covers the async-wait feedback gap (ripple covers click-instant)."
+    - "THEN (still §1.1, before §1.2): progressively var()-tokenize each space's remaining literal warm
       hexes, THEN add light/morandi tokens + seven time-of-day theming (data-time attr + JS lerp on local
       time, prefers-reduced-motion degrade, user lock), and capture day+night screenshots per doc-11 §1.1.6."
     - "THEN local font packaging (LXGW WenKai/Noto Serif SC/Cormorant/JetBrains Mono, CSP-safe offline,
