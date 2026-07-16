@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-16T10:48:00+08:00
+updated_at: 2026-07-16T10:56:00+08:00
 authority:
   - goal-objective.md
   - 对齐文档/17-单会话持续Goal模式执行协议.md
@@ -594,7 +594,7 @@ closed_front_g3_starfield_importance_archive:
       capabilities have verified AppShell parity, per the G3-UX-SHELL-REAL-PARITY rule."
     - "Or pick a fresher higher-value machine-actionable acceptance front if one surfaces."
 
-active_front:
+closed_front_g3_capsule_boundary_editor:
   id: G3-CAPSULE-BOUNDARY-EDITOR
   state: DONE_VERIFIED_LIVE_END_TO_END
   intent: |
@@ -636,6 +636,43 @@ active_front:
       presence, the largest remaining port)."
     - "Or pick a fresher higher-value machine-actionable acceptance front (Campaign C Genome IR next
       slice; an UNASSESSED G2 contract item) if one outranks the remaining UX ports."
+
+active_front:
+  id: G3-PLAZA-DIRECTORY-AND-OPEN-CHAT
+  state: DONE_VERIFIED_LIVE_END_TO_END
+  intent: |
+    Executed ranked port items #4 + #5 together (echo-plaza.html): the AppShell only had a curated
+    resonance match list — no directory to browse ALL public capsules, and no way to chat with one
+    outside the curated set. Backend GET /api/plaza/capsules (public-safe VO) + the persona-chat
+    endpoints already existed — pure frontend port.
+  done_this_front_summary:
+    - "New PlazaDirectory.tsx: browse every public capsule with free-text search (name/intro),
+      tag-chip filter (parsed from the publicTags JSON array), and sort by echo-energy/freshness/
+      recent-activity. '开始对话' on any card opens the existing visitor workbench. api.ts:
+      plazaCapsules(). AuroraApp: loads the public list in bootstrap (appended at END), a
+      directoryPick state, and a generalized visitorMatch derivation that wraps a directory-picked
+      PublicCapsule in a synthetic CapsuleMatch (strategy SERENDIPITY, '主动发现', resonant:false)
+      so persona chat + slow letter work unchanged for a capsule that is NOT in the curated matches.
+      openDirectoryCapsule reuses chooseVisitorMatch's reset."
+    - "Tests: 4 new PlazaDirectory Vitest cases (lists+opens; free-text filter; tag filter; empty
+      state). 55/55 Vitest green (was 51), tsc clean, bundle rebuilt. No backend change -> no Java
+      re-gate (risk-based)."
+    - "Live end-to-end (packaged jar, throwaway H2, TWO real users): user A created + published a
+      capsule (genome ACTIVE, visibility PUBLIC); user B (fresh, zero curated matches) saw it in the
+      directory with its tags + filter chips, and '开始对话' opened the visitor workbench for that
+      capsule, started a persona session, and a turn produced a correctly-framed bounded-echo reply
+      — proving chat with a capsule OUTSIDE the curated match set. 0 console errors."
+  next_machine_actions:
+    - "NEXT — remaining ranked UX-SHELL ports: letters outbox/drafts/archive/thread view (#10, needs
+      a quick letters-backend audit); aurora-chat voice input + session-closure rituals (#6, voice
+      needs Web Audio/MediaRecorder — heavier); capsule-create's remaining non-boundary fields (#9
+      tail: owner-note/style-profile/stand-in/contact-policy/turn-limit at creation); relations/
+      social (#3, the largest — backend /api/social/people|friends|requests|groups exists but ZERO
+      API-client presence, needs its own multi-checkpoint effort)."
+    - "Or pick a fresher higher-value machine-actionable acceptance front (Campaign C Genome IR next
+      slice; an UNASSESSED G2 contract item like ARCH-MODULES/API-CONTRACT/EVENT-RELIABLE) if one
+      outranks the remaining UX ports — several UX ports are now closed, so a non-UX front may be
+      the higher-value next move."
 
 priority_queue:
   - id: CAMPAIGN-C-QUALITY
@@ -716,10 +753,11 @@ last_full_gate:
     500 fix). NOTE: earlier gates claimed 795/795 when Docker WAS available; the 4-test delta is
     exactly those Docker-gated integration tests, now un-runnable here — not lost tests.
   claimed_vitest: |
-    51/51 (was 42 at session resume; +4 UnderstandingCorrection history/retire, +3 MemoryStarfield
-    importance/archive, +2 CapsuleWorkbench boundary-editor). The starfield and boundary fronts
-    changed no Java, so no Java gate was re-run for them (risk-based); the 791/791-runnable Java gate
-    above still holds at its baseline (last Java change was the correction-versioning 500 fix).
+    55/55 (was 42 at session resume; +4 UnderstandingCorrection history/retire, +3 MemoryStarfield
+    importance/archive, +2 CapsuleWorkbench boundary-editor, +4 PlazaDirectory). The starfield,
+    boundary, and plaza fronts changed no Java, so no Java gate was re-run for them (risk-based); the
+    791/791-runnable Java gate above still holds at its baseline (last Java change was the
+    correction-versioning 500 fix).
   claimed_playwright: 13/13 plus Living Aurora 1/1 (not re-run this checkpoint — no change to the
     journeys they cover; the new frontend surface is covered by Vitest + live browser verification)
   independent_reverification: BUILDER_VERIFIED_WITH_HUMAN_AND_PRODUCTION_GATES
