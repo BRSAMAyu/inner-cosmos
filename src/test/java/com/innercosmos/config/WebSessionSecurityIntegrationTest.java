@@ -53,13 +53,16 @@ class WebSessionSecurityIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.token").isNotEmpty())
                 .andExpect(jsonPath("$.data.headerName").value("X-CSRF-TOKEN"));
+        mockMvc.perform(get("/api/v1/auth/csrf"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.token").isNotEmpty());
 
         RegisterRequest register = registerRequest();
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(register)))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.error").value("CSRF_INVALID"));
+                .andExpect(jsonPath("$.code").value("CSRF_INVALID"));
 
         mockMvc.perform(post("/api/auth/register")
                         .with(csrf())
@@ -142,7 +145,7 @@ class WebSessionSecurityIntegrationTest {
         mockMvc.perform(get("/api/user/profile").header("X-User-Id", "1"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
     }
 
     @Test
@@ -157,7 +160,7 @@ class WebSessionSecurityIntegrationTest {
 
         mockMvc.perform(post("/api/auth/logout").session(session))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.error").value("CSRF_INVALID"));
+                .andExpect(jsonPath("$.code").value("CSRF_INVALID"));
 
         mockMvc.perform(post("/api/auth/logout").session(session).with(csrf()))
                 .andExpect(status().isOk());

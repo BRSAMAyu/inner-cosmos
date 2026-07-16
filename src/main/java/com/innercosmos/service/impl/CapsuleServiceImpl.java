@@ -571,7 +571,7 @@ public class CapsuleServiceImpl implements CapsuleService {
     }
 
     @Override
-    public void updateBoundary(Long userId, Long capsuleId, CapsuleBoundary boundary) {
+    public CapsuleBoundary updateBoundary(Long userId, Long capsuleId, CapsuleBoundary boundary, Integer expectedVersion) {
         EchoCapsule capsule = getOwnedCapsule(userId, capsuleId);
         if (capsule == null) {
             throw new com.innercosmos.exception.BusinessException(
@@ -582,12 +582,31 @@ public class CapsuleServiceImpl implements CapsuleService {
             throw new com.innercosmos.exception.BusinessException(
                     com.innercosmos.common.ErrorCode.NOT_FOUND, "边界配置不存在");
         }
+        int currentVersion = existing.version == null ? 1 : existing.version;
+        int expected = expectedVersion == null ? currentVersion : expectedVersion;
+        if (expected != currentVersion) {
+            throw new com.innercosmos.exception.BusinessException(
+                    com.innercosmos.common.ErrorCode.CONFLICT, "capsule boundary version is stale");
+        }
         if (boundary.allowTopics != null) existing.allowTopics = boundary.allowTopics;
         if (boundary.blockedTopics != null) existing.blockedTopics = boundary.blockedTopics;
         if (boundary.maxConversationTurns != null) existing.maxConversationTurns = boundary.maxConversationTurns;
         if (boundary.allowLetterRequest != null) existing.allowLetterRequest = boundary.allowLetterRequest;
         if (boundary.privacyLevel != null) existing.privacyLevel = boundary.privacyLevel;
-        boundaryMapper.updateById(existing);
+        int updated = boundaryMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<CapsuleBoundary>()
+                .eq("id", existing.id).eq("version", currentVersion)
+                .set("allow_topics", existing.allowTopics)
+                .set("blocked_topics", existing.blockedTopics)
+                .set("max_conversation_turns", existing.maxConversationTurns)
+                .set("allow_letter_request", existing.allowLetterRequest)
+                .set("privacy_level", existing.privacyLevel)
+                .set("version", currentVersion + 1)
+                .set("updated_at", java.time.LocalDateTime.now()));
+        if (updated != 1) {
+            throw new com.innercosmos.exception.BusinessException(
+                    com.innercosmos.common.ErrorCode.CONFLICT, "capsule boundary changed concurrently");
+        }
+        return getBoundary(userId, capsuleId);
     }
 
     @Override

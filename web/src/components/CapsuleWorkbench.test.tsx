@@ -8,7 +8,7 @@ afterEach(cleanup);
 const memory: MemoryCard = { id: 1, title: "一次和解", summary: null, status: "ACTIVE", versionNo: 1, consentScope: "SHARED", memoryLayer: "EPISODIC", confidence: .8 };
 const capsule: EchoCapsule = { id: 9, pseudonym: "雨后的人", intro: "先沉默再表达", authorizedMemoryIds: "[1]", visibilityStatus: "PRIVATE", isPublic: false, activeGenomeVersionId: 3, publicTags: "[]" };
 const genomeVersion: CapsuleGenomeVersion = { id: 3, versionNo: 1, parentVersionId: null, compilerVersion: "v1", status: "ACTIVE", evaluationJson: "{}", changeReason: "初始编译", createdAt: "2026-07-15T00:00:00Z" };
-const boundary: CapsuleBoundary = { capsuleId: 9, allowTopics: "自我观察, 日常支持", blockedTopics: "真实姓名, 诊断承诺", maxConversationTurns: 30, allowLetterRequest: true, privacyLevel: "STRICT" };
+const boundary: CapsuleBoundary = { capsuleId: 9, allowTopics: "自我观察, 日常支持", blockedTopics: "真实姓名, 诊断承诺", maxConversationTurns: 30, allowLetterRequest: true, privacyLevel: "STRICT", version: 1 };
 
 describe("CapsuleWorkbench", () => {
   it("lets the owner start a new capsule from the create form", () => {

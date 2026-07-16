@@ -51,7 +51,7 @@ class PsychologySkillReleaseControllerTest {
                         .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(run)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.manifestHash").isString());
         mockMvc.perform(get("/api/admin/psychology/skills/releases").session(river))
-                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
+                .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
         mockMvc.perform(get("/api/admin/psychology/skills/releases").session(admin))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(3))

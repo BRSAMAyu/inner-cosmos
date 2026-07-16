@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-16T13:08:00+08:00
+updated_at: 2026-07-16T13:41:00+08:00
 authority:
   - goal-objective.md
   - 对齐文档/17-单会话持续Goal模式执行协议.md
@@ -833,20 +833,45 @@ closed_front_campaign_c_data_use_grants:
     exports, analytics, mobile push and admin processing have not yet migrated to the generalized
     authority. Legal retention and subprocessor wording remain human gates.
 
-active_front:
-  id: G2-API-CONTRACT-AUDIT
-  state: START_FROM_DATA_USE_GRANT_CHECKPOINT
+closed_front_g2_api_contract_baseline:
+  id: G2-API-CONTRACT-BASELINE
+  state: BUILDER_VERIFIED_CHECKPOINT_READY
   intent: |
-    Audit the currently UNASSESSED API-CONTRACT gate and turn the real external contract into an
-    executable versioned OpenAPI/typed-error/idempotency/concurrency/resumable-SSE baseline without
-    claiming completeness from controller count or generated prose.
+    Turn the UNASSESSED API-CONTRACT gate into an executable high-value external baseline spanning
+    auth, Aurora private streaming/recovery, capsule creation/boundaries, slow letters and persona chat.
+  done_this_front_summary:
+    - "Shipped OpenAPI 3.1 v1.0.0 plus real /api/v1 controller aliases and drift tests. Legacy routes
+      remain compatible; the React/PWA now consumes the v1 auth, Aurora stream/replay, capsule create/
+      boundary, persona write and slow-letter draft slice."
+    - "Unified MVC, Security, rate-limit and idempotency failures into ApiErrorResponse with semantic
+      401/403/404/409 statuses, safe traceId/timestamp/details and no stack/private content."
+    - "Added request-fingerprint idempotency: v1 core writes require a key; identical success replays,
+      in-flight requests are excluded and different-payload key reuse fails closed. Redis Lua is the
+      production cross-Pod authority; production startup rejects the in-process store."
+    - "Capsule boundary ETag/If-Match uses a PostgreSQL/H2 version CAS; stale writers cannot overwrite.
+      Aurora private text moves to an owner-bound, one-use, bounded staging token before v1 SSE, and
+      Last-Event-ID durable turn replay remains the recovery source."
+    - "Verification: Redis 7.4.2 two-store atomic integration PASS; PostgreSQL 16/pgvector V1-V17 exact
+      reconciliation/application smoke PASS; Java 21 full gate 135 suites/819 tests PASS; React 15
+      files/60 tests and production build PASS. Evidence evidence/g2/API-CONTRACT-001."
+  honest_boundary: |
+    This is an eight-path external core contract, not all 48 controllers/237 mappings. Generated client
+    and breaking-diff enforcement, remaining public-domain schemas, uniform cursors/concurrency, and
+    cross-Pod live Redis Stream SSE heartbeat/load behavior remain open. API-CONTRACT is IN_PROGRESS.
+
+active_front:
+  id: G2-API-GENERATED-CLIENT-AND-DIFF
+  state: START_FROM_API_CONTRACT_BASELINE
+  intent: |
+    Make OpenAPI the source of client truth rather than a parallel YAML artifact by generating a
+    checked-in TypeScript contract, adopting it in the PWA core slice, and failing CI on generation
+    drift or unreviewed breaking changes.
   next_machine_actions:
-    - "Inventory controller routes, ApiResponse/error codes, SSE endpoints, idempotent writes and
-      optimistic-concurrency surfaces; compare them to the G2 target and deployment profiles."
-    - "Select the smallest vertical contract slice with failing tests, prioritizing externally used
-      auth, Aurora turn streaming and capsule/letter writes over internal/admin-only endpoints."
-    - "Generate or author a versioned OpenAPI artifact from executable contracts, add drift gates,
-      then close typed errors/idempotency/concurrency/resume gaps in risk order."
+    - "Add a pinned, reproducible OpenAPI-to-TypeScript generation command and first red drift test."
+    - "Replace duplicate handwritten request/response shapes for the v1 core slice with generated
+      types while preserving auth, CSRF, idempotency, ETag and SSE runtime behavior."
+    - "Add a baseline-aware breaking-change check or explicit reviewed-baseline workflow; then choose
+      the next highest API gap between cursor pagination and cross-Pod live SSE fan-out."
 
 priority_queue:
   - id: CAMPAIGN-C-QUALITY
@@ -910,13 +935,13 @@ known_human_gates:
   - REAL-ANDROID-IOS-APNS-FCM-AND-SIGNING
 
 last_full_gate:
-  baseline_commit: a8e9af0 (versioned DataUseGrant checkpoint)
-  executed_at: 2026-07-16T12:59:10+08:00
-  java: "PASS — Java 21 full mvn test, 131 suites, 810 tests, 0 failures/errors/skips, 140.4s"
-  focused_evaluation: "PASS — 4 grant scenarios; long-lived H2 idempotency; PostgreSQL V1-V16 exact contract"
-  frontend: "Not rerun: no frontend files changed; prior verified Vitest 60/60 and production build remain the relevant baseline."
-  browser_mobile: "Not rerun: no browser/mobile surface changed in this backend/compiler checkpoint."
-  evidence: evidence/innovation/INNO-CAP-009/
-  review: BUILDER_VERIFIED_WITH_CROSS_DOMAIN_CONSENT_AND_LEGAL_GATES_REMAINING
+  baseline_commit: PENDING_API_CONTRACT_BASELINE_CHECKPOINT
+  executed_at: 2026-07-16T13:39:28+08:00
+  java: "PASS — Java 21 full mvn test, 135 suites, 819 tests, 0 failures/errors/skips, 146.7s"
+  focused_evaluation: "PASS — OpenAPI drift/error/idempotency/CAS; Redis 7.4.2 two-Pod semantics; PostgreSQL V1-V17 exact contract"
+  frontend: "PASS — React/Vitest 15 files, 60 tests; TypeScript and production Vite build; built artifact uses token-only v1 Aurora stream."
+  browser_mobile: "Not rerun in a browser/device: contract behavior is builder-verified through client unit/build and server integration; live weak-network/device evidence remains open."
+  evidence: evidence/g2/API-CONTRACT-001/
+  review: BUILDER_VERIFIED_WITH_GENERATED_CLIENT_AND_LIVE_CROSS_POD_SSE_GAPS_REMAINING
 
 handoff_rule: Do not return a final answer at commits or campaign checkpoints; continue with the next machine-actionable gap.

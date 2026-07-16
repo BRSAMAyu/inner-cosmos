@@ -19,15 +19,16 @@ import com.innercosmos.vo.CapsuleFidelitySummaryVO;
 import com.innercosmos.vo.CapsulePreviewVO;
 import com.innercosmos.vo.CapsuleSandboxVO;
 import jakarta.servlet.http.HttpSession;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/api/capsule")
+@RequestMapping({"/api/capsule", "/api/v1/capsule"})
 public class CapsuleController extends BaseController {
     private final CapsuleService capsuleService;
     private final DataMaskingService dataMaskingService;
@@ -81,10 +82,7 @@ public class CapsuleController extends BaseController {
     public ApiResponse<CapsulePreviewVO> previewFromMemory(@RequestBody Map<String, Object> body, HttpSession session) {
         Long userId = currentUserId(session);
         Object rawMemoryIds = body.get("memoryIds");
-        if (rawMemoryIds == null) {
-            return ApiResponse.fail("BAD_REQUEST", "memoryIds不能为空");
-        }
-        List<Long> memoryIds = ((List<Number>) rawMemoryIds).stream().map(Number::longValue).collect(Collectors.toList());
+        List<Long> memoryIds = parseMemoryIds(rawMemoryIds);
         String privacyLevel = (String) body.getOrDefault("privacyLevel", "STRICT");
         List<String> allowTopics = (List<String>) body.getOrDefault("allowTopics", List.of());
         List<String> blockedTopics = (List<String>) body.getOrDefault("blockedTopics", List.of());
@@ -109,15 +107,27 @@ public class CapsuleController extends BaseController {
     }
 
     @GetMapping("/{id}/boundary")
-    public ApiResponse<CapsuleBoundary> getBoundary(@PathVariable Long id, HttpSession session) {
-        return ApiResponse.ok(capsuleService.getBoundary(currentUserId(session), id)); // M-023
+    public ResponseEntity<ApiResponse<CapsuleBoundary>> getBoundary(@PathVariable Long id, HttpSession session) {
+        CapsuleBoundary boundary = capsuleService.getBoundary(currentUserId(session), id); // M-023
+        int version = boundary == null || boundary.version == null ? 1 : boundary.version;
+        return ResponseEntity.ok().eTag(String.valueOf(version)).body(ApiResponse.ok(boundary));
     }
 
     @PostMapping("/{id}/boundary")
-    public ApiResponse<Void> updateBoundary(@PathVariable Long id, @RequestBody CapsuleBoundary boundary, HttpSession session) {
+    public ResponseEntity<ApiResponse<CapsuleBoundary>> updateBoundary(
+            @PathVariable Long id, @RequestBody CapsuleBoundary boundary,
+            @RequestHeader(value = "If-Match", required = false) String ifMatch,
+            HttpSession session, HttpServletRequest request) {
         Long userId = currentUserId(session);
-        capsuleService.updateBoundary(userId, id, boundary);
-        return ApiResponse.ok(null);
+        if (request.getRequestURI().startsWith(request.getContextPath() + "/api/v1/")
+                && (ifMatch == null || ifMatch.isBlank())) {
+            throw new com.innercosmos.exception.BusinessException(
+                    com.innercosmos.common.ErrorCode.BAD_REQUEST, "If-Match is required for v1 boundary updates");
+        }
+        Integer expectedVersion = parseVersion(ifMatch);
+        CapsuleBoundary updated = capsuleService.updateBoundary(userId, id, boundary, expectedVersion);
+        int version = updated.version == null ? 1 : updated.version;
+        return ResponseEntity.ok().eTag(String.valueOf(version)).body(ApiResponse.ok(updated));
     }
 
     @PostMapping("/{id}/archive")
@@ -151,10 +161,7 @@ public class CapsuleController extends BaseController {
                                                               @RequestBody Map<String, Object> body,
                                                               HttpSession session) {
         Object raw = body.get("memoryIds");
-        if (!(raw instanceof List<?> values)) return ApiResponse.fail("BAD_REQUEST", "memoryIds不能为空");
-        List<Long> ids = values.stream().filter(Number.class::isInstance)
-                .map(Number.class::cast).map(Number::longValue).toList();
-        if (ids.size() != values.size()) return ApiResponse.fail("BAD_REQUEST", "memoryIds必须全部为数字");
+        List<Long> ids = parseMemoryIds(raw);
         return ApiResponse.ok(capsuleService.recompileGenome(currentUserId(session), id, ids));
     }
 
@@ -183,5 +190,34 @@ public class CapsuleController extends BaseController {
     public ApiResponse<List<CapsuleFidelitySummaryVO>> sandboxFidelity(
             @PathVariable Long id, HttpSession session) {
         return ApiResponse.ok(sandboxService.fidelitySummary(currentUserId(session), id));
+    }
+
+    private Integer parseVersion(String ifMatch) {
+        if (ifMatch == null || ifMatch.isBlank()) return null;
+        String value = ifMatch.trim();
+        if (value.startsWith("W/")) value = value.substring(2);
+        if (value.startsWith("\"") && value.endsWith("\"") && value.length() >= 2) {
+            value = value.substring(1, value.length() - 1);
+        }
+        try { return Integer.valueOf(value); }
+        catch (NumberFormatException invalid) {
+            throw new com.innercosmos.exception.BusinessException(
+                    com.innercosmos.common.ErrorCode.BAD_REQUEST,
+                    "If-Match must contain the numeric boundary version");
+        }
+    }
+
+    private List<Long> parseMemoryIds(Object raw) {
+        if (!(raw instanceof List<?> values) || values.isEmpty()) {
+            throw new com.innercosmos.exception.BusinessException(
+                    com.innercosmos.common.ErrorCode.BAD_REQUEST, "memoryIds不能为空");
+        }
+        List<Long> ids = values.stream().filter(Number.class::isInstance)
+                .map(Number.class::cast).map(Number::longValue).toList();
+        if (ids.size() != values.size()) {
+            throw new com.innercosmos.exception.BusinessException(
+                    com.innercosmos.common.ErrorCode.BAD_REQUEST, "memoryIds必须全部为数字");
+        }
+        return ids;
     }
 }

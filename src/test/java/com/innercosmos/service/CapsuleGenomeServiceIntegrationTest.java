@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.innercosmos.dto.CapsuleCreateRequest;
 import com.innercosmos.dto.CapsuleSandboxFeedbackRequest;
 import com.innercosmos.entity.CapsuleGenomeVersion;
+import com.innercosmos.entity.CapsuleBoundary;
 import com.innercosmos.entity.EchoCapsule;
 import com.innercosmos.exception.BusinessException;
 import com.innercosmos.vo.CapsuleSandboxVO;
@@ -33,6 +34,30 @@ class CapsuleGenomeServiceIntegrationTest {
     @Autowired PersonaChatService personaChatService;
     @Autowired CapsuleSandboxService sandboxService;
     @Autowired ObjectMapper objectMapper;
+
+    @Test
+    @Transactional
+    void boundaryCompareAndSetRejectsStaleWriter() {
+        Long owner = seedUser("boundary-cas");
+        Long memory = seedMemory(owner, "允许用于边界并发测试的摘要", "AURORA_PRIVATE");
+        CapsuleCreateRequest request = new CapsuleCreateRequest();
+        request.memoryIds = List.of(memory);
+        request.visibilityStatus = "PRIVATE";
+        request.isPublic = false;
+        EchoCapsule capsule = capsuleService.createFromMemory(owner, request);
+        CapsuleBoundary initial = capsuleService.getBoundary(owner, capsule.id);
+        assertEquals(1, initial.version);
+
+        CapsuleBoundary change = new CapsuleBoundary();
+        change.maxConversationTurns = 8;
+        CapsuleBoundary updated = capsuleService.updateBoundary(owner, capsule.id, change, initial.version);
+
+        assertEquals(2, updated.version);
+        assertEquals(8, updated.maxConversationTurns);
+        BusinessException stale = assertThrows(BusinessException.class,
+                () -> capsuleService.updateBoundary(owner, capsule.id, change, initial.version));
+        assertEquals("CONFLICT", stale.code);
+    }
 
     @Test
     @Transactional

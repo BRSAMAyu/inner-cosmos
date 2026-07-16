@@ -131,8 +131,8 @@ class MemoryLifecycleControllerTest {
         mockMvc.perform(post("/api/memory/operations/preview").session(session)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"operationType\":\"ARCHIVE\",\"primaryMemoryId\":" + foreign.id + "}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value("NOT_FOUND"));
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
         assertEquals("ACTIVE", memoryMapper.selectById(foreign.id).status);
     }
 

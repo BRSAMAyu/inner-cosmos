@@ -55,7 +55,7 @@ class WakeIntentControllerTest {
         mockMvc.perform(get("/api/aurora/wake-intents").session(other))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data").isEmpty());
         mockMvc.perform(post("/api/aurora/wake-intents/{id}/cancel", id).session(other))
-            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.error").value("NOT_FOUND"));
+            .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("NOT_FOUND"));
 
         LocalDateTime moved = preferred.plusDays(1);
         mockMvc.perform(put("/api/aurora/wake-intents/{id}/schedule", id).session(owner)

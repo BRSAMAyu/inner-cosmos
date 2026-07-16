@@ -1,0 +1,303 @@
+openapi: 3.1.0
+info:
+  title: Inner Cosmos Core API
+  version: 1.0.0
+  summary: Executable baseline for authentication, Aurora, capsules, slow letters, and resumable turns.
+  description: |
+    This is the first stable external contract slice. Legacy `/api/*` routes remain available
+    during migration; generated clients must target `/api/v1/*`. Every v1 core POST except the
+    one-time stream staging handshake requires `Idempotency-Key`.
+servers:
+  - url: /
+security:
+  - sessionCookie: []
+  - bearerOidc: []
+tags:
+  - {name: Auth}
+  - {name: Aurora}
+  - {name: Capsule}
+  - {name: Letter}
+  - {name: Persona}
+paths:
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LoginRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/Success'}
+        '400': {$ref: '#/components/responses/Error'}
+        '429': {$ref: '#/components/responses/Error'}
+  /api/v1/aurora/message:
+    post:
+      tags: [Aurora]
+      operationId: sendAuroraMessage
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: {type: string, minLength: 8, maxLength: 128}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ChatRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/Success'}
+        '400': {$ref: '#/components/responses/Error'}
+        '409': {$ref: '#/components/responses/Error'}
+  /api/v1/aurora/stream-stage:
+    post:
+      tags: [Aurora]
+      operationId: stageAuroraStream
+      description: Stages the complete private message body and returns a one-use, owner-bound token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ChatRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/Success'}
+        '400': {$ref: '#/components/responses/Error'}
+  /api/v1/aurora/stream:
+    get:
+      tags: [Aurora]
+      operationId: streamAuroraTurn
+      description: The private message never appears in the URL; v1 requires a valid staged token.
+      parameters:
+        - in: query
+          name: token
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: Live named SSE events. Durable recovery uses the turn events endpoint.
+          content:
+            text/event-stream:
+              schema: {type: string}
+        '400': {$ref: '#/components/responses/Error'}
+  /api/v1/aurora/turns/{turnId}/events:
+    get:
+      tags: [Aurora]
+      operationId: resumeAuroraTurn
+      parameters:
+        - in: path
+          name: turnId
+          required: true
+          schema: {type: integer, format: int64}
+        - in: header
+          name: Last-Event-ID
+          required: false
+          description: Last consumed `turnId:sequence` cursor.
+          schema: {type: string}
+        - in: query
+          name: afterSequence
+          required: false
+          schema: {type: integer, minimum: 0, default: 0}
+      responses:
+        '200':
+          description: Owner-scoped durable replay ending in `replay.completed`.
+          headers:
+            Cache-Control:
+              schema: {type: string}
+          content:
+            text/event-stream:
+              schema: {type: string}
+        '404': {$ref: '#/components/responses/Error'}
+  /api/v1/capsule/create-from-memory:
+    post:
+      tags: [Capsule]
+      operationId: createCapsuleFromMemory
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: {type: string, minLength: 8, maxLength: 128}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CapsuleCreateRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/Success'}
+        '400': {$ref: '#/components/responses/Error'}
+        '409': {$ref: '#/components/responses/Error'}
+  /api/v1/capsule/{id}/boundary:
+    get:
+      tags: [Capsule]
+      operationId: getCapsuleBoundary
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: integer, format: int64}
+      responses:
+        '200':
+          description: Boundary with an ETag equal to its numeric version.
+          headers:
+            ETag:
+              required: true
+              schema: {type: string}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SuccessEnvelope'}
+        '404': {$ref: '#/components/responses/Error'}
+    post:
+      tags: [Capsule]
+      operationId: updateCapsuleBoundary
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: integer, format: int64}
+        - in: header
+          name: If-Match
+          required: true
+          description: Numeric version from the latest boundary ETag.
+          schema: {type: string, pattern: '^(W/)?"?[0-9]+"?$'}
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: {type: string, minLength: 8, maxLength: 128}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CapsuleBoundaryPatch'}
+      responses:
+        '200': {$ref: '#/components/responses/Success'}
+        '400': {$ref: '#/components/responses/Error'}
+        '409': {$ref: '#/components/responses/Error'}
+  /api/v1/letters/draft:
+    post:
+      tags: [Letter]
+      operationId: draftSlowLetter
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: {type: string, minLength: 8, maxLength: 128}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SlowLetterDraftRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/Success'}
+        '400': {$ref: '#/components/responses/Error'}
+        '409': {$ref: '#/components/responses/Error'}
+  /api/v1/persona-chat/message:
+    post:
+      tags: [Persona]
+      operationId: sendPersonaMessage
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: {type: string, minLength: 8, maxLength: 128}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PersonaMessageRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/Success'}
+        '400': {$ref: '#/components/responses/Error'}
+        '409': {$ref: '#/components/responses/Error'}
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: JSESSIONID
+    bearerOidc:
+      type: openIdConnect
+      openIdConnectUrl: /.well-known/openid-configuration
+  responses:
+    Success:
+      description: Successful API envelope.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/SuccessEnvelope'}
+    Error:
+      description: Typed error envelope. `traceId` is safe to quote to support.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ApiError'}
+  schemas:
+    SuccessEnvelope:
+      type: object
+      required: [success, code, message, data]
+      properties:
+        success: {type: boolean, const: true}
+        code: {type: string, const: OK}
+        message: {type: string}
+        data: {}
+    ApiError:
+      type: object
+      required: [success, code, message, status, traceId, timestamp, details]
+      properties:
+        success: {type: boolean, const: false}
+        code: {type: string}
+        message: {type: string}
+        status: {type: integer, minimum: 400, maximum: 599}
+        traceId: {type: string, minLength: 16}
+        timestamp: {type: string, format: date-time}
+        details: {type: object, additionalProperties: true}
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: {type: string}
+        password: {type: string, format: password, writeOnly: true}
+        timezone: {type: string}
+    ChatRequest:
+      type: object
+      required: [sessionId, message]
+      properties:
+        sessionId: {type: integer, format: int64}
+        message: {type: string, minLength: 1}
+        mode: {type: string}
+        clientMessageId: {type: string}
+        timezone: {type: string}
+        weatherType: {type: string}
+        locationLabel: {type: string}
+    CapsuleCreateRequest:
+      type: object
+      required: [memoryIds]
+      properties:
+        pseudonym: {type: string}
+        intro: {type: string}
+        memoryIds:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: {type: integer, format: int64}
+        visibilityStatus: {type: string, enum: [PRIVATE, PUBLIC]}
+        isPublic: {type: boolean}
+    CapsuleBoundaryPatch:
+      type: object
+      properties:
+        allowTopics: {type: string}
+        blockedTopics: {type: string}
+        maxConversationTurns: {type: integer, minimum: 1, maximum: 100}
+        allowLetterRequest: {type: boolean}
+        privacyLevel: {type: string}
+    SlowLetterDraftRequest:
+      type: object
+      required: [receiverCapsuleId, title, letterBody]
+      properties:
+        receiverCapsuleId: {type: integer, format: int64}
+        title: {type: string}
+        letterBody: {type: string}
+    PersonaMessageRequest:
+      type: object
+      required: [sessionId, message]
+      properties:
+        sessionId: {type: integer, format: int64}
+        message: {type: string, minLength: 1}

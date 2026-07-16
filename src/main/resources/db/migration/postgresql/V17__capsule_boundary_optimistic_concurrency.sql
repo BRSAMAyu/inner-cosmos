@@ -1,0 +1,2 @@
+ALTER TABLE tb_capsule_boundary
+    ADD COLUMN IF NOT EXISTS version INT NOT NULL DEFAULT 1;

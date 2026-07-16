@@ -19,10 +19,10 @@ public interface AuroraAgentService {
     SseEmitter stream(Long userId, Long sessionId, String message, String mode, ChatRequest richContext);
 
     /** VS-003b — stage rich SSE context for a soon-to-open GET /stream. */
-    String stageStreamContext(ChatRequest request);
+    String stageStreamContext(Long userId, ChatRequest request);
 
     /** VS-003b — consume (once) the staged rich context for a stream token. */
-    ChatRequest consumeStage(String token);
+    ChatRequest consumeStage(Long userId, String token);
 
     AuroraReplyVO generateGreeting(Long userId, Long sessionId, String mode);
 }

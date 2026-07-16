@@ -21,6 +21,7 @@ import com.innercosmos.vo.AuroraMoodVO;
 import com.innercosmos.vo.AuroraReplyVO;
 import com.innercosmos.vo.DailyRecordVO;
 import jakarta.servlet.http.HttpSession;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -36,7 +37,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/aurora")
+@RequestMapping({"/api/aurora", "/api/v1/aurora"})
 public class AuroraChatController extends BaseController {
     private final AuroraAgentService auroraAgentService;
     private final MemoryService memoryService;
@@ -100,21 +101,36 @@ public class AuroraChatController extends BaseController {
      * The token is consumed once and expires shortly.
      */
     @PostMapping("/stream-stage")
-    public ApiResponse<java.util.Map<String, String>> stageStream(@RequestBody ChatRequest request, HttpSession session) {
-        currentUserId(session); // ensure logged in
-        String token = auroraAgentService.stageStreamContext(request);
+    public ApiResponse<java.util.Map<String, String>> stageStream(@Valid @RequestBody ChatRequest request, HttpSession session) {
+        Long userId = currentUserId(session);
+        assertOwnsSession(userId, request.sessionId);
+        String token = auroraAgentService.stageStreamContext(userId, request);
         return ApiResponse.ok(java.util.Map.of("token", token == null ? "" : token));
     }
 
     @GetMapping("/stream")
-    public SseEmitter stream(@RequestParam Long sessionId,
-                             @RequestParam String message,
+    public SseEmitter stream(@RequestParam(required = false) Long sessionId,
+                             @RequestParam(required = false) String message,
                              @RequestParam(required = false) String mode,
                              @RequestParam(required = false) String token,
-                             HttpSession session) {
+                             HttpSession session,
+                             HttpServletRequest request) {
         Long userId = currentUserId(session);
+        ChatRequest staged = auroraAgentService.consumeStage(userId, token);
+        if (request.getRequestURI().startsWith(request.getContextPath() + "/api/v1/")) {
+            if (staged == null) {
+                throw new com.innercosmos.exception.BusinessException(
+                        com.innercosmos.common.ErrorCode.BAD_REQUEST, "valid stream-stage token is required");
+            }
+            sessionId = staged.sessionId;
+            message = staged.message;
+            mode = staged.mode;
+        }
+        if (sessionId == null || message == null || message.isBlank()) {
+            throw new com.innercosmos.exception.BusinessException(
+                    com.innercosmos.common.ErrorCode.BAD_REQUEST, "sessionId and message are required");
+        }
         assertOwnsSession(userId, sessionId); // M-001
-        ChatRequest staged = auroraAgentService.consumeStage(token);
         return auroraAgentService.stream(userId, sessionId, message, mode, staged);
     }
 

@@ -437,6 +437,7 @@ CREATE TABLE IF NOT EXISTS tb_capsule_boundary (
   max_conversation_turns INT DEFAULT 5,
   allow_letter_request BOOLEAN DEFAULT TRUE,
   privacy_level VARCHAR(32),
+  version INT NOT NULL DEFAULT 1,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_boundary_capsule FOREIGN KEY (capsule_id) REFERENCES tb_echo_capsule(id) ON DELETE CASCADE

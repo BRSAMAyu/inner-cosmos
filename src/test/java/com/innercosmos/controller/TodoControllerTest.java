@@ -145,7 +145,7 @@ class TodoControllerTest {
         mockMvc.perform(delete("/api/todos/abc").session(session))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.error").value("BAD_REQUEST"));
+                .andExpect(jsonPath("$.code").value("BAD_REQUEST"));
     }
 
     // ---------------- Delete ----------------

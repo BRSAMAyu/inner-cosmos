@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/letters")
+@RequestMapping({"/api/letters", "/api/v1/letters"})
 public class LetterController extends BaseController {
     private final SlowLetterService slowLetterService;
 

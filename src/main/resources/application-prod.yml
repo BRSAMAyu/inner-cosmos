@@ -81,6 +81,12 @@ llm:
   allow-fallback: false
 
 inner-cosmos:
+  idempotency:
+    ttl: ${IDEMPOTENCY_TTL:PT24H}
+    max-response-bytes: ${IDEMPOTENCY_MAX_RESPONSE_BYTES:1048576}
+    redis:
+      enabled: ${REDIS_IDEMPOTENCY_ENABLED:true}
+      namespace: ${REDIS_IDEMPOTENCY_NAMESPACE:inner-cosmos:idempotency:v1}
   session:
     redis:
       enabled: ${REDIS_SESSION_ENABLED:true}

@@ -70,8 +70,8 @@ class PsychologySkillControllerTest {
         assertThat(stored.evidenceRefs).contains("Lieberman");
 
         mockMvc.perform(post("/api/psychology/skills/runs/{id}/revoke", runId).session(river))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value("NOT_FOUND"));
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
         mockMvc.perform(post("/api/psychology/skills/runs/{id}/revoke", runId).session(demo))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("REVOKED"))

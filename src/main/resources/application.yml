@@ -139,6 +139,12 @@ llm:
     timeout-ms: ${DEEPSEEK_TIMEOUT_MS:30000}
 
 inner-cosmos:
+  idempotency:
+    ttl: ${IDEMPOTENCY_TTL:PT24H}
+    max-response-bytes: ${IDEMPOTENCY_MAX_RESPONSE_BYTES:1048576}
+    redis:
+      enabled: ${REDIS_IDEMPOTENCY_ENABLED:false}
+      namespace: ${REDIS_IDEMPOTENCY_NAMESPACE:inner-cosmos:idempotency:v1}
   runtime:
     role: ${INNER_COSMOS_RUNTIME_ROLE:all}
   events:

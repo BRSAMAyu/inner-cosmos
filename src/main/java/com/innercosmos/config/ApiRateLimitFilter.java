@@ -1,6 +1,7 @@
 package com.innercosmos.config;
 
 import com.innercosmos.common.Constants;
+import com.innercosmos.common.ApiErrorResponse;
 import com.innercosmos.entity.User;
 import com.innercosmos.ratelimit.RateLimitDecision;
 import com.innercosmos.ratelimit.RateLimitKey;
@@ -8,6 +9,7 @@ import com.innercosmos.ratelimit.RateLimitPolicy;
 import com.innercosmos.ratelimit.RateLimitProperties;
 import com.innercosmos.ratelimit.RateLimitStore;
 import com.innercosmos.ratelimit.RateLimitStoreUnavailableException;
+import com.innercosmos.util.JsonUtils;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -57,7 +59,7 @@ public final class ApiRateLimitFilter extends OncePerRequestFilter {
                 }
             }
 
-            if (path.startsWith("/api/auth/")) {
+            if (path.startsWith("/api/auth/") || path.startsWith("/api/v1/auth/")) {
                 chain.doFilter(request, response);
                 return;
             }
@@ -89,8 +91,8 @@ public final class ApiRateLimitFilter extends OncePerRequestFilter {
             chain.doFilter(request, response);
         } catch (RateLimitStoreUnavailableException unavailable) {
             response.setHeader("Retry-After", "5");
-            writeJson(response, 503,
-                    "{\"error\":\"rate_limit_unavailable\",\"message\":\"请求保护服务暂时不可用，请稍后重试。\",\"retry_after\":5}");
+            writeJson(response, ApiErrorResponse.of("RATE_LIMIT_UNAVAILABLE",
+                    "请求保护服务暂时不可用，请稍后重试。", 503, java.util.Map.of("retryAfter", 5)));
         }
     }
 
@@ -121,7 +123,8 @@ public final class ApiRateLimitFilter extends OncePerRequestFilter {
     }
 
     private boolean isLoginAttempt(HttpServletRequest request, String path) {
-        return "POST".equalsIgnoreCase(request.getMethod()) && "/api/auth/login".equals(path);
+        return "POST".equalsIgnoreCase(request.getMethod())
+                && ("/api/auth/login".equals(path) || "/api/v1/auth/login".equals(path));
     }
 
     private String requestPath(HttpServletRequest request) {
@@ -135,10 +138,11 @@ public final class ApiRateLimitFilter extends OncePerRequestFilter {
     }
 
     private boolean isAuroraLlm(String path) {
-        return path.startsWith("/api/aurora/chat")
-                || path.startsWith("/api/aurora/stream")
-                || path.startsWith("/api/aurora/greeting")
-                || path.startsWith("/api/aurora/message");
+        String normalized = path.replaceFirst("^/api/v1/", "/api/");
+        return normalized.startsWith("/api/aurora/chat")
+                || normalized.startsWith("/api/aurora/stream")
+                || normalized.startsWith("/api/aurora/greeting")
+                || normalized.startsWith("/api/aurora/message");
     }
 
     private String clientIp(HttpServletRequest request) {
@@ -154,14 +158,14 @@ public final class ApiRateLimitFilter extends OncePerRequestFilter {
 
     private void writeExceeded(HttpServletResponse response, String message) throws IOException {
         response.setHeader("Retry-After", "60");
-        writeJson(response, 429, "{\"error\":\"rate_limit_exceeded\",\"message\":\""
-                + message + "\",\"retry_after\":60}");
+        writeJson(response, ApiErrorResponse.of("RATE_LIMIT_EXCEEDED", message, 429,
+                java.util.Map.of("retryAfter", 60)));
     }
 
-    private void writeJson(HttpServletResponse response, int status, String body) throws IOException {
-        response.setStatus(status);
+    private void writeJson(HttpServletResponse response, ApiErrorResponse error) throws IOException {
+        response.setStatus(error.status());
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.setContentType("application/json");
-        response.getWriter().write(body);
+        response.getWriter().write(JsonUtils.toJson(error));
     }
 }

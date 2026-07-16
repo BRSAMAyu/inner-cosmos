@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/persona-chat")
+@RequestMapping({"/api/persona-chat", "/api/v1/persona-chat"})
 public class PersonaChatController extends BaseController {
     private final PersonaChatService personaChatService;
 

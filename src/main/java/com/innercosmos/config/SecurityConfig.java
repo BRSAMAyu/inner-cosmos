@@ -1,5 +1,7 @@
 package com.innercosmos.config;
 
+import com.innercosmos.common.ApiErrorResponse;
+import com.innercosmos.util.JsonUtils;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.beans.factory.ObjectProvider;
@@ -84,7 +86,8 @@ public class SecurityConfig {
                     new RequestAttributeSecurityContextRepository()))
             .authorizeHttpRequests(auth -> auth
                 // Public endpoints
-                .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/csrf").permitAll()
+                .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/csrf",
+                        "/api/v1/auth/login", "/api/v1/auth/register", "/api/v1/auth/csrf").permitAll()
                 .requestMatchers("/api/public/**").permitAll()
                 .requestMatchers("/api/plaza/capsules").permitAll()
                 .requestMatchers("/api/safety/resources").permitAll()
@@ -130,7 +133,6 @@ public class SecurityConfig {
         response.setStatus(status);
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.getWriter().write("{\"success\":false,\"error\":\"" + code
-                + "\",\"message\":\"" + message + "\",\"status\":" + status + "}");
+        response.getWriter().write(JsonUtils.toJson(ApiErrorResponse.of(code, message, status)));
     }
 }

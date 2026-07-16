@@ -41,7 +41,7 @@ public interface CapsuleService {
 
     CapsuleBoundary getBoundary(Long userId, Long capsuleId);
 
-    void updateBoundary(Long userId, Long capsuleId, CapsuleBoundary boundary);
+    CapsuleBoundary updateBoundary(Long userId, Long capsuleId, CapsuleBoundary boundary, Integer expectedVersion);
 
     void archiveCapsule(Long userId, Long capsuleId);
 

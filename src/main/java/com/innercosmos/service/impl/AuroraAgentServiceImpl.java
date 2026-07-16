@@ -105,8 +105,9 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
      * /stream-stage, then opens the GET stream with the returned token. The token
      * is consumed once and expires within {@link #STREAM_STAGE_TTL_MS}.
      */
-    private final Map<String, ChatRequest> streamStage = new ConcurrentHashMap<>();
+    private final Map<String, StagedStream> streamStage = new ConcurrentHashMap<>();
     private static final long STREAM_STAGE_TTL_MS = 60_000L;
+    private static final int STREAM_STAGE_MAX_ENTRIES = 1024;
 
     public AuroraAgentServiceImpl(StructuredAiService structuredAiService,
                                   DialogService dialogService,
@@ -587,27 +588,41 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
      * VS-003b — stage rich SSE context for a soon-to-open stream. The browser's
      * EventSource can only GET, so the frontend POSTs the rich body here, gets a
      * token, then opens GET /stream?token=…. Returns the token. Best-effort: a
-     * self-expiring entry, consumed once by {@link #consumeStage(String)}.
+     * self-expiring entry, consumed once by {@link #consumeStage(Long, String)}.
      */
     @Override
-    public String stageStreamContext(ChatRequest request) {
-        if (request == null) return null;
+    public String stageStreamContext(Long userId, ChatRequest request) {
+        if (userId == null || request == null) return null;
+        purgeExpiredStages();
+        if (streamStage.size() >= STREAM_STAGE_MAX_ENTRIES) {
+            throw new com.innercosmos.exception.BusinessException(
+                    com.innercosmos.common.ErrorCode.CONFLICT, "too many pending stream stages");
+        }
         String token = java.util.UUID.randomUUID().toString().replace("-", "");
-        streamStage.put(token, request);
-        // TTL sweep — fire-and-forget; the map is bounded by active streams.
-        aiExecutor.execute(() -> {
-            try { Thread.sleep(STREAM_STAGE_TTL_MS); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); return; }
-            streamStage.remove(token);
-        });
+        streamStage.put(token, new StagedStream(userId, request,
+                System.currentTimeMillis() + STREAM_STAGE_TTL_MS));
         return token;
     }
 
     /** VS-003b — consume (once) the staged rich context for a stream token. */
     @Override
-    public ChatRequest consumeStage(String token) {
-        if (token == null || token.isBlank()) return null;
-        return streamStage.remove(token);
+    public ChatRequest consumeStage(Long userId, String token) {
+        if (userId == null || token == null || token.isBlank()) return null;
+        StagedStream staged = streamStage.get(token);
+        if (staged == null || staged.expiresAt <= System.currentTimeMillis()) {
+            if (staged != null) streamStage.remove(token, staged);
+            return null;
+        }
+        if (!userId.equals(staged.userId)) return null;
+        return streamStage.remove(token, staged) ? staged.request : null;
     }
+
+    private void purgeExpiredStages() {
+        long now = System.currentTimeMillis();
+        streamStage.entrySet().removeIf(entry -> entry.getValue().expiresAt <= now);
+    }
+
+    private record StagedStream(Long userId, ChatRequest request, long expiresAt) {}
 
     /**
      * Persist the user turn + the single crisis safe-message as a DialogMessage so the

@@ -32,7 +32,9 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .allowedOrigins(origins.toArray(new String[0]))
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")
                 .allowedHeaders("Content-Type", "Accept", "Authorization", "X-CSRF-TOKEN", "X-XSRF-TOKEN",
-                        "Idempotency-Key", "Last-Event-ID", "X-Requested-With")
+                        "Idempotency-Key", "If-Match", "Last-Event-ID", "X-Requested-With")
+                .exposedHeaders("ETag", "Idempotency-Replayed", "Retry-After", "X-RateLimit-Limit",
+                        "X-RateLimit-Remaining")
                 .allowCredentials(true)
                 .maxAge(3600); // 1 hour preflight cache
     }

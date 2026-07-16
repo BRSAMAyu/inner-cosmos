@@ -85,7 +85,7 @@ class ApiRateLimitFilterTest {
         filter.doFilter(post("/api/todo"), response, chain);
 
         assertThat(response.getStatus()).isEqualTo(503);
-        assertThat(response.getContentAsString()).contains("rate_limit_unavailable");
+        assertThat(response.getContentAsString()).contains("RATE_LIMIT_UNAVAILABLE");
         assertThat(chain.getRequest()).isNull();
     }
 

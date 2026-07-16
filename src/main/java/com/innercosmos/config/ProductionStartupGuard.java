@@ -68,8 +68,10 @@ public final class ProductionStartupGuard implements ApplicationRunner {
         requireTrue("inner-cosmos.auth.oidc.enabled", "OIDC resource-server authentication");
         requireTrue("inner-cosmos.session.redis.enabled", "Redis-backed HTTP sessions");
         requireTrue("inner-cosmos.security.rate-limit.redis.enabled", "Redis-backed distributed rate limiting");
+        requireTrue("inner-cosmos.idempotency.redis.enabled", "Redis-backed idempotency");
         required("spring.session.redis.namespace", "Redis session namespace");
         required("inner-cosmos.security.rate-limit.redis.namespace", "Redis rate-limit namespace");
+        required("inner-cosmos.idempotency.redis.namespace", "Redis idempotency namespace");
         requireHttps("inner-cosmos.auth.oidc.issuer-uri", "OIDC issuer URI");
         requireHttps("inner-cosmos.auth.oidc.jwk-set-uri", "OIDC JWK set URI");
         required("inner-cosmos.auth.oidc.audience", "OIDC API audience");

@@ -10,4 +10,6 @@ public class CapsuleBoundary extends BaseEntity {
     public Integer maxConversationTurns;
     public Boolean allowLetterRequest;
     public String privacyLevel;
+    /** Monotonic compare-and-set token exposed as the HTTP ETag. */
+    public Integer version;
 }

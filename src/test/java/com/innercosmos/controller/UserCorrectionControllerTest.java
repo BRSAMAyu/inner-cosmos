@@ -120,7 +120,7 @@ class UserCorrectionControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"newValue\":\"   \"}"))
                 .andExpect(status().is4xxClientError())
-                .andExpect(jsonPath("$.error").value("BAD_REQUEST"));
+                .andExpect(jsonPath("$.code").value("BAD_REQUEST"));
 
         mockMvc.perform(get("/api/aurora/corrections").session(session))
                 .andExpect(status().isOk())

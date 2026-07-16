@@ -102,6 +102,7 @@ export type CapsuleGenomeVersion = {
 export type CapsuleBoundary = {
   capsuleId: number; allowTopics: string | null; blockedTopics: string | null;
   maxConversationTurns: number | null; allowLetterRequest: boolean | null; privacyLevel: string | null;
+  version: number;
 };
 export type CapsulePreview = {
   abstractSummary: string; removedSensitiveItems: string[]; publicTags: string[];
@@ -167,6 +168,21 @@ type AccessTokenProvider = () => Promise<string | null>;
 let accessTokenProvider: AccessTokenProvider | null = null;
 let accessTokenInvalidator: (() => Promise<void>) | null = null;
 let bearerRequired = false;
+const capsuleBoundaryEtags = new Map<number, string>();
+
+function newIdempotencyKey(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  const random = typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function"
+    ? crypto.getRandomValues(new Uint32Array(4)).join("-") : `${Date.now()}-${Math.random()}`;
+  return `web-${random}`.replace(/[^A-Za-z0-9._:-]/g, "-").slice(0, 128);
+}
+
+function needsIdempotency(method: string, url: string): boolean {
+  if (method !== "POST") return false;
+  const core = ["/api/v1/aurora/", "/api/v1/capsule/", "/api/v1/letters/", "/api/v1/persona-chat/"]
+    .some(prefix => url.startsWith(prefix));
+  return core && !url.endsWith("/stream-stage") && !url.endsWith("/rhythm-check");
+}
 
 export function configureBearerAuth(provider: AccessTokenProvider | null, required = false,
                                     invalidator: (() => Promise<void>) | null = null): void {
@@ -292,19 +308,32 @@ async function request<T>(url: string, init: RequestInit = {}, retriedCsrf = fal
   if (bearerRequired && !accessToken) throw new Error("Mobile OIDC authentication is required");
   if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
   if (!headers.has("Content-Type") && init.body) headers.set("Content-Type", "application/json");
+  if (needsIdempotency(method, url) && !headers.has("Idempotency-Key")) {
+    headers.set("Idempotency-Key", newIdempotencyKey());
+  }
+  const boundaryMatch = url.match(/^\/api\/v1\/capsule\/(\d+)\/boundary$/);
+  if (method === "POST" && boundaryMatch && !headers.has("If-Match")) {
+    const etag = capsuleBoundaryEtags.get(Number(boundaryMatch[1]));
+    if (!etag) throw new Error("Reload the capsule boundary before saving changes");
+    headers.set("If-Match", etag);
+  }
   if (!accessToken && !["GET", "HEAD", "OPTIONS"].includes(method)) {
     csrf ??= await getCsrf();
     headers.set(csrf.headerName, csrf.token);
   }
   const response = await fetch(apiUrl(url), { ...init, headers, credentials: accessToken ? "omit" : "include" });
+  if (boundaryMatch && response.ok) {
+    const etag = response.headers.get("ETag");
+    if (etag) capsuleBoundaryEtags.set(Number(boundaryMatch[1]), etag);
+  }
   const body = await response.json() as ApiEnvelope<T>;
   if (response.status === 401 && accessToken && accessTokenInvalidator && !retriedBearer) {
     await accessTokenInvalidator();
-    return request<T>(url, init, retriedCsrf, true);
+    return request<T>(url, { ...init, headers }, retriedCsrf, true);
   }
   if (response.status === 403 && (body.code === "CSRF_INVALID" || body.error === "CSRF_INVALID") && !retriedCsrf) {
     csrf = null;
-    return request<T>(url, init, true);
+    return request<T>(url, { ...init, headers }, true);
   }
   if (!response.ok || !body.success) throw new Error(body.message ?? `HTTP ${response.status}`);
   return body.data;
@@ -312,7 +341,7 @@ async function request<T>(url: string, init: RequestInit = {}, retriedCsrf = fal
 
 async function getCsrf(): Promise<Csrf> {
   if (bearerRequired) throw new Error("CSRF session authentication is disabled for native clients");
-  const response = await fetch(apiUrl("/api/auth/csrf"), { credentials: "include" });
+  const response = await fetch(apiUrl("/api/v1/auth/csrf"), { credentials: "include" });
   const body = await response.json() as ApiEnvelope<Csrf>;
   if (!body.success) throw new Error(body.message ?? "无法建立安全会话");
   return body.data;
@@ -320,7 +349,7 @@ async function getCsrf(): Promise<Csrf> {
 
 export const api = {
   login: async (username: string, password: string) => {
-    const result = await request<unknown>("/api/auth/login", {
+    const result = await request<unknown>("/api/v1/auth/login", {
       method: "POST", body: JSON.stringify({ username, password,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Singapore" })
     });
@@ -330,7 +359,7 @@ export const api = {
     return result;
   },
   logout: async () => {
-    const result = await request<boolean>("/api/auth/logout", { method: "POST" });
+    const result = await request<boolean>("/api/v1/auth/logout", { method: "POST" });
     csrf = null;
     return result;
   },
@@ -347,8 +376,8 @@ export const api = {
     method: "POST", body: JSON.stringify({ title: "Aurora 对话", sessionType: "AURORA_CHAT" })
   }),
   messages: (sessionId: number) => request<DialogMessage[]>(`/api/dialog/session/${sessionId}/messages`),
-  timeline: (turnId: number) => request<TurnTimeline>(`/api/aurora/turns/${turnId}/timeline`),
-  stop: (turnId: number) => request<TurnTimeline>(`/api/aurora/turns/${turnId}/stop`, { method: "POST" }),
+  timeline: (turnId: number) => request<TurnTimeline>(`/api/v1/aurora/turns/${turnId}/timeline`),
+  stop: (turnId: number) => request<TurnTimeline>(`/api/v1/aurora/turns/${turnId}/stop`, { method: "POST" }),
   wakeIntents: () => request<WakeIntent[]>("/api/aurora/wake-intents"),
   wakeIntent: (id: number) => request<WakeIntent>(`/api/aurora/wake-intents/${id}`),
   negotiateWakeIntent: (input: { when: string; purpose: string; reasonForUser: string; content: string;
@@ -413,7 +442,7 @@ export const api = {
     method: "POST", body: JSON.stringify({ memoryIds, privacyLevel: "STRICT", allowTopics: [], blockedTopics: [] })
   }),
   createCapsule: (input: { pseudonym: string; intro: string; memoryIds: number[]; publicTags: string[] }) =>
-    request<EchoCapsule>("/api/capsule/create-from-memory", { method: "POST", body: JSON.stringify({
+    request<EchoCapsule>("/api/v1/capsule/create-from-memory", { method: "POST", body: JSON.stringify({
       ...input, visibilityStatus: "PRIVATE", isPublic: false, privacyLevel: "STRICT",
       allowTopics: ["自我观察", "日常支持"], blockedTopics: ["真实身份", "联系方式", "心理诊断"]
     }) }),
@@ -423,9 +452,9 @@ export const api = {
   setCapsuleVisibility: (id: number, visibilityStatus: "PRIVATE" | "PUBLIC", isPublic: boolean) =>
     request<EchoCapsule>(`/api/capsule/${id}/visibility`, { method: "POST", body: JSON.stringify({ visibilityStatus, isPublic }) }),
   archiveCapsule: (id: number) => request<unknown>(`/api/capsule/${id}/archive`, { method: "POST" }),
-  capsuleBoundary: (id: number) => request<CapsuleBoundary | null>(`/api/capsule/${id}/boundary`),
+  capsuleBoundary: (id: number) => request<CapsuleBoundary | null>(`/api/v1/capsule/${id}/boundary`),
   updateCapsuleBoundary: (id: number, boundary: Partial<CapsuleBoundary>) =>
-    request<void>(`/api/capsule/${id}/boundary`, { method: "POST", body: JSON.stringify(boundary) }),
+    request<CapsuleBoundary>(`/api/v1/capsule/${id}/boundary`, { method: "POST", body: JSON.stringify(boundary) }),
   sandboxCapsule: (id: number, question: string) => request<CapsuleSandbox>(`/api/capsule/${id}/sandbox/respond`, {
     method: "POST", body: JSON.stringify({ question })
   }),
@@ -434,15 +463,15 @@ export const api = {
   resonanceMatches: (strategy: ResonanceStrategy = "MIRROR") =>
     request<CapsuleMatch[]>(`/api/plaza/matches?strategy=${encodeURIComponent(strategy)}`),
   plazaCapsules: () => request<PublicCapsule[]>("/api/plaza/capsules"),
-  createPersonaSession: (capsuleId: number) => request<PersonaSession>("/api/persona-chat/session/create", {
+  createPersonaSession: (capsuleId: number) => request<PersonaSession>("/api/v1/persona-chat/session/create", {
     method: "POST", body: JSON.stringify({ capsuleId })
   }),
   personaMessages: (sessionId: number) => request<PersonaMessage[]>(`/api/persona-chat/session/${sessionId}/messages`),
-  sendPersonaMessage: (sessionId: number, message: string) => request<PersonaMessage>("/api/persona-chat/message", {
+  sendPersonaMessage: (sessionId: number, message: string) => request<PersonaMessage>("/api/v1/persona-chat/message", {
     method: "POST", body: JSON.stringify({ sessionId, message })
   }),
   capsuleQuota: (capsuleId: number) => request<CapsuleQuota>(`/api/persona-chat/quota?capsuleId=${capsuleId}`),
-  draftSlowLetter: (receiverCapsuleId: number, title: string, letterBody: string) => request<SlowLetter>("/api/letters/draft", {
+  draftSlowLetter: (receiverCapsuleId: number, title: string, letterBody: string) => request<SlowLetter>("/api/v1/letters/draft", {
     method: "POST", body: JSON.stringify({ receiverCapsuleId, title, letterBody })
   }),
   sendSlowLetter: (id: number) => request<SlowLetter>(`/api/letters/${id}/send`, { method: "POST" }),
@@ -472,18 +501,19 @@ export async function streamAurora(
   signal: AbortSignal,
   onEvent: (event: AuroraStreamEvent) => void
 ): Promise<void> {
-  const query = new URLSearchParams({
-    sessionId: String(input.sessionId), message: input.message, mode: input.mode
+  const staged = await request<{ token: string }>("/api/v1/aurora/stream-stage", {
+    method: "POST", body: JSON.stringify(input)
   });
+  const query = new URLSearchParams({ token: staged.token });
   let token = await accessTokenProvider?.() ?? null;
   if (bearerRequired && !token) throw new Error("Mobile OIDC authentication is required");
-  let response = await fetch(apiUrl(`/api/aurora/stream?${query}`), {
+  let response = await fetch(apiUrl(`/api/v1/aurora/stream?${query}`), {
     credentials: token ? "omit" : "include", headers: { Accept: "text/event-stream", ...(token ? { Authorization: `Bearer ${token}` } : {}) }, signal
   });
   if (response.status === 401 && token && accessTokenInvalidator) {
     await accessTokenInvalidator();
     token = await accessTokenProvider?.() ?? null;
-    if (token) response = await fetch(apiUrl(`/api/aurora/stream?${query}`), {
+    if (token) response = await fetch(apiUrl(`/api/v1/aurora/stream?${query}`), {
       credentials: "omit", headers: { Accept: "text/event-stream", Authorization: `Bearer ${token}` }, signal
     });
   }
@@ -508,14 +538,14 @@ export async function replayTurnEvents(
 ): Promise<string> {
   let token = await accessTokenProvider?.() ?? null;
   if (bearerRequired && !token) throw new Error("Mobile OIDC authentication is required");
-  let response = await fetch(apiUrl(`/api/aurora/turns/${turnId}/events`), {
+  let response = await fetch(apiUrl(`/api/v1/aurora/turns/${turnId}/events`), {
     credentials: token ? "omit" : "include",
     headers: { Accept: "text/event-stream", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(lastEventId ? { "Last-Event-ID": lastEventId } : {}) }
   });
   if (response.status === 401 && token && accessTokenInvalidator) {
     await accessTokenInvalidator();
     token = await accessTokenProvider?.() ?? null;
-    if (token) response = await fetch(apiUrl(`/api/aurora/turns/${turnId}/events`), {
+    if (token) response = await fetch(apiUrl(`/api/v1/aurora/turns/${turnId}/events`), {
       credentials: "omit",
       headers: { Accept: "text/event-stream", Authorization: `Bearer ${token}`, ...(lastEventId ? { "Last-Event-ID": lastEventId } : {}) }
     });

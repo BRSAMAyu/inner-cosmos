@@ -19,7 +19,7 @@ import org.springframework.http.MediaType;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @RestController
-@RequestMapping("/api/aurora/turns")
+@RequestMapping({"/api/aurora/turns", "/api/v1/aurora/turns"})
 public class ConversationTimelineController extends BaseController {
     private final ConversationChoreographyService choreographyService;
     private final ObjectMapper objectMapper;

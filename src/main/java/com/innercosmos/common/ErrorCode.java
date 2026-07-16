@@ -8,6 +8,7 @@ public final class ErrorCode {
     public static final String LETTER_STATE_INVALID = "LETTER_STATE_INVALID";
     public static final String AI_PROVIDER_ERROR = "AI_PROVIDER_ERROR";
     public static final String FORBIDDEN = "FORBIDDEN";
+    public static final String CONFLICT = "CONFLICT";
 
     private ErrorCode() {
     }
