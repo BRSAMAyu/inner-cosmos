@@ -1,6 +1,6 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
-import { api, apiConfigurationError, configureBearerAuth, hasConfiguredApiBase, replayTurnEvents, streamAurora, subscribeProactive, type ClaimCandidate, type CapsuleBoundary, type CapsuleFidelitySummary, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type ConnectionRequests, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type Notification, type DiscoverablePerson, type PersonaMessage, type PersonaSession, type PortraitDimension, type PublicCapsule, type PortraitHistoryEntry, type RelationMention, type RelationTimelinePoint, type RelationHealth, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type PsychologySkillSuggestion, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type SocialConnection, type StarfieldDetail, type StarfieldScene, type StarfieldStar, type UnderstandingClaim, type UserCorrection, type WakeIntent } from "./api";
+import { api, apiConfigurationError, configureBearerAuth, hasConfiguredApiBase, replayTurnEvents, streamAurora, subscribeProactive, type ClaimCandidate, type CapsuleBoundary, type CapsuleFidelitySummary, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type ConnectionRequests, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type Notification, type DiscoverablePerson, type PersonaMessage, type PersonaSession, type PortraitDimension, type PublicCapsule, type PortraitHistoryEntry, type RelationMention, type RelationTimelinePoint, type RelationHealth, type LetterThread, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type PsychologySkillSuggestion, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type SocialConnection, type StarfieldDetail, type StarfieldScene, type StarfieldStar, type UnderstandingClaim, type UserCorrection, type WakeIntent } from "./api";
 import { initialMobileState, mobileRuntime, type MobileRuntimeState } from "./mobile";
 import { mobileOidc } from "./mobile-auth";
 import type { AuroraStreamEvent, DialogMessage, TurnStatus } from "./protocol";
@@ -100,6 +100,10 @@ export function AuroraApp() {
   const [sentLetter, setSentLetter] = useState<SlowLetter | null>(null);
   const [letterInbox, setLetterInbox] = useState<SlowLetter[]>([]);
   const [letterOutbox, setLetterOutbox] = useState<SlowLetter[]>([]);
+  const [letterThreads, setLetterThreads] = useState<LetterThread[]>([]);
+  const [selectedThreadId, setSelectedThreadId] = useState<number | null>(null);
+  const [threadLetters, setThreadLetters] = useState<SlowLetter[]>([]);
+  const [draftBusy, setDraftBusy] = useState(false);
   const [connectionRequests, setConnectionRequests] = useState<ConnectionRequests>({ incoming: [], outgoing: [] });
   const [friends, setFriends] = useState<SocialConnection[]>([]);
   const [people, setPeople] = useState<DiscoverablePerson[]>([]);
@@ -181,7 +185,8 @@ export function AuroraApp() {
         api.letterOutbox().then(setLetterOutbox).catch(() => undefined),
         api.discoverPeople().then(setPeople).catch(() => undefined),
         api.claimCandidates().then(setClaimCandidates).catch(() => undefined),
-        api.relations().then(setRelations).catch(() => undefined)
+        api.relations().then(setRelations).catch(() => undefined),
+        api.letterThreads().then(setLetterThreads).catch(() => undefined)
       ]);
       const loadedCapsules = loaded[8] as EchoCapsule[];
       const loadedMatches = loaded[9] as CapsuleMatch[];
@@ -1011,6 +1016,22 @@ export function AuroraApp() {
     finally { setRelationBusy(false); }
   };
 
+  const openThread = async (threadId: number) => {
+    setSelectedThreadId(threadId); setThreadLetters([]);
+    try { setThreadLetters(await api.letterThreadLetters(threadId)); }
+    catch (error) { setStatus(error instanceof Error ? error.message : "暂时读不到这段往来"); }
+  };
+
+  const sendDraft = async (id: number) => {
+    setDraftBusy(true);
+    try {
+      await api.sendSlowLetter(id);
+      await api.letterOutbox().then(setLetterOutbox).catch(() => undefined);
+      setStatus("这封信已经启程，会按慢信的节奏抵达。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法寄出这封草稿"); }
+    finally { setDraftBusy(false); }
+  };
+
   const requestConnection = async (letter: SlowLetter) => {
     try {
       await api.requestConnectionFromLetter(letter.id); await refreshConnections();
@@ -1208,7 +1229,7 @@ export function AuroraApp() {
       <PeopleDiscovery people={people} busy={peopleBusy} onRequest={userId => void requestPersonConnection(userId)} />
       <RelationsView relations={relations} selected={selectedRelation} timeline={relationTimeline} health={relationHealth} busy={relationBusy} onSelect={label => void openRelation(label)} />
 
-      <LettersInbox letterInbox={letterInbox} letterOutbox={letterOutbox} replyDrafts={replyDrafts} connectionRequests={connectionRequests} friends={friends}
+      <LettersInbox letterInbox={letterInbox} letterOutbox={letterOutbox} threads={letterThreads} threadLetters={threadLetters} selectedThreadId={selectedThreadId} draftBusy={draftBusy} onSendDraft={id => void sendDraft(id)} onOpenThread={id => void openThread(id)} replyDrafts={replyDrafts} connectionRequests={connectionRequests} friends={friends}
         onReplyDraftChange={(letterId, value) => setReplyDrafts(drafts => ({ ...drafts, [letterId]: value }))}
         onReply={letter => void replyWithLetter(letter)} onActOnLetter={(letter, action) => void actOnLetter(letter, action)}
         onReportLetter={letter => void reportLetter(letter)} onRequestConnection={letter => void requestConnection(letter)}

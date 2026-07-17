@@ -45,6 +45,43 @@ describe("LettersInbox", () => {
     expect(screen.queryByText("你写的黄昏让我停了一下")).not.toBeInTheDocument();
   });
 
+  it("lists draft letters under the drafts tab and can send one", () => {
+    const onSendDraft = vi.fn();
+    const draft: SlowLetter = { id: 20, senderUserId: 1, receiverUserId: 3, receiverCapsuleId: 8,
+      title: "还没寄出的信", letterBody: "我想慢慢改。", status: "DRAFT", parallaxDistance: 1, estimatedArrivalAt: "" };
+    render(<LettersInbox letterInbox={[]} letterOutbox={[draft]} replyDrafts={{}}
+      connectionRequests={{ incoming: [], outgoing: [] }} friends={[]} onSendDraft={onSendDraft}
+      onReplyDraftChange={() => undefined} onReply={() => undefined} onActOnLetter={() => undefined}
+      onReportLetter={() => undefined} onRequestConnection={() => undefined}
+      onDecideConnection={() => undefined} onLeaveConnection={() => undefined} />);
+    // a DRAFT does not show under the read-only outbox (sent) tab
+    fireEvent.click(screen.getByRole("tab", { name: /寄出的/ }));
+    expect(screen.queryByText("还没寄出的信")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: /草稿/ }));
+    expect(screen.getByText("还没寄出的信")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "让这封信启程" }));
+    expect(onSendDraft).toHaveBeenCalledExactlyOnceWith(20);
+  });
+
+  it("opens a letter thread and shows its conversation", () => {
+    const onOpenThread = vi.fn();
+    const { rerender } = render(<LettersInbox letterInbox={[]} replyDrafts={{}} threads={[{ id: 9, firstLetterId: 1, participantA: 1, participantB: 2, capsuleId: 4, status: "ACTIVE", lastLetterAt: "2026-07-17T00:00:00Z" }]}
+      connectionRequests={{ incoming: [], outgoing: [] }} friends={[]} onOpenThread={onOpenThread}
+      onReplyDraftChange={() => undefined} onReply={() => undefined} onActOnLetter={() => undefined}
+      onReportLetter={() => undefined} onRequestConnection={() => undefined}
+      onDecideConnection={() => undefined} onLeaveConnection={() => undefined} />);
+    fireEvent.click(screen.getByRole("tab", { name: /往来/ }));
+    fireEvent.click(screen.getByRole("button", { name: /往来 #9/ }));
+    expect(onOpenThread).toHaveBeenCalledExactlyOnceWith(9);
+    rerender(<LettersInbox letterInbox={[]} replyDrafts={{}} threads={[{ id: 9, firstLetterId: 1, participantA: 1, participantB: 2, capsuleId: 4, status: "ACTIVE", lastLetterAt: "2026-07-17T00:00:00Z" }]}
+      selectedThreadId={9} threadLetters={[{ ...letter, id: 30, title: "线程里的信", letterBody: "往来内容", status: "DELIVERED" }]}
+      connectionRequests={{ incoming: [], outgoing: [] }} friends={[]} onOpenThread={onOpenThread}
+      onReplyDraftChange={() => undefined} onReply={() => undefined} onActOnLetter={() => undefined}
+      onReportLetter={() => undefined} onRequestConnection={() => undefined}
+      onDecideConnection={() => undefined} onLeaveConnection={() => undefined} />);
+    expect(screen.getByText("线程里的信")).toBeVisible();
+  });
+
   it("lets the user accept an incoming connection request", () => {
     const onDecideConnection = vi.fn();
     render(<LettersInbox letterInbox={[]} replyDrafts={{}}

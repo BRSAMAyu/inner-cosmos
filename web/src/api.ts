@@ -159,6 +159,7 @@ export type DiscoverablePerson = { id: number; username: string; nickname: strin
 export type RelationMention = { id: number; relationLabel: string; relationType: string | null; emotionTags: string | null; triggerSummary: string | null; boundaryHint: string | null };
 export type RelationTimelinePoint = { timestamp: string; emotions: string | null; summary: string | null };
 export type RelationHealth = { relationLabel: string; healthScore: number };
+export type LetterThread = { id: number; firstLetterId: number; participantA: number; participantB: number; capsuleId: number | null; status: string; lastLetterAt: string | null };
 export type PsychologySkillManifest = {
   id: string; version: string; owner: string; title: Record<string, string>; description: Record<string, string>;
   estimatedMinutes: number; riskTier: "L1" | "L2" | "L3"; agentInvocation: string; userInvocation: string;
@@ -497,6 +498,8 @@ export const api = {
     return request<SlowLetter>("/api/v1/letters/draft", { method: "POST", body: JSON.stringify(body) });
   },
   sendSlowLetter: (id: number) => request<SlowLetter>(`/api/letters/${id}/send`, { method: "POST" }),
+  letterThreads: () => request<LetterThread[]>("/api/letters/threads"),
+  letterThreadLetters: (threadId: number) => request<SlowLetter[]>(`/api/letters/threads/${threadId}/letters`),
   letterInbox: () => request<SlowLetter[]>("/api/letters/inbox"),
   letterOutbox: () => request<SlowLetter[]>("/api/letters/outbox"),
   transitionLetter: (id: number, action: "read" | "reply" | "decline" | "block" | "archive") =>
