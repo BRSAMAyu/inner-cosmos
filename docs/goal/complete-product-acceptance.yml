@@ -179,6 +179,13 @@ gates:
           presence. This is a genuinely large, previously-unmeasured gap between "five spaces
           exist" and "five spaces have real parity with what they're replacing" — do not treat
           UX-SHELL as near-PASS on the basis of the spaces merely existing.
+          UPDATE (2026-07-18): three of the named legacy gaps were ported into the AppShell and deployed
+          live on prod EKS (image eks-prod2): (1) relationship TEMPERATURE + TIMELINE (RelationsView.tsx +
+          api /api/relation/list|timeline|health), previously zero API-client presence; (2) letter DRAFTS
+          tab (with send) + conversation THREADS view (LettersInbox extended + /api/letters/threads); (3)
+          VOICE input in the Aurora composer (AuroraConversation MediaRecorder -> /api/asr/transcribe).
+          Web suite 123 passing, tsc + vite build green, data paths verified 200 on prod. Still open in
+          relations/social: people discovery groups; and ASR quality is Mock until a real ASR key.
       - {id: UX-CONTRACTS, target: "Generated typed API client and unified auth, errors, tasks, offline, and telemetry are used.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CONV-003/]}
       - {id: UX-QUALITY, target: "Core routes pass Playwright, visual regression, accessibility, i18n, and performance budgets.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CONV-003/]}
       - id: UX-VISUAL-SYSTEM

@@ -16,7 +16,7 @@ resources:
 images:
   - name: inner-cosmos
     newName: 477296622190.dkr.ecr.us-east-1.amazonaws.com/inner-cosmos
-    newTag: eks-prod
+    newTag: eks-prod2
 patches:
   - target:
       kind: Gateway
