@@ -1,0 +1,51 @@
+# Inner Cosmos — keyless developer / demo compose.
+#
+# Unlike local-complete.yml and the root docker-compose.yml (both prod-profile, fail-closed,
+# and requiring real DB/Redis/LLM/OIDC secrets), this file runs the app in the offline-safe
+# `dev` profile: file-backed H2 + the Mock AI provider, no TLS, no OIDC, no external services.
+#
+#   docker compose -f deploy/compose/dev.yml up --build
+#   -> open http://localhost:8080/app/aurora/   (register a local account)
+#
+# It works with ZERO configuration. To drive the *real* product loop with a real provider,
+# inject env vars only (never commit them):
+#
+#   LLM_PROVIDER=deepseek LLM_API_KEY=sk-... docker compose -f deploy/compose/dev.yml up --build
+#
+# H2 data persists in the named volume `inner-cosmos-dev-data`; `docker compose ... down -v` clears it.
+
+name: inner-cosmos-dev
+
+services:
+  app:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    image: ${INNER_COSMOS_IMAGE:-inner-cosmos:dev}
+    environment:
+      # Offline-safe dev profile: H2 + Mock AI, no prod startup guard.
+      SPRING_PROFILES_ACTIVE: dev
+      # Real provider is opt-in; defaults keep the stack keyless.
+      LLM_MODE: ${LLM_MODE:-dev}
+      LLM_PROVIDER: ${LLM_PROVIDER:-mock}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_ALLOW_FALLBACK: ${LLM_ALLOW_FALLBACK:-true}
+      # Demo seed data is off by default (matches the documented default); set true for a populated first run.
+      SEED_ENABLED: ${SEED_ENABLED:-false}
+      # dev uses in-memory fallbacks, no Redis — drop the Redis health contributor so /actuator/health
+      # (and the container healthcheck) reflects real usability instead of a missing optional dependency.
+      MANAGEMENT_HEALTH_REDIS_ENABLED: "false"
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - inner-cosmos-dev-data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 30
+      start_period: 40s
+    restart: unless-stopped
+
+volumes:
+  inner-cosmos-dev-data:

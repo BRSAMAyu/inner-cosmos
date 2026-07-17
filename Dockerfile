@@ -10,8 +10,12 @@ RUN apk add --no-cache bash
 COPY .mvn .mvn
 COPY mvnw mvnw
 COPY pom.xml pom.xml
-# Pre-fetch deps (fail fast, better layer caching). javadoc/attachments stay off.
-RUN ./mvnw -B -q -DskipTests dependency:go-offline
+# Pre-fetch deps for better layer caching (best-effort). go-offline aggressively resolves
+# optional transitives — e.g. a flyway-core -> google-cloud-storage -> opentelemetry chain
+# hosted on maven.pkg.github.com — which some build networks cannot reach. That pre-fetch is
+# only a cache optimization, so it must not fail the build: the `package` step below is the
+# authoritative, fail-fast dependency resolution and pulls exactly what the app needs.
+RUN ./mvnw -B -q -DskipTests dependency:go-offline || true
 COPY src src
 RUN ./mvnw -B -q -DskipTests package
 

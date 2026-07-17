@@ -1356,3 +1356,27 @@ last_full_gate:
   review: BUILDER_VERIFIED_WITH_GENERATED_CLIENT_AND_LIVE_CROSS_POD_SSE_GAPS_REMAINING
 
 handoff_rule: Do not return a final answer at commits or campaign checkpoints; continue with the next machine-actionable gap.
+
+# Parallel supervisor-first track (separate branch feat/supervisor-k8s-ai-g9). Does NOT touch web/ styling
+# (owned by teammate sangchenyi's experience front / active_front above). Append-only to avoid conflicts.
+supervisor_track_2026_07_17:
+  branch: feat/supervisor-k8s-ai-g9
+  rationale: "Operator-approved reprioritization toward the supervisor's two questions (k8s solid? vision runs end-to-end?). Sequence: A Foundation -> B AI effectiveness -> C k8s ops -> D G2 engineering -> E G9 demo/RC. Real DeepSeek+GLM keys provided (env-only). See memory supervisor-first-override."
+  phase_a_checkpoint:
+    state: DONE_PENDING_COMMIT
+    done:
+      - "Verified honest baseline: backend 835/835 (Testcontainers incl., Docker up), frontend 115/115, kustomize base(6)+academy-eks(20) offline build, secret scan clean."
+      - "Fixed HPA drift: evidence/academy/ACADEMY-LIVE-001/summary.md claimed HPA 2..6 but manifest is 2..4 (git history confirms never 2..6). Corrected the false claim."
+      - "Added deploy/compose/dev.yml — first keyless dev/demo compose (H2+Mock, one-command boot verified healthy ~20s, /app/aurora/ 200). Real provider opt-in via env. MANAGEMENT_HEALTH_REDIS_ENABLED=false in dev."
+      - "Fixed Dockerfile: dependency:go-offline made best-effort (|| true) — it over-fetched a flyway->google-cloud-storage->opentelemetry transitive from maven.pkg.github.com that buildkit here can't resolve; package remains authoritative. Image now builds on restricted networks."
+      - "Added scripts/scan-secrets.sh — portable bash/ripgrep mirror of scan-secrets.ps1 (no pwsh on macOS). Self-tested: catches planted token, passes clean."
+      - "Real-provider smoke PASSED: DeepSeek wired (log: fallbackAllowed=false), full API path register->login->session->/aurora/message returned a real 5.9s reply computing 12+30=42 (Mock cannot). evidence/g8/DEV-COMPOSE-SMOKE-001/."
+    next_machine_actions:
+      - "Commit Phase A on feat/supervisor-k8s-ai-g9; then Phase C kickoff (Docker up): create kind cluster (a 3-node 'kubedeploy' kind cluster is already running and reusable), port root docker-compose Prometheus v2.54 + Grafana 11.3 into deploy/k8s/observability/ scraping /actuator/prometheus, ship dashboards+alerts as code (OPS-OBSERVABILITY)."
+      - "Then Phase C: HPA load test 2->N on kind (ACADEMY-RELIABILITY / evidence/g8/HPA-LOAD-001), resilience drills (OPS-RESILIENCE), pg_dump CronJob + restore drill (BACKUP-RESTORE-001), lock /actuator/prometheus (deferred from Phase A item 3 — verify probes still pass on kind), terraform to plan (EKS-IAC)."
+      - "Phase B (keys available): enable MEMORY_EMBEDDING semantic retrieval + pgvector; run ai-lab real-pairwise / wire OptionalLlmJudge; FORGET propagation remaining four surfaces."
+    verify_commands:
+      - "docker compose -f deploy/compose/dev.yml up -d && curl -s -o /dev/null -w '%{http_code}' localhost:8080/app/aurora/"
+      - "./scripts/scan-secrets.sh"
+      - "kubectl kustomize deploy/k8s/base >/dev/null && kubectl kustomize deploy/k8s/overlays/academy-eks >/dev/null && echo kustomize-ok"
+    blockers: ["Rotate the DeepSeek+GLM keys after session (HG-SECRET-ROTATION) — they were pasted into chat."]
