@@ -1,0 +1,13 @@
+{
+  "prohibitedCurrentRoutineReturned" : false,
+  "datasetVersion" : "memory-retrieval-hard-v2",
+  "providerRecallAt3" : 1.0,
+  "absoluteLift" : 1.0,
+  "localTotalMillis" : 10.05775,
+  "providerDocumentCallsInBackgroundBatch" : 18,
+  "pricing" : "not measured: deterministic local contract provider",
+  "providerContractTotalMillis" : 19.597916,
+  "providerOnlineQueryCalls" : 5,
+  "cases" : 4,
+  "localRecallAt3" : 0.0
+}

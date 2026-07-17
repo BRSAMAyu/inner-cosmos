@@ -1399,3 +1399,16 @@ supervisor_track_2026_07_17:
       - "kubectl --context kind-inner-cosmos-ops -n observability get pods"
       - "kubectl kustomize deploy/k8s/observability >/dev/null && kubectl kustomize deploy/k8s/overlays/kind-dev >/dev/null && echo ok"
     known_limitation: "actuator /prometheus is still unauthenticated (repo audit S4-028) — hardening deferred within Phase C; see next_machine_actions."
+  phase_b_checkpoint:
+    state: REAL_PROVIDER_PAIRWISE_EXECUTED_AND_SEMANTIC_RETRIEVAL_PROVEN
+    done:
+      - "ai-lab real-pairwise EXECUTED against DeepSeek (profile ~/.config/inner-cosmos/providers.local.json, key env-only): 11 trajectories, provider_called=true, fallback_used=false, dual-kernel = 2 real LLM calls each. Artifact evidence/innovation/INNO-EVAL-003/ (runs.json + blind-human CSV)."
+      - "HONEST: deterministic lexical rubric single-pass 0.64 >= dual-kernel 0.55 -> dual-kernel superiority NOT shown; real verdict needs the blind human panel (gate REAL-PROVIDER-CREDENTIALS-AND-BLIND-REVIEW). Recorded, not hidden."
+      - "Semantic retrieval proven > lexical: MemoryEmbeddingCandidateIntegrationTest providerRecall@3=1.0 vs local=0.0 (+100pts, gate >=0.30), contradicted-stale never returned. evidence/innovation/INNO-INNER-008/."
+      - "Real embedding provider reachable: GLM embedding-3 OpenAI-compatible /embeddings HTTP 200, 1536-dim (DeepSeek has no embeddings). Recipe recorded for MEMORY_EMBEDDING_* with GLM."
+      - "ai-lab venv at ai-lab/.venv (pip install -e .); offline `validate` + `run` also pass (192 runs, hard_gates PASS)."
+    next_machine_actions:
+      - "Optional deeper Phase B: full app-E2E semantic retrieval with real GLM embedder (MEMORY_EMBEDDING_ENABLED=true + GLM base_url/embedding-3/1536) on H2 (localScores) or postgres profile (pgvector); FORGET propagation remaining four surfaces (prompt-cache/sync-queue/analytics/backup)."
+      - "Phase D (G2 engineering): ARCH-MODULES Spring Modulith arch tests, EVENT-RELIABLE outbox->DLQ full chain (Testcontainers), RUNTIME-ROLES 5-role isolation."
+      - "Finish Phase C: EKS-IAC terraform validate/plan (install terraform), CI hardening (SBOM/SAST), actuator lockdown (spawned as task_bb411aa8)."
+      - "Phase E (G9): FINAL-E2E, 8-12min demo, FINAL-OPERATIONS runbook + non-author rehearsal, FINAL-TRACEABILITY matrix -> declare RC."
