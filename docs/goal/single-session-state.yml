@@ -1410,5 +1410,18 @@ supervisor_track_2026_07_17:
     next_machine_actions:
       - "Optional deeper Phase B: full app-E2E semantic retrieval with real GLM embedder (MEMORY_EMBEDDING_ENABLED=true + GLM base_url/embedding-3/1536) on H2 (localScores) or postgres profile (pgvector); FORGET propagation remaining four surfaces (prompt-cache/sync-queue/analytics/backup)."
       - "Phase D (G2 engineering): ARCH-MODULES Spring Modulith arch tests, EVENT-RELIABLE outbox->DLQ full chain (Testcontainers), RUNTIME-ROLES 5-role isolation."
+  phase_d_checkpoint:
+    state: EVENT_RELIABLE_DLQ_DONE_RUNTIME_ROLES_NOTED_ARCH_MODULES_DEFERRED
+    done:
+      - "EVENT-RELIABLE (UNASSESSED->IN_PROGRESS): added JdbcOutboxRepository.replayDead() + a Testcontainers test proving dead-letter on retry exhaustion (status DEAD, not re-claimed, no leaked side effect) and replay reprocessing exactly once. JdbcOutboxRepositoryIntegrationTest 3/3 green on real Postgres. evidence/g2/EVENT-RELIABLE-001/."
+      - "RUNTIME-ROLES (UNASSESSED->IN_PROGRESS): documented that existing RuntimeRoleConfigurationTest (scheduling gate per role + migration exit/reject) + ACADEMY-LIVE-001 (ran api+worker+scheduler+migration as independent workloads) already substantiate it. A full-boot per-role bean-presence test was attempted and REVERTED (enabling the Postgres-only outbox worker on H2 triggers its poll -> H2 syntax error; correct form is Testcontainers/ApplicationContextRunner slice)."
+    deferred:
+      - "ARCH-MODULES: codebase is layer-structured (controller/service/entity/mapper), not package-by-feature, so Spring Modulith module boundaries need a scoped design decision (define @ApplicationModule domains, or use ArchUnit layer rules) — not a drop-in. Deferred, not attempted, to avoid a large speculative refactor."
+    next_machine_actions:
+      - "Finish Phase C: EKS-IAC terraform validate/plan (install terraform); CI hardening (SBOM/SAST/scan gating in .github/workflows); actuator /prometheus lockdown (spawned task_bb411aa8)."
+      - "Phase E (G9): FINAL-E2E Playwright core journeys; 8-12min reproducible demo (dev compose + kind); FINAL-OPERATIONS runbook + non-author rehearsal; FINAL-TRACEABILITY matrix -> declare RELEASE_CANDIDATE."
+      - "Optional: ARCH-MODULES design decision; full app-E2E semantic retrieval with real GLM embedder; FORGET propagation remaining surfaces; per-role bean-presence slice test."
+    verify_commands:
+      - "docker running required for: ./mvnw -Dtest=JdbcOutboxRepositoryIntegrationTest test (3/3)"
       - "Finish Phase C: EKS-IAC terraform validate/plan (install terraform), CI hardening (SBOM/SAST), actuator lockdown (spawned as task_bb411aa8)."
       - "Phase E (G9): FINAL-E2E, 8-12min demo, FINAL-OPERATIONS runbook + non-author rehearsal, FINAL-TRACEABILITY matrix -> declare RC."

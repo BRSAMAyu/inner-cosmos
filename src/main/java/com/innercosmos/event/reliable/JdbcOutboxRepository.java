@@ -109,6 +109,23 @@ public class JdbcOutboxRepository {
                 """, maxAttempts, delay.toMillis(), message, event.id(), event.lockedBy());
     }
 
+    /**
+     * Dead-letter replay: reset up to {@code limit} events that exhausted their retries (status DEAD)
+     * back to PENDING so a worker re-processes them from a clean slate. Idempotent consumption still
+     * protects against duplicate side effects (tb_inbox_receipt), so replay is safe to re-run. Returns
+     * the number of events requeued.
+     */
+    public int replayDead(int limit) {
+        return jdbc.update("""
+                UPDATE tb_outbox_event
+                SET status = 'PENDING', attempts = 0, available_at = CURRENT_TIMESTAMP,
+                    locked_by = NULL, locked_until = NULL, last_error = NULL
+                WHERE id IN (
+                    SELECT id FROM tb_outbox_event WHERE status = 'DEAD' ORDER BY id LIMIT ?
+                )
+                """, limit);
+    }
+
     private OutboxEvent map(ResultSet rs, int rowNum) throws SQLException {
         return new OutboxEvent(
                 rs.getLong("id"),

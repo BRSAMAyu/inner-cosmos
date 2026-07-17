@@ -110,6 +110,49 @@ class JdbcOutboxRepositoryIntegrationTest {
         assertThat(effects).hasValue(2);
     }
 
+    @Test
+    void exhaustedRetriesLandInDeadLetterThenReplayReprocessesExactlyOnce() {
+        UUID eventId = UUID.randomUUID();
+        repository.append(eventId, "dlq:" + eventId, "contract", "3", "dlq.v1", 1,
+                "{\"value\":3}", "trace-dlq");
+        AtomicInteger effects = new AtomicInteger();
+        OutboxEventHandler failing = handler("dlq.v1", effects, true);
+
+        // Simulate the worker loop: claim -> handler fails (rolls back) -> retry, until MAX_ATTEMPTS (5).
+        for (int attempt = 0; attempt < 5; attempt++) {
+            OutboxEvent claimed = repository.claim("dlq-worker", 1, Duration.ofSeconds(30)).get(0);
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> repository.complete(claimed, failing))
+                    .isInstanceOf(IllegalStateException.class);
+            repository.retry(claimed, new IllegalStateException("transient"), 5, Duration.ZERO);
+        }
+
+        // The event is now dead-lettered and is no longer picked up by normal claims.
+        assertThat(statusOf(eventId)).isEqualTo("DEAD");
+        assertThat(repository.claim("dlq-worker", 1, Duration.ofSeconds(30))).isEmpty();
+        // Failing handler never left a receipt, so no side effect leaked despite 5 attempts.
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM tb_inbox_receipt WHERE event_id=?",
+                Integer.class, eventId)).isZero();
+
+        // Replay the dead-letter queue: the event returns to PENDING with a clean attempt count.
+        assertThat(repository.replayDead(10)).isEqualTo(1);
+        assertThat(statusOf(eventId)).isEqualTo("PENDING");
+
+        // A healthy handler now processes it exactly once and it reaches PUBLISHED.
+        OutboxEvent replayed = repository.claim("dlq-worker", 1, Duration.ofSeconds(30)).get(0);
+        assertThat(replayed.eventId()).isEqualTo(eventId);
+        assertThat(replayed.attempts()).isZero();
+        assertThat(repository.complete(replayed, handler("dlq.v1", effects, false))).isTrue();
+        assertThat(statusOf(eventId)).isEqualTo("PUBLISHED");
+        assertThat(effects).hasValue(6); // 5 failed attempts + 1 successful replay
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM tb_inbox_receipt WHERE event_id=?",
+                Integer.class, eventId)).isEqualTo(1);
+    }
+
+    private String statusOf(UUID eventId) {
+        return jdbc.queryForObject("SELECT status FROM tb_outbox_event WHERE event_id=?",
+                String.class, eventId);
+    }
+
     private OutboxEventHandler handler(String eventType, AtomicInteger effects, boolean fail) {
         return new OutboxEventHandler() {
             @Override public String eventType() { return eventType; }
