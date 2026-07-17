@@ -1,8 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  applyColorScheme,
   applyTimeOfDayTheme,
   currentTimeOfDay,
+  getColorScheme,
   getLockedTimeOfDay,
+  setColorScheme,
   setThemeLock,
   timeOfDayForHour,
   type TimeOfDay,
@@ -75,5 +78,39 @@ describe("applyTimeOfDayTheme", () => {
     const root = document.createElement("html");
     applyTimeOfDayTheme(root, new Date(2026, 0, 1, 13, 0, 0));
     expect(root.dataset.time).toBe("dawn");
+  });
+});
+
+describe("color scheme (明暗轴)", () => {
+  afterEach(() => setColorScheme(null));
+
+  it("默认(跟随)返回 null", () => {
+    expect(getColorScheme()).toBeNull();
+  });
+
+  it("round-trips day/night", () => {
+    setColorScheme("day");
+    expect(getColorScheme()).toBe("day");
+    setColorScheme("night");
+    expect(getColorScheme()).toBe("night");
+  });
+
+  it("忽略非法存储值", () => {
+    localStorage.setItem("ic-color-scheme", "rainbow");
+    expect(getColorScheme()).toBeNull();
+  });
+
+  it('applyColorScheme: 仅 day 写 data-theme="day"，否则移除', () => {
+    const root = document.createElement("html");
+    setColorScheme("day");
+    applyColorScheme(root);
+    expect(root.dataset.theme).toBe("day");
+    setColorScheme("night");
+    applyColorScheme(root);
+    expect(root.dataset.theme).toBeUndefined(); // 夜色=默认，不写属性
+    setColorScheme(null);
+    root.dataset.theme = "day"; // 预置以验证被清除
+    applyColorScheme(root);
+    expect(root.dataset.theme).toBeUndefined();
   });
 });

@@ -21,6 +21,12 @@ export const TIME_OF_DAY_ORDER: TimeOfDay[] = [
 ];
 
 const LOCK_KEY = "ic-theme-lock";
+const SCHEME_KEY = "ic-color-scheme";
+
+// 明暗轴：与七时段(data-time)正交。默认 null=跟随（当前=暖夜暗色系）；
+// "day"=白昼莫兰迪浅色；"night"=强制暖夜暗色。仅 "day" 时写 <html data-theme="day">，
+// 让 styles.css 的浅色 token 覆盖生效；默认不写属性，暗色行为 100% 不变。
+export type ColorScheme = "day" | "night";
 
 /** 纯函数：给定本地小时(0-23)返回时段。可测试。 */
 export function timeOfDayForHour(hour: number): TimeOfDay {
@@ -70,11 +76,40 @@ export function applyTimeOfDayTheme(
   return tod;
 }
 
-/** 启动：立即应用并每分钟刷新一次；返回停止函数。 */
+/** 读取用户选择的明暗方案（无选择或非法值返回 null=跟随）。 */
+export function getColorScheme(): ColorScheme | null {
+  try {
+    const v = localStorage.getItem(SCHEME_KEY);
+    return v === "day" || v === "night" ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+/** 设置明暗方案；传 null 恢复跟随（暖夜暗色系）。 */
+export function setColorScheme(scheme: ColorScheme | null): void {
+  try {
+    if (scheme) localStorage.setItem(SCHEME_KEY, scheme);
+    else localStorage.removeItem(SCHEME_KEY);
+  } catch {
+    /* localStorage 不可用时静默降级 */
+  }
+}
+
+/** 把明暗方案写到 <html data-theme>：仅 "day" 写 data-theme="day"，否则移除(暗色默认)。 */
+export function applyColorScheme(root: HTMLElement = document.documentElement): ColorScheme | null {
+  const scheme = getColorScheme();
+  if (scheme === "day") root.dataset.theme = "day";
+  else delete root.dataset.theme;
+  return scheme;
+}
+
+/** 启动：立即应用时段主题 + 明暗方案，并每分钟刷新时段；返回停止函数。 */
 export function startTimeOfDayTheme(
   root: HTMLElement = document.documentElement
 ): () => void {
   applyTimeOfDayTheme(root);
+  applyColorScheme(root);
   const id = window.setInterval(() => applyTimeOfDayTheme(root), 60_000);
   return () => window.clearInterval(id);
 }

@@ -89,6 +89,23 @@ body { margin: 0; min-width: 320px; min-height: 100vh; background: radial-gradie
 :root[data-time="dusk"] { --surface-canvas: #241A1C; --amb-a: #4a2f28; --amb-b: #322036; --accent-aurora: #CD9B67; --grad-1: #271b1d; --grad-2: #241a1c; --grad-3: #1d1517; }
 /* night 19:00–23:00 基准暖褐(与默认一致) */
 :root[data-time="night"] { --surface-canvas: #211A18; --amb-a: #3a2a1f; --amb-b: #2c2030; --accent-aurora: #C79A68; --grad-1: #241b17; --grad-2: #211a18; --grad-3: #1c1512; }
+
+/* —— 白昼莫兰迪浅色主题(§1.1 / UIUXdesign §3 白昼)：与 data-time 正交，仅当用户显式选择
+   <html data-theme="day"> 时生效；默认(无该属性)保持暖夜暗色系，生产默认零改变。
+   米白基底 + 暖褐深文字，绝非纯白/纯黑；WCAG AA 对比。已 token 化的文字/accent/hairline 会
+   自动翻转；尚未 token 化的硬编码深色表面会在此主题下"现形"，作为后续 token 化的可见清单。 —— */
+:root[data-theme="day"] {
+  --surface-canvas: #F7F2EC; --surface-canvas-2: #EFE7DC; --surface-raised: #FCF8F2;
+  --glass-raised: #FCF8F2e6;
+  --accent-aurora: #A9713A; --accent-aurora-soft: #C0894F;
+  --accent-sage: #5E7462; --accent-sage-soft: #6E8270;
+  --accent-sky: #566A83; --accent-sky-soft: #63758B;
+  --accent-plum: #6E5566; --accent-plum-soft: #7D6472;
+  --text-primary: #2E2620; --text-muted: #6B5F54; --text-faint: #726556;
+  --danger: #B4513A; --danger-soft: #C77258;
+  --hairline: #2E262014; --hairline-mid: #2E26201f; --hairline-strong: #2E262033;
+  --amb-a: #EDE3D5; --amb-b: #E7E0E6; --grad-1: #F7F2EC; --grad-2: #F1EAE1; --grad-3: #EAE0D4;
+}
 button, textarea, input { font: inherit; }
 /* —— 微交互(§1.1 母题: 流动/呼吸): 统一走 token 曲线, 禁 ease/linear ——
    点击 scale(.97) 快按下 -> 用 --ease-bloom 带回弹松开; hover 微亮; focus 可见。 */
@@ -252,6 +269,14 @@ footer { padding: 18px 4px; display: flex; justify-content: space-between; color
 @keyframes loading-dot { 0%, 60%, 100% { opacity: .3; } 30% { opacity: 1; } }
 .loading-text { color: var(--text-muted); font-size: 14px; display: inline-flex; align-items: center; }
 .async-busy { display: inline-flex; align-items: center; }
+
+/* 外观明暗切换（§1.1 白昼莫兰迪）——全部走 token，两种主题下都协调。 */
+.appearance-toggle { display: flex; align-items: center; gap: 12px; margin: 18px 0; }
+.appearance-label { color: var(--text-muted); font-size: .82rem; }
+.appearance-options { display: inline-flex; gap: 4px; padding: 4px; border: 1px solid var(--hairline-mid); border-radius: var(--r-pill); background: var(--glass-raised); }
+.appearance-options button { padding: 6px 14px; border: 1px solid transparent; border-radius: var(--r-pill); color: var(--text-muted); background: transparent; font-size: .82rem; }
+.appearance-options button:hover:not(.active) { color: var(--text-primary); }
+.appearance-options button.active { color: var(--surface-canvas); background: var(--accent-aurora); }
 
 /* 星尘母题：极淡暖色粒子层，铺在内容之后、body 渐变之上；绝不拦截指针。 */
 .stardust { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }

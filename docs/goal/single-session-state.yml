@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 mode: SINGLE_SESSION_CONTINUOUS_GOAL
 status: ACTIVE
-updated_at: 2026-07-16T23:54:00+08:00
+updated_at: 2026-07-17T00:12:00+08:00
 
 session_2026_07_16_checkpoints:
   - "7db1a84 feat: cross-Pod live Aurora SSE fan-out/resume/heartbeat + turn.started race fix (G2). 826/826."
@@ -944,7 +944,7 @@ closed_front_g2_sse_cross_pod:
 
 active_front:
   id: EXPERIENCE-FLOW-OVERHAUL
-  state: CHECKPOINT_12_NEARCOLOR_TEXT_NORMALIZED_136_LITERALS_TOKENIZED_401_HEXES_LEFT_NEXT_IS_ALPHA_OVERLAYS_THEN_TIMEVARYING_THEN_LIGHT_BAND
+  state: CHECKPOINT_13_OPTIN_LIGHT_MORANDI_THEME_LIVE_AA_PASS_NEXT_IS_TOKENIZE_THE_10_REMAINING_DARK_SURFACES_AGAINST_LIGHT_THEME
   intent: |
     Operator directive docs/goal/loop-goal-directive.md §1 raised体验层重造 to the highest priority,
     ahead of the prior CAMPAIGN-B front (now closed below). §1.1 视觉系统重造 (P0): kill the cold
@@ -1133,15 +1133,33 @@ active_front:
       rendered invisible/transparent by the normalization); UI fully renders. npm test 108/108, build OK.
       Backend shut down after; cp12probe is a harmless dev-only account. Evidence checkpoint-12-nearcolor-normalize.md."
     - "Tokenization running total: cp10 41 + cp11 38 + cp12 57 = ~136 literals -> tokens."
+  done_checkpoint_13:
+    - "Shipped an OPT-IN 白昼莫兰迪 light theme (resolves the surface-tokenization verification deadlock by
+      making un-tokenized dark surfaces VISIBLE against a light bg): theme.ts adds a ColorScheme axis
+      (day|night) orthogonal to data-time — only 'day' writes <html data-theme=day>, default unchanged so
+      dark production is 100% intact. styles.css :root[data-theme=day] overrides core tokens to morandi
+      light (米白 #F7F2EC canvas, #2E2620 warm-dark text, dark-alpha hairlines, light amb/grad, deepened
+      accents), riding the existing @property transition for a smooth switch. AppearanceToggle component
+      (跟随时间/白昼/夜色) wired into MeSpace, all token-driven."
+    - "Verified: npm test 115/115 (+4 color-scheme, +3 AppearanceToggle). npm run build OK. Real backend
+      end-to-end (JDK21 dev, registered cp13probe, localStorage-locked day, reloaded authenticated shell):
+      data-theme=day active, tokens flip (--surface-canvas rgb(247,242,236)=#F7F2EC, --text-primary
+      rgb(46,38,32)=#2E2620); WCAG 2.2 AA contrast ALL PASS (primary 13.34, muted 5.57, faint 5.08, need
+      >=4.5). Evidence evidence/experience/EXPERIENCE-VISUAL-P0-light-morandi/checkpoint-13.md."
+    - "VISIBLE REMAINING WORK the light theme surfaced — 10 element types still render dark (hardcoded
+      #251d18dc/#ffffffXX/#241bXX surfaces that did not flip): .app-shell-nav, input, button, textarea,
+      .active tab, .skill-catalog, .skill-runner, .plaza-search, .composer, and a couple inline. This is
+      the concrete surface-tokenization to-do list, now verifiable live against the light theme."
   next_machine_actions:
-    - "NEXT batch 4 — ALPHA overlays: #211a18d9/e8/ed (semi-transparent surface bg -> --glass-raised or
-      color-mix(--surface-canvas)) and the #ffffffXX white-alpha hairline/overlay family (-> --hairline*/
-      color-mix) — these are the light-mode-critical ones (white-on-light = invisible). Plus accent alpha
-      variants #a9bcae4a/#74869b35/#9bb0a24a (-> color-mix of the accent token)."
-    - "THEN #c79a68->var(--accent-aurora) + #211a18->var(--surface-canvas) (time-varying; verify across
-      2-3 data-time values). Plus remaining stray warm hexes (#c8b697/#c7bbaa/#c2b3a3 tan family, shadows #000X)."
-    - "THEN (tokenization ~done) add light/morandi tokens (米白 #F7F2EC) + light half of seven time-of-day,
-      verify WCAG 2.2 AA + day+night screenshots. THEN local font packaging; glass-motif unify; Lighthouse>85 + mobile."
+    - "NEXT: tokenize the 10 remaining dark surfaces against the live light theme (lock day, fix each so it
+      flips, re-check). These are the #251d18dc/#ffffffXX/#241bXX hardcoded surface/overlay bgs — map to
+      --glass-raised / --surface-raised / color-mix(--surface-canvas) so they flow with the theme. Iterate
+      until the light theme has zero dark panels, then capture day+night screenshots per doc-11 §1.1.6."
+    - "THEN the light half of seven time-of-day (optional refinement: dawn/morning/noon could auto-lean
+      light) and #c79a68->var(--accent-aurora)/#211a18->var(--surface-canvas) time-varying mapping."
+    - "THEN local font packaging (LXGW WenKai/Noto Serif SC/Cormorant/JetBrains Mono, CSP-safe offline);
+      glass-motif unify; Lighthouse>85 + mobile breakpoints. Lower value: per-view ERROR states; remaining
+      inline-busy buttons + AuroraSelfSpace/ClaimCandidateReview onto AsyncButton."
     - "THEN add light/morandi tokens (米白 #F7F2EC base) + the light half of seven time-of-day (dawn/morning/
       noon warm-light), verify WCAG 2.2 AA contrast + capture day+night screenshots per doc-11 §1.1.6."
     - "THEN local font packaging (LXGW WenKai/Noto Serif SC/Cormorant/JetBrains Mono, CSP-safe offline);
