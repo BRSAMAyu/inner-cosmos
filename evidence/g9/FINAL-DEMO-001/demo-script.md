@@ -77,6 +77,15 @@ corrected to the true 2..4), transactional outbox with dead-letter replay, and a
 
 ---
 
+## Known behaviors (verified 2026-07-17 on the prod EKS stack — NOT bugs)
+- **Capsule boundary editor works** via the UI (correct payload = comma-joined topic strings +
+  `maxConversationTurns` + `If-Match` version header). A raw-API smoke that sent arrays/omitted If-Match
+  failed, but the SPA sends the right shape — safe to demo.
+- **Slow letters are intentionally delayed ~3 minutes** (`estimatedArrivalAt = now + 3min`; `LetterDeliveryJob`
+  runs every 60s, SENT→FLYING→DELIVERED). In the demo, show the "已寄出 / 在路上(FLYING)" state, or wait
+  ~3–4 min for it to land in the recipient's inbox — do not expect instant arrival.
+- **Semantic memory retrieval now uses real GLM embeddings + pgvector** on prod (INNO-INNER-009).
+
 ## Status / remaining
 - This is the demo **script** with every step exercised this session. To reach `FINAL-DEMO` PASS: capture a
   single recorded run (screen capture) end-to-end, and have a **non-author** drive it from a clean checkout.
