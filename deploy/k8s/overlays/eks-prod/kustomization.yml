@@ -1,0 +1,27 @@
+# eks-prod overlay — the full production-shape stack (prod profile) on the live EKS cluster:
+# static-PV PostgreSQL (TLS) + Redis (TLS) + migration Job + API/worker/scheduler roles + Gateway(HTTPS).
+# Reuses the academy-eks overlay and adapts it to this real cluster:
+#   - namespace: inner-cosmos
+#   - image: the amd64 image in ECR (same jar as eks-dev; behaviour is prod via SPRING_PROFILES_ACTIVE)
+#   - GatewayClass: the cluster's envoy 'eg' (academy used a placeholder class)
+#
+# Secrets (created out-of-band, never committed): inner-cosmos-runtime (DB/Redis pw, LLM_PROVIDER=deepseek,
+# LLM_API_KEY, OIDC placeholders) + postgres/redis server-tls & client-ca + edge-tls. A node must be
+# labelled inner-cosmos.academy/storage=true for the static-PV Postgres. See evidence/g8/EKS-PROD-001/.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: inner-cosmos
+resources:
+  - ../academy-eks
+images:
+  - name: inner-cosmos
+    newName: 477296622190.dkr.ecr.us-east-1.amazonaws.com/inner-cosmos
+    newTag: eks-prod
+patches:
+  - target:
+      kind: Gateway
+      name: inner-cosmos
+    patch: |-
+      - op: replace
+        path: /spec/gatewayClassName
+        value: eg

@@ -1436,5 +1436,16 @@ supervisor_track_2026_07_17:
     verify_commands:
       - "aws eks update-kubeconfig --name MyEKS && kubectl -n inner-cosmos-dev get pods,hpa,gateway"
       - "curl http://<gateway-elb>/actuator/health   # {\"status\":\"UP\"}"
+  eks_prod_checkpoint:
+    state: FULL_PROD_STACK_RUNNING_ON_REAL_EKS_AND_A_PROD_BLOCKING_BUG_FIXED
+    done:
+      - "deploy/k8s/overlays/eks-prod (based on academy-eks, patched: namespace inner-cosmos, ECR image, GatewayClass eg). Deployed the full prod stack on real EKS: TLS PostgreSQL (static PV, Flyway V1..V17) + TLS Redis + migration Job + API x2 + worker + scheduler + HTTPS Gateway (self-signed edge cert). Secrets (runtime/postgres-tls/redis-tls/edge-tls) created out-of-band; OIDC placeholders; real DeepSeek key."
+      - "FIXED a real prod-blocking bug: the 14 H2/MySQL SchemaMx*Initializers were gated only on spring.flyway.enabled=false; prod requires the app's Flyway disabled (migration Job owns it), so they ran on Postgres and crashed on AUTO_INCREMENT DDL. Added an H2-only @ConditionalOnExpression driver gate to all 14. Full suite 836/0/0; still run on H2 (tests) and skip on Postgres. evidence/g8/EKS-PROD-001/."
+      - "Verified real user flow via HTTPS ELB: register->login (shared Redis session across replicas)->create session (Postgres)->real DeepSeek Aurora reply. Suitable for multi-user testing (shared durable Postgres + Redis). Removed the superseded eks-dev (mock) overlay to leave one clean prod URL."
+    urls:
+      - "prod HTTPS (self-signed, click through): https://a60f3ce14c2e146f1bc5804884788d36-1144038221.us-east-1.elb.amazonaws.com/app/aurora/ (ELB hostname changes if the Gateway is recreated)"
+    teardown: "kubectl delete -k deploy/k8s/overlays/eks-prod   # removes the ELB when done (Learner Lab creds/cluster are temporary)"
+    next_machine_actions:
+      - "Optional: enable pgvector semantic retrieval on the prod DB with a real GLM embedding key (MEMORY_EMBEDDING_* Secret); observability stack on EKS; node-drain drill on EKS."
       - "Finish Phase C: EKS-IAC terraform validate/plan (install terraform), CI hardening (SBOM/SAST), actuator lockdown (spawned as task_bb411aa8)."
       - "Phase E (G9): FINAL-E2E, 8-12min demo, FINAL-OPERATIONS runbook + non-author rehearsal, FINAL-TRACEABILITY matrix -> declare RC."
