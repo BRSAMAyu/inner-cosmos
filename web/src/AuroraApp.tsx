@@ -1,6 +1,6 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
-import { api, apiConfigurationError, configureBearerAuth, hasConfiguredApiBase, replayTurnEvents, streamAurora, subscribeProactive, type ClaimCandidate, type CapsuleBoundary, type CapsuleFidelitySummary, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type ConnectionRequests, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type Notification, type DiscoverablePerson, type PersonaMessage, type PersonaSession, type PortraitDimension, type PublicCapsule, type PortraitHistoryEntry, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type PsychologySkillSuggestion, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type SocialConnection, type StarfieldDetail, type StarfieldScene, type StarfieldStar, type UnderstandingClaim, type UserCorrection, type WakeIntent } from "./api";
+import { api, apiConfigurationError, configureBearerAuth, hasConfiguredApiBase, replayTurnEvents, streamAurora, subscribeProactive, type ClaimCandidate, type CapsuleBoundary, type CapsuleFidelitySummary, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type ConnectionRequests, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type Notification, type DiscoverablePerson, type PersonaMessage, type PersonaSession, type PortraitDimension, type PublicCapsule, type PortraitHistoryEntry, type RelationMention, type RelationTimelinePoint, type RelationHealth, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type PsychologySkillSuggestion, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type SocialConnection, type StarfieldDetail, type StarfieldScene, type StarfieldStar, type UnderstandingClaim, type UserCorrection, type WakeIntent } from "./api";
 import { initialMobileState, mobileRuntime, type MobileRuntimeState } from "./mobile";
 import { mobileOidc } from "./mobile-auth";
 import type { AuroraStreamEvent, DialogMessage, TurnStatus } from "./protocol";
@@ -14,6 +14,7 @@ import { CapsuleWorkbench } from "./components/CapsuleWorkbench";
 import { ResonanceNetwork } from "./components/ResonanceNetwork";
 import { PlazaDirectory } from "./components/PlazaDirectory";
 import { PeopleDiscovery } from "./components/PeopleDiscovery";
+import { RelationsView } from "./components/RelationsView";
 import { LettersInbox } from "./components/LettersInbox";
 import { PortraitView } from "./components/PortraitView";
 import { AccountSettings, type AccountBusy } from "./components/AccountSettings";
@@ -103,6 +104,11 @@ export function AuroraApp() {
   const [friends, setFriends] = useState<SocialConnection[]>([]);
   const [people, setPeople] = useState<DiscoverablePerson[]>([]);
   const [peopleBusy, setPeopleBusy] = useState(false);
+  const [relations, setRelations] = useState<RelationMention[]>([]);
+  const [selectedRelation, setSelectedRelation] = useState<string | null>(null);
+  const [relationTimeline, setRelationTimeline] = useState<RelationTimelinePoint[]>([]);
+  const [relationHealth, setRelationHealth] = useState<RelationHealth | null>(null);
+  const [relationBusy, setRelationBusy] = useState(false);
   const [skills, setSkills] = useState<PsychologySkillManifest[]>([]);
   const [skillRuns, setSkillRuns] = useState<PsychologySkillRun[]>([]);
   const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
@@ -174,7 +180,8 @@ export function AuroraApp() {
         api.plazaCapsules().then(setPublicCapsules).catch(() => undefined),
         api.letterOutbox().then(setLetterOutbox).catch(() => undefined),
         api.discoverPeople().then(setPeople).catch(() => undefined),
-        api.claimCandidates().then(setClaimCandidates).catch(() => undefined)
+        api.claimCandidates().then(setClaimCandidates).catch(() => undefined),
+        api.relations().then(setRelations).catch(() => undefined)
       ]);
       const loadedCapsules = loaded[8] as EchoCapsule[];
       const loadedMatches = loaded[9] as CapsuleMatch[];
@@ -991,6 +998,19 @@ export function AuroraApp() {
     finally { setPeopleBusy(false); }
   };
 
+  const openRelation = async (label: string) => {
+    setSelectedRelation(label); setRelationBusy(true);
+    setRelationTimeline([]); setRelationHealth(null);
+    try {
+      const [timeline, health] = await Promise.all([
+        api.relationTimeline(label),
+        api.relationHealth(label).catch(() => null)
+      ]);
+      setRelationTimeline(timeline); setRelationHealth(health);
+    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时读不到这段关系的时间线"); }
+    finally { setRelationBusy(false); }
+  };
+
   const requestConnection = async (letter: SlowLetter) => {
     try {
       await api.requestConnectionFromLetter(letter.id); await refreshConnections();
@@ -1186,6 +1206,7 @@ export function AuroraApp() {
 
       <div className="product-space" hidden={productSpace !== "letters"}>
       <PeopleDiscovery people={people} busy={peopleBusy} onRequest={userId => void requestPersonConnection(userId)} />
+      <RelationsView relations={relations} selected={selectedRelation} timeline={relationTimeline} health={relationHealth} busy={relationBusy} onSelect={label => void openRelation(label)} />
 
       <LettersInbox letterInbox={letterInbox} letterOutbox={letterOutbox} replyDrafts={replyDrafts} connectionRequests={connectionRequests} friends={friends}
         onReplyDraftChange={(letterId, value) => setReplyDrafts(drafts => ({ ...drafts, [letterId]: value }))}

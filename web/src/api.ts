@@ -156,6 +156,9 @@ export type FriendRelation = {
 };
 export type ConnectionRequests = { incoming: SocialConnection[]; outgoing: SocialConnection[] };
 export type DiscoverablePerson = { id: number; username: string; nickname: string; relationStatus: string };
+export type RelationMention = { id: number; relationLabel: string; relationType: string | null; emotionTags: string | null; triggerSummary: string | null; boundaryHint: string | null };
+export type RelationTimelinePoint = { timestamp: string; emotions: string | null; summary: string | null };
+export type RelationHealth = { relationLabel: string; healthScore: number };
 export type PsychologySkillManifest = {
   id: string; version: string; owner: string; title: Record<string, string>; description: Record<string, string>;
   estimatedMinutes: number; riskTier: "L1" | "L2" | "L3"; agentInvocation: string; userInvocation: string;
@@ -512,7 +515,12 @@ export const api = {
   friends: () => request<SocialConnection[]>("/api/social/friends"),
   requestConnectionFromLetter: (letterId: number) => request<FriendRelation>(`/api/social/connections/from-letter/${letterId}`, { method: "POST" }),
   decideConnection: (id: number, decision: "accept" | "decline") => request<FriendRelation>(`/api/social/friends/${id}/${decision}`, { method: "POST" }),
-  leaveConnection: (id: number) => request<FriendRelation>(`/api/social/friends/${id}/leave`, { method: "POST" })
+  leaveConnection: (id: number) => request<FriendRelation>(`/api/social/friends/${id}/leave`, { method: "POST" }),
+  relations: () => request<RelationMention[]>("/api/relation/list"),
+  relationStats: () => request<Record<string, number>>("/api/relation/stats"),
+  relationHighEmotion: () => request<RelationMention[]>("/api/relation/high-emotion"),
+  relationTimeline: (label: string) => request<RelationTimelinePoint[]>(`/api/relation/timeline?label=${encodeURIComponent(label)}`),
+  relationHealth: (label: string) => request<RelationHealth>(`/api/relation/health?label=${encodeURIComponent(label)}`)
 };
 
 export async function streamAurora(
