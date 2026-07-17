@@ -181,6 +181,22 @@ gates:
           UX-SHELL as near-PASS on the basis of the spaces merely existing.
       - {id: UX-CONTRACTS, target: "Generated typed API client and unified auth, errors, tasks, offline, and telemetry are used.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CONV-003/]}
       - {id: UX-QUALITY, target: "Core routes pass Playwright, visual regression, accessibility, i18n, and performance budgets.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CONV-003/]}
+      - id: UX-VISUAL-SYSTEM
+        target: >-
+          The AppShell renders the authoritative warm "flowing inner cosmos" visual system
+          (对齐文档/11 §14.1 design tokens + UIUXdesign v1.0): design-token layer, warm day/dusk/night
+          palettes, seven time-of-day theming, packaged fonts, five motifs (flow/breath/stardust/
+          ripple/translucence), micro-interactions, and full empty/error/wait/recover states — NOT the
+          cold dark-green/blue "AI console" theme doc-11 forbids.
+        status: IN_PROGRESS
+        evidence: [evidence/experience/EXPERIENCE-VISUAL-P0-tokens/]
+        remaining: >-
+          Checkpoint 1 (2026-07-16) landed the design-token layer + warm night base, remapped the whole
+          styles.css off the cold theme (365 colors -> warm palette; only sanctioned sage/sky/plum kept),
+          build+67/67 web tests green, browser-verified warm (--surface-canvas rgb(33,26,24), r>g>b).
+          Still open: light/morandi + seven time-of-day theming with lerp (needs full var() tokenization
+          first), local font packaging, motifs/micro-interactions/loading-four-states, and §1.2 dead-button
+          Playwright sweep. Tracked as active_front EXPERIENCE-FLOW-OVERHAUL in single-session-state.yml.
       - id: UX-LEGACY
         target: Migrated journeys have no competing legacy physical-page implementation.
         status: IN_PROGRESS

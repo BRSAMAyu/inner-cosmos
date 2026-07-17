@@ -1,3 +1,5 @@
+import { AppearanceToggle } from "./AppearanceToggle";
+
 export type ProductSpace = "aurora" | "cosmos" | "resonance" | "letters" | "me";
 
 export const productSpaces: Array<[ProductSpace, string, string]> = [
@@ -37,6 +39,7 @@ export function MeSpace({ native, connected, wakeIntentCount, activeClaimCount, 
       <article><strong>理解与记忆</strong><span>{activeClaimCount} 条已确认理解</span><button type="button" onClick={() => onNavigate("cosmos")}>纠正、追溯或撤回</button></article>
       <article><strong>共鸣与连接</strong><span>{publicCapsuleCount} 个公开共鸣体 · {friendCount} 个双向连接</span><button type="button" onClick={() => onNavigate("resonance")}>管理授权</button></article>
     </div>
+    <AppearanceToggle />
     {native && <div className="mobile-actions"><button type="button" onClick={onRequestPush}>管理通知权限</button><button type="button" onClick={onRequestMicrophone}>管理麦克风权限</button></div>}
     <button type="button" className="danger-quiet" onClick={onLogout}>安全退出这台设备</button>
   </section>;

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { AsyncButton } from "../loading";
 
 export type AccountBusy = "password" | "export" | "delete" | null;
 
@@ -42,7 +43,7 @@ export function AccountSettings({ busy, message, onChangePassword, onExportData,
       <article>
         <strong>导出我的数据</strong>
         <p className="muted">把你的记忆、画像、共鸣体和慢信打包成一份 JSON 文件。</p>
-        <button type="button" disabled={busy === "export"} onClick={onExportData}>导出数据</button>
+        <AsyncButton busy={busy === "export"} busyText="正在导出" onClick={onExportData}>导出数据</AsyncButton>
       </article>
 
       <article>
@@ -58,7 +59,7 @@ export function AccountSettings({ busy, message, onChangePassword, onExportData,
             {passwordError && <p className="account-error" role="alert">{passwordError}</p>}
             <div className="account-form-actions">
               <button type="button" onClick={closePasswordForm}>取消</button>
-              <button type="button" disabled={busy === "password"} onClick={submitPassword}>确认修改</button>
+              <AsyncButton busy={busy === "password"} busyText="正在修改" onClick={submitPassword}>确认修改</AsyncButton>
             </div>
           </div>}
       </article>
@@ -73,7 +74,7 @@ export function AccountSettings({ busy, message, onChangePassword, onExportData,
             {deleteError && <p className="account-error" role="alert">{deleteError}</p>}
             <div className="account-form-actions">
               <button type="button" onClick={closeDeleteForm}>取消</button>
-              <button type="button" className="danger-quiet" disabled={busy === "delete"} onClick={submitDelete}>确认删除</button>
+              <AsyncButton busy={busy === "delete"} busyText="正在删除" className="danger-quiet" onClick={submitDelete}>确认删除</AsyncButton>
             </div>
           </div>}
       </article>
