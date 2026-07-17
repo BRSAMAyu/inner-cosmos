@@ -1,0 +1,18 @@
+# kind-dev overlay — runs the actual app image (inner-cosmos:dev) standalone on a local kind
+# cluster, in the offline-safe dev profile (H2 + Mock AI, zero secrets). It mirrors the base
+# overlay's operational hardening (probes, resources, PDB, HPA 2..4, rolling update, security
+# context, topology spread, graceful shutdown) so k8s operability — observability, autoscaling,
+# and resilience — can be exercised without cloud, TLS, OIDC, or a real provider.
+#
+#   kind create cluster --name inner-cosmos-ops
+#   kind load docker-image inner-cosmos:dev --name inner-cosmos-ops
+#   kubectl apply -k deploy/k8s/overlays/kind-dev
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: inner-cosmos-dev
+resources:
+  - namespace.yaml
+  - app-deployment.yaml
+  - app-service.yaml
+  - app-hpa.yaml
+  - app-pdb.yaml

@@ -1380,3 +1380,22 @@ supervisor_track_2026_07_17:
       - "./scripts/scan-secrets.sh"
       - "kubectl kustomize deploy/k8s/base >/dev/null && kubectl kustomize deploy/k8s/overlays/academy-eks >/dev/null && echo kustomize-ok"
     blockers: ["Rotate the DeepSeek+GLM keys after session (HG-SECRET-ROTATION) — they were pasted into chat."]
+    committed: e5b081c
+  phase_c_checkpoint:
+    state: OBSERVABILITY_HPA_RESILIENCE_BACKUP_DONE_ON_KIND
+    cluster: "local kind 'inner-cosmos-ops' (control-plane + worker); metrics-server installed (--kubelet-insecure-tls)."
+    done:
+      - "deploy/k8s/overlays/kind-dev: runs the real app image standalone (dev profile, H2+Mock, zero secrets) mirroring base probes/PDB/HPA/rolling/security/graceful — makes the k8s manifests demonstrably runnable, not just kustomize-buildable."
+      - "deploy/k8s/observability (OPS-OBSERVABILITY): Prometheus v2.54 pod-discovery + 4 alert rules + Grafana 11.3 provisioned datasource & App/JVM dashboard. Verified live: both API pods up=1, JVM/HTTP/CPU series present, dashboard rendered under load. evidence/g8/OPS-OBSERVABILITY-001/."
+      - "HPA exercised (ACADEMY-RELIABILITY): fortio load -> cpu 149%/70% -> scale 2->4 -> (load off) 4->2. evidence/g8/HPA-LOAD-001/. Also corrected the false HPA 2..6 evidence claim to 2..4."
+      - "Resilience (OPS-RESILIENCE): pod-kill recovery, zero-downtime rolling restart (avail held 4), node-drain with PDB blocking unsafe eviction + reschedule + continuous 200s. evidence/g8/OPS-RESILIENCE-001/."
+      - "Backup/restore (closes durability gap): deploy/k8s/backup/pg-backup.yaml CronJob; drill 42 rows -> pg_dump -> DROP -> pg_restore -> 42 rows. evidence/g8/BACKUP-RESTORE-001/."
+    next_machine_actions:
+      - "Commit Phase C observability/HPA/resilience/backup. Then finish Phase C: EKS-IAC terraform to validate+plan (install terraform first), CI hardening (SBOM/SAST/scan gating in .github/workflows), and actuator-endpoint lockdown (deferred from Phase A item 3 — separate mgmt port OR Spring Security path rules; verify probes+scrape still work on kind)."
+      - "Then Phase B (keys available, env-only): enable MEMORY_EMBEDDING semantic retrieval + pgvector; ai-lab real-pairwise + wire OptionalLlmJudge; FORGET propagation remaining surfaces."
+    verify_commands:
+      - "kind get clusters   # inner-cosmos-ops"
+      - "kubectl --context kind-inner-cosmos-ops -n inner-cosmos-dev get hpa,pods"
+      - "kubectl --context kind-inner-cosmos-ops -n observability get pods"
+      - "kubectl kustomize deploy/k8s/observability >/dev/null && kubectl kustomize deploy/k8s/overlays/kind-dev >/dev/null && echo ok"
+    known_limitation: "actuator /prometheus is still unauthenticated (repo audit S4-028) — hardening deferred within Phase C; see next_machine_actions."

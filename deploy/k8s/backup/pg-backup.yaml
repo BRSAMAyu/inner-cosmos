@@ -1,0 +1,70 @@
+# PostgreSQL logical backup as-code — closes the durability gap called out in
+# evidence/academy/ACADEMY-LIVE-001 (static hostPath PV, "not durable across node replacement",
+# and backup/restore "not exercised"). The repo already had scripts/backup/backup.sh but it was
+# never wired as an in-cluster resource, so no backups actually ran in the deployed environment.
+#
+# This CronJob runs pg_dump -Fc into a dedicated PVC on a schedule, with retention pruning.
+# Connection params come from a ConfigMap + the existing runtime Secret (same one the app uses),
+# so it drops onto the academy-eks overlay by setting PGHOST/PGDATABASE/PGUSER and pointing
+# PGPASSWORD at inner-cosmos-runtime. Restore drill: see evidence/g8/BACKUP-RESTORE-001/.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: inner-cosmos-backups
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: inner-cosmos-pg-backup
+spec:
+  schedule: "0 3 * * *"            # daily 03:00
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 999
+            fsGroup: 999
+            seccompProfile: {type: RuntimeDefault}
+          containers:
+            - name: pg-backup
+              image: pgvector/pgvector:0.8.1-pg16@sha256:33198da2828a14c30348d2ccb4750833d5ed9a44c88d840a0e523d7417120337
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -eu
+                  TS="$(date +%Y%m%d-%H%M%S)"
+                  OUT="/backups/innercosmos_${TS}.dump"
+                  echo "pg_dump -> ${OUT}"
+                  pg_dump -Fc -f "${OUT}"
+                  # verify the dump is non-trivial, then prune backups older than 30 days
+                  test "$(stat -c%s "${OUT}")" -gt 1024
+                  find /backups -name 'innercosmos_*.dump' -mtime +30 -delete
+                  echo "backup ok: $(ls -l "${OUT}")"
+              env:
+                - {name: PGHOST, value: inner-cosmos-postgres}
+                - {name: PGPORT, value: "5432"}
+                - {name: PGDATABASE, value: inner_cosmos}
+                - {name: PGUSER, value: inner_cosmos}
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: inner-cosmos-runtime
+                      key: SPRING_DATASOURCE_PASSWORD
+              volumeMounts:
+                - {name: backups, mountPath: /backups}
+          volumes:
+            - name: backups
+              persistentVolumeClaim:
+                claimName: inner-cosmos-backups

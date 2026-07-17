@@ -1,0 +1,72 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: observability
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+    rule_files:
+      - /etc/prometheus/rules/*.yml
+    scrape_configs:
+      # Auto-discover any pod annotated prometheus.io/scrape=true (the app carries these).
+      - job_name: kubernetes-pods
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: "true"
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+          - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_component]
+            target_label: component
+      - job_name: prometheus
+        static_configs:
+          - targets: [localhost:9090]
+  rules.yml: |
+    groups:
+      - name: inner-cosmos-app
+        rules:
+          - alert: InnerCosmosApiDown
+            expr: up{component="api"} == 0
+            for: 1m
+            labels: {severity: critical}
+            annotations:
+              summary: "Inner Cosmos API target {{ $labels.pod }} is down"
+              description: "Prometheus has not scraped {{ $labels.pod }} for over 1 minute."
+          - alert: InnerCosmosNoApiReplicas
+            expr: sum(up{component="api"}) < 1
+            for: 1m
+            labels: {severity: critical}
+            annotations:
+              summary: "No Inner Cosmos API replicas are being scraped"
+          - alert: InnerCosmosHighJvmHeap
+            expr: |
+              sum by (pod) (jvm_memory_used_bytes{area="heap"})
+                / sum by (pod) (jvm_memory_max_bytes{area="heap"}) > 0.9
+            for: 5m
+            labels: {severity: warning}
+            annotations:
+              summary: "JVM heap >90% on {{ $labels.pod }}"
+          - alert: InnerCosmosHigh5xxRate
+            expr: |
+              sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+                / clamp_min(sum(rate(http_server_requests_seconds_count[5m])), 1) > 0.05
+            for: 5m
+            labels: {severity: warning}
+            annotations:
+              summary: "HTTP 5xx ratio >5% across the API fleet"

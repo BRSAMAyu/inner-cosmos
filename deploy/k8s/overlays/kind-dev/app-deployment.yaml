@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inner-cosmos-api
+  namespace: inner-cosmos-dev
+  labels:
+    app.kubernetes.io/name: inner-cosmos
+    app.kubernetes.io/component: api
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: inner-cosmos
+      app.kubernetes.io/component: api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: inner-cosmos
+        app.kubernetes.io/component: api
+        inner-cosmos/runtime-role: api
+      annotations:
+        # Scraped by the observability stack (deploy/k8s/observability).
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8080"
+    spec:
+      terminationGracePeriodSeconds: 45
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: inner-cosmos
+              app.kubernetes.io/component: api
+      containers:
+        - name: app
+          # Loaded into kind via `kind load docker-image inner-cosmos:dev`.
+          image: inner-cosmos:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            # Offline-safe dev profile: H2 + Mock AI, no secrets, no external deps.
+            - {name: SPRING_PROFILES_ACTIVE, value: dev}
+            - {name: LLM_MODE, value: dev}
+            - {name: LLM_PROVIDER, value: mock}
+            - {name: MANAGEMENT_HEALTH_REDIS_ENABLED, value: "false"}
+            - {name: INNER_COSMOS_RUNTIME_ROLE, value: api}
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          startupProbe:
+            httpGet: {path: /actuator/health, port: http}
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet: {path: /actuator/health, port: http}
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: {path: /actuator/health, port: http}
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sh", "-c", "sleep 15"]
+          volumeMounts:
+            - {name: data, mountPath: /app/data}
+            - {name: logs, mountPath: /var/log/inner-cosmos}
+      volumes:
+        - name: data
+          emptyDir: {}
+        - name: logs
+          emptyDir: {}
