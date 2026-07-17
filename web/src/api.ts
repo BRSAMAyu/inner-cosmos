@@ -526,6 +526,26 @@ export const api = {
   relationHealth: (label: string) => request<RelationHealth>(`/api/relation/health?label=${encodeURIComponent(label)}`)
 };
 
+export type AsrResult = { text: string; audioDurationSec: number; speechRate: number; pauseCount: number; longPauseCount: number; inputConfidence: number };
+
+// Voice input: multipart upload to the ASR endpoint. Bypasses request()'s JSON Content-Type so the
+// browser sets the multipart boundary; still carries CSRF (session) or bearer (mobile) auth.
+export async function transcribeAudio(blob: Blob): Promise<AsrResult> {
+  const form = new FormData();
+  form.append("file", blob, "voice.webm");
+  const headers = new Headers();
+  const token = await accessTokenProvider?.() ?? null;
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  else { const c = await getCsrf(); headers.set(c.headerName, c.token); }
+  const response = await fetch(apiUrl("/api/asr/transcribe"), {
+    method: "POST", body: form, headers, credentials: token ? "omit" : "include"
+  });
+  if (!response.ok) throw new Error(`ASR HTTP ${response.status}`);
+  const env = await response.json() as ApiEnvelope<AsrResult>;
+  if (!env.success) throw new Error(env.message ?? "语音转写失败");
+  return env.data;
+}
+
 export async function streamAurora(
   input: Pick<CoreChatRequest, "sessionId" | "message"> & { mode: string },
   signal: AbortSignal,

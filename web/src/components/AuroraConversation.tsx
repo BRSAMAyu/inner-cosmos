@@ -1,8 +1,8 @@
-import type { FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 
 export type AuroraUiMessage = { key: string; speaker: "USER" | "AURORA"; text: string; partial?: boolean };
 
-export function AuroraConversation({ messages, activeTurnId, draft, sessionReady, onDraftChange, onSubmit, onStop }: {
+export function AuroraConversation({ messages, activeTurnId, draft, sessionReady, onDraftChange, onSubmit, onStop, onTranscribe }: {
   messages: AuroraUiMessage[];
   activeTurnId: number | null;
   draft: string;
@@ -10,7 +10,37 @@ export function AuroraConversation({ messages, activeTurnId, draft, sessionReady
   onDraftChange: (value: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onStop: () => void;
+  onTranscribe?: (blob: Blob) => Promise<string>;
 }) {
+  const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const voiceSupported = typeof navigator !== "undefined"
+    && !!navigator.mediaDevices?.getUserMedia && typeof MediaRecorder !== "undefined";
+
+  const startRecording = async () => {
+    if (!onTranscribe || !voiceSupported) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const rec = new MediaRecorder(stream);
+      chunksRef.current = [];
+      rec.ondataavailable = event => { if (event.data.size > 0) chunksRef.current.push(event.data); };
+      rec.onstop = async () => {
+        stream.getTracks().forEach(track => track.stop());
+        const blob = new Blob(chunksRef.current, { type: rec.mimeType || "audio/webm" });
+        setTranscribing(true);
+        try { const text = await onTranscribe(blob); if (text) onDraftChange((draft ? draft + " " : "") + text); }
+        catch { /* surfaced upstream via status; keep the composer usable */ }
+        finally { setTranscribing(false); }
+      };
+      recorderRef.current = rec;
+      rec.start();
+      setRecording(true);
+    } catch { setRecording(false); }
+  };
+  const stopRecording = () => { recorderRef.current?.stop(); setRecording(false); };
+
   return <>
     <section className="conversation" aria-live="polite" aria-label="与 Aurora 的对话">
       {messages.length === 0 && <div className="empty"><span>✦</span><p>把现在最真实的一句话放在这里。</p></div>}
@@ -27,6 +57,13 @@ export function AuroraConversation({ messages, activeTurnId, draft, sessionReady
           if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); }
         }} />
       <div className="actions">
+        {onTranscribe && voiceSupported && <button type="button"
+          className={"voice" + (recording ? " recording" : "")}
+          disabled={transcribing || !sessionReady}
+          aria-pressed={recording}
+          aria-label={recording ? "停止录音并转写" : "用语音输入"}
+          onClick={() => recording ? stopRecording() : void startRecording()}>
+          {transcribing ? "转写中…" : recording ? "● 停止录音" : "🎤 语音"}</button>}
         {activeTurnId && <button type="button" className="stop" onClick={onStop}>停止回应</button>}
         <button type="submit" className="send" disabled={!draft.trim() || !sessionReady}>{activeTurnId ? "打断并发送" : "发送"}</button>
       </div>
