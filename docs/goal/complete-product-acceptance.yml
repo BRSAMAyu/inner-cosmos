@@ -322,7 +322,7 @@ gates:
     required: true
     acceptance:
       - {id: FINAL-E2E, target: "Web, PWA, and mobile complete-product journeys pass against a production-like environment.", status: UNASSESSED, evidence: []}
-      - {id: FINAL-DEMO, target: "An 8-12 minute reproducible demo proves product differentiation, AI depth, data lineage, and Kubernetes operations.", status: UNASSESSED, evidence: []}
+      - {id: FINAL-DEMO, target: "An 8-12 minute reproducible demo proves product differentiation, AI depth, data lineage, and Kubernetes operations.", status: IN_PROGRESS, evidence: [evidence/g9/FINAL-DEMO-001/, evidence/g9/TRACEABILITY-SNAPSHOT-2026-07-17.md], remaining: "2026-07-17: reproducible demo SCRIPT written covering all four elements, every step exercised this session (one-command dev compose; real-DeepSeek + dual-kernel pairwise; semantic-retrieval + provenance; live kind observability/HPA/resilience/backup; outbox DLQ). Remaining for PASS: one recorded end-to-end run captured by a NON-AUTHOR driving it from a clean checkout."}
       - {id: FINAL-USABILITY, target: "Non-author participants complete core tasks and articulate the unique value without developer explanation.", status: UNASSESSED, evidence: []}
       - {id: FINAL-OPERATIONS, target: "Release, rollback, incident, provider failure, data-rights, and disaster-recovery runbooks are independently exercised.", status: UNASSESSED, evidence: []}
       - {id: FINAL-TRACEABILITY, target: "Every required acceptance item points to current reproducible evidence and no hidden P0 blocker remains.", status: UNASSESSED, evidence: []}
