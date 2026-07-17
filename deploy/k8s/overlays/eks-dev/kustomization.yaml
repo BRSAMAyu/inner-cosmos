@@ -1,0 +1,18 @@
+# eks-dev overlay — deploys the real app image to a live EKS cluster (AWS Academy Learner Lab),
+# reusing the kind-dev manifests (dev profile, H2 + Mock, mirrors base hardening) and swapping in the
+# amd64 image pushed to ECR, plus a Gateway + HTTPRoute on the cluster's `eg` GatewayClass for a real
+# external LoadBalancer URL. Proves the workload runs on genuine EKS nodes with real autoscaling/resilience.
+#
+#   ./mvnw -DskipTests package && docker buildx build --platform linux/amd64 \
+#     -f deploy/eks/Dockerfile.runtime -t <ecr>/inner-cosmos:eks-dev --push .   (see Dockerfile.runtime note)
+#   aws eks update-kubeconfig --name MyEKS && kubectl apply -k deploy/k8s/overlays/eks-dev
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../kind-dev
+  - gateway.yaml
+  - httproute.yaml
+images:
+  - name: inner-cosmos
+    newName: 477296622190.dkr.ecr.us-east-1.amazonaws.com/inner-cosmos
+    newTag: eks-dev

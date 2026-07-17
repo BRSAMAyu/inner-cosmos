@@ -1423,5 +1423,18 @@ supervisor_track_2026_07_17:
       - "Optional: ARCH-MODULES design decision; full app-E2E semantic retrieval with real GLM embedder; FORGET propagation remaining surfaces; per-role bean-presence slice test."
     verify_commands:
       - "docker running required for: ./mvnw -Dtest=JdbcOutboxRepositoryIntegrationTest test (3/3)"
+  real_eks_checkpoint:
+    state: APP_DEPLOYED_AND_OPERATED_ON_LIVE_AWS_EKS
+    context: "Operator provided AWS Academy Learner Lab creds (temporary, ~/.aws only, never committed). Cluster MyEKS, k8s 1.36, 2 amd64 EC2 nodes, envoy-gateway (GatewayClass eg) + metrics-server + gp2 present. Disposable guestbook removed (operator-authorized)."
+    done:
+      - "Cross-built amd64 image (arm64 dev image won't run on amd64 nodes) via deploy/eks/Dockerfile.runtime (copies pre-built fat-jar onto amd64 JRE, no emulated Maven build); pushed to ECR 477296622190.dkr.ecr.us-east-1.amazonaws.com/inner-cosmos:eks-dev @ sha256:dad7f1ed..."
+      - "deploy/k8s/overlays/eks-dev (reuses kind-dev + ECR image + Gateway/HTTPRoute on GatewayClass eg). Deployed to EKS: 2 pods across both nodes, real AWS ELB serves /app/aurora/ (AppShell) + /actuator/health UP."
+      - "REAL-CLOUD HPA: cpu 339%/70% -> scaled 2->4 (2+2 across nodes). REAL-CLOUD resilience: pod-kill kept ELB at 200 (5/5), zero-downtime rolling restart. Evidence: evidence/g8/EKS-LIVE-002/."
+    next_machine_actions:
+      - "Optional deeper: deploy the full prod academy-eks overlay on EKS (postgres/redis/TLS/OIDC/real-provider) — needs real IdP issuer + provider secret as k8s Secrets; deploy observability stack on EKS; run node-drain on EKS."
+      - "Teardown when done to free Learner Lab budget: kubectl delete -k deploy/k8s/overlays/eks-dev (removes the ELB)."
+    verify_commands:
+      - "aws eks update-kubeconfig --name MyEKS && kubectl -n inner-cosmos-dev get pods,hpa,gateway"
+      - "curl http://<gateway-elb>/actuator/health   # {\"status\":\"UP\"}"
       - "Finish Phase C: EKS-IAC terraform validate/plan (install terraform), CI hardening (SBOM/SAST), actuator lockdown (spawned as task_bb411aa8)."
       - "Phase E (G9): FINAL-E2E, 8-12min demo, FINAL-OPERATIONS runbook + non-author rehearsal, FINAL-TRACEABILITY matrix -> declare RC."
