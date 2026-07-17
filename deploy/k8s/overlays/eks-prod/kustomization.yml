@@ -25,3 +25,10 @@ patches:
       - op: replace
         path: /spec/gatewayClassName
         value: eg
+      # Enable ELB cross-zone load balancing so every AZ's ELB node reaches the (single-AZ) envoy proxy —
+      # otherwise DNS handing out a node in an AZ without a healthy target makes external access time out.
+      - op: add
+        path: /spec/infrastructure
+        value:
+          annotations:
+            service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
