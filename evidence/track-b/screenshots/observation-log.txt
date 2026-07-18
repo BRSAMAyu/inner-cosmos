@@ -1,0 +1,46 @@
+console.error: Failed to load resource: the server responded with a status of 401 ()
+screenshot: 01-register-page-desktop.png
+register inputs: [{"name":"","id":"username","type":"text","placeholder":"给自己取一个名字"},{"name":"","id":"nickname","type":"text","placeholder":"怎么称呼你（可选）"},{"name":"","id":"password","type":"password","placeholder":"设置密码（至少 8 位）"},{"name":"","id":"password2","type":"password","placeholder":"再输入一次密码"}]
+confirm password field filled: true
+nickname field filled: true
+screenshot: 02-register-filled-desktop.png
+register submit button found: true
+screenshot: 03-register-result-desktop.png
+url after register submit: http://localhost:8080/app/aurora/
+screenshot: 03b-register-after-redirect-desktop.png
+url after redirect wait: http://localhost:8080/app/aurora/
+screenshot: 04-aurora-shell-initial-desktop.png
+url at aurora shell: http://localhost:8080/app/aurora/
+aurora shell initial text snippet: ✦ | Inner Cosmos | 今天 | Aurora | 内宇宙 | 记忆与自我理解 | 共鸣 | 共鸣体与相遇 | 连接 | 慢信与关系 | 我的 | 控制与边界 | INNER COSMOS · AURORA | 可以被打断的陪伴， | 才是真的在听。 | 你不需要等 Aurora 说完。新消息会成为新的理解输入，而不是错误。 | 在这里 | 倾诉 | 整理 | 追问 | 行动 | 关系 | AURORA RETURNS | 回来约定 | 什么时候合适 | 和 Aurora 约好 | 现在没有约定。需要时，你可以邀请 Aurora 在合适的时候回来。 | AURORA, BECOMING | 她最近学会了什么 | v1 | Aurora 的连续自我从这里开始；后续变化会说明来源、评测与回退
+No login form found on /app/aurora/ -- registration session carried over automatically (cookie-based).
+console.error: Failed to load resource: the server responded with a status of 403 ()
+screenshot: 10-space-aurora-desktop.png
+space=aurora desktop text length=398
+console.error: Failed to load resource: the server responded with a status of 403 ()
+screenshot: 10-space-cosmos-desktop.png
+space=cosmos desktop text length=868
+screenshot: 10-space-resonance-desktop.png
+space=resonance desktop text length=2912
+console.error: Failed to load resource: the server responded with a status of 403 ()
+screenshot: 10-space-letters-desktop.png
+space=letters desktop text length=898
+console.error: Failed to load resource: the server responded with a status of 403 ()
+screenshot: 10-space-me-desktop.png
+space=me desktop text length=593
+screenshot: 20-space-aurora-mobile.png
+screenshot: 20-space-cosmos-mobile.png
+screenshot: 20-space-resonance-mobile.png
+screenshot: 20-space-letters-mobile.png
+screenshot: 20-space-me-mobile.png
+composer textarea found: true
+screenshot: 30-aurora-composer-filled-desktop.png
+send button found: true
+screenshot: 31-aurora-thinking-state-desktop.png
+screenshot: 32-aurora-mid-response-desktop.png
+screenshot: 33-aurora-response-settled-desktop.png
+offline reload error: page.reload: net::ERR_INTERNET_DISCONNECTED
+Call log:
+[2m  - waiting for navigation until "domcontentloaded"[22m
+
+offline body text snippet: 
+expired-auth body text snippet: INNER COSMOS | 回到你的内宇宙 | 用户名 | 密码 | 登录

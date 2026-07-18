@@ -1,7 +1,7 @@
 schema_version: 1
 track_id: TRACK-B
 name: Complete Experience and Delivery
-status: NOT_STARTED
+status: IN_PROGRESS
 implementation_audit_base: 97500a385a1fa1a5f0e4c3bbb6e2c1b0c895ec61
 minimum_handoff_commit: 7e0688308292cd9d41552c98f576d25681738be0
 base_sha: 14e1b85596034544b7fb291677fb8dd3f8240f1c
@@ -11,9 +11,17 @@ updated_at: "2026-07-18"
 spec: docs/tracks/TRACK-B-COMPLETE-EXPERIENCE.md
 evidence_root: evidence/track-b
 integration_requests: docs/goal/tracks/track-b-integration-requests.yml
-current_front: B0-experience-observation
+current_front: B1-product-architecture
 workstreams:
-  B0-experience-observation: {status: NOT_STARTED, evidence: [], remaining: "Observe the live product and freeze first, longitudinal, resonance and recovery journeys."}
+  B0-experience-observation:
+    status: DONE
+    evidence:
+      - evidence/track-b/README.md
+      - evidence/track-b/experience-inventory.md
+      - evidence/track-b/golden-journeys.md
+      - evidence/track-b/screenshots/
+      - evidence/track-b/scripts/observe-b0-journeys.mjs
+    remaining: "Live-verified only J1 (partially), the Aurora conversation itself, offline reload, and expired-auth deep link. J2 (WakeIntent return), most of J3 (capsule compile/sandbox/match-chat/slow-letter), provider-unavailable, denied-permission, partial-stream-reconnect, conflicting-correction and withdrawn-data recovery paths are still UNVERIFIED live (see golden-journeys.md verification tags) -- retest as B1/B2 build the real flows, do not assume DONE means fully exercised."
   B1-product-architecture: {status: NOT_STARTED, evidence: [], remaining: "Refactor routes, AppShell, domain state and progressive disclosure."}
   B2-visible-innovation: {status: NOT_STARTED, evidence: [], remaining: "Make living Aurora, Inner Cosmos and resonance differentiation immediately visible."}
   B3-design-content: {status: NOT_STARTED, evidence: [], remaining: "Complete design primitives, content states, responsive polish and visual regression."}
@@ -21,10 +29,30 @@ workstreams:
   B5-pwa-mobile: {status: NOT_STARTED, evidence: [], remaining: "Complete install/offline/update and all machine-actionable Capacitor checks."}
   B6-local-complete: {status: NOT_STARTED, evidence: [], remaining: "Make the complete real-provider product reproducible locally from a clean checkout."}
   B7-demo-handoff: {status: NOT_STARTED, evidence: [], remaining: "Deliver full E2E, 8-12 minute demo and non-author product/operations handoff."}
-latest_checkpoint: null
+latest_checkpoint: "B0 experience observation complete; product run live in dev profile (H2 + Mock), five spaces walked desktop+mobile, one real Aurora conversation driven, offline and expired-auth recovery states forced live. See evidence/track-b/README.md."
 commits: []
-verification: {}
+verification:
+  B0_observation:
+    method: "Live browser walk via Playwright (evidence/track-b/scripts/observe-b0-journeys.mjs), dev profile, H2 + Mock AI provider, no real keys."
+    frontend_build: "cd web && npm ci && npm run build -- PASS, no rebuild committed (no source changes made, output was byte-identical to HEAD after line-ending normalization; discarded to keep the tree clean)."
+    server: "./mvnw.cmd spring-boot:run under JAVA_HOME=jdk-21.0.10, reached http://localhost:8080/app/aurora/ with HTTP 200; /actuator/health reported DOWN only because of Redis health indicator (no Redis in dev profile) -- not a functional blocker, noted as a discovery below."
 human_gates: []
 blockers: []
-discoveries: []
-handoff_notes: []
+discoveries:
+  - "The React AppShell (/app/aurora/) has no registration form or register link at all; the only working registration entry point is the legacy static page /pages/register.html, completely unlinked from the new app. A user following CLAUDE.md's own run instructions hits a dead-end login form. This is the top-priority B1 fix."
+  - "Registration -> AppShell session hand-off already works correctly: register.html redirects to /app/aurora/ and the cookie session carries over with no forced re-login."
+  - "The Aurora conversation experience itself is already in good shape: live-verified multi-message pacing, a visible stop/interrupt control pair while streaming, and a dual-core status signal ('理解与表达双核协作'). Preserve this through the B1 refactor rather than rebuilding it."
+  - "No real client routes exist anywhere; navigation is a single ?space= query param on one path (/app/aurora/), and all five spaces are simultaneously mounted in the DOM (toggled via the hidden attribute) out of one 1292-line AuroraApp.tsx with 60+ useState hooks. Confirms 对齐文档/20 4.3 with fresh evidence, not just re-citing the doc."
+  - "Mobile bottom navigation is not fixed/sticky -- on the Aurora space it renders inline after the hero/mode-picker/WakeIntent/Self-Emergence blocks, pushing both the nav and the message composer below the fold on first load. Screenshot: evidence/track-b/screenshots/20-space-aurora-mobile.png."
+  - "No PWA offline shell exists: forcing the browser fully offline and reloading produces a blank browser network-error page, not a branded offline state. Screenshot: evidence/track-b/screenshots/40-offline-reload-desktop.png."
+  - "Expired/cleared-cookie deep links (e.g. ?space=cosmos) silently drop the intended target and show a bare, unexplained login form with no register link; user always lands back on the default aurora space after re-login. Screenshot: evidence/track-b/screenshots/41-expired-auth-desktop.png."
+  - "The Resonance space ships 11 fully-written sample capsule personas (洛哥, 苏格拉底, 庄周, ...) visible to every brand-new, zero-activity account, grouped by all five target matching strategies. Whether this is intentional sample/practice content or leaked seed data is UNRESOLVED and should be a first product decision for B1/B2 before designing the Resonance first-run state."
+  - "The People-Discovery list (Connections space) surfaces QA/test accounts to real users -- observed 'CSRF Runtime' x3, 'CSRF Check', 'Header', 'Smoke', and two of this pass's own throwaway B0-observer test accounts, all listed as people a brand-new real user could 'want to get to know'. Every registered account, including automated test ones, appears to be globally discoverable by default with no filtering. Needs a backend-side fix (track-b-integration-requests.yml candidate) before any local-complete demo is trusted."
+  - "A shared loading/error primitive set already exists (web/src/loading.tsx: useDelayedBusy 3-tier timing, ConnectError, AsyncButton) implementing 对齐文档/11 14.3's loading-state rule correctly. B1's 'single async/task/error model' work should audit for consistent adoption across components rather than invent a new primitive from scratch."
+  - "Every full navigation to /app/aurora/?space=<x> logs one console `403 POST /api/dialog/session/create` (confirmed the exact URL with a dedicated network-tap script). The conversation still works, so this reads as a redundant 'ensure session' bootstrap call re-firing on every full-page reload rather than a functional break -- silent to the user today, but worth Track A/B1 follow-up as part of consolidating bootstrap/session logic."
+  - "Theme inconsistency: /pages/register.html and /app/aurora/ rendered in opposite time-of-day themes (light/day vs dark/night) at the identical wall-clock moment, because they are two separate implementations that don't share the same time-of-day computation."
+  - "Portrait ('Aurora 眼中的你') is currently rendered inside the Me space, not Inner Cosmos, contradicting the target IA table in 对齐文档/09 5. Needs a deliberate decision in B1: move the component, or update the spec's target home for Portrait."
+handoff_notes:
+  - "B0 is observation-only per the task charter -- nothing above was fixed in this pass. golden-journeys.md's 'What this unblocks for B1' section is the prioritized starting backlog for the next session: (1) unify the login/register entry surface, (2) reorder the mobile Aurora space so the composer is reachable without scrolling past capability displays, (3) resolve what the 11 Resonance personas are, (4) get a dev-safe way to fast-forward WakeIntent arrival so J2 can be driven end-to-end, (5) filter test/service accounts out of People Discovery, (6) build a real offline app shell."
+  - "J2 (WakeIntent longitudinal return) and most of J3 (capsule compile/sandbox/persona-chat/slow-letter send) could not be live-verified in a single observation pass without either waiting real wall-clock time or fabricating account history that would need to be cleaned up before a trusted demo. Treat every UNVERIFIED row in golden-journeys.md as real backlog, not as 'probably fine'."
+  - "evidence/track-b/scripts/observe-b0-journeys.mjs is reusable for future checkpoints -- rerun it after any B1/B2 change to re-screenshot the same five spaces and compare before/after."
