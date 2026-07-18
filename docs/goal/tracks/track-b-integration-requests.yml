@@ -2,9 +2,33 @@ schema_version: 1
 track_id: TRACK-B
 minimum_handoff_commit: 7e0688308292cd9d41552c98f576d25681738be0
 track_base_sha: 14e1b85596034544b7fb291677fb8dd3f8240f1c
-status: EMPTY
+status: OPEN
 instructions: >-
   Track B appends every backend capability needed by a user journey. Each entry must include user
   impact, priority, desired typed contract, loading/error/retry semantics, temporary fixture/adapter,
   acceptance test and affected Track A workstream. Track B does not edit Java or DB migrations.
-requests: []
+requests:
+  - id: TB-REQ-001
+    title: "Filter QA/service/test accounts out of People Discovery"
+    user_impact: >-
+      Every brand-new real account currently sees automated test/QA accounts (observed:
+      "CSRF Runtime" x3, "CSRF Check", "Header", "Smoke", and throwaway B0-observation accounts)
+      listed as real people to "get to know" in Connections > People Discovery. This is visible to
+      any real user and to any demo audience, and undermines trust in the product on first contact.
+    desired_contract: >-
+      GET /api/connections/discoverable (or equivalent backing api.discoverPeople()) should exclude
+      accounts flagged as synthetic/test/service, e.g. via an `accountKind` or `isTestAccount` column,
+      or a naming/seed-source convention the backend already tracks, rather than requiring the
+      frontend to pattern-match usernames.
+    priority: P1
+    loading_error_semantics: "No change to existing empty/error states; only the candidate set narrows."
+    temporary_fixture: >-
+      web/src/testAccountFilter.ts (excludeTestAccounts) wraps both api.discoverPeople() call sites
+      in AuroraApp.tsx through a client-side denylist (case-insensitive username/nickname substring
+      match: csrf, smoke, header, qa-, test-, b0-observer) -- see the `// TB-REQ-001` marker. This is
+      an honest, removable stopgap, not a security boundary; delete the whole module and its test
+      once the backend filters at the source.
+    acceptance_test: "web/src/testAccountFilter.test.ts covers the denylist; remove it when the fixture is removed."
+    affected_track_a_workstream: "A2-memory-profile or account/data-plane ownership (whichever owns account provenance/seeding)"
+    evidence: evidence/track-b/golden-journeys.md#J3 (discovery finding), evidence/track-b/experience-inventory.md
+    status: OPEN

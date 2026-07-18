@@ -20,6 +20,7 @@ import { PortraitView } from "./components/PortraitView";
 import { AccountSettings, type AccountBusy } from "./components/AccountSettings";
 import { PsychologySkillStudio, SkillSuggestionBanner, type SkillLocale } from "./components/PsychologySkillStudio";
 import { ConnectError, LoadingText } from "./loading";
+import { excludeTestAccounts } from "./testAccountFilter";
 
 type RuntimeSignal = { stage: "idle" | "understanding" | "composing" | "speaking"; runtime: "single" | "dual"; relationshipMove?: string; repaired?: boolean };
 const terminal = new Set<TurnStatus>(["COMPLETED", "INTERRUPTED", "CANCELLED"]);
@@ -183,7 +184,7 @@ export function AuroraApp() {
         api.recentCorrections().then(setCorrections),
         api.plazaCapsules().then(setPublicCapsules).catch(() => undefined),
         api.letterOutbox().then(setLetterOutbox).catch(() => undefined),
-        api.discoverPeople().then(setPeople).catch(() => undefined),
+        api.discoverPeople().then(people => setPeople(excludeTestAccounts(people))).catch(() => undefined),
         api.claimCandidates().then(setClaimCandidates).catch(() => undefined),
         api.relations().then(setRelations).catch(() => undefined),
         api.letterThreads().then(setLetterThreads).catch(() => undefined)
@@ -991,7 +992,7 @@ export function AuroraApp() {
     const [requests, accepted, discoverable] = await Promise.all([
       api.connectionRequests(), api.friends(), api.discoverPeople().catch(() => people)
     ]);
-    setConnectionRequests(requests); setFriends(accepted); setPeople(discoverable);
+    setConnectionRequests(requests); setFriends(accepted); setPeople(excludeTestAccounts(discoverable));
   };
 
   const requestPersonConnection = async (userId: number) => {
