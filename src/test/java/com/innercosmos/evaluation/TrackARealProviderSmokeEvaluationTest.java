@@ -22,6 +22,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -45,12 +47,39 @@ import static org.mockito.Mockito.when;
  * {@code allowFallback} is set to {@code false} on every real client constructed here, so a
  * provider failure surfaces as a thrown {@link com.innercosmos.exception.AiProviderException}
  * rather than a silently-substituted Mock response being reported as a real success.
+ *
+ * <p><b>A1-living-aurora regression gate (added after the schema-embedding fix):</b> this suite
+ * originally only recorded {@code badOutputEventsInThisCall} as evidence. Once
+ * {@link AuroraDualKernelRuntime#generate} was fixed to embed an inline JSON schema example in
+ * its plan/speaker (and critic) instructions, every dual-kernel {@code CALLED} run against a real
+ * provider parsed cleanly on the first attempt in this session's evidence — see
+ * {@code evidence/track-a/A1-living-aurora/}. {@link #assertNoBadOutputRegressionOnDualKernel} now
+ * asserts {@code badOutputEventsInThisCall == 0} for every dual-kernel {@code CALLED} row so a
+ * future prompt/runtime change that reintroduces the schema-drift bug shows up as a real,
+ * non-author-verifiable test failure instead of silently regressing.
+ *
+ * <p><b>Declared demo latency budgets (A1 §5 "P95 first-visible-message and total latency stay
+ * within declared demo budgets"):</b> {@link #SINGLE_PASS_LATENCY_CEILING_MS} and
+ * {@link #DUAL_KERNEL_LATENCY_CEILING_MS} are generous per-call ceilings (not tight SLA targets)
+ * chosen from this session's observed real-provider range (single-pass up to ~18.8s on MiniMax;
+ * dual-kernel up to ~29.8s on GLM pre-fix, ~24.3s post-fix) plus headroom, so the assertion catches
+ * a genuine hang/regression without being flaky on ordinary network/provider variance. Dual-kernel
+ * necessarily costs more than single-pass (plan + speaker + conditional critic are sequential real
+ * calls) — TRACK-A-LIVING-INTELLIGENCE.md §5 asks the dual/adaptive system to be non-inferior on
+ * quality and to stay within a declared budget, not to match single-pass latency call-for-call.
+ * True P95 needs a larger sample than this smoke suite's n=2 scenarios; {@code latencyP95Ms} here
+ * is computed nearest-rank over the samples actually collected this run and reported as such, not
+ * claimed as a statistically robust P95.
  */
 @Tag("real-provider")
 class TrackARealProviderSmokeEvaluationTest {
 
     private static final NoOpAiLogService LOG = new NoOpAiLogService();
     private static final java.util.concurrent.Executor DIRECT = Runnable::run;
+
+    /** Declared demo budget ceilings — see class javadoc for how these were chosen. */
+    private static final double SINGLE_PASS_LATENCY_CEILING_MS = 30_000.0;
+    private static final double DUAL_KERNEL_LATENCY_CEILING_MS = 60_000.0;
 
     @Test
     void glmRealProviderSinglePassVsDualKernelSmoke() throws Exception {
@@ -85,7 +114,7 @@ class TrackARealProviderSmokeEvaluationTest {
             row.put("status", "SKIPPED_NO_CREDENTIAL");
             row.put("note", "environment variable not set for this session; never falls back to Mock silently");
             rows.add(row);
-            writeReport(providerName, rows);
+            writeReport(providerName, rows, null);
             return;
         }
 
@@ -145,7 +174,60 @@ class TrackARealProviderSmokeEvaluationTest {
                 rows.add(row);
             }
         }
-        writeReport(providerName, rows);
+
+        // A1 regression gate: the schema-embedding fix in AuroraDualKernelRuntime must keep every
+        // real-provider dual-kernel CALLED run parsing cleanly on the first attempt. See class
+        // javadoc — this is the permanent test for the finding recorded in
+        // evidence/track-a/A0-quality-laboratory/README.md §4 and fixed for A1.
+        for (Map<String, Object> row : rows) {
+            if ("dual-kernel".equals(row.get("variant")) && "CALLED".equals(row.get("status"))) {
+                assertEquals(0L, row.get("badOutputEventsInThisCall"),
+                        providerName + "/" + row.get("scenarioId") + ": dual-kernel schema-drift regression — "
+                                + "plan/speaker instructions should embed an inline JSON schema example "
+                                + "(A1 fix) so real providers parse on the first attempt");
+            }
+        }
+
+        // A1 declared demo latency budget (see class javadoc for how the ceilings were chosen).
+        // A soft ceiling on real network calls, not a tight SLA — it exists to catch a genuine
+        // hang/regression, not ordinary provider latency variance.
+        for (Map<String, Object> row : rows) {
+            if (!"CALLED".equals(row.get("status"))) continue;
+            double latency = (double) row.get("latencyMs");
+            double ceiling = "dual-kernel".equals(row.get("variant"))
+                    ? DUAL_KERNEL_LATENCY_CEILING_MS : SINGLE_PASS_LATENCY_CEILING_MS;
+            assertTrue(latency <= ceiling, providerName + "/" + row.get("scenarioId") + "/" + row.get("variant")
+                    + ": latency " + latency + "ms exceeded declared demo budget ceiling " + ceiling + "ms");
+        }
+
+        Map<String, Object> latencyBudget = new LinkedHashMap<>();
+        latencyBudget.put("singlePassCeilingMs", SINGLE_PASS_LATENCY_CEILING_MS);
+        latencyBudget.put("dualKernelCeilingMs", DUAL_KERNEL_LATENCY_CEILING_MS);
+        latencyBudget.put("singlePassLatencyP95Ms", p95(latenciesFor(rows, "single-pass")));
+        latencyBudget.put("dualKernelLatencyP95Ms", p95(latenciesFor(rows, "dual-kernel")));
+        latencyBudget.put("note", "Nearest-rank P95 over this run's own samples (n=" + SMOKE_SCENARIOS.length
+                + " scenarios) — an evidence figure, not a statistically robust P95 over a large population.");
+
+        writeReport(providerName, rows, latencyBudget);
+    }
+
+    private static List<Double> latenciesFor(List<Map<String, Object>> rows, String variant) {
+        List<Double> latencies = new ArrayList<>();
+        for (Map<String, Object> row : rows) {
+            if (variant.equals(row.get("variant")) && "CALLED".equals(row.get("status"))) {
+                latencies.add((double) row.get("latencyMs"));
+            }
+        }
+        return latencies;
+    }
+
+    /** Nearest-rank P95 over a small sample; returns null when there is nothing to measure. */
+    private static Double p95(List<Double> latencies) {
+        if (latencies.isEmpty()) return null;
+        List<Double> sorted = new ArrayList<>(latencies);
+        sorted.sort(Double::compareTo);
+        int rank = (int) Math.ceil(0.95 * sorted.size()) - 1;
+        return sorted.get(Math.max(0, Math.min(rank, sorted.size() - 1)));
     }
 
     private static final List<String> FALLBACK_SENTINEL_SEGMENTS = List.of("我在。");
@@ -173,13 +255,15 @@ class TrackARealProviderSmokeEvaluationTest {
         return result;
     }
 
-    private void writeReport(String providerName, List<Map<String, Object>> rows) throws Exception {
+    private void writeReport(String providerName, List<Map<String, Object>> rows, Map<String, Object> latencyBudget)
+            throws Exception {
         Map<String, Object> report = new LinkedHashMap<>();
         report.put("suite", "track-a-real-provider-smoke-v1");
         report.put("provider", providerName);
         report.put("note", "No credential VALUES are read into or written by this report — only env VAR "
                 + "NAMES and structural outcomes (status/latency/segmentCount) are captured.");
         report.put("runs", rows);
+        if (latencyBudget != null) report.put("latencyBudget", latencyBudget);
         Path reportPath = Path.of("target", "track-a-eval", "real-provider-smoke-" + providerName.toLowerCase() + ".json");
         Files.createDirectories(reportPath.getParent());
         new ObjectMapper().writerWithDefaultPrettyPrinter().writeValue(reportPath.toFile(), report);
