@@ -1,6 +1,6 @@
 # Track B Goal Prompt
 
-在 `D:\code\inner cosmos` 从精确基线 `97500a385a1fa1a5f0e4c3bbb6e2c1b0c895ec61` 创建并工作在 `codex/track-b-complete-experience`。先完整阅读 `AGENTS.md`、`goal-objective.md`、`对齐文档/README.md`、`对齐文档/19-双轨并行完全体收敛与交接计划.md`、`对齐文档/20-当前状态重对账与完全体差距基线.md`、`对齐文档/18-组员与Coding-Agent启动部署交接指南.md` 与 `docs/tracks/TRACK-B-COMPLETE-EXPERIENCE.md`，然后实际启动并逐页体验当前 Web/移动/本地部署，不要只根据旧文档判断。
+在 `D:\code\inner cosmos` 先同步负责人指定的最新 `main`，确认当前 HEAD 包含最低交接提交 `7e0688308292cd9d41552c98f576d25681738be0`，并与 Track A 使用完全相同的 HEAD；把 `git rev-parse HEAD` 写入 Track B 状态/契约文件后创建并工作在 `codex/track-b-complete-experience`。先完整阅读 `AGENTS.md`、`goal-objective.md`、`对齐文档/README.md`、`对齐文档/19-双轨并行完全体收敛与交接计划.md`、`对齐文档/20-当前状态重对账与完全体差距基线.md`、`对齐文档/18-组员与Coding-Agent启动部署交接指南.md` 与 `docs/tracks/TRACK-B-COMPLETE-EXPERIENCE.md`，然后实际启动并逐页体验当前 Web/移动/本地部署，不要只根据旧文档判断。`97500a3` 只是实现审查基线，不是建分支点。
 
 你的唯一目标是完整实现 Track B：把现有庞大能力收拢成自然、惊艳、无需开发者解释的完整产品。完成黄金首次、纵向回访和共鸣旅程；重构超大 AppShell、真实路由和领域状态；用渐进披露消除能力堆叠；让 Aurora 多消息/思考/打断/主动回访、可纠正画像、星空和高保真共鸣在 UI 上一眼可见；完成中英/en-SG、WCAG 2.2 AA 目标、视觉回归、性能、PWA、Capacitor 可执行部分；把 PostgreSQL/pgvector + TLS Redis + 真实 Provider 的 `local-complete` 做成干净仓库可复现的主要产品真相，并交付完整 Playwright 与 8—12 分钟非作者 Demo。Academy EKS 只证明同镜像云原生能力，不得因其限制削减本地完整体验。
 

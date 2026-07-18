@@ -1,7 +1,8 @@
 # Track A — Living Intelligence & Data Truth
 
 > Branch: `codex/track-a-living-intelligence`
-> Base: `97500a385a1fa1a5f0e4c3bbb6e2c1b0c895ec61`
+> Audited implementation base: `97500a385a1fa1a5f0e4c3bbb6e2c1b0c895ec61`
+> Branch base: the same current `main` as Track B, containing handoff commit `7e06883`; record its full SHA at start
 > Owner: group member A + continuous-loop Coding Agent
 > Primary surfaces: Java backend, AI runtime, data model/migrations, AI Lab and Track A evidence.
 

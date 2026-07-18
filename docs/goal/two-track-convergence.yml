@@ -2,7 +2,10 @@ schema_version: 1
 goal_id: INNER-COSMOS-TWO-TRACK-CONVERGENCE
 status: READY_FOR_PARALLEL_EXECUTION
 base_branch: main
-base_sha: 97500a385a1fa1a5f0e4c3bbb6e2c1b0c895ec61
+implementation_audit_base: 97500a385a1fa1a5f0e4c3bbb6e2c1b0c895ec61
+minimum_handoff_commit: 7e0688308292cd9d41552c98f576d25681738be0
+shared_track_base_sha: null
+base_rule: Both tracks record the same current main HEAD containing minimum_handoff_commit before branching.
 created_at: 2026-07-18T00:00:00+08:00
 authority:
   objective: goal-objective.md
