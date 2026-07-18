@@ -1,6 +1,6 @@
 # Inner Cosmos
 
-[中文说明](README.zh-CN.md) · [Deployment handoff](对齐文档/18-组员与Coding-Agent启动部署交接指南.md) · [Complete-product goal](goal-objective.md) · [Acceptance ledger](docs/goal/complete-product-acceptance.yml)
+[中文说明](README.zh-CN.md) · [Two-track handoff](对齐文档/19-双轨并行完全体收敛与交接计划.md) · [Deployment handoff](对齐文档/18-组员与Coding-Agent启动部署交接指南.md) · [Complete-product goal](goal-objective.md) · [Acceptance ledger](docs/goal/complete-product-acceptance.yml)
 
 Inner Cosmos is an AI-native self-understanding and slow-social platform. Aurora turns natural conversations into a long-lived, user-correctable model of memories, values, relationships, emotions, and goals. With explicit consent, that model can be compiled into bounded Echo Capsules that help people discover meaningful resonance before deciding whether to connect as humans.
 
@@ -12,7 +12,7 @@ This repository is not a finished commercial release yet. It is an actively impl
 - **Living Inner Cosmos** — memories and profile claims retain provenance, confidence, lifecycle, corrections, and downstream invalidation; the starfield exposes why the system believes something.
 - **Resonance Network** — authorized memories compile into versioned Echo Capsules with boundaries, sandbox feedback, public discovery, explainable matching, capsule conversations, and slow letters.
 - **Psychology with guardrails** — versioned, non-diagnostic skills with consent, evidence metadata, risk paths, and user-controlled retention.
-- **One product across surfaces** — a React/TypeScript PWA, Capacitor Android/iOS projects, and one Java artifact that can run as API, worker, scheduler, or migration roles.
+- **One product across surfaces** — a React/TypeScript web app evolving toward a verified PWA, Capacitor Android/iOS projects, and one Java artifact that can run as API, worker, scheduler, or migration roles.
 - **Honest cloud proof** — `local-complete` preserves full product semantics; `academy-eks` proves Kubernetes behavior within Learner Lab constraints; `commercial-sg` remains the production target rather than a claim about the teaching account.
 
 ## Architecture snapshot
@@ -128,10 +128,11 @@ Before making product or deployment decisions, a Coding Agent must read, in orde
 1. [`AGENTS.md`](AGENTS.md)
 2. [`goal-objective.md`](goal-objective.md)
 3. [`对齐文档/README.md`](对齐文档/README.md)
-4. [`对齐文档/17-单会话持续Goal模式执行协议.md`](对齐文档/17-单会话持续Goal模式执行协议.md)
-5. [`docs/goal/complete-product-acceptance.yml`](docs/goal/complete-product-acceptance.yml)
-6. [`docs/goal/single-session-state.yml`](docs/goal/single-session-state.yml)
-7. The deployment handoff linked above when the task involves running or deploying the system.
+4. For the current two-PR convergence: [`对齐文档/19-双轨并行完全体收敛与交接计划.md`](对齐文档/19-双轨并行完全体收敛与交接计划.md), the [current gap baseline](对齐文档/20-当前状态重对账与完全体差距基线.md), and the assigned [`docs/tracks/`](docs/tracks/) spec.
+5. For a single-agent continuation: [`对齐文档/17-单会话持续Goal模式执行协议.md`](对齐文档/17-单会话持续Goal模式执行协议.md).
+6. [`docs/goal/complete-product-acceptance.yml`](docs/goal/complete-product-acceptance.yml) (read-only inside either parallel track).
+7. [`docs/goal/two-track-convergence.yml`](docs/goal/two-track-convergence.yml) or [`docs/goal/single-session-state.yml`](docs/goal/single-session-state.yml), matching the execution mode.
+8. The deployment handoff linked above when the task involves running or deploying the system.
 
 The agent must inspect live `HEAD`, the working tree, processes, configuration, and evidence before trusting summaries. A commit, green test, or Kubernetes screenshot is a checkpoint, not proof that the complete product is finished.
 
@@ -146,6 +147,7 @@ deploy/k8s/                    Kubernetes base and Academy overlay
 scripts/                       build, verification, local and Academy operations
 ai-lab/                        reproducible AI evaluations and pairwise tooling
 docs/goal/                     machine-readable acceptance and recovery state
+docs/tracks/                   two parallel complete-product execution specifications
 对齐文档/                       authoritative product, architecture and execution specs
 evidence/                      reproducible implementation and acceptance evidence
 ```

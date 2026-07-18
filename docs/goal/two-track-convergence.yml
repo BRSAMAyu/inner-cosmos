@@ -1,0 +1,124 @@
+schema_version: 1
+goal_id: INNER-COSMOS-TWO-TRACK-CONVERGENCE
+status: READY_FOR_PARALLEL_EXECUTION
+base_branch: main
+base_sha: 97500a385a1fa1a5f0e4c3bbb6e2c1b0c895ec61
+created_at: 2026-07-18T00:00:00+08:00
+authority:
+  objective: goal-objective.md
+  execution_plan: 对齐文档/19-双轨并行完全体收敛与交接计划.md
+  fact_baseline: 对齐文档/20-当前状态重对账与完全体差距基线.md
+  acceptance_ledger: docs/goal/complete-product-acceptance.yml
+
+strategy:
+  primary_product_truth: local-complete
+  cloud_proof: academy-eks
+  future_production_target: commercial-sg
+  integration_order:
+    - review_and_merge_track_a
+    - refresh_track_b_against_merged_backend_contracts
+    - review_and_merge_track_b
+    - run_final_integration_and_non_author_acceptance
+
+reserved_for_integrator:
+  - goal-objective.md
+  - 对齐文档/README.md
+  - 对齐文档/19-双轨并行完全体收敛与交接计划.md
+  - 对齐文档/20-当前状态重对账与完全体差距基线.md
+  - docs/goal/complete-product-acceptance.yml
+  - docs/goal/single-session-state.yml
+  - docs/goal/two-track-convergence.yml
+  - README.md
+  - README.zh-CN.md
+  - CLAUDE.md
+  - AGENTS.md
+
+tracks:
+  - id: TRACK-A
+    name: Living Intelligence and Data Truth
+    branch: codex/track-a-living-intelligence
+    spec: docs/tracks/TRACK-A-LIVING-INTELLIGENCE.md
+    prompt: docs/goal/prompts/track-a-codex-prompt.md
+    state: docs/goal/tracks/track-a-status.yml
+    integration_contract: docs/goal/tracks/track-a-contract-deltas.yml
+    evidence_root: evidence/track-a
+    owns:
+      - src/main/java/**
+      - src/test/java/**
+      - src/main/resources/db/migration/**
+      - ai-lab/**
+      - evidence/track-a/**
+      - docs/goal/tracks/track-a-status.yml
+      - docs/goal/tracks/track-a-contract-deltas.yml
+    must_not_edit:
+      - web/**
+      - deploy/**
+      - src/main/resources/static/app/aurora/**
+      - reserved_for_integrator
+    required_outcomes:
+      - adaptive_living_aurora_quality
+      - temporal_memory_and_profile_truth
+      - dynamic_capsule_genome_and_vector_matching
+      - three_product_quality_psychology_skills
+      - derivative_graph_and_erasure_propagation
+      - privacy_safe_ai_observability_and_failure_degradation
+
+  - id: TRACK-B
+    name: Complete Experience and Delivery
+    branch: codex/track-b-complete-experience
+    spec: docs/tracks/TRACK-B-COMPLETE-EXPERIENCE.md
+    prompt: docs/goal/prompts/track-b-codex-prompt.md
+    state: docs/goal/tracks/track-b-status.yml
+    integration_contract: docs/goal/tracks/track-b-integration-requests.yml
+    evidence_root: evidence/track-b
+    owns:
+      - web/**
+      - src/main/resources/static/app/aurora/**
+      - deploy/**
+      - scripts/**
+      - evidence/track-b/**
+      - docs/goal/tracks/track-b-status.yml
+      - docs/goal/tracks/track-b-integration-requests.yml
+    must_not_edit:
+      - src/main/java/**
+      - src/test/java/**
+      - src/main/resources/db/migration/**
+      - ai-lab/**
+      - reserved_for_integrator
+    required_outcomes:
+      - golden_first_longitudinal_and_resonance_journeys
+      - route_state_and_progressive_disclosure_refactor
+      - visible_living_aurora_and_resonance_stagecraft
+      - complete_zh_and_en_sg_i18n_wcag_and_performance
+      - pwa_and_capacitor_completion
+      - reproducible_local_complete_and_non_author_demo
+
+cross_track_protocol:
+  backend_to_frontend: docs/goal/tracks/track-a-contract-deltas.yml
+  frontend_to_backend: docs/goal/tracks/track-b-integration-requests.yml
+  global_ledger_is_read_only: true
+  undocumented_contract_changes_allowed: false
+  temporary_frontend_fixtures_allowed: true
+  temporary_fixtures_must_be_removed_before_final_acceptance: true
+
+commit_policy:
+  checkpoint_commits_required: true
+  force_push_allowed: false
+  unrelated_changes_allowed: false
+  secret_material_allowed: false
+  public_deployment_authorized: false
+
+terminal_conditions:
+  - all_machine_actionable_track_outcomes_pass_with_reproducible_evidence
+  - only_explicit_human_device_account_or_professional_review_gates_remain
+  - clean_worktree_and_reviewable_pr_ready
+
+final_integration_gates:
+  - full_maven_suite
+  - full_vitest_typescript_vite
+  - full_ai_lab_offline_and_real_provider_report
+  - local_complete_golden_and_recovery_playwright
+  - secret_scan_and_git_diff_check
+  - base_academy_eks_and_eks_prod_kustomize
+  - non_author_demo_and_usability
+  - global_acceptance_ledger_reconciliation

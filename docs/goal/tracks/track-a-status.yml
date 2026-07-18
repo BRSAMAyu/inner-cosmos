@@ -1,0 +1,27 @@
+schema_version: 1
+track_id: TRACK-A
+name: Living Intelligence and Data Truth
+status: NOT_STARTED
+base_sha: 97500a385a1fa1a5f0e4c3bbb6e2c1b0c895ec61
+branch: codex/track-a-living-intelligence
+owner: unassigned
+updated_at: null
+spec: docs/tracks/TRACK-A-LIVING-INTELLIGENCE.md
+evidence_root: evidence/track-a
+contract_deltas: docs/goal/tracks/track-a-contract-deltas.yml
+current_front: A0-quality-laboratory
+workstreams:
+  A0-quality-laboratory: {status: NOT_STARTED, evidence: [], remaining: "Establish development and frozen held-out scenarios, ablations and reproducible real-provider reporting."}
+  A1-living-aurora: {status: NOT_STARTED, evidence: [], remaining: "Optimize adaptive dual-kernel, multi-message timing, interruption/replan and proactive quality."}
+  A2-memory-profile: {status: NOT_STARTED, evidence: [], remaining: "Complete temporal claims, task-aware retrieval and correction/withdrawal propagation."}
+  A3-capsule-matching: {status: NOT_STARTED, evidence: [], remaining: "Deliver dynamic Genome fidelity and consent-scoped multi-strategy vector matching."}
+  A4-psychology-skills: {status: NOT_STARTED, evidence: [], remaining: "Ship and evaluate at least three bilingual non-diagnostic product skills."}
+  A5-data-rights: {status: NOT_STARTED, evidence: [], remaining: "Cover every derivative, queue, cache, analytics, notification and backup policy."}
+  A6-observability-boundaries: {status: NOT_STARTED, evidence: [], remaining: "Add privacy-safe AI signals, failure injection, backend actuator hardening and executable module boundaries."}
+latest_checkpoint: null
+commits: []
+verification: {}
+human_gates: []
+blockers: []
+discoveries: []
+handoff_notes: []

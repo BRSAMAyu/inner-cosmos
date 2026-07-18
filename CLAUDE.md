@@ -123,11 +123,12 @@ Read in this order before making product/architecture/deployment decisions:
 2. [`对齐文档/README.md`](对齐文档/README.md) — index of the authoritative spec system (product,
    architecture, UX, AI innovation, campaigns).
 3. [`对齐文档/16-体验优先的完全体重构策略与产品战役.md`](对齐文档/16-体验优先的完全体重构策略与产品战役.md) — the campaign strategy (A–E).
-4. [`对齐文档/17-单会话持续Goal模式执行协议.md`](对齐文档/17-单会话持续Goal模式执行协议.md) — the single-session continuous-Goal execution protocol.
-5. [`docs/goal/complete-product-acceptance.yml`](docs/goal/complete-product-acceptance.yml) — the machine-readable acceptance ledger (the source of truth for "what is done").
-6. [`docs/goal/single-session-state.yml`](docs/goal/single-session-state.yml) — the resumable cursor: active front, priority queue, and the latest session's checkpoints.
-7. [`对齐文档/18-组员与Coding-Agent启动部署交接指南.md`](对齐文档/18-组员与Coding-Agent启动部署交接指南.md) — the deployment/run handoff runbook (local, `local-complete`, `academy-eks`).
-8. [`README.md`](README.md) / [`README.zh-CN.md`](README.zh-CN.md) — accurate project overview and quick start.
+4. For the current two-PR convergence, read [`对齐文档/19-双轨并行完全体收敛与交接计划.md`](对齐文档/19-双轨并行完全体收敛与交接计划.md), [`对齐文档/20-当前状态重对账与完全体差距基线.md`](对齐文档/20-当前状态重对账与完全体差距基线.md), and the assigned [`docs/tracks/`](docs/tracks/) spec.
+5. For single-agent continuation, read [`对齐文档/17-单会话持续Goal模式执行协议.md`](对齐文档/17-单会话持续Goal模式执行协议.md).
+6. [`docs/goal/complete-product-acceptance.yml`](docs/goal/complete-product-acceptance.yml) — the machine-readable acceptance ledger; it is read-only inside either parallel track.
+7. Use [`docs/goal/two-track-convergence.yml`](docs/goal/two-track-convergence.yml) for parallel work or [`docs/goal/single-session-state.yml`](docs/goal/single-session-state.yml) for single-agent recovery.
+8. [`对齐文档/18-组员与Coding-Agent启动部署交接指南.md`](对齐文档/18-组员与Coding-Agent启动部署交接指南.md) — the deployment/run handoff runbook (local, `local-complete`, `academy-eks`).
+9. [`README.md`](README.md) / [`README.zh-CN.md`](README.zh-CN.md) — accurate project overview and quick start.
 
 **Historical / superseded:** [`AGENTS.md`](AGENTS.md) contains rich, still-useful module and
 design-pattern notes, but its tech-stack table, project structure, and run commands describe the
@@ -144,7 +145,8 @@ AGENTS.md's stack/run sections.
 - **TDD for behavior.** Write a failing test that pins the gap, then make it pass. Extend the labeled
   evaluation gates under `src/test/.../evaluation` and `evidence/` rather than self-scoring.
 - **Bind work to an acceptance gap.** Every meaningful change should map to an item in the acceptance
-  ledger; record reproducible evidence and update the ledger + `single-session-state.yml`.
+  ledger; in a parallel track update only its track-local status/evidence, then let the integrator reconcile
+  the ledger + `single-session-state.yml` after both PRs.
 - **Preserve unrelated work.** Inspect live `HEAD`, working tree, and evidence before acting; do not
   overwrite or discard in-flight assets you did not create.
 - **Secrets stay external.** Env-vars only; run `scripts/scan-secrets.ps1` before pushing. Removing a

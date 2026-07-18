@@ -1,6 +1,6 @@
 # Inner Cosmos（内宇宙）
 
-[English README](README.md) · [组员与 Coding Agent 部署交接](对齐文档/18-组员与Coding-Agent启动部署交接指南.md) · [完全体总目标](goal-objective.md) · [机器验收账本](docs/goal/complete-product-acceptance.yml)
+[English README](README.md) · [双轨并行完全体交接](对齐文档/19-双轨并行完全体收敛与交接计划.md) · [启动部署交接](对齐文档/18-组员与Coding-Agent启动部署交接指南.md) · [完全体总目标](goal-objective.md) · [机器验收账本](docs/goal/complete-product-acceptance.yml)
 
 Inner Cosmos 是一个以长期自我理解和慢社交为核心的 AI 原生产品。Aurora 将自然对话逐步沉淀为可追溯、可纠正、可撤回的记忆、画像、关系、情绪与目标模型；用户在明确授权后，可以把其中一部分编译成有边界的 Echo Capsule（共鸣体），先形成理解与共鸣，再决定是否接近真人。
 
@@ -12,7 +12,7 @@ Inner Cosmos 是一个以长期自我理解和慢社交为核心的 AI 原生产
 - **Living Inner Cosmos**：记忆和画像保留来源、置信度、时间、生命周期和纠正历史；用户能理解系统为什么这样判断。
 - **Resonance Network**：授权记忆编译为有版本、有边界的共鸣体，支持沙盒、反馈、公开发现、可解释匹配、共鸣体对话与慢信。
 - **有边界的心理能力**：Skill 具备版本、用途、同意、证据元数据和风险路径，不冒充诊断或治疗。
-- **跨端与云原生**：React PWA、Capacitor Android/iOS，以及同一 Java 制品的 API/Worker/Scheduler/Migration 多运行角色。
+- **跨端与云原生**：正在闭环 PWA 能力的 React Web App、Capacitor Android/iOS，以及同一 Java 制品的 API/Worker/Scheduler/Migration 多运行角色。
 - **不混淆部署证据**：`local-complete` 保证完整产品语义；`academy-eks` 证明教学账户允许的 Kubernetes 能力；`commercial-sg` 是尚待关闭门禁的新加坡生产目标。
 
 ## 当前技术基线
@@ -108,10 +108,11 @@ Agent 开始编码或部署前，必须依次阅读：
 1. [`AGENTS.md`](AGENTS.md)
 2. [`goal-objective.md`](goal-objective.md)
 3. [`对齐文档/README.md`](对齐文档/README.md)
-4. [`对齐文档/17-单会话持续Goal模式执行协议.md`](对齐文档/17-单会话持续Goal模式执行协议.md)
-5. [`docs/goal/complete-product-acceptance.yml`](docs/goal/complete-product-acceptance.yml)
-6. [`docs/goal/single-session-state.yml`](docs/goal/single-session-state.yml)
-7. 涉及启动/部署时再完整阅读部署交接文档。
+4. 当前双轨阶段阅读 [`对齐文档/19-双轨并行完全体收敛与交接计划.md`](对齐文档/19-双轨并行完全体收敛与交接计划.md)、[当前差距基线](对齐文档/20-当前状态重对账与完全体差距基线.md) 及被分配的 [`docs/tracks/`](docs/tracks/) 任务书。
+5. 单 Agent 连续推进时阅读 [`对齐文档/17-单会话持续Goal模式执行协议.md`](对齐文档/17-单会话持续Goal模式执行协议.md)。
+6. [`docs/goal/complete-product-acceptance.yml`](docs/goal/complete-product-acceptance.yml)；并行分支只读，合并后由集成者统一重对账。
+7. 按执行模式读取 [`docs/goal/two-track-convergence.yml`](docs/goal/two-track-convergence.yml) 或 [`docs/goal/single-session-state.yml`](docs/goal/single-session-state.yml)。
+8. 涉及启动/部署时再完整阅读部署交接文档。
 
 随后检查实时 HEAD、分支、工作树、进程、配置和 evidence；不要只相信旧摘要。提交、测试通过或 K8s 截图只是 checkpoint，不是完全体完成证明。
 
@@ -134,6 +135,7 @@ deploy/k8s/                    Kubernetes base 与 Academy overlay
 scripts/                       构建、验证、本地与 Academy 操作脚本
 ai-lab/                        AI 评测和 pairwise 工具
 docs/goal/                     机器验收与单会话恢复状态
+docs/tracks/                   两条完全体并行执行任务书
 对齐文档/                       权威产品、架构与执行规格
 evidence/                      可复现的实现与验收证据
 ```

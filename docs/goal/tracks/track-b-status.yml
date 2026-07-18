@@ -1,0 +1,28 @@
+schema_version: 1
+track_id: TRACK-B
+name: Complete Experience and Delivery
+status: NOT_STARTED
+base_sha: 97500a385a1fa1a5f0e4c3bbb6e2c1b0c895ec61
+branch: codex/track-b-complete-experience
+owner: unassigned
+updated_at: null
+spec: docs/tracks/TRACK-B-COMPLETE-EXPERIENCE.md
+evidence_root: evidence/track-b
+integration_requests: docs/goal/tracks/track-b-integration-requests.yml
+current_front: B0-experience-observation
+workstreams:
+  B0-experience-observation: {status: NOT_STARTED, evidence: [], remaining: "Observe the live product and freeze first, longitudinal, resonance and recovery journeys."}
+  B1-product-architecture: {status: NOT_STARTED, evidence: [], remaining: "Refactor routes, AppShell, domain state and progressive disclosure."}
+  B2-visible-innovation: {status: NOT_STARTED, evidence: [], remaining: "Make living Aurora, Inner Cosmos and resonance differentiation immediately visible."}
+  B3-design-content: {status: NOT_STARTED, evidence: [], remaining: "Complete design primitives, content states, responsive polish and visual regression."}
+  B4-i18n-a11y: {status: NOT_STARTED, evidence: [], remaining: "Complete Chinese and English/en-SG, WCAG target and manual accessibility checks."}
+  B5-pwa-mobile: {status: NOT_STARTED, evidence: [], remaining: "Complete install/offline/update and all machine-actionable Capacitor checks."}
+  B6-local-complete: {status: NOT_STARTED, evidence: [], remaining: "Make the complete real-provider product reproducible locally from a clean checkout."}
+  B7-demo-handoff: {status: NOT_STARTED, evidence: [], remaining: "Deliver full E2E, 8-12 minute demo and non-author product/operations handoff."}
+latest_checkpoint: null
+commits: []
+verification: {}
+human_gates: []
+blockers: []
+discoveries: []
+handoff_notes: []

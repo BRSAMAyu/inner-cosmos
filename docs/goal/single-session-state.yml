@@ -1,8 +1,39 @@
 schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
-mode: SINGLE_SESSION_CONTINUOUS_GOAL
-status: ACTIVE
-updated_at: 2026-07-17T00:12:00+08:00
+mode: TWO_TRACK_PARALLEL_CONVERGENCE_HANDOFF
+status: READY_FOR_PARALLEL_EXECUTION
+updated_at: 2026-07-18T00:00:00+08:00
+
+current_reconciliation_2026_07_18:
+  head: 97500a385a1fa1a5f0e4c3bbb6e2c1b0c895ec61
+  branch: main
+  worktree_at_audit: CLEAN
+  fact_baseline: 对齐文档/20-当前状态重对账与完全体差距基线.md
+  execution_plan: 对齐文档/19-双轨并行完全体收敛与交接计划.md
+  machine_split: docs/goal/two-track-convergence.yml
+  track_a: docs/tracks/TRACK-A-LIVING-INTELLIGENCE.md
+  track_b: docs/tracks/TRACK-B-COMPLETE-EXPERIENCE.md
+  verified:
+    java: "PASS — 836 tests, 0 failures/errors/skips on Java 21 with Docker/Testcontainers"
+    frontend: "PASS — Vitest 22 files / 123 tests; TypeScript and production Vite build"
+    ai_lab: "PASS — 51 tests"
+    secret_scan: "PASS — 0 current-tree findings"
+    kustomize: "PASS — base, academy-eks and eks-prod build"
+    browser: "PASS for current smoke — five-space AppShell/Aurora/resonance rendered; complete UX acceptance remains open"
+  state_correction: >-
+    The former EXPERIENCE-FLOW-OVERHAUL active front and priority queue are retained below as history.
+    Their checkpoint counts and remaining text are not the current execution cursor. The current cursor
+    is two parallel PRs; each updates only its track-local status/evidence. Global reconciliation resumes
+    after both PRs are ready.
+
+active_front:
+  id: TWO-TRACK-COMPLETE-PRODUCT-CONVERGENCE
+  state: READY_FOR_TRACK_A_AND_TRACK_B_TO_START_FROM_FROZEN_BASE
+  intent: >-
+    Track A owns living intelligence and data truth; Track B owns complete experience and delivery.
+    Execute docs/goal/two-track-convergence.yml and the assigned docs/tracks specification. Do not mutate
+    the global ledger/state inside either branch. Final integrator reviews Track A, connects Track B to
+    final backend contracts, runs full acceptance, and performs the last reconciliation.
 
 session_2026_07_16_checkpoints:
   - "7db1a84 feat: cross-Pod live Aurora SSE fan-out/resume/heartbeat + turn.started race fix (G2). 826/826."
@@ -26,10 +57,15 @@ team_handoff_2026_07_16:
   continue_goal: "Resume from active_front / priority_queue below; verify from live HEAD + evidence; commit recoverable checkpoints; do not stop until acceptance ledger PASS or only human gates remain."
 authority:
   - goal-objective.md
+  - 对齐文档/19-双轨并行完全体收敛与交接计划.md
+  - 对齐文档/20-当前状态重对账与完全体差距基线.md
   - 对齐文档/17-单会话持续Goal模式执行协议.md
   - 对齐文档/16-体验优先的完全体重构策略与产品战役.md
 acceptance_ledger: docs/goal/complete-product-acceptance.yml
 operator_prompt: docs/goal/single-session-codex-prompt.md
+parallel_operator_prompts:
+  - docs/goal/prompts/track-a-codex-prompt.md
+  - docs/goal/prompts/track-b-codex-prompt.md
 
 audit_baseline:
   commit: d6bf5b518c4e8904056413feadf0d51420ac28a0
@@ -942,7 +978,7 @@ closed_front_g2_sse_cross_pod:
     a sustained multi-Pod SSE soak with recorded latency/heartbeat percentiles, and Redis Stream
     consumer groups / claim-based redelivery. API-CONTRACT stays IN_PROGRESS.
 
-active_front:
+historical_active_front_experience_overhaul:
   id: EXPERIENCE-FLOW-OVERHAUL
   state: CHECKPOINT_13_OPTIN_LIGHT_MORANDI_THEME_LIVE_AA_PASS_NEXT_IS_TOKENIZE_THE_10_REMAINING_DARK_SURFACES_AGAINST_LIGHT_THEME
   intent: |
@@ -1239,7 +1275,7 @@ closed_front_campaign_b_auto_claim_extraction:
     - "Reassess whether to try the academic AWS EKS deploy (temporary credentials, 4h window) once a
       deployable release candidate + IaC exist; record any external gate that blocks it and continue."
 
-priority_queue:
+historical_priority_queue:
   # —— Operator directive §1 (loop-goal-directive.md) merged per 17号协议 §9 (2026-07-16). These
   #    outrank everything below and must reach zero before the campaign/engineering queue resumes. ——
   - id: EXPERIENCE-VISUAL-SYSTEM
@@ -1346,14 +1382,14 @@ known_human_gates:
   - REAL-ANDROID-IOS-APNS-FCM-AND-SIGNING
 
 last_full_gate:
-  baseline_commit: d0f0cb6 (executable v1 API contract baseline)
-  executed_at: 2026-07-16T13:39:28+08:00
-  java: "PASS — Java 21 full mvn test, 135 suites, 819 tests, 0 failures/errors/skips, 146.7s"
-  focused_evaluation: "PASS — OpenAPI drift/error/idempotency/CAS; Redis 7.4.2 two-Pod semantics; PostgreSQL V1-V17 exact contract"
-  frontend: "PASS — React/Vitest 15 files, 60 tests; TypeScript and production Vite build; built artifact uses token-only v1 Aurora stream."
-  browser_mobile: "Not rerun in a browser/device: contract behavior is builder-verified through client unit/build and server integration; live weak-network/device evidence remains open."
-  evidence: evidence/g2/API-CONTRACT-001/
-  review: BUILDER_VERIFIED_WITH_GENERATED_CLIENT_AND_LIVE_CROSS_POD_SSE_GAPS_REMAINING
+  baseline_commit: 97500a385a1fa1a5f0e4c3bbb6e2c1b0c895ec61
+  executed_at: 2026-07-18T00:00:00+08:00
+  java: "PASS — Java 21 Maven full gate, 836 tests, 0 failures/errors/skips"
+  focused_evaluation: "PASS — AI Lab 51/51; Secret scan 0; Kustomize base/academy-eks/eks-prod"
+  frontend: "PASS — React/Vitest 22 files, 123 tests; TypeScript and production Vite build"
+  browser_mobile: "Current browser smoke PASS; complete Playwright/PWA/real-device/non-author acceptance remains open"
+  evidence: 对齐文档/20-当前状态重对账与完全体差距基线.md
+  review: INDEPENDENT_CURRENT_HEAD_RECONCILIATION_READY_FOR_TWO_TRACK_EXECUTION
 
 handoff_rule: Do not return a final answer at commits or campaign checkpoints; continue with the next machine-actionable gap.
 
