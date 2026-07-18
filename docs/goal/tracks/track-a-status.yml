@@ -47,11 +47,10 @@ workstreams:
   A4-psychology-skills: {status: NOT_STARTED, evidence: [], remaining: "Ship and evaluate at least three bilingual non-diagnostic product skills."}
   A5-data-rights: {status: NOT_STARTED, evidence: [], remaining: "Cover every derivative, queue, cache, analytics, notification and backup policy."}
   A6-observability-boundaries: {status: NOT_STARTED, evidence: [], remaining: "Add privacy-safe AI signals, failure injection, backend actuator hardening and executable module boundaries."}
-latest_checkpoint: "pending — filled in by the follow-up status-only commit in this same session (see commits[] below for the SHA once available)"
+latest_checkpoint: "5daa4dc92ac8e5375a0cd9486112ce44d80e58bc"
 commits:
-  - message: "test(track-a): A0 quality-lab ablation suites (runtime/memory/capsule/proactive) + real-provider smoke"
-    sha: "PENDING_NEXT_COMMIT"
-    note: "This entry's sha is filled by a small follow-up commit in the same session, since this file cannot embed its own commit's SHA in advance."
+  - message: "test(track-a): A0 quality-lab ablation suites + real-provider smoke evidence"
+    sha: "5daa4dc92ac8e5375a0cd9486112ce44d80e58bc"
 verification:
   full_suite: "./mvnw test -> Tests run: 844, Failures: 0, Errors: 0, Skipped: 0 (2026-07-18, this session, JAVA_HOME=JDK 21.0.10)"
   new_suites_focused: "./mvnw test -Dtest=TrackARuntimeAblationEvaluationTest,TrackAMemoryAuthorityAblationEvaluationTest,TrackACapsuleGenomeAblationEvaluationTest,TrackAProactiveDecisionEvaluationTest -> all green"
