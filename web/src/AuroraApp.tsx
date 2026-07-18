@@ -1,10 +1,11 @@
-import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
 import { api, apiConfigurationError, configureBearerAuth, hasConfiguredApiBase, replayTurnEvents, streamAurora, subscribeProactive, transcribeAudio, type ClaimCandidate, type CapsuleBoundary, type CapsuleFidelitySummary, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type ConnectionRequests, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type Notification, type DiscoverablePerson, type PersonaMessage, type PersonaSession, type PortraitDimension, type PublicCapsule, type PortraitHistoryEntry, type RelationMention, type RelationTimelinePoint, type RelationHealth, type LetterThread, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type PsychologySkillSuggestion, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type SocialConnection, type StarfieldDetail, type StarfieldScene, type StarfieldStar, type UnderstandingClaim, type UserCorrection, type WakeIntent } from "./api";
 import { initialMobileState, mobileRuntime, type MobileRuntimeState } from "./mobile";
 import { mobileOidc } from "./mobile-auth";
 import type { AuroraStreamEvent, DialogMessage, TurnStatus } from "./protocol";
-import { initialProductSpace, MeSpace, ProductShellNavigation, type ProductSpace } from "./components/ProductShell";
+import { MeSpace, productSpaceFromPath, productSpaces, ProductShellNavigation, spacePath, type ProductSpace } from "./components/ProductShell";
 import { AuroraConversation, type AuroraUiMessage } from "./components/AuroraConversation";
 import { AuroraSelfSpace } from "./components/AuroraSelfSpace";
 import { UnderstandingCorrection, type CorrectionTarget } from "./components/UnderstandingCorrection";
@@ -34,7 +35,14 @@ function toUi(rows: DialogMessage[]): AuroraUiMessage[] {
 }
 
 export function AuroraApp() {
-  const [productSpace, setProductSpace] = useState<ProductSpace>(initialProductSpace);
+  // Real client routing (react-router HashRouter, mounted in main.tsx): the active space is
+  // derived from the current route on every render instead of being copied into state once
+  // at mount. This is what makes an expired-auth deep link resume the right space after
+  // re-login "for free" -- the route never changes underneath the AuthGate swap, so once
+  // `authenticated` flips back to true, `productSpace` is still whatever the URL says.
+  const location = useLocation();
+  const navigate = useNavigate();
+  const productSpace = useMemo(() => productSpaceFromPath(location.pathname), [location.pathname]);
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [messages, setMessages] = useState<AuroraUiMessage[]>([]);
@@ -139,17 +147,22 @@ export function AuroraApp() {
   const bootstrapCallRef = useRef(0);
 
   const navigateSpace = useCallback((space: ProductSpace) => {
-    setProductSpace(space);
-    const url = new URL(window.location.href);
-    url.searchParams.set("space", space);
-    window.history.pushState({}, "", `${url.pathname}${url.search}${url.hash}`);
+    navigate(spacePath(space));
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }, []);
+  }, [navigate]);
 
+  // One-time redirect for bookmarks/links made before this checkpoint, which used
+  // `?space=<x>` on the app's single path instead of a real route. Cheap and low-risk: a
+  // stale link should not 404 or silently ignore the requested space just because routing
+  // moved on. Only fires when there is no hash-route yet (i.e. the link predates routing);
+  // once any real route is present it always wins.
   useEffect(() => {
-    const restoreSpace = () => setProductSpace(initialProductSpace());
-    window.addEventListener("popstate", restoreSpace);
-    return () => window.removeEventListener("popstate", restoreSpace);
+    if (window.location.hash) return;
+    const legacySpace = new URLSearchParams(window.location.search).get("space");
+    if (legacySpace && productSpaces.some(([space]) => space === legacySpace)) {
+      navigate(spacePath(legacySpace as ProductSpace), { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const replaceFromHistory = useCallback(async (sid: number) => {
@@ -1116,6 +1129,22 @@ export function AuroraApp() {
 
   return (
     <main className="shell" data-product-space={productSpace}>
+      {/* Real routes for the five spaces. Each space's content below still mounts
+          unconditionally and toggles via `hidden` (not <Route element>) so switching
+          spaces never remounts/loses in-progress state (draft text, scroll position,
+          sandbox results, etc.) -- exactly how it worked before routing, just now driven
+          by a real, shareable, back/forward-correct path instead of a `space` state
+          variable. <Routes> here only canonicalizes the URL itself: root and any
+          unrecognized path redirect to /aurora, and every known (sub-)path is left alone. */}
+      <Routes>
+        <Route path="/" element={<Navigate to={spacePath("aurora")} replace />} />
+        <Route path="/aurora/*" element={null} />
+        <Route path="/cosmos/*" element={null} />
+        <Route path="/resonance/*" element={null} />
+        <Route path="/connections/letters/*" element={null} />
+        <Route path="/me/*" element={null} />
+        <Route path="*" element={<Navigate to={spacePath("aurora")} replace />} />
+      </Routes>
       <ProductShellNavigation active={productSpace} onNavigate={navigateSpace} />
 
       <div className="product-space" hidden={productSpace !== "aurora"}>

@@ -107,3 +107,50 @@ decomposition, single async/task/error model, progressive disclosure) remains op
 - Mobile Aurora-space reordering is now solved for the *composer*; the WakeIntent/Self-Emergence panels
   still render as full-detail sections rather than progressively disclosed — that's B2/B3 territory
   (progressive disclosure, not just ordering).
+
+## Workstream B1 — second checkpoint: real client routing
+
+Replaces the `?space=` query param with real, addressable client-side routes (`react-router`), the
+prerequisite the spec (§5) calls out for shareable deep links and for eventually splitting
+`AuroraApp.tsx`'s remaining ~60 `useState` hooks into per-route domain hooks.
+
+| Artifact | What it is |
+|---|---|
+| `web/src/components/ProductShell.tsx` | Added `spacePath(space)` (space → real path, e.g. `letters` → `/connections/letters`) and `productSpaceFromPath(pathname)` (route → space, matching nested sub-paths too so a future per-space route split doesn't need to touch this resolver). `initialProductSpace` (the old `?space=` reader) is kept as a characterization-tested legacy-link redirect target, not the live navigation mechanism anymore. |
+| `web/src/main.tsx` | Mounts `HashRouter` (not `BrowserRouter`) around `<AuroraApp>` — Spring's static handling only forwards the exact `/app/aurora`/`/app/aurora/` paths, with no `/app/aurora/**` catch-all, so a `BrowserRouter` path would 404 on refresh. Filed as `TB-REQ-002`; the rest of the app depends only on react-router's location/navigate API, so swapping routers later is a one-line change. |
+| `web/src/AuroraApp.tsx` | `productSpace` is now derived from `useLocation().pathname` via `useMemo`, not copied into `useState` once at mount — this is also what makes an expired-auth deep link resume the right space after re-login "for free," since the route itself never changes underneath the `AuthGate` swap. `navigateSpace` now calls react-router's `navigate()`. A one-time effect redirects legacy `?space=` bookmarks to their real-route equivalent. A `<Routes>` block canonicalizes the URL (root and unrecognized paths redirect to `/aurora`); each space's content still mounts unconditionally and toggles via `hidden`, preserving in-progress state exactly as before (draft text, scroll position, sandbox results). |
+| `web/src/components/ProductShell.test.tsx` | New cases for `spacePath`, `productSpaceFromPath` (exact, nested-subroute, and fallback cases), alongside the pre-existing `initialProductSpace` characterization test. |
+| `evidence/track-b/scripts/observe-b1-routes.mjs` | New Playwright script: register → click through all five nav items, asserting the URL becomes the real hash route each time → browser back → direct hash deep link to `/#/resonance` → legacy `?space=letters` link redirect. |
+| `evidence/track-b/screenshots/b1-routes-*.png` | Screenshots from the above. |
+| `docs/goal/tracks/track-b-integration-requests.yml` | `TB-REQ-002`: server-side `/app/aurora/**` SPA fallback, to unblock swapping `HashRouter` → `BrowserRouter` later. |
+
+### How this was verified
+
+- `cd web && npx vitest run` — 142/142 passing (24 files).
+- `cd web && npm run build` — clean `tsc -b && vite build`.
+- Live run (`dev` profile, H2 + Mock, `.\mvnw.cmd spring-boot:run`) via
+  `evidence/track-b/scripts/observe-b1-routes.mjs`: fresh register lands on `#/aurora`; clicking
+  each of the five nav items (共鸣/内宇宙/连接/我的/今天) updates the URL to
+  `#/resonance`, `#/cosmos`, `#/connections/letters`, `#/me`, `#/aurora` respectively (all
+  confirmed true); `goBack()` correctly returns to the previous space's route; a direct visit to
+  `/app/aurora/#/resonance` (simulating a bookmarked/shared link) renders resonance content
+  immediately with no click-through needed; a legacy `/app/aurora/?space=letters` link redirects to
+  `#/connections/letters` instead of 404ing or being silently ignored.
+- Methodology note: the first run of this script used loose, unscoped `getByRole("button", {name})`
+  selectors and produced a false-looking failure (nav click for "我" landed on `#/cosmos`) — this was
+  a test-script bug (matching a same-substring element elsewhere in the simultaneously-mounted DOM,
+  not the actual nav item, and the actual label is "我的" not "我"), not an app bug. Fixed by scoping
+  to the `nav[aria-label="Inner Cosmos 五个空间"]` landmark and using each space's exact label. See
+  `docs/goal/tracks/track-b-status.yml` discoveries for the general lesson.
+
+### What is still open for B1
+
+- `AuroraApp.tsx` is still ~1270 lines with 60+ `useState` hooks — routing gives real addresses to
+  hang per-route domain hooks/state off of, but the extraction itself is the next step, not done here.
+- Only the five top-level spaces have real routes. Nested sub-routes from the spec's suggested model
+  (`/cosmos/starfield` vs `/cosmos/portrait`, `/resonance/capsule/:id`, `/connections/letters/:id`) are
+  not yet split out — `productSpaceFromPath` already resolves nested sub-paths to their parent space,
+  so adding these later is additive, not a rework.
+- No single async/task/error model consolidation yet (separate from routing; see the B0 finding about
+  `web/src/loading.tsx`'s existing primitives).
+- `HashRouter` is an intentional, documented interim choice (`TB-REQ-002`), not the end state.

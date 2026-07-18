@@ -28,7 +28,8 @@
     "@capacitor/network": "^8.0.1",
     "@capacitor/push-notifications": "^8.1.2",
     "react": "19.2.7",
-    "react-dom": "19.2.7"
+    "react-dom": "19.2.7",
+    "react-router-dom": "7.18.1"
   },
   "devDependencies": {
     "@capacitor/android": "^8.4.2",

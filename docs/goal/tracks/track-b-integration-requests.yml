@@ -32,3 +32,29 @@ requests:
     affected_track_a_workstream: "A2-memory-profile or account/data-plane ownership (whichever owns account provenance/seeding)"
     evidence: evidence/track-b/golden-journeys.md#J3 (discovery finding), evidence/track-b/experience-inventory.md
     status: OPEN
+  - id: TB-REQ-002
+    title: "Server-side SPA fallback for /app/aurora/** deep-link paths"
+    user_impact: >-
+      B1 replaced the `?space=` query param with real client routes (react-router), but Spring's
+      static-resource handling only forwards the exact `/app/aurora` and `/app/aurora/` paths to
+      index.html -- there is no `/app/aurora/**` catch-all. A real BrowserRouter path like
+      `/app/aurora/cosmos` would 404 on a hard refresh or a pasted/shared deep link. Track B worked
+      around this with HashRouter (`/app/aurora/#/cosmos`), which needs zero server changes and is
+      fully shareable/back-forward-correct today, but hash URLs are visually noisier than clean paths
+      and are a worse fit for the spec's suggested nested route model (`/resonance/capsule/:id`, etc.)
+      as it grows.
+    desired_contract: >-
+      A server-side rule (Spring MVC view controller / WebMvcConfigurer forward, or edge/nginx rewrite
+      in deploy/compose configs) that serves `/app/aurora/index.html` for any unmatched path under
+      `/app/aurora/**`, leaving `/api/**` and other real endpoints untouched.
+    priority: P2
+    loading_error_semantics: "No behavior change for existing users; only removes the constraint forcing HashRouter."
+    temporary_fixture: >-
+      web/main.tsx mounts react-router's `HashRouter` instead of `BrowserRouter`. Every other part of
+      the app depends only on react-router's location/navigate API, not on this specific router choice
+      -- see the comment above the `HashRouter` import in web/src/main.tsx. Once the server-side
+      fallback exists, swap `HashRouter` for `BrowserRouter` there only.
+    acceptance_test: "web/src/components/ProductShell.test.tsx already covers path<->space resolution independent of router choice; add a build/E2E check that a hard refresh on a nested path (e.g. /aurora/cosmos with BrowserRouter) returns 200 with the app shell, not a 404, once this request is implemented."
+    affected_track_a_workstream: "Whichever workstream owns src/main/java/**/WebMvcConfig or equivalent static-resource routing (not owned by any Track B path)"
+    evidence: evidence/track-b/scripts/observe-b1-routes.mjs, evidence/track-b/screenshots/b1-routes-*.png
+    status: OPEN
