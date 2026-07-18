@@ -1,0 +1,70 @@
+schema_version: 1
+goal_id: INNER-COSMOS-TEAMMATE-CONTINUATION
+status: READY_FOR_TEAMMATE_CONTINUATION
+updated_at: "2026-07-18T23:00:00+08:00"
+authority:
+  objective: goal-objective.md
+  current_handoff: 对齐文档/21-双轨阶段合并审查与完全体续跑交接.md
+  acceptance: docs/goal/complete-product-acceptance.yml
+  prompt: docs/goal/prompts/teammate-complete-product-codex-prompt.md
+integration:
+  base_branch: main
+  historical_common_base: 14e1b85596034544b7fb291677fb8dd3f8240f1c
+  accepted_track_a_through: 9714aab
+  accepted_track_b_through: 22e779d
+  main_merge_commits: [24e1939, 3b25611, a107745]
+  note: "Both bounded checkpoints are merged. The final documentation commit and push become the teammate base; verify origin/main."
+track_a:
+  branch: codex/track-a-living-intelligence
+  checkpoint: 9714aab
+  checkpoint_class: BUILDER_VERIFIED_IN_PROGRESS
+  merged_to_main: true
+  closed_checkpoint_findings:
+    - current_content_hash_required_for_scoring
+    - postgresql_pgvector_invalidation_and_supersession_tests
+    - no_interactive_candidate_provider_n_plus_one
+    - bounded_shedlock_rebuild
+  next_front: A3-quality-and-rights-propagation
+  open:
+    - real_provider_latency_cost_backpressure_and_quality_evidence
+    - consent_correction_deletion_receipts_across_all_derivatives_and_caches
+    - similarity_complementarity_diversity_held_out_benchmark
+    - dynamic_genome_fidelity_and_blind_human_review
+  later_fronts:
+    - A0-human-blind-quality-and-aggregation
+    - A1-first-visible-latency-and-quality-cost-frontier
+    - A2-temporal-conflict-claim-graph-and-hybrid-benchmark
+    - A4-three-bilingual-product-quality-psychology-skills
+    - A5-complete-derivative-rights-propagation
+    - A6-observability-failure-degradation-and-boundaries
+track_b:
+  branch: codex/track-b-complete-experience
+  checkpoint: 22e779d
+  checkpoint_class: BUILDER_VERIFIED_IN_PROGRESS
+  merged_to_main: true
+  next_front: B1-remaining-product-architecture
+  open:
+    - remaining-domain-extraction-and-nested-routes
+    - B2-visible-innovation
+    - B3-design-content-and-visual-regression
+    - B4-zh-en-sg-i18n-wcag-and-performance
+    - B5-real-device-and-deployed-update-validation
+    - B6-clean-checkout-local-complete
+    - B7-non-author-demo-and-handoff
+  integration_requests: [TB-REQ-001, TB-REQ-002]
+coordination:
+  recommended_active_agents: 1
+  maximum_active_agents: 3
+  topology: "one coordinator plus at most two bounded helpers"
+  checkpoint_rule: "Commit a recoverable vertical slice and update state/evidence before another long task."
+  global_ledger_owner: final_integrator
+verification_at_handoff:
+  track_a_full: "mvnw clean test: 873/873; PostgreSQL 16 + pgvector + Flyway V1-V18 and Redis integration included."
+  track_a_after_final_cleanup: "Targeted A3 checkpoint: 4/4; git diff --check PASS."
+  track_b_checkpoint: "Vitest 199/199; frontend build PASS; git diff --check PASS."
+  merged_full_regression: "main mvnw clean test 873/873; Vitest 199/199; frontend production build PASS; Secret scan 0; YAML parse 5/5; git diff --check PASS."
+human_gates:
+  - provider_secret_revocation_and_rotation_signoff
+  - real_device_apns_fcm_signing_and_ios_build
+  - production_aws_dns_store_payment_and_legal_actions
+  - pdpa_cross_border_and_professional_psychology_review

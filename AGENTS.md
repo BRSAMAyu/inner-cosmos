@@ -6,7 +6,7 @@
 
 > **启动/部署交接**：当任务涉及本地运行、`local-complete`、AWS Academy EKS 或组员交接时，在上述权威入口之后完整阅读 [`对齐文档/18-组员与Coding-Agent启动部署交接指南.md`](对齐文档/18-组员与Coding-Agent启动部署交接指南.md)。真实密钥只能由操作者在本地进程或外部 Secret 管理中注入，禁止写入仓库、聊天、日志或 Kubernetes manifest。
 
-> **当前双轨收敛**：当任务属于两名组员并行完成完全体时，继续完整阅读 [`对齐文档/19-双轨并行完全体收敛与交接计划.md`](对齐文档/19-双轨并行完全体收敛与交接计划.md)、[`对齐文档/20-当前状态重对账与完全体差距基线.md`](对齐文档/20-当前状态重对账与完全体差距基线.md) 和被分配的 [`docs/tracks/`](docs/tracks/) 任务书。严格服从其中的文件所有权；两轨不得直接修改全局验收账本。
+> **当前组员续跑交接**：完整阅读 [对齐文档/21-双轨阶段合并审查与完全体续跑交接.md](对齐文档/21-双轨阶段合并审查与完全体续跑交接.md)、[docs/goal/teammate-continuation-state.yml](docs/goal/teammate-continuation-state.yml) 与被分配的 [docs/tracks/](docs/tracks/) 任务书。19、20 保留为拆轨和差距历史基线；两个 bounded checkpoint 已合入 main，不得 cherry-pick 旧 WIP 或重复实现。两轨仍不得直接修改全局验收账本。
 
 > ⚠️ **本文正文是 V0.1 历史工程基线，其“技术栈 / 项目结构 / 构建与运行命令”已过时**（当前实际为 Java 21、Spring Boot 3.5.x、React 19 + Vite 前端、PostgreSQL 16 + pgvector + Flyway、Redis，入口 `http://localhost:8080/app/aurora/`）。**要构建、运行或了解当前真实架构，以 [`CLAUDE.md`](CLAUDE.md) 与 [`README.md`](README.md) 为准**。以下正文保留的模块划分、设计模式、隐私分层、安全边界等概念仍具参考价值。
 

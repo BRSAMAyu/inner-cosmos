@@ -11,10 +11,12 @@
 | L1-EXEC | `16-体验优先的完全体重构策略与产品战役.md` | 体验优先裁决、重构授权、五场产品战役与验证节奏 |
 | L1-EXEC | `17-单会话持续Goal模式执行协议.md` | 单顶层会话的恢复、循环、优先级、状态持久化和唯一终止条件 |
 | L1-EXEC | `19-双轨并行完全体收敛与交接计划.md` | 当前双 PR 的目标、边界、文件所有权、质量门槛、合并与最终收尾协议 |
+| L1-EXEC-CURRENT | 21-双轨阶段合并审查与完全体续跑交接.md | 当前已合并 checkpoint、恢复点、剩余瓶颈、组员续跑与最终收尾权威 |
 | L1-AI | `08-Aurora生命感与共鸣智能创新架构.md` | Aurora、记忆画像、共鸣体、心理 Skill 的详细创新架构 |
 | L1-DEPLOY | `14-AWS-Academy-EKS约束与双轨部署架构.md` | 课程 Learner Lab 与商业新加坡环境的边界、替代适配器和双轨演示合同 |
 | L2 | `00`、`02`—`07` | 项目理解、EKS、移动端、新加坡、Agent 流程、技术演进、近期决策与执行基线 |
 | L3-CURRENT | `20-当前状态重对账与完全体差距基线.md` | 基于当前 HEAD 复核的已完成能力、剩余差距、风险与下一阶段裁决 |
+
 | L3 | `01`、`13`、`15`、`docs/audit`、`docs/gap_analysis`、现有 specs | 历史时点的评估、连接指南、进展审查、缺口和专题设计；用于事实发现，不自动决定最终方向 |
 | L4 | work package、ADR、research、evidence、测试报告 | 实施契约、局部决策与可复现证据 |
 | 历史 | 根目录旧总纲、旧推进书、旧 UIUX 资产 | 设计来源与历史上下文；未被上层吸收的内容不具有目标裁决权 |
@@ -44,8 +46,9 @@
 | 18 | `18-组员与Coding-Agent启动部署交接指南.md` | 如何让组员或 Coding Agent 在不泄密、不混淆三种 profile 证据的前提下快速启动、部署、验证和恢复 |
 | 19 | `19-双轨并行完全体收敛与交接计划.md` | 如何把剩余工作拆成低冲突的智能数据轨与完整体验交付轨，并用两个 PR 收敛 |
 | 20 | `20-当前状态重对账与完全体差距基线.md` | 当前真实完成度、关键瓶颈、隐藏缺口和“效果完成”的判据 |
+| 21 | 21-双轨阶段合并审查与完全体续跑交接.md | A/B checkpoint 合并事实、组员恢复点、剩余完全体路线与统一验收交接 |
 
-机器可读对应物：`docs/goal/complete-product-acceptance.yml`。当前双轨收敛使用
+机器可读对应物：docs/goal/complete-product-acceptance.yml。当前组员续跑以 21 和 docs/goal/teammate-continuation-state.yml 为准；历史双轨拆分使用
 `docs/goal/two-track-convergence.yml`、`docs/tracks/` 和 `docs/goal/prompts/track-*-codex-prompt.md`；
 单 Agent 持续 Goal 仍使用 `docs/goal/single-session-codex-prompt.md` 与 `docs/goal/single-session-state.yml`。
 
@@ -61,7 +64,7 @@
 - 当前实现优先级、是否允许推翻旧界面/架构、产品战役与测试频率：读 `16`；其执行裁决优先于旧的微切片或兼容性习惯。
 - 单会话连续自主执行：读 `17` 和 `docs/goal/single-session-state.yml`；内部提交与检查点不得结束顶层 Goal。
 - 组员接管启动、local-complete 或 AWS Academy 部署：读 `18`；其中的操作步骤必须服从 `14` 的环境能力边界。
-- 当前两名组员并行收敛：先读 `19` 和 `20`，再进入 `docs/tracks/README.md` 选择 A/B 任务书；两轨不得同时改全局验收账本。
+- 当前组员续跑：先读 21 和 docs/goal/teammate-continuation-state.yml，再进入 docs/tracks/README.md 选择 A/B 任务书；19、20 用于理解拆轨与差距来源，两轨不得同时改全局验收账本。
 
 ## 5. 文档与实现的双向追溯
 

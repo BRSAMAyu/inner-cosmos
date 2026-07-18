@@ -1,6 +1,6 @@
 # Inner Cosmos（内宇宙）
 
-[English README](README.md) · [双轨并行完全体交接](对齐文档/19-双轨并行完全体收敛与交接计划.md) · [启动部署交接](对齐文档/18-组员与Coding-Agent启动部署交接指南.md) · [完全体总目标](goal-objective.md) · [机器验收账本](docs/goal/complete-product-acceptance.yml)
+[English README](README.md) · [当前组员续跑交接](对齐文档/21-双轨阶段合并审查与完全体续跑交接.md) · [启动部署交接](对齐文档/18-组员与Coding-Agent启动部署交接指南.md) · [完全体总目标](goal-objective.md) · [机器验收账本](docs/goal/complete-product-acceptance.yml)
 
 Inner Cosmos 是一个以长期自我理解和慢社交为核心的 AI 原生产品。Aurora 将自然对话逐步沉淀为可追溯、可纠正、可撤回的记忆、画像、关系、情绪与目标模型；用户在明确授权后，可以把其中一部分编译成有边界的 Echo Capsule（共鸣体），先形成理解与共鸣，再决定是否接近真人。
 
@@ -108,7 +108,7 @@ Agent 开始编码或部署前，必须依次阅读：
 1. [`AGENTS.md`](AGENTS.md)
 2. [`goal-objective.md`](goal-objective.md)
 3. [`对齐文档/README.md`](对齐文档/README.md)
-4. 当前双轨阶段阅读 [`对齐文档/19-双轨并行完全体收敛与交接计划.md`](对齐文档/19-双轨并行完全体收敛与交接计划.md)、[当前差距基线](对齐文档/20-当前状态重对账与完全体差距基线.md) 及被分配的 [`docs/tracks/`](docs/tracks/) 任务书。
+4. 当前组员续跑阶段阅读 [当前交接](对齐文档/21-双轨阶段合并审查与完全体续跑交接.md)、[机器状态](docs/goal/teammate-continuation-state.yml) 及被分配的 [docs/tracks/](docs/tracks/) 任务书。
 5. 单 Agent 连续推进时阅读 [`对齐文档/17-单会话持续Goal模式执行协议.md`](对齐文档/17-单会话持续Goal模式执行协议.md)。
 6. [`docs/goal/complete-product-acceptance.yml`](docs/goal/complete-product-acceptance.yml)；并行分支只读，合并后由集成者统一重对账。
 7. 按执行模式读取 [`docs/goal/two-track-convergence.yml`](docs/goal/two-track-convergence.yml) 或 [`docs/goal/single-session-state.yml`](docs/goal/single-session-state.yml)。

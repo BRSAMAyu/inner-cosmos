@@ -123,7 +123,7 @@ Read in this order before making product/architecture/deployment decisions:
 2. [`对齐文档/README.md`](对齐文档/README.md) — index of the authoritative spec system (product,
    architecture, UX, AI innovation, campaigns).
 3. [`对齐文档/16-体验优先的完全体重构策略与产品战役.md`](对齐文档/16-体验优先的完全体重构策略与产品战役.md) — the campaign strategy (A–E).
-4. For the current two-PR convergence, read [`对齐文档/19-双轨并行完全体收敛与交接计划.md`](对齐文档/19-双轨并行完全体收敛与交接计划.md), [`对齐文档/20-当前状态重对账与完全体差距基线.md`](对齐文档/20-当前状态重对账与完全体差距基线.md), and the assigned [`docs/tracks/`](docs/tracks/) spec.
+4. For the current teammate continuation, read [对齐文档/21-双轨阶段合并审查与完全体续跑交接.md](对齐文档/21-双轨阶段合并审查与完全体续跑交接.md), [docs/goal/teammate-continuation-state.yml](docs/goal/teammate-continuation-state.yml), and the assigned [docs/tracks/](docs/tracks/) spec. Documents 19 and 20 remain the historical split/gap baseline.
 5. For single-agent continuation, read [`对齐文档/17-单会话持续Goal模式执行协议.md`](对齐文档/17-单会话持续Goal模式执行协议.md).
 6. [`docs/goal/complete-product-acceptance.yml`](docs/goal/complete-product-acceptance.yml) — the machine-readable acceptance ledger; it is read-only inside either parallel track.
 7. Use [`docs/goal/two-track-convergence.yml`](docs/goal/two-track-convergence.yml) for parallel work or [`docs/goal/single-session-state.yml`](docs/goal/single-session-state.yml) for single-agent recovery.
