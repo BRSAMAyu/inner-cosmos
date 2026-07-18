@@ -77,6 +77,8 @@ describe("CapsuleWorkbench", () => {
       onRecompile={() => undefined} onSandboxQuestion={() => undefined} onRunSandbox={() => undefined}
       onRateSandbox={() => undefined} onPublish={() => undefined} onPause={() => undefined} onArchive={() => undefined}
       boundary={boundary} boundaryBusy={true} onSaveBoundary={() => undefined} />);
-    expect(screen.getByRole("button", { name: "保存中…" })).toBeDisabled();
+    // AsyncButton (web/src/loading.tsx) keeps the original label for the first second of a busy
+    // state, so a synchronous render/assert checks disabled on the original label.
+    expect(screen.getByRole("button", { name: "保存边界设置" })).toBeDisabled();
   });
 });

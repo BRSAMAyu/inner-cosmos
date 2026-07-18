@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { api } from "../api";
 import { mobileOidc } from "../mobile-auth";
+import { AsyncButton } from "../loading";
 
 // The single entry surface for /app/aurora/: it must offer both login and account
 // creation, because it is the only route a new user is told to visit (see CLAUDE.md's
@@ -87,7 +88,8 @@ export function AuthGate({ native, onSuccess }: { native: boolean; onSuccess: ()
       {mode === "register" && <label>确认密码
         <input type="password" value={password2} onChange={e => setPassword2(e.target.value)} autoComplete="new-password" /></label>}
       {error && <p className="error" role="alert">{error}</p>}
-      <button className="send" type="submit" disabled={busy}>{mode === "login" ? "登录" : "创建账号"}</button>
+      <AsyncButton className="send" type="submit" busy={busy}
+        busyText={mode === "login" ? "正在登录" : "正在创建"}>{mode === "login" ? "登录" : "创建账号"}</AsyncButton>
     </form>
   </main>;
 }

@@ -1,4 +1,5 @@
 import type { RelationMention, RelationTimelinePoint, RelationHealth } from "../api";
+import { LoadingText } from "../loading";
 
 // emotionTags may arrive as a comma-joined string or a JSON array string; normalize to chips.
 function parseTags(raw: string | null): string[] {
@@ -56,7 +57,7 @@ export function RelationsView({ relations, selected, timeline, health, busy, onS
             {!selected
               ? <div className="network-empty">选一段关系，看它的温度与时间线。</div>
               : busy
-                ? <div className="network-empty">正在读取「{selected}」的时间线…</div>
+                ? <LoadingText busy className="network-empty">正在读取「{selected}」的时间线…</LoadingText>
                 : <>
                     {health && <div className="relation-temperature">
                       <div className="relation-temp-row">
