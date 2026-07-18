@@ -1,47 +1,46 @@
-# A3 capsule matching handoff checkpoint
+# A3 capsule matching foundation checkpoint
 
-Status: WIP_REVIEW_REQUIRED / IN_PROGRESS. This slice is preserved on the Track A branch and is
-not accepted into main at this checkpoint.
+Status: BUILDER_VERIFIED_IN_PROGRESS. The bounded engineering foundation is accepted for integration;
+the broader A3 product-quality and research work remains IN_PROGRESS.
 
-## Implemented foundation
+## Accepted foundation
 
-- Adds a capsule-embedding entity, mapper, index service and PostgreSQL V18 migration.
-- Builds embedding text only from capsule public-safe pseudonym, introduction and public tags.
-- Builds the viewer query from eligible memories while excluding LOCAL_ONLY,
-  NO_EXTERNAL_PROCESSING and SIMULATOR scopes.
-- Adds the semantic score to existing matching strategies and fails soft to the previous matching
-  behavior if the embedding provider or database path is unavailable.
+- Persists versioned capsule embeddings through PostgreSQL V18 and pgvector.
+- Embeds only public-safe pseudonym, introduction and public tags.
+- Builds viewer queries only from eligible memory sources, excluding LOCAL_ONLY,
+  NO_EXTERNAL_PROCESSING and SIMULATOR.
+- Keeps safety, privacy, visibility and block rules as hard filters independent of ranking.
+- Interactive matching performs one query embedding and scores only warmed current vectors; it does
+  not synchronously embed every candidate.
+- Both PostgreSQL and local scoring require the capsule current public-content hash. Successful
+  rebuild atomically marks older active rows for the same model/version as SUPERSEDED.
+- A ShedLock-protected background job performs bounded, configurable missing-index rebuilds.
+- Embedding/provider/database failures degrade to existing deterministic strategies without
+  widening access.
 
-## Verification performed
+## Verification
 
-- CapsuleMatchingTest: 18 tests, 0 failures/errors/skips.
-- git diff --check: PASS.
-- No full Maven regression was run for this WIP slice. The previous committed A0-A2 checkpoint
-  reported 874/874 only after rerunning one unrelated concurrency flake.
+- ./mvnw clean test: 873 tests, 0 failures, 0 errors, 0 skipped.
+- CapsuleMatchingTest: 18/18.
+- CapsuleEmbeddingIndexServiceIntegrationTest: 2/2. Proves no interactive candidate-provider
+  N+1, bounded rebuild, content-change invalidation, supersession, and private/simulator exclusion.
+- CapsuleEmbeddingPostgresIntegrationTest: 1/1 against PostgreSQL 16 + pgvector. Proves Flyway
+  V1-V18, vector persistence, current-hash scoring and old-vector exclusion.
+- PostgreSQL baseline/smoke and scheduler lease contract tests were updated and pass.
+- git diff --check: PASS before checkpoint commit.
 
-## Review findings that block main integration
+## Honest remaining A3 work
 
-1. PostgreSQL scoring takes MAX over all ACTIVE embeddings for capsule/model/version but does not
-   require the current capsule content hash. Editing a capsule can leave an older public-text vector
-   active and able to influence ranking.
-2. There is no dedicated service/integration test for index creation, content change invalidation,
-   consent withdrawal, provider failure, rebuild behavior or real PostgreSQL cosine ranking.
-3. First-use indexing is synchronous and may issue an embedding-provider call per candidate. There
-   is no asynchronous rebuild, batch control, latency budget, backpressure or cache-warm evidence.
-4. This is only the vector-matching foundation. Dynamic Genome fidelity, strategy calibration,
-   complementarity/diversity behavior, privacy adversarial evaluation and blind human quality
-   evidence are still open.
+This checkpoint establishes correctness and operability; it does not prove that the matching
+experience is already best-in-class. The next owner must still:
 
-## Required continuation
+1. Measure real-provider latency, cost, failure/backpressure behavior, and warm-index operations.
+2. Evaluate similarity, complementarity and controlled diversity on held-out bilingual cases
+   against lexical/theme baselines.
+3. Validate Dynamic Genome fidelity and simulator realism with blind human pairwise review.
+4. Close end-to-end correction/withdrawal/deletion receipts for all derived data and cached match
+   results, not only current capsule-vector scoring.
+5. Tune user-facing explanations and controls without weakening hard privacy/safety filters.
 
-- Bind active scoring to current content hash or atomically retire superseded embeddings.
-- Add Testcontainers coverage for V18, vector scoring, idempotent rebuild and invalidation.
-- Prove consent/correction/withdrawal propagation through embeddings and cached match results.
-- Move indexing out of the synchronous candidate loop or enforce a measured bounded warm-up path.
-- Evaluate semantic similarity, complementarity and controlled diversity against explicit
-  baselines with held-out cases; keep safety/privacy hard filters independent of rank score.
-- Re-run the full Maven suite, AI evaluation gate, secret scan and migration checks before proposing
-  A3 for main.
-
-No user-visible API or OpenAPI change is introduced by this WIP slice, so the contract-delta ledger
-remains EMPTY.
+No user-visible API or OpenAPI change is introduced by this checkpoint, so the contract-delta
+ledger remains EMPTY.

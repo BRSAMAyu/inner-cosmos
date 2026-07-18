@@ -28,4 +28,10 @@ public interface CapsuleEmbeddingIndexService {
      *         configured, the query is blank, or candidates is empty.
      */
     Map<Long, Double> similarities(String queryText, List<EchoCapsule> candidates);
+
+    RebuildResult rebuildMissing(int batchSize);
+
+    long pendingCount();
+
+    record RebuildResult(int selected, int indexed, int failed, long remaining) {}
 }
