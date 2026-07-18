@@ -13,7 +13,7 @@ Current-session results:
 - A live PostgreSQL outbox event was claimed by the worker and reached `PUBLISHED` with exactly one inbox receipt.
 - Deleting one API Pod recovered to two Ready replicas, and the same Redis session remained valid through recovery.
 - A rolling restart returned to two Ready replicas, and the same Redis session remained valid afterward.
-- PDB and HPA `2..6` contracts are installed. Actual HPA scale-out/load behavior was not exercised.
+- PDB and HPA `2..4` contracts are installed (min 2 / max 4, CPU 70% target — see `deploy/k8s/base/app-hpa.yml`). Actual HPA scale-out/load behavior was not exercised in this Academy run; it is exercised separately on a local kind cluster (see `evidence/g8/HPA-LOAD-001/`).
 
 Evidence boundary:
 

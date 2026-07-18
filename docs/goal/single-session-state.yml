@@ -1356,3 +1356,96 @@ last_full_gate:
   review: BUILDER_VERIFIED_WITH_GENERATED_CLIENT_AND_LIVE_CROSS_POD_SSE_GAPS_REMAINING
 
 handoff_rule: Do not return a final answer at commits or campaign checkpoints; continue with the next machine-actionable gap.
+
+# Parallel supervisor-first track (separate branch feat/supervisor-k8s-ai-g9). Does NOT touch web/ styling
+# (owned by teammate sangchenyi's experience front / active_front above). Append-only to avoid conflicts.
+supervisor_track_2026_07_17:
+  branch: feat/supervisor-k8s-ai-g9
+  rationale: "Operator-approved reprioritization toward the supervisor's two questions (k8s solid? vision runs end-to-end?). Sequence: A Foundation -> B AI effectiveness -> C k8s ops -> D G2 engineering -> E G9 demo/RC. Real DeepSeek+GLM keys provided (env-only). See memory supervisor-first-override."
+  phase_a_checkpoint:
+    state: DONE_PENDING_COMMIT
+    done:
+      - "Verified honest baseline: backend 835/835 (Testcontainers incl., Docker up), frontend 115/115, kustomize base(6)+academy-eks(20) offline build, secret scan clean."
+      - "Fixed HPA drift: evidence/academy/ACADEMY-LIVE-001/summary.md claimed HPA 2..6 but manifest is 2..4 (git history confirms never 2..6). Corrected the false claim."
+      - "Added deploy/compose/dev.yml — first keyless dev/demo compose (H2+Mock, one-command boot verified healthy ~20s, /app/aurora/ 200). Real provider opt-in via env. MANAGEMENT_HEALTH_REDIS_ENABLED=false in dev."
+      - "Fixed Dockerfile: dependency:go-offline made best-effort (|| true) — it over-fetched a flyway->google-cloud-storage->opentelemetry transitive from maven.pkg.github.com that buildkit here can't resolve; package remains authoritative. Image now builds on restricted networks."
+      - "Added scripts/scan-secrets.sh — portable bash/ripgrep mirror of scan-secrets.ps1 (no pwsh on macOS). Self-tested: catches planted token, passes clean."
+      - "Real-provider smoke PASSED: DeepSeek wired (log: fallbackAllowed=false), full API path register->login->session->/aurora/message returned a real 5.9s reply computing 12+30=42 (Mock cannot). evidence/g8/DEV-COMPOSE-SMOKE-001/."
+    next_machine_actions:
+      - "Commit Phase A on feat/supervisor-k8s-ai-g9; then Phase C kickoff (Docker up): create kind cluster (a 3-node 'kubedeploy' kind cluster is already running and reusable), port root docker-compose Prometheus v2.54 + Grafana 11.3 into deploy/k8s/observability/ scraping /actuator/prometheus, ship dashboards+alerts as code (OPS-OBSERVABILITY)."
+      - "Then Phase C: HPA load test 2->N on kind (ACADEMY-RELIABILITY / evidence/g8/HPA-LOAD-001), resilience drills (OPS-RESILIENCE), pg_dump CronJob + restore drill (BACKUP-RESTORE-001), lock /actuator/prometheus (deferred from Phase A item 3 — verify probes still pass on kind), terraform to plan (EKS-IAC)."
+      - "Phase B (keys available): enable MEMORY_EMBEDDING semantic retrieval + pgvector; run ai-lab real-pairwise / wire OptionalLlmJudge; FORGET propagation remaining four surfaces."
+    verify_commands:
+      - "docker compose -f deploy/compose/dev.yml up -d && curl -s -o /dev/null -w '%{http_code}' localhost:8080/app/aurora/"
+      - "./scripts/scan-secrets.sh"
+      - "kubectl kustomize deploy/k8s/base >/dev/null && kubectl kustomize deploy/k8s/overlays/academy-eks >/dev/null && echo kustomize-ok"
+    blockers: ["Rotate the DeepSeek+GLM keys after session (HG-SECRET-ROTATION) — they were pasted into chat."]
+    committed: e5b081c
+  phase_c_checkpoint:
+    state: OBSERVABILITY_HPA_RESILIENCE_BACKUP_DONE_ON_KIND
+    cluster: "local kind 'inner-cosmos-ops' (control-plane + worker); metrics-server installed (--kubelet-insecure-tls)."
+    done:
+      - "deploy/k8s/overlays/kind-dev: runs the real app image standalone (dev profile, H2+Mock, zero secrets) mirroring base probes/PDB/HPA/rolling/security/graceful — makes the k8s manifests demonstrably runnable, not just kustomize-buildable."
+      - "deploy/k8s/observability (OPS-OBSERVABILITY): Prometheus v2.54 pod-discovery + 4 alert rules + Grafana 11.3 provisioned datasource & App/JVM dashboard. Verified live: both API pods up=1, JVM/HTTP/CPU series present, dashboard rendered under load. evidence/g8/OPS-OBSERVABILITY-001/."
+      - "HPA exercised (ACADEMY-RELIABILITY): fortio load -> cpu 149%/70% -> scale 2->4 -> (load off) 4->2. evidence/g8/HPA-LOAD-001/. Also corrected the false HPA 2..6 evidence claim to 2..4."
+      - "Resilience (OPS-RESILIENCE): pod-kill recovery, zero-downtime rolling restart (avail held 4), node-drain with PDB blocking unsafe eviction + reschedule + continuous 200s. evidence/g8/OPS-RESILIENCE-001/."
+      - "Backup/restore (closes durability gap): deploy/k8s/backup/pg-backup.yaml CronJob; drill 42 rows -> pg_dump -> DROP -> pg_restore -> 42 rows. evidence/g8/BACKUP-RESTORE-001/."
+    next_machine_actions:
+      - "Commit Phase C observability/HPA/resilience/backup. Then finish Phase C: EKS-IAC terraform to validate+plan (install terraform first), CI hardening (SBOM/SAST/scan gating in .github/workflows), and actuator-endpoint lockdown (deferred from Phase A item 3 — separate mgmt port OR Spring Security path rules; verify probes+scrape still work on kind)."
+      - "Then Phase B (keys available, env-only): enable MEMORY_EMBEDDING semantic retrieval + pgvector; ai-lab real-pairwise + wire OptionalLlmJudge; FORGET propagation remaining surfaces."
+    verify_commands:
+      - "kind get clusters   # inner-cosmos-ops"
+      - "kubectl --context kind-inner-cosmos-ops -n inner-cosmos-dev get hpa,pods"
+      - "kubectl --context kind-inner-cosmos-ops -n observability get pods"
+      - "kubectl kustomize deploy/k8s/observability >/dev/null && kubectl kustomize deploy/k8s/overlays/kind-dev >/dev/null && echo ok"
+    known_limitation: "actuator /prometheus is still unauthenticated (repo audit S4-028) — hardening deferred within Phase C; see next_machine_actions."
+  phase_b_checkpoint:
+    state: REAL_PROVIDER_PAIRWISE_EXECUTED_AND_SEMANTIC_RETRIEVAL_PROVEN
+    done:
+      - "ai-lab real-pairwise EXECUTED against DeepSeek (profile ~/.config/inner-cosmos/providers.local.json, key env-only): 11 trajectories, provider_called=true, fallback_used=false, dual-kernel = 2 real LLM calls each. Artifact evidence/innovation/INNO-EVAL-003/ (runs.json + blind-human CSV)."
+      - "HONEST: deterministic lexical rubric single-pass 0.64 >= dual-kernel 0.55 -> dual-kernel superiority NOT shown; real verdict needs the blind human panel (gate REAL-PROVIDER-CREDENTIALS-AND-BLIND-REVIEW). Recorded, not hidden."
+      - "Semantic retrieval proven > lexical: MemoryEmbeddingCandidateIntegrationTest providerRecall@3=1.0 vs local=0.0 (+100pts, gate >=0.30), contradicted-stale never returned. evidence/innovation/INNO-INNER-008/."
+      - "Real embedding provider reachable: GLM embedding-3 OpenAI-compatible /embeddings HTTP 200, 1536-dim (DeepSeek has no embeddings). Recipe recorded for MEMORY_EMBEDDING_* with GLM."
+      - "ai-lab venv at ai-lab/.venv (pip install -e .); offline `validate` + `run` also pass (192 runs, hard_gates PASS)."
+    next_machine_actions:
+      - "Optional deeper Phase B: full app-E2E semantic retrieval with real GLM embedder (MEMORY_EMBEDDING_ENABLED=true + GLM base_url/embedding-3/1536) on H2 (localScores) or postgres profile (pgvector); FORGET propagation remaining four surfaces (prompt-cache/sync-queue/analytics/backup)."
+      - "Phase D (G2 engineering): ARCH-MODULES Spring Modulith arch tests, EVENT-RELIABLE outbox->DLQ full chain (Testcontainers), RUNTIME-ROLES 5-role isolation."
+  phase_d_checkpoint:
+    state: EVENT_RELIABLE_DLQ_DONE_RUNTIME_ROLES_NOTED_ARCH_MODULES_DEFERRED
+    done:
+      - "EVENT-RELIABLE (UNASSESSED->IN_PROGRESS): added JdbcOutboxRepository.replayDead() + a Testcontainers test proving dead-letter on retry exhaustion (status DEAD, not re-claimed, no leaked side effect) and replay reprocessing exactly once. JdbcOutboxRepositoryIntegrationTest 3/3 green on real Postgres. evidence/g2/EVENT-RELIABLE-001/."
+      - "RUNTIME-ROLES (UNASSESSED->IN_PROGRESS): documented that existing RuntimeRoleConfigurationTest (scheduling gate per role + migration exit/reject) + ACADEMY-LIVE-001 (ran api+worker+scheduler+migration as independent workloads) already substantiate it. A full-boot per-role bean-presence test was attempted and REVERTED (enabling the Postgres-only outbox worker on H2 triggers its poll -> H2 syntax error; correct form is Testcontainers/ApplicationContextRunner slice)."
+    deferred:
+      - "ARCH-MODULES: codebase is layer-structured (controller/service/entity/mapper), not package-by-feature, so Spring Modulith module boundaries need a scoped design decision (define @ApplicationModule domains, or use ArchUnit layer rules) — not a drop-in. Deferred, not attempted, to avoid a large speculative refactor."
+    next_machine_actions:
+      - "Finish Phase C: EKS-IAC terraform validate/plan (install terraform); CI hardening (SBOM/SAST/scan gating in .github/workflows); actuator /prometheus lockdown (spawned task_bb411aa8)."
+      - "Phase E (G9): FINAL-E2E Playwright core journeys; 8-12min reproducible demo (dev compose + kind); FINAL-OPERATIONS runbook + non-author rehearsal; FINAL-TRACEABILITY matrix -> declare RELEASE_CANDIDATE."
+      - "Optional: ARCH-MODULES design decision; full app-E2E semantic retrieval with real GLM embedder; FORGET propagation remaining surfaces; per-role bean-presence slice test."
+    verify_commands:
+      - "docker running required for: ./mvnw -Dtest=JdbcOutboxRepositoryIntegrationTest test (3/3)"
+  real_eks_checkpoint:
+    state: APP_DEPLOYED_AND_OPERATED_ON_LIVE_AWS_EKS
+    context: "Operator provided AWS Academy Learner Lab creds (temporary, ~/.aws only, never committed). Cluster MyEKS, k8s 1.36, 2 amd64 EC2 nodes, envoy-gateway (GatewayClass eg) + metrics-server + gp2 present. Disposable guestbook removed (operator-authorized)."
+    done:
+      - "Cross-built amd64 image (arm64 dev image won't run on amd64 nodes) via deploy/eks/Dockerfile.runtime (copies pre-built fat-jar onto amd64 JRE, no emulated Maven build); pushed to ECR 477296622190.dkr.ecr.us-east-1.amazonaws.com/inner-cosmos:eks-dev @ sha256:dad7f1ed..."
+      - "deploy/k8s/overlays/eks-dev (reuses kind-dev + ECR image + Gateway/HTTPRoute on GatewayClass eg). Deployed to EKS: 2 pods across both nodes, real AWS ELB serves /app/aurora/ (AppShell) + /actuator/health UP."
+      - "REAL-CLOUD HPA: cpu 339%/70% -> scaled 2->4 (2+2 across nodes). REAL-CLOUD resilience: pod-kill kept ELB at 200 (5/5), zero-downtime rolling restart. Evidence: evidence/g8/EKS-LIVE-002/."
+    next_machine_actions:
+      - "Optional deeper: deploy the full prod academy-eks overlay on EKS (postgres/redis/TLS/OIDC/real-provider) — needs real IdP issuer + provider secret as k8s Secrets; deploy observability stack on EKS; run node-drain on EKS."
+      - "Teardown when done to free Learner Lab budget: kubectl delete -k deploy/k8s/overlays/eks-dev (removes the ELB)."
+    verify_commands:
+      - "aws eks update-kubeconfig --name MyEKS && kubectl -n inner-cosmos-dev get pods,hpa,gateway"
+      - "curl http://<gateway-elb>/actuator/health   # {\"status\":\"UP\"}"
+  eks_prod_checkpoint:
+    state: FULL_PROD_STACK_RUNNING_ON_REAL_EKS_AND_A_PROD_BLOCKING_BUG_FIXED
+    done:
+      - "deploy/k8s/overlays/eks-prod (based on academy-eks, patched: namespace inner-cosmos, ECR image, GatewayClass eg). Deployed the full prod stack on real EKS: TLS PostgreSQL (static PV, Flyway V1..V17) + TLS Redis + migration Job + API x2 + worker + scheduler + HTTPS Gateway (self-signed edge cert). Secrets (runtime/postgres-tls/redis-tls/edge-tls) created out-of-band; OIDC placeholders; real DeepSeek key."
+      - "FIXED a real prod-blocking bug: the 14 H2/MySQL SchemaMx*Initializers were gated only on spring.flyway.enabled=false; prod requires the app's Flyway disabled (migration Job owns it), so they ran on Postgres and crashed on AUTO_INCREMENT DDL. Added an H2-only @ConditionalOnExpression driver gate to all 14. Full suite 836/0/0; still run on H2 (tests) and skip on Postgres. evidence/g8/EKS-PROD-001/."
+      - "Verified real user flow via HTTPS ELB: register->login (shared Redis session across replicas)->create session (Postgres)->real DeepSeek Aurora reply. Suitable for multi-user testing (shared durable Postgres + Redis). Removed the superseded eks-dev (mock) overlay to leave one clean prod URL."
+    urls:
+      - "prod HTTPS (self-signed, click through): https://a60f3ce14c2e146f1bc5804884788d36-1144038221.us-east-1.elb.amazonaws.com/app/aurora/ (ELB hostname changes if the Gateway is recreated)"
+    teardown: "kubectl delete -k deploy/k8s/overlays/eks-prod   # removes the ELB when done (Learner Lab creds/cluster are temporary)"
+    next_machine_actions:
+      - "Optional: enable pgvector semantic retrieval on the prod DB with a real GLM embedding key (MEMORY_EMBEDDING_* Secret); observability stack on EKS; node-drain drill on EKS."
+      - "Finish Phase C: EKS-IAC terraform validate/plan (install terraform), CI hardening (SBOM/SAST), actuator lockdown (spawned as task_bb411aa8)."
+      - "Phase E (G9): FINAL-E2E, 8-12min demo, FINAL-OPERATIONS runbook + non-author rehearsal, FINAL-TRACEABILITY matrix -> declare RC."

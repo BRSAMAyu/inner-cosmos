@@ -1,0 +1,17 @@
+# Observability stack as-code — Prometheus + Grafana in an `observability` namespace.
+# Prometheus auto-discovers pods annotated prometheus.io/scrape=true (the app carries them)
+# and scrapes /actuator/prometheus (Micrometer). Grafana is provisioned with the Prometheus
+# datasource and the "Inner Cosmos — App Health & JVM" dashboard, plus alert rules.
+#
+#   kubectl apply -k deploy/k8s/observability
+#   kubectl -n observability port-forward svc/grafana 3000:3000   # http://localhost:3000 (admin/admin, local only)
+#   kubectl -n observability port-forward svc/prometheus 9090:9090
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - prometheus-rbac.yaml
+  - prometheus-config.yaml
+  - prometheus.yaml
+  - grafana-config.yaml
+  - grafana.yaml

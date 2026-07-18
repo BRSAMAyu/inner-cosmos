@@ -156,6 +156,10 @@ export type FriendRelation = {
 };
 export type ConnectionRequests = { incoming: SocialConnection[]; outgoing: SocialConnection[] };
 export type DiscoverablePerson = { id: number; username: string; nickname: string; relationStatus: string };
+export type RelationMention = { id: number; relationLabel: string; relationType: string | null; emotionTags: string | null; triggerSummary: string | null; boundaryHint: string | null };
+export type RelationTimelinePoint = { timestamp: string; emotions: string | null; summary: string | null };
+export type RelationHealth = { relationLabel: string; healthScore: number };
+export type LetterThread = { id: number; firstLetterId: number; participantA: number; participantB: number; capsuleId: number | null; status: string; lastLetterAt: string | null };
 export type PsychologySkillManifest = {
   id: string; version: string; owner: string; title: Record<string, string>; description: Record<string, string>;
   estimatedMinutes: number; riskTier: "L1" | "L2" | "L3"; agentInvocation: string; userInvocation: string;
@@ -494,6 +498,8 @@ export const api = {
     return request<SlowLetter>("/api/v1/letters/draft", { method: "POST", body: JSON.stringify(body) });
   },
   sendSlowLetter: (id: number) => request<SlowLetter>(`/api/letters/${id}/send`, { method: "POST" }),
+  letterThreads: () => request<LetterThread[]>("/api/letters/threads"),
+  letterThreadLetters: (threadId: number) => request<SlowLetter[]>(`/api/letters/threads/${threadId}/letters`),
   letterInbox: () => request<SlowLetter[]>("/api/letters/inbox"),
   letterOutbox: () => request<SlowLetter[]>("/api/letters/outbox"),
   transitionLetter: (id: number, action: "read" | "reply" | "decline" | "block" | "archive") =>
@@ -512,8 +518,33 @@ export const api = {
   friends: () => request<SocialConnection[]>("/api/social/friends"),
   requestConnectionFromLetter: (letterId: number) => request<FriendRelation>(`/api/social/connections/from-letter/${letterId}`, { method: "POST" }),
   decideConnection: (id: number, decision: "accept" | "decline") => request<FriendRelation>(`/api/social/friends/${id}/${decision}`, { method: "POST" }),
-  leaveConnection: (id: number) => request<FriendRelation>(`/api/social/friends/${id}/leave`, { method: "POST" })
+  leaveConnection: (id: number) => request<FriendRelation>(`/api/social/friends/${id}/leave`, { method: "POST" }),
+  relations: () => request<RelationMention[]>("/api/relation/list"),
+  relationStats: () => request<Record<string, number>>("/api/relation/stats"),
+  relationHighEmotion: () => request<RelationMention[]>("/api/relation/high-emotion"),
+  relationTimeline: (label: string) => request<RelationTimelinePoint[]>(`/api/relation/timeline?label=${encodeURIComponent(label)}`),
+  relationHealth: (label: string) => request<RelationHealth>(`/api/relation/health?label=${encodeURIComponent(label)}`)
 };
+
+export type AsrResult = { text: string; audioDurationSec: number; speechRate: number; pauseCount: number; longPauseCount: number; inputConfidence: number };
+
+// Voice input: multipart upload to the ASR endpoint. Bypasses request()'s JSON Content-Type so the
+// browser sets the multipart boundary; still carries CSRF (session) or bearer (mobile) auth.
+export async function transcribeAudio(blob: Blob): Promise<AsrResult> {
+  const form = new FormData();
+  form.append("file", blob, "voice.webm");
+  const headers = new Headers();
+  const token = await accessTokenProvider?.() ?? null;
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  else { const c = await getCsrf(); headers.set(c.headerName, c.token); }
+  const response = await fetch(apiUrl("/api/asr/transcribe"), {
+    method: "POST", body: form, headers, credentials: token ? "omit" : "include"
+  });
+  if (!response.ok) throw new Error(`ASR HTTP ${response.status}`);
+  const env = await response.json() as ApiEnvelope<AsrResult>;
+  if (!env.success) throw new Error(env.message ?? "语音转写失败");
+  return env.data;
+}
 
 export async function streamAurora(
   input: Pick<CoreChatRequest, "sessionId" | "message"> & { mode: string },

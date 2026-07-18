@@ -1,0 +1,71 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-provisioning
+  namespace: observability
+data:
+  datasource.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus.observability.svc:9090
+        isDefault: true
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+      - name: inner-cosmos
+        orgId: 1
+        folder: Inner Cosmos
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: observability
+data:
+  inner-cosmos-app.json: |
+    {
+      "title": "Inner Cosmos — App Health & JVM",
+      "uid": "inner-cosmos-app",
+      "schemaVersion": 39,
+      "time": {"from": "now-30m", "to": "now"},
+      "refresh": "10s",
+      "panels": [
+        {
+          "type": "stat", "title": "API replicas up", "id": 1,
+          "gridPos": {"h": 5, "w": 6, "x": 0, "y": 0},
+          "fieldConfig": {"defaults": {"thresholds": {"steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}},
+          "targets": [{"expr": "sum(up{component=\"api\"})", "refId": "A"}]
+        },
+        {
+          "type": "timeseries", "title": "HTTP request rate (req/s by status)", "id": 2,
+          "gridPos": {"h": 8, "w": 12, "x": 6, "y": 0},
+          "targets": [{"expr": "sum by (status) (rate(http_server_requests_seconds_count[1m]))", "legendFormat": "{{status}}", "refId": "A"}]
+        },
+        {
+          "type": "stat", "title": "HTTP 5xx ratio", "id": 3,
+          "gridPos": {"h": 5, "w": 6, "x": 18, "y": 0},
+          "fieldConfig": {"defaults": {"unit": "percentunit", "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "red", "value": 0.05}]}}},
+          "targets": [{"expr": "sum(rate(http_server_requests_seconds_count{status=~\"5..\"}[5m])) / clamp_min(sum(rate(http_server_requests_seconds_count[5m])), 1)", "refId": "A"}]
+        },
+        {
+          "type": "timeseries", "title": "JVM heap used / max (per pod)", "id": 4,
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+          "fieldConfig": {"defaults": {"unit": "percentunit"}},
+          "targets": [{"expr": "sum by (pod) (jvm_memory_used_bytes{area=\"heap\"}) / sum by (pod) (jvm_memory_max_bytes{area=\"heap\"})", "legendFormat": "{{pod}}", "refId": "A"}]
+        },
+        {
+          "type": "timeseries", "title": "Process CPU usage (per pod)", "id": 5,
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+          "fieldConfig": {"defaults": {"unit": "percentunit"}},
+          "targets": [{"expr": "process_cpu_usage", "legendFormat": "{{pod}}", "refId": "A"}]
+        }
+      ]
+    }
