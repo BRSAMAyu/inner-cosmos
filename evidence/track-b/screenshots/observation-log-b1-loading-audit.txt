@@ -1,0 +1,12 @@
+console.error: Failed to load resource: the server responded with a status of 401 ()
+register button <1s: label still "创建账号", disabled=true
+screenshot: b1-loading-audit-01-register-under-1s.png
+register button 1-3s: "正在创建" visible=true
+screenshot: b1-loading-audit-02-register-busy-text.png
+url after register settles: http://localhost:8080/app/aurora/#/aurora
+screenshot: b1-loading-audit-03-skill-ready.png
+skill-start <1s disabled=true
+screenshot: b1-loading-audit-04-skill-under-1s.png
+skill-start 1-3s: busy text visible=true
+screenshot: b1-loading-audit-05-skill-busy-text.png
+console.error: Failed to load resource: the server responded with a status of 403 ()

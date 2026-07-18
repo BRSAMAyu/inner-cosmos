@@ -154,3 +154,117 @@ prerequisite the spec (§5) calls out for shareable deep links and for eventuall
 - No single async/task/error model consolidation yet (separate from routing; see the B0 finding about
   `web/src/loading.tsx`'s existing primitives).
 - `HashRouter` is an intentional, documented interim choice (`TB-REQ-002`), not the end state.
+
+## Workstream B1 — third checkpoint: single async/task/error model audit
+
+Audits every component under `web/src/components/` and `web/src/AuroraApp.tsx` for busy/loading/error
+UI that hand-rolls what `web/src/loading.tsx`'s existing `useDelayedBusy`/`AsyncButton`/`LoadingText`/
+`ConnectError` primitives already do correctly (B0 finding #10). No new primitive was invented; every
+migration below adapts a call site onto the existing API. `web/src/loading.tsx` itself was **not**
+touched — every hand-rolled instance found fit the existing API without modification.
+
+### Migrated (mechanism swap, same copy, same disable logic)
+
+| File | What changed |
+|---|---|
+| `web/src/components/MemoryStarfield.tsx` | Four buttons converted to `AsyncButton`, preserving their exact existing hand-written busy copy: the importance-save button (`"保存重要度"` / `"保存中…"`), the archive button (`"归档这颗记忆"` / `"归档中…"`), the per-star "查看来源与变化" reveal button (`"正在追溯…"`, with the original *global* `detailBusy !== null` disable preserved via `AsyncButton`'s explicit `disabled` prop alongside its own per-star `busy`), and the per-operation "撤回这次变更" rollback button (`"正在撤回…"`, same global-disable-plus-per-item-busy technique). The three `时间/主题/人物` mode-tab buttons were deliberately **not** migrated — see "Left alone" below. |
+| `web/src/components/ClaimCandidateReview.tsx` | The confirm (`"对，就是我"` / `t.confirming`) and inline dismiss-confirm (`"确认忽略"` / `t.dismissing`) buttons, which already hand-rolled the exact `disabled={busy} + {busy ? busyText : label}` pattern `AsyncButton` exists to replace. The "rethink"/initial-dismiss buttons stay plain (they only toggle local UI state, they are not themselves async). |
+| `web/src/components/CapsuleWorkbench.tsx` | The one hand-rolled holdout in a file that otherwise already used `AsyncButton` everywhere else: `CapsuleBoundaryEditor`'s "保存边界设置" / "保存中…" save button. |
+| `web/src/components/UnderstandingCorrection.tsx` | The actual async trigger for retiring a correction (`btn-retire-confirm`, `"确认退休"` / `"退休中…"`). The sibling "让这条退休" opener button (which only ever renders *before* the inline confirmation state, so it can never actually be seen mid-retire) was deliberately left alone — see "Left alone". |
+| `web/src/components/PsychologySkillStudio.tsx` | The "开始这次反思" / `text.busy` (bilingual) skill-run button. |
+| `web/src/components/RelationsView.tsx` | The relation-timeline panel's `busy ? <div className="network-empty">正在读取「{selected}」的时间线…</div> : ...` block-level loading message — this is exactly what `LoadingText` is for (a region/panel loading indicator, not a single button), so it was swapped for `<LoadingText busy className="network-empty">` with the identical copy. |
+| `web/src/components/AuthGate.tsx` | The login/register submit button, which previously only disabled with zero busy feedback (`disabled={busy}`, static label). Now an `AsyncButton` with a mode-dependent `busyText` (`"正在登录"` / `"正在创建"`), following the "正在X" convention already established by every other `AsyncButton` call site in the codebase. This is the very first interactive control a new user sees, so it was worth fixing even though it needed a small (convention-consistent) copy addition rather than a pure mechanism swap. |
+| `web/src/components/AuroraConversation.tsx` | The voice-input button, which previously hand-rolled a 3-way `transcribing ? "转写中…" : recording ? "● 停止录音" : "🎤 语音"` label with `disabled={transcribing \|\| !sessionReady}`. Converted to `AsyncButton` with `busy={transcribing}`, `busyText="转写中…"`, `disabled={!sessionReady}`, and `children={recording ? "● 停止录音" : "🎤 语音"}` — the non-busy branch still needs the recording/idle toggle, which `AsyncButton` supports since it only replaces `children` while `busy`. |
+| `web/src/components/PortraitView.tsx` | The per-dimension calibration "告诉 Aurora" button, which previously only disabled (`disabled={busyDim === d.dim \|\| !draft.trim()}`) with **zero** busy feedback at all — a real instance of the "plain `disabled={busy}` button with no busy text" pattern the audit was asked to find. Converted to `AsyncButton` (busy=`busyDim === d.dim`, disabled=`!draft.trim()`), relying on the primitive's own built-in `"处理中"` fallback rather than inventing new component-specific copy, since only one calibration form is ever open at a time (no sibling-button ambiguity). |
+
+### Left alone, with reasons (discoveries, not fixes)
+
+Several more `disabled={busy}`-only buttons were found and deliberately **not** migrated, because in
+each case one shared busy boolean disables **several sibling buttons that represent different
+items** (candidates, proposals, versions, mode tabs, strategies, runs, rating options) with no
+per-item id to key off of. Naively wrapping each sibling in its own `AsyncButton` with the same shared
+`busy` flag would make *every* sibling button show busy text the instant *any one* of them is
+clicked — a UX regression (misleading feedback on buttons the user didn't touch), not a consolidation.
+Fixing this properly means giving the underlying state a per-item id (mirroring the `claimCandidateBusyId` /
+`detailBusy` / `rollbackBusy` pattern already used elsewhere in `AuroraApp.tsx`), which is state-shape
+work that belongs with the `AuroraApp.tsx` domain-hook decomposition, not a call-site swap:
+
+- `web/src/components/AuroraSelfSpace.tsx` — propose/evaluate/activate/rollback buttons across
+  different candidates/proposals/versions all share one `busy: boolean` prop, with no busy text at all.
+- `web/src/components/MemoryStarfield.tsx` — the `时间`/`主题`/`人物` starfield-mode tab buttons share
+  one `starfieldBusy: boolean`.
+- `web/src/components/ResonanceNetwork.tsx` — the five matching-strategy switcher buttons share one
+  `visitorBusy: boolean`.
+- `web/src/components/PsychologySkillStudio.tsx` — each saved run's "撤回这次结果" button shares one
+  `skillBusy: boolean` across the whole run list (no per-run id).
+- `web/src/components/CapsuleWorkbench.tsx` — the five sandbox-feedback rating buttons share one
+  `capsuleBusy: boolean`.
+
+Also left alone, for other reasons:
+
+- `web/src/components/LettersInbox.tsx` — the reply-to-letter button (`disabled={!replyDrafts[letter.id]?.trim()}`)
+  has **no busy tracking passed in at all** (no prop exists for it), so clicking it while the reply
+  network call is in flight gives zero feedback and does not guard against a double-submit. This is a
+  real gap, but fixing it needs a new busy-id piece of state threaded from `AuroraApp.tsx`'s
+  `replyWithLetter`, not just a call-site swap — flagged here as backlog rather than invented on the spot.
+- `web/src/components/AuroraConversation.tsx`'s send button (`{activeTurnId ? "打断并发送" : "发送"}`) —
+  intentionally a different, correct pattern: it reflects "there is an active turn you can interrupt"
+  domain state, not a loading indicator for the send action itself. Left unchanged.
+- Various "cancel"/"return to edit"/"rethink" buttons next to a migrated `AsyncButton` (e.g. `CapsuleWorkbench`'s
+  "返回修改", `UnderstandingCorrection`'s "改为整体理解"/"返回修改", `ClaimCandidateReview`'s "再想想") —
+  these stay plain `disabled={busy}` buttons since they perform a synchronous local-state toggle, not
+  the async action itself; this already matches the precedent set by every previously-migrated component.
+
+### Tests
+
+Nine `.test.tsx` files needed updating alongside their components:
+
+- `MemoryStarfield.test.tsx`, `ClaimCandidateReview.test.tsx`, `CapsuleWorkbench.test.tsx`: each had one
+  assertion that queried a busy button by its *already-swapped* label (e.g. `"保存中…"`) synchronously,
+  with no timer advance. `AsyncButton` withholds the busy label for the first second (the spec's "don't
+  flash before 1s" rule), so a synchronous assert now checks `disabled` on the *original* label —
+  exactly the convention every already-migrated component's tests (`AccountSettings.test.tsx`,
+  `PeopleDiscovery.test.tsx`) already used before this checkpoint.
+- `UnderstandingCorrection.test.tsx`: the pre-existing "shows a retiring state…" test turned out to
+  exercise the *un-migrated* opener button, not the actual async trigger (a two-click interaction is
+  needed to reach the confirm button while busy). Added a new characterization test for the confirm
+  button first — ran it against the pre-migration hand-rolled code to confirm it passed with the old,
+  undelayed text, *then* migrated the component and updated that one assertion to the post-migration
+  (disabled-on-original-label) form. Both tests are green.
+- `RelationsView.test.tsx`: added `vi.useFakeTimers()`/`vi.advanceTimersByTime(1000)` (matching
+  `loading.test.tsx`'s own convention) since `LoadingText` now withholds its text for the first second.
+- `PsychologySkillStudio.test.tsx`, `PortraitView.test.tsx`, `AuthGate.test.tsx`, `AuroraConversation.test.tsx`:
+  no changes needed — none of their existing assertions queried a busy-swapped label synchronously.
+
+### How this was verified
+
+- `cd web && npx vitest run` — 143/143 passing (24 files; +1 new characterization test in
+  `UnderstandingCorrection.test.tsx`), after every meaningful edit, not just at the end.
+- `cd web && npm run build` — clean `tsc -b && vite build` after the full migration set.
+- Live run (`dev` profile, H2 + Mock, `.\mvnw.cmd spring-boot:run`, server restarted after the rebuild)
+  via `evidence/track-b/scripts/observe-b1-loading-audit.mjs` (run from a temporary copy under `web/`,
+  per the by-now-standard workaround for Node's ESM resolver). The script intercepts
+  `POST /api/v1/auth/register` and `POST /api/psychology/skills/*/runs` with an artificial ~1.8s delay
+  (the local Mock/H2 backend otherwise responds too fast to observe the delayed-loading tiers) and
+  confirms, against the real running app: the register button keeps its original `"创建账号"` label and
+  is already disabled at <1s (no flash), then shows `"正在创建 ···"` at 1-3s; the skill-run button is
+  disabled at <1s with its original label, then shows `"正在整理 ····"` at 1-3s. Screenshots:
+  `evidence/track-b/screenshots/b1-loading-audit-01..05*.png`.
+
+### Extending `loading.tsx` itself
+
+Not needed this pass — every hand-rolled instance found (button busy+text, block-level busy text)
+mapped cleanly onto the existing `AsyncButton`/`LoadingText` API. No gap was found in the primitive
+itself.
+
+### What is still open for B1
+
+- `AuroraApp.tsx`'s domain-hook/store decomposition is still the largest remaining B1 item (unchanged
+  by this checkpoint — this pass only touched leaf components' internal busy/error rendering, not
+  `AuroraApp.tsx`'s own state shape).
+- The "left alone" shared-busy-boolean buttons above are real, but smaller, follow-up items: once
+  `AuroraApp.tsx`'s domain hooks introduce per-item busy ids for those flows (mirroring the
+  `claimCandidateBusyId`/`detailBusy`/`rollbackBusy` pattern that already exists for other actions),
+  those sibling buttons can adopt `AsyncButton` too.
+- `LettersInbox.tsx`'s reply-button busy/double-submit gap (no busy tracking at all) is unclaimed
+  backlog for whoever next touches the letters domain hook.
