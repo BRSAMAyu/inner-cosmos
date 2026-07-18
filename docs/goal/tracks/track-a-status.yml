@@ -78,12 +78,12 @@ workstreams:
   A4-psychology-skills: {status: NOT_STARTED, evidence: [], remaining: "Ship and evaluate at least three bilingual non-diagnostic product skills."}
   A5-data-rights: {status: NOT_STARTED, evidence: [], remaining: "Cover every derivative, queue, cache, analytics, notification and backup policy."}
   A6-observability-boundaries: {status: NOT_STARTED, evidence: [], remaining: "Add privacy-safe AI signals, failure injection, backend actuator hardening and executable module boundaries."}
-latest_checkpoint: "PENDING_THIS_SESSION_COMMIT"
+latest_checkpoint: "ea467e25228debfd59ea60195a90d1fcd7a389d8"
 commits:
   - message: "test(track-a): A0 quality-lab ablation suites + real-provider smoke evidence"
     sha: "5daa4dc92ac8e5375a0cd9486112ce44d80e58bc"
-  - message: "fix(track-a): embed inline JSON schema examples in dual-kernel plan/speaker/critic instructions; add real-provider regression + latency-budget gate"
-    sha: "PENDING_THIS_SESSION_COMMIT"
+  - message: "fix(track-a): embed inline JSON schema examples in dual-kernel plan/speaker/critic instructions"
+    sha: "ea467e25228debfd59ea60195a90d1fcd7a389d8"
 verification:
   full_suite: "./mvnw test -> Tests run: 842, Failures: 0, Errors: 0, Skipped: 0 (2026-07-18, this session, JAVA_HOME=JDK 21.0.10, after the A1 schema fix)"
   new_suites_focused: "./mvnw test -Dtest=TrackARuntimeAblationEvaluationTest,TrackAMemoryAuthorityAblationEvaluationTest,TrackACapsuleGenomeAblationEvaluationTest,TrackAProactiveDecisionEvaluationTest -> Tests run: 6, Failures: 0 (unaffected by the runtime prompt-text change, as expected — these suites use a ScriptedClient that ignores instruction text)"
