@@ -10,10 +10,18 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      // registerType "autoUpdate": a new build activates its service worker on next load
-      // without asking the user to manually refresh -- versioned-update UX is deliberately
-      // out of scope for this first B5 slice (see track-b-status.yml handoff note).
-      registerType: "autoUpdate",
+      // registerType "prompt" (not "autoUpdate"): confirmed by reading vite-plugin-pwa's
+      // generated client (node_modules/vite-plugin-pwa/dist/client/build/register.js) rather
+      // than guessing from the option name. Under "autoUpdate" the generated register script
+      // NEVER calls onNeedRefresh at all -- it silently reloads the page itself the instant a
+      // new service worker activates, with zero user-visible warning, which could interrupt an
+      // in-progress Aurora conversation. "prompt" mode surfaces needRefresh/offlineReady state
+      // instead (see web/src/components/PwaUpdateNotice.tsx) and only applies the waiting
+      // worker -- via the update-service-worker call the banner's "现在刷新" button
+      // triggers -- once the user explicitly chooses to. autoUpdate + a visible refresh
+      // button would otherwise race (the page could reload out from under the user before
+      // they click anything), so this is a real behavior change, not just added UI.
+      registerType: "prompt",
       manifest: buildPwaManifest(),
       // Only precache the built static app shell (JS/CSS/HTML/icons/manifest -- globPatterns
       // below already matches web/public/icons/*.png in the build output, so no separate

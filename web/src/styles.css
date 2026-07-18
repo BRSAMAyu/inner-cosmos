@@ -329,4 +329,22 @@ footer { padding: 18px 4px; display: flex; justify-content: space-between; color
 .connect-error-title { color: var(--text-primary); font-size: 17px; margin: 0; }
 .connect-error-detail { color: var(--danger); font-size: 14px; margin: 0; word-break: break-word; }
 
+/* B5-pwa-mobile: install-prompt (InstallPrompt.tsx) and versioned-update (UpdateBanner.tsx via
+   PwaUpdateNotice.tsx) affordances. Same warm card language as .connect-error above (hairline
+   border, raised surface, no cold/neon). Both live inside one .pwa-banner-stack wrapper (see
+   web/src/main.tsx) rather than each independently position:fixed -- live-verification caught
+   both banners rendering at once for a genuinely fresh account (offline-ready fires the moment
+   the service worker first installs, which can coincide with install-prompt becoming
+   available), and two independent position:fixed elements at the same coordinates silently
+   overlapped and blocked each other's clicks. The shared stack fixes that by laying siblings
+   out in normal flow (column + gap) inside one fixed-position, non-interactive container. */
+.pwa-banner-stack { position: fixed; left: 50%; bottom: 18px; z-index: 40; transform: translateX(-50%); display: flex; flex-direction: column; gap: 12px; align-items: center; width: min(420px, calc(100% - 32px)); pointer-events: none; }
+.pwa-banner { pointer-events: auto; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; width: 100%; padding: 18px 20px; border: 1px solid var(--hairline-strong); border-radius: var(--r-card); background: var(--glass-raised); backdrop-filter: blur(20px); box-shadow: 0 16px 45px #0006; animation: pwa-banner-rise var(--dur-enter) var(--ease-bloom); }
+.pwa-banner-title { color: var(--text-primary); font-size: 15px; font-weight: 500; margin: 0; }
+.pwa-banner-detail { color: var(--text-muted); font-size: 13px; line-height: 1.5; margin: 0; }
+.pwa-banner-actions { display: flex; gap: 10px; }
+.pwa-banner-primary { padding: 8px 16px; border: none; border-radius: var(--r-btn); background: var(--accent-aurora); color: var(--surface-canvas); font-size: 13px; font-weight: 500; }
+.pwa-banner-dismiss { padding: 8px 14px; border: 1px solid var(--hairline-strong); border-radius: var(--r-btn); background: transparent; color: var(--text-muted); font-size: 13px; }
+@keyframes pwa-banner-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }

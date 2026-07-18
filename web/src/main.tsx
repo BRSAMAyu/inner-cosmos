@@ -1,8 +1,9 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { HashRouter } from "react-router-dom";
-import { registerSW } from "virtual:pwa-register";
 import { AuroraApp } from "./AuroraApp";
+import { InstallPrompt } from "./components/InstallPrompt";
+import { PwaUpdateNotice } from "./components/PwaUpdateNotice";
 import { startTimeOfDayTheme } from "./theme";
 import { startRipples } from "./ripple";
 import { startStardust } from "./stardust";
@@ -15,15 +16,6 @@ startRipples();
 // 星尘背景：极淡暖色粒子缓慢流动（prefers-reduced-motion 跳过，移动端降级）。
 startStardust();
 
-// B5-pwa-mobile: registers the service worker vite-plugin-pwa generates at build time
-// (web/vite.config.ts's VitePWA() config). In dev (`npm run dev`) this is a no-op unless
-// devOptions.enabled is set, so it only takes effect against a real `npm run build` output
-// -- exactly the artifact Spring serves under /app/aurora/. registerType is "autoUpdate", so
-// no update-available prompt is shown here (see track-b-status.yml for that as a follow-up).
-if ("serviceWorker" in navigator) {
-  registerSW({ immediate: true });
-}
-
 // HashRouter (not BrowserRouter): the app is served as a static bundle under
 // /app/aurora/ by Spring Boot, whose WebMvcConfig only forwards the exact "/app/aurora"
 // and "/app/aurora/" paths to index.html -- there is no "/app/aurora/**" catch-all
@@ -33,10 +25,22 @@ if ("serviceWorker" in navigator) {
 // Filed as a follow-up in docs/goal/tracks/track-b-integration-requests.yml: once a
 // server-side SPA fallback exists, swap HashRouter for BrowserRouter here only -- the rest
 // of the app depends solely on react-router's location/navigate API, not on this choice.
+// InstallPrompt and PwaUpdateNotice (B5-pwa-mobile: install-prompt UX + versioned-update flow)
+// are mounted as siblings to <AuroraApp>, not inside its render tree -- neither needs any of
+// AuroraApp's internal state, router location, or auth session, and this keeps them out of the
+// way of the concurrent AuroraApp.tsx domain-hook decomposition in progress on this branch.
+// Both share one .pwa-banner-stack wrapper (web/src/styles.css) so that if both happen to be
+// visible at once (live-verification caught this: a genuinely fresh account can see the
+// offline-ready notice fire at the same moment install becomes available) they stack instead
+// of overlapping at the same fixed viewport position.
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <HashRouter>
       <AuroraApp />
     </HashRouter>
+    <div className="pwa-banner-stack">
+      <InstallPrompt />
+      <PwaUpdateNotice />
+    </div>
   </StrictMode>
 );

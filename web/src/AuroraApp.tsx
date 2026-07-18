@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
-import { api, apiConfigurationError, configureBearerAuth, hasConfiguredApiBase, transcribeAudio, type ClaimCandidate, type CapsuleBoundary, type CapsuleFidelitySummary, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type ConnectionRequests, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type DiscoverablePerson, type PersonaMessage, type PersonaSession, type PortraitDimension, type PublicCapsule, type PortraitHistoryEntry, type RelationMention, type RelationTimelinePoint, type RelationHealth, type LetterThread, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type PsychologySkillSuggestion, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type SocialConnection, type StarfieldDetail, type StarfieldScene, type StarfieldStar, type UnderstandingClaim, type UserCorrection } from "./api";
+import { api, apiConfigurationError, configureBearerAuth, hasConfiguredApiBase, transcribeAudio, type ClaimCandidate, type CapsuleBoundary, type CapsuleFidelitySummary, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type PersonaMessage, type PersonaSession, type PortraitDimension, type PublicCapsule, type PortraitHistoryEntry, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type PsychologySkillSuggestion, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type StarfieldDetail, type StarfieldScene, type StarfieldStar, type UnderstandingClaim, type UserCorrection } from "./api";
 import { initialMobileState, mobileRuntime, type MobileRuntimeState } from "./mobile";
 import { mobileOidc } from "./mobile-auth";
 import { MeSpace, productSpaceFromPath, productSpaces, ProductShellNavigation, spacePath, type ProductSpace } from "./components/ProductShell";
@@ -21,8 +21,8 @@ import { AccountSettings, type AccountBusy } from "./components/AccountSettings"
 import { AuthGate } from "./components/AuthGate";
 import { PsychologySkillStudio, SkillSuggestionBanner, type SkillLocale } from "./components/PsychologySkillStudio";
 import { ConnectError, LoadingText } from "./loading";
-import { excludeTestAccounts } from "./testAccountFilter";
 import { useAuroraSession } from "./hooks/useAuroraSession";
+import { useConnectionsAndLetters } from "./hooks/useConnectionsAndLetters";
 
 // The Aurora conversation/session domain (message list, streaming/turn status, interrupt/stop,
 // mode picker, WakeIntent negotiate, session bootstrap/replay) has been extracted into
@@ -98,21 +98,6 @@ export function AuroraApp() {
   const [letterTitle, setLetterTitle] = useState("想把刚才的共鸣慢慢写下来");
   const [letterBody, setLetterBody] = useState("");
   const [sentLetter, setSentLetter] = useState<SlowLetter | null>(null);
-  const [letterInbox, setLetterInbox] = useState<SlowLetter[]>([]);
-  const [letterOutbox, setLetterOutbox] = useState<SlowLetter[]>([]);
-  const [letterThreads, setLetterThreads] = useState<LetterThread[]>([]);
-  const [selectedThreadId, setSelectedThreadId] = useState<number | null>(null);
-  const [threadLetters, setThreadLetters] = useState<SlowLetter[]>([]);
-  const [draftBusy, setDraftBusy] = useState(false);
-  const [connectionRequests, setConnectionRequests] = useState<ConnectionRequests>({ incoming: [], outgoing: [] });
-  const [friends, setFriends] = useState<SocialConnection[]>([]);
-  const [people, setPeople] = useState<DiscoverablePerson[]>([]);
-  const [peopleBusy, setPeopleBusy] = useState(false);
-  const [relations, setRelations] = useState<RelationMention[]>([]);
-  const [selectedRelation, setSelectedRelation] = useState<string | null>(null);
-  const [relationTimeline, setRelationTimeline] = useState<RelationTimelinePoint[]>([]);
-  const [relationHealth, setRelationHealth] = useState<RelationHealth | null>(null);
-  const [relationBusy, setRelationBusy] = useState(false);
   const [skills, setSkills] = useState<PsychologySkillManifest[]>([]);
   const [skillRuns, setSkillRuns] = useState<PsychologySkillRun[]>([]);
   const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
@@ -122,7 +107,6 @@ export function AuroraApp() {
   const [skillBusy, setSkillBusy] = useState(false);
   const [skillSuggestion, setSkillSuggestion] = useState<PsychologySkillSuggestion | null>(null);
   const [skillLocale, setSkillLocale] = useState<SkillLocale>("zh-CN");
-  const [replyDrafts, setReplyDrafts] = useState<Record<number, string>>({});
   const [visitorBusy, setVisitorBusy] = useState(false);
   const [mobileState, setMobileState] = useState<MobileRuntimeState>(initialMobileState);
   const bootstrappedRef = useRef(false);
@@ -134,6 +118,11 @@ export function AuroraApp() {
   const auroraSession = useAuroraSession({
     authenticated, skillLocale, onSkillSuggestion: setSkillSuggestion, setStatus
   });
+
+  // Connections/letters domain (People Discovery, relation mentions/timeline, connection
+  // requests/friends, slow-letter inbox/outbox/threads) -- extracted into its own hook; see
+  // web/src/hooks/useConnectionsAndLetters.ts.
+  const connectionsAndLetters = useConnectionsAndLetters({ setStatus });
 
   const navigateSpace = useCallback((space: ProductSpace) => {
     navigate(spacePath(space));
@@ -178,19 +167,19 @@ export function AuroraApp() {
         api.memoryCards().then(setMemories),
         api.myCapsules().then(rows => { setCapsules(rows); loadedCapsules = rows; }),
         api.resonanceMatches().then(rows => { setResonanceMatches(rows); loadedMatches = rows; }),
-        api.letterInbox().then(setLetterInbox),
-        api.connectionRequests().then(setConnectionRequests),
-        api.friends().then(setFriends),
+        connectionsAndLetters.loadLetterInbox(),
+        connectionsAndLetters.loadConnectionRequests(),
+        connectionsAndLetters.loadFriends(),
         api.psychologySkills().then(rows => { setSkills(rows); loadedSkills = rows; }),
         api.psychologySkillRuns().then(setSkillRuns),
         api.portrait().then(setPortrait),
         api.recentCorrections().then(setCorrections),
         api.plazaCapsules().then(setPublicCapsules).catch(() => undefined),
-        api.letterOutbox().then(setLetterOutbox).catch(() => undefined),
-        api.discoverPeople().then(people => setPeople(excludeTestAccounts(people))).catch(() => undefined),
+        connectionsAndLetters.loadLetterOutbox(),
+        connectionsAndLetters.loadPeople(),
         api.claimCandidates().then(setClaimCandidates).catch(() => undefined),
-        api.relations().then(setRelations).catch(() => undefined),
-        api.letterThreads().then(setLetterThreads).catch(() => undefined)
+        connectionsAndLetters.loadRelations(),
+        connectionsAndLetters.loadLetterThreads()
       ]);
       if (call !== bootstrapCallRef.current) return;
       setAuthenticated(true);
@@ -214,7 +203,9 @@ export function AuroraApp() {
         setStatus(message);
       }
     }
-  }, [auroraSession.resolveSession, auroraSession.replaceFromHistory, auroraSession.loadWakeIntents, auroraSession.loadNotifications]);
+  }, [auroraSession.resolveSession, auroraSession.replaceFromHistory, auroraSession.loadWakeIntents, auroraSession.loadNotifications,
+      connectionsAndLetters.loadLetterInbox, connectionsAndLetters.loadConnectionRequests, connectionsAndLetters.loadFriends,
+      connectionsAndLetters.loadLetterOutbox, connectionsAndLetters.loadPeople, connectionsAndLetters.loadRelations, connectionsAndLetters.loadLetterThreads]);
 
   const selectedCapsule = capsules.find(capsule => capsule.id === selectedCapsuleId) ?? null;
   // A capsule opened from the public plaza directory (not the curated match set) is wrapped in a
@@ -704,7 +695,7 @@ export function AuroraApp() {
       const draft = await api.draftSlowLetter(visitorMatch.capsule.id, letterTitle.trim(), letterBody.trim());
       const sent = await api.sendSlowLetter(draft.id);
       setSentLetter(sent);
-      void api.letterOutbox().then(setLetterOutbox).catch(() => undefined);
+      void connectionsAndLetters.loadLetterOutbox();
       setStatus("慢信已经启程。收件人看到的是你的原话和安全预览，不是 AI 代写的统一模板。 ");
     } catch (error) { setStatus(error instanceof Error ? error.message : "慢信没有发送，草稿内容仍在这里"); }
     finally { setVisitorBusy(false); }
@@ -721,100 +712,6 @@ export function AuroraApp() {
       setAuthenticated(false); auroraSession.resetSession(); setPersonaSession(null); setPersonaMessages([]);
       setStatus(remoteWarning ?? "已安全退出");
     } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法退出"); }
-  };
-
-  const actOnLetter = async (letter: SlowLetter, action: "read" | "decline" | "block" | "archive") => {
-    try {
-      const updated = await api.transitionLetter(letter.id, action);
-      setLetterInbox(rows => rows.map(row => row.id === updated.id ? updated : row));
-      setStatus(action === "block" ? "已屏蔽来信者；后续慢信也会被阻断。" : "慢信边界已更新。 ");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法更新这封信"); }
-  };
-
-  const reportLetter = async (letter: SlowLetter) => {
-    try {
-      await api.reportLetter(letter.id, "收件人从 Aurora 界面举报慢信");
-      setStatus("已提交举报。举报不会自动公开信件内容，交由受限审核处理。 ");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法提交举报"); }
-  };
-
-  const replyWithLetter = async (letter: SlowLetter) => {
-    const body = replyDrafts[letter.id]?.trim();
-    if (!body) return;
-    try {
-      const draft = await api.replyWithSlowLetter(letter.id, `回复：${letter.title}`, body);
-      await api.sendSlowLetter(draft.id);
-      const updated = letter.status === "READ" ? await api.transitionLetter(letter.id, "reply") : letter;
-      setLetterInbox(rows => rows.map(row => row.id === updated.id ? updated : row));
-      void api.letterOutbox().then(setLetterOutbox).catch(() => undefined);
-      setReplyDrafts(drafts => ({ ...drafts, [letter.id]: "" }));
-      setStatus("回复慢信已启程。它仍会经过时间，而不是变成即时聊天。 ");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "回复慢信没有启程"); }
-  };
-
-  const refreshConnections = async () => {
-    const [requests, accepted, discoverable] = await Promise.all([
-      api.connectionRequests(), api.friends(), api.discoverPeople().catch(() => people)
-    ]);
-    setConnectionRequests(requests); setFriends(accepted); setPeople(excludeTestAccounts(discoverable));
-  };
-
-  const requestPersonConnection = async (userId: number) => {
-    setPeopleBusy(true);
-    try {
-      await api.requestFriend(userId); await refreshConnections();
-      setStatus("邀请已发出。对方同意前不会开放任何私密内容，也不会变成即时聊天。");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法发出这个邀请"); }
-    finally { setPeopleBusy(false); }
-  };
-
-  const openRelation = async (label: string) => {
-    setSelectedRelation(label); setRelationBusy(true);
-    setRelationTimeline([]); setRelationHealth(null);
-    try {
-      const [timeline, health] = await Promise.all([
-        api.relationTimeline(label),
-        api.relationHealth(label).catch(() => null)
-      ]);
-      setRelationTimeline(timeline); setRelationHealth(health);
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时读不到这段关系的时间线"); }
-    finally { setRelationBusy(false); }
-  };
-
-  const openThread = async (threadId: number) => {
-    setSelectedThreadId(threadId); setThreadLetters([]);
-    try { setThreadLetters(await api.letterThreadLetters(threadId)); }
-    catch (error) { setStatus(error instanceof Error ? error.message : "暂时读不到这段往来"); }
-  };
-
-  const sendDraft = async (id: number) => {
-    setDraftBusy(true);
-    try {
-      await api.sendSlowLetter(id);
-      await api.letterOutbox().then(setLetterOutbox).catch(() => undefined);
-      setStatus("这封信已经启程，会按慢信的节奏抵达。");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法寄出这封草稿"); }
-    finally { setDraftBusy(false); }
-  };
-
-  const requestConnection = async (letter: SlowLetter) => {
-    try {
-      await api.requestConnectionFromLetter(letter.id); await refreshConnections();
-      setStatus("连接邀请已发出。只有对方明确接受后，双方才会成为真实连接。 ");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法发出连接邀请"); }
-  };
-
-  const decideConnection = async (id: number, decision: "accept" | "decline") => {
-    try {
-      await api.decideConnection(id, decision); await refreshConnections();
-      setStatus(decision === "accept" ? "双方都已同意这段连接。" : "已婉拒；不会自动建立任何关系。 ");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法处理连接邀请"); }
-  };
-
-  const leaveConnection = async (id: number) => {
-    try {
-      await api.leaveConnection(id); await refreshConnections(); setStatus("已退出这段连接。 ");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法退出连接"); }
   };
 
   const runPsychologySkill = async () => {
@@ -1023,21 +920,21 @@ export function AuroraApp() {
       </div>
 
       <div className="product-space" hidden={productSpace !== "letters"}>
-      <PeopleDiscovery people={people} busy={peopleBusy} onRequest={userId => void requestPersonConnection(userId)} />
-      <RelationsView relations={relations} selected={selectedRelation} timeline={relationTimeline} health={relationHealth} busy={relationBusy} onSelect={label => void openRelation(label)} />
+      <PeopleDiscovery people={connectionsAndLetters.people} busy={connectionsAndLetters.peopleBusy} onRequest={userId => void connectionsAndLetters.requestPersonConnection(userId)} />
+      <RelationsView relations={connectionsAndLetters.relations} selected={connectionsAndLetters.selectedRelation} timeline={connectionsAndLetters.relationTimeline} health={connectionsAndLetters.relationHealth} busy={connectionsAndLetters.relationBusy} onSelect={label => void connectionsAndLetters.openRelation(label)} />
 
-      <LettersInbox letterInbox={letterInbox} letterOutbox={letterOutbox} threads={letterThreads} threadLetters={threadLetters} selectedThreadId={selectedThreadId} draftBusy={draftBusy} onSendDraft={id => void sendDraft(id)} onOpenThread={id => void openThread(id)} replyDrafts={replyDrafts} connectionRequests={connectionRequests} friends={friends}
-        onReplyDraftChange={(letterId, value) => setReplyDrafts(drafts => ({ ...drafts, [letterId]: value }))}
-        onReply={letter => void replyWithLetter(letter)} onActOnLetter={(letter, action) => void actOnLetter(letter, action)}
-        onReportLetter={letter => void reportLetter(letter)} onRequestConnection={letter => void requestConnection(letter)}
-        onDecideConnection={(id, decision) => void decideConnection(id, decision)} onLeaveConnection={id => void leaveConnection(id)} />
+      <LettersInbox letterInbox={connectionsAndLetters.letterInbox} letterOutbox={connectionsAndLetters.letterOutbox} threads={connectionsAndLetters.letterThreads} threadLetters={connectionsAndLetters.threadLetters} selectedThreadId={connectionsAndLetters.selectedThreadId} draftBusy={connectionsAndLetters.draftBusy} onSendDraft={id => void connectionsAndLetters.sendDraft(id)} onOpenThread={id => void connectionsAndLetters.openThread(id)} replyDrafts={connectionsAndLetters.replyDrafts} connectionRequests={connectionsAndLetters.connectionRequests} friends={connectionsAndLetters.friends}
+        onReplyDraftChange={connectionsAndLetters.updateReplyDraft}
+        onReply={letter => void connectionsAndLetters.replyWithLetter(letter)} onActOnLetter={(letter, action) => void connectionsAndLetters.actOnLetter(letter, action)}
+        onReportLetter={letter => void connectionsAndLetters.reportLetter(letter)} onRequestConnection={letter => void connectionsAndLetters.requestConnection(letter)}
+        onDecideConnection={(id, decision) => void connectionsAndLetters.decideConnection(id, decision)} onLeaveConnection={id => void connectionsAndLetters.leaveConnection(id)} />
       </div>
 
       <div className="product-space" hidden={productSpace !== "me"}>
         <MeSpace native={mobileState.native} connected={mobileState.connected} wakeIntentCount={auroraSession.wakeIntents.length}
           activeClaimCount={claims.filter(claim => claim.status === "ACTIVE").length}
           publicCapsuleCount={capsules.filter(capsule => capsule.visibilityStatus === "PUBLIC").length}
-          friendCount={friends.length} onNavigate={navigateSpace} onRequestPush={() => void requestMobilePush()}
+          friendCount={connectionsAndLetters.friends.length} onNavigate={navigateSpace} onRequestPush={() => void requestMobilePush()}
           onRequestMicrophone={() => void requestMobileMicrophone()} onLogout={() => void logout()} />
         <PortraitView dimensions={portrait} history={portraitHistory} calibrated={portraitCalibrated} busyDim={portraitBusy}
           onLoadHistory={dim => void loadPortraitHistory(dim)} onCalibrate={(dim, oldValue, newValue) => void submitPortraitCalibration(dim, oldValue, newValue)} />

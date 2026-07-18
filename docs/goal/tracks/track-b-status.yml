@@ -12,6 +12,22 @@ spec: docs/tracks/TRACK-B-COMPLETE-EXPERIENCE.md
 evidence_root: evidence/track-b
 integration_requests: docs/goal/tracks/track-b-integration-requests.yml
 current_front: B1-product-architecture
+handoff_checkpoint:
+  status: IN_PROGRESS
+  scope: "Second domain-hook extraction plus explicit PWA install/update UX; this checkpoint supersedes older B1/B5 remaining text where they conflict."
+  accepted_changes:
+    - "web/src/hooks/useConnectionsAndLetters.ts extracts the connections, relations, people discovery, slow-letter inbox and reply lifecycle from AuroraApp.tsx."
+    - "InstallPrompt, PwaUpdateNotice and UpdateBanner add a user-controlled install and update flow; registerType is prompt, so an active Aurora turn is not silently reloaded."
+    - "Generated Spring static assets were rebuilt from the reviewed React source."
+  verification:
+    frontend_tests: "30 files, 199 tests, 0 failed."
+    frontend_build: "npm run build PASS; Vite PWA generateSW emitted 18 precache entries and workbox-98f7a950.js."
+    whitespace: "git diff --check PASS."
+  remaining:
+    - "AuroraApp.tsx still owns memory/profile, capsule/resonance, psychology-skill, portrait and account domains; continue decomposition by cohesive domain, not line-count-only extraction."
+    - "Install affordance remains browser/platform dependent and needs real-device validation; update flow needs a real deployed-version rehearsal during an active and idle Aurora turn."
+    - "Nested routes, progressive disclosure, per-item busy identifiers, localized offline copy, Capacitor/device gates, B2-B4 and B6-B7 remain open."
+    - "TB-REQ-001 and TB-REQ-002 remain cross-track integration requests."
 workstreams:
   B0-experience-observation:
     status: DONE
