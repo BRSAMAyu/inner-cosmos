@@ -18,6 +18,7 @@ import { RelationsView } from "./components/RelationsView";
 import { LettersInbox } from "./components/LettersInbox";
 import { PortraitView } from "./components/PortraitView";
 import { AccountSettings, type AccountBusy } from "./components/AccountSettings";
+import { AuthGate } from "./components/AuthGate";
 import { PsychologySkillStudio, SkillSuggestionBanner, type SkillLocale } from "./components/PsychologySkillStudio";
 import { ConnectError, LoadingText } from "./loading";
 import { excludeTestAccounts } from "./testAccountFilter";
@@ -1111,7 +1112,7 @@ export function AuroraApp() {
       ? <ConnectError message={bootstrapError} onRetry={() => void bootstrap()} />
       : <LoadingText busy>正在连接你的内宇宙</LoadingText>}
   </div></main>;
-  if (!authenticated) return <Login native={mobileState.native} onSuccess={bootstrap} />;
+  if (!authenticated) return <AuthGate native={mobileState.native} onSuccess={bootstrap} />;
 
   return (
     <main className="shell" data-product-space={productSpace}>
@@ -1136,6 +1137,22 @@ export function AuroraApp() {
       <nav className="modes" aria-label="对话模式">
         {modes.map(([value, label]) => <button key={value} className={mode === value ? "active" : ""} onClick={() => setMode(value)}>{label}</button>)}
       </nav>
+
+      {/* The composer sits directly after the hero/mode-picker, before the WakeIntent and
+          Self/Emergence "capability display" panels below, so a first-time user (mobile
+          especially) can reach it without scrolling past those panels first. Previously this
+          lived in a second, disconnected `aurora` block far down in DOM order (after the
+          cosmos/resonance/letters spaces) purely because of source-file history -- see
+          golden-journeys.md J1 step 4 and 对齐文档/20 4.3's "旅程像能力陈列" finding. */}
+      {skillSuggestion && <SkillSuggestionBanner suggestion={skillSuggestion} locale={skillLocale}
+        onOpen={openSuggestedSkill} onDismiss={() => setSkillSuggestion(null)} />}
+
+      <AuroraConversation messages={messages} activeTurnId={activeTurnId} draft={draft} sessionReady={Boolean(sessionId)}
+        onDraftChange={setDraft} onSubmit={send} onStop={() => void stop()}
+        onTranscribe={async blob => {
+          try { const result = await transcribeAudio(blob); return result.text; }
+          catch (error) { setStatus(error instanceof Error ? error.message : "语音转写暂时不可用"); return ""; }
+        }} />
 
       {(mobileState.native || !mobileState.connected) && <section className={`mobile-presence ${mobileState.connected ? "online" : "offline"}`} aria-label="移动端连接状态">
         <div>
@@ -1237,18 +1254,6 @@ export function AuroraApp() {
         onDecideConnection={(id, decision) => void decideConnection(id, decision)} onLeaveConnection={id => void leaveConnection(id)} />
       </div>
 
-      <div className="product-space" hidden={productSpace !== "aurora"}>
-      {skillSuggestion && <SkillSuggestionBanner suggestion={skillSuggestion} locale={skillLocale}
-        onOpen={openSuggestedSkill} onDismiss={() => setSkillSuggestion(null)} />}
-
-      <AuroraConversation messages={messages} activeTurnId={activeTurnId} draft={draft} sessionReady={Boolean(sessionId)}
-        onDraftChange={setDraft} onSubmit={send} onStop={() => void stop()}
-        onTranscribe={async blob => {
-          try { const result = await transcribeAudio(blob); return result.text; }
-          catch (error) { setStatus(error instanceof Error ? error.message : "语音转写暂时不可用"); return ""; }
-        }} />
-      </div>
-
       <div className="product-space" hidden={productSpace !== "me"}>
         <MeSpace native={mobileState.native} connected={mobileState.connected} wakeIntentCount={wakeIntents.length}
           activeClaimCount={claims.filter(claim => claim.status === "ACTIVE").length}
@@ -1264,30 +1269,4 @@ export function AuroraApp() {
       <footer><a href="/pages/dashboard.html">尚未迁移的工具</a><span>五空间 AppShell · 数据与能力持续保留</span><button type="button" onClick={() => void logout()}>安全退出</button></footer>
     </main>
   );
-}
-
-function Login({ native, onSuccess }: { native: boolean; onSuccess: () => Promise<void> }) {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  if (native) return <main className="login-shell"><section className="login">
-    <span className="eyebrow">INNER COSMOS</span><h1>回到你的内宇宙</h1>
-    <p>原生应用使用系统浏览器与 Authorization Code + PKCE 登录。密码不会进入 Aurora 应用。</p>
-    {error && <p className="error" role="alert">{error}</p>}
-    <button className="send" type="button" onClick={() => void mobileOidc.beginLogin()
-      .catch(reason => setError(reason instanceof Error ? reason.message : "无法启动安全登录"))}>使用身份提供方继续</button>
-  </section></main>;
-  return <main className="login-shell"><form className="login" onSubmit={async e => {
-    e.preventDefault();
-    try {
-      await api.login(username, password);
-      await onSuccess();
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "登录失败"); }
-  }}>
-    <span className="eyebrow">INNER COSMOS</span><h1>回到你的内宇宙</h1>
-    <label>用户名<input value={username} onChange={e => setUsername(e.target.value)} autoComplete="username" /></label>
-    <label>密码<input type="password" value={password} onChange={e => setPassword(e.target.value)} autoComplete="current-password" /></label>
-    {error && <p className="error" role="alert">{error}</p>}
-    <button className="send" type="submit">登录</button>
-  </form></main>;
 }

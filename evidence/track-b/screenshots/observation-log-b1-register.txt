@@ -1,0 +1,21 @@
+console.error: Failed to load resource: the server responded with a status of 401 ()
+screenshot: b1-01-entry-login-desktop.png
+login/register tablist present on first visit: true
+"注册" tab present: true
+screenshot: b1-02-entry-register-empty-desktop.png
+screenshot: b1-03-register-password-mismatch-desktop.png
+mismatch alert text: 两次输入的密码不一致。
+screenshot: b1-04-register-filled-desktop.png
+screenshot: b1-05-post-register-authenticated-desktop.png
+url after register submit: http://localhost:8080/app/aurora/
+login/register form still present after submit (should be false): false
+app shell navigation present (authenticated landed in AppShell): true
+console.error: Failed to load resource: the server responded with a status of 403 ()
+screenshot: b1-06-after-logout-desktop.png
+"登录" tab present after logout: true
+re-login via the same toggle screen succeeded: true
+screenshot: b1-07-relogin-authenticated-desktop.png
+screenshot: b1-08-expired-auth-with-register-desktop.png
+expired/cleared-session deep-link screen also offers the register tab: true
+screenshot: b1-09-entry-login-mobile.png
+screenshot: b1-10-entry-register-mobile.png

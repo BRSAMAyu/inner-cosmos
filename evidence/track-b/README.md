@@ -47,3 +47,63 @@ evaluation (that is Track A's evidence root, `evidence/track-a/`).
 None of the above were fixed in this pass — B0 is observation-only per the task charter. They are the
 starting backlog for B1 (architecture/IA), B2 (visible innovation), B3 (design/content), and B5
 (PWA/mobile).
+
+## Workstream B1 — first checkpoint: unified login/register entry + mobile composer reorder
+
+Fixes B0 finding #1 (no register entry point in the SPA) and the mobile half of finding #5 (composer
+pushed below the fold). `B1-product-architecture`'s full scope (real routes, `AuroraApp.tsx`
+decomposition, single async/task/error model, progressive disclosure) remains open — see
+`docs/goal/tracks/track-b-status.yml` for the current front and handoff notes.
+
+| Artifact | What it is |
+|---|---|
+| `web/src/components/AuthGate.tsx` | New component: the single entry surface for `/app/aurora/`. A `role="tablist"` login/register mode toggle on the same screen, same warm-theme markup as the previous inline `Login`. Native/Capacitor OIDC branch is untouched. |
+| `web/src/components/AuthGate.test.tsx` | 13 Vitest/RTL cases: characterizes the pre-existing login-only behavior first, then covers the mode toggle, register validation (password length, confirmation mismatch), the exact `api.register(username, nickname, password)` contract (nickname optional, falls back server-side too but mirrored client-side), success/failure paths, and that the native branch is unaffected. |
+| `web/src/api.ts` | Added `api.register(username, nickname, password)` calling `POST /api/v1/auth/register`, matching `register.html`'s exact contract (`{ username, nickname: nickname \|\| username, password }`). `AuthController.register` already rotates/creates the session the same way `login` does, so a successful call can drive the same `onSuccess`/bootstrap path as login — confirmed live, not just read from source. |
+| `web/src/AuroraApp.tsx` | Swapped the inline `Login` function for `<AuthGate>`. Also merged the Aurora space's two disconnected `product-space` blocks (B0 finding: "not contiguous in JSX") into one, and moved the composer (`SkillSuggestionBanner` + `AuroraConversation`) to sit directly after the hero/mode-picker, ahead of the WakeIntent ("回来约定") and Self/Emergence ("AURORA, BECOMING") panels. Pure reorder — no state/handler changes. |
+| `web/src/styles.css` | Added `.auth-copy` / `.auth-mode-switch` styles for the new toggle, reusing the existing pill-button visual language (same pattern as `.appearance-options`/`.strategy-switcher`). No other selectors changed. |
+| `evidence/track-b/scripts/observe-b1-register.mjs` | New Playwright script: fresh visit to `/app/aurora/` → register via the new toggle → password-mismatch inline error → successful register lands authenticated in the AppShell → logout → re-login via the same toggle → expired/cleared-session deep link also offers the register tab → mobile viewport of the toggle. |
+| `evidence/track-b/screenshots/b1-01…b1-12*` | Live screenshots from the above, plus two ad hoc composer-order checks (`b1-12-aurora-composer-order-{mobile,desktop}.png`) confirming the composer is now within the initial viewport (no scroll) on both breakpoints. |
+
+### How this was verified
+
+- `cd web && npx vitest run` — 138/138 passing (24 files), including the new 13-case `AuthGate.test.tsx`.
+- `cd web && npm run build` — clean `tsc -b && vite build`, output written to
+  `src/main/resources/static/app/aurora/`.
+- Live run: `dev` profile (H2 + Mock provider), `JAVA_HOME=jdk-21.0.10`, `.\mvnw.cmd spring-boot:run`,
+  server restarted after each frontend rebuild so the freshly built static assets are actually served
+  (Spring Boot copies `src/main/resources/static` into the classpath at boot; a running instance does not
+  pick up a later `npm run build` without a restart — worth remembering for future B-track checkpoints).
+- `node evidence/track-b/scripts/observe-b1-register.mjs`, executed from a temporary copy under `web/`
+  (Node's ESM resolver walks up from the *script file's own path*, not `cwd`, so a script physically
+  outside `web/` cannot resolve `web/node_modules/playwright` no matter the working directory — this
+  contradicts `experience-inventory.md` §7's "must run with cwd=web/" note, which does not actually work
+  in this Node 22.20 environment; noted here so the next session doesn't rediscover this the hard way).
+  Confirmed live: register tab discoverable on first visit, password-mismatch shows an inline error and
+  never calls the API, successful register lands fully authenticated in the AppShell (composer visible,
+  five-space nav present), logout → re-login through the same toggle works, and the previously bare
+  expired-auth deep link (`?space=cosmos` with cleared cookies) now also offers the register tab.
+- Ad hoc mobile/desktop check confirmed `.composer` is within the initial viewport's bounding rect on both
+  390×844 and 1440×900 after the JSX reorder, and that `.app-shell-nav` remains reachable in both cases
+  (`position: fixed` at mobile, `position: sticky` at desktop — this was already correct pre-existing CSS;
+  B0's claim that the mobile nav itself was not fixed/sticky did not reproduce in this pass, only the
+  composer-below-the-fold half of that finding did — see `docs/goal/tracks/track-b-status.yml` discoveries).
+
+### What is still open for B1
+
+- No real client routes yet (still one `?space=` query param). `AuroraApp.tsx` is still ~1290 lines with
+  60+ `useState` hooks — this checkpoint reduced the Aurora space's JSX fragmentation but did not touch
+  the domain-hook/store decomposition called for in the spec.
+- The theme-inconsistency finding (register.html vs. the SPA rendering opposite day/night themes) is now
+  moot for any *new* user, since the primary path is the SPA's own login/register toggle sharing one theme
+  implementation; `register.html` itself is untouched and still exists as a secondary, unlinked path (see
+  "should register.html retire" below).
+- `register.html`/`login.html` retirement: not done this pass, per the task brief's explicit "do not delete
+  yet." Recommendation for a later checkpoint: once the SPA register path has a few checkpoints of real
+  usage confirming no regressions (e.g. locale/timezone handling, mobile Capacitor build), redirect
+  `/pages/register.html` and `/pages/login.html` to `/app/aurora/` (or remove them) and drop the now-dead
+  `doRegister()`/`doLogin()` legacy JS — but keep them until then since they are still the only tested path
+  for anyone with a bookmarked/linked URL.
+- Mobile Aurora-space reordering is now solved for the *composer*; the WakeIntent/Self-Emergence panels
+  still render as full-detail sections rather than progressively disclosed — that's B2/B3 territory
+  (progressive disclosure, not just ordering).
