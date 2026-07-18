@@ -29,8 +29,10 @@ workstreams:
   B5-pwa-mobile: {status: NOT_STARTED, evidence: [], remaining: "Complete install/offline/update and all machine-actionable Capacitor checks."}
   B6-local-complete: {status: NOT_STARTED, evidence: [], remaining: "Make the complete real-provider product reproducible locally from a clean checkout."}
   B7-demo-handoff: {status: NOT_STARTED, evidence: [], remaining: "Deliver full E2E, 8-12 minute demo and non-author product/operations handoff."}
-latest_checkpoint: "B0 experience observation complete; product run live in dev profile (H2 + Mock), five spaces walked desktop+mobile, one real Aurora conversation driven, offline and expired-auth recovery states forced live. See evidence/track-b/README.md."
-commits: []
+latest_checkpoint: "B0 experience observation complete @ e176b61; product run live in dev profile (H2 + Mock), five spaces walked desktop+mobile, one real Aurora conversation driven, offline and expired-auth recovery states forced live. See evidence/track-b/README.md."
+commits:
+  - sha: e176b61443192882b0a90bdbb7cbcd2ad3b3cff9
+    summary: "docs(track-b): B0 experience observation of the live five-space AppShell"
 verification:
   B0_observation:
     method: "Live browser walk via Playwright (evidence/track-b/scripts/observe-b0-journeys.mjs), dev profile, H2 + Mock AI provider, no real keys."
