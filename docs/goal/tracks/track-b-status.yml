@@ -66,6 +66,12 @@ commits:
     summary: "docs(track-b): resolve B0's open question on the 11 Resonance sample personas"
   - sha: 26f4aa2
     summary: "feat(web): introduce react-router (HashRouter) replacing the ?space= query param -- real per-space routes, legacy-link redirect, TB-REQ-002 filed for a future BrowserRouter swap"
+  - sha: df2e189
+    summary: "docs(track-b): draft v1 of the B7 8-12 minute demo script (concurrent with this checkpoint's own work; recorded here for a complete history since it landed on this branch between sessions)"
+  - sha: a5f1e96
+    summary: "feat(web): consolidate hand-rolled busy/error UI onto shared loading.tsx primitives (B1) -- nine components migrated onto AsyncButton/LoadingText; see evidence/track-b/README.md 'Workstream B1 -- third checkpoint' for the exact file list"
+  - sha: 5e3790d
+    summary: "docs(track-b): record the loading-audit checkpoint (B1) with evidence and next step"
 verification:
   B0_observation:
     method: "Live browser walk via Playwright (evidence/track-b/scripts/observe-b0-journeys.mjs), dev profile, H2 + Mock AI provider, no real keys."
