@@ -1,0 +1,18 @@
+url after register: http://localhost:8080/app/aurora/#/aurora
+screenshot: b1-pwa-offline-01-online-authenticated.png
+service worker state after first load: activated
+cache entries after online load: 14
+sample cached urls: ["http://localhost:8080/app/aurora/manifest.webmanifest?__WB_REVISION__=703880457376158708cf2b469c5990b8","http://localhost:8080/app/aurora/index.html?__WB_REVISION__=c4fdcacb24a4b1532d7cf5c93c41a592","http://localhost:8080/app/aurora/icons/icon-512.png?__WB_REVISION__=40c341939e138c6b363acede73faf2f5","http://localhost:8080/app/aurora/icons/icon-512-maskable.png?__WB_REVISION__=1cbc42667460dd501cf4481eabd451b7","http://localhost:8080/app/aurora/icons/icon-192.png?__WB_REVISION__=61640def84d9bad5d6552095d498c304","http://localhost:8080/app/aurora/assets/workbox-window.prod.es5.js","http://localhost:8080/app/aurora/assets/web4.js","http://localhost:8080/app/aurora/assets/web3.js"]
+cached /api/ urls (must be 0): 0 []
+online reload body text length (no regression check): 398
+screenshot: b1-pwa-offline-02-online-reload-no-regression.png
+offline reload error (expected: null, navigateFallback should still resolve): null
+screenshot: b1-pwa-offline-03-offline-reload.png
+offline reload body text length: 30
+offline reload body text (first 300 chars): "没能连上你的内宇宙\n\nFailed to fetch\n\n重试"
+offline reload page is BLANK (must be false): false
+offline reload shows the branded connect-error state (ConnectError): true
+/api/ requests observed during offline reload: [{"phase":"offline-reload","url":"http://localhost:8080/api/v1/auth/csrf"}]
+/api/ responses served FROM the service worker cache during offline reload (must be 0): []
+back-online reload body text length (recovery check): 398
+screenshot: b1-pwa-offline-04-back-online-recovered.png

@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { HashRouter } from "react-router-dom";
+import { registerSW } from "virtual:pwa-register";
 import { AuroraApp } from "./AuroraApp";
 import { startTimeOfDayTheme } from "./theme";
 import { startRipples } from "./ripple";
@@ -13,6 +14,15 @@ startTimeOfDayTheme();
 startRipples();
 // 星尘背景：极淡暖色粒子缓慢流动（prefers-reduced-motion 跳过，移动端降级）。
 startStardust();
+
+// B5-pwa-mobile: registers the service worker vite-plugin-pwa generates at build time
+// (web/vite.config.ts's VitePWA() config). In dev (`npm run dev`) this is a no-op unless
+// devOptions.enabled is set, so it only takes effect against a real `npm run build` output
+// -- exactly the artifact Spring serves under /app/aurora/. registerType is "autoUpdate", so
+// no update-available prompt is shown here (see track-b-status.yml for that as a follow-up).
+if ("serviceWorker" in navigator) {
+  registerSW({ immediate: true });
+}
 
 // HashRouter (not BrowserRouter): the app is served as a static bundle under
 // /app/aurora/ by Spring Boot, whose WebMvcConfig only forwards the exact "/app/aurora"
