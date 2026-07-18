@@ -43,3 +43,5 @@ web/*.d.ts
 __pycache__/
 *.pyc
 build/mobile-domain-association/
+web/.scratch-*/
+web/pwa-preview.html

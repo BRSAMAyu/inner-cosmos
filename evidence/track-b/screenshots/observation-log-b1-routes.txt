@@ -1,0 +1,15 @@
+console.error: Failed to load resource: the server responded with a status of 401 ()
+url after register: http://localhost:8080/app/aurora/#/aurora
+screenshot: b1-routes-01-post-register.png
+nav "共鸣" -> http://localhost:8080/app/aurora/#/resonance (expected to contain #/resonance): true
+nav "内宇宙" -> http://localhost:8080/app/aurora/#/cosmos (expected to contain #/cosmos): true
+nav "连接" -> http://localhost:8080/app/aurora/#/connections/letters (expected to contain #/connections/letters): true
+nav "我的" -> http://localhost:8080/app/aurora/#/me (expected to contain #/me): true
+nav "今天" -> http://localhost:8080/app/aurora/#/aurora (expected to contain #/aurora): true
+screenshot: b1-routes-02-after-nav-clicks.png
+after goBack(): http://localhost:8080/app/aurora/#/me
+screenshot: b1-routes-03-after-back.png
+direct deep link to #/resonance rendered resonance-ish content: true
+screenshot: b1-routes-04-direct-deep-link-resonance.png
+legacy ?space=letters redirected to: http://localhost:8080/app/aurora/?space=letters#/connections/letters
+screenshot: b1-routes-05-legacy-query-redirect.png

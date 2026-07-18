@@ -1,4 +1,5 @@
 import type { PsychologyRetention, PsychologySkillManifest, PsychologySkillRun, PsychologySkillSuggestion } from "../api";
+import { AsyncButton } from "../loading";
 
 export type SkillLocale = "zh-CN" | "en-SG";
 
@@ -84,7 +85,7 @@ export function PsychologySkillStudio({ skills, skillRuns, selectedSkill, skillA
           <label><input type="radio" name="skill-retention" checked={skillRetention === "PROFILE_ELIGIBLE"} onChange={() => onRetentionChange("PROFILE_ELIGIBLE")} />{text.profile}</label>
         </fieldset>
         <label className="skill-consent"><input type="checkbox" checked={skillConsent} onChange={event => onConsentChange(event.target.checked)} />{text.consent} v{selectedSkill.version}</label>
-        <button className="skill-start" type="button" disabled={skillBusy || !skillConsent} onClick={onRun}>{skillBusy ? text.busy : text.start}</button>
+        <AsyncButton className="skill-start" busy={skillBusy} disabled={!skillConsent} busyText={text.busy} onClick={onRun}>{text.start}</AsyncButton>
       </div>}
     </div>
     {skillRuns.length > 0 && <div className="skill-results" aria-label={skillLocale === "en-SG" ? "My Skill results" : "我的 Skill 结果"}>

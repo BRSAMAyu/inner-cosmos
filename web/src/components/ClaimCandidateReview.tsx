@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { ClaimCandidate } from "../api";
 import type { SkillLocale } from "./PsychologySkillStudio";
+import { AsyncButton } from "../loading";
 
 // Friendly names for the doc-16 user-model dimensions, per locale, so the user sees "看懂自己" /
 // "understand yourself", not database enums.
@@ -82,13 +83,13 @@ export function ClaimCandidateReview({ candidates, locale = "zh-CN", busyId = nu
             <span className="candidate-confirm-hint">{t.dismissHint}</span>
             <button type="button" className="btn-candidate-cancel" disabled={busy}
               onClick={() => setDismissingId(null)}>{t.rethink}</button>
-            <button type="button" className="btn-candidate-dismiss-confirm" disabled={busy}
-              onClick={() => onDismiss(candidate.id)}>{busy ? t.dismissing : t.dismissConfirm}</button>
+            <AsyncButton className="btn-candidate-dismiss-confirm" busy={busy} busyText={t.dismissing}
+              onClick={() => onDismiss(candidate.id)}>{t.dismissConfirm}</AsyncButton>
           </> : <>
             <button type="button" className="btn-candidate-dismiss" disabled={busy}
               onClick={() => setDismissingId(candidate.id)}>{t.dismiss}</button>
-            <button type="button" className="btn-candidate-confirm" disabled={busy}
-              onClick={() => onConfirm(candidate.id)}>{busy ? t.confirming : t.confirm}</button>
+            <AsyncButton className="btn-candidate-confirm" busy={busy} busyText={t.confirming}
+              onClick={() => onConfirm(candidate.id)}>{t.confirm}</AsyncButton>
           </>}
         </div>
       </article>;

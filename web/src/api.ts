@@ -374,6 +374,21 @@ export const api = {
     csrf = null;
     return result;
   },
+  // Same contract as the legacy /pages/register.html form: username required, nickname
+  // optional (falls back to username server-side too, but we mirror it here so the request
+  // body always matches what a human filled in), password 8-128 chars (server-validated).
+  // AuthController.register() also establishes the session (rotates the id, stores the
+  // user id), so a successful register can call the same onSuccess/bootstrap path as login.
+  register: async (username: string, nickname: string, password: string) => {
+    const body: { username: string; nickname: string; password: string } = {
+      username, nickname: nickname || username, password
+    };
+    const result = await request<unknown>("/api/v1/auth/register", {
+      method: "POST", body: JSON.stringify(body)
+    });
+    csrf = null;
+    return result;
+  },
   logout: async () => {
     const result = await request<boolean>("/api/v1/auth/logout", { method: "POST" });
     csrf = null;

@@ -13,6 +13,32 @@ export function initialProductSpace(search = window.location.search): ProductSpa
   return productSpaces.some(([space]) => space === value) ? value as ProductSpace : "aurora";
 }
 
+// Real, stable, shareable route per space (see docs/tracks/TRACK-B-COMPLETE-EXPERIENCE.md
+// section 5's suggested route model). "letters" keeps its target's Chinese-facing product
+// name ("连接") but its path follows the spec's `/connections/letters` slot.
+const spacePaths: Record<ProductSpace, string> = {
+  aurora: "/aurora",
+  cosmos: "/cosmos",
+  resonance: "/resonance",
+  letters: "/connections/letters",
+  me: "/me"
+};
+
+export function spacePath(space: ProductSpace): string {
+  return spacePaths[space];
+}
+
+// Resolves the active space from a router pathname. Matches nested sub-routes too
+// (e.g. "/cosmos/starfield") so a future per-space route split (B1's next slice) does not
+// need to touch this resolver -- only add real <Route> elements underneath.
+export function productSpaceFromPath(pathname: string): ProductSpace {
+  const match = productSpaces.find(([space]) => {
+    const base = spacePaths[space];
+    return pathname === base || pathname.startsWith(`${base}/`);
+  });
+  return match ? match[0] : "aurora";
+}
+
 export function ProductShellNavigation({ active, onNavigate }: { active: ProductSpace; onNavigate: (space: ProductSpace) => void }) {
   return <nav className="app-shell-nav" aria-label="Inner Cosmos 五个空间">
     <div className="app-mark"><span aria-hidden="true">✦</span><strong>Inner Cosmos</strong></div>

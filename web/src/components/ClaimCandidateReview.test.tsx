@@ -42,8 +42,11 @@ describe("ClaimCandidateReview", () => {
   });
 
   it("marks a busy candidate's actions as in-progress and disabled", () => {
+    // AsyncButton (web/src/loading.tsx) keeps the original label for the first second of a busy
+    // state, so a synchronous render/assert checks disabled on the original label -- matching the
+    // convention already used by every other AsyncButton-adopting component's tests in this repo.
     render(<ClaimCandidateReview candidates={[candidate({ id: 7 })]} busyId={7} onConfirm={() => undefined} onDismiss={() => undefined} />);
-    expect(screen.getByRole("button", { name: "记住中…" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "对，就是我" })).toBeDisabled();
   });
 
   it("surfaces uncertain and already-known badges", () => {

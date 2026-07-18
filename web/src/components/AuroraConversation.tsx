@@ -1,4 +1,5 @@
 import { useRef, useState, type FormEvent } from "react";
+import { AsyncButton } from "../loading";
 
 export type AuroraUiMessage = { key: string; speaker: "USER" | "AURORA"; text: string; partial?: boolean };
 
@@ -57,13 +58,15 @@ export function AuroraConversation({ messages, activeTurnId, draft, sessionReady
           if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); }
         }} />
       <div className="actions">
-        {onTranscribe && voiceSupported && <button type="button"
+        {onTranscribe && voiceSupported && <AsyncButton
           className={"voice" + (recording ? " recording" : "")}
-          disabled={transcribing || !sessionReady}
+          disabled={!sessionReady}
+          busy={transcribing}
+          busyText="转写中…"
           aria-pressed={recording}
           aria-label={recording ? "停止录音并转写" : "用语音输入"}
           onClick={() => recording ? stopRecording() : void startRecording()}>
-          {transcribing ? "转写中…" : recording ? "● 停止录音" : "🎤 语音"}</button>}
+          {recording ? "● 停止录音" : "🎤 语音"}</AsyncButton>}
         {activeTurnId && <button type="button" className="stop" onClick={onStop}>停止回应</button>}
         <button type="submit" className="send" disabled={!draft.trim() || !sessionReady}>{activeTurnId ? "打断并发送" : "发送"}</button>
       </div>

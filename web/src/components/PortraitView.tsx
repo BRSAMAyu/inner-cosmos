@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { PortraitDimension, PortraitHistoryEntry } from "../api";
+import { AsyncButton } from "../loading";
 
 const DIM_LABELS: Record<string, string> = {
   INNER_DRIVE: "内驱力", VALUES: "在意的事", SELF_NARRATIVE: "自我叙事",
@@ -72,8 +73,8 @@ export function PortraitView({ dimensions, history, calibrated, busyDim, onLoadH
                 placeholder="比如：我其实不是外向，只是在熟人面前才放得开…" />
               <div className="portrait-calibrate-actions">
                 <button type="button" onClick={() => setCalibratingDim(null)}>先不</button>
-                <button type="button" disabled={busyDim === d.dim || !draft.trim()}
-                  onClick={() => { onCalibrate(d.dim, value, draft); setCalibratingDim(null); }}>告诉 Aurora</button>
+                <AsyncButton busy={busyDim === d.dim} disabled={!draft.trim()}
+                  onClick={() => { onCalibrate(d.dim, value, draft); setCalibratingDim(null); }}>告诉 Aurora</AsyncButton>
               </div>
             </div>}
             {calibrated[d.dim] && <div className="portrait-note">✓ Aurora 会把你的看法和它的观察并在一起。</div>}

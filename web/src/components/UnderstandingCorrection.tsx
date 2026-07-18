@@ -62,8 +62,8 @@ export function UnderstandingCorrection({ claims, oldValue, newValue, impact, bu
               <span className="correction-record-confirm-hint">确定让这条退休吗？</span>
               <button type="button" className="btn-retire-cancel" disabled={retiring}
                 onClick={() => setConfirmingId(null)}>再想想</button>
-              <button type="button" className="btn-retire-confirm" disabled={retiring}
-                onClick={() => onRetire?.(item.id)}>{retiring ? "退休中…" : "确认退休"}</button>
+              <AsyncButton className="btn-retire-confirm" busy={retiring} busyText="退休中…"
+                onClick={() => onRetire?.(item.id)}>确认退休</AsyncButton>
             </> : <button type="button" className="btn-retire" disabled={retiring}
               onClick={() => setConfirmingId(item.id)}>{retiring ? "退休中…" : "让这条退休"}</button>}
           </div>

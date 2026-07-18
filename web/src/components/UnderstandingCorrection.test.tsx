@@ -75,6 +75,25 @@ describe("UnderstandingCorrection", () => {
     expect(screen.getByRole("button", { name: "退休中…" })).toBeDisabled();
   });
 
+  it("disables the confirm-retire button once the inline confirmation is open and that correction is busy", () => {
+    // Characterizes the actual async trigger (btn-retire-confirm, calling onRetire) rather than
+    // the "让这条退休" opener button above (which only ever shows retiringId's ternary because it
+    // renders before the inline confirmation is opened, and confirmingId is local state).
+    const { rerender } = render(<UnderstandingCorrection claims={[]} oldValue="" newValue="" impact={null} busy={false} target={null}
+      corrections={[correction({ id: 42 })]} retiringId={null}
+      onOldValue={() => undefined} onNewValue={() => undefined} onPreview={() => undefined}
+      onCancelPreview={() => undefined} onConfirm={() => undefined} onClearTarget={() => undefined} onRetire={() => undefined} />);
+    fireEvent.click(screen.getByRole("button", { name: "让这条退休" }));
+    rerender(<UnderstandingCorrection claims={[]} oldValue="" newValue="" impact={null} busy={false} target={null}
+      corrections={[correction({ id: 42 })]} retiringId={42}
+      onOldValue={() => undefined} onNewValue={() => undefined} onPreview={() => undefined}
+      onCancelPreview={() => undefined} onConfirm={() => undefined} onClearTarget={() => undefined} onRetire={() => undefined} />);
+    // AsyncButton (web/src/loading.tsx) keeps the original label for the first second of a busy
+    // state (the spec's "don't flash before 1s" rule), so a synchronous render/assert checks
+    // disabled on the original label -- matching every other AsyncButton-adopting component's tests.
+    expect(screen.getByRole("button", { name: "确认退休" })).toBeDisabled();
+  });
+
   it("does not render the history section when there are no past corrections", () => {
     render(<UnderstandingCorrection claims={[]} oldValue="" newValue="" impact={null} busy={false} target={null}
       corrections={[]}

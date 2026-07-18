@@ -93,11 +93,15 @@ describe("MemoryStarfield", () => {
   });
 
   it("disables importance and archive actions while that card is busy", () => {
+    // AsyncButton (web/src/loading.tsx) holds the original label for the first second of a busy
+    // state (the spec's "don't flash before 1s" rule), so a synchronous render/assert -- as every
+    // other AsyncButton-adopting component's tests in this repo already do -- checks disabled on
+    // the original label, not an instantly-swapped busy label.
     render(<MemoryStarfield starfield={starfield} starfieldBusy={false} onChangeMode={() => undefined}
       starfieldDetail={detail} detailBusy={null} onRevealStar={() => undefined} onCloseDetail={() => undefined}
       memoryOperations={[]} rollbackBusy={null} onRollback={() => undefined} onCorrectMemory={() => undefined}
       onUpdateImportance={() => undefined} onArchive={() => undefined} importanceBusy={1} archiveBusy={1} />);
-    expect(screen.getByRole("button", { name: "保存中…" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "归档中…" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "保存重要度" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "归档这颗记忆" })).toBeDisabled();
   });
 });

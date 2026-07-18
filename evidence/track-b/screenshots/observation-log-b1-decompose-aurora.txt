@@ -1,0 +1,21 @@
+console.error: Failed to load resource: the server responded with a status of 401 ()
+url after register: http://localhost:8080/app/aurora/#/aurora
+screenshot: b1-decompose-01-post-register.png
+mode picker "整理" active class after click: active
+console.error: Failed to load resource: the server responded with a status of 403 ()
+console.error: Failed to load resource: the server responded with a status of 403 ()
+console.error: Failed to load resource: the server responded with a status of 403 ()
+screenshot: b1-decompose-02-mid-stream.png
+stop/interrupt control visible mid-stream: true
+console.error: Failed to load resource: the server responded with a status of 403 ()
+clicked stop/interrupt mid-stream
+screenshot: b1-decompose-03-after-stop.png
+status banner after stop: 已停在这里。直接继续说，Aurora 会带着已听见的部分重新理解。
+console.error: Failed to load resource: the server responded with a status of 403 ()
+console.error: Failed to load resource: the server responded with a status of 403 ()
+console.error: Failed to load resource: the server responded with a status of 403 ()
+screenshot: b1-decompose-04-settled.png
+message bubbles present after second turn: 4
+console.error: Failed to load resource: the server responded with a status of 403 ()
+WakeIntent return-card count after scheduling: 1
+screenshot: b1-decompose-05-wakeintent-scheduled.png

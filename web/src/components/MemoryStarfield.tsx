@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { MemoryOperation, StarfieldDetail, StarfieldScene, StarfieldStar } from "../api";
+import { AsyncButton } from "../loading";
 
 const modeOptions: Array<[StarfieldScene["mode"], string]> = [["TIME", "时间"], ["THEME", "主题"], ["PEOPLE", "人物"]];
 const rollbackExcluded = new Set(["FORGET", "LINK", "NO_OP", "ROLLBACK"]);
@@ -22,10 +23,10 @@ function MemoryDetailActions({ card, importanceBusy, archiveBusy, onUpdateImport
       <span className="importance-value">{importance.toFixed(1)}</span>
     </label>}
     <div className="memory-detail-buttons">
-      {onUpdateImportance && <button type="button" disabled={saving}
-        onClick={() => onUpdateImportance(card.id, importance)}>{saving ? "保存中…" : "保存重要度"}</button>}
-      {onArchive && <button type="button" className="quiet" disabled={archiving}
-        onClick={() => onArchive(card.id)}>{archiving ? "归档中…" : "归档这颗记忆"}</button>}
+      {onUpdateImportance && <AsyncButton busy={saving} busyText="保存中…"
+        onClick={() => onUpdateImportance(card.id, importance)}>保存重要度</AsyncButton>}
+      {onArchive && <AsyncButton className="quiet" busy={archiving} busyText="归档中…"
+        onClick={() => onArchive(card.id)}>归档这颗记忆</AsyncButton>}
     </div>
   </div>;
 }
@@ -61,7 +62,8 @@ export function MemoryStarfield({ starfield, starfieldBusy, onChangeMode, starfi
       {starfield.accessibleList.map(star => <li key={star.id}><div><strong>{star.title}</strong><span>{star.theme} · {star.memoryLayer}</span></div>
         <small>置信度 {Math.round(star.confidence * 100)}% · v{star.versionNo}</small><p>{star.summary}</p>
         <div className="cosmos-list-actions">
-          <button type="button" disabled={detailBusy !== null} onClick={() => onRevealStar(star.id)}>{detailBusy === star.id ? "正在追溯…" : "查看来源与变化"}</button>
+          <AsyncButton disabled={detailBusy !== null} busy={detailBusy === star.id} busyText="正在追溯…"
+            onClick={() => onRevealStar(star.id)}>查看来源与变化</AsyncButton>
           <button type="button" className="quiet" onClick={() => onCorrectMemory(star)}>这条不准确了</button>
         </div></li>)}
     </ol>
@@ -81,7 +83,8 @@ export function MemoryStarfield({ starfield, starfieldBusy, onChangeMode, starfi
       {memoryOperations.slice(0, 5).map(operation => <article key={operation.id}>
         <div><strong>{operation.operationType}</strong><span>v{operation.oldVersion} → v{operation.newVersion} · {operation.status === "ROLLED_BACK" ? "已撤回" : "已生效"}</span></div>
         {operation.status === "APPLIED" && !rollbackExcluded.has(operation.operationType) &&
-          <button type="button" disabled={rollbackBusy !== null} onClick={() => onRollback(operation)}>{rollbackBusy === operation.id ? "正在撤回…" : "撤回这次变更"}</button>}
+          <AsyncButton disabled={rollbackBusy !== null} busy={rollbackBusy === operation.id} busyText="正在撤回…"
+            onClick={() => onRollback(operation)}>撤回这次变更</AsyncButton>}
         {operation.operationType === "FORGET" && <small>原文已删除，不可恢复</small>}
       </article>)}
     </div>}

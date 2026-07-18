@@ -1,9 +1,13 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RelationsView } from "./RelationsView";
 import type { RelationMention } from "../api";
 
-afterEach(cleanup);
+beforeEach(() => vi.useFakeTimers());
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 const rel = (over: Partial<RelationMention> = {}): RelationMention => ({
   id: 1, relationLabel: "妈妈", relationType: "家人", emotionTags: "牵挂,愧疚",
@@ -37,7 +41,11 @@ describe("RelationsView", () => {
   });
 
   it("shows a loading state while the timeline is being fetched", () => {
+    // Now routed through the shared LoadingText primitive (web/src/loading.tsx), which withholds
+    // its text for the first second (the spec's "don't flash a loader under 1s" rule) -- advance
+    // past that threshold before asserting, same as loading.test.tsx's own convention.
     render(<RelationsView relations={[rel()]} selected="妈妈" timeline={[]} health={null} busy={true} onSelect={() => undefined} />);
+    act(() => vi.advanceTimersByTime(1000));
     expect(screen.getByText(/正在读取「妈妈」的时间线/)).toBeVisible();
   });
 });

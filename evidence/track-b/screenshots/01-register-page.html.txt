@@ -1,0 +1,147 @@
+<!DOCTYPE html><html lang="zh-CN" style="--aurora-name: Aurora; --surface-warm: #F7F2EC; --surface-secondary: #EFE6DA; --weather-opacity: 0.15; --weather-blur: 2px;"><head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="/css/app.css">
+  <title>注册 · 内宇宙</title>
+  <style>
+    .login-shell {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      position: relative;
+    }
+    .login-shell::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 50% 60% at 25% 30%, rgba(168,161,184,.10), transparent),
+        radial-gradient(ellipse 40% 50% at 75% 65%, rgba(184,194,174,.08), transparent),
+        radial-gradient(ellipse 30% 40% at 50% 50%, rgba(200,144,96,.05), transparent);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .login-shell::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(1px 1px at 15% 30%, rgba(184,194,174,.36), transparent),
+        radial-gradient(1px 1px at 40% 60%, rgba(200,192,187,.28), transparent),
+        radial-gradient(1.2px 1.2px at 65% 20%, rgba(184,194,174,.24), transparent),
+        radial-gradient(1px 1px at 85% 75%, rgba(168,161,184,.30), transparent),
+        radial-gradient(1px 1px at 30% 85%, rgba(200,192,187,.22), transparent);
+      pointer-events: none;
+      z-index: 0;
+      animation: login-stardust 20s var(--ease-drift) infinite alternate;
+    }
+    @keyframes login-stardust {
+      0% { opacity: .5; transform: translateY(0); }
+      100% { opacity: .8; transform: translateY(-6px); }
+    }
+
+    .login-card {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 440px;
+      background:
+        linear-gradient(180deg, rgba(255,250,243,.78), rgba(247,242,236,.62)),
+        rgba(255,250,243,.56);
+      border: 1px solid rgba(255,255,255,.32);
+      border-radius: var(--radius-flow);
+      backdrop-filter: blur(28px) saturate(120%);
+      box-shadow:
+        0 4px 16px rgba(0,0,0,.04),
+        0 24px 64px rgba(0,0,0,.10),
+        inset 0 1px 0 rgba(255,255,255,.40);
+      padding: 48px 40px 40px;
+      animation: card-enter 800ms var(--ease-bloom) both;
+      transition: box-shadow 600ms var(--ease-flow), transform 600ms var(--ease-flow);
+    }
+    .login-card:focus-within {
+      box-shadow:
+        0 6px 20px rgba(0,0,0,.05),
+        0 30px 76px rgba(0,0,0,.12),
+        inset 0 1px 0 rgba(255,255,255,.46);
+      transform: translateY(-2px);
+    }
+    @keyframes card-enter {
+      from { opacity: 0; transform: translateY(20px) scale(.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .login-brand {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    .login-brand-mark {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background:
+        linear-gradient(135deg, var(--accent-lavender), var(--accent-dusty-blue) 52%, var(--accent-sage));
+      box-shadow: 0 0 0 6px rgba(168,161,184,.10), 0 0 24px rgba(168,161,184,.16);
+      margin-bottom: 16px;
+      animation: brand-breathe 5.6s var(--ease-flow, ease-in-out) infinite;
+    }
+    /* A slow living glow — the mark breathes like the rest of the cosmos. */
+    @keyframes brand-breathe {
+      0%, 100% { box-shadow: 0 0 0 6px rgba(168,161,184,.10), 0 0 24px rgba(168,161,184,.16); transform: scale(1); }
+      50% { box-shadow: 0 0 0 8px rgba(168,161,184,.08), 0 0 36px rgba(168,161,184,.26); transform: scale(1.03); }
+    }
+    .login-brand h1 {
+      font-family: var(--font-hero);
+      font-size: 1.8rem;
+      margin: 0 0 8px;
+      color: var(--ink);
+      letter-spacing: .02em;
+      text-wrap: balance;
+    }
+    .login-brand .subtitle {
+      font-size: .9375rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .field {
+      margin-bottom: 20px;
+    }
+    .field label {
+      display: block;
+      font-size: .8125rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+      letter-spacing: .02em;
+    }
+    .field input {
+      width: 100%;
+      padding: 12px 16px;
+      font-size: .9375rem;
+      font-family: var(--font-body);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(247,242,236,.48);
+      color: var(--text);
+      transition: border-color 260ms var(--ease-flow), box-shadow 260ms var(--ease-flow);
+    }
+    .field input:focus {
+      outline: none;
+      border-color: var(--accent-sage);
+      box-shadow: 0 0 0 3px rgba(143,163,148,.12);
+      background: rgba(247,242,236,.64);
+    }
+
+    .register-btn {
+      width: 100%;
+      padding: 14px;
+      font-size: 1rem;
+      font-family: var(--font-body);
+      font-weight: 600;
+      color: #fff;
+      background: linear-gradient(135deg, var(--accent-sage), var(--ac

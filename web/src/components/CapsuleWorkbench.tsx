@@ -52,9 +52,9 @@ function CapsuleBoundaryEditor({ boundary, boundaryBusy, onSaveBoundary }: {
       </div>
       <label className="boundary-check"><input type="checkbox" checked={allowLetter}
         onChange={event => setAllowLetter(event.target.checked)} />允许访客读完后请求给你写一封慢信</label>
-      <button type="button" className="resonance-secondary" disabled={boundaryBusy}
+      <AsyncButton className="resonance-secondary" busy={boundaryBusy} busyText="保存中…"
         onClick={() => onSaveBoundary({ allowTopics, blockedTopics, maxConversationTurns: maxTurns, allowLetterRequest: allowLetter, privacyLevel: privacy })}>
-        {boundaryBusy ? "保存中…" : "保存边界设置"}</button>
+        保存边界设置</AsyncButton>
     </div>
   </>;
 }
