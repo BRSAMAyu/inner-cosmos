@@ -269,6 +269,77 @@ itself.
 - `LettersInbox.tsx`'s reply-button busy/double-submit gap (no busy tracking at all) is unclaimed
   backlog for whoever next touches the letters domain hook.
 
+## Workstream B1 — fourth checkpoint: first `AuroraApp.tsx` domain-hook decomposition slice
+
+Begins the spec's §5 ask to "decompose `AuroraApp.tsx` into application shell, route pages, domain
+hooks/stores and small presentational components." `AuroraApp.tsx` was ~1270 lines with 60+
+`useState` hooks and zero domain-hook extraction to date — this checkpoint is deliberately scoped to
+**one** cohesive first slice (per the task brief) rather than the whole file: the **Aurora
+conversation/session domain**.
+
+| Artifact | What it is |
+|---|---|
+| `web/src/hooks/useAuroraSession.ts` | New hook. Owns: `sessionId`, `messages`, `draft`/`setDraft`, `mode`/`setMode`, `activeTurnId`, `runtimeSignal`, `wakeIntents`, `wakeBusy`, `returnWhen`/`setReturnWhen`, `notifications`, and the refs (`abortRef`, `activeTurnRef`, `bubbleKeyRef`, `eventIdsRef`, `lastEventIdRef`, `reconnectingRef`, `handleEventRef`). Exposes: `send`, `stop`, `scheduleReturn`/`respondToReturn`/`postponeReturn`/`cancelReturn` (WakeIntent negotiate), `resolveSession`/`replaceFromHistory`/`loadWakeIntents`/`loadNotifications` (session bootstrap pieces used by `AuroraApp.tsx`'s own `bootstrap()`), `refreshNotifications`/`resumeConversation` (used by the mobile-runtime resume effect), `openMobileWakeIntent`, and `resetSession` (used by `logout`/`deleteAccount`). The internal WakeIntent-arrival `subscribeProactive` effect (previously inline in `AuroraApp.tsx`) also moved in, since it only ever touches `notifications`/`wakeIntents`/status. `notifications` state moved in too: every one of its usages in `AuroraApp.tsx` was WakeIntent-arrival-only (the "AURORA RETURNED" card and `respondToReturn`), never a generic app-wide notification surface, so it belongs with WakeIntent negotiate, not as a separate cross-cutting concern. |
+| `web/src/hooks/useAuroraSession.test.ts` | New: 14 Vitest cases (`renderHook` + `vi.mock("../api")` mirroring `AuthGate.test.tsx`'s mocking convention) written *before* wiring the hook into `AuroraApp.tsx`, since `AuroraApp.tsx` itself had zero prior test coverage of its own logic (only child components like `AuroraConversation.tsx` had prop-driven tests). Covers: initial state; `resolveSession` (fresh session / WakeIntent-return session / stale-abort via an `isStale` callback); `replaceFromHistory`; `loadWakeIntents`/`loadNotifications`; `send` + simulated `streamAurora` events (`turn.started` → `activeTurnId`/`runtimeSignal`, `bubble.started`/`token`/`bubble.completed` → message content, `turn.completed` → reset); `stop` (aborts, marks the live bubble partial, calls `api.stop`); `setMode`; and all four WakeIntent negotiate handlers. |
+| `web/src/AuroraApp.tsx` | Calls `useAuroraSession({ authenticated, skillLocale, onSkillSuggestion: setSkillSuggestion, setStatus })` and consumes its return value everywhere the moved state/handlers used to live directly (`auroraSession.messages`, `auroraSession.send`, `auroraSession.wakeIntents`, etc.) — **zero JSX structure changes**, only identifier rewrites. `bootstrap()` was restructured but not behaviorally changed: it now calls `auroraSession.resolveSession(() => call !== bootstrapCallRef.current)` for the session/WakeIntent-return resolution (preserving the exact original "abort a stale/superseded bootstrap call before firing every other domain's fetch" race guard, via an `isStale` callback rather than losing it to a naive parallel restructuring), then runs the same one 23-way `Promise.all` of every other domain's initial fetch it always did (three of those 23 entries — `replaceFromHistory`, `loadWakeIntents`, `loadNotifications` — are now the hook's own small functions instead of inline `api.*` calls, but the concurrency shape is unchanged). The big mobile-runtime effect (online/offline resume, WakeIntent deep-link, push-token) now delegates to `auroraSession.resumeConversation()`/`refreshNotifications()`/`openMobileWakeIntent` instead of reaching into the (now hook-private) `activeTurnRef`/`replaceFromHistory`/`recover` directly. `logout`/`deleteAccount` call `auroraSession.resetSession()` instead of `setSessionId(null); setMessages([])` inline. `continueSkillWithAurora` (Skill domain, stays in `AuroraApp.tsx`) calls `auroraSession.setDraft(...)`. |
+| `evidence/track-b/scripts/observe-b1-decompose-aurora.mjs` | New Playwright script: register → switch mode picker → send a message and observe a real mid-stream Aurora reply with the stop/interrupt control visible → click stop and confirm the exact original status copy → send a second message and let it settle to multiple message bubbles → fill in a WakeIntent return time and schedule it, confirming a real return-card with the exact original copy. |
+| `evidence/track-b/screenshots/b1-decompose-01..05*.png`, `observation-log-b1-decompose-aurora.txt` | Screenshots and log from the above. |
+
+### What did NOT move (deliberately out of scope for this slice)
+
+Per the task brief, only the Aurora conversation/session domain moved. `AuroraApp.tsx` still holds
+every other domain inline as plain `useState`: memory/starfield (`starfield`, `starfieldDetail`,
+`memoryOperations`, correction targets/claims/candidates), capsule/resonance (`capsules`,
+`genomeHistory`, `capsulePreview`, sandbox, persona chat, slow letters), connections/letters
+(`connectionRequests`, `friends`, `people`, `relations`, letter threads), psychology skills, portrait,
+account settings, and the five-space routing/nav state from the prior checkpoint. `AuroraApp.tsx`'s
+own `bootstrap()` also still orchestrates loading *every* domain's initial data (not just Aurora's) —
+that could not move into the new hook without also moving every other domain's state, so it stays in
+`AuroraApp.tsx` and calls into the hook only for the Aurora-specific piece (see above).
+
+### How this was verified
+
+- `cd web && npx vitest run` — 163/163 passing across 26 files (143/24 checkpoint-start baseline + 14
+  new `useAuroraSession.test.ts` cases run green in isolation *before* wiring the hook into
+  `AuroraApp.tsx`, plus ~6 more contributed by a concurrent B5 PWA checkpoint's own
+  `pwaManifest.test.ts` that landed in the same working tree mid-session via commit `856a243`).
+- `cd web && npx tsc -b` — clean, zero errors, run after every meaningful edit (not just at the end).
+- `cd web && npm run build` — clean; the resulting `src/main/resources/static/app/aurora/**` was
+  byte-identical to what the concurrent B5 checkpoint's commit `856a243` had already committed,
+  confirming the two independent checkpoints' work composes with zero interaction once both were
+  finished (see discoveries in `docs/goal/tracks/track-b-status.yml`).
+- Live run (`dev` profile, H2 + Mock provider, `.\mvnw.cmd spring-boot:run` under
+  `JAVA_HOME=jdk-21.0.10`) via `evidence/track-b/scripts/observe-b1-decompose-aurora.mjs` (run from a
+  temporary copy under `web/`, per the by-now-standard Node ESM-resolver workaround): mode picker
+  toggles the `active` class correctly; a real streamed Aurora reply appears mid-turn with the
+  stop/interrupt control (`停止回应`) visible; clicking stop mid-stream produces the byte-exact
+  original status copy `已停在这里。直接继续说，Aurora 会带着已听见的部分重新理解。`; a second full
+  turn settles to multiple message bubbles in the conversation; WakeIntent negotiate produces a real
+  return-card with the exact original `因为还有话没有说完...` reason copy and the exact original
+  `约好了。你随时可以改期或取消，不需要迁就 Aurora。` status text. A first live-verification attempt
+  showed an apparently-failed stream with no reproducible pattern across repeated re-runs regardless
+  of a Playwright service-worker setting — traced to the pre-existing, already-documented "403 then
+  self-healing CSRF retry" behavior in `api.ts`'s `request()` wrapper being occasionally visible as
+  console noise right after a brand-new registration, not a regression from this extraction (see
+  `docs/goal/tracks/track-b-status.yml` discoveries for the full methodology note).
+
+### What is still open for B1
+
+- `AuroraApp.tsx` is down from ~1270 to ~900 lines but still holds every other domain's state inline
+  — memory/starfield + correction, capsule/resonance, connections/letters, psychology skills,
+  portrait, account settings. Suggested next slices (either order is reasonable): (a) memory/starfield
+  + correction/claims (a natural pairing since `beginMemoryCorrection` already bridges them), or (b)
+  the smaller, more self-contained relations/connections domain as an easier warm-up before the more
+  entangled capsule/resonance domain (which shares `sessionId`/`skillLocale`/status with the
+  just-extracted Aurora domain and with psychology skills).
+- The shared-busy-across-siblings buttons flagged in the third checkpoint (`AuroraSelfSpace`,
+  `MemoryStarfield`'s mode tabs, `ResonanceNetwork`'s strategy switcher, `PsychologySkillStudio`'s
+  per-run revoke, `CapsuleWorkbench`'s sandbox ratings) remain unclaimed — fixing those needs a
+  per-item busy id introduced by whichever domain hook covers that component next.
+- No rendering-decomposition pass yet (splitting the five product-space JSX blocks into small
+  presentational components) — the spec treats this as a separate later pass from the domain-hook
+  extraction, and this checkpoint did not attempt it.
+
 ## Workstream B5 — first checkpoint: PWA offline app shell
 
 Fixes B0 finding #6 (backlog item (6) from the original golden-journeys.md list): "no PWA offline
