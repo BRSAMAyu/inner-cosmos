@@ -53,7 +53,7 @@ commits:
     summary: "feat(web): unify login/register into one AppShell entry surface (B1) -- AuthGate component, api.register, Aurora composer reorder; see evidence/track-b/README.md B1 section for the exact file list"
   - sha: cf5faac
     summary: "docs(track-b): resolve B0's open question on the 11 Resonance sample personas"
-  - sha: PENDING
+  - sha: 26f4aa2
     summary: "feat(web): introduce react-router (HashRouter) replacing the ?space= query param -- real per-space routes, legacy-link redirect, TB-REQ-002 filed for a future BrowserRouter swap"
 verification:
   B0_observation:
