@@ -7,11 +7,11 @@ minimum_handoff_commit: 7e0688308292cd9d41552c98f576d25681738be0
 base_sha: 14e1b85596034544b7fb291677fb8dd3f8240f1c
 branch: codex/track-a-living-intelligence
 owner: claude-code-track-a
-updated_at: "2026-07-18T18:55:00Z"
+updated_at: "2026-07-18T19:10:00Z"
 spec: docs/tracks/TRACK-A-LIVING-INTELLIGENCE.md
 evidence_root: evidence/track-a
 contract_deltas: docs/goal/tracks/track-a-contract-deltas.yml
-current_front: A1-living-aurora
+current_front: A2-memory-profile
 workstreams:
   A0-quality-laboratory:
     status: IN_PROGRESS
@@ -98,12 +98,60 @@ workstreams:
       TrackARuntimeAblationEvaluationTest; and no new P0 privacy/factual scenario was added this
       session (existing A0 scripted P0 cases still cover unauthorized/forgotten-memory and
       diagnostic-claim leakage). See evidence/track-a/A1-living-aurora/README.md §6 for full detail.
-  A2-memory-profile: {status: NOT_STARTED, evidence: [], remaining: "Complete temporal claims, task-aware retrieval and correction/withdrawal propagation."}
+  A2-memory-profile:
+    status: IN_PROGRESS
+    evidence:
+      - src/main/java/com/innercosmos/ai/claim/ClaimConfidenceDecayPolicy.java
+      - src/main/java/com/innercosmos/scheduler/ClaimDecaySweepJob.java
+      - src/main/java/com/innercosmos/service/ClaimCandidateService.java
+      - src/main/java/com/innercosmos/service/impl/ClaimCandidateServiceImpl.java
+      - src/test/java/com/innercosmos/ai/claim/ClaimConfidenceDecayPolicyTest.java
+      - src/test/java/com/innercosmos/scheduler/ClaimDecaySweepJobTest.java
+      - src/test/java/com/innercosmos/service/impl/ClaimCandidateServiceImplIntegrationTest.java
+      - src/test/java/com/innercosmos/evaluation/TrackAClaimDecayAblationEvaluationTest.java
+      - evidence/track-a/A2-memory-profile/README.md
+      - evidence/track-a/A2-memory-profile/claim-decay-ablation-report.json
+    remaining: >
+      This session's audit found A2 already had a substantial, tested unified claim system
+      (ClaimCandidateServiceImpl/UserCorrectionServiceImpl/MemoryLifecycleServiceImpl: ingestion with
+      provenance+authority tiers, broad correction/withdrawal propagation to memory/portrait/capsule/
+      embeddings/derived-data, and a partial task-aware MemoryRetrievalServiceImpl.taskFit policy) —
+      contrary to the NOT_STARTED status this workstream carried in. The one concretely-verified 0%
+      gap (exhaustive grep confirmed tb_understanding_claim.confidence was written once at insert and
+      never read/modified anywhere else) was closed this session: ClaimConfidenceDecayPolicy gives
+      per-authority-tier half-life decay (MODEL_INFERENCE 14d < SINGLE_EXPLICIT 30d <
+      REPEATED_BEHAVIOR 60d < REPEATED_EXPLICIT 90d, unrecognized tier falls back to 21d) as a pure,
+      non-mutating function of (base confidence, tier, elapsed time since last reinforcement), with
+      USER_CORRECTION/USER_CONFIRMED explicitly protected from ever decaying. Wired into
+      ClaimCandidateServiceImpl.listCandidates (lazy per-user decay+auto-dismiss on read) and a new
+      global ClaimCandidateService.sweepStaleCandidates(batchSize) backed by a new scheduled
+      ClaimDecaySweepJob (mirrors MemoryEmbeddingRebuildJob's batch pattern, ShedLock-guarded,
+      runtime-role-gated). 9 pure unit tests + 2 scheduler-delegation tests + 3 new H2 integration
+      tests (stale-unreinforced candidate auto-dismissed; exactly-one-half-life candidate shows a
+      halved-not-binary confidence and stays listed; a global sweep across 3 users dismisses the
+      stale one, leaves a fresh one, and leaves a confirm()-promoted ACTIVE/USER_CORRECTION claim
+      backdated 2 years completely untouched at confidence 1.0) + 1 new sibling evaluation suite
+      (TrackAClaimDecayAblationEvaluationTest, 4 scenario rows / 2 types x dev+held-out, real service
+      vs two naive baselines defined only in the test: naive_static never retires a stale guess;
+      naive_uniform_decay would wrongly erode an explicit correction to ~1e-6/1e-11) all passed. Full
+      ./mvnw test: 874/874 green (one AuroraStreamControllerTest concurrency flake was seen in one
+      full-suite run this session, unrelated to any file touched here — reproduced as a pass both
+      standalone and in an immediate full-suite rerun). No contract delta needed (ClaimCandidateVO's
+      existing confidence field just carries a more honest, time-aware value; no shape change). Still
+      missing before A2 COMPLETE: claims are not part of retrieval at all (MemoryRetrievalService only
+      reads tb_memory_card, never tb_understanding_claim — the largest remaining architectural gap);
+      no explicit valid/effective-time window or contradiction-group modeling on UnderstandingClaim
+      (only supersedesClaimId chaining); no lexical/vector/hybrid retrieval benchmark across hard
+      negative/temporal conflict/paraphrase/privacy cases; the chosen decay half-lives are a first
+      reasoned calibration against the extractor's own qualitative authority-tier ordering, not tuned
+      against a labeled staleness corpus (human gate, same pattern as A1's adaptive-budget-policy
+      weights). See evidence/track-a/A2-memory-profile/README.md for full detail and the exact
+      real-code-vs-gap audit.
   A3-capsule-matching: {status: NOT_STARTED, evidence: [], remaining: "Deliver dynamic Genome fidelity and consent-scoped multi-strategy vector matching."}
   A4-psychology-skills: {status: NOT_STARTED, evidence: [], remaining: "Ship and evaluate at least three bilingual non-diagnostic product skills."}
   A5-data-rights: {status: NOT_STARTED, evidence: [], remaining: "Cover every derivative, queue, cache, analytics, notification and backup policy."}
   A6-observability-boundaries: {status: NOT_STARTED, evidence: [], remaining: "Add privacy-safe AI signals, failure injection, backend actuator hardening and executable module boundaries."}
-latest_checkpoint: "de1f984ed8de08c1eed528ac185233034a9aba92"
+latest_checkpoint: "PENDING-A2-DECAY-CHECKPOINT"
 commits:
   - message: "test(track-a): A0 quality-lab ablation suites + real-provider smoke evidence"
     sha: "5daa4dc92ac8e5375a0cd9486112ce44d80e58bc"
@@ -111,6 +159,8 @@ commits:
     sha: "ea467e25228debfd59ea60195a90d1fcd7a389d8"
   - message: "feat(track-a): adaptive per-turn dual-kernel budget policy"
     sha: "de1f984ed8de08c1eed528ac185233034a9aba92"
+  - message: "feat(track-a): A2 claim confidence decay policy + auto-dismiss + evaluation suite"
+    sha: "PENDING-A2-DECAY-CHECKPOINT"
 verification:
   full_suite: "./mvnw test -> Tests run: 842, Failures: 0, Errors: 0, Skipped: 0 (2026-07-18, this session, JAVA_HOME=JDK 21.0.10, after the A1 schema fix)"
   new_suites_focused: "./mvnw test -Dtest=TrackARuntimeAblationEvaluationTest,TrackAMemoryAuthorityAblationEvaluationTest,TrackACapsuleGenomeAblationEvaluationTest,TrackAProactiveDecisionEvaluationTest -> Tests run: 6, Failures: 0 (unaffected by the runtime prompt-text change, as expected — these suites use a ScriptedClient that ignores instruction text)"
@@ -121,11 +171,15 @@ verification:
   adaptive_full_suite: "./mvnw test -> Tests run: 855, Failures: 0, Errors: 0, Skipped: 0 (this follow-up session, JAVA_HOME=JDK 21.0.10, after the adaptive-policy change; 842 + 13 new tests)"
   adaptive_real_provider_smoke: "./mvnw test -Dtest=TrackAAdaptiveRealProviderSmokeEvaluationTest -DexcludedGroups= (env sourced from .env.track-a.local, never printed; GLM only this session) -> Tests run: 1, Failures: 0. adaptive mode routed the gratitude scenario to SINGLE_PASS (1 real call, 7.15s) and the crisis scenario to DUAL_KERNEL (2 real calls, 12.26s) against the SAME real provider in the same run. Report: evidence/track-a/A1-living-aurora/adaptive-dual-kernel/adaptive-real-provider-smoke-glm.json"
   adaptive_secret_scan: "powershell -File scripts/scan-secrets.ps1 -> Secret scan PASS: 0 findings (this follow-up session, run again before the checkpoint commit)"
+  a2_decay_focused: "./mvnw test -Dtest=ClaimConfidenceDecayPolicyTest,ClaimDecaySweepJobTest,ClaimCandidateServiceImplIntegrationTest,TrackAClaimDecayAblationEvaluationTest -> exit 0; per-class surefire reports: ClaimConfidenceDecayPolicyTest Tests run 9/Failures 0, ClaimDecaySweepJobTest Tests run 2/Failures 0, ClaimCandidateServiceImplIntegrationTest Tests run 6/Failures 0 (3 pre-existing + 3 new), TrackAClaimDecayAblationEvaluationTest Tests run 1/Failures 0 (4 scenario rows internally). Report: evidence/track-a/A2-memory-profile/claim-decay-ablation-report.json"
+  a2_full_suite: "./mvnw test (this A2 session, JAVA_HOME=JDK 21.0.10). First run: exit 1, one failure — AuroraStreamControllerTest.replay_typedTimelineEvents (ConcurrentModificationException), a pre-existing flake unrelated to any file this session touched (confirmed: passed standalone in the same session, `./mvnw test -Dtest=AuroraStreamControllerTest` -> Tests run 4/Failures 0). Immediate full-suite rerun: exit 0, aggregated across all target/surefire-reports/*.txt -> Tests run 874, Failures 0, Errors 0, Skipped 0 (855 baseline + 9 + 2 + 3 + 1 new = 870 attributable to this session's files; the 874 vs 870 count difference between the two consecutive full runs reflects Testcontainers-gated tests that only execute when Docker is reachable, not a regression)."
+  a2_secret_scan: "powershell -File scripts/scan-secrets.ps1 -> Secret scan PASS: 0 findings (this A2 session, run before the checkpoint commit); .env.track-a.local confirmed still git-ignored via `git check-ignore -v .env.track-a.local` and absent from `git status --porcelain` immediately before committing."
 human_gates:
   - "Non-author review of the frozen held-out scenario set (currently authored by the same agent that wrote the ablation logic)."
   - "Human/blind-review pairwise package for Aurora response quality — this session's real-provider evidence (both before A0 and after A1) is structural (parse success, latency, fallback-sentinel detection) plus a permanent parse-correctness regression gate, not a human relational-quality judgment; §5's blind-review deliverable remains open."
   - "MiMo ASR real-provider smoke needs a human-supplied or recorded audio fixture; MIMO_API_KEY is present in .env.track-a.local but no audio input was available this session."
   - "The adaptive dual-kernel budget policy's score weights/threshold (this follow-up session) are a first reasoned calibration validated against 6 of the 13 catalog scenario types plus one real-provider pair, not a human-reviewed or corpus-tuned calibration — a non-author should sanity-check the weighting before it is relied on for a production default."
+  - "The A2 claim-confidence-decay half-lives (MODEL_INFERENCE 14d, SINGLE_EXPLICIT 30d, REPEATED_BEHAVIOR 60d, REPEATED_EXPLICIT 90d, DISMISS_THRESHOLD 0.15) are a first reasoned calibration matching the extractor's own qualitative authority-tier ordering (ClaimAuthority's javadoc), not tuned against a labeled corpus of real user staleness judgments — a non-author should sanity-check these numbers (e.g. is 14 days really the right point for a model inference to stop being worth surfacing?) before they are relied on for a production default, matching the same caveat pattern as A1's adaptive-budget-policy weights."
 blockers: []
 discoveries:
   - "ai-lab/ (Python) already has a mature dev/held_out/adversarial/compiler_train split, adapters, judges and a real-provider-pairwise CLI (evidence/innovation/INNO-EVAL-001/002/003) — but its adapters are deterministic fixtures that match `expected` by construction, not a harness that drives the real Java runtime. This session's Java suites fill exactly that gap; they are additive, not a replacement, and the two catalogs are not yet cross-referenced (see A0 remaining)."
@@ -136,8 +190,13 @@ discoveries:
   - "The next highest-value A1 lead identified but not yet implemented this session: AuroraDualKernelRuntime.enabled() is a global single-vs-dual switch (inner-cosmos.aurora.runtime property), not a per-turn adaptive decision as TRACK-A-LIVING-INTELLIGENCE.md §5 asks for ('Dual kernel is adaptive, not mandatory... high-ambiguity, high-continuity or high-risk turns may spend more budget'). Implementing per-turn adaptivity (e.g. a cheap pre-classifier or a plan-kernel self-assessment deciding whether to invoke the speaker+critic path vs. a fast single-pass reply) is recorded as the top remaining A1 lead in evidence/track-a/A1-living-aurora/README.md §5."
   - "ADAPTIVE BUDGET POLICY IMPLEMENTED (this follow-up session): the A1 lead above is now real code, not just a recommendation. New DualKernelBudgetPolicy (com.innercosmos.ai.runtime) scores a turn using signals reused from com.innercosmos.safety (CrisisKeywordRule, DistressSignalDetector — deliberately NOT a new risk lexicon), a small dedicated ambiguity-marker list, and structural continuity signals (interruption present, relevant-memory count, recent-thread depth). AuroraDualKernelRuntime.shouldUseDualKernelForTurn(turnContext) is the new routing entry point; inner-cosmos.aurora.runtime now accepts `adaptive` alongside the unchanged-default `single`/`dual`. AuroraAgentServiceImpl's single call site was updated from `.enabled()` to `.shouldUseDualKernelForTurn(turnContext)` — the only production wiring change. 12 unit tests + a 12-scenario-row ablation (6 catalog types x dev/held-out, reusing track-a-scenario-catalog-v1.json) all passed with correct budget AND correct module-call pattern (single-pass never touches AURORA_PLAN/SPEAKER/CRITIC). A real-GLM smoke run showed a genuine provider-observed difference: 1 real call/7.15s for a simple scenario vs 2 real calls/12.26s for a crisis scenario, same adaptive runtime, same provider, same session. Full detail: evidence/track-a/A1-living-aurora/README.md §6."
   - "Calibration caveat for the adaptive policy (honest limitation, not a hidden gap): the score weights (risk=3, ambiguity=2, interruption=2, memory up to 2, thread-depth=1) and the dual-kernel threshold (2) were reasoned to match the spec's qualitative examples on 6 of the 13 catalog scenario types, not tuned against a labeled corpus or validated on the other 7 types (disagreement, user_correction, quiet_hours, changing_preference, data_withdrawal, and the 2 capsule types). A future session should widen the ablation to those types and consider whether they expose a signal the current policy does not yet score, and treat the weights as a first calibration, not a final one — see the new human_gates entry."
+  - "A2 SESSION START AUDIT: contrary to A2-memory-profile's NOT_STARTED status coming into this session, a substantial unified-claim system already exists and is already tested — ClaimCandidateServiceImpl (Campaign B automatic ingestion with authority tiers via ai.claim.ClaimAuthority/ClaimCandidateExtractor), UserCorrectionServiceImpl (explicit-correction promotion with UnderstandingClaim version/supersedesClaimId chaining and ClaimPropagation audit rows), and MemoryLifecycleServiceImpl (broad correction/withdrawal propagation: MemoryCard supersede, AuthorizedMemoryRef/EchoCapsule NEEDS_REVIEW + CapsuleGenomeService.markNeedsReview, MemoryEmbedding STALE invalidation, DataUseGrantService revocation, derived ThoughtFragment/TodoItem/RelationMention deletion on FORGET). MemoryRetrievalServiceImpl.taskFit already gives a real (if simple) task-conditioned retrieval policy. This changed which A2 gap this session targeted: not \"build unified ingestion\" or \"build correction propagation\" (both already real), but the one piece an exhaustive grep proved was 0% implemented — UnderstandingClaim.confidence was written once at insert and never read/modified by any other production code path, so §6's \"decay weak inferences and never decay explicit user assertions as if they were guesses\" sentence had zero code behind it."
+  - "A2 CLAIM CONFIDENCE DECAY IMPLEMENTED (this session): new pure ClaimConfidenceDecayPolicy (com.innercosmos.ai.claim) computes a time-decayed confidence as a read-time function of (immutable stored confidence, authority tier, elapsed time since last reinforcement) rather than mutating the stored column in place — deliberately avoiding the double-decay/idempotency risk a nightly-multiplication design (like NightlyMemorySettlementJob's capsule-energy decay) would carry. Per-tier half-lives: MODEL_INFERENCE 14d < SINGLE_EXPLICIT 30d < REPEATED_BEHAVIOR 60d < REPEATED_EXPLICIT 90d; USER_CORRECTION/USER_CONFIRMED never decay. Wired into ClaimCandidateServiceImpl.listCandidates (lazy per-user decay+auto-dismiss below a 0.15 floor, on read) and a new global ClaimCandidateService.sweepStaleCandidates(batchSize) backed by a new scheduled ClaimDecaySweepJob (mirrors MemoryEmbeddingRebuildJob's simpler global-batch pattern rather than NightlyMemorySettlementJob's per-user loop, since decay needs no per-user context). 9 pure unit tests + 2 scheduler-delegation tests + 3 new H2 integration tests (200-day-stale candidate auto-dismissed; exactly-one-half-life candidate shows a halved-not-binary confidence and stays listed; a 3-user global sweep dismisses the stale one, leaves a fresh one, and leaves a confirm()-promoted ACTIVE claim backdated 2 years completely untouched at confidence 1.0) + 1 new sibling evaluation suite (TrackAClaimDecayAblationEvaluationTest, 4 rows / 2 types x dev+held-out, proving both failure modes a naive design could have: never-retiring a stale guess, and wrongly eroding an explicit correction) all passed. Full detail: evidence/track-a/A2-memory-profile/README.md."
+  - "Backdating a BaseEntity's updatedAt for test purposes cannot use updateById(entity) — MybatisMetaObjectHandler.updateFill unconditionally stamps updated_at to now() on every entity-based update (that was the M1 fix's whole point). The working pattern, already used in production by MemoryLifecycleServiceImpl's FORGET path for the same reason, is claimMapper.update(null, new UpdateWrapper<T>().eq(\"id\", id).set(\"updated_at\", when)) — bypassing the entity-fill path entirely by passing a null entity and setting the column directly in the wrapper."
+  - "The single largest remaining A2 gap identified but not yet implemented this session: UnderstandingClaim (the portrait/correction ledger) is never consulted by MemoryRetrievalServiceImpl.retrieve() — retrieval reads tb_memory_card only. An ACTIVE, USER_CORRECTION-authority claim is authoritative but is not itself retrievable evidence; it only reaches a conversation indirectly through whichever MemoryCard rows the correction flow also touched. Bridging the claim graph into retrieval (or explicitly documenting why it should remain a separate ledger) is recorded as the top remaining A2 architectural question for the next session — see evidence/track-a/A2-memory-profile/README.md §5."
 handoff_notes:
   - "Five offline suites are green under ./mvnw test: TrackARuntimeAblationEvaluationTest, TrackAMemoryAuthorityAblationEvaluationTest, TrackACapsuleGenomeAblationEvaluationTest, TrackAProactiveDecisionEvaluationTest (offline/deterministic, always run) and TrackARealProviderSmokeEvaluationTest (tagged real-provider, excluded from the default gate via pom.xml's excludedGroups property, run explicitly with -DexcludedGroups= plus env credentials)."
   - "pom.xml changed in the A0 session: added an `excludedGroups` property (default `real-provider`) and wired maven-surefire-plugin's `excludedGroups` to it, so the default gate stays fully offline/deterministic while the real-provider suite remains explicitly runnable. Not touched again this A1 session."
   - "This A1 session touched only: src/main/java/com/innercosmos/ai/runtime/AuroraDualKernelRuntime.java (prompt text only — plan/speaker/critic instructions now embed inline JSON schema examples), src/test/java/com/innercosmos/evaluation/TrackARealProviderSmokeEvaluationTest.java (new regression + latency-budget assertions, javadoc), evidence/track-a/A1-living-aurora/** (new), and this status file. No web/**, deploy/**, or contract-delta changes were needed — the fix is entirely internal to how AuroraDualKernelRuntime talks to the model, with no user-visible backend API/response shape change."
   - "This A1 FOLLOW-UP session (adaptive budget policy) touched: src/main/java/com/innercosmos/ai/runtime/DualKernelBudgetPolicy.java (new), src/main/java/com/innercosmos/ai/runtime/AuroraDualKernelRuntime.java (added shouldUseDualKernelForTurn/isAdaptive/explainBudgetDecision + adaptive javadoc; enabled()/generate() internals otherwise unchanged), src/main/java/com/innercosmos/service/impl/AuroraAgentServiceImpl.java (one-line call-site change: .enabled() -> .shouldUseDualKernelForTurn(turnContext)), src/test/java/com/innercosmos/ai/runtime/DualKernelBudgetPolicyTest.java (new), src/test/java/com/innercosmos/evaluation/TrackAAdaptiveDualKernelEvaluationTest.java (new), src/test/java/com/innercosmos/evaluation/TrackAAdaptiveRealProviderSmokeEvaluationTest.java (new), evidence/track-a/A1-living-aurora/README.md (§6 appended, §6/7 reproduction commands updated), evidence/track-a/A1-living-aurora/adaptive-dual-kernel/** (new), and this status file. No web/**, deploy/**, pom.xml, or contract-delta changes. Critic/repair-retry, needsCritic triggers, interruption handling, Self/Constitution/Emergence, relationship evolution and the legacy single/dual switch semantics are all unchanged/preserved — the change is additive (a new adaptive mode plus the policy that powers it)."
+  - "This A2 session (claim confidence decay) touched: src/main/java/com/innercosmos/ai/claim/ClaimConfidenceDecayPolicy.java (new), src/main/java/com/innercosmos/scheduler/ClaimDecaySweepJob.java (new), src/main/java/com/innercosmos/service/ClaimCandidateService.java (added sweepStaleCandidates(int) to the interface), src/main/java/com/innercosmos/service/impl/ClaimCandidateServiceImpl.java (listCandidates now returns decayed confidence and lazily auto-dismisses stale rows; new sweepStaleCandidates implementation), src/test/java/com/innercosmos/ai/claim/ClaimConfidenceDecayPolicyTest.java (new), src/test/java/com/innercosmos/scheduler/ClaimDecaySweepJobTest.java (new), src/test/java/com/innercosmos/service/impl/ClaimCandidateServiceImplIntegrationTest.java (3 new tests appended to the existing Campaign B suite), src/test/java/com/innercosmos/evaluation/TrackAClaimDecayAblationEvaluationTest.java (new), evidence/track-a/A2-memory-profile/** (new), evidence/track-a/README.md (corrected the A1/A2 status column, which had drifted stale from a prior session), and this status file. No web/**, deploy/**, pom.xml, migration, or contract-delta changes — the stored confidence column's meaning/shape is unchanged; only its displayed/decision value is now time-aware. Unified ingestion, correction/withdrawal propagation, and task-aware retrieval — all found to already exist and already be tested — were read and verified but not modified."

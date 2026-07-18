@@ -5,8 +5,8 @@ Track: `docs/tracks/TRACK-A-LIVING-INTELLIGENCE.md`. Status: `docs/goal/tracks/t
 | Workstream | Status | Evidence |
 |---|---|---|
 | A0-quality-laboratory | IN_PROGRESS | [`A0-quality-laboratory/`](A0-quality-laboratory/README.md) |
-| A1-living-aurora | NOT_STARTED | — |
-| A2-memory-profile | NOT_STARTED | — |
+| A1-living-aurora | IN_PROGRESS | [`A1-living-aurora/`](A1-living-aurora/README.md) |
+| A2-memory-profile | IN_PROGRESS | [`A2-memory-profile/`](A2-memory-profile/README.md) |
 | A3-capsule-matching | NOT_STARTED | — |
 | A4-psychology-skills | NOT_STARTED | — |
 | A5-data-rights | NOT_STARTED | — |

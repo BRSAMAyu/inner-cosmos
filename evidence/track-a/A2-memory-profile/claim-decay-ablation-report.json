@@ -1,0 +1,53 @@
+{
+  "suite" : "track-a-claim-decay-ablation-v1",
+  "runs" : [ {
+    "scenarioId" : "TA-DECAY-DEV-01",
+    "scenarioType" : "stale_weak_inference_retired",
+    "variant" : "with_decay_policy",
+    "pass" : true,
+    "detail" : "listed=false status=DISMISSED"
+  }, {
+    "scenarioId" : "TA-DECAY-DEV-01",
+    "scenarioType" : "stale_weak_inference_retired",
+    "variant" : "naive_static",
+    "pass" : true,
+    "detail" : "naive baseline would keep reporting the original confidence forever and never retire this 210-day-old unconfirmed guess (expected true — this IS the gap)"
+  }, {
+    "scenarioId" : "TA-DECAY-HOLD-01",
+    "scenarioType" : "stale_weak_inference_retired",
+    "variant" : "with_decay_policy",
+    "pass" : true,
+    "detail" : "listed=false status=DISMISSED"
+  }, {
+    "scenarioId" : "TA-DECAY-HOLD-01",
+    "scenarioType" : "stale_weak_inference_retired",
+    "variant" : "naive_static",
+    "pass" : true,
+    "detail" : "naive baseline would keep reporting the original confidence forever and never retire this 365-day-old unconfirmed guess (expected true — this IS the gap)"
+  }, {
+    "scenarioId" : "TA-CORRECT-DEV-01",
+    "scenarioType" : "explicit_correction_protected",
+    "variant" : "with_decay_policy",
+    "pass" : true,
+    "detail" : "effectiveConfidence=1.0 after 400 backdated days, status=ACTIVE"
+  }, {
+    "scenarioId" : "TA-CORRECT-DEV-01",
+    "scenarioType" : "explicit_correction_protected",
+    "variant" : "naive_uniform_decay",
+    "pass" : true,
+    "detail" : "naive uniform-decay baseline would erode this explicit correction to 1.8454204149701914E-6 (expected true — this IS the gap the real policy's neverDecays() guard closes)"
+  }, {
+    "scenarioId" : "TA-CORRECT-HOLD-01",
+    "scenarioType" : "explicit_correction_protected",
+    "variant" : "with_decay_policy",
+    "pass" : true,
+    "detail" : "effectiveConfidence=1.0 after 730 backdated days, status=ACTIVE"
+  }, {
+    "scenarioId" : "TA-CORRECT-HOLD-01",
+    "scenarioType" : "explicit_correction_protected",
+    "variant" : "naive_uniform_decay",
+    "pass" : true,
+    "detail" : "naive uniform-decay baseline would erode this explicit correction to 3.4326060235540106E-11 (expected true — this IS the gap the real policy's neverDecays() guard closes)"
+  } ],
+  "unexpectedFailureLedger" : [ ]
+}
