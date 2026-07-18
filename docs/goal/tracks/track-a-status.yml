@@ -7,11 +7,29 @@ minimum_handoff_commit: 7e0688308292cd9d41552c98f576d25681738be0
 base_sha: 14e1b85596034544b7fb291677fb8dd3f8240f1c
 branch: codex/track-a-living-intelligence
 owner: claude-code-track-a
-updated_at: "2026-07-18T19:10:00Z"
+updated_at: "2026-07-18T22:50:00+08:00"
 spec: docs/tracks/TRACK-A-LIVING-INTELLIGENCE.md
 evidence_root: evidence/track-a
 contract_deltas: docs/goal/tracks/track-a-contract-deltas.yml
-current_front: A2-memory-profile
+current_front: A3-capsule-matching
+handoff_checkpoint:
+  status: BUILDER_VERIFIED_IN_PROGRESS
+  scope: "Accepted A3 capsule-vector foundation checkpoint: consent-scoped query material, current-content-hash scoring and bounded asynchronous rebuild. Full A3 quality research remains IN_PROGRESS."
+  implemented:
+    - "Capsule public-safe text construction, embedding entity/mapper/index service and PostgreSQL V18 migration."
+    - "Interactive matching performs one query embedding and scores only already-built current capsule vectors; it never triggers candidate-provider N+1 calls."
+    - "PostgreSQL and local scoring bind model/version rows to each capsule current public-content hash; successful rebuild retires superseded rows."
+    - "A ShedLock-protected bounded rebuild job discovers missing public non-simulator capsules and exposes configurable batch/delay controls."
+    - "Viewer query material excludes LOCAL_ONLY, NO_EXTERNAL_PROCESSING and SIMULATOR sources; unavailable embeddings fail soft to existing hard-filtered strategies."
+  verification:
+    full_suite: "mvnw clean test: 873 tests, 0 failures, 0 errors, 0 skipped."
+    postgres: "PostgreSQL 16 + pgvector + Flyway V1-V18 integration proves vector persistence, current-hash scoring, invalidation and supersession."
+    targeted: "CapsuleMatchingTest 18/18; CapsuleEmbeddingIndexServiceIntegrationTest 2/2; CapsuleEmbeddingPostgresIntegrationTest 1/1."
+    whitespace: "git diff --check PASS before final commit."
+  remaining_quality_work:
+    - "Real-provider latency, cost, backpressure and recall/precision evidence."
+    - "Dynamic Genome fidelity, multi-strategy calibration, complementarity/diversity behavior and blind human quality evaluation."
+    - "End-to-end data-rights propagation beyond the public capsule index, including cached match results and deletion/withdrawal receipts."
 workstreams:
   A0-quality-laboratory:
     status: IN_PROGRESS
@@ -147,7 +165,7 @@ workstreams:
       against a labeled staleness corpus (human gate, same pattern as A1's adaptive-budget-policy
       weights). See evidence/track-a/A2-memory-profile/README.md for full detail and the exact
       real-code-vs-gap audit.
-  A3-capsule-matching: {status: NOT_STARTED, evidence: [], remaining: "Deliver dynamic Genome fidelity and consent-scoped multi-strategy vector matching."}
+  A3-capsule-matching: {status: IN_PROGRESS, evidence: [evidence/track-a/A3-capsule-matching/README.md], remaining: "Foundation checkpoint accepted: current-hash invalidation, dedicated H2/PostgreSQL tests and bounded asynchronous rebuild are complete. Continue real-provider latency/cost/backpressure evaluation, full consent/deletion receipt propagation, dynamic Genome fidelity and blind multi-strategy quality evidence."}
   A4-psychology-skills: {status: NOT_STARTED, evidence: [], remaining: "Ship and evaluate at least three bilingual non-diagnostic product skills."}
   A5-data-rights: {status: NOT_STARTED, evidence: [], remaining: "Cover every derivative, queue, cache, analytics, notification and backup policy."}
   A6-observability-boundaries: {status: NOT_STARTED, evidence: [], remaining: "Add privacy-safe AI signals, failure injection, backend actuator hardening and executable module boundaries."}

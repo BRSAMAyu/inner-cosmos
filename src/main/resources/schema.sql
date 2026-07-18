@@ -443,6 +443,22 @@ CREATE TABLE IF NOT EXISTS tb_capsule_boundary (
   CONSTRAINT fk_boundary_capsule FOREIGN KEY (capsule_id) REFERENCES tb_echo_capsule(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS tb_capsule_embedding (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  capsule_id BIGINT NOT NULL,
+  model_name VARCHAR(128) NOT NULL,
+  model_version VARCHAR(64) NOT NULL,
+  content_hash VARCHAR(64) NOT NULL,
+  dimensions INT NOT NULL,
+  embedding_json TEXT NOT NULL,
+  status VARCHAR(32) DEFAULT 'ACTIVE',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_capsule_embedding_version (capsule_id, model_name, model_version, content_hash),
+  INDEX idx_capsule_embedding_model (model_name, model_version, status),
+  CONSTRAINT fk_capsule_embedding_capsule FOREIGN KEY (capsule_id) REFERENCES tb_echo_capsule(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS tb_capsule_usage_quota (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   visitor_user_id BIGINT NOT NULL,

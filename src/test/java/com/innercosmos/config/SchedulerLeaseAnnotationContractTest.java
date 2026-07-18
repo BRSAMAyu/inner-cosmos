@@ -3,6 +3,7 @@ package com.innercosmos.config;
 import com.innercosmos.ai.goodbye.SessionIdleWatcher;
 import com.innercosmos.scheduler.AuroraProactiveJob;
 import com.innercosmos.scheduler.CapsuleSyncRetryJob;
+import com.innercosmos.scheduler.CapsuleEmbeddingRebuildJob;
 import com.innercosmos.scheduler.LetterDeliveryJob;
 import com.innercosmos.scheduler.NightlyMemorySettlementJob;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
@@ -20,6 +21,7 @@ class SchedulerLeaseAnnotationContractTest {
         Map<Method, String> scheduledMethods = Map.of(
                 LetterDeliveryJob.class.getMethod("deliverArrivedLetters"), "letter-delivery",
                 CapsuleSyncRetryJob.class.getMethod("retryFailedSyncs"), "capsule-sync-retry",
+                CapsuleEmbeddingRebuildJob.class.getMethod("run"), "capsule-embedding-rebuild",
                 AuroraProactiveJob.class.getMethod("run"), "aurora-proactive",
                 NightlyMemorySettlementJob.class.getMethod("nightlyRecalculation"), "nightly-memory-settlement",
                 SessionIdleWatcher.class.getMethod("scan"), "session-idle-goodbye");

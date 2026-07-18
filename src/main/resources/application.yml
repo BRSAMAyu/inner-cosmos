@@ -100,6 +100,11 @@ memory:
     rebuild-batch-size: ${MEMORY_EMBEDDING_REBUILD_BATCH_SIZE:50}
     rebuild-delay-ms: ${MEMORY_EMBEDDING_REBUILD_DELAY_MS:60000}
 
+capsule:
+  embedding:
+    rebuild-batch-size: ${CAPSULE_EMBEDDING_REBUILD_BATCH_SIZE:50}
+    rebuild-delay-ms: ${CAPSULE_EMBEDDING_REBUILD_DELAY_MS:60000}
+
 llm:
   mode: ${LLM_MODE:dev}
   provider: ${LLM_PROVIDER:mock}

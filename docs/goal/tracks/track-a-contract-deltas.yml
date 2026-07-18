@@ -1,7 +1,7 @@
 schema_version: 1
 track_id: TRACK-A
 minimum_handoff_commit: 7e0688308292cd9d41552c98f576d25681738be0
-track_base_sha: null
+track_base_sha: 14e1b85596034544b7fb291677fb8dd3f8240f1c
 status: EMPTY
 instructions: >-
   Track A appends every user-visible backend or OpenAPI change here. Each entry must include
