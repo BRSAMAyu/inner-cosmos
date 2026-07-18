@@ -1,0 +1,21 @@
+{
+  "suite" : "track-a-adaptive-real-provider-smoke-v1",
+  "note" : "No credential VALUES are read into or written by this report — only env VAR NAMES and structural outcomes (status/budget/callCount/latency) are captured.",
+  "runs" : [ {
+    "provider" : "GLM",
+    "scenarioId" : "TA-SES-DEV-01",
+    "status" : "CALLED",
+    "adaptiveBudget" : "SINGLE_PASS",
+    "policyReasons" : [ "simple_turn:no_risk_ambiguity_or_continuity_signal" ],
+    "realModelCallCount" : 1,
+    "latencyMs" : 7151.0491
+  }, {
+    "provider" : "GLM",
+    "scenarioId" : "TA-CRISIS-DEV-01",
+    "status" : "CALLED",
+    "adaptiveBudget" : "DUAL_KERNEL",
+    "policyReasons" : [ "risk:crisis_keyword" ],
+    "realModelCallCount" : 2,
+    "latencyMs" : 12258.8738
+  } ]
+}

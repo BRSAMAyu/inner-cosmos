@@ -305,7 +305,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         Map<String, Object> runtimeMeta = new LinkedHashMap<>();
         try {
             StructuredAiResults.AuroraResult ai;
-            if (dualKernelRuntime != null && dualKernelRuntime.enabled()) {
+            if (dualKernelRuntime != null && dualKernelRuntime.shouldUseDualKernelForTurn(turnContext)) {
                 var generation = dualKernelRuntime.generate(userId, mode, turnContext, resolved.client(),
                     () -> fallbackAuroraResult(request.message, mode, gravityMemories, memoryContext, allowMemory, stateSignal));
                 ai = generation.result();

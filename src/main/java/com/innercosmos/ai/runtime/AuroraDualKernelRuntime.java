@@ -16,10 +16,18 @@ import java.util.function.Supplier;
  * Campaign A runtime: a compact understanding/planning kernel followed by a separate
  * relationship/expression kernel, with a bounded critic only when the plan says risk
  * or the generated response violates observable quality constraints.
+ *
+ * <p><b>Runtime mode</b> ({@code inner-cosmos.aurora.runtime}, default {@code dual}, unchanged
+ * from prior behavior): {@code single} always uses the caller's single-pass path, {@code dual}
+ * always uses this dual-kernel path, and {@code adaptive} (Track A / A1) asks
+ * {@link DualKernelBudgetPolicy} to decide per turn — see
+ * {@link #shouldUseDualKernelForTurn(Map)}, the method callers should use instead of the legacy
+ * {@link #enabled()} boolean when they want turn-level adaptivity.
  */
 @Component
 public class AuroraDualKernelRuntime {
     private final StructuredAiService ai;
+    private final DualKernelBudgetPolicy budgetPolicy = new DualKernelBudgetPolicy();
 
     @Value("${inner-cosmos.aurora.runtime:dual}")
     private String runtimeMode = "dual";
@@ -28,8 +36,37 @@ public class AuroraDualKernelRuntime {
         this.ai = ai;
     }
 
+    /**
+     * Legacy global switch: {@code true} unless the mode is explicitly {@code single}. Kept for
+     * backward compatibility (e.g. existing tests that only ever exercised {@code single}/{@code
+     * dual}); it does NOT make a per-turn decision for {@code adaptive} — callers that want the
+     * turn-level decision must call {@link #shouldUseDualKernelForTurn(Map)} instead.
+     */
     public boolean enabled() {
         return !"single".equalsIgnoreCase(runtimeMode);
+    }
+
+    public boolean isAdaptive() {
+        return "adaptive".equalsIgnoreCase(runtimeMode);
+    }
+
+    /**
+     * The real per-turn routing decision. {@code single} always returns {@code false}, {@code
+     * dual} (and any other/unrecognized value, preserving today's default behavior) always
+     * returns {@code true}, and {@code adaptive} delegates to {@link DualKernelBudgetPolicy}
+     * using the same turn-context map {@link #generate} would receive.
+     */
+    public boolean shouldUseDualKernelForTurn(Map<String, Object> turnContext) {
+        if ("single".equalsIgnoreCase(runtimeMode)) return false;
+        if ("adaptive".equalsIgnoreCase(runtimeMode)) {
+            return budgetPolicy.decide(turnContext).isDualKernel();
+        }
+        return true;
+    }
+
+    /** The {@link DualKernelBudgetPolicy.Decision} for a turn — exposed for logging/evidence, not routing. */
+    public DualKernelBudgetPolicy.Decision explainBudgetDecision(Map<String, Object> turnContext) {
+        return budgetPolicy.decide(turnContext);
     }
 
     public Generation generate(Long userId, String mode, Map<String, Object> assembledContext,

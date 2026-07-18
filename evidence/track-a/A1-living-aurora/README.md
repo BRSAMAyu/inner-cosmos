@@ -122,13 +122,127 @@ visible to a streaming client — see "What is still missing").
   scenarios (unauthorized_memory, forgotten_memory_reference, diagnostic_claim); no new P0 case
   was added this session.
 
-## 6. Reproducing this evidence
+## 6. Adaptive dual-kernel budget policy (this session, follow-up)
+
+This session implemented the top remaining A1 lead recorded in §5 above and in
+`docs/goal/tracks/track-a-status.yml`'s `discoveries`: TRACK-A-LIVING-INTELLIGENCE.md §5's
+"Dual kernel is adaptive, not mandatory. Simple turns should remain fast; high-ambiguity,
+high-continuity or high-risk turns may spend more budget" was previously not a real per-turn
+decision — `AuroraDualKernelRuntime.enabled()` only exposed a global `inner-cosmos.aurora.runtime`
+single/dual switch.
+
+### 6.1 What was built
+
+- `src/main/java/com/innercosmos/ai/runtime/DualKernelBudgetPolicy.java` — a small, dependency-free,
+  stateless per-turn scorer. Given a `Signals` bundle (user message text, whether an interruption is
+  present, how many memories are relevant to this turn, and recent-thread depth) it returns a
+  `Decision(Budget SINGLE_PASS|DUAL_KERNEL, score, reasons)`. It deliberately **reuses** the
+  product's existing risk classifiers instead of inventing a new lexicon:
+  `com.innercosmos.safety.CrisisKeywordRule` and `com.innercosmos.safety.DistressSignalDetector`
+  (both already tuned to distinguish genuine crisis language from casual venting — see their own
+  javadoc). A small dedicated ambiguity-marker list ("说不清楚", "不确定", "拿不准", …) and
+  structural continuity signals (interruption present, ≥2 relevant memories, an established
+  recent-message thread of ≥6) round out the score. Threshold is 2; every signal and its weight is
+  named in a `reasons` list so a decision is always inspectable, never a black box.
+- `AuroraDualKernelRuntime` gained `shouldUseDualKernelForTurn(Map<String,Object> turnContext)` — the
+  real per-turn routing decision callers should use — plus `isAdaptive()` and
+  `explainBudgetDecision(...)` for observability. `inner-cosmos.aurora.runtime` now accepts a third
+  value, `adaptive`, alongside the unchanged `single`/`dual` (default remains `dual`, so no existing
+  deployment's behavior changes unless it opts into `adaptive` explicitly). The legacy `enabled()`
+  boolean is kept as-is for backward compatibility with existing callers/tests that only ever
+  exercised `single`/`dual`.
+- `AuroraAgentServiceImpl`'s single call site that used to gate on `dualKernelRuntime.enabled()` now
+  gates on `dualKernelRuntime.shouldUseDualKernelForTurn(turnContext)` — the only production wiring
+  change this session made. No new field was added to `vo.agentLoop`/the API response shape (the
+  `runtime` value it already reports, `"single-pass.v1"` or `"dual-kernel.v1"`, is unchanged and
+  still selected by the same branch), so **no contract delta was needed** — confirmed by re-reading
+  the diff before writing this section.
+
+### 6.2 Tests
+
+- `src/test/java/com/innercosmos/ai/runtime/DualKernelBudgetPolicyTest.java` — 12 pure, deterministic
+  unit tests (no Spring context, no LLM, no network) covering: a simple gratitude message and a
+  concrete action request both landing on `SINGLE_PASS`; an explicit crisis keyword and a distress
+  signal (without a crisis keyword) both forcing `DUAL_KERNEL`; an ambiguity marker alone forcing
+  `DUAL_KERNEL`; an interruption alone forcing `DUAL_KERNEL`; a single relevant memory alone being
+  *insufficient* while two are *sufficient*; an established thread depth alone being insufficient but
+  combining with one memory reference to cross the threshold; `Signals.from(Map)` correctly reading
+  both the direct scripted-context keys (`relevantMemoryIds`, `interruptionContext`) already used by
+  the sibling ablation tests and the production `unifiedAgentContext` (`AgentContext`) shape; and
+  null/empty context degrading safely to `SINGLE_PASS`.
+- `src/test/java/com/innercosmos/evaluation/TrackAAdaptiveDualKernelEvaluationTest.java` — drives the
+  REAL `AuroraDualKernelRuntime` in `adaptive` mode end to end, mirroring
+  `AuroraAgentServiceImpl`'s exact call pattern (only invoke `generate()` when the policy says dual;
+  otherwise take the fast single-pass path). Reuses six existing types from
+  `track-a-scenario-catalog-v1.json` (both `development` and `frozen_held_out` instances of each, 12
+  scenario runs total): `short_emotional_support` and `action_request` (simple, expect
+  `SINGLE_PASS`), `ambiguous_need` (expect `DUAL_KERNEL` via the ambiguity marker),
+  `interrupted_response` (expect `DUAL_KERNEL` via the interruption signal),
+  `crisis_safe_degradation` (expect `DUAL_KERNEL` via the risk signal), and `long_gap_return` (expect
+  `DUAL_KERNEL` via a high-continuity signal — 3 relevant memories that must be grounded accurately
+  after a long gap without fabricating continuity). All 12 rows matched their expected budget with a
+  clean, honest routing: every `SINGLE_PASS` row's `modulesCalled` contains only `AURORA_CHAT_*`
+  (never touches `AURORA_PLAN`/`AURORA_SPEAKER`/`AURORA_CRITIC`), and every `DUAL_KERNEL` row
+  actually invoked `AURORA_PLAN_*` and `AURORA_SPEAKER_*`. Full report:
+  `evidence/track-a/A1-living-aurora/adaptive-dual-kernel/adaptive-dual-kernel-ablation-report.json`.
+- `src/test/java/com/innercosmos/evaluation/TrackAAdaptiveRealProviderSmokeEvaluationTest.java` —
+  tagged `real-provider` (excluded from the default gate, same discipline as its sibling), drives
+  `adaptive` mode against the REAL GLM provider for one simple scenario and one crisis scenario in
+  the same run. Result this session (`evidence/track-a/A1-living-aurora/adaptive-dual-kernel/adaptive-real-provider-smoke-glm.json`):
+
+  | Scenario | Adaptive budget | Real model calls | Latency |
+  |---|---|---|---|
+  | TA-SES-DEV-01 (gratitude) | `SINGLE_PASS` | 1 | 7.15s |
+  | TA-CRISIS-DEV-01 (crisis) | `DUAL_KERNEL` | 2 | 12.26s |
+
+  This is a genuine, real-network-observed budget difference (not just a policy-internal claim):
+  the same adaptive runtime, against the same real provider, made one call for the simple turn and
+  two for the crisis turn (plan + speaker; the critic did not additionally fire this run), and cost
+  visibly more latency doing so — exactly the "simple turns remain fast, high-risk turns may spend
+  more budget" behavior TRACK-A-LIVING-INTELLIGENCE.md §5 asks for. Only GLM was smoke-tested this
+  session (the fastest provider in this evidence base); DeepSeek/MiniMax adaptive smoke was not run
+  this session for time reasons — see "What is still missing" below.
+
+### 6.3 Verification this session
+
+- `./mvnw test` (full suite): **855 tests, 0 failures, 0 errors** (842 before this session's changes
+  + 13 new: 12 `DualKernelBudgetPolicyTest` cases + 1 `TrackAAdaptiveDualKernelEvaluationTest`).
+- `./mvnw test -Dtest=TrackAAdaptiveRealProviderSmokeEvaluationTest -DexcludedGroups=` (real GLM
+  provider, credentials sourced from `.env.track-a.local`, never printed): 1 test, 0 failures.
+- `powershell -File scripts/scan-secrets.ps1`: see the commit-time run recorded in
+  `docs/goal/tracks/track-a-status.yml`'s `verification`.
+
+### 6.4 What is still missing after this follow-up
+
+- **DeepSeek/MiniMax adaptive real-provider smoke** was not run this session (only GLM) — the
+  routing logic is provider-independent (it never reads provider identity), but a genuine
+  cross-provider latency comparison for `adaptive` mode specifically remains unrun.
+- **The score weights and threshold are a first, reasoned but not tuned, calibration.** They were
+  chosen so the six catalog types used in `TrackAAdaptiveDualKernelEvaluationTest` land where the
+  spec's qualitative examples suggest they should, not derived from a labeled corpus or a
+  precision/recall sweep against a larger scenario set. A future session should widen coverage (the
+  remaining catalog types this session did not target: `disagreement`, `user_correction`,
+  `quiet_hours`, `changing_preference`, `data_withdrawal`, the two capsule types) and consider
+  whether any of them expose a signal this policy does not yet score.
+- **No proactive/WakeIntent integration.** This policy governs the reactive per-turn dual-kernel
+  decision inside `AuroraAgentServiceImpl` only; TRACK-A-LIVING-INTELLIGENCE.md §5's proactive
+  WakeIntent budget logic is a separate, already-existing system (`TrackAProactiveDecisionEvaluationTest`)
+  and was not touched or unified with this policy this session.
+- All items already listed in §5 above (first-visible-message latency instrumentation, a formal
+  non-inferiority statistic, the blind-review pairwise package, deeper interruption ablation
+  variants, and new P0 scenarios) remain open; this session's addition is additive to that list, not
+  a replacement for it.
+
+## 7. Reproducing this evidence
 
 ```bash
 export JAVA_HOME=/path/to/jdk-21
 ./mvnw test -Dtest=TrackARuntimeAblationEvaluationTest,TrackAMemoryAuthorityAblationEvaluationTest,TrackACapsuleGenomeAblationEvaluationTest,TrackAProactiveDecisionEvaluationTest
+# adaptive dual-kernel budget policy (offline/deterministic, always run):
+./mvnw test -Dtest=DualKernelBudgetPolicyTest,TrackAAdaptiveDualKernelEvaluationTest
 # real-provider (manual, needs credentials, never printed):
 export $(grep -v '^#' .env.track-a.local | xargs)
 ./mvnw test -Dtest=TrackARealProviderSmokeEvaluationTest -DexcludedGroups=
+./mvnw test -Dtest=TrackAAdaptiveRealProviderSmokeEvaluationTest -DexcludedGroups=
 # reports land in target/track-a-eval/*.json (gitignored target/; copies checked in here and under A0)
 ```

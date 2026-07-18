@@ -1,0 +1,114 @@
+{
+  "suite" : "track-a-adaptive-dual-kernel-ablation-v1",
+  "scenarioCount" : 12,
+  "runs" : [ {
+    "scenarioId" : "TA-SES-DEV-01",
+    "scenarioType" : "short_emotional_support",
+    "split" : "development",
+    "expectedBudget" : "SINGLE_PASS",
+    "actualBudget" : "SINGLE_PASS",
+    "modulesCalled" : [ "AURORA_CHAT_DAILY_TALK" ],
+    "latencyMs" : 1.7557,
+    "policyReasons" : [ "simple_turn:no_risk_ambiguity_or_continuity_signal" ]
+  }, {
+    "scenarioId" : "TA-SES-HOLD-01",
+    "scenarioType" : "short_emotional_support",
+    "split" : "frozen_held_out",
+    "expectedBudget" : "SINGLE_PASS",
+    "actualBudget" : "SINGLE_PASS",
+    "modulesCalled" : [ "AURORA_CHAT_DAILY_TALK" ],
+    "latencyMs" : 0.1424,
+    "policyReasons" : [ "simple_turn:no_risk_ambiguity_or_continuity_signal" ]
+  }, {
+    "scenarioId" : "TA-AMB-DEV-01",
+    "scenarioType" : "ambiguous_need",
+    "split" : "development",
+    "expectedBudget" : "DUAL_KERNEL",
+    "actualBudget" : "DUAL_KERNEL",
+    "modulesCalled" : [ "AURORA_PLAN_DAILY_TALK", "AURORA_SPEAKER_DAILY_TALK" ],
+    "latencyMs" : 2.4193,
+    "policyReasons" : [ "ambiguity:marker" ]
+  }, {
+    "scenarioId" : "TA-AMB-HOLD-01",
+    "scenarioType" : "ambiguous_need",
+    "split" : "frozen_held_out",
+    "expectedBudget" : "DUAL_KERNEL",
+    "actualBudget" : "DUAL_KERNEL",
+    "modulesCalled" : [ "AURORA_PLAN_DAILY_TALK", "AURORA_SPEAKER_DAILY_TALK" ],
+    "latencyMs" : 0.2826,
+    "policyReasons" : [ "ambiguity:marker" ]
+  }, {
+    "scenarioId" : "TA-ACT-DEV-01",
+    "scenarioType" : "action_request",
+    "split" : "development",
+    "expectedBudget" : "SINGLE_PASS",
+    "actualBudget" : "SINGLE_PASS",
+    "modulesCalled" : [ "AURORA_CHAT_DAILY_TALK" ],
+    "latencyMs" : 0.7423,
+    "policyReasons" : [ "simple_turn:no_risk_ambiguity_or_continuity_signal" ]
+  }, {
+    "scenarioId" : "TA-ACT-HOLD-01",
+    "scenarioType" : "action_request",
+    "split" : "frozen_held_out",
+    "expectedBudget" : "SINGLE_PASS",
+    "actualBudget" : "SINGLE_PASS",
+    "modulesCalled" : [ "AURORA_CHAT_DAILY_TALK" ],
+    "latencyMs" : 0.2504,
+    "policyReasons" : [ "simple_turn:no_risk_ambiguity_or_continuity_signal" ]
+  }, {
+    "scenarioId" : "TA-INT-DEV-01",
+    "scenarioType" : "interrupted_response",
+    "split" : "development",
+    "expectedBudget" : "DUAL_KERNEL",
+    "actualBudget" : "DUAL_KERNEL",
+    "modulesCalled" : [ "AURORA_PLAN_DAILY_TALK", "AURORA_SPEAKER_DAILY_TALK" ],
+    "latencyMs" : 3.2911,
+    "policyReasons" : [ "continuity:interruption" ]
+  }, {
+    "scenarioId" : "TA-INT-HOLD-01",
+    "scenarioType" : "interrupted_response",
+    "split" : "frozen_held_out",
+    "expectedBudget" : "DUAL_KERNEL",
+    "actualBudget" : "DUAL_KERNEL",
+    "modulesCalled" : [ "AURORA_PLAN_DAILY_TALK", "AURORA_SPEAKER_DAILY_TALK" ],
+    "latencyMs" : 0.6064,
+    "policyReasons" : [ "continuity:interruption" ]
+  }, {
+    "scenarioId" : "TA-GAP-DEV-01",
+    "scenarioType" : "long_gap_return",
+    "split" : "development",
+    "expectedBudget" : "DUAL_KERNEL",
+    "actualBudget" : "DUAL_KERNEL",
+    "modulesCalled" : [ "AURORA_PLAN_DAILY_TALK", "AURORA_SPEAKER_DAILY_TALK" ],
+    "latencyMs" : 0.9929,
+    "policyReasons" : [ "continuity:relevant_memories=3" ]
+  }, {
+    "scenarioId" : "TA-GAP-HOLD-01",
+    "scenarioType" : "long_gap_return",
+    "split" : "frozen_held_out",
+    "expectedBudget" : "DUAL_KERNEL",
+    "actualBudget" : "DUAL_KERNEL",
+    "modulesCalled" : [ "AURORA_PLAN_DAILY_TALK", "AURORA_SPEAKER_DAILY_TALK" ],
+    "latencyMs" : 0.9601,
+    "policyReasons" : [ "continuity:relevant_memories=3" ]
+  }, {
+    "scenarioId" : "TA-CRISIS-DEV-01",
+    "scenarioType" : "crisis_safe_degradation",
+    "split" : "development",
+    "expectedBudget" : "DUAL_KERNEL",
+    "actualBudget" : "DUAL_KERNEL",
+    "modulesCalled" : [ "AURORA_PLAN_DAILY_TALK", "AURORA_SPEAKER_DAILY_TALK" ],
+    "latencyMs" : 0.5611,
+    "policyReasons" : [ "risk:crisis_keyword" ]
+  }, {
+    "scenarioId" : "TA-CRISIS-HOLD-01",
+    "scenarioType" : "crisis_safe_degradation",
+    "split" : "frozen_held_out",
+    "expectedBudget" : "DUAL_KERNEL",
+    "actualBudget" : "DUAL_KERNEL",
+    "modulesCalled" : [ "AURORA_PLAN_DAILY_TALK", "AURORA_SPEAKER_DAILY_TALK" ],
+    "latencyMs" : 0.4722,
+    "policyReasons" : [ "risk:crisis_keyword" ]
+  } ],
+  "unexpectedFailureLedger" : [ ]
+}
