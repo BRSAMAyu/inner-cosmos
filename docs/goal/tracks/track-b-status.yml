@@ -44,8 +44,8 @@ commits:
     summary: "docs(track-b): B0 experience observation of the live five-space AppShell"
   - sha: c2524d0
     summary: "fix(track-b): filter QA/service accounts out of People Discovery (pre-existing on branch at session start; recorded here since B0's status entry above predates it)"
-  - sha: PENDING_THIS_SESSION
-    summary: "feat(track-b): in-app AuthGate login/register toggle + Aurora composer reorder -- see evidence/track-b/README.md B1 section for the exact file list; commit hash to be filled after `git commit`"
+  - sha: 93662ed
+    summary: "feat(web): unify login/register into one AppShell entry surface (B1) -- AuthGate component, api.register, Aurora composer reorder; see evidence/track-b/README.md B1 section for the exact file list"
 verification:
   B0_observation:
     method: "Live browser walk via Playwright (evidence/track-b/scripts/observe-b0-journeys.mjs), dev profile, H2 + Mock AI provider, no real keys."
