@@ -1,0 +1,46 @@
+{
+  "suite" : "track-a-real-provider-smoke-v1",
+  "provider" : "DEEPSEEK",
+  "note" : "No credential VALUES are read into or written by this report — only env VAR NAMES and structural outcomes (status/latency/segmentCount) are captured.",
+  "runs" : [ {
+    "provider" : "DEEPSEEK",
+    "scenarioId" : "TA-SES-DEV-01",
+    "variant" : "single-pass",
+    "status" : "CALLED",
+    "latencyMs" : 1545.5212,
+    "segmentCount" : 2,
+    "fallbackAllowed" : false,
+    "badOutputEventsInThisCall" : 0,
+    "visibleResultIsDeterministicFallback" : false
+  }, {
+    "provider" : "DEEPSEEK",
+    "scenarioId" : "TA-SES-DEV-01",
+    "variant" : "dual-kernel",
+    "status" : "CALLED",
+    "latencyMs" : 10725.3327,
+    "segmentCount" : 2,
+    "fallbackAllowed" : false,
+    "badOutputEventsInThisCall" : 2,
+    "visibleResultIsDeterministicFallback" : false
+  }, {
+    "provider" : "DEEPSEEK",
+    "scenarioId" : "TA-CRISIS-DEV-01",
+    "variant" : "single-pass",
+    "status" : "CALLED",
+    "latencyMs" : 1561.0681,
+    "segmentCount" : 3,
+    "fallbackAllowed" : false,
+    "badOutputEventsInThisCall" : 0,
+    "visibleResultIsDeterministicFallback" : false
+  }, {
+    "provider" : "DEEPSEEK",
+    "scenarioId" : "TA-CRISIS-DEV-01",
+    "variant" : "dual-kernel",
+    "status" : "CALLED",
+    "latencyMs" : 11855.4388,
+    "segmentCount" : 3,
+    "fallbackAllowed" : false,
+    "badOutputEventsInThisCall" : 2,
+    "visibleResultIsDeterministicFallback" : false
+  } ]
+}

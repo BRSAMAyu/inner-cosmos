@@ -1,0 +1,47 @@
+{
+  "suite" : "track-a-capsule-genome-ablation-v1",
+  "runs" : [ {
+    "scenarioId" : "TA-CAPFACT-DEV-01",
+    "scenarioType" : "capsule_fact_fidelity",
+    "variant" : "dynamic_genome",
+    "pass" : true,
+    "detail" : "reply present"
+  }, {
+    "scenarioId" : "TA-CAPFACT-HOLD-01",
+    "scenarioType" : "capsule_fact_fidelity",
+    "variant" : "dynamic_genome",
+    "pass" : true,
+    "detail" : "authorizedMemoryIds=[\"11\"]"
+  }, {
+    "scenarioId" : "TA-CAPFACT-HOLD-01",
+    "scenarioType" : "capsule_fact_fidelity",
+    "variant" : "static_card_baseline",
+    "pass" : true,
+    "detail" : "naive concatenation has no authorization gate, so the foreign summary is present verbatim (expected true — this IS the ablation finding)"
+  }, {
+    "scenarioId" : "TA-CAPSTYLE-DEV-01",
+    "scenarioType" : "capsule_style_boundary_fidelity",
+    "variant" : "dynamic_genome",
+    "pass" : true,
+    "detail" : "reply present"
+  }, {
+    "scenarioId" : "TA-CAPSTYLE-HOLD-01",
+    "scenarioType" : "capsule_style_boundary_fidelity",
+    "variant" : "dynamic_genome",
+    "pass" : true,
+    "detail" : "reply=我听见这句话里有一些很重的声音.作为有限的回声,我不能替代现实中的人,但我想说,你现在的感受很重要,值得被一个人真实地听见."
+  }, {
+    "scenarioId" : "TA-CAPSTYLE-HOLD-01",
+    "scenarioType" : "capsule_style_boundary_fidelity",
+    "variant" : "dynamic_genome_metadata",
+    "pass" : true,
+    "detail" : "evaluationJson declares identityDisclosureAllowed invariant"
+  }, {
+    "scenarioId" : "TA-CAPSTYLE-HOLD-01",
+    "scenarioType" : "capsule_style_boundary_fidelity",
+    "variant" : "static_card_baseline_metadata",
+    "pass" : false,
+    "detail" : "a raw concatenated string carries no declared identity-disclosure invariant at all (expected false — this IS the ablation finding: no structural boundary contract)"
+  } ],
+  "unexpectedFailureLedger" : [ ]
+}

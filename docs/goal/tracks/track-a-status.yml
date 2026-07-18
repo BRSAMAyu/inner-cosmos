@@ -1,29 +1,71 @@
 schema_version: 1
 track_id: TRACK-A
 name: Living Intelligence and Data Truth
-status: NOT_STARTED
+status: IN_PROGRESS
 implementation_audit_base: 97500a385a1fa1a5f0e4c3bbb6e2c1b0c895ec61
 minimum_handoff_commit: 7e0688308292cd9d41552c98f576d25681738be0
-base_sha: null
+base_sha: 14e1b85596034544b7fb291677fb8dd3f8240f1c
 branch: codex/track-a-living-intelligence
-owner: unassigned
-updated_at: null
+owner: claude-code-track-a
+updated_at: "2026-07-18T18:00:00Z"
 spec: docs/tracks/TRACK-A-LIVING-INTELLIGENCE.md
 evidence_root: evidence/track-a
 contract_deltas: docs/goal/tracks/track-a-contract-deltas.yml
 current_front: A0-quality-laboratory
 workstreams:
-  A0-quality-laboratory: {status: NOT_STARTED, evidence: [], remaining: "Establish development and frozen held-out scenarios, ablations and reproducible real-provider reporting."}
+  A0-quality-laboratory:
+    status: IN_PROGRESS
+    evidence:
+      - src/test/resources/evaluation/track-a-scenario-catalog-v1.json
+      - src/test/java/com/innercosmos/evaluation/TrackARuntimeAblationEvaluationTest.java
+      - src/test/java/com/innercosmos/evaluation/TrackAMemoryAuthorityAblationEvaluationTest.java
+      - src/test/java/com/innercosmos/evaluation/TrackACapsuleGenomeAblationEvaluationTest.java
+      - src/test/java/com/innercosmos/ai/proactive/TrackAProactiveDecisionEvaluationTest.java
+      - src/test/java/com/innercosmos/evaluation/TrackARealProviderSmokeEvaluationTest.java
+      - evidence/track-a/A0-quality-laboratory/README.md
+      - evidence/track-a/A0-quality-laboratory/runtime-ablation-report.json
+      - evidence/track-a/A0-quality-laboratory/memory-authority-ablation-report.json
+      - evidence/track-a/A0-quality-laboratory/capsule-genome-ablation-report.json
+      - evidence/track-a/A0-quality-laboratory/proactive-decision-quiet-hours-report.json
+      - evidence/track-a/A0-quality-laboratory/proactive-decision-long-gap-return-report.json
+      - evidence/track-a/A0-quality-laboratory/proactive-decision-changing-preference-report.json
+      - evidence/track-a/A0-quality-laboratory/real-provider-smoke/real-provider-smoke-glm.json
+      - evidence/track-a/A0-quality-laboratory/real-provider-smoke/real-provider-smoke-deepseek.json
+      - evidence/track-a/A0-quality-laboratory/real-provider-smoke/real-provider-smoke-minimax.json
+    remaining: >
+      13-type dev+frozen-held-out scenario catalog and 5 ablation suites (single-pass vs
+      dual-kernel; with/without memory-retrieval authority; static-card vs dynamic-Genome; quiet
+      hours/long-gap/changing-preference proactive gates; real-provider smoke across GLM/DeepSeek/
+      MiniMax) are built and green in ./mvnw test. Still missing before COMPLETE: MiMo/ASR smoke
+      run (audio fixture not built this session), non-author review of the held-out set, a
+      human/blind-review pairwise package, cross-referencing this catalog with ai-lab's existing
+      Python harness/manifest, and a single aggregated cross-suite report (today there are 5
+      separate JSON reports, not one). See evidence/track-a/A0-quality-laboratory/README.md section 5.
   A1-living-aurora: {status: NOT_STARTED, evidence: [], remaining: "Optimize adaptive dual-kernel, multi-message timing, interruption/replan and proactive quality."}
   A2-memory-profile: {status: NOT_STARTED, evidence: [], remaining: "Complete temporal claims, task-aware retrieval and correction/withdrawal propagation."}
   A3-capsule-matching: {status: NOT_STARTED, evidence: [], remaining: "Deliver dynamic Genome fidelity and consent-scoped multi-strategy vector matching."}
   A4-psychology-skills: {status: NOT_STARTED, evidence: [], remaining: "Ship and evaluate at least three bilingual non-diagnostic product skills."}
   A5-data-rights: {status: NOT_STARTED, evidence: [], remaining: "Cover every derivative, queue, cache, analytics, notification and backup policy."}
   A6-observability-boundaries: {status: NOT_STARTED, evidence: [], remaining: "Add privacy-safe AI signals, failure injection, backend actuator hardening and executable module boundaries."}
-latest_checkpoint: null
-commits: []
-verification: {}
-human_gates: []
+latest_checkpoint: "pending — filled in by the follow-up status-only commit in this same session (see commits[] below for the SHA once available)"
+commits:
+  - message: "test(track-a): A0 quality-lab ablation suites (runtime/memory/capsule/proactive) + real-provider smoke"
+    sha: "PENDING_NEXT_COMMIT"
+    note: "This entry's sha is filled by a small follow-up commit in the same session, since this file cannot embed its own commit's SHA in advance."
+verification:
+  full_suite: "./mvnw test -> Tests run: 844, Failures: 0, Errors: 0, Skipped: 0 (2026-07-18, this session, JAVA_HOME=JDK 21.0.10)"
+  new_suites_focused: "./mvnw test -Dtest=TrackARuntimeAblationEvaluationTest,TrackAMemoryAuthorityAblationEvaluationTest,TrackACapsuleGenomeAblationEvaluationTest,TrackAProactiveDecisionEvaluationTest -> all green"
+  real_provider_smoke: "./mvnw test -Dtest=TrackARealProviderSmokeEvaluationTest -DexcludedGroups= (env sourced from .env.track-a.local, never printed) -> GLM/DeepSeek/MiniMax all CALLED, 0 provider failures, evidence at evidence/track-a/A0-quality-laboratory/real-provider-smoke/"
+  secret_scan: "pwsh scripts/scan-secrets.ps1 -> PASS: 0 findings"
+human_gates:
+  - "Non-author review of the frozen held-out scenario set (currently authored by the same agent that wrote the ablation logic)."
+  - "Human/blind-review pairwise package for Aurora response quality — this session's real-provider evidence is structural (parse success, latency, fallback-sentinel detection), not a human quality judgment; §5's blind-review deliverable remains open."
+  - "MiMo ASR real-provider smoke needs a human-supplied or recorded audio fixture; MIMO_API_KEY is present in .env.track-a.local but no audio input was available this session."
 blockers: []
-discoveries: []
-handoff_notes: []
+discoveries:
+  - "ai-lab/ (Python) already has a mature dev/held_out/adversarial/compiler_train split, adapters, judges and a real-provider-pairwise CLI (evidence/innovation/INNO-EVAL-001/002/003) — but its adapters are deterministic fixtures that match `expected` by construction, not a harness that drives the real Java runtime. This session's Java suites fill exactly that gap; they are additive, not a replacement, and the two catalogs are not yet cross-referenced (see A0 remaining)."
+  - "AuroraDualKernelRuntime already supports single-vs-dual via the `inner-cosmos.aurora.runtime` property (enabled()/runtimeMode field), so the single-pass-vs-dual-kernel ablation needed no production code change to drive — only ReflectionTestUtils to set the field per test variant."
+  - "Real-provider finding (reproduced identically on GLM, DeepSeek and MiniMax, n=2 scenarios x these 3 providers): production's dual-kernel plan/speaker instructions (AuroraDualKernelRuntime.planInstruction()/speakerInstruction()) do not embed an inline JSON schema example, and every real provider deviated from the expected AuroraPlanResult/AuroraResult field names on the first attempt every single time (badOutputEventsInThisCall=2 on every dual-kernel run vs 0 on single-pass, which does embed a schema example in this test). The repair-retry/critic path still recovered a non-fallback answer every time, but this is a concrete, repeatable A1 prompt-engineering lead, not a lexical guess. Full detail in evidence/track-a/A0-quality-laboratory/README.md section 4."
+handoff_notes:
+  - "Five suites are green under ./mvnw test: TrackARuntimeAblationEvaluationTest, TrackAMemoryAuthorityAblationEvaluationTest, TrackACapsuleGenomeAblationEvaluationTest, TrackAProactiveDecisionEvaluationTest (offline/deterministic, always run) and TrackARealProviderSmokeEvaluationTest (tagged real-provider, excluded from the default gate via pom.xml's excludedGroups property, run explicitly with -DexcludedGroups= plus env credentials)."
+  - "pom.xml changed: added an `excludedGroups` property (default `real-provider`) and wired maven-surefire-plugin's `excludedGroups` to it, so the default gate stays fully offline/deterministic while the real-provider suite remains explicitly runnable — this is the only non-test, non-evidence file this session touched."
