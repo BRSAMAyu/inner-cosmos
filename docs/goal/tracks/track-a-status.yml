@@ -11,7 +11,23 @@ updated_at: "2026-07-18T19:10:00Z"
 spec: docs/tracks/TRACK-A-LIVING-INTELLIGENCE.md
 evidence_root: evidence/track-a
 contract_deltas: docs/goal/tracks/track-a-contract-deltas.yml
-current_front: A2-memory-profile
+current_front: A3-capsule-matching
+handoff_checkpoint:
+  status: WIP_REVIEW_REQUIRED
+  scope: "Consent-scoped capsule embedding and vector-assisted matching foundation. Preserved for continuation; excluded from the reviewed main integration boundary."
+  implemented:
+    - "Capsule public-safe text construction, embedding entity/mapper/index service and PostgreSQL V18 migration."
+    - "Matching adds a semantic signal and fails soft to the existing strategy when embeddings are unavailable."
+    - "Query material excludes LOCAL_ONLY, NO_EXTERNAL_PROCESSING and SIMULATOR sources."
+  verification:
+    targeted_tests: "CapsuleMatchingTest: 18 tests, 0 failed."
+    whitespace: "git diff --check PASS."
+    full_suite: "NOT_RUN for this uncommitted A3 slice; earlier A0-A2 branch checkpoint reported 874/874 after rerun."
+  review_findings:
+    - "PostgreSQL scoring selects MAX across all ACTIVE rows for model/version but does not bind to the capsule's current content hash; stale public-text embeddings can influence ranking after an edit."
+    - "No dedicated CapsuleEmbeddingIndexService integration test proves indexing, invalidation, consent withdrawal, provider failure or PostgreSQL vector scoring."
+    - "First-use indexing is synchronous and potentially N+1; no rebuild job, latency budget, backpressure or real-provider evidence exists."
+    - "A3 dynamic Genome fidelity, multi-strategy evaluation and blind quality evidence remain open."
 workstreams:
   A0-quality-laboratory:
     status: IN_PROGRESS
@@ -147,7 +163,7 @@ workstreams:
       against a labeled staleness corpus (human gate, same pattern as A1's adaptive-budget-policy
       weights). See evidence/track-a/A2-memory-profile/README.md for full detail and the exact
       real-code-vs-gap audit.
-  A3-capsule-matching: {status: NOT_STARTED, evidence: [], remaining: "Deliver dynamic Genome fidelity and consent-scoped multi-strategy vector matching."}
+  A3-capsule-matching: {status: IN_PROGRESS, evidence: [evidence/track-a/A3-capsule-matching/README.md], remaining: "Finish content-hash invalidation, dedicated PostgreSQL integration tests, consent/withdrawal propagation, asynchronous rebuild and latency controls, real-provider evaluation, dynamic Genome fidelity and blind multi-strategy quality evidence. Do not merge this WIP slice into main before those correctness gates close."}
   A4-psychology-skills: {status: NOT_STARTED, evidence: [], remaining: "Ship and evaluate at least three bilingual non-diagnostic product skills."}
   A5-data-rights: {status: NOT_STARTED, evidence: [], remaining: "Cover every derivative, queue, cache, analytics, notification and backup policy."}
   A6-observability-boundaries: {status: NOT_STARTED, evidence: [], remaining: "Add privacy-safe AI signals, failure injection, backend actuator hardening and executable module boundaries."}

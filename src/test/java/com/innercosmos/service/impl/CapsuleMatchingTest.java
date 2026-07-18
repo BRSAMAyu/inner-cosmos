@@ -49,6 +49,7 @@ class CapsuleMatchingTest {
     @Mock CapsuleGenomeService genomeService;
     @Mock DataUseGrantService dataUseGrantService;
     @Mock com.innercosmos.mapper.BlockRelationMapper blockRelationMapper;
+    @Mock com.innercosmos.service.CapsuleEmbeddingIndexService capsuleEmbeddingIndexService;
 
     CapsuleServiceImpl service;
 
@@ -60,11 +61,14 @@ class CapsuleMatchingTest {
     void setUp() {
         service = new CapsuleServiceImpl(echoCapsuleMapper, boundaryMapper, capsuleAgent,
                 memoryCardMapper, userPortraitMapper, authorizedMemoryRefMapper, genomeService, dataUseGrantService,
-                blockRelationMapper, new com.fasterxml.jackson.databind.ObjectMapper());
+                blockRelationMapper, new com.fasterxml.jackson.databind.ObjectMapper(), capsuleEmbeddingIndexService);
         // default: no portrait rows unless a test overrides
         lenient().when(userPortraitMapper.selectList(any())).thenReturn(new ArrayList<>());
         // default: no block relationships unless a test overrides
         lenient().when(blockRelationMapper.selectList(any())).thenReturn(new ArrayList<>());
+        // default: no embedding provider configured (mirrors production DisabledMemoryEmbeddingClient
+        // degrade) unless a test explicitly stubs a semantic similarity map.
+        lenient().when(capsuleEmbeddingIndexService.similarities(any(), any())).thenReturn(Map.of());
         lenient().when(dataUseGrantService.authorize(any(), any())).thenAnswer(invocation -> {
             com.innercosmos.entity.DataUseGrant primary = new com.innercosmos.entity.DataUseGrant();
             primary.id = 7001L;

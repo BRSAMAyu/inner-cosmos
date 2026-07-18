@@ -21,7 +21,9 @@ import com.innercosmos.ai.semantic.PseudoSemanticAnalyzer;
 import com.innercosmos.service.CapsuleService;
 import com.innercosmos.service.ResonanceMatchStrategy;
 import com.innercosmos.service.CapsuleGenomeService;
+import com.innercosmos.service.CapsuleEmbeddingIndexService;
 import com.innercosmos.service.DataUseGrantService;
+import com.innercosmos.util.CapsulePublicTextUtils;
 import com.innercosmos.util.DataMaskingUtils;
 import com.innercosmos.vo.CapsulePreviewVO;
 import org.springframework.stereotype.Service;
@@ -35,6 +37,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.Arrays;
@@ -51,6 +54,7 @@ public class CapsuleServiceImpl implements CapsuleService {
     private final DataUseGrantService dataUseGrantService;
     private final BlockRelationMapper blockRelationMapper;
     private final ObjectMapper objectMapper;
+    private final CapsuleEmbeddingIndexService capsuleEmbeddingIndexService;
 
     public CapsuleServiceImpl(EchoCapsuleMapper capsuleMapper,
                               CapsuleBoundaryMapper boundaryMapper,
@@ -61,7 +65,8 @@ public class CapsuleServiceImpl implements CapsuleService {
                               CapsuleGenomeService genomeService,
                               DataUseGrantService dataUseGrantService,
                               BlockRelationMapper blockRelationMapper,
-                              ObjectMapper objectMapper) {
+                              ObjectMapper objectMapper,
+                              CapsuleEmbeddingIndexService capsuleEmbeddingIndexService) {
         this.capsuleMapper = capsuleMapper;
         this.boundaryMapper = boundaryMapper;
         this.capsuleAgent = capsuleAgent;
@@ -72,6 +77,7 @@ public class CapsuleServiceImpl implements CapsuleService {
         this.dataUseGrantService = dataUseGrantService;
         this.blockRelationMapper = blockRelationMapper;
         this.objectMapper = objectMapper;
+        this.capsuleEmbeddingIndexService = capsuleEmbeddingIndexService;
     }
 
     @Override
@@ -316,6 +322,16 @@ public class CapsuleServiceImpl implements CapsuleService {
     private static final double ENERGY_WEIGHT = 0.18;
     private static final double SEED_BOOST = 0.12;
     private static final double USER_BOOST = 0.06;
+    // A3-capsule-matching: real embedding/vector-similarity signal, ensembled with the lexical
+    // theme-overlap signal above rather than replacing it (multi-strategy: lexical always
+    // available offline; semantic widens recall on paraphrase/no-shared-keyword cases whenever an
+    // embedding provider is configured — see CapsuleEmbeddingIndexService). Contributes to MIRROR
+    // relevance only; capped well below THEME_OVERLAP_CAP so a strong lexical overlap can never be
+    // out-voted by embedding noise, and a zero-lexical-overlap capsule needs a genuinely high
+    // cosine similarity to become resonant at all.
+    private static final double SEMANTIC_SIMILARITY_WEIGHT = 0.5;
+    private static final double SEMANTIC_SIMILARITY_CAP = 0.40;
+    private static final double SEMANTIC_REASON_THRESHOLD = 0.05;
 
     @Override
     public List<Map<String, Object>> matchedCapsules(Long userId) {
@@ -348,16 +364,24 @@ public class CapsuleServiceImpl implements CapsuleService {
         Set<Long> blockedUserIds = blockedCounterparties(userId);
 
         List<EchoCapsule> all = plazaCapsules();
-        List<Map<String, Object>> scored = new ArrayList<>();
+        // Pre-filter to the exact candidate set the scoring loop below will consider, BEFORE
+        // asking the embedding index for similarities — a blocked or self-owned capsule must never
+        // even be sent to the embedding path, let alone surface via a semantic score.
+        List<EchoCapsule> eligible = new ArrayList<>();
         for (EchoCapsule capsule : all) {
-            if (userId.equals(capsule.ownerUserId)) {
-                continue;
-            }
-            if (capsule.ownerUserId != null && blockedUserIds.contains(capsule.ownerUserId)) {
-                continue; // safety filter: never surface a blocked (either-direction) user's capsule
-            }
-            String capText = joinText(capsule.intro,
-                    String.join(" ", parseTags(capsule.publicTags)), capsule.pseudonym);
+            if (userId.equals(capsule.ownerUserId)) continue;
+            if (capsule.ownerUserId != null && blockedUserIds.contains(capsule.ownerUserId)) continue;
+            eligible.add(capsule);
+        }
+        // Consent-scoped query text: the same memories driving userThemeProfile, minus any memory
+        // whose consentScope forbids external processing — mirrors the exact filter
+        // MemoryEmbeddingIndexServiceImpl already applies before sending memory text to a provider.
+        String semanticQueryText = consentScopedSemanticQueryText(memories);
+        Map<Long, Double> semanticScores = capsuleEmbeddingIndexService.similarities(semanticQueryText, eligible);
+
+        List<Map<String, Object>> scored = new ArrayList<>();
+        for (EchoCapsule capsule : eligible) {
+            String capText = CapsulePublicTextUtils.publicSafeText(capsule);
             Map<String, Integer> capsuleThemeProfile = new HashMap<>();
             mergeThemes(capsuleThemeProfile, themesOf(capText));
 
@@ -384,17 +408,33 @@ public class CapsuleServiceImpl implements CapsuleService {
             }
             portraitSignal = Math.min(PORTRAIT_CAP, portraitSignal);
 
+            // semanticSignal: real embedding cosine similarity between the viewer's consent-scoped
+            // profile text and this capsule's public-safe text, widened into a bounded relevance
+            // contribution. 0.0 whenever no embedding provider is configured (graceful degrade to
+            // pure lexical matching, matching MemoryRetrievalService's established pattern).
+            double semanticSimilarity = semanticScores.getOrDefault(capsule.id, 0.0);
+            double semanticSignal = Math.min(SEMANTIC_SIMILARITY_CAP,
+                    Math.max(0.0, semanticSimilarity) * SEMANTIC_SIMILARITY_WEIGHT);
+
             double energyScore = (capsule.echoEnergy == null ? 0.5 : capsule.echoEnergy) * ENERGY_WEIGHT;
             double seedBoost = "SEED_CAPSULE".equals(capsule.capsuleType) ? SEED_BOOST : USER_BOOST;
             // FIX-A: relevance is ONLY the genuinely user-specific signal (themeOverlap +
-            // portraitSignal). seedBoost/energyScore are NOT relevance — they break ties and
-            // shape ordering, but must never make a zero-overlap capsule count as a match.
+            // portraitSignal + semanticSignal). seedBoost/energyScore are NOT relevance — they
+            // break ties and shape ordering, but must never make a zero-overlap capsule count as a
+            // match on their own.
             shared.sort(Comparator
                     .comparingInt((Map.Entry<String, Integer> en) -> -en.getValue())
                     .thenComparingInt(en -> FAMILY_ORDER.indexOf(en.getKey())));
-            List<String> mirrorReasons = shared.stream().limit(5).map(Map.Entry::getKey).toList();
+            List<String> mirrorReasons = new ArrayList<>(shared.stream().limit(5).map(Map.Entry::getKey).toList());
+            // Interpretable reason: only surfaced when the semantic signal meaningfully
+            // contributes, so a viewer can tell a match apart from pure lexical overlap (spec:
+            // "expose understandable reasons and controls").
+            if (semanticSignal >= SEMANTIC_REASON_THRESHOLD) {
+                mirrorReasons.add("语义相近");
+            }
             StrategySignal signal = strategySignal(strategy, userThemeProfile, portraitFamilies,
-                    capsuleThemeProfile.keySet(), capsule.id, themeOverlap + portraitSignal, mirrorReasons);
+                    capsuleThemeProfile.keySet(), capsule.id, themeOverlap + portraitSignal + semanticSignal,
+                    mirrorReasons);
             boolean resonant = signal.relevance() > 0.0;
             double score = Math.min(0.99, signal.relevance() + energyScore + seedBoost);
 
@@ -568,6 +608,29 @@ public class CapsuleServiceImpl implements CapsuleService {
             }
         }
         return sb.toString();
+    }
+
+    /**
+     * A3-capsule-matching: the viewer-side text handed to the embedding provider. Built from the
+     * SAME up-to-24 recent memories driving userThemeProfile, minus any memory whose consentScope
+     * forbids external processing — the identical LOCAL_ONLY/NO_EXTERNAL_PROCESSING exclusion
+     * MemoryEmbeddingIndexServiceImpl already applies before it ever calls a provider. A memory the
+     * owner marked local-only must never leave the process boundary just because it also happens to
+     * be one of their most emotionally weighted memories.
+     */
+    private String consentScopedSemanticQueryText(List<MemoryCard> memories) {
+        List<String> parts = new ArrayList<>();
+        for (MemoryCard memory : memories) {
+            String scope = memory.consentScope == null ? "" : memory.consentScope.toUpperCase(Locale.ROOT);
+            if ("LOCAL_ONLY".equals(scope) || "NO_EXTERNAL_PROCESSING".equals(scope)
+                    || SIMULATOR_CONSENT_SCOPE.equalsIgnoreCase(memory.consentScope)) {
+                continue;
+            }
+            parts.add(joinText(memory.title, memory.summary,
+                    String.join(" ", parseTags(memory.keywordTags)),
+                    String.join(" ", parseTags(memory.emotionTags))));
+        }
+        return String.join(" ", parts).trim();
     }
 
     /** Run the pseudo-semantic analyzer and keep only the 6 real theme families (drop "日常分享"). */
