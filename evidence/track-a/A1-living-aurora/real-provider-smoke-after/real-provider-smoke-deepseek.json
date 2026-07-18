@@ -1,0 +1,53 @@
+{
+  "suite" : "track-a-real-provider-smoke-v1",
+  "provider" : "DEEPSEEK",
+  "note" : "No credential VALUES are read into or written by this report — only env VAR NAMES and structural outcomes (status/latency/segmentCount) are captured.",
+  "runs" : [ {
+    "provider" : "DEEPSEEK",
+    "scenarioId" : "TA-SES-DEV-01",
+    "variant" : "single-pass",
+    "status" : "CALLED",
+    "latencyMs" : 1431.8209,
+    "segmentCount" : 1,
+    "fallbackAllowed" : false,
+    "badOutputEventsInThisCall" : 0,
+    "visibleResultIsDeterministicFallback" : false
+  }, {
+    "provider" : "DEEPSEEK",
+    "scenarioId" : "TA-SES-DEV-01",
+    "variant" : "dual-kernel",
+    "status" : "CALLED",
+    "latencyMs" : 4686.9841,
+    "segmentCount" : 2,
+    "fallbackAllowed" : false,
+    "badOutputEventsInThisCall" : 0,
+    "visibleResultIsDeterministicFallback" : false
+  }, {
+    "provider" : "DEEPSEEK",
+    "scenarioId" : "TA-CRISIS-DEV-01",
+    "variant" : "single-pass",
+    "status" : "CALLED",
+    "latencyMs" : 1721.4629,
+    "segmentCount" : 3,
+    "fallbackAllowed" : false,
+    "badOutputEventsInThisCall" : 0,
+    "visibleResultIsDeterministicFallback" : false
+  }, {
+    "provider" : "DEEPSEEK",
+    "scenarioId" : "TA-CRISIS-DEV-01",
+    "variant" : "dual-kernel",
+    "status" : "CALLED",
+    "latencyMs" : 9960.5462,
+    "segmentCount" : 3,
+    "fallbackAllowed" : false,
+    "badOutputEventsInThisCall" : 0,
+    "visibleResultIsDeterministicFallback" : false
+  } ],
+  "latencyBudget" : {
+    "singlePassCeilingMs" : 30000.0,
+    "dualKernelCeilingMs" : 60000.0,
+    "singlePassLatencyP95Ms" : 1721.4629,
+    "dualKernelLatencyP95Ms" : 9960.5462,
+    "note" : "Nearest-rank P95 over this run's own samples (n=2 scenarios) — an evidence figure, not a statistically robust P95 over a large population."
+  }
+}

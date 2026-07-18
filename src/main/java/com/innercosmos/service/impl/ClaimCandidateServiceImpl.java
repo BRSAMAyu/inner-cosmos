@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.innercosmos.ai.claim.ClaimCandidate;
+import com.innercosmos.ai.claim.ClaimConfidenceDecayPolicy;
 import com.innercosmos.common.ErrorCode;
 import com.innercosmos.dto.CorrectionCommand;
 import com.innercosmos.entity.DialogMessage;
@@ -17,6 +18,7 @@ import com.innercosmos.service.DialogService;
 import com.innercosmos.service.UserCorrectionService;
 import com.innercosmos.vo.ClaimCandidateVO;
 import com.innercosmos.vo.CorrectionConfirmationVO;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -113,18 +115,38 @@ public class ClaimCandidateServiceImpl implements ClaimCandidateService {
         return true;
     }
 
+    /**
+     * Track A / A2 — {@code confidence} is shown at its time-decayed value, and a row whose belief
+     * has decayed below {@link ClaimConfidenceDecayPolicy#DISMISS_THRESHOLD} is dismissed here (lazy,
+     * per-user, on read) rather than left to linger with a stale-but-displayed number. The stored
+     * {@code confidence} column itself is never overwritten by decay — only read-time display and the
+     * stale/dismiss decision use the decayed value — so the original evidence-based confidence
+     * remains available as provenance. See {@link #sweepStaleCandidates(int)} for the
+     * scheduler-driven equivalent that also reaches candidates the owner never revisits.
+     */
     @Override
     public List<ClaimCandidateVO> listCandidates(Long userId) {
         List<UnderstandingClaim> rows = claimMapper.selectList(new QueryWrapper<UnderstandingClaim>()
                 .eq("user_id", userId).eq("status", STATUS_CANDIDATE).orderByDesc("id"));
+        LocalDateTime now = LocalDateTime.now();
         List<ClaimCandidateVO> out = new ArrayList<>();
         for (UnderstandingClaim row : rows) {
+            double base = row.confidence == null ? 0.0 : row.confidence;
+            LocalDateTime reference = row.updatedAt != null ? row.updatedAt : row.createdAt;
+            double effective = ClaimConfidenceDecayPolicy.effectiveConfidence(base, row.authorityLevel, reference, now);
+            if (ClaimConfidenceDecayPolicy.isStale(effective)) {
+                row.status = STATUS_DISMISSED;
+                claimMapper.updateById(row);
+                log.debug("Auto-dismissed stale claim candidate {} for user {} (effective confidence {})",
+                        row.id, userId, effective);
+                continue;
+            }
             JsonNode value = readTree(row.valueJson);
             boolean alreadyActive = claimMapper.selectCount(new QueryWrapper<UnderstandingClaim>()
                     .eq("user_id", userId).eq("claim_key", row.claimKey).eq("status", STATUS_ACTIVE)) > 0;
             out.add(new ClaimCandidateVO(row.id, row.claimType,
                     value.path("value").asText(""), row.authorityLevel,
-                    row.confidence == null ? 0.0 : row.confidence,
+                    effective,
                     decodeIds(value.path("provenanceMessageIds")),
                     value.path("evidenceText").asText(""),
                     value.path("uncertain").asBoolean(false),
@@ -132,6 +154,34 @@ public class ClaimCandidateServiceImpl implements ClaimCandidateService {
                     row.createdAt == null ? null : row.createdAt.toString()));
         }
         return out;
+    }
+
+    /**
+     * Track A / A2 — global batch sweep for candidates the owner never revisits (so decay is a real
+     * background process, not only a side-effect of opening the review list). Scoped to
+     * {@code status=CANDIDATE, sourceType=AUTO_EXTRACTION}; ACTIVE/confirmed claims (explicit user
+     * assertions) are never selected, matching {@link ClaimConfidenceDecayPolicy#neverDecays}.
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int sweepStaleCandidates(int batchSize) {
+        int limit = Math.max(1, batchSize);
+        List<UnderstandingClaim> rows = claimMapper.selectList(new QueryWrapper<UnderstandingClaim>()
+                .eq("status", STATUS_CANDIDATE).eq("source_type", SOURCE_AUTO)
+                .orderByAsc("id").last("LIMIT " + limit));
+        LocalDateTime now = LocalDateTime.now();
+        int dismissed = 0;
+        for (UnderstandingClaim row : rows) {
+            double base = row.confidence == null ? 0.0 : row.confidence;
+            LocalDateTime reference = row.updatedAt != null ? row.updatedAt : row.createdAt;
+            double effective = ClaimConfidenceDecayPolicy.effectiveConfidence(base, row.authorityLevel, reference, now);
+            if (ClaimConfidenceDecayPolicy.isStale(effective)) {
+                row.status = STATUS_DISMISSED;
+                claimMapper.updateById(row);
+                dismissed++;
+            }
+        }
+        return dismissed;
     }
 
     @Override

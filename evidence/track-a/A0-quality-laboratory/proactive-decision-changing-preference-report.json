@@ -1,0 +1,11 @@
+{
+  "suite" : "track-a-proactive-decision-changing-preference",
+  "runs" : [ {
+    "scenarioId" : "TA-PREF-DEV-01",
+    "scenarioType" : "changing_preference",
+    "variant" : "increased_cadence",
+    "pass" : true,
+    "detail" : "a 'more companionship' preference results in a scheduled return"
+  } ],
+  "unexpectedFailureLedger" : [ ]
+}

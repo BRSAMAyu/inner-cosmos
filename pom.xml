@@ -19,6 +19,10 @@
 
     <properties>
         <java.version>21</java.version>
+        <!-- Track A / A0 quality laboratory: real-provider evaluation runs must stay out of the
+             deterministic/offline default gate but be explicitly runnable, e.g.
+             `./mvnw test -Dtest=TrackARealProviderSmokeEvaluationTest -DexcludedGroups=`. -->
+        <excludedGroups>real-provider</excludedGroups>
         <!-- Security patch overrides ahead of the next Boot 3.5 service release. -->
         <tomcat.version>10.1.55</tomcat.version>
         <jackson-bom.version>2.21.4</jackson-bom.version>
@@ -174,6 +178,14 @@
                     <failIfNoTests>true</failIfNoTests>
                     <failIfNoSpecifiedTests>true</failIfNoSpecifiedTests>
                     <argLine>-javaagent:${settings.localRepository}/org/mockito/mockito-core/${mockito.version}/mockito-core-${mockito.version}.jar</argLine>
+                    <!-- Track A / A0 quality laboratory: real-provider evaluation runs are explicit,
+                         separately reported, and never part of the deterministic/offline default
+                         gate (docs/tracks/TRACK-A-LIVING-INTELLIGENCE.md #4). Excluded here so
+                         `./mvnw test` stays offline; run them explicitly with
+                         `-DexcludedGroups=` (empty) plus the required provider env vars set. The
+                         default value lives in the ${excludedGroups} property above so it is
+                         command-line overridable. -->
+                    <excludedGroups>${excludedGroups}</excludedGroups>
                 </configuration>
             </plugin>
             <plugin>

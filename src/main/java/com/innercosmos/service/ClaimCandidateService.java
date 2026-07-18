@@ -28,4 +28,16 @@ public interface ClaimCandidateService {
 
     /** Dismiss a candidate the user rejects; it is marked DISMISSED, not hard-deleted. */
     void dismissCandidate(Long userId, Long candidateId);
+
+    /**
+     * Track A / A2 — global batch sweep (not owner-scoped; this is an internal maintenance pass, not
+     * a user-facing read) that auto-dismisses {@code CANDIDATE} rows whose
+     * {@link com.innercosmos.ai.claim.ClaimConfidenceDecayPolicy#effectiveConfidence} has decayed
+     * below {@link com.innercosmos.ai.claim.ClaimConfidenceDecayPolicy#DISMISS_THRESHOLD}. Confirmed/
+     * ACTIVE claims (explicit user assertions) are never touched — the query is scoped to
+     * {@code status=CANDIDATE, sourceType=AUTO_EXTRACTION} only.
+     *
+     * @return the number of candidates dismissed as stale in this sweep.
+     */
+    int sweepStaleCandidates(int batchSize);
 }

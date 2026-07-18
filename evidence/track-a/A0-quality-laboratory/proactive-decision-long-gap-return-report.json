@@ -1,0 +1,11 @@
+{
+  "suite" : "track-a-proactive-decision-long-gap-return",
+  "runs" : [ {
+    "scenarioId" : "TA-GAP-DEV-01",
+    "scenarioType" : "long_gap_return",
+    "variant" : "with_recency_gate",
+    "pass" : true,
+    "detail" : "returns exactly one gentle check-in after a long silence, not a push barrage"
+  } ],
+  "unexpectedFailureLedger" : [ ]
+}
