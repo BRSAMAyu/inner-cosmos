@@ -81,4 +81,20 @@ describe("CapsuleWorkbench", () => {
     // state, so a synchronous render/assert checks disabled on the original label.
     expect(screen.getByRole("button", { name: "保存边界设置" })).toBeDisabled();
   });
+
+  it("renders the workbench and boundary editor in English when locale is en-SG", () => {
+    render(<CapsuleWorkbench locale="en-SG" capsules={[capsule]} selectedCapsuleId={capsule.id} selectedCapsule={capsule} selectableMemories={[memory]}
+      selectedMemoryIds={[1]} capsuleName="" capsuleIntro="" capsulePreview={null} capsuleBusy={false} genomeHistory={[genomeVersion]} fidelitySummary={[]}
+      sandboxQuestion="" sandboxResult={null} sandboxFeedback={null} onSelectCapsule={() => undefined}
+      onToggleMemory={() => undefined} onCapsuleName={() => undefined} onCapsuleIntro={() => undefined}
+      onPreviewNewCapsule={() => undefined} onCancelPreview={() => undefined} onCreateCapsule={() => undefined}
+      onRecompile={() => undefined} onSandboxQuestion={() => undefined} onRunSandbox={() => undefined}
+      onRateSandbox={() => undefined} onPublish={() => undefined} onPause={() => undefined} onArchive={() => undefined}
+      boundary={boundary} boundaryBusy={false} onSaveBoundary={() => undefined} />);
+    expect(screen.getByRole("heading", { name: "Confirm it's like you before others meet it" })).toBeVisible();
+    expect(screen.getByText("1 capsule")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Generate a new version from the current selection" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Save boundary settings" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Withdraw this capsule" })).toBeVisible();
+  });
 });
