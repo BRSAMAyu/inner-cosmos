@@ -104,4 +104,18 @@ describe("MemoryStarfield", () => {
     expect(screen.getByRole("button", { name: "保存重要度" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "归档这颗记忆" })).toBeDisabled();
   });
+
+  it("renders the starfield, view modes and history in English when locale is en-SG", () => {
+    render(<MemoryStarfield locale="en-SG" starfield={starfield} starfieldBusy={false} onChangeMode={() => undefined}
+      starfieldDetail={null} detailBusy={null} onRevealStar={() => undefined} onCloseDetail={() => undefined}
+      memoryOperations={[operation]} rollbackBusy={null} onRollback={() => undefined} onCorrectMemory={() => undefined}
+      onUpdateImportance={() => undefined} onArchive={() => undefined} />);
+    expect(screen.getByRole("heading", { name: "Your memory isn't a filing cabinet" })).toBeVisible();
+    expect(screen.getByText("1 current memory")).toBeVisible(); // singular
+    expect(screen.getByRole("button", { name: "Time" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "View source & changes" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "This isn't accurate" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Recent memory changes" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Undo this change" })).toBeVisible();
+  });
 });
