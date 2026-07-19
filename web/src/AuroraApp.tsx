@@ -22,6 +22,7 @@ import { DataRightsPanel } from "./components/DataRightsPanel";
 import { LocaleToggle } from "./components/LocaleToggle";
 import type { DataRetractionReceipt } from "./api";
 import { loadLocale, saveLocale, type Locale } from "./i18n";
+import { APP_COPY, type DialogMode } from "./appCopy";
 import { AuthGate } from "./components/AuthGate";
 import { PsychologySkillStudio, SkillSuggestionBanner, type SkillLocale } from "./components/PsychologySkillStudio";
 import { ConnectError, LoadingText } from "./loading";
@@ -796,6 +797,7 @@ export function AuroraApp() {
     window.setTimeout(() => document.querySelector(".skill-studio")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
   };
 
+  const tt = APP_COPY[skillLocale];
   if (mobileState.native && (!hasConfiguredApiBase || apiConfigurationError)) return <main className="login-shell"><div className="login mobile-gate" role="alert">
     <span className="eyebrow">MOBILE ENVIRONMENT GATE</span>
     <h1>这台设备还没有安全后端入口</h1>
@@ -805,7 +807,7 @@ export function AuroraApp() {
   if (authenticated === null) return <main className="login-shell"><div className="login">
     {bootstrapError
       ? <ConnectError message={bootstrapError} onRetry={() => void bootstrap()} />
-      : <LoadingText busy>正在连接你的内宇宙</LoadingText>}
+      : <LoadingText busy>{tt.connecting.replace(/…$/, "")}</LoadingText>}
   </div></main>;
   if (!authenticated) return <AuthGate native={mobileState.native} onSuccess={bootstrap} locale={skillLocale} />;
 
@@ -833,20 +835,20 @@ export function AuroraApp() {
       <header className="hero">
         <div>
           <span className="eyebrow">INNER COSMOS · AURORA</span>
-          <h1>可以被打断的陪伴，<br />才是真的在听。</h1>
-          <p>你不需要等 Aurora 说完。新消息会成为新的理解输入，而不是错误。</p>
-          <div className={`runtime-signal ${auroraSession.runtimeSignal.stage}`} aria-label="Aurora 当前回应状态">
-            <span>{auroraSession.runtimeSignal.stage === "understanding" ? "正在理解" : auroraSession.runtimeSignal.stage === "composing" ? "正在组织" : auroraSession.runtimeSignal.stage === "speaking" ? "正在回应" : "在这里"}</span>
-            {auroraSession.runtimeSignal.runtime === "dual" && <small>理解与表达双核协作</small>}
-            {auroraSession.runtimeSignal.relationshipMove && <small>关系动作 · {auroraSession.runtimeSignal.relationshipMove}</small>}
-            {auroraSession.runtimeSignal.repaired && <small>回应已通过边界复核</small>}
+          <h1>{tt.heroLine1}<br />{tt.heroLine2}</h1>
+          <p>{tt.heroP}</p>
+          <div className={`runtime-signal ${auroraSession.runtimeSignal.stage}`} aria-label={tt.runtimeAria}>
+            <span>{auroraSession.runtimeSignal.stage === "understanding" ? tt.runtimeUnderstanding : auroraSession.runtimeSignal.stage === "composing" ? tt.runtimeComposing : auroraSession.runtimeSignal.stage === "speaking" ? tt.runtimeSpeaking : tt.runtimeHere}</span>
+            {auroraSession.runtimeSignal.runtime === "dual" && <small>{tt.dualCore}</small>}
+            {auroraSession.runtimeSignal.relationshipMove && <small>{tt.relationshipMovePrefix}{auroraSession.runtimeSignal.relationshipMove}</small>}
+            {auroraSession.runtimeSignal.repaired && <small>{tt.repaired}</small>}
           </div>
         </div>
         <div className="orb" aria-hidden="true"><span /></div>
       </header>
 
-      <nav className="modes" aria-label="对话模式">
-        {modes.map(([value, label]) => <button key={value} className={auroraSession.mode === value ? "active" : ""} onClick={() => auroraSession.setMode(value)}>{label}</button>)}
+      <nav className="modes" aria-label={tt.modesAria}>
+        {modes.map(([value]) => <button key={value} className={auroraSession.mode === value ? "active" : ""} onClick={() => auroraSession.setMode(value)}>{tt.modeLabel[value as DialogMode]}</button>)}
       </nav>
 
       {/* The composer sits directly after the hero/mode-picker, before the WakeIntent and
@@ -864,41 +866,41 @@ export function AuroraApp() {
         onDraftChange={auroraSession.setDraft} onSubmit={auroraSession.send} onStop={() => void auroraSession.stop()}
         onTranscribe={async blob => {
           try { const result = await transcribeAudio(blob); return result.text; }
-          catch (error) { setStatus(error instanceof Error ? error.message : "语音转写暂时不可用"); return ""; }
+          catch (error) { setStatus(error instanceof Error ? error.message : tt.transcribeUnavailable); return ""; }
         }} locale={skillLocale} />
 
-      {(mobileState.native || !mobileState.connected) && <section className={`mobile-presence ${mobileState.connected ? "online" : "offline"}`} aria-label="移动端连接状态">
+      {(mobileState.native || !mobileState.connected) && <section className={`mobile-presence ${mobileState.connected ? "online" : "offline"}`} aria-label={tt.mobileAria}>
         <div>
           <span className="eyebrow">AURORA, WITH YOU</span>
-          <strong>{mobileState.connected ? "移动端已连接" : "网络暂时离开了"}</strong>
+          <strong>{mobileState.connected ? tt.mobileConnected : tt.mobileOffline}</strong>
           <p>{mobileState.connected
-            ? `${mobileState.platform.toUpperCase()} · ${mobileState.connectionType} · 回到前台时会从持久化时间线续接`
-            : "你已经看到的内容会留在这里；网络恢复后，Aurora 会重新读取时间线，不会把断线误当成新对话。"}</p>
+            ? tt.mobileConnectedP(mobileState.platform.toUpperCase(), mobileState.connectionType)
+            : tt.mobileOfflineP}</p>
         </div>
         {mobileState.native && <div className="mobile-actions">
-          <button type="button" onClick={() => void requestMobilePush()}>开启回来提醒</button>
-          <button type="button" onClick={() => void requestMobileMicrophone()}>准备语音输入</button>
+          <button type="button" onClick={() => void requestMobilePush()}>{tt.pushBtn}</button>
+          <button type="button" onClick={() => void requestMobileMicrophone()}>{tt.micBtn}</button>
         </div>}
       </section>}
 
-      <section className="returns" aria-label="Aurora 的回来约定">
-        <div className="returns-head"><div><span className="eyebrow">AURORA RETURNS</span><h2>回来约定</h2></div>
-          <div className="return-negotiate"><label>什么时候合适<input aria-label="回来时间" value={auroraSession.returnWhen} onChange={event => auroraSession.setReturnWhen(event.target.value)} /></label>
-          <button type="button" disabled={auroraSession.wakeBusy || !auroraSession.returnWhen.trim()} onClick={() => void auroraSession.scheduleReturn()}>和 Aurora 约好</button></div></div>
-        {auroraSession.wakeIntents.length === 0 ? <p className="returns-empty">现在没有约定。需要时，你可以邀请 Aurora 在合适的时候回来。</p> :
+      <section className="returns" aria-label={tt.returnsAria}>
+        <div className="returns-head"><div><span className="eyebrow">AURORA RETURNS</span><h2>{tt.returnsTitle}</h2></div>
+          <div className="return-negotiate"><label>{tt.whenLabel}<input aria-label={tt.returnTimeAria} value={auroraSession.returnWhen} onChange={event => auroraSession.setReturnWhen(event.target.value)} /></label>
+          <button type="button" disabled={auroraSession.wakeBusy || !auroraSession.returnWhen.trim()} onClick={() => void auroraSession.scheduleReturn()}>{tt.scheduleBtn}</button></div></div>
+        {auroraSession.wakeIntents.length === 0 ? <p className="returns-empty">{tt.returnsEmpty}</p> :
           <div className="return-list">{auroraSession.wakeIntents.map(intent => <article key={intent.id} className="return-card">
-            <div><strong>{intent.reasonForUser}</strong><span>{new Date(intent.preferredAt).toLocaleString("zh-CN", { dateStyle: "short", timeStyle: "short" })}</span><small>{intent.purpose}</small></div>
-            <div className="return-actions"><button type="button" disabled={auroraSession.wakeBusy} onClick={() => void auroraSession.postponeReturn(intent)}>晚一小时</button><button type="button" disabled={auroraSession.wakeBusy} onClick={() => void auroraSession.cancelReturn(intent)}>取消</button></div>
+            <div><strong>{intent.reasonForUser}</strong><span>{new Date(intent.preferredAt).toLocaleString(skillLocale, { dateStyle: "short", timeStyle: "short" })}</span><small>{intent.purpose}</small></div>
+            <div className="return-actions"><button type="button" disabled={auroraSession.wakeBusy} onClick={() => void auroraSession.postponeReturn(intent)}>{tt.postpone}</button><button type="button" disabled={auroraSession.wakeBusy} onClick={() => void auroraSession.cancelReturn(intent)}>{tt.cancel}</button></div>
           </article>)}</div>}
       </section>
 
       {auroraSession.notifications.filter(notice => notice.refType === "WAKE_INTENT").map(notice =>
-        <section className="return-arrival" aria-label="Aurora 按约定回来" key={notice.id}>
+        <section className="return-arrival" aria-label={tt.arrivalAria} key={notice.id}>
           <span className="eyebrow">AURORA RETURNED</span><h2>{notice.title}</h2><p>{notice.body}</p>
-          <a href={`?wakeIntent=${notice.refId}`}>回到当时没说完的地方</a>
-          <div className="return-actions"><button disabled={auroraSession.wakeBusy} onClick={() => void auroraSession.respondToReturn(notice, "MATCHED")}>正合适</button>
-            <button disabled={auroraSession.wakeBusy} onClick={() => void auroraSession.respondToReturn(notice, "LATER")}>晚一点</button>
-            <button disabled={auroraSession.wakeBusy} onClick={() => void auroraSession.respondToReturn(notice, "STOP_SIMILAR")}>不再提醒这类事</button></div>
+          <a href={`?wakeIntent=${notice.refId}`}>{tt.backToUnfinished}</a>
+          <div className="return-actions"><button disabled={auroraSession.wakeBusy} onClick={() => void auroraSession.respondToReturn(notice, "MATCHED")}>{tt.matched}</button>
+            <button disabled={auroraSession.wakeBusy} onClick={() => void auroraSession.respondToReturn(notice, "LATER")}>{tt.later}</button>
+            <button disabled={auroraSession.wakeBusy} onClick={() => void auroraSession.respondToReturn(notice, "STOP_SIMILAR")}>{tt.stopSimilar}</button></div>
         </section>)}
 
       {selfEvolution && <AuroraSelfSpace evolution={selfEvolution} busy={selfBusy}
@@ -986,7 +988,7 @@ export function AuroraApp() {
           onLoad={() => void loadDataRightsReceipts()} locale={skillLocale} />
       </div>
       <div className="state global-state" role="status"><i className={auroraSession.activeTurnId ? "pulse" : ""} />{status}</div>
-      <footer><a href="/pages/dashboard.html">尚未迁移的工具</a><span>五空间 AppShell · 数据与能力持续保留</span><button type="button" onClick={() => void logout()}>安全退出</button></footer>
+      <footer><a href="/pages/dashboard.html">{tt.footerTools}</a><span>{tt.footerTagline}</span><button type="button" onClick={() => void logout()}>{tt.footerSignOut}</button></footer>
     </main>
   );
 }
