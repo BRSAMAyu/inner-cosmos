@@ -807,7 +807,7 @@ export function AuroraApp() {
       ? <ConnectError message={bootstrapError} onRetry={() => void bootstrap()} />
       : <LoadingText busy>正在连接你的内宇宙</LoadingText>}
   </div></main>;
-  if (!authenticated) return <AuthGate native={mobileState.native} onSuccess={bootstrap} />;
+  if (!authenticated) return <AuthGate native={mobileState.native} onSuccess={bootstrap} locale={skillLocale} />;
 
   return (
     <main className="shell" data-product-space={productSpace}>
