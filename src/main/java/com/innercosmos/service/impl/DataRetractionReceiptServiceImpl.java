@@ -2,8 +2,10 @@ package com.innercosmos.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.innercosmos.entity.DataRetractionReceipt;
+import com.innercosmos.event.DataRetractedEvent;
 import com.innercosmos.mapper.DataRetractionReceiptMapper;
 import com.innercosmos.service.DataRetractionReceiptService;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -14,9 +16,12 @@ public class DataRetractionReceiptServiceImpl implements DataRetractionReceiptSe
     private static final int MAX_REASON = 240;
 
     private final DataRetractionReceiptMapper mapper;
+    private final ApplicationEventPublisher eventPublisher;
 
-    public DataRetractionReceiptServiceImpl(DataRetractionReceiptMapper mapper) {
+    public DataRetractionReceiptServiceImpl(DataRetractionReceiptMapper mapper,
+                                            ApplicationEventPublisher eventPublisher) {
         this.mapper = mapper;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -31,6 +36,10 @@ public class DataRetractionReceiptServiceImpl implements DataRetractionReceiptSe
         row.affectedCount = Math.max(0, affectedCount);
         row.reason = trim(reason);
         mapper.insert(row);
+        // Fire a domain event so a durable, replayable data.retracted.v1 outbox row can be written in
+        // this same transaction when the outbox is enabled. No listener when disabled -> no-op.
+        eventPublisher.publishEvent(new DataRetractedEvent(row.id, userId, subjectType, subjectId,
+                derivativeType, action, row.affectedCount));
         return row;
     }
 

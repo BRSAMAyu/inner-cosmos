@@ -78,6 +78,20 @@ Full-suite merge-node verification (this session):
   inventory 79→80, identity columns 77→78) — updated in `PostgresApplicationSmokeTest` /
   `PostgresFlywayBaselineTest`; these guards exist to force exactly that acknowledgement.
 
+Durable/replayable delivery (follow-up):
+- `src/main/java/com/innercosmos/event/DataRetractedEvent.java` — domain event published by
+  `DataRetractionReceiptServiceImpl.record` after each receipt insert (sensitive-free fields).
+- `src/main/java/com/innercosmos/event/reliable/DataRetractedOutboxWriter.java` — mirrors the proven
+  `DialogFinishedOutboxWriter`: on `BEFORE_COMMIT` of the owner data-rights transaction, appends a
+  `data.retracted.v1` row to the transactional JDBC outbox (idempotent dedup key `data-retraction:{id}:v1`),
+  so downstream caches/projections invalidate reliably via the existing worker + inbox dedup + retry
+  instead of only the synchronous in-transaction fan-out. Gated on
+  `inner-cosmos.events.outbox.enabled=true` → default off = no-op, current behavior unchanged.
+- `src/test/java/com/innercosmos/event/reliable/DataRetractedOutboxWriterTest.java` (1) — asserts one
+  sensitive-free row per receipt, keyed by receipt id, with the declared event type/schema version.
+  Receipt-path regressions (DataRights 2/2, correction 1/1, retirement 4/4) stay green with the new
+  ApplicationEventPublisher dependency.
+
 Source→derivative registry (follow-up):
 - `src/main/java/com/innercosmos/service/DataDerivativeRegistry.java` — the single canonical map of
   each subject (MEMORY / CAPSULE / DATA_USE_GRANT) → its derivatives (MEMORY_EMBEDDING /

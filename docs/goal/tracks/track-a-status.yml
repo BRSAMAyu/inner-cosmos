@@ -203,10 +203,13 @@ workstreams:
       single source->derivative registry DataDerivativeRegistry enumerating every subject->derivative
       edge + retraction action, with a reflection completeness guard (DataDerivativeRegistryTest 3/3)
       that fails the build if a new DERIVATIVE_* constant is added without registering how it is
-      retracted/audited — DONE. Still missing before A5 COMPLETE: equivalent erasure/receipts for
-      prompt snapshots/summaries, analytics, notifications and honest backup tombstones; and
-      durable/replayable delivery via the existing outbox (data.retracted.v1) instead of the current
-      synchronous in-transaction fan-out. See evidence/track-a/A5-rights-propagation/README.md.
+      retracted/audited — DONE. (c) durable/replayable delivery: DataRetractionReceiptServiceImpl now
+      publishes a DataRetractedEvent per receipt and DataRetractedOutboxWriter appends a
+      data.retracted.v1 row to the transactional JDBC outbox on BEFORE_COMMIT (mirrors the proven
+      DialogFinishedOutboxWriter; gated on inner-cosmos.events.outbox.enabled, default off = no-op;
+      DataRetractedOutboxWriterTest 1/1 + receipt-path regressions green) — DONE. Still missing before
+      A5 COMPLETE: equivalent erasure/receipts for prompt snapshots/summaries, analytics, notifications
+      and honest backup tombstones. See evidence/track-a/A5-rights-propagation/README.md.
   A6-observability-boundaries:
     status: IN_PROGRESS
     evidence:
