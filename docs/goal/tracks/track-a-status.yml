@@ -7,7 +7,7 @@ minimum_handoff_commit: 7e0688308292cd9d41552c98f576d25681738be0
 base_sha: 14e1b85596034544b7fb291677fb8dd3f8240f1c
 branch: codex/track-a-living-intelligence
 owner: claude-code-track-a
-updated_at: "2026-07-19T19:30:00+08:00"
+updated_at: "2026-07-19T20:20:00+08:00"
 spec: docs/tracks/TRACK-A-LIVING-INTELLIGENCE.md
 evidence_root: evidence/track-a
 contract_deltas: docs/goal/tracks/track-a-contract-deltas.yml
@@ -178,7 +178,9 @@ workstreams:
       - src/main/java/com/innercosmos/service/impl/DataRetractionReceiptServiceImpl.java
       - src/main/java/com/innercosmos/service/CapsuleEmbeddingIndexService.java
       - src/main/resources/db/migration/postgresql/V19__data_retraction_receipts.sql
+      - src/main/java/com/innercosmos/service/impl/UserCorrectionServiceImpl.java
       - src/test/java/com/innercosmos/service/impl/CapsuleEmbeddingRetirementTest.java
+      - src/test/java/com/innercosmos/service/impl/CorrectionEmbeddingPropagationTest.java
       - src/test/java/com/innercosmos/service/impl/CapsuleEmbeddingPostgresIntegrationTest.java
     remaining: >
       THIS SESSION: closed the highest-value machine-verifiable derivative-propagation gap. The
@@ -190,9 +192,14 @@ workstreams:
       three schema mechanisms (Flyway V19, schema.sql, SchemaM18Initializer). Wired erasure + one
       receipt into all three erasure paths; 4 new H2 regressions + an extended PostgreSQL/pgvector
       assertion (24/24 focused green; 144/145 across every touched service, the 1 non-pass being the
-      Docker-gated Postgres test that ERRORED on missing Docker, not a code defect). Still missing
-      before A5 COMPLETE: the single source->derivative registry; equivalent erasure/receipts for
-      memory embeddings on the correction/supersession path, prompt snapshots/summaries, analytics,
+      Docker-gated Postgres test that ERRORED on missing Docker, not a code defect). FOLLOW-UP commit
+      extended propagation to the correction path (UserCorrectionServiceImpl.confirm): a superseded
+      memory's ACTIVE embedding is now marked STALE (MEMORY_EMBEDDING/CLEARED receipt) and a capsule
+      the correction delists has its matching vector erased (CAPSULE_MATCH_INDEX/ERASED receipt),
+      making the correction path consistent with forget/archive/grant-revoke; +1 H2 regression
+      (CorrectionEmbeddingPropagationTest) green with UserCorrectionControllerTest 10/10 unaffected.
+      Still missing before A5 COMPLETE: the single source->derivative registry; equivalent
+      erasure/receipts for prompt snapshots/summaries, analytics,
       notifications and honest backup tombstones; durable/replayable delivery via the existing outbox
       (data.retracted.v1) instead of the current synchronous in-transaction fan-out; and an
       owner-facing audit-trail API (Track A contract delta + Track B integration request). See

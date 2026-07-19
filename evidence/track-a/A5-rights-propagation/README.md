@@ -38,6 +38,13 @@ Audit of live `HEAD` (85b3a5b) found that the newest derivative — the capsule 
    with the correct subject).
 4. Schema across all three mechanisms: Flyway `V19__data_retraction_receipts.sql` (PostgreSQL),
    `schema.sql` (fresh H2), `SchemaM18Initializer` (long-lived non-Flyway H2).
+5. **Correction-path coverage (follow-up commit).** `UserCorrectionServiceImpl.confirm` supersedes
+   memories and delists authorized capsules but touched neither the memory retrieval embedding nor the
+   capsule matching vector. Added: (a) a superseded memory's ACTIVE `tb_memory_embedding` rows are
+   marked `STALE` with a `MEMORY_EMBEDDING`/`CLEARED` receipt (soft — the memory still exists as
+   SUPERSEDED, so the rebuild job re-embeds current content), and (b) a capsule delisted by the
+   correction has its matching vector erased via `retireForCapsule` with a `CAPSULE_MATCH_INDEX`/
+   `ERASED` receipt — making the correction path consistent with forget/archive/grant-revoke.
 
 ## 3. Files
 
@@ -55,8 +62,12 @@ Production:
 - `src/main/resources/db/migration/postgresql/V19__data_retraction_receipts.sql`
 - `src/main/resources/schema.sql`
 
+Correction-path (follow-up):
+- `src/main/java/com/innercosmos/service/impl/UserCorrectionServiceImpl.java`
+
 Tests:
 - `src/test/java/com/innercosmos/service/impl/CapsuleEmbeddingRetirementTest.java` (new, 4 tests, H2)
+- `src/test/java/com/innercosmos/service/impl/CorrectionEmbeddingPropagationTest.java` (new, 1 test, H2)
 - `src/test/java/com/innercosmos/service/impl/CapsuleEmbeddingPostgresIntegrationTest.java`
   (extended: asserts both derived vectors and their pgvector column are erased)
 - `src/test/java/com/innercosmos/service/impl/CapsuleMatchingTest.java` (constructor mock added)
