@@ -70,6 +70,14 @@ Owner-facing audit-trail API (follow-up):
 - `src/main/java/com/innercosmos/vo/DataRetractionReceiptVO.java`
 - Contract delta `TA-DELTA-001` in `docs/goal/tracks/track-a-contract-deltas.yml` (so Track B can build the UI panel)
 
+Full-suite merge-node verification (this session):
+- `./mvnw test` with Docker present → **895 tests, 0 failures, 0 errors, 0 skipped, BUILD SUCCESS**
+  (Testcontainers PostgreSQL 16 + pgvector + Redis all ran). This validates the whole Track A
+  continuation together, not just focused tests. The run also caught two schema-baseline count
+  assertions the V19 migration shifted (tb_% tables 79→80, Flyway migrations 18→19, schema.sql table
+  inventory 79→80, identity columns 77→78) — updated in `PostgresApplicationSmokeTest` /
+  `PostgresFlywayBaselineTest`; these guards exist to force exactly that acknowledgement.
+
 Source→derivative registry (follow-up):
 - `src/main/java/com/innercosmos/service/DataDerivativeRegistry.java` — the single canonical map of
   each subject (MEMORY / CAPSULE / DATA_USE_GRANT) → its derivatives (MEMORY_EMBEDDING /
