@@ -3,9 +3,20 @@ import { AsyncButton } from "../loading";
 
 export type AuroraUiMessage = { key: string; speaker: "USER" | "AURORA"; text: string; partial?: boolean };
 
-export function AuroraConversation({ messages, activeTurnId, draft, sessionReady, onDraftChange, onSubmit, onStop, onTranscribe }: {
+/** The two pre-speech beats worth showing inline; `null` while idle or actively streaming tokens. */
+export type AuroraThinkingStage = "understanding" | "composing" | null;
+
+const THINKING_COPY: Record<"understanding" | "composing", string> = {
+  understanding: "Aurora 正在理解这一刻…",
+  composing: "Aurora 正在组织下一句…"
+};
+
+export function AuroraConversation({ messages, activeTurnId, thinkingStage = null, draft, sessionReady, onDraftChange, onSubmit, onStop, onTranscribe }: {
   messages: AuroraUiMessage[];
   activeTurnId: number | null;
+  /** Derived from the session runtime signal; drives an inline "thinking" beat where the user is
+   * looking, instead of only a far-away hero badge. */
+  thinkingStage?: AuroraThinkingStage;
   draft: string;
   sessionReady: boolean;
   onDraftChange: (value: string) => void;
@@ -50,6 +61,10 @@ export function AuroraConversation({ messages, activeTurnId, draft, sessionReady
         <p>{message.text || "…"}</p>
         {message.partial && message.text && <small>停在这里</small>}
       </article>)}
+      {activeTurnId !== null && thinkingStage && <article className={`message aurora thinking ${thinkingStage}`} aria-label="Aurora 正在思考">
+        <span className="speaker">Aurora</span>
+        <p><span className="thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span>{THINKING_COPY[thinkingStage]}</p>
+      </article>}
     </section>
     <form className="composer" onSubmit={onSubmit}>
       <textarea value={draft} onChange={event => onDraftChange(event.target.value)}

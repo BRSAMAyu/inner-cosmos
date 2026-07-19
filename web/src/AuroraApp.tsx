@@ -823,7 +823,9 @@ export function AuroraApp() {
       {skillSuggestion && <SkillSuggestionBanner suggestion={skillSuggestion} locale={skillLocale}
         onOpen={openSuggestedSkill} onDismiss={() => setSkillSuggestion(null)} />}
 
-      <AuroraConversation messages={auroraSession.messages} activeTurnId={auroraSession.activeTurnId} draft={auroraSession.draft} sessionReady={Boolean(auroraSession.sessionId)}
+      <AuroraConversation messages={auroraSession.messages} activeTurnId={auroraSession.activeTurnId}
+        thinkingStage={auroraSession.activeTurnId !== null && (auroraSession.runtimeSignal.stage === "understanding" || auroraSession.runtimeSignal.stage === "composing") ? auroraSession.runtimeSignal.stage : null}
+        draft={auroraSession.draft} sessionReady={Boolean(auroraSession.sessionId)}
         onDraftChange={auroraSession.setDraft} onSubmit={auroraSession.send} onStop={() => void auroraSession.stop()}
         onTranscribe={async blob => {
           try { const result = await transcribeAudio(blob); return result.text; }

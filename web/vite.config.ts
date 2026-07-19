@@ -41,7 +41,7 @@ export default defineConfig({
         // rule change can silently start caching sensitive API responses.
         runtimeCaching: [
           {
-            urlPattern: ({ url }) => url.pathname.startsWith("/api/"),
+            urlPattern: ({ url }: { url: URL }) => url.pathname.startsWith("/api/"),
             handler: "NetworkOnly",
           },
         ],

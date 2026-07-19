@@ -223,6 +223,12 @@ h1 { margin: 14px 0; font-family: Georgia, "Noto Serif SC", serif; font-size: cl
 .message { max-width: 76%; padding: 15px 18px; border-radius: 5px 20px 20px 20px; background: #2d221b; border: 1px solid #ffffff10; box-shadow: 0 12px 30px #0003; }
 .message.user { align-self: flex-end; border-radius: 20px 5px 20px 20px; background: #d7cbbc; color: #201812; }
 .message.partial { border-style: dashed; opacity: .86; }
+.message.thinking { border-style: dashed; background: #2d221bcc; opacity: .92; }
+.message.thinking p { display: flex; align-items: center; gap: 10px; color: var(--text-muted); font-style: italic; }
+.thinking-dots { display: inline-flex; gap: 4px; }
+.thinking-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent-sage-soft); animation: loading-dot 1.4s infinite; }
+.thinking-dots i:nth-child(2) { animation-delay: .2s; }
+.thinking-dots i:nth-child(3) { animation-delay: .4s; }
 .speaker { display: block; margin-bottom: 7px; color: var(--text-muted); font-size: .72rem; letter-spacing: .08em; }.user .speaker { color: #6b5a3f; }
 .message p { margin: 0; white-space: pre-wrap; line-height: 1.72; }.message small { display: block; margin-top: 8px; color: var(--text-muted); }
 .state { min-height: 30px; color: var(--text-muted); font-size: .86rem; display: flex; align-items: center; gap: 9px; }

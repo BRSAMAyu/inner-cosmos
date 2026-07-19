@@ -7,11 +7,13 @@ minimum_handoff_commit: 7e0688308292cd9d41552c98f576d25681738be0
 base_sha: 14e1b85596034544b7fb291677fb8dd3f8240f1c
 branch: codex/track-b-complete-experience
 owner: claude-code-track-b
-updated_at: "2026-07-18"
+updated_at: "2026-07-19T19:45:00+08:00"
 spec: docs/tracks/TRACK-B-COMPLETE-EXPERIENCE.md
 evidence_root: evidence/track-b
 integration_requests: docs/goal/tracks/track-b-integration-requests.yml
-current_front: B1-product-architecture
+continuation_branch: feat/track-b-complete-experience-cont
+continuation_base_sha: 85b3a5b30519cc5894c6ee4a94fe9844d20bc3ee
+current_front: B2-visible-innovation
 handoff_checkpoint:
   status: IN_PROGRESS
   scope: "Second domain-hook extraction plus explicit PWA install/update UX; this checkpoint supersedes older B1/B5 remaining text where they conflict."
@@ -69,7 +71,30 @@ workstreams:
       - evidence/track-b/scripts/observe-b1-decompose-aurora.mjs
       - evidence/track-b/screenshots/b1-decompose-01..05*.png, observation-log-b1-decompose-aurora.txt
     remaining: "Five of B1's items now done: (1) unified login/register entry surface, (2) Aurora composer reachable without scrolling on mobile+desktop, (3) real client routes (react-router HashRouter) replacing the ?space= query param, (4) single async/task/error model audit, (5) FIRST domain-hook decomposition slice -- the Aurora conversation/session domain (message list, streaming/turn status, interrupt/stop, mode picker, WakeIntent negotiate, session bootstrap/replay) extracted out of AuroraApp.tsx into web/src/hooks/useAuroraSession.ts. Still open: AuroraApp.tsx is down from ~1270 to ~900 lines but still holds every OTHER domain's state as inline useState (memory/starfield, correction/claims, capsule/resonance, connections/letters, psychology skills, portrait, account) -- none of those moved this pass. Several more disabled={busy}-only buttons were deliberately left as documented discoveries (see prior checkpoint) because they share one busy boolean across sibling buttons representing different items (AuroraSelfSpace's propose/evaluate/activate/rollback, MemoryStarfield's mode tabs, ResonanceNetwork's strategy switcher, PsychologySkillStudio's per-run revoke, CapsuleWorkbench's sandbox ratings) -- migrating those safely needs a per-item busy id, which is domain-hook-decomposition-shaped work for whichever domain is extracted next, not a call-site swap; LettersInbox's reply button has no busy tracking at all (a real gap, flagged not fixed). No progressive-disclosure pass on WakeIntent/Self-Emergence panels, and only the five top-level spaces have real routes (nested sub-routes like /cosmos/starfield vs /cosmos/portrait, /resonance/capsule/:id are not yet split out -- productSpaceFromPath already matches nested sub-paths so this is additive, not a rework). HashRouter (not BrowserRouter) is used because Spring's static handling has no /app/aurora/** catch-all -- filed as TB-REQ-002 for a future clean-URL swap."
-  B2-visible-innovation: {status: NOT_STARTED, evidence: [], remaining: "Make living Aurora, Inner Cosmos and resonance differentiation immediately visible."}
+  B2-visible-innovation:
+    status: IN_PROGRESS
+    evidence:
+      - evidence/track-b/B2-visible-innovation/README.md
+      - web/src/hooks/useAuroraSession.ts
+      - web/src/components/AuroraConversation.tsx
+      - web/src/components/AuroraConversation.test.tsx
+      - web/src/hooks/useAuroraSession.test.ts
+      - web/src/AuroraApp.tsx
+      - web/src/styles.css
+    remaining: >
+      THIS SESSION (first B2 slice, Aurora stagecraft): the server's deliberate `segment` pacing
+      event was being dropped by the client and the thinking/planning runtime signal only showed as a
+      far-away hero badge. Added a `segment` handler (reads as a brief "composing next message" beat),
+      an inline aria-labelled thinking beat in AuroraConversation (understanding/composing only, gated
+      on an active turn, hidden while streaming tokens or after the turn ends, reduced-motion-safe),
+      and the one-line AuroraApp wiring. Vitest 200/200 (199 + 1 new; --no-file-parallelism needed
+      only for this machine's memory), production build PASS (18 PWA precache entries),
+      git diff --check clean. Still open: LIVE in-browser verification of the beat during a real
+      streamed turn (deferred this session because C: was at ~0GB free and file-backed H2 boot risked
+      ENOSPC corruption — see evidence README §4); inline memory-provenance chips (need a Track A
+      contract/integration request); and the Inner Cosmos + Resonance B2 items. Also surfaced: the
+      committed package-lock.json is out of sync with package.json (npm ci fails), a pre-existing
+      delivery/B6 infra gap.
   B3-design-content: {status: NOT_STARTED, evidence: [], remaining: "Complete design primitives, content states, responsive polish and visual regression."}
   B4-i18n-a11y: {status: NOT_STARTED, evidence: [], remaining: "Complete Chinese and English/en-SG, WCAG target and manual accessibility checks."}
   B5-pwa-mobile:

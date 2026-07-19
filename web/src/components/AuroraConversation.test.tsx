@@ -29,6 +29,30 @@ describe("AuroraConversation", () => {
     expect(onStop).toHaveBeenCalledOnce();
   });
 
+  it("shows an inline thinking beat only while a turn is active and pre-speech", () => {
+    const { rerender } = render(<AuroraConversation messages={[{ key: "u1", speaker: "USER", text: "在吗" }]}
+      activeTurnId={7} thinkingStage="understanding" draft="" sessionReady
+      onDraftChange={() => undefined} onSubmit={event => event.preventDefault()} onStop={() => undefined} />);
+    expect(screen.getByLabelText("Aurora 正在思考")).toBeVisible();
+    expect(screen.getByText("Aurora 正在理解这一刻…")).toBeVisible();
+
+    rerender(<AuroraConversation messages={[{ key: "u1", speaker: "USER", text: "在吗" }]}
+      activeTurnId={7} thinkingStage="composing" draft="" sessionReady
+      onDraftChange={() => undefined} onSubmit={event => event.preventDefault()} onStop={() => undefined} />);
+    expect(screen.getByText("Aurora 正在组织下一句…")).toBeVisible();
+
+    // No beat once the turn ends, and none while actively streaming tokens (thinkingStage null).
+    rerender(<AuroraConversation messages={[{ key: "u1", speaker: "USER", text: "在吗" }]}
+      activeTurnId={null} thinkingStage="understanding" draft="" sessionReady
+      onDraftChange={() => undefined} onSubmit={event => event.preventDefault()} onStop={() => undefined} />);
+    expect(screen.queryByLabelText("Aurora 正在思考")).not.toBeInTheDocument();
+
+    rerender(<AuroraConversation messages={[{ key: "u1", speaker: "USER", text: "在吗" }]}
+      activeTurnId={7} thinkingStage={null} draft="" sessionReady
+      onDraftChange={() => undefined} onSubmit={event => event.preventDefault()} onStop={() => undefined} />);
+    expect(screen.queryByLabelText("Aurora 正在思考")).not.toBeInTheDocument();
+  });
+
   it("hides the mic button when voice capture is unsupported", () => {
     render(<AuroraConversation messages={[]} activeTurnId={null} draft="" sessionReady
       onDraftChange={() => undefined} onSubmit={event => event.preventDefault()} onStop={() => undefined}

@@ -167,6 +167,12 @@ describe("useAuroraSession -- send / streaming / interrupt", () => {
     act(() => { capturedOnEvent!({ id: "4", type: "bubble.completed", payload: { order: 0 } }); });
     expect(result.current.messages.find(m => m.key === "live-9-0")?.partial).toBe(false);
 
+    // A deliberate inter-bubble pacing break must read as "composing", not be dropped.
+    act(() => { capturedOnEvent!({ id: "4b", type: "segment", payload: { break: true } }); });
+    expect(result.current.runtimeSignal.stage).toBe("composing");
+    act(() => { capturedOnEvent!({ id: "4c", type: "bubble.started", payload: { order: 1 } }); });
+    expect(result.current.runtimeSignal.stage).toBe("speaking");
+
     act(() => { capturedOnEvent!({ id: "5", type: "turn.completed", payload: { message: "done" } }); });
     expect(result.current.activeTurnId).toBeNull();
     expect(result.current.runtimeSignal.stage).toBe("idle");
