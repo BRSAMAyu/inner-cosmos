@@ -41,11 +41,24 @@ ids or the user id.
     that build `AuroraAgentServiceImpl` directly still pass with `aiTurnMetrics == null`, proving the
     no-op guard.
 
-## 4. Remaining / not yet proven
+## 4. Executable domain boundaries (follow-up)
+
+The modular monolith's layering is now enforced by a test, so cross-layer drift fails the build in
+review instead of being discovered later. Rather than add an ArchUnit/bytecode dependency (and a
+network fetch the offline build can't do), this is a **dependency-free** source-scanner:
+
+- `src/test/java/com/innercosmos/architecture/DomainBoundaryArchitectureTest.java` (4 tests) walks
+  `src/main/java/com/innercosmos/<layer>` and asserts no `import com.innercosmos.<forbidden>.`
+  statements. Rules verified to hold today: `entity` imports none of
+  service/controller/mapper/vo/dto/ratelimit/idempotency/scheduler/streaming (pure persistence);
+  `mapper` ↛ service/controller; `service` ↛ controller; `safety` ↛ controller. Violations are
+  reported as `file -> import line`.
+- `./mvnw test -Dtest=DomainBoundaryArchitectureTest` → **4/4**.
+
+## 5. Remaining / not yet proven
 
 - Live-turn emission through the fully-wired Spring context (counter increments on a real chat turn)
   is exercised by any full-context chat integration test at the merge node; a dedicated
   assert-the-counter-incremented `@SpringBootTest` would make it explicit.
-- The rest of A6 remains open: OpenTelemetry distributed spans (not just metrics), failure-injection
-  for timeout/429/malformed/partial-stream with a defined user-visible degradation contract, and
-  executable domain boundaries (Spring Modulith / ArchUnit).
+- Still open: OpenTelemetry distributed spans (not just metrics) and failure-injection for
+  timeout/429/malformed/partial-stream with a defined user-visible degradation contract.

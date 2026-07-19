@@ -7,7 +7,7 @@ minimum_handoff_commit: 7e0688308292cd9d41552c98f576d25681738be0
 base_sha: 14e1b85596034544b7fb291677fb8dd3f8240f1c
 branch: codex/track-a-living-intelligence
 owner: claude-code-track-a
-updated_at: "2026-07-19T20:55:00+08:00"
+updated_at: "2026-07-19T21:20:00+08:00"
 spec: docs/tracks/TRACK-A-LIVING-INTELLIGENCE.md
 evidence_root: evidence/track-a
 contract_deltas: docs/goal/tracks/track-a-contract-deltas.yml
@@ -211,6 +211,7 @@ workstreams:
       - src/main/java/com/innercosmos/ai/observability/AiTurnMetrics.java
       - src/test/java/com/innercosmos/ai/observability/AiTurnMetricsTest.java
       - src/main/java/com/innercosmos/service/impl/AuroraAgentServiceImpl.java
+      - src/test/java/com/innercosmos/architecture/DomainBoundaryArchitectureTest.java
     remaining: >
       THIS SESSION: privacy-safe per-turn AI metrics (aurora.turn.count counter + aurora.turn.latency
       timer) tagged only with bounded non-sensitive dimensions (route/runtime/provider/mode/fallback/
@@ -218,10 +219,13 @@ workstreams:
       AuroraAgentServiceImpl via the class's own @Autowired(required=false) optional-injection idiom
       (no constructor/legacy-test churn; no-op when unwired). AiTurnMetricsTest 2/2 (incl. a
       privacy-safety allowlist regression); the two constructor-level unit tests stay green with the
-      null guard. Still open: OpenTelemetry distributed spans; failure injection (timeout/429/
-      malformed/partial-stream) with a user-visible degradation contract; executable domain boundaries
-      (Spring Modulith / ArchUnit); explicit assert-the-counter-incremented live-turn @SpringBootTest;
-      and the scheduler/Testcontainer shutdown-noise cleanup.
+      null guard. FOLLOW-UP: executable domain boundaries added dependency-free
+      (DomainBoundaryArchitectureTest, 4/4) — a source-scanner enforcing entity ↛
+      service/controller/mapper/vo/dto/…, mapper ↛ service/controller, service ↛ controller, safety ↛
+      controller (chosen over ArchUnit to avoid a new dependency + offline network fetch). Still open:
+      OpenTelemetry distributed spans; failure injection (timeout/429/malformed/partial-stream) with a
+      user-visible degradation contract; explicit assert-the-counter-incremented live-turn
+      @SpringBootTest; and the scheduler/Testcontainer shutdown-noise cleanup.
 latest_checkpoint: "2c11dfb7d71fb632147b4408f8510bbe713d10b5"
 commits:
   - message: "test(track-a): A0 quality-lab ablation suites + real-provider smoke evidence"
