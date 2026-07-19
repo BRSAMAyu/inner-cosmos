@@ -66,8 +66,14 @@ Booted the real app (dev H2 + Mock), registered, opened the Me space and drove t
   voice-input labels, and the stop / interrupt-send / send controls. `AuroraApp` passes
   `locale={skillLocale}`. AuroraConversation.test now 6/6 (+1 en-SG case).
 
+## 3e. AccountSettings migrated — the Me space is now fully bilingual (follow-up)
+- `AccountSettings` (export / change-password / delete-account, including the client-side validation
+  messages and the irreversibility warning) now renders via a `Record<Locale, …>` map;
+  `AuroraApp` passes `locale={skillLocale}`. With MeSpace + DataRightsPanel + LocaleToggle already
+  bilingual, the **entire Me / 控制与边界 space is now bilingual**. AccountSettings.test 5/5.
+
 ## 4. Remaining
-- Migrated so far: DataRightsPanel, the LocaleToggle switcher, the MeSpace hub, and the Aurora
-  conversation surface. The remaining space bodies (Cosmos / Resonance / Letters and their
-  sub-components) are still Chinese-only; each adopts the `locale` prop incrementally using this seam.
+- Fully bilingual now: the Me space (MeSpace, AccountSettings, DataRightsPanel, LocaleToggle) and the
+  Aurora conversation surface. The remaining space bodies (Cosmos / Resonance / Letters composer and
+  their sub-components) are still Chinese-only; each adopts the `locale` prop incrementally via this seam.
 - WCAG/a11y audit and non-author en-SG copy review remain open B4 items.

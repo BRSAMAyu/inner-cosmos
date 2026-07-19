@@ -58,4 +58,18 @@ describe("AccountSettings", () => {
     expect(screen.getByRole("button", { name: "导出数据" })).toBeDisabled();
     expect(screen.getByText("数据已导出")).toBeVisible();
   });
+
+  it("renders in English and validates in English when locale is en-SG", () => {
+    const onChangePassword = vi.fn();
+    render(<AccountSettings locale="en-SG" busy={null} message={null} onChangePassword={onChangePassword}
+      onExportData={() => undefined} onDeleteAccount={() => undefined} />);
+    expect(screen.getByRole("heading", { name: "Account & data" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Change password" }));
+    fireEvent.change(screen.getByPlaceholderText("Current password"), { target: { value: "old-pass" } });
+    fireEvent.change(screen.getByPlaceholderText("New password (at least 8 characters)"), { target: { value: "short" } });
+    fireEvent.change(screen.getByPlaceholderText("Re-enter new password"), { target: { value: "short" } });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm change" }));
+    expect(screen.getByText("New password must be at least 8 characters")).toBeVisible();
+    expect(onChangePassword).not.toHaveBeenCalled();
+  });
 });

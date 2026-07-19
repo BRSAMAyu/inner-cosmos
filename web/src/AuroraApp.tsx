@@ -980,7 +980,7 @@ export function AuroraApp() {
         <PortraitView dimensions={portrait} history={portraitHistory} calibrated={portraitCalibrated} busyDim={portraitBusy}
           onLoadHistory={dim => void loadPortraitHistory(dim)} onCalibrate={(dim, oldValue, newValue) => void submitPortraitCalibration(dim, oldValue, newValue)} />
         <AccountSettings busy={accountBusy} message={accountMessage} onChangePassword={(oldPassword, newPassword) => void changeAccountPassword(oldPassword, newPassword)}
-          onExportData={() => void exportAccountData()} onDeleteAccount={password => void deleteAccount(password)} />
+          onExportData={() => void exportAccountData()} onDeleteAccount={password => void deleteAccount(password)} locale={skillLocale} />
         <LocaleToggle locale={skillLocale} onChange={changeLocale} />
         <DataRightsPanel receipts={dataRightsReceipts} loading={dataRightsLoading} loaded={dataRightsLoaded}
           onLoad={() => void loadDataRightsReceipts()} locale={skillLocale} />
