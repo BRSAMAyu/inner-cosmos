@@ -79,10 +79,19 @@ AuthGate, AuroraConversation, MeSpace, AccountSettings, DataRightsPanel, LocaleT
 UnderstandingCorrection, MemoryStarfield, AuroraSelfSpace, PeopleDiscovery, PlazaDirectory,
 ResonanceNetwork, CapsuleWorkbench, LettersInbox. Full Vitest **227/227**; build PASS.
 
+## 3g. AuroraApp shell strings migrated (follow-up)
+The static strings inlined in the 1000-line `AuroraApp.tsx` shell now come from a typed
+`web/src/appCopy.ts` (`APP_COPY: Record<Locale, …>`) keyed by `skillLocale`: the Aurora hero banner +
+runtime-signal labels, dialog-mode labels, the mobile-presence section, the returns/wake-intent cards
+and arrival prompts, the connecting state, the footer, and the transcribe-unavailable status. Dates
+render in the active locale. tsc validates every key. Build PASS; full Vitest **227/227**.
+
 ## 4. Remaining
-- Component-level i18n is essentially complete (all five spaces + auth switch language end to end via
-  the shared LocaleToggle). What's left: a handful of strings inlined directly in `AuroraApp.tsx`
-  (the Aurora hero banner + mobile-presence section + a few transient status-banner messages) and any
-  minor sub-panels; these live in the 1000-line shell rather than a component, so they're migrated as
-  a separate focused pass. WCAG/a11y audit and non-author en-SG copy review also remain.
+- B4 i18n is code-complete across **all component surfaces AND the AuroraApp shell** — switching
+  language now translates the entire product end to end (all five spaces + auth + shell chrome).
+- Only the many transient async `setStatus(...)` toast messages in AuroraApp handlers are still
+  Chinese-literal (low-visibility, dozens of call sites) — a mechanical follow-up.
+- Non-code B4 items remain: WCAG/a11y audit and a non-author en-SG copy review; plus a live
+  end-to-end bilingual smoke of the shell (the shell has no isolated unit test — verified here via
+  tsc + the full suite, which is why a browser smoke is the recommended next check).
 - WCAG/a11y audit and non-author en-SG copy review remain open B4 items.
