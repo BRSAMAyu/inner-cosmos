@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { capsulePath, initialProductSpace, letterThreadPath, productSpaceFromPath, ProductShellNavigation, resourceFromPath, spacePath } from "./ProductShell";
+import { capsulePath, initialProductSpace, letterThreadPath, MeSpace, productSpaceFromPath, ProductShellNavigation, resourceFromPath, spacePath } from "./ProductShell";
 
 afterEach(cleanup);
 
@@ -75,5 +75,22 @@ describe("ProductShell", () => {
     render(<ProductShellNavigation active="aurora" onNavigate={onNavigate} />);
     fireEvent.click(screen.getByRole("button", { name: /^共鸣/ }));
     expect(onNavigate).toHaveBeenCalledWith("resonance");
+  });
+
+  it("renders the Me control hub bilingually and pluralizes English counts", () => {
+    const props = {
+      native: false, connected: true, wakeIntentCount: 1, activeClaimCount: 2,
+      publicCapsuleCount: 1, friendCount: 3, onNavigate: () => undefined,
+      onRequestPush: () => undefined, onRequestMicrophone: () => undefined, onLogout: () => undefined
+    };
+    const { rerender } = render(<MeSpace {...props} locale="zh-CN" />);
+    expect(screen.getByRole("heading", { name: "由你决定，Aurora 怎样参与。" })).toBeVisible();
+    expect(screen.getByText("1 个有效约定")).toBeVisible();
+
+    rerender(<MeSpace {...props} locale="en-SG" />);
+    expect(screen.getByRole("heading", { name: "You decide how Aurora takes part." })).toBeVisible();
+    expect(screen.getByText("1 active plan")).toBeVisible(); // singular
+    expect(screen.getByText("1 public capsule · 3 mutual connections")).toBeVisible(); // singular + plural
+    expect(screen.getByRole("button", { name: "Sign out of this device" })).toBeVisible();
   });
 });

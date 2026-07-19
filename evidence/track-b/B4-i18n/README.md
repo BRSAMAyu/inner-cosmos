@@ -53,7 +53,15 @@ Booted the real app (dev H2 + Mock), registered, opened the Me space and drove t
   stale bundle is served after a rebuild until the SW is updated — hard-reload / SW-update needed to
   see new code (relevant to B5's update flow; the reload beat was already added there).
 
+## 3c. Me control hub migrated (follow-up)
+- `MeSpace` (the 我的 / 控制与边界 hub in `ProductShell.tsx`) is now fully bilingual via a
+  `Record<Locale, …>` copy map, with English count pluralization (`1 active plan` /
+  `3 mutual connections`); `AuroraApp` passes `locale={skillLocale}`. So switching language now
+  translates the whole Me space (switcher + panel + hub), not just the data-rights panel.
+- ProductShell.test now 12/12 (added a bilingual MeSpace case).
+
 ## 4. Remaining
-- This is groundwork + one migrated surface (DataRightsPanel) + the switcher, not full coverage. The
-  rest of the shell is still Chinese-only; each surface adopts the `locale` prop incrementally.
+- Migrated so far: DataRightsPanel, the LocaleToggle switcher, and the MeSpace hub. The other spaces
+  (Aurora / Cosmos / Resonance / Letters bodies) are still Chinese-only; each adopts the `locale` prop
+  incrementally using this seam.
 - WCAG/a11y audit and non-author en-SG copy review remain open B4 items.

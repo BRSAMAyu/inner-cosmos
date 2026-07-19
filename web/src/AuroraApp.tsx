@@ -976,7 +976,7 @@ export function AuroraApp() {
           activeClaimCount={claims.filter(claim => claim.status === "ACTIVE").length}
           publicCapsuleCount={capsules.filter(capsule => capsule.visibilityStatus === "PUBLIC").length}
           friendCount={connectionsAndLetters.friends.length} onNavigate={navigateSpace} onRequestPush={() => void requestMobilePush()}
-          onRequestMicrophone={() => void requestMobileMicrophone()} onLogout={() => void logout()} />
+          onRequestMicrophone={() => void requestMobileMicrophone()} onLogout={() => void logout()} locale={skillLocale} />
         <PortraitView dimensions={portrait} history={portraitHistory} calibrated={portraitCalibrated} busyDim={portraitBusy}
           onLoadHistory={dim => void loadPortraitHistory(dim)} onCalibrate={(dim, oldValue, newValue) => void submitPortraitCalibration(dim, oldValue, newValue)} />
         <AccountSettings busy={accountBusy} message={accountMessage} onChangePassword={(oldPassword, newPassword) => void changeAccountPassword(oldPassword, newPassword)}
