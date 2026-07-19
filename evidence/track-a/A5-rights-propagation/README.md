@@ -65,6 +65,11 @@ Production:
 Correction-path (follow-up):
 - `src/main/java/com/innercosmos/service/impl/UserCorrectionServiceImpl.java`
 
+Owner-facing audit-trail API (follow-up):
+- `src/main/java/com/innercosmos/controller/DataRightsController.java` — `GET /api/me/data-rights/receipts`
+- `src/main/java/com/innercosmos/vo/DataRetractionReceiptVO.java`
+- Contract delta `TA-DELTA-001` in `docs/goal/tracks/track-a-contract-deltas.yml` (so Track B can build the UI panel)
+
 Tests:
 - `src/test/java/com/innercosmos/service/impl/CapsuleEmbeddingRetirementTest.java` (new, 4 tests, H2)
 - `src/test/java/com/innercosmos/service/impl/CorrectionEmbeddingPropagationTest.java` (new, 1 test, H2)
