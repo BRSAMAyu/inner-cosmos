@@ -102,6 +102,9 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     private ConversationChoreographyService choreographyService;
     @Autowired(required = false)
     private AuroraDualKernelRuntime dualKernelRuntime;
+    /** A6 privacy-safe AI metrics; Spring always wires it, null only in constructor-level unit tests. */
+    @Autowired(required = false)
+    private com.innercosmos.ai.observability.AiTurnMetrics aiTurnMetrics;
     private final Map<Long, Integer> turnCounter = new ConcurrentHashMap<>();
     private final Map<Long, Integer> goodbyeConfirmCount = new ConcurrentHashMap<>();
     private AuroraStreamStageStore streamStageStore =
@@ -186,6 +189,8 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
      */
     private AuroraReplyVO produceReply(Long userId, ChatRequest request, SafetyResult safety,
                                        Long userMessageId, Long turnId, boolean persistImmediately) {
+        long turnStartNanos = System.nanoTime();
+        boolean fallbackUsed = false;
         // M7: Hard boundary protection — right to refuse identity violation
         String boundaryRefusal = checkHardBoundaries(request.message, userId);
         if (boundaryRefusal != null) {
@@ -217,6 +222,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                             saved == null ? List.of() : List.of(saved));
                 }
             }
+            recordTurnMetrics("boundary-refusal", vo, null, normalizeMode(request.mode), false, turnStartNanos);
             return vo;
         }
 
@@ -332,6 +338,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         } catch (Exception e) {
             log.error("Aurora agent call failed after retries: {}", e.getMessage(), e);
             vo = differentiatedFallback(e, request.message, mode, stateSignal);
+            fallbackUsed = true;
         }
         // Tag the response with the resolved provider/model for the UI
         vo.aiState = aiState(resolved);
@@ -404,7 +411,21 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         // Goodbye trigger detection: check user message for goodbye intent
         afterMessage(userId, request.sessionId, request.message);
 
+        recordTurnMetrics("chat", vo, resolved, mode, fallbackUsed, turnStartNanos);
         return vo;
+    }
+
+    /** A6: emit the privacy-safe per-turn counter/timer. No-op when metrics are not wired. */
+    private void recordTurnMetrics(String route, AuroraReplyVO vo, ResolvedModel resolved, String mode,
+                                   boolean fallbackUsed, long startNanos) {
+        if (aiTurnMetrics == null) return;
+        String runtime = vo != null && vo.agentLoop != null && vo.agentLoop.get("runtime") instanceof String r
+                ? r : "single-pass.v1";
+        String provider = resolved == null || resolved.provider() == null
+                ? llmConfig.activeProvider() : resolved.provider();
+        boolean memoryReferenced = vo != null && Boolean.TRUE.equals(vo.memoryReferenced);
+        long durationMs = (System.nanoTime() - startNanos) / 1_000_000L;
+        aiTurnMetrics.recordTurn(route, runtime, provider, mode, fallbackUsed, memoryReferenced, durationMs);
     }
 
     private void afterMessage(Long userId, Long sessionId, String userMessage) {
