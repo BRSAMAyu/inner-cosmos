@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { capsulePath, initialProductSpace, productSpaceFromPath, ProductShellNavigation, resourceFromPath, spacePath } from "./ProductShell";
+import { capsulePath, initialProductSpace, letterThreadPath, productSpaceFromPath, ProductShellNavigation, resourceFromPath, spacePath } from "./ProductShell";
 
 afterEach(cleanup);
 
@@ -51,6 +51,11 @@ describe("ProductShell", () => {
   it("builds a shareable capsule deep link that round-trips through resourceFromPath", () => {
     expect(capsulePath(42)).toBe("/resonance/capsule/42");
     expect(resourceFromPath(capsulePath(42))).toEqual({ space: "resonance", resource: "capsule", id: 42 });
+  });
+
+  it("builds a shareable letter-thread deep link that round-trips through resourceFromPath", () => {
+    expect(letterThreadPath(9)).toBe("/connections/letters/thread/9");
+    expect(resourceFromPath(letterThreadPath(9))).toEqual({ space: "letters", resource: "thread", id: 9 });
   });
 
   it("falls back to aurora for the root path and any unrecognized path", () => {

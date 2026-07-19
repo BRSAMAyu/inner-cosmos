@@ -60,6 +60,11 @@ export function capsulePath(id: number): string {
   return `${spacePaths.resonance}/capsule/${id}`;
 }
 
+/** Shareable deep link to one slow-letter thread inside the connections space. */
+export function letterThreadPath(id: number): string {
+  return `${spacePaths.letters}/thread/${id}`;
+}
+
 export function ProductShellNavigation({ active, onNavigate }: { active: ProductSpace; onNavigate: (space: ProductSpace) => void }) {
   return <nav className="app-shell-nav" aria-label="Inner Cosmos 五个空间">
     <div className="app-mark"><span aria-hidden="true">✦</span><strong>Inner Cosmos</strong></div>

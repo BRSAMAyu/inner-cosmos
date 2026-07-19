@@ -30,9 +30,13 @@ The five-space router already resolves nested paths to the right space; this add
 - Full suite `npm test -- --run --no-file-parallelism` → **206/206**; `npm run build` PASS (18 PWA
   precache entries), static assets rebuilt.
 
+## 3b. Second resource route — letter threads (follow-up)
+- `letterThreadPath(id)` → `/connections/letters/thread/:id`, round-trips through `resourceFromPath`
+  (`{space:letters, resource:"thread", id}`). `AuroraApp` opens that thread on deep-link entry (effect)
+  and navigates to the path when a thread is opened. ProductShell.test now 11/11.
+
 ## 4. Remaining
-- Live in-browser deep-link check (open `/resonance/capsule/:id` → that capsule is selected) is a
-  follow-up — exercising it requires creating a capsule first; the parser round-trip + wiring are
-  deterministically covered here.
-- Other resource routes (`/connections/letters/:id`, `/cosmos/portrait`) can follow the same
-  `resourceFromPath` pattern; only the capsule link is wired this slice.
+- Live in-browser deep-link check (open `/resonance/capsule/:id` or `/connections/letters/thread/:id`)
+  is a follow-up — exercising it needs a capsule/thread to exist first; the parser round-trips + wiring
+  are deterministically covered here.
+- `/cosmos/portrait` (and other sub-views) can follow the same `resourceFromPath` pattern.

@@ -4,7 +4,7 @@ import { Capacitor } from "@capacitor/core";
 import { api, apiConfigurationError, configureBearerAuth, hasConfiguredApiBase, transcribeAudio, type ClaimCandidate, type CapsuleBoundary, type CapsuleFidelitySummary, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type PersonaMessage, type PersonaSession, type PortraitDimension, type PublicCapsule, type PortraitHistoryEntry, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type PsychologySkillSuggestion, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type StarfieldDetail, type StarfieldScene, type StarfieldStar, type UnderstandingClaim, type UserCorrection } from "./api";
 import { initialMobileState, mobileRuntime, type MobileRuntimeState } from "./mobile";
 import { mobileOidc } from "./mobile-auth";
-import { capsulePath, MeSpace, productSpaceFromPath, productSpaces, ProductShellNavigation, resourceFromPath, spacePath, type ProductSpace } from "./components/ProductShell";
+import { capsulePath, letterThreadPath, MeSpace, productSpaceFromPath, productSpaces, ProductShellNavigation, resourceFromPath, spacePath, type ProductSpace } from "./components/ProductShell";
 import { AuroraConversation } from "./components/AuroraConversation";
 import { AuroraSelfSpace } from "./components/AuroraSelfSpace";
 import { UnderstandingCorrection, type CorrectionTarget } from "./components/UnderstandingCorrection";
@@ -146,6 +146,11 @@ export function AuroraApp() {
     if (resource.space === "resonance" && resource.resource === "capsule" && resource.id != null) {
       setSelectedCapsuleId(current => current === resource.id ? current : resource.id);
     }
+    if (resource.space === "letters" && resource.resource === "thread" && resource.id != null
+        && connectionsAndLetters.selectedThreadId !== resource.id) {
+      void connectionsAndLetters.openThread(resource.id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
 
   // One-time redirect for bookmarks/links made before this checkpoint, which used
@@ -959,7 +964,7 @@ export function AuroraApp() {
       <PeopleDiscovery people={connectionsAndLetters.people} busy={connectionsAndLetters.peopleBusy} onRequest={userId => void connectionsAndLetters.requestPersonConnection(userId)} />
       <RelationsView relations={connectionsAndLetters.relations} selected={connectionsAndLetters.selectedRelation} timeline={connectionsAndLetters.relationTimeline} health={connectionsAndLetters.relationHealth} busy={connectionsAndLetters.relationBusy} onSelect={label => void connectionsAndLetters.openRelation(label)} />
 
-      <LettersInbox letterInbox={connectionsAndLetters.letterInbox} letterOutbox={connectionsAndLetters.letterOutbox} threads={connectionsAndLetters.letterThreads} threadLetters={connectionsAndLetters.threadLetters} selectedThreadId={connectionsAndLetters.selectedThreadId} draftBusy={connectionsAndLetters.draftBusy} replyBusyId={connectionsAndLetters.replyBusyId} onSendDraft={id => void connectionsAndLetters.sendDraft(id)} onOpenThread={id => void connectionsAndLetters.openThread(id)} replyDrafts={connectionsAndLetters.replyDrafts} connectionRequests={connectionsAndLetters.connectionRequests} friends={connectionsAndLetters.friends}
+      <LettersInbox letterInbox={connectionsAndLetters.letterInbox} letterOutbox={connectionsAndLetters.letterOutbox} threads={connectionsAndLetters.letterThreads} threadLetters={connectionsAndLetters.threadLetters} selectedThreadId={connectionsAndLetters.selectedThreadId} draftBusy={connectionsAndLetters.draftBusy} replyBusyId={connectionsAndLetters.replyBusyId} onSendDraft={id => void connectionsAndLetters.sendDraft(id)} onOpenThread={id => { void connectionsAndLetters.openThread(id); navigate(letterThreadPath(id)); }} replyDrafts={connectionsAndLetters.replyDrafts} connectionRequests={connectionsAndLetters.connectionRequests} friends={connectionsAndLetters.friends}
         onReplyDraftChange={connectionsAndLetters.updateReplyDraft}
         onReply={letter => void connectionsAndLetters.replyWithLetter(letter)} onActOnLetter={(letter, action) => void connectionsAndLetters.actOnLetter(letter, action)}
         onReportLetter={letter => void connectionsAndLetters.reportLetter(letter)} onRequestConnection={letter => void connectionsAndLetters.requestConnection(letter)}
