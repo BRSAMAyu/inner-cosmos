@@ -55,10 +55,28 @@ network fetch the offline build can't do), this is a **dependency-free** source-
   reported as `file -> import line`.
 - `./mvnw test -Dtest=DomainBoundaryArchitectureTest` → **4/4**.
 
-## 5. Remaining / not yet proven
+## 5. User-visible degradation contract (follow-up)
+
+The turn-failure → user-message mapping is now an isolated, failure-injection-tested contract instead
+of inline string-matching buried in a 1200-line service:
+
+- `src/main/java/com/innercosmos/ai/runtime/AiFailureContract.java` — `classify(Throwable)` walks the
+  whole cause chain and keys off exception TYPE and message, returning
+  `TIMEOUT | RATE_LIMITED | MALFORMED_OUTPUT | PROVIDER_UNAVAILABLE`; each carries the stable historical
+  risk flag (TIMEOUT/RATE_LIMITED/PARSE_ERROR/NETWORK_ERROR) and a calm default user message.
+- `AuroraAgentServiceImpl.differentiatedFallback` now delegates to it; `PROVIDER_UNAVAILABLE` keeps the
+  state-aware message (VS-004 coherence). Behavior preserved — the two service tests that exercise the
+  fallback (`AuroraEmergenceTest`, `AuroraStreamServiceTest`) stay green.
+- `src/test/java/com/innercosmos/ai/runtime/AiFailureContractTest.java` (6 tests): timeout by
+  type/message/nested-cause, 429/rate-limit, malformed (parse + `JsonParseException`), safe default for
+  unknown/null, stable flags, and no infinite loop on a self-referencing cause.
+
+`./mvnw test -Dtest=AiFailureContractTest,AuroraEmergenceTest,AuroraStreamServiceTest` → **12/12**.
+
+## 6. Remaining / not yet proven
 
 - Live-turn emission through the fully-wired Spring context (counter increments on a real chat turn)
   is exercised by any full-context chat integration test at the merge node; a dedicated
   assert-the-counter-incremented `@SpringBootTest` would make it explicit.
-- Still open: OpenTelemetry distributed spans (not just metrics) and failure-injection for
-  timeout/429/malformed/partial-stream with a defined user-visible degradation contract.
+- Partial-stream-reconnect degradation and OpenTelemetry distributed spans (not just metrics) remain
+  open.

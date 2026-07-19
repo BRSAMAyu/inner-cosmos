@@ -212,6 +212,8 @@ workstreams:
       - src/test/java/com/innercosmos/ai/observability/AiTurnMetricsTest.java
       - src/main/java/com/innercosmos/service/impl/AuroraAgentServiceImpl.java
       - src/test/java/com/innercosmos/architecture/DomainBoundaryArchitectureTest.java
+      - src/main/java/com/innercosmos/ai/runtime/AiFailureContract.java
+      - src/test/java/com/innercosmos/ai/runtime/AiFailureContractTest.java
     remaining: >
       THIS SESSION: privacy-safe per-turn AI metrics (aurora.turn.count counter + aurora.turn.latency
       timer) tagged only with bounded non-sensitive dimensions (route/runtime/provider/mode/fallback/
@@ -222,9 +224,13 @@ workstreams:
       null guard. FOLLOW-UP: executable domain boundaries added dependency-free
       (DomainBoundaryArchitectureTest, 4/4) — a source-scanner enforcing entity ↛
       service/controller/mapper/vo/dto/…, mapper ↛ service/controller, service ↛ controller, safety ↛
-      controller (chosen over ArchUnit to avoid a new dependency + offline network fetch). Still open:
-      OpenTelemetry distributed spans; failure injection (timeout/429/malformed/partial-stream) with a
-      user-visible degradation contract; explicit assert-the-counter-incremented live-turn
+      controller (chosen over ArchUnit to avoid a new dependency + offline network fetch). FOLLOW-UP:
+      user-visible degradation contract extracted to AiFailureContract (classify(Throwable) by
+      type+message across the cause chain -> TIMEOUT/RATE_LIMITED/MALFORMED_OUTPUT/PROVIDER_UNAVAILABLE
+      with stable risk flags + calm messages); differentiatedFallback delegates to it (behavior
+      preserved, PROVIDER_UNAVAILABLE keeps the state-aware message); AiFailureContractTest 6/6 +
+      Emergence/Stream regressions green. Still open: OpenTelemetry distributed spans;
+      partial-stream-reconnect degradation; explicit assert-the-counter-incremented live-turn
       @SpringBootTest; and the scheduler/Testcontainer shutdown-noise cleanup.
 latest_checkpoint: "2c11dfb7d71fb632147b4408f8510bbe713d10b5"
 commits:

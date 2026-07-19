@@ -11,6 +11,7 @@ import com.innercosmos.ai.portrait.AgentUserRelationshipService;
 import com.innercosmos.ai.portrait.UserPortraitService;
 import com.innercosmos.ai.prompt.PromptBuilder;
 import com.innercosmos.ai.router.ResolvedModel;
+import com.innercosmos.ai.runtime.AiFailureContract;
 import com.innercosmos.ai.runtime.AuroraDualKernelRuntime;
 import com.innercosmos.ai.router.SessionModelRouter;
 import com.innercosmos.ai.semantic.PseudoSemanticAnalyzer;
@@ -907,25 +908,15 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     }
 
     private AuroraReplyVO differentiatedFallback(Exception e, String message, String mode, String stateSignal) {
-        String fallbackMsg;
-        String flag;
-        if (e.getMessage() != null && (e.getMessage().contains("timeout") || e.getMessage().contains("timed out"))) {
-            fallbackMsg = "I am still thinking about what you said, but it is taking a while. You can say it again, or we can talk about something else.";
-            flag = "TIMEOUT";
-        } else if (e.getMessage() != null && (e.getMessage().contains("429") || e.getMessage().contains("rate_limit"))) {
-            fallbackMsg = "Things are a bit busy on my end. Please wait a minute and try again.";
-            flag = "RATE_LIMITED";
-        } else if (e.getMessage() != null && (e.getMessage().contains("parse") || e.getMessage().contains("JSON"))) {
-            fallbackMsg = "I heard you but my thoughts did not come together clearly. Could you try saying it differently?";
-            flag = "PARSE_ERROR";
-        } else {
-            // VS-004 mock-fallback coherence: when the LLM path failed, the
-            // fallback still gently reflects the perceptual state signal so the
-            // response stays coherent with the richer context. Perception only,
-            // not a clinical label (vision §9/§13).
-            fallbackMsg = fallbackAwareMessage(stateSignal);
-            flag = "NETWORK_ERROR";
-        }
+        // A6 user-visible degradation contract: classification (by exception type + message, whole
+        // cause chain) lives in the unit-tested AiFailureContract. PROVIDER_UNAVAILABLE keeps the
+        // state-aware message so an unreachable provider still reflects the perceptual state signal
+        // (VS-004 mock-fallback coherence; perception only, not a clinical label -- vision §9/§13).
+        AiFailureContract.Category category = AiFailureContract.classify(e);
+        String flag = category.riskFlag;
+        String fallbackMsg = category == AiFailureContract.Category.PROVIDER_UNAVAILABLE
+                ? fallbackAwareMessage(stateSignal)
+                : category.defaultUserMessage;
         AuroraReplyVO vo = new AuroraReplyVO();
         vo.messages = List.of(fallbackMsg);
         vo.replyTone = "warm, specific, friend-like";
