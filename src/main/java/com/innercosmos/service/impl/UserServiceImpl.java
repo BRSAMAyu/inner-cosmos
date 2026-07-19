@@ -52,6 +52,10 @@ public class UserServiceImpl implements UserService {
     private final DialogSummaryMapper dialogSummaryMapper;
     private final ABTestMetricsMapper abTestMetricsMapper;
     private final ReportRecordMapper reportRecordMapper;
+    // A5 right-to-erasure: the compiled derivatives + audit trail must be purged on account deletion.
+    private final MemoryEmbeddingMapper memoryEmbeddingMapper;
+    private final CapsuleEmbeddingMapper capsuleEmbeddingMapper;
+    private final DataRetractionReceiptMapper dataRetractionReceiptMapper;
     private final PasswordEncoder passwordEncoder;
 
     public UserServiceImpl(UserMapper userMapper,
@@ -85,6 +89,9 @@ public class UserServiceImpl implements UserService {
                            DialogSummaryMapper dialogSummaryMapper,
                            ABTestMetricsMapper abTestMetricsMapper,
                            ReportRecordMapper reportRecordMapper,
+                           MemoryEmbeddingMapper memoryEmbeddingMapper,
+                           CapsuleEmbeddingMapper capsuleEmbeddingMapper,
+                           DataRetractionReceiptMapper dataRetractionReceiptMapper,
                            PasswordEncoder passwordEncoder) {
         this.userMapper = userMapper;
         this.userProfileMapper = userProfileMapper;
@@ -117,6 +124,9 @@ public class UserServiceImpl implements UserService {
         this.dialogSummaryMapper = dialogSummaryMapper;
         this.abTestMetricsMapper = abTestMetricsMapper;
         this.reportRecordMapper = reportRecordMapper;
+        this.memoryEmbeddingMapper = memoryEmbeddingMapper;
+        this.capsuleEmbeddingMapper = capsuleEmbeddingMapper;
+        this.dataRetractionReceiptMapper = dataRetractionReceiptMapper;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -386,6 +396,18 @@ public class UserServiceImpl implements UserService {
         // Letter threads
         letterThreadMapper.delete(new QueryWrapper<LetterThread>()
                 .eq("participant_a", userId).or().eq("participant_b", userId));
+
+        // A5 right-to-erasure — compiled derivatives that have no FK cascade must be purged explicitly,
+        // or account deletion would orphan the user's matching/retrieval vectors and audit trail.
+        // Capsule matching vectors are keyed by capsule_id, so collect ids BEFORE deleting the capsules.
+        List<Long> ownedCapsuleIds = echoCapsuleMapper
+                .selectList(new QueryWrapper<EchoCapsule>().select("id").eq("owner_user_id", userId))
+                .stream().map(c -> c.id).toList();
+        if (!ownedCapsuleIds.isEmpty()) {
+            capsuleEmbeddingMapper.delete(new QueryWrapper<CapsuleEmbedding>().in("capsule_id", ownedCapsuleIds));
+        }
+        memoryEmbeddingMapper.delete(new QueryWrapper<MemoryEmbedding>().eq("user_id", userId));
+        dataRetractionReceiptMapper.delete(new QueryWrapper<DataRetractionReceipt>().eq("user_id", userId));
 
         // Echo capsules (FK cascade deletes capsule_boundary, authorized_memory_ref)
         echoCapsuleMapper.delete(new QueryWrapper<EchoCapsule>().eq("owner_user_id", userId));

@@ -78,6 +78,16 @@ Full-suite merge-node verification (this session):
   inventory 79→80, identity columns 77→78) — updated in `PostgresApplicationSmokeTest` /
   `PostgresFlywayBaselineTest`; these guards exist to force exactly that acknowledgement.
 
+Right-to-erasure on account deletion (follow-up):
+- `src/main/java/com/innercosmos/service/impl/UserServiceImpl.java` — `deleteAccount` was thorough for
+  source rows but predated the compiled-derivative tables, so it **orphaned** `tb_capsule_embedding`
+  (matching vectors, keyed by capsule_id — collected before the capsules are deleted),
+  `tb_memory_embedding` (retrieval vectors) and the `tb_data_retraction_receipt` audit trail. All three
+  are now purged as part of deletion.
+- `src/test/java/com/innercosmos/service/impl/AccountDeletionErasureTest.java` (1, H2) — seeds a capsule
+  + capsule vector, a memory + memory vector, and a receipt, then asserts all three (and the capsule)
+  are gone after `deleteAccount`.
+
 Durable/replayable delivery (follow-up):
 - `src/main/java/com/innercosmos/event/DataRetractedEvent.java` — domain event published by
   `DataRetractionReceiptServiceImpl.record` after each receipt insert (sensitive-free fields).
