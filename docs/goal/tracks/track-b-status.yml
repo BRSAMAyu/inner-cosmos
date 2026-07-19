@@ -81,6 +81,10 @@ workstreams:
       - web/src/hooks/useAuroraSession.test.ts
       - web/src/AuroraApp.tsx
       - web/src/styles.css
+      - web/src/components/DataRightsPanel.tsx
+      - web/src/components/DataRightsPanel.test.tsx
+      - web/src/api.ts (dataRightsReceipts + DataRetractionReceipt type)
+      - docs/goal/tracks/track-b-integration-requests.yml (TB-REQ-003)
     remaining: >
       THIS SESSION (first B2 slice, Aurora stagecraft): the server's deliberate `segment` pacing
       event was being dropped by the client and the thinking/planning runtime signal only showed as a
@@ -88,7 +92,15 @@ workstreams:
       an inline aria-labelled thinking beat in AuroraConversation (understanding/composing only, gated
       on an active turn, hidden while streaming tokens or after the turn ends, reduced-motion-safe),
       and the one-line AuroraApp wiring. Vitest 200/200 (199 + 1 new; --no-file-parallelism needed
-      only for this machine's memory), production build PASS (18 PWA precache entries),
+      only for this machine's memory), production build PASS (18 PWA precache entries). SECOND B2
+      slice: a "Aurora 停止使用了什么" data-rights audit panel in the Me/控制与边界 space
+      (DataRightsPanel) that consumes Track A contract delta TA-DELTA-001
+      (GET /api/me/data-rights/receipts) via api.dataRightsReceipts, making the G5 propagation
+      user-visible (recorded as cross-track TB-REQ-003). Vitest now 203/203 (+3 panel cases);
+      build still PASS. NOTE: the endpoint lives on the Track A continuation branch, so the panel is
+      tested against the typed contract with mocks and surfaces an error via the status banner rather
+      than faking data if the endpoint is absent at runtime; full end-to-end wiring happens when the
+      integrator merges both branches.
       git diff --check clean. Still open: LIVE in-browser verification of the beat during a real
       streamed turn (deferred this session because C: was at ~0GB free and file-backed H2 boot risked
       ENOSPC corruption — see evidence README §4); inline memory-provenance chips (need a Track A

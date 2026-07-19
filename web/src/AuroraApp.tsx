@@ -18,6 +18,8 @@ import { RelationsView } from "./components/RelationsView";
 import { LettersInbox } from "./components/LettersInbox";
 import { PortraitView } from "./components/PortraitView";
 import { AccountSettings, type AccountBusy } from "./components/AccountSettings";
+import { DataRightsPanel } from "./components/DataRightsPanel";
+import type { DataRetractionReceipt } from "./api";
 import { AuthGate } from "./components/AuthGate";
 import { PsychologySkillStudio, SkillSuggestionBanner, type SkillLocale } from "./components/PsychologySkillStudio";
 import { ConnectError, LoadingText } from "./loading";
@@ -62,6 +64,9 @@ export function AuroraApp() {
   const [portraitCalibrated, setPortraitCalibrated] = useState<Record<string, boolean>>({});
   const [portraitBusy, setPortraitBusy] = useState<string | null>(null);
   const [accountBusy, setAccountBusy] = useState<AccountBusy>(null);
+  const [dataRightsReceipts, setDataRightsReceipts] = useState<DataRetractionReceipt[]>([]);
+  const [dataRightsLoading, setDataRightsLoading] = useState(false);
+  const [dataRightsLoaded, setDataRightsLoaded] = useState(false);
   const [accountMessage, setAccountMessage] = useState<string | null>(null);
   const [starfield, setStarfield] = useState<StarfieldScene | null>(null);
   const [starfieldBusy, setStarfieldBusy] = useState(false);
@@ -436,6 +441,13 @@ export function AuroraApp() {
       setStatus("记下了。我会带着你这份看法继续理解你。");
     } catch (error) { setStatus(error instanceof Error ? error.message : "没能存下，待会儿再试一次"); }
     finally { setPortraitBusy(null); }
+  };
+
+  const loadDataRightsReceipts = async () => {
+    setDataRightsLoading(true);
+    try { setDataRightsReceipts(await api.dataRightsReceipts()); setDataRightsLoaded(true); }
+    catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法读取数据权利回执"); }
+    finally { setDataRightsLoading(false); }
   };
 
   const changeAccountPassword = async (oldPassword: string, newPassword: string) => {
@@ -942,6 +954,8 @@ export function AuroraApp() {
           onLoadHistory={dim => void loadPortraitHistory(dim)} onCalibrate={(dim, oldValue, newValue) => void submitPortraitCalibration(dim, oldValue, newValue)} />
         <AccountSettings busy={accountBusy} message={accountMessage} onChangePassword={(oldPassword, newPassword) => void changeAccountPassword(oldPassword, newPassword)}
           onExportData={() => void exportAccountData()} onDeleteAccount={password => void deleteAccount(password)} />
+        <DataRightsPanel receipts={dataRightsReceipts} loading={dataRightsLoading} loaded={dataRightsLoaded}
+          onLoad={() => void loadDataRightsReceipts()} />
       </div>
       <div className="state global-state" role="status"><i className={auroraSession.activeTurnId ? "pulse" : ""} />{status}</div>
       <footer><a href="/pages/dashboard.html">尚未迁移的工具</a><span>五空间 AppShell · 数据与能力持续保留</span><button type="button" onClick={() => void logout()}>安全退出</button></footer>

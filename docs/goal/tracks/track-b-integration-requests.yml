@@ -58,3 +58,28 @@ requests:
     affected_track_a_workstream: "Whichever workstream owns src/main/java/**/WebMvcConfig or equivalent static-resource routing (not owned by any Track B path)"
     evidence: evidence/track-b/scripts/observe-b1-routes.mjs, evidence/track-b/screenshots/b1-routes-*.png
     status: OPEN
+  - id: TB-REQ-003
+    title: "Owner-facing data-rights receipts endpoint (consumes Track A TA-DELTA-001)"
+    user_impact: >-
+      The Me / 控制与边界 space now shows a "Aurora 停止使用了什么" audit panel so a user can see the
+      matching vectors and retrieval embeddings Aurora erased/stopped using when they forgot a memory,
+      archived a capsule, revoked consent or corrected an inference. This turns the (previously
+      invisible) G5 PROFILE-PROPAGATION backend work into a trust-building surface.
+    desired_contract: >-
+      GET /api/me/data-rights/receipts?limit=<int> -> ApiResponse<DataRetractionReceiptVO[]> newest
+      first, owner-scoped, sensitive-payload-free. Exactly as specified by Track A contract delta
+      TA-DELTA-001 (docs/goal/tracks/track-a-contract-deltas.yml). Already IMPLEMENTED on the Track A
+      continuation branch; this request records the cross-track dependency for the integrator.
+    priority: P2
+    loading_error_semantics: >-
+      Panel is load-on-demand (a button in the Me space); 401 falls back to the app-wide status
+      banner; empty result shows an explicit "no receipts yet" state; loaded via api.dataRightsReceipts().
+    temporary_fixture: >-
+      None hardcoded in the product path. web/src/api.ts#dataRightsReceipts calls the real endpoint;
+      web/src/components/DataRightsPanel.test.tsx drives the presentational component with typed
+      fixtures matching TA-DELTA-001. If the endpoint is absent at runtime the panel simply surfaces
+      the error via the status banner rather than showing fake data.
+    acceptance_test: "web/src/components/DataRightsPanel.test.tsx (3 cases: load trigger, empty state, receipt rendering)."
+    affected_track_a_workstream: "A5-data-rights (DataRightsController / DataRetractionReceiptService); contract delta TA-DELTA-001."
+    evidence: evidence/track-b/B2-visible-innovation/README.md, docs/goal/tracks/track-a-contract-deltas.yml#TA-DELTA-001
+    status: OPEN

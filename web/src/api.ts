@@ -19,6 +19,17 @@ export type WakeIntent = {
   contextSessionId: number | null; supersedesIntentId: number | null; userFeedback: string | null;
 };
 export type Notification = { id: number; type: string; title: string; body: string; refId: number; refType: string; read: boolean };
+// Consumes Track A contract delta TA-DELTA-001 (GET /api/me/data-rights/receipts). Sensitive-free.
+export type DataRetractionReceipt = {
+  id: number;
+  subjectType: "MEMORY" | "CAPSULE" | "DATA_USE_GRANT";
+  subjectId: number;
+  derivativeType: "CAPSULE_MATCH_INDEX" | "MEMORY_EMBEDDING" | "CAPSULE_PERSONA" | "GENOME";
+  action: "ERASED" | "CLEARED" | "REVIEW_REQUIRED";
+  affectedCount: number;
+  reason: string;
+  createdAt: string;
+};
 export type ProactiveEvent = { type: string; content: string; ts: string };
 export type SelfEvolution = {
   candidates: Array<{ id: number; dimension: string; proposedBelief: string; confidence: number; evidenceRefs: string; createdAt: string }>;
@@ -403,6 +414,8 @@ export const api = {
     return result;
   },
   exportData: () => request<Record<string, unknown>>("/api/user/export"),
+  dataRightsReceipts: (limit?: number) => request<DataRetractionReceipt[]>(
+    "/api/me/data-rights/receipts" + (limit ? `?limit=${limit}` : "")),
   createSession: () => request<{ id: number }>("/api/dialog/session/create", {
     method: "POST", body: JSON.stringify({ title: "Aurora 对话", sessionType: "AURORA_CHAT" })
   }),
