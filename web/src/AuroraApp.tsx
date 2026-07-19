@@ -865,7 +865,7 @@ export function AuroraApp() {
         onTranscribe={async blob => {
           try { const result = await transcribeAudio(blob); return result.text; }
           catch (error) { setStatus(error instanceof Error ? error.message : "语音转写暂时不可用"); return ""; }
-        }} />
+        }} locale={skillLocale} />
 
       {(mobileState.native || !mobileState.connected) && <section className={`mobile-presence ${mobileState.connected ? "online" : "offline"}`} aria-label="移动端连接状态">
         <div>

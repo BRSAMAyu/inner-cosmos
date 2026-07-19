@@ -18,6 +18,17 @@ describe("AuroraConversation", () => {
     expect(screen.getByRole("button", { name: "打断并发送" })).toBeEnabled();
   });
 
+  it("renders composer, thinking beat and controls in English when locale is en-SG", () => {
+    render(<AuroraConversation locale="en-SG" messages={[
+      { key: "a1", speaker: "AURORA", text: "", partial: true }
+    ]} activeTurnId={7} thinkingStage="composing" draft="a new thought" sessionReady
+      onDraftChange={() => undefined} onSubmit={event => event.preventDefault()} onStop={() => undefined} />);
+    expect(screen.getByLabelText("Write to Aurora")).toBeVisible();
+    expect(screen.getByText("Aurora is composing the next line…")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Stop responding" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Interrupt & send" })).toBeEnabled();
+  });
+
   it("keeps stop and draft changes under caller control", () => {
     const onStop = vi.fn();
     const onDraftChange = vi.fn();

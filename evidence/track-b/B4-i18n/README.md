@@ -60,8 +60,14 @@ Booted the real app (dev H2 + Mock), registered, opened the Me space and drove t
   translates the whole Me space (switcher + panel + hub), not just the data-rights panel.
 - ProductShell.test now 12/12 (added a bilingual MeSpace case).
 
+## 3d. Aurora conversation surface migrated (follow-up)
+- `AuroraConversation` (the main chat surface) is now fully bilingual via a `Record<Locale, …>` map:
+  empty state, speaker "you", partial-reply hint, the inline thinking beat copy, composer placeholders,
+  voice-input labels, and the stop / interrupt-send / send controls. `AuroraApp` passes
+  `locale={skillLocale}`. AuroraConversation.test now 6/6 (+1 en-SG case).
+
 ## 4. Remaining
-- Migrated so far: DataRightsPanel, the LocaleToggle switcher, and the MeSpace hub. The other spaces
-  (Aurora / Cosmos / Resonance / Letters bodies) are still Chinese-only; each adopts the `locale` prop
-  incrementally using this seam.
+- Migrated so far: DataRightsPanel, the LocaleToggle switcher, the MeSpace hub, and the Aurora
+  conversation surface. The remaining space bodies (Cosmos / Resonance / Letters and their
+  sub-components) are still Chinese-only; each adopts the `locale` prop incrementally using this seam.
 - WCAG/a11y audit and non-author en-SG copy review remain open B4 items.
