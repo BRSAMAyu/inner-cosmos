@@ -39,4 +39,14 @@ describe("DataRightsPanel", () => {
     expect(screen.getByText("已彻底清除")).toBeVisible();
     expect(screen.getByText(/2 项/)).toBeVisible();
   });
+
+  it("renders English (en-SG) copy and labels when that locale is selected", () => {
+    render(<DataRightsPanel loaded loading={false} onLoad={() => undefined} locale="en-SG" receipts={[
+      receipt({ id: 2, derivativeType: "MEMORY_EMBEDDING", action: "CLEARED", affectedCount: 2, reason: "memory superseded by user correction" })
+    ]} />);
+    expect(screen.getByRole("heading", { name: "What Aurora stopped using" })).toBeVisible();
+    expect(screen.getByText("memory retrieval vector")).toBeVisible();
+    expect(screen.getByText("stopped using")).toBeVisible();
+    expect(screen.getByText(/2 items/)).toBeVisible();
+  });
 });

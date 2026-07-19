@@ -123,7 +123,25 @@ workstreams:
       deep-link verification (needs a capsule created first); other resource routes
       (/connections/letters/:id, /cosmos/portrait) can reuse resourceFromPath but are not wired yet.
   B3-design-content: {status: NOT_STARTED, evidence: [], remaining: "Complete design primitives, content states, responsive polish and visual regression."}
-  B4-i18n-a11y: {status: NOT_STARTED, evidence: [], remaining: "Complete Chinese and English/en-SG, WCAG target and manual accessibility checks."}
+  B4-i18n-a11y:
+    status: IN_PROGRESS
+    evidence:
+      - evidence/track-b/B4-i18n/README.md
+      - web/src/i18n.ts
+      - web/src/i18n.test.ts
+      - web/src/components/DataRightsPanel.tsx
+      - web/src/components/DataRightsPanel.test.tsx
+      - web/src/AuroraApp.tsx
+    remaining: >
+      THIS SESSION: added the missing shared locale seam on top of the app's existing per-component
+      SkillLocale/Record<Locale,dict> convention -- web/src/i18n.ts (Locale, normalizeLocale,
+      detectLocale stored>browser>zh-CN default, loadLocale/saveLocale) with 3 unit tests; migrated the
+      DataRightsPanel to fully bilingual (zh-CN default + en-SG) via the same pattern; AuroraApp now
+      initializes skillLocale from loadLocale() so the app respects a stored pref/browser language
+      instead of hard-coding zh-CN. i18n+panel 7/7, full suite 210/210, build PASS. Still open:
+      most of the shell is still Chinese-only (adopt the locale prop per surface using this seam), no
+      in-app locale switcher yet (saveLocale is ready), WCAG target + manual a11y checks, and
+      non-author en-SG copy review.
   B5-pwa-mobile:
     status: IN_PROGRESS
     evidence:

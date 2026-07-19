@@ -20,6 +20,7 @@ import { PortraitView } from "./components/PortraitView";
 import { AccountSettings, type AccountBusy } from "./components/AccountSettings";
 import { DataRightsPanel } from "./components/DataRightsPanel";
 import type { DataRetractionReceipt } from "./api";
+import { loadLocale } from "./i18n";
 import { AuthGate } from "./components/AuthGate";
 import { PsychologySkillStudio, SkillSuggestionBanner, type SkillLocale } from "./components/PsychologySkillStudio";
 import { ConnectError, LoadingText } from "./loading";
@@ -111,7 +112,7 @@ export function AuroraApp() {
   const [skillRetention, setSkillRetention] = useState<PsychologyRetention>("DISCARD_AFTER_SESSION");
   const [skillBusy, setSkillBusy] = useState(false);
   const [skillSuggestion, setSkillSuggestion] = useState<PsychologySkillSuggestion | null>(null);
-  const [skillLocale, setSkillLocale] = useState<SkillLocale>("zh-CN");
+  const [skillLocale, setSkillLocale] = useState<SkillLocale>(() => loadLocale());
   const [visitorBusy, setVisitorBusy] = useState(false);
   const [mobileState, setMobileState] = useState<MobileRuntimeState>(initialMobileState);
   const bootstrappedRef = useRef(false);
@@ -971,7 +972,7 @@ export function AuroraApp() {
         <AccountSettings busy={accountBusy} message={accountMessage} onChangePassword={(oldPassword, newPassword) => void changeAccountPassword(oldPassword, newPassword)}
           onExportData={() => void exportAccountData()} onDeleteAccount={password => void deleteAccount(password)} />
         <DataRightsPanel receipts={dataRightsReceipts} loading={dataRightsLoading} loaded={dataRightsLoaded}
-          onLoad={() => void loadDataRightsReceipts()} />
+          onLoad={() => void loadDataRightsReceipts()} locale={skillLocale} />
       </div>
       <div className="state global-state" role="status"><i className={auroraSession.activeTurnId ? "pulse" : ""} />{status}</div>
       <footer><a href="/pages/dashboard.html">尚未迁移的工具</a><span>五空间 AppShell · 数据与能力持续保留</span><button type="button" onClick={() => void logout()}>安全退出</button></footer>
