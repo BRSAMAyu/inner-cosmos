@@ -107,6 +107,21 @@ workstreams:
       contract/integration request); and the Inner Cosmos + Resonance B2 items. Also surfaced: the
       committed package-lock.json is out of sync with package.json (npm ci fails), a pre-existing
       delivery/B6 infra gap.
+  B1-nested-routes:
+    status: IN_PROGRESS
+    evidence:
+      - evidence/track-b/B1-nested-routes/README.md
+      - web/src/components/ProductShell.tsx
+      - web/src/components/ProductShell.test.tsx
+      - web/src/AuroraApp.tsx
+    remaining: >
+      THIS SESSION: first true nested RESOURCE deep link on top of the existing per-space routes.
+      resourceFromPath(pathname) parses "/resonance/capsule/:id" -> {space,resource,id} (numeric id
+      only), capsulePath(id) builds the shareable link and round-trips; AuroraApp maps the URL id onto
+      the existing selectedCapsuleId (deep-link entry + back/forward) and navigates on select/deselect.
+      ProductShell.test 10/10 (+4); full suite 206/206; build PASS. Remaining: live in-browser
+      deep-link verification (needs a capsule created first); other resource routes
+      (/connections/letters/:id, /cosmos/portrait) can reuse resourceFromPath but are not wired yet.
   B3-design-content: {status: NOT_STARTED, evidence: [], remaining: "Complete design primitives, content states, responsive polish and visual regression."}
   B4-i18n-a11y: {status: NOT_STARTED, evidence: [], remaining: "Complete Chinese and English/en-SG, WCAG target and manual accessibility checks."}
   B5-pwa-mobile:

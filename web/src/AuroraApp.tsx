@@ -4,7 +4,7 @@ import { Capacitor } from "@capacitor/core";
 import { api, apiConfigurationError, configureBearerAuth, hasConfiguredApiBase, transcribeAudio, type ClaimCandidate, type CapsuleBoundary, type CapsuleFidelitySummary, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type PersonaMessage, type PersonaSession, type PortraitDimension, type PublicCapsule, type PortraitHistoryEntry, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type PsychologySkillSuggestion, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type StarfieldDetail, type StarfieldScene, type StarfieldStar, type UnderstandingClaim, type UserCorrection } from "./api";
 import { initialMobileState, mobileRuntime, type MobileRuntimeState } from "./mobile";
 import { mobileOidc } from "./mobile-auth";
-import { MeSpace, productSpaceFromPath, productSpaces, ProductShellNavigation, spacePath, type ProductSpace } from "./components/ProductShell";
+import { capsulePath, MeSpace, productSpaceFromPath, productSpaces, ProductShellNavigation, resourceFromPath, spacePath, type ProductSpace } from "./components/ProductShell";
 import { AuroraConversation } from "./components/AuroraConversation";
 import { AuroraSelfSpace } from "./components/AuroraSelfSpace";
 import { UnderstandingCorrection, type CorrectionTarget } from "./components/UnderstandingCorrection";
@@ -133,6 +133,18 @@ export function AuroraApp() {
     navigate(spacePath(space));
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [navigate]);
+
+  // Nested resource deep links: opening /resonance/capsule/:id selects that capsule, so a shared
+  // link or a back/forward step lands on the exact capsule rather than the space default. The
+  // capsule domain still owns loading/rendering; this only maps the URL id onto the existing
+  // selection. If the id is not among the loaded capsules, selectedCapsule resolves to null and the
+  // workbench shows its normal empty state -- no crash on a stale/foreign link.
+  useEffect(() => {
+    const resource = resourceFromPath(location.pathname);
+    if (resource.space === "resonance" && resource.resource === "capsule" && resource.id != null) {
+      setSelectedCapsuleId(current => current === resource.id ? current : resource.id);
+    }
+  }, [location.pathname]);
 
   // One-time redirect for bookmarks/links made before this checkpoint, which used
   // `?space=<x>` on the app's single path instead of a real route. Cheap and low-risk: a
@@ -913,7 +925,11 @@ export function AuroraApp() {
         selectableMemories={selectableMemories} selectedMemoryIds={selectedMemoryIds} capsuleName={capsuleName} capsuleIntro={capsuleIntro}
         capsulePreview={capsulePreview} capsuleBusy={capsuleBusy} genomeHistory={genomeHistory} fidelitySummary={fidelitySummary} sandboxQuestion={sandboxQuestion}
         sandboxResult={sandboxResult} sandboxFeedback={sandboxFeedback}
-        onSelectCapsule={id => { setSelectedCapsuleId(id); if (id === null) { setSelectedMemoryIds([]); setCapsulePreview(null); } }}
+        onSelectCapsule={id => {
+          setSelectedCapsuleId(id);
+          if (id === null) { setSelectedMemoryIds([]); setCapsulePreview(null); navigate(spacePath("resonance")); }
+          else { navigate(capsulePath(id)); }
+        }}
         onToggleMemory={toggleCapsuleMemory} onCapsuleName={setCapsuleName} onCapsuleIntro={setCapsuleIntro}
         onPreviewNewCapsule={() => void previewNewCapsule()} onCancelPreview={() => setCapsulePreview(null)} onCreateCapsule={() => void createCapsule()}
         onRecompile={() => void recompileSelectedCapsule()} onSandboxQuestion={setSandboxQuestion} onRunSandbox={() => void runCapsuleSandbox()}

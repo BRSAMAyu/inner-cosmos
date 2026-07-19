@@ -39,6 +39,27 @@ export function productSpaceFromPath(pathname: string): ProductSpace {
   return match ? match[0] : "aurora";
 }
 
+// A parsed nested resource deep link within a space, e.g. "/resonance/capsule/42" ->
+// { space: "resonance", resource: "capsule", id: 42 }. This is what makes a specific capsule,
+// letter thread or portrait dimension shareable and back/forward-correct, on top of the existing
+// per-space routing. `resource`/`id` are null for a bare space path.
+export type ProductResource = { space: ProductSpace; resource: string | null; id: number | null };
+
+export function resourceFromPath(pathname: string): ProductResource {
+  const space = productSpaceFromPath(pathname);
+  const base = spacePaths[space];
+  const rest = pathname === base ? ""
+    : pathname.startsWith(`${base}/`) ? pathname.slice(base.length + 1) : "";
+  const [resource = "", rawId = ""] = rest.split("/");
+  const id = /^\d+$/.test(rawId) ? Number(rawId) : null;
+  return { space, resource: resource || null, id };
+}
+
+/** Shareable deep link to one capsule inside the resonance space. */
+export function capsulePath(id: number): string {
+  return `${spacePaths.resonance}/capsule/${id}`;
+}
+
 export function ProductShellNavigation({ active, onNavigate }: { active: ProductSpace; onNavigate: (space: ProductSpace) => void }) {
   return <nav className="app-shell-nav" aria-label="Inner Cosmos 五个空间">
     <div className="app-mark"><span aria-hidden="true">✦</span><strong>Inner Cosmos</strong></div>
