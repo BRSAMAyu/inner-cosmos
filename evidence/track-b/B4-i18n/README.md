@@ -38,8 +38,22 @@ proves it on a real surface, without a big-bang string migration:
 
 `npm test -- --run src/components/LocaleToggle.test.tsx` → **2/2**; full suite **212/212**; build PASS.
 
+## 3b. Live in-browser verification (this session)
+
+Booted the real app (dev H2 + Mock), registered, opened the Me space and drove the switcher:
+
+- Both new surfaces render in the real shell: the `语言 / 中文 / English` toggle and the
+  `Aurora 停止使用了什么` data-rights panel (initial locale zh-CN via detection).
+- Clicking **English** flipped `aria-pressed` (English=true, 中文=false) **and** switched the panel
+  copy live — heading `What Aurora stopped using`, intro in English, button `View data-rights
+  receipts`.
+- The choice **persisted**: `localStorage["ic.locale"] === "en-SG"` (so `loadLocale()` restores it on
+  next boot). **Zero console errors** across the flow.
+- Also surfaced+fixed a real gotcha: the PWA service worker precaches the unhashed `app.js`, so a
+  stale bundle is served after a rebuild until the SW is updated — hard-reload / SW-update needed to
+  see new code (relevant to B5's update flow; the reload beat was already added there).
+
 ## 4. Remaining
-- This is groundwork + two migrated surfaces (DataRightsPanel) + the switcher, not full coverage. The
+- This is groundwork + one migrated surface (DataRightsPanel) + the switcher, not full coverage. The
   rest of the shell is still Chinese-only; each surface adopts the `locale` prop incrementally.
-- Live in-browser verification of the switcher flipping copy is a follow-up (deterministically covered
-  here); WCAG/a11y audit and non-author en-SG copy review remain open B4 items.
+- WCAG/a11y audit and non-author en-SG copy review remain open B4 items.
