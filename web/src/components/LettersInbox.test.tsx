@@ -28,6 +28,29 @@ describe("LettersInbox", () => {
     expect(onActOnLetter).toHaveBeenCalledWith(letter, "block");
   });
 
+  it("marks the reply button busy (disabled + aria-busy) for the letter being sent", () => {
+    // AsyncButton disables + sets aria-busy immediately; the label only swaps after 1s (anti-flicker),
+    // so assert the immediate, deterministic state rather than the delayed busy text.
+    const { rerender } = render(<LettersInbox letterInbox={[letter]} replyDrafts={{ 7: "谢谢你告诉我" }} replyBusyId={7}
+      connectionRequests={{ incoming: [], outgoing: [] }} friends={[]}
+      onReplyDraftChange={() => undefined} onReply={() => undefined} onActOnLetter={() => undefined}
+      onReportLetter={() => undefined} onRequestConnection={() => undefined}
+      onDecideConnection={() => undefined} onLeaveConnection={() => undefined} />);
+    const btn = screen.getByRole("button", { name: "让回复慢信启程" });
+    expect(btn).toBeDisabled();
+    expect(btn).toHaveAttribute("aria-busy", "true");
+
+    // A different letter being busy does NOT disable this letter's reply button.
+    rerender(<LettersInbox letterInbox={[letter]} replyDrafts={{ 7: "谢谢你告诉我" }} replyBusyId={999}
+      connectionRequests={{ incoming: [], outgoing: [] }} friends={[]}
+      onReplyDraftChange={() => undefined} onReply={() => undefined} onActOnLetter={() => undefined}
+      onReportLetter={() => undefined} onRequestConnection={() => undefined}
+      onDecideConnection={() => undefined} onLeaveConnection={() => undefined} />);
+    const enabled = screen.getByRole("button", { name: "让回复慢信启程" });
+    expect(enabled).toBeEnabled();
+    expect(enabled).not.toHaveAttribute("aria-busy", "true");
+  });
+
   it("shows letters the user has sent under the outbox tab", () => {
     const sent: SlowLetter = { id: 12, senderUserId: 1, receiverUserId: 3, receiverCapsuleId: 8,
       title: "谢谢你愿意在雨里等", letterBody: "我想让你知道那句话我记住了。", status: "IN_FLIGHT",

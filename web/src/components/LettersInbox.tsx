@@ -13,11 +13,11 @@ const outboxStatusLabel: Record<string, string> = {
 };
 
 export function LettersInbox({ letterInbox, letterOutbox = [], threads = [], threadLetters = [], selectedThreadId = null,
-  draftBusy = false, replyDrafts, connectionRequests, friends,
+  draftBusy = false, replyBusyId = null, replyDrafts, connectionRequests, friends,
   onReplyDraftChange, onReply, onActOnLetter, onReportLetter, onRequestConnection, onDecideConnection, onLeaveConnection,
   onSendDraft, onOpenThread }: {
   letterInbox: SlowLetter[]; letterOutbox?: SlowLetter[]; threads?: LetterThread[]; threadLetters?: SlowLetter[];
-  selectedThreadId?: number | null; draftBusy?: boolean;
+  selectedThreadId?: number | null; draftBusy?: boolean; replyBusyId?: number | null;
   replyDrafts: Record<number, string>; connectionRequests: ConnectionRequests; friends: SocialConnection[];
   onReplyDraftChange: (letterId: number, value: string) => void; onReply: (letter: SlowLetter) => void;
   onActOnLetter: (letter: SlowLetter, action: "read" | "decline" | "block" | "archive") => void;
@@ -46,7 +46,7 @@ export function LettersInbox({ letterInbox, letterOutbox = [], threads = [], thr
           <p>{letter.letterBody}</p>
           {repliable.has(letter.status) && <div className="letter-reply"><textarea aria-label={`回复「${letter.title}」`}
             value={replyDrafts[letter.id] ?? ""} onChange={event => onReplyDraftChange(letter.id, event.target.value)}
-            placeholder="写下你愿意负责的回应；它仍会慢慢抵达。" /><button disabled={!replyDrafts[letter.id]?.trim()} onClick={() => onReply(letter)}>让回复慢信启程</button></div>}
+            placeholder="写下你愿意负责的回应；它仍会慢慢抵达。" /><AsyncButton busy={replyBusyId === letter.id} busyText="正在启程" disabled={!replyDrafts[letter.id]?.trim()} onClick={() => onReply(letter)}>让回复慢信启程</AsyncButton></div>}
           <div>
             {letter.status === "DELIVERED" && <button onClick={() => onActOnLetter(letter, "read")}>标记已读</button>}
             {declinable.has(letter.status) && <button onClick={() => onActOnLetter(letter, "decline")}>温和婉拒</button>}
