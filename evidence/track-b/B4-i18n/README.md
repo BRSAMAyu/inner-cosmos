@@ -73,7 +73,8 @@ Booted the real app (dev H2 + Mock), registered, opened the Me space and drove t
   bilingual, the **entire Me / 控制与边界 space is now bilingual**. AccountSettings.test 5/5.
 
 ## 4. Remaining
-- Fully bilingual now: the Me space (MeSpace, AccountSettings, DataRightsPanel, LocaleToggle) and the
-  Aurora conversation surface. The remaining space bodies (Cosmos / Resonance / Letters composer and
-  their sub-components) are still Chinese-only; each adopts the `locale` prop incrementally via this seam.
+- Fully bilingual now: the Me space (MeSpace, AccountSettings, DataRightsPanel, LocaleToggle), the
+  Aurora conversation surface, and the UnderstandingCorrection surface ("if this isn't quite you" +
+  correction history). Remaining space bodies (memory starfield, capsule workbench, resonance,
+  letters composer, Aurora self) still adopt the `locale` prop incrementally via this seam.
 - WCAG/a11y audit and non-author en-SG copy review remain open B4 items.

@@ -915,7 +915,7 @@ export function AuroraApp() {
         corrections={corrections} retiringId={retiringCorrectionId}
         onOldValue={value => { setCorrectionOld(value); setCorrectionImpact(null); }} onNewValue={value => { setCorrectionNew(value); setCorrectionImpact(null); }}
         onPreview={() => void previewCorrection()} onCancelPreview={() => setCorrectionImpact(null)} onConfirm={() => void confirmCorrection()} onClearTarget={clearCorrectionTarget}
-        onRetire={id => void retireCorrection(id)} />
+        onRetire={id => void retireCorrection(id)} locale={skillLocale} />
 
       {starfield && <MemoryStarfield starfield={starfield} starfieldBusy={starfieldBusy} onChangeMode={mode => void changeStarfieldMode(mode)}
         starfieldDetail={starfieldDetail} detailBusy={detailBusy} onRevealStar={id => void revealStar(id)} onCloseDetail={() => setStarfieldDetail(null)}
