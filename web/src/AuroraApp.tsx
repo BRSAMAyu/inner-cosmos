@@ -957,7 +957,7 @@ export function AuroraApp() {
         onChooseStrategy={strategy => void chooseResonanceStrategy(strategy)} onChooseMatch={chooseVisitorMatch}
         onStartPersonaConversation={() => void startPersonaConversation()} onPersonaDraftChange={setPersonaDraft}
         onSendPersonaTurn={() => void sendPersonaTurn()} onLetterTitleChange={setLetterTitle} onLetterBodyChange={setLetterBody}
-        onSendLetter={() => void sendLetterToMatch()} />
+        onSendLetter={() => void sendLetterToMatch()} locale={skillLocale} />
       </div>
 
       <div className="product-space" hidden={productSpace !== "letters"}>
