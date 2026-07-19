@@ -26,8 +26,20 @@ proves it on a real surface, without a big-bang string migration:
 - Full suite `npm test -- --run --no-file-parallelism` → **210/210**; `npm run build` PASS (18 PWA
   precache entries), static assets rebuilt.
 
-## 3. Remaining
-- This is groundwork + one migrated surface, not full coverage. The rest of the shell is still
-  Chinese-only; each surface adopts the `locale` prop incrementally using this seam.
-- No in-app locale switcher yet (detection only); `saveLocale()` exists for when a switcher is added.
-- WCAG/a11y audit and en-SG copy review by a non-author remain open B4 items.
+## 3. In-app language switcher (follow-up)
+
+- `web/src/components/LocaleToggle.tsx` — an accessible 中文/English switcher (role=group,
+  `aria-pressed`, self-labels in the active language, reuses `.appearance-toggle` styling) rendered in
+  the Me space next to the theme toggle.
+- `AuroraApp` wires it via `changeLocale`, which sets the shared `skillLocale` and persists through
+  `i18n.saveLocale`, so the choice survives reloads (and `loadLocale` picks it up next boot).
+- `web/src/components/LocaleToggle.test.tsx` (2 tests): active-locale `aria-pressed` + self-labelling,
+  and the chosen locale is emitted on click.
+
+`npm test -- --run src/components/LocaleToggle.test.tsx` → **2/2**; full suite **212/212**; build PASS.
+
+## 4. Remaining
+- This is groundwork + two migrated surfaces (DataRightsPanel) + the switcher, not full coverage. The
+  rest of the shell is still Chinese-only; each surface adopts the `locale` prop incrementally.
+- Live in-browser verification of the switcher flipping copy is a follow-up (deterministically covered
+  here); WCAG/a11y audit and non-author en-SG copy review remain open B4 items.

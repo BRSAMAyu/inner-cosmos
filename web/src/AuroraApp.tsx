@@ -19,8 +19,9 @@ import { LettersInbox } from "./components/LettersInbox";
 import { PortraitView } from "./components/PortraitView";
 import { AccountSettings, type AccountBusy } from "./components/AccountSettings";
 import { DataRightsPanel } from "./components/DataRightsPanel";
+import { LocaleToggle } from "./components/LocaleToggle";
 import type { DataRetractionReceipt } from "./api";
-import { loadLocale } from "./i18n";
+import { loadLocale, saveLocale, type Locale } from "./i18n";
 import { AuthGate } from "./components/AuthGate";
 import { PsychologySkillStudio, SkillSuggestionBanner, type SkillLocale } from "./components/PsychologySkillStudio";
 import { ConnectError, LoadingText } from "./loading";
@@ -462,6 +463,10 @@ export function AuroraApp() {
     catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法读取数据权利回执"); }
     finally { setDataRightsLoading(false); }
   };
+
+  // App-wide language: initialized from detection (loadLocale), overridable + persisted here so the
+  // choice survives reloads. skillLocale is the single shared locale state (see i18n.ts).
+  const changeLocale = (locale: Locale) => { setSkillLocale(locale); saveLocale(locale); };
 
   const changeAccountPassword = async (oldPassword: string, newPassword: string) => {
     setAccountBusy("password");
@@ -971,6 +976,7 @@ export function AuroraApp() {
           onLoadHistory={dim => void loadPortraitHistory(dim)} onCalibrate={(dim, oldValue, newValue) => void submitPortraitCalibration(dim, oldValue, newValue)} />
         <AccountSettings busy={accountBusy} message={accountMessage} onChangePassword={(oldPassword, newPassword) => void changeAccountPassword(oldPassword, newPassword)}
           onExportData={() => void exportAccountData()} onDeleteAccount={password => void deleteAccount(password)} />
+        <LocaleToggle locale={skillLocale} onChange={changeLocale} />
         <DataRightsPanel receipts={dataRightsReceipts} loading={dataRightsLoading} loaded={dataRightsLoaded}
           onLoad={() => void loadDataRightsReceipts()} locale={skillLocale} />
       </div>

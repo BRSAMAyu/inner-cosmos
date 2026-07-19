@@ -131,6 +131,8 @@ workstreams:
       - web/src/i18n.test.ts
       - web/src/components/DataRightsPanel.tsx
       - web/src/components/DataRightsPanel.test.tsx
+      - web/src/components/LocaleToggle.tsx
+      - web/src/components/LocaleToggle.test.tsx
       - web/src/AuroraApp.tsx
     remaining: >
       THIS SESSION: added the missing shared locale seam on top of the app's existing per-component
@@ -138,10 +140,11 @@ workstreams:
       detectLocale stored>browser>zh-CN default, loadLocale/saveLocale) with 3 unit tests; migrated the
       DataRightsPanel to fully bilingual (zh-CN default + en-SG) via the same pattern; AuroraApp now
       initializes skillLocale from loadLocale() so the app respects a stored pref/browser language
-      instead of hard-coding zh-CN. i18n+panel 7/7, full suite 210/210, build PASS. Still open:
-      most of the shell is still Chinese-only (adopt the locale prop per surface using this seam), no
-      in-app locale switcher yet (saveLocale is ready), WCAG target + manual a11y checks, and
-      non-author en-SG copy review.
+      instead of hard-coding zh-CN. FOLLOW-UP: added an accessible in-app 中文/English switcher
+      (LocaleToggle, in the Me space) that persists via saveLocale so the choice survives reloads;
+      LocaleToggle 2/2, full suite 212/212, build PASS. Still open: most of the shell is still
+      Chinese-only (adopt the locale prop per surface using this seam), WCAG target + manual a11y
+      checks, non-author en-SG copy review, and live in-browser verification of the switcher.
   B5-pwa-mobile:
     status: IN_PROGRESS
     evidence:
