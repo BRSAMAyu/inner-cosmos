@@ -73,10 +73,29 @@ of inline string-matching buried in a 1200-line service:
 
 `./mvnw test -Dtest=AiFailureContractTest,AuroraEmergenceTest,AuroraStreamServiceTest` → **12/12**.
 
-## 6. Remaining / not yet proven
+## 6. Privacy-safe AI spans via the Observation API (follow-up)
 
-- Live-turn emission through the fully-wired Spring context (counter increments on a real chat turn)
-  is exercised by any full-context chat integration test at the merge node; a dedicated
-  assert-the-counter-incremented `@SpringBootTest` would make it explicit.
-- Partial-stream-reconnect degradation and OpenTelemetry distributed spans (not just metrics) remain
-  open.
+Distributed AI-turn **spans** are now emitted through Micrometer's Observation API — which is already on
+the compile classpath (no new *main* dependency), and which Spring Boot turns into real OpenTelemetry
+spans as soon as a tracing bridge is configured:
+
+- `src/main/java/com/innercosmos/ai/observability/AiTurnObservation.java` — emits an `aurora.turn`
+  observation per turn with the same bounded, non-sensitive attributes as the metrics (route, runtime,
+  provider, mode, fallback, memory_referenced) plus a coarse `duration_bucket` (never a raw-ms,
+  high-cardinality value). No tracer → cheap no-op; tracer present → an `aurora.turn` span.
+- Wired next to `AiTurnMetrics` at the single `recordTurnMetrics` site in `AuroraAgentServiceImpl`
+  (same `@Autowired(required=false)` idiom; both are no-ops when unwired).
+- `src/test/java/com/innercosmos/ai/observability/AiTurnObservationTest.java` (3) — uses
+  `TestObservationRegistry` to assert the observation is started/stopped with the declared bounded
+  attributes, normalises null inputs, never emits a `userId`/`message`/`content`/`duration_ms` key, and
+  buckets latency coarsely. Added `micrometer-observation-test` (test scope) to the pom.
+
+## 7. Remaining / not yet proven
+
+- Turning the `aurora.turn` observation into an exported OTel span in prod is a **deploy/config** step
+  (add a tracing bridge — e.g. `micrometer-tracing-bridge-otel` + an exporter endpoint — and point it at
+  a collector). The instrumentation + span contract are done and tested here; wiring an actual exporter
+  is environment configuration, not code.
+- Live-turn emission through the fully-wired Spring context is exercised by any full-context chat
+  integration test at the merge node.
+- Partial-stream-reconnect degradation remains open.

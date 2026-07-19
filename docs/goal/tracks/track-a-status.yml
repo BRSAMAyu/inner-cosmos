@@ -220,6 +220,8 @@ workstreams:
       - src/test/java/com/innercosmos/architecture/DomainBoundaryArchitectureTest.java
       - src/main/java/com/innercosmos/ai/runtime/AiFailureContract.java
       - src/test/java/com/innercosmos/ai/runtime/AiFailureContractTest.java
+      - src/main/java/com/innercosmos/ai/observability/AiTurnObservation.java
+      - src/test/java/com/innercosmos/ai/observability/AiTurnObservationTest.java
     remaining: >
       THIS SESSION: privacy-safe per-turn AI metrics (aurora.turn.count counter + aurora.turn.latency
       timer) tagged only with bounded non-sensitive dimensions (route/runtime/provider/mode/fallback/

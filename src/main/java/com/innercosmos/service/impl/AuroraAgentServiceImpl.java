@@ -106,6 +106,9 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     /** A6 privacy-safe AI metrics; Spring always wires it, null only in constructor-level unit tests. */
     @Autowired(required = false)
     private com.innercosmos.ai.observability.AiTurnMetrics aiTurnMetrics;
+    /** A6 privacy-safe AI span (Observation → OTel span with a tracer); Spring always wires it. */
+    @Autowired(required = false)
+    private com.innercosmos.ai.observability.AiTurnObservation aiTurnObservation;
     private final Map<Long, Integer> turnCounter = new ConcurrentHashMap<>();
     private final Map<Long, Integer> goodbyeConfirmCount = new ConcurrentHashMap<>();
     private AuroraStreamStageStore streamStageStore =
@@ -416,17 +419,22 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         return vo;
     }
 
-    /** A6: emit the privacy-safe per-turn counter/timer. No-op when metrics are not wired. */
+    /** A6: emit the privacy-safe per-turn counter/timer + span. No-op for whichever is not wired. */
     private void recordTurnMetrics(String route, AuroraReplyVO vo, ResolvedModel resolved, String mode,
                                    boolean fallbackUsed, long startNanos) {
-        if (aiTurnMetrics == null) return;
+        if (aiTurnMetrics == null && aiTurnObservation == null) return;
         String runtime = vo != null && vo.agentLoop != null && vo.agentLoop.get("runtime") instanceof String r
                 ? r : "single-pass.v1";
         String provider = resolved == null || resolved.provider() == null
                 ? llmConfig.activeProvider() : resolved.provider();
         boolean memoryReferenced = vo != null && Boolean.TRUE.equals(vo.memoryReferenced);
         long durationMs = (System.nanoTime() - startNanos) / 1_000_000L;
-        aiTurnMetrics.recordTurn(route, runtime, provider, mode, fallbackUsed, memoryReferenced, durationMs);
+        if (aiTurnMetrics != null) {
+            aiTurnMetrics.recordTurn(route, runtime, provider, mode, fallbackUsed, memoryReferenced, durationMs);
+        }
+        if (aiTurnObservation != null) {
+            aiTurnObservation.record(route, runtime, provider, mode, fallbackUsed, memoryReferenced, durationMs);
+        }
     }
 
     private void afterMessage(Long userId, Long sessionId, String userMessage) {
