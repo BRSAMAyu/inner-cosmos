@@ -72,9 +72,17 @@ Booted the real app (dev H2 + Mock), registered, opened the Me space and drove t
   `AuroraApp` passes `locale={skillLocale}`. With MeSpace + DataRightsPanel + LocaleToggle already
   bilingual, the **entire Me / 控制与边界 space is now bilingual**. AccountSettings.test 5/5.
 
+## 3f. All major component surfaces migrated (follow-up)
+Every major user-facing component now renders via a `Record<Locale, …>` map and takes a `locale` prop
+threaded from `AuroraApp`'s `skillLocale`, each with an added en-SG test case:
+AuthGate, AuroraConversation, MeSpace, AccountSettings, DataRightsPanel, LocaleToggle,
+UnderstandingCorrection, MemoryStarfield, AuroraSelfSpace, PeopleDiscovery, PlazaDirectory,
+ResonanceNetwork, CapsuleWorkbench, LettersInbox. Full Vitest **227/227**; build PASS.
+
 ## 4. Remaining
-- Fully bilingual now: the Me space (MeSpace, AccountSettings, DataRightsPanel, LocaleToggle), the
-  Aurora conversation surface, and the UnderstandingCorrection surface ("if this isn't quite you" +
-  correction history). Remaining space bodies (memory starfield, capsule workbench, resonance,
-  letters composer, Aurora self) still adopt the `locale` prop incrementally via this seam.
+- Component-level i18n is essentially complete (all five spaces + auth switch language end to end via
+  the shared LocaleToggle). What's left: a handful of strings inlined directly in `AuroraApp.tsx`
+  (the Aurora hero banner + mobile-presence section + a few transient status-banner messages) and any
+  minor sub-panels; these live in the 1000-line shell rather than a component, so they're migrated as
+  a separate focused pass. WCAG/a11y audit and non-author en-SG copy review also remain.
 - WCAG/a11y audit and non-author en-SG copy review remain open B4 items.
