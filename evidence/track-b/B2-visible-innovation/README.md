@@ -47,14 +47,31 @@ away where the user is actually looking (the conversation):
   entries** (matches baseline) and rebuilt `src/main/resources/static/app/aurora/{assets/app.js,assets/index.css,sw.js}`.
 - `git diff --check` → clean.
 
+## 3b. Live in-browser verification (this session, after disk was freed)
+
+Booted the real app (`./mvnw spring-boot:run --server.port=8090`, dev H2 + Mock provider, serving
+the rebuilt assets) and drove it through the in-app browser:
+
+- Registered a throwaway local account, entered the Aurora space (idle hero badge "在这里").
+- Sent a message → received a streamed reply; runtime meta rendered live ("理解与表达双核协作",
+  "关系动作 · 保持连续，把下一步选择权交还用户").
+- Sent an action-mode message → the reply rendered as **two distinct, separately-spaced Aurora
+  bubbles** (accessibility-tree read of the conversation region shows two sibling `article`s) — i.e.
+  the deliberate `segment`-driven multi-message rhythm this slice restores, working end to end.
+- **Zero console errors** across the whole flow.
+
+Not visually captured: the sub-second inline *thinking* beat itself. With the Mock provider a full
+turn (understanding→composing→speaking→done) completes in well under a second, so the transient beat
+cannot be reliably screenshotted through the async browser-polling interface. Its exact rendering and
+the `segment`→`composing` transition are pinned by the deterministic component/hook tests in §3; the
+live run confirms the surrounding flow, the multi-bubble pacing, and the absence of runtime errors.
+(Screenshot capture itself timed out — the continuous stardust/ripple canvas keeps the renderer busy;
+the accessibility-tree read is the structural evidence, which the verification guidance prefers.)
+
 ## 4. Remaining / not yet proven
 
-- **Live in-browser verification** of the beat during a real streamed turn is pending this session.
-  The machine's C: drive was at ~0 GB free, so booting Spring Boot with file-backed H2 risked an
-  ENOSPC mid-run corrupting the dev database — an unsafe action deferred deliberately. The Mock
-  provider does produce multi-segment replies, so this is directly exercisable at a less
-  disk-constrained point: register → send → observe the "正在理解…/正在组织下一句…" beat and the
-  inter-bubble pacing. Recommended as the next Track B live check.
+- A slower/real provider would make the inline thinking beat visually observable for a demo capture;
+  worth a screenshot when real-provider evidence is next gathered.
 - Dependency note: `web/node_modules` was found broadly corrupted (several packages missing their
   `.mjs` builds) and `npm ci` fails because the committed `package-lock.json` is out of sync with
   `package.json` (missing `@emnapi/*`). A full `npm install` was needed to get a working tree; the
