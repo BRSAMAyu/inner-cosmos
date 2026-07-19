@@ -38,4 +38,11 @@ describe("PeopleDiscovery", () => {
     render(<PeopleDiscovery people={[person()]} busy={true} onRequest={() => undefined} />);
     expect(screen.getByRole("button", { name: "想认识 ta" })).toBeDisabled();
   });
+
+  it("renders in English and maps relation statuses when locale is en-SG", () => {
+    render(<PeopleDiscovery locale="en-SG" people={[person({ relationStatus: "PENDING_OUT" })]} busy={false} onRequest={() => undefined} />);
+    expect(screen.getByRole("heading", { name: "Reach out to people, without rushing any relationship" })).toBeVisible();
+    expect(screen.getByText("1 person to get to know")).toBeVisible();
+    expect(screen.getByText("Invite sent")).toBeVisible();
+  });
 });
