@@ -70,6 +70,15 @@ Owner-facing audit-trail API (follow-up):
 - `src/main/java/com/innercosmos/vo/DataRetractionReceiptVO.java`
 - Contract delta `TA-DELTA-001` in `docs/goal/tracks/track-a-contract-deltas.yml` (so Track B can build the UI panel)
 
+Source→derivative registry (follow-up):
+- `src/main/java/com/innercosmos/service/DataDerivativeRegistry.java` — the single canonical map of
+  each subject (MEMORY / CAPSULE / DATA_USE_GRANT) → its derivatives (MEMORY_EMBEDDING /
+  CAPSULE_MATCH_INDEX / CAPSULE_PERSONA / GENOME) + the default retraction action per edge.
+- `src/test/java/com/innercosmos/service/DataDerivativeRegistryTest.java` (3) — a completeness guard:
+  reflection over the receipt service's `DERIVATIVE_*` constants asserts each is registered, every edge
+  uses a valid subject/action constant, and grouping-by-subject is correct. Adding a new derivative
+  type without registering how it is retracted + audited now fails the build.
+
 Tests:
 - `src/test/java/com/innercosmos/service/impl/CapsuleEmbeddingRetirementTest.java` (new, 4 tests, H2)
 - `src/test/java/com/innercosmos/service/impl/CorrectionEmbeddingPropagationTest.java` (new, 1 test, H2)

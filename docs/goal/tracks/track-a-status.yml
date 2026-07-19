@@ -198,12 +198,15 @@ workstreams:
       the correction delists has its matching vector erased (CAPSULE_MATCH_INDEX/ERASED receipt),
       making the correction path consistent with forget/archive/grant-revoke; +1 H2 regression
       (CorrectionEmbeddingPropagationTest) green with UserCorrectionControllerTest 10/10 unaffected.
-      Still missing before A5 COMPLETE: the single source->derivative registry; equivalent
-      erasure/receipts for prompt snapshots/summaries, analytics,
-      notifications and honest backup tombstones; durable/replayable delivery via the existing outbox
-      (data.retracted.v1) instead of the current synchronous in-transaction fan-out; and an
-      owner-facing audit-trail API (Track A contract delta + Track B integration request). See
-      evidence/track-a/A5-rights-propagation/README.md.
+      FOLLOW-UPS since: (a) owner-facing audit-trail API GET /api/me/data-rights/receipts
+      (DataRightsController, contract delta TA-DELTA-001, DataRightsControllerTest 2/2) — DONE; (b) the
+      single source->derivative registry DataDerivativeRegistry enumerating every subject->derivative
+      edge + retraction action, with a reflection completeness guard (DataDerivativeRegistryTest 3/3)
+      that fails the build if a new DERIVATIVE_* constant is added without registering how it is
+      retracted/audited — DONE. Still missing before A5 COMPLETE: equivalent erasure/receipts for
+      prompt snapshots/summaries, analytics, notifications and honest backup tombstones; and
+      durable/replayable delivery via the existing outbox (data.retracted.v1) instead of the current
+      synchronous in-transaction fan-out. See evidence/track-a/A5-rights-propagation/README.md.
   A6-observability-boundaries:
     status: IN_PROGRESS
     evidence:
