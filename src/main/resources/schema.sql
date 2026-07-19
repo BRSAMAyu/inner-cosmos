@@ -331,6 +331,21 @@ CREATE TABLE IF NOT EXISTS tb_memory_projection_receipt (
   CONSTRAINT fk_memory_projection_operation FOREIGN KEY (operation_id) REFERENCES tb_memory_operation(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS tb_data_retraction_receipt (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  subject_type VARCHAR(32) NOT NULL,
+  subject_id BIGINT NOT NULL,
+  derivative_type VARCHAR(48) NOT NULL,
+  action VARCHAR(24) NOT NULL,
+  affected_count INT NOT NULL DEFAULT 0,
+  reason VARCHAR(240),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_data_retraction_user (user_id, created_at),
+  INDEX idx_data_retraction_subject (subject_type, subject_id)
+);
+
 CREATE TABLE IF NOT EXISTS tb_memory_embedding (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT NOT NULL,

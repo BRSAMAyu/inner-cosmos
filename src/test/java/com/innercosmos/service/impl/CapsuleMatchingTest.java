@@ -50,6 +50,7 @@ class CapsuleMatchingTest {
     @Mock DataUseGrantService dataUseGrantService;
     @Mock com.innercosmos.mapper.BlockRelationMapper blockRelationMapper;
     @Mock com.innercosmos.service.CapsuleEmbeddingIndexService capsuleEmbeddingIndexService;
+    @Mock com.innercosmos.service.DataRetractionReceiptService retractionReceiptService;
 
     CapsuleServiceImpl service;
 
@@ -61,7 +62,8 @@ class CapsuleMatchingTest {
     void setUp() {
         service = new CapsuleServiceImpl(echoCapsuleMapper, boundaryMapper, capsuleAgent,
                 memoryCardMapper, userPortraitMapper, authorizedMemoryRefMapper, genomeService, dataUseGrantService,
-                blockRelationMapper, new com.fasterxml.jackson.databind.ObjectMapper(), capsuleEmbeddingIndexService);
+                blockRelationMapper, new com.fasterxml.jackson.databind.ObjectMapper(), capsuleEmbeddingIndexService,
+                retractionReceiptService);
         // default: no portrait rows unless a test overrides
         lenient().when(userPortraitMapper.selectList(any())).thenReturn(new ArrayList<>());
         // default: no block relationships unless a test overrides

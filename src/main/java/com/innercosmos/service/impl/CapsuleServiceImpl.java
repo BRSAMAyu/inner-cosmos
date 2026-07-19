@@ -22,6 +22,7 @@ import com.innercosmos.service.CapsuleService;
 import com.innercosmos.service.ResonanceMatchStrategy;
 import com.innercosmos.service.CapsuleGenomeService;
 import com.innercosmos.service.CapsuleEmbeddingIndexService;
+import com.innercosmos.service.DataRetractionReceiptService;
 import com.innercosmos.service.DataUseGrantService;
 import com.innercosmos.util.CapsulePublicTextUtils;
 import com.innercosmos.util.DataMaskingUtils;
@@ -55,6 +56,7 @@ public class CapsuleServiceImpl implements CapsuleService {
     private final BlockRelationMapper blockRelationMapper;
     private final ObjectMapper objectMapper;
     private final CapsuleEmbeddingIndexService capsuleEmbeddingIndexService;
+    private final DataRetractionReceiptService retractionReceiptService;
 
     public CapsuleServiceImpl(EchoCapsuleMapper capsuleMapper,
                               CapsuleBoundaryMapper boundaryMapper,
@@ -66,7 +68,8 @@ public class CapsuleServiceImpl implements CapsuleService {
                               DataUseGrantService dataUseGrantService,
                               BlockRelationMapper blockRelationMapper,
                               ObjectMapper objectMapper,
-                              CapsuleEmbeddingIndexService capsuleEmbeddingIndexService) {
+                              CapsuleEmbeddingIndexService capsuleEmbeddingIndexService,
+                              DataRetractionReceiptService retractionReceiptService) {
         this.capsuleMapper = capsuleMapper;
         this.boundaryMapper = boundaryMapper;
         this.capsuleAgent = capsuleAgent;
@@ -78,6 +81,7 @@ public class CapsuleServiceImpl implements CapsuleService {
         this.blockRelationMapper = blockRelationMapper;
         this.objectMapper = objectMapper;
         this.capsuleEmbeddingIndexService = capsuleEmbeddingIndexService;
+        this.retractionReceiptService = retractionReceiptService;
     }
 
     @Override
@@ -776,6 +780,12 @@ public class CapsuleServiceImpl implements CapsuleService {
             ref.authorizationStatus = "WITHDRAWN";
             authorizedMemoryRefMapper.updateById(ref);
         }
+        // Archiving delists the capsule; erase its compiled matching vector now so it can no longer
+        // surface as a discovery candidate, and leave an auditable receipt of the erasure.
+        int erased = capsuleEmbeddingIndexService.retireForCapsule(capsuleId);
+        retractionReceiptService.record(userId, DataRetractionReceiptService.SUBJECT_CAPSULE,
+                capsuleId, DataRetractionReceiptService.DERIVATIVE_CAPSULE_MATCH_INDEX,
+                DataRetractionReceiptService.ACTION_ERASED, erased, "owner archived capsule");
     }
 
     private List<MemoryCard> replaceAuthorizations(Long userId, EchoCapsule capsule, List<Long> requestedIds) {

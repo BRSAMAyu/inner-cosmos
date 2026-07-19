@@ -7,11 +7,13 @@ minimum_handoff_commit: 7e0688308292cd9d41552c98f576d25681738be0
 base_sha: 14e1b85596034544b7fb291677fb8dd3f8240f1c
 branch: codex/track-a-living-intelligence
 owner: claude-code-track-a
-updated_at: "2026-07-18T22:50:00+08:00"
+updated_at: "2026-07-19T19:30:00+08:00"
 spec: docs/tracks/TRACK-A-LIVING-INTELLIGENCE.md
 evidence_root: evidence/track-a
 contract_deltas: docs/goal/tracks/track-a-contract-deltas.yml
-current_front: A3-capsule-matching
+continuation_branch: feat/track-a-living-intelligence-cont
+continuation_base_sha: 85b3a5b30519cc5894c6ee4a94fe9844d20bc3ee
+current_front: A5-data-rights-propagation
 handoff_checkpoint:
   status: BUILDER_VERIFIED_IN_PROGRESS
   scope: "Accepted A3 capsule-vector foundation checkpoint: consent-scoped query material, current-content-hash scoring and bounded asynchronous rebuild. Full A3 quality research remains IN_PROGRESS."
@@ -165,9 +167,36 @@ workstreams:
       against a labeled staleness corpus (human gate, same pattern as A1's adaptive-budget-policy
       weights). See evidence/track-a/A2-memory-profile/README.md for full detail and the exact
       real-code-vs-gap audit.
-  A3-capsule-matching: {status: IN_PROGRESS, evidence: [evidence/track-a/A3-capsule-matching/README.md], remaining: "Foundation checkpoint accepted: current-hash invalidation, dedicated H2/PostgreSQL tests and bounded asynchronous rebuild are complete. Continue real-provider latency/cost/backpressure evaluation, full consent/deletion receipt propagation, dynamic Genome fidelity and blind multi-strategy quality evidence."}
+  A3-capsule-matching: {status: IN_PROGRESS, evidence: [evidence/track-a/A3-capsule-matching/README.md, evidence/track-a/A5-rights-propagation/README.md], remaining: "Foundation checkpoint accepted: current-hash invalidation, dedicated H2/PostgreSQL tests and bounded asynchronous rebuild are complete. THIS SESSION closed the consent/withdrawal/forget -> matching-vector propagation gap (see A5-data-rights). Still open: real-provider latency/cost/backpressure evaluation, dynamic Genome fidelity and blind multi-strategy quality evidence."}
   A4-psychology-skills: {status: NOT_STARTED, evidence: [], remaining: "Ship and evaluate at least three bilingual non-diagnostic product skills."}
-  A5-data-rights: {status: NOT_STARTED, evidence: [], remaining: "Cover every derivative, queue, cache, analytics, notification and backup policy."}
+  A5-data-rights:
+    status: IN_PROGRESS
+    evidence:
+      - evidence/track-a/A5-rights-propagation/README.md
+      - src/main/java/com/innercosmos/entity/DataRetractionReceipt.java
+      - src/main/java/com/innercosmos/service/DataRetractionReceiptService.java
+      - src/main/java/com/innercosmos/service/impl/DataRetractionReceiptServiceImpl.java
+      - src/main/java/com/innercosmos/service/CapsuleEmbeddingIndexService.java
+      - src/main/resources/db/migration/postgresql/V19__data_retraction_receipts.sql
+      - src/test/java/com/innercosmos/service/impl/CapsuleEmbeddingRetirementTest.java
+      - src/test/java/com/innercosmos/service/impl/CapsuleEmbeddingPostgresIntegrationTest.java
+    remaining: >
+      THIS SESSION: closed the highest-value machine-verifiable derivative-propagation gap. The
+      capsule matching vector (tb_capsule_embedding, the A3/V18 derivative) previously had NO
+      invalidation hook — memory forget, capsule archive and data-use-grant revoke all left it
+      ACTIVE. Added CapsuleEmbeddingIndexService.retireForCapsule (physical erasure of the derived
+      pgvector, idempotent, rebuild-safe) and a new sensitive-payload-free audit table
+      tb_data_retraction_receipt (+ entity/mapper/DataRetractionReceiptService) written across all
+      three schema mechanisms (Flyway V19, schema.sql, SchemaM18Initializer). Wired erasure + one
+      receipt into all three erasure paths; 4 new H2 regressions + an extended PostgreSQL/pgvector
+      assertion (24/24 focused green; 144/145 across every touched service, the 1 non-pass being the
+      Docker-gated Postgres test that ERRORED on missing Docker, not a code defect). Still missing
+      before A5 COMPLETE: the single source->derivative registry; equivalent erasure/receipts for
+      memory embeddings on the correction/supersession path, prompt snapshots/summaries, analytics,
+      notifications and honest backup tombstones; durable/replayable delivery via the existing outbox
+      (data.retracted.v1) instead of the current synchronous in-transaction fan-out; and an
+      owner-facing audit-trail API (Track A contract delta + Track B integration request). See
+      evidence/track-a/A5-rights-propagation/README.md.
   A6-observability-boundaries: {status: NOT_STARTED, evidence: [], remaining: "Add privacy-safe AI signals, failure injection, backend actuator hardening and executable module boundaries."}
 latest_checkpoint: "2c11dfb7d71fb632147b4408f8510bbe713d10b5"
 commits:

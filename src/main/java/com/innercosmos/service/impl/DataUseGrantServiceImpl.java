@@ -11,7 +11,9 @@ import com.innercosmos.mapper.AuthorizedMemoryRefMapper;
 import com.innercosmos.mapper.DataUseGrantMapper;
 import com.innercosmos.mapper.EchoCapsuleMapper;
 import com.innercosmos.mapper.MemoryCardMapper;
+import com.innercosmos.service.CapsuleEmbeddingIndexService;
 import com.innercosmos.service.CapsuleGenomeService;
+import com.innercosmos.service.DataRetractionReceiptService;
 import com.innercosmos.service.DataUseGrantService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,15 +29,21 @@ public class DataUseGrantServiceImpl implements DataUseGrantService {
     private final MemoryCardMapper memoryMapper;
     private final AuthorizedMemoryRefMapper refMapper;
     private final CapsuleGenomeService genomeService;
+    private final CapsuleEmbeddingIndexService capsuleEmbeddingIndexService;
+    private final DataRetractionReceiptService retractionReceiptService;
 
     public DataUseGrantServiceImpl(DataUseGrantMapper grantMapper, EchoCapsuleMapper capsuleMapper,
                                    MemoryCardMapper memoryMapper, AuthorizedMemoryRefMapper refMapper,
-                                   CapsuleGenomeService genomeService) {
+                                   CapsuleGenomeService genomeService,
+                                   CapsuleEmbeddingIndexService capsuleEmbeddingIndexService,
+                                   DataRetractionReceiptService retractionReceiptService) {
         this.grantMapper = grantMapper;
         this.capsuleMapper = capsuleMapper;
         this.memoryMapper = memoryMapper;
         this.refMapper = refMapper;
         this.genomeService = genomeService;
+        this.capsuleEmbeddingIndexService = capsuleEmbeddingIndexService;
+        this.retractionReceiptService = retractionReceiptService;
     }
 
     @Override
@@ -139,6 +147,12 @@ public class DataUseGrantServiceImpl implements DataUseGrantService {
         capsuleMapper.update(null, new UpdateWrapper<EchoCapsule>().eq("id", capsuleId)
                 .set("visibility_status", "NEEDS_REVIEW").set("is_public", false));
         genomeService.markNeedsReview(capsuleId, "data-use grant revoked by owner");
+        // The capsule just left the public plaza, so its compiled matching vector must stop being a
+        // discoverable candidate immediately — not merely wait for the next content-hash rebuild.
+        int erased = capsuleEmbeddingIndexService.retireForCapsule(capsuleId);
+        retractionReceiptService.record(ownerUserId, DataRetractionReceiptService.SUBJECT_DATA_USE_GRANT,
+                grantId, DataRetractionReceiptService.DERIVATIVE_CAPSULE_MATCH_INDEX,
+                DataRetractionReceiptService.ACTION_ERASED, erased, "data-use grant revoked by owner");
         return grant;
     }
 }

@@ -25,7 +25,9 @@ import com.innercosmos.mapper.MemoryProjectionReceiptMapper;
 import com.innercosmos.mapper.RelationMentionMapper;
 import com.innercosmos.mapper.ThoughtFragmentMapper;
 import com.innercosmos.mapper.TodoItemMapper;
+import com.innercosmos.service.CapsuleEmbeddingIndexService;
 import com.innercosmos.service.CapsuleGenomeService;
+import com.innercosmos.service.DataRetractionReceiptService;
 import com.innercosmos.service.DataUseGrantService;
 import com.innercosmos.service.MemoryLifecycleService;
 import com.innercosmos.vo.MemoryOperationPreviewVO;
@@ -61,6 +63,8 @@ public class MemoryLifecycleServiceImpl implements MemoryLifecycleService {
     private final EchoCapsuleMapper capsuleMapper;
     private final CapsuleGenomeService genomeService;
     private final DataUseGrantService dataUseGrantService;
+    private final CapsuleEmbeddingIndexService capsuleEmbeddingIndexService;
+    private final DataRetractionReceiptService retractionReceiptService;
 
     public MemoryLifecycleServiceImpl(MemoryCardMapper memoryMapper,
                                       MemoryOperationMapper operationMapper,
@@ -75,7 +79,9 @@ public class MemoryLifecycleServiceImpl implements MemoryLifecycleService {
                                       ApplicationEventPublisher eventPublisher,
                                       EchoCapsuleMapper capsuleMapper,
                                       CapsuleGenomeService genomeService,
-                                      DataUseGrantService dataUseGrantService) {
+                                      DataUseGrantService dataUseGrantService,
+                                      CapsuleEmbeddingIndexService capsuleEmbeddingIndexService,
+                                      DataRetractionReceiptService retractionReceiptService) {
         this.memoryMapper = memoryMapper;
         this.operationMapper = operationMapper;
         this.projectionReceiptMapper = projectionReceiptMapper;
@@ -90,6 +96,8 @@ public class MemoryLifecycleServiceImpl implements MemoryLifecycleService {
         this.capsuleMapper = capsuleMapper;
         this.genomeService = genomeService;
         this.dataUseGrantService = dataUseGrantService;
+        this.capsuleEmbeddingIndexService = capsuleEmbeddingIndexService;
+        this.retractionReceiptService = retractionReceiptService;
     }
 
     @Override
@@ -350,7 +358,7 @@ public class MemoryLifecycleServiceImpl implements MemoryLifecycleService {
                 .eq("user_id", card.userId).eq("memory_id", card.id));
 
         for (Long capsuleId : affectedCapsuleIds) {
-            withdrawCapsuleForForgottenMemory(capsuleId);
+            withdrawCapsuleForForgottenMemory(card.userId, card.id, capsuleId);
         }
     }
 
@@ -361,7 +369,7 @@ public class MemoryLifecycleServiceImpl implements MemoryLifecycleService {
      * markNeedsReview then withdraws the active Genome version so runtime chat can no longer
      * read the old compiled prompt either.
      */
-    private void withdrawCapsuleForForgottenMemory(Long capsuleId) {
+    private void withdrawCapsuleForForgottenMemory(Long userId, Long forgottenMemoryId, Long capsuleId) {
         capsuleMapper.update(null, new UpdateWrapper<EchoCapsule>()
                 .eq("id", capsuleId)
                 .set("visibility_status", "NEEDS_REVIEW")
@@ -369,6 +377,14 @@ public class MemoryLifecycleServiceImpl implements MemoryLifecycleService {
                 .set("style_profile_json", null)
                 .set("context_preview_json", null));
         genomeService.markNeedsReview(capsuleId, "source-authorized memory forgotten by owner");
+        // The capsule's compiled matching vector is a derivative of the very memory being erased.
+        // Delete it now (not on the next rebuild) so a forgotten memory cannot keep steering
+        // discovery through a stale public-text embedding, and record an auditable receipt.
+        int erased = capsuleEmbeddingIndexService.retireForCapsule(capsuleId);
+        retractionReceiptService.record(userId, DataRetractionReceiptService.SUBJECT_MEMORY,
+                forgottenMemoryId, DataRetractionReceiptService.DERIVATIVE_CAPSULE_MATCH_INDEX,
+                DataRetractionReceiptService.ACTION_ERASED, erased,
+                "source-authorized memory forgotten by owner");
     }
 
     private void invalidateEmbeddings(List<MemoryCard> source, String operation) {
