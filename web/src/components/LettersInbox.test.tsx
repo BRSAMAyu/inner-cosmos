@@ -105,6 +105,19 @@ describe("LettersInbox", () => {
     expect(screen.getByText("线程里的信")).toBeVisible();
   });
 
+  it("renders tabs, inbox actions and consent panel in English when locale is en-SG", () => {
+    render(<LettersInbox locale="en-SG" letterInbox={[letter]} replyDrafts={{ 7: "thanks" }}
+      connectionRequests={{ incoming: [{ id: 3, status: "PENDING", userId: 5, nickname: "Mira", username: "mira", source: "SLOW_LETTER" }], outgoing: [] }}
+      friends={[]} onReplyDraftChange={() => undefined} onReply={() => undefined} onActOnLetter={() => undefined}
+      onReportLetter={() => undefined} onRequestConnection={() => undefined} onDecideConnection={() => undefined} onLeaveConnection={() => undefined} />);
+    expect(screen.getByRole("heading", { name: /Only after it arrives/ })).toBeVisible();
+    expect(screen.getByRole("tab", { name: "Received" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Send the reply slow letter" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Report this letter" })).toBeVisible();
+    expect(screen.getByText("Mira would like to know you after the letters")).toBeVisible();
+    expect(screen.getByRole("button", { name: "I'd like to too" })).toBeVisible();
+  });
+
   it("lets the user accept an incoming connection request", () => {
     const onDecideConnection = vi.fn();
     render(<LettersInbox letterInbox={[]} replyDrafts={{}}
