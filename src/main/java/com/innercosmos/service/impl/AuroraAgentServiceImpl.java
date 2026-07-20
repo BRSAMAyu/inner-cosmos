@@ -11,6 +11,7 @@ import com.innercosmos.ai.portrait.AgentUserRelationshipService;
 import com.innercosmos.ai.portrait.UserPortraitService;
 import com.innercosmos.ai.prompt.PromptBuilder;
 import com.innercosmos.ai.router.ResolvedModel;
+import com.innercosmos.ai.runtime.AiFailureContract;
 import com.innercosmos.ai.runtime.AuroraDualKernelRuntime;
 import com.innercosmos.ai.router.SessionModelRouter;
 import com.innercosmos.ai.semantic.PseudoSemanticAnalyzer;
@@ -102,6 +103,12 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     private ConversationChoreographyService choreographyService;
     @Autowired(required = false)
     private AuroraDualKernelRuntime dualKernelRuntime;
+    /** A6 privacy-safe AI metrics; Spring always wires it, null only in constructor-level unit tests. */
+    @Autowired(required = false)
+    private com.innercosmos.ai.observability.AiTurnMetrics aiTurnMetrics;
+    /** A6 privacy-safe AI span (Observation → OTel span with a tracer); Spring always wires it. */
+    @Autowired(required = false)
+    private com.innercosmos.ai.observability.AiTurnObservation aiTurnObservation;
     private final Map<Long, Integer> turnCounter = new ConcurrentHashMap<>();
     private final Map<Long, Integer> goodbyeConfirmCount = new ConcurrentHashMap<>();
     private AuroraStreamStageStore streamStageStore =
@@ -186,6 +193,8 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
      */
     private AuroraReplyVO produceReply(Long userId, ChatRequest request, SafetyResult safety,
                                        Long userMessageId, Long turnId, boolean persistImmediately) {
+        long turnStartNanos = System.nanoTime();
+        boolean fallbackUsed = false;
         // M7: Hard boundary protection — right to refuse identity violation
         String boundaryRefusal = checkHardBoundaries(request.message, userId);
         if (boundaryRefusal != null) {
@@ -217,6 +226,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                             saved == null ? List.of() : List.of(saved));
                 }
             }
+            recordTurnMetrics("boundary-refusal", vo, null, normalizeMode(request.mode), false, turnStartNanos);
             return vo;
         }
 
@@ -332,6 +342,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         } catch (Exception e) {
             log.error("Aurora agent call failed after retries: {}", e.getMessage(), e);
             vo = differentiatedFallback(e, request.message, mode, stateSignal);
+            fallbackUsed = true;
         }
         // Tag the response with the resolved provider/model for the UI
         vo.aiState = aiState(resolved);
@@ -404,7 +415,26 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         // Goodbye trigger detection: check user message for goodbye intent
         afterMessage(userId, request.sessionId, request.message);
 
+        recordTurnMetrics("chat", vo, resolved, mode, fallbackUsed, turnStartNanos);
         return vo;
+    }
+
+    /** A6: emit the privacy-safe per-turn counter/timer + span. No-op for whichever is not wired. */
+    private void recordTurnMetrics(String route, AuroraReplyVO vo, ResolvedModel resolved, String mode,
+                                   boolean fallbackUsed, long startNanos) {
+        if (aiTurnMetrics == null && aiTurnObservation == null) return;
+        String runtime = vo != null && vo.agentLoop != null && vo.agentLoop.get("runtime") instanceof String r
+                ? r : "single-pass.v1";
+        String provider = resolved == null || resolved.provider() == null
+                ? llmConfig.activeProvider() : resolved.provider();
+        boolean memoryReferenced = vo != null && Boolean.TRUE.equals(vo.memoryReferenced);
+        long durationMs = (System.nanoTime() - startNanos) / 1_000_000L;
+        if (aiTurnMetrics != null) {
+            aiTurnMetrics.recordTurn(route, runtime, provider, mode, fallbackUsed, memoryReferenced, durationMs);
+        }
+        if (aiTurnObservation != null) {
+            aiTurnObservation.record(route, runtime, provider, mode, fallbackUsed, memoryReferenced, durationMs);
+        }
     }
 
     private void afterMessage(Long userId, Long sessionId, String userMessage) {
@@ -886,25 +916,15 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     }
 
     private AuroraReplyVO differentiatedFallback(Exception e, String message, String mode, String stateSignal) {
-        String fallbackMsg;
-        String flag;
-        if (e.getMessage() != null && (e.getMessage().contains("timeout") || e.getMessage().contains("timed out"))) {
-            fallbackMsg = "I am still thinking about what you said, but it is taking a while. You can say it again, or we can talk about something else.";
-            flag = "TIMEOUT";
-        } else if (e.getMessage() != null && (e.getMessage().contains("429") || e.getMessage().contains("rate_limit"))) {
-            fallbackMsg = "Things are a bit busy on my end. Please wait a minute and try again.";
-            flag = "RATE_LIMITED";
-        } else if (e.getMessage() != null && (e.getMessage().contains("parse") || e.getMessage().contains("JSON"))) {
-            fallbackMsg = "I heard you but my thoughts did not come together clearly. Could you try saying it differently?";
-            flag = "PARSE_ERROR";
-        } else {
-            // VS-004 mock-fallback coherence: when the LLM path failed, the
-            // fallback still gently reflects the perceptual state signal so the
-            // response stays coherent with the richer context. Perception only,
-            // not a clinical label (vision §9/§13).
-            fallbackMsg = fallbackAwareMessage(stateSignal);
-            flag = "NETWORK_ERROR";
-        }
+        // A6 user-visible degradation contract: classification (by exception type + message, whole
+        // cause chain) lives in the unit-tested AiFailureContract. PROVIDER_UNAVAILABLE keeps the
+        // state-aware message so an unreachable provider still reflects the perceptual state signal
+        // (VS-004 mock-fallback coherence; perception only, not a clinical label -- vision §9/§13).
+        AiFailureContract.Category category = AiFailureContract.classify(e);
+        String flag = category.riskFlag;
+        String fallbackMsg = category == AiFailureContract.Category.PROVIDER_UNAVAILABLE
+                ? fallbackAwareMessage(stateSignal)
+                : category.defaultUserMessage;
         AuroraReplyVO vo = new AuroraReplyVO();
         vo.messages = List.of(fallbackMsg);
         vo.replyTone = "warm, specific, friend-like";

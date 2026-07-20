@@ -73,8 +73,9 @@ class PostgresApplicationSmokeTest {
         login.password = register.password;
         assertEquals(created.id, userService.login(login).id);
 
-        // V10 adds provider embeddings; V13 adds consent-bound Psychology Skill run audit.
-        assertEquals(79L, jdbcTemplate.queryForObject("""
+        // V10 adds provider embeddings; V13 adds consent-bound Psychology Skill run audit;
+        // V19 adds tb_data_retraction_receipt (A5 data-rights audit trail).
+        assertEquals(80L, jdbcTemplate.queryForObject("""
                 SELECT COUNT(*) FROM information_schema.tables
                 WHERE table_schema='public' AND table_name LIKE 'tb_%'
                 """, Long.class));

@@ -83,6 +83,17 @@ public class CapsuleEmbeddingIndexServiceImpl implements CapsuleEmbeddingIndexSe
     }
 
     @Override
+    public int retireForCapsule(Long capsuleId) {
+        if (capsuleId == null) return 0;
+        // Delete every version/status row for the capsule. The pgvector column lives on the same
+        // row, so a delete is an honest physical erasure of the derived vector (no orphaned vector
+        // survives on PostgreSQL). The scoring path already only ever reads status='ACTIVE', but
+        // relying on a soft flag would leave the withdrawn vector on disk and would collide with
+        // the content-hash uniqueness constraint if the owner later re-consents and rebuilds.
+        return mapper.delete(new QueryWrapper<CapsuleEmbedding>().eq("capsule_id", capsuleId));
+    }
+
+    @Override
     public RebuildResult rebuildMissing(int requestedBatchSize) {
         if (!client.available()) return new RebuildResult(0, 0, 0, 0);
         int batchSize = Math.max(1, Math.min(500, requestedBatchSize));

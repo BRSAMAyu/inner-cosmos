@@ -7,11 +7,13 @@ minimum_handoff_commit: 7e0688308292cd9d41552c98f576d25681738be0
 base_sha: 14e1b85596034544b7fb291677fb8dd3f8240f1c
 branch: codex/track-a-living-intelligence
 owner: claude-code-track-a
-updated_at: "2026-07-18T22:50:00+08:00"
+updated_at: "2026-07-19T21:20:00+08:00"
 spec: docs/tracks/TRACK-A-LIVING-INTELLIGENCE.md
 evidence_root: evidence/track-a
 contract_deltas: docs/goal/tracks/track-a-contract-deltas.yml
-current_front: A3-capsule-matching
+continuation_branch: feat/track-a-living-intelligence-cont
+continuation_base_sha: 85b3a5b30519cc5894c6ee4a94fe9844d20bc3ee
+current_front: A5-data-rights-propagation
 handoff_checkpoint:
   status: BUILDER_VERIFIED_IN_PROGRESS
   scope: "Accepted A3 capsule-vector foundation checkpoint: consent-scoped query material, current-content-hash scoring and bounded asynchronous rebuild. Full A3 quality research remains IN_PROGRESS."
@@ -165,10 +167,79 @@ workstreams:
       against a labeled staleness corpus (human gate, same pattern as A1's adaptive-budget-policy
       weights). See evidence/track-a/A2-memory-profile/README.md for full detail and the exact
       real-code-vs-gap audit.
-  A3-capsule-matching: {status: IN_PROGRESS, evidence: [evidence/track-a/A3-capsule-matching/README.md], remaining: "Foundation checkpoint accepted: current-hash invalidation, dedicated H2/PostgreSQL tests and bounded asynchronous rebuild are complete. Continue real-provider latency/cost/backpressure evaluation, full consent/deletion receipt propagation, dynamic Genome fidelity and blind multi-strategy quality evidence."}
+  A3-capsule-matching: {status: IN_PROGRESS, evidence: [evidence/track-a/A3-capsule-matching/README.md, evidence/track-a/A5-rights-propagation/README.md], remaining: "Foundation checkpoint accepted: current-hash invalidation, dedicated H2/PostgreSQL tests and bounded asynchronous rebuild are complete. THIS SESSION closed the consent/withdrawal/forget -> matching-vector propagation gap (see A5-data-rights). Still open: real-provider latency/cost/backpressure evaluation, dynamic Genome fidelity and blind multi-strategy quality evidence."}
   A4-psychology-skills: {status: NOT_STARTED, evidence: [], remaining: "Ship and evaluate at least three bilingual non-diagnostic product skills."}
-  A5-data-rights: {status: NOT_STARTED, evidence: [], remaining: "Cover every derivative, queue, cache, analytics, notification and backup policy."}
-  A6-observability-boundaries: {status: NOT_STARTED, evidence: [], remaining: "Add privacy-safe AI signals, failure injection, backend actuator hardening and executable module boundaries."}
+  A5-data-rights:
+    status: IN_PROGRESS
+    evidence:
+      - evidence/track-a/A5-rights-propagation/README.md
+      - src/main/java/com/innercosmos/entity/DataRetractionReceipt.java
+      - src/main/java/com/innercosmos/service/DataRetractionReceiptService.java
+      - src/main/java/com/innercosmos/service/impl/DataRetractionReceiptServiceImpl.java
+      - src/main/java/com/innercosmos/service/CapsuleEmbeddingIndexService.java
+      - src/main/resources/db/migration/postgresql/V19__data_retraction_receipts.sql
+      - src/main/java/com/innercosmos/service/impl/UserCorrectionServiceImpl.java
+      - src/test/java/com/innercosmos/service/impl/CapsuleEmbeddingRetirementTest.java
+      - src/test/java/com/innercosmos/service/impl/CorrectionEmbeddingPropagationTest.java
+      - src/test/java/com/innercosmos/service/impl/CapsuleEmbeddingPostgresIntegrationTest.java
+    remaining: >
+      THIS SESSION: closed the highest-value machine-verifiable derivative-propagation gap. The
+      capsule matching vector (tb_capsule_embedding, the A3/V18 derivative) previously had NO
+      invalidation hook — memory forget, capsule archive and data-use-grant revoke all left it
+      ACTIVE. Added CapsuleEmbeddingIndexService.retireForCapsule (physical erasure of the derived
+      pgvector, idempotent, rebuild-safe) and a new sensitive-payload-free audit table
+      tb_data_retraction_receipt (+ entity/mapper/DataRetractionReceiptService) written across all
+      three schema mechanisms (Flyway V19, schema.sql, SchemaM18Initializer). Wired erasure + one
+      receipt into all three erasure paths; 4 new H2 regressions + an extended PostgreSQL/pgvector
+      assertion (24/24 focused green; 144/145 across every touched service, the 1 non-pass being the
+      Docker-gated Postgres test that ERRORED on missing Docker, not a code defect). FOLLOW-UP commit
+      extended propagation to the correction path (UserCorrectionServiceImpl.confirm): a superseded
+      memory's ACTIVE embedding is now marked STALE (MEMORY_EMBEDDING/CLEARED receipt) and a capsule
+      the correction delists has its matching vector erased (CAPSULE_MATCH_INDEX/ERASED receipt),
+      making the correction path consistent with forget/archive/grant-revoke; +1 H2 regression
+      (CorrectionEmbeddingPropagationTest) green with UserCorrectionControllerTest 10/10 unaffected.
+      FOLLOW-UPS since: (a) owner-facing audit-trail API GET /api/me/data-rights/receipts
+      (DataRightsController, contract delta TA-DELTA-001, DataRightsControllerTest 2/2) — DONE; (b) the
+      single source->derivative registry DataDerivativeRegistry enumerating every subject->derivative
+      edge + retraction action, with a reflection completeness guard (DataDerivativeRegistryTest 3/3)
+      that fails the build if a new DERIVATIVE_* constant is added without registering how it is
+      retracted/audited — DONE. (c) durable/replayable delivery: DataRetractionReceiptServiceImpl now
+      publishes a DataRetractedEvent per receipt and DataRetractedOutboxWriter appends a
+      data.retracted.v1 row to the transactional JDBC outbox on BEFORE_COMMIT (mirrors the proven
+      DialogFinishedOutboxWriter; gated on inner-cosmos.events.outbox.enabled, default off = no-op;
+      DataRetractedOutboxWriterTest 1/1 + receipt-path regressions green) — DONE. Still missing before
+      A5 COMPLETE: equivalent erasure/receipts for prompt snapshots/summaries, analytics, notifications
+      and honest backup tombstones. See evidence/track-a/A5-rights-propagation/README.md.
+  A6-observability-boundaries:
+    status: IN_PROGRESS
+    evidence:
+      - evidence/track-a/A6-observability/README.md
+      - src/main/java/com/innercosmos/ai/observability/AiTurnMetrics.java
+      - src/test/java/com/innercosmos/ai/observability/AiTurnMetricsTest.java
+      - src/main/java/com/innercosmos/service/impl/AuroraAgentServiceImpl.java
+      - src/test/java/com/innercosmos/architecture/DomainBoundaryArchitectureTest.java
+      - src/main/java/com/innercosmos/ai/runtime/AiFailureContract.java
+      - src/test/java/com/innercosmos/ai/runtime/AiFailureContractTest.java
+      - src/main/java/com/innercosmos/ai/observability/AiTurnObservation.java
+      - src/test/java/com/innercosmos/ai/observability/AiTurnObservationTest.java
+    remaining: >
+      THIS SESSION: privacy-safe per-turn AI metrics (aurora.turn.count counter + aurora.turn.latency
+      timer) tagged only with bounded non-sensitive dimensions (route/runtime/provider/mode/fallback/
+      memory_referenced), exposed via the existing /actuator/prometheus. Wired into
+      AuroraAgentServiceImpl via the class's own @Autowired(required=false) optional-injection idiom
+      (no constructor/legacy-test churn; no-op when unwired). AiTurnMetricsTest 2/2 (incl. a
+      privacy-safety allowlist regression); the two constructor-level unit tests stay green with the
+      null guard. FOLLOW-UP: executable domain boundaries added dependency-free
+      (DomainBoundaryArchitectureTest, 4/4) — a source-scanner enforcing entity ↛
+      service/controller/mapper/vo/dto/…, mapper ↛ service/controller, service ↛ controller, safety ↛
+      controller (chosen over ArchUnit to avoid a new dependency + offline network fetch). FOLLOW-UP:
+      user-visible degradation contract extracted to AiFailureContract (classify(Throwable) by
+      type+message across the cause chain -> TIMEOUT/RATE_LIMITED/MALFORMED_OUTPUT/PROVIDER_UNAVAILABLE
+      with stable risk flags + calm messages); differentiatedFallback delegates to it (behavior
+      preserved, PROVIDER_UNAVAILABLE keeps the state-aware message); AiFailureContractTest 6/6 +
+      Emergence/Stream regressions green. Still open: OpenTelemetry distributed spans;
+      partial-stream-reconnect degradation; explicit assert-the-counter-incremented live-turn
+      @SpringBootTest; and the scheduler/Testcontainer shutdown-noise cleanup.
 latest_checkpoint: "2c11dfb7d71fb632147b4408f8510bbe713d10b5"
 commits:
   - message: "test(track-a): A0 quality-lab ablation suites + real-provider smoke evidence"

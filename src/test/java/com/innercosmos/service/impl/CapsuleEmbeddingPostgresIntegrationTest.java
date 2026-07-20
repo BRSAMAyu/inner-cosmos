@@ -94,5 +94,15 @@ class CapsuleEmbeddingPostgresIntegrationTest {
         assertEquals(1, embeddingMapper.selectCount(new QueryWrapper<CapsuleEmbedding>()
                 .eq("capsule_id", capsule.id).eq("status", "SUPERSEDED")));
         assertTrue(index.similarities("garden", List.of(capsule)).get(capsule.id) > .99);
+
+        // G5 PROFILE-PROPAGATION: withdrawing consent must physically erase the pgvector column,
+        // not merely soft-flag it. Both the ACTIVE and SUPERSEDED rows (and their vectors) go.
+        int erased = index.retireForCapsule(capsule.id);
+        assertEquals(2, erased, "both current and superseded derived vectors must be erased");
+        assertEquals(0L, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM tb_capsule_embedding WHERE capsule_id=?", Long.class, capsule.id),
+                "no pgvector row may survive a consent withdrawal");
+        assertTrue(index.similarities("garden", List.of(capsule)).isEmpty(),
+                "an erased capsule can never score again");
     }
 }

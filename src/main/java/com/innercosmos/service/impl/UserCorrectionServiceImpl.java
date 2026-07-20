@@ -18,9 +18,13 @@ import com.innercosmos.mapper.MemoryCardMapper;
 import com.innercosmos.mapper.UnderstandingClaimMapper;
 import com.innercosmos.mapper.UserCorrectionMapper;
 import com.innercosmos.mapper.EchoCapsuleMapper;
+import com.innercosmos.mapper.MemoryEmbeddingMapper;
 import com.innercosmos.entity.EchoCapsule;
+import com.innercosmos.entity.MemoryEmbedding;
 import com.innercosmos.service.UserCorrectionService;
+import com.innercosmos.service.CapsuleEmbeddingIndexService;
 import com.innercosmos.service.CapsuleGenomeService;
+import com.innercosmos.service.DataRetractionReceiptService;
 import com.innercosmos.vo.CorrectionConfirmationVO;
 import com.innercosmos.vo.CorrectionImpactVO;
 import org.springframework.context.ApplicationEventPublisher;
@@ -43,6 +47,9 @@ public class UserCorrectionServiceImpl implements UserCorrectionService {
     private final ApplicationEventPublisher eventPublisher;
     private final EchoCapsuleMapper capsuleMapper;
     private final CapsuleGenomeService genomeService;
+    private final MemoryEmbeddingMapper memoryEmbeddingMapper;
+    private final CapsuleEmbeddingIndexService capsuleEmbeddingIndexService;
+    private final DataRetractionReceiptService retractionReceiptService;
 
     public UserCorrectionServiceImpl(UserCorrectionMapper userCorrectionMapper,
                                      UserPortraitService userPortraitService,
@@ -52,7 +59,10 @@ public class UserCorrectionServiceImpl implements UserCorrectionService {
                                      AuthorizedMemoryRefMapper authorizedMemoryRefMapper,
                                      ApplicationEventPublisher eventPublisher,
                                      EchoCapsuleMapper capsuleMapper,
-                                     CapsuleGenomeService genomeService) {
+                                     CapsuleGenomeService genomeService,
+                                     MemoryEmbeddingMapper memoryEmbeddingMapper,
+                                     CapsuleEmbeddingIndexService capsuleEmbeddingIndexService,
+                                     DataRetractionReceiptService retractionReceiptService) {
         this.userCorrectionMapper = userCorrectionMapper;
         this.userPortraitService = userPortraitService;
         this.claimMapper = claimMapper;
@@ -62,6 +72,9 @@ public class UserCorrectionServiceImpl implements UserCorrectionService {
         this.eventPublisher = eventPublisher;
         this.capsuleMapper = capsuleMapper;
         this.genomeService = genomeService;
+        this.memoryEmbeddingMapper = memoryEmbeddingMapper;
+        this.capsuleEmbeddingIndexService = capsuleEmbeddingIndexService;
+        this.retractionReceiptService = retractionReceiptService;
     }
 
     @Override
@@ -168,6 +181,16 @@ public class UserCorrectionServiceImpl implements UserCorrectionService {
         for (MemoryCard memory : memories) {
             memory.status = "SUPERSEDED";
             memoryCardMapper.updateById(memory);
+            // A superseded memory's vector must stop being a retrieval candidate explicitly, not
+            // only rely on the query-time status join. Mark its ACTIVE embeddings STALE (the rebuild
+            // job re-embeds current content) and record an auditable receipt for the derivative.
+            int staled = memoryEmbeddingMapper.update(null,
+                    new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<MemoryEmbedding>()
+                            .eq("user_id", userId).eq("memory_id", memory.id).eq("status", "ACTIVE")
+                            .set("status", "STALE"));
+            retractionReceiptService.record(userId, DataRetractionReceiptService.SUBJECT_MEMORY,
+                    memory.id, DataRetractionReceiptService.DERIVATIVE_MEMORY_EMBEDDING,
+                    DataRetractionReceiptService.ACTION_CLEARED, staled, "memory superseded by user correction");
             propagated.add(propagate(userId, correction.id, claim.id, "MEMORY", memory.id,
                     "APPLIED", "旧记忆已替代并从当前星空/检索候选中排除"));
         }
@@ -184,6 +207,14 @@ public class UserCorrectionServiceImpl implements UserCorrectionService {
                     capsule.isPublic = false;
                     capsuleMapper.updateById(capsule);
                     genomeService.markNeedsReview(capsule.id, "authorized memory was explicitly corrected");
+                    // Consistent with the forget/archive/grant-revoke paths: a correction that
+                    // delists a capsule must also erase its compiled matching vector immediately,
+                    // with an auditable receipt, so the corrected content stops steering discovery.
+                    int erased = capsuleEmbeddingIndexService.retireForCapsule(capsule.id);
+                    retractionReceiptService.record(userId, DataRetractionReceiptService.SUBJECT_CAPSULE,
+                            capsule.id, DataRetractionReceiptService.DERIVATIVE_CAPSULE_MATCH_INDEX,
+                            DataRetractionReceiptService.ACTION_ERASED, erased,
+                            "authorized memory was explicitly corrected");
                 }
                 propagated.add(propagate(userId, correction.id, claim.id, "CAPSULE_CONTEXT", ref.id,
                         "REVIEW_REQUIRED", "已授权摘要受影响，等待用户复核"));

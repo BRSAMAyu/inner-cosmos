@@ -2,9 +2,42 @@ schema_version: 1
 track_id: TRACK-A
 minimum_handoff_commit: 7e0688308292cd9d41552c98f576d25681738be0
 track_base_sha: 14e1b85596034544b7fb291677fb8dd3f8240f1c
-status: EMPTY
+status: ACTIVE
 instructions: >-
   Track A appends every user-visible backend or OpenAPI change here. Each entry must include
   purpose, endpoints/events, auth, idempotency/concurrency, request/response schemas, typed errors,
   stream semantics, compatibility, fixtures, tests, commit and evidence. Track A does not edit web/**.
-deltas: []
+deltas:
+  - id: TA-DELTA-001
+    title: Owner-facing data-rights retraction receipts
+    purpose: >-
+      Expose the auditable "what Aurora stopped using, and when" trail so Track B can render a
+      trust-building data-rights panel. Makes the G5 PROFILE-PROPAGATION backend work user-visible.
+    endpoint: "GET /api/me/data-rights/receipts?limit=<int, optional, default 50, clamped 1..500>"
+    auth: "Session/authenticated (falls under /api/** authenticated); owner-scoped — only the caller's own receipts are returned."
+    idempotency: "Read-only GET; safe to retry."
+    response_schema: |
+      ApiResponse<DataRetractionReceiptVO[]> newest-first:
+        { success: true, data: [ {
+            id: number,
+            subjectType: "MEMORY" | "CAPSULE" | "DATA_USE_GRANT",
+            subjectId: number,
+            derivativeType: "CAPSULE_MATCH_INDEX" | "MEMORY_EMBEDDING" | "CAPSULE_PERSONA" | "GENOME",
+            action: "ERASED" | "CLEARED" | "REVIEW_REQUIRED",
+            affectedCount: number,
+            reason: string,          // short, non-sensitive; never source content
+            createdAt: string        // ISO-8601 local date-time
+        } ] }
+    typed_errors: "401 UNAUTHORIZED when not logged in (ApiResponse.success=false)."
+    sensitive_payload: "None. Counts + a short reason only; never memory text, embeddings or persona prompts."
+    compatibility: "Additive; new endpoint + new tb_data_retraction_receipt table (Flyway V19). No existing response changed."
+    fixture: |
+      [
+        {"id":12,"subjectType":"CAPSULE","subjectId":5,"derivativeType":"CAPSULE_MATCH_INDEX",
+         "action":"ERASED","affectedCount":1,"reason":"owner archived capsule","createdAt":"2026-07-19T20:10:00"},
+        {"id":11,"subjectType":"MEMORY","subjectId":1,"derivativeType":"MEMORY_EMBEDDING",
+         "action":"CLEARED","affectedCount":2,"reason":"memory superseded by user correction","createdAt":"2026-07-19T20:05:00"}
+      ]
+    tests: "src/test/java/com/innercosmos/controller/DataRightsControllerTest.java (2/2: auth required; owner-scoped newest-first)."
+    commit: "pending (this checkpoint)"
+    evidence: "evidence/track-a/A5-rights-propagation/README.md"

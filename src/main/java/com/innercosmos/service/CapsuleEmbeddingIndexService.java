@@ -29,6 +29,21 @@ public interface CapsuleEmbeddingIndexService {
      */
     Map<Long, Double> similarities(String queryText, List<EchoCapsule> candidates);
 
+    /**
+     * G5 PROFILE-PROPAGATION: physically erase every stored matching vector derived from a capsule
+     * whose source consent has been withdrawn (owner forgot a source memory, archived the capsule,
+     * or revoked a data-use grant so the capsule is delisted). Deleting the rows — rather than only
+     * soft-flipping a status — means the derived vector stops being served the instant the owner
+     * acts, keeps the {@code (capsule, model, version, content_hash)} uniqueness free for a future
+     * fresh re-consent/rebuild, and leaves the audit trail to the sensitive-payload-free
+     * {@link com.innercosmos.service.DataRetractionReceiptService} instead of a lingering vector.
+     *
+     * <p>Idempotent: a second call for an already-cleared capsule returns 0.</p>
+     *
+     * @return the number of embedding rows erased.
+     */
+    int retireForCapsule(Long capsuleId);
+
     RebuildResult rebuildMissing(int batchSize);
 
     long pendingCount();
