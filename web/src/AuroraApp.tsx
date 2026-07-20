@@ -4,7 +4,7 @@ import { Capacitor } from "@capacitor/core";
 import { api, apiConfigurationError, configureBearerAuth, hasConfiguredApiBase, transcribeAudio, type ClaimCandidate, type CapsuleBoundary, type CapsuleFidelitySummary, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type PersonaMessage, type PersonaSession, type PortraitDimension, type PublicCapsule, type PortraitHistoryEntry, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type PsychologySkillSuggestion, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type StarfieldDetail, type StarfieldScene, type StarfieldStar, type UnderstandingClaim, type UserCorrection } from "./api";
 import { initialMobileState, mobileRuntime, type MobileRuntimeState } from "./mobile";
 import { mobileOidc } from "./mobile-auth";
-import { MeSpace, productSpaceFromPath, productSpaces, ProductShellNavigation, spacePath, type ProductSpace } from "./components/ProductShell";
+import { capsulePath, letterThreadPath, MeSpace, productSpaceFromPath, productSpaces, ProductShellNavigation, resourceFromPath, spacePath, type ProductSpace } from "./components/ProductShell";
 import { AuroraConversation } from "./components/AuroraConversation";
 import { AuroraSelfSpace } from "./components/AuroraSelfSpace";
 import { UnderstandingCorrection, type CorrectionTarget } from "./components/UnderstandingCorrection";
@@ -18,6 +18,11 @@ import { RelationsView } from "./components/RelationsView";
 import { LettersInbox } from "./components/LettersInbox";
 import { PortraitView } from "./components/PortraitView";
 import { AccountSettings, type AccountBusy } from "./components/AccountSettings";
+import { DataRightsPanel } from "./components/DataRightsPanel";
+import { LocaleToggle } from "./components/LocaleToggle";
+import type { DataRetractionReceipt } from "./api";
+import { loadLocale, saveLocale, type Locale } from "./i18n";
+import { APP_COPY, type DialogMode } from "./appCopy";
 import { AuthGate } from "./components/AuthGate";
 import { PsychologySkillStudio, SkillSuggestionBanner, type SkillLocale } from "./components/PsychologySkillStudio";
 import { ConnectError, LoadingText } from "./loading";
@@ -62,6 +67,9 @@ export function AuroraApp() {
   const [portraitCalibrated, setPortraitCalibrated] = useState<Record<string, boolean>>({});
   const [portraitBusy, setPortraitBusy] = useState<string | null>(null);
   const [accountBusy, setAccountBusy] = useState<AccountBusy>(null);
+  const [dataRightsReceipts, setDataRightsReceipts] = useState<DataRetractionReceipt[]>([]);
+  const [dataRightsLoading, setDataRightsLoading] = useState(false);
+  const [dataRightsLoaded, setDataRightsLoaded] = useState(false);
   const [accountMessage, setAccountMessage] = useState<string | null>(null);
   const [starfield, setStarfield] = useState<StarfieldScene | null>(null);
   const [starfieldBusy, setStarfieldBusy] = useState(false);
@@ -106,7 +114,7 @@ export function AuroraApp() {
   const [skillRetention, setSkillRetention] = useState<PsychologyRetention>("DISCARD_AFTER_SESSION");
   const [skillBusy, setSkillBusy] = useState(false);
   const [skillSuggestion, setSkillSuggestion] = useState<PsychologySkillSuggestion | null>(null);
-  const [skillLocale, setSkillLocale] = useState<SkillLocale>("zh-CN");
+  const [skillLocale, setSkillLocale] = useState<SkillLocale>(() => loadLocale());
   const [visitorBusy, setVisitorBusy] = useState(false);
   const [mobileState, setMobileState] = useState<MobileRuntimeState>(initialMobileState);
   const bootstrappedRef = useRef(false);
@@ -128,6 +136,23 @@ export function AuroraApp() {
     navigate(spacePath(space));
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [navigate]);
+
+  // Nested resource deep links: opening /resonance/capsule/:id selects that capsule, so a shared
+  // link or a back/forward step lands on the exact capsule rather than the space default. The
+  // capsule domain still owns loading/rendering; this only maps the URL id onto the existing
+  // selection. If the id is not among the loaded capsules, selectedCapsule resolves to null and the
+  // workbench shows its normal empty state -- no crash on a stale/foreign link.
+  useEffect(() => {
+    const resource = resourceFromPath(location.pathname);
+    if (resource.space === "resonance" && resource.resource === "capsule" && resource.id != null) {
+      setSelectedCapsuleId(current => current === resource.id ? current : resource.id);
+    }
+    if (resource.space === "letters" && resource.resource === "thread" && resource.id != null
+        && connectionsAndLetters.selectedThreadId !== resource.id) {
+      void connectionsAndLetters.openThread(resource.id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
 
   // One-time redirect for bookmarks/links made before this checkpoint, which used
   // `?space=<x>` on the app's single path instead of a real route. Cheap and low-risk: a
@@ -437,6 +462,17 @@ export function AuroraApp() {
     } catch (error) { setStatus(error instanceof Error ? error.message : "没能存下，待会儿再试一次"); }
     finally { setPortraitBusy(null); }
   };
+
+  const loadDataRightsReceipts = async () => {
+    setDataRightsLoading(true);
+    try { setDataRightsReceipts(await api.dataRightsReceipts()); setDataRightsLoaded(true); }
+    catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法读取数据权利回执"); }
+    finally { setDataRightsLoading(false); }
+  };
+
+  // App-wide language: initialized from detection (loadLocale), overridable + persisted here so the
+  // choice survives reloads. skillLocale is the single shared locale state (see i18n.ts).
+  const changeLocale = (locale: Locale) => { setSkillLocale(locale); saveLocale(locale); };
 
   const changeAccountPassword = async (oldPassword: string, newPassword: string) => {
     setAccountBusy("password");
@@ -761,6 +797,7 @@ export function AuroraApp() {
     window.setTimeout(() => document.querySelector(".skill-studio")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
   };
 
+  const tt = APP_COPY[skillLocale];
   if (mobileState.native && (!hasConfiguredApiBase || apiConfigurationError)) return <main className="login-shell"><div className="login mobile-gate" role="alert">
     <span className="eyebrow">MOBILE ENVIRONMENT GATE</span>
     <h1>这台设备还没有安全后端入口</h1>
@@ -770,9 +807,9 @@ export function AuroraApp() {
   if (authenticated === null) return <main className="login-shell"><div className="login">
     {bootstrapError
       ? <ConnectError message={bootstrapError} onRetry={() => void bootstrap()} />
-      : <LoadingText busy>正在连接你的内宇宙</LoadingText>}
+      : <LoadingText busy>{tt.connecting.replace(/…$/, "")}</LoadingText>}
   </div></main>;
-  if (!authenticated) return <AuthGate native={mobileState.native} onSuccess={bootstrap} />;
+  if (!authenticated) return <AuthGate native={mobileState.native} onSuccess={bootstrap} locale={skillLocale} />;
 
   return (
     <main className="shell" data-product-space={productSpace}>
@@ -798,20 +835,20 @@ export function AuroraApp() {
       <header className="hero">
         <div>
           <span className="eyebrow">INNER COSMOS · AURORA</span>
-          <h1>可以被打断的陪伴，<br />才是真的在听。</h1>
-          <p>你不需要等 Aurora 说完。新消息会成为新的理解输入，而不是错误。</p>
-          <div className={`runtime-signal ${auroraSession.runtimeSignal.stage}`} aria-label="Aurora 当前回应状态">
-            <span>{auroraSession.runtimeSignal.stage === "understanding" ? "正在理解" : auroraSession.runtimeSignal.stage === "composing" ? "正在组织" : auroraSession.runtimeSignal.stage === "speaking" ? "正在回应" : "在这里"}</span>
-            {auroraSession.runtimeSignal.runtime === "dual" && <small>理解与表达双核协作</small>}
-            {auroraSession.runtimeSignal.relationshipMove && <small>关系动作 · {auroraSession.runtimeSignal.relationshipMove}</small>}
-            {auroraSession.runtimeSignal.repaired && <small>回应已通过边界复核</small>}
+          <h1>{tt.heroLine1}<br />{tt.heroLine2}</h1>
+          <p>{tt.heroP}</p>
+          <div className={`runtime-signal ${auroraSession.runtimeSignal.stage}`} aria-label={tt.runtimeAria}>
+            <span>{auroraSession.runtimeSignal.stage === "understanding" ? tt.runtimeUnderstanding : auroraSession.runtimeSignal.stage === "composing" ? tt.runtimeComposing : auroraSession.runtimeSignal.stage === "speaking" ? tt.runtimeSpeaking : tt.runtimeHere}</span>
+            {auroraSession.runtimeSignal.runtime === "dual" && <small>{tt.dualCore}</small>}
+            {auroraSession.runtimeSignal.relationshipMove && <small>{tt.relationshipMovePrefix}{auroraSession.runtimeSignal.relationshipMove}</small>}
+            {auroraSession.runtimeSignal.repaired && <small>{tt.repaired}</small>}
           </div>
         </div>
         <div className="orb" aria-hidden="true"><span /></div>
       </header>
 
-      <nav className="modes" aria-label="对话模式">
-        {modes.map(([value, label]) => <button key={value} className={auroraSession.mode === value ? "active" : ""} onClick={() => auroraSession.setMode(value)}>{label}</button>)}
+      <nav className="modes" aria-label={tt.modesAria}>
+        {modes.map(([value]) => <button key={value} className={auroraSession.mode === value ? "active" : ""} onClick={() => auroraSession.setMode(value)}>{tt.modeLabel[value as DialogMode]}</button>)}
       </nav>
 
       {/* The composer sits directly after the hero/mode-picker, before the WakeIntent and
@@ -823,52 +860,54 @@ export function AuroraApp() {
       {skillSuggestion && <SkillSuggestionBanner suggestion={skillSuggestion} locale={skillLocale}
         onOpen={openSuggestedSkill} onDismiss={() => setSkillSuggestion(null)} />}
 
-      <AuroraConversation messages={auroraSession.messages} activeTurnId={auroraSession.activeTurnId} draft={auroraSession.draft} sessionReady={Boolean(auroraSession.sessionId)}
+      <AuroraConversation messages={auroraSession.messages} activeTurnId={auroraSession.activeTurnId}
+        thinkingStage={auroraSession.activeTurnId !== null && (auroraSession.runtimeSignal.stage === "understanding" || auroraSession.runtimeSignal.stage === "composing") ? auroraSession.runtimeSignal.stage : null}
+        draft={auroraSession.draft} sessionReady={Boolean(auroraSession.sessionId)}
         onDraftChange={auroraSession.setDraft} onSubmit={auroraSession.send} onStop={() => void auroraSession.stop()}
         onTranscribe={async blob => {
           try { const result = await transcribeAudio(blob); return result.text; }
-          catch (error) { setStatus(error instanceof Error ? error.message : "语音转写暂时不可用"); return ""; }
-        }} />
+          catch (error) { setStatus(error instanceof Error ? error.message : tt.transcribeUnavailable); return ""; }
+        }} locale={skillLocale} />
 
-      {(mobileState.native || !mobileState.connected) && <section className={`mobile-presence ${mobileState.connected ? "online" : "offline"}`} aria-label="移动端连接状态">
+      {(mobileState.native || !mobileState.connected) && <section className={`mobile-presence ${mobileState.connected ? "online" : "offline"}`} aria-label={tt.mobileAria}>
         <div>
           <span className="eyebrow">AURORA, WITH YOU</span>
-          <strong>{mobileState.connected ? "移动端已连接" : "网络暂时离开了"}</strong>
+          <strong>{mobileState.connected ? tt.mobileConnected : tt.mobileOffline}</strong>
           <p>{mobileState.connected
-            ? `${mobileState.platform.toUpperCase()} · ${mobileState.connectionType} · 回到前台时会从持久化时间线续接`
-            : "你已经看到的内容会留在这里；网络恢复后，Aurora 会重新读取时间线，不会把断线误当成新对话。"}</p>
+            ? tt.mobileConnectedP(mobileState.platform.toUpperCase(), mobileState.connectionType)
+            : tt.mobileOfflineP}</p>
         </div>
         {mobileState.native && <div className="mobile-actions">
-          <button type="button" onClick={() => void requestMobilePush()}>开启回来提醒</button>
-          <button type="button" onClick={() => void requestMobileMicrophone()}>准备语音输入</button>
+          <button type="button" onClick={() => void requestMobilePush()}>{tt.pushBtn}</button>
+          <button type="button" onClick={() => void requestMobileMicrophone()}>{tt.micBtn}</button>
         </div>}
       </section>}
 
-      <section className="returns" aria-label="Aurora 的回来约定">
-        <div className="returns-head"><div><span className="eyebrow">AURORA RETURNS</span><h2>回来约定</h2></div>
-          <div className="return-negotiate"><label>什么时候合适<input aria-label="回来时间" value={auroraSession.returnWhen} onChange={event => auroraSession.setReturnWhen(event.target.value)} /></label>
-          <button type="button" disabled={auroraSession.wakeBusy || !auroraSession.returnWhen.trim()} onClick={() => void auroraSession.scheduleReturn()}>和 Aurora 约好</button></div></div>
-        {auroraSession.wakeIntents.length === 0 ? <p className="returns-empty">现在没有约定。需要时，你可以邀请 Aurora 在合适的时候回来。</p> :
+      <section className="returns" aria-label={tt.returnsAria}>
+        <div className="returns-head"><div><span className="eyebrow">AURORA RETURNS</span><h2>{tt.returnsTitle}</h2></div>
+          <div className="return-negotiate"><label>{tt.whenLabel}<input aria-label={tt.returnTimeAria} value={auroraSession.returnWhen} onChange={event => auroraSession.setReturnWhen(event.target.value)} /></label>
+          <button type="button" disabled={auroraSession.wakeBusy || !auroraSession.returnWhen.trim()} onClick={() => void auroraSession.scheduleReturn()}>{tt.scheduleBtn}</button></div></div>
+        {auroraSession.wakeIntents.length === 0 ? <p className="returns-empty">{tt.returnsEmpty}</p> :
           <div className="return-list">{auroraSession.wakeIntents.map(intent => <article key={intent.id} className="return-card">
-            <div><strong>{intent.reasonForUser}</strong><span>{new Date(intent.preferredAt).toLocaleString("zh-CN", { dateStyle: "short", timeStyle: "short" })}</span><small>{intent.purpose}</small></div>
-            <div className="return-actions"><button type="button" disabled={auroraSession.wakeBusy} onClick={() => void auroraSession.postponeReturn(intent)}>晚一小时</button><button type="button" disabled={auroraSession.wakeBusy} onClick={() => void auroraSession.cancelReturn(intent)}>取消</button></div>
+            <div><strong>{intent.reasonForUser}</strong><span>{new Date(intent.preferredAt).toLocaleString(skillLocale, { dateStyle: "short", timeStyle: "short" })}</span><small>{intent.purpose}</small></div>
+            <div className="return-actions"><button type="button" disabled={auroraSession.wakeBusy} onClick={() => void auroraSession.postponeReturn(intent)}>{tt.postpone}</button><button type="button" disabled={auroraSession.wakeBusy} onClick={() => void auroraSession.cancelReturn(intent)}>{tt.cancel}</button></div>
           </article>)}</div>}
       </section>
 
       {auroraSession.notifications.filter(notice => notice.refType === "WAKE_INTENT").map(notice =>
-        <section className="return-arrival" aria-label="Aurora 按约定回来" key={notice.id}>
+        <section className="return-arrival" aria-label={tt.arrivalAria} key={notice.id}>
           <span className="eyebrow">AURORA RETURNED</span><h2>{notice.title}</h2><p>{notice.body}</p>
-          <a href={`?wakeIntent=${notice.refId}`}>回到当时没说完的地方</a>
-          <div className="return-actions"><button disabled={auroraSession.wakeBusy} onClick={() => void auroraSession.respondToReturn(notice, "MATCHED")}>正合适</button>
-            <button disabled={auroraSession.wakeBusy} onClick={() => void auroraSession.respondToReturn(notice, "LATER")}>晚一点</button>
-            <button disabled={auroraSession.wakeBusy} onClick={() => void auroraSession.respondToReturn(notice, "STOP_SIMILAR")}>不再提醒这类事</button></div>
+          <a href={`?wakeIntent=${notice.refId}`}>{tt.backToUnfinished}</a>
+          <div className="return-actions"><button disabled={auroraSession.wakeBusy} onClick={() => void auroraSession.respondToReturn(notice, "MATCHED")}>{tt.matched}</button>
+            <button disabled={auroraSession.wakeBusy} onClick={() => void auroraSession.respondToReturn(notice, "LATER")}>{tt.later}</button>
+            <button disabled={auroraSession.wakeBusy} onClick={() => void auroraSession.respondToReturn(notice, "STOP_SIMILAR")}>{tt.stopSimilar}</button></div>
         </section>)}
 
       {selfEvolution && <AuroraSelfSpace evolution={selfEvolution} busy={selfBusy}
         onPropose={candidateId => void evolve(() => api.proposeSelfEvolution(candidateId, "让 Aurora 在相似时刻更连续、更贴近双方已经形成的相处方式"), "这还只是一个提案。你可以先看它会怎样改变 Aurora。")}
         onEvaluate={proposalId => void evolve(() => api.evaluateSelfEvolution(proposalId), "沙盒评测完成。变化不会在你确认前生效。")}
         onActivate={proposalId => void evolve(() => api.activateSelfEvolution(proposalId), "这次变化已经成为新的 Aurora 版本，并且仍然可以回退。")}
-        onRollback={(versionId, versionNo) => void evolve(() => api.rollbackSelfEvolution(versionId), `已回到第 ${versionNo} 版；回退本身也留下了可追溯的新版本。`)} />}
+        onRollback={(versionId, versionNo) => void evolve(() => api.rollbackSelfEvolution(versionId), `已回到第 ${versionNo} 版；回退本身也留下了可追溯的新版本。`)} locale={skillLocale} />}
       </div>
 
       <div className="product-space" hidden={productSpace !== "cosmos"}>
@@ -878,13 +917,13 @@ export function AuroraApp() {
         corrections={corrections} retiringId={retiringCorrectionId}
         onOldValue={value => { setCorrectionOld(value); setCorrectionImpact(null); }} onNewValue={value => { setCorrectionNew(value); setCorrectionImpact(null); }}
         onPreview={() => void previewCorrection()} onCancelPreview={() => setCorrectionImpact(null)} onConfirm={() => void confirmCorrection()} onClearTarget={clearCorrectionTarget}
-        onRetire={id => void retireCorrection(id)} />
+        onRetire={id => void retireCorrection(id)} locale={skillLocale} />
 
       {starfield && <MemoryStarfield starfield={starfield} starfieldBusy={starfieldBusy} onChangeMode={mode => void changeStarfieldMode(mode)}
         starfieldDetail={starfieldDetail} detailBusy={detailBusy} onRevealStar={id => void revealStar(id)} onCloseDetail={() => setStarfieldDetail(null)}
         memoryOperations={memoryOperations} rollbackBusy={rollbackBusy} onRollback={operation => void rollbackMemoryOperation(operation)} onCorrectMemory={beginMemoryCorrection}
         onUpdateImportance={(id, importance) => void updateMemoryImportance(id, importance)} onArchive={id => void archiveMemory(id)}
-        importanceBusy={importanceBusy} archiveBusy={archiveBusy} />}
+        importanceBusy={importanceBusy} archiveBusy={archiveBusy} locale={skillLocale} />}
 
       <PsychologySkillStudio skills={skills} skillRuns={skillRuns} selectedSkill={selectedSkill} skillAnswers={skillAnswers}
         skillConsent={skillConsent} skillRetention={skillRetention} skillBusy={skillBusy} skillLocale={skillLocale}
@@ -899,16 +938,20 @@ export function AuroraApp() {
         selectableMemories={selectableMemories} selectedMemoryIds={selectedMemoryIds} capsuleName={capsuleName} capsuleIntro={capsuleIntro}
         capsulePreview={capsulePreview} capsuleBusy={capsuleBusy} genomeHistory={genomeHistory} fidelitySummary={fidelitySummary} sandboxQuestion={sandboxQuestion}
         sandboxResult={sandboxResult} sandboxFeedback={sandboxFeedback}
-        onSelectCapsule={id => { setSelectedCapsuleId(id); if (id === null) { setSelectedMemoryIds([]); setCapsulePreview(null); } }}
+        onSelectCapsule={id => {
+          setSelectedCapsuleId(id);
+          if (id === null) { setSelectedMemoryIds([]); setCapsulePreview(null); navigate(spacePath("resonance")); }
+          else { navigate(capsulePath(id)); }
+        }}
         onToggleMemory={toggleCapsuleMemory} onCapsuleName={setCapsuleName} onCapsuleIntro={setCapsuleIntro}
         onPreviewNewCapsule={() => void previewNewCapsule()} onCancelPreview={() => setCapsulePreview(null)} onCreateCapsule={() => void createCapsule()}
         onRecompile={() => void recompileSelectedCapsule()} onSandboxQuestion={setSandboxQuestion} onRunSandbox={() => void runCapsuleSandbox()}
         onRateSandbox={rating => void rateCapsuleSandbox(rating)} onPublish={() => void publishSelectedCapsule()}
         onPause={() => void pauseSelectedCapsule()} onArchive={() => void archiveSelectedCapsule()}
-        boundary={capsuleBoundary} boundaryBusy={boundaryBusy} onSaveBoundary={boundary => void saveCapsuleBoundary(boundary)} />
+        boundary={capsuleBoundary} boundaryBusy={boundaryBusy} onSaveBoundary={boundary => void saveCapsuleBoundary(boundary)} locale={skillLocale} />
 
       <PlazaDirectory capsules={publicCapsules} activeCapsuleId={visitorMatch?.capsule.id ?? null} busy={visitorBusy}
-        onOpenCapsule={openDirectoryCapsule} />
+        onOpenCapsule={openDirectoryCapsule} locale={skillLocale} />
 
       <ResonanceNetwork resonanceMatches={resonanceMatches} resonanceStrategy={resonanceStrategy} visitorBusy={visitorBusy}
         visitorMatch={visitorMatch} personaSession={personaSession} personaMessages={personaMessages} personaDraft={personaDraft}
@@ -916,18 +959,18 @@ export function AuroraApp() {
         onChooseStrategy={strategy => void chooseResonanceStrategy(strategy)} onChooseMatch={chooseVisitorMatch}
         onStartPersonaConversation={() => void startPersonaConversation()} onPersonaDraftChange={setPersonaDraft}
         onSendPersonaTurn={() => void sendPersonaTurn()} onLetterTitleChange={setLetterTitle} onLetterBodyChange={setLetterBody}
-        onSendLetter={() => void sendLetterToMatch()} />
+        onSendLetter={() => void sendLetterToMatch()} locale={skillLocale} />
       </div>
 
       <div className="product-space" hidden={productSpace !== "letters"}>
-      <PeopleDiscovery people={connectionsAndLetters.people} busy={connectionsAndLetters.peopleBusy} onRequest={userId => void connectionsAndLetters.requestPersonConnection(userId)} />
+      <PeopleDiscovery people={connectionsAndLetters.people} busy={connectionsAndLetters.peopleBusy} onRequest={userId => void connectionsAndLetters.requestPersonConnection(userId)} locale={skillLocale} />
       <RelationsView relations={connectionsAndLetters.relations} selected={connectionsAndLetters.selectedRelation} timeline={connectionsAndLetters.relationTimeline} health={connectionsAndLetters.relationHealth} busy={connectionsAndLetters.relationBusy} onSelect={label => void connectionsAndLetters.openRelation(label)} />
 
-      <LettersInbox letterInbox={connectionsAndLetters.letterInbox} letterOutbox={connectionsAndLetters.letterOutbox} threads={connectionsAndLetters.letterThreads} threadLetters={connectionsAndLetters.threadLetters} selectedThreadId={connectionsAndLetters.selectedThreadId} draftBusy={connectionsAndLetters.draftBusy} onSendDraft={id => void connectionsAndLetters.sendDraft(id)} onOpenThread={id => void connectionsAndLetters.openThread(id)} replyDrafts={connectionsAndLetters.replyDrafts} connectionRequests={connectionsAndLetters.connectionRequests} friends={connectionsAndLetters.friends}
+      <LettersInbox letterInbox={connectionsAndLetters.letterInbox} letterOutbox={connectionsAndLetters.letterOutbox} threads={connectionsAndLetters.letterThreads} threadLetters={connectionsAndLetters.threadLetters} selectedThreadId={connectionsAndLetters.selectedThreadId} draftBusy={connectionsAndLetters.draftBusy} replyBusyId={connectionsAndLetters.replyBusyId} onSendDraft={id => void connectionsAndLetters.sendDraft(id)} onOpenThread={id => { void connectionsAndLetters.openThread(id); navigate(letterThreadPath(id)); }} replyDrafts={connectionsAndLetters.replyDrafts} connectionRequests={connectionsAndLetters.connectionRequests} friends={connectionsAndLetters.friends}
         onReplyDraftChange={connectionsAndLetters.updateReplyDraft}
         onReply={letter => void connectionsAndLetters.replyWithLetter(letter)} onActOnLetter={(letter, action) => void connectionsAndLetters.actOnLetter(letter, action)}
         onReportLetter={letter => void connectionsAndLetters.reportLetter(letter)} onRequestConnection={letter => void connectionsAndLetters.requestConnection(letter)}
-        onDecideConnection={(id, decision) => void connectionsAndLetters.decideConnection(id, decision)} onLeaveConnection={id => void connectionsAndLetters.leaveConnection(id)} />
+        onDecideConnection={(id, decision) => void connectionsAndLetters.decideConnection(id, decision)} onLeaveConnection={id => void connectionsAndLetters.leaveConnection(id)} locale={skillLocale} />
       </div>
 
       <div className="product-space" hidden={productSpace !== "me"}>
@@ -935,14 +978,17 @@ export function AuroraApp() {
           activeClaimCount={claims.filter(claim => claim.status === "ACTIVE").length}
           publicCapsuleCount={capsules.filter(capsule => capsule.visibilityStatus === "PUBLIC").length}
           friendCount={connectionsAndLetters.friends.length} onNavigate={navigateSpace} onRequestPush={() => void requestMobilePush()}
-          onRequestMicrophone={() => void requestMobileMicrophone()} onLogout={() => void logout()} />
+          onRequestMicrophone={() => void requestMobileMicrophone()} onLogout={() => void logout()} locale={skillLocale} />
         <PortraitView dimensions={portrait} history={portraitHistory} calibrated={portraitCalibrated} busyDim={portraitBusy}
           onLoadHistory={dim => void loadPortraitHistory(dim)} onCalibrate={(dim, oldValue, newValue) => void submitPortraitCalibration(dim, oldValue, newValue)} />
         <AccountSettings busy={accountBusy} message={accountMessage} onChangePassword={(oldPassword, newPassword) => void changeAccountPassword(oldPassword, newPassword)}
-          onExportData={() => void exportAccountData()} onDeleteAccount={password => void deleteAccount(password)} />
+          onExportData={() => void exportAccountData()} onDeleteAccount={password => void deleteAccount(password)} locale={skillLocale} />
+        <LocaleToggle locale={skillLocale} onChange={changeLocale} />
+        <DataRightsPanel receipts={dataRightsReceipts} loading={dataRightsLoading} loaded={dataRightsLoaded}
+          onLoad={() => void loadDataRightsReceipts()} locale={skillLocale} />
       </div>
       <div className="state global-state" role="status"><i className={auroraSession.activeTurnId ? "pulse" : ""} />{status}</div>
-      <footer><a href="/pages/dashboard.html">尚未迁移的工具</a><span>五空间 AppShell · 数据与能力持续保留</span><button type="button" onClick={() => void logout()}>安全退出</button></footer>
+      <footer><a href="/pages/dashboard.html">{tt.footerTools}</a><span>{tt.footerTagline}</span><button type="button" onClick={() => void logout()}>{tt.footerSignOut}</button></footer>
     </main>
   );
 }

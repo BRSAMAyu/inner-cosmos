@@ -41,4 +41,16 @@ describe("ResonanceNetwork", () => {
     expect(onSend).toHaveBeenCalledOnce();
     expect(onStart).not.toHaveBeenCalled();
   });
+
+  it("renders the network, strategies and entry in English when locale is en-SG", () => {
+    render(<ResonanceNetwork locale="en-SG" resonanceMatches={[match]} resonanceStrategy="MIRROR" visitorBusy={false}
+      visitorMatch={match} personaSession={null} personaMessages={[]} personaDraft="" personaQuota={null}
+      letterTitle="" letterBody="" sentLetter={null} onChooseStrategy={() => undefined} onChooseMatch={() => undefined}
+      onStartPersonaConversation={() => undefined} onPersonaDraftChange={() => undefined} onSendPersonaTurn={() => undefined}
+      onLetterTitleChange={() => undefined} onLetterBodyChange={() => undefined} onSendLetter={() => undefined} />);
+    expect(screen.getByRole("heading", { name: "Not swiping cards — understanding why you'd meet" })).toBeVisible();
+    expect(screen.getByText("1 candidate right now")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Meaningful complement" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Enter a limited but natural conversation" })).toBeVisible();
+  });
 });

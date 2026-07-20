@@ -121,6 +121,19 @@ describe("AuthGate -- web session mode (native=false)", () => {
     expect(api.register).toHaveBeenCalledExactlyOnceWith("newperson", "阿新", "longenoughpass");
   });
 
+  it("renders login, the mode toggle and register validation in English when locale is en-SG", () => {
+    render(<AuthGate native={false} onSuccess={vi.fn()} locale="en-SG" />);
+    expect(screen.getByRole("heading", { name: "Back to your inner cosmos" })).toBeVisible();
+    expect(screen.getByLabelText("Username")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Sign up" }));
+    fireEvent.change(screen.getByLabelText("Username"), { target: { value: "newperson" } });
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "short1" } });
+    fireEvent.change(screen.getByLabelText("Confirm password"), { target: { value: "short1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Password must be at least 8 characters.");
+    expect(api.register).not.toHaveBeenCalled();
+  });
+
   it("a failed register shows an inline alert and does not call onSuccess", async () => {
     vi.mocked(api.register).mockRejectedValue(new Error("注册失败，请换个用户名试试。"));
     const onSuccess = vi.fn();

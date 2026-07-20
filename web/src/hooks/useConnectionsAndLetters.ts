@@ -39,6 +39,7 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
   const [selectedThreadId, setSelectedThreadId] = useState<number | null>(null);
   const [threadLetters, setThreadLetters] = useState<SlowLetter[]>([]);
   const [draftBusy, setDraftBusy] = useState(false);
+  const [replyBusyId, setReplyBusyId] = useState<number | null>(null);
   const [replyDrafts, setReplyDrafts] = useState<Record<number, string>>({});
 
   // ---- Bootstrap loaders. AuroraApp.tsx's own bootstrap() still fires ONE 23-way Promise.all of
@@ -130,6 +131,7 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
   const replyWithLetter = useCallback(async (letter: SlowLetter) => {
     const body = replyDrafts[letter.id]?.trim();
     if (!body) return;
+    setReplyBusyId(letter.id);
     try {
       const draft = await api.replyWithSlowLetter(letter.id, `回复：${letter.title}`, body);
       await api.sendSlowLetter(draft.id);
@@ -139,6 +141,7 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
       setReplyDrafts(drafts => ({ ...drafts, [letter.id]: "" }));
       setStatus("回复慢信已启程。它仍会经过时间，而不是变成即时聊天。 ");
     } catch (error) { setStatus(error instanceof Error ? error.message : "回复慢信没有启程"); }
+    finally { setReplyBusyId(null); }
   }, [replyDrafts, setStatus]);
 
   const updateReplyDraft = useCallback((letterId: number, value: string) => {
@@ -172,7 +175,7 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
   return {
     connectionRequests, friends, people, peopleBusy,
     relations, selectedRelation, relationTimeline, relationHealth, relationBusy,
-    letterInbox, letterOutbox, letterThreads, selectedThreadId, threadLetters, draftBusy, replyDrafts,
+    letterInbox, letterOutbox, letterThreads, selectedThreadId, threadLetters, draftBusy, replyBusyId, replyDrafts,
     loadLetterInbox, loadConnectionRequests, loadFriends, loadLetterOutbox, loadPeople, loadRelations, loadLetterThreads,
     refreshConnections, requestPersonConnection, openRelation, openThread, sendDraft,
     actOnLetter, reportLetter, replyWithLetter, updateReplyDraft,

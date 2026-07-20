@@ -101,4 +101,16 @@ describe("UnderstandingCorrection", () => {
       onCancelPreview={() => undefined} onConfirm={() => undefined} onClearTarget={() => undefined} onRetire={() => undefined} />);
     expect(screen.queryByRole("button", { name: "让这条退休" })).not.toBeInTheDocument();
   });
+
+  it("renders the correction surface and history in English when locale is en-SG", () => {
+    render(<UnderstandingCorrection locale="en-SG" claims={[]} oldValue="" newValue="I just need to recharge first"
+      impact={null} busy={false} target={null} corrections={[correction()]} onOldValue={() => undefined}
+      onNewValue={() => undefined} onPreview={() => undefined} onCancelPreview={() => undefined}
+      onConfirm={() => undefined} onClearTarget={() => undefined} onRetire={() => undefined} />);
+    expect(screen.getByRole("heading", { name: "If this isn't quite you" })).toBeVisible();
+    expect(screen.getByLabelText("How Aurora understood it before (optional)")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Preview what changes" })).toBeEnabled();
+    expect(screen.getByRole("heading", { name: "Corrections you've confirmed" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Retire this one" })).toBeVisible();
+  });
 });

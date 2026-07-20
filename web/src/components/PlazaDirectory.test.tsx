@@ -45,4 +45,12 @@ describe("PlazaDirectory", () => {
     expect(screen.queryByRole("button", { name: "开始对话" })).not.toBeInTheDocument();
     expect(screen.getByText(/还没有/)).toBeVisible();
   });
+
+  it("renders headings, sort controls and cards in English when locale is en-SG", () => {
+    render(<PlazaDirectory locale="en-SG" capsules={[capsule()]} activeCapsuleId={null} busy={false} onOpenCapsule={() => undefined} />);
+    expect(screen.getByRole("heading", { name: /Walk into the plaza yourself/ })).toBeVisible();
+    expect(screen.getByText("1 public capsule")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Echo energy" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Start a conversation" })).toBeVisible();
+  });
 });

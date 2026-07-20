@@ -1,4 +1,5 @@
 import { AppearanceToggle } from "./AppearanceToggle";
+import type { Locale } from "../i18n";
 
 export type ProductSpace = "aurora" | "cosmos" | "resonance" | "letters" | "me";
 
@@ -39,6 +40,32 @@ export function productSpaceFromPath(pathname: string): ProductSpace {
   return match ? match[0] : "aurora";
 }
 
+// A parsed nested resource deep link within a space, e.g. "/resonance/capsule/42" ->
+// { space: "resonance", resource: "capsule", id: 42 }. This is what makes a specific capsule,
+// letter thread or portrait dimension shareable and back/forward-correct, on top of the existing
+// per-space routing. `resource`/`id` are null for a bare space path.
+export type ProductResource = { space: ProductSpace; resource: string | null; id: number | null };
+
+export function resourceFromPath(pathname: string): ProductResource {
+  const space = productSpaceFromPath(pathname);
+  const base = spacePaths[space];
+  const rest = pathname === base ? ""
+    : pathname.startsWith(`${base}/`) ? pathname.slice(base.length + 1) : "";
+  const [resource = "", rawId = ""] = rest.split("/");
+  const id = /^\d+$/.test(rawId) ? Number(rawId) : null;
+  return { space, resource: resource || null, id };
+}
+
+/** Shareable deep link to one capsule inside the resonance space. */
+export function capsulePath(id: number): string {
+  return `${spacePaths.resonance}/capsule/${id}`;
+}
+
+/** Shareable deep link to one slow-letter thread inside the connections space. */
+export function letterThreadPath(id: number): string {
+  return `${spacePaths.letters}/thread/${id}`;
+}
+
 export function ProductShellNavigation({ active, onNavigate }: { active: ProductSpace; onNavigate: (space: ProductSpace) => void }) {
   return <nav className="app-shell-nav" aria-label="Inner Cosmos 五个空间">
     <div className="app-mark"><span aria-hidden="true">✦</span><strong>Inner Cosmos</strong></div>
@@ -50,23 +77,54 @@ export function ProductShellNavigation({ active, onNavigate }: { active: Product
   </nav>;
 }
 
+const ME_COPY: Record<Locale, {
+  ariaLabel: string; eyebrow: string; heading: string; intro: string;
+  device: string; deviceNative: string; deviceWeb: string; online: string; offline: string;
+  returns: string; returnsValue: (n: number) => string; returnsAction: string;
+  understanding: string; understandingValue: (n: number) => string; understandingAction: string;
+  resonance: string; resonanceValue: (pub: number, friends: number) => string; resonanceAction: string;
+  push: string; mic: string; logout: string;
+}> = {
+  "zh-CN": {
+    ariaLabel: "我的控制与边界", eyebrow: "ME · CONTROL & BOUNDARIES", heading: "由你决定，Aurora 怎样参与。",
+    intro: "身份、设备权限、主动回来和数据边界都集中在这里。关闭一项能力不会删除你的创新体验，也不会暗中改写已有记忆。",
+    device: "登录与设备", deviceNative: "OIDC + PKCE · 安全存储", deviceWeb: "安全 Web Session",
+    online: "当前在线", offline: "当前离线，时间线会在恢复后续接",
+    returns: "主动回来", returnsValue: n => `${n} 个有效约定`, returnsAction: "查看和调整",
+    understanding: "理解与记忆", understandingValue: n => `${n} 条已确认理解`, understandingAction: "纠正、追溯或撤回",
+    resonance: "共鸣与连接", resonanceValue: (p, f) => `${p} 个公开共鸣体 · ${f} 个双向连接`, resonanceAction: "管理授权",
+    push: "管理通知权限", mic: "管理麦克风权限", logout: "安全退出这台设备"
+  },
+  "en-SG": {
+    ariaLabel: "My controls and boundaries", eyebrow: "ME · CONTROL & BOUNDARIES", heading: "You decide how Aurora takes part.",
+    intro: "Identity, device permissions, proactive returns and data boundaries all live here. Turning a capability off never deletes your experience, nor quietly rewrites existing memories.",
+    device: "Login & device", deviceNative: "OIDC + PKCE · secure storage", deviceWeb: "Secure web session",
+    online: "Online now", offline: "Offline now — your timeline resumes when you reconnect",
+    returns: "Proactive returns", returnsValue: n => `${n} active plan${n === 1 ? "" : "s"}`, returnsAction: "View and adjust",
+    understanding: "Understanding & memory", understandingValue: n => `${n} confirmed understanding${n === 1 ? "" : "s"}`, understandingAction: "Correct, trace or withdraw",
+    resonance: "Resonance & connection", resonanceValue: (p, f) => `${p} public capsule${p === 1 ? "" : "s"} · ${f} mutual connection${f === 1 ? "" : "s"}`, resonanceAction: "Manage authorization",
+    push: "Manage notifications", mic: "Manage microphone", logout: "Sign out of this device"
+  }
+};
+
 export function MeSpace({ native, connected, wakeIntentCount, activeClaimCount, publicCapsuleCount,
-  friendCount, onNavigate, onRequestPush, onRequestMicrophone, onLogout }: {
+  friendCount, onNavigate, onRequestPush, onRequestMicrophone, onLogout, locale = "zh-CN" }: {
   native: boolean; connected: boolean; wakeIntentCount: number; activeClaimCount: number;
   publicCapsuleCount: number; friendCount: number; onNavigate: (space: ProductSpace) => void;
-  onRequestPush: () => void; onRequestMicrophone: () => void; onLogout: () => void;
+  onRequestPush: () => void; onRequestMicrophone: () => void; onLogout: () => void; locale?: Locale;
 }) {
-  return <section className="controls-space" aria-label="我的控制与边界">
-    <span className="eyebrow">ME · CONTROL &amp; BOUNDARIES</span><h1>由你决定，Aurora 怎样参与。</h1>
-    <p>身份、设备权限、主动回来和数据边界都集中在这里。关闭一项能力不会删除你的创新体验，也不会暗中改写已有记忆。</p>
+  const t = ME_COPY[locale];
+  return <section className="controls-space" aria-label={t.ariaLabel}>
+    <span className="eyebrow">{t.eyebrow}</span><h1>{t.heading}</h1>
+    <p>{t.intro}</p>
     <div className="control-grid">
-      <article><strong>登录与设备</strong><span>{native ? "OIDC + PKCE · 安全存储" : "安全 Web Session"}</span><small>{connected ? "当前在线" : "当前离线，时间线会在恢复后续接"}</small></article>
-      <article><strong>主动回来</strong><span>{wakeIntentCount} 个有效约定</span><button type="button" onClick={() => onNavigate("aurora")}>查看和调整</button></article>
-      <article><strong>理解与记忆</strong><span>{activeClaimCount} 条已确认理解</span><button type="button" onClick={() => onNavigate("cosmos")}>纠正、追溯或撤回</button></article>
-      <article><strong>共鸣与连接</strong><span>{publicCapsuleCount} 个公开共鸣体 · {friendCount} 个双向连接</span><button type="button" onClick={() => onNavigate("resonance")}>管理授权</button></article>
+      <article><strong>{t.device}</strong><span>{native ? t.deviceNative : t.deviceWeb}</span><small>{connected ? t.online : t.offline}</small></article>
+      <article><strong>{t.returns}</strong><span>{t.returnsValue(wakeIntentCount)}</span><button type="button" onClick={() => onNavigate("aurora")}>{t.returnsAction}</button></article>
+      <article><strong>{t.understanding}</strong><span>{t.understandingValue(activeClaimCount)}</span><button type="button" onClick={() => onNavigate("cosmos")}>{t.understandingAction}</button></article>
+      <article><strong>{t.resonance}</strong><span>{t.resonanceValue(publicCapsuleCount, friendCount)}</span><button type="button" onClick={() => onNavigate("resonance")}>{t.resonanceAction}</button></article>
     </div>
     <AppearanceToggle />
-    {native && <div className="mobile-actions"><button type="button" onClick={onRequestPush}>管理通知权限</button><button type="button" onClick={onRequestMicrophone}>管理麦克风权限</button></div>}
-    <button type="button" className="danger-quiet" onClick={onLogout}>安全退出这台设备</button>
+    {native && <div className="mobile-actions"><button type="button" onClick={onRequestPush}>{t.push}</button><button type="button" onClick={onRequestMicrophone}>{t.mic}</button></div>}
+    <button type="button" className="danger-quiet" onClick={onLogout}>{t.logout}</button>
   </section>;
 }

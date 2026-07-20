@@ -215,6 +215,15 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
         }));
         break;
       }
+      case "segment": {
+        // The server places a deliberate pacing break (with its own short pause) between bubbles;
+        // it used to be dropped here, collapsing multi-message replies into an undifferentiated
+        // wrap. Reflecting it as a brief "composing the next message" beat is what makes Aurora's
+        // multi-message rhythm read as authored rather than accidental. The very next
+        // bubble.started flips the stage back to "speaking".
+        setRuntimeSignal(current => ({ ...current, stage: "composing" }));
+        break;
+      }
       case "bubble.started": {
         const turnId = activeTurnRef.current ?? 0;
         const key = `live-${turnId}-${event.payload.order}`;
