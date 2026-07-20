@@ -4,6 +4,7 @@ import com.innercosmos.ai.portrait.AgentUserRelationshipService;
 import com.innercosmos.entity.AgentUserRelationship;
 import com.innercosmos.entity.UserCorrection;
 import com.innercosmos.entity.UserPortrait;
+import com.innercosmos.entity.UnderstandingClaim;
 import com.innercosmos.vo.AuroraMemoryContextVO;
 
 import java.util.ArrayList;
@@ -33,6 +34,8 @@ public class PromptBuilder {
     static final int MOMENT_EMOTION_MAX_CHARS = 200;
     /** Max user corrections surfaced (most-recent-first). */
     public static final int CORRECTION_MAX = 5;
+    /** Max user-confirmed extracted claims surfaced per turn. */
+    public static final int UNDERSTANDING_CLAIM_MAX = 8;
     /** Max chars per correction field value. */
     static final int CORRECTION_VALUE_MAX_CHARS = 120;
 
@@ -212,6 +215,30 @@ public class PromptBuilder {
         }
         if (block.length() == 0) return this;
         parts.add("用户亲自做过的更正（这是 TA 本人对你理解的纠正，权威性高于你自己的任何画像推断或记忆——当画像／记忆与这里冲突时，一律以这里为准；请安静地把旧理解换掉，不要旧调重弹，也不要当面逐条复述）：\n"
+                + block.toString().stripTrailing());
+        return this;
+    }
+
+    /**
+     * Bridge the reviewable understanding ledger into the next turn. These are
+     * user-confirmed observations, never diagnoses or copy to recite back verbatim.
+     */
+    public PromptBuilder withConfirmedUnderstandingClaims(List<UnderstandingClaim> claims) {
+        if (claims == null || claims.isEmpty()) return this;
+        StringBuilder block = new StringBuilder();
+        int count = 0;
+        for (UnderstandingClaim claim : claims) {
+            if (claim == null || !"ACTIVE".equals(claim.status)) continue;
+            String value = sanitize(truncate(claim.valueJson, PORTRAIT_VALUE_MAX_CHARS));
+            if (value.isEmpty()) continue;
+            String type = sanitize(truncate(blankTo(claim.claimType, "UNDERSTANDING"), 64));
+            double confidence = claim.confidence == null ? 0.5 : claim.confidence;
+            block.append("- ").append(type).append(": ").append(value)
+                    .append(" (user-confirmed, confidence ").append(roundConf(confidence)).append(")\n");
+            if (++count >= UNDERSTANDING_CLAIM_MAX) break;
+        }
+        if (block.length() == 0) return this;
+        parts.add("User-confirmed understanding claims (use only when relevant; never diagnose, label, or recite this block; if an explicit user correction conflicts, the correction wins):\n"
                 + block.toString().stripTrailing());
         return this;
     }

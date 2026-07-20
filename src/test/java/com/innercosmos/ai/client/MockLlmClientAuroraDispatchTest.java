@@ -77,6 +77,23 @@ class MockLlmClientAuroraDispatchTest {
     }
 
     @Test
+    void mixedEmotionPresentationRequestIsGroundedAndActionable() {
+        MockLlmClient client = new MockLlmClient(DIRECT_EXECUTOR);
+
+        AuroraResult result = StructuredOutputParser.parse(
+                client.chat(request("AURORA_AGENT_LOOP_DAILY_TALK",
+                        "我明天要做项目展示，既兴奋又担心讲不清楚。先陪我稳一下，再帮我找到第一步。")),
+                AuroraResult.class);
+
+        assertNotNull(result);
+        assertEquals(2, result.segments.size());
+        assertTrue(result.segments.get(0).contains("兴奋和担心"), result.segments.get(0));
+        assertTrue(result.segments.get(1).contains("老师"), result.segments.get(1));
+        assertTrue(result.segments.get(1).contains("第一步"), result.segments.get(1));
+        assertEquals("写下展示唯一需要被记住的一句话。", result.smallStep);
+    }
+
+    @Test
     void proactiveGreetingModule_stillProducesGreetingJson() {
         MockLlmClient client = new MockLlmClient(DIRECT_EXECUTOR);
 

@@ -184,6 +184,12 @@ public class MockDataInitializer implements CommandLineRunner {
         user.role = role;
         user.nickname = nickname;
         user.status = "ACTIVE";
+        user.accountKind = switch (username) {
+            case "admin" -> "SYSTEM";
+            case "demo" -> "DEMO";
+            case "river", "cloud" -> "SHOWCASE";
+            default -> "HUMAN";
+        };
         userMapper.updateById(user);
         return user;
     }

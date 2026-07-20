@@ -190,6 +190,8 @@ export type PsychologySkillSuggestion = {
   invocation: "SUGGEST_ONLY"; createsRun: false;
 };
 let csrf: Csrf | null = null;
+let csrfPromise: Promise<Csrf> | null = null;
+let csrfEpoch = 0;
 type AccessTokenProvider = () => Promise<string | null>;
 let accessTokenProvider: AccessTokenProvider | null = null;
 let accessTokenInvalidator: (() => Promise<void>) | null = null;
@@ -215,7 +217,13 @@ export function configureBearerAuth(provider: AccessTokenProvider | null, requir
   accessTokenProvider = provider;
   accessTokenInvalidator = invalidator;
   bearerRequired = required;
+  invalidateCsrf();
+}
+
+function invalidateCsrf(): void {
   csrf = null;
+  csrfPromise = null;
+  csrfEpoch += 1;
 }
 
 function isNonPublicHost(hostname: string): boolean {
@@ -343,9 +351,10 @@ async function request<T>(url: string, init: RequestInit = {}, retriedCsrf = fal
     if (!etag) throw new Error("Reload the capsule boundary before saving changes");
     headers.set("If-Match", etag);
   }
+  let requestCsrf: Csrf | null = null;
   if (!accessToken && !["GET", "HEAD", "OPTIONS"].includes(method)) {
-    csrf ??= await getCsrf();
-    headers.set(csrf.headerName, csrf.token);
+    requestCsrf = await getOrLoadCsrf();
+    headers.set(requestCsrf.headerName, requestCsrf.token);
   }
   const response = await fetch(apiUrl(url), { ...init, headers, credentials: accessToken ? "omit" : "include" });
   if (boundaryMatch && response.ok) {
@@ -358,7 +367,7 @@ async function request<T>(url: string, init: RequestInit = {}, retriedCsrf = fal
     return request<T>(url, { ...init, headers }, retriedCsrf, true);
   }
   if (response.status === 403 && (body.code === "CSRF_INVALID" || body.error === "CSRF_INVALID") && !retriedCsrf) {
-    csrf = null;
+    await refreshCsrf(requestCsrf?.token);
     return request<T>(url, { ...init, headers }, true);
   }
   if (!response.ok || !body.success) throw new Error(body.message ?? `HTTP ${response.status}`);
@@ -373,6 +382,30 @@ async function getCsrf(): Promise<Csrf> {
   return body.data;
 }
 
+async function getOrLoadCsrf(): Promise<Csrf> {
+  if (csrf) return csrf;
+  if (!csrfPromise) {
+    const epoch = csrfEpoch;
+    const pending = getCsrf().then(token => {
+      if (csrfEpoch === epoch) csrf = token;
+      return token;
+    });
+    csrfPromise = pending;
+    const clear = () => { if (csrfPromise === pending) csrfPromise = null; };
+    void pending.then(clear, clear);
+  }
+  return csrfPromise;
+}
+
+async function refreshCsrf(failedToken?: string): Promise<Csrf> {
+  if (csrf && csrf.token !== failedToken) return csrf;
+  // Another request may already be refreshing the same rejected token.
+  if (csrfPromise) return csrfPromise;
+  csrf = null;
+  csrfEpoch += 1;
+  return getOrLoadCsrf();
+}
+
 export const api = {
   login: async (username: string, password: string) => {
     const body: CoreLoginRequest = { username, password,
@@ -382,7 +415,7 @@ export const api = {
     });
     // AuthController rotates the session ID after login. The pre-authentication
     // synchronizer token must never be reused with the authenticated session.
-    csrf = null;
+    invalidateCsrf();
     return result;
   },
   // Same contract as the legacy /pages/register.html form: username required, nickname
@@ -397,12 +430,12 @@ export const api = {
     const result = await request<unknown>("/api/v1/auth/register", {
       method: "POST", body: JSON.stringify(body)
     });
-    csrf = null;
+    invalidateCsrf();
     return result;
   },
   logout: async () => {
     const result = await request<boolean>("/api/v1/auth/logout", { method: "POST" });
-    csrf = null;
+    invalidateCsrf();
     return result;
   },
   changePassword: (oldPassword: string, newPassword: string) => request<void>("/api/user/password", {
@@ -410,7 +443,7 @@ export const api = {
   }),
   deleteAccount: async (password: string) => {
     const result = await request<void>("/api/user/account", { method: "DELETE", body: JSON.stringify({ password }) });
-    csrf = null;
+    invalidateCsrf();
     return result;
   },
   exportData: () => request<Record<string, unknown>>("/api/user/export"),
@@ -564,7 +597,7 @@ export async function transcribeAudio(blob: Blob): Promise<AsrResult> {
   const headers = new Headers();
   const token = await accessTokenProvider?.() ?? null;
   if (token) headers.set("Authorization", `Bearer ${token}`);
-  else { const c = await getCsrf(); headers.set(c.headerName, c.token); }
+  else { const c = await getOrLoadCsrf(); headers.set(c.headerName, c.token); }
   const response = await fetch(apiUrl("/api/asr/transcribe"), {
     method: "POST", body: form, headers, credentials: token ? "omit" : "include"
   });

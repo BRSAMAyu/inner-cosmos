@@ -10,7 +10,7 @@ const COPY: Record<Locale, {
   aria: string; heading: string; count: (n: number) => string; intro: string;
   searchPlaceholder: string; searchAria: string; sortAria: string; sort: Record<SortMode, string>;
   tagAria: string; all: string; emptyNone: string; emptyFilter: string; energyTitle: string;
-  openBusy: string; open: string;
+  openBusy: string; open: string; showMoreTags: (n: number) => string; showFewerTags: string;
 }> = {
   "zh-CN": {
     aria: "共鸣广场 · 浏览所有公开共鸣体", heading: "主动走进广场，而不是只等推荐", count: n => `${n} 个公开共鸣体`,
@@ -19,7 +19,7 @@ const COPY: Record<Locale, {
     sort: { ENERGY: "回声能量", FRESH: "新鲜度", RECENT: "最近活跃" }, tagAria: "按主题筛选", all: "全部",
     emptyNone: "广场上还没有公开的共鸣体。当有人愿意被遇见时，它会出现在这里。",
     emptyFilter: "没有符合当前筛选的共鸣体。换个主题或清空搜索试试。", energyTitle: "回声能量",
-    openBusy: "正在打开", open: "开始对话"
+    openBusy: "正在打开", open: "开始对话", showMoreTags: n => `展开另外 ${n} 个主题`, showFewerTags: "收起主题"
   },
   "en-SG": {
     aria: "Resonance plaza · browse all public capsules", heading: "Walk into the plaza yourself, don't only wait for recommendations", count: n => `${n} public capsule${n === 1 ? "" : "s"}`,
@@ -28,7 +28,7 @@ const COPY: Record<Locale, {
     sort: { ENERGY: "Echo energy", FRESH: "Freshness", RECENT: "Recently active" }, tagAria: "Filter by theme", all: "All",
     emptyNone: "No public capsules in the plaza yet. When someone is open to being met, it appears here.",
     emptyFilter: "No capsules match the current filter. Try another theme or clear the search.", energyTitle: "Echo energy",
-    openBusy: "Opening", open: "Start a conversation"
+    openBusy: "Opening", open: "Start a conversation", showMoreTags: n => `Show ${n} more themes`, showFewerTags: "Show fewer themes"
   }
 };
 
@@ -52,12 +52,22 @@ export function PlazaDirectory({ capsules, activeCapsuleId, busy, onOpenCapsule,
   const [query, setQuery] = useState("");
   const [tag, setTag] = useState<string | null>(null);
   const [sort, setSort] = useState<SortMode>("ENERGY");
+  const [tagsExpanded, setTagsExpanded] = useState(false);
 
   const allTags = useMemo(() => {
-    const seen = new Set<string>();
-    capsules.forEach(capsule => parseTags(capsule.publicTags).forEach(t => seen.add(t)));
-    return [...seen];
-  }, [capsules]);
+    const frequency = new Map<string, number>();
+    capsules.forEach(capsule => parseTags(capsule.publicTags)
+      .forEach(name => frequency.set(name, (frequency.get(name) ?? 0) + 1)));
+    return [...frequency.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], locale))
+      .map(([name]) => name);
+  }, [capsules, locale]);
+
+  const visibleTags = useMemo(() => {
+    if (tagsExpanded || allTags.length <= 12) return allTags;
+    const compact = allTags.slice(0, 12);
+    return tag && !compact.includes(tag) ? [...compact.slice(0, 11), tag] : compact;
+  }, [allTags, tag, tagsExpanded]);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -87,8 +97,12 @@ export function PlazaDirectory({ capsules, activeCapsuleId, busy, onOpenCapsule,
     </div>
     {allTags.length > 0 && <div className="plaza-tags" role="group" aria-label={t.tagAria}>
       <button type="button" aria-pressed={tag === null} className={tag === null ? "active" : ""} onClick={() => setTag(null)}>{t.all}</button>
-      {allTags.map(tagName => <button type="button" key={tagName} aria-pressed={tag === tagName}
+      {visibleTags.map(tagName => <button type="button" key={tagName} aria-pressed={tag === tagName}
         className={tag === tagName ? "active" : ""} onClick={() => setTag(current => current === tagName ? null : tagName)}>{tagName}</button>)}
+      {allTags.length > 12 && <button type="button" className="tag-disclosure"
+        aria-expanded={tagsExpanded} onClick={() => setTagsExpanded(value => !value)}>
+        {tagsExpanded ? t.showFewerTags : t.showMoreTags(allTags.length - 12)}
+      </button>}
     </div>}
 
     {capsules.length === 0 ? <div className="network-empty">{t.emptyNone}</div> :

@@ -142,7 +142,7 @@ describe("useAuroraSession -- send / streaming / interrupt", () => {
       capturedOnEvent = onEvent;
     });
     vi.mocked(api.psychologySkillSuggestion).mockResolvedValue(null);
-    const { result, onSkillSuggestion } = setup();
+    const { result, setStatus, onSkillSuggestion } = setup();
     await act(async () => { await result.current.resolveSession(); });
     act(() => { result.current.setDraft("今天有点累"); });
 
@@ -176,6 +176,7 @@ describe("useAuroraSession -- send / streaming / interrupt", () => {
     act(() => { capturedOnEvent!({ id: "5", type: "turn.completed", payload: { message: "done" } }); });
     expect(result.current.activeTurnId).toBeNull();
     expect(result.current.runtimeSignal.stage).toBe("idle");
+    expect(setStatus).toHaveBeenLastCalledWith("Aurora 在这里，等你接着说");
   });
 
   it("stop aborts the in-flight turn, marks the live bubble partial and resets activeTurnId", async () => {

@@ -19,6 +19,8 @@ async function login(page: import("@playwright/test").Page) {
     await page.getByRole("button", { name: "登录" }).click();
   }
   await expect(appShell).toBeVisible();
+  const offlineNotice = page.getByRole("button", { name: "知道了" });
+  if (await offlineNotice.isVisible().catch(() => false)) await offlineNotice.click();
 }
 
 /** 在页面内扫描"当前 space"的所有按钮，返回无响应控件 label 列表。 */
@@ -26,7 +28,7 @@ function scanCurrentSpace(): Promise<string[]> {
   return (async () => {
     const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
     // 破坏性 / 会中断遍历的控件不点：登出、删号、导出、永久删除。
-    const DANGER = /退出|注销|登出|删除账号|永久|清除所有|导出|删掉账号/;
+    const DANGER = /退出|注销|登出|删除账号|永久|清除所有|导出|删掉账号|English|中文|Sign out|Log out|Delete account|Permanently|Clear all|Export/;
     const nav = document.querySelector('nav[aria-label*="空间"]');
     // 网络请求也是"可观察响应"：包裹 fetch 计数（异步响应常在 220ms 后才改 DOM）。
     const w = window as unknown as { __clickFetch?: number; __fetchHooked?: boolean };

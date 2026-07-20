@@ -253,7 +253,7 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
       case "turn.completed":
       case "done":
         finishTurn();
-        setStatus("Aurora 在听");
+        setStatus("Aurora 在这里，等你接着说");
         break;
       case "safety":
         finishTurn();

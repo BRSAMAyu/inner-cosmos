@@ -145,6 +145,7 @@ public class UserServiceImpl implements UserService {
         user.email = request.email;
         user.role = Constants.ROLE_USER;
         user.status = Constants.STATUS_ACTIVE;
+        user.accountKind = "HUMAN";
         userMapper.insert(user);
         return user;
     }

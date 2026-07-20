@@ -40,6 +40,19 @@ describe("PlazaDirectory", () => {
     expect(screen.getByText("B")).toBeVisible();
   });
 
+  it("keeps large theme vocabularies progressively disclosed on small screens", () => {
+    const tags = Array.from({ length: 15 }, (_, index) => `theme-${String.fromCharCode(65 + index)}`);
+    render(<PlazaDirectory capsules={[capsule({ publicTags: JSON.stringify(tags) })]}
+      activeCapsuleId={null} busy={false} onOpenCapsule={() => undefined} />);
+
+    expect(screen.queryByRole("button", { name: "theme-O" })).not.toBeInTheDocument();
+    const disclosure = screen.getByRole("button", { name: "展开另外 3 个主题" });
+    expect(disclosure).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(disclosure);
+    expect(screen.getByRole("button", { name: "theme-O" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "收起主题" })).toHaveAttribute("aria-expanded", "true");
+  });
+
   it("shows an empty state when there are no public capsules", () => {
     render(<PlazaDirectory capsules={[]} activeCapsuleId={null} busy={false} onOpenCapsule={() => undefined} />);
     expect(screen.queryByRole("button", { name: "开始对话" })).not.toBeInTheDocument();

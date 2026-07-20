@@ -11,6 +11,8 @@ async function loginIfNeeded(page: import("@playwright/test").Page) {
     await page.getByRole("button", { name: "登录" }).click();
   }
   await expect(appShell).toBeVisible();
+  const offlineNotice = page.getByRole("button", { name: "知道了" });
+  if (await offlineNotice.isVisible().catch(() => false)) await offlineNotice.click();
   return composer;
 }
 
@@ -36,11 +38,11 @@ test("Aurora supports multi-bubble streaming, stop, interrupt and replanning", a
 
   await expect(page.getByText("等等，我不想先分析原因。我想先确认这种害怕是不是可以被接住。 ")).toBeVisible();
   await expect(page.locator("article.aurora").last()).toContainText(/.+/);
-  await expect(page.getByLabel("Aurora 当前回应状态")).toContainText("理解与表达双核协作");
+  await expect(page.getByLabel("Aurora 当前回应状态")).toContainText("在这里");
 
   const stop = page.getByRole("button", { name: "停止回应" });
   if (await stop.isVisible().catch(() => false)) await stop.click();
-  await expect(page.getByRole("status")).toContainText(/已停在这里|Aurora 在听|已从时间线恢复/);
+  await expect(page.locator(".global-state")).toContainText(/已停在这里|Aurora 在这里|已从时间线恢复/);
 });
 
 test("Aurora resumes from the durable timeline after the live SSE connection breaks", async ({ page }) => {
@@ -52,11 +54,9 @@ test("Aurora resumes from the durable timeline after the live SSE connection bre
       const raw = args[0];
       const url = typeof raw === "string" ? raw : raw instanceof Request ? raw.url : String(raw);
       const response = await nativeFetch(...args);
-      if (injected || !url.includes("/api/aurora/stream?") || !response.body) return response;
+      if (injected || !url.includes("/api/v1/aurora/stream?") || !response.body) return response;
 
       const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let observed = "";
       let failNextRead = false;
       const body = new ReadableStream<Uint8Array>({
         async pull(controller) {
@@ -72,8 +72,9 @@ test("Aurora resumes from the durable timeline after the live SSE connection bre
             return;
           }
           controller.enqueue(value);
-          observed = (observed + decoder.decode(value, { stream: true })).slice(-1024);
-          if (/event:\s*turn\.started/.test(observed)) failNextRead = true;
+          // The live stream's first chunk always contains the durable turn start.
+          // Fail the following read so the client must replay from persisted events.
+          failNextRead = true;
         },
         cancel(reason) { return reader.cancel(reason); }
       });
@@ -93,7 +94,7 @@ test("Aurora resumes from the durable timeline after the live SSE connection bre
   await expect.poll(() => page.evaluate(() => Boolean(
     (window as Window & { __auroraSseFaultInjected?: boolean }).__auroraSseFaultInjected
   ))).toBe(true);
-  await expect(page.getByRole("status")).toContainText(/已从时间线恢复完整回应|已恢复到打断发生的位置/);
+  await expect(page.locator(".global-state")).toContainText(/已从时间线恢复完整回应|已恢复到打断发生的位置/);
   await expect(page.locator("article.aurora").last()).toContainText(/.+/);
 });
 
@@ -105,10 +106,10 @@ test("user can create, postpone and cancel an explainable Aurora return", async 
   const card = page.locator(".return-card").last();
   await expect(card).toContainText("因为还有话没有说完");
   await card.getByRole("button", { name: "晚一小时" }).click();
-  await expect(page.getByRole("status")).toContainText("已为你推迟一小时");
+  await expect(page.locator(".global-state")).toContainText("已为你推迟一小时");
   await card.getByRole("button", { name: "取消" }).click();
   await expect(card).toHaveCount(0);
-  await expect(page.getByRole("status")).toContainText("已取消");
+  await expect(page.locator(".global-state")).toContainText("已取消");
 });
 
 test("Aurora Self changes stay visible, evaluated, consented and rollbackable", async ({ page }) => {
@@ -148,7 +149,7 @@ test("user previews and confirms an authoritative understanding correction", asy
   await expect(space.locator(".claim-card")).toHaveCount(0);
   await preview.getByRole("button", { name: "确认，这是更准确的我" }).click();
   await expect(space.locator(".claim-card").first()).toContainText("我是在谨慎选择下一步");
-  await expect(page.getByRole("status")).toContainText("已校准");
+  await expect(page.locator(".global-state")).toContainText("已校准");
 });
 
 test("memory starfield switches between time, theme and people without losing its accessible view", async ({ page }) => {
@@ -192,7 +193,7 @@ test("correcting a specific memory star supersedes exactly that memory and clear
   await expect(preview).toContainText(targetTitle);
   await expect(preview).toContainText("记忆星空");
   await preview.getByRole("button", { name: "确认，这是更准确的我" }).click();
-  await expect(page.getByRole("status")).toContainText("已校准");
+  await expect(page.locator(".global-state")).toContainText("已校准");
 
   await expect(accessible.getByText(targetTitle, { exact: true })).toHaveCount(0);
   await expect(understanding.locator(".correction-target")).toHaveCount(0);
@@ -227,7 +228,7 @@ test("correcting a memory authorized to a capsule flips that capsule to needs-re
   const preview = understanding.getByRole("region", { name: "纠正影响预览" });
   await expect(preview).toContainText("共鸣体授权上下文");
   await preview.getByRole("button", { name: "确认，这是更准确的我" }).click();
-  await expect(page.getByRole("status")).toContainText("已校准");
+  await expect(page.locator(".global-state")).toContainText("已校准");
 
   await openProductSpace(page, "共鸣");
   const capsuleTab = page.getByRole("tab", { name: new RegExp(`^${target.pseudonym}`) });
@@ -261,7 +262,7 @@ test("user can roll back a memory change while permanent forgetting stays irreve
   const history = page.getByLabel("记忆变更历史");
   await expect(history).toContainText("UPDATE");
   await history.getByRole("button", { name: "撤回这次变更" }).first().click();
-  await expect(page.getByRole("status")).toContainText("已撤回这次UPDATE");
+  await expect(page.locator(".global-state")).toContainText("已撤回这次UPDATE");
   await expect(page.getByRole("list", { name: "记忆星空可访问列表" }).getByText(originalTitle, { exact: true })).toBeVisible();
   await expect(history).toContainText("已撤回");
 });
@@ -291,7 +292,7 @@ test("owner publishes, a visitor sends a slow letter, then withdrawal stops the 
   await expect(sandbox).toContainText("不会发送给其他人");
   await expect(sandbox).toContainText(/.+/);
   await sandbox.getByRole("button", { name: "像我", exact: true }).click();
-  await expect(page.getByRole("status")).toContainText("没有暗中漂移");
+  await expect(page.locator(".global-state")).toContainText("没有暗中漂移");
   await expect(resonance.locator(".fidelity-note")).toContainText("1 次反馈 · 100% 像我");
 
   await resonance.getByRole("button", { name: "确认并发布当前版本" }).click();
@@ -334,14 +335,14 @@ test("owner publishes, a visitor sends a slow letter, then withdrawal stops the 
   await page.getByLabel("密码").fill("demo123");
   await page.getByRole("button", { name: "登录" }).click();
   await openProductSpace(page, "连接");
-  const inbox = page.getByRole("region", { name: "抵达我的慢信" });
+  const inbox = page.getByRole("region", { name: "慢信收件箱与寄件箱" });
   await expect(inbox.getByRole("heading", { name: "只在抵达之后，才由你决定关系往哪里走" })).toBeVisible();
   await page.screenshot({ path: "../evidence/innovation/INNO-CAP-006/owner-letter-inbox.png", fullPage: true });
   await openProductSpace(page, "共鸣");
   const ownerSpace = page.getByRole("region", { name: "共鸣体创建与像不像我沙盒" });
   await ownerSpace.getByRole("tab", { name: new RegExp(capsuleName) }).click();
   await ownerSpace.getByRole("button", { name: "撤回这个共鸣体" }).click();
-  await expect(page.getByRole("status")).toContainText("已撤回");
+  await expect(page.locator(".global-state")).toContainText("已撤回");
 
   await openProductSpace(page, "连接");
   const consent = inbox.getByLabel("双向连接同意");
@@ -352,7 +353,7 @@ test("owner publishes, a visitor sends a slow letter, then withdrawal stops the 
   if (await markRead.isVisible().catch(() => false)) await markRead.click();
   await arrivedFromRiver.getByLabel("回复「你写的黄昏让我停了一下」").fill("我愿意认真回你：真实理解不是一句确认，而是愿意让对方纠正，并在之后真的改变。 ");
   await arrivedFromRiver.getByRole("button", { name: "让回复慢信启程" }).click();
-  await expect(page.getByRole("status")).toContainText("回复慢信已启程");
+  await expect(page.locator(".global-state")).toContainText("回复慢信已启程");
   await arrivedFromRiver.getByRole("button", { name: "愿意认识对方" }).click();
   await expect(consent).toContainText("尚未同意，不会提前开放真人连接");
 
@@ -401,7 +402,7 @@ test("a psychology Skill requires consent, exposes its basis, and supports revoc
   await results.screenshot({ path: "../evidence/innovation/INNO-PSY-001/psychology-skill-studio.png" });
   await results.getByRole("button", { name: "撤回这次结果" }).first().click();
   await expect(results.locator("article").first()).toContainText("已撤回");
-  await expect(page.getByRole("status")).toContainText("保存的结果内容已清除");
+  await expect(page.locator(".global-state")).toContainText("保存的结果内容已清除");
 
   await studio.getByRole("button", { name: "English" }).click();
   const englishStudio = page.getByRole("region", { name: "Psychology-informed self reflection" });

@@ -1,11 +1,24 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { FormEvent } from "react";
 import { AuroraConversation } from "./AuroraConversation";
 
 afterEach(cleanup);
 afterEach(() => { delete (navigator as unknown as Record<string, unknown>).mediaDevices; delete (globalThis as Record<string, unknown>).MediaRecorder; });
 
 describe("AuroraConversation", () => {
+  it("uses compact invitation spacing only before the first message", () => {
+    const props = { activeTurnId: null, draft: "", sessionReady: true,
+      onDraftChange: () => undefined, onSubmit: (event: FormEvent<HTMLFormElement>) => event.preventDefault(),
+      onStop: () => undefined };
+    const { rerender } = render(<AuroraConversation {...props} messages={[]} />);
+    expect(screen.getByRole("region", { name: "与 Aurora 的对话" })).toHaveClass("empty-state");
+
+    rerender(<AuroraConversation {...props} messages={[{ key: "u1", speaker: "USER", text: "我想说一件事" }]} />);
+    expect(screen.getByRole("region", { name: "与 Aurora 的对话" })).toHaveClass("has-messages");
+    expect(screen.getByRole("region", { name: "与 Aurora 的对话" })).not.toHaveClass("empty-state");
+  });
+
   it("preserves multi-message and partial interruption semantics", () => {
     render(<AuroraConversation messages={[
       { key: "u1", speaker: "USER", text: "先听我说" },

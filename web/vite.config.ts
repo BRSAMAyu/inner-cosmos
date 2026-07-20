@@ -3,10 +3,10 @@ import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 import { buildPwaManifest } from "./src/pwaManifest";
 
-export default defineConfig({
-  // Relative assets work both at Spring's /app/aurora/ path and inside the
-  // Capacitor local origin. An absolute base makes the bundled native app blank.
-  base: "./",
+export default defineConfig(({ mode }) => ({
+  // Clean BrowserRouter deep links need an absolute web base; the Capacitor local
+  // origin still needs relative assets. `npm run build:mobile` selects that branch.
+  base: mode === "mobile" ? "./" : "/app/aurora/",
   plugins: [
     react(),
     VitePWA({
@@ -68,4 +68,4 @@ export default defineConfig({
     setupFiles: "./src/test/setup.ts",
     exclude: ["e2e/**", "scripts/**", "node_modules/**", "dist/**"]
   }
-});
+}));

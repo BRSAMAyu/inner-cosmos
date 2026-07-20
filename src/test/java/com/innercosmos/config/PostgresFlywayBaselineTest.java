@@ -46,7 +46,7 @@ class PostgresFlywayBaselineTest {
                 .locations("classpath:db/migration/postgresql")
                 .load();
 
-        assertEquals(19, flyway.migrate().migrationsExecuted);
+        assertEquals(20, flyway.migrate().migrationsExecuted);
         assertEquals(0, flyway.migrate().migrationsExecuted);
 
         String source = readClasspath("schema.sql");
@@ -115,6 +115,44 @@ class PostgresFlywayBaselineTest {
         try (Connection migrated = DriverManager.getConnection(jdbcUrl, POSTGRES.getUsername(), POSTGRES.getPassword())) {
             assertEquals(2, scalar(migrated,
                 "SELECT COUNT(*) FROM tb_notification WHERE user_id=91 AND ref_type='CAPSULE_SYNC' AND ref_id=7"));
+        }
+    }
+
+    @Test
+    void v20ClassifiesHistoricalAutomationAccountsWithoutHidingRealPeople() throws Exception {
+        String database = "legacy_account_provenance_" + System.nanoTime();
+        try (Connection admin = connection(); Statement statement = admin.createStatement()) {
+            statement.execute("CREATE DATABASE " + database);
+        }
+        String jdbcUrl = POSTGRES.getJdbcUrl().replace("/inner_cosmos_schema", "/" + database);
+        Flyway v19 = Flyway.configure()
+                .dataSource(jdbcUrl, POSTGRES.getUsername(), POSTGRES.getPassword())
+                .locations("classpath:db/migration/postgresql")
+                .target("19")
+                .load();
+        assertEquals(19, v19.migrate().migrationsExecuted);
+        try (Connection legacy = DriverManager.getConnection(
+                jdbcUrl, POSTGRES.getUsername(), POSTGRES.getPassword());
+             Statement statement = legacy.createStatement()) {
+            statement.executeUpdate("""
+                    INSERT INTO tb_user(username,password_hash,nickname,role,status)
+                    VALUES ('handoff_21128','not-a-real-hash','Smoke','USER','ACTIVE'),
+                           ('head_1784075627305','not-a-real-hash','Header','USER','ACTIVE'),
+                           ('real_person','not-a-real-hash','Header enthusiast','USER','ACTIVE')
+                    """);
+        }
+
+        Flyway v20 = Flyway.configure()
+                .dataSource(jdbcUrl, POSTGRES.getUsername(), POSTGRES.getPassword())
+                .locations("classpath:db/migration/postgresql")
+                .load();
+        assertEquals(1, v20.migrate().migrationsExecuted);
+        try (Connection migrated = DriverManager.getConnection(
+                jdbcUrl, POSTGRES.getUsername(), POSTGRES.getPassword())) {
+            assertEquals(2, scalar(migrated,
+                    "SELECT COUNT(*) FROM tb_user WHERE account_kind='SYNTHETIC'"));
+            assertEquals("HUMAN", textScalar(migrated,
+                    "SELECT account_kind FROM tb_user WHERE username='real_person'"));
         }
     }
 

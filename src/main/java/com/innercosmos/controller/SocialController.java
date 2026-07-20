@@ -53,6 +53,9 @@ public class SocialController extends BaseController {
         List<User> users = userMapper.selectList(new QueryWrapper<User>()
                 .ne("id", me)
                 .eq("status", "ACTIVE")
+                .in("account_kind", "HUMAN", "SHOWCASE")
+                .orderByDesc("last_login_at")
+                .orderByDesc("id")
                 .last("LIMIT 30"));
         return ApiResponse.ok(users.stream().map(u -> {
             Map<String, Object> item = new HashMap<>();

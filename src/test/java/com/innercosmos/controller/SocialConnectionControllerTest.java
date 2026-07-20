@@ -3,6 +3,7 @@ package com.innercosmos.controller;
 import com.innercosmos.common.Constants;
 import com.innercosmos.entity.FriendRelation;
 import com.innercosmos.entity.SlowLetter;
+import com.innercosmos.entity.User;
 import com.innercosmos.exception.BusinessException;
 import com.innercosmos.mapper.BlockRelationMapper;
 import com.innercosmos.mapper.FriendRelationMapper;
@@ -19,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpSession;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -85,6 +87,23 @@ class SocialConnectionControllerTest {
         pending.status = "ACCEPTED";
         assertEquals("WITHDRAWN", controller.leave(1L, session).data.status);
         verify(friendMapper, org.mockito.Mockito.times(2)).updateById(pending);
+    }
+
+    @Test
+    void peopleDiscoveryFiltersSyntheticAccountsAtTheDatabaseBoundary() {
+        when(userMapper.selectList(any())).thenReturn(java.util.List.of());
+
+        controller.people(session);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<User>> query =
+                ArgumentCaptor.forClass(com.baomidou.mybatisplus.core.conditions.query.QueryWrapper.class);
+        verify(userMapper).selectList(query.capture());
+        String sql = query.getValue().getTargetSql().toLowerCase(java.util.Locale.ROOT);
+        assertTrue(sql.contains("account_kind in"), sql);
+        assertTrue(query.getValue().getParamNameValuePairs().containsValue("HUMAN"));
+        assertTrue(query.getValue().getParamNameValuePairs().containsValue("SHOWCASE"));
+        assertTrue(sql.contains("last_login_at"), sql);
     }
 
     private SlowLetter letter(Long sender, Long receiver, String status) {

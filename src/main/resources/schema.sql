@@ -7,9 +7,11 @@ CREATE TABLE IF NOT EXISTS tb_user (
   email VARCHAR(128),
   role VARCHAR(32) NOT NULL,
   status VARCHAR(32) NOT NULL,
+  account_kind VARCHAR(16) NOT NULL DEFAULT 'HUMAN',
   last_login_at TIMESTAMP NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_user_discovery (status, account_kind, last_login_at, id)
 );
 
 CREATE TABLE IF NOT EXISTS tb_user_profile (

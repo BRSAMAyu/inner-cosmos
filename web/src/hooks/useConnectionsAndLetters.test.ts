@@ -124,11 +124,11 @@ describe("useConnectionsAndLetters -- bootstrap loaders", () => {
     expect(result.current.relations).toEqual([]);
   });
 
-  it("loadPeople filters test accounts out of the discovered list and swallows failure", async () => {
-    vi.mocked(api.discoverPeople).mockResolvedValue([person(), person({ id: 2, username: "csrf-runtime-3", nickname: "CSRF Runtime" })]);
+  it("loadPeople trusts the backend provenance boundary and swallows failure", async () => {
+    vi.mocked(api.discoverPeople).mockResolvedValue([person(), person({ id: 2, username: "mira", nickname: "Mira" })]);
     const { result } = setup();
     await act(async () => { await result.current.loadPeople(); });
-    expect(result.current.people).toEqual([person()]);
+    expect(result.current.people).toHaveLength(2);
   });
 });
 

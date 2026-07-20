@@ -30,6 +30,8 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -144,7 +146,8 @@ public class AliveDecisionEngine {
             请决定这一刻是否要主动发起对话。
             只输出严格 JSON:
             {"decide":"push|wait|schedule", "wait_minutes":N, "content_for_user":"...", "reason":"..."}
-            wait_minutes ∈ [5, 1440]。push 时必须填 content_for_user。
+            wait_minutes ∈ [5, 1440]。push 与 schedule 都必须填写 content_for_user；
+            content_for_user 最多 800 字，不得诊断、制造依赖或虚构你没有看到的事实。
             当前时间: %s
             用户画像: %s
             关系状态: %s
@@ -162,13 +165,25 @@ public class AliveDecisionEngine {
                 json = json.substring(start, end + 1);
             }
             JsonNode node = om.readTree(json);
-            String decide = node.has("decide") ? node.get("decide").asText() : "wait";
-            int waitMinutes = node.has("wait_minutes") ? node.get("wait_minutes").asInt() : 30;
-            String content = node.has("content_for_user") ? node.get("content_for_user").asText() : "";
-            String reason = node.has("reason") ? node.get("reason").asText() : "";
+            String decide = node.has("decide")
+                    ? node.get("decide").asText("wait").trim().toLowerCase(Locale.ROOT) : "wait";
+            if (!Set.of("push", "wait", "schedule").contains(decide)) {
+                return AliveDecision.wait(30, "invalid_decision");
+            }
+            int waitMinutes = Math.max(5, Math.min(1440,
+                    node.has("wait_minutes") ? node.get("wait_minutes").asInt(30) : 30));
+            String content = node.has("content_for_user") ? node.get("content_for_user").asText("").strip() : "";
+            if (content.length() > 800) content = content.substring(0, 800);
+            String reason = node.has("reason") ? node.get("reason").asText("").strip() : "";
+            if (reason.length() > 240) reason = reason.substring(0, 240);
+            if (("push".equals(decide) || "schedule".equals(decide)) && content.isBlank()) {
+                return AliveDecision.wait(waitMinutes, "missing_user_content");
+            }
             return new AliveDecision(decide, waitMinutes, content, reason);
         } catch (Exception e) {
-            log.warn("Failed to parse ALIVE decision JSON: {}", raw);
+            // Never log model output here: it can echo portrait, relationship or proactive-history
+            // content. Length is enough to diagnose a contract failure without leaking P0/P1 data.
+            log.warn("Failed to parse ALIVE decision JSON (responseLength={})", raw == null ? 0 : raw.length());
             return AliveDecision.wait(30, "parse_error");
         }
     }

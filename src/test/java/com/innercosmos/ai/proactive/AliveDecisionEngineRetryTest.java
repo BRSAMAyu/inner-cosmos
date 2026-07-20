@@ -5,6 +5,7 @@ import com.innercosmos.ai.client.LlmRequest;
 import com.innercosmos.ai.portrait.AgentUserRelationshipService;
 import com.innercosmos.ai.portrait.UserPortraitService;
 import com.innercosmos.entity.ProactiveEventLog;
+import com.innercosmos.entity.PrivateTimer;
 import com.innercosmos.mapper.PrivateTimerMapper;
 import com.innercosmos.mapper.ProactiveEventLogMapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -93,5 +94,19 @@ class AliveDecisionEngineRetryTest {
 
         assertDoesNotThrow(() -> engine.tick(USER_ID),
             "tick() must not throw even when all LLM retry attempts fail");
+    }
+
+    @Test
+    void malformedActionAndBlankPushFailClosedWithoutDelivery() {
+        when(llm.chat(any(LlmRequest.class))).thenReturn(
+                "{\"decide\":\"push\",\"wait_minutes\":1,\"content_for_user\":\"\",\"reason\":\"bad\"}");
+
+        assertDoesNotThrow(() -> engine.tick(USER_ID));
+
+        // The invalid model-authored blank push is never delivered. The engine may still execute
+        // its separate, deterministic once-daily minimum check-in contract.
+        verify(deliveryChannel).push(eq(USER_ID), argThat(content -> content != null && !content.isBlank()),
+                eq("alive_minimum"));
+        verify(timerMapper, never()).insert(any(PrivateTimer.class));
     }
 }

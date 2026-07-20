@@ -2,16 +2,12 @@ package com.innercosmos.ai.semantic;
 
 import com.innercosmos.ai.lexicon.ChineseIntensifiers;
 import com.innercosmos.ai.lexicon.ChineseSentimentLexicon;
-import com.innercosmos.ai.lexicon.ChineseStopwords;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Pseudo-semantic analyzer for Mock mode.
@@ -49,7 +45,7 @@ public final class PseudoSemanticAnalyzer {
 
     static {
         // Task/Academic pressure
-        THEME_KEYWORDS.put("任务压力", Set.of("作业", "考试", "任务", "项目", "拖延", "ddl", "截止", "交", "提交", "复习", "压力", "累"));
+        THEME_KEYWORDS.put("任务压力", Set.of("作业", "考试", "任务", "项目", "工作", "展示", "汇报", "演示", "答辩", "拖延", "ddl", "截止", "提交", "复习", "压力"));
 
         // Relationship issues
         THEME_KEYWORDS.put("关系牵动", Set.of("朋友", "同学", "家人", "老师", "关系", "吵架", "冲突", "分手", "冷战", "闹翻"));
@@ -58,7 +54,7 @@ public final class PseudoSemanticAnalyzer {
         THEME_KEYWORDS.put("情绪承压", Set.of("累", "压力", "焦虑", "烦", "崩溃", "撑不住", "痛苦", "煎熬", "委屈", "难过"));
 
         // Cognitive clarity
-        THEME_KEYWORDS.put("认知探索", Set.of("想不通", "混乱", "理不清", "不知道", "迷茫", "困惑", "想", "觉得", "认为"));
+        THEME_KEYWORDS.put("认知探索", Set.of("想不通", "混乱", "理不清", "不知道怎么办", "迷茫", "困惑", "拿不准", "反复想"));
 
         // Self-evaluation
         THEME_KEYWORDS.put("自我评价", Set.of("不行", "没用", "废物", "失败", "做不好", "做不到", "笨", "蠢", "差劲"));
@@ -81,7 +77,7 @@ public final class PseudoSemanticAnalyzer {
         INTENT_PATTERNS.put("EXPRESS_EMOTION", Set.of("难过", "开心", "痛苦", "委屈", "生气", "愤怒", "焦虑", "害怕"));
 
         // Task stress
-        INTENT_PATTERNS.put("TASK_STRESS", Set.of("作业", "考试", "任务", "项目", "拖延", "ddl"));
+        INTENT_PATTERNS.put("TASK_STRESS", Set.of("作业", "考试", "任务", "项目", "工作", "展示", "汇报", "演示", "答辩", "拖延", "ddl", "presentation"));
 
         // Relationship issues
         INTENT_PATTERNS.put("RELATION_ISSUE", Set.of("吵架", "冲突", "分手", "冷战", "朋友", "同学", "家人", "关系"));
@@ -93,9 +89,6 @@ public final class PseudoSemanticAnalyzer {
         INTENT_PATTERNS.put("DAILY_SHARE", Set.of("今天", "明天", "昨天", "最近", "发生"));
     }
 
-    // Simple tokenizer (splits by common delimiters)
-    private static final Pattern TOKENIZER = Pattern.compile("[\\s,.,!?!?;;、]+");
-
     /**
      * Analyze user text and return semantic analysis result.
      */
@@ -106,21 +99,20 @@ public final class PseudoSemanticAnalyzer {
 
         AnalysisResult result = new AnalysisResult();
 
-        // Tokenize
-        List<String> tokens = tokenize(text);
-
         // Calculate sentiment score (scans raw text for lexicon words directly — see
         // calculateSentiment's Javadoc for why per-token exact lookup cannot work here)
         result.sentimentScore = calculateSentiment(text);
 
-        // Detect themes
-        result.detectedThemes = detectThemes(tokens);
+        // Chinese meaning lives in phrases, not isolated characters. Earlier versions split every
+        // Chinese sentence into single characters and then used reverse substring matching; a lone
+        // character such as "想" could therefore manufacture unrelated themes and intents.
+        result.detectedThemes = detectThemes(text);
 
         // Determine primary intent
-        result.primaryIntent = detectIntent(tokens, result.detectedThemes);
+        result.primaryIntent = detectIntent(text);
 
         // Check for safety intervention
-        result.needsSafetyIntervention = checkSafetyRisk(tokens, text);
+        result.needsSafetyIntervention = checkSafetyRisk(text);
 
         // Calculate intensity score (0-10)
         result.intensityScore = calculateIntensity(text, result.sentimentScore);
@@ -132,50 +124,16 @@ public final class PseudoSemanticAnalyzer {
         result.suggestedMode = suggestMode(result.primaryIntent, result.sentimentLabel);
 
         // Extract keywords (non-stopwords with sentiment value)
-        result.extractedKeywords = extractKeywords(tokens);
+        result.extractedKeywords = extractKeywords(text);
 
         return result;
     }
 
     /**
-     * Tokenize Chinese text into individual words/characters.
-     */
-    private static List<String> tokenize(String text) {
-        List<String> tokens = new ArrayList<>();
-        String[] parts = TOKENIZER.split(text.trim());
-        for (String part : parts) {
-            if (part.isBlank()) continue;
-            // For Chinese, also split by individual characters for granular matching
-            if (containsChinese(part)) {
-                for (char c : part.toCharArray()) {
-                    if (!isWhitespace(c)) {
-                        tokens.add(String.valueOf(c));
-                    }
-                }
-            } else {
-                tokens.add(part);
-            }
-        }
-        return tokens;
-    }
-
-    private static boolean containsChinese(String text) {
-        return text.matches(".*[\\u4e00-\\u9fa5]+.*");
-    }
-
-    private static boolean isWhitespace(char c) {
-        return Character.isWhitespace(c);
-    }
-
-    /**
      * Calculate overall sentiment score by scanning the raw text for lexicon words.
      *
-     * This intentionally does NOT look up individual tokenize() tokens: tokenize() splits
-     * Chinese text into single characters, but ChineseSentimentLexicon's keys are almost all
-     * 2+ character words, so an exact per-token lookup silently matches almost nothing and
-     * scores every real sentence as ~0 (NEUTRAL) — verified directly against clearly emotional
-     * probe sentences. Scanning the original text via substring containment is the same
-     * technique detectThemes()/detectIntent() already use successfully in this class.
+     * Chinese sentiment entries are mostly multi-character phrases, so the original sentence
+     * must be scanned directly instead of being reduced to isolated characters.
      */
     private static double calculateSentiment(String text) {
         if (text == null || text.isBlank()) return 0;
@@ -205,23 +163,15 @@ public final class PseudoSemanticAnalyzer {
     /**
      * Detect themes based on keyword matching.
      */
-    private static List<String> detectThemes(List<String> tokens) {
+    private static List<String> detectThemes(String text) {
         List<String> detectedThemes = new ArrayList<>();
+        String normalized = text.toLowerCase(java.util.Locale.ROOT);
 
         for (Map.Entry<String, Set<String>> entry : THEME_KEYWORDS.entrySet()) {
             String theme = entry.getKey();
             Set<String> keywords = entry.getValue();
-
-            // Check if any theme keyword appears in tokens
             for (String keyword : keywords) {
-                boolean found = false;
-                for (String token : tokens) {
-                    if (token.contains(keyword) || keyword.contains(token)) {
-                        found = true;
-                        break;
-                    }
-                }
-                if (found) {
+                if (normalized.contains(keyword.toLowerCase(java.util.Locale.ROOT))) {
                     detectedThemes.add(theme);
                     break;
                 }
@@ -240,56 +190,33 @@ public final class PseudoSemanticAnalyzer {
      * Detect primary intent based on tokens and themes.
      * Priority: SELF_HARM > SEEK_SUPPORT > others
      */
-    private static String detectIntent(List<String> tokens, List<String> themes) {
-        // Check self-harm first (highest priority)
-        for (String token : tokens) {
-            for (String crisisKeyword : INTENT_PATTERNS.get("SELF_HARM")) {
-                if (token.contains(crisisKeyword) || crisisKeyword.contains(token)) {
-                    return "SELF_HARM";
-                }
-            }
-        }
-
-        // Check other intents by priority
-        Set<String> tokensSet = new HashSet<>(tokens);
-
-        if (hasAnyMatch(tokensSet, INTENT_PATTERNS.get("SEEK_SUPPORT"))) return "SEEK_SUPPORT";
-        if (hasAnyMatch(tokensSet, INTENT_PATTERNS.get("TASK_STRESS"))) return "TASK_STRESS";
-        if (hasAnyMatch(tokensSet, INTENT_PATTERNS.get("RELATION_ISSUE"))) return "RELATION_ISSUE";
-        if (hasAnyMatch(tokensSet, INTENT_PATTERNS.get("COGNITIVE_CLARITY"))) return "COGNITIVE_CLARITY";
-        if (hasAnyMatch(tokensSet, INTENT_PATTERNS.get("EXPRESS_EMOTION"))) return "EXPRESS_EMOTION";
+    private static String detectIntent(String text) {
+        if (containsAnyPhrase(text, INTENT_PATTERNS.get("SELF_HARM"))) return "SELF_HARM";
+        // Domain intent wins over generic words such as "希望" or "需要". This lets a sentence
+        // like "我担心明天的项目展示，希望你先陪我稳一下" retain both its emotion and task.
+        if (containsAnyPhrase(text, INTENT_PATTERNS.get("TASK_STRESS"))) return "TASK_STRESS";
+        if (containsAnyPhrase(text, INTENT_PATTERNS.get("RELATION_ISSUE"))) return "RELATION_ISSUE";
+        if (containsAnyPhrase(text, INTENT_PATTERNS.get("COGNITIVE_CLARITY"))) return "COGNITIVE_CLARITY";
+        if (containsAnyPhrase(text, INTENT_PATTERNS.get("SEEK_SUPPORT"))) return "SEEK_SUPPORT";
+        if (containsAnyPhrase(text, INTENT_PATTERNS.get("EXPRESS_EMOTION"))) return "EXPRESS_EMOTION";
 
         return "DAILY_SHARE";
     }
 
-    private static boolean hasAnyMatch(Set<String> tokens, Set<String> patterns) {
-        for (String token : tokens) {
-            for (String pattern : patterns) {
-                // Only match if token contains the full pattern, or if pattern contains token
-                // but avoid single-character false positives by requiring minimum length
-                if (token.contains(pattern)) {
-                    return true;
-                }
-                // For reverse match (pattern contains token), require token to be at least 2 characters
-                // to avoid single-character tokens matching multi-character patterns
-                if (pattern.contains(token) && token.length() >= 2) {
-                    return true;
-                }
-            }
-        }
-        return false;
+    private static boolean containsAnyPhrase(String text, Set<String> phrases) {
+        if (text == null || text.isBlank()) return false;
+        String normalized = text.toLowerCase(java.util.Locale.ROOT);
+        return phrases.stream().anyMatch(phrase ->
+                normalized.contains(phrase.toLowerCase(java.util.Locale.ROOT)));
     }
 
     /**
      * Check for safety risk (self-harm or severe distress).
      */
-    private static boolean checkSafetyRisk(List<String> tokens, String text) {
-        Set<String> tokensSet = new HashSet<>(tokens);
-        // Check self-harm keywords (substring match against per-char tokens — already correct)
-        if (hasAnyMatch(tokensSet, INTENT_PATTERNS.get("SELF_HARM"))) return true;
+    private static boolean checkSafetyRisk(String text) {
+        if (containsAnyPhrase(text, INTENT_PATTERNS.get("SELF_HARM"))) return true;
 
-        // Check severe negative sentiment words (score <= -4) — every such lexicon entry is 2+
-        // characters, so this must scan the raw text rather than look up individual tokens.
+        // Severe negative lexicon entries are phrases, so scan the original text.
         return hasSevereNegativeWord(text);
     }
 
@@ -310,8 +237,7 @@ public final class PseudoSemanticAnalyzer {
         // Adjust based on sentiment magnitude
         baseIntensity += Math.abs(sentimentScore) * 0.8;
 
-        // Check for amplifying intensifiers present anywhere in the text (most are 2+ characters,
-        // so this must scan raw text rather than look up individual tokenize() tokens).
+        // Check for amplifying intensifiers present anywhere in the phrase.
         for (Map.Entry<String, Double> entry : ChineseIntensifiers.entries().entrySet()) {
             if (entry.getValue() > 1.0 && text.contains(entry.getKey())) {
                 baseIntensity += 0.5;
@@ -362,37 +288,14 @@ public final class PseudoSemanticAnalyzer {
     /**
      * Extract meaningful keywords (non-stopwords with sentiment or theme relevance).
      */
-    private static List<String> extractKeywords(List<String> tokens) {
+    private static List<String> extractKeywords(String text) {
         List<String> keywords = new ArrayList<>();
-
-        for (String token : tokens) {
-            // Skip stopwords
-            if (ChineseStopwords.isStopword(token)) continue;
-
-            // Skip intensifiers
-            if (ChineseIntensifiers.isIntensifier(token)) continue;
-
-            // Include if has sentiment value
-            if (ChineseSentimentLexicon.getScore(token) != 0) {
-                keywords.add(token);
-                continue;
-            }
-
-            // Include if matches any theme keyword
-            boolean matchesTheme = false;
-            for (Set<String> themeKeywords : THEME_KEYWORDS.values()) {
-                for (String kw : themeKeywords) {
-                    if (token.contains(kw) || kw.contains(token)) {
-                        matchesTheme = true;
-                        break;
-                    }
-                }
-                if (matchesTheme) break;
-            }
-            if (matchesTheme) {
-                keywords.add(token);
-            }
-        }
+        if (text == null || text.isBlank()) return keywords;
+        String normalized = text.toLowerCase(java.util.Locale.ROOT);
+        THEME_KEYWORDS.values().stream().flatMap(Set::stream).distinct()
+                .filter(keyword -> normalized.contains(keyword.toLowerCase(java.util.Locale.ROOT)))
+                .limit(12)
+                .forEach(keywords::add);
 
         return keywords;
     }

@@ -3,7 +3,6 @@ import {
   api, type ConnectionRequests, type DiscoverablePerson, type LetterThread,
   type RelationHealth, type RelationMention, type RelationTimelinePoint, type SlowLetter, type SocialConnection
 } from "../api";
-import { excludeTestAccounts } from "../testAccountFilter";
 
 // Extracted from AuroraApp.tsx (B1 domain-hook decomposition, second slice): the "connections/letters"
 // product space -- People Discovery, relation mentions/timeline, connection requests/friends, and the
@@ -52,7 +51,9 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
   const loadConnectionRequests = useCallback(() => api.connectionRequests().then(setConnectionRequests), []);
   const loadFriends = useCallback(() => api.friends().then(setFriends), []);
   const loadLetterOutbox = useCallback(() => api.letterOutbox().then(setLetterOutbox).catch(() => undefined), []);
-  const loadPeople = useCallback(() => api.discoverPeople().then(rows => setPeople(excludeTestAccounts(rows))).catch(() => undefined), []);
+  // The backend applies persisted account provenance (HUMAN/SHOWCASE only). Do not
+  // re-infer identity from usernames in the browser.
+  const loadPeople = useCallback(() => api.discoverPeople().then(setPeople).catch(() => undefined), []);
   const loadRelations = useCallback(() => api.relations().then(setRelations).catch(() => undefined), []);
   const loadLetterThreads = useCallback(() => api.letterThreads().then(setLetterThreads).catch(() => undefined), []);
 
@@ -63,7 +64,7 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
   // function was redefined fresh every render; here, as a stable useCallback, a functional setPeople
   // update is used instead so a discoverPeople failure keeps whatever the freshest `people` state is,
   // not a value captured when this callback was created. Observably identical (both keep the existing,
-  // already-filtered list unchanged on failure) -- see docs/goal/tracks/track-b-status.yml discoveries.
+  // list unchanged on failure) -- see docs/goal/tracks/track-b-status.yml discoveries.
   const refreshConnections = useCallback(async () => {
     const [requestsRows, acceptedRows, discoverable] = await Promise.all([
       api.connectionRequests(), api.friends(),
@@ -71,7 +72,7 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
     ]);
     setConnectionRequests(requestsRows);
     setFriends(acceptedRows);
-    setPeople(current => excludeTestAccounts(discoverable.ok ? discoverable.rows : current));
+    setPeople(current => discoverable.ok ? discoverable.rows : current);
   }, []);
 
   const requestPersonConnection = useCallback(async (userId: number) => {

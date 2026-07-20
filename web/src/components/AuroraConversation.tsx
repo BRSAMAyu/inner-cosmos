@@ -76,7 +76,8 @@ export function AuroraConversation({ messages, activeTurnId, thinkingStage = nul
   const stopRecording = () => { recorderRef.current?.stop(); setRecording(false); };
 
   return <>
-    <section className="conversation" aria-live="polite" aria-label={t.convAria}>
+    <section className={`conversation ${messages.length === 0 ? "empty-state" : "has-messages"}`}
+      aria-live="polite" aria-label={t.convAria}>
       {messages.length === 0 && <div className="empty"><span>✦</span><p>{t.empty}</p></div>}
       {messages.map(message => <article className={`message ${message.speaker.toLowerCase()} ${message.partial ? "partial" : ""}`} key={message.key}>
         <span className="speaker">{message.speaker === "AURORA" ? "Aurora" : t.speakerYou}</span>

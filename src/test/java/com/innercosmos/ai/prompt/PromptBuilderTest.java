@@ -748,6 +748,32 @@ class PromptBuilderTest {
         assertFalse(result.contains("你是"), "role-hijack phrase stripped");
     }
 
+    @Test
+    void confirmedUnderstandingClaimsReachThePromptButUnreviewedOrRetiredClaimsDoNot() {
+        com.innercosmos.entity.UnderstandingClaim active = claim("ACTIVE", "prefers concrete next steps");
+        com.innercosmos.entity.UnderstandingClaim candidate = claim("CANDIDATE", "unreviewed guess");
+        com.innercosmos.entity.UnderstandingClaim retired = claim("RETIRED", "stale understanding");
+
+        String result = new PromptBuilder()
+                .withConfirmedUnderstandingClaims(java.util.List.of(active, candidate, retired))
+                .build();
+
+        assertTrue(result.contains("prefers concrete next steps"));
+        assertTrue(result.contains("user-confirmed"));
+        assertFalse(result.contains("unreviewed guess"));
+        assertFalse(result.contains("stale understanding"));
+    }
+
+    private com.innercosmos.entity.UnderstandingClaim claim(String status, String value) {
+        com.innercosmos.entity.UnderstandingClaim claim = new com.innercosmos.entity.UnderstandingClaim();
+        claim.status = status;
+        claim.sourceType = "AUTO_EXTRACTION";
+        claim.claimType = "PREFERENCE";
+        claim.valueJson = value;
+        claim.confidence = 0.86;
+        return claim;
+    }
+
     private com.innercosmos.entity.UserCorrection calibration(String dim, String newValue, String oldValue, String reason) {
         com.innercosmos.entity.UserCorrection c = new com.innercosmos.entity.UserCorrection();
         c.targetType = "PORTRAIT_DIM";

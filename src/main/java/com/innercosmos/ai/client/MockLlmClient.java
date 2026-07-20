@@ -1,7 +1,6 @@
 package com.innercosmos.ai.client;
 
 import com.innercosmos.ai.lexicon.ChineseSentimentLexicon;
-import com.innercosmos.ai.lexicon.ChineseStopwords;
 import com.innercosmos.ai.prompt.AuroraContentLibrary;
 import com.innercosmos.ai.semantic.PseudoSemanticAnalyzer;
 import com.innercosmos.ai.semantic.PseudoSemanticAnalyzer.AnalysisResult;
@@ -10,12 +9,10 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 import java.util.concurrent.Executor;
 
 public class MockLlmClient implements LlmClient {
     private final Executor aiExecutor;
-    private final Random random = new Random();
 
     public MockLlmClient(Executor aiExecutor) {
         this.aiExecutor = aiExecutor;
@@ -51,6 +48,14 @@ public class MockLlmClient implements LlmClient {
         // Analyze input for semantic understanding
         AnalysisResult analysis = PseudoSemanticAnalyzer.analyze(textToAnalyze);
 
+        // ALIVE is a decision worker, not a conversation worker. Without this explicit route the
+        // demo client falls through to AuroraContentLibrary and returns two natural-language
+        // paragraphs; AliveDecisionEngine then cannot parse its contract and the proactive loop
+        // silently degrades every 90 seconds.
+        if (module.contains("ALIVE_DECISION")) {
+            return buildAliveDecisionJson(text);
+        }
+
         // Aurora structured dispatch. The real service uses module names
         // "AURORA_AGENT_LOOP_<mode>" (chat reply) and "AURORA_PROACTIVE_GREETING_<mode>"
         // (proactive greeting); the legacy "AURORA_CHAT"/"AURORA_GREETING" names are kept
@@ -64,7 +69,7 @@ public class MockLlmClient implements LlmClient {
         }
         if (module.contains("AURORA")) {
             boolean greeting = module.contains("GREETING");
-            return buildAuroraChatJson(text, analysis, greeting);
+            return buildAuroraChatJson(textToAnalyze, analysis, greeting);
         }
         if (module.contains("THOUGHT_SHREDDER")) {
             return buildThoughtShredderJson(text, analysis);
@@ -82,6 +87,21 @@ public class MockLlmClient implements LlmClient {
             return buildLetterGuardJson(textToAnalyze, analysis);
         }
         return null;
+    }
+
+    private String buildAliveDecisionJson(String prompt) {
+        // The deterministic mock makes exactly one gentle first-contact decision when no recent
+        // proactive history exists. Once history exists it waits, so demo scheduling remains alive
+        // without manufacturing notification spam or a wall of duplicate WakeIntents.
+        boolean noRecentHistory = prompt.contains("最近 7d 主动式日志: 无")
+                || prompt.contains("recent proactive log: none");
+        if (noRecentHistory) {
+            return "{\"decide\":\"push\",\"wait_minutes\":30,"
+                    + "\"content_for_user\":\"我刚刚想起你。今天有没有一个瞬间，你希望有人多陪你停一会儿？\","
+                    + "\"reason\":\"mock-first-contact-with-no-recent-proactive-history\"}";
+        }
+        return "{\"decide\":\"wait\",\"wait_minutes\":30,\"content_for_user\":\"\","
+                + "\"reason\":\"mock-respects-recent-proactive-history\"}";
     }
 
     private String buildAuroraPlanJson(AnalysisResult analysis, String text) {
@@ -107,29 +127,33 @@ public class MockLlmClient implements LlmClient {
         boolean greeting = greetingHint || text.contains("主动发起对话") || text.contains("AURORA_GREETING");
         if (greeting) {
             segments.add("我先来找你一下。今天不用等到想清楚再开口，我们可以从一句很小的话开始。");
-            if (random.nextBoolean()) {
-                segments.add("如果你愿意，我可以陪你聊今天最占心的位置，也可以只是陪你把脑子里的噪音放下来。");
-            }
+            segments.add("如果你愿意，我可以陪你聊今天最占心的位置，也可以只是陪你把脑子里的噪音放下来。");
         } else if ("CRISIS".equals(analysis.sentimentLabel)) {
             segments.add("我先把安全放在最前面。你现在不需要一个人扛着，请尽快联系身边可信任的人或当地紧急支持。");
+        } else if ("TASK_STRESS".equals(analysis.primaryIntent)) {
+            boolean presentation = containsAny(text, List.of("展示", "汇报", "演示", "答辩", "presentation"));
+            boolean mixedFeeling = containsAny(text, List.of("兴奋", "期待"))
+                    && containsAny(text, List.of("担心", "紧张", "焦虑", "害怕"));
+            if (mixedFeeling) {
+                segments.add("兴奋和担心可以同时在这里。担心不等于你不行，它更像是在说：这次展示对你真的很重要。先不用压住任何一种感受，和我一起把呼吸放慢一点。");
+            } else {
+                segments.add("先不把这项任务当成对你的评判。它现在只是太大、太近了；我们先把身体和注意力稳回这一小刻。");
+            }
+            segments.add(presentation
+                    ? "第一步只写一句话：你希望老师在展示结束后，还能记住这个项目最不可替代的什么？接下来每一页、每一次演示，都只为这句话服务。"
+                    : "第一步只做十分钟：打开任务入口，写下最小的可交付结果，不要求今天把整件事完成。");
+        } else if ("RELATION_ISSUE".equals(analysis.primaryIntent)) {
+            segments.add("关系里的事经常不是一句对错能说清的。我更想陪你先分清：发生了什么、你有什么反应、你真正希望被理解的是什么。");
+            segments.add("先不用替对方解释，也不用急着决定关系的结论。写下你最希望对方真正听懂的那一句，我们从那里继续。");
         } else if ("NEGATIVE".equals(analysis.sentimentLabel) || containsAny(text, List.of("累", "焦虑", "烦", "崩"))) {
             segments.add("我听见这件事对你不是轻轻掠过的那种影响。它像是在你心里占了一块位置，而且已经待了一阵子。");
             segments.add("我们先不急着把它解释成你哪里做得不够好，可以先把事实、感受和真正想要的东西分开。");
         } else if ("POSITIVE".equals(analysis.sentimentLabel) || containsAny(text, List.of("开心", "高兴", "顺利"))) {
             segments.add("这个瞬间我想先替你接住。不是所有好的感受都要立刻进入下一步，它本身就值得被看见。");
             segments.add("也许你可以把这件事存成一张记忆卡，让以后低落的时候还能回头看到它。");
-        } else if (containsAny(text, List.of("关系", "朋友", "家人", "同事"))) {
-            segments.add("关系里的事经常不是一句对错能说清的。我更想陪你先分清：发生了什么、你有什么反应、你真正希望被理解的是什么。");
-        } else if (containsAny(text, List.of("任务", "工作", "拖延"))) {
-            segments.add("这听起来像是任务已经在脑子里变得太大了。我们可以先不碰完整计划，只找一个十分钟内能开始的小动作。");
         } else {
             segments.add("我在。你可以不用把话组织得很漂亮，先把现在最真实的那一句放到这里。");
-            if (random.nextBoolean()) {
-                segments.add("我会根据你说的内容，帮你慢慢整理成记忆、情绪线索或一个很小的下一步。");
-            }
-        }
-        if (segments.size() == 1 && random.nextInt(3) == 0) {
-            segments.add("如果这句话后面还有一点没说完的地方，我也想听。");
+            segments.add("我会根据你说的内容，帮你慢慢整理成记忆、情绪线索或一个很小的下一步。");
         }
 
         String detectedTheme = analysis.detectedThemes.isEmpty() ? "日常倾诉" : analysis.detectedThemes.get(0);
@@ -137,7 +161,9 @@ public class MockLlmClient implements LlmClient {
         if ("SELF_HARM".equals(analysis.primaryIntent)) {
             nextQuestion = "你身边现在有没有一个可以立刻联系到的可信任的人？";
         } else if ("TASK_STRESS".equals(analysis.primaryIntent)) {
-            nextQuestion = "如果只允许做十分钟，第一步可以小到什么程度？";
+            nextQuestion = containsAny(text, List.of("展示", "汇报", "演示", "答辩", "presentation"))
+                    ? "展示结束后，你最希望老师记住这个项目的哪一句话？"
+                    : "如果只允许做十分钟，第一步可以小到什么程度？";
         } else if ("RELATION_ISSUE".equals(analysis.primaryIntent)) {
             nextQuestion = "这段关系里，你最希望对方真正听懂哪一句话？";
         } else {
@@ -146,7 +172,9 @@ public class MockLlmClient implements LlmClient {
 
         String smallStep;
         if ("TASK_STRESS".equals(analysis.primaryIntent)) {
-            smallStep = "只打开任务入口，不要求完成。";
+            smallStep = containsAny(text, List.of("展示", "汇报", "演示", "答辩", "presentation"))
+                    ? "写下展示唯一需要被记住的一句话。"
+                    : "只打开任务入口，不要求完成。";
         } else if ("RELATION_ISSUE".equals(analysis.primaryIntent)) {
             smallStep = "写下事实和感受各一句。";
         } else {

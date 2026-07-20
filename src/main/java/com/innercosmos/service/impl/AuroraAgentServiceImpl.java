@@ -95,6 +95,8 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     @Autowired(required = false)
     private com.innercosmos.service.UserCorrectionService userCorrectionService;
     @Autowired(required = false)
+    private com.innercosmos.mapper.UnderstandingClaimMapper understandingClaimMapper;
+    @Autowired(required = false)
     private com.innercosmos.service.PromptVersionService promptVersionService; // M-052
     @Autowired(required = false)
     private com.innercosmos.service.EmotionBaselineService emotionBaselineService;
@@ -260,6 +262,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 .withUserProfile(profileBrief(profile))
                 .withUserPortrait(portrait)
                 .withUserCorrections(safeCorrections(userId))
+                .withConfirmedUnderstandingClaims(safeConfirmedClaims(userId))
                 .withPortraitCalibrations(safePortraitCalibrations(userId))
                 .withRelationship(relationship)
                 .withCurrentStateSignal(stateSignal)
@@ -740,6 +743,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 .withUserProfile(profileBrief(profile))
                 .withUserPortrait(safePortrait(userId))
                 .withUserCorrections(safeCorrections(userId))
+                .withConfirmedUnderstandingClaims(safeConfirmedClaims(userId))
                 .withPortraitCalibrations(safePortraitCalibrations(userId))
                 .withGravityMemories(gravityMemories)
                 .withMemoryContext(memoryContext)
@@ -1386,6 +1390,25 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             return recent == null ? List.of() : recent;
         } catch (Exception e) {
             log.warn("Correction read failed (non-fatal): {}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    /** Only user-confirmed automatic claims are eligible; explicit corrections use their higher-authority block. */
+    private List<com.innercosmos.entity.UnderstandingClaim> safeConfirmedClaims(Long userId) {
+        if (userId == null || understandingClaimMapper == null) return List.of();
+        try {
+            List<com.innercosmos.entity.UnderstandingClaim> claims = understandingClaimMapper.selectList(
+                    new QueryWrapper<com.innercosmos.entity.UnderstandingClaim>()
+                            .eq("user_id", userId)
+                            .eq("status", "ACTIVE")
+                            .eq("source_type", "AUTO_EXTRACTION")
+                            .orderByDesc("confidence")
+                            .orderByDesc("version")
+                            .last("LIMIT " + PromptBuilder.UNDERSTANDING_CLAIM_MAX));
+            return claims == null ? List.of() : claims;
+        } catch (Exception e) {
+            log.warn("Confirmed understanding claim read failed (non-fatal): {}", e.getMessage());
             return List.of();
         }
     }

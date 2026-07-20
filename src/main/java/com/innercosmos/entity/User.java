@@ -12,5 +12,7 @@ public class User extends BaseEntity {
     public String email;
     public String role;
     public String status;
+    /** Persisted provenance used by discovery policy; never inferred at read time. */
+    public String accountKind;
     public LocalDateTime lastLoginAt;
 }
