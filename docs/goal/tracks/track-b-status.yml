@@ -7,13 +7,31 @@ minimum_handoff_commit: 7e0688308292cd9d41552c98f576d25681738be0
 base_sha: 14e1b85596034544b7fb291677fb8dd3f8240f1c
 branch: codex/track-b-complete-experience
 owner: claude-code-track-b
-updated_at: "2026-07-19T19:45:00+08:00"
+updated_at: "2026-07-20T13:45:00+08:00"
 spec: docs/tracks/TRACK-B-COMPLETE-EXPERIENCE.md
 evidence_root: evidence/track-b
 integration_requests: docs/goal/tracks/track-b-integration-requests.yml
 continuation_branch: feat/track-b-complete-experience-cont
 continuation_base_sha: 85b3a5b30519cc5894c6ee4a94fe9844d20bc3ee
-current_front: B2-visible-innovation
+current_front: final-integration-stabilization
+integrator_checkpoint_2026_07_20:
+  status: BUILDER_VERIFIED_IN_PROGRESS
+  evidence: evidence/integration/FINAL-STABILIZATION-2026-07-20/README.md
+  accepted:
+    - "Track A and Track B continuations are merged on main; all three TB integration requests are closed in the integrated tree."
+    - "Clean BrowserRouter URLs hard-refresh correctly under /app/aurora; Capacitor retains relative assets through a dedicated mobile Vite mode."
+    - "Aurora's complete action loop fits common short laptop/projector viewports and 390x844 mobile, including composer actions and the five-space bottom navigation."
+    - "Resonance theme filters use frequency-ranked progressive disclosure (12 themes by default, explicit expansion for the remainder)."
+    - "People Discovery is backed by persisted server-side account provenance and no longer exposes historical QA accounts."
+    - "A live Mock-provider turn proves intentional multi-bubble pacing, grounded mixed-emotion support, a presentation-specific first step and a truthful idle state."
+  supersedes_stale_remaining:
+    - "B1 clean nested routes and TB-REQ-002 are closed; resource paths for capsules and letter threads are supported without hash URLs."
+    - "B3 is no longer NOT_STARTED: the warm visual system, responsive short-viewport composition, progressive disclosure and interaction feedback exist, though global visual regression and non-author review remain open."
+    - "B4 component/shell i18n is substantially implemented and all current Vitest files pass; qualified en-SG copy review, global axe/manual screen-reader review and performance budgets remain open."
+  remaining_human_or_environment_gates:
+    - "Real Android/iOS devices, APNs/FCM, signing and deployed update rehearsal."
+    - "Non-author golden-journey usability and demo rehearsal from a clean checkout."
+    - "Real-provider and commercial Singapore release gates tracked globally."
 handoff_checkpoint:
   status: IN_PROGRESS
   scope: "Second domain-hook extraction plus explicit PWA install/update UX; this checkpoint supersedes older B1/B5 remaining text where they conflict."
@@ -122,7 +140,7 @@ workstreams:
       ProductShell.test 10/10 (+4); full suite 206/206; build PASS. Remaining: live in-browser
       deep-link verification (needs a capsule created first); other resource routes
       (/connections/letters/:id, /cosmos/portrait) can reuse resourceFromPath but are not wired yet.
-  B3-design-content: {status: NOT_STARTED, evidence: [], remaining: "Complete design primitives, content states, responsive polish and visual regression."}
+  B3-design-content: {status: IN_PROGRESS, evidence: [web/src/styles.css, web/src/components/, evidence/integration/FINAL-STABILIZATION-2026-07-20/README.md], remaining: "Warm visual tokens, motion/reduced-motion, responsive layouts, short-viewport Aurora composition, shared async feedback and resonance progressive disclosure are implemented. Automated visual regression coverage and non-author content/design review remain open."}
   B4-i18n-a11y:
     status: IN_PROGRESS
     evidence:

@@ -2,7 +2,8 @@ schema_version: 1
 track_id: TRACK-B
 minimum_handoff_commit: 7e0688308292cd9d41552c98f576d25681738be0
 track_base_sha: 14e1b85596034544b7fb291677fb8dd3f8240f1c
-status: OPEN
+status: CLOSED
+updated_at: "2026-07-20T13:45:00+08:00"
 instructions: >-
   Track B appends every backend capability needed by a user journey. Each entry must include user
   impact, priority, desired typed contract, loading/error/retry semantics, temporary fixture/adapter,
@@ -31,7 +32,13 @@ requests:
     acceptance_test: "web/src/testAccountFilter.test.ts covers the denylist; remove it when the fixture is removed."
     affected_track_a_workstream: "A2-memory-profile or account/data-plane ownership (whichever owns account provenance/seeding)"
     evidence: evidence/track-b/golden-journeys.md#J3 (discovery finding), evidence/track-b/experience-inventory.md
-    status: OPEN
+    status: CLOSED
+    resolution: >-
+      PostgreSQL Flyway V20 and the H2 long-lived-data initializer persist account_kind, backfill
+      historical automation accounts once, and classify demo/system/showcase seeds explicitly.
+      SocialController now filters discoverability at the database boundary to HUMAN/SHOWCASE.
+      The client-side name denylist and its tests were removed. PostgreSQL/H2 migration tests plus a
+      live browser journey prove that only river/cloud appear for the demo account.
   - id: TB-REQ-002
     title: "Server-side SPA fallback for /app/aurora/** deep-link paths"
     user_impact: >-
@@ -57,7 +64,12 @@ requests:
     acceptance_test: "web/src/components/ProductShell.test.tsx already covers path<->space resolution independent of router choice; add a build/E2E check that a hard refresh on a nested path (e.g. /aurora/cosmos with BrowserRouter) returns 200 with the app shell, not a 404, once this request is implemented."
     affected_track_a_workstream: "Whichever workstream owns src/main/java/**/WebMvcConfig or equivalent static-resource routing (not owned by any Track B path)"
     evidence: evidence/track-b/scripts/observe-b1-routes.mjs, evidence/track-b/screenshots/b1-routes-*.png
-    status: OPEN
+    status: CLOSED
+    resolution: >-
+      AuroraSpaController forwards extension-free nested paths under /app/aurora to index.html while
+      leaving real static assets and APIs untouched. The React entry now uses BrowserRouter with the
+      /app/aurora basename; web and Capacitor builds use distinct absolute/relative Vite bases.
+      Controller tests and hard-refresh browser checks cover /connections/letters and /resonance.
   - id: TB-REQ-003
     title: "Owner-facing data-rights receipts endpoint (consumes Track A TA-DELTA-001)"
     user_impact: >-
@@ -82,4 +94,8 @@ requests:
     acceptance_test: "web/src/components/DataRightsPanel.test.tsx (3 cases: load trigger, empty state, receipt rendering)."
     affected_track_a_workstream: "A5-data-rights (DataRightsController / DataRetractionReceiptService); contract delta TA-DELTA-001."
     evidence: evidence/track-b/B2-visible-innovation/README.md, docs/goal/tracks/track-a-contract-deltas.yml#TA-DELTA-001
-    status: OPEN
+    status: CLOSED
+    resolution: >-
+      Track A's owner-scoped, sensitive-payload-free endpoint and Track B's bilingual DataRightsPanel
+      are both merged on main. Typed component tests and the merged backend contract remain the
+      acceptance authority; no fixture is used in the product path.

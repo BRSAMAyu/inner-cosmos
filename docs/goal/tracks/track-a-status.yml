@@ -7,13 +7,28 @@ minimum_handoff_commit: 7e0688308292cd9d41552c98f576d25681738be0
 base_sha: 14e1b85596034544b7fb291677fb8dd3f8240f1c
 branch: codex/track-a-living-intelligence
 owner: claude-code-track-a
-updated_at: "2026-07-19T21:20:00+08:00"
+updated_at: "2026-07-20T13:45:00+08:00"
 spec: docs/tracks/TRACK-A-LIVING-INTELLIGENCE.md
 evidence_root: evidence/track-a
 contract_deltas: docs/goal/tracks/track-a-contract-deltas.yml
 continuation_branch: feat/track-a-living-intelligence-cont
 continuation_base_sha: 85b3a5b30519cc5894c6ee4a94fe9844d20bc3ee
-current_front: A5-data-rights-propagation
+current_front: final-integration-stabilization
+integrator_checkpoint_2026_07_20:
+  status: BUILDER_VERIFIED_IN_PROGRESS
+  evidence: evidence/integration/FINAL-STABILIZATION-2026-07-20/README.md
+  accepted:
+    - "Confirmed ACTIVE automatic understanding claims are now injected into both Aurora reply and greeting prompts through a sanitized, capped, user-confirmed block; explicit corrections retain higher authority."
+    - "Mock-mode semantic analysis now matches Chinese phrases rather than manufacturing themes from isolated characters; mixed emotion plus presentation requests produce a grounded two-bubble response and a concrete first step."
+    - "ALIVE_DECISION has a strict deterministic JSON contract in Mock mode, and invalid decisions fail closed without logging private prompt content."
+    - "Account provenance is persisted and migrated; runtime social discovery relies only on account_kind rather than frontend username heuristics."
+  supersedes_stale_remaining:
+    - "A2's older statement that UnderstandingClaim is never consulted by Aurora is no longer true. Direct conversation continuity is closed; the generic task-aware retrieval benchmark and temporal contradiction graph remain open."
+    - "A4 is implemented as three bilingual consent-bound L1 skills with version/release/revocation tests. It remains IN_PROGRESS, not NOT_STARTED, because qualified human review and blind usefulness evidence are still open."
+  remaining_human_or_research_gates:
+    - "Non-author held-out and blind relational-quality review against real providers."
+    - "Calibrated temporal/contradiction/hybrid-retrieval benchmark and Dynamic Genome fidelity review."
+    - "Qualified psychology-content review and provider-owned credential/ASR gates."
 handoff_checkpoint:
   status: BUILDER_VERIFIED_IN_PROGRESS
   scope: "Accepted A3 capsule-vector foundation checkpoint: consent-scoped query material, current-content-hash scoring and bounded asynchronous rebuild. Full A3 quality research remains IN_PROGRESS."
@@ -168,7 +183,7 @@ workstreams:
       weights). See evidence/track-a/A2-memory-profile/README.md for full detail and the exact
       real-code-vs-gap audit.
   A3-capsule-matching: {status: IN_PROGRESS, evidence: [evidence/track-a/A3-capsule-matching/README.md, evidence/track-a/A5-rights-propagation/README.md], remaining: "Foundation checkpoint accepted: current-hash invalidation, dedicated H2/PostgreSQL tests and bounded asynchronous rebuild are complete. THIS SESSION closed the consent/withdrawal/forget -> matching-vector propagation gap (see A5-data-rights). Still open: real-provider latency/cost/backpressure evaluation, dynamic Genome fidelity and blind multi-strategy quality evidence."}
-  A4-psychology-skills: {status: NOT_STARTED, evidence: [], remaining: "Ship and evaluate at least three bilingual non-diagnostic product skills."}
+  A4-psychology-skills: {status: IN_PROGRESS, evidence: [evidence/innovation/INNO-PSY-001/, evidence/innovation/INNO-PSY-002/, src/main/resources/skills/, src/test/java/com/innercosmos/skill/PsychologySkillRegistryTest.java, src/test/java/com/innercosmos/controller/PsychologySkillControllerTest.java, src/test/java/com/innercosmos/controller/PsychologySkillReleaseControllerTest.java], remaining: "Three bilingual, explicit-consent, suggest-only L1 skills and their version/release/revocation runtime are implemented. Qualified human content review, non-author usefulness testing and release sign-off remain open."}
   A5-data-rights:
     status: IN_PROGRESS
     evidence:

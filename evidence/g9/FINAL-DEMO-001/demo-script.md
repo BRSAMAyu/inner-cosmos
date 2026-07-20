@@ -1,93 +1,81 @@
-# FINAL-DEMO-001 — reproducible 8–12 minute demo script
+# FINAL-DEMO-001 — 8–12 分钟教师演示脚本
 
-> Date: 2026-07-17 · Branch: `feat/supervisor-k8s-ai-g9` · Ledger: G9 `FINAL-DEMO`.
-> Covers the four required elements: **product differentiation · AI depth · data lineage · K8s operations.**
-> Every step below was exercised this session; evidence paths are cited inline.
+> 更新：2026-07-20
 >
-> Prereqs (this machine): JDK 21, Node 22+, Docker Desktop running, `kind` + `kubectl`. Provider keys are
-> operator-injected via env only (never committed) — the demo also runs fully keyless in Mock mode.
+> 本地产品候选：无密钥 Mock 可稳定演示；真实 Provider 只在操作者本地注入并提前彩排。
+>
+> 核心叙事：不是普通聊天壳，而是“有时间感和连续自我的 Aurora → 可纠正的长期理解 → 授权共鸣体与慢连接 → Kubernetes 可运营底座”。
 
----
+## 0. 启动与开场（30–60 秒）
 
-## Part 0 — one-command startup (30s) — *product runs at all*
-```bash
-docker compose -f deploy/compose/dev.yml up -d          # zero config, H2 + Mock AI
-open http://localhost:8080/app/aurora/                  # five-space AppShell
+```powershell
+.\scripts\run-dev.ps1 -Profile demo -Port 8080
 ```
-Talking point: unlike the prod compose files (fail-closed, need real DB/Redis/LLM/OIDC secrets), this
-keyless dev compose boots healthy in ~20s. Evidence: `evidence/g8/DEV-COMPOSE-SMOKE-001/`.
 
-## Part 1 — product differentiation (2–3 min)
-Register a local account → walk the five spaces (Aurora chat, memory starfield, capsule workbench,
-resonance/letters, Me). Show a full conversation loop, memory formation, and a compiled Echo Capsule.
-(Mock mode is fine for the walk-through; switch to real AI for Part 2.)
+打开 `http://localhost:8080/app/aurora/`，使用本地 `demo / demo123`。说明课堂主路径使用 Mock 是为了可复现节奏；真实模型质量有独立、不可伪造的盲评门禁。
 
-## Part 2 — AI depth (2–3 min) — *real provider + dual-kernel*
+## 1. Living Aurora（2–3 分钟）
+
+输入：
+
+> 我对这次项目展示既兴奋又担心。我想让老师记住我们的独特价值，但现在内容太多，不知道第一步该抓什么。
+
+展示并讲解：
+
+- Aurora 先承接“兴奋与担心并存”，再给出“只写一句希望老师记住什么”的具体下一步。
+- 回应分成自然的多条消息，有理解、组织与表达阶段；用户可以在说完前打断、停止或重写方向。
+- “回来约定”是耐久 WakeIntent，不是浏览器定时器；可延期、取消，抵达前重查安静时段、风险和用户偏好。
+- “她最近学会了什么”展示 Aurora Self 的提案、评测、用户同意、版本与回退；它是受控的连续自我，不是静态 prompt 人设。
+
+## 2. 内宇宙与数据真相（2 分钟）
+
+进入“内宇宙”：
+
+- 展示待确认理解与“这不是我”的校准流程；确认后的 claim 会进入 Aurora 上下文，纠正优先于旧理解。
+- 切换星空的时间/主题/人物视图，打开可访问列表与来源详情。
+- 对一颗星做定点修正，说明旧版本可追溯、相关共鸣体会进入 `needs-review`；再展示撤回与永久忘记的区别。
+- 强调 PostgreSQL/pgvector、传统关系字段、版本/来源/同意/纠正共同工作，不是“把所有文字塞进向量库”。
+
+## 3. 共鸣体与慢连接（2–3 分钟）
+
+进入“共鸣”：
+
+- 选择授权记忆，先看严格脱敏预览，再编译私密 Genome。
+- 在沙盒里问一句话并评价“像我/不像我”；反馈不暗中改变人格，必须形成新版本。
+- 展示相似、互补、成长边缘、偶遇、阶段同行策略与解释，而不是单一余弦相似度。
+- 发布后以访客进入有限但自然的共鸣体对话，再写慢信。慢信有飞行时间，不是假装即时在线；真人连接必须双方同意。
+- 回到所有者撤回共鸣体，说明公开发现立即停止，授权与删除可以传播。
+
+## 4. 心理 Skill 与边界（1 分钟）
+
+让 Aurora 建议一项反思，指出“不会自动运行”。打开 Skill，展示：依据、版本、非诊断声明、显式同意、保存策略、结果撤回和中英文界面。产品借鉴心理学机制提升体验，但不冒充医生或治疗。
+
+## 5. Kubernetes / Cloud Computing（2–3 分钟）
+
+根据现场环境选择 Kind 或已录制的 Academy EKS 证据：
+
 ```bash
-# real DeepSeek, fallback disabled so Mock cannot mask it:
-LLM_PROVIDER=deepseek LLM_API_KEY=$DEEPSEEK_API_KEY LLM_ALLOW_FALLBACK=false \
-  docker compose -f deploy/compose/dev.yml up -d
-# send a message in the UI; Aurora replies from the real model (5–6s, real reasoning)
+kubectl -n inner-cosmos-dev get pods,hpa,pdb
+kubectl -n inner-cosmos-dev get deploy,svc,ingress
 ```
-Then show the dual-kernel (planner→speaker) vs single-pass comparison artifact:
-```bash
-cd ai-lab && . .venv/bin/activate
-python -m evals.cli.main real-pairwise --profile deepseek --seed 7 --output /tmp/pairwise
-```
-Talking point (honest): the dual-kernel runtime executes on a real model; the *quality* verdict is the
-blind-human panel (the one standing gate). Evidence: `evidence/innovation/INNO-EVAL-003/`,
-`evidence/g8/DEV-COMPOSE-SMOKE-001/`.
 
-## Part 3 — data lineage (1–2 min) — *memory → semantic retrieval → provenance*
-```bash
-./mvnw -Dtest=MemoryEmbeddingCandidateIntegrationTest test   # semantic recall 1.0 vs lexical 0.0
-```
-Show that memories carry source/consent/provenance and that semantic retrieval beats lexical on hard
-paraphrase/temporal/multi-hop cases, while consent-scoped memories are never sent to the provider.
-Evidence: `evidence/innovation/INNO-INNER-008/`.
+依次说明：
 
-## Part 4 — Kubernetes operations (3–4 min) — *the headline for Q1*
-```bash
-# cluster already up: kind cluster 'inner-cosmos-ops' with the app + observability
-kubectl -n inner-cosmos-dev get pods,hpa
-kubectl -n observability port-forward svc/grafana 3000:3000 &   # http://localhost:3000 (admin/admin, local)
-```
-Show live:
-- **Observability**: Grafana "Inner Cosmos — App Health & JVM" dashboard (replicas up, HTTP rate, JVM heap,
-  CPU) fed by Prometheus scraping `/actuator/prometheus`. Evidence: `evidence/g8/OPS-OBSERVABILITY-001/`.
-- **Autoscaling**: drive load and watch HPA scale 2→4 then back.
-  ```bash
-  kubectl -n inner-cosmos-dev run loadgen --image=fortio/fortio --restart=Never -- \
-    load -qps 0 -t 120s -c 100 http://inner-cosmos-api.inner-cosmos-dev.svc:8080/actuator/prometheus
-  watch kubectl -n inner-cosmos-dev get hpa
-  ```
-  Evidence: `evidence/g8/HPA-LOAD-001/`.
-- **Resilience**: `kubectl -n inner-cosmos-dev delete pod <one>` → recovers; `kubectl rollout restart` →
-  zero downtime; `kubectl drain <worker>` → PDB protects availability, pods reschedule. Evidence:
-  `evidence/g8/OPS-RESILIENCE-001/`.
-- **Backup/restore**: `kubectl -n inner-cosmos-dev create job --from=cronjob/inner-cosmos-pg-backup demo-backup`
-  then show the restore drill. Evidence: `evidence/g8/BACKUP-RESTORE-001/`.
+- 同一不可变镜像拆成 API、worker、scheduler 运行角色；PostgreSQL 是事实源，Redis 提供共享实时状态，JDBC outbox 保证事件可恢复。
+- 多副本 session/rate-limit/lease/idempotency、健康探针、滚动更新、PDB、HPA、观测与恢复证据。
+- AWS Academy 环境刻意不用不可获得的 SQS、EBS CSI 和 Pod learner credentials；静态存储与 Lab session 生命周期必须如实披露。
+- `local-complete`、`academy-eks`、`commercial-sg` 是三份不同部署合同，课程证据不冒充新加坡商业生产。
 
-## Part 5 — reliability & credibility (1 min)
-```bash
-./mvnw -Dtest=JdbcOutboxRepositoryIntegrationTest test   # outbox → idempotent → retry → DLQ → replay (3/3)
-```
-Point at the cross-cutting integrity work: real EKS deploy evidence (ACADEMY-LIVE-001, with the HPA claim
-corrected to the true 2..4), transactional outbox with dead-letter replay, and a portable secret scan.
+## 6. 收尾（30 秒）
 
----
+一句话总结：
 
-## Known behaviors (verified 2026-07-17 on the prod EKS stack — NOT bugs)
-- **Capsule boundary editor works** via the UI (correct payload = comma-joined topic strings +
-  `maxConversationTurns` + `If-Match` version header). A raw-API smoke that sent arrays/omitted If-Match
-  failed, but the SPA sends the right shape — safe to demo.
-- **Slow letters are intentionally delayed ~3 minutes** (`estimatedArrivalAt = now + 3min`; `LetterDeliveryJob`
-  runs every 60s, SENT→FLYING→DELIVERED). In the demo, show the "已寄出 / 在路上(FLYING)" state, or wait
-  ~3–4 min for it to land in the recipient's inbox — do not expect instant arrival.
-- **Semantic memory retrieval now uses real GLM embeddings + pgvector** on prod (INNO-INNER-009).
+> Inner Cosmos 的差异不是“又一个会聊天的 AI”，而是把可被打断、有时间感、有连续自我的陪伴，沉淀为用户可纠正的长期自我理解，再通过可授权、可撤回的高保真共鸣体，转化为低压力但更真实的人际连接；Kubernetes 让这条链路能够被多副本运行、观察和恢复。
 
-## Status / remaining
-- This is the demo **script** with every step exercised this session. To reach `FINAL-DEMO` PASS: capture a
-  single recorded run (screen capture) end-to-end, and have a **non-author** drive it from a clean checkout.
-- FINAL-E2E (automated Playwright across the five spaces) and the non-author FINAL-OPERATIONS runbook
-  rehearsal are the remaining G9 items before declaring RELEASE_CANDIDATE.
+## 现场门禁与降级顺序
+
+1. 默认 Mock，全程不依赖网络和密钥。
+2. 若真实 Provider 已提前彩排，单独展示一轮并明确其 Provider；失败立即回到 Mock，不伪装成功。
+3. 云端不可用时使用本地产品 + 已验证的 EKS/Kind 证据，不在现场临时改集群。
+4. 不展示任何密钥、真实隐私数据或管理员 P0 内容。
+5. 当前发布声明是 `LOCAL_TEACHER_DEMO_READY`；商业发布仍受真实 Provider 盲评、真机、PDPA/跨境、心理专业与生产账户门禁约束。

@@ -1,7 +1,8 @@
 schema_version: 1
 goal_id: INNER-COSMOS-TEAMMATE-CONTINUATION
-status: READY_FOR_TEAMMATE_CONTINUATION
-updated_at: "2026-07-18T23:00:00+08:00"
+status: SUPERSEDED_BY_FINAL_INTEGRATION_STATE
+updated_at: "2026-07-20T14:40:00+08:00"
+superseded_by: docs/goal/release-candidate-state.yml
 authority:
   objective: goal-objective.md
   current_handoff: 对齐文档/21-双轨阶段合并审查与完全体续跑交接.md

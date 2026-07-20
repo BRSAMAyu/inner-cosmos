@@ -2,7 +2,7 @@
 
 > 状态：ACTIVE / AUTHORITATIVE
 > 目标类型：长期自主实现目标，而非单轮工作包
-> 最后对齐：2026-07-18
+> 最后对齐：2026-07-20
 > 适用对象：接管本仓库并以 Goal Mode 持续工作的 Codex/Agent 团队
 
 ## 1. 唯一总目标
@@ -22,7 +22,7 @@
 5. `对齐文档/11-完全体UIUX与交互设计规格.md`。
 6. `对齐文档/12-完全体实现路线与最终验收规约.md`。
 7. `对齐文档/16-体验优先的完全体重构策略与产品战役.md`。
-8. 当前组员续跑阶段读 对齐文档/21-双轨阶段合并审查与完全体续跑交接.md、docs/goal/teammate-continuation-state.yml 与负责轨道任务书；19、20 作为拆轨和差距历史基线。
+8. 当前统一集成阶段读 `对齐文档/22-最终集成与教师演示候选状态.md` 与 `docs/goal/release-candidate-state.yml`；21、19、20 与双轨任务书作为历史基线。
 9. 单 Agent 延续时读 `对齐文档/17-单会话持续Goal模式执行协议.md` 与 `docs/goal/single-session-state.yml`。
 10. `对齐文档/08-Aurora生命感与共鸣智能创新架构.md`。
 11. `docs/goal/complete-product-acceptance.yml`。
@@ -31,7 +31,7 @@
 
 不得只读本文件便开始大规模编码；不得只读旧 README、旧总纲或单个 work package 推断最终方向。
 
-当前两个 bounded checkpoint 已完成并合入主线；后续两名执行者从最新 origin/main 建分支，只更新各自轨道状态和证据，不直接修改全局验收账本。全局状态由两个 PR 合并后的独立审查统一重对账，避免并行分支相互覆盖事实。
+两个 bounded checkpoint 与其后统一集成已经进入主线。当前本地教师演示候选已通过 913 个 Java、226 个前端和 14 个 Playwright 测试；真实 Provider、真机、非作者盲评、新加坡合规与生产账户仍按人工门禁管理。后续执行者从最新 origin/main 建分支，以 22 为恢复点，只修真实开放差距。
 
 ## 3. 结果契约
 

@@ -1,0 +1,41 @@
+schema_version: 1
+goal_id: INNER-COSMOS-COMPLETE-PRODUCT
+status: LOCAL_TEACHER_DEMO_READY_HUMAN_GATES_OPEN
+updated_at: "2026-07-20T14:40:00+08:00"
+authority:
+  objective: goal-objective.md
+  current_handoff: 对齐文档/22-最终集成与教师演示候选状态.md
+  acceptance: docs/goal/complete-product-acceptance.yml
+  deployment: 对齐文档/18-组员与Coding-Agent启动部署交接指南.md
+integrated_main:
+  branch: main
+  head_before_final_commit: f75fdc4
+  track_a_merge: 947d455
+  track_b_merge: f75fdc4
+  final_product_commit: 67b0f4ef3343e17e0082d8d4c84d6d684e5bf86e
+capabilities_closed_for_local_demo:
+  - durable_multi_bubble_aurora_with_interrupt_stop_replan_and_recovery
+  - wake_intent_and_continuous_aurora_self_controls
+  - confirmed_understanding_claims_in_aurora_context
+  - memory_correction_rollback_forgetting_and_capsule_invalidation
+  - capsule_publish_conversation_slow_letter_withdrawal_and_connection_consent
+  - psychology_skill_consent_evidence_retention_and_revocation
+  - persistent_account_provenance_and_synthetic_discovery_exclusion
+  - clean_browser_routes_desktop_projector_mobile_and_pwa_recovery
+verification:
+  java: "mvnw clean test: 913/913; 0 failures, 0 errors, 0 skipped; Java 21; Spring Boot 3.5.14"
+  data: "PostgreSQL 16 + pgvector + Flyway V1-V20 and Redis Testcontainers paths PASS"
+  frontend: "Vitest 33 files, 226/226; production Vite/PWA build PASS"
+  e2e: "Playwright 14/14 PASS, one worker against a fresh H2 seeded runtime"
+  browser_acceptance: "Clean-route hard refresh, short desktop/projector, 390x844 mobile, discovery provenance, tag disclosure and grounded two-bubble Mock turn manually verified"
+  supply_chain: "final secret scan and diff checks recorded in evidence/integration/FINAL-STABILIZATION-2026-07-20/README.md"
+human_gates:
+  - provider_secret_revocation_rotation_and_independent_signoff
+  - blind_real_provider_quality_and_longitudinal_non_author_review
+  - real_device_apns_fcm_signing_ios_and_store_release
+  - singapore_pdpa_cross_border_and_professional_psychology_review
+  - production_aws_dns_payment_legal_accounts_and_operations_rehearsal
+completion_claim:
+  local_teacher_demo: READY
+  academy_cloud_native_evidence: AVAILABLE_WITH_DOCUMENTED_LIMITS
+  commercial_release: BLOCKED_BY_HUMAN_AND_EXTERNAL_GATES
