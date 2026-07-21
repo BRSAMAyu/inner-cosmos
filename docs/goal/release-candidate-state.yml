@@ -28,7 +28,7 @@ verification:
   java: "mvnw clean test: 916/916; 0 failures, 0 errors, 0 skipped; Java 21; Spring Boot 3.5.14"
   static_analysis: "SpotBugs 4.10.2.0: 0 bug instances; 0 errors"
   data: "PostgreSQL 16 + pgvector + Flyway V1-V20 and Redis Testcontainers paths PASS"
-  frontend: "Vitest 33 files, 226/226; production Vite/PWA build PASS"
+  frontend: "Vitest 34 files, 227/227; concurrent Aurora CSRF recovery regression and production Vite/PWA build PASS"
   e2e: "Playwright 14/14 PASS, one worker against a fresh H2 seeded runtime"
   browser_acceptance: "Login, grounded two-bubble Aurora turn, empty-memory strict capsule preview, desktop and 390x844 mobile manually reverified"
   supply_chain: "current-tree secret scan includes untracked non-ignored files; 0 findings; Trivy K8s HIGH/CRITICAL 0"

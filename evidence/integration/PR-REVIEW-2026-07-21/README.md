@@ -13,6 +13,7 @@ This verdict means **local teacher-demo candidate**, not commercial release. Rea
 - Accepted the non-2xx and empty-stream fallback behavior for real-provider SSE clients.
 - Added the missing regression for an HTTP 200 response with an empty body. Both non-2xx and successful-empty cases now prove that MiniMax falls back to a non-empty local reply rather than completing a silent turn.
 - The test executor is explicitly shut down to avoid leaking a test thread.
+- Closed the PR-description residual around rapid/concurrent browser sends with a transport-level regression: two Aurora stage requests are forced to receive `CSRF_INVALID` together, share one fresh-token load, retry with the new synchronizer token, and both complete their SSE handshake.
 
 ### PR #6 — CI, time zones, dependencies, and secret scanning
 
@@ -49,7 +50,7 @@ The mobile correction removes the visually competing nested scrollbar, contains 
 | Java full regression | `mvnw clean test`: 916/916; 0 failures, 0 errors, 0 skipped |
 | Static analysis | SpotBugs 4.10.2.0: 0 bug instances, 0 errors |
 | Data integration | PostgreSQL 16 + pgvector + Flyway V1–V20 and Redis Testcontainers paths PASS |
-| Frontend | Vitest 33 files, 226/226 PASS; Vite/PWA production build PASS |
+| Frontend | Vitest 34 files, 227/227 PASS, including concurrent Aurora CSRF recovery; Vite/PWA production build PASS |
 | Browser E2E | Existing Playwright suite 14/14 PASS before integration polish; focused live-browser journeys reverified after polish |
 | API contract | generated client current; breaking-rule tests 6/6 PASS |
 | Secrets | current-tree scan PASS, 0 findings, including untracked non-ignored files |

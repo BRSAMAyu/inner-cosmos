@@ -31,7 +31,7 @@
 
 不得只读本文件便开始大规模编码；不得只读旧 README、旧总纲或单个 work package 推断最终方向。
 
-两个 bounded checkpoint、统一集成及组员 PR #5/#6/#7 已进入当前候选。当前本地教师演示候选已通过 916 个 Java、226 个前端和 14 个 Playwright 测试，并完成 Android debug APK 构建；真实 Provider、真机、非作者盲评、新加坡合规与生产账户仍按人工门禁管理。后续执行者从最新 origin/main 建分支，以 23 为恢复点，只修真实开放差距。
+两个 bounded checkpoint、统一集成及组员 PR #5/#6/#7 已进入当前候选。当前本地教师演示候选已通过 916 个 Java、227 个前端和 14 个 Playwright 测试，并完成 Android debug APK 构建；真实 Provider、真机、非作者盲评、新加坡合规与生产账户仍按人工门禁管理。后续执行者从最新 origin/main 建分支，以 23 为恢复点，只修真实开放差距。
 
 ## 3. 结果契约
 
