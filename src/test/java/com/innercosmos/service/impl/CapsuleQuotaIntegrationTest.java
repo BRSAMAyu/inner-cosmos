@@ -10,6 +10,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -28,6 +30,11 @@ import static org.junit.jupiter.api.Assertions.*;
         "llm.allow-fallback=true"
 })
 class CapsuleQuotaIntegrationTest {
+
+    // Must match PersonaChatServiceImpl.QUOTA_ZONE so seeded/queried quota_date agrees with the
+    // date the product writes; SQL CURRENT_DATE (DB/JVM zone = UTC on CI) drifts by a day in the
+    // 16:00-24:00 UTC window and makes the daily-quota rows invisible to these assertions.
+    private static final ZoneId QUOTA_ZONE = ZoneId.of("Asia/Shanghai");
 
     @Autowired
     private JdbcTemplate jdbc;
@@ -62,16 +69,16 @@ class CapsuleQuotaIntegrationTest {
     private int quotaTurnCount(Long userId, Long capsuleId) {
         Integer count = jdbc.queryForObject(
                 "SELECT turn_count FROM tb_capsule_usage_quota "
-                        + "WHERE visitor_user_id = ? AND capsule_id = ? AND quota_date = CURRENT_DATE",
-                Integer.class, userId, capsuleId);
+                        + "WHERE visitor_user_id = ? AND capsule_id = ? AND quota_date = ?",
+                Integer.class, userId, capsuleId, LocalDate.now(QUOTA_ZONE));
         return count != null ? count : 0;
     }
 
     private int quotaRowCount(Long userId, Long capsuleId) {
         Integer count = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM tb_capsule_usage_quota "
-                        + "WHERE visitor_user_id = ? AND capsule_id = ? AND quota_date = CURRENT_DATE",
-                Integer.class, userId, capsuleId);
+                        + "WHERE visitor_user_id = ? AND capsule_id = ? AND quota_date = ?",
+                Integer.class, userId, capsuleId, LocalDate.now(QUOTA_ZONE));
         return count != null ? count : 0;
     }
 
@@ -198,8 +205,8 @@ class CapsuleQuotaIntegrationTest {
         // Pre-fill quota to 50 (= the SEED effective limit) via direct SQL
         jdbc.update(
                 "INSERT INTO tb_capsule_usage_quota (visitor_user_id, capsule_id, quota_date, turn_count) "
-                        + "VALUES (?, ?, CURRENT_DATE, ?)",
-                visitor, capsuleId, 50);
+                        + "VALUES (?, ?, ?, ?)",
+                visitor, capsuleId, LocalDate.now(QUOTA_ZONE), 50);
 
         // Create a session and try to reply — should be blocked (seed effective limit = 50)
         PersonaChatSession session = personaChatService.create(visitor, capsuleId);
