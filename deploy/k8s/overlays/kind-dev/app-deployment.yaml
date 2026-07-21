@@ -50,6 +50,11 @@ spec:
           # Loaded into kind via `kind load docker-image inner-cosmos:dev`.
           image: inner-cosmos:dev
           imagePullPolicy: IfNotPresent
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
           ports:
             - name: http
               containerPort: 8080
@@ -88,8 +93,11 @@ spec:
           volumeMounts:
             - {name: data, mountPath: /app/data}
             - {name: logs, mountPath: /var/log/inner-cosmos}
+            - {name: tmp, mountPath: /tmp}
       volumes:
         - name: data
           emptyDir: {}
         - name: logs
+          emptyDir: {}
+        - name: tmp
           emptyDir: {}

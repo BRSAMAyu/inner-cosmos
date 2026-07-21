@@ -9,11 +9,13 @@ kind: ClusterRole
 metadata:
   name: inner-cosmos-prometheus
 rules:
+  # This Prometheus uses only `role: pod` service discovery (see prometheus-config.yaml),
+  # so it needs read access to pods and nothing else. nodes/proxy in particular would grant
+  # kubelet-proxy access that enables privilege escalation (trivy KSV-0047); dropped here to
+  # keep the ClusterRole least-privilege.
   - apiGroups: [""]
-    resources: [nodes, nodes/proxy, services, endpoints, pods]
+    resources: [pods]
     verbs: [get, list, watch]
-  - nonResourceURLs: [/metrics]
-    verbs: [get]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

@@ -20,6 +20,10 @@ spec:
       containers:
         - name: grafana
           image: grafana/grafana:11.3.0
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
           env:
             # Local kind-only credentials; NOT a production secret. Override via a real Secret off-cluster.
             - {name: GF_SECURITY_ADMIN_USER, value: admin}
@@ -36,10 +40,18 @@ spec:
             requests: {cpu: 50m, memory: 128Mi}
             limits: {cpu: 500m, memory: 256Mi}
           volumeMounts:
+            # readOnlyRootFilesystem is on, so Grafana's home (grafana.db, plugins, png/csv
+            # render cache) needs a writable volume; the dashboards configMap mounts beneath it.
+            - {name: grafana-data, mountPath: /var/lib/grafana}
+            - {name: tmp, mountPath: /tmp}
             - {name: provisioning-ds, mountPath: /etc/grafana/provisioning/datasources}
             - {name: provisioning-dash, mountPath: /etc/grafana/provisioning/dashboards}
             - {name: dashboards, mountPath: /var/lib/grafana/dashboards}
       volumes:
+        - name: grafana-data
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
         - name: provisioning-ds
           configMap:
             name: grafana-provisioning

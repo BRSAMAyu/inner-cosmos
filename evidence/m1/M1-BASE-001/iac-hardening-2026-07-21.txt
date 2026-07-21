@@ -1,0 +1,88 @@
+BASE-SUPPLY — IaC misconfiguration gate regression closed (readOnlyRootFilesystem + RBAC)
+Recorded: 2026-07-21 Asia/Shanghai
+Scope: deploy/k8s (base + observability + backup + academy-eks/kind-dev overlays)
+
+Why this was needed
+- The 2026-07-15 supply-chain-summary.txt recorded the pinned Trivy `config` scan as
+  "0 findings". Deployment resources added afterwards — the observability stack
+  (Prometheus/Grafana), the pg_dump backup CronJob, the academy-eks StatefulSet/Redis/
+  worker/scheduler/migration workloads, and the kind-dev overlay — were NOT hardened to
+  the same bar, so the IaC gate had silently regressed. A hosted CI run would have caught
+  it, but pushes to origin are access-gated, so the gate had not re-run green on the new
+  files.
+- Re-running the CI-pinned scanner locally against the current tree confirmed the
+  regression:
+    docker run --rm -v "$PWD:/workspace:ro" \
+      aquasec/trivy@sha256:be1190afcb28352bfddc4ddeb71470835d16462af68d310f9f4bca710961a41e \
+      config --skip-version-check --severity HIGH,CRITICAL /workspace/deploy/k8s
+  Baseline: 20 HIGH misconfigurations across 11 manifests:
+    - KSV-0014 (readOnlyRootFilesystem unset): 17  — every app container + its psql
+      init container, plus prometheus, grafana, pg-backup, postgres (+2 init), redis (+1 init).
+    - KSV-0047 (Role permits privilege escalation from node proxy): 1  — prometheus ClusterRole.
+    - KSV-0118 (Pod uses default security context / allows root): 2  — postgres, redis.
+
+What changed (deploy/k8s)
+- Application workloads (base/app-deployment.yml, overlays/kind-dev/app-deployment.yaml,
+  academy-eks worker/scheduler/migration): added a container-level securityContext with
+  readOnlyRootFilesystem: true, allowPrivilegeEscalation: false, capabilities drop [ALL]
+  to both the main container and the wait-for-schema/wait-for-postgres init containers.
+  A writable /tmp emptyDir was mounted where the embedded Tomcat work dir and multipart
+  upload staging live under java.io.tmpdir (logs already used an emptyDir; kind-dev H2
+  keeps its existing /app/data emptyDir).
+- Prometheus (observability/prometheus.yaml): container readOnlyRootFilesystem; TSDB path
+  /prometheus is already a writable emptyDir with Pod fsGroup 65534.
+- Grafana (observability/grafana.yaml): container readOnlyRootFilesystem + a writable
+  /var/lib/grafana emptyDir (grafana.db / plugins / render cache) and /tmp; the dashboards
+  configMap mounts beneath it. Pod fsGroup 472 makes the emptyDirs writable.
+- pg-backup CronJob (backup/pg-backup.yaml): container readOnlyRootFilesystem + /tmp
+  emptyDir; the /backups PVC stays writable (Pod fsGroup 999).
+- Prometheus RBAC (observability/prometheus-rbac.yaml, KSV-0047): the ClusterRole used
+  `nodes, nodes/proxy, services, endpoints, pods`, but prometheus-config.yaml only uses
+  `role: pod` service discovery. Narrowed resources to `[pods]`, dropping the nodes/proxy
+  grant that enabled kubelet-proxy privilege escalation. Least-privilege, not an exemption.
+- PostgreSQL (academy-eks/postgres-statefulset.yml): main container readOnlyRootFilesystem
+  with writable emptyDir mounts for /var/run/postgresql (Unix socket) and /tmp; the root
+  prepare-data init container now also chowns those emptyDirs to 999 (a Pod fsGroup would
+  recursively relax PGDATA below the 0700/0750 PostgreSQL 16 requires and refuse to start,
+  so chown-via-init-container is the deliberate choice). Init containers set
+  readOnlyRootFilesystem: true.
+- Redis (academy-eks/redis-deployment.yml): main container readOnlyRootFilesystem; a
+  writable /data emptyDir (chowned by the root prepare-tls init container) guards against
+  edge-case writes even though persistence is disabled (--save "" --appendonly no).
+- KSV-0118 (postgres, redis): resolved WITHOUT an ignore — added a Pod-level
+  securityContext (runAsNonRoot: true + seccompProfile RuntimeDefault); the two ephemeral
+  chown init containers, which genuinely need root, opt back in with runAsNonRoot: false.
+  The main containers already run as non-root 999.
+
+Runtime verification of the read-only-root changes (local Docker, not just static scan)
+- postgres: `docker run --read-only --tmpfs /tmp --tmpfs /var/run/postgresql
+  --tmpfs /var/lib/postgresql/data --user 999:999 pgvector/pgvector:0.8.1-pg16 -c ssl=off`
+  → "database system is ready to accept connections"; `pg_isready` → accepting connections.
+- redis: `docker run --read-only --tmpfs /data --user 999:999 redis:7.4.2-alpine
+  redis-server --save "" --appendonly no` → "Ready to accept connections"; `redis-cli ping`
+  → PONG.
+- grafana: `docker run --read-only --tmpfs /var/lib/grafana --tmpfs /tmp --user 472:472
+  grafana/grafana:11.3.0` → 608 SQLite migrations OK; "HTTP Server Listen :3000"; running,
+  0 restarts. (The two `xychart already registered` errors are a known Grafana 11.3.0 bug,
+  unrelated to the read-only root.)
+  NOTE: this is Docker-level evidence (tmpfs ~= a writable emptyDir with the right owner).
+  A real Kubernetes apply on academy-eks remains the human-gated confirmation.
+
+Gate result (pinned CI scanner, exit-code 1)
+1. Trivy config, severity HIGH,CRITICAL, exit-code 1, /workspace/deploy/k8s
+   PASS: EXIT=0, 0 HIGH/CRITICAL findings.
+2. Trivy config, CI-equivalent full workspace
+   (--skip-dirs /workspace/.git --skip-dirs /workspace/target --exit-code 1 /workspace)
+   PASS: EXIT=0, 0 HIGH/CRITICAL findings.
+3. kubectl kustomize deploy/k8s/base | overlays/academy-eks | overlays/kind-dev |
+   observability
+   PASS: all four render without error.
+
+Scope and non-claims
+- Only deploy/k8s manifests were changed. The CI workflows already gate SBOM/dependency,
+  secret, IaC config, image build, cosign sign+verify, and image-vulnerability scans
+  (.github/workflows/java-baseline.yml, release-image.yml) — unchanged here.
+- The acceptance ledger (docs/goal/complete-product-acceptance.yml) was NOT edited; it is
+  read-only within a track. This file is builder evidence for the BASE-SUPPLY "IaC scans
+  are gated" line; independent review and a hosted Actions run remain required, and the
+  real-cluster apply of the read-only-root workloads is the human-gated step.

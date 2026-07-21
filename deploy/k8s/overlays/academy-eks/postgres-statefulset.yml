@@ -17,21 +17,38 @@ spec:
     spec:
       automountServiceAccountToken: false
       terminationGracePeriodSeconds: 60
+      securityContext:
+        # Pod-level baseline: the main container runs non-root (999); only the ephemeral
+        # chown init containers opt back into root via runAsNonRoot:false below.
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       initContainers:
         - name: prepare-data
           image: busybox:1.37.0@sha256:9532d8c39891ca2ecde4d30d7710e01fb739c87a8b9299685c63704296b16028
-          command: ["sh", "-c", "mkdir -p /var/lib/postgresql/data/pgdata && chown -R 999:999 /var/lib/postgresql/data"]
+          command: ["sh", "-c", "mkdir -p /var/lib/postgresql/data/pgdata && chown -R 999:999 /var/lib/postgresql/data /var/run/postgresql /tmp"]
           securityContext:
             runAsUser: 0
+            runAsNonRoot: false
             allowPrivilegeEscalation: false
+            # Writes only to mounted volumes; root is required for chown.
+            readOnlyRootFilesystem: true
           volumeMounts:
             - {name: data, mountPath: /var/lib/postgresql/data}
+            # chown the emptyDir socket/tmp volumes to 999 here rather than via a Pod
+            # fsGroup, which would recursively relax PGDATA below the 0700/0750 that
+            # PostgreSQL 16 requires and refuse to start.
+            - {name: run-postgresql, mountPath: /var/run/postgresql}
+            - {name: tmp, mountPath: /tmp}
         - name: prepare-tls
           image: busybox:1.37.0@sha256:9532d8c39891ca2ecde4d30d7710e01fb739c87a8b9299685c63704296b16028
           command: ["sh", "-c", "cp /input/* /tls/ && chmod 600 /tls/server.key && chmod 644 /tls/server.crt /tls/ca.crt && chown -R 999:999 /tls"]
           securityContext:
             runAsUser: 0
+            runAsNonRoot: false
             allowPrivilegeEscalation: false
+            # Writes only to the mounted /tls volume; root is required for chown/chmod.
+            readOnlyRootFilesystem: true
           volumeMounts:
             - {name: tls-input, mountPath: /input, readOnly: true}
             - {name: tls-runtime, mountPath: /tls}
@@ -52,6 +69,7 @@ spec:
             runAsUser: 999
             allowPrivilegeEscalation: false
             capabilities: {drop: [ALL]}
+            readOnlyRootFilesystem: true
           env:
             - {name: POSTGRES_DB, value: inner_cosmos}
             - {name: POSTGRES_USER, value: inner_cosmos}
@@ -77,10 +95,18 @@ spec:
           volumeMounts:
             - {name: data, mountPath: /var/lib/postgresql/data}
             - {name: tls-runtime, mountPath: /tls, readOnly: true}
+            # readOnlyRootFilesystem is on: PostgreSQL needs a writable Unix-socket dir
+            # and temp-file dir. Verified with a read-only-root pgvector smoke run.
+            - {name: run-postgresql, mountPath: /var/run/postgresql}
+            - {name: tmp, mountPath: /tmp}
       volumes:
         - name: data
           persistentVolumeClaim: {claimName: inner-cosmos-postgres}
         - name: tls-input
           secret: {secretName: inner-cosmos-postgres-server-tls, defaultMode: 0444}
         - name: tls-runtime
+          emptyDir: {}
+        - name: run-postgresql
+          emptyDir: {}
+        - name: tmp
           emptyDir: {}

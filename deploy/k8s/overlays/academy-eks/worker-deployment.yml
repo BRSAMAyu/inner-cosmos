@@ -26,6 +26,10 @@ spec:
         - name: wait-for-schema-v3
           image: pgvector/pgvector:0.8.1-pg16@sha256:33198da2828a14c30348d2ccb4750833d5ed9a44c88d840a0e523d7417120337
           command: ["sh", "-c", "until [ \"$(psql -h inner-cosmos-postgres -U inner_cosmos -d inner_cosmos -Atc \"SELECT COALESCE(MAX(version::integer),0) FROM flyway_schema_history WHERE success\" 2>/dev/null)\" -ge 3 ]; do sleep 2; done"]
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
           env:
             - name: PGPASSWORD
               valueFrom:
@@ -38,6 +42,10 @@ spec:
         - name: worker
           image: inner-cosmos:academy-placeholder
           imagePullPolicy: IfNotPresent
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
           envFrom:
             - configMapRef: {name: inner-cosmos-config}
             - secretRef: {name: inner-cosmos-runtime}
@@ -66,10 +74,13 @@ spec:
             - {name: postgres-ca, mountPath: /run/secrets/postgres, readOnly: true}
             - {name: redis-ca, mountPath: /run/secrets/redis, readOnly: true}
             - {name: logs, mountPath: /var/log/inner-cosmos}
+            - {name: tmp, mountPath: /tmp}
       volumes:
         - name: postgres-ca
           secret: {secretName: inner-cosmos-postgres-client-ca, defaultMode: 0444}
         - name: redis-ca
           secret: {secretName: inner-cosmos-redis-client-ca, defaultMode: 0444}
         - name: logs
+          emptyDir: {}
+        - name: tmp
           emptyDir: {}
