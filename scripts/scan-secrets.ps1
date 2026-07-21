@@ -64,7 +64,11 @@ if ($History) {
         }
     }
 } else {
-    foreach ($path in (rg --files -g '!target/**' -g '!.git/**')) {
+    # Enumerate tracked files with git (always available) instead of ripgrep, which is not
+    # installed on the CI runner (or many dev machines) and made this gate error out. git ls-files
+    # already excludes .gitignored paths such as target/; the guard below is belt-and-suspenders.
+    foreach ($path in (git ls-files)) {
+        if ($path -match '(^|/)(target|\.git)/') { continue }
         try {
             $content = Get-Content -LiteralPath $path -Raw -Encoding utf8
             Test-Content $path $content
