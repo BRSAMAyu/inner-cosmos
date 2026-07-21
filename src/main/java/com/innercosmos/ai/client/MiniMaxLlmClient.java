@@ -135,11 +135,18 @@ public class MiniMaxLlmClient implements LlmClient {
                 .timeout(Duration.ofMillis(timeoutMs))
                 .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
                 .build();
+        StringBuilder aggregated = new StringBuilder();
         try {
-            java.util.stream.Stream<String> lines = httpClient.send(httpRequest,
-                    HttpResponse.BodyHandlers.ofLines()).body();
-            StringBuilder aggregated = new StringBuilder();
-            lines.forEach(line -> {
+            HttpResponse<java.util.stream.Stream<String>> httpResponse = httpClient.send(httpRequest,
+                    HttpResponse.BodyHandlers.ofLines());
+            if (httpResponse.statusCode() < 200 || httpResponse.statusCode() >= 300) {
+                // Non-2xx (rate limit / bad request / auth): body is an error JSON, not SSE `data:`
+                // lines. Without this guard those lines are all skipped, the stream ends empty, and the
+                // caller emits a silent empty `done` -> user sees no reply. Route it into the fallback.
+                httpResponse.body().close();
+                throw new java.io.IOException("MiniMax stream HTTP " + httpResponse.statusCode());
+            }
+            httpResponse.body().forEach(line -> {
                 if (line == null) return;
                 if (!line.startsWith("data:")) return;
                 String payload = line.substring(5).trim();
@@ -157,15 +164,30 @@ public class MiniMaxLlmClient implements LlmClient {
                     log.debug("MiniMax stream parse skip: {}", parseEx.getMessage());
                 }
             });
-            return aggregated.toString();
         } catch (Exception remoteError) {
             log.warn("MiniMax stream failed, falling back to chat drip: {}", remoteError.getMessage());
-            String full = chat(request);
-            for (String token : full.split("")) {
-                emitter.send(SseEmitter.event().name("token").data("{\"content\":\"" + escape(token) + "\"}"));
+            // Only drip the full fallback when nothing was streamed yet, otherwise we would duplicate
+            // the partial content already delivered to the client.
+            if (aggregated.length() == 0) {
+                return dripFromChat(request, emitter);
             }
-            return full;
+            return aggregated.toString();
         }
+        if (aggregated.length() == 0) {
+            // 2xx but no content deltas (empty/malformed stream) -> fall back so the turn still replies.
+            log.warn("MiniMax stream returned empty content, falling back to chat drip");
+            return dripFromChat(request, emitter);
+        }
+        return aggregated.toString();
+    }
+
+    /** Blocking-path fallback (retries then local mock) dripped out as stream tokens. */
+    private String dripFromChat(LlmRequest request, SseEmitter emitter) throws Exception {
+        String full = chat(request);
+        for (String token : full.split("")) {
+            emitter.send(SseEmitter.event().name("token").data("{\"content\":\"" + escape(token) + "\"}"));
+        }
+        return full;
     }
 
     private List<Map<String, String>> buildMessages(LlmRequest request) {
