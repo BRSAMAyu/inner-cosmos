@@ -4,7 +4,7 @@ authority: goal-objective.md
 status: IN_PROGRESS
 last_reconciled_at: 2026-07-20T14:40:00+08:00
 last_reconciled_commit: 67b0f4ef3343e17e0082d8d4c84d6d684e5bf86e
-current_fact_baseline: 对齐文档/22-最终集成与教师演示候选状态.md
+current_fact_baseline: 对齐文档/23-组员PR集成审查与本地演示收口.md
 current_execution_plan: 对齐文档/19-双轨并行完全体收敛与交接计划.md
 parallel_state: docs/goal/two-track-convergence.yml
 

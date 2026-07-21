@@ -8,6 +8,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -29,14 +30,26 @@ class MiniMaxLlmClientStreamFallbackTest {
 
     @Test
     void non2xxStreamFallsBackToMockInsteadOfSilentEmptyReply() throws Exception {
+        assertStreamFallsBack(429, "{\"error\":\"rate limited\"}");
+    }
+
+    @Test
+    void successfulButEmptyStreamFallsBackToMockInsteadOfSilentEmptyReply() throws Exception {
+        assertStreamFallsBack(200, "");
+    }
+
+    private void assertStreamFallsBack(int status, String responseBody) throws Exception {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/", exchange -> {
-            byte[] body = "{\"error\":\"rate limited\"}".getBytes(StandardCharsets.UTF_8);
-            exchange.sendResponseHeaders(429, body.length);
-            exchange.getResponseBody().write(body);
+            byte[] body = responseBody.getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(status, body.length);
+            if (body.length > 0) {
+                exchange.getResponseBody().write(body);
+            }
             exchange.close();
         });
         server.start();
+        ExecutorService executor = Executors.newSingleThreadExecutor();
 
         CountDownLatch recorded = new CountDownLatch(1);
         AtomicReference<String> provider = new AtomicReference<>();
@@ -57,7 +70,7 @@ class MiniMaxLlmClientStreamFallbackTest {
         try {
             String baseUrl = "http://127.0.0.1:" + server.getAddress().getPort() + "/";
             MiniMaxLlmClient client = new MiniMaxLlmClient("dummy-key", baseUrl, "test-model", 3000,
-                    true, capturing, Executors.newSingleThreadExecutor());
+                    true, capturing, executor);
 
             SseEmitter emitter = client.streamChat(new LlmRequest(1L, "TEST", "hello"));
             assertNotNull(emitter);
@@ -69,6 +82,7 @@ class MiniMaxLlmClientStreamFallbackTest {
             assertNotNull(response.get(), "fallback must produce a reply");
             assertFalse(response.get().isBlank(), "fallback reply must be non-empty, not a silent empty turn");
         } finally {
+            executor.shutdownNow();
             server.stop(0);
         }
     }

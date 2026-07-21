@@ -11,7 +11,7 @@
 | L1-EXEC | `16-体验优先的完全体重构策略与产品战役.md` | 体验优先裁决、重构授权、五场产品战役与验证节奏 |
 | L1-EXEC | `17-单会话持续Goal模式执行协议.md` | 单顶层会话的恢复、循环、优先级、状态持久化和唯一终止条件 |
 | L1-EXEC | `19-双轨并行完全体收敛与交接计划.md` | 当前双 PR 的目标、边界、文件所有权、质量门槛、合并与最终收尾协议 |
-| L1-EXEC-CURRENT | 22-最终集成与教师演示候选状态.md | 当前统一集成事实、教师演示路径、证据边界与剩余人工门禁权威 |
+| L1-EXEC-CURRENT | 23-组员PR集成审查与本地演示收口.md | 当前组员 PR 集成事实、教师演示路径、证据边界与剩余人工门禁权威 |
 | L1-AI | `08-Aurora生命感与共鸣智能创新架构.md` | Aurora、记忆画像、共鸣体、心理 Skill 的详细创新架构 |
 | L1-DEPLOY | `14-AWS-Academy-EKS约束与双轨部署架构.md` | 课程 Learner Lab 与商业新加坡环境的边界、替代适配器和双轨演示合同 |
 | L2 | `00`、`02`—`07` | 项目理解、EKS、移动端、新加坡、Agent 流程、技术演进、近期决策与执行基线 |
@@ -48,8 +48,9 @@
 | 20 | `20-当前状态重对账与完全体差距基线.md` | 当前真实完成度、关键瓶颈、隐藏缺口和“效果完成”的判据 |
 | 21 | 21-双轨阶段合并审查与完全体续跑交接.md | A/B checkpoint 合并事实、组员恢复点、剩余完全体路线与统一验收交接 |
 | 22 | 22-最终集成与教师演示候选状态.md | 最终本地集成、演示候选验证、开放的人类/外部门禁与最新恢复点 |
+| 23 | 23-组员PR集成审查与本地演示收口.md | 组员 PR #5–#7 的集成审查、修正及最新网站/API/Android 验收与设备边界 |
 
-机器可读对应物：docs/goal/complete-product-acceptance.yml。当前状态以 22 和 docs/goal/release-candidate-state.yml 为准；21 与 teammate-continuation-state.yml 已成为历史交接记录。历史双轨拆分使用
+机器可读对应物：docs/goal/complete-product-acceptance.yml。当前状态以 23 和 docs/goal/release-candidate-state.yml 为准；22、21 与 teammate-continuation-state.yml 已成为历史交接记录。历史双轨拆分使用
 `docs/goal/two-track-convergence.yml`、`docs/tracks/` 和 `docs/goal/prompts/track-*-codex-prompt.md`；
 单 Agent 持续 Goal 仍使用 `docs/goal/single-session-codex-prompt.md` 与 `docs/goal/single-session-state.yml`。
 
@@ -65,7 +66,7 @@
 - 当前实现优先级、是否允许推翻旧界面/架构、产品战役与测试频率：读 `16`；其执行裁决优先于旧的微切片或兼容性习惯。
 - 单会话连续自主执行：读 `17` 和 `docs/goal/single-session-state.yml`；内部提交与检查点不得结束顶层 Goal。
 - 组员接管启动、local-complete 或 AWS Academy 部署：读 `18`；其中的操作步骤必须服从 `14` 的环境能力边界。
-- 当前集成/演示接管：先读 22 和 docs/goal/release-candidate-state.yml；21、19、20 与 docs/tracks 仅用于追溯双轨来源，不得重复旧 WIP 或把本地证据夸大为商业 PASS。
+- 当前集成/演示接管：先读 23 和 docs/goal/release-candidate-state.yml；22、21、19、20 与 docs/tracks 仅用于追溯历史来源，不得重复旧 WIP 或把本地证据夸大为商业 PASS。
 
 ## 5. 文档与实现的双向追溯
 

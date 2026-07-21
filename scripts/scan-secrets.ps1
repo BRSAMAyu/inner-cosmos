@@ -64,10 +64,10 @@ if ($History) {
         }
     }
 } else {
-    # Enumerate tracked files with git (always available) instead of ripgrep, which is not
-    # installed on the CI runner (or many dev machines) and made this gate error out. git ls-files
-    # already excludes .gitignored paths such as target/; the guard below is belt-and-suspenders.
-    foreach ($path in (git ls-files)) {
+    # Enumerate both tracked files and untracked, non-ignored files with git (always available)
+    # instead of ripgrep, which is not installed on the CI runner (or many dev machines).
+    # Scanning tracked files alone would miss a newly-created credential before it is staged.
+    foreach ($path in (git ls-files --cached --others --exclude-standard)) {
         if ($path -match '(^|/)(target|\.git)/') { continue }
         try {
             $content = Get-Content -LiteralPath $path -Raw -Encoding utf8

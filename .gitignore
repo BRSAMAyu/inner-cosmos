@@ -33,6 +33,7 @@ kubeconfig*
 
 # React/TypeScript workspace generated state
 node_modules/
+.pnpm-store/
 web/playwright-report/
 web/test-results/
 web/*.tsbuildinfo

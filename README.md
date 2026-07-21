@@ -1,6 +1,6 @@
 # Inner Cosmos
 
-[中文说明](README.zh-CN.md) · [Current release-candidate handoff](对齐文档/22-最终集成与教师演示候选状态.md) · [Deployment handoff](对齐文档/18-组员与Coding-Agent启动部署交接指南.md) · [Complete-product goal](goal-objective.md) · [Acceptance ledger](docs/goal/complete-product-acceptance.yml)
+[中文说明](README.zh-CN.md) · [Current release-candidate handoff](对齐文档/23-组员PR集成审查与本地演示收口.md) · [Deployment handoff](对齐文档/18-组员与Coding-Agent启动部署交接指南.md) · [Complete-product goal](goal-objective.md) · [Acceptance ledger](docs/goal/complete-product-acceptance.yml)
 
 Inner Cosmos is an AI-native self-understanding and slow-social platform. Aurora turns natural conversations into a long-lived, user-correctable model of memories, values, relationships, emotions, and goals. With explicit consent, that model can be compiled into bounded Echo Capsules that help people discover meaningful resonance before deciding whether to connect as humans.
 
@@ -128,7 +128,7 @@ Before making product or deployment decisions, a Coding Agent must read, in orde
 1. [`AGENTS.md`](AGENTS.md)
 2. [`goal-objective.md`](goal-objective.md)
 3. [`对齐文档/README.md`](对齐文档/README.md)
-4. For current integration/demo continuation: [current handoff](对齐文档/22-最终集成与教师演示候选状态.md) and [machine state](docs/goal/release-candidate-state.yml). Track documents are historical implementation evidence.
+4. For current integration/demo continuation: [current handoff](对齐文档/23-组员PR集成审查与本地演示收口.md) and [machine state](docs/goal/release-candidate-state.yml). Track documents are historical implementation evidence.
 5. For a single-agent continuation: [`对齐文档/17-单会话持续Goal模式执行协议.md`](对齐文档/17-单会话持续Goal模式执行协议.md).
 6. [`docs/goal/complete-product-acceptance.yml`](docs/goal/complete-product-acceptance.yml) (read-only inside either parallel track).
 7. [`docs/goal/two-track-convergence.yml`](docs/goal/two-track-convergence.yml) or [`docs/goal/single-session-state.yml`](docs/goal/single-session-state.yml), matching the execution mode.

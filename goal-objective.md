@@ -22,7 +22,7 @@
 5. `对齐文档/11-完全体UIUX与交互设计规格.md`。
 6. `对齐文档/12-完全体实现路线与最终验收规约.md`。
 7. `对齐文档/16-体验优先的完全体重构策略与产品战役.md`。
-8. 当前统一集成阶段读 `对齐文档/22-最终集成与教师演示候选状态.md` 与 `docs/goal/release-candidate-state.yml`；21、19、20 与双轨任务书作为历史基线。
+8. 当前统一集成阶段读 `对齐文档/23-组员PR集成审查与本地演示收口.md` 与 `docs/goal/release-candidate-state.yml`；22、21、19、20 与双轨任务书作为历史基线。
 9. 单 Agent 延续时读 `对齐文档/17-单会话持续Goal模式执行协议.md` 与 `docs/goal/single-session-state.yml`。
 10. `对齐文档/08-Aurora生命感与共鸣智能创新架构.md`。
 11. `docs/goal/complete-product-acceptance.yml`。
@@ -31,7 +31,7 @@
 
 不得只读本文件便开始大规模编码；不得只读旧 README、旧总纲或单个 work package 推断最终方向。
 
-两个 bounded checkpoint 与其后统一集成已经进入主线。当前本地教师演示候选已通过 913 个 Java、226 个前端和 14 个 Playwright 测试；真实 Provider、真机、非作者盲评、新加坡合规与生产账户仍按人工门禁管理。后续执行者从最新 origin/main 建分支，以 22 为恢复点，只修真实开放差距。
+两个 bounded checkpoint、统一集成及组员 PR #5/#6/#7 已进入当前候选。当前本地教师演示候选已通过 916 个 Java、226 个前端和 14 个 Playwright 测试，并完成 Android debug APK 构建；真实 Provider、真机、非作者盲评、新加坡合规与生产账户仍按人工门禁管理。后续执行者从最新 origin/main 建分支，以 23 为恢复点，只修真实开放差距。
 
 ## 3. 结果契约
 

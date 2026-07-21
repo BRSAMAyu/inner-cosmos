@@ -1,10 +1,10 @@
 schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 status: LOCAL_TEACHER_DEMO_READY_HUMAN_GATES_OPEN
-updated_at: "2026-07-20T14:40:00+08:00"
+updated_at: "2026-07-21T19:45:00+08:00"
 authority:
   objective: goal-objective.md
-  current_handoff: 对齐文档/22-最终集成与教师演示候选状态.md
+  current_handoff: 对齐文档/23-组员PR集成审查与本地演示收口.md
   acceptance: docs/goal/complete-product-acceptance.yml
   deployment: 对齐文档/18-组员与Coding-Agent启动部署交接指南.md
 integrated_main:
@@ -23,12 +23,18 @@ capabilities_closed_for_local_demo:
   - persistent_account_provenance_and_synthetic_discovery_exclusion
   - clean_browser_routes_desktop_projector_mobile_and_pwa_recovery
 verification:
-  java: "mvnw clean test: 913/913; 0 failures, 0 errors, 0 skipped; Java 21; Spring Boot 3.5.14"
+  java: "mvnw clean test: 916/916; 0 failures, 0 errors, 0 skipped; Java 21; Spring Boot 3.5.14"
+  static_analysis: "SpotBugs 4.10.2.0: 0 bug instances; 0 errors"
   data: "PostgreSQL 16 + pgvector + Flyway V1-V20 and Redis Testcontainers paths PASS"
   frontend: "Vitest 33 files, 226/226; production Vite/PWA build PASS"
   e2e: "Playwright 14/14 PASS, one worker against a fresh H2 seeded runtime"
-  browser_acceptance: "Clean-route hard refresh, short desktop/projector, 390x844 mobile, discovery provenance, tag disclosure and grounded two-bubble Mock turn manually verified"
-  supply_chain: "final secret scan and diff checks recorded in evidence/integration/FINAL-STABILIZATION-2026-07-20/README.md"
+  browser_acceptance: "Login, grounded two-bubble Aurora turn, empty-memory strict capsule preview, desktop and 390x844 mobile manually reverified"
+  supply_chain: "current-tree secret scan includes untracked non-ignored files; 0 findings; Trivy K8s HIGH/CRITICAL 0"
+  android: "Capacitor sync and Gradle assembleDebug PASS; fresh APK recorded in evidence/integration/PR-REVIEW-2026-07-21/README.md; no attached device or configured AVD"
+teammate_pr_integration:
+  pull_requests: [5, 6, 7]
+  review_evidence: evidence/integration/PR-REVIEW-2026-07-21/README.md
+  local_integration_branch: codex/integrate-prs-5-7
 human_gates:
   - provider_secret_revocation_rotation_and_independent_signoff
   - blind_real_provider_quality_and_longitudinal_non_author_review
