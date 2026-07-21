@@ -3,10 +3,12 @@ package com.innercosmos.event;
 import com.innercosmos.service.MemoryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 @Component
+@ConditionalOnProperty(name = "inner-cosmos.events.outbox.enabled", havingValue = "false", matchIfMissing = true)
 public class MemoryExtractListener {
     private static final Logger log = LoggerFactory.getLogger(MemoryExtractListener.class);
     private final MemoryService memoryService;

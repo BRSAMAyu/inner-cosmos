@@ -9,10 +9,10 @@
 ## 0. 启动与开场（30–60 秒）
 
 ```powershell
-.\scripts\run-dev.ps1 -Profile demo -Port 8080
+.\scripts\run-teacher-demo.ps1 -Port 8080
 ```
 
-打开 `http://localhost:8080/app/aurora/`，使用本地 `demo / demo123`。说明课堂主路径使用 Mock 是为了可复现节奏；真实模型质量有独立、不可伪造的盲评门禁。
+脚本会构建应用、创建本次运行独享的临时 H2 数据库、启动 Demo、等待健康检查，并验证 CSRF、`demo / demo123` 登录、当前用户会话与 React 主入口。打开 `http://localhost:8080/app/aurora/` 后按 `Ctrl+C` 结束，临时数据库会被清理。说明课堂主路径使用 Mock 是为了可复现节奏；真实模型质量有独立、不可伪造的盲评门禁。
 
 ## 1. Living Aurora（2–3 分钟）
 

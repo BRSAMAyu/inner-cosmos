@@ -238,9 +238,9 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         AgentContext agentContext = agentContextAssembler.assemble(
                 userId, request.sessionId, request.message, allowMemory,
                 request.latitude, request.longitude);
-        List<String> gravityMemories = allowMemory ? memoryService.topGravitySummaries(userId, 5) : List.of();
+        List<String> gravityMemories = allowMemory ? List.copyOf(agentContext.longTermMemories) : List.of();
         AuroraMemoryContextVO memoryContext = allowMemory
-                ? memoryContextService.buildContext(userId, request.sessionId, request.message, 8, 6)
+                ? alignMemoryContext(memoryContextService.buildContext(userId, request.sessionId, request.message, 8, 0), agentContext)
                 : null;
         DialogSession session = request.sessionId == null ? null : sessionMapper.selectById(request.sessionId);
         String rhythm = rhythmGuardService.checkRhythm(userId, request.sessionId);
@@ -723,15 +723,39 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 + ",\"safeMessage\":\"" + escape(safe) + "\"}";
     }
 
+    /**
+     * Keep the legacy memory-context envelope (short-term messages, themes, emotion and summary)
+     * while making its long-term evidence identical to the task-aware, privacy-gated pack used by
+     * the dual-kernel context. This prevents the same turn from receiving a second gravity-only
+     * memory selection with different IDs.
+     */
+    private AuroraMemoryContextVO alignMemoryContext(AuroraMemoryContextVO memoryContext,
+                                                      AgentContext agentContext) {
+        if (memoryContext == null || agentContext == null) return memoryContext;
+        memoryContext.longTermMemoryNotes = new ArrayList<>(agentContext.longTermMemories);
+        memoryContext.referencedMemoryIds = new ArrayList<>(agentContext.evidenceMemoryIds);
+        memoryContext.memoryPolicy = "task_aware_hybrid_retrieval";
+        memoryContext.continuityHypothesis = memoryContext.longTermMemoryNotes.isEmpty()
+                ? "No relevant authorized long-term evidence was selected; stay with the current expression."
+                : "Task-aware evidence was selected; reference it only when it helps and identify uncertainty.";
+        if (!memoryContext.longTermMemoryNotes.isEmpty()
+                && !memoryContext.proactiveSuggestions.contains(
+                        "If referencing memory, use transparent wording and avoid sounding like surveillance.")) {
+            memoryContext.proactiveSuggestions.add(
+                    "If referencing memory, use transparent wording and avoid sounding like surveillance.");
+        }
+        return memoryContext;
+    }
+
     @Override
     public AuroraReplyVO generateGreeting(Long userId, Long sessionId, String mode) {
         UserProfile profile = loadProfile(userId);
         String normalizedMode = normalizeMode(mode);
         boolean allowMemory = allowMemory(profile);
         AgentContext agentContext = agentContextAssembler.assemble(userId, sessionId, "", allowMemory);
-        List<String> gravityMemories = allowMemory ? memoryService.topGravitySummaries(userId, 3) : List.of();
+        List<String> gravityMemories = allowMemory ? List.copyOf(agentContext.longTermMemories) : List.of();
         AuroraMemoryContextVO memoryContext = allowMemory
-                ? memoryContextService.buildContext(userId, sessionId, "", 6, 4)
+                ? alignMemoryContext(memoryContextService.buildContext(userId, sessionId, "", 6, 0), agentContext)
                 : null;
         String timeLabel = timeLabel();
         ModeStrategy modeStrategy = modeRegistry.get(normalizedMode);

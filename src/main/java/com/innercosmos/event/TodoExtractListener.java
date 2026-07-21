@@ -6,6 +6,7 @@ import com.innercosmos.mapper.DialogMessageMapper;
 import com.innercosmos.mapper.TodoItemMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
@@ -14,6 +15,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Component
+@ConditionalOnProperty(name = "inner-cosmos.events.outbox.enabled", havingValue = "false", matchIfMissing = true)
 public class TodoExtractListener {
     private static final Logger log = LoggerFactory.getLogger(TodoExtractListener.class);
     private final DialogMessageMapper messageMapper;

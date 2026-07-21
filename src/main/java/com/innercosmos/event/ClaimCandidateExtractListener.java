@@ -3,6 +3,7 @@ package com.innercosmos.event;
 import com.innercosmos.service.ClaimCandidateService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
@@ -15,6 +16,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * (which, unlike memory extraction, retain per-message provenance).
  */
 @Component
+@ConditionalOnProperty(name = "inner-cosmos.events.outbox.enabled", havingValue = "false", matchIfMissing = true)
 public class ClaimCandidateExtractListener {
     private static final Logger log = LoggerFactory.getLogger(ClaimCandidateExtractListener.class);
     private final ClaimCandidateService claimCandidateService;

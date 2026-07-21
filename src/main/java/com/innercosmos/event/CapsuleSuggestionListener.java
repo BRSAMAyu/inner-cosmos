@@ -4,6 +4,7 @@ import com.innercosmos.entity.MemoryCard;
 import com.innercosmos.mapper.MemoryCardMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 @Component
+@ConditionalOnProperty(name = "inner-cosmos.events.outbox.enabled", havingValue = "false", matchIfMissing = true)
 public class CapsuleSuggestionListener {
     private static final Logger log = LoggerFactory.getLogger(CapsuleSuggestionListener.class);
     private static final double GRAVITY_THRESHOLD = 1.5;

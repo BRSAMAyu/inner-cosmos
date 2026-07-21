@@ -23,14 +23,17 @@ spec:
         fsGroup: 1001
         seccompProfile: {type: RuntimeDefault}
       initContainers:
-        - name: wait-for-schema-v3
+        - name: wait-for-schema-version
           image: pgvector/pgvector:0.8.1-pg16@sha256:33198da2828a14c30348d2ccb4750833d5ed9a44c88d840a0e523d7417120337
-          command: ["sh", "-c", "until [ \"$(psql -h inner-cosmos-postgres -U inner_cosmos -d inner_cosmos -Atc \"SELECT COALESCE(MAX(version::integer),0) FROM flyway_schema_history WHERE success\" 2>/dev/null)\" -ge 3 ]; do sleep 2; done"]
+          command: ["sh", "-c", "until [ \"$(psql -h inner-cosmos-postgres -U inner_cosmos -d inner_cosmos -Atc \"SELECT CASE WHEN EXISTS (SELECT 1 FROM flyway_schema_history WHERE NOT success) THEN -1 ELSE COALESCE(MAX(version::integer),0) END FROM flyway_schema_history WHERE success\" 2>/dev/null)\" -eq \"$INNER_COSMOS_EXPECTED_SCHEMA_VERSION\" ]; do sleep 2; done"]
           securityContext:
             readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
             capabilities: {drop: [ALL]}
           env:
+            - name: INNER_COSMOS_EXPECTED_SCHEMA_VERSION
+              valueFrom:
+                configMapKeyRef: {name: inner-cosmos-config, key: INNER_COSMOS_EXPECTED_SCHEMA_VERSION}
             - name: PGPASSWORD
               valueFrom:
                 secretKeyRef: {name: inner-cosmos-runtime, key: SPRING_DATASOURCE_PASSWORD}

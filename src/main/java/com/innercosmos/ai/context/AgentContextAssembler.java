@@ -14,6 +14,9 @@ import com.innercosmos.ai.semantic.MomentMood;
 import com.innercosmos.service.AuroraConstitutionService;
 import com.innercosmos.service.AuroraSelfContinuityService;
 import com.innercosmos.service.EmotionInsightService;
+import com.innercosmos.service.MemoryRetrievalService;
+import com.innercosmos.dto.MemoryRetrievalQuery;
+import com.innercosmos.vo.MemoryEvidencePackVO;
 import com.innercosmos.entity.DailyRecord;
 import com.innercosmos.entity.DialogMessage;
 import com.innercosmos.entity.EmotionTrace;
@@ -64,6 +67,7 @@ public class AgentContextAssembler {
     @Autowired(required = false) private AuroraSelfContinuityService auroraSelfContinuityService;
     @Autowired(required = false) private EmotionInsightService emotionInsightService;
     @Autowired(required = false) private com.innercosmos.service.EmotionBaselineService emotionBaselineService;
+    @Autowired(required = false) private MemoryRetrievalService memoryRetrievalService;
 
     public AgentContextAssembler(UserProfileMapper userProfileMapper,
                                  DialogMessageMapper dialogMessageMapper,
@@ -147,15 +151,7 @@ public class AgentContextAssembler {
         context.relationSignals = relationSignals(userId);
         context.themeSignals = themeSignals(userId);
         if (Boolean.TRUE.equals(context.memoryRecallAllowed)) {
-            List<MemoryCard> cards = memoryCardMapper.selectList(new QueryWrapper<MemoryCard>()
-                    .eq("user_id", userId)
-                    .eq("status", "ACTIVE")
-                    .orderByDesc("emotional_gravity")
-                    .last("LIMIT 8"));
-            for (MemoryCard card : cards) {
-                context.longTermMemories.add("#" + card.id + " " + safe(card.title) + "：" + abbreviate(card.summary, 180));
-                context.evidenceMemoryIds.add(card.id);
-            }
+            addTaskAwareMemories(context, userId, currentMessage);
         }
         // 3-model block: Aurora identity + Relationship state + User portrait
         context.threeModelBlock = buildThreeModelBlock(userId);
@@ -173,6 +169,44 @@ public class AgentContextAssembler {
             }
         }
         return context;
+    }
+
+    /**
+     * The online Aurora path consumes the same privacy/status/budget gates as the public memory
+     * retrieval API.  A missing optional bean (only possible in lightweight hand-built tests) or
+     * a retrieval failure fails closed to no long-term memory instead of silently falling back to
+     * a gravity-only query that may surface an irrelevant memory.
+     */
+    private void addTaskAwareMemories(AgentContext context, Long userId, String currentMessage) {
+        if (memoryRetrievalService == null || userId == null) return;
+        MemoryEvidencePackVO pack;
+        try {
+            pack = memoryRetrievalService.retrieve(userId, new MemoryRetrievalQuery(
+                    safe(currentMessage), retrievalTask(currentMessage), List.of(), 8, 800, false));
+        } catch (RuntimeException unavailable) {
+            return;
+        }
+        if (pack == null || pack.evidence() == null) return;
+        for (MemoryEvidencePackVO.Evidence evidence : pack.evidence()) {
+            if (evidence == null || evidence.memoryId() == null) continue;
+            context.longTermMemories.add("#" + evidence.memoryId() + " " + safe(evidence.title())
+                    + "：" + abbreviate(evidence.summary(), 180));
+            context.evidenceMemoryIds.add(evidence.memoryId());
+        }
+    }
+
+    private String retrievalTask(String currentMessage) {
+        String message = safe(currentMessage).toLowerCase(java.util.Locale.ROOT);
+        if (containsAny(message, List.of("朋友", "关系", "恋爱", "同学", "家人", "同事", "relationship"))) {
+            return "AURORA_RELATION";
+        }
+        if (containsAny(message, List.of("作业", "考试", "项目", "论文", "任务", "截止", "ddl", "计划", "下一步", "deadline"))) {
+            return "AURORA_ACTION";
+        }
+        if (containsAny(message, List.of("感受", "情绪", "焦虑", "紧张", "害怕", "难过", "开心", "feeling", "emotion"))) {
+            return "AURORA_EMOTION";
+        }
+        return "AURORA_CONVERSATION";
     }
 
     private UserProfile profile(Long userId) {

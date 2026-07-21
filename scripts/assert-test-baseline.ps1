@@ -1,5 +1,5 @@
 param(
-    [int]$MinimumTests = 613,
+    [int]$MinimumTests = 923,
     [string]$ReportsDirectory = ""
 )
 

@@ -79,7 +79,10 @@ public class AuroraMemoryContextServiceImpl implements AuroraMemoryContextServic
         context.shortTermMessages = shortTermMessages(userId, sessionId, Math.max(2, shortTermLimit));
         context.lastDialogSummary = lastDialogSummary(userId, sessionId);
         if (Boolean.TRUE.equals(context.memoryRecallAllowed)) {
-            loadLongTermMemory(context, userId, userInput, Math.max(1, longTermLimit));
+            // Aurora's primary runtime passes zero here after supplying the task-aware EvidencePack
+            // assembled by AgentContextAssembler. Other callers may still request this legacy
+            // compatibility view explicitly with a positive limit.
+            if (longTermLimit > 0) loadLongTermMemory(context, userId, userInput, longTermLimit);
             context.activeThemeNotes = activeThemes(userId, userInput, 4);
         }
         context.emotionWeather = latestEmotionWeather(userId);

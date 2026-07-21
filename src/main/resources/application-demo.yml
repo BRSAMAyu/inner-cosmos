@@ -4,3 +4,10 @@ llm:
   api-key: ""
   model: mock-inner-cosmos
   allow-fallback: true
+
+# The demo profile is explicitly selected by an operator and is structurally excluded from prod
+# by DemoDataConfiguration. Keeping this here makes a clean demo deterministic instead of relying
+# on an easy-to-miss environment variable or stale local H2 file.
+inner-cosmos:
+  demo:
+    seed-enabled: true

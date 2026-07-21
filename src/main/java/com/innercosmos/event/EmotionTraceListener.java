@@ -5,6 +5,7 @@ import com.innercosmos.mapper.DialogMessageMapper;
 import com.innercosmos.service.EmotionInsightService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Component;
  * deterministic lexicon fallback).
  */
 @Component
+@ConditionalOnProperty(name = "inner-cosmos.events.outbox.enabled", havingValue = "false", matchIfMissing = true)
 public class EmotionTraceListener {
     private static final Logger log = LoggerFactory.getLogger(EmotionTraceListener.class);
     private final DialogMessageMapper messageMapper;

@@ -46,6 +46,14 @@ On macOS/Linux:
 
 Open [http://localhost:8080/app/aurora/](http://localhost:8080/app/aurora/) and register a local account. The default `dev` profile uses file-backed H2 and Mock AI, so it does not require credentials. To use disposable demo data explicitly, set `SEED_ENABLED=true` and run the `demo` profile; production always disables demo seeding.
 
+For a self-checking, disposable teacher-demo runtime, use:
+
+```powershell
+.\scripts\run-teacher-demo.ps1 -Port 8080
+```
+
+It creates an isolated H2 database, waits for the application, verifies health, CSRF, demo login/session, and the React shell, then cleans up the database when the process stops.
+
 For frontend work:
 
 ```powershell

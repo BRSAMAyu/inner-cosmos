@@ -117,7 +117,6 @@ class AuroraEmergenceTest {
         when(dialogService.messages(anyLong())).thenReturn(List.of());
         when(memoryContextService.buildContext(anyLong(), anyLong(), anyString(), anyInt(), anyInt()))
                 .thenReturn(null);
-        when(memoryService.topGravitySummaries(anyLong(), anyInt())).thenReturn(List.of());
         when(sessionMapper.selectById(anyLong())).thenReturn(null);
         when(rhythmGuardService.checkRhythm(anyLong(), anyLong())).thenReturn("");
         when(rhythmGuardService.shouldSuggestSettle(any(), anyLong())).thenReturn(false);

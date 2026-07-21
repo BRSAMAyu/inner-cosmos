@@ -60,13 +60,16 @@ jobs:
         run: ./mvnw -B -f poc/postgres-pgvector/pom.xml -Pbenchmark verify
       - name: Enforce executed test baseline
         shell: pwsh
-        run: ./scripts/assert-test-baseline.ps1 -MinimumTests 613
+        run: ./scripts/assert-test-baseline.ps1 -MinimumTests 923
       - name: Scan current tree for credentials
         shell: pwsh
         run: ./scripts/scan-secrets.ps1
       - name: Scan reachable branch history for credentials
         shell: pwsh
         run: ./scripts/scan-secrets.ps1 -History
+      - name: Gate Academy workloads on the latest Flyway schema
+        shell: pwsh
+        run: ./scripts/academy/validate-schema-version.ps1
       - name: Gate High and Critical dependency vulnerabilities from SBOM
         run: >-
           docker run --rm

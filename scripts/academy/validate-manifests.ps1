@@ -5,6 +5,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+& (Join-Path $PSScriptRoot "validate-schema-version.ps1") | Out-Null
+
 $renderedLines = @(& kubectl kustomize $Overlay 2>$null)
 if ($LASTEXITCODE -ne 0) { throw "Kustomize render failed." }
 $rendered = $renderedLines -join "`n"
@@ -32,6 +34,17 @@ $required = @(
 $missing = @($required | Where-Object { $rendered -notmatch [Regex]::Escape($_) })
 if ($missing.Count -gt 0) { throw "Academy manifest contract is missing $($missing.Count) required controls." }
 
+# The source-level validator catches migration/config drift. These rendered checks ensure an
+# overlay cannot accidentally delete or replace one role's gate after the source files pass.
+$schemaGateCount = [regex]::Matches($rendered, '(?m)^\s*name:\s*wait-for-schema-version\s*$').Count
+$schemaVersionRefCount = [regex]::Matches(
+    $rendered, '(?m)^\s*key:\s*INNER_COSMOS_EXPECTED_SCHEMA_VERSION\s*$').Count
+$schemaFailedClosedCount = [regex]::Matches(
+    $rendered, 'flyway_schema_history\s+WHERE\s+NOT success').Count
+if ($schemaGateCount -ne 3 -or $schemaVersionRefCount -ne 3 -or $schemaFailedClosedCount -ne 3) {
+    throw "Academy render must retain one fail-closed authoritative schema gate for api, worker, and scheduler."
+}
+
 $forbidden = @(
     'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_SESSION_TOKEN',
     'amazonaws.com/role-arn', 'ebs.csi.aws.com', 'kind: StorageClass',
@@ -54,6 +67,7 @@ if ($unpinnedInfrastructureImages.Count -gt 0) { throw "Academy infrastructure i
     Resources = @($renderedLines | Where-Object { $_ -eq '---' }).Count + 1
     ForbiddenFindings = 0
     MissingControls = 0
+    SchemaVersionGates = $schemaGateCount
     OfflineStructuralValidation = $true
     ClusterSchemaDryRun = [bool]$ClusterSchemaDryRun
     SecretValuesInGit = $false
