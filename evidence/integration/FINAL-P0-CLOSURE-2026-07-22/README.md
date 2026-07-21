@@ -4,6 +4,8 @@
 
 本检查点完成四项机器可关闭的 P0：对话结束后的耐久派生投影、Aurora 任务感知记忆取证、Academy EKS 精确 Flyway schema 门禁，以及可自检的一键教师演示。它不关闭真实 Provider、真实设备、法务或生产账户等人工门禁。
 
+实现提交：`3f75c0dee46e199b7a057e33243068def6edc8d2`。
+
 ## 实现事实
 
 1. `DialogFinishedProjectionHandler` 取代仅写审计日志的 handler。生产 outbox 路径在一次 `JdbcOutboxRepository.complete` 事务中执行记忆抽取、画像候选与情绪时间线聚合；异常会回滚 receipt/effect 并由 outbox 重试。

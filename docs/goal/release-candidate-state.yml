@@ -1,7 +1,7 @@
 schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 status: LOCAL_TEACHER_DEMO_READY_HUMAN_GATES_OPEN
-updated_at: "2026-07-21T19:45:00+08:00"
+updated_at: "2026-07-22T00:49:00+08:00"
 authority:
   objective: goal-objective.md
   current_handoff: 对齐文档/23-组员PR集成审查与本地演示收口.md
@@ -14,7 +14,9 @@ integrated_main:
   track_b_merge: f75fdc4
   previous_final_product_commit: 67b0f4ef3343e17e0082d8d4c84d6d684e5bf86e
   teammate_pr_integration_commit: 2067b9eaa79ecf9563471858a853218a67e0fc77
-  final_product_commit: 2067b9eaa79ecf9563471858a853218a67e0fc77
+  concurrent_csrf_recovery_commit: d55a3f188cdcdeb63df99906cdbd6edf94746854
+  durable_demo_readiness_commit: 3f75c0dee46e199b7a057e33243068def6edc8d2
+  final_product_commit: 3f75c0dee46e199b7a057e33243068def6edc8d2
 capabilities_closed_for_local_demo:
   - durable_multi_bubble_aurora_with_interrupt_stop_replan_and_recovery
   - wake_intent_and_continuous_aurora_self_controls
@@ -24,20 +26,29 @@ capabilities_closed_for_local_demo:
   - psychology_skill_consent_evidence_retention_and_revocation
   - persistent_account_provenance_and_synthetic_discovery_exclusion
   - clean_browser_routes_desktop_projector_mobile_and_pwa_recovery
+  - task_aware_memory_evidence_in_live_aurora_context
+  - durable_dialog_finished_memory_claim_and_emotion_projection
+  - exact_flyway_v20_gate_for_academy_api_worker_and_scheduler
+  - isolated_self_verifying_teacher_demo_runtime
 verification:
-  java: "mvnw clean test: 916/916; 0 failures, 0 errors, 0 skipped; Java 21; Spring Boot 3.5.14"
+  java: "mvnw clean test: 923/923; 0 failures, 0 errors, 0 skipped; Java 21; Spring Boot 3.5.14"
   static_analysis: "SpotBugs 4.10.2.0: 0 bug instances; 0 errors"
   data: "PostgreSQL 16 + pgvector + Flyway V1-V20 and Redis Testcontainers paths PASS"
   frontend: "Vitest 34 files, 227/227; concurrent Aurora CSRF recovery regression and production Vite/PWA build PASS"
   e2e: "Playwright 14/14 PASS, one worker against a fresh H2 seeded runtime"
   browser_acceptance: "Login, grounded two-bubble Aurora turn, empty-memory strict capsule preview, desktop and 390x844 mobile manually reverified"
-  supply_chain: "current-tree secret scan includes untracked non-ignored files; 0 findings; Trivy K8s HIGH/CRITICAL 0"
+  supply_chain: "current-tree secret scan includes untracked non-ignored files; 0 findings; Trivy K8s HIGH/CRITICAL 0; CI minimum test baseline 923"
   android: "Capacitor sync and Gradle assembleDebug PASS; fresh APK recorded in evidence/integration/PR-REVIEW-2026-07-21/README.md; no attached device or configured AVD"
+  teacher_demo: "scripts/run-teacher-demo.ps1 -Action Verify PASS on isolated in-memory H2: health, CSRF, demo login/session and React shell"
+  academy_schema: "highest PostgreSQL Flyway migration V20; api/worker/scheduler 3/3 exact-version fail-closed gates; 20 rendered resources PASS"
 teammate_pr_integration:
   pull_requests: [5, 6, 7]
   review_evidence: evidence/integration/PR-REVIEW-2026-07-21/README.md
   source_integration_branch: codex/integrate-prs-5-7
   disposition: reviewed_and_approved_for_fast_forward_to_main
+final_p0_closure:
+  evidence: evidence/integration/FINAL-P0-CLOSURE-2026-07-22/README.md
+  disposition: machine_verification_passed_human_gates_unchanged
 human_gates:
   - provider_secret_revocation_rotation_and_independent_signoff
   - blind_real_provider_quality_and_longitudinal_non_author_review
