@@ -12,7 +12,9 @@ integrated_main:
   head_before_final_commit: f75fdc4
   track_a_merge: 947d455
   track_b_merge: f75fdc4
-  final_product_commit: 67b0f4ef3343e17e0082d8d4c84d6d684e5bf86e
+  previous_final_product_commit: 67b0f4ef3343e17e0082d8d4c84d6d684e5bf86e
+  teammate_pr_integration_commit: 2067b9eaa79ecf9563471858a853218a67e0fc77
+  final_product_commit: 2067b9eaa79ecf9563471858a853218a67e0fc77
 capabilities_closed_for_local_demo:
   - durable_multi_bubble_aurora_with_interrupt_stop_replan_and_recovery
   - wake_intent_and_continuous_aurora_self_controls
@@ -34,7 +36,8 @@ verification:
 teammate_pr_integration:
   pull_requests: [5, 6, 7]
   review_evidence: evidence/integration/PR-REVIEW-2026-07-21/README.md
-  local_integration_branch: codex/integrate-prs-5-7
+  source_integration_branch: codex/integrate-prs-5-7
+  disposition: reviewed_and_approved_for_fast_forward_to_main
 human_gates:
   - provider_secret_revocation_rotation_and_independent_signoff
   - blind_real_provider_quality_and_longitudinal_non_author_review
