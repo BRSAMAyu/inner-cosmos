@@ -11,6 +11,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+
+import java.time.LocalDate;
+import java.time.ZoneId;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -39,6 +42,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @Import(com.innercosmos.config.TestRateLimitConfig.class)
 class PersonaChatQuotaControllerTest {
+
+    // Must match PersonaChatServiceImpl.QUOTA_ZONE so the seeded quota_date agrees with the
+    // date the product computes when reading the quota.
+    private static final ZoneId QUOTA_ZONE = ZoneId.of("Asia/Shanghai");
 
     @Autowired
     MockMvc mockMvc;
@@ -84,11 +91,14 @@ class PersonaChatQuotaControllerTest {
     void quota_partialUsage_computesRemaining() throws Exception {
         long userId = currentUserId();
         long capsuleId = seedUserCapsule(userId, 10);
-        // Pre-fill 4 turns today
+        // Pre-fill 4 turns today. Key the quota row by the SAME zone the product uses
+        // (PersonaChatServiceImpl.QUOTA_ZONE = Asia/Shanghai), not SQL CURRENT_DATE which is the
+        // DB/JVM zone (UTC on CI) -- otherwise the row's date and the controller's lookup date
+        // disagree in the 16:00-24:00 UTC window and the quota reads back as 0.
         jdbc.update(
                 "INSERT INTO tb_capsule_usage_quota (visitor_user_id, capsule_id, quota_date, turn_count) "
-                        + "VALUES (?, ?, CURRENT_DATE, 4)",
-                userId, capsuleId);
+                        + "VALUES (?, ?, ?, 4)",
+                userId, capsuleId, LocalDate.now(QUOTA_ZONE));
 
         mockMvc.perform(get("/api/persona-chat/quota").param("capsuleId", String.valueOf(capsuleId)).session(session))
                 .andExpect(status().isOk())
@@ -126,8 +136,8 @@ class PersonaChatQuotaControllerTest {
         // Pre-fill MORE than the limit (simulates a previous higher limit or manual edit)
         jdbc.update(
                 "INSERT INTO tb_capsule_usage_quota (visitor_user_id, capsule_id, quota_date, turn_count) "
-                        + "VALUES (?, ?, CURRENT_DATE, 99)",
-                userId, capsuleId);
+                        + "VALUES (?, ?, ?, 99)",
+                userId, capsuleId, LocalDate.now(QUOTA_ZONE));
 
         mockMvc.perform(get("/api/persona-chat/quota").param("capsuleId", String.valueOf(capsuleId)).session(session))
                 .andExpect(status().isOk())

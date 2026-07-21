@@ -28,6 +28,13 @@ class WakeIntentServiceIntegrationTest {
     @Autowired WakeIntentMapper mapper;
     @Autowired NotificationMapper notificationMapper;
 
+    // Generate wall-clock times in the SAME zone we pass to schedule(). Using the bare
+    // LocalDateTime.now(SHANGHAI) (JVM-local) while labelling it "Asia/Shanghai" only works when the JVM
+    // runs in UTC+8; on a UTC CI runner it skews the due window 8h into the past, closing it, so
+    // claimDue finds nothing and the tests fail with NoSuchElement. Anchoring "now" to the same
+    // zone makes these tests timezone-independent.
+    private static final ZoneId SHANGHAI = ZoneId.of("Asia/Shanghai");
+
     @AfterEach
     void clean() {
         mapper.delete(new QueryWrapper<>());
@@ -36,7 +43,7 @@ class WakeIntentServiceIntegrationTest {
 
     @Test
     void ownerCanExplainRescheduleAndCancelButAnotherUserCannotMutateIt() {
-        LocalDateTime preferred = LocalDateTime.now().plusHours(1);
+        LocalDateTime preferred = LocalDateTime.now(SHANGHAI).plusHours(1);
         WakeIntent intent = service.schedule(71001L, "继续未说完的话", "Aurora 记得你想再聊聊",
             "我还在，想继续时我们就从这里开始。", preferred.minusMinutes(5), preferred,
             preferred.plusHours(2), "Asia/Shanghai", "turn:42");
@@ -59,7 +66,7 @@ class WakeIntentServiceIntegrationTest {
 
     @Test
     void twoWorkersCannotClaimTheSameDueIntent() throws Exception {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(SHANGHAI);
         service.schedule(72001L, "按约回来", "约定时间到了", "我来赴约了。",
             now.minusMinutes(2), now.minusMinutes(1), now.plusHours(1), "Asia/Shanghai", null);
         CountDownLatch start = new CountDownLatch(1);
@@ -80,7 +87,7 @@ class WakeIntentServiceIntegrationTest {
 
     @Test
     void anotherReplicaRecoversAnAbandonedLease() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(SHANGHAI);
         service.schedule(72501L, "恢复约定", "节点恢复后仍回来", "我没有忘记这次约定。",
             now.minusMinutes(2), now.minusMinutes(1), now.plusHours(1), "Asia/Shanghai", null);
 
@@ -94,7 +101,7 @@ class WakeIntentServiceIntegrationTest {
 
     @Test
     void cancellationWinningTheClaimRaceLeavesNoDelivery() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(SHANGHAI);
         WakeIntent intent = service.schedule(72701L, "取消竞态", "原本约定回来", "这条不应送达。",
             now.minusMinutes(2), now.minusMinutes(1), now.plusHours(1), "Asia/Shanghai", null);
         WakeIntent claimed = service.claimDue("worker", 1, Duration.ofMinutes(1)).getFirst();
@@ -108,7 +115,7 @@ class WakeIntentServiceIntegrationTest {
 
     @Test
     void expiredWindowIsDroppedWithoutClaiming() {
-        LocalDateTime past = LocalDateTime.now().minusHours(2);
+        LocalDateTime past = LocalDateTime.now(SHANGHAI).minusHours(2);
         WakeIntent intent = service.schedule(73001L, "过期约定", "旧提醒", "旧内容",
             past, past.plusMinutes(10), past.plusMinutes(20), "Asia/Shanghai", null);
         assertThat(service.expirePastDue()).isEqualTo(1);
@@ -168,7 +175,7 @@ class WakeIntentServiceIntegrationTest {
 
     @Test
     void deliveryFeedbackCanDelayOrMuteTheSamePurpose() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(SHANGHAI);
         WakeIntent fired = service.schedule(75002L, "继续通勤后的话题", "约定到了", "我回来了。",
             now.minusMinutes(2), now.minusMinutes(1), now.plusHours(1), "Asia/Singapore", null);
         WakeIntent claim = service.claimDue("feedback-worker", 1, Duration.ofMinutes(1)).getFirst();

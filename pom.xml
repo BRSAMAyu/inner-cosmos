@@ -28,6 +28,11 @@
         <jackson-bom.version>2.21.4</jackson-bom.version>
         <mybatis-plus.version>3.5.9</mybatis-plus.version>
         <shedlock.version>7.7.0</shedlock.version>
+        <!-- Patch-level bumps closing HIGH CVEs flagged by the SBOM trivy gate:
+             netty 4.1.135.Final -> CVE-2026-42583 (codec), CVE-2026-44249/45416/50010 (handler);
+             postgresql 42.7.11 -> CVE-2026-42198 (client-side DoS). -->
+        <netty.version>4.1.135.Final</netty.version>
+        <postgresql.version>42.7.11</postgresql.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <maven.compiler.encoding>UTF-8</maven.compiler.encoding>
