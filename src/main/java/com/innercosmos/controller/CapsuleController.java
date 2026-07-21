@@ -82,7 +82,11 @@ public class CapsuleController extends BaseController {
     public ApiResponse<CapsulePreviewVO> previewFromMemory(@RequestBody Map<String, Object> body, HttpSession session) {
         Long userId = currentUserId(session);
         Object rawMemoryIds = body.get("memoryIds");
-        List<Long> memoryIds = parseMemoryIds(rawMemoryIds);
+        // A preview may legitimately carry no memoryIds: the UI advertises "create a general
+        // facet that reads no memories", and DataMaskingService.previewFromMemory already
+        // returns an empty-facet preview for that case. Only reject a malformed (non-numeric)
+        // list here — rejecting an empty one silently blocked that advertised path.
+        List<Long> memoryIds = parseMemoryIdsAllowEmpty(rawMemoryIds);
         String privacyLevel = (String) body.getOrDefault("privacyLevel", "STRICT");
         List<String> allowTopics = (List<String>) body.getOrDefault("allowTopics", List.of());
         List<String> blockedTopics = (List<String>) body.getOrDefault("blockedTopics", List.of());
@@ -161,7 +165,9 @@ public class CapsuleController extends BaseController {
                                                               @RequestBody Map<String, Object> body,
                                                               HttpSession session) {
         Object raw = body.get("memoryIds");
-        List<Long> ids = parseMemoryIds(raw);
+        // A recompile of a general (no-memory) facet may carry an empty selection; the service
+        // handles it. Keep numeric validation, drop the non-empty requirement.
+        List<Long> ids = parseMemoryIdsAllowEmpty(raw);
         return ApiResponse.ok(capsuleService.recompileGenome(currentUserId(session), id, ids));
     }
 
@@ -207,11 +213,19 @@ public class CapsuleController extends BaseController {
         }
     }
 
-    private List<Long> parseMemoryIds(Object raw) {
-        if (!(raw instanceof List<?> values) || values.isEmpty()) {
+    // Tolerates an absent/empty list (a general capsule that reads no memory). Still rejects a
+    // non-list or a list with non-numeric elements.
+    private List<Long> parseMemoryIdsAllowEmpty(Object raw) {
+        if (raw == null) return List.of();
+        if (!(raw instanceof List<?> values)) {
             throw new com.innercosmos.exception.BusinessException(
-                    com.innercosmos.common.ErrorCode.BAD_REQUEST, "memoryIds不能为空");
+                    com.innercosmos.common.ErrorCode.BAD_REQUEST, "memoryIds必须是数组");
         }
+        if (values.isEmpty()) return List.of();
+        return toLongIds(values);
+    }
+
+    private List<Long> toLongIds(List<?> values) {
         List<Long> ids = values.stream().filter(Number.class::isInstance)
                 .map(Number.class::cast).map(Number::longValue).toList();
         if (ids.size() != values.size()) {

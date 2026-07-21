@@ -42,6 +42,11 @@ spec:
         - name: wait-for-schema-v3
           image: pgvector/pgvector:0.8.1-pg16@sha256:33198da2828a14c30348d2ccb4750833d5ed9a44c88d840a0e523d7417120337
           command: ["sh", "-c", "until [ \"$(psql -h inner-cosmos-postgres -U inner_cosmos -d inner_cosmos -Atc \"SELECT COALESCE(MAX(version::integer),0) FROM flyway_schema_history WHERE success\" 2>/dev/null)\" -ge 3 ]; do sleep 2; done"]
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
           env:
             - name: PGPASSWORD
               valueFrom:
@@ -54,6 +59,11 @@ spec:
         - name: app
           image: inner-cosmos:academy-placeholder
           imagePullPolicy: IfNotPresent
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
           ports:
             - name: http
               containerPort: 8080
@@ -104,6 +114,10 @@ spec:
               readOnly: true
             - name: logs
               mountPath: /var/log/inner-cosmos
+            # readOnlyRootFilesystem is on, so the embedded Tomcat work dir and
+            # multipart upload staging under java.io.tmpdir need a writable volume.
+            - name: tmp
+              mountPath: /tmp
       volumes:
         - name: postgres-ca
           secret:
@@ -114,4 +128,6 @@ spec:
             secretName: inner-cosmos-redis-client-ca
             defaultMode: 0444
         - name: logs
+          emptyDir: {}
+        - name: tmp
           emptyDir: {}

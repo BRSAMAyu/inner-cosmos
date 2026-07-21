@@ -24,6 +24,10 @@ spec:
         - name: wait-for-postgres
           image: pgvector/pgvector:0.8.1-pg16@sha256:33198da2828a14c30348d2ccb4750833d5ed9a44c88d840a0e523d7417120337
           command: ["sh", "-c", "until psql -h inner-cosmos-postgres -U inner_cosmos -d inner_cosmos -c 'SELECT 1' >/dev/null 2>&1; do sleep 2; done"]
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
           env:
             - name: PGPASSWORD
               valueFrom:
@@ -36,6 +40,10 @@ spec:
         - name: migration
           image: inner-cosmos:academy-placeholder
           imagePullPolicy: IfNotPresent
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
           envFrom:
             - configMapRef: {name: inner-cosmos-config}
             - secretRef: {name: inner-cosmos-runtime}
@@ -56,8 +64,11 @@ spec:
           volumeMounts:
             - {name: postgres-ca, mountPath: /run/secrets/postgres, readOnly: true}
             - {name: logs, mountPath: /var/log/inner-cosmos}
+            - {name: tmp, mountPath: /tmp}
       volumes:
         - name: postgres-ca
           secret: {secretName: inner-cosmos-postgres-client-ca, defaultMode: 0444}
         - name: logs
+          emptyDir: {}
+        - name: tmp
           emptyDir: {}

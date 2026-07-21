@@ -16,16 +16,26 @@ spec:
         app.kubernetes.io/component: redis
     spec:
       automountServiceAccountToken: false
+      securityContext:
+        # Pod-level baseline: the main container runs non-root (999); only the ephemeral
+        # chown init container opts back into root via runAsNonRoot:false below.
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       initContainers:
         - name: prepare-tls
           image: busybox:1.37.0@sha256:9532d8c39891ca2ecde4d30d7710e01fb739c87a8b9299685c63704296b16028
-          command: ["sh", "-c", "cp /input/* /tls/ && chmod 600 /tls/server.key && chmod 644 /tls/server.crt /tls/ca.crt && chown -R 999:999 /tls"]
+          command: ["sh", "-c", "cp /input/* /tls/ && chmod 600 /tls/server.key && chmod 644 /tls/server.crt /tls/ca.crt && chown -R 999:999 /tls /data"]
           securityContext:
             runAsUser: 0
+            runAsNonRoot: false
             allowPrivilegeEscalation: false
+            # Writes only to the mounted /tls and /data volumes; root is required for chown/chmod.
+            readOnlyRootFilesystem: true
           volumeMounts:
             - {name: tls-input, mountPath: /input, readOnly: true}
             - {name: tls-runtime, mountPath: /tls}
+            - {name: data, mountPath: /data}
       containers:
         - name: redis
           image: redis:7.4.2-alpine@sha256:02419de7eddf55aa5bcf49efb74e88fa8d931b4d77c07eff8a6b2144472b6952
@@ -37,6 +47,7 @@ spec:
             runAsUser: 999
             allowPrivilegeEscalation: false
             capabilities: {drop: [ALL]}
+            readOnlyRootFilesystem: true
           env:
             - name: REDIS_PASSWORD
               valueFrom:
@@ -58,8 +69,14 @@ spec:
             periodSeconds: 20
           volumeMounts:
             - {name: tls-runtime, mountPath: /tls, readOnly: true}
+            # readOnlyRootFilesystem is on. Persistence is disabled (--save "" --appendonly no)
+            # so Redis writes nothing durable, but /data is its working dir; a writable emptyDir
+            # avoids any edge-case write against the read-only image layer.
+            - {name: data, mountPath: /data}
       volumes:
         - name: tls-input
           secret: {secretName: inner-cosmos-redis-server-tls, defaultMode: 0444}
         - name: tls-runtime
+          emptyDir: {}
+        - name: data
           emptyDir: {}
