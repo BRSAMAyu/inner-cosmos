@@ -77,7 +77,7 @@ gates:
     acceptance:
       - {id: BASE-JAVA, target: "Java 21 is both compile and runtime baseline.", status: IN_PROGRESS, evidence: [evidence/m1/M1-BASE-001/]}
       - {id: BASE-BOOT, target: "Spring Boot 3.5 supported patch baseline passes the full suite.", status: IN_PROGRESS, evidence: [evidence/m1/M1-BASE-001/]}
-      - {id: BASE-SUPPLY, target: "SBOM, dependency, SAST, secret, IaC, and container scans are gated.", status: IN_PROGRESS, evidence: [evidence/m1/M1-BASE-001/]}
+      - {id: BASE-SUPPLY, target: "SBOM, dependency, SAST, secret, IaC, and container scans are gated.", status: IN_PROGRESS, evidence: [evidence/m1/M1-BASE-001/, evidence/integration/FINAL-P0-CLOSURE-2026-07-22/], remaining: "2026-07-22: ordinary CI enforces 923 executed tests, frontend contract/tests/build, current-tree and history secret scans, SBOM/Trivy, production image smoke/signature and Academy schema drift. The signed tag/manual release workflow now reruns backend/frontend/secret/schema verification and build-sign cannot start unless it passes. Remaining: an actual authorized registry release and independent provenance verification."}
       - {id: BASE-IMAGE, target: "Signed non-root minimal OCI image passes production-profile smoke.", status: IN_PROGRESS, evidence: [evidence/m1/M1-BASE-001/image-release-summary.txt]}
 
   - id: G2

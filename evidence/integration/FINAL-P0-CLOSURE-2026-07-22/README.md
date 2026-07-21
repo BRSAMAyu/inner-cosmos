@@ -14,6 +14,7 @@
 4. API、worker、scheduler 三个 Academy 工作负载在启动前要求 Flyway 恰好到仓库最高版本 V20，且任何失败 migration 都会 fail closed。
 5. `scripts/run-teacher-demo.ps1` 使用每次运行独享的 H2 文件、Mock Provider 与显式 Demo seed，验证 health、CSRF、登录、当前用户和 React shell；退出后清理数据库。
 6. CI/Surefire 最低测试门槛从历史 613 提升到当前完整基线 923。
+7. 签名 OCI 发布工作流在任何 tag 或手动发布前重新执行 Java 923 基线、前端契约/测试/构建、Secret 历史扫描和 Academy schema 门禁；`build-sign` 明确依赖 `verify`，不能从发布入口绕过普通 CI。
 
 ## 2026-07-22 机器验证
 

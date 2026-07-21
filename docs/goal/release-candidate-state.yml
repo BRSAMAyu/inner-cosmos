@@ -38,6 +38,7 @@ verification:
   e2e: "Playwright 14/14 PASS, one worker against a fresh H2 seeded runtime"
   browser_acceptance: "Login, grounded two-bubble Aurora turn, empty-memory strict capsule preview, desktop and 390x844 mobile manually reverified"
   supply_chain: "current-tree secret scan includes untracked non-ignored files; 0 findings; Trivy K8s HIGH/CRITICAL 0; CI minimum test baseline 923"
+  release_workflow: "signed OCI build-sign job is blocked on an in-workflow backend/frontend/secret/schema verify job, including the 923-test minimum"
   android: "Capacitor sync and Gradle assembleDebug PASS; fresh APK recorded in evidence/integration/PR-REVIEW-2026-07-21/README.md; no attached device or configured AVD"
   teacher_demo: "scripts/run-teacher-demo.ps1 -Action Verify PASS on isolated in-memory H2: health, CSRF, demo login/session and React shell"
   academy_schema: "highest PostgreSQL Flyway migration V20; api/worker/scheduler 3/3 exact-version fail-closed gates; 20 rendered resources PASS"
