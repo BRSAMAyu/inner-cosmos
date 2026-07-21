@@ -129,6 +129,35 @@ class ApplicationFlowTest {
                 .andExpect(jsonPath("$.data.isPublic").value(true));
     }
 
+    // The Resonance workbench advertises "create a general facet that reads no memories" and
+    // leaves the preview / recompile buttons enabled with an empty selection. The controller
+    // used to reject an empty memoryIds list with 400 "memoryIds不能为空", so those buttons did
+    // nothing for a user with no (selected) memories. Preview and recompile must accept empty.
+    @Test
+    void capsulePreviewAndRecompileAcceptEmptyMemorySelection() throws Exception {
+        MockHttpSession session = login();
+
+        mockMvc.perform(withSession(post("/api/capsule/preview-from-memory")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"memoryIds\":[],\"privacyLevel\":\"STRICT\",\"allowTopics\":[],\"blockedTopics\":[]}"), session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.suggestedPseudonym").isNotEmpty());
+
+        MvcResult capsule = mockMvc.perform(withSession(post("/api/capsule/create-from-memory")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"pseudonym\":\"通用侧面\",\"intro\":\"不读取记忆的通用侧面\",\"memoryIds\":[],\"publicTags\":[],\"visibilityStatus\":\"PRIVATE\",\"isPublic\":false}"), session))
+                .andExpect(status().isOk())
+                .andReturn();
+        String capsuleId = readId(capsule);
+
+        mockMvc.perform(withSession(post("/api/capsule/" + capsuleId + "/genome/recompile")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"memoryIds\":[]}"), session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+    }
+
     @Test
     void auroraRichReplyThoughtShredderAndSafetyInspectionWork() throws Exception {
         MockHttpSession session = login();
