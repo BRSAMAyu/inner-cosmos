@@ -1,7 +1,7 @@
 schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 status: LOCAL_TEACHER_DEMO_READY_HUMAN_GATES_OPEN
-updated_at: "2026-07-22T00:49:00+08:00"
+updated_at: "2026-07-22T16:30:00+08:00"
 authority:
   objective: goal-objective.md
   current_handoff: 对齐文档/23-组员PR集成审查与本地演示收口.md
@@ -17,6 +17,17 @@ integrated_main:
   concurrent_csrf_recovery_commit: d55a3f188cdcdeb63df99906cdbd6edf94746854
   durable_demo_readiness_commit: 3f75c0dee46e199b7a057e33243068def6edc8d2
   final_product_commit: 3f75c0dee46e199b7a057e33243068def6edc8d2
+mobile_desktop_push_checkpoint_2026_07_22:
+  evidence: evidence/innovation/INNO-MOBILE-004/README.md
+  summary: >-
+    Reconciled and committed a large batch of previously-uncommitted work: native OIDC/PKCE auth
+    proven end to end against a real local Keycloak IdP on Android and a new Tauri desktop client;
+    a mobile push-notification device-registration and delivery pipeline (FCM real gateway, APNs
+    explicitly gated, AES-256-GCM token encryption); native audio capture. Found and fixed on arrival:
+    missing H2 schema.sql mirror for the new push tables, a Postgres-only SQL construct that broke on
+    H2, stale baseline-drift test counts, a broken (mobile-mode) production static web build, and
+    hardcoded local-only secrets that failed the current-tree scan. Full detail in the evidence file.
+  disposition: machine_verification_passed_human_gates_unchanged
 capabilities_closed_for_local_demo:
   - durable_multi_bubble_aurora_with_interrupt_stop_replan_and_recovery
   - wake_intent_and_continuous_aurora_self_controls
@@ -30,18 +41,20 @@ capabilities_closed_for_local_demo:
   - durable_dialog_finished_memory_claim_and_emotion_projection
   - exact_flyway_v20_gate_for_academy_api_worker_and_scheduler
   - isolated_self_verifying_teacher_demo_runtime
+  - native_oidc_pkce_against_a_real_idp_on_android_and_tauri_desktop
+  - mobile_push_notification_device_registration_and_delivery
 verification:
-  java: "mvnw clean test: 923/923; 0 failures, 0 errors, 0 skipped; Java 21; Spring Boot 3.5.14"
+  java: "mvnw clean test: 931/931 (0 failures, 0 errors, 1 intentional opt-in skip); Java 21; Spring Boot 3.5.14"
   static_analysis: "SpotBugs 4.10.2.0: 0 bug instances; 0 errors"
-  data: "PostgreSQL 16 + pgvector + Flyway V1-V20 and Redis Testcontainers paths PASS"
-  frontend: "Vitest 34 files, 227/227; concurrent Aurora CSRF recovery regression and production Vite/PWA build PASS"
+  data: "PostgreSQL 16 + pgvector + Flyway V1-V21 and Redis Testcontainers paths PASS"
+  frontend: "Vitest 35 files, 232/232; concurrent Aurora CSRF recovery regression and production Vite/PWA build PASS"
   e2e: "Playwright 14/14 PASS, one worker against a fresh H2 seeded runtime"
   browser_acceptance: "Login, grounded two-bubble Aurora turn, empty-memory strict capsule preview, desktop and 390x844 mobile manually reverified"
-  supply_chain: "current-tree secret scan includes untracked non-ignored files; 0 findings; Trivy K8s HIGH/CRITICAL 0; CI minimum test baseline 923"
-  release_workflow: "signed OCI build-sign job is blocked on an in-workflow backend/frontend/secret/schema verify job, including the 923-test minimum"
+  supply_chain: "current-tree secret scan includes untracked non-ignored files; 0 findings; Trivy K8s HIGH/CRITICAL 0; CI minimum test baseline 931 (max 1 allowed skip: opt-in OidcLiveDecoderTest)"
+  release_workflow: "signed OCI build-sign job is blocked on an in-workflow backend/frontend/secret/schema verify job, including the 931-test minimum"
   android: "Capacitor sync and Gradle assembleDebug PASS; fresh APK recorded in evidence/integration/PR-REVIEW-2026-07-21/README.md; no attached device or configured AVD"
   teacher_demo: "scripts/run-teacher-demo.ps1 -Action Verify PASS on isolated in-memory H2: health, CSRF, demo login/session and React shell"
-  academy_schema: "highest PostgreSQL Flyway migration V20; api/worker/scheduler 3/3 exact-version fail-closed gates; 20 rendered resources PASS"
+  academy_schema: "highest PostgreSQL Flyway migration V21; api/worker/scheduler 3/3 exact-version fail-closed gates; 20 rendered resources PASS"
 teammate_pr_integration:
   pull_requests: [5, 6, 7]
   review_evidence: evidence/integration/PR-REVIEW-2026-07-21/README.md

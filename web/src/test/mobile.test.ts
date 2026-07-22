@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { apiUrl, subscribeProactive, validateApiBase } from "../api";
-import { parseWakeIntentDeepLink } from "../mobile";
+import {
+  dueWakeIntentIds, parseWakeIntentDeepLink, wakeIntentFromLocalNotificationId,
+  wakeIntentFromNotification, wakeNotificationId
+} from "../mobile";
 
 describe("mobile deep-link boundary", () => {
   it("accepts only owned Aurora wake routes", () => {
@@ -14,6 +17,30 @@ describe("mobile deep-link boundary", () => {
     expect(parseWakeIntentDeepLink("innercosmos://admin/wake/9")).toBeNull();
     expect(parseWakeIntentDeepLink("innercosmos://aurora/wake/-1")).toBeNull();
     expect(parseWakeIntentDeepLink("innercosmos://aurora/wake/1?next=https://evil.example")).toBe(1);
+  });
+});
+
+describe("notification payload boundary", () => {
+  it("accepts only positive safe wake-intent identifiers", () => {
+    expect(wakeIntentFromNotification({ wakeIntent: "42" })).toBe(42);
+    expect(wakeIntentFromNotification('{"wakeIntent":42}')).toBe(42);
+    expect(wakeIntentFromNotification({ wakeIntent: -1 })).toBeNull();
+    expect(wakeIntentFromNotification({ wakeIntent: "not-an-id" })).toBeNull();
+    expect(wakeIntentFromNotification(null)).toBeNull();
+  });
+
+  it("recovers only due durable WakeIntent schedules in delivery order", () => {
+    expect(dueWakeIntentIds({ "9": 101, "4": 99, invalid: 1, "-2": 1 }, 100)).toEqual([4]);
+    expect(dueWakeIntentIds({ "9": 101, "4": 99 }, 101)).toEqual([4, 9]);
+  });
+
+  it("maps owned WakeIntents to stable Android notification identifiers", () => {
+    expect(wakeNotificationId(42)).toBe(1_000_042);
+    expect(wakeNotificationId(1_000_000_042)).toBe(1_000_042);
+    expect(wakeIntentFromLocalNotificationId(1_000_042)).toBe(42);
+    expect(wakeIntentFromLocalNotificationId("1000042")).toBe(42);
+    expect(wakeIntentFromLocalNotificationId(42)).toBeNull();
+    expect(() => wakeNotificationId(0)).toThrow();
   });
 });
 

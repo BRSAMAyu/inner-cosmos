@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, streamAurora } from "../api";
 import type { Notification, WakeIntent } from "../api";
 import type { AuroraStreamEvent } from "../protocol";
+import { mobileRuntime } from "../mobile";
 import { useAuroraSession } from "./useAuroraSession";
 
 vi.mock("../api", () => ({
@@ -228,8 +229,10 @@ describe("useAuroraSession -- WakeIntent negotiate", () => {
   it("postponeReturn shifts the intent's window by one hour", async () => {
     const original = wakeIntent({ id: 6, earliestAt: "2026-07-19T08:00:00", preferredAt: "2026-07-19T08:30:00", latestAt: "2026-07-19T09:00:00" });
     vi.mocked(api.wakeIntents).mockResolvedValue([original]);
-    const shifted = wakeIntent({ id: 6, earliestAt: "2026-07-19T09:00:00", preferredAt: "2026-07-19T09:30:00", latestAt: "2026-07-19T10:00:00" });
+    const shifted = wakeIntent({ id: 6, earliestAt: "2099-07-19T09:00:00", preferredAt: "2099-07-19T09:30:00", latestAt: "2099-07-19T10:00:00" });
     vi.mocked(api.rescheduleWakeIntent).mockResolvedValue(shifted);
+    const cancelNative = vi.spyOn(mobileRuntime, "cancelWakeIntentNotification").mockResolvedValue();
+    const scheduleNative = vi.spyOn(mobileRuntime, "scheduleWakeIntentNotification").mockResolvedValue();
     const { result } = setup();
     await act(async () => { await result.current.loadWakeIntents(); });
     await act(async () => { await result.current.postponeReturn(original); });
@@ -237,15 +240,21 @@ describe("useAuroraSession -- WakeIntent negotiate", () => {
       earliestAt: "2026-07-19T09:00:00", preferredAt: "2026-07-19T09:30:00", latestAt: "2026-07-19T10:00:00"
     });
     expect(result.current.wakeIntents[0]).toEqual(shifted);
+    expect(cancelNative).toHaveBeenCalledExactlyOnceWith(6);
+    expect(scheduleNative).toHaveBeenCalledOnce();
+    cancelNative.mockRestore(); scheduleNative.mockRestore();
   });
 
   it("cancelReturn removes the intent from the list", async () => {
     vi.mocked(api.wakeIntents).mockResolvedValue([wakeIntent({ id: 6 })]);
     vi.mocked(api.cancelWakeIntent).mockResolvedValue(wakeIntent({ id: 6, status: "CANCELLED" }));
+    const cancelNative = vi.spyOn(mobileRuntime, "cancelWakeIntentNotification").mockResolvedValue();
     const { result } = setup();
     await act(async () => { await result.current.loadWakeIntents(); });
     await act(async () => { await result.current.cancelReturn(wakeIntent({ id: 6 })); });
     expect(result.current.wakeIntents).toHaveLength(0);
+    expect(cancelNative).toHaveBeenCalledExactlyOnceWith(6);
+    cancelNative.mockRestore();
   });
 
   it("respondToReturn ('MATCHED') marks the arrival notification read and removes it", async () => {

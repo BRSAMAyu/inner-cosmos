@@ -1,0 +1,9 @@
+services:
+  keycloak:
+    command: ["start-dev", "--import-realm", "--hostname=http://127.0.0.1:8081", "--health-enabled=true"]
+  app:
+    environment:
+      OIDC_ISSUER_URI: http://127.0.0.1:8081/realms/inner-cosmos
+      OIDC_AUTHORIZATION_URI: http://127.0.0.1:8081/realms/inner-cosmos/protocol/openid-connect/auth
+      OIDC_TOKEN_URI: http://127.0.0.1:8081/realms/inner-cosmos/protocol/openid-connect/token
+      CORS_ALLOWED_ORIGINS: http://localhost,http://127.0.0.1,tauri://localhost

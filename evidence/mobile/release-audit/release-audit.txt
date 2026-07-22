@@ -1,0 +1,5 @@
+﻿status=PASS
+aab_sha256=97b681fe0d3ea176e8d6bc5f13e5aea5c8125f398ebed00a526b1abfd8479d4f
+forbidden_pattern_count=0
+debug_network_policy_present=false
+verified_at=2026-07-22T10:51:25.2007220+08:00

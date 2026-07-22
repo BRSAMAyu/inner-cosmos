@@ -4,6 +4,22 @@ mode: TEAMMATE_CONTINUATION_AFTER_CHECKPOINT_MERGE
 status: READY_FOR_TEAMMATE_CONTINUATION
 updated_at: 2026-07-18T00:00:00+08:00
 
+current_authority_2026_07_22: >-
+  This file's active_front/priority_queue below is HISTORICAL (last updated 2026-07-18) and has been
+  superseded by faster-moving work on main. The current authority for where the project actually
+  stands is docs/goal/release-candidate-state.yml (status LOCAL_TEACHER_DEMO_READY_HUMAN_GATES_OPEN)
+  plus 对齐文档/23-组员PR集成审查与本地演示收口.md. On 2026-07-22 a large batch of previously-uncommitted
+  native mobile/desktop OIDC+PKCE auth (real local Keycloak IdP, Android + new Tauri desktop client),
+  mobile push notification delivery (device registration, FCM gateway, APNs gated), and native audio
+  capture was found in the working tree, verified, fixed (H2 schema drift, non-portable SQL, stale
+  baseline-drift test counts, a broken mobile-mode static web build, hardcoded local dev secrets) and
+  committed — see evidence/innovation/INNO-MOBILE-004/README.md. Java full gate is now 931/931 (0
+  failures/errors, 1 intentional opt-in skip); frontend Vitest is 232/232. Next machine-actionable
+  work: see "Identify and start next highest-value gap" reasoning in the commit that added this note,
+  or re-derive from docs/goal/complete-product-acceptance.yml's UNASSESSED/IN_PROGRESS items (e.g.
+  ARCH-MODULES, API-CONTRACT remaining pieces, CAPSULE-RUNTIME, SIMULATOR-ASSET, UX-COMPLETE i18n/a11y
+  audit) since the phase/front language below no longer matches live HEAD.
+
 current_handoff_2026_07_18:
   authority: 对齐文档/21-双轨阶段合并审查与完全体续跑交接.md
   machine_state: docs/goal/teammate-continuation-state.yml

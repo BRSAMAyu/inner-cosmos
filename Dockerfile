@@ -15,7 +15,7 @@ COPY pom.xml pom.xml
 # hosted on maven.pkg.github.com — which some build networks cannot reach. That pre-fetch is
 # only a cache optimization, so it must not fail the build: the `package` step below is the
 # authoritative, fail-fast dependency resolution and pulls exactly what the app needs.
-RUN ./mvnw -B -q -DskipTests dependency:go-offline || true
+RUN timeout 180s ./mvnw -B -q -DskipTests dependency:go-offline || true
 COPY src src
 RUN ./mvnw -B -q -DskipTests package
 

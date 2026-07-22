@@ -9,6 +9,7 @@ import com.innercosmos.mapper.DialogSessionMapper;
 import com.innercosmos.mapper.DialogMessageMapper;
 import com.innercosmos.service.NaturalTimeNegotiator;
 import com.innercosmos.service.NotificationService;
+import com.innercosmos.service.PushDeliveryService;
 import com.innercosmos.service.WakeIntentService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -31,16 +32,19 @@ public class WakeIntentServiceImpl implements WakeIntentService {
     private final DialogSessionMapper sessions;
     private final NaturalTimeNegotiator timeNegotiator;
     private final DialogMessageMapper dialogMessages;
+    private final PushDeliveryService pushDeliveries;
 
     public WakeIntentServiceImpl(WakeIntentMapper mapper, JdbcTemplate jdbc,
                                  NotificationService notifications, DialogSessionMapper sessions,
-                                 NaturalTimeNegotiator timeNegotiator, DialogMessageMapper dialogMessages) {
+                                 NaturalTimeNegotiator timeNegotiator, DialogMessageMapper dialogMessages,
+                                 PushDeliveryService pushDeliveries) {
         this.mapper = mapper;
         this.jdbc = jdbc;
         this.notifications = notifications;
         this.sessions = sessions;
         this.timeNegotiator = timeNegotiator;
         this.dialogMessages = dialogMessages;
+        this.pushDeliveries = pushDeliveries;
     }
 
     @Override
@@ -242,6 +246,7 @@ public class WakeIntentServiceImpl implements WakeIntentService {
         if (!finish(claimed, outcome, reason)) return false;
         notifications.notifyOnce(claimed.userId, "AURORA_RETURN", title, content,
             claimed.id, "WAKE_INTENT");
+        pushDeliveries.enqueueWakeIntent(claimed.userId, claimed.id, title, content);
         return true;
     }
 

@@ -47,7 +47,9 @@ const COPY: Record<Locale, {
   }
 };
 
-export function AuthGate({ native, onSuccess, locale = "zh-CN" }: { native: boolean; onSuccess: () => Promise<void>; locale?: Locale }) {
+export function AuthGate({ native, onSuccess, locale = "zh-CN", externalError = "" }: {
+  native: boolean; onSuccess: () => Promise<void>; locale?: Locale; externalError?: string;
+}) {
   const t = COPY[locale];
   const [mode, setMode] = useState<AuthMode>("login");
   const [username, setUsername] = useState("");
@@ -55,14 +57,26 @@ export function AuthGate({ native, onSuccess, locale = "zh-CN" }: { native: bool
   const [password, setPassword] = useState("");
   const [password2, setPassword2] = useState("");
   const [error, setError] = useState("");
+  const [nativeProgress, setNativeProgress] = useState("");
   const [busy, setBusy] = useState(false);
 
   if (native) return <main className="login-shell"><section className="login">
     <span className="eyebrow">INNER COSMOS</span><h1>{t.loginH1}</h1>
     <p>{t.nativeP}</p>
-    {error && <p className="error" role="alert">{error}</p>}
-    <button className="send" type="button" onClick={() => void mobileOidc.beginLogin()
-      .catch(reason => setError(reason instanceof Error ? reason.message : t.nativeErr))}>{t.nativeBtn}</button>
+    {(error || externalError) && <p className="error" role="alert" data-testid="native-auth-error">
+      Sign-in error: {error || externalError}
+    </p>}
+    {nativeProgress && !error && !externalError && <p role="status">{nativeProgress}</p>}
+    <button className="send" type="button" onClick={() => {
+      setError("");
+      setNativeProgress("Opening secure sign-in…");
+      void mobileOidc.beginLogin()
+        .then(() => setNativeProgress("Continue in the system browser"))
+        .catch(reason => {
+          setNativeProgress("");
+          setError(reason instanceof Error ? reason.message : t.nativeErr);
+        });
+    }}>{t.nativeBtn}</button>
   </section></main>;
 
   const switchMode = (next: AuthMode) => {

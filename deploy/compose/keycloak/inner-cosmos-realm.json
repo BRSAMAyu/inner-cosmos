@@ -1,0 +1,59 @@
+{
+  "realm": "inner-cosmos",
+  "enabled": true,
+  "displayName": "Inner Cosmos Local",
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": false,
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "revokeRefreshToken": true,
+  "refreshTokenMaxReuse": 0,
+  "clients": [
+    {
+      "clientId": "inner-cosmos-mobile-local",
+      "name": "Inner Cosmos Mobile Local",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": ["innercosmos://oauth/callback"],
+      "webOrigins": ["http://localhost", "https://localhost", "tauri://localhost", "http://tauri.localhost"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "innercosmos://oauth/callback"
+      },
+      "defaultClientScopes": ["web-origins", "acr", "basic", "profile", "roles", "email"],
+      "protocolMappers": [
+        {
+          "name": "inner-cosmos-api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "inner-cosmos-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "mobile-demo",
+      "email": "mobile-demo@innercosmos.local",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Mobile",
+      "lastName": "Demo",
+      "credentials": [
+        {"type": "password", "value": "demo123", "temporary": false}
+      ]
+    }
+  ]
+}

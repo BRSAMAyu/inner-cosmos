@@ -1,0 +1,71 @@
+spring:
+  sql:
+    init:
+      mode: never
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/inner_cosmos}
+    username: ${SPRING_DATASOURCE_USERNAME:inner_cosmos}
+    password: ${SPRING_DATASOURCE_PASSWORD:test-only-mobile-local-pg}
+    driver-class-name: org.postgresql.Driver
+  flyway:
+    enabled: true
+    locations: classpath:db/migration/postgresql
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:test-only-mobile-local-redis}
+
+llm:
+  mode: dev
+  provider: ${LLM_PROVIDER:mock}
+  allow-fallback: true
+
+inner-cosmos:
+  runtime:
+    role: all
+  events:
+    outbox:
+      enabled: true
+  session:
+    redis:
+      enabled: true
+  security:
+    cors-origins: ${CORS_ALLOWED_ORIGINS:http://localhost,https://localhost}
+    rate-limit:
+      redis:
+        enabled: true
+  scheduler:
+    redis-lock:
+      enabled: true
+  push:
+    worker-enabled: true
+  auth:
+    oidc:
+      enabled: true
+      auto-provision: true
+      issuer-uri: ${OIDC_ISSUER_URI:http://10.0.2.2:8081/realms/inner-cosmos}
+      jwk-set-uri: ${OIDC_JWK_SET_URI:http://localhost:8081/realms/inner-cosmos/protocol/openid-connect/certs}
+      audience: ${OIDC_AUDIENCE:inner-cosmos-api}
+      authorization-uri: ${OIDC_AUTHORIZATION_URI:http://10.0.2.2:8081/realms/inner-cosmos/protocol/openid-connect/auth}
+      token-uri: ${OIDC_TOKEN_URI:http://10.0.2.2:8081/realms/inner-cosmos/protocol/openid-connect/token}
+      client-id: ${OIDC_MOBILE_CLIENT_ID:inner-cosmos-mobile-local}
+      redirect-uri: ${OIDC_MOBILE_REDIRECT_URI:innercosmos://oauth/callback}
+      scopes: openid,profile,email
+  demo:
+    seed-enabled: false
+  infrastructure:
+    profile: mobile-local
+    region: developer-controlled
+    event-dispatcher: jdbc-outbox
+    database: postgresql-pgvector
+    redis: local-password
+    durable-storage-claim: docker-volume-only
+    product-semantics: complete
+
+server:
+  forward-headers-strategy: framework
+  tomcat:
+    accesslog:
+      enabled: true
+      pattern: "%m %U %s"

@@ -4,6 +4,7 @@ import { Capacitor } from "@capacitor/core";
 import { api, apiConfigurationError, configureBearerAuth, hasConfiguredApiBase, transcribeAudio, type ClaimCandidate, type CapsuleBoundary, type CapsuleFidelitySummary, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type PersonaMessage, type PersonaSession, type PortraitDimension, type PublicCapsule, type PortraitHistoryEntry, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type PsychologySkillSuggestion, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type StarfieldDetail, type StarfieldScene, type StarfieldStar, type UnderstandingClaim, type UserCorrection } from "./api";
 import { initialMobileState, mobileRuntime, type MobileRuntimeState } from "./mobile";
 import { mobileOidc } from "./mobile-auth";
+import { isTauriRuntime } from "./desktop-runtime";
 import { capsulePath, letterThreadPath, MeSpace, productSpaceFromPath, productSpaces, ProductShellNavigation, resourceFromPath, spacePath, type ProductSpace } from "./components/ProductShell";
 import { AuroraConversation } from "./components/AuroraConversation";
 import { AuroraSelfSpace } from "./components/AuroraSelfSpace";
@@ -119,6 +120,7 @@ export function AuroraApp() {
   const [mobileState, setMobileState] = useState<MobileRuntimeState>(initialMobileState);
   const bootstrappedRef = useRef(false);
   const bootstrapCallRef = useRef(0);
+  const draftRestoredRef = useRef(false);
 
   // Aurora conversation/session domain (message list, streaming/turn status, interrupt/stop, mode
   // picker, WakeIntent negotiate, session bootstrap/replay) -- extracted into its own hook; see
@@ -217,7 +219,7 @@ export function AuroraApp() {
         : "Aurora 在这里。你可以随时打断，她会重新理解。 ");
     } catch (error) {
       if (call !== bootstrapCallRef.current) return;
-      if (String(error).includes("Authentication") || String(error).includes("401")) {
+      if (/authentication|unauthori[sz]ed|\b401\b/i.test(String(error))) {
         setAuthenticated(false);
         setStatus("请先登录");
       } else {
@@ -270,13 +272,14 @@ export function AuroraApp() {
   useEffect(() => {
     if (bootstrappedRef.current) return;
     bootstrappedRef.current = true;
-    const native = Capacitor.isNativePlatform();
+    const native = Capacitor.isNativePlatform() || isTauriRuntime();
     configureBearerAuth(native ? () => mobileOidc.accessToken() : null, native,
       native ? () => mobileOidc.expireAccessToken() : null);
     let dispose: (() => Promise<void>) | undefined;
     void mobileOidc.initialize(bootstrap, error => {
       setAuthenticated(false);
       setStatus(error.message);
+      setBootstrapError(error.message);
     }).then(cleanup => {
       dispose = cleanup;
       return bootstrap();
@@ -326,6 +329,39 @@ export function AuroraApp() {
       if (cleanup) void cleanup();
     };
   }, [auroraSession.openMobileWakeIntent, auroraSession.resumeConversation, auroraSession.refreshNotifications]);
+
+  useEffect(() => {
+    if (!authenticated || (!Capacitor.isNativePlatform() && !isTauriRuntime())) return;
+    void mobileRuntime.deviceContext().then(context => api.registerDevice(context.installationId, {
+      platform: context.platform === "ios" ? "IOS" : context.platform === "macos" ? "MACOS"
+        : context.platform === "windows" ? "WINDOWS" : "ANDROID",
+      transport: "LOCAL_EVIDENCE", appVersion: context.appVersion,
+      locale: context.locale, timezone: context.timezone
+    })).catch(error => setStatus(error instanceof Error ? error.message : "Unable to register this device"));
+  }, [authenticated]);
+
+  // Persist only the explicitly recoverable composer draft. It lives in Keystore-backed storage
+  // on native platforms and IndexedDB on the web, expires after 24 hours, and is never auto-sent.
+  useEffect(() => {
+    if (draftRestoredRef.current) return;
+    draftRestoredRef.current = true;
+    void mobileRuntime.loadDraft("aurora").then(saved => {
+      if (saved && !auroraSession.draft) {
+        auroraSession.setDraft(saved.value);
+        setStatus(skillLocale === "en-SG"
+          ? "Your unsent draft was restored. Review it before choosing Send."
+          : "未发送的草稿已恢复。请确认内容后再主动发送。");
+      }
+    });
+  }, [auroraSession.draft, auroraSession.setDraft, skillLocale]);
+
+  useEffect(() => {
+    if (!draftRestoredRef.current) return;
+    const timer = window.setTimeout(() => {
+      void mobileRuntime.saveDraft("aurora", auroraSession.draft, auroraSession.sessionId?.toString() ?? null);
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [auroraSession.draft, auroraSession.sessionId]);
 
   const requestMobilePush = async () => {
     const permission = await mobileRuntime.requestPushRegistration();
@@ -500,6 +536,7 @@ export function AuroraApp() {
     setAccountBusy("delete");
     try {
       await api.deleteAccount(password);
+      await mobileRuntime.clearPrivateState();
       setAuthenticated(false); auroraSession.resetSession(); setPersonaSession(null); setPersonaMessages([]);
       setAccountMessage(null);
     } catch (error) { setAccountMessage(error instanceof Error ? error.message : "账户删除失败"); }
@@ -740,11 +777,12 @@ export function AuroraApp() {
   const logout = async () => {
     let remoteWarning: string | null = null;
     try {
-      if (Capacitor.isNativePlatform()) {
+      if (Capacitor.isNativePlatform() || isTauriRuntime()) {
         try { await mobileOidc.logout(); }
         catch (error) { remoteWarning = error instanceof Error ? error.message : "远程撤销未确认"; }
       }
       else await api.logout();
+      await mobileRuntime.clearPrivateState();
       setAuthenticated(false); auroraSession.resetSession(); setPersonaSession(null); setPersonaMessages([]);
       setStatus(remoteWarning ?? "已安全退出");
     } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法退出"); }
@@ -809,10 +847,11 @@ export function AuroraApp() {
       ? <ConnectError message={bootstrapError} onRetry={() => void bootstrap()} />
       : <LoadingText busy>{tt.connecting.replace(/…$/, "")}</LoadingText>}
   </div></main>;
-  if (!authenticated) return <AuthGate native={mobileState.native} onSuccess={bootstrap} locale={skillLocale} />;
+  if (!authenticated) return <AuthGate native={mobileState.native} onSuccess={bootstrap} locale={skillLocale}
+    externalError={bootstrapError ?? ""} />;
 
   return (
-    <main className="shell" data-product-space={productSpace}>
+    <main className="shell" data-product-space={productSpace} aria-label="Authenticated Inner Cosmos">
       {/* Real routes for the five spaces. Each space's content below still mounts
           unconditionally and toggles via `hidden` (not <Route element>) so switching
           spaces never remounts/loses in-progress state (draft text, scroll position,

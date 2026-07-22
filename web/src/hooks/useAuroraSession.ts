@@ -6,6 +6,7 @@ import {
 import type { AuroraStreamEvent, DialogMessage, TurnStatus } from "../protocol";
 import type { AuroraUiMessage } from "../components/AuroraConversation";
 import type { SkillLocale } from "../components/PsychologySkillStudio";
+import { mobileRuntime } from "../mobile";
 
 // Extracted from AuroraApp.tsx (B1 domain-hook decomposition, first slice): everything behind the
 // Aurora space's chat experience -- message list, streaming/turn status, interrupt/stop, mode
@@ -302,6 +303,12 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
         contextSessionId: sessionId
       });
       setWakeIntents(current => [...current, created].sort((a, b) => a.preferredAt.localeCompare(b.preferredAt)));
+      const notificationAt = new Date(created.preferredAt);
+      if (Number.isFinite(notificationAt.getTime()) && notificationAt.getTime() > Date.now()) {
+        await mobileRuntime.scheduleWakeIntentNotification({
+          wakeIntentId: created.id, title: "Aurora", body: created.reasonForUser, at: notificationAt
+        }).catch(() => undefined);
+      }
       setStatus("约好了。你随时可以改期或取消，不需要迁就 Aurora。");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "暂时无法保存约定");
@@ -314,7 +321,13 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
       const result = await api.wakeFeedback(notice.refId, choice);
       await api.readNotification(notice.id);
       setNotifications(current => current.filter(row => row.id !== notice.id));
-      if (choice === "LATER") setWakeIntents(current => [...current, result]);
+      if (choice === "LATER") {
+        setWakeIntents(current => [...current, result]);
+        const at = new Date(result.preferredAt);
+        if (Number.isFinite(at.getTime()) && at.getTime() > Date.now()) {
+          await mobileRuntime.scheduleWakeIntentNotification({ wakeIntentId: result.id, title: "Aurora", body: result.reasonForUser, at }).catch(() => undefined);
+        }
+      }
       setStatus(choice === "MATCHED" ? "谢谢你告诉我，Aurora 会记住这次节奏。"
         : choice === "LATER" ? "好，Aurora 会晚一点再判断是否适合回来。"
         : "明白了。之后不会再为同一类事情主动提醒。 ");
@@ -332,6 +345,11 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
       const changed = await api.rescheduleWakeIntent(intent.id, {
         earliestAt: shift(intent.earliestAt), preferredAt: shift(intent.preferredAt), latestAt: shift(intent.latestAt)
       });
+      await mobileRuntime.cancelWakeIntentNotification(intent.id);
+      const at = new Date(changed.preferredAt);
+      if (Number.isFinite(at.getTime()) && at.getTime() > Date.now()) {
+        await mobileRuntime.scheduleWakeIntentNotification({ wakeIntentId: changed.id, title: "Aurora", body: changed.reasonForUser, at }).catch(() => undefined);
+      }
       setWakeIntents(current => current.map(row => row.id === intent.id ? changed : row));
       setStatus("已为你推迟一小时。这个约定由你掌控。");
     } finally { setWakeBusy(false); }
@@ -341,6 +359,7 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
     setWakeBusy(true);
     try {
       await api.cancelWakeIntent(intent.id);
+      await mobileRuntime.cancelWakeIntentNotification(intent.id);
       setWakeIntents(current => current.filter(row => row.id !== intent.id));
       setStatus("已取消。Aurora 不会按这个约定主动回来。");
     } finally { setWakeBusy(false); }

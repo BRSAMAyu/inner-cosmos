@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
+import { Capacitor } from "@capacitor/core";
 import { AuroraApp } from "./AuroraApp";
 import { InstallPrompt } from "./components/InstallPrompt";
 import { PwaUpdateNotice } from "./components/PwaUpdateNotice";
@@ -26,14 +27,20 @@ startStardust();
 // visible at once (live-verification caught this: a genuinely fresh account can see the
 // offline-ready notice fire at the same moment install becomes available) they stack instead
 // of overlapping at the same fixed viewport position.
+const nativeShell = import.meta.env.VITE_NATIVE_SHELL === "true"
+  || Capacitor.isNativePlatform()
+  || "__TAURI_INTERNALS__" in window;
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <BrowserRouter basename="/app/aurora">
+    <BrowserRouter basename={nativeShell ? "/" : "/app/aurora"}>
       <AuroraApp />
     </BrowserRouter>
-    <div className="pwa-banner-stack">
-      <InstallPrompt />
-      <PwaUpdateNotice />
-    </div>
+    {!nativeShell && (
+      <div className="pwa-banner-stack">
+        <InstallPrompt />
+        <PwaUpdateNotice />
+      </div>
+    )}
   </StrictMode>
 );

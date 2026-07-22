@@ -34,7 +34,7 @@ jobs:
       - name: Verify backend and executed-test baseline
         run: |
           ./mvnw -B clean verify
-          pwsh ./scripts/assert-test-baseline.ps1 -MinimumTests 923
+          pwsh ./scripts/assert-test-baseline.ps1 -MinimumTests 931
       - name: Verify frontend contract, tests and production build
         working-directory: web
         run: |

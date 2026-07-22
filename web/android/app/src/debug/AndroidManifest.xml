@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <application
+        android:label="Inner Cosmos Dev"
+        android:usesCleartextTraffic="true"
+        android:networkSecurityConfig="@xml/network_security_config"
+        tools:replace="android:label,android:usesCleartextTraffic,android:networkSecurityConfig" />
+    <!-- Debug/instrumentation only: makes the one-minute WakeIntent system-notification proof
+         deterministic. Production intentionally uses Android's policy-compliant inexact fallback. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+</manifest>

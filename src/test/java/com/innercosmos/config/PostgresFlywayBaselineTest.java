@@ -46,7 +46,7 @@ class PostgresFlywayBaselineTest {
                 .locations("classpath:db/migration/postgresql")
                 .load();
 
-        assertEquals(20, flyway.migrate().migrationsExecuted);
+        assertEquals(21, flyway.migrate().migrationsExecuted);
         assertEquals(0, flyway.migrate().migrationsExecuted);
 
         String source = readClasspath("schema.sql");
@@ -71,12 +71,12 @@ class PostgresFlywayBaselineTest {
                     WHERE constraint_schema='public' AND constraint_type='FOREIGN KEY'
                     """);
 
-            assertEquals(80, expectedTables.size(), "source schema table inventory changed");
+            assertEquals(82, expectedTables.size(), "source schema table inventory changed");
             assertEquals(expectedTables, actualTables, "PostgreSQL baseline table drift");
             assertTrue(actualIndexes.containsAll(expectedIndexes),
                     () -> "missing PostgreSQL indexes: " + difference(expectedIndexes, actualIndexes));
             assertEquals(expectedForeignKeys, actualForeignKeys, "PostgreSQL foreign-key drift");
-            assertEquals(78, scalar(connection, """
+            assertEquals(80, scalar(connection, """
                     SELECT COUNT(*) FROM information_schema.columns
                     WHERE table_schema='public' AND is_identity='YES'
                     """));
@@ -146,7 +146,7 @@ class PostgresFlywayBaselineTest {
                 .dataSource(jdbcUrl, POSTGRES.getUsername(), POSTGRES.getPassword())
                 .locations("classpath:db/migration/postgresql")
                 .load();
-        assertEquals(1, v20.migrate().migrationsExecuted);
+        assertEquals(2, v20.migrate().migrationsExecuted);
         try (Connection migrated = DriverManager.getConnection(
                 jdbcUrl, POSTGRES.getUsername(), POSTGRES.getPassword())) {
             assertEquals(2, scalar(migrated,

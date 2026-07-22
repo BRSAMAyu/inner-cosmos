@@ -3,8 +3,20 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { FormEvent } from "react";
 import { AuroraConversation } from "./AuroraConversation";
 
+const recorder = vi.hoisted(() => ({ start: vi.fn(), stop: vi.fn() }));
+vi.mock("../audio-recorder", () => ({
+  PcmWavRecorder: class {
+    start = recorder.start;
+    stop = recorder.stop;
+  }
+}));
+
 afterEach(cleanup);
-afterEach(() => { delete (navigator as unknown as Record<string, unknown>).mediaDevices; delete (globalThis as Record<string, unknown>).MediaRecorder; });
+afterEach(() => {
+  delete (navigator as unknown as Record<string, unknown>).mediaDevices;
+  delete (globalThis as Record<string, unknown>).AudioContext;
+  recorder.start.mockReset(); recorder.stop.mockReset();
+});
 
 describe("AuroraConversation", () => {
   it("uses compact invitation spacing only before the first message", () => {
@@ -85,28 +97,21 @@ describe("AuroraConversation", () => {
   });
 
   it("records voice, transcribes on stop, and appends the text to the draft", async () => {
-    let rec: { ondataavailable: ((e: { data: Blob }) => void) | null; onstop: (() => void) | null } | null = null;
-    class FakeRecorder {
-      ondataavailable: ((e: { data: Blob }) => void) | null = null;
-      onstop: (() => void) | null = null;
-      mimeType = "audio/webm";
-      constructor() { rec = this; }
-      start() { /* no-op */ }
-      stop() { this.ondataavailable?.({ data: new Blob(["x"], { type: "audio/webm" }) }); this.onstop?.(); }
-    }
-    (globalThis as Record<string, unknown>).MediaRecorder = FakeRecorder;
+    (globalThis as Record<string, unknown>).AudioContext = class {};
     const getUserMedia = vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] });
     (navigator as unknown as Record<string, unknown>).mediaDevices = { getUserMedia };
+    recorder.start.mockResolvedValue(undefined);
+    recorder.stop.mockResolvedValue(new Blob(["wav"], { type: "audio/wav" }));
     const onDraftChange = vi.fn();
     const onTranscribe = vi.fn().mockResolvedValue("语音转出来的文字");
     render(<AuroraConversation messages={[]} activeTurnId={null} draft="" sessionReady
       onDraftChange={onDraftChange} onSubmit={event => event.preventDefault()} onStop={() => undefined}
       onTranscribe={onTranscribe} />);
     fireEvent.click(screen.getByRole("button", { name: "用语音输入" }));
-    await waitFor(() => expect(getUserMedia).toHaveBeenCalled());
+    await waitFor(() => expect(recorder.start).toHaveBeenCalled());
     fireEvent.click(await screen.findByRole("button", { name: "停止录音并转写" }));
     await waitFor(() => expect(onTranscribe).toHaveBeenCalled());
     await waitFor(() => expect(onDraftChange).toHaveBeenCalledWith("语音转出来的文字"));
-    expect(rec).not.toBeNull();
+    expect(recorder.stop).toHaveBeenCalledWith(false);
   });
 });

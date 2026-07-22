@@ -19,6 +19,10 @@ export type WakeIntent = {
   contextSessionId: number | null; supersedesIntentId: number | null; userFeedback: string | null;
 };
 export type Notification = { id: number; type: string; title: string; body: string; refId: number; refType: string; read: boolean };
+export type DeviceRegistration = {
+  id: number; installationId: string; platform: string; transport: "FCM" | "APNS" | "LOCAL_EVIDENCE";
+  appVersion: string; locale: string; timezone: string; enabled: boolean; revoked: boolean; lastSeenAt: string;
+};
 // Consumes Track A contract delta TA-DELTA-001 (GET /api/me/data-rights/receipts). Sensitive-free.
 export type DataRetractionReceipt = {
   id: number;
@@ -237,17 +241,25 @@ function isNonPublicHost(hostname: string): boolean {
     || (a === 192 && b === 168) || (a === 198 && (b === 18 || b === 19));
 }
 
-export function validateApiBase(raw: string, allowedOrigins: string, production: boolean): string {
+export function validateApiBase(raw: string, allowedOrigins: string, production: boolean,
+                                mobileLocal = false, desktopLocal = false,
+                                localOrigin = import.meta.env.VITE_LOCAL_API_ORIGIN ?? ""): string {
   if (!raw.trim()) return "";
   let url: URL;
   try { url = new URL(raw); } catch { throw new Error("VITE_API_BASE_URL must be an absolute URL"); }
   if (url.username || url.password || url.search || url.hash) throw new Error("API URL cannot contain credentials, query, or fragment");
-  if (url.pathname !== "/" || url.port) throw new Error("API URL must be an origin without a path or custom port");
-  if (production && url.protocol !== "https:") throw new Error("Production API URL must use HTTPS");
-  if (production && isNonPublicHost(url.hostname)) throw new Error("Production API URL cannot use a local or private host");
+  const exactMobileLocal = mobileLocal && Boolean(localOrigin) && url.origin === localOrigin;
+  const exactDesktopLocal = desktopLocal && Boolean(localOrigin) && url.origin === localOrigin;
+  const exactInstalledLocal = exactMobileLocal || exactDesktopLocal;
+  if (url.pathname !== "/" || (url.port && !exactInstalledLocal)) throw new Error("API URL must be an origin without a path or custom port");
+  if (mobileLocal && !exactMobileLocal) throw new Error("Local mobile API must match the build-time development origin");
+  if (desktopLocal && !exactDesktopLocal) throw new Error("Local desktop API must use the fixed loopback port 8080");
+  if (production && !mobileLocal && !desktopLocal && url.protocol !== "https:") throw new Error("Production API URL must use HTTPS");
+  if (production && !mobileLocal && !desktopLocal && isNonPublicHost(url.hostname)) throw new Error("Production API URL cannot use a local or private host");
   const allowed = new Set(allowedOrigins.split(",").map(value => value.trim()).filter(Boolean).map(value => {
     const candidate = new URL(value);
-    if (candidate.username || candidate.password || candidate.search || candidate.hash || candidate.pathname !== "/" || candidate.port) {
+    const localAllowed = (mobileLocal || desktopLocal) && Boolean(localOrigin) && candidate.origin === localOrigin;
+    if (candidate.username || candidate.password || candidate.search || candidate.hash || candidate.pathname !== "/" || (candidate.port && !localAllowed)) {
       throw new Error("VITE_API_ALLOWED_ORIGINS contains a non-origin value");
     }
     return candidate.origin;
@@ -257,11 +269,14 @@ export function validateApiBase(raw: string, allowedOrigins: string, production:
 }
 
 const rawApiBase = String(import.meta.env.VITE_API_BASE_URL ?? "");
+export const mobileLocalBuild = String(import.meta.env.VITE_MOBILE_LOCAL ?? "") === "true";
+export const desktopLocalBuild = String(import.meta.env.VITE_DESKTOP_LOCAL ?? "") === "true";
 let configuredApiBase = "";
 export let apiConfigurationError: string | null = null;
 try {
   configuredApiBase = validateApiBase(rawApiBase,
-    String(import.meta.env.VITE_API_ALLOWED_ORIGINS ?? "https://api.innercosmos.sg"), import.meta.env.PROD);
+    String(import.meta.env.VITE_API_ALLOWED_ORIGINS ?? "https://api.innercosmos.sg"), import.meta.env.PROD,
+    mobileLocalBuild, desktopLocalBuild);
 } catch (error) {
   apiConfigurationError = error instanceof Error ? error.message : "Invalid production API origin";
 }
@@ -361,10 +376,16 @@ async function request<T>(url: string, init: RequestInit = {}, retriedCsrf = fal
     const etag = response.headers.get("ETag");
     if (etag) capsuleBoundaryEtags.set(Number(boundaryMatch[1]), etag);
   }
-  const body = await response.json() as ApiEnvelope<T>;
   if (response.status === 401 && accessToken && accessTokenInvalidator && !retriedBearer) {
     await accessTokenInvalidator();
     return request<T>(url, { ...init, headers }, retriedCsrf, true);
+  }
+  const responseText = await response.text();
+  let body: ApiEnvelope<T>;
+  try {
+    body = responseText ? JSON.parse(responseText) as ApiEnvelope<T> : { success: false, data: undefined as T };
+  } catch {
+    throw new Error(`API returned invalid JSON (HTTP ${response.status})`);
   }
   if (response.status === 403 && (body.code === "CSRF_INVALID" || body.error === "CSRF_INVALID") && !retriedCsrf) {
     await refreshCsrf(requestCsrf?.token);
@@ -470,6 +491,14 @@ export const api = {
   wakeFeedback: (id: number, choice: "MATCHED" | "LATER" | "STOP_SIMILAR") =>
     request<WakeIntent>(`/api/aurora/wake-intents/${id}/feedback`, { method: "POST", body: JSON.stringify({ choice }) }),
   notifications: () => request<Notification[]>("/api/notifications"),
+  devices: () => request<DeviceRegistration[]>("/api/v1/devices"),
+  registerDevice: (installationId: string, input: {
+    platform: "ANDROID" | "IOS" | "WINDOWS" | "MACOS"; transport: "FCM" | "APNS" | "LOCAL_EVIDENCE";
+    token?: string; appVersion: string; locale: string; timezone: string;
+  }) => request<DeviceRegistration>(`/api/v1/devices/${encodeURIComponent(installationId)}`,
+    { method: "PUT", body: JSON.stringify(input) }),
+  revokeDevice: (installationId: string) => request<void>(`/api/v1/devices/${encodeURIComponent(installationId)}`,
+    { method: "DELETE" }),
   psychologySkills: () => request<PsychologySkillManifest[]>("/api/psychology/skills"),
   psychologySkillRuns: () => request<PsychologySkillRun[]>("/api/psychology/skills/runs"),
   psychologySkillSuggestion: (text: string, locale: "zh-CN" | "en-SG") => request<PsychologySkillSuggestion | null>("/api/psychology/skills/suggestions", {

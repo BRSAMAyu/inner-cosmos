@@ -60,7 +60,7 @@ jobs:
         run: ./mvnw -B -f poc/postgres-pgvector/pom.xml -Pbenchmark verify
       - name: Enforce executed test baseline
         shell: pwsh
-        run: ./scripts/assert-test-baseline.ps1 -MinimumTests 923
+        run: ./scripts/assert-test-baseline.ps1 -MinimumTests 931
       - name: Scan current tree for credentials
         shell: pwsh
         run: ./scripts/scan-secrets.ps1

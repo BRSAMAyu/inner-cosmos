@@ -1,0 +1,5 @@
+﻿serial=emulator-5554
+state=device
+package=sg.innercosmos.app.dev
+apk_sha256=56f3188c4cce81ebcf01138d514eb61e47c5d2b7e8f3afa4ef7130dc2ae4b38c
+verified_at=2026-07-22T13:15:38.7337697+08:00

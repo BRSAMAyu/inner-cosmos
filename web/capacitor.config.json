@@ -2,6 +2,7 @@
   "appId": "sg.innercosmos.app",
   "appName": "Inner Cosmos",
   "webDir": "../src/main/resources/static/app/aurora",
+  "loggingBehavior": "none",
   "server": {
     "androidScheme": "https",
     "hostname": "localhost"

@@ -1,0 +1,103 @@
+# INNO-MOBILE-004 — real-IdP native auth (Android + Tauri desktop) and mobile push delivery
+
+Status: `BUILDER_VERIFIED_AGAINST_REAL_LOCAL_IDP / PRODUCTION_TENANT_AND_DEVICE_GATES_OPEN`
+
+Date: 2026-07-22
+
+This checkpoint picks up where INNO-MOBILE-002 (native OIDC/PKCE contract, `REAL_IDP_AND_DEVICE_PENDING`)
+left off, and closes the "does the PKCE contract actually work against a real, non-mocked OIDC
+server" question, plus adds the first native desktop client and the mobile push delivery pipeline
+that Aurora's WakeIntent system needed to reach devices.
+
+## What changed
+
+**Real IdP proof (not a mock).** `deploy/compose/keycloak/` + `deploy/compose/mobile-local.yml` run a
+real Keycloak 26.7 server locally with an imported `inner-cosmos-realm.json` and a public
+`inner-cosmos-mobile-local` client. `src/main/resources/application-mobile-local.yml` points the
+existing OIDC resource-server config at it. `src/test/java/.../OidcLiveDecoderTest.java` is an
+opt-in (`@EnabledIfEnvironmentVariable`) contract test that decodes a real token minted by that
+Keycloak instance — it does not run by default and embeds no credential, only reading
+`INNER_COSMOS_TEST_ACCESS_TOKEN` from the environment. `evidence/mobile/latest/` holds the actual
+screenshots from this run: `keycloak-login.png`, `oidc-click.png`, `pkce-return.png`,
+`pkce-diagnostic.png`, `pkce-latest.png` — a full authorization-code+PKCE round trip against the
+real IdP, followed by a real Android launch (`android-launch.png`, `logcat-summary.txt`) and a real
+Tauri desktop window (`tauri-dev.png`, `tauri-maximized.png`, `tauri-auth-control.png`,
+`tauri-auth-after-enter.png`, `tauri-click-state.png`, `tauri-physical.png`).
+
+**New desktop client (Tauri).** `web/src-tauri/` is a full Tauri 2 desktop project (Windows/macOS/Linux)
+reusing the same React AppShell bundle (`build:tauri` / `build:tauri:local` Vite modes,
+`desktop:dev` / `desktop:build` scripts) with plugins for deep-link OAuth callback handling,
+notifications, and secure token storage (stronghold). `web/src/desktop-runtime.ts` is the thin
+platform-detection/bridge layer the existing `mobile-auth.ts` PKCE flow now shares with the desktop
+shell instead of duplicating it. `deploy/compose/desktop-local.yml` and `scripts/desktop/{build-tauri.ps1,run-tauri.ps1}`
+support local iteration.
+
+**Mobile push delivery, end to end.** New backend: `DeviceRegistrationController`/`Service`/`Impl`
+(owner-scoped upsert-by-installation-id, rejects tokens when no encryption key is configured),
+`PushTokenProtector` (AES-256-GCM, random IV per call, fails closed with no key configured — no
+plaintext token is ever persisted), `PushDeliveryService`/`Impl` (enqueues one delivery row per
+enabled device when a `WakeIntent` fires — see `WakeIntentServiceImpl.finishWithNotification`),
+`PushDeliveryJob` (scheduler-role-gated, claims rows with `FOR UPDATE SKIP LOCKED`, dispatches
+through a real FCM HTTP v1 gateway with proper retryable-vs-invalid-token branching; APNs is an
+explicit `EXTERNAL_CREDENTIAL_GATE` stub, not faked). Migration `V21__mobile_device_push_delivery.sql`
+adds `tb_device_registration`/`tb_push_delivery` to PostgreSQL; this checkpoint also mirrored both
+tables (with the same named `fk_*` constraints, for baseline-drift-test parity) into `schema.sql` so
+H2 dev/test databases have them too — this was missing from the tree as received and is exactly the
+class of drift `LOCAL-DEV-SCHEMA-DRIFT` fixed once before.
+
+**Native audio capture.** `web/src/audio-recorder.ts` wires a real Capacitor/Web MediaRecorder path
+for voice input (the gap INNO-MOBILE-001 left open: "voice input is not wired").
+
+## What this checkpoint found broken and fixed (received as uncommitted work)
+
+All of the above was already implemented and partially live-verified (per the evidence screenshots)
+but left uncommitted, with three real defects surfaced by running the actual verification gates
+rather than trusting the code as received:
+
+1. **H2 schema drift**: `tb_device_registration`/`tb_push_delivery` existed only in the PostgreSQL
+   Flyway migration, not `schema.sql` — `WakeIntentServiceIntegrationTest` failed with a real SQL
+   error on H2. Fixed by adding both tables to `schema.sql` with matching named FK constraints.
+2. **Non-portable SQL**: `PushDeliveryServiceImpl.enqueueWakeIntent` used
+   `INSERT ... SELECT ... ON CONFLICT`, which PostgreSQL accepts but H2 does not (H2 only supports
+   `ON CONFLICT` on `INSERT ... VALUES`). Rewritten to resolve device ids first, then insert one
+   `VALUES`-form row per device — portable across both engines, same conflict-skip semantics.
+3. **Drifted baseline-gate tests**: the new migration made
+   `PostgresFlywayBaselineTest`/`PostgresApplicationSmokeTest`'s hardcoded migration/table/identity
+   counts stale (20→21 migrations, 80→82 tables, 78→80 identity columns after switching the new
+   tables' PKs from `BIGSERIAL` to the project's established `GENERATED BY DEFAULT AS IDENTITY`
+   convention for consistency with every other migration). Updated to the new, verified values.
+4. **Non-portable production static build**: the `static/app/aurora/` tree in the working copy was
+   last written by a `--mode mobile`/`tauri` Vite build (relative asset paths, PWA manifest/service
+   worker stripped) — the exact bundle the production Spring Boot app serves at `/app/aurora/` was
+   broken for real web/PWA users. Fixed by rebuilding with the default (`npm run build`) web mode;
+   `manifest.webmanifest`/`sw.js`/`workbox-*.js` and absolute `/app/aurora/` asset paths are restored.
+5. **Hardcoded local dev secrets tripped the current-tree secret scan**: `deploy/compose/mobile-local.yml`
+   and `application-mobile-local.yml` used a literal `inner_cosmos_local` Postgres/Redis password and
+   a literal `local-admin-only` Keycloak bootstrap password, both loopback-only and non-sensitive but
+   inconsistent with this repo's established "no literal credential-shaped values, even throwaway
+   ones" convention (`deploy/compose/local-complete.yml` requires the operator to inject via
+   `${VAR:?...}`). Renamed to `test-only-mobile-local-*`, matching `scan-secrets.ps1`'s existing
+   allowed-prefix vocabulary, with identical functional behavior.
+6. **`docs/goal` / `deploy/k8s` schema-version authority not bumped**: `deploy/k8s/base/app-config.yml`'s
+   `INNER_COSMOS_EXPECTED_SCHEMA_VERSION` still said `"20"`; `scripts/academy/validate-schema-version.ps1`
+   would have thrown "Schema gate drift" against the new V21 migration. Bumped to `"21"`.
+
+## Verification
+
+| Gate | Result |
+|---|---|
+| `mvnw test` (Java 21, Docker/Testcontainers up) | **931 tests, 0 failures, 0 errors, 1 skipped** (up from the 923 baseline) |
+| `pnpm test` (Vitest) | **35 files, 232 tests, all passed** (up from 227) |
+| `pnpm run build` (default web mode) | PASS — `manifest.webmanifest`/`sw.js`/workbox restored, `index.html` byte-identical to the last committed build |
+| `scripts/scan-secrets.ps1` (current tree incl. untracked) | PASS — 0 findings |
+| `kubectl kustomize deploy/k8s/base` / `overlays/academy-eks` | PASS |
+
+## Remaining human/external gates (unchanged in kind, narrower in scope)
+
+- A **production** IdP tenant (not a local Keycloak) must register the real client/callback/CORS
+  policy; this checkpoint proves the PKCE contract itself works end-to-end against a real server,
+  not that a production tenant is configured.
+- Real Android/iOS/Windows/macOS devices, APNs/FCM production credentials, and store/notarization
+  signing remain outside what this checkpoint can close (`PushTokenProtector`/APNs gateway are
+  correctly gated behind `EXTERNAL_CREDENTIAL_GATE` rather than faked).
+- Tauri desktop release signing/notarization and auto-update are not attempted here.

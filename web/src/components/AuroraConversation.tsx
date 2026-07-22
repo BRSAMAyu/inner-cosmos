@@ -1,6 +1,7 @@
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { AsyncButton } from "../loading";
 import type { Locale } from "../i18n";
+import { PcmWavRecorder } from "../audio-recorder";
 
 export type AuroraUiMessage = { key: string; speaker: "USER" | "AURORA"; text: string; partial?: boolean };
 
@@ -48,32 +49,46 @@ export function AuroraConversation({ messages, activeTurnId, thinkingStage = nul
   const t = COPY[locale];
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
+  const [audioLevel, setAudioLevel] = useState(0);
+  const [speaking, setSpeaking] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const recorderRef = useRef<PcmWavRecorder | null>(null);
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
   const voiceSupported = typeof navigator !== "undefined"
-    && !!navigator.mediaDevices?.getUserMedia && typeof MediaRecorder !== "undefined";
+    && !!navigator.mediaDevices?.getUserMedia && typeof AudioContext !== "undefined";
+
+  const finishRecording = async (cancel = false) => {
+    const recorder = recorderRef.current;
+    recorderRef.current = null;
+    setRecording(false); setAudioLevel(0); setSpeaking(false);
+    if (!recorder) return;
+    const blob = await recorder.stop(cancel);
+    if (!blob || cancel || !onTranscribe) return;
+    setTranscribing(true);
+    try {
+      const text = await onTranscribe(blob);
+      if (text) onDraftChange((draftRef.current ? `${draftRef.current} ` : "") + text);
+    } catch { /* upstream status keeps the text draft intact */ }
+    finally { setTranscribing(false); }
+  };
+
+  useEffect(() => () => { void finishRecording(true); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const startRecording = async () => {
     if (!onTranscribe || !voiceSupported) return;
+    setVoiceError(null);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const rec = new MediaRecorder(stream);
-      chunksRef.current = [];
-      rec.ondataavailable = event => { if (event.data.size > 0) chunksRef.current.push(event.data); };
-      rec.onstop = async () => {
-        stream.getTracks().forEach(track => track.stop());
-        const blob = new Blob(chunksRef.current, { type: rec.mimeType || "audio/webm" });
-        setTranscribing(true);
-        try { const text = await onTranscribe(blob); if (text) onDraftChange((draft ? draft + " " : "") + text); }
-        catch { /* surfaced upstream via status; keep the composer usable */ }
-        finally { setTranscribing(false); }
-      };
-      recorderRef.current = rec;
-      rec.start();
+      const recorder = new PcmWavRecorder();
+      recorderRef.current = recorder;
+      await recorder.start((level, voice) => { setAudioLevel(level); setSpeaking(voice); }, () => void finishRecording());
       setRecording(true);
-    } catch { setRecording(false); }
+    } catch (error) {
+      recorderRef.current = null; setRecording(false);
+      const reason = error instanceof DOMException || error instanceof Error ? error.name : "RecorderError";
+      setVoiceError(reason || "RecorderError");
+    }
   };
-  const stopRecording = () => { recorderRef.current?.stop(); setRecording(false); };
 
   return <>
     <section className={`conversation ${messages.length === 0 ? "empty-state" : "has-messages"}`}
@@ -103,8 +118,20 @@ export function AuroraConversation({ messages, activeTurnId, thinkingStage = nul
           busyText={t.transcribing}
           aria-pressed={recording}
           aria-label={recording ? t.micStop : t.micStart}
-          onClick={() => recording ? stopRecording() : void startRecording()}>
+          onClick={() => recording ? void finishRecording() : void startRecording()}>
           {recording ? t.recStop : t.voice}</AsyncButton>}
+        {recording && <>
+          <span className={`voice-meter ${speaking ? "speaking" : ""}`} role="meter" aria-label={locale === "zh-CN" ? "录音音量" : "Recording level"}
+            aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(audioLevel * 100)}>
+            <i style={{ transform: `scaleX(${Math.max(.04, audioLevel)})` }} />
+          </span>
+          <button type="button" className="voice-cancel" onClick={() => void finishRecording(true)}>
+            {locale === "zh-CN" ? "取消录音" : "Cancel recording"}
+          </button>
+        </>}
+        {voiceError && <span className="voice-error" role="status" data-error={voiceError}>
+          {locale === "zh-CN" ? "暂时无法启动录音；文字草稿仍然安全保留。" : "Recording could not start; your text draft is still safe."}
+        </span>}
         {activeTurnId && <button type="button" className="stop" onClick={onStop}>{t.stop}</button>}
         <button type="submit" className="send" disabled={!draft.trim() || !sessionReady}>{activeTurnId ? t.interruptSend : t.send}</button>
       </div>

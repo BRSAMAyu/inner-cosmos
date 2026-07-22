@@ -74,8 +74,9 @@ class PostgresApplicationSmokeTest {
         assertEquals(created.id, userService.login(login).id);
 
         // V10 adds provider embeddings; V13 adds consent-bound Psychology Skill run audit;
-        // V19 adds tb_data_retraction_receipt (A5 data-rights audit trail).
-        assertEquals(80L, jdbcTemplate.queryForObject("""
+        // V19 adds tb_data_retraction_receipt (A5 data-rights audit trail); V21 adds
+        // tb_device_registration/tb_push_delivery (mobile/desktop push delivery).
+        assertEquals(82L, jdbcTemplate.queryForObject("""
                 SELECT COUNT(*) FROM information_schema.tables
                 WHERE table_schema='public' AND table_name LIKE 'tb_%'
                 """, Long.class));

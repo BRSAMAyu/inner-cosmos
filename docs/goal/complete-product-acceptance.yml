@@ -86,7 +86,7 @@ gates:
     required: true
     acceptance:
       - {id: ARCH-MODULES, target: "Module boundaries are executable through Spring Modulith and architecture tests.", status: UNASSESSED, evidence: []}
-      - {id: AUTH-OIDC, target: "Spring Security protects secure web sessions and mobile OIDC PKCE flows.", status: IN_PROGRESS, evidence: [evidence/m1/M1-AUTH-WEB-001/, evidence/m1/M1-AUTH-OIDC-001/, evidence/innovation/INNO-MOBILE-002/]}
+      - {id: AUTH-OIDC, target: "Spring Security protects secure web sessions and mobile OIDC PKCE flows.", status: IN_PROGRESS, evidence: [evidence/m1/M1-AUTH-WEB-001/, evidence/m1/M1-AUTH-OIDC-001/, evidence/innovation/INNO-MOBILE-002/, evidence/innovation/INNO-MOBILE-004/], remaining: "2026-07-22: the PKCE contract is now proven against a real (locally-hosted) Keycloak IdP end to end on Android and a new Tauri desktop client, not just mocked. Still open: a production IdP tenant registration, and real-device verification."}
       - id: API-CONTRACT
         target: "Versioned OpenAPI, typed errors, idempotency, concurrency, and resumable SSE are verified."
         status: IN_PROGRESS
@@ -307,7 +307,7 @@ gates:
     acceptance:
       - {id: SKILL-RUNTIME, target: "Versioned skill manifests enforce schemas, tools, consent, evidence, risk, retention, evaluation, and escalation.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-PSY-001/]}
       - {id: SKILL-PRODUCT, target: "At least three evidence-informed non-diagnostic skills pass quality, safety, i18n, and human review.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-PSY-001/, evidence/innovation/INNO-PSY-002/]}
-      - {id: MOBILE-NATIVE, target: "Capacitor push, microphone, deep links, secure storage, lifecycle, and network recovery pass on real devices.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-MOBILE-001/, evidence/innovation/INNO-MOBILE-002/, evidence/innovation/INNO-MOBILE-003/]}
+      - {id: MOBILE-NATIVE, target: "Capacitor push, microphone, deep links, secure storage, lifecycle, and network recovery pass on real devices.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-MOBILE-001/, evidence/innovation/INNO-MOBILE-002/, evidence/innovation/INNO-MOBILE-003/, evidence/innovation/INNO-MOBILE-004/], remaining: "2026-07-22: a real device-registration + push-delivery pipeline (FCM HTTP v1 gateway, encrypted-at-rest tokens, WakeIntent-triggered enqueue) and native audio capture (web/src/audio-recorder.ts) now exist and pass the full Java/frontend gates. APNs remains an explicit EXTERNAL_CREDENTIAL_GATE stub. Still open: real device execution, production FCM/APNs credentials, and store signing."}
       - {id: UX-COMPLETE, target: "All five product spaces meet desktop/mobile, bilingual, WCAG 2.2 AA target, reduced-motion, and blind-experience acceptance.", status: IN_PROGRESS, evidence: [evidence/experience/, evidence/integration/FINAL-STABILIZATION-2026-07-20/], remaining: "Five clean BrowserRouter spaces, hard-refresh routes, desktop/projector/mobile viewports, progressive-disclosure tags, PWA banner clearance and 14 Playwright journeys are verified. Still open: complete copy-level i18n, global axe/manual WCAG audit, performance/visual-regression budgets and non-author blind experience acceptance."}
 
   - id: G8

@@ -1,8 +1,9 @@
 import { App, type URLOpenListenerEvent } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
-import { Capacitor, type PluginListenerHandle } from "@capacitor/core";
+import { Capacitor } from "@capacitor/core";
 import { KeychainAccess, SecureStorage } from "@aparajita/capacitor-secure-storage";
-import { apiUrl } from "./api";
+import { apiUrl, desktopLocalBuild, mobileLocalBuild } from "./api";
+import { desktopRuntime, isTauriRuntime } from "./desktop-runtime";
 
 type OidcBootstrap = {
   enabled: boolean;
@@ -43,6 +44,47 @@ const TRANSACTION_KEY = "oidc-auth-transaction";
 const CALLBACK_SCHEME = "innercosmos:";
 const CALLBACK_HOST = "oauth";
 const CALLBACK_PATH = "/callback";
+const NATIVE_AUTH_STEP_TIMEOUT_MS = 15_000;
+
+function installedAuthRuntime(): boolean { return Capacitor.isNativePlatform() || isTauriRuntime(); }
+
+async function configureSecureStorage(): Promise<void> {
+  if (Capacitor.isNativePlatform()) {
+    await SecureStorage.setKeyPrefix("inner-cosmos_");
+    await SecureStorage.setSynchronize(false);
+    await SecureStorage.setDefaultKeychainAccess(KeychainAccess.whenUnlockedThisDeviceOnly);
+  } else if (isTauriRuntime()) await desktopRuntime.initialize();
+}
+
+async function secureGet(key: string): Promise<string | null> {
+  const value = Capacitor.isNativePlatform() ? await SecureStorage.get(key).catch(() => null)
+    : isTauriRuntime() ? await desktopRuntime.get(key).catch(() => null) : null;
+  return typeof value === "string" ? value : null;
+}
+
+async function secureSet(key: string, value: string): Promise<void> {
+  if (Capacitor.isNativePlatform()) await SecureStorage.set(key, value);
+  else if (isTauriRuntime()) await desktopRuntime.set(key, value);
+}
+
+async function secureRemove(key: string): Promise<void> {
+  if (Capacitor.isNativePlatform()) await SecureStorage.remove(key).catch(() => undefined);
+  else if (isTauriRuntime()) await desktopRuntime.remove(key).catch(() => undefined);
+}
+
+async function withTimeout<T>(operation: Promise<T>, message: string): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<T>((_, reject) => {
+        timeout = setTimeout(() => reject(new Error(message)), NATIVE_AUTH_STEP_TIMEOUT_MS);
+      })
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
 
 function base64Url(bytes: Uint8Array): string {
   let binary = "";
@@ -118,7 +160,12 @@ export function isOwnedOidcCallback(raw: string, expectedRedirect: string): bool
 
 function secureEndpoint(raw: string, label: string): string {
   const url = new URL(raw);
-  if (url.protocol !== "https:" || url.username || url.password || url.hash) throw new Error(`${label} must be a trusted HTTPS URL`);
+  const configuredLocalOidcOrigin = import.meta.env.VITE_LOCAL_OIDC_ORIGIN ?? "";
+  const exactLocal = mobileLocalBuild && Boolean(configuredLocalOidcOrigin) && url.origin === configuredLocalOidcOrigin;
+  const exactDesktopLocal = desktopLocalBuild && Boolean(configuredLocalOidcOrigin) && url.origin === configuredLocalOidcOrigin;
+  if ((!exactLocal && !exactDesktopLocal && url.protocol !== "https:") || url.username || url.password || url.hash) {
+    throw new Error(`${label} must be a trusted HTTPS URL`);
+  }
   return url.href;
 }
 
@@ -179,25 +226,23 @@ async function saveBundle(body: Record<string, unknown>, transaction: AuthTransa
     revocationEndpoint: transaction.revocationEndpoint
     ,jwksUri: transaction.jwksUri
   };
-  await SecureStorage.set(TOKEN_KEY, JSON.stringify(bundle));
+  await secureSet(TOKEN_KEY, JSON.stringify(bundle));
   return bundle;
 }
 
 export class MobileOidcClient {
   private bundle: TokenBundle | null = null;
-  private listener: PluginListenerHandle | null = null;
+  private listenerCleanup: (() => void | Promise<void>) | null = null;
   private authenticated: (() => void | Promise<void>) | null = null;
   private authError: ((error: Error) => void) | null = null;
   private refreshInFlight: Promise<string | null> | null = null;
 
   async initialize(onAuthenticated: () => void | Promise<void>, onError?: (error: Error) => void): Promise<() => Promise<void>> {
-    if (!Capacitor.isNativePlatform()) return async () => undefined;
+    if (!installedAuthRuntime()) return async () => undefined;
     this.authenticated = onAuthenticated;
     this.authError = onError ?? null;
-    await SecureStorage.setKeyPrefix("inner-cosmos_");
-    await SecureStorage.setSynchronize(false);
-    await SecureStorage.setDefaultKeychainAccess(KeychainAccess.whenUnlockedThisDeviceOnly);
-    const stored = await SecureStorage.get(TOKEN_KEY).catch(() => null);
+    await configureSecureStorage();
+    const stored = await secureGet(TOKEN_KEY);
     if (typeof stored === "string") {
       try {
         const candidate = JSON.parse(stored) as TokenBundle;
@@ -207,21 +252,29 @@ export class MobileOidcClient {
         secureEndpoint(candidate.jwksUri, "Stored OIDC JWK endpoint");
         if (!candidate.clientId || !candidate.accessToken || !Number.isFinite(candidate.expiresAt)) throw new Error("Stored OIDC token is incomplete");
         this.bundle = candidate;
-      } catch { await SecureStorage.remove(TOKEN_KEY); }
+      } catch { await secureRemove(TOKEN_KEY); }
     }
-    this.listener = await App.addListener("appUrlOpen", event => void this.handleCallback(event)
-      .catch(error => this.authError?.(error instanceof Error ? error : new Error("OIDC callback failed"))));
-    const launch = await App.getLaunchUrl();
-    if (launch?.url) await this.handleCallback({ url: launch.url });
-    return async () => { await this.listener?.remove(); this.listener = null; this.authenticated = null; this.authError = null; };
+    const callback = (url: string) => void this.handleCallback({ url })
+      .catch(error => this.authError?.(error instanceof Error ? error : new Error("OIDC callback failed")));
+    if (Capacitor.isNativePlatform()) {
+      const listener = await App.addListener("appUrlOpen", event => callback(event.url));
+      this.listenerCleanup = () => listener.remove();
+      const launch = await App.getLaunchUrl();
+      if (launch?.url) await this.handleCallback({ url: launch.url });
+    } else {
+      this.listenerCleanup = await desktopRuntime.listenDeepLinks(callback);
+    }
+    return async () => { await this.listenerCleanup?.(); this.listenerCleanup = null; this.authenticated = null; this.authError = null; };
   }
 
   async beginLogin(): Promise<void> {
-    if (!Capacitor.isNativePlatform()) throw new Error("Native OIDC is available only in the installed app");
-    const { bootstrap, revocationEndpoint, jwksUri } = await loadBootstrap();
+    if (!installedAuthRuntime()) throw new Error("OIDC is available only in the installed app");
+    const { bootstrap, revocationEndpoint, jwksUri } = await withTimeout(
+      loadBootstrap(), "OIDC bootstrap timed out while reaching the local stack");
     const verifier = randomValue(64);
     const transaction: AuthTransaction = { state: randomValue(), nonce: randomValue(), verifier, bootstrap, revocationEndpoint, jwksUri };
-    await SecureStorage.set(TRANSACTION_KEY, JSON.stringify(transaction));
+    await withTimeout(secureSet(TRANSACTION_KEY, JSON.stringify(transaction)),
+      "Secure storage did not accept the OIDC transaction");
     const authorization = new URL(bootstrap.authorizationEndpoint);
     authorization.searchParams.set("response_type", "code");
     authorization.searchParams.set("client_id", bootstrap.clientId);
@@ -231,11 +284,14 @@ export class MobileOidcClient {
     authorization.searchParams.set("nonce", transaction.nonce);
     authorization.searchParams.set("code_challenge", await createPkceChallenge(verifier));
     authorization.searchParams.set("code_challenge_method", "S256");
-    await Browser.open({ url: authorization.href, presentationStyle: "popover" });
+    await withTimeout(Capacitor.isNativePlatform()
+      ? Browser.open({ url: authorization.href, presentationStyle: "popover" })
+      : desktopRuntime.openSystemBrowser(authorization.href),
+      "The system browser did not open for OIDC sign-in");
   }
 
   async accessToken(): Promise<string | null> {
-    if (!Capacitor.isNativePlatform()) return null;
+    if (!installedAuthRuntime()) return null;
     if (!this.bundle) return null;
     if (this.bundle.expiresAt > Date.now() + 30_000) return this.bundle.accessToken;
     if (!this.bundle.refreshToken) { await this.clear(); return null; }
@@ -246,7 +302,7 @@ export class MobileOidcClient {
   async expireAccessToken(): Promise<void> {
     if (!this.bundle) return;
     this.bundle.expiresAt = 0;
-    await SecureStorage.set(TOKEN_KEY, JSON.stringify(this.bundle));
+    await secureSet(TOKEN_KEY, JSON.stringify(this.bundle));
   }
 
   async logout(): Promise<void> {
@@ -266,15 +322,15 @@ export class MobileOidcClient {
   }
 
   private async handleCallback(event: Pick<URLOpenListenerEvent, "url">): Promise<void> {
-    const stored = await SecureStorage.get(TRANSACTION_KEY).catch(() => null);
+    const stored = await secureGet(TRANSACTION_KEY);
     if (typeof stored !== "string") return;
     let transaction: AuthTransaction;
     try { transaction = JSON.parse(stored) as AuthTransaction; }
-    catch { await SecureStorage.remove(TRANSACTION_KEY); return; }
+    catch { await secureRemove(TRANSACTION_KEY); return; }
     if (!isOwnedOidcCallback(event.url, transaction.bootstrap.redirectUri)) return;
-    await Browser.close().catch(() => undefined);
+    if (Capacitor.isNativePlatform()) await Browser.close().catch(() => undefined);
     const callback = new URL(event.url);
-    await SecureStorage.remove(TRANSACTION_KEY);
+    await secureRemove(TRANSACTION_KEY);
     if (callback.searchParams.get("state") !== transaction.state) throw new Error("OIDC state mismatch");
     const code = callback.searchParams.get("code");
     if (!code || callback.searchParams.has("error")) throw new Error("OIDC authorization was not completed");
@@ -309,7 +365,7 @@ export class MobileOidcClient {
 
   private async clear(): Promise<void> {
     this.bundle = null;
-    await Promise.all([SecureStorage.remove(TOKEN_KEY), SecureStorage.remove(TRANSACTION_KEY)]);
+    await Promise.all([secureRemove(TOKEN_KEY), secureRemove(TRANSACTION_KEY)]);
   }
 }
 

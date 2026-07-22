@@ -21,6 +21,6 @@ public class ExampleInstrumentedTest {
         // Context of the app under test.
         Context appContext = InstrumentationRegistry.getInstrumentation().getTargetContext();
 
-        assertEquals("sg.innercosmos.app", appContext.getPackageName());
+        assertTrue(appContext.getPackageName().startsWith("sg.innercosmos.app"));
     }
 }

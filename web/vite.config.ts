@@ -6,10 +6,13 @@ import { buildPwaManifest } from "./src/pwaManifest";
 export default defineConfig(({ mode }) => ({
   // Clean BrowserRouter deep links need an absolute web base; the Capacitor local
   // origin still needs relative assets. `npm run build:mobile` selects that branch.
-  base: mode === "mobile" ? "./" : "/app/aurora/",
+  base: mode.startsWith("mobile") || mode.startsWith("tauri") ? "./" : "/app/aurora/",
   plugins: [
     react(),
     VitePWA({
+      // Native shells ship immutable bundled assets. Registering a service worker there can
+      // keep an older bundle alive across APK upgrades and produce a blank or stale native UI.
+      disable: mode.startsWith("mobile") || mode.startsWith("tauri"),
       // registerType "prompt" (not "autoUpdate"): confirmed by reading vite-plugin-pwa's
       // generated client (node_modules/vite-plugin-pwa/dist/client/build/register.js) rather
       // than guessing from the option name. Under "autoUpdate" the generated register script
