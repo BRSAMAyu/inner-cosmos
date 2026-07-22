@@ -331,6 +331,59 @@ export function subscribeProactive(
   return () => source.close();
 }
 
+// Admin console (Phase 3 port of the legacy static /pages/admin.html, 8 tabs). Every /api/admin/*,
+// /api/abtest/*, /api/ai-logs, /api/ai/health endpoint is server-side `requireAdmin`-gated already
+// (see AdminController/ABTestController/AiLogController/AiHealthController); these are thin typed
+// wrappers, not new authorization surface.
+export type AdminOverview = {
+  totalUsers: number; activeUsersToday: number; totalCapsules: number; publicCapsules: number;
+  totalLetters: number; pendingLetters: number; totalAiLogs: number; failedAiCalls: number;
+  safetyEvents: number; pendingReports: number;
+};
+// UserProfileVO.from(User) as seen by an admin: identity + role + the subset of self-profile
+// fields the backend actually serializes. No status/email/createdAt -- the VO doesn't carry them.
+export type AdminUserRow = {
+  id: number; username: string; nickname: string; role: string;
+  bio: string | null; socialReachabilityStatus: string | null;
+};
+export type AdminCapsuleRow = {
+  id: number; ownerUserId: number; capsuleType: string | null; pseudonym: string; intro: string;
+  echoEnergy: number | null; freshnessScore: number | null; visibilityStatus: string; isPublic: boolean;
+  createdAt: string | null;
+};
+export type AdminReport = {
+  id: number; reporterUserId: number; targetType: string; targetId: number;
+  reason: string; status: string; createdAt: string | null;
+};
+export type AdminSafetyEvent = {
+  id: number; userId: number; riskType: string; riskLevel: string; matchedRule: string | null;
+  handledAction: string | null; triggerScene: string | null; createdAt: string | null;
+};
+export type AdminModelConfigRow = { id: number; configKey: string; configValue: string; description: string | null };
+export type AdminAuditLog = {
+  id: number; adminUserId: number; actionType: string; targetType: string; targetId: number | null;
+  detail: string | null; createdAt: string | null;
+};
+export type AdminAiLog = {
+  id: number; moduleName: string; provider: string; modelName: string;
+  success: boolean; fallbackUsed: boolean; errorMessage: string | null; createdAt: string | null;
+};
+export type AdminAiHealth = {
+  mode: string; provider: string; model: string; apiKeyConfigured: boolean; fallbackAllowed: boolean;
+  mockProvider: boolean; asrProvider: string; asrModel: string; asrKeyConfigured: boolean;
+  lastSuccess: boolean | null; lastError: string | null;
+};
+export type AdminAbTestConfig = {
+  id: number; testName: string; description: string | null; enabled: boolean;
+  mockPercentage: number | null; controlGroup: string | null; totalParticipants: number | null;
+  status: string | null;
+};
+export type AdminAbTestGroupStats = {
+  groupName: string; totalRequests: number; successCount: number; fallbackCount: number;
+  avgLatency: number; successRate: number;
+};
+export type AdminAbTestStats = Record<string, AdminAbTestGroupStats>;
+
 async function subscribeProactiveBearer(controller: AbortController, onEvent: (event: ProactiveEvent) => void,
                                         onConnectionChange?: (connected: boolean) => void): Promise<void> {
   while (!controller.signal.aborted) {
@@ -658,7 +711,43 @@ export const api = {
   relationStats: () => request<Record<string, number>>("/api/relation/stats"),
   relationHighEmotion: () => request<RelationMention[]>("/api/relation/high-emotion"),
   relationTimeline: (label: string) => request<RelationTimelinePoint[]>(`/api/relation/timeline?label=${encodeURIComponent(label)}`),
-  relationHealth: (label: string) => request<RelationHealth>(`/api/relation/health?label=${encodeURIComponent(label)}`)
+  relationHealth: (label: string) => request<RelationHealth>(`/api/relation/health?label=${encodeURIComponent(label)}`),
+
+  /* Admin console (requireAdmin-gated server-side; see AdminController etc.) */
+  adminOverview: () => request<AdminOverview>("/api/admin/overview"),
+  adminUsers: () => request<AdminUserRow[]>("/api/admin/users"),
+  adminCapsules: (status?: string, keyword?: string) => {
+    const params = new URLSearchParams();
+    if (status) params.set("status", status);
+    if (keyword) params.set("keyword", keyword);
+    const qs = params.toString();
+    return request<AdminCapsuleRow[]>(`/api/admin/capsules${qs ? `?${qs}` : ""}`);
+  },
+  adminHideCapsule: (id: number, reason: string) => request<void>(`/api/admin/capsules/${id}/hide`, {
+    method: "POST", body: JSON.stringify({ reason })
+  }),
+  adminRestoreCapsule: (id: number, reason: string) => request<void>(`/api/admin/capsules/${id}/restore`, {
+    method: "POST", body: JSON.stringify({ reason })
+  }),
+  adminReports: (status?: string) => request<AdminReport[]>(`/api/admin/reports${status ? `?status=${encodeURIComponent(status)}` : ""}`),
+  adminResolveReport: (id: number, action: string, reason: string) => request<void>(`/api/admin/reports/${id}/resolve`, {
+    method: "POST", body: JSON.stringify({ action, reason })
+  }),
+  adminAuditLogs: () => request<AdminAuditLog[]>("/api/admin/audit-logs"),
+  adminSafetyEvents: () => request<AdminSafetyEvent[]>("/api/admin/safety-events"),
+  adminModelConfig: () => request<AdminModelConfigRow[]>("/api/admin/model-config"),
+  adminUpdateModelConfig: (config: Partial<AdminModelConfigRow>) => request<void>("/api/admin/model-config", {
+    method: "POST", body: JSON.stringify(config)
+  }),
+  adminDisableUser: (id: number) => request<void>(`/api/admin/users/${id}/disable`, { method: "POST" }),
+  adminEnableUser: (id: number) => request<void>(`/api/admin/users/${id}/enable`, { method: "POST" }),
+  aiLogs: () => request<AdminAiLog[]>("/api/ai-logs"),
+  aiHealth: () => request<AdminAiHealth>("/api/ai/health"),
+  // ABTestController.activeConfig() returns the single currently-active config (or null), not a
+  // list -- unlike the legacy admin.html JS, which mistakenly treated the response as an array.
+  abtestActive: () => request<AdminAbTestConfig | null>("/api/abtest/active"),
+  abtestStats: (testName: string) => request<AdminAbTestStats>(`/api/abtest/stats?testName=${encodeURIComponent(testName)}`),
+  abtestToggle: (id: number, enabled: boolean) => request<void>(`/api/abtest/${id}/toggle?enabled=${enabled}`, { method: "POST" })
 };
 
 export type AsrResult = { text: string; audioDurationSec: number; speechRate: number; pauseCount: number; longPauseCount: number; inputConfidence: number };

@@ -11,6 +11,7 @@ import { SafetyResourceCard } from "./components/SafetyResourceCard";
 import { GoodbyeRitualCard } from "./components/GoodbyeRitualCard";
 import { SocialGroupsView } from "./components/SocialGroupsView";
 import { SafetyHarborPage } from "./components/SafetyHarborPage";
+import { AdminConsole } from "./components/admin/AdminConsole";
 import { AuroraSelfSpace } from "./components/AuroraSelfSpace";
 import { UnderstandingCorrection, type CorrectionTarget } from "./components/UnderstandingCorrection";
 import { ClaimCandidateReview } from "./components/ClaimCandidateReview";
@@ -913,6 +914,24 @@ export function AuroraApp() {
     return <SafetyHarborPage resources={auroraSession.safetyResources} locale={skillLocale}
       onBack={() => navigate(spacePath("aurora"))}
       onTalkToAurora={() => navigate(spacePath("aurora"))} />;
+  }
+
+  // Phase 3 port of the legacy static /pages/admin.html (8-tab moderation console). Like Safety
+  // Harbor above, this is deliberately its own standalone route, not a 6th ProductShell space (see
+  // ProductShell.tsx's five-space consumer information architecture). The backend already
+  // `requireAdmin`-gates every /api/admin/*, /api/abtest/*, /api/ai-logs, /api/ai/health call (see
+  // AdminController etc.) -- this is a UX gate on top of that, not the authorization boundary
+  // itself: a non-admin session is redirected back to a normal space instead of ever mounting
+  // AdminConsole (which would otherwise just show empty lists / 401s for every tab). While
+  // userProfile hasn't loaded yet (a brief window right after bootstrap), wait rather than
+  // guessing -- redirecting an actual admin away on a false negative would be worse than a
+  // moment's delay.
+  if (location.pathname === "/admin" || location.pathname.startsWith("/admin/")) {
+    if (userProfile === null) return <main className="login-shell"><div className="login">
+      <LoadingText busy>{tt.connecting.replace(/…$/, "")}</LoadingText>
+    </div></main>;
+    if (userProfile.role !== "ADMIN") return <Navigate to={spacePath("aurora")} replace />;
+    return <AdminConsole locale={skillLocale} onBack={() => navigate(spacePath("aurora"))} />;
   }
 
   return (
