@@ -56,6 +56,32 @@ export function resourceFromPath(pathname: string): ProductResource {
   return { space, resource: resource || null, id };
 }
 
+// Cosmos-internal secondary navigation (doc 24 section 3.3): the timeline/daily-record/
+// weekly-review/thought-shredder/todo/heart-diary/belief-gallery modules ported from legacy
+// static pages must not stack vertically in one long "cosmos" page. They group into five
+// sub-sections behind the existing space's own segmented nav, reusing resourceFromPath's
+// {space, resource, id} parsing (resource holds the tab key) so each is a real, shareable,
+// back/forward-correct URL -- not just client-side tab state.
+export type CosmosTab = "starfield" | "daily" | "weekly" | "thoughts" | "beliefs";
+
+export const cosmosTabs: Array<[CosmosTab, string, string]> = [
+  ["starfield", "星空与成长轨迹", "Starfield & growth"],
+  ["daily", "今日记录与心声", "Daily record & voice"],
+  ["weekly", "周报与变化", "Weekly review"],
+  ["thoughts", "思维整理与待办", "Thoughts & todo"],
+  ["beliefs", "信念与自我理解", "Beliefs & self-understanding"]
+];
+
+/** Shareable deep link to one cosmos sub-tab; "starfield" is the bare /cosmos landing tab. */
+export function cosmosTabPath(tab: CosmosTab): string {
+  return tab === "starfield" ? spacePaths.cosmos : `${spacePaths.cosmos}/${tab}`;
+}
+
+export function cosmosTabFromPath(pathname: string): CosmosTab {
+  const resource = resourceFromPath(pathname).resource;
+  return cosmosTabs.some(([tab]) => tab === resource) ? (resource as CosmosTab) : "starfield";
+}
+
 /** Shareable deep link to one capsule inside the resonance space. */
 export function capsulePath(id: number): string {
   return `${spacePaths.resonance}/capsule/${id}`;
@@ -74,6 +100,14 @@ export function ProductShellNavigation({ active, onNavigate }: { active: Product
         aria-current={active === value ? "page" : undefined} onClick={() => onNavigate(value)}>
         <strong>{label}</strong><small>{description}</small>
       </button>)}</div>
+  </nav>;
+}
+
+export function CosmosSubNav({ active, onNavigate }: { active: CosmosTab; onNavigate: (tab: CosmosTab) => void }) {
+  return <nav className="cosmos-sub-nav" aria-label="内宇宙分区导航">
+    {cosmosTabs.map(([value, label]) =>
+      <button type="button" key={value} className={active === value ? "active" : ""}
+        aria-current={active === value ? "page" : undefined} onClick={() => onNavigate(value)}>{label}</button>)}
   </nav>;
 }
 

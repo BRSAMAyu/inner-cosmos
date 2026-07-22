@@ -5,7 +5,7 @@ import { api, apiConfigurationError, configureBearerAuth, hasConfiguredApiBase, 
 import { initialMobileState, mobileRuntime, type MobileRuntimeState } from "./mobile";
 import { mobileOidc } from "./mobile-auth";
 import { isTauriRuntime } from "./desktop-runtime";
-import { capsulePath, letterThreadPath, MeSpace, productSpaceFromPath, productSpaces, ProductShellNavigation, resourceFromPath, spacePath, type ProductSpace } from "./components/ProductShell";
+import { capsulePath, letterThreadPath, MeSpace, productSpaceFromPath, productSpaces, ProductShellNavigation, resourceFromPath, spacePath, type ProductSpace, type CosmosTab, cosmosTabFromPath, cosmosTabPath, CosmosSubNav } from "./components/ProductShell";
 import { AuroraConversation } from "./components/AuroraConversation";
 import { SafetyResourceCard } from "./components/SafetyResourceCard";
 import { GoodbyeRitualCard } from "./components/GoodbyeRitualCard";
@@ -67,6 +67,7 @@ export function AuroraApp() {
   const location = useLocation();
   const navigate = useNavigate();
   const productSpace = useMemo(() => productSpaceFromPath(location.pathname), [location.pathname]);
+  const cosmosTab = useMemo(() => cosmosTabFromPath(location.pathname), [location.pathname]);
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [status, setStatus] = useState("正在连接你的内宇宙…");
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
@@ -179,6 +180,46 @@ export function AuroraApp() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [navigate]);
 
+  const navigateCosmosTab = useCallback((tab: CosmosTab) => {
+    navigate(cosmosTabPath(tab));
+  }, [navigate]);
+
+  // Lazy per-tab fetch: each cosmos sub-tab's data loads only the first time it is actually
+  // visited, not eagerly in the shared login bootstrap (doc 24 section 3.3 forbids adding
+  // non-first-screen requests to that awaited Promise.all). Sections stay mounted (`hidden`,
+  // matching the five-space precedent above) once loaded so switching tabs back and forth does
+  // not re-fetch or lose scroll/edit state. memoryThemes + the daily-records list feed both the
+  // "starfield" tab's TimelineSection and the "daily" tab's DailyRecordSection, so they get their
+  // own once-only guards fired by whichever of those two tabs is visited first (e.g. a deep link
+  // straight to /cosmos/daily still populates Timeline correctly if the user later switches to it).
+  const cosmosTabLoadedRef = useRef<Partial<Record<CosmosTab, boolean>>>({});
+  const themesLoadedRef = useRef(false);
+  const dailyListLoadedRef = useRef(false);
+  useEffect(() => {
+    // Guarded on productSpace too, not just authenticated: cosmosTab defaults to "starfield" for
+    // any path outside /cosmos/*, so without this the "cosmos" tab data would load as soon as the
+    // user lands on Aurora, never actually deferred until they open the space.
+    if (!authenticated || productSpace !== "cosmos" || cosmosTabLoadedRef.current[cosmosTab]) return;
+    cosmosTabLoadedRef.current[cosmosTab] = true;
+    if (cosmosTab === "starfield" || cosmosTab === "daily") {
+      if (!themesLoadedRef.current) { themesLoadedRef.current = true; api.memoryThemes().then(setMemoryThemes).catch(() => undefined); }
+      if (!dailyListLoadedRef.current) { dailyListLoadedRef.current = true; dailyRecord.loadDailyRecords().catch(() => undefined); }
+    }
+    if (cosmosTab === "daily") {
+      void dailyRecord.loadLatestDailyRecord();
+    } else if (cosmosTab === "weekly") {
+      void weeklyReview.loadWeeklyReview();
+    } else if (cosmosTab === "thoughts") {
+      void thoughtShredder.loadShredderAiHealth();
+      void thoughtShredder.loadShredderHistory();
+      todoBoard.loadTodos().catch(() => undefined);
+    } else if (cosmosTab === "beliefs") {
+      beliefGallery.loadAll().catch(() => undefined);
+      void beliefGallery.loadContradictions();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authenticated, productSpace, cosmosTab]);
+
   // Nested resource deep links: opening /resonance/capsule/:id selects that capsule, so a shared
   // link or a back/forward step lands on the exact capsule rather than the space default. The
   // capsule domain still owns loading/rendering; this only maps the URL id onto the existing
@@ -250,18 +291,12 @@ export function AuroraApp() {
         connectionsAndLetters.loadLetterThreads(),
         api.getProfile().then(setUserProfile),
         connectionsAndLetters.loadGroups(),
-        connectionsAndLetters.loadGroupInvites(),
-        // Phase 3 legacy-page port additions -- appended at the very end of this array per the
-        // documented past-incident gotcha (some earlier entries are consumed positionally elsewhere).
-        api.memoryThemes().then(setMemoryThemes).catch(() => undefined),
-        dailyRecord.loadDailyRecords().catch(() => undefined),
-        dailyRecord.loadLatestDailyRecord(),
-        weeklyReview.loadWeeklyReview(),
-        thoughtShredder.loadShredderAiHealth(),
-        thoughtShredder.loadShredderHistory(),
-        todoBoard.loadTodos().catch(() => undefined),
-        beliefGallery.loadAll().catch(() => undefined),
-        beliefGallery.loadContradictions()
+        connectionsAndLetters.loadGroupInvites()
+        // NOTE: timeline/daily-record/weekly-review/thought-shredder/todo/belief-gallery data is
+        // deliberately NOT loaded here -- it is not first-screen (Aurora landing) data. It lazy-loads
+        // the first time the user actually opens the relevant "cosmos" sub-tab; see the
+        // cosmosTabLoadedRef effect below. Doc 24 section 3.3 forbids adding non-first-screen
+        // requests to this awaited Promise.all.
       ]);
       if (call !== bootstrapCallRef.current) return;
       setAuthenticated(true);
@@ -288,10 +323,7 @@ export function AuroraApp() {
   }, [auroraSession.resolveSession, auroraSession.replaceFromHistory, auroraSession.loadWakeIntents, auroraSession.loadNotifications,
       auroraSession.loadSafetyResources,
       connectionsAndLetters.loadLetterInbox, connectionsAndLetters.loadConnectionRequests, connectionsAndLetters.loadFriends,
-      connectionsAndLetters.loadLetterOutbox, connectionsAndLetters.loadPeople, connectionsAndLetters.loadRelations, connectionsAndLetters.loadLetterThreads,
-      dailyRecord.loadDailyRecords, dailyRecord.loadLatestDailyRecord, weeklyReview.loadWeeklyReview,
-      thoughtShredder.loadShredderAiHealth, thoughtShredder.loadShredderHistory,
-      todoBoard.loadTodos, beliefGallery.loadAll, beliefGallery.loadContradictions]);
+      connectionsAndLetters.loadLetterOutbox, connectionsAndLetters.loadPeople, connectionsAndLetters.loadRelations, connectionsAndLetters.loadLetterThreads]);
 
   const selectedCapsule = capsules.find(capsule => capsule.id === selectedCapsuleId) ?? null;
   // A capsule opened from the public plaza directory (not the curated match set) is wrapped in a
@@ -1083,60 +1115,70 @@ export function AuroraApp() {
       </div>
 
       <div className="product-space" hidden={productSpace !== "cosmos"}>
-      <ClaimCandidateReview candidates={claimCandidates} locale={skillLocale} busyId={claimCandidateBusyId}
-        onConfirm={id => void confirmClaimCandidate(id)} onDismiss={id => void dismissClaimCandidate(id)} />
-      <UnderstandingCorrection claims={claims} oldValue={correctionOld} newValue={correctionNew} impact={correctionImpact} busy={correctionBusy} target={correctionTarget}
-        corrections={corrections} retiringId={retiringCorrectionId}
-        onOldValue={value => { setCorrectionOld(value); setCorrectionImpact(null); }} onNewValue={value => { setCorrectionNew(value); setCorrectionImpact(null); }}
-        onPreview={() => void previewCorrection()} onCancelPreview={() => setCorrectionImpact(null)} onConfirm={() => void confirmCorrection()} onClearTarget={clearCorrectionTarget}
-        onRetire={id => void retireCorrection(id)} locale={skillLocale} />
+      {/* Cosmos-internal secondary navigation (doc 24 section 3.3): five sub-sections, each a
+          real shareable /cosmos/<tab> URL, mounted-but-hidden like the five top-level spaces so
+          switching back and forth keeps scroll/edit state. Each tab's data lazy-loads on first
+          visit -- see the cosmosTabLoadedRef effect above -- instead of blocking login bootstrap. */}
+      <CosmosSubNav active={cosmosTab} onNavigate={navigateCosmosTab} />
 
-      {starfield && <MemoryStarfield starfield={starfield} starfieldBusy={starfieldBusy} onChangeMode={mode => void changeStarfieldMode(mode)}
-        starfieldDetail={starfieldDetail} detailBusy={detailBusy} onRevealStar={id => void revealStar(id)} onCloseDetail={() => setStarfieldDetail(null)}
-        memoryOperations={memoryOperations} rollbackBusy={rollbackBusy} onRollback={operation => void rollbackMemoryOperation(operation)} onCorrectMemory={beginMemoryCorrection}
-        onUpdateImportance={(id, importance) => void updateMemoryImportance(id, importance)} onArchive={id => void archiveMemory(id)}
-        importanceBusy={importanceBusy} archiveBusy={archiveBusy} locale={skillLocale} />}
+      <div hidden={cosmosTab !== "starfield"}>
+        <ClaimCandidateReview candidates={claimCandidates} locale={skillLocale} busyId={claimCandidateBusyId}
+          onConfirm={id => void confirmClaimCandidate(id)} onDismiss={id => void dismissClaimCandidate(id)} />
+        <UnderstandingCorrection claims={claims} oldValue={correctionOld} newValue={correctionNew} impact={correctionImpact} busy={correctionBusy} target={correctionTarget}
+          corrections={corrections} retiringId={retiringCorrectionId}
+          onOldValue={value => { setCorrectionOld(value); setCorrectionImpact(null); }} onNewValue={value => { setCorrectionNew(value); setCorrectionImpact(null); }}
+          onPreview={() => void previewCorrection()} onCancelPreview={() => setCorrectionImpact(null)} onConfirm={() => void confirmCorrection()} onClearTarget={clearCorrectionTarget}
+          onRetire={id => void retireCorrection(id)} locale={skillLocale} />
 
-      <PsychologySkillStudio skills={skills} skillRuns={skillRuns} selectedSkill={selectedSkill} skillAnswers={skillAnswers}
-        skillConsent={skillConsent} skillRetention={skillRetention} skillBusy={skillBusy} skillLocale={skillLocale}
-        onLocaleChange={setSkillLocale} onSelectSkill={skillId => { setSelectedSkillId(skillId); setSkillAnswers({}); setSkillConsent(false); }}
-        onAnswerChange={(key, value) => setSkillAnswers(current => ({ ...current, [key]: value }))}
-        onRetentionChange={setSkillRetention} onConsentChange={setSkillConsent} onRun={() => void runPsychologySkill()}
-        onContinueWithAurora={continueSkillWithAurora} onRevokeRun={id => void revokePsychologyRun(id)} />
+        {starfield && <MemoryStarfield starfield={starfield} starfieldBusy={starfieldBusy} onChangeMode={mode => void changeStarfieldMode(mode)}
+          starfieldDetail={starfieldDetail} detailBusy={detailBusy} onRevealStar={id => void revealStar(id)} onCloseDetail={() => setStarfieldDetail(null)}
+          memoryOperations={memoryOperations} rollbackBusy={rollbackBusy} onRollback={operation => void rollbackMemoryOperation(operation)} onCorrectMemory={beginMemoryCorrection}
+          onUpdateImportance={(id, importance) => void updateMemoryImportance(id, importance)} onArchive={id => void archiveMemory(id)}
+          importanceBusy={importanceBusy} archiveBusy={archiveBusy} locale={skillLocale} />}
 
-      {/* Phase 3 legacy-page port: timeline.html, weekly-review.html, daily-record.html,
-          thought-shredder.html, todo.html, heart-diary.html, beliefs.html (pattern-browsing half)
-          -- ported as additional sections inside the existing "cosmos" product space, not a 6th
-          top-level nav tab (the five-space IA is a hard constraint).
-          TODO(W0 IA restructure, doc 24 section 3.3): these seven modules must not stay stacked
-          vertically in one long page -- move to Cosmos-internal secondary routes/segmented
-          navigation with lazy/prefetched loading, in the dedicated pass right after all four
-          locked branches are integrated. */}
-      <TimelineSection dailyRecords={dailyRecord.dailyRecords} themes={memoryThemes} locale={skillLocale} />
-      <DailyRecordSection records={dailyRecord.dailyRecords} detail={dailyRecord.dailyRecordDetail}
-        index={dailyRecord.dailyRecordIndex} acceptBusy={dailyRecord.dailyRecordAcceptBusy} editBusy={dailyRecord.dailyRecordEditBusy}
-        onAccept={() => void dailyRecord.acceptDailyRecord()} onEditField={(field, value) => void dailyRecord.editDailyRecordField(field, value)}
-        onSelectIndex={dailyRecord.selectDailyRecordIndex} locale={skillLocale} />
-      <WeeklyReviewSection review={weeklyReview.weeklyReview} busy={weeklyReview.weeklyReviewBusy}
-        onGenerate={() => void weeklyReview.generateWeeklyReview()} locale={skillLocale} />
-      <ThoughtShredderSection aiHealth={thoughtShredder.shredderAiHealth} history={thoughtShredder.shredderHistory}
-        result={thoughtShredder.shredderResult} busy={thoughtShredder.shredderBusy}
-        onShred={(text, saveMode) => void thoughtShredder.processShred(text, saveMode)}
-        onSettle={id => void thoughtShredder.settleShred(id)} onDelete={id => void thoughtShredder.deleteShred(id)} locale={skillLocale} />
-      <TodoBoard todos={todoBoard.todos} tab={todoBoard.tab} busy={todoBoard.busy} splitBusyId={todoBoard.splitBusyId}
-        onSelectTab={todoBoard.setTab} onCreate={input => void todoBoard.createTodo(input)}
-        onUpdateStatus={(id, status) => void todoBoard.updateStatus(id, status)} onSplit={id => void todoBoard.splitTodo(id)}
-        onDelete={id => void todoBoard.deleteTodo(id)} onUpdate={(id, input) => void todoBoard.updateTodo(id, input)} locale={skillLocale} />
+        <PsychologySkillStudio skills={skills} skillRuns={skillRuns} selectedSkill={selectedSkill} skillAnswers={skillAnswers}
+          skillConsent={skillConsent} skillRetention={skillRetention} skillBusy={skillBusy} skillLocale={skillLocale}
+          onLocaleChange={setSkillLocale} onSelectSkill={skillId => { setSelectedSkillId(skillId); setSkillAnswers({}); setSkillConsent(false); }}
+          onAnswerChange={(key, value) => setSkillAnswers(current => ({ ...current, [key]: value }))}
+          onRetentionChange={setSkillRetention} onConsentChange={setSkillConsent} onRun={() => void runPsychologySkill()}
+          onContinueWithAurora={continueSkillWithAurora} onRevokeRun={id => void revokePsychologyRun(id)} />
 
-      <HeartDiary rawText={heartDiary.rawText} displayText={heartDiary.displayText} activeLevel={heartDiary.activeLevel}
-        polishBusy={heartDiary.polishBusy} submitBusy={heartDiary.submitBusy} onTextChange={heartDiary.onTextChange}
-        onSwitchLevel={level => void heartDiary.switchLevel(level)} onTranscribeAudio={blob => heartDiary.transcribeAudio(blob)}
-        onSubmit={() => void heartDiary.submit()} locale={skillLocale} />
+        <TimelineSection dailyRecords={dailyRecord.dailyRecords} themes={memoryThemes} locale={skillLocale} />
+      </div>
 
-      <BeliefGallery beliefs={beliefGallery.beliefs} contradictions={beliefGallery.contradictions} filter={beliefGallery.filter}
-        categories={beliefGallery.categories} selectedCategory={beliefGallery.selectedCategory} categoryBeliefs={beliefGallery.categoryBeliefs}
-        busy={beliefGallery.busy} onSelectFilter={filter => void beliefGallery.selectFilter(filter)}
-        onSelectCategory={category => void beliefGallery.selectCategory(category)} locale={skillLocale} />
+      <div hidden={cosmosTab !== "daily"}>
+        <DailyRecordSection records={dailyRecord.dailyRecords} detail={dailyRecord.dailyRecordDetail}
+          index={dailyRecord.dailyRecordIndex} acceptBusy={dailyRecord.dailyRecordAcceptBusy} editBusy={dailyRecord.dailyRecordEditBusy}
+          onAccept={() => void dailyRecord.acceptDailyRecord()} onEditField={(field, value) => void dailyRecord.editDailyRecordField(field, value)}
+          onSelectIndex={dailyRecord.selectDailyRecordIndex} locale={skillLocale} />
+        <HeartDiary rawText={heartDiary.rawText} displayText={heartDiary.displayText} activeLevel={heartDiary.activeLevel}
+          polishBusy={heartDiary.polishBusy} submitBusy={heartDiary.submitBusy} onTextChange={heartDiary.onTextChange}
+          onSwitchLevel={level => void heartDiary.switchLevel(level)} onTranscribeAudio={blob => heartDiary.transcribeAudio(blob)}
+          onSubmit={() => void heartDiary.submit()} locale={skillLocale} />
+      </div>
+
+      <div hidden={cosmosTab !== "weekly"}>
+        <WeeklyReviewSection review={weeklyReview.weeklyReview} busy={weeklyReview.weeklyReviewBusy}
+          onGenerate={() => void weeklyReview.generateWeeklyReview()} locale={skillLocale} />
+      </div>
+
+      <div hidden={cosmosTab !== "thoughts"}>
+        <ThoughtShredderSection aiHealth={thoughtShredder.shredderAiHealth} history={thoughtShredder.shredderHistory}
+          result={thoughtShredder.shredderResult} busy={thoughtShredder.shredderBusy}
+          onShred={(text, saveMode) => void thoughtShredder.processShred(text, saveMode)}
+          onSettle={id => void thoughtShredder.settleShred(id)} onDelete={id => void thoughtShredder.deleteShred(id)} locale={skillLocale} />
+        <TodoBoard todos={todoBoard.todos} tab={todoBoard.tab} busy={todoBoard.busy} splitBusyId={todoBoard.splitBusyId}
+          onSelectTab={todoBoard.setTab} onCreate={input => void todoBoard.createTodo(input)}
+          onUpdateStatus={(id, status) => void todoBoard.updateStatus(id, status)} onSplit={id => void todoBoard.splitTodo(id)}
+          onDelete={id => void todoBoard.deleteTodo(id)} onUpdate={(id, input) => void todoBoard.updateTodo(id, input)} locale={skillLocale} />
+      </div>
+
+      <div hidden={cosmosTab !== "beliefs"}>
+        <BeliefGallery beliefs={beliefGallery.beliefs} contradictions={beliefGallery.contradictions} filter={beliefGallery.filter}
+          categories={beliefGallery.categories} selectedCategory={beliefGallery.selectedCategory} categoryBeliefs={beliefGallery.categoryBeliefs}
+          busy={beliefGallery.busy} onSelectFilter={filter => void beliefGallery.selectFilter(filter)}
+          onSelectCategory={category => void beliefGallery.selectCategory(category)} locale={skillLocale} />
+      </div>
       </div>
 
       <div className="product-space" hidden={productSpace !== "resonance"}>
