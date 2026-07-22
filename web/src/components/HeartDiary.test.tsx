@@ -1,8 +1,21 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { HeartDiary } from "./HeartDiary";
 
+const recorder = vi.hoisted(() => ({ start: vi.fn(), stop: vi.fn() }));
+vi.mock("../audio-recorder", () => ({
+  PcmWavRecorder: class {
+    start = recorder.start;
+    stop = recorder.stop;
+  }
+}));
+
 afterEach(cleanup);
+afterEach(() => {
+  delete (navigator as unknown as Record<string, unknown>).mediaDevices;
+  delete (globalThis as Record<string, unknown>).AudioContext;
+  recorder.start.mockReset(); recorder.stop.mockReset();
+});
 
 function baseProps() {
   return {
@@ -71,5 +84,30 @@ describe("HeartDiary", () => {
   it("hides the recording button when voice capture is unsupported (jsdom default)", () => {
     render(<HeartDiary {...baseProps()} />);
     expect(screen.queryByRole("button", { name: /开始倾诉录音/ })).not.toBeInTheDocument();
+  });
+
+  it("keeps the stop button clickable while recording (regression: 2.2.2)", async () => {
+    // Gemini audit / remaining-work-handoff.md 2.2.2: the recording toggle button must only be
+    // disabled while genuinely non-actionable (transcribing), never while `recording` itself --
+    // otherwise "stop" is dead on arrival the moment recording starts. AuroraConversation.tsx
+    // already gets this right (busy={transcribing} only); this pins HeartDiary to the same rule.
+    const getUserMedia = vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] });
+    (navigator as unknown as Record<string, unknown>).mediaDevices = { getUserMedia };
+    (globalThis as Record<string, unknown>).AudioContext = class {};
+    recorder.start.mockResolvedValue(undefined);
+    recorder.stop.mockResolvedValue(new Blob(["wav"], { type: "audio/wav" }));
+
+    const onTranscribeAudio = vi.fn().mockResolvedValue(undefined);
+    render(<HeartDiary {...baseProps()} onTranscribeAudio={onTranscribeAudio} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "🎤 开始倾诉录音" }));
+    await waitFor(() => expect(recorder.start).toHaveBeenCalled());
+
+    const stopButton = await screen.findByRole("button", { name: "■ 结束录音" });
+    expect(stopButton).not.toBeDisabled();
+
+    fireEvent.click(stopButton);
+    await waitFor(() => expect(recorder.stop).toHaveBeenCalledWith(false));
+    await waitFor(() => expect(onTranscribeAudio).toHaveBeenCalled());
   });
 });

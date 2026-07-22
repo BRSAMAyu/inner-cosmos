@@ -107,8 +107,11 @@ export function HeartDiary({ rawText, displayText, activeLevel, polishBusy, subm
     </div>
 
     <div className="diary-actions">
+      {/* busy is `transcribing` only, never `recording` -- AsyncButton disables on busy, and the
+          stop action (recording -> finishRecording()) must stay clickable exactly while recording
+          is true. See AuroraConversation.tsx's voice button for the same established rule. */}
       {voiceSupported && <AsyncButton className={"voice-pill" + (recording ? " recording" : "")}
-        busy={recording || transcribing} busyText={recording ? t.recording : t.transcribing}
+        busy={transcribing} busyText={t.transcribing}
         aria-pressed={recording} onClick={() => (recording ? void finishRecording() : void startRecording())}>
         {recording ? t.stopRecording : t.startRecording}
       </AsyncButton>}
