@@ -183,6 +183,9 @@ export type SocialConnection = {
 export type FriendRelation = {
   id: number; requesterId: number; addresseeId: number; status: string; source: string;
 };
+export type SocialGroup = { id: number; ownerUserId: number; groupName: string; intro: string; visibility: string };
+export type GroupInvite = { memberId: number; groupId: number; groupName: string };
+export type GroupMember = { userId: number; memberRole: string; nickname: string };
 export type ConnectionRequests = { incoming: SocialConnection[]; outgoing: SocialConnection[] };
 export type DiscoverablePerson = { id: number; username: string; nickname: string; relationStatus: string };
 export type RelationMention = { id: number; relationLabel: string; relationType: string | null; emotionTags: string | null; triggerSummary: string | null; boundaryHint: string | null };
@@ -638,6 +641,19 @@ export const api = {
   requestConnectionFromLetter: (letterId: number) => request<FriendRelation>(`/api/social/connections/from-letter/${letterId}`, { method: "POST" }),
   decideConnection: (id: number, decision: "accept" | "decline") => request<FriendRelation>(`/api/social/friends/${id}/${decision}`, { method: "POST" }),
   leaveConnection: (id: number) => request<FriendRelation>(`/api/social/friends/${id}/leave`, { method: "POST" }),
+  myGroups: () => request<SocialGroup[]>("/api/social/groups"),
+  createGroup: (groupName: string, intro?: string) => request<SocialGroup>("/api/social/groups", {
+    method: "POST", body: JSON.stringify({ groupName, intro })
+  }),
+  groupInvites: () => request<GroupInvite[]>("/api/social/groups/invites"),
+  inviteToGroup: (groupId: number, userId: number) => request<void>(`/api/social/groups/${groupId}/invite`, {
+    method: "POST", body: JSON.stringify({ userId: String(userId) })
+  }),
+  respondToGroupInvite: (memberId: number, decision: "accept" | "decline") => request<void>(`/api/social/groups/invites/${memberId}/respond`, {
+    method: "POST", body: JSON.stringify({ decision })
+  }),
+  leaveGroup: (groupId: number) => request<void>(`/api/social/groups/${groupId}/leave`, { method: "POST" }),
+  groupMembers: (groupId: number) => request<GroupMember[]>(`/api/social/groups/${groupId}/members`),
   relations: () => request<RelationMention[]>("/api/relation/list"),
   relationStats: () => request<Record<string, number>>("/api/relation/stats"),
   relationHighEmotion: () => request<RelationMention[]>("/api/relation/high-emotion"),

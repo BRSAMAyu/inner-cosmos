@@ -23,7 +23,14 @@ vi.mock("../api", () => ({
     sendSlowLetter: vi.fn(),
     transitionLetter: vi.fn(),
     reportLetter: vi.fn(),
-    replyWithSlowLetter: vi.fn()
+    replyWithSlowLetter: vi.fn(),
+    myGroups: vi.fn(),
+    createGroup: vi.fn(),
+    groupInvites: vi.fn(),
+    inviteToGroup: vi.fn(),
+    respondToGroupInvite: vi.fn(),
+    leaveGroup: vi.fn(),
+    groupMembers: vi.fn()
   }
 }));
 
@@ -288,5 +295,71 @@ describe("useConnectionsAndLetters -- letters", () => {
     await act(async () => { await result.current.requestConnection(letter()); });
     expect(api.requestConnectionFromLetter).toHaveBeenCalledExactlyOnceWith(1);
     expect(setStatus).toHaveBeenCalledWith(expect.stringContaining("连接邀请已发出"));
+  });
+});
+
+describe("useConnectionsAndLetters -- groups", () => {
+  it("loadGroups and loadGroupInvites populate their own state", async () => {
+    vi.mocked(api.myGroups).mockResolvedValue([{ id: 1, ownerUserId: 1, groupName: "老朋友们", intro: "", visibility: "PRIVATE" }]);
+    vi.mocked(api.groupInvites).mockResolvedValue([{ memberId: 9, groupId: 2, groupName: "读书会" }]);
+    const { result } = setup();
+    await act(async () => { await Promise.all([result.current.loadGroups(), result.current.loadGroupInvites()]); });
+    expect(result.current.groups).toHaveLength(1);
+    expect(result.current.groupInvites).toHaveLength(1);
+  });
+
+  it("createGroup adds the new group to the front of the list", async () => {
+    vi.mocked(api.createGroup).mockResolvedValue({ id: 5, ownerUserId: 1, groupName: "新群组", intro: "", visibility: "PRIVATE" });
+    const { result, setStatus } = setup();
+    await act(async () => { await result.current.createGroup("新群组"); });
+    expect(api.createGroup).toHaveBeenCalledExactlyOnceWith("新群组");
+    expect(result.current.groups[0].groupName).toBe("新群组");
+    expect(setStatus).toHaveBeenCalledWith(expect.stringContaining("群组已创建"));
+  });
+
+  it("createGroup does nothing for a blank name", async () => {
+    const { result } = setup();
+    await act(async () => { await result.current.createGroup("   "); });
+    expect(api.createGroup).not.toHaveBeenCalled();
+  });
+
+  it("openGroup selects the group and loads its members", async () => {
+    vi.mocked(api.groupMembers).mockResolvedValue([{ userId: 1, memberRole: "OWNER", nickname: "我" }]);
+    const { result } = setup();
+    await act(async () => { await result.current.openGroup(5); });
+    expect(result.current.selectedGroupId).toBe(5);
+    expect(result.current.groupMembers).toHaveLength(1);
+  });
+
+  it("inviteToGroup calls the API with the target friend's userId", async () => {
+    vi.mocked(api.inviteToGroup).mockResolvedValue(undefined as never);
+    const { result, setStatus } = setup();
+    await act(async () => { await result.current.inviteToGroup(5, 30); });
+    expect(api.inviteToGroup).toHaveBeenCalledExactlyOnceWith(5, 30);
+    expect(setStatus).toHaveBeenCalledWith(expect.stringContaining("邀请已发出"));
+  });
+
+  it("respondToGroupInvite removes the invite from the list and reloads groups on accept", async () => {
+    vi.mocked(api.respondToGroupInvite).mockResolvedValue(undefined as never);
+    vi.mocked(api.myGroups).mockResolvedValue([{ id: 2, ownerUserId: 9, groupName: "读书会", intro: "", visibility: "PRIVATE" }]);
+    const { result } = setup();
+    await act(async () => { await result.current.loadGroupInvites(); });
+    vi.mocked(api.groupInvites).mockResolvedValue([{ memberId: 9, groupId: 2, groupName: "读书会" }]);
+    await act(async () => { await result.current.loadGroupInvites(); });
+    await act(async () => { await result.current.respondToGroupInvite(9, "accept"); });
+    expect(result.current.groupInvites).toHaveLength(0);
+    expect(api.myGroups).toHaveBeenCalled();
+  });
+
+  it("leaveGroup removes the group from the list and clears selection if it was selected", async () => {
+    vi.mocked(api.myGroups).mockResolvedValue([{ id: 5, ownerUserId: 9, groupName: "读书会", intro: "", visibility: "PRIVATE" }]);
+    vi.mocked(api.groupMembers).mockResolvedValue([]);
+    vi.mocked(api.leaveGroup).mockResolvedValue(undefined as never);
+    const { result } = setup();
+    await act(async () => { await result.current.loadGroups(); });
+    await act(async () => { await result.current.openGroup(5); });
+    await act(async () => { await result.current.leaveGroup(5); });
+    expect(result.current.groups).toHaveLength(0);
+    expect(result.current.selectedGroupId).toBeNull();
   });
 });

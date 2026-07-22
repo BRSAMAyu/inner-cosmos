@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import {
-  api, type ConnectionRequests, type DiscoverablePerson, type LetterThread,
-  type RelationHealth, type RelationMention, type RelationTimelinePoint, type SlowLetter, type SocialConnection
+  api, type ConnectionRequests, type DiscoverablePerson, type GroupInvite, type GroupMember, type LetterThread,
+  type RelationHealth, type RelationMention, type RelationTimelinePoint, type SlowLetter, type SocialConnection, type SocialGroup
 } from "../api";
 
 // Extracted from AuroraApp.tsx (B1 domain-hook decomposition, second slice): the "connections/letters"
@@ -40,6 +40,11 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
   const [draftBusy, setDraftBusy] = useState(false);
   const [replyBusyId, setReplyBusyId] = useState<number | null>(null);
   const [replyDrafts, setReplyDrafts] = useState<Record<number, string>>({});
+  const [groups, setGroups] = useState<SocialGroup[]>([]);
+  const [groupInvites, setGroupInvites] = useState<GroupInvite[]>([]);
+  const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
+  const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
+  const [groupBusy, setGroupBusy] = useState(false);
 
   // ---- Bootstrap loaders. AuroraApp.tsx's own bootstrap() still fires ONE 23-way Promise.all of
   // every domain's initial fetch (unchanged in shape by this extraction, matching the precedent set
@@ -56,6 +61,8 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
   const loadPeople = useCallback(() => api.discoverPeople().then(setPeople).catch(() => undefined), []);
   const loadRelations = useCallback(() => api.relations().then(setRelations).catch(() => undefined), []);
   const loadLetterThreads = useCallback(() => api.letterThreads().then(setLetterThreads).catch(() => undefined), []);
+  const loadGroups = useCallback(() => api.myGroups().then(setGroups).catch(() => undefined), []);
+  const loadGroupInvites = useCallback(() => api.groupInvites().then(setGroupInvites).catch(() => undefined), []);
 
   // Re-fetches the three connection-shaped lists together, still as one concurrent Promise.all
   // (matching the original shape). One deliberate, documented improvement over the original: the
@@ -174,13 +181,65 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
     } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法退出连接"); }
   }, [refreshConnections, setStatus]);
 
+  const createGroup = useCallback(async (groupName: string) => {
+    const name = groupName.trim();
+    if (!name) return;
+    setGroupBusy(true);
+    try {
+      const created = await api.createGroup(name);
+      setGroups(current => [created, ...current]);
+      setStatus("群组已创建。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法创建群组"); }
+    finally { setGroupBusy(false); }
+  }, [setStatus]);
+
+  const openGroup = useCallback(async (groupId: number) => {
+    setSelectedGroupId(groupId); setGroupMembers([]);
+    try { setGroupMembers(await api.groupMembers(groupId)); }
+    catch (error) { setStatus(error instanceof Error ? error.message : "暂时读不到这个群组的成员"); }
+  }, [setStatus]);
+
+  const inviteToGroup = useCallback(async (groupId: number, userId: number) => {
+    setGroupBusy(true);
+    try {
+      await api.inviteToGroup(groupId, userId);
+      setStatus("邀请已发出，等待对方接受。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法邀请这位朋友"); }
+    finally { setGroupBusy(false); }
+  }, [setStatus]);
+
+  const respondToGroupInvite = useCallback(async (memberId: number, decision: "accept" | "decline") => {
+    setGroupBusy(true);
+    try {
+      await api.respondToGroupInvite(memberId, decision);
+      setGroupInvites(current => current.filter(invite => invite.memberId !== memberId));
+      if (decision === "accept") await loadGroups();
+      setStatus(decision === "accept" ? "已加入群组。" : "已婉拒这个群组邀请。 ");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法处理这个邀请"); }
+    finally { setGroupBusy(false); }
+  }, [loadGroups, setStatus]);
+
+  const leaveGroup = useCallback(async (groupId: number) => {
+    setGroupBusy(true);
+    try {
+      await api.leaveGroup(groupId);
+      setGroups(current => current.filter(group => group.id !== groupId));
+      if (selectedGroupId === groupId) { setSelectedGroupId(null); setGroupMembers([]); }
+      setStatus("已退出这个群组。 ");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法退出这个群组"); }
+    finally { setGroupBusy(false); }
+  }, [selectedGroupId, setStatus]);
+
   return {
     connectionRequests, friends, people, peopleBusy,
     relations, selectedRelation, relationTimeline, relationHealth, relationBusy,
     letterInbox, letterOutbox, letterThreads, selectedThreadId, threadLetters, draftBusy, replyBusyId, replyDrafts,
+    groups, groupInvites, selectedGroupId, groupMembers, groupBusy,
     loadLetterInbox, loadConnectionRequests, loadFriends, loadLetterOutbox, loadPeople, loadRelations, loadLetterThreads,
+    loadGroups, loadGroupInvites,
     refreshConnections, requestPersonConnection, openRelation, openThread, sendDraft,
     actOnLetter, reportLetter, replyWithLetter, updateReplyDraft,
-    requestConnection, decideConnection, leaveConnection
+    requestConnection, decideConnection, leaveConnection,
+    createGroup, openGroup, inviteToGroup, respondToGroupInvite, leaveGroup
   };
 }

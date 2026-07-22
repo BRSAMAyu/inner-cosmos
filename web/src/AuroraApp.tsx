@@ -9,6 +9,7 @@ import { capsulePath, letterThreadPath, MeSpace, productSpaceFromPath, productSp
 import { AuroraConversation } from "./components/AuroraConversation";
 import { SafetyResourceCard } from "./components/SafetyResourceCard";
 import { GoodbyeRitualCard } from "./components/GoodbyeRitualCard";
+import { SocialGroupsView } from "./components/SocialGroupsView";
 import { SafetyHarborPage } from "./components/SafetyHarborPage";
 import { AuroraSelfSpace } from "./components/AuroraSelfSpace";
 import { UnderstandingCorrection, type CorrectionTarget } from "./components/UnderstandingCorrection";
@@ -217,7 +218,9 @@ export function AuroraApp() {
         api.claimCandidates().then(setClaimCandidates).catch(() => undefined),
         connectionsAndLetters.loadRelations(),
         connectionsAndLetters.loadLetterThreads(),
-        api.getProfile().then(setUserProfile)
+        api.getProfile().then(setUserProfile),
+        connectionsAndLetters.loadGroups(),
+        connectionsAndLetters.loadGroupInvites()
       ]);
       if (call !== bootstrapCallRef.current) return;
       setAuthenticated(true);
@@ -1076,7 +1079,13 @@ export function AuroraApp() {
 
       <div className="product-space" hidden={productSpace !== "letters"}>
       <PeopleDiscovery people={connectionsAndLetters.people} busy={connectionsAndLetters.peopleBusy} onRequest={userId => void connectionsAndLetters.requestPersonConnection(userId)} locale={skillLocale} />
-      <RelationsView relations={connectionsAndLetters.relations} selected={connectionsAndLetters.selectedRelation} timeline={connectionsAndLetters.relationTimeline} health={connectionsAndLetters.relationHealth} busy={connectionsAndLetters.relationBusy} onSelect={label => void connectionsAndLetters.openRelation(label)} />
+      <RelationsView relations={connectionsAndLetters.relations} selected={connectionsAndLetters.selectedRelation} timeline={connectionsAndLetters.relationTimeline} health={connectionsAndLetters.relationHealth} busy={connectionsAndLetters.relationBusy} onSelect={label => void connectionsAndLetters.openRelation(label)} locale={skillLocale} />
+      <SocialGroupsView groups={connectionsAndLetters.groups} invites={connectionsAndLetters.groupInvites} friends={connectionsAndLetters.friends}
+        selectedGroupId={connectionsAndLetters.selectedGroupId} members={connectionsAndLetters.groupMembers} busy={connectionsAndLetters.groupBusy}
+        onSelectGroup={id => void connectionsAndLetters.openGroup(id)} onCreateGroup={name => void connectionsAndLetters.createGroup(name)}
+        onInvite={(groupId, userId) => void connectionsAndLetters.inviteToGroup(groupId, userId)}
+        onRespondInvite={(memberId, decision) => void connectionsAndLetters.respondToGroupInvite(memberId, decision)}
+        onLeaveGroup={id => void connectionsAndLetters.leaveGroup(id)} locale={skillLocale} />
 
       <LettersInbox letterInbox={connectionsAndLetters.letterInbox} letterOutbox={connectionsAndLetters.letterOutbox} threads={connectionsAndLetters.letterThreads} threadLetters={connectionsAndLetters.threadLetters} selectedThreadId={connectionsAndLetters.selectedThreadId} draftBusy={connectionsAndLetters.draftBusy} replyBusyId={connectionsAndLetters.replyBusyId} onSendDraft={id => void connectionsAndLetters.sendDraft(id)} onOpenThread={id => { void connectionsAndLetters.openThread(id); navigate(letterThreadPath(id)); }} replyDrafts={connectionsAndLetters.replyDrafts} connectionRequests={connectionsAndLetters.connectionRequests} friends={connectionsAndLetters.friends}
         onReplyDraftChange={connectionsAndLetters.updateReplyDraft}

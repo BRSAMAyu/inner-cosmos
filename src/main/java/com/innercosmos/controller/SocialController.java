@@ -205,6 +205,91 @@ public class SocialController extends BaseController {
         return ApiResponse.ok(group);
     }
 
+    @PostMapping("/groups/{id}/invite")
+    public ApiResponse<SocialGroupMember> inviteToGroup(@PathVariable Long id, @RequestBody Map<String, String> body, HttpSession session) {
+        Long me = currentUserId(session);
+        SocialGroupMember myMembership = memberMapper.selectOne(new QueryWrapper<SocialGroupMember>()
+                .eq("group_id", id).eq("user_id", me).eq("status", "ACTIVE"));
+        if (myMembership == null) throw new BusinessException(ErrorCode.UNAUTHORIZED, "只有群组成员可以邀请他人");
+        Long targetUserId = Long.valueOf(body.get("userId"));
+        if (userMapper.selectById(targetUserId) == null) throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在");
+        SocialGroupMember existing = memberMapper.selectOne(new QueryWrapper<SocialGroupMember>()
+                .eq("group_id", id).eq("user_id", targetUserId));
+        if (existing != null && !"DECLINED".equals(existing.status) && !"LEFT".equals(existing.status)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "对方已经在群组中或已有待处理邀请");
+        }
+        SocialGroupMember invite = existing != null ? existing : new SocialGroupMember();
+        invite.groupId = id;
+        invite.userId = targetUserId;
+        invite.memberRole = "MEMBER";
+        invite.status = "PENDING";
+        if (existing != null) memberMapper.updateById(invite); else memberMapper.insert(invite);
+        return ApiResponse.ok(invite);
+    }
+
+    @GetMapping("/groups/invites")
+    public ApiResponse<List<Map<String, Object>>> groupInvites(HttpSession session) {
+        Long me = currentUserId(session);
+        List<SocialGroupMember> pending = memberMapper.selectList(new QueryWrapper<SocialGroupMember>()
+                .eq("user_id", me).eq("status", "PENDING"));
+        if (pending.isEmpty()) return ApiResponse.ok(List.of());
+        List<Long> groupIds = pending.stream().map(m -> m.groupId).toList();
+        Map<Long, SocialGroup> groups = groupMapper.selectList(new QueryWrapper<SocialGroup>().in("id", groupIds))
+                .stream().collect(java.util.stream.Collectors.toMap(g -> g.id, g -> g));
+        return ApiResponse.ok(pending.stream().map(m -> {
+            Map<String, Object> row = new HashMap<>();
+            row.put("memberId", m.id);
+            row.put("groupId", m.groupId);
+            SocialGroup group = groups.get(m.groupId);
+            row.put("groupName", group == null ? "" : group.groupName);
+            return row;
+        }).toList());
+    }
+
+    @PostMapping("/groups/invites/{memberId}/respond")
+    public ApiResponse<SocialGroupMember> respondToGroupInvite(@PathVariable Long memberId, @RequestBody Map<String, String> body, HttpSession session) {
+        Long me = currentUserId(session);
+        SocialGroupMember member = memberMapper.selectById(memberId);
+        if (member == null || !me.equals(member.userId)) throw new BusinessException(ErrorCode.UNAUTHORIZED, "无权操作此邀请");
+        if (!"PENDING".equals(member.status)) throw new BusinessException(ErrorCode.BAD_REQUEST, "该邀请已被处理");
+        member.status = "accept".equals(body.get("decision")) ? "ACTIVE" : "DECLINED";
+        memberMapper.updateById(member);
+        return ApiResponse.ok(member);
+    }
+
+    @PostMapping("/groups/{id}/leave")
+    public ApiResponse<Void> leaveGroup(@PathVariable Long id, HttpSession session) {
+        Long me = currentUserId(session);
+        SocialGroupMember member = memberMapper.selectOne(new QueryWrapper<SocialGroupMember>()
+                .eq("group_id", id).eq("user_id", me).eq("status", "ACTIVE"));
+        if (member == null) throw new BusinessException(ErrorCode.NOT_FOUND, "你不在这个群组中");
+        if ("OWNER".equals(member.memberRole)) throw new BusinessException(ErrorCode.BAD_REQUEST, "群主不能直接退出，请先转让或解散群组");
+        member.status = "LEFT";
+        memberMapper.updateById(member);
+        return ApiResponse.ok(null);
+    }
+
+    @GetMapping("/groups/{id}/members")
+    public ApiResponse<List<Map<String, Object>>> groupMembers(@PathVariable Long id, HttpSession session) {
+        Long me = currentUserId(session);
+        long myCount = memberMapper.selectCount(new QueryWrapper<SocialGroupMember>()
+                .eq("group_id", id).eq("user_id", me).eq("status", "ACTIVE"));
+        if (myCount == 0) throw new BusinessException(ErrorCode.UNAUTHORIZED, "无权查看此群组成员");
+        List<SocialGroupMember> members = memberMapper.selectList(new QueryWrapper<SocialGroupMember>()
+                .eq("group_id", id).eq("status", "ACTIVE"));
+        List<Long> userIds = members.stream().map(m -> m.userId).toList();
+        Map<Long, User> users = userIds.isEmpty() ? Map.of() : userMapper.selectList(new QueryWrapper<User>().in("id", userIds))
+                .stream().collect(java.util.stream.Collectors.toMap(u -> u.id, u -> u));
+        return ApiResponse.ok(members.stream().map(m -> {
+            Map<String, Object> row = new HashMap<>();
+            row.put("userId", m.userId);
+            row.put("memberRole", m.memberRole);
+            User user = users.get(m.userId);
+            row.put("nickname", user == null ? "" : user.nickname);
+            return row;
+        }).toList());
+    }
+
     private String relationStatus(Long me, Long other) {
         FriendRelation relation = friendMapper.selectOne(new QueryWrapper<FriendRelation>()
                 .and(q -> q.eq("requester_id", me).eq("addressee_id", other)

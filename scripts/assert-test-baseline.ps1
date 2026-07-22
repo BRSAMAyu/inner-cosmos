@@ -1,5 +1,5 @@
 param(
-    [int]$MinimumTests = 940,
+    [int]$MinimumTests = 950,
     # OidcLiveDecoderTest is an intentional opt-in contract test (@EnabledIfEnvironmentVariable)
     # that only runs when INNER_COSMOS_TEST_ACCESS_TOKEN is set by an operator against a real
     # OIDC IdP; ordinary CI does not set it, so exactly 1 skip is expected and allowed here.

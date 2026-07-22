@@ -48,4 +48,14 @@ describe("RelationsView", () => {
     act(() => vi.advanceTimersByTime(1000));
     expect(screen.getByText(/正在读取「妈妈」的时间线/)).toBeVisible();
   });
+
+  it("renders in English when locale is en-SG", () => {
+    render(<RelationsView locale="en-SG" relations={[rel({ id: 7, relationLabel: "Alex" })]} selected="Alex"
+      timeline={[{ timestamp: "2026-07-17T10:00:00", emotions: "warm", summary: "had dinner together" }]}
+      health={{ relationLabel: "Alex", healthScore: 0.82 }} busy={false} onSelect={() => undefined} />);
+    expect(screen.getByRole("heading", { name: "Relationship warmth, seen slowly" })).toBeVisible();
+    expect(screen.getByText(/Warm · 82%/)).toBeVisible();
+    expect(screen.getByText(/Alex's timeline/)).toBeVisible();
+    expect(screen.getByText("had dinner together")).toBeVisible();
+  });
 });
