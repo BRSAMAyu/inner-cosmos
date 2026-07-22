@@ -219,6 +219,20 @@ h1 { margin: 14px 0; font-family: Georgia, "Noto Serif SC", serif; font-size: cl
 .capsule-summary { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }.capsule-summary h3 { margin: 6px 0; font: 500 1.35rem Georgia,"Noto Serif SC",serif; }.capsule-summary p { margin: 0; color: #b8aaa0; line-height: 1.55; }.capsule-status { color: #d0a97e; font-size: .72rem; letter-spacing: .06em; }.genome-badge { display: grid; flex: 0 0 auto; place-items: center; width: 68px; height: 68px; border: 1px solid #d9ad7d47; border-radius: 50%; background: #ac673226; }.genome-badge strong { font: 500 1.2rem Georgia,serif; }.genome-badge small { color: #a88f7a; font-size: .62rem; }.fidelity-note { margin: 4px 0 0; color: #a88f7a; font-size: .74rem; }.genome-history { margin: 13px 0; padding: 10px 12px; border: 1px solid #ffffff0e; border-radius: 12px; color: #bcaea3; }.genome-history summary { cursor: pointer; }.genome-history article { display: grid; grid-template-columns: 110px 1fr auto; gap: 10px; padding: 8px 0; border-top: 1px solid #ffffff0c; font-size: .74rem; }.genome-history article span,.genome-history article small { color: #8f837a; }
 .sandbox-composer { display: grid; grid-template-columns: 1fr auto; gap: 9px; align-items: end; }.sandbox-composer textarea { min-height: 74px; resize: vertical; }.sandbox-composer .resonance-primary { margin: 0; }.sandbox-response { margin-top: 12px; padding: 16px; border: 1px solid #cc9e7040; border-radius: 18px; background: linear-gradient(145deg,#221710,#101512); }.sandbox-response > span,.sandbox-response > small { color: #9c8d81; font-size: .7rem; }.sandbox-response p { line-height: 1.68; }.sandbox-ratings { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }.sandbox-ratings button { padding: 6px 10px; border: 1px solid #ffffff18; border-radius: 999px; color: #baa99c; background: #ffffff07; }.sandbox-ratings button.active { color: #291a10; background: var(--accent-aurora-soft); }.resonance-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; margin-top: 13px; }.resonance-actions .resonance-primary { margin-top: 0; }.resonance-actions .danger-quiet { color: var(--danger-soft); border-color: #d77b7142; background: #7d302b1f; }
 .skill-suggestion { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-top: 18px; padding: 15px 17px; border: 1px solid #aa8bd34d; border-radius: 18px; background: linear-gradient(135deg,#6a514029,#171722e8); }.skill-suggestion > div:first-child { display: grid; gap: 4px; }.skill-suggestion span { color: #9d8bb3; font-size: .68rem; letter-spacing: .08em; }.skill-suggestion strong { color: var(--text-primary); }.skill-suggestion p { margin: 0; color: var(--text-muted); font-size: .78rem; line-height: 1.5; }.skill-suggestion > div:last-child { display: flex; flex-wrap: wrap; gap: 7px; }.skill-suggestion button { padding: 7px 11px; border: 1px solid #c7a9c04a; border-radius: 999px; color: var(--text-primary); background: #8d74822d; white-space: nowrap; }.skill-suggestion button.quiet { color: var(--text-muted); background: transparent; }
+
+/* Safety-critical, deliberately distinct from every other banner/card: warm-urgent (rose), not the
+   cold-red "error" convention the design system otherwise forbids. Persistent until dismissed --
+   no auto-fade animation. */
+.safety-resource-card { display: grid; gap: 10px; margin: 16px 0; padding: 18px 20px; border: 1px solid #d0918d80; border-radius: 20px; background: linear-gradient(135deg,#5b302d4d,#28221ee8); box-shadow: 0 4px 18px rgba(0,0,0,.18); }
+.safety-resource-card > strong { color: #f0c4bc; font-size: 1.05rem; }
+.safety-resource-card > p { margin: 0; color: var(--text-primary); font-size: .88rem; line-height: 1.6; }
+.safety-resource-list { display: grid; gap: 8px; padding: 12px 14px; border-radius: 14px; background: #ffffff0a; }
+.safety-resource-list p { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin: 0; color: var(--text-primary); font-size: .84rem; line-height: 1.5; }
+.safety-resource-list .phone-link { color: #f0c4bc; font-weight: 600; white-space: nowrap; text-decoration: none; }
+.safety-resource-list .phone-link:hover { text-decoration: underline; }
+.safety-resource-card-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.safety-resource-card-actions button { padding: 8px 16px; border: 1px solid #d0918d80; border-radius: 999px; color: #f0c4bc; background: #d0918d26; }
+.safety-resource-card-actions button.quiet { color: var(--text-muted); background: transparent; border-color: #ffffff24; }
 .conversation { min-height: 360px; max-height: 55vh; overflow-y: auto; padding: 30px 4px; display: flex; flex-direction: column; gap: 18px; scrollbar-color: #52463b transparent; scroll-margin-top: 108px; }
 .conversation.empty-state { min-height: 112px; padding: 14px 4px; }
 .empty { margin: auto; text-align: center; color: var(--text-faint); }.empty span { font-size: 2rem; color: var(--accent-sage-soft); }
@@ -382,5 +396,34 @@ footer { padding: 18px 4px; display: flex; justify-content: space-between; color
 .pwa-banner-primary { padding: 8px 16px; border: none; border-radius: var(--r-btn); background: var(--accent-aurora); color: var(--surface-canvas); font-size: 13px; font-weight: 500; }
 .pwa-banner-dismiss { padding: 8px 14px; border: 1px solid var(--hairline-strong); border-radius: var(--r-btn); background: transparent; color: var(--text-muted); font-size: 13px; }
 @keyframes pwa-banner-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Safety Harbor (Phase 0 port of the legacy safety-harbor.html): a freely reachable support space,
+   deliberately calm -- no glass/ripple/stardust motifs, no urgency accents (the rose/urgent tone
+   belongs to the crisis-alert card only, not this page's own quiet register). */
+.safety-harbor { max-width: 720px; margin: 0 auto; padding: 32px 20px 60px; }
+.safety-hero { text-align: center; padding: 12px 0 30px; }
+.safety-hero .route-hint { display: block; color: var(--text-muted); font-size: .8rem; margin-bottom: 6px; }
+.safety-hero h1 { font: 500 2.1rem Georgia,"Noto Serif SC",serif; margin: 0 0 8px; color: var(--text-primary); }
+.safety-hero p { color: var(--text-muted); font-size: .92rem; }
+.safety-section { margin-bottom: 30px; }
+.safety-section h2 { font: 500 1.2rem Georgia,"Noto Serif SC",serif; margin: 0 0 8px; color: var(--text-primary); }
+.safety-section > p { color: var(--text-muted); font-size: .85rem; line-height: 1.6; margin: 0 0 12px; }
+.breath-area { text-align: center; padding: 16px 0; }
+.breathing-circle { width: 90px; height: 90px; border-radius: 50%; margin: 0 auto 14px; background: radial-gradient(circle, color-mix(in srgb, var(--accent-sage) 22%, transparent), color-mix(in srgb, var(--accent-sage) 4%, transparent)); border: 2px solid color-mix(in srgb, var(--accent-sage) 30%, transparent); animation: safety-breathe 8s var(--ease-flow) infinite; }
+@keyframes safety-breathe { 0% { transform: scale(1); } 25% { transform: scale(1.18); } 50% { transform: scale(1); } 75% { transform: scale(.88); } 100% { transform: scale(1); } }
+.breath-label { color: var(--text-muted); font-size: .9rem; }
+.grounding-list { display: flex; flex-direction: column; gap: 8px; }
+.grounding-item { display: flex; gap: 14px; align-items: flex-start; padding: 14px 18px; border-radius: var(--r-card); border-left: 3px solid var(--accent-sage); background: #ffffff08; }
+.grounding-num { font: 500 1.4rem Georgia,serif; color: var(--accent-sage); line-height: 1; min-width: 24px; }
+.grounding-text strong { display: block; font-size: .9rem; margin-bottom: 2px; color: var(--text-primary); }
+.grounding-text p { margin: 0; font-size: .8rem; color: var(--text-muted); }
+.care-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(200px,1fr)); gap: 12px; }
+.care-card { padding: 16px; border-radius: var(--r-card); background: #ffffff08; border: 1px solid #ffffff14; }
+.care-card strong { display: block; font-size: .875rem; margin-bottom: 4px; color: var(--text-primary); }
+.care-card p { margin: 0; font-size: .8rem; color: var(--text-muted); line-height: 1.5; }
+.safety-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ffffff14; }
+.safety-actions button { padding: 10px 18px; border: 1px solid var(--accent-aurora); border-radius: var(--r-pill); color: var(--surface-canvas); background: var(--accent-aurora); }
+.safety-actions button.quiet { color: var(--text-muted); background: transparent; border-color: #ffffff24; }
+@media (max-width: 640px) { .care-grid { grid-template-columns: 1fr; } }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }

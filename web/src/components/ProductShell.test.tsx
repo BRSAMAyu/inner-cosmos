@@ -81,7 +81,8 @@ describe("ProductShell", () => {
     const props = {
       native: false, connected: true, wakeIntentCount: 1, activeClaimCount: 2,
       publicCapsuleCount: 1, friendCount: 3, onNavigate: () => undefined,
-      onRequestPush: () => undefined, onRequestMicrophone: () => undefined, onLogout: () => undefined
+      onRequestPush: () => undefined, onRequestMicrophone: () => undefined, onLogout: () => undefined,
+      onOpenSafetyHarbor: () => undefined
     };
     const { rerender } = render(<MeSpace {...props} locale="zh-CN" />);
     expect(screen.getByRole("heading", { name: "由你决定，Aurora 怎样参与。" })).toBeVisible();
@@ -92,5 +93,18 @@ describe("ProductShell", () => {
     expect(screen.getByText("1 active plan")).toBeVisible(); // singular
     expect(screen.getByText("1 public capsule · 3 mutual connections")).toBeVisible(); // singular + plural
     expect(screen.getByRole("button", { name: "Sign out of this device" })).toBeVisible();
+  });
+
+  it("MeSpace always offers a way to reach the safety harbor, not just during a triggered alert", () => {
+    const onOpenSafetyHarbor = vi.fn();
+    const props = {
+      native: false, connected: true, wakeIntentCount: 0, activeClaimCount: 0,
+      publicCapsuleCount: 0, friendCount: 0, onNavigate: () => undefined,
+      onRequestPush: () => undefined, onRequestMicrophone: () => undefined, onLogout: () => undefined,
+      onOpenSafetyHarbor
+    };
+    render(<MeSpace {...props} locale="zh-CN" />);
+    fireEvent.click(screen.getByRole("button", { name: /安全避风港/ }));
+    expect(onOpenSafetyHarbor).toHaveBeenCalledOnce();
   });
 });

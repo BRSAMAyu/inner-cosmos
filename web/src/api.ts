@@ -468,6 +468,7 @@ export const api = {
     return result;
   },
   exportData: () => request<Record<string, unknown>>("/api/user/export"),
+  safetyResources: () => request<string[]>("/api/safety/resources"),
   dataRightsReceipts: (limit?: number) => request<DataRetractionReceipt[]>(
     "/api/me/data-rights/receipts" + (limit ? `?limit=${limit}` : "")),
   createSession: () => request<{ id: number }>("/api/dialog/session/create", {

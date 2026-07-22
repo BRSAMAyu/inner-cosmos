@@ -92,9 +92,10 @@ export function AuroraConversation({ messages, activeTurnId, thinkingStage = nul
 
   return <>
     <section className={`conversation ${messages.length === 0 ? "empty-state" : "has-messages"}`}
-      aria-live="polite" aria-label={t.convAria}>
+      aria-label={t.convAria}>
       {messages.length === 0 && <div className="empty"><span>✦</span><p>{t.empty}</p></div>}
-      {messages.map(message => <article className={`message ${message.speaker.toLowerCase()} ${message.partial ? "partial" : ""}`} key={message.key}>
+      {messages.map(message => <article className={`message ${message.speaker.toLowerCase()} ${message.partial ? "partial" : ""}`} key={message.key}
+        aria-live={message.partial ? "polite" : undefined}>
         <span className="speaker">{message.speaker === "AURORA" ? "Aurora" : t.speakerYou}</span>
         <p>{message.text || "…"}</p>
         {message.partial && message.text && <small>{t.partialHint}</small>}

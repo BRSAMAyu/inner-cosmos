@@ -13,6 +13,7 @@ vi.mock("../api", () => ({
     wakeIntent: vi.fn(),
     wakeIntents: vi.fn(),
     notifications: vi.fn(),
+    safetyResources: vi.fn(),
     timeline: vi.fn(),
     stop: vi.fn(),
     negotiateWakeIntent: vi.fn(),
@@ -180,6 +181,59 @@ describe("useAuroraSession -- send / streaming / interrupt", () => {
     expect(setStatus).toHaveBeenLastCalledWith("Aurora 在这里，等你接着说");
   });
 
+  it("a safety event sets a persistent safetyAlert that survives later status updates until dismissed", async () => {
+    let capturedOnEvent: ((event: AuroraStreamEvent) => void) | undefined;
+    vi.mocked(streamAurora).mockImplementation(async (_input, _signal, onEvent) => {
+      capturedOnEvent = onEvent;
+    });
+    vi.mocked(api.psychologySkillSuggestion).mockResolvedValue(null);
+    const { result } = setup();
+    await act(async () => { await result.current.resolveSession(); });
+    act(() => { result.current.setDraft("我撑不下去了"); });
+    await act(async () => { await result.current.send({ preventDefault: () => undefined } as never); });
+
+    act(() => { capturedOnEvent!({ id: "1", type: "turn.started", payload: { turnId: 9 } }); });
+    expect(result.current.safetyAlert).toBeNull();
+
+    act(() => { capturedOnEvent!({
+      id: "2", type: "safety",
+      payload: { riskLevel: "HIGH", featureTarget: "AURORA_CHAT", safeMessage: "先看看这些资源" }
+    }); });
+
+    expect(result.current.safetyAlert).toEqual({
+      riskLevel: "HIGH", featureTarget: "AURORA_CHAT", safeMessage: "先看看这些资源"
+    });
+    expect(result.current.activeTurnId).toBeNull();
+
+    // A later, unrelated status-bearing event must not silently clear the alert.
+    act(() => { capturedOnEvent!({ id: "3", type: "turn.completed", payload: { message: "done" } }); });
+    expect(result.current.safetyAlert).not.toBeNull();
+
+    act(() => { result.current.dismissSafetyAlert(); });
+    expect(result.current.safetyAlert).toBeNull();
+  });
+
+  it("an error event ends the turn like every other terminal event, instead of leaving the composer stuck", async () => {
+    let capturedOnEvent: ((event: AuroraStreamEvent) => void) | undefined;
+    vi.mocked(streamAurora).mockImplementation(async (_input, _signal, onEvent) => {
+      capturedOnEvent = onEvent;
+    });
+    vi.mocked(api.psychologySkillSuggestion).mockResolvedValue(null);
+    const { result, setStatus } = setup();
+    await act(async () => { await result.current.resolveSession(); });
+    act(() => { result.current.setDraft("接着说"); });
+    await act(async () => { await result.current.send({ preventDefault: () => undefined } as never); });
+
+    act(() => { capturedOnEvent!({ id: "1", type: "turn.started", payload: { turnId: 9 } }); });
+    expect(result.current.activeTurnId).toBe(9);
+
+    act(() => { capturedOnEvent!({ id: "2", type: "error", payload: { message: "流式回应发生错误" } }); });
+
+    expect(result.current.activeTurnId).toBeNull();
+    expect(result.current.runtimeSignal.stage).toBe("idle");
+    expect(setStatus).toHaveBeenLastCalledWith("流式回应发生错误");
+  });
+
   it("stop aborts the in-flight turn, marks the live bubble partial and resets activeTurnId", async () => {
     let capturedOnEvent: ((event: AuroraStreamEvent) => void) | undefined;
     vi.mocked(streamAurora).mockImplementation(async (_input, signal, onEvent) => {
@@ -204,6 +258,20 @@ describe("useAuroraSession -- send / streaming / interrupt", () => {
     expect(api.stop).toHaveBeenCalledExactlyOnceWith(9);
     expect(result.current.activeTurnId).toBeNull();
     expect(result.current.messages.find(m => m.key === "live-9-0")?.partial).toBe(true);
+  });
+});
+
+describe("useAuroraSession -- safety resources", () => {
+  it("loadSafetyResources fetches and stores the real backend crisis-resource list", async () => {
+    vi.mocked(api.safetyResources).mockResolvedValue([
+      "如果你正处于紧急危险中，请立即拨打 110（报警），或联系身边可信赖的人。"
+    ]);
+    const { result } = setup();
+    expect(result.current.safetyResources).toEqual([]);
+    await act(async () => { await result.current.loadSafetyResources(); });
+    expect(result.current.safetyResources).toEqual([
+      "如果你正处于紧急危险中，请立即拨打 110（报警），或联系身边可信赖的人。"
+    ]);
   });
 });
 

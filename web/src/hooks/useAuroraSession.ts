@@ -22,6 +22,8 @@ export type AuroraRuntimeSignal = {
   repaired?: boolean;
 };
 
+export type AuroraSafetyAlert = { riskLevel: string; featureTarget: string; safeMessage?: string };
+
 const terminal = new Set<TurnStatus>(["COMPLETED", "INTERRUPTED", "CANCELLED"]);
 
 function toUi(rows: DialogMessage[]): AuroraUiMessage[] {
@@ -53,6 +55,10 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
   const [wakeBusy, setWakeBusy] = useState(false);
   const [returnWhen, setReturnWhen] = useState("明天早上 8:30");
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [safetyAlert, setSafetyAlert] = useState<AuroraSafetyAlert | null>(null);
+  const dismissSafetyAlert = useCallback(() => setSafetyAlert(null), []);
+  const [safetyResources, setSafetyResources] = useState<string[]>([]);
+  const loadSafetyResources = useCallback(() => api.safetyResources().then(setSafetyResources), []);
 
   const abortRef = useRef<AbortController | null>(null);
   const activeTurnRef = useRef<number | null>(null);
@@ -258,9 +264,15 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
         break;
       case "safety":
         finishTurn();
+        setSafetyAlert({
+          riskLevel: event.payload.riskLevel,
+          featureTarget: event.payload.featureTarget,
+          safeMessage: event.payload.safeMessage
+        });
         setStatus("这段内容需要把现实安全放在第一位，请先查看支持资源。");
         break;
       case "error":
+        finishTurn();
         setStatus(event.payload.message || "流式回应发生错误");
         break;
     }
@@ -374,7 +386,8 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
 
   return {
     sessionId, messages, draft, setDraft, mode, setMode, activeTurnId, runtimeSignal,
-    wakeIntents, wakeBusy, returnWhen, setReturnWhen, notifications,
+    wakeIntents, wakeBusy, returnWhen, setReturnWhen, notifications, safetyAlert, dismissSafetyAlert,
+    safetyResources, loadSafetyResources,
     send, stop, scheduleReturn, respondToReturn, postponeReturn, cancelReturn,
     resolveSession, replaceFromHistory, loadWakeIntents, loadNotifications, refreshNotifications,
     resumeConversation, openMobileWakeIntent, resetSession

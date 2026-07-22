@@ -7,6 +7,8 @@ import { mobileOidc } from "./mobile-auth";
 import { isTauriRuntime } from "./desktop-runtime";
 import { capsulePath, letterThreadPath, MeSpace, productSpaceFromPath, productSpaces, ProductShellNavigation, resourceFromPath, spacePath, type ProductSpace } from "./components/ProductShell";
 import { AuroraConversation } from "./components/AuroraConversation";
+import { SafetyResourceCard } from "./components/SafetyResourceCard";
+import { SafetyHarborPage } from "./components/SafetyHarborPage";
 import { AuroraSelfSpace } from "./components/AuroraSelfSpace";
 import { UnderstandingCorrection, type CorrectionTarget } from "./components/UnderstandingCorrection";
 import { ClaimCandidateReview } from "./components/ClaimCandidateReview";
@@ -187,6 +189,7 @@ export function AuroraApp() {
         auroraSession.replaceFromHistory(resolved.sessionId),
         auroraSession.loadWakeIntents(),
         auroraSession.loadNotifications(),
+        auroraSession.loadSafetyResources(),
         api.selfEvolution().then(setSelfEvolution),
         api.understandingClaims().then(setClaims),
         api.starfield("TIME").then(setStarfield),
@@ -231,6 +234,7 @@ export function AuroraApp() {
       }
     }
   }, [auroraSession.resolveSession, auroraSession.replaceFromHistory, auroraSession.loadWakeIntents, auroraSession.loadNotifications,
+      auroraSession.loadSafetyResources,
       connectionsAndLetters.loadLetterInbox, connectionsAndLetters.loadConnectionRequests, connectionsAndLetters.loadFriends,
       connectionsAndLetters.loadLetterOutbox, connectionsAndLetters.loadPeople, connectionsAndLetters.loadRelations, connectionsAndLetters.loadLetterThreads]);
 
@@ -850,6 +854,15 @@ export function AuroraApp() {
   if (!authenticated) return <AuthGate native={mobileState.native} onSuccess={bootstrap} locale={skillLocale}
     externalError={bootstrapError ?? ""} />;
 
+  // A freely reachable support space (Phase 0, safety-critical) -- deliberately NOT one of the five
+  // ProductSpace tabs (see ProductShell.tsx's five-space information architecture), so it renders as
+  // its own standalone route instead of another `hidden`-toggled product-space div.
+  if (location.pathname === "/safety-harbor" || location.pathname.startsWith("/safety-harbor/")) {
+    return <SafetyHarborPage resources={auroraSession.safetyResources} locale={skillLocale}
+      onBack={() => navigate(spacePath("aurora"))}
+      onTalkToAurora={() => navigate(spacePath("aurora"))} />;
+  }
+
   return (
     <main className="shell" data-product-space={productSpace} aria-label="Authenticated Inner Cosmos">
       {/* Real routes for the five spaces. Each space's content below still mounts
@@ -898,6 +911,10 @@ export function AuroraApp() {
           golden-journeys.md J1 step 4 and 对齐文档/20 4.3's "旅程像能力陈列" finding. */}
       {skillSuggestion && <SkillSuggestionBanner suggestion={skillSuggestion} locale={skillLocale}
         onOpen={openSuggestedSkill} onDismiss={() => setSkillSuggestion(null)} />}
+
+      <SafetyResourceCard alert={auroraSession.safetyAlert} resources={auroraSession.safetyResources}
+        locale={skillLocale} onDismiss={auroraSession.dismissSafetyAlert}
+        onOpenHarbor={() => navigate("/safety-harbor")} />
 
       <AuroraConversation messages={auroraSession.messages} activeTurnId={auroraSession.activeTurnId}
         thinkingStage={auroraSession.activeTurnId !== null && (auroraSession.runtimeSignal.stage === "understanding" || auroraSession.runtimeSignal.stage === "composing") ? auroraSession.runtimeSignal.stage : null}
@@ -1017,7 +1034,8 @@ export function AuroraApp() {
           activeClaimCount={claims.filter(claim => claim.status === "ACTIVE").length}
           publicCapsuleCount={capsules.filter(capsule => capsule.visibilityStatus === "PUBLIC").length}
           friendCount={connectionsAndLetters.friends.length} onNavigate={navigateSpace} onRequestPush={() => void requestMobilePush()}
-          onRequestMicrophone={() => void requestMobileMicrophone()} onLogout={() => void logout()} locale={skillLocale} />
+          onRequestMicrophone={() => void requestMobileMicrophone()} onLogout={() => void logout()}
+          onOpenSafetyHarbor={() => navigate("/safety-harbor")} locale={skillLocale} />
         <PortraitView dimensions={portrait} history={portraitHistory} calibrated={portraitCalibrated} busyDim={portraitBusy}
           onLoadHistory={dim => void loadPortraitHistory(dim)} onCalibrate={(dim, oldValue, newValue) => void submitPortraitCalibration(dim, oldValue, newValue)} />
         <AccountSettings busy={accountBusy} message={accountMessage} onChangePassword={(oldPassword, newPassword) => void changeAccountPassword(oldPassword, newPassword)}

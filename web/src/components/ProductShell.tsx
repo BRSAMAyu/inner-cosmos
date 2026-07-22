@@ -83,6 +83,7 @@ const ME_COPY: Record<Locale, {
   returns: string; returnsValue: (n: number) => string; returnsAction: string;
   understanding: string; understandingValue: (n: number) => string; understandingAction: string;
   resonance: string; resonanceValue: (pub: number, friends: number) => string; resonanceAction: string;
+  safety: string; safetyValue: string; safetyAction: string;
   push: string; mic: string; logout: string;
 }> = {
   "zh-CN": {
@@ -93,6 +94,7 @@ const ME_COPY: Record<Locale, {
     returns: "主动回来", returnsValue: n => `${n} 个有效约定`, returnsAction: "查看和调整",
     understanding: "理解与记忆", understandingValue: n => `${n} 条已确认理解`, understandingAction: "纠正、追溯或撤回",
     resonance: "共鸣与连接", resonanceValue: (p, f) => `${p} 个公开共鸣体 · ${f} 个双向连接`, resonanceAction: "管理授权",
+    safety: "需要先停一下？", safetyValue: "呼吸练习、着陆练习与支持资源，随时可用", safetyAction: "打开安全避风港",
     push: "管理通知权限", mic: "管理麦克风权限", logout: "安全退出这台设备"
   },
   "en-SG": {
@@ -103,15 +105,17 @@ const ME_COPY: Record<Locale, {
     returns: "Proactive returns", returnsValue: n => `${n} active plan${n === 1 ? "" : "s"}`, returnsAction: "View and adjust",
     understanding: "Understanding & memory", understandingValue: n => `${n} confirmed understanding${n === 1 ? "" : "s"}`, understandingAction: "Correct, trace or withdraw",
     resonance: "Resonance & connection", resonanceValue: (p, f) => `${p} public capsule${p === 1 ? "" : "s"} · ${f} mutual connection${f === 1 ? "" : "s"}`, resonanceAction: "Manage authorization",
+    safety: "Need to pause first?", safetyValue: "Breathing, grounding and support resources, always available", safetyAction: "Open the safety harbor",
     push: "Manage notifications", mic: "Manage microphone", logout: "Sign out of this device"
   }
 };
 
 export function MeSpace({ native, connected, wakeIntentCount, activeClaimCount, publicCapsuleCount,
-  friendCount, onNavigate, onRequestPush, onRequestMicrophone, onLogout, locale = "zh-CN" }: {
+  friendCount, onNavigate, onRequestPush, onRequestMicrophone, onLogout, onOpenSafetyHarbor, locale = "zh-CN" }: {
   native: boolean; connected: boolean; wakeIntentCount: number; activeClaimCount: number;
   publicCapsuleCount: number; friendCount: number; onNavigate: (space: ProductSpace) => void;
-  onRequestPush: () => void; onRequestMicrophone: () => void; onLogout: () => void; locale?: Locale;
+  onRequestPush: () => void; onRequestMicrophone: () => void; onLogout: () => void;
+  onOpenSafetyHarbor: () => void; locale?: Locale;
 }) {
   const t = ME_COPY[locale];
   return <section className="controls-space" aria-label={t.ariaLabel}>
@@ -122,6 +126,7 @@ export function MeSpace({ native, connected, wakeIntentCount, activeClaimCount, 
       <article><strong>{t.returns}</strong><span>{t.returnsValue(wakeIntentCount)}</span><button type="button" onClick={() => onNavigate("aurora")}>{t.returnsAction}</button></article>
       <article><strong>{t.understanding}</strong><span>{t.understandingValue(activeClaimCount)}</span><button type="button" onClick={() => onNavigate("cosmos")}>{t.understandingAction}</button></article>
       <article><strong>{t.resonance}</strong><span>{t.resonanceValue(publicCapsuleCount, friendCount)}</span><button type="button" onClick={() => onNavigate("resonance")}>{t.resonanceAction}</button></article>
+      <article><strong>{t.safety}</strong><span>{t.safetyValue}</span><button type="button" onClick={onOpenSafetyHarbor}>{t.safetyAction}</button></article>
     </div>
     <AppearanceToggle />
     {native && <div className="mobile-actions"><button type="button" onClick={onRequestPush}>{t.push}</button><button type="button" onClick={onRequestMicrophone}>{t.mic}</button></div>}

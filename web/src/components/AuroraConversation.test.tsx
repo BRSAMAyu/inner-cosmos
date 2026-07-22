@@ -31,6 +31,24 @@ describe("AuroraConversation", () => {
     expect(screen.getByRole("region", { name: "与 Aurora 的对话" })).not.toHaveClass("empty-state");
   });
 
+  it("scopes aria-live to only the actively streaming/partial bubble, not the whole conversation region", () => {
+    const props = { activeTurnId: 9, draft: "", sessionReady: true,
+      onDraftChange: () => undefined, onSubmit: (event: FormEvent<HTMLFormElement>) => event.preventDefault(),
+      onStop: () => undefined };
+    render(<AuroraConversation {...props} messages={[
+      { key: "u1", speaker: "USER", text: "我想说一件事" },
+      { key: "a1", speaker: "AURORA", text: "已经完成的一句", partial: false },
+      { key: "a2", speaker: "AURORA", text: "还在生成中", partial: true }
+    ]} />);
+    // Screen readers must not re-announce every token across the whole region -- only the
+    // one bubble that is actively streaming should be a live region.
+    expect(screen.getByRole("region", { name: "与 Aurora 的对话" })).not.toHaveAttribute("aria-live");
+    const streamingBubble = screen.getByText("还在生成中").closest("article");
+    expect(streamingBubble).toHaveAttribute("aria-live", "polite");
+    const completedBubble = screen.getByText("已经完成的一句").closest("article");
+    expect(completedBubble).not.toHaveAttribute("aria-live");
+  });
+
   it("preserves multi-message and partial interruption semantics", () => {
     render(<AuroraConversation messages={[
       { key: "u1", speaker: "USER", text: "先听我说" },
