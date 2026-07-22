@@ -1,6 +1,11 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { InstallPrompt } from "./InstallPrompt";
+
+// jsdom's default navigator.language (en-US) would otherwise make loadLocale() fall back to
+// en-SG for every test with no stored preference -- pin zh-CN explicitly so these tests assert
+// deterministic default behavior regardless of the test runner's environment.
+beforeEach(() => localStorage.setItem("ic.locale", "zh-CN"));
 
 // B5-pwa-mobile: pins the in-app install affordance's visibility logic against the browser's
 // beforeinstallprompt contract -- MUST call event.preventDefault() synchronously (or the
@@ -73,5 +78,13 @@ describe("InstallPrompt", () => {
       window.dispatchEvent(new Event("appinstalled"));
     });
     expect(screen.queryByRole("button", { name: "安装内宇宙" })).not.toBeInTheDocument();
+  });
+
+  it("renders in English when the stored locale preference is en-SG", () => {
+    localStorage.setItem("ic.locale", "en-SG");
+    render(<InstallPrompt />);
+    fireBeforeInstallPrompt();
+    expect(screen.getByRole("button", { name: "Install Inner Cosmos" })).toBeInTheDocument();
+    localStorage.removeItem("ic.locale");
   });
 });

@@ -97,4 +97,10 @@ describe("加载四态 三档时序", () => {
     screen.getByRole("button", { name: "重试" }).click();
     expect(onRetry).toHaveBeenCalledOnce();
   });
+
+  it("ConnectError renders in English when locale is en-SG", () => {
+    render(<ConnectError locale="en-SG" message="Could not reach the backend" onRetry={() => undefined} />);
+    expect(screen.getByText("Couldn't connect to your Inner Cosmos")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Retry" })).toBeVisible();
+  });
 });

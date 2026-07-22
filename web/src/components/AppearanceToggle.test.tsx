@@ -31,4 +31,12 @@ describe("AppearanceToggle", () => {
     expect(document.documentElement.dataset.theme).toBeUndefined();
     expect(screen.getByRole("button", { name: "夜色" })).toHaveAttribute("aria-pressed", "true");
   });
+
+  it("renders in English when locale is en-SG", () => {
+    render(<AppearanceToggle locale="en-SG" />);
+    expect(screen.getByRole("group", { name: "Appearance" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Follow time" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Day" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Night" })).toBeVisible();
+  });
 });

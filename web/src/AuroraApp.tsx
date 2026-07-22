@@ -900,7 +900,7 @@ export function AuroraApp() {
   </div></main>;
   if (authenticated === null) return <main className="login-shell"><div className="login">
     {bootstrapError
-      ? <ConnectError message={bootstrapError} onRetry={() => void bootstrap()} />
+      ? <ConnectError message={bootstrapError} onRetry={() => void bootstrap()} locale={skillLocale} />
       : <LoadingText busy>{tt.connecting.replace(/…$/, "")}</LoadingText>}
   </div></main>;
   if (!authenticated) return <AuthGate native={mobileState.native} onSuccess={bootstrap} locale={skillLocale}
@@ -1102,7 +1102,7 @@ export function AuroraApp() {
           onRequestMicrophone={() => void requestMobileMicrophone()} onLogout={() => void logout()}
           onOpenSafetyHarbor={() => navigate("/safety-harbor")} locale={skillLocale} />
         <PortraitView dimensions={portrait} history={portraitHistory} calibrated={portraitCalibrated} busyDim={portraitBusy}
-          onLoadHistory={dim => void loadPortraitHistory(dim)} onCalibrate={(dim, oldValue, newValue) => void submitPortraitCalibration(dim, oldValue, newValue)} />
+          onLoadHistory={dim => void loadPortraitHistory(dim)} onCalibrate={(dim, oldValue, newValue) => void submitPortraitCalibration(dim, oldValue, newValue)} locale={skillLocale} />
         <AccountSettings busy={accountBusy} message={accountMessage} onChangePassword={(oldPassword, newPassword) => void changeAccountPassword(oldPassword, newPassword)}
           onExportData={() => void exportAccountData()} onDeleteAccount={password => void deleteAccount(password)}
           profile={userProfile} profileBusy={profileBusy} onSaveProfile={patch => void saveProfile(patch)} locale={skillLocale} />

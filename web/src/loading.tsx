@@ -7,6 +7,7 @@
 
 import { useEffect, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { prefersReducedMotion } from "./ripple";
+import type { Locale } from "./i18n";
 
 export type LoadPhase = "idle" | "text" | "anim";
 
@@ -64,6 +65,9 @@ export function LoadingText({
   if (phase === "idle") return null;
   return (
     <p className={`loading-text ${className ?? ""}`.trim()} role="status" aria-live="polite">
+      {/* i18n-completeness remaining: every real caller passes its own bilingual children, so
+          this Chinese fallback only shows if a future caller forgets to. Not worth a `locale`
+          prop on this generic primitive until/unless that actually happens. */}
       {children ?? "正在加载"}
       <LoadingDots animated={phase === "anim"} />
     </p>
@@ -75,13 +79,19 @@ export function LoadingText({
  * 抽成独立组件以便单测；此前 AuroraApp bootstrap 非鉴权失败会把 authenticated 停在 null，
  * 用户永久卡在连接加载屏——本组件让失败可见且可恢复。
  */
-export function ConnectError({ message, onRetry }: { message: string; onRetry: () => void }) {
+const CONNECT_ERROR_COPY: Record<Locale, { title: string; retry: string }> = {
+  "zh-CN": { title: "没能连上你的内宇宙", retry: "重试" },
+  "en-SG": { title: "Couldn't connect to your Inner Cosmos", retry: "Retry" }
+};
+
+export function ConnectError({ message, onRetry, locale = "zh-CN" }: { message: string; onRetry: () => void; locale?: Locale }) {
+  const t = CONNECT_ERROR_COPY[locale];
   return (
     <div className="connect-error" role="alert">
-      <p className="connect-error-title">没能连上你的内宇宙</p>
+      <p className="connect-error-title">{t.title}</p>
       <p className="connect-error-detail">{message}</p>
       <button type="button" className="understanding-action" onClick={onRetry}>
-        重试
+        {t.retry}
       </button>
     </div>
   );

@@ -128,7 +128,7 @@ export function MeSpace({ native, connected, wakeIntentCount, activeClaimCount, 
       <article><strong>{t.resonance}</strong><span>{t.resonanceValue(publicCapsuleCount, friendCount)}</span><button type="button" onClick={() => onNavigate("resonance")}>{t.resonanceAction}</button></article>
       <article><strong>{t.safety}</strong><span>{t.safetyValue}</span><button type="button" onClick={onOpenSafetyHarbor}>{t.safetyAction}</button></article>
     </div>
-    <AppearanceToggle />
+    <AppearanceToggle locale={locale} />
     {native && <div className="mobile-actions"><button type="button" onClick={onRequestPush}>{t.push}</button><button type="button" onClick={onRequestMicrophone}>{t.mic}</button></div>}
     <button type="button" className="danger-quiet" onClick={onLogout}>{t.logout}</button>
   </section>;

@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PwaUpdateNotice } from "./PwaUpdateNotice";
 
 // B5-pwa-mobile: PwaUpdateNotice is the thin container that owns vite-plugin-pwa's
@@ -23,6 +23,9 @@ vi.mock("virtual:pwa-register/react", () => ({
   }),
 }));
 
+// jsdom's default navigator.language (en-US) would otherwise make loadLocale() fall back to
+// en-SG for every test with no stored preference -- pin zh-CN explicitly (see UpdateBanner.tsx).
+beforeEach(() => localStorage.setItem("ic.locale", "zh-CN"));
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();

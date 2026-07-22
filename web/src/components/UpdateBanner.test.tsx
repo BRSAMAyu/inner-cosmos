@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { UpdateBanner } from "./UpdateBanner";
 
 // B5-pwa-mobile: pins the versioned-update affordance's visibility logic given the
@@ -7,6 +7,9 @@ import { UpdateBanner } from "./UpdateBanner";
 // -- see PwaUpdateNotice.tsx for the container that actually owns that hook. This component
 // stays a plain, controlled presentational component so it is testable with no service worker
 // or virtual-module mocking at all.
+// jsdom's default navigator.language (en-US) would otherwise make loadLocale() fall back to
+// en-SG for every test with no stored preference -- pin zh-CN explicitly.
+beforeEach(() => localStorage.setItem("ic.locale", "zh-CN"));
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
@@ -116,5 +119,14 @@ describe("UpdateBanner", () => {
     );
     expect(screen.getByText("内宇宙有新版本了")).toBeInTheDocument();
     expect(screen.queryByText("内宇宙现在可以离线打开了")).not.toBeInTheDocument();
+  });
+
+  it("renders in English when the stored locale preference is en-SG", () => {
+    localStorage.setItem("ic.locale", "en-SG");
+    render(
+      <UpdateBanner needRefresh offlineReady={false} onReload={vi.fn()} onDismissRefresh={vi.fn()} onDismissOfflineReady={vi.fn()} />
+    );
+    expect(screen.getByText("Inner Cosmos has an update")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reload now" })).toBeInTheDocument();
   });
 });

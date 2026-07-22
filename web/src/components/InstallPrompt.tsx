@@ -1,4 +1,10 @@
 import { useEffect, useState } from "react";
+import { loadLocale, type Locale } from "../i18n";
+
+const COPY: Record<Locale, { title: string; detail: string; install: string; dismiss: string }> = {
+  "zh-CN": { title: "把内宇宙装到桌面/主屏幕", detail: "像原生应用一样打开，离线也能进入。", install: "安装内宇宙", dismiss: "不用了" },
+  "en-SG": { title: "Add Inner Cosmos to your desktop/home screen", detail: "Opens like a native app, and works offline too.", install: "Install Inner Cosmos", dismiss: "Not now" }
+};
 
 // B5-pwa-mobile: in-app "install Inner Cosmos" affordance. Not in TS's lib.dom.d.ts (it is a
 // Chromium-only extension, never shipped by Safari/Firefox), so it is declared locally rather
@@ -12,6 +18,8 @@ type BeforeInstallPromptEvent = Event & {
 export function InstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [dismissed, setDismissed] = useState(false);
+  const [locale] = useState<Locale>(() => loadLocale());
+  const t = COPY[locale];
 
   useEffect(() => {
     // The browser fires this at most once per page load, and only when it has decided the
@@ -55,14 +63,14 @@ export function InstallPrompt() {
 
   return (
     <div className="pwa-banner pwa-banner-install" role="status" aria-live="polite">
-      <p className="pwa-banner-title">把内宇宙装到桌面/主屏幕</p>
-      <p className="pwa-banner-detail">像原生应用一样打开，离线也能进入。</p>
+      <p className="pwa-banner-title">{t.title}</p>
+      <p className="pwa-banner-detail">{t.detail}</p>
       <div className="pwa-banner-actions">
         <button type="button" className="pwa-banner-primary" onClick={handleInstall}>
-          安装内宇宙
+          {t.install}
         </button>
         <button type="button" className="pwa-banner-dismiss" onClick={() => setDismissed(true)}>
-          不用了
+          {t.dismiss}
         </button>
       </div>
     </div>

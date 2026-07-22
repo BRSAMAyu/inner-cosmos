@@ -68,4 +68,15 @@ describe("PortraitView", () => {
       history={{}} calibrated={{ VALUES: true }} busyDim={null} onLoadHistory={() => undefined} onCalibrate={() => undefined} />);
     expect(screen.getByText("✓ Aurora 会把你的看法和它的观察并在一起。")).toBeVisible();
   });
+
+  it("renders in English when locale is en-SG, including dimension labels", () => {
+    render(<PortraitView locale="en-SG"
+      dimensions={[{ dim: "INNER_DRIVE", valueJson: "\"wants to do things thoroughly\"", confidence: 0.8, updatedAt: null }]}
+      history={{}} calibrated={{}} busyDim={null} onLoadHistory={() => undefined} onCalibrate={() => undefined} />);
+    expect(screen.getByRole("heading", { name: "How Aurora sees you" })).toBeVisible();
+    expect(screen.getByText("Inner drive")).toBeVisible();
+    expect(screen.getByText(/Grasped 80%/)).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Not quite me" }));
+    expect(screen.getByText(/Aurora's current understanding is/)).toBeVisible();
+  });
 });
