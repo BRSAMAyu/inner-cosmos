@@ -63,7 +63,11 @@ class CapsuleMatchingTest {
         service = new CapsuleServiceImpl(echoCapsuleMapper, boundaryMapper, capsuleAgent,
                 memoryCardMapper, userPortraitMapper, authorizedMemoryRefMapper, genomeService, dataUseGrantService,
                 blockRelationMapper, new com.fasterxml.jackson.databind.ObjectMapper(), capsuleEmbeddingIndexService,
-                retractionReceiptService);
+                retractionReceiptService,
+                // Real instance, not a mock: maskText() is a pure text function, and a bare
+                // Mockito mock would return null here, silently corrupting every persona
+                // summary/excerpt this test builds via createFromMemory.
+                new DataMaskingServiceImpl(memoryCardMapper, authorizedMemoryRefMapper));
         // default: no portrait rows unless a test overrides
         lenient().when(userPortraitMapper.selectList(any())).thenReturn(new ArrayList<>());
         // default: no block relationships unless a test overrides

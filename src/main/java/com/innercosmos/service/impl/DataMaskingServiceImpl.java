@@ -131,12 +131,16 @@ public class DataMaskingServiceImpl implements DataMaskingService {
         if ("STRICT".equalsIgnoreCase(privacyLevel)) {
             // Strict masking: remove names, places, schools, dates, contact info
             result = maskPatterns(result);
-        } else if ("MODERATE".equalsIgnoreCase(privacyLevel)) {
-            // Moderate masking: remove names and contact info only
+        } else if ("MODERATE".equalsIgnoreCase(privacyLevel) || "BALANCED".equalsIgnoreCase(privacyLevel)) {
+            // Moderate masking: remove names and contact info only. "BALANCED" is
+            // CapsuleBoundary's actual middle-tier enum value (CapsuleServiceImpl.safePrivacy
+            // only ever produces STRICT/OPEN/BALANCED, never "MODERATE") -- without this branch
+            // every capsule at the real, most-common default tier fell through to the
+            // contact-info-only case below, silently never getting name masking.
             result = maskContactInfo(result);
             result = maskNames(result);
         }
-        // LOW or default: minimal masking
+        // OPEN/LOW or unrecognized: minimal masking
         result = maskContactInfo(result);
 
         return result;

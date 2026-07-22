@@ -22,6 +22,7 @@ import com.innercosmos.service.CapsuleService;
 import com.innercosmos.service.ResonanceMatchStrategy;
 import com.innercosmos.service.CapsuleGenomeService;
 import com.innercosmos.service.CapsuleEmbeddingIndexService;
+import com.innercosmos.service.DataMaskingService;
 import com.innercosmos.service.DataRetractionReceiptService;
 import com.innercosmos.service.DataUseGrantService;
 import com.innercosmos.util.CapsulePublicTextUtils;
@@ -57,6 +58,12 @@ public class CapsuleServiceImpl implements CapsuleService {
     private final ObjectMapper objectMapper;
     private final CapsuleEmbeddingIndexService capsuleEmbeddingIndexService;
     private final DataRetractionReceiptService retractionReceiptService;
+    // Gemini audit 3.1 (CONFIRMED/P0): the P1->P2 scrubbing chokepoint. Previously this stronger
+    // masker existed only behind the disconnected POST /api/capsule/preview-from-memory endpoint
+    // (DataMaskingServiceImpl.previewFromMemory) while the REAL compile path below sent raw
+    // memory title/summary straight to the persona-synthesis LLM provider and into persisted
+    // genome artifacts, with at most DataMaskingUtils.maskContact's digit/email-only masking.
+    private final DataMaskingService dataMaskingService;
 
     public CapsuleServiceImpl(EchoCapsuleMapper capsuleMapper,
                               CapsuleBoundaryMapper boundaryMapper,
@@ -69,7 +76,8 @@ public class CapsuleServiceImpl implements CapsuleService {
                               BlockRelationMapper blockRelationMapper,
                               ObjectMapper objectMapper,
                               CapsuleEmbeddingIndexService capsuleEmbeddingIndexService,
-                              DataRetractionReceiptService retractionReceiptService) {
+                              DataRetractionReceiptService retractionReceiptService,
+                              DataMaskingService dataMaskingService) {
         this.capsuleMapper = capsuleMapper;
         this.boundaryMapper = boundaryMapper;
         this.capsuleAgent = capsuleAgent;
@@ -82,6 +90,19 @@ public class CapsuleServiceImpl implements CapsuleService {
         this.objectMapper = objectMapper;
         this.capsuleEmbeddingIndexService = capsuleEmbeddingIndexService;
         this.retractionReceiptService = retractionReceiptService;
+        this.dataMaskingService = dataMaskingService;
+    }
+
+    /**
+     * Gemini audit 3.1: the single point every memory line passes through before it can reach
+     * either the persona-synthesis provider call or a persisted/servable genome artifact
+     * (personaPrompt, contextPreviewJson/genomeIr). Minimization is a property of the compiler,
+     * not of whichever call site remembered to apply it.
+     */
+    private String scrubbedMemoryLine(MemoryCard card, String privacyLevel) {
+        String title = card.title == null ? "" : card.title;
+        String summary = card.summary == null ? "" : card.summary;
+        return dataMaskingService.maskText(title + ": " + summary, privacyLevel);
     }
 
     @Override
@@ -92,6 +113,12 @@ public class CapsuleServiceImpl implements CapsuleService {
         capsule.capsuleType = "USER_CAPSULE";
         capsule.pseudonym = request.pseudonym == null || request.pseudonym.isBlank() ? "未命名回声" : request.pseudonym;
         capsule.intro = request.intro == null ? "一枚从脱敏记忆中编织出的数字回声." : request.intro;
+
+        // Gemini audit 3.1: the privacy tier is resolved up front (mirrors the same request field
+        // the boundary insert below uses) so the SAME tier scrubs every artifact derived from
+        // these memories -- the provider-bound persona summary and the persisted context preview
+        // must never diverge in how hard they scrub.
+        String privacyLevel = safePrivacy(request.privacyLevel);
 
         // Fetch selected memory cards to synthesize user persona
         List<String> memorySummaries = new java.util.ArrayList<>();
@@ -107,7 +134,7 @@ public class CapsuleServiceImpl implements CapsuleService {
                         && !"LOCAL_ONLY".equalsIgnoreCase(card.consentScope)
                         && !"NO_EXTERNAL_PROCESSING".equalsIgnoreCase(card.consentScope)
                         && !SIMULATOR_CONSENT_SCOPE.equalsIgnoreCase(card.consentScope)) {
-                    memorySummaries.add(card.title + ": " + card.summary);
+                    memorySummaries.add(scrubbedMemoryLine(card, privacyLevel));
                     authorizedCards.add(card);
                 }
             }
@@ -116,7 +143,9 @@ public class CapsuleServiceImpl implements CapsuleService {
         capsule.authorizedMemoryIds = toJsonArray(authorizedCards.stream().map(card -> String.valueOf(card.id)).toList());
         capsule.ownerContextNote = request.ownerContextNote;
         capsule.styleProfileJson = request.styleProfileJson == null ? inferStyleProfile(authorizedCards) : request.styleProfileJson;
-        capsule.contextPreviewJson = request.contextPreviewJson == null ? buildContextPreview(authorizedCards, capsule.publicTags, capsule.ownerContextNote) : request.contextPreviewJson;
+        capsule.contextPreviewJson = request.contextPreviewJson == null
+                ? buildContextPreview(authorizedCards, capsule.publicTags, capsule.ownerContextNote, privacyLevel)
+                : request.contextPreviewJson;
         capsule.standInEnabled = request.standInEnabled == null ? false : request.standInEnabled;
         capsule.realContactPolicy = request.realContactPolicy == null ? "LETTER_ONLY" : request.realContactPolicy;
         capsule.echoEnergy = 0.72;
@@ -165,7 +194,12 @@ public class CapsuleServiceImpl implements CapsuleService {
             }
             authorizedCards.add(card);
         }
-        List<String> memorySummaries = authorizedCards.stream().map(card -> card.title + ": " + card.summary).toList();
+        // Gemini audit 3.1: same scrubbing chokepoint as createFromMemory -- a simulator capsule
+        // is owner-only/isolated, but its persona is still synthesized by the same external
+        // provider call, so the same minimization applies before that call.
+        String privacyLevel = safePrivacy(request.privacyLevel);
+        List<String> memorySummaries = authorizedCards.stream()
+                .map(card -> scrubbedMemoryLine(card, privacyLevel)).toList();
 
         EchoCapsule capsule = new EchoCapsule();
         capsule.ownerUserId = userId;
@@ -177,7 +211,8 @@ public class CapsuleServiceImpl implements CapsuleService {
         capsule.ownerContextNote = request.ownerContextNote;
         capsule.styleProfileJson = request.styleProfileJson == null ? inferStyleProfile(authorizedCards) : request.styleProfileJson;
         capsule.contextPreviewJson = request.contextPreviewJson == null
-                ? buildContextPreview(authorizedCards, capsule.publicTags, capsule.ownerContextNote) : request.contextPreviewJson;
+                ? buildContextPreview(authorizedCards, capsule.publicTags, capsule.ownerContextNote, privacyLevel)
+                : request.contextPreviewJson;
         capsule.standInEnabled = false;
         capsule.realContactPolicy = "LETTER_ONLY";
         capsule.echoEnergy = 0.0;
@@ -689,11 +724,20 @@ public class CapsuleServiceImpl implements CapsuleService {
             vo.personaPromptDraft = capsuleAgent.buildPersonaPrompt(vo.suggestedPseudonym, vo.abstractSummary);
             return vo;
         }
+        // Gemini audit 3.1: this preview calls the SAME generateUserPersona provider RPC as real
+        // capsule creation (it is not a purely local summary), and it must show the owner what
+        // will actually be sent/persisted -- not a rosier, unscrubbed stand-in for it. No
+        // capsule/boundary exists yet at preview time, so this uses safePrivacy's own default
+        // (BALANCED) rather than a stricter tier that would make the preview look safer than the
+        // real capsule createFromMemory would produce.
+        String privacyLevel = safePrivacy(null);
         StringBuilder summary = new StringBuilder();
         List<String> memorySummaries = new ArrayList<>();
         for (MemoryCard card : cards) {
-            summary.append("「").append(card.title).append("」").append(card.summary).append("\n");
-            memorySummaries.add(card.title + ": " + card.summary);
+            String scrubbedTitle = dataMaskingService.maskText(card.title == null ? "" : card.title, privacyLevel);
+            String scrubbedSummary = dataMaskingService.maskText(card.summary == null ? "" : card.summary, privacyLevel);
+            summary.append("「").append(scrubbedTitle).append("」").append(scrubbedSummary).append("\n");
+            memorySummaries.add(scrubbedTitle + ": " + scrubbedSummary);
             vo.publicTags.addAll(parseTags(card.keywordTags).stream().limit(3).toList());
             if (card.intensityScore != null && card.intensityScore >= 7.5) {
                 vo.riskWarnings.add("包含高情绪重力记忆，建议公开前再次确认边界。");
@@ -872,13 +916,18 @@ public class CapsuleServiceImpl implements CapsuleService {
                     com.innercosmos.common.ErrorCode.BAD_REQUEST,
                     "所选记忆包含已撤回、非本人或禁止用于共鸣体的内容");
         }
-        List<String> summaries = cards.stream().map(card ->
-                (card.title == null ? "" : card.title) + ": " + (card.summary == null ? "" : card.summary)).toList();
+        // Gemini audit 3.1: recompile must scrub with the capsule's OWN configured privacy tier,
+        // not a hardcoded default -- an owner who set STRICT at creation must not silently get a
+        // weaker scrub just because they later re-authorized their memory selection.
+        CapsuleBoundary existingBoundary = boundaryMapper.selectOne(
+                new QueryWrapper<CapsuleBoundary>().eq("capsule_id", capsuleId).last("LIMIT 1"));
+        String privacyLevel = safePrivacy(existingBoundary == null ? null : existingBoundary.privacyLevel);
+        List<String> summaries = cards.stream().map(card -> scrubbedMemoryLine(card, privacyLevel)).toList();
         capsule.personaPrompt = capsuleAgent.generateUserPersona(
                 userId, summaries, capsule.pseudonym, capsule.intro);
         capsule.styleProfileJson = inferStyleProfile(cards);
         capsule.contextPreviewJson = buildContextPreview(
-                cards, capsule.publicTags, capsule.ownerContextNote);
+                cards, capsule.publicTags, capsule.ownerContextNote, privacyLevel);
         capsule.visibilityStatus = "PRIVATE";
         capsule.isPublic = false;
         capsule.lastMemoryUpdateAt = LocalDateTime.now();
@@ -1065,7 +1114,7 @@ public class CapsuleServiceImpl implements CapsuleService {
      * same relationship is normal emotional complexity, not a logical inconsistency the compiler
      * has detected — it's a signal to represent nuance rather than blend it into one flat voice.
      */
-    private String buildContextPreview(List<MemoryCard> cards, String publicTags, String note) {
+    private String buildContextPreview(List<MemoryCard> cards, String publicTags, String note, String privacyLevel) {
         Map<String, List<MemoryCard>> byScene = new LinkedHashMap<>();
         for (MemoryCard card : cards) {
             String text = joinText(card.title, card.summary, String.join(" ", parseTags(card.keywordTags)));
@@ -1090,6 +1139,12 @@ public class CapsuleServiceImpl implements CapsuleService {
             String excerpt = ((representative.title == null ? "" : representative.title) + ": "
                     + (representative.summary == null ? "" : representative.summary)).replaceAll("\\s+", " ").trim();
             excerpt = excerpt.substring(0, Math.min(160, excerpt.length()));
+            // Gemini audit 3.1: this excerpt is not just an owner-facing preview string -- it is
+            // read back at persona-chat runtime (CapsuleRuntimeContextComposer selects "scenes"
+            // straight out of this JSON into the live provider prompt), so it needs the same
+            // entity/PII scrubbing as personaPrompt, not only the narrower digit/email masking
+            // maskContact alone provides.
+            excerpt = dataMaskingService.maskText(excerpt, privacyLevel);
             excerpt = DataMaskingUtils.maskContact(excerpt);
 
             Set<String> sentimentLabels = new LinkedHashSet<>();
@@ -1131,7 +1186,7 @@ public class CapsuleServiceImpl implements CapsuleService {
 
         Map<String, Object> preview = new LinkedHashMap<>();
         preview.put("schemaVersion", "capsule-context-preview.v3");
-        preview.put("genomeIr", buildGenomeIr(cards));
+        preview.put("genomeIr", buildGenomeIr(cards, privacyLevel));
         preview.put("scenes", topScenes);
         preview.put("tensions", tensions);
         preview.put("retrievalPolicy", retrievalPolicy());
@@ -1164,13 +1219,18 @@ public class CapsuleServiceImpl implements CapsuleService {
      * authorized memory. This compiler intentionally records absence as unknown instead of
      * generalising one event into a stable personality trait.
      */
-    private Map<String, Object> buildGenomeIr(List<MemoryCard> cards) {
+    private Map<String, Object> buildGenomeIr(List<MemoryCard> cards, String privacyLevel) {
         List<Map<String, Object>> claims = new ArrayList<>();
         List<Map<String, Object>> values = new ArrayList<>();
         List<Map<String, Object>> habits = new ArrayList<>();
         List<Map<String, Object>> temporalState = new ArrayList<>();
         for (MemoryCard card : cards) {
-            String statement = DataMaskingUtils.maskContact(joinText(card.title, card.summary))
+            // Gemini audit 3.1: claims/values/habits/temporalState statements are the exact text
+            // CapsuleRuntimeContextComposer selects into the live persona-chat provider prompt on
+            // every visitor turn -- the single highest-traffic egress point in the whole compiler,
+            // so it gets the same scrubbing as personaPrompt, not only contact masking.
+            String statement = DataMaskingUtils.maskContact(
+                            dataMaskingService.maskText(joinText(card.title, card.summary), privacyLevel))
                     .replaceAll("\\s+", " ").trim();
             if (statement.isBlank()) continue;
             statement = statement.substring(0, Math.min(220, statement.length()));
