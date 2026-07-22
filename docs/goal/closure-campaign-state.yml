@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 authority: 对齐文档/24-完全体最终收敛与云原生课程战役.md
 status: IN_PROGRESS
-updated_at: 2026-07-22T00:00:00+08:00
+updated_at: 2026-07-23T00:00:00+08:00
 
 legal_terminal_states:
   - COMPLETE
@@ -24,9 +24,10 @@ current_front:
 
 campaigns:
   - {id: W0, name: integration-and-truth-baseline, status: READY, depends_on: []}
-  - {id: W1, name: living-intelligence-and-data-loop, status: BLOCKED_BY_W0, depends_on: [W0]}
-  - {id: W2, name: complete-experience-and-multiplatform-polish, status: BLOCKED_BY_W0, depends_on: [W0]}
-  - {id: W3, name: cloud-native-showcase, status: BLOCKED_BY_W0, depends_on: [W0]}
+  - {id: W0V, name: verified-audit-defect-closure, status: BLOCKED_BY_W0, depends_on: [W0], contract: docs/audit/2026-07-23-gemini-master-audit-reconciliation.md}
+  - {id: W1, name: living-intelligence-and-data-loop, status: BLOCKED_BY_W0V, depends_on: [W0V]}
+  - {id: W2, name: complete-experience-and-multiplatform-polish, status: BLOCKED_BY_W0V, depends_on: [W0V]}
+  - {id: W3, name: cloud-native-showcase, status: BLOCKED_BY_W0V, depends_on: [W0V]}
   - {id: W4, name: convergence-and-non-author-acceptance, status: BLOCKED_BY_W1_W2_W3, depends_on: [W1, W2, W3]}
 
 parallelism:

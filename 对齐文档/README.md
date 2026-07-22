@@ -16,6 +16,7 @@
 | L1-DEPLOY | `14-AWS-Academy-EKS约束与双轨部署架构.md` | 课程 Learner Lab 与商业新加坡环境的边界、替代适配器和双轨演示合同 |
 | L2 | `00`、`02`—`07` | 项目理解、EKS、移动端、新加坡、Agent 流程、技术演进、近期决策与执行基线 |
 | L3-CURRENT | `20-当前状态重对账与完全体差距基线.md` | 基于当前 HEAD 复核的已完成能力、剩余差距、风险与下一阶段裁决 |
+| L3-CURRENT-AUDIT | `docs/audit/2026-07-23-gemini-master-audit-reconciliation.md` | 对 Gemini 36 项审查线索的当前 HEAD 独立裁决、正确修复合同与 W0V 硬验收 |
 
 | L3 | `01`、`13`、`15`、`docs/audit`、`docs/gap_analysis`、现有 specs | 历史时点的评估、连接指南、进展审查、缺口和专题设计；用于事实发现，不自动决定最终方向 |
 | L4 | work package、ADR、research、evidence、测试报告 | 实施契约、局部决策与可复现证据 |
@@ -68,6 +69,7 @@
 - 单会话连续自主执行：读 `17`，但当前 cursor 只取 `docs/goal/closure-campaign-state.yml`；内部提交与检查点不得结束顶层 Goal。
 - 组员接管启动、local-complete 或 AWS Academy 部署：读 `18`；其中的操作步骤必须服从 `14` 的环境能力边界。
 - 当前最终收敛接管：先读 24、`docs/goal/closure-campaign-state.yml` 与验收账本；23 及更早文档仅用于追溯，不得重复旧 WIP 或把本地/Academy 证据夸大为商业 PASS。
+- 外部 Agent 审查线索：先读原报告定位，再以 `docs/audit/2026-07-23-gemini-master-audit-reconciliation.md` 裁决；不得把“VICTORY CONFIRMED”等标签代替当前 HEAD 复现或反证。
 
 ## 5. 文档与实现的双向追溯
 

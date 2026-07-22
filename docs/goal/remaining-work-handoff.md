@@ -62,6 +62,12 @@
 - 工作树只剩接管前明确保留的用户改动或完全 clean；
 - closure state/ledger 记录集成 HEAD、命令、结果和边界。
 
+## 2.5 W0V：Gemini 审查线索的独立闭环
+
+W0 集成完成后，先执行 `docs/audit/2026-07-23-gemini-master-audit-reconciliation.md`，再允许 W1/W2/W3 进入完成态。该文件是逐项事实裁决与正确修复合同：28 confirmed、6 partial、1 duplicate、1 false。重点不是把 36 个标题逐字实现，而是用复现/反证关闭真实根因，尤其是状态条件更新、事务外 LLM、P1→P2 compiler、统一输出 gate、turn-scoped SSE recovery 和 UI async lifecycle。
+
+允许 Backend State/Transaction、AI Privacy/Safety、Frontend Resilience 三轨最多 3 Agent 并行；Integrator 独占 Flyway 序列、共享 API/types/locale、generated bundle、ledger/state。P0 项先关闭，P1/P2 随后；2.3 禁止创建重复索引，2.5 未经代表性 `EXPLAIN ANALYZE` 不得堆 HNSW，V21 不得复用。
+
 ## 3. W1：Living Intelligence 与六条产品闭环
 
 详细合同见文档 24。实现顺序不是按页面，而是按可体验闭环：
