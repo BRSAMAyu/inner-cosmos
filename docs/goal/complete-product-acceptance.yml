@@ -85,7 +85,24 @@ gates:
     status: IN_PROGRESS
     required: true
     acceptance:
-      - {id: ARCH-MODULES, target: "Module boundaries are executable through Spring Modulith and architecture tests.", status: UNASSESSED, evidence: []}
+      - id: ARCH-MODULES
+        target: "Module boundaries are executable through Spring Modulith and architecture tests."
+        status: IN_PROGRESS
+        evidence: [docs/adr/0003-arch-modules-archunit-not-spring-modulith.md, src/test/java/com/innercosmos/architecture/ControllerLayerShortcutArchTest.java, src/test/java/com/innercosmos/architecture/DomainBoundaryArchitectureTest.java]
+        remaining: |
+          ADR-0003: deliberately NOT adopting Spring Modulith -- the codebase is layer-structured
+          (one controller/service/mapper package for all domains), not package-by-feature, so a
+          Modulith migration would be a large structural rewrite disproportionate to this item's
+          scope. Adopted real ArchUnit (bytecode-based) layer-boundary tests instead, alongside the
+          pre-existing regex-based DomainBoundaryArchitectureTest. New ControllerLayerShortcutArchTest
+          enforces controller -> service interface -> mapper (no controller->mapper or
+          controller->service.impl shortcut), with an explicit, non-growable allowlist of 7
+          pre-existing violations (SocialController, AuroraChatController, UserController,
+          UserPreferenceController, DiaryController, PortraitController inject a mapper directly;
+          DailyRecordController injects the interface-less WeeklyReviewV2Service directly). Still
+          open: refactor each of the 7 through its service interface and remove it from the
+          allowlist (a reverse assertion in the test fails if the allowlist stops matching reality,
+          so it cannot silently grow); give WeeklyReviewV2Service a service-package interface.
       - {id: AUTH-OIDC, target: "Spring Security protects secure web sessions and mobile OIDC PKCE flows.", status: IN_PROGRESS, evidence: [evidence/m1/M1-AUTH-WEB-001/, evidence/m1/M1-AUTH-OIDC-001/, evidence/innovation/INNO-MOBILE-002/, evidence/innovation/INNO-MOBILE-004/], remaining: "2026-07-22: the PKCE contract is now proven against a real (locally-hosted) Keycloak IdP end to end on Android and a new Tauri desktop client, not just mocked. Still open: a production IdP tenant registration, and real-device verification."}
       - id: API-CONTRACT
         target: "Versioned OpenAPI, typed errors, idempotency, concurrency, and resumable SSE are verified."

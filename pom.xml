@@ -97,6 +97,15 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <!-- ARCH-MODULES: executable layer-boundary rules (controller to service to mapper,
+                 no controller/mapper shortcut); see 对齐文档/ADR-0001-arch-modules.md for why
+                 this replaces a Spring Modulith migration. -->
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit-junit5</artifactId>
+            <version>1.3.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <!-- A6: TestObservationRegistry, to assert privacy-safe AI turn observations/spans. -->
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-observation-test</artifactId>
