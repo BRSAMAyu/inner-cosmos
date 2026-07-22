@@ -42,6 +42,12 @@ import { WeeklyReviewSection } from "./components/WeeklyReviewSection";
 import { DailyRecordSection } from "./components/DailyRecordSection";
 import { ThoughtShredderSection } from "./components/ThoughtShredderSection";
 import type { MemoryThemeRow } from "./api";
+import { useTodoBoard } from "./hooks/useTodoBoard";
+import { useHeartDiary } from "./hooks/useHeartDiary";
+import { useBeliefGallery } from "./hooks/useBeliefGallery";
+import { TodoBoard } from "./components/TodoBoard";
+import { HeartDiary } from "./components/HeartDiary";
+import { BeliefGallery } from "./components/BeliefGallery";
 
 // The Aurora conversation/session domain (message list, streaming/turn status, interrupt/stop,
 // mode picker, WakeIntent negotiate, session bootstrap/replay) has been extracted into
@@ -161,6 +167,12 @@ export function AuroraApp() {
   const dailyRecord = useDailyRecord({ setStatus });
   const weeklyReview = useWeeklyReview({ setStatus });
   const thoughtShredder = useThoughtShredder({ setStatus });
+  // Legacy static-page ports (Phase 3, legacy batch B): todo.html, heart-diary.html, and the
+  // belief-pattern-browsing half of beliefs.html. Each domain gets its own small hook, matching the
+  // precedent set by useConnectionsAndLetters.ts.
+  const todoBoard = useTodoBoard({ setStatus });
+  const heartDiary = useHeartDiary({ setStatus });
+  const beliefGallery = useBeliefGallery({ setStatus });
 
   const navigateSpace = useCallback((space: ProductSpace) => {
     navigate(spacePath(space));
@@ -246,7 +258,10 @@ export function AuroraApp() {
         dailyRecord.loadLatestDailyRecord(),
         weeklyReview.loadWeeklyReview(),
         thoughtShredder.loadShredderAiHealth(),
-        thoughtShredder.loadShredderHistory()
+        thoughtShredder.loadShredderHistory(),
+        todoBoard.loadTodos().catch(() => undefined),
+        beliefGallery.loadAll().catch(() => undefined),
+        beliefGallery.loadContradictions()
       ]);
       if (call !== bootstrapCallRef.current) return;
       setAuthenticated(true);
@@ -275,7 +290,8 @@ export function AuroraApp() {
       connectionsAndLetters.loadLetterInbox, connectionsAndLetters.loadConnectionRequests, connectionsAndLetters.loadFriends,
       connectionsAndLetters.loadLetterOutbox, connectionsAndLetters.loadPeople, connectionsAndLetters.loadRelations, connectionsAndLetters.loadLetterThreads,
       dailyRecord.loadDailyRecords, dailyRecord.loadLatestDailyRecord, weeklyReview.loadWeeklyReview,
-      thoughtShredder.loadShredderAiHealth, thoughtShredder.loadShredderHistory]);
+      thoughtShredder.loadShredderAiHealth, thoughtShredder.loadShredderHistory,
+      todoBoard.loadTodos, beliefGallery.loadAll, beliefGallery.loadContradictions]);
 
   const selectedCapsule = capsules.find(capsule => capsule.id === selectedCapsuleId) ?? null;
   // A capsule opened from the public plaza directory (not the curated match set) is wrapped in a
@@ -1089,8 +1105,13 @@ export function AuroraApp() {
         onContinueWithAurora={continueSkillWithAurora} onRevokeRun={id => void revokePsychologyRun(id)} />
 
       {/* Phase 3 legacy-page port: timeline.html, weekly-review.html, daily-record.html,
-          thought-shredder.html -- ported as additional sections inside the existing "cosmos"
-          product space, not a 6th top-level nav tab (the five-space IA is a hard constraint). */}
+          thought-shredder.html, todo.html, heart-diary.html, beliefs.html (pattern-browsing half)
+          -- ported as additional sections inside the existing "cosmos" product space, not a 6th
+          top-level nav tab (the five-space IA is a hard constraint).
+          TODO(W0 IA restructure, doc 24 section 3.3): these seven modules must not stay stacked
+          vertically in one long page -- move to Cosmos-internal secondary routes/segmented
+          navigation with lazy/prefetched loading, in the dedicated pass right after all four
+          locked branches are integrated. */}
       <TimelineSection dailyRecords={dailyRecord.dailyRecords} themes={memoryThemes} locale={skillLocale} />
       <DailyRecordSection records={dailyRecord.dailyRecords} detail={dailyRecord.dailyRecordDetail}
         index={dailyRecord.dailyRecordIndex} acceptBusy={dailyRecord.dailyRecordAcceptBusy} editBusy={dailyRecord.dailyRecordEditBusy}
@@ -1102,6 +1123,20 @@ export function AuroraApp() {
         result={thoughtShredder.shredderResult} busy={thoughtShredder.shredderBusy}
         onShred={(text, saveMode) => void thoughtShredder.processShred(text, saveMode)}
         onSettle={id => void thoughtShredder.settleShred(id)} onDelete={id => void thoughtShredder.deleteShred(id)} locale={skillLocale} />
+      <TodoBoard todos={todoBoard.todos} tab={todoBoard.tab} busy={todoBoard.busy} splitBusyId={todoBoard.splitBusyId}
+        onSelectTab={todoBoard.setTab} onCreate={input => void todoBoard.createTodo(input)}
+        onUpdateStatus={(id, status) => void todoBoard.updateStatus(id, status)} onSplit={id => void todoBoard.splitTodo(id)}
+        onDelete={id => void todoBoard.deleteTodo(id)} onUpdate={(id, input) => void todoBoard.updateTodo(id, input)} locale={skillLocale} />
+
+      <HeartDiary rawText={heartDiary.rawText} displayText={heartDiary.displayText} activeLevel={heartDiary.activeLevel}
+        polishBusy={heartDiary.polishBusy} submitBusy={heartDiary.submitBusy} onTextChange={heartDiary.onTextChange}
+        onSwitchLevel={level => void heartDiary.switchLevel(level)} onTranscribeAudio={blob => heartDiary.transcribeAudio(blob)}
+        onSubmit={() => void heartDiary.submit()} locale={skillLocale} />
+
+      <BeliefGallery beliefs={beliefGallery.beliefs} contradictions={beliefGallery.contradictions} filter={beliefGallery.filter}
+        categories={beliefGallery.categories} selectedCategory={beliefGallery.selectedCategory} categoryBeliefs={beliefGallery.categoryBeliefs}
+        busy={beliefGallery.busy} onSelectFilter={filter => void beliefGallery.selectFilter(filter)}
+        onSelectCategory={category => void beliefGallery.selectCategory(category)} locale={skillLocale} />
       </div>
 
       <div className="product-space" hidden={productSpace !== "resonance"}>

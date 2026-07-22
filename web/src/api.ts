@@ -245,6 +245,29 @@ export type GroupMember = { userId: number; memberRole: string; nickname: string
 export type ConnectionRequests = { incoming: SocialConnection[]; outgoing: SocialConnection[] };
 export type DiscoverablePerson = { id: number; username: string; nickname: string; relationStatus: string };
 export type RelationMention = { id: number; relationLabel: string; relationType: string | null; emotionTags: string | null; triggerSummary: string | null; boundaryHint: string | null };
+// Port of src/main/resources/static/pages/todo.html into the AppShell (Phase 3, legacy batch B):
+// full CRUD + Aurora's "split into first step" over TodoController (/api/todos/*).
+export type TodoItem = {
+  id: number; taskName: string; description: string | null; priority: "HIGH" | "MEDIUM" | "LOW";
+  status: "TODO" | "DOING" | "DONE" | "CANCELLED"; deadline: string | null; sourceMemoryCardId: number | null;
+};
+export type TodoDraft = { taskName: string; priority: TodoItem["priority"]; deadline: string | null; description: string };
+// Port of src/main/resources/static/pages/heart-diary.html: voice/text diary with AI transcription,
+// level-based polish and submit, over DiaryController (/api/diary/*).
+export type VoiceTranscription = {
+  id: number; originalText: string; editedText: string | null; status: string | null;
+};
+// Port of the belief-pattern-browsing half of src/main/resources/static/pages/beliefs.html over
+// BeliefController (/api/belief/*). The other half of that legacy page (the M6 "Aurora Self Panel" --
+// constitution/model/candidates/statements, served by AuroraSelfController's /api/aurora/self/{constitution,model,
+// candidates,statements} endpoints) is a SEPARATE, still-unported backend from the self-evolution
+// feature (SelfEvolution / api.selfEvolution() / AuroraSelfSpace) already wired into AuroraApp.tsx --
+// see the report from this porting batch for why beliefs.html is deliberately not retired.
+export type BeliefPattern = {
+  id: number; beliefContent: string; beliefType: string | null; beliefCategory: string | null;
+  strengthScore: number | null; confirmationCount: number | null; status: string | null;
+};
+export type BeliefContradiction = { beliefA: BeliefPattern; beliefB: BeliefPattern; contradictionReason: string };
 export type RelationTimelinePoint = { timestamp: string; emotions: string | null; summary: string | null };
 export type RelationHealth = { relationLabel: string; healthScore: number };
 export type LetterThread = { id: number; firstLetterId: number; participantA: number; participantB: number; capsuleId: number | null; status: string; lastLetterAt: string | null };
@@ -815,7 +838,29 @@ export const api = {
     request<ShredderResult>("/api/thought-shredder/process", { method: "POST", body: JSON.stringify({ text, originalHandlingMode }) }),
   shredderHistory: () => request<ShredderHistoryEntry[]>("/api/thought-shredder/history"),
   shredderSettle: (id: number) => request<void>(`/api/thought-shredder/${id}/settle`, { method: "POST" }),
-  shredderDelete: (id: number) => request<void>(`/api/thought-shredder/${id}`, { method: "DELETE" })
+  shredderDelete: (id: number) => request<void>(`/api/thought-shredder/${id}`, { method: "DELETE" }),
+
+  todoList: () => request<TodoItem[]>("/api/todos"),
+  createTodo: (input: TodoDraft) => request<TodoItem>("/api/todos", { method: "POST", body: JSON.stringify(input) }),
+  updateTodo: (id: number, input: TodoDraft) => request<TodoItem>(`/api/todos/${id}`, { method: "PUT", body: JSON.stringify(input) }),
+  updateTodoStatus: (id: number, status: TodoItem["status"]) => request<TodoItem>(`/api/todos/${id}/status`, {
+    method: "POST", body: JSON.stringify({ status })
+  }),
+  splitTodo: (id: number) => request<TodoItem>(`/api/todos/${id}/split`, { method: "POST" }),
+  deleteTodo: (id: number) => request<boolean>(`/api/todos/${id}`, { method: "DELETE" }),
+  diaryTranscribe: (text: string) => request<VoiceTranscription>("/api/diary/transcribe", {
+    method: "POST", body: JSON.stringify({ text })
+  }),
+  diaryPolish: (text: string, level: 1 | 2 | 3) => request<{ polishedText: string }>("/api/diary/polish", {
+    method: "POST", body: JSON.stringify({ text, level })
+  }),
+  diarySubmit: (id: number, content: string) => request<boolean>("/api/diary/submit", {
+    method: "POST", body: JSON.stringify({ id, content })
+  }),
+  beliefList: () => request<BeliefPattern[]>("/api/belief/list"),
+  beliefByCategory: (category: string) => request<BeliefPattern[]>(`/api/belief/by-category?category=${encodeURIComponent(category)}`),
+  beliefStrong: (minStrength = 0.5) => request<BeliefPattern[]>(`/api/belief/strong?minStrength=${minStrength}`),
+  beliefContradictions: () => request<BeliefContradiction[]>("/api/belief/contradictions")
 };
 
 export type AsrResult = { text: string; audioDurationSec: number; speechRate: number; pauseCount: number; longPauseCount: number; inputConfidence: number };
@@ -835,6 +880,30 @@ export async function transcribeAudio(blob: Blob): Promise<AsrResult> {
   if (!response.ok) throw new Error(`ASR HTTP ${response.status}`);
   const env = await response.json() as ApiEnvelope<AsrResult>;
   if (!env.success) throw new Error(env.message ?? "语音转写失败");
+  return env.data;
+}
+
+// Heart diary voice input: multipart upload to the diary-specific transcription endpoint (distinct
+// from transcribeAudio()'s generic /api/asr/transcribe -- this one persists a VoiceTranscription row
+// whose id later threads through diaryPolish/diarySubmit, matching heart-diary.html's original flow).
+export async function diaryTranscribeAudio(blob: Blob): Promise<VoiceTranscription> {
+  const form = new FormData();
+  form.append("file", blob, "heart-diary.wav");
+  const headers = new Headers();
+  const token = await accessTokenProvider?.() ?? null;
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  else { const c = await getOrLoadCsrf(); headers.set(c.headerName, c.token); }
+  const response = await fetch(apiUrl("/api/diary/transcribe-audio"), {
+    method: "POST", body: form, headers, credentials: token ? "omit" : "include"
+  });
+  const responseText = await response.text();
+  let env: ApiEnvelope<VoiceTranscription>;
+  try {
+    env = responseText ? JSON.parse(responseText) as ApiEnvelope<VoiceTranscription> : { success: false, data: undefined as never };
+  } catch {
+    throw new Error(`Diary ASR HTTP ${response.status}`);
+  }
+  if (!response.ok || !env.success) throw new Error(env.message ?? "语音转写失败");
   return env.data;
 }
 
