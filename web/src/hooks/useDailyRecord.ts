@@ -24,9 +24,12 @@ export function useDailyRecord({ setStatus }: UseDailyRecordOptions) {
   const loadDailyRecords = useCallback(() => api.dailyRecords().then(setDailyRecords), []);
   const loadLatestDailyRecord = useCallback(() => api.latestDailyRecord().then(setDailyRecordDetail).catch(() => undefined), []);
 
+  // Regression (Gemini audit 2.2.1): clamp against the loaded list's actual bounds, not against
+  // the *current* index -- the old `Math.min(index, current)` could never increase past `current`,
+  // permanently disabling the "前一天" (previous day) button, which calls onSelectIndex(index + 1).
   const selectDailyRecordIndex = useCallback((index: number) => {
-    setDailyRecordIndex(current => Math.max(0, Math.min(index, current)));
-  }, []);
+    setDailyRecordIndex(() => Math.max(0, Math.min(index, dailyRecords.length - 1)));
+  }, [dailyRecords.length]);
 
   const acceptDailyRecord = useCallback(async () => {
     const record = dailyRecords[dailyRecordIndex];

@@ -61,6 +61,58 @@ describe("useDailyRecord", () => {
     expect(setStatus).toHaveBeenCalledWith("没有可保存的记录");
   });
 
+  it("can navigate to the previous day, then back to today, across multiple entries", async () => {
+    // Regression for the Gemini audit's 2.2.1 finding: the old clamp was
+    // `Math.max(0, Math.min(index, current))`, which can never increase past `current`, so the
+    // "前一天" (previous day) button -- which calls onSelectIndex(index + 1) -- was permanently
+    // inert. records[] is ordered newest-first (index 0 = today); spans a month boundary to also
+    // cover the "跨月" (cross-month) requirement, since index navigation must not assume any
+    // particular date arithmetic, only list bounds.
+    vi.mocked(api.dailyRecords).mockResolvedValue([
+      entry({ id: 3, recordDate: "2026-08-01" }),
+      entry({ id: 2, recordDate: "2026-07-31" }),
+      entry({ id: 1, recordDate: "2026-07-30" })
+    ]);
+    const { result } = setup();
+    await act(async () => { await result.current.loadDailyRecords(); });
+    expect(result.current.dailyRecordIndex).toBe(0);
+
+    act(() => result.current.selectDailyRecordIndex(1)); // "前一天" from today
+    expect(result.current.dailyRecordIndex).toBe(1);
+
+    act(() => result.current.selectDailyRecordIndex(2)); // "前一天" again, crossing into July
+    expect(result.current.dailyRecordIndex).toBe(2);
+
+    act(() => result.current.selectDailyRecordIndex(1)); // "后一天" back towards today
+    expect(result.current.dailyRecordIndex).toBe(1);
+
+    act(() => result.current.selectDailyRecordIndex(0)); // "后一天" all the way back
+    expect(result.current.dailyRecordIndex).toBe(0);
+  });
+
+  it("clamps navigation to the loaded record list's bounds", async () => {
+    vi.mocked(api.dailyRecords).mockResolvedValue([entry({ id: 1 }), entry({ id: 2 })]);
+    const { result } = setup();
+    await act(async () => { await result.current.loadDailyRecords(); });
+
+    act(() => result.current.selectDailyRecordIndex(-5));
+    expect(result.current.dailyRecordIndex).toBe(0);
+
+    act(() => result.current.selectDailyRecordIndex(50));
+    expect(result.current.dailyRecordIndex).toBe(1); // clamped to records.length - 1, not left inert
+
+    act(() => result.current.selectDailyRecordIndex(50));
+    expect(result.current.dailyRecordIndex).toBe(1); // repeat past-bound selection stays clamped, not stuck below it
+  });
+
+  it("clamps to index 0 when there are no records to page through (no-data day)", async () => {
+    vi.mocked(api.dailyRecords).mockResolvedValue([]);
+    const { result } = setup();
+    await act(async () => { await result.current.loadDailyRecords(); });
+    act(() => result.current.selectDailyRecordIndex(3));
+    expect(result.current.dailyRecordIndex).toBe(0);
+  });
+
   it("edits the theme field of the current record and refreshes the latest detail when it is index 0", async () => {
     vi.mocked(api.dailyRecords).mockResolvedValue([entry({ id: 9, theme: "旧主题" })]);
     vi.mocked(api.editDailyRecord).mockResolvedValue(entry({ id: 9, theme: "新主题" }));

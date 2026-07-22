@@ -25,26 +25,53 @@ async function goToCosmos(page: import("@playwright/test").Page) {
   await page.getByRole("button", { name: /^内宇宙/ }).click();
 }
 
+// The four ported modules now live behind CosmosSubNav's five sub-tabs (doc 24 section 3.3:
+// they must not stack vertically in one page) -- select the sub-tab by its exact label before
+// asserting on a section only rendered there.
+async function goToCosmosTab(page: import("@playwright/test").Page, label: string) {
+  await goToCosmos(page);
+  await page.getByRole("navigation", { name: "内宇宙分区导航" }).getByRole("button", { name: label, exact: true }).click();
+}
+
 // The global status bar at the bottom of AuroraApp shows success/error from hooks.
 function globalStatus(page: import("@playwright/test").Page) {
   return page.locator(".global-state[role='status']");
 }
 
 test.describe.serial("legacy batch A: cosmos space ported sections", () => {
-  test("all four ported sections render in cosmos space", async ({ page }) => {
+  test("all four ported sections are reachable through their own cosmos sub-tab", async ({ page }) => {
     await goToCosmos(page);
+    const subNav = page.getByRole("navigation", { name: "内宇宙分区导航" });
+    await expect(subNav).toBeVisible();
 
-    // All four headings should be visible in the cosmos space.
+    // Default landing tab ("星空与成长轨迹") shows the timeline; the other three ported sections
+    // are not simultaneously visible -- each lives behind its own sub-tab.
     await expect(page.locator(".timeline-section")).toBeVisible();
-    await expect(page.locator(".daily-record-section")).toBeVisible();
-    await expect(page.locator(".weekly-review-section")).toBeVisible();
-    await expect(page.locator(".thought-shredder-section")).toBeVisible();
-
+    await expect(page.locator(".daily-record-section")).toBeHidden();
+    await expect(page.locator(".weekly-review-section")).toBeHidden();
+    await expect(page.locator(".thought-shredder-section")).toBeHidden();
     await page.screenshot({ path: "test-results/cosmos-overview.png", fullPage: true });
+
+    await subNav.getByRole("button", { name: "今日记录与心声", exact: true }).click();
+    await expect(page.locator(".daily-record-section")).toBeVisible();
+    await expect(page.locator(".timeline-section")).toBeHidden();
+
+    await subNav.getByRole("button", { name: "周报与变化", exact: true }).click();
+    await expect(page.locator(".weekly-review-section")).toBeVisible();
+    await expect(page.locator(".daily-record-section")).toBeHidden();
+
+    await subNav.getByRole("button", { name: "思维整理与待办", exact: true }).click();
+    await expect(page.locator(".thought-shredder-section")).toBeVisible();
+    await expect(page.locator(".weekly-review-section")).toBeHidden();
+
+    // Deep link straight to a non-default sub-tab must land directly on it (shareable URL;
+    // BrowserRouter with basename "/app/aurora", not hash routing).
+    await page.goto("/app/aurora/cosmos/weekly");
+    await expect(page.locator(".weekly-review-section")).toBeVisible({ timeout: 15_000 });
   });
 
   test("thought shredder processes real text end-to-end", async ({ page }) => {
-    await goToCosmos(page);
+    await goToCosmosTab(page, "思维整理与待办");
 
     // AI health line shows provider/model info.
     const aiHealthLine = page.locator(".thought-shredder-section p.muted", { hasText: /\// });
@@ -67,7 +94,7 @@ test.describe.serial("legacy batch A: cosmos space ported sections", () => {
   });
 
   test("daily record accept round-trips and timeline shows data", async ({ page }) => {
-    await goToCosmos(page);
+    await goToCosmosTab(page, "今日记录与心声");
 
     const dailySection = page.locator(".daily-record-section");
     await expect(dailySection.getByText("今日主题")).toBeVisible();
@@ -84,13 +111,14 @@ test.describe.serial("legacy batch A: cosmos space ported sections", () => {
     await dailySection.getByRole("button", { name: "保存", exact: true }).click();
     await expect(globalStatus(page)).toContainText("已保存", { timeout: 10_000 });
 
-    // Timeline section shows the same record.
+    // Timeline lives in its own sub-tab ("星空与成长轨迹") and shows the same record.
+    await page.getByRole("navigation", { name: "内宇宙分区导航" }).getByRole("button", { name: "星空与成长轨迹", exact: true }).click();
     await expect(page.locator(".timeline-section")).toBeVisible();
     await page.screenshot({ path: "test-results/timeline.png", fullPage: true });
   });
 
   test("weekly review generates and shows structured content", async ({ page }) => {
-    await goToCosmos(page);
+    await goToCosmosTab(page, "周报与变化");
 
     const weeklySection = page.locator(".weekly-review-section");
     await weeklySection.getByRole("button", { name: "重新生成这一周" }).click();

@@ -18,6 +18,9 @@ async function gotoCosmos(page: import("@playwright/test").Page) {
   await page.goto("/app/aurora/index.html");
   await loginIfNeeded(page);
   await page.getByRole("button", { name: /^内宇宙/ }).click();
+  // Belief gallery lives behind the "信念与自我理解" cosmos sub-tab (doc 24 section 3.3: ported
+  // legacy modules must not stack vertically in one page).
+  await page.getByRole("navigation", { name: "内宇宙分区导航" }).getByRole("button", { name: "信念与自我理解", exact: true }).click();
   await expect(page.getByRole("heading", { name: "信念画廊" })).toBeVisible();
 }
 
