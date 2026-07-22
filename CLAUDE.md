@@ -122,13 +122,15 @@ Read in this order before making product/architecture/deployment decisions:
 1. [`goal-objective.md`](goal-objective.md) — the complete-product goal and authority hierarchy.
 2. [`对齐文档/README.md`](对齐文档/README.md) — index of the authoritative spec system (product,
    architecture, UX, AI innovation, campaigns).
-3. [`对齐文档/16-体验优先的完全体重构策略与产品战役.md`](对齐文档/16-体验优先的完全体重构策略与产品战役.md) — the campaign strategy (A–E).
-4. For the current teammate continuation, read [对齐文档/21-双轨阶段合并审查与完全体续跑交接.md](对齐文档/21-双轨阶段合并审查与完全体续跑交接.md), [docs/goal/teammate-continuation-state.yml](docs/goal/teammate-continuation-state.yml), and the assigned [docs/tracks/](docs/tracks/) spec. Documents 19 and 20 remain the historical split/gap baseline.
-5. For single-agent continuation, read [`对齐文档/17-单会话持续Goal模式执行协议.md`](对齐文档/17-单会话持续Goal模式执行协议.md).
-6. [`docs/goal/complete-product-acceptance.yml`](docs/goal/complete-product-acceptance.yml) — the machine-readable acceptance ledger; it is read-only inside either parallel track.
-7. Use [`docs/goal/two-track-convergence.yml`](docs/goal/two-track-convergence.yml) for parallel work or [`docs/goal/single-session-state.yml`](docs/goal/single-session-state.yml) for single-agent recovery.
+3. [`对齐文档/24-完全体最终收敛与云原生课程战役.md`](对齐文档/24-完全体最终收敛与云原生课程战役.md) — the only current execution authority: product quality, exact branch integration, advanced Kubernetes showcase, collaboration and closure.
+4. [`对齐文档/25-云原生高级能力展柜与课程评分设计.md`](对齐文档/25-云原生高级能力展柜与课程评分设计.md) — the plugin/gallery architecture, environment matrix, scorecard and course evidence contract.
+5. [`docs/goal/closure-campaign-state.yml`](docs/goal/closure-campaign-state.yml) — the only current machine cursor.
+6. [`docs/goal/complete-product-acceptance.yml`](docs/goal/complete-product-acceptance.yml) — the global machine-readable acceptance ledger.
+7. For single-agent continuation, also read [`对齐文档/17-单会话持续Goal模式执行协议.md`](对齐文档/17-单会话持续Goal模式执行协议.md), but do not use its old state files as the cursor.
 8. [`对齐文档/18-组员与Coding-Agent启动部署交接指南.md`](对齐文档/18-组员与Coding-Agent启动部署交接指南.md) — the deployment/run handoff runbook (local, `local-complete`, `academy-eks`).
 9. [`README.md`](README.md) / [`README.zh-CN.md`](README.zh-CN.md) — accurate project overview and quick start.
+
+Documents 19–23, `release-candidate-state.yml`, `single-session-state.yml`, `teammate-continuation-state.yml`, `two-track-convergence.yml`, and `docs/tracks/` are historical snapshots. Never use their old branch wildcard, counts or cursor to override document 24.
 
 **Historical / superseded:** [`AGENTS.md`](AGENTS.md) contains rich, still-useful module and
 design-pattern notes, but its tech-stack table, project structure, and run commands describe the
@@ -145,8 +147,8 @@ AGENTS.md's stack/run sections.
 - **TDD for behavior.** Write a failing test that pins the gap, then make it pass. Extend the labeled
   evaluation gates under `src/test/.../evaluation` and `evidence/` rather than self-scoring.
 - **Bind work to an acceptance gap.** Every meaningful change should map to an item in the acceptance
-  ledger; in a parallel track update only its track-local status/evidence, then let the integrator reconcile
-  the ledger + `single-session-state.yml` after both PRs.
+  ledger; parallel agents do not edit global state, and the integrator reconciles the ledger plus
+  `closure-campaign-state.yml` after merge.
 - **Preserve unrelated work.** Inspect live `HEAD`, working tree, and evidence before acting; do not
   overwrite or discard in-flight assets you did not create.
 - **Secrets stay external.** Env-vars only; run `scripts/scan-secrets.ps1` before pushing. Removing a
@@ -164,9 +166,8 @@ This project is meant to be advanced in a **single continuous session** toward t
 not one ticket at a time. On resuming:
 
 1. Read the document map above; re-derive reality from live `HEAD`, the working tree, and `evidence/`.
-2. Read the operator's standing directive [`docs/goal/loop-goal-directive.md`](docs/goal/loop-goal-directive.md)
-   (phased roadmap, experience-overhaul priority, agent-handoff protocol for the continuous /loop run),
-   then pick up the `active_front` / `priority_queue` in `docs/goal/single-session-state.yml`.
+2. Read document 24 and pick up `current_front` in `docs/goal/closure-campaign-state.yml`; old loop,
+   track and single-session state files are recovery history only.
 3. Implement the next highest-value, machine-executable gap; verify; write evidence; update the
    ledger + state; commit a recoverable checkpoint; push; then immediately continue to the next gap.
 4. A checkpoint, a passing test, or a context compaction is **not** a stopping point. Stop only when

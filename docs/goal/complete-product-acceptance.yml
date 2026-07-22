@@ -2,11 +2,14 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 authority: goal-objective.md
 status: IN_PROGRESS
-last_reconciled_at: 2026-07-22T00:48:00+08:00
-last_reconciled_commit: 3f75c0dee46e199b7a057e33243068def6edc8d2
-current_fact_baseline: 对齐文档/23-组员PR集成审查与本地演示收口.md
-current_execution_plan: 对齐文档/23-组员PR集成审查与本地演示收口.md
-parallel_state: docs/goal/release-candidate-state.yml
+last_reconciled_at: 2026-07-22T00:00:00+08:00
+last_reconciled_commit: 642f034
+current_fact_baseline: 对齐文档/24-完全体最终收敛与云原生课程战役.md
+current_execution_plan: 对齐文档/24-完全体最终收敛与云原生课程战役.md
+parallel_state: docs/goal/closure-campaign-state.yml
+reconciliation_boundary: >-
+  W0 integration of the four exact Claude branches is pending. Historical counts and evidence remain
+  valid only for their recorded commits; statuses may not be promoted until the integrated HEAD is verified.
 
 status_semantics:
   UNASSESSED: current HEAD and target environment have not been verified
@@ -86,7 +89,7 @@ gates:
     required: true
     acceptance:
       - id: ARCH-MODULES
-        target: "Module boundaries are executable through Spring Modulith and architecture tests."
+        target: "Module boundaries are executable through ArchUnit, domain interfaces and events; Spring Modulith is optional after a package-by-feature migration."
         status: IN_PROGRESS
         evidence: [docs/adr/0003-arch-modules-archunit-not-spring-modulith.md, src/test/java/com/innercosmos/architecture/ControllerLayerShortcutArchTest.java, src/test/java/com/innercosmos/architecture/DomainBoundaryArchitectureTest.java]
         remaining: |
@@ -122,7 +125,7 @@ gates:
           latency/heartbeat percentiles and Redis Stream consumer-group redelivery, remain open.
       - {id: DATA-POSTGRES, target: "PostgreSQL and Flyway are production truth with Testcontainers and migration reconciliation.", status: IN_PROGRESS, evidence: [evidence/m1/M1-DATA-POC-001/, evidence/m1/M1-DATA-APP-001/, evidence/m1/M1-AUTH-OIDC-001/, evidence/innovation/INNO-INNER-005/, evidence/g2/API-CONTRACT-001/, docs/adr/0002-postgresql-system-of-record.md]}
       - {id: DATA-REDIS, target: "Sessions, short state, limits, and leases are externalized to Redis where required.", status: IN_PROGRESS, evidence: [evidence/m1/M1-DATA-REDIS-001/, evidence/m1/M1-DATA-REDIS-002/, evidence/m1/M1-DATA-REDIS-003/, evidence/g2/API-CONTRACT-001/]}
-      - {id: EVENT-RELIABLE, target: "Transactional outbox, SQS, idempotent consumers, retries, and DLQ replay are verified.", status: IN_PROGRESS, evidence: [evidence/g2/EVENT-RELIABLE-001/, evidence/academy/ACADEMY-LIVE-001/, evidence/integration/FINAL-P0-CLOSURE-2026-07-22/], remaining: "2026-07-22: dialog-finished now has a real durable projection handler for memory extraction, claim staging and emotion-timeline aggregation; production outbox mode excludes the six duplicate in-process async listeners, and failures roll back the inbox receipt for retry. PostgreSQL/Redis full regression is 923/923. Remaining: real SQS wiring/delivery (JDBC outbox remains the Academy-compatible substitute), complete derivative receipts beyond this event type, and non-author review."}
+      - {id: EVENT-RELIABLE, target: "Transactional outbox/inbox, idempotent consumers, retries and replay are verified with JDBC transport for local/Academy and SQS/DLQ transport for commercial-sg.", status: IN_PROGRESS, evidence: [evidence/g2/EVENT-RELIABLE-001/, evidence/academy/ACADEMY-LIVE-001/, evidence/integration/FINAL-P0-CLOSURE-2026-07-22/], remaining: "The durable JDBC projection path is implemented and is the authoritative Academy transport. Remaining: reconcile all derivative receipts and non-author replay evidence; implement and verify the commercial-sg SQS/DLQ adapter only in an authorized environment. Academy does not wait for SQS and must not receive learner AWS credentials."}
       - {id: RUNTIME-ROLES, target: "API, AI worker, event worker, scheduler, and migration roles run and scale independently.", status: IN_PROGRESS, evidence: [evidence/academy/ACADEMY-LIVE-001/], remaining: "Role assembly is gated by inner-cosmos.runtime.role (@ConditionalOnExpression): worker->JdbcOutboxWorker, scheduler->6 scheduler jobs + SessionIdleWatcher, api->neither, migration->MigrationRoleExit run-once. Covered by RuntimeRoleConfigurationTest (scheduling gate per role + migration exit/reject) and by ACADEMY-LIVE-001 which ran api(2 replicas)+worker+scheduler+migration as independent workloads. Remaining: an explicit per-role job-bean-presence assertion test (a full-boot attempt was reverted because enabling the Postgres-only outbox worker on H2 triggers its poll; the right form is a Testcontainers or ApplicationContextRunner slice) + independent scaling soak."}
       - {id: DATA-RIGHTS, target: "Consent, provenance, correction, export, and deletion propagate to all derivatives.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-INNER-001/, evidence/innovation/INNO-INNER-003/, evidence/innovation/INNO-INNER-005/]}
 
@@ -324,7 +327,8 @@ gates:
     acceptance:
       - {id: SKILL-RUNTIME, target: "Versioned skill manifests enforce schemas, tools, consent, evidence, risk, retention, evaluation, and escalation.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-PSY-001/]}
       - {id: SKILL-PRODUCT, target: "At least three evidence-informed non-diagnostic skills pass quality, safety, i18n, and human review.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-PSY-001/, evidence/innovation/INNO-PSY-002/]}
-      - {id: MOBILE-NATIVE, target: "Capacitor push, microphone, deep links, secure storage, lifecycle, and network recovery pass on real devices.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-MOBILE-001/, evidence/innovation/INNO-MOBILE-002/, evidence/innovation/INNO-MOBILE-003/, evidence/innovation/INNO-MOBILE-004/], remaining: "2026-07-22: a real device-registration + push-delivery pipeline (FCM HTTP v1 gateway, encrypted-at-rest tokens, WakeIntent-triggered enqueue) and native audio capture (web/src/audio-recorder.ts) now exist and pass the full Java/frontend gates. APNs remains an explicit EXTERNAL_CREDENTIAL_GATE stub. Still open: real device execution, production FCM/APNs credentials, and store signing."}
+      - {id: MOBILE-MACHINE-RUNTIME, target: "Capacitor Android emulator and Tauri Windows execute PKCE, Aurora, recovery, deep-link, local notification, secure storage and audio journeys with current evidence.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-MOBILE-001/, evidence/innovation/INNO-MOBILE-002/, evidence/innovation/INNO-MOBILE-003/, evidence/innovation/INNO-MOBILE-004/], remaining: "Reconcile the existing Android/desktop evidence on the integrated W0 HEAD and close all machine-runnable emulator/Tauri journeys."}
+      - {id: MOBILE-EXTERNAL-RELEASE, target: "Real iOS/Android devices, production FCM/APNs, Apple signing/notarization and store signing are independently verified.", status: BLOCKED, evidence: [evidence/innovation/INNO-MOBILE-004/], remaining: "External device, Firebase/Apple credentials, signing and store-account gate. Code, templates and Mac handoff remain machine work; only the external execution/signoff is blocked."}
       - {id: UX-COMPLETE, target: "All five product spaces meet desktop/mobile, bilingual, WCAG 2.2 AA target, reduced-motion, and blind-experience acceptance.", status: IN_PROGRESS, evidence: [evidence/experience/, evidence/integration/FINAL-STABILIZATION-2026-07-20/], remaining: "Five clean BrowserRouter spaces, hard-refresh routes, desktop/projector/mobile viewports, progressive-disclosure tags, PWA banner clearance and 14 Playwright journeys are verified. Still open: complete copy-level i18n, global axe/manual WCAG audit, performance/visual-regression budgets and non-author blind experience acceptance."}
 
   - id: G8
@@ -340,6 +344,12 @@ gates:
       - {id: EKS-WORKLOAD, target: "Kustomize workloads enforce probes, resources, PDB, spread, HPA, network policy, secrets, and graceful shutdown.", status: PASS, evidence: [evidence/academy/PROFILE-FOUNDATION-001/, evidence/academy/ACADEMY-RUNTIME-001/, evidence/academy/ACADEMY-LIVE-001/]}
       - {id: OPS-OBSERVABILITY, target: "OpenTelemetry dashboards, alerts, traces, AI cost/quality signals, and runbooks are exercised by non-authors.", status: IN_PROGRESS, evidence: [evidence/g8/OPS-OBSERVABILITY-001/], remaining: "2026-07-17: observability-as-code shipped (deploy/k8s/observability: Prometheus v2.54 pod-discovery scraping /actuator/prometheus + 4 alert rules; Grafana 11.3 provisioned datasource + App Health/JVM dashboard). Verified live on kind: both API pods up=1, JVM/HTTP/CPU series present, dashboard rendered during load. Remaining: OpenTelemetry distributed traces; AI cost/quality signal panels; non-author runbook rehearsal (tracked in G9 FINAL-OPERATIONS)."}
       - {id: OPS-RESILIENCE, target: "Canary, rollback, pod/node/provider failure, queue replay, and database/object restore meet declared SLO/RPO/RTO.", status: IN_PROGRESS, evidence: [evidence/g8/OPS-RESILIENCE-001/, evidence/g8/BACKUP-RESTORE-001/], remaining: "2026-07-17: exercised on kind — pod-kill recovery, zero-downtime rolling update (availableReplicas held at 4, maxUnavailable=0), node-drain with PDB minAvailable=1 blocking unsafe eviction + reschedule to another node + continuous HTTP 200, and a full pg_dump->drop->pg_restore backup/restore drill; SLO/RPO/RTO statement recorded. Remaining: canary + automated rollback scripting, provider-failure injection, queue-replay (see G2 EVENT-RELIABLE), off-cluster backup copy, and rerun on real academy-eks."}
+      - {id: CN-ZERO-LOSS-DRAIN, target: "Deleting an API Pod during a live multi-bubble Aurora SSE turn drains and resumes via durable timeline/Last-Event-ID without duplicate bubbles or side effects.", status: UNASSESSED, evidence: [], remaining: "Fix role-specific probes and run a timed kind fault journey; record recovery time and business invariants."}
+      - {id: CN-EVENT-DRIVEN-AUTOSCALING, target: "Outbox backlog and oldest-job age drive worker scale-out/scale-in while lease competition and inbox processing remain exactly once.", status: UNASSESSED, evidence: [], remaining: "Expose privacy-safe business metrics; prove KEDA on kind and document a freshly probed Academy fallback."}
+      - {id: CN-OTEL-SEMANTIC-TRACE, target: "A privacy-safe distributed trace links Aurora HTTP/SSE, provider, retrieval, outbox, worker, memory/profile and WakeIntent spans without content or stable user identifiers.", status: UNASSESSED, evidence: [], remaining: "Connect OTLP Collector and trace backend, propagate/link async context, and record a real drill-down."}
+      - {id: CN-PROGRESSIVE-DELIVERY, target: "Gateway-weighted stable/canary delivery uses operational and AI-quality analysis to stop or automatically roll back a degrading runtime version.", status: UNASSESSED, evidence: [], remaining: "Adopt expand-contract schema compatibility, then prove Argo Rollouts/Flagger or scripted HTTPRoute+PromQL fallback."}
+      - {id: CN-POLICY-AS-CODE, target: "Cluster or CI admission policy rejects unsigned, mutable, root, over-privileged, unbounded or production-debug workloads with reproducible evidence.", status: UNASSESSED, evidence: [], remaining: "Prove Kyverno/ValidatingAdmissionPolicy on kind and freshly probe Academy enforcement capability."}
+      - {id: CN-EXTENSION-SHOWCASE, target: "Selected advanced cloud-native extensions each have a product hook, real success and failure evidence, kill switch, resource boundary and environment fallback.", status: UNASSESSED, evidence: [], remaining: "Score and implement Tier B/C candidates from document 24 after hero gates; chart installation alone is insufficient."}
       - {id: SG-PRODUCT, target: "English-first Singapore timezone experience and current local safety resources work completely.", status: UNASSESSED, evidence: []}
       - {id: SG-RELEASE, target: "Current PDPA, cross-border LLM, store, HSA-boundary, corporate, tax, and payment checks have owner sign-off.", status: UNASSESSED, evidence: []}
 
@@ -359,3 +369,8 @@ completion_rule:
   required_human_gate_status: PASS
   allow_release_candidate_blocked_by_human_gate: true
   complete_when: Every required gate and acceptance item is PASS with current evidence and required independent review.
+  release_candidate_blocked_by_human_gate_when: >-
+    Every machine-executable required item is PASS and every remaining non-PASS item is mapped to a
+    named external credential, device, legal, qualified-expert, real-user or irreversible-account gate
+    with owner, required input and closure procedure. Convenience, uncertainty, missing tests, missing
+    implementation, unavailable local setup or agent self-review never qualify as a human gate.

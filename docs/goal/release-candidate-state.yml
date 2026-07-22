@@ -1,12 +1,17 @@
 schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
-status: LOCAL_TEACHER_DEMO_READY_HUMAN_GATES_OPEN
-updated_at: "2026-07-22T16:30:00+08:00"
+status: HISTORICAL_SNAPSHOT_SUPERSEDED_BY_CLOSURE_CAMPAIGN
+updated_at: "2026-07-22T00:00:00+08:00"
 authority:
   objective: goal-objective.md
-  current_handoff: 对齐文档/23-组员PR集成审查与本地演示收口.md
+  current_handoff: 对齐文档/24-完全体最终收敛与云原生课程战役.md
+  current_cursor: docs/goal/closure-campaign-state.yml
   acceptance: docs/goal/complete-product-acceptance.yml
   deployment: 对齐文档/18-组员与Coding-Agent启动部署交接指南.md
+snapshot_boundary: >-
+  All counts, heads and capability claims below are retained as the previous release-candidate
+  snapshot. They are not current integration truth. Four exact Claude branches await W0 integration;
+  only closure-campaign-state.yml may select new work and only the integrated HEAD may publish new counts.
 integrated_main:
   branch: main
   head_before_final_commit: f75fdc4

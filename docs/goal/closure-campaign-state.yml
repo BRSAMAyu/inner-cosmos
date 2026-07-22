@@ -1,0 +1,64 @@
+schema_version: 1
+goal_id: INNER-COSMOS-COMPLETE-PRODUCT
+authority: 对齐文档/24-完全体最终收敛与云原生课程战役.md
+status: IN_PROGRESS
+updated_at: 2026-07-22T00:00:00+08:00
+
+legal_terminal_states:
+  - COMPLETE
+  - RELEASE_CANDIDATE_BLOCKED_BY_HUMAN_GATE
+
+current_front:
+  id: W0-INTEGRATE-FOUR-CLAUDE-BRANCHES
+  intent: Integrate the exact four reviewed source/test branches, rebuild once, and reconcile current truth.
+  status: READY
+  exact_sources:
+    - {branch: worktree-agent-a537b49a, head: 42d6253, scope: admin-console}
+    - {branch: worktree-agent-aa2e0d29, head: d6925f8, scope: timeline-daily-weekly-shredder}
+    - {branch: worktree-agent-a9edba5a, head: 1fc014b, scope: todo-heart-diary-belief}
+    - {branch: worktree-agent-a0ddcfc1, head: 6867c0f, scope: playwright-five-components}
+  forbidden:
+    - wildcard-selection-of-worktree-agent-branches
+    - merging-per-branch-generated-bundles
+    - overwriting-pre-existing-working-tree-changes
+
+campaigns:
+  - {id: W0, name: integration-and-truth-baseline, status: READY, depends_on: []}
+  - {id: W1, name: living-intelligence-and-data-loop, status: BLOCKED_BY_W0, depends_on: [W0]}
+  - {id: W2, name: complete-experience-and-multiplatform-polish, status: BLOCKED_BY_W0, depends_on: [W0]}
+  - {id: W3, name: cloud-native-showcase, status: BLOCKED_BY_W0, depends_on: [W0]}
+  - {id: W4, name: convergence-and-non-author-acceptance, status: BLOCKED_BY_W1_W2_W3, depends_on: [W1, W2, W3]}
+
+parallelism:
+  max_agents: 3
+  integrator_owns:
+    - global-authority-and-ledgers
+    - shared-generated-bundle
+    - shared-api-types-and-locales
+    - flyway-version-sequence
+    - merges-and-release-gates
+  parallel_tracks:
+    - product-living-quality
+    - cloud-native-showcase
+
+cloud_native_hero_gates:
+  - {id: CN-ZERO-LOSS-DRAIN, status: UNASSESSED}
+  - {id: CN-EVENT-DRIVEN-AUTOSCALING, status: UNASSESSED}
+  - {id: CN-OTEL-SEMANTIC-TRACE, status: UNASSESSED}
+
+human_gates_are_not_machine_work:
+  - external-provider-secret-rotation-and-independent-signoff
+  - production-cloud-dns-store-payment-accounts
+  - apple-signing-notarization-apns-and-real-ios-device
+  - singapore-legal-privacy-and-cross-border-review
+  - qualified-psychology-review
+  - consented-real-user-study-and-final-aesthetic-signoff
+
+next_reconciliation_must_record:
+  - integrated_head
+  - preserved_preexisting_dirty_paths
+  - exact_test_commands_and_counts
+  - browser_android_desktop_runtime_evidence
+  - acceptance_ledger_changes
+  - remaining_machine_work
+  - remaining_human_gates
