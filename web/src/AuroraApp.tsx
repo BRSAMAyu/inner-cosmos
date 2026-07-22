@@ -24,7 +24,7 @@ import { PortraitView } from "./components/PortraitView";
 import { AccountSettings, type AccountBusy } from "./components/AccountSettings";
 import { DataRightsPanel } from "./components/DataRightsPanel";
 import { LocaleToggle } from "./components/LocaleToggle";
-import type { DataRetractionReceipt } from "./api";
+import type { DataRetractionReceipt, UserProfileSettings } from "./api";
 import { loadLocale, saveLocale, type Locale } from "./i18n";
 import { APP_COPY, type DialogMode } from "./appCopy";
 import { AuthGate } from "./components/AuthGate";
@@ -75,6 +75,8 @@ export function AuroraApp() {
   const [dataRightsLoading, setDataRightsLoading] = useState(false);
   const [dataRightsLoaded, setDataRightsLoaded] = useState(false);
   const [accountMessage, setAccountMessage] = useState<string | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfileSettings | null>(null);
+  const [profileBusy, setProfileBusy] = useState(false);
   const [starfield, setStarfield] = useState<StarfieldScene | null>(null);
   const [starfieldBusy, setStarfieldBusy] = useState(false);
   const [memoryOperations, setMemoryOperations] = useState<MemoryOperation[]>([]);
@@ -214,7 +216,8 @@ export function AuroraApp() {
         connectionsAndLetters.loadPeople(),
         api.claimCandidates().then(setClaimCandidates).catch(() => undefined),
         connectionsAndLetters.loadRelations(),
-        connectionsAndLetters.loadLetterThreads()
+        connectionsAndLetters.loadLetterThreads(),
+        api.getProfile().then(setUserProfile)
       ]);
       if (call !== bootstrapCallRef.current) return;
       setAuthenticated(true);
@@ -550,6 +553,16 @@ export function AuroraApp() {
       setAccountMessage(null);
     } catch (error) { setAccountMessage(error instanceof Error ? error.message : "账户删除失败"); }
     finally { setAccountBusy(null); }
+  };
+
+  const saveProfile = async (patch: Partial<UserProfileSettings>) => {
+    setProfileBusy(true);
+    try {
+      const updated = await api.updateProfile(patch);
+      setUserProfile(updated);
+      setAccountMessage("偏好设置已保存");
+    } catch (error) { setAccountMessage(error instanceof Error ? error.message : "偏好设置未能保存"); }
+    finally { setProfileBusy(false); }
   };
 
   const changeStarfieldMode = async (nextMode: StarfieldScene["mode"]) => {
@@ -1082,7 +1095,8 @@ export function AuroraApp() {
         <PortraitView dimensions={portrait} history={portraitHistory} calibrated={portraitCalibrated} busyDim={portraitBusy}
           onLoadHistory={dim => void loadPortraitHistory(dim)} onCalibrate={(dim, oldValue, newValue) => void submitPortraitCalibration(dim, oldValue, newValue)} />
         <AccountSettings busy={accountBusy} message={accountMessage} onChangePassword={(oldPassword, newPassword) => void changeAccountPassword(oldPassword, newPassword)}
-          onExportData={() => void exportAccountData()} onDeleteAccount={password => void deleteAccount(password)} locale={skillLocale} />
+          onExportData={() => void exportAccountData()} onDeleteAccount={password => void deleteAccount(password)}
+          profile={userProfile} profileBusy={profileBusy} onSaveProfile={patch => void saveProfile(patch)} locale={skillLocale} />
         <LocaleToggle locale={skillLocale} onChange={changeLocale} />
         <DataRightsPanel receipts={dataRightsReceipts} loading={dataRightsLoading} loaded={dataRightsLoaded}
           onLoad={() => void loadDataRightsReceipts()} locale={skillLocale} />

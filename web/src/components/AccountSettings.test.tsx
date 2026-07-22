@@ -1,8 +1,19 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AccountSettings } from "./AccountSettings";
+import type { UserProfileSettings } from "../api";
 
 afterEach(cleanup);
+
+const profile: UserProfileSettings = {
+  id: 1, username: "demo", nickname: "demo", role: "USER",
+  auroraName: null, auroraTone: "温柔安静", preferredInputType: null,
+  socialReachabilityStatus: "PRIVATE", bio: null, reflectionDepth: 3,
+  allowMemoryRecall: true, quietHoursStart: "22:00", quietHoursEnd: "07:00",
+  proactiveSensitivity: 2, allowMultiMessage: true, focusModeEnabled: false,
+  focusWindowsJson: null, currentEnvironmentLabel: null,
+  weatherAwarenessEnabled: true, timeAwarenessEnabled: true, timezone: "Asia/Shanghai"
+};
 
 describe("AccountSettings", () => {
   it("triggers data export directly, without a confirmation form", () => {
@@ -57,6 +68,42 @@ describe("AccountSettings", () => {
       onExportData={() => undefined} onDeleteAccount={() => undefined} />);
     expect(screen.getByRole("button", { name: "导出数据" })).toBeDisabled();
     expect(screen.getByText("数据已导出")).toBeVisible();
+  });
+
+  it("seeds Aurora preferences from the loaded profile and saves a full patch on demand", () => {
+    const onSaveProfile = vi.fn();
+    render(<AccountSettings busy={null} message={null} onChangePassword={() => undefined}
+      onExportData={() => undefined} onDeleteAccount={() => undefined}
+      profile={profile} profileBusy={false} onSaveProfile={onSaveProfile} />);
+
+    expect(screen.getByLabelText("对话风格")).toHaveValue("温柔安静");
+    expect(screen.getByLabelText("反思深度")).toHaveValue("3");
+    expect(screen.getByLabelText("允许记忆回溯")).toBeChecked();
+    expect(screen.getByLabelText("允许多条消息")).toBeChecked();
+    expect(screen.getByLabelText("主动关心频率")).toHaveValue("2");
+    expect(screen.getByLabelText("谁可以找到你")).toHaveValue("PRIVATE");
+    expect(screen.getByLabelText("安静时段开始")).toHaveValue("22:00");
+    expect(screen.getByLabelText("安静时段结束")).toHaveValue("07:00");
+    expect(screen.getByLabelText("专注模式")).not.toBeChecked();
+    expect(screen.getByLabelText("感知天气")).toBeChecked();
+    expect(screen.getByLabelText("感知时间")).toBeChecked();
+
+    fireEvent.change(screen.getByLabelText("对话风格"), { target: { value: "理性清晰" } });
+    fireEvent.click(screen.getByLabelText("专注模式"));
+    fireEvent.click(screen.getByRole("button", { name: "保存偏好设置" }));
+
+    expect(onSaveProfile).toHaveBeenCalledExactlyOnceWith({
+      auroraTone: "理性清晰", reflectionDepth: 3, allowMemoryRecall: true, allowMultiMessage: true,
+      proactiveSensitivity: 2, socialReachabilityStatus: "PRIVATE",
+      quietHoursStart: "22:00", quietHoursEnd: "07:00",
+      focusModeEnabled: true, weatherAwarenessEnabled: true, timeAwarenessEnabled: true
+    });
+  });
+
+  it("does not render the preferences panel before the profile has loaded", () => {
+    render(<AccountSettings busy={null} message={null} onChangePassword={() => undefined}
+      onExportData={() => undefined} onDeleteAccount={() => undefined} />);
+    expect(screen.queryByLabelText("对话风格")).not.toBeInTheDocument();
   });
 
   it("renders in English and validates in English when locale is en-SG", () => {

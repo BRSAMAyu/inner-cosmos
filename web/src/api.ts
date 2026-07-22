@@ -19,6 +19,15 @@ export type WakeIntent = {
   contextSessionId: number | null; supersedesIntentId: number | null; userFeedback: string | null;
 };
 export type Notification = { id: number; type: string; title: string; body: string; refId: number; refType: string; read: boolean };
+export type UserProfileSettings = {
+  id: number; username: string; nickname: string; role: string;
+  auroraName: string | null; auroraTone: string | null; preferredInputType: string | null;
+  socialReachabilityStatus: string | null; bio: string | null; reflectionDepth: number | null;
+  allowMemoryRecall: boolean | null; quietHoursStart: string | null; quietHoursEnd: string | null;
+  proactiveSensitivity: number | null; allowMultiMessage: boolean | null; focusModeEnabled: boolean | null;
+  focusWindowsJson: string | null; currentEnvironmentLabel: string | null;
+  weatherAwarenessEnabled: boolean | null; timeAwarenessEnabled: boolean | null; timezone: string | null;
+};
 export type GoodbyeResult = {
   success: boolean; line: string; stepsCompleted: string[]; confirmed: boolean; reverted: boolean;
   confidence: number; goodbyeStrength: string;
@@ -473,6 +482,10 @@ export const api = {
     return result;
   },
   exportData: () => request<Record<string, unknown>>("/api/user/export"),
+  getProfile: () => request<UserProfileSettings>("/api/user/profile"),
+  updateProfile: (patch: Partial<UserProfileSettings>) => request<UserProfileSettings>("/api/user/profile", {
+    method: "PUT", body: JSON.stringify(patch)
+  }),
   safetyResources: () => request<string[]>("/api/safety/resources"),
   dataRightsReceipts: (limit?: number) => request<DataRetractionReceipt[]>(
     "/api/me/data-rights/receipts" + (limit ? `?limit=${limit}` : "")),
