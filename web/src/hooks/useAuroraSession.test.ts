@@ -21,18 +21,19 @@ vi.mock("../api", () => ({
     readNotification: vi.fn(),
     rescheduleWakeIntent: vi.fn(),
     cancelWakeIntent: vi.fn(),
-    psychologySkillSuggestion: vi.fn()
+    psychologySkillSuggestion: vi.fn(),
+    triggerGoodbye: vi.fn()
   },
   streamAurora: vi.fn(),
   replayTurnEvents: vi.fn(),
   subscribeProactive: vi.fn(() => () => undefined)
 }));
 
-function setup() {
+function setup(skillLocale: "zh-CN" | "en-SG" = "zh-CN") {
   const setStatus = vi.fn();
   const onSkillSuggestion = vi.fn();
   const { result } = renderHook(() => useAuroraSession({
-    authenticated: true, skillLocale: "zh-CN", onSkillSuggestion, setStatus
+    authenticated: true, skillLocale, onSkillSuggestion, setStatus
   }));
   return { result, setStatus, onSkillSuggestion };
 }
@@ -272,6 +273,95 @@ describe("useAuroraSession -- safety resources", () => {
     expect(result.current.safetyResources).toEqual([
       "如果你正处于紧急危险中，请立即拨打 110（报警），或联系身边可信赖的人。"
     ]);
+  });
+});
+
+describe("useAuroraSession -- goodbye ritual", () => {
+  it("triggerGoodbye posts to the goodbye endpoint for the current session and stores the farewell line", async () => {
+    vi.mocked(api.triggerGoodbye).mockResolvedValue({
+      success: true, line: "今天先到这里，我会把重要的部分留住。", stepsCompleted: [],
+      confirmed: false, reverted: false, confidence: 0.95, goodbyeStrength: "HIGH"
+    });
+    const { result } = setup();
+    await act(async () => { await result.current.resolveSession(); });
+    expect(result.current.goodbyeResult).toBeNull();
+
+    await act(async () => { await result.current.triggerGoodbye(); });
+
+    expect(api.triggerGoodbye).toHaveBeenCalledExactlyOnceWith(100, "BUTTON");
+    expect(result.current.goodbyeResult?.line).toBe("今天先到这里，我会把重要的部分留住。");
+  });
+
+  it("does nothing without an active session", async () => {
+    const { result } = setup();
+    await act(async () => { await result.current.triggerGoodbye(); });
+    expect(api.triggerGoodbye).not.toHaveBeenCalled();
+  });
+
+  it("dismissGoodbye clears the stored farewell result", async () => {
+    vi.mocked(api.triggerGoodbye).mockResolvedValue({
+      success: true, line: "先到这里。", stepsCompleted: [], confirmed: false, reverted: false,
+      confidence: 0.9, goodbyeStrength: "MEDIUM"
+    });
+    const { result } = setup();
+    await act(async () => { await result.current.resolveSession(); });
+    await act(async () => { await result.current.triggerGoodbye(); });
+    expect(result.current.goodbyeResult).not.toBeNull();
+
+    act(() => { result.current.dismissGoodbye(); });
+    expect(result.current.goodbyeResult).toBeNull();
+  });
+
+  it("surfaces a status message when the goodbye request fails, without crashing", async () => {
+    vi.mocked(api.triggerGoodbye).mockRejectedValue(new Error("暂时无法完成这次告别"));
+    const { result, setStatus } = setup();
+    await act(async () => { await result.current.resolveSession(); });
+    await act(async () => { await result.current.triggerGoodbye(); });
+    expect(setStatus).toHaveBeenCalledWith("暂时无法完成这次告别");
+    expect(result.current.goodbyeResult).toBeNull();
+  });
+});
+
+describe("useAuroraSession -- status copy is locale-aware, not hardcoded Chinese", () => {
+  it("send() and terminal turn events use English status text when skillLocale is en-SG", async () => {
+    let capturedOnEvent: ((event: AuroraStreamEvent) => void) | undefined;
+    vi.mocked(streamAurora).mockImplementation(async (_input, _signal, onEvent) => { capturedOnEvent = onEvent; });
+    vi.mocked(api.psychologySkillSuggestion).mockResolvedValue(null);
+    const { result, setStatus } = setup("en-SG");
+    await act(async () => { await result.current.resolveSession(); });
+    act(() => { result.current.setDraft("a bit tired today"); });
+
+    await act(async () => { await result.current.send({ preventDefault: () => undefined } as never); });
+    expect(setStatus).toHaveBeenCalledWith(expect.stringMatching(/^Aurora is listening/));
+
+    act(() => { capturedOnEvent!({ id: "1", type: "turn.started", payload: { turnId: 9 } }); });
+    expect(setStatus).toHaveBeenLastCalledWith(expect.stringMatching(/Aurora is/));
+    act(() => { capturedOnEvent!({ id: "2", type: "turn.completed", payload: { message: "done" } }); });
+    expect(setStatus).toHaveBeenLastCalledWith(expect.not.stringMatching(/[一-鿿]/));
+  });
+
+  it("stop() and the streaming-error fallback use English status text when skillLocale is en-SG", async () => {
+    let capturedOnEvent: ((event: AuroraStreamEvent) => void) | undefined;
+    vi.mocked(streamAurora).mockImplementation(async (_input, signal, onEvent) => {
+      capturedOnEvent = onEvent;
+      await new Promise<void>((_resolve, reject) => {
+        signal.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })));
+      });
+    });
+    vi.mocked(api.psychologySkillSuggestion).mockResolvedValue(null);
+    vi.mocked(api.stop).mockResolvedValue({ turn: { id: 9, status: "INTERRUPTED" }, bubbles: [], events: [] });
+    const { result, setStatus } = setup("en-SG");
+    await act(async () => { await result.current.resolveSession(); });
+    act(() => { result.current.setDraft("keep going"); });
+    const sendPromise = act(async () => { await result.current.send({ preventDefault: () => undefined } as never); });
+    act(() => { capturedOnEvent!({ id: "1", type: "turn.started", payload: { turnId: 9 } }); });
+
+    await act(async () => { await result.current.stop(); });
+    await sendPromise;
+    expect(setStatus).toHaveBeenLastCalledWith(expect.not.stringMatching(/[一-鿿]/));
+
+    act(() => { capturedOnEvent!({ id: "2", type: "error", payload: { message: "" } }); });
+    expect(setStatus).toHaveBeenLastCalledWith(expect.not.stringMatching(/[一-鿿]/));
   });
 });
 

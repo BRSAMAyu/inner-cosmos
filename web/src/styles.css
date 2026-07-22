@@ -233,6 +233,18 @@ h1 { margin: 14px 0; font-family: Georgia, "Noto Serif SC", serif; font-size: cl
 .safety-resource-card-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .safety-resource-card-actions button { padding: 8px 16px; border: 1px solid #d0918d80; border-radius: 999px; color: #f0c4bc; background: #d0918d26; }
 .safety-resource-card-actions button.quiet { color: var(--text-muted); background: transparent; border-color: #ffffff24; }
+
+/* Calm, deliberately NOT another chat bubble: a closing recap for the "沉淀今天" ritual. Warm
+   sage/aurora tones (never the safety card's rose-urgent palette) with a gentle breathing glow. */
+.goodbye-ritual-card { display: flex; gap: 16px; align-items: center; margin: 16px 0; padding: 18px 20px; border: 1px solid #a9bcae4d; border-radius: 20px; background: linear-gradient(135deg,#2c342e4d,#221c17e8); box-shadow: 0 4px 18px rgba(0,0,0,.16); animation: pwa-banner-rise var(--dur-enter) var(--ease-bloom); }
+.goodbye-ritual-glow { flex: 0 0 auto; width: 44px; height: 44px; border-radius: 50%; padding: 8px; background: radial-gradient(circle at 35% 25%, var(--text-primary), var(--accent-sage-soft) 30%, #223028 65%, transparent 70%); filter: drop-shadow(0 0 20px #7e928177); animation: breathe 6s ease-in-out infinite; }
+.goodbye-ritual-glow span { display: block; width: 100%; height: 100%; border: 1px solid #efe4d955; border-radius: inherit; }
+.goodbye-ritual-body { display: grid; gap: 6px; }
+.goodbye-ritual-body .eyebrow { color: var(--accent-sage-soft); }
+.goodbye-ritual-line { margin: 0; color: var(--text-primary); font: 500 1.02rem Georgia,"Noto Serif SC",serif; line-height: 1.6; }
+.goodbye-ritual-body small { color: var(--text-faint); }
+.goodbye-ritual-body button { justify-self: start; margin-top: 4px; padding: 7px 14px; border: 1px solid #a9bcae4d; border-radius: 999px; color: var(--accent-sage-soft); background: transparent; }
+.actions button.goodbye-trigger { border: 1px solid #ffffff24; color: var(--text-muted); background: transparent; }
 .conversation { min-height: 360px; max-height: 55vh; overflow-y: auto; padding: 30px 4px; display: flex; flex-direction: column; gap: 18px; scrollbar-color: #52463b transparent; scroll-margin-top: 108px; }
 .conversation.empty-state { min-height: 112px; padding: 14px 4px; }
 .empty { margin: auto; text-align: center; color: var(--text-faint); }.empty span { font-size: 2rem; color: var(--accent-sage-soft); }

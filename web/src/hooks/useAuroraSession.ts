@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import {
   api, replayTurnEvents, streamAurora, subscribeProactive,
-  type Notification, type PsychologySkillSuggestion, type WakeIntent
+  type GoodbyeResult, type Notification, type PsychologySkillSuggestion, type WakeIntent
 } from "../api";
 import type { AuroraStreamEvent, DialogMessage, TurnStatus } from "../protocol";
 import type { AuroraUiMessage } from "../components/AuroraConversation";
@@ -26,6 +26,57 @@ export type AuroraSafetyAlert = { riskLevel: string; featureTarget: string; safe
 
 const terminal = new Set<TurnStatus>(["COMPLETED", "INTERRUPTED", "CANCELLED"]);
 
+const STATUS_COPY: Record<SkillLocale, {
+  reconnecting: string; restoringEvent: (eventType: string) => string;
+  recoveredCompleted: string; recoveredInterrupted: string; stillGenerating: string;
+  wakeIntentReturn: (purpose: string) => string; wakeIntentResumeFailed: string;
+  wakeIntentArrived: string; wakeIntentArrivedPendingConfirm: string;
+  stoppedHere: string; turnStarted: string; turnPlanned: string;
+  interrupted: string; completed: string; safetyStatus: string; streamErrorFallback: string;
+  listening: string; noTimelineRetry: string; goodbyeFailed: string;
+  returnScheduled: string; returnSaveFailed: string;
+  returnFeedbackMatched: string; returnFeedbackLater: string; returnFeedbackStop: string; returnFeedbackSaveFailed: string;
+  returnPostponed: string; returnCancelled: string;
+}> = {
+  "zh-CN": {
+    reconnecting: "连接闪了一下，正在从持久化时间线恢复…", restoringEvent: eventType => `正在恢复：${eventType}`,
+    recoveredCompleted: "已从时间线恢复完整回应", recoveredInterrupted: "已恢复到打断发生的位置",
+    stillGenerating: "回应仍在后台生成，你可以继续说，Aurora 会重新规划。",
+    wakeIntentReturn: purpose => `Aurora 按约定回到这里：${purpose}`, wakeIntentResumeFailed: "暂时无法续接这次回来约定",
+    wakeIntentArrived: "Aurora 按约定回来了；这次抵达已经写入耐久通知。",
+    wakeIntentArrivedPendingConfirm: "Aurora 发来了回来信号；正在等待耐久时间线确认。",
+    stoppedHere: "已停在这里。直接继续说，Aurora 会带着已听见的部分重新理解。",
+    turnStarted: "Aurora 正在重新理解这一刻…", turnPlanned: "Aurora 已想好怎样回应",
+    interrupted: "Aurora 停下来了，正在听你接着说。", completed: "Aurora 在这里，等你接着说",
+    safetyStatus: "这段内容需要把现实安全放在第一位，请先查看支持资源。", streamErrorFallback: "流式回应发生错误",
+    listening: "Aurora 正在听…", noTimelineRetry: "还没建立回应时间线，请重试这句话。",
+    goodbyeFailed: "暂时无法完成这次告别",
+    returnScheduled: "约好了。你随时可以改期或取消，不需要迁就 Aurora。", returnSaveFailed: "暂时无法保存约定",
+    returnFeedbackMatched: "谢谢你告诉我，Aurora 会记住这次节奏。", returnFeedbackLater: "好，Aurora 会晚一点再判断是否适合回来。",
+    returnFeedbackStop: "明白了。之后不会再为同一类事情主动提醒。 ", returnFeedbackSaveFailed: "反馈暂时没有保存",
+    returnPostponed: "已为你推迟一小时。这个约定由你掌控。", returnCancelled: "已取消。Aurora 不会按这个约定主动回来。"
+  },
+  "en-SG": {
+    reconnecting: "The connection flickered; recovering from the durable timeline…",
+    restoringEvent: eventType => `Restoring: ${eventType}`,
+    recoveredCompleted: "Recovered the full response from the timeline", recoveredInterrupted: "Recovered up to where it was interrupted",
+    stillGenerating: "The response is still generating in the background — you can keep talking, Aurora will replan.",
+    wakeIntentReturn: purpose => `Aurora came back as arranged: ${purpose}`, wakeIntentResumeFailed: "Couldn't resume this return right now",
+    wakeIntentArrived: "Aurora came back as arranged; this arrival is already recorded in durable notifications.",
+    wakeIntentArrivedPendingConfirm: "Aurora sent a return signal; waiting for durable timeline confirmation.",
+    stoppedHere: "Stopped here. Keep talking directly — Aurora will re-understand with what it already heard.",
+    turnStarted: "Aurora is re-understanding this moment…", turnPlanned: "Aurora has decided how to respond",
+    interrupted: "Aurora paused, listening for you to continue.", completed: "Aurora is here, waiting for you to go on",
+    safetyStatus: "This needs real-world safety put first — please check the support resources first.", streamErrorFallback: "The streaming response hit an error",
+    listening: "Aurora is listening…", noTimelineRetry: "No response timeline exists yet — please retry this message.",
+    goodbyeFailed: "Couldn't complete this goodbye right now",
+    returnScheduled: "It's arranged. You can reschedule or cancel anytime — Aurora won't hold you to it.", returnSaveFailed: "Couldn't save this arrangement right now",
+    returnFeedbackMatched: "Thanks for telling me — Aurora will remember this rhythm.", returnFeedbackLater: "Okay, Aurora will judge later whether it's a good time to come back.",
+    returnFeedbackStop: "Understood. Aurora won't proactively remind you about this kind of thing again. ", returnFeedbackSaveFailed: "The feedback wasn't saved this time",
+    returnPostponed: "Postponed by an hour for you. You're in control of this arrangement.", returnCancelled: "Cancelled. Aurora won't proactively come back for this arrangement."
+  }
+};
+
 function toUi(rows: DialogMessage[]): AuroraUiMessage[] {
   return rows.map(row => ({ key: `db-${row.id}`, speaker: row.speaker, text: row.textContent }));
 }
@@ -45,6 +96,7 @@ export type UseAuroraSessionOptions = {
 };
 
 export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion, setStatus }: UseAuroraSessionOptions) {
+  const t = STATUS_COPY[skillLocale];
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [messages, setMessages] = useState<AuroraUiMessage[]>([]);
   const [draft, setDraft] = useState("");
@@ -59,6 +111,8 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
   const dismissSafetyAlert = useCallback(() => setSafetyAlert(null), []);
   const [safetyResources, setSafetyResources] = useState<string[]>([]);
   const loadSafetyResources = useCallback(() => api.safetyResources().then(setSafetyResources), []);
+  const [goodbyeResult, setGoodbyeResult] = useState<GoodbyeResult | null>(null);
+  const dismissGoodbye = useCallback(() => setGoodbyeResult(null), []);
 
   const abortRef = useRef<AbortController | null>(null);
   const activeTurnRef = useRef<number | null>(null);
@@ -106,11 +160,11 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
   const recover = useCallback(async (turnId: number, sid: number) => {
     if (reconnectingRef.current) return;
     reconnectingRef.current = true;
-    setStatus("连接闪了一下，正在从持久化时间线恢复…");
+    setStatus(t.reconnecting);
     try {
       lastEventIdRef.current = await replayTurnEvents(turnId, lastEventIdRef.current, event => {
         if (event.type === "timeline.event") {
-          setStatus(`正在恢复：${event.payload.eventType}`);
+          setStatus(t.restoringEvent(event.payload.eventType));
         } else {
           handleEventRef.current(event);
         }
@@ -131,17 +185,17 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
         ]);
         if (terminal.has(timeline.turn.status)) {
           await replaceFromHistory(sid);
-          setStatus(timeline.turn.status === "COMPLETED" ? "已从时间线恢复完整回应" : "已恢复到打断发生的位置");
+          setStatus(timeline.turn.status === "COMPLETED" ? t.recoveredCompleted : t.recoveredInterrupted);
           finishTurn();
           return;
         }
         await new Promise(resolve => setTimeout(resolve, 500));
       }
-      setStatus("回应仍在后台生成，你可以继续说，Aurora 会重新规划。");
+      setStatus(t.stillGenerating);
     } finally {
       reconnectingRef.current = false;
     }
-  }, [finishTurn, replaceFromHistory, setStatus]);
+  }, [finishTurn, replaceFromHistory, setStatus, t]);
 
   const openMobileWakeIntent = useCallback(async (wakeIntentId: number) => {
     try {
@@ -154,11 +208,11 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
       const url = new URL(window.location.href);
       url.searchParams.set("wakeIntent", String(wakeIntentId));
       window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
-      setStatus(`Aurora 按约定回到这里：${intent.purpose}`);
+      setStatus(t.wakeIntentReturn(intent.purpose));
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "暂时无法续接这次回来约定");
+      setStatus(error instanceof Error ? error.message : t.wakeIntentResumeFailed);
     }
-  }, [replaceFromHistory, setStatus]);
+  }, [replaceFromHistory, setStatus, t]);
 
   // Encapsulates the "recover an in-flight turn, or just reload history" branch the mobile-runtime
   // resume effect needs -- kept here (rather than exposing activeTurnRef itself) so the ref stays
@@ -178,10 +232,10 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
         setWakeIntents(current => current.filter(intent => !rows.some(
           notice => notice.refType === "WAKE_INTENT" && notice.refId === intent.id
         )));
-        setStatus("Aurora 按约定回来了；这次抵达已经写入耐久通知。");
-      }).catch(() => setStatus("Aurora 发来了回来信号；正在等待耐久时间线确认。"));
+        setStatus(t.wakeIntentArrived);
+      }).catch(() => setStatus(t.wakeIntentArrivedPendingConfirm));
     });
-  }, [authenticated, setStatus]);
+  }, [authenticated, setStatus, t]);
 
   const stop = useCallback(async () => {
     const turnId = activeTurnRef.current;
@@ -193,8 +247,16 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
       message.key.startsWith(`live-${turnId}-`) ? { ...message, partial: true } : message
     ));
     finishTurn();
-    setStatus("已停在这里。直接继续说，Aurora 会带着已听见的部分重新理解。");
-  }, [finishTurn, setStatus]);
+    setStatus(t.stoppedHere);
+  }, [finishTurn, setStatus, t]);
+
+  const triggerGoodbye = useCallback(async () => {
+    if (!sessionId) return;
+    try {
+      const result = await api.triggerGoodbye(sessionId, "BUTTON");
+      setGoodbyeResult(result);
+    } catch (error) { setStatus(error instanceof Error ? error.message : t.goodbyeFailed); }
+  }, [sessionId, setStatus, t]);
 
   const handleEvent = useCallback((event: AuroraStreamEvent) => {
     if (event.id && eventIdsRef.current.has(event.id)) return;
@@ -207,7 +269,7 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
         activeTurnRef.current = turnId;
         setActiveTurnId(turnId);
         setRuntimeSignal(current => ({ ...current, stage: event.type === "turn.started" ? "understanding" : "composing" }));
-        setStatus(event.type === "turn.started" ? "Aurora 正在重新理解这一刻…" : "Aurora 已想好怎样回应");
+        setStatus(event.type === "turn.started" ? t.turnStarted : t.turnPlanned);
         break;
       }
       case "meta": {
@@ -255,12 +317,12 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
       }
       case "turn.interrupted":
         finishTurn();
-        setStatus("Aurora 停下来了，正在听你接着说。");
+        setStatus(t.interrupted);
         break;
       case "turn.completed":
       case "done":
         finishTurn();
-        setStatus("Aurora 在这里，等你接着说");
+        setStatus(t.completed);
         break;
       case "safety":
         finishTurn();
@@ -269,14 +331,14 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
           featureTarget: event.payload.featureTarget,
           safeMessage: event.payload.safeMessage
         });
-        setStatus("这段内容需要把现实安全放在第一位，请先查看支持资源。");
+        setStatus(t.safetyStatus);
         break;
       case "error":
         finishTurn();
-        setStatus(event.payload.message || "流式回应发生错误");
+        setStatus(event.payload.message || t.streamErrorFallback);
         break;
     }
-  }, [finishTurn, setStatus]);
+  }, [finishTurn, setStatus, t]);
   handleEventRef.current = handleEvent;
 
   // Deliberately NOT wrapped in useCallback -- matches the original AuroraApp.tsx, where `send`
@@ -288,7 +350,7 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
     if (abortRef.current || activeTurnRef.current) await stop();
     setDraft("");
     setMessages(current => [...current, { key: `local-${crypto.randomUUID()}`, speaker: "USER", text }]);
-    setStatus("Aurora 正在听…");
+    setStatus(t.listening);
     onSkillSuggestion(null);
     void api.psychologySkillSuggestion(text, skillLocale).then(onSkillSuggestion).catch(() => onSkillSuggestion(null));
     eventIdsRef.current.clear();
@@ -301,7 +363,7 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
       if ((error as Error).name === "AbortError") return;
       const turnId = activeTurnRef.current;
       if (turnId) await recover(turnId, sessionId);
-      else setStatus("还没建立回应时间线，请重试这句话。");
+      else setStatus(t.noTimelineRetry);
     }
   };
 
@@ -321,9 +383,9 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
           wakeIntentId: created.id, title: "Aurora", body: created.reasonForUser, at: notificationAt
         }).catch(() => undefined);
       }
-      setStatus("约好了。你随时可以改期或取消，不需要迁就 Aurora。");
+      setStatus(t.returnScheduled);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "暂时无法保存约定");
+      setStatus(error instanceof Error ? error.message : t.returnSaveFailed);
     } finally { setWakeBusy(false); }
   };
 
@@ -340,10 +402,10 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
           await mobileRuntime.scheduleWakeIntentNotification({ wakeIntentId: result.id, title: "Aurora", body: result.reasonForUser, at }).catch(() => undefined);
         }
       }
-      setStatus(choice === "MATCHED" ? "谢谢你告诉我，Aurora 会记住这次节奏。"
-        : choice === "LATER" ? "好，Aurora 会晚一点再判断是否适合回来。"
-        : "明白了。之后不会再为同一类事情主动提醒。 ");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "反馈暂时没有保存"); }
+      setStatus(choice === "MATCHED" ? t.returnFeedbackMatched
+        : choice === "LATER" ? t.returnFeedbackLater
+        : t.returnFeedbackStop);
+    } catch (error) { setStatus(error instanceof Error ? error.message : t.returnFeedbackSaveFailed); }
     finally { setWakeBusy(false); }
   };
 
@@ -363,7 +425,7 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
         await mobileRuntime.scheduleWakeIntentNotification({ wakeIntentId: changed.id, title: "Aurora", body: changed.reasonForUser, at }).catch(() => undefined);
       }
       setWakeIntents(current => current.map(row => row.id === intent.id ? changed : row));
-      setStatus("已为你推迟一小时。这个约定由你掌控。");
+      setStatus(t.returnPostponed);
     } finally { setWakeBusy(false); }
   };
 
@@ -373,7 +435,7 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
       await api.cancelWakeIntent(intent.id);
       await mobileRuntime.cancelWakeIntentNotification(intent.id);
       setWakeIntents(current => current.filter(row => row.id !== intent.id));
-      setStatus("已取消。Aurora 不会按这个约定主动回来。");
+      setStatus(t.returnCancelled);
     } finally { setWakeBusy(false); }
   };
 
@@ -387,7 +449,7 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
   return {
     sessionId, messages, draft, setDraft, mode, setMode, activeTurnId, runtimeSignal,
     wakeIntents, wakeBusy, returnWhen, setReturnWhen, notifications, safetyAlert, dismissSafetyAlert,
-    safetyResources, loadSafetyResources,
+    safetyResources, loadSafetyResources, goodbyeResult, dismissGoodbye, triggerGoodbye,
     send, stop, scheduleReturn, respondToReturn, postponeReturn, cancelReturn,
     resolveSession, replaceFromHistory, loadWakeIntents, loadNotifications, refreshNotifications,
     resumeConversation, openMobileWakeIntent, resetSession

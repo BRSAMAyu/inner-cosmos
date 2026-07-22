@@ -8,6 +8,7 @@ import { isTauriRuntime } from "./desktop-runtime";
 import { capsulePath, letterThreadPath, MeSpace, productSpaceFromPath, productSpaces, ProductShellNavigation, resourceFromPath, spacePath, type ProductSpace } from "./components/ProductShell";
 import { AuroraConversation } from "./components/AuroraConversation";
 import { SafetyResourceCard } from "./components/SafetyResourceCard";
+import { GoodbyeRitualCard } from "./components/GoodbyeRitualCard";
 import { SafetyHarborPage } from "./components/SafetyHarborPage";
 import { AuroraSelfSpace } from "./components/AuroraSelfSpace";
 import { UnderstandingCorrection, type CorrectionTarget } from "./components/UnderstandingCorrection";
@@ -951,6 +952,8 @@ export function AuroraApp() {
         locale={skillLocale} onDismiss={auroraSession.dismissSafetyAlert}
         onOpenHarbor={() => navigate("/safety-harbor")} />
 
+      <GoodbyeRitualCard result={auroraSession.goodbyeResult} locale={skillLocale} onDismiss={auroraSession.dismissGoodbye} />
+
       <AuroraConversation messages={auroraSession.messages} activeTurnId={auroraSession.activeTurnId}
         thinkingStage={auroraSession.activeTurnId !== null && (auroraSession.runtimeSignal.stage === "understanding" || auroraSession.runtimeSignal.stage === "composing") ? auroraSession.runtimeSignal.stage : null}
         draft={auroraSession.draft} sessionReady={Boolean(auroraSession.sessionId)}
@@ -958,7 +961,7 @@ export function AuroraApp() {
         onTranscribe={async blob => {
           try { const result = await transcribeAudio(blob); return result.text; }
           catch (error) { setStatus(error instanceof Error ? error.message : tt.transcribeUnavailable); return ""; }
-        }} locale={skillLocale} />
+        }} onGoodbye={() => void auroraSession.triggerGoodbye()} locale={skillLocale} />
 
       {(mobileState.native || !mobileState.connected) && <section className={`mobile-presence ${mobileState.connected ? "online" : "offline"}`} aria-label={tt.mobileAria}>
         <div>

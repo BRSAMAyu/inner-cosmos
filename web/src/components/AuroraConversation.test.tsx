@@ -61,6 +61,38 @@ describe("AuroraConversation", () => {
     expect(screen.getByRole("button", { name: "打断并发送" })).toBeEnabled();
   });
 
+  it("auto-scrolls to the newest message as the conversation grows, so a long thread never leaves the reply hidden below the fold", () => {
+    const scrollIntoView = vi.spyOn(Element.prototype, "scrollIntoView").mockImplementation(() => {});
+    const props = { activeTurnId: null, draft: "", sessionReady: true,
+      onDraftChange: () => undefined, onSubmit: (event: FormEvent<HTMLFormElement>) => event.preventDefault(),
+      onStop: () => undefined };
+    const { rerender } = render(<AuroraConversation {...props} messages={[{ key: "u1", speaker: "USER", text: "第一句" }]} />);
+    expect(scrollIntoView).toHaveBeenCalled();
+    scrollIntoView.mockClear();
+
+    rerender(<AuroraConversation {...props} messages={[
+      { key: "u1", speaker: "USER", text: "第一句" },
+      { key: "a1", speaker: "AURORA", text: "第二句", partial: true }
+    ]} />);
+    expect(scrollIntoView).toHaveBeenCalled();
+    scrollIntoView.mockRestore();
+  });
+
+  it("offers a goodbye-ritual trigger only when idle and ready, never mid-stream", () => {
+    const onGoodbye = vi.fn();
+    const props = { draft: "", onDraftChange: () => undefined, onSubmit: (event: FormEvent<HTMLFormElement>) => event.preventDefault(),
+      onStop: () => undefined, onGoodbye };
+    const { rerender } = render(<AuroraConversation {...props} messages={[]} activeTurnId={null} sessionReady />);
+    fireEvent.click(screen.getByRole("button", { name: "沉淀今天" }));
+    expect(onGoodbye).toHaveBeenCalledOnce();
+
+    rerender(<AuroraConversation {...props} messages={[]} activeTurnId={7} sessionReady />);
+    expect(screen.queryByRole("button", { name: "沉淀今天" })).not.toBeInTheDocument();
+
+    rerender(<AuroraConversation {...props} messages={[]} activeTurnId={null} sessionReady={false} />);
+    expect(screen.queryByRole("button", { name: "沉淀今天" })).not.toBeInTheDocument();
+  });
+
   it("renders composer, thinking beat and controls in English when locale is en-SG", () => {
     render(<AuroraConversation locale="en-SG" messages={[
       { key: "a1", speaker: "AURORA", text: "", partial: true }

@@ -12,7 +12,7 @@ const COPY: Record<Locale, {
   convAria: string; empty: string; speakerYou: string; partialHint: string; thinkingAria: string;
   understanding: string; composing: string; placeholderActive: string; placeholderIdle: string;
   writeAria: string; transcribing: string; micStop: string; micStart: string; recStop: string;
-  voice: string; stop: string; interruptSend: string; send: string;
+  voice: string; stop: string; interruptSend: string; send: string; goodbye: string;
 }> = {
   "zh-CN": {
     convAria: "与 Aurora 的对话", empty: "把现在最真实的一句话放在这里。", speakerYou: "你",
@@ -20,7 +20,7 @@ const COPY: Record<Locale, {
     understanding: "Aurora 正在理解这一刻…", composing: "Aurora 正在组织下一句…",
     placeholderActive: "直接说出新的想法，Aurora 会停下并重新理解…", placeholderIdle: "此刻，你想从哪里说起？",
     writeAria: "写给 Aurora", transcribing: "转写中…", micStop: "停止录音并转写", micStart: "用语音输入",
-    recStop: "● 停止录音", voice: "🎤 语音", stop: "停止回应", interruptSend: "打断并发送", send: "发送"
+    recStop: "● 停止录音", voice: "🎤 语音", stop: "停止回应", interruptSend: "打断并发送", send: "发送", goodbye: "沉淀今天"
   },
   "en-SG": {
     convAria: "Conversation with Aurora", empty: "Put the truest thing you feel right now here.", speakerYou: "You",
@@ -28,11 +28,11 @@ const COPY: Record<Locale, {
     understanding: "Aurora is taking in this moment…", composing: "Aurora is composing the next line…",
     placeholderActive: "Just say the new thought — Aurora will pause and re-understand…", placeholderIdle: "Where would you like to begin, right now?",
     writeAria: "Write to Aurora", transcribing: "Transcribing…", micStop: "Stop recording and transcribe", micStart: "Use voice input",
-    recStop: "● Stop recording", voice: "🎤 Voice", stop: "Stop responding", interruptSend: "Interrupt & send", send: "Send"
+    recStop: "● Stop recording", voice: "🎤 Voice", stop: "Stop responding", interruptSend: "Interrupt & send", send: "Send", goodbye: "Settle today"
   }
 };
 
-export function AuroraConversation({ messages, activeTurnId, thinkingStage = null, draft, sessionReady, onDraftChange, onSubmit, onStop, onTranscribe, locale = "zh-CN" }: {
+export function AuroraConversation({ messages, activeTurnId, thinkingStage = null, draft, sessionReady, onDraftChange, onSubmit, onStop, onTranscribe, onGoodbye, locale = "zh-CN" }: {
   messages: AuroraUiMessage[];
   activeTurnId: number | null;
   /** Derived from the session runtime signal; drives an inline "thinking" beat where the user is
@@ -44,6 +44,9 @@ export function AuroraConversation({ messages, activeTurnId, thinkingStage = nul
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onStop: () => void;
   onTranscribe?: (blob: Blob) => Promise<string>;
+  /** Triggers the "沉淀今天/温柔告别" ritual (GoodbyeOrchestrator). Only offered while idle and
+   * ready -- a deliberate closing action, never available mid-stream. */
+  onGoodbye?: () => void;
   locale?: Locale;
 }) {
   const t = COPY[locale];
@@ -53,8 +56,13 @@ export function AuroraConversation({ messages, activeTurnId, thinkingStage = nul
   const [speaking, setSpeaking] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const recorderRef = useRef<PcmWavRecorder | null>(null);
+  const bottomRef = useRef<HTMLDivElement | null>(null);
   const draftRef = useRef(draft);
   draftRef.current = draft;
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ block: "end" });
+  }, [messages, thinkingStage]);
   const voiceSupported = typeof navigator !== "undefined"
     && !!navigator.mediaDevices?.getUserMedia && typeof AudioContext !== "undefined";
 
@@ -104,6 +112,7 @@ export function AuroraConversation({ messages, activeTurnId, thinkingStage = nul
         <span className="speaker">Aurora</span>
         <p><span className="thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span>{thinkingStage === "understanding" ? t.understanding : t.composing}</p>
       </article>}
+      <div ref={bottomRef} aria-hidden="true" />
     </section>
     <form className="composer" onSubmit={onSubmit}>
       <textarea value={draft} onChange={event => onDraftChange(event.target.value)}
@@ -134,6 +143,7 @@ export function AuroraConversation({ messages, activeTurnId, thinkingStage = nul
           {locale === "zh-CN" ? "暂时无法启动录音；文字草稿仍然安全保留。" : "Recording could not start; your text draft is still safe."}
         </span>}
         {activeTurnId && <button type="button" className="stop" onClick={onStop}>{t.stop}</button>}
+        {onGoodbye && !activeTurnId && sessionReady && <button type="button" className="goodbye-trigger" onClick={onGoodbye}>{t.goodbye}</button>}
         <button type="submit" className="send" disabled={!draft.trim() || !sessionReady}>{activeTurnId ? t.interruptSend : t.send}</button>
       </div>
     </form>

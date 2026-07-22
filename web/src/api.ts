@@ -19,6 +19,10 @@ export type WakeIntent = {
   contextSessionId: number | null; supersedesIntentId: number | null; userFeedback: string | null;
 };
 export type Notification = { id: number; type: string; title: string; body: string; refId: number; refType: string; read: boolean };
+export type GoodbyeResult = {
+  success: boolean; line: string; stepsCompleted: string[]; confirmed: boolean; reverted: boolean;
+  confidence: number; goodbyeStrength: string;
+};
 export type DeviceRegistration = {
   id: number; installationId: string; platform: string; transport: "FCM" | "APNS" | "LOCAL_EVIDENCE";
   appVersion: string; locale: string; timezone: string; enabled: boolean; revoked: boolean; lastSeenAt: string;
@@ -478,6 +482,9 @@ export const api = {
   messages: (sessionId: number) => request<DialogMessage[]>(`/api/dialog/session/${sessionId}/messages`),
   timeline: (turnId: number) => request<TurnTimeline>(`/api/v1/aurora/turns/${turnId}/timeline`),
   stop: (turnId: number) => request<TurnTimeline>(`/api/v1/aurora/turns/${turnId}/stop`, { method: "POST" }),
+  triggerGoodbye: (sessionId: number | null, trigger: string = "BUTTON") => request<GoodbyeResult>("/api/aurora/goodbye", {
+    method: "POST", body: JSON.stringify(sessionId ? { sessionId: String(sessionId), trigger } : { trigger })
+  }),
   wakeIntents: () => request<WakeIntent[]>("/api/aurora/wake-intents"),
   wakeIntent: (id: number) => request<WakeIntent>(`/api/aurora/wake-intents/${id}`),
   negotiateWakeIntent: (input: { when: string; purpose: string; reasonForUser: string; content: string;
