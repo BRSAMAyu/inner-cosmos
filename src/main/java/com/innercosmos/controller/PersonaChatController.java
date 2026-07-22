@@ -47,4 +47,18 @@ public class PersonaChatController extends BaseController {
     public ApiResponse<CapsuleQuotaVO> quota(@RequestParam Long capsuleId, HttpSession session) {
         return ApiResponse.ok(personaChatService.quota(currentUserId(session), capsuleId));
     }
+
+    /** In-the-moment report — a visitor need not wait for a delivered letter to flag a session. */
+    @PostMapping("/session/{id}/report")
+    public ApiResponse<Void> report(@PathVariable Long id, @RequestBody java.util.Map<String, String> body, HttpSession session) {
+        personaChatService.report(currentUserId(session), id, body.get("reason"));
+        return ApiResponse.ok(null);
+    }
+
+    /** In-the-moment block — stops this visitor from ever matching the capsule owner's capsules again. */
+    @PostMapping("/session/{id}/block")
+    public ApiResponse<Void> block(@PathVariable Long id, HttpSession session) {
+        personaChatService.block(currentUserId(session), id);
+        return ApiResponse.ok(null);
+    }
 }

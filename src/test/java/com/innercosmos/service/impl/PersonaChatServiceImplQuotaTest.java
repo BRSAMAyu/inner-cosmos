@@ -59,6 +59,8 @@ class PersonaChatServiceImplQuotaTest {
     @Mock private CapsuleGenomeService genomeService;
     @Mock private CapsuleRuntimeContextComposer runtimeContextComposer;
     @Mock private DataUseGrantService dataUseGrantService;
+    @Mock private com.innercosmos.mapper.ReportRecordMapper reportRecordMapper;
+    @Mock private com.innercosmos.mapper.BlockRelationMapper blockRelationMapper;
 
     private PersonaChatServiceImpl service;
 
@@ -68,7 +70,8 @@ class PersonaChatServiceImplQuotaTest {
                 sessionMapper, messageMapper, capsuleMapper,
                 capsuleAgent, safetyService, structuredAiService,
                 boundaryMapper, quotaMapper, jdbcTemplate, authorizedMemoryRefMapper,
-                genomeService, runtimeContextComposer, dataUseGrantService);
+                genomeService, runtimeContextComposer, dataUseGrantService,
+                reportRecordMapper, blockRelationMapper);
         lenient().when(dataUseGrantService.authorizationsValid(any(), anySet())).thenReturn(true);
         lenient().when(runtimeContextComposer.compose(any(), anyString())).thenReturn(java.util.Map.of(
                 "selectedEvidenceSummary", "", "selectedContext", java.util.Map.of(),

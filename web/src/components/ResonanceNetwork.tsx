@@ -12,7 +12,7 @@ const COPY: Record<Locale, {
   speakerYou: string; writeToCapsule: string; sendBusy: string; sendTurn: string; letterStepTitle: string;
   letterStepNote: string; seedWarning: string; letterFlightTitle: string; letterArrival: (time: string, status: string) => string;
   letterTitleLabel: string; letterBodyLabel: string; letterBodyAria: string; letterBodyPlaceholder: string;
-  sendLetterBusy: string; sendLetterBtn: string;
+  sendLetterBusy: string; sendLetterBtn: string; reportSession: string; blockSession: string;
 }> = {
   "zh-CN": {
     aria: "发现共鸣并写一封慢信", heading: "不是刷卡片，是理解为什么会相遇", count: n => `${n} 个此刻的候选`,
@@ -30,7 +30,8 @@ const COPY: Record<Locale, {
     seedWarning: "这是官方种子共鸣体，没有对应的真人收件人；你仍可继续对话，但不能把它当作认识真人的入口。",
     letterFlightTitle: "慢信已启程", letterArrival: (t, s) => `预计 ${t} 到达 · 状态 ${s}`,
     letterTitleLabel: "信的题目", letterBodyLabel: "你真正想让对方读到的话", letterBodyAria: "慢信正文",
-    letterBodyPlaceholder: "不用总结整段对话，只写你愿意为它负责的那部分。", sendLetterBusy: "正在寄出", sendLetterBtn: "让慢信启程"
+    letterBodyPlaceholder: "不用总结整段对话，只写你愿意为它负责的那部分。", sendLetterBusy: "正在寄出", sendLetterBtn: "让慢信启程",
+    reportSession: "举报这段对话", blockSession: "屏蔽这个共鸣体"
   },
   "en-SG": {
     aria: "Discover resonance and write a slow letter", heading: "Not swiping cards — understanding why you'd meet", count: n => `${n} candidate${n === 1 ? "" : "s"} right now`,
@@ -48,21 +49,22 @@ const COPY: Record<Locale, {
     seedWarning: "This is an official seed capsule with no real recipient; you can keep talking, but don't treat it as a way to meet a real person.",
     letterFlightTitle: "The slow letter is on its way", letterArrival: (t, s) => `Arrives ~${t} · status ${s}`,
     letterTitleLabel: "Letter title", letterBodyLabel: "What you truly want them to read", letterBodyAria: "Slow letter body",
-    letterBodyPlaceholder: "No need to summarize the whole conversation — just write the part you're willing to stand behind.", sendLetterBusy: "Sending", sendLetterBtn: "Send the slow letter"
+    letterBodyPlaceholder: "No need to summarize the whole conversation — just write the part you're willing to stand behind.", sendLetterBusy: "Sending", sendLetterBtn: "Send the slow letter",
+    reportSession: "Report this conversation", blockSession: "Block this capsule"
   }
 };
 
 export function ResonanceNetwork({ resonanceMatches, resonanceStrategy, visitorBusy, visitorMatch, personaSession,
   personaMessages, personaDraft, personaQuota, letterTitle, letterBody, sentLetter,
   onChooseStrategy, onChooseMatch, onStartPersonaConversation, onPersonaDraftChange, onSendPersonaTurn,
-  onLetterTitleChange, onLetterBodyChange, onSendLetter, locale = "zh-CN" }: {
+  onLetterTitleChange, onLetterBodyChange, onSendLetter, onReportSession, onBlockSession, locale = "zh-CN" }: {
   resonanceMatches: CapsuleMatch[]; resonanceStrategy: ResonanceStrategy; visitorBusy: boolean;
   visitorMatch: CapsuleMatch | null; personaSession: PersonaSession | null; personaMessages: PersonaMessage[];
   personaDraft: string; personaQuota: CapsuleQuota | null; letterTitle: string; letterBody: string; sentLetter: SlowLetter | null;
   onChooseStrategy: (strategy: ResonanceStrategy) => void; onChooseMatch: (capsuleId: number) => void;
   onStartPersonaConversation: () => void; onPersonaDraftChange: (value: string) => void; onSendPersonaTurn: () => void;
   onLetterTitleChange: (value: string) => void; onLetterBodyChange: (value: string) => void; onSendLetter: () => void;
-  locale?: Locale;
+  onReportSession?: () => void; onBlockSession?: () => void; locale?: Locale;
 }) {
   const t = COPY[locale];
   return <section className="resonance-network" aria-label={t.aria}>
@@ -88,7 +90,12 @@ export function ResonanceNetwork({ resonanceMatches, resonanceStrategy, visitorB
           <p>{visitorMatch.capsule.intro}</p></div><div className="match-reasons">{visitorMatch.matchReasons.map(reason => <span key={reason}>{reason}</span>)}</div></header>
         {!personaSession ? <div className="visitor-entry"><p>{t.entryP}</p>
           <AsyncButton className="resonance-primary" busy={visitorBusy} busyText={t.enterBusy} onClick={onStartPersonaConversation}>{t.enterBtn}</AsyncButton></div> : <>
-          <div className="visitor-quota"><span>{t.quota(personaQuota?.remainingTurns ?? "–")}</span><small>{t.quotaNote}</small></div>
+          <div className="visitor-quota"><span>{t.quota(personaQuota?.remainingTurns ?? "–")}</span><small>{t.quotaNote}</small>
+            {(onReportSession || onBlockSession) && <div className="persona-safety-actions">
+              {onReportSession && <button type="button" className="quiet" onClick={onReportSession}>{t.reportSession}</button>}
+              {onBlockSession && <button type="button" className="quiet" onClick={onBlockSession}>{t.blockSession}</button>}
+            </div>}
+          </div>
           <div className="persona-history" aria-label={t.personaHistAria}>{personaMessages.length === 0 ? <p>{t.historyStart}</p> : personaMessages.map(message =>
             <article className={message.senderType === "VISITOR" ? "visitor" : "capsule"} key={message.id}><span>{message.senderType === "VISITOR" ? t.speakerYou : visitorMatch.capsule.pseudonym}</span><p>{message.textContent}</p></article>)}</div>
           <div className="sandbox-composer"><textarea aria-label={t.writeToCapsule} value={personaDraft} onChange={event => onPersonaDraftChange(event.target.value)} />

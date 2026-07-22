@@ -42,6 +42,33 @@ describe("ResonanceNetwork", () => {
     expect(onStart).not.toHaveBeenCalled();
   });
 
+  it("lets a visitor report or block mid-chat, without waiting for a delivered letter", () => {
+    const onReportSession = vi.fn();
+    const onBlockSession = vi.fn();
+    const session: PersonaSession = { id: 1, capsuleId: 4, status: "ACTIVE", turnCount: 0, dailyLimit: 5 };
+    render(<ResonanceNetwork resonanceMatches={[match]} resonanceStrategy="MIRROR" visitorBusy={false} visitorMatch={match}
+      personaSession={session} personaMessages={[]} personaDraft="" personaQuota={{ usedTurns: 0, remainingTurns: 5, dailyLimit: 5, exhausted: false }}
+      letterTitle="" letterBody="" sentLetter={null} onChooseStrategy={() => undefined} onChooseMatch={() => undefined}
+      onStartPersonaConversation={() => undefined} onPersonaDraftChange={() => undefined} onSendPersonaTurn={() => undefined}
+      onLetterTitleChange={() => undefined} onLetterBodyChange={() => undefined} onSendLetter={() => undefined}
+      onReportSession={onReportSession} onBlockSession={onBlockSession} />);
+    fireEvent.click(screen.getByRole("button", { name: "举报这段对话" }));
+    expect(onReportSession).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole("button", { name: "屏蔽这个共鸣体" }));
+    expect(onBlockSession).toHaveBeenCalledOnce();
+  });
+
+  it("does not show report/block affordances before a persona conversation has started", () => {
+    render(<ResonanceNetwork resonanceMatches={[match]} resonanceStrategy="MIRROR" visitorBusy={false} visitorMatch={match}
+      personaSession={null} personaMessages={[]} personaDraft="" personaQuota={null}
+      letterTitle="" letterBody="" sentLetter={null} onChooseStrategy={() => undefined} onChooseMatch={() => undefined}
+      onStartPersonaConversation={() => undefined} onPersonaDraftChange={() => undefined} onSendPersonaTurn={() => undefined}
+      onLetterTitleChange={() => undefined} onLetterBodyChange={() => undefined} onSendLetter={() => undefined}
+      onReportSession={() => undefined} onBlockSession={() => undefined} />);
+    expect(screen.queryByRole("button", { name: "举报这段对话" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "屏蔽这个共鸣体" })).not.toBeInTheDocument();
+  });
+
   it("renders the network, strategies and entry in English when locale is en-SG", () => {
     render(<ResonanceNetwork locale="en-SG" resonanceMatches={[match]} resonanceStrategy="MIRROR" visitorBusy={false}
       visitorMatch={match} personaSession={null} personaMessages={[]} personaDraft="" personaQuota={null}

@@ -20,4 +20,14 @@ public interface PersonaChatService {
      * row exists yet today).
      */
     CapsuleQuotaVO quota(Long userId, Long capsuleId);
+
+    /** Report a persona-chat session for review, in the moment — not only after a delivered letter. */
+    void report(Long userId, Long sessionId, String reason);
+
+    /**
+     * Block the session's capsule owner (reusing the same BlockRelation the slow-letter flow
+     * uses), so this visitor never matches any of that owner's capsules again, and mark the
+     * session BLOCKED so the frontend stops offering it as an active conversation.
+     */
+    void block(Long userId, Long sessionId);
 }

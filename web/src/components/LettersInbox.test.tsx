@@ -68,6 +68,50 @@ describe("LettersInbox", () => {
     expect(screen.queryByText("你写的黄昏让我停了一下")).not.toBeInTheDocument();
   });
 
+  it("shows the real backend FLYING status translated, with its arrival ETA, not the never-sent IN_FLIGHT literal", () => {
+    // The letter-state machine's real in-transit code is FLYING (see FlyingState.java), never IN_FLIGHT.
+    const flying: SlowLetter = { id: 13, senderUserId: 1, receiverUserId: 3, receiverCapsuleId: 8,
+      title: "还在路上的信", letterBody: "还没到呢。", status: "FLYING",
+      parallaxDistance: 2, estimatedArrivalAt: "2026-07-20T00:00:00Z" };
+    render(<LettersInbox letterInbox={[]} letterOutbox={[flying]} replyDrafts={{}}
+      connectionRequests={{ incoming: [], outgoing: [] }} friends={[]}
+      onReplyDraftChange={() => undefined} onReply={() => undefined} onActOnLetter={() => undefined}
+      onReportLetter={() => undefined} onRequestConnection={() => undefined}
+      onDecideConnection={() => undefined} onLeaveConnection={() => undefined} />);
+    fireEvent.click(screen.getByRole("tab", { name: /寄出的/ }));
+    expect(screen.getByText("飞行中")).toBeVisible();
+    expect(screen.queryByText("FLYING")).not.toBeInTheDocument();
+    expect(screen.getByText(/预计.*抵达/)).toBeVisible();
+    expect(document.querySelector(".letter-flying-transit")).toBeTruthy();
+  });
+
+  it("does not render the flying transit visual for a letter that has already arrived", () => {
+    render(<LettersInbox letterInbox={[]} letterOutbox={[{ ...letter, id: 40, status: "SENT" }]} replyDrafts={{}}
+      connectionRequests={{ incoming: [], outgoing: [] }} friends={[]}
+      onReplyDraftChange={() => undefined} onReply={() => undefined} onActOnLetter={() => undefined}
+      onReportLetter={() => undefined} onRequestConnection={() => undefined}
+      onDecideConnection={() => undefined} onLeaveConnection={() => undefined} />);
+    fireEvent.click(screen.getByRole("tab", { name: /寄出的/ }));
+    expect(document.querySelector(".letter-flying-transit")).toBeFalsy();
+  });
+
+  it("lets the sender archive a concluded outbox letter, but not one still awaiting the recipient", () => {
+    const onActOnLetter = vi.fn();
+    const concluded: SlowLetter = { id: 21, senderUserId: 1, receiverUserId: 3, receiverCapsuleId: 8,
+      title: "已经有结果的信", letterBody: "对方回应过了。", status: "DECLINED", parallaxDistance: 1, estimatedArrivalAt: "" };
+    const stillFlying: SlowLetter = { id: 22, senderUserId: 1, receiverUserId: 3, receiverCapsuleId: 8,
+      title: "还没到的信", letterBody: "还在路上。", status: "FLYING", parallaxDistance: 1, estimatedArrivalAt: "2026-07-20T00:00:00Z" };
+    render(<LettersInbox letterInbox={[]} letterOutbox={[concluded, stillFlying]} replyDrafts={{}}
+      connectionRequests={{ incoming: [], outgoing: [] }} friends={[]}
+      onReplyDraftChange={() => undefined} onReply={() => undefined} onActOnLetter={onActOnLetter}
+      onReportLetter={() => undefined} onRequestConnection={() => undefined}
+      onDecideConnection={() => undefined} onLeaveConnection={() => undefined} />);
+    fireEvent.click(screen.getByRole("tab", { name: /寄出的/ }));
+    expect(screen.getAllByRole("button", { name: "归档" })).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "归档" }));
+    expect(onActOnLetter).toHaveBeenCalledWith(concluded, "archive");
+  });
+
   it("lists draft letters under the drafts tab and can send one", () => {
     const onSendDraft = vi.fn();
     const draft: SlowLetter = { id: 20, senderUserId: 1, receiverUserId: 3, receiverCapsuleId: 8,

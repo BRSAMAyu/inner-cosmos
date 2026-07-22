@@ -584,6 +584,10 @@ export const api = {
     return request<PersonaMessage>("/api/v1/persona-chat/message", { method: "POST", body: JSON.stringify(body) });
   },
   capsuleQuota: (capsuleId: number) => request<CapsuleQuota>(`/api/persona-chat/quota?capsuleId=${capsuleId}`),
+  reportPersonaSession: (sessionId: number, reason: string) => request<void>(`/api/persona-chat/session/${sessionId}/report`, {
+    method: "POST", body: JSON.stringify({ reason })
+  }),
+  blockPersonaSession: (sessionId: number) => request<void>(`/api/persona-chat/session/${sessionId}/block`, { method: "POST" }),
   draftSlowLetter: (receiverCapsuleId: number, title: string, letterBody: string) => {
     const body: CoreSlowLetterDraftRequest = { receiverCapsuleId, title, letterBody };
     return request<SlowLetter>("/api/v1/letters/draft", { method: "POST", body: JSON.stringify(body) });

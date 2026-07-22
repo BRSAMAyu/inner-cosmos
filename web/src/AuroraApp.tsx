@@ -765,6 +765,23 @@ export function AuroraApp() {
     finally { setVisitorBusy(false); }
   };
 
+  const reportPersonaSession = async () => {
+    if (!personaSession) return;
+    try {
+      await api.reportPersonaSession(personaSession.id, "访客在对话中举报了这个共鸣体");
+      setStatus("已提交举报。举报不会自动公开对话内容，交由受限审核处理。 ");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法提交举报"); }
+  };
+
+  const blockPersonaSession = async () => {
+    if (!personaSession) return;
+    try {
+      await api.blockPersonaSession(personaSession.id);
+      setPersonaSession(null); setPersonaMessages([]); setPersonaQuota(null);
+      setStatus("已屏蔽这个共鸣体；它不会再出现在你的相遇候选里。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法屏蔽"); }
+  };
+
   const sendLetterToMatch = async () => {
     if (!visitorMatch || !letterTitle.trim() || !letterBody.trim()) return;
     setVisitorBusy(true);
@@ -1015,7 +1032,8 @@ export function AuroraApp() {
         onChooseStrategy={strategy => void chooseResonanceStrategy(strategy)} onChooseMatch={chooseVisitorMatch}
         onStartPersonaConversation={() => void startPersonaConversation()} onPersonaDraftChange={setPersonaDraft}
         onSendPersonaTurn={() => void sendPersonaTurn()} onLetterTitleChange={setLetterTitle} onLetterBodyChange={setLetterBody}
-        onSendLetter={() => void sendLetterToMatch()} locale={skillLocale} />
+        onSendLetter={() => void sendLetterToMatch()} onReportSession={() => void reportPersonaSession()}
+        onBlockSession={() => void blockPersonaSession()} locale={skillLocale} />
       </div>
 
       <div className="product-space" hidden={productSpace !== "letters"}>

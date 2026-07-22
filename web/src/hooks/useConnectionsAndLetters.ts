@@ -118,6 +118,7 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
     try {
       const updated = await api.transitionLetter(letter.id, action);
       setLetterInbox(rows => rows.map(row => row.id === updated.id ? updated : row));
+      setLetterOutbox(rows => rows.map(row => row.id === updated.id ? updated : row));
       setStatus(action === "block" ? "已屏蔽来信者；后续慢信也会被阻断。" : "慢信边界已更新。 ");
     } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法更新这封信"); }
   }, [setStatus]);

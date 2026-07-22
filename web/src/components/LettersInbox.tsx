@@ -5,6 +5,7 @@ import { AsyncButton } from "../loading";
 
 const repliable = new Set(["READ", "REPLIED"]);
 const declinable = new Set(["DELIVERED", "READ"]);
+const archivableFromOutbox = new Set(["READ", "REPLIED", "DECLINED", "BLOCKED"]);
 
 const COPY: Record<Locale, {
   outboxStatus: Record<string, string>;
@@ -12,14 +13,14 @@ const COPY: Record<Locale, {
   aria: string; heading: string; tabsAria: string; tabInbox: string; tabOutbox: string; tabDrafts: string; tabThreads: string;
   inboxIntro: string; inboxEmpty: string; replyAria: (title: string) => string; replyPlaceholder: string; replyBusy: string; replySend: string;
   markRead: string; decline: string; willKnow: string; block: string; report: string;
-  outboxIntro: string; outboxEmpty: string; arrivalEta: (time: string) => string;
+  outboxIntro: string; outboxEmpty: string; arrivalEta: (time: string) => string; archiveLetter: string;
   draftsIntro: string; draftsEmpty: string; untitledDraft: string; draftStatus: string; sendDraftBusy: string; sendDraft: string;
   threadsIntro: string; threadsEmpty: string; threadItem: (id: number) => string; threadPickPrompt: string; threadLoading: string;
   consentAria: string; awaitingYou: string; noIncoming: string; wantsToKnow: (name: string) => string; accept: string; declineConn: string;
   awaitingThem: string; noOutgoing: string; notYetAgreed: string; bothAgreed: string; noFriends: string; leave: string;
 }> = {
   "zh-CN": {
-    outboxStatus: { DRAFT: "草稿", SENT: "已寄出", IN_FLIGHT: "飞行中", DELIVERED: "已抵达", READ: "对方已读", REPLIED: "对方回信了", DECLINED: "被婉拒", BLOCKED: "被屏蔽", ARCHIVED: "已归档" },
+    outboxStatus: { DRAFT: "草稿", SENT: "已寄出", FLYING: "飞行中", DELIVERED: "已抵达", READ: "对方已读", REPLIED: "对方回信了", DECLINED: "被婉拒", BLOCKED: "被屏蔽", ARCHIVED: "已归档" },
     counts: { inbox: n => `${n} 封已抵达`, outbox: n => `${n} 封已寄出`, drafts: n => `${n} 封草稿`, threads: n => `${n} 段往来` },
     aria: "慢信收件箱与寄件箱", heading: "只在抵达之后，才由你决定关系往哪里走", tabsAria: "慢信方向",
     tabInbox: "收到的", tabOutbox: "寄出的", tabDrafts: "草稿", tabThreads: "往来",
@@ -27,7 +28,7 @@ const COPY: Record<Locale, {
     replyAria: title => `回复「${title}」`, replyPlaceholder: "写下你愿意负责的回应；它仍会慢慢抵达。", replyBusy: "正在启程", replySend: "让回复慢信启程",
     markRead: "标记已读", decline: "温和婉拒", willKnow: "愿意认识对方", block: "屏蔽后续来信", report: "举报这封信",
     outboxIntro: "你写出去的信都在这里。它们会按各自的节奏抵达；对方是否回应由对方决定，你不会被催促，也不会看到假装的实时状态。", outboxEmpty: "你还没有寄出任何慢信。",
-    arrivalEta: t => `预计 ${t} 抵达`,
+    arrivalEta: t => `预计 ${t} 抵达`, archiveLetter: "归档",
     draftsIntro: "还没寄出的信留在这里。你可以慢慢改，准备好了再让它启程——寄出后它会按慢信的节奏抵达。", draftsEmpty: "没有草稿。", untitledDraft: "未命名草稿", draftStatus: "草稿",
     sendDraftBusy: "正在寄出", sendDraft: "让这封信启程",
     threadsIntro: "同一段关系里来回的慢信会聚成一条往来。点开看看你们之间慢慢积累的对话。", threadsEmpty: "还没有形成往来的慢信线程。",
@@ -36,7 +37,7 @@ const COPY: Record<Locale, {
     awaitingThem: "等待对方决定", noOutgoing: "没有等待中的邀请", notYetAgreed: "尚未同意，不会提前开放真人连接", bothAgreed: "双方已同意", noFriends: "还没有建立真人连接", leave: "退出连接"
   },
   "en-SG": {
-    outboxStatus: { DRAFT: "Draft", SENT: "Sent", IN_FLIGHT: "In flight", DELIVERED: "Delivered", READ: "Read", REPLIED: "Replied", DECLINED: "Declined", BLOCKED: "Blocked", ARCHIVED: "Archived" },
+    outboxStatus: { DRAFT: "Draft", SENT: "Sent", FLYING: "In flight", DELIVERED: "Delivered", READ: "Read", REPLIED: "Replied", DECLINED: "Declined", BLOCKED: "Blocked", ARCHIVED: "Archived" },
     counts: { inbox: n => `${n} arrived`, outbox: n => `${n} sent`, drafts: n => `${n} draft${n === 1 ? "" : "s"}`, threads: n => `${n} thread${n === 1 ? "" : "s"}` },
     aria: "Slow-letter inbox and outbox", heading: "Only after it arrives do you decide where the relationship goes", tabsAria: "Slow-letter direction",
     tabInbox: "Received", tabOutbox: "Sent", tabDrafts: "Drafts", tabThreads: "Threads",
@@ -44,7 +45,7 @@ const COPY: Record<Locale, {
     replyAria: title => `Reply to "${title}"`, replyPlaceholder: "Write a response you're willing to stand behind; it still arrives slowly.", replyBusy: "Sending", replySend: "Send the reply slow letter",
     markRead: "Mark read", decline: "Gently decline", willKnow: "Willing to know them", block: "Block future letters", report: "Report this letter",
     outboxIntro: "Every letter you've sent is here. Each arrives at its own pace; whether they reply is theirs to decide — you're never rushed, and never shown a fake live status.", outboxEmpty: "You haven't sent any slow letters yet.",
-    arrivalEta: t => `Arrives ~${t}`,
+    arrivalEta: t => `Arrives ~${t}`, archiveLetter: "Archive",
     draftsIntro: "Letters not yet sent stay here. Revise slowly and send when ready — once sent, it arrives at a slow letter's pace.", draftsEmpty: "No drafts.", untitledDraft: "Untitled draft", draftStatus: "Draft",
     sendDraftBusy: "Sending", sendDraft: "Send this letter",
     threadsIntro: "Letters back and forth in one relationship gather into a thread. Open one to see the conversation you've slowly built.", threadsEmpty: "No slow-letter threads yet.",
@@ -105,8 +106,10 @@ export function LettersInbox({ letterInbox, letterOutbox = [], threads = [], thr
         {sent.map(letter => <article key={letter.id}><header><strong>{letter.title}</strong>
           <span className="outbox-status">{status(letter.status)}</span></header>
           <p>{letter.letterBody}</p>
-          {letter.estimatedArrivalAt && (letter.status === "IN_FLIGHT" || letter.status === "SENT") &&
+          {letter.status === "FLYING" && <div className="letter-flying-transit" aria-hidden="true"><span className="letter-flying-point" /></div>}
+          {letter.estimatedArrivalAt && (letter.status === "FLYING" || letter.status === "SENT") &&
             <small>{t.arrivalEta(new Date(letter.estimatedArrivalAt).toLocaleString(locale))}</small>}
+          {archivableFromOutbox.has(letter.status) && <button onClick={() => onActOnLetter(letter, "archive")}>{t.archiveLetter}</button>}
         </article>)}
       </div>}
     </> : tab === "drafts" ? <>

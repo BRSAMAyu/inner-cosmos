@@ -7,14 +7,18 @@ import com.innercosmos.ai.structured.StructuredAiService;
 import com.innercosmos.entity.CapsuleBoundary;
 import com.innercosmos.entity.CapsuleUsageQuota;
 import com.innercosmos.entity.EchoCapsule;
+import com.innercosmos.entity.BlockRelation;
 import com.innercosmos.entity.PersonaChatMessage;
 import com.innercosmos.entity.PersonaChatSession;
+import com.innercosmos.entity.ReportRecord;
 import com.innercosmos.exception.BusinessException;
+import com.innercosmos.mapper.BlockRelationMapper;
 import com.innercosmos.mapper.CapsuleBoundaryMapper;
 import com.innercosmos.mapper.CapsuleUsageQuotaMapper;
 import com.innercosmos.mapper.EchoCapsuleMapper;
 import com.innercosmos.mapper.PersonaChatMessageMapper;
 import com.innercosmos.mapper.PersonaChatSessionMapper;
+import com.innercosmos.mapper.ReportRecordMapper;
 import com.innercosmos.mapper.AuthorizedMemoryRefMapper;
 import com.innercosmos.entity.AuthorizedMemoryRef;
 import com.innercosmos.service.PersonaChatService;
@@ -76,6 +80,8 @@ public class PersonaChatServiceImpl implements PersonaChatService {
     private final CapsuleGenomeService genomeService;
     private final CapsuleRuntimeContextComposer runtimeContextComposer;
     private final DataUseGrantService dataUseGrantService;
+    private final ReportRecordMapper reportRecordMapper;
+    private final BlockRelationMapper blockRelationMapper;
 
     public PersonaChatServiceImpl(PersonaChatSessionMapper sessionMapper,
                                   PersonaChatMessageMapper messageMapper,
@@ -89,7 +95,9 @@ public class PersonaChatServiceImpl implements PersonaChatService {
                                   AuthorizedMemoryRefMapper authorizedMemoryRefMapper,
                                   CapsuleGenomeService genomeService,
                                   CapsuleRuntimeContextComposer runtimeContextComposer,
-                                  DataUseGrantService dataUseGrantService) {
+                                  DataUseGrantService dataUseGrantService,
+                                  ReportRecordMapper reportRecordMapper,
+                                  BlockRelationMapper blockRelationMapper) {
         this.sessionMapper = sessionMapper;
         this.messageMapper = messageMapper;
         this.capsuleMapper = capsuleMapper;
@@ -103,6 +111,8 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         this.genomeService = genomeService;
         this.runtimeContextComposer = runtimeContextComposer;
         this.dataUseGrantService = dataUseGrantService;
+        this.reportRecordMapper = reportRecordMapper;
+        this.blockRelationMapper = blockRelationMapper;
     }
 
     @Override
@@ -457,6 +467,48 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         if (!userId.equals(session.visitorUserId)) {
             throw new BusinessException("UNAUTHORIZED", "无权访问此会话");
         }
+    }
+
+    @Override
+    public void report(Long userId, Long sessionId, String reason) {
+        PersonaChatSession session = requireOwnedSession(userId, sessionId);
+        ReportRecord report = new ReportRecord();
+        report.reporterUserId = userId;
+        report.targetType = "PERSONA_CHAT_SESSION";
+        report.targetId = session.id;
+        report.reason = reason;
+        report.status = "PENDING";
+        reportRecordMapper.insert(report);
+    }
+
+    @Override
+    public void block(Long userId, Long sessionId) {
+        PersonaChatSession session = requireOwnedSession(userId, sessionId);
+        EchoCapsule capsule = capsuleMapper.selectById(session.capsuleId);
+        if (capsule != null && capsule.ownerUserId != null) {
+            Long existing = blockRelationMapper.selectCount(new QueryWrapper<BlockRelation>()
+                    .eq("blocker_user_id", userId).eq("blocked_user_id", capsule.ownerUserId));
+            if (existing == null || existing == 0L) {
+                BlockRelation relation = new BlockRelation();
+                relation.blockerUserId = userId;
+                relation.blockedUserId = capsule.ownerUserId;
+                relation.reason = "PERSONA_CHAT_BLOCK";
+                blockRelationMapper.insert(relation);
+            }
+        }
+        session.status = "BLOCKED";
+        sessionMapper.updateById(session);
+    }
+
+    private PersonaChatSession requireOwnedSession(Long userId, Long sessionId) {
+        PersonaChatSession session = sessionMapper.selectById(sessionId);
+        if (session == null) {
+            throw new BusinessException("NOT_FOUND", "共鸣体对话会话不存在");
+        }
+        if (!userId.equals(session.visitorUserId)) {
+            throw new BusinessException("UNAUTHORIZED", "无权访问此会话");
+        }
+        return session;
     }
 
     @Override

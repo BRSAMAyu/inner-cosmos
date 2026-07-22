@@ -239,6 +239,15 @@ describe("useConnectionsAndLetters -- letters", () => {
     expect(result.current.letterInbox[0].status).toBe("READ");
   });
 
+  it("actOnLetter also patches the letter in the outbox, so archiving a sent letter updates its own list", async () => {
+    vi.mocked(api.letterOutbox).mockResolvedValue([letter({ id: 5, status: "DECLINED" })]);
+    vi.mocked(api.transitionLetter).mockResolvedValue(letter({ id: 5, status: "ARCHIVED" }));
+    const { result } = setup();
+    await act(async () => { await result.current.loadLetterOutbox(); });
+    await act(async () => { await result.current.actOnLetter(letter({ id: 5 }), "archive"); });
+    expect(result.current.letterOutbox[0].status).toBe("ARCHIVED");
+  });
+
   it("reportLetter submits the report", async () => {
     vi.mocked(api.reportLetter).mockResolvedValue(undefined as never);
     const { result, setStatus } = setup();
