@@ -1,6 +1,7 @@
 package com.innercosmos.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.innercosmos.ai.agent.CapsuleAgent;
 import com.innercosmos.ai.structured.StructuredAiResults;
 import com.innercosmos.ai.structured.StructuredAiService;
@@ -167,12 +168,24 @@ public class PersonaChatServiceImpl implements PersonaChatService {
 
         // Fetch capsule once, before any branch
         int dailyLimit = resolveDailyLimit(capsule);
+        CapsuleBoundary boundary = boundary(capsule == null ? null : capsule.id);
+        // Regression (Gemini audit 1.4, P0): the owner-configured per-session cap
+        // (CapsuleBoundary.maxConversationTurns) used to be written at capsule-creation time and
+        // then never read again anywhere in this class — every enforcement path only ever checked
+        // EchoCapsule.conversationLimitPerDay (a *daily*, cross-session cap). The two are distinct
+        // owner-facing concepts and must be enforced independently and atomically.
+        Integer sessionCap = boundary == null ? null : boundary.maxConversationTurns;
 
         if (Boolean.TRUE.equals(safety.blockModelCall)) {
             // Safety path: preserve prior behavior — the visitor message is recorded.
             messageMapper.insert(userMessage);
             capsuleMessage.textContent = safety.safeMessage;
             session.status = "SAFETY_GUIDED";
+        } else if (!tryReserveSessionTurn(sessionId, sessionCap)) {
+            // Session's own turn cap exhausted — independent of and checked before the daily
+            // quota, so an exhausted session never even touches the cross-session quota row.
+            capsuleMessage.textContent = "这次对话已经到了主人设置的轮次上限.如果你愿意,可以把想继续说的话写成一封慢信.";
+            session.status = "LETTER_GUIDED";
         } else {
             // Atomically try to reserve a turn before calling AI
             LocalDate today = LocalDate.now(QUOTA_ZONE);
@@ -180,6 +193,9 @@ public class PersonaChatServiceImpl implements PersonaChatService {
 
             if (!reserved) {
                 // IC-CAP-002 MAJOR-2: over-limit → do NOT persist the visitor message.
+                // The session-turn reservation above was never actually used for a real turn —
+                // give it back, symmetric with the AI-unavailable compensation below.
+                compensateSessionTurn(sessionId);
                 capsuleMessage.textContent = "今天的回声已经足够深了.如果你愿意,可以把想继续说的话写成一封慢信.";
                 session.status = "LETTER_GUIDED";
             } else {
@@ -193,7 +209,6 @@ public class PersonaChatServiceImpl implements PersonaChatService {
                         : capsule != null && capsule.personaPrompt != null && !capsule.personaPrompt.isBlank()
                         ? capsule.personaPrompt
                         : capsuleAgent.buildPersonaPrompt(personaName, personaIntro);
-                CapsuleBoundary boundary = boundary(capsule == null ? null : capsule.id);
                 boolean seedCapsule = capsule != null && ("SEED_CAPSULE".equals(capsule.capsuleType)
                         || "SEED".equals(capsule.capsuleType));
                 Map<String, Object> runtimeContext = seedCapsule
@@ -259,6 +274,7 @@ public class PersonaChatServiceImpl implements PersonaChatService {
 
                 if (aiUnavailable) {
                     compensateQuota(userId, session.capsuleId, today);
+                    compensateSessionTurn(sessionId);
                     // IC-CAP RUN-003 polish (FIX-B): make AI-unavailable symmetric with the
                     // over-limit (LETTER_GUIDED) branch — an unanswered turn must leave NO
                     // conversation trace. The visitor message was inserted above to feed the
@@ -268,23 +284,54 @@ public class PersonaChatServiceImpl implements PersonaChatService {
                         messageMapper.deleteById(userMessage.id);
                     }
                     // Do NOT bump echo energy on the unavailable path.
-                    // IC-CAP-002 FIX-3: an unanswered turn un-charges the day quota, so it must
-                    // NOT advance session.turnCount either — otherwise the session counter and the
-                    // day quota diverge (the session would over-count vs. what the user was charged).
+                    // IC-CAP-002 FIX-3: an unanswered turn un-charges the day quota AND the session
+                    // turn reservation, so neither counter advances for a turn nobody was charged for.
                 } else {
                     // Genuine success: quota stays consumed; bump capsule activity (B-4).
                     bumpCapsuleActivity(capsule);
-                    // IC-CAP-002 FIX-3: only a genuinely answered turn advances the session counter,
-                    // keeping it in lock-step with the (consumed) day quota.
-                    session.turnCount = session.turnCount == null ? 1 : session.turnCount + 1;
+                    // Regression (1.4): session.turnCount is now managed exclusively by the atomic
+                    // tryReserveSessionTurn/compensateSessionTurn SQL above, not by mutating this
+                    // Java field — see the scoped status-only write below for why.
                 }
 
                 session.status = "ACTIVE"; // reset from any prior LETTER_GUIDED
             }
         }
         messageMapper.insert(capsuleMessage);
-        sessionMapper.updateById(session);
+        // Regression (1.4): scoped to `status` only. session.turnCount is now managed exclusively
+        // by tryReserveSessionTurn/compensateSessionTurn's own atomic UPDATEs; a full-entity
+        // updateById(session) here would overwrite that real DB value with this stale in-memory
+        // snapshot (read once at the top of this method, before any reservation/compensation ran).
+        sessionMapper.update(null, new UpdateWrapper<PersonaChatSession>()
+                .eq("id", session.id).set("status", session.status));
         return capsuleMessage;
+    }
+
+    /**
+     * Atomically reserves one turn against the session's own owner-configured cap
+     * (CapsuleBoundary.maxConversationTurns), independent of the cross-session daily quota.
+     * A null/non-positive cap means unlimited: the counter still advances (for observability)
+     * but no ceiling is enforced.
+     *
+     * @return true if the turn was reserved (or the session is uncapped), false if the
+     *         session's own turn cap is already exhausted
+     */
+    private boolean tryReserveSessionTurn(Long sessionId, Integer maxConversationTurns) {
+        if (maxConversationTurns == null || maxConversationTurns <= 0) {
+            jdbcTemplate.update("UPDATE tb_persona_chat_session SET turn_count = turn_count + 1 WHERE id = ?", sessionId);
+            return true;
+        }
+        int updated = jdbcTemplate.update(
+                "UPDATE tb_persona_chat_session SET turn_count = turn_count + 1 WHERE id = ? AND turn_count < ?",
+                sessionId, maxConversationTurns);
+        return updated == 1;
+    }
+
+    /** Undoes a previously-reserved session turn (mirrors compensateQuota for the daily cap). */
+    private void compensateSessionTurn(Long sessionId) {
+        jdbcTemplate.update(
+                "UPDATE tb_persona_chat_session SET turn_count = turn_count - 1 WHERE id = ? AND turn_count > 0",
+                sessionId);
     }
 
     private int resolveDailyLimit(EchoCapsule capsule) {

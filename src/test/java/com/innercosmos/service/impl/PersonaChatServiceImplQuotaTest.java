@@ -77,6 +77,13 @@ class PersonaChatServiceImplQuotaTest {
                 "selectedEvidenceSummary", "", "selectedContext", java.util.Map.of(),
                 "contextBuildManifest", java.util.Map.of(), "unsupported", true,
                 "fallbackPolicy", "ACKNOWLEDGE_UNKNOWN"));
+        // Regression (Gemini audit 1.4): none of this test file's sessions configure a
+        // CapsuleBoundary (boundaryMapper.selectOne returns null throughout), so the new
+        // per-session turn-cap reservation always takes its "uncapped" 2-arg path
+        // (sql, sessionId) -- distinct from the capped 3-arg (sql, sessionId, cap) path
+        // exercised by PersonaChatServiceImplSessionCapTest. Stub it leniently here so every
+        // existing quota-only test in this file doesn't need to know about session-cap plumbing.
+        lenient().when(jdbcTemplate.update(anyString(), any(Long.class))).thenReturn(1);
     }
 
     // ──────────────────────────────────────────────────────

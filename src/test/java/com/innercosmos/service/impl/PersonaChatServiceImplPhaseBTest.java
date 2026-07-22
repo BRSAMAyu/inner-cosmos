@@ -74,6 +74,9 @@ class PersonaChatServiceImplPhaseBTest {
                 "selectedEvidenceSummary", "", "selectedContext", java.util.Map.of(),
                 "contextBuildManifest", java.util.Map.of(), "unsupported", true,
                 "fallbackPolicy", "ACKNOWLEDGE_UNKNOWN"));
+        // Regression (Gemini audit 1.4): no test in this file configures a CapsuleBoundary, so the
+        // new per-session turn-cap reservation always takes its "uncapped" 2-arg path.
+        lenient().when(jdbcTemplate.update(anyString(), any(Long.class))).thenReturn(1);
     }
 
     private EchoCapsule capsule(Long id) {
@@ -152,12 +155,15 @@ class PersonaChatServiceImplPhaseBTest {
         assertTrue(saved.freshnessScore >= 0.9, "freshness pulled up to >= 0.9");
         assertNotNull(saved.lastActivityAt, "lastActivityAt must be set on success");
 
-        // IC-CAP-002 FIX-3: a genuinely answered turn DOES advance session.turnCount
-        // (0 → 1), staying in lock-step with the consumed day quota.
-        ArgumentCaptor<PersonaChatSession> sCap = ArgumentCaptor.forClass(PersonaChatSession.class);
-        verify(sessionMapper).updateById(sCap.capture());
-        assertEquals(1, sCap.getValue().turnCount,
-                "a successful turn must increment session.turnCount");
+        // Regression (Gemini audit 1.4): session.turnCount is now managed exclusively by the
+        // atomic tryReserveSessionTurn SQL, not a Java-side field mutation written back via
+        // sessionMapper.updateById(). A genuinely answered turn must have reserved exactly one
+        // session turn (the uncapped 2-arg increment, since this test sets no CapsuleBoundary).
+        verify(jdbcTemplate).update(
+                eq("UPDATE tb_persona_chat_session SET turn_count = turn_count + 1 WHERE id = ?"), eq(sessionId));
+        // And the final write only ever scopes to `status` — never re-touches turn_count.
+        verify(sessionMapper).update(eq(null), any(com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper.class));
+        verify(sessionMapper, never()).updateById(any(PersonaChatSession.class));
     }
 
     @Test
@@ -196,12 +202,14 @@ class PersonaChatServiceImplPhaseBTest {
         // message is deleted by its id.
         verify(messageMapper).deleteById(7777L);
 
-        // IC-CAP-002 FIX-3: an unanswered turn un-charges the day quota, so session.turnCount
-        // must NOT advance — otherwise the session counter and the day quota diverge.
-        ArgumentCaptor<PersonaChatSession> sCap = ArgumentCaptor.forClass(PersonaChatSession.class);
-        verify(sessionMapper).updateById(sCap.capture());
-        assertEquals(3, sCap.getValue().turnCount,
-                "AI-unavailable turn must NOT increment session.turnCount");
+        // Regression (Gemini audit 1.4): an unanswered turn must reserve, then compensate
+        // (give back), its session-turn slot too — symmetric with the day-quota compensation
+        // above, so the session counter and the day quota stay in lock-step.
+        verify(jdbcTemplate).update(
+                eq("UPDATE tb_persona_chat_session SET turn_count = turn_count + 1 WHERE id = ?"), eq(sessionId));
+        verify(jdbcTemplate).update(
+                eq("UPDATE tb_persona_chat_session SET turn_count = turn_count - 1 WHERE id = ? AND turn_count > 0"), eq(sessionId));
+        verify(sessionMapper, never()).updateById(any(PersonaChatSession.class));
     }
 
     @Test
@@ -209,7 +217,8 @@ class PersonaChatServiceImplPhaseBTest {
     void overLimit_stillGated() {
         Long userId = 3L, sessionId = 12L, capsuleId = 102L;
         EchoCapsule c = capsule(capsuleId);
-        when(sessionMapper.selectById(sessionId)).thenReturn(session(sessionId, userId, capsuleId));
+        PersonaChatSession s = session(sessionId, userId, capsuleId);
+        when(sessionMapper.selectById(sessionId)).thenReturn(s);
         when(safetyService.check(any(), any(), any())).thenReturn(safePassed());
         when(capsuleMapper.selectById(capsuleId)).thenReturn(c);
         // UPDATE returns 0 (at limit) and INSERT throws Duplicate (row exists at limit) → not reserved.
@@ -224,9 +233,16 @@ class PersonaChatServiceImplPhaseBTest {
         verify(structuredAiService, never()).call(any(), any(), any(), any(), any(), any());
         assertTrue(result.textContent.contains("慢信"));
 
-        ArgumentCaptor<PersonaChatSession> cap = ArgumentCaptor.forClass(PersonaChatSession.class);
-        verify(sessionMapper).updateById(cap.capture());
-        assertEquals("LETTER_GUIDED", cap.getValue().status);
+        // Regression (Gemini audit 1.4): the session-turn reservation itself succeeded, then got
+        // compensated (given back) once the day-quota gate rejected the turn -- net-zero reserve
+        // does not weaken the daily gate, symmetric with aiUnavailable_doesNotConsumeQuota above.
+        verify(jdbcTemplate).update(
+                eq("UPDATE tb_persona_chat_session SET turn_count = turn_count + 1 WHERE id = ?"), eq(sessionId));
+        verify(jdbcTemplate).update(
+                eq("UPDATE tb_persona_chat_session SET turn_count = turn_count - 1 WHERE id = ? AND turn_count > 0"), eq(sessionId));
+        // The final write only ever scopes to `status` via sessionMapper.update(), never updateById().
+        assertEquals("LETTER_GUIDED", s.status);
+        verify(sessionMapper, never()).updateById(any(PersonaChatSession.class));
     }
 
     @Test
