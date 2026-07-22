@@ -1,6 +1,7 @@
 package com.innercosmos.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.innercosmos.ai.agent.MemoryExtractAgent;
 import com.innercosmos.entity.DailyRecord;
 import com.innercosmos.entity.DialogMessage;
@@ -407,15 +408,30 @@ public class MemoryServiceImpl implements MemoryService {
 
     @Override
     public void updateImportance(Long userId, Long cardId, Double importance) {
-        MemoryCard card = memoryCardMapper.selectById(cardId);
-        if (card == null || !userId.equals(card.userId)) {
-            throw new com.innercosmos.exception.BusinessException(
-                    com.innercosmos.common.ErrorCode.UNAUTHORIZED, "无权操作此记忆卡");
+        // Regression (Gemini audit 2.1, P0): field-level conditional update guarded on
+        // versionNo instead of a whole-entity updateById() -- a background gravity recompute
+        // (GravityRecalculateListener / NightlyMemorySettlementJob, same versionNo guard) could
+        // otherwise race between this read and this write and have its own update silently
+        // clobbered, or clobber this one. The user's own edit must win: retry once against the
+        // freshest row if the first attempt loses the race, since a background recompute only
+        // ever touches emotionalGravity/versionNo, never userImportance.
+        for (int attempt = 0; attempt < 2; attempt++) {
+            MemoryCard card = memoryCardMapper.selectById(cardId);
+            if (card == null || !userId.equals(card.userId)) {
+                throw new com.innercosmos.exception.BusinessException(
+                        com.innercosmos.common.ErrorCode.UNAUTHORIZED, "无权操作此记忆卡");
+            }
+            double gravity = gravityService.calculateGravity(
+                    card.intensityScore, card.recurrenceCount, importance, card.triggerCount, 0);
+            int updated = memoryCardMapper.update(null, new UpdateWrapper<MemoryCard>()
+                    .eq("id", cardId).eq("version_no", card.versionNo)
+                    .set("user_importance", importance)
+                    .set("emotional_gravity", gravity)
+                    .set("version_no", (card.versionNo == null ? 0 : card.versionNo) + 1));
+            if (updated == 1) return;
         }
-        card.userImportance = importance;
-        card.emotionalGravity = gravityService.calculateGravity(
-                card.intensityScore, card.recurrenceCount, importance, card.triggerCount, 0);
-        memoryCardMapper.updateById(card);
+        throw new com.innercosmos.exception.BusinessException(
+                com.innercosmos.common.ErrorCode.CONFLICT, "记忆卡刚被更新，请重试一次");
     }
 
     @Override

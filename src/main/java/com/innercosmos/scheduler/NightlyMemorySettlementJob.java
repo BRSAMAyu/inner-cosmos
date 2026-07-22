@@ -1,6 +1,7 @@
 package com.innercosmos.scheduler;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.innercosmos.entity.EchoCapsule;
 import com.innercosmos.entity.MemoryCard;
@@ -10,6 +11,7 @@ import com.innercosmos.mapper.MemoryCardMapper;
 import com.innercosmos.mapper.UserMapper;
 import com.innercosmos.service.EmotionBaselineService;
 import com.innercosmos.service.GravityService;
+import com.innercosmos.service.GravityTimePolicy;
 import com.innercosmos.service.MemorySettlementService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +29,7 @@ public class NightlyMemorySettlementJob {
     private final UserMapper userMapper;
     private final MemoryCardMapper memoryCardMapper;
     private final GravityService gravityService;
+    private final GravityTimePolicy gravityTimePolicy;
     private final MemorySettlementService settlementService;
     private final EmotionBaselineService emotionBaselineService;
     private final EchoCapsuleMapper echoCapsuleMapper;
@@ -50,12 +53,14 @@ public class NightlyMemorySettlementJob {
     public NightlyMemorySettlementJob(UserMapper userMapper,
                                       MemoryCardMapper memoryCardMapper,
                                       GravityService gravityService,
+                                      GravityTimePolicy gravityTimePolicy,
                                       MemorySettlementService settlementService,
                                       EmotionBaselineService emotionBaselineService,
                                       EchoCapsuleMapper echoCapsuleMapper) {
         this.userMapper = userMapper;
         this.memoryCardMapper = memoryCardMapper;
         this.gravityService = gravityService;
+        this.gravityTimePolicy = gravityTimePolicy;
         this.settlementService = settlementService;
         this.emotionBaselineService = emotionBaselineService;
         this.echoCapsuleMapper = echoCapsuleMapper;
@@ -119,19 +124,28 @@ public class NightlyMemorySettlementJob {
         QueryWrapper<MemoryCard> query = new QueryWrapper<>();
         query.eq("user_id", userId).eq("status", "ACTIVE");
         List<MemoryCard> cards = memoryCardMapper.selectList(query);
-        java.time.LocalDateTime now = java.time.LocalDateTime.now();
         for (MemoryCard card : cards) {
             // M-014: apply real time-decay — gravity fades with days since the card was last
             // touched (falling back to createdAt when never re-touched), so the starfield ages
             // instead of freezing at creation-time ordering. Card-creation paths still pass 0.
-            java.time.LocalDateTime anchor = card.lastTouchedAt != null
-                    ? card.lastTouchedAt : card.createdAt;
-            long daysSince = anchor == null ? 0L
-                    : java.time.temporal.ChronoUnit.DAYS.between(anchor, now);
-            card.emotionalGravity = gravityService.calculateGravity(
+            // Regression (Gemini audit 1.5): shared GravityTimePolicy instead of this method's
+            // own inline anchor logic -- see GravityRecalculateListener, which now uses the same
+            // policy instead of its previously-divergent hardcoded 30-day fallback.
+            long daysSince = gravityTimePolicy.daysSinceAnchor(card);
+            double gravity = gravityService.calculateGravity(
                     card.intensityScore, card.recurrenceCount,
                     card.userImportance, card.triggerCount, daysSince);
-            memoryCardMapper.updateById(card);
+            // Regression (Gemini audit 2.1, P0): field-level conditional update guarded on
+            // versionNo instead of a whole-entity updateById() -- see GravityRecalculateListener
+            // for the identical pattern and rationale (background recompute must never overwrite
+            // a concurrent user edit; 0 rows means skip, the next nightly run retries).
+            int updated = memoryCardMapper.update(null, new UpdateWrapper<MemoryCard>()
+                    .eq("id", card.id).eq("version_no", card.versionNo)
+                    .set("emotional_gravity", gravity)
+                    .set("version_no", (card.versionNo == null ? 0 : card.versionNo) + 1));
+            if (updated == 0) {
+                log.info("Memory card {} changed concurrently during nightly gravity recompute; skipping, next run will retry", card.id);
+            }
         }
     }
 }

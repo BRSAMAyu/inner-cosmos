@@ -8,6 +8,7 @@ import com.innercosmos.mapper.MemoryCardMapper;
 import com.innercosmos.mapper.UserMapper;
 import com.innercosmos.service.EmotionBaselineService;
 import com.innercosmos.service.GravityService;
+import com.innercosmos.service.GravityTimePolicy;
 import com.innercosmos.service.MemorySettlementService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -37,6 +38,7 @@ class NightlyMemorySettlementJobBaselineTest {
     @Mock private UserMapper userMapper;
     @Mock private MemoryCardMapper memoryCardMapper;
     @Mock private GravityService gravityService;
+    @Mock private GravityTimePolicy gravityTimePolicy;
     @Mock private MemorySettlementService settlementService;
     @Mock private EmotionBaselineService emotionBaselineService;
     @Mock private EchoCapsuleMapper echoCapsuleMapper;
@@ -64,7 +66,7 @@ class NightlyMemorySettlementJobBaselineTest {
         lenient().when(echoCapsuleMapper.findPublicByOwner(any())).thenReturn(List.<EchoCapsule>of());
 
         NightlyMemorySettlementJob job = new NightlyMemorySettlementJob(
-                userMapper, memoryCardMapper, gravityService, settlementService,
+                userMapper, memoryCardMapper, gravityService, gravityTimePolicy, settlementService,
                 emotionBaselineService, echoCapsuleMapper);
         // Force batch size to match the page we return (3), so the termination condition
         // "batch.size() < batchSizeForTest" fires correctly (3 < 3 is false, so we need
@@ -90,7 +92,7 @@ class NightlyMemorySettlementJobBaselineTest {
         when(emotionBaselineService.bridgeToPortrait(1L)).thenThrow(new RuntimeException("boom"));
 
         NightlyMemorySettlementJob job = new NightlyMemorySettlementJob(
-                userMapper, memoryCardMapper, gravityService, settlementService,
+                userMapper, memoryCardMapper, gravityService, gravityTimePolicy, settlementService,
                 emotionBaselineService, echoCapsuleMapper);
         job.batchSizeForTest = 10; // 2 users < 10 → single page, loop terminates
 

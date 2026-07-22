@@ -6,6 +6,7 @@ import com.innercosmos.mapper.MemoryCardMapper;
 import com.innercosmos.mapper.UserMapper;
 import com.innercosmos.service.EmotionBaselineService;
 import com.innercosmos.service.GravityService;
+import com.innercosmos.service.GravityTimePolicy;
 import com.innercosmos.service.MemorySettlementService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -33,6 +34,7 @@ class CapsuleEnergyDecayTest {
     @Mock private UserMapper userMapper;
     @Mock private MemoryCardMapper memoryCardMapper;
     @Mock private GravityService gravityService;
+    @Mock private GravityTimePolicy gravityTimePolicy;
     @Mock private MemorySettlementService settlementService;
     @Mock private EmotionBaselineService emotionBaselineService;
     @Mock private EchoCapsuleMapper echoCapsuleMapper;
@@ -41,7 +43,7 @@ class CapsuleEnergyDecayTest {
 
     @BeforeEach
     void setUp() {
-        job = new NightlyMemorySettlementJob(userMapper, memoryCardMapper, gravityService,
+        job = new NightlyMemorySettlementJob(userMapper, memoryCardMapper, gravityService, gravityTimePolicy,
                 settlementService, emotionBaselineService, echoCapsuleMapper);
     }
 
