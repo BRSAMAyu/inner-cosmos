@@ -57,4 +57,19 @@ test("opening a capsule from the plaza reveals a real, authorized-AI preview", a
   await expect(workbench.getByText("授权 AI 共鸣体 · 不是真人实时在线")).toBeVisible();
 
   await page.screenshot({ path: "test-results/plaza-directory.png", fullPage: true });
+
+  // Regression (remaining-work-handoff.md 2.2.6, "共鸣体 preview 至少发送一个授权 turn"): the test
+  // used to stop at "the workbench opened", never actually exercising the real persona-chat round
+  // trip a capsule preview exists for. Enter the conversation and send one real, authorized turn.
+  await workbench.getByRole("button", { name: "进入有限但自然的对话" }).click();
+  await expect(workbench.getByLabel("写给共鸣体")).toBeVisible({ timeout: 15000 });
+
+  await workbench.getByLabel("写给共鸣体").fill("你如何理解认识你自己这句话？");
+  await workbench.getByRole("button", { name: "发送这一轮" }).click();
+
+  const history = workbench.locator(".persona-history");
+  await expect(history.locator("article.visitor")).toContainText("你如何理解认识你自己这句话？", { timeout: 15000 });
+  await expect(history.locator("article.capsule")).toBeVisible({ timeout: 20000 });
+
+  await page.screenshot({ path: "test-results/plaza-directory-turn.png", fullPage: true });
 });

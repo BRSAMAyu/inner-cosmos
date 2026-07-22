@@ -28,6 +28,51 @@ async function loginAsAdmin(page: import("@playwright/test").Page) {
   }
 }
 
+async function dismissPwaBanner(page: import("@playwright/test").Page) {
+  await page.evaluate(() => {
+    document.querySelectorAll(".pwa-banner-stack, .pwa-banner-offline-ready")
+      .forEach(el => { (el as HTMLElement).style.display = "none"; });
+  });
+}
+
+// Regression (Gemini audit / doc 24's four-branch integration table): the resolve test below
+// used to skip its own write-path assertion whenever the seed happened to have no pending report
+// at the moment it ran ("如果没有 pending report 就 skip"). Create one deterministically instead,
+// from a fresh throwaway account (never "demo"), by opening a real persona chat with a seeded
+// public capsule and reporting that session -- a genuine tb_report_record row every run.
+async function createRealPendingReport(page: import("@playwright/test").Page) {
+  const username = `e2ereporter${Date.now()}`;
+  await page.goto("/app/aurora/index.html");
+  await expect(page.getByRole("heading", { name: "回到你的内宇宙" })).toBeVisible();
+  await dismissPwaBanner(page);
+  await page.getByRole("tab", { name: "注册" }).click();
+  await page.getByLabel("用户名", { exact: true }).fill(username);
+  await page.getByLabel("密码", { exact: true }).fill("throwaway-pw-1");
+  await page.getByLabel("确认密码").fill("throwaway-pw-1");
+  await page.getByRole("button", { name: "创建账号" }).click();
+  await expect(page.getByRole("navigation", { name: "Inner Cosmos 五个空间" })).toBeVisible({ timeout: 15000 });
+  await dismissPwaBanner(page);
+
+  await page.evaluate(async () => {
+    const capsules = await fetch("/api/plaza/capsules").then(r => r.json());
+    const target = capsules.data.find((c: { pseudonym: string }) => c.pseudonym === "苏格拉底");
+    const session = await fetch("/api/v1/persona-chat/session/create", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ capsuleId: target.id })
+    }).then(r => r.json());
+    await fetch(`/api/persona-chat/session/${session.data.id}/report`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason: "E2E deterministic pending-report fixture" })
+    });
+  });
+
+  // Log out the throwaway reporter so loginAsAdmin's subsequent goto() actually sees the login
+  // form again, instead of silently staying authenticated as the wrong (non-admin) account.
+  await page.evaluate(() => fetch("/api/auth/logout", { method: "POST" }));
+  await page.goto("/app/aurora/index.html");
+  await expect(page.getByRole("heading", { name: "回到你的内宇宙" })).toBeVisible({ timeout: 15000 });
+}
+
 test("admin console shows overview metrics and all 8 tabs with real seed data", async ({ page }) => {
   await loginAsAdmin(page);
   await page.goto("/app/aurora/admin");
@@ -51,6 +96,10 @@ test("admin console shows overview metrics and all 8 tabs with real seed data", 
 });
 
 test("resolving a pending report round-trips through the real backend", async ({ page }) => {
+  // Regression: this used to skip its own write-path assertion whenever the seed happened to
+  // have no pending report at the moment it ran. Create a real one deterministically first.
+  await createRealPendingReport(page);
+
   await loginAsAdmin(page);
   await page.goto("/app/aurora/admin");
   await expect(page.getByRole("heading", { name: "管理后台" })).toBeVisible({ timeout: 15_000 });
@@ -58,29 +107,21 @@ test("resolving a pending report round-trips through the real backend", async ({
   // Switch to the reports tab.
   await page.getByRole("tab", { name: "举报" }).click();
 
-  // If there are no pending reports in this seed, skip gracefully --
-  // the point is to prove the action wiring when data exists.
   const pendingBadge = page.locator(".admin-badge.is-pending").first();
-  const hasPending = await pendingBadge.isVisible().catch(() => false);
+  await expect(pendingBadge).toBeVisible({ timeout: 15_000 });
 
-  if (hasPending) {
-    // Click "忽略" (dismiss) on the first pending report.
-    await page.getByRole("button", { name: "忽略" }).first().click();
-    // Enter a reason and confirm.
-    const reasonInput = page.locator(".admin-reason-form input").first();
-    await expect(reasonInput).toBeVisible();
-    await reasonInput.fill("E2E automated dismissal");
-    await page.getByRole("button", { name: "确认处理" }).click();
+  // Click "忽略" (dismiss) on the first pending report.
+  await page.getByRole("button", { name: "忽略" }).first().click();
+  // Enter a reason and confirm.
+  const reasonInput = page.locator(".admin-reason-form input").first();
+  await expect(reasonInput).toBeVisible();
+  await reasonInput.fill("E2E automated dismissal");
+  await page.getByRole("button", { name: "确认处理" }).click();
 
-    // The status banner should confirm the action.
-    await expect(page.getByRole("status")).toContainText("举报已处理", { timeout: 15_000 });
+  // The status banner should confirm the action.
+  await expect(page.getByRole("status")).toContainText("举报已处理", { timeout: 15_000 });
 
-    await page.screenshot({ path: "test-results/admin-report-resolved.png", fullPage: true });
-  } else {
-    // No pending reports -- still confirm the tab and empty-state render.
-    await expect(page.getByRole("tabpanel")).toBeVisible();
-    await page.screenshot({ path: "test-results/admin-reports-empty.png", fullPage: true });
-  }
+  await page.screenshot({ path: "test-results/admin-report-resolved.png", fullPage: true });
 });
 
 test("non-admin user is redirected away from /admin", async ({ page }) => {

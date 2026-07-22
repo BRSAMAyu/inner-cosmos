@@ -40,4 +40,16 @@ test("viewing a portrait dimension's history and submitting a \"not quite me\" c
   await expect(page.getByText("记下了。我会带着你这份看法继续理解你。")).toBeVisible({ timeout: 15000 });
 
   await page.screenshot({ path: "test-results/portrait-view.png", fullPage: true });
+
+  // Regression (remaining-work-handoff.md 2.2.6, "画像校准 reload"): portraitCalibrated used to be
+  // a write-only local flag that reset to {} on every refresh, even though the correction itself
+  // was always genuinely persisted -- so the "already calibrated" ribbon silently vanished on
+  // reload. Reload and confirm it is still there, derived from the real corrections list.
+  await page.reload();
+  await loginIfNeeded(page);
+  await page.getByRole("button", { name: /^我的/ }).click();
+  await expect(page.getByRole("heading", { name: "Aurora 眼中的你" })).toBeVisible({ timeout: 15000 });
+  const cardAfterReload = page.locator(".portrait-dim-card").first();
+  await expect(cardAfterReload).toHaveClass(/calibrated/);
+  await expect(cardAfterReload.locator(".portrait-note")).toBeVisible();
 });

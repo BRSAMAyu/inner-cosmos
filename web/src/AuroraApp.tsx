@@ -85,7 +85,6 @@ export function AuroraApp() {
   const [claimCandidateBusyId, setClaimCandidateBusyId] = useState<number | null>(null);
   const [portrait, setPortrait] = useState<PortraitDimension[]>([]);
   const [portraitHistory, setPortraitHistory] = useState<Record<string, PortraitHistoryEntry[]>>({});
-  const [portraitCalibrated, setPortraitCalibrated] = useState<Record<string, boolean>>({});
   const [portraitBusy, setPortraitBusy] = useState<string | null>(null);
   const [accountBusy, setAccountBusy] = useState<AccountBusy>(null);
   const [dataRightsReceipts, setDataRightsReceipts] = useState<DataRetractionReceipt[]>([]);
@@ -324,6 +323,18 @@ export function AuroraApp() {
       auroraSession.loadSafetyResources,
       connectionsAndLetters.loadLetterInbox, connectionsAndLetters.loadConnectionRequests, connectionsAndLetters.loadFriends,
       connectionsAndLetters.loadLetterOutbox, connectionsAndLetters.loadPeople, connectionsAndLetters.loadRelations, connectionsAndLetters.loadLetterThreads]);
+
+  // Regression (remaining-work-handoff.md 2.2.6, "画像校准 reload"): derived from the real,
+  // reloaded `corrections` list instead of a write-only local flag that reset to {} on every
+  // refresh -- the correction itself was always genuinely persisted via api.confirmCorrection(),
+  // only the "already calibrated" ribbon on the card silently vanished on reload.
+  const portraitCalibrated = useMemo(() => {
+    const calibrated: Record<string, boolean> = {};
+    for (const correction of corrections) {
+      if (correction.targetType === "PORTRAIT_DIM") calibrated[correction.fieldName] = true;
+    }
+    return calibrated;
+  }, [corrections]);
 
   const selectedCapsule = capsules.find(capsule => capsule.id === selectedCapsuleId) ?? null;
   // A capsule opened from the public plaza directory (not the curated match set) is wrapped in a
@@ -583,8 +594,10 @@ export function AuroraApp() {
         oldValue: oldValue || null, newValue: trimmed, reason: "用户在「Aurora 眼中的你」页面校准了这一维度"
       });
       // The correction coexists alongside Aurora's own observation rather than overwriting it
-      // (RUN-006 semantics) — mark calibrated locally instead of refetching/replacing the value.
-      setPortraitCalibrated(current => ({ ...current, [dim]: true }));
+      // (RUN-006 semantics). Refresh the real corrections list so portraitCalibrated (derived
+      // from it above) picks this up immediately and survives a reload, instead of a local-only
+      // flag that used to vanish the moment the page refreshed.
+      setCorrections(await api.recentCorrections());
       setStatus("记下了。我会带着你这份看法继续理解你。");
     } catch (error) { setStatus(error instanceof Error ? error.message : "没能存下，待会儿再试一次"); }
     finally { setPortraitBusy(null); }
