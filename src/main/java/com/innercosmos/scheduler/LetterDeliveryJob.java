@@ -1,6 +1,7 @@
 package com.innercosmos.scheduler;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.innercosmos.entity.LetterStatusLog;
 import com.innercosmos.entity.SlowLetter;
 import com.innercosmos.mapper.LetterStatusLogMapper;
@@ -66,28 +67,47 @@ public class LetterDeliveryJob {
      * retries it — no letter is silently dropped. The valid LetterState
      * transitions are unchanged.
      *
-     * @return true if the letter reached DELIVERED, false if all attempts failed
+     * Regression (Gemini audit 1.1/2.2, P0): this previously read the row, checked
+     * its status in Java, then wrote the whole entity back via updateById() — a
+     * read-then-write race. A user action landing between the read and the write
+     * (block, decline, withdraw) would be silently overwritten by this scheduler
+     * forcing the row back to FLYING/DELIVERED. The update is now a single atomic
+     * `UPDATE ... WHERE id=? AND status=?`; 0 rows affected means someone else
+     * already changed this letter's status in that exact window, and the
+     * scheduler must yield to that newer state rather than retry-overwriting it.
+     *
+     * @return true if the letter reached DELIVERED (or something else already advanced it
+     *         out of fromStatus, needing no further action from this job), false if a
+     *         genuine transient failure exhausted every retry attempt
      */
     private boolean advanceWithRetry(SlowLetter letter, String fromStatus, String toStatus, boolean setDeliveredAt) {
         for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
             try {
-                SlowLetter fresh = letterMapper.selectById(letter.id);
-                if (fresh == null || !fromStatus.equals(fresh.status)) {
-                    return true; // already advanced or deleted
+                UpdateWrapper<SlowLetter> claim = new UpdateWrapper<SlowLetter>()
+                        .eq("id", letter.id).eq("status", fromStatus)
+                        .set("status", toStatus);
+                if (setDeliveredAt) claim.set("delivered_at", LocalDateTime.now());
+                int updated = letterMapper.update(null, claim);
+                if (updated == 0) {
+                    // Never retry a lost race: the letter is no longer at fromStatus, so a
+                    // concurrent user action (or, if ever run without SchedulerLock, another
+                    // scheduler replica) already decided its fate in this exact window.
+                    // Overwriting that would be exactly the bug this fix closes.
+                    SlowLetter current = letterMapper.selectById(letter.id);
+                    log.info("Letter {} no longer {} (now {}); yielding to the newer state instead of overwriting it",
+                            letter.id, fromStatus, current == null ? "deleted" : current.status);
+                    return true;
                 }
-                fresh.status = toStatus;
-                if (setDeliveredAt) fresh.deliveredAt = LocalDateTime.now();
-                letterMapper.updateById(fresh);
                 try {
                     LetterStatusLog entry = new LetterStatusLog();
-                    entry.letterId = fresh.id;
+                    entry.letterId = letter.id;
                     entry.fromStatus = fromStatus;
                     entry.toStatus = toStatus;
                     entry.operatorUserId = null;
                     entry.reason = "scheduled delivery";
                     logMapper.insert(entry);
                 } catch (Exception logEx) {
-                    log.warn("Failed to record delivery audit log for letter {}: {}", fresh.id, logEx.getMessage());
+                    log.warn("Failed to record delivery audit log for letter {}: {}", letter.id, logEx.getMessage());
                 }
                 return true;
             } catch (Exception e) {
