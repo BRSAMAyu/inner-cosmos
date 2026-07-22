@@ -2,14 +2,18 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 authority: goal-objective.md
 status: IN_PROGRESS
-last_reconciled_at: 2026-07-22T00:00:00+08:00
-last_reconciled_commit: 642f034
+last_reconciled_at: 2026-07-23T02:45:00+08:00
+last_reconciled_commit: 28c4987
 current_fact_baseline: 对齐文档/24-完全体最终收敛与云原生课程战役.md
 current_execution_plan: 对齐文档/24-完全体最终收敛与云原生课程战役.md
 parallel_state: docs/goal/closure-campaign-state.yml
 reconciliation_boundary: >-
-  W0 integration of the four exact Claude branches is pending. Historical counts and evidence remain
-  valid only for their recorded commits; statuses may not be promoted until the integrated HEAD is verified.
+  W0 integration of the four exact Claude branches is DONE on branch codex/w0-integration
+  (commit 28c4987; not yet merged to main) -- see closure-campaign-state.yml's integrated_head
+  for exact test commands/counts and known non-blocking findings. W0V (the Gemini audit's 36
+  numbered findings) has not started; VERIFIED-STATE-CONCURRENCY, VERIFIED-AI-DATA-BOUNDARY,
+  VERIFIED-CLIENT-RESILIENCE and VERIFIED-STORAGE-EVOLUTION below remain UNASSESSED until it is.
+  Historical counts and evidence predating 642f034 remain valid only for their recorded commits.
 
 status_semantics:
   UNASSESSED: current HEAD and target environment have not been verified
@@ -213,6 +217,16 @@ gates:
           VOICE input in the Aurora composer (AuroraConversation MediaRecorder -> /api/asr/transcribe).
           Web suite 123 passing, tsc + vite build green, data paths verified 200 on prod. Still open in
           relations/social: people discovery groups; and ASR quality is Mock until a real ASR key.
+          UPDATE (W0, this checkpoint, commit 28c4987): the four locked worktree branches (admin
+          console standalone route; timeline/daily-record/weekly-review/thought-shredder;
+          todo/heart-diary/belief-gallery; five Playwright specs) are integrated. Their raw merge
+          had stacked all seven newly-ported cosmos modules vertically in one page and bloated the
+          login bootstrap Promise.all with 9 non-first-screen requests -- both explicitly forbidden
+          by doc 24 section 3.3. Fixed in a dedicated follow-up: five real CosmosSubNav sub-tabs
+          (星空与成长轨迹/今日记录与心声/周报与变化/思维整理与待办/信念与自我理解), each a shareable
+          /cosmos/<tab> URL, each lazy-loading its data on first visit instead of at bootstrap.
+          vitest 430/430, tsc clean, Playwright verified live (legacy-batch-a/heart-diary/todo/
+          belief-gallery specs all updated and passing against the new sub-tab structure).
       - {id: UX-CONTRACTS, target: "Generated typed API client and unified auth, errors, tasks, offline, and telemetry are used.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CONV-003/]}
       - {id: UX-QUALITY, target: "Core routes pass Playwright, visual regression, accessibility, i18n, and performance budgets.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CONV-003/]}
       - id: UX-VISUAL-SYSTEM

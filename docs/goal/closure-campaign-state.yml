@@ -2,29 +2,75 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 authority: 对齐文档/24-完全体最终收敛与云原生课程战役.md
 status: IN_PROGRESS
-updated_at: 2026-07-23T00:00:00+08:00
+updated_at: 2026-07-23T02:45:00+08:00
 
 legal_terminal_states:
   - COMPLETE
   - RELEASE_CANDIDATE_BLOCKED_BY_HUMAN_GATE
 
+integrated_head:
+  commit: 28c4987
+  branch: codex/w0-integration
+  parent_before_integration: 6bc56bb
+  note: >-
+    W0 is closed on this branch, not yet merged to main. Four locked sources integrated by
+    exact commit id (a537a44bc5858ddc7@42d6253, aa2efe3576e09de2d@d6925f8,
+    a9edc9fd3e995bd9d@1fc014b, a0dd2129a00e3e921@6867c0f); per-branch generated bundles
+    excluded, single clean `npm run build` produced the committed static/app/aurora/** bundle.
+    Cosmos IA restructured into five lazy-loaded CosmosSubNav sub-tabs (doc 24 section 3.3) --
+    the raw per-branch merge had stacked 7 ported modules vertically and bloated the login
+    bootstrap Promise.all; both fixed in a dedicated follow-up commit, not per-branch.
+    remaining-work-handoff.md section 2.2's six "集成即修复" P1/P2 items are all closed:
+    useDailyRecord date-clamp, HeartDiary stop-button, Social Groups atomicity/invite
+    validation/decision race, admin report-resolve test + /api/ai-logs+/api/ai/health
+    permission correction, and E2E hygiene (deterministic report fixture, portrait-reload
+    product bug fix, capsule-preview real turn, throwaway-account people-discovery actor).
+  preserved_preexisting_dirty_paths:
+    - src/main/resources/application.yml (user's local LLM model-version tweaks; never committed by this work)
+    - .agents/ (Codex multi-agent scratch workspace; untouched)
+    - 对齐文档/prompt最终方案 (this goal's own source prompt; untouched)
+  exact_test_commands_and_counts:
+    - {cmd: "mvn test", result: "961/961 (1 pre-existing skip, 0 failures)"}
+    - {cmd: "cd web && npx tsc --noEmit", result: clean}
+    - {cmd: "cd web && npx vitest run", result: "430/430 (65 files)"}
+    - {cmd: "cd web && npm run build", result: "single clean bundle, committed"}
+    - {cmd: "cd web && npx playwright test (fresh single-run server)", result: "40/42 passed", known_non_blocking: [
+        "dead-button-scan.spec.ts 我的-space findings: AppearanceToggle/PortraitView/AccountSettings buttons pre-date 642f034 (the four branches' merge-base) and are untouched by any of the four branches or this branch's W0V fixes -- stable/deterministic pre-existing gap, tracked as follow-up, not a W0 regression.",
+        "aurora-interrupt.spec.ts psychology-Skill test: failed once under full-suite sequential load, passes cleanly in isolation -- confirmed Mock-LLM-timing flake, not a regression."
+      ]}
+    - {cmd: "powershell scripts/scan-secrets.ps1", result: "PASS, 0 findings"}
+    - {cmd: "kubectl kustomize deploy/k8s/base && deploy/k8s/overlays/academy-eks", result: "both render cleanly"}
+    - {cmd: "git diff --check (642f034..HEAD)", result: clean}
+
 current_front:
-  id: W0-INTEGRATE-FOUR-CLAUDE-BRANCHES
-  intent: Integrate the exact four reviewed source/test branches, rebuild once, and reconcile current truth.
+  id: W0V-VERIFIED-AUDIT-CLOSURE
+  intent: >-
+    Close all 36 lines of docs/audit/2026-07-23-gemini-master-audit-reconciliation.md (28
+    confirmed, 6 partial, 1 duplicate, 1 false) with failing-first regression/concurrency/
+    adversarial tests, real fixes, and reproducible receipts, per that document's section 4
+    P0-then-P1-then-P2/P3 order. NOT started yet on this branch -- everything closed so far
+    (see integrated_head above) was W0's own "集成即修复" list, a distinct, smaller set of
+    defects specific to the four-branch merge itself, not the Gemini audit's 36 numbered items.
   status: READY
-  exact_sources:
-    - {branch: worktree-agent-a537b49a, head: 42d6253, scope: admin-console}
-    - {branch: worktree-agent-aa2e0d29, head: d6925f8, scope: timeline-daily-weekly-shredder}
-    - {branch: worktree-agent-a9edba5a, head: 1fc014b, scope: todo-heart-diary-belief}
-    - {branch: worktree-agent-a0ddcfc1, head: 6867c0f, scope: playwright-five-components}
+  p0_order:
+    - {id: "1.1/2.2", desc: "LetterDeliveryJob atomic conditional claim, not read-then-updateById"}
+    - {id: "1.4", desc: "session-turn-cap vs daily-quota enforcement, both atomic, not conflated"}
+    - {id: "1.5/2.1", desc: "unify GravityTimePolicy; MemoryCard field-level conditional update, user importance wins races"}
+    - {id: "2.4", desc: "PersonaChatServiceImpl.reply(): reserve -> provider call outside transaction -> finalize state machine"}
+    - {id: "3.1/3.2", desc: "P1->P2 capsule compiler: purpose-bound authorization, minimization, PII/secret scrub before persona generation + persistence"}
+    - {id: "3.4/3.5", desc: "PromptBuilder role/data boundary (no user-text delimiter injection); output leakage/grounding critic"}
+    - {id: "3.7/3.8", desc: "crisis/abuse Unicode NFKC normalization; unified pre-first-event output policy gate for POST+SSE"}
+    - {id: "4.1-4.3", desc: "turn-scoped SSE recovery (generation+AbortController); terminal-aware EOF contract; bounded auth-retry fetch-SSE"}
   forbidden:
-    - wildcard-selection-of-worktree-agent-branches
-    - merging-per-branch-generated-bundles
-    - overwriting-pre-existing-working-tree-changes
+    - duplicate-fk-index-for-2.3-it-is-false
+    - reuse-flyway-v21-mobile-migration-already-owns-it
+    - "@Order-to-fake-async-listener-completion-ordering"
+    - keyword-deletion-sanitize-instead-of-prompt-data-boundary
+    - misreading-current-full-response-then-sse-slice-as-token-level-leakage
 
 campaigns:
-  - {id: W0, name: integration-and-truth-baseline, status: READY, depends_on: []}
-  - {id: W0V, name: verified-audit-defect-closure, status: BLOCKED_BY_W0, depends_on: [W0], contract: docs/audit/2026-07-23-gemini-master-audit-reconciliation.md}
+  - {id: W0, name: integration-and-truth-baseline, status: DONE, depends_on: [], commit: 28c4987}
+  - {id: W0V, name: verified-audit-defect-closure, status: READY, depends_on: [W0], contract: docs/audit/2026-07-23-gemini-master-audit-reconciliation.md}
   - {id: W1, name: living-intelligence-and-data-loop, status: BLOCKED_BY_W0V, depends_on: [W0V]}
   - {id: W2, name: complete-experience-and-multiplatform-polish, status: BLOCKED_BY_W0V, depends_on: [W0V]}
   - {id: W3, name: cloud-native-showcase, status: BLOCKED_BY_W0V, depends_on: [W0V]}
