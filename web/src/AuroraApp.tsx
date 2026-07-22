@@ -33,6 +33,12 @@ import { PsychologySkillStudio, SkillSuggestionBanner, type SkillLocale } from "
 import { ConnectError, LoadingText } from "./loading";
 import { useAuroraSession } from "./hooks/useAuroraSession";
 import { useConnectionsAndLetters } from "./hooks/useConnectionsAndLetters";
+import { useTodoBoard } from "./hooks/useTodoBoard";
+import { useHeartDiary } from "./hooks/useHeartDiary";
+import { useBeliefGallery } from "./hooks/useBeliefGallery";
+import { TodoBoard } from "./components/TodoBoard";
+import { HeartDiary } from "./components/HeartDiary";
+import { BeliefGallery } from "./components/BeliefGallery";
 
 // The Aurora conversation/session domain (message list, streaming/turn status, interrupt/stop,
 // mode picker, WakeIntent negotiate, session bootstrap/replay) has been extracted into
@@ -144,6 +150,13 @@ export function AuroraApp() {
   // web/src/hooks/useConnectionsAndLetters.ts.
   const connectionsAndLetters = useConnectionsAndLetters({ setStatus });
 
+  // Legacy static-page ports (Phase 3, legacy batch B): todo.html, heart-diary.html, and the
+  // belief-pattern-browsing half of beliefs.html. Each domain gets its own small hook, matching the
+  // precedent set by useConnectionsAndLetters.ts.
+  const todoBoard = useTodoBoard({ setStatus });
+  const heartDiary = useHeartDiary({ setStatus });
+  const beliefGallery = useBeliefGallery({ setStatus });
+
   const navigateSpace = useCallback((space: ProductSpace) => {
     navigate(spacePath(space));
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -220,7 +233,10 @@ export function AuroraApp() {
         connectionsAndLetters.loadLetterThreads(),
         api.getProfile().then(setUserProfile),
         connectionsAndLetters.loadGroups(),
-        connectionsAndLetters.loadGroupInvites()
+        connectionsAndLetters.loadGroupInvites(),
+        todoBoard.loadTodos().catch(() => undefined),
+        beliefGallery.loadAll().catch(() => undefined),
+        beliefGallery.loadContradictions()
       ]);
       if (call !== bootstrapCallRef.current) return;
       setAuthenticated(true);
@@ -247,7 +263,8 @@ export function AuroraApp() {
   }, [auroraSession.resolveSession, auroraSession.replaceFromHistory, auroraSession.loadWakeIntents, auroraSession.loadNotifications,
       auroraSession.loadSafetyResources,
       connectionsAndLetters.loadLetterInbox, connectionsAndLetters.loadConnectionRequests, connectionsAndLetters.loadFriends,
-      connectionsAndLetters.loadLetterOutbox, connectionsAndLetters.loadPeople, connectionsAndLetters.loadRelations, connectionsAndLetters.loadLetterThreads]);
+      connectionsAndLetters.loadLetterOutbox, connectionsAndLetters.loadPeople, connectionsAndLetters.loadRelations, connectionsAndLetters.loadLetterThreads,
+      todoBoard.loadTodos, beliefGallery.loadAll, beliefGallery.loadContradictions]);
 
   const selectedCapsule = capsules.find(capsule => capsule.id === selectedCapsuleId) ?? null;
   // A capsule opened from the public plaza directory (not the curated match set) is wrapped in a
@@ -1041,6 +1058,21 @@ export function AuroraApp() {
         onAnswerChange={(key, value) => setSkillAnswers(current => ({ ...current, [key]: value }))}
         onRetentionChange={setSkillRetention} onConsentChange={setSkillConsent} onRun={() => void runPsychologySkill()}
         onContinueWithAurora={continueSkillWithAurora} onRevokeRun={id => void revokePsychologyRun(id)} />
+
+      <TodoBoard todos={todoBoard.todos} tab={todoBoard.tab} busy={todoBoard.busy} splitBusyId={todoBoard.splitBusyId}
+        onSelectTab={todoBoard.setTab} onCreate={input => void todoBoard.createTodo(input)}
+        onUpdateStatus={(id, status) => void todoBoard.updateStatus(id, status)} onSplit={id => void todoBoard.splitTodo(id)}
+        onDelete={id => void todoBoard.deleteTodo(id)} onUpdate={(id, input) => void todoBoard.updateTodo(id, input)} locale={skillLocale} />
+
+      <HeartDiary rawText={heartDiary.rawText} displayText={heartDiary.displayText} activeLevel={heartDiary.activeLevel}
+        polishBusy={heartDiary.polishBusy} submitBusy={heartDiary.submitBusy} onTextChange={heartDiary.onTextChange}
+        onSwitchLevel={level => void heartDiary.switchLevel(level)} onTranscribeAudio={blob => heartDiary.transcribeAudio(blob)}
+        onSubmit={() => void heartDiary.submit()} locale={skillLocale} />
+
+      <BeliefGallery beliefs={beliefGallery.beliefs} contradictions={beliefGallery.contradictions} filter={beliefGallery.filter}
+        categories={beliefGallery.categories} selectedCategory={beliefGallery.selectedCategory} categoryBeliefs={beliefGallery.categoryBeliefs}
+        busy={beliefGallery.busy} onSelectFilter={filter => void beliefGallery.selectFilter(filter)}
+        onSelectCategory={category => void beliefGallery.selectCategory(category)} locale={skillLocale} />
       </div>
 
       <div className="product-space" hidden={productSpace !== "resonance"}>
