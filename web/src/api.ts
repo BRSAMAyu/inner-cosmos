@@ -132,6 +132,62 @@ export type MemoryCard = {
   id: number; title: string; summary: string | null; status: string; versionNo: number;
   consentScope: string | null; memoryLayer: string | null; confidence: number | null;
 };
+// Phase 3 legacy-page port (timeline.html / weekly-review.html / daily-record.html /
+// thought-shredder.html): types for the "cosmos" space's daily-record + weekly-review +
+// thought-shredder domains, verified directly against MemoryController, DailyRecordController,
+// ThoughtShredderController and their entities/VOs -- not guessed from the legacy static HTML.
+export type MemoryThemeRow = {
+  id: number; themeName: string | null; themeSummary: string | null; themeType: string | null;
+  keywords: string | null; memoryCount: number | null; averageGravity: number | null;
+  lastTouchedAt: string | null; status: string | null;
+};
+// The raw tb_daily_record entity (from GET /api/memory/daily-records): has a real, stable `id`
+// but none of the richer per-day fragments/emotions/todos arrays.
+export type DailyRecordEntry = {
+  id: number; recordDate: string; theme: string | null; eventSummary: string | null;
+  emotionWeather: string | null; cognitiveSummary: string | null; todoSummary: string | null;
+  auroraSummary: string | null; capsuleSuggested: boolean | null; userAccepted: boolean | null; status: string | null;
+};
+export type ThoughtFragmentRow = { id: number; fragmentType: string; rawExcerpt: string | null; aiAnalysis: string | null; reframeText: string | null };
+export type EmotionTraceRow = { id: number; emotionName: string | null; emotionScore: number | null; weatherType: string | null; triggerScene: string | null };
+export type TodoItemRow = { id: number; taskName: string; description: string | null; priority: string | null; status: string };
+// The richer DailyRecordVO (from GET /api/daily-record/latest): built from the user's latest
+// MemoryCard, not the DailyRecord table -- it deliberately has NO `id` field of its own (see
+// MemoryServiceImpl.latestDailyRecord()). Callers needing to accept/edit "today" must resolve the
+// real DailyRecord id from the dailyRecords() list (its first/most-recent entry), not from this VO.
+export type DailyRecordDetail = {
+  theme: string | null; auroraSummary: string | null; mainMemory: MemoryCard | null;
+  fragments: ThoughtFragmentRow[]; emotions: EmotionTraceRow[]; todos: TodoItemRow[]; capsuleSuggested: boolean;
+};
+export type WeeklyDailySnapshot = {
+  date: string; dayLabel: string; emotionWeather: string | null; theme: string | null;
+  memorySummary: string | null; cognitiveSummary: string | null; taskRatio: string | null; auroraSummary: string | null;
+};
+// WeeklyReviewV2VO (GET/POST /api/daily-record/weekly/v2/*) -- richer and field-compatible with the
+// legacy weekly-review.html's rendering, unlike the plain WeeklyReview entity the legacy page's own
+// api.js literally calls (weeklyReviewLatest/weeklyReviewGenerate -> /api/daily-record/weekly/latest
+// and /weekly/generate): that endpoint returns dominantTheme/themeSummary/emotionTrend/etc., none of
+// which match the fields (title/dateRange/topThemes/dailySnapshots/...) the legacy page's own JS
+// reads off the response -- a real, pre-existing bug in the legacy static page. The V2 endpoint is
+// the one that actually matches the page's intent, so this port uses it instead.
+export type WeeklyReviewV2 = {
+  id: number | null; title: string; dateRange: string; weekStartDate: string; weekEndDate: string;
+  topThemes: string; memoryCount: number; dominantEmotion: string; emotionSpectrum: string;
+  intensityAverage: number; todoRatio: string; recommendation: string; auroraObservation: string;
+  dailySnapshots: WeeklyDailySnapshot[]; legacy: boolean;
+};
+export type ShredderResult = {
+  originalHandlingMode: string; coreFeeling: string; hiddenNeed: string; noiseToDrop: string[];
+  sentenceToKeep: string; memoryCard: MemoryCard; fragments: ThoughtFragmentRow[]; suggestedTodo: TodoItemRow | null;
+};
+export type ShredderHistoryEntry = { id: number; title: string; summary: string | null; memoryType: string | null; emotionalGravity: number | null };
+// Full shape of AiHealthVO (see AiHealthController#health) -- ThoughtShredderSection only reads
+// the first four fields, AdminAiLogsTab/AdminModelTab read the rest; one canonical type for both.
+export type AiHealth = {
+  provider: string | null; model: string | null; apiKeyConfigured: boolean; fallbackAllowed: boolean;
+  mode?: string; mockProvider?: boolean; asrProvider?: string; asrModel?: string; asrKeyConfigured?: boolean;
+  lastSuccess?: boolean | null; lastError?: string | null;
+};
 export type EchoCapsule = {
   id: number; pseudonym: string; intro: string; authorizedMemoryIds: string;
   visibilityStatus: "PRIVATE" | "PUBLIC" | "NEEDS_REVIEW" | "HIDDEN" | "ARCHIVED";
@@ -367,11 +423,6 @@ export type AdminAuditLog = {
 export type AdminAiLog = {
   id: number; moduleName: string; provider: string; modelName: string;
   success: boolean; fallbackUsed: boolean; errorMessage: string | null; createdAt: string | null;
-};
-export type AdminAiHealth = {
-  mode: string; provider: string; model: string; apiKeyConfigured: boolean; fallbackAllowed: boolean;
-  mockProvider: boolean; asrProvider: string; asrModel: string; asrKeyConfigured: boolean;
-  lastSuccess: boolean | null; lastError: string | null;
 };
 export type AdminAbTestConfig = {
   id: number; testName: string; description: string | null; enabled: boolean;
@@ -742,12 +793,29 @@ export const api = {
   adminDisableUser: (id: number) => request<void>(`/api/admin/users/${id}/disable`, { method: "POST" }),
   adminEnableUser: (id: number) => request<void>(`/api/admin/users/${id}/enable`, { method: "POST" }),
   aiLogs: () => request<AdminAiLog[]>("/api/ai-logs"),
-  aiHealth: () => request<AdminAiHealth>("/api/ai/health"),
   // ABTestController.activeConfig() returns the single currently-active config (or null), not a
   // list -- unlike the legacy admin.html JS, which mistakenly treated the response as an array.
   abtestActive: () => request<AdminAbTestConfig | null>("/api/abtest/active"),
   abtestStats: (testName: string) => request<AdminAbTestStats>(`/api/abtest/stats?testName=${encodeURIComponent(testName)}`),
-  abtestToggle: (id: number, enabled: boolean) => request<void>(`/api/abtest/${id}/toggle?enabled=${enabled}`, { method: "POST" })
+  abtestToggle: (id: number, enabled: boolean) => request<void>(`/api/abtest/${id}/toggle?enabled=${enabled}`, { method: "POST" }),
+
+  // Phase 3 legacy-page port: timeline.html, weekly-review.html, daily-record.html, thought-shredder.html.
+  memoryThemes: () => request<MemoryThemeRow[]>("/api/memory/themes"),
+  dailyRecords: () => request<DailyRecordEntry[]>("/api/memory/daily-records"),
+  acceptDailyRecordEntry: (id: number) => request<void>(`/api/memory/daily-records/${id}/accept`, { method: "POST" }),
+  latestDailyRecord: () => request<DailyRecordDetail>("/api/daily-record/latest"),
+  editDailyRecord: (id: number, patch: { theme?: string; emotionWeather?: string; cognitiveSummary?: string }) =>
+    request<DailyRecordEntry>(`/api/daily-record/${id}/edit`, { method: "POST", body: JSON.stringify(patch) }),
+  weeklyReviewV2Latest: () => request<WeeklyReviewV2 | null>("/api/daily-record/weekly/v2/latest"),
+  generateWeeklyReviewV2: () => request<WeeklyReviewV2>("/api/daily-record/weekly/v2/generate", { method: "POST" }),
+  // Single canonical wrapper for /api/ai/health: read by both ThoughtShredderSection (base fields)
+  // and AdminAiLogsTab/AdminModelTab (full AiHealthVO fields) -- see the AiHealth type above.
+  aiHealth: () => request<AiHealth>("/api/ai/health"),
+  shredderProcess: (text: string, originalHandlingMode: "KEEP_RAW" | "KEEP_ONLY_RESULT" | "DISPLAY_ONCE" = "KEEP_ONLY_RESULT") =>
+    request<ShredderResult>("/api/thought-shredder/process", { method: "POST", body: JSON.stringify({ text, originalHandlingMode }) }),
+  shredderHistory: () => request<ShredderHistoryEntry[]>("/api/thought-shredder/history"),
+  shredderSettle: (id: number) => request<void>(`/api/thought-shredder/${id}/settle`, { method: "POST" }),
+  shredderDelete: (id: number) => request<void>(`/api/thought-shredder/${id}`, { method: "DELETE" })
 };
 
 export type AsrResult = { text: string; audioDurationSec: number; speechRate: number; pauseCount: number; longPauseCount: number; inputConfidence: number };

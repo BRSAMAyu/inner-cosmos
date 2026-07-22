@@ -1,11 +1,11 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { AdminModelTab } from "./AdminModelTab";
-import type { AdminAiHealth, AdminModelConfigRow } from "../../api";
+import type { AiHealth, AdminModelConfigRow } from "../../api";
 
 afterEach(cleanup);
 
-const health = (over: Partial<AdminAiHealth> = {}): AdminAiHealth => ({
+const health = (over: Partial<AiHealth> = {}): AiHealth => ({
   mode: "dev", provider: "glm", model: "glm-4", apiKeyConfigured: true, fallbackAllowed: true,
   mockProvider: false, asrProvider: "mock", asrModel: "mock-asr", asrKeyConfigured: false,
   lastSuccess: true, lastError: null, ...over

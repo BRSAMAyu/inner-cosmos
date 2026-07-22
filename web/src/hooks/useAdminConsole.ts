@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import {
-  api, type AdminAbTestConfig, type AdminAbTestStats, type AdminAiHealth, type AdminAiLog,
+  api, type AdminAbTestConfig, type AdminAbTestStats, type AiHealth, type AdminAiLog,
   type AdminAuditLog, type AdminCapsuleRow, type AdminModelConfigRow, type AdminOverview,
   type AdminReport, type AdminSafetyEvent, type AdminUserRow
 } from "../api";
@@ -20,7 +20,7 @@ export function useAdminConsole() {
   const [auditLogs, setAuditLogs] = useState<AdminAuditLog[]>([]);
   const [safetyEvents, setSafetyEvents] = useState<AdminSafetyEvent[]>([]);
   const [modelConfig, setModelConfig] = useState<AdminModelConfigRow[]>([]);
-  const [aiHealth, setAiHealth] = useState<AdminAiHealth | null>(null);
+  const [aiHealth, setAiHealth] = useState<AiHealth | null>(null);
   const [aiLogs, setAiLogs] = useState<AdminAiLog[]>([]);
   const [abtestConfig, setAbtestConfig] = useState<AdminAbTestConfig | null>(null);
   const [abtestStats, setAbtestStats] = useState<AdminAbTestStats | null>(null);

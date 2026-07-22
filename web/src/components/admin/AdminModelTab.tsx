@@ -1,4 +1,4 @@
-import type { AdminAiHealth, AdminModelConfigRow } from "../../api";
+import type { AiHealth, AdminModelConfigRow } from "../../api";
 import type { Locale } from "../../i18n";
 
 // Port of admin.html's "模型" tab (loadModelConfig(): AI health card + model config rows).
@@ -23,7 +23,7 @@ const COPY: Record<Locale, {
 };
 
 export function AdminModelTab({ health, configs, locale = "zh-CN" }: {
-  health: AdminAiHealth | null; configs: AdminModelConfigRow[]; locale?: Locale;
+  health: AiHealth | null; configs: AdminModelConfigRow[]; locale?: Locale;
 }) {
   const t = COPY[locale];
   return <div className="admin-grid" aria-label={t.aria}>

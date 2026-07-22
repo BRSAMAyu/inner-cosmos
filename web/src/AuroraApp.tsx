@@ -34,6 +34,14 @@ import { PsychologySkillStudio, SkillSuggestionBanner, type SkillLocale } from "
 import { ConnectError, LoadingText } from "./loading";
 import { useAuroraSession } from "./hooks/useAuroraSession";
 import { useConnectionsAndLetters } from "./hooks/useConnectionsAndLetters";
+import { useDailyRecord } from "./hooks/useDailyRecord";
+import { useWeeklyReview } from "./hooks/useWeeklyReview";
+import { useThoughtShredder } from "./hooks/useThoughtShredder";
+import { TimelineSection } from "./components/TimelineSection";
+import { WeeklyReviewSection } from "./components/WeeklyReviewSection";
+import { DailyRecordSection } from "./components/DailyRecordSection";
+import { ThoughtShredderSection } from "./components/ThoughtShredderSection";
+import type { MemoryThemeRow } from "./api";
 
 // The Aurora conversation/session domain (message list, streaming/turn status, interrupt/stop,
 // mode picker, WakeIntent negotiate, session bootstrap/replay) has been extracted into
@@ -129,6 +137,7 @@ export function AuroraApp() {
   const [skillLocale, setSkillLocale] = useState<SkillLocale>(() => loadLocale());
   const [visitorBusy, setVisitorBusy] = useState(false);
   const [mobileState, setMobileState] = useState<MobileRuntimeState>(initialMobileState);
+  const [memoryThemes, setMemoryThemes] = useState<MemoryThemeRow[]>([]);
   const bootstrappedRef = useRef(false);
   const bootstrapCallRef = useRef(0);
   const draftRestoredRef = useRef(false);
@@ -144,6 +153,14 @@ export function AuroraApp() {
   // requests/friends, slow-letter inbox/outbox/threads) -- extracted into its own hook; see
   // web/src/hooks/useConnectionsAndLetters.ts.
   const connectionsAndLetters = useConnectionsAndLetters({ setStatus });
+
+  // Phase 3 legacy-page port (timeline.html / weekly-review.html / daily-record.html /
+  // thought-shredder.html) -- three small domain hooks for the "cosmos" space's growth-timeline,
+  // weekly-review and thought-shredder sections; see web/src/hooks/useDailyRecord.ts,
+  // useWeeklyReview.ts and useThoughtShredder.ts.
+  const dailyRecord = useDailyRecord({ setStatus });
+  const weeklyReview = useWeeklyReview({ setStatus });
+  const thoughtShredder = useThoughtShredder({ setStatus });
 
   const navigateSpace = useCallback((space: ProductSpace) => {
     navigate(spacePath(space));
@@ -221,7 +238,15 @@ export function AuroraApp() {
         connectionsAndLetters.loadLetterThreads(),
         api.getProfile().then(setUserProfile),
         connectionsAndLetters.loadGroups(),
-        connectionsAndLetters.loadGroupInvites()
+        connectionsAndLetters.loadGroupInvites(),
+        // Phase 3 legacy-page port additions -- appended at the very end of this array per the
+        // documented past-incident gotcha (some earlier entries are consumed positionally elsewhere).
+        api.memoryThemes().then(setMemoryThemes).catch(() => undefined),
+        dailyRecord.loadDailyRecords().catch(() => undefined),
+        dailyRecord.loadLatestDailyRecord(),
+        weeklyReview.loadWeeklyReview(),
+        thoughtShredder.loadShredderAiHealth(),
+        thoughtShredder.loadShredderHistory()
       ]);
       if (call !== bootstrapCallRef.current) return;
       setAuthenticated(true);
@@ -248,7 +273,9 @@ export function AuroraApp() {
   }, [auroraSession.resolveSession, auroraSession.replaceFromHistory, auroraSession.loadWakeIntents, auroraSession.loadNotifications,
       auroraSession.loadSafetyResources,
       connectionsAndLetters.loadLetterInbox, connectionsAndLetters.loadConnectionRequests, connectionsAndLetters.loadFriends,
-      connectionsAndLetters.loadLetterOutbox, connectionsAndLetters.loadPeople, connectionsAndLetters.loadRelations, connectionsAndLetters.loadLetterThreads]);
+      connectionsAndLetters.loadLetterOutbox, connectionsAndLetters.loadPeople, connectionsAndLetters.loadRelations, connectionsAndLetters.loadLetterThreads,
+      dailyRecord.loadDailyRecords, dailyRecord.loadLatestDailyRecord, weeklyReview.loadWeeklyReview,
+      thoughtShredder.loadShredderAiHealth, thoughtShredder.loadShredderHistory]);
 
   const selectedCapsule = capsules.find(capsule => capsule.id === selectedCapsuleId) ?? null;
   // A capsule opened from the public plaza directory (not the curated match set) is wrapped in a
@@ -1060,6 +1087,21 @@ export function AuroraApp() {
         onAnswerChange={(key, value) => setSkillAnswers(current => ({ ...current, [key]: value }))}
         onRetentionChange={setSkillRetention} onConsentChange={setSkillConsent} onRun={() => void runPsychologySkill()}
         onContinueWithAurora={continueSkillWithAurora} onRevokeRun={id => void revokePsychologyRun(id)} />
+
+      {/* Phase 3 legacy-page port: timeline.html, weekly-review.html, daily-record.html,
+          thought-shredder.html -- ported as additional sections inside the existing "cosmos"
+          product space, not a 6th top-level nav tab (the five-space IA is a hard constraint). */}
+      <TimelineSection dailyRecords={dailyRecord.dailyRecords} themes={memoryThemes} locale={skillLocale} />
+      <DailyRecordSection records={dailyRecord.dailyRecords} detail={dailyRecord.dailyRecordDetail}
+        index={dailyRecord.dailyRecordIndex} acceptBusy={dailyRecord.dailyRecordAcceptBusy} editBusy={dailyRecord.dailyRecordEditBusy}
+        onAccept={() => void dailyRecord.acceptDailyRecord()} onEditField={(field, value) => void dailyRecord.editDailyRecordField(field, value)}
+        onSelectIndex={dailyRecord.selectDailyRecordIndex} locale={skillLocale} />
+      <WeeklyReviewSection review={weeklyReview.weeklyReview} busy={weeklyReview.weeklyReviewBusy}
+        onGenerate={() => void weeklyReview.generateWeeklyReview()} locale={skillLocale} />
+      <ThoughtShredderSection aiHealth={thoughtShredder.shredderAiHealth} history={thoughtShredder.shredderHistory}
+        result={thoughtShredder.shredderResult} busy={thoughtShredder.shredderBusy}
+        onShred={(text, saveMode) => void thoughtShredder.processShred(text, saveMode)}
+        onSettle={id => void thoughtShredder.settleShred(id)} onDelete={id => void thoughtShredder.deleteShred(id)} locale={skillLocale} />
       </div>
 
       <div className="product-space" hidden={productSpace !== "resonance"}>
