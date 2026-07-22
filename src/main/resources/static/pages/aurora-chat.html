@@ -1167,7 +1167,7 @@ async function finish() {
   document.getElementById("settleOverlay").style.display = "flex";
   await API.finishSession(sid);
   await API.auroraSettle(sid);
-  setTimeout(function() { location.href = "/pages/daily-record.html"; }, 900);
+  setTimeout(function() { location.href = "/app/aurora/#/cosmos"; }, 900);
 }
 
 async function goodbye() {
@@ -1179,7 +1179,7 @@ async function goodbye() {
       addBubble(r.data.line, "ai");
       setTimeout(function() {
         if (confirm("Aurora 已经道别。要去沉淀今天的记录吗？")) {
-          location.href = "/pages/daily-record.html";
+          location.href = "/app/aurora/#/cosmos";
         }
       }, 1500);
     } else {
