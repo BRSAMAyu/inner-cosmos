@@ -41,6 +41,11 @@ async function dismissPwaBanner(page: import("@playwright/test").Page) {
 // from a fresh throwaway account (never "demo"), by opening a real persona chat with a seeded
 // public capsule and reporting that session -- a genuine tb_report_record row every run.
 async function createRealPendingReport(page: import("@playwright/test").Page) {
+  // Real UI flow throughout (not raw fetch) -- CSRF/session-cookie handling is already correctly
+  // solved by api.ts's request() helper for every one of these calls; reimplementing it with raw
+  // fetch() in the test is exactly the kind of thing that silently breaks (a session-bound
+  // HttpSessionCsrfTokenRepository token fetched via one fetch() is not guaranteed to still be
+  // valid for a separate fetch() unless every credentials/cookie detail is replicated exactly).
   const username = `e2ereporter${Date.now()}`;
   await page.goto("/app/aurora/index.html");
   await expect(page.getByRole("heading", { name: "回到你的内宇宙" })).toBeVisible();
@@ -53,23 +58,23 @@ async function createRealPendingReport(page: import("@playwright/test").Page) {
   await expect(page.getByRole("navigation", { name: "Inner Cosmos 五个空间" })).toBeVisible({ timeout: 15000 });
   await dismissPwaBanner(page);
 
-  await page.evaluate(async () => {
-    const capsules = await fetch("/api/plaza/capsules").then(r => r.json());
-    const target = capsules.data.find((c: { pseudonym: string }) => c.pseudonym === "苏格拉底");
-    const session = await fetch("/api/v1/persona-chat/session/create", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ capsuleId: target.id })
-    }).then(r => r.json());
-    await fetch(`/api/persona-chat/session/${session.data.id}/report`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reason: "E2E deterministic pending-report fixture" })
-    });
-  });
+  await page.getByRole("button", { name: /^共鸣/ }).click();
+  const plaza = page.locator(".plaza-directory");
+  await plaza.getByLabel("搜索公开共鸣体").fill("苏格拉底");
+  const card = plaza.getByRole("listitem").filter({ hasText: "苏格拉底" });
+  await expect(card).toBeVisible({ timeout: 15000 });
+  await card.getByRole("button", { name: "开始对话" }).click();
+
+  const workbench = page.locator(".visitor-workbench");
+  await expect(workbench).toBeVisible({ timeout: 15000 });
+  await workbench.getByRole("button", { name: "进入有限但自然的对话" }).click();
+  await expect(workbench.getByRole("button", { name: "举报这段对话" })).toBeVisible({ timeout: 15000 });
+  await workbench.getByRole("button", { name: "举报这段对话" }).click();
 
   // Log out the throwaway reporter so loginAsAdmin's subsequent goto() actually sees the login
   // form again, instead of silently staying authenticated as the wrong (non-admin) account.
-  await page.evaluate(() => fetch("/api/auth/logout", { method: "POST" }));
-  await page.goto("/app/aurora/index.html");
+  await page.getByRole("button", { name: /^我的/ }).click();
+  await page.getByRole("button", { name: "安全退出这台设备" }).click();
   await expect(page.getByRole("heading", { name: "回到你的内宇宙" })).toBeVisible({ timeout: 15000 });
 }
 

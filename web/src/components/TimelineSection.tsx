@@ -52,7 +52,9 @@ export function TimelineSection({ dailyRecords, themes, locale = "zh-CN" }: {
       </div>
       <div className="row gap-sm">
         <input type="date" aria-label={t.dateLabel} value={date} onChange={event => setDate(event.target.value)} />
-        <button type="button" onClick={() => setDate("")}>{t.all}</button>
+        {/* Disabled while already unfiltered: setDate("") on an already-empty date is a same-value
+            no-op React bails out of, producing no observable response (dead-button-scan regression). */}
+        <button type="button" disabled={!date} onClick={() => setDate("")}>{t.all}</button>
       </div>
     </div>
 

@@ -47,6 +47,18 @@ describe("TimelineSection", () => {
     expect(screen.getByText("B")).toBeVisible();
   });
 
+  it("disables the 全部 (clear filter) button when there is no date filter to clear (dead-button regression)", () => {
+    render(<TimelineSection dailyRecords={[record()]} themes={[]} />);
+    const allButton = screen.getByRole("button", { name: /全部|All/ });
+    expect(allButton).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText(/按日期查看|Filter by date/i), { target: { value: "2026-07-20" } });
+    expect(allButton).not.toBeDisabled();
+
+    fireEvent.click(allButton);
+    expect(allButton).toBeDisabled();
+  });
+
   it("renders in English when locale is en-SG", () => {
     render(<TimelineSection locale="en-SG" dailyRecords={[]} themes={[]} />);
     expect(screen.getByRole("heading", { name: "Growth Timeline" })).toBeVisible();

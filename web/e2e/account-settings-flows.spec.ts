@@ -83,7 +83,16 @@ test("exporting account data downloads a real JSON file from the backend", async
   const ownerId = profile.data.id as number;
   expect(ownerId).toBeGreaterThan(0);
 
+  // A fresh registration has no tb_user_profile row yet (it's created lazily on first update),
+  // so exercise a real update first -- otherwise the export's userProfile field is legitimately
+  // null and this test would prove nothing about owner-scoping. Goes through the real UI (same
+  // save flow account-preferences.spec.ts already proves) rather than a raw fetch() PUT, which
+  // would need to replicate api.ts's CSRF-token handling exactly to avoid a silent 403.
   await page.getByRole("button", { name: /^我的/ }).click();
+  await page.getByLabel("对话风格").selectOption("理性清晰");
+  await page.getByRole("button", { name: "保存偏好设置" }).click();
+  await expect(page.getByText("偏好设置已保存")).toBeVisible({ timeout: 15000 });
+
   await expect(page.getByRole("heading", { name: "账户与数据" })).toBeVisible({ timeout: 15000 });
 
   const [download] = await Promise.all([
@@ -105,10 +114,12 @@ test("exporting account data downloads a real JSON file from the backend", async
   expect(exported.userProfile.userId).toBe(ownerId);
   expect(Array.isArray(exported.dialogSessions)).toBe(true);
   expect(Array.isArray(exported.memoryCards)).toBe(true);
-  // A fresh throwaway account has no history yet, so every owner-scoped collection must be empty
-  // -- not another account's rows leaking through a missing WHERE user_id = ? filter.
-  expect(exported.dialogSessions).toHaveLength(0);
+  // A fresh throwaway account has no memory history yet, so that collection must be empty.
+  // dialogSessions is not necessarily empty -- landing on the Aurora space auto-creates one
+  // AURORA_CHAT session -- but every row in it must belong to this exact owner, not another
+  // account's session leaking through a missing WHERE user_id = ? filter.
   expect(exported.memoryCards).toHaveLength(0);
+  for (const session of exported.dialogSessions) expect(session.userId).toBe(ownerId);
   // Negative assertion: the export must never carry credential material.
   expect(raw).not.toMatch(/passwordHash|password_hash/i);
 
