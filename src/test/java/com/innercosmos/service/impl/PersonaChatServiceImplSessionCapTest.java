@@ -25,6 +25,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -56,6 +57,7 @@ class PersonaChatServiceImplSessionCapTest {
     @Mock private DataUseGrantService dataUseGrantService;
     @Mock private com.innercosmos.mapper.ReportRecordMapper reportRecordMapper;
     @Mock private com.innercosmos.mapper.BlockRelationMapper blockRelationMapper;
+    @Mock private PlatformTransactionManager transactionManager;
 
     private PersonaChatServiceImpl service;
 
@@ -74,7 +76,7 @@ class PersonaChatServiceImplSessionCapTest {
                 capsuleAgent, safetyService, structuredAiService,
                 boundaryMapper, quotaMapper, jdbcTemplate, authorizedMemoryRefMapper,
                 genomeService, runtimeContextComposer, dataUseGrantService,
-                reportRecordMapper, blockRelationMapper);
+                reportRecordMapper, blockRelationMapper, transactionManager);
         lenient().when(dataUseGrantService.authorizationsValid(any(), anySet())).thenReturn(true);
         lenient().when(runtimeContextComposer.compose(any(), anyString())).thenReturn(java.util.Map.of(
                 "selectedEvidenceSummary", "", "selectedContext", java.util.Map.of(),

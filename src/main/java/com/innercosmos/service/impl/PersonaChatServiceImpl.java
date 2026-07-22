@@ -32,7 +32,8 @@ import com.innercosmos.vo.CapsuleQuotaVO;
 import com.innercosmos.vo.SafetyResult;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -83,6 +84,19 @@ public class PersonaChatServiceImpl implements PersonaChatService {
     private final DataUseGrantService dataUseGrantService;
     private final ReportRecordMapper reportRecordMapper;
     private final BlockRelationMapper blockRelationMapper;
+    // Gemini audit 2.4 (CONFIRMED/P0): reply() used to run entirely inside one
+    // @Transactional method, including the external AI provider RPC -- a slow or hanging
+    // provider held a pooled DB connection (and the row locks taken by the quota/turn
+    // reservations) for the whole call. reply() is no longer @Transactional; it runs two
+    // short transactions of its own (reserve, then finalize) around the provider call, which
+    // itself runs with no transaction open at all. Deliberately plain PROPAGATION_REQUIRED
+    // (TransactionTemplate's default), NOT REQUIRES_NEW: in production reply() has no ambient
+    // transaction, so REQUIRED already gives two independent committed transactions around the
+    // provider call; REQUIRES_NEW would instead suspend and physically fork a parallel connection
+    // whenever a caller (e.g. a @Transactional integration test) DOES have one open, making that
+    // caller's own uncommitted writes invisible to this method -- exactly the failure the
+    // existing @Transactional integration tests hit when this was tried.
+    private final TransactionTemplate shortTransaction;
 
     public PersonaChatServiceImpl(PersonaChatSessionMapper sessionMapper,
                                   PersonaChatMessageMapper messageMapper,
@@ -98,7 +112,8 @@ public class PersonaChatServiceImpl implements PersonaChatService {
                                   CapsuleRuntimeContextComposer runtimeContextComposer,
                                   DataUseGrantService dataUseGrantService,
                                   ReportRecordMapper reportRecordMapper,
-                                  BlockRelationMapper blockRelationMapper) {
+                                  BlockRelationMapper blockRelationMapper,
+                                  PlatformTransactionManager transactionManager) {
         this.sessionMapper = sessionMapper;
         this.messageMapper = messageMapper;
         this.capsuleMapper = capsuleMapper;
@@ -114,6 +129,7 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         this.dataUseGrantService = dataUseGrantService;
         this.reportRecordMapper = reportRecordMapper;
         this.blockRelationMapper = blockRelationMapper;
+        this.shortTransaction = new TransactionTemplate(transactionManager);
     }
 
     @Override
@@ -139,9 +155,62 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         return session;
     }
 
+    // Gemini audit 2.4: JSON-only system instruction for the persona-chat provider call,
+    // extracted to a constant now that the call site (reply(), outside any transaction) and the
+    // prompt-assembly site (prepareTurn(), short tx #1) are different methods.
+    private static final String PERSONA_CHAT_INSTRUCTION = """
+            只返回 JSON：{"reply":"","boundaryNotice":"","letterSuggested":false,"riskFlags":[]}
+            你正在驱动一个共鸣体，不是真人实时回复，也不是治疗师。
+            必须基于 personaPrompt、本轮选中的 authorizedMemorySummary、styleProfile、contextBuildManifest 和 boundary 回应。
+            contextBuildManifest 是本轮证据选择账本；不得使用其中未选中的 Genome 类别或记忆。
+            如果 retrievalUnsupported=true，必须坦诚说明授权信息不足，不能用其他经历猜测答案。
+            如果 standInEnabled=true，可以说明"我可以先作为回声代你回应"；否则只能引导慢信或真人会话邀请。
+            不要美化原用户；保留真实困惑、表达习惯、价值偏好和边界。
+            不要泄露真实身份、联系方式、原始对话全文和未授权记忆。
+            """;
+
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public PersonaChatMessage reply(Long userId, Long sessionId, String message) {
+        TurnPreparation prep = shortTransaction.execute(status -> prepareTurn(userId, sessionId, message));
+        if (!prep.aiCallNeeded) {
+            return prep.capsuleMessage;
+        }
+        // Gemini audit 2.4 (CONFIRMED/P0): the provider RPC runs here with NO Spring transaction
+        // open. Short tx #1 (prepareTurn, just above) already committed the reservation; short
+        // tx #2 (finalizeAiTurn, just below) opens its own fresh transaction only after this call
+        // returns. A slow or hanging provider can no longer hold a pooled DB connection or the
+        // reservation's row locks for the duration of the call.
+        StructuredAiResults.PersonaResult ai = structuredAiService.call(userId, "PERSONA_CHAT",
+                PERSONA_CHAT_INSTRUCTION, prep.aiContext, StructuredAiResults.PersonaResult.class,
+                () -> unavailablePersona());
+        return shortTransaction.execute(status -> finalizeAiTurn(prep, ai));
+    }
+
+    /**
+     * Everything short tx #2 (finalizeAiTurn) needs after the provider call, which runs outside
+     * of any transaction in between. Deliberately carries IDs/values, not live entity references
+     * from short tx #1 — finalizeAiTurn re-selects the authoritative session/capsule rows itself.
+     */
+    private static final class TurnPreparation {
+        boolean aiCallNeeded;
+        PersonaChatMessage capsuleMessage; // set (and already persisted) only when aiCallNeeded == false
+        Long userId;
+        Long sessionId;
+        Long capsuleId;
+        Long userMessageId;
+        LocalDate quotaDate;
+        Map<String, Object> aiContext;
+        String safetyPrefix;
+    }
+
+    /**
+     * Short tx #1: validates the turn is eligible and checks safety / session-cap / daily-quota.
+     * The safety-guided, session-cap-exhausted and quota-exhausted branches never need the AI
+     * provider at all, so this method fully resolves them itself (via finishWithoutAi, inside
+     * this same transaction). Only the remaining branch — a successfully reserved turn — returns
+     * with aiCallNeeded=true so reply() can call the provider with no transaction open.
+     */
+    private TurnPreparation prepareTurn(Long userId, Long sessionId, String message) {
         PersonaChatSession session = sessionMapper.selectById(sessionId);
         if (session == null) {
             throw new BusinessException("NOT_FOUND", "persona chat session not found");
@@ -181,127 +250,176 @@ public class PersonaChatServiceImpl implements PersonaChatService {
             messageMapper.insert(userMessage);
             capsuleMessage.textContent = safety.safeMessage;
             session.status = "SAFETY_GUIDED";
-        } else if (!tryReserveSessionTurn(sessionId, sessionCap)) {
+            return finishWithoutAi(session, capsuleMessage);
+        }
+        if (!tryReserveSessionTurn(sessionId, sessionCap)) {
             // Session's own turn cap exhausted — independent of and checked before the daily
             // quota, so an exhausted session never even touches the cross-session quota row.
             capsuleMessage.textContent = "这次对话已经到了主人设置的轮次上限.如果你愿意,可以把想继续说的话写成一封慢信.";
             session.status = "LETTER_GUIDED";
-        } else {
-            // Atomically try to reserve a turn before calling AI
-            LocalDate today = LocalDate.now(QUOTA_ZONE);
-            boolean reserved = tryReserveQuota(userId, session.capsuleId, today, dailyLimit);
-
-            if (!reserved) {
-                // IC-CAP-002 MAJOR-2: over-limit → do NOT persist the visitor message.
-                // The session-turn reservation above was never actually used for a real turn —
-                // give it back, symmetric with the AI-unavailable compensation below.
-                compensateSessionTurn(sessionId);
-                capsuleMessage.textContent = "今天的回声已经足够深了.如果你愿意,可以把想继续说的话写成一封慢信.";
-                session.status = "LETTER_GUIDED";
-            } else {
-                // Reserved a turn → the visitor message is now part of the conversation.
-                messageMapper.insert(userMessage);
-                String personaName = capsule != null && capsule.pseudonym != null ? capsule.pseudonym : "数字回声";
-                String personaIntro = capsule != null && capsule.intro != null ? capsule.intro : "一个有限的共鸣体";
-                String compiledPrompt = genome == null ? null : genome.compiledPersonaPrompt;
-                String personaPrompt = compiledPrompt != null && !compiledPrompt.isBlank()
-                        ? compiledPrompt
-                        : capsule != null && capsule.personaPrompt != null && !capsule.personaPrompt.isBlank()
-                        ? capsule.personaPrompt
-                        : capsuleAgent.buildPersonaPrompt(personaName, personaIntro);
-                boolean seedCapsule = capsule != null && ("SEED_CAPSULE".equals(capsule.capsuleType)
-                        || "SEED".equals(capsule.capsuleType));
-                Map<String, Object> runtimeContext = seedCapsule
-                        ? seedRuntimeContext() : runtimeContextComposer.compose(genome, message);
-                // M-005: do NOT egress the visitor's private context (todos/records/portrait/
-                // relationship) into a stranger's capsule prompt. assemble(includeMemory=false)
-                // still populates those, so we deliberately do NOT assemble a visitor agent-context
-                // here — the capsule speaks from its own persona + authorized memory + the visitor's
-                // current message (visitorMessage below).
-                List<String> history = recentHistory(sessionId);
-                Map<String, Object> aiContext = new LinkedHashMap<>();
-                aiContext.put("personaPrompt", personaPrompt);
-                aiContext.put("authorizedMemorySummary", runtimeContext.get("selectedEvidenceSummary"));
-                aiContext.put("styleProfile", runtimeContext.get("selectedContext"));
-                aiContext.put("contextPreview", runtimeContext.get("selectedContext"));
-                aiContext.put("contextBuildManifest", runtimeContext.get("contextBuildManifest"));
-                aiContext.put("retrievalUnsupported", runtimeContext.get("unsupported"));
-                aiContext.put("retrievalFallbackPolicy", runtimeContext.get("fallbackPolicy"));
-                aiContext.put("standInEnabled", capsule != null && Boolean.TRUE.equals(capsule.standInEnabled));
-                aiContext.put("realContactPolicy", capsule == null ? "LETTER_ONLY" : nullToDefault(capsule.realContactPolicy, "LETTER_ONLY"));
-                aiContext.put("boundary", boundary == null ? "" : java.util.Map.of(
-                        "allowTopics", nullToEmpty(boundary.allowTopics),
-                        "blockedTopics", nullToEmpty(boundary.blockedTopics),
-                        "privacyLevel", nullToEmpty(boundary.privacyLevel)));
-                aiContext.put("recentPersonaChat", history);
-                aiContext.put("visitorMessage", message);
-                aiContext.put("turnCount", session.turnCount);
-                aiContext.put("dailyLimit", dailyLimit);
-                String prefix = "MEDIUM".equals(safety.riskLevel) ? "我会先把这段话放回到安全和尊重的边界里. " : "";
-                StructuredAiResults.PersonaResult ai = structuredAiService.call(userId, "PERSONA_CHAT",
-                        """
-                        只返回 JSON：{"reply":"","boundaryNotice":"","letterSuggested":false,"riskFlags":[]}
-                        你正在驱动一个共鸣体，不是真人实时回复，也不是治疗师。
-                        必须基于 personaPrompt、本轮选中的 authorizedMemorySummary、styleProfile、contextBuildManifest 和 boundary 回应。
-                        contextBuildManifest 是本轮证据选择账本；不得使用其中未选中的 Genome 类别或记忆。
-                        如果 retrievalUnsupported=true，必须坦诚说明授权信息不足，不能用其他经历猜测答案。
-                        如果 standInEnabled=true，可以说明"我可以先作为回声代你回应"；否则只能引导慢信或真人会话邀请。
-                        不要美化原用户；保留真实困惑、表达习惯、价值偏好和边界。
-                        不要泄露真实身份、联系方式、原始对话全文和未授权记忆。
-                        """,
-                        aiContext,
-                        StructuredAiResults.PersonaResult.class,
-                        () -> unavailablePersona());
-                String boundaryText = ai.boundaryNotice == null || ai.boundaryNotice.isBlank() ? "" : ai.boundaryNotice + " ";
-                String identityNotice = capsule != null && "USER_CAPSULE".equals(capsule.capsuleType)
-                        ? "（这是授权共鸣体的回应，不是真人实时在线。）"
-                        : "";
-                // The system prompt instructs the model not to leak contact info/identity, but that
-                // is a request, not a guarantee — a real provider (currently human-gated) manipulated
-                // via prompt injection could still comply with an injected instruction to quote a
-                // phone number or email verbatim. Redact as an output-side safety net regardless of
-                // whether the model behaved, mirroring the same DataMaskingUtils.maskContact chokepoint
-                // AiLogServiceImpl already uses for logged AI responses.
-                String reply = DataMaskingUtils.maskContact(blank(ai.reply,
-                        "真实模型暂时不可用，我不想用模板伪装成这个共鸣体。请稍后再试，或者写一封慢信。"));
-                capsuleMessage.textContent = prefix + boundaryText + reply + identityNotice;
-
-                // IC-CAP-002 MAJOR-1: detect the AI-unavailable fallback. The quota was
-                // already atomically reserved; if the model is unavailable we COMPENSATE
-                // (decrement the reserved turn) so an unanswered turn never costs the user.
-                boolean aiUnavailable = ai.riskFlags != null && ai.riskFlags.contains("REMOTE_UNAVAILABLE")
-                        || ai.reply == null || ai.reply.isBlank();
-
-                if (aiUnavailable) {
-                    compensateQuota(userId, session.capsuleId, today);
-                    compensateSessionTurn(sessionId);
-                    // IC-CAP RUN-003 polish (FIX-B): make AI-unavailable symmetric with the
-                    // over-limit (LETTER_GUIDED) branch — an unanswered turn must leave NO
-                    // conversation trace. The visitor message was inserted above to feed the
-                    // (now-failed) AI call; delete it by id so it does not pollute the next
-                    // turn's recentHistory. The quota was already compensated.
-                    if (userMessage.id != null) {
-                        messageMapper.deleteById(userMessage.id);
-                    }
-                    // Do NOT bump echo energy on the unavailable path.
-                    // IC-CAP-002 FIX-3: an unanswered turn un-charges the day quota AND the session
-                    // turn reservation, so neither counter advances for a turn nobody was charged for.
-                } else {
-                    // Genuine success: quota stays consumed; bump capsule activity (B-4).
-                    bumpCapsuleActivity(capsule);
-                    // Regression (1.4): session.turnCount is now managed exclusively by the atomic
-                    // tryReserveSessionTurn/compensateSessionTurn SQL above, not by mutating this
-                    // Java field — see the scoped status-only write below for why.
-                }
-
-                session.status = "ACTIVE"; // reset from any prior LETTER_GUIDED
-            }
+            return finishWithoutAi(session, capsuleMessage);
         }
+
+        // Atomically try to reserve a turn before calling AI
+        LocalDate today = LocalDate.now(QUOTA_ZONE);
+        boolean reserved = tryReserveQuota(userId, session.capsuleId, today, dailyLimit);
+
+        if (!reserved) {
+            // IC-CAP-002 MAJOR-2: over-limit → do NOT persist the visitor message.
+            // The session-turn reservation above was never actually used for a real turn —
+            // give it back, symmetric with the AI-unavailable compensation below.
+            compensateSessionTurn(sessionId);
+            capsuleMessage.textContent = "今天的回声已经足够深了.如果你愿意,可以把想继续说的话写成一封慢信.";
+            session.status = "LETTER_GUIDED";
+            return finishWithoutAi(session, capsuleMessage);
+        }
+
+        // Reserved a turn → the visitor message is now part of the conversation.
+        messageMapper.insert(userMessage);
+        String personaName = capsule != null && capsule.pseudonym != null ? capsule.pseudonym : "数字回声";
+        String personaIntro = capsule != null && capsule.intro != null ? capsule.intro : "一个有限的共鸣体";
+        String compiledPrompt = genome == null ? null : genome.compiledPersonaPrompt;
+        String personaPrompt = compiledPrompt != null && !compiledPrompt.isBlank()
+                ? compiledPrompt
+                : capsule != null && capsule.personaPrompt != null && !capsule.personaPrompt.isBlank()
+                ? capsule.personaPrompt
+                : capsuleAgent.buildPersonaPrompt(personaName, personaIntro);
+        boolean seedCapsule = capsule != null && ("SEED_CAPSULE".equals(capsule.capsuleType)
+                || "SEED".equals(capsule.capsuleType));
+        Map<String, Object> runtimeContext = seedCapsule
+                ? seedRuntimeContext() : runtimeContextComposer.compose(genome, message);
+        // M-005: do NOT egress the visitor's private context (todos/records/portrait/
+        // relationship) into a stranger's capsule prompt. assemble(includeMemory=false)
+        // still populates those, so we deliberately do NOT assemble a visitor agent-context
+        // here — the capsule speaks from its own persona + authorized memory + the visitor's
+        // current message (visitorMessage below).
+        List<String> history = recentHistory(sessionId);
+        Map<String, Object> aiContext = new LinkedHashMap<>();
+        aiContext.put("personaPrompt", personaPrompt);
+        aiContext.put("authorizedMemorySummary", runtimeContext.get("selectedEvidenceSummary"));
+        aiContext.put("styleProfile", runtimeContext.get("selectedContext"));
+        aiContext.put("contextPreview", runtimeContext.get("selectedContext"));
+        aiContext.put("contextBuildManifest", runtimeContext.get("contextBuildManifest"));
+        aiContext.put("retrievalUnsupported", runtimeContext.get("unsupported"));
+        aiContext.put("retrievalFallbackPolicy", runtimeContext.get("fallbackPolicy"));
+        aiContext.put("standInEnabled", capsule != null && Boolean.TRUE.equals(capsule.standInEnabled));
+        aiContext.put("realContactPolicy", capsule == null ? "LETTER_ONLY" : nullToDefault(capsule.realContactPolicy, "LETTER_ONLY"));
+        aiContext.put("boundary", boundary == null ? "" : java.util.Map.of(
+                "allowTopics", nullToEmpty(boundary.allowTopics),
+                "blockedTopics", nullToEmpty(boundary.blockedTopics),
+                "privacyLevel", nullToEmpty(boundary.privacyLevel)));
+        aiContext.put("recentPersonaChat", history);
+        aiContext.put("visitorMessage", message);
+        aiContext.put("turnCount", session.turnCount);
+        aiContext.put("dailyLimit", dailyLimit);
+
+        TurnPreparation prep = new TurnPreparation();
+        prep.aiCallNeeded = true;
+        prep.userId = userId;
+        prep.sessionId = sessionId;
+        prep.capsuleId = session.capsuleId;
+        prep.userMessageId = userMessage.id;
+        prep.quotaDate = today;
+        prep.aiContext = aiContext;
+        prep.safetyPrefix = "MEDIUM".equals(safety.riskLevel) ? "我会先把这段话放回到安全和尊重的边界里. " : "";
+        return prep;
+    }
+
+    /** Fully resolves a turn that never needed the AI provider, inside short tx #1 itself. */
+    private TurnPreparation finishWithoutAi(PersonaChatSession session, PersonaChatMessage capsuleMessage) {
         messageMapper.insert(capsuleMessage);
         // Regression (1.4): scoped to `status` only. session.turnCount is now managed exclusively
         // by tryReserveSessionTurn/compensateSessionTurn's own atomic UPDATEs; a full-entity
         // updateById(session) here would overwrite that real DB value with this stale in-memory
-        // snapshot (read once at the top of this method, before any reservation/compensation ran).
+        // snapshot (read once at the top of prepareTurn, before any reservation/compensation ran).
+        sessionMapper.update(null, new UpdateWrapper<PersonaChatSession>()
+                .eq("id", session.id).set("status", session.status));
+        TurnPreparation prep = new TurnPreparation();
+        prep.aiCallNeeded = false;
+        prep.capsuleMessage = capsuleMessage;
+        return prep;
+    }
+
+    /**
+     * Short tx #2: opens a fresh transaction after the provider call returns (with no
+     * transaction open in between — see reply()). Gemini audit 2.4's "block/revoke recheck":
+     * re-selects the authoritative session/capsule state and, if the visitor blocked this
+     * capsule or the owner withdrew/archived it while the call was in flight, compensates the
+     * reservation instead of publishing a reply generated against authorization that may no
+     * longer hold.
+     */
+    private PersonaChatMessage finalizeAiTurn(TurnPreparation prep, StructuredAiResults.PersonaResult ai) {
+        PersonaChatSession session = sessionMapper.selectById(prep.sessionId);
+        EchoCapsule capsule = capsuleMapper.selectById(prep.capsuleId);
+
+        PersonaChatMessage capsuleMessage = new PersonaChatMessage();
+        capsuleMessage.sessionId = prep.sessionId;
+        capsuleMessage.senderType = "CAPSULE";
+
+        boolean stillEligible = session != null && !"BLOCKED".equals(session.status)
+                && capsule != null && Boolean.TRUE.equals(capsule.isPublic) && "PUBLIC".equals(capsule.visibilityStatus);
+        if (!stillEligible) {
+            compensateQuota(prep.userId, prep.capsuleId, prep.quotaDate);
+            compensateSessionTurn(prep.sessionId);
+            if (prep.userMessageId != null) {
+                messageMapper.deleteById(prep.userMessageId);
+            }
+            capsuleMessage.textContent = "这段对话在等待回声时状态发生了变化,请重新打开看看现在的情况.";
+            messageMapper.insert(capsuleMessage);
+            // Deliberately do NOT touch session.status here: if it just became BLOCKED that must
+            // stick, and if only the capsule was withdrawn the session row itself is unaffected —
+            // the next call hits requireRunnableCapsule's CAPSULE_WITHDRAWN check instead.
+            return capsuleMessage;
+        }
+
+        String boundaryText = ai.boundaryNotice == null || ai.boundaryNotice.isBlank() ? "" : ai.boundaryNotice + " ";
+        String identityNotice = "USER_CAPSULE".equals(capsule.capsuleType)
+                ? "（这是授权共鸣体的回应，不是真人实时在线。）"
+                : "";
+        // The system prompt instructs the model not to leak contact info/identity, but that
+        // is a request, not a guarantee — a real provider (currently human-gated) manipulated
+        // via prompt injection could still comply with an injected instruction to quote a
+        // phone number or email verbatim. Redact as an output-side safety net regardless of
+        // whether the model behaved, mirroring the same DataMaskingUtils.maskContact chokepoint
+        // AiLogServiceImpl already uses for logged AI responses.
+        String reply = DataMaskingUtils.maskContact(blank(ai.reply,
+                "真实模型暂时不可用，我不想用模板伪装成这个共鸣体。请稍后再试，或者写一封慢信。"));
+        capsuleMessage.textContent = prep.safetyPrefix + boundaryText + reply + identityNotice;
+
+        // IC-CAP-002 MAJOR-1: detect the AI-unavailable fallback. The quota was
+        // already atomically reserved; if the model is unavailable we COMPENSATE
+        // (decrement the reserved turn) so an unanswered turn never costs the user.
+        boolean aiUnavailable = ai.riskFlags != null && ai.riskFlags.contains("REMOTE_UNAVAILABLE")
+                || ai.reply == null || ai.reply.isBlank();
+
+        if (aiUnavailable) {
+            compensateQuota(prep.userId, prep.capsuleId, prep.quotaDate);
+            compensateSessionTurn(prep.sessionId);
+            // IC-CAP RUN-003 polish (FIX-B): make AI-unavailable symmetric with the
+            // over-limit (LETTER_GUIDED) branch — an unanswered turn must leave NO
+            // conversation trace. The visitor message was inserted in prepareTurn to feed the
+            // (now-failed) AI call; delete it by id so it does not pollute the next
+            // turn's recentHistory. The quota was already compensated.
+            if (prep.userMessageId != null) {
+                messageMapper.deleteById(prep.userMessageId);
+            }
+            // Do NOT bump echo energy on the unavailable path.
+            // IC-CAP-002 FIX-3: an unanswered turn un-charges the day quota AND the session
+            // turn reservation, so neither counter advances for a turn nobody was charged for.
+        } else {
+            // Genuine success: quota stays consumed; bump capsule activity (B-4).
+            bumpCapsuleActivity(capsule);
+            // Regression (1.4): session.turnCount is now managed exclusively by the atomic
+            // tryReserveSessionTurn/compensateSessionTurn SQL in prepareTurn, not by mutating
+            // this Java field — see the scoped status-only write below for why.
+        }
+
+        session.status = "ACTIVE"; // reset from any prior LETTER_GUIDED
+        messageMapper.insert(capsuleMessage);
+        // Regression (1.4): scoped to `status` only. session.turnCount is now managed exclusively
+        // by tryReserveSessionTurn/compensateSessionTurn's own atomic UPDATEs; a full-entity
+        // updateById(session) here would overwrite that real DB value with this stale in-memory
+        // snapshot.
         sessionMapper.update(null, new UpdateWrapper<PersonaChatSession>()
                 .eq("id", session.id).set("status", session.status));
         return capsuleMessage;

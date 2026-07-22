@@ -26,6 +26,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import java.time.LocalDate;
 
@@ -61,6 +62,7 @@ class PersonaChatServiceImplQuotaTest {
     @Mock private DataUseGrantService dataUseGrantService;
     @Mock private com.innercosmos.mapper.ReportRecordMapper reportRecordMapper;
     @Mock private com.innercosmos.mapper.BlockRelationMapper blockRelationMapper;
+    @Mock private PlatformTransactionManager transactionManager;
 
     private PersonaChatServiceImpl service;
 
@@ -71,7 +73,7 @@ class PersonaChatServiceImplQuotaTest {
                 capsuleAgent, safetyService, structuredAiService,
                 boundaryMapper, quotaMapper, jdbcTemplate, authorizedMemoryRefMapper,
                 genomeService, runtimeContextComposer, dataUseGrantService,
-                reportRecordMapper, blockRelationMapper);
+                reportRecordMapper, blockRelationMapper, transactionManager);
         lenient().when(dataUseGrantService.authorizationsValid(any(), anySet())).thenReturn(true);
         lenient().when(runtimeContextComposer.compose(any(), anyString())).thenReturn(java.util.Map.of(
                 "selectedEvidenceSummary", "", "selectedContext", java.util.Map.of(),

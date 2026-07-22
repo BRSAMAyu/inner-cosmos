@@ -26,6 +26,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -54,6 +55,7 @@ class PersonaChatServiceImplReportBlockTest {
     @Mock private DataUseGrantService dataUseGrantService;
     @Mock private ReportRecordMapper reportRecordMapper;
     @Mock private BlockRelationMapper blockRelationMapper;
+    @Mock private PlatformTransactionManager transactionManager;
 
     private PersonaChatServiceImpl service;
 
@@ -64,7 +66,7 @@ class PersonaChatServiceImplReportBlockTest {
                 capsuleAgent, safetyService, structuredAiService,
                 boundaryMapper, quotaMapper, jdbcTemplate, authorizedMemoryRefMapper,
                 genomeService, runtimeContextComposer, dataUseGrantService,
-                reportRecordMapper, blockRelationMapper);
+                reportRecordMapper, blockRelationMapper, transactionManager);
     }
 
     private PersonaChatSession session(Long id, Long visitorUserId, Long capsuleId) {
