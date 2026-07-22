@@ -57,14 +57,14 @@ const COPY: Record<Locale, {
 export function ResonanceNetwork({ resonanceMatches, resonanceStrategy, visitorBusy, visitorMatch, personaSession,
   personaMessages, personaDraft, personaQuota, letterTitle, letterBody, sentLetter,
   onChooseStrategy, onChooseMatch, onStartPersonaConversation, onPersonaDraftChange, onSendPersonaTurn,
-  onLetterTitleChange, onLetterBodyChange, onSendLetter, onReportSession, onBlockSession, locale = "zh-CN" }: {
+  onLetterTitleChange, onLetterBodyChange, onSendLetter, onReportSession, onBlockSession, personaTurnError = null, locale = "zh-CN" }: {
   resonanceMatches: CapsuleMatch[]; resonanceStrategy: ResonanceStrategy; visitorBusy: boolean;
   visitorMatch: CapsuleMatch | null; personaSession: PersonaSession | null; personaMessages: PersonaMessage[];
   personaDraft: string; personaQuota: CapsuleQuota | null; letterTitle: string; letterBody: string; sentLetter: SlowLetter | null;
   onChooseStrategy: (strategy: ResonanceStrategy) => void; onChooseMatch: (capsuleId: number) => void;
   onStartPersonaConversation: () => void; onPersonaDraftChange: (value: string) => void; onSendPersonaTurn: () => void;
   onLetterTitleChange: (value: string) => void; onLetterBodyChange: (value: string) => void; onSendLetter: () => void;
-  onReportSession?: () => void; onBlockSession?: () => void; locale?: Locale;
+  onReportSession?: () => void; onBlockSession?: () => void; personaTurnError?: string | null; locale?: Locale;
 }) {
   const t = COPY[locale];
   return <section className="resonance-network" aria-label={t.aria}>
@@ -100,6 +100,7 @@ export function ResonanceNetwork({ resonanceMatches, resonanceStrategy, visitorB
             <article className={message.senderType === "VISITOR" ? "visitor" : "capsule"} key={message.id}><span>{message.senderType === "VISITOR" ? t.speakerYou : visitorMatch.capsule.pseudonym}</span><p>{message.textContent}</p></article>)}</div>
           <div className="sandbox-composer"><textarea aria-label={t.writeToCapsule} value={personaDraft} onChange={event => onPersonaDraftChange(event.target.value)} />
             <AsyncButton className="resonance-primary" busy={visitorBusy} disabled={!personaDraft.trim() || personaQuota?.exhausted} busyText={t.sendBusy} onClick={onSendPersonaTurn}>{t.sendTurn}</AsyncButton></div>
+          {personaTurnError && <p className="preview-warning" role="alert">{personaTurnError}</p>}
           {personaMessages.some(message => message.senderType === "CAPSULE") && <div className="slow-letter-compose">
             <div className="capsule-step"><span>✉</span><div><strong>{t.letterStepTitle}</strong><small>{t.letterStepNote}</small></div></div>
             {visitorMatch.capsule.capsuleType !== "USER_CAPSULE" ? <p className="preview-warning">{t.seedWarning}</p> : sentLetter ?

@@ -90,6 +90,10 @@ export function AuroraApp() {
   const [selectedMemoryIds, setSelectedMemoryIds] = useState<number[]>([]);
   const [capsuleName, setCapsuleName] = useState("");
   const [capsuleIntro, setCapsuleIntro] = useState("");
+  const [capsuleOwnerNote, setCapsuleOwnerNote] = useState("");
+  const [capsuleStandIn, setCapsuleStandIn] = useState(false);
+  const [capsuleContactPolicy, setCapsuleContactPolicy] = useState("LETTER_ONLY");
+  const [personaTurnError, setPersonaTurnError] = useState<string | null>(null);
   const [capsulePreview, setCapsulePreview] = useState<CapsulePreview | null>(null);
   const [capsuleBusy, setCapsuleBusy] = useState(false);
   const [capsuleBoundary, setCapsuleBoundary] = useState<CapsuleBoundary | null>(null);
@@ -629,13 +633,27 @@ export function AuroraApp() {
       const created = await api.createCapsule({
         pseudonym: capsuleName.trim() || capsulePreview.suggestedPseudonym,
         intro: capsuleIntro.trim() || capsulePreview.abstractSummary,
-        memoryIds: selectedMemoryIds, publicTags: capsulePreview.publicTags
+        memoryIds: selectedMemoryIds, publicTags: capsulePreview.publicTags,
+        ownerContextNote: capsuleOwnerNote.trim() || undefined, standInEnabled: capsuleStandIn,
+        realContactPolicy: capsuleContactPolicy
       });
       setCapsules(current => [created, ...current]);
       setSelectedCapsuleId(created.id);
       setCapsulePreview(null); setCapsuleName(""); setCapsuleIntro("");
+      setCapsuleOwnerNote(""); setCapsuleStandIn(false); setCapsuleContactPolicy("LETTER_ONLY");
       setStatus("共鸣体已作为私密版本编译。先在沙盒里判断像不像你，再决定是否公开。");
     } catch (error) { setStatus(error instanceof Error ? error.message : "共鸣体没有创建，授权未改变"); }
+    finally { setCapsuleBusy(false); }
+  };
+
+  const saveCapsuleContext = async (patch: { ownerContextNote: string; standInEnabled: boolean; realContactPolicy: string }) => {
+    if (!selectedCapsule) return;
+    setCapsuleBusy(true);
+    try {
+      await api.updateCapsuleContext(selectedCapsule.id, patch);
+      await refreshSelectedCapsule(selectedCapsule.id);
+      setStatus("背景说明与联系方式设置已保存。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法保存这些设置"); }
     finally { setCapsuleBusy(false); }
   };
 
@@ -716,7 +734,7 @@ export function AuroraApp() {
 
   const chooseVisitorMatch = (capsuleId: number) => {
     setVisitorMatchId(capsuleId);
-    setPersonaSession(null); setPersonaMessages([]); setPersonaQuota(null); setSentLetter(null); setLetterBody("");
+    setPersonaSession(null); setPersonaMessages([]); setPersonaQuota(null); setSentLetter(null); setLetterBody(""); setPersonaTurnError(null);
   };
 
   const openDirectoryCapsule = (capsule: PublicCapsule) => {
@@ -732,7 +750,7 @@ export function AuroraApp() {
       const matches = await api.resonanceMatches(strategy);
       setResonanceStrategy(strategy); setResonanceMatches(matches);
       setVisitorMatchId(matches[0]?.capsule.id ?? null);
-      setPersonaSession(null); setPersonaMessages([]); setPersonaQuota(null); setSentLetter(null); setLetterBody("");
+      setPersonaSession(null); setPersonaMessages([]); setPersonaQuota(null); setSentLetter(null); setLetterBody(""); setPersonaTurnError(null);
       setStatus(matches[0]?.strategyDescription ?? "已经切换相遇方式");
     } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法切换相遇方式"); }
     finally { setVisitorBusy(false); }
@@ -745,7 +763,7 @@ export function AuroraApp() {
       const [session, quota] = await Promise.all([
         api.createPersonaSession(visitorMatch.capsule.id), api.capsuleQuota(visitorMatch.capsule.id)
       ]);
-      setPersonaSession(session); setPersonaQuota(quota); setPersonaMessages([]);
+      setPersonaSession(session); setPersonaQuota(quota); setPersonaMessages([]); setPersonaTurnError(null);
       setStatus(`你正在和「${visitorMatch.capsule.pseudonym}」的授权 AI 共鸣体对话，不是真人实时在线。`);
     } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法进入这个共鸣体"); }
     finally { setVisitorBusy(false); }
@@ -753,7 +771,7 @@ export function AuroraApp() {
 
   const sendPersonaTurn = async () => {
     if (!personaSession || !visitorMatch || !personaDraft.trim()) return;
-    setVisitorBusy(true);
+    setVisitorBusy(true); setPersonaTurnError(null);
     try {
       await api.sendPersonaMessage(personaSession.id, personaDraft.trim());
       const [history, quota] = await Promise.all([
@@ -761,7 +779,7 @@ export function AuroraApp() {
       ]);
       setPersonaMessages(history); setPersonaQuota(quota); setPersonaDraft("");
       setStatus("回应来自授权 Genome；你可以继续验证共鸣，也可以把真正想说的内容写成慢信。 ");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "这轮对话没有送达"); }
+    } catch (error) { setPersonaTurnError(error instanceof Error ? error.message : "这轮对话没有送达，草稿内容仍在这里"); }
     finally { setVisitorBusy(false); }
   };
 
@@ -1021,7 +1039,11 @@ export function AuroraApp() {
         onRecompile={() => void recompileSelectedCapsule()} onSandboxQuestion={setSandboxQuestion} onRunSandbox={() => void runCapsuleSandbox()}
         onRateSandbox={rating => void rateCapsuleSandbox(rating)} onPublish={() => void publishSelectedCapsule()}
         onPause={() => void pauseSelectedCapsule()} onArchive={() => void archiveSelectedCapsule()}
-        boundary={capsuleBoundary} boundaryBusy={boundaryBusy} onSaveBoundary={boundary => void saveCapsuleBoundary(boundary)} locale={skillLocale} />
+        boundary={capsuleBoundary} boundaryBusy={boundaryBusy} onSaveBoundary={boundary => void saveCapsuleBoundary(boundary)}
+        capsuleOwnerNote={capsuleOwnerNote} onCapsuleOwnerNote={setCapsuleOwnerNote}
+        capsuleStandIn={capsuleStandIn} onCapsuleStandIn={setCapsuleStandIn}
+        capsuleContactPolicy={capsuleContactPolicy} onCapsuleContactPolicy={setCapsuleContactPolicy}
+        onSaveContext={patch => void saveCapsuleContext(patch)} locale={skillLocale} />
 
       <PlazaDirectory capsules={publicCapsules} activeCapsuleId={visitorMatch?.capsule.id ?? null} busy={visitorBusy}
         onOpenCapsule={openDirectoryCapsule} locale={skillLocale} />
@@ -1033,7 +1055,7 @@ export function AuroraApp() {
         onStartPersonaConversation={() => void startPersonaConversation()} onPersonaDraftChange={setPersonaDraft}
         onSendPersonaTurn={() => void sendPersonaTurn()} onLetterTitleChange={setLetterTitle} onLetterBodyChange={setLetterBody}
         onSendLetter={() => void sendLetterToMatch()} onReportSession={() => void reportPersonaSession()}
-        onBlockSession={() => void blockPersonaSession()} locale={skillLocale} />
+        onBlockSession={() => void blockPersonaSession()} personaTurnError={personaTurnError} locale={skillLocale} />
       </div>
 
       <div className="product-space" hidden={productSpace !== "letters"}>

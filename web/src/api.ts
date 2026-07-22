@@ -123,6 +123,7 @@ export type EchoCapsule = {
   id: number; pseudonym: string; intro: string; authorizedMemoryIds: string;
   visibilityStatus: "PRIVATE" | "PUBLIC" | "NEEDS_REVIEW" | "HIDDEN" | "ARCHIVED";
   isPublic: boolean; activeGenomeVersionId: number | null; publicTags: string;
+  ownerContextNote?: string | null; standInEnabled?: boolean; realContactPolicy?: string;
 };
 export type CapsuleGenomeVersion = {
   id: number; versionNo: number; parentVersionId: number | null; compilerVersion: string;
@@ -551,13 +552,16 @@ export const api = {
   previewCapsule: (memoryIds: number[]) => request<CapsulePreview>("/api/capsule/preview-from-memory", {
     method: "POST", body: JSON.stringify({ memoryIds, privacyLevel: "STRICT", allowTopics: [], blockedTopics: [] })
   }),
-  createCapsule: (input: Required<Pick<CoreCapsuleCreateRequest, "pseudonym" | "intro" | "memoryIds" | "publicTags">>) => {
+  createCapsule: (input: Required<Pick<CoreCapsuleCreateRequest, "pseudonym" | "intro" | "memoryIds" | "publicTags">>
+    & Pick<CoreCapsuleCreateRequest, "ownerContextNote" | "standInEnabled" | "realContactPolicy" | "visibilityStatus">) => {
     const body: CoreCapsuleCreateRequest = {
-      ...input, visibilityStatus: "PRIVATE", isPublic: false, privacyLevel: "STRICT",
+      ...input, visibilityStatus: input.visibilityStatus ?? "PRIVATE", isPublic: false, privacyLevel: "STRICT",
       allowTopics: ["自我观察", "日常支持"], blockedTopics: ["真实身份", "联系方式", "心理诊断"]
     };
     return request<EchoCapsule>("/api/v1/capsule/create-from-memory", { method: "POST", body: JSON.stringify(body) });
   },
+  updateCapsuleContext: (id: number, patch: { ownerContextNote?: string; standInEnabled?: boolean; realContactPolicy?: string }) =>
+    request<EchoCapsule>(`/api/capsule/${id}/context`, { method: "POST", body: JSON.stringify(patch) }),
   recompileCapsule: (id: number, memoryIds: number[]) => request<CapsuleGenomeVersion>(`/api/capsule/${id}/genome/recompile`, {
     method: "POST", body: JSON.stringify({ memoryIds })
   }),

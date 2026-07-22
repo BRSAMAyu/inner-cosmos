@@ -82,6 +82,45 @@ describe("CapsuleWorkbench", () => {
     expect(screen.getByRole("button", { name: "保存边界设置" })).toBeDisabled();
   });
 
+  it("lets the owner set the owner context note, stand-in permission and contact policy when creating a capsule", () => {
+    const onCapsuleOwnerNote = vi.fn();
+    const onCapsuleStandIn = vi.fn();
+    const onCapsuleContactPolicy = vi.fn();
+    render(<CapsuleWorkbench capsules={[]} selectedCapsuleId={null} selectedCapsule={null} selectableMemories={[memory]}
+      selectedMemoryIds={[]} capsuleName="" capsuleIntro="" capsulePreview={null} capsuleBusy={false} genomeHistory={[]} fidelitySummary={[]}
+      sandboxQuestion="" sandboxResult={null} sandboxFeedback={null} onSelectCapsule={() => undefined}
+      onToggleMemory={() => undefined} onCapsuleName={() => undefined} onCapsuleIntro={() => undefined}
+      onPreviewNewCapsule={() => undefined} onCancelPreview={() => undefined} onCreateCapsule={() => undefined}
+      onRecompile={() => undefined} onSandboxQuestion={() => undefined} onRunSandbox={() => undefined}
+      onRateSandbox={() => undefined} onPublish={() => undefined} onPause={() => undefined} onArchive={() => undefined}
+      capsuleOwnerNote="" onCapsuleOwnerNote={onCapsuleOwnerNote} capsuleStandIn={false} onCapsuleStandIn={onCapsuleStandIn}
+      capsuleContactPolicy="LETTER_ONLY" onCapsuleContactPolicy={onCapsuleContactPolicy} />);
+    fireEvent.change(screen.getByLabelText("给它的额外背景说明"), { target: { value: "我在关系里习惯先沉默" } });
+    expect(onCapsuleOwnerNote).toHaveBeenCalledWith("我在关系里习惯先沉默");
+    fireEvent.click(screen.getByLabelText("允许它先作为回声代你回应"));
+    expect(onCapsuleStandIn).toHaveBeenCalledWith(true);
+    fireEvent.change(screen.getByLabelText("真人联系方式"), { target: { value: "STAND_IN_FIRST" } });
+    expect(onCapsuleContactPolicy).toHaveBeenCalledWith("STAND_IN_FIRST");
+  });
+
+  it("lets the owner edit and save an existing capsule's context and contact policy", () => {
+    const onSaveContext = vi.fn();
+    const withContext: EchoCapsule = { ...capsule, ownerContextNote: "先前的备注", standInEnabled: false, realContactPolicy: "LETTER_ONLY" };
+    render(<CapsuleWorkbench capsules={[withContext]} selectedCapsuleId={withContext.id} selectedCapsule={withContext} selectableMemories={[memory]}
+      selectedMemoryIds={[1]} capsuleName="" capsuleIntro="" capsulePreview={null} capsuleBusy={false} genomeHistory={[genomeVersion]} fidelitySummary={[]}
+      sandboxQuestion="" sandboxResult={null} sandboxFeedback={null} onSelectCapsule={() => undefined}
+      onToggleMemory={() => undefined} onCapsuleName={() => undefined} onCapsuleIntro={() => undefined}
+      onPreviewNewCapsule={() => undefined} onCancelPreview={() => undefined} onCreateCapsule={() => undefined}
+      onRecompile={() => undefined} onSandboxQuestion={() => undefined} onRunSandbox={() => undefined}
+      onRateSandbox={() => undefined} onPublish={() => undefined} onPause={() => undefined} onArchive={() => undefined}
+      onSaveContext={onSaveContext} />);
+    const note = screen.getByLabelText("给它的额外背景说明") as HTMLTextAreaElement;
+    expect(note.value).toBe("先前的备注");
+    fireEvent.change(note, { target: { value: "更新后的备注" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存背景与联系设置" }));
+    expect(onSaveContext).toHaveBeenCalledWith({ ownerContextNote: "更新后的备注", standInEnabled: false, realContactPolicy: "LETTER_ONLY" });
+  });
+
   it("renders the workbench and boundary editor in English when locale is en-SG", () => {
     render(<CapsuleWorkbench locale="en-SG" capsules={[capsule]} selectedCapsuleId={capsule.id} selectedCapsule={capsule} selectableMemories={[memory]}
       selectedMemoryIds={[1]} capsuleName="" capsuleIntro="" capsulePreview={null} capsuleBusy={false} genomeHistory={[genomeVersion]} fidelitySummary={[]}

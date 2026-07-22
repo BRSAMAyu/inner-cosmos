@@ -69,6 +69,28 @@ describe("ResonanceNetwork", () => {
     expect(screen.queryByRole("button", { name: "屏蔽这个共鸣体" })).not.toBeInTheDocument();
   });
 
+  it("shows a turn-scoped error next to the composer, without needing the global status banner", () => {
+    const session: PersonaSession = { id: 1, capsuleId: 4, status: "ACTIVE", turnCount: 0, dailyLimit: 5 };
+    render(<ResonanceNetwork resonanceMatches={[match]} resonanceStrategy="MIRROR" visitorBusy={false} visitorMatch={match}
+      personaSession={session} personaMessages={[]} personaDraft="想继续聊聊" personaQuota={{ usedTurns: 0, remainingTurns: 5, dailyLimit: 5, exhausted: false }}
+      letterTitle="" letterBody="" sentLetter={null} onChooseStrategy={() => undefined} onChooseMatch={() => undefined}
+      onStartPersonaConversation={() => undefined} onPersonaDraftChange={() => undefined} onSendPersonaTurn={() => undefined}
+      onLetterTitleChange={() => undefined} onLetterBodyChange={() => undefined} onSendLetter={() => undefined}
+      personaTurnError="这轮对话没有送达，草稿内容仍在这里" />);
+    expect(screen.getByText("这轮对话没有送达，草稿内容仍在这里")).toBeVisible();
+    expect(screen.getByLabelText("写给共鸣体")).toHaveValue("想继续聊聊");
+  });
+
+  it("does not show a turn error when there is none", () => {
+    const session: PersonaSession = { id: 1, capsuleId: 4, status: "ACTIVE", turnCount: 0, dailyLimit: 5 };
+    render(<ResonanceNetwork resonanceMatches={[match]} resonanceStrategy="MIRROR" visitorBusy={false} visitorMatch={match}
+      personaSession={session} personaMessages={[]} personaDraft="" personaQuota={{ usedTurns: 0, remainingTurns: 5, dailyLimit: 5, exhausted: false }}
+      letterTitle="" letterBody="" sentLetter={null} onChooseStrategy={() => undefined} onChooseMatch={() => undefined}
+      onStartPersonaConversation={() => undefined} onPersonaDraftChange={() => undefined} onSendPersonaTurn={() => undefined}
+      onLetterTitleChange={() => undefined} onLetterBodyChange={() => undefined} onSendLetter={() => undefined} />);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("renders the network, strategies and entry in English when locale is en-SG", () => {
     render(<ResonanceNetwork locale="en-SG" resonanceMatches={[match]} resonanceStrategy="MIRROR" visitorBusy={false}
       visitorMatch={match} personaSession={null} personaMessages={[]} personaDraft="" personaQuota={null}

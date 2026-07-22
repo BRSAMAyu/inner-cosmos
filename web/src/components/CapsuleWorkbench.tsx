@@ -5,6 +5,7 @@ import { AsyncButton } from "../loading";
 
 const sandboxRatingOrder = ["LIKE_ME", "NOT_ME", "FACT_WRONG", "TOO_EXPOSED", "TONE_WRONG"] as const;
 const privacyOrder = ["STRICT", "BALANCED", "OPEN"] as const;
+const contactPolicyOrder = ["LETTER_ONLY", "STAND_IN_FIRST", "DIRECT_REQUEST", "NO_REAL_CONTACT"] as const;
 const blockedScopes = new Set(["LOCAL_ONLY", "NO_EXTERNAL_PROCESSING"]);
 
 type WorkbenchCopy = {
@@ -22,6 +23,8 @@ type WorkbenchCopy = {
   // boundary editor
   step3Title: string; step3Note: string; allowLabel: string; allowPlaceholder: string; blockLabel: string; blockPlaceholder: string;
   privacyLabel: string; privacy: Record<string, string>; maxTurnsLabel: string; allowLetterCheck: string; boundarySaveBusy: string; boundarySave: string;
+  ownerNoteLabel: string; ownerNotePlaceholder: string; standInCheck: string; contactPolicyLabel: string;
+  contactPolicy: Record<string, string>; contextStepTitle: string; contextStepNote: string; contextSaveBusy: string; contextSave: string;
 };
 
 const COPY: Record<Locale, WorkbenchCopy> = {
@@ -50,7 +53,12 @@ const COPY: Record<Locale, WorkbenchCopy> = {
     step3Title: "设定它在对话里的边界", step3Note: "这些只有你能改：它可以谈什么、要避开什么、每天最多聊几轮、别人能否请求给你写慢信。",
     allowLabel: "允许谈论的话题", allowPlaceholder: "例如：自我观察, 日常支持, 温柔建议", blockLabel: "明确避开的话题", blockPlaceholder: "例如：真实姓名, 诊断承诺, 强迫即时回应",
     privacyLabel: "隐私等级", privacy: { STRICT: "严格保护", BALANCED: "均衡保护", OPEN: "开放一点" }, maxTurnsLabel: "每日对话轮数",
-    allowLetterCheck: "允许访客读完后请求给你写一封慢信", boundarySaveBusy: "保存中…", boundarySave: "保存边界设置"
+    allowLetterCheck: "允许访客读完后请求给你写一封慢信", boundarySaveBusy: "保存中…", boundarySave: "保存边界设置",
+    ownerNoteLabel: "给它的额外背景说明", ownerNotePlaceholder: "只有你能看到；帮助它更准确地表达这个侧面。",
+    standInCheck: "允许它先作为回声代你回应", contactPolicyLabel: "真人联系方式",
+    contactPolicy: { LETTER_ONLY: "只能引导慢信", STAND_IN_FIRST: "先作为回声回应", DIRECT_REQUEST: "可以请求真人连接", NO_REAL_CONTACT: "不开放真人联系" },
+    contextStepTitle: "补充背景与联系方式偏好", contextStepNote: "这些设置只有你能改；共鸣体不会因为它们而假装是真人。",
+    contextSaveBusy: "保存中…", contextSave: "保存背景与联系设置"
   },
   "en-SG": {
     aria: "Capsule creation and like-me sandbox", heading: "Confirm it's like you before others meet it", count: n => `${n} capsule${n === 1 ? "" : "s"}`,
@@ -77,7 +85,12 @@ const COPY: Record<Locale, WorkbenchCopy> = {
     step3Title: "Set its boundaries in conversation", step3Note: "Only you can change these: what it may discuss, what to avoid, the daily turn cap, and whether others may request a slow letter to you.",
     allowLabel: "Topics it may discuss", allowPlaceholder: "e.g. self-observation, everyday support, gentle suggestions", blockLabel: "Topics to explicitly avoid", blockPlaceholder: "e.g. real name, diagnostic promises, forced instant replies",
     privacyLabel: "Privacy level", privacy: { STRICT: "Strict", BALANCED: "Balanced", OPEN: "More open" }, maxTurnsLabel: "Daily conversation turns",
-    allowLetterCheck: "Let a visitor request a slow letter to you after reading", boundarySaveBusy: "Saving…", boundarySave: "Save boundary settings"
+    allowLetterCheck: "Let a visitor request a slow letter to you after reading", boundarySaveBusy: "Saving…", boundarySave: "Save boundary settings",
+    ownerNoteLabel: "Extra background for it", ownerNotePlaceholder: "Only you see this; it helps the facet speak more accurately.",
+    standInCheck: "Let it answer as a stand-in on your behalf first", contactPolicyLabel: "Real-contact policy",
+    contactPolicy: { LETTER_ONLY: "Only guide to a slow letter", STAND_IN_FIRST: "Stand in first", DIRECT_REQUEST: "May request a real connection", NO_REAL_CONTACT: "No real contact" },
+    contextStepTitle: "Background and contact-policy preferences", contextStepNote: "Only you can change these; the capsule never pretends to be a real person because of them.",
+    contextSaveBusy: "Saving…", contextSave: "Save background & contact settings"
   }
 };
 
@@ -131,11 +144,38 @@ function CapsuleBoundaryEditor({ boundary, boundaryBusy, onSaveBoundary, t }: {
   </>;
 }
 
+// Owner-private context editor for an existing capsule: background note, stand-in permission
+// and real-contact policy. Local state is seeded from the selected capsule and reset per
+// capsule via key={capsuleId}, mirroring CapsuleBoundaryEditor above.
+function CapsuleContextEditor({ capsule, capsuleBusy, onSaveContext, t }: {
+  capsule: EchoCapsule; capsuleBusy: boolean;
+  onSaveContext: (patch: { ownerContextNote: string; standInEnabled: boolean; realContactPolicy: string }) => void; t: WorkbenchCopy;
+}) {
+  const [ownerNote, setOwnerNote] = useState(capsule.ownerContextNote ?? "");
+  const [standIn, setStandIn] = useState(capsule.standInEnabled ?? false);
+  const [contactPolicy, setContactPolicy] = useState(capsule.realContactPolicy ?? "LETTER_ONLY");
+  return <>
+    <div className="capsule-step"><span>4</span><div><strong>{t.contextStepTitle}</strong><small>{t.contextStepNote}</small></div></div>
+    <div className="boundary-editor">
+      <label>{t.ownerNoteLabel}<textarea value={ownerNote} onChange={event => setOwnerNote(event.target.value)} placeholder={t.ownerNotePlaceholder} /></label>
+      <label className="boundary-check"><input type="checkbox" checked={standIn}
+        onChange={event => setStandIn(event.target.checked)} />{t.standInCheck}</label>
+      <label>{t.contactPolicyLabel}<select value={contactPolicy} onChange={event => setContactPolicy(event.target.value)}>
+        {contactPolicyOrder.map(value => <option key={value} value={value}>{t.contactPolicy[value]}</option>)}</select></label>
+      <AsyncButton className="resonance-secondary" busy={capsuleBusy} busyText={t.contextSaveBusy}
+        onClick={() => onSaveContext({ ownerContextNote: ownerNote, standInEnabled: standIn, realContactPolicy: contactPolicy })}>
+        {t.contextSave}</AsyncButton>
+    </div>
+  </>;
+}
+
 export function CapsuleWorkbench({ capsules, selectedCapsuleId, selectedCapsule, selectableMemories, selectedMemoryIds,
   capsuleName, capsuleIntro, capsulePreview, capsuleBusy, genomeHistory, fidelitySummary, sandboxQuestion, sandboxResult, sandboxFeedback,
   onSelectCapsule, onToggleMemory, onCapsuleName, onCapsuleIntro, onPreviewNewCapsule, onCancelPreview, onCreateCapsule,
   onRecompile, onSandboxQuestion, onRunSandbox, onRateSandbox, onPublish, onPause, onArchive,
-  boundary = null, boundaryBusy = false, onSaveBoundary, locale = "zh-CN" }: {
+  boundary = null, boundaryBusy = false, onSaveBoundary,
+  capsuleOwnerNote = "", onCapsuleOwnerNote, capsuleStandIn = false, onCapsuleStandIn,
+  capsuleContactPolicy = "LETTER_ONLY", onCapsuleContactPolicy, onSaveContext, locale = "zh-CN" }: {
   capsules: EchoCapsule[]; selectedCapsuleId: number | null; selectedCapsule: EchoCapsule | null;
   selectableMemories: MemoryCard[]; selectedMemoryIds: number[]; capsuleName: string; capsuleIntro: string;
   capsulePreview: CapsulePreview | null; capsuleBusy: boolean; genomeHistory: CapsuleGenomeVersion[];
@@ -145,7 +185,12 @@ export function CapsuleWorkbench({ capsules, selectedCapsuleId, selectedCapsule,
   onPreviewNewCapsule: () => void; onCancelPreview: () => void; onCreateCapsule: () => void;
   onRecompile: () => void; onSandboxQuestion: (value: string) => void; onRunSandbox: () => void;
   onRateSandbox: (rating: string) => void; onPublish: () => void; onPause: () => void; onArchive: () => void;
-  boundary?: CapsuleBoundary | null; boundaryBusy?: boolean; onSaveBoundary?: (boundary: Partial<CapsuleBoundary>) => void; locale?: Locale;
+  boundary?: CapsuleBoundary | null; boundaryBusy?: boolean; onSaveBoundary?: (boundary: Partial<CapsuleBoundary>) => void;
+  capsuleOwnerNote?: string; onCapsuleOwnerNote?: (value: string) => void;
+  capsuleStandIn?: boolean; onCapsuleStandIn?: (value: boolean) => void;
+  capsuleContactPolicy?: string; onCapsuleContactPolicy?: (value: string) => void;
+  onSaveContext?: (patch: { ownerContextNote: string; standInEnabled: boolean; realContactPolicy: string }) => void;
+  locale?: Locale;
 }) {
   const t = COPY[locale];
   const activeFidelity = fidelityLabel(fidelitySummary.find(summary => summary.genomeVersionId === genomeHistory[0]?.id), t);
@@ -173,7 +218,12 @@ export function CapsuleWorkbench({ capsules, selectedCapsuleId, selectedCapsule,
       })}</div>
       <div className="capsule-step"><span>2</span><div><strong>{t.step2Title}</strong><small>{t.step2Note}</small></div></div>
       <div className="capsule-fields"><label>{t.nameLabel}<input value={capsuleName} onChange={event => onCapsuleName(event.target.value)} placeholder={t.namePlaceholder} /></label>
-        <label>{t.introLabel}<textarea value={capsuleIntro} onChange={event => onCapsuleIntro(event.target.value)} placeholder={t.introPlaceholder} /></label></div>
+        <label>{t.introLabel}<textarea value={capsuleIntro} onChange={event => onCapsuleIntro(event.target.value)} placeholder={t.introPlaceholder} /></label>
+        <label>{t.ownerNoteLabel}<textarea value={capsuleOwnerNote} onChange={event => onCapsuleOwnerNote?.(event.target.value)} placeholder={t.ownerNotePlaceholder} /></label>
+        <label>{t.contactPolicyLabel}<select value={capsuleContactPolicy} onChange={event => onCapsuleContactPolicy?.(event.target.value)}>
+          {contactPolicyOrder.map(value => <option key={value} value={value}>{t.contactPolicy[value]}</option>)}</select></label></div>
+      <label className="boundary-check"><input type="checkbox" checked={capsuleStandIn}
+        onChange={event => onCapsuleStandIn?.(event.target.checked)} />{t.standInCheck}</label>
       {!capsulePreview ? <AsyncButton className="resonance-primary" busy={capsuleBusy} busyText={t.previewBusy} onClick={onPreviewNewCapsule}>{t.previewBtn}</AsyncButton> :
         <div className="capsule-preview" aria-label={t.previewAria}><span className="eyebrow">WHAT IT MAY USE</span><p>{capsulePreview.abstractSummary}</p>
           <div className="preview-tags">{capsulePreview.publicTags.map(tag => <span key={tag}>{tag}</span>)}</div>
@@ -212,8 +262,10 @@ export function CapsuleWorkbench({ capsules, selectedCapsuleId, selectedCapsule,
 
       {onSaveBoundary && <CapsuleBoundaryEditor key={`${selectedCapsule.id}:${boundary?.capsuleId ?? "loading"}`}
         boundary={boundary} boundaryBusy={boundaryBusy} onSaveBoundary={onSaveBoundary} t={t} />}
+      {onSaveContext && <CapsuleContextEditor key={`context:${selectedCapsule.id}`}
+        capsule={selectedCapsule} capsuleBusy={capsuleBusy} onSaveContext={onSaveContext} t={t} />}
 
-      <div className="capsule-step"><span>4</span><div><strong>{t.step4Title}</strong><small>{t.step4Note}</small></div></div>
+      <div className="capsule-step"><span>5</span><div><strong>{t.step4Title}</strong><small>{t.step4Note}</small></div></div>
       <div className="resonance-actions">{selectedCapsule.visibilityStatus !== "PUBLIC" && <AsyncButton className="resonance-primary" busy={capsuleBusy} disabled={genomeHistory[0]?.status !== "ACTIVE"} busyText={t.publishBusy} onClick={onPublish}>{t.publishBtn}</AsyncButton>}
         {selectedCapsule.visibilityStatus === "PUBLIC" && <AsyncButton busy={capsuleBusy} busyText={t.pauseBusy} onClick={onPause}>{t.pauseBtn}</AsyncButton>}
         <AsyncButton className="danger-quiet" busy={capsuleBusy} busyText={t.archiveBusy} onClick={onArchive}>{t.archiveBtn}</AsyncButton></div>
