@@ -993,14 +993,17 @@ export function AuroraApp() {
 
   // Phase 3 port of the legacy static /pages/admin.html (8-tab moderation console). Like Safety
   // Harbor above, this is deliberately its own standalone route, not a 6th ProductShell space (see
-  // ProductShell.tsx's five-space consumer information architecture). The backend already
-  // `requireAdmin`-gates every /api/admin/*, /api/abtest/*, /api/ai-logs, /api/ai/health call (see
-  // AdminController etc.) -- this is a UX gate on top of that, not the authorization boundary
-  // itself: a non-admin session is redirected back to a normal space instead of ever mounting
-  // AdminConsole (which would otherwise just show empty lists / 401s for every tab). While
-  // userProfile hasn't loaded yet (a brief window right after bootstrap), wait rather than
-  // guessing -- redirecting an actual admin away on a false negative would be worse than a
-  // moment's delay.
+  // ProductShell.tsx's five-space consumer information architecture). The backend `requireAdmin`-
+  // gates every /api/admin/* and /api/abtest/* call (see AdminController etc.), and -- as of the
+  // W0V 2.2.5 fix -- /api/ai-logs too (it has no other caller). /api/ai/health is deliberately NOT
+  // admin-gated: ThoughtShredderSection also reads it as an ordinary user's own "is AI real or
+  // mock" status, so it stays any-authenticated-user, with its own per-caller data scoped instead
+  // (see AiHealthController). This frontend check is a UX gate on top of those, not the
+  // authorization boundary itself: a non-admin session is redirected back to a normal space
+  // instead of ever mounting AdminConsole (which would otherwise just show empty lists / 401s for
+  // every admin-only tab). While userProfile hasn't loaded yet (a brief window right after
+  // bootstrap), wait rather than guessing -- redirecting an actual admin away on a false negative
+  // would be worse than a moment's delay.
   if (location.pathname === "/admin" || location.pathname.startsWith("/admin/")) {
     if (userProfile === null) return <main className="login-shell"><div className="login">
       <LoadingText busy>{tt.connecting.replace(/…$/, "")}</LoadingText>
@@ -1220,6 +1223,7 @@ export function AuroraApp() {
       <RelationsView relations={connectionsAndLetters.relations} selected={connectionsAndLetters.selectedRelation} timeline={connectionsAndLetters.relationTimeline} health={connectionsAndLetters.relationHealth} busy={connectionsAndLetters.relationBusy} onSelect={label => void connectionsAndLetters.openRelation(label)} locale={skillLocale} />
       <SocialGroupsView groups={connectionsAndLetters.groups} invites={connectionsAndLetters.groupInvites} friends={connectionsAndLetters.friends}
         selectedGroupId={connectionsAndLetters.selectedGroupId} members={connectionsAndLetters.groupMembers} busy={connectionsAndLetters.groupBusy}
+        currentUserId={userProfile?.id ?? null}
         onSelectGroup={id => void connectionsAndLetters.openGroup(id)} onCreateGroup={name => void connectionsAndLetters.createGroup(name)}
         onInvite={(groupId, userId) => void connectionsAndLetters.inviteToGroup(groupId, userId)}
         onRespondInvite={(memberId, decision) => void connectionsAndLetters.respondToGroupInvite(memberId, decision)}

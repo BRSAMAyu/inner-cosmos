@@ -286,7 +286,13 @@ class ApplicationFlowTest {
                         .content("{\"sessionId\":" + sessionId + ",\"message\":\"测试 fallback\",\"inputType\":\"TEXT\"}"), session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").isNotEmpty());
+        // W0V 2.2.5: /api/ai-logs is admin-only and system-wide (its only frontend caller is the
+        // admin console) -- querying it as the ordinary "demo" session must now 401, and only an
+        // admin session can see the fallback event this test just produced.
         mockMvc.perform(withSession(get("/api/ai-logs"), session))
+                .andExpect(status().isUnauthorized());
+        MockHttpSession adminSession = login("admin", "admin123");
+        mockMvc.perform(withSession(get("/api/ai-logs"), adminSession))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()", greaterThanOrEqualTo(1)))
                 .andExpect(jsonPath("$.data[0].provider").exists())

@@ -21,9 +21,12 @@ public class AiHealthController extends BaseController {
         this.aiLogService = aiLogService;
     }
 
+    // Any authenticated user can call this -- not admin-only. ThoughtShredderSection shows this
+    // as an ordinary user's own "is AI real or mock" status, and AdminConsole's model tab also
+    // reads it; both are legitimate. What must stay scoped is the "last call" detail below.
     @GetMapping("/health")
     public ApiResponse<AiHealthVO> health(HttpSession session) {
-        currentUserId(session);
+        Long me = currentUserId(session);
         AiHealthVO vo = new AiHealthVO();
         vo.failoverProviders = llmConfig.orderedProviderNames();
         vo.failoverModels = llmConfig.orderedProviderModels();
@@ -38,7 +41,10 @@ public class AiHealthController extends BaseController {
         vo.asrKeyConfigured = llmConfig.hasActiveAsrKey();
         vo.asrMockProvider = "mock".equalsIgnoreCase(vo.asrProvider);
 
-        AiInteractionLog latest = aiLogService.latest();
+        // Regression (Gemini audit / remaining-work-handoff.md 2.2.5): scoped to the caller's own
+        // id -- this endpoint is reachable by any authenticated user, and previously returned
+        // whichever row was globally most recent, leaking another user's AI-call metadata.
+        AiInteractionLog latest = aiLogService.latest(me);
         if (latest != null) {
             vo.lastSuccess = latest.success;
             vo.lastFallbackUsed = latest.fallbackUsed;

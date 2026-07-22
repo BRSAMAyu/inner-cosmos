@@ -289,6 +289,6 @@ class TrackARealProviderSmokeEvaluationTest {
             return List.of();
         }
 
-        @Override public AiInteractionLog latest() { return null; }
+        @Override public AiInteractionLog latest(Long userId) { return null; }
     }
 }

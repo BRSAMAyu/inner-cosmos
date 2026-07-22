@@ -74,8 +74,17 @@ public class AiLogServiceImpl implements AiLogService {
         return mapper.selectList(query);
     }
 
+    // Regression (Gemini audit / remaining-work-handoff.md 2.2.5): this was previously
+    // unscoped by user, and /api/ai/health -- callable by ANY authenticated user, not just admin
+    // (ThoughtShredderSection legitimately relies on that) -- surfaced whichever row this returned
+    // as "the last AI call", leaking another user's module/provider/model/error/latency metadata.
     @Override
-    public AiInteractionLog latest() {
-        return mapper.selectOne(new QueryWrapper<AiInteractionLog>().orderByDesc("id").last("LIMIT 1"));
+    public AiInteractionLog latest(Long userId) {
+        QueryWrapper<AiInteractionLog> query = new QueryWrapper<>();
+        if (userId != null) {
+            query.eq("user_id", userId);
+        }
+        query.orderByDesc("id").last("LIMIT 1");
+        return mapper.selectOne(query);
     }
 }

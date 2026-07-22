@@ -20,11 +20,19 @@ public class AiLogController extends BaseController {
         this.aiLogService = aiLogService;
     }
 
+    // Regression (Gemini audit / remaining-work-handoff.md 2.2.5): this only ever called
+    // currentUserId(session), never requireAdmin(session), despite this endpoint being
+    // documented and consumed exclusively as an admin moderation view (AdminAiLogsTab.tsx is
+    // its only frontend caller). Passing the caller's own id as the userId filter also meant an
+    // admin could only ever see their OWN AI interactions, defeating the point of a system-wide
+    // log view -- pass null so every user's interactions are visible to admins, same as every
+    // other AdminController list endpoint (users/capsules/reports/safety-events/audit-logs).
     @GetMapping
     public ApiResponse<List<AiInteractionLog>> list(@RequestParam(required = false) String module,
                                                      @RequestParam(required = false) String provider,
                                                      @RequestParam(required = false) Boolean success,
                                                      HttpSession session) {
-        return ApiResponse.ok(aiLogService.listRecent(currentUserId(session), module, provider, success));
+        requireAdmin(session);
+        return ApiResponse.ok(aiLogService.listRecent(null, module, provider, success));
     }
 }

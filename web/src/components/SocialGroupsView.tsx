@@ -33,10 +33,10 @@ const COPY: Record<Locale, {
   }
 };
 
-export function SocialGroupsView({ groups, invites, friends, selectedGroupId, members, busy,
+export function SocialGroupsView({ groups, invites, friends, selectedGroupId, members, busy, currentUserId,
   onSelectGroup, onCreateGroup, onInvite, onRespondInvite, onLeaveGroup, locale = "zh-CN" }: {
   groups: SocialGroup[]; invites: GroupInvite[]; friends: SocialConnection[];
-  selectedGroupId: number | null; members: GroupMember[]; busy: boolean;
+  selectedGroupId: number | null; members: GroupMember[]; busy: boolean; currentUserId: number | null;
   onSelectGroup: (id: number) => void; onCreateGroup: (name: string) => void;
   onInvite: (groupId: number, userId: number) => void;
   onRespondInvite: (memberId: number, decision: "accept" | "decline") => void;
@@ -47,6 +47,11 @@ export function SocialGroupsView({ groups, invites, friends, selectedGroupId, me
   const [name, setName] = useState("");
   const [inviteUserId, setInviteUserId] = useState("");
   const selectedGroup = groups.find(g => g.id === selectedGroupId) ?? null;
+  // Regression (Gemini audit / remaining-work-handoff.md 2.2.4): the backend correctly rejects
+  // OWNER leave-group (must transfer ownership or disband first), but this button rendered
+  // unconditionally for any selected group -- an owner would always see a "Leave" action that is
+  // guaranteed to fail with a 400.
+  const isOwner = Boolean(selectedGroup && currentUserId !== null && selectedGroup.ownerUserId === currentUserId);
 
   return <section className="social-groups" aria-label={t.aria}>
     <div className="resonance-heading"><div><span className="eyebrow">SLOW GROUPS</span><h2>{t.heading}</h2></div>
@@ -92,7 +97,7 @@ export function SocialGroupsView({ groups, invites, friends, selectedGroupId, me
             onClick={() => { onInvite(selectedGroup.id, Number(inviteUserId)); setInviteUserId(""); }}>{t.invite}</AsyncButton>
         </div>}
         {friends.length === 0 && <p className="muted">{t.noFriends}</p>}
-        <AsyncButton className="danger-quiet" busy={busy} busyText={t.leaveBusy} onClick={() => onLeaveGroup(selectedGroup.id)}>{t.leave}</AsyncButton>
+        {!isOwner && <AsyncButton className="danger-quiet" busy={busy} busyText={t.leaveBusy} onClick={() => onLeaveGroup(selectedGroup.id)}>{t.leave}</AsyncButton>}
       </div>}
     </div>}
   </section>;

@@ -77,6 +77,12 @@ test("exporting account data downloads a real JSON file from the backend", async
   const username = `e2eacct${Date.now()}exp`;
   await registerThrowawayAccount(page, username, "throwaway-pw-1");
 
+  // Cross-reference against the real owner id (UserProfileSettings.id == UserProfile.userId)
+  // so the export's owner-scoping can actually be verified, not just assumed from a 200 response.
+  const profile = await page.evaluate(() => fetch("/api/user/profile").then(r => r.json()));
+  const ownerId = profile.data.id as number;
+  expect(ownerId).toBeGreaterThan(0);
+
   await page.getByRole("button", { name: /^我的/ }).click();
   await expect(page.getByRole("heading", { name: "账户与数据" })).toBeVisible({ timeout: 15000 });
 
@@ -89,6 +95,22 @@ test("exporting account data downloads a real JSON file from the backend", async
 
   const exportPath = await download.path();
   expect(exportPath).toBeTruthy();
+
+  // Parse the real downloaded JSON and verify it is scoped to this exact owner, not just a
+  // 200-and-a-toast (remaining-work-handoff.md 2.2.6: "导出解析 JSON 并验证 owner/敏感字段").
+  const fs = await import("node:fs/promises");
+  const raw = await fs.readFile(exportPath!, "utf-8");
+  const exported = JSON.parse(raw);
+  expect(exported.userProfile).toBeTruthy();
+  expect(exported.userProfile.userId).toBe(ownerId);
+  expect(Array.isArray(exported.dialogSessions)).toBe(true);
+  expect(Array.isArray(exported.memoryCards)).toBe(true);
+  // A fresh throwaway account has no history yet, so every owner-scoped collection must be empty
+  // -- not another account's rows leaking through a missing WHERE user_id = ? filter.
+  expect(exported.dialogSessions).toHaveLength(0);
+  expect(exported.memoryCards).toHaveLength(0);
+  // Negative assertion: the export must never carry credential material.
+  expect(raw).not.toMatch(/passwordHash|password_hash/i);
 
   await page.screenshot({ path: "test-results/account-settings-export.png", fullPage: true });
 });

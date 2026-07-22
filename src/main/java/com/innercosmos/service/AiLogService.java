@@ -14,5 +14,5 @@ public interface AiLogService {
 
     List<AiInteractionLog> listRecent(Long userId, String moduleName, String provider, Boolean success);
 
-    AiInteractionLog latest();
+    AiInteractionLog latest(Long userId);
 }

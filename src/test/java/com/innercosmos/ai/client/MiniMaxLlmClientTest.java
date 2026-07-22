@@ -42,7 +42,7 @@ class MiniMaxLlmClientTest {
         }
 
         @Override
-        public AiInteractionLog latest() {
+        public AiInteractionLog latest(Long userId) {
             return null;
         }
     }

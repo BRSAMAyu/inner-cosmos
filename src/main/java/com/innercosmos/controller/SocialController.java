@@ -1,6 +1,7 @@
 package com.innercosmos.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.innercosmos.common.ApiResponse;
 import com.innercosmos.common.ErrorCode;
 import com.innercosmos.entity.FriendRelation;
@@ -17,6 +18,7 @@ import com.innercosmos.mapper.SocialGroupMapper;
 import com.innercosmos.mapper.SocialGroupMemberMapper;
 import com.innercosmos.mapper.UserMapper;
 import jakarta.servlet.http.HttpSession;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -185,6 +187,11 @@ public class SocialController extends BaseController {
         return ApiResponse.ok(groupMapper.selectList(new QueryWrapper<SocialGroup>().in("id", groupIds).orderByDesc("id")));
     }
 
+    // Regression (Gemini audit / remaining-work-handoff.md 2.2.4): the group row and its OWNER
+    // membership row were two independent, unguarded inserts -- a failure between them (or a
+    // request abort) could leave an ownerless group. @Transactional makes them succeed or fail
+    // together.
+    @Transactional(rollbackFor = Exception.class)
     @PostMapping("/groups")
     public ApiResponse<SocialGroup> createGroup(@RequestBody Map<String, Object> body, HttpSession session) {
         Long me = currentUserId(session);
@@ -212,6 +219,15 @@ public class SocialController extends BaseController {
                 .eq("group_id", id).eq("user_id", me).eq("status", "ACTIVE"));
         if (myMembership == null) throw new BusinessException(ErrorCode.UNAUTHORIZED, "只有群组成员可以邀请他人");
         Long targetUserId = Long.valueOf(body.get("userId"));
+        // Regression (Gemini audit / remaining-work-handoff.md 2.2.4): self-invite, block, and
+        // non-friend invites were previously accepted -- friendMapper/blockMapper were already
+        // injected and used elsewhere in this controller (relationStatus/isBlocked) but never
+        // consulted here.
+        if (me.equals(targetUserId)) throw new BusinessException(ErrorCode.BAD_REQUEST, "不能邀请自己");
+        if (isBlocked(me, targetUserId)) throw new BusinessException(ErrorCode.FORBIDDEN, "双方存在屏蔽关系，不能邀请");
+        if (!"ACCEPTED".equals(relationStatus(me, targetUserId))) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "只能邀请已互相接受的好友加入群组");
+        }
         if (userMapper.selectById(targetUserId) == null) throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在");
         SocialGroupMember existing = memberMapper.selectOne(new QueryWrapper<SocialGroupMember>()
                 .eq("group_id", id).eq("user_id", targetUserId));
@@ -246,14 +262,35 @@ public class SocialController extends BaseController {
         }).toList());
     }
 
+    private enum InviteDecision { ACCEPT, DECLINE }
+
     @PostMapping("/groups/invites/{memberId}/respond")
     public ApiResponse<SocialGroupMember> respondToGroupInvite(@PathVariable Long memberId, @RequestBody Map<String, String> body, HttpSession session) {
         Long me = currentUserId(session);
         SocialGroupMember member = memberMapper.selectById(memberId);
         if (member == null || !me.equals(member.userId)) throw new BusinessException(ErrorCode.UNAUTHORIZED, "无权操作此邀请");
         if (!"PENDING".equals(member.status)) throw new BusinessException(ErrorCode.BAD_REQUEST, "该邀请已被处理");
-        member.status = "accept".equals(body.get("decision")) ? "ACTIVE" : "DECLINED";
-        memberMapper.updateById(member);
+        // Regression (Gemini audit / remaining-work-handoff.md 2.2.4): `"accept".equals(decision)
+        // ? ACTIVE : DECLINED` silently treated ANY non-"accept" value -- typos, null, empty -- as
+        // a decline, instead of rejecting invalid input. Use an explicit enum of the two legal
+        // decisions (matches the frontend's own "accept" | "decline" union in web/src/api.ts).
+        InviteDecision decision;
+        try {
+            decision = InviteDecision.valueOf(String.valueOf(body.get("decision")).toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "decision 必须是 accept 或 decline");
+        }
+        String newStatus = decision == InviteDecision.ACCEPT ? "ACTIVE" : "DECLINED";
+        // Regression: plain updateById() after a read-then-check is a race -- two concurrent
+        // respond calls could both pass the "PENDING".equals(member.status) check above before
+        // either writes. Use an atomic conditional UPDATE ... WHERE id=? AND status='PENDING',
+        // matching the pattern in DialogServiceImpl#finishSession; 0 rows means someone else
+        // already resolved this invite in the race window.
+        int updated = memberMapper.update(null, new UpdateWrapper<SocialGroupMember>()
+                .eq("id", memberId).eq("status", "PENDING")
+                .set("status", newStatus));
+        if (updated == 0) throw new BusinessException(ErrorCode.BAD_REQUEST, "该邀请已被处理");
+        member.status = newStatus;
         return ApiResponse.ok(member);
     }
 

@@ -1,6 +1,7 @@
 package com.innercosmos.controller;
 
 import com.innercosmos.common.Constants;
+import com.innercosmos.entity.FriendRelation;
 import com.innercosmos.entity.SocialGroup;
 import com.innercosmos.entity.SocialGroupMember;
 import com.innercosmos.entity.User;
@@ -57,6 +58,12 @@ class SocialGroupControllerTest {
         return m;
     }
 
+    private FriendRelation accepted(Long requesterId, Long addresseeId) {
+        FriendRelation r = new FriendRelation();
+        r.requesterId = requesterId; r.addresseeId = addresseeId; r.status = "ACCEPTED";
+        return r;
+    }
+
     @Test
     void onlyAnActiveMemberCanInviteSomeoneElseIntoTheGroup() {
         when(memberMapper.selectOne(any())).thenReturn(null); // caller not an active member
@@ -69,10 +76,46 @@ class SocialGroupControllerTest {
     }
 
     @Test
+    void cannotInviteYourself() {
+        when(memberMapper.selectOne(any())).thenReturn(member(1L, 5L, 20L, "OWNER", "ACTIVE"));
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> controller.inviteToGroup(5L, Map.of("userId", "20"), session));
+
+        assertEquals("BAD_REQUEST", error.code);
+        verify(memberMapper, never()).insert(any(SocialGroupMember.class));
+    }
+
+    @Test
+    void cannotInviteABlockedUser() {
+        when(memberMapper.selectOne(any())).thenReturn(member(1L, 5L, 20L, "OWNER", "ACTIVE"));
+        when(blockMapper.selectCount(any())).thenReturn(1L);
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> controller.inviteToGroup(5L, Map.of("userId", "30"), session));
+
+        assertEquals("FORBIDDEN", error.code);
+        verify(memberMapper, never()).insert(any(SocialGroupMember.class));
+    }
+
+    @Test
+    void cannotInviteSomeoneWhoIsNotYetAnAcceptedFriend() {
+        when(memberMapper.selectOne(any())).thenReturn(member(1L, 5L, 20L, "OWNER", "ACTIVE"));
+        when(friendMapper.selectOne(any())).thenReturn(null); // no relation at all
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> controller.inviteToGroup(5L, Map.of("userId", "30"), session));
+
+        assertEquals("BAD_REQUEST", error.code);
+        verify(memberMapper, never()).insert(any(SocialGroupMember.class));
+    }
+
+    @Test
     void invitingCreatesAPendingMembershipForTheTargetUser() {
         when(memberMapper.selectOne(any()))
                 .thenReturn(member(1L, 5L, 20L, "OWNER", "ACTIVE")) // caller's own membership
                 .thenReturn(null); // target has no existing row
+        when(friendMapper.selectOne(any())).thenReturn(accepted(20L, 30L));
         when(userMapper.selectById(30L)).thenReturn(new User());
 
         controller.inviteToGroup(5L, Map.of("userId", "30"), session);
@@ -89,6 +132,7 @@ class SocialGroupControllerTest {
         when(memberMapper.selectOne(any()))
                 .thenReturn(member(1L, 5L, 20L, "OWNER", "ACTIVE"))
                 .thenReturn(member(2L, 5L, 30L, "MEMBER", "PENDING"));
+        when(friendMapper.selectOne(any())).thenReturn(accepted(20L, 30L));
         when(userMapper.selectById(30L)).thenReturn(new User());
 
         BusinessException error = assertThrows(BusinessException.class,
@@ -116,6 +160,7 @@ class SocialGroupControllerTest {
     void acceptingAnInviteActivatesMembershipAndDecliningMarksItDeclined() {
         SocialGroupMember pending = member(9L, 5L, 20L, "MEMBER", "PENDING");
         when(memberMapper.selectById(9L)).thenReturn(pending);
+        when(memberMapper.update(any(), any())).thenReturn(1);
 
         controller.respondToGroupInvite(9L, Map.of("decision", "accept"), session);
         assertEquals("ACTIVE", pending.status);
@@ -134,6 +179,37 @@ class SocialGroupControllerTest {
                 () -> controller.respondToGroupInvite(9L, Map.of("decision", "accept"), session));
 
         assertEquals("UNAUTHORIZED", error.code);
+    }
+
+    @Test
+    void respondingWithAnythingOtherThanAcceptOrDeclineIsRejectedInstadOfSilentlyDeclining() {
+        // Regression: the old code did `"accept".equals(decision) ? ACTIVE : DECLINED`, so a typo,
+        // empty string, or missing key silently became a decline instead of a rejected request.
+        SocialGroupMember pending = member(9L, 5L, 20L, "MEMBER", "PENDING");
+        when(memberMapper.selectById(9L)).thenReturn(pending);
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> controller.respondToGroupInvite(9L, Map.of("decision", "accpet"), session));
+
+        assertEquals("BAD_REQUEST", error.code);
+        assertEquals("PENDING", pending.status); // untouched, not silently declined
+        verify(memberMapper, never()).update(any(), any());
+    }
+
+    @Test
+    void losingTheConcurrentRespondRaceIsRejectedNotSilentlyOverwritten() {
+        // Regression: plain updateById() after a read-then-check "PENDING".equals() is a race --
+        // two concurrent respond calls could both pass the check before either writes. The
+        // conditional UPDATE ... WHERE status='PENDING' must report the loss (0 rows) instead of
+        // pretending the second caller's decision won.
+        SocialGroupMember pending = member(9L, 5L, 20L, "MEMBER", "PENDING");
+        when(memberMapper.selectById(9L)).thenReturn(pending);
+        when(memberMapper.update(any(), any())).thenReturn(0); // someone else's UPDATE won the race first
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> controller.respondToGroupInvite(9L, Map.of("decision", "accept"), session));
+
+        assertEquals("BAD_REQUEST", error.code);
     }
 
     @Test
