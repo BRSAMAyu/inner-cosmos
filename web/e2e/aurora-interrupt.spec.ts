@@ -363,7 +363,10 @@ test("owner publishes, a visitor sends a slow letter, then withdrawal stops the 
   await page.getByRole("button", { name: "登录" }).click();
   await openProductSpace(page, "连接");
   const riverConsent = page.getByLabel("双向连接同意");
-  await riverConsent.getByRole("button", { name: "我也愿意" }).click();
+  // Scope to demo's (林澈's) specific consent card: other specs in the suite can leave additional
+  // incoming requests for river, and the product correctly renders one accept button per requester.
+  // A bare "我也愿意" match would be ambiguous (strict-mode violation) in that legitimate state.
+  await riverConsent.locator("article").filter({ hasText: "林澈" }).getByRole("button", { name: "我也愿意" }).click();
   await expect(riverConsent).toContainText("双方已同意");
   await riverConsent.screenshot({ path: "../evidence/innovation/INNO-CAP-007/mutual-connection-consent.png" });
   await riverConsent.getByRole("button", { name: "退出连接" }).click();
