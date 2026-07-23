@@ -14,6 +14,9 @@ application-dev.yml
 *.db
 *.mv.db
 
+# operator-owned real API keys/docs -- never committed, per CLAUDE.md secret policy
+API及文档.txt
+
 # Operator credentials and generated deployment identity material
 .aws/
 kubeconfig*
