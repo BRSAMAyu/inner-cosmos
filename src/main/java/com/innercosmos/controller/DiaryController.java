@@ -8,8 +8,7 @@ import com.innercosmos.common.ApiResponse;
 import com.innercosmos.common.ErrorCode;
 import com.innercosmos.entity.VoiceTranscription;
 import com.innercosmos.exception.BusinessException;
-import com.innercosmos.mapper.VoiceTranscriptionMapper;
-import com.innercosmos.service.MemorySettlementService;
+import com.innercosmos.service.VoiceTranscriptionService;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -26,18 +25,15 @@ import java.util.Map;
 @RequestMapping("/api/diary")
 public class DiaryController extends BaseController {
     private final AsrClient asrClient;
-    private final VoiceTranscriptionMapper transcriptionMapper;
+    private final VoiceTranscriptionService transcriptionService;
     private final LlmClient llmClient;
-    private final MemorySettlementService memorySettlementService;
 
     public DiaryController(AsrClient asrClient,
-                           VoiceTranscriptionMapper transcriptionMapper,
-                           LlmClient llmClient,
-                           MemorySettlementService memorySettlementService) {
+                           VoiceTranscriptionService transcriptionService,
+                           LlmClient llmClient) {
         this.asrClient = asrClient;
-        this.transcriptionMapper = transcriptionMapper;
+        this.transcriptionService = transcriptionService;
         this.llmClient = llmClient;
-        this.memorySettlementService = memorySettlementService;
     }
 
     @PostMapping("/transcribe")
@@ -48,7 +44,7 @@ public class DiaryController extends BaseController {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "日记原文不能为空");
         }
         AsrResult asr = asrClient.transcribe(text.getBytes(StandardCharsets.UTF_8), text);
-        return ApiResponse.ok(saveTranscription(userId, text, asr, "DIARY"));
+        return ApiResponse.ok(transcriptionService.create(userId, text, asr, "DIARY"));
     }
 
     @PostMapping("/transcribe-audio")
@@ -67,7 +63,7 @@ public class DiaryController extends BaseController {
         if (text.isBlank()) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "没有识别到可用文字，请靠近麦克风再试一次");
         }
-        return ApiResponse.ok(saveTranscription(userId, text, asr, "DIARY_AUDIO"));
+        return ApiResponse.ok(transcriptionService.create(userId, text, asr, "DIARY_AUDIO"));
     }
 
     @PostMapping("/polish")
@@ -97,10 +93,7 @@ public class DiaryController extends BaseController {
     @PostMapping("/{id}/analyze")
     public ApiResponse<Map<String, String>> analyze(@PathVariable Long id, HttpSession session) {
         Long userId = currentUserId(session);
-        VoiceTranscription vt = transcriptionMapper.selectById(id);
-        if (vt == null || !userId.equals(vt.userId)) {
-            throw new BusinessException(ErrorCode.NOT_FOUND, "日记转写记录不存在");
-        }
+        VoiceTranscription vt = transcriptionService.getOwned(id, userId);
         String text = vt.editedText == null || vt.editedText.isBlank() ? vt.originalText : vt.editedText;
         String raw = llmClient.chat(new LlmRequest(userId, "DIARY_ANALYZE", analyzePrompt(text)));
         return ApiResponse.ok(Map.of(
@@ -122,29 +115,8 @@ public class DiaryController extends BaseController {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "日记内容不能为空");
         }
 
-        VoiceTranscription vt = transcriptionMapper.selectById(id);
-        if (vt == null || !userId.equals(vt.userId)) {
-            throw new BusinessException(ErrorCode.NOT_FOUND, "日记转写记录不存在");
-        }
-        vt.editedText = finalContent;
-        vt.status = "SUBMITTED";
-        transcriptionMapper.updateById(vt);
-        memorySettlementService.settleDiary(userId, finalContent);
+        transcriptionService.submitFinal(id, userId, finalContent);
         return ApiResponse.ok(true);
-    }
-
-    private VoiceTranscription saveTranscription(Long userId, String text, AsrResult asr, String status) {
-        VoiceTranscription vt = new VoiceTranscription();
-        vt.userId = userId;
-        vt.originalText = text;
-        vt.editedText = text;
-        vt.audioDurationSec = asr.audioDurationSec;
-        vt.speechRate = asr.speechRate;
-        vt.pauseCount = asr.pauseCount;
-        vt.emotionHint = status;
-        vt.status = "RAW";
-        transcriptionMapper.insert(vt);
-        return vt;
     }
 
     private String polishPrompt(int level, String text) {
