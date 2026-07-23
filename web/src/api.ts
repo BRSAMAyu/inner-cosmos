@@ -804,11 +804,22 @@ export const api = {
     method: "POST", body: JSON.stringify({ reason })
   }),
   blockPersonaSession: (sessionId: number) => request<void>(`/api/persona-chat/session/${sessionId}/block`, { method: "POST" }),
-  draftSlowLetter: (receiverCapsuleId: number, title: string, letterBody: string) => {
+  // Gemini audit 4.5 (CONFIRMED/P1): both draftSlowLetter and sendSlowLetter accept an optional
+  // client-supplied Idempotency-Key so a retried compose-and-send attempt (see
+  // web/src/composeAndSend.ts) can present the SAME key across retries instead of always minting a
+  // fresh one -- ready for a backend idempotent-compose contract (audit item 1.8) whether or not
+  // that contract is live in this checkout yet. Explicit header wins over the generic per-request
+  // auto-idempotency in request() (which would otherwise mint a new key on every call).
+  draftSlowLetter: (receiverCapsuleId: number, title: string, letterBody: string, idempotencyKey?: string) => {
     const body: CoreSlowLetterDraftRequest = { receiverCapsuleId, title, letterBody };
-    return request<SlowLetter>("/api/v1/letters/draft", { method: "POST", body: JSON.stringify(body) });
+    return request<SlowLetter>("/api/v1/letters/draft", {
+      method: "POST", body: JSON.stringify(body),
+      headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : undefined
+    });
   },
-  sendSlowLetter: (id: number) => request<SlowLetter>(`/api/letters/${id}/send`, { method: "POST" }),
+  sendSlowLetter: (id: number, idempotencyKey?: string) => request<SlowLetter>(`/api/letters/${id}/send`, {
+    method: "POST", headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : undefined
+  }),
   letterThreads: () => request<LetterThread[]>("/api/letters/threads"),
   letterThreadLetters: (threadId: number) => request<SlowLetter[]>(`/api/letters/threads/${threadId}/letters`),
   letterInbox: () => request<SlowLetter[]>("/api/letters/inbox"),
@@ -818,8 +829,9 @@ export const api = {
   reportLetter: (id: number, reason: string) => request<void>(`/api/letters/${id}/report`, {
     method: "POST", body: JSON.stringify({ reason })
   }),
-  replyWithSlowLetter: (id: number, title: string, letterBody: string) => request<SlowLetter>(`/api/letters/${id}/reply-with-letter`, {
-    method: "POST", body: JSON.stringify({ title, letterBody })
+  replyWithSlowLetter: (id: number, title: string, letterBody: string, idempotencyKey?: string) => request<SlowLetter>(`/api/letters/${id}/reply-with-letter`, {
+    method: "POST", body: JSON.stringify({ title, letterBody }),
+    headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : undefined
   }),
   discoverPeople: () => request<DiscoverablePerson[]>("/api/social/people"),
   requestFriend: (userId: number) => request<FriendRelation>("/api/social/friends/request", {

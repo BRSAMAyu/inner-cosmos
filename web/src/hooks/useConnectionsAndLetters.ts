@@ -3,6 +3,7 @@ import {
   api, type ConnectionRequests, type DiscoverablePerson, type GroupInvite, type GroupMember, type LetterThread,
   type RelationHealth, type RelationMention, type RelationTimelinePoint, type SlowLetter, type SocialConnection, type SocialGroup
 } from "../api";
+import { sendComposedLetter, type DraftedLetterState } from "../composeAndSend";
 
 // Extracted from AuroraApp.tsx (B1 domain-hook decomposition, second slice): the "connections/letters"
 // product space -- People Discovery, relation mentions/timeline, connection requests/friends, and the
@@ -45,6 +46,10 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
   const [draftBusy, setDraftBusy] = useState(false);
   const [replyBusyId, setReplyBusyId] = useState<number | null>(null);
   const [replyDrafts, setReplyDrafts] = useState<Record<number, string>>({});
+  // Gemini audit 4.5 (CONFIRMED/P1): keyed by the PARENT letter's id, persists each in-flight
+  // reply's created-draft id + idempotency key across a failed send-retry (see
+  // web/src/composeAndSend.ts) -- a retry must reuse the same reply draft, not create another one.
+  const replyDraftsRef = useRef<Record<number, DraftedLetterState>>({});
   const [groups, setGroups] = useState<SocialGroup[]>([]);
   const [groupInvites, setGroupInvites] = useState<GroupInvite[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
@@ -174,14 +179,27 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
     if (!body) return;
     setReplyBusyId(letter.id);
     try {
-      const draft = await api.replyWithSlowLetter(letter.id, `回复：${letter.title}`, body);
-      await api.sendSlowLetter(draft.id);
+      // Gemini audit 4.5: reuses replyDraftsRef.current[letter.id] (set by a prior failed attempt
+      // replying to this SAME parent letter) instead of unconditionally drafting again -- a retry
+      // after a failed send must never produce a second, duplicate reply draft.
+      await sendComposedLetter({
+        pending: replyDraftsRef.current[letter.id] ?? null,
+        onDraftCreated: next => { replyDraftsRef.current = { ...replyDraftsRef.current, [letter.id]: next }; },
+        createDraft: idempotencyKey => api.replyWithSlowLetter(letter.id, `回复：${letter.title}`, body, idempotencyKey),
+        sendDraft: (draftId, idempotencyKey) => api.sendSlowLetter(draftId, idempotencyKey)
+      });
+      const { [letter.id]: _discard, ...rest } = replyDraftsRef.current;
+      replyDraftsRef.current = rest; // sent successfully -- clear so the next reply starts fresh.
       const updated = letter.status === "READ" ? await api.transitionLetter(letter.id, "reply") : letter;
       setLetterInbox(rows => rows.map(row => row.id === updated.id ? updated : row));
       void api.letterOutbox().then(setLetterOutbox).catch(() => undefined);
       setReplyDrafts(drafts => ({ ...drafts, [letter.id]: "" }));
       setStatus("回复慢信已启程。它仍会经过时间，而不是变成即时聊天。 ");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "回复慢信没有启程"); }
+    } catch (error) {
+      // replyDraftsRef.current[letter.id] is intentionally left set (if a draft was created) so
+      // retrying this same letter's reply reuses the same draft rather than creating another.
+      setStatus(error instanceof Error ? error.message : "回复慢信没有启程");
+    }
     finally { setReplyBusyId(null); }
   }, [replyDrafts, setStatus]);
 

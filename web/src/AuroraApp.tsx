@@ -34,6 +34,7 @@ import { PsychologySkillStudio, SkillSuggestionBanner, type SkillLocale } from "
 import { ConnectError, LoadingText } from "./loading";
 import { useAuroraSession } from "./hooks/useAuroraSession";
 import { useConnectionsAndLetters } from "./hooks/useConnectionsAndLetters";
+import { sendComposedLetter, type DraftedLetterState } from "./composeAndSend";
 import { useDailyRecord } from "./hooks/useDailyRecord";
 import { useWeeklyReview } from "./hooks/useWeeklyReview";
 import { useThoughtShredder } from "./hooks/useThoughtShredder";
@@ -132,6 +133,11 @@ export function AuroraApp() {
   const [letterTitle, setLetterTitle] = useState("想把刚才的共鸣慢慢写下来");
   const [letterBody, setLetterBody] = useState("");
   const [sentLetter, setSentLetter] = useState<SlowLetter | null>(null);
+  // Gemini audit 4.5 (CONFIRMED/P1): persists the draft id + idempotency key across a failed
+  // send-retry (see web/src/composeAndSend.ts) so retrying sendLetterToMatch after a failed send
+  // reuses the SAME draft instead of creating a duplicate one. Reset to null whenever the compose
+  // target changes (chooseVisitorMatch/chooseResonanceStrategy) or once a send finally succeeds.
+  const letterDraftRef = useRef<DraftedLetterState>(null);
   const [skills, setSkills] = useState<PsychologySkillManifest[]>([]);
   const [skillRuns, setSkillRuns] = useState<PsychologySkillRun[]>([]);
   const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
@@ -841,6 +847,7 @@ export function AuroraApp() {
   const chooseVisitorMatch = (capsuleId: number) => {
     setVisitorMatchId(capsuleId);
     setPersonaSession(null); setPersonaMessages([]); setPersonaQuota(null); setSentLetter(null); setLetterBody(""); setPersonaTurnError(null);
+    letterDraftRef.current = null; // 4.5: a different compose target invalidates any pending draft for the previous one.
   };
 
   const openDirectoryCapsule = (capsule: PublicCapsule) => {
@@ -857,6 +864,7 @@ export function AuroraApp() {
       setResonanceStrategy(strategy); setResonanceMatches(matches);
       setVisitorMatchId(matches[0]?.capsule.id ?? null);
       setPersonaSession(null); setPersonaMessages([]); setPersonaQuota(null); setSentLetter(null); setLetterBody(""); setPersonaTurnError(null);
+      letterDraftRef.current = null; // 4.5: a different compose target invalidates any pending draft for the previous one.
       setStatus(matches[0]?.strategyDescription ?? "已经切换相遇方式");
     } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法切换相遇方式"); }
     finally { setVisitorBusy(false); }
@@ -910,12 +918,24 @@ export function AuroraApp() {
     if (!visitorMatch || !letterTitle.trim() || !letterBody.trim()) return;
     setVisitorBusy(true);
     try {
-      const draft = await api.draftSlowLetter(visitorMatch.capsule.id, letterTitle.trim(), letterBody.trim());
-      const sent = await api.sendSlowLetter(draft.id);
+      // Gemini audit 4.5: reuses letterDraftRef.current (set by a prior failed attempt for this
+      // SAME compose) instead of unconditionally drafting again -- a retry after a failed send
+      // must never produce a second, duplicate draft.
+      const sent = await sendComposedLetter({
+        pending: letterDraftRef.current,
+        onDraftCreated: next => { letterDraftRef.current = next; },
+        createDraft: idempotencyKey => api.draftSlowLetter(visitorMatch.capsule.id, letterTitle.trim(), letterBody.trim(), idempotencyKey),
+        sendDraft: (draftId, idempotencyKey) => api.sendSlowLetter(draftId, idempotencyKey)
+      });
+      letterDraftRef.current = null; // sent successfully -- clear so the next compose starts fresh.
       setSentLetter(sent);
       void connectionsAndLetters.loadLetterOutbox();
       setStatus("慢信已经启程。收件人看到的是你的原话和安全预览，不是 AI 代写的统一模板。 ");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "慢信没有发送，草稿内容仍在这里"); }
+    } catch (error) {
+      // letterDraftRef.current is intentionally left set (if a draft was created) so the user's
+      // next click on "send" retries the send against the SAME draft rather than creating another.
+      setStatus(error instanceof Error ? error.message : "慢信没有发送，草稿内容仍在这里");
+    }
     finally { setVisitorBusy(false); }
   };
 

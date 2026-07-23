@@ -377,9 +377,35 @@ describe("useConnectionsAndLetters -- letters", () => {
     const { result, setStatus } = setup();
     act(() => { result.current.updateReplyDraft(1, "谢谢你的信"); });
     await act(async () => { await result.current.replyWithLetter(letter({ id: 1, status: "READ" })); });
-    expect(api.replyWithSlowLetter).toHaveBeenCalledExactlyOnceWith(1, "回复：写给你", "谢谢你的信");
+    expect(api.replyWithSlowLetter).toHaveBeenCalledExactlyOnceWith(1, "回复：写给你", "谢谢你的信", expect.any(String));
     expect(api.transitionLetter).toHaveBeenCalledExactlyOnceWith(1, "reply");
     expect(result.current.replyDrafts[1]).toBe("");
+    expect(setStatus).toHaveBeenCalledWith(expect.stringContaining("回复慢信已启程"));
+  });
+
+  // Gemini audit 4.5 (CONFIRMED/P1): "create-draft 后 send 失败，重试会再次 create." A retry of
+  // replyWithLetter for the SAME parent letter, after sendSlowLetter failed the first time, must
+  // reuse the already-created reply draft rather than calling replyWithSlowLetter (create) again.
+  it("replyWithLetter retried after a failed send reuses the SAME reply draft instead of creating another", async () => {
+    vi.mocked(api.replyWithSlowLetter).mockResolvedValue(letter({ id: 9 }));
+    vi.mocked(api.sendSlowLetter)
+      .mockRejectedValueOnce(new Error("network down"))
+      .mockResolvedValueOnce(letter({ id: 9, status: "SENT" }));
+    vi.mocked(api.transitionLetter).mockResolvedValue(letter({ id: 1, status: "REPLIED" }));
+    vi.mocked(api.letterOutbox).mockResolvedValue([]);
+    const { result, setStatus } = setup();
+    act(() => { result.current.updateReplyDraft(1, "谢谢你的信"); });
+
+    await act(async () => { await result.current.replyWithLetter(letter({ id: 1, status: "READ" })); });
+    expect(api.replyWithSlowLetter).toHaveBeenCalledTimes(1);
+    expect(setStatus).toHaveBeenCalledWith("network down");
+    // The draft was NOT cleared on failure -- the reply text is still there for the user to retry.
+    expect(result.current.replyDrafts[1]).toBe("谢谢你的信");
+
+    await act(async () => { await result.current.replyWithLetter(letter({ id: 1, status: "READ" })); });
+    // Still only ONE create call across both attempts -- the retry reused the same draft id.
+    expect(api.replyWithSlowLetter).toHaveBeenCalledTimes(1);
+    expect(api.sendSlowLetter).toHaveBeenCalledTimes(2);
     expect(setStatus).toHaveBeenCalledWith(expect.stringContaining("回复慢信已启程"));
   });
 
