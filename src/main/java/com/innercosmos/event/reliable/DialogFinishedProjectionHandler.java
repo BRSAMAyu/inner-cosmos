@@ -7,6 +7,9 @@ import com.innercosmos.service.EmotionTimelineService;
 import com.innercosmos.service.GravityRecalculationService;
 import com.innercosmos.service.MemoryService;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 
 import java.time.LocalDate;
 
@@ -20,6 +23,8 @@ import java.time.LocalDate;
  */
 @Component
 public class DialogFinishedProjectionHandler implements OutboxEventHandler {
+    @Autowired(required = false)
+    private ObservationRegistry observationRegistry;
     private final ObjectMapper objectMapper;
     private final MemoryService memoryService;
     private final ClaimCandidateService claimCandidateService;
@@ -51,16 +56,29 @@ public class DialogFinishedProjectionHandler implements OutboxEventHandler {
     @Override
     public void handle(OutboxEvent event) {
         Projection projection = parse(event.payload());
-        memoryService.extractFromSession(projection.userId(), projection.sessionId());
+        observe("inner.cosmos.projection.memory",
+                () -> memoryService.extractFromSession(projection.userId(), projection.sessionId()));
         // Gemini audit 1.6 (CONFIRMED/P1): gravity recompute must run AFTER extraction, in this
         // same ordered projection -- never as a second, independently-scheduled listener with no
         // ordering guarantee against extraction (the legacy in-process path's exact bug; see
         // MemoryExtractListener). This durable path never had that race, but it also never called
         // gravity recompute at all -- wiring it in here (in the correct order) is this fix's
         // other half: neither delivery path may silently skip it.
-        gravityRecalculationService.recalculateForUser(projection.userId());
-        claimCandidateService.stageForSession(projection.userId(), projection.sessionId());
-        emotionTimelineService.aggregateFromTraces(projection.userId(), LocalDate.now());
+        observe("inner.cosmos.projection.profile", () -> {
+            gravityRecalculationService.recalculateForUser(projection.userId());
+            claimCandidateService.stageForSession(projection.userId(), projection.sessionId());
+            emotionTimelineService.aggregateFromTraces(projection.userId(), LocalDate.now());
+        });
+    }
+
+    private void observe(String name, Runnable action) {
+        if (observationRegistry == null) {
+            action.run();
+            return;
+        }
+        Observation.createNotStarted(name, observationRegistry)
+                .lowCardinalityKeyValue("projection", "dialog-finished-v1")
+                .observe(action);
     }
 
     private Projection parse(String payload) {

@@ -1,5 +1,10 @@
 # Inner Cosmos 剩余工作交接（当前操作版）
 
+> **2026-07-23 W3 后续入口**：W3 三条云原生英雄链路已完成并冻结。Claude 接管 W1
+> 残余、W2 与 W4 时，先读
+> [`claude-w2-w4-handoff-2026-07-23.md`](claude-w2-w4-handoff-2026-07-23.md)；
+> 本文后续 W3 “待完成”描述保留为历史计划，不再是当前 cursor。
+
 > 本文件是 `对齐文档/24-完全体最终收敛与云原生课程战役.md` 的操作附件，不独立裁决产品方向。唯一机器 cursor 是 `docs/goal/closure-campaign-state.yml`。旧 19—23、track、loop、single-session 和 release state 仅供追溯。
 
 ## 1. 接管前五分钟

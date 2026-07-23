@@ -26,7 +26,8 @@ class DataRetractedOutboxWriterTest {
     void appendsOneSensitiveFreeOutboxRowKeyedByReceiptId() throws Exception {
         JdbcOutboxRepository repository = mock(JdbcOutboxRepository.class);
         when(repository.append(any(), any(), any(), any(), any(), anyInt(), any(), any())).thenReturn(true);
-        DataRetractedOutboxWriter writer = new DataRetractedOutboxWriter(repository, new ObjectMapper());
+        DataRetractedOutboxWriter writer = new DataRetractedOutboxWriter(
+                repository, new ObjectMapper(), new OutboxTraceContext(io.micrometer.tracing.Tracer.NOOP));
 
         writer.onDataRetracted(new DataRetractedEvent(42L, 7L, "CAPSULE", 5L,
                 "CAPSULE_MATCH_INDEX", "ERASED", 1));

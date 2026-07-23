@@ -6,7 +6,7 @@
 
 > **启动/部署交接**：当任务涉及本地运行、`local-complete`、AWS Academy EKS 或组员交接时，在上述权威入口之后完整阅读 [`对齐文档/18-组员与Coding-Agent启动部署交接指南.md`](对齐文档/18-组员与Coding-Agent启动部署交接指南.md)。真实密钥只能由操作者在本地进程或外部 Secret 管理中注入，禁止写入仓库、聊天、日志或 Kubernetes manifest。
 
-> **当前最终收敛交接**：完整阅读 [对齐文档/24-完全体最终收敛与云原生课程战役.md](对齐文档/24-完全体最终收敛与云原生课程战役.md)、[对齐文档/25-云原生高级能力展柜与课程评分设计.md](对齐文档/25-云原生高级能力展柜与课程评分设计.md)、[docs/goal/closure-campaign-state.yml](docs/goal/closure-campaign-state.yml) 与 [docs/goal/complete-product-acceptance.yml](docs/goal/complete-product-acceptance.yml)。23、22、21、19、20、旧 single-session/teammate state 与 `docs/tracks/` 保留为历史集成/拆轨证据；不得按通配符 cherry-pick 旧 WIP 或重复实现。真实 Provider、设备、法务和生产账户仍是人工门禁。
+> **当前最终收敛交接**：完整阅读 [对齐文档/24-完全体最终收敛与云原生课程战役.md](对齐文档/24-完全体最终收敛与云原生课程战役.md)、[对齐文档/25-云原生高级能力展柜与课程评分设计.md](对齐文档/25-云原生高级能力展柜与课程评分设计.md)、[docs/goal/closure-campaign-state.yml](docs/goal/closure-campaign-state.yml)、[docs/goal/complete-product-acceptance.yml](docs/goal/complete-product-acceptance.yml) 与 [docs/goal/claude-w2-w4-handoff-2026-07-23.md](docs/goal/claude-w2-w4-handoff-2026-07-23.md)。W3 已完成并冻结；Claude 接管 W1 残余、W2 与 W4。23、22、21、19、20、旧 single-session/teammate state 与 `docs/tracks/` 保留为历史集成/拆轨证据；不得按通配符 cherry-pick 旧 WIP 或重复实现。真实 Provider、设备、法务和生产账户仍是人工门禁。
 
 > ⚠️ **本文正文是 V0.1 历史工程基线，其“技术栈 / 项目结构 / 构建与运行命令”已过时**（当前实际为 Java 21、Spring Boot 3.5.x、React 19 + Vite 前端、PostgreSQL 16 + pgvector + Flyway、Redis，入口 `http://localhost:8080/app/aurora/`）。**要构建、运行或了解当前真实架构，以 [`CLAUDE.md`](CLAUDE.md) 与 [`README.md`](README.md) 为准**。以下正文保留的模块划分、设计模式、隐私分层、安全边界等概念仍具参考价值。
 

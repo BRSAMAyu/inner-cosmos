@@ -2,6 +2,8 @@ package com.innercosmos.event.reliable;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import io.micrometer.tracing.Span;
+import io.micrometer.tracing.Tracer;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -25,10 +27,15 @@ public class JdbcOutboxWorker {
 
     private final JdbcOutboxRepository repository;
     private final Map<String, OutboxEventHandler> handlers;
+    private final OutboxTraceContext traceContext;
+    private final Tracer tracer;
     private final String workerId;
 
-    public JdbcOutboxWorker(JdbcOutboxRepository repository, List<OutboxEventHandler> handlers) {
+    public JdbcOutboxWorker(JdbcOutboxRepository repository, List<OutboxEventHandler> handlers,
+                            OutboxTraceContext traceContext, Tracer tracer) {
         this.repository = repository;
+        this.traceContext = traceContext;
+        this.tracer = tracer;
         this.handlers = new HashMap<>();
         for (OutboxEventHandler handler : handlers) {
             if (this.handlers.put(handler.eventType(), handler) != null) {
@@ -46,11 +53,18 @@ public class JdbcOutboxWorker {
                 repository.retry(event, new IllegalStateException("No handler for event type"), MAX_ATTEMPTS, RETRY_DELAY);
                 continue;
             }
+            Span span = traceContext.startConsumer(event);
             try {
-                repository.complete(event, handler);
+                try (Tracer.SpanInScope ignored = tracer.withSpan(span)) {
+                    repository.complete(event, handler);
+                    span.tag("outcome", "published");
+                }
             } catch (RuntimeException e) {
+                span.tag("outcome", "retry").error(e);
                 log.warn("Outbox event {} failed on attempt {}", event.eventId(), event.attempts() + 1);
                 repository.retry(event, e, MAX_ATTEMPTS, RETRY_DELAY);
+            } finally {
+                span.end();
             }
         }
     }

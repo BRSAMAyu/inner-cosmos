@@ -25,3 +25,4 @@ resources:
   - scheduler-deployment.yaml
   - migration-job.yaml
   - network-policy.yaml
+  - observability.yaml

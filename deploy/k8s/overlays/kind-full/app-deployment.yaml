@@ -63,6 +63,9 @@ spec:
             - secretRef: {name: inner-cosmos-runtime}
           env:
             - {name: INNER_COSMOS_RUNTIME_ROLE, value: api}
+            - {name: OTEL_SERVICE_NAME, value: inner-cosmos-api}
+            - {name: MANAGEMENT_OPENTELEMETRY_RESOURCE_ATTRIBUTES_SERVICE_NAME, value: inner-cosmos-api}
+            - {name: MANAGEMENT_OPENTELEMETRY_RESOURCE_ATTRIBUTES_INNER_COSMOS_RUNTIME_ROLE, value: api}
           resources:
             requests: {cpu: 250m, memory: 512Mi}
             limits: {cpu: "1", memory: 1Gi}

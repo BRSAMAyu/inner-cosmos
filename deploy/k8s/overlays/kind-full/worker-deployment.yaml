@@ -52,6 +52,9 @@ spec:
             - secretRef: {name: inner-cosmos-runtime}
           env:
             - {name: INNER_COSMOS_RUNTIME_ROLE, value: worker}
+            - {name: OTEL_SERVICE_NAME, value: inner-cosmos-worker}
+            - {name: MANAGEMENT_OPENTELEMETRY_RESOURCE_ATTRIBUTES_SERVICE_NAME, value: inner-cosmos-worker}
+            - {name: MANAGEMENT_OPENTELEMETRY_RESOURCE_ATTRIBUTES_INNER_COSMOS_RUNTIME_ROLE, value: worker}
             - {name: SERVER_PORT, value: "8081"}
           ports:
             - {name: health, containerPort: 8081}

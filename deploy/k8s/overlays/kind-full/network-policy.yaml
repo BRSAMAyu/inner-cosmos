@@ -23,6 +23,7 @@ spec:
         - {protocol: TCP, port: 53}
         - {protocol: TCP, port: 5432}
         - {protocol: TCP, port: 6379}
+        - {protocol: TCP, port: 4318}
     - to:
         - ipBlock:
             cidr: 0.0.0.0/0
@@ -53,6 +54,7 @@ spec:
         - {protocol: TCP, port: 53}
         - {protocol: TCP, port: 5432}
         - {protocol: TCP, port: 6379}
+        - {protocol: TCP, port: 4318}
     - to:
         - ipBlock:
             cidr: 0.0.0.0/0
@@ -78,3 +80,32 @@ spec:
       ports:
         - {protocol: TCP, port: 5432}
         - {protocol: TCP, port: 6379}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: inner-cosmos-observability
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/component
+        operator: In
+        values: [otel-collector, trace-backend]
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: inner-cosmos}
+      ports:
+        - {protocol: TCP, port: 4318}
+        - {protocol: TCP, port: 4317}
+    - ports:
+        - {protocol: TCP, port: 16686}
+        - {protocol: TCP, port: 13133}
+  egress:
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+        - {protocol: TCP, port: 4318}

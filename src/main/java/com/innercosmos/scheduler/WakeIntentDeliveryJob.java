@@ -13,6 +13,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 
 import java.lang.management.ManagementFactory;
 import java.time.Duration;
@@ -25,6 +28,8 @@ import java.time.ZonedDateTime;
 @Component
 @ConditionalOnExpression("'${inner-cosmos.runtime.role:all}' == 'all' or '${inner-cosmos.runtime.role:all}' == 'scheduler'")
 public class WakeIntentDeliveryJob {
+    @Autowired(required = false)
+    private ObservationRegistry observationRegistry;
     private static final Logger log = LoggerFactory.getLogger(WakeIntentDeliveryJob.class);
     private static final Duration CLAIM_LEASE = Duration.ofMinutes(2);
 
@@ -53,12 +58,22 @@ public class WakeIntentDeliveryJob {
         intents.expirePastDue();
         for (WakeIntent intent : intents.claimDue(workerId, 50, CLAIM_LEASE)) {
             try {
-                decide(intent);
+                if (observationRegistry == null) {
+                    decide(intent);
+                } else {
+                    Observation.createNotStarted("inner.cosmos.wake-intent.deliver", observationRegistry)
+                            .lowCardinalityKeyValue("purpose", boundedPurpose(intent.purpose))
+                            .observe(() -> decide(intent));
+                }
             } catch (RuntimeException failure) {
                 // A crashed/failed worker deliberately leaves the lease for another replica.
                 log.warn("Wake intent {} decision failed; lease will recover it: {}", intent.id, failure.getMessage());
             }
         }
+    }
+
+    private String boundedPurpose(String purpose) {
+        return purpose != null && purpose.matches("[A-Z0-9_:-]{1,48}") ? purpose : "other";
     }
 
     void decide(WakeIntent intent) {

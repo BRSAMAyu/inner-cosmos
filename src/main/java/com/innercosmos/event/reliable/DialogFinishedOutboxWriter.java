@@ -3,7 +3,6 @@ package com.innercosmos.event.reliable;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.innercosmos.event.DialogFinishedEvent;
-import org.slf4j.MDC;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
@@ -19,10 +18,13 @@ public class DialogFinishedOutboxWriter {
 
     private final JdbcOutboxRepository repository;
     private final ObjectMapper objectMapper;
+    private final OutboxTraceContext traceContext;
 
-    public DialogFinishedOutboxWriter(JdbcOutboxRepository repository, ObjectMapper objectMapper) {
+    public DialogFinishedOutboxWriter(JdbcOutboxRepository repository, ObjectMapper objectMapper,
+                                      OutboxTraceContext traceContext) {
         this.repository = repository;
         this.objectMapper = objectMapper;
+        this.traceContext = traceContext;
     }
 
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
@@ -39,7 +41,7 @@ public class DialogFinishedOutboxWriter {
                     EVENT_TYPE,
                     1,
                     payload,
-                    MDC.get("traceId"));
+                    traceContext.capture());
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Unable to serialize dialog-finished outbox payload", e);
         }

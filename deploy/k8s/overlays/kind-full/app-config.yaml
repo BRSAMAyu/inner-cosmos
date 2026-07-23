@@ -32,3 +32,15 @@ data:
   MANAGEMENT_HEALTH_REDIS_ENABLED: "true"
   SEED_ENABLED: "false"
   COOKIE_SECURE: "false"
+  DEPLOYMENT_ENVIRONMENT: kind-w3-showcase
+  TRACING_SAMPLING_PROBABILITY: "1.0"
+  OTLP_TRACING_ENABLED: "true"
+  OTLP_TRACING_ENDPOINT: http://inner-cosmos-otel-collector:4318/v1/traces
+  # Direct Spring property names are required because this showcase activates dev,postgres
+  # rather than the production profile that maps the shorter aliases above.
+  MANAGEMENT_OTLP_TRACING_EXPORT_ENABLED: "true"
+  MANAGEMENT_OTLP_TRACING_ENDPOINT: http://inner-cosmos-otel-collector:4318/v1/traces
+  MANAGEMENT_TRACING_SAMPLING_PROBABILITY: "1.0"
+  MANAGEMENT_TRACING_PROPAGATION_PRODUCE: W3C
+  MANAGEMENT_OPENTELEMETRY_RESOURCE_ATTRIBUTES_SERVICE_NAMESPACE: inner-cosmos
+  MANAGEMENT_OPENTELEMETRY_RESOURCE_ATTRIBUTES_DEPLOYMENT_ENVIRONMENT: kind-w3-showcase

@@ -64,4 +64,28 @@ class AiTurnObservationTest {
         assertEquals(">10s", AiTurnObservation.durationBucket(10000));
         assertEquals("unknown", AiTurnObservation.durationBucket(-5));
     }
+
+    @Test
+    void providerObservationMeasuresTheActualScopedCallWithoutSensitiveTags() {
+        TestObservationRegistry registry = TestObservationRegistry.create();
+        AiTurnObservation observation = new AiTurnObservation(registry);
+
+        var provider = observation.startProvider("deepseek", "COMPANION");
+        try (var ignored = provider.openScope()) {
+            // Represents the provider/runtime call owned by AuroraAgentServiceImpl.
+        } finally {
+            provider.stop();
+        }
+
+        assertThat(registry)
+                .hasObservationWithNameEqualTo("inner.cosmos.ai.provider")
+                .that()
+                .hasBeenStarted()
+                .hasBeenStopped()
+                .hasLowCardinalityKeyValue("provider", "deepseek")
+                .hasLowCardinalityKeyValue("mode", "COMPANION")
+                .doesNotHaveLowCardinalityKeyValueWithKey("userId")
+                .doesNotHaveLowCardinalityKeyValueWithKey("message")
+                .doesNotHaveLowCardinalityKeyValueWithKey("prompt");
+    }
 }

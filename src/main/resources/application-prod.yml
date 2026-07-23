@@ -66,6 +66,24 @@ logging:
     max-history: 30
 
 management:
+  tracing:
+    enabled: true
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:0.10}
+    propagation:
+      produce: W3C
+  opentelemetry:
+    resource-attributes:
+      service.name: ${OTEL_SERVICE_NAME:inner-cosmos}
+      service.namespace: inner-cosmos
+      deployment.environment: ${DEPLOYMENT_ENVIRONMENT:production}
+      inner-cosmos.runtime.role: ${INNER_COSMOS_RUNTIME_ROLE:all}
+  otlp:
+    tracing:
+      endpoint: ${OTLP_TRACING_ENDPOINT:http://localhost:4318/v1/traces}
+      export:
+        # Export is opt-in so offline tests and local development never emit telemetry.
+        enabled: ${OTLP_TRACING_ENABLED:false}
   endpoints:
     web:
       exposure:

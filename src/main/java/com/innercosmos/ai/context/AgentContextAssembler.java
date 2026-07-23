@@ -40,6 +40,9 @@ import com.innercosmos.mapper.UserProfileMapper;
 import com.innercosmos.mapper.WeeklyReviewMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -48,6 +51,8 @@ import java.util.stream.Collectors;
 
 @Component
 public class AgentContextAssembler {
+    @Autowired(required = false)
+    private ObservationRegistry observationRegistry;
     private final UserProfileMapper userProfileMapper;
     private final DialogMessageMapper dialogMessageMapper;
     private final MemoryCardMapper memoryCardMapper;
@@ -180,11 +185,25 @@ public class AgentContextAssembler {
     private void addTaskAwareMemories(AgentContext context, Long userId, String currentMessage) {
         if (memoryRetrievalService == null || userId == null) return;
         MemoryEvidencePackVO pack;
+        Observation observation = observationRegistry == null ? null
+                : Observation.createNotStarted("inner.cosmos.memory.retrieve", observationRegistry)
+                .lowCardinalityKeyValue("task", retrievalTask(currentMessage))
+                .start();
         try {
-            pack = memoryRetrievalService.retrieve(userId, new MemoryRetrievalQuery(
-                    safe(currentMessage), retrievalTask(currentMessage), List.of(), 8, 800, false));
+            if (observation == null) {
+                pack = memoryRetrievalService.retrieve(userId, new MemoryRetrievalQuery(
+                        safe(currentMessage), retrievalTask(currentMessage), List.of(), 8, 800, false));
+            } else {
+                try (Observation.Scope ignored = observation.openScope()) {
+                    pack = memoryRetrievalService.retrieve(userId, new MemoryRetrievalQuery(
+                            safe(currentMessage), retrievalTask(currentMessage), List.of(), 8, 800, false));
+                }
+            }
         } catch (RuntimeException unavailable) {
+            if (observation != null) observation.error(unavailable);
             return;
+        } finally {
+            if (observation != null) observation.stop();
         }
         if (pack == null || pack.evidence() == null) return;
         for (MemoryEvidencePackVO.Evidence evidence : pack.evidence()) {

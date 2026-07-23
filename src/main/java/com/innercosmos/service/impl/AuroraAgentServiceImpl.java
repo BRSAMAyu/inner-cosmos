@@ -317,6 +317,10 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
 
         AuroraReplyVO vo;
         Map<String, Object> runtimeMeta = new LinkedHashMap<>();
+        io.micrometer.observation.Observation providerObservation = aiTurnObservation == null
+                ? null : aiTurnObservation.startProvider(resolved.provider(), mode);
+        io.micrometer.observation.Observation.Scope providerScope = providerObservation == null
+                ? null : providerObservation.openScope();
         try {
             StructuredAiResults.AuroraResult ai;
             if (dualKernelRuntime != null && dualKernelRuntime.shouldUseDualKernelForTurn(turnContext)) {
@@ -344,9 +348,13 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 );
             }
         } catch (Exception e) {
+            if (providerObservation != null) providerObservation.error(e);
             log.error("Aurora agent call failed after retries: {}", e.getMessage(), e);
             vo = differentiatedFallback(e, request.message, mode, stateSignal);
             fallbackUsed = true;
+        } finally {
+            if (providerScope != null) providerScope.close();
+            if (providerObservation != null) providerObservation.stop();
         }
         // Tag the response with the resolved provider/model for the UI
         vo.aiState = aiState(resolved);

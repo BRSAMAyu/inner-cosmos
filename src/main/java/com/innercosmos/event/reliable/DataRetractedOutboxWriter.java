@@ -3,7 +3,6 @@ package com.innercosmos.event.reliable;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.innercosmos.event.DataRetractedEvent;
-import org.slf4j.MDC;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
@@ -29,10 +28,13 @@ public class DataRetractedOutboxWriter {
 
     private final JdbcOutboxRepository repository;
     private final ObjectMapper objectMapper;
+    private final OutboxTraceContext traceContext;
 
-    public DataRetractedOutboxWriter(JdbcOutboxRepository repository, ObjectMapper objectMapper) {
+    public DataRetractedOutboxWriter(JdbcOutboxRepository repository, ObjectMapper objectMapper,
+                                     OutboxTraceContext traceContext) {
         this.repository = repository;
         this.objectMapper = objectMapper;
+        this.traceContext = traceContext;
     }
 
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
@@ -55,7 +57,7 @@ public class DataRetractedOutboxWriter {
                     EVENT_TYPE,
                     SCHEMA_VERSION,
                     objectMapper.writeValueAsString(body),
-                    MDC.get("traceId"));
+                    traceContext.capture());
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Unable to serialize data-retracted outbox payload", e);
         }

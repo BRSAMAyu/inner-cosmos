@@ -26,6 +26,17 @@ public class AiTurnObservation {
         this.registry = registry;
     }
 
+    /**
+     * Starts the span that measures the actual provider/runtime call. The caller owns its scope
+     * and must stop it in a finally block. Only bounded routing decisions are attached.
+     */
+    public Observation startProvider(String provider, String mode) {
+        return Observation.createNotStarted("inner.cosmos.ai.provider", registry)
+                .lowCardinalityKeyValue("provider", safe(provider))
+                .lowCardinalityKeyValue("mode", safe(mode))
+                .start();
+    }
+
     public void record(String route, String runtime, String provider, String mode,
                        boolean fallbackUsed, boolean memoryReferenced, long durationMs) {
         Observation.createNotStarted(NAME, registry)
