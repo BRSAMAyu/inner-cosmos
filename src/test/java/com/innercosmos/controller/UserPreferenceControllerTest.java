@@ -1,43 +1,52 @@
 package com.innercosmos.controller;
 
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.innercosmos.ai.router.SessionModelRouter;
 import com.innercosmos.common.Constants;
-import com.innercosmos.entity.UserProfile;
-import com.innercosmos.mapper.UserProfileMapper;
+import com.innercosmos.service.UserService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpSession;
 
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-/** M-030: preferred-model must be loaded by user_id (FK), not by the profile PK id. */
+/**
+ * The M-030 by-user_id-not-by-PK regression is now pinned at the service layer in
+ * {@code UserServiceImplPreferredModelTest} (G2.ARCH-MODULES: this controller was refactored to go
+ * through {@link UserService} instead of injecting {@code UserProfileMapper} directly). This test
+ * only covers the controller's own responsibility: extracting the session user id and the request
+ * body's provider field, and delegating them unchanged to the service.
+ */
 class UserPreferenceControllerTest {
 
     @Test
-    @DisplayName("M-030: setPreferredModel selects the profile by user_id, never selectById")
-    void setPreferredModel_usesUserIdKey() {
-        UserProfileMapper mapper = mock(UserProfileMapper.class);
-        UserProfile profile = new UserProfile();
-        profile.id = 7L;          // profile PK (≠ userId on purpose)
-        profile.userId = 2L;      // the FK the lookup must use
-        when(mapper.selectOne(any(QueryWrapper.class))).thenReturn(profile);
-        when(mapper.updateById(any(UserProfile.class))).thenReturn(1);
-
+    @DisplayName("setPreferredModel delegates the session user id and body provider to UserService")
+    void setPreferredModel_delegatesToUserService() {
+        UserService userService = mock(UserService.class);
         UserPreferenceController controller =
-                new UserPreferenceController(mapper, mock(SessionModelRouter.class));
+                new UserPreferenceController(userService, mock(SessionModelRouter.class));
 
         MockHttpSession session = new MockHttpSession();
         session.setAttribute(Constants.SESSION_USER_KEY, 2L);
 
         controller.setPreferredModel(Map.of("provider", "glm"), session);
 
-        verify(mapper).selectOne(any(QueryWrapper.class)); // by user_id
-        verify(mapper, never()).selectById(any());         // never the wrong PK lookup
-        assertEquals("GLM", profile.preferredModel);
+        verify(userService).setPreferredModel(2L, "glm");
+    }
+
+    @Test
+    @DisplayName("a missing provider field is passed through as null (service clears the preference)")
+    void setPreferredModel_missingProviderPassesNull() {
+        UserService userService = mock(UserService.class);
+        UserPreferenceController controller =
+                new UserPreferenceController(userService, mock(SessionModelRouter.class));
+
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute(Constants.SESSION_USER_KEY, 5L);
+
+        controller.setPreferredModel(Map.of(), session);
+
+        verify(userService).setPreferredModel(5L, null);
     }
 }

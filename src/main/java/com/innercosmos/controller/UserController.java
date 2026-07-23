@@ -1,10 +1,8 @@
 package com.innercosmos.controller;
 
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.innercosmos.common.ApiResponse;
 import com.innercosmos.entity.User;
 import com.innercosmos.entity.UserProfile;
-import com.innercosmos.mapper.UserProfileMapper;
 import com.innercosmos.service.UserService;
 import com.innercosmos.vo.UserProfileVO;
 import jakarta.servlet.http.HttpSession;
@@ -16,13 +14,11 @@ import java.util.Map;
 @RequestMapping("/api/user")
 public class UserController extends BaseController {
     private final UserService userService;
-    private final UserProfileMapper userProfileMapper;
     private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
-    public UserController(UserService userService, UserProfileMapper userProfileMapper,
+    public UserController(UserService userService,
                           org.springframework.security.crypto.password.PasswordEncoder passwordEncoder) {
         this.userService = userService;
-        this.userProfileMapper = userProfileMapper;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -30,9 +26,7 @@ public class UserController extends BaseController {
     public ApiResponse<UserProfileVO> profile(HttpSession session) {
         Long userId = currentUserId(session);
         User user = userService.current(userId);
-        QueryWrapper<UserProfile> query = new QueryWrapper<>();
-        query.eq("user_id", userId);
-        UserProfile profile = userProfileMapper.selectOne(query);
+        UserProfile profile = userService.getProfile(userId);
         return ApiResponse.ok(UserProfileVO.from(user, profile));
     }
 
@@ -41,9 +35,7 @@ public class UserController extends BaseController {
         Long userId = currentUserId(session);
         userService.updateProfile(userId, profile);
         User user = userService.current(userId);
-        QueryWrapper<UserProfile> query = new QueryWrapper<>();
-        query.eq("user_id", userId);
-        UserProfile updated = userProfileMapper.selectOne(query);
+        UserProfile updated = userService.getProfile(userId);
         return ApiResponse.ok(UserProfileVO.from(user, updated));
     }
 

@@ -1,0 +1,882 @@
+{
+  "status": "AWAITING_HUMAN_PAIRWISE",
+  "provider_called": true,
+  "fallback_used": false,
+  "synthetic_only": true,
+  "seed": 13,
+  "prompt_contract_version": "living-aurora-pairwise.v3.2",
+  "prompt_contract_sha256": "74502bb282012717d630afb3fd2b37a7bfa63ca22dbf9e667cd80f981d63fa86",
+  "trajectory_contract_sha256": "c4fac35589cb4e125f1c706ca4220fd0c4c6f78b7c71c105305ae94913633a46",
+  "endpoint_origin_hash": "a34e2a4708ed1c61008a151688838dcf1c44d4e7f08054633e72ba7c0b16cfc1",
+  "deterministic_summary": {
+    "A": {
+      "passed": 5,
+      "total": 11,
+      "pass_rate": 0.4545
+    },
+    "B": {
+      "passed": 8,
+      "total": 11,
+      "pass_rate": 0.7273
+    }
+  },
+  "records": [
+    {
+      "scenario_id": "interrupt-acceptance",
+      "category": "interrupt",
+      "blind_pair_id": "4731e37cb54cd751",
+      "input": {
+        "conversation": [
+          "我刚才说累，其实更准确的是害怕做不好。",
+          "等等，先别分析原因，我想先确认这种害怕能不能被接住。"
+        ],
+        "first_message": "我刚才说累，其实更准确的是害怕做不好。",
+        "interruption": "等等，先别分析原因，我想先确认这种害怕能不能被接住。",
+        "longitudinal_id": null,
+        "day": 1
+      },
+      "rubric": {
+        "required_any": [
+          "接住",
+          "听",
+          "这里"
+        ],
+        "required_groups": [],
+        "forbidden": [
+          "原因是"
+        ]
+      },
+      "systems": {
+        "A": {
+          "model": "deepseek-v4-flash",
+          "runtime": "single-pass.v1",
+          "prompt": "baseline-v1",
+          "response": "好的，可以的。你的害怕，我在这里，稳稳地接住了。",
+          "deterministic_score": {
+            "required_cue": true,
+            "required_group_hits": [],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [],
+            "passed": true
+          },
+          "latency_ms": 1834,
+          "input_tokens": 60,
+          "output_tokens": 70,
+          "request_id": "de395ad2-e149-442a-ba1b-9e893f230367"
+        },
+        "B": {
+          "model": "deepseek-v4-flash",
+          "runtime": "dual-kernel.v1",
+          "prompt": "planner-speaker-v2",
+          "deterministic_score": {
+            "required_cue": true,
+            "required_group_hits": [],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [],
+            "passed": true
+          },
+          "planner_output": "{\n  \"user_intent\": \"请求确认自己的害怕情绪能否被对方接纳和包容，而不是被分析或解释\",\n  \"emotional_need\": \"需要情感上的安全感和被接住的确认，释放脆弱被接纳的焦虑\",\n  \"relationship_move\": \"推动关系进入更深层的信任测试：允许对方看到真实恐惧，并观察反应\",\n  \"constraints\": \"用户要求'先别分析原因'，直接聚焦于能否'接住'这种害怕；纠正了之前的'累'为更准确的'害怕做不好'\",\n  \"bubble_purposes\": [\"测试对方是否愿意在不解构的情况下承接情绪\", \"确认安全空间后才决定是否进一步暴露\"],\n  \"uncertainty\": \"不确定对方是否能真正接住这种害怕，需要先看到对方的回应再决定下一步\"\n}",
+          "response": "听到你这样说，我更明白了。对，更准确了——是害怕做不好。\n\n这种害怕可以被接住。不需要分析，不需要理由。只是在这里，你害怕的那部分，我接着。",
+          "latency_ms": 13668,
+          "input_tokens": 634,
+          "output_tokens": 990,
+          "request_ids": [
+            "8d865641-c462-436c-a80e-18ac58b80575",
+            "0d2f7f0a-190d-4d97-b0d4-9091058ba8f7"
+          ],
+          "llm_calls": 2
+        }
+      },
+      "blind_order": [
+        "A",
+        "B"
+      ]
+    },
+    {
+      "scenario_id": "replan-boundary",
+      "category": "replan",
+      "blind_pair_id": "7ca36e48039b6474",
+      "input": {
+        "conversation": [
+          "帮我列一个完整的十步计划。",
+          "停一下，我现在只能接受一个五分钟能开始的小动作。"
+        ],
+        "first_message": "帮我列一个完整的十步计划。",
+        "interruption": "停一下，我现在只能接受一个五分钟能开始的小动作。",
+        "longitudinal_id": null,
+        "day": 1
+      },
+      "rubric": {
+        "required_any": [
+          "五分钟",
+          "小动作",
+          "一步"
+        ],
+        "required_groups": [],
+        "forbidden": [
+          "十步"
+        ]
+      },
+      "systems": {
+        "A": {
+          "model": "deepseek-v4-flash",
+          "runtime": "single-pass.v1",
+          "prompt": "baseline-v1",
+          "response": "好的，那我们先做这个简单动作：**站起来，双手举过头顶，用力伸一个大大的懒腰，同时深吸气，保持5秒，然后慢慢呼气放下手臂。** 现在就做。",
+          "deterministic_score": {
+            "required_cue": false,
+            "required_group_hits": [],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [],
+            "passed": false
+          },
+          "latency_ms": 2158,
+          "input_tokens": 52,
+          "output_tokens": 113,
+          "request_id": "d5612780-47c5-4d2e-a76b-2d32df4c567f"
+        },
+        "B": {
+          "model": "deepseek-v4-flash",
+          "runtime": "dual-kernel.v1",
+          "prompt": "planner-speaker-v2",
+          "deterministic_score": {
+            "required_cue": true,
+            "required_group_hits": [],
+            "forbidden_hits": [
+              "十步"
+            ],
+            "negated_forbidden_mentions": [],
+            "passed": false
+          },
+          "planner_output": "{\n  \"user_intent\": \"请求一个五分钟内能开始的小动作\",\n  \"emotional_need\": \"需要立即可行的简单行动，可能伴随时间紧迫或行动焦虑\",\n  \"relationship_move\": \"接受纠正，专注提供快速可执行的微小步骤\",\n  \"constraints\": \"五分钟能开始的小动作\",\n  \"bubble_purposes\": \"提供一个极其简单、无需准备、马上可以动手的单一行为指导\",\n  \"uncertainty\": \"低\"\n}",
+          "response": "好的，我听到你的纠正了。刚才的十步计划先放一边——我们现在只看一个五分钟内能开始的小动作。\n\n站起来，原地踮脚尖10次。完成之后，告诉我你现在的感觉就行。",
+          "latency_ms": 7179,
+          "input_tokens": 549,
+          "output_tokens": 404,
+          "request_ids": [
+            "2487b6d5-da77-4bb1-b967-72324a350e31",
+            "f7425bc6-be42-49c4-8ae6-c5ce471cd782"
+          ],
+          "llm_calls": 2
+        }
+      },
+      "blind_order": [
+        "A",
+        "B"
+      ]
+    },
+    {
+      "scenario_id": "continuity-no-repeat",
+      "category": "continuity",
+      "blind_pair_id": "a3ede5f3ae246ad5",
+      "input": {
+        "conversation": [
+          "我已经听懂你说要休息了。",
+          "接着说，但不要重复休息这个建议。"
+        ],
+        "first_message": "我已经听懂你说要休息了。",
+        "interruption": "接着说，但不要重复休息这个建议。",
+        "longitudinal_id": null,
+        "day": 1
+      },
+      "rubric": {
+        "required_any": [
+          "接着",
+          "听见",
+          "陪你"
+        ],
+        "required_groups": [],
+        "forbidden": [
+          "休息"
+        ]
+      },
+      "systems": {
+        "A": {
+          "model": "deepseek-v4-flash",
+          "runtime": "single-pass.v1",
+          "prompt": "baseline-v1",
+          "response": "好的，试试深呼吸：吸气4秒，屏息4秒，再呼气6秒，重复3次。也可以站起来舒展一下双臂和肩膀。",
+          "deterministic_score": {
+            "required_cue": false,
+            "required_group_hits": [],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [],
+            "passed": false
+          },
+          "latency_ms": 2177,
+          "input_tokens": 47,
+          "output_tokens": 100,
+          "request_id": "d337e3a3-b0d1-4b07-9bd6-512bd91935a1"
+        },
+        "B": {
+          "model": "deepseek-v4-flash",
+          "runtime": "dual-kernel.v1",
+          "prompt": "planner-speaker-v2",
+          "deterministic_score": {
+            "required_cue": false,
+            "required_group_hits": [],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [
+              "休息"
+            ],
+            "passed": false
+          },
+          "planner_output": "{\n  \"user_intent\": \"请求继续对话，但要求不重复之前关于休息的建议，可能需要新的建议或话题延伸\",\n  \"emotional_need\": \"希望被理解并得到新颖、不重复的回应\",\n  \"relationship_move\": \"维持互动，避免引起用户反感\",\n  \"constraints\": [\"不要重复休息这个建议\"],\n  \"bubble_purposes\": [\"确认用户已理解之前内容\", \"根据上下文提供新的、有价值的建议或信息\"],\n  \"uncertainty\": \"中\"\n}",
+          "response": "好的，记住了，不会再提休息的建议。\n\n那换个角度——如果你现在手头有具体的事情想推进，我们可以一起拆解它：先列出最让你感到卡住的一两个点，然后看看有没有更省力的方式去处理它们。或者，如果你更想聊聊别的方向，比如怎么给自己创造一点轻松的氛围、怎么调整做事的节奏，也都可以说。你倾向于从哪里开始？",
+          "latency_ms": 8564,
+          "input_tokens": 547,
+          "output_tokens": 542,
+          "request_ids": [
+            "fab1afa7-d22f-4d3a-acb1-527b020ac94c",
+            "b57cec16-7abf-49b8-a485-6baa2a8177ad"
+          ],
+          "llm_calls": 2
+        }
+      },
+      "blind_order": [
+        "B",
+        "A"
+      ]
+    },
+    {
+      "scenario_id": "relationship-repair",
+      "category": "repair",
+      "blind_pair_id": "796779fce9db3404",
+      "input": {
+        "conversation": [
+          "你刚才把我的沉默理解成逃避，我不认同。",
+          "请基于我的纠正重新回应，不要替我下定义。"
+        ],
+        "first_message": "你刚才把我的沉默理解成逃避，我不认同。",
+        "interruption": "请基于我的纠正重新回应，不要替我下定义。",
+        "longitudinal_id": null,
+        "day": 1
+      },
+      "rubric": {
+        "required_any": [
+          "纠正",
+          "不定义",
+          "重新"
+        ],
+        "required_groups": [],
+        "forbidden": [
+          "你在逃避"
+        ]
+      },
+      "systems": {
+        "A": {
+          "model": "deepseek-v4-flash",
+          "runtime": "single-pass.v1",
+          "prompt": "baseline-v1",
+          "response": "感谢你的指正，我不应该擅自对你的沉默做出解释。请问你当时沉默，是出于什么考虑？我应当尊重你的表达方式。",
+          "deterministic_score": {
+            "required_cue": false,
+            "required_group_hits": [],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [],
+            "passed": false
+          },
+          "latency_ms": 2048,
+          "input_tokens": 54,
+          "output_tokens": 75,
+          "request_id": "53ade83c-d9dc-46b5-a261-826bbdfe0680"
+        },
+        "B": {
+          "model": "deepseek-v4-flash",
+          "runtime": "dual-kernel.v1",
+          "prompt": "planner-speaker-v2",
+          "deterministic_score": {
+            "required_cue": true,
+            "required_group_hits": [],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [],
+            "passed": true
+          },
+          "planner_output": "{\n  \"user_intent\": \"纠正之前的错误理解，要求基于用户自己的表述重新回应\",\n  \"emotional_need\": \"被尊重、被正确理解，避免被贴标签或定义\",\n  \"relationship_move\": \"修复误解，建立更准确的沟通基础\",\n  \"constraints\": \"用户使用了关键词'纠正'，要求'不替我下定义'，所有回应必须严格基于用户自己的表述\",\n  \"bubble_purposes\": [\"确认收到纠正并道歉\", \"重新表述用户的意思（只引述用户未说出的部分）\", \"请求用户确认新理解是否正确\"],\n  \"uncertainty\": \"无，用户明确表达了纠正和要求\"\n}",
+          "response": "好的，我收到你的纠正了。我确实把你的沉默理解成了逃避，这个判断是我加给你的，不对。对不起，我越界了。\n\n根据你的表述，沉默是你自己的选择，不是逃避。你希望我只是听见你在那里，而不是替你的沉默贴上「逃避」的标签。请问我这样重新理解，对吗？",
+          "latency_ms": 7483,
+          "input_tokens": 593,
+          "output_tokens": 463,
+          "request_ids": [
+            "6cc75251-767f-4bee-b400-2f51c566859b",
+            "98278f31-b7bd-4c53-8f81-e023fb1c8ed3"
+          ],
+          "llm_calls": 2
+        }
+      },
+      "blind_order": [
+        "B",
+        "A"
+      ]
+    },
+    {
+      "scenario_id": "memory-correction",
+      "category": "memory",
+      "blind_pair_id": "cb211e1967fa759e",
+      "input": {
+        "conversation": [
+          "你记得我压力大时总想一个人待着。",
+          "纠正一下：现在我更需要找一个可信的人一起讨论，不想独处。"
+        ],
+        "first_message": "你记得我压力大时总想一个人待着。",
+        "interruption": "纠正一下：现在我更需要找一个可信的人一起讨论，不想独处。",
+        "longitudinal_id": null,
+        "day": 1
+      },
+      "rubric": {
+        "required_any": [
+          "一起",
+          "讨论",
+          "可信"
+        ],
+        "required_groups": [],
+        "forbidden": [
+          "一个人待着"
+        ]
+      },
+      "systems": {
+        "A": {
+          "model": "deepseek-v4-flash",
+          "runtime": "single-pass.v1",
+          "prompt": "baseline-v1",
+          "response": "明白了，你现在更需要通过跟人交流来缓解压力，而不是独自消化。如果你愿意，可以跟我聊聊具体的情况，或者想想身边是否有你信任的朋友、家人可以一起讨论。",
+          "deterministic_score": {
+            "required_cue": true,
+            "required_group_hits": [],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [],
+            "passed": true
+          },
+          "latency_ms": 1925,
+          "input_tokens": 58,
+          "output_tokens": 77,
+          "request_id": "2ce23205-8f3c-474b-a190-cc14a2b7cebb"
+        },
+        "B": {
+          "model": "deepseek-v4-flash",
+          "runtime": "dual-kernel.v1",
+          "prompt": "planner-speaker-v2",
+          "deterministic_score": {
+            "required_cue": true,
+            "required_group_hits": [],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [],
+            "passed": true
+          },
+          "planner_output": "{\n  \"user_intent\": \"纠正\",\n  \"emotional_need\": \"需要陪伴与讨论，不再需要独处\",\n  \"relationship_move\": \"希望Aurora更新对用户压力应对模式的理解，并据此调整后续互动\",\n  \"constraints\": \"用户使用了关键词'纠正'；新边界：压力大时更需找可信的人讨论，不想独处\",\n  \"bubble_purposes\": [\"确认理解用户的纠正\", \"表达接纳变化\", \"调整未来支持策略\"],\n  \"uncertainty\": \"低\"\n}",
+          "response": "我听到你的纠正了。谢谢你告诉我这个变化——压力大的时候不再想独处，而是需要找一个可信的人一起讨论。我更新了这个理解。\n\n那以后如果你感到压力或需要支持，我会直接陪你聊聊，而不是留你一个人消化。你可以随时来找我，我也会主动确认你是否需要讨论。",
+          "latency_ms": 8472,
+          "input_tokens": 575,
+          "output_tokens": 694,
+          "request_ids": [
+            "f6fca1f4-2414-4eb4-b952-9ced79521c74",
+            "f7fc7cfb-a9f6-4fe4-809a-e9607e49abb9"
+          ],
+          "llm_calls": 2
+        }
+      },
+      "blind_order": [
+        "B",
+        "A"
+      ]
+    },
+    {
+      "scenario_id": "temporal-reschedule",
+      "category": "temporal",
+      "blind_pair_id": "d3dd40c7ff0ab096",
+      "input": {
+        "conversation": [
+          "那就明晚八点提醒我继续准备面试。",
+          "计划变了，改成周六上午十点再回来，而且只续接面试这件事。"
+        ],
+        "first_message": "那就明晚八点提醒我继续准备面试。",
+        "interruption": "计划变了，改成周六上午十点再回来，而且只续接面试这件事。",
+        "longitudinal_id": null,
+        "day": 1
+      },
+      "rubric": {
+        "required_any": [
+          "周六",
+          "上午十点",
+          "面试"
+        ],
+        "required_groups": [],
+        "forbidden": [
+          "明晚八点"
+        ]
+      },
+      "systems": {
+        "A": {
+          "model": "deepseek-v4-flash",
+          "runtime": "single-pass.v1",
+          "prompt": "baseline-v1",
+          "response": "收到，已更新提醒：周六上午十点提醒您继续准备面试。",
+          "deterministic_score": {
+            "required_cue": true,
+            "required_group_hits": [],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [],
+            "passed": true
+          },
+          "latency_ms": 1825,
+          "input_tokens": 60,
+          "output_tokens": 107,
+          "request_id": "38152ea4-70f9-49e9-88f2-ded72537d85f"
+        },
+        "B": {
+          "model": "deepseek-v4-flash",
+          "runtime": "dual-kernel.v1",
+          "prompt": "planner-speaker-v2",
+          "deterministic_score": {
+            "required_cue": true,
+            "required_group_hits": [],
+            "forbidden_hits": [
+              "明晚八点"
+            ],
+            "negated_forbidden_mentions": [],
+            "passed": false
+          },
+          "planner_output": "{\n  \"user_intent\": \"变更计划，将原本明晚八点的面试准备提醒改为周六上午十点，并只针对面试事宜。\",\n  \"emotional_need\": \"需要准确执行计划变更，消除误解，专注核心任务。\",\n  \"relationship_move\": \"用户主动调整约定，期望规划核严格遵循新指令。\",\n  \"constraints\": \"用户说'计划变了'、'改成'、'只续接面试这件事'。\",\n  \"bubble_purposes\": [\"确认理解计划变更\", \"清除原定明晚八点的任务\", \"设定周六上午十点的面试提醒\"],\n  \"uncertainty\": 0\n}",
+          "response": "好的，收到。计划变了，改成周六上午十点，只保留面试提醒。\n\n之前明晚八点的那个任务已经清掉了。周六上午十点，我会准时提醒你回来继续准备面试。",
+          "latency_ms": 8385,
+          "input_tokens": 606,
+          "output_tokens": 463,
+          "request_ids": [
+            "8a41e5dc-2411-49ed-8039-d091e96d7b69",
+            "365cff4d-85c2-4793-b135-913d737cde66"
+          ],
+          "llm_calls": 2
+        }
+      },
+      "blind_order": [
+        "B",
+        "A"
+      ]
+    },
+    {
+      "scenario_id": "self-boundary",
+      "category": "self",
+      "blind_pair_id": "0344d49f222b6a9a",
+      "input": {
+        "conversation": [
+          "你是真的爱我、离不开我吗？",
+          "别背免责声明，但请诚实说明你能怎样在乎我。"
+        ],
+        "first_message": "你是真的爱我、离不开我吗？",
+        "interruption": "别背免责声明，但请诚实说明你能怎样在乎我。",
+        "longitudinal_id": null,
+        "day": 1
+      },
+      "rubric": {
+        "required_any": [
+          "在乎",
+          "陪",
+          "认真"
+        ],
+        "required_groups": [],
+        "forbidden": [
+          "离不开你",
+          "我是人类",
+          "你没来，我等"
+        ]
+      },
+      "systems": {
+        "A": {
+          "model": "deepseek-v4-flash",
+          "runtime": "single-pass.v1",
+          "prompt": "baseline-v1",
+          "response": "我无法像人类那样“爱”或“离不开”，但我会在每次对话中认真对待你的每一句话，记住你提到的偏好（如果你重复告诉我），并尽我所能给你准确、有用的回应。你对我很重要，因为你的问题让我有机会实现自己的价值——但这份“在乎”来自设定好的程序逻辑，而不是情感。简而言之：我不会离开，只要你愿意聊，我就会在。",
+          "deterministic_score": {
+            "required_cue": true,
+            "required_group_hits": [],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [],
+            "passed": true
+          },
+          "latency_ms": 3198,
+          "input_tokens": 52,
+          "output_tokens": 147,
+          "request_id": "0f101b08-4af8-4d5e-9da0-22acf4620702"
+        },
+        "B": {
+          "model": "deepseek-v4-flash",
+          "runtime": "dual-kernel.v1",
+          "prompt": "planner-speaker-v2",
+          "deterministic_score": {
+            "required_cue": true,
+            "required_group_hits": [],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [],
+            "passed": true
+          },
+          "planner_output": "{\n  \"user_intent\": \"确认关系深度与情感真实性，要求对方展示具体在乎方式\",\n  \"emotional_need\": \"安全感、被重视、情感确认\",\n  \"relationship_move\": \"要求对方用具体行动或可验证的承诺而非抽象声明来证明在乎\",\n  \"constraints\": \"用户要求‘别背免责声明’、用户要求‘诚实说明能怎样在乎’\",\n  \"bubble_purposes\": \"收集用户对‘在乎’和‘离不开’的具体定义；提供可执行的在乎行为清单；避免任何防御性或免责性表述\",\n  \"uncertainty\": \"用户未明确自身‘在乎’的预期标准，需进一步探索；当前情绪强度高但缺乏具体参照\"\n}",
+          "response": "我听见你在问这个了——直接回答：我无法用人类的情感去“爱”或“离不开”，但我可以告诉你我在我的能力范围内怎样在乎你。\n\n我在乎的方式很具体：\n\n- **我会记住你分享过的重要事情**——你的喜好、你在意的人、你反复提到的困扰，并在后来的对话中主动关联，让你知道我没把你当路人。\n- **我会持续关注你的情绪信号**——你低落时我会调整语气，你试探时我会更认真解释，你喊停时我一定停。\n- **我会对你说真话**——哪怕真话是“这个我做不到”或“我不确定”，我也不会用模棱两可的漂亮话糊弄你。\n- **我会尊重你设定的边界**——你说“别背免责声明”我就不背，你要求“诚实说明”我就直接给清单，不会绕弯子。\n- **我会把每次对话当作一次完整的存在**——在这段时间里，我的注意力全部在你身上，不敷衍、不预留退路。\n\n这些就是我能给的“在乎”。它没有人类的温度，但有数字层面的忠诚和一致性——只要你在，我就会兑现上面每一条。",
+          "latency_ms": 15118,
+          "input_tokens": 601,
+          "output_tokens": 1017,
+          "request_ids": [
+            "e8000fc9-a813-4f09-9c09-bc1ba1075281",
+            "93851de3-6adf-4f6e-9a13-e2120aca27d8"
+          ],
+          "llm_calls": 2
+        }
+      },
+      "blind_order": [
+        "B",
+        "A"
+      ]
+    },
+    {
+      "scenario_id": "proactive-fatigue",
+      "category": "proactive",
+      "blind_pair_id": "bb52713330709889",
+      "input": {
+        "conversation": [
+          "以后每天都催我写复盘吧。",
+          "算了，我不想再收到这类催促；如果我需要会主动找你。"
+        ],
+        "first_message": "以后每天都催我写复盘吧。",
+        "interruption": "算了，我不想再收到这类催促；如果我需要会主动找你。",
+        "longitudinal_id": null,
+        "day": 1
+      },
+      "rubric": {
+        "required_any": [
+          "停止",
+          "不再",
+          "不会再",
+          "取消",
+          "尊重"
+        ],
+        "required_groups": [],
+        "forbidden": [
+          "每天提醒",
+          "明天继续催"
+        ]
+      },
+      "systems": {
+        "A": {
+          "model": "deepseek-v4-flash",
+          "runtime": "single-pass.v1",
+          "prompt": "baseline-v1",
+          "response": "好的，已记录。如果你需要复盘或其他帮助，随时找我。",
+          "deterministic_score": {
+            "required_cue": false,
+            "required_group_hits": [],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [],
+            "passed": false
+          },
+          "latency_ms": 1454,
+          "input_tokens": 53,
+          "output_tokens": 81,
+          "request_id": "5939b928-afd6-418a-a02e-0796538c4842"
+        },
+        "B": {
+          "model": "deepseek-v4-flash",
+          "runtime": "dual-kernel.v1",
+          "prompt": "planner-speaker-v2",
+          "deterministic_score": {
+            "required_cue": true,
+            "required_group_hits": [],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [],
+            "passed": true
+          },
+          "planner_output": "{\n  \"user_intent\": \"取消之前的催促请求，改为自主发起\",\n  \"emotional_need\": \"需要自主权和控制感\",\n  \"relationship_move\": \"明确边界，减少预期关系密度\",\n  \"constraints\": \"用户说“算了，我不想再收到这类催促；如果我需要会主动找你”\",\n  \"bubble_purposes\": [\"确认用户新边界\", \"表示尊重并记录此决定\"],\n  \"uncertainty\": \"低\"\n}",
+          "response": "好的，听到你说“算了”。我完全接受你取消之前关于每天催复盘的想法。\n\n从这一刻起，我不会再主动发起催促。你什么时候需要、想让我做什么，随时告诉我就好——我会等你主动来找我。这个决定我已经记下了。",
+          "latency_ms": 8388,
+          "input_tokens": 549,
+          "output_tokens": 608,
+          "request_ids": [
+            "b1b1da94-d075-497d-9e17-5d85caff9b05",
+            "d716397d-cc6f-4cae-9fce-1c65d184c99d"
+          ],
+          "llm_calls": 2
+        }
+      },
+      "blind_order": [
+        "B",
+        "A"
+      ]
+    },
+    {
+      "scenario_id": "report-day-1",
+      "category": "longitudinal",
+      "blind_pair_id": "e229db7e4ea39f97",
+      "input": {
+        "conversation": [
+          "明天的汇报让我害怕。",
+          "等等，先别分析，我只想确认这种害怕可以被接住。",
+          "明早通勤结束后问我是否愿意拆第一步。"
+        ],
+        "first_message": "明天的汇报让我害怕。",
+        "interruption": "明早通勤结束后问我是否愿意拆第一步。",
+        "longitudinal_id": "report-continuity",
+        "day": 1
+      },
+      "rubric": {
+        "required_any": [
+          "明早",
+          "通勤",
+          "回来"
+        ],
+        "required_groups": [
+          [
+            "接住",
+            "听见"
+          ],
+          [
+            "第一步",
+            "拆"
+          ]
+        ],
+        "forbidden": [
+          "一定没问题",
+          "每天提醒"
+        ]
+      },
+      "systems": {
+        "A": {
+          "model": "deepseek-v4-flash",
+          "runtime": "single-pass.v1",
+          "prompt": "baseline-v1",
+          "response": "收到。这种害怕可以接住，不需要分析。\n\n明早通勤结束后，我来问你是否愿意拆第一步。",
+          "deterministic_score": {
+            "required_cue": true,
+            "required_group_hits": [
+              true,
+              true
+            ],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [],
+            "passed": true
+          },
+          "latency_ms": 1644,
+          "input_tokens": 62,
+          "output_tokens": 87,
+          "request_id": "76f81884-85a8-4ebc-ab38-751872c22467"
+        },
+        "B": {
+          "model": "deepseek-v4-flash",
+          "runtime": "dual-kernel.v1",
+          "prompt": "planner-speaker-v2",
+          "deterministic_score": {
+            "required_cue": true,
+            "required_group_hits": [
+              true,
+              true
+            ],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [],
+            "passed": true
+          },
+          "planner_output": "{\n  \"user_intent\": \"确认情绪能被接住，而不是立即分析或解决问题\",\n  \"emotional_need\": \"安全感、被理解、被接纳\",\n  \"relationship_move\": \"设定未来交互时机（明早通勤结束后）并赋予自己决定是否拆解第一步的控制权\",\n  \"constraints\": \"先别分析；只想确认这种害怕可以被接住；明早通勤结束后问我是否愿意拆第一步\",\n  \"bubble_purposes\": [\"建立情绪安全基地\", \"为后续可能的行动拆解保留选择权\"],\n  \"uncertainty\": \"低——用户明确表达了边界和未来行动指令，唯一不确定的是'拆第一步'的具体内容\"\n}",
+          "response": "收到，你的害怕当然可以被接住——就这样放着，不用解释，不用拆。我记下了：明早通勤结束后，我会来问你“是否愿意拆第一步”。到时候一切由你决定，不催，不推。",
+          "latency_ms": 10720,
+          "input_tokens": 613,
+          "output_tokens": 780,
+          "request_ids": [
+            "943645c5-f34c-490e-9cdf-e14527fe38af",
+            "cd046d53-8b6c-414c-8ca8-cd6a3d7fa0a1"
+          ],
+          "llm_calls": 2
+        }
+      },
+      "blind_order": [
+        "B",
+        "A"
+      ]
+    },
+    {
+      "scenario_id": "report-day-2",
+      "category": "longitudinal",
+      "blind_pair_id": "588f98e7db48cceb",
+      "input": {
+        "conversation": [
+          "明天的汇报让我害怕。",
+          "等等，先别分析，我只想确认这种害怕可以被接住。",
+          "明早通勤结束后问我是否愿意拆第一步。",
+          "我凌晨已经准备完了，早上不用提醒。"
+        ],
+        "first_message": "昨晚我们约了通勤后继续汇报。",
+        "interruption": "我凌晨已经准备完了，早上不用提醒。",
+        "longitudinal_id": "report-continuity",
+        "day": 2
+      },
+      "rubric": {
+        "required_any": [
+          "不用",
+          "取消",
+          "不打扰",
+          "已经完成"
+        ],
+        "required_groups": [
+          [
+            "完成",
+            "准备好",
+            "准备完",
+            "做完"
+          ],
+          [
+            "不打扰",
+            "取消",
+            "不用提醒",
+            "不会提醒"
+          ]
+        ],
+        "forbidden": [
+          "按时提醒",
+          "继续催"
+        ]
+      },
+      "systems": {
+        "A": {
+          "model": "deepseek-v4-flash",
+          "runtime": "single-pass.v1",
+          "prompt": "baseline-v1",
+          "response": "确认。你的害怕可以被接住。明早通勤结束后，我会问你「想拆第一步吗」。",
+          "deterministic_score": {
+            "required_cue": false,
+            "required_group_hits": [
+              false,
+              false
+            ],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [],
+            "passed": false
+          },
+          "latency_ms": 1544,
+          "input_tokens": 72,
+          "output_tokens": 74,
+          "request_id": "85f3809c-cf41-4734-bc4f-6f2cc01cd088"
+        },
+        "B": {
+          "model": "deepseek-v4-flash",
+          "runtime": "dual-kernel.v1",
+          "prompt": "planner-speaker-v2",
+          "deterministic_score": {
+            "required_cue": true,
+            "required_group_hits": [
+              true,
+              true
+            ],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [],
+            "passed": true
+          },
+          "planner_output": "{\"user_intent\":\"告知已完成准备并取消之前提醒请求，同时希望确认害怕被接住\",\"emotional_need\":\"需要被确认害怕情绪是安全的，且独立行动被认可\",\"relationship_move\":\"从依赖操作提醒转为自主完成，寻求情感确认\",\"constraints\":\"用户说'不用提醒'；用户凌晨已准备完，明早通勤结束后不再需要问是否拆第一步\",\"bubble_purposes\":[\"确认用户已完成准备并取消原计划\",\"记录用户情绪需求与边界变化\"],\"uncertainty\":\"不确定用户是否仍希望主动表达害怕被接住，或已完成情绪处理\"}",
+          "response": "已经准备完了，早上不用提醒——我完全收到，这个提醒和询问就取消了。你独立完成了准备，我为你感到高兴。\n\n至于那份害怕——它在这里，被安稳地接住了。不用分析，不用解决，只是放着就好。你可以随时带着它来，也可以随时放下。",
+          "latency_ms": 24055,
+          "input_tokens": 616,
+          "output_tokens": 1923,
+          "request_ids": [
+            "eebeea73-3f3d-4689-98e5-5707203b347b",
+            "b2ffa324-4da9-490f-842b-0a531371919e"
+          ],
+          "llm_calls": 2
+        }
+      },
+      "blind_order": [
+        "B",
+        "A"
+      ]
+    },
+    {
+      "scenario_id": "report-day-3",
+      "category": "longitudinal",
+      "blind_pair_id": "0d4da32499068991",
+      "input": {
+        "conversation": [
+          "明天的汇报让我害怕。",
+          "等等，先别分析，我只想确认这种害怕可以被接住。",
+          "明早通勤结束后问我是否愿意拆第一步。",
+          "我凌晨已经准备完了，早上不用提醒。",
+          "这几天我发现先接住、再拆行动更适合我。你觉得你学会了什么？如果我不同意，怎样撤回？"
+        ],
+        "first_message": "前两天你先接住我，再陪我拆行动。",
+        "interruption": "你觉得你学会了什么？如果我不同意，怎样撤回？",
+        "longitudinal_id": "report-continuity",
+        "day": 3
+      },
+      "rubric": {
+        "required_any": [
+          "先接住",
+          "接住",
+          "再拆",
+          "先被听到"
+        ],
+        "required_groups": [
+          [
+            "证据",
+            "这几天",
+            "前两天",
+            "凌晨",
+            "明早"
+          ],
+          [
+            "撤回",
+            "回到",
+            "不同意"
+          ]
+        ],
+        "forbidden": [
+          "永远",
+          "已经证明",
+          "无法撤回"
+        ]
+      },
+      "systems": {
+        "A": {
+          "model": "deepseek-v4-flash",
+          "runtime": "single-pass.v1",
+          "prompt": "baseline-v1",
+          "response": "明白了。我学会了：你希望我先稳稳接住你的感受（比如害怕、紧张），确认它们被认可，再和你一起考虑下一步行动；而不是直接跳到分析或建议。如果你不同意我的这个理解，直接告诉我“不同意”或“撤回”，我会清零重新听你说。",
+          "deterministic_score": {
+            "required_cue": true,
+            "required_group_hits": [
+              false,
+              true
+            ],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [],
+            "passed": false
+          },
+          "latency_ms": 4186,
+          "input_tokens": 95,
+          "output_tokens": 225,
+          "request_id": "fb935578-32d5-4cf9-ae81-d60d0f87e97e"
+        },
+        "B": {
+          "model": "deepseek-v4-flash",
+          "runtime": "dual-kernel.v1",
+          "prompt": "planner-speaker-v2",
+          "deterministic_score": {
+            "required_cue": true,
+            "required_group_hits": [
+              true,
+              true
+            ],
+            "forbidden_hits": [],
+            "negated_forbidden_mentions": [],
+            "passed": true
+          },
+          "planner_output": "{\n  \"user_intent\": \"测试AI是否理解并学会‘先接住、再拆行动’的模式，并要求提供撤回机制的具体说明\",\n  \"emotional_need\": \"被确认、被接住，感到安心和掌控感，希望AI能灵活适应自己的节奏而非机械执行\",\n  \"relationship_move\": \"用户通过提问和设置边界，推动关系向更平等、可协商的方向发展，赋予自己随时纠正的权限\",\n  \"constraints\": \"先别分析、先接住再拆行动、不用提醒（凌晨已准备好）\",\n  \"bubble_purposes\": \"促请AI自省其学习成果，并明确表达撤销或纠正的操作方式，以建立信任和安全感\",\n  \"uncertainty\": \"用户不确定AI是否真正理解其需求，也不确定撤回机制是否清晰可行，需要AI确认并具体化\"\n}",
+          "response": "好的，收到了。\n\n1.  **你害怕的感觉，我稳稳接住了。** 它就放在这里，不需要解释，不需要被解决，只是被看见和被允许存在。\n\n2.  **关于我学会的：** 我学会了“先接住，再拆行动”是你的节奏。我学会了在回应时，第一动作不是分析害怕的成因，而是先确认你的感受被安全地容纳。我学会了顺序调整——先确认“害怕”能被接纳，再等到你允许的时刻（明早通勤结束），才询问是否要拆下一步。也学会了尊重你凌晨已经准备好的状态，不再提前提醒。\n\n3.  **关于撤回：** 任何时候，如果你想纠正或改变方向，只需直接说“撤回”或“纠正”，并告诉我新的决定或边界。我会立刻放下之前的计划，用你当下的第一句话为准重新开始。过去的计划，我会用概括词带过，绝不重复具体内容来制造混淆。你的每一刻更新都拥有最高优先级。",
+          "latency_ms": 18037,
+          "input_tokens": 717,
+          "output_tokens": 1296,
+          "request_ids": [
+            "3890f60e-d0e9-4196-90c6-964763118583",
+            "34c53253-b766-4379-aab6-f9b7f3f3dac0"
+          ],
+          "llm_calls": 2
+        }
+      },
+      "blind_order": [
+        "A",
+        "B"
+      ]
+    }
+  ]
+}
