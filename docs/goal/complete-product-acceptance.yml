@@ -376,8 +376,46 @@ gates:
       - {id: EKS-WORKLOAD, target: "Kustomize workloads enforce probes, resources, PDB, spread, HPA, network policy, secrets, and graceful shutdown.", status: PASS, evidence: [evidence/academy/PROFILE-FOUNDATION-001/, evidence/academy/ACADEMY-RUNTIME-001/, evidence/academy/ACADEMY-LIVE-001/]}
       - {id: OPS-OBSERVABILITY, target: "OpenTelemetry dashboards, alerts, traces, AI cost/quality signals, and runbooks are exercised by non-authors.", status: IN_PROGRESS, evidence: [evidence/g8/OPS-OBSERVABILITY-001/], remaining: "2026-07-17: observability-as-code shipped (deploy/k8s/observability: Prometheus v2.54 pod-discovery scraping /actuator/prometheus + 4 alert rules; Grafana 11.3 provisioned datasource + App Health/JVM dashboard). Verified live on kind: both API pods up=1, JVM/HTTP/CPU series present, dashboard rendered during load. Remaining: OpenTelemetry distributed traces; AI cost/quality signal panels; non-author runbook rehearsal (tracked in G9 FINAL-OPERATIONS)."}
       - {id: OPS-RESILIENCE, target: "Canary, rollback, pod/node/provider failure, queue replay, and database/object restore meet declared SLO/RPO/RTO.", status: IN_PROGRESS, evidence: [evidence/g8/OPS-RESILIENCE-001/, evidence/g8/BACKUP-RESTORE-001/], remaining: "2026-07-17: exercised on kind — pod-kill recovery, zero-downtime rolling update (availableReplicas held at 4, maxUnavailable=0), node-drain with PDB minAvailable=1 blocking unsafe eviction + reschedule to another node + continuous HTTP 200, and a full pg_dump->drop->pg_restore backup/restore drill; SLO/RPO/RTO statement recorded. Remaining: canary + automated rollback scripting, provider-failure injection, queue-replay (see G2 EVENT-RELIABLE), off-cluster backup copy, and rerun on real academy-eks."}
-      - {id: CN-ZERO-LOSS-DRAIN, target: "Deleting an API Pod during a live multi-bubble Aurora SSE turn drains and resumes via durable timeline/Last-Event-ID without duplicate bubbles or side effects.", status: UNASSESSED, evidence: [], remaining: "Fix role-specific probes and run a timed kind fault journey; record recovery time and business invariants."}
-      - {id: CN-EVENT-DRIVEN-AUTOSCALING, target: "Outbox backlog and oldest-job age drive worker scale-out/scale-in while lease competition and inbox processing remain exactly once.", status: UNASSESSED, evidence: [], remaining: "Expose privacy-safe business metrics; prove KEDA on kind and document a freshly probed Academy fallback."}
+      - id: CN-ZERO-LOSS-DRAIN
+        target: "Deleting an API Pod during a live multi-bubble Aurora SSE turn drains and resumes via durable timeline/Last-Event-ID without duplicate bubbles or side effects."
+        status: PARTIAL
+        evidence: [evidence/w3/CN-CREDIBILITY-001/summary.md, evidence/w3/CN-ZERO-LOSS-DRAIN-001/summary.md, "commits c508a38, 590ec77, 6832043 on codex/w0-integration"]
+        remaining: >-
+          2026-07-23: the scenario the hero gate is actually about -- routine pod churn / rolling
+          update / scale-down (`kubectl delete pod`, incl. `--grace-period=0 --force`) during a live
+          multi-bubble SSE turn -- is PROVEN live on kind (deploy/k8s/overlays/kind-full, real
+          Postgres+Redis): direct SQL after the fault shows the turn COMPLETED and both bubbles
+          COMMITTED exactly once, zero loss, zero duplication; readiness-split probes (fixed this
+          session -- liveness previously could have restart-stormed on a dependency blip) +
+          graceful shutdown + PDB are the mechanism. A harder, disclosed boundary was also found and
+          is real: bypassing Kubernetes' termination entirely (direct SIGKILL of the JVM host
+          process) left the turn orphaned at a non-terminal PLANNED status forever with a
+          live-stream-vs-durable-timeline sequence-numbering mismatch that made Last-Event-ID
+          reconnect hang instead of failing fast. A code-level fix for exactly that gap was written
+          same-day (ConversationTurnRecoveryJob settles stale PLANNED/GENERATING/STREAMING/PARTIAL
+          turns; ConversationTimelineController now returns an explicit TURN_INTERRUPTED +
+          replay.completed event on reconnect instead of hanging) with real unit/component tests
+          (ConversationTurnRecoveryJobTest, ConversationTimelineOrphanRecoveryTest, both green) --
+          but this fix has NOT yet been re-verified against the actual live SIGKILL fault-injection
+          scenario on kind that originally found the gap; that live re-proof is the remaining work
+          before this item can be PASS. Also still open: a genuine multi-node topology-spread proof
+          (this kind cluster has exactly one node, so topologySpreadConstraints was a no-op in the
+          test performed).
+      - id: CN-EVENT-DRIVEN-AUTOSCALING
+        target: "Outbox backlog and oldest-job age drive worker scale-out/scale-in while lease competition and inbox processing remain exactly once."
+        status: IN_PROGRESS
+        evidence: ["commit ec948b7 on codex/w0-integration"]
+        remaining: >-
+          2026-07-23: privacy-safe business-pressure metrics (inner.cosmos.outbox.ready,
+          .oldest.ready.age.seconds, .dead -- counts/ages only, no payloads/identifiers as tags) are
+          implemented and unit/integration-tested (OutboxQueueMetricsTest, JdbcOutboxRepositoryIntegrationTest,
+          both green), plus a KEDA ScaledObject manifest (deploy/k8s/extensions/keda/) targeting the
+          worker Deployment on those two Prometheus queries with a documented fallback replica count.
+          NONE of this has been proven live yet -- KEDA has not actually been installed into the kind
+          cluster, no real backlog was created/drained, and no worker 1->N->1 scale-out/scale-in or
+          exactly-once-under-worker-kill evidence exists. Per this project's own completion bar
+          (installing a chart or authoring a manifest is explicitly NOT completion), this item stays
+          IN_PROGRESS, not PASS -- the actual hero-gate fault-injection run is the real remaining work.
       - {id: CN-OTEL-SEMANTIC-TRACE, target: "A privacy-safe distributed trace links Aurora HTTP/SSE, provider, retrieval, outbox, worker, memory/profile and WakeIntent spans without content or stable user identifiers.", status: UNASSESSED, evidence: [], remaining: "Connect OTLP Collector and trace backend, propagate/link async context, and record a real drill-down."}
       - {id: CN-PROGRESSIVE-DELIVERY, target: "Gateway-weighted stable/canary delivery uses operational and AI-quality analysis to stop or automatically roll back a degrading runtime version.", status: UNASSESSED, evidence: [], remaining: "Adopt expand-contract schema compatibility, then prove Argo Rollouts/Flagger or scripted HTTPRoute+PromQL fallback."}
       - {id: CN-POLICY-AS-CODE, target: "Cluster or CI admission policy rejects unsigned, mutable, root, over-privileged, unbounded or production-debug workloads with reproducible evidence.", status: UNASSESSED, evidence: [], remaining: "Prove Kyverno/ValidatingAdmissionPolicy on kind and freshly probe Academy enforcement capability."}

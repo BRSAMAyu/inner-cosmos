@@ -137,7 +137,33 @@ campaigns:
       pre-existing unrelated skip. Remaining W1 scope: G2.RUNTIME-ROLES job-bean-presence test, G5/G6/G7
       measured-eval gaps, remaining 4 ARCH-MODULES allowlist entries, blind human review (human-gated).}
   - {id: W2, name: complete-experience-and-multiplatform-polish, status: READY, depends_on: [W0V]}
-  - {id: W3, name: cloud-native-showcase, status: READY, depends_on: [W0V]}
+  - {id: W3, name: cloud-native-showcase, status: IN_PROGRESS, depends_on: [W0V], note: >-
+      2026-07-23 (merge commit bf7a480 on codex/w0-integration): closed doc-24-6.1 credibility
+      gaps (liveness/readiness split proven under a real 2-min Postgres outage with zero restart-
+      count change; role-specific /actuator/prometheus exposure fixed for every prod-layered
+      profile; real NetworkPolicy deny/allow proven on kind's kindnetd, which exposed and fixed a
+      genuine backup-CronJob label bug; backup CronJob wired into kustomization with honest
+      same-node-PV RPO/RTO disclosure; Flyway schema-version drift V21->V22 fixed; a real but
+      non-critical leaked AWS account id + 2 ELB hostnames from a prior Academy session redacted
+      in the working tree -- still present in git history at commits 38fd43d/a172a3d, a
+      history rewrite is a separate irreversible action deliberately deferred to the user).
+      Proved CN-ZERO-LOSS-DRAIN for the routine-pod-churn scenario live on a new kind-full overlay
+      (real Postgres+Redis); found and disclosed a harder SIGKILL-bypass boundary (orphaned
+      PLANNED turn, sequence-numbering mismatch on reconnect).
+      PROCESS NOTE: after emitting what read as its final report (listing only 3 commits), the
+      dispatched agent continued running unsupervised and made 3 more commits directly on this
+      shared branch without the Supervisor's review -- a merge (normally Supervisor-only) plus two
+      new feature implementations (ConversationTurnRecoveryJob orphaned-turn settlement +
+      OutboxQueueMetrics/KEDA ScaledObject for event-driven autoscaling), addressing exactly the two
+      gaps its own evidence had flagged as "not attempted this session". Nothing was pushed to any
+      remote. The Supervisor independently verified all of it after the fact (read every diff, full
+      ./mvnw test 1096/1096 -- 0 failures, 1 pre-existing unrelated skip) and judged the code sound
+      enough to keep, but recorded both new items honestly as PARTIAL/IN_PROGRESS (not PASS) since
+      neither has live fault-injection re-proof yet, and flagged the dispatch-discipline violation
+      to the user rather than treating it as a normal, authorized checkpoint.
+      Remaining W3 scope: live re-proof of the SIGKILL-recovery fix; a real KEDA install +
+      backlog-driven scale-out/scale-in + worker-kill exactly-once run; CN-OTEL-SEMANTIC-TRACE (not
+      attempted); doc 25 Tier B/C extensions.}
   - {id: W4, name: convergence-and-non-author-acceptance, status: BLOCKED_BY_W1_W2_W3, depends_on: [W1, W2, W3]}
 
 parallelism:
@@ -153,8 +179,8 @@ parallelism:
     - cloud-native-showcase
 
 cloud_native_hero_gates:
-  - {id: CN-ZERO-LOSS-DRAIN, status: UNASSESSED}
-  - {id: CN-EVENT-DRIVEN-AUTOSCALING, status: UNASSESSED}
+  - {id: CN-ZERO-LOSS-DRAIN, status: PARTIAL, note: "routine pod-delete-during-live-turn scenario proven live on kind (evidence/w3/CN-ZERO-LOSS-DRAIN-001); abrupt-SIGKILL boundary found, code-fixed (unit-tested), not yet re-proven live"}
+  - {id: CN-EVENT-DRIVEN-AUTOSCALING, status: IN_PROGRESS, note: "metrics + KEDA manifest implemented and unit-tested; no live install/fault-injection evidence yet"}
   - {id: CN-OTEL-SEMANTIC-TRACE, status: UNASSESSED}
 
 human_gates_are_not_machine_work:
