@@ -77,6 +77,19 @@ services:
       LLM_PROVIDER: ${LLM_PROVIDER:?set a real provider}
       LLM_API_KEY: ${LLM_API_KEY:?set a low-scope provider key}
       LLM_ALLOW_FALLBACK: "false"
+      # W1 real-provider embedding (pgvector) + inner-voice TTS. The full local-complete
+      # experience defaults these ON; the app fail-closes if a key is missing while enabled,
+      # so an operator who brings the stack up without provider keys gets a clear boot error
+      # instead of a silent Disabled*Client. Forwarded here (not hardcoded) so operators on a
+      # private/workspace-scoped gateway (e.g. a dedicated MaaS endpoint) override via env.
+      MEMORY_EMBEDDING_ENABLED: ${MEMORY_EMBEDDING_ENABLED:-true}
+      MEMORY_EMBEDDING_API_KEY: ${MEMORY_EMBEDDING_API_KEY:-}
+      MEMORY_EMBEDDING_BASE_URL: ${MEMORY_EMBEDDING_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
+      MEMORY_EMBEDDING_MODEL: ${MEMORY_EMBEDDING_MODEL:-text-embedding-v4}
+      MEMORY_EMBEDDING_DIMENSIONS: ${MEMORY_EMBEDDING_DIMENSIONS:-1536}
+      TTS_ENABLED: ${TTS_ENABLED:-true}
+      TTS_API_KEY: ${TTS_API_KEY:-}
+      TTS_WS_URL: ${TTS_WS_URL:-wss://dashscope.aliyuncs.com/api-ws/v1/inference}
       OIDC_ENABLED: "true"
       OIDC_ISSUER_URI: ${OIDC_ISSUER_URI:?set current IdP issuer}
       OIDC_JWK_SET_URI: ${OIDC_JWK_SET_URI:?set current IdP JWKS endpoint}
