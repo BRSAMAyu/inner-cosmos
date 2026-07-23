@@ -2,8 +2,8 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 authority: goal-objective.md
 status: IN_PROGRESS
-last_reconciled_at: 2026-07-23T17:50:00+08:00
-last_reconciled_commit: 50bd1eb
+last_reconciled_at: 2026-07-23T18:55:00+08:00
+last_reconciled_commit: 3a306a3
 current_fact_baseline: 对齐文档/24-完全体最终收敛与云原生课程战役.md
 current_execution_plan: 对齐文档/24-完全体最终收敛与云原生课程战役.md
 parallel_state: docs/goal/closure-campaign-state.yml
@@ -481,10 +481,17 @@ gates:
           read in full, web suite 482/482 (71 files), tsc clean.
           Still open (explicitly not attempted this pass, not silently claimed): complete axe/global
           WCAG audit, visual-regression and performance budgets, non-author blind-experience
-          acceptance, full per-component empty/loading/streaming/partial/offline/error/expired/
+          acceptance, and full per-component empty/loading/streaming/partial/offline/error/expired/
           permission-denied matrix beyond what was spot-checked, live 200%-browser-zoom check (only
-          the existing jsdom-level test was read), and the same <strong>+<small> run-on-naming risk
-          in ResonanceNetwork/PeopleDiscovery/LettersInbox/CapsuleWorkbench (found, not fixed).
+          the existing jsdom-level test was read).
+          UPDATE 2026-07-23 (commit 72e1bd3, in HEAD): the "run-on-naming risk in
+          ResonanceNetwork/PeopleDiscovery/LettersInbox/CapsuleWorkbench" called out above as
+          "found, not fixed" is now FIXED -- ResonanceNetwork/LettersInbox/CapsuleWorkbench each
+          got an aria-label + aria-hidden-duplicate fix with a per-component vitest regression
+          test; PeopleDiscovery was live-verified as genuinely NOT the bug (its strong+small sit
+          in a plain article with `display:block`, no accessible-name concatenation) and correctly
+          left unchanged. That specific sub-item is closed; the broader axe/WCAG/perf-budget/
+          blind-experience matrix above is what remains.
 
   - id: G8
     name: EKS operations and Singapore readiness
