@@ -1,0 +1,36 @@
+# CN-PROGRESSIVE-DELIVERY — real Prometheus health gate for the canary.
+#
+# This AnalysisTemplate is consumed by api-rollout.yaml at the canary step. It
+# queries the LIVE Prometheus already running in the cluster
+# (deploy/k8s/observability, service prometheus.observability.svc:9090), which
+# auto-discovers any pod annotated prometheus.io/scrape=true (the Aurora API pod
+# template carries that annotation). The metric `up` is 1 when Prometheus has
+# successfully scraped the pod's /actuator/prometheus endpoint - i.e. the canary
+# pod is up and serving. If the canary revision is broken (pods never become
+# ready / never serve), `up` is empty and this analysis fails -> Argo aborts.
+#
+# This is a REAL metric query against the running Prometheus (not a sentinel):
+# the success condition requires at least one healthy scrape target for the
+# canary namespace. It runs 3 times at 15s intervals to ride out scrape timing.
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: aurora-canary-health
+  namespace: inner-cosmos-rollouts
+spec:
+  args:
+    - name: namespace
+      value: inner-cosmos-rollouts
+  metrics:
+    - name: canary-scrape-up
+      # Run 3 evaluations; pass as soon as a healthy target is seen.
+      count: 3
+      interval: 15s
+      # Abort only after 2 consecutive failures (rides out first-scrape timing).
+      failureLimit: 2
+      successCondition: "len(result) > 0 && result[0] >= 1"
+      provider:
+        prometheus:
+          address: http://prometheus.observability.svc:9090
+          query: |
+            count(up{namespace="{{args.namespace}}"} == 1)

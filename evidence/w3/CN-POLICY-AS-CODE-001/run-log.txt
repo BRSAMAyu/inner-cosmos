@@ -1,0 +1,106 @@
+CN-POLICY-AS-CODE-001 — raw captured kubectl/helm output (kind kubedeploy, k8s v1.36.1)
+Branch codex/w3-extensions @ fe0e443. Date 2026-07-24. Real commands run this session.
+
+================================================================================
+INSTALL (helm)
+================================================================================
+$ helm install kyverno kyverno/kyverno --namespace kyverno --create-namespace --version 3.8.2 -f deploy/k8s/extensions/kyverno/values-kind.yaml
+NAME: kyverno
+LAST DEPLOYED: Fri Jul 24 04:11:00 2026
+NAMESPACE: kyverno
+STATUS: deployed
+REVISION: 1
+Chart version: 3.8.2 / Kyverno version: v1.18.2
+Components installed: CRDs, Admission controller (reports/cleanup/background/ttl disabled)
+
+$ kubectl -n kyverno get pods
+NAME                                            READY   STATUS    RESTARTS   AGE
+kyverno-admission-controller-7758575f4d-fm8ff   1/1     Running   0          6m33s
+
+$ kubectl get cpol
+NAME                                   ADMISSION   BACKGROUND   READY   MESSAGE
+inner-cosmos-disallow-latest-tag       true        false        True    Ready
+inner-cosmos-disallow-root-user        true        false        True    Ready
+inner-cosmos-require-resource-limits   true        false        True    Ready
+
+================================================================================
+SUCCESS: COMPLIANT POD ADMITTED + RUNNING
+================================================================================
+$ kubectl apply -f evidence/w3/CN-POLICY-AS-CODE-001/compliant-pod.yaml
+pod/cn-policy-compliant-probe created
+
+$ kubectl -n inner-cosmos-w3 get pod cn-policy-compliant-probe
+NAME                        READY   STATUS    RESTARTS   AGE
+cn-policy-compliant-probe   1/1     Running   0          10s
+
+SUCCESS: COMPLIANT DEPLOYMENT (product controller shape) ADMITTED via dry-run
+$ kubectl apply --dry-run=server -f /tmp/dp-compliant.yaml
+deployment.apps/cn-policy-dp-compliant created (server dry run)
+
+================================================================================
+REJECTION 1: ROOT USER (runAsUser: 0)
+================================================================================
+$ kubectl apply -f violating-root.yaml
+Error from server: error when creating "violating-root.yaml": admission webhook "validate.kyverno.svc-fail" denied the request:
+resource Pod/inner-cosmos-w3/cn-policy-violating-root was blocked due to the following policies
+inner-cosmos-disallow-root-user:
+  containers-must-not-be-root: 'validation failure: Inner Cosmos runtime pods must run as a non-root user. A pod that runs as UID 0 sits next to mounted DB/CA secrets and the memory/pgvector store - reject it before scheduling, not after.'
+  pod-must-not-be-root: Inner Cosmos runtime pods must run as a non-root user. A pod that runs as UID 0 sits next to mounted DB/CA secrets and the memory/pgvector store - reject it before scheduling, not after.
+
+================================================================================
+REJECTION 2: MISSING resource requests/limits
+================================================================================
+$ kubectl apply -f violating-no-resources.yaml
+Error from server ... admission webhook "validate.kyverno.svc-fail" denied the request:
+resource Pod/inner-cosmos-w3/cn-policy-violating-no-resources was blocked due to the following policies
+inner-cosmos-require-resource-limits:
+  containers-need-requests-and-limits: 'validation failure: Every Inner Cosmos container must declare resources.requests and resources.limits. An unbounded neighbor can starve/OOM-kill the pod serving a live Aurora turn or holding in-flight dialog state.'
+
+================================================================================
+REJECTION 3: MUTABLE :latest IMAGE TAG
+================================================================================
+$ kubectl apply -f violating-latest.yaml
+Error from server ... admission webhook "validate.kyverno.svc-fail" denied the request:
+resource Pod/inner-cosmos-w3/cn-policy-violating-latest was blocked due to the following policies
+inner-cosmos-disallow-latest-tag:
+  require-pinned-image-tag: 'validation failure: Inner Cosmos images must be pinned to an explicit tag (not :latest and not tag-less). A mutable tag would silently pull an unvetted Aurora build past the schema gate and invalidate the zero-loss-drain evidence.'
+
+================================================================================
+REJECTION 4: AUTOGEN — same rule blocks a violating Deployment's pod template
+================================================================================
+$ kubectl apply --dry-run=server -f /tmp/dp-root.yaml
+Error from server ... denied: resource Deployment/inner-cosmos-w3/cn-policy-dp-root was blocked due to the following policies
+inner-cosmos-disallow-root-user:
+  autogen-pod-must-not-be-root: Inner Cosmos runtime pods must run as a non-root user. A pod that runs as UID 0 sits next to mounted DB/CA secrets and the memory/pgvector store - reject it before scheduling, not after.
+
+================================================================================
+KILL SWITCH (proven live): delete ONE policy -> :latest pod admitted; restore -> blocked again
+================================================================================
+$ kubectl delete cpol inner-cosmos-disallow-latest-tag
+clusterpolicy.kyverno.io "inner-cosmos-disallow-latest-tag" deleted
+$ kubectl apply -f violating-latest.yaml
+pod/cn-policy-violating-latest created              (admitted once policy gone)
+$ kubectl -n inner-cosmos-w3 delete pod cn-policy-violating-latest --grace-period=0 --force
+pod "cn-policy-violating-latest" force deleted
+$ kubectl apply -k deploy/k8s/extensions/kyverno
+clusterpolicy.kyverno.io/inner-cosmos-disallow-latest-tag created
+$ kubectl apply -f violating-latest.yaml
+Error from server ... denied ... inner-cosmos-disallow-latest-tag   (blocking again)
+
+================================================================================
+RESOURCE BOUNDARY + WEBHOOK (fail-closed)
+================================================================================
+$ kubectl -n kyverno get deploy kyverno-admission-controller -o jsonpath='requests={.spec.template.spec.containers[0].resources.requests} limits={.spec.template.spec.containers[0].resources.limits}'
+requests={"cpu":"100m","memory":"128Mi"} limits={"memory":"384Mi"}
+
+$ kubectl describe node kubedeploy-control-plane | grep -A4 "Allocated resources"
+  Resource           Requests      Limits
+  --------           --------      ------
+  cpu                2750m (17%)   10500m (65%)
+  memory             3790Mi (31%)  10174Mi (85%)
+
+$ kubectl get validatingwebhookconfigurations kyverno-resource-validating-webhook-cfg -o jsonpath='{.webhooks[0].name} fp={.webhooks[0].failurePolicy}'
+validate.kyverno.svc-fail fp=Fail
+
+$ helm list -n kyverno
+kyverno  kyverno  1  2026-07-24 04:11:00  deployed  kyverno-3.8.2  v1.18.2

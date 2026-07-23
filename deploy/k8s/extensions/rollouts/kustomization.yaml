@@ -1,0 +1,23 @@
+# CN-PROGRESSIVE-DELIVERY — Argo Rollouts bundle for the Aurora API workload.
+#
+# Install Argo Rollouts controller (once per cluster):
+#   helm install argo-rollouts argo/argo-rollouts \
+#     --namespace argo-rollouts --create-namespace --version 2.41.1 \
+#     --set controller.resources.requests.cpu=50m \
+#     --set controller.resources.requests.memory=64Mi \
+#     --set controller.resources.limits.cpu=250m \
+#     --set controller.resources.limits.memory=256Mi
+#
+# Apply this canary bundle:
+#   kubectl apply -k deploy/k8s/extensions/rollouts
+#
+# Remove (kill switch) - in order:
+#   kubectl delete -k deploy/k8s/extensions/rollouts   # remove Rollout/Service/AnalysisTemplate/NS
+#   helm uninstall argo-rollouts -n argo-rollouts      # remove the controller + webhooks + CRDs
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - analysis-template.yaml
+  - api-service.yaml
+  - api-rollout.yaml

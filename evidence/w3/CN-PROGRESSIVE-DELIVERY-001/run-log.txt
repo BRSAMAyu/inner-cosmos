@@ -1,0 +1,149 @@
+CN-PROGRESSIVE-DELIVERY-001 — raw captured kubectl/helm output (kind kubedeploy, k8s v1.36.1)
+Branch codex/w3-extensions @ fe0e443 (then 84f65e1 after the Kyverno commit).
+Date 2026-07-24. Real commands run this session. Namespace: inner-cosmos-rollouts.
+
+================================================================================
+INSTALL (helm) + controller
+================================================================================
+$ helm install argo-rollouts argo/argo-rollouts --namespace argo-rollouts --create-namespace --version 2.41.1 \
+    --set controller.resources.requests.cpu=50m --set controller.resources.requests.memory=64Mi \
+    --set controller.resources.limits.cpu=250m --set controller.resources.limits.memory=256Mi
+NAME: argo-rollouts   STATUS: deployed   REVISION: 1   chart: argo-rollouts-2.41.1 / app v1.9.1
+
+$ kubectl -n argo-rollouts get pods
+NAME                             READY   STATUS    RESTARTS   AGE
+argo-rollouts-7749d46c4b-dgbgt   1/1     Running   0          4m6s
+argo-rollouts-7749d46c4b-wgfc2   1/1     Running   0          4m6s
+
+$ kubectl get crd | grep argo
+analysisruns.argoproj.io   analysistemplates.argoproj.io   clusteranalysistemplates.argoproj.io
+experiments.argoproj.io    rollouts.argoproj.io
+
+================================================================================
+THE ROLLOUT (committed deploy/k8s/extensions/rollouts/)
+================================================================================
+kind: Rollout inner-cosmos-api, replicas: 4, image inner-cosmos:w3-otel (real product image),
+non-root securityContext, bounded resources, readiness/liveness split, prometheus annotation,
+weighted canary: setWeight 25 -> analysis(aurora-canary-health) -> setWeight 50 -> pause 15s -> setWeight 100
+spec.progressDeadlineSeconds: 60 + spec.progressDeadlineAbort: true  <-- THE auto-rollback switch
+AnalysisTemplate aurora-canary-health: query `count(up{namespace="inner-cosmos-rollouts"} == 1)`
+against http://prometheus.observability.svc:9090 (the LIVE prometheus from deploy/k8s/observability),
+successCondition len(result)>0 && result[0]>=1, count 3 @ 15s, failureLimit 2.
+
+================================================================================
+REVISION 1 BASELINE -> HEALTHY (stable ReplicaSet established)
+================================================================================
+$ kubectl -n inner-cosmos-rollouts get rollout inner-cosmos-api
+NAME               DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+inner-cosmos-api   4         4         4            4           84s
+phase=Healthy revision=64c697ddc7 stable=64c697ddc7 readyReplicas=4   (4 pods 1/1 Running)
+
+(Note: first attempt crashed - the w3-otel image's readiness health group lists 'redis' but the
+isolated namespace has no Redis; disabling the redis contributor tripped Spring's group-membership
+validator -> APPLICATION FAILED TO START. Fixed by adding env
+MANAGEMENT_ENDPOINT_HEALTH_VALIDATE_GROUP_MEMBERSHIP=false, documented in api-rollout.yaml.)
+
+================================================================================
+GOOD REVISION (rev 2): trigger canary, watch the weighted ramp + analysis gate
+================================================================================
+$ kubectl -n inner-cosmos-rollouts patch rollout inner-cosmos-api --type=json \
+    -p '[{"op":"add","path":"/spec/template/spec/containers/0/env/-","value":{"name":"AURORA_BUILD","value":"rev-2-good"}}]'
+rollout.argoproj.io/inner-cosmos-api patched
+
+step 0 setWeight25 : canary RS 677fcc9c96 1r ready=0, stable 64c697ddc7 4/4 ready=4
+step 1 analysis    : canary 1r ready=1 (analysis runs against live Prometheus)
+step 2 setWeight50 : canary 2/2 ready=1, stable 3/3 ready=3
+step 3 pause 15s   : phase=Paused CanaryPauseStep, canary 2/2 ready=2, stable 2/2 ready=2
+step 4 setWeight100: canary -> 4/4, old stable scaled to 0
+-> PROMOTED: phase=Healthy stable=677fcc9c96 current=677fcc9c96
+
+REAL AnalysisRun (live Prometheus gate):
+$ kubectl -n inner-cosmos-rollouts get analysisrun
+NAME                              STATUS       AGE
+inner-cosmos-api-677fcc9c96-2-1   Successful   2m
+phase=Successful metric=canary-scrape-up successful=3 count=3 error=
+measurements (real values from Prometheus count(up{namespace="inner-cosmos-rollouts"}==1)):
+  Successful: value=[5]   Successful: value=[5]   Successful: value=[4]
+
+================================================================================
+BAD REVISION (rev 3): broken readiness probe -> AUTO-ABORT (real auto-rollback)
+================================================================================
+$ kubectl -n inner-cosmos-rollouts patch rollout inner-cosmos-api --type=json \
+    -p '[{"op":"replace","path":"/spec/template/spec/containers/0/readinessProbe/httpGet/path","value":"/actuator/health/never-exists"}]'
+rollout.argoproj.io/inner-cosmos-api patched
+(canary pod's JVM starts fine [startupProbe path unchanged], but readiness never passes -> 0/1 Ready)
+
+t+0..40s : canary RS 7b7894f7ff 1r ready=0 (Running, NotReady), stable 677fcc9c96 4/4 ready=4 serving
+t+~60s   : progressDeadlineSeconds(60) + progressDeadlineAbort -> ABORT
+phase=Degraded abort=true current=7b7894f7ff stable=677fcc9c96
+message=RolloutAborted: Rollout aborted update to revision 3   abortedAt=2026-07-23T20:40:10Z
+reason=RolloutAborted   canary RS 7b7894f7ff scaled 1 -> 0
+
+RESULT: the bad revision was contained to a 25% canary slice that NEVER received traffic (pod never
+Ready -> never in Service endpoints). The Service kept serving only the 4 stable-revision pods:
+
+$ kubectl -n inner-cosmos-rollouts get endpoints inner-cosmos-api
+NAME               ENDPOINTS
+inner-cosmos-api   10.244.0.108:8080,10.244.0.109:8080,10.244.0.110:8080,+1 more (4 stable pods, 0 bad)
+
+$ kubectl -n inner-cosmos-rollouts get rs -l app.kubernetes.io/name=inner-cosmos
+NAME                          DESIRED   CURRENT   READY   (after abort)
+inner-cosmos-api-677fcc9c96   4         4         4       <- good rev 2, still serving
+inner-cosmos-api-7b7894f7ff   0         0         0       <- bad rev 3, scaled to 0
+availableReplicas=4 readyReplicas=4   (ZERO downtime; full availability from stable throughout)
+
+================================================================================
+RESTORE to committed spec -> Healthy (CLI test patches reverted)
+================================================================================
+$ kubectl apply -f deploy/k8s/extensions/rollouts/api-rollout.yaml   (reverts AURORA_BUILD + broken probe)
+-> new revision canaries the committed spec back to stable: phase=Healthy stable=current=64c697ddc7
+old test RSs (677fcc9c96, 7b7894f7ff) scaled to 0. Cluster left matching committed desired state.
+
+================================================================================
+KILL SWITCH (documented; the abort above IS the auto kill switch firing)
+================================================================================
+Per-rollout abort / promote (Argo CLI):  kubectl argo rollouts abort   inner-cosmos-api -n inner-cosmos-rollouts
+                                       kubectl argo rollouts promote inner-cosmos-api -n inner-cosmos-rollouts
+Remove the whole canary bundle:          kubectl delete -k deploy/k8s/extensions/rollouts
+Remove the controller + CRDs + webhooks: helm uninstall argo-rollouts -n argo-rollouts
+
+================================================================================
+RESOURCE BOUNDARY
+================================================================================
+$ kubectl -n argo-rollouts get deploy argo-rollouts -o jsonpath='replicas={.spec.replicas} req/lim'
+replicas=2 requests={"cpu":"50m","memory":"64Mi"} limits={"cpu":"250m","memory":"256Mi"}
+
+Node after full product stack + Kyverno + Argo Rollouts:
+  cpu     3850m (24%) requests / 15 (93%) limits   <- limits overcommitted; requests (scheduling) fine
+  memory  ~31% requests
+
+================================================================================
+EXPAND-CONTRACT SCHEMA COMPATIBILITY (the other half of this gate)
+================================================================================
+The canary above ran two app revisions CONCURRENTLY (stable 64c697ddc7 + canary 677fcc9c96 both
+Running and Ready at the same time during steps 1-4) - which is exactly the situation
+expand-contract schema compatibility exists to make safe against a SHARED database. The contract:
+- migrations are ADDITIVE only (new nullable columns / new tables), never drop/rename/retype during a
+  canary window, so the old stable revision and the new canary revision can both read+write the same
+  schema. The Flyway set under db/migration/postgresql + the init-container schema-version gate
+  (scripts/academy/validate-schema-version.ps1, CN-CREDIBILITY-001 6.1-6) is the mechanism that
+  bounds what a canary revision's schema may be.
+- HONEST BOUNDARY: this local proof used per-pod H2 (emptyDir), so stable and canary did NOT share a
+  single DB here - it proves the canary/rollback MECHANICS, not live schema-compat against shared
+  Postgres. The deeper exact-match -> version-compatible-range gate redesign (CN-CREDIBILITY-001
+  6.1-6) remains deferred; verifying two revisions against the real shared Postgres in inner-cosmos-w3
+  is real remaining work (out of scope: it would disturb the live hero-gate workload).
+
+================================================================================
+ACADEMY FALLBACK (CRD controller may not run under limited LabRole)
+================================================================================
+If Academy EKS LabRole cannot run the Argo Rollouts controller / Rollouts CRD, the same progressive-
+delivery guarantee is obtained with a SCRIPTED HTTPRoute-weighted canary using only Gateway API
+(which Academy DOES support - deploy/k8s/overlays/academy-eks/http-route.yml):
+- two Deployments (stable + canary) behind one Gateway/HTTPRoute; a Job or human bumps HTTPRoute
+  weights stable90/canary10 -> 50/50 -> 0/100;
+- a PromQL/health gate (the same aurora-canary-health query against the running Prometheus, or a
+  kube_pod_status_ready check) MUST pass before each weight bump;
+- on degradation the gate flips the route back to 0% canary (stable 100%) - the manual/scripted
+  equivalent of progressDeadlineAbort. No CRD controller, no webhooks, just HTTPRoute + a gate.
+This is documented as the Academy path in deploy/k8s/extensions/rollouts/api-rollout.yaml.

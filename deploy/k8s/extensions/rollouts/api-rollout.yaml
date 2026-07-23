@@ -1,0 +1,138 @@
+# CN-PROGRESSIVE-DELIVERY — Aurora API Rollout (Deployment -> Rollout, weighted canary).
+#
+# This is the real product API workload (deploy/k8s/base/app-deployment.yml +
+# the kind-dev offline-safe env: dev profile, H2+Mock AI, no Postgres/Redis
+# dependency, image inner-cosmos:w3-otel, the SAME non-root securityContext,
+# resource bounds, readiness/liveness split, preStop and prometheus annotation
+# as the running product) expressed as an Argo Rollout instead of a Deployment,
+# with a weighted canary strategy gated by a real Prometheus health signal.
+#
+# Strategy (read top-to-bottom as the ramp a new revision goes through):
+#   setWeight 25  -> spin a 1-of-4 canary ReplicaSet (25% of fleet)
+#   analysis      -> aurora-canary-health: live Prometheus `up` count gate
+#   setWeight 50  -> widen to half the fleet
+#   pause 15s     -> human/automation observation window
+#   setWeight 100 -> full promotion; the old stable becomes history
+#
+# AUTO-ROLLBACK (the load-bearing gate):
+#   spec.progressDeadlineSeconds: 60 + strategy.canary.progressDeadlineAbort: true
+#   means: if the new revision's ReplicaSet does not reach Ready within 60s
+#   (e.g. a bad readiness probe, a crash-looping build, a failing analysis),
+#   Argo AUTOMATICALLY ABORTS the rollout and the Service keeps serving only the
+#   last-good stable ReplicaSet. The bad revision never receives more than the
+#   canary slice. This is proven live in evidence/w3/CN-PROGRESSIVE-DELIVERY-001.
+#
+# Academy fallback (if the Argo controller / Rollouts CRD cannot run under
+# limited LabRole): the same progressive-delivery guarantee is obtained with a
+# SCRIPTED HTTPRoute-weighted canary - a Job/human flips HTTPRoute weights
+# 10->50->100 between a stable and a canary deployment behind the existing
+# Gateway API (deploy/k8s/overlays/academy-eks/http-route.yml), gated by a
+# PromQL/health check that must pass before each weight bump and that auto-flips
+# back to 0 on degradation. No CRD controller needed - only HTTPRoute (Gateway
+# API), which Academy does support.
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: inner-cosmos-api
+  namespace: inner-cosmos-rollouts
+  labels:
+    app.kubernetes.io/name: inner-cosmos
+    app.kubernetes.io/component: api
+spec:
+  replicas: 4
+  # If the new ReplicaSet can't go Ready within 60s, the rollout is failed.
+  progressDeadlineSeconds: 60
+  # THE auto-rollback switch (top-level spec field in Argo Rollouts v1.9):
+  # exceed progressDeadlineSeconds -> abort the rollout back to stable.
+  progressDeadlineAbort: true
+  strategy:
+    canary:
+      # On abort, immediately remove the failed canary ReplicaSet (don't leave it).
+      abortScaleDownDelaySeconds: 0
+      maxSurge: 1
+      maxUnavailable: 0
+      steps:
+        - setWeight: 25
+        - analysis:
+            templates:
+              - templateName: aurora-canary-health
+        - setWeight: 50
+        - pause: {duration: 15s}
+        - setWeight: 100
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: inner-cosmos
+      app.kubernetes.io/component: api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: inner-cosmos
+        app.kubernetes.io/component: api
+        inner-cosmos/runtime-role: api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8080"
+    spec:
+      terminationGracePeriodSeconds: 45
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: app
+          # The real product image, pinned (Kyverno would reject :latest).
+          image: inner-cosmos:w3-otel
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+          ports:
+            - {name: http, containerPort: 8080}
+          env:
+            # Offline-safe dev profile: H2 + Mock AI, no Postgres/Redis needed,
+            # so this Rollout is self-sufficient in the isolated namespace.
+            - {name: SPRING_PROFILES_ACTIVE, value: dev}
+            - {name: LLM_MODE, value: dev}
+            - {name: LLM_PROVIDER, value: mock}
+            # No Redis in the isolated namespace: drop the redis contributor and
+            # tell Spring's health-group validator to tolerate its absence (the
+            # prod readiness group lists redis). Readiness still = readinessState
+            # + db(H2) + custom, all of which are UP offline.
+            - {name: MANAGEMENT_HEALTH_REDIS_ENABLED, value: "false"}
+            - {name: MANAGEMENT_ENDPOINT_HEALTH_VALIDATE_GROUP_MEMBERSHIP, value: "false"}
+            - {name: INNER_COSMOS_RUNTIME_ROLE, value: api}
+          resources:
+            requests: {cpu: 250m, memory: 512Mi}
+            limits: {cpu: "1", memory: 1Gi}
+          startupProbe:
+            httpGet: {path: /actuator/health/readiness, port: http}
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet: {path: /actuator/health/readiness, port: http}
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: {path: /actuator/health/liveness, port: http}
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sh", "-c", "sleep 15"]
+          volumeMounts:
+            - {name: data, mountPath: /app/data}
+            - {name: logs, mountPath: /var/log/inner-cosmos}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - {name: data, emptyDir: {}}
+        - {name: logs, emptyDir: {}}
+        - {name: tmp, emptyDir: {}}

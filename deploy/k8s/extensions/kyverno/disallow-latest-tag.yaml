@@ -1,0 +1,58 @@
+# CN-POLICY-AS-CODE — ClusterPolicy: disallow the mutable :latest image tag.
+#
+# Product hook (why this matters for Inner Cosmos):
+#   The API Deployment's init container `wait-for-schema-version` gates startup
+#   on the Flyway schema version (CN-CREDIBILITY-001 6.1-6), and the durable
+#   evidence (CN-ZERO-LOSS-DRAIN) depends on a specific binary behaviour. The
+#   `:latest` tag (and a tag-less image, which Kubernetes treats as :latest with
+#   imagePullPolicy: Always) is mutable: a redeploy silently pulls a different,
+#   unvetted Aurora build, breaking reproducibility and the schema gate.
+#   Requiring a pinned tag means the exact image proven in evidence is the one
+#   that runs in production.
+#
+# Honest scope: the policy denies (a) images ending in `:latest` and (b) bare
+# image names with no `:` tag at all. Images that carry a registry port but no
+# tag (e.g. `registry:5000/foo`) are an edge case not used by this product's
+# manifests and are not specifically caught - disclosed rather than hidden.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: inner-cosmos-disallow-latest-tag
+  annotations:
+    policies.kyverno.io/title: Disallow mutable :latest image tag
+    policies.kyverno.io/category: Best Practices
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Rejects any Pod in an inner-cosmos-* namespace whose container image uses
+      :latest or has no tag (defaults to :latest). Pins Aurora runtime images to
+      the exact, evidence-proven build.
+spec:
+  validationFailureAction: Enforce
+  background: false
+  rules:
+    - name: require-pinned-image-tag
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces: ["inner-cosmos-*"]
+      validate:
+        message: >-
+          Inner Cosmos images must be pinned to an explicit tag (not :latest and
+          not tag-less). A mutable tag would silently pull an unvetted Aurora
+          build past the schema gate and invalidate the zero-loss-drain evidence.
+        foreach:
+          - list: "request.object.spec.containers[]"
+            deny:
+              conditions:
+                any:
+                  # explicit :latest tag
+                  - key: "{{ regex_match('^.*:latest$', element.image) }}"
+                    operator: Equals
+                    value: true
+                  # bare image name with no ':' (defaults to :latest)
+                  # (ignores digest-only refs, which this product does not use)
+                  - key: "{{ regex_match('^[^/:]+$', element.image) }}"
+                    operator: Equals
+                    value: true

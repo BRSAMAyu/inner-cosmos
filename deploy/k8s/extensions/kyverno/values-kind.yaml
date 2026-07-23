@@ -1,0 +1,56 @@
+# Kyverno install values for the local kind proof (CN-POLICY-AS-CODE).
+#
+# Product hook: Inner Cosmos persists user memories, pgvector embeddings and
+# relationship graphs in-cluster. A pod that runs as root (or with no resource
+# bounds, or off a mutable :latest tag) is exactly the blast-radius we must NOT
+# let a misconfigured runtime role reach production with. Kyverno's admission
+# controller rejects such pods AT THE API SERVER, before scheduling - so a bad
+# overlay/manifest is stopped at `kubectl apply`, not discovered after it is
+# already running next to user data.
+#
+# Install:
+#   helm install kyverno kyverno/kyverno \
+#     --namespace kyverno --create-namespace \
+#     --version 3.8.2 -f deploy/k8s/extensions/kyverno/values-kind.yaml
+#
+# Resource boundary: this single-node kind cluster already runs the real product
+# (Postgres/Redis/2x API/worker/scheduler + KEDA + Prometheus/Grafana), so we
+# disable the heavy sub-controllers we do NOT need for an admission-deny proof
+# (reports-controller, cleanup-controller, ttl-controller, background-scan) and
+# cap the admission controller itself at a hard 512Mi / 500m ceiling. In a real
+# cluster the same knobs are how Kyverno is bounded to a known resource budget.
+#
+# Kill switch (one command):
+#   helm uninstall kyverno -n kyverno
+# Removing the release removes the admission webhooks, so the cluster returns to
+# default admission. The ClusterPolicy manifests in this directory are plain YAML
+# and can also be deleted individually with `kubectl delete clusterpolicy <name>.
+
+admissionController:
+  replicas: 1
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+# Not needed for an admission-deny proof; disabled to respect the kind node's
+# ~12 Gi budget. Re-enable in a real cluster for policy-report/audit scanning.
+reportsController:
+  enabled: false
+cleanupController:
+  enabled: false
+backgroundController:
+  enabled: false
+
+# Cluster-wide policy reports (needs reportsController) and self-checks off.
+webhooksCleanup:
+  enabled: true
+policyReports:
+  enable: false
+admissionReports:
+  enabled: false
+reports:
+  enabled: false
