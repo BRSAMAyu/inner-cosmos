@@ -164,4 +164,94 @@ describe("AuroraConversation", () => {
     await waitFor(() => expect(onDraftChange).toHaveBeenCalledWith("语音转出来的文字"));
     expect(recorder.stop).toHaveBeenCalledWith(false);
   });
+
+  // Gemini audit 4.6 (CONFIRMED/P2): a transcription promise that is still in flight when the
+  // component unmounts must not be allowed to call onDraftChange (or otherwise touch state) once
+  // it finally resolves -- there is no component left to own that draft anymore.
+  it("does not apply a transcription result that resolves after the component has unmounted", async () => {
+    (globalThis as Record<string, unknown>).AudioContext = class {};
+    const getUserMedia = vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] });
+    (navigator as unknown as Record<string, unknown>).mediaDevices = { getUserMedia };
+    recorder.start.mockResolvedValue(undefined);
+    recorder.stop.mockResolvedValue(new Blob(["wav"], { type: "audio/wav" }));
+    const onDraftChange = vi.fn();
+    let resolveTranscribe!: (text: string) => void;
+    const onTranscribe = vi.fn(() => new Promise<string>(resolve => { resolveTranscribe = resolve; }));
+
+    const { unmount } = render(<AuroraConversation messages={[]} activeTurnId={null} draft="" sessionReady
+      onDraftChange={onDraftChange} onSubmit={event => event.preventDefault()} onStop={() => undefined}
+      onTranscribe={onTranscribe} />);
+    fireEvent.click(screen.getByRole("button", { name: "用语音输入" }));
+    await waitFor(() => expect(recorder.start).toHaveBeenCalled());
+    fireEvent.click(await screen.findByRole("button", { name: "停止录音并转写" }));
+    await waitFor(() => expect(onTranscribe).toHaveBeenCalled());
+
+    unmount();
+    resolveTranscribe("迟到的转写文字");
+    // Let the resolved-promise continuation actually run before asserting.
+    await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+
+    expect(onDraftChange).not.toHaveBeenCalledWith("迟到的转写文字");
+    expect(onDraftChange).not.toHaveBeenCalled();
+  });
+
+  // Same audit item: overlapping generations. finishRecording() nulls recorderRef and flips
+  // `recording` back to false *synchronously*, before it awaits `recorder.stop()` -- so there is a
+  // real window, while that stop() promise is still pending (and `transcribing` hasn't flipped on
+  // yet), where the mic button is already re-enabled and labelled to start a brand new recording.
+  // We hold recorder.stop()'s first call open to force that window, then run a whole second
+  // start/stop cycle (generation #2) inside it, whose own recorder.stop() resolves immediately and
+  // so reaches onTranscribe first. The stale (first) transcription must never be applied once it
+  // finally resolves, no matter the resolution order.
+  it("ignores a stale transcription result once a newer recording generation has started", async () => {
+    (globalThis as Record<string, unknown>).AudioContext = class {};
+    const getUserMedia = vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] });
+    (navigator as unknown as Record<string, unknown>).mediaDevices = { getUserMedia };
+    recorder.start.mockResolvedValue(undefined);
+    let resolveStopA!: (blob: Blob) => void;
+    const stopAPromise = new Promise<Blob>(resolve => { resolveStopA = resolve; });
+    recorder.stop
+      .mockImplementationOnce(() => stopAPromise)
+      .mockImplementationOnce(() => Promise.resolve(new Blob(["wav-b"], { type: "audio/wav" })));
+
+    const onDraftChange = vi.fn();
+    let resolveFirstTranscribe!: (text: string) => void;
+    let resolveSecondTranscribe!: (text: string) => void;
+    const onTranscribe = vi.fn()
+      .mockImplementationOnce(() => new Promise<string>(resolve => { resolveFirstTranscribe = resolve; }))
+      .mockImplementationOnce(() => new Promise<string>(resolve => { resolveSecondTranscribe = resolve; }));
+
+    render(<AuroraConversation messages={[]} activeTurnId={null} draft="" sessionReady
+      onDraftChange={onDraftChange} onSubmit={event => event.preventDefault()} onStop={() => undefined}
+      onTranscribe={onTranscribe} />);
+
+    // Start + stop recording A -- generation #1. Its recorder.stop() is held open by stopAPromise.
+    fireEvent.click(screen.getByRole("button", { name: "用语音输入" }));
+    await waitFor(() => expect(recorder.start).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole("button", { name: "停止录音并转写" }));
+
+    // While A's recorder.stop() is still pending, the mic button is already back to its idle
+    // "start" state -- use that window to run a whole second recording, B (generation #2), whose
+    // own recorder.stop() resolves immediately.
+    fireEvent.click(await screen.findByRole("button", { name: "用语音输入" }));
+    await waitFor(() => expect(recorder.start).toHaveBeenCalledTimes(2));
+    fireEvent.click(await screen.findByRole("button", { name: "停止录音并转写" }));
+
+    // Generation #2 (B) reaches onTranscribe first, since generation #1 (A) is still blocked on
+    // its own recorder.stop().
+    await waitFor(() => expect(onTranscribe).toHaveBeenCalledTimes(1));
+
+    // Now let generation #1 catch up: its recorder.stop() finally resolves, so it too proceeds to
+    // call onTranscribe -- but generationRef has already moved on to #2, so its result is stale.
+    resolveStopA(new Blob(["wav-a"], { type: "audio/wav" }));
+    await waitFor(() => expect(onTranscribe).toHaveBeenCalledTimes(2));
+
+    resolveSecondTranscribe("过期的转写A");
+    await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+    expect(onDraftChange).not.toHaveBeenCalledWith("过期的转写A");
+
+    resolveFirstTranscribe("最新的转写B");
+    await waitFor(() => expect(onDraftChange).toHaveBeenCalledWith("最新的转写B"));
+    expect(onDraftChange).not.toHaveBeenCalledWith("过期的转写A");
+  });
 });
