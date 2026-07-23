@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 authority: 对齐文档/24-完全体最终收敛与云原生课程战役.md
 status: IN_PROGRESS
-updated_at: 2026-07-23T11:19:00+08:00
+updated_at: 2026-07-23T17:50:00+08:00
 
 legal_terminal_states:
   - COMPLETE
@@ -129,14 +129,31 @@ campaigns:
   - {id: W0, name: integration-and-truth-baseline, status: DONE, depends_on: [], commit: 28c4987}
   - {id: W0V, name: verified-audit-defect-closure, status: DONE, depends_on: [W0], contract: docs/audit/2026-07-23-gemini-master-audit-reconciliation.md, closing_commit: 3ce6ac7}
   - {id: W1, name: living-intelligence-and-data-loop, status: IN_PROGRESS, depends_on: [W0V], note: >-
-      2026-07-23 (merge commit on codex/w0-integration): closed the AURORA-DUAL-KERNEL measured-benefit
-      gap (root-caused Speaker-prompt paraphrase-drift/verbatim-restatement, fixed in eval harness +
-      production runtime, re-verified via real-DeepSeek re-run 16/22=0.7273 vs 12/22=0.5455) and
-      partially closed G2.ARCH-MODULES (3 of 7 grandfathered controllers refactored through service
-      interfaces). Supervisor independently re-ran ./mvnw test post-merge: 1092/1092, 0 failures, 1
-      pre-existing unrelated skip. Remaining W1 scope: G2.RUNTIME-ROLES job-bean-presence test, G5/G6/G7
-      measured-eval gaps, remaining 4 ARCH-MODULES allowlist entries, blind human review (human-gated).}
-  - {id: W2, name: complete-experience-and-multiplatform-polish, status: READY, depends_on: [W0V]}
+      2026-07-23 (this HEAD, commit 50bd1eb on codex/w0-integration; superseding this note's older
+      1092/1092 snapshot -- see docs/goal/complete-product-acceptance.yml for the per-gate detail,
+      which has been kept current through every intermediate merge and is more current than this
+      summary): since the prior note, G2.ARCH-MODULES closed to zero remaining allowlist exceptions
+      (PASS), RuntimeRoleJobBeanPresenceIntegrationTest closed the RUNTIME-ROLES bean-presence gap,
+      G6.CAPSULE-RUNTIME got a real-DeepSeek privacy-fidelity measurement (INNO-CAP-011),
+      G6.MATCH-MULTI got a labeled precision/recall baseline (INNO-CAP-012) then a local
+      semantic-cue/graded-tier fix (INNO-CAP-013), G5.RETRIEVAL-QUALITY reran its concurrent-load
+      methodology on real Postgres+Redis (INNO-INNER-011, not just H2), and G5.PROFILE-PROPAGATION
+      gained a second withdrawal-variant journey test. Supervisor independently re-ran ./mvnw.cmd
+      test post-merge: 1139/1139, 0 failures, 1 pre-existing unrelated skip. In flight this round
+      (branches codex/w1-voice-backend / codex/w2-voice-frontend, not yet merged): a real
+      Qwen/DashScope embedding-model wiring (replacing the Mock-vector path with a real HTTP
+      embedding provider) and a new real-time-TTS "Aurora inner voice" feature per user direction
+      (spoken, non-repeating first-person aside from the planner kernel, user-selectable voice,
+      ambient-autoplay-by-default with an on-demand toggle) -- this is new W1/G6 scope added by the
+      user mid-campaign, not in the original doc-24 gate list; the acceptance ledger will get a new
+      acceptance item for it once the backend/frontend branches land. Remaining prior W1 scope:
+      G4/G5/G6/G7 blind human review and real-provider re-measurements needing a live key beyond
+      Mock (now partially unblocked by the user-supplied keys), W2 completion, W4 convergence.}
+  - {id: W2, name: complete-experience-and-multiplatform-polish, status: IN_PROGRESS, depends_on: [W0V], note: >-
+      2026-07-23: mobile/desktop real-journey + accessibility-fix round in flight (branch
+      codex/w2-mobile-3, not yet merged); voice-picker UI in flight (branch codex/w2-voice-frontend,
+      not yet merged). See docs/goal/complete-product-acceptance.yml G7.MOBILE-MACHINE-RUNTIME and
+      G7.UX-COMPLETE for prior state.}
   - {id: W3, name: cloud-native-showcase, status: COMPLETE, depends_on: [W0V], note: >-
       2026-07-23: all three mandatory cloud-native hero gates are PASS with local-kind runtime
       evidence. Zero-loss drain covers graceful Pod churn and true JVM SIGKILL recovery; KEDA
