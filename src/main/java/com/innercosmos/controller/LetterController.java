@@ -2,6 +2,8 @@ package com.innercosmos.controller;
 
 import com.innercosmos.common.ApiResponse;
 import com.innercosmos.dto.LetterCreateRequest;
+import com.innercosmos.dto.LetterDraftPatchRequest;
+import com.innercosmos.dto.LetterSendRequest;
 import com.innercosmos.entity.LetterThread;
 import com.innercosmos.entity.SlowLetter;
 import com.innercosmos.service.SlowLetterService;
@@ -26,9 +28,31 @@ public class LetterController extends BaseController {
         return ApiResponse.ok(slowLetterService.draft(currentUserId(session), request));
     }
 
+    /**
+     * Gemini audit 1.8 (CONFIRMED/P1): owner-scoped, version/ETag-checked edit of a DRAFT letter.
+     * {@code expectedVersion} must match the draft's current version or this is rejected as a
+     * lost concurrent-edit race (409 CONFLICT) rather than silently overwriting.
+     */
+    @PatchMapping("/{id}")
+    public ApiResponse<SlowLetter> patchDraft(@PathVariable Long id, @RequestBody LetterDraftPatchRequest request,
+                                               HttpSession session) {
+        return ApiResponse.ok(slowLetterService.patchDraft(currentUserId(session), id,
+                request.title, request.letterBody, request.expectedVersion));
+    }
+
+    /**
+     * Gemini audit 3.3 (CONFIRMED/P1): {@code confirmPii} is the sender's explicit confirmation
+     * that they still want to send a letter flagged as containing soft-confirm PII (phone/email/
+     * address). Omitted or false on a flagged letter -> 428 PII_CONFIRMATION_REQUIRED so the
+     * client can show a "confirm and send" affordance; has no effect on a hard-blocked letter
+     * (credentials/secrets), which cannot be sent regardless.
+     */
     @PostMapping("/{id}/send")
-    public ApiResponse<SlowLetter> send(@PathVariable Long id, HttpSession session) {
-        return ApiResponse.ok(slowLetterService.transition(currentUserId(session), id, "SENT"));
+    public ApiResponse<SlowLetter> send(@PathVariable Long id,
+                                         @RequestBody(required = false) LetterSendRequest request,
+                                         HttpSession session) {
+        Boolean confirmPii = request == null ? null : request.confirmPii;
+        return ApiResponse.ok(slowLetterService.transition(currentUserId(session), id, "SENT", confirmPii));
     }
 
     @PostMapping("/{id}/deliver")
@@ -41,10 +65,13 @@ public class LetterController extends BaseController {
         return ApiResponse.ok(slowLetterService.transition(currentUserId(session), id, "READ"));
     }
 
-    @PostMapping("/{id}/reply")
-    public ApiResponse<SlowLetter> reply(@PathVariable Long id, HttpSession session) {
-        return ApiResponse.ok(slowLetterService.transition(currentUserId(session), id, "REPLIED"));
-    }
+    // Gemini audit 1.8 (CONFIRMED/P1): the old POST /{id}/reply (a bare, client-triggered
+    // transition straight to REPLIED) is REMOVED. It was already dead from the frontend's own
+    // perspective (only replyWithSlowLetter -> POST /{id}/reply-with-letter is ever called), and
+    // it is exactly the anti-pattern the audit flags: REPLIED must only ever be an automatic,
+    // atomic side effect of a linked reply letter's own successful SENT transition (see
+    // SlowLetterServiceImpl#transition's replyToLetterId branch) -- never a manual client call
+    // disconnected from whether a reply was actually sent, or even exists.
 
     @PostMapping("/{id}/decline")
     public ApiResponse<SlowLetter> decline(@PathVariable Long id, HttpSession session) {

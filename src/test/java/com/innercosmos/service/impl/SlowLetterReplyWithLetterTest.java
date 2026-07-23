@@ -7,6 +7,7 @@ import com.innercosmos.entity.SlowLetter;
 import com.innercosmos.exception.BusinessException;
 import com.innercosmos.exception.SafetyBlockedException;
 import com.innercosmos.letterstate.LetterStateRegistry;
+import com.innercosmos.safety.PiiCredentialDetector;
 import com.innercosmos.mapper.LetterStatusLogMapper;
 import com.innercosmos.mapper.LetterThreadMapper;
 import com.innercosmos.mapper.ReportRecordMapper;
@@ -20,6 +21,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.Clock;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -64,7 +67,8 @@ class SlowLetterReplyWithLetterTest {
         safe.passed = true;
         org.mockito.Mockito.lenient().when(letterSafetyFilter.filter(any(), any(), any())).thenReturn(safe);
         return new SlowLetterServiceImpl(letterMapper, logMapper, stateRegistry,
-                guardAgent, threadMapper, reportRecordMapper, letterSafetyFilter, capsuleMapper, blockRelationMapper);
+                guardAgent, threadMapper, reportRecordMapper, letterSafetyFilter, capsuleMapper, blockRelationMapper, new PiiCredentialDetector(),
+                Clock.systemUTC());
     }
 
     /** An original letter sent by `sender` to `receiver`. */

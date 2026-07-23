@@ -7,6 +7,7 @@ import com.innercosmos.safety.DistressSignalDetector;
 import com.innercosmos.safety.SafetyBoundaryFilter;
 import com.innercosmos.safety.SafetyMatch;
 import com.innercosmos.safety.SafetyReviewService;
+import com.innercosmos.safety.SessionRiskAggregator;
 import com.innercosmos.service.impl.SafetyServiceImpl;
 import com.innercosmos.vo.SafetyResult;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,8 +47,12 @@ class SafetyServiceTest {
 
     @BeforeEach
     void setUp() {
+        // Gemini audit 3.9: a fresh aggregator per test (JUnit's default per-method test
+        // instance lifecycle already gives each test its own SafetyServiceTest, so this alone
+        // is enough to keep session state from leaking across test methods that reuse SESSION_ID).
         safetyService = new SafetyServiceImpl(safetyEventMapper, safetyBoundaryFilter,
-                safetyReviewService, distressSignalDetector, true);
+                safetyReviewService, distressSignalDetector,
+                new SessionRiskAggregator(java.time.Clock.systemUTC()), true);
     }
 
     // --- check (returns SafetyResult) ---
@@ -293,7 +298,8 @@ class SafetyServiceTest {
     @DisplayName("semantic-recheck disabled → distress flows as LOW (current behavior), recheck never invoked")
     void check_distressDisabled_flowsLow() {
         SafetyServiceImpl disabled = new SafetyServiceImpl(safetyEventMapper, safetyBoundaryFilter,
-                safetyReviewService, distressSignalDetector, false);
+                safetyReviewService, distressSignalDetector,
+                new SessionRiskAggregator(java.time.Clock.systemUTC()), false);
         String text = "我真的是大家的累赘，想要彻底解脱";
         when(safetyBoundaryFilter.inspect(text)).thenReturn(SafetyMatch.safe());
 

@@ -15,6 +15,7 @@ import com.innercosmos.mapper.EchoCapsuleMapper;
 import com.innercosmos.mapper.PersonaChatMessageMapper;
 import com.innercosmos.mapper.PersonaChatSessionMapper;
 import com.innercosmos.mapper.ReportRecordMapper;
+import com.innercosmos.mapper.UserProfileMapper;
 import com.innercosmos.service.CapsuleGenomeService;
 import com.innercosmos.service.DataUseGrantService;
 import com.innercosmos.service.SafetyService;
@@ -27,6 +28,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
+
+import java.time.Clock;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -56,6 +59,7 @@ class PersonaChatServiceImplReportBlockTest {
     @Mock private ReportRecordMapper reportRecordMapper;
     @Mock private BlockRelationMapper blockRelationMapper;
     @Mock private PlatformTransactionManager transactionManager;
+    @Mock private UserProfileMapper userProfileMapper;
 
     private PersonaChatServiceImpl service;
 
@@ -66,7 +70,9 @@ class PersonaChatServiceImplReportBlockTest {
                 capsuleAgent, safetyService, structuredAiService,
                 boundaryMapper, quotaMapper, jdbcTemplate, authorizedMemoryRefMapper,
                 genomeService, runtimeContextComposer, dataUseGrantService,
-                reportRecordMapper, blockRelationMapper, transactionManager);
+                reportRecordMapper, blockRelationMapper, transactionManager,
+                userProfileMapper, Clock.systemUTC());
+        lenient().when(userProfileMapper.selectOne(any())).thenReturn(null);
     }
 
     private PersonaChatSession session(Long id, Long visitorUserId, Long capsuleId) {

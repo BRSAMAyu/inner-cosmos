@@ -26,6 +26,10 @@ public class GlobalExceptionHandler {
             case ErrorCode.FORBIDDEN -> HttpStatus.FORBIDDEN;
             case ErrorCode.NOT_FOUND -> HttpStatus.NOT_FOUND;
             case ErrorCode.CONFLICT -> HttpStatus.CONFLICT;
+            // Gemini audit 3.3 (CONFIRMED/P1): distinct from a hard SAFETY_BLOCKED refusal -- the
+            // client can resubmit with explicit confirmation, so 428 (not 400/403) is the accurate
+            // "you must confirm and retry" status.
+            case ErrorCode.PII_CONFIRMATION_REQUIRED -> HttpStatus.PRECONDITION_REQUIRED;
             default -> HttpStatus.BAD_REQUEST;
         };
         return ResponseEntity.status(status).body(error(ex.code, ex.getMessage(), status));

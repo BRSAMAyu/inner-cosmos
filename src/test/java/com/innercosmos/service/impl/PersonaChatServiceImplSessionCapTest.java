@@ -14,6 +14,7 @@ import com.innercosmos.mapper.EchoCapsuleMapper;
 import com.innercosmos.mapper.PersonaChatMessageMapper;
 import com.innercosmos.mapper.PersonaChatSessionMapper;
 import com.innercosmos.mapper.AuthorizedMemoryRefMapper;
+import com.innercosmos.mapper.UserProfileMapper;
 import com.innercosmos.service.CapsuleGenomeService;
 import com.innercosmos.service.SafetyService;
 import com.innercosmos.service.DataUseGrantService;
@@ -26,6 +27,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
+
+import java.time.Clock;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -58,6 +61,7 @@ class PersonaChatServiceImplSessionCapTest {
     @Mock private com.innercosmos.mapper.ReportRecordMapper reportRecordMapper;
     @Mock private com.innercosmos.mapper.BlockRelationMapper blockRelationMapper;
     @Mock private PlatformTransactionManager transactionManager;
+    @Mock private UserProfileMapper userProfileMapper;
 
     private PersonaChatServiceImpl service;
 
@@ -76,7 +80,9 @@ class PersonaChatServiceImplSessionCapTest {
                 capsuleAgent, safetyService, structuredAiService,
                 boundaryMapper, quotaMapper, jdbcTemplate, authorizedMemoryRefMapper,
                 genomeService, runtimeContextComposer, dataUseGrantService,
-                reportRecordMapper, blockRelationMapper, transactionManager);
+                reportRecordMapper, blockRelationMapper, transactionManager,
+                userProfileMapper, Clock.systemUTC());
+        lenient().when(userProfileMapper.selectOne(any())).thenReturn(null);
         lenient().when(dataUseGrantService.authorizationsValid(any(), anySet())).thenReturn(true);
         lenient().when(runtimeContextComposer.compose(any(), anyString())).thenReturn(java.util.Map.of(
                 "selectedEvidenceSummary", "", "selectedContext", java.util.Map.of(),
