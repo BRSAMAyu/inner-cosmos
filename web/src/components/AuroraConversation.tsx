@@ -117,7 +117,7 @@ export function AuroraConversation({ messages, activeTurnId, thinkingStage = nul
       {messages.map(message => <article className={`message ${message.speaker.toLowerCase()} ${message.partial ? "partial" : ""}`} key={message.key}
         aria-live={message.partial ? "polite" : undefined}>
         <span className="speaker">{message.speaker === "AURORA" ? "Aurora" : t.speakerYou}</span>
-        <p>{message.text || "…"}</p>
+        <p className="ugc-text">{message.text || "…"}</p>
         {message.partial && message.text && <small>{t.partialHint}</small>}
       </article>)}
       {activeTurnId !== null && thinkingStage && <article className={`message aurora thinking ${thinkingStage}`} aria-label={t.thinkingAria}>

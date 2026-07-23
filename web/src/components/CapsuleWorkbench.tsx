@@ -233,7 +233,7 @@ export function CapsuleWorkbench({ capsules, selectedCapsuleId, selectedCapsule,
         </div>}
     </div> : <div className="capsule-workbench">
       <div className="capsule-summary"><div><span className="capsule-status">{summaryStatus(selectedCapsule.visibilityStatus)}</span>
-        <h3>{selectedCapsule.pseudonym}</h3><p>{selectedCapsule.intro}</p></div>
+        <h3>{selectedCapsule.pseudonym}</h3><p className="ugc-text">{selectedCapsule.intro}</p></div>
         <div className="genome-badge"><strong>v{genomeHistory[0]?.versionNo ?? "–"}</strong><small>{genomeHistory[0]?.status ?? t.genomeReading}</small></div></div>
       {activeFidelity && <p className="fidelity-note">{t.fidelityCurrent(activeFidelity)}</p>}
       <details className="genome-history"><summary>{t.genomeHistorySummary}</summary>{genomeHistory.map(version => {

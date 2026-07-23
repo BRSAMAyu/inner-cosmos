@@ -283,6 +283,11 @@ h1 { margin: 14px 0; font-family: Georgia, "Noto Serif SC", serif; font-size: cl
 .data-rights-list small { color: var(--text-faint); font-size: .7rem; }
 .speaker { display: block; margin-bottom: 7px; color: var(--text-muted); font-size: .72rem; letter-spacing: .08em; }.user .speaker { color: #6b5a3f; }
 .message p { margin: 0; white-space: pre-wrap; line-height: 1.72; }.message small { display: block; margin-top: 8px; color: var(--text-muted); }
+/* Gemini audit 4.11 (CONFIRMED/P2): shared UGC free-text primitive. Any arbitrary-length
+   user-authored/derived text (messages, letters, capsule intros, memory summaries...) must never
+   overflow its container -- a long unbroken URL/CJK run/emoji chain needs a break point. Applied
+   at every genuinely-user-content render site; never on static i18n copy strings. */
+.ugc-text { overflow-wrap: anywhere; word-break: break-word; min-width: 0; }
 .state { min-height: 30px; color: var(--text-muted); font-size: .86rem; display: flex; align-items: center; gap: 9px; }
 .state i { width: 7px; height: 7px; border-radius: 50%; background: var(--text-faint); }.state i.pulse { background: var(--accent-sage-soft); box-shadow: 0 0 0 0 #a9bcae77; animation: pulse 1.5s infinite; }
 @keyframes pulse { 70% { box-shadow: 0 0 0 8px transparent; } }

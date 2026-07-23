@@ -100,7 +100,7 @@ export function MemoryStarfield({ starfield, starfieldBusy, onChangeMode, starfi
     <div className="cosmos-legend">{Object.entries(starfield.legend).map(([key, value]) => <span key={key}><strong>{key}</strong>{value}</span>)}</div>
     <ol className="cosmos-list" aria-label={t.listAria}>
       {starfield.accessibleList.map(star => <li key={star.id}><div><strong>{star.title}</strong><span>{star.theme} · {star.memoryLayer}</span></div>
-        <small>{t.confidence(Math.round(star.confidence * 100), star.versionNo)}</small><p>{star.summary}</p>
+        <small>{t.confidence(Math.round(star.confidence * 100), star.versionNo)}</small><p className="ugc-text">{star.summary}</p>
         <div className="cosmos-list-actions">
           <AsyncButton disabled={detailBusy !== null} busy={detailBusy === star.id} busyText={t.revealBusy}
             onClick={() => onRevealStar(star.id)}>{t.revealBtn}</AsyncButton>

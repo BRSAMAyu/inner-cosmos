@@ -88,7 +88,7 @@ export function LettersInbox({ letterInbox, letterOutbox = [], threads = [], thr
       <p className="resonance-intro">{t.inboxIntro}</p>
       {letterInbox.length === 0 ? <div className="network-empty">{t.inboxEmpty}</div> : <div className="inbox-list">
         {letterInbox.map(letter => <article key={letter.id}><header><strong>{letter.title}</strong><span>{letter.status}</span></header>
-          <p>{letter.letterBody}</p>
+          <p className="ugc-text">{letter.letterBody}</p>
           {repliable.has(letter.status) && <div className="letter-reply"><textarea aria-label={t.replyAria(letter.title)}
             value={replyDrafts[letter.id] ?? ""} onChange={event => onReplyDraftChange(letter.id, event.target.value)}
             placeholder={t.replyPlaceholder} /><AsyncButton busy={replyBusyId === letter.id} busyText={t.replyBusy} disabled={!replyDrafts[letter.id]?.trim()} onClick={() => onReply(letter)}>{t.replySend}</AsyncButton></div>}
@@ -105,7 +105,7 @@ export function LettersInbox({ letterInbox, letterOutbox = [], threads = [], thr
       {sent.length === 0 ? <div className="network-empty">{t.outboxEmpty}</div> : <div className="inbox-list outbox-list">
         {sent.map(letter => <article key={letter.id}><header><strong>{letter.title}</strong>
           <span className="outbox-status">{status(letter.status)}</span></header>
-          <p>{letter.letterBody}</p>
+          <p className="ugc-text">{letter.letterBody}</p>
           {letter.status === "FLYING" && <div className="letter-flying-transit" aria-hidden="true"><span className="letter-flying-point" /></div>}
           {letter.estimatedArrivalAt && (letter.status === "FLYING" || letter.status === "SENT") &&
             <small>{t.arrivalEta(new Date(letter.estimatedArrivalAt).toLocaleString(locale))}</small>}
@@ -116,7 +116,7 @@ export function LettersInbox({ letterInbox, letterOutbox = [], threads = [], thr
       <p className="resonance-intro">{t.draftsIntro}</p>
       {drafts.length === 0 ? <div className="network-empty">{t.draftsEmpty}</div> : <div className="inbox-list outbox-list">
         {drafts.map(letter => <article key={letter.id}><header><strong>{letter.title || t.untitledDraft}</strong><span className="outbox-status">{t.draftStatus}</span></header>
-          <p>{letter.letterBody}</p>
+          <p className="ugc-text">{letter.letterBody}</p>
           <div><AsyncButton busy={draftBusy} busyText={t.sendDraftBusy} onClick={() => onSendDraft?.(letter.id)}>{t.sendDraft}</AsyncButton></div>
         </article>)}
       </div>}
@@ -131,7 +131,7 @@ export function LettersInbox({ letterInbox, letterOutbox = [], threads = [], thr
         <div className="thread-letters" aria-live="polite">
           {!selectedThreadId ? <div className="network-empty">{t.threadPickPrompt}</div>
             : threadLetters.length === 0 ? <div className="network-empty">{t.threadLoading}</div>
-            : <div className="inbox-list">{threadLetters.map(letter => <article key={letter.id}><header><strong>{letter.title}</strong><span>{status(letter.status)}</span></header><p>{letter.letterBody}</p></article>)}</div>}
+            : <div className="inbox-list">{threadLetters.map(letter => <article key={letter.id}><header><strong>{letter.title}</strong><span>{status(letter.status)}</span></header><p className="ugc-text">{letter.letterBody}</p></article>)}</div>}
         </div>
       </div>}
     </>}
