@@ -354,11 +354,22 @@ function isNonPublicHost(hostname: string): boolean {
 
 export function validateApiBase(raw: string, allowedOrigins: string, production: boolean,
                                 mobileLocal = false, desktopLocal = false,
-                                localOrigin = import.meta.env.VITE_LOCAL_API_ORIGIN ?? ""): string {
+                                localOrigin = import.meta.env.VITE_LOCAL_API_ORIGIN ?? "",
+                                demoMode = false): string {
   if (!raw.trim()) return "";
   let url: URL;
   try { url = new URL(raw); } catch { throw new Error("VITE_API_BASE_URL must be an absolute URL"); }
   if (url.username || url.password || url.search || url.hash) throw new Error("API URL cannot contain credentials, query, or fragment");
+  // Demo mode (VITE_DEMO_MODE): a locally-distributed DEBUG build for an in-class demo only. It may
+  // point at a plain-HTTP LAN origin (a laptop mobile hotspot) OR a public HTTPS tunnel. Credentials,
+  // query and fragment are still rejected. This relaxation is gated on the build flag and NEVER
+  // applies to a signed production build (which has no VITE_DEMO_MODE) -- production's HTTPS,
+  // private-host and allowlist enforcement below is unchanged when demoMode is false.
+  if (demoMode) {
+    if (url.protocol !== "https:" && url.protocol !== "http:") throw new Error("Demo API URL must use http or https");
+    if (url.pathname !== "/") throw new Error("Demo API URL must be an origin without a path");
+    return url.origin;
+  }
   const exactMobileLocal = mobileLocal && Boolean(localOrigin) && url.origin === localOrigin;
   const exactDesktopLocal = desktopLocal && Boolean(localOrigin) && url.origin === localOrigin;
   const exactInstalledLocal = exactMobileLocal || exactDesktopLocal;
@@ -382,12 +393,13 @@ export function validateApiBase(raw: string, allowedOrigins: string, production:
 const rawApiBase = String(import.meta.env.VITE_API_BASE_URL ?? "");
 export const mobileLocalBuild = String(import.meta.env.VITE_MOBILE_LOCAL ?? "") === "true";
 export const desktopLocalBuild = String(import.meta.env.VITE_DESKTOP_LOCAL ?? "") === "true";
+export const demoModeBuild = String(import.meta.env.VITE_DEMO_MODE ?? "") === "true";
 let configuredApiBase = "";
 export let apiConfigurationError: string | null = null;
 try {
   configuredApiBase = validateApiBase(rawApiBase,
     String(import.meta.env.VITE_API_ALLOWED_ORIGINS ?? "https://api.innercosmos.sg"), import.meta.env.PROD,
-    mobileLocalBuild, desktopLocalBuild);
+    mobileLocalBuild, desktopLocalBuild, import.meta.env.VITE_LOCAL_API_ORIGIN ?? "", demoModeBuild);
 } catch (error) {
   apiConfigurationError = error instanceof Error ? error.message : "Invalid production API origin";
 }

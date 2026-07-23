@@ -11,6 +11,7 @@
     "build:mobile:local": "tsc -b && vite build --mode mobile-local",
     "build:tauri": "tsc -b && vite build --mode tauri",
     "build:tauri:local": "tsc -b && vite build --mode tauri-local",
+    "build:demo": "tsc -b && vite build --mode demo",
     "test": "vitest run",
     "api:generate": "node scripts/generate-openapi.mjs",
     "api:check": "node scripts/check-openapi-generated.mjs",
