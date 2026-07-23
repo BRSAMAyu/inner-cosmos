@@ -1077,7 +1077,7 @@ export function AuroraApp() {
         <Route path="/me/*" element={null} />
         <Route path="*" element={<Navigate to={spacePath("aurora")} replace />} />
       </Routes>
-      <ProductShellNavigation active={productSpace} onNavigate={navigateSpace} />
+      <ProductShellNavigation active={productSpace} onNavigate={navigateSpace} locale={skillLocale} />
 
       {/* Gemini audit 4.7: each product space gets its own ErrorBoundary so a crash rendering one
           space (all five are always mounted, just `hidden`, to preserve scroll/edit state across
