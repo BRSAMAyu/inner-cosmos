@@ -1,0 +1,21 @@
+# CN-PROGRESSIVE-DELIVERY — namespace for the isolated canary proof.
+#
+# Product hook: a new Aurora runtime revision (e.g. a provider-config or
+# generation-pipeline change) is risky to ship 100% in one shot because a subtle
+# regression can break the live SSE turn path or degrade reply quality for every
+# user at once. Argo Rollouts ramps a new revision through a weighted canary
+# gated by a real health/quality signal, and AUTO-ABORTS back to the last good
+# revision if the signal degrades - so a bad build touches only the canary slice,
+# never the full fleet.
+#
+# This namespace is isolated from the live hero-gate workload in inner-cosmos-w3
+# so the proof does not disturb CN-ZERO-LOSS-DRAIN / CN-EVENT-DRIVEN-AUTOSCALING
+# state. It still matches the inner-cosmos-* scope, so the Kyverno admission
+# policies (CN-POLICY-AS-CODE) apply here too - a nice cross-check that the
+# canary pods are themselves policy-compliant.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: inner-cosmos-rollouts
+  labels:
+    app.kubernetes.io/name: inner-cosmos

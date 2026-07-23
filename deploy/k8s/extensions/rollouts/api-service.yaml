@@ -1,0 +1,25 @@
+# CN-PROGRESSIVE-DELIVERY — Service fronting the Aurora API Rollout.
+#
+# A single Service whose selector matches both the stable and canary ReplicaSets
+# (they share the Rollout's pod labels). With ReplicaSet-weighted canary (no L7
+# trafficRouting provider), Kubernetes' default endpoints balancing naturally
+# sends a proportional share of traffic to the canary pods. For true L7 weighted
+# splitting (stable vs canary Service + trafficRouting.gatewayAPI/nginx), see the
+# Academy fallback note in api-rollout.yaml - that is the scripted-HTTPRoute path
+# used when the Argo controller cannot run.
+apiVersion: v1
+kind: Service
+metadata:
+  name: inner-cosmos-api
+  namespace: inner-cosmos-rollouts
+  labels:
+    app.kubernetes.io/name: inner-cosmos
+    app.kubernetes.io/component: api
+spec:
+  selector:
+    app.kubernetes.io/name: inner-cosmos
+    app.kubernetes.io/component: api
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
