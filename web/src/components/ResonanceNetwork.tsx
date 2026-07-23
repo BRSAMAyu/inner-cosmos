@@ -82,12 +82,12 @@ export function ResonanceNetwork({ resonanceMatches, resonanceStrategy, visitorB
         {resonanceMatches.map(match => <button type="button" role="listitem" key={match.capsule.id}
           className={visitorMatch?.capsule.id === match.capsule.id ? "match-card active" : "match-card"}
           onClick={() => onChooseMatch(match.capsule.id)}><span>{match.resonant ? t.resonantNow : t.exploreMeet}</span>
-          <strong>{match.capsule.pseudonym}</strong><p>{match.capsule.intro}</p>
+          <strong>{match.capsule.pseudonym}</strong><p className="ugc-text">{match.capsule.intro}</p>
           <small>{match.matchSummary}</small></button>)}
       </div>
       {visitorMatch && <div className="visitor-workbench">
         <header><div><span className="identity-notice">{t.identityNotice}</span><h3>{visitorMatch.capsule.pseudonym}</h3>
-          <p>{visitorMatch.capsule.intro}</p></div><div className="match-reasons">{visitorMatch.matchReasons.map(reason => <span key={reason}>{reason}</span>)}</div></header>
+          <p className="ugc-text">{visitorMatch.capsule.intro}</p></div><div className="match-reasons">{visitorMatch.matchReasons.map(reason => <span key={reason}>{reason}</span>)}</div></header>
         {!personaSession ? <div className="visitor-entry"><p>{t.entryP}</p>
           <AsyncButton className="resonance-primary" busy={visitorBusy} busyText={t.enterBusy} onClick={onStartPersonaConversation}>{t.enterBtn}</AsyncButton></div> : <>
           <div className="visitor-quota"><span>{t.quota(personaQuota?.remainingTurns ?? "–")}</span><small>{t.quotaNote}</small>
@@ -97,7 +97,7 @@ export function ResonanceNetwork({ resonanceMatches, resonanceStrategy, visitorB
             </div>}
           </div>
           <div className="persona-history" aria-label={t.personaHistAria}>{personaMessages.length === 0 ? <p>{t.historyStart}</p> : personaMessages.map(message =>
-            <article className={message.senderType === "VISITOR" ? "visitor" : "capsule"} key={message.id}><span>{message.senderType === "VISITOR" ? t.speakerYou : visitorMatch.capsule.pseudonym}</span><p>{message.textContent}</p></article>)}</div>
+            <article className={message.senderType === "VISITOR" ? "visitor" : "capsule"} key={message.id}><span>{message.senderType === "VISITOR" ? t.speakerYou : visitorMatch.capsule.pseudonym}</span><p className="ugc-text">{message.textContent}</p></article>)}</div>
           <div className="sandbox-composer"><textarea aria-label={t.writeToCapsule} value={personaDraft} onChange={event => onPersonaDraftChange(event.target.value)} />
             <AsyncButton className="resonance-primary" busy={visitorBusy} disabled={!personaDraft.trim() || personaQuota?.exhausted} busyText={t.sendBusy} onClick={onSendPersonaTurn}>{t.sendTurn}</AsyncButton></div>
           {personaTurnError && <p className="preview-warning" role="alert">{personaTurnError}</p>}

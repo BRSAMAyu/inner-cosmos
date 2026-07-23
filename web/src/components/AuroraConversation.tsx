@@ -59,6 +59,13 @@ export function AuroraConversation({ messages, activeTurnId, thinkingStage = nul
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const draftRef = useRef(draft);
   draftRef.current = draft;
+  // Gemini audit 4.6 (CONFIRMED/P2): mountedRef + a per-attempt generation counter guard the
+  // transcription-result *application*, not the recorder itself. Every stop-recording-and-
+  // transcribe attempt is its own generation; a still-in-flight onTranscribe() promise from an
+  // earlier attempt (superseded by a newer recording, or outlived by an unmount) must never write
+  // onDraftChange/setTranscribing on the caller's behalf once it finally resolves.
+  const mountedRef = useRef(true);
+  const generationRef = useRef(0);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: "end" });
@@ -69,6 +76,7 @@ export function AuroraConversation({ messages, activeTurnId, thinkingStage = nul
   const finishRecording = async (cancel = false) => {
     const recorder = recorderRef.current;
     recorderRef.current = null;
+    const generation = ++generationRef.current;
     setRecording(false); setAudioLevel(0); setSpeaking(false);
     if (!recorder) return;
     const blob = await recorder.stop(cancel);
@@ -76,12 +84,16 @@ export function AuroraConversation({ messages, activeTurnId, thinkingStage = nul
     setTranscribing(true);
     try {
       const text = await onTranscribe(blob);
-      if (text) onDraftChange((draftRef.current ? `${draftRef.current} ` : "") + text);
+      if (text && mountedRef.current && generation === generationRef.current) {
+        onDraftChange((draftRef.current ? `${draftRef.current} ` : "") + text);
+      }
     } catch { /* upstream status keeps the text draft intact */ }
-    finally { setTranscribing(false); }
+    finally {
+      if (mountedRef.current && generation === generationRef.current) setTranscribing(false);
+    }
   };
 
-  useEffect(() => () => { void finishRecording(true); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => { mountedRef.current = false; void finishRecording(true); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const startRecording = async () => {
     if (!onTranscribe || !voiceSupported) return;
@@ -105,7 +117,7 @@ export function AuroraConversation({ messages, activeTurnId, thinkingStage = nul
       {messages.map(message => <article className={`message ${message.speaker.toLowerCase()} ${message.partial ? "partial" : ""}`} key={message.key}
         aria-live={message.partial ? "polite" : undefined}>
         <span className="speaker">{message.speaker === "AURORA" ? "Aurora" : t.speakerYou}</span>
-        <p>{message.text || "…"}</p>
+        <p className="ugc-text">{message.text || "…"}</p>
         {message.partial && message.text && <small>{t.partialHint}</small>}
       </article>)}
       {activeTurnId !== null && thinkingStage && <article className={`message aurora thinking ${thinkingStage}`} aria-label={t.thinkingAria}>

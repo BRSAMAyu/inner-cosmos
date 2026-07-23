@@ -113,7 +113,7 @@ export function PlazaDirectory({ capsules, activeCapsuleId, busy, onOpenCapsule,
           return <article className={activeCapsuleId === capsule.id ? "plaza-card active" : "plaza-card"} role="listitem" key={capsule.id}>
             <div className="plaza-card-head"><strong>{capsule.pseudonym}</strong>
               <span className="plaza-energy" title={t.energyTitle}>✦ {Math.round(capsule.echoEnergy)}</span></div>
-            <p>{capsule.intro}</p>
+            <p className="ugc-text">{capsule.intro}</p>
             {tags.length > 0 && <div className="plaza-card-tags">{tags.map(tagName => <span key={tagName}>{tagName}</span>)}</div>}
             <AsyncButton className="resonance-secondary" busy={busy} busyText={t.openBusy}
               onClick={() => onOpenCapsule(capsule)}>{t.open}</AsyncButton>

@@ -64,7 +64,7 @@ export function AdminCapsulesTab({ capsules, busyId, onHide, onRestore, locale =
           <strong>{c.pseudonym || "未命名"}</strong>
           <span className="admin-badge">{t.statusLabel[c.visibilityStatus] ?? c.visibilityStatus}</span>
         </div>
-        <p className="admin-muted">{c.intro}</p>
+        <p className="admin-muted ugc-text">{c.intro}</p>
         <div className="admin-pill-row">
           <span className="admin-pill">{c.isPublic ? t.visibilityPublic : t.visibilityPrivate}</span>
           {c.capsuleType && <span className="admin-pill">{c.capsuleType}</span>}

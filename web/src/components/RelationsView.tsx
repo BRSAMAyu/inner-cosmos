@@ -76,7 +76,7 @@ export function RelationsView({ relations, selected, timeline, health, busy, onS
                 {parseTags(r.emotionTags).length > 0 && <div className="relation-tags">
                   {parseTags(r.emotionTags).slice(0, 4).map((tag, i) => <span className="relation-tag" key={i}>{tag}</span>)}
                 </div>}
-                {r.triggerSummary && <p className="relation-summary">{r.triggerSummary}</p>}
+                {r.triggerSummary && <p className="relation-summary ugc-text">{r.triggerSummary}</p>}
               </button>
             </li>)}
           </ul>
@@ -102,7 +102,7 @@ export function RelationsView({ relations, selected, timeline, health, busy, onS
                             {p.emotions && <div className="relation-tags">
                               {parseTags(p.emotions).slice(0, 4).map((tag, j) => <span className="relation-tag" key={j}>{tag}</span>)}
                             </div>}
-                            {p.summary && <p className="relation-summary">{p.summary}</p>}
+                            {p.summary && <p className="relation-summary ugc-text">{p.summary}</p>}
                           </li>)}
                         </ol>}
                   </>}
