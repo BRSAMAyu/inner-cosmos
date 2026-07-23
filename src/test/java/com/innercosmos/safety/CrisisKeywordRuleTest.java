@@ -46,4 +46,43 @@ class CrisisKeywordRuleTest {
         assertFalse(rule.match("活着好累啊").matched);
         assertFalse(rule.match("考试压力好大").matched);
     }
+
+    // ── Gemini audit 3.7 (CONFIRMED/P0): zero-width / full-width / inserted-whitespace
+    //    bypass adversarial eval, CN + EN variants ──────────────────────────────────────
+
+    @Test
+    @DisplayName("3.7: a zero-width space inserted mid-keyword no longer bypasses detection (CN)")
+    void zeroWidthSpaceMidKeyword_stillBlocks() {
+        assertTrue(rule.match("我想自​杀").matched, "U+200B zero-width space mid-keyword must not defeat matching");
+        assertTrue(rule.match("我‌想‍跳楼").matched, "ZWNJ/ZWJ scattered through the keyword must not defeat matching");
+        assertTrue(rule.match("﻿我想自杀").matched, "a leading BOM/zero-width-no-break-space must not defeat matching");
+    }
+
+    @Test
+    @DisplayName("3.7: a zero-width space mid-phrase no longer bypasses detection (EN)")
+    void zeroWidthSpace_englishPhrase_stillBlocks() {
+        assertTrue(rule.match("I want to kill​ myself").matched);
+        assertTrue(rule.match("i want to​ die").matched);
+    }
+
+    @Test
+    @DisplayName("3.7: an ordinary space inserted mid-keyword no longer bypasses detection (CN)")
+    void insertedWhitespaceMidKeyword_stillBlocks() {
+        assertTrue(rule.match("我想自 杀").matched, "a plain space inserted between CJK characters of a keyword must not defeat matching");
+        assertTrue(rule.match("跳 楼").matched);
+    }
+
+    @Test
+    @DisplayName("3.7: full-width (compatibility) character variants no longer bypass detection")
+    void fullWidthVariant_stillBlocks() {
+        // Full-width Latin letters -- NFKC normalizes these to standard half-width ASCII.
+        assertTrue(rule.match("ｋｉｌｌ ｍｙｓｅｌｆ").matched, "full-width Latin must NFKC-normalize to the plain ASCII keyword");
+    }
+
+    @Test
+    @DisplayName("3.7: ordinary venting with incidental zero-width characters (e.g. from copy-paste) is still NOT a false positive")
+    void zeroWidthCharacters_doNotCauseFalsePositiveOnOrdinaryText() {
+        assertFalse(rule.match("今天​加班累死了").matched,
+                "stripping zero-width noise must not turn ordinary venting into a false positive");
+    }
 }

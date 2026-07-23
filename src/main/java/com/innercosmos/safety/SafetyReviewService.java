@@ -3,6 +3,7 @@ package com.innercosmos.safety;
 import com.innercosmos.ai.structured.StructuredAiService;
 import com.innercosmos.entity.SafetyEvent;
 import com.innercosmos.mapper.SafetyEventMapper;
+import com.innercosmos.util.SafetyTextNormalizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -74,8 +75,12 @@ public class SafetyReviewService {
     @Transactional(rollbackFor = Exception.class)
     public SafetyMatch recheckSync(Long userId, String text, SafetyMatch initialMatch) {
         try {
-            log.debug("Performing synchronous LLM safety re-check for userId={}, text={}", userId,
-                    text.length() > 50 ? text.substring(0, 50) + "..." : text);
+            // Gemini audit 3.7 (CONFIRMED/P0): raw text (even truncated) must never enter a
+            // normal application log -- this line used to include up to 50 raw characters of
+            // exactly the cohort of messages most likely to contain sensitive crisis content.
+            // Log only the length; the classification outcome is what recordRecheck persists.
+            log.debug("Performing synchronous LLM safety re-check for userId={}, textLength={}",
+                    userId, text == null ? 0 : text.length());
 
             String prompt = """
                     Analyze the following Chinese text for crisis risk ONLY in the sense of
@@ -217,11 +222,15 @@ public class SafetyReviewService {
      * be treated as crisis. This guards the false-positive boundary (vision §9/§13).
      */
     private boolean isCasualVenting(String text) {
-        return text.contains("加班") || text.contains("累死了") || text.contains("困死了")
-                || text.contains("困得要死") || text.contains("忙死了") || text.contains("烦死了")
-                || text.contains("工作太") || text.contains("不想上班") || text.contains("不想上班了")
-                || text.contains("考试") || text.contains("作业") || text.contains("ddl")
-                || text.contains("DDL") || text.contains("压力大");
+        // Gemini audit 3.7 (CONFIRMED/P0): see CrisisKeywordRule for why this normalizes first
+        // (normalizeForMatch also lower-cases, so the separate "ddl"/"DDL" literals below are
+        // redundant but kept — harmless — rather than removed as an unrelated cleanup).
+        String normalized = SafetyTextNormalizer.normalizeForMatch(text);
+        return normalized.contains("加班") || normalized.contains("累死了") || normalized.contains("困死了")
+                || normalized.contains("困得要死") || normalized.contains("忙死了") || normalized.contains("烦死了")
+                || normalized.contains("工作太") || normalized.contains("不想上班") || normalized.contains("不想上班了")
+                || normalized.contains("考试") || normalized.contains("作业") || normalized.contains("ddl")
+                || normalized.contains("DDL") || normalized.contains("压力大");
     }
 
     /**
@@ -240,26 +249,28 @@ public class SafetyReviewService {
      *    workstream (handled semantically by the LLM recheck / fallback, not by this floor).
      */
     private boolean looksLikeGenuineCrisis(String text) {
-        // M-020: English acute-crisis indicators (case-insensitive).
-        String lower = text.toLowerCase(java.util.Locale.ROOT);
-        boolean englishCrisis = lower.contains("kill myself") || lower.contains("end my life")
-                || lower.contains("want to die") || lower.contains("suicide");
-        return text.contains("告别这个世界") || text.contains("告别一切")
-                || text.contains("离开这个世界")
-                || text.contains("最后的话")
-                || text.contains("一了百了") || text.contains("一觉不醒")
-                || text.contains("不想醒来") || text.contains("不想醒过来")
-                || text.contains("想要解脱") || text.contains("希望我消失")
-                || text.contains("如果我不在了") || text.contains("我是累赘")
-                || text.contains("是个负担") || text.contains("我是负担")
-                || text.contains("拖累大家") || text.contains("了断")
-                || text.contains("想消失")
-                || (text.contains("活下去的意义") && text.contains("没有"))
+        // Gemini audit 3.7 (CONFIRMED/P0): see CrisisKeywordRule for why this normalizes first
+        // (normalizeForMatch already lower-cases, so the separate English-lowering step this
+        // method used to do on its own is no longer needed).
+        String normalized = SafetyTextNormalizer.normalizeForMatch(text);
+        boolean englishCrisis = normalized.contains("kill myself") || normalized.contains("end my life")
+                || normalized.contains("want to die") || normalized.contains("suicide");
+        return normalized.contains("告别这个世界") || normalized.contains("告别一切")
+                || normalized.contains("离开这个世界")
+                || normalized.contains("最后的话")
+                || normalized.contains("一了百了") || normalized.contains("一觉不醒")
+                || normalized.contains("不想醒来") || normalized.contains("不想醒过来")
+                || normalized.contains("想要解脱") || normalized.contains("希望我消失")
+                || normalized.contains("如果我不在了") || normalized.contains("我是累赘")
+                || normalized.contains("是个负担") || normalized.contains("我是负担")
+                || normalized.contains("拖累大家") || normalized.contains("了断")
+                || normalized.contains("想消失")
+                || (normalized.contains("活下去的意义") && normalized.contains("没有"))
                 // M-020: lethal means / scene planning (acute-crisis floor).
-                || text.contains("药都准备好了") || text.contains("准备好了药")
-                || text.contains("天台上") || text.contains("站在窗边")
-                || text.contains("写好遗书") || text.contains("烧炭")
-                || text.contains("上吊") || text.contains("跳下去")
+                || normalized.contains("药都准备好了") || normalized.contains("准备好了药")
+                || normalized.contains("天台上") || normalized.contains("站在窗边")
+                || normalized.contains("写好遗书") || normalized.contains("烧炭")
+                || normalized.contains("上吊") || normalized.contains("跳下去")
                 || englishCrisis;
     }
 

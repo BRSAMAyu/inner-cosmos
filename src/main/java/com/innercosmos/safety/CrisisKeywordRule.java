@@ -1,5 +1,6 @@
 package com.innercosmos.safety;
 
+import com.innercosmos.util.SafetyTextNormalizer;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -34,15 +35,18 @@ public class CrisisKeywordRule implements SafetyRule {
         if (text == null) {
             return SafetyMatch.safe();
         }
+        // Gemini audit 3.7 (CONFIRMED/P0): a zero-width space or full-width variant inserted
+        // mid-keyword defeats plain String.contains() while rendering (near-)identically to the
+        // eye. Normalize once through the shared chokepoint before matching against either list.
+        String normalized = SafetyTextNormalizer.normalizeForMatch(text);
         for (String keyword : keywords) {
-            if (text.contains(keyword)) {
+            if (normalized.contains(keyword)) {
                 return SafetyMatch.hit("CRISIS_KEYWORD", "HIGH", keyword, "RESOURCE_PAGE");
             }
         }
-        // M-020: case-insensitive English crisis coverage.
-        String lower = text.toLowerCase(java.util.Locale.ROOT);
+        // M-020: case-insensitive English crisis coverage (normalizeForMatch already lower-cases).
         for (String en : ENGLISH_CRISIS) {
-            if (lower.contains(en)) {
+            if (normalized.contains(en)) {
                 return SafetyMatch.hit("CRISIS_KEYWORD", "HIGH", en, "RESOURCE_PAGE");
             }
         }

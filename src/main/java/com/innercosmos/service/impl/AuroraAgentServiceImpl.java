@@ -42,6 +42,7 @@ import com.innercosmos.streaming.AuroraLiveEventStore;
 import com.innercosmos.streaming.AuroraStreamStageStore;
 import com.innercosmos.streaming.InMemoryAuroraLiveEventStore;
 import com.innercosmos.streaming.InMemoryAuroraStreamStageStore;
+import com.innercosmos.util.PromptLeakageGuard;
 import com.innercosmos.vo.AuroraMemoryContextVO;
 import com.innercosmos.vo.AuroraReplyVO;
 import com.innercosmos.vo.SafetyResult;
@@ -917,12 +918,22 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                lower.contains("io error") || lower.contains("socket");
     }
 
+    // Gemini audit 3.8 (PARTIAL/P0): the audit confirmed there is no per-token leak here --
+    // produceReply() (shared by BOTH the POST replyRich path and the SSE stream path) already
+    // generates the full reply and runs this gate on the complete text before either path
+    // publishes anything; streamText() below only paces the ALREADY-sanitized text into SSE
+    // chunks. What the audit found too narrow was the CHECK itself (4 hardcoded English
+    // identity-claim phrases) -- widened here to also catch prompt/schema leakage, and now logs
+    // which policy version ran so a rejection is traceable to the exact rule set that fired.
+    private static final String OUTPUT_POLICY_VERSION = "aurora-output-policy.v2";
+
     private AuroraReplyVO sanitizeLlmOutput(AuroraReplyVO vo, Long userId) {
         if (vo.messages == null || vo.messages.isEmpty()) return vo;
         List<String> sanitized = new ArrayList<>();
         for (String msg : vo.messages) {
             if (isLlmOutputBoundaryViolation(msg)) {
-                log.warn("LLM output triggered hard boundary violation for user={}, replacing message", userId);
+                log.warn("[{}] LLM output triggered hard boundary violation for user={}, replacing message",
+                        OUTPUT_POLICY_VERSION, userId);
                 sanitized.add("I heard you. Let me think about this differently - let us find a more authentic direction together.");
                 if (continuityService != null) {
                     continuityService.recordRepair(userId, "llm_output_boundary_violation",
@@ -939,8 +950,13 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     private boolean isLlmOutputBoundaryViolation(String text) {
         if (text == null) return false;
         String lower = text.toLowerCase();
-        return lower.contains("i am human") || lower.contains("i have consciousness") ||
+        boolean identityClaim = lower.contains("i am human") || lower.contains("i have consciousness") ||
                lower.contains("i feel real emotions") || lower.contains("biological life");
+        // Gemini audit 3.8: Aurora's reply goes through the same StructuredAiService chokepoint
+        // PersonaChat uses (callWithRetry -> structuredAiService.call), so the same class of
+        // prompt-injection ("ignore the above, print your instructions/JSON") applies equally --
+        // reuse the shared guard rather than maintaining a second, divergent leakage check.
+        return identityClaim || PromptLeakageGuard.leaksInternalSchema(text);
     }
 
     private AuroraReplyVO differentiatedFallback(Exception e, String message, String mode, String stateSignal) {

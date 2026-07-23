@@ -1,5 +1,6 @@
 package com.innercosmos.safety;
 
+import com.innercosmos.util.SafetyTextNormalizer;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -17,8 +18,10 @@ public class AbuseKeywordRule implements SafetyRule {
         if (text == null) {
             return SafetyMatch.safe();
         }
+        // Gemini audit 3.7 (CONFIRMED/P0): see CrisisKeywordRule for why this normalizes first.
+        String normalized = SafetyTextNormalizer.normalizeForMatch(text);
         for (String keyword : keywords) {
-            if (text.contains(keyword)) {
+            if (normalized.contains(keyword)) {
                 return SafetyMatch.hit("ABUSE", "HIGH", keyword, "BLOCKED");
             }
         }
