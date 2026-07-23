@@ -126,6 +126,39 @@ public class JdbcOutboxRepository {
                 """, limit);
     }
 
+    /**
+     * Privacy-safe queue pressure used by Prometheus/KEDA. These queries expose counts and age
+     * only; event payloads, aggregate identifiers, users and trace identifiers never become tags.
+     */
+    public long readyCount() {
+        Long count = jdbc.queryForObject("""
+                SELECT COUNT(*)
+                FROM tb_outbox_event
+                WHERE (status IN ('PENDING', 'RETRY') AND available_at <= CURRENT_TIMESTAMP)
+                   OR (status = 'PROCESSING' AND locked_until < CURRENT_TIMESTAMP)
+                """, Long.class);
+        return count == null ? 0L : count;
+    }
+
+    public double oldestReadyAgeSeconds() {
+        Double age = jdbc.queryForObject("""
+                SELECT COALESCE(
+                    EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - MIN(available_at))),
+                    0
+                )
+                FROM tb_outbox_event
+                WHERE (status IN ('PENDING', 'RETRY') AND available_at <= CURRENT_TIMESTAMP)
+                   OR (status = 'PROCESSING' AND locked_until < CURRENT_TIMESTAMP)
+                """, Double.class);
+        return age == null ? 0.0 : Math.max(0.0, age);
+    }
+
+    public long deadCount() {
+        Long count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM tb_outbox_event WHERE status = 'DEAD'", Long.class);
+        return count == null ? 0L : count;
+    }
+
     private OutboxEvent map(ResultSet rs, int rowNum) throws SQLException {
         return new OutboxEvent(
                 rs.getLong("id"),

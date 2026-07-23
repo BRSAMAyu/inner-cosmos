@@ -1,0 +1,55 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: inner-cosmos-worker-outbox
+  namespace: inner-cosmos-w3
+  labels:
+    app.kubernetes.io/name: inner-cosmos
+    app.kubernetes.io/component: worker
+    inner-cosmos/showcase: event-driven-autoscaling
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: inner-cosmos-worker
+  pollingInterval: 15
+  cooldownPeriod: 60
+  initialCooldownPeriod: 15
+  minReplicaCount: 1
+  maxReplicaCount: 6
+  fallback:
+    failureThreshold: 3
+    replicas: 1
+  advanced:
+    restoreToOriginalReplicaCount: true
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleUp:
+          stabilizationWindowSeconds: 0
+          policies:
+            - {type: Percent, value: 100, periodSeconds: 15}
+            - {type: Pods, value: 2, periodSeconds: 15}
+          selectPolicy: Max
+        scaleDown:
+          stabilizationWindowSeconds: 60
+          policies:
+            - {type: Percent, value: 50, periodSeconds: 30}
+  triggers:
+    - type: prometheus
+      metricType: AverageValue
+      metadata:
+        serverAddress: http://prometheus.observability.svc.cluster.local:9090
+        metricName: inner_cosmos_outbox_ready_pressure
+        query: max(inner_cosmos_outbox_ready) OR on() vector(0)
+        threshold: "10"
+        activationThreshold: "1"
+        timeout: "5s"
+    - type: prometheus
+      metricType: AverageValue
+      metadata:
+        serverAddress: http://prometheus.observability.svc.cluster.local:9090
+        metricName: inner_cosmos_outbox_oldest_age_pressure
+        query: max(inner_cosmos_outbox_oldest_ready_age_seconds) OR on() vector(0)
+        threshold: "30"
+        activationThreshold: "5"
+        timeout: "5s"

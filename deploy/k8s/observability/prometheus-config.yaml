@@ -70,3 +70,15 @@ data:
             labels: {severity: warning}
             annotations:
               summary: "HTTP 5xx ratio >5% across the API fleet"
+          - alert: InnerCosmosOutboxBacklogStalled
+            expr: max(inner_cosmos_outbox_oldest_ready_age_seconds) > 120
+            for: 2m
+            labels: {severity: warning}
+            annotations:
+              summary: "Oldest Inner Cosmos projection event has waited over two minutes"
+          - alert: InnerCosmosOutboxDeadLetters
+            expr: max(inner_cosmos_outbox_dead) > 0
+            for: 1m
+            labels: {severity: critical}
+            annotations:
+              summary: "Inner Cosmos outbox contains dead-letter events"

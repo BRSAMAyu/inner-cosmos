@@ -148,6 +148,26 @@ class JdbcOutboxRepositoryIntegrationTest {
                 Integer.class, eventId)).isEqualTo(1);
     }
 
+    @Test
+    void queuePressureQueriesReflectReadyAgeAndDeadLetterTruthWithoutPayloadAccess() {
+        long readyBefore = repository.readyCount();
+        long deadBefore = repository.deadCount();
+        UUID eventId = UUID.randomUUID();
+        repository.append(eventId, "metrics:" + eventId, "contract", "4", "metrics.v1", 1,
+                "{\"privateValue\":\"must-never-be-a-metric-tag\"}", "trace-metrics");
+        jdbc.update("UPDATE tb_outbox_event SET available_at=CURRENT_TIMESTAMP - INTERVAL '20 seconds' "
+                + "WHERE event_id=?", eventId);
+
+        assertThat(repository.readyCount()).isEqualTo(readyBefore + 1);
+        assertThat(repository.oldestReadyAgeSeconds()).isGreaterThanOrEqualTo(19.0);
+
+        OutboxEvent claimed = repository.claim("metrics-worker", 1, Duration.ofSeconds(30)).get(0);
+        repository.retry(claimed, new IllegalStateException("terminal"), 1, Duration.ZERO);
+
+        assertThat(repository.readyCount()).isEqualTo(readyBefore);
+        assertThat(repository.deadCount()).isEqualTo(deadBefore + 1);
+    }
+
     private String statusOf(UUID eventId) {
         return jdbc.queryForObject("SELECT status FROM tb_outbox_event WHERE event_id=?",
                 String.class, eventId);
