@@ -388,10 +388,14 @@ gates:
           (evidence/innovation/INNO-INNER-014/). 2026-07-24 real-LLM verification
           (TrackARealProviderSmokeEvaluationTest, INNO-EVAL-005): DeepSeek clean (0 schema drift,
           3/3) on this HEAD; GLM drifts ~3/run (provider behavior, prompts unchanged) -> the demo
-          server (scripts/demo/run-demo-server.sh) defaults to DeepSeek. Still open: slow-letter
-          read-aloud; a full statistically-robust real-embedding recall benchmark
-          (only one relevant-vs-distractor case proven so far) and independent (non-author) review
-          of the inner-voice line's genuine "aliveness"/non-repetition quality remain open.
+          server (scripts/demo/run-demo-server.sh) defaults to DeepSeek. 2026-07-24 (branch
+          codex/w1-letter-voice, merged): slow-letter read-aloud DONE -- a recipient can tap-to-play a
+          delivered slow letter synthesized in the warm default voice (POST /api/letters/{id}/voice,
+          recipient-only + delivery-state-gated, reuses TtsClient; evidence/w1-letter-voice/). This
+          completes the "reuse the voice model elsewhere" theme: Aurora inner voice + capsule persona
+          voice + slow-letter read-aloud. Still open: a full statistically-robust real-embedding
+          recall benchmark (only one relevant-vs-distractor case proven so far) and independent
+          (non-author) review of the inner-voice line's genuine "aliveness"/non-repetition quality.
           INDEPENDENT CODE REVIEW (2026-07-24): verdict ship-as-is, no CRITICAL/HIGH. M2 (MEDIUM,
           the top follow-up) RESOLVED -- the inner_voice SSE payload is now built via Jackson
           ObjectMapper (buildInnerVoicePayload) instead of hand-rolled string concatenation, so a raw
