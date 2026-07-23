@@ -26,7 +26,7 @@ import { PortraitView } from "./components/PortraitView";
 import { AccountSettings, type AccountBusy } from "./components/AccountSettings";
 import { DataRightsPanel } from "./components/DataRightsPanel";
 import { LocaleToggle } from "./components/LocaleToggle";
-import type { DataRetractionReceipt, UserProfileSettings } from "./api";
+import type { DataRetractionReceipt, TtsPreferences, TtsPreferencesPatch, UserProfileSettings } from "./api";
 import { loadLocale, saveLocale, type Locale } from "./i18n";
 import { APP_COPY, type DialogMode } from "./appCopy";
 import { AuthGate } from "./components/AuthGate";
@@ -95,6 +95,12 @@ export function AuroraApp() {
   const [accountMessage, setAccountMessage] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfileSettings | null>(null);
   const [profileBusy, setProfileBusy] = useState(false);
+  // W2 voice feature: the user's TTS voice/inner-voice preferences. Both AccountSettings' voice
+  // picker AND AuroraConversation's inner-voice bubble read from this single fetched-once source
+  // (there is no dedicated shared preference context/store in this codebase yet -- see
+  // AuroraApp.tsx's existing userProfile for the same one-fetch-many-consumers shape this mirrors).
+  const [ttsPreferences, setTtsPreferences] = useState<TtsPreferences | null>(null);
+  const [ttsBusy, setTtsBusy] = useState(false);
   const [starfield, setStarfield] = useState<StarfieldScene | null>(null);
   const [starfieldBusy, setStarfieldBusy] = useState(false);
   const [memoryOperations, setMemoryOperations] = useState<MemoryOperation[]>([]);
@@ -296,6 +302,11 @@ export function AuroraApp() {
         connectionsAndLetters.loadRelations(),
         connectionsAndLetters.loadLetterThreads(),
         api.getProfile().then(setUserProfile),
+        // W2 voice: defensive like api.plazaCapsules() above -- a still-new, non-critical endpoint
+        // failing (e.g. not yet deployed everywhere) must not fail the whole Aurora bootstrap.
+        // AuroraConversation/AccountSettings both already treat a null ttsPreferences as "feature
+        // not yet available" (render nothing / render nothing), so this degrades gracefully.
+        api.ttsPreferences().then(setTtsPreferences).catch(() => undefined),
         connectionsAndLetters.loadGroups(),
         connectionsAndLetters.loadGroupInvites()
         // NOTE: timeline/daily-record/weekly-review/thought-shredder/todo/belief-gallery data is
@@ -676,6 +687,26 @@ export function AuroraApp() {
     } catch (error) { setAccountMessage(error instanceof Error ? error.message : "偏好设置未能保存"); }
     finally { setProfileBusy(false); }
   };
+
+  // W2 voice: same null-on-confirmed-success / error-message-on-failure contract as
+  // changeAccountPassword/deleteAccount above -- AccountSettings' VoicePreferencesEditor awaits
+  // this before deciding whether to keep an optimistic selection or roll it back with an inline
+  // error (see that component's applyPatch).
+  const updateTtsPreferences = async (patch: TtsPreferencesPatch): Promise<string | null> => {
+    setTtsBusy(true);
+    try {
+      const updated = await api.updateTtsPreferences(patch);
+      setTtsPreferences(updated);
+      setAccountMessage("语音偏好已保存");
+      return null;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "语音偏好未能保存";
+      setAccountMessage(errorMessage);
+      return errorMessage;
+    } finally { setTtsBusy(false); }
+  };
+
+  const previewTtsVoice = (voiceId: string) => api.previewTtsVoice(voiceId).then(result => result.audio);
 
   const changeStarfieldMode = async (nextMode: StarfieldScene["mode"]) => {
     setStarfieldBusy(true);
@@ -1125,7 +1156,10 @@ export function AuroraApp() {
         onTranscribe={async blob => {
           try { const result = await transcribeAudio(blob); return result.text; }
           catch (error) { setStatus(error instanceof Error ? error.message : tt.transcribeUnavailable); return ""; }
-        }} onGoodbye={() => void auroraSession.triggerGoodbye()} locale={skillLocale} />
+        }} onGoodbye={() => void auroraSession.triggerGoodbye()}
+        innerVoiceEnabled={ttsPreferences?.innerVoiceEnabled ?? false}
+        innerVoiceMode={ttsPreferences?.innerVoiceMode ?? "AMBIENT"}
+        locale={skillLocale} />
 
       {(mobileState.native || !mobileState.connected) && <section className={`mobile-presence ${mobileState.connected ? "online" : "offline"}`} aria-label={tt.mobileAria}>
         <div>
@@ -1312,7 +1346,10 @@ export function AuroraApp() {
           onLoadHistory={dim => void loadPortraitHistory(dim)} onCalibrate={(dim, oldValue, newValue) => void submitPortraitCalibration(dim, oldValue, newValue)} locale={skillLocale} />
         <AccountSettings busy={accountBusy} message={accountMessage} onChangePassword={(oldPassword, newPassword) => changeAccountPassword(oldPassword, newPassword)}
           onExportData={() => void exportAccountData()} onDeleteAccount={password => deleteAccount(password)}
-          profile={userProfile} profileBusy={profileBusy} onSaveProfile={patch => void saveProfile(patch)} locale={skillLocale} />
+          profile={userProfile} profileBusy={profileBusy} onSaveProfile={patch => void saveProfile(patch)}
+          ttsPreferences={ttsPreferences} ttsBusy={ttsBusy}
+          onUpdateTtsPreferences={patch => updateTtsPreferences(patch)} onPreviewVoice={voiceId => previewTtsVoice(voiceId)}
+          locale={skillLocale} />
         <LocaleToggle locale={skillLocale} onChange={changeLocale} />
         <DataRightsPanel receipts={dataRightsReceipts} loading={dataRightsLoading} loaded={dataRightsLoaded}
           onLoad={() => void loadDataRightsReceipts()} locale={skillLocale} />

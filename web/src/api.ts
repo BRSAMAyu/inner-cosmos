@@ -51,6 +51,18 @@ export type DataRetractionReceipt = {
   createdAt: string;
 };
 export type ProactiveEvent = { type: string; content: string; ts: string };
+// W2 voice feature: GET /api/me/tts/voices, PATCH /api/me/tts/preferences (same response shape),
+// POST /api/me/tts/preview. Fixed contract from the backend agent's parallel worktree -- see the
+// W2 dispatch brief for the exact shapes this mirrors.
+export type TtsVoice = { id: string; label: string; language: "zh" | "en"; previewText: string };
+export type TtsPreferences = {
+  voices: TtsVoice[]; currentVoiceId: string; innerVoiceEnabled: boolean;
+  innerVoiceMode: "AMBIENT" | "ON_DEMAND";
+};
+export type TtsPreferencesPatch = {
+  voiceId?: string; innerVoiceEnabled?: boolean; innerVoiceMode?: "AMBIENT" | "ON_DEMAND";
+};
+export type TtsPreviewResult = { audio: string };
 export type SelfEvolution = {
   candidates: Array<{ id: number; dimension: string; proposedBelief: string; confidence: number; evidenceRefs: string; createdAt: string }>;
   proposals: Array<{
@@ -679,6 +691,13 @@ export const api = {
     method: "PUT", body: JSON.stringify(patch)
   }),
   safetyResources: () => request<string[]>("/api/safety/resources"),
+  ttsPreferences: () => request<TtsPreferences>("/api/me/tts/voices"),
+  updateTtsPreferences: (patch: TtsPreferencesPatch) => request<TtsPreferences>("/api/me/tts/preferences", {
+    method: "PATCH", body: JSON.stringify(patch)
+  }),
+  previewTtsVoice: (voiceId: string) => request<TtsPreviewResult>("/api/me/tts/preview", {
+    method: "POST", body: JSON.stringify({ voiceId })
+  }),
   dataRightsReceipts: (limit?: number) => request<DataRetractionReceipt[]>(
     "/api/me/data-rights/receipts" + (limit ? `?limit=${limit}` : "")),
   createSession: () => request<{ id: number }>("/api/dialog/session/create", {

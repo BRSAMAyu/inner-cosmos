@@ -1,9 +1,23 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AccountSettings } from "./AccountSettings";
-import type { UserProfileSettings } from "../api";
+import type { TtsPreferences, UserProfileSettings } from "../api";
 
+// A fully controllable fake Audio -- see InlineAudioPlayer.test.tsx for why jsdom's real
+// HTMLMediaElement.play() (a stub returning undefined) cannot exercise these assertions.
+class FakeAudio {
+  static instances: FakeAudio[] = [];
+  src: string;
+  play: ReturnType<typeof vi.fn>;
+  pause = vi.fn();
+  constructor(src: string) { this.src = src; this.play = vi.fn(() => Promise.resolve()); FakeAudio.instances.push(this); }
+  addEventListener() { /* no-op: these tests only assert on play() */ }
+  removeEventListener() { /* no-op */ }
+}
+
+beforeEach(() => { FakeAudio.instances = []; vi.stubGlobal("Audio", FakeAudio); });
 afterEach(cleanup);
+afterEach(() => vi.unstubAllGlobals());
 
 const profile: UserProfileSettings = {
   id: 1, username: "demo", nickname: "demo", role: "USER",
@@ -208,5 +222,118 @@ describe("AccountSettings", () => {
     fireEvent.click(screen.getByRole("button", { name: "Confirm change" }));
     expect(screen.getByText("New password must be at least 8 characters")).toBeVisible();
     expect(onChangePassword).not.toHaveBeenCalled();
+  });
+});
+
+describe("AccountSettings -- W2 voice preferences", () => {
+  const ttsPreferences: TtsPreferences = {
+    voices: [
+      { id: "warm-a", label: "温和 A", language: "zh", previewText: "你好，我在这里。" },
+      { id: "calm-b", label: "沉静 B", language: "zh", previewText: "别急，我陪着你。" }
+    ],
+    currentVoiceId: "warm-a", innerVoiceEnabled: true, innerVoiceMode: "AMBIENT"
+  };
+
+  function renderVoiceSettings(overrides: Partial<{
+    onUpdateTtsPreferences: (patch: Record<string, unknown>) => Promise<string | null>;
+    onPreviewVoice: (voiceId: string) => Promise<string>;
+  }> = {}) {
+    const onUpdateTtsPreferences = overrides.onUpdateTtsPreferences ?? vi.fn().mockResolvedValue(null);
+    const onPreviewVoice = overrides.onPreviewVoice ?? vi.fn().mockResolvedValue("data:audio/mpeg;base64,AAA");
+    render(<AccountSettings busy={null} message={null} onChangePassword={() => Promise.resolve(null)}
+      onExportData={() => undefined} onDeleteAccount={() => Promise.resolve(null)}
+      ttsPreferences={ttsPreferences} ttsBusy={false}
+      onUpdateTtsPreferences={onUpdateTtsPreferences} onPreviewVoice={onPreviewVoice} />);
+    return { onUpdateTtsPreferences, onPreviewVoice };
+  }
+
+  it("does not render the voice section before tts preferences have loaded", () => {
+    render(<AccountSettings busy={null} message={null} onChangePassword={() => Promise.resolve(null)}
+      onExportData={() => undefined} onDeleteAccount={() => Promise.resolve(null)} />);
+    expect(screen.queryByText("Aurora 的声音")).not.toBeInTheDocument();
+  });
+
+  it("seeds the voice picker and delivery-mode radios from the loaded preferences", () => {
+    renderVoiceSettings();
+    expect(screen.getByLabelText("开启内心独白")).toBeChecked();
+    expect((screen.getByLabelText("自动播放 - 心声出现时自动轻声念出") as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText("点按播放 - 轻触后才展开并播放") as HTMLInputElement).checked).toBe(false);
+    expect((screen.getByLabelText("温和 A") as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText("沉静 B") as HTMLInputElement).checked).toBe(false);
+  });
+
+  // (a) toggling delivery mode calls PATCH with the right body.
+  it("calls PATCH with the right body when the delivery mode is toggled", () => {
+    const { onUpdateTtsPreferences } = renderVoiceSettings();
+    fireEvent.click(screen.getByLabelText("点按播放 - 轻触后才展开并播放"));
+    expect(onUpdateTtsPreferences).toHaveBeenCalledExactlyOnceWith({ innerVoiceMode: "ON_DEMAND" });
+  });
+
+  it("calls PATCH with the right body when a different voice preset is picked", () => {
+    const { onUpdateTtsPreferences } = renderVoiceSettings();
+    fireEvent.click(screen.getByLabelText("沉静 B"));
+    expect(onUpdateTtsPreferences).toHaveBeenCalledExactlyOnceWith({ voiceId: "calm-b" });
+  });
+
+  it("calls PATCH with the right body when the overall mute switch is toggled", () => {
+    const { onUpdateTtsPreferences } = renderVoiceSettings();
+    fireEvent.click(screen.getByLabelText("开启内心独白"));
+    expect(onUpdateTtsPreferences).toHaveBeenCalledExactlyOnceWith({ innerVoiceEnabled: false });
+  });
+
+  // (b) a failed PATCH preserves the previous UI selection and shows an inline error, rather than
+  // silently reverting or crashing.
+  it("preserves the previous delivery-mode selection and shows an inline error when the PATCH fails", async () => {
+    const pending = deferred<string | null>();
+    renderVoiceSettings({ onUpdateTtsPreferences: vi.fn().mockReturnValue(pending.promise) });
+    const ambient = screen.getByLabelText("自动播放 - 心声出现时自动轻声念出") as HTMLInputElement;
+    const onDemand = screen.getByLabelText("点按播放 - 轻触后才展开并播放") as HTMLInputElement;
+    fireEvent.click(onDemand);
+
+    await act(async () => { pending.resolve("网络错误，暂时无法保存"); await pending.promise; });
+
+    expect(screen.getByRole("alert")).toHaveTextContent("网络错误，暂时无法保存");
+    // Rolled back to the last server-confirmed selection, with a visible reason -- not a silent,
+    // unexplained snap-back and not a crash.
+    expect(ambient.checked).toBe(true);
+    expect(onDemand.checked).toBe(false);
+  });
+
+  it("keeps a successful selection applied without any error banner", async () => {
+    const onUpdateTtsPreferences = vi.fn().mockResolvedValue(null);
+    renderVoiceSettings({ onUpdateTtsPreferences });
+    const onDemand = screen.getByLabelText("点按播放 - 轻触后才展开并播放") as HTMLInputElement;
+    fireEvent.click(onDemand);
+    await waitFor(() => expect(onUpdateTtsPreferences).toHaveBeenCalledOnce());
+    expect(onDemand.checked).toBe(true);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  // (c) the preview button actually attempts to play audio -- asserted on the mocked Audio.play
+  // call, not merely that a request was made.
+  it("attempts to play audio through the shared InlineAudioPlayer when a preview succeeds", async () => {
+    const { onPreviewVoice } = renderVoiceSettings();
+    fireEvent.click(screen.getAllByRole("button", { name: "▶ 试听" })[0]);
+    await waitFor(() => expect(onPreviewVoice).toHaveBeenCalledWith("warm-a"));
+    await waitFor(() => expect(FakeAudio.instances.length).toBeGreaterThan(0));
+    expect(FakeAudio.instances[0].play).toHaveBeenCalledOnce();
+  });
+
+  it("disables the preview button while a preview request is in flight, and re-enables it with an inline error on failure", async () => {
+    let rejectPreview!: (error: Error) => void;
+    const pendingPreview = new Promise<string>((_resolve, reject) => { rejectPreview = reject; });
+    // A rejection is intentionally left unhandled until the assertions below run; suppress the
+    // Node "unhandled rejection" warning this otherwise prints between attaching the promise here
+    // and the component's own .catch() picking it up on the next microtask.
+    pendingPreview.catch(() => undefined);
+    renderVoiceSettings({ onPreviewVoice: vi.fn().mockReturnValue(pendingPreview) });
+    const button = screen.getAllByRole("button", { name: "▶ 试听" })[0];
+    fireEvent.click(button);
+    expect(button).toBeDisabled();
+
+    await act(async () => { rejectPreview(new Error("试听服务暂时不可用")); await pendingPreview.catch(() => undefined); });
+
+    expect(screen.getByRole("alert")).toHaveTextContent("试听服务暂时不可用");
+    expect(button).not.toBeDisabled();
   });
 });

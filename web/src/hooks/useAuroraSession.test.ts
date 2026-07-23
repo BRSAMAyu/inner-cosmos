@@ -216,6 +216,72 @@ describe("useAuroraSession -- send / streaming / interrupt", () => {
     expect(result.current.safetyAlert).toBeNull();
   });
 
+  // W2 voice: the "inner_voice" SSE event is purely additive -- it must never block, delay, or
+  // otherwise change normal turn completion, whether it arrives mid-turn or never at all.
+  it("appends an AURORA_INNER message on an inner_voice event without touching turn/runtime state, and leaves normal completion unaffected", async () => {
+    let capturedOnEvent: ((event: AuroraStreamEvent) => void) | undefined;
+    vi.mocked(streamAurora).mockImplementation(async (_input, _signal, onEvent) => {
+      capturedOnEvent = onEvent;
+      return "TERMINAL_EVENT";
+    });
+    vi.mocked(api.psychologySkillSuggestion).mockResolvedValue(null);
+    const { result, setStatus } = setup();
+    await act(async () => { await result.current.resolveSession(); });
+    act(() => { result.current.setDraft("今天有点乱"); });
+    await act(async () => { await result.current.send({ preventDefault: () => undefined } as never); });
+
+    act(() => { capturedOnEvent!({ id: "1", type: "turn.started", payload: { turnId: 9 } }); });
+    act(() => { capturedOnEvent!({ id: "2", type: "bubble.started", payload: { order: 0 } }); });
+    act(() => { capturedOnEvent!({ id: "3", type: "token", payload: { content: "我在" } }); });
+
+    act(() => { capturedOnEvent!({
+      id: "3b", type: "inner_voice",
+      payload: { text: "其实我有点担心她今天的状态", audio: "data:audio/mpeg;base64,AAA", voiceId: "warm-a" }
+    }); });
+
+    const innerVoiceMessage = result.current.messages.find(m => m.speaker === "AURORA_INNER");
+    expect(innerVoiceMessage).toEqual({
+      key: "inner-9", speaker: "AURORA_INNER", text: "其实我有点担心她今天的状态",
+      audio: "data:audio/mpeg;base64,AAA", voiceId: "warm-a"
+    });
+    // Purely additive: still mid-turn, runtime/activeTurnId untouched by the inner_voice event.
+    expect(result.current.activeTurnId).toBe(9);
+    expect(result.current.runtimeSignal.stage).toBe("speaking");
+
+    act(() => { capturedOnEvent!({ id: "4", type: "bubble.completed", payload: { order: 0 } }); });
+    act(() => { capturedOnEvent!({ id: "5", type: "turn.completed", payload: { message: "done" } }); });
+
+    // Normal completion proceeds exactly as if the inner_voice event never happened.
+    expect(result.current.activeTurnId).toBeNull();
+    expect(result.current.runtimeSignal.stage).toBe("idle");
+    expect(setStatus).toHaveBeenLastCalledWith("Aurora 在这里，等你接着说");
+    // The inner-voice bubble itself is untouched by turn completion.
+    expect(result.current.messages.find(m => m.speaker === "AURORA_INNER")).toEqual(innerVoiceMessage);
+  });
+
+  it("completes a turn normally when no inner_voice event ever arrives -- its absence never blocks completion", async () => {
+    let capturedOnEvent: ((event: AuroraStreamEvent) => void) | undefined;
+    vi.mocked(streamAurora).mockImplementation(async (_input, _signal, onEvent) => {
+      capturedOnEvent = onEvent;
+      return "TERMINAL_EVENT";
+    });
+    vi.mocked(api.psychologySkillSuggestion).mockResolvedValue(null);
+    const { result, setStatus } = setup();
+    await act(async () => { await result.current.resolveSession(); });
+    act(() => { result.current.setDraft("没什么特别的"); });
+    await act(async () => { await result.current.send({ preventDefault: () => undefined } as never); });
+
+    act(() => { capturedOnEvent!({ id: "1", type: "turn.started", payload: { turnId: 9 } }); });
+    act(() => { capturedOnEvent!({ id: "2", type: "bubble.started", payload: { order: 0 } }); });
+    act(() => { capturedOnEvent!({ id: "3", type: "bubble.completed", payload: { order: 0 } }); });
+    act(() => { capturedOnEvent!({ id: "4", type: "turn.completed", payload: { message: "done" } }); });
+
+    expect(result.current.activeTurnId).toBeNull();
+    expect(result.current.runtimeSignal.stage).toBe("idle");
+    expect(setStatus).toHaveBeenLastCalledWith("Aurora 在这里，等你接着说");
+    expect(result.current.messages.some(m => m.speaker === "AURORA_INNER")).toBe(false);
+  });
+
   it("an error event ends the turn like every other terminal event, instead of leaving the composer stuck", async () => {
     let capturedOnEvent: ((event: AuroraStreamEvent) => void) | undefined;
     vi.mocked(streamAurora).mockImplementation(async (_input, _signal, onEvent) => {

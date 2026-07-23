@@ -2,8 +2,15 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { AsyncButton } from "../loading";
 import type { Locale } from "../i18n";
 import { PcmWavRecorder } from "../audio-recorder";
+import { InlineAudioPlayer } from "./shared/InlineAudioPlayer";
 
-export type AuroraUiMessage = { key: string; speaker: "USER" | "AURORA"; text: string; partial?: boolean };
+// "AURORA_INNER" (W2 voice): Aurora's occasional spoken inner-monologue line, distinct from her
+// normal reply -- see the "inner_voice" SSE event case in useAuroraSession.ts. `audio`/`voiceId`
+// are only ever populated on this variant.
+export type AuroraUiMessage = {
+  key: string; speaker: "USER" | "AURORA" | "AURORA_INNER"; text: string; partial?: boolean;
+  audio?: string; voiceId?: string;
+};
 
 /** The two pre-speech beats worth showing inline; `null` while idle or actively streaming tokens. */
 export type AuroraThinkingStage = "understanding" | "composing" | null;
@@ -13,6 +20,7 @@ const COPY: Record<Locale, {
   understanding: string; composing: string; placeholderActive: string; placeholderIdle: string;
   writeAria: string; transcribing: string; micStop: string; micStart: string; recStop: string;
   voice: string; stop: string; interruptSend: string; send: string; goodbye: string;
+  innerVoiceLabel: string; innerVoiceAria: string; innerVoiceReveal: string;
 }> = {
   "zh-CN": {
     convAria: "与 Aurora 的对话", empty: "把现在最真实的一句话放在这里。", speakerYou: "你",
@@ -20,7 +28,8 @@ const COPY: Record<Locale, {
     understanding: "Aurora 正在理解这一刻…", composing: "Aurora 正在组织下一句…",
     placeholderActive: "直接说出新的想法，Aurora 会停下并重新理解…", placeholderIdle: "此刻，你想从哪里说起？",
     writeAria: "写给 Aurora", transcribing: "转写中…", micStop: "停止录音并转写", micStart: "用语音输入",
-    recStop: "● 停止录音", voice: "🎤 语音", stop: "停止回应", interruptSend: "打断并发送", send: "发送", goodbye: "沉淀今天"
+    recStop: "● 停止录音", voice: "🎤 语音", stop: "停止回应", interruptSend: "打断并发送", send: "发送", goodbye: "沉淀今天",
+    innerVoiceLabel: "💭 内心", innerVoiceAria: "Aurora 的内心独白", innerVoiceReveal: "💭 内心独白 · 点按展开并播放"
   },
   "en-SG": {
     convAria: "Conversation with Aurora", empty: "Put the truest thing you feel right now here.", speakerYou: "You",
@@ -28,11 +37,13 @@ const COPY: Record<Locale, {
     understanding: "Aurora is taking in this moment…", composing: "Aurora is composing the next line…",
     placeholderActive: "Just say the new thought — Aurora will pause and re-understand…", placeholderIdle: "Where would you like to begin, right now?",
     writeAria: "Write to Aurora", transcribing: "Transcribing…", micStop: "Stop recording and transcribe", micStart: "Use voice input",
-    recStop: "● Stop recording", voice: "🎤 Voice", stop: "Stop responding", interruptSend: "Interrupt & send", send: "Send", goodbye: "Settle today"
+    recStop: "● Stop recording", voice: "🎤 Voice", stop: "Stop responding", interruptSend: "Interrupt & send", send: "Send", goodbye: "Settle today",
+    innerVoiceLabel: "💭 Inner voice", innerVoiceAria: "Aurora's inner voice", innerVoiceReveal: "💭 Inner voice · tap to reveal and play"
   }
 };
 
-export function AuroraConversation({ messages, activeTurnId, thinkingStage = null, draft, sessionReady, onDraftChange, onSubmit, onStop, onTranscribe, onGoodbye, locale = "zh-CN" }: {
+export function AuroraConversation({ messages, activeTurnId, thinkingStage = null, draft, sessionReady, onDraftChange, onSubmit, onStop, onTranscribe, onGoodbye,
+  innerVoiceEnabled = false, innerVoiceMode = "AMBIENT", locale = "zh-CN" }: {
   messages: AuroraUiMessage[];
   activeTurnId: number | null;
   /** Derived from the session runtime signal; drives an inline "thinking" beat where the user is
@@ -47,6 +58,12 @@ export function AuroraConversation({ messages, activeTurnId, thinkingStage = nul
   /** Triggers the "沉淀今天/温柔告别" ritual (GoodbyeOrchestrator). Only offered while idle and
    * ready -- a deliberate closing action, never available mid-stream. */
   onGoodbye?: () => void;
+  /** W2 voice: the user's current TTS preferences (GET /api/me/tts/voices, or the shared
+   * preference source once one exists). When `innerVoiceEnabled` is false, "AURORA_INNER"
+   * messages are still safely received (see useAuroraSession's handleEvent) but render nothing at
+   * all here -- never even the reveal affordance. */
+  innerVoiceEnabled?: boolean;
+  innerVoiceMode?: "AMBIENT" | "ON_DEMAND";
   locale?: Locale;
 }) {
   const t = COPY[locale];
@@ -55,6 +72,10 @@ export function AuroraConversation({ messages, activeTurnId, thinkingStage = nul
   const [audioLevel, setAudioLevel] = useState(0);
   const [speaking, setSpeaking] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
+  // W2 voice / ON_DEMAND mode: which inner-voice bubbles the user has tapped to reveal (AMBIENT
+  // mode ignores this entirely -- it always shows revealed). Keyed by message.key, so it survives
+  // independently across however many inner-voice bubbles a session accumulates.
+  const [revealedInnerVoice, setRevealedInnerVoice] = useState<Set<string>>(new Set());
   const recorderRef = useRef<PcmWavRecorder | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const draftRef = useRef(draft);
@@ -114,12 +135,31 @@ export function AuroraConversation({ messages, activeTurnId, thinkingStage = nul
     <section className={`conversation ${messages.length === 0 ? "empty-state" : "has-messages"}`}
       aria-label={t.convAria}>
       {messages.length === 0 && <div className="empty"><span>✦</span><p>{t.empty}</p></div>}
-      {messages.map(message => <article className={`message ${message.speaker.toLowerCase()} ${message.partial ? "partial" : ""}`} key={message.key}
-        aria-live={message.partial ? "polite" : undefined}>
-        <span className="speaker">{message.speaker === "AURORA" ? "Aurora" : t.speakerYou}</span>
-        <p className="ugc-text">{message.text || "…"}</p>
-        {message.partial && message.text && <small>{t.partialHint}</small>}
-      </article>)}
+      {messages.map(message => {
+        if (message.speaker === "AURORA_INNER") {
+          // Still safely received when disabled (see useAuroraSession's handleEvent) -- just
+          // rendered as nothing at all, never even the reveal affordance.
+          if (!innerVoiceEnabled) return null;
+          const isAmbient = innerVoiceMode === "AMBIENT";
+          const revealed = isAmbient || revealedInnerVoice.has(message.key);
+          const reveal = () => setRevealedInnerVoice(current => current.has(message.key) ? current : new Set(current).add(message.key));
+          // A single InlineAudioPlayer instance persists across the reveal transition (never
+          // unmounted/remounted when `revealed` flips) -- ON_DEMAND's one tap both reveals the
+          // text AND plays the audio, on the SAME underlying <audio> element the click landed on.
+          return <article className="message aurora-inner" key={message.key} aria-label={t.innerVoiceAria}>
+            <span className="speaker">{t.innerVoiceLabel}</span>
+            {revealed && <p className="ugc-text">{message.text}</p>}
+            {message.audio && <InlineAudioPlayer audio={message.audio} autoPlay={isAmbient} locale={locale}
+              ariaLabel={revealed ? undefined : t.innerVoiceReveal} onPlayAttempt={reveal} />}
+          </article>;
+        }
+        return <article className={`message ${message.speaker.toLowerCase()} ${message.partial ? "partial" : ""}`} key={message.key}
+          aria-live={message.partial ? "polite" : undefined}>
+          <span className="speaker">{message.speaker === "AURORA" ? "Aurora" : t.speakerYou}</span>
+          <p className="ugc-text">{message.text || "…"}</p>
+          {message.partial && message.text && <small>{t.partialHint}</small>}
+        </article>;
+      })}
       {activeTurnId !== null && thinkingStage && <article className={`message aurora thinking ${thinkingStage}`} aria-label={t.thinkingAria}>
         <span className="speaker">Aurora</span>
         <p><span className="thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span>{thinkingStage === "understanding" ? t.understanding : t.composing}</p>

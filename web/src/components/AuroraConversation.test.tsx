@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FormEvent } from "react";
 import { AuroraConversation } from "./AuroraConversation";
 
@@ -11,11 +11,25 @@ vi.mock("../audio-recorder", () => ({
   }
 }));
 
+// A fully controllable fake Audio -- see InlineAudioPlayer.test.tsx for why jsdom's real
+// HTMLMediaElement.play() (a stub returning undefined) cannot exercise these assertions.
+class FakeAudio {
+  static instances: FakeAudio[] = [];
+  src: string;
+  play: ReturnType<typeof vi.fn>;
+  pause = vi.fn();
+  constructor(src: string) { this.src = src; this.play = vi.fn(() => Promise.resolve()); FakeAudio.instances.push(this); }
+  addEventListener() { /* no-op: these tests only assert on play() */ }
+  removeEventListener() { /* no-op */ }
+}
+
+beforeEach(() => { FakeAudio.instances = []; vi.stubGlobal("Audio", FakeAudio); });
 afterEach(cleanup);
 afterEach(() => {
   delete (navigator as unknown as Record<string, unknown>).mediaDevices;
   delete (globalThis as Record<string, unknown>).AudioContext;
   recorder.start.mockReset(); recorder.stop.mockReset();
+  vi.unstubAllGlobals();
 });
 
 describe("AuroraConversation", () => {
@@ -253,5 +267,63 @@ describe("AuroraConversation", () => {
     resolveFirstTranscribe("最新的转写B");
     await waitFor(() => expect(onDraftChange).toHaveBeenCalledWith("最新的转写B"));
     expect(onDraftChange).not.toHaveBeenCalledWith("过期的转写A");
+  });
+});
+
+describe("AuroraConversation -- W2 inner-voice bubble", () => {
+  const baseMessages = [
+    { key: "u1", speaker: "USER" as const, text: "今天有点乱" },
+    { key: "a1", speaker: "AURORA" as const, text: "我在，慢慢说", partial: false },
+    { key: "i1", speaker: "AURORA_INNER" as const, text: "其实我有点担心她今天的状态", audio: "data:audio/mpeg;base64,AAA", voiceId: "warm-a" }
+  ];
+  const props = { activeTurnId: null, draft: "", sessionReady: true,
+    onDraftChange: () => undefined, onSubmit: (event: import("react").FormEvent<HTMLFormElement>) => event.preventDefault(),
+    onStop: () => undefined };
+
+  it("renders nothing for an inner_voice message when innerVoiceEnabled is false, but keeps rendering the normal reply", () => {
+    render(<AuroraConversation {...props} messages={baseMessages} innerVoiceEnabled={false} />);
+    expect(screen.getByText("我在，慢慢说")).toBeVisible();
+    expect(screen.queryByText("其实我有点担心她今天的状态")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Aurora 的内心独白")).not.toBeInTheDocument();
+  });
+
+  it("renders the inner-voice bubble visually distinct from a normal reply bubble, and attempts autoplay in AMBIENT mode", () => {
+    render(<AuroraConversation {...props} messages={baseMessages} innerVoiceEnabled innerVoiceMode="AMBIENT" />);
+    const innerBubble = screen.getByLabelText("Aurora 的内心独白");
+    expect(innerBubble).toHaveClass("aurora-inner");
+    const normalBubble = screen.getByText("我在，慢慢说").closest("article");
+    expect(normalBubble).not.toHaveClass("aurora-inner");
+    // AMBIENT: text is shown immediately (not gated behind a tap).
+    expect(screen.getByText("其实我有点担心她今天的状态")).toBeVisible();
+    // AMBIENT: autoplay is attempted without any click.
+    expect(FakeAudio.instances.length).toBeGreaterThan(0);
+    expect(FakeAudio.instances[0].play).toHaveBeenCalledOnce();
+  });
+
+  it("does NOT autoplay in ON_DEMAND mode -- shows a tap affordance instead, and only reveals+plays once tapped", () => {
+    render(<AuroraConversation {...props} messages={baseMessages} innerVoiceEnabled innerVoiceMode="ON_DEMAND" />);
+    // Before any tap: no autoplay attempted, and the composed text is not yet shown.
+    expect(FakeAudio.instances.length === 0 || FakeAudio.instances.every(instance => !instance.play.mock.calls.length)).toBe(true);
+    expect(screen.queryByText("其实我有点担心她今天的状态")).not.toBeInTheDocument();
+    const revealButton = screen.getByRole("button", { name: "💭 内心独白 · 点按展开并播放" });
+
+    fireEvent.click(revealButton);
+
+    // After the tap: revealed AND an actual play attempt was made.
+    expect(screen.getByText("其实我有点担心她今天的状态")).toBeVisible();
+    expect(FakeAudio.instances.length).toBeGreaterThan(0);
+    expect(FakeAudio.instances[FakeAudio.instances.length - 1].play).toHaveBeenCalledOnce();
+  });
+
+  it("a turn with no inner_voice message at all renders and completes normally, never stuck waiting for one", () => {
+    const messagesWithoutInnerVoice = baseMessages.filter(message => message.speaker !== "AURORA_INNER");
+    render(<AuroraConversation {...props} messages={messagesWithoutInnerVoice} activeTurnId={null} innerVoiceEnabled innerVoiceMode="AMBIENT" />);
+    expect(screen.getByText("我在，慢慢说")).toBeVisible();
+    expect(screen.queryByLabelText("Aurora 的内心独白")).not.toBeInTheDocument();
+  });
+
+  it("renders the inner-voice affordance in English when locale is en-SG", () => {
+    render(<AuroraConversation {...props} messages={baseMessages} innerVoiceEnabled innerVoiceMode="ON_DEMAND" locale="en-SG" />);
+    expect(screen.getByRole("button", { name: "💭 Inner voice · tap to reveal and play" })).toBeVisible();
   });
 });

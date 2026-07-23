@@ -77,6 +77,11 @@ const STATUS_COPY: Record<SkillLocale, {
   }
 };
 
+// W2 voice: an inner-voice bubble reuses the same `messages` list as ordinary turn bubbles (see
+// handleEvent's "inner_voice" case below) so AuroraConversation's existing render loop and
+// auto-scroll/aria-live wiring pick it up "for free" -- no separate list or extra prop threading
+// through this hook. AccountSettings-style filtering (innerVoiceEnabled/innerVoiceMode) happens
+// entirely in AuroraConversation itself; this hook only stores what arrived.
 function toUi(rows: DialogMessage[]): AuroraUiMessage[] {
   return rows.map(row => ({ key: `db-${row.id}`, speaker: row.speaker, text: row.textContent }));
 }
@@ -345,6 +350,19 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
       case "bubble.completed": {
         const key = bubbleKeyRef.current;
         if (key) setMessages(current => current.map(message => message.key === key ? { ...message, partial: false } : message));
+        break;
+      }
+      case "inner_voice": {
+        // At most once per turn, and deliberately NOT a terminal/control event -- it never
+        // touches runtimeSignal/activeTurnId/status. A turn that never emits one (the common
+        // case: disabled, or the backend had nothing genuinely distinct to say) completes exactly
+        // as if this case did not exist.
+        const turnId = activeTurnRef.current ?? 0;
+        const key = `inner-${turnId}`;
+        setMessages(current => current.some(message => message.key === key) ? current : [
+          ...current,
+          { key, speaker: "AURORA_INNER", text: event.payload.text, audio: event.payload.audio, voiceId: event.payload.voiceId }
+        ]);
         break;
       }
       case "turn.interrupted":
