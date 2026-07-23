@@ -185,4 +185,61 @@ describe("LettersInbox", () => {
     fireEvent.click(screen.getByRole("button", { name: "我也愿意" }));
     expect(onDecideConnection).toHaveBeenCalledWith(3, "accept");
   });
+
+  // W1 slow-letter voice reuse: tap-to-play a delivered letter's body read aloud, via the shared
+  // InlineAudioPlayer (no second player). Mirrors the capsule-voice test contract in
+  // ResonanceNetwork.test.tsx.
+  it("shows a tap-to-play button on a delivered letter and fires onPlayLetterVoice", () => {
+    const onPlayLetterVoice = vi.fn();
+    render(<LettersInbox letterInbox={[letter]} replyDrafts={{}}
+      connectionRequests={{ incoming: [], outgoing: [] }} friends={[]}
+      isDraftBusy={() => false} isLetterActionBusy={() => false} isConnectionDecisionBusy={() => false} isConnectionLeaveBusy={() => false} isLetterConnectionBusy={() => false}
+      isLetterVoiceBusy={() => false} onPlayLetterVoice={onPlayLetterVoice}
+      onReplyDraftChange={() => undefined} onReply={() => undefined} onActOnLetter={() => undefined}
+      onReportLetter={() => undefined} onRequestConnection={() => undefined} onDecideConnection={() => undefined} onLeaveConnection={() => undefined} />);
+    fireEvent.click(screen.getByRole("button", { name: "▶ 朗读这封信" }));
+    expect(onPlayLetterVoice).toHaveBeenCalledWith(letter);
+  });
+
+  it("replaces the play button with the shared InlineAudioPlayer once audio is fetched", () => {
+    render(<LettersInbox letterInbox={[letter]} replyDrafts={{}}
+      connectionRequests={{ incoming: [], outgoing: [] }} friends={[]}
+      isDraftBusy={() => false} isLetterActionBusy={() => false} isConnectionDecisionBusy={() => false} isConnectionLeaveBusy={() => false} isLetterConnectionBusy={() => false}
+      letterVoiceLetterId={letter.id} letterVoiceAudio="data:audio/mpeg;base64,AAAA" isLetterVoiceBusy={() => false} onPlayLetterVoice={() => undefined}
+      onReplyDraftChange={() => undefined} onReply={() => undefined} onActOnLetter={() => undefined}
+      onReportLetter={() => undefined} onRequestConnection={() => undefined} onDecideConnection={() => undefined} onLeaveConnection={() => undefined} />);
+    // The InlineAudioPlayer takes over (its accessible name is the letter-voice aria-label).
+    expect(screen.getByRole("button", { name: "听这封慢信被朗读出来" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "▶ 朗读这封信" })).not.toBeInTheDocument();
+  });
+
+  it("marks the letter-voice play button busy only for the letter being synthesized", () => {
+    const { rerender } = render(<LettersInbox letterInbox={[letter]} replyDrafts={{}}
+      connectionRequests={{ incoming: [], outgoing: [] }} friends={[]}
+      isDraftBusy={() => false} isLetterActionBusy={() => false} isConnectionDecisionBusy={() => false} isConnectionLeaveBusy={() => false} isLetterConnectionBusy={() => false}
+      isLetterVoiceBusy={id => id === letter.id} onPlayLetterVoice={() => undefined}
+      onReplyDraftChange={() => undefined} onReply={() => undefined} onActOnLetter={() => undefined}
+      onReportLetter={() => undefined} onRequestConnection={() => undefined} onDecideConnection={() => undefined} onLeaveConnection={() => undefined} />);
+    const btn = screen.getByRole("button", { name: "▶ 朗读这封信" });
+    expect(btn).toBeDisabled();
+    expect(btn).toHaveAttribute("aria-busy", "true");
+
+    rerender(<LettersInbox letterInbox={[letter]} replyDrafts={{}}
+      connectionRequests={{ incoming: [], outgoing: [] }} friends={[]}
+      isDraftBusy={() => false} isLetterActionBusy={() => false} isConnectionDecisionBusy={() => false} isConnectionLeaveBusy={() => false} isLetterConnectionBusy={() => false}
+      isLetterVoiceBusy={() => false} onPlayLetterVoice={() => undefined}
+      onReplyDraftChange={() => undefined} onReply={() => undefined} onActOnLetter={() => undefined}
+      onReportLetter={() => undefined} onRequestConnection={() => undefined} onDecideConnection={() => undefined} onLeaveConnection={() => undefined} />);
+    expect(screen.getByRole("button", { name: "▶ 朗读这封信" })).toBeEnabled();
+  });
+
+  it("shows the English read-aloud label under en-SG locale", () => {
+    render(<LettersInbox locale="en-SG" letterInbox={[letter]} replyDrafts={{}}
+      connectionRequests={{ incoming: [], outgoing: [] }} friends={[]}
+      isDraftBusy={() => false} isLetterActionBusy={() => false} isConnectionDecisionBusy={() => false} isConnectionLeaveBusy={() => false} isLetterConnectionBusy={() => false}
+      isLetterVoiceBusy={() => false} onPlayLetterVoice={() => undefined}
+      onReplyDraftChange={() => undefined} onReply={() => undefined} onActOnLetter={() => undefined}
+      onReportLetter={() => undefined} onRequestConnection={() => undefined} onDecideConnection={() => undefined} onLeaveConnection={() => undefined} />);
+    expect(screen.getByRole("button", { name: "▶ Read this letter aloud" })).toBeVisible();
+  });
 });

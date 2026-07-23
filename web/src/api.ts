@@ -862,6 +862,10 @@ export const api = {
   letterThreadLetters: (threadId: number) => request<SlowLetter[]>(`/api/letters/threads/${threadId}/letters`),
   letterInbox: () => request<SlowLetter[]>("/api/letters/inbox"),
   letterOutbox: () => request<SlowLetter[]>("/api/letters/outbox"),
+  // W1 slow-letter voice reuse: on-demand MP3 synthesis of a delivered letter's body, read aloud in
+  // a warm voice. Same base64 data-URI shape as personaVoice/previewTtsVoice. No /v1/ prefix (and
+  // therefore no idempotency key) -- a side-effect-free synthesis read, matching personaVoice.
+  letterVoice: (id: number) => request<TtsPreviewResult>(`/api/letters/${id}/voice`, { method: "POST" }),
   transitionLetter: (id: number, action: "read" | "reply" | "decline" | "block" | "archive") =>
     request<SlowLetter>(`/api/letters/${id}/${action}`, { method: "POST" }),
   reportLetter: (id: number, reason: string) => request<void>(`/api/letters/${id}/report`, {

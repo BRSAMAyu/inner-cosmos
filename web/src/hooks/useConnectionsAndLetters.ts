@@ -45,6 +45,13 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
   const [threadLettersStatus, setThreadLettersStatus] = useState<FetchStatus>("idle");
   const [replyBusyId, setReplyBusyId] = useState<number | null>(null);
   const [replyDrafts, setReplyDrafts] = useState<Record<number, string>>({});
+  // W1 slow-letter voice reuse: ephemeral playback state for "hear this delivered letter read
+  // aloud". One active clip at a time (letterVoiceLetterId names which letter the audio/error
+  // belong to), mirroring the capsule-voice personaVoiceAudio pattern in AuroraApp.tsx. The audio
+  // is a base64 data URI fetched on demand from POST /api/letters/{id}/voice.
+  const [letterVoiceLetterId, setLetterVoiceLetterId] = useState<number | null>(null);
+  const [letterVoiceAudio, setLetterVoiceAudio] = useState<string | null>(null);
+  const [letterVoiceError, setLetterVoiceError] = useState<string | null>(null);
   // Gemini audit 4.5 (CONFIRMED/P1): keyed by the PARENT letter's id, persists each in-flight
   // reply's created-draft id + idempotency key across a failed send-retry (see
   // web/src/composeAndSend.ts) -- a retry must reuse the same reply draft, not create another one.
@@ -68,6 +75,7 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
   const connectionLeaveBusyKeys = useBusyKeys<number>(); // keyed by connection id (leaveConnection)
   const letterConnectionBusyKeys = useBusyKeys<number>(); // keyed by letter id (requestConnection "willKnow")
   const letterActionBusyKeys = useBusyKeys<number>(); // keyed by letter id (actOnLetter + reportLetter)
+  const letterVoiceBusyKeys = useBusyKeys<number>(); // keyed by letter id (playLetterVoice)
   const draftBusyKeys = useBusyKeys<number>(); // keyed by draft id (sendDraft)
   const groupInviteBusyKeys = useBusyKeys<number>(); // keyed by groupId (inviteToGroup)
   const groupInviteDecisionBusyKeys = useBusyKeys<number>(); // keyed by memberId (respondToGroupInvite)
@@ -186,6 +194,22 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
       setStatus("已提交举报。举报不会自动公开信件内容，交由受限审核处理。 ");
     } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法提交举报"); }
   }), [letterActionBusyKeys, setStatus]);
+
+  // W1 slow-letter voice reuse: tap-to-play a delivered letter's body read aloud. The recipient's
+  // tap is the user gesture that authorizes autoplay on arrival. Per-letter busy guard so playing
+  // one letter never disables another's button. A synthesis failure (e.g. TTS not configured) surfaces
+  // as a visible inline error on that letter -- the letter itself is never affected.
+  const playLetterVoice = useCallback((letter: SlowLetter) => letterVoiceBusyKeys.run(letter.id, async () => {
+    setLetterVoiceLetterId(letter.id);
+    setLetterVoiceAudio(null);
+    setLetterVoiceError(null);
+    try {
+      const { audio } = await api.letterVoice(letter.id);
+      setLetterVoiceAudio(audio);
+    } catch (error) {
+      setLetterVoiceError(error instanceof Error ? error.message : "暂时无法朗读这封信");
+    }
+  }), [letterVoiceBusyKeys]);
 
   const replyWithLetter = useCallback(async (letter: SlowLetter) => {
     const body = replyDrafts[letter.id]?.trim();
@@ -306,13 +330,14 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
     isConnectionDecisionBusy: connectionDecisionBusyKeys.isBusy,
     isConnectionLeaveBusy: connectionLeaveBusyKeys.isBusy,
     isLetterConnectionBusy: letterConnectionBusyKeys.isBusy,
+    letterVoiceLetterId, letterVoiceAudio, letterVoiceError, isLetterVoiceBusy: letterVoiceBusyKeys.isBusy,
     groups, groupInvites, selectedGroupId, groupMembers, groupMembersStatus,
     groupCreateBusy, isGroupInviteBusy: groupInviteBusyKeys.isBusy,
     isGroupInviteDecisionBusy: groupInviteDecisionBusyKeys.isBusy, isGroupLeaveBusy: groupLeaveBusyKeys.isBusy,
     loadLetterInbox, loadConnectionRequests, loadFriends, loadLetterOutbox, loadPeople, loadRelations, loadLetterThreads,
     loadGroups, loadGroupInvites,
     refreshConnections, requestPersonConnection, openRelation, openThread, sendDraft,
-    actOnLetter, reportLetter, replyWithLetter, updateReplyDraft,
+    actOnLetter, reportLetter, replyWithLetter, updateReplyDraft, playLetterVoice,
     requestConnection, decideConnection, leaveConnection,
     createGroup, openGroup, inviteToGroup, respondToGroupInvite, leaveGroup
   };

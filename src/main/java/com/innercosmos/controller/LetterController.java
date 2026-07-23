@@ -104,6 +104,22 @@ public class LetterController extends BaseController {
         return ApiResponse.ok(slowLetterService.getLetter(userId, id));
     }
 
+    /**
+     * W1 slow-letter voice reuse: on-demand MP3 synthesis of a delivered letter's body, read aloud
+     * in a warm voice. Tap-to-play (the frontend renders it on the letter body via the shared
+     * InlineAudioPlayer), so hearing a letter is opt-in/visible, never autoplay-surprising. Reuses
+     * the existing letter transport (synchronous POST, same controller/session auth) and the
+     * {@link SlowLetterService} recipient-scoped + delivered-state gates -- no new auth surface.
+     * Returns the audio as an inline base64 data URI, exactly like the capsule-voice and TTS
+     * preview endpoints. Mirrors {@code POST /api/persona-chat/session/{id}/voice}.
+     */
+    @PostMapping("/{id}/voice")
+    public ApiResponse<Map<String, String>> voice(@PathVariable Long id, HttpSession session) {
+        byte[] audio = slowLetterService.synthesizeVoice(currentUserId(session), id);
+        String dataUri = "data:audio/mpeg;base64," + java.util.Base64.getEncoder().encodeToString(audio);
+        return ApiResponse.ok(Map.of("audio", dataUri));
+    }
+
     @PostMapping("/{id}/reply-with-letter")
     public ApiResponse<SlowLetter> replyWithLetter(@PathVariable Long id, @RequestBody LetterCreateRequest request, HttpSession session) {
         Long userId = currentUserId(session);
