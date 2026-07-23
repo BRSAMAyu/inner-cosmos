@@ -1,0 +1,72 @@
+# CN-POLICY-AS-CODE — ClusterPolicy: disallow containers running as root (UID 0).
+#
+# Product hook (why this matters for Inner Cosmos):
+#   The app namespace `inner-cosmos-w3` co-locates the API runtime with mounted
+#   secrets (SPRING_DATASOURCE_PASSWORD, Postgres/Redis client CA certs) and with
+#   the durable store of user memories, pgvector relationship embeddings, emotion
+#   baselines and dialog transcripts. A pod that runs as UID 0 (or that sets
+#   runAsNonRoot=false) has the filesystem reach to read those secrets and any
+#   hostPath-mounted data dir - exactly the privilege escalation we must never
+#   let a misconfigured runtime role reach production with. This policy rejects
+#   such a Pod at the API server, before it is ever scheduled next to user data.
+#
+# Scope: ClusterPolicy scoped to namespaces matching inner-cosmos-* so system
+# namespaces (kube-system, kyverno, keda, observability, ...) keep operating.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: inner-cosmos-disallow-root-user
+  annotations:
+    policies.kyverno.io/title: Disallow Root User for Inner Cosmos runtime
+    policies.kyverno.io/category: Pod Security Standards (Restricted)
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Rejects any Pod in an inner-cosmos-* namespace that runs a container as
+      UID/GID 0 or that sets securityContext.runAsNonRoot=false.
+spec:
+  validationFailureAction: Enforce
+  background: false            # admission-time only (no background controller on kind)
+  rules:
+    - name: pod-must-not-be-root
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces: ["inner-cosmos-*"]
+      validate:
+        message: &msg >-
+          Inner Cosmos runtime pods must run as a non-root user. A pod that runs
+          as UID 0 sits next to mounted DB/CA secrets and the memory/pgvector
+          store - reject it before scheduling, not after.
+        deny:
+          conditions:
+            any:
+              # A missing leaf throws "Unknown key" in Kyverno 1.18 rather than
+              # returning null, so each optional field is given a string default.
+              # Only an *explicit* runAsUser: 0 (or runAsNonRoot: false) is denied.
+              - key: "{{ request.object.spec.securityContext.runAsUser || 'none' }}"
+                operator: Equals
+                value: 0
+              - key: "{{ request.object.spec.securityContext.runAsNonRoot || 'unset' }}"
+                operator: Equals
+                value: false
+    - name: containers-must-not-be-root
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces: ["inner-cosmos-*"]
+      validate:
+        message: *msg
+        foreach:
+          - list: "request.object.spec.containers[]"
+            deny:
+              conditions:
+                any:
+                  - key: "{{ element.securityContext.runAsUser || 'none' }}"
+                    operator: Equals
+                    value: 0
+                  - key: "{{ element.securityContext.runAsNonRoot || 'unset' }}"
+                    operator: Equals
+                    value: false

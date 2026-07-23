@@ -1,0 +1,54 @@
+# CN-POLICY-AS-CODE — ClusterPolicy: require resource requests+limits on every container.
+#
+# Product hook (why this matters for Inner Cosmos):
+#   The single-node kind cluster (and any shared Academy node) co-schedules the
+#   API, worker, scheduler, Postgres and Redis runtimes. A container without
+#   resource requests/limits is unbounded: under load it can starve the API pod
+#   serving a live multi-bubble Aurora SSE turn (CN-ZERO-LOSS-DRAIN) or OOM-kill
+#   the Postgres pod holding in-flight dialog state. Enforcing bounded resources
+#   is what keeps the zero-loss-drain + event-driven-autoscaling invariants
+#   honest - the HPA/KEDA math only means something if every neighbor is bounded.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: inner-cosmos-require-resource-limits
+  annotations:
+    policies.kyverno.io/title: Require Resource Requests and Limits
+    policies.kyverno.io/category: Best Practices
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Rejects any Pod in an inner-cosmos-* namespace whose containers (or
+      initContainers) omit resources.requests or resources.limits.
+spec:
+  validationFailureAction: Enforce
+  background: false
+  rules:
+    - name: containers-need-requests-and-limits
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces: ["inner-cosmos-*"]
+      validate:
+        message: >-
+          Every Inner Cosmos container must declare resources.requests and
+          resources.limits. An unbounded neighbor can starve/OOM-kill the pod
+          serving a live Aurora turn or holding in-flight dialog state.
+        foreach:
+          - list: "request.object.spec.containers[]"
+            deny:
+              conditions:
+                any:
+                  - key: "{{ element.resources.requests.memory || '' }}"
+                    operator: Equals
+                    value: ""
+                  - key: "{{ element.resources.requests.cpu || '' }}"
+                    operator: Equals
+                    value: ""
+                  - key: "{{ element.resources.limits.memory || '' }}"
+                    operator: Equals
+                    value: ""
+                  - key: "{{ element.resources.limits.cpu || '' }}"
+                    operator: Equals
+                    value: ""

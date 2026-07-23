@@ -1,0 +1,33 @@
+# Fully compliant Pod: non-root, pinned tag, bounded resources. Must be ADMITTED.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: cn-policy-compliant-probe
+  namespace: inner-cosmos-w3
+  labels:
+    app.kubernetes.io/name: inner-cosmos
+spec:
+  automountServiceAccountToken: false
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1001
+    runAsGroup: 1001
+    seccompProfile: {type: RuntimeDefault}
+  restartPolicy: OnFailure
+  containers:
+    - name: app
+      image: inner-cosmos:w3-otel
+      imagePullPolicy: IfNotPresent
+      command: ["sh", "-c", "sleep 30"]
+      securityContext:
+        readOnlyRootFilesystem: true
+        allowPrivilegeEscalation: false
+        capabilities: {drop: [ALL]}
+      resources:
+        requests: {cpu: 50m, memory: 64Mi}
+        limits:   {cpu: 200m, memory: 256Mi}
+      volumeMounts:
+        - {name: tmp, mountPath: /tmp}
+  volumes:
+    - name: tmp
+      emptyDir: {}
