@@ -1,0 +1,56 @@
+{
+  "startedAt": "2026-07-23T19:32:09.144Z",
+  "steps": {
+    "bootstrap": {
+      "enabled": true,
+      "flow": "authorization_code",
+      "pkceRequired": true,
+      "codeChallengeMethod": "S256",
+      "issuer": "http://localhost:8081/realms/inner-cosmos",
+      "clientId": "inner-cosmos-mobile-local",
+      "redirectUri": "innercosmos://oauth/callback"
+    },
+    "discovery": {
+      "issuer": "http://localhost:8081/realms/inner-cosmos",
+      "jwks_uri": "http://localhost:8081/realms/inner-cosmos/protocol/openid-connect/certs",
+      "matches": true
+    },
+    "pkce": {
+      "verifierRedacted": "fycJTMYz5Z…(len=86)",
+      "challengeRedacted": "PRCT2Nk-pa…(len=43)",
+      "method": "S256"
+    },
+    "authorize": {
+      "callbackScheme": "innercosmos:",
+      "stateMatched": true,
+      "codeRedacted": "cb5784c0-c…(len=98)"
+    },
+    "tokenExchange": {
+      "status": 200,
+      "tokenType": "Bearer",
+      "expiresIn": 300,
+      "hasIdToken": true,
+      "hasRefreshToken": true
+    },
+    "idToken": {
+      "alg": "RS256",
+      "kid": "zcTehjtXxzfxSmKOpS447_LxYHsXEb03ASe_m4pEVL4",
+      "signatureValid": true,
+      "iss": true,
+      "audience": [
+        "inner-cosmos-mobile-local"
+      ],
+      "nonceMatched": true,
+      "expiryOk": true,
+      "subject": "9ec607c4-cc6e-4705-82bf-5892bb1f6e0c"
+    },
+    "resourceServer": {
+      "status": 200,
+      "success": true,
+      "items": 0
+    }
+  },
+  "ok": true,
+  "accessTokenPrefix": "eyJhbGciOi…(len=1279)",
+  "idTokenPrefix": "eyJhbGciOi…(len=1187)"
+}
