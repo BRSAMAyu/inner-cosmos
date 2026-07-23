@@ -367,7 +367,30 @@ gates:
       - {id: SKILL-PRODUCT, target: "At least three evidence-informed non-diagnostic skills pass quality, safety, i18n, and human review.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-PSY-001/, evidence/innovation/INNO-PSY-002/]}
       - {id: MOBILE-MACHINE-RUNTIME, target: "Capacitor Android emulator and Tauri Windows execute PKCE, Aurora, recovery, deep-link, local notification, secure storage and audio journeys with current evidence.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-MOBILE-001/, evidence/innovation/INNO-MOBILE-002/, evidence/innovation/INNO-MOBILE-003/, evidence/innovation/INNO-MOBILE-004/], remaining: "Reconcile the existing Android/desktop evidence on the integrated W0 HEAD and close all machine-runnable emulator/Tauri journeys."}
       - {id: MOBILE-EXTERNAL-RELEASE, target: "Real iOS/Android devices, production FCM/APNs, Apple signing/notarization and store signing are independently verified.", status: BLOCKED, evidence: [evidence/innovation/INNO-MOBILE-004/], remaining: "External device, Firebase/Apple credentials, signing and store-account gate. Code, templates and Mac handoff remain machine work; only the external execution/signoff is blocked."}
-      - {id: UX-COMPLETE, target: "All five product spaces meet desktop/mobile, bilingual, WCAG 2.2 AA target, reduced-motion, and blind-experience acceptance.", status: IN_PROGRESS, evidence: [evidence/experience/, evidence/integration/FINAL-STABILIZATION-2026-07-20/], remaining: "Five clean BrowserRouter spaces, hard-refresh routes, desktop/projector/mobile viewports, progressive-disclosure tags, PWA banner clearance and 14 Playwright journeys are verified. Still open: complete copy-level i18n, global axe/manual WCAG audit, performance/visual-regression budgets and non-author blind experience acceptance."}
+      - id: UX-COMPLETE
+        target: "All five product spaces meet desktop/mobile, bilingual, WCAG 2.2 AA target, reduced-motion, and blind-experience acceptance."
+        status: IN_PROGRESS
+        evidence: [evidence/experience/, evidence/integration/FINAL-STABILIZATION-2026-07-20/, "commit on codex/w0-integration (W2 first UIUX audit pass)"]
+        remaining: >-
+          Five clean BrowserRouter spaces, hard-refresh routes, desktop/projector/mobile viewports,
+          progressive-disclosure tags, PWA banner clearance and 14 Playwright journeys are verified.
+          2026-07-23 (W2 first dispatch, live browser-driven audit, not just code-reading): confirmed
+          already-solid: entry flow, five-space routing, Resonance-space empty states,
+          prefers-reduced-motion (already fully wired -- CSS blanket override plus JS-level skips in
+          ripple/stardust motifs). Found and fixed 4 real WCAG/i18n/touch-target bugs: HeartDiary
+          textarea's suppressed focus outline with no replacement (2.4.7 focus-visible hard gate);
+          five-space nav's <strong>+<small> concatenating into a run-on screen-reader name; the same
+          nav never actually localizing to en-SG despite every other string translating (slipped past
+          the existing i18n-completeness test, which only checks module import, not per-string
+          localization); `.danger-quiet` (sign-out/delete-account) measuring 62x20px live with zero
+          padding, under the 48dp touch-target hard gate. Supervisor independently re-verified: diffs
+          read in full, web suite 482/482 (71 files), tsc clean.
+          Still open (explicitly not attempted this pass, not silently claimed): complete axe/global
+          WCAG audit, visual-regression and performance budgets, non-author blind-experience
+          acceptance, full per-component empty/loading/streaming/partial/offline/error/expired/
+          permission-denied matrix beyond what was spot-checked, live 200%-browser-zoom check (only
+          the existing jsdom-level test was read), and the same <strong>+<small> run-on-naming risk
+          in ResonanceNetwork/PeopleDiscovery/LettersInbox/CapsuleWorkbench (found, not fixed).
 
   - id: G8
     name: EKS operations and Singapore readiness
