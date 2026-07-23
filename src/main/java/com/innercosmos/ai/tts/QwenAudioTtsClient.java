@@ -55,8 +55,7 @@ public class QwenAudioTtsClient implements TtsClient {
     @Override
     public byte[] synthesize(String text, String voiceId) {
         if (!available()) throw new IllegalStateException("tts provider is not configured");
-        TtsVoicePreset preset = TtsVoicePresets.byId(voiceId)
-            .orElseThrow(() -> new IllegalArgumentException("unknown tts voice id: " + voiceId));
+        TtsVoicePreset preset = resolvePreset(voiceId);
         if (text == null || text.isBlank()) throw new IllegalArgumentException("text to synthesize must not be blank");
         try {
             return synthesizeViaWebSocket(text, preset);
@@ -65,6 +64,19 @@ public class QwenAudioTtsClient implements TtsClient {
         } catch (Exception e) {
             throw new IllegalStateException("tts synthesis failed: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * Resolves a preset voice by id across BOTH catalogs: Aurora's inner-voice presets
+     * ({@link TtsVoicePresets}) AND the capsule persona-voice presets ({@link CapsuleVoicePresets}).
+     * The capsule voice path reuses this same {@code TtsClient} rather than wrapping a second one,
+     * so capsule ids must be resolvable here. Package-private + static so the resolution contract
+     * (both catalogs, disjoint, unknown rejected) is pinned directly by a unit test without a network.
+     */
+    static TtsVoicePreset resolvePreset(String voiceId) {
+        return TtsVoicePresets.byId(voiceId)
+            .or(() -> CapsuleVoicePresets.byId(voiceId))
+            .orElseThrow(() -> new IllegalArgumentException("unknown tts voice id: " + voiceId));
     }
 
     private byte[] synthesizeViaWebSocket(String text, TtsVoicePreset preset) throws Exception {

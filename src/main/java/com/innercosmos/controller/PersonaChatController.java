@@ -39,6 +39,22 @@ public class PersonaChatController extends BaseController {
     }
 
     /**
+     * W1 capsule-voice reuse: on-demand MP3 synthesis of the visitor's most recent capsule reply,
+     * spoken in a persona voice distinct from Aurora's inner-voice. Tap-to-play (the frontend
+     * renders it on the latest capsule bubble via the shared InlineAudioPlayer), so hearing a
+     * capsule is opt-in/visible, never autoplay-surprising. Reuses the existing persona-chat
+     * transport (synchronous POST, same controller/session auth) and the {@link PersonaChatService}
+     * ownership + published-capsule gates -- no new auth surface. Returns the audio as an inline
+     * base64 data URI, exactly like {@code POST /api/me/tts/preview}.
+     */
+    @PostMapping("/session/{id}/voice")
+    public ApiResponse<java.util.Map<String, String>> voice(@PathVariable Long id, HttpSession session) {
+        byte[] audio = personaChatService.synthesizeVoice(currentUserId(session), id);
+        String dataUri = "data:audio/mpeg;base64," + java.util.Base64.getEncoder().encodeToString(audio);
+        return ApiResponse.ok(java.util.Map.of("audio", dataUri));
+    }
+
+    /**
      * IC-CAP-001: authoritative per-day quota state for the current visitor on a capsule.
      * The frontend uses this to render "remaining turns today" instead of guessing
      * from session-local turnCount (which can be bypassed by opening new sessions).

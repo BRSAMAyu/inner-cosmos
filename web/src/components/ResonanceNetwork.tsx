@@ -1,6 +1,7 @@
 import type { CapsuleMatch, CapsuleQuota, PersonaMessage, PersonaSession, ResonanceStrategy, SlowLetter } from "../api";
 import type { Locale } from "../i18n";
 import { AsyncButton } from "../loading";
+import { InlineAudioPlayer } from "./shared/InlineAudioPlayer";
 
 const strategyOrder: ResonanceStrategy[] = ["MIRROR", "COMPLEMENT", "GROWTH_EDGE", "SERENDIPITY", "CONTEXTUAL"];
 
@@ -14,6 +15,7 @@ const COPY: Record<Locale, {
   letterStepNote: string; seedWarning: string; letterFlightTitle: string; letterArrival: (time: string, status: string) => string;
   letterTitleLabel: string; letterBodyLabel: string; letterBodyAria: string; letterBodyPlaceholder: string;
   sendLetterBusy: string; sendLetterBtn: string; reportSession: string; blockSession: string;
+  playCapsuleVoice: string; capsuleVoiceBusy: string; capsuleVoiceAria: string;
 }> = {
   "zh-CN": {
     aria: "发现共鸣并写一封慢信", heading: "不是刷卡片，是理解为什么会相遇", count: n => `${n} 个此刻的候选`,
@@ -33,7 +35,9 @@ const COPY: Record<Locale, {
     letterFlightTitle: "慢信已启程", letterArrival: (t, s) => `预计 ${t} 到达 · 状态 ${s}`,
     letterTitleLabel: "信的题目", letterBodyLabel: "你真正想让对方读到的话", letterBodyAria: "慢信正文",
     letterBodyPlaceholder: "不用总结整段对话，只写你愿意为它负责的那部分。", sendLetterBusy: "正在寄出", sendLetterBtn: "让慢信启程",
-    reportSession: "举报这段对话", blockSession: "屏蔽这个共鸣体"
+    reportSession: "举报这段对话", blockSession: "屏蔽这个共鸣体",
+    playCapsuleVoice: "▶ 听这条回声", capsuleVoiceBusy: "正在合成…",
+    capsuleVoiceAria: "听到这个共鸣体的回复（与 Aurora 不同的声音）"
   },
   "en-SG": {
     aria: "Discover resonance and write a slow letter", heading: "Not swiping cards — understanding why you'd meet", count: n => `${n} candidate${n === 1 ? "" : "s"} right now`,
@@ -53,14 +57,17 @@ const COPY: Record<Locale, {
     letterFlightTitle: "The slow letter is on its way", letterArrival: (t, s) => `Arrives ~${t} · status ${s}`,
     letterTitleLabel: "Letter title", letterBodyLabel: "What you truly want them to read", letterBodyAria: "Slow letter body",
     letterBodyPlaceholder: "No need to summarize the whole conversation — just write the part you're willing to stand behind.", sendLetterBusy: "Sending", sendLetterBtn: "Send the slow letter",
-    reportSession: "Report this conversation", blockSession: "Block this capsule"
+    reportSession: "Report this conversation", blockSession: "Block this capsule",
+    playCapsuleVoice: "▶ Hear this echo", capsuleVoiceBusy: "Synthesizing…",
+    capsuleVoiceAria: "Hear this capsule's reply spoken (a voice distinct from Aurora)"
   }
 };
 
 export function ResonanceNetwork({ resonanceMatches, resonanceStrategy, visitorBusy, visitorMatch, personaSession,
   personaMessages, personaDraft, personaQuota, letterTitle, letterBody, sentLetter,
   onChooseStrategy, onChooseMatch, onStartPersonaConversation, onPersonaDraftChange, onSendPersonaTurn,
-  onLetterTitleChange, onLetterBodyChange, onSendLetter, onReportSession, onBlockSession, personaTurnError = null, locale = "zh-CN" }: {
+  onLetterTitleChange, onLetterBodyChange, onSendLetter, onReportSession, onBlockSession, personaTurnError = null,
+  personaVoiceAudio = null, personaVoiceBusy = false, personaVoiceError = null, onPlayPersonaVoice, locale = "zh-CN" }: {
   resonanceMatches: CapsuleMatch[]; resonanceStrategy: ResonanceStrategy; visitorBusy: boolean;
   visitorMatch: CapsuleMatch | null; personaSession: PersonaSession | null; personaMessages: PersonaMessage[];
   personaDraft: string; personaQuota: CapsuleQuota | null; letterTitle: string; letterBody: string; sentLetter: SlowLetter | null;
@@ -68,6 +75,8 @@ export function ResonanceNetwork({ resonanceMatches, resonanceStrategy, visitorB
   onStartPersonaConversation: () => void; onPersonaDraftChange: (value: string) => void; onSendPersonaTurn: () => void;
   onLetterTitleChange: (value: string) => void; onLetterBodyChange: (value: string) => void; onSendLetter: () => void;
   onReportSession?: () => void; onBlockSession?: () => void; personaTurnError?: string | null; locale?: Locale;
+  personaVoiceAudio?: string | null; personaVoiceBusy?: boolean; personaVoiceError?: string | null;
+  onPlayPersonaVoice?: () => void;
 }) {
   const t = COPY[locale];
   return <section className="resonance-network" aria-label={t.aria}>
@@ -106,8 +115,27 @@ export function ResonanceNetwork({ resonanceMatches, resonanceStrategy, visitorB
               {onBlockSession && <button type="button" className="quiet" onClick={onBlockSession}>{t.blockSession}</button>}
             </div>}
           </div>
-          <div className="persona-history" aria-label={t.personaHistAria}>{personaMessages.length === 0 ? <p>{t.historyStart}</p> : personaMessages.map(message =>
-            <article className={message.senderType === "VISITOR" ? "visitor" : "capsule"} key={message.id}><span>{message.senderType === "VISITOR" ? t.speakerYou : visitorMatch.capsule.pseudonym}</span><p className="ugc-text">{message.textContent}</p></article>)}</div>
+          <div className="persona-history" aria-label={t.personaHistAria}>{personaMessages.length === 0 ? <p>{t.historyStart}</p> : (() => {
+            // W1 capsule-voice: the play affordance is shown ONLY on the most recent CAPSULE reply --
+            // the one the visitor just received and is most likely to want heard aloud.
+            const lastCapsuleId = [...personaMessages].reverse().find(m => m.senderType === "CAPSULE")?.id ?? null;
+            return personaMessages.map(message => {
+              const isLatestCapsule = message.senderType === "CAPSULE" && message.id === lastCapsuleId;
+              return <article className={message.senderType === "VISITOR" ? "visitor" : "capsule"} key={message.id}>
+                <span>{message.senderType === "VISITOR" ? t.speakerYou : visitorMatch.capsule.pseudonym}</span>
+                <p className="ugc-text">{message.textContent}</p>
+                {isLatestCapsule && onPlayPersonaVoice && <div className="capsule-voice">
+                  {personaVoiceAudio
+                    // autoPlay is safe here: the visitor's tap on "Hear this echo" is the user gesture
+                    // that initiated the fetch, so playback on arrival satisfies the autoplay policy.
+                    ? <InlineAudioPlayer audio={personaVoiceAudio} autoPlay locale={locale} ariaLabel={t.capsuleVoiceAria} />
+                    : <AsyncButton className="quiet" busy={personaVoiceBusy} busyText={t.capsuleVoiceBusy}
+                        onClick={onPlayPersonaVoice}>{t.playCapsuleVoice}</AsyncButton>}
+                  {personaVoiceError && <span className="voice-error" role="alert">{personaVoiceError}</span>}
+                </div>}
+              </article>;
+            });
+          })()}</div>
           <div className="sandbox-composer"><textarea aria-label={t.writeToCapsule} value={personaDraft} onChange={event => onPersonaDraftChange(event.target.value)} />
             <AsyncButton className="resonance-primary" busy={visitorBusy} disabled={!personaDraft.trim() || personaQuota?.exhausted} busyText={t.sendBusy} onClick={onSendPersonaTurn}>{t.sendTurn}</AsyncButton></div>
           {personaTurnError && <p className="preview-warning" role="alert">{personaTurnError}</p>}

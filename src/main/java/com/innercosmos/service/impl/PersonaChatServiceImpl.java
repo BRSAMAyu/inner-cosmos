@@ -5,6 +5,8 @@ import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.innercosmos.ai.agent.CapsuleAgent;
 import com.innercosmos.ai.structured.StructuredAiResults;
 import com.innercosmos.ai.structured.StructuredAiService;
+import com.innercosmos.ai.tts.CapsuleVoicePresets;
+import com.innercosmos.ai.tts.TtsClient;
 import com.innercosmos.entity.CapsuleBoundary;
 import com.innercosmos.entity.CapsuleUsageQuota;
 import com.innercosmos.entity.EchoCapsule;
@@ -52,6 +54,16 @@ import java.util.regex.Pattern;
 
 @Service
 public class PersonaChatServiceImpl implements PersonaChatService {
+    /**
+     * W1 capsule-voice reuse: the same {@link TtsClient} Aurora's inner-voice path uses, field-injected
+     * (optional) exactly like {@code AuroraAgentServiceImpl#ttsClient} -- Spring always wires a real
+     * bean ({@code QwenAudioTtsClient} or {@code DisabledTtsClient}), so this is non-null in
+     * production and only null in direct-construction unit tests. Field injection (not constructor)
+     * is deliberate: it keeps this class's heavily-audited constructor signature stable.
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private TtsClient ttsClient;
+
     /**
      * SEED (official seed capsules) effective daily turn limit.
      * Set to the same clamp ceiling as non-SEED capsules (50) so that:
@@ -690,6 +702,47 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         }
         if (!userId.equals(session.visitorUserId)) {
             throw new BusinessException("UNAUTHORIZED", "无权访问此会话");
+        }
+    }
+
+    @Override
+    public byte[] synthesizeVoice(Long userId, Long sessionId) {
+        // Authorization gate #1 — reuse the existing ownership check (same helper report()/block()
+        // use): a visitor may only synthesize audio for a session they own.
+        PersonaChatSession session = requireOwnedSession(userId, sessionId);
+        EchoCapsule capsule = capsuleMapper.selectById(session.capsuleId);
+        // Authorization gate #2 — reuse the EXACT published-capsule condition that create() and
+        // finalizeAiTurn()'s `stillEligible` check enforce: isPublic==true AND visibilityStatus==
+        // "PUBLIC". A withdrawn or needs-review capsule cannot be heard aloud, even if the visitor
+        // already received the text reply earlier. This is the same gate, reapplied -- not a new one.
+        if (capsule == null || !Boolean.TRUE.equals(capsule.isPublic)
+                || !"PUBLIC".equals(capsule.visibilityStatus)) {
+            throw new BusinessException("CAPSULE_WITHDRAWN", "这个共鸣体已撤回，不能合成它的声音");
+        }
+        // Synthesize the most recent CAPSULE reply in this session (the bubble the visitor tapped
+        // play on). Each turn produces exactly one CAPSULE PersonaChatMessage, so "the last reply"
+        // is well-defined.
+        PersonaChatMessage lastReply = messageMapper.selectOne(new QueryWrapper<PersonaChatMessage>()
+                .eq("session_id", sessionId)
+                .eq("sender_type", "CAPSULE")
+                .orderByDesc("id")
+                .last("LIMIT 1"));
+        if (lastReply == null || lastReply.textContent == null || lastReply.textContent.isBlank()) {
+            throw new BusinessException("NOT_FOUND", "还没有可以合成声音的共鸣体回复");
+        }
+        if (ttsClient == null || !ttsClient.available()) {
+            throw new BusinessException("AI_PROVIDER_ERROR", "共鸣体语音合成暂未启用");
+        }
+        try {
+            // Distinct persona voice (CapsuleVoicePresets, NOT Aurora's defaults) so a visitor
+            // hears the capsule as a different persona from Aurora.
+            return ttsClient.synthesize(lastReply.textContent, CapsuleVoicePresets.defaultVoice().id());
+        } catch (Exception failure) {
+            // Mirrors Aurora's inner_voice resilience (AuroraAgentServiceImpl stream()): a synthesis
+            // failure or bounded timeout (tts.timeout-ms, default 8s) never breaks the chat -- this
+            // on-demand endpoint surfaces a clean business error and the visitor's conversation is
+            // untouched. The text reply was already delivered via the separate POST /message path.
+            throw new BusinessException("AI_PROVIDER_ERROR", "共鸣体语音暂时不可用，请稍后再试");
         }
     }
 

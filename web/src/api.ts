@@ -835,6 +835,13 @@ export const api = {
     method: "POST", body: JSON.stringify({ reason })
   }),
   blockPersonaSession: (sessionId: number) => request<void>(`/api/persona-chat/session/${sessionId}/block`, { method: "POST" }),
+  // W1 capsule-voice reuse: on-demand MP3 synthesis of the visitor's most recent capsule reply,
+  // spoken in a persona voice distinct from Aurora's. Same base64 data-URI shape as previewTtsVoice.
+  // No /v1/ prefix (and therefore no idempotency key) -- this is a side-effect-free synthesis read,
+  // matching the report/block endpoint convention.
+  personaVoice: (sessionId: number) => request<TtsPreviewResult>(`/api/persona-chat/session/${sessionId}/voice`, {
+    method: "POST"
+  }),
   // Gemini audit 4.5 (CONFIRMED/P1): both draftSlowLetter and sendSlowLetter accept an optional
   // client-supplied Idempotency-Key so a retried compose-and-send attempt (see
   // web/src/composeAndSend.ts) can present the SAME key across retries instead of always minting a
