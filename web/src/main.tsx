@@ -5,6 +5,7 @@ import { Capacitor } from "@capacitor/core";
 import { AuroraApp } from "./AuroraApp";
 import { InstallPrompt } from "./components/InstallPrompt";
 import { PwaUpdateNotice } from "./components/PwaUpdateNotice";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { startTimeOfDayTheme } from "./theme";
 import { startRipples } from "./ripple";
 import { startStardust } from "./stardust";
@@ -31,16 +32,24 @@ const nativeShell = import.meta.env.VITE_NATIVE_SHELL === "true"
   || Capacitor.isNativePlatform()
   || "__TAURI_INTERNALS__" in window;
 
+// Gemini audit 4.7 (CONFIRMED/P1): main.tsx had no ErrorBoundary at all -- any uncaught render
+// error anywhere in <AuroraApp/> unmounted the entire React tree with no recovery path but a blank
+// page. This is the single top-level "fatal" boundary; AuroraApp.tsx additionally wraps each of the
+// five product-shell spaces in their own "space" boundary so one space's crash doesn't take the
+// whole shell down. See web/src/components/ErrorBoundary.tsx for the retry/reload/telemetry-scrub
+// contract.
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <BrowserRouter basename={nativeShell ? "/" : "/app/aurora"}>
-      <AuroraApp />
-    </BrowserRouter>
-    {!nativeShell && (
-      <div className="pwa-banner-stack">
-        <InstallPrompt />
-        <PwaUpdateNotice />
-      </div>
-    )}
+    <ErrorBoundary variant="fatal">
+      <BrowserRouter basename={nativeShell ? "/" : "/app/aurora"}>
+        <AuroraApp />
+      </BrowserRouter>
+      {!nativeShell && (
+        <div className="pwa-banner-stack">
+          <InstallPrompt />
+          <PwaUpdateNotice />
+        </div>
+      )}
+    </ErrorBoundary>
   </StrictMode>
 );

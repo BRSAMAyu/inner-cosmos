@@ -30,6 +30,7 @@ import type { DataRetractionReceipt, UserProfileSettings } from "./api";
 import { loadLocale, saveLocale, type Locale } from "./i18n";
 import { APP_COPY, type DialogMode } from "./appCopy";
 import { AuthGate } from "./components/AuthGate";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { PsychologySkillStudio, SkillSuggestionBanner, type SkillLocale } from "./components/PsychologySkillStudio";
 import { ConnectError, LoadingText } from "./loading";
 import { useAuroraSession } from "./hooks/useAuroraSession";
@@ -1065,6 +1066,10 @@ export function AuroraApp() {
       </Routes>
       <ProductShellNavigation active={productSpace} onNavigate={navigateSpace} />
 
+      {/* Gemini audit 4.7: each product space gets its own ErrorBoundary so a crash rendering one
+          space (all five are always mounted, just `hidden`, to preserve scroll/edit state across
+          tab switches) never takes the other four -- or the shared nav/footer below -- down too. */}
+      <ErrorBoundary variant="space" locale={skillLocale}>
       <div className="product-space" hidden={productSpace !== "aurora"}>
       <header className="hero">
         <div>
@@ -1149,7 +1154,9 @@ export function AuroraApp() {
         onActivate={proposalId => void evolve(() => api.activateSelfEvolution(proposalId), "这次变化已经成为新的 Aurora 版本，并且仍然可以回退。")}
         onRollback={(versionId, versionNo) => void evolve(() => api.rollbackSelfEvolution(versionId), `已回到第 ${versionNo} 版；回退本身也留下了可追溯的新版本。`)} locale={skillLocale} />}
       </div>
+      </ErrorBoundary>
 
+      <ErrorBoundary variant="space" locale={skillLocale}>
       <div className="product-space" hidden={productSpace !== "cosmos"}>
       {/* Cosmos-internal secondary navigation (doc 24 section 3.3): five sub-sections, each a
           real shareable /cosmos/<tab> URL, mounted-but-hidden like the five top-level spaces so
@@ -1216,7 +1223,9 @@ export function AuroraApp() {
           onSelectCategory={category => void beliefGallery.selectCategory(category)} locale={skillLocale} />
       </div>
       </div>
+      </ErrorBoundary>
 
+      <ErrorBoundary variant="space" locale={skillLocale}>
       <div className="product-space" hidden={productSpace !== "resonance"}>
       <CapsuleWorkbench capsules={capsules} selectedCapsuleId={selectedCapsuleId} selectedCapsule={selectedCapsule}
         selectableMemories={selectableMemories} selectedMemoryIds={selectedMemoryIds} capsuleName={capsuleName} capsuleIntro={capsuleIntro}
@@ -1250,7 +1259,9 @@ export function AuroraApp() {
         onSendLetter={() => void sendLetterToMatch()} onReportSession={() => void reportPersonaSession()}
         onBlockSession={() => void blockPersonaSession()} personaTurnError={personaTurnError} locale={skillLocale} />
       </div>
+      </ErrorBoundary>
 
+      <ErrorBoundary variant="space" locale={skillLocale}>
       <div className="product-space" hidden={productSpace !== "letters"}>
       <PeopleDiscovery people={connectionsAndLetters.people} busy={connectionsAndLetters.peopleBusy} onRequest={userId => void connectionsAndLetters.requestPersonConnection(userId)} locale={skillLocale} />
       <RelationsView relations={connectionsAndLetters.relations} selected={connectionsAndLetters.selectedRelation} timeline={connectionsAndLetters.relationTimeline} health={connectionsAndLetters.relationHealth} busy={connectionsAndLetters.relationBusy} onSelect={label => void connectionsAndLetters.openRelation(label)} locale={skillLocale} />
@@ -1268,7 +1279,9 @@ export function AuroraApp() {
         onReportLetter={letter => void connectionsAndLetters.reportLetter(letter)} onRequestConnection={letter => void connectionsAndLetters.requestConnection(letter)}
         onDecideConnection={(id, decision) => void connectionsAndLetters.decideConnection(id, decision)} onLeaveConnection={id => void connectionsAndLetters.leaveConnection(id)} locale={skillLocale} />
       </div>
+      </ErrorBoundary>
 
+      <ErrorBoundary variant="space" locale={skillLocale}>
       <div className="product-space" hidden={productSpace !== "me"}>
         <MeSpace native={mobileState.native} connected={mobileState.connected} wakeIntentCount={auroraSession.wakeIntents.length}
           activeClaimCount={claims.filter(claim => claim.status === "ACTIVE").length}
@@ -1285,6 +1298,7 @@ export function AuroraApp() {
         <DataRightsPanel receipts={dataRightsReceipts} loading={dataRightsLoading} loaded={dataRightsLoaded}
           onLoad={() => void loadDataRightsReceipts()} locale={skillLocale} />
       </div>
+      </ErrorBoundary>
       <div className="state global-state" role="status"><i className={auroraSession.activeTurnId ? "pulse" : ""} />{status}</div>
       <footer><a href="/pages/dashboard.html">{tt.footerTools}</a><span>{tt.footerTagline}</span><button type="button" onClick={() => void logout()}>{tt.footerSignOut}</button></footer>
     </main>

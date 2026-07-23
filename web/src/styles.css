@@ -430,6 +430,18 @@ footer { padding: 18px 4px; display: flex; justify-content: space-between; color
 .connect-error-title { color: var(--text-primary); font-size: 17px; margin: 0; }
 .connect-error-detail { color: var(--danger); font-size: 14px; margin: 0; word-break: break-word; }
 
+/* Gemini audit 4.7: ErrorBoundary.tsx fallback. Same warm card language as .connect-error (hairline
+   border, raised surface) rather than a jarring red crash screen -- this is a recoverable state,
+   not a security alert. .error-boundary-fatal gets extra breathing room since it replaces the
+   entire app; .error-boundary-space sits inline where one product space used to be. */
+.error-boundary { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; max-width: 480px; padding: 24px; border: 1px solid var(--hairline-strong); border-radius: 18px; background: var(--surface-raised); }
+.error-boundary-fatal { margin: 15vh auto; }
+.error-boundary-title { color: var(--text-primary); font-size: 17px; font-weight: 500; margin: 0; }
+.error-boundary-detail { color: var(--text-muted); font-size: 14px; line-height: 1.5; margin: 0; }
+.error-boundary-actions { display: flex; gap: 10px; }
+.error-boundary-actions button { padding: 8px 16px; border: 1px solid var(--hairline-strong); border-radius: var(--r-btn); background: transparent; color: var(--text-primary); font-size: 13px; }
+.error-boundary-actions button[data-testid="error-boundary-reload"] { background: var(--accent-aurora); color: var(--surface-canvas); border: none; }
+
 /* B5-pwa-mobile: install-prompt (InstallPrompt.tsx) and versioned-update (UpdateBanner.tsx via
    PwaUpdateNotice.tsx) affordances. Same warm card language as .connect-error above (hairline
    border, raised surface, no cold/neon). Both live inside one .pwa-banner-stack wrapper (see
