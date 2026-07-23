@@ -1,0 +1,266 @@
+{
+  "register": {
+    "success": true,
+    "code": "OK",
+    "message": "success",
+    "data": {
+      "id": 2,
+      "username": "lc_user_1784842497",
+      "nickname": "LC Test",
+      "role": "USER"
+    }
+  },
+  "current": {
+    "success": true,
+    "code": "OK",
+    "message": "success",
+    "data": {
+      "id": 2,
+      "username": "lc_user_1784842497",
+      "nickname": "LC Test",
+      "role": "USER"
+    }
+  },
+  "session_create": {
+    "success": true,
+    "code": "OK",
+    "message": "success",
+    "data": {
+      "id": 1,
+      "createdAt": "2026-07-23T21:34:58.134248655",
+      "updatedAt": "2026-07-23T21:34:58.134248655",
+      "userId": 2,
+      "title": "LC E2E",
+      "sessionType": "AURORA_CHAT",
+      "status": "ACTIVE",
+      "messageCount": 0,
+      "tokenEstimate": 0,
+      "startedAt": "2026-07-23T21:34:58.132331554"
+    }
+  },
+  "greeting": {
+    "success": true,
+    "code": "OK",
+    "message": "success",
+    "data": {
+      "messages": [
+        "晚上好呀～这个点还没休息？",
+        "如果不想那么早睡，可以一起聊聊～"
+      ],
+      "replyTone": "温柔、具体、像朋友",
+      "detectedTheme": "日常问候与陪伴",
+      "nextQuestion": "今晚有心事还是想放空？",
+      "smallStep": "",
+      "featureSuggestion": "",
+      "featureTarget": "",
+      "agentLoop": {
+        "speakCount": 2,
+        "mode": "DAILY_TALK",
+        "continueReason": "主动发起对话，温暖问候并留出选择空间",
+        "modeLabel": "今日倾诉"
+      },
+      "aiState": {
+        "fallbackAllowed": false,
+        "provider": "deepseek",
+        "mode": "prod",
+        "apiKeyConfigured": true,
+        "model": "deepseek-v4-flash"
+      },
+      "riskFlags": [],
+      "suggestSettle": false,
+      "memoryReferenced": false,
+      "referencedMemoryIds": [],
+      "memoryContext": {
+        "userId": 2,
+        "sessionId": 1,
+        "memoryPolicy": "task_aware_hybrid_retrieval",
+        "shortTermMessages": [],
+        "longTermMemoryNotes": [],
+        "referencedMemoryIds": [],
+        "activeThemeNotes": [],
+        "emotionWeather": "unknown",
+        "continuityHypothesis": "No relevant authorized long-term evidence was selected; stay with the current expression.",
+        "proactiveSuggestions": [
+          "Ask one concrete question that helps the user name what matters most right now."
+        ],
+        "memoryRecallAllowed": true
+      }
+    }
+  },
+  "message": {
+    "success": true,
+    "code": "OK",
+    "message": "success",
+    "data": {
+      "reply": "听起来今天虽然累，但那种帮同事解决棘手的bug之后的满足感，确实很值得开心呢～\n\n累了就好好休息一下，成就感可以慢慢回味。要喝杯水或者做点放松的事吗？",
+      "type": "normal"
+    }
+  },
+  "settle": {
+    "success": true,
+    "code": "OK",
+    "message": "success",
+    "data": {
+      "theme": "帮助同事解决bug的成就感",
+      "auroraSummary": "工作虽累，但帮同事解决棘手bug后感到成就感。",
+      "mainMemory": {
+        "id": 1,
+        "createdAt": "2026-07-23T21:35:27.153593",
+        "updatedAt": "2026-07-23T21:35:27.153593",
+        "userId": 2,
+        "sourceSessionId": 1,
+        "title": "帮助同事解决bug的成就感",
+        "summary": "工作虽累，但帮同事解决棘手bug后感到成就感。",
+        "memoryType": "工作成就",
+        "emotionTags": "[\"成就感\",\"疲惫\"]",
+        "keywordTags": "[\"工作\",\"bug\",\"帮助同事\"]",
+        "peopleTags": "[\"同事\"]",
+        "intensityScore": 0.6,
+        "recurrenceCount": 1,
+        "userImportance": 0.5,
+        "triggerCount": 1,
+        "emotionalGravity": 0.5394130806179032,
+        "lastTouchedAt": "2026-07-23T21:35:27.149678",
+        "visibilityLevel": "PRIVATE",
+        "status": "ACTIVE",
+        "versionNo": 1,
+        "memoryLayer": "EPISODIC",
+        "confidence": 0.5,
+        "consentScope": "AURORA_PRIVATE"
+      },
+      "fragments": [
+        {
+          "id": 1,
+          "createdAt": "2026-07-23T21:35:27.157244",
+          "updatedAt": "2026-07-23T21:35:27.157244",
+          "userId": 2,
+          "memoryCardId": 1,
+          "fragmentType": "反思",
+          "rawExcerpt": "今天工作有点累，但帮同事解决了一个棘手的bug，心里其实挺有成就感的。",
+          "aiAnalysis": "此人因工作感到疲劳，但通过合作解决问题获得了正面情绪。",
+          "reframeText": "即使工作累人，协作带来的成就感让这一天变得有意义。"
+        }
+      ],
+      "emotions": [
+        {
+          "id": 1,
+          "createdAt": "2026-07-23T21:35:27.167828",
+          "updatedAt": "2026-07-23T21:35:27.167861",
+          "userId": 2,
+          "sourceSessionId": 1,
+          "emotionName": "成就感",
+          "emotionScore": 0.7,
+          "weatherType": "室内",
+          "triggerScene": "帮助同事解决了一个棘手的bug",
+          "recordDate": "2026-07-23",
+          "emotionSpectrum": "[{\"emotion\":\"平静\",\"ratio\":0.8418},{\"emotion\":\"其他\",\"ratio\":0.1582}]",
+          "analysisSource": "SETTLEMENT"
+        }
+      ],
+      "todos": [],
+      "capsuleSuggested": false
+    }
+  },
+  "tts_voices": {
+    "success": true,
+    "code": "OK",
+    "message": "success",
+    "data": {
+      "voices": [
+        {
+          "id": "warm_gentle_female",
+          "label": "温柔女声 · 小春",
+          "language": "zh",
+          "previewText": "你好呀，很高兴听到你的声音。"
+        },
+        {
+          "id": "calm_steady_female",
+          "label": "沉稳女声 · 婉儿",
+          "language": "zh",
+          "previewText": "我在这里，慢慢说，不着急。"
+        },
+        {
+          "id": "deep_soothing_male",
+          "label": "低沉男声 · 成然",
+          "language": "zh",
+          "previewText": "有些话不必大声说出来，我陪你。"
+        },
+        {
+          "id": "bright_young_female",
+          "label": "明亮女声 · 悦悦",
+          "language": "zh",
+          "previewText": "嗨，今天想聊点什么呀？"
+        },
+        {
+          "id": "bright_young_male",
+          "label": "阳光男声 · 昂扬",
+          "language": "zh",
+          "previewText": "嘿，我一直都在，随时找我聊聊。"
+        },
+        {
+          "id": "warm_expressive_female",
+          "label": "温暖女声（表现力）· 安欢",
+          "language": "zh",
+          "previewText": "你好，我是你内心的声音，很高兴认识你。"
+        }
+      ],
+      "currentVoiceId": "warm_gentle_female",
+      "innerVoiceEnabled": true,
+      "innerVoiceMode": "AMBIENT"
+    }
+  },
+  "tts_preview_status": 200,
+  "tts_preview_body": null,
+  "tts_preview_bytes": 54426,
+  "stream_stage": {
+    "success": true,
+    "code": "OK",
+    "message": "success",
+    "data": {
+      "token": "5f84a62dcfef4419a15fa683ba2c6a1e"
+    }
+  },
+  "stream_events": [
+    "turn.started",
+    "turn.plan",
+    "bubble.started",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "bubble.completed",
+    "segment",
+    "bubble.started",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token"
+  ]
+}

@@ -1,5 +1,6 @@
 package com.innercosmos.ai.structured;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -132,6 +133,8 @@ public final class StructuredAiResults {
     }
 
     public static class Event {
+        // DeepSeek's MEMORY_SETTLEMENT emits "title" for the event title; accept both.
+        @JsonAlias("title")
         public String eventTitle;
         public String eventSummary;
         public String eventTimeLabel;

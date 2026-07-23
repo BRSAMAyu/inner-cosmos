@@ -1,5 +1,6 @@
 package com.innercosmos.ai.prompt;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -7,7 +8,16 @@ import org.slf4j.LoggerFactory;
 public final class StructuredOutputParser {
 
     private static final Logger log = LoggerFactory.getLogger(StructuredOutputParser.class);
-    private static final ObjectMapper objectMapper = new ObjectMapper();
+    /**
+     * LLM structured output routinely emits extra vendor fields or slightly-renamed keys
+     * (e.g. DeepSeek's MEMORY_SETTLEMENT returns {@code eventCards[].title} instead of the
+     * {@code eventTitle} contract). Failing the entire parse over one unknown field would
+     * silently drop the memory and its pgvector embedding, so unknown properties are ignored
+     * -- the canonical aliases on {@link com.innercosmos.ai.structured.StructuredAiResults}
+     * fields still map the common renames onto the right fields.
+     */
+    private static final ObjectMapper objectMapper = new ObjectMapper()
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     private StructuredOutputParser() {
     }
