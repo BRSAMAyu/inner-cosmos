@@ -67,6 +67,9 @@ public class MockLlmClient implements LlmClient {
         if (module.contains("AURORA_CRITIC")) {
             return "{\"pass\":true,\"issues\":[],\"repaired\":null}";
         }
+        if (module.contains("AURORA_INNER_VOICE")) {
+            return buildInnerVoiceJson(request.requestJson);
+        }
         if (module.contains("AURORA")) {
             boolean greeting = module.contains("GREETING");
             return buildAuroraChatJson(textToAnalyze, analysis, greeting);
@@ -87,6 +90,38 @@ public class MockLlmClient implements LlmClient {
             return buildLetterGuardJson(textToAnalyze, analysis);
         }
         return null;
+    }
+
+    /**
+     * Deterministic mock for the "AURORA_INNER_VOICE_*" module. Deliberately keyed ONLY off the
+     * planner's emotionalNeed/relationshipMove signals extracted from requestJson -- never off
+     * the visibleReply text -- so the mock cannot accidentally echo the spoken segments'
+     * wording; this mirrors the real behavioral contract InnerVoiceComposer's instruction asks
+     * the real provider to honor (see InnerVoiceComposerTest).
+     */
+    private String buildInnerVoiceJson(String requestJson) {
+        String emotionalNeed = extractJsonString(requestJson, "emotionalNeed");
+        String relationshipMove = extractJsonString(requestJson, "relationshipMove");
+        String line = composeInnerVoiceLine(emotionalNeed, relationshipMove);
+        return "{\"innerVoiceText\":\"" + escapeJson(line) + "\"}";
+    }
+
+    private String composeInnerVoiceLine(String emotionalNeed, String relationshipMove) {
+        String need = emotionalNeed == null ? "" : emotionalNeed;
+        String move = relationshipMove == null ? "" : relationshipMove;
+        if (containsAny(need, List.of("压力", "承认", "沉重"))) {
+            return "但愿TA能感觉到，这份重量我真的接住了。";
+        }
+        if (containsAny(move, List.of("打断", "重规划", "边界"))) {
+            return "刚才那条路先放一放，此刻的转向才要紧。";
+        }
+        if (containsAny(need, List.of("危机", "安全"))) {
+            return "此刻只有一件事重要：TA真的安全吗。";
+        }
+        if (containsAny(need, List.of("被听见", "被理解"))) {
+            return "希望这句回应，真的落进了TA心里。";
+        }
+        return "这一刻，我只想陪着，不急着说更多。";
     }
 
     private String buildAliveDecisionJson(String prompt) {

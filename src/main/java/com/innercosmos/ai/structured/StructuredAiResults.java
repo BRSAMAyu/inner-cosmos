@@ -39,6 +39,16 @@ public final class StructuredAiResults {
         public AuroraResult repaired;
     }
 
+    /**
+     * Aurora's "inner voice" (心声): a genuine, first-person interior line -- distinct from the
+     * visible spoken {@code segments} -- that may be surfaced (as text + synthesized audio) at
+     * most once per turn. Never a restatement/paraphrase/summary of the spoken reply; see
+     * {@code InnerVoiceComposer}.
+     */
+    public static class InnerVoiceResult {
+        public String innerVoiceText;
+    }
+
     public static class ShredderResult {
         public String coreFeeling;
         public String hiddenNeed;
