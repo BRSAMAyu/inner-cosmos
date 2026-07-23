@@ -120,6 +120,12 @@ capsule:
     rebuild-batch-size: ${CAPSULE_EMBEDDING_REBUILD_BATCH_SIZE:50}
     rebuild-delay-ms: ${CAPSULE_EMBEDDING_REBUILD_DELAY_MS:60000}
 
+tts:
+  enabled: ${TTS_ENABLED:false}
+  api-key: ${TTS_API_KEY:}
+  ws-url: ${TTS_WS_URL:wss://dashscope.aliyuncs.com/api-ws/v1/inference}
+  timeout-ms: ${TTS_TIMEOUT_MS:8000}
+
 llm:
   mode: ${LLM_MODE:dev}
   provider: ${LLM_PROVIDER:mock}

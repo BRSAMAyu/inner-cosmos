@@ -32,4 +32,12 @@ public interface UserService {
      * preference. Throws if the user has no profile row yet.
      */
     void setPreferredModel(Long userId, String provider);
+
+    /**
+     * Upsert this user's TTS voice + Aurora inner-voice (心声) delivery preferences (creates the
+     * profile row if this is the user's first preference write, mirroring {@link #updateProfile}).
+     * Any {@code null} parameter leaves that field unchanged; callers are responsible for
+     * validating {@code preferredTtsVoiceId}/{@code innerVoiceMode} before calling.
+     */
+    void updateTtsPreferences(Long userId, String preferredTtsVoiceId, Boolean innerVoiceEnabled, String innerVoiceMode);
 }

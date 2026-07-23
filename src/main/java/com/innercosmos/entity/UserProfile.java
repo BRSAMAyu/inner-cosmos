@@ -44,4 +44,19 @@ public class UserProfile extends BaseEntity {
      * Temporary boost expiration timestamp (null = no boost).
      */
     public java.time.LocalDateTime boostUntil;
+    /**
+     * Preferred preset voice id for TTS synthesis (see {@code TtsVoicePresets}).
+     * null = system default (the first preset).
+     */
+    public String preferredTtsVoiceId;
+    /**
+     * Whether Aurora's "inner voice" (心声) is composed, synthesized and surfaced at all.
+     * null is treated as the product default of {@code true} (ships on by default).
+     */
+    public Boolean innerVoiceEnabled;
+    /**
+     * Inner-voice delivery mode: {@code AMBIENT} (auto-plays automatically, the default) or
+     * {@code ON_DEMAND} (tap-to-reveal-and-play). null is treated as {@code AMBIENT}.
+     */
+    public String innerVoiceMode;
 }
