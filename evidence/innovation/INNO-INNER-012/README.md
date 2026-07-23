@@ -69,7 +69,11 @@ export MEMORY_EMBEDDING_MODEL=text-embedding-v4
 ```
 
 Result: **1 test run, 0 failures.** Evidence JSON written to
-`target/evaluation/memory-embedding-real-provider-report.json`:
+`target/evaluation/memory-embedding-real-provider-report.json`, and **committed** (secret-free) at
+`evidence/innovation/INNO-INNER-012/real-provider-report.json` so the numbers are durably
+inspectable. A 2026-07-24 re-run through the same committed client confirmed an identical CALLED
+result, 1536-dim vectors, and relevant-memory-retrieved=true (this run also indexed 13 evidence
+rows with 0 failures):
 
 ```json
 {

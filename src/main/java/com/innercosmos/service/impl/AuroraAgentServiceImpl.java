@@ -70,6 +70,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @Service
 public class AuroraAgentServiceImpl implements AuroraAgentService {
     private static final Logger log = LoggerFactory.getLogger(AuroraAgentServiceImpl.class);
+    // M2 (independent code review): used to build the inner_voice SSE payload via writeValueAsString
+    // instead of hand-rolled string concatenation, so an odd control char (U+0000-U+001F) in LLM
+    // output can never produce invalid JSON that the frontend silently drops. Jackson's ObjectMapper
+    // is thread-safe after construction; a plain shared instance is the same pattern GlmLlmClient uses.
+    private static final com.fasterxml.jackson.databind.ObjectMapper INNER_VOICE_MAPPER =
+            new com.fasterxml.jackson.databind.ObjectMapper();
     private static final List<String> MODES = List.of(
             "DAILY_TALK", "THOUGHT_CLARIFY", "SLEEP_REVIEW", "SOCRATIC", "ACTION_SPLIT", "RELATION_REVIEW"
     );
@@ -652,8 +658,9 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                             byte[] audio = ttsClient.synthesize(reply.innerVoiceText, voiceId);
                             String audioDataUri = "data:audio/mpeg;base64,"
                                     + java.util.Base64.getEncoder().encodeToString(audio);
-                            String innerVoicePayload = "{\"text\":\"" + escape(reply.innerVoiceText)
-                                    + "\",\"audio\":\"" + audioDataUri + "\",\"voiceId\":\"" + escape(voiceId) + "\"}";
+                            // M2 (code review): build the payload via ObjectMapper so a raw control
+                            // char in the LLM-composed text can never produce invalid JSON.
+                            String innerVoicePayload = buildInnerVoicePayload(reply.innerVoiceText, audioDataUri, voiceId);
                             emitLive(emitter, clientConnected, userId, reply.turnId, eventSequence++,
                                     "inner_voice", innerVoicePayload, false);
                         }
@@ -1748,12 +1755,38 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         return value == null || value.isBlank();
     }
 
-    private String escape(String text) {
+    private static String escape(String text) {
         return text == null ? "" : text.replace("\\", "\\\\")
                 .replace("\"", "\\\"")
                 .replace("\n", "\\n")
                 .replace("\r", "\\r")
                 .replace("\t", "\\t");
+    }
+
+    /**
+     * M2 (independent code review): builds the {@code inner_voice} SSE event payload as valid JSON via
+     * {@link com.fasterxml.jackson.databind.ObjectMapper}, so a raw control character (U+0000-U+001F,
+     * e.g. backspace/form-feed) the LLM might emit inside its composed inner-voice line can never
+     * produce invalid JSON that the frontend would silently drop. Package-private + static so a unit
+     * test can pin the control-char case directly (the hand-rolled {@link #escape} only covered
+     * {@code \ " \n \r \t}).
+     */
+    static String buildInnerVoicePayload(String text, String audioDataUri, String voiceId) {
+        java.util.Map<String, String> payload = new java.util.LinkedHashMap<>();
+        // Coerce nulls to "" so the payload always carries string fields (a null Map value would
+        // serialize as JSON null, which the frontend's typed payload does not expect). The
+        // production caller already guards text non-blank, but this keeps the helper self-safe.
+        payload.put("text", text == null ? "" : text);
+        payload.put("audio", audioDataUri == null ? "" : audioDataUri);
+        payload.put("voiceId", voiceId == null ? "" : voiceId);
+        try {
+            return INNER_VOICE_MAPPER.writeValueAsString(payload);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            // Should be unreachable for a Map of three strings, but never let payload-building fail
+            // the turn -- fall back to the strict escaped form.
+            return "{\"text\":\"" + escape(text) + "\",\"audio\":\"" + escape(audioDataUri)
+                    + "\",\"voiceId\":\"" + escape(voiceId) + "\"}";
+        }
     }
 
     /**

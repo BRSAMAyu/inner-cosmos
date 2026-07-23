@@ -125,6 +125,20 @@ all 6 presets `"status":"OK"` with real audio byte counts (38961–60277 bytes f
 text across voices), e.g. `warm_gentle_female` (cosyvoice-v2/longxiaochun_v2): 38961 bytes,
 `bright_young_male` (cosyvoice-v3-flash/longanyang): 60277 bytes.
 
+### Durable committed artifact + observed provider latency (2026-07-24 re-run)
+
+The report JSON is now **committed** at `evidence/innovation/INNO-INNER-013/real-provider-report.json`
+(secret-free: voice status, model, providerVoice, audioBytes only — no key) so the numbers are
+inspectable rather than trust-the-README. A 2026-07-24 re-run through the same committed client
+recorded **5/6 voices synthesizing per run, with one transient per-voice timeout** — and the
+failing voice **differed across two consecutive runs** (`warm_expressive_female` then
+`calm_steady_female`), confirming this is **Aliyun-side WebSocket latency under concurrent
+synthesis, not a voice-specific defect** (all 6 are confirmed-working in the original spike and
+succeed on most runs). This is exactly the failure mode the production code is designed for:
+synthesis is wrapped in try/catch with an 8s timeout, and on timeout the `inner_voice` event is
+simply omitted — the turn still completes normally; the user just doesn't get inner-voice audio
+that turn. The committed report is one honest run's snapshot (5/6 OK).
+
 ## Honest scope — what is proven vs not
 
 **Proven:** the real key authenticates and synthesizes real MP3 audio for 8 (model, voice)

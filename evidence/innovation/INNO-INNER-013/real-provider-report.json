@@ -1,0 +1,40 @@
+{
+  "status" : "CALLED",
+  "wsUrl" : "wss://llm-errus8cw2pf66bx9.cn-beijing.maas.aliyuncs.com/api-ws/v1/inference",
+  "voices" : {
+    "warm_gentle_female" : {
+      "status" : "OK",
+      "audioBytes" : 38961,
+      "model" : "cosyvoice-v2",
+      "providerVoice" : "longxiaochun_v2"
+    },
+    "calm_steady_female" : {
+      "status" : "FAILED: IllegalStateException",
+      "message" : "tts synthesis timed out after 15000ms"
+    },
+    "deep_soothing_male" : {
+      "status" : "OK",
+      "audioBytes" : 41468,
+      "model" : "cosyvoice-v2",
+      "providerVoice" : "longcheng_v2"
+    },
+    "bright_young_female" : {
+      "status" : "OK",
+      "audioBytes" : 44394,
+      "model" : "cosyvoice-v3-flash",
+      "providerVoice" : "longyue_v3"
+    },
+    "bright_young_male" : {
+      "status" : "OK",
+      "audioBytes" : 60277,
+      "model" : "cosyvoice-v3-flash",
+      "providerVoice" : "longanyang"
+    },
+    "warm_expressive_female" : {
+      "status" : "OK",
+      "audioBytes" : 49410,
+      "model" : "qwen-audio-3.0-tts-flash",
+      "providerVoice" : "longanhuan_v3.6"
+    }
+  }
+}

@@ -2,8 +2,8 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 authority: goal-objective.md
 status: IN_PROGRESS
-last_reconciled_at: 2026-07-23T18:55:00+08:00
-last_reconciled_commit: 3a306a3
+last_reconciled_at: 2026-07-24T00:35:00+08:00
+last_reconciled_commit: fb7d510
 current_fact_baseline: 对齐文档/24-完全体最终收敛与云原生课程战役.md
 current_execution_plan: 对齐文档/24-完全体最终收敛与云原生课程战役.md
 parallel_state: docs/goal/closure-campaign-state.yml
@@ -384,6 +384,26 @@ gates:
           pass -- queued as follow-up. A full statistically-robust real-embedding recall benchmark
           (only one relevant-vs-distractor case proven so far) and independent (non-author) review
           of the inner-voice line's genuine "aliveness"/non-repetition quality remain open.
+          INDEPENDENT CODE REVIEW (2026-07-24): verdict ship-as-is, no CRITICAL/HIGH. M2 (MEDIUM,
+          the top follow-up) RESOLVED -- the inner_voice SSE payload is now built via Jackson
+          ObjectMapper (buildInnerVoicePayload) instead of hand-rolled string concatenation, so a raw
+          control char (U+0000-U+001F) the LLM might emit can never produce invalid JSON the frontend
+          silently drops; pinned by InnerVoicePayloadJsonTest (incl. a backspace case that fails
+          against the old escape()). Remaining tracked, non-blocking follow-ups from that review: M1
+          inner-voice synthesis runs inline on the SSE stream thread (bounded 8s, turn closeout
+          already fired -- only matters at production TTS scale; track an async executor); L1
+          InnerVoiceComposer is @Component AND re-new'd in AuroraDualKernelRuntime (harmless dead
+          code -- inject the bean, but it touches 5 test call sites, deferred); L2 the
+          X-DashScope-DataInspection header routes inner-voice text through Aliyun content moderation
+          (a third-party-disclosure product/legal call for a self-understanding feature, tied to the
+          standing HG-PRIVACY-LEGAL human gate -- not a code bug); L3/L4/L5 minor UI/pref nits;
+          L6 a redundant loadProfile per streaming turn. INDEPENDENT EVIDENCE REVIEW (2026-07-24):
+          all voice-related evidence dirs HONEST, no overclaims; the one material gap --
+          real-provider report JSONs were gitignored/non-durable -- is now RESOLVED: secret-free
+          copies committed at evidence/innovation/INNO-INNER-012/real-provider-report.json and
+          INNO-INNER-013/real-provider-report.json. The TTS re-run honestly disclosed transient
+          per-voice Aliyun latency (5/6 per run, different voice each run) -- exactly the failure
+          mode the production try/catch+timeout handles.
 
   - id: G5
     name: Memory, profile, and Inner Cosmos

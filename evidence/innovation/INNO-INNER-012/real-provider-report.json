@@ -1,0 +1,13 @@
+{
+  "status" : "CALLED",
+  "provider" : "aliyun-dashscope",
+  "model" : "text-embedding-v4",
+  "modelVersion" : "2026-01",
+  "configuredDimensions" : 1536,
+  "rebuildIndexed" : 13,
+  "rebuildFailed" : 0,
+  "storedVectorDimension" : 1536,
+  "relevantMemoryRetrieved" : true,
+  "evidenceCount" : 2,
+  "distractorIds" : [ 12, 13 ]
+}
