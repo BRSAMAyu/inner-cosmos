@@ -55,6 +55,27 @@ describe("mobile API boundary", () => {
     ]) expect(() => validateApiBase(value, "https://api.innercosmos.sg", true)).toThrow();
   });
 
+  // Demo connectivity (DEMO-RUNBOOK): a debug build flagged VITE_DEMO_MODE may point at a public
+  // HTTPS tunnel OR a plain-HTTP LAN hotspot origin, so the class can reach a laptop server over
+  // school WiFi. Production stays fully strict (the cases above). Demo still rejects credentials,
+  // query, fragment, non-http(s) schemes, and paths.
+  it("demo mode allows a public HTTPS tunnel origin and a plain-HTTP LAN origin, but still rejects unsafe shapes", () => {
+    expect(validateApiBase("https://some-words.trycloudflare.com", "", false, false, false, "", true))
+      .toBe("https://some-words.trycloudflare.com");
+    expect(validateApiBase("http://192.168.137.1:8080", "", false, false, false, "", true))
+      .toBe("http://192.168.137.1:8080");
+    for (const value of [
+      "ftp://192.168.137.1", "https://user:pw@host", "https://host/path", "https://host?q=1",
+      "https://host#frag", "not-a-url"
+    ]) expect(() => validateApiBase(value, "", false, false, false, "", true)).toThrow();
+  });
+
+  it("production still rejects what demo would allow (demoMode does not weaken signed builds)", () => {
+    // Same HTTP/LAN origins, but with demoMode=false (a real production build): must throw.
+    expect(() => validateApiBase("http://192.168.137.1:8080", "http://192.168.137.1:8080", true)).toThrow();
+    expect(() => validateApiBase("https://some-words.trycloudflare.com", "", true)).toThrow();
+  });
+
   it("keeps API requests scoped to the Inner Cosmos API namespace", () => {
     expect(apiUrl("/api/auth/csrf")).toBe("/api/auth/csrf");
     expect(() => apiUrl("https://evil.example/collect")).toThrow("Only Inner Cosmos API paths are allowed");

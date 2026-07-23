@@ -49,3 +49,7 @@ __pycache__/
 build/mobile-domain-association/
 web/.scratch-*/
 web/pwa-preview.html
+
+# demo build profile (generated per-demo with the live tunnel/hotspot URL)
+web/.env.demo
+web/.env.demo.local
