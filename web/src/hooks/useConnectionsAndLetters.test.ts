@@ -97,7 +97,7 @@ describe("useConnectionsAndLetters -- initial state", () => {
     expect(result.current.connectionRequests).toEqual({ incoming: [], outgoing: [] });
     expect(result.current.friends).toEqual([]);
     expect(result.current.people).toEqual([]);
-    expect(result.current.peopleBusy).toBe(false);
+    expect(result.current.isPersonBusy(1)).toBe(false);
     expect(result.current.relations).toEqual([]);
     expect(result.current.selectedRelation).toBeNull();
     expect(result.current.relationTimeline).toEqual([]);
@@ -108,7 +108,7 @@ describe("useConnectionsAndLetters -- initial state", () => {
     expect(result.current.letterThreads).toEqual([]);
     expect(result.current.selectedThreadId).toBeNull();
     expect(result.current.threadLetters).toEqual([]);
-    expect(result.current.draftBusy).toBe(false);
+    expect(result.current.isDraftBusy(1)).toBe(false);
     expect(result.current.replyDrafts).toEqual({});
   });
 });
@@ -156,7 +156,7 @@ describe("useConnectionsAndLetters -- People Discovery / connections", () => {
     await act(async () => { await result.current.requestPersonConnection(7); });
     expect(api.requestFriend).toHaveBeenCalledExactlyOnceWith(7);
     expect(result.current.friends).toHaveLength(1);
-    expect(result.current.peopleBusy).toBe(false);
+    expect(result.current.isPersonBusy(7)).toBe(false);
     expect(setStatus).toHaveBeenCalledWith(expect.stringContaining("邀请已发出"));
   });
 
@@ -164,8 +164,25 @@ describe("useConnectionsAndLetters -- People Discovery / connections", () => {
     vi.mocked(api.requestFriend).mockRejectedValue(new Error("网络错误"));
     const { result, setStatus } = setup();
     await act(async () => { await result.current.requestPersonConnection(7); });
-    expect(result.current.peopleBusy).toBe(false);
+    expect(result.current.isPersonBusy(7)).toBe(false);
     expect(setStatus).toHaveBeenCalledWith("网络错误");
+  });
+
+  // Gemini audit 4.8 (CONFIRMED/P1): requestPersonConnection previously used a single shared
+  // `peopleBusy` boolean -- inviting person 7 would disable person 9's invite button too, even
+  // though they're unrelated. isPersonBusy must be keyed by userId.
+  it("requestPersonConnection only marks the TARGET userId busy -- an unrelated userId stays free while the request is in flight", async () => {
+    const slow = deferred<void>();
+    vi.mocked(api.requestFriend).mockReturnValueOnce(slow.promise as never);
+    const { result } = setup();
+
+    let requestStarted: Promise<void>;
+    act(() => { requestStarted = result.current.requestPersonConnection(7); });
+    expect(result.current.isPersonBusy(7)).toBe(true);
+    expect(result.current.isPersonBusy(9)).toBe(false); // unrelated person, must stay free
+
+    await act(async () => { slow.resolve(); await requestStarted; });
+    expect(result.current.isPersonBusy(7)).toBe(false);
   });
 
   it("refreshConnections keeps the existing (already-filtered) people list when discoverPeople fails, instead of a stale closure", async () => {
@@ -193,6 +210,37 @@ describe("useConnectionsAndLetters -- People Discovery / connections", () => {
     await act(async () => { await result.current.leaveConnection(3); });
     expect(api.leaveConnection).toHaveBeenCalledExactlyOnceWith(3);
     expect(setStatus).toHaveBeenCalledWith(expect.stringContaining("已退出这段连接"));
+  });
+
+  // Gemini audit 4.8 (CONFIRMED/P1): decideConnection and leaveConnection previously had NO busy
+  // guard at all -- nothing stopped a double-click double-submit on the same connection request.
+  // Both must also be keyed per-resource so acting on request 3 never blocks request 5.
+  it("decideConnection marks only the TARGET request id busy while in flight; an unrelated request id stays free", async () => {
+    const slow = deferred<void>();
+    vi.mocked(api.decideConnection).mockReturnValueOnce(slow.promise as never);
+    const { result } = setup();
+
+    let decideStarted: Promise<void>;
+    act(() => { decideStarted = result.current.decideConnection(3, "accept"); });
+    expect(result.current.isConnectionDecisionBusy(3)).toBe(true);
+    expect(result.current.isConnectionDecisionBusy(5)).toBe(false);
+
+    await act(async () => { slow.resolve(); await decideStarted; });
+    expect(result.current.isConnectionDecisionBusy(3)).toBe(false);
+  });
+
+  it("leaveConnection marks only the TARGET connection id busy while in flight; an unrelated connection id stays free", async () => {
+    const slow = deferred<void>();
+    vi.mocked(api.leaveConnection).mockReturnValueOnce(slow.promise as never);
+    const { result } = setup();
+
+    let leaveStarted: Promise<void>;
+    act(() => { leaveStarted = result.current.leaveConnection(3); });
+    expect(result.current.isConnectionLeaveBusy(3)).toBe(true);
+    expect(result.current.isConnectionLeaveBusy(5)).toBe(false);
+
+    await act(async () => { slow.resolve(); await leaveStarted; });
+    expect(result.current.isConnectionLeaveBusy(3)).toBe(false);
   });
 });
 
@@ -327,8 +375,25 @@ describe("useConnectionsAndLetters -- letters", () => {
     await act(async () => { await result.current.sendDraft(1); });
     expect(api.sendSlowLetter).toHaveBeenCalledExactlyOnceWith(1);
     expect(result.current.letterOutbox).toHaveLength(1);
-    expect(result.current.draftBusy).toBe(false);
+    expect(result.current.isDraftBusy(1)).toBe(false);
     expect(setStatus).toHaveBeenCalledWith(expect.stringContaining("已经启程"));
+  });
+
+  // Gemini audit 4.8 (CONFIRMED/P1): sendDraft previously used a single shared `draftBusy` boolean
+  // -- sending draft 1 would disable draft 2's send button too, even though they're unrelated
+  // drafts a user could otherwise send independently.
+  it("sendDraft marks only the TARGET draft id busy while in flight; an unrelated draft id stays free", async () => {
+    const slow = deferred<SlowLetter>();
+    vi.mocked(api.sendSlowLetter).mockReturnValueOnce(slow.promise as never);
+    const { result } = setup();
+
+    let sendStarted: Promise<void>;
+    act(() => { sendStarted = result.current.sendDraft(1); });
+    expect(result.current.isDraftBusy(1)).toBe(true);
+    expect(result.current.isDraftBusy(2)).toBe(false);
+
+    await act(async () => { slow.resolve(letter({ status: "SENT" })); await sendStarted; });
+    expect(result.current.isDraftBusy(1)).toBe(false);
   });
 
   it("actOnLetter transitions the letter and patches it in place in the inbox", async () => {
@@ -355,6 +420,37 @@ describe("useConnectionsAndLetters -- letters", () => {
     await act(async () => { await result.current.reportLetter(letter()); });
     expect(api.reportLetter).toHaveBeenCalledExactlyOnceWith(1, expect.any(String));
     expect(setStatus).toHaveBeenCalledWith(expect.stringContaining("已提交举报"));
+  });
+
+  // Gemini audit 4.8 (CONFIRMED/P1): actOnLetter/reportLetter previously had NO busy guard at all
+  // (plain onClick buttons in LettersInbox), allowing a double-click double-submit. Both are keyed
+  // by letter id and share ONE busy tracker (isLetterActionBusy) -- acting on letter 1 must not
+  // affect letter 2's buttons.
+  it("actOnLetter marks only the TARGET letter id busy while in flight; an unrelated letter id stays free", async () => {
+    const slow = deferred<SlowLetter>();
+    vi.mocked(api.transitionLetter).mockReturnValueOnce(slow.promise as never);
+    const { result } = setup();
+
+    let actStarted: Promise<void>;
+    act(() => { actStarted = result.current.actOnLetter(letter({ id: 1 }), "read"); });
+    expect(result.current.isLetterActionBusy(1)).toBe(true);
+    expect(result.current.isLetterActionBusy(2)).toBe(false);
+
+    await act(async () => { slow.resolve(letter({ id: 1, status: "READ" })); await actStarted; });
+    expect(result.current.isLetterActionBusy(1)).toBe(false);
+  });
+
+  it("reportLetter shares the SAME per-letter busy key as actOnLetter (both are 'an action on this letter')", async () => {
+    const slow = deferred<void>();
+    vi.mocked(api.reportLetter).mockReturnValueOnce(slow.promise as never);
+    const { result } = setup();
+
+    let reportStarted: Promise<void>;
+    act(() => { reportStarted = result.current.reportLetter(letter({ id: 1 })); });
+    expect(result.current.isLetterActionBusy(1)).toBe(true);
+
+    await act(async () => { slow.resolve(); await reportStarted; });
+    expect(result.current.isLetterActionBusy(1)).toBe(false);
   });
 
   it("updateReplyDraft stores per-letter reply drafts", () => {
@@ -415,6 +511,22 @@ describe("useConnectionsAndLetters -- letters", () => {
     await act(async () => { await result.current.requestConnection(letter()); });
     expect(api.requestConnectionFromLetter).toHaveBeenCalledExactlyOnceWith(1);
     expect(setStatus).toHaveBeenCalledWith(expect.stringContaining("连接邀请已发出"));
+  });
+
+  // Gemini audit 4.8 (CONFIRMED/P1): requestConnection ("willKnow" button) previously had NO busy
+  // guard at all. Keyed by letter id -- an unrelated letter must stay free.
+  it("requestConnection marks only the TARGET letter id busy while in flight; an unrelated letter id stays free", async () => {
+    const slow = deferred<void>();
+    vi.mocked(api.requestConnectionFromLetter).mockReturnValueOnce(slow.promise as never);
+    const { result } = setup();
+
+    let requestStarted: Promise<void>;
+    act(() => { requestStarted = result.current.requestConnection(letter({ id: 1 })); });
+    expect(result.current.isLetterConnectionBusy(1)).toBe(true);
+    expect(result.current.isLetterConnectionBusy(2)).toBe(false);
+
+    await act(async () => { slow.resolve(); await requestStarted; });
+    expect(result.current.isLetterConnectionBusy(1)).toBe(false);
   });
 });
 
@@ -501,6 +613,25 @@ describe("useConnectionsAndLetters -- groups", () => {
     expect(setStatus).toHaveBeenCalledWith(expect.stringContaining("邀请已发出"));
   });
 
+  // Gemini audit 4.8 (CONFIRMED/P1): the anti-pattern named explicitly in the audit -- a single
+  // shared `groupBusy` boolean previously meant inviting into group 5 disabled EVERY group action
+  // for EVERY other group, including leaving a completely unrelated group 9. Each is now its own
+  // keyed tracker.
+  it("inviteToGroup marks only the TARGET groupId busy; leaveGroup for an unrelated groupId stays free the whole time", async () => {
+    const slow = deferred<void>();
+    vi.mocked(api.inviteToGroup).mockReturnValueOnce(slow.promise as never);
+    const { result } = setup();
+
+    let inviteStarted: Promise<void>;
+    act(() => { inviteStarted = result.current.inviteToGroup(5, 30); });
+    expect(result.current.isGroupInviteBusy(5)).toBe(true);
+    expect(result.current.isGroupInviteBusy(9)).toBe(false);
+    expect(result.current.isGroupLeaveBusy(9)).toBe(false); // a DIFFERENT action, unrelated group -- must never be true
+
+    await act(async () => { slow.resolve(); await inviteStarted; });
+    expect(result.current.isGroupInviteBusy(5)).toBe(false);
+  });
+
   it("respondToGroupInvite removes the invite from the list and reloads groups on accept", async () => {
     vi.mocked(api.respondToGroupInvite).mockResolvedValue(undefined as never);
     vi.mocked(api.myGroups).mockResolvedValue([{ id: 2, ownerUserId: 9, groupName: "读书会", intro: "", visibility: "PRIVATE" }]);
@@ -513,6 +644,20 @@ describe("useConnectionsAndLetters -- groups", () => {
     expect(api.myGroups).toHaveBeenCalled();
   });
 
+  it("respondToGroupInvite marks only the TARGET memberId busy; an unrelated memberId's invite stays free", async () => {
+    const slow = deferred<void>();
+    vi.mocked(api.respondToGroupInvite).mockReturnValueOnce(slow.promise as never);
+    const { result } = setup();
+
+    let respondStarted: Promise<void>;
+    act(() => { respondStarted = result.current.respondToGroupInvite(9, "accept"); });
+    expect(result.current.isGroupInviteDecisionBusy(9)).toBe(true);
+    expect(result.current.isGroupInviteDecisionBusy(11)).toBe(false);
+
+    await act(async () => { slow.resolve(); await respondStarted; });
+    expect(result.current.isGroupInviteDecisionBusy(9)).toBe(false);
+  });
+
   it("leaveGroup removes the group from the list and clears selection if it was selected", async () => {
     vi.mocked(api.myGroups).mockResolvedValue([{ id: 5, ownerUserId: 9, groupName: "读书会", intro: "", visibility: "PRIVATE" }]);
     vi.mocked(api.groupMembers).mockResolvedValue([]);
@@ -523,5 +668,19 @@ describe("useConnectionsAndLetters -- groups", () => {
     await act(async () => { await result.current.leaveGroup(5); });
     expect(result.current.groups).toHaveLength(0);
     expect(result.current.selectedGroupId).toBeNull();
+  });
+
+  it("leaveGroup marks only the TARGET groupId busy; an unrelated groupId stays free", async () => {
+    const slow = deferred<void>();
+    vi.mocked(api.leaveGroup).mockReturnValueOnce(slow.promise as never);
+    const { result } = setup();
+
+    let leaveStarted: Promise<void>;
+    act(() => { leaveStarted = result.current.leaveGroup(5); });
+    expect(result.current.isGroupLeaveBusy(5)).toBe(true);
+    expect(result.current.isGroupLeaveBusy(9)).toBe(false);
+
+    await act(async () => { slow.resolve(); await leaveStarted; });
+    expect(result.current.isGroupLeaveBusy(5)).toBe(false);
   });
 });

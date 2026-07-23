@@ -36,11 +36,18 @@ const COPY: Record<Locale, {
   }
 };
 
-export function SocialGroupsView({ groups, invites, friends, selectedGroupId, members, membersStatus = "idle", busy, currentUserId,
+export function SocialGroupsView({ groups, invites, friends, selectedGroupId, members, membersStatus = "idle",
+  createBusy, isInviteBusy, isInviteDecisionBusy, isLeaveBusy, currentUserId,
   onSelectGroup, onCreateGroup, onInvite, onRespondInvite, onLeaveGroup, locale = "zh-CN" }: {
   groups: SocialGroup[]; invites: GroupInvite[]; friends: SocialConnection[];
   selectedGroupId: number | null; members: GroupMember[]; membersStatus?: "idle" | "loading" | "success" | "error";
-  busy: boolean; currentUserId: number | null;
+  // Gemini audit 4.8 (CONFIRMED/P1): each busy check is keyed by the SPECIFIC resource the action
+  // targets (memberId for an invite decision, groupId for invite-to-group/leave-group) -- a single
+  // shared `busy` boolean used to disable every action for every group/invite/friend at once the
+  // moment ANY one of them was in flight.
+  createBusy: boolean; isInviteBusy: (groupId: number) => boolean;
+  isInviteDecisionBusy: (memberId: number) => boolean; isLeaveBusy: (groupId: number) => boolean;
+  currentUserId: number | null;
   onSelectGroup: (id: number) => void; onCreateGroup: (name: string) => void;
   onInvite: (groupId: number, userId: number) => void;
   onRespondInvite: (memberId: number, decision: "accept" | "decline") => void;
@@ -67,15 +74,15 @@ export function SocialGroupsView({ groups, invites, friends, selectedGroupId, me
       {invites.map(invite => <article key={invite.memberId}>
         <span>{invite.groupName}</span>
         <div>
-          <AsyncButton busy={busy} busyText={t.acceptBusy} onClick={() => onRespondInvite(invite.memberId, "accept")}>{t.accept}</AsyncButton>
-          <button type="button" onClick={() => onRespondInvite(invite.memberId, "decline")}>{t.decline}</button>
+          <AsyncButton busy={isInviteDecisionBusy(invite.memberId)} busyText={t.acceptBusy} onClick={() => onRespondInvite(invite.memberId, "accept")}>{t.accept}</AsyncButton>
+          <AsyncButton busy={isInviteDecisionBusy(invite.memberId)} busyText={t.declineBusy} onClick={() => onRespondInvite(invite.memberId, "decline")}>{t.decline}</AsyncButton>
         </div>
       </article>)}
     </div>}
 
     <div className="group-create">
       <input value={name} onChange={event => setName(event.target.value)} placeholder={t.namePlaceholder} />
-      <AsyncButton busy={busy} busyText={t.createBusy} disabled={!name.trim()} onClick={() => { onCreateGroup(name); setName(""); }}>{t.create}</AsyncButton>
+      <AsyncButton busy={createBusy} busyText={t.createBusy} disabled={!name.trim()} onClick={() => { onCreateGroup(name); setName(""); }}>{t.create}</AsyncButton>
     </div>
 
     {groups.length === 0 ? <div className="network-empty">{t.empty}</div> : <div className="group-layout">
@@ -102,11 +109,11 @@ export function SocialGroupsView({ groups, invites, friends, selectedGroupId, me
             <option value="">{t.invitePlaceholder}</option>
             {friends.map(friend => <option key={friend.userId} value={friend.userId}>{friend.nickname}</option>)}
           </select></label>
-          <AsyncButton busy={busy} busyText={t.inviteBusy} disabled={!inviteUserId}
+          <AsyncButton busy={isInviteBusy(selectedGroup.id)} busyText={t.inviteBusy} disabled={!inviteUserId}
             onClick={() => { onInvite(selectedGroup.id, Number(inviteUserId)); setInviteUserId(""); }}>{t.invite}</AsyncButton>
         </div>}
         {friends.length === 0 && <p className="muted">{t.noFriends}</p>}
-        {!isOwner && <AsyncButton className="danger-quiet" busy={busy} busyText={t.leaveBusy} onClick={() => onLeaveGroup(selectedGroup.id)}>{t.leave}</AsyncButton>}
+        {!isOwner && <AsyncButton className="danger-quiet" busy={isLeaveBusy(selectedGroup.id)} busyText={t.leaveBusy} onClick={() => onLeaveGroup(selectedGroup.id)}>{t.leave}</AsyncButton>}
       </div>}
     </div>}
   </section>;

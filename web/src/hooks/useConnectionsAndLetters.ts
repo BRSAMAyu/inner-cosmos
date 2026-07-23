@@ -4,6 +4,7 @@ import {
   type RelationHealth, type RelationMention, type RelationTimelinePoint, type SlowLetter, type SocialConnection, type SocialGroup
 } from "../api";
 import { sendComposedLetter, type DraftedLetterState } from "../composeAndSend";
+import { useBusyKeys } from "./useBusyKeys";
 
 // Extracted from AuroraApp.tsx (B1 domain-hook decomposition, second slice): the "connections/letters"
 // product space -- People Discovery, relation mentions/timeline, connection requests/friends, and the
@@ -31,7 +32,6 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
   const [connectionRequests, setConnectionRequests] = useState<ConnectionRequests>({ incoming: [], outgoing: [] });
   const [friends, setFriends] = useState<SocialConnection[]>([]);
   const [people, setPeople] = useState<DiscoverablePerson[]>([]);
-  const [peopleBusy, setPeopleBusy] = useState(false);
   const [relations, setRelations] = useState<RelationMention[]>([]);
   const [selectedRelation, setSelectedRelation] = useState<string | null>(null);
   const [relationTimeline, setRelationTimeline] = useState<RelationTimelinePoint[]>([]);
@@ -43,7 +43,6 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
   const [selectedThreadId, setSelectedThreadId] = useState<number | null>(null);
   const [threadLetters, setThreadLetters] = useState<SlowLetter[]>([]);
   const [threadLettersStatus, setThreadLettersStatus] = useState<FetchStatus>("idle");
-  const [draftBusy, setDraftBusy] = useState(false);
   const [replyBusyId, setReplyBusyId] = useState<number | null>(null);
   const [replyDrafts, setReplyDrafts] = useState<Record<number, string>>({});
   // Gemini audit 4.5 (CONFIRMED/P1): keyed by the PARENT letter's id, persists each in-flight
@@ -55,7 +54,24 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
   const [groupMembersStatus, setGroupMembersStatus] = useState<FetchStatus>("idle");
-  const [groupBusy, setGroupBusy] = useState(false);
+  const [groupCreateBusy, setGroupCreateBusy] = useState(false); // no resource id -- one create form
+
+  // Gemini audit 4.8 (CONFIRMED/P1): "多个 social action 使用普通 button，无 per-resource busy
+  // guard." Each of these tracks ITS OWN resource-keyed in-flight set -- an action on one resource
+  // (e.g. inviting user 7 to group 3) must never disable an unrelated action's button (e.g.
+  // leaving group 9, or inviting a different user to a different group). Previously
+  // peopleBusy/groupBusy/draftBusy were single shared booleans (the exact anti-pattern the audit
+  // calls out), and decideConnection/leaveConnection/requestConnection/actOnLetter/reportLetter had
+  // NO busy guard at all, allowing a double-click double-submit.
+  const peopleBusyKeys = useBusyKeys<number>(); // keyed by target userId (requestPersonConnection)
+  const connectionDecisionBusyKeys = useBusyKeys<number>(); // keyed by connection-request id (decideConnection)
+  const connectionLeaveBusyKeys = useBusyKeys<number>(); // keyed by connection id (leaveConnection)
+  const letterConnectionBusyKeys = useBusyKeys<number>(); // keyed by letter id (requestConnection "willKnow")
+  const letterActionBusyKeys = useBusyKeys<number>(); // keyed by letter id (actOnLetter + reportLetter)
+  const draftBusyKeys = useBusyKeys<number>(); // keyed by draft id (sendDraft)
+  const groupInviteBusyKeys = useBusyKeys<number>(); // keyed by groupId (inviteToGroup)
+  const groupInviteDecisionBusyKeys = useBusyKeys<number>(); // keyed by memberId (respondToGroupInvite)
+  const groupLeaveBusyKeys = useBusyKeys<number>(); // keyed by groupId (leaveGroup)
 
   // Gemini audit 4.4 (CONFIRMED/P1): relation/thread/group loaders had no request epoch, so a slow
   // response for a stale selection could overwrite the currently-selected resource's state (e.g.
@@ -105,15 +121,13 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
     setPeople(current => discoverable.ok ? discoverable.rows : current);
   }, []);
 
-  const requestPersonConnection = useCallback(async (userId: number) => {
-    setPeopleBusy(true);
+  const requestPersonConnection = useCallback((userId: number) => peopleBusyKeys.run(userId, async () => {
     try {
       await api.requestFriend(userId);
       await refreshConnections();
       setStatus("邀请已发出。对方同意前不会开放任何私密内容，也不会变成即时聊天。");
     } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法发出这个邀请"); }
-    finally { setPeopleBusy(false); }
-  }, [refreshConnections, setStatus]);
+  }), [peopleBusyKeys, refreshConnections, setStatus]);
 
   const openRelation = useCallback(async (label: string) => {
     const generation = ++relationGenerationRef.current;
@@ -148,31 +162,30 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
     }
   }, [setStatus]);
 
-  const sendDraft = useCallback(async (id: number) => {
-    setDraftBusy(true);
+  const sendDraft = useCallback((id: number) => draftBusyKeys.run(id, async () => {
     try {
       await api.sendSlowLetter(id);
       await api.letterOutbox().then(setLetterOutbox).catch(() => undefined);
       setStatus("这封信已经启程，会按慢信的节奏抵达。");
     } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法寄出这封草稿"); }
-    finally { setDraftBusy(false); }
-  }, [setStatus]);
+  }), [draftBusyKeys, setStatus]);
 
-  const actOnLetter = useCallback(async (letter: SlowLetter, action: "read" | "decline" | "block" | "archive") => {
-    try {
-      const updated = await api.transitionLetter(letter.id, action);
-      setLetterInbox(rows => rows.map(row => row.id === updated.id ? updated : row));
-      setLetterOutbox(rows => rows.map(row => row.id === updated.id ? updated : row));
-      setStatus(action === "block" ? "已屏蔽来信者；后续慢信也会被阻断。" : "慢信边界已更新。 ");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法更新这封信"); }
-  }, [setStatus]);
+  const actOnLetter = useCallback((letter: SlowLetter, action: "read" | "decline" | "block" | "archive") =>
+    letterActionBusyKeys.run(letter.id, async () => {
+      try {
+        const updated = await api.transitionLetter(letter.id, action);
+        setLetterInbox(rows => rows.map(row => row.id === updated.id ? updated : row));
+        setLetterOutbox(rows => rows.map(row => row.id === updated.id ? updated : row));
+        setStatus(action === "block" ? "已屏蔽来信者；后续慢信也会被阻断。" : "慢信边界已更新。 ");
+      } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法更新这封信"); }
+    }), [letterActionBusyKeys, setStatus]);
 
-  const reportLetter = useCallback(async (letter: SlowLetter) => {
+  const reportLetter = useCallback((letter: SlowLetter) => letterActionBusyKeys.run(letter.id, async () => {
     try {
       await api.reportLetter(letter.id, "收件人从 Aurora 界面举报慢信");
       setStatus("已提交举报。举报不会自动公开信件内容，交由受限审核处理。 ");
     } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法提交举报"); }
-  }, [setStatus]);
+  }), [letterActionBusyKeys, setStatus]);
 
   const replyWithLetter = useCallback(async (letter: SlowLetter) => {
     const body = replyDrafts[letter.id]?.trim();
@@ -207,40 +220,40 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
     setReplyDrafts(drafts => ({ ...drafts, [letterId]: value }));
   }, []);
 
-  const requestConnection = useCallback(async (letter: SlowLetter) => {
+  const requestConnection = useCallback((letter: SlowLetter) => letterConnectionBusyKeys.run(letter.id, async () => {
     try {
       await api.requestConnectionFromLetter(letter.id);
       await refreshConnections();
       setStatus("连接邀请已发出。只有对方明确接受后，双方才会成为真实连接。 ");
     } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法发出连接邀请"); }
-  }, [refreshConnections, setStatus]);
+  }), [letterConnectionBusyKeys, refreshConnections, setStatus]);
 
-  const decideConnection = useCallback(async (id: number, decision: "accept" | "decline") => {
+  const decideConnection = useCallback((id: number, decision: "accept" | "decline") => connectionDecisionBusyKeys.run(id, async () => {
     try {
       await api.decideConnection(id, decision);
       await refreshConnections();
       setStatus(decision === "accept" ? "双方都已同意这段连接。" : "已婉拒；不会自动建立任何关系。 ");
     } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法处理连接邀请"); }
-  }, [refreshConnections, setStatus]);
+  }), [connectionDecisionBusyKeys, refreshConnections, setStatus]);
 
-  const leaveConnection = useCallback(async (id: number) => {
+  const leaveConnection = useCallback((id: number) => connectionLeaveBusyKeys.run(id, async () => {
     try {
       await api.leaveConnection(id);
       await refreshConnections();
       setStatus("已退出这段连接。 ");
     } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法退出连接"); }
-  }, [refreshConnections, setStatus]);
+  }), [connectionLeaveBusyKeys, refreshConnections, setStatus]);
 
   const createGroup = useCallback(async (groupName: string) => {
     const name = groupName.trim();
     if (!name) return;
-    setGroupBusy(true);
+    setGroupCreateBusy(true);
     try {
       const created = await api.createGroup(name);
       setGroups(current => [created, ...current]);
       setStatus("群组已创建。");
     } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法创建群组"); }
-    finally { setGroupBusy(false); }
+    finally { setGroupCreateBusy(false); }
   }, [setStatus]);
 
   const openGroup = useCallback(async (groupId: number) => {
@@ -258,43 +271,44 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
     }
   }, [setStatus]);
 
-  const inviteToGroup = useCallback(async (groupId: number, userId: number) => {
-    setGroupBusy(true);
+  const inviteToGroup = useCallback((groupId: number, userId: number) => groupInviteBusyKeys.run(groupId, async () => {
     try {
       await api.inviteToGroup(groupId, userId);
       setStatus("邀请已发出，等待对方接受。");
     } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法邀请这位朋友"); }
-    finally { setGroupBusy(false); }
-  }, [setStatus]);
+  }), [groupInviteBusyKeys, setStatus]);
 
-  const respondToGroupInvite = useCallback(async (memberId: number, decision: "accept" | "decline") => {
-    setGroupBusy(true);
-    try {
-      await api.respondToGroupInvite(memberId, decision);
-      setGroupInvites(current => current.filter(invite => invite.memberId !== memberId));
-      if (decision === "accept") await loadGroups();
-      setStatus(decision === "accept" ? "已加入群组。" : "已婉拒这个群组邀请。 ");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法处理这个邀请"); }
-    finally { setGroupBusy(false); }
-  }, [loadGroups, setStatus]);
+  const respondToGroupInvite = useCallback((memberId: number, decision: "accept" | "decline") =>
+    groupInviteDecisionBusyKeys.run(memberId, async () => {
+      try {
+        await api.respondToGroupInvite(memberId, decision);
+        setGroupInvites(current => current.filter(invite => invite.memberId !== memberId));
+        if (decision === "accept") await loadGroups();
+        setStatus(decision === "accept" ? "已加入群组。" : "已婉拒这个群组邀请。 ");
+      } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法处理这个邀请"); }
+    }), [groupInviteDecisionBusyKeys, loadGroups, setStatus]);
 
-  const leaveGroup = useCallback(async (groupId: number) => {
-    setGroupBusy(true);
+  const leaveGroup = useCallback((groupId: number) => groupLeaveBusyKeys.run(groupId, async () => {
     try {
       await api.leaveGroup(groupId);
       setGroups(current => current.filter(group => group.id !== groupId));
       if (selectedGroupId === groupId) { setSelectedGroupId(null); setGroupMembers([]); }
       setStatus("已退出这个群组。 ");
     } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法退出这个群组"); }
-    finally { setGroupBusy(false); }
-  }, [selectedGroupId, setStatus]);
+  }), [groupLeaveBusyKeys, selectedGroupId, setStatus]);
 
   return {
-    connectionRequests, friends, people, peopleBusy,
+    connectionRequests, friends, people, isPersonBusy: peopleBusyKeys.isBusy,
     relations, selectedRelation, relationTimeline, relationHealth, relationBusy,
     letterInbox, letterOutbox, letterThreads, selectedThreadId, threadLetters, threadLettersStatus,
-    draftBusy, replyBusyId, replyDrafts,
-    groups, groupInvites, selectedGroupId, groupMembers, groupMembersStatus, groupBusy,
+    isDraftBusy: draftBusyKeys.isBusy, replyBusyId, replyDrafts,
+    isLetterActionBusy: letterActionBusyKeys.isBusy,
+    isConnectionDecisionBusy: connectionDecisionBusyKeys.isBusy,
+    isConnectionLeaveBusy: connectionLeaveBusyKeys.isBusy,
+    isLetterConnectionBusy: letterConnectionBusyKeys.isBusy,
+    groups, groupInvites, selectedGroupId, groupMembers, groupMembersStatus,
+    groupCreateBusy, isGroupInviteBusy: groupInviteBusyKeys.isBusy,
+    isGroupInviteDecisionBusy: groupInviteDecisionBusyKeys.isBusy, isGroupLeaveBusy: groupLeaveBusyKeys.isBusy,
     loadLetterInbox, loadConnectionRequests, loadFriends, loadLetterOutbox, loadPeople, loadRelations, loadLetterThreads,
     loadGroups, loadGroupInvites,
     refreshConnections, requestPersonConnection, openRelation, openThread, sendDraft,

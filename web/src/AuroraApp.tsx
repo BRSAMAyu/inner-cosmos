@@ -1263,17 +1263,23 @@ export function AuroraApp() {
 
       <ErrorBoundary variant="space" locale={skillLocale}>
       <div className="product-space" hidden={productSpace !== "letters"}>
-      <PeopleDiscovery people={connectionsAndLetters.people} busy={connectionsAndLetters.peopleBusy} onRequest={userId => void connectionsAndLetters.requestPersonConnection(userId)} locale={skillLocale} />
+      <PeopleDiscovery people={connectionsAndLetters.people} isBusy={connectionsAndLetters.isPersonBusy} onRequest={userId => void connectionsAndLetters.requestPersonConnection(userId)} locale={skillLocale} />
       <RelationsView relations={connectionsAndLetters.relations} selected={connectionsAndLetters.selectedRelation} timeline={connectionsAndLetters.relationTimeline} health={connectionsAndLetters.relationHealth} busy={connectionsAndLetters.relationBusy} onSelect={label => void connectionsAndLetters.openRelation(label)} locale={skillLocale} />
       <SocialGroupsView groups={connectionsAndLetters.groups} invites={connectionsAndLetters.groupInvites} friends={connectionsAndLetters.friends}
-        selectedGroupId={connectionsAndLetters.selectedGroupId} members={connectionsAndLetters.groupMembers} membersStatus={connectionsAndLetters.groupMembersStatus} busy={connectionsAndLetters.groupBusy}
+        selectedGroupId={connectionsAndLetters.selectedGroupId} members={connectionsAndLetters.groupMembers} membersStatus={connectionsAndLetters.groupMembersStatus}
+        createBusy={connectionsAndLetters.groupCreateBusy} isInviteBusy={connectionsAndLetters.isGroupInviteBusy}
+        isInviteDecisionBusy={connectionsAndLetters.isGroupInviteDecisionBusy} isLeaveBusy={connectionsAndLetters.isGroupLeaveBusy}
         currentUserId={userProfile?.id ?? null}
         onSelectGroup={id => void connectionsAndLetters.openGroup(id)} onCreateGroup={name => void connectionsAndLetters.createGroup(name)}
         onInvite={(groupId, userId) => void connectionsAndLetters.inviteToGroup(groupId, userId)}
         onRespondInvite={(memberId, decision) => void connectionsAndLetters.respondToGroupInvite(memberId, decision)}
         onLeaveGroup={id => void connectionsAndLetters.leaveGroup(id)} locale={skillLocale} />
 
-      <LettersInbox letterInbox={connectionsAndLetters.letterInbox} letterOutbox={connectionsAndLetters.letterOutbox} threads={connectionsAndLetters.letterThreads} threadLetters={connectionsAndLetters.threadLetters} threadLettersStatus={connectionsAndLetters.threadLettersStatus} selectedThreadId={connectionsAndLetters.selectedThreadId} draftBusy={connectionsAndLetters.draftBusy} replyBusyId={connectionsAndLetters.replyBusyId} onSendDraft={id => void connectionsAndLetters.sendDraft(id)} onOpenThread={id => { void connectionsAndLetters.openThread(id); navigate(letterThreadPath(id)); }} replyDrafts={connectionsAndLetters.replyDrafts} connectionRequests={connectionsAndLetters.connectionRequests} friends={connectionsAndLetters.friends}
+      <LettersInbox letterInbox={connectionsAndLetters.letterInbox} letterOutbox={connectionsAndLetters.letterOutbox} threads={connectionsAndLetters.letterThreads} threadLetters={connectionsAndLetters.threadLetters} threadLettersStatus={connectionsAndLetters.threadLettersStatus} selectedThreadId={connectionsAndLetters.selectedThreadId}
+        isDraftBusy={connectionsAndLetters.isDraftBusy} replyBusyId={connectionsAndLetters.replyBusyId}
+        isLetterActionBusy={connectionsAndLetters.isLetterActionBusy} isConnectionDecisionBusy={connectionsAndLetters.isConnectionDecisionBusy}
+        isConnectionLeaveBusy={connectionsAndLetters.isConnectionLeaveBusy} isLetterConnectionBusy={connectionsAndLetters.isLetterConnectionBusy}
+        onSendDraft={id => void connectionsAndLetters.sendDraft(id)} onOpenThread={id => { void connectionsAndLetters.openThread(id); navigate(letterThreadPath(id)); }} replyDrafts={connectionsAndLetters.replyDrafts} connectionRequests={connectionsAndLetters.connectionRequests} friends={connectionsAndLetters.friends}
         onReplyDraftChange={connectionsAndLetters.updateReplyDraft}
         onReply={letter => void connectionsAndLetters.replyWithLetter(letter)} onActOnLetter={(letter, action) => void connectionsAndLetters.actOnLetter(letter, action)}
         onReportLetter={letter => void connectionsAndLetters.reportLetter(letter)} onRequestConnection={letter => void connectionsAndLetters.requestConnection(letter)}

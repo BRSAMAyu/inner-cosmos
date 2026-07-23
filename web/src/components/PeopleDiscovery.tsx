@@ -20,8 +20,10 @@ const COPY: Record<Locale, {
   }
 };
 
-export function PeopleDiscovery({ people, busy, onRequest, locale = "zh-CN" }: {
-  people: DiscoverablePerson[]; busy: boolean; onRequest: (userId: number) => void; locale?: Locale;
+export function PeopleDiscovery({ people, isBusy, onRequest, locale = "zh-CN" }: {
+  // Gemini audit 4.8 (CONFIRMED/P1): isBusy is per-resource (keyed by the target person's userId),
+  // not a single shared flag -- inviting person A must not disable person B's invite button too.
+  people: DiscoverablePerson[]; isBusy: (userId: number) => boolean; onRequest: (userId: number) => void; locale?: Locale;
 }) {
   const t = COPY[locale];
   return <section className="people-discovery" aria-label={t.aria}>
@@ -32,7 +34,7 @@ export function PeopleDiscovery({ people, busy, onRequest, locale = "zh-CN" }: {
       {people.map(person => <article className="person-card" role="listitem" key={person.id}>
         <div><strong>{person.nickname}</strong><small>@{person.username}</small></div>
         {person.relationStatus === "NONE"
-          ? <AsyncButton className="resonance-secondary" busy={busy} busyText={t.inviteBusy} onClick={() => onRequest(person.id)}>{t.invite}</AsyncButton>
+          ? <AsyncButton className="resonance-secondary" busy={isBusy(person.id)} busyText={t.inviteBusy} onClick={() => onRequest(person.id)}>{t.invite}</AsyncButton>
           : <span className="person-status">{t.status[person.relationStatus] ?? person.relationStatus}</span>}
       </article>)}
     </div>}
