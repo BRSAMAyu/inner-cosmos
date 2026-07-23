@@ -372,6 +372,27 @@ public class CapsuleServiceImpl implements CapsuleService {
     private static final double SEMANTIC_SIMILARITY_CAP = 0.40;
     private static final double SEMANTIC_REASON_THRESHOLD = 0.05;
 
+    // G6.MATCH-MULTI (INNO-CAP-013, this dispatch): a local, deterministic "Mock" semantic-
+    // similarity stand-in for a real embedding provider. No real embedding/LLM provider key is
+    // available in this environment (see evidence/innovation/INNO-CAP-013), so this is NOT the
+    // CapsuleEmbeddingIndexService real-provider path above -- it is a small, hand-curated,
+    // per-family "paraphrase cue" lexicon, deliberately kept separate from and additive to the
+    // strict PseudoSemanticAnalyzer.THEME_KEYWORDS lexicon `themesOf()` uses everywhere else in
+    // this class and in Aurora mode-suggestion/sentiment/intent detection, so this fix has zero
+    // blast radius outside capsule matching. A family only counts via this path when the STRICT
+    // theme match already missed it (see paraphraseFamiliesOf below), and the contribution is
+    // capped low so a paraphrase can never out-rank or match the strength of a genuine exact
+    // keyword overlap.
+    private static final Map<String, Set<String>> PARAPHRASE_CUES = Map.of(
+            "任务压力", Set.of("熬夜", "赶稿", "加班", "连轴转", "焦头烂额", "扛不住", "身心俱疲"),
+            "关系牵动", Set.of("疏远", "隔阂", "不理我", "渐行渐远", "话不投机"),
+            "情绪承压", Set.of("喘不过气", "情绪崩溃", "心力交瘁", "无力感", "快撑不下去"),
+            "认知探索", Set.of("拿不定主意", "理不出头绪", "举棋不定", "不知道该信谁"),
+            "自我评价", Set.of("配不上", "抬不起头", "一无是处", "自我怀疑"),
+            "希望期待", Set.of("满怀期待", "值得期待", "心生向往", "盼望已久"));
+    private static final double PARAPHRASE_SIGNAL_UNIT = 0.10;
+    private static final double PARAPHRASE_SIGNAL_CAP = 0.10;
+
     @Override
     public List<Map<String, Object>> matchedCapsules(Long userId) {
         return matchedCapsules(userId, ResonanceMatchStrategy.MIRROR);
@@ -455,6 +476,19 @@ public class CapsuleServiceImpl implements CapsuleService {
             double semanticSignal = Math.min(SEMANTIC_SIMILARITY_CAP,
                     Math.max(0.0, semanticSimilarity) * SEMANTIC_SIMILARITY_WEIGHT);
 
+            // paraphraseSignal: G6.MATCH-MULTI local Mock semantic-cue signal (see PARAPHRASE_CUES
+            // Javadoc above). Only counts a family the viewer already actively cares about
+            // (userThemeProfile) that the STRICT theme match on this capsule missed -- so a family
+            // already driving themeOverlap is never double-counted here.
+            Set<String> paraphraseFamilies = new LinkedHashSet<>();
+            for (String fam : weakParaphraseFamiliesOf(capText)) {
+                if (userThemeProfile.containsKey(fam) && !capsuleThemeProfile.containsKey(fam)) {
+                    paraphraseFamilies.add(fam);
+                }
+            }
+            double paraphraseSignal = Math.min(PARAPHRASE_SIGNAL_CAP,
+                    paraphraseFamilies.size() * PARAPHRASE_SIGNAL_UNIT);
+
             double energyScore = (capsule.echoEnergy == null ? 0.5 : capsule.echoEnergy) * ENERGY_WEIGHT;
             double seedBoost = "SEED_CAPSULE".equals(capsule.capsuleType) ? SEED_BOOST : USER_BOOST;
             // FIX-A: relevance is ONLY the genuinely user-specific signal (themeOverlap +
@@ -468,20 +502,37 @@ public class CapsuleServiceImpl implements CapsuleService {
             // Interpretable reason: only surfaced when the semantic signal meaningfully
             // contributes, so a viewer can tell a match apart from pure lexical overlap (spec:
             // "expose understandable reasons and controls").
-            if (semanticSignal >= SEMANTIC_REASON_THRESHOLD) {
+            if (semanticSignal >= SEMANTIC_REASON_THRESHOLD || paraphraseSignal > 0.0) {
                 mirrorReasons.add("语义相近");
             }
             StrategySignal signal = strategySignal(strategy, userThemeProfile, portraitFamilies,
-                    capsuleThemeProfile.keySet(), capsule.id, themeOverlap + portraitSignal + semanticSignal,
+                    capsuleThemeProfile.keySet(), capsule.id,
+                    themeOverlap + portraitSignal + semanticSignal + paraphraseSignal,
                     mirrorReasons);
             boolean resonant = signal.relevance() > 0.0;
             double score = Math.min(0.99, signal.relevance() + energyScore + seedBoost);
+
+            // matchTier: G6.MATCH-MULTI graded neutral/partial-overlap bucket. FULL when every one
+            // of the viewer's currently active theme families (userThemeProfile) is represented by
+            // this capsule (strict OR paraphrase match); PARTIAL when only some are; NONE when none
+            // are (mirrors the existing resonant=false backfill case). Purely additive/explanatory
+            // metadata -- does not change resonant, matchScore or ranking/backfill behavior.
+            Set<String> coveredFamilies = new LinkedHashSet<>(capsuleThemeProfile.keySet());
+            coveredFamilies.addAll(paraphraseFamilies);
+            String matchTier;
+            if (userThemeProfile.isEmpty()) {
+                matchTier = "NONE";
+            } else {
+                long covered = userThemeProfile.keySet().stream().filter(coveredFamilies::contains).count();
+                matchTier = covered == 0 ? "NONE" : covered == userThemeProfile.size() ? "FULL" : "PARTIAL";
+            }
 
             Map<String, Object> item = new HashMap<>();
             item.put("capsule", capsule);
             item.put("matchScore", Math.round(score * 100.0) / 100.0);
             item.put("matchReasons", signal.reasons());
             item.put("matchSummary", buildMatchSummary(capsule, strategy, signal.reasons()));
+            item.put("matchTier", matchTier);
             item.put("strategy", strategy.name());
             item.put("strategyLabel", strategy.label);
             item.put("strategyDescription", strategy.description);
@@ -681,6 +732,30 @@ public class CapsuleServiceImpl implements CapsuleService {
         for (String theme : PseudoSemanticAnalyzer.analyze(text).detectedThemes) {
             if (THEME_FAMILIES.contains(theme)) {
                 families.add(theme);
+            }
+        }
+        return families;
+    }
+
+    /**
+     * G6.MATCH-MULTI (INNO-CAP-013): families detected only via the broader {@link
+     * #PARAPHRASE_CUES} lexicon -- see that field's Javadoc for why this is a local Mock stand-in,
+     * not a real embedding call. Independent of {@link #themesOf}; the caller is responsible for
+     * only counting a family here when the strict lexicon already missed it, so this never
+     * double-counts a family the exact-keyword path already found.
+     */
+    private Set<String> weakParaphraseFamiliesOf(String text) {
+        Set<String> families = new LinkedHashSet<>();
+        if (text == null || text.isBlank()) {
+            return families;
+        }
+        String normalized = text.toLowerCase(Locale.ROOT);
+        for (Map.Entry<String, Set<String>> entry : PARAPHRASE_CUES.entrySet()) {
+            for (String cue : entry.getValue()) {
+                if (normalized.contains(cue.toLowerCase(Locale.ROOT))) {
+                    families.add(entry.getKey());
+                    break;
+                }
             }
         }
         return families;

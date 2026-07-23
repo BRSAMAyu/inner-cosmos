@@ -267,18 +267,19 @@ class CapsuleMatchingPrecisionRecallTest {
     }
 
     /**
-     * DISCLOSED KNOWN LIMITATION (not fixed by this change): a capsule that a human reviewer would
-     * judge as the SAME real-world domain as the viewer's profile (job-burnout exhaustion, matching
-     * the viewer's 任务压力/work-deadline profile), but that is worded with zero exact lexicon
-     * keyword overlap (a paraphrase), is NOT recognized as resonant by the current lexical/
-     * theme-family algorithm. This pins the exact boundary the ledger's MATCH-MULTI remaining note
-     * already names in prose ("Matching remains lexical/theme-family based ... embedding/user-vector
-     * similarity ... remain the real-provider human gate") with a concrete, reproducible case
-     * instead of an unmeasured assertion. This test is expected to keep passing (documenting the
-     * gap) until a real embedding/semantic signal is wired in and re-measured.
+     * FORMERLY a disclosed known limitation (see git history / INNO-CAP-012): this exact case --
+     * a capsule a human reviewer would judge as the SAME real-world domain as the viewer's profile
+     * (job-burnout exhaustion, matching the viewer's 任务压力/work-deadline profile) but worded with
+     * zero exact lexicon keyword overlap (a paraphrase) -- used to NOT be recognized as resonant.
+     * UPDATE (INNO-CAP-013, this dispatch): now FIXED by a local, deterministic "Mock" semantic-cue
+     * signal (see {@code CapsuleServiceImpl.PARAPHRASE_CUES} and
+     * {@code paraphraseSameDomainCapsule_nowRecognizedViaLocalSemanticCueSignal} below, which pins
+     * the same case with additional score/reason assertions). Kept here, flipped rather than
+     * deleted, as the historical record of the exact before/after boundary -- no real
+     * embedding/LLM provider was used; this is NOT a real-provider re-measurement.
      */
     @Test
-    void disclosedLimitation_paraphrasedSameDomainCapsuleIsNotRecognizedAsResonant() {
+    void formerlyDisclosedLimitation_paraphrasedSameDomainCapsuleIsNowRecognizedAsResonant() {
         Harness harness = new Harness();
         harness.stubMemories(memoryOf(Family.TASK_PRESSURE));
 
@@ -286,8 +287,9 @@ class CapsuleMatchingPrecisionRecallTest {
         paraphrase.id = 9002L; paraphrase.ownerUserId = 88002L; paraphrase.capsuleType = "USER_CAPSULE";
         paraphrase.pseudonym = "paraphrase-burnout";
         // Same real-world domain as 任务压力 (deadline/work-stress exhaustion) but deliberately
-        // avoids every 任务压力/情绪承压/etc. lexicon keyword (verified: no substring match against
-        // PseudoSemanticAnalyzer.THEME_KEYWORDS), so themesOf() returns an empty family set.
+        // avoids every 任务压力/情绪承压/etc. STRICT lexicon keyword (verified: no substring match
+        // against PseudoSemanticAnalyzer.THEME_KEYWORDS, so themesOf() alone still returns an empty
+        // family set) -- it now matches via the separate, additive PARAPHRASE_CUES lexicon instead.
         paraphrase.intro = "连续熬夜赶稿件，身心俱疲，不知道还能撑多久，却不敢和领导说";
         paraphrase.publicTags = "[]"; paraphrase.echoEnergy = 0.6; paraphrase.isPublic = true;
         paraphrase.visibilityStatus = "PUBLIC";
@@ -295,9 +297,140 @@ class CapsuleMatchingPrecisionRecallTest {
 
         List<Map<String, Object>> result = harness.service.matchedCapsules(VIEWER_ID);
 
+        assertTrue(resonantOf(result.get(0)),
+                "UPDATE (INNO-CAP-013): this same-domain paraphrase is now recognized as resonant via "
+                        + "a local Mock semantic-cue signal -- NOT a real-provider embedding re-measurement, "
+                        + "see evidence/innovation/INNO-CAP-013 for the honest scope of this fix");
+    }
+
+    /**
+     * HONEST REMAINING LIMITATION (INNO-CAP-013, not fixed): the fix above is a small, hand-curated
+     * cue lexicon, not real semantic understanding -- a DIFFERENT same-domain paraphrase that
+     * happens not to use any of the curated cue words (and shares zero exact lexicon keywords
+     * either) is still missed. This proves the fix's scope is honestly narrow, not a general
+     * semantic-similarity solution -- real embedding/user-vector similarity remains the
+     * real-provider human gate the ledger names.
+     */
+    @Test
+    void disclosedLimitation_aDifferentUncuredParaphraseIsStillNotRecognizedAsResonant() {
+        Harness harness = new Harness();
+        harness.stubMemories(memoryOf(Family.TASK_PRESSURE));
+
+        EchoCapsule paraphrase = new EchoCapsule();
+        paraphrase.id = 9006L; paraphrase.ownerUserId = 88006L; paraphrase.capsuleType = "USER_CAPSULE";
+        paraphrase.pseudonym = "paraphrase-thesis";
+        // Same 任务压力/deadline-anxiety domain by human judgment, but avoids every STRICT keyword
+        // AND every PARAPHRASE_CUES word (verified: no substring match against either lexicon).
+        paraphrase.intro = "论文due日快到了，脑子转不动，只想找个地方躲起来";
+        paraphrase.publicTags = "[]"; paraphrase.echoEnergy = 0.6; paraphrase.isPublic = true;
+        paraphrase.visibilityStatus = "PUBLIC";
+        harness.stubPlaza(List.of(paraphrase));
+
+        List<Map<String, Object>> result = harness.service.matchedCapsules(VIEWER_ID);
+
         assertFalse(resonantOf(result.get(0)),
-                "KNOWN LIMITATION: a same-domain paraphrase with zero exact keyword overlap is missed by "
-                        + "the lexical/theme-family algorithm -- semantic/embedding matching remains the "
-                        + "real-provider human gate named in the ledger, not silently claimed as solved");
+                "HONEST LIMITATION: a same-domain paraphrase using words outside the curated cue "
+                        + "lexicon is still missed -- this fix is a narrow local stand-in, not general "
+                        + "semantic understanding; real embedding/provider similarity remains the "
+                        + "standing human/provider gate");
+    }
+
+    /**
+     * INNO-CAP-013 (this dispatch), G6.MATCH-MULTI: pins the FIXED behavior for the exact same
+     * paraphrase case documented as a known limitation above. No real embedding/LLM provider key is
+     * available in this environment, so this is NOT a real-provider semantic fix -- it is a small,
+     * local, deterministic "Mock" semantic-similarity stand-in (a hand-curated per-family
+     * paraphrase-cue lexicon, independent of the strict PseudoSemanticAnalyzer THEME_KEYWORDS
+     * lexicon used elsewhere) added to {@code CapsuleServiceImpl.matchedCapsules}. Written FIRST as
+     * a failing test against the current (pre-fix) lexical-only algorithm -- confirmed RED before
+     * the fix existed -- then made to pass by the fix. Kept alongside (not replacing) the
+     * `disclosedLimitation_...` test above for the historical record; that test's own assertion
+     * still passes unchanged because it is a DIFFERENT case (this test additionally asserts the
+     * new graded "语义相近" reason and a nonzero-but-capped score contribution, not just resonant).
+     */
+    @Test
+    void paraphraseSameDomainCapsule_nowRecognizedViaLocalSemanticCueSignal() {
+        Harness harness = new Harness();
+        harness.stubMemories(memoryOf(Family.TASK_PRESSURE));
+
+        EchoCapsule paraphrase = new EchoCapsule();
+        paraphrase.id = 9003L; paraphrase.ownerUserId = 88003L; paraphrase.capsuleType = "USER_CAPSULE";
+        paraphrase.pseudonym = "paraphrase-burnout-2";
+        // Identical construction to the disclosed-limitation case above: same real-world domain
+        // (任务压力/work-deadline exhaustion), zero exact THEME_KEYWORDS overlap.
+        paraphrase.intro = "连续熬夜赶稿件，身心俱疲，不知道还能撑多久，却不敢和领导说";
+        paraphrase.publicTags = "[]"; paraphrase.echoEnergy = 0.6; paraphrase.isPublic = true;
+        paraphrase.visibilityStatus = "PUBLIC";
+        harness.stubPlaza(List.of(paraphrase));
+
+        List<Map<String, Object>> result = harness.service.matchedCapsules(VIEWER_ID);
+
+        assertTrue(resonantOf(result.get(0)),
+                "a same-domain paraphrase must now get a nonzero graded semantic-similarity "
+                        + "contribution instead of a hard miss (local Mock semantic-cue signal, not a "
+                        + "real-provider embedding -- see evidence/innovation/INNO-CAP-013)");
+        @SuppressWarnings("unchecked")
+        List<String> reasons = (List<String>) result.get(0).get("matchReasons");
+        assertTrue(reasons.contains("语义相近"),
+                "the semantic contribution must be explainable, not a silent score bump: " + reasons);
+        double score = ((Number) result.get(0).get("matchScore")).doubleValue();
+        // seedBoost/energyScore alone (USER_CAPSULE, echoEnergy 0.6) = 0.06 + 0.6*0.18=0.108 -> 0.168.
+        // A genuine paraphrase signal must push the score ABOVE that floor (proof the signal is not
+        // a no-op) while staying well below a strong exact-keyword match (~0.108+0.168+0.18=~0.348
+        // for a single strong family), so a paraphrase can never out-rank a real lexical hit.
+        assertTrue(score > 0.168 + 1e-9, "paraphrase signal must move the score above the no-signal floor: " + score);
+        assertTrue(score < 0.30, "paraphrase signal must stay well below a strong exact-keyword match: " + score);
+    }
+
+    /**
+     * INNO-CAP-013 (this dispatch), G6.MATCH-MULTI: the graded neutral/partial-overlap bucket the
+     * ledger's remaining note explicitly asked for ("a two-family viewer shows the algorithm has no
+     * graded neutral/partial-overlap bucket"). A new additive `matchTier` field (FULL/PARTIAL/NONE)
+     * exposes family-coverage breadth without changing `resonant`, `matchScore` or ranking -- the
+     * exact same fixture as `mixedTwoFamilyViewer_resonatesOnPartialOverlap` above (still resonant,
+     * unchanged), now also tagged PARTIAL because the capsule covers only one of the viewer's two
+     * active families.
+     */
+    @Test
+    void mixedTwoFamilyViewer_isTaggedPartialNotFull() {
+        Harness harness = new Harness();
+        MemoryCard mixed = new MemoryCard();
+        mixed.id = 3L; mixed.userId = VIEWER_ID; mixed.title = "mixed";
+        mixed.summary = Family.TASK_PRESSURE.memoryText() + " " + Family.EMOTIONAL_DISTRESS.memoryText();
+        mixed.keywordTags = ""; mixed.emotionTags = ""; mixed.status = "ACTIVE"; mixed.emotionalGravity = 5.0;
+        harness.stubMemories(mixed);
+
+        EchoCapsule partial = new EchoCapsule();
+        partial.id = 9004L; partial.ownerUserId = 88004L; partial.capsuleType = "USER_CAPSULE";
+        partial.pseudonym = "partial-2"; partial.intro = Family.EMOTIONAL_DISTRESS.memoryText() + " 的独白";
+        partial.publicTags = "[]"; partial.echoEnergy = 0.5; partial.isPublic = true; partial.visibilityStatus = "PUBLIC";
+        harness.stubPlaza(List.of(partial));
+
+        List<Map<String, Object>> result = harness.service.matchedCapsules(VIEWER_ID);
+
+        assertTrue(resonantOf(result.get(0)), "resonant is unchanged by adding matchTier");
+        assertEquals("PARTIAL", result.get(0).get("matchTier"),
+                "covering only one of the viewer's two active families must be PARTIAL, not FULL");
+    }
+
+    /**
+     * FULL-tier control: a single-family viewer whose only active family is fully covered by the
+     * capsule must be tagged FULL, not PARTIAL -- proves the new bucket is genuinely graded (both
+     * values are reachable), not a renamed boolean.
+     */
+    @Test
+    void singleFamilyFullOverlap_isTaggedFull() {
+        Harness harness = new Harness();
+        harness.stubMemories(memoryOf(Family.TASK_PRESSURE));
+        EchoCapsule capsule = new EchoCapsule();
+        capsule.id = 9005L; capsule.ownerUserId = 88005L; capsule.capsuleType = "USER_CAPSULE";
+        capsule.pseudonym = "full"; capsule.intro = Family.TASK_PRESSURE.memoryText() + " 的经历";
+        capsule.publicTags = "[]"; capsule.echoEnergy = 0.5; capsule.isPublic = true; capsule.visibilityStatus = "PUBLIC";
+        harness.stubPlaza(List.of(capsule));
+
+        List<Map<String, Object>> result = harness.service.matchedCapsules(VIEWER_ID);
+
+        assertEquals("FULL", result.get(0).get("matchTier"),
+                "a capsule covering the viewer's single active family entirely must be FULL");
     }
 }
