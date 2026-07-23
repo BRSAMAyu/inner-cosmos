@@ -3,6 +3,8 @@ package com.innercosmos.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.innercosmos.ai.agent.LetterGuardAgent;
+import com.innercosmos.ai.tts.TtsClient;
+import com.innercosmos.ai.tts.TtsVoicePresets;
 import com.innercosmos.common.ErrorCode;
 import com.innercosmos.dto.LetterCreateRequest;
 import com.innercosmos.entity.BlockRelation;
@@ -60,6 +62,27 @@ public class SlowLetterServiceImpl implements SlowLetterService {
     // fixed/adjustable Clock directly instead of racing the wall clock. No method in this class
     // calls LocalDateTime.now() with an implicit zone anymore.
     private final Clock clock;
+    /**
+     * W1 slow-letter voice reuse: the same {@link TtsClient} Aurora's inner-voice and the capsule
+     * persona-voice paths use, field-injected (optional) exactly like
+     * {@code PersonaChatServiceImpl#ttsClient} -- Spring always wires a real bean
+     * ({@code QwenAudioTtsClient} or {@code DisabledTtsClient}), so this is non-null in production
+     * and only null in direct-construction unit tests. Field injection (not constructor) is
+     * deliberate: it keeps this class's heavily-audited 11-arg constructor signature stable.
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private TtsClient ttsClient;
+
+    /**
+     * The statuses that mean "this letter has been delivered to the recipient and is readable by
+     * them" -- exactly the set {@link #inbox(Long)} selects for the receiver. Reused as the voice
+     * delivery-state gate so "hearable" is defined by the SAME existing delivered-to-recipient
+     * boundary the inbox already enforces, not a new one. Pre-delivery states (DRAFT/SENT/FLYING)
+     * are absent on purpose: a recipient must never hear a letter before it arrives.
+     */
+    static final java.util.Set<String> DELIVERED_TO_RECEIVER_STATUSES = java.util.Set.of(
+            "DELIVERED", "READ", "REPLIED", "DECLINED", "BLOCKED", "ARCHIVED");
+
 
     public SlowLetterServiceImpl(SlowLetterMapper letterMapper, LetterStatusLogMapper logMapper, LetterStateRegistry stateRegistry, LetterGuardAgent guardAgent, LetterThreadMapper threadMapper, ReportRecordMapper reportRecordMapper, LetterSafetyFilter letterSafetyFilter, EchoCapsuleMapper capsuleMapper, BlockRelationMapper blockRelationMapper, PiiCredentialDetector piiCredentialDetector, Clock clock) {
         this.letterMapper = letterMapper;
@@ -347,7 +370,10 @@ public class SlowLetterServiceImpl implements SlowLetterService {
     public List<SlowLetter> inbox(Long userId) {
         QueryWrapper<SlowLetter> query = new QueryWrapper<>();
         query.eq("receiver_user_id", userId)
-                .in("status", "DELIVERED", "READ", "REPLIED", "DECLINED", "BLOCKED", "ARCHIVED")
+                // Reuses DELIVERED_TO_RECEIVER_STATUSES -- the single source of truth for "delivered
+                // to the recipient", shared with the voice gate (synthesizeVoice) so the two cannot
+                // drift apart on which states count as "arrived".
+                .in("status", DELIVERED_TO_RECEIVER_STATUSES)
                 .orderByDesc("id");
         return letterMapper.selectList(query);
     }
@@ -371,6 +397,48 @@ public class SlowLetterServiceImpl implements SlowLetterService {
             throw new com.innercosmos.exception.BusinessException(com.innercosmos.common.ErrorCode.UNAUTHORIZED, "无权查看此信件");
         }
         return letter;
+    }
+
+    @Override
+    public byte[] synthesizeVoice(Long userId, Long letterId) {
+        SlowLetter letter = letterMapper.selectById(letterId);
+        if (letter == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "信件不存在");
+        }
+        // Authorization gate #1 -- reuse the SAME recipient-scoped fetch + party-membership check
+        // getLetter()/reportLetter() use (only a party to the letter may act on it), narrowed here to
+        // RECIPIENT-only: voice exists so the recipient can hear a delivered letter read aloud. The
+        // sender already knows what they wrote, and a third party must never reach this path (IDOR).
+        // This is the existing recipient-scoped letter-read gate reapplied, NOT a new surface.
+        if (!userId.equals(letter.receiverUserId)) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "只有收件人可以听这封信");
+        }
+        // Authorization gate #2 -- reuse the SAME delivered-to-recipient delivery-state gate the
+        // inbox() query uses (DELIVERED_TO_RECEIVER_STATUSES): a letter is hearable only once it has
+        // actually arrived. In-flight SENT/FLYING letters (and unreadable DRAFTs) are rejected -- a
+        // recipient must never hear a letter before it is delivered, exactly as they can never see
+        // its body in their inbox before then.
+        if (!DELIVERED_TO_RECEIVER_STATUSES.contains(letter.status)) {
+            throw new BusinessException(ErrorCode.LETTER_STATE_INVALID, "信件抵达后才能朗读");
+        }
+        if (letter.letterBody == null || letter.letterBody.isBlank()) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "这封信没有可以朗读的正文");
+        }
+        if (ttsClient == null || !ttsClient.available()) {
+            throw new BusinessException(ErrorCode.AI_PROVIDER_ERROR, "慢信朗读暂未启用");
+        }
+        try {
+            // Warm, calm default voice reused from Aurora's own TtsVoicePresets (NO new catalog) -- a
+            // slow letter deserves the same gentle warmth as Aurora's inner voice, deliberately NOT a
+            // distinct persona voice (that distinction belongs to the capsule path only).
+            return ttsClient.synthesize(letter.letterBody, TtsVoicePresets.defaultVoice().id());
+        } catch (Exception failure) {
+            // Mirrors the capsule-voice / Aurora inner-voice resilience: a synthesis failure or a
+            // bounded timeout (tts.timeout-ms, default 8s) never breaks the letter -- this on-demand
+            // endpoint surfaces a clean business error and the recipient's letter is untouched. The
+            // text body was already delivered via the separate GET /api/letters/{id} path.
+            throw new BusinessException(ErrorCode.AI_PROVIDER_ERROR, "慢信朗读暂时不可用，请稍后再试");
+        }
     }
 
     @Override

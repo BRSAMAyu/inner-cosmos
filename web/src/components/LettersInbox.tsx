@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { ConnectionRequests, LetterThread, SlowLetter, SocialConnection } from "../api";
 import type { Locale } from "../i18n";
 import { AsyncButton, LoadingText } from "../loading";
+import { InlineAudioPlayer } from "./shared/InlineAudioPlayer";
 
 const repliable = new Set(["READ", "REPLIED"]);
 const declinable = new Set(["DELIVERED", "READ"]);
@@ -13,6 +14,7 @@ const COPY: Record<Locale, {
   aria: string; heading: string; tabsAria: string; tabInbox: string; tabOutbox: string; tabDrafts: string; tabThreads: string;
   inboxIntro: string; inboxEmpty: string; replyAria: (title: string) => string; replyPlaceholder: string; replyBusy: string; replySend: string;
   markRead: string; markReadBusy: string; decline: string; declineBusy: string;
+  playLetterVoice: string; letterVoiceBusy: string; letterVoiceAria: string;
   willKnow: string; willKnowBusy: string; block: string; blockBusy: string; report: string; reportBusy: string;
   outboxIntro: string; outboxEmpty: string; arrivalEta: (time: string) => string; archiveLetter: string; archiveBusy: string;
   draftsIntro: string; draftsEmpty: string; untitledDraft: string; draftStatus: string; sendDraftBusy: string; sendDraft: string;
@@ -30,6 +32,7 @@ const COPY: Record<Locale, {
     inboxIntro: "飞行中的信不会提前泄露正文。抵达后你可以阅读、婉拒、举报或屏蔽；屏蔽会阻断同一来信者之后的慢信。", inboxEmpty: "此刻没有已经抵达的慢信。",
     replyAria: title => `回复「${title}」`, replyPlaceholder: "写下你愿意负责的回应；它仍会慢慢抵达。", replyBusy: "正在启程", replySend: "让回复慢信启程",
     markRead: "标记已读", markReadBusy: "正在标记", decline: "温和婉拒", declineBusy: "正在婉拒",
+    playLetterVoice: "▶ 朗读这封信", letterVoiceBusy: "正在合成…", letterVoiceAria: "听这封慢信被朗读出来",
     willKnow: "愿意认识对方", willKnowBusy: "正在发出", block: "屏蔽后续来信", blockBusy: "正在屏蔽", report: "举报这封信", reportBusy: "正在提交",
     outboxIntro: "你写出去的信都在这里。它们会按各自的节奏抵达；对方是否回应由对方决定，你不会被催促，也不会看到假装的实时状态。", outboxEmpty: "你还没有寄出任何慢信。",
     arrivalEta: t => `预计 ${t} 抵达`, archiveLetter: "归档", archiveBusy: "正在归档",
@@ -50,6 +53,7 @@ const COPY: Record<Locale, {
     inboxIntro: "A letter in flight never reveals its body early. Once it arrives you can read, decline, report or block; blocking stops future letters from the same sender.", inboxEmpty: "No slow letters have arrived just now.",
     replyAria: title => `Reply to "${title}"`, replyPlaceholder: "Write a response you're willing to stand behind; it still arrives slowly.", replyBusy: "Sending", replySend: "Send the reply slow letter",
     markRead: "Mark read", markReadBusy: "Marking", decline: "Gently decline", declineBusy: "Declining",
+    playLetterVoice: "▶ Read this letter aloud", letterVoiceBusy: "Synthesizing…", letterVoiceAria: "Hear this slow letter read aloud",
     willKnow: "Willing to know them", willKnowBusy: "Sending", block: "Block future letters", blockBusy: "Blocking", report: "Report this letter", reportBusy: "Submitting",
     outboxIntro: "Every letter you've sent is here. Each arrives at its own pace; whether they reply is theirs to decide — you're never rushed, and never shown a fake live status.", outboxEmpty: "You haven't sent any slow letters yet.",
     arrivalEta: t => `Arrives ~${t}`, archiveLetter: "Archive", archiveBusy: "Archiving",
@@ -68,7 +72,9 @@ export function LettersInbox({ letterInbox, letterOutbox = [], threads = [], thr
   isDraftBusy, replyBusyId = null, isLetterActionBusy, isConnectionDecisionBusy, isConnectionLeaveBusy, isLetterConnectionBusy,
   replyDrafts, connectionRequests, friends,
   onReplyDraftChange, onReply, onActOnLetter, onReportLetter, onRequestConnection, onDecideConnection, onLeaveConnection,
-  onSendDraft, onOpenThread, locale = "zh-CN" }: {
+  onSendDraft, onOpenThread, locale = "zh-CN",
+  letterVoiceLetterId = null, letterVoiceAudio = null, letterVoiceError = null,
+  isLetterVoiceBusy = () => false, onPlayLetterVoice }: {
   letterInbox: SlowLetter[]; letterOutbox?: SlowLetter[]; threads?: LetterThread[]; threadLetters?: SlowLetter[];
   threadLettersStatus?: "idle" | "loading" | "success" | "error";
   selectedThreadId?: number | null; replyBusyId?: number | null;
@@ -84,6 +90,11 @@ export function LettersInbox({ letterInbox, letterOutbox = [], threads = [], thr
   onReportLetter: (letter: SlowLetter) => void; onRequestConnection: (letter: SlowLetter) => void;
   onDecideConnection: (id: number, decision: "accept" | "decline") => void; onLeaveConnection: (id: number) => void;
   onSendDraft?: (id: number) => void; onOpenThread?: (threadId: number) => void; locale?: Locale;
+  // W1 slow-letter voice reuse (optional -- defaults to "no play affordance" so callers not passing
+  // these props, including existing tests, render unchanged). All four are wired together by
+  // useConnectionsAndLetters.playLetterVoice and bound to one active clip at a time.
+  letterVoiceLetterId?: number | null; letterVoiceAudio?: string | null; letterVoiceError?: string | null;
+  isLetterVoiceBusy?: (letterId: number) => boolean; onPlayLetterVoice?: (letter: SlowLetter) => void;
 }) {
   const t = COPY[locale];
   const [tab, setTab] = useState<"inbox" | "outbox" | "drafts" | "threads">("inbox");
@@ -106,6 +117,17 @@ export function LettersInbox({ letterInbox, letterOutbox = [], threads = [], thr
       {letterInbox.length === 0 ? <div className="network-empty">{t.inboxEmpty}</div> : <div className="inbox-list">
         {letterInbox.map(letter => <article key={letter.id}><header><strong>{letter.title}</strong><span>{letter.status}</span></header>
           <p className="ugc-text">{letter.letterBody}</p>
+          {onPlayLetterVoice && <div className="letter-voice">
+            {/* W1 slow-letter voice reuse: tap-to-play the delivered body read aloud. Every inbox
+                letter has already arrived (the inbox query only returns delivered-or-later statuses),
+                so the affordance is shown on each. autoPlay on arrival is safe: the tap below is the
+                user gesture that authorizes playback (same reasoning as the capsule-voice bubble). */}
+            {letterVoiceLetterId === letter.id && letterVoiceAudio
+              ? <InlineAudioPlayer audio={letterVoiceAudio} autoPlay locale={locale} ariaLabel={t.letterVoiceAria} />
+              : <AsyncButton className="quiet" busy={isLetterVoiceBusy?.(letter.id) ?? false} busyText={t.letterVoiceBusy}
+                  onClick={() => onPlayLetterVoice(letter)}>{t.playLetterVoice}</AsyncButton>}
+            {letterVoiceLetterId === letter.id && letterVoiceError && <span className="voice-error" role="alert">{letterVoiceError}</span>}
+          </div>}
           {repliable.has(letter.status) && <div className="letter-reply"><textarea aria-label={t.replyAria(letter.title)}
             value={replyDrafts[letter.id] ?? ""} onChange={event => onReplyDraftChange(letter.id, event.target.value)}
             placeholder={t.replyPlaceholder} /><AsyncButton busy={replyBusyId === letter.id} busyText={t.replyBusy} disabled={!replyDrafts[letter.id]?.trim()} onClick={() => onReply(letter)}>{t.replySend}</AsyncButton></div>}

@@ -1352,7 +1352,9 @@ export function AuroraApp() {
         onReplyDraftChange={connectionsAndLetters.updateReplyDraft}
         onReply={letter => void connectionsAndLetters.replyWithLetter(letter)} onActOnLetter={(letter, action) => void connectionsAndLetters.actOnLetter(letter, action)}
         onReportLetter={letter => void connectionsAndLetters.reportLetter(letter)} onRequestConnection={letter => void connectionsAndLetters.requestConnection(letter)}
-        onDecideConnection={(id, decision) => void connectionsAndLetters.decideConnection(id, decision)} onLeaveConnection={id => void connectionsAndLetters.leaveConnection(id)} locale={skillLocale} />
+        onDecideConnection={(id, decision) => void connectionsAndLetters.decideConnection(id, decision)} onLeaveConnection={id => void connectionsAndLetters.leaveConnection(id)} locale={skillLocale}
+        letterVoiceLetterId={connectionsAndLetters.letterVoiceLetterId} letterVoiceAudio={connectionsAndLetters.letterVoiceAudio} letterVoiceError={connectionsAndLetters.letterVoiceError}
+        isLetterVoiceBusy={connectionsAndLetters.isLetterVoiceBusy} onPlayLetterVoice={letter => void connectionsAndLetters.playLetterVoice(letter)} />
       </div>
       </ErrorBoundary>
 

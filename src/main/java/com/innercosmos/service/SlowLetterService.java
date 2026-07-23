@@ -29,6 +29,18 @@ public interface SlowLetterService {
 
     SlowLetter getLetter(Long userId, Long id);
 
+    /**
+     * W1 slow-letter voice reuse: on-demand MP3 synthesis of a delivered letter's body, read aloud
+     * in a warm voice (reuses Aurora's own {@code TtsVoicePresets} -- no new voice catalog). Mirrors
+     * the capsule-voice contract: a bounded, tap-to-play extra on top of text the recipient already
+     * has. Authorization reuses the existing recipient-scoped letter-read gate (recipient-only) and
+     * the existing delivered-to-recipient delivery-state gate (the same status set the inbox query
+     * treats as "arrived") -- see {@link com.innercosmos.service.impl.SlowLetterServiceImpl}.
+     *
+     * @return raw audio bytes (MP3) of the letter body
+     */
+    byte[] synthesizeVoice(Long userId, Long id);
+
     SlowLetter replyWithLetter(Long userId, Long id, LetterCreateRequest request);
 
     List<SlowLetter> inbox(Long userId);
