@@ -342,6 +342,39 @@ gates:
         evidence: [evidence/innovation/INNO-SELF-001/, evidence/campaign-a/LIVING-AURORA-001/]
         remaining: Builder evidence proves proposal, fail-closed evaluation, consented activation, visible versioning and forward rollback; the v3 three-day contract is executable but real Provider output, two independent reviews and longitudinal blind experience remain.
       - {id: AURORA-QUALITY, target: "Blind longitudinal evaluation passes empathy, continuity, proactive appropriateness, and recovery thresholds.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-EVAL-001/, evidence/innovation/INNO-EVAL-002/, evidence/campaign-a/LIVING-AURORA-001/]}
+      - id: AURORA-INNER-VOICE
+        target: >-
+          Aurora's normally-invisible planning kernel occasionally surfaces a genuine, spoken,
+          first-person "inner voice" (心声) that is never a restatement of the visible reply, in a
+          user-chosen real-TTS voice, additive and non-blocking to turn completion.
+        status: IN_PROGRESS
+        added: 2026-07-23T18:45:00+08:00
+        note: >-
+          New user-directed scope added mid-campaign (not in the original doc-24 gate list),
+          following real API keys (embedding + real-time TTS) supplied by the operator. Backend
+          (commit on codex/w0-integration, merging codex/w1-voice-backend) and frontend (merging
+          codex/w2-voice-frontend) both landed this session, built in parallel against a fixed
+          API contract (GET/PATCH /api/me/tts/preferences, POST /api/me/tts/preview, SSE
+          `inner_voice` event) and independently re-verified together post-merge: full
+          ./mvnw.cmd test 1148/1148 (0 failures, 1 pre-existing unrelated skip), web tsc -b clean,
+          vitest 511/511 (72 files). Implemented: InnerVoiceComposer (TDD-pinned structural
+          distinctness from the spoken reply via a planner-grounded, dedicated LLM call),
+          QwenAudioTtsClient (real WebSocket synthesis against the operator's Aliyun/DashScope
+          account, 6 empirically-confirmed voice presets), UserProfile voice/delivery-mode
+          preferences (ships enabled by default, AMBIENT autoplay, ON_DEMAND tap-to-reveal
+          user-selectable in settings), and the real Qwen/DashScope text-embedding-v4 provider
+          replacing the placeholder OpenAI default (evidence/innovation/INNO-INNER-012). Real
+          audio synthesis for all 6 presets and a real embedding round-trip through the actual
+          index/retrieval pipeline are both proven with the real key this session
+          (evidence/innovation/INNO-INNER-013).
+        evidence: [evidence/innovation/INNO-INNER-012/, evidence/innovation/INNO-INNER-013/]
+        remaining: >-
+          Capsule/persona-voice reuse (a distinct voice for capsule chat replies, reinforcing
+          "this is not Aurora") and slow-letter read-aloud were explicitly deferred this round to
+          avoid colliding with a concurrent W2 accessibility pass touching the same components --
+          queued as follow-up. A full statistically-robust real-embedding recall benchmark (only
+          one relevant-vs-distractor case was proven this round) and independent (non-author)
+          review of the inner-voice line's genuine "aliveness"/non-repetition quality remain open.
 
   - id: G5
     name: Memory, profile, and Inner Cosmos
@@ -350,7 +383,7 @@ gates:
     acceptance:
       - {id: MEMORY-LIFECYCLE, target: "Memories support consolidation, reinforcement, contradiction, supersession, decay, archive, and forgetting.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-INNER-001/, evidence/innovation/INNO-INNER-002/, evidence/innovation/INNO-INNER-003/]}
       - {id: PROFILE-MODEL, target: "High-dimensional claims retain source, confidence, time, consent, conflict, and correction history.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-INNER-001/, evidence/innovation/INNO-INNER-007/, evidence/integration/FINAL-STABILIZATION-2026-07-20/], remaining: "Reconciled 2026-07-20: automatic extraction, persistence, owner review, confirm/correct/dismiss, bilingual UI and the confirmed-claim-to-Aurora prompt bridge are implemented. Still open: held-out real-provider quality, temporal/conflict calibration, complete retention semantics, and human review."}
-      - {id: RETRIEVAL-QUALITY, target: "Task-aware hybrid retrieval meets precision, relevance, contradiction, privacy, latency, and budget thresholds.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-INNER-002/, evidence/innovation/INNO-INNER-004/, evidence/innovation/INNO-INNER-005/, evidence/innovation/INNO-INNER-006/, evidence/innovation/INNO-INNER-008/, evidence/innovation/INNO-INNER-009/, evidence/innovation/INNO-INNER-010/, evidence/innovation/INNO-INNER-011/, evidence/integration/FINAL-P0-CLOSURE-2026-07-22/], remaining: "2026-07-22: semantic pgvector retrieval is now wired into the actual Aurora context assembler as a task-aware MemoryEvidencePack; the legacy context is constrained to the same evidence IDs and retrieval failure does not silently substitute gravity Top-N. Existing real-EKS embedding evidence remains valid. 2026-07-23 (branch codex/w1-product-3): the latency/budget-under-load sub-clause is now machine-proven, not just sequentially timed -- MemoryRetrievalLoadTest fires 180 concurrent MemoryRetrievalService.retrieve() calls (24-thread pool, wider than the configured HikariCP pool of 10) across a 10-user, ~212-row-per-user corpus; two honest runs measured p95 ~244-258ms/p99 ~249-268ms with zero budget violations, zero prohibited-memory leakage and zero relevant-recall misses under concurrency (evidence/innovation/INNO-INNER-010/). This was H2 in-memory, not PostgreSQL/pgvector, and is a measurement pass only (no retrieval-scoring code changed). 2026-07-23 (branch codex/w1-product-6, merged commit 50bd1eb's parent on codex/w0-integration): the identical methodology re-run on real Testcontainers PostgreSQL+pgvector and Redis (MemoryRetrievalLoadPostgresRedisTest, two runs) measured p95 ~263-279ms/p99 ~275-285ms, zero budget/leakage/recall violations across 360 calls -- the Postgres+Redis rerun this item explicitly asked for is now done (evidence/innovation/INNO-INNER-011/). Supervisor independently re-ran full ./mvnw.cmd test post-merge: 1139/1139, 0 failures, 1 pre-existing unrelated skip. Still remaining: blind human-rated retrieval quality and contradiction calibration (both human/real-provider gates); a real-provider (not Mock) embedding re-measurement is in flight (codex/w1-voice-backend, real Qwen/DashScope embedding wiring)."}
+      - {id: RETRIEVAL-QUALITY, target: "Task-aware hybrid retrieval meets precision, relevance, contradiction, privacy, latency, and budget thresholds.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-INNER-002/, evidence/innovation/INNO-INNER-004/, evidence/innovation/INNO-INNER-005/, evidence/innovation/INNO-INNER-006/, evidence/innovation/INNO-INNER-008/, evidence/innovation/INNO-INNER-009/, evidence/innovation/INNO-INNER-010/, evidence/innovation/INNO-INNER-011/, evidence/innovation/INNO-INNER-012/, evidence/integration/FINAL-P0-CLOSURE-2026-07-22/], remaining: "2026-07-22: semantic pgvector retrieval is now wired into the actual Aurora context assembler as a task-aware MemoryEvidencePack; the legacy context is constrained to the same evidence IDs and retrieval failure does not silently substitute gravity Top-N. Existing real-EKS embedding evidence remains valid. 2026-07-23 (branch codex/w1-product-3): the latency/budget-under-load sub-clause is now machine-proven, not just sequentially timed -- MemoryRetrievalLoadTest fires 180 concurrent MemoryRetrievalService.retrieve() calls (24-thread pool, wider than the configured HikariCP pool of 10) across a 10-user, ~212-row-per-user corpus; two honest runs measured p95 ~244-258ms/p99 ~249-268ms with zero budget violations, zero prohibited-memory leakage and zero relevant-recall misses under concurrency (evidence/innovation/INNO-INNER-010/). This was H2 in-memory, not PostgreSQL/pgvector, and is a measurement pass only (no retrieval-scoring code changed). 2026-07-23 (branch codex/w1-product-6, merged commit 50bd1eb's parent on codex/w0-integration): the identical methodology re-run on real Testcontainers PostgreSQL+pgvector and Redis (MemoryRetrievalLoadPostgresRedisTest, two runs) measured p95 ~263-279ms/p99 ~275-285ms, zero budget/leakage/recall violations across 360 calls -- the Postgres+Redis rerun this item explicitly asked for is now done (evidence/innovation/INNO-INNER-011/). Supervisor independently re-ran full ./mvnw.cmd test post-merge: 1139/1139, 0 failures, 1 pre-existing unrelated skip. 2026-07-23 (branch codex/w1-voice-backend, merged): the default embedding provider is now real Qwen/DashScope text-embedding-v4 (was a placeholder OpenAI default), empirically confirmed end-to-end -- real HTTP call, exact 1536-dim schema match with no migration needed, and a real embedding round-trips through the actual rebuildMissing/retrieve pipeline to out-rank unrelated distractors (evidence/innovation/INNO-INNER-012/). Still remaining: blind human-rated retrieval quality and contradiction calibration (both human/real-provider gates); a statistically robust real-embedding recall benchmark (only one relevant-vs-distractor case proven so far, not a full recall@k study)."}
       - id: PROFILE-PROPAGATION
         target: "Correction and withdrawal re-evaluate downstream insights, vectors, caches, capsules, and matching."
         status: IN_PROGRESS
