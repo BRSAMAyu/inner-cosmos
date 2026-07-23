@@ -108,8 +108,12 @@ memory:
   embedding:
     enabled: ${MEMORY_EMBEDDING_ENABLED:false}
     api-key: ${MEMORY_EMBEDDING_API_KEY:}
-    base-url: ${MEMORY_EMBEDDING_BASE_URL:https://api.openai.com/v1}
-    model: ${MEMORY_EMBEDDING_MODEL:text-embedding-3-small}
+    # Real, empirically-confirmed W1 default: Aliyun DashScope's OpenAI-compatible endpoint,
+    # text-embedding-v4 at 1536 dimensions -- matches tb_memory_embedding.embedding_vector's
+    # fixed vector(1536) column exactly (see MemoryEmbeddingConfig javadoc). Any OpenAI-compatible
+    # provider still works by overriding these three env vars.
+    base-url: ${MEMORY_EMBEDDING_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
+    model: ${MEMORY_EMBEDDING_MODEL:text-embedding-v4}
     version: ${MEMORY_EMBEDDING_VERSION:2026-01}
     dimensions: ${MEMORY_EMBEDDING_DIMENSIONS:1536}
     rebuild-batch-size: ${MEMORY_EMBEDDING_REBUILD_BATCH_SIZE:50}

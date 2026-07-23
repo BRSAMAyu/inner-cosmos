@@ -8,13 +8,24 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * Defaults point at the real, empirically-confirmed W1 embedding provider: Aliyun DashScope's
+ * OpenAI-compatible endpoint with {@code text-embedding-v4}, requested at {@code dimensions=1536}
+ * via that model's documented dimension-reduction parameter -- matching, byte-for-byte, the
+ * existing fixed {@code tb_memory_embedding.embedding_vector vector(1536)} column (V10), so
+ * turning this on requires no new migration or index change. Confirmed via a real HTTP call
+ * (200, 1536-length vector) and a full index/retrieval round-trip; see
+ * {@code evidence/innovation/INNO-INNER-012/README.md} and
+ * {@code MemoryEmbeddingRealProviderIndexRetrievalTest}. Any OpenAI-compatible provider still
+ * works by overriding these three env vars -- this is a default, not a hardcoded provider.
+ */
 @Configuration
 @ConfigurationProperties(prefix = "memory.embedding")
 public class MemoryEmbeddingConfig {
     public boolean enabled;
     public String apiKey = "";
-    public String baseUrl = "https://api.openai.com/v1";
-    public String model = "text-embedding-3-small";
+    public String baseUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1";
+    public String model = "text-embedding-v4";
     public String version = "2026-01";
     public int dimensions = 1536;
 
