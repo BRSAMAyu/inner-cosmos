@@ -3,6 +3,7 @@ package com.innercosmos.conversation.service;
 import com.innercosmos.conversation.vo.TurnTimelineVO;
 import com.innercosmos.entity.DialogMessage;
 import com.innercosmos.vo.AuroraReplyVO;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.function.Supplier;
 
@@ -21,6 +22,8 @@ public interface ConversationChoreographyService {
     TurnTimelineVO completeTurn(Long userId, Long turnId);
 
     TurnTimelineVO cancelTurn(Long userId, Long turnId, String reason);
+
+    TurnTimelineVO interruptIfStale(Long userId, Long turnId, LocalDateTime cutoff, String reason);
 
     void cancelActiveTurns(Long userId, Long sessionId, String reason);
 

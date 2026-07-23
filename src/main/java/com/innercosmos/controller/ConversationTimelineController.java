@@ -12,6 +12,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -67,21 +68,24 @@ public class ConversationTimelineController extends BaseController {
                              HttpSession session) {
         Long userId = currentUserId(session);
         TurnTimelineVO timeline = choreographyService.timeline(userId, turnId);
-        int cursor = Math.max(afterSequence, sequence(lastEventId));
+        ResumeCursor resumeCursor = cursor(lastEventId, afterSequence);
         SseEmitter emitter = new SseEmitter(120_000L);
         AtomicBoolean connected = new AtomicBoolean(true);
         emitter.onCompletion(() -> connected.set(false));
         emitter.onTimeout(() -> connected.set(false));
         emitter.onError(ignored -> connected.set(false));
         streamExecutor.execute(() -> followLiveOrReplayDurable(
-                emitter, connected, userId, turnId, cursor, timeline));
+                emitter, connected, userId, turnId, resumeCursor, timeline));
         return emitter;
     }
 
     private void followLiveOrReplayDurable(SseEmitter emitter, AtomicBoolean connected, Long userId,
-                                           Long turnId, long cursor, TurnTimelineVO initialTimeline) {
-        long liveCursor = cursor;
+                                           Long turnId, ResumeCursor resumeCursor,
+                                           TurnTimelineVO initialTimeline) {
+        long liveCursor = resumeCursor.liveSequence();
+        int durableCursor = resumeCursor.timelineSequence();
         long lastHeartbeat = System.nanoTime();
+        int emptyWindows = 0;
         try {
             // A turn is "live" while it is still in-flight in the durable timeline, OR while its
             // live stream still holds any event (sequence >= 0, so the sequence-0 turn.started
@@ -92,7 +96,7 @@ public class ConversationTimelineController extends BaseController {
             boolean hasBufferedLiveEvents = !liveEventStore
                     .readAfter(userId, turnId, -1L, Duration.ZERO).isEmpty();
             if (!turnStillActive && !hasBufferedLiveEvents) {
-                replayDurableSnapshot(emitter, turnId, (int) cursor, initialTimeline);
+                replayDurableSnapshot(emitter, turnId, durableCursor, initialTimeline);
                 return;
             }
             while (connected.get()) {
@@ -105,6 +109,18 @@ public class ConversationTimelineController extends BaseController {
                         emitter.complete();
                         return;
                     }
+                    emptyWindows++;
+                    int allowedEmptyWindows = "GENERATING".equals(current.turn.status) ? 12 : 2;
+                    if (emptyWindows >= allowedEmptyWindows) {
+                        LocalDateTime cutoff = LocalDateTime.now().minusSeconds(
+                                "GENERATING".equals(current.turn.status) ? 120 : 20);
+                        current = choreographyService.interruptIfStale(
+                                userId, turnId, cutoff, "STREAM_ORPHANED_AFTER_RECONNECT");
+                        if (isTerminal(current.turn.status)) {
+                            replayDurableSnapshot(emitter, turnId, 0, current);
+                            return;
+                        }
+                    }
                     if (System.nanoTime() - lastHeartbeat >= Duration.ofSeconds(10).toNanos()) {
                         emitter.send(SseEmitter.event().name("heartbeat")
                                 .data(Map.of("turnId", turnId, "at", Instant.now().toString())));
@@ -112,6 +128,7 @@ public class ConversationTimelineController extends BaseController {
                     }
                     continue;
                 }
+                emptyWindows = 0;
                 for (AuroraLiveEvent event : events) {
                     if (event.sequence() <= liveCursor) continue;
                     emitter.send(SseEmitter.event().id(event.id()).name(event.name()).data(event.data()));
@@ -144,7 +161,7 @@ public class ConversationTimelineController extends BaseController {
             envelope.put("eventType", event.eventType);
             envelope.put("occurredAt", event.createdAt);
             envelope.put("payload", payload(event.payloadJson));
-            emitter.send(SseEmitter.event().id(turnId + ":" + event.eventSequence)
+            emitter.send(SseEmitter.event().id(turnId + ":timeline:" + event.eventSequence)
                     .name("timeline.event").data(envelope));
         }
         int last = timeline.events.stream().map(e -> e.eventSequence == null ? 0 : e.eventSequence)
@@ -162,13 +179,20 @@ public class ConversationTimelineController extends BaseController {
         return "COMPLETED".equals(status) || "CANCELLED".equals(status) || "INTERRUPTED".equals(status);
     }
 
-    private int sequence(String eventId) {
-        if (eventId == null || eventId.isBlank()) return 0;
+    private ResumeCursor cursor(String eventId, int afterSequence) {
+        int explicitTimeline = Math.max(0, afterSequence);
+        if (eventId == null || eventId.isBlank()) return new ResumeCursor(-1, explicitTimeline);
         try {
-            int colon = eventId.lastIndexOf(':');
-            return Integer.parseInt(colon < 0 ? eventId : eventId.substring(colon + 1));
+            String[] parts = eventId.split(":");
+            int sequence = Integer.parseInt(parts[parts.length - 1]);
+            if (parts.length >= 3 && "timeline".equals(parts[parts.length - 2])) {
+                return new ResumeCursor(-1, Math.max(explicitTimeline, sequence));
+            }
+            // Legacy turnId:sequence IDs were emitted by the live stream. Treating them as a
+            // PostgreSQL event cursor can skip the entire durable timeline after a hard crash.
+            return new ResumeCursor(sequence, explicitTimeline);
         } catch (NumberFormatException ignored) {
-            return 0;
+            return new ResumeCursor(-1, explicitTimeline);
         }
     }
 
@@ -180,4 +204,6 @@ public class ConversationTimelineController extends BaseController {
             return Map.of("unparsed", true);
         }
     }
+
+    private record ResumeCursor(long liveSequence, int timelineSequence) {}
 }

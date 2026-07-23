@@ -693,7 +693,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             return sendStream(emitter, clientConnected,
                     SseEmitter.event().id("legacy:" + sequence).name(name).data(data));
         }
-        String id = turnId + ":" + sequence;
+        String id = turnId + ":live:" + sequence;
         try {
             liveEventStore.publish(new AuroraLiveEvent(userId, turnId, sequence, id, name, data, terminal));
         } catch (Exception transportFailure) {

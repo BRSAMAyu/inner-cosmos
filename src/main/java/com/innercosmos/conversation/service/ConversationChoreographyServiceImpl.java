@@ -238,6 +238,23 @@ public class ConversationChoreographyServiceImpl implements ConversationChoreogr
     @Transactional
     public TurnTimelineVO cancelTurn(Long userId, Long turnId, String reason) {
         ConversationTurn turn = ownedTurn(userId, turnId, true);
+        return cancelTurnLocked(turn, userId, reason);
+    }
+
+    @Override
+    @Transactional
+    public TurnTimelineVO interruptIfStale(Long userId, Long turnId, LocalDateTime cutoff, String reason) {
+        ConversationTurn turn = ownedTurn(userId, turnId, true);
+        LocalDateTime lastProgress = turn.updatedAt == null ? turn.startedAt : turn.updatedAt;
+        if (lastProgress == null || cutoff == null || lastProgress.isAfter(cutoff)
+                || isTerminalCancellation(turn.status) || "COMPLETED".equals(turn.status)) {
+            return timeline(userId, turnId);
+        }
+        return cancelTurnLocked(turn, userId, blankTo(reason, "STREAM_ORPHANED"));
+    }
+
+    private TurnTimelineVO cancelTurnLocked(ConversationTurn turn, Long userId, String reason) {
+        Long turnId = turn.id;
         if (isTerminalCancellation(turn.status) || "COMPLETED".equals(turn.status)) return timeline(userId, turnId);
         LocalDateTime now = LocalDateTime.now();
         List<MessageBubble> pending = bubbleMapper.selectList(new QueryWrapper<MessageBubble>()
