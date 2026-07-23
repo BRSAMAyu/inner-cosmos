@@ -58,6 +58,14 @@ function scanCurrentSpace(): Promise<string[]> {
     const dead: string[] = [];
     for (const b of btns) {
       const label = (b.getAttribute("aria-label") || b.textContent || "").trim().slice(0, 40) || "(无文本按钮)";
+      // Re-check disabled + still-attached at click time. A button captured enabled can be disabled
+      // by a *prior* click's async side-effect (e.g. the voice-preview group is mutually exclusive --
+      // clicking one preset sets previewingId and disables its siblings), or detached from the DOM
+      // when an earlier click replaced its subtree (e.g. the "修改密码" button is swapped for the
+      // inline password form). An intentionally-disabled or detached control is not a "dead button";
+      // only an enabled, attached control that does nothing on click is. Skipping here removes those
+      // false positives without masking truly-dead (enabled, attached, inert) controls.
+      if ((b as HTMLButtonElement).disabled || !document.body.contains(b)) continue;
       const bUrl = location.href;
       const bLen = document.body.innerText.length;
       const bStatus = [...document.querySelectorAll('[role=status],[aria-live],[role=alert]')].map((e) => e.textContent).join("|");
