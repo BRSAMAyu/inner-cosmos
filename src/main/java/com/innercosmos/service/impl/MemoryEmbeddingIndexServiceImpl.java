@@ -3,6 +3,7 @@ package com.innercosmos.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.innercosmos.ai.embedding.EmbeddingDimensionMismatchException;
 import com.innercosmos.ai.embedding.MemoryEmbeddingClient;
 import com.innercosmos.entity.MemoryCard;
 import com.innercosmos.entity.MemoryEmbedding;
@@ -24,6 +25,15 @@ import java.util.Map;
 @Service
 public class MemoryEmbeddingIndexServiceImpl implements MemoryEmbeddingIndexService {
     private static final Logger log = LoggerFactory.getLogger(MemoryEmbeddingIndexServiceImpl.class);
+    /**
+     * Gemini audit 2.6 (CONFIRMED/P1): tb_memory_embedding.embedding_vector is a fixed-width
+     * PostgreSQL {@code vector(1536)} column (V10__versioned_memory_embeddings.sql). Embedding
+     * dimension is part of the embedding-model-version contract -- {@code
+     * memory.embedding.dimensions} is operator-configurable in [8,1536] (MemoryEmbeddingConfig),
+     * so a real vector whose length does not equal this exact column width must be rejected,
+     * never silently zero-padded (if shorter) or truncated (if longer) to force-fit.
+     */
+    static final int MEMORY_EMBEDDING_VECTOR_COLUMN_DIMENSION = 1536;
     private final MemoryEmbeddingClient client;
     private final MemoryEmbeddingMapper mapper;
     private final MemoryCardMapper memoryMapper;
@@ -100,11 +110,16 @@ public class MemoryEmbeddingIndexServiceImpl implements MemoryEmbeddingIndexServ
         row.userId = userId; row.memoryId = card.id; row.modelName = client.modelName();
         row.modelVersion = client.modelVersion(); row.sourceVersion = sourceVersion; row.taskScope = "GENERAL";
         row.dimensions = vector.length; row.embeddingJson = objectMapper.writeValueAsString(vector); row.status = "ACTIVE";
+        if (isPostgres()) {
+            // Gemini audit 2.6: fail fast BEFORE inserting anything -- a dimension mismatch here
+            // must not create an embedding_json row with no matching (or a corrupted) vector.
+            requireDimensionContract(vector);
+        }
         try { mapper.insert(row); } catch (DuplicateKeyException race) { return false; }
         if (isPostgres()) {
             try {
                 jdbc.update("UPDATE tb_memory_embedding SET embedding_vector=?::vector WHERE id=?",
-                        vectorLiteral(vector, 1536), row.id);
+                        vectorLiteral(vector), row.id);
             } catch (RuntimeException vectorWriteFailure) {
                 mapper.deleteById(row.id);
                 throw vectorWriteFailure;
@@ -113,8 +128,29 @@ public class MemoryEmbeddingIndexServiceImpl implements MemoryEmbeddingIndexServ
         return true;
     }
 
+    /**
+     * Gemini audit 2.6 (CONFIRMED/P1): the embedding-model-version -> dimension contract, checked
+     * at the one place a vector is about to be written to or compared against the fixed-width
+     * PostgreSQL column. Throws rather than silently zero-padding/truncating to force-fit.
+     */
+    private static void requireDimensionContract(float[] vector) {
+        if (vector.length != MEMORY_EMBEDDING_VECTOR_COLUMN_DIMENSION) {
+            throw new EmbeddingDimensionMismatchException(
+                    "embedding dimension contract violation: got a " + vector.length
+                    + "-dimension vector but tb_memory_embedding.embedding_vector is a fixed "
+                    + MEMORY_EMBEDDING_VECTOR_COLUMN_DIMENSION + "-dimension pgvector column (V10). "
+                    + "A model/dimension change requires an explicit expand-contract migration "
+                    + "(new column/table, backfill, dual-read, index rebuild) -- never a silently "
+                    + "zero-padded or truncated write.");
+        }
+    }
+
     private Map<Long, Double> postgresScores(Long userId, float[] queryVector) {
-        String vector = vectorLiteral(queryVector, 1536);
+        // Gemini audit 2.6: the query vector is compared against the SAME fixed-width column, so
+        // it is held to the same fail-fast contract -- never silently padded/truncated to compare
+        // apples to oranges against stored 1536-dimension vectors.
+        requireDimensionContract(queryVector);
+        String vector = vectorLiteral(queryVector);
         Map<Long, Double> result = new HashMap<>();
         jdbc.query("""
                 SELECT e.memory_id, 1 - (e.embedding_vector <=> ?::vector) AS score
@@ -157,10 +193,18 @@ public class MemoryEmbeddingIndexServiceImpl implements MemoryEmbeddingIndexServ
         for (int i = 0; i < a.length; i++) { dot += a[i] * b.get(i); aa += a[i] * a[i]; bb += b.get(i) * b.get(i); }
         return aa == 0 || bb == 0 ? 0 : clamp(dot / Math.sqrt(aa * bb));
     }
-    private static String vectorLiteral(float[] vector, int dimensions) {
+    /**
+     * Gemini audit 2.6 (CONFIRMED/P1): serializes the vector EXACTLY as-is -- callers must have
+     * already passed it through {@link #requireDimensionContract(float[])}. This used to take a
+     * separate {@code dimensions} parameter and silently zero-pad (if the vector was shorter) or
+     * truncate (if longer) to force-fit that width; that force-fit is exactly the anti-pattern
+     * the audit calls out, so there is no longer any way to call this with a mismatched length.
+     */
+    private static String vectorLiteral(float[] vector) {
         StringBuilder value = new StringBuilder("[");
-        for (int i = 0; i < dimensions; i++) {
-            if (i > 0) value.append(','); value.append(i < vector.length ? vector[i] : 0f);
+        for (int i = 0; i < vector.length; i++) {
+            if (i > 0) value.append(',');
+            value.append(vector[i]);
         }
         return value.append(']').toString();
     }
