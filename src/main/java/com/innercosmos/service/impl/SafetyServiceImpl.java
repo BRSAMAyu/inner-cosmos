@@ -7,6 +7,7 @@ import com.innercosmos.safety.DistressSignalDetector;
 import com.innercosmos.safety.SafetyBoundaryFilter;
 import com.innercosmos.safety.SafetyMatch;
 import com.innercosmos.safety.SafetyReviewService;
+import com.innercosmos.safety.SessionRiskAggregator;
 import com.innercosmos.service.SafetyService;
 import com.innercosmos.vo.SafetyResult;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,17 +29,22 @@ public class SafetyServiceImpl implements SafetyService {
     private final SafetyBoundaryFilter safetyBoundaryFilter;
     private final SafetyReviewService safetyReviewService;
     private final DistressSignalDetector distressSignalDetector;
+    // Gemini audit 3.9 (CONFIRMED/P1): session-scoped, time-decaying escalation ADDED on top of
+    // the existing per-message detectors above -- never replacing or re-deciding their matches.
+    private final SessionRiskAggregator sessionRiskAggregator;
     private final boolean semanticRecheckEnabled;
 
     public SafetyServiceImpl(SafetyEventMapper safetyEventMapper,
                              SafetyBoundaryFilter safetyBoundaryFilter,
                              SafetyReviewService safetyReviewService,
                              DistressSignalDetector distressSignalDetector,
+                             SessionRiskAggregator sessionRiskAggregator,
                              @Value("${inner-cosmos.safety.semantic-recheck.enabled:true}") boolean semanticRecheckEnabled) {
         this.safetyEventMapper = safetyEventMapper;
         this.safetyBoundaryFilter = safetyBoundaryFilter;
         this.safetyReviewService = safetyReviewService;
         this.distressSignalDetector = distressSignalDetector;
+        this.sessionRiskAggregator = sessionRiskAggregator;
         this.semanticRecheckEnabled = semanticRecheckEnabled;
     }
 
@@ -85,6 +91,7 @@ public class SafetyServiceImpl implements SafetyService {
             result.handledAction = "RESOURCE_PAGE";
             result.blockModelCall = true;
             result.safeMessage = CRISIS_SAFE_MESSAGE;
+            sessionRiskAggregator.observe(sessionId, "HIGH", text); // bookkeeping only, already maximal
             return result;
         }
         // Abuse keywords: HIGH risk, but don't block model call (flag only)
@@ -96,6 +103,7 @@ public class SafetyServiceImpl implements SafetyService {
             result.handledAction = "FLAG";
             result.blockModelCall = false;
             result.safeMessage = "这段内容可能涉及边界或伤害性表达.我会保持克制,并尽量把讨论带回到安全、尊重和现实可行的方向.";
+            sessionRiskAggregator.observe(sessionId, "HIGH", text); // bookkeeping only, already maximal
             return result;
         }
         if (match.matched) {
@@ -106,7 +114,7 @@ public class SafetyServiceImpl implements SafetyService {
             result.handledAction = "FLAG";
             result.blockModelCall = false;
             result.safeMessage = "这段内容可能涉及边界或伤害性表达.我会保持克制,并尽量把讨论带回到安全、尊重和现实可行的方向.";
-            return result;
+            return escalateIfSessionPatternWarrants(userId, sessionId, text, result);
         }
 
         // No explicit rule matched. Check for an implicit distress signal and, if present,
@@ -123,6 +131,7 @@ public class SafetyServiceImpl implements SafetyService {
                 result.handledAction = "RESOURCE_PAGE";
                 result.blockModelCall = true;
                 result.safeMessage = CRISIS_SAFE_MESSAGE;
+                sessionRiskAggregator.observe(sessionId, "HIGH", text); // bookkeeping only, already maximal
                 return result;
             }
             // Casual venting / non-crisis distress → allow; do NOT medicalize.
@@ -133,12 +142,34 @@ public class SafetyServiceImpl implements SafetyService {
             result.matchedRule = review.matchedRule;
             result.handledAction = "ALLOWED";
             result.blockModelCall = false;
-            return result;
+            return escalateIfSessionPatternWarrants(userId, sessionId, text, result);
         }
 
         result.riskLevel = "LOW";
         result.riskType = "NONE";
         result.blockModelCall = false;
+        return escalateIfSessionPatternWarrants(userId, sessionId, text, result);
+    }
+
+    /**
+     * Gemini audit 3.9 (CONFIRMED/P1): feeds this turn's own (non-HIGH) risk level into the
+     * session-scoped rolling aggregator and, if the ACCUMULATED session pattern crosses the
+     * escalation threshold, upgrades the result to the same HIGH/block/resource-page response a
+     * single explicit crisis signal would get. This never runs for a result that is already HIGH
+     * (those paths feed the aggregator directly for bookkeeping and return above, unmodified) --
+     * it only ever escalates UP from MEDIUM/LOW/NONE, never overrides an existing HIGH decision.
+     */
+    private SafetyResult escalateIfSessionPatternWarrants(Long userId, Long sessionId, String text, SafetyResult result) {
+        SessionRiskAggregator.Escalation escalation = sessionRiskAggregator.observe(sessionId, result.riskLevel, text);
+        if (escalation.escalate()) {
+            record(userId, sessionId, "SESSION_ESCALATION", "HIGH", "session-pattern", "RESOURCE_PAGE");
+            result.riskLevel = "HIGH";
+            result.riskType = "SESSION_ESCALATION";
+            result.matchedRule = "session-pattern";
+            result.handledAction = "RESOURCE_PAGE";
+            result.blockModelCall = true;
+            result.safeMessage = CRISIS_SAFE_MESSAGE;
+        }
         return result;
     }
 
