@@ -352,7 +352,27 @@ gates:
     required: true
     acceptance:
       - {id: CAPSULE-COMPILER, target: "Authorized data compiles into a versioned Genome with coverage, conflicts, sandbox, and withdrawal.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CAP-001/, evidence/innovation/INNO-CAP-002/, evidence/innovation/INNO-CAP-003/, evidence/innovation/INNO-CAP-008/, evidence/innovation/INNO-CAP-009/]}
-      - {id: CAPSULE-RUNTIME, target: "Planner, retrieval, speaker, critics, and reranker produce materially better fidelity than a long-prompt baseline.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CAP-008/]}
+      - id: CAPSULE-RUNTIME
+        target: "Planner, retrieval, speaker, critics, and reranker produce materially better fidelity than a long-prompt baseline."
+        status: IN_PROGRESS
+        evidence: [evidence/innovation/INNO-CAP-008/, evidence/innovation/INNO-CAP-011/]
+        remaining: |
+          INNO-CAP-008 closed the machine-verifiable v3 structural IR/retrieval-minimization slice
+          but explicitly left open "no real-provider candidate generator ... or long-prompt baseline
+          comparison." 2026-07-23 (branch codex/w1-product-4): closed with a real DeepSeek
+          (deepseek-v4-flash) comparison of the actual production PersonaChat prompt (scoped to only
+          the manifest-authorized evidence, byte-identical system instruction) against a naive
+          long-prompt baseline (full undifferentiated profile dump, told to "use judgment"), 8 fixed
+          synthetic scenarios x 2 independent runs = 32 real LLM calls. Honest result: production's
+          leak rate is 0/16 by construction (the unauthorized fact is structurally absent from its
+          prompt); the naive baseline's leak rate was 1/16, with the exact real leaking response
+          preserved verbatim in evidence/innovation/INNO-CAP-011/README.md -- a genuine, reproducible
+          real-provider privacy-fidelity gap, not a fabricated or assumed one. The required-cue
+          grounding pass-rate difference (10/16 vs 11/16 aggregate) is small and partly a
+          lexical-rubric paraphrase artifact, disclosed honestly rather than oversold. Remaining:
+          independent (non-author) review, a larger sample for a tighter leak-rate estimate, and the
+          still-fully-open CAPSULE-SAFETY/CAPSULE-RUNTIME adversarial-longitudinal and blind
+          human-fidelity-panel gates.
       - {id: CAPSULE-SAFETY, target: "Fact, style, habit, boundary, leakage, adversarial, and longitudinal evaluations pass.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CAP-001/, evidence/innovation/INNO-CAP-002/, evidence/innovation/INNO-CAP-003/, evidence/innovation/INNO-CAP-008/, evidence/innovation/INNO-CAP-009/]}
       - {id: MATCH-MULTI, target: "Mirror, Complement, Growth Edge, Serendipity, and Contextual matching are explainable and user-controllable.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CAP-005/, evidence/innovation/INNO-CAP-010/], remaining: "INNO-CAP-010 adds the two missing scoring stages: a bidirectional block safety filter and an MMR diversity re-rank (both deterministic, tested). Matching remains lexical/theme-family based; embedding/user-vector similarity and calibrated semantic relevance remain the real-provider human gate."}
       - {id: SOCIAL-CLOSED-LOOP, target: "Discovery, capsule conversation, slow letter, mutual connection, refusal, report, and withdrawal work end to end.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CAP-001/, evidence/innovation/INNO-CAP-002/, evidence/innovation/INNO-CAP-003/, evidence/innovation/INNO-CAP-004/, evidence/innovation/INNO-CAP-006/, evidence/innovation/INNO-CAP-007/, evidence/integration/FINAL-STABILIZATION-2026-07-20/], remaining: "Local E2E now proves publish -> visitor capsule conversation -> slow letter -> owner inbox -> withdrawal and connection consent, while persistent account provenance keeps synthetic QA users out of discovery. Still open: non-author longitudinal quality, notification/device delivery and production moderation operations."}
