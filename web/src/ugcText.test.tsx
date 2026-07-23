@@ -121,6 +121,8 @@ describe("ugc-text shared primitive (styles.css, real stylesheet pinned via read
     };
     render(<LettersInbox letterInbox={[letter]} replyDrafts={{}}
       connectionRequests={{ incoming: [], outgoing: [] }} friends={[]}
+      isDraftBusy={() => false} isLetterActionBusy={() => false} isConnectionDecisionBusy={() => false}
+      isConnectionLeaveBusy={() => false} isLetterConnectionBusy={() => false}
       onReplyDraftChange={() => undefined} onReply={() => undefined} onActOnLetter={() => undefined}
       onReportLetter={() => undefined} onRequestConnection={() => undefined}
       onDecideConnection={() => undefined} onLeaveConnection={() => undefined} />);
