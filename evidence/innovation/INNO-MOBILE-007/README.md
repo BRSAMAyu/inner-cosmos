@@ -142,8 +142,43 @@ is not exercised in a browser; its code path is in `desktop-runtime.ts` / `mobil
 - **`tauri build` release / MSI-NSIS bundling, signing, notarization, auto-update** are not run (the
   task's machine-verifiable floor is the runnable binary, met in §1; release bundling rebuilds the
   frontend into the committed static bundle, which the Supervisor owns).
-- **Android (Capacitor) emulator journeys** are not covered in this checkpoint (Tauri was the
-  deterministic priority); the shared backend journeys above are common to the Android client.
+## Android (Capacitor) emulator — APK build + install + launch (subset)
+
+The emulator (`Medium_Phone_API_36.1`, `emulator-5554`) was booted and the **same OIDC login gate
+as desktop applies** (the Capacitor app is a native runtime → `bearerRequired` → OIDC/PKCE), so the
+logged-in mobile journeys could not be driven without the IdP. The deterministic machine subset was
+run and captured (`logs/android-emulator-launch.log`, `screenshots/android-emulator-launch.png` +
+`-settled.png`):
+
+```
+cd web && pnpm run mobile:sync        # build:mobile (relative-asset mobile bundle) + cap sync android
+cd web/android && ./gradlew.bat assembleDebug
+  -> app/build/outputs/apk/debug/app-debug.apk
+adb -s emulator-5554 install -r app-debug.apk   -> Success
+adb shell monkey -p sg.innercosmos.app.dev -c android.intent.category.LAUNCHER 1
+# mCurrentFocus = sg.innercosmos.app.dev/sg.innercosmos.app.MainActivity
+```
+logcat (app pid 24566):
+- `Zygote: Process 24566 created for sg.innercosmos.app.dev`
+- `WebViewFactory: Loading com.google.android.webview version 134.0.6998.135`
+- `Capacitor: Starting BridgeActivity`
+- `VRI[MainActivity]: WindowInsets changed: 1080x2400 ...`
+
+So on the integrated HEAD the Capacitor shell **compiles to a debug APK, installs, and launches** the
+Inner Cosmos `MainActivity` with the Capacitor bridge + WebView v134 on the Android emulator. The
+committed Spring web bundle (`src/main/resources/static/app/aurora/**`) and the native
+`capacitor.*.gradle` / `Package.swift` were overwritten only transiently by `cap sync` and have been
+restored — the Supervisor still owns the single production rebuild.
+
+### Android journeys deferred (and why)
+All logged-in mobile journeys — PKCE login, Aurora multi-bubble + interrupt, kill/background→recover,
+deep link, local notification, mic/voice-record→Mock transcribe, offline draft, logout wipe — require
+a logged-in session, and on Android (like desktop) login is OIDC/PKCE-only. With the Mock dev backend
+`GET /api/public/auth/mobile-oidc` returns `enabled:false`, so none can complete without the local
+Keycloak IdP. The shared Aurora/recovery/offline-draft journeys are proven via the web build of the
+same React source in §5/§7/§9; the native-only paths (PKCE, secure-storage wipe, deep-link routing,
+local notification) are code-intact on this HEAD and were exercised against real Keycloak/ADB in
+INNO-MOBILE-004.
 
 ## Artifacts
 - `logs/`: backend boot logs, the raw SSE capture, the curl contract-drive log/script, CDP probe log,
