@@ -39,6 +39,9 @@ CREATE TABLE IF NOT EXISTS tb_user_profile (
   sleep_window_end VARCHAR(8),
   timezone VARCHAR(64) NOT NULL DEFAULT 'Asia/Singapore',
   boost_until TIMESTAMP NULL,
+  preferred_tts_voice_id VARCHAR(64),
+  inner_voice_enabled BOOLEAN DEFAULT TRUE,
+  inner_voice_mode VARCHAR(16) DEFAULT 'AMBIENT',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE INDEX uk_user_profile_user (user_id)

@@ -287,6 +287,27 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateTtsPreferences(Long userId, String preferredTtsVoiceId, Boolean innerVoiceEnabled, String innerVoiceMode) {
+        QueryWrapper<UserProfile> query = new QueryWrapper<>();
+        query.eq("user_id", userId);
+        UserProfile existing = userProfileMapper.selectOne(query);
+        if (existing == null) {
+            existing = new UserProfile();
+            existing.userId = userId;
+        }
+        if (preferredTtsVoiceId != null) existing.preferredTtsVoiceId = preferredTtsVoiceId;
+        if (innerVoiceEnabled != null) existing.innerVoiceEnabled = innerVoiceEnabled;
+        if (innerVoiceMode != null) existing.innerVoiceMode = innerVoiceMode;
+
+        if (existing.id == null) {
+            userProfileMapper.insert(existing);
+        } else {
+            userProfileMapper.updateById(existing);
+        }
+    }
+
+    @Override
     public Map<String, Object> exportData(Long userId) {
         Map<String, Object> data = new HashMap<>();
 

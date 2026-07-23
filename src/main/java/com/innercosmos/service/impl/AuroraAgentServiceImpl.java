@@ -17,6 +17,8 @@ import com.innercosmos.ai.router.SessionModelRouter;
 import com.innercosmos.ai.semantic.PseudoSemanticAnalyzer;
 import com.innercosmos.ai.structured.StructuredAiResults;
 import com.innercosmos.ai.structured.StructuredAiService;
+import com.innercosmos.ai.tts.TtsClient;
+import com.innercosmos.ai.tts.TtsVoicePresets;
 import com.innercosmos.ai.portrait.PortraitReflectionService;
 import com.innercosmos.config.LlmConfig;
 import com.innercosmos.conversation.service.ConversationChoreographyService;
@@ -106,6 +108,9 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     private ConversationChoreographyService choreographyService;
     @Autowired(required = false)
     private AuroraDualKernelRuntime dualKernelRuntime;
+    /** W1: Aurora's inner-voice (心声) TTS synthesis; null-safe -- {@code DisabledTtsClient} when not configured. */
+    @Autowired(required = false)
+    private TtsClient ttsClient;
     /** A6 privacy-safe AI metrics; Spring always wires it, null only in constructor-level unit tests. */
     @Autowired(required = false)
     private com.innercosmos.ai.observability.AiTurnMetrics aiTurnMetrics;
@@ -321,16 +326,24 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 ? null : aiTurnObservation.startProvider(resolved.provider(), mode);
         io.micrometer.observation.Observation.Scope providerScope = providerObservation == null
                 ? null : providerObservation.openScope();
+        String innerVoiceText = null;
         try {
             StructuredAiResults.AuroraResult ai;
             if (dualKernelRuntime != null && dualKernelRuntime.shouldUseDualKernelForTurn(turnContext)) {
+                // Inner-voice composition only ever runs for the streaming path (only it can
+                // actually surface synthesized audio via the SSE inner_voice event -- see
+                // stream()), and only when the user hasn't disabled it. Best-effort inside
+                // generate() itself: composition failure never surfaces here as an exception.
+                boolean composeInnerVoice = !persistImmediately && innerVoiceEnabledFor(profile);
                 var generation = dualKernelRuntime.generate(userId, mode, turnContext, resolved.client(),
-                    () -> fallbackAuroraResult(request.message, mode, gravityMemories, memoryContext, allowMemory, stateSignal));
+                    () -> fallbackAuroraResult(request.message, mode, gravityMemories, memoryContext, allowMemory, stateSignal),
+                    composeInnerVoice);
                 ai = generation.result();
                 runtimeMeta.put("runtime", generation.runtime());
                 runtimeMeta.put("relationshipMove", generation.relationshipMove());
                 runtimeMeta.put("criticRepaired", generation.repaired());
                 runtimeMeta.put("criticIssues", generation.criticIssues());
+                innerVoiceText = generation.innerVoiceText();
             } else {
                 ai = callWithRetry(userId, mode, turnContext, resolved, request, gravityMemories,
                     memoryContext, allowMemory, stateSignal);
@@ -338,6 +351,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             }
             vo = toReply(profile, ai, request, mode, memoryContext, gravityMemories, allowMemory);
             vo = sanitizeLlmOutput(vo, userId);
+            vo.innerVoiceText = innerVoiceText;
             if (Boolean.FALSE.equals(agentContext.multiMessageAllowed) && vo.messages.size() > 1) {
                 vo.messages = List.of(vo.messages.get(0));
                 vo.agentLoop = Map.of(
@@ -605,6 +619,29 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 }
                 if (choreographyService != null && reply.turnId != null) {
                     choreographyService.completeTurn(userId, reply.turnId);
+                }
+                // W1 — Aurora's "inner voice" (心声): at most one inner_voice event per turn,
+                // strictly additive. Composition already ran best-effort inside
+                // dualKernelRuntime.generate() (produceReply set reply.innerVoiceText to null on
+                // any failure/opt-out); synthesis here is wrapped in its own try/catch so a TTS
+                // outage or timeout can NEVER delay or fail the main turn -- it just silently
+                // omits the event.
+                if (reply.innerVoiceText != null && !reply.innerVoiceText.isBlank()) {
+                    try {
+                        if (ttsClient != null && ttsClient.available()) {
+                            String voiceId = preferredTtsVoiceIdFor(loadProfile(userId));
+                            byte[] audio = ttsClient.synthesize(reply.innerVoiceText, voiceId);
+                            String audioDataUri = "data:audio/mpeg;base64,"
+                                    + java.util.Base64.getEncoder().encodeToString(audio);
+                            String innerVoicePayload = "{\"text\":\"" + escape(reply.innerVoiceText)
+                                    + "\",\"audio\":\"" + audioDataUri + "\",\"voiceId\":\"" + escape(voiceId) + "\"}";
+                            emitLive(emitter, clientConnected, userId, reply.turnId, eventSequence++,
+                                    "inner_voice", innerVoicePayload, false);
+                        }
+                    } catch (Exception innerVoiceFailure) {
+                        log.warn("Inner-voice synthesis failed for user {} turn {}, omitting inner_voice event: {}",
+                                userId, reply.turnId, innerVoiceFailure.getMessage());
+                    }
                 }
                 // VS-003b — meta now carries the full perception payload (agentLoop,
                 // aiState, voice/weather/location/timezone) so the frontend can render
@@ -1404,6 +1441,16 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
 
     private boolean allowMemory(UserProfile profile) {
         return profile == null || profile.allowMemoryRecall == null || Boolean.TRUE.equals(profile.allowMemoryRecall);
+    }
+
+    /** W1: inner-voice (心声) ships enabled by default -- null (no profile row yet) means true. */
+    private boolean innerVoiceEnabledFor(UserProfile profile) {
+        return profile == null || profile.innerVoiceEnabled == null || Boolean.TRUE.equals(profile.innerVoiceEnabled);
+    }
+
+    private String preferredTtsVoiceIdFor(UserProfile profile) {
+        String voiceId = profile == null ? null : profile.preferredTtsVoiceId;
+        return (voiceId == null || voiceId.isBlank()) ? TtsVoicePresets.defaultVoice().id() : voiceId;
     }
 
     /**
