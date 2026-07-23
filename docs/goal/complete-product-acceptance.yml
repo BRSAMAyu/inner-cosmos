@@ -2,8 +2,8 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 authority: goal-objective.md
 status: IN_PROGRESS
-last_reconciled_at: 2026-07-23T02:45:00+08:00
-last_reconciled_commit: 28c4987
+last_reconciled_at: 2026-07-23T08:45:00+08:00
+last_reconciled_commit: d8e744e
 current_fact_baseline: 对齐文档/24-完全体最终收敛与云原生课程战役.md
 current_execution_plan: 对齐文档/24-完全体最终收敛与云原生课程战役.md
 parallel_state: docs/goal/closure-campaign-state.yml
@@ -11,8 +11,11 @@ reconciliation_boundary: >-
   W0 integration of the four exact Claude branches is DONE on branch codex/w0-integration
   (commit 28c4987; not yet merged to main) -- see closure-campaign-state.yml's integrated_head
   for exact test commands/counts and known non-blocking findings. W0V (the Gemini audit's 36
-  numbered findings) has not started; VERIFIED-STATE-CONCURRENCY, VERIFIED-AI-DATA-BOUNDARY,
-  VERIFIED-CLIENT-RESILIENCE and VERIFIED-STORAGE-EVOLUTION below remain UNASSESSED until it is.
+  numbered findings): all 8 P0 items are DONE as of commit d8e744e (see
+  closure-campaign-state.yml's current_front.p0_order for the exact commit per item and
+  p0_verification for exact test counts) -- VERIFIED-STATE-CONCURRENCY, VERIFIED-AI-DATA-BOUNDARY
+  and VERIFIED-CLIENT-RESILIENCE below are PARTIAL (their P0 slice is closed; P1/P2 items within
+  each remain). VERIFIED-STORAGE-EVOLUTION (2.3/2.5-2.8, all P1-P3) has not started.
   Historical counts and evidence predating 642f034 remain valid only for their recorded commits.
 
 status_semantics:
@@ -127,9 +130,9 @@ gates:
           timeline, with a Docker-gated two-instance real-Redis proof. Consistent cursor pagination and
           concurrency beyond the core slice, plus a sustained multi-Pod SSE soak with recorded
           latency/heartbeat percentiles and Redis Stream consumer-group redelivery, remain open.
-      - {id: VERIFIED-STATE-CONCURRENCY, target: "Slow-letter, memory and persona-turn state changes use conditional short transactions; user block/edit wins races and no provider RPC holds a database transaction.", status: UNASSESSED, evidence: [docs/audit/2026-07-23-gemini-master-audit-reconciliation.md], remaining: "Close W0V findings 1.1/1.4/1.5/1.6/1.8/2.1/2.2/2.4 with reproducible concurrent tests and runtime evidence."}
-      - {id: VERIFIED-AI-DATA-BOUNDARY, target: "P1-to-P2 compilation, model context and model output enforce purpose-bound authorization, minimization, adversarial leakage resistance and withdrawal before any cross-user delivery.", status: UNASSESSED, evidence: [docs/audit/2026-07-23-gemini-master-audit-reconciliation.md], remaining: "Close W0V findings 3.1-3.9 using a fixed adversarial corpus without persisting P0 content in evidence."}
-      - {id: VERIFIED-CLIENT-RESILIENCE, target: "Turn-scoped cancellation, terminal-aware SSE, bounded auth retry and explicit async UI lifecycle prevent stale writes, hangs, duplicate actions and destructive form loss.", status: UNASSESSED, evidence: [docs/audit/2026-07-23-gemini-master-audit-reconciliation.md], remaining: "Close W0V findings 4.1-4.11 with component, fault and browser journey evidence."}
+      - {id: VERIFIED-STATE-CONCURRENCY, target: "Slow-letter, memory and persona-turn state changes use conditional short transactions; user block/edit wins races and no provider RPC holds a database transaction.", status: PARTIAL, evidence: [docs/audit/2026-07-23-gemini-master-audit-reconciliation.md, "commits 93a7ab8, cb10419, d7297bb, fc91d09 on codex/w0-integration"], remaining: "P0 items 1.1/2.2, 1.4, 1.5/2.1, 2.4 are DONE (real fixes + regression/concurrency tests + mvn test 1017/1017 non-Docker-gated). Close remaining P1 findings 1.2, 1.6-1.8 with reproducible concurrent tests and runtime evidence."}
+      - {id: VERIFIED-AI-DATA-BOUNDARY, target: "P1-to-P2 compilation, model context and model output enforce purpose-bound authorization, minimization, adversarial leakage resistance and withdrawal before any cross-user delivery.", status: PARTIAL, evidence: [docs/audit/2026-07-23-gemini-master-audit-reconciliation.md, "commits ba73a0d, 77f411f, 05f55fc on codex/w0-integration"], remaining: "P0 items 3.1/3.2 (P1->P2 scrub chokepoint + canary leakage test), 3.4/3.5 (JSON-escaped delimiter + provider-role separation + output leakage gate), 3.7/3.8 (shared Unicode normalization + widened output policy gate) are DONE. Close remaining P1 findings 3.3, 3.6, 3.9 using a fixed adversarial corpus without persisting P0 content in evidence."}
+      - {id: VERIFIED-CLIENT-RESILIENCE, target: "Turn-scoped cancellation, terminal-aware SSE, bounded auth retry and explicit async UI lifecycle prevent stale writes, hangs, duplicate actions and destructive form loss.", status: PARTIAL, evidence: [docs/audit/2026-07-23-gemini-master-audit-reconciliation.md, "commit d8e744e on codex/w0-integration"], remaining: "P0 items 4.1-4.3 (generation-scoped recovery, StreamTerminalReason contract, fetch-based bounded-401/backoff/circuit-breaker) are DONE (vitest 434/434, tsc clean, build clean). Close remaining P1 findings 4.4/4.5/4.7-4.10 and P2 findings 4.6/4.11 with component, fault and browser journey evidence."}
       - {id: VERIFIED-STORAGE-EVOLUTION, target: "Redis retention is atomic and embedding dimensions/indexes evolve through measured, reversible contracts without duplicate indexes or migration-version collision.", status: UNASSESSED, evidence: [docs/audit/2026-07-23-gemini-master-audit-reconciliation.md], remaining: "Close W0V findings 2.3/2.5-2.8; preserve the V21 mobile migration and require representative EXPLAIN ANALYZE before ANN adoption."}
       - {id: DATA-POSTGRES, target: "PostgreSQL and Flyway are production truth with Testcontainers and migration reconciliation.", status: IN_PROGRESS, evidence: [evidence/m1/M1-DATA-POC-001/, evidence/m1/M1-DATA-APP-001/, evidence/m1/M1-AUTH-OIDC-001/, evidence/innovation/INNO-INNER-005/, evidence/g2/API-CONTRACT-001/, docs/adr/0002-postgresql-system-of-record.md]}
       - {id: DATA-REDIS, target: "Sessions, short state, limits, and leases are externalized to Redis where required.", status: IN_PROGRESS, evidence: [evidence/m1/M1-DATA-REDIS-001/, evidence/m1/M1-DATA-REDIS-002/, evidence/m1/M1-DATA-REDIS-003/, evidence/g2/API-CONTRACT-001/]}
