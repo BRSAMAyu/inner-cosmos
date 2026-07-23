@@ -1,12 +1,8 @@
 package com.innercosmos.controller;
 
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.innercosmos.ai.router.SessionModelRouter;
 import com.innercosmos.common.ApiResponse;
-import com.innercosmos.common.ErrorCode;
-import com.innercosmos.entity.UserProfile;
-import com.innercosmos.exception.BusinessException;
-import com.innercosmos.mapper.UserProfileMapper;
+import com.innercosmos.service.UserService;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -28,11 +24,11 @@ import java.util.Map;
 @RequestMapping("/api/user")
 public class UserPreferenceController extends BaseController {
 
-    private final UserProfileMapper userProfileMapper;
+    private final UserService userService;
     private final SessionModelRouter router;
 
-    public UserPreferenceController(UserProfileMapper userProfileMapper, SessionModelRouter router) {
-        this.userProfileMapper = userProfileMapper;
+    public UserPreferenceController(UserService userService, SessionModelRouter router) {
+        this.userService = userService;
         this.router = router;
     }
 
@@ -43,16 +39,8 @@ public class UserPreferenceController extends BaseController {
     @PutMapping("/preferred-model")
     public ApiResponse<Boolean> setPreferredModel(@RequestBody Map<String, String> body, HttpSession session) {
         Long userId = currentUserId(session);
-        // M-030: select by user_id (the FK), NOT by the profile's own PK id — selectById(userId)
-        // loaded the wrong row (or null) for real users whose profile.id != user.id.
-        UserProfile profile = userProfileMapper.selectOne(
-                new QueryWrapper<UserProfile>().eq("user_id", userId).last("LIMIT 1"));
-        if (profile == null) {
-            throw new BusinessException(ErrorCode.NOT_FOUND, "user not found");
-        }
         String provider = body == null ? null : body.get("provider");
-        profile.preferredModel = (provider == null || provider.isBlank()) ? null : provider.toUpperCase();
-        userProfileMapper.updateById(profile);
+        userService.setPreferredModel(userId, provider);
         return ApiResponse.ok(true);
     }
 }

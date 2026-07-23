@@ -3,6 +3,7 @@ package com.innercosmos.service;
 import com.innercosmos.dto.LoginRequest;
 import com.innercosmos.dto.RegisterRequest;
 import com.innercosmos.entity.User;
+import com.innercosmos.entity.UserProfile;
 import com.innercosmos.vo.UserProfileVO;
 
 import java.util.Map;
@@ -16,10 +17,19 @@ public interface UserService {
 
     void updateProfile(Long userId, UserProfileVO profile);
 
+    /** The raw {@code tb_user_profile} row for a user (by user_id, the FK), or {@code null}. */
+    UserProfile getProfile(Long userId);
+
     Map<String, Object> exportData(Long userId);
 
     void deleteAccount(Long userId);
 
     /** M-032: change the current user's password (requires the old password). */
     void changePassword(Long userId, String oldPassword, String newPassword);
+
+    /**
+     * Set (or clear, when {@code provider} is null/blank) the user's default LLM provider
+     * preference. Throws if the user has no profile row yet.
+     */
+    void setPreferredModel(Long userId, String provider);
 }

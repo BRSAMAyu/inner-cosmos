@@ -256,6 +256,37 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    public UserProfile getProfile(Long userId) {
+        QueryWrapper<UserProfile> query = new QueryWrapper<>();
+        query.eq("user_id", userId);
+        return userProfileMapper.selectOne(query);
+    }
+
+    @Override
+    public void setPreferredModel(Long userId, String provider) {
+        // M-030: select by user_id (the FK), NOT by the profile's own PK id — selectById(userId)
+        // loaded the wrong row (or null) for real users whose profile.id != user.id.
+        UserProfile profile = userProfileMapper.selectOne(
+                new QueryWrapper<UserProfile>().eq("user_id", userId).last("LIMIT 1"));
+        if (profile == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "user not found");
+        }
+        String normalized = (provider == null || provider.isBlank()) ? null : provider.toUpperCase();
+        if (normalized == null) {
+            // MyBatis-Plus's entity-based updateById() skips null fields (FieldStrategy.NOT_NULL by
+            // default), so assigning profile.preferredModel = null and calling updateById() was a
+            // silent no-op -- "clear my preferred model" never actually cleared it. An explicit
+            // UpdateWrapper.set(..., null) is required to write NULL back to the column.
+            userProfileMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<UserProfile>()
+                    .eq("id", profile.id)
+                    .set("preferred_model", null));
+        } else {
+            profile.preferredModel = normalized;
+            userProfileMapper.updateById(profile);
+        }
+    }
+
+    @Override
     public Map<String, Object> exportData(Long userId) {
         Map<String, Object> data = new HashMap<>();
 

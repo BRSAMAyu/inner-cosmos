@@ -34,6 +34,15 @@ public class UserPortraitService {
                 .eq("user_id", userId).eq("dim", dim));
     }
 
+    /** Last 10 recorded history points for one portrait dimension, most recent first. */
+    public List<UserPortraitHistory> getHistory(Long userId, String dim) {
+        return historyMapper.selectList(new QueryWrapper<UserPortraitHistory>()
+                .eq("user_id", userId)
+                .eq("dim", dim)
+                .orderByDesc("recorded_at")
+                .last("LIMIT 10"));
+    }
+
     @Transactional
     public void applyDeltas(Long userId, List<PortraitDeltas.Delta> deltas) {
         for (PortraitDeltas.Delta d : deltas) {
