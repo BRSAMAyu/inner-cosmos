@@ -41,6 +41,10 @@ export type AuroraStreamEvent =
   | EventBase<"safety", { riskLevel: string; featureTarget: string; safeMessage?: string }>
   | EventBase<"error", { message: string }>
   | EventBase<"done", { message: string }>
+  // W2 voice: at most once per turn, only when the backend composed a genuinely distinct
+  // inner-monologue line AND the user has it enabled. Deliberately NOT a terminal event (see
+  // TERMINAL_EVENT_TYPES below) -- its absence must never block or delay normal turn completion.
+  | EventBase<"inner_voice", { text: string; audio: string; voiceId: string }>
   | EventBase<"timeline.event", {
       turnId: number;
       sequence: number;

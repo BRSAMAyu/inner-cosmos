@@ -137,6 +137,21 @@ a { transition: color var(--dur-micro) var(--ease-flow), opacity var(--dur-micro
 .account-preferences select, .account-preferences input[type=time] { width: 100%; box-sizing: border-box; border: 1px solid #ffffff18; border-radius: 12px; padding: 9px 11px; color: var(--text-primary); background: #1d1512cc; font: inherit; }
 .account-preferences input[type=range] { width: 100%; }
 .account-preferences > small { margin-top: -6px; color: var(--text-faint); font-size: .74rem; }
+/* W2 voice: preset picker + delivery-mode/mute toggles inside AccountSettings' Aurora prefs card. */
+.voice-preset-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.voice-preset-option { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 11px; border: 1px solid #ffffff14; border-radius: 12px; background: #1d1512aa; }
+.voice-preset-option > label { display: flex; align-items: center; gap: 8px; color: var(--text-primary); font-size: .85rem; }
+.voice-error { display: block; margin-top: 4px; color: var(--danger-soft); font-size: .76rem; }
+.inline-audio-player { padding: 6px 12px; border: 1px solid #9bb0a24a; border-radius: 999px; color: var(--text-primary); background: #6b5a3f2b; font-size: .78rem; }
+.inline-audio-player:disabled { opacity: .6; }
+.inline-audio-player.blocked, .inline-audio-player.error { border-color: #d77b7142; color: var(--danger-soft); }
+/* Aurora's occasional spoken "inner voice" bubble -- deliberately faint/translucent and italic so
+   it never reads as just another normal reply; a thought-glyph label ("内心"/"Inner voice") marks
+   it distinctly from the surrounding conversation. */
+.message.aurora-inner { border-style: dotted; background: #2d221b66; opacity: .74; font-style: italic; }
+.message.aurora-inner .speaker { color: var(--accent-sage-soft); font-style: normal; }
+.message.aurora-inner .inline-audio-player { margin-top: 8px; }
+.inner-voice-reveal-hint { display: block; margin-top: 4px; color: var(--text-faint); font-size: .72rem; font-style: normal; }
 .account-toggle { display: flex; flex-direction: column; gap: 2px; }
 .account-toggle label { display: flex; align-items: center; gap: 9px; color: var(--text-primary); font-size: .85rem; }
 .account-toggle input { width: auto; }
