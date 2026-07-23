@@ -241,7 +241,7 @@ describe("useAuroraSession -- send / streaming / interrupt", () => {
 
     const innerVoiceMessage = result.current.messages.find(m => m.speaker === "AURORA_INNER");
     expect(innerVoiceMessage).toEqual({
-      key: "inner-9", speaker: "AURORA_INNER", text: "其实我有点担心她今天的状态",
+      key: "inner-3b", speaker: "AURORA_INNER", text: "其实我有点担心她今天的状态",
       audio: "data:audio/mpeg;base64,AAA", voiceId: "warm-a"
     });
     // Purely additive: still mid-turn, runtime/activeTurnId untouched by the inner_voice event.
@@ -280,6 +280,42 @@ describe("useAuroraSession -- send / streaming / interrupt", () => {
     expect(result.current.runtimeSignal.stage).toBe("idle");
     expect(setStatus).toHaveBeenLastCalledWith("Aurora 在这里，等你接着说");
     expect(result.current.messages.some(m => m.speaker === "AURORA_INNER")).toBe(false);
+  });
+
+  // Self-review regression guard: the backend now emits inner_voice AFTER turn.completed (so a slow
+  // TTS synthesis never delays turn closeout), at which point activeTurnRef.current is already null.
+  // Keying the inner_voice message on activeTurnRef would collapse every turn's inner_voice to the
+  // same "inner-0" and the dedup would silently drop the second turn's. Each inner_voice must key on
+  // its unique SSE event id so a second turn's inner_voice still renders. Failing-first against the
+  // pre-fix keying.
+  it("renders inner_voice from a SECOND turn even though each arrives after its turn.completed (no cross-turn key collision)", async () => {
+    const onEvents: Array<(event: AuroraStreamEvent) => void> = [];
+    vi.mocked(streamAurora).mockImplementation(async (_input, _signal, onEvent) => {
+      onEvents.push(onEvent);
+      return "TERMINAL_EVENT";
+    });
+    vi.mocked(api.psychologySkillSuggestion).mockResolvedValue(null);
+    const { result } = setup();
+    await act(async () => { await result.current.resolveSession(); });
+
+    // Turn 1 -- inner_voice arrives AFTER turn.completed (activeTurnRef now null): the reorder case.
+    act(() => { result.current.setDraft("第一回合"); });
+    await act(async () => { await result.current.send({ preventDefault: () => undefined } as never); });
+    act(() => { onEvents[0]!({ id: "t1-1", type: "turn.started", payload: { turnId: 9 } }); });
+    act(() => { onEvents[0]!({ id: "t1-2", type: "turn.completed", payload: { message: "done" } }); });
+    act(() => { onEvents[0]!({ id: "t1-3", type: "inner_voice", payload: { text: "回合一的心声", audio: "data:audio/mpeg;base64,A", voiceId: "warm-a" } }); });
+    expect(result.current.messages.filter(m => m.speaker === "AURORA_INNER")).toHaveLength(1);
+
+    // Turn 2 (distinct turnId) -- before the fix this inner_voice was silently dropped.
+    act(() => { result.current.setDraft("第二回合"); });
+    await act(async () => { await result.current.send({ preventDefault: () => undefined } as never); });
+    act(() => { onEvents[1]!({ id: "t2-1", type: "turn.started", payload: { turnId: 10 } }); });
+    act(() => { onEvents[1]!({ id: "t2-2", type: "turn.completed", payload: { message: "done" } }); });
+    act(() => { onEvents[1]!({ id: "t2-3", type: "inner_voice", payload: { text: "回合二的心声", audio: "data:audio/mpeg;base64,B", voiceId: "warm-a" } }); });
+
+    const innerMessages = result.current.messages.filter(m => m.speaker === "AURORA_INNER");
+    expect(innerMessages).toHaveLength(2);
+    expect(innerMessages.map(m => m.text)).toEqual(["回合一的心声", "回合二的心声"]);
   });
 
   it("an error event ends the turn like every other terminal event, instead of leaving the composer stuck", async () => {

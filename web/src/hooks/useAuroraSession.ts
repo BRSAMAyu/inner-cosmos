@@ -356,9 +356,13 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
         // At most once per turn, and deliberately NOT a terminal/control event -- it never
         // touches runtimeSignal/activeTurnId/status. A turn that never emits one (the common
         // case: disabled, or the backend had nothing genuinely distinct to say) completes exactly
-        // as if this case did not exist.
-        const turnId = activeTurnRef.current ?? 0;
-        const key = `inner-${turnId}`;
+        // as if this case did not exist. Since the backend emits inner_voice AFTER turn.completed
+        // (so a slow synthesis never delays turn closeout), activeTurnRef.current is already null
+        // here -- keying on it would collapse every turn's inner_voice to the same "inner-0" and the
+        // dedup below would silently drop the second turn's. Key on the unique SSE event id
+        // (turnId:live:sequence, collision-free) instead; fall back to the turnId only when an id
+        // is absent (e.g. some tests).
+        const key = event.id ? `inner-${event.id}` : `inner-${activeTurnRef.current ?? 0}`;
         setMessages(current => current.some(message => message.key === key) ? current : [
           ...current,
           { key, speaker: "AURORA_INNER", text: event.payload.text, audio: event.payload.audio, voiceId: event.payload.voiceId }
