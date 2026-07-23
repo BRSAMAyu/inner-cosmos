@@ -26,7 +26,10 @@ import java.util.function.Supplier;
  */
 @Component
 public class AuroraDualKernelRuntime {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AuroraDualKernelRuntime.class);
+
     private final StructuredAiService ai;
+    private final InnerVoiceComposer innerVoiceComposer;
     private final DualKernelBudgetPolicy budgetPolicy = new DualKernelBudgetPolicy();
 
     @Value("${inner-cosmos.aurora.runtime:dual}")
@@ -34,6 +37,10 @@ public class AuroraDualKernelRuntime {
 
     public AuroraDualKernelRuntime(StructuredAiService ai) {
         this.ai = ai;
+        // A plain POJO wrapper over the same StructuredAiService -- safe to construct directly
+        // here rather than requiring a second constructor param, which would force every existing
+        // `new AuroraDualKernelRuntime(ai)` call site (tests included) to change.
+        this.innerVoiceComposer = new InnerVoiceComposer(ai);
     }
 
     /**
@@ -71,7 +78,22 @@ public class AuroraDualKernelRuntime {
 
     public Generation generate(Long userId, String mode, Map<String, Object> assembledContext,
                                LlmClient client, Supplier<StructuredAiResults.AuroraResult> fallback) {
-        if (!enabled()) return new Generation(fallback.get(), "single-fallback", "", false, List.of());
+        return generate(userId, mode, assembledContext, client, fallback, false);
+    }
+
+    /**
+     * @param composeInnerVoice when {@code true}, additionally composes Aurora's "inner voice"
+     *                          (心声, see {@link InnerVoiceComposer}) after the speaker/critic
+     *                          stages settle, and populates {@link Generation#innerVoiceText()}.
+     *                          Composition is always best-effort: any exception is caught and
+     *                          logged here, never propagated, so inner-voice composition can
+     *                          never fail or delay the main turn (see caller-side contract in
+     *                          {@code AuroraAgentServiceImpl}).
+     */
+    public Generation generate(Long userId, String mode, Map<String, Object> assembledContext,
+                               LlmClient client, Supplier<StructuredAiResults.AuroraResult> fallback,
+                               boolean composeInnerVoice) {
+        if (!enabled()) return new Generation(fallback.get(), "single-fallback", "", false, List.of(), null);
 
         var plan = ai.call(userId, "AURORA_PLAN_" + mode, planInstruction(), assembledContext,
             StructuredAiResults.AuroraPlanResult.class, () -> fallbackPlan(assembledContext), client);
@@ -105,8 +127,24 @@ public class AuroraDualKernelRuntime {
             }
             if (critique != null && critique.issues != null) observableIssues = critique.issues;
         }
+        String innerVoiceText = composeInnerVoice ? safeComposeInnerVoice(userId, mode, plan, spoken, client) : null;
         return new Generation(spoken, "dual-kernel.v1", safe(plan.relationshipMove), repaired,
-            observableIssues == null ? List.of() : List.copyOf(observableIssues));
+            observableIssues == null ? List.of() : List.copyOf(observableIssues), innerVoiceText);
+    }
+
+    /**
+     * Never lets an inner-voice composition failure escape into the main generation path --
+     * this is an additive, best-effort enhancement, not a turn-blocking dependency.
+     */
+    private String safeComposeInnerVoice(Long userId, String mode, StructuredAiResults.AuroraPlanResult plan,
+                                         StructuredAiResults.AuroraResult spoken, LlmClient client) {
+        try {
+            return innerVoiceComposer.compose(userId, mode, plan, spoken, client);
+        } catch (Exception e) {
+            log.warn("Inner-voice composition failed for user {} mode {}, omitting inner_voice this turn: {}",
+                    userId, mode, e.getMessage());
+            return null;
+        }
     }
 
     private String planInstruction() {
@@ -217,6 +255,8 @@ public class AuroraDualKernelRuntime {
 
     private static String safe(Object value) { return value == null ? "" : String.valueOf(value); }
 
+    /** @param innerVoiceText null unless {@code composeInnerVoice} was requested and composition succeeded. */
     public record Generation(StructuredAiResults.AuroraResult result, String runtime,
-                             String relationshipMove, boolean repaired, List<String> criticIssues) {}
+                             String relationshipMove, boolean repaired, List<String> criticIssues,
+                             String innerVoiceText) {}
 }

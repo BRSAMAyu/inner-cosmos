@@ -22,4 +22,11 @@ public class AuroraReplyVO {
     public Boolean memoryReferenced;
     public List<Long> referencedMemoryIds;
     public AuroraMemoryContextVO memoryContext;
+    /**
+     * Aurora's composed "inner voice" (心声) text for this turn, or {@code null} when none was
+     * composed (single-pass runtime, user disabled it, or composition failed/was skipped). Only
+     * text lives here -- synthesized audio is produced (and the {@code inner_voice} SSE event
+     * emitted) only on the streaming path; see {@code AuroraAgentServiceImpl.stream}.
+     */
+    public String innerVoiceText;
 }
