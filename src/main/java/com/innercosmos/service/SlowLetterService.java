@@ -15,7 +15,17 @@ public interface SlowLetterService {
      */
     SlowLetter patchDraft(Long userId, Long id, String title, String letterBody, Integer expectedVersion);
 
-    SlowLetter transition(Long userId, Long id, String targetStatus);
+    default SlowLetter transition(Long userId, Long id, String targetStatus) {
+        return transition(userId, id, targetStatus, null);
+    }
+
+    /**
+     * Gemini audit 3.3 (CONFIRMED/P1): {@code piiConfirmed} is consulted ONLY for the SENT
+     * transition -- it is the sender's explicit confirmation that they still want to send a
+     * letter flagged as containing soft-confirm PII (phone/email/address). It has no effect on
+     * any other transition and can never override a hard-block (credentials/secrets).
+     */
+    SlowLetter transition(Long userId, Long id, String targetStatus, Boolean piiConfirmed);
 
     SlowLetter getLetter(Long userId, Long id);
 

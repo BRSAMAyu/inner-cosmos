@@ -6,6 +6,7 @@ import com.innercosmos.entity.LetterStatusLog;
 import com.innercosmos.entity.SlowLetter;
 import com.innercosmos.exception.BusinessException;
 import com.innercosmos.letterstate.LetterStateRegistry;
+import com.innercosmos.safety.PiiCredentialDetector;
 import com.innercosmos.mapper.BlockRelationMapper;
 import com.innercosmos.mapper.EchoCapsuleMapper;
 import com.innercosmos.mapper.LetterStatusLogMapper;
@@ -59,7 +60,7 @@ class SlowLetterAutoRepliedOnSendTest {
 
     private SlowLetterServiceImpl service() {
         return new SlowLetterServiceImpl(letterMapper, logMapper, stateRegistry, guardAgent,
-                threadMapper, reportRecordMapper, letterSafetyFilter, capsuleMapper, blockRelationMapper,
+                threadMapper, reportRecordMapper, letterSafetyFilter, capsuleMapper, blockRelationMapper, new PiiCredentialDetector(),
                 FIXED_CLOCK);
     }
 

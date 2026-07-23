@@ -20,6 +20,7 @@ import com.innercosmos.mapper.LetterStatusLogMapper;
 import com.innercosmos.mapper.LetterThreadMapper;
 import com.innercosmos.mapper.ReportRecordMapper;
 import com.innercosmos.mapper.SlowLetterMapper;
+import com.innercosmos.safety.PiiCredentialDetector;
 import com.innercosmos.service.LetterSafetyFilter;
 import com.innercosmos.service.SlowLetterService;
 import org.springframework.dao.DuplicateKeyException;
@@ -50,13 +51,17 @@ public class SlowLetterServiceImpl implements SlowLetterService {
     private final LetterSafetyFilter letterSafetyFilter;
     private final EchoCapsuleMapper capsuleMapper;
     private final BlockRelationMapper blockRelationMapper;
+    // Gemini audit 3.3 (CONFIRMED/P1): detect-and-gate for credentials/PII at SEND time. Never
+    // rewrites/redacts the letter body -- see the SENT branch of transition() for the hard-block
+    // vs. soft-confirm handling.
+    private final PiiCredentialDetector piiCredentialDetector;
     // Gemini audit 1.7 (PARTIAL/P1): the only clock this class advances on. Constructor-injected
     // (Spring wires the Clock.systemUTC() @Bean from ClockConfig in production); tests inject a
     // fixed/adjustable Clock directly instead of racing the wall clock. No method in this class
     // calls LocalDateTime.now() with an implicit zone anymore.
     private final Clock clock;
 
-    public SlowLetterServiceImpl(SlowLetterMapper letterMapper, LetterStatusLogMapper logMapper, LetterStateRegistry stateRegistry, LetterGuardAgent guardAgent, LetterThreadMapper threadMapper, ReportRecordMapper reportRecordMapper, LetterSafetyFilter letterSafetyFilter, EchoCapsuleMapper capsuleMapper, BlockRelationMapper blockRelationMapper, Clock clock) {
+    public SlowLetterServiceImpl(SlowLetterMapper letterMapper, LetterStatusLogMapper logMapper, LetterStateRegistry stateRegistry, LetterGuardAgent guardAgent, LetterThreadMapper threadMapper, ReportRecordMapper reportRecordMapper, LetterSafetyFilter letterSafetyFilter, EchoCapsuleMapper capsuleMapper, BlockRelationMapper blockRelationMapper, PiiCredentialDetector piiCredentialDetector, Clock clock) {
         this.letterMapper = letterMapper;
         this.logMapper = logMapper;
         this.stateRegistry = stateRegistry;
@@ -66,6 +71,7 @@ public class SlowLetterServiceImpl implements SlowLetterService {
         this.letterSafetyFilter = letterSafetyFilter;
         this.capsuleMapper = capsuleMapper;
         this.blockRelationMapper = blockRelationMapper;
+        this.piiCredentialDetector = piiCredentialDetector;
         this.clock = clock;
     }
 
@@ -203,7 +209,7 @@ public class SlowLetterServiceImpl implements SlowLetterService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public SlowLetter transition(Long userId, Long id, String targetStatus) {
+    public SlowLetter transition(Long userId, Long id, String targetStatus, Boolean piiConfirmed) {
         SlowLetter letter = letterMapper.selectById(id);
         if (letter == null) {
             throw new com.innercosmos.exception.BusinessException(com.innercosmos.common.ErrorCode.NOT_FOUND, "信件不存在");
@@ -240,8 +246,29 @@ public class SlowLetterServiceImpl implements SlowLetterService {
         if ("SENT".equals(targetStatus) && "SENT".equals(letter.status)) {
             return letter;
         }
+        // Gemini audit 3.3 (CONFIRMED/P1): detect-and-gate for credentials/PII, never a keyword
+        // -deletion sanitize -- the letter body itself is never rewritten or redacted.
+        java.util.List<String> piiConsentCategories = java.util.List.of();
         if ("SENT".equals(targetStatus)) {
             ensureDeliveryAllowed(letter.letterBody, letter.senderUserId, letter.receiverUserId);
+            PiiCredentialDetector.ScanResult pii = piiCredentialDetector.scan(letter.letterBody);
+            if (pii.hasHardBlock()) {
+                // Credentials/secrets: hard-blocked outright, no confirmation override exists.
+                throw new SafetyBlockedException("这封信似乎包含密码、密钥或证件号等凭据信息("
+                        + String.join(",", pii.hardBlockCategories) + ")，为了你的账号和信息安全，无法发送。"
+                        + "请删除这些内容后再试一次。");
+            }
+            if (pii.hasSoftConfirm()) {
+                if (!Boolean.TRUE.equals(piiConfirmed)) {
+                    throw new com.innercosmos.exception.BusinessException(
+                            com.innercosmos.common.ErrorCode.PII_CONFIRMATION_REQUIRED,
+                            "这封信包含个人联系方式或住址信息(" + String.join(",", pii.softConfirmCategories)
+                                    + ")，确认要发送吗？");
+                }
+                // Explicit confirmation given -- record a minimal consent RECEIPT (category names
+                // only) in the transition log below. Never the raw matched PII text itself.
+                piiConsentCategories = pii.softConfirmCategories;
+            }
         }
         stateRegistry.validate(letter.status, targetStatus);
         String from = letter.status;
@@ -307,7 +334,11 @@ public class SlowLetterServiceImpl implements SlowLetterService {
         log.fromStatus = from;
         log.toStatus = targetStatus;
         log.operatorUserId = userId;
-        log.reason = "API transition";
+        // Gemini audit 3.3: minimal consent RECEIPT -- category names only (e.g. "PHONE,EMAIL"),
+        // never the raw PII text that was matched -- appended when the sender confirmed sending a
+        // letter flagged with soft-confirm PII.
+        log.reason = piiConsentCategories.isEmpty() ? "API transition"
+                : "API transition; PII_CONSENT_CONFIRMED:" + String.join(",", piiConsentCategories);
         logMapper.insert(log);
         return letter;
     }

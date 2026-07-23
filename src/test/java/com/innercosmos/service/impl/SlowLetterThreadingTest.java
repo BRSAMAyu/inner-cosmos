@@ -9,6 +9,7 @@ import com.innercosmos.entity.LetterThread;
 import com.innercosmos.entity.SlowLetter;
 import com.innercosmos.exception.BusinessException;
 import com.innercosmos.letterstate.LetterStateRegistry;
+import com.innercosmos.safety.PiiCredentialDetector;
 import com.innercosmos.mapper.EchoCapsuleMapper;
 import com.innercosmos.mapper.BlockRelationMapper;
 import com.innercosmos.mapper.LetterStatusLogMapper;
@@ -59,7 +60,7 @@ class SlowLetterThreadingTest {
         safe.passed = true;
         org.mockito.Mockito.lenient().when(letterSafetyFilter.filter(any(), any(), any())).thenReturn(safe);
         return new SlowLetterServiceImpl(letterMapper, logMapper, stateRegistry,
-                guardAgent, threadMapper, reportRecordMapper, letterSafetyFilter, capsuleMapper, blockRelationMapper,
+                guardAgent, threadMapper, reportRecordMapper, letterSafetyFilter, capsuleMapper, blockRelationMapper, new PiiCredentialDetector(),
                 Clock.systemUTC());
     }
 

@@ -3,6 +3,7 @@ package com.innercosmos.controller;
 import com.innercosmos.common.ApiResponse;
 import com.innercosmos.dto.LetterCreateRequest;
 import com.innercosmos.dto.LetterDraftPatchRequest;
+import com.innercosmos.dto.LetterSendRequest;
 import com.innercosmos.entity.LetterThread;
 import com.innercosmos.entity.SlowLetter;
 import com.innercosmos.service.SlowLetterService;
@@ -39,9 +40,19 @@ public class LetterController extends BaseController {
                 request.title, request.letterBody, request.expectedVersion));
     }
 
+    /**
+     * Gemini audit 3.3 (CONFIRMED/P1): {@code confirmPii} is the sender's explicit confirmation
+     * that they still want to send a letter flagged as containing soft-confirm PII (phone/email/
+     * address). Omitted or false on a flagged letter -> 428 PII_CONFIRMATION_REQUIRED so the
+     * client can show a "confirm and send" affordance; has no effect on a hard-blocked letter
+     * (credentials/secrets), which cannot be sent regardless.
+     */
     @PostMapping("/{id}/send")
-    public ApiResponse<SlowLetter> send(@PathVariable Long id, HttpSession session) {
-        return ApiResponse.ok(slowLetterService.transition(currentUserId(session), id, "SENT"));
+    public ApiResponse<SlowLetter> send(@PathVariable Long id,
+                                         @RequestBody(required = false) LetterSendRequest request,
+                                         HttpSession session) {
+        Boolean confirmPii = request == null ? null : request.confirmPii;
+        return ApiResponse.ok(slowLetterService.transition(currentUserId(session), id, "SENT", confirmPii));
     }
 
     @PostMapping("/{id}/deliver")
