@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { ConnectionRequests, LetterThread, SlowLetter, SocialConnection } from "../api";
 import type { Locale } from "../i18n";
-import { AsyncButton } from "../loading";
+import { AsyncButton, LoadingText } from "../loading";
 
 const repliable = new Set(["READ", "REPLIED"]);
 const declinable = new Set(["DELIVERED", "READ"]);
@@ -16,6 +16,7 @@ const COPY: Record<Locale, {
   outboxIntro: string; outboxEmpty: string; arrivalEta: (time: string) => string; archiveLetter: string;
   draftsIntro: string; draftsEmpty: string; untitledDraft: string; draftStatus: string; sendDraftBusy: string; sendDraft: string;
   threadsIntro: string; threadsEmpty: string; threadItem: (id: number) => string; threadPickPrompt: string; threadLoading: string;
+  threadLettersEmpty: string; threadLettersError: string;
   consentAria: string; awaitingYou: string; noIncoming: string; wantsToKnow: (name: string) => string; accept: string; declineConn: string;
   awaitingThem: string; noOutgoing: string; notYetAgreed: string; bothAgreed: string; noFriends: string; leave: string;
 }> = {
@@ -33,6 +34,7 @@ const COPY: Record<Locale, {
     sendDraftBusy: "正在寄出", sendDraft: "让这封信启程",
     threadsIntro: "同一段关系里来回的慢信会聚成一条往来。点开看看你们之间慢慢积累的对话。", threadsEmpty: "还没有形成往来的慢信线程。",
     threadItem: id => `往来 #${id}`, threadPickPrompt: "选一段往来，看你们之间的慢信。", threadLoading: "正在读取这段往来…",
+    threadLettersEmpty: "这段往来里还没有信件。", threadLettersError: "暂时读不到这段往来，请稍后再试。",
     consentAria: "双向连接同意", awaitingYou: "等待你决定", noIncoming: "没有新的连接邀请", wantsToKnow: name => `${name} 想在慢信之后认识你`, accept: "我也愿意", declineConn: "暂不连接",
     awaitingThem: "等待对方决定", noOutgoing: "没有等待中的邀请", notYetAgreed: "尚未同意，不会提前开放真人连接", bothAgreed: "双方已同意", noFriends: "还没有建立真人连接", leave: "退出连接"
   },
@@ -50,16 +52,18 @@ const COPY: Record<Locale, {
     sendDraftBusy: "Sending", sendDraft: "Send this letter",
     threadsIntro: "Letters back and forth in one relationship gather into a thread. Open one to see the conversation you've slowly built.", threadsEmpty: "No slow-letter threads yet.",
     threadItem: id => `Thread #${id}`, threadPickPrompt: "Pick a thread to see the letters between you.", threadLoading: "Loading this thread…",
+    threadLettersEmpty: "No letters in this thread yet.", threadLettersError: "Couldn't load this thread right now -- try again shortly.",
     consentAria: "Mutual connection consent", awaitingYou: "Awaiting your decision", noIncoming: "No new connection invitations", wantsToKnow: name => `${name} would like to know you after the letters`, accept: "I'd like to too", declineConn: "Not yet",
     awaitingThem: "Awaiting their decision", noOutgoing: "No pending invitations", notYetAgreed: "Not yet agreed — a real connection won't open early", bothAgreed: "Both agreed", noFriends: "No real connections yet", leave: "Leave connection"
   }
 };
 
-export function LettersInbox({ letterInbox, letterOutbox = [], threads = [], threadLetters = [], selectedThreadId = null,
+export function LettersInbox({ letterInbox, letterOutbox = [], threads = [], threadLetters = [], threadLettersStatus = "idle", selectedThreadId = null,
   draftBusy = false, replyBusyId = null, replyDrafts, connectionRequests, friends,
   onReplyDraftChange, onReply, onActOnLetter, onReportLetter, onRequestConnection, onDecideConnection, onLeaveConnection,
   onSendDraft, onOpenThread, locale = "zh-CN" }: {
   letterInbox: SlowLetter[]; letterOutbox?: SlowLetter[]; threads?: LetterThread[]; threadLetters?: SlowLetter[];
+  threadLettersStatus?: "idle" | "loading" | "success" | "error";
   selectedThreadId?: number | null; draftBusy?: boolean; replyBusyId?: number | null;
   replyDrafts: Record<number, string>; connectionRequests: ConnectionRequests; friends: SocialConnection[];
   onReplyDraftChange: (letterId: number, value: string) => void; onReply: (letter: SlowLetter) => void;
@@ -130,7 +134,13 @@ export function LettersInbox({ letterInbox, letterOutbox = [], threads = [], thr
         </ul>
         <div className="thread-letters" aria-live="polite">
           {!selectedThreadId ? <div className="network-empty">{t.threadPickPrompt}</div>
-            : threadLetters.length === 0 ? <div className="network-empty">{t.threadLoading}</div>
+            // Gemini audit 4.9 fix: an explicit status distinguishes "still loading" from a
+            // genuinely empty successful response and from a failed fetch -- `threadLetters.length
+            // === 0` alone used to mean all three, so a real empty thread was mislabeled "loading"
+            // forever.
+            : threadLettersStatus === "loading" ? <LoadingText busy className="network-empty">{t.threadLoading}</LoadingText>
+            : threadLettersStatus === "error" ? <div className="network-empty" role="alert">{t.threadLettersError}</div>
+            : threadLetters.length === 0 ? <div className="network-empty">{t.threadLettersEmpty}</div>
             : <div className="inbox-list">{threadLetters.map(letter => <article key={letter.id}><header><strong>{letter.title}</strong><span>{status(letter.status)}</span></header><p>{letter.letterBody}</p></article>)}</div>}
         </div>
       </div>}

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { GroupInvite, GroupMember, SocialConnection, SocialGroup } from "../api";
 import type { Locale } from "../i18n";
-import { AsyncButton } from "../loading";
+import { AsyncButton, LoadingText } from "../loading";
 
 const COPY: Record<Locale, {
   aria: string; heading: string; count: (n: number) => string; intro: string; empty: string;
@@ -10,6 +10,7 @@ const COPY: Record<Locale, {
   membersHeading: string; roleOwner: string; roleMember: string;
   inviteAria: string; invitePlaceholder: string; inviteBusy: string; invite: string;
   leaveBusy: string; leave: string; noMembers: string; noFriends: string;
+  membersLoading: string; membersError: string;
 }> = {
   "zh-CN": {
     aria: "慢群组", heading: "慢慢认识的一小群人，不是群聊噪音", count: n => `${n} 个群组`,
@@ -19,7 +20,8 @@ const COPY: Record<Locale, {
     invitesHeading: "等待你回应的群组邀请", acceptBusy: "正在加入", accept: "接受", declineBusy: "正在婉拒", decline: "婉拒",
     membersHeading: "成员", roleOwner: "群主", roleMember: "成员",
     inviteAria: "邀请朋友加入", invitePlaceholder: "选择一位朋友", inviteBusy: "正在邀请", invite: "邀请",
-    leaveBusy: "正在退出", leave: "退出群组", noMembers: "还没有成员。", noFriends: "还没有可邀请的朋友。"
+    leaveBusy: "正在退出", leave: "退出群组", noMembers: "还没有成员。", noFriends: "还没有可邀请的朋友。",
+    membersLoading: "正在读取成员…", membersError: "暂时读不到成员列表，请稍后再试。"
   },
   "en-SG": {
     aria: "Slow groups", heading: "Slow groups, not group chat noise", count: n => `${n} group${n === 1 ? "" : "s"}`,
@@ -29,14 +31,16 @@ const COPY: Record<Locale, {
     invitesHeading: "Group invites awaiting your response", acceptBusy: "Joining", accept: "Accept", declineBusy: "Declining", decline: "Decline",
     membersHeading: "Members", roleOwner: "Owner", roleMember: "Member",
     inviteAria: "Invite a friend to join", invitePlaceholder: "Choose a friend", inviteBusy: "Inviting", invite: "Invite",
-    leaveBusy: "Leaving", leave: "Leave group", noMembers: "No members yet.", noFriends: "No friends to invite yet."
+    leaveBusy: "Leaving", leave: "Leave group", noMembers: "No members yet.", noFriends: "No friends to invite yet.",
+    membersLoading: "Loading members…", membersError: "Couldn't load the member list right now -- try again shortly."
   }
 };
 
-export function SocialGroupsView({ groups, invites, friends, selectedGroupId, members, busy, currentUserId,
+export function SocialGroupsView({ groups, invites, friends, selectedGroupId, members, membersStatus = "idle", busy, currentUserId,
   onSelectGroup, onCreateGroup, onInvite, onRespondInvite, onLeaveGroup, locale = "zh-CN" }: {
   groups: SocialGroup[]; invites: GroupInvite[]; friends: SocialConnection[];
-  selectedGroupId: number | null; members: GroupMember[]; busy: boolean; currentUserId: number | null;
+  selectedGroupId: number | null; members: GroupMember[]; membersStatus?: "idle" | "loading" | "success" | "error";
+  busy: boolean; currentUserId: number | null;
   onSelectGroup: (id: number) => void; onCreateGroup: (name: string) => void;
   onInvite: (groupId: number, userId: number) => void;
   onRespondInvite: (memberId: number, decision: "accept" | "decline") => void;
@@ -83,7 +87,12 @@ export function SocialGroupsView({ groups, invites, friends, selectedGroupId, me
       </ul>
       {selectedGroup && <div className="group-detail">
         <h3>{t.membersHeading}</h3>
-        {members.length === 0 ? <div className="network-empty">{t.noMembers}</div> : <ul role="list">
+        {/* Gemini audit 4.9 sibling fix: explicit status distinguishes loading from a genuinely
+            empty member list -- `members.length === 0` alone used to show "no members" while the
+            fetch was still in flight. */}
+        {membersStatus === "loading" ? <LoadingText busy className="network-empty">{t.membersLoading}</LoadingText>
+          : membersStatus === "error" ? <div className="network-empty" role="alert">{t.membersError}</div>
+          : members.length === 0 ? <div className="network-empty">{t.noMembers}</div> : <ul role="list">
           {members.map(member => <li key={member.userId}>
             <span>{member.nickname}</span><small>{member.memberRole === "OWNER" ? t.roleOwner : t.roleMember}</small>
           </li>)}

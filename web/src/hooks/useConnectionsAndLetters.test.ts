@@ -72,6 +72,15 @@ const thread = (overrides: Partial<LetterThread> = {}): LetterThread => ({
   id: 1, status: "ACTIVE", lastLetterAt: null, ...overrides
 } as LetterThread);
 
+// A controllable promise so a test can decide exactly when a "slow" fetch resolves, after a
+// "fast" fetch for a different resource has already resolved and committed its own state.
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+  return { promise, resolve, reject };
+}
+
 beforeEach(() => {
   vi.mocked(api.connectionRequests).mockResolvedValue(requests());
   vi.mocked(api.friends).mockResolvedValue([]);
@@ -215,6 +224,38 @@ describe("useConnectionsAndLetters -- relations", () => {
     expect(setStatus).toHaveBeenCalledWith("暂时读不到");
     expect(result.current.relationBusy).toBe(false);
   });
+
+  // Gemini audit 4.4 (CONFIRMED/P1): relation loader has no request epoch. A slow response for a
+  // stale selection ("妈妈") that resolves AFTER the user has already moved on to a different
+  // selection ("爸爸") must never overwrite the currently-selected relation's timeline/health.
+  it("a slow openRelation('妈妈') response arriving after openRelation('爸爸') already committed must NOT overwrite '爸爸''s timeline/health", async () => {
+    const slowTimeline = deferred<RelationTimelinePoint[]>();
+    const slowHealth = deferred<RelationHealth>();
+    vi.mocked(api.relationTimeline).mockReturnValueOnce(slowTimeline.promise);
+    vi.mocked(api.relationHealth).mockReturnValueOnce(slowHealth.promise);
+    const { result } = setup();
+
+    let openMomStarted: Promise<void>;
+    act(() => { openMomStarted = result.current.openRelation("妈妈"); });
+
+    vi.mocked(api.relationTimeline).mockResolvedValueOnce([timelinePoint({ summary: "爸爸的时间线" })]);
+    vi.mocked(api.relationHealth).mockResolvedValueOnce(health({ healthScore: 0.5 }));
+    await act(async () => { await result.current.openRelation("爸爸"); });
+    expect(result.current.selectedRelation).toBe("爸爸");
+    expect(result.current.relationTimeline[0].summary).toBe("爸爸的时间线");
+
+    // Now let the STALE "妈妈" response finally arrive.
+    await act(async () => {
+      slowTimeline.resolve([timelinePoint({ summary: "妈妈的时间线（过期）" })]);
+      slowHealth.resolve(health({ healthScore: 0.9 }));
+      await openMomStarted;
+    });
+
+    // The stale response must have been discarded -- the UI must still show "爸爸"'s data.
+    expect(result.current.selectedRelation).toBe("爸爸");
+    expect(result.current.relationTimeline[0].summary).toBe("爸爸的时间线");
+    expect(result.current.relationHealth?.healthScore).toBe(0.5);
+  });
 });
 
 describe("useConnectionsAndLetters -- letters", () => {
@@ -224,6 +265,59 @@ describe("useConnectionsAndLetters -- letters", () => {
     await act(async () => { await result.current.openThread(5); });
     expect(result.current.selectedThreadId).toBe(5);
     expect(result.current.threadLetters).toHaveLength(1);
+  });
+
+  // Gemini audit 4.9 (CONFIRMED/P1): `threadLetters.length === 0` conflated "still loading" and
+  // "genuinely empty successful response". The hook must expose an explicit status so the two are
+  // distinguishable, and it must be visibly "loading" the instant a thread is opened, BEFORE the
+  // fetch resolves -- not just after.
+  it("openThread exposes an explicit loading state distinct from a genuinely empty successful response", async () => {
+    const slow = deferred<SlowLetter[]>();
+    vi.mocked(api.letterThreadLetters).mockReturnValueOnce(slow.promise);
+    const { result } = setup();
+
+    let openStarted: Promise<void>;
+    act(() => { openStarted = result.current.openThread(5); });
+    // Still in flight: must be visibly "loading", NOT indistinguishable from a real empty list.
+    expect(result.current.threadLettersStatus).toBe("loading");
+    expect(result.current.threadLetters).toEqual([]);
+
+    await act(async () => { slow.resolve([]); await openStarted; });
+    // A genuinely empty thread: status flips to "success" even though the array is still empty --
+    // this is what makes it distinguishable from the loading state above.
+    expect(result.current.threadLettersStatus).toBe("success");
+    expect(result.current.threadLetters).toEqual([]);
+  });
+
+  it("openThread surfaces an explicit error status (not just a silently-empty list) when the fetch fails", async () => {
+    vi.mocked(api.letterThreadLetters).mockRejectedValue(new Error("暂时读不到这段往来"));
+    const { result } = setup();
+    await act(async () => { await result.current.openThread(5); });
+    expect(result.current.threadLettersStatus).toBe("error");
+  });
+
+  // Gemini audit 4.4: a slow openThread(A) response arriving after openThread(B) already
+  // committed must not clobber thread B's already-displayed letters.
+  it("a slow openThread(5) response arriving after openThread(6) already committed must NOT overwrite thread 6's letters", async () => {
+    const slow = deferred<SlowLetter[]>();
+    vi.mocked(api.letterThreadLetters).mockReturnValueOnce(slow.promise);
+    const { result } = setup();
+
+    let openFiveStarted: Promise<void>;
+    act(() => { openFiveStarted = result.current.openThread(5); });
+
+    vi.mocked(api.letterThreadLetters).mockResolvedValueOnce([letter({ id: 6, title: "线程六" })]);
+    await act(async () => { await result.current.openThread(6); });
+    expect(result.current.selectedThreadId).toBe(6);
+    expect(result.current.threadLetters[0].title).toBe("线程六");
+
+    await act(async () => {
+      slow.resolve([letter({ id: 5, title: "线程五（过期）" })]);
+      await openFiveStarted;
+    });
+
+    expect(result.current.selectedThreadId).toBe(6);
+    expect(result.current.threadLetters[0].title).toBe("线程六");
   });
 
   it("sendDraft sends the draft, refreshes the outbox and resets busy", async () => {
@@ -329,6 +423,48 @@ describe("useConnectionsAndLetters -- groups", () => {
     await act(async () => { await result.current.openGroup(5); });
     expect(result.current.selectedGroupId).toBe(5);
     expect(result.current.groupMembers).toHaveLength(1);
+  });
+
+  // Gemini audit 4.9 sibling (same conflation as threadLetters): `groupMembers.length === 0` was
+  // the only signal SocialGroupsView had, so a group that is still loading its member list looked
+  // identical to a group that genuinely has no members yet.
+  it("openGroup exposes an explicit loading state distinct from a genuinely empty member list", async () => {
+    const slow = deferred<Array<{ userId: number; memberRole: string; nickname: string }>>();
+    vi.mocked(api.groupMembers).mockReturnValueOnce(slow.promise as never);
+    const { result } = setup();
+
+    let openStarted: Promise<void>;
+    act(() => { openStarted = result.current.openGroup(5); });
+    expect(result.current.groupMembersStatus).toBe("loading");
+    expect(result.current.groupMembers).toEqual([]);
+
+    await act(async () => { slow.resolve([]); await openStarted; });
+    expect(result.current.groupMembersStatus).toBe("success");
+    expect(result.current.groupMembers).toEqual([]);
+  });
+
+  // Gemini audit 4.4: a slow openGroup(A) response arriving after openGroup(B) already committed
+  // must not clobber group B's already-displayed member list.
+  it("a slow openGroup(5) response arriving after openGroup(6) already committed must NOT overwrite group 6's members", async () => {
+    const slow = deferred<Array<{ userId: number; memberRole: string; nickname: string }>>();
+    vi.mocked(api.groupMembers).mockReturnValueOnce(slow.promise as never);
+    const { result } = setup();
+
+    let openFiveStarted: Promise<void>;
+    act(() => { openFiveStarted = result.current.openGroup(5); });
+
+    vi.mocked(api.groupMembers).mockResolvedValueOnce([{ userId: 6, memberRole: "OWNER", nickname: "组六成员" }]);
+    await act(async () => { await result.current.openGroup(6); });
+    expect(result.current.selectedGroupId).toBe(6);
+    expect(result.current.groupMembers[0].nickname).toBe("组六成员");
+
+    await act(async () => {
+      slow.resolve([{ userId: 5, memberRole: "MEMBER", nickname: "组五成员（过期）" }]);
+      await openFiveStarted;
+    });
+
+    expect(result.current.selectedGroupId).toBe(6);
+    expect(result.current.groupMembers[0].nickname).toBe("组六成员");
   });
 
   it("inviteToGroup calls the API with the target friend's userId", async () => {

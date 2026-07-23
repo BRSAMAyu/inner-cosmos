@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   api, type ConnectionRequests, type DiscoverablePerson, type GroupInvite, type GroupMember, type LetterThread,
   type RelationHealth, type RelationMention, type RelationTimelinePoint, type SlowLetter, type SocialConnection, type SocialGroup
@@ -22,6 +22,10 @@ export type UseConnectionsAndLettersOptions = {
   setStatus: (status: string) => void;
 };
 
+// Gemini audit 4.9 (CONFIRMED/P1): a discriminated fetch status so "still loading" and "genuinely
+// empty successful response" can never be conflated by a UI reading `someList.length === 0`.
+export type FetchStatus = "idle" | "loading" | "success" | "error";
+
 export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLettersOptions) {
   const [connectionRequests, setConnectionRequests] = useState<ConnectionRequests>({ incoming: [], outgoing: [] });
   const [friends, setFriends] = useState<SocialConnection[]>([]);
@@ -37,6 +41,7 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
   const [letterThreads, setLetterThreads] = useState<LetterThread[]>([]);
   const [selectedThreadId, setSelectedThreadId] = useState<number | null>(null);
   const [threadLetters, setThreadLetters] = useState<SlowLetter[]>([]);
+  const [threadLettersStatus, setThreadLettersStatus] = useState<FetchStatus>("idle");
   const [draftBusy, setDraftBusy] = useState(false);
   const [replyBusyId, setReplyBusyId] = useState<number | null>(null);
   const [replyDrafts, setReplyDrafts] = useState<Record<number, string>>({});
@@ -44,7 +49,20 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
   const [groupInvites, setGroupInvites] = useState<GroupInvite[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
+  const [groupMembersStatus, setGroupMembersStatus] = useState<FetchStatus>("idle");
   const [groupBusy, setGroupBusy] = useState(false);
+
+  // Gemini audit 4.4 (CONFIRMED/P1): relation/thread/group loaders had no request epoch, so a slow
+  // response for a stale selection could overwrite the currently-selected resource's state (e.g.
+  // select relation A, quickly reselect B, then A's late response clobbers B's already-rendered
+  // timeline). Each loader below bumps its own monotonic generation counter BEFORE starting the
+  // fetch and captures that generation; every subsequent state-commit checks the ref is still the
+  // CURRENT generation before writing. A stale generation's response is discarded silently rather
+  // than applied -- the equivalent of an AbortController/sequence-number guard for plain (non-
+  // cancellable) GET fetches that don't take an AbortSignal today.
+  const relationGenerationRef = useRef(0);
+  const threadGenerationRef = useRef(0);
+  const groupGenerationRef = useRef(0);
 
   // ---- Bootstrap loaders. AuroraApp.tsx's own bootstrap() still fires ONE 23-way Promise.all of
   // every domain's initial fetch (unchanged in shape by this extraction, matching the precedent set
@@ -93,6 +111,8 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
   }, [refreshConnections, setStatus]);
 
   const openRelation = useCallback(async (label: string) => {
+    const generation = ++relationGenerationRef.current;
+    const isCurrent = () => relationGenerationRef.current === generation;
     setSelectedRelation(label); setRelationBusy(true);
     setRelationTimeline([]); setRelationHealth(null);
     try {
@@ -100,15 +120,27 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
         api.relationTimeline(label),
         api.relationHealth(label).catch(() => null)
       ]);
+      if (!isCurrent()) return; // 4.4: a newer selection superseded this one -- discard silently.
       setRelationTimeline(timeline); setRelationHealth(health);
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时读不到这段关系的时间线"); }
-    finally { setRelationBusy(false); }
+    } catch (error) {
+      if (!isCurrent()) return;
+      setStatus(error instanceof Error ? error.message : "暂时读不到这段关系的时间线");
+    } finally { if (isCurrent()) setRelationBusy(false); }
   }, [setStatus]);
 
   const openThread = useCallback(async (threadId: number) => {
-    setSelectedThreadId(threadId); setThreadLetters([]);
-    try { setThreadLetters(await api.letterThreadLetters(threadId)); }
-    catch (error) { setStatus(error instanceof Error ? error.message : "暂时读不到这段往来"); }
+    const generation = ++threadGenerationRef.current;
+    const isCurrent = () => threadGenerationRef.current === generation;
+    setSelectedThreadId(threadId); setThreadLetters([]); setThreadLettersStatus("loading");
+    try {
+      const letters = await api.letterThreadLetters(threadId);
+      if (!isCurrent()) return; // 4.4: a newer selection superseded this one -- discard silently.
+      setThreadLetters(letters); setThreadLettersStatus("success");
+    } catch (error) {
+      if (!isCurrent()) return;
+      setThreadLettersStatus("error");
+      setStatus(error instanceof Error ? error.message : "暂时读不到这段往来");
+    }
   }, [setStatus]);
 
   const sendDraft = useCallback(async (id: number) => {
@@ -194,9 +226,18 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
   }, [setStatus]);
 
   const openGroup = useCallback(async (groupId: number) => {
-    setSelectedGroupId(groupId); setGroupMembers([]);
-    try { setGroupMembers(await api.groupMembers(groupId)); }
-    catch (error) { setStatus(error instanceof Error ? error.message : "暂时读不到这个群组的成员"); }
+    const generation = ++groupGenerationRef.current;
+    const isCurrent = () => groupGenerationRef.current === generation;
+    setSelectedGroupId(groupId); setGroupMembers([]); setGroupMembersStatus("loading");
+    try {
+      const members = await api.groupMembers(groupId);
+      if (!isCurrent()) return; // 4.4: a newer selection superseded this one -- discard silently.
+      setGroupMembers(members); setGroupMembersStatus("success");
+    } catch (error) {
+      if (!isCurrent()) return;
+      setGroupMembersStatus("error");
+      setStatus(error instanceof Error ? error.message : "暂时读不到这个群组的成员");
+    }
   }, [setStatus]);
 
   const inviteToGroup = useCallback(async (groupId: number, userId: number) => {
@@ -233,8 +274,9 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
   return {
     connectionRequests, friends, people, peopleBusy,
     relations, selectedRelation, relationTimeline, relationHealth, relationBusy,
-    letterInbox, letterOutbox, letterThreads, selectedThreadId, threadLetters, draftBusy, replyBusyId, replyDrafts,
-    groups, groupInvites, selectedGroupId, groupMembers, groupBusy,
+    letterInbox, letterOutbox, letterThreads, selectedThreadId, threadLetters, threadLettersStatus,
+    draftBusy, replyBusyId, replyDrafts,
+    groups, groupInvites, selectedGroupId, groupMembers, groupMembersStatus, groupBusy,
     loadLetterInbox, loadConnectionRequests, loadFriends, loadLetterOutbox, loadPeople, loadRelations, loadLetterThreads,
     loadGroups, loadGroupInvites,
     refreshConnections, requestPersonConnection, openRelation, openThread, sendDraft,
