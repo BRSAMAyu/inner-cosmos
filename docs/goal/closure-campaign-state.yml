@@ -65,8 +65,10 @@ current_front:
     - {cmd: "cd web && npx vitest run", result: "434/434 (65 files)"}
     - {cmd: "cd web && npm run build", result: "clean, rebuilt bundle committed in d8e744e"}
   p1_order:
-    - {id: "1.2", desc: "see audit doc section R1 for exact current-fact/fix-contract text"}
-    - {id: "1.6-1.8", desc: "see audit doc section R1"}
+    - {id: "1.2", desc: "SENT->FLYING departure gate separated from FLYING->DELIVERED arrival gate; injectable Clock", status: DONE, commit: 97bc18e}
+    - {id: "1.6", desc: "merged the racing MemoryExtractListener/GravityRecalculateListener @Async listeners into one ordered sequence via new GravityRecalculationService", status: DONE, commit: f4b3db8}
+    - {id: "1.7", desc: "see audit doc section R1 (time source Instant/UTC + per-user IANA timezone display; injected Clock; explainable parallax policy)"}
+    - {id: "1.8", desc: "see audit doc section R1 (owner-scoped draft PATCH with version/ETag; idempotency key; parent-letter REPLIED only on real send success)"}
     - {id: "2.6/2.7", desc: "see audit doc section R2"}
     - {id: "3.3/3.6/3.9", desc: "see audit doc section R3 (慢信 PII policy; MemoryExtractAgent raw interpolation; session-scoped rolling risk state)"}
     - {id: "4.4/4.5/4.7-4.10", desc: "see audit doc section R4 (per-resource request epoch; draft-id+idempotency compose-and-send; top-level+per-space ErrorBoundary; per-resource busy-guard; explicit loading/empty/error hook state; async-safe password/delete forms)"}
