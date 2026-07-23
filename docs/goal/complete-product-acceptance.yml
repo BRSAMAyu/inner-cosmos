@@ -343,7 +343,24 @@ gates:
       - {id: MEMORY-LIFECYCLE, target: "Memories support consolidation, reinforcement, contradiction, supersession, decay, archive, and forgetting.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-INNER-001/, evidence/innovation/INNO-INNER-002/, evidence/innovation/INNO-INNER-003/]}
       - {id: PROFILE-MODEL, target: "High-dimensional claims retain source, confidence, time, consent, conflict, and correction history.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-INNER-001/, evidence/innovation/INNO-INNER-007/, evidence/integration/FINAL-STABILIZATION-2026-07-20/], remaining: "Reconciled 2026-07-20: automatic extraction, persistence, owner review, confirm/correct/dismiss, bilingual UI and the confirmed-claim-to-Aurora prompt bridge are implemented. Still open: held-out real-provider quality, temporal/conflict calibration, complete retention semantics, and human review."}
       - {id: RETRIEVAL-QUALITY, target: "Task-aware hybrid retrieval meets precision, relevance, contradiction, privacy, latency, and budget thresholds.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-INNER-002/, evidence/innovation/INNO-INNER-004/, evidence/innovation/INNO-INNER-005/, evidence/innovation/INNO-INNER-006/, evidence/innovation/INNO-INNER-008/, evidence/innovation/INNO-INNER-009/, evidence/innovation/INNO-INNER-010/, evidence/integration/FINAL-P0-CLOSURE-2026-07-22/], remaining: "2026-07-22: semantic pgvector retrieval is now wired into the actual Aurora context assembler as a task-aware MemoryEvidencePack; the legacy context is constrained to the same evidence IDs and retrieval failure does not silently substitute gravity Top-N. Existing real-EKS embedding evidence remains valid. 2026-07-23 (branch codex/w1-product-3): the latency/budget-under-load sub-clause is now machine-proven, not just sequentially timed -- MemoryRetrievalLoadTest fires 180 concurrent MemoryRetrievalService.retrieve() calls (24-thread pool, wider than the configured HikariCP pool of 10) across a 10-user, ~212-row-per-user corpus; two honest runs measured p95 ~244-258ms/p99 ~249-268ms with zero budget violations, zero prohibited-memory leakage and zero relevant-recall misses under concurrency (evidence/innovation/INNO-INNER-010/). This was H2 in-memory, not PostgreSQL/pgvector, and is a measurement pass only (no retrieval-scoring code changed). Still remaining: blind human-rated retrieval quality and contradiction calibration (both human/real-provider gates), plus rerunning this exact load methodology on a live Postgres+Redis topology."}
-      - {id: PROFILE-PROPAGATION, target: "Correction and withdrawal re-evaluate downstream insights, vectors, caches, capsules, and matching.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-INNER-001/, evidence/innovation/INNO-INNER-003/, evidence/integration/FINAL-STABILIZATION-2026-07-20/], remaining: "Playwright proves targeted memory correction, exact-star removal, capsule needs-review propagation, rollback and irreversible forgetting. Still open: complete receipts across every cache/vector/derived export under real-provider and production topologies."}
+      - id: PROFILE-PROPAGATION
+        target: "Correction and withdrawal re-evaluate downstream insights, vectors, caches, capsules, and matching."
+        status: IN_PROGRESS
+        evidence: [evidence/innovation/INNO-INNER-001/, evidence/innovation/INNO-INNER-003/, evidence/integration/FINAL-STABILIZATION-2026-07-20/, evidence/integration/CLOSED-LOOP-API-JOURNEY-2026-07-23/]
+        remaining: |
+          Playwright proves targeted memory correction, exact-star removal, capsule needs-review
+          propagation, rollback and irreversible forgetting. 2026-07-23 (branch codex/w1-product-4):
+          added the missing real-API-layer proof (not browser, not a direct service call) --
+          MemoryCorrectionCapsuleClosedLoopApiJourneyTest drives real HTTP register -> capsule
+          creation -> visitor persona-chat -> owner memory correction -> capsule NEEDS_REVIEW
+          (verified via GET) -> visitor's next request genuinely 403s -> owner's own
+          GET /api/me/data-rights/receipts shows the real CAPSULE_MATCH_INDEX and MEMORY_EMBEDDING
+          retraction receipts -> correction history/retire, with two real registered accounts and
+          real cross-request sessions. mvn test -Dtest=MemoryCorrectionCapsuleClosedLoopApiJourneyTest
+          -> 1/1 green; broader mvn test -Dtest="com.innercosmos.controller.**" -> 111/111. Still
+          open: complete receipts across every cache/vector/derived export under real-provider and
+          production topologies (this test uses H2 + Mock, one linear journey, not an exhaustive
+          matrix of every correction/withdrawal variant).
       - {id: STARFIELD-V2, target: "Starfield visual semantics, time/topic/person exploration, provenance detail, accessible alternative, and mobile performance pass.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-INNER-001/, evidence/innovation/INNO-INNER-002/, evidence/innovation/INNO-INNER-003/, evidence/innovation/INNO-INNER-004/]}
 
   - id: G6
@@ -375,7 +392,20 @@ gates:
           human-fidelity-panel gates.
       - {id: CAPSULE-SAFETY, target: "Fact, style, habit, boundary, leakage, adversarial, and longitudinal evaluations pass.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CAP-001/, evidence/innovation/INNO-CAP-002/, evidence/innovation/INNO-CAP-003/, evidence/innovation/INNO-CAP-008/, evidence/innovation/INNO-CAP-009/]}
       - {id: MATCH-MULTI, target: "Mirror, Complement, Growth Edge, Serendipity, and Contextual matching are explainable and user-controllable.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CAP-005/, evidence/innovation/INNO-CAP-010/], remaining: "INNO-CAP-010 adds the two missing scoring stages: a bidirectional block safety filter and an MMR diversity re-rank (both deterministic, tested). Matching remains lexical/theme-family based; embedding/user-vector similarity and calibrated semantic relevance remain the real-provider human gate."}
-      - {id: SOCIAL-CLOSED-LOOP, target: "Discovery, capsule conversation, slow letter, mutual connection, refusal, report, and withdrawal work end to end.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CAP-001/, evidence/innovation/INNO-CAP-002/, evidence/innovation/INNO-CAP-003/, evidence/innovation/INNO-CAP-004/, evidence/innovation/INNO-CAP-006/, evidence/innovation/INNO-CAP-007/, evidence/integration/FINAL-STABILIZATION-2026-07-20/], remaining: "Local E2E now proves publish -> visitor capsule conversation -> slow letter -> owner inbox -> withdrawal and connection consent, while persistent account provenance keeps synthetic QA users out of discovery. Still open: non-author longitudinal quality, notification/device delivery and production moderation operations."}
+      - id: SOCIAL-CLOSED-LOOP
+        target: "Discovery, capsule conversation, slow letter, mutual connection, refusal, report, and withdrawal work end to end."
+        status: IN_PROGRESS
+        evidence: [evidence/innovation/INNO-CAP-001/, evidence/innovation/INNO-CAP-002/, evidence/innovation/INNO-CAP-003/, evidence/innovation/INNO-CAP-004/, evidence/innovation/INNO-CAP-006/, evidence/innovation/INNO-CAP-007/, evidence/integration/FINAL-STABILIZATION-2026-07-20/, evidence/integration/CLOSED-LOOP-API-JOURNEY-2026-07-23/]
+        remaining: |
+          Local E2E now proves publish -> visitor capsule conversation -> slow letter -> owner inbox
+          -> withdrawal and connection consent, while persistent account provenance keeps synthetic
+          QA users out of discovery. 2026-07-23 (branch codex/w1-product-4): added a real-HTTP
+          (non-browser) proof of the publish -> visitor persona-chat -> owner correction -> capsule
+          withdrawal -> visitor's next real request 403s slice of this chain
+          (MemoryCorrectionCapsuleClosedLoopApiJourneyTest); the slow-letter/connection-consent half
+          keeps its existing Playwright/FINAL-STABILIZATION evidence, not re-proven here. Still open:
+          non-author longitudinal quality, notification/device delivery and production moderation
+          operations.
       - {id: SIMULATOR-ASSET, target: "An isolated consent-bound simulator demo proves reusable fidelity technology without covert personal-data training.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-CAP-009/]}
 
   - id: G7
