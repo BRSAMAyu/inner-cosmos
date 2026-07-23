@@ -149,6 +149,20 @@ describe("LettersInbox", () => {
     expect(screen.getByText("线程里的信")).toBeVisible();
   });
 
+  // W2 UIUX audit follow-up: the thread-item button rendered <strong>label</strong><small>status</small>
+  // with no aria-label, so its accessible name concatenated into a run-on string (e.g. "往来 #9ACTIVE").
+  // Same shape as the ProductShellNavigation run-on bug this campaign already fixed. Fixed with a
+  // properly separated aria-label and aria-hidden on the visual duplicate.
+  it("gives the thread-item button a separated accessible name (label + status), not a run-on concatenation", () => {
+    render(<LettersInbox letterInbox={[]} replyDrafts={{}} threads={[{ id: 9, firstLetterId: 1, participantA: 1, participantB: 2, capsuleId: 4, status: "ACTIVE", lastLetterAt: null }]}
+      connectionRequests={{ incoming: [], outgoing: [] }} friends={[]}
+      isDraftBusy={() => false} isLetterActionBusy={() => false} isConnectionDecisionBusy={() => false} isConnectionLeaveBusy={() => false} isLetterConnectionBusy={() => false} onReplyDraftChange={() => undefined} onReply={() => undefined} onActOnLetter={() => undefined}
+      onReportLetter={() => undefined} onRequestConnection={() => undefined}
+      onDecideConnection={() => undefined} onLeaveConnection={() => undefined} />);
+    fireEvent.click(screen.getByRole("tab", { name: /往来/ }));
+    expect(screen.getByRole("button", { name: "往来 #9 · ACTIVE" })).toBeInTheDocument();
+  });
+
   it("renders tabs, inbox actions and consent panel in English when locale is en-SG", () => {
     render(<LettersInbox locale="en-SG" letterInbox={[letter]} replyDrafts={{ 7: "thanks" }}
       connectionRequests={{ incoming: [{ id: 3, status: "PENDING", userId: 5, nickname: "Mira", username: "mira", source: "SLOW_LETTER" }], outgoing: [] }}

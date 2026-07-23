@@ -16,7 +16,8 @@ const COPY: Record<Locale, {
   willKnow: string; willKnowBusy: string; block: string; blockBusy: string; report: string; reportBusy: string;
   outboxIntro: string; outboxEmpty: string; arrivalEta: (time: string) => string; archiveLetter: string; archiveBusy: string;
   draftsIntro: string; draftsEmpty: string; untitledDraft: string; draftStatus: string; sendDraftBusy: string; sendDraft: string;
-  threadsIntro: string; threadsEmpty: string; threadItem: (id: number) => string; threadPickPrompt: string; threadLoading: string;
+  threadsIntro: string; threadsEmpty: string; threadItem: (id: number) => string; threadItemAria: (label: string, statusText: string) => string;
+  threadPickPrompt: string; threadLoading: string;
   threadLettersEmpty: string; threadLettersError: string;
   consentAria: string; awaitingYou: string; noIncoming: string; wantsToKnow: (name: string) => string; accept: string; acceptBusy: string; declineConn: string; declineConnBusy: string;
   awaitingThem: string; noOutgoing: string; notYetAgreed: string; bothAgreed: string; noFriends: string; leave: string; leaveBusy: string;
@@ -35,7 +36,8 @@ const COPY: Record<Locale, {
     draftsIntro: "还没寄出的信留在这里。你可以慢慢改，准备好了再让它启程——寄出后它会按慢信的节奏抵达。", draftsEmpty: "没有草稿。", untitledDraft: "未命名草稿", draftStatus: "草稿",
     sendDraftBusy: "正在寄出", sendDraft: "让这封信启程",
     threadsIntro: "同一段关系里来回的慢信会聚成一条往来。点开看看你们之间慢慢积累的对话。", threadsEmpty: "还没有形成往来的慢信线程。",
-    threadItem: id => `往来 #${id}`, threadPickPrompt: "选一段往来，看你们之间的慢信。", threadLoading: "正在读取这段往来…",
+    threadItem: id => `往来 #${id}`, threadItemAria: (label, statusText) => `${label} · ${statusText}`,
+    threadPickPrompt: "选一段往来，看你们之间的慢信。", threadLoading: "正在读取这段往来…",
     threadLettersEmpty: "这段往来里还没有信件。", threadLettersError: "暂时读不到这段往来，请稍后再试。",
     consentAria: "双向连接同意", awaitingYou: "等待你决定", noIncoming: "没有新的连接邀请", wantsToKnow: name => `${name} 想在慢信之后认识你`, accept: "我也愿意", acceptBusy: "正在同意", declineConn: "暂不连接", declineConnBusy: "正在婉拒",
     awaitingThem: "等待对方决定", noOutgoing: "没有等待中的邀请", notYetAgreed: "尚未同意，不会提前开放真人连接", bothAgreed: "双方已同意", noFriends: "还没有建立真人连接", leave: "退出连接", leaveBusy: "正在退出"
@@ -54,7 +56,8 @@ const COPY: Record<Locale, {
     draftsIntro: "Letters not yet sent stay here. Revise slowly and send when ready — once sent, it arrives at a slow letter's pace.", draftsEmpty: "No drafts.", untitledDraft: "Untitled draft", draftStatus: "Draft",
     sendDraftBusy: "Sending", sendDraft: "Send this letter",
     threadsIntro: "Letters back and forth in one relationship gather into a thread. Open one to see the conversation you've slowly built.", threadsEmpty: "No slow-letter threads yet.",
-    threadItem: id => `Thread #${id}`, threadPickPrompt: "Pick a thread to see the letters between you.", threadLoading: "Loading this thread…",
+    threadItem: id => `Thread #${id}`, threadItemAria: (label, statusText) => `${label} · ${statusText}`,
+    threadPickPrompt: "Pick a thread to see the letters between you.", threadLoading: "Loading this thread…",
     threadLettersEmpty: "No letters in this thread yet.", threadLettersError: "Couldn't load this thread right now -- try again shortly.",
     consentAria: "Mutual connection consent", awaitingYou: "Awaiting your decision", noIncoming: "No new connection invitations", wantsToKnow: name => `${name} would like to know you after the letters`, accept: "I'd like to too", acceptBusy: "Accepting", declineConn: "Not yet", declineConnBusy: "Declining",
     awaitingThem: "Awaiting their decision", noOutgoing: "No pending invitations", notYetAgreed: "Not yet agreed — a real connection won't open early", bothAgreed: "Both agreed", noFriends: "No real connections yet", leave: "Leave connection", leaveBusy: "Leaving"
@@ -138,9 +141,19 @@ export function LettersInbox({ letterInbox, letterOutbox = [], threads = [], thr
       <p className="resonance-intro">{t.threadsIntro}</p>
       {threads.length === 0 ? <div className="network-empty">{t.threadsEmpty}</div> : <div className="letter-threads">
         <ul className="thread-list" role="list">
-          {threads.map(thread => <li key={thread.id}><button type="button" className={"thread-item" + (selectedThreadId === thread.id ? " is-selected" : "")} aria-pressed={selectedThreadId === thread.id} onClick={() => onOpenThread?.(thread.id)}>
-            <strong>{t.threadItem(thread.id)}</strong><small>{thread.status}{thread.lastLetterAt ? ` · ${new Date(thread.lastLetterAt).toLocaleDateString(locale)}` : ""}</small>
-          </button></li>)}
+          {threads.map(thread => {
+            const label = t.threadItem(thread.id);
+            const statusText = `${thread.status}${thread.lastLetterAt ? ` · ${new Date(thread.lastLetterAt).toLocaleDateString(locale)}` : ""}`;
+            // W2 UIUX audit: same run-on-naming shape as ProductShellNavigation's five-space tabs --
+            // <strong>label</strong><small>status</small> sit with no separator inside this button, so
+            // its accessible name would concatenate into one run-on string (e.g. "往来 #3FLYING").
+            // aria-hidden the visual duplicate and give the button a properly separated aria-label.
+            return <li key={thread.id}><button type="button" className={"thread-item" + (selectedThreadId === thread.id ? " is-selected" : "")}
+              aria-pressed={selectedThreadId === thread.id} aria-label={t.threadItemAria(label, statusText)}
+              onClick={() => onOpenThread?.(thread.id)}>
+              <strong aria-hidden="true">{label}</strong><small aria-hidden="true">{statusText}</small>
+            </button></li>;
+          })}
         </ul>
         <div className="thread-letters" aria-live="polite">
           {!selectedThreadId ? <div className="network-empty">{t.threadPickPrompt}</div>

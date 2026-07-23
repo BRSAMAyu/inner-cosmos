@@ -121,6 +121,34 @@ describe("CapsuleWorkbench", () => {
     expect(onSaveContext).toHaveBeenCalledWith({ ownerContextNote: "更新后的备注", standInEnabled: false, realContactPolicy: "LETTER_ONLY" });
   });
 
+  // W2 UIUX audit follow-up: each memory checkbox's <label> wrapped <strong>title</strong>
+  // <small>layer · version</small> with no separator, so the wrapped checkbox's accessible name
+  // concatenated into a run-on string (live-verified against a real memory: label.textContent ===
+  // "今日沉淀EPISODIC · v1"). Same shape as the ProductShellNavigation run-on bug this campaign
+  // already fixed. Fixed with an explicit aria-label on the checkbox and aria-hidden on the visual
+  // duplicate, in both the create-tab list and the review-tab "compact" list.
+  it("gives each memory checkbox a separated accessible name (title + layer/version), not a run-on concatenation", () => {
+    render(<CapsuleWorkbench capsules={[]} selectedCapsuleId={null} selectedCapsule={null} selectableMemories={[memory]}
+      selectedMemoryIds={[]} capsuleName="" capsuleIntro="" capsulePreview={null} capsuleBusy={false} genomeHistory={[]} fidelitySummary={[]}
+      sandboxQuestion="" sandboxResult={null} sandboxFeedback={null} onSelectCapsule={() => undefined}
+      onToggleMemory={() => undefined} onCapsuleName={() => undefined} onCapsuleIntro={() => undefined}
+      onPreviewNewCapsule={() => undefined} onCancelPreview={() => undefined} onCreateCapsule={() => undefined}
+      onRecompile={() => undefined} onSandboxQuestion={() => undefined} onRunSandbox={() => undefined}
+      onRateSandbox={() => undefined} onPublish={() => undefined} onPause={() => undefined} onArchive={() => undefined} />);
+    expect(screen.getByLabelText("一次和解 · EPISODIC · v1")).toBeInTheDocument();
+  });
+
+  it("gives the review-tab compact memory checkbox the same separated accessible name", () => {
+    render(<CapsuleWorkbench capsules={[capsule]} selectedCapsuleId={capsule.id} selectedCapsule={capsule} selectableMemories={[memory]}
+      selectedMemoryIds={[1]} capsuleName="" capsuleIntro="" capsulePreview={null} capsuleBusy={false} genomeHistory={[genomeVersion]} fidelitySummary={[]}
+      sandboxQuestion="" sandboxResult={null} sandboxFeedback={null} onSelectCapsule={() => undefined}
+      onToggleMemory={() => undefined} onCapsuleName={() => undefined} onCapsuleIntro={() => undefined}
+      onPreviewNewCapsule={() => undefined} onCancelPreview={() => undefined} onCreateCapsule={() => undefined}
+      onRecompile={() => undefined} onSandboxQuestion={() => undefined} onRunSandbox={() => undefined}
+      onRateSandbox={() => undefined} onPublish={() => undefined} onPause={() => undefined} onArchive={() => undefined} />);
+    expect(screen.getByLabelText("一次和解 · v1")).toBeInTheDocument();
+  });
+
   it("renders the workbench and boundary editor in English when locale is en-SG", () => {
     render(<CapsuleWorkbench locale="en-SG" capsules={[capsule]} selectedCapsuleId={capsule.id} selectedCapsule={capsule} selectableMemories={[memory]}
       selectedMemoryIds={[1]} capsuleName="" capsuleIntro="" capsulePreview={null} capsuleBusy={false} genomeHistory={[genomeVersion]} fidelitySummary={[]}

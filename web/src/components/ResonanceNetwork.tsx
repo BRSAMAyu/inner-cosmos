@@ -7,7 +7,8 @@ const strategyOrder: ResonanceStrategy[] = ["MIRROR", "COMPLEMENT", "GROWTH_EDGE
 const COPY: Record<Locale, {
   aria: string; heading: string; count: (n: number) => string; intro: string; strategyAria: string;
   strategy: Record<ResonanceStrategy, string>; emptyMatches: string; railAria: string; resonantNow: string;
-  exploreMeet: string; identityNotice: string; entryP: string; enterBusy: string; enterBtn: string;
+  exploreMeet: string; matchCardAria: (pseudonym: string, summary: string) => string;
+  identityNotice: string; entryP: string; enterBusy: string; enterBtn: string;
   quota: (remaining: number | string) => string; quotaNote: string; personaHistAria: string; historyStart: string;
   speakerYou: string; writeToCapsule: string; sendBusy: string; sendTurn: string; letterStepTitle: string;
   letterStepNote: string; seedWarning: string; letterFlightTitle: string; letterArrival: (time: string, status: string) => string;
@@ -20,7 +21,8 @@ const COPY: Record<Locale, {
     strategyAria: "选择共鸣匹配方式",
     strategy: { MIRROR: "相似共鸣", COMPLEMENT: "有意义的互补", GROWTH_EDGE: "成长边缘", SERENDIPITY: "温和偶遇", CONTEXTUAL: "阶段同行" },
     emptyMatches: "暂时没有足够安全的相遇候选。Inner Cosmos 不会用随机陌生人填满这里。", railAria: "共鸣候选",
-    resonantNow: "此刻同行", exploreMeet: "探索相遇", identityNotice: "授权 AI 共鸣体 · 不是真人实时在线",
+    resonantNow: "此刻同行", exploreMeet: "探索相遇", matchCardAria: (name, summary) => `${name} · ${summary}`,
+    identityNotice: "授权 AI 共鸣体 · 不是真人实时在线",
     entryP: "先问一两个真正重要的问题。它只能使用创建者明确授权的侧面，也不会把你的 Aurora 私有画像带进这段对话。",
     enterBusy: "正在进入", enterBtn: "进入有限但自然的对话", quota: r => `今天还可深入 ${r} 轮`,
     quotaNote: "额度用于防滥用；模型故障不会扣次数，达到边界后会自然引导慢信。", personaHistAria: "共鸣体对话记录",
@@ -39,7 +41,8 @@ const COPY: Record<Locale, {
     strategyAria: "Choose a resonance matching strategy",
     strategy: { MIRROR: "Similar resonance", COMPLEMENT: "Meaningful complement", GROWTH_EDGE: "Growth edge", SERENDIPITY: "Gentle serendipity", CONTEXTUAL: "Same-season company" },
     emptyMatches: "No safe-enough candidates for now. Inner Cosmos won't fill this with random strangers.", railAria: "Resonance candidates",
-    resonantNow: "Alongside now", exploreMeet: "Explore a meeting", identityNotice: "Authorized AI capsule · not a real person online",
+    resonantNow: "Alongside now", exploreMeet: "Explore a meeting", matchCardAria: (name, summary) => `${name} · ${summary}`,
+    identityNotice: "Authorized AI capsule · not a real person online",
     entryP: "Start with one or two questions that truly matter. It can only use facets the creator explicitly authorized, and won't bring your private Aurora portrait into this conversation.",
     enterBusy: "Entering", enterBtn: "Enter a limited but natural conversation", quota: r => `${r} more turn${r === 1 ? "" : "s"} today`,
     quotaNote: "The quota guards against misuse; a model failure never costs a turn, and reaching the boundary gently guides you to a slow letter.", personaHistAria: "Capsule conversation log",
@@ -79,11 +82,18 @@ export function ResonanceNetwork({ resonanceMatches, resonanceStrategy, visitorB
     {resonanceMatches[0] && <p className="strategy-explanation"><strong>{resonanceMatches[0].strategyLabel}</strong> · {resonanceMatches[0].strategyDescription}</p>}
     {resonanceMatches.length === 0 ? <div className="network-empty">{t.emptyMatches}</div> : <>
       <div className="match-rail" role="list" aria-label={t.railAria}>
+        {/* W2 UIUX audit: same run-on-naming shape as ProductShellNavigation's five-space tabs, but
+            worse here -- with no aria-label this button's accessible name would concatenate its
+            badge + pseudonym + the full user-authored intro paragraph + the match summary into one
+            unreadable run-on string (live-verified against a real seeded capsule). aria-hidden the
+            visual content and give the button itself a short, properly separated aria-label; the
+            visual card layout is unchanged. */}
         {resonanceMatches.map(match => <button type="button" role="listitem" key={match.capsule.id}
           className={visitorMatch?.capsule.id === match.capsule.id ? "match-card active" : "match-card"}
-          onClick={() => onChooseMatch(match.capsule.id)}><span>{match.resonant ? t.resonantNow : t.exploreMeet}</span>
-          <strong>{match.capsule.pseudonym}</strong><p className="ugc-text">{match.capsule.intro}</p>
-          <small>{match.matchSummary}</small></button>)}
+          aria-label={t.matchCardAria(match.capsule.pseudonym, match.matchSummary)}
+          onClick={() => onChooseMatch(match.capsule.id)}><span aria-hidden="true">{match.resonant ? t.resonantNow : t.exploreMeet}</span>
+          <strong aria-hidden="true">{match.capsule.pseudonym}</strong><p className="ugc-text" aria-hidden="true">{match.capsule.intro}</p>
+          <small aria-hidden="true">{match.matchSummary}</small></button>)}
       </div>
       {visitorMatch && <div className="visitor-workbench">
         <header><div><span className="identity-notice">{t.identityNotice}</span><h3>{visitorMatch.capsule.pseudonym}</h3>
