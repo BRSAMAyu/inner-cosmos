@@ -69,6 +69,17 @@ class AuroraInnerVoiceEnabledStreamTest {
         assertTrue(body.contains("\"voiceId\":\"warm_gentle_female\""),
                 "inner_voice payload must carry the resolved (default) voiceId; got:\n" + body);
         assertTrue(body.contains("event:turn.completed"), "turn must still complete normally; got:\n" + body);
+        // Voice-polish fix: inner_voice must arrive AFTER turn.completed (not before), so a
+        // slow-but-successful TTS synthesis never delays the turn's formal closeout. The frontend
+        // SSE reader reads until connection close (not until a terminal event), so it still
+        // receives this late inner_voice. Failing-first against the pre-fix order (inner_voice
+        // before turn.completed).
+        int turnCompletedAt = body.indexOf("event:turn.completed");
+        int innerVoiceAt = body.indexOf("event:inner_voice");
+        assertTrue(turnCompletedAt >= 0 && innerVoiceAt >= 0
+                        && turnCompletedAt < innerVoiceAt,
+                "inner_voice must be emitted AFTER turn.completed so it never delays turn closeout; got order turn.completed@"
+                        + turnCompletedAt + " inner_voice@" + innerVoiceAt + ":\n" + body);
     }
 
     @TestConfiguration

@@ -620,23 +620,31 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 if (choreographyService != null && reply.turnId != null) {
                     choreographyService.completeTurn(userId, reply.turnId);
                 }
+                // VS-003b — meta now carries the full perception payload (agentLoop,
+                // aiState, voice/weather/location/timezone) so the frontend can render
+                // the same panels on stream as on the POST fallback path. Emitted (with
+                // turn.completed) BEFORE the inner-voice synthesis below, so the turn's formal
+                // closeout and the next-send / settle-it-today gating it unlocks happen immediately.
+                emitLive(emitter, clientConnected, userId, reply.turnId, eventSequence++, "meta",
+                        jsonMeta(reply, request, null), false);
+                // turn.completed also advances the sequence so the inner_voice event emitted next
+                // gets a strictly-higher, collision-free event id (the frontend dedups live events
+                // by id -- a shared sequence would silently drop the inner_voice). The `terminal`
+                // flag, not the sequence value, marks this as terminal in the live store.
+                emitLive(emitter, clientConnected, userId, reply.turnId, eventSequence++, "turn.completed",
+                        "{\"message\":\"done\"}", true);
                 // W1 — Aurora's "inner voice" (心声): at most one inner_voice event per turn,
-                // strictly additive. Composition already ran best-effort inside
-                // dualKernelRuntime.generate() (produceReply set reply.innerVoiceText to null on
-                // any failure/opt-out). KNOWN FOLLOW-UP (see AURORA-INNER-VOICE acceptance item):
-                // this synthesis is a blocking call bounded by tts.timeout-ms (default 8s). The
-                // try/catch below only guarantees a TTS *failure* omits the event without failing
-                // the turn -- a SLOW-but-SUCCESSFUL synthesis still blocks here and therefore
-                // delays the meta/turn.completed/done events emitted just below by up to that
-                // timeout. The spoken-reply bubbles are already streamed above this point, so the
-                // user is not waiting for content, but the turn's formal closeout (and the next-send
-                // / settle-it-today gating it unlocks) can lag by the synthesis latency. With the
-                // default tts.enabled=false this whole block is skipped (no-op in dev/CI). The proper
-                // fix -- emit the terminal events first, then synthesize+emit inner_voice before
-                // connection close, with the frontend SSE reader confirmed to keep reading past
-                // turn.completed -- is tracked as a focused voice-polish round (it touches the
-                // just-written AuroraInnerVoiceEnabledStreamTest + the frontend reader contract
-                // together, so it is not a drive-by change).
+                // strictly additive and NON-BLOCKING to turn completion. Composition already ran
+                // best-effort inside dualKernelRuntime.generate() (produceReply set
+                // reply.innerVoiceText to null on any failure/opt-out). By synthesizing + emitting
+                // AFTER meta/turn.completed (and before the final done/close), a SLOW-but-SUCCESSFUL
+                // synthesis -- bounded by tts.timeout-ms (default 8s) -- can only delay the spoken
+                // inner-voice audio itself, never the turn's closeout: the UI already marked the turn
+                // complete above. The frontend SSE reader reads until connection close (not until a
+                // terminal event), so it still receives this late inner_voice and appends it. The
+                // try/catch only omits the event on a TTS failure -- a failure can never fail the
+                // turn. With the default tts.enabled=false this whole block is skipped (no-op in
+                // dev/CI).
                 if (reply.innerVoiceText != null && !reply.innerVoiceText.isBlank()) {
                     try {
                         if (ttsClient != null && ttsClient.available()) {
@@ -654,13 +662,6 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                                 userId, reply.turnId, innerVoiceFailure.getMessage());
                     }
                 }
-                // VS-003b — meta now carries the full perception payload (agentLoop,
-                // aiState, voice/weather/location/timezone) so the frontend can render
-                // the same panels on stream as on the POST fallback path.
-                emitLive(emitter, clientConnected, userId, reply.turnId, eventSequence++, "meta",
-                        jsonMeta(reply, request, null), false);
-                emitLive(emitter, clientConnected, userId, reply.turnId, eventSequence, "turn.completed",
-                        "{\"message\":\"done\"}", true);
                 // Preserve the original done contract used by the current frontend.
                 sendStream(emitter, clientConnected,
                         SseEmitter.event().name("done").data("{\"message\":\"done\"}"));
