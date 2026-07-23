@@ -6,7 +6,12 @@ server:
     session:
       cookie:
         http-only: true
-        same-site: lax
+        # A demo APK's WebView origin (https://localhost, see web/capacitor.config.json) is
+        # cross-site relative to a tunneled backend origin, so its session cookie needs
+        # SameSite=None (which requires Secure=true) to survive that cross-origin fetch --
+        # same-site: lax silently drops it. Override both via env for that scenario only;
+        # same-site: lax + secure: false remain the safe defaults for plain local dev.
+        same-site: ${COOKIE_SAME_SITE:lax}
         secure: ${COOKIE_SECURE:false}
   tomcat:
     threads:
@@ -75,6 +80,11 @@ management:
     health:
       show-details: when_authorized
       show-components: when_authorized
+      # Spring Boot's "when_authorized" is satisfied by ANY authenticated principal unless a
+      # roles list is set here -- and registration is public/unauthenticated, so without this,
+      # anyone who self-registers in seconds unlocks full health details (DB status/errors, JVM
+      # memory) at the permitAll /actuator/health endpoint (2026-07-24 8-agent audit P2-16).
+      roles: ADMIN
       # Kubernetes liveness must only ever reflect "is this JVM's own event loop still
       # alive", never a transient PostgreSQL/Redis/AI-provider outage — otherwise a
       # dependency blip triggers a liveness-driven restart storm across every replica
@@ -241,3 +251,30 @@ inner-cosmos:
   safety:
     semantic-recheck:
       enabled: ${SAFETY_SEMANTIC_RECHECK_ENABLED:true}
+
+---
+# 2026-07-24 8-agent audit (P1-7): CLAUDE.md documents `./mvnw spring-boot:run` (dev profile, H2 +
+# Mock, no Redis) as the zero-config quick start, and its own verification guidance says to poll
+# /actuator/health. Without this, that exact documented path reports DOWN (Spring Boot's Redis
+# health indicator has no local Redis to reach) even though every dev-profile feature needing
+# Redis already defaults its own *_ENABLED flag to false, so there is nothing real to report on.
+# Scoped to the `dev` profile only (via this document's own activation guard) so profiles that do
+# run real Redis (local-complete, prod, academy-eks) keep the real health signal unchanged.
+# NOTE: src/main/resources/application-dev.yml is gitignored (a personal/local override file, not
+# shipped to other checkouts) -- this fix belongs in the tracked file so it survives a fresh clone.
+spring:
+  config:
+    activate:
+      on-profile: dev
+management:
+  endpoint:
+    health:
+      group:
+        readiness:
+          # Disabling the redis contributor below removes it from existence, so it must also
+          # drop out of this group's include list or Spring Boot fails startup validation
+          # ("Included health contributor 'redis' in group 'readiness' does not exist").
+          include: readinessState,db,custom
+  health:
+    redis:
+      enabled: false

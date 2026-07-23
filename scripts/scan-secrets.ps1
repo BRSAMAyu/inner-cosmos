@@ -77,6 +77,28 @@ if ($History) {
             # covered by the image/container scanner in the release gate.
         }
     }
+
+    # `--exclude-standard` above deliberately respects .git/info/exclude so that other
+    # agents' registered git worktrees (each with their own index) aren't double-scanned
+    # as this worktree's untracked files. That rule also hides .claude/worktrees/** from
+    # this pass entirely -- including orphaned, non-worktree scratch copies left behind
+    # under that path (2026-07-24 8-agent audit finding P0-3: a real API key sat in
+    # plaintext in exactly such an orphaned copy, invisible to this scan). Walk that
+    # directory explicitly on the filesystem, regardless of git-ignore status, so a
+    # stray checkout can never hide a live credential from this scanner again.
+    $worktreesRoot = Join-Path (git rev-parse --show-toplevel) '.claude/worktrees'
+    if (Test-Path -LiteralPath $worktreesRoot) {
+        Get-ChildItem -LiteralPath $worktreesRoot -Recurse -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -notmatch '[\\/](target|\.git|node_modules)[\\/]' } |
+            ForEach-Object {
+                try {
+                    $content = Get-Content -LiteralPath $_.FullName -Raw -Encoding utf8
+                    Test-Content $_.FullName $content
+                } catch {
+                    # Binary or unreadable files are ignored by this text scanner.
+                }
+            }
+    }
 }
 
 if ($findings.Count -gt 0) {

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
-import { api, apiConfigurationError, configureBearerAuth, hasConfiguredApiBase, transcribeAudio, type ClaimCandidate, type CapsuleBoundary, type CapsuleFidelitySummary, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type PersonaMessage, type PersonaSession, type PortraitDimension, type PublicCapsule, type PortraitHistoryEntry, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type PsychologySkillSuggestion, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type StarfieldDetail, type StarfieldScene, type StarfieldStar, type UnderstandingClaim, type UserCorrection } from "./api";
+import { api, apiConfigurationError, configureBearerAuth, demoModeBuild, hasConfiguredApiBase, transcribeAudio, type ClaimCandidate, type CapsuleBoundary, type CapsuleFidelitySummary, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type PersonaMessage, type PersonaSession, type PortraitDimension, type PublicCapsule, type PortraitHistoryEntry, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type PsychologySkillSuggestion, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type StarfieldDetail, type StarfieldScene, type StarfieldStar, type UnderstandingClaim, type UserCorrection } from "./api";
 import { initialMobileState, mobileRuntime, type MobileRuntimeState } from "./mobile";
 import { mobileOidc } from "./mobile-auth";
 import { isTauriRuntime } from "./desktop-runtime";
@@ -399,8 +399,13 @@ export function AuroraApp() {
     if (bootstrappedRef.current) return;
     bootstrappedRef.current = true;
     const native = Capacitor.isNativePlatform() || isTauriRuntime();
-    configureBearerAuth(native ? () => mobileOidc.accessToken() : null, native,
-      native ? () => mobileOidc.expireAccessToken() : null);
+    // Demo-mode native builds (VITE_DEMO_MODE, see scripts/demo/build-demo-apk.sh) fall back to
+    // the same session/password auth the web build uses, instead of hard-requiring OIDC/PKCE --
+    // 2026-07-24 8-agent audit P0-1: a demo APK pointed at a plain-dev backend (OIDC disabled)
+    // could never get past AuthGate's OIDC-only screen at all.
+    const nativeAuthRequired = native && !demoModeBuild;
+    configureBearerAuth(nativeAuthRequired ? () => mobileOidc.accessToken() : null, nativeAuthRequired,
+      nativeAuthRequired ? () => mobileOidc.expireAccessToken() : null);
     let dispose: (() => Promise<void>) | undefined;
     void mobileOidc.initialize(bootstrap, error => {
       setAuthenticated(false);
@@ -1007,7 +1012,7 @@ export function AuroraApp() {
   const logout = async () => {
     let remoteWarning: string | null = null;
     try {
-      if (Capacitor.isNativePlatform() || isTauriRuntime()) {
+      if ((Capacitor.isNativePlatform() || isTauriRuntime()) && !demoModeBuild) {
         try { await mobileOidc.logout(); }
         catch (error) { remoteWarning = error instanceof Error ? error.message : "远程撤销未确认"; }
       }
@@ -1077,7 +1082,7 @@ export function AuroraApp() {
       ? <ConnectError message={bootstrapError} onRetry={() => void bootstrap()} locale={skillLocale} />
       : <LoadingText busy>{tt.connecting.replace(/…$/, "")}</LoadingText>}
   </div></main>;
-  if (!authenticated) return <AuthGate native={mobileState.native} onSuccess={bootstrap} locale={skillLocale}
+  if (!authenticated) return <AuthGate native={mobileState.native && !demoModeBuild} onSuccess={bootstrap} locale={skillLocale}
     externalError={bootstrapError ?? ""} />;
 
   // A freely reachable support space (Phase 0, safety-critical) -- deliberately NOT one of the five

@@ -58,12 +58,26 @@ export GLM_API_KEY="$GLM_KEY"          # present in env regardless; only used if
 export DEEPSEEK_API_KEY="$DS_KEY"      # likewise; only used if LLM_PROVIDER=deepseek
 export LLM_ALLOW_FALLBACK=false        # a demo must show the REAL provider, never silently fall back to Mock
 
+# --- Public-tunnel hardening (2026-07-24 8-agent delivery-readiness audit, P1-4/P1-5/P1-7) ---
+# The whole point of this script is to be reachable over a public Cloudflare Tunnel (see
+# docs/demo/DEMO-RUNBOOK.md), so it must not run with plain-localhost-only defaults.
+export COOKIE_SECURE=true                                    # tunnel is HTTPS end-to-end; never ship an insecure cookie publicly
+export COOKIE_SAME_SITE=none                                 # the demo APK's WebView origin (https://localhost) is cross-site from
+                                                               # the tunnel origin; SameSite=Lax silently drops the session cookie there
+export INNER_COSMOS_SECURITY_TRUSTED_PROXY_ENABLED=true       # honor X-Forwarded-For from cloudflared so rate limits are per-visitor,
+                                                               # not one shared bucket for every judge hitting the tunnel from localhost
+export MANAGEMENT_HEALTH_REDIS_ENABLED=false                  # this demo path never starts Redis; without this the health
+                                                               # endpoint falsely reports DOWN even though the app works fine
+# Never combine this demo path with SPRING_PROFILES_ACTIVE=demo/mysql or SEED_ENABLED=true: those
+# profiles default seed-enabled:true, which would put a hardcoded admin/admin123 account on the
+# public tunnel. This script intentionally never sets either.
+
 # JAVA_HOME for the Maven wrapper on Windows.
 if [ -z "${JAVA_HOME:-}" ] && [ -d "/c/Program Files/Java/jdk-21.0.10" ]; then
   export JAVA_HOME="/c/Program Files/Java/jdk-21.0.10"
 fi
 
-echo "Starting Inner Cosmos on :${PORT} with LLM_PROVIDER=glm + real embedding + real TTS..."
+echo "Starting Inner Cosmos on :${PORT} with LLM_PROVIDER=${DEMO_PROVIDER} + real embedding + real TTS..."
 echo "Health check:  http://localhost:${PORT}/actuator/health"
 echo "App:           http://localhost:${PORT}/app/aurora/"
 echo "(Keep this terminal open. Stop with Ctrl+C.)"

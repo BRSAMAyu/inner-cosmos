@@ -22,9 +22,10 @@ the tunnel. The tunnel also gives a **valid HTTPS** URL, which mobile apps requi
 bash scripts/demo/run-demo-server.sh
 ```
 
-This boots Spring Boot on **:8080** with the **real GLM** chat provider + **real Qwen embedding** +
-**real Qwen TTS** (keys read from `API及文档.txt`), dev H2 DB, Mock disabled for the configured
-providers. Wait for `Started InnerCosmosApplication`. Health: `http://localhost:8080/actuator/health`.
+This boots Spring Boot on **:8080** with a **real chat provider** (DeepSeek by default; the script's
+own startup line prints exactly which one is active) + **real Qwen embedding** + **real Qwen TTS**
+(keys read from `API及文档.txt`), dev H2 DB, Mock disabled for the configured providers. Wait for
+`Started InnerCosmosApplication`. Health: `http://localhost:8080/actuator/health`.
 
 > If :8080 is already taken by another instance, set `DEMO_PORT=8086` before running the script and
 > use that port in the tunnel command below.
@@ -45,10 +46,14 @@ URL, not your IP. Share this URL with the class.
   for most of the class.
 - **App downloaders**: build a demo APK pointed at that URL (step 3).
 
-### Stable URL across restarts (optional, for "smooth and easy")
+### Stable URL across restarts (do this before an unattended/asynchronous grading window)
 
-A free quick-tunnel URL is random and changes if you restart cloudflared. For a **stable, memorable
-URL** (e.g. `https://inner-cosmos-demo.your-domain.com`) that survives restarts and IP changes:
+A free quick-tunnel URL is random and changes if you restart cloudflared — and any already-built demo
+APK, or a URL already shared with judges, silently breaks on that restart with no error pointing at
+the cause. This is **optional for a live, supervised, single-session demo** where you control every
+restart, but it is **not optional** if grading happens asynchronously or the laptop might sleep/reboot
+during the window — set this up first in that case. For a **stable, memorable URL**
+(e.g. `https://inner-cosmos-demo.your-domain.com`) that survives restarts and IP changes:
 
 1. Create a free Cloudflare account + add a domain (or a free `.workers.dev` route).
 2. `cloudflared tunnel login`, `cloudflared tunnel create inner-cosmos-demo`, route a hostname to it,
@@ -69,6 +74,15 @@ is a **public HTTPS origin**, so the app's existing production URL validator acc
 **no production security is weakened**. Share the APK; classmates install it and it connects to your
 laptop through the tunnel.
 
+**Login in the APK**: a `VITE_DEMO_MODE=true` build (this script always sets it) uses the same
+username/password login as the website instead of requiring an OIDC identity provider — there is no
+Keycloak to stand up for this path (2026-07-24 8-agent audit P0-1). This *does* require
+`run-demo-server.sh`'s `COOKIE_SECURE=true` + `COOKIE_SAME_SITE=none` (already set by that script) so
+the session cookie survives the cross-origin request from the APK's `https://localhost` WebView
+origin to your tunnel origin. **Verify a real logged-in journey (register → chat → see a reply) on an
+actual installed APK on a real device before relying on this for grading** — it has not yet been
+rehearsed on a physical device over a real network in this repo's evidence.
+
 > If you change the tunnel URL later, rebuild with the new URL. (A runtime server-URL setting inside
 > the app — so classmates can re-point without a rebuild — is a tracked follow-up; the baked demo
 > build is sufficient for a demo.)
@@ -88,11 +102,18 @@ apply. Range/capacity is limited by your laptop's hotspot.
 
 ## 5. Verify before the demo
 
-- Backend health green, and a real Aurora reply (the run script logs the provider; it must be GLM,
-  not Mock fallback).
-- From **another device** (phone on school WiFi), open the tunnel URL → register → send a message →
-  see a real streamed reply + (if you enabled TTS) hear the inner voice.
-- The demo APK installs and reaches the same URL.
+- Backend health green, and a real Aurora reply — the run script's startup line prints
+  `LLM_PROVIDER=<provider>`; confirm the reply isn't the Mock fallback text.
+- From **another device** (phone on school WiFi, not the laptop's own network), open the tunnel URL →
+  register → send a message → see a real streamed reply + (if you enabled TTS) hear the inner voice.
+  Also try an intentionally mundane, slightly-stressed message (e.g. "我今天有点焦虑，工作压力很大") and
+  confirm it gets an ordinary supportive reply, not an emergency-contact/crisis message — a real
+  bug reproduced during the 2026-07-24 audit and fixed, but worth a live sanity check before grading.
+- The demo APK installs on a **real Android device** (not just the emulator) and completes a full
+  register → login → chat journey through the tunnel — this exact path was not yet proven on
+  physical hardware as of the 2026-07-24 audit; rehearse it, don't assume it from the code fix alone.
+- If grading is asynchronous or unattended, confirm the **stable named tunnel** (section 2) is set up
+  and both the backend and `cloudflared` are configured not to die if the laptop sleeps.
 
 ## Troubleshooting
 
@@ -103,4 +124,9 @@ apply. Range/capacity is limited by your laptop's hotspot.
 - **Tunnel URL changed after a restart** → re-share it (free tier) or set up a named tunnel (step 2,
   stable-URL section).
 - **"Mock" replies instead of real LLM** → the provider key wasn't read; confirm `API及文档.txt` is at
-  the repo root and `run-demo-server.sh` printed `LLM_PROVIDER=glm`.
+  the repo root and check exactly which provider name `run-demo-server.sh`'s startup line printed
+  (`LLM_PROVIDER=<deepseek|glm>` — DeepSeek is the current default; it is no longer always GLM).
+- **APK login fails / session doesn't persist** → confirm `run-demo-server.sh` is the script that
+  started the backend (it sets `COOKIE_SECURE=true` + `COOKIE_SAME_SITE=none`, both required for the
+  APK's cross-origin session cookie); a manually-started `spring-boot:run` without those env vars will
+  not work for the APK's login even though the website still will.

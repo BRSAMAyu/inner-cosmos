@@ -117,8 +117,13 @@ public final class PseudoSemanticAnalyzer {
         // Calculate intensity score (0-10)
         result.intensityScore = calculateIntensity(text, result.sentimentScore);
 
-        // Determine sentiment label
-        result.sentimentLabel = categorizeSentiment(result.sentimentScore);
+        // Determine sentiment label. CRISIS must never be reachable by summing several
+        // ordinary mild-negative words (e.g. "焦虑"=-3 + "压力"=-2 clamps to -5) -- only a
+        // genuine severe/self-harm signal may cross that line (2026-07-24 8-agent audit
+        // P0-2: "我今天有点焦虑，工作压力很大" was reproducibly misclassified as CRISIS and
+        // answered with an emergency-support referral).
+        boolean severeRiskSignal = "SELF_HARM".equals(result.primaryIntent) || hasSevereNegativeWord(text);
+        result.sentimentLabel = categorizeSentiment(result.sentimentScore, severeRiskSignal);
 
         // Suggest conversation mode
         result.suggestedMode = suggestMode(result.primaryIntent, result.sentimentLabel);
@@ -254,9 +259,14 @@ public final class PseudoSemanticAnalyzer {
 
     /**
      * Categorize sentiment score into label.
+     *
+     * @param severeRiskSignal true only when an actual self-harm intent or a single
+     *                         independently-severe lexicon word (score &lt;= -4 on its own,
+     *                         see {@link #hasSevereNegativeWord}) was found -- never true from
+     *                         additively summing several mild-negative words.
      */
-    private static String categorizeSentiment(double score) {
-        if (score <= -4) return "CRISIS";
+    private static String categorizeSentiment(double score, boolean severeRiskSignal) {
+        if (score <= -4 && severeRiskSignal) return "CRISIS";
         if (score <= -2) return "NEGATIVE";
         if (score <= 2) return "NEUTRAL";
         return "POSITIVE";

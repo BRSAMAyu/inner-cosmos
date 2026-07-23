@@ -53,6 +53,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public class MockDataInitializer implements CommandLineRunner {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(MockDataInitializer.class);
     private final UserMapper userMapper;
     private final UserProfileMapper userProfileMapper;
     private final EchoCapsuleMapper capsuleMapper;
@@ -153,6 +154,7 @@ public class MockDataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
+        warnIfSeedAccountsLookPubliclyReachable();
         ensureUser("admin", "admin123", "管理员", Constants.ROLE_ADMIN);
         User demo = ensureUser("demo", "demo123", "林澈", Constants.ROLE_USER);
         User river = ensureUser("river", "demo123", "河岸来信", Constants.ROLE_USER);
@@ -169,6 +171,33 @@ public class MockDataInitializer implements CommandLineRunner {
             emotionBaselineService.bridgeToPortrait(demo.id);
         } catch (Exception e) {
             System.out.println("[MockData] bridgeToPortrait(demo) skipped: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 2026-07-24 8-agent audit (P1-6): this initializer only runs when a non-prod profile sets
+     * {@code inner-cosmos.demo.seed-enabled=true} (see DemoDataConfiguration's {@code @Profile("!prod")}
+     * guard), but {@code application-demo.yml}/{@code application-mysql.yml} both default that flag
+     * to true -- one profile/env-var mix-up away from putting a well-known, guessable
+     * admin/admin123 account on a publicly-tunneled instance. This cannot safely hard-fail startup
+     * (a legitimate LAN-only classroom demo intentionally wants this seed data), so it logs a loud,
+     * impossible-to-miss warning whenever CORS_ALLOWED_ORIGINS names a non-loopback origin, which is
+     * the one signal available at this layer that the instance is meant to be reached from outside
+     * this machine.
+     */
+    private void warnIfSeedAccountsLookPubliclyReachable() {
+        String corsOrigins = System.getenv("CORS_ALLOWED_ORIGINS");
+        if (corsOrigins == null || corsOrigins.isBlank()) return;
+        boolean publicLooking = java.util.Arrays.stream(corsOrigins.split(","))
+                .map(String::trim).filter(value -> !value.isBlank())
+                .anyMatch(origin -> !origin.contains("localhost") && !origin.contains("127.0.0.1"));
+        if (publicLooking) {
+            log.warn("SECURITY WARNING: inner-cosmos.demo.seed-enabled=true is active while "
+                    + "CORS_ALLOWED_ORIGINS ('{}') names a non-localhost origin. This seeds a "
+                    + "well-known admin/admin123 account (plus demo/river/cloud, all demo123). If "
+                    + "this instance is reachable from the public internet (e.g. a Cloudflare "
+                    + "Tunnel), rotate these passwords immediately or disable seed-enabled.",
+                    corsOrigins);
         }
     }
 

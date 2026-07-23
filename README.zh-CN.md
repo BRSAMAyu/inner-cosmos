@@ -1,10 +1,18 @@
 # Inner Cosmos（内宇宙）
 
-[English README](README.md) · [当前组员续跑交接](对齐文档/21-双轨阶段合并审查与完全体续跑交接.md) · [启动部署交接](对齐文档/18-组员与Coding-Agent启动部署交接指南.md) · [完全体总目标](goal-objective.md) · [机器验收账本](docs/goal/complete-product-acceptance.yml)
+[English README](README.md) · [Agent 入口 (CLAUDE.md)](CLAUDE.md) · [当前执行权威](对齐文档/24-完全体最终收敛与云原生课程战役.md) · [启动部署交接](对齐文档/18-组员与Coding-Agent启动部署交接指南.md) · [完全体总目标](goal-objective.md) · [机器验收账本](docs/goal/complete-product-acceptance.yml)
 
 Inner Cosmos 是一个以长期自我理解和慢社交为核心的 AI 原生产品。Aurora 将自然对话逐步沉淀为可追溯、可纠正、可撤回的记忆、画像、关系、情绪与目标模型；用户在明确授权后，可以把其中一部分编译成有边界的 Echo Capsule（共鸣体），先形成理解与共鸣，再决定是否接近真人。
 
 本仓库仍处于完全体持续实现阶段，不是已经完成商业发布的产品。当前已具备五空间 React AppShell、Aurora SSE 编排与打断/重规划、耐久 WakeIntent、记忆来源与纠正传播、数据驱动星空、版本化 Genome 编译脚手架、共鸣发现与对话、慢信、心理 Skill、Capacitor 移动工程，以及本地完整体和 AWS Academy EKS 双轨部署资产。真实 Provider 的完整质量证明、双语/a11y/真实设备覆盖、生产运维与灾备、独立体验评审和若干人类发布门禁仍未关闭；实时状态以验收账本为准。
+
+## 给评委/老师
+
+如果你收到的是一个链接或一个 APK，而不是被要求克隆本仓库，你不需要自己构建——直接看
+**[`docs/demo/DEMO-RUNBOOK.md`](docs/demo/DEMO-RUNBOOK.md)**：用任意浏览器打开对方分享的
+`https://…trycloudflare.com/app/aurora/` 链接（最快的路径），或者在 Android 设备上安装分享的演示
+APK。两者都是连接到操作者自己电脑上通过公网隧道暴露的服务，没有单独的云端部署。如果还没收到链接，
+请向演示者索取，或参考下面的"最快本地启动"章节自行运行。
 
 ## 核心差异
 
@@ -103,16 +111,21 @@ PostgreSQL/Redis Testcontainers 测试依赖可用的 Docker Engine。Docker 缺
 
 ## Coding Agent 接管顺序
 
-Agent 开始编码或部署前，必须依次阅读：
+Agent 开始编码或部署前，必须依次阅读（以 [`CLAUDE.md`](CLAUDE.md) 为准——它是当前准确的入口，下列
+顺序会覆盖它标记为历史的任何旧交接文档或状态文件）：
 
-1. [`AGENTS.md`](AGENTS.md)
+1. [`CLAUDE.md`](CLAUDE.md) —— 技术栈、启动/验证命令与权威文档地图。
 2. [`goal-objective.md`](goal-objective.md)
 3. [`对齐文档/README.md`](对齐文档/README.md)
-4. 当前组员续跑阶段阅读 [当前交接](对齐文档/21-双轨阶段合并审查与完全体续跑交接.md)、[机器状态](docs/goal/teammate-continuation-state.yml) 及被分配的 [docs/tracks/](docs/tracks/) 任务书。
-5. 单 Agent 连续推进时阅读 [`对齐文档/17-单会话持续Goal模式执行协议.md`](对齐文档/17-单会话持续Goal模式执行协议.md)。
-6. [`docs/goal/complete-product-acceptance.yml`](docs/goal/complete-product-acceptance.yml)；并行分支只读，合并后由集成者统一重对账。
-7. 按执行模式读取 [`docs/goal/two-track-convergence.yml`](docs/goal/two-track-convergence.yml) 或 [`docs/goal/single-session-state.yml`](docs/goal/single-session-state.yml)。
-8. 涉及启动/部署时再完整阅读部署交接文档。
+4. [`对齐文档/24-完全体最终收敛与云原生课程战役.md`](对齐文档/24-完全体最终收敛与云原生课程战役.md) —— 当前唯一的执行权威。
+5. [`docs/goal/closure-campaign-state.yml`](docs/goal/closure-campaign-state.yml) —— 当前唯一的机器游标。
+6. [`docs/goal/complete-product-acceptance.yml`](docs/goal/complete-product-acceptance.yml) —— 全局机器验收账本。
+7. 涉及启动/部署时再完整阅读部署交接文档。
+
+`AGENTS.md` 的模块与设计模式笔记仍有参考价值，但其技术栈/启动/目录结构章节描述的是已被取代的
+V0.1 基线——这部分请以 `CLAUDE.md` 为准。19–23 号对齐文档以及 `release-candidate-state.yml` /
+`single-session-state.yml` / `teammate-continuation-state.yml` / `two-track-convergence.yml` 均为
+历史快照，不是当前游标。
 
 随后检查实时 HEAD、分支、工作树、进程、配置和 evidence；不要只相信旧摘要。提交、测试通过或 K8s 截图只是 checkpoint，不是完全体完成证明。
 

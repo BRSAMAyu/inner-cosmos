@@ -41,7 +41,9 @@ public final class ChineseSentimentLexicon {
         LEXICON.put("折磨", -3);
         LEXICON.put("窒息", -3);
         LEXICON.put("压抑", -3);
-        LEXICON.put("绝望", -3);
+        // "绝望" is intentionally -4 (see the SEVERE block above) -- a duplicate -3 entry here
+        // used to silently overwrite it (HashMap.put semantics), downgrading a severe word to
+        // moderate and weakening the severe-word signal PseudoSemanticAnalyzer relies on.
         LEXICON.put("无助", -3);
         LEXICON.put("孤单", -3);
         LEXICON.put("孤独", -3);

@@ -1,10 +1,19 @@
 # Inner Cosmos
 
-[中文说明](README.zh-CN.md) · [Current release-candidate handoff](对齐文档/23-组员PR集成审查与本地演示收口.md) · [Deployment handoff](对齐文档/18-组员与Coding-Agent启动部署交接指南.md) · [Complete-product goal](goal-objective.md) · [Acceptance ledger](docs/goal/complete-product-acceptance.yml)
+[中文说明](README.zh-CN.md) · [Agent entry point (CLAUDE.md)](CLAUDE.md) · [Current execution authority](对齐文档/24-完全体最终收敛与云原生课程战役.md) · [Deployment handoff](对齐文档/18-组员与Coding-Agent启动部署交接指南.md) · [Complete-product goal](goal-objective.md) · [Acceptance ledger](docs/goal/complete-product-acceptance.yml)
 
 Inner Cosmos is an AI-native self-understanding and slow-social platform. Aurora turns natural conversations into a long-lived, user-correctable model of memories, values, relationships, emotions, and goals. With explicit consent, that model can be compiled into bounded Echo Capsules that help people discover meaningful resonance before deciding whether to connect as humans.
 
 This repository is not a finished commercial release yet. It is an actively implemented complete-product program with reproducible acceptance gates. The current application already spans a five-space React product shell, a stateful Aurora runtime, memory provenance and correction, a data-driven starfield, versioned Capsule Genome scaffolding, resonance discovery, slow letters, psychology skills, Capacitor mobile shells, and local/AWS Academy deployment profiles. Real-provider quality, complete bilingual and accessibility coverage, production operations, independent experience review, and several human release gates remain `IN_PROGRESS` or `UNASSESSED`; see the machine-readable ledger for the exact current state.
+
+## For judges / graders
+
+If you were sent a link or an APK instead of asked to clone this repo, you don't need to build
+anything — see **[`docs/demo/DEMO-RUNBOOK.md`](docs/demo/DEMO-RUNBOOK.md)** for exactly what to do:
+open the shared `https://…trycloudflare.com/app/aurora/` URL in any browser (the fastest path), or
+install the shared demo APK on an Android device. Both connect to the operator's own machine acting
+as the server over a public tunnel — there is no separate cloud deployment. If no link was shared
+with you yet, ask the presenter, or follow the "Quick start" section below to run it yourself.
 
 ## Why it is different
 
@@ -131,16 +140,22 @@ Security rotation and human sign-off remain tracked by the acceptance ledger; au
 
 ## Coding Agent bootstrap
 
-Before making product or deployment decisions, a Coding Agent must read, in order:
+Before making product or deployment decisions, a Coding Agent must read, in order (per
+[`CLAUDE.md`](CLAUDE.md), the current, accurate entry point — this list supersedes any older
+handoff doc or state file it names as historical):
 
-1. [`AGENTS.md`](AGENTS.md)
+1. [`CLAUDE.md`](CLAUDE.md) — stack, run/verify commands, and the authoritative document map.
 2. [`goal-objective.md`](goal-objective.md)
 3. [`对齐文档/README.md`](对齐文档/README.md)
-4. For current integration/demo continuation: [current handoff](对齐文档/23-组员PR集成审查与本地演示收口.md) and [machine state](docs/goal/release-candidate-state.yml). Track documents are historical implementation evidence.
-5. For a single-agent continuation: [`对齐文档/17-单会话持续Goal模式执行协议.md`](对齐文档/17-单会话持续Goal模式执行协议.md).
-6. [`docs/goal/complete-product-acceptance.yml`](docs/goal/complete-product-acceptance.yml) (read-only inside either parallel track).
-7. [`docs/goal/two-track-convergence.yml`](docs/goal/two-track-convergence.yml) or [`docs/goal/single-session-state.yml`](docs/goal/single-session-state.yml), matching the execution mode.
-8. The deployment handoff linked above when the task involves running or deploying the system.
+4. [`对齐文档/24-完全体最终收敛与云原生课程战役.md`](对齐文档/24-完全体最终收敛与云原生课程战役.md) — the current execution authority.
+5. [`docs/goal/closure-campaign-state.yml`](docs/goal/closure-campaign-state.yml) — the current machine cursor.
+6. [`docs/goal/complete-product-acceptance.yml`](docs/goal/complete-product-acceptance.yml) — the global acceptance ledger.
+7. The deployment handoff linked above when the task involves running or deploying the system.
+
+`AGENTS.md`'s module/pattern notes remain useful, but its stack/run/structure sections describe a
+superseded V0.1 baseline — trust `CLAUDE.md` for those. Documents 19–23 and the `release-candidate-state.yml` /
+`single-session-state.yml` / `teammate-continuation-state.yml` / `two-track-convergence.yml` state
+files are historical snapshots, not current cursors.
 
 The agent must inspect live `HEAD`, the working tree, processes, configuration, and evidence before trusting summaries. A commit, green test, or Kubernetes screenshot is a checkpoint, not proof that the complete product is finished.
 
