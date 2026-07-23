@@ -120,10 +120,16 @@ gates:
           allowlist's reverse assertion (which fails if an allowlisted class stops matching reality)
           confirmed the shrink is real. Independently re-verified by the Supervisor: ArchUnit +
           affected controller/service tests 12/12, full ./mvnw test 1092/1092 (0 failures, 1
-          pre-existing unrelated skip). Still open: SocialController, AuroraChatController,
-          DiaryController (mapper-access) remain allowlisted -- larger/riskier refactors deliberately
-          deferred; DailyRecordController still injects the interface-less WeeklyReviewV2Service
-          directly (needs a new service-package interface).
+          pre-existing unrelated skip).
+          UPDATE (2026-07-23, branch codex/w1-product-2 merged via commit on codex/w0-integration):
+          DiaryController now goes through a new VoiceTranscriptionService interface instead of a
+          mapper; DailyRecordController's interface-less WeeklyReviewV2Service got a proper
+          service-package interface (WeeklyReviewV2ServiceImpl). Mapper-access allowlist down to 2
+          (SocialController, AuroraChatController); impl-access allowlist now empty. Independently
+          re-verified by the Supervisor: targeted tests 23/23, full ./mvnw test 1107/1107 (0
+          failures, 1 pre-existing unrelated skip). Still open: SocialController and
+          AuroraChatController (mapper-access) remain allowlisted -- larger/riskier refactors
+          deliberately deferred.
       - {id: AUTH-OIDC, target: "Spring Security protects secure web sessions and mobile OIDC PKCE flows.", status: IN_PROGRESS, evidence: [evidence/m1/M1-AUTH-WEB-001/, evidence/m1/M1-AUTH-OIDC-001/, evidence/innovation/INNO-MOBILE-002/, evidence/innovation/INNO-MOBILE-004/], remaining: "2026-07-22: the PKCE contract is now proven against a real (locally-hosted) Keycloak IdP end to end on Android and a new Tauri desktop client, not just mocked. Still open: a production IdP tenant registration, and real-device verification."}
       - id: API-CONTRACT
         target: "Versioned OpenAPI, typed errors, idempotency, concurrency, and resumable SSE are verified."
@@ -148,7 +154,7 @@ gates:
       - {id: DATA-POSTGRES, target: "PostgreSQL and Flyway are production truth with Testcontainers and migration reconciliation.", status: IN_PROGRESS, evidence: [evidence/m1/M1-DATA-POC-001/, evidence/m1/M1-DATA-APP-001/, evidence/m1/M1-AUTH-OIDC-001/, evidence/innovation/INNO-INNER-005/, evidence/g2/API-CONTRACT-001/, docs/adr/0002-postgresql-system-of-record.md]}
       - {id: DATA-REDIS, target: "Sessions, short state, limits, and leases are externalized to Redis where required.", status: IN_PROGRESS, evidence: [evidence/m1/M1-DATA-REDIS-001/, evidence/m1/M1-DATA-REDIS-002/, evidence/m1/M1-DATA-REDIS-003/, evidence/g2/API-CONTRACT-001/]}
       - {id: EVENT-RELIABLE, target: "Transactional outbox/inbox, idempotent consumers, retries and replay are verified with JDBC transport for local/Academy and SQS/DLQ transport for commercial-sg.", status: IN_PROGRESS, evidence: [evidence/g2/EVENT-RELIABLE-001/, evidence/academy/ACADEMY-LIVE-001/, evidence/integration/FINAL-P0-CLOSURE-2026-07-22/], remaining: "The durable JDBC projection path is implemented and is the authoritative Academy transport. Remaining: reconcile all derivative receipts and non-author replay evidence; implement and verify the commercial-sg SQS/DLQ adapter only in an authorized environment. Academy does not wait for SQS and must not receive learner AWS credentials."}
-      - {id: RUNTIME-ROLES, target: "API, AI worker, event worker, scheduler, and migration roles run and scale independently.", status: IN_PROGRESS, evidence: [evidence/academy/ACADEMY-LIVE-001/], remaining: "Role assembly is gated by inner-cosmos.runtime.role (@ConditionalOnExpression): worker->JdbcOutboxWorker, scheduler->6 scheduler jobs + SessionIdleWatcher, api->neither, migration->MigrationRoleExit run-once. Covered by RuntimeRoleConfigurationTest (scheduling gate per role + migration exit/reject) and by ACADEMY-LIVE-001 which ran api(2 replicas)+worker+scheduler+migration as independent workloads. Remaining: an explicit per-role job-bean-presence assertion test (a full-boot attempt was reverted because enabling the Postgres-only outbox worker on H2 triggers its poll; the right form is a Testcontainers or ApplicationContextRunner slice) + independent scaling soak."}
+      - {id: RUNTIME-ROLES, target: "API, AI worker, event worker, scheduler, and migration roles run and scale independently.", status: IN_PROGRESS, evidence: [evidence/academy/ACADEMY-LIVE-001/, "commit on codex/w0-integration (RuntimeRoleJobBeanPresenceIntegrationTest)"], remaining: "Role assembly is gated by inner-cosmos.runtime.role (@ConditionalOnExpression): worker->JdbcOutboxWorker, scheduler->6 scheduler jobs + SessionIdleWatcher, api->neither, migration->MigrationRoleExit run-once. Covered by RuntimeRoleConfigurationTest (scheduling gate per role + migration exit/reject) and by ACADEMY-LIVE-001 which ran api(2 replicas)+worker+scheduler+migration as independent workloads. 2026-07-23: added the previously-missing explicit per-role job-bean-presence assertion (RuntimeRoleJobBeanPresenceIntegrationTest) -- a real Testcontainers-Postgres boot per role (api/worker/scheduler/migration) asserting exactly which job/worker beans are and aren't present, using spring.task.scheduling.enabled=false to avoid the earlier H2-outbox-poll trap without weakening what bean-presence proves. Supervisor independently re-ran it: 4/4 green. Remaining: independent scaling soak."}
       - {id: DATA-RIGHTS, target: "Consent, provenance, correction, export, and deletion propagate to all derivatives.", status: IN_PROGRESS, evidence: [evidence/innovation/INNO-INNER-001/, evidence/innovation/INNO-INNER-003/, evidence/innovation/INNO-INNER-005/]}
 
   - id: G3
