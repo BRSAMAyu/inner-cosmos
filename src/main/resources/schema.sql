@@ -525,11 +525,15 @@ CREATE TABLE IF NOT EXISTS tb_slow_letter (
   delivered_at TIMESTAMP NULL,
   read_at TIMESTAMP NULL,
   replied_at TIMESTAMP NULL,
+  reply_to_letter_id BIGINT NULL,
+  version_no INT DEFAULT 0,
+  idempotency_key VARCHAR(128) NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_letter_sender (sender_user_id),
   INDEX idx_letter_receiver (receiver_user_id),
-  INDEX idx_letter_status (status)
+  INDEX idx_letter_status (status),
+  INDEX idx_letter_reply_to (reply_to_letter_id)
 );
 
 CREATE TABLE IF NOT EXISTS tb_letter_status_log (

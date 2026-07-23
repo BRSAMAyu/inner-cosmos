@@ -33,6 +33,16 @@ public class SchemaLetterThreadInitializer implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         addColumnIfAbsent("TB_SLOW_LETTER", "THREAD_ID",
                 "ALTER TABLE tb_slow_letter ADD COLUMN thread_id BIGINT NULL");
+        // Gemini audit 1.8 (CONFIRMED/P1): links a reply letter to the letter it replies to (so
+        // its own SENT transition can atomically flip the original to REPLIED), an optimistic
+        // -concurrency version for the owner-scoped draft PATCH, and a compose-action idempotency
+        // key.
+        addColumnIfAbsent("TB_SLOW_LETTER", "REPLY_TO_LETTER_ID",
+                "ALTER TABLE tb_slow_letter ADD COLUMN reply_to_letter_id BIGINT NULL");
+        addColumnIfAbsent("TB_SLOW_LETTER", "VERSION_NO",
+                "ALTER TABLE tb_slow_letter ADD COLUMN version_no INT DEFAULT 0");
+        addColumnIfAbsent("TB_SLOW_LETTER", "IDEMPOTENCY_KEY",
+                "ALTER TABLE tb_slow_letter ADD COLUMN idempotency_key VARCHAR(128) NULL");
     }
 
     private void addColumnIfAbsent(String table, String column, String alterSql) {
