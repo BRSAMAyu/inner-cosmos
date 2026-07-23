@@ -13,6 +13,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -28,28 +29,44 @@ public class LetterDeliveryJob {
 
     private final SlowLetterMapper letterMapper;
     private final LetterStatusLogMapper logMapper;
+    // Gemini audit 1.2 (CONFIRMED/P1): package-private setter for tests, matching this
+    // codebase's existing Clock-injectable time-policy convention (e.g. GravityTimePolicy).
+    private Clock clock = Clock.systemDefaultZone();
 
     public LetterDeliveryJob(SlowLetterMapper letterMapper, LetterStatusLogMapper logMapper) {
         this.letterMapper = letterMapper;
         this.logMapper = logMapper;
     }
 
+    void useClock(Clock fixedClock) {
+        this.clock = fixedClock;
+    }
+
     @Scheduled(fixedRate = 60000)
     @SchedulerLock(name = "letter-delivery", lockAtMostFor = "PT5M", lockAtLeastFor = "PT55S")
     public void deliverArrivedLetters() {
-        java.time.LocalDateTime now = LocalDateTime.now();
-        // M-068: two-stage delivery with a visible FLYING (in-transit) state.
-        // Stage 1: SENT letters whose arrival time has come -> FLYING.
+        LocalDateTime now = LocalDateTime.now(clock);
+        // Gemini audit 1.2 (CONFIRMED/P1): the old Stage 1 query gated SENT->FLYING on
+        // `estimated_arrival_at <= now` -- the SAME condition that should gate arrival -- so a
+        // letter only ever became visibly FLYING once it had ALREADY matured, and Stage 2 (below)
+        // had no time gate at all, immediately delivering it in that same tick. The visible
+        // "flying" period the parallax delay is meant to produce never actually existed: a letter
+        // went from SENT straight to DELIVERED with no observable in-transit window.
+        //
+        // Departure/arrival semantics, now separated: a letter departs (SENT->FLYING) as soon as
+        // it exists, unconditionally -- FLYING covers the whole visible parallax window, not just
+        // its final instant. It arrives (FLYING->DELIVERED) only once `estimated_arrival_at` has
+        // actually passed, which is the ONLY place that time gate belongs.
         QueryWrapper<SlowLetter> sentQuery = new QueryWrapper<>();
-        sentQuery.eq("status", "SENT").le("estimated_arrival_at", now);
+        sentQuery.eq("status", "SENT");
         List<SlowLetter> sentLetters = letterMapper.selectList(sentQuery);
         int flown = 0;
         for (SlowLetter letter : sentLetters) {
             if (advanceWithRetry(letter, "SENT", "FLYING", false)) flown++;
         }
-        // Stage 2: FLYING letters -> DELIVERED (completes the journey).
+        // Stage 2: FLYING letters whose arrival time has come -> DELIVERED.
         QueryWrapper<SlowLetter> flyingQuery = new QueryWrapper<>();
-        flyingQuery.eq("status", "FLYING");
+        flyingQuery.eq("status", "FLYING").le("estimated_arrival_at", now);
         List<SlowLetter> flyingLetters = letterMapper.selectList(flyingQuery);
         int delivered = 0;
         for (SlowLetter letter : flyingLetters) {
