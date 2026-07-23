@@ -119,4 +119,65 @@ describe("ResonanceNetwork", () => {
     expect(screen.getByRole("button", { name: "Meaningful complement" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Enter a limited but natural conversation" })).toBeVisible();
   });
+
+  // W1 capsule-voice reuse: a visitor can tap to hear the latest capsule reply spoken in a voice
+  // distinct from Aurora's. The play affordance is opt-in (tap-to-play), shown only on the most
+  // recent CAPSULE reply, and reuses the shared InlineAudioPlayer once audio is fetched.
+  it("shows a tap-to-play 'hear this echo' button only on the latest capsule reply", () => {
+    const onPlayPersonaVoice = vi.fn();
+    const session: PersonaSession = { id: 1, capsuleId: 4, status: "ACTIVE", turnCount: 2, dailyLimit: 5 };
+    const messages: PersonaMessage[] = [
+      { id: 1, sessionId: 1, senderType: "CAPSULE", textContent: "早些时候的回声" },
+      { id: 2, sessionId: 1, senderType: "VISITOR", textContent: "继续" },
+      { id: 3, sessionId: 1, senderType: "CAPSULE", textContent: "最新的回声" }
+    ];
+    render(<ResonanceNetwork resonanceMatches={[match]} resonanceStrategy="MIRROR" visitorBusy={false} visitorMatch={match}
+      personaSession={session} personaMessages={messages} personaDraft="" personaQuota={{ usedTurns: 1, remainingTurns: 4, dailyLimit: 5, exhausted: false }}
+      letterTitle="" letterBody="" sentLetter={null} onChooseStrategy={() => undefined} onChooseMatch={() => undefined}
+      onStartPersonaConversation={() => undefined} onPersonaDraftChange={() => undefined} onSendPersonaTurn={() => undefined}
+      onLetterTitleChange={() => undefined} onLetterBodyChange={() => undefined} onSendLetter={() => undefined}
+      onPlayPersonaVoice={onPlayPersonaVoice} />);
+    // Exactly one play affordance, on the latest capsule reply.
+    const playButton = screen.getByRole("button", { name: "▶ 听这条回声" });
+    expect(playButton).toBeVisible();
+    fireEvent.click(playButton);
+    expect(onPlayPersonaVoice).toHaveBeenCalledOnce();
+  });
+
+  it("does not offer capsule voice before a capsule reply exists", () => {
+    const session: PersonaSession = { id: 1, capsuleId: 4, status: "ACTIVE", turnCount: 0, dailyLimit: 5 };
+    render(<ResonanceNetwork resonanceMatches={[match]} resonanceStrategy="MIRROR" visitorBusy={false} visitorMatch={match}
+      personaSession={session} personaMessages={[]} personaDraft="" personaQuota={{ usedTurns: 0, remainingTurns: 5, dailyLimit: 5, exhausted: false }}
+      letterTitle="" letterBody="" sentLetter={null} onChooseStrategy={() => undefined} onChooseMatch={() => undefined}
+      onStartPersonaConversation={() => undefined} onPersonaDraftChange={() => undefined} onSendPersonaTurn={() => undefined}
+      onLetterTitleChange={() => undefined} onLetterBodyChange={() => undefined} onSendLetter={() => undefined}
+      onPlayPersonaVoice={() => undefined} />);
+    expect(screen.queryByRole("button", { name: "▶ 听这条回声" })).not.toBeInTheDocument();
+  });
+
+  it("replaces the play button with the shared InlineAudioPlayer once audio is fetched", () => {
+    const session: PersonaSession = { id: 1, capsuleId: 4, status: "ACTIVE", turnCount: 1, dailyLimit: 5 };
+    const messages: PersonaMessage[] = [{ id: 5, sessionId: 1, senderType: "CAPSULE", textContent: "听这条回声" }];
+    render(<ResonanceNetwork resonanceMatches={[match]} resonanceStrategy="MIRROR" visitorBusy={false} visitorMatch={match}
+      personaSession={session} personaMessages={messages} personaDraft="" personaQuota={{ usedTurns: 1, remainingTurns: 4, dailyLimit: 5, exhausted: false }}
+      letterTitle="" letterBody="" sentLetter={null} onChooseStrategy={() => undefined} onChooseMatch={() => undefined}
+      onStartPersonaConversation={() => undefined} onPersonaDraftChange={() => undefined} onSendPersonaTurn={() => undefined}
+      onLetterTitleChange={() => undefined} onLetterBodyChange={() => undefined} onSendLetter={() => undefined}
+      onPlayPersonaVoice={() => undefined} personaVoiceAudio="data:audio/mpeg;base64,AAA" />);
+    // The fetch button is gone, replaced by the InlineAudioPlayer (aria-label = capsuleVoiceAria).
+    expect(screen.queryByRole("button", { name: "▶ 听这条回声" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "听到这个共鸣体的回复（与 Aurora 不同的声音）" })).toBeVisible();
+  });
+
+  it("surfaces a capsule-voice synthesis error as an alert on the reply bubble", () => {
+    const session: PersonaSession = { id: 1, capsuleId: 4, status: "ACTIVE", turnCount: 1, dailyLimit: 5 };
+    const messages: PersonaMessage[] = [{ id: 5, sessionId: 1, senderType: "CAPSULE", textContent: "听这条回声" }];
+    render(<ResonanceNetwork resonanceMatches={[match]} resonanceStrategy="MIRROR" visitorBusy={false} visitorMatch={match}
+      personaSession={session} personaMessages={messages} personaDraft="" personaQuota={{ usedTurns: 1, remainingTurns: 4, dailyLimit: 5, exhausted: false }}
+      letterTitle="" letterBody="" sentLetter={null} onChooseStrategy={() => undefined} onChooseMatch={() => undefined}
+      onStartPersonaConversation={() => undefined} onPersonaDraftChange={() => undefined} onSendPersonaTurn={() => undefined}
+      onLetterTitleChange={() => undefined} onLetterBodyChange={() => undefined} onSendLetter={() => undefined}
+      onPlayPersonaVoice={() => undefined} personaVoiceError="共鸣体语音暂时不可用" />);
+    expect(screen.getByRole("alert")).toHaveTextContent("共鸣体语音暂时不可用");
+  });
 });

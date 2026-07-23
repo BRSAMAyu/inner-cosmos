@@ -137,6 +137,12 @@ export function AuroraApp() {
   const [personaMessages, setPersonaMessages] = useState<PersonaMessage[]>([]);
   const [personaDraft, setPersonaDraft] = useState("最近有什么让你觉得自己被认真理解了？");
   const [personaQuota, setPersonaQuota] = useState<CapsuleQuota | null>(null);
+  // W1 capsule-voice reuse: on-demand synthesized audio of the latest capsule reply, fetched only
+  // when the visitor taps play (opt-in/visible, never autoplay-surprising). Cleared on each new
+  // turn / session so the play affordance reappears for the newest reply.
+  const [personaVoiceAudio, setPersonaVoiceAudio] = useState<string | null>(null);
+  const [personaVoiceBusy, setPersonaVoiceBusy] = useState(false);
+  const [personaVoiceError, setPersonaVoiceError] = useState<string | null>(null);
   const [letterTitle, setLetterTitle] = useState("想把刚才的共鸣慢慢写下来");
   const [letterBody, setLetterBody] = useState("");
   const [sentLetter, setSentLetter] = useState<SlowLetter | null>(null);
@@ -923,6 +929,7 @@ export function AuroraApp() {
         api.createPersonaSession(visitorMatch.capsule.id), api.capsuleQuota(visitorMatch.capsule.id)
       ]);
       setPersonaSession(session); setPersonaQuota(quota); setPersonaMessages([]); setPersonaTurnError(null);
+      setPersonaVoiceAudio(null); setPersonaVoiceError(null);
       setStatus(`你正在和「${visitorMatch.capsule.pseudonym}」的授权 AI 共鸣体对话，不是真人实时在线。`);
     } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法进入这个共鸣体"); }
     finally { setVisitorBusy(false); }
@@ -937,6 +944,8 @@ export function AuroraApp() {
         api.personaMessages(personaSession.id), api.capsuleQuota(visitorMatch.capsule.id)
       ]);
       setPersonaMessages(history); setPersonaQuota(quota); setPersonaDraft("");
+      // Clear the previous reply's synthesized audio so the play affordance reappears for the new reply.
+      setPersonaVoiceAudio(null); setPersonaVoiceError(null);
       setStatus("回应来自授权 Genome；你可以继续验证共鸣，也可以把真正想说的内容写成慢信。 ");
     } catch (error) { setPersonaTurnError(error instanceof Error ? error.message : "这轮对话没有送达，草稿内容仍在这里"); }
     finally { setVisitorBusy(false); }
@@ -957,6 +966,17 @@ export function AuroraApp() {
       setPersonaSession(null); setPersonaMessages([]); setPersonaQuota(null);
       setStatus("已屏蔽这个共鸣体；它不会再出现在你的相遇候选里。");
     } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法屏蔽"); }
+  };
+
+  const playPersonaVoice = async () => {
+    if (!personaSession) return;
+    setPersonaVoiceBusy(true); setPersonaVoiceError(null);
+    try {
+      const { audio } = await api.personaVoice(personaSession.id);
+      setPersonaVoiceAudio(audio);
+    } catch (error) {
+      setPersonaVoiceError(error instanceof Error ? error.message : "共鸣体语音暂时不可用");
+    } finally { setPersonaVoiceBusy(false); }
   };
 
   const sendLetterToMatch = async () => {
@@ -1304,7 +1324,9 @@ export function AuroraApp() {
         onStartPersonaConversation={() => void startPersonaConversation()} onPersonaDraftChange={setPersonaDraft}
         onSendPersonaTurn={() => void sendPersonaTurn()} onLetterTitleChange={setLetterTitle} onLetterBodyChange={setLetterBody}
         onSendLetter={() => void sendLetterToMatch()} onReportSession={() => void reportPersonaSession()}
-        onBlockSession={() => void blockPersonaSession()} personaTurnError={personaTurnError} locale={skillLocale} />
+        onBlockSession={() => void blockPersonaSession()} personaTurnError={personaTurnError}
+        personaVoiceAudio={personaVoiceAudio} personaVoiceBusy={personaVoiceBusy} personaVoiceError={personaVoiceError}
+        onPlayPersonaVoice={() => void playPersonaVoice()} locale={skillLocale} />
       </div>
       </ErrorBoundary>
 
