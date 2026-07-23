@@ -621,10 +621,17 @@ export function AuroraApp() {
   // choice survives reloads. skillLocale is the single shared locale state (see i18n.ts).
   const changeLocale = (locale: Locale) => { setSkillLocale(locale); saveLocale(locale); };
 
-  const changeAccountPassword = async (oldPassword: string, newPassword: string) => {
+  // Gemini audit 4.10 (CONFIRMED/P1): returns null on confirmed success or the error message on
+  // failure -- AccountSettings.tsx awaits this before deciding whether to close/clear its own form
+  // (only on success) or keep it open with the user's input and this message inline (on failure).
+  const changeAccountPassword = async (oldPassword: string, newPassword: string): Promise<string | null> => {
     setAccountBusy("password");
-    try { await api.changePassword(oldPassword, newPassword); setAccountMessage("密码已更新"); }
-    catch (error) { setAccountMessage(error instanceof Error ? error.message : "密码修改失败"); }
+    try { await api.changePassword(oldPassword, newPassword); setAccountMessage("密码已更新"); return null; }
+    catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "密码修改失败";
+      setAccountMessage(errorMessage);
+      return errorMessage;
+    }
     finally { setAccountBusy(null); }
   };
 
@@ -643,14 +650,20 @@ export function AuroraApp() {
     finally { setAccountBusy(null); }
   };
 
-  const deleteAccount = async (password: string) => {
+  // Gemini audit 4.10: same null-on-success / message-on-failure contract as changeAccountPassword.
+  const deleteAccount = async (password: string): Promise<string | null> => {
     setAccountBusy("delete");
     try {
       await api.deleteAccount(password);
       await mobileRuntime.clearPrivateState();
       setAuthenticated(false); auroraSession.resetSession(); setPersonaSession(null); setPersonaMessages([]);
       setAccountMessage(null);
-    } catch (error) { setAccountMessage(error instanceof Error ? error.message : "账户删除失败"); }
+      return null;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "账户删除失败";
+      setAccountMessage(errorMessage);
+      return errorMessage;
+    }
     finally { setAccountBusy(null); }
   };
 
@@ -1297,8 +1310,8 @@ export function AuroraApp() {
           onOpenSafetyHarbor={() => navigate("/safety-harbor")} locale={skillLocale} />
         <PortraitView dimensions={portrait} history={portraitHistory} calibrated={portraitCalibrated} busyDim={portraitBusy}
           onLoadHistory={dim => void loadPortraitHistory(dim)} onCalibrate={(dim, oldValue, newValue) => void submitPortraitCalibration(dim, oldValue, newValue)} locale={skillLocale} />
-        <AccountSettings busy={accountBusy} message={accountMessage} onChangePassword={(oldPassword, newPassword) => void changeAccountPassword(oldPassword, newPassword)}
-          onExportData={() => void exportAccountData()} onDeleteAccount={password => void deleteAccount(password)}
+        <AccountSettings busy={accountBusy} message={accountMessage} onChangePassword={(oldPassword, newPassword) => changeAccountPassword(oldPassword, newPassword)}
+          onExportData={() => void exportAccountData()} onDeleteAccount={password => deleteAccount(password)}
           profile={userProfile} profileBusy={profileBusy} onSaveProfile={patch => void saveProfile(patch)} locale={skillLocale} />
         <LocaleToggle locale={skillLocale} onChange={changeLocale} />
         <DataRightsPanel receipts={dataRightsReceipts} loading={dataRightsLoading} loaded={dataRightsLoaded}

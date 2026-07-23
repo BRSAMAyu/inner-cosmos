@@ -119,9 +119,14 @@ function AuroraPreferencesEditor({ profile, profileBusy, onSaveProfile, t }: {
 export function AccountSettings({ busy, message, onChangePassword, onExportData, onDeleteAccount,
   profile = null, profileBusy = false, onSaveProfile, locale = "zh-CN" }: {
   busy: AccountBusy; message: string | null;
-  onChangePassword: (oldPassword: string, newPassword: string) => void;
+  // Gemini audit 4.10 (CONFIRMED/P1): both return a Promise resolving to `null` on confirmed
+  // success or an error message string on failure -- the form below AWAITS this before deciding
+  // whether to close/clear (success) or stay open with the error inline (failure). Returning void
+  // synchronously (the old contract) was exactly what let the form close/clear before the async
+  // result was known.
+  onChangePassword: (oldPassword: string, newPassword: string) => Promise<string | null>;
   onExportData: () => void;
-  onDeleteAccount: (password: string) => void;
+  onDeleteAccount: (password: string) => Promise<string | null>;
   profile?: UserProfileSettings | null; profileBusy?: boolean;
   onSaveProfile?: (patch: Partial<UserProfileSettings>) => void;
   locale?: Locale;
@@ -132,25 +137,44 @@ export function AccountSettings({ busy, message, onChangePassword, onExportData,
   const [newPassword, setNewPassword] = useState("");
   const [newPassword2, setNewPassword2] = useState("");
   const [passwordError, setPasswordError] = useState("");
+  const [passwordSubmitting, setPasswordSubmitting] = useState(false);
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deletePassword, setDeletePassword] = useState("");
   const [deleteError, setDeleteError] = useState("");
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
 
   const closePasswordForm = () => { setPasswordOpen(false); setOldPassword(""); setNewPassword(""); setNewPassword2(""); setPasswordError(""); };
-  const submitPassword = () => {
+  const submitPassword = async () => {
+    if (passwordSubmitting) return; // guard against a double-submit while one is already in flight
     if (!oldPassword || !newPassword) { setPasswordError(t.errFill); return; }
     if (newPassword.length < 8) { setPasswordError(t.errLen); return; }
     if (newPassword !== newPassword2) { setPasswordError(t.errMismatch); return; }
-    onChangePassword(oldPassword, newPassword);
-    closePasswordForm();
+    setPasswordError("");
+    setPasswordSubmitting(true);
+    try {
+      // Gemini audit 4.10: only close/clear the form on a CONFIRMED success (result === null).
+      // A slow or failing request must never look like it succeeded, and a failure must keep the
+      // user's already-typed input so they don't have to retype everything.
+      const errorMessage = await onChangePassword(oldPassword, newPassword);
+      if (errorMessage === null) closePasswordForm();
+      else setPasswordError(errorMessage);
+    } finally { setPasswordSubmitting(false); }
   };
 
   const closeDeleteForm = () => { setDeleteOpen(false); setDeletePassword(""); setDeleteError(""); };
-  const submitDelete = () => {
+  const submitDelete = async () => {
+    if (deleteSubmitting) return; // guard against a double-submit while one is already in flight
     if (!deletePassword) { setDeleteError(t.delErrFill); return; }
-    onDeleteAccount(deletePassword);
-    closeDeleteForm();
+    setDeleteError("");
+    setDeleteSubmitting(true);
+    try {
+      // Gemini audit 4.10: same async-safe contract for the destructive delete-account dialog --
+      // it must not close itself until deletion is confirmed to have actually happened.
+      const errorMessage = await onDeleteAccount(deletePassword);
+      if (errorMessage === null) closeDeleteForm();
+      else setDeleteError(errorMessage);
+    } finally { setDeleteSubmitting(false); }
   };
 
   return <section className="account-settings" aria-label={t.aria}>
@@ -176,8 +200,8 @@ export function AccountSettings({ busy, message, onChangePassword, onExportData,
               value={newPassword2} onChange={event => setNewPassword2(event.target.value)} />
             {passwordError && <p className="account-error" role="alert">{passwordError}</p>}
             <div className="account-form-actions">
-              <button type="button" onClick={closePasswordForm}>{t.cancel}</button>
-              <AsyncButton busy={busy === "password"} busyText={t.pwBusy} onClick={submitPassword}>{t.pwConfirm}</AsyncButton>
+              <button type="button" onClick={closePasswordForm} disabled={passwordSubmitting}>{t.cancel}</button>
+              <AsyncButton busy={busy === "password" || passwordSubmitting} busyText={t.pwBusy} onClick={() => void submitPassword()}>{t.pwConfirm}</AsyncButton>
             </div>
           </div>}
       </article>
@@ -191,8 +215,8 @@ export function AccountSettings({ busy, message, onChangePassword, onExportData,
               value={deletePassword} onChange={event => setDeletePassword(event.target.value)} />
             {deleteError && <p className="account-error" role="alert">{deleteError}</p>}
             <div className="account-form-actions">
-              <button type="button" onClick={closeDeleteForm}>{t.cancel}</button>
-              <AsyncButton busy={busy === "delete"} busyText={t.delBusy} className="danger-quiet" onClick={submitDelete}>{t.delConfirm}</AsyncButton>
+              <button type="button" onClick={closeDeleteForm} disabled={deleteSubmitting}>{t.cancel}</button>
+              <AsyncButton busy={busy === "delete" || deleteSubmitting} busyText={t.delBusy} className="danger-quiet" onClick={() => void submitDelete()}>{t.delConfirm}</AsyncButton>
             </div>
           </div>}
       </article>
