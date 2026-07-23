@@ -375,6 +375,21 @@ gates:
           queued as follow-up. A full statistically-robust real-embedding recall benchmark (only
           one relevant-vs-distractor case was proven this round) and independent (non-author)
           review of the inner-voice line's genuine "aliveness"/non-repetition quality remain open.
+          KNOWN FOLLOW-UP (confirmed, bounded, prioritized for the next voice-polish round): the
+          inner-voice TTS synthesis on the streaming path is a blocking call bounded by tts.timeout-ms
+          (default 8s) emitted BEFORE the meta/turn.completed/done terminal events, so a
+          slow-but-successful synthesis delays the turn's formal closeout by up to that timeout
+          (the spoken-reply bubbles already stream earlier, so content is not delayed). The code's
+          original comment overclaimed "NEVER delay" -- corrected in place to state the real latency
+          behavior and point here. The proper fix (emit terminal events first, then synthesize +
+          emit inner_voice before connection close, with the frontend SSE reader confirmed to keep
+          reading past turn.completed, and AuroraInnerVoiceEnabledStreamTest updated to the new
+          order) is tracked as a coordinated backend+frontend change, not a drive-by. With the
+          default tts.enabled=false this whole path is a no-op in dev/CI, so it does not block
+          current usability. Also still open: capsule/persona-voice reuse (a distinct voice for
+          capsule chat replies, reinforcing "this is not Aurora") and slow-letter read-aloud were
+          deferred this round to avoid colliding with the concurrent W2 accessibility pass touching
+          the same components -- queued as follow-up.
 
   - id: G5
     name: Memory, profile, and Inner Cosmos

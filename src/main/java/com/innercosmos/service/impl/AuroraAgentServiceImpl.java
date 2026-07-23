@@ -623,9 +623,20 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 // W1 — Aurora's "inner voice" (心声): at most one inner_voice event per turn,
                 // strictly additive. Composition already ran best-effort inside
                 // dualKernelRuntime.generate() (produceReply set reply.innerVoiceText to null on
-                // any failure/opt-out); synthesis here is wrapped in its own try/catch so a TTS
-                // outage or timeout can NEVER delay or fail the main turn -- it just silently
-                // omits the event.
+                // any failure/opt-out). KNOWN FOLLOW-UP (see AURORA-INNER-VOICE acceptance item):
+                // this synthesis is a blocking call bounded by tts.timeout-ms (default 8s). The
+                // try/catch below only guarantees a TTS *failure* omits the event without failing
+                // the turn -- a SLOW-but-SUCCESSFUL synthesis still blocks here and therefore
+                // delays the meta/turn.completed/done events emitted just below by up to that
+                // timeout. The spoken-reply bubbles are already streamed above this point, so the
+                // user is not waiting for content, but the turn's formal closeout (and the next-send
+                // / settle-it-today gating it unlocks) can lag by the synthesis latency. With the
+                // default tts.enabled=false this whole block is skipped (no-op in dev/CI). The proper
+                // fix -- emit the terminal events first, then synthesize+emit inner_voice before
+                // connection close, with the frontend SSE reader confirmed to keep reading past
+                // turn.completed -- is tracked as a focused voice-polish round (it touches the
+                // just-written AuroraInnerVoiceEnabledStreamTest + the frontend reader contract
+                // together, so it is not a drive-by change).
                 if (reply.innerVoiceText != null && !reply.innerVoiceText.isBlank()) {
                     try {
                         if (ttsClient != null && ttsClient.available()) {
