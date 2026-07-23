@@ -151,6 +151,63 @@ class MemoryCorrectionCapsuleClosedLoopApiJourneyTest {
                 "the retired correction must no longer appear in the owner's own correction list");
     }
 
+    /**
+     * G5.PROFILE-PROPAGATION withdrawal-variant matrix (this dispatch): the previous test above
+     * proves withdrawal triggered INDIRECTLY by a memory correction (NEEDS_REVIEW). This is a
+     * DIFFERENT withdrawal path -- the owner DIRECTLY archives the capsule
+     * (POST /api/capsule/{id}/archive, no memory correction involved) -- proven end to end through
+     * real HTTP with the same rigor: visitor's next real request 403s, and the owner's own
+     * data-rights receipts endpoint shows the real CAPSULE_MATCH_INDEX erasure receipt this
+     * specific withdrawal path produces (CapsuleServiceImpl#archiveCapsule).
+     */
+    @Test
+    @DisplayName("real API journey (withdrawal variant): a DIRECT owner archive (not a memory "
+            + "correction) also blocks the visitor's next chat and surfaces its own receipt")
+    void directOwnerArchiveBlocksTheVisitorsNextChatAndRecordsItsOwnReceipt() throws Exception {
+        MockHttpSession ownerSession = register("owner2");
+        MockHttpSession visitorSession = register("visitor2");
+        Long ownerId = userId(ownerSession);
+
+        Long memoryId = seedMemory(ownerId, "关于专注的记忆", "user 在深度工作时更容易进入心流");
+        String createBody = "{\"pseudonym\":\"回声2\",\"intro\":\"另一段真实的旅程测试\",\"memoryIds\":[" + memoryId + "]}";
+        MvcResult createResult = mockMvc.perform(post("/api/capsule/create-from-memory")
+                        .session(ownerSession).contentType(MediaType.APPLICATION_JSON).content(createBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.visibilityStatus").value("PUBLIC"))
+                .andReturn();
+        Long capsuleId = extractLong(createResult, "$.data.id");
+
+        // Visitor can chat while the capsule is still public/authorized.
+        String sessionBody = "{\"capsuleId\":" + capsuleId + "}";
+        mockMvc.perform(post("/api/persona-chat/session/create")
+                        .session(visitorSession).contentType(MediaType.APPLICATION_JSON).content(sessionBody))
+                .andExpect(status().isOk());
+
+        // DIRECT withdrawal: the owner archives the capsule outright -- no memory correction at all.
+        mockMvc.perform(post("/api/capsule/" + capsuleId + "/archive").session(ownerSession))
+                .andExpect(status().isOk());
+
+        // Owner's own GET confirms the archive genuinely propagated through the real read path.
+        mockMvc.perform(get("/api/capsule/" + capsuleId).session(ownerSession))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.visibilityStatus").value("ARCHIVED"))
+                .andExpect(jsonPath("$.data.isPublic").value(false));
+
+        // The visitor's next real request against the archived capsule is genuinely rejected.
+        mockMvc.perform(post("/api/persona-chat/session/create")
+                        .session(visitorSession).contentType(MediaType.APPLICATION_JSON).content(sessionBody))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false));
+
+        // The owner's own data-rights receipts endpoint shows the erasure receipt THIS withdrawal
+        // path produced (archiveCapsule records DERIVATIVE_CAPSULE_MATCH_INDEX itself, distinct
+        // from the correction-triggered path proven above).
+        mockMvc.perform(get("/api/me/data-rights/receipts").session(ownerSession))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[?(@.derivativeType=='CAPSULE_MATCH_INDEX' "
+                        + "&& @.subjectId==" + capsuleId + ")]").isNotEmpty());
+    }
+
     private MockHttpSession register(String prefix) throws Exception {
         String username = prefix + "-" + UUID.randomUUID().toString().substring(0, 8);
         String json = "{\"username\":\"" + username + "\",\"password\":\"testPass123\","
