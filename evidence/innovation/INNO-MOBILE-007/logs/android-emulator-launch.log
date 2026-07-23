@@ -1,0 +1,8 @@
+# Android emulator launch logcat — Inner Cosmos Capacitor debug APK on emulator-5554
+# AVD: Medium_Phone_API_36.1, WebView: com.google.android.webview v134, app pid=24566
+# applicationId: sg.innercosmos.app.dev (debug suffix), built via: pnpm mobile:sync -> gradlew assembleDebug
+07-23 17:28:00.167 24566 24566 I Zygote  : Process 24566 created for sg.innercosmos.app.dev
+07-23 17:28:02.720 24566 24566 I WebViewFactory: Loading com.google.android.webview version 134.0.6998.135 (code 699813538)
+07-23 17:28:02.740 24566 24566 D ApplicationLoaders: Returning zygote-cached class loader: /system_ext/framework/androidx.window.extensions.jar
+07-23 17:28:05.132 24566 24566 D Capacitor: Starting BridgeActivity
+07-23 17:28:06.176 24566 24566 D VRI[MainActivity]: WindowInsets changed: 1080x2400 statusBars:[0,63,0,0] navigationBars:[0,0,0,63] mandatorySystemGestures:[0,63,0,84] 
