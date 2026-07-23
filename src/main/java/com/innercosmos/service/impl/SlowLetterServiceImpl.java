@@ -22,11 +22,21 @@ import com.innercosmos.service.SlowLetterService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
 public class SlowLetterServiceImpl implements SlowLetterService {
+    /**
+     * Gemini audit 1.7 (PARTIAL/P1): the "3 minutes" flight duration used to be a bare magic
+     * number inlined at every estimatedArrivalAt call site. It is a deliberate, explainable
+     * parallax-flight policy (matching LetterDeliveryJob's own comment: "gives the letter a
+     * flight duration"), not an arbitrary constant, so it is named and defined once here.
+     */
+    static final Duration PARALLAX_FLIGHT_DURATION = Duration.ofMinutes(3);
+
     private final SlowLetterMapper letterMapper;
     private final LetterStatusLogMapper logMapper;
     private final LetterStateRegistry stateRegistry;
@@ -36,8 +46,13 @@ public class SlowLetterServiceImpl implements SlowLetterService {
     private final LetterSafetyFilter letterSafetyFilter;
     private final EchoCapsuleMapper capsuleMapper;
     private final BlockRelationMapper blockRelationMapper;
+    // Gemini audit 1.7 (PARTIAL/P1): the only clock this class advances on. Constructor-injected
+    // (Spring wires the Clock.systemUTC() @Bean from ClockConfig in production); tests inject a
+    // fixed/adjustable Clock directly instead of racing the wall clock. No method in this class
+    // calls LocalDateTime.now() with an implicit zone anymore.
+    private final Clock clock;
 
-    public SlowLetterServiceImpl(SlowLetterMapper letterMapper, LetterStatusLogMapper logMapper, LetterStateRegistry stateRegistry, LetterGuardAgent guardAgent, LetterThreadMapper threadMapper, ReportRecordMapper reportRecordMapper, LetterSafetyFilter letterSafetyFilter, EchoCapsuleMapper capsuleMapper, BlockRelationMapper blockRelationMapper) {
+    public SlowLetterServiceImpl(SlowLetterMapper letterMapper, LetterStatusLogMapper logMapper, LetterStateRegistry stateRegistry, LetterGuardAgent guardAgent, LetterThreadMapper threadMapper, ReportRecordMapper reportRecordMapper, LetterSafetyFilter letterSafetyFilter, EchoCapsuleMapper capsuleMapper, BlockRelationMapper blockRelationMapper, Clock clock) {
         this.letterMapper = letterMapper;
         this.logMapper = logMapper;
         this.stateRegistry = stateRegistry;
@@ -47,6 +62,7 @@ public class SlowLetterServiceImpl implements SlowLetterService {
         this.letterSafetyFilter = letterSafetyFilter;
         this.capsuleMapper = capsuleMapper;
         this.blockRelationMapper = blockRelationMapper;
+        this.clock = clock;
     }
 
     @Override
@@ -84,7 +100,7 @@ public class SlowLetterServiceImpl implements SlowLetterService {
         letter.letterBody = request.letterBody;
         letter.status = "DRAFT";
         letter.parallaxDistance = 3;
-        letter.estimatedArrivalAt = LocalDateTime.now().plusMinutes(3);
+        letter.estimatedArrivalAt = LocalDateTime.now(clock).plus(PARALLAX_FLIGHT_DURATION);
         letterMapper.insert(letter);
         return letter;
     }
@@ -121,7 +137,7 @@ public class SlowLetterServiceImpl implements SlowLetterService {
         // M-022: atomic conditional UPDATE — only applies if status is still `from`, so a concurrent
         // transition (e.g. user /read racing the scheduler SENT->DELIVERED) cannot both pass
         // validate() and clobber each other. rowsAffected==0 means we lost the race.
-        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        java.time.LocalDateTime now = java.time.LocalDateTime.now(clock);
         com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<SlowLetter> w =
                 new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<SlowLetter>()
                         .eq("id", id).eq("status", from)
@@ -222,7 +238,7 @@ public class SlowLetterServiceImpl implements SlowLetterService {
         reply.letterBody = request.letterBody;
         reply.status = "DRAFT";
         reply.parallaxDistance = 3;
-        reply.estimatedArrivalAt = LocalDateTime.now().plusMinutes(3);
+        reply.estimatedArrivalAt = LocalDateTime.now(clock).plus(PARALLAX_FLIGHT_DURATION);
         letterMapper.insert(reply);
 
         // Back-fill the original so the whole conversation is walkable by thread id.
@@ -231,7 +247,7 @@ public class SlowLetterServiceImpl implements SlowLetterService {
             letterMapper.updateById(original);
         }
 
-        thread.lastLetterAt = LocalDateTime.now();
+        thread.lastLetterAt = LocalDateTime.now(clock);
         threadMapper.updateById(thread);
         return reply;
     }
@@ -270,7 +286,7 @@ public class SlowLetterServiceImpl implements SlowLetterService {
         thread.participantB = b;
         thread.capsuleId = original.receiverCapsuleId;
         thread.status = "ACTIVE";
-        thread.lastLetterAt = LocalDateTime.now();
+        thread.lastLetterAt = LocalDateTime.now(clock);
         threadMapper.insert(thread);
         return thread;
     }

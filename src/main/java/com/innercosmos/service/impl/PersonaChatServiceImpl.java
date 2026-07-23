@@ -21,7 +21,9 @@ import com.innercosmos.mapper.PersonaChatMessageMapper;
 import com.innercosmos.mapper.PersonaChatSessionMapper;
 import com.innercosmos.mapper.ReportRecordMapper;
 import com.innercosmos.mapper.AuthorizedMemoryRefMapper;
+import com.innercosmos.mapper.UserProfileMapper;
 import com.innercosmos.entity.AuthorizedMemoryRef;
+import com.innercosmos.entity.UserProfile;
 import com.innercosmos.service.PersonaChatService;
 import com.innercosmos.service.CapsuleGenomeService;
 import com.innercosmos.entity.CapsuleGenomeVersion;
@@ -36,6 +38,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -61,10 +64,13 @@ public class PersonaChatServiceImpl implements PersonaChatService {
     private static final int SEED_EFFECTIVE_DAILY_LIMIT = 50;
 
     /**
-     * IC-CAP-002 MAJOR-4: all quota-date arithmetic uses a single fixed zone so a
-     * user's daily boundary is stable regardless of server TZ.
+     * Gemini audit 1.7 (PARTIAL/P1): this used to be applied to EVERY visitor regardless of
+     * where they actually are -- a single hardcoded zone is exactly the "globally hardcode
+     * Shanghai as a strategy" anti-pattern the audit calls out. It now serves only as the
+     * documented FALLBACK for a visitor with no persisted timezone (see resolveQuotaZone),
+     * matching this codebase's existing WakeIntentServiceImpl#validZone fallback convention.
      */
-    private static final ZoneId QUOTA_ZONE = ZoneId.of("Asia/Shanghai");
+    private static final ZoneId DEFAULT_QUOTA_ZONE = ZoneId.of("Asia/Shanghai");
 
     private final PersonaChatSessionMapper sessionMapper;
     private final PersonaChatMessageMapper messageMapper;
@@ -85,6 +91,14 @@ public class PersonaChatServiceImpl implements PersonaChatService {
     private final DataUseGrantService dataUseGrantService;
     private final ReportRecordMapper reportRecordMapper;
     private final BlockRelationMapper blockRelationMapper;
+    // Gemini audit 1.7 (PARTIAL/P1): resolves the VISITOR's own persisted IANA timezone for
+    // daily-quota-boundary arithmetic instead of the old hardcoded-for-everyone constant.
+    private final UserProfileMapper userProfileMapper;
+    // Gemini audit 1.7 (PARTIAL/P1): the only clock this class advances on. Constructor-injected
+    // (Spring wires the Clock.systemUTC() @Bean from ClockConfig in production); tests inject a
+    // fixed/adjustable Clock directly. No method in this class calls Instant.now()/
+    // LocalDate.now()/LocalDateTime.now() with the platform default zone anymore.
+    private final Clock clock;
     // Gemini audit 2.4 (CONFIRMED/P0): reply() used to run entirely inside one
     // @Transactional method, including the external AI provider RPC -- a slow or hanging
     // provider held a pooled DB connection (and the row locks taken by the quota/turn
@@ -114,7 +128,9 @@ public class PersonaChatServiceImpl implements PersonaChatService {
                                   DataUseGrantService dataUseGrantService,
                                   ReportRecordMapper reportRecordMapper,
                                   BlockRelationMapper blockRelationMapper,
-                                  PlatformTransactionManager transactionManager) {
+                                  PlatformTransactionManager transactionManager,
+                                  UserProfileMapper userProfileMapper,
+                                  Clock clock) {
         this.sessionMapper = sessionMapper;
         this.messageMapper = messageMapper;
         this.capsuleMapper = capsuleMapper;
@@ -130,7 +146,36 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         this.dataUseGrantService = dataUseGrantService;
         this.reportRecordMapper = reportRecordMapper;
         this.blockRelationMapper = blockRelationMapper;
+        this.userProfileMapper = userProfileMapper;
+        this.clock = clock;
         this.shortTransaction = new TransactionTemplate(transactionManager);
+    }
+
+    /**
+     * Gemini audit 1.7 (PARTIAL/P1): resolves the daily-quota boundary's zone from the
+     * VISITOR's own persisted IANA timezone (tb_user_profile.timezone) when they have one on
+     * file; falls back to DEFAULT_QUOTA_ZONE only when the profile is missing, blank, or holds
+     * an unparseable value. This makes the daily boundary explainable per-user instead of a
+     * single constant applied globally.
+     */
+    private ZoneId resolveQuotaZone(Long userId) {
+        if (userId != null) {
+            UserProfile profile = userProfileMapper.selectOne(
+                    new QueryWrapper<UserProfile>().eq("user_id", userId).last("LIMIT 1"));
+            if (profile != null && profile.timezone != null && !profile.timezone.isBlank()) {
+                try {
+                    return ZoneId.of(profile.timezone);
+                } catch (RuntimeException invalid) {
+                    // fall through to the documented default below
+                }
+            }
+        }
+        return DEFAULT_QUOTA_ZONE;
+    }
+
+    /** Today's date in the visitor's own quota zone, read off the single injected Clock. */
+    private LocalDate todayFor(Long userId) {
+        return LocalDate.now(clock.withZone(resolveQuotaZone(userId)));
     }
 
     @Override
@@ -262,7 +307,7 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         }
 
         // Atomically try to reserve a turn before calling AI
-        LocalDate today = LocalDate.now(QUOTA_ZONE);
+        LocalDate today = todayFor(userId);
         boolean reserved = tryReserveQuota(userId, session.capsuleId, today, dailyLimit);
 
         if (!reserved) {
@@ -422,7 +467,7 @@ public class PersonaChatServiceImpl implements PersonaChatService {
             // turn reservation, so neither counter advances for a turn nobody was charged for.
         } else {
             // Genuine success: quota stays consumed; bump capsule activity (B-4).
-            bumpCapsuleActivity(capsule);
+            bumpCapsuleActivity(capsule, prep.userId);
             // Regression (1.4): session.turnCount is now managed exclusively by the atomic
             // tryReserveSessionTurn/compensateSessionTurn SQL in prepareTurn, not by mutating
             // this Java field — see the scoped status-only write below for why.
@@ -532,15 +577,15 @@ public class PersonaChatServiceImpl implements PersonaChatService {
      * IC-CAP-002 B-4: bump a capsule's activity signals after a genuinely successful turn.
      * echoEnergy += 0.02 (cap 1.0); freshnessScore = max(current, 0.9); lastActivityAt = now.
      */
-    private void bumpCapsuleActivity(EchoCapsule capsule) {
+    private void bumpCapsuleActivity(EchoCapsule capsule, Long visitorUserId) {
         if (capsule == null) return;
         double energy = capsule.echoEnergy == null ? 0.0 : capsule.echoEnergy;
         double freshness = capsule.freshnessScore == null ? 0.0 : capsule.freshnessScore;
         capsule.echoEnergy = Math.min(1.0, energy + 0.02);
         capsule.freshnessScore = Math.max(freshness, 0.9);
-        // IC-CAP RUN-003 polish (FIX-D): use the same fixed zone as all quota-date arithmetic
+        // IC-CAP RUN-003 polish (FIX-D): use the same zone as this turn's quota-date arithmetic
         // so a capsule's activity timestamp is consistent with its daily-quota boundary.
-        capsule.lastActivityAt = LocalDateTime.now(QUOTA_ZONE);
+        capsule.lastActivityAt = LocalDateTime.now(clock.withZone(resolveQuotaZone(visitorUserId)));
         capsuleMapper.updateById(capsule);
     }
 
@@ -696,7 +741,7 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         int dailyLimit = resolveDailyLimit(capsule);
         boolean seed = capsule != null
                 && ("SEED_CAPSULE".equals(capsule.capsuleType) || "SEED".equals(capsule.capsuleType));
-        LocalDate today = LocalDate.now(QUOTA_ZONE);
+        LocalDate today = todayFor(userId);
         CapsuleUsageQuota row = quotaMapper.selectOne(
                 new QueryWrapper<CapsuleUsageQuota>()
                         .eq("visitor_user_id", userId)

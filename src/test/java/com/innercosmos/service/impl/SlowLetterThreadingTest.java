@@ -23,6 +23,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -58,7 +59,8 @@ class SlowLetterThreadingTest {
         safe.passed = true;
         org.mockito.Mockito.lenient().when(letterSafetyFilter.filter(any(), any(), any())).thenReturn(safe);
         return new SlowLetterServiceImpl(letterMapper, logMapper, stateRegistry,
-                guardAgent, threadMapper, reportRecordMapper, letterSafetyFilter, capsuleMapper, blockRelationMapper);
+                guardAgent, threadMapper, reportRecordMapper, letterSafetyFilter, capsuleMapper, blockRelationMapper,
+                Clock.systemUTC());
     }
 
     private SlowLetter original(long id, long sender, long receiver, long capsuleId) {
