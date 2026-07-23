@@ -127,6 +127,15 @@ public class DialogServiceImpl implements DialogService {
     }
 
     @Override
+    public Long lastMessageId(Long sessionId) {
+        if (sessionId == null) return null;
+        QueryWrapper<DialogMessage> query = new QueryWrapper<>();
+        query.eq("session_id", sessionId).orderByDesc("id").last("LIMIT 1");
+        DialogMessage msg = messageMapper.selectOne(query);
+        return msg != null ? msg.id : null;
+    }
+
+    @Override
     public void verifyOwnership(Long userId, Long sessionId) {
         DialogSession session = sessionMapper.selectById(sessionId);
         if (session == null) {

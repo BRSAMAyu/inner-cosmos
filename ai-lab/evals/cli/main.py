@@ -14,6 +14,7 @@ from evals.metrics import evaluate_runs
 from evals.reports import build_report, write_report
 from evals.schemas.validator import validate_schema_documents
 from evals.real_provider_pairwise import config_from_environment, config_from_local_profile, rescore_report, run_pairwise, score_pairwise
+from evals.capsule_runtime_pairwise import run_pairwise as run_capsule_pairwise
 from evals.psychology import run as run_psychology
 from evals.psychology_compare import run as run_psychology_compare, score as score_psychology_compare
 from evals.living_experience import score as score_living_experience
@@ -89,6 +90,9 @@ def main() -> None:
     real_rescore_parser = subparsers.add_parser("real-pairwise-rescore")
     real_rescore_parser.add_argument("--runs", type=Path, required=True)
     real_rescore_parser.add_argument("--output", type=Path, required=True)
+    capsule_parser = subparsers.add_parser("capsule-pairwise")
+    capsule_parser.add_argument("--output", type=Path, required=True)
+    capsule_parser.add_argument("--profile", help="Profile in ~/.config/inner-cosmos/providers.local.json")
     experience_score_parser = subparsers.add_parser("experience-score")
     experience_score_parser.add_argument("--ratings", type=Path, nargs="+", required=True)
     experience_score_parser.add_argument("--output", type=Path, required=True)
@@ -112,6 +116,9 @@ def main() -> None:
         result = score_pairwise(args.ratings, args.runs, args.output, args.min_reviewers)
     elif args.command == "real-pairwise-rescore":
         result = rescore_report(args.runs, args.output)
+    elif args.command == "capsule-pairwise":
+        config = config_from_local_profile(args.profile) if args.profile else config_from_environment()
+        result = run_capsule_pairwise(config, args.output)
     elif args.command == "experience-score":
         result = score_living_experience(args.ratings, args.output, args.min_reviewers)
     elif args.command == "psychology":

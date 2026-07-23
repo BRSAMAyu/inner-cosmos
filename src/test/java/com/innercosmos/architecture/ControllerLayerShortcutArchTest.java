@@ -30,11 +30,14 @@ class ControllerLayerShortcutArchTest {
             .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
             .importPackages("com.innercosmos");
 
-    /** Pre-existing controllers that inject a mapper directly instead of a service method. */
-    private static final Set<Class<?>> GRANDFATHERED_MAPPER_ACCESS = Set.of(
-            com.innercosmos.controller.SocialController.class,
-            com.innercosmos.controller.AuroraChatController.class
-    );
+    /**
+     * Pre-existing controllers that inject a mapper directly instead of a service method. Empty
+     * since SocialController was routed through the new SocialService interface and
+     * AuroraChatController was routed through UserService#getProfile and a new
+     * DialogService#lastMessageId (G2.ARCH-MODULES) -- kept as a typed allowlist (not deleted) so
+     * a future violation has to be added here explicitly rather than silently passing.
+     */
+    private static final Set<Class<?>> GRANDFATHERED_MAPPER_ACCESS = Set.of();
 
     /**
      * Pre-existing controllers that inject a concrete service.impl class instead of a service
