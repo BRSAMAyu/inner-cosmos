@@ -33,14 +33,16 @@ class ControllerLayerShortcutArchTest {
     /** Pre-existing controllers that inject a mapper directly instead of a service method. */
     private static final Set<Class<?>> GRANDFATHERED_MAPPER_ACCESS = Set.of(
             com.innercosmos.controller.SocialController.class,
-            com.innercosmos.controller.AuroraChatController.class,
-            com.innercosmos.controller.DiaryController.class
+            com.innercosmos.controller.AuroraChatController.class
     );
 
-    /** Pre-existing controllers that inject a concrete service.impl class instead of a service interface. */
-    private static final Set<Class<?>> GRANDFATHERED_IMPL_ACCESS = Set.of(
-            com.innercosmos.controller.DailyRecordController.class
-    );
+    /**
+     * Pre-existing controllers that inject a concrete service.impl class instead of a service
+     * interface. Empty since DailyRecordController was routed through the new WeeklyReviewV2Service
+     * interface (G2.ARCH-MODULES) -- kept as a typed allowlist (not deleted) so a future violation
+     * has to be added here explicitly rather than silently passing.
+     */
+    private static final Set<Class<?>> GRANDFATHERED_IMPL_ACCESS = Set.of();
 
     @Test
     void controllersMustNotDependOnMappersDirectly() {

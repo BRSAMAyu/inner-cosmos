@@ -20,6 +20,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.innercosmos.service.WeeklyReviewV2Service;
+
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -38,9 +40,9 @@ import java.util.stream.Collectors;
  * to produce a richer weekly review than the legacy WeeklyReview entity.
  */
 @Service
-public class WeeklyReviewV2Service {
+public class WeeklyReviewV2ServiceImpl implements WeeklyReviewV2Service {
 
-    private static final Logger log = LoggerFactory.getLogger(WeeklyReviewV2Service.class);
+    private static final Logger log = LoggerFactory.getLogger(WeeklyReviewV2ServiceImpl.class);
 
     private final WeeklyReviewMapper weeklyReviewMapper;
     private final DailyRecordMapper dailyRecordMapper;
@@ -49,7 +51,7 @@ public class WeeklyReviewV2Service {
     private final EmotionTimelineMapper emotionTimelineMapper;
     private final EmotionPatternService emotionPatternService;
 
-    public WeeklyReviewV2Service(WeeklyReviewMapper weeklyReviewMapper,
+    public WeeklyReviewV2ServiceImpl(WeeklyReviewMapper weeklyReviewMapper,
                                  DailyRecordMapper dailyRecordMapper,
                                  MemoryCardMapper memoryCardMapper,
                                  TodoItemMapper todoItemMapper,
@@ -66,6 +68,7 @@ public class WeeklyReviewV2Service {
     /**
      * Generate a V2 weekly review for the current week.
      */
+    @Override
     @Transactional
     public WeeklyReviewV2VO generate(Long userId) {
         LocalDate weekStartDate = LocalDate.now().with(DayOfWeek.MONDAY);
@@ -77,6 +80,7 @@ public class WeeklyReviewV2Service {
     /**
      * Generate a V2 weekly review for a specific date range.
      */
+    @Override
     @Transactional
     public WeeklyReviewV2VO generateForRange(Long userId, LocalDate weekStartDate, LocalDate weekEndDate) {
         // Query daily records for the week
@@ -168,6 +172,7 @@ public class WeeklyReviewV2Service {
     /**
      * Get the latest V2 review for a user (returns V2 VO even if only V1 exists in DB).
      */
+    @Override
     public WeeklyReviewV2VO latest(Long userId) {
         WeeklyReview existing = weeklyReviewMapper.selectOne(
                 new QueryWrapper<WeeklyReview>()
@@ -201,6 +206,7 @@ public class WeeklyReviewV2Service {
     /**
      * Save V2 review (persists to existing tb_weekly_review table with V2 fields).
      */
+    @Override
     @Transactional
     public WeeklyReviewV2VO save(WeeklyReviewV2VO vo) {
         LocalDate weekStartDate = LocalDate.parse(vo.weekStartDate);
