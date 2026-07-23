@@ -19,6 +19,14 @@ spec:
         app.kubernetes.io/name: inner-cosmos
         app.kubernetes.io/component: api
         inner-cosmos/runtime-role: api
+      annotations:
+        # Scraped by the observability stack (deploy/k8s/observability) — every runtime
+        # role carries this same annotation triple so Prometheus discovers api/worker/
+        # scheduler pods identically; the "component" label on the scrape target is what
+        # lets a role-specific dashboard/alert query distinguish them (see prometheus-config.yaml).
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8080"
     spec:
       serviceAccountName: inner-cosmos
       automountServiceAccountToken: false
@@ -84,22 +92,30 @@ spec:
             limits:
               cpu: "1"
               memory: 1Gi
+          # Startup/readiness intentionally check the "readiness" health group (app +
+          # PostgreSQL + Redis + custom indicators): a pod must not receive traffic until
+          # its dependencies are actually reachable. Liveness checks ONLY the "liveness"
+          # group (process-internal only) so a transient PostgreSQL/Redis/Provider outage
+          # pulls the pod out of Service/HPA rotation without ever restarting the JVM —
+          # a liveness probe that also depended on those externals would restart every
+          # replica in lockstep the moment a shared dependency blips (a restart storm that
+          # cannot fix an external outage and only adds cold-start load on top of it).
           startupProbe:
             httpGet:
-              path: /actuator/health
+              path: /actuator/health/readiness
               port: http
             periodSeconds: 5
             failureThreshold: 24
           readinessProbe:
             httpGet:
-              path: /actuator/health
+              path: /actuator/health/readiness
               port: http
             periodSeconds: 10
             timeoutSeconds: 3
             failureThreshold: 3
           livenessProbe:
             httpGet:
-              path: /actuator/health
+              path: /actuator/health/liveness
               port: http
             periodSeconds: 20
             timeoutSeconds: 3

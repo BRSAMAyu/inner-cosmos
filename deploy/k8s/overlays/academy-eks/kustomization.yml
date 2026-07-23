@@ -15,6 +15,7 @@ resources:
   - runtime-network-policy.yml
   - gateway.yml
   - http-route.yml
+  - ../../backup
 labels:
   - includeSelectors: false
     pairs:

@@ -75,11 +75,26 @@ management:
     health:
       show-details: when_authorized
       show-components: when_authorized
+      # Kubernetes liveness must only ever reflect "is this JVM's own event loop still
+      # alive", never a transient PostgreSQL/Redis/AI-provider outage — otherwise a
+      # dependency blip triggers a liveness-driven restart storm across every replica
+      # at once (the opposite of what a restart is for). Readiness is where dependency
+      # health belongs: it only pulls the pod out of Service/HPA traffic, non-destructively.
+      probes:
+        enabled: true
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState,db,redis,custom
   health:
     db:
       enabled: true
     diskspace:
       enabled: true
+    # management.health.redis.enabled is left at its Spring Boot default (true) here;
+    # deployments without Redis (e.g. kind-dev's H2+Mock profile) turn it off via the
+    # MANAGEMENT_HEALTH_REDIS_ENABLED=false env var already wired into that overlay.
 
 mybatis-plus:
   configuration:
