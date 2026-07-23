@@ -1,5 +1,8 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { capsulePath, initialProductSpace, letterThreadPath, MeSpace, productSpaceFromPath, ProductShellNavigation, resourceFromPath, spacePath } from "./ProductShell";
 
 afterEach(cleanup);
@@ -135,5 +138,48 @@ describe("ProductShell", () => {
     render(<MeSpace {...props} locale="zh-CN" />);
     fireEvent.click(screen.getByRole("button", { name: /安全避风港/ }));
     expect(onOpenSafetyHarbor).toHaveBeenCalledOnce();
+  });
+
+  // W2 UIUX audit follow-up: the earlier run-on-naming fix (above) swapped the space tab's label
+  // element from <span> to <strong> (so it could carry aria-hidden alongside the new aria-label)
+  // but styles.css's sizing/truncation rule was never updated to match -- it still targeted
+  // `.space-tabs button span`, a selector nothing in the DOM matches anymore. Live-verified in a
+  // real browser at 375px width with the en-SG locale (doc 24's own bilingual mandate): the orphaned
+  // selector left the label with no font-size/ellipsis rule at all, so it rendered at the browser's
+  // default bold ~16px instead of the design's .8rem and visibly overlapped the neighboring tab
+  // ("Resonance" measured 85px wide inside a 70px-wide button). Fixed by repointing the selector at
+  // `strong`. This test loads the real, shipped styles.css (not a hand-copied duplicate, matching the
+  // established DangerQuiet/HeartDiary pattern) so the rule can't silently drift out of sync again.
+  describe(".space-tabs button label sizing (styles.css, real stylesheet pinned via readFileSync)", () => {
+    const here = path.dirname(fileURLToPath(import.meta.url));
+    const stylesheetText = readFileSync(path.join(here, "..", "styles.css"), "utf-8");
+    let styleTag: HTMLStyleElement;
+
+    beforeAll(() => {
+      styleTag = document.createElement("style");
+      styleTag.textContent = stylesheetText;
+      document.head.appendChild(styleTag);
+    });
+    afterAll(() => styleTag.remove());
+
+    it("no longer targets a <span> the JSX never renders, at either the base rule or the <=680px mobile override", () => {
+      expect(stylesheetText).not.toMatch(/\.space-tabs button span/);
+    });
+
+    it("gives the real <strong> label (not a stale <span>) the .8rem truncating rule", () => {
+      render(<ProductShellNavigation active="aurora" onNavigate={() => undefined} />);
+      const label = screen.getByRole("button", { name: "今天 · Aurora" }).querySelector("strong")!;
+      const style = getComputedStyle(label);
+      expect(style.fontSize).toBe("0.8rem");
+      expect(style.display).toBe("block");
+      expect(style.overflow).toBe("hidden");
+      expect(style.whiteSpace).toBe("nowrap");
+    });
+
+    it("also repoints the <=680px mobile override at <strong> (live-verified at 375px: label used to overlap the next tab)", () => {
+      const mobileRuleMatch = stylesheetText.match(/@media \(max-width: 680px\)[^]*?\.space-tabs button (strong|span) \{ font-size: \.72rem; \}/);
+      expect(mobileRuleMatch, "expected the mobile space-tabs label override to target strong").not.toBeNull();
+      expect(mobileRuleMatch![1]).toBe("strong");
+    });
   });
 });

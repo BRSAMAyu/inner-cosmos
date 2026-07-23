@@ -12,6 +12,7 @@ type WorkbenchCopy = {
   aria: string; heading: string; count: (n: number) => string; intro: string; tabsAria: string;
   tabPublic: string; tabReview: string; tabPrivate: string; newTab: string; createAria: string;
   step1Title: string; step1Note: string; noMemories: string; blockedMem: string; memoryFallback: string;
+  memoryCheckboxAria: (title: string, meta: string) => string;
   step2Title: string; step2Note: string; nameLabel: string; namePlaceholder: string; introLabel: string; introPlaceholder: string;
   previewBusy: string; previewBtn: string; previewAria: string; removedPrefix: string; backToEdit: string; compileBusy: string; compileBtn: string;
   statusPublic: string; statusReview: string; statusPrivate: string; genomeReading: string;
@@ -34,6 +35,7 @@ const COPY: Record<Locale, WorkbenchCopy> = {
     tabsAria: "我的共鸣体", tabPublic: "已公开", tabReview: "需复核", tabPrivate: "仅自己", newTab: "＋ 新建一个侧面", createAria: "创建共鸣体",
     step1Title: "你愿意让它使用哪些记忆？", step1Note: "这里的选择不会自动公开；LOCAL_ONLY 与禁止外部处理的内容不能进入 Genome。",
     noMemories: "还没有可选择的当前记忆。你也可以创建一个不读取记忆的通用侧面。", blockedMem: "不会用于共鸣体", memoryFallback: "记忆",
+    memoryCheckboxAria: (title, meta) => `${title} · ${meta}`,
     step2Title: "它表达你的哪一部分？", step2Note: "名字和说明面向访客，但创建后仍保持私密，直到你主动发布。",
     nameLabel: "共鸣体名字", namePlaceholder: "例如：雨后仍愿意开口的人", introLabel: "希望它保留的侧面",
     introPlaceholder: "例如：面对关系误解时，我会先沉默整理，再清楚说出边界。",
@@ -66,6 +68,7 @@ const COPY: Record<Locale, WorkbenchCopy> = {
     tabsAria: "My capsules", tabPublic: "Public", tabReview: "Needs review", tabPrivate: "Private", newTab: "＋ New facet", createAria: "Create a capsule",
     step1Title: "Which memories are you willing to let it use?", step1Note: "Choices here aren't published automatically; LOCAL_ONLY and no-external-processing content can't enter the Genome.",
     noMemories: "No current memories to choose yet. You can also create a general facet that reads no memories.", blockedMem: "Won't be used by the capsule", memoryFallback: "Memory",
+    memoryCheckboxAria: (title, meta) => `${title} · ${meta}`,
     step2Title: "Which part of you does it express?", step2Note: "The name and description face visitors, but stay private after creation until you publish.",
     nameLabel: "Capsule name", namePlaceholder: "e.g. someone still willing to speak after the rain", introLabel: "The facet you want it to keep",
     introPlaceholder: "e.g. facing a relationship misunderstanding, I go quiet to sort myself out, then clearly state my boundary.",
@@ -213,8 +216,15 @@ export function CapsuleWorkbench({ capsules, selectedCapsuleId, selectedCapsule,
       <div className="capsule-step"><span>1</span><div><strong>{t.step1Title}</strong><small>{t.step1Note}</small></div></div>
       <div className="memory-consent-list">{selectableMemories.length === 0 ? <p>{t.noMemories}</p> : selectableMemories.slice(0, 10).map(memory => {
         const blocked = blockedScopes.has((memory.consentScope ?? "").toUpperCase());
+        const meta = blocked ? t.blockedMem : `${memory.memoryLayer ?? t.memoryFallback} · v${memory.versionNo}`;
+        // W2 UIUX audit: same run-on-naming shape as ProductShellNavigation's five-space tabs --
+        // <strong>title</strong><small>meta</small> sit with no separator inside a <label>, so the
+        // wrapped checkbox's accessible name concatenates into one run-on string (live-verified:
+        // label.textContent === "今日沉淀EPISODIC · v1"). aria-hidden the visual duplicate and give
+        // the checkbox itself a properly separated aria-label; the two-line visual layout is unchanged.
         return <label className={blocked ? "blocked" : ""} key={memory.id}><input type="checkbox" disabled={blocked || capsuleBusy}
-          checked={selectedMemoryIds.includes(memory.id)} onChange={() => onToggleMemory(memory.id)} /><span><strong>{memory.title}</strong><small>{blocked ? t.blockedMem : `${memory.memoryLayer ?? t.memoryFallback} · v${memory.versionNo}`}</small></span></label>;
+          aria-label={t.memoryCheckboxAria(memory.title, meta)}
+          checked={selectedMemoryIds.includes(memory.id)} onChange={() => onToggleMemory(memory.id)} /><span aria-hidden="true"><strong>{memory.title}</strong><small>{meta}</small></span></label>;
       })}</div>
       <div className="capsule-step"><span>2</span><div><strong>{t.step2Title}</strong><small>{t.step2Note}</small></div></div>
       <div className="capsule-fields"><label>{t.nameLabel}<input value={capsuleName} onChange={event => onCapsuleName(event.target.value)} placeholder={t.namePlaceholder} /></label>
@@ -244,8 +254,11 @@ export function CapsuleWorkbench({ capsules, selectedCapsuleId, selectedCapsule,
       <div className="capsule-step"><span>1</span><div><strong>{t.rvStep1Title}</strong><small>{t.rvStep1Note}</small></div></div>
       <div className="memory-consent-list compact">{selectableMemories.slice(0, 10).map(memory => {
         const blocked = blockedScopes.has((memory.consentScope ?? "").toUpperCase());
+        const meta = blocked ? t.blockedMem2 : `v${memory.versionNo}`;
+        // W2 UIUX audit: same run-on-naming fix as the create-tab memory list above.
         return <label className={blocked ? "blocked" : ""} key={memory.id}><input type="checkbox" disabled={blocked || capsuleBusy}
-          checked={selectedMemoryIds.includes(memory.id)} onChange={() => onToggleMemory(memory.id)} /><span><strong>{memory.title}</strong><small>{blocked ? t.blockedMem2 : `v${memory.versionNo}`}</small></span></label>;
+          aria-label={t.memoryCheckboxAria(memory.title, meta)}
+          checked={selectedMemoryIds.includes(memory.id)} onChange={() => onToggleMemory(memory.id)} /><span aria-hidden="true"><strong>{memory.title}</strong><small>{meta}</small></span></label>;
       })}</div>
       <AsyncButton className="resonance-secondary" busy={capsuleBusy} busyText={t.recompileBusy} onClick={onRecompile}>{t.recompileBtn}</AsyncButton>
 

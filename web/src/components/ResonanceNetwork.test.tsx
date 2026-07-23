@@ -91,6 +91,23 @@ describe("ResonanceNetwork", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
+  // W2 UIUX audit follow-up: the match-card button rendered <span>badge</span><strong>pseudonym</strong>
+  // <p>intro</p><small>summary</small> with no aria-label, so its accessible name concatenated all
+  // four pieces (including the full user-authored intro paragraph) into one run-on string -- the same
+  // shape as the ProductShellNavigation run-on bug this campaign already fixed, but worse. Fixed with
+  // a short, properly separated aria-label and aria-hidden on the visual duplicate.
+  it("gives the match-card button a short, separated accessible name instead of concatenating the whole card", () => {
+    render(<ResonanceNetwork resonanceMatches={[match]} resonanceStrategy="MIRROR" visitorBusy={false} visitorMatch={null}
+      personaSession={null} personaMessages={[]} personaDraft="" personaQuota={null} letterTitle="" letterBody="" sentLetter={null}
+      onChooseStrategy={() => undefined} onChooseMatch={() => undefined} onStartPersonaConversation={() => undefined}
+      onPersonaDraftChange={() => undefined} onSendPersonaTurn={() => undefined} onLetterTitleChange={() => undefined}
+      onLetterBodyChange={() => undefined} onSendLetter={() => undefined} />);
+    const card = screen.getByRole("listitem", { name: "同行者 · 最近都在面对转变" });
+    expect(card.tagName).toBe("BUTTON");
+    // the visual content (badge/intro paragraph) must not leak into the accessible name
+    expect(card).not.toHaveAccessibleName(/阶段相近的人/);
+  });
+
   it("renders the network, strategies and entry in English when locale is en-SG", () => {
     render(<ResonanceNetwork locale="en-SG" resonanceMatches={[match]} resonanceStrategy="MIRROR" visitorBusy={false}
       visitorMatch={match} personaSession={null} personaMessages={[]} personaDraft="" personaQuota={null}
