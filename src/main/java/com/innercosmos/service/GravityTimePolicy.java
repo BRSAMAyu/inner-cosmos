@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 /**
  * Single canonical anchor/clock/rounding policy for gravity time-decay.
  *
- * Regression (Gemini audit 1.5, P1): GravityRecalculateListener (event-driven) and
+ * Regression (Gemini audit 1.5, P1): GravityRecalculationServiceImpl (event-driven) and
  * NightlyMemorySettlementJob (nightly batch) used to each inline their own copy of the
  * "days since last touch" calculation with DIFFERENT fallbacks for a missing lastTouchedAt --
  * the listener hardcoded 30 days, the nightly job fell back to createdAt (or 0 if even that

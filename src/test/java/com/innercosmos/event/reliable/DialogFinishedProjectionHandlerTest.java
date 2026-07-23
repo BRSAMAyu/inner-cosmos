@@ -3,6 +3,7 @@ package com.innercosmos.event.reliable;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.innercosmos.service.ClaimCandidateService;
 import com.innercosmos.service.EmotionTimelineService;
+import com.innercosmos.service.GravityRecalculationService;
 import com.innercosmos.service.MemoryService;
 import org.junit.jupiter.api.Test;
 
@@ -22,15 +23,19 @@ class DialogFinishedProjectionHandlerTest {
     private final MemoryService memoryService = mock(MemoryService.class);
     private final ClaimCandidateService claimCandidateService = mock(ClaimCandidateService.class);
     private final EmotionTimelineService emotionTimelineService = mock(EmotionTimelineService.class);
+    private final GravityRecalculationService gravityRecalculationService = mock(GravityRecalculationService.class);
     private final DialogFinishedProjectionHandler handler = new DialogFinishedProjectionHandler(
-            new ObjectMapper(), memoryService, claimCandidateService, emotionTimelineService);
+            new ObjectMapper(), memoryService, claimCandidateService, emotionTimelineService, gravityRecalculationService);
 
     @Test
-    void projectsMemoryClaimsAndEmotionTimelineInOneFailFastHandler() {
+    void projectsMemoryGravityClaimsAndEmotionTimelineInOneFailFastHandler() {
         handler.handle(event("{\"userId\":7,\"sessionId\":19}"));
 
-        var ordered = inOrder(memoryService, claimCandidateService, emotionTimelineService);
+        // Gemini audit 1.6 (CONFIRMED/P1): gravity recompute must run AFTER extraction, in this
+        // same ordered projection -- this durable path never called it at all before this fix.
+        var ordered = inOrder(memoryService, gravityRecalculationService, claimCandidateService, emotionTimelineService);
         ordered.verify(memoryService).extractFromSession(7L, 19L);
+        ordered.verify(gravityRecalculationService).recalculateForUser(7L);
         ordered.verify(claimCandidateService).stageForSession(7L, 19L);
         ordered.verify(emotionTimelineService).aggregateFromTraces(org.mockito.ArgumentMatchers.eq(7L), any());
         assertThat(handler.eventType()).isEqualTo(DialogFinishedOutboxWriter.EVENT_TYPE);
@@ -44,6 +49,7 @@ class DialogFinishedProjectionHandlerTest {
                 .hasMessageContaining("identifiers");
 
         verify(memoryService, never()).extractFromSession(any(), any());
+        verify(gravityRecalculationService, never()).recalculateForUser(any());
         verify(claimCandidateService, never()).stageForSession(any(), any());
         verify(emotionTimelineService, never()).aggregateFromTraces(any(), any());
     }
@@ -56,6 +62,7 @@ class DialogFinishedProjectionHandlerTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("database unavailable");
 
+        verify(gravityRecalculationService, never()).recalculateForUser(any());
         verify(claimCandidateService, never()).stageForSession(any(), any());
         verify(emotionTimelineService, never()).aggregateFromTraces(any(), any());
     }

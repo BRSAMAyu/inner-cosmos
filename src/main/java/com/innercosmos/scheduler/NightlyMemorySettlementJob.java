@@ -129,14 +129,14 @@ public class NightlyMemorySettlementJob {
             // touched (falling back to createdAt when never re-touched), so the starfield ages
             // instead of freezing at creation-time ordering. Card-creation paths still pass 0.
             // Regression (Gemini audit 1.5): shared GravityTimePolicy instead of this method's
-            // own inline anchor logic -- see GravityRecalculateListener, which now uses the same
+            // own inline anchor logic -- see GravityRecalculationServiceImpl, which now uses the same
             // policy instead of its previously-divergent hardcoded 30-day fallback.
             long daysSince = gravityTimePolicy.daysSinceAnchor(card);
             double gravity = gravityService.calculateGravity(
                     card.intensityScore, card.recurrenceCount,
                     card.userImportance, card.triggerCount, daysSince);
             // Regression (Gemini audit 2.1, P0): field-level conditional update guarded on
-            // versionNo instead of a whole-entity updateById() -- see GravityRecalculateListener
+            // versionNo instead of a whole-entity updateById() -- see GravityRecalculationServiceImpl
             // for the identical pattern and rationale (background recompute must never overwrite
             // a concurrent user edit; 0 rows means skip, the next nightly run retries).
             int updated = memoryCardMapper.update(null, new UpdateWrapper<MemoryCard>()

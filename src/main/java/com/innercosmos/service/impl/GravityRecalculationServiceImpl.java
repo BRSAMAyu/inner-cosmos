@@ -1,47 +1,43 @@
-package com.innercosmos.event;
+package com.innercosmos.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.innercosmos.entity.MemoryCard;
 import com.innercosmos.mapper.MemoryCardMapper;
+import com.innercosmos.service.GravityRecalculationService;
 import com.innercosmos.service.GravityService;
 import com.innercosmos.service.GravityTimePolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.event.EventListener;
-import org.springframework.scheduling.annotation.Async;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
-@Component
-@ConditionalOnProperty(name = "inner-cosmos.events.outbox.enabled", havingValue = "false", matchIfMissing = true)
-public class GravityRecalculateListener {
-    private static final Logger log = LoggerFactory.getLogger(GravityRecalculateListener.class);
+@Service
+public class GravityRecalculationServiceImpl implements GravityRecalculationService {
+    private static final Logger log = LoggerFactory.getLogger(GravityRecalculationServiceImpl.class);
+
     private final MemoryCardMapper memoryCardMapper;
     private final GravityService gravityService;
     private final GravityTimePolicy gravityTimePolicy;
 
-    public GravityRecalculateListener(MemoryCardMapper memoryCardMapper, GravityService gravityService,
-                                       GravityTimePolicy gravityTimePolicy) {
+    public GravityRecalculationServiceImpl(MemoryCardMapper memoryCardMapper, GravityService gravityService,
+                                           GravityTimePolicy gravityTimePolicy) {
         this.memoryCardMapper = memoryCardMapper;
         this.gravityService = gravityService;
         this.gravityTimePolicy = gravityTimePolicy;
     }
 
-    @org.springframework.transaction.event.TransactionalEventListener(phase = org.springframework.transaction.event.TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
-    @Async("taskExecutor")
-    public void onDialogFinished(DialogFinishedEvent event) {
+    @Override
+    public void recalculateForUser(Long userId) {
         try {
             List<MemoryCard> cards = memoryCardMapper.selectList(
-                    new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<MemoryCard>()
-                            .eq("user_id", event.userId)
-                            .eq("status", "ACTIVE"));
+                    new QueryWrapper<MemoryCard>().eq("user_id", userId).eq("status", "ACTIVE"));
             for (MemoryCard card : cards) {
                 // Regression (Gemini audit 1.5): shared GravityTimePolicy/GravityService instead
                 // of an inline formula copy with its own divergent (hardcoded 30-day) fallback --
-                // see NightlyMemorySettlementJob#recalculateGravity, which now uses the same policy.
+                // see NightlyMemorySettlementJob#recalculateGravity, which uses the same policy.
                 long days = gravityTimePolicy.daysSinceAnchor(card);
                 double gravity = gravityService.calculateGravity(
                         card.intensityScore != null ? card.intensityScore : 0,
@@ -66,7 +62,7 @@ public class GravityRecalculateListener {
                 }
             }
         } catch (Exception e) {
-            log.error("Event processing failed", e);
+            log.error("Gravity recalculation failed for user {}", userId, e);
         }
     }
 }

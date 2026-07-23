@@ -10,7 +10,7 @@ import java.time.ZoneId;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Gemini audit 1.5 (CONFIRMED/P1): GravityRecalculateListener and NightlyMemorySettlementJob
+ * Gemini audit 1.5 (CONFIRMED/P1): GravityRecalculationServiceImpl and NightlyMemorySettlementJob
  * used to each inline their own "days since last touch" calculation with DIFFERENT fallbacks
  * for a missing lastTouchedAt (listener: hardcoded 30 days; nightly job: createdAt, or 0 if even
  * that was missing) -- so the same card's gravity could jump depending on which path last ran.

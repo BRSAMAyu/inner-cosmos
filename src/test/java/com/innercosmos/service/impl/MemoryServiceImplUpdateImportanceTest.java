@@ -15,7 +15,7 @@ import static org.mockito.Mockito.*;
 
 /**
  * Gemini audit 2.1 (CONFIRMED/P0): MemoryCard.versionNo was a plain field that never guarded
- * any write -- both the background gravity recompute (GravityRecalculateListener /
+ * any write -- both the background gravity recompute (GravityRecalculationServiceImpl /
  * NightlyMemorySettlementJob) and this user-facing updateImportance() wrote the whole entity
  * via updateById(), so whichever write happened last silently won, with no conflict detection.
  * These tests pin MemoryServiceImpl#updateImportance's new field-level conditional update.

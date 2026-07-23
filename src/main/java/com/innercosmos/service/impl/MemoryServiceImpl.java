@@ -410,7 +410,7 @@ public class MemoryServiceImpl implements MemoryService {
     public void updateImportance(Long userId, Long cardId, Double importance) {
         // Regression (Gemini audit 2.1, P0): field-level conditional update guarded on
         // versionNo instead of a whole-entity updateById() -- a background gravity recompute
-        // (GravityRecalculateListener / NightlyMemorySettlementJob, same versionNo guard) could
+        // (GravityRecalculationServiceImpl / NightlyMemorySettlementJob, same versionNo guard) could
         // otherwise race between this read and this write and have its own update silently
         // clobbered, or clobber this one. The user's own edit must win: retry once against the
         // freshest row if the first attempt loses the race, since a background recompute only

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.innercosmos.service.ClaimCandidateService;
 import com.innercosmos.service.EmotionTimelineService;
+import com.innercosmos.service.GravityRecalculationService;
 import com.innercosmos.service.MemoryService;
 import org.springframework.stereotype.Component;
 
@@ -23,15 +24,18 @@ public class DialogFinishedProjectionHandler implements OutboxEventHandler {
     private final MemoryService memoryService;
     private final ClaimCandidateService claimCandidateService;
     private final EmotionTimelineService emotionTimelineService;
+    private final GravityRecalculationService gravityRecalculationService;
 
     public DialogFinishedProjectionHandler(ObjectMapper objectMapper,
                                            MemoryService memoryService,
                                            ClaimCandidateService claimCandidateService,
-                                           EmotionTimelineService emotionTimelineService) {
+                                           EmotionTimelineService emotionTimelineService,
+                                           GravityRecalculationService gravityRecalculationService) {
         this.objectMapper = objectMapper;
         this.memoryService = memoryService;
         this.claimCandidateService = claimCandidateService;
         this.emotionTimelineService = emotionTimelineService;
+        this.gravityRecalculationService = gravityRecalculationService;
     }
 
     @Override
@@ -48,6 +52,13 @@ public class DialogFinishedProjectionHandler implements OutboxEventHandler {
     public void handle(OutboxEvent event) {
         Projection projection = parse(event.payload());
         memoryService.extractFromSession(projection.userId(), projection.sessionId());
+        // Gemini audit 1.6 (CONFIRMED/P1): gravity recompute must run AFTER extraction, in this
+        // same ordered projection -- never as a second, independently-scheduled listener with no
+        // ordering guarantee against extraction (the legacy in-process path's exact bug; see
+        // MemoryExtractListener). This durable path never had that race, but it also never called
+        // gravity recompute at all -- wiring it in here (in the correct order) is this fix's
+        // other half: neither delivery path may silently skip it.
+        gravityRecalculationService.recalculateForUser(projection.userId());
         claimCandidateService.stageForSession(projection.userId(), projection.sessionId());
         emotionTimelineService.aggregateFromTraces(projection.userId(), LocalDate.now());
     }

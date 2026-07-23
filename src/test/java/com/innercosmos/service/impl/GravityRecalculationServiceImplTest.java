@@ -1,4 +1,4 @@
-package com.innercosmos.event;
+package com.innercosmos.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.innercosmos.entity.MemoryCard;
@@ -14,13 +14,16 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /**
- * Gemini audit 1.5/2.1 (P1/P0): this listener used to inline its own gravity formula and a
- * hardcoded 30-day fallback (divergent from NightlyMemorySettlementJob's own inline copy), and
- * wrote the recomputed gravity via a whole-entity updateById() with no conflict guard. Both are
- * fixed by routing through the shared GravityService/GravityTimePolicy and an atomic
- * versionNo-guarded conditional update.
+ * Gemini audit 1.5/2.1/1.6: this used to be an independent {@code @Async} listener
+ * (GravityRecalculateListener) racing against MemoryExtractListener on the same
+ * DialogFinishedEvent with no ordering guarantee (audit 1.6, CONFIRMED/P1). It is now an
+ * unconditionally-available service both MemoryExtractListener (legacy path, called
+ * synchronously AFTER extraction) and DialogFinishedProjectionHandler (durable-outbox path) call
+ * directly, in the correct order. These tests pin the shared-policy call, the conditional write,
+ * and that a lost race is skipped, not overwritten -- same coverage as the deleted listener test,
+ * now against the extracted service.
  */
-class GravityRecalculateListenerTest {
+class GravityRecalculationServiceImplTest {
 
     private static final Long USER_ID = 1L;
 
@@ -45,8 +48,8 @@ class GravityRecalculateListenerTest {
         when(gravityService.calculateGravity(0.0, 0, 0.0, 0, 5L)).thenReturn(0.42);
         when(mapper.update(any(), any(UpdateWrapper.class))).thenReturn(1);
 
-        GravityRecalculateListener listener = new GravityRecalculateListener(mapper, gravityService, timePolicy);
-        listener.onDialogFinished(new DialogFinishedEvent(USER_ID, 100L));
+        GravityRecalculationServiceImpl service = new GravityRecalculationServiceImpl(mapper, gravityService, timePolicy);
+        service.recalculateForUser(USER_ID);
 
         // Uses the shared policy for the anchor -- not an inline hardcoded fallback.
         verify(timePolicy).daysSinceAnchor(theCard);
@@ -67,14 +70,14 @@ class GravityRecalculateListenerTest {
         when(timePolicy.daysSinceAnchor(any())).thenReturn(1L);
         when(gravityService.calculateGravity(anyDouble(), anyInt(), anyDouble(), anyInt(), anyLong())).thenReturn(0.5);
         // 0 rows: the card's version_no no longer matches (something else, e.g. a user edit,
-        // already bumped it) -- the listener must accept this and move on, not force-write.
+        // already bumped it) -- must accept this and move on, not force-write.
         when(mapper.update(any(), any(UpdateWrapper.class))).thenReturn(0);
 
-        GravityRecalculateListener listener = new GravityRecalculateListener(mapper, gravityService, timePolicy);
-        listener.onDialogFinished(new DialogFinishedEvent(USER_ID, 100L));
+        GravityRecalculationServiceImpl service = new GravityRecalculationServiceImpl(mapper, gravityService, timePolicy);
+        service.recalculateForUser(USER_ID);
 
         verify(mapper).update(eq(null), any(UpdateWrapper.class));
-        // Exactly one attempt -- a lost race here is not retried within this event; the next
+        // Exactly one attempt -- a lost race here is not retried within this call; the next
         // dialog-finished event or nightly run will recompute against the fresh row.
         verify(mapper, times(1)).update(any(), any(UpdateWrapper.class));
         verify(mapper, never()).updateById(any(MemoryCard.class));
@@ -88,10 +91,11 @@ class GravityRecalculateListenerTest {
         GravityTimePolicy timePolicy = mock(GravityTimePolicy.class);
         when(mapper.selectList(any())).thenThrow(new RuntimeException("db down"));
 
-        GravityRecalculateListener listener = new GravityRecalculateListener(mapper, gravityService, timePolicy);
+        GravityRecalculationServiceImpl service = new GravityRecalculationServiceImpl(mapper, gravityService, timePolicy);
 
-        // Must not throw -- this runs @Async, fallbackExecution=true, after commit; an uncaught
-        // exception here must never propagate back into the triggering request.
-        listener.onDialogFinished(new DialogFinishedEvent(USER_ID, 100L));
+        // Must not throw -- callers (MemoryExtractListener's @Async after-commit path,
+        // DialogFinishedProjectionHandler's durable projection) must never see an uncaught
+        // exception propagate back from a best-effort background recompute.
+        service.recalculateForUser(USER_ID);
     }
 }
