@@ -378,10 +378,18 @@ gates:
           it still receives the late inner_voice). The reorder also exposed and fixed a live-event-
           id collision (turn.completed now increments its sequence so the following inner_voice gets
           a distinct id and is not silently dropped by the frontend dedup). Pinned by a failing-first
-          order assertion in AuroraInnerVoiceEnabledStreamTest. Still open: capsule/persona-voice
-          reuse (a distinct voice for capsule chat replies, reinforcing "this is not Aurora") and
-          slow-letter read-aloud were deferred to avoid colliding with a concurrent W2 accessibility
-          pass -- queued as follow-up. A full statistically-robust real-embedding recall benchmark
+          order assertion in AuroraInnerVoiceEnabledStreamTest. 2026-07-24 (branch
+          codex/w1-capsule-voice, merged): capsule/persona-voice reuse DONE -- a visitor chatting
+          with a published Echo Capsule can tap-to-play the capsule's reply synthesized in a DISTINCT
+          persona voice (two new presets, capsule_calm_neutral / capsule_deep_steady, disjoint from
+          Aurora's catalog), via POST /api/persona-chat/session/{id}/voice reusing QwenAudioTtsClient;
+          visitor-authorized (requireOwnedSession + isPublic/PUBLIC gate, no withdrawn-capsule bypass),
+          on-demand so it never adds latency to the chat turn; proven real on both voices
+          (evidence/innovation/INNO-INNER-014/). 2026-07-24 real-LLM verification
+          (TrackARealProviderSmokeEvaluationTest, INNO-EVAL-005): DeepSeek clean (0 schema drift,
+          3/3) on this HEAD; GLM drifts ~3/run (provider behavior, prompts unchanged) -> the demo
+          server (scripts/demo/run-demo-server.sh) defaults to DeepSeek. Still open: slow-letter
+          read-aloud; a full statistically-robust real-embedding recall benchmark
           (only one relevant-vs-distractor case proven so far) and independent (non-author) review
           of the inner-voice line's genuine "aliveness"/non-repetition quality remain open.
           INDEPENDENT CODE REVIEW (2026-07-24): verdict ship-as-is, no CRITICAL/HIGH. M2 (MEDIUM,
