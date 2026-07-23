@@ -1,0 +1,34 @@
+# kind-full: a real-Postgres + real-Redis, 3-role (api/worker/scheduler) local kind profile
+# that stays offline-safe (dev + Mock AI, no OIDC/TLS/cloud) so the W3 hero-gate fault
+# injections (pod delete mid-SSE-turn, outbox-driven autoscaling) exercise genuine
+# cross-pod durable state instead of each pod's own isolated H2 file (kind-dev's profile).
+# Known, disclosed boundary: no TLS and no password on the in-namespace Postgres/Redis,
+# and no OIDC — this profile trades production security posture for a fast, reproducible
+# local fault-injection ground per document 24 6.2 ("本地 kind 是三条高级能力的完整实验与
+# 演示场"). It must never be pointed at real user data or exposed outside the cluster.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: inner-cosmos-config
+data:
+  INNER_COSMOS_EXPECTED_SCHEMA_VERSION: "22"
+  SPRING_PROFILES_ACTIVE: dev,postgres
+  SPRING_DATASOURCE_URL: jdbc:postgresql://inner-cosmos-postgres:5432/inner_cosmos
+  SPRING_DATASOURCE_USERNAME: inner_cosmos
+  SPRING_FLYWAY_ENABLED: "false"
+  REDIS_HOST: inner-cosmos-redis
+  REDIS_PORT: "6379"
+  REDIS_SESSION_ENABLED: "true"
+  REDIS_IDEMPOTENCY_ENABLED: "true"
+  REDIS_RATE_LIMIT_ENABLED: "true"
+  REDIS_AURORA_STREAM_ENABLED: "true"
+  REDIS_SCHEDULER_LOCK_ENABLED: "true"
+  REDIS_SESSION_NAMESPACE: inner-cosmos:w3:session
+  REDIS_RATE_LIMIT_NAMESPACE: inner-cosmos:w3:rate-limit:v1
+  REDIS_SCHEDULER_LOCK_NAMESPACE: inner-cosmos-w3-scheduler-v1
+  JDBC_OUTBOX_ENABLED: "true"
+  LLM_MODE: dev
+  LLM_PROVIDER: mock
+  MANAGEMENT_HEALTH_REDIS_ENABLED: "true"
+  SEED_ENABLED: "false"
+  COOKIE_SECURE: "false"

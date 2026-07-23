@@ -1,0 +1,27 @@
+# kind-full overlay — real Postgres + real Redis + 3 runtime roles (api/worker/scheduler)
+# + a migration Job, all in the offline-safe dev+Mock-AI profile, for W3 Cloud-Native
+# Showcase fault injection on a local kind cluster (see document 24 section 6.2: "本地
+# kind 是三条高级能力的完整实验与演示场"). Disclosed boundary: no TLS, no Redis auth, no
+# OIDC — see app-config.yaml's header comment. Not a substitute for the TLS/OIDC
+# academy-eks overlay; it exists specifically so durable cross-pod state (Postgres-backed
+# conversation timeline, Redis-backed session/outbox lease) survives an individual API/
+# worker pod being deleted, which kind-dev's per-pod H2 file cannot support.
+#
+#   kubectl apply -k deploy/k8s/overlays/kind-full
+#   kubectl -n inner-cosmos-w3 create secret generic inner-cosmos-runtime \
+#     --from-literal=SPRING_DATASOURCE_PASSWORD=<generated>
+#   kubectl -n inner-cosmos-w3 apply -k deploy/k8s/overlays/kind-full   # re-apply after the Secret exists
+#   kubectl -n inner-cosmos-w3 create job --from=cronjob/... (n/a here; see migration-job.yaml, applied by the kustomization)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: inner-cosmos-w3
+resources:
+  - namespace.yaml
+  - app-config.yaml
+  - postgres-statefulset.yaml
+  - redis-deployment.yaml
+  - app-deployment.yaml
+  - worker-deployment.yaml
+  - scheduler-deployment.yaml
+  - migration-job.yaml
+  - network-policy.yaml

@@ -30,6 +30,16 @@ spec:
     spec:
       backoffLimit: 2
       template:
+        metadata:
+          # Required for the data-tier NetworkPolicy (podSelector app.kubernetes.io/name=
+          # inner-cosmos) to admit this pod's egress to PostgreSQL — confirmed live on kind:
+          # without this label, pg_dump hangs forever (NetworkPolicy silently drops the
+          # packets rather than refusing the connection, so there is no error, just a stuck
+          # Job) once the data NetworkPolicy is actually enforced. See evidence/w3/ for the
+          # before/after proof.
+          labels:
+            app.kubernetes.io/name: inner-cosmos
+            app.kubernetes.io/component: backup
         spec:
           restartPolicy: OnFailure
           securityContext:
