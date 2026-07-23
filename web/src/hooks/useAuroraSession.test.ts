@@ -1,6 +1,6 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api, streamAurora } from "../api";
+import { api, streamAurora, replayTurnEvents } from "../api";
 import type { Notification, WakeIntent } from "../api";
 import type { AuroraStreamEvent } from "../protocol";
 import { mobileRuntime } from "../mobile";
@@ -143,6 +143,7 @@ describe("useAuroraSession -- send / streaming / interrupt", () => {
     let capturedOnEvent: ((event: AuroraStreamEvent) => void) | undefined;
     vi.mocked(streamAurora).mockImplementation(async (_input, _signal, onEvent) => {
       capturedOnEvent = onEvent;
+      return "TERMINAL_EVENT";
     });
     vi.mocked(api.psychologySkillSuggestion).mockResolvedValue(null);
     const { result, setStatus, onSkillSuggestion } = setup();
@@ -186,6 +187,7 @@ describe("useAuroraSession -- send / streaming / interrupt", () => {
     let capturedOnEvent: ((event: AuroraStreamEvent) => void) | undefined;
     vi.mocked(streamAurora).mockImplementation(async (_input, _signal, onEvent) => {
       capturedOnEvent = onEvent;
+      return "TERMINAL_EVENT";
     });
     vi.mocked(api.psychologySkillSuggestion).mockResolvedValue(null);
     const { result } = setup();
@@ -218,6 +220,7 @@ describe("useAuroraSession -- send / streaming / interrupt", () => {
     let capturedOnEvent: ((event: AuroraStreamEvent) => void) | undefined;
     vi.mocked(streamAurora).mockImplementation(async (_input, _signal, onEvent) => {
       capturedOnEvent = onEvent;
+      return "TERMINAL_EVENT";
     });
     vi.mocked(api.psychologySkillSuggestion).mockResolvedValue(null);
     const { result, setStatus } = setup();
@@ -242,6 +245,7 @@ describe("useAuroraSession -- send / streaming / interrupt", () => {
       await new Promise<void>((_resolve, reject) => {
         signal.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })));
       });
+      return "TERMINAL_EVENT";
     });
     vi.mocked(api.psychologySkillSuggestion).mockResolvedValue(null);
     vi.mocked(api.stop).mockResolvedValue({ turn: { id: 9, status: "INTERRUPTED" }, bubbles: [], events: [] });
@@ -259,6 +263,90 @@ describe("useAuroraSession -- send / streaming / interrupt", () => {
     expect(api.stop).toHaveBeenCalledExactlyOnceWith(9);
     expect(result.current.activeTurnId).toBeNull();
     expect(result.current.messages.find(m => m.key === "live-9-0")?.partial).toBe(true);
+  });
+
+  // ── Gemini audit 4.2 (CONFIRMED/P0): clean EOF without a terminal event must trigger bounded
+  //    recovery, never be silently treated as success ──────────────────────────────────────────
+
+  it("4.2: streamAurora resolving EOF_WITHOUT_TERMINAL (no terminal event ever seen) triggers recover(), not silent success", async () => {
+    vi.mocked(streamAurora).mockImplementation(async (_input, _signal, onEvent) => {
+      onEvent({ id: "1", type: "turn.started", payload: { turnId: 9 } });
+      return "EOF_WITHOUT_TERMINAL";
+    });
+    vi.mocked(api.psychologySkillSuggestion).mockResolvedValue(null);
+    vi.mocked(replayTurnEvents).mockResolvedValue("");
+    vi.mocked(api.timeline).mockResolvedValue({ turn: { id: 9, status: "COMPLETED" }, bubbles: [], events: [] });
+    vi.mocked(api.messages).mockResolvedValue([]);
+    const { result, setStatus } = setup();
+    await act(async () => { await result.current.resolveSession(); });
+    act(() => { result.current.setDraft("接着说"); });
+
+    await act(async () => { await result.current.send({ preventDefault: () => undefined } as never); });
+
+    // A clean EOF with no terminal event must invoke recover(), not fall through as if the turn
+    // had completed normally. (lastEventIdRef is already "1" by this point -- handleEvent updated
+    // it from the turn.started event the mock fired before returning EOF_WITHOUT_TERMINAL.)
+    expect(replayTurnEvents).toHaveBeenCalledWith(9, "1", expect.any(Function));
+    expect(api.timeline).toHaveBeenCalledWith(9);
+    expect(setStatus).toHaveBeenCalledWith(expect.stringContaining("恢复"));
+    // recover() found the turn already COMPLETED via the timeline poll, so the turn genuinely
+    // ends here -- not stuck showing "still generating" forever.
+    expect(result.current.activeTurnId).toBeNull();
+  });
+
+  // ── Gemini audit 4.1 (CONFIRMED/P0): a superseded turn's in-flight recovery must never
+  //    clobber a newer turn's live state ──────────────────────────────────────────────────────
+
+  it("4.1: a stale recovery for an already-stopped turn cannot resurrect state after a newer action superseded it", async () => {
+    let releaseTimeline!: () => void;
+    const timelineHang = new Promise<void>(resolve => { releaseTimeline = resolve; });
+    vi.mocked(streamAurora).mockImplementation(async (_input, _signal, onEvent) => {
+      onEvent({ id: "1", type: "turn.started", payload: { turnId: 9 } });
+      return "EOF_WITHOUT_TERMINAL";
+    });
+    vi.mocked(api.psychologySkillSuggestion).mockResolvedValue(null);
+    vi.mocked(replayTurnEvents).mockResolvedValue("");
+    vi.mocked(api.timeline).mockImplementation(async () => {
+      await timelineHang; // simulates a slow recovery poll for the now-superseded turn
+      return { turn: { id: 9, status: "COMPLETED" as const }, bubbles: [], events: [] };
+    });
+    vi.mocked(api.messages).mockResolvedValue([]);
+    vi.mocked(api.stop).mockResolvedValue({ turn: { id: 9, status: "INTERRUPTED" }, bubbles: [], events: [] });
+    const { result, setStatus } = setup();
+    await act(async () => { await result.current.resolveSession(); });
+    act(() => { result.current.setDraft("接着说"); });
+
+    // send() triggers EOF_WITHOUT_TERMINAL -> recover() -> api.timeline(), which hangs. Started
+    // and pumped inside ONE act() so its synchronous state updates (turn.started) are flushed,
+    // then this act() call itself resolves while the underlying send() promise keeps running in
+    // the background, blocked on the hung timeline call -- it is picked back up (still the SAME
+    // promise) by a later, separate act() below, never left un-awaited.
+    let sendPromise!: Promise<void>;
+    await act(async () => {
+      sendPromise = result.current.send({ preventDefault: () => undefined } as never);
+      await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+    });
+    expect(result.current.activeTurnId).toBe(9);
+
+    // The user stops the turn WHILE its recovery is still hung on the timeline poll -- this is
+    // exactly the "a newer action supersedes an in-flight recovery" scenario 4.1 protects.
+    await act(async () => { await result.current.stop(); });
+    expect(result.current.activeTurnId).toBeNull();
+    setStatus.mockClear();
+
+    // Now let the stale recovery's timeline poll finally resolve, and await the ORIGINAL send()
+    // promise (started above) all the way through to completion.
+    await act(async () => {
+      releaseTimeline();
+      await sendPromise;
+      await Promise.resolve();
+    });
+
+    // The stale recovery must NOT resurrect activeTurnId or overwrite stop()'s own status with
+    // its own "recovered" status message -- its generation was superseded by stop().
+    expect(result.current.activeTurnId).toBeNull();
+    expect(setStatus).not.toHaveBeenCalledWith(expect.stringContaining("已从时间线恢复"));
+    expect(setStatus).not.toHaveBeenCalledWith(expect.stringContaining("已恢复到打断发生的位置"));
   });
 });
 
@@ -325,7 +413,7 @@ describe("useAuroraSession -- goodbye ritual", () => {
 describe("useAuroraSession -- status copy is locale-aware, not hardcoded Chinese", () => {
   it("send() and terminal turn events use English status text when skillLocale is en-SG", async () => {
     let capturedOnEvent: ((event: AuroraStreamEvent) => void) | undefined;
-    vi.mocked(streamAurora).mockImplementation(async (_input, _signal, onEvent) => { capturedOnEvent = onEvent; });
+    vi.mocked(streamAurora).mockImplementation(async (_input, _signal, onEvent) => { capturedOnEvent = onEvent; return "TERMINAL_EVENT"; });
     vi.mocked(api.psychologySkillSuggestion).mockResolvedValue(null);
     const { result, setStatus } = setup("en-SG");
     await act(async () => { await result.current.resolveSession(); });
@@ -347,6 +435,7 @@ describe("useAuroraSession -- status copy is locale-aware, not hardcoded Chinese
       await new Promise<void>((_resolve, reject) => {
         signal.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })));
       });
+      return "TERMINAL_EVENT";
     });
     vi.mocked(api.psychologySkillSuggestion).mockResolvedValue(null);
     vi.mocked(api.stop).mockResolvedValue({ turn: { id: 9, status: "INTERRUPTED" }, bubbles: [], events: [] });

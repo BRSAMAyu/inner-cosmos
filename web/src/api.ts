@@ -1,4 +1,7 @@
-import { SseDecoder, toTypedEvent, type AuroraStreamEvent, type DialogMessage, type TurnTimeline } from "./protocol";
+import {
+  SseDecoder, TERMINAL_EVENT_TYPES, toTypedEvent,
+  type AuroraStreamEvent, type DialogMessage, type StreamTerminalReason, type TurnTimeline
+} from "./protocol";
 import type { components as CoreApiComponents } from "./generated/inner-cosmos-v1";
 
 type CoreApiSchemas = CoreApiComponents["schemas"];
@@ -384,30 +387,125 @@ export function apiUrl(path: string): string {
   return configuredApiBase ? `${configuredApiBase}${path}` : path;
 }
 
+/**
+ * Gemini audit 4.3 (CONFIRMED/P0): converged onto ONE fetch-based implementation for both the
+ * session-cookie (browser) and bearer-token (mobile) cases. Native EventSource cannot read the
+ * HTTP status of a failed connection attempt (a real platform limitation, not something fixable
+ * by reading `.status` off it), so it can never distinguish a real 401 from a transient network
+ * blip -- it would otherwise rely on the browser's own indefinite, unbounded auto-reconnect.
+ * fetch + ReadableStream CAN read that status, which is what the bounded-401 and
+ * backoff/circuit-breaker logic below depends on.
+ */
 export function subscribeProactive(
   onEvent: (event: ProactiveEvent) => void,
   onConnectionChange?: (connected: boolean) => void
 ): () => void {
-  if (accessTokenProvider) {
-    const controller = new AbortController();
-    void subscribeProactiveBearer(controller, onEvent, onConnectionChange);
-    return () => controller.abort();
-  }
-  if (typeof EventSource === "undefined") return () => undefined;
-  const source = new EventSource(apiUrl("/api/proactive/stream"), { withCredentials: true });
-  source.onopen = () => onConnectionChange?.(true);
-  source.onerror = () => onConnectionChange?.(false);
-  source.addEventListener("proactive", raw => {
+  const controller = new AbortController();
+  void subscribeProactiveViaFetch(controller, onEvent, onConnectionChange);
+  return () => controller.abort();
+}
+
+const PROACTIVE_BASE_DELAY_MS = 1000;
+const PROACTIVE_MAX_DELAY_MS = 30000;
+/** Circuit breaker: stop retrying after this many CONSECUTIVE failed connection attempts rather
+ *  than hammering the server forever. Durable notifications (polled elsewhere) remain the source
+ *  of truth if this live channel gives up. */
+const PROACTIVE_MAX_CONSECUTIVE_FAILURES = 8;
+
+function backoffDelayMs(attempt: number): number {
+  const capped = Math.min(PROACTIVE_MAX_DELAY_MS, PROACTIVE_BASE_DELAY_MS * 2 ** attempt);
+  // +/-20% jitter so many tabs/devices reconnecting after the same outage don't thunder together.
+  return capped * (0.8 + Math.random() * 0.4);
+}
+
+function proactiveShouldPause(): boolean {
+  return (typeof navigator !== "undefined" && navigator.onLine === false)
+      || (typeof document !== "undefined" && document.visibilityState === "hidden");
+}
+
+/** Resolves as soon as the tab comes back online/foreground, or the subscription is aborted --
+ *  never polls on a timer while paused. */
+function waitForProactiveResume(signal: AbortSignal): Promise<void> {
+  return new Promise(resolve => {
+    if (signal.aborted) { resolve(); return; }
+    const cleanup = () => {
+      window.removeEventListener("online", onResume);
+      document.removeEventListener("visibilitychange", onVisibility);
+      signal.removeEventListener("abort", onAbort);
+    };
+    const onResume = () => { cleanup(); resolve(); };
+    const onVisibility = () => { if (document.visibilityState === "visible") { cleanup(); resolve(); } };
+    const onAbort = () => { cleanup(); resolve(); };
+    window.addEventListener("online", onResume);
+    document.addEventListener("visibilitychange", onVisibility);
+    signal.addEventListener("abort", onAbort);
+  });
+}
+
+async function subscribeProactiveViaFetch(
+  controller: AbortController,
+  onEvent: (event: ProactiveEvent) => void,
+  onConnectionChange?: (connected: boolean) => void
+): Promise<void> {
+  let consecutiveFailures = 0;
+  while (!controller.signal.aborted) {
+    // 4.3: never poll the server while offline or backgrounded -- wait for a real resume signal.
+    if (proactiveShouldPause()) {
+      await waitForProactiveResume(controller.signal);
+      if (controller.signal.aborted) break;
+    }
     try {
-      const value = JSON.parse((raw as MessageEvent<string>).data) as Partial<ProactiveEvent>;
-      if (typeof value.type === "string" && typeof value.content === "string" && typeof value.ts === "string") {
-        onEvent(value as ProactiveEvent);
+      let token = await accessTokenProvider?.() ?? null;
+      if (bearerRequired && !token) throw new Error("Mobile authentication is required");
+      let response = await fetch(apiUrl("/api/proactive/stream"), {
+        signal: controller.signal,
+        headers: { Accept: "text/event-stream", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        credentials: token ? "omit" : "include"
+      });
+      if (response.status === 401) {
+        // 4.3: at most ONE token refresh on a real 401 -- never loop forever against a session
+        // that is actually invalid.
+        if (accessTokenInvalidator) {
+          await accessTokenInvalidator();
+          token = await accessTokenProvider?.() ?? null;
+          response = await fetch(apiUrl("/api/proactive/stream"), {
+            signal: controller.signal,
+            headers: { Accept: "text/event-stream", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+            credentials: token ? "omit" : "include"
+          });
+        }
+        if (response.status === 401) {
+          onConnectionChange?.(false);
+          return;
+        }
+      }
+      if (!response.ok || !response.body) throw new Error(`Proactive SSE HTTP ${response.status}`);
+      onConnectionChange?.(true);
+      consecutiveFailures = 0;
+      const decoder = new SseDecoder();
+      const reader = response.body.getReader();
+      const textDecoder = new TextDecoder();
+      while (!controller.signal.aborted) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        for (const frame of decoder.push(textDecoder.decode(value, { stream: true }))) {
+          if (frame.event !== "proactive") continue;
+          try {
+            const event = JSON.parse(frame.data) as Partial<ProactiveEvent>;
+            if (typeof event.type === "string" && typeof event.content === "string" && typeof event.ts === "string") {
+              onEvent(event as ProactiveEvent);
+            }
+          } catch { /* durable notifications remain the source of truth */ }
+        }
       }
     } catch {
-      // Malformed live hints are ignored. Durable notifications remain the source of truth.
+      if (controller.signal.aborted) return;
     }
-  });
-  return () => source.close();
+    onConnectionChange?.(false);
+    consecutiveFailures += 1;
+    if (consecutiveFailures >= PROACTIVE_MAX_CONSECUTIVE_FAILURES) return;
+    await new Promise(resolve => setTimeout(resolve, backoffDelayMs(consecutiveFailures)));
+  }
 }
 
 // Admin console (Phase 3 port of the legacy static /pages/admin.html, 8 tabs). Every /api/admin/*,
@@ -457,42 +555,6 @@ export type AdminAbTestGroupStats = {
   avgLatency: number; successRate: number;
 };
 export type AdminAbTestStats = Record<string, AdminAbTestGroupStats>;
-
-async function subscribeProactiveBearer(controller: AbortController, onEvent: (event: ProactiveEvent) => void,
-                                        onConnectionChange?: (connected: boolean) => void): Promise<void> {
-  while (!controller.signal.aborted) {
-    try {
-      const token = await accessTokenProvider?.();
-      if (!token) throw new Error("Mobile authentication is required");
-      const response = await fetch(apiUrl("/api/proactive/stream"), {
-        signal: controller.signal, headers: { Accept: "text/event-stream", Authorization: `Bearer ${token}` }
-      });
-      if (response.status === 401) await accessTokenInvalidator?.();
-      if (!response.ok || !response.body) throw new Error(`Proactive SSE HTTP ${response.status}`);
-      onConnectionChange?.(true);
-      const decoder = new SseDecoder();
-      const reader = response.body.getReader();
-      const textDecoder = new TextDecoder();
-      while (!controller.signal.aborted) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        for (const frame of decoder.push(textDecoder.decode(value, { stream: true }))) {
-          if (frame.event !== "proactive") continue;
-          try {
-            const event = JSON.parse(frame.data) as Partial<ProactiveEvent>;
-            if (typeof event.type === "string" && typeof event.content === "string" && typeof event.ts === "string") {
-              onEvent(event as ProactiveEvent);
-            }
-          } catch { /* durable notifications remain the source of truth */ }
-        }
-      }
-    } catch (error) {
-      if (controller.signal.aborted) return;
-    }
-    onConnectionChange?.(false);
-    await new Promise(resolve => setTimeout(resolve, 2000));
-  }
-}
 
 async function request<T>(url: string, init: RequestInit = {}, retriedCsrf = false, retriedBearer = false): Promise<T> {
   const method = (init.method ?? "GET").toUpperCase();
@@ -907,11 +969,19 @@ export async function diaryTranscribeAudio(blob: Blob): Promise<VoiceTranscripti
   return env.data;
 }
 
+/**
+ * Gemini audit 4.2 (CONFIRMED/P0): returns an explicit terminal-state contract instead of
+ * silently resolving on any EOF. A clean connection close with no terminal event ever observed
+ * ("EOF_WITHOUT_TERMINAL") is NOT success -- it is indistinguishable from the connection dropping
+ * mid-generation, and the caller (useAuroraSession's send()) must react to it exactly like the
+ * existing network-error/throw path already does: attempt bounded recovery via recover(), never
+ * silently treat it as a completed turn.
+ */
 export async function streamAurora(
   input: Pick<CoreChatRequest, "sessionId" | "message"> & { mode: string },
   signal: AbortSignal,
   onEvent: (event: AuroraStreamEvent) => void
-): Promise<void> {
+): Promise<StreamTerminalReason> {
   const body: CoreChatRequest = input;
   const staged = await request<CoreStreamStage>("/api/v1/aurora/stream-stage", {
     method: "POST", body: JSON.stringify(body)
@@ -933,14 +1003,19 @@ export async function streamAurora(
   const decoder = new SseDecoder();
   const reader = response.body.getReader();
   const textDecoder = new TextDecoder();
+  let sawTerminalEvent = false;
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
     for (const frame of decoder.push(textDecoder.decode(value, { stream: true }))) {
       const event = toTypedEvent(frame);
-      if (event) onEvent(event);
+      if (event) {
+        onEvent(event);
+        if (TERMINAL_EVENT_TYPES.has(event.type)) sawTerminalEvent = true;
+      }
     }
   }
+  return sawTerminalEvent ? "TERMINAL_EVENT" : "EOF_WITHOUT_TERMINAL";
 }
 
 export async function replayTurnEvents(

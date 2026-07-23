@@ -48,6 +48,25 @@ export type AuroraStreamEvent =
       payload: Record<string, unknown>;
     }>;
 
+// Gemini audit 4.2 (CONFIRMED/P0): event types that constitute a real end-of-turn. If the
+// underlying connection closes (clean EOF) without ANY of these having been seen, that is NOT a
+// successful completion -- it is indistinguishable from the connection just dropping mid-
+// generation, and streamAurora's terminal-reason contract (see api.ts) uses this exact set to
+// tell the two apart.
+export const TERMINAL_EVENT_TYPES: ReadonlySet<AuroraStreamEvent["type"]> = new Set([
+  "turn.completed", "turn.interrupted", "safety", "error", "done"
+]);
+
+/**
+ * Gemini audit 4.2: the explicit terminal-state contract a stream function returns instead of
+ * silently succeeding on any EOF.
+ *   - "TERMINAL_EVENT": the stream ended after a real terminal event (done/turn.completed/
+ *     turn.interrupted/safety/error) was observed -- a genuine, known end-of-turn.
+ *   - "EOF_WITHOUT_TERMINAL": the connection closed with no terminal event ever seen -- the
+ *     caller must treat this as still-in-flight, not as success, and attempt bounded recovery.
+ */
+export type StreamTerminalReason = "TERMINAL_EVENT" | "EOF_WITHOUT_TERMINAL";
+
 export interface SseFrame {
   id: string;
   event: string;

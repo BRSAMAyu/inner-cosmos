@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { apiUrl, subscribeProactive, validateApiBase } from "../api";
+import { apiUrl, configureBearerAuth, subscribeProactive, validateApiBase } from "../api";
 import {
   dueWakeIntentIds, parseWakeIntentDeepLink, wakeIntentFromLocalNotificationId,
   wakeIntentFromNotification, wakeNotificationId
@@ -60,26 +60,92 @@ describe("mobile API boundary", () => {
     expect(() => apiUrl("https://evil.example/collect")).toThrow("Only Inner Cosmos API paths are allowed");
   });
 
-  it("accepts only typed proactive events and closes the live channel", () => {
-    const listeners = new Map<string, EventListener>();
-    const close = vi.fn();
-    class FakeEventSource {
-      onopen: (() => void) | null = null;
-      onerror: (() => void) | null = null;
-      constructor(public url: string, public init: EventSourceInit) {}
-      addEventListener(name: string, listener: EventListener) { listeners.set(name, listener); }
-      close = close;
-    }
-    vi.stubGlobal("EventSource", FakeEventSource);
+  // Gemini audit 4.3 (CONFIRMED/P0): subscribeProactive converged onto a fetch-based
+  // implementation (native EventSource cannot read the HTTP status of a failed connection
+  // attempt, so it can never detect a real 401 vs. a transient blip). This rewrites the old
+  // FakeEventSource-based test as a fetch/ReadableStream mock -- same two behaviors pinned:
+  // only well-typed events reach the caller, and unsubscribing tears down the live connection.
+  it("accepts only typed proactive events and tears down the live connection on unsubscribe", async () => {
+    const encoder = new TextEncoder();
+    const frames = "event: proactive\ndata: "
+      + JSON.stringify({ type: "wake_intent", content: "回来", ts: "2026-07-15T00:00:00Z" })
+      + "\n\nevent: proactive\ndata: not-json\n\n";
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode(frames));
+        controller.close();
+      }
+    });
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Response(body, { status: 200, headers: { "Content-Type": "text/event-stream" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
     const received = vi.fn();
     const unsubscribe = subscribeProactive(received);
-    listeners.get("proactive")?.({ data: JSON.stringify({ type: "wake_intent", content: "回来", ts: "2026-07-15T00:00:00Z" }) } as MessageEvent);
-    listeners.get("proactive")?.({ data: "not-json" } as MessageEvent);
-    expect(received).toHaveBeenCalledOnce();
+    await vi.waitFor(() => expect(received).toHaveBeenCalledOnce());
+
     expect(received).toHaveBeenCalledWith({ type: "wake_intent", content: "回来", ts: "2026-07-15T00:00:00Z" });
+
     unsubscribe();
-    expect(close).toHaveBeenCalledOnce();
+    const firstCallInit = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
+    expect(firstCallInit?.signal?.aborted).toBe(true);
+  });
+
+  // Gemini audit 4.3 (CONFIRMED/P0): a real 401 must attempt AT MOST ONE token refresh before
+  // giving up -- never loop forever against a session/token that is actually invalid.
+  it("gives up after exactly one token refresh attempt on a real 401, never looping forever", async () => {
+    const invalidator = vi.fn(async () => undefined);
+    let tokenCalls = 0;
+    configureBearerAuth(async () => { tokenCalls += 1; return `token-${tokenCalls}`; }, true, invalidator);
+
+    const fetchMock = vi.fn(async () => new Response(null, { status: 401 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const onConnectionChange = vi.fn();
+    subscribeProactive(vi.fn(), onConnectionChange);
+
+    await vi.waitFor(() => expect(onConnectionChange).toHaveBeenCalledWith(false));
+
+    // Exactly two fetch attempts (initial + the one bounded retry after refresh), never a third.
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(invalidator).toHaveBeenCalledOnce();
+
+    // Waiting further must not trigger any additional attempt -- the loop has genuinely stopped,
+    // not just paused for a backoff interval.
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    configureBearerAuth(null);
+  });
+
+  // Gemini audit 4.3 (CONFIRMED/P0): sustained transient failures must trip a circuit breaker
+  // rather than hammering the server forever with an unbounded retry loop.
+  it("stops retrying after sustained consecutive transient failures (circuit breaker)", async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchMock = vi.fn(async () => { throw new Error("network down"); });
+      vi.stubGlobal("fetch", fetchMock);
+      const onConnectionChange = vi.fn();
+
+      subscribeProactive(vi.fn(), onConnectionChange);
+
+      // Drive enough fake-timer advances to exhaust the circuit breaker's failure budget --
+      // exponential backoff caps at 30s, so a generous total covers every attempt.
+      for (let i = 0; i < 12; i++) {
+        await vi.advanceTimersByTimeAsync(30000);
+      }
+
+      const callsAtBreaker = fetchMock.mock.calls.length;
+      expect(callsAtBreaker).toBeGreaterThan(1);
+      expect(onConnectionChange).toHaveBeenCalledWith(false);
+
+      // Advancing further must not produce any additional attempt -- the breaker has tripped.
+      await vi.advanceTimersByTimeAsync(120000);
+      expect(fetchMock.mock.calls.length).toBe(callsAtBreaker);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.unstubAllGlobals(); configureBearerAuth(null); });

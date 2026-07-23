@@ -120,7 +120,21 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
   const eventIdsRef = useRef(new Set<string>());
   const lastEventIdRef = useRef("");
   const reconnectingRef = useRef(false);
-  const handleEventRef = useRef<(event: AuroraStreamEvent) => void>(() => undefined);
+  const handleEventRef = useRef<(event: AuroraStreamEvent, generation: number) => void>(() => undefined);
+  // Gemini audit 4.1 (CONFIRMED/P0): a per-turn generation counter. Every async continuation that
+  // can outlive its own turn (recover()'s bounded poll, streamAurora's live event callback, the
+  // network-error/EOF-without-terminal recovery path, resumeConversation) captures the CURRENT
+  // generation when it starts and must check isCurrentGeneration() before writing any shared
+  // state. send() bumps this counter for every new turn, which immediately invalidates any
+  // still-in-flight recovery/finish from a superseded turn -- it can no longer clobber the new
+  // turn's live state, and the reducer (finishTurn/handleEvent) is naturally idempotent against
+  // stale/duplicate writes since a stale generation simply no-ops instead of applying.
+  const turnGenerationRef = useRef(0);
+  const isCurrentGeneration = useCallback((generation: number) => turnGenerationRef.current === generation, []);
+  const beginNewTurnGeneration = useCallback(() => {
+    turnGenerationRef.current += 1;
+    return turnGenerationRef.current;
+  }, []);
 
   const replaceFromHistory = useCallback(async (sid: number) => {
     setMessages(toUi(await api.messages(sid)));
@@ -149,28 +163,32 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
   // silent rather than surface as a connection error.
   const refreshNotifications = useCallback(() => api.notifications().then(setNotifications).catch(() => undefined), []);
 
-  const finishTurn = useCallback(() => {
+  const finishTurn = useCallback((generation: number) => {
+    if (!isCurrentGeneration(generation)) return; // 4.1: a superseded turn must never clobber a newer one's live state.
     abortRef.current = null;
     activeTurnRef.current = null;
     setActiveTurnId(null);
     bubbleKeyRef.current = null;
     setRuntimeSignal(current => ({ ...current, stage: "idle" }));
-  }, []);
+  }, [isCurrentGeneration]);
 
-  const recover = useCallback(async (turnId: number, sid: number) => {
+  const recover = useCallback(async (turnId: number, sid: number, generation: number) => {
     if (reconnectingRef.current) return;
     reconnectingRef.current = true;
-    setStatus(t.reconnecting);
+    if (isCurrentGeneration(generation)) setStatus(t.reconnecting);
     try {
       lastEventIdRef.current = await replayTurnEvents(turnId, lastEventIdRef.current, event => {
+        if (!isCurrentGeneration(generation)) return; // 4.1: stale turn -- ignore replayed events.
         if (event.type === "timeline.event") {
           setStatus(t.restoringEvent(event.payload.eventType));
         } else {
-          handleEventRef.current(event);
+          handleEventRef.current(event, generation);
         }
       });
       for (let attempt = 0; attempt < 40; attempt++) {
+        if (!isCurrentGeneration(generation)) return; // 4.1: a newer turn superseded this recovery.
         const timeline = await api.timeline(turnId);
+        if (!isCurrentGeneration(generation)) return;
         const recovered = timeline.bubbles
           .filter(b => b.status === "COMMITTED" || b.deliveredChars > 0)
           .map(b => ({
@@ -185,17 +203,22 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
         ]);
         if (terminal.has(timeline.turn.status)) {
           await replaceFromHistory(sid);
-          setStatus(timeline.turn.status === "COMPLETED" ? t.recoveredCompleted : t.recoveredInterrupted);
-          finishTurn();
+          if (isCurrentGeneration(generation)) {
+            setStatus(timeline.turn.status === "COMPLETED" ? t.recoveredCompleted : t.recoveredInterrupted);
+          }
+          finishTurn(generation);
           return;
         }
         await new Promise(resolve => setTimeout(resolve, 500));
       }
-      setStatus(t.stillGenerating);
+      // 4.2: bounded recovery exhausted -- surface a visible, retryable status instead of leaving
+      // the UI stuck silently showing "still generating" forever. The user can keep talking
+      // (Aurora replans), which is this app's established retry idiom for this status banner.
+      if (isCurrentGeneration(generation)) setStatus(t.stillGenerating);
     } finally {
       reconnectingRef.current = false;
     }
-  }, [finishTurn, replaceFromHistory, setStatus, t]);
+  }, [finishTurn, isCurrentGeneration, replaceFromHistory, setStatus, t]);
 
   const openMobileWakeIntent = useCallback(async (wakeIntentId: number) => {
     try {
@@ -219,7 +242,8 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
   // private to this hook.
   const resumeConversation = useCallback(async () => {
     const activeTurn = activeTurnRef.current;
-    if (activeTurn && sessionId) await recover(activeTurn, sessionId);
+    const generation = turnGenerationRef.current;
+    if (activeTurn && sessionId) await recover(activeTurn, sessionId, generation);
     else if (sessionId) await replaceFromHistory(sessionId);
   }, [recover, replaceFromHistory, sessionId]);
 
@@ -239,16 +263,23 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
 
   const stop = useCallback(async () => {
     const turnId = activeTurnRef.current;
+    const generation = turnGenerationRef.current;
     abortRef.current?.abort();
     if (turnId) {
       try { await api.stop(turnId); } catch { /* stream may have completed first */ }
     }
+    if (!isCurrentGeneration(generation)) return;
     setMessages(current => current.map(message =>
       message.key.startsWith(`live-${turnId}-`) ? { ...message, partial: true } : message
     ));
-    finishTurn();
+    finishTurn(generation);
+    // 4.1: bump the generation AFTER finishing this turn's own update, so any recover() that was
+    // independently in flight for this same turn is invalidated too -- once the user explicitly
+    // stopped, a stale recovery poll (whose next generation check now fails) must never overwrite
+    // this stop's own state a few hundred ms later.
+    beginNewTurnGeneration();
     setStatus(t.stoppedHere);
-  }, [finishTurn, setStatus, t]);
+  }, [beginNewTurnGeneration, finishTurn, isCurrentGeneration, setStatus, t]);
 
   const triggerGoodbye = useCallback(async () => {
     if (!sessionId) return;
@@ -258,7 +289,8 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
     } catch (error) { setStatus(error instanceof Error ? error.message : t.goodbyeFailed); }
   }, [sessionId, setStatus, t]);
 
-  const handleEvent = useCallback((event: AuroraStreamEvent) => {
+  const handleEvent = useCallback((event: AuroraStreamEvent, generation: number) => {
+    if (!isCurrentGeneration(generation)) return; // 4.1: stale (superseded) turn -- ignore entirely.
     if (event.id && eventIdsRef.current.has(event.id)) return;
     if (event.id) eventIdsRef.current.add(event.id);
     if (event.id) lastEventIdRef.current = event.id;
@@ -316,16 +348,16 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
         break;
       }
       case "turn.interrupted":
-        finishTurn();
+        finishTurn(generation);
         setStatus(t.interrupted);
         break;
       case "turn.completed":
       case "done":
-        finishTurn();
+        finishTurn(generation);
         setStatus(t.completed);
         break;
       case "safety":
-        finishTurn();
+        finishTurn(generation);
         setSafetyAlert({
           riskLevel: event.payload.riskLevel,
           featureTarget: event.payload.featureTarget,
@@ -334,11 +366,11 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
         setStatus(t.safetyStatus);
         break;
       case "error":
-        finishTurn();
+        finishTurn(generation);
         setStatus(event.payload.message || t.streamErrorFallback);
         break;
     }
-  }, [finishTurn, setStatus, t]);
+  }, [finishTurn, isCurrentGeneration, setStatus, t]);
   handleEventRef.current = handleEvent;
 
   // Deliberately NOT wrapped in useCallback -- matches the original AuroraApp.tsx, where `send`
@@ -348,6 +380,10 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
     const text = draft.trim();
     if (!text || !sessionId) return;
     if (abortRef.current || activeTurnRef.current) await stop();
+    // Gemini audit 4.1: bump the generation BEFORE any of this turn's state/async work begins --
+    // this is what invalidates whatever the just-stopped previous turn may still have in flight
+    // (a recover() poll, a late live event) from this point on.
+    const generation = beginNewTurnGeneration();
     setDraft("");
     setMessages(current => [...current, { key: `local-${crypto.randomUUID()}`, speaker: "USER", text }]);
     setStatus(t.listening);
@@ -358,11 +394,21 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
     const controller = new AbortController();
     abortRef.current = controller;
     try {
-      await streamAurora({ sessionId, message: text, mode }, controller.signal, handleEvent);
+      const outcome = await streamAurora({ sessionId, message: text, mode }, controller.signal,
+        streamEvent => handleEvent(streamEvent, generation));
+      if (outcome === "EOF_WITHOUT_TERMINAL" && isCurrentGeneration(generation)) {
+        // Gemini audit 4.2: the connection closed cleanly but no terminal/done event was ever
+        // seen -- this is NOT a successful completion. Recover exactly like the network-error/
+        // throw path below, within this same turn's timeline.
+        const turnId = activeTurnRef.current;
+        if (turnId) await recover(turnId, sessionId, generation);
+        else if (isCurrentGeneration(generation)) setStatus(t.noTimelineRetry);
+      }
     } catch (error) {
       if ((error as Error).name === "AbortError") return;
+      if (!isCurrentGeneration(generation)) return;
       const turnId = activeTurnRef.current;
-      if (turnId) await recover(turnId, sessionId);
+      if (turnId) await recover(turnId, sessionId, generation);
       else setStatus(t.noTimelineRetry);
     }
   };
@@ -442,9 +488,22 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
   // Used by logout/deleteAccount (still owned by AuroraApp.tsx) to clear the conversation when the
   // account session itself ends.
   const resetSession = useCallback(() => {
+    // Gemini audit 4.1: logout must cancel any in-flight stream/recovery -- an old turn's
+    // recovery finishing after logout must never resurrect state for an account that just ended
+    // its session (e.g. writing messages/status the next user of this device would then see).
+    abortRef.current?.abort();
+    beginNewTurnGeneration();
     setSessionId(null);
     setMessages([]);
-  }, []);
+  }, [beginNewTurnGeneration]);
+
+  // Gemini audit 4.1: unmount must cancel any in-flight stream/recovery the same way logout does
+  // -- React 18/19 StrictMode double-invokes effects, and in production an unmounted component's
+  // async continuation writing to refs (not state) wouldn't even warn, silently leaking work.
+  useEffect(() => () => {
+    abortRef.current?.abort();
+    beginNewTurnGeneration();
+  }, [beginNewTurnGeneration]);
 
   return {
     sessionId, messages, draft, setDraft, mode, setMode, activeTurnId, runtimeSignal,

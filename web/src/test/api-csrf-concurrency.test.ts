@@ -60,7 +60,11 @@ describe("CSRF recovery under concurrent Aurora sends", () => {
     const second = streamAurora({ sessionId: 1, message: "第二条", mode: "COMPANION" },
       new AbortController().signal, () => undefined);
 
-    await expect(Promise.all([first, second])).resolves.toEqual([undefined, undefined]);
+    // Gemini audit 4.2: the mocked stream response here has an empty body (closes immediately,
+    // zero SSE frames), so it genuinely IS "connection closed with no terminal event ever seen" --
+    // streamAurora's terminal-reason contract correctly classifies that as EOF_WITHOUT_TERMINAL,
+    // not a silent success. This test's own purpose (CSRF-retry dedup) is unaffected either way.
+    await expect(Promise.all([first, second])).resolves.toEqual(["EOF_WITHOUT_TERMINAL", "EOF_WITHOUT_TERMINAL"]);
     expect(csrfLoads).toBe(2);
     expect(rejectedStages).toBe(2);
     expect(acceptedStages).toBe(2);
