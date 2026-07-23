@@ -64,3 +64,29 @@ heading "Aurora's voice" + 6 presets render in English).
 - This is a render/voice-journey snapshot, not a WCAG 2.2 AA assistive-tech review,
   a perf-budget run, or a non-author blind-experience panel — those remain the
   human-gated items called out in `UX-COMPLETE.remaining`.
+
+## Full Playwright suite result (fresh Mock-chat backend, this branch)
+
+**45 passed / 1 failed** (was 40 passed / 2 failed before this branch's fixes),
+including the 4 new `voice-features` journeys.
+
+- `dead-button-scan` — was FAILING, now FIXED. The scan captured all buttons once
+  then clicked sequentially; buttons disabled by a prior click's async side-effect
+  (the mutually-exclusive voice-preview group) or detached when an earlier click
+  replaced their subtree (the change-password → inline-form swap) were misreported
+  as dead. Re-checking `disabled` + `document.body.contains(b)` before each click
+  removes those false positives without masking truly-dead controls. Result: zero
+  dead buttons across all five spaces.
+- `aurora-interrupt › owner publishes, a visitor sends a slow letter…` — still
+  FAILING, intermittently. It failed at line 366 (strict-mode: 2 "我也愿意"
+  buttons) in one fresh-DB run and at line 356 ("资源不存在" on the seeded-letter
+  reply) in another. Root cause is shared-DB-state / seed-isolation (the seed
+  hardcodes `receiverCapsuleId` 1–4 in `MockDataInitializer.seedLetters`, and the
+  spec withdraws its own capsule before replying to a seeded letter whose capsule
+  id can collide on minimal-state DBs); the backend log shows no matching
+  NOT_FOUND, i.e. it is a stale-frontend-state artifact, not a real 404. This
+  spec's line-366 selector ambiguity was scoped to demo's card (a correct,
+  deterministic fix for that failure mode), but the separate line-356 flake is
+  **documented, not force-fixed** — it predates and is unrelated to the integrated
+  voice/demo/capsule-voice/slow-letter work (the reply/consent path is untouched
+  by the voice stack; voice only added the read-only `▶ 朗读这封信` affordance).
