@@ -68,8 +68,11 @@ class MemoryCorrectionCapsuleClosedLoopApiJourneyTest {
         //    extraction itself is a separately-covered slice; this test starts from its output).
         Long memoryId = seedMemory(ownerId, "关于安全感的记忆", "user 在关系里需要先建立安全感才会敞开");
 
-        // 3. Real HTTP: owner compiles a public capsule from that memory.
-        String createBody = "{\"pseudonym\":\"回声\",\"intro\":\"一个真实的旅程测试\",\"memoryIds\":[" + memoryId + "]}";
+        // 3. Real HTTP: owner compiles a public capsule from that memory. visibilityStatus/isPublic
+        //    are explicit (safeVisibility() now fails CLOSED to PRIVATE by default, 2026-07-24
+        //    8-agent audit P2-11) since this journey specifically exercises a public capsule.
+        String createBody = "{\"pseudonym\":\"回声\",\"intro\":\"一个真实的旅程测试\",\"memoryIds\":[" + memoryId + "],"
+                + "\"visibilityStatus\":\"PUBLIC\",\"isPublic\":true}";
         MvcResult createResult = mockMvc.perform(post("/api/capsule/create-from-memory")
                         .session(ownerSession).contentType(MediaType.APPLICATION_JSON).content(createBody))
                 .andExpect(status().isOk())
@@ -169,7 +172,9 @@ class MemoryCorrectionCapsuleClosedLoopApiJourneyTest {
         Long ownerId = userId(ownerSession);
 
         Long memoryId = seedMemory(ownerId, "关于专注的记忆", "user 在深度工作时更容易进入心流");
-        String createBody = "{\"pseudonym\":\"回声2\",\"intro\":\"另一段真实的旅程测试\",\"memoryIds\":[" + memoryId + "]}";
+        // visibilityStatus/isPublic explicit -- see the comment on the analogous line above.
+        String createBody = "{\"pseudonym\":\"回声2\",\"intro\":\"另一段真实的旅程测试\",\"memoryIds\":[" + memoryId + "],"
+                + "\"visibilityStatus\":\"PUBLIC\",\"isPublic\":true}";
         MvcResult createResult = mockMvc.perform(post("/api/capsule/create-from-memory")
                         .session(ownerSession).contentType(MediaType.APPLICATION_JSON).content(createBody))
                 .andExpect(status().isOk())

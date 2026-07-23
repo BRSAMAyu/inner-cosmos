@@ -112,28 +112,35 @@ P2 = quality/polish gap · P3 = minor.
   fixed alongside the P0-1/P1 batch.
 - [ ] **P2-2** No real-AI-vs-Mock indicator in the main Aurora chat UI (only wired into
   ThoughtShredder); a silent mid-demo fallback would go unnoticed. (`r1-backend-security`)
-- [ ] **P2-3** `LlmConfig.failoverClient()` gates its Mock-fallback candidate on the raw
+- [x] **P2-3** `LlmConfig.failoverClient()` gates its Mock-fallback candidate on the raw
   `allowFallback` field instead of `isEffectiveFallbackAllowed()`, a defense-in-depth gap if
-  `llm.mode=prod` is ever set without the `prod` Spring profile. (`r1-backend-security`)
+  `llm.mode=prod` is ever set without the `prod` Spring profile. (`r1-backend-security`) — fixed.
 - [ ] **P2-4** No automated test enforces H2 `schema.sql` / Flyway parity — currently in sync by
   convention only. (`r1-backend-security`)
 - [ ] **P2-5** TTS voice-synthesis endpoints hit a paid provider per call, no caching, only the
   generic rate limit. (`r1-backend-security`)
-- [ ] **P2-6** Footer link (`web/src/AuroraApp.tsx:1383`) sends users to the unfinished legacy V0.1
+- [x] **P2-6** Footer link (`web/src/AuroraApp.tsx:1383`) sends users to the unfinished legacy V0.1
   static dashboard (`/pages/dashboard.html`), self-labeled "tools not yet migrated". (`r1-frontend-mobile`)
+  — link removed (`footerTools` copy key removed too).
 - [ ] **P2-7** Production JS bundle (577 kB) exceeds Vite's 500 kB warning threshold, single unsplit
   chunk. (`r1-frontend-mobile`)
-- [ ] **P2-8** Actuator `/metrics` and `/prometheus` are `permitAll` and become internet-exposed once
-  tunneled. (`r1-deployment-public-access`)
+- [x] **P2-8** Actuator `/metrics` and `/prometheus` are `permitAll` and become internet-exposed once
+  tunneled. (`r1-deployment-public-access`) — deliberately kept `permitAll` (Spring Security change
+  would break the real, already-COMPLETE in-cluster Prometheus scrape in the K8s showcase, whose
+  isolation boundary is NetworkPolicy, not app auth); instead documented as a known, accepted
+  exposure in DEMO-RUNBOOK.md with an explicit "tear down the tunnel after grading" instruction.
 - [ ] **P2-9** No mock-fallback rehearsal plan if the operator's real-provider key hits a rate
   limit/quota during the actual grading window with concurrent judges. (`r1-deployment-public-access`)
 - [ ] **P2-10** The tunnel+APK judge-delivery plan is not referenced anywhere in the authoritative
   document map (对齐文档/24) or either machine ledger — undiscoverable by design. (`r1-deployment-public-access`)
-- [ ] **P2-11** Capsule `safeVisibility()` fails OPEN to `PUBLIC` for any unrecognized status value
+- [x] **P2-11** Capsule `safeVisibility()` fails OPEN to `PUBLIC` for any unrecognized status value
   instead of failing closed to `PRIVATE` (not reachable via current shipped frontend, but a real
-  fail-open default). (`r2-e2e-judge-journey`)
-- [ ] **P2-12** Malformed/invalid-UTF-8 JSON bodies return 500 instead of 400 —
+  fail-open default). (`r2-e2e-judge-journey`) — now fails closed to `PRIVATE`; regression test
+  added (`unrecognizedVisibilityStatusNeverResultsInPublicCapsule`), one pre-existing test updated
+  to opt in to `PUBLIC` explicitly.
+- [x] **P2-12** Malformed/invalid-UTF-8 JSON bodies return 500 instead of 400 —
   `GlobalExceptionHandler` has no `HttpMessageNotReadableException` handler. (`r2-e2e-judge-journey`)
+  — handler added, regression test added.
 - [ ] **P2-13** Repo HEAD advances mid-verification (another autonomous session commits concurrently)
   — no lock/coordination mechanism; snapshot/tag a fixed commit before actual grading.
   (`r2-test-evidence-reconciliation`)
@@ -170,6 +177,40 @@ P2 = quality/polish gap · P3 = minor.
 ## 3. Remediation log
 
 (Newest first. Each entry: finding id(s), what changed, commit.)
+
+- **P2-3, P2-6, P2-8 (doc-only), P2-11, P2-12** (2026-07-24):
+  - `LlmConfig.failoverClient()` now gates its Mock candidate on `isEffectiveFallbackAllowed()`
+    instead of the raw `allowFallback` field (P2-3).
+  - `CapsuleServiceImpl.safeVisibility()` now fails CLOSED to `PRIVATE` for any unrecognized value
+    (was fail-OPEN to `PUBLIC`); regression test added
+    (`CapsuleP1P2PrivacyBoundaryTest#unrecognizedVisibilityStatusNeverResultsInPublicCapsule`).
+    Updated 3 pre-existing tests that relied on the old fail-open default to explicitly request
+    `visibilityStatus=PUBLIC, isPublic=true` (`CapsuleP1P2PrivacyBoundaryTest` and both methods in
+    `MemoryCorrectionCapsuleClosedLoopApiJourneyTest`, the latter caught by a full-suite run after
+    the targeted test looked clean) (P2-11).
+  - `GlobalExceptionHandler` gained an `HttpMessageNotReadableException` handler returning 400
+    instead of falling through to the generic 500 catch-all; regression test added in
+    `ApiContractErrorTest` (P2-12).
+  - Removed the footer link to the legacy V0.1 static dashboard (`/pages/dashboard.html`,
+    self-labeled "tools not yet migrated") from `web/src/AuroraApp.tsx`; removed the now-unused
+    `footerTools` copy key from `web/src/appCopy.ts` (P2-6).
+  - P2-8 (actuator `/metrics`/`/prometheus` `permitAll`): deliberately did NOT restrict these via
+    Spring Security, because `deploy/k8s/base/app-deployment.yml`'s `prometheus.io/path:
+    /actuator/prometheus` annotation depends on unauthenticated in-cluster scraping for the
+    already-COMPLETE W3 cloud-native showcase (NetworkPolicy is that environment's isolation
+    boundary, not app-level auth) — restricting it would have regressed real, evidenced work.
+    Instead documented the tunnel-specific exposure risk explicitly in DEMO-RUNBOOK.md with a
+    "tear the tunnel down after grading" instruction.
+  - Verified: full `./mvnw test` re-run after fixing 2 newly-surfaced pre-existing-test failures —
+    **1188/1188, 0 failures, 1 pre-existing skip, BUILD SUCCESS**; frontend `tsc --noEmit` clean,
+    `npx vitest run` 522/522 (72 files), `npm run build` clean rebuild, `scan-secrets.ps1` PASS.
+  - **Not done in this pass**: P2-2 (mock-vs-real indicator in main chat UI), P2-4 (H2/Flyway
+    parity test), P2-5/P3-1 (TTS caching), P2-7 (bundle code-splitting), P2-9 (provider-quota
+    rehearsal — operational, not code), P2-10 (add an explicit acceptance-ledger gate for the
+    judge-delivery mechanism), P2-15 (emotion-baseline ledger coverage), P2-17 (prompt-injection
+    envelope for replayed memory/summary text — a known, documented design tradeoff per
+    `PromptBuilder.sanitize()`'s own comment, not a hidden bug), P2-18 (judge feature walkthrough
+    script). These remain open in the P2 checklist above for a future pass.
 
 - **P1-4, P1-5, P1-6, P1-7, P1-8, P1-9, P2-16** (2026-07-24), bundled with the P0-1 fix since they
   touch the same demo-delivery/security surface:

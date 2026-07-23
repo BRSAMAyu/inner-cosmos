@@ -1017,10 +1017,15 @@ public class CapsuleServiceImpl implements CapsuleService {
     }
 
     private String safeVisibility(String value) {
-        if ("PRIVATE".equals(value) || "HIDDEN".equals(value) || "ARCHIVED".equals(value)) {
+        // Fail CLOSED: only a recognized public-facing value resolves to PUBLIC; anything else
+        // (an unrecognized string, a client bug, a future enum-name drift) defaults to PRIVATE,
+        // never the other way around, for a value that governs whether a capsule derived from
+        // private, emotionally-sensitive memories becomes publicly visible (2026-07-24 8-agent
+        // audit P2-11 -- the previous default direction failed OPEN to PUBLIC).
+        if ("PUBLIC".equals(value) || "HIDDEN".equals(value) || "ARCHIVED".equals(value)) {
             return value;
         }
-        return "PUBLIC";
+        return "PRIVATE";
     }
 
     private String safePrivacy(String value) {

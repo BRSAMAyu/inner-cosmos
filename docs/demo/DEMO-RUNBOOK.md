@@ -41,6 +41,14 @@ This starts `cloudflared`, prints a public HTTPS URL like
 open**. **That URL does not change when your laptop's IP changes** (DHCP) — the tunnel routes by the
 URL, not your IP. Share this URL with the class.
 
+> **Known, accepted exposure (2026-07-24 8-agent audit P2-8):** the free quick-tunnel forwards the
+> *entire* `:8080` origin, including `/actuator/metrics/*` and `/actuator/prometheus` (permitAll —
+> intentionally, so the real in-cluster Prometheus scraper in the Kubernetes showcase doesn't need
+> app-level credentials; NetworkPolicy is the isolation boundary there, not this app). Over the
+> public tunnel, anyone with the URL can read JVM/DB-pool/request-timing metrics (no user PII).
+> Low-stakes for a course demo, but not zero — **tear the tunnel down (`Ctrl+C`) as soon as grading
+> ends** rather than leaving it running indefinitely.
+
 - **Website visitors**: open `<that-url>/app/aurora/` in any browser → register → full experience.
   The web app is served same-origin by Spring, so no CORS or extra config. This is the easiest path
   for most of the class.

@@ -371,8 +371,12 @@ public class LlmConfig {
         // Final safety net for the degradation circuit: Mock is always available, so once a
         // real provider (GLM) is down the chain tries the next real one (MiniMax) and, only if
         // every real provider fails, the keyword-aware Mock — the user never sees a hard error.
-        // Gated on allow-fallback so a strict deployment can opt out.
-        if (allowFallback) {
+        // Gated on the EFFECTIVE allow-fallback (not the raw field): this method is only ever
+        // invoked from the isProdMode() branch, so using the raw flag here would silently wire
+        // Mock into the failover chain if llm.mode=prod is ever set without the `prod` Spring
+        // profile active (2026-07-24 8-agent audit P2-3) -- every other construction path in this
+        // class already uses the effective check.
+        if (isEffectiveFallbackAllowed()) {
             candidates.add(new FailoverLlmClient.ProviderCandidate("MOCK", "mock-inner-cosmos", new MockLlmClient(aiExecutor)));
         }
         return new FailoverLlmClient(candidates, aiExecutor);

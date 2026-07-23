@@ -54,6 +54,15 @@ public class GlobalExceptionHandler {
             .body(error("BAD_REQUEST", "缺少必需的参数: " + ex.getParameterName(), HttpStatus.BAD_REQUEST));
     }
 
+    // 2026-07-24 8-agent audit P2-12: a malformed/invalid-UTF-8 JSON body (Jackson parse failure)
+    // fell through to the generic 500 catch-all instead of a 400, since no handler here matched
+    // Spring's HttpMessageNotReadableException specifically.
+    @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiErrorResponse> handleMalformedBody(org.springframework.http.converter.HttpMessageNotReadableException ex) {
+        return ResponseEntity.badRequest()
+            .body(error("BAD_REQUEST", "请求体格式不正确", HttpStatus.BAD_REQUEST));
+    }
+
     @ExceptionHandler(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ApiErrorResponse> handleTypeMismatch(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException ex) {
         return ResponseEntity.badRequest()

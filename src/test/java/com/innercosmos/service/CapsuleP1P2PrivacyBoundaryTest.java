@@ -199,8 +199,12 @@ class CapsuleP1P2PrivacyBoundaryTest {
         CapsuleCreateRequest request = new CapsuleCreateRequest();
         request.memoryIds = List.of(memory);
         request.privacyLevel = "STRICT";
-        // Left at defaults: visibilityStatus/isPublic resolve to PUBLIC, exactly what a real
-        // visitor could reach.
+        // safeVisibility() now fails CLOSED to PRIVATE by default (2026-07-24 8-agent audit
+        // P2-11), so this test -- which specifically exercises a real visitor reaching the
+        // capsule -- must opt in to PUBLIC explicitly rather than relying on the old fail-open
+        // default.
+        request.visibilityStatus = "PUBLIC";
+        request.isPublic = true;
         EchoCapsule capsule = capsuleService.createFromMemory(owner, request);
 
         AtomicReference<Map<String, Object>> capturedContext = new AtomicReference<>();
@@ -225,5 +229,24 @@ class CapsuleP1P2PrivacyBoundaryTest {
         assertFalse(contextText.contains(CANARY_EMAIL), "persona-chat runtime context leaked the canary email to the provider");
         assertFalse(contextText.contains(CANARY_WECHAT), "persona-chat runtime context leaked the canary WeChat id to the provider");
         assertFalse(contextText.contains(CANARY_SCHOOL), "persona-chat runtime context leaked the canary school name to the provider");
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("2026-07-24 8-agent audit P2-11: an unrecognized visibilityStatus value must fail CLOSED to PRIVATE, never PUBLIC")
+    void unrecognizedVisibilityStatusNeverResultsInPublicCapsule() {
+        Long owner = seedUser("p2-11-fail-closed");
+        Long memory = seedCanaryMemory(owner);
+
+        CapsuleCreateRequest request = new CapsuleCreateRequest();
+        request.memoryIds = List.of(memory);
+        request.privacyLevel = "STRICT";
+        request.visibilityStatus = "DRAFT"; // not a recognized value
+        request.isPublic = false;
+
+        EchoCapsule capsule = capsuleService.createFromMemory(owner, request);
+
+        assertEquals("PRIVATE", capsule.visibilityStatus,
+                "an unrecognized visibilityStatus must default to PRIVATE, not PUBLIC");
     }
 }

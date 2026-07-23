@@ -16,7 +16,7 @@ export const APP_COPY: Record<Locale, {
   returnsAria: string; returnsTitle: string; whenLabel: string; returnTimeAria: string; scheduleBtn: string;
   returnsEmpty: string; postpone: string; cancel: string;
   arrivalAria: string; backToUnfinished: string; matched: string; later: string; stopSimilar: string;
-  footerTools: string; footerTagline: string; footerSignOut: string;
+  footerTagline: string; footerSignOut: string;
 }> = {
   "zh-CN": {
     connecting: "正在连接你的内宇宙…",
@@ -34,7 +34,7 @@ export const APP_COPY: Record<Locale, {
     scheduleBtn: "和 Aurora 约好", returnsEmpty: "现在没有约定。需要时，你可以邀请 Aurora 在合适的时候回来。",
     postpone: "晚一小时", cancel: "取消",
     arrivalAria: "Aurora 按约定回来", backToUnfinished: "回到当时没说完的地方", matched: "正合适", later: "晚一点", stopSimilar: "不再提醒这类事",
-    footerTools: "尚未迁移的工具", footerTagline: "五空间 AppShell · 数据与能力持续保留", footerSignOut: "安全退出"
+    footerTagline: "五空间 AppShell · 数据与能力持续保留", footerSignOut: "安全退出"
   },
   "en-SG": {
     connecting: "Connecting to your inner cosmos…",
@@ -52,6 +52,6 @@ export const APP_COPY: Record<Locale, {
     scheduleBtn: "Agree with Aurora", returnsEmpty: "No agreement right now. When you need it, you can invite Aurora to return at a suitable time.",
     postpone: "An hour later", cancel: "Cancel",
     arrivalAria: "Aurora returned as agreed", backToUnfinished: "Back to what was left unsaid", matched: "Good timing", later: "A bit later", stopSimilar: "Stop reminders like this",
-    footerTools: "Tools not yet migrated", footerTagline: "Five-space AppShell · data and capabilities preserved", footerSignOut: "Sign out"
+    footerTagline: "Five-space AppShell · data and capabilities preserved", footerSignOut: "Sign out"
   }
 };

@@ -1385,7 +1385,7 @@ export function AuroraApp() {
       </div>
       </ErrorBoundary>
       <div className="state global-state" role="status"><i className={auroraSession.activeTurnId ? "pulse" : ""} />{status}</div>
-      <footer><a href="/pages/dashboard.html">{tt.footerTools}</a><span>{tt.footerTagline}</span><button type="button" onClick={() => void logout()}>{tt.footerSignOut}</button></footer>
+      <footer><span>{tt.footerTagline}</span><button type="button" onClick={() => void logout()}>{tt.footerSignOut}</button></footer>
     </main>
   );
 }
