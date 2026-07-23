@@ -115,6 +115,14 @@ button:active:not(:disabled) { transform: scale(.97); transition-duration: 90ms;
 button:disabled { cursor: default; }
 a { transition: color var(--dur-micro) var(--ease-flow), opacity var(--dur-micro) var(--ease-flow); }
 :where(a, button):focus-visible { outline: 2px solid var(--accent-aurora); outline-offset: 2px; }
+/* W2 UIUX audit (doc 24 section 5.2: "48dp 触控目标... 是硬门" -- a hard gate): `.danger-quiet` is
+   used bare (ProductShell.tsx's MeSpace sign-out, AccountSettings.tsx, SocialGroupsView.tsx) with
+   no other class supplying padding/sizing -- only `.resonance-actions .danger-quiet` (CapsuleWorkbench)
+   had its own scoped color override. Live-measured the bare case (Me space "安全退出"): 62x20px, a
+   near-invisible, sub-touch-target native button with zero padding. This base rule gives every
+   `.danger-quiet` a real touch target and visual affordance; the scoped rule's color/border-color/
+   background overrides still apply on top via normal cascade specificity. */
+.danger-quiet { padding: 11px 18px; min-height: 48px; border: 1px solid #d77b7142; border-radius: 999px; color: var(--danger-soft); background: transparent; }
 .shell { width: min(920px, calc(100% - 32px)); margin: 0 auto; padding: 22px 0 30px; }
 .app-shell-nav { position: sticky; top: 12px; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 28px; padding: 9px 11px 9px 15px; border: 1px solid #ffffff1c; border-radius: 22px; background: #251d18dc; box-shadow: 0 16px 45px #0006; backdrop-filter: blur(20px); }
 .app-mark { display: grid; flex: 0 0 auto; gap: 1px; color: var(--text-primary); font: 500 .9rem Georgia,"Noto Serif SC",serif; letter-spacing: .04em; }.app-mark small { color: var(--text-faint); font: 400 .58rem Inter,"Noto Sans SC",sans-serif; letter-spacing: .16em; text-transform: uppercase; }
@@ -576,7 +584,12 @@ footer { padding: 18px 4px; display: flex; justify-content: space-between; color
 .todo-edit-form input,.todo-edit-form select,.todo-edit-form textarea { border: 1px solid #ffffff18; border-radius: 12px; padding: 8px 10px; color: var(--text-primary); background: #1d1512cc; font: inherit; }
 .diary-paper { margin-top: 16px; padding: 20px; border: 1px solid var(--line-strong,#ffffff18); border-radius: var(--r-card,18px); background: #1d1512cc; }
 .diary-textarea { width: 100%; min-height: 200px; border: none; background: transparent; resize: vertical; color: var(--text-primary); line-height: 1.8; font-size: 1rem; font: inherit; }
-.diary-textarea:focus { outline: none; }
+/* W2 UIUX audit: this borderless, background-transparent textarea used to suppress the outline
+   entirely on focus with nothing standing in for it -- a real WCAG 2.4.7 "focus visible" miss
+   (doc 24 section 5.2 calls visible focus a hard gate), confirmed live via computed style
+   (outline-style: none, no border, no box-shadow). A soft warm underline glow keeps the paper-like
+   borderless look while still giving keyboard/screen-magnifier users a real focus indicator. */
+.diary-textarea:focus-visible { outline: none; box-shadow: 0 2px 0 0 var(--accent-aurora, #c79a68); }
 .diary-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 14px; }
 .voice-pill { padding: 9px 16px; border: 1px solid #9bb0a24a; border-radius: 999px; color: var(--text-primary); background: #6b5a3f2b; }
 .voice-pill.recording { color: #f0c4bc; background: #5b302d4d; border-color: #d0918d80; }

@@ -14,6 +14,18 @@
       "port": 8090
     },
     {
+      "name": "ic-app-8080",
+      "runtimeExecutable": "./mvnw",
+      "runtimeArgs": ["spring-boot:run"],
+      "port": 8080
+    },
+    {
+      "name": "web-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "web"],
+      "port": 5173
+    },
+    {
       "name": "ic-jar",
       "runtimeExecutable": "C:/Program Files/Java/jdk-21.0.10/bin/java.exe",
       "runtimeArgs": ["-jar", "D:/code/inner cosmos/target/inner-cosmos-0.1.0.jar"],

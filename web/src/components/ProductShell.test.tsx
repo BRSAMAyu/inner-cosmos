@@ -77,6 +77,35 @@ describe("ProductShell", () => {
     expect(onNavigate).toHaveBeenCalledWith("resonance");
   });
 
+  // W2 UIUX audit: <strong>label</strong><small>description</small> sit adjacent with no
+  // whitespace in the DOM (verified live: textContent === "今天Aurora"), so a screen reader would
+  // concatenate them into one run-on word. An explicit aria-label with a separator gives assistive
+  // tech a properly separated announcement without changing the two-line visual layout.
+  it("gives every space tab a screen-reader-friendly separated name, not a run-on concatenation", () => {
+    render(<ProductShellNavigation active="aurora" onNavigate={() => undefined} />);
+    expect(screen.getByRole("button", { name: "今天 · Aurora" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "内宇宙 · 记忆与自我理解" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "共鸣 · 共鸣体与相遇" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "连接 · 慢信与关系" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "我的 · 控制与边界" })).toBeInTheDocument();
+  });
+
+  // W2 UIUX audit (doc 24 section 5.1: "中文和 en-SG 均无硬编码"): live-verified with the app's own
+  // locale toggle -- every other string on the page translated to English except this nav, because
+  // it never took a `locale` prop at all. Pins the fix and guards the five real space keys can never
+  // silently drift out of sync between the zh-CN source array and the en-SG label map.
+  it("translates every space tab's label when locale is en-SG, and stays zh-CN by default", () => {
+    const { unmount } = render(<ProductShellNavigation active="aurora" onNavigate={() => undefined} locale="en-SG" />);
+    expect(screen.getByRole("button", { name: "Today · Aurora" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cosmos · Memory & self-understanding" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Resonance · Capsules & encounters" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Connect · Slow letters & relationships" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Me · Control & boundaries" })).toBeInTheDocument();
+    unmount();
+    render(<ProductShellNavigation active="aurora" onNavigate={() => undefined} />);
+    expect(screen.getByRole("button", { name: "今天 · Aurora" })).toBeInTheDocument();
+  });
+
   it("renders the Me control hub bilingually and pluralizes English counts", () => {
     const props = {
       native: false, connected: true, wakeIntentCount: 1, activeClaimCount: 2,

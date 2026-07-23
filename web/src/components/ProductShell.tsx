@@ -9,6 +9,21 @@ export const productSpaces: Array<[ProductSpace, string, string]> = [
   ["me", "我的", "控制与边界"]
 ];
 
+// W2 UIUX audit (doc 24 section 5.1: "中文和 en-SG 均无硬编码"): live-verified with the app's own
+// locale toggle switched to English -- every other string on the page (ME space headings, account
+// settings, preferences...) translated, but the five-space top nav stayed 100% hardcoded Chinese
+// ("今天Aurora", "内宇宙记忆与自我理解", ...) because ProductShellNavigation never took a `locale`
+// prop at all. `productSpaces` above stays the zh-CN source of truth for the five space *keys*
+// (routing/back-compat parsing depends on its exact tuple shape); this map supplies only the en-SG
+// label/description, keyed by the same ProductSpace so it can never list a different set of spaces.
+const SPACE_LABELS_EN: Record<ProductSpace, [string, string]> = {
+  aurora: ["Today", "Aurora"],
+  cosmos: ["Cosmos", "Memory & self-understanding"],
+  resonance: ["Resonance", "Capsules & encounters"],
+  letters: ["Connect", "Slow letters & relationships"],
+  me: ["Me", "Control & boundaries"]
+};
+
 export function initialProductSpace(search = window.location.search): ProductSpace {
   const value = new URLSearchParams(search).get("space");
   return productSpaces.some(([space]) => space === value) ? value as ProductSpace : "aurora";
@@ -92,14 +107,23 @@ export function letterThreadPath(id: number): string {
   return `${spacePaths.letters}/thread/${id}`;
 }
 
-export function ProductShellNavigation({ active, onNavigate }: { active: ProductSpace; onNavigate: (space: ProductSpace) => void }) {
-  return <nav className="app-shell-nav" aria-label="Inner Cosmos 五个空间">
+export function ProductShellNavigation({ active, onNavigate, locale = "zh-CN" }: {
+  active: ProductSpace; onNavigate: (space: ProductSpace) => void; locale?: Locale;
+}) {
+  return <nav className="app-shell-nav" aria-label={locale === "en-SG" ? "Inner Cosmos, five spaces" : "Inner Cosmos 五个空间"}>
     <div className="app-mark"><span aria-hidden="true">✦</span><strong>Inner Cosmos</strong></div>
-    <div className="space-tabs">{productSpaces.map(([value, label, description]) =>
-      <button type="button" key={value} className={active === value ? "active" : ""}
-        aria-current={active === value ? "page" : undefined} onClick={() => onNavigate(value)}>
-        <strong>{label}</strong><small>{description}</small>
-      </button>)}</div>
+    <div className="space-tabs">{productSpaces.map(([value, zhLabel, zhDescription]) => {
+      const [label, description] = locale === "en-SG" ? SPACE_LABELS_EN[value] : [zhLabel, zhDescription];
+      // W2 UIUX audit: <strong>label</strong><small>description</small> sit adjacent with no
+      // whitespace in the DOM, so a screen reader concatenates them into one run-on word (verified
+      // live: textContent === "今天Aurora"). An explicit aria-label gives assistive tech a properly
+      // separated announcement while the two-line visual layout is unchanged for sighted users.
+      return <button type="button" key={value} className={active === value ? "active" : ""}
+        aria-current={active === value ? "page" : undefined} aria-label={`${label} · ${description}`}
+        onClick={() => onNavigate(value)}>
+        <strong aria-hidden="true">{label}</strong><small aria-hidden="true">{description}</small>
+      </button>;
+    })}</div>
   </nav>;
 }
 
