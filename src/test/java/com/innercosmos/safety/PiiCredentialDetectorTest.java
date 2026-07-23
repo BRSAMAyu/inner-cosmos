@@ -27,7 +27,12 @@ class PiiCredentialDetectorTest {
     @Test
     @DisplayName("3.3: an API key/token phrase is HARD-BLOCK")
     void apiKey_isHardBlock() {
-        var result = detector.scan("这是我的api_key: sk-abc123def456ghi789");
+        // Deliberately NOT shaped like a real provider's key prefix (e.g. "sk-...") -- this
+        // detector matches on the api_key/token KEYWORD plus any following value, not on any
+        // specific provider's key format, so a fake, provider-prefix-free placeholder value
+        // exercises the same code path without tripping scripts/scan-secrets.ps1's unrelated
+        // known-token-prefix heuristic on a fixture that was never a real credential.
+        var result = detector.scan("这是我的api_key: placeholder-fake-value-000111222");
         assertTrue(result.hasHardBlock());
         assertTrue(result.hardBlockCategories.contains("API_KEY"));
     }
