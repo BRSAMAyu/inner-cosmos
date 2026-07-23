@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: inner-cosmos-w3
+  labels:
+    app.kubernetes.io/part-of: inner-cosmos
+    inner-cosmos/profile: kind-full

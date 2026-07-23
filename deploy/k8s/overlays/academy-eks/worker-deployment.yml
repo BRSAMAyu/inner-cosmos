@@ -12,6 +12,10 @@ spec:
         app.kubernetes.io/name: inner-cosmos
         app.kubernetes.io/component: worker
         inner-cosmos/runtime-role: worker
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8081"
     spec:
       serviceAccountName: inner-cosmos
       automountServiceAccountToken: false
@@ -61,14 +65,14 @@ spec:
             requests: {cpu: 150m, memory: 384Mi}
             limits: {cpu: "1", memory: 768Mi}
           startupProbe:
-            httpGet: {path: /actuator/health, port: health}
+            httpGet: {path: /actuator/health/readiness, port: health}
             periodSeconds: 5
             failureThreshold: 24
           readinessProbe:
-            httpGet: {path: /actuator/health, port: health}
+            httpGet: {path: /actuator/health/readiness, port: health}
             periodSeconds: 10
           livenessProbe:
-            httpGet: {path: /actuator/health, port: health}
+            httpGet: {path: /actuator/health/liveness, port: health}
             periodSeconds: 20
           lifecycle:
             preStop:

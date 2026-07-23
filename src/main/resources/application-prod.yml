@@ -69,7 +69,13 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        # NOTE: this list previously narrowed to "health,info" only, silently dropping
+        # metrics/prometheus for every profile that layers on top of prod (academy-eks,
+        # commercial-sg, local-complete all activate "prod,<overlay>" together) — Prometheus
+        # scraping /actuator/prometheus in those environments would 404. Restated explicitly
+        # so role-specific metrics are provably scraped in every deployed environment, not
+        # just the dev-profile kind demo.
+        include: health,metrics,prometheus,info
   endpoint:
     health:
       show-details: when_authorized

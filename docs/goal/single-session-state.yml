@@ -1484,7 +1484,7 @@ supervisor_track_2026_07_17:
     state: APP_DEPLOYED_AND_OPERATED_ON_LIVE_AWS_EKS
     context: "Operator provided AWS Academy Learner Lab creds (temporary, ~/.aws only, never committed). Cluster MyEKS, k8s 1.36, 2 amd64 EC2 nodes, envoy-gateway (GatewayClass eg) + metrics-server + gp2 present. Disposable guestbook removed (operator-authorized)."
     done:
-      - "Cross-built amd64 image (arm64 dev image won't run on amd64 nodes) via deploy/eks/Dockerfile.runtime (copies pre-built fat-jar onto amd64 JRE, no emulated Maven build); pushed to ECR 477296622190.dkr.ecr.us-east-1.amazonaws.com/inner-cosmos:eks-dev @ sha256:dad7f1ed..."
+      - "Cross-built amd64 image (arm64 dev image won't run on amd64 nodes) via deploy/eks/Dockerfile.runtime (copies pre-built fat-jar onto amd64 JRE, no emulated Maven build); pushed to ECR <redacted-account-id>.dkr.ecr.us-east-1.amazonaws.com/inner-cosmos:eks-dev @ sha256:dad7f1ed..."
       - "deploy/k8s/overlays/eks-dev (reuses kind-dev + ECR image + Gateway/HTTPRoute on GatewayClass eg). Deployed to EKS: 2 pods across both nodes, real AWS ELB serves /app/aurora/ (AppShell) + /actuator/health UP."
       - "REAL-CLOUD HPA: cpu 339%/70% -> scaled 2->4 (2+2 across nodes). REAL-CLOUD resilience: pod-kill kept ELB at 200 (5/5), zero-downtime rolling restart. Evidence: evidence/g8/EKS-LIVE-002/."
     next_machine_actions:
@@ -1500,7 +1500,7 @@ supervisor_track_2026_07_17:
       - "FIXED a real prod-blocking bug: the 14 H2/MySQL SchemaMx*Initializers were gated only on spring.flyway.enabled=false; prod requires the app's Flyway disabled (migration Job owns it), so they ran on Postgres and crashed on AUTO_INCREMENT DDL. Added an H2-only @ConditionalOnExpression driver gate to all 14. Full suite 836/0/0; still run on H2 (tests) and skip on Postgres. evidence/g8/EKS-PROD-001/."
       - "Verified real user flow via HTTPS ELB: register->login (shared Redis session across replicas)->create session (Postgres)->real DeepSeek Aurora reply. Suitable for multi-user testing (shared durable Postgres + Redis). Removed the superseded eks-dev (mock) overlay to leave one clean prod URL."
     urls:
-      - "prod HTTPS (self-signed, click through): https://a60f3ce14c2e146f1bc5804884788d36-1144038221.us-east-1.elb.amazonaws.com/app/aurora/ (ELB hostname changes if the Gateway is recreated)"
+      - "prod HTTPS (self-signed, click through): https://<redacted-elb-hostname>.us-east-1.elb.amazonaws.com/app/aurora/ (ELB hostname changes if the Gateway is recreated)"
     teardown: "kubectl delete -k deploy/k8s/overlays/eks-prod   # removes the ELB when done (Learner Lab creds/cluster are temporary)"
     next_machine_actions:
       - "Optional: enable pgvector semantic retrieval on the prod DB with a real GLM embedding key (MEMORY_EMBEDDING_* Secret); observability stack on EKS; node-drain drill on EKS."

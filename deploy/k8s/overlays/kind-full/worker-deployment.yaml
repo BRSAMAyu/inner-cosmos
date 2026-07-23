@@ -1,24 +1,22 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: inner-cosmos-scheduler
+  name: inner-cosmos-worker
 spec:
   replicas: 1
   selector:
-    matchLabels: {app.kubernetes.io/name: inner-cosmos, app.kubernetes.io/component: scheduler}
+    matchLabels: {app.kubernetes.io/name: inner-cosmos, app.kubernetes.io/component: worker}
   template:
     metadata:
       labels:
         app.kubernetes.io/name: inner-cosmos
-        app.kubernetes.io/component: scheduler
-        inner-cosmos/runtime-role: scheduler
+        app.kubernetes.io/component: worker
+        inner-cosmos/runtime-role: worker
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/path: /actuator/prometheus
-        prometheus.io/port: "8082"
+        prometheus.io/port: "8081"
     spec:
-      serviceAccountName: inner-cosmos
-      automountServiceAccountToken: false
       terminationGracePeriodSeconds: 45
       securityContext:
         runAsNonRoot: true
@@ -41,13 +39,9 @@ spec:
             - name: PGPASSWORD
               valueFrom:
                 secretKeyRef: {name: inner-cosmos-runtime, key: SPRING_DATASOURCE_PASSWORD}
-            - {name: PGSSLMODE, value: verify-full}
-            - {name: PGSSLROOTCERT, value: /run/secrets/postgres/ca.crt}
-          volumeMounts:
-            - {name: postgres-ca, mountPath: /run/secrets/postgres, readOnly: true}
       containers:
-        - name: scheduler
-          image: inner-cosmos:academy-placeholder
+        - name: worker
+          image: inner-cosmos:w3-dev
           imagePullPolicy: IfNotPresent
           securityContext:
             readOnlyRootFilesystem: true
@@ -57,10 +51,10 @@ spec:
             - configMapRef: {name: inner-cosmos-config}
             - secretRef: {name: inner-cosmos-runtime}
           env:
-            - {name: INNER_COSMOS_RUNTIME_ROLE, value: scheduler}
-            - {name: SERVER_PORT, value: "8082"}
+            - {name: INNER_COSMOS_RUNTIME_ROLE, value: worker}
+            - {name: SERVER_PORT, value: "8081"}
           ports:
-            - {name: health, containerPort: 8082}
+            - {name: health, containerPort: 8081}
           resources:
             requests: {cpu: 150m, memory: 384Mi}
             limits: {cpu: "1", memory: 768Mi}
@@ -78,15 +72,9 @@ spec:
             preStop:
               exec: {command: ["sh", "-c", "sleep 15"]}
           volumeMounts:
-            - {name: postgres-ca, mountPath: /run/secrets/postgres, readOnly: true}
-            - {name: redis-ca, mountPath: /run/secrets/redis, readOnly: true}
             - {name: logs, mountPath: /var/log/inner-cosmos}
             - {name: tmp, mountPath: /tmp}
       volumes:
-        - name: postgres-ca
-          secret: {secretName: inner-cosmos-postgres-client-ca, defaultMode: 0444}
-        - name: redis-ca
-          secret: {secretName: inner-cosmos-redis-client-ca, defaultMode: 0444}
         - name: logs
           emptyDir: {}
         - name: tmp

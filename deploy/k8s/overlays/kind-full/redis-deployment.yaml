@@ -1,0 +1,60 @@
+# No TLS, no password: kind-full is an isolated local demo namespace (see app-config.yaml
+# header for the disclosed boundary). Persistence is disabled (--save "" --appendonly no)
+# matching the academy-eks Redis, which is documented as disposable/session-cache-only.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inner-cosmos-redis
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app.kubernetes.io/name: inner-cosmos, app.kubernetes.io/component: redis}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: inner-cosmos, app.kubernetes.io/component: redis}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: redis
+          image: redis:7.4.2-alpine@sha256:02419de7eddf55aa5bcf49efb74e88fa8d931b4d77c07eff8a6b2144472b6952
+          args: ["redis-server", "--save", "", "--appendonly", "no"]
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 999
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+            readOnlyRootFilesystem: true
+          ports:
+            - {name: redis, containerPort: 6379}
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 256Mi}
+          startupProbe:
+            exec: {command: ["sh", "-c", "redis-cli ping | grep -q PONG"]}
+            periodSeconds: 5
+            failureThreshold: 24
+          readinessProbe:
+            exec: {command: ["sh", "-c", "redis-cli ping | grep -q PONG"]}
+            periodSeconds: 10
+          livenessProbe:
+            exec: {command: ["sh", "-c", "redis-cli ping | grep -q PONG"]}
+            periodSeconds: 20
+          volumeMounts:
+            - {name: data, mountPath: /data}
+      volumes:
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: inner-cosmos-redis
+spec:
+  selector: {app.kubernetes.io/name: inner-cosmos, app.kubernetes.io/component: redis}
+  ports:
+    - {name: redis, port: 6379, targetPort: redis}
