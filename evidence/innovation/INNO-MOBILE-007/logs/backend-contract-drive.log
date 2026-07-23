@@ -1,0 +1,22 @@
+=== register journey_user_1 ===
+csrf header=X-CSRF-TOKEN token=M6ZEYNDLFnKk...
+register={"success":true,"code":"OK","message":"success","data":{"id":5,"username":"journey_user_1","nickname":"journey_user_1","role":"USER"}}
+sessionId=3
+stream-stage={"success":true,"code":"OK","message":"success","data":{"token":"da56f9792ba145cd9b2cc82a5f2a6016"}}
+stageToken len=32
+=== SSE stream (raw events, 35s budget) ===
+--- SSE bytes: 3120 ---
+--- distinct SSE event types (event: lines) ---
+      2 event:bubble.completed
+      2 event:bubble.started
+      1 event:done
+      1 event:meta
+      1 event:segment
+     34 event:token
+      1 event:turn.completed
+      1 event:turn.plan
+      1 event:turn.started
+--- inner_voice occurrences in stream ---
+0
+--- bubble / turn terminal signals ---
+=== drive complete ===

@@ -1,0 +1,12 @@
+=== DESKTOP SHELL (Tauri WebView2 via CDP) ===
+{
+  "url": "http://localhost:5173/",
+  "title": "Aurora · Inner Cosmos",
+  "tauri": true,
+  "bodyText": "MOBILE ENVIRONMENT GATE\n这台设备还没有安全后端入口\n\n应用壳、深链与恢复能力已经就绪，但本次构建没有注入 VITE_API_BASE_URL。 为避免把凭据和会话发往错误地址，Aurora 不会尝试登录。\n\n请使用经过验证的 HTTPS API 域重新构建；推送凭据与商店签名也必须由授权环境提供。",
+  "readyState": "complete"
+}
+=== /api calls observed from webview (last 1.5s) ===
+(none in this window)
+=== pageerrors ===
+(none)

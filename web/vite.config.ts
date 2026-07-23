@@ -64,7 +64,12 @@ export default defineConfig(({ mode }) => ({
   },
   server: {
     port: 5173,
-    proxy: { "/api": "http://localhost:8080" }
+    // Configurable so a local desktop/mobile shell can point at an operator-started dev backend on
+    // any free loopback port (the default 8080 may be held by another instance). The app always
+    // fetches same-origin `/api/**` (VITE_API_BASE_URL is empty in tauri/mobile-local modes), so this
+    // proxy is the only hop between the shell and the backend — keeping it env-driven avoids forking
+    // the config per machine without changing the committed default behavior.
+    proxy: { "/api": process.env.INNER_COSMOS_API_PROXY ?? "http://localhost:8080" }
   },
   test: {
     environment: "jsdom",
