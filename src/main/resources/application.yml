@@ -127,6 +127,7 @@ llm:
   base-url: ${LLM_BASE_URL:}
   model: ${LLM_MODEL:mock-inner-cosmos}
   allow-fallback: ${LLM_ALLOW_FALLBACK:true}
+  disable-thinking-mode: ${LLM_DISABLE_THINKING_MODE:true}
   asr-provider: ${ASR_PROVIDER:mock}
   failover-providers: ${LLM_FAILOVER_PROVIDERS:glm,minimax}
   prompt:
@@ -142,6 +143,7 @@ llm:
   glm:
     api-key: ${GLM_API_KEY:}
     model: ${GLM_MODEL:glm-4.7}
+    model-high: ${GLM_MODEL_HIGH:glm-5.2}
     base-url: ${GLM_BASE_URL:https://open.bigmodel.cn/api/paas/v4/chat/completions}
     timeout-ms: ${GLM_TIMEOUT_MS:60000}
     asr-api-key: ${GLM_ASR_API_KEY:}
@@ -149,12 +151,12 @@ llm:
     asr-base-url: ${GLM_ASR_BASE_URL:https://open.bigmodel.cn/api/paas/v4/audio/transcriptions}
   minimax:
     api-key: ${MINIMAX_API_KEY:}
-    model: ${MINIMAX_MODEL:MiniMax-Text-01}
+    model: ${MINIMAX_MODEL:MiniMax-M3}
     base-url: ${MINIMAX_BASE_URL:https://api.minimaxi.com/v1/chat/completions}
     timeout-ms: ${MINIMAX_TIMEOUT_MS:60000}
   deepseek:
     api-key: ${DEEPSEEK_API_KEY:}
-    model: ${DEEPSEEK_MODEL:deepseek-chat}
+    model: ${DEEPSEEK_MODEL:deepseek-v4-flash}
     base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
     timeout-ms: ${DEEPSEEK_TIMEOUT_MS:30000}
 
