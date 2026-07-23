@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 authority: 对齐文档/24-完全体最终收敛与云原生课程战役.md
 status: IN_PROGRESS
-updated_at: 2026-07-23T08:45:00+08:00
+updated_at: 2026-07-23T11:19:00+08:00
 
 legal_terminal_states:
   - COMPLETE
@@ -49,7 +49,20 @@ current_front:
     confirmed, 6 partial, 1 duplicate, 1 false) with failing-first regression/concurrency/
     adversarial tests, real fixes, and reproducible receipts, per that document's section 4
     P0-then-P1-then-P2/P3 order.
-  status: P0_DONE_STARTING_P1
+  status: ALL_36_LINES_CLOSED
+  closing_commit: 3ce6ac7
+  closure_note: >-
+    All remaining P1 and P2/P3 items had already been implemented on three separate,
+    file-disjoint worktree branches by earlier agent sessions but never merged. An Orchestrator
+    agent independently re-verified each branch (re-ran the 11 new backend test classes plus 56
+    frontend tests plus the 2 p2p3 backend classes; read every diff against the audit's
+    correct-fix contract) and merged them in order (backend -> p2p3 -> frontend, commits
+    4d48f6f, 96d8497, e216d31), fixing one real gap found by tsc -b (f92740c, stale
+    ugcText.test.tsx prop shape) and one real scan-secrets.ps1 false positive (3ce6ac7, a test
+    fixture using an sk-... shaped placeholder). The Supervisor independently re-ran the full
+    `./mvnw test` suite in parallel (not trusting the sub-agent's self-report) and reconciled an
+    identical result: 1089/1089, 0 failures, 1 pre-existing environment-gated skip
+    (OidcLiveDecoderTest, needs a live OIDC provider, unrelated to any W0V fix).
   p0_order:
     - {id: "1.1/2.2", desc: "LetterDeliveryJob atomic conditional claim, not read-then-updateById", status: DONE, commit: 93a7ab8}
     - {id: "1.4", desc: "session-turn-cap vs daily-quota enforcement, both atomic, not conflated", status: DONE, commit: cb10419}
@@ -67,17 +80,44 @@ current_front:
   p1_order:
     - {id: "1.2", desc: "SENT->FLYING departure gate separated from FLYING->DELIVERED arrival gate; injectable Clock", status: DONE, commit: 97bc18e}
     - {id: "1.6", desc: "merged the racing MemoryExtractListener/GravityRecalculateListener @Async listeners into one ordered sequence via new GravityRecalculationService", status: DONE, commit: f4b3db8}
-    - {id: "1.7", desc: "see audit doc section R1 (time source Instant/UTC + per-user IANA timezone display; injected Clock; explainable parallax policy)"}
-    - {id: "1.8", desc: "see audit doc section R1 (owner-scoped draft PATCH with version/ETag; idempotency key; parent-letter REPLIED only on real send success)"}
-    - {id: "2.6/2.7", desc: "see audit doc section R2"}
-    - {id: "3.3/3.6/3.9", desc: "see audit doc section R3 (慢信 PII policy; MemoryExtractAgent raw interpolation; session-scoped rolling risk state)"}
-    - {id: "4.4/4.5/4.7-4.10", desc: "see audit doc section R4 (per-resource request epoch; draft-id+idempotency compose-and-send; top-level+per-space ErrorBoundary; per-resource busy-guard; explicit loading/empty/error hook state; async-safe password/delete forms)"}
+    - {id: "1.7", desc: "injected Clock; per-visitor IANA-timezone quota-zone resolution replacing hardcoded Asia/Shanghai; named parallax-flight-duration policy", status: DONE, commit: f019229, merged_via: 4d48f6f}
+    - {id: "1.8", desc: "owner-scoped draft PATCH with version conditional update; compose/send idempotency key; parent-letter REPLIED only via the reply's own atomic SENT transition", status: DONE, commit: 7aadcfd, merged_via: 4d48f6f}
+    - {id: "2.6", desc: "fail-fast EmbeddingDimensionMismatchException replacing silent pad/truncate on tb_memory_embedding.embedding_vector", status: DONE, commit: d25282f, merged_via: 4d48f6f}
+    - {id: "2.7", desc: "atomic Lua XADD+MAXLEN-trim+EXPIRE (single redis.execute), closing the no-TTL crash window", status: DONE, commit: 7241b11, merged_via: 4d48f6f}
+    - {id: "3.3", desc: "PiiCredentialDetector: hard-block credentials/secrets, soft-confirm other PII at slow-letter send, never silently sanitize; consent receipt is category-only, never raw text", status: DONE, commit: f1d2c40, merged_via: 4d48f6f, fixture_followup: 3ce6ac7}
+    - {id: "3.6", desc: "MemoryExtractAgent instruction is now a static constant; raw text travels only via the context map, never interpolated into the system-role instruction", status: DONE, commit: f4590bf, merged_via: 4d48f6f}
+    - {id: "3.9", desc: "SessionRiskAggregator: additive, time-decaying (10min half-life), negation/third-party-quote-aware session risk escalation; per-JVM, documented as an honest known limitation (not cross-pod)", status: DONE, commit: 2923424, merged_via: 4d48f6f}
+    - {id: "4.4", desc: "per-resource request epoch (relation/thread/group generation refs) discards stale-selection responses", status: DONE, commit: 17b579e, merged_via: e216d31}
+    - {id: "4.5", desc: "draft-id + idempotency key (composeAndSend.ts) reused across a failed send retry, never re-drafting", status: DONE, commit: 8ff0978, merged_via: e216d31}
+    - {id: "4.7", desc: "top-level fatal ErrorBoundary + per-product-space ErrorBoundary, retry/reload, scrubbed onError telemetry", status: DONE, commit: cd6dbfa, merged_via: e216d31}
+    - {id: "4.8", desc: "per-resource (keyed) busy guard (useBusyKeys) replacing shared booleans across social actions", status: DONE, commit: 0743c24, merged_via: e216d31}
+    - {id: "4.9", desc: "explicit idle/loading/success/error FetchStatus for thread letters, replacing the threadLetters.length===0 overload; verified as a genuine discriminated type wired through LettersInbox, not a renamed boolean", status: DONE, commit: 17b579e, merged_via: e216d31, note: "shipped incidentally inside the 4.4 commit"}
+    - {id: "4.10", desc: "async-safe password-change/delete-account forms: callback returns a Promise, clears/closes only on real success, preserves input + inline error on failure", status: DONE, commit: f962e15, merged_via: e216d31}
+  p1_verification:
+    - {cmd: "mvn test -Dtest=<11 branch-1 classes: PiiCredentialDetectorTest,SessionRiskAggregatorTest,SafetyServiceSessionEscalationTest,MemoryEmbeddingIndexServiceImplDimensionContractTest,SlowLetterDraftPatchAndIdempotencyTest,SlowLetterAutoRepliedOnSendTest,SlowLetterPiiGateTest,SlowLetterServiceImplClockTest,RedisAuroraLiveEventStorePublishAtomicityUnitTest,RedisAuroraLiveEventStoreTtlAtomicityTest,MemoryExtractAgentPromptBoundaryTest>", result: "50/50 green, real Docker-backed Testcontainers Redis/Postgres"}
+    - {cmd: "cd web && npx vitest run <ErrorBoundary.test.tsx,composeAndSend.test.ts,useBusyKeys.test.ts,useConnectionsAndLetters.test.ts>", result: "56/56 green"}
+    - {cmd: "cd web && npx tsc -b", result: "clean (after fixing a real gap in web/src/ugcText.test.tsx's stale pre-4.8 LettersInbox prop shape, commit f92740c)"}
+    - {cmd: "cd web && npx vitest run (full suite)", result: "475/475 (69 files)"}
+    - {cmd: "cd web && npm run build", result: "clean, single rebuild, committed in f92740c"}
+    - {cmd: "./mvnw test (full suite, post-merge, HEAD 3ce6ac7)", result: "1089/1089, 0 failures, 0 errors, 1 skipped (OidcLiveDecoderTest, pre-existing, needs live OIDC provider), BUILD SUCCESS -- Docker running, real Testcontainers Postgres/Redis executed. Run independently TWICE: once by the Orchestrator sub-agent, once by the Supervisor in parallel; both produced the identical count."}
+    - {cmd: "powershell scripts/scan-secrets.ps1", result: "PASS, 0 findings (after fixing a real false-positive fixture, commit 3ce6ac7). Independently re-run by the Supervisor after reconciliation: PASS, 0 findings."}
+    - {cmd: "kubectl kustomize deploy/k8s/base && deploy/k8s/overlays/academy-eks", result: "both render cleanly"}
   p2_p3_order:
-    - {id: "2.5", desc: "pgvector ANN index only with representative-dataset load evidence -- do not create speculatively"}
-    - {id: "2.8", desc: "see audit doc section R2"}
-    - {id: "4.6", desc: "transcription-promise unmount/generation guard"}
-    - {id: "4.11", desc: "shared UGC text-wrapping primitive (overflow-wrap/word-break/min-width) + 320/390px + 200% font visual test"}
-    - {id: "2.3", desc: "FALSE per audit reconciliation -- reject-only, no fix, no duplicate FK index"}
+    - {id: "2.5", desc: "reject-with-evidence: real Testcontainers latency/build-cost measurement supports the growth-risk concern, but recall could not be honestly measured with synthetic (non-semantic) vectors -- no HNSW index created, no Flyway migration added", status: REJECTED_WITH_EVIDENCE, commit: af0057e, merged_via: 96d8497, evidence: evidence/audit/2026-07-23-w0v-2.5-pgvector-ann-index-decision.md}
+    - {id: "2.8", desc: "idle-expiry sweep (injected Clock) for InMemoryAuroraStreamStageStore", status: DONE, commit: 32524af, merged_via: 96d8497}
+    - {id: "4.6", desc: "transcription-promise guarded against unmount/stale generation", status: DONE, commit: 941029e4, merged_via: 96d8497}
+    - {id: "4.11", desc: "shared .ugc-text primitive (overflow-wrap/word-break/min-width) applied at every genuine UGC render site", status: DONE, commit: facb172, merged_via: 96d8497}
+    - {id: "2.3", desc: "FALSE per audit reconciliation -- reject-only, no duplicate FK index; pinned as a permanent regression guard (PostgresForeignKeyIndexCoverageTest, real pgvector Testcontainers)", status: REJECTED_FALSE_PER_AUDIT, commit: 1e10161, merged_via: 96d8497}
+  p2_p3_verification:
+    - {cmd: "mvn test -Dtest=PostgresForeignKeyIndexCoverageTest,InMemoryAuroraStreamStageStoreTest", result: "4/4 green, real pgvector Testcontainers"}
+    - {cmd: "cd web && npx vitest run (full suite, prior independent session on codex/w0v-p2p3 alone)", result: "441/441"}
+  merge_commits:
+    - {branch: worktree-agent-a3797a8883af977ac, commits: 7, merge_commit: 4d48f6f, scope: "P1 backend: 1.7, 1.8, 2.6, 2.7, 3.3, 3.6, 3.9", conflicts: none}
+    - {branch: codex/w0v-p2p3, commits: 6, merge_commit: 96d8497, scope: "P2/P3: 2.3, 2.5, 2.8, 4.6, 4.11", conflicts: none}
+    - {branch: w0v-4x-frontend, commits: 5, merge_commit: e216d31, scope: "P1 frontend: 4.4, 4.5, 4.7, 4.8, 4.9(incidental), 4.10", conflicts: "web/src/components/LettersInbox.tsx (semantically combined 4.9 discriminated status + 4.8 isDraftBusy + 4.11 ugc-text class); bundle assets resolved to a placeholder, superseded by one clean rebuild in f92740c"}
+  followup_commits:
+    - {commit: f92740c, desc: "fixed a real gap (ugcText.test.tsx stale prop shape) found by tsc -b post-merge; one clean npm run build"}
+    - {commit: 3ce6ac7, desc: "fixed a real scan-secrets.ps1 false positive in the merged PiiCredentialDetectorTest.java fixture; behavior-inert, test still 10/10 green"}
   forbidden:
     - duplicate-fk-index-for-2.3-it-is-false
     - reuse-flyway-v21-mobile-migration-already-owns-it
@@ -87,10 +127,10 @@ current_front:
 
 campaigns:
   - {id: W0, name: integration-and-truth-baseline, status: DONE, depends_on: [], commit: 28c4987}
-  - {id: W0V, name: verified-audit-defect-closure, status: IN_PROGRESS_P0_DONE, depends_on: [W0], contract: docs/audit/2026-07-23-gemini-master-audit-reconciliation.md}
-  - {id: W1, name: living-intelligence-and-data-loop, status: BLOCKED_BY_W0V, depends_on: [W0V]}
-  - {id: W2, name: complete-experience-and-multiplatform-polish, status: BLOCKED_BY_W0V, depends_on: [W0V]}
-  - {id: W3, name: cloud-native-showcase, status: BLOCKED_BY_W0V, depends_on: [W0V]}
+  - {id: W0V, name: verified-audit-defect-closure, status: DONE, depends_on: [W0], contract: docs/audit/2026-07-23-gemini-master-audit-reconciliation.md, closing_commit: 3ce6ac7}
+  - {id: W1, name: living-intelligence-and-data-loop, status: READY, depends_on: [W0V]}
+  - {id: W2, name: complete-experience-and-multiplatform-polish, status: READY, depends_on: [W0V]}
+  - {id: W3, name: cloud-native-showcase, status: READY, depends_on: [W0V]}
   - {id: W4, name: convergence-and-non-author-acceptance, status: BLOCKED_BY_W1_W2_W3, depends_on: [W1, W2, W3]}
 
 parallelism:
