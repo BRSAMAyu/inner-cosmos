@@ -1,22 +1,19 @@
 package com.innercosmos.controller;
 
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.innercosmos.ai.router.SessionModelRouter;
 import com.innercosmos.ai.self.UserTriggeredSelfReflection;
 import com.innercosmos.ai.semantic.EmotionInsight;
 import com.innercosmos.ai.semantic.MomentMood;
 import com.innercosmos.common.ApiResponse;
 import com.innercosmos.dto.ChatRequest;
-import com.innercosmos.entity.DialogMessage;
 import com.innercosmos.entity.UserProfile;
-import com.innercosmos.mapper.DialogMessageMapper;
-import com.innercosmos.mapper.UserProfileMapper;
 import com.innercosmos.service.AuroraAgentService;
 import com.innercosmos.service.DialogService;
 import com.innercosmos.service.EmotionInsightService;
 import com.innercosmos.service.MemoryService;
 import com.innercosmos.service.MemorySettlementService;
 import com.innercosmos.service.RhythmGuardService;
+import com.innercosmos.service.UserService;
 import com.innercosmos.vo.AuroraMoodVO;
 import com.innercosmos.vo.AuroraReplyVO;
 import com.innercosmos.vo.DailyRecordVO;
@@ -45,9 +42,8 @@ public class AuroraChatController extends BaseController {
     private final RhythmGuardService rhythmGuardService;
     private final SessionModelRouter modelRouter;
     private final UserTriggeredSelfReflection selfReflection;
-    private final DialogMessageMapper dialogMessageMapper;
     private final EmotionInsightService emotionInsightService;
-    private final UserProfileMapper userProfileMapper;
+    private final UserService userService;
     private final DialogService dialogService;
 
     public AuroraChatController(AuroraAgentService auroraAgentService,
@@ -56,9 +52,8 @@ public class AuroraChatController extends BaseController {
                                 RhythmGuardService rhythmGuardService,
                                 SessionModelRouter modelRouter,
                                 UserTriggeredSelfReflection selfReflection,
-                                DialogMessageMapper dialogMessageMapper,
                                 EmotionInsightService emotionInsightService,
-                                UserProfileMapper userProfileMapper,
+                                UserService userService,
                                 DialogService dialogService) {
         this.auroraAgentService = auroraAgentService;
         this.memoryService = memoryService;
@@ -66,9 +61,8 @@ public class AuroraChatController extends BaseController {
         this.rhythmGuardService = rhythmGuardService;
         this.modelRouter = modelRouter;
         this.selfReflection = selfReflection;
-        this.dialogMessageMapper = dialogMessageMapper;
         this.emotionInsightService = emotionInsightService;
-        this.userProfileMapper = userProfileMapper;
+        this.userService = userService;
         this.dialogService = dialogService;
     }
 
@@ -193,8 +187,7 @@ public class AuroraChatController extends BaseController {
 
     /** Whether the user has emotion/weather perception enabled (default: enabled). */
     private boolean emotionAwarenessEnabled(Long userId) {
-        UserProfile profile = userProfileMapper.selectOne(
-                new QueryWrapper<UserProfile>().eq("user_id", userId).last("LIMIT 1"));
+        UserProfile profile = userService.getProfile(userId);
         return profile == null || !Boolean.FALSE.equals(profile.weatherAwarenessEnabled);
     }
 
@@ -263,12 +256,6 @@ public class AuroraChatController extends BaseController {
 
     // M4: Get the last message ID for the session
     private Long getLastMessageId(Long sessionId) {
-        if (sessionId == null) return null;
-        QueryWrapper<DialogMessage> q = new QueryWrapper<>();
-        q.eq("session_id", sessionId)
-         .orderByDesc("id")
-         .last("LIMIT 1");
-        DialogMessage msg = dialogMessageMapper.selectOne(q);
-        return msg != null ? msg.id : null;
+        return dialogService.lastMessageId(sessionId);
     }
 }

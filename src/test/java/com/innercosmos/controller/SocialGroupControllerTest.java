@@ -1,53 +1,38 @@
 package com.innercosmos.controller;
 
 import com.innercosmos.common.Constants;
-import com.innercosmos.entity.FriendRelation;
-import com.innercosmos.entity.SocialGroup;
 import com.innercosmos.entity.SocialGroupMember;
-import com.innercosmos.entity.User;
-import com.innercosmos.exception.BusinessException;
-import com.innercosmos.mapper.BlockRelationMapper;
-import com.innercosmos.mapper.FriendRelationMapper;
-import com.innercosmos.mapper.SlowLetterMapper;
-import com.innercosmos.mapper.SocialGroupMapper;
-import com.innercosmos.mapper.SocialGroupMemberMapper;
-import com.innercosmos.mapper.UserMapper;
+import com.innercosmos.service.SocialService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpSession;
 
-import java.util.List;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
- * The Groups tab in RelationsView needs invite/respond/leave/members endpoints that the audit in
- * the closure plan flagged as possibly missing beyond list+create -- confirmed genuinely absent.
- * These tests pin the new SocialController group-membership methods.
+ * G2.ARCH-MODULES: the Groups tab endpoints on SocialController now delegate to SocialService --
+ * this only pins the controller's own responsibility (session -> caller id, request body -> typed
+ * args, service result -> ApiResponse). The invite/respond/leave/members business rules these
+ * tests used to cover live in SocialServiceImplTest now.
  */
 @ExtendWith(MockitoExtension.class)
 class SocialGroupControllerTest {
-    @Mock UserMapper userMapper;
-    @Mock FriendRelationMapper friendMapper;
-    @Mock SocialGroupMapper groupMapper;
-    @Mock SocialGroupMemberMapper memberMapper;
-    @Mock SlowLetterMapper letterMapper;
-    @Mock BlockRelationMapper blockMapper;
+    @Mock SocialService socialService;
 
     private SocialController controller;
     private MockHttpSession session;
 
     @BeforeEach
     void setUp() {
-        controller = new SocialController(userMapper, friendMapper, groupMapper, memberMapper,
-                letterMapper, blockMapper);
+        controller = new SocialController(socialService);
         session = new MockHttpSession();
         session.setAttribute(Constants.SESSION_USER_KEY, 20L);
     }
@@ -58,201 +43,55 @@ class SocialGroupControllerTest {
         return m;
     }
 
-    private FriendRelation accepted(Long requesterId, Long addresseeId) {
-        FriendRelation r = new FriendRelation();
-        r.requesterId = requesterId; r.addresseeId = addresseeId; r.status = "ACCEPTED";
-        return r;
+    @Test
+    void inviteToGroupParsesTheTargetUserIdFromTheBody() {
+        SocialGroupMember expected = member(2L, 5L, 30L, "MEMBER", "PENDING");
+        when(socialService.inviteToGroup(20L, 5L, 30L)).thenReturn(expected);
+
+        SocialGroupMember result = controller.inviteToGroup(5L, Map.of("userId", "30"), session).data;
+
+        assertSame(expected, result);
+        verify(socialService).inviteToGroup(20L, 5L, 30L);
     }
 
     @Test
-    void onlyAnActiveMemberCanInviteSomeoneElseIntoTheGroup() {
-        when(memberMapper.selectOne(any())).thenReturn(null); // caller not an active member
+    void groupInvitesDelegatesToTheServiceWithTheCallerId() {
+        when(socialService.listGroupInvites(20L)).thenReturn(java.util.List.of());
 
-        BusinessException error = assertThrows(BusinessException.class,
-                () -> controller.inviteToGroup(5L, Map.of("userId", "30"), session));
+        controller.groupInvites(session);
 
-        assertEquals("UNAUTHORIZED", error.code);
-        verify(memberMapper, never()).insert(any(SocialGroupMember.class));
+        verify(socialService).listGroupInvites(20L);
     }
 
     @Test
-    void cannotInviteYourself() {
-        when(memberMapper.selectOne(any())).thenReturn(member(1L, 5L, 20L, "OWNER", "ACTIVE"));
+    void respondToGroupInvitePassesTheDecisionThrough() {
+        SocialGroupMember expected = member(9L, 5L, 20L, "MEMBER", "ACTIVE");
+        when(socialService.respondToGroupInvite(20L, 9L, "accept")).thenReturn(expected);
 
-        BusinessException error = assertThrows(BusinessException.class,
-                () -> controller.inviteToGroup(5L, Map.of("userId", "20"), session));
+        SocialGroupMember result = controller.respondToGroupInvite(9L, Map.of("decision", "accept"), session).data;
 
-        assertEquals("BAD_REQUEST", error.code);
-        verify(memberMapper, never()).insert(any(SocialGroupMember.class));
+        assertSame(expected, result);
+        verify(socialService).respondToGroupInvite(20L, 9L, "accept");
     }
 
     @Test
-    void cannotInviteABlockedUser() {
-        when(memberMapper.selectOne(any())).thenReturn(member(1L, 5L, 20L, "OWNER", "ACTIVE"));
-        when(blockMapper.selectCount(any())).thenReturn(1L);
-
-        BusinessException error = assertThrows(BusinessException.class,
-                () -> controller.inviteToGroup(5L, Map.of("userId", "30"), session));
-
-        assertEquals("FORBIDDEN", error.code);
-        verify(memberMapper, never()).insert(any(SocialGroupMember.class));
-    }
-
-    @Test
-    void cannotInviteSomeoneWhoIsNotYetAnAcceptedFriend() {
-        when(memberMapper.selectOne(any())).thenReturn(member(1L, 5L, 20L, "OWNER", "ACTIVE"));
-        when(friendMapper.selectOne(any())).thenReturn(null); // no relation at all
-
-        BusinessException error = assertThrows(BusinessException.class,
-                () -> controller.inviteToGroup(5L, Map.of("userId", "30"), session));
-
-        assertEquals("BAD_REQUEST", error.code);
-        verify(memberMapper, never()).insert(any(SocialGroupMember.class));
-    }
-
-    @Test
-    void invitingCreatesAPendingMembershipForTheTargetUser() {
-        when(memberMapper.selectOne(any()))
-                .thenReturn(member(1L, 5L, 20L, "OWNER", "ACTIVE")) // caller's own membership
-                .thenReturn(null); // target has no existing row
-        when(friendMapper.selectOne(any())).thenReturn(accepted(20L, 30L));
-        when(userMapper.selectById(30L)).thenReturn(new User());
-
-        controller.inviteToGroup(5L, Map.of("userId", "30"), session);
-
-        ArgumentCaptor<SocialGroupMember> captor = ArgumentCaptor.forClass(SocialGroupMember.class);
-        verify(memberMapper).insert(captor.capture());
-        assertEquals(5L, captor.getValue().groupId);
-        assertEquals(30L, captor.getValue().userId);
-        assertEquals("PENDING", captor.getValue().status);
-    }
-
-    @Test
-    void cannotInviteSomeoneAlreadyActiveOrAlreadyPending() {
-        when(memberMapper.selectOne(any()))
-                .thenReturn(member(1L, 5L, 20L, "OWNER", "ACTIVE"))
-                .thenReturn(member(2L, 5L, 30L, "MEMBER", "PENDING"));
-        when(friendMapper.selectOne(any())).thenReturn(accepted(20L, 30L));
-        when(userMapper.selectById(30L)).thenReturn(new User());
-
-        BusinessException error = assertThrows(BusinessException.class,
-                () -> controller.inviteToGroup(5L, Map.of("userId", "30"), session));
-
-        assertEquals("BAD_REQUEST", error.code);
-        verify(memberMapper, never()).insert(any(SocialGroupMember.class));
-    }
-
-    @Test
-    void listsOnlyMyPendingInvitesWithTheGroupName() {
-        when(memberMapper.selectList(any())).thenReturn(List.of(member(9L, 5L, 20L, "MEMBER", "PENDING")));
-        SocialGroup group = new SocialGroup(); group.id = 5L; group.groupName = "老朋友们";
-        when(groupMapper.selectList(any())).thenReturn(List.of(group));
-
-        List<Map<String, Object>> invites = controller.groupInvites(session).data;
-
-        assertEquals(1, invites.size());
-        assertEquals(5L, invites.get(0).get("groupId"));
-        assertEquals("老朋友们", invites.get(0).get("groupName"));
-        assertEquals(9L, invites.get(0).get("memberId"));
-    }
-
-    @Test
-    void acceptingAnInviteActivatesMembershipAndDecliningMarksItDeclined() {
-        SocialGroupMember pending = member(9L, 5L, 20L, "MEMBER", "PENDING");
-        when(memberMapper.selectById(9L)).thenReturn(pending);
-        when(memberMapper.update(any(), any())).thenReturn(1);
-
-        controller.respondToGroupInvite(9L, Map.of("decision", "accept"), session);
-        assertEquals("ACTIVE", pending.status);
-
-        pending.status = "PENDING";
-        controller.respondToGroupInvite(9L, Map.of("decision", "decline"), session);
-        assertEquals("DECLINED", pending.status);
-    }
-
-    @Test
-    void cannotRespondToSomeoneElsesInvite() {
-        SocialGroupMember pending = member(9L, 5L, 999L, "MEMBER", "PENDING");
-        when(memberMapper.selectById(9L)).thenReturn(pending);
-
-        BusinessException error = assertThrows(BusinessException.class,
-                () -> controller.respondToGroupInvite(9L, Map.of("decision", "accept"), session));
-
-        assertEquals("UNAUTHORIZED", error.code);
-    }
-
-    @Test
-    void respondingWithAnythingOtherThanAcceptOrDeclineIsRejectedInstadOfSilentlyDeclining() {
-        // Regression: the old code did `"accept".equals(decision) ? ACTIVE : DECLINED`, so a typo,
-        // empty string, or missing key silently became a decline instead of a rejected request.
-        SocialGroupMember pending = member(9L, 5L, 20L, "MEMBER", "PENDING");
-        when(memberMapper.selectById(9L)).thenReturn(pending);
-
-        BusinessException error = assertThrows(BusinessException.class,
-                () -> controller.respondToGroupInvite(9L, Map.of("decision", "accpet"), session));
-
-        assertEquals("BAD_REQUEST", error.code);
-        assertEquals("PENDING", pending.status); // untouched, not silently declined
-        verify(memberMapper, never()).update(any(), any());
-    }
-
-    @Test
-    void losingTheConcurrentRespondRaceIsRejectedNotSilentlyOverwritten() {
-        // Regression: plain updateById() after a read-then-check "PENDING".equals() is a race --
-        // two concurrent respond calls could both pass the check before either writes. The
-        // conditional UPDATE ... WHERE status='PENDING' must report the loss (0 rows) instead of
-        // pretending the second caller's decision won.
-        SocialGroupMember pending = member(9L, 5L, 20L, "MEMBER", "PENDING");
-        when(memberMapper.selectById(9L)).thenReturn(pending);
-        when(memberMapper.update(any(), any())).thenReturn(0); // someone else's UPDATE won the race first
-
-        BusinessException error = assertThrows(BusinessException.class,
-                () -> controller.respondToGroupInvite(9L, Map.of("decision", "accept"), session));
-
-        assertEquals("BAD_REQUEST", error.code);
-    }
-
-    @Test
-    void leavingRemovesAnOrdinaryMemberButNotTheOwner() {
-        SocialGroupMember mine = member(1L, 5L, 20L, "MEMBER", "ACTIVE");
-        when(memberMapper.selectOne(any())).thenReturn(mine);
-
+    void leaveGroupDelegatesCallerAndGroupIdToTheService() {
         controller.leaveGroup(5L, session);
 
-        assertEquals("LEFT", mine.status);
+        verify(socialService).leaveGroup(20L, 5L);
     }
 
     @Test
-    void ownerCannotLeaveViaTheOrdinaryLeaveEndpoint() {
-        when(memberMapper.selectOne(any())).thenReturn(member(1L, 5L, 20L, "OWNER", "ACTIVE"));
+    void groupMembersDelegatesCallerAndGroupIdToTheService() {
+        SocialGroupMember owner = member(1L, 5L, 20L, "OWNER", "ACTIVE");
+        Map<String, Object> row = Map.of("userId", owner.userId, "memberRole", owner.memberRole, "nickname", "我");
+        when(socialService.listGroupMembers(20L, 5L)).thenReturn(java.util.List.of(row));
 
-        BusinessException error = assertThrows(BusinessException.class, () -> controller.leaveGroup(5L, session));
-
-        assertEquals("BAD_REQUEST", error.code);
-        verify(memberMapper, never()).updateById(any(SocialGroupMember.class));
-    }
-
-    @Test
-    void onlyAnActiveMemberCanListGroupMembers() {
-        when(memberMapper.selectCount(any())).thenReturn(0L);
-
-        BusinessException error = assertThrows(BusinessException.class, () -> controller.groupMembers(5L, session));
-
-        assertEquals("UNAUTHORIZED", error.code);
-    }
-
-    @Test
-    void listsActiveMembersWithNicknames() {
-        when(memberMapper.selectCount(any())).thenReturn(1L);
-        when(memberMapper.selectList(any())).thenReturn(List.of(member(1L, 5L, 20L, "OWNER", "ACTIVE")));
-        User me = new User(); me.id = 20L; me.nickname = "我";
-        when(userMapper.selectList(any())).thenReturn(List.of(me));
-
-        List<Map<String, Object>> members = controller.groupMembers(5L, session).data;
+        var members = controller.groupMembers(5L, session).data;
 
         assertEquals(1, members.size());
         assertEquals(20L, members.get(0).get("userId"));
         assertEquals("我", members.get(0).get("nickname"));
-        assertEquals("OWNER", members.get(0).get("memberRole"));
+        verify(socialService).listGroupMembers(20L, 5L);
     }
 }

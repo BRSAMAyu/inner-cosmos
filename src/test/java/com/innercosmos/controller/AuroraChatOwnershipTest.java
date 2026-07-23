@@ -32,7 +32,7 @@ class AuroraChatOwnershipTest {
         // Only the agent + dialogService are touched before the ownership guard throws;
         // the remaining collaborators are unreachable here, so null is safe.
         AuroraChatController controller = new AuroraChatController(
-                aurora, null, null, null, null, null, null, null, null, dialogService);
+                aurora, null, null, null, null, null, null, null, dialogService);
 
         HttpSession session = new MockHttpSession();
         session.setAttribute(Constants.SESSION_USER_KEY, 2L);

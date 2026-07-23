@@ -20,4 +20,10 @@ public interface DialogService {
     List<DialogMessage> recentMessages(Long sessionId, int limit);
 
     void verifyOwnership(Long userId, Long sessionId);
+
+    /**
+     * The id of the most recent message in a session, or {@code null} when the session is
+     * {@code null} or has no messages yet.
+     */
+    Long lastMessageId(Long sessionId);
 }
