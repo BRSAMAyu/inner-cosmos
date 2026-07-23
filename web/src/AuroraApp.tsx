@@ -30,10 +30,12 @@ import type { DataRetractionReceipt, UserProfileSettings } from "./api";
 import { loadLocale, saveLocale, type Locale } from "./i18n";
 import { APP_COPY, type DialogMode } from "./appCopy";
 import { AuthGate } from "./components/AuthGate";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { PsychologySkillStudio, SkillSuggestionBanner, type SkillLocale } from "./components/PsychologySkillStudio";
 import { ConnectError, LoadingText } from "./loading";
 import { useAuroraSession } from "./hooks/useAuroraSession";
 import { useConnectionsAndLetters } from "./hooks/useConnectionsAndLetters";
+import { sendComposedLetter, type DraftedLetterState } from "./composeAndSend";
 import { useDailyRecord } from "./hooks/useDailyRecord";
 import { useWeeklyReview } from "./hooks/useWeeklyReview";
 import { useThoughtShredder } from "./hooks/useThoughtShredder";
@@ -132,6 +134,11 @@ export function AuroraApp() {
   const [letterTitle, setLetterTitle] = useState("想把刚才的共鸣慢慢写下来");
   const [letterBody, setLetterBody] = useState("");
   const [sentLetter, setSentLetter] = useState<SlowLetter | null>(null);
+  // Gemini audit 4.5 (CONFIRMED/P1): persists the draft id + idempotency key across a failed
+  // send-retry (see web/src/composeAndSend.ts) so retrying sendLetterToMatch after a failed send
+  // reuses the SAME draft instead of creating a duplicate one. Reset to null whenever the compose
+  // target changes (chooseVisitorMatch/chooseResonanceStrategy) or once a send finally succeeds.
+  const letterDraftRef = useRef<DraftedLetterState>(null);
   const [skills, setSkills] = useState<PsychologySkillManifest[]>([]);
   const [skillRuns, setSkillRuns] = useState<PsychologySkillRun[]>([]);
   const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
@@ -614,10 +621,17 @@ export function AuroraApp() {
   // choice survives reloads. skillLocale is the single shared locale state (see i18n.ts).
   const changeLocale = (locale: Locale) => { setSkillLocale(locale); saveLocale(locale); };
 
-  const changeAccountPassword = async (oldPassword: string, newPassword: string) => {
+  // Gemini audit 4.10 (CONFIRMED/P1): returns null on confirmed success or the error message on
+  // failure -- AccountSettings.tsx awaits this before deciding whether to close/clear its own form
+  // (only on success) or keep it open with the user's input and this message inline (on failure).
+  const changeAccountPassword = async (oldPassword: string, newPassword: string): Promise<string | null> => {
     setAccountBusy("password");
-    try { await api.changePassword(oldPassword, newPassword); setAccountMessage("密码已更新"); }
-    catch (error) { setAccountMessage(error instanceof Error ? error.message : "密码修改失败"); }
+    try { await api.changePassword(oldPassword, newPassword); setAccountMessage("密码已更新"); return null; }
+    catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "密码修改失败";
+      setAccountMessage(errorMessage);
+      return errorMessage;
+    }
     finally { setAccountBusy(null); }
   };
 
@@ -636,14 +650,20 @@ export function AuroraApp() {
     finally { setAccountBusy(null); }
   };
 
-  const deleteAccount = async (password: string) => {
+  // Gemini audit 4.10: same null-on-success / message-on-failure contract as changeAccountPassword.
+  const deleteAccount = async (password: string): Promise<string | null> => {
     setAccountBusy("delete");
     try {
       await api.deleteAccount(password);
       await mobileRuntime.clearPrivateState();
       setAuthenticated(false); auroraSession.resetSession(); setPersonaSession(null); setPersonaMessages([]);
       setAccountMessage(null);
-    } catch (error) { setAccountMessage(error instanceof Error ? error.message : "账户删除失败"); }
+      return null;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "账户删除失败";
+      setAccountMessage(errorMessage);
+      return errorMessage;
+    }
     finally { setAccountBusy(null); }
   };
 
@@ -841,6 +861,7 @@ export function AuroraApp() {
   const chooseVisitorMatch = (capsuleId: number) => {
     setVisitorMatchId(capsuleId);
     setPersonaSession(null); setPersonaMessages([]); setPersonaQuota(null); setSentLetter(null); setLetterBody(""); setPersonaTurnError(null);
+    letterDraftRef.current = null; // 4.5: a different compose target invalidates any pending draft for the previous one.
   };
 
   const openDirectoryCapsule = (capsule: PublicCapsule) => {
@@ -857,6 +878,7 @@ export function AuroraApp() {
       setResonanceStrategy(strategy); setResonanceMatches(matches);
       setVisitorMatchId(matches[0]?.capsule.id ?? null);
       setPersonaSession(null); setPersonaMessages([]); setPersonaQuota(null); setSentLetter(null); setLetterBody(""); setPersonaTurnError(null);
+      letterDraftRef.current = null; // 4.5: a different compose target invalidates any pending draft for the previous one.
       setStatus(matches[0]?.strategyDescription ?? "已经切换相遇方式");
     } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法切换相遇方式"); }
     finally { setVisitorBusy(false); }
@@ -910,12 +932,24 @@ export function AuroraApp() {
     if (!visitorMatch || !letterTitle.trim() || !letterBody.trim()) return;
     setVisitorBusy(true);
     try {
-      const draft = await api.draftSlowLetter(visitorMatch.capsule.id, letterTitle.trim(), letterBody.trim());
-      const sent = await api.sendSlowLetter(draft.id);
+      // Gemini audit 4.5: reuses letterDraftRef.current (set by a prior failed attempt for this
+      // SAME compose) instead of unconditionally drafting again -- a retry after a failed send
+      // must never produce a second, duplicate draft.
+      const sent = await sendComposedLetter({
+        pending: letterDraftRef.current,
+        onDraftCreated: next => { letterDraftRef.current = next; },
+        createDraft: idempotencyKey => api.draftSlowLetter(visitorMatch.capsule.id, letterTitle.trim(), letterBody.trim(), idempotencyKey),
+        sendDraft: (draftId, idempotencyKey) => api.sendSlowLetter(draftId, idempotencyKey)
+      });
+      letterDraftRef.current = null; // sent successfully -- clear so the next compose starts fresh.
       setSentLetter(sent);
       void connectionsAndLetters.loadLetterOutbox();
       setStatus("慢信已经启程。收件人看到的是你的原话和安全预览，不是 AI 代写的统一模板。 ");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "慢信没有发送，草稿内容仍在这里"); }
+    } catch (error) {
+      // letterDraftRef.current is intentionally left set (if a draft was created) so the user's
+      // next click on "send" retries the send against the SAME draft rather than creating another.
+      setStatus(error instanceof Error ? error.message : "慢信没有发送，草稿内容仍在这里");
+    }
     finally { setVisitorBusy(false); }
   };
 
@@ -1045,6 +1079,10 @@ export function AuroraApp() {
       </Routes>
       <ProductShellNavigation active={productSpace} onNavigate={navigateSpace} />
 
+      {/* Gemini audit 4.7: each product space gets its own ErrorBoundary so a crash rendering one
+          space (all five are always mounted, just `hidden`, to preserve scroll/edit state across
+          tab switches) never takes the other four -- or the shared nav/footer below -- down too. */}
+      <ErrorBoundary variant="space" locale={skillLocale}>
       <div className="product-space" hidden={productSpace !== "aurora"}>
       <header className="hero">
         <div>
@@ -1129,7 +1167,9 @@ export function AuroraApp() {
         onActivate={proposalId => void evolve(() => api.activateSelfEvolution(proposalId), "这次变化已经成为新的 Aurora 版本，并且仍然可以回退。")}
         onRollback={(versionId, versionNo) => void evolve(() => api.rollbackSelfEvolution(versionId), `已回到第 ${versionNo} 版；回退本身也留下了可追溯的新版本。`)} locale={skillLocale} />}
       </div>
+      </ErrorBoundary>
 
+      <ErrorBoundary variant="space" locale={skillLocale}>
       <div className="product-space" hidden={productSpace !== "cosmos"}>
       {/* Cosmos-internal secondary navigation (doc 24 section 3.3): five sub-sections, each a
           real shareable /cosmos/<tab> URL, mounted-but-hidden like the five top-level spaces so
@@ -1196,7 +1236,9 @@ export function AuroraApp() {
           onSelectCategory={category => void beliefGallery.selectCategory(category)} locale={skillLocale} />
       </div>
       </div>
+      </ErrorBoundary>
 
+      <ErrorBoundary variant="space" locale={skillLocale}>
       <div className="product-space" hidden={productSpace !== "resonance"}>
       <CapsuleWorkbench capsules={capsules} selectedCapsuleId={selectedCapsuleId} selectedCapsule={selectedCapsule}
         selectableMemories={selectableMemories} selectedMemoryIds={selectedMemoryIds} capsuleName={capsuleName} capsuleIntro={capsuleIntro}
@@ -1230,25 +1272,35 @@ export function AuroraApp() {
         onSendLetter={() => void sendLetterToMatch()} onReportSession={() => void reportPersonaSession()}
         onBlockSession={() => void blockPersonaSession()} personaTurnError={personaTurnError} locale={skillLocale} />
       </div>
+      </ErrorBoundary>
 
+      <ErrorBoundary variant="space" locale={skillLocale}>
       <div className="product-space" hidden={productSpace !== "letters"}>
-      <PeopleDiscovery people={connectionsAndLetters.people} busy={connectionsAndLetters.peopleBusy} onRequest={userId => void connectionsAndLetters.requestPersonConnection(userId)} locale={skillLocale} />
+      <PeopleDiscovery people={connectionsAndLetters.people} isBusy={connectionsAndLetters.isPersonBusy} onRequest={userId => void connectionsAndLetters.requestPersonConnection(userId)} locale={skillLocale} />
       <RelationsView relations={connectionsAndLetters.relations} selected={connectionsAndLetters.selectedRelation} timeline={connectionsAndLetters.relationTimeline} health={connectionsAndLetters.relationHealth} busy={connectionsAndLetters.relationBusy} onSelect={label => void connectionsAndLetters.openRelation(label)} locale={skillLocale} />
       <SocialGroupsView groups={connectionsAndLetters.groups} invites={connectionsAndLetters.groupInvites} friends={connectionsAndLetters.friends}
-        selectedGroupId={connectionsAndLetters.selectedGroupId} members={connectionsAndLetters.groupMembers} busy={connectionsAndLetters.groupBusy}
+        selectedGroupId={connectionsAndLetters.selectedGroupId} members={connectionsAndLetters.groupMembers} membersStatus={connectionsAndLetters.groupMembersStatus}
+        createBusy={connectionsAndLetters.groupCreateBusy} isInviteBusy={connectionsAndLetters.isGroupInviteBusy}
+        isInviteDecisionBusy={connectionsAndLetters.isGroupInviteDecisionBusy} isLeaveBusy={connectionsAndLetters.isGroupLeaveBusy}
         currentUserId={userProfile?.id ?? null}
         onSelectGroup={id => void connectionsAndLetters.openGroup(id)} onCreateGroup={name => void connectionsAndLetters.createGroup(name)}
         onInvite={(groupId, userId) => void connectionsAndLetters.inviteToGroup(groupId, userId)}
         onRespondInvite={(memberId, decision) => void connectionsAndLetters.respondToGroupInvite(memberId, decision)}
         onLeaveGroup={id => void connectionsAndLetters.leaveGroup(id)} locale={skillLocale} />
 
-      <LettersInbox letterInbox={connectionsAndLetters.letterInbox} letterOutbox={connectionsAndLetters.letterOutbox} threads={connectionsAndLetters.letterThreads} threadLetters={connectionsAndLetters.threadLetters} selectedThreadId={connectionsAndLetters.selectedThreadId} draftBusy={connectionsAndLetters.draftBusy} replyBusyId={connectionsAndLetters.replyBusyId} onSendDraft={id => void connectionsAndLetters.sendDraft(id)} onOpenThread={id => { void connectionsAndLetters.openThread(id); navigate(letterThreadPath(id)); }} replyDrafts={connectionsAndLetters.replyDrafts} connectionRequests={connectionsAndLetters.connectionRequests} friends={connectionsAndLetters.friends}
+      <LettersInbox letterInbox={connectionsAndLetters.letterInbox} letterOutbox={connectionsAndLetters.letterOutbox} threads={connectionsAndLetters.letterThreads} threadLetters={connectionsAndLetters.threadLetters} threadLettersStatus={connectionsAndLetters.threadLettersStatus} selectedThreadId={connectionsAndLetters.selectedThreadId}
+        isDraftBusy={connectionsAndLetters.isDraftBusy} replyBusyId={connectionsAndLetters.replyBusyId}
+        isLetterActionBusy={connectionsAndLetters.isLetterActionBusy} isConnectionDecisionBusy={connectionsAndLetters.isConnectionDecisionBusy}
+        isConnectionLeaveBusy={connectionsAndLetters.isConnectionLeaveBusy} isLetterConnectionBusy={connectionsAndLetters.isLetterConnectionBusy}
+        onSendDraft={id => void connectionsAndLetters.sendDraft(id)} onOpenThread={id => { void connectionsAndLetters.openThread(id); navigate(letterThreadPath(id)); }} replyDrafts={connectionsAndLetters.replyDrafts} connectionRequests={connectionsAndLetters.connectionRequests} friends={connectionsAndLetters.friends}
         onReplyDraftChange={connectionsAndLetters.updateReplyDraft}
         onReply={letter => void connectionsAndLetters.replyWithLetter(letter)} onActOnLetter={(letter, action) => void connectionsAndLetters.actOnLetter(letter, action)}
         onReportLetter={letter => void connectionsAndLetters.reportLetter(letter)} onRequestConnection={letter => void connectionsAndLetters.requestConnection(letter)}
         onDecideConnection={(id, decision) => void connectionsAndLetters.decideConnection(id, decision)} onLeaveConnection={id => void connectionsAndLetters.leaveConnection(id)} locale={skillLocale} />
       </div>
+      </ErrorBoundary>
 
+      <ErrorBoundary variant="space" locale={skillLocale}>
       <div className="product-space" hidden={productSpace !== "me"}>
         <MeSpace native={mobileState.native} connected={mobileState.connected} wakeIntentCount={auroraSession.wakeIntents.length}
           activeClaimCount={claims.filter(claim => claim.status === "ACTIVE").length}
@@ -1258,13 +1310,14 @@ export function AuroraApp() {
           onOpenSafetyHarbor={() => navigate("/safety-harbor")} locale={skillLocale} />
         <PortraitView dimensions={portrait} history={portraitHistory} calibrated={portraitCalibrated} busyDim={portraitBusy}
           onLoadHistory={dim => void loadPortraitHistory(dim)} onCalibrate={(dim, oldValue, newValue) => void submitPortraitCalibration(dim, oldValue, newValue)} locale={skillLocale} />
-        <AccountSettings busy={accountBusy} message={accountMessage} onChangePassword={(oldPassword, newPassword) => void changeAccountPassword(oldPassword, newPassword)}
-          onExportData={() => void exportAccountData()} onDeleteAccount={password => void deleteAccount(password)}
+        <AccountSettings busy={accountBusy} message={accountMessage} onChangePassword={(oldPassword, newPassword) => changeAccountPassword(oldPassword, newPassword)}
+          onExportData={() => void exportAccountData()} onDeleteAccount={password => deleteAccount(password)}
           profile={userProfile} profileBusy={profileBusy} onSaveProfile={patch => void saveProfile(patch)} locale={skillLocale} />
         <LocaleToggle locale={skillLocale} onChange={changeLocale} />
         <DataRightsPanel receipts={dataRightsReceipts} loading={dataRightsLoading} loaded={dataRightsLoaded}
           onLoad={() => void loadDataRightsReceipts()} locale={skillLocale} />
       </div>
+      </ErrorBoundary>
       <div className="state global-state" role="status"><i className={auroraSession.activeTurnId ? "pulse" : ""} />{status}</div>
       <footer><a href="/pages/dashboard.html">{tt.footerTools}</a><span>{tt.footerTagline}</span><button type="button" onClick={() => void logout()}>{tt.footerSignOut}</button></footer>
     </main>
