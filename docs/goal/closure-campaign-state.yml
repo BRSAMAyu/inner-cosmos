@@ -128,7 +128,14 @@ current_front:
 campaigns:
   - {id: W0, name: integration-and-truth-baseline, status: DONE, depends_on: [], commit: 28c4987}
   - {id: W0V, name: verified-audit-defect-closure, status: DONE, depends_on: [W0], contract: docs/audit/2026-07-23-gemini-master-audit-reconciliation.md, closing_commit: 3ce6ac7}
-  - {id: W1, name: living-intelligence-and-data-loop, status: READY, depends_on: [W0V]}
+  - {id: W1, name: living-intelligence-and-data-loop, status: IN_PROGRESS, depends_on: [W0V], note: >-
+      2026-07-23 (merge commit on codex/w0-integration): closed the AURORA-DUAL-KERNEL measured-benefit
+      gap (root-caused Speaker-prompt paraphrase-drift/verbatim-restatement, fixed in eval harness +
+      production runtime, re-verified via real-DeepSeek re-run 16/22=0.7273 vs 12/22=0.5455) and
+      partially closed G2.ARCH-MODULES (3 of 7 grandfathered controllers refactored through service
+      interfaces). Supervisor independently re-ran ./mvnw test post-merge: 1092/1092, 0 failures, 1
+      pre-existing unrelated skip. Remaining W1 scope: G2.RUNTIME-ROLES job-bean-presence test, G5/G6/G7
+      measured-eval gaps, remaining 4 ARCH-MODULES allowlist entries, blind human review (human-gated).}
   - {id: W2, name: complete-experience-and-multiplatform-polish, status: READY, depends_on: [W0V]}
   - {id: W3, name: cloud-native-showcase, status: READY, depends_on: [W0V]}
   - {id: W4, name: convergence-and-non-author-acceptance, status: BLOCKED_BY_W1_W2_W3, depends_on: [W1, W2, W3]}
