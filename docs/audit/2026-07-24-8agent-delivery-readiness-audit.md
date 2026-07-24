@@ -49,6 +49,25 @@ cookies) and a full authenticated rehearsal from a separate device before relyin
 Severity legend: P0 = blocks delivery entirely · P1 = judge will notice / a core journey breaks ·
 P2 = quality/polish gap · P3 = minor.
 
+### P0 — blocks delivery (found post-audit, during a real-provider verification pass)
+
+- [x] **P0-4** Any pre-existing (pre-V23) file-backed H2 database — i.e. exactly the operator's own
+  long-running local delivery machine — 500s on the **very first real Aurora chat message**, with
+  `Column "preferred_tts_voice_id" not found`. Every Flyway migration through V22 has a matching H2
+  retrofit initializer (`SchemaM*Initializer`); V23 (`tb_user_profile`'s TTS/inner-voice columns)
+  simply never got one. Reproduced live against the real-DeepSeek+Qwen demo server
+  (`scripts/demo/run-demo-server.sh`) on this exact machine. Fixed: added
+  `src/main/java/com/innercosmos/config/SchemaM19Initializer.java` following the established
+  idempotent `ALTER TABLE ... ADD COLUMN` pattern; regression test
+  `SchemaM19InitializerTest` pins it against a simulated pre-V23 table shape. Re-verified live
+  end to end after the fix: register → real Aurora chat (real DeepSeek reply, ~22-27s latency) →
+  session finish → real memory extraction → mood/emotion trace → real capsule creation (real Qwen
+  embedding, ~10s) → a second real visitor account → real persona-chat reply from the capsule
+  (~6s) — all correct, all fast enough to be a good demo experience, no crisis
+  misclassification (confirming that bug was Mock-path-only). This was found specifically because
+  the user asked to verify the *real* LLM/embedding/database experience end to end, not just run
+  the test suite.
+
 ### P0 — blocks delivery
 
 - [x] **P0-1** Android APK / Tauri desktop native login cannot complete — OIDC-only auth, no public
@@ -177,6 +196,19 @@ P2 = quality/polish gap · P3 = minor.
 ## 3. Remediation log
 
 (Newest first. Each entry: finding id(s), what changed, commit.)
+
+- **P0-4** (2026-07-24): Found while manually verifying the *real* end-to-end guest experience
+  (real DeepSeek + real Qwen embedding/TTS, per the user's explicit request to prioritize real
+  provider smoothness over just re-running the test suite): a pre-existing file-backed H2
+  database missing V23's `tb_user_profile` TTS/inner-voice columns 500s on the first-ever real
+  Aurora message. Added `SchemaM19Initializer` (idempotent H2 retrofit, same pattern as every
+  other `SchemaM*Initializer` in this package) + `SchemaM19InitializerTest`. Re-verified the full
+  guest journey live against real providers after the fix: register, Aurora chat (both an
+  anxiety/stress message and a positive follow-up — real DeepSeek handled both naturally, no
+  crisis over-triggering), session finish, real memory extraction, mood/emotion trace, real
+  capsule creation (real Qwen embedding), a second real visitor account reaching the capsule via
+  persona-chat and getting an in-character real DeepSeek reply. All correct; latencies (~6-27s
+  depending on step) are real-provider-typical, not a hang.
 
 - **P2-3, P2-6, P2-8 (doc-only), P2-11, P2-12** (2026-07-24):
   - `LlmConfig.failoverClient()` now gates its Mock candidate on `isEffectiveFallbackAllowed()`
