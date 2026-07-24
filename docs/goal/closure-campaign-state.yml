@@ -151,15 +151,23 @@ campaigns:
       embedding recall benchmark and a non-author inner-voice-quality review are the concrete next
       steps now that a live key is configured), plus W2 completion and W4 convergence.}
   - {id: W2, name: complete-experience-and-multiplatform-polish, status: IN_PROGRESS, depends_on: [W0V], note: >-
-      2026-07-23: voice-picker UI + Aurora inner-voice bubble landed this session (branch
-      codex/w2-voice-frontend, merged). The run-on screen-reader naming accessibility fix
-      (ResonanceNetwork/LettersInbox/CapsuleWorkbench, commit 72e1bd3) is already in HEAD, so the
-      remaining UX-COMPLETE work is the broader axe/WCAG/perf-budget/blind-experience matrix, not
-      that fix. Still genuinely open: the real Android-emulator + Windows-Tauri journeys
-      (G7.MOBILE-MACHINE-RUNTIME) on the current integrated HEAD -- a first attempt on branch
-      codex/w2-mobile-3 committed nothing before being terminated by an external API session-limit,
-      so that round is unstarted and queued for re-dispatch. See
-      docs/goal/complete-product-acceptance.yml G7.MOBILE-MACHINE-RUNTIME and G7.UX-COMPLETE.}
+      2026-07-24 (superseding the note below, which went stale): this note previously said
+      G7.MOBILE-MACHINE-RUNTIME's Android-emulator/Windows-Tauri journeys were "unstarted, queued
+      for re-dispatch" after codex/w2-mobile-3 was terminated by a session limit -- that round WAS
+      re-dispatched and DID land (commits f9601f6/838e6e7, merged 18a8f5a, INNO-MOBILE-007): real
+      Tauri Windows exe + Android emulator APK install/launch, both driven, both in HEAD. See
+      docs/goal/complete-product-acceptance.yml G7.MOBILE-MACHINE-RUNTIME for the current per-item
+      remaining gap (a deep-link glue check driven from inside the actual shells, not a host
+      script over the same code path) -- that file is kept current through every merge; trust it
+      over this file's prose for exact remaining scope. Genuinely still open for W2:
+      G7.UX-COMPLETE's broader axe/WCAG/visual-regression/perf-budget/200%-zoom matrix (only its
+      trailing non-author blind-experience acceptance is human-gated).
+      ---
+      2026-07-23 (superseded, kept for history): voice-picker UI + Aurora inner-voice bubble
+      landed this session (branch codex/w2-voice-frontend, merged). The run-on screen-reader
+      naming accessibility fix (ResonanceNetwork/LettersInbox/CapsuleWorkbench, commit 72e1bd3) is
+      already in HEAD, so the remaining UX-COMPLETE work is the broader axe/WCAG/perf-budget/
+      blind-experience matrix, not that fix.}
   - {id: W3, name: cloud-native-showcase, status: COMPLETE, depends_on: [W0V], note: >-
       2026-07-23: all three mandatory cloud-native hero gates are PASS with local-kind runtime
       evidence. Zero-loss drain covers graceful Pod churn and true JVM SIGKILL recovery; KEDA
