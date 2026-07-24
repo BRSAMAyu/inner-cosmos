@@ -48,6 +48,10 @@ spec:
             - {name: SPRING_MAIN_WEB_APPLICATION_TYPE, value: none}
             - {name: SPRING_MAIN_LAZY_INITIALIZATION, value: "true"}
             - {name: SPRING_FLYWAY_ENABLED, value: "true"}
+            - {name: MANAGEMENT_HEALTH_REDIS_ENABLED, value: "false"}
+            - {name: MANAGEMENT_ENDPOINT_HEALTH_GROUP_READINESS_INCLUDE, value: "readinessState,db,custom"}
+            - name: SPRING_AUTOCONFIGURE_EXCLUDE
+              value: org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration,org.springframework.boot.actuate.autoconfigure.data.redis.RedisHealthContributorAutoConfiguration
             - {name: REDIS_SESSION_ENABLED, value: "false"}
             - {name: REDIS_RATE_LIMIT_ENABLED, value: "false"}
             - {name: REDIS_SCHEDULER_LOCK_ENABLED, value: "false"}

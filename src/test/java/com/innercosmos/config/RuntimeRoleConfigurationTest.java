@@ -33,6 +33,17 @@ class RuntimeRoleConfigurationTest {
     }
 
     @Test
+    void explicitSchedulingDisableOverridesEveryRuntimeRole() {
+        for (String role : new String[]{"all", "worker", "scheduler", "api", "migration"}) {
+            runner.withPropertyValues(
+                            "inner-cosmos.runtime.role=" + role,
+                            "spring.task.scheduling.enabled=false")
+                    .run(context -> assertThat(context).doesNotHaveBean(
+                            TaskManagementConfigUtils.SCHEDULED_ANNOTATION_PROCESSOR_BEAN_NAME));
+        }
+    }
+
+    @Test
     void migrationExitClosesOnlyMigrationRole() throws Exception {
         ConfigurableApplicationContext context = mock(ConfigurableApplicationContext.class);
         ConfigurableEnvironment environment = mock(ConfigurableEnvironment.class);

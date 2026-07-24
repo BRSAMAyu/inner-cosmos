@@ -1,0 +1,4 @@
+﻿package_process_running=true
+fatal_exception_count=0
+anr_count=0
+raw_logcat_persisted=false

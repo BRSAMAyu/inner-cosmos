@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Signed release builds must not accept arbitrary third-party WebView cookies. -->
+    <bool name="allow_third_party_session_cookies">false</bool>
+</resources>

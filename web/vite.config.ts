@@ -3,16 +3,19 @@ import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 import { buildPwaManifest } from "./src/pwaManifest";
 
-export default defineConfig(({ mode }) => ({
+export default defineConfig(({ mode }) => {
+  const installedBundle = mode.startsWith("mobile") || mode.startsWith("tauri") || mode === "demo";
+  return ({
   // Clean BrowserRouter deep links need an absolute web base; the Capacitor local
-  // origin still needs relative assets. `npm run build:mobile` selects that branch.
-  base: mode.startsWith("mobile") || mode.startsWith("tauri") ? "./" : "/app/aurora/",
+  // origin still needs relative assets. Demo mode is also an installed Capacitor
+  // bundle, so an absolute /app/aurora base would produce a blank APK.
+  base: installedBundle ? "./" : "/app/aurora/",
   plugins: [
     react(),
     VitePWA({
       // Native shells ship immutable bundled assets. Registering a service worker there can
       // keep an older bundle alive across APK upgrades and produce a blank or stale native UI.
-      disable: mode.startsWith("mobile") || mode.startsWith("tauri"),
+      disable: installedBundle,
       // registerType "prompt" (not "autoUpdate"): confirmed by reading vite-plugin-pwa's
       // generated client (node_modules/vite-plugin-pwa/dist/client/build/register.js) rather
       // than guessing from the option name. Under "autoUpdate" the generated register script
@@ -76,4 +79,5 @@ export default defineConfig(({ mode }) => ({
     setupFiles: "./src/test/setup.ts",
     exclude: ["e2e/**", "scripts/**", "node_modules/**", "dist/**"]
   }
-}));
+  });
+});

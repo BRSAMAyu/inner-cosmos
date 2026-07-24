@@ -53,6 +53,8 @@ spec:
             - {name: SPRING_MAIN_LAZY_INITIALIZATION, value: "true"}
             - {name: INNER_COSMOS_RUNTIME_EXIT_AFTER_STARTUP, value: "true"}
             - {name: SPRING_FLYWAY_ENABLED, value: "true"}
+            - {name: MANAGEMENT_HEALTH_REDIS_ENABLED, value: "false"}
+            - {name: MANAGEMENT_ENDPOINT_HEALTH_GROUP_READINESS_INCLUDE, value: "readinessState,db,custom"}
             - {name: REDIS_SESSION_ENABLED, value: "false"}
             - {name: REDIS_RATE_LIMIT_ENABLED, value: "false"}
             - {name: REDIS_SCHEDULER_LOCK_ENABLED, value: "false"}

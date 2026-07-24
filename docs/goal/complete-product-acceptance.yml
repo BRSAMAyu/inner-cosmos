@@ -508,32 +508,19 @@ gates:
         status: IN_PROGRESS
         evidence: [evidence/experience/, evidence/integration/FINAL-STABILIZATION-2026-07-20/, "commit on codex/w0-integration (W2 first UIUX audit pass)"]
         remaining: >-
-          Five clean BrowserRouter spaces, hard-refresh routes, desktop/projector/mobile viewports,
-          progressive-disclosure tags, PWA banner clearance and 14 Playwright journeys are verified.
-          2026-07-23 (W2 first dispatch, live browser-driven audit, not just code-reading): confirmed
-          already-solid: entry flow, five-space routing, Resonance-space empty states,
-          prefers-reduced-motion (already fully wired -- CSS blanket override plus JS-level skips in
-          ripple/stardust motifs). Found and fixed 4 real WCAG/i18n/touch-target bugs: HeartDiary
-          textarea's suppressed focus outline with no replacement (2.4.7 focus-visible hard gate);
-          five-space nav's <strong>+<small> concatenating into a run-on screen-reader name; the same
-          nav never actually localizing to en-SG despite every other string translating (slipped past
-          the existing i18n-completeness test, which only checks module import, not per-string
-          localization); `.danger-quiet` (sign-out/delete-account) measuring 62x20px live with zero
-          padding, under the 48dp touch-target hard gate. Supervisor independently re-verified: diffs
-          read in full, web suite 482/482 (71 files), tsc clean.
-          Still open (explicitly not attempted this pass, not silently claimed): complete axe/global
-          WCAG audit, visual-regression and performance budgets, non-author blind-experience
-          acceptance, and full per-component empty/loading/streaming/partial/offline/error/expired/
-          permission-denied matrix beyond what was spot-checked, live 200%-browser-zoom check (only
-          the existing jsdom-level test was read).
-          UPDATE 2026-07-23 (commit 72e1bd3, in HEAD): the "run-on-naming risk in
-          ResonanceNetwork/PeopleDiscovery/LettersInbox/CapsuleWorkbench" called out above as
-          "found, not fixed" is now FIXED -- ResonanceNetwork/LettersInbox/CapsuleWorkbench each
-          got an aria-label + aria-hidden-duplicate fix with a per-component vitest regression
-          test; PeopleDiscovery was live-verified as genuinely NOT the bug (its strong+small sit
-          in a plain article with `display:block`, no accessible-name concatenation) and correctly
-          left unchanged. That specific sub-item is closed; the broader axe/WCAG/perf-budget/
-          blind-experience matrix above is what remains.
+          Five clean BrowserRouter spaces, bilingual navigation, hard-refresh routes,
+          progressive disclosure, reduced-motion wiring and mobile/projector layouts are verified.
+          2026-07-24: a real axe-core WCAG 2.2 AA matrix now drives all five spaces across day/night
+          and zh-CN/en-SG (20 scans). It first exposed active-state contrast defects, then the final
+          public-Demo run exposed a 24px target-size failure in every matrix combination for the
+          Capsule boundary checkbox. Theme-aware foreground tokens and a 24px checkbox inside a
+          48px clickable label closed both classes; the public run changed from 4/5 to 5/5 PASS.
+          The same public run measured TTFB 80.1ms, FCP 316ms, LCP 524ms, CLS 0, approximate TBT
+          27ms and Aurora composer interactive at 1580ms; evidence is
+          EXPERIENCE-AXE-AUDIT-001. Still IN_PROGRESS rather than inflated to PASS: screenshot
+          visual-diff coverage, live 200% zoom, the complete per-component offline/error/expired/
+          permission matrix, a physical TalkBack/keyboard-only walkthrough, and non-author
+          aesthetic/blind-experience acceptance remain.
 
   - id: G8
     name: EKS operations and Singapore readiness
@@ -580,8 +567,8 @@ gates:
     status: UNASSESSED
     required: true
     acceptance:
-      - {id: FINAL-E2E, target: "Web, PWA, and mobile complete-product journeys pass against a production-like environment.", status: IN_PROGRESS, evidence: [evidence/g9/FINAL-E2E-001/, evidence/innovation/INNO-MOBILE-007/, evidence/innovation/INNO-MOBILE-009/], remaining: "2026-07-24 (branch codex/w2-e2e-golden, merged): web golden journeys driven -- Playwright 45/46 on a fresh Mock backend (dead-button-scan fixed to zero dead buttons across all five spaces; new voice-features.spec.ts 4/4 proving the 6-preset picker, graceful no-key preview, slow-letter tap-to-play, inner_voice SSE path), plus a 20-screenshot golden visual matrix (5 spaces x zh-CN/en-SG x desktop/mobile390, 0 real console errors, en-SG + reduced-motion confirmed) (evidence/g9/FINAL-E2E-001/). 1 remaining flake (aurora-interrupt slow-letter) root-caused as a seed-isolation/shared-DB artifact, documented not force-greened. Still open: the production-like (real-provider, TLS) golden run + mobile on-device golden journeys (Tauri/Android shell deep-link glue) + non-author acceptance."}
-      - {id: FINAL-DEMO, target: "An 8-12 minute reproducible demo proves product differentiation, AI depth, data lineage, and Kubernetes operations.", status: IN_PROGRESS, evidence: [evidence/g9/FINAL-DEMO-001/, evidence/g9/TRACEABILITY-SNAPSHOT-2026-07-17.md, evidence/integration/FINAL-P0-CLOSURE-2026-07-22/], remaining: "2026-07-22: the teacher-demo entrypoint now builds an isolated disposable runtime and self-verifies health, CSRF, demo login/session and the React shell before handoff. The narrative covers Aurora, task-aware memory, resonance and Kubernetes. Remaining for PASS: one recorded end-to-end run captured by a non-author from a clean checkout, plus the standing real-provider quality gate."}
+      - {id: FINAL-E2E, target: "Web, PWA, and mobile complete-product journeys pass against a production-like environment.", status: IN_PROGRESS, evidence: [evidence/g9/FINAL-E2E-001/, evidence/innovation/INNO-MOBILE-007/, evidence/innovation/INNO-MOBILE-009/, evidence/demo/PUBLIC-DEMO-001/, evidence/demo/PUBLIC-DEMO-ANDROID-001/], remaining: "2026-07-24 public-Demo update: the real-provider classroom path is now machine-proven over a public HTTPS tunnel with PostgreSQL/pgvector + Redis. Two fresh users completed registration, discovery, friendship, private group membership, Aurora -> memory settlement, capsule publish/discovery/chat and slow-letter send; the exact public APK was installed on Android API 36.1, registered a fresh account inside the shell and received a real Aurora multi-bubble response with zero crash/ANR. Still IN_PROGRESS rather than inflated to PASS: a physical Android sideload/cellular smoke, the standing PKCE-native-shell release path, the one documented shared-seed Playwright flake, and non-author acceptance remain."}
+      - {id: FINAL-DEMO, target: "An 8-12 minute reproducible demo proves product differentiation, AI depth, data lineage, and Kubernetes operations.", status: IN_PROGRESS, evidence: [evidence/g9/FINAL-DEMO-001/, evidence/g9/TRACEABILITY-SNAPSHOT-2026-07-17.md, evidence/integration/FINAL-P0-CLOSURE-2026-07-22/, evidence/demo/PUBLIC-DEMO-001/, evidence/demo/PUBLIC-DEMO-ANDROID-001/], remaining: "2026-07-24: scripts/demo/run-public-demo.ps1 is now the classroom authority. One command creates the public HTTPS tunnel, builds an origin-bound Android APK, starts PostgreSQL/pgvector + Redis + real DeepSeek/Qwen services, and self-verifies the full core trajectory including social relations. Android emulator install/in-App registration/Aurora and public-vs-installed APK hash equality are proven. Remaining for PASS: one physical-phone/cellular rehearsal and a non-author delivery of the documented 8-12 minute narrative; the Kubernetes showcase remains a separate presentation segment, not a runtime dependency for this laptop-server Demo."}
       - {id: FINAL-USABILITY, target: "Non-author participants complete core tasks and articulate the unique value without developer explanation.", status: UNASSESSED, evidence: []}
       - {id: FINAL-OPERATIONS, target: "Release, rollback, incident, provider failure, data-rights, and disaster-recovery runbooks are independently exercised.", status: UNASSESSED, evidence: []}
       - {id: FINAL-TRACEABILITY, target: "Every required acceptance item points to current reproducible evidence and no hidden P0 blocker remains.", status: PASS, evidence: [evidence/g9/FINAL-TRACEABILITY-001/, docs/goal/complete-product-acceptance.yml, docs/audit/2026-07-23-gemini-master-audit-reconciliation.md], remaining: "2026-07-24: traceability snapshot frozen at evidence/g9/FINAL-TRACEABILITY-001/ -- every gate's evidence: array resolves at HEAD; W0V closed all 36 audit findings; two independent reviews ship-as-is (no CRITICAL/HIGH, M2 fixed); self-review fixed 3 voice regressions. The only remaining non-PASS items are the named HG-* external human gates + MOBILE-EXTERNAL-RELEASE + environment-portability proofs needing a real cluster (Academy EKS multi-AZ, commercial-sg SQS, EKS-IAC Terraform apply). No hidden P0 blocker. Ledger is the live cursor."}

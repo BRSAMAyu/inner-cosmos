@@ -1,5 +1,52 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=/pages/index.html"></head>
-<body><a href="/pages/index.html">Inner Cosmos</a></body>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#151226">
+  <title>Inner Cosmos · 演示入口</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, "Noto Sans SC", system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    body {
+      min-height: 100vh; margin: 0; display: grid; place-items: center; padding: 24px;
+      color: #f8f5ff;
+      background:
+        radial-gradient(circle at 18% 18%, rgba(154, 119, 255, .26), transparent 34%),
+        radial-gradient(circle at 82% 72%, rgba(74, 201, 190, .17), transparent 32%),
+        linear-gradient(145deg, #0c0b15, #19142d 58%, #101727);
+    }
+    main {
+      width: min(720px, 100%); padding: clamp(28px, 6vw, 58px);
+      border: 1px solid rgba(255,255,255,.14); border-radius: 32px;
+      background: rgba(20, 17, 37, .78); box-shadow: 0 28px 90px rgba(0,0,0,.42);
+      backdrop-filter: blur(24px);
+    }
+    .eyebrow { color: #bfb0ff; letter-spacing: .16em; text-transform: uppercase; font-size: .78rem; }
+    h1 { margin: 14px 0 12px; font-size: clamp(2.3rem, 8vw, 4.6rem); line-height: .98; }
+    p { color: #d7d0e5; line-height: 1.75; font-size: 1.03rem; }
+    .actions { display: grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap: 14px; margin-top: 30px; }
+    a {
+      min-height: 58px; display: grid; place-items: center; padding: 14px 20px;
+      border-radius: 18px; color: white; text-decoration: none; font-weight: 720;
+      border: 1px solid rgba(255,255,255,.18); transition: transform .18s ease, border-color .18s ease;
+    }
+    a:hover, a:focus-visible { transform: translateY(-2px); border-color: rgba(255,255,255,.58); outline: none; }
+    .primary { background: linear-gradient(135deg, #7358dd, #4aaeb0); }
+    .secondary { background: rgba(255,255,255,.075); }
+    small { display: block; margin-top: 24px; color: #aaa1bb; line-height: 1.6; }
+  </style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">NUS Cloud Computing · Live Demo</div>
+  <h1>Inner Cosmos</h1>
+  <p>与 Aurora 对话，让记忆、画像与共鸣逐渐形成；也可以和现场同学建立连接、创建群组、交换慢信。</p>
+  <div class="actions">
+    <a class="primary" href="/app/aurora/">在浏览器中进入</a>
+    <a class="secondary" href="/downloads/inner-cosmos-demo.apk" download>下载 Android App</a>
+  </div>
+  <small>Android 首次安装时可能提示“未知来源”，请选择允许本次安装。演示结束后可直接卸载。</small>
+</main>
+</body>
 </html>

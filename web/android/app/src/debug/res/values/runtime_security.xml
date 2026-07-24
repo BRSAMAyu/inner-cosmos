@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Demo/mobile-local debug builds use a bundled https://localhost shell against an
+         operator-selected HTTPS API origin. SameSite=None + Secure remains enforced server-side. -->
+    <bool name="allow_third_party_session_cookies">true</bool>
+</resources>

@@ -45,6 +45,15 @@ if ($schemaGateCount -ne 3 -or $schemaVersionRefCount -ne 3 -or $schemaFailedClo
     throw "Academy render must retain one fail-closed authoritative schema gate for api, worker, and scheduler."
 }
 
+# The migration role deliberately excludes Redis auto-configuration. Its health group must
+# therefore exclude the absent contributor as well; otherwise Spring Boot validates the
+# readiness group before MigrationRoleExit can close cleanly, after applying the schema.
+$migrationRedisHealthDisabled = $rendered -match '(?s)name:\s*MANAGEMENT_HEALTH_REDIS_ENABLED\s+value:\s*"false"'
+$migrationReadinessWithoutRedis = $rendered -match '(?s)name:\s*MANAGEMENT_ENDPOINT_HEALTH_GROUP_READINESS_INCLUDE\s+value:\s*readinessState,db,custom'
+if (-not $migrationRedisHealthDisabled -or -not $migrationReadinessWithoutRedis) {
+    throw "Academy migration role must remove the intentionally absent Redis contributor from readiness."
+}
+
 $forbidden = @(
     'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_SESSION_TOKEN',
     'amazonaws.com/role-arn', 'ebs.csi.aws.com', 'kind: StorageClass',
@@ -68,6 +77,7 @@ if ($unpinnedInfrastructureImages.Count -gt 0) { throw "Academy infrastructure i
     ForbiddenFindings = 0
     MissingControls = 0
     SchemaVersionGates = $schemaGateCount
+    MigrationReadinessContract = "DB_ONLY"
     OfflineStructuralValidation = $true
     ClusterSchemaDryRun = [bool]$ClusterSchemaDryRun
     SecretValuesInGit = $false

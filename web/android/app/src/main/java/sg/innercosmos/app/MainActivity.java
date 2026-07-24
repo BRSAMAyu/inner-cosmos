@@ -1,6 +1,8 @@
 package sg.innercosmos.app;
 
 import android.content.Intent;
+import android.os.Bundle;
+import android.webkit.CookieManager;
 
 import com.getcapacitor.BridgeActivity;
 
@@ -10,6 +12,21 @@ public class MainActivity extends BridgeActivity {
     private static final int WAKE_NOTIFICATION_OFFSET = 1_000_000;
     private int consumedNotificationId = Integer.MIN_VALUE;
     private int pendingNotificationId = Integer.MIN_VALUE;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        // Capacitor serves bundled assets from https://localhost. A classroom demo API is a
+        // different HTTPS origin, so Android classifies its session cookie as third-party.
+        // Debug builds opt in explicitly; release resources keep this false so production does
+        // not silently broaden WebView cookie policy.
+        if (getBridge() != null && getBridge().getWebView() != null
+                && getResources().getBoolean(R.bool.allow_third_party_session_cookies)) {
+            CookieManager manager = CookieManager.getInstance();
+            manager.setAcceptCookie(true);
+            manager.setAcceptThirdPartyCookies(getBridge().getWebView(), true);
+        }
+    }
 
     @Override
     protected void onNewIntent(Intent intent) {

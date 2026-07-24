@@ -1,140 +1,160 @@
-# Inner Cosmos — Demo Runbook (laptop as server over school WiFi)
+# Inner Cosmos 本机公网 Demo 运行手册
 
-Goal: run the whole product on **your laptop**, and let teachers/classmates **visit the website or
-download the app** and use it over the school's WiFi — even though the laptop's IP keeps changing.
+## 目标与边界
 
-The robust path is a **public HTTPS tunnel** (Cloudflare Tunnel). It works **regardless of the
-laptop's DHCP IP** and **even if the school WiFi enforces client/AP isolation** (devices on the same
-WiFi can't talk to each other directly) — because traffic goes out to the internet and back through
-the tunnel. The tunnel also gives a **valid HTTPS** URL, which mobile apps require.
+本轮演示不依赖云服务器。演示者的 Windows 笔记本同时承担应用服务器、PostgreSQL、
+Redis 和 AI Provider 网关；Cloudflare Quick Tunnel 提供临时公网 HTTPS 入口。老师和
+同学可以：
 
-## 0. One-time prep
+- 用手机或电脑浏览器访问完整 Web 产品；
+- 从同一入口下载 Android APK，安装后连接同一台笔记本；
+- 自助注册真实账号；
+- 与 Aurora 对话并生成记忆；
+- 创建、发布和访问共鸣体，进行共鸣体对话和慢信；
+- 发现现场其他用户、添加好友、创建和加入群组。
 
-- JDK 21, Node 22, the repo checked out. (You already have these.)
-- Real provider keys in `API及文档.txt` at the repo root (gitignored — never commit it). The
-  scripts read the key from there at runtime; it is never written into a committed file.
-- `cloudflared` — the tunnel binary. `scripts/demo/start-tunnel.sh` downloads it automatically the
-  first time (Windows `.exe` into `scripts/demo/bin/`). No account needed.
+这里的“完成”以现场核心轨迹可用为准，不以 AWS、商店发布、长期生产运维或新加坡
+合规签字为前置条件。
 
-## 1. Start the backend (real LLM) on the laptop
+## 一次性准备
 
-```bash
-bash scripts/demo/run-demo-server.sh
+Windows 需要：
+
+- Docker Desktop 已启动；
+- JDK 21、Node.js 22、Android SDK（只有构建/安装 APK 时需要）；
+- 仓库根目录存在被 `.gitignore` 排除的 `API*.txt`，包含 DeepSeek 与 Qwen 凭据；
+- 电脑不能休眠，网络需允许访问 Cloudflare 和模型 Provider。
+
+脚本在缺少 `cloudflared.exe` 时，会从 Cloudflare 官方 GitHub Release 下载 Windows
+AMD64 版本到被 Git 忽略的 `scripts/demo/bin/`。密钥只注入当前 Docker Compose
+进程，不会写入镜像、Git、Markdown 或运行证据。
+
+## 启动：一条命令
+
+在仓库根目录打开 PowerShell：
+
+```powershell
+.\scripts\demo\run-public-demo.ps1
 ```
 
-This boots Spring Boot on **:8080** with a **real chat provider** (DeepSeek by default; the script's
-own startup line prints exactly which one is active) + **real Qwen embedding** + **real Qwen TTS**
-(keys read from `API及文档.txt`), dev H2 DB, Mock disabled for the configured providers. Wait for
-`Started InnerCosmosApplication`. Health: `http://localhost:8080/actuator/health`.
+脚本以单并发 Gradle 和单并发 Compose 构建为默认，依次完成：
 
-> If :8080 is already taken by another instance, set `DEMO_PORT=8086` before running the script and
-> use that port in the tunnel command below.
+1. 生成临时公网 HTTPS 地址；
+2. 将该地址编译进本次 Debug APK；
+3. 构建 Capacitor Android 应用；
+4. 启动 PostgreSQL 16 + pgvector、Redis 和 Spring Boot；
+5. 启用 Redis Session、限流、幂等、Aurora 流和 JDBC Outbox；
+6. 使用真实 DeepSeek 对话、Qwen embedding 和 Qwen TTS，禁用 Mock fallback；
+7. 自动验证公网健康、首页、APK 下载、双用户注册、好友、群组、Aurora、记忆沉淀、
+   共鸣体发布/发现/对话以及慢信发送；
+8. 打印三个可分享地址和 APK SHA-256。
 
-## 2. Expose it over the school WiFi (the tunnel)
+成功标志为：
 
-```bash
-bash scripts/demo/start-tunnel.sh 8080
+```text
+PUBLIC_DEMO_READY
+Landing: https://...trycloudflare.com/
+Web App: https://...trycloudflare.com/app/aurora/
+Android: https://...trycloudflare.com/downloads/inner-cosmos-demo.apk
 ```
 
-This starts `cloudflared`, prints a public HTTPS URL like
-`https://<random-words>.trycloudflare.com`, and keeps it stable **as long as the terminal stays
-open**. **That URL does not change when your laptop's IP changes** (DHCP) — the tunnel routes by the
-URL, not your IP. Share this URL with the class.
+不要把仓库内旧的 APK 另行发给同学。必须分享本次 `Android:` 地址，因为 Quick
+Tunnel 地址每次重新启动都会变化，APK 也会随之重新绑定。
 
-> **Known, accepted exposure (2026-07-24 8-agent audit P2-8):** the free quick-tunnel forwards the
-> *entire* `:8080` origin, including `/actuator/metrics/*` and `/actuator/prometheus` (permitAll —
-> intentionally, so the real in-cluster Prometheus scraper in the Kubernetes showcase doesn't need
-> app-level credentials; NetworkPolicy is the isolation boundary there, not this app). Over the
-> public tunnel, anyone with the URL can read JVM/DB-pool/request-timing metrics (no user PII).
-> Low-stakes for a course demo, but not zero — **tear the tunnel down (`Ctrl+C`) as soon as grading
-> ends** rather than leaving it running indefinitely.
+## 演示前 5 分钟检查
 
-- **Website visitors**: open `<that-url>/app/aurora/` in any browser → register → full experience.
-  The web app is served same-origin by Spring, so no CORS or extra config. This is the easiest path
-  for most of the class.
-- **App downloaders**: build a demo APK pointed at that URL (step 3).
-
-### Stable URL across restarts (do this before an unattended/asynchronous grading window)
-
-A free quick-tunnel URL is random and changes if you restart cloudflared — and any already-built demo
-APK, or a URL already shared with judges, silently breaks on that restart with no error pointing at
-the cause. This is **optional for a live, supervised, single-session demo** where you control every
-restart, but it is **not optional** if grading happens asynchronously or the laptop might sleep/reboot
-during the window — set this up first in that case. For a **stable, memorable URL**
-(e.g. `https://inner-cosmos-demo.your-domain.com`) that survives restarts and IP changes:
-
-1. Create a free Cloudflare account + add a domain (or a free `.workers.dev` route).
-2. `cloudflared tunnel login`, `cloudflared tunnel create inner-cosmos-demo`, route a hostname to it,
-   `cloudflared tunnel run inner-cosmos-demo`.
-3. Put the stable URL in the demo build (step 3) once; it never needs rebuilding.
-
-For a one-off class demo, the random quick-tunnel URL + re-sharing if it restarts is fine.
-
-## 3. Build the demo Android app pointed at the server
-
-```bash
-bash scripts/demo/build-demo-apk.sh https://<your-tunnel-url>.trycloudflare.com
+```powershell
+.\scripts\demo\status-public-demo.ps1
 ```
 
-This writes a throwaway `.env.demo` (gitignored) with that URL, builds the web bundle in demo mode,
-syncs Capacitor, and produces `web/android/app/build/outputs/apk/debug/app-debug.apk`. The tunnel URL
-is a **public HTTPS origin**, so the app's existing production URL validator accepts it unchanged —
-**no production security is weakened**. Share the APK; classmates install it and it connects to your
-laptop through the tunnel.
+确认：
 
-**Login in the APK**: a `VITE_DEMO_MODE=true` build (this script always sets it) uses the same
-username/password login as the website instead of requiring an OIDC identity provider — there is no
-Keycloak to stand up for this path (2026-07-24 8-agent audit P0-1). This *does* require
-`run-demo-server.sh`'s `COOKIE_SECURE=true` + `COOKIE_SAME_SITE=none` (already set by that script) so
-the session cookie survives the cross-origin request from the APK's `https://localhost` WebView
-origin to your tunnel origin. **Verify a real logged-in journey (register → chat → see a reply) on an
-actual installed APK on a real device before relying on this for grading** — it has not yet been
-rehearsed on a physical device over a real network in this repo's evidence.
+- `postgres`、`redis`、`app` 均为 healthy；
+- `tunnel_running=True`；
+- 手机蜂窝网络能打开 `Landing`（这能排除仅在本机可见的假成功）；
+- 浏览器可以注册一个新账号；
+- APK 可以下载；
+- 演示笔记本已接电并关闭自动睡眠。
 
-> If you change the tunnel URL later, rebuild with the new URL. (A runtime server-URL setting inside
-> the app — so classmates can re-point without a rebuild — is a tracked follow-up; the baked demo
-> build is sufficient for a demo.)
+如需人工重跑核心验收：
 
-## 4. Fallback: laptop mobile hotspot (if the school blocks outbound tunneling)
+```powershell
+.\scripts\demo\verify-public-demo.ps1 -Origin "https://你的地址.trycloudflare.com"
+```
 
-If the school WiFi proxies/blocks cloudflared, turn your laptop into a **mobile hotspot**
-(Windows: Settings → Network → Mobile hotspot). Classmates join THAT WiFi. Your laptop's IP on the
-hotspot is stable (Windows gateway is usually `192.168.137.1`). Then:
+只复核网络、注册、好友与群组而不再次调用 AI：
 
-- Website: `http://192.168.137.1:8080/app/aurora/` (plain HTTP — fine for a browser).
-- App: build with `build-demo-apk.sh http://192.168.137.1:8080` (the demo build allows this; note
-  Android needs "cleartext permitted" for HTTP — the demo APK enables it; production builds do not).
+```powershell
+.\scripts\demo\verify-public-demo.ps1 `
+  -Origin "https://你的地址.trycloudflare.com" -SkipAurora
+```
 
-The hotspot bypasses the school WiFi entirely (it's your own network), so AP isolation doesn't
-apply. Range/capacity is limited by your laptop's hotspot.
+## Android 安装与使用
 
-## 5. Verify before the demo
+老师或同学在 Android 手机浏览器打开 `Landing`，点击“下载 Android App”。首次
+旁加载可能需要允许当前浏览器安装未知应用；这是课堂 Debug APK 的正常流程。安装后：
 
-- Backend health green, and a real Aurora reply — the run script's startup line prints
-  `LLM_PROVIDER=<provider>`; confirm the reply isn't the Mock fallback text.
-- From **another device** (phone on school WiFi, not the laptop's own network), open the tunnel URL →
-  register → send a message → see a real streamed reply + (if you enabled TTS) hear the inner voice.
-  Also try an intentionally mundane, slightly-stressed message (e.g. "我今天有点焦虑，工作压力很大") and
-  confirm it gets an ordinary supportive reply, not an emergency-contact/crisis message — a real
-  bug reproduced during the 2026-07-24 audit and fixed, but worth a live sanity check before grading.
-- The demo APK installs on a **real Android device** (not just the emulator) and completes a full
-  register → login → chat journey through the tunnel — this exact path was not yet proven on
-  physical hardware as of the 2026-07-24 audit; rehearse it, don't assume it from the code fix alone.
-- If grading is asynchronous or unattended, confirm the **stable named tunnel** (section 2) is set up
-  and both the backend and `cloudflared` are configured not to die if the laptop sleeps.
+1. 打开 Inner Cosmos；
+2. 选择注册，创建自己的账号；
+3. App 直接连接本次公网 HTTPS 地址；
+4. 进入 Today 与 Aurora 对话；
+5. 在 Cosmos 查看沉淀的记忆与画像；
+6. 在 Resonance 创建/发现共鸣体；
+7. 在 Connect 添加同学、接受邀请、创建群组与查看慢信。
 
-## Troubleshooting
+Debug APK 只为本轮课堂演示开启跨 HTTPS Origin 的 WebView Session Cookie。Release
+资源保持关闭，不会把这一策略带入正式包。App 不使用演示账号或内置密码。
 
-- **Can't reach the laptop IP directly from another device** → the school WiFi has AP isolation. Use
-  the **tunnel** (step 2) or the **hotspot** (step 4); both bypass AP isolation.
-- **App refuses to connect / "not HTTPS"** → you're serving plain HTTP. Use the tunnel (HTTPS) or
-  the demo APK (which permits cleartext for the demo). Production builds require HTTPS by design.
-- **Tunnel URL changed after a restart** → re-share it (free tier) or set up a named tunnel (step 2,
-  stable-URL section).
-- **"Mock" replies instead of real LLM** → the provider key wasn't read; confirm `API及文档.txt` is at
-  the repo root and check exactly which provider name `run-demo-server.sh`'s startup line printed
-  (`LLM_PROVIDER=<deepseek|glm>` — DeepSeek is the current default; it is no longer always GLM).
-- **APK login fails / session doesn't persist** → confirm `run-demo-server.sh` is the script that
-  started the backend (it sets `COOKIE_SECURE=true` + `COOKIE_SAME_SITE=none`, both required for the
-  APK's cross-origin session cookie); a manually-started `spring-boot:run` without those env vars will
-  not work for the APK's login even though the website still will.
+## 推荐 8–12 分钟演示轨迹
+
+1. 两名同学分别用网页或 App 注册。
+2. 用户 A 与 Aurora 对话，展示多气泡、打断/停止/继续和 Inner Voice。
+3. 结束对话，进入 Cosmos 查看新记忆、来源和可纠正画像。
+4. 用户 A 用授权记忆编译私有共鸣体，预览、沙盒验证后发布。
+5. 用户 B 在 Resonance 发现它，查看匹配解释并进行共鸣体对话。
+6. 用户 B 写一封慢信；用户 A 在 Connect 看到关系轨迹。
+7. A/B 互相添加好友，创建课堂群组并接受邀请。
+8. 最后展示同一产品在浏览器和 Android App 中共享相同数据与会话语义。
+
+## 停止与恢复
+
+保留数据库数据并停止：
+
+```powershell
+.\scripts\demo\stop-public-demo.ps1
+```
+
+同时删除本次 PostgreSQL/Redis 数据：
+
+```powershell
+.\scripts\demo\stop-public-demo.ps1 -DeleteData
+```
+
+Quick Tunnel 进程停止、电脑休眠、网络切换或重启后，旧公网地址和旧 APK 都可能失效。
+重新运行 `run-public-demo.ps1` 会生成新地址和新 APK。需要跨重启的固定地址时，应另行
+配置命名 Cloudflare Tunnel；这不是现场单次演示的阻塞项。
+
+## 常见故障
+
+- `Docker Desktop is not reachable`：启动 Docker Desktop，等待 Engine 就绪后重试。
+- `A public demo tunnel is already running`：先运行状态脚本；确需重建时先停止旧 Demo。
+- 找不到 Provider Key：确认根目录的 `API*.txt` 未被移动，且没有提交到 Git。
+- 网页可用但 App 登录失败：不要手动构建普通 mobile APK；重新运行完整启动脚本。
+- Aurora 无回复：先确认公网健康，再检查 Provider 网络；脚本默认禁止 Mock fallback，
+  因此不会把假回复伪装成真实成功。
+- APK 安装失败：卸载旧的 `sg.innercosmos.app.dev` 后重装；正式签名和商店发布不属于
+  本次课堂旁加载路径。
+
+## 已验证事实与诚实边界
+
+2026-07-24 已在 Windows 主机、Android API 36.1 模拟器和公网 Quick Tunnel 上证明：
+
+- APK 安装、冷启动、注册、Session 恢复与真实 Aurora 多气泡回复；
+- 公网新用户相互发现、好友请求/接受、私有群组邀请/接受；
+- Aurora 对话到记忆沉淀；
+- 私有共鸣体编译、发布、访客发现、访客对话与慢信发送；
+- 公网下载 APK 与模拟器安装 APK 的 SHA-256 完全一致；
+- Android 进程无 Crash/ANR。
+
+仍需在正式课堂前用至少一台真实 Android 手机做一次旁加载和蜂窝网络冒烟。iOS
+签名、应用商店、固定域名、云端部署和长期生产监管不是本轮 Demo 的完成条件。

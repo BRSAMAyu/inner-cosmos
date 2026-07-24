@@ -22,6 +22,36 @@ $redisPassword = [Guid]::NewGuid().ToString("N")
 $tempRoot = Join-Path ([IO.Path]::GetTempPath()) "inner-cosmos-prod-smoke-$runId"
 $resolvedTempBase = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
 $resolvedTempRoot = [IO.Path]::GetFullPath($tempRoot)
+$repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$migrationDirectory = Join-Path $repositoryRoot "src/main/resources/db/migration/postgresql"
+$schemaPath = Join-Path $repositoryRoot "src/main/resources/schema.sql"
+
+$migrationVersions = @(Get-ChildItem -LiteralPath $migrationDirectory -File -Filter "V*__*.sql" |
+    ForEach-Object {
+        if ($_.Name -notmatch '^V(?<version>[0-9]+)__.+\.sql$') {
+            throw "Production smoke supports integer Flyway versions; unsupported migration name: $($_.Name)"
+        }
+        [int]$Matches.version
+    })
+if ($migrationVersions.Count -eq 0) {
+    throw "No versioned PostgreSQL Flyway migrations found at $migrationDirectory"
+}
+$duplicateMigrationVersions = @($migrationVersions | Group-Object | Where-Object Count -gt 1)
+if ($duplicateMigrationVersions.Count -gt 0) {
+    throw "Duplicate Flyway version(s): $($duplicateMigrationVersions.Name -join ', ')"
+}
+$expectedFlywayVersion = ($migrationVersions | Measure-Object -Maximum).Maximum
+
+$schemaSource = Get-Content -LiteralPath $schemaPath -Raw -Encoding UTF8
+$expectedApplicationTables = @([regex]::Matches(
+        $schemaSource,
+        '(?im)^CREATE TABLE IF NOT EXISTS\s+(?<table>tb_[a-z0-9_]+)\s*\(') |
+    ForEach-Object { $_.Groups['table'].Value } |
+    Sort-Object -Unique)
+if ($expectedApplicationTables.Count -eq 0) {
+    throw "Canonical schema has no application-table inventory at $schemaPath"
+}
+$expectedApplicationTableCount = $expectedApplicationTables.Count
 
 if (-not $resolvedTempRoot.StartsWith($resolvedTempBase, [StringComparison]::OrdinalIgnoreCase)) {
     throw "Refusing to use a temporary path outside the system temp directory."
@@ -133,6 +163,8 @@ chmod 644 redis-server.key redis-server.crt ca.crt
         "-e", "SPRING_MAIN_WEB_APPLICATION_TYPE=none",
         "-e", "SPRING_MAIN_LAZY_INITIALIZATION=true",
         "-e", "SPRING_AUTOCONFIGURE_EXCLUDE=org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration,org.springframework.boot.actuate.autoconfigure.data.redis.RedisHealthContributorAutoConfiguration",
+        "-e", "MANAGEMENT_HEALTH_REDIS_ENABLED=false",
+        "-e", "MANAGEMENT_ENDPOINT_HEALTH_GROUP_READINESS_INCLUDE=readinessState,db,custom",
         "-e", "REDIS_SESSION_ENABLED=false",
         "-e", "REDIS_RATE_LIMIT_ENABLED=false",
         "-e", "REDIS_SCHEDULER_LOCK_ENABLED=false",
@@ -152,7 +184,7 @@ chmod 644 redis-server.key redis-server.crt ca.crt
     $outboxDedupKey = "production-smoke-$runId"
     & docker exec -e "PGPASSWORD=$databasePassword" $postgresName psql `
         -U $databaseUser -d $database -v ON_ERROR_STOP=1 -c `
-        "INSERT INTO tb_outbox_event(event_id,dedup_key,aggregate_type,aggregate_id,event_type,schema_version,payload,status,available_at) VALUES ('$outboxEventId','$outboxDedupKey','smoke','1','dialog.finished.v1',1,jsonb_build_object('userId',1,'sessionId',1),'PENDING',CURRENT_TIMESTAMP)" | Out-Null
+        "INSERT INTO tb_outbox_event(event_id,dedup_key,aggregate_type,aggregate_id,event_type,schema_version,payload,status,available_at) VALUES ('$outboxEventId','$outboxDedupKey','system','$outboxDedupKey','system.outbox-smoke-probe.v1',1,jsonb_build_object('probeId','$outboxDedupKey'),'PENDING',CURRENT_TIMESTAMP)" | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "Unable to seed the production outbox delivery probe." }
 
     Invoke-Docker -DockerArguments @(
@@ -165,9 +197,12 @@ chmod 644 redis-server.key redis-server.crt ca.crt
         "-e", "SPRING_FLYWAY_ENABLED=false",
         "-e", "INNER_COSMOS_RUNTIME_ROLE=worker",
         "-e", "JDBC_OUTBOX_ENABLED=true",
+        "-e", "INNER_COSMOS_EVENTS_OUTBOX_SMOKE_PROBE_ENABLED=true",
         "-e", "SPRING_MAIN_WEB_APPLICATION_TYPE=none",
         "-e", "SPRING_MAIN_LAZY_INITIALIZATION=true",
         "-e", "SPRING_AUTOCONFIGURE_EXCLUDE=org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration,org.springframework.boot.actuate.autoconfigure.data.redis.RedisHealthContributorAutoConfiguration",
+        "-e", "MANAGEMENT_HEALTH_REDIS_ENABLED=false",
+        "-e", "MANAGEMENT_ENDPOINT_HEALTH_GROUP_READINESS_INCLUDE=readinessState,db,custom",
         "-e", "REDIS_SESSION_ENABLED=false",
         "-e", "REDIS_RATE_LIMIT_ENABLED=false",
         "-e", "REDIS_SCHEDULER_LOCK_ENABLED=false",
@@ -308,11 +343,18 @@ chmod 644 redis-server.key redis-server.crt ca.crt
         -U $databaseUser -d $database -Atc "SELECT COUNT(*) FROM tb_user").Trim()
     $flywayVersion = (& docker exec -e "PGPASSWORD=$databasePassword" $postgresName psql `
         -U $databaseUser -d $database -Atc 'SELECT MAX(version) FROM flyway_schema_history WHERE success').Trim()
+    $failedMigrations = (& docker exec -e "PGPASSWORD=$databasePassword" $postgresName psql `
+        -U $databaseUser -d $database -Atc 'SELECT COUNT(*) FROM flyway_schema_history WHERE NOT success').Trim()
     $runtimeUser = (& docker inspect $appName --format '{{.Config.User}}').Trim()
 
-    if ([int]$tableCount -ne 63) { throw "Production Flyway schema did not create exactly 63 application tables." }
+    if ([int]$tableCount -ne $expectedApplicationTableCount) {
+        throw "Production Flyway schema created $tableCount application tables; canonical schema requires $expectedApplicationTableCount."
+    }
     if ([int]$seededUsers -ne 0) { throw "Production smoke unexpectedly seeded demo users." }
-    if ($flywayVersion -ne "3") { throw "Production Flyway schema version is not 3." }
+    if ([int]$failedMigrations -ne 0) { throw "Production Flyway history contains failed migrations." }
+    if ($flywayVersion -ne $expectedFlywayVersion.ToString()) {
+        throw "Production Flyway schema version is V$flywayVersion; repository migrations require V$expectedFlywayVersion."
+    }
     if ($runtimeUser -ne "appuser") { throw "Production image is not running as appuser." }
 
     [pscustomobject]@{
@@ -327,7 +369,9 @@ chmod 644 redis-server.key redis-server.crt ca.crt
         RedisRateLimitKeys = $rateLimitKeyCount
         RedisSchedulerLeaseKeys = $schedulerLeaseKeyCount
         FlywayVersion = $flywayVersion
+        FailedMigrations = [int]$failedMigrations
         SchemaTables = [int]$tableCount
+        CanonicalSchemaTables = $expectedApplicationTableCount
         DemoUsers = [int]$seededUsers
         RuntimeUser = $runtimeUser
         MigrationRole = "PASS"

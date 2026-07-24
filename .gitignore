@@ -54,3 +54,5 @@ web/pwa-preview.html
 web/.env.demo
 web/.env.demo.local
 scripts/demo/bin/
+.demo-runtime/
+src/main/resources/static/downloads/*.apk

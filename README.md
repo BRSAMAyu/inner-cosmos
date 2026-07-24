@@ -55,13 +55,20 @@ On macOS/Linux:
 
 Open [http://localhost:8080/app/aurora/](http://localhost:8080/app/aurora/) and register a local account. The default `dev` profile uses file-backed H2 and Mock AI, so it does not require credentials. To use disposable demo data explicitly, set `SEED_ENABLED=true` and run the `demo` profile; production always disables demo seeding.
 
-For a self-checking, disposable teacher-demo runtime, use:
+For the current classroom delivery path — this laptop as the server, a public HTTPS tunnel,
+a downloadable Android APK, real PostgreSQL/Redis and real AI providers — use:
 
 ```powershell
-.\scripts\run-teacher-demo.ps1 -Port 8080
+.\scripts\demo\run-public-demo.ps1
 ```
 
-It creates an isolated H2 database, waits for the application, verifies health, CSRF, demo login/session, and the React shell, then cleans up the database when the process stops.
+It builds an APK bound to the generated tunnel URL, starts the full local stack, and verifies the
+multi-user product trajectory (registration, friends, groups, Aurora, memory settlement, capsule
+publication/conversation, and a slow letter). Share the three printed URLs with judges. The
+authoritative operating checklist and shutdown procedure are in
+[`docs/demo/DEMO-RUNBOOK.md`](docs/demo/DEMO-RUNBOOK.md). The older
+`scripts/run-teacher-demo.ps1` remains a lightweight H2/Mock development smoke, not the classroom
+acceptance path.
 
 For frontend work:
 

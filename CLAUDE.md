@@ -32,6 +32,23 @@ autonomously toward the complete product (see "Autonomous continuation").
 
 ---
 
+## Current classroom Demo authority
+
+The current delivery priority is the **laptop-as-public-server Demo**, not an AWS deployment or an
+app-store release. On Windows, use:
+
+```powershell
+.\scripts\demo\run-public-demo.ps1
+```
+
+This one command creates a temporary public HTTPS tunnel, builds an Android APK bound to that
+origin, starts PostgreSQL/pgvector + Redis + real AI providers, and self-verifies the multi-user
+core trajectory. Read [`docs/demo/DEMO-RUNBOOK.md`](docs/demo/DEMO-RUNBOOK.md) before operating or
+changing this path. Do not replace it with the older H2/Mock teacher smoke, and do not claim that an
+APK built against an expired Quick Tunnel is usable.
+
+---
+
 ## Run it locally (no API keys needed)
 
 Prerequisites: **JDK 21** (a full JDK, not just a JRE — the Maven wrapper needs `JAVA_HOME`). Node.js
