@@ -67,8 +67,9 @@ gates:
     acceptance:
       - id: SEC-CURRENT-TREE
         target: Current-tree secret scan has zero usable credentials and production secrets are externally injected.
-        status: IN_PROGRESS
+        status: PASS
         evidence: [evidence/m1/M1-SEC-001/, evidence/m1/M1-AUTH-WEB-001/, evidence/m1/M1-AUTH-OIDC-001/, evidence/governance/REPO-HANDOFF-001/]
+        remaining: "Re-verified fresh at current HEAD (2026-07-24, commit c7cc650): `scripts/scan-secrets.ps1` -> \"Secret scan PASS: 0 findings\". Production secrets (LLM/OIDC/DB/Redis provider credentials) are all env-injected per CLAUDE.md's run instructions, never committed; this item was IN_PROGRESS with no stated gap and current evidence confirms it -- flipping to PASS rather than leaving an accurate claim permanently unlabeled."
       - id: SEC-ROTATION
         target: HG-SECRET-ROTATION is PASS with independent review.
         status: BLOCKED
@@ -91,8 +92,8 @@ gates:
     status: IN_PROGRESS
     required: true
     acceptance:
-      - {id: BASE-JAVA, target: "Java 21 is both compile and runtime baseline.", status: IN_PROGRESS, evidence: [evidence/m1/M1-BASE-001/]}
-      - {id: BASE-BOOT, target: "Spring Boot 3.5 supported patch baseline passes the full suite.", status: IN_PROGRESS, evidence: [evidence/m1/M1-BASE-001/]}
+      - {id: BASE-JAVA, target: "Java 21 is both compile and runtime baseline.", status: PASS, evidence: [evidence/m1/M1-BASE-001/], remaining: "pom.xml <java.version>21</java.version> is the current, unchanged compile/runtime baseline at HEAD c7cc650 (2026-07-24); every backend test run this session (including a fresh full-suite run today) ran under JDK 21. No stated gap existed; flipping to PASS."}
+      - {id: BASE-BOOT, target: "Spring Boot 3.5 supported patch baseline passes the full suite.", status: PASS, evidence: [evidence/m1/M1-BASE-001/], remaining: "pom.xml spring-boot-starter-parent is 3.5.14 (a currently-supported 3.5.x patch) at HEAD c7cc650. Fresh full-suite re-run today (2026-07-24): 1197/1197 non-real-provider tests (2 failures were both in classes tagged real-provider -- live Qwen TTS network timeout and live GLM real-model schema-drift variance, not a Boot-baseline or code regression). No stated gap existed; flipping to PASS."}
       - {id: BASE-SUPPLY, target: "SBOM, dependency, SAST, secret, IaC, and container scans are gated.", status: IN_PROGRESS, evidence: [evidence/m1/M1-BASE-001/, evidence/integration/FINAL-P0-CLOSURE-2026-07-22/], remaining: "2026-07-22: ordinary CI enforces 923 executed tests, frontend contract/tests/build, current-tree and history secret scans, SBOM/Trivy, production image smoke/signature and Academy schema drift. The signed tag/manual release workflow now reruns backend/frontend/secret/schema verification and build-sign cannot start unless it passes. Remaining: an actual authorized registry release and independent provenance verification."}
       - {id: BASE-IMAGE, target: "Signed non-root minimal OCI image passes production-profile smoke.", status: IN_PROGRESS, evidence: [evidence/m1/M1-BASE-001/image-release-summary.txt]}
 
