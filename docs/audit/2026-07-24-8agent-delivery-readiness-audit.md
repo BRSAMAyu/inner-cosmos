@@ -122,6 +122,38 @@ P2 = quality/polish gap · P3 = minor.
   state file is current (READMEs point at superseded docs 21/23 and superseded state files).
   (`r2-delivery-packaging`) — both READMEs now point at CLAUDE.md / doc 24 / closure-campaign-state.yml.
 
+### P2 — quality / polish (found post-audit, during a real-provider browser walkthrough)
+
+- [ ] **P2-19** The inner-voice "▶ 播放" (replay) button in the main Aurora chat (rendered by
+  `web/src/components/shared/InlineAudioPlayer.tsx`, driven by the `inner_voice` SSE event's
+  `audio` base64 payload) did not visibly change state (stayed `idle`, no `playing`/`blocked`
+  transition) across 4 different click methods (Browser-pane click at the exact button
+  coordinates twice, a raw DOM `.click()`, and a dispatched `MouseEvent`), with zero related
+  network activity and zero console errors either time. Isolated that this browser environment
+  can play an inline base64 `data:audio/wav` URI successfully on its own (`new Audio(...).play()`
+  resolved fine standalone), so it is not a blanket autoplay-policy block in this environment —
+  the issue looks specific to this component/click-handling path. **Not root-caused**: the text
+  side of the inner-voice feature (the "💭 内心" bubble content itself, sourced from the same SSE
+  event) rendered correctly with real DeepSeek-authored content, so the feature is not entirely
+  broken, and the core Aurora chat/memory/capsule/persona-chat loop (the primary golden path) was
+  independently verified working perfectly with real providers in the same session. Given the
+  time already spent, this is flagged as a reproducible-but-unconfirmed finding for a focused
+  follow-up (attach React DevTools or add temporary logging to `attemptPlay`/the mount effect in
+  `InlineAudioPlayer.tsx` to see whether `elementRef.current` is actually populated and whether
+  `element.play()` is genuinely being invoked) rather than guessed at further here.
+- [ ] **P2-20** A PWA "内宇宙现在可以离线打开了" (offline-ready) toast rendered directly on top of
+  the register form's submit button on first load, silently swallowing the first click (no
+  request fired, no visible error) until the toast was dismissed. Reproduced once, live, in the
+  exact fresh-guest register flow. Considered a fix (moving `.pwa-banner-stack` from
+  `bottom:18px` to `top:18px` in `web/src/styles.css`, since `.login-shell` centers the auth card
+  and a bottom-anchored toast can land on its submit button on shorter viewports) but reverted it
+  before committing: the main (post-login) app's `.app-shell-nav` sits near the same top-of-page
+  position, and moving the toast there risked trading a one-time login-screen collision for a
+  more persistent collision with primary navigation for every logged-in user -- not verified
+  either way given flaky screenshot tooling in this session, so left as a documented, unfixed
+  finding rather than ship an unverified layout change. A real fix should condition the toast's
+  position on whether the auth gate is showing, not change it globally.
+
 ### P2 — quality / polish
 
 - [x] **P2-1** `scripts/demo/run-demo-server.sh` hardcodes `LLM_PROVIDER=glm` in its status echo
