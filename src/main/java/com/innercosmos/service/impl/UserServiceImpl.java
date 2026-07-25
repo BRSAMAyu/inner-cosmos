@@ -145,9 +145,25 @@ public class UserServiceImpl implements UserService {
         user.email = request.email;
         user.role = Constants.ROLE_USER;
         user.status = Constants.STATUS_ACTIVE;
-        user.accountKind = "HUMAN";
+        user.accountKind = accountKindForRegistration(request.username);
         userMapper.insert(user);
         return user;
+    }
+
+    /**
+     * Persist provenance when an account is created, rather than trying to guess it every time a
+     * discovery list is read. These prefixes are reserved for repository-owned automated journeys
+     * and real-provider evaluations. Keeping them SYNTHETIC prevents repeated classroom verifier
+     * runs from filling the real-people surface with QA actors.
+     */
+    static String accountKindForRegistration(String username) {
+        if (username == null) return "HUMAN";
+        String normalized = username.toLowerCase(java.util.Locale.ROOT);
+        // demoproof A/B deliberately remain HUMAN for the few seconds in which the public verifier
+        // proves that two ordinary users can discover each other; verify-public-demo.ps1 deletes
+        // both accounts before it reports PASS. Older leaked demoproof rows are reconciled by V24.
+        return normalized.matches("(?:bench(?:deepseek|glm)|journey|final|guard|semantic|eval|strong)\\d+")
+                ? "SYNTHETIC" : "HUMAN";
     }
 
     @Override
@@ -182,6 +198,24 @@ public class UserServiceImpl implements UserService {
             throw new BusinessException(ErrorCode.UNAUTHORIZED, "尚未登录");
         }
         return user;
+    }
+
+    @Override
+    public User findPublicDemoPersona(String username) {
+        if (username == null || username.isBlank()) {
+            return null;
+        }
+        User user = userMapper.selectOne(new QueryWrapper<User>()
+                .eq("username", username)
+                .last("LIMIT 1"));
+        return isPublicDemoPersona(user) ? user : null;
+    }
+
+    static boolean isPublicDemoPersona(User user) {
+        return user != null
+                && Constants.STATUS_ACTIVE.equals(user.status)
+                && !Constants.ROLE_ADMIN.equals(user.role)
+                && ("DEMO".equals(user.accountKind) || "SHOWCASE".equals(user.accountKind));
     }
 
     @Override

@@ -49,7 +49,8 @@ class PostgresFlywayBaselineTest {
         // Gemini audit 1.8 (CONFIRMED/P1): V22 adds tb_slow_letter.reply_to_letter_id/version_no/
         // idempotency_key (owner-scoped draft PATCH + compose idempotency + atomic auto-REPLIED).
         // W1: V23 adds tb_user_profile.preferred_tts_voice_id/inner_voice_enabled/inner_voice_mode.
-        assertEquals(23, flyway.migrate().migrationsExecuted);
+        // Classroom Demo: V24 reconciles historical verifier/benchmark accounts to SYNTHETIC.
+        assertEquals(24, flyway.migrate().migrationsExecuted);
         assertEquals(0, flyway.migrate().migrationsExecuted);
 
         String source = readClasspath("schema.sql");
@@ -149,8 +150,9 @@ class PostgresFlywayBaselineTest {
                 .dataSource(jdbcUrl, POSTGRES.getUsername(), POSTGRES.getPassword())
                 .locations("classpath:db/migration/postgresql")
                 .load();
-        // No .target(): migrates from V19 all the way to the current latest (V20, V21, V22, V23).
-        assertEquals(4, v20.migrate().migrationsExecuted);
+        // No .target(): migrates from V19 all the way to the current latest
+        // (V20, V21, V22, V23 and the V24 provenance reconciliation).
+        assertEquals(5, v20.migrate().migrationsExecuted);
         try (Connection migrated = DriverManager.getConnection(
                 jdbcUrl, POSTGRES.getUsername(), POSTGRES.getPassword())) {
             assertEquals(2, scalar(migrated,

@@ -124,7 +124,9 @@ public final class ApiRateLimitFilter extends OncePerRequestFilter {
 
     private boolean isLoginAttempt(HttpServletRequest request, String path) {
         return "POST".equalsIgnoreCase(request.getMethod())
-                && ("/api/auth/login".equals(path) || "/api/v1/auth/login".equals(path));
+                && ("/api/auth/login".equals(path)
+                    || "/api/v1/auth/login".equals(path)
+                    || path.startsWith("/api/public/demo/enter/"));
     }
 
     private String requestPath(HttpServletRequest request) {

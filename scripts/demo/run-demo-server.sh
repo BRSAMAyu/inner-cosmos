@@ -68,9 +68,12 @@ export INNER_COSMOS_SECURITY_TRUSTED_PROXY_ENABLED=true       # honor X-Forwarde
                                                                # not one shared bucket for every judge hitting the tunnel from localhost
 export MANAGEMENT_HEALTH_REDIS_ENABLED=false                  # this demo path never starts Redis; without this the health
                                                                # endpoint falsely reports DOWN even though the app works fine
-# Never combine this demo path with SPRING_PROFILES_ACTIVE=demo/mysql or SEED_ENABLED=true: those
-# profiles default seed-enabled:true, which would put a hardcoded admin/admin123 account on the
-# public tunnel. This script intentionally never sets either.
+# Classroom experience data is explicit and public-demo-only. It creates three curated,
+# passwordless-entry showcase personas, while the well-known admin seed is disabled. The
+# controller also refuses to operate under the prod profile.
+export SEED_ENABLED=true
+export DEMO_PUBLIC_ENTRY_ENABLED=true
+export DEMO_SEED_ADMIN_ENABLED=false
 
 # JAVA_HOME for the Maven wrapper on Windows.
 if [ -z "${JAVA_HOME:-}" ] && [ -d "/c/Program Files/Java/jdk-21.0.10" ]; then

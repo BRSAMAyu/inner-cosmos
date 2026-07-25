@@ -394,16 +394,32 @@ public class MemoryServiceImpl implements MemoryService {
                                     detail.versionHistory.stream().map(operation -> operation.id).toList())
                             .orderByDesc("id"));
         } else detail.projectionReceipts = List.of();
-        detail.provenanceExplanation = card.sourceSessionId == null
-                ? "这条记忆由你直接创建或在整理过程中形成；所有后续变化均保留版本。"
-                : "这条记忆来自一次仅你可见的 Aurora 对话；详情不向共鸣体公开，除非你另行授权。";
+        String sourceTime = card.lastTouchedAt == null
+                ? (card.createdAt == null ? "" : card.createdAt.toLocalDate().toString())
+                : card.lastTouchedAt.toLocalDate().toString();
+        if (card.sourceSessionId != null) {
+            detail.provenanceExplanation = "来源：仅你可见的 Aurora 对话 #" + card.sourceSessionId
+                    + (sourceTime.isBlank() ? "" : " · " + sourceTime)
+                    + "。这段来源不会向共鸣体公开，除非你另行授权。";
+        } else if (card.provenanceRefs != null && !card.provenanceRefs.isBlank()) {
+            detail.provenanceExplanation = "来源：" + card.provenanceRefs
+                    + "。它不是模型凭空猜出的结论；你可以在这里纠正、降权或归档。";
+        } else {
+            detail.provenanceExplanation = "来源：由你直接创建或在整理过程中形成"
+                    + (sourceTime.isBlank() ? "" : " · " + sourceTime)
+                    + "。所有后续变化都会保留版本。";
+        }
         detail.gravityExplanation = "情感重力 " + String.format("%.2f", card.emotionalGravity)
-                + ",由情绪强度 " + card.intensityScore
-                + "、用户重要性 " + card.userImportance
-                + "、出现次数 " + card.recurrenceCount + " 综合计算.";
+                + "，由情绪强度 " + displayMetric(card.intensityScore)
+                + "、用户重要性 " + displayMetric(card.userImportance)
+                + "、出现次数 " + (card.recurrenceCount == null ? 0 : card.recurrenceCount) + " 综合计算。";
         detail.auroraObservation = card.summary;
         detail.canCreateCapsule = card.emotionalGravity != null && card.emotionalGravity > 1.1;
         return detail;
+    }
+
+    private String displayMetric(Double value) {
+        return value == null ? "0.0" : String.format("%.1f", value);
     }
 
     @Override

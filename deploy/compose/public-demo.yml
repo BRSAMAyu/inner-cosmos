@@ -43,6 +43,21 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       REDIS_SESSION_ENABLED: "true"
       REDIS_RATE_LIMIT_ENABLED: "true"
+      # Curated Demo identities are intentionally shared by several classroom visitors.
+      # Keep distributed protection in place, but size it for simultaneous exploration
+      # so one visitor cannot consume another visitor's Aurora or persona-switch quota.
+      RATE_LIMIT_USER_CAPACITY: "300"
+      RATE_LIMIT_USER_REFILL_PER_MINUTE: "300"
+      RATE_LIMIT_USER_ADVERTISED: "300"
+      RATE_LIMIT_ANON_CAPACITY: "120"
+      RATE_LIMIT_ANON_REFILL_PER_MINUTE: "120"
+      RATE_LIMIT_ANON_ADVERTISED: "120"
+      RATE_LIMIT_AURORA_CAPACITY: "60"
+      RATE_LIMIT_AURORA_REFILL_PER_MINUTE: "60"
+      RATE_LIMIT_AURORA_ADVERTISED: "60"
+      RATE_LIMIT_LOGIN_CAPACITY: "120"
+      RATE_LIMIT_LOGIN_REFILL_PER_MINUTE: "120"
+      RATE_LIMIT_LOGIN_ADVERTISED: "120"
       REDIS_SCHEDULER_LOCK_ENABLED: "true"
       REDIS_AURORA_STREAM_ENABLED: "true"
       REDIS_IDEMPOTENCY_ENABLED: "true"
@@ -66,9 +81,20 @@ services:
       COOKIE_SECURE: "true"
       COOKIE_SAME_SITE: none
       INNER_COSMOS_SECURITY_TRUSTED_PROXY_ENABLED: "true"
+      # These are three public, shared, equal-privilege classroom stories with no real user data.
+      # Session-bound CSRF rotation repeatedly stranded A -> B -> C comparisons during a hard
+      # reload. Keep auth/data ownership/rate limits intact, but remove that production-only
+      # interaction tax in this temporary public-demo compose. Prod still hard-requires CSRF via
+      # ProductionStartupGuard and never consumes this compose file.
+      INNER_COSMOS_SECURITY_CSRF_ENABLED: "false"
       SERVER_FORWARD_HEADERS_STRATEGY: framework
       MANAGEMENT_HEALTH_REDIS_ENABLED: "true"
-      SEED_ENABLED: "false"
+      # Classroom-only lived-in personas. Public passwordless entry is limited to the three
+      # non-admin SHOWCASE identities; the production profile still refuses this controller.
+      SEED_ENABLED: "true"
+      INNER_COSMOS_DEMO_SEED_ENABLED: "true"
+      DEMO_PUBLIC_ENTRY_ENABLED: "true"
+      DEMO_SEED_ADMIN_ENABLED: "false"
     ports:
       - "127.0.0.1:${DEMO_PORT:-8080}:8080"
     depends_on:

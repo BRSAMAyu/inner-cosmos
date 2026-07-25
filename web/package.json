@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:classroom": "tsc -b && vite build --mode classroom",
     "build:mobile": "tsc -b && vite build --mode mobile",
     "build:mobile:local": "tsc -b && vite build --mode mobile-local",
     "build:tauri": "tsc -b && vite build --mode tauri",

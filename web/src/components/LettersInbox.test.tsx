@@ -24,8 +24,21 @@ describe("LettersInbox", () => {
     expect(onReply).toHaveBeenCalledWith(letter);
     fireEvent.click(screen.getByRole("button", { name: "愿意认识对方" }));
     expect(onRequestConnection).toHaveBeenCalledWith(letter);
+    fireEvent.click(screen.getByText("边界与安全"));
     fireEvent.click(screen.getByRole("button", { name: "屏蔽后续来信" }));
     expect(onActOnLetter).toHaveBeenCalledWith(letter, "block");
+  });
+
+  it("offers a direct entry to compose a new slow letter", () => {
+    const onComposeNew = vi.fn();
+    render(<LettersInbox letterInbox={[]} replyDrafts={{}} onComposeNew={onComposeNew}
+      connectionRequests={{ incoming: [], outgoing: [] }} friends={[]}
+      isDraftBusy={() => false} isLetterActionBusy={() => false} isConnectionDecisionBusy={() => false} isConnectionLeaveBusy={() => false} isLetterConnectionBusy={() => false}
+      onReplyDraftChange={() => undefined} onReply={() => undefined} onActOnLetter={() => undefined}
+      onReportLetter={() => undefined} onRequestConnection={() => undefined}
+      onDecideConnection={() => undefined} onLeaveConnection={() => undefined} />);
+    fireEvent.click(screen.getByRole("button", { name: "写一封慢信" }));
+    expect(onComposeNew).toHaveBeenCalledOnce();
   });
 
   it("marks the reply button busy (disabled + aria-busy) for the letter being sent", () => {
@@ -171,6 +184,7 @@ describe("LettersInbox", () => {
     expect(screen.getByRole("heading", { name: /Only after it arrives/ })).toBeVisible();
     expect(screen.getByRole("tab", { name: "Received" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Send the reply slow letter" })).toBeVisible();
+    fireEvent.click(screen.getByText("Boundaries & safety"));
     expect(screen.getByRole("button", { name: "Report this letter" })).toBeVisible();
     expect(screen.getByText("Mira would like to know you after the letters")).toBeVisible();
     expect(screen.getByRole("button", { name: "I'd like to too" })).toBeVisible();

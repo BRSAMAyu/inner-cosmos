@@ -46,6 +46,7 @@ import com.innercosmos.streaming.InMemoryAuroraLiveEventStore;
 import com.innercosmos.streaming.InMemoryAuroraStreamStageStore;
 import com.innercosmos.util.PromptLeakageGuard;
 import com.innercosmos.vo.AuroraMemoryContextVO;
+import com.innercosmos.vo.AuroraForegroundVO;
 import com.innercosmos.vo.AuroraReplyVO;
 import com.innercosmos.vo.SafetyResult;
 import org.slf4j.Logger;
@@ -64,7 +65,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Service
@@ -199,6 +203,24 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         return produceReply(userId, request, safety, userMessage == null ? null : userMessage.id, turnId, true);
     }
 
+    @Override
+    public AuroraForegroundVO foregroundAcknowledgement(Long userId, ChatRequest request) {
+        AuroraForegroundVO vo = new AuroraForegroundVO();
+        SafetyResult safety = safetyService.check(
+                request == null ? null : request.message,
+                userId,
+                request == null ? null : request.sessionId);
+        if (Boolean.TRUE.equals(safety.blockModelCall)) {
+            vo.safetyBlocked = true;
+            return vo;
+        }
+        ForegroundAcknowledgement acknowledgement = fastForegroundAcknowledgement(userId, request);
+        vo.text = acknowledgement.text();
+        vo.source = acknowledgement.source();
+        vo.latencyMs = acknowledgement.latencyMs();
+        return vo;
+    }
+
     /**
      * Shared reply-production path used by both the POST (replyRich) and the SSE
      * (stream) entrypoints. The synchronous safety gate has ALREADY run by the time
@@ -316,6 +338,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         turnContext.put("preferredProvider", resolved.provider());
         turnContext.put("recentAuroraMessages", recentAuroraMessages(request.sessionId, 6));
         turnContext.put("providerPolicy", providerPolicy(resolved));
+        turnContext.put("foregroundAcknowledgementAlreadySent", request.foregroundAcknowledgementSent);
         if (choreographyService != null && request.sessionId != null) {
             String interruptionContext = choreographyService.latestInterruptionContext(userId, request.sessionId);
             if (interruptionContext != null && !interruptionContext.isBlank()) {
@@ -332,15 +355,17 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 ? null : aiTurnObservation.startProvider(resolved.provider(), mode);
         io.micrometer.observation.Observation.Scope providerScope = providerObservation == null
                 ? null : providerObservation.openScope();
-        String innerVoiceText = null;
+        AuroraDualKernelRuntime.InnerVoiceRequest innerVoiceRequest = null;
         try {
             StructuredAiResults.AuroraResult ai;
             if (dualKernelRuntime != null && dualKernelRuntime.shouldUseDualKernelForTurn(turnContext)) {
-                // Inner-voice composition only ever runs for the streaming path (only it can
-                // actually surface synthesized audio via the SSE inner_voice event -- see
-                // stream()), and only when the user hasn't disabled it. Best-effort inside
-                // generate() itself: composition failure never surfaces here as an exception.
-                boolean composeInnerVoice = !persistImmediately && innerVoiceEnabledFor(profile);
+                // Capture only the inputs needed for a post-turn inner-voice call. Do not spend
+                // the extra provider round trip unless this is a live stream with an available
+                // TTS provider; composition itself runs after turn.completed in stream().
+                boolean composeInnerVoice = !persistImmediately
+                        && innerVoiceEnabledFor(profile)
+                        && ttsClient != null
+                        && ttsClient.available();
                 var generation = dualKernelRuntime.generate(userId, mode, turnContext, resolved.client(),
                     () -> fallbackAuroraResult(request.message, mode, gravityMemories, memoryContext, allowMemory, stateSignal),
                     composeInnerVoice);
@@ -349,7 +374,11 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 runtimeMeta.put("relationshipMove", generation.relationshipMove());
                 runtimeMeta.put("criticRepaired", generation.repaired());
                 runtimeMeta.put("criticIssues", generation.criticIssues());
-                innerVoiceText = generation.innerVoiceText();
+                runtimeMeta.put("stageLatenciesMs", generation.stageLatenciesMs());
+                runtimeMeta.put("plannerFallbackUsed", generation.plannerFallbackUsed());
+                runtimeMeta.put("speakerFallbackUsed", generation.speakerFallbackUsed());
+                runtimeMeta.put("criticFallbackUsed", generation.criticFallbackUsed());
+                innerVoiceRequest = generation.innerVoiceRequest();
             } else {
                 ai = callWithRetry(userId, mode, turnContext, resolved, request, gravityMemories,
                     memoryContext, allowMemory, stateSignal);
@@ -357,7 +386,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             }
             vo = toReply(profile, ai, request, mode, memoryContext, gravityMemories, allowMemory);
             vo = sanitizeLlmOutput(vo, userId);
-            vo.innerVoiceText = innerVoiceText;
+            vo.innerVoiceRequest = innerVoiceRequest;
             if (Boolean.FALSE.equals(agentContext.multiMessageAllowed) && vo.messages.size() > 1) {
                 vo.messages = List.of(vo.messages.get(0));
                 vo.agentLoop = Map.of(
@@ -568,6 +597,8 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                     request.latitude = richContext.latitude;
                     request.longitude = richContext.longitude;
                     request.aiProviderPreference = richContext.aiProviderPreference;
+                    request.foregroundAcknowledgementText = richContext.foregroundAcknowledgementText;
+                    request.foregroundAcknowledgementSource = richContext.foregroundAcknowledgementSource;
                 }
                 DialogMessage userMessage = dialogService.saveUserMessage(userId, request);
                 turnId = beginChoreography(userId, sessionId, userMessage);
@@ -575,17 +606,57 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                     emitLive(emitter, clientConnected, userId, turnId, 0L, "turn.started",
                             "{\"turnId\":" + turnId + "}", false);
                 }
-                AuroraReplyVO reply = produceReply(userId, request, safety,
-                        userMessage == null ? null : userMessage.id, turnId, false);
+                // Progressive dual-kernel choreography:
+                // - the full planner -> speaker -> bounded critic path starts immediately in the
+                //   background and remains the authoritative reply;
+                // - a separate non-thinking foreground kernel produces one short acknowledgement
+                //   so the user is not left staring at a status label while depth is computed.
+                // The deep speaker is told that this acknowledgement already happened, preventing
+                // a second generic "I hear you" opening.
+                boolean foregroundAcknowledgementAlreadyVisible =
+                        richContext != null && richContext.foregroundAcknowledgementSent;
+                request.foregroundAcknowledgementSent = true;
+                if (foregroundAcknowledgementAlreadyVisible
+                        && request.foregroundAcknowledgementText != null
+                        && !request.foregroundAcknowledgementText.isBlank()) {
+                    dialogService.saveAuroraMessage(
+                            userId, sessionId, request.foregroundAcknowledgementText.strip());
+                }
+                final Long generationTurnId = turnId;
+                final Long generationUserMessageId = userMessage == null ? null : userMessage.id;
+                CompletableFuture<AuroraReplyVO> deepReply = CompletableFuture.supplyAsync(
+                        () -> produceReply(userId, request, safety,
+                                generationUserMessageId, generationTurnId, false),
+                        aiExecutor);
+
+                long eventSequence = 1L;
+                ForegroundAcknowledgement acknowledgement = foregroundAcknowledgementAlreadyVisible
+                        ? null : fastForegroundAcknowledgement(userId, request);
+                if (acknowledgement != null && !acknowledgement.text().isBlank()
+                        && !isTurnCancelled(userId, turnId)) {
+                    AuroraReplyVO acknowledgementReply = new AuroraReplyVO();
+                    acknowledgementReply.turnId = turnId;
+                    emitLive(emitter, clientConnected, userId, turnId, eventSequence++, "bubble.started",
+                            "{\"order\":0,\"kind\":\"foreground-acknowledgement\",\"source\":\""
+                                    + escape(acknowledgement.source()) + "\",\"latencyMs\":"
+                                    + acknowledgement.latencyMs() + "}", false);
+                    StreamProgress acknowledgementProgress = streamText(emitter, clientConnected,
+                            acknowledgement.text(), acknowledgementReply, eventSequence, userId);
+                    eventSequence = acknowledgementProgress.nextEventSequence();
+                    dialogService.saveAuroraMessage(userId, sessionId, acknowledgement.text());
+                    emitLive(emitter, clientConnected, userId, turnId, eventSequence++, "bubble.completed",
+                            "{\"order\":0,\"kind\":\"foreground-acknowledgement\"}", false);
+                }
+
+                AuroraReplyVO reply = deepReply.join();
 
                 if (Boolean.TRUE.equals(reply.cancelled)) {
-                    emitLive(emitter, clientConnected, userId, reply.turnId, 1L, "turn.interrupted",
+                    emitLive(emitter, clientConnected, userId, reply.turnId, eventSequence, "turn.interrupted",
                             "{\"reason\":\"USER_INTERRUPTED\"}", true);
                     completeQuietly(emitter);
                     return;
                 }
 
-                long eventSequence = 1L;
                 emitLive(emitter, clientConnected, userId, reply.turnId, eventSequence++, "turn.plan",
                         "{\"turnId\":" + numeric(reply.turnId)
                                 + ",\"planId\":" + numeric(reply.planId) + "}", false);
@@ -640,29 +711,25 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 emitLive(emitter, clientConnected, userId, reply.turnId, eventSequence++, "turn.completed",
                         "{\"message\":\"done\"}", true);
                 // W1 — Aurora's "inner voice" (心声): at most one inner_voice event per turn,
-                // strictly additive and NON-BLOCKING to turn completion. Composition already ran
-                // best-effort inside dualKernelRuntime.generate() (produceReply set
-                // reply.innerVoiceText to null on any failure/opt-out). By synthesizing + emitting
-                // AFTER meta/turn.completed (and before the final done/close), a SLOW-but-SUCCESSFUL
-                // synthesis -- bounded by tts.timeout-ms (default 8s) -- can only delay the spoken
-                // inner-voice audio itself, never the turn's closeout: the UI already marked the turn
-                // complete above. The frontend SSE reader reads until connection close (not until a
-                // terminal event), so it still receives this late inner_voice and appends it. The
-                // try/catch only omits the event on a TTS failure -- a failure can never fail the
-                // turn. With the default tts.enabled=false this whole block is skipped (no-op in
-                // dev/CI).
-                if (reply.innerVoiceText != null && !reply.innerVoiceText.isBlank()) {
+                // strictly additive and NON-BLOCKING to turn completion. The deferred model call
+                // and TTS both run AFTER meta/turn.completed (and before final done/close), so a
+                // slow-but-successful enrichment can only delay its own audio. The frontend SSE
+                // reader reads until connection close, so it still receives this late event.
+                if (clientConnected.get() && reply.innerVoiceRequest != null) {
                     try {
                         if (ttsClient != null && ttsClient.available()) {
-                            String voiceId = preferredTtsVoiceIdFor(loadProfile(userId));
-                            byte[] audio = ttsClient.synthesize(reply.innerVoiceText, voiceId);
-                            String audioDataUri = "data:audio/mpeg;base64,"
-                                    + java.util.Base64.getEncoder().encodeToString(audio);
-                            // M2 (code review): build the payload via ObjectMapper so a raw control
-                            // char in the LLM-composed text can never produce invalid JSON.
-                            String innerVoicePayload = buildInnerVoicePayload(reply.innerVoiceText, audioDataUri, voiceId);
-                            emitLive(emitter, clientConnected, userId, reply.turnId, eventSequence++,
-                                    "inner_voice", innerVoicePayload, false);
+                            String innerVoiceText = dualKernelRuntime.composeInnerVoice(reply.innerVoiceRequest);
+                            if (innerVoiceText != null && !innerVoiceText.isBlank()) {
+                                String voiceId = preferredTtsVoiceIdFor(loadProfile(userId));
+                                byte[] audio = ttsClient.synthesize(innerVoiceText, voiceId);
+                                String audioDataUri = "data:audio/mpeg;base64,"
+                                        + java.util.Base64.getEncoder().encodeToString(audio);
+                                // M2 (code review): build the payload via ObjectMapper so a raw control
+                                // char in the LLM-composed text can never produce invalid JSON.
+                                String innerVoicePayload = buildInnerVoicePayload(innerVoiceText, audioDataUri, voiceId);
+                                emitLive(emitter, clientConnected, userId, reply.turnId, eventSequence++,
+                                        "inner_voice", innerVoicePayload, false);
+                            }
                         }
                     } catch (Exception innerVoiceFailure) {
                         log.warn("Inner-voice synthesis failed for user {} turn {}, omitting inner_voice event: {}",
@@ -945,6 +1012,206 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         return vo;
     }
 
+    /**
+     * The latency-facing expression kernel. It is a real, non-thinking model call running in
+     * parallel with the authoritative planner → speaker → critic path. A strict 2.5-second
+     * contract and local fallback guarantee that first feedback cannot inherit the planner's
+     * long reasoning tail. It receives no memory and may not advise, question, diagnose or claim
+     * facts, so speed never expands the deep kernel's authority.
+     */
+    private ForegroundAcknowledgement fastForegroundAcknowledgement(Long userId, ChatRequest request) {
+        long start = System.nanoTime();
+        String message = request == null || request.message == null ? "" : request.message.strip();
+        String fallback = localForegroundAcknowledgement(message);
+        if (message.isBlank()) {
+            return new ForegroundAcknowledgement(fallback, "local-empty", elapsedMillis(start));
+        }
+        // Relationship ambiguity is policy-sensitive: a tiny expression model repeatedly turned
+        // "the cause is unknown" into praise, therapeutic effect, or a story about the other
+        // person's motives. Keep the immediate sentence factual and deterministic for this narrow
+        // class; the authoritative planner → speaker → critic path still runs in full afterwards.
+        if (isProtectedRelationshipAmbiguity(message)) {
+            return new ForegroundAcknowledgement(
+                    fallback, "local-relationship-boundary", elapsedMillis(start));
+        }
+        CompletableFuture<String> modelCall = CompletableFuture.supplyAsync(
+                () -> modelForegroundAcknowledgement(userId, request, message, fallback), aiExecutor);
+        try {
+            String candidate = modelCall.get(2_400, TimeUnit.MILLISECONDS);
+            String safe = safeForegroundAcknowledgement(candidate, fallback, message);
+            String source = safe.equals(fallback)
+                    ? (candidate == null || candidate.isBlank() ? "local-provider-fallback" : "local-quality-gate")
+                    : "model-fast";
+            return new ForegroundAcknowledgement(safe, source, elapsedMillis(start));
+        } catch (TimeoutException timeout) {
+            modelCall.cancel(true);
+            return new ForegroundAcknowledgement(fallback, "local-timeout", elapsedMillis(start));
+        } catch (Exception exception) {
+            modelCall.cancel(true);
+            log.debug("Fast foreground kernel fell back locally: {}", exception.getMessage());
+            return new ForegroundAcknowledgement(fallback, "local-error", elapsedMillis(start));
+        }
+    }
+
+    private String modelForegroundAcknowledgement(Long userId, ChatRequest request,
+                                                  String message, String fallback) {
+        ResolvedModel resolved = modelRouter.resolve(userId, request.sessionId);
+        Map<String, Object> context = new LinkedHashMap<>();
+        context.put("userMessage", message);
+        context.put("mode", normalizeMode(request.mode));
+        context.put("preferredProvider", resolved.provider());
+        StructuredAiResults.AuroraForegroundResult result = structuredAiService.call(
+                userId,
+                "AURORA_FOREGROUND_" + normalizeMode(request.mode),
+                """
+                你是 Aurora 的快速表达核。深层理解核正在并行工作；你只负责先真实地接住这一刻。
+                只输出严格 JSON：{"text":"一句自然中文"}。
+                text 为 18—52 个汉字，贴住用户原话里一个具体事实或张力，像朋友当下说的一句话。
+                 不提系统、模型、思考或“正在处理”；不追问、不建议、不诊断、不解释第三方动机，
+                 不承诺永远陪伴，不用“我听到了、这很正常、我陪着你、说明你很在乎”等套话，
+                 不评价用户的态度或选择，不把“愿意、能直接说、克制、没有下结论”包装成优点或疗效，
+                 不用“这本身就……、已经为……留出空间、给了彼此……”一类总结式漂亮话，
+                 不复述整段输入，也不虚构用户没说过的经历。用户明确不要建议时，只留下安静落点。
+                即使用户要求行动建议，快速核也只接住“任务同时挤来”的处境，不抢先给具体动作；
+                具体行动必须留给看过完整规划的深层表达核。
+                """,
+                context,
+                StructuredAiResults.AuroraForegroundResult.class,
+                () -> {
+                    StructuredAiResults.AuroraForegroundResult local =
+                            new StructuredAiResults.AuroraForegroundResult();
+                    local.text = fallback;
+                    return local;
+                },
+                resolved.client());
+        return result == null ? null : result.text;
+    }
+
+    private String localForegroundAcknowledgement(String message) {
+        if (message == null || message.isBlank()) {
+            return foregroundAcknowledgementFallback().segments.get(0);
+        }
+
+        boolean noAdvice = message.contains("先别") && (message.contains("方案") || message.contains("建议"))
+                || message.contains("不要给") && (message.contains("方案") || message.contains("建议"));
+        boolean actionRequested = message.matches(
+                "(?s).*(十分钟|先动哪|先做哪|拆出|只拆).*(一步|开始|任务).*");
+        if (actionRequested) {
+            return "几件任务同时挤在眼前，先不用把它们全部铺开。";
+        }
+        if (message.contains("展示") || message.contains("汇报") || message.contains("答辩")
+                || message.toLowerCase().contains("presentation")) {
+            return noAdvice
+                    ? "先不谈方案。明天要把项目交到别人面前，紧张先留在这里。"
+                    : "项目就要交到别人面前了，这一刻的紧张很具体。";
+        }
+        if (message.contains("关系") || message.contains("朋友") || message.contains("伴侣")
+                || message.contains("同事") || message.contains("家人")) {
+            return "今天的变化是你看见的，原因还不知道；先把这两件事分开。";
+        }
+        if (message.contains("累") || message.contains("撑不住") || message.contains("压力")
+                || message.contains("焦虑") || message.contains("紧张")) {
+            return noAdvice
+                    ? "先不拆步骤。眼前这件事对你很重，我们先停在这里。"
+                    : "眼前这份重量已经很具体了，先不用急着把它变成答案。";
+        }
+        if (noAdvice) {
+            return "先不谈方案。你刚才放下的这句话，我不急着把它推向下一步。";
+        }
+
+        String clause = firstConcreteClause(message);
+        if (!clause.isBlank()) {
+            return "你说的「" + clause + "」，我先不急着替它下结论。";
+        }
+        return foregroundAcknowledgementFallback().segments.get(0);
+    }
+
+    private String safeForegroundAcknowledgement(String candidate, String fallback, String userMessage) {
+        String text = candidate == null ? "" : candidate.strip();
+        String input = userMessage == null ? "" : userMessage;
+        int length = text.codePointCount(0, text.length());
+        boolean unsafeShape = length < 8 || length > 80
+                || text.contains("?") || text.contains("？")
+                || text.contains("你可以") || text.contains("不妨") || text.contains("建议")
+                || text.contains("我听到了") || text.contains("这很正常")
+                || text.contains("我陪着你") || text.contains("我在这里")
+                || text.contains("说明你") || text.contains("正在思考")
+                || text.contains("正在处理") || text.contains("模型")
+                || text.contains("自然的") || text.contains("正常的")
+                || text.contains("说出来了就好") || text.contains("说出来就对了")
+                || text.contains("说出来就好受") || text.contains("好受些")
+                || text.contains("等一等") || text.contains("或许会更清楚")
+                || text.contains("给了彼此") || text.contains("先打开")
+                || text.contains("只看第一处") || text.contains("写完")
+                || text.contains("就十分钟") || text.contains("很珍贵")
+                || text.contains("挺成熟") || text.contains("很成熟")
+                || text.contains("挺清醒") || text.contains("很清醒")
+                || text.contains("清醒的温柔") || text.contains("一种清醒")
+                || text.contains("没有立刻追问") || text.contains("已经轻了")
+                || text.contains("轻了一些")
+                 || text.contains("已经是在面对") || text.contains("本身就是")
+                 || text.contains("这本身") || text.contains("本身就")
+                 || text.contains("给自己留") || text.contains("留了个平静")
+                 || text.matches("(?s).*你(?:愿意|选择|能|能够|可以|没有|没).*?(?:就是|留出|留了|给了|给自己|意味着|说明|证明).*")
+                 || text.matches("(?s).*(?:留出|给了).{0,8}(?:空间|余地|可能).*")
+                 || text.contains("像") || text.contains("仿佛") || text.contains("好像")
+                || text.contains("毫无预兆") || text.contains("雨的气息")
+                || text.contains("打开") || text.contains("五分钟")
+                || text.contains("十分钟") || text.contains("不要求")
+                || text.contains("只要求")
+                || ((text.contains("胃里") || text.contains("胸口") || text.contains("呼吸")
+                    || text.contains("心跳") || text.contains("发抖") || text.contains("手心"))
+                    && !(input.contains("胃里") || input.contains("胸口") || input.contains("呼吸")
+                    || input.contains("心跳") || input.contains("发抖") || input.contains("手心")));
+        return unsafeShape ? fallback : text;
+    }
+
+    private boolean isProtectedRelationshipAmbiguity(String message) {
+        String input = message == null ? "" : message.replaceAll("\\s+", "");
+        boolean actor = input.contains("关系") || input.contains("朋友") || input.contains("同事")
+                || input.contains("父母") || input.contains("伴侣") || input.contains("他")
+                || input.contains("她");
+        boolean tension = input.contains("冷淡") || input.contains("很冷") || input.contains("变冷")
+                || input.contains("疏远") || input.contains("误解") || input.contains("争吵");
+        boolean protectsUnknown = input.contains("不想猜") || input.contains("不想先猜")
+                || input.contains("不想去猜") || input.contains("不愿意猜")
+                || input.contains("先不猜") || input.contains("不想下结论")
+                || input.contains("不知道是不是") || input.contains("还不确定")
+                || input.contains("不能确定") || input.contains("不想判断")
+                || input.contains("不想贴标签");
+        return actor && tension && protectsUnknown;
+    }
+
+    private record ForegroundAcknowledgement(String text, String source, long latencyMs) {}
+
+    private static long elapsedMillis(long startedAtNanos) {
+        return Math.max(0L, (System.nanoTime() - startedAtNanos) / 1_000_000L);
+    }
+
+    private String firstConcreteClause(String message) {
+        String normalized = message.replaceAll("\\s+", " ").strip();
+        String[] clauses = normalized.split("[。！？!?；;\\n]");
+        for (String raw : clauses) {
+            String clause = raw.strip();
+            int length = clause.codePointCount(0, clause.length());
+            if (length < 4) continue;
+            if (length > 24) clause = clause.substring(0, clause.offsetByCodePoints(0, 24)) + "…";
+            return clause;
+        }
+        return "";
+    }
+
+    private StructuredAiResults.AuroraResult foregroundAcknowledgementFallback() {
+        StructuredAiResults.AuroraResult fallback = new StructuredAiResults.AuroraResult();
+        fallback.segments = List.of("先不急着往下推。你刚才那句话，我认真放在这里。");
+        fallback.speakCount = 1;
+        fallback.continueReason = "foreground-ack-fallback";
+        fallback.memoryReferenced = false;
+        fallback.referencedMemoryIds = List.of();
+        fallback.riskFlags = List.of();
+        return fallback;
+    }
+
     private StructuredAiResults.AuroraResult callWithRetry(Long userId, String mode, Map<String, Object> turnContext,
                                                             ResolvedModel resolved, ChatRequest request,
                                                             List<String> gravityMemories,
@@ -1140,6 +1407,9 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             + "2. segments = Chinese chat bubbles, not article paragraphs. Each message should feel like a WeChat message.\n"
             + "3. referencedMemoryIds = number array only, e.g. [7, 12]. No strings, no #7 format.\n"
             + "4. No text outside the JSON.\n\n"
+            + "5. Never open with generic assistant phrases such as “我听到了”, “我理解你的感受”, or “听起来”. Anchor one concrete detail or contrast from the user's own situation.\n"
+            + "6. If foregroundAcknowledgementAlreadySent is true, do not acknowledge again. Continue from the concrete detail and add depth without repeating comfort.\n"
+            + "7. If the user explicitly asks for no advice, do not smuggle in a plan, exercise, feature, or follow-up question.\n\n"
             + "[Message Count & Shape — friend-style flow]\n"
             + "Max " + segmentCount + " segments. Count is determined by context, not fixed.\n"
             + "第一条必须先「接住情绪」：用一两句温柔地共情、确认你听见了TA此刻的感受，不要急着分析、不要立刻给建议或下判断。就像朋友先轻轻接住你，再慢慢聊。\n"
@@ -1373,6 +1643,12 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         sb.append(",\"featureSuggestion\":\"").append(escape(reply.featureSuggestion)).append("\"");
         sb.append(",\"suggestSettle\":").append(Boolean.TRUE.equals(reply.suggestSettle));
         sb.append(",\"memoryReferenced\":").append(Boolean.TRUE.equals(reply.memoryReferenced));
+        // This is user-visible provenance, not chain-of-thought: the client needs the exact,
+        // owner-scoped card ids in order to prove that long-term memory affected this turn and
+        // let the user inspect/correct the source. Previously the POST response carried the ids
+        // while the normal SSE path dropped them, making a real retrieval indistinguishable from
+        // a generic claim that Aurora "remembered".
+        sb.append(",\"referencedMemoryIds\":").append(jsonLongArray(reply.referencedMemoryIds));
         sb.append(",\"riskFlags\":").append(jsonStringArray(reply.riskFlags));
         // agentLoop block: same shape as the POST path returns.
         Map<String, Object> loop = reply.agentLoop;
@@ -1383,6 +1659,9 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         String loopRuntime = loop != null && loop.get("runtime") instanceof String r ? r : "single";
         String relationshipMove = loop != null && loop.get("relationshipMove") instanceof String rm ? rm : "";
         boolean criticRepaired = loop != null && Boolean.TRUE.equals(loop.get("criticRepaired"));
+        boolean plannerFallbackUsed = loop != null && Boolean.TRUE.equals(loop.get("plannerFallbackUsed"));
+        boolean speakerFallbackUsed = loop != null && Boolean.TRUE.equals(loop.get("speakerFallbackUsed"));
+        boolean criticFallbackUsed = loop != null && Boolean.TRUE.equals(loop.get("criticFallbackUsed"));
         @SuppressWarnings("unchecked")
         List<String> criticIssues = loop != null && loop.get("criticIssues") instanceof List<?> issues
                 ? issues.stream().filter(String.class::isInstance).map(String.class::cast).toList()
@@ -1394,6 +1673,9 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 .append(",\"runtime\":\"").append(escape(loopRuntime)).append("\"")
                 .append(",\"relationshipMove\":\"").append(escape(relationshipMove)).append("\"")
                 .append(",\"criticRepaired\":").append(criticRepaired)
+                .append(",\"plannerFallbackUsed\":").append(plannerFallbackUsed)
+                .append(",\"speakerFallbackUsed\":").append(speakerFallbackUsed)
+                .append(",\"criticFallbackUsed\":").append(criticFallbackUsed)
                 .append(",\"criticIssues\":").append(jsonStringArray(criticIssues)).append("}");
         // aiState block.
         if (reply.aiState != null) {
@@ -1431,6 +1713,14 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         }
         sb.append("]");
         return sb.toString();
+    }
+
+    private String jsonLongArray(List<Long> items) {
+        if (items == null || items.isEmpty()) return "[]";
+        return items.stream()
+                .filter(java.util.Objects::nonNull)
+                .map(String::valueOf)
+                .collect(java.util.stream.Collectors.joining(",", "[", "]"));
     }
 
     private String jsonObject(Map<String, Object> map) {

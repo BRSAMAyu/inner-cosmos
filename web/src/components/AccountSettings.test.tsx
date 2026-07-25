@@ -250,14 +250,14 @@ describe("AccountSettings -- W2 voice preferences", () => {
   it("does not render the voice section before tts preferences have loaded", () => {
     render(<AccountSettings busy={null} message={null} onChangePassword={() => Promise.resolve(null)}
       onExportData={() => undefined} onDeleteAccount={() => Promise.resolve(null)} />);
-    expect(screen.queryByText("Aurora 的声音")).not.toBeInTheDocument();
+    expect(screen.queryByText("Aurora 的心声")).not.toBeInTheDocument();
   });
 
   it("seeds the voice picker and delivery-mode radios from the loaded preferences", () => {
     renderVoiceSettings();
-    expect(screen.getByLabelText("开启内心独白")).toBeChecked();
-    expect((screen.getByLabelText("自动播放 - 心声出现时自动轻声念出") as HTMLInputElement).checked).toBe(true);
-    expect((screen.getByLabelText("点按播放 - 轻触后才展开并播放") as HTMLInputElement).checked).toBe(false);
+    expect(screen.getByLabelText("允许心声浮现")).toBeChecked();
+    expect((screen.getByLabelText("自然浮现 - 出现时直接展示，声音仍由你点按") as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText("含蓄浮现 - 轻触后才展开，声音仍由你点按") as HTMLInputElement).checked).toBe(false);
     expect((screen.getByLabelText("温和 A") as HTMLInputElement).checked).toBe(true);
     expect((screen.getByLabelText("沉静 B") as HTMLInputElement).checked).toBe(false);
   });
@@ -265,7 +265,7 @@ describe("AccountSettings -- W2 voice preferences", () => {
   // (a) toggling delivery mode calls PATCH with the right body.
   it("calls PATCH with the right body when the delivery mode is toggled", () => {
     const { onUpdateTtsPreferences } = renderVoiceSettings();
-    fireEvent.click(screen.getByLabelText("点按播放 - 轻触后才展开并播放"));
+    fireEvent.click(screen.getByLabelText("含蓄浮现 - 轻触后才展开，声音仍由你点按"));
     expect(onUpdateTtsPreferences).toHaveBeenCalledExactlyOnceWith({ innerVoiceMode: "ON_DEMAND" });
   });
 
@@ -277,7 +277,7 @@ describe("AccountSettings -- W2 voice preferences", () => {
 
   it("calls PATCH with the right body when the overall mute switch is toggled", () => {
     const { onUpdateTtsPreferences } = renderVoiceSettings();
-    fireEvent.click(screen.getByLabelText("开启内心独白"));
+    fireEvent.click(screen.getByLabelText("允许心声浮现"));
     expect(onUpdateTtsPreferences).toHaveBeenCalledExactlyOnceWith({ innerVoiceEnabled: false });
   });
 
@@ -286,8 +286,8 @@ describe("AccountSettings -- W2 voice preferences", () => {
   it("preserves the previous delivery-mode selection and shows an inline error when the PATCH fails", async () => {
     const pending = deferred<string | null>();
     renderVoiceSettings({ onUpdateTtsPreferences: vi.fn().mockReturnValue(pending.promise) });
-    const ambient = screen.getByLabelText("自动播放 - 心声出现时自动轻声念出") as HTMLInputElement;
-    const onDemand = screen.getByLabelText("点按播放 - 轻触后才展开并播放") as HTMLInputElement;
+    const ambient = screen.getByLabelText("自然浮现 - 出现时直接展示，声音仍由你点按") as HTMLInputElement;
+    const onDemand = screen.getByLabelText("含蓄浮现 - 轻触后才展开，声音仍由你点按") as HTMLInputElement;
     fireEvent.click(onDemand);
 
     await act(async () => { pending.resolve("网络错误，暂时无法保存"); await pending.promise; });
@@ -302,7 +302,7 @@ describe("AccountSettings -- W2 voice preferences", () => {
   it("keeps a successful selection applied without any error banner", async () => {
     const onUpdateTtsPreferences = vi.fn().mockResolvedValue(null);
     renderVoiceSettings({ onUpdateTtsPreferences });
-    const onDemand = screen.getByLabelText("点按播放 - 轻触后才展开并播放") as HTMLInputElement;
+    const onDemand = screen.getByLabelText("含蓄浮现 - 轻触后才展开，声音仍由你点按") as HTMLInputElement;
     fireEvent.click(onDemand);
     await waitFor(() => expect(onUpdateTtsPreferences).toHaveBeenCalledOnce());
     expect(onDemand.checked).toBe(true);

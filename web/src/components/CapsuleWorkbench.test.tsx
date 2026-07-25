@@ -158,8 +158,9 @@ describe("CapsuleWorkbench", () => {
       onRecompile={() => undefined} onSandboxQuestion={() => undefined} onRunSandbox={() => undefined}
       onRateSandbox={() => undefined} onPublish={() => undefined} onPause={() => undefined} onArchive={() => undefined}
       boundary={boundary} boundaryBusy={false} onSaveBoundary={() => undefined} />);
-    expect(screen.getByRole("heading", { name: "Confirm it's like you before others meet it" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "The facets that can meet others for you" })).toBeVisible();
     expect(screen.getByText("1 capsule")).toBeVisible();
+    fireEvent.click(screen.getByText("Edit, test or create a capsule"));
     expect(screen.getByRole("button", { name: "Generate a new version from the current selection" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Save boundary settings" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Withdraw this capsule" })).toBeVisible();

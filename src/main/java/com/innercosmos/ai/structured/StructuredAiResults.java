@@ -32,12 +32,21 @@ public final class StructuredAiResults {
         public List<Long> relevantMemoryIds = new ArrayList<>();
         public String uncertainty;
         public Boolean needsCritic;
+        /** True only when the deep kernel found a genuinely new unsaid relational layer. */
+        public Boolean innerVoiceWorthy;
+        /** A bounded seed for the later side-channel composer; never exposed directly. */
+        public String innerVoiceSeed;
     }
 
     public static class AuroraCriticResult {
         public Boolean pass;
         public List<String> issues = new ArrayList<>();
         public AuroraResult repaired;
+    }
+
+    /** Fast, non-thinking expression-core output shown while the deep dual kernel is still working. */
+    public static class AuroraForegroundResult {
+        public String text;
     }
 
     /**

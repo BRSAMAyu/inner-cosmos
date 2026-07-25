@@ -359,7 +359,10 @@ public class CapsuleServiceImpl implements CapsuleService {
     private static final double PORTRAIT_INCREMENT = 0.07;
     private static final double PORTRAIT_CAP = 0.20;
     private static final double ENERGY_WEIGHT = 0.18;
-    private static final double SEED_BOOST = 0.12;
+    // Resonance is ultimately a path toward a real person. Official seed capsules stay available
+    // as safe practice spaces, but must not win a tie against an equally relevant user-authorized
+    // capsule that can continue into a slow letter and mutual connection.
+    private static final double SEED_BOOST = 0.0;
     private static final double USER_BOOST = 0.06;
     // A3-capsule-matching: real embedding/vector-similarity signal, ensembled with the lexical
     // theme-overlap signal above rather than replacing it (multi-strategy: lexical always
@@ -490,9 +493,9 @@ public class CapsuleServiceImpl implements CapsuleService {
                     paraphraseFamilies.size() * PARAPHRASE_SIGNAL_UNIT);
 
             double energyScore = (capsule.echoEnergy == null ? 0.5 : capsule.echoEnergy) * ENERGY_WEIGHT;
-            double seedBoost = "SEED_CAPSULE".equals(capsule.capsuleType) ? SEED_BOOST : USER_BOOST;
+            double relationshipPathBoost = "SEED_CAPSULE".equals(capsule.capsuleType) ? SEED_BOOST : USER_BOOST;
             // FIX-A: relevance is ONLY the genuinely user-specific signal (themeOverlap +
-            // portraitSignal + semanticSignal). seedBoost/energyScore are NOT relevance — they
+            // portraitSignal + semanticSignal). relationshipPathBoost/energyScore are NOT relevance — they
             // break ties and shape ordering, but must never make a zero-overlap capsule count as a
             // match on their own.
             shared.sort(Comparator
@@ -510,7 +513,7 @@ public class CapsuleServiceImpl implements CapsuleService {
                     themeOverlap + portraitSignal + semanticSignal + paraphraseSignal,
                     mirrorReasons);
             boolean resonant = signal.relevance() > 0.0;
-            double score = Math.min(0.99, signal.relevance() + energyScore + seedBoost);
+            double score = Math.min(0.99, signal.relevance() + energyScore + relationshipPathBoost);
 
             // matchTier: G6.MATCH-MULTI graded neutral/partial-overlap bucket. FULL when every one
             // of the viewer's currently active theme families (userThemeProfile) is represented by

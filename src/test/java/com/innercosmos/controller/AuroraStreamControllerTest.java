@@ -145,10 +145,16 @@ class AuroraStreamControllerTest {
         // The agentLoop block (perception panel source) must be present on the stream path now.
         assertTrue(body.contains("\"agentLoop\""),
                 "meta must carry agentLoop for the perception panel on stream; got:\n" + body);
+        assertTrue(body.contains("\"referencedMemoryIds\""),
+                "meta must carry exact owner-scoped memory ids so the client can show provenance; got:\n" + body);
         assertTrue(body.contains("\"runtime\":\"dual-kernel.v1\""),
                 "meta must expose the observable dual-kernel runtime without internal reasoning; got:\n" + body);
         assertTrue(body.contains("\"criticRepaired\""),
                 "meta must expose the safe critic outcome field; got:\n" + body);
+        assertTrue(body.contains("\"plannerFallbackUsed\""),
+                "meta must reveal whether the planning kernel used a deterministic fallback; got:\n" + body);
+        assertTrue(body.contains("\"speakerFallbackUsed\""),
+                "meta must reveal whether the speaking kernel used a deterministic fallback; got:\n" + body);
     }
 
     @Test

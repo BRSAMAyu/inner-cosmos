@@ -18,7 +18,7 @@ describe("PlazaDirectory", () => {
     render(<PlazaDirectory capsules={[c]} activeCapsuleId={null} busy={false} onOpenCapsule={onOpenCapsule} />);
     expect(screen.getByText("雨后的人")).toBeVisible();
     expect(screen.getByText("自我观察", { selector: ".plaza-card-tags span" })).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "开始对话" }));
+    fireEvent.click(screen.getByRole("button", { name: "和这个侧影聊聊" }));
     expect(onOpenCapsule).toHaveBeenCalledExactlyOnceWith(c);
   });
 
@@ -38,6 +38,28 @@ describe("PlazaDirectory", () => {
     fireEvent.click(screen.getByRole("button", { name: "工作" }));
     expect(screen.queryByText("A")).not.toBeInTheDocument();
     expect(screen.getByText("B")).toBeVisible();
+  });
+
+  it("puts real-person paths before official practice facets and keeps the plaza compact", () => {
+    const capsules = [
+      ...Array.from({ length: 6 }, (_, index) => capsule({
+        id: index + 1,
+        pseudonym: `官方 ${index + 1}`,
+        capsuleType: "SEED_CAPSULE",
+        echoEnergy: 99 - index
+      })),
+      capsule({ id: 20, pseudonym: "真实侧影", capsuleType: "USER_CAPSULE", echoEnergy: 1 })
+    ];
+    render(<PlazaDirectory capsules={capsules} activeCapsuleId={null} busy={false} onOpenCapsule={() => undefined} />);
+
+    const cards = screen.getAllByRole("listitem");
+    expect(cards).toHaveLength(6);
+    expect(cards[0]).toHaveTextContent("真实侧影");
+    expect(screen.getByText("可以写信给本人")).toBeVisible();
+    expect(screen.queryByText("官方 6")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "继续浏览另外 1 个侧影" }));
+    expect(screen.getAllByRole("listitem")).toHaveLength(7);
+    expect(screen.getByText("官方 6")).toBeVisible();
   });
 
   it("keeps large theme vocabularies progressively disclosed on small screens", () => {
@@ -61,9 +83,9 @@ describe("PlazaDirectory", () => {
 
   it("renders headings, sort controls and cards in English when locale is en-SG", () => {
     render(<PlazaDirectory locale="en-SG" capsules={[capsule()]} activeCapsuleId={null} busy={false} onOpenCapsule={() => undefined} />);
-    expect(screen.getByRole("heading", { name: /Walk into the plaza yourself/ })).toBeVisible();
+    expect(screen.getByRole("heading", { name: /Meet a facet first/ })).toBeVisible();
     expect(screen.getByText("1 public capsule")).toBeVisible();
     expect(screen.getByRole("button", { name: "Echo energy" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Start a conversation" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Talk to this facet" })).toBeVisible();
   });
 });

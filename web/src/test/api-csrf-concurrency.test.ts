@@ -69,4 +69,61 @@ describe("CSRF recovery under concurrent Aurora sends", () => {
     expect(rejectedStages).toBe(2);
     expect(acceptedStages).toBe(2);
   });
+
+  it("materializes a post-switch token before a Demo persona reload begins", async () => {
+    vi.resetModules();
+    const calls: string[] = [];
+    let csrfLoads = 0;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const url = String(input);
+      if (url.endsWith("/api/v1/auth/csrf")) {
+        csrfLoads += 1;
+        calls.push(`csrf-${csrfLoads}`);
+        return envelope(200, {
+          token: `csrf-${csrfLoads}`,
+          headerName: "X-CSRF-TOKEN",
+          parameterName: "_csrf"
+        });
+      }
+      if (url.endsWith("/api/public/demo/enter/xia-yu")) {
+        calls.push(`enter:${new Headers(init?.headers).get("X-CSRF-TOKEN")}`);
+        return envelope(200, { id: 3, username: "cloud", nickname: "夏榆", role: "USER" });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { api } = await import("../api");
+    await expect(api.enterDemoPersona("xia-yu")).resolves.toMatchObject({ username: "cloud" });
+
+    expect(calls).toEqual(["csrf-1", "enter:csrf-1", "csrf-2"]);
+    expect(csrfLoads).toBe(2);
+  });
+
+  it("keeps unsafe Demo requests usable when the classroom profile disables CSRF", async () => {
+    vi.resetModules();
+    const calls: string[] = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const url = String(input);
+      if (url.endsWith("/api/v1/auth/csrf")) {
+        calls.push("csrf-disabled");
+        return envelope(200, {});
+      }
+      if (url.endsWith("/api/public/demo/enter/lin-chuan")) {
+        calls.push(`enter:${new Headers(init?.headers).get("X-CSRF-TOKEN")}`);
+        return envelope(200, { id: 2, username: "river", nickname: "林川", role: "USER" });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { api } = await import("../api");
+    await expect(api.enterDemoPersona("lin-chuan")).resolves.toMatchObject({ username: "river" });
+
+    expect(calls).toEqual([
+      "csrf-disabled",
+      "enter:csrf-disabled",
+      "csrf-disabled"
+    ]);
+  });
 });

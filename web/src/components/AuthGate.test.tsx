@@ -4,7 +4,11 @@ import { AuthGate } from "./AuthGate";
 import { api } from "../api";
 
 vi.mock("../api", () => ({
-  api: { login: vi.fn(), register: vi.fn() }
+  api: {
+    login: vi.fn(), register: vi.fn(),
+    demoPersonas: vi.fn().mockResolvedValue([]),
+    enterDemoPersona: vi.fn()
+  }
 }));
 vi.mock("../mobile-auth", () => ({
   mobileOidc: { beginLogin: vi.fn() }

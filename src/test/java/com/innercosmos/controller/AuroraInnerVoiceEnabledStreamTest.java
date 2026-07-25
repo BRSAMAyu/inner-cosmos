@@ -69,6 +69,12 @@ class AuroraInnerVoiceEnabledStreamTest {
         assertTrue(body.contains("\"voiceId\":\"warm_gentle_female\""),
                 "inner_voice payload must carry the resolved (default) voiceId; got:\n" + body);
         assertTrue(body.contains("event:turn.completed"), "turn must still complete normally; got:\n" + body);
+        int acknowledgementAt = body.indexOf("\"kind\":\"foreground-acknowledgement\"");
+        int deepPlanAt = body.indexOf("event:turn.plan");
+        assertTrue(acknowledgementAt >= 0 && deepPlanAt >= 0 && acknowledgementAt < deepPlanAt,
+                "the fast non-thinking expression kernel must surface before the deep dual-kernel plan; got:\n" + body);
+        assertTrue(body.contains("\"runtime\":\"dual-kernel.v1\""),
+                "progressive acknowledgement must not replace or bypass the authoritative dual kernel; got:\n" + body);
         // Voice-polish fix: inner_voice must arrive AFTER turn.completed (not before), so a
         // slow-but-successful TTS synthesis never delays the turn's formal closeout. The frontend
         // SSE reader reads until connection close (not until a terminal event), so it still

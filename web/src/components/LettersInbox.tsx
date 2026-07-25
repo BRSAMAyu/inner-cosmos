@@ -21,6 +21,7 @@ const COPY: Record<Locale, {
   threadsIntro: string; threadsEmpty: string; threadItem: (id: number) => string; threadItemAria: (label: string, statusText: string) => string;
   threadPickPrompt: string; threadLoading: string;
   threadLettersEmpty: string; threadLettersError: string;
+  refresh: string; refreshBusy: string; autoRefreshNote: string; composeNew: string; safetyActions: string;
   consentAria: string; awaitingYou: string; noIncoming: string; wantsToKnow: (name: string) => string; accept: string; acceptBusy: string; declineConn: string; declineConnBusy: string;
   awaitingThem: string; noOutgoing: string; notYetAgreed: string; bothAgreed: string; noFriends: string; leave: string; leaveBusy: string;
 }> = {
@@ -42,6 +43,8 @@ const COPY: Record<Locale, {
     threadItem: id => `往来 #${id}`, threadItemAria: (label, statusText) => `${label} · ${statusText}`,
     threadPickPrompt: "选一段往来，看你们之间的慢信。", threadLoading: "正在读取这段往来…",
     threadLettersEmpty: "这段往来里还没有信件。", threadLettersError: "暂时读不到这段往来，请稍后再试。",
+    refresh: "刷新慢信", refreshBusy: "正在刷新", autoRefreshNote: "停留在这里时会自动同步抵达与回信。",
+    composeNew: "写一封慢信", safetyActions: "边界与安全",
     consentAria: "双向连接同意", awaitingYou: "等待你决定", noIncoming: "没有新的连接邀请", wantsToKnow: name => `${name} 想在慢信之后认识你`, accept: "我也愿意", acceptBusy: "正在同意", declineConn: "暂不连接", declineConnBusy: "正在婉拒",
     awaitingThem: "等待对方决定", noOutgoing: "没有等待中的邀请", notYetAgreed: "尚未同意，不会提前开放真人连接", bothAgreed: "双方已同意", noFriends: "还没有建立真人连接", leave: "退出连接", leaveBusy: "正在退出"
   },
@@ -63,6 +66,8 @@ const COPY: Record<Locale, {
     threadItem: id => `Thread #${id}`, threadItemAria: (label, statusText) => `${label} · ${statusText}`,
     threadPickPrompt: "Pick a thread to see the letters between you.", threadLoading: "Loading this thread…",
     threadLettersEmpty: "No letters in this thread yet.", threadLettersError: "Couldn't load this thread right now -- try again shortly.",
+    refresh: "Refresh letters", refreshBusy: "Refreshing", autoRefreshNote: "Arrivals and replies sync automatically while you stay here.",
+    composeNew: "Write a slow letter", safetyActions: "Boundaries & safety",
     consentAria: "Mutual connection consent", awaitingYou: "Awaiting your decision", noIncoming: "No new connection invitations", wantsToKnow: name => `${name} would like to know you after the letters`, accept: "I'd like to too", acceptBusy: "Accepting", declineConn: "Not yet", declineConnBusy: "Declining",
     awaitingThem: "Awaiting their decision", noOutgoing: "No pending invitations", notYetAgreed: "Not yet agreed — a real connection won't open early", bothAgreed: "Both agreed", noFriends: "No real connections yet", leave: "Leave connection", leaveBusy: "Leaving"
   }
@@ -74,7 +79,7 @@ export function LettersInbox({ letterInbox, letterOutbox = [], threads = [], thr
   onReplyDraftChange, onReply, onActOnLetter, onReportLetter, onRequestConnection, onDecideConnection, onLeaveConnection,
   onSendDraft, onOpenThread, locale = "zh-CN",
   letterVoiceLetterId = null, letterVoiceAudio = null, letterVoiceError = null,
-  isLetterVoiceBusy = () => false, onPlayLetterVoice }: {
+  isLetterVoiceBusy = () => false, onPlayLetterVoice, refreshBusy = false, onRefresh, onComposeNew }: {
   letterInbox: SlowLetter[]; letterOutbox?: SlowLetter[]; threads?: LetterThread[]; threadLetters?: SlowLetter[];
   threadLettersStatus?: "idle" | "loading" | "success" | "error";
   selectedThreadId?: number | null; replyBusyId?: number | null;
@@ -95,6 +100,7 @@ export function LettersInbox({ letterInbox, letterOutbox = [], threads = [], thr
   // useConnectionsAndLetters.playLetterVoice and bound to one active clip at a time.
   letterVoiceLetterId?: number | null; letterVoiceAudio?: string | null; letterVoiceError?: string | null;
   isLetterVoiceBusy?: (letterId: number) => boolean; onPlayLetterVoice?: (letter: SlowLetter) => void;
+  refreshBusy?: boolean; onRefresh?: () => void; onComposeNew?: () => void;
 }) {
   const t = COPY[locale];
   const [tab, setTab] = useState<"inbox" | "outbox" | "drafts" | "threads">("inbox");
@@ -104,7 +110,12 @@ export function LettersInbox({ letterInbox, letterOutbox = [], threads = [], thr
   const status = (s: string) => t.outboxStatus[s] ?? s;
   return <section className="letter-inbox" aria-label={t.aria}>
     <div className="resonance-heading"><div><span className="eyebrow">LETTERS, ARRIVED</span><h2>{t.heading}</h2></div>
-      <span>{counts[tab]}</span></div>
+      <div className="letter-sync"><span>{counts[tab]}</span>
+        {onComposeNew && <button type="button" className="letter-compose-entry" onClick={onComposeNew}>{t.composeNew}</button>}
+        {onRefresh && <AsyncButton className="quiet" busy={refreshBusy} busyText={t.refreshBusy}
+          onClick={onRefresh}>{t.refresh}</AsyncButton>}
+      </div></div>
+    <small className="letter-sync-note">{t.autoRefreshNote}</small>
     <div className="letter-tabs" role="tablist" aria-label={t.tabsAria}>
       <button type="button" role="tab" aria-selected={tab === "inbox"} className={tab === "inbox" ? "active" : ""} onClick={() => setTab("inbox")}>{t.tabInbox}</button>
       <button type="button" role="tab" aria-selected={tab === "outbox"} className={tab === "outbox" ? "active" : ""} onClick={() => setTab("outbox")}>{t.tabOutbox}</button>
@@ -115,7 +126,7 @@ export function LettersInbox({ letterInbox, letterOutbox = [], threads = [], thr
     {tab === "inbox" ? <>
       <p className="resonance-intro">{t.inboxIntro}</p>
       {letterInbox.length === 0 ? <div className="network-empty">{t.inboxEmpty}</div> : <div className="inbox-list">
-        {letterInbox.map(letter => <article key={letter.id}><header><strong>{letter.title}</strong><span>{letter.status}</span></header>
+        {letterInbox.map(letter => <article key={letter.id}><header><strong>{letter.title}</strong><span>{status(letter.status)}</span></header>
           <p className="ugc-text">{letter.letterBody}</p>
           {onPlayLetterVoice && <div className="letter-voice">
             {/* W1 slow-letter voice reuse: tap-to-play the delivered body read aloud. Every inbox
@@ -131,13 +142,19 @@ export function LettersInbox({ letterInbox, letterOutbox = [], threads = [], thr
           {repliable.has(letter.status) && <div className="letter-reply"><textarea aria-label={t.replyAria(letter.title)}
             value={replyDrafts[letter.id] ?? ""} onChange={event => onReplyDraftChange(letter.id, event.target.value)}
             placeholder={t.replyPlaceholder} /><AsyncButton busy={replyBusyId === letter.id} busyText={t.replyBusy} disabled={!replyDrafts[letter.id]?.trim()} onClick={() => onReply(letter)}>{t.replySend}</AsyncButton></div>}
-          <div>
+          <div className="letter-primary-actions">
             {letter.status === "DELIVERED" && <AsyncButton busy={isLetterActionBusy(letter.id)} busyText={t.markReadBusy} onClick={() => onActOnLetter(letter, "read")}>{t.markRead}</AsyncButton>}
             {declinable.has(letter.status) && <AsyncButton busy={isLetterActionBusy(letter.id)} busyText={t.declineBusy} onClick={() => onActOnLetter(letter, "decline")}>{t.decline}</AsyncButton>}
             {repliable.has(letter.status) && <AsyncButton busy={isLetterConnectionBusy(letter.id)} busyText={t.willKnowBusy} onClick={() => onRequestConnection(letter)}>{t.willKnow}</AsyncButton>}
-            {letter.status !== "BLOCKED" && <AsyncButton busy={isLetterActionBusy(letter.id)} busyText={t.blockBusy} onClick={() => onActOnLetter(letter, "block")}>{t.block}</AsyncButton>}
-            <AsyncButton busy={isLetterActionBusy(letter.id)} busyText={t.reportBusy} onClick={() => onReportLetter(letter)}>{t.report}</AsyncButton>
-          </div></article>)}
+          </div>
+          <details className="letter-secondary-actions">
+            <summary>{t.safetyActions}</summary>
+            <div>
+              {letter.status !== "BLOCKED" && <AsyncButton busy={isLetterActionBusy(letter.id)} busyText={t.blockBusy} onClick={() => onActOnLetter(letter, "block")}>{t.block}</AsyncButton>}
+              <AsyncButton busy={isLetterActionBusy(letter.id)} busyText={t.reportBusy} onClick={() => onReportLetter(letter)}>{t.report}</AsyncButton>
+            </div>
+          </details>
+        </article>)}
       </div>}
     </> : tab === "outbox" ? <>
       <p className="resonance-intro">{t.outboxIntro}</p>

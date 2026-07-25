@@ -23,6 +23,31 @@ public class LlmRequest {
      * path sets this from the active mode's {@code ModeStrategy.temperature()}.
      */
     public Double temperature;
+    /**
+     * Per-call reasoning budget. Foreground response modules set this to {@code false};
+     * background planner/critic modules may set it to {@code true}. Provider clients that
+     * support an explicit thinking toggle must honor it.
+     */
+    public Boolean thinkingEnabled;
+    /**
+     * Optional output-token budget for this module. Null preserves the provider-wide generous
+     * reply budget, while structured multi-kernel stages can reserve only the room their schema
+     * needs. This is separate from {@link #thinkingEnabled}: the background planner may still
+     * reason deeply, but it should not inherit the same 4096-token envelope as a long-form reply.
+     */
+    public Integer maxTokens;
+    /**
+     * Optional provider-call deadline for this module. Null keeps the provider default.
+     * Aurora's progressive runtime uses a shorter bounded deadline for each background stage so
+     * one slow provider attempt cannot silently double the user's wait.
+     */
+    public Integer timeoutMs;
+    /**
+     * Optional same-request provider retry switch. Null preserves legacy retry-once behavior.
+     * Structured Aurora stages set false because their next stage already has a deterministic
+     * business fallback and retrying a 30-second reasoning request harms the live experience.
+     */
+    public Boolean retryEnabled;
 
     public LlmRequest(Long userId, String moduleName, String prompt) {
         this.userId = userId;
@@ -32,5 +57,17 @@ public class LlmRequest {
 
     public String systemPromptOr(String fallback) {
         return systemPrompt == null || systemPrompt.isBlank() ? fallback : systemPrompt;
+    }
+
+    public int timeoutMsOr(int fallback) {
+        return timeoutMs == null || timeoutMs <= 0 ? fallback : timeoutMs;
+    }
+
+    public int maxTokensOr(int fallback) {
+        return maxTokens == null || maxTokens <= 0 ? fallback : maxTokens;
+    }
+
+    public boolean retryEnabledOrDefault() {
+        return retryEnabled == null || retryEnabled;
     }
 }

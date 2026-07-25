@@ -224,7 +224,7 @@ class CapsuleMatchingTest {
     /**
      * 1b. Tight floor-removal guard. Small plaza (<12) so every capsule is returned regardless of
      * rank, isolating the SCORE rather than the ranking. A zero-overlap USER noise capsule with
-     * empty portrait must score exactly seedBoost + energyScore = 0.06 + (0.5*0.18=0.09) = 0.15,
+     * empty portrait must score exactly userBoost + energyScore = 0.06 + (0.5*0.18=0.09) = 0.15,
      * which is BELOW the removed 0.16 floor. Under the old floor it would have been clamped to
      * >= 0.16 — so `noiseScore < 0.16` is RED-before-the-fix and GREEN now.
      */
@@ -256,9 +256,9 @@ class CapsuleMatchingTest {
                 .orElseThrow(() -> new AssertionError("overlap capsule must be present"));
 
         double noiseScore = scoreOf(noiseItem);
-        // expected = themeOverlap(0) + portraitSignal(0) + energyScore(0.5*0.18=0.09) + seedBoost(0.06) = 0.15
+        // expected = themeOverlap(0) + portraitSignal(0) + energyScore(0.5*0.18=0.09) + userBoost(0.06) = 0.15
         assertEquals(0.15, noiseScore, 0.0051,
-                "zero-overlap noise score == seedBoost + energyScore (0.15), no floor");
+                "zero-overlap noise score == userBoost + energyScore (0.15), no floor");
         // RED-before-the-fix guard: old 0.16 floor would have clamped this up to >= 0.16.
         assertTrue(noiseScore < 0.16,
                 "noise score must be below the removed 0.16 floor (was " + noiseScore + ")");
@@ -267,9 +267,9 @@ class CapsuleMatchingTest {
                 "overlapping capsule must score strictly above zero-overlap noise capsule");
     }
 
-    /** 2. SEED outranks USER capsule given identical overlap+energy (seedBoost direction). */
+    /** 2. A real-person path outranks an official practice seed when relevance is identical. */
     @Test
-    void seedSemanticMatch_ranksAboveUserCapsule() {
+    void userCapsule_ranksAboveSeedWhenRelevanceIsIdentical() {
         stubMemories(memory(1, "复习", "考试 作业 拖延 压力", "考试", "焦虑"));
 
         EchoCapsule seed = capsule(201L, 999L, "SEED_CAPSULE", "种子",
@@ -282,10 +282,10 @@ class CapsuleMatchingTest {
 
         long firstId = idOf(result.get(0));
         long secondId = idOf(result.get(1));
-        assertEquals(201L, firstId, "SEED should rank above USER capsule");
-        assertEquals(202L, secondId);
+        assertEquals(202L, firstId, "A user-authorized capsule should lead toward a real connection");
+        assertEquals(201L, secondId);
         assertTrue(scoreOf(result.get(0)) > scoreOf(result.get(1)),
-                "SEED matchScore must strictly exceed USER given identical overlap+energy");
+                "USER matchScore must strictly exceed SEED given identical overlap+energy");
     }
 
     /** 3. more theme overlap => higher rank and score. */

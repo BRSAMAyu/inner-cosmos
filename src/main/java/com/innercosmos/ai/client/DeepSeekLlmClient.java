@@ -13,6 +13,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
@@ -35,7 +36,7 @@ public class DeepSeekLlmClient implements LlmClient {
                              boolean allowFallback, AiLogService aiLogService, Executor aiExecutor) {
         this.apiKey = apiKey;
         this.baseUrl = normalizeUrl(baseUrl);
-        this.model = model == null || model.isBlank() ? "deepseek-chat" : model;
+        this.model = model == null || model.isBlank() ? "deepseek-v4-flash" : model;
         this.timeoutMs = timeoutMs <= 0 ? 30000 : timeoutMs;
         this.allowFallback = allowFallback;
         this.aiLogService = aiLogService;
@@ -60,7 +61,18 @@ public class DeepSeekLlmClient implements LlmClient {
             return response;
         } catch (Exception firstError) {
             errorMessage = firstError.getMessage();
-            log.warn("DeepSeek chat failed on first attempt: {}", firstError.getMessage());
+            if (!request.retryEnabledOrDefault()) {
+                if (!allowFallback) {
+                    throw new RuntimeException("DeepSeek remote chat failed within the stage deadline and retry is disabled",
+                            firstError);
+                }
+                log.warn("DeepSeek stage failed without retry, falling back to local mock: {}", firstError.getMessage());
+                response = fallback.chat(request);
+                fallbackUsed = true;
+                success = true;
+                return response;
+            }
+            log.warn("DeepSeek chat failed on first attempt, retrying once: {}", firstError.getMessage());
             try {
                 if (apiKey == null || apiKey.isBlank()) {
                     throw firstError;
@@ -113,19 +125,13 @@ public class DeepSeekLlmClient implements LlmClient {
      */
     private String streamRemote(LlmRequest request, SseEmitter emitter) throws Exception {
         List<Map<String, String>> messages = buildMessages(request);
-        Map<String, Object> body = Map.of(
-                "model", model,
-                "messages", messages,
-                "temperature", request.temperature != null ? request.temperature : 0.72,
-                "max_tokens", LlmClient.RESPONSE_MAX_TOKENS,
-                "stream", true
-        );
+        Map<String, Object> body = requestBody(request, messages, true);
         HttpRequest httpRequest = HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl))
                 .header("Content-Type", "application/json")
                 .header("Authorization", "Bearer " + apiKey)
                 .header("Accept", "text/event-stream")
-                .timeout(Duration.ofMillis(timeoutMs))
+                .timeout(Duration.ofMillis(request.timeoutMsOr(timeoutMs)))
                 .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
                 .build();
         StringBuilder aggregated = new StringBuilder();
@@ -207,19 +213,13 @@ public class DeepSeekLlmClient implements LlmClient {
             }
         }
         messages.add(Map.of("role", "user", "content", request.prompt == null ? "" : request.prompt));
-        Map<String, Object> body = Map.of(
-                "model", model,
-                "messages", messages,
-                "temperature", request.temperature != null ? request.temperature : 0.72,
-                "max_tokens", LlmClient.RESPONSE_MAX_TOKENS,
-                "stream", false
-        );
+        Map<String, Object> body = requestBody(request, messages, false);
 
         HttpRequest httpRequest = HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl))
                 .header("Content-Type", "application/json")
                 .header("Authorization", "Bearer " + apiKey)
-                .timeout(Duration.ofMillis(timeoutMs))
+                .timeout(Duration.ofMillis(request.timeoutMsOr(timeoutMs)))
                 .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
                 .build();
         HttpResponse<String> httpResponse = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
@@ -232,6 +232,22 @@ public class DeepSeekLlmClient implements LlmClient {
             throw new RuntimeException("Unexpected DeepSeek response format: " + httpResponse.body());
         }
         return content.asText();
+    }
+
+    Map<String, Object> requestBody(LlmRequest request, List<Map<String, String>> messages, boolean stream) {
+        boolean thinking = Boolean.TRUE.equals(request.thinkingEnabled);
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("model", model);
+        body.put("messages", messages);
+        body.put("max_tokens", request.maxTokensOr(LlmClient.RESPONSE_MAX_TOKENS));
+        body.put("stream", stream);
+        body.put("thinking", Map.of("type", thinking ? "enabled" : "disabled"));
+        // DeepSeek thinking mode does not support temperature. Omitting it avoids a misleading
+        // no-op parameter while preserving the foreground speaker's tuned sampling.
+        if (!thinking) {
+            body.put("temperature", request.temperature != null ? request.temperature : 0.72);
+        }
+        return body;
     }
 
     private String systemPrompt() {

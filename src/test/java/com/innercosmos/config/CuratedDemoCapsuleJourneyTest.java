@@ -1,0 +1,123 @@
+package com.innercosmos.config;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.innercosmos.mapper.EchoCapsuleMapper;
+import com.innercosmos.service.CapsuleGenomeService;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpSession;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+/**
+ * Pins the classroom seed at its startup boundary in an isolated database. Other journey tests
+ * intentionally finish Demo conversations and trigger capsule resynchronization, so sharing their
+ * mutable context would test cross-test ordering instead of whether a fresh/restarted Demo is
+ * immediately runnable.
+ */
+@SpringBootTest(properties = {
+        "inner-cosmos.demo.seed-enabled=true",
+        "spring.datasource.url=jdbc:h2:mem:curated-demo-capsules;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1",
+        "spring.sql.init.mode=always",
+        "llm.mode=dev",
+        "llm.provider=mock",
+        "llm.allow-fallback=true"
+})
+@AutoConfigureMockMvc
+@Import(TestRateLimitConfig.class)
+class CuratedDemoCapsuleJourneyTest {
+    @Autowired MockMvc mockMvc;
+    @Autowired CapsuleGenomeService capsuleGenomeService;
+    @Autowired EchoCapsuleMapper echoCapsuleMapper;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Test
+    void everyCuratedMirrorHasGrantsGenomeIrAndCanStartAConversation() throws Exception {
+        MockHttpSession visitor = loginAsAdmin();
+        MvcResult plazaResult = mockMvc.perform(get("/api/plaza/capsules").session(visitor))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode capsules = objectMapper.readTree(plazaResult.getResponse().getContentAsString()).path("data");
+
+        for (String pseudonym : new String[]{
+                "林澈的回声分身",
+                "沿河缓慢生活的人",
+                "把自己放回照护里的人"
+        }) {
+            JsonNode selected = null;
+            for (JsonNode capsule : capsules) {
+                if (pseudonym.equals(capsule.path("pseudonym").asText())) {
+                    if (selected != null) throw new AssertionError("Ambiguous curated mirror: " + pseudonym);
+                    selected = capsule;
+                }
+            }
+            if (selected == null) throw new AssertionError("Missing curated mirror: " + pseudonym);
+
+            long capsuleId = selected.path("id").asLong();
+            assertNotNull(capsuleGenomeService.current(capsuleId),
+                    "Curated mirror must have an active Genome: " + pseudonym);
+            assertTrue(echoCapsuleMapper.selectById(capsuleId).contextPreviewJson.contains("\"genomeIr\""),
+                    "Curated mirror must expose provenance-carrying Genome IR: " + pseudonym);
+            mockMvc.perform(post("/api/v1/persona-chat/session/create")
+                            .session(visitor)
+                            .header("Idempotency-Key", "curated-demo-" + capsuleId)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"capsuleId\":" + capsuleId + "}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.status").value("ACTIVE"))
+                    .andExpect(jsonPath("$.data.capsuleId").value(capsuleId));
+        }
+    }
+
+    @Test
+    void everyCuratedPersonaStartsWithAnArrivedStorySpecificSlowLetter() throws Exception {
+        assertInboxContains("demo", "把很大的愿景拆成今天的一小格");
+        assertInboxContains("river", "你没有急着选一座城市，让我松了一口气");
+        assertInboxContains("cloud", "你说照护不该靠耗尽证明");
+    }
+
+    private void assertInboxContains(String username, String title) throws Exception {
+        MockHttpSession session = login(username, "demo123");
+        MvcResult result = mockMvc.perform(get("/api/letters/inbox").session(session))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode letters = objectMapper.readTree(result.getResponse().getContentAsString()).path("data");
+        for (JsonNode letter : letters) {
+            if (title.equals(letter.path("title").asText())) {
+                assertTrue(letter.path("receiverCapsuleId").asLong() > 0,
+                        "Curated slow letters must point to a real receiver capsule");
+                assertTrue("DELIVERED".equals(letter.path("status").asText())
+                                || "READ".equals(letter.path("status").asText()),
+                        "Curated inbox letter must already be readable");
+                return;
+            }
+        }
+        throw new AssertionError("Missing curated slow letter for " + username + ": " + title);
+    }
+
+    private MockHttpSession loginAsAdmin() throws Exception {
+        return login("admin", "admin123");
+    }
+
+    private MockHttpSession login(String username, String password) throws Exception {
+        MvcResult login = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"" + username + "\",\"password\":\"" + password + "\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        return (MockHttpSession) login.getRequest().getSession(false);
+    }
+}

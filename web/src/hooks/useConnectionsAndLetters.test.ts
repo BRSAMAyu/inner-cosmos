@@ -82,6 +82,9 @@ function deferred<T>() {
 }
 
 beforeEach(() => {
+  vi.mocked(api.letterInbox).mockResolvedValue([]);
+  vi.mocked(api.letterOutbox).mockResolvedValue([]);
+  vi.mocked(api.letterThreads).mockResolvedValue([]);
   vi.mocked(api.connectionRequests).mockResolvedValue(requests());
   vi.mocked(api.friends).mockResolvedValue([]);
   vi.mocked(api.discoverPeople).mockResolvedValue([]);
@@ -145,6 +148,18 @@ describe("useConnectionsAndLetters -- bootstrap loaders", () => {
     const { result } = setup();
     await act(async () => { await result.current.loadPeople(); });
     expect(result.current.people).toHaveLength(2);
+  });
+
+  it("refreshLetters updates inbox, outbox and threads as one scheduler-driven snapshot", async () => {
+    vi.mocked(api.letterInbox).mockResolvedValue([letter({ id: 7 })]);
+    vi.mocked(api.letterOutbox).mockResolvedValue([letter({ id: 8, status: "FLYING" })]);
+    vi.mocked(api.letterThreads).mockResolvedValue([thread({ id: 9 })]);
+    const { result } = setup();
+    await act(async () => { await result.current.refreshLetters(); });
+    expect(result.current.letterInbox.map(row => row.id)).toEqual([7]);
+    expect(result.current.letterOutbox.map(row => row.id)).toEqual([8]);
+    expect(result.current.letterThreads.map(row => row.id)).toEqual([9]);
+    expect(result.current.lettersRefreshing).toBe(false);
   });
 });
 

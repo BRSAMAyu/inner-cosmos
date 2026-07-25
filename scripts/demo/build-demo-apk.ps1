@@ -33,6 +33,12 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Demo web bundle failed." }
     & npx.cmd --no-install cap sync android
     if ($LASTEXITCODE -ne 0) { throw "Capacitor Android sync failed." }
+    $nativeBundle = Join-Path $web "android\app\src\main\assets\public\assets\app.js"
+    if (-not (Test-Path -LiteralPath $nativeBundle) -or
+        -not (Select-String -LiteralPath $nativeBundle -Pattern $origin -SimpleMatch -Quiet) -or
+        -not (Select-String -LiteralPath $nativeBundle -Pattern "/api/public/demo/personas" -SimpleMatch -Quiet)) {
+        throw "Synced Android bundle is missing the public Demo origin or passwordless persona entry."
+    }
     Push-Location "android"
     try {
         & .\gradlew.bat assembleDebug --no-daemon "--max-workers=$MaxWorkers"

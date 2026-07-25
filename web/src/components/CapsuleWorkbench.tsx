@@ -39,7 +39,7 @@ const COPY: Record<Locale, WorkbenchCopy> = {
     step2Title: "它表达你的哪一部分？", step2Note: "名字和说明面向访客，但创建后仍保持私密，直到你主动发布。",
     nameLabel: "共鸣体名字", namePlaceholder: "例如：雨后仍愿意开口的人", introLabel: "希望它保留的侧面",
     introPlaceholder: "例如：面对关系误解时，我会先沉默整理，再清楚说出边界。",
-    previewBusy: "正在脱敏", previewBtn: "先看严格脱敏预览", previewAria: "共鸣体授权预览", removedPrefix: "已移除：",
+    previewBusy: "正在生成私密草稿", previewBtn: "让 Aurora 生成一个私密草稿", previewAria: "共鸣体授权预览", removedPrefix: "已移除：",
     backToEdit: "返回修改", compileBusy: "正在编译", compileBtn: "编译为私密版本",
     statusPublic: "公开中", statusReview: "授权变化，等待复核", statusPrivate: "仅自己可见", genomeReading: "读取中",
     fidelity: (n, p) => `${n} 次反馈 · ${p}% 像我`, fidelityCurrent: l => `当前版本 · ${l}`, genomeHistorySummary: "Genome 版本与变化记录",
@@ -72,7 +72,7 @@ const COPY: Record<Locale, WorkbenchCopy> = {
     step2Title: "Which part of you does it express?", step2Note: "The name and description face visitors, but stay private after creation until you publish.",
     nameLabel: "Capsule name", namePlaceholder: "e.g. someone still willing to speak after the rain", introLabel: "The facet you want it to keep",
     introPlaceholder: "e.g. facing a relationship misunderstanding, I go quiet to sort myself out, then clearly state my boundary.",
-    previewBusy: "De-identifying", previewBtn: "See the strict de-identified preview", previewAria: "Capsule authorization preview", removedPrefix: "Removed: ",
+    previewBusy: "Creating a private draft", previewBtn: "Let Aurora create a private draft", previewAria: "Capsule authorization preview", removedPrefix: "Removed: ",
     backToEdit: "Back to edit", compileBusy: "Compiling", compileBtn: "Compile as a private version",
     statusPublic: "Public", statusReview: "Authorization changed, awaiting review", statusPrivate: "Visible to you only", genomeReading: "Loading",
     fidelity: (n, p) => `${n} feedback · ${p}% like me`, fidelityCurrent: l => `Current version · ${l}`, genomeHistorySummary: "Genome versions & change log",
@@ -200,10 +200,25 @@ export function CapsuleWorkbench({ capsules, selectedCapsuleId, selectedCapsule,
   const tabStatus = (status: string) => status === "PUBLIC" ? t.tabPublic : status === "NEEDS_REVIEW" ? t.tabReview : t.tabPrivate;
   const summaryStatus = (status: string) => status === "PUBLIC" ? t.statusPublic : status === "NEEDS_REVIEW" ? t.statusReview : t.statusPrivate;
   return <section className="resonance-space" aria-label={t.aria}>
-    <div className="resonance-heading"><div><span className="eyebrow">YOUR RESONANCE</span><h2>{t.heading}</h2></div>
+    <div className="resonance-heading"><div><span className="eyebrow">YOUR RESONANCE</span>
+      <h2>{locale === "en-SG" ? "The facets that can meet others for you" : "那些可以替你先去相遇的侧影"}</h2></div>
       <span>{t.count(capsules.filter(capsule => capsule.visibilityStatus !== "ARCHIVED").length)}</span></div>
-    <p className="resonance-intro">{t.intro}</p>
+    {capsules.length > 0 && <div className="capsule-glance" role="list">
+      {capsules.filter(capsule => capsule.visibilityStatus !== "ARCHIVED").map(capsule =>
+        <button type="button" role="listitem" key={capsule.id}
+          className={selectedCapsuleId === capsule.id ? "active" : ""}
+          onClick={() => onSelectCapsule(capsule.id)}>
+          <strong>{capsule.pseudonym}</strong>
+          <small>{tabStatus(capsule.visibilityStatus)}</small>
+          <span>{capsule.intro}</span>
+        </button>)}
+    </div>}
 
+    <details className="capsule-manager" open={capsules.length === 0}>
+      <summary>{capsules.length === 0
+        ? (locale === "en-SG" ? "Create your first capsule" : "创建第一个共鸣侧影")
+        : (locale === "en-SG" ? "Edit, test or create a capsule" : "编辑、试聊或新建共鸣体")}</summary>
+      <p className="resonance-intro">{t.intro}</p>
     {capsules.length > 0 && <div className="capsule-tabs" role="tablist" aria-label={t.tabsAria}>
       {capsules.filter(capsule => capsule.visibilityStatus !== "ARCHIVED").map(capsule =>
         <button type="button" role="tab" aria-selected={selectedCapsuleId === capsule.id} className={selectedCapsuleId === capsule.id ? "active" : ""}
@@ -228,12 +243,15 @@ export function CapsuleWorkbench({ capsules, selectedCapsuleId, selectedCapsule,
       })}</div>
       <div className="capsule-step"><span>2</span><div><strong>{t.step2Title}</strong><small>{t.step2Note}</small></div></div>
       <div className="capsule-fields"><label>{t.nameLabel}<input value={capsuleName} onChange={event => onCapsuleName(event.target.value)} placeholder={t.namePlaceholder} /></label>
-        <label>{t.introLabel}<textarea value={capsuleIntro} onChange={event => onCapsuleIntro(event.target.value)} placeholder={t.introPlaceholder} /></label>
+        <label>{t.introLabel}<textarea value={capsuleIntro} onChange={event => onCapsuleIntro(event.target.value)} placeholder={t.introPlaceholder} /></label></div>
+      <details className="capsule-advanced"><summary>{locale === "en-SG" ? "Optional: background and contact preferences" : "可选：背景与联系偏好"}</summary>
+        <div className="capsule-fields">
         <label>{t.ownerNoteLabel}<textarea value={capsuleOwnerNote} onChange={event => onCapsuleOwnerNote?.(event.target.value)} placeholder={t.ownerNotePlaceholder} /></label>
         <label>{t.contactPolicyLabel}<select value={capsuleContactPolicy} onChange={event => onCapsuleContactPolicy?.(event.target.value)}>
           {contactPolicyOrder.map(value => <option key={value} value={value}>{t.contactPolicy[value]}</option>)}</select></label></div>
-      <label className="boundary-check"><input type="checkbox" checked={capsuleStandIn}
-        onChange={event => onCapsuleStandIn?.(event.target.checked)} />{t.standInCheck}</label>
+        <label className="boundary-check"><input type="checkbox" checked={capsuleStandIn}
+          onChange={event => onCapsuleStandIn?.(event.target.checked)} />{t.standInCheck}</label>
+      </details>
       {!capsulePreview ? <AsyncButton className="resonance-primary" busy={capsuleBusy} busyText={t.previewBusy} onClick={onPreviewNewCapsule}>{t.previewBtn}</AsyncButton> :
         <div className="capsule-preview" aria-label={t.previewAria}><span className="eyebrow">WHAT IT MAY USE</span><p>{capsulePreview.abstractSummary}</p>
           <div className="preview-tags">{capsulePreview.publicTags.map(tag => <span key={tag}>{tag}</span>)}</div>
@@ -283,5 +301,6 @@ export function CapsuleWorkbench({ capsules, selectedCapsuleId, selectedCapsule,
         {selectedCapsule.visibilityStatus === "PUBLIC" && <AsyncButton busy={capsuleBusy} busyText={t.pauseBusy} onClick={onPause}>{t.pauseBtn}</AsyncButton>}
         <AsyncButton className="danger-quiet" busy={capsuleBusy} busyText={t.archiveBusy} onClick={onArchive}>{t.archiveBtn}</AsyncButton></div>
     </div>}
+    </details>
   </section>;
 }

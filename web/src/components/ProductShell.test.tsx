@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { capsulePath, initialProductSpace, letterThreadPath, MeSpace, productSpaceFromPath, ProductShellNavigation, resourceFromPath, spacePath } from "./ProductShell";
+import { capsulePath, connectionTabFromSearch, connectionTabPath, ConnectionSubNav, initialProductSpace, letterThreadPath, MeSpace, productSpaceFromPath, ProductShellNavigation, resonanceTabFromPath, resonanceTabPath, ResonanceSubNav, resourceFromPath, spacePath } from "./ProductShell";
 
 afterEach(cleanup);
 
@@ -59,6 +59,43 @@ describe("ProductShell", () => {
   it("builds a shareable letter-thread deep link that round-trips through resourceFromPath", () => {
     expect(letterThreadPath(9)).toBe("/connections/letters/thread/9");
     expect(resourceFromPath(letterThreadPath(9))).toEqual({ space: "letters", resource: "thread", id: 9 });
+  });
+
+  it("keeps the three resonance intents focused on shareable sub-routes", () => {
+    expect(resonanceTabFromPath("/resonance")).toBe("mine");
+    expect(resonanceTabFromPath("/resonance/capsule/42")).toBe("mine");
+    expect(resonanceTabFromPath("/resonance/plaza")).toBe("plaza");
+    expect(resonanceTabFromPath("/resonance/encounters")).toBe("encounters");
+    expect(resonanceTabFromPath("/resonance/unknown")).toBe("mine");
+    expect(resonanceTabPath("mine")).toBe("/resonance");
+    expect(resonanceTabPath("plaza")).toBe("/resonance/plaza");
+    expect(resonanceTabPath("encounters")).toBe("/resonance/encounters");
+  });
+
+  it("renders a concise bilingual resonance sub-navigation", () => {
+    const onNavigate = vi.fn();
+    const { rerender } = render(<ResonanceSubNav active="mine" onNavigate={onNavigate} />);
+    fireEvent.click(screen.getByRole("button", { name: "共鸣广场" }));
+    expect(onNavigate).toHaveBeenCalledWith("plaza");
+    rerender(<ResonanceSubNav active="plaza" onNavigate={onNavigate} locale="en-SG" />);
+    expect(screen.getByRole("button", { name: "Plaza" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("keeps slow letters first while exposing shareable connection sub-sections", () => {
+    expect(connectionTabFromSearch("")).toBe("letters");
+    expect(connectionTabFromSearch("?view=people")).toBe("people");
+    expect(connectionTabFromSearch("?view=unknown")).toBe("letters");
+    expect(connectionTabPath("letters")).toBe("/connections/letters");
+    expect(connectionTabPath("groups")).toBe("/connections/letters?view=groups");
+  });
+
+  it("renders a concise bilingual connections sub-navigation", () => {
+    const onNavigate = vi.fn();
+    const { rerender } = render(<ConnectionSubNav active="letters" onNavigate={onNavigate} />);
+    fireEvent.click(screen.getByRole("button", { name: "真人连接" }));
+    expect(onNavigate).toHaveBeenCalledWith("people");
+    rerender(<ConnectionSubNav active="people" onNavigate={onNavigate} locale="en-SG" />);
+    expect(screen.getByRole("button", { name: "People" })).toHaveAttribute("aria-current", "page");
   });
 
   it("falls back to aurora for the root path and any unrecognized path", () => {

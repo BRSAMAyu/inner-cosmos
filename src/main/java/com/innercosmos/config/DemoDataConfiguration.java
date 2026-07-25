@@ -21,9 +21,12 @@ import com.innercosmos.mapper.UserMapper;
 import com.innercosmos.mapper.UserPortraitMapper;
 import com.innercosmos.mapper.UserProfileMapper;
 import com.innercosmos.service.EmotionBaselineService;
+import com.innercosmos.service.CapsuleGenomeService;
+import com.innercosmos.service.DataUseGrantService;
 import com.innercosmos.service.GravityService;
 import com.innercosmos.service.UserService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
@@ -63,13 +66,17 @@ public class DemoDataConfiguration {
             AuroraSelfReflectionMapper auroraSelfReflectionMapper,
             BeliefPatternMapper beliefPatternMapper,
             EmotionBaselineService emotionBaselineService,
-            AuthorizedMemoryRefMapper authorizedMemoryRefMapper) {
+            AuthorizedMemoryRefMapper authorizedMemoryRefMapper,
+            DataUseGrantService dataUseGrantService,
+            CapsuleGenomeService capsuleGenomeService,
+            @Value("${inner-cosmos.demo.seed-admin-enabled:true}") boolean seedAdminEnabled) {
         return new MockDataInitializer(userMapper, userProfileMapper, capsuleMapper, boundaryMapper,
                 memoryCardMapper, todoItemMapper, slowLetterMapper, dailyRecordMapper,
                 emotionTraceMapper, thoughtFragmentMapper, eventCardMapper,
                 relationMentionMapper, memoryThemeMapper, gravityService, userService,
                 auroraSelfProfileMapper, auroraConstitutionMapper, userPortraitMapper,
                 auroraSelfModelMapper, auroraSelfReflectionMapper, beliefPatternMapper,
-                emotionBaselineService, authorizedMemoryRefMapper);
+                emotionBaselineService, authorizedMemoryRefMapper, dataUseGrantService,
+                capsuleGenomeService, seedAdminEnabled);
     }
 }

@@ -9,6 +9,7 @@ import { useAuroraSession } from "./useAuroraSession";
 vi.mock("../api", () => ({
   api: {
     createSession: vi.fn(),
+    auroraForeground: vi.fn(),
     messages: vi.fn(),
     wakeIntent: vi.fn(),
     wakeIntents: vi.fn(),
@@ -22,7 +23,8 @@ vi.mock("../api", () => ({
     rescheduleWakeIntent: vi.fn(),
     cancelWakeIntent: vi.fn(),
     psychologySkillSuggestion: vi.fn(),
-    triggerGoodbye: vi.fn()
+    triggerGoodbye: vi.fn(),
+    settleAuroraSession: vi.fn()
   },
   streamAurora: vi.fn(),
   replayTurnEvents: vi.fn(),
@@ -51,6 +53,12 @@ const notification = (overrides: Partial<Notification> = {}): Notification => ({
 
 beforeEach(() => {
   vi.mocked(api.createSession).mockResolvedValue({ id: 100 });
+  vi.mocked(api.auroraForeground).mockResolvedValue({
+    text: "眼前这份累已经很具体了。",
+    source: "model-fast",
+    latencyMs: 820,
+    safetyBlocked: false
+  });
   vi.mocked(api.messages).mockResolvedValue([]);
   vi.mocked(api.wakeIntents).mockResolvedValue([]);
   vi.mocked(api.notifications).mockResolvedValue([]);
@@ -70,6 +78,7 @@ describe("useAuroraSession -- initial state", () => {
     expect(result.current.mode).toBe("DAILY_TALK");
     expect(result.current.activeTurnId).toBeNull();
     expect(result.current.runtimeSignal).toEqual({ stage: "idle", runtime: "single" });
+    expect(result.current.memoryTrace).toBeNull();
     expect(result.current.wakeIntents).toEqual([]);
     expect(result.current.wakeBusy).toBe(false);
     expect(result.current.returnWhen).toBe("明天早上 8:30");
@@ -154,8 +163,18 @@ describe("useAuroraSession -- send / streaming / interrupt", () => {
 
     expect(result.current.draft).toBe("");
     expect(result.current.messages.some(m => m.speaker === "USER" && m.text === "今天有点累")).toBe(true);
+    expect(result.current.messages.some(m =>
+      m.speaker === "AURORA" && m.text === "眼前这份累已经很具体了。")).toBe(true);
     expect(onSkillSuggestion).toHaveBeenCalledWith(null);
     expect(streamAurora).toHaveBeenCalledOnce();
+    expect(vi.mocked(streamAurora).mock.calls[0]?.[0]).toMatchObject({
+      sessionId: 100,
+      message: "今天有点累",
+      mode: "DAILY_TALK",
+      foregroundAcknowledgementSent: true,
+      foregroundAcknowledgementText: "眼前这份累已经很具体了。",
+      foregroundAcknowledgementSource: "model-fast"
+    });
 
     act(() => { capturedOnEvent!({ id: "1", type: "turn.started", payload: { turnId: 9 } }); });
     expect(result.current.activeTurnId).toBe(9);
@@ -177,9 +196,21 @@ describe("useAuroraSession -- send / streaming / interrupt", () => {
     act(() => { capturedOnEvent!({ id: "4c", type: "bubble.started", payload: { order: 1 } }); });
     expect(result.current.runtimeSignal.stage).toBe("speaking");
 
+    act(() => { capturedOnEvent!({ id: "4d", type: "meta", payload: {
+      memoryReferenced: true, referencedMemoryIds: [17, 23, "bad"],
+      detectedTheme: "恢复", agentLoop: { runtime: "dual-kernel.v1" }
+    } }); });
+    expect(result.current.memoryTrace).toEqual({
+      referencedMemoryIds: [17, 23], detectedTheme: "恢复"
+    });
+    expect(result.current.runtimeSignal.runtime).toBe("dual");
+
     act(() => { capturedOnEvent!({ id: "5", type: "turn.completed", payload: { message: "done" } }); });
     expect(result.current.activeTurnId).toBeNull();
     expect(result.current.runtimeSignal.stage).toBe("idle");
+    expect(result.current.memoryTrace).toEqual({
+      referencedMemoryIds: [17, 23], detectedTheme: "恢复"
+    });
     expect(setStatus).toHaveBeenLastCalledWith("Aurora 在这里，等你接着说");
   });
 
@@ -218,7 +249,7 @@ describe("useAuroraSession -- send / streaming / interrupt", () => {
 
   // W2 voice: the "inner_voice" SSE event is purely additive -- it must never block, delay, or
   // otherwise change normal turn completion, whether it arrives mid-turn or never at all.
-  it("appends an AURORA_INNER message on an inner_voice event without touching turn/runtime state, and leaves normal completion unaffected", async () => {
+  it("publishes inner_voice on a separate side channel without touching turn/runtime state", async () => {
     let capturedOnEvent: ((event: AuroraStreamEvent) => void) | undefined;
     vi.mocked(streamAurora).mockImplementation(async (_input, _signal, onEvent) => {
       capturedOnEvent = onEvent;
@@ -239,9 +270,9 @@ describe("useAuroraSession -- send / streaming / interrupt", () => {
       payload: { text: "其实我有点担心她今天的状态", audio: "data:audio/mpeg;base64,AAA", voiceId: "warm-a" }
     }); });
 
-    const innerVoiceMessage = result.current.messages.find(m => m.speaker === "AURORA_INNER");
+    const innerVoiceMessage = result.current.innerVoice;
     expect(innerVoiceMessage).toEqual({
-      key: "inner-3b", speaker: "AURORA_INNER", text: "其实我有点担心她今天的状态",
+      key: "inner-3b", text: "其实我有点担心她今天的状态",
       audio: "data:audio/mpeg;base64,AAA", voiceId: "warm-a"
     });
     // Purely additive: still mid-turn, runtime/activeTurnId untouched by the inner_voice event.
@@ -255,8 +286,9 @@ describe("useAuroraSession -- send / streaming / interrupt", () => {
     expect(result.current.activeTurnId).toBeNull();
     expect(result.current.runtimeSignal.stage).toBe("idle");
     expect(setStatus).toHaveBeenLastCalledWith("Aurora 在这里，等你接着说");
-    // The inner-voice bubble itself is untouched by turn completion.
-    expect(result.current.messages.find(m => m.speaker === "AURORA_INNER")).toEqual(innerVoiceMessage);
+    // The independent side channel is untouched by turn completion.
+    expect(result.current.innerVoice).toEqual(innerVoiceMessage);
+    expect(result.current.messages.some(m => m.speaker === "AURORA_INNER")).toBe(false);
   });
 
   it("completes a turn normally when no inner_voice event ever arrives -- its absence never blocks completion", async () => {
@@ -279,16 +311,15 @@ describe("useAuroraSession -- send / streaming / interrupt", () => {
     expect(result.current.activeTurnId).toBeNull();
     expect(result.current.runtimeSignal.stage).toBe("idle");
     expect(setStatus).toHaveBeenLastCalledWith("Aurora 在这里，等你接着说");
-    expect(result.current.messages.some(m => m.speaker === "AURORA_INNER")).toBe(false);
+    expect(result.current.innerVoice).toBeNull();
   });
 
   // Self-review regression guard: the backend now emits inner_voice AFTER turn.completed (so a slow
   // TTS synthesis never delays turn closeout), at which point activeTurnRef.current is already null.
-  // Keying the inner_voice message on activeTurnRef would collapse every turn's inner_voice to the
-  // same "inner-0" and the dedup would silently drop the second turn's. Each inner_voice must key on
-  // its unique SSE event id so a second turn's inner_voice still renders. Failing-first against the
-  // pre-fix keying.
-  it("renders inner_voice from a SECOND turn even though each arrives after its turn.completed (no cross-turn key collision)", async () => {
+  // The side channel intentionally keeps only the latest meaningful heart-voice; it is not a second
+  // transcript. A later turn must replace the previous observation even when both arrive after
+  // turn.completed.
+  it("replaces the side channel with a SECOND turn inner_voice after turn.completed", async () => {
     const onEvents: Array<(event: AuroraStreamEvent) => void> = [];
     vi.mocked(streamAurora).mockImplementation(async (_input, _signal, onEvent) => {
       onEvents.push(onEvent);
@@ -304,7 +335,8 @@ describe("useAuroraSession -- send / streaming / interrupt", () => {
     act(() => { onEvents[0]!({ id: "t1-1", type: "turn.started", payload: { turnId: 9 } }); });
     act(() => { onEvents[0]!({ id: "t1-2", type: "turn.completed", payload: { message: "done" } }); });
     act(() => { onEvents[0]!({ id: "t1-3", type: "inner_voice", payload: { text: "回合一的心声", audio: "data:audio/mpeg;base64,A", voiceId: "warm-a" } }); });
-    expect(result.current.messages.filter(m => m.speaker === "AURORA_INNER")).toHaveLength(1);
+    expect(result.current.innerVoice?.text).toBe("回合一的心声");
+    expect(result.current.messages.some(m => m.speaker === "AURORA_INNER")).toBe(false);
 
     // Turn 2 (distinct turnId) -- before the fix this inner_voice was silently dropped.
     act(() => { result.current.setDraft("第二回合"); });
@@ -313,9 +345,11 @@ describe("useAuroraSession -- send / streaming / interrupt", () => {
     act(() => { onEvents[1]!({ id: "t2-2", type: "turn.completed", payload: { message: "done" } }); });
     act(() => { onEvents[1]!({ id: "t2-3", type: "inner_voice", payload: { text: "回合二的心声", audio: "data:audio/mpeg;base64,B", voiceId: "warm-a" } }); });
 
-    const innerMessages = result.current.messages.filter(m => m.speaker === "AURORA_INNER");
-    expect(innerMessages).toHaveLength(2);
-    expect(innerMessages.map(m => m.text)).toEqual(["回合一的心声", "回合二的心声"]);
+    expect(result.current.innerVoice).toEqual({
+      key: "inner-t2-3", text: "回合二的心声",
+      audio: "data:audio/mpeg;base64,B", voiceId: "warm-a"
+    });
+    expect(result.current.messages.some(m => m.speaker === "AURORA_INNER")).toBe(false);
   });
 
   it("an error event ends the turn like every other terminal event, instead of leaving the composer stuck", async () => {
@@ -354,7 +388,11 @@ describe("useAuroraSession -- send / streaming / interrupt", () => {
     const { result } = setup();
     await act(async () => { await result.current.resolveSession(); });
     act(() => { result.current.setDraft("接着说"); });
-    const sendPromise = act(async () => { await result.current.send({ preventDefault: () => undefined } as never); });
+    let sendPromise!: Promise<void>;
+    await act(async () => {
+      sendPromise = result.current.send({ preventDefault: () => undefined } as never);
+      await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+    });
     act(() => { capturedOnEvent!({ id: "1", type: "turn.started", payload: { turnId: 9 } }); });
     act(() => { capturedOnEvent!({ id: "2", type: "bubble.started", payload: { order: 0 } }); });
     act(() => { capturedOnEvent!({ id: "3", type: "token", payload: { content: "部" } }); });
@@ -482,6 +520,27 @@ describe("useAuroraSession -- goodbye ritual", () => {
     expect(result.current.goodbyeResult?.line).toBe("今天先到这里，我会把重要的部分留住。");
   });
 
+  it("settles a real conversation and reports completion after the goodbye", async () => {
+    vi.mocked(api.triggerGoodbye).mockResolvedValue({
+      success: true, line: "先到这里。", stepsCompleted: [], confirmed: false, reverted: false,
+      confidence: 0.9, goodbyeStrength: "HIGH"
+    });
+    vi.mocked(api.settleAuroraSession).mockResolvedValue({} as never);
+    const onMemorySettled = vi.fn();
+    const setStatus = vi.fn();
+    const { result } = renderHook(() => useAuroraSession({
+      authenticated: true, skillLocale: "zh-CN", onSkillSuggestion: vi.fn(), setStatus, onMemorySettled
+    }));
+    await act(async () => { await result.current.resolveSession(); });
+    vi.mocked(api.messages).mockResolvedValue([{ id: 1, sessionId: 100, speaker: "USER", textContent: "我很在乎明天的展示" } as never]);
+    await act(async () => { await result.current.replaceFromHistory(100); });
+
+    await act(async () => { await result.current.triggerGoodbye(); });
+
+    expect(api.settleAuroraSession).toHaveBeenCalledExactlyOnceWith(100);
+    expect(onMemorySettled).toHaveBeenCalledOnce();
+  });
+
   it("does nothing without an active session", async () => {
     const { result } = setup();
     await act(async () => { await result.current.triggerGoodbye(); });
@@ -544,7 +603,11 @@ describe("useAuroraSession -- status copy is locale-aware, not hardcoded Chinese
     const { result, setStatus } = setup("en-SG");
     await act(async () => { await result.current.resolveSession(); });
     act(() => { result.current.setDraft("keep going"); });
-    const sendPromise = act(async () => { await result.current.send({ preventDefault: () => undefined } as never); });
+    let sendPromise!: Promise<void>;
+    await act(async () => {
+      sendPromise = result.current.send({ preventDefault: () => undefined } as never);
+      await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+    });
     act(() => { capturedOnEvent!({ id: "1", type: "turn.started", payload: { turnId: 9 } }); });
 
     await act(async () => { await result.current.stop(); });

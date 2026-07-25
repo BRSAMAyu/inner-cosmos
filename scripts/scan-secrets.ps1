@@ -18,9 +18,26 @@ $rules = @(
 )
 $allowed = '(?i)^(test-only|placeholder|example|configured|not-configured|your_|change_me|redacted|removed_from_history|\$\{|<)'
 $findings = [System.Collections.Generic.List[string]]::new()
+$knownSyntheticFixtureBlobs = [System.Collections.Generic.HashSet[string]]::new(
+    [System.StringComparer]::OrdinalIgnoreCase)
+# This exact historical blob predates 3ce6ac7 and contains a deliberately fake
+# provider-shaped value used to prove PiiCredentialDetector rejects credentials.
+# The fixture was later rewritten to avoid resembling a provider token. Scope the
+# exception to the immutable blob + exact test path + prefix rule; any different
+# blob, path, or assignment-shaped finding must still fail the release gate.
+[void]$knownSyntheticFixtureBlobs.Add('e2640f25bb1f75285ddb00b5ed10cd9d2449a69c')
 
-function Test-Content([string]$PathLabel, [string]$Content) {
+function Test-Content(
+    [string]$PathLabel,
+    [string]$Content,
+    [string]$BlobId = ''
+) {
     foreach ($rule in $rules) {
+        if ($rule.Name -eq 'known-token-prefix' -and
+            $PathLabel -match ':src/test/java/com/innercosmos/safety/PiiCredentialDetectorTest\.java$' -and
+            $knownSyntheticFixtureBlobs.Contains($BlobId)) {
+            continue
+        }
         if ($rule.Name -eq 'literal-sensitive-assignment' -and $PathLabel -match 'src[\\/]test[\\/]java') {
             continue
         }
@@ -58,9 +75,11 @@ if ($History) {
         $commit = $candidateRef.Substring(0, $separator)
         $path = $candidateRef.Substring($separator + 1)
         if ($path -match '(^|/)(target|\.git)/') { continue }
+        $blobId = (git rev-parse "${commit}:$path" 2>$null)
+        if ($LASTEXITCODE -ne 0) { continue }
         $content = git show "${commit}:$path" 2>$null
         if ($LASTEXITCODE -eq 0) {
-            Test-Content "$commit`:$path" ($content -join "`n")
+            Test-Content "$commit`:$path" ($content -join "`n") $blobId
         }
     }
 } else {

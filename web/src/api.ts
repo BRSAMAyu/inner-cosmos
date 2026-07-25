@@ -31,6 +31,12 @@ export type UserProfileSettings = {
   focusWindowsJson: string | null; currentEnvironmentLabel: string | null;
   weatherAwarenessEnabled: boolean | null; timeAwarenessEnabled: boolean | null; timezone: string | null;
 };
+export type DemoPersona = {
+  key: string; name: string; headline: string; story: string; themes: string[];
+};
+export type AuroraForeground = {
+  text: string; source: string; latencyMs: number; safetyBlocked: boolean;
+};
 export type GoodbyeResult = {
   success: boolean; line: string; stepsCompleted: string[]; confirmed: boolean; reverted: boolean;
   confidence: number; goodbyeStrength: string;
@@ -243,7 +249,9 @@ export type CapsuleMatch = {
 };
 export type PersonaSession = { id: number; capsuleId: number; status: string; turnCount: number; dailyLimit: number };
 export type PersonaMessage = { id: number; sessionId: number; senderType: "VISITOR" | "CAPSULE"; textContent: string };
-export type CapsuleQuota = { usedTurns: number; remainingTurns: number; dailyLimit: number; exhausted: boolean };
+export type CapsuleQuota = {
+  turnCount: number; remaining: number; dailyLimit: number; seed: boolean; quotaDate: string;
+};
 export type SlowLetter = {
   id: number; senderUserId: number; receiverUserId: number; receiverCapsuleId: number; title: string; letterBody: string; status: string;
   parallaxDistance: number; estimatedArrivalAt: string;
@@ -580,6 +588,20 @@ export type AdminAbTestGroupStats = {
 };
 export type AdminAbTestStats = Record<string, AdminAbTestGroupStats>;
 
+function nonJsonResponseError(response: Response, responseText: string): Error {
+  const normalized = responseText.toLowerCase();
+  const tunnelUnavailable = response.status === 530
+    || normalized.includes("cloudflare tunnel")
+    || normalized.includes("error 1033");
+  if (tunnelUnavailable) {
+    return new Error("这次临时演示连接已经失效。请打开最新的演示链接；你的操作没有被提交。");
+  }
+  if (response.status >= 500) {
+    return new Error(`服务暂时没有返回可用内容（HTTP ${response.status}）。请稍后重试。`);
+  }
+  return new Error(`服务返回了无法识别的内容（HTTP ${response.status}）。`);
+}
+
 async function request<T>(url: string, init: RequestInit = {}, retriedCsrf = false, retriedBearer = false): Promise<T> {
   const method = (init.method ?? "GET").toUpperCase();
   const headers = new Headers(init.headers);
@@ -615,7 +637,7 @@ async function request<T>(url: string, init: RequestInit = {}, retriedCsrf = fal
   try {
     body = responseText ? JSON.parse(responseText) as ApiEnvelope<T> : { success: false, data: undefined as T };
   } catch {
-    throw new Error(`API returned invalid JSON (HTTP ${response.status})`);
+    throw nonJsonResponseError(response, responseText);
   }
   if (response.status === 403 && (body.code === "CSRF_INVALID" || body.error === "CSRF_INVALID") && !retriedCsrf) {
     await refreshCsrf(requestCsrf?.token);
@@ -628,8 +650,24 @@ async function request<T>(url: string, init: RequestInit = {}, retriedCsrf = fal
 async function getCsrf(): Promise<Csrf> {
   if (bearerRequired) throw new Error("CSRF session authentication is disabled for native clients");
   const response = await fetch(apiUrl("/api/v1/auth/csrf"), { credentials: "include" });
-  const body = await response.json() as ApiEnvelope<Csrf>;
+  const responseText = await response.text();
+  if (!responseText) throw nonJsonResponseError(response, responseText);
+  let body: ApiEnvelope<Csrf>;
+  try {
+    body = JSON.parse(responseText) as ApiEnvelope<Csrf>;
+  } catch {
+    throw nonJsonResponseError(response, responseText);
+  }
+  if (!response.ok) throw new Error(body.message ?? `HTTP ${response.status}`);
   if (!body.success) throw new Error(body.message ?? "无法建立安全会话");
+  if (!body.data
+      || typeof body.data.token !== "string"
+      || typeof body.data.headerName !== "string") {
+    // The temporary public classroom Demo deliberately disables synchronizer-token
+    // validation. Keep the shared request pipeline intact with a harmless placeholder;
+    // production profiles always return a real token and still fail closed at startup.
+    return { token: "csrf-disabled", headerName: "X-CSRF-TOKEN" };
+  }
   return body.data;
 }
 
@@ -658,6 +696,19 @@ async function refreshCsrf(failedToken?: string): Promise<Csrf> {
 }
 
 export const api = {
+  demoPersonas: () => request<DemoPersona[]>("/api/public/demo/personas"),
+  enterDemoPersona: async (key: string) => {
+    const result = await request<UserProfileSettings>(`/api/public/demo/enter/${encodeURIComponent(key)}`, {
+      method: "POST"
+    });
+    // A persona switch changes the server-owned user id inside the shared classroom session.
+    // Materialize the post-switch token before the caller reloads and launches the parallel
+    // bootstrap, otherwise Redis/session propagation can make the first POST (createSession)
+    // race a stale synchronizer token and strand the whole Demo on a CSRF error screen.
+    invalidateCsrf();
+    await getOrLoadCsrf();
+    return result;
+  },
   login: async (username: string, password: string) => {
     const body: CoreLoginRequest = { username, password,
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Singapore" };
@@ -715,12 +766,20 @@ export const api = {
   createSession: () => request<{ id: number }>("/api/dialog/session/create", {
     method: "POST", body: JSON.stringify({ title: "Aurora 对话", sessionType: "AURORA_CHAT" })
   }),
+  auroraForeground: (input: { sessionId: number; message: string; mode: string }) =>
+    request<AuroraForeground>("/api/v1/aurora/foreground", {
+      method: "POST", body: JSON.stringify(input)
+    }),
   messages: (sessionId: number) => request<DialogMessage[]>(`/api/dialog/session/${sessionId}/messages`),
   timeline: (turnId: number) => request<TurnTimeline>(`/api/v1/aurora/turns/${turnId}/timeline`),
   stop: (turnId: number) => request<TurnTimeline>(`/api/v1/aurora/turns/${turnId}/stop`, { method: "POST" }),
   triggerGoodbye: (sessionId: number | null, trigger: string = "BUTTON") => request<GoodbyeResult>("/api/aurora/goodbye", {
     method: "POST", body: JSON.stringify(sessionId ? { sessionId: String(sessionId), trigger } : { trigger })
   }),
+  settleAuroraSession: (sessionId: number) => request<DailyRecordDetail>(
+    `/api/aurora/settle?sessionId=${encodeURIComponent(String(sessionId))}`,
+    { method: "POST" }
+  ),
   wakeIntents: () => request<WakeIntent[]>("/api/aurora/wake-intents"),
   wakeIntent: (id: number) => request<WakeIntent>(`/api/aurora/wake-intents/${id}`),
   negotiateWakeIntent: (input: { when: string; purpose: string; reasonForUser: string; content: string;
@@ -1032,11 +1091,16 @@ export async function diaryTranscribeAudio(blob: Blob): Promise<VoiceTranscripti
  * silently treat it as a completed turn.
  */
 export async function streamAurora(
-  input: Pick<CoreChatRequest, "sessionId" | "message"> & { mode: string },
+  input: Pick<CoreChatRequest, "sessionId" | "message"> & {
+    mode: string;
+    foregroundAcknowledgementSent?: boolean;
+    foregroundAcknowledgementText?: string;
+    foregroundAcknowledgementSource?: string;
+  },
   signal: AbortSignal,
   onEvent: (event: AuroraStreamEvent) => void
 ): Promise<StreamTerminalReason> {
-  const body: CoreChatRequest = input;
+  const body = input as unknown as CoreChatRequest;
   const staged = await request<CoreStreamStage>("/api/v1/aurora/stream-stage", {
     method: "POST", body: JSON.stringify(body)
   });

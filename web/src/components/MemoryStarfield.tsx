@@ -11,9 +11,12 @@ const COPY: Record<Locale, {
   listAria: string; confidence: (pct: number, v: number) => string; revealBusy: string; revealBtn: string; inaccurate: string;
   provAria: string; closeProv: string; curVersion: string; confidenceLabel: string; memLayer: string; whyHere: string;
   changeHistory: (n: number) => string; noChanges: string; downstream: (n: number) => string;
+  observation: string; noDownstream: string; moreMemories: (n: number) => string;
   importance: string; saveBusy: string; saveImportance: string; archiveBusy: string; archiveBtn: string;
   historyAria: string; recentChanges: string; historyHint: string; rolledBack: string; applied: string;
   rollbackBusy: string; rollbackBtn: string; forgetNote: string;
+  emptyTitle: Record<StarfieldScene["mode"], string>; emptyBody: Record<StarfieldScene["mode"], string>;
+  emptyAction: string; openStar: (title: string) => string;
 }> = {
   "zh-CN": {
     aria: "记忆星空", heading: "你的记忆不是档案柜", count: n => `${n} 颗当前记忆`, modesAria: "星空视角",
@@ -22,11 +25,20 @@ const COPY: Record<Locale, {
     revealBtn: "查看来源与变化", inaccurate: "这条不准确了", provAria: "记忆来源与变化", closeProv: "关闭记忆来源",
     curVersion: "当前版本", confidenceLabel: "理解置信度", memLayer: "记忆层", whyHere: "为什么它在这里",
     changeHistory: n => `变化历史（${n}）`, noChanges: "还没有后续改动。", downstream: n => `下游状态（${n}）`,
+    observation: "Aurora 目前怎样理解它", noDownstream: "它还没有因为一次修改触发下游重建；被 Aurora 实际调用时，会在对话旁显示“记忆回声”。",
+    moreMemories: n => `展开其余 ${n} 颗记忆`,
     importance: "重要度", saveBusy: "保存中…", saveImportance: "保存重要度", archiveBusy: "归档中…", archiveBtn: "归档这颗记忆",
     historyAria: "记忆变更历史", recentChanges: "最近的记忆变更",
     historyHint: "撤回会生成一个新版本，不会抹掉发生过的历史。永久忘记不会恢复原文。",
     rolledBack: "已撤回", applied: "已生效", rollbackBusy: "正在撤回…", rollbackBtn: "撤回这次变更",
-    forgetNote: "原文已删除，不可恢复"
+    forgetNote: "原文已删除，不可恢复",
+    emptyTitle: { TIME: "这里还没有第一颗星", THEME: "还没有足够的记忆形成主题", PEOPLE: "还没有被你确认的人物线索" },
+    emptyBody: {
+      TIME: "和 Aurora 说完一个真实片段后，点一次“沉淀今天”，这一刻会立即出现在这里。",
+      THEME: "当两段以上的记忆出现相似线索，主题视角会把它们聚在一起，而不是重复堆放。",
+      PEOPLE: "只有你确认过的关系线索才会进入人物视角；原始对话不会公开。"
+    },
+    emptyAction: "回到 Aurora 留下第一颗星", openStar: title => `打开记忆：${title}`
   },
   "en-SG": {
     aria: "Memory starfield", heading: "Your memory isn't a filing cabinet", count: n => `${n} current memor${n === 1 ? "y" : "ies"}`,
@@ -35,11 +47,20 @@ const COPY: Record<Locale, {
     revealBtn: "View source & changes", inaccurate: "This isn't accurate", provAria: "Memory source & changes", closeProv: "Close memory source",
     curVersion: "Current version", confidenceLabel: "Understanding confidence", memLayer: "Memory layer", whyHere: "Why it's here",
     changeHistory: n => `Change history (${n})`, noChanges: "No further changes yet.", downstream: n => `Downstream status (${n})`,
+    observation: "How Aurora currently understands it", noDownstream: "No edit has triggered a downstream rebuild yet. When Aurora actually retrieves it, a Memory Echo appears beside the conversation.",
+    moreMemories: n => `Show ${n} more memor${n === 1 ? "y" : "ies"}`,
     importance: "Importance", saveBusy: "Saving…", saveImportance: "Save importance", archiveBusy: "Archiving…", archiveBtn: "Archive this memory",
     historyAria: "Memory change history", recentChanges: "Recent memory changes",
     historyHint: "Undoing creates a new version — it never erases what happened. A permanent forget does not restore the original.",
     rolledBack: "Rolled back", applied: "Applied", rollbackBusy: "Rolling back…", rollbackBtn: "Undo this change",
-    forgetNote: "The original is deleted and cannot be recovered"
+    forgetNote: "The original is deleted and cannot be recovered",
+    emptyTitle: { TIME: "Your first star has not appeared yet", THEME: "Not enough memories form a theme yet", PEOPLE: "No people cues have been confirmed yet" },
+    emptyBody: {
+      TIME: "Share one real moment with Aurora, then choose “Settle today” to place it here immediately.",
+      THEME: "Once two or more memories share a cue, this view groups them into a theme instead of stacking duplicates.",
+      PEOPLE: "Only relationship cues you confirm enter this view; raw conversations never become public."
+    },
+    emptyAction: "Return to Aurora and leave the first star", openStar: title => `Open memory: ${title}`
   }
 };
 
@@ -57,7 +78,7 @@ function MemoryDetailActions({ card, importanceBusy, archiveBusy, onUpdateImport
   if (!onUpdateImportance && !onArchive) return null;
   return <div className="memory-detail-actions">
     {onUpdateImportance && <label className="importance-control">{t.importance}
-      <input type="range" min={0.5} max={2} step={0.1} value={importance} disabled={saving}
+      <input type="range" min={0.5} max={10} step={0.1} value={importance} disabled={saving}
         onChange={event => setImportance(Number(event.target.value))} />
       <span className="importance-value">{importance.toFixed(1)}</span>
     </label>}
@@ -72,15 +93,25 @@ function MemoryDetailActions({ card, importanceBusy, archiveBusy, onUpdateImport
 
 export function MemoryStarfield({ starfield, starfieldBusy, onChangeMode, starfieldDetail, detailBusy,
   onRevealStar, onCloseDetail, memoryOperations, rollbackBusy, onRollback, onCorrectMemory,
-  onUpdateImportance, onArchive, importanceBusy = null, archiveBusy = null, locale = "zh-CN" }: {
+  onUpdateImportance, onArchive, onStartMemory, importanceBusy = null, archiveBusy = null, locale = "zh-CN" }: {
   starfield: StarfieldScene; starfieldBusy: boolean; onChangeMode: (mode: StarfieldScene["mode"]) => void;
   starfieldDetail: StarfieldDetail | null; detailBusy: number | null; onRevealStar: (id: number) => void;
   onCloseDetail: () => void; memoryOperations: MemoryOperation[]; rollbackBusy: number | null;
   onRollback: (operation: MemoryOperation) => void; onCorrectMemory: (star: StarfieldStar) => void;
   onUpdateImportance?: (id: number, importance: number) => void; onArchive?: (id: number) => void;
+  onStartMemory?: () => void;
   importanceBusy?: number | null; archiveBusy?: number | null; locale?: Locale;
 }) {
   const t = COPY[locale];
+  const renderMemoryRow = (star: StarfieldStar) => <li key={star.id}><div><strong>{star.title}</strong><span>{star.theme} · {star.memoryLayer}</span></div>
+    <small>{t.confidence(Math.round(star.confidence * 100), star.versionNo)}</small><p className="ugc-text">{star.summary}</p>
+    <div className="cosmos-list-actions">
+      <AsyncButton disabled={detailBusy !== null} busy={detailBusy === star.id} busyText={t.revealBusy}
+        onClick={() => onRevealStar(star.id)}>{t.revealBtn}</AsyncButton>
+      <button type="button" className="quiet" onClick={() => onCorrectMemory(star)}>{t.inaccurate}</button>
+    </div></li>;
+  const visibleMemories = starfield.accessibleList.slice(0, 3);
+  const foldedMemories = starfield.accessibleList.slice(3);
   return <section className="cosmos-space" aria-label={t.aria}>
     <div className="cosmos-heading"><div><span className="eyebrow">MEMORY, ALIVE</span><h2>{t.heading}</h2></div>
       <span>{t.count(starfield.stars.length)}</span></div>
@@ -90,30 +121,41 @@ export function MemoryStarfield({ starfield, starfieldBusy, onChangeMode, starfi
           className={starfield.mode === value ? "active" : ""} onClick={() => onChangeMode(value)}>{t.modeLabel[value]}</button>)}
     </div>
     <p className="cosmos-explanation">{starfield.modeExplanation}</p>
-    <div className="cosmos-map" aria-hidden="true">
-      {starfield.stars.map(star => <span className="cosmos-star" key={star.id} title={star.ariaLabel} style={{
+    <div className="cosmos-map" aria-label={t.listAria}>
+      {starfield.stars.map(star => <button type="button" className="cosmos-star" key={star.id}
+        aria-label={t.openStar(star.title)} title={star.ariaLabel} disabled={detailBusy !== null}
+        onClick={() => onRevealStar(star.id)} style={{
         left: `${50 + Math.max(-46, Math.min(46, star.x / 2))}%`, top: `${50 + Math.max(-42, Math.min(42, star.y / 2))}%`,
-        width: `${Math.max(8, Math.min(24, 8 + star.gravity * 3))}px`, height: `${Math.max(8, Math.min(24, 8 + star.gravity * 3))}px`,
-        background: star.color, opacity: Math.max(.45, star.glow ?? .7)
-      }} />)}
+        color: star.color, opacity: Math.max(.45, star.glow ?? .7)
+      }}><span className="cosmos-star-core" aria-hidden="true" style={{
+          width: `${Math.max(9, Math.min(26, 9 + star.gravity * 3))}px`,
+          height: `${Math.max(9, Math.min(26, 9 + star.gravity * 3))}px`,
+          background: star.color
+        }} /><span className="cosmos-star-label" aria-hidden="true">{star.title}</span></button>)}
+      {starfield.stars.length === 0 && <div className="cosmos-empty">
+        <strong>{t.emptyTitle[starfield.mode]}</strong>
+        <p>{t.emptyBody[starfield.mode]}</p>
+        {onStartMemory && <button type="button" onClick={onStartMemory}>{t.emptyAction}</button>}
+      </div>}
     </div>
     <div className="cosmos-legend">{Object.entries(starfield.legend).map(([key, value]) => <span key={key}><strong>{key}</strong>{value}</span>)}</div>
     <ol className="cosmos-list" aria-label={t.listAria}>
-      {starfield.accessibleList.map(star => <li key={star.id}><div><strong>{star.title}</strong><span>{star.theme} · {star.memoryLayer}</span></div>
-        <small>{t.confidence(Math.round(star.confidence * 100), star.versionNo)}</small><p className="ugc-text">{star.summary}</p>
-        <div className="cosmos-list-actions">
-          <AsyncButton disabled={detailBusy !== null} busy={detailBusy === star.id} busyText={t.revealBusy}
-            onClick={() => onRevealStar(star.id)}>{t.revealBtn}</AsyncButton>
-          <button type="button" className="quiet" onClick={() => onCorrectMemory(star)}>{t.inaccurate}</button>
-        </div></li>)}
+      {visibleMemories.map(renderMemoryRow)}
     </ol>
+    {foldedMemories.length > 0 && <details className="cosmos-more-memories">
+      <summary>{t.moreMemories(foldedMemories.length)}</summary>
+      <ol className="cosmos-list">{foldedMemories.map(renderMemoryRow)}</ol>
+    </details>}
     {starfieldDetail && <aside className="provenance-panel" aria-label={t.provAria}>
       <div><span className="eyebrow">WHY THIS STAR</span><button type="button" onClick={onCloseDetail} aria-label={t.closeProv}>×</button></div>
       <h3>{starfieldDetail.card.title}</h3><p>{starfieldDetail.provenanceExplanation}</p>
       <dl><div><dt>{t.curVersion}</dt><dd>v{starfieldDetail.card.versionNo}</dd></div><div><dt>{t.confidenceLabel}</dt><dd>{Math.round(starfieldDetail.card.confidence * 100)}%</dd></div><div><dt>{t.memLayer}</dt><dd>{starfieldDetail.card.memoryLayer}</dd></div></dl>
+      <details open><summary>{t.observation}</summary><p>{starfieldDetail.auroraObservation}</p></details>
       <details open><summary>{t.whyHere}</summary><p>{starfieldDetail.gravityExplanation}</p></details>
       <details><summary>{t.changeHistory(starfieldDetail.versionHistory.length)}</summary>{starfieldDetail.versionHistory.length === 0 ? <p>{t.noChanges}</p> : starfieldDetail.versionHistory.map(operation => <p key={operation.id}><strong>{operation.operationType}</strong> · v{operation.oldVersion} → v{operation.newVersion} · {operation.status}</p>)}</details>
-      <details><summary>{t.downstream(starfieldDetail.projectionReceipts.length)}</summary>{starfieldDetail.projectionReceipts.map(receipt => <p key={receipt.id}><strong>{receipt.projectionType}</strong> · {receipt.status}<br /><small>{receipt.detail}</small></p>)}</details>
+      <details><summary>{t.downstream(starfieldDetail.projectionReceipts.length)}</summary>{starfieldDetail.projectionReceipts.length === 0
+        ? <p>{t.noDownstream}</p>
+        : starfieldDetail.projectionReceipts.map(receipt => <p key={receipt.id}><strong>{receipt.projectionType}</strong> · {receipt.status}<br /><small>{receipt.detail}</small></p>)}</details>
       <MemoryDetailActions key={starfieldDetail.card.id} card={starfieldDetail.card}
         importanceBusy={importanceBusy} archiveBusy={archiveBusy}
         onUpdateImportance={onUpdateImportance} onArchive={onArchive} locale={locale} />

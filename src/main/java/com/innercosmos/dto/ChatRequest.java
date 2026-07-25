@@ -25,4 +25,10 @@ public class ChatRequest {
     public Double latitude;
     public Double longitude;
     public String aiProviderPreference;
+    /** Internal streaming hint: a short foreground acknowledgement is already being shown. */
+    public boolean foregroundAcknowledgementSent;
+    /** Exact server-generated foreground text already shown by the client; persisted before deep bubbles. */
+    public String foregroundAcknowledgementText;
+    /** Observability label returned by the fast expression-core endpoint. */
+    public String foregroundAcknowledgementSource;
 }

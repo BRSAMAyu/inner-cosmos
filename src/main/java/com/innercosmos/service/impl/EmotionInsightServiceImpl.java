@@ -211,12 +211,12 @@ public class EmotionInsightServiceImpl implements EmotionInsightService {
 
             trace.userId = userId;
             trace.sourceSessionId = sessionId;
-            trace.emotionName = insight.primaryEmotion;
+            trace.emotionName = bounded(insight.primaryEmotion, 64);
             trace.emotionScore = EmotionTrace.clampScore(insight.emotionScore);
-            trace.weatherType = insight.weatherType;
+            trace.weatherType = EmotionWeatherMapper.weatherFor(trace.emotionName, trace.emotionScore);
             trace.triggerScene = insight.triggerScene;
             trace.emotionSpectrum = JsonUtils.toJson(insight.spectrum == null ? List.of() : insight.spectrum);
-            trace.analysisSource = insight.analysisSource;
+            trace.analysisSource = bounded(insight.analysisSource, 32);
             trace.recordDate = LocalDate.now();
 
             if (update) {
@@ -283,7 +283,9 @@ public class EmotionInsightServiceImpl implements EmotionInsightService {
 
     private EmotionInsight toInsight(StructuredAiResults.Emotion emotion, AnalysisResult analysis, String source) {
         EmotionInsight insight = new EmotionInsight();
-        insight.primaryEmotion = blank(emotion.emotionName) ? emotionName(analysis) : emotion.emotionName;
+        insight.primaryEmotion = bounded(
+                blank(emotion.emotionName) ? emotionName(analysis) : emotion.emotionName,
+                64);
         double score = emotion.emotionScore == null ? analysis.intensityScore : emotion.emotionScore;
         insight.emotionScore = EmotionInsight.clampScore(score);
         insight.triggerScene = blank(emotion.triggerScene) ? triggerScene(analysis) : emotion.triggerScene;
@@ -295,9 +297,10 @@ public class EmotionInsightServiceImpl implements EmotionInsightService {
         }
         insight.spectrum = spectrum;
 
-        insight.weatherType = blank(emotion.weatherType)
-                ? EmotionWeatherMapper.weatherFor(insight.primaryEmotion, insight.emotionScore)
-                : emotion.weatherType;
+        // weatherType is a product-level semantic enum consumed by storage and UI. Providers
+        // sometimes return a poetic sentence here (the public E2E caught one longer than the
+        // VARCHAR(32) contract), so never persist or surface that free text as the enum itself.
+        insight.weatherType = EmotionWeatherMapper.weatherFor(insight.primaryEmotion, insight.emotionScore);
         insight.analysisSource = source;
         return insight;
     }
@@ -352,5 +355,11 @@ public class EmotionInsightServiceImpl implements EmotionInsightService {
 
     private boolean blank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private static String bounded(String value, int maxLength) {
+        if (value == null) return null;
+        String normalized = value.trim();
+        return normalized.length() <= maxLength ? normalized : normalized.substring(0, maxLength);
     }
 }

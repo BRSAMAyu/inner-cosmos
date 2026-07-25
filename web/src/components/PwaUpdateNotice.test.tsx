@@ -14,13 +14,19 @@ const setOfflineReady = vi.fn();
 const updateServiceWorker = vi.fn().mockResolvedValue(undefined);
 let needRefreshValue = false;
 let offlineReadyValue = false;
+let registerOptions: {
+  onRegisteredSW?: (serviceWorkerUrl: string, registration?: ServiceWorkerRegistration) => void;
+} | undefined;
 
 vi.mock("virtual:pwa-register/react", () => ({
-  useRegisterSW: () => ({
-    needRefresh: [needRefreshValue, setNeedRefresh],
-    offlineReady: [offlineReadyValue, setOfflineReady],
-    updateServiceWorker,
-  }),
+  useRegisterSW: (options: typeof registerOptions) => {
+    registerOptions = options;
+    return {
+      needRefresh: [needRefreshValue, setNeedRefresh],
+      offlineReady: [offlineReadyValue, setOfflineReady],
+      updateServiceWorker,
+    };
+  },
 }));
 
 // jsdom's default navigator.language (en-US) would otherwise make loadLocale() fall back to
@@ -31,12 +37,23 @@ afterEach(() => {
   vi.clearAllMocks();
   needRefreshValue = false;
   offlineReadyValue = false;
+  registerOptions = undefined;
 });
 
 describe("PwaUpdateNotice", () => {
   it("renders nothing when the registered service worker reports no pending state", () => {
     const { container } = render(<PwaUpdateNotice />);
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it("checks for an updated service worker whenever registration completes", () => {
+    const update = vi.fn().mockResolvedValue(undefined);
+    render(<PwaUpdateNotice />);
+    registerOptions?.onRegisteredSW?.(
+      "/app/aurora/sw.js",
+      { update } as unknown as ServiceWorkerRegistration,
+    );
+    expect(update).toHaveBeenCalledOnce();
   });
 
   it("shows the update banner when useRegisterSW reports needRefresh, and reloading calls updateServiceWorker", () => {

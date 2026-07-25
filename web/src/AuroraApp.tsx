@@ -5,8 +5,10 @@ import { api, apiConfigurationError, configureBearerAuth, demoModeBuild, hasConf
 import { initialMobileState, mobileRuntime, type MobileRuntimeState } from "./mobile";
 import { mobileOidc } from "./mobile-auth";
 import { isTauriRuntime } from "./desktop-runtime";
-import { capsulePath, letterThreadPath, MeSpace, productSpaceFromPath, productSpaces, ProductShellNavigation, resourceFromPath, spacePath, type ProductSpace, type CosmosTab, cosmosTabFromPath, cosmosTabPath, CosmosSubNav } from "./components/ProductShell";
+import { capsulePath, connectionTabFromSearch, connectionTabPath, ConnectionSubNav, letterThreadPath, MeSpace, productSpaceFromPath, productSpaces, ProductShellNavigation, resourceFromPath, spacePath, type ConnectionTab, type ProductSpace, type CosmosTab, cosmosTabFromPath, cosmosTabPath, CosmosSubNav, type ResonanceTab, resonanceTabFromPath, resonanceTabPath, ResonanceSubNav } from "./components/ProductShell";
 import { AuroraConversation } from "./components/AuroraConversation";
+import { AuroraInnerVoiceAside } from "./components/AuroraInnerVoiceAside";
+import { AuroraMemoryTrace } from "./components/AuroraMemoryTrace";
 import { SafetyResourceCard } from "./components/SafetyResourceCard";
 import { GoodbyeRitualCard } from "./components/GoodbyeRitualCard";
 import { SocialGroupsView } from "./components/SocialGroupsView";
@@ -50,6 +52,10 @@ import { useBeliefGallery } from "./hooks/useBeliefGallery";
 import { TodoBoard } from "./components/TodoBoard";
 import { HeartDiary } from "./components/HeartDiary";
 import { BeliefGallery } from "./components/BeliefGallery";
+import { userVisiblePublicCapsules, userVisibleResonanceMatches } from "./demoFixtureVisibility";
+import { DemoPersonaChooser } from "./components/DemoPersonaChooser";
+import { TodayOverview } from "./components/TodayOverview";
+import { InnerCosmosOverview } from "./components/InnerCosmosOverview";
 
 // The Aurora conversation/session domain (message list, streaming/turn status, interrupt/stop,
 // mode picker, WakeIntent negotiate, session bootstrap/replay) has been extracted into
@@ -70,6 +76,8 @@ export function AuroraApp() {
   const navigate = useNavigate();
   const productSpace = useMemo(() => productSpaceFromPath(location.pathname), [location.pathname]);
   const cosmosTab = useMemo(() => cosmosTabFromPath(location.pathname), [location.pathname]);
+  const resonanceTab = useMemo(() => resonanceTabFromPath(location.pathname), [location.pathname]);
+  const connectionTab = useMemo(() => connectionTabFromSearch(location.search), [location.search]);
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [status, setStatus] = useState("正在连接你的内宇宙…");
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
@@ -171,7 +179,18 @@ export function AuroraApp() {
   // picker, WakeIntent negotiate, session bootstrap/replay) -- extracted into its own hook; see
   // web/src/hooks/useAuroraSession.ts.
   const auroraSession = useAuroraSession({
-    authenticated, skillLocale, onSkillSuggestion: setSkillSuggestion, setStatus
+    authenticated, skillLocale, onSkillSuggestion: setSkillSuggestion, setStatus,
+    onMemorySettled: async () => {
+      const [scene, cards, operations] = await Promise.all([
+        api.starfield("TIME"), api.memoryCards(), api.memoryOperations()
+      ]);
+      setStarfield(scene);
+      setMemories(cards);
+      setMemoryOperations(operations);
+      navigate(cosmosTabPath("starfield"));
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      setStatus(`已经把这一刻沉淀成 ${cards.length} 颗可追溯的记忆星；点星体可以查看它来自哪里。`);
+    }
   });
 
   // Connections/letters domain (People Discovery, relation mentions/timeline, connection
@@ -201,6 +220,25 @@ export function AuroraApp() {
   const navigateCosmosTab = useCallback((tab: CosmosTab) => {
     navigate(cosmosTabPath(tab));
   }, [navigate]);
+
+  const navigateConnectionTab = useCallback((tab: ConnectionTab) => {
+    navigate(connectionTabPath(tab));
+  }, [navigate]);
+
+  const navigateResonanceTab = useCallback((tab: ResonanceTab) => {
+    navigate(resonanceTabPath(tab));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [navigate]);
+
+  // Delivery is advanced by the backend scheduler, so keep the visible inbox/outbox honest while
+  // the user stays on this tab. The immediate refresh covers returning from another space; the
+  // bounded interval avoids requiring a full-page reload during the three-minute demo flight.
+  useEffect(() => {
+    if (!authenticated || productSpace !== "letters" || connectionTab !== "letters") return;
+    void connectionsAndLetters.refreshLetters();
+    const timer = window.setInterval(() => void connectionsAndLetters.refreshLetters(), 20_000);
+    return () => window.clearInterval(timer);
+  }, [authenticated, productSpace, connectionTab, connectionsAndLetters.refreshLetters]);
 
   // Lazy per-tab fetch: each cosmos sub-tab's data loads only the first time it is actually
   // visited, not eagerly in the shared login bootstrap (doc 24 section 3.3 forbids adding
@@ -293,7 +331,11 @@ export function AuroraApp() {
         api.memoryOperations().then(setMemoryOperations),
         api.memoryCards().then(setMemories),
         api.myCapsules().then(rows => { setCapsules(rows); loadedCapsules = rows; }),
-        api.resonanceMatches().then(rows => { setResonanceMatches(rows); loadedMatches = rows; }),
+        api.resonanceMatches().then(rows => {
+          const visibleRows = userVisibleResonanceMatches(rows);
+          setResonanceMatches(visibleRows);
+          loadedMatches = visibleRows;
+        }),
         connectionsAndLetters.loadLetterInbox(),
         connectionsAndLetters.loadConnectionRequests(),
         connectionsAndLetters.loadFriends(),
@@ -301,7 +343,7 @@ export function AuroraApp() {
         api.psychologySkillRuns().then(setSkillRuns),
         api.portrait().then(setPortrait),
         api.recentCorrections().then(setCorrections),
-        api.plazaCapsules().then(setPublicCapsules).catch(() => undefined),
+        api.plazaCapsules().then(rows => setPublicCapsules(userVisiblePublicCapsules(rows))).catch(() => undefined),
         connectionsAndLetters.loadLetterOutbox(),
         connectionsAndLetters.loadPeople(),
         api.claimCandidates().then(setClaimCandidates).catch(() => undefined),
@@ -529,7 +571,7 @@ export function AuroraApp() {
   const beginMemoryCorrection = (star: StarfieldStar) => {
     setCorrectionTarget({ id: star.id, label: star.title });
     setCorrectionOld(""); setCorrectionNew(""); setCorrectionImpact(null);
-    navigateSpace("cosmos");
+    navigate(cosmosTabPath("beliefs"));
     window.setTimeout(() => document.querySelector(".understanding-space")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
   };
 
@@ -720,8 +762,16 @@ export function AuroraApp() {
   const previewTtsVoice = (voiceId: string) => api.previewTtsVoice(voiceId).then(result => result.audio);
 
   const changeStarfieldMode = async (nextMode: StarfieldScene["mode"]) => {
+    if (starfield?.mode === nextMode) return;
     setStarfieldBusy(true);
-    try { setStarfield(await api.starfield(nextMode)); }
+    setStarfieldDetail(null);
+    const viewLabel = nextMode === "TIME" ? "时间" : nextMode === "THEME" ? "主题" : "人物";
+    setStatus(`正在切换到${viewLabel}视角…`);
+    navigate(`${cosmosTabPath("starfield")}?view=${nextMode.toLowerCase()}`, { replace: true });
+    try {
+      setStarfield(await api.starfield(nextMode));
+      setStatus(`已进入${viewLabel}视角`);
+    }
     catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法切换星空视角"); }
     finally { setStarfieldBusy(false); }
   };
@@ -742,6 +792,13 @@ export function AuroraApp() {
     try { setStarfieldDetail(await api.starfieldDetail(id)); }
     catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法打开这颗记忆的来源"); }
     finally { setDetailBusy(null); }
+  };
+
+  const openMemoryEvidence = (id: number) => {
+    navigate(cosmosTabPath("starfield"));
+    void revealStar(id);
+    window.setTimeout(() => document.querySelector(".provenance-panel")
+      ?.scrollIntoView({ behavior: "smooth", block: "center" }), 120);
   };
 
   const updateMemoryImportance = async (id: number, importance: number) => {
@@ -786,10 +843,16 @@ export function AuroraApp() {
   const previewNewCapsule = async () => {
     setCapsuleBusy(true);
     try {
-      const preview = await api.previewCapsule(selectedMemoryIds);
+      const memoryIds = selectedMemoryIds.length > 0
+        ? selectedMemoryIds
+        : selectableMemories.filter(memory => !["LOCAL_ONLY", "NO_EXTERNAL_PROCESSING"].includes((memory.consentScope ?? "").toUpperCase()))
+          .slice(0, 3).map(memory => memory.id);
+      if (memoryIds.length > 0) setSelectedMemoryIds(memoryIds);
+      const preview = await api.previewCapsule(memoryIds);
       setCapsulePreview(preview);
       if (!capsuleName.trim()) setCapsuleName(preview.suggestedPseudonym);
-      setStatus("这是严格脱敏后的编译预览；还没有创建或公开任何共鸣体。");
+      if (!capsuleIntro.trim()) setCapsuleIntro(preview.abstractSummary);
+      setStatus("Aurora 已用最近的可授权记忆生成私密草稿；敏感项已移除，还没有公开任何内容。");
     } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法生成授权预览"); }
     finally { setCapsuleBusy(false); }
   };
@@ -910,13 +973,14 @@ export function AuroraApp() {
     setDirectoryPick(capsule);
     chooseVisitorMatch(capsule.id);
     setStatus(`你从广场走近了「${capsule.pseudonym}」。它是授权 AI 共鸣体，不是真人实时在线。`);
-    window.setTimeout(() => document.querySelector(".visitor-workbench, .resonance-network")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+    navigate(resonanceTabPath("encounters"));
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const chooseResonanceStrategy = async (strategy: ResonanceStrategy) => {
     setVisitorBusy(true);
     try {
-      const matches = await api.resonanceMatches(strategy);
+      const matches = userVisibleResonanceMatches(await api.resonanceMatches(strategy));
       setResonanceStrategy(strategy); setResonanceMatches(matches);
       setVisitorMatchId(matches[0]?.capsule.id ?? null);
       setPersonaSession(null); setPersonaMessages([]); setPersonaQuota(null); setSentLetter(null); setLetterBody(""); setPersonaTurnError(null);
@@ -1134,6 +1198,8 @@ export function AuroraApp() {
         <Route path="*" element={<Navigate to={spacePath("aurora")} replace />} />
       </Routes>
       <ProductShellNavigation active={productSpace} onNavigate={navigateSpace} locale={skillLocale} />
+      <DemoPersonaChooser compact currentUsername={userProfile?.username ?? null} locale={skillLocale}
+        onEntered={() => window.location.reload()} />
 
       {/* Gemini audit 4.7: each product space gets its own ErrorBoundary so a crash rendering one
           space (all five are always mounted, just `hidden`, to preserve scroll/edit state across
@@ -1155,9 +1221,34 @@ export function AuroraApp() {
         <div className="orb" aria-hidden="true"><span /></div>
       </header>
 
+      <TodayOverview memoryCount={memories.length} latestMemory={memories[0]?.title ?? null}
+        arrivedLetters={connectionsAndLetters.letterInbox.length}
+        latestLetter={connectionsAndLetters.letterInbox[0]?.title ?? null}
+        publicCapsules={capsules.filter(capsule => capsule.visibilityStatus === "PUBLIC").length}
+        wakeIntents={auroraSession.wakeIntents.length}
+        onOpenCosmos={() => navigateSpace("cosmos")}
+        onOpenLetters={() => navigate(connectionTabPath("letters"))}
+        onOpenResonance={() => navigateSpace("resonance")}
+        onWriteLetter={() => {
+          navigate(resonanceTabPath("encounters"));
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }}
+        onOpenReturns={() => document.querySelector(".returns")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+        locale={skillLocale} />
+
       <nav className="modes" aria-label={tt.modesAria}>
         {modes.map(([value]) => <button key={value} className={auroraSession.mode === value ? "active" : ""} onClick={() => auroraSession.setMode(value)}>{tt.modeLabel[value as DialogMode]}</button>)}
       </nav>
+
+      <AuroraInnerVoiceAside voice={auroraSession.innerVoice}
+        enabled={ttsPreferences?.innerVoiceEnabled ?? false}
+        mode={ttsPreferences?.innerVoiceMode ?? "AMBIENT"}
+        locale={skillLocale}
+        onDismiss={auroraSession.dismissInnerVoice} />
+
+      <AuroraMemoryTrace trace={auroraSession.memoryTrace} memories={memories}
+        locale={skillLocale} onOpenMemory={openMemoryEvidence}
+        onDismiss={auroraSession.dismissMemoryTrace} />
 
       {/* The composer sits directly after the hero/mode-picker, before the WakeIntent and
           Self/Emergence "capability display" panels below, so a first-time user (mobile
@@ -1181,7 +1272,7 @@ export function AuroraApp() {
         onTranscribe={async blob => {
           try { const result = await transcribeAudio(blob); return result.text; }
           catch (error) { setStatus(error instanceof Error ? error.message : tt.transcribeUnavailable); return ""; }
-        }} onGoodbye={() => void auroraSession.triggerGoodbye()}
+        }} onGoodbye={() => void auroraSession.triggerGoodbye()} goodbyeBusy={auroraSession.goodbyeBusy}
         innerVoiceEnabled={ttsPreferences?.innerVoiceEnabled ?? false}
         innerVoiceMode={ttsPreferences?.innerVoiceMode ?? "AMBIENT"}
         locale={skillLocale} />
@@ -1202,8 +1293,26 @@ export function AuroraApp() {
 
       <section className="returns" aria-label={tt.returnsAria}>
         <div className="returns-head"><div><span className="eyebrow">AURORA RETURNS</span><h2>{tt.returnsTitle}</h2></div>
-          <div className="return-negotiate"><label>{tt.whenLabel}<input aria-label={tt.returnTimeAria} value={auroraSession.returnWhen} onChange={event => auroraSession.setReturnWhen(event.target.value)} /></label>
+          <div className="return-negotiate">
+          <label>{skillLocale === "en-SG" ? "What should Aurora return for?" : "这次回来，想继续什么"}
+            <select aria-label={skillLocale === "en-SG" ? "Return purpose" : "回来约定的目的"}
+              value={auroraSession.returnPurpose} onChange={event => auroraSession.setReturnPurpose(event.target.value)}>
+              <option value="继续这一刻未说完的话">{skillLocale === "en-SG" ? "Continue what we left unfinished" : "继续这一刻未说完的话"}</option>
+              <option value="看看今天最难的事有没有松一点">{skillLocale === "en-SG" ? "Check whether the hardest thing has eased" : "看看今天最难的事有没有松一点"}</option>
+              <option value="陪我开始一个很小的行动">{skillLocale === "en-SG" ? "Help me begin one small action" : "陪我开始一个很小的行动"}</option>
+              <option value="在一天结束时一起收尾">{skillLocale === "en-SG" ? "Close the day together" : "在一天结束时一起收尾"}</option>
+            </select></label>
+          <label>{tt.whenLabel}<input aria-label={tt.returnTimeAria} value={auroraSession.returnWhen} onChange={event => auroraSession.setReturnWhen(event.target.value)} /></label>
           <button type="button" disabled={auroraSession.wakeBusy || !auroraSession.returnWhen.trim()} onClick={() => void auroraSession.scheduleReturn()}>{tt.scheduleBtn}</button></div></div>
+        <div className="return-presets" aria-label={skillLocale === "en-SG" ? "Common return times" : "常用回来时间"}>
+          {(skillLocale === "en-SG"
+            ? ["Tonight at 10", "Tomorrow morning at 8:30", "Friday after work", "Next Sunday afternoon"]
+            : ["今晚 10 点", "明天早上 8:30", "周五下班后", "下周日下午"]).map(value =>
+              <button type="button" key={value} onClick={() => auroraSession.setReturnWhen(value)}>{value}</button>)}
+        </div>
+        <p className="returns-autonomy">{skillLocale === "en-SG"
+          ? "You can keep several different return plans. When your chats reveal a stable routine or something unfinished, Aurora may also gently propose one—never force it."
+          : "不同目的的约定可以同时存在。对话里出现稳定作息或未完成的事时，Aurora 也可以主动提出一个合适的回来时间，但不会替你强制开启。"}</p>
         {auroraSession.wakeIntents.length === 0 ? <p className="returns-empty">{tt.returnsEmpty}</p> :
           <div className="return-list">{auroraSession.wakeIntents.map(intent => <article key={intent.id} className="return-card">
             <div><strong>{intent.reasonForUser}</strong><span>{new Date(intent.preferredAt).toLocaleString(skillLocale, { dateStyle: "short", timeStyle: "short" })}</span><small>{intent.purpose}</small></div>
@@ -1237,26 +1346,18 @@ export function AuroraApp() {
       <CosmosSubNav active={cosmosTab} onNavigate={navigateCosmosTab} />
 
       <div hidden={cosmosTab !== "starfield"}>
-        <ClaimCandidateReview candidates={claimCandidates} locale={skillLocale} busyId={claimCandidateBusyId}
-          onConfirm={id => void confirmClaimCandidate(id)} onDismiss={id => void dismissClaimCandidate(id)} />
-        <UnderstandingCorrection claims={claims} oldValue={correctionOld} newValue={correctionNew} impact={correctionImpact} busy={correctionBusy} target={correctionTarget}
-          corrections={corrections} retiringId={retiringCorrectionId}
-          onOldValue={value => { setCorrectionOld(value); setCorrectionImpact(null); }} onNewValue={value => { setCorrectionNew(value); setCorrectionImpact(null); }}
-          onPreview={() => void previewCorrection()} onCancelPreview={() => setCorrectionImpact(null)} onConfirm={() => void confirmCorrection()} onClearTarget={clearCorrectionTarget}
-          onRetire={id => void retireCorrection(id)} locale={skillLocale} />
+        {starfield && <InnerCosmosOverview starfield={starfield}
+          dailyRecords={dailyRecord.dailyRecords} themes={memoryThemes} locale={skillLocale}
+          onOpenMemory={id => void revealStar(id)}
+          onOpenDaily={() => navigateCosmosTab("daily")}
+          onOpenWeekly={() => navigateCosmosTab("weekly")}
+          onOpenBeliefs={() => navigateCosmosTab("beliefs")} />}
 
         {starfield && <MemoryStarfield starfield={starfield} starfieldBusy={starfieldBusy} onChangeMode={mode => void changeStarfieldMode(mode)}
           starfieldDetail={starfieldDetail} detailBusy={detailBusy} onRevealStar={id => void revealStar(id)} onCloseDetail={() => setStarfieldDetail(null)}
           memoryOperations={memoryOperations} rollbackBusy={rollbackBusy} onRollback={operation => void rollbackMemoryOperation(operation)} onCorrectMemory={beginMemoryCorrection}
           onUpdateImportance={(id, importance) => void updateMemoryImportance(id, importance)} onArchive={id => void archiveMemory(id)}
-          importanceBusy={importanceBusy} archiveBusy={archiveBusy} locale={skillLocale} />}
-
-        <PsychologySkillStudio skills={skills} skillRuns={skillRuns} selectedSkill={selectedSkill} skillAnswers={skillAnswers}
-          skillConsent={skillConsent} skillRetention={skillRetention} skillBusy={skillBusy} skillLocale={skillLocale}
-          onLocaleChange={setSkillLocale} onSelectSkill={skillId => { setSelectedSkillId(skillId); setSkillAnswers({}); setSkillConsent(false); }}
-          onAnswerChange={(key, value) => setSkillAnswers(current => ({ ...current, [key]: value }))}
-          onRetentionChange={setSkillRetention} onConsentChange={setSkillConsent} onRun={() => void runPsychologySkill()}
-          onContinueWithAurora={continueSkillWithAurora} onRevokeRun={id => void revokePsychologyRun(id)} />
+          onStartMemory={() => navigateSpace("aurora")} importanceBusy={importanceBusy} archiveBusy={archiveBusy} locale={skillLocale} />}
 
         <TimelineSection dailyRecords={dailyRecord.dailyRecords} themes={memoryThemes} locale={skillLocale} />
       </div>
@@ -1289,16 +1390,31 @@ export function AuroraApp() {
       </div>
 
       <div hidden={cosmosTab !== "beliefs"}>
+        <ClaimCandidateReview candidates={claimCandidates} locale={skillLocale} busyId={claimCandidateBusyId}
+          onConfirm={id => void confirmClaimCandidate(id)} onDismiss={id => void dismissClaimCandidate(id)} />
+        <UnderstandingCorrection claims={claims} oldValue={correctionOld} newValue={correctionNew} impact={correctionImpact} busy={correctionBusy} target={correctionTarget}
+          corrections={corrections} retiringId={retiringCorrectionId}
+          onOldValue={value => { setCorrectionOld(value); setCorrectionImpact(null); }} onNewValue={value => { setCorrectionNew(value); setCorrectionImpact(null); }}
+          onPreview={() => void previewCorrection()} onCancelPreview={() => setCorrectionImpact(null)} onConfirm={() => void confirmCorrection()} onClearTarget={clearCorrectionTarget}
+          onRetire={id => void retireCorrection(id)} locale={skillLocale} />
         <BeliefGallery beliefs={beliefGallery.beliefs} contradictions={beliefGallery.contradictions} filter={beliefGallery.filter}
           categories={beliefGallery.categories} selectedCategory={beliefGallery.selectedCategory} categoryBeliefs={beliefGallery.categoryBeliefs}
           busy={beliefGallery.busy} onSelectFilter={filter => void beliefGallery.selectFilter(filter)}
           onSelectCategory={category => void beliefGallery.selectCategory(category)} locale={skillLocale} />
+        <PsychologySkillStudio skills={skills} skillRuns={skillRuns} selectedSkill={selectedSkill} skillAnswers={skillAnswers}
+          skillConsent={skillConsent} skillRetention={skillRetention} skillBusy={skillBusy} skillLocale={skillLocale}
+          onLocaleChange={setSkillLocale} onSelectSkill={skillId => { setSelectedSkillId(skillId); setSkillAnswers({}); setSkillConsent(false); }}
+          onAnswerChange={(key, value) => setSkillAnswers(current => ({ ...current, [key]: value }))}
+          onRetentionChange={setSkillRetention} onConsentChange={setSkillConsent} onRun={() => void runPsychologySkill()}
+          onContinueWithAurora={continueSkillWithAurora} onRevokeRun={id => void revokePsychologyRun(id)} />
       </div>
       </div>
       </ErrorBoundary>
 
       <ErrorBoundary variant="space" locale={skillLocale}>
       <div className="product-space" hidden={productSpace !== "resonance"}>
+      <ResonanceSubNav active={resonanceTab} onNavigate={navigateResonanceTab} locale={skillLocale} />
+      <div hidden={resonanceTab !== "mine"}>
       <CapsuleWorkbench capsules={capsules} selectedCapsuleId={selectedCapsuleId} selectedCapsule={selectedCapsule}
         selectableMemories={selectableMemories} selectedMemoryIds={selectedMemoryIds} capsuleName={capsuleName} capsuleIntro={capsuleIntro}
         capsulePreview={capsulePreview} capsuleBusy={capsuleBusy} genomeHistory={genomeHistory} fidelitySummary={fidelitySummary} sandboxQuestion={sandboxQuestion}
@@ -1318,10 +1434,14 @@ export function AuroraApp() {
         capsuleStandIn={capsuleStandIn} onCapsuleStandIn={setCapsuleStandIn}
         capsuleContactPolicy={capsuleContactPolicy} onCapsuleContactPolicy={setCapsuleContactPolicy}
         onSaveContext={patch => void saveCapsuleContext(patch)} locale={skillLocale} />
+      </div>
 
+      <div hidden={resonanceTab !== "plaza"}>
       <PlazaDirectory capsules={publicCapsules} activeCapsuleId={visitorMatch?.capsule.id ?? null} busy={visitorBusy}
         onOpenCapsule={openDirectoryCapsule} locale={skillLocale} />
+      </div>
 
+      <div hidden={resonanceTab !== "encounters"}>
       <ResonanceNetwork resonanceMatches={resonanceMatches} resonanceStrategy={resonanceStrategy} visitorBusy={visitorBusy}
         visitorMatch={visitorMatch} personaSession={personaSession} personaMessages={personaMessages} personaDraft={personaDraft}
         personaQuota={personaQuota} letterTitle={letterTitle} letterBody={letterBody} sentLetter={sentLetter}
@@ -1333,13 +1453,23 @@ export function AuroraApp() {
         personaVoiceAudio={personaVoiceAudio} personaVoiceBusy={personaVoiceBusy} personaVoiceError={personaVoiceError}
         onPlayPersonaVoice={() => void playPersonaVoice()} locale={skillLocale} />
       </div>
+      </div>
       </ErrorBoundary>
 
       <ErrorBoundary variant="space" locale={skillLocale}>
       <div className="product-space" hidden={productSpace !== "letters"}>
-      <PeopleDiscovery people={connectionsAndLetters.people} isBusy={connectionsAndLetters.isPersonBusy} onRequest={userId => void connectionsAndLetters.requestPersonConnection(userId)} locale={skillLocale} />
-      <RelationsView relations={connectionsAndLetters.relations} selected={connectionsAndLetters.selectedRelation} timeline={connectionsAndLetters.relationTimeline} health={connectionsAndLetters.relationHealth} busy={connectionsAndLetters.relationBusy} onSelect={label => void connectionsAndLetters.openRelation(label)} locale={skillLocale} />
-      <SocialGroupsView groups={connectionsAndLetters.groups} invites={connectionsAndLetters.groupInvites} friends={connectionsAndLetters.friends}
+      <ConnectionSubNav active={connectionTab} onNavigate={navigateConnectionTab} locale={skillLocale} />
+
+      <div hidden={connectionTab !== "people"}>
+        <PeopleDiscovery people={connectionsAndLetters.people} isBusy={connectionsAndLetters.isPersonBusy} onRequest={userId => void connectionsAndLetters.requestPersonConnection(userId)} locale={skillLocale} />
+      </div>
+
+      <div hidden={connectionTab !== "relations"}>
+        <RelationsView relations={connectionsAndLetters.relations} selected={connectionsAndLetters.selectedRelation} timeline={connectionsAndLetters.relationTimeline} health={connectionsAndLetters.relationHealth} busy={connectionsAndLetters.relationBusy} onSelect={label => void connectionsAndLetters.openRelation(label)} locale={skillLocale} />
+      </div>
+
+      <div hidden={connectionTab !== "groups"}>
+        <SocialGroupsView groups={connectionsAndLetters.groups} invites={connectionsAndLetters.groupInvites} friends={connectionsAndLetters.friends}
         selectedGroupId={connectionsAndLetters.selectedGroupId} members={connectionsAndLetters.groupMembers} membersStatus={connectionsAndLetters.groupMembersStatus}
         createBusy={connectionsAndLetters.groupCreateBusy} isInviteBusy={connectionsAndLetters.isGroupInviteBusy}
         isInviteDecisionBusy={connectionsAndLetters.isGroupInviteDecisionBusy} isLeaveBusy={connectionsAndLetters.isGroupLeaveBusy}
@@ -1348,7 +1478,9 @@ export function AuroraApp() {
         onInvite={(groupId, userId) => void connectionsAndLetters.inviteToGroup(groupId, userId)}
         onRespondInvite={(memberId, decision) => void connectionsAndLetters.respondToGroupInvite(memberId, decision)}
         onLeaveGroup={id => void connectionsAndLetters.leaveGroup(id)} locale={skillLocale} />
+      </div>
 
+      <div hidden={connectionTab !== "letters"}>
       <LettersInbox letterInbox={connectionsAndLetters.letterInbox} letterOutbox={connectionsAndLetters.letterOutbox} threads={connectionsAndLetters.letterThreads} threadLetters={connectionsAndLetters.threadLetters} threadLettersStatus={connectionsAndLetters.threadLettersStatus} selectedThreadId={connectionsAndLetters.selectedThreadId}
         isDraftBusy={connectionsAndLetters.isDraftBusy} replyBusyId={connectionsAndLetters.replyBusyId}
         isLetterActionBusy={connectionsAndLetters.isLetterActionBusy} isConnectionDecisionBusy={connectionsAndLetters.isConnectionDecisionBusy}
@@ -1359,7 +1491,10 @@ export function AuroraApp() {
         onReportLetter={letter => void connectionsAndLetters.reportLetter(letter)} onRequestConnection={letter => void connectionsAndLetters.requestConnection(letter)}
         onDecideConnection={(id, decision) => void connectionsAndLetters.decideConnection(id, decision)} onLeaveConnection={id => void connectionsAndLetters.leaveConnection(id)} locale={skillLocale}
         letterVoiceLetterId={connectionsAndLetters.letterVoiceLetterId} letterVoiceAudio={connectionsAndLetters.letterVoiceAudio} letterVoiceError={connectionsAndLetters.letterVoiceError}
-        isLetterVoiceBusy={connectionsAndLetters.isLetterVoiceBusy} onPlayLetterVoice={letter => void connectionsAndLetters.playLetterVoice(letter)} />
+        isLetterVoiceBusy={connectionsAndLetters.isLetterVoiceBusy} onPlayLetterVoice={letter => void connectionsAndLetters.playLetterVoice(letter)}
+        refreshBusy={connectionsAndLetters.lettersRefreshing} onRefresh={() => void connectionsAndLetters.refreshLetters()}
+        onComposeNew={() => navigate("/resonance/encounters")} />
+      </div>
       </div>
       </ErrorBoundary>
 
@@ -1385,7 +1520,6 @@ export function AuroraApp() {
       </div>
       </ErrorBoundary>
       <div className="state global-state" role="status"><i className={auroraSession.activeTurnId ? "pulse" : ""} />{status}</div>
-      <footer><span>{tt.footerTagline}</span><button type="button" onClick={() => void logout()}>{tt.footerSignOut}</button></footer>
     </main>
   );
 }

@@ -2,9 +2,14 @@ import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 import { buildPwaManifest } from "./src/pwaManifest";
+import {
+  pwaRegisterTypeForMode,
+  shouldActivatePwaUpdateImmediately,
+} from "./src/pwaUpdatePolicy";
 
 export default defineConfig(({ mode }) => {
   const installedBundle = mode.startsWith("mobile") || mode.startsWith("tauri") || mode === "demo";
+  const activatePwaUpdateImmediately = shouldActivatePwaUpdateImmediately(mode);
   return ({
   // Clean BrowserRouter deep links need an absolute web base; the Capacitor local
   // origin still needs relative assets. Demo mode is also an installed Capacitor
@@ -16,18 +21,10 @@ export default defineConfig(({ mode }) => {
       // Native shells ship immutable bundled assets. Registering a service worker there can
       // keep an older bundle alive across APK upgrades and produce a blank or stale native UI.
       disable: installedBundle,
-      // registerType "prompt" (not "autoUpdate"): confirmed by reading vite-plugin-pwa's
-      // generated client (node_modules/vite-plugin-pwa/dist/client/build/register.js) rather
-      // than guessing from the option name. Under "autoUpdate" the generated register script
-      // NEVER calls onNeedRefresh at all -- it silently reloads the page itself the instant a
-      // new service worker activates, with zero user-visible warning, which could interrupt an
-      // in-progress Aurora conversation. "prompt" mode surfaces needRefresh/offlineReady state
-      // instead (see web/src/components/PwaUpdateNotice.tsx) and only applies the waiting
-      // worker -- via the update-service-worker call the banner's "现在刷新" button
-      // triggers -- once the user explicitly chooses to. autoUpdate + a visible refresh
-      // button would otherwise race (the page could reload out from under the user before
-      // they click anything), so this is a real behavior change, not just added UI.
-      registerType: "prompt",
+      // Normal web builds prompt before reloading so a conversation is not interrupted.
+      // The classroom build auto-updates because consistency across tutor devices matters
+      // more than preserving an ephemeral tab during a live demonstration.
+      registerType: pwaRegisterTypeForMode(mode),
       manifest: buildPwaManifest(),
       // Only precache the built static app shell (JS/CSS/HTML/icons/manifest -- globPatterns
       // below already matches web/public/icons/*.png in the build output, so no separate
@@ -43,6 +40,9 @@ export default defineConfig(({ mode }) => {
         // the shell itself can load offline -- reused as-is, not reinvented here.
         navigateFallback: "index.html",
         navigateFallbackDenylist: [/^\/api\//],
+        // Classroom Demo updates take control immediately so a returning tutor never stays on
+        // an old shell. API payloads remain NetworkOnly and are never cached.
+        ...(activatePwaUpdateImmediately ? { skipWaiting: true, clientsClaim: true } : {}),
         // Belt-and-suspenders: explicit NetworkOnly for /api/** so no future runtimeCaching
         // rule change can silently start caching sensitive API responses.
         runtimeCaching: [

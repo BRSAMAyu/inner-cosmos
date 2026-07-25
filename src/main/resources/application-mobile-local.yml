@@ -53,7 +53,9 @@ inner-cosmos:
       redirect-uri: ${OIDC_MOBILE_REDIRECT_URI:innercosmos://oauth/callback}
       scopes: openid,profile,email
   demo:
-    seed-enabled: false
+    # Remains off by default, but the explicitly operated classroom public-demo compose may
+    # enable curated lived-in personas. The prod profile still structurally excludes seeding.
+    seed-enabled: ${SEED_ENABLED:false}
   infrastructure:
     profile: mobile-local
     region: developer-controlled

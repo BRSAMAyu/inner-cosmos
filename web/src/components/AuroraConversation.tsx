@@ -12,6 +12,11 @@ export type AuroraUiMessage = {
   audio?: string; voiceId?: string;
 };
 
+/** A post-turn side-channel signal, intentionally separate from the conversation transcript. */
+export type AuroraInnerVoice = {
+  key: string; text: string; audio?: string; voiceId?: string;
+};
+
 /** The two pre-speech beats worth showing inline; `null` while idle or actively streaming tokens. */
 export type AuroraThinkingStage = "understanding" | "composing" | null;
 
@@ -42,7 +47,7 @@ const COPY: Record<Locale, {
   }
 };
 
-export function AuroraConversation({ messages, activeTurnId, thinkingStage = null, draft, sessionReady, onDraftChange, onSubmit, onStop, onTranscribe, onGoodbye,
+export function AuroraConversation({ messages, activeTurnId, thinkingStage = null, draft, sessionReady, onDraftChange, onSubmit, onStop, onTranscribe, onGoodbye, goodbyeBusy = false,
   innerVoiceEnabled = false, innerVoiceMode = "AMBIENT", locale = "zh-CN" }: {
   messages: AuroraUiMessage[];
   activeTurnId: number | null;
@@ -58,6 +63,7 @@ export function AuroraConversation({ messages, activeTurnId, thinkingStage = nul
   /** Triggers the "沉淀今天/温柔告别" ritual (GoodbyeOrchestrator). Only offered while idle and
    * ready -- a deliberate closing action, never available mid-stream. */
   onGoodbye?: () => void;
+  goodbyeBusy?: boolean;
   /** W2 voice: the user's current TTS preferences (GET /api/me/tts/voices, or the shared
    * preference source once one exists). When `innerVoiceEnabled` is false, "AURORA_INNER"
    * messages are still safely received (see useAuroraSession's handleEvent) but render nothing at
@@ -149,7 +155,7 @@ export function AuroraConversation({ messages, activeTurnId, thinkingStage = nul
           return <article className="message aurora-inner" key={message.key} aria-label={t.innerVoiceAria}>
             <span className="speaker">{t.innerVoiceLabel}</span>
             {revealed && <p className="ugc-text">{message.text}</p>}
-            {message.audio && <InlineAudioPlayer audio={message.audio} autoPlay={isAmbient} locale={locale}
+            {message.audio && <InlineAudioPlayer audio={message.audio} autoPlay={false} locale={locale}
               ariaLabel={revealed ? undefined : t.innerVoiceReveal} onPlayAttempt={reveal} />}
           </article>;
         }
@@ -195,7 +201,8 @@ export function AuroraConversation({ messages, activeTurnId, thinkingStage = nul
           {locale === "zh-CN" ? "暂时无法启动录音；文字草稿仍然安全保留。" : "Recording could not start; your text draft is still safe."}
         </span>}
         {activeTurnId && <button type="button" className="stop" onClick={onStop}>{t.stop}</button>}
-        {onGoodbye && !activeTurnId && sessionReady && <button type="button" className="goodbye-trigger" onClick={onGoodbye}>{t.goodbye}</button>}
+        {onGoodbye && !activeTurnId && sessionReady && <button type="button" className="goodbye-trigger"
+          disabled={goodbyeBusy} onClick={onGoodbye}>{goodbyeBusy ? (locale === "en-SG" ? "Settling…" : "正在沉淀…") : t.goodbye}</button>}
         <button type="submit" className="send" disabled={!draft.trim() || !sessionReady}>{activeTurnId ? t.interruptSend : t.send}</button>
       </div>
     </form>

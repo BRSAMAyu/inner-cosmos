@@ -88,6 +88,14 @@ public class AuroraChatController extends BaseController {
         return ApiResponse.ok(auroraAgentService.replyRich(userId, request));
     }
 
+    @PostMapping("/foreground")
+    public ApiResponse<com.innercosmos.vo.AuroraForegroundVO> foreground(
+            @Valid @RequestBody ChatRequest request, HttpSession session) {
+        Long userId = currentUserId(session);
+        assertOwnsSession(userId, request.sessionId);
+        return ApiResponse.ok(auroraAgentService.foregroundAcknowledgement(userId, request));
+    }
+
     /**
      * VS-003b — stage rich SSE context (voice/weather/location/timezone) before
      * opening the GET /stream. EventSource cannot send a body, so the frontend
@@ -102,13 +110,22 @@ public class AuroraChatController extends BaseController {
         return ApiResponse.ok(java.util.Map.of("token", token == null ? "" : token));
     }
 
-    @GetMapping("/stream")
+    @GetMapping(value = "/stream", produces = org.springframework.http.MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter stream(@RequestParam(required = false) Long sessionId,
                              @RequestParam(required = false) String message,
                              @RequestParam(required = false) String mode,
                              @RequestParam(required = false) String token,
                              HttpSession session,
-                             HttpServletRequest request) {
+                             HttpServletRequest request,
+                             jakarta.servlet.http.HttpServletResponse response) {
+        // Explicit SSE transport contract. Without no-transform / no-buffer headers the
+        // classroom Cloudflare tunnel may hold every event until turn completion, making a
+        // one-second foreground kernel appear to take 10–25 seconds in the browser.
+        response.setCharacterEncoding(java.nio.charset.StandardCharsets.UTF_8.name());
+        response.setContentType(org.springframework.http.MediaType.TEXT_EVENT_STREAM_VALUE);
+        response.setHeader("Cache-Control", "no-cache, no-transform");
+        response.setHeader("X-Accel-Buffering", "no");
+        response.setHeader("Connection", "keep-alive");
         Long userId = currentUserId(session);
         ChatRequest staged = auroraAgentService.consumeStage(userId, token);
         if (request.getRequestURI().startsWith(request.getContextPath() + "/api/v1/")) {

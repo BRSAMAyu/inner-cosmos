@@ -3,6 +3,7 @@ import { api } from "../api";
 import { mobileOidc } from "../mobile-auth";
 import type { Locale } from "../i18n";
 import { AsyncButton } from "../loading";
+import { DemoPersonaChooser } from "./DemoPersonaChooser";
 
 // The single entry surface for /app/aurora/: it must offer both login and account
 // creation, because it is the only route a new user is told to visit (see CLAUDE.md's
@@ -116,7 +117,8 @@ export function AuthGate({ native, onSuccess, locale = "zh-CN", externalError = 
     }
   };
 
-  return <main className="login-shell">
+  return <main className="login-shell demo-login-shell">
+    <DemoPersonaChooser locale={locale} onEntered={onSuccess} />
     <form className="login" onSubmit={mode === "login" ? submitLogin : submitRegister}>
       <span className="eyebrow">INNER COSMOS</span>
       <h1>{mode === "login" ? t.loginH1 : t.registerH1}</h1>

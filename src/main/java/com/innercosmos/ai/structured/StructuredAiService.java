@@ -78,6 +78,8 @@ public class StructuredAiService {
             request.requestJson = contextJson;
             request.preferredProvider = preferredProvider(context);
             request.temperature = modeTemperature(context);
+            request.thinkingEnabled = thinkingEnabled(moduleName);
+            applyLatencyContract(request, moduleName, false);
             if ("MOCK".equals(assignedGroup)) {
                 request.forceMock = true;
             }
@@ -100,6 +102,9 @@ public class StructuredAiService {
             retry.requestJson = contextJson;
             retry.preferredProvider = preferredProvider(context);
             retry.temperature = modeTemperature(context);
+            // Repairing malformed JSON is formatting work, not another deep-reasoning pass.
+            retry.thinkingEnabled = Boolean.FALSE;
+            applyLatencyContract(retry, moduleName, true);
             if ("MOCK".equals(assignedGroup)) {
                 retry.forceMock = true;
             }
@@ -161,6 +166,66 @@ public class StructuredAiService {
             return n.doubleValue();
         }
         return null;
+    }
+
+    /**
+     * Keep deep reasoning behind the interaction boundary. The visible speaker and optional
+     * inner voice must answer in non-thinking mode; only the planner and bounded critic may spend
+     * a reasoning budget. The critic is a fast independent supervisor: it sees the compact plan,
+     * candidate and deterministic findings, so making it perform another long reasoning pass adds
+     * latency without adding a second source of evidence. All other structured modules default to
+     * non-thinking until explicitly classified as background work.
+     */
+    private Boolean thinkingEnabled(String moduleName) {
+        if (moduleName == null) return Boolean.FALSE;
+        String normalized = moduleName.toUpperCase(java.util.Locale.ROOT);
+        return normalized.startsWith("AURORA_PLAN_");
+    }
+
+    private void applyLatencyContract(LlmRequest request, String moduleName, boolean jsonRepair) {
+        if (request == null || moduleName == null) return;
+        String normalized = moduleName.toUpperCase(java.util.Locale.ROOT);
+        if (jsonRepair && normalized.startsWith("AURORA_FOREGROUND_")) {
+            request.timeoutMs = 1_000;
+            request.maxTokens = 256;
+            request.retryEnabled = Boolean.FALSE;
+        } else if (jsonRepair && normalized.startsWith("AURORA_")) {
+            request.timeoutMs = 6_000;
+            request.maxTokens = 1_024;
+            request.retryEnabled = Boolean.FALSE;
+        } else if (normalized.startsWith("AURORA_FOREGROUND_")) {
+            // This is the user's first real conversational feedback, not a status label.
+            // Keep it non-thinking and tightly bounded while the planner runs in parallel.
+            request.timeoutMs = 2_500;
+            request.maxTokens = 256;
+            request.retryEnabled = Boolean.FALSE;
+        } else if (normalized.startsWith("AURORA_PLAN_")) {
+            // The planner emits a compact JSON contract, not a user-facing essay. A 1K-token
+            // reasoning budget was enough for the real DeepSeek relationship and disclosure
+            // journeys, while 2K regularly spent the full 18 seconds on task-splitting and then
+            // fell back. Keep thinking enabled, but bound it so the foreground acknowledgement
+            // is followed by a real plan rather than a late timeout.
+            // DeepSeek v4-flash can spend the first 1K tokens entirely in reasoning_content and
+            // finish with no JSON (finish_reason=length). The public acceptance caught that exact
+            // failure. Preserve enough budget for both thinking and the compact plan; the 30s
+            // deadline only protects a genuinely stalled request. Foreground acknowledgement is
+            // immediate, so this background budget improves quality without blocking first paint.
+            request.timeoutMs = 30_000;
+            request.maxTokens = 2_048;
+            request.retryEnabled = Boolean.FALSE;
+        } else if (normalized.startsWith("AURORA_SPEAKER_")) {
+            request.timeoutMs = 8_000;
+            request.maxTokens = 1_536;
+            request.retryEnabled = Boolean.FALSE;
+        } else if (normalized.startsWith("AURORA_CRITIC_")) {
+            request.timeoutMs = 6_000;
+            request.maxTokens = 1_536;
+            request.retryEnabled = Boolean.FALSE;
+        } else if (normalized.startsWith("AURORA_INNER_VOICE_")) {
+            request.timeoutMs = 6_000;
+            request.maxTokens = 512;
+            request.retryEnabled = Boolean.FALSE;
+        }
     }
 
     public String getCurrentTestGroup(Long userId) {

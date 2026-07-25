@@ -26,20 +26,66 @@ describe("ResonanceNetwork", () => {
     expect(onChooseMatch).toHaveBeenCalledWith(4);
   });
 
+  it("shows the top three candidates first and expands the rest on demand", () => {
+    const matches = Array.from({ length: 5 }, (_, index): CapsuleMatch => ({
+      ...match,
+      capsule: { ...match.capsule, id: index + 1, pseudonym: `同行者 ${index + 1}` },
+      matchSummary: `匹配理由 ${index + 1}`
+    }));
+    render(<ResonanceNetwork resonanceMatches={matches} resonanceStrategy="MIRROR" visitorBusy={false} visitorMatch={null}
+      personaSession={null} personaMessages={[]} personaDraft="" personaQuota={null} letterTitle="" letterBody="" sentLetter={null}
+      onChooseStrategy={() => undefined} onChooseMatch={() => undefined} onStartPersonaConversation={() => undefined}
+      onPersonaDraftChange={() => undefined} onSendPersonaTurn={() => undefined} onLetterTitleChange={() => undefined}
+      onLetterBodyChange={() => undefined} onSendLetter={() => undefined} />);
+    expect(screen.getAllByRole("listitem")).toHaveLength(3);
+    expect(screen.queryByRole("listitem", { name: "同行者 4 · 匹配理由 4" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "查看其余 2 个候选" }));
+    expect(screen.getAllByRole("listitem")).toHaveLength(5);
+    expect(screen.getByRole("listitem", { name: "同行者 5 · 匹配理由 5" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "收起，只看最相关的 3 个" }));
+    expect(screen.getAllByRole("listitem")).toHaveLength(3);
+  });
+
   it("lets a visitor start a persona conversation and send a turn", () => {
     const onStart = vi.fn();
     const onSend = vi.fn();
     const session: PersonaSession = { id: 1, capsuleId: 4, status: "ACTIVE", turnCount: 0, dailyLimit: 5 };
     const messages: PersonaMessage[] = [{ id: 1, sessionId: 1, senderType: "CAPSULE", textContent: "谢谢你愿意说" }];
     render(<ResonanceNetwork resonanceMatches={[match]} resonanceStrategy="MIRROR" visitorBusy={false} visitorMatch={match}
-      personaSession={session} personaMessages={messages} personaDraft="想继续聊聊" personaQuota={{ usedTurns: 1, remainingTurns: 4, dailyLimit: 5, exhausted: false }}
+      personaSession={session} personaMessages={messages} personaDraft="想继续聊聊" personaQuota={{ turnCount: 1, remaining: 4, dailyLimit: 5, seed: false, quotaDate: "2026-07-25" }}
       letterTitle="" letterBody="" sentLetter={null} onChooseStrategy={() => undefined} onChooseMatch={() => undefined}
       onStartPersonaConversation={onStart} onPersonaDraftChange={() => undefined} onSendPersonaTurn={onSend}
       onLetterTitleChange={() => undefined} onLetterBodyChange={() => undefined} onSendLetter={() => undefined} />);
     expect(screen.getByText("谢谢你愿意说")).toBeVisible();
+    expect(screen.getByText("今天还可以聊 4 轮")).toBeVisible();
+    expect(screen.queryByText(/– 轮/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "发送这一轮" }));
     expect(onSend).toHaveBeenCalledOnce();
     expect(onStart).not.toHaveBeenCalled();
+  });
+
+  it("keeps anti-abuse quota in the background until the visitor is close to it", () => {
+    const session: PersonaSession = { id: 1, capsuleId: 4, status: "ACTIVE", turnCount: 1, dailyLimit: 30 };
+    render(<ResonanceNetwork resonanceMatches={[match]} resonanceStrategy="MIRROR" visitorBusy={false} visitorMatch={match}
+      personaSession={session} personaMessages={[]} personaDraft="继续" personaQuota={{ turnCount: 1, remaining: 29, dailyLimit: 30, seed: false, quotaDate: "2026-07-25" }}
+      letterTitle="" letterBody="" sentLetter={null} onChooseStrategy={() => undefined} onChooseMatch={() => undefined}
+      onStartPersonaConversation={() => undefined} onPersonaDraftChange={() => undefined} onSendPersonaTurn={() => undefined}
+      onLetterTitleChange={() => undefined} onLetterBodyChange={() => undefined} onSendLetter={() => undefined} />);
+
+    expect(screen.getByText("可以自然聊，不用赶进度")).toBeVisible();
+    expect(screen.getByRole("button", { name: "发送这一轮" })).toBeEnabled();
+  });
+
+  it("only disables the composer when the authoritative remaining quota reaches zero", () => {
+    const session: PersonaSession = { id: 1, capsuleId: 4, status: "ACTIVE", turnCount: 30, dailyLimit: 30 };
+    render(<ResonanceNetwork resonanceMatches={[match]} resonanceStrategy="MIRROR" visitorBusy={false} visitorMatch={match}
+      personaSession={session} personaMessages={[]} personaDraft="继续" personaQuota={{ turnCount: 30, remaining: 0, dailyLimit: 30, seed: false, quotaDate: "2026-07-25" }}
+      letterTitle="" letterBody="" sentLetter={null} onChooseStrategy={() => undefined} onChooseMatch={() => undefined}
+      onStartPersonaConversation={() => undefined} onPersonaDraftChange={() => undefined} onSendPersonaTurn={() => undefined}
+      onLetterTitleChange={() => undefined} onLetterBodyChange={() => undefined} onSendLetter={() => undefined} />);
+
+    expect(screen.getByText("今天还可以聊 0 轮")).toBeVisible();
+    expect(screen.getByRole("button", { name: "发送这一轮" })).toBeDisabled();
   });
 
   it("lets a visitor report or block mid-chat, without waiting for a delivered letter", () => {
@@ -47,7 +93,7 @@ describe("ResonanceNetwork", () => {
     const onBlockSession = vi.fn();
     const session: PersonaSession = { id: 1, capsuleId: 4, status: "ACTIVE", turnCount: 0, dailyLimit: 5 };
     render(<ResonanceNetwork resonanceMatches={[match]} resonanceStrategy="MIRROR" visitorBusy={false} visitorMatch={match}
-      personaSession={session} personaMessages={[]} personaDraft="" personaQuota={{ usedTurns: 0, remainingTurns: 5, dailyLimit: 5, exhausted: false }}
+      personaSession={session} personaMessages={[]} personaDraft="" personaQuota={{ turnCount: 0, remaining: 5, dailyLimit: 5, seed: false, quotaDate: "2026-07-25" }}
       letterTitle="" letterBody="" sentLetter={null} onChooseStrategy={() => undefined} onChooseMatch={() => undefined}
       onStartPersonaConversation={() => undefined} onPersonaDraftChange={() => undefined} onSendPersonaTurn={() => undefined}
       onLetterTitleChange={() => undefined} onLetterBodyChange={() => undefined} onSendLetter={() => undefined}
@@ -72,7 +118,7 @@ describe("ResonanceNetwork", () => {
   it("shows a turn-scoped error next to the composer, without needing the global status banner", () => {
     const session: PersonaSession = { id: 1, capsuleId: 4, status: "ACTIVE", turnCount: 0, dailyLimit: 5 };
     render(<ResonanceNetwork resonanceMatches={[match]} resonanceStrategy="MIRROR" visitorBusy={false} visitorMatch={match}
-      personaSession={session} personaMessages={[]} personaDraft="想继续聊聊" personaQuota={{ usedTurns: 0, remainingTurns: 5, dailyLimit: 5, exhausted: false }}
+      personaSession={session} personaMessages={[]} personaDraft="想继续聊聊" personaQuota={{ turnCount: 0, remaining: 5, dailyLimit: 5, seed: false, quotaDate: "2026-07-25" }}
       letterTitle="" letterBody="" sentLetter={null} onChooseStrategy={() => undefined} onChooseMatch={() => undefined}
       onStartPersonaConversation={() => undefined} onPersonaDraftChange={() => undefined} onSendPersonaTurn={() => undefined}
       onLetterTitleChange={() => undefined} onLetterBodyChange={() => undefined} onSendLetter={() => undefined}
@@ -84,7 +130,7 @@ describe("ResonanceNetwork", () => {
   it("does not show a turn error when there is none", () => {
     const session: PersonaSession = { id: 1, capsuleId: 4, status: "ACTIVE", turnCount: 0, dailyLimit: 5 };
     render(<ResonanceNetwork resonanceMatches={[match]} resonanceStrategy="MIRROR" visitorBusy={false} visitorMatch={match}
-      personaSession={session} personaMessages={[]} personaDraft="" personaQuota={{ usedTurns: 0, remainingTurns: 5, dailyLimit: 5, exhausted: false }}
+      personaSession={session} personaMessages={[]} personaDraft="" personaQuota={{ turnCount: 0, remaining: 5, dailyLimit: 5, seed: false, quotaDate: "2026-07-25" }}
       letterTitle="" letterBody="" sentLetter={null} onChooseStrategy={() => undefined} onChooseMatch={() => undefined}
       onStartPersonaConversation={() => undefined} onPersonaDraftChange={() => undefined} onSendPersonaTurn={() => undefined}
       onLetterTitleChange={() => undefined} onLetterBodyChange={() => undefined} onSendLetter={() => undefined} />);
@@ -117,7 +163,7 @@ describe("ResonanceNetwork", () => {
     expect(screen.getByRole("heading", { name: "Not swiping cards — understanding why you'd meet" })).toBeVisible();
     expect(screen.getByText("1 candidate right now")).toBeVisible();
     expect(screen.getByRole("button", { name: "Meaningful complement" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Enter a limited but natural conversation" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Talk with this facet first" })).toBeVisible();
   });
 
   // W1 capsule-voice reuse: a visitor can tap to hear the latest capsule reply spoken in a voice
@@ -132,7 +178,7 @@ describe("ResonanceNetwork", () => {
       { id: 3, sessionId: 1, senderType: "CAPSULE", textContent: "最新的回声" }
     ];
     render(<ResonanceNetwork resonanceMatches={[match]} resonanceStrategy="MIRROR" visitorBusy={false} visitorMatch={match}
-      personaSession={session} personaMessages={messages} personaDraft="" personaQuota={{ usedTurns: 1, remainingTurns: 4, dailyLimit: 5, exhausted: false }}
+      personaSession={session} personaMessages={messages} personaDraft="" personaQuota={{ turnCount: 1, remaining: 4, dailyLimit: 5, seed: false, quotaDate: "2026-07-25" }}
       letterTitle="" letterBody="" sentLetter={null} onChooseStrategy={() => undefined} onChooseMatch={() => undefined}
       onStartPersonaConversation={() => undefined} onPersonaDraftChange={() => undefined} onSendPersonaTurn={() => undefined}
       onLetterTitleChange={() => undefined} onLetterBodyChange={() => undefined} onSendLetter={() => undefined}
@@ -147,7 +193,7 @@ describe("ResonanceNetwork", () => {
   it("does not offer capsule voice before a capsule reply exists", () => {
     const session: PersonaSession = { id: 1, capsuleId: 4, status: "ACTIVE", turnCount: 0, dailyLimit: 5 };
     render(<ResonanceNetwork resonanceMatches={[match]} resonanceStrategy="MIRROR" visitorBusy={false} visitorMatch={match}
-      personaSession={session} personaMessages={[]} personaDraft="" personaQuota={{ usedTurns: 0, remainingTurns: 5, dailyLimit: 5, exhausted: false }}
+      personaSession={session} personaMessages={[]} personaDraft="" personaQuota={{ turnCount: 0, remaining: 5, dailyLimit: 5, seed: false, quotaDate: "2026-07-25" }}
       letterTitle="" letterBody="" sentLetter={null} onChooseStrategy={() => undefined} onChooseMatch={() => undefined}
       onStartPersonaConversation={() => undefined} onPersonaDraftChange={() => undefined} onSendPersonaTurn={() => undefined}
       onLetterTitleChange={() => undefined} onLetterBodyChange={() => undefined} onSendLetter={() => undefined}
@@ -159,7 +205,7 @@ describe("ResonanceNetwork", () => {
     const session: PersonaSession = { id: 1, capsuleId: 4, status: "ACTIVE", turnCount: 1, dailyLimit: 5 };
     const messages: PersonaMessage[] = [{ id: 5, sessionId: 1, senderType: "CAPSULE", textContent: "听这条回声" }];
     render(<ResonanceNetwork resonanceMatches={[match]} resonanceStrategy="MIRROR" visitorBusy={false} visitorMatch={match}
-      personaSession={session} personaMessages={messages} personaDraft="" personaQuota={{ usedTurns: 1, remainingTurns: 4, dailyLimit: 5, exhausted: false }}
+      personaSession={session} personaMessages={messages} personaDraft="" personaQuota={{ turnCount: 1, remaining: 4, dailyLimit: 5, seed: false, quotaDate: "2026-07-25" }}
       letterTitle="" letterBody="" sentLetter={null} onChooseStrategy={() => undefined} onChooseMatch={() => undefined}
       onStartPersonaConversation={() => undefined} onPersonaDraftChange={() => undefined} onSendPersonaTurn={() => undefined}
       onLetterTitleChange={() => undefined} onLetterBodyChange={() => undefined} onSendLetter={() => undefined}
@@ -173,7 +219,7 @@ describe("ResonanceNetwork", () => {
     const session: PersonaSession = { id: 1, capsuleId: 4, status: "ACTIVE", turnCount: 1, dailyLimit: 5 };
     const messages: PersonaMessage[] = [{ id: 5, sessionId: 1, senderType: "CAPSULE", textContent: "听这条回声" }];
     render(<ResonanceNetwork resonanceMatches={[match]} resonanceStrategy="MIRROR" visitorBusy={false} visitorMatch={match}
-      personaSession={session} personaMessages={messages} personaDraft="" personaQuota={{ usedTurns: 1, remainingTurns: 4, dailyLimit: 5, exhausted: false }}
+      personaSession={session} personaMessages={messages} personaDraft="" personaQuota={{ turnCount: 1, remaining: 4, dailyLimit: 5, seed: false, quotaDate: "2026-07-25" }}
       letterTitle="" letterBody="" sentLetter={null} onChooseStrategy={() => undefined} onChooseMatch={() => undefined}
       onStartPersonaConversation={() => undefined} onPersonaDraftChange={() => undefined} onSendPersonaTurn={() => undefined}
       onLetterTitleChange={() => undefined} onLetterBodyChange={() => undefined} onSendLetter={() => undefined}

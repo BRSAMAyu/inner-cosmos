@@ -44,7 +44,10 @@ import com.innercosmos.mapper.TodoItemMapper;
 import com.innercosmos.mapper.UserMapper;
 import com.innercosmos.mapper.UserProfileMapper;
 import com.innercosmos.service.GravityService;
+import com.innercosmos.service.CapsuleGenomeService;
+import com.innercosmos.service.DataUseGrantService;
 import com.innercosmos.service.UserService;
+import com.innercosmos.util.JsonUtils;
 import jakarta.annotation.PostConstruct;
 import org.springframework.boot.CommandLineRunner;
 
@@ -77,6 +80,9 @@ public class MockDataInitializer implements CommandLineRunner {
     private final BeliefPatternMapper beliefPatternMapper;
     private final com.innercosmos.service.EmotionBaselineService emotionBaselineService;
     private final AuthorizedMemoryRefMapper authorizedMemoryRefMapper;
+    private final DataUseGrantService dataUseGrantService;
+    private final CapsuleGenomeService capsuleGenomeService;
+    private final boolean seedAdminEnabled;
 
     public MockDataInitializer(UserMapper userMapper,
                                UserProfileMapper userProfileMapper,
@@ -100,7 +106,10 @@ public class MockDataInitializer implements CommandLineRunner {
                                AuroraSelfReflectionMapper auroraSelfReflectionMapper,
                                BeliefPatternMapper beliefPatternMapper,
                                com.innercosmos.service.EmotionBaselineService emotionBaselineService,
-                               AuthorizedMemoryRefMapper authorizedMemoryRefMapper) {
+                               AuthorizedMemoryRefMapper authorizedMemoryRefMapper,
+                               DataUseGrantService dataUseGrantService,
+                               CapsuleGenomeService capsuleGenomeService,
+                               boolean seedAdminEnabled) {
         this.userMapper = userMapper;
         this.userProfileMapper = userProfileMapper;
         this.capsuleMapper = capsuleMapper;
@@ -124,6 +133,9 @@ public class MockDataInitializer implements CommandLineRunner {
         this.beliefPatternMapper = beliefPatternMapper;
         this.emotionBaselineService = emotionBaselineService;
         this.authorizedMemoryRefMapper = authorizedMemoryRefMapper;
+        this.dataUseGrantService = dataUseGrantService;
+        this.capsuleGenomeService = capsuleGenomeService;
+        this.seedAdminEnabled = seedAdminEnabled;
     }
 
     @PostConstruct
@@ -155,14 +167,29 @@ public class MockDataInitializer implements CommandLineRunner {
     @Override
     public void run(String... args) {
         warnIfSeedAccountsLookPubliclyReachable();
-        ensureUser("admin", "admin123", "管理员", Constants.ROLE_ADMIN);
+        if (seedAdminEnabled) {
+            ensureUser("admin", "admin123", "管理员", Constants.ROLE_ADMIN);
+        } else {
+            disableSeedAdminIfPresent();
+        }
         User demo = ensureUser("demo", "demo123", "林澈", Constants.ROLE_USER);
-        User river = ensureUser("river", "demo123", "河岸来信", Constants.ROLE_USER);
-        User cloud = ensureUser("cloud", "demo123", "云杉", Constants.ROLE_USER);
+        User river = ensureUser("river", "demo123", "沈砚", Constants.ROLE_USER);
+        User cloud = ensureUser("cloud", "demo123", "夏榆", Constants.ROLE_USER);
 
         ensureSeedCapsules();
         ensureDemoProfile(demo.id);
         ensureDemoAssets(demo, river, cloud);
+        ensureShowcaseProfile(river.id, "river");
+        ensureShowcaseProfile(cloud.id, "cloud");
+        ensureShowcaseAssets(river.id, "river");
+        ensureShowcaseAssets(cloud.id, "cloud");
+        enrichCuratedMemoryEvidence(demo.id);
+        enrichCuratedMemoryEvidence(river.id);
+        enrichCuratedMemoryEvidence(cloud.id);
+        ensureCuratedMirrorRunnable(demo.id, "林澈的回声分身");
+        ensureCuratedMirrorRunnable(river.id, "沿河缓慢生活的人");
+        ensureCuratedMirrorRunnable(cloud.id, "把自己放回照护里的人");
+        ensureCuratedSocialStory(demo, river, cloud);
         initializeAuroraConstitution();
 
         // startup 真实算一次画像情绪维：让 3 个情绪维看起来是真算的（已种 4 条 emotion_trace 支撑）。
@@ -223,6 +250,15 @@ public class MockDataInitializer implements CommandLineRunner {
         return user;
     }
 
+    private void disableSeedAdminIfPresent() {
+        User admin = userMapper.selectOne(new QueryWrapper<User>()
+                .eq("username", "admin").last("LIMIT 1"));
+        if (admin != null && "SYSTEM".equals(admin.accountKind)) {
+            admin.status = "DISABLED";
+            userMapper.updateById(admin);
+        }
+    }
+
     private void ensureDemoProfile(Long userId) {
         UserProfile profile = userProfileMapper.selectOne(new QueryWrapper<UserProfile>().eq("user_id", userId).last("LIMIT 1"));
         if (profile == null) {
@@ -252,6 +288,48 @@ public class MockDataInitializer implements CommandLineRunner {
         } else {
             userProfileMapper.updateById(profile);
         }
+    }
+
+    private void ensureShowcaseProfile(Long userId, String persona) {
+        UserProfile profile = userProfileMapper.selectOne(new QueryWrapper<UserProfile>()
+                .eq("user_id", userId).last("LIMIT 1"));
+        if (profile == null) {
+            profile = new UserProfile();
+            profile.userId = userId;
+        }
+        profile.auroraName = "Aurora";
+        profile.allowMemoryRecall = true;
+        profile.allowMultiMessage = true;
+        profile.weatherAwarenessEnabled = true;
+        profile.timeAwarenessEnabled = true;
+        profile.socialReachabilityStatus = "MATCHABLE";
+        if ("river".equals(persona)) {
+            profile.auroraTone = "安静、准确，不急着给答案；像一个愿意陪我把异乡生活慢慢说清楚的老朋友。";
+            profile.preferredInputType = "TEXT";
+            profile.bio = "建筑系交换生。搬到陌生城市四个月，白天在工作室画图，晚上沿河走路。正在学习把孤独和独处区分开。";
+            profile.reflectionDepth = 5;
+            profile.quietHoursStart = "00:30";
+            profile.quietHoursEnd = "09:00";
+            profile.proactiveSensitivity = 3;
+            profile.focusModeEnabled = true;
+            profile.focusWindowsJson = "[\"10:00-12:30\",\"15:00-18:30\"]";
+            profile.currentEnvironmentLabel = "交换学期中段，作品集与异乡生活交织";
+            profile.proactiveIntensity = "STEADY";
+        } else {
+            profile.auroraTone = "温柔但不哄我，能看见照顾别人背后的疲惫，也提醒我把自己放回生活里。";
+            profile.preferredInputType = "TEXT_AND_VOICE";
+            profile.bio = "刚入职的社区社工，也在照顾术后恢复的家人。习惯先回应所有人的需要，最近才开始练习不带愧疚地休息。";
+            profile.reflectionDepth = 4;
+            profile.quietHoursStart = "22:30";
+            profile.quietHoursEnd = "07:30";
+            profile.proactiveSensitivity = 5;
+            profile.focusModeEnabled = false;
+            profile.focusWindowsJson = "[]";
+            profile.currentEnvironmentLabel = "工作适应期与家庭照护并行";
+            profile.proactiveIntensity = "ALIVE";
+        }
+        if (profile.id == null) userProfileMapper.insert(profile);
+        else userProfileMapper.updateById(profile);
     }
 
     private void ensureSeedCapsules() {
@@ -340,6 +418,357 @@ public class MockDataInitializer implements CommandLineRunner {
         if (beliefPatternMapper.selectCount(new QueryWrapper<BeliefPattern>().eq("user_id", userId)) == 0) {
             seedBeliefPatterns(userId);
         }
+    }
+
+    private void ensureShowcaseAssets(Long userId, String persona) {
+        if (memoryCardMapper.selectCount(new QueryWrapper<MemoryCard>().eq("user_id", userId)) < 5) {
+            seedShowcaseMemorySystem(userId, persona);
+        }
+        if (capsuleMapper.selectCount(new QueryWrapper<EchoCapsule>()
+                .eq("owner_user_id", userId).eq("capsule_type", "USER_CAPSULE")) == 0) {
+            seedShowcaseMirror(userId, persona);
+        }
+    }
+
+    /**
+     * The classroom personas are meant to demonstrate months of accumulated context, including
+     * where each conclusion came from. Early demo volumes predate versioned-memory provenance and
+     * therefore show every curated card as the same anonymous 50% / v1 item. Reconcile those
+     * existing rows without touching user-authored summaries or later corrections.
+     */
+    private void enrichCuratedMemoryEvidence(Long userId) {
+        List<MemoryCard> cards = memoryCardMapper.selectList(new QueryWrapper<MemoryCard>()
+                .eq("user_id", userId).eq("status", "ACTIVE"));
+        for (MemoryCard card : cards) {
+            boolean changed = false;
+            if (card.confidence == null || card.confidence <= 0.5) {
+                int recurrence = card.recurrenceCount == null ? 1 : card.recurrenceCount;
+                card.confidence = Math.min(0.92, 0.62 + recurrence * 0.045);
+                changed = true;
+            }
+            if (card.memoryLayer == null || card.memoryLayer.isBlank()
+                    || ("EPISODIC".equals(card.memoryLayer) && isSemanticMemory(card.memoryType))) {
+                card.memoryLayer = isSemanticMemory(card.memoryType) ? "SEMANTIC" : "EPISODIC";
+                changed = true;
+            }
+            if (card.consentScope == null || card.consentScope.isBlank()) {
+                card.consentScope = "AURORA_PRIVATE";
+                changed = true;
+            }
+            if (card.provenanceRefs == null || card.provenanceRefs.isBlank()) {
+                LocalDateTime sourceTime = card.lastTouchedAt == null ? card.createdAt : card.lastTouchedAt;
+                String sourceDate = sourceTime == null ? "演示时间线" : sourceTime.toLocalDate().toString();
+                int evidenceCount = Math.max(1, card.recurrenceCount == null ? 1 : card.recurrenceCount);
+                String sourceKind = switch (card.memoryType == null ? "" : card.memoryType) {
+                    case "DIARY" -> "心声日记";
+                    case "RELATION" -> "关系复盘与 Aurora 对话";
+                    case "TODO" -> "行动复盘与 Aurora 对话";
+                    default -> "日记与 Aurora 对话";
+                };
+                card.provenanceRefs = sourceDate + " · " + sourceKind + " · "
+                        + evidenceCount + " 次相互印证（课堂 Demo 预置旅程）";
+                changed = true;
+            }
+            if (changed) memoryCardMapper.updateById(card);
+        }
+    }
+
+    private boolean isSemanticMemory(String memoryType) {
+        return "BELIEF".equals(memoryType) || "IDENTITY".equals(memoryType)
+                || "PREFERENCE".equals(memoryType) || "AURORA".equals(memoryType);
+    }
+
+    /**
+     * Demo profiles are long-lived in the classroom PostgreSQL volume. Older seed versions wrote
+     * the public capsule and AuthorizedMemoryRef rows but predated DataUseGrant v1, leaving a card
+     * that looked chat-ready in the plaza yet failed at session creation. Reconcile only the three
+     * named curated mirrors: production/user-created capsules must still go through explicit owner
+     * authorization and review.
+     */
+    private void ensureCuratedMirrorRunnable(Long ownerUserId, String pseudonym) {
+        EchoCapsule capsule = capsuleMapper.selectOne(new QueryWrapper<EchoCapsule>()
+                .eq("owner_user_id", ownerUserId)
+                .eq("capsule_type", "USER_CAPSULE")
+                .eq("pseudonym", pseudonym)
+                .last("LIMIT 1"));
+        if (capsule == null) return;
+
+        List<AuthorizedMemoryRef> refs = authorizedMemoryRefMapper.selectList(
+                new QueryWrapper<AuthorizedMemoryRef>()
+                        .eq("capsule_id", capsule.id)
+                        .eq("authorization_status", "AUTHORIZED"));
+        java.util.Set<Long> memoryIds = refs.stream()
+                .map(ref -> ref.memoryCardId)
+                .filter(java.util.Objects::nonNull)
+                .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new));
+        if (!dataUseGrantService.authorizationsValid(capsule, memoryIds)) {
+            dataUseGrantService.revokeForCapsule(capsule.id, "DEMO_SEED_RECONCILIATION");
+        }
+        List<MemoryCard> authorizedCards = new java.util.ArrayList<>();
+        for (AuthorizedMemoryRef ref : refs) {
+            MemoryCard card = memoryCardMapper.selectById(ref.memoryCardId);
+            if (card == null || !ownerUserId.equals(card.userId)
+                    || !"ACTIVE".equalsIgnoreCase(card.status)) {
+                continue;
+            }
+            authorizedCards.add(card);
+            if (!dataUseGrantService.authorizationsValid(capsule, java.util.Set.of(card.id))) {
+                List<com.innercosmos.entity.DataUseGrant> grants = dataUseGrantService.authorize(capsule, card);
+                ref.dataUseGrantId = grants.getFirst().id;
+                ref.authorizationStatus = "AUTHORIZED";
+                authorizedMemoryRefMapper.updateById(ref);
+            }
+        }
+
+        boolean missingGenomeIr = capsule.contextPreviewJson == null
+                || !capsule.contextPreviewJson.contains("\"genomeIr\"");
+        if (missingGenomeIr) {
+            capsule.contextPreviewJson = buildCuratedGenomeContext(authorizedCards, capsule);
+            capsuleMapper.updateById(capsule);
+        }
+        if (capsuleGenomeService.current(capsule.id) == null || missingGenomeIr) {
+            capsuleGenomeService.compile(capsule, authorizedCards, "curated demo runtime reconciliation");
+        }
+    }
+
+    private String buildCuratedGenomeContext(List<MemoryCard> cards, EchoCapsule capsule) {
+        List<java.util.Map<String, Object>> claims = cards.stream().map(card -> {
+            java.util.Map<String, Object> evidence = new java.util.LinkedHashMap<>();
+            evidence.put("memoryId", card.id);
+            evidence.put("sourceVersion", card.versionNo == null ? 1 : card.versionNo);
+            evidence.put("confidence", card.confidence == null ? 0.9 : card.confidence);
+            java.util.Map<String, Object> claim = new java.util.LinkedHashMap<>();
+            claim.put("kind", "claim");
+            claim.put("statement", ((card.title == null ? "" : card.title) + " "
+                    + (card.summary == null ? "" : card.summary)).trim());
+            claim.put("scope", "EPISODIC_ONLY");
+            claim.put("evidence", List.of(evidence));
+            return claim;
+        }).toList();
+        java.util.Map<String, Object> ir = new java.util.LinkedHashMap<>();
+        ir.put("schemaVersion", "capsule-genome-ir.v1");
+        ir.put("claims", claims);
+        ir.put("values", List.of());
+        ir.put("habits", List.of());
+        ir.put("temporalState", List.of());
+        ir.put("unknowns", List.of(
+                java.util.Map.of("category", "values", "reason", "没有足够显式线索，不推断稳定价值"),
+                java.util.Map.of("category", "habits", "reason", "没有足够显式线索，不推断稳定习惯"),
+                java.util.Map.of("category", "temporalState", "reason", "没有足够显式线索，不推断当前状态")));
+        ir.put("compilerNotice", "演示数据的确定性证据索引，不代表真人实时在线");
+
+        java.util.Map<String, Object> preview = new java.util.LinkedHashMap<>();
+        preview.put("schemaVersion", "capsule-context-preview.v3");
+        preview.put("genomeIr", ir);
+        preview.put("scenes", List.of());
+        preview.put("tensions", List.of());
+        preview.put("retrievalPolicy", java.util.Map.of("unsupportedBehavior", "ACKNOWLEDGE_UNKNOWN"));
+        preview.put("publicTags", capsule.publicTags == null ? "[]" : capsule.publicTags);
+        preview.put("ownerNote", capsule.ownerContextNote == null ? "" : capsule.ownerContextNote);
+        preview.put("privacy", "只使用演示身份明确授权的脱敏记忆，不展示联系方式、真实身份或原始对话");
+        return JsonUtils.toJson(preview);
+    }
+
+    /**
+     * A classroom visitor should immediately understand the social loop from every curated story,
+     * not only from the original "demo" account. Reconcile one already-arrived, story-specific
+     * letter per persona so Inbox is lived-in after restarts and old persistent demo volumes are
+     * upgraded idempotently.
+     */
+    private void ensureCuratedSocialStory(User demo, User river, User cloud) {
+        Long demoCapsuleId = curatedCapsuleId(demo.id, "林澈的回声分身");
+        Long riverCapsuleId = curatedCapsuleId(river.id, "沿河缓慢生活的人");
+        Long cloudCapsuleId = curatedCapsuleId(cloud.id, "把自己放回照护里的人");
+        if (demoCapsuleId == null || riverCapsuleId == null || cloudCapsuleId == null) return;
+
+        ensureCuratedLetter(demo.id, river.id, riverCapsuleId,
+                "你没有急着选一座城市，让我松了一口气",
+                "你写归属不必靠只选一边来证明。我最近也在练习：不急着给生活下结论，先把今天过得具体一点。",
+                LocalDateTime.now().minusHours(6));
+        ensureCuratedLetter(river.id, cloud.id, cloudCapsuleId,
+                "你说照护不该靠耗尽证明",
+                "我一直以为可靠就是随时都在。读完你的侧影，我第一次觉得，慢一点回应也可能是在保护一段关系。",
+                LocalDateTime.now().minusHours(9));
+        ensureCuratedLetter(cloud.id, demo.id, demoCapsuleId,
+                "把很大的愿景拆成今天的一小格",
+                "你没有把复杂说得很轻，却还是留下了一个可以开始的位置。那种不敷衍的具体，让我愿意继续认识你。",
+                LocalDateTime.now().minusDays(1));
+    }
+
+    private Long curatedCapsuleId(Long ownerUserId, String pseudonym) {
+        EchoCapsule capsule = capsuleMapper.selectOne(new QueryWrapper<EchoCapsule>()
+                .eq("owner_user_id", ownerUserId)
+                .eq("capsule_type", "USER_CAPSULE")
+                .eq("pseudonym", pseudonym)
+                .last("LIMIT 1"));
+        return capsule == null ? null : capsule.id;
+    }
+
+    private void ensureCuratedLetter(Long senderUserId, Long receiverUserId, Long receiverCapsuleId,
+                                     String title, String body, LocalDateTime arrivedAt) {
+        Long existing = slowLetterMapper.selectCount(new QueryWrapper<SlowLetter>()
+                .eq("sender_user_id", senderUserId)
+                .eq("receiver_user_id", receiverUserId)
+                .eq("title", title));
+        if (existing != null && existing > 0) return;
+        insertLetter(senderUserId, receiverUserId, receiverCapsuleId, title, body,
+                "DELIVERED", 0, arrivedAt);
+    }
+
+    private void seedShowcaseMemorySystem(Long userId, String persona) {
+        if ("river".equals(persona)) {
+            MemoryCard arrival = insertShowcaseCard(userId, "刚到异乡时，所有声音都很远",
+                    "抵达交换城市的第一周，语言、路线和人群都让沈砚保持警觉。后来他意识到，疲惫不等于自己不适合这里。",
+                    "IDENTITY", List.of("陌生", "紧绷"), List.of("交换", "异乡", "适应"), 7.2, 5, 112);
+            insertEvent(userId, arrival.id, "抵达后的第一晚",
+                    "拖着行李走过一条不认识的河，第一次承认兴奋和害怕可以同时存在。",
+                    "四个月前", "河岸电车站", List.of("兴奋", "害怕"), List.of());
+            MemoryCard studio = insertShowcaseCard(userId, "工作室里不敢交出的那张图",
+                    "沈砚反复修改作品，不只是追求完成度，也在担心口音和陌生背景会让自己的判断显得不够可信。",
+                    "COGNITION", List.of("焦虑", "自我怀疑"), List.of("作品集", "表达", "完美主义"), 7.8, 4, 78);
+            insertTodo(userId, studio.id, "把未完成版本带去工作室",
+                    "先请同学说出一处看见的东西，不急着为整张图辩护。", "HIGH", "DOING",
+                    LocalDateTime.now().plusDays(2));
+            insertShowcaseCard(userId, "星期三的固定河岸路线",
+                    "连续几周在同一段河边散步后，这条路线从逃离工作室变成了可以恢复感觉的私人节律。",
+                    "EMOTION", List.of("平静", "安定"), List.of("河岸", "散步", "恢复"), 5.1, 7, 54);
+            insertShowcaseCard(userId, "没有回国，也不等于背叛原来的生活",
+                    "春节前后，他第一次说出对两座城市都留恋。归属不必通过只选择一边来证明。",
+                    "BELIEF", List.of("想念", "松动"), List.of("归属", "家", "选择"), 8.0, 3, 31);
+            insertShowcaseCard(userId, "在共享厨房认识了一个慢热的人",
+                    "两个人没有迅速交换全部故事，只是从每周一次一起做饭开始。低频联系反而让他觉得可靠。",
+                    "RELATION", List.of("好奇", "安心"), List.of("朋友", "慢关系", "共同生活"), 6.4, 3, 12);
+            insertTheme(userId, "异乡与归属", "归属正在从单一地点变成可携带的生活节律。",
+                    "IDENTITY", List.of("异乡", "家", "归属"), 3, 7.3);
+            insertTheme(userId, "创作中的可见性", "作品焦虑常和被看见、被误解的担心一起出现。",
+                    "CREATION", List.of("作品集", "表达", "自我怀疑"), 2, 6.8);
+            insertEmotionTrace(userId, "平静", 5.8, "CLEAR", "沿河走完固定路线", LocalDate.now());
+            insertEmotionTrace(userId, "想念", 6.4, "CLOUDY", "听见家乡口音", LocalDate.now().minusDays(18));
+            insertEmotionTrace(userId, "紧张", 7.1, "RAINY", "第一次作品讲评", LocalDate.now().minusDays(72));
+            insertDailyRecord(userId, LocalDate.now(), "不急着决定属于哪里", "CLEAR",
+                    "今天在河边意识到，熟悉感已经开始长出来。",
+                    "我不是必须选一座城市，才能证明另一段生活是真的。",
+                    "把作品集最新一页发给搭档；晚上去共享厨房。",
+                    "Aurora 记得这条河岸路线不是逃避，而是你恢复感知的方式。");
+            insertDailyRecord(userId, LocalDate.now().minusDays(46), "把半成品带到别人面前", "CLOUDY",
+                    "第一次带着没画完的图参加讲评。",
+                    "羞耻感出现时，我仍然可以让作品先被看见。",
+                    "只记录收到的三个具体观察，不立刻重画。",
+                    "你没有因为准备不足而消失，这比一张完美的图更重要。");
+            insertDailyRecord(userId, LocalDate.now().minusDays(103), "抵达", "RAINY",
+                    "拖着行李走过陌生的河和电车站。",
+                    "兴奋和害怕同时存在，不需要互相取消。",
+                    "先记住回住处的路线，再处理其他事情。",
+                    "今天不用成为适应得很好的人，只需要安全抵达。");
+        } else {
+            MemoryCard firstMonth = insertShowcaseCard(userId, "入职第一个月，把每个人都接住",
+                    "夏榆很快成为同事和来访者都愿意求助的人，但下班后仍在脑内继续处理别人的情绪。",
+                    "RELATION", List.of("投入", "疲惫"), List.of("社工", "工作", "责任"), 7.6, 6, 92);
+            insertEvent(userId, firstMonth.id, "第一次独立值班",
+                    "顺利处理了突发来访，却在回家路上突然没有力气说话。",
+                    "三个月前", "社区服务站", List.of("紧张", "如释重负"), List.of("同事", "来访者"));
+            insertShowcaseCard(userId, "家人的恢复不是我的单人项目",
+                    "照护计划占满日程后，夏榆开始练习请亲属共同承担，而不是把求助理解成不够孝顺。",
+                    "BELIEF", List.of("内疚", "松动"), List.of("家庭", "照护", "求助"), 8.2, 5, 61);
+            MemoryCard rest = insertShowcaseCard(userId, "休息时也会冒出的愧疚",
+                    "真正难的不是找到半小时，而是允许这半小时不产生价值。Aurora 多次提醒她区分恢复与逃避。",
+                    "COGNITION", List.of("愧疚", "疲惫"), List.of("休息", "价值", "边界"), 7.9, 7, 39);
+            insertTodo(userId, rest.id, "周六留出一段不照顾任何人的时间",
+                    "不安排成长任务，只选一件身体觉得舒服的小事。", "MEDIUM", "TODO",
+                    LocalDateTime.now().plusDays(4));
+            insertShowcaseCard(userId, "没有立即回复，也没有失去关系",
+                    "一次把工作消息留到第二天再回之后，关系并没有破裂。这成为她设置边界的重要反例。",
+                    "RELATION", List.of("忐忑", "安心"), List.of("消息", "边界", "关系安全"), 6.9, 4, 20);
+            insertShowcaseCard(userId, "开始听见自己的生气",
+                    "过去她只承认累，最近开始辨认生气是在提醒：有些责任本来就不该由她独自承担。",
+                    "EMOTION", List.of("生气", "清醒"), List.of("情绪", "责任", "自我保护"), 7.4, 3, 8);
+            insertTheme(userId, "照护与责任边界", "关心别人不再自动等于独自承担。",
+                    "RELATION", List.of("照护", "家庭", "边界"), 3, 7.8);
+            insertTheme(userId, "不带愧疚地恢复", "恢复不是奖品，而是持续生活的条件。",
+                    "EMOTION", List.of("休息", "疲惫", "价值"), 2, 7.1);
+            insertEmotionTrace(userId, "疲惫", 7.5, "CLOUDY", "连续值班后回家照护", LocalDate.now());
+            insertEmotionTrace(userId, "安心", 5.6, "CLEAR", "把一项照护任务交给亲属", LocalDate.now().minusDays(12));
+            insertEmotionTrace(userId, "内疚", 6.8, "RAINY", "第一次没有立即回工作消息", LocalDate.now().minusDays(41));
+            insertDailyRecord(userId, LocalDate.now(), "今天不把所有人都接住", "CLOUDY",
+                    "完成必要工作后按时离开，没有替同事接下额外轮班。",
+                    "拒绝一件事并不会抹掉我已经付出的关心。",
+                    "晚饭后把手机放远二十分钟。",
+                    "Aurora 看见的不是你变冷淡了，而是你开始让关心变得可持续。");
+            insertDailyRecord(userId, LocalDate.now().minusDays(37), "晚一点回复", "CLEAR",
+                    "第一次把非紧急工作消息留到第二天。",
+                    "关系承受得住等待；及时回应不是我唯一的价值。",
+                    "设置下班后的免打扰时段。",
+                    "昨晚没有发生灾难，这是一条可以相信的新证据。");
+            insertDailyRecord(userId, LocalDate.now().minusDays(86), "第一次独立值班", "RAINY",
+                    "接住了突发来访，也在回家路上耗尽力气。",
+                    "能完成工作和需要恢复可以同时成立。",
+                    "今晚只做最必要的照护安排。",
+                    "你不需要靠继续撑住来证明刚才做得够好。");
+        }
+    }
+
+    private MemoryCard insertShowcaseCard(Long userId, String title, String summary, String type,
+                                          List<String> emotions, List<String> keywords,
+                                          double intensity, int recurrence, int daysAgo) {
+        MemoryCard card = insertCard(userId, title, summary, type, emotions, keywords,
+                intensity, recurrence, Math.max(4.0, intensity - 0.4), Math.max(1, recurrence - 1));
+        card.lastTouchedAt = LocalDateTime.now().minusDays(daysAgo);
+        memoryCardMapper.updateById(card);
+        return card;
+    }
+
+    private void seedShowcaseMirror(Long userId, String persona) {
+        List<MemoryCard> cards = memoryCardMapper.selectList(new QueryWrapper<MemoryCard>()
+                .eq("user_id", userId).orderByDesc("emotional_gravity").last("LIMIT 5"));
+        boolean river = "river".equals(persona);
+        EchoCapsule mirror = new EchoCapsule();
+        mirror.ownerUserId = userId;
+        mirror.capsuleType = "USER_CAPSULE";
+        mirror.pseudonym = river ? "沿河缓慢生活的人" : "把自己放回照护里的人";
+        mirror.intro = river
+                ? "关于异乡、创作和归属：不急着变得合群，也不把孤独美化。"
+                : "关于照护、责任和边界：依然温柔，但不再用耗尽自己证明在意。";
+        mirror.personaPrompt = (river
+                ? "你是沈砚授权生成的共鸣体。安静、具体，不替别人定义归属。"
+                : "你是夏榆授权生成的共鸣体。温柔但不讨好，重视照护者也需要边界。")
+                + "\n只使用这些脱敏记忆：\n"
+                + cards.stream().map(c -> "- " + c.title + "：" + c.summary)
+                .reduce("", (a, b) -> a + "\n" + b);
+        mirror.publicTags = toJsonArray(river
+                ? List.of("异乡生活", "创作", "归属", "慢关系")
+                : List.of("照护者", "工作边界", "休息", "不再独自承担"));
+        mirror.authorizedMemoryIds = toJsonArray(cards.stream().map(c -> String.valueOf(c.id)).toList());
+        mirror.echoEnergy = river ? 0.79 : 0.84;
+        mirror.freshnessScore = 0.93;
+        mirror.conversationLimitPerDay = 30;
+        mirror.visibilityStatus = "PUBLIC";
+        mirror.isPublic = true;
+        mirror.lastMemoryUpdateAt = LocalDateTime.now();
+        mirror.ownerContextNote = river
+                ? "可以谈异乡与创作，不展示学校、城市和真实身份。"
+                : "可以谈照护与边界，不展示家人病情和工作机构。";
+        mirror.styleProfileJson = river
+                ? "{\"voice\":\"安静、准确、留白\",\"notBeautified\":true}"
+                : "{\"voice\":\"温柔、清醒、不讨好\",\"notBeautified\":true}";
+        mirror.contextPreviewJson = river
+                ? "{\"visibleSummary\":\"异乡、创作、归属与慢关系\",\"privacy\":\"不展示学校、城市和身份\"}"
+                : "{\"visibleSummary\":\"照护、工作边界与恢复\",\"privacy\":\"不展示家人病情和工作机构\"}";
+        mirror.standInEnabled = true;
+        mirror.realContactPolicy = "LETTER_ONLY";
+        capsuleMapper.insert(mirror);
+        for (MemoryCard card : cards) {
+            AuthorizedMemoryRef ref = new AuthorizedMemoryRef();
+            ref.capsuleId = mirror.id;
+            ref.memoryCardId = card.id;
+            ref.abstractExcerpt = card.summary;
+            ref.authorizationStatus = "AUTHORIZED";
+            authorizedMemoryRefMapper.insert(ref);
+        }
+        ensureBoundary(mirror.id,
+                river ? List.of("异乡", "创作", "归属", "慢关系")
+                        : List.of("照护", "工作边界", "休息", "关系"),
+                List.of("真实身份", "联系方式", "医疗诊断", "替本人承诺关系"),
+                5, "BALANCED");
     }
 
     /** 1) 多维画像：10 维严格对齐 PortraitReflectionService / portrait.html 的 DIM code。 */
@@ -596,6 +1025,10 @@ public class MockDataInitializer implements CommandLineRunner {
         card.lastTouchedAt = LocalDateTime.now();
         card.visibilityLevel = "CANDIDATE";
         card.status = "ACTIVE";
+        card.versionNo = 1;
+        card.memoryLayer = isSemanticMemory(type) ? "SEMANTIC" : "EPISODIC";
+        card.confidence = Math.min(0.92, 0.62 + Math.max(1, recurrence) * 0.045);
+        card.consentScope = "AURORA_PRIVATE";
         memoryCardMapper.insert(card);
         return card;
     }

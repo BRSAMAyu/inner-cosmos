@@ -11,6 +11,7 @@ const COPY: Record<Locale, {
   searchPlaceholder: string; searchAria: string; sortAria: string; sort: Record<SortMode, string>;
   tagAria: string; all: string; emptyNone: string; emptyFilter: string; energyTitle: string;
   openBusy: string; open: string; showMoreTags: (n: number) => string; showFewerTags: string;
+  realPersonPath: string; practiceCapsule: string; showMoreCapsules: (n: number) => string; showFewerCapsules: string;
 }> = {
   "zh-CN": {
     aria: "共鸣广场 · 浏览所有公开共鸣体", heading: "主动走进广场，而不是只等推荐", count: n => `${n} 个公开共鸣体`,
@@ -19,7 +20,9 @@ const COPY: Record<Locale, {
     sort: { ENERGY: "回声能量", FRESH: "新鲜度", RECENT: "最近活跃" }, tagAria: "按主题筛选", all: "全部",
     emptyNone: "广场上还没有公开的共鸣体。当有人愿意被遇见时，它会出现在这里。",
     emptyFilter: "没有符合当前筛选的共鸣体。换个主题或清空搜索试试。", energyTitle: "回声能量",
-    openBusy: "正在打开", open: "开始对话", showMoreTags: n => `展开另外 ${n} 个主题`, showFewerTags: "收起主题"
+    openBusy: "正在打开", open: "开始对话", showMoreTags: n => `展开另外 ${n} 个主题`, showFewerTags: "收起主题",
+    realPersonPath: "可以写信给本人", practiceCapsule: "官方练习侧影",
+    showMoreCapsules: n => `继续浏览另外 ${n} 个侧影`, showFewerCapsules: "收起，只看最适合开始的 6 个"
   },
   "en-SG": {
     aria: "Resonance plaza · browse all public capsules", heading: "Walk into the plaza yourself, don't only wait for recommendations", count: n => `${n} public capsule${n === 1 ? "" : "s"}`,
@@ -28,7 +31,9 @@ const COPY: Record<Locale, {
     sort: { ENERGY: "Echo energy", FRESH: "Freshness", RECENT: "Recently active" }, tagAria: "Filter by theme", all: "All",
     emptyNone: "No public capsules in the plaza yet. When someone is open to being met, it appears here.",
     emptyFilter: "No capsules match the current filter. Try another theme or clear the search.", energyTitle: "Echo energy",
-    openBusy: "Opening", open: "Start a conversation", showMoreTags: n => `Show ${n} more themes`, showFewerTags: "Show fewer themes"
+    openBusy: "Opening", open: "Start a conversation", showMoreTags: n => `Show ${n} more themes`, showFewerTags: "Show fewer themes",
+    realPersonPath: "You can write to the person", practiceCapsule: "Official practice facet",
+    showMoreCapsules: n => `Browse ${n} more facet${n === 1 ? "" : "s"}`, showFewerCapsules: "Show only the best 6 starting points"
   }
 };
 
@@ -53,6 +58,7 @@ export function PlazaDirectory({ capsules, activeCapsuleId, busy, onOpenCapsule,
   const [tag, setTag] = useState<string | null>(null);
   const [sort, setSort] = useState<SortMode>("ENERGY");
   const [tagsExpanded, setTagsExpanded] = useState(false);
+  const [capsulesExpanded, setCapsulesExpanded] = useState(false);
 
   const allTags = useMemo(() => {
     const frequency = new Map<string, number>();
@@ -78,13 +84,28 @@ export function PlazaDirectory({ capsules, activeCapsuleId, busy, onOpenCapsule,
       .filter(capsule => !tag || parseTags(capsule.publicTags).includes(tag))
       .filter(capsule => !q || `${capsule.pseudonym} ${capsule.intro}`.toLowerCase().includes(q))
       .slice()
-      .sort((a, b) => rank(b) - rank(a));
+      .sort((a, b) => {
+        const relationshipPath = Number(b.capsuleType === "USER_CAPSULE") - Number(a.capsuleType === "USER_CAPSULE");
+        return relationshipPath || rank(b) - rank(a);
+      });
   }, [capsules, query, tag, sort]);
+  const displayed = capsulesExpanded || visible.length <= 6 ? visible : visible.slice(0, 6);
+  const plazaHeading = locale === "en-SG"
+    ? "Meet a facet first; decide about the person later"
+    : "先遇见一个人的侧影，再决定要不要靠近本人";
+  const plazaIntro = locale === "en-SG"
+    ? "The plaza lets you browse every public capsule. Encounters are Aurora's smaller shortlist for you. A capsule chat can stay here, become a slow letter, or—only if both people want—open a real connection."
+    : "广场让你主动浏览所有公开共鸣体；「相遇」则是 Aurora 为你筛出的少量候选。你可以只和侧影聊，也可以写一封慢信；只有双方都愿意，才会走向真人连接。";
 
   return <section className="plaza-directory" aria-label={t.aria}>
-    <div className="resonance-heading"><div><span className="eyebrow">RESONANCE PLAZA</span><h2>{t.heading}</h2></div>
+    <div className="resonance-heading"><div><span className="eyebrow">RESONANCE PLAZA</span><h2>{plazaHeading}</h2></div>
       <span>{t.count(capsules.length)}</span></div>
-    <p className="resonance-intro">{t.intro}</p>
+    <p className="resonance-intro">{plazaIntro}</p>
+    <div className="plaza-path" aria-label={locale === "en-SG" ? "Possible relationship path" : "可能的关系路径"}>
+      <span>{locale === "en-SG" ? "Browse a facet" : "浏览侧影"}</span><i aria-hidden="true">→</i>
+      <span>{locale === "en-SG" ? "A few honest turns" : "聊几句真话"}</span><i aria-hidden="true">→</i>
+      <span>{locale === "en-SG" ? "Slow letter, if wanted" : "想继续，再写慢信"}</span>
+    </div>
 
     <div className="plaza-controls">
       <input className="plaza-search" value={query} onChange={event => setQuery(event.target.value)}
@@ -107,18 +128,28 @@ export function PlazaDirectory({ capsules, activeCapsuleId, busy, onOpenCapsule,
 
     {capsules.length === 0 ? <div className="network-empty">{t.emptyNone}</div> :
       visible.length === 0 ? <div className="network-empty">{t.emptyFilter}</div> :
+      <>
       <div className="plaza-grid" role="list">
-        {visible.map(capsule => {
+        {displayed.map(capsule => {
           const tags = parseTags(capsule.publicTags);
           return <article className={activeCapsuleId === capsule.id ? "plaza-card active" : "plaza-card"} role="listitem" key={capsule.id}>
             <div className="plaza-card-head"><strong>{capsule.pseudonym}</strong>
               <span className="plaza-energy" title={t.energyTitle}>✦ {Math.round(capsule.echoEnergy)}</span></div>
+            <span className={capsule.capsuleType === "USER_CAPSULE" ? "plaza-kind real" : "plaza-kind practice"}>
+              {capsule.capsuleType === "USER_CAPSULE" ? t.realPersonPath : t.practiceCapsule}
+            </span>
             <p className="ugc-text">{capsule.intro}</p>
+            <small className="plaza-topic-label">{locale === "en-SG" ? "You might talk about" : "你们可能会聊起"}</small>
             {tags.length > 0 && <div className="plaza-card-tags">{tags.map(tagName => <span key={tagName}>{tagName}</span>)}</div>}
             <AsyncButton className="resonance-secondary" busy={busy} busyText={t.openBusy}
-              onClick={() => onOpenCapsule(capsule)}>{t.open}</AsyncButton>
+              onClick={() => onOpenCapsule(capsule)}>{locale === "en-SG" ? "Talk to this facet" : "和这个侧影聊聊"}</AsyncButton>
           </article>;
         })}
-      </div>}
+      </div>
+      {visible.length > 6 && <button type="button" className="match-rail-toggle"
+        aria-expanded={capsulesExpanded} onClick={() => setCapsulesExpanded(value => !value)}>
+        {capsulesExpanded ? t.showFewerCapsules : t.showMoreCapsules(visible.length - displayed.length)}
+      </button>}
+      </>}
   </section>;
 }

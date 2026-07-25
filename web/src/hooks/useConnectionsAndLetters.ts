@@ -40,6 +40,7 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
   const [letterInbox, setLetterInbox] = useState<SlowLetter[]>([]);
   const [letterOutbox, setLetterOutbox] = useState<SlowLetter[]>([]);
   const [letterThreads, setLetterThreads] = useState<LetterThread[]>([]);
+  const [lettersRefreshing, setLettersRefreshing] = useState(false);
   const [selectedThreadId, setSelectedThreadId] = useState<number | null>(null);
   const [threadLetters, setThreadLetters] = useState<SlowLetter[]>([]);
   const [threadLettersStatus, setThreadLettersStatus] = useState<FetchStatus>("idle");
@@ -110,6 +111,25 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
   const loadLetterThreads = useCallback(() => api.letterThreads().then(setLetterThreads).catch(() => undefined), []);
   const loadGroups = useCallback(() => api.myGroups().then(setGroups).catch(() => undefined), []);
   const loadGroupInvites = useCallback(() => api.groupInvites().then(setGroupInvites).catch(() => undefined), []);
+
+  // Slow letters change state in the scheduler after they leave the sender's request. A user
+  // should not need to reload the entire app to see a letter move from SENT -> FLYING -> DELIVERED
+  // or appear in their inbox. Refresh the three letter projections as one coherent snapshot.
+  const refreshLetters = useCallback(async () => {
+    setLettersRefreshing(true);
+    try {
+      const [inbox, outbox, threads] = await Promise.all([
+        api.letterInbox(), api.letterOutbox(), api.letterThreads()
+      ]);
+      setLetterInbox(inbox);
+      setLetterOutbox(outbox);
+      setLetterThreads(threads);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "暂时无法刷新慢信，请稍后再试");
+    } finally {
+      setLettersRefreshing(false);
+    }
+  }, [setStatus]);
 
   // Re-fetches the three connection-shaped lists together, still as one concurrent Promise.all
   // (matching the original shape). One deliberate, documented improvement over the original: the
@@ -325,6 +345,7 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
     connectionRequests, friends, people, isPersonBusy: peopleBusyKeys.isBusy,
     relations, selectedRelation, relationTimeline, relationHealth, relationBusy,
     letterInbox, letterOutbox, letterThreads, selectedThreadId, threadLetters, threadLettersStatus,
+    lettersRefreshing,
     isDraftBusy: draftBusyKeys.isBusy, replyBusyId, replyDrafts,
     isLetterActionBusy: letterActionBusyKeys.isBusy,
     isConnectionDecisionBusy: connectionDecisionBusyKeys.isBusy,
@@ -336,7 +357,7 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
     isGroupInviteDecisionBusy: groupInviteDecisionBusyKeys.isBusy, isGroupLeaveBusy: groupLeaveBusyKeys.isBusy,
     loadLetterInbox, loadConnectionRequests, loadFriends, loadLetterOutbox, loadPeople, loadRelations, loadLetterThreads,
     loadGroups, loadGroupInvites,
-    refreshConnections, requestPersonConnection, openRelation, openThread, sendDraft,
+    refreshConnections, refreshLetters, requestPersonConnection, openRelation, openThread, sendDraft,
     actOnLetter, reportLetter, replyWithLetter, updateReplyDraft, playLetterVoice,
     requestConnection, decideConnection, leaveConnection,
     createGroup, openGroup, inviteToGroup, respondToGroupInvite, leaveGroup

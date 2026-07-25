@@ -51,6 +51,26 @@ describe("MemoryStarfield", () => {
     expect(onCloseDetail).toHaveBeenCalledOnce();
   });
 
+  it("opens a memory when the user clicks its visible star, not only the list action", () => {
+    const onRevealStar = vi.fn();
+    render(<MemoryStarfield starfield={starfield} starfieldBusy={false} onChangeMode={() => undefined}
+      starfieldDetail={null} detailBusy={null} onRevealStar={onRevealStar} onCloseDetail={() => undefined}
+      memoryOperations={[]} rollbackBusy={null} onRollback={() => undefined} onCorrectMemory={() => undefined} />);
+    fireEvent.click(screen.getByRole("button", { name: "打开记忆：星1" }));
+    expect(onRevealStar).toHaveBeenCalledExactlyOnceWith(1);
+  });
+
+  it("explains an empty view and offers a direct route back to Aurora", () => {
+    const onStartMemory = vi.fn();
+    render(<MemoryStarfield starfield={{ ...starfield, mode: "THEME", stars: [], accessibleList: [] }}
+      starfieldBusy={false} onChangeMode={() => undefined} starfieldDetail={null} detailBusy={null}
+      onRevealStar={() => undefined} onCloseDetail={() => undefined} memoryOperations={[]} rollbackBusy={null}
+      onRollback={() => undefined} onCorrectMemory={() => undefined} onStartMemory={onStartMemory} />);
+    expect(screen.getByText("还没有足够的记忆形成主题")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "回到 Aurora 留下第一颗星" }));
+    expect(onStartMemory).toHaveBeenCalledOnce();
+  });
+
   it("offers rollback only for reversible operations still applied", () => {
     const onRollback = vi.fn();
     render(<MemoryStarfield starfield={starfield} starfieldBusy={false} onChangeMode={() => undefined}

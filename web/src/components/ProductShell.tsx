@@ -135,6 +135,75 @@ export function CosmosSubNav({ active, onNavigate }: { active: CosmosTab; onNavi
   </nav>;
 }
 
+// Resonance has three different user intents. They used to be rendered as one long page:
+// managing one's own capsule, browsing every public capsule, and reviewing the small set Aurora
+// selected for this moment. Besides making the mobile page enormous, that flattened "directory"
+// and "recommendation" into one indistinguishable list. Real sub-routes keep each intent focused,
+// shareable and back/forward-correct while preserving the five-space top-level IA.
+export type ResonanceTab = "mine" | "plaza" | "encounters";
+
+export const resonanceTabs: Array<[ResonanceTab, string, string]> = [
+  ["mine", "我的侧影", "My capsule"],
+  ["plaza", "共鸣广场", "Plaza"],
+  ["encounters", "为我相遇", "For me"]
+];
+
+export function resonanceTabPath(tab: ResonanceTab): string {
+  return tab === "mine" ? spacePaths.resonance : `${spacePaths.resonance}/${tab}`;
+}
+
+export function resonanceTabFromPath(pathname: string): ResonanceTab {
+  const resource = resourceFromPath(pathname).resource;
+  // A capsule deep link belongs to the owner's workbench, not to a public discovery tab.
+  if (resource === "capsule" || resource == null) return "mine";
+  return resonanceTabs.some(([tab]) => tab === resource) ? resource as ResonanceTab : "mine";
+}
+
+export function ResonanceSubNav({ active, onNavigate, locale = "zh-CN" }: {
+  active: ResonanceTab; onNavigate: (tab: ResonanceTab) => void; locale?: Locale;
+}) {
+  return <nav className="cosmos-sub-nav resonance-sub-nav"
+    aria-label={locale === "en-SG" ? "Resonance sections" : "共鸣空间分区导航"}>
+    {resonanceTabs.map(([value, zh, en]) =>
+      <button type="button" key={value} className={active === value ? "active" : ""}
+        aria-current={active === value ? "page" : undefined}
+        onClick={() => onNavigate(value)}>{locale === "en-SG" ? en : zh}</button>)}
+  </nav>;
+}
+
+// People discovery, relationship history, groups and slow letters are four distinct intents.
+// Keeping them behind one concise secondary navigation stops the core letter journey from being
+// buried below a long directory while preserving the five-space top-level model.
+export type ConnectionTab = "letters" | "people" | "relations" | "groups";
+
+export const connectionTabs: Array<[ConnectionTab, string, string]> = [
+  ["letters", "慢信", "Slow letters"],
+  ["people", "真人连接", "People"],
+  ["relations", "关系轨迹", "Relationship trail"],
+  ["groups", "小组", "Groups"]
+];
+
+export function connectionTabFromSearch(search: string): ConnectionTab {
+  const value = new URLSearchParams(search).get("view");
+  return connectionTabs.some(([tab]) => tab === value) ? value as ConnectionTab : "letters";
+}
+
+export function connectionTabPath(tab: ConnectionTab): string {
+  return tab === "letters" ? spacePaths.letters : `${spacePaths.letters}?view=${tab}`;
+}
+
+export function ConnectionSubNav({ active, onNavigate, locale = "zh-CN" }: {
+  active: ConnectionTab; onNavigate: (tab: ConnectionTab) => void; locale?: Locale;
+}) {
+  return <nav className="cosmos-sub-nav connection-sub-nav"
+    aria-label={locale === "en-SG" ? "Connections sections" : "连接空间分区导航"}>
+    {connectionTabs.map(([value, zh, en]) =>
+      <button type="button" key={value} className={active === value ? "active" : ""}
+        aria-current={active === value ? "page" : undefined}
+        onClick={() => onNavigate(value)}>{locale === "en-SG" ? en : zh}</button>)}
+  </nav>;
+}
+
 const ME_COPY: Record<Locale, {
   ariaLabel: string; eyebrow: string; heading: string; intro: string;
   device: string; deviceNative: string; deviceWeb: string; online: string; offline: string;

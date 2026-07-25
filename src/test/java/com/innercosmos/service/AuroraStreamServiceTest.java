@@ -16,6 +16,7 @@ import com.innercosmos.mapper.DialogSessionMapper;
 import com.innercosmos.mapper.UserProfileMapper;
 import com.innercosmos.service.impl.AuroraAgentServiceImpl;
 import com.innercosmos.vo.AuroraReplyVO;
+import com.innercosmos.vo.AuroraForegroundVO;
 import com.innercosmos.vo.SafetyResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -191,6 +192,22 @@ class AuroraStreamServiceTest {
         assertNotNull(vo);
         assertFalse(vo.messages == null || vo.messages.isEmpty());
         verify(safetyService).check(eq("今天有点累"), eq(USER_ID), eq(SESSION_ID));
+    }
+
+    @Test
+    @DisplayName("fast foreground rejects praise-shaped relationship inference and uses factual local acknowledgement")
+    void foreground_relationshipPraiseShape_isReplacedByQualityGate() {
+        ChatRequest request = new ChatRequest();
+        request.sessionId = SESSION_ID;
+        request.message = "朋友今天突然变得很冷淡，我不想先猜他怎么了。";
+        request.mode = "DAILY_TALK";
+        when(safetyService.check(eq(request.message), eq(USER_ID), eq(SESSION_ID))).thenReturn(safe());
+
+        AuroraForegroundVO vo = service.foregroundAcknowledgement(USER_ID, request);
+
+        assertEquals("local-relationship-boundary", vo.source);
+        assertEquals("今天的变化是你看见的，原因还不知道；先把这两件事分开。", vo.text);
+        verifyNoInteractions(structuredAiService, modelRouter);
     }
 
     // ── Gemini audit 3.8 (PARTIAL/P0): the shared output gate (sanitizeLlmOutput, running on

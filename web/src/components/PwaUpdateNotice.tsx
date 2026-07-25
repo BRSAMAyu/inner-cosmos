@@ -9,20 +9,23 @@ import { UpdateBanner } from "./UpdateBanner";
 // "serviceWorker" is not in navigator (see vite-plugin-pwa's client/build/register.js), so no
 // extra feature-detection guard is needed here.
 //
-// registerType is "prompt" (see vite.config.ts), not "autoUpdate": under vite-plugin-pwa's
-// generated register script, "autoUpdate" mode never calls onNeedRefresh at all -- it silently
-// reloads the page itself the moment an updated service worker activates, with zero user
-// warning. "prompt" mode is the one that surfaces needRefresh/offlineReady state and only
-// applies the waiting service worker (via updateServiceWorker(), which sends the
-// skip-waiting message and reloads once the new worker takes control) when the user clicks
-// "现在刷新" below -- confirmed by reading node_modules/vite-plugin-pwa/dist/client/build/
-// register.js directly rather than assuming from the option name.
+// Normal web builds use the explicit update prompt below. Public classroom builds use
+// autoUpdate instead, so a returning tutor cannot remain pinned to a stale Demo shell; in
+// that mode needRefresh stays false and this component only owns the offline-ready notice.
 export function PwaUpdateNotice() {
   const {
     needRefresh: [needRefresh, setNeedRefresh],
     offlineReady: [offlineReady, setOfflineReady],
     updateServiceWorker,
-  } = useRegisterSW({ immediate: true });
+  } = useRegisterSW({
+    immediate: true,
+    // Browser-managed service-worker checks may be throttled for many hours. Ask for one
+    // explicit check whenever the app shell starts; normal builds still show their prompt,
+    // while classroom builds activate and reload immediately.
+    onRegisteredSW: (_serviceWorkerUrl, registration) => {
+      void registration?.update();
+    },
+  });
 
   return (
     <UpdateBanner

@@ -255,7 +255,7 @@ public class LlmConfig {
 
     public static class DeepSeekProperties {
         public String apiKey = "";
-        public String model = "deepseek-chat";
+        public String model = "deepseek-v4-flash";
         public String baseUrl = "https://api.deepseek.com";
         public int timeoutMs = 30000;
 

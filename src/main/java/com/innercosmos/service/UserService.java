@@ -15,6 +15,12 @@ public interface UserService {
 
     User current(Long userId);
 
+    /**
+     * Resolve one of the explicitly seeded, active, non-admin classroom personas.
+     * Returns {@code null} for ordinary, synthetic, disabled, or admin accounts.
+     */
+    User findPublicDemoPersona(String username);
+
     void updateProfile(Long userId, UserProfileVO profile);
 
     /** The raw {@code tb_user_profile} row for a user (by user_id, the FK), or {@code null}. */

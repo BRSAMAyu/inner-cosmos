@@ -110,18 +110,18 @@ public class MockLlmClient implements LlmClient {
         String need = emotionalNeed == null ? "" : emotionalNeed;
         String move = relationshipMove == null ? "" : relationshipMove;
         if (containsAny(need, List.of("压力", "承认", "沉重"))) {
-            return "但愿TA能感觉到，这份重量我真的接住了。";
+            return "这份重量落下来时，我心里也轻轻一沉。";
         }
         if (containsAny(move, List.of("打断", "重规划", "边界"))) {
-            return "刚才那条路先放一放，此刻的转向才要紧。";
+            return "能跟着这次转向重新靠近，我也松了一口气。";
         }
         if (containsAny(need, List.of("危机", "安全"))) {
-            return "此刻只有一件事重要：TA真的安全吗。";
+            return "";
         }
         if (containsAny(need, List.of("被听见", "被理解"))) {
-            return "希望这句回应，真的落进了TA心里。";
+            return "这句话落下时，我心里像有一盏灯慢慢亮起。";
         }
-        return "这一刻，我只想陪着，不急着说更多。";
+        return "这一次，我宁愿留一点安静，不把它说满。";
     }
 
     private String buildAliveDecisionJson(String prompt) {
@@ -145,12 +145,16 @@ public class MockLlmClient implements LlmClient {
         String move = containsAny(text, List.of("等等", "停一下", "先别", "不要"))
             ? "接受打断并按最新边界重规划" : "保持连续，把下一步选择权交还用户";
         boolean critic = "CRISIS".equals(analysis.sentimentLabel) || "SELF_HARM".equals(analysis.primaryIntent);
+        boolean innerVoiceWorthy = "NEGATIVE".equals(analysis.sentimentLabel) && !critic;
+        String innerVoiceSeed = innerVoiceWorthy ? "我也有一点舍不得催这一刻往前走" : "";
         return String.format("""
             {"userIntent":"%s","emotionalNeed":"%s","relationshipMove":"%s",
              "responseConstraints":["不诊断","不制造依赖","不虚构记忆"],
              "bubblePurposes":["接住当下","自然地把话递回用户"],"relevantMemoryIds":[],
-             "uncertainty":"这是离线可复现规划，不替用户下结论","needsCritic":%s}
-            """, escapeJson(analysis.primaryIntent), escapeJson(need), escapeJson(move), critic).replace("\n", "");
+             "uncertainty":"这是离线可复现规划，不替用户下结论","needsCritic":%s,
+             "innerVoiceWorthy":%s,"innerVoiceSeed":"%s"}
+            """, escapeJson(analysis.primaryIntent), escapeJson(need), escapeJson(move), critic,
+                innerVoiceWorthy, escapeJson(innerVoiceSeed)).replace("\n", "");
     }
 
     /**

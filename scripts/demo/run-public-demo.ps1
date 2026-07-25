@@ -4,15 +4,20 @@ param(
     [string]$Provider = "deepseek",
     [int]$Port = 8080,
     [int]$MaxBuildWorkers = 1,
+    [switch]$ReuseTunnel,
     [switch]$SkipVerification
 )
 
 $ErrorActionPreference = "Stop"
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+$web = Join-Path $root "web"
 $stateDir = Join-Path $root ".demo-runtime"
 $compose = Join-Path $root "deploy\compose\public-demo.yml"
 $cloudflared = Join-Path $root "scripts\demo\bin\cloudflared.exe"
 $tunnelPidFile = Join-Path $stateDir "cloudflared.pid"
+$demoInfoFile = Join-Path $stateDir "demo-info.txt"
+$origin = $null
+$tunnel = $null
 $keyFile = Get-ChildItem -LiteralPath $root -File |
     Where-Object { $_.Name.StartsWith("API", [StringComparison]::OrdinalIgnoreCase) -and $_.Extension -eq ".txt" } |
     Select-Object -First 1 -ExpandProperty FullName
@@ -20,12 +25,26 @@ $keyFile = Get-ChildItem -LiteralPath $root -File |
 if (Test-Path $tunnelPidFile) {
     $existingPid = (Get-Content -LiteralPath $tunnelPidFile -Raw).Trim()
     if ($existingPid -match "^\d+$" -and (Get-Process -Id ([int]$existingPid) -ErrorAction SilentlyContinue)) {
-        throw "A public demo tunnel is already running. Use status-public-demo.ps1 or stop-public-demo.ps1 first."
+        if (-not $ReuseTunnel) {
+            throw "A public demo tunnel is already running. Use -ReuseTunnel for an in-place rebuild, or stop-public-demo.ps1 first."
+        }
+        if (-not (Test-Path $demoInfoFile)) {
+            throw "Cannot reuse the tunnel because demo-info.txt is missing."
+        }
+        $savedInfo = Get-Content -LiteralPath $demoInfoFile -Encoding utf8 |
+            Where-Object { $_ -match "^origin=https://" } | Select-Object -First 1
+        if (-not $savedInfo) { throw "Cannot reuse the tunnel because its public origin is unknown." }
+        $origin = ($savedInfo -replace "^origin=", "").Trim()
+    } elseif ($ReuseTunnel) {
+        throw "Cannot reuse the tunnel because its recorded process is no longer running."
+    } else {
+        Remove-Item -LiteralPath $tunnelPidFile -Force -ErrorAction SilentlyContinue
     }
-    Remove-Item -LiteralPath $tunnelPidFile -Force -ErrorAction SilentlyContinue
+} elseif ($ReuseTunnel) {
+    throw "Cannot reuse the tunnel because cloudflared.pid is missing."
 }
 
-if (-not (Test-Path $cloudflared)) {
+if (-not $ReuseTunnel -and -not (Test-Path $cloudflared)) {
     $cloudflaredDirectory = Split-Path -Parent $cloudflared
     New-Item -ItemType Directory -Force -Path $cloudflaredDirectory | Out-Null
     $download = "$cloudflared.download"
@@ -49,26 +68,39 @@ if ($LASTEXITCODE -ne 0) { throw "Docker Desktop is not reachable." }
 New-Item -ItemType Directory -Force -Path $stateDir | Out-Null
 $stdout = Join-Path $stateDir "cloudflared.stdout.log"
 $stderr = Join-Path $stateDir "cloudflared.stderr.log"
-Remove-Item $stdout, $stderr -Force -ErrorAction SilentlyContinue
-$tunnel = Start-Process -FilePath $cloudflared -ArgumentList @(
-    "tunnel", "--no-autoupdate", "--url", "http://127.0.0.1:$Port"
-) -RedirectStandardOutput $stdout -RedirectStandardError $stderr -WindowStyle Hidden -PassThru
-$tunnel.Id | Set-Content -Encoding ascii $tunnelPidFile
+if (-not $ReuseTunnel) {
+    Remove-Item $stdout, $stderr -Force -ErrorAction SilentlyContinue
+    $tunnel = Start-Process -FilePath $cloudflared -ArgumentList @(
+        "tunnel", "--no-autoupdate", "--url", "http://127.0.0.1:$Port"
+    ) -RedirectStandardOutput $stdout -RedirectStandardError $stderr -WindowStyle Hidden -PassThru
+    $tunnel.Id | Set-Content -Encoding ascii $tunnelPidFile
 
-$origin = $null
-$deadline = (Get-Date).AddMinutes(2)
-do {
-    Start-Sleep -Milliseconds 750
-    $log = ((Get-Content $stdout, $stderr -Raw -ErrorAction SilentlyContinue) -join "`n")
-    $match = [regex]::Match($log, "https://[a-z0-9-]+\.trycloudflare\.com")
-    if ($match.Success) { $origin = $match.Value }
-    if ($tunnel.HasExited) { throw "cloudflared exited before assigning a public URL. See $stderr" }
-} while (-not $origin -and (Get-Date) -lt $deadline)
-if (-not $origin) { throw "Timed out waiting for a Cloudflare quick-tunnel URL." }
+    $deadline = (Get-Date).AddMinutes(2)
+    do {
+        Start-Sleep -Milliseconds 750
+        $log = ((Get-Content $stdout, $stderr -Raw -ErrorAction SilentlyContinue) -join "`n")
+        $match = [regex]::Match($log, "https://[a-z0-9-]+\.trycloudflare\.com")
+        if ($match.Success) { $origin = $match.Value }
+        if ($tunnel.HasExited) { throw "cloudflared exited before assigning a public URL. See $stderr" }
+    } while (-not $origin -and (Get-Date) -lt $deadline)
+    if (-not $origin) { throw "Timed out waiting for a Cloudflare quick-tunnel URL." }
+}
 
 try {
     & (Join-Path $PSScriptRoot "build-demo-apk.ps1") -ServerOrigin $origin -MaxWorkers $MaxBuildWorkers
     if ($LASTEXITCODE -ne 0) { throw "Demo APK build failed." }
+
+    # build-demo-apk.ps1 intentionally emits a native-shell bundle (basename "/")
+    # before syncing it into Android. Do not put that bundle into the server image:
+    # a browser visit would navigate to /aurora instead of /app/aurora/aurora and
+    # any full reload (including switching Demo personas) would fall through to a
+    # backend 404. The APK has already copied its assets, so restore the real web
+    # bundle before Docker snapshots src/main/resources/static.
+    Push-Location $web
+    try {
+        & npm.cmd run build:classroom
+        if ($LASTEXITCODE -ne 0) { throw "Public Demo web bundle failed." }
+    } finally { Pop-Location }
 
     $keys = Get-Content -LiteralPath $keyFile -Encoding utf8
     $qwenLine = $keys | Where-Object { $_ -match "^\s*qwen\s*:" } | Select-Object -First 1
@@ -105,8 +137,11 @@ try {
     }
     $env:LLM_PROVIDER = $Provider
     $env:LLM_API_KEY = $chatKey
-    $env:DEEPSEEK_API_KEY = $deepseekKey
-    $env:GLM_API_KEY = $glmKey
+    $env:DEEPSEEK_API_KEY = if ($Provider -eq "deepseek") { $deepseekKey } else { "" }
+    # Only expose the selected chat provider to the in-app model selector. A stale key for an
+    # unselected provider must not create a clickable model that only returns deterministic
+    # fallbacks during a classroom demo.
+    $env:GLM_API_KEY = if ($Provider -eq "glm") { $glmKey } else { "" }
     $env:MEMORY_EMBEDDING_API_KEY = $qwenKey
     $env:MEMORY_EMBEDDING_BASE_URL = "https://llm-errus8cw2pf66bx9.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"
     $env:MEMORY_EMBEDDING_MODEL = "text-embedding-v4"
@@ -148,6 +183,6 @@ try {
     Write-Host "Android: $origin/downloads/inner-cosmos-demo.apk"
     Write-Host "Stop:    .\scripts\demo\stop-public-demo.ps1"
 } catch {
-    Stop-Process -Id $tunnel.Id -Force -ErrorAction SilentlyContinue
+    if ($tunnel) { Stop-Process -Id $tunnel.Id -Force -ErrorAction SilentlyContinue }
     throw
 }

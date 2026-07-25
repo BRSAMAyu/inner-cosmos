@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import type { CapsuleMatch, CapsuleQuota, PersonaMessage, PersonaSession, ResonanceStrategy, SlowLetter } from "../api";
 import type { Locale } from "../i18n";
 import { AsyncButton } from "../loading";
@@ -9,13 +10,17 @@ const COPY: Record<Locale, {
   aria: string; heading: string; count: (n: number) => string; intro: string; strategyAria: string;
   strategy: Record<ResonanceStrategy, string>; emptyMatches: string; railAria: string; resonantNow: string;
   exploreMeet: string; matchCardAria: (pseudonym: string, summary: string) => string;
-  identityNotice: string; entryP: string; enterBusy: string; enterBtn: string;
-  quota: (remaining: number | string) => string; quotaNote: string; personaHistAria: string; historyStart: string;
+  entryP: string; enterBusy: string; enterBtn: string;
+  realPersonPath: string; practiceCapsule: string; userIdentityNotice: string; seedIdentityNotice: string;
+  quotaComfort: string; quotaLow: (remaining: number) => string; quotaLoading: string; quotaNote: string;
+  personaHistAria: string; historyStart: string;
   speakerYou: string; writeToCapsule: string; sendBusy: string; sendTurn: string; letterStepTitle: string;
   letterStepNote: string; seedWarning: string; letterFlightTitle: string; letterArrival: (time: string, status: string) => string;
   letterTitleLabel: string; letterBodyLabel: string; letterBodyAria: string; letterBodyPlaceholder: string;
+  letterTitleDetails: string; deliveryPromise: string; deliveryStatus: Record<string, string>;
   sendLetterBusy: string; sendLetterBtn: string; reportSession: string; blockSession: string;
   playCapsuleVoice: string; capsuleVoiceBusy: string; capsuleVoiceAria: string;
+  showMoreMatches: (n: number) => string; showFewerMatches: string;
 }> = {
   "zh-CN": {
     aria: "发现共鸣并写一封慢信", heading: "不是刷卡片，是理解为什么会相遇", count: n => `${n} 个此刻的候选`,
@@ -24,10 +29,14 @@ const COPY: Record<Locale, {
     strategy: { MIRROR: "相似共鸣", COMPLEMENT: "有意义的互补", GROWTH_EDGE: "成长边缘", SERENDIPITY: "温和偶遇", CONTEXTUAL: "阶段同行" },
     emptyMatches: "暂时没有足够安全的相遇候选。Inner Cosmos 不会用随机陌生人填满这里。", railAria: "共鸣候选",
     resonantNow: "此刻同行", exploreMeet: "探索相遇", matchCardAria: (name, summary) => `${name} · ${summary}`,
-    identityNotice: "授权 AI 共鸣体 · 不是真人实时在线",
+    realPersonPath: "聊过后可写信给本人", practiceCapsule: "官方练习侧影",
+    userIdentityNotice: "由一位真实用户授权形成 · 聊过后可以写信给本人",
+    seedIdentityNotice: "官方练习侧影 · 没有真人收件人",
     entryP: "先问一两个真正重要的问题。它只能使用创建者明确授权的侧面，也不会把你的 Aurora 私有画像带进这段对话。",
-    enterBusy: "正在进入", enterBtn: "进入有限但自然的对话", quota: r => `今天还可深入 ${r} 轮`,
-    quotaNote: "额度用于防滥用；模型故障不会扣次数，达到边界后会自然引导慢信。", personaHistAria: "共鸣体对话记录",
+    enterBusy: "正在进入", enterBtn: "先和这个侧影聊几句",
+    quotaComfort: "可以自然聊，不用赶进度", quotaLow: r => `今天还可以聊 ${r} 轮`,
+    quotaLoading: "正在确认今天的交流节奏",
+    quotaNote: "只有接近每日防刷上限时才会提醒；模型故障不会扣次数。", personaHistAria: "共鸣体对话记录",
     historyStart: "可以从一个具体时刻开始，而不是交换完整履历。", speakerYou: "你", writeToCapsule: "写给共鸣体",
     sendBusy: "正在发送", sendTurn: "发送这一轮", letterStepTitle: "如果仍想继续，把话交给时间",
     letterStepNote: "这封信会送给创建者本人。共鸣体不会替对方承诺回复，也不会泄露联系方式。",
@@ -35,9 +44,12 @@ const COPY: Record<Locale, {
     letterFlightTitle: "慢信已启程", letterArrival: (t, s) => `预计 ${t} 到达 · 状态 ${s}`,
     letterTitleLabel: "信的题目", letterBodyLabel: "你真正想让对方读到的话", letterBodyAria: "慢信正文",
     letterBodyPlaceholder: "不用总结整段对话，只写你愿意为它负责的那部分。", sendLetterBusy: "正在寄出", sendLetterBtn: "让慢信启程",
+    letterTitleDetails: "调整信的题目（可选）", deliveryPromise: "寄出后约 3 分钟抵达。等待不是故障；你可以离开这里，进度会在「连接 → 慢信」继续同步。",
+    deliveryStatus: { DRAFT: "草稿", SENT: "已寄出", FLYING: "飞行中", DELIVERED: "已抵达", READ: "对方已读", REPLIED: "对方回信了", DECLINED: "被婉拒", BLOCKED: "被屏蔽", ARCHIVED: "已归档" },
     reportSession: "举报这段对话", blockSession: "屏蔽这个共鸣体",
     playCapsuleVoice: "▶ 听这条回声", capsuleVoiceBusy: "正在合成…",
-    capsuleVoiceAria: "听到这个共鸣体的回复（与 Aurora 不同的声音）"
+    capsuleVoiceAria: "听到这个共鸣体的回复（与 Aurora 不同的声音）",
+    showMoreMatches: n => `查看其余 ${n} 个候选`, showFewerMatches: "收起，只看最相关的 3 个"
   },
   "en-SG": {
     aria: "Discover resonance and write a slow letter", heading: "Not swiping cards — understanding why you'd meet", count: n => `${n} candidate${n === 1 ? "" : "s"} right now`,
@@ -46,10 +58,14 @@ const COPY: Record<Locale, {
     strategy: { MIRROR: "Similar resonance", COMPLEMENT: "Meaningful complement", GROWTH_EDGE: "Growth edge", SERENDIPITY: "Gentle serendipity", CONTEXTUAL: "Same-season company" },
     emptyMatches: "No safe-enough candidates for now. Inner Cosmos won't fill this with random strangers.", railAria: "Resonance candidates",
     resonantNow: "Alongside now", exploreMeet: "Explore a meeting", matchCardAria: (name, summary) => `${name} · ${summary}`,
-    identityNotice: "Authorized AI capsule · not a real person online",
+    realPersonPath: "You can write to the person after chatting", practiceCapsule: "Official practice facet",
+    userIdentityNotice: "Authorized by a real user · you can write to them after chatting",
+    seedIdentityNotice: "Official practice facet · no real recipient",
     entryP: "Start with one or two questions that truly matter. It can only use facets the creator explicitly authorized, and won't bring your private Aurora portrait into this conversation.",
-    enterBusy: "Entering", enterBtn: "Enter a limited but natural conversation", quota: r => `${r} more turn${r === 1 ? "" : "s"} today`,
-    quotaNote: "The quota guards against misuse; a model failure never costs a turn, and reaching the boundary gently guides you to a slow letter.", personaHistAria: "Capsule conversation log",
+    enterBusy: "Entering", enterBtn: "Talk with this facet first",
+    quotaComfort: "Talk naturally — there is no need to rush", quotaLow: r => `${r} turn${r === 1 ? "" : "s"} left today`,
+    quotaLoading: "Checking today's conversation rhythm",
+    quotaNote: "The limit only appears when you are close to the daily anti-abuse cap; model failures never cost a turn.", personaHistAria: "Capsule conversation log",
     historyStart: "You can start from one concrete moment, rather than exchanging full resumes.", speakerYou: "You", writeToCapsule: "Write to the capsule",
     sendBusy: "Sending", sendTurn: "Send this turn", letterStepTitle: "If you still want to continue, entrust it to time",
     letterStepNote: "This letter goes to the creator themselves. The capsule won't promise a reply on their behalf, nor reveal contact details.",
@@ -57,9 +73,12 @@ const COPY: Record<Locale, {
     letterFlightTitle: "The slow letter is on its way", letterArrival: (t, s) => `Arrives ~${t} · status ${s}`,
     letterTitleLabel: "Letter title", letterBodyLabel: "What you truly want them to read", letterBodyAria: "Slow letter body",
     letterBodyPlaceholder: "No need to summarize the whole conversation — just write the part you're willing to stand behind.", sendLetterBusy: "Sending", sendLetterBtn: "Send the slow letter",
+    letterTitleDetails: "Adjust the letter title (optional)", deliveryPromise: "It arrives in about 3 minutes. Waiting is not a failure; you can leave this page and follow its progress in Connect → Slow letters.",
+    deliveryStatus: { DRAFT: "Draft", SENT: "Sent", FLYING: "In flight", DELIVERED: "Delivered", READ: "Read", REPLIED: "Replied", DECLINED: "Declined", BLOCKED: "Blocked", ARCHIVED: "Archived" },
     reportSession: "Report this conversation", blockSession: "Block this capsule",
     playCapsuleVoice: "▶ Hear this echo", capsuleVoiceBusy: "Synthesizing…",
-    capsuleVoiceAria: "Hear this capsule's reply spoken (a voice distinct from Aurora)"
+    capsuleVoiceAria: "Hear this capsule's reply spoken (a voice distinct from Aurora)",
+    showMoreMatches: n => `View ${n} more candidate${n === 1 ? "" : "s"}`, showFewerMatches: "Show only the top 3"
   }
 };
 
@@ -79,6 +98,22 @@ export function ResonanceNetwork({ resonanceMatches, resonanceStrategy, visitorB
   onPlayPersonaVoice?: () => void;
 }) {
   const t = COPY[locale];
+  const [showAllMatches, setShowAllMatches] = useState(false);
+  const isUserCapsule = visitorMatch?.capsule.capsuleType === "USER_CAPSULE";
+  const quotaExhausted = personaQuota?.remaining === 0;
+  const quotaLabel = !personaQuota ? t.quotaLoading
+    : personaQuota.remaining <= 5 ? t.quotaLow(personaQuota.remaining)
+    : t.quotaComfort;
+  const visibleMatches = useMemo(() => {
+    if (showAllMatches || resonanceMatches.length <= 3) return resonanceMatches;
+    const selected = visitorMatch
+      ? resonanceMatches.find(match => match.capsule.id === visitorMatch.capsule.id)
+      : null;
+    const ordered = selected
+      ? [selected, ...resonanceMatches.filter(match => match.capsule.id !== selected.capsule.id)]
+      : resonanceMatches;
+    return ordered.slice(0, 3);
+  }, [resonanceMatches, showAllMatches, visitorMatch]);
   return <section className="resonance-network" aria-label={t.aria}>
     <div className="resonance-heading"><div><span className="eyebrow">RESONANCE NETWORK</span><h2>{t.heading}</h2></div>
       <span>{t.count(resonanceMatches.length)}</span></div>
@@ -86,7 +121,7 @@ export function ResonanceNetwork({ resonanceMatches, resonanceStrategy, visitorB
     <div className="strategy-switcher" role="group" aria-label={t.strategyAria}>
       {strategyOrder.map(value =>
         <button type="button" key={value} aria-pressed={resonanceStrategy === value} disabled={visitorBusy}
-          onClick={() => onChooseStrategy(value)}>{t.strategy[value]}</button>)}
+          onClick={() => { setShowAllMatches(false); onChooseStrategy(value); }}>{t.strategy[value]}</button>)}
     </div>
     {resonanceMatches[0] && <p className="strategy-explanation"><strong>{resonanceMatches[0].strategyLabel}</strong> · {resonanceMatches[0].strategyDescription}</p>}
     {resonanceMatches.length === 0 ? <div className="network-empty">{t.emptyMatches}</div> : <>
@@ -97,19 +132,26 @@ export function ResonanceNetwork({ resonanceMatches, resonanceStrategy, visitorB
             unreadable run-on string (live-verified against a real seeded capsule). aria-hidden the
             visual content and give the button itself a short, properly separated aria-label; the
             visual card layout is unchanged. */}
-        {resonanceMatches.map(match => <button type="button" role="listitem" key={match.capsule.id}
+        {visibleMatches.map(match => <button type="button" role="listitem" key={match.capsule.id}
           className={visitorMatch?.capsule.id === match.capsule.id ? "match-card active" : "match-card"}
           aria-label={t.matchCardAria(match.capsule.pseudonym, match.matchSummary)}
           onClick={() => onChooseMatch(match.capsule.id)}><span aria-hidden="true">{match.resonant ? t.resonantNow : t.exploreMeet}</span>
+          <em className={match.capsule.capsuleType === "USER_CAPSULE" ? "real" : "practice"} aria-hidden="true">
+            {match.capsule.capsuleType === "USER_CAPSULE" ? t.realPersonPath : t.practiceCapsule}
+          </em>
           <strong aria-hidden="true">{match.capsule.pseudonym}</strong><p className="ugc-text" aria-hidden="true">{match.capsule.intro}</p>
           <small aria-hidden="true">{match.matchSummary}</small></button>)}
       </div>
+      {resonanceMatches.length > 3 && <button type="button" className="match-rail-toggle"
+        aria-expanded={showAllMatches} onClick={() => setShowAllMatches(value => !value)}>
+        {showAllMatches ? t.showFewerMatches : t.showMoreMatches(resonanceMatches.length - visibleMatches.length)}
+      </button>}
       {visitorMatch && <div className="visitor-workbench">
-        <header><div><span className="identity-notice">{t.identityNotice}</span><h3>{visitorMatch.capsule.pseudonym}</h3>
+        <header><div><span className="identity-notice">{isUserCapsule ? t.userIdentityNotice : t.seedIdentityNotice}</span><h3>{visitorMatch.capsule.pseudonym}</h3>
           <p className="ugc-text">{visitorMatch.capsule.intro}</p></div><div className="match-reasons">{visitorMatch.matchReasons.map(reason => <span key={reason}>{reason}</span>)}</div></header>
         {!personaSession ? <div className="visitor-entry"><p>{t.entryP}</p>
           <AsyncButton className="resonance-primary" busy={visitorBusy} busyText={t.enterBusy} onClick={onStartPersonaConversation}>{t.enterBtn}</AsyncButton></div> : <>
-          <div className="visitor-quota"><span>{t.quota(personaQuota?.remainingTurns ?? "–")}</span><small>{t.quotaNote}</small>
+          <div className="visitor-quota"><span>{quotaLabel}</span><small>{t.quotaNote}</small>
             {(onReportSession || onBlockSession) && <div className="persona-safety-actions">
               {onReportSession && <button type="button" className="quiet" onClick={onReportSession}>{t.reportSession}</button>}
               {onBlockSession && <button type="button" className="quiet" onClick={onBlockSession}>{t.blockSession}</button>}
@@ -137,14 +179,17 @@ export function ResonanceNetwork({ resonanceMatches, resonanceStrategy, visitorB
             });
           })()}</div>
           <div className="sandbox-composer"><textarea aria-label={t.writeToCapsule} value={personaDraft} onChange={event => onPersonaDraftChange(event.target.value)} />
-            <AsyncButton className="resonance-primary" busy={visitorBusy} disabled={!personaDraft.trim() || personaQuota?.exhausted} busyText={t.sendBusy} onClick={onSendPersonaTurn}>{t.sendTurn}</AsyncButton></div>
+            <AsyncButton className="resonance-primary" busy={visitorBusy} disabled={!personaDraft.trim() || quotaExhausted} busyText={t.sendBusy} onClick={onSendPersonaTurn}>{t.sendTurn}</AsyncButton></div>
           {personaTurnError && <p className="preview-warning" role="alert">{personaTurnError}</p>}
           {personaMessages.some(message => message.senderType === "CAPSULE") && <div className="slow-letter-compose">
             <div className="capsule-step"><span>✉</span><div><strong>{t.letterStepTitle}</strong><small>{t.letterStepNote}</small></div></div>
             {visitorMatch.capsule.capsuleType !== "USER_CAPSULE" ? <p className="preview-warning">{t.seedWarning}</p> : sentLetter ?
-              <div className="letter-flight" role="status"><strong>{t.letterFlightTitle}</strong><span>{sentLetter.title}</span><small>{t.letterArrival(new Date(sentLetter.estimatedArrivalAt).toLocaleString(locale), sentLetter.status)}</small></div> : <>
-                <label>{t.letterTitleLabel}<input value={letterTitle} onChange={event => onLetterTitleChange(event.target.value)} /></label>
+              <div className="letter-flight" role="status"><strong>{t.letterFlightTitle}</strong><span>{sentLetter.title}</span><small>{t.letterArrival(new Date(sentLetter.estimatedArrivalAt).toLocaleString(locale), t.deliveryStatus[sentLetter.status] ?? sentLetter.status)}</small></div> : <>
                 <label>{t.letterBodyLabel}<textarea aria-label={t.letterBodyAria} value={letterBody} onChange={event => onLetterBodyChange(event.target.value)} placeholder={t.letterBodyPlaceholder} /></label>
+                <p className="letter-delivery-promise">{t.deliveryPromise}</p>
+                <details className="letter-title-details"><summary>{t.letterTitleDetails}</summary>
+                  <label>{t.letterTitleLabel}<input value={letterTitle} onChange={event => onLetterTitleChange(event.target.value)} /></label>
+                </details>
                 <AsyncButton className="resonance-primary" busy={visitorBusy} disabled={!letterTitle.trim() || !letterBody.trim()} busyText={t.sendLetterBusy} onClick={onSendLetter}>{t.sendLetterBtn}</AsyncButton></>}
           </div>}
         </>}

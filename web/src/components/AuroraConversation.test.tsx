@@ -287,7 +287,7 @@ describe("AuroraConversation -- W2 inner-voice bubble", () => {
     expect(screen.queryByLabelText("Aurora 的内心独白")).not.toBeInTheDocument();
   });
 
-  it("renders the inner-voice bubble visually distinct from a normal reply bubble, and attempts autoplay in AMBIENT mode", () => {
+  it("renders the legacy inner-voice bubble distinctly in AMBIENT mode without taking audio control", () => {
     render(<AuroraConversation {...props} messages={baseMessages} innerVoiceEnabled innerVoiceMode="AMBIENT" />);
     const innerBubble = screen.getByLabelText("Aurora 的内心独白");
     expect(innerBubble).toHaveClass("aurora-inner");
@@ -295,9 +295,9 @@ describe("AuroraConversation -- W2 inner-voice bubble", () => {
     expect(normalBubble).not.toHaveClass("aurora-inner");
     // AMBIENT: text is shown immediately (not gated behind a tap).
     expect(screen.getByText("其实我有点担心她今天的状态")).toBeVisible();
-    // AMBIENT: autoplay is attempted without any click.
+    // AMBIENT reveals text, but audio remains an explicit user action.
     expect(FakeAudio.instances.length).toBeGreaterThan(0);
-    expect(FakeAudio.instances[0].play).toHaveBeenCalledOnce();
+    expect(FakeAudio.instances[0].play).not.toHaveBeenCalled();
   });
 
   it("does NOT autoplay in ON_DEMAND mode -- shows a tap affordance instead, and only reveals+plays once tapped", () => {

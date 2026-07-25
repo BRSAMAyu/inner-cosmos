@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { flushSync } from "react-dom";
 import {
   api, replayTurnEvents, streamAurora, subscribeProactive,
   type GoodbyeResult, type Notification, type PsychologySkillSuggestion, type WakeIntent
 } from "../api";
 import type { AuroraStreamEvent, DialogMessage, TurnStatus } from "../protocol";
-import type { AuroraUiMessage } from "../components/AuroraConversation";
+import type { AuroraInnerVoice, AuroraUiMessage } from "../components/AuroraConversation";
 import type { SkillLocale } from "../components/PsychologySkillStudio";
 import { mobileRuntime } from "../mobile";
 
@@ -23,6 +24,10 @@ export type AuroraRuntimeSignal = {
 };
 
 export type AuroraSafetyAlert = { riskLevel: string; featureTarget: string; safeMessage?: string };
+export type AuroraMemoryTrace = {
+  referencedMemoryIds: number[];
+  detectedTheme?: string;
+};
 
 const terminal = new Set<TurnStatus>(["COMPLETED", "INTERRUPTED", "CANCELLED"]);
 
@@ -77,11 +82,6 @@ const STATUS_COPY: Record<SkillLocale, {
   }
 };
 
-// W2 voice: an inner-voice bubble reuses the same `messages` list as ordinary turn bubbles (see
-// handleEvent's "inner_voice" case below) so AuroraConversation's existing render loop and
-// auto-scroll/aria-live wiring pick it up "for free" -- no separate list or extra prop threading
-// through this hook. AccountSettings-style filtering (innerVoiceEnabled/innerVoiceMode) happens
-// entirely in AuroraConversation itself; this hook only stores what arrived.
 function toUi(rows: DialogMessage[]): AuroraUiMessage[] {
   return rows.map(row => ({ key: `db-${row.id}`, speaker: row.speaker, text: row.textContent }));
 }
@@ -98,12 +98,16 @@ export type UseAuroraSessionOptions = {
   /** The app-wide status banner is a cross-cutting concern shared by every domain (see
    * web/src/loading.tsx's B1 loading-audit checkpoint); this hook only ever writes to it. */
   setStatus: (status: string) => void;
+  /** Called only after the explicit "settle today" memory write succeeds. */
+  onMemorySettled?: () => void | Promise<void>;
 };
 
-export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion, setStatus }: UseAuroraSessionOptions) {
+export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion, setStatus, onMemorySettled }: UseAuroraSessionOptions) {
   const t = STATUS_COPY[skillLocale];
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [messages, setMessages] = useState<AuroraUiMessage[]>([]);
+  const [innerVoice, setInnerVoice] = useState<AuroraInnerVoice | null>(null);
+  const [memoryTrace, setMemoryTrace] = useState<AuroraMemoryTrace | null>(null);
   const [draft, setDraft] = useState("");
   const [mode, setMode] = useState("DAILY_TALK");
   const [activeTurnId, setActiveTurnId] = useState<number | null>(null);
@@ -111,12 +115,14 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
   const [wakeIntents, setWakeIntents] = useState<WakeIntent[]>([]);
   const [wakeBusy, setWakeBusy] = useState(false);
   const [returnWhen, setReturnWhen] = useState("明天早上 8:30");
+  const [returnPurpose, setReturnPurpose] = useState("继续这一刻未说完的话");
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [safetyAlert, setSafetyAlert] = useState<AuroraSafetyAlert | null>(null);
   const dismissSafetyAlert = useCallback(() => setSafetyAlert(null), []);
   const [safetyResources, setSafetyResources] = useState<string[]>([]);
   const loadSafetyResources = useCallback(() => api.safetyResources().then(setSafetyResources), []);
   const [goodbyeResult, setGoodbyeResult] = useState<GoodbyeResult | null>(null);
+  const [goodbyeBusy, setGoodbyeBusy] = useState(false);
   const dismissGoodbye = useCallback(() => setGoodbyeResult(null), []);
 
   const abortRef = useRef<AbortController | null>(null);
@@ -287,12 +293,22 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
   }, [beginNewTurnGeneration, finishTurn, isCurrentGeneration, setStatus, t]);
 
   const triggerGoodbye = useCallback(async () => {
-    if (!sessionId) return;
+    if (!sessionId || goodbyeBusy) return;
+    setGoodbyeBusy(true);
     try {
       const result = await api.triggerGoodbye(sessionId, "BUTTON");
       setGoodbyeResult(result);
-    } catch (error) { setStatus(error instanceof Error ? error.message : t.goodbyeFailed); }
-  }, [sessionId, setStatus, t]);
+      if (messages.some(message => message.speaker === "USER" && message.text.trim())) {
+        setStatus(skillLocale === "en-SG" ? "Placing this moment into your starfield…" : "正在把这一刻放进你的星空…");
+        await api.settleAuroraSession(sessionId);
+        await onMemorySettled?.();
+      }
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : t.goodbyeFailed);
+    } finally {
+      setGoodbyeBusy(false);
+    }
+  }, [goodbyeBusy, messages, onMemorySettled, sessionId, setStatus, skillLocale, t]);
 
   const handleEvent = useCallback((event: AuroraStreamEvent, generation: number) => {
     if (!isCurrentGeneration(generation)) return; // 4.1: stale (superseded) turn -- ignore entirely.
@@ -310,6 +326,15 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
         break;
       }
       case "meta": {
+        const referencedMemoryIds = Array.isArray(event.payload.referencedMemoryIds)
+          ? event.payload.referencedMemoryIds.filter((id): id is number =>
+              typeof id === "number" && Number.isSafeInteger(id) && id > 0)
+          : [];
+        setMemoryTrace(event.payload.memoryReferenced === true ? {
+          referencedMemoryIds,
+          detectedTheme: typeof event.payload.detectedTheme === "string"
+            ? event.payload.detectedTheme : undefined
+        } : null);
         const loop = event.payload.agentLoop;
         if (!loop || typeof loop !== "object") break;
         const safe = loop as Record<string, unknown>;
@@ -353,20 +378,13 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
         break;
       }
       case "inner_voice": {
-        // At most once per turn, and deliberately NOT a terminal/control event -- it never
-        // touches runtimeSignal/activeTurnId/status. A turn that never emits one (the common
-        // case: disabled, or the backend had nothing genuinely distinct to say) completes exactly
-        // as if this case did not exist. Since the backend emits inner_voice AFTER turn.completed
-        // (so a slow synthesis never delays turn closeout), activeTurnRef.current is already null
-        // here -- keying on it would collapse every turn's inner_voice to the same "inner-0" and the
-        // dedup below would silently drop the second turn's. Key on the unique SSE event id
-        // (turnId:live:sequence, collision-free) instead; fall back to the turnId only when an id
-        // is absent (e.g. some tests).
+        // A post-turn side channel, not another chat message. Keeping only the latest meaningful
+        // signal prevents the transcript from becoming noisy and avoids coupling its reveal or
+        // playback lifecycle to message auto-scroll and turn completion.
         const key = event.id ? `inner-${event.id}` : `inner-${activeTurnRef.current ?? 0}`;
-        setMessages(current => current.some(message => message.key === key) ? current : [
-          ...current,
-          { key, speaker: "AURORA_INNER", text: event.payload.text, audio: event.payload.audio, voiceId: event.payload.voiceId }
-        ]);
+        setInnerVoice(current => current?.key === key ? current : {
+          key, text: event.payload.text, audio: event.payload.audio, voiceId: event.payload.voiceId
+        });
         break;
       }
       case "turn.interrupted":
@@ -407,7 +425,14 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
     // (a recover() poll, a late live event) from this point on.
     const generation = beginNewTurnGeneration();
     setDraft("");
-    setMessages(current => [...current, { key: `local-${crypto.randomUUID()}`, speaker: "USER", text }]);
+    // A memory echo describes exactly one completed turn. Clear the previous turn before the
+    // fast foreground acknowledgement appears, so it can never be mistaken for evidence about
+    // the new message while the deep kernel is still working.
+    setMemoryTrace(null);
+    setMessages(current => [
+      ...current,
+      { key: `local-${crypto.randomUUID()}`, speaker: "USER", text }
+    ]);
     setStatus(t.listening);
     onSkillSuggestion(null);
     void api.psychologySkillSuggestion(text, skillLocale).then(onSkillSuggestion).catch(() => onSkillSuggestion(null));
@@ -416,7 +441,32 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
     const controller = new AbortController();
     abortRef.current = controller;
     try {
-      const outcome = await streamAurora({ sessionId, message: text, mode }, controller.signal,
+      let foreground: Awaited<ReturnType<typeof api.auroraForeground>> | null = null;
+      try {
+        foreground = await api.auroraForeground({ sessionId, message: text, mode });
+      } catch {
+        // The authoritative stream still owns safety and the complete reply. If the fast lane
+        // is unavailable, continue without manufacturing a client-side conversational bubble.
+      }
+      if (foreground?.text && !foreground.safetyBlocked && isCurrentGeneration(generation)) {
+        // React may otherwise keep this update in the async event batch until the long SSE
+        // promise settles. Commit the latency-facing bubble before opening that transport so the
+        // user actually sees the fast core's response when it arrives.
+        flushSync(() => {
+          setMessages(current => [
+            ...current,
+            { key: `foreground-${crypto.randomUUID()}`, speaker: "AURORA", text: foreground.text }
+          ]);
+        });
+      }
+      const outcome = await streamAurora({
+        sessionId,
+        message: text,
+        mode,
+        foregroundAcknowledgementSent: Boolean(foreground?.text && !foreground.safetyBlocked),
+        foregroundAcknowledgementText: foreground?.text ?? "",
+        foregroundAcknowledgementSource: foreground?.source ?? ""
+      }, controller.signal,
         streamEvent => handleEvent(streamEvent, generation));
       if (outcome === "EOF_WITHOUT_TERMINAL" && isCurrentGeneration(generation)) {
         // Gemini audit 4.2: the connection closed cleanly but no terminal/done event was ever
@@ -439,7 +489,8 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
     setWakeBusy(true);
     try {
       const created = await api.negotiateWakeIntent({
-        when: returnWhen, purpose: "继续这一刻未说完的话", reasonForUser: `因为还有话没有说完，Aurora 会在 ${returnWhen} 回来`,
+        when: returnWhen, purpose: returnPurpose,
+        reasonForUser: `因为“${returnPurpose}”，Aurora 会在 ${returnWhen} 回来`,
         content: "我回来了。刚才没有说完的部分，我们可以慢慢接着说。",
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Shanghai",
         contextSessionId: sessionId
@@ -517,6 +568,8 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
     beginNewTurnGeneration();
     setSessionId(null);
     setMessages([]);
+    setInnerVoice(null);
+    setMemoryTrace(null);
   }, [beginNewTurnGeneration]);
 
   // Gemini audit 4.1: unmount must cancel any in-flight stream/recovery the same way logout does
@@ -528,9 +581,12 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
   }, [beginNewTurnGeneration]);
 
   return {
-    sessionId, messages, draft, setDraft, mode, setMode, activeTurnId, runtimeSignal,
-    wakeIntents, wakeBusy, returnWhen, setReturnWhen, notifications, safetyAlert, dismissSafetyAlert,
-    safetyResources, loadSafetyResources, goodbyeResult, dismissGoodbye, triggerGoodbye,
+    sessionId, messages, innerVoice, dismissInnerVoice: () => setInnerVoice(null),
+    memoryTrace, dismissMemoryTrace: () => setMemoryTrace(null),
+    draft, setDraft, mode, setMode, activeTurnId, runtimeSignal,
+    wakeIntents, wakeBusy, returnWhen, setReturnWhen, returnPurpose, setReturnPurpose,
+    notifications, safetyAlert, dismissSafetyAlert,
+    safetyResources, loadSafetyResources, goodbyeResult, goodbyeBusy, dismissGoodbye, triggerGoodbye,
     send, stop, scheduleReturn, respondToReturn, postponeReturn, cancelReturn,
     resolveSession, replaceFromHistory, loadWakeIntents, loadNotifications, refreshNotifications,
     resumeConversation, openMobileWakeIntent, resetSession

@@ -101,6 +101,21 @@ class EmotionInsightServiceImplTest {
     }
 
     @Test
+    @DisplayName("analyze(): provider prose cannot escape the canonical weather enum")
+    void analyze_canonicalizesProviderWeatherProse() {
+        StructuredAiResults.Emotion emotion = new StructuredAiResults.Emotion();
+        emotion.emotionName = "焦虑";
+        emotion.emotionScore = 6.0;
+        emotion.weatherType = "像一场迟迟没有落下来的雨，云层很低，但远处仍然有一点光";
+        when(structuredAiService.call(eq(USER_ID), eq("EMOTION_INSIGHT"), any(), any(), any(), any()))
+                .thenReturn(emotion);
+
+        EmotionInsight insight = service.analyze(USER_ID, "明天要展示，我有点焦虑");
+
+        assertEquals("FOGGY", insight.weatherType);
+    }
+
+    @Test
     @DisplayName("writeTrace(): sessionId present + no prior row -> insert")
     void writeTrace_upsertInsertsWhenAbsent() {
         when(emotionTraceMapper.selectOne(any())).thenReturn(null);
@@ -110,6 +125,25 @@ class EmotionInsightServiceImplTest {
 
         verify(emotionTraceMapper, times(1)).insert(any(EmotionTrace.class));
         verify(emotionTraceMapper, never()).updateById(any(EmotionTrace.class));
+    }
+
+    @Test
+    @DisplayName("writeTrace(): storage boundary always persists a bounded canonical weather")
+    void writeTrace_boundsProviderControlledColumns() {
+        when(emotionTraceMapper.selectOne(any())).thenReturn(null);
+        EmotionInsight insight = sampleInsight("SETTLEMENT");
+        insight.primaryEmotion = "很复杂的情绪".repeat(20);
+        insight.weatherType = "这是一段不应该直接写进枚举列的自由文本".repeat(4);
+        insight.analysisSource = "UNTRUSTED_PROVIDER_SOURCE".repeat(4);
+
+        service.writeTrace(USER_ID, SESSION_ID, insight);
+
+        ArgumentCaptor<EmotionTrace> captor = ArgumentCaptor.forClass(EmotionTrace.class);
+        verify(emotionTraceMapper).insert(captor.capture());
+        EmotionTrace trace = captor.getValue();
+        assertTrue(trace.emotionName.length() <= 64);
+        assertTrue(List.of("SUNNY", "CLOUDY", "RAINY", "FOGGY", "STORM").contains(trace.weatherType));
+        assertTrue(trace.analysisSource.length() <= 32);
     }
 
     @Test

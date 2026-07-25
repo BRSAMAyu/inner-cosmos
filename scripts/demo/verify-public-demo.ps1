@@ -11,6 +11,7 @@ if ($originUri.Scheme -ne "https") { throw "Public demo verification requires HT
 $origin = $originUri.GetLeftPart([UriPartial]::Authority)
 $suffix = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
 $password = "Demo-proof-$suffix!"
+$verificationActors = [System.Collections.Generic.List[object]]::new()
 
 function Invoke-Envelope {
     param(
@@ -22,7 +23,15 @@ function Invoke-Envelope {
     $headers = @{}
     if ($Method -notin @("GET", "HEAD")) {
         $csrf = Invoke-RestMethod -Uri "$origin/api/v1/auth/csrf" -WebSession $Session -TimeoutSec 20
-        $headers[$csrf.data.headerName] = $csrf.data.token
+        # The classroom Demo deliberately permits frictionless persona switching and
+        # may return an empty CSRF contract. Keep the verifier compatible with both
+        # modes: attach the token when the server advertises one, otherwise let the
+        # request itself prove that the Demo endpoint accepts the mutation.
+        if ($csrf.data -and
+            -not [string]::IsNullOrWhiteSpace([string]$csrf.data.headerName) -and
+            -not [string]::IsNullOrWhiteSpace([string]$csrf.data.token)) {
+            $headers[[string]$csrf.data.headerName] = [string]$csrf.data.token
+        }
         $headers["Idempotency-Key"] = [Guid]::NewGuid().ToString()
     }
     $params = @{
@@ -31,12 +40,20 @@ function Invoke-Envelope {
         WebSession = $Session
         Headers = $headers
         TimeoutSec = 90
+        UseBasicParsing = $true
     }
     if ($null -ne $Body) {
-        $params.ContentType = "application/json"
-        $params.Body = ($Body | ConvertTo-Json -Depth 8 -Compress)
+        $params.ContentType = "application/json; charset=utf-8"
+        $json = $Body | ConvertTo-Json -Depth 8 -Compress
+        $params.Body = [Text.Encoding]::UTF8.GetBytes($json)
     }
-    $response = Invoke-RestMethod @params
+    $web = Invoke-WebRequest @params
+    $bytes = if ($web.RawContentStream) {
+        $web.RawContentStream.ToArray()
+    } else {
+        [Text.Encoding]::UTF8.GetBytes($web.Content)
+    }
+    $response = ([Text.Encoding]::UTF8.GetString($bytes) | ConvertFrom-Json)
     if (-not $response.success) { throw "API failed: $Path $($response.message)" }
     return $response.data
 }
@@ -46,18 +63,195 @@ function Register-Actor([string]$username, [string]$nickname) {
     $null = Invoke-Envelope $session "POST" "/api/v1/auth/register" @{
         username = $username; nickname = $nickname; password = $password
     }
+    $script:verificationActors.Add([pscustomobject]@{ Session = $session; Username = $username })
     $current = Invoke-Envelope $session "GET" "/api/v1/auth/current"
     return @{ Session = $session; User = $current }
 }
 
-$health = Invoke-RestMethod -Uri "$origin/actuator/health" -TimeoutSec 30
+function Invoke-PublicReadyCheck {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Label,
+        [Parameter(Mandatory = $true)]
+        [scriptblock]$Operation,
+        [int]$TimeoutSeconds = 90
+    )
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    $attempt = 0
+    $lastFailure = $null
+    do {
+        $attempt++
+        try {
+            return & $Operation
+        } catch {
+            $lastFailure = $_
+            if ((Get-Date) -lt $deadline) { Start-Sleep -Seconds 2 }
+        }
+    } while ((Get-Date) -lt $deadline)
+    throw "$Label did not become ready after $attempt attempts: $($lastFailure.Exception.Message)"
+}
+
+trap {
+    $failure = $_
+    foreach ($actor in @($verificationActors)) {
+        try {
+            $null = Invoke-Envelope $actor.Session "DELETE" "/api/user/account" @{ password = $password }
+        } catch {
+            Write-Warning "Could not clean verification actor '$($actor.Username)': $($_.Exception.Message)"
+        }
+    }
+    throw $failure
+}
+
+$health = Invoke-PublicReadyCheck "Public health" {
+    $result = Invoke-RestMethod -Uri "$origin/actuator/health" -TimeoutSec 30
+    if ($result.status -ne "UP") { throw "status=$($result.status)" }
+    return $result
+}
 if ($health.status -ne "UP") { throw "Public health is not UP." }
-$landing = Invoke-WebRequest -UseBasicParsing -Uri "$origin/" -TimeoutSec 30
+$landing = Invoke-PublicReadyCheck "Public landing page" {
+    Invoke-WebRequest -UseBasicParsing -Uri "$origin/" -TimeoutSec 30
+}
 if ($landing.StatusCode -ne 200 -or $landing.Content -notmatch "Inner Cosmos") {
     throw "Public landing page is unavailable."
 }
-$apkHead = Invoke-WebRequest -UseBasicParsing -Method Head -Uri "$origin/downloads/inner-cosmos-demo.apk" -TimeoutSec 30
+$webApp = Invoke-PublicReadyCheck "Public Web App" {
+    Invoke-WebRequest -UseBasicParsing -Uri "$origin/app/aurora/" -TimeoutSec 30
+}
+if ($webApp.StatusCode -ne 200 -or
+    $webApp.Content -notmatch '["'']\/app\/aurora\/assets\/app\.js["'']') {
+    throw "Public Web App is not using the /app/aurora browser bundle; in-app navigation may reload to a 404."
+}
+$apkHead = Invoke-PublicReadyCheck "Public APK download" {
+    Invoke-WebRequest -UseBasicParsing -Method Head -Uri "$origin/downloads/inner-cosmos-demo.apk" -TimeoutSec 30
+}
 if ($apkHead.StatusCode -ne 200) { throw "Public APK download is unavailable." }
+
+$demoSession = [Microsoft.PowerShell.Commands.WebRequestSession]::new()
+$demoPersonas = @(Invoke-Envelope $demoSession "GET" "/api/public/demo/personas")
+if ($demoPersonas.Count -ne 3 -or @($demoPersonas | Where-Object { $_.key -notin @("lin-che", "shen-yan", "xia-yu") }).Count -ne 0) {
+    throw "Public Demo must expose exactly the three curated non-admin personas."
+}
+$null = Invoke-Envelope $demoSession "POST" "/api/public/demo/enter/lin-che"
+$lin = Invoke-Envelope $demoSession "GET" "/api/v1/auth/current"
+$null = Invoke-Envelope $demoSession "POST" "/api/public/demo/enter/shen-yan"
+$shen = Invoke-Envelope $demoSession "GET" "/api/v1/auth/current"
+if ($lin.username -ne "demo" -or $shen.username -ne "river" -or [long]$lin.id -eq [long]$shen.id) {
+    throw "Passwordless Demo persona switching did not establish two distinct real sessions."
+}
+
+$linDemoSession = [Microsoft.PowerShell.Commands.WebRequestSession]::new()
+$cloudDemoSession = [Microsoft.PowerShell.Commands.WebRequestSession]::new()
+$null = Invoke-Envelope $linDemoSession "POST" "/api/public/demo/enter/lin-che"
+$null = Invoke-Envelope $cloudDemoSession "POST" "/api/public/demo/enter/xia-yu"
+$linDemo = Invoke-Envelope $linDemoSession "GET" "/api/v1/auth/current"
+$cloudDemo = Invoke-Envelope $cloudDemoSession "GET" "/api/v1/auth/current"
+if ($linDemo.username -ne "demo" -or $cloudDemo.username -ne "cloud" -or
+    [long]$linDemo.id -eq [long]$cloudDemo.id) {
+    throw "Curated slow-letter proof requires two distinct Lin Che and Xia Yu sessions."
+}
+
+# The three months-lived Demo identities are the actual product showcase. A fresh synthetic
+# capsule passing below must never mask a curated card that is visible in the plaza but blocked by
+# stale memory/data-use grants. Create a real visitor session for every curated mirror on every run.
+$curatedCapsuleSpecs = @(
+    @{ Name = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String("5p6X5r6I55qE5Zue5aOw5YiG6Lqr")); Visitor = "cloud" },
+    @{ Name = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String("5rK/5rKz57yT5oWi55Sf5rS755qE5Lq6")); Visitor = "lin" },
+    @{ Name = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String("5oqK6Ieq5bex5pS+5Zue54Wn5oqk6YeM55qE5Lq6")); Visitor = "lin" }
+)
+$curatedPlaza = @(Invoke-Envelope $linDemoSession "GET" "/api/plaza/capsules")
+$curatedPersonaSessions = [System.Collections.Generic.List[object]]::new()
+foreach ($spec in $curatedCapsuleSpecs) {
+    $name = [string]$spec.Name
+    $matches = @($curatedPlaza | Where-Object { $_.pseudonym -eq $name })
+    if ($matches.Count -ne 1) {
+        throw "Curated capsule '$name' is missing or ambiguous in the public plaza."
+    }
+    $visitorSession = if ($spec.Visitor -eq "cloud") { $cloudDemoSession } else { $linDemoSession }
+    $personaSession = Invoke-Envelope $visitorSession "POST" "/api/v1/persona-chat/session/create" @{
+        capsuleId = [long]$matches[0].id
+    }
+    if ($personaSession.status -ne "ACTIVE") {
+        throw "Curated capsule '$name' did not create an active visitor session."
+    }
+    $curatedPersonaSessions.Add([pscustomobject]@{
+        Name = $name
+        Session = $visitorSession
+        PersonaSessionId = [long]$personaSession.id
+    })
+}
+
+# Prove the intended showcase path with the curated, months-old identities themselves:
+# Xia Yu's already-read slow letter lets Lin Che ask to meet, Xia Yu accepts, and both sides
+# see the relationship. Normalize and restore the relationship so this gate is repeatable and
+# never leaves the shared classroom personas in a verifier-mutated state.
+$curatedConnection = "NOT_RUN"
+try {
+    $existingFriends = @(Invoke-Envelope $linDemoSession "GET" "/api/social/friends")
+    foreach ($friend in @($existingFriends | Where-Object { [long]$_.userId -eq [long]$cloudDemo.id })) {
+        $null = Invoke-Envelope $linDemoSession "POST" "/api/social/friends/$($friend.id)/leave"
+    }
+
+    $linRequests = Invoke-Envelope $linDemoSession "GET" "/api/social/requests"
+    $cloudRequests = Invoke-Envelope $cloudDemoSession "GET" "/api/social/requests"
+    foreach ($request in @($linRequests.incoming | Where-Object { [long]$_.userId -eq [long]$cloudDemo.id })) {
+        $null = Invoke-Envelope $linDemoSession "POST" "/api/social/friends/$($request.id)/decline"
+    }
+    foreach ($request in @($cloudRequests.incoming | Where-Object { [long]$_.userId -eq [long]$linDemo.id })) {
+        $null = Invoke-Envelope $cloudDemoSession "POST" "/api/social/friends/$($request.id)/decline"
+    }
+
+    $linInbox = @(Invoke-Envelope $linDemoSession "GET" "/api/letters/inbox")
+    $seedLetter = @($linInbox | Where-Object {
+        [long]$_.senderUserId -eq [long]$cloudDemo.id -and
+        [long]$_.receiverUserId -eq [long]$linDemo.id -and
+        $_.status -in @("READ", "REPLIED")
+    })
+    if ($seedLetter.Count -ne 1) {
+        throw "The curated Xia Yu to Lin Che read slow letter is missing or ambiguous."
+    }
+
+    $requested = Invoke-Envelope $linDemoSession "POST" "/api/social/connections/from-letter/$($seedLetter[0].id)"
+    if ($requested.status -ne "PENDING" -or
+        [long]$requested.requesterId -ne [long]$linDemo.id -or
+        [long]$requested.addresseeId -ne [long]$cloudDemo.id) {
+        throw "The slow letter did not create the expected Lin Che to Xia Yu request."
+    }
+
+    $cloudRequests = Invoke-Envelope $cloudDemoSession "GET" "/api/social/requests"
+    $incomingFromLin = @($cloudRequests.incoming | Where-Object {
+        [long]$_.id -eq [long]$requested.id -and
+        [long]$_.userId -eq [long]$linDemo.id -and
+        $_.source -eq "SLOW_LETTER:$($seedLetter[0].id)"
+    })
+    if ($incomingFromLin.Count -ne 1) {
+        throw "Xia Yu did not receive the connection request created from the slow letter."
+    }
+    $null = Invoke-Envelope $cloudDemoSession "POST" "/api/social/friends/$($requested.id)/accept"
+
+    $linFriends = @(Invoke-Envelope $linDemoSession "GET" "/api/social/friends")
+    $cloudFriends = @(Invoke-Envelope $cloudDemoSession "GET" "/api/social/friends")
+    if (-not ($linFriends | Where-Object {
+            [long]$_.id -eq [long]$requested.id -and [long]$_.userId -eq [long]$cloudDemo.id
+        }) -or
+        -not ($cloudFriends | Where-Object {
+            [long]$_.id -eq [long]$requested.id -and [long]$_.userId -eq [long]$linDemo.id
+        })) {
+        throw "The curated slow-letter connection is not visible to both personas."
+    }
+    $curatedConnection = "LETTER_TO_FRIEND_ACCEPTED"
+}
+finally {
+    try {
+        $cleanupFriends = @(Invoke-Envelope $linDemoSession "GET" "/api/social/friends")
+        foreach ($friend in @($cleanupFriends | Where-Object { [long]$_.userId -eq [long]$cloudDemo.id })) {
+            $null = Invoke-Envelope $linDemoSession "POST" "/api/social/friends/$($friend.id)/leave"
+        }
+    }
+    catch {
+        Write-Warning "Could not restore the curated Lin Che / Xia Yu friendship baseline: $($_.Exception.Message)"
+    }
+}
 
 $a = Register-Actor "demoproofa$suffix" "Demo A $suffix"
 $b = Register-Actor "demoproofb$suffix" "Demo B $suffix"
@@ -100,24 +294,85 @@ $auroraReplyLength = 0
 $memoryCards = 0
 $capsulePublished = $false
 $capsuleChatReplyLength = 0
+$curatedCapsuleReplies = 0
+$curatedCapsuleDistinctReplies = 0
 $slowLetterStatus = "SKIPPED"
+$auroraRuntime = "SKIPPED"
+$auroraFallbacks = "SKIPPED"
 if (-not $SkipAurora) {
+    $curatedPrompt = [Text.Encoding]::UTF8.GetString(
+        [Convert]::FromBase64String(
+            "5oiR5b6I5Zyo5oSP5LiA5Liq6aG555uu77yM5Lmf5Zug5Li65oCV5YGa5LiN5aW96ICM5LiA55u05ouW552A5LiN5pWi6K6p5Yir5Lq655yL44CC5L2g5Lya5oCO5LmI5Zue5bqU77yf"))
+    $curatedTexts = [System.Collections.Generic.List[string]]::new()
+    foreach ($curated in $curatedPersonaSessions) {
+        $curatedReply = Invoke-Envelope $curated.Session "POST" "/api/v1/persona-chat/message" @{
+            sessionId = [long]$curated.PersonaSessionId
+            message = $curatedPrompt
+        }
+        $text = [string]$curatedReply.textContent
+        if ($text.Length -lt 20) {
+            throw "Curated capsule '$($curated.Name)' returned an implausibly short response."
+        }
+        $curatedTexts.Add($text)
+    }
+    $curatedCapsuleReplies = $curatedTexts.Count
+    $curatedCapsuleDistinctReplies = @($curatedTexts | Select-Object -Unique).Count
+    if ($curatedCapsuleDistinctReplies -ne $curatedCapsuleReplies) {
+        throw "Curated capsules returned duplicate voices for the same lived-experience prompt."
+    }
+
     $dialog = Invoke-Envelope $a.Session "POST" "/api/dialog/session/create" @{
         title = "Public demo verification"; sessionType = "AURORA_CHAT"
     }
+    $quietDisclosurePrompt = [Text.Encoding]::UTF8.GetString(
+        [Convert]::FromBase64String(
+            "5piO5aSp6KaB5bGV56S66L+Z5Liq6aG555uu77yM5oiR5b6I57Sn5byg44CC5YWI5Yir57uZ5bu66K6u77yM5oiR5Y+q5piv5oOz5oqK6L+Z5Y+l6K+d6K+05Ye65p2l44CC"))
     $reply = Invoke-Envelope $a.Session "POST" "/api/v1/aurora/message-rich" @{
         sessionId = [long]$dialog.id
-        message = "I am a little nervous and excited about showing this project to my classmates. Please respond like a thoughtful friend."
+        message = $quietDisclosurePrompt
         inputType = "TEXT"
         mode = "DAILY_TALK"
         timezone = "Asia/Shanghai"
         clientMessageId = "demo-proof-$suffix"
+        foregroundAcknowledgementSent = $true
     }
-    $replyText = [string]$reply.content
+    $replyText = @($reply.messages) -join "`n"
+    if ([string]::IsNullOrWhiteSpace($replyText)) { $replyText = [string]$reply.content }
     if ([string]::IsNullOrWhiteSpace($replyText)) { $replyText = [string]$reply.text }
     if ([string]::IsNullOrWhiteSpace($replyText)) { $replyText = ($reply | ConvertTo-Json -Depth 8 -Compress) }
     $auroraReplyLength = $replyText.Length
-    if ($auroraReplyLength -lt 20) { throw "Aurora returned an implausibly short response." }
+    # Quiet disclosure is intentionally allowed to be one restrained sentence. Character count is
+    # only an empty/placeholder guard; the semantic assertions immediately below enforce the real
+    # no-advice/no-question boundary.
+    if ($auroraReplyLength -lt 8) {
+        throw "Aurora returned an empty or placeholder-length response: '$replyText'."
+    }
+    $quietReframe = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String("5LiN5piv5Z2P5LqL"))
+    if ($replyText.Contains("?") -or $replyText.Contains([string][char]0xFF1F) -or
+        $replyText.Contains($quietReframe) -or
+        -not [string]::IsNullOrWhiteSpace([string]$reply.nextQuestion) -or
+        -not [string]::IsNullOrWhiteSpace([string]$reply.smallStep)) {
+        throw "Aurora violated the quiet-disclosure boundary during public acceptance: reply='$replyText'; nextQuestion='$($reply.nextQuestion)'; smallStep='$($reply.smallStep)'."
+    }
+    $auroraRuntime = [string]$reply.agentLoop.runtime
+    if ($auroraRuntime -ne "dual-kernel.v1") {
+        throw "Aurora did not use the required dual-kernel runtime (got '$auroraRuntime')."
+    }
+    if ([bool]$reply.agentLoop.plannerFallbackUsed) {
+        throw "Aurora planning kernel fell back during public acceptance."
+    }
+    if ([bool]$reply.agentLoop.speakerFallbackUsed) {
+        throw "Aurora speaking kernel fell back during public acceptance."
+    }
+    # The critic's fallback is a bounded deterministic quality repair, followed by the same
+    # observable boundary assertions above. It is deliberately non-fatal for a classroom launch:
+    # a transient supervisor timeout must not make Web/APK unreachable after planner + speaker
+    # both completed on the real provider.
+    $auroraFallbacks = if ([bool]$reply.agentLoop.criticFallbackUsed) {
+        "CRITIC_DETERMINISTIC_REPAIR"
+    } else {
+        "NONE"
+    }
 
     # Close the same conversation so the real settlement pipeline has to materialize a memory
     # card. Poll the public API instead of assuming async listeners finish immediately.
@@ -193,17 +448,31 @@ if (-not $SkipAurora) {
     }
 }
 
+# The verifier proves the full path with fresh accounts, then removes those synthetic actors so a
+# repeated classroom launch never fills the real "People, slowly" surface with Demo A/B rows. The
+# PASS summary below is computed before cleanup; deletion itself is part of the verification gate.
+$null = Invoke-Envelope $b.Session "DELETE" "/api/user/account" @{ password = $password }
+$null = Invoke-Envelope $a.Session "DELETE" "/api/user/account" @{ password = $password }
+$verificationActors.Clear()
+
 [pscustomobject]@{
     Status = "PASS"
     Origin = $origin
     Health = $health.status
     ApkDownload = "PASS"
+    DemoPersonaSwitch = "LIN_CHE_TO_SHEN_YAN"
+    CuratedSlowLetterConnection = $curatedConnection
     RegisteredUsers = 2
     Friendship = "BIDIRECTIONAL_ACCEPTED"
     GroupMembers = 2
     AuroraReplyLength = $auroraReplyLength
+    AuroraRuntime = $auroraRuntime
+    AuroraFallbacks = $auroraFallbacks
     MemoryCards = $memoryCards
     CapsulePublished = $capsulePublished
     CapsuleChatReplyLength = $capsuleChatReplyLength
+    CuratedCapsuleSessions = $curatedPersonaSessions.Count
+    CuratedCapsuleReplies = $curatedCapsuleReplies
+    CuratedCapsuleDistinctReplies = $curatedCapsuleDistinctReplies
     SlowLetterStatus = $slowLetterStatus
 } | Format-List

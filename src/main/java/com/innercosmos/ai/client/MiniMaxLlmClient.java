@@ -62,6 +62,17 @@ public class MiniMaxLlmClient implements LlmClient {
             return response;
         } catch (Exception firstError) {
             errorMessage = firstError.getMessage();
+            if (!request.retryEnabledOrDefault()) {
+                if (!allowFallback) {
+                    throw new AiProviderException("MiniMax remote chat failed within the stage deadline and retry is disabled: "
+                            + firstError.getMessage());
+                }
+                log.warn("MiniMax stage failed without retry, falling back to mock: {}", firstError.getMessage());
+                response = fallback.chat(request);
+                fallbackUsed = true;
+                success = true;
+                return response;
+            }
             log.warn("MiniMax chat failed on first attempt, retrying once: {}", firstError.getMessage());
             try {
                 if (apiKey == null || apiKey.isBlank()) {
@@ -124,7 +135,7 @@ public class MiniMaxLlmClient implements LlmClient {
                 "model", model,
                 "messages", messages,
                 "temperature", request.temperature != null ? request.temperature : 0.72,
-                "max_tokens", LlmClient.RESPONSE_MAX_TOKENS,
+                "max_tokens", request.maxTokensOr(LlmClient.RESPONSE_MAX_TOKENS),
                 "stream", true
         );
         HttpRequest httpRequest = HttpRequest.newBuilder()
@@ -132,7 +143,7 @@ public class MiniMaxLlmClient implements LlmClient {
                 .header("Content-Type", "application/json")
                 .header("Authorization", "Bearer " + apiKey)
                 .header("Accept", "text/event-stream")
-                .timeout(Duration.ofMillis(timeoutMs))
+                .timeout(Duration.ofMillis(request.timeoutMsOr(timeoutMs)))
                 .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
                 .build();
         StringBuilder aggregated = new StringBuilder();
@@ -219,13 +230,13 @@ public class MiniMaxLlmClient implements LlmClient {
                 "model", model,
                 "messages", messages,
                 "temperature", request.temperature != null ? request.temperature : 0.72,
-                "max_tokens", LlmClient.RESPONSE_MAX_TOKENS
+                "max_tokens", request.maxTokensOr(LlmClient.RESPONSE_MAX_TOKENS)
         );
         HttpRequest httpRequest = HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl))
                 .header("Content-Type", "application/json")
                 .header("Authorization", "Bearer " + apiKey)
-                .timeout(Duration.ofMillis(timeoutMs))
+                .timeout(Duration.ofMillis(request.timeoutMsOr(timeoutMs)))
                 .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
                 .build();
         HttpResponse<String> httpResponse = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
