@@ -35,4 +35,17 @@ describe("AuroraSelfSpace", () => {
     expect(screen.getByRole("button", { name: "Let her remember this growth" })).toBeEnabled();
     expect(screen.getByText("An understanding taking shape · 80%")).toBeVisible();
   });
+
+  it("localises the legacy baseline narrative without changing user-authored evolution text", () => {
+    const legacy = {
+      ...evolution,
+      versions: [{
+        ...evolution.versions[0],
+        publicNarrative: "Aurora 的连续自我从这里开始；后续变化会说明来源、评测与回退路径。"
+      }]
+    };
+    render(<AuroraSelfSpace locale="en-SG" evolution={legacy} busy={false} onPropose={() => undefined}
+      onEvaluate={() => undefined} onActivate={() => undefined} onRollback={() => undefined} />);
+    expect(screen.getByText("Aurora's continuous self begins here. Every later change will show its source, evaluation and rollback path.")).toBeVisible();
+  });
 });

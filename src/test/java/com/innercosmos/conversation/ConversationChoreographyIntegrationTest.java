@@ -56,6 +56,23 @@ class ConversationChoreographyIntegrationTest {
     }
 
     @Test
+    void persistsConfirmationGatedActionOnTheCommittedTurnPlan() {
+        Fixture fixture = fixture(81000L, List.of("请确认后再保存。"));
+        fixture.reply.proposedActionType = "REMEMBER";
+        fixture.reply.proposedActionSummary = "保存为私密记忆";
+        fixture.reply.proposedActionPayloadJson = "{\"title\":\"展示\",\"content\":\"先走本地备用流程\"}";
+        fixture.reply.proposedActionStatus = "PENDING_CONFIRMATION";
+
+        TurnTimelineVO timeline = choreography.recordCompletedTurn(
+                fixture.userId, fixture.session.id, fixture.userMessage.id, fixture.reply, fixture.auroraMessages);
+
+        assertThat(timeline.activePlan.proposedActionType).isEqualTo("REMEMBER");
+        assertThat(timeline.activePlan.proposedActionPayload).contains("先走本地备用流程");
+        assertThat(timeline.activePlan.actionStatus).isEqualTo("PENDING_CONFIRMATION");
+        assertThat(timeline.activePlan.actionConfirmedAt).isNull();
+    }
+
+    @Test
     void retryReturnsSameCommittedPlanAndNeverDuplicatesBubbles() {
         Fixture fixture = fixture(81002L, List.of("第一条", "第二条"));
         TurnTimelineVO first = choreography.recordCompletedTurn(

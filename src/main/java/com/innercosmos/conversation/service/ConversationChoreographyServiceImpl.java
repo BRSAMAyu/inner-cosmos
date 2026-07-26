@@ -113,6 +113,7 @@ public class ConversationChoreographyServiceImpl implements ConversationChoreogr
         plan.intent = blankTo(reply == null ? null : reply.detectedTheme, "陪伴与回应");
         plan.posture = blankTo(reply == null ? null : reply.replyTone, "温柔、具体、像朋友");
         plan.stopCondition = "ALL_BUBBLES_COMMITTED_OR_CANCELLED";
+        copyProposedAction(plan, reply);
         plan.committedAt = now;
         planMapper.insert(plan);
         List<String> messages = reply == null || reply.messages == null ? List.of() : reply.messages;
@@ -349,6 +350,7 @@ public class ConversationChoreographyServiceImpl implements ConversationChoreogr
         plan.intent = blankTo(reply == null ? null : reply.detectedTheme, "陪伴与回应");
         plan.posture = blankTo(reply == null ? null : reply.replyTone, "温柔、具体、像朋友");
         plan.stopCondition = "ALL_BUBBLES_COMMITTED";
+        copyProposedAction(plan, reply);
         plan.committedAt = now;
         planMapper.insert(plan);
         appendEvent(turn, plan.id, null, "PLAN_COMMITTED", "turn:" + turn.id,
@@ -450,6 +452,15 @@ public class ConversationChoreographyServiceImpl implements ConversationChoreogr
     private GenerationAttempt runningAttempt(Long turnId, Long userId) {
         return attemptMapper.selectOne(new QueryWrapper<GenerationAttempt>()
                 .eq("turn_id", turnId).eq("user_id", userId).eq("status", "RUNNING").last("LIMIT 1"));
+    }
+
+    private void copyProposedAction(TurnPlan plan, AuroraReplyVO reply) {
+        if (plan == null || reply == null || reply.proposedActionType == null
+                || reply.proposedActionType.isBlank()) return;
+        plan.proposedActionType = reply.proposedActionType;
+        plan.proposedActionPayload = reply.proposedActionPayloadJson;
+        plan.proposedActionSummary = reply.proposedActionSummary;
+        plan.actionStatus = blankTo(reply.proposedActionStatus, "PENDING_CONFIRMATION");
     }
 
     private void discardRunningAttempt(ConversationTurn turn, String reason) {

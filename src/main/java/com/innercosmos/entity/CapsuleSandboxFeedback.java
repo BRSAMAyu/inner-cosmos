@@ -11,5 +11,7 @@ public class CapsuleSandboxFeedback extends BaseEntity {
     public String responseText;
     public String rating;
     public String ownerComment;
+    public String calibrationSignalsJson;
+    public Long appliedGenomeVersionId;
     public String status;
 }

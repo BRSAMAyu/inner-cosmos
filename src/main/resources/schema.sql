@@ -167,6 +167,12 @@ CREATE TABLE IF NOT EXISTS tb_turn_plan (
   intent VARCHAR(160),
   posture VARCHAR(160),
   stop_condition VARCHAR(64),
+  proposed_action_type VARCHAR(48),
+  proposed_action_payload TEXT,
+  proposed_action_summary VARCHAR(500),
+  action_status VARCHAR(32),
+  action_confirmed_at TIMESTAMP NULL,
+  action_result_ref VARCHAR(160),
   committed_at TIMESTAMP NULL,
   cancelled_at TIMESTAMP NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -174,6 +180,7 @@ CREATE TABLE IF NOT EXISTS tb_turn_plan (
   UNIQUE KEY uk_turn_plan_version (turn_id, plan_version),
   UNIQUE KEY uk_turn_plan_single_commit (turn_id, commit_slot),
   INDEX idx_turn_plan_owner (user_id, turn_id),
+  INDEX idx_turn_plan_pending_action (user_id, action_status, id),
   CONSTRAINT ck_turn_plan_commit_slot CHECK ((status = 'COMMITTED' AND commit_slot = 1) OR (status <> 'COMMITTED' AND commit_slot IS NULL)),
   CONSTRAINT fk_turn_plan_turn FOREIGN KEY (turn_id) REFERENCES tb_conversation_turn(id) ON DELETE CASCADE
 );
@@ -1186,12 +1193,16 @@ CREATE TABLE IF NOT EXISTS tb_capsule_sandbox_feedback (
   response_text TEXT NOT NULL,
   rating VARCHAR(32) NOT NULL,
   owner_comment TEXT,
+  calibration_signals_json TEXT,
+  applied_genome_version_id BIGINT,
   status VARCHAR(32) NOT NULL DEFAULT 'OPEN',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_capsule_sandbox_feedback (capsule_id, genome_version_id, created_at),
+  INDEX idx_capsule_sandbox_feedback_status (capsule_id, status, created_at),
   CONSTRAINT fk_capsule_sandbox_feedback_capsule FOREIGN KEY (capsule_id) REFERENCES tb_echo_capsule(id) ON DELETE CASCADE,
-  CONSTRAINT fk_capsule_sandbox_feedback_genome FOREIGN KEY (genome_version_id) REFERENCES tb_capsule_genome_version(id) ON DELETE CASCADE
+  CONSTRAINT fk_capsule_sandbox_feedback_genome FOREIGN KEY (genome_version_id) REFERENCES tb_capsule_genome_version(id) ON DELETE CASCADE,
+  CONSTRAINT fk_capsule_sandbox_feedback_applied_genome FOREIGN KEY (applied_genome_version_id) REFERENCES tb_capsule_genome_version(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS tb_aurora_self_version (

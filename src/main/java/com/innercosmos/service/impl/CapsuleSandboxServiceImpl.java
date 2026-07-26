@@ -1,6 +1,8 @@
 package com.innercosmos.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.innercosmos.ai.capsule.CapsuleCalibrationPolicy;
 import com.innercosmos.ai.structured.StructuredAiResults;
 import com.innercosmos.ai.structured.StructuredAiService;
 import com.innercosmos.dto.CapsuleSandboxFeedbackRequest;
@@ -12,12 +14,13 @@ import com.innercosmos.mapper.CapsuleGenomeVersionMapper;
 import com.innercosmos.mapper.CapsuleSandboxFeedbackMapper;
 import com.innercosmos.mapper.EchoCapsuleMapper;
 import com.innercosmos.service.CapsuleSandboxService;
+import com.innercosmos.service.DataMaskingService;
 import com.innercosmos.service.SafetyService;
+import com.innercosmos.safety.PiiCredentialDetector;
 import com.innercosmos.vo.CapsuleFidelitySummaryVO;
 import com.innercosmos.vo.CapsuleSandboxVO;
 import com.innercosmos.vo.SafetyResult;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -36,17 +39,26 @@ public class CapsuleSandboxServiceImpl implements CapsuleSandboxService {
     private final CapsuleSandboxFeedbackMapper feedbackMapper;
     private final StructuredAiService structuredAiService;
     private final SafetyService safetyService;
+    private final DataMaskingService dataMaskingService;
+    private final PiiCredentialDetector piiCredentialDetector;
+    private final ObjectMapper objectMapper;
 
     public CapsuleSandboxServiceImpl(EchoCapsuleMapper capsuleMapper,
                                      CapsuleGenomeVersionMapper genomeMapper,
                                      CapsuleSandboxFeedbackMapper feedbackMapper,
                                      StructuredAiService structuredAiService,
-                                     SafetyService safetyService) {
+                                     SafetyService safetyService,
+                                     DataMaskingService dataMaskingService,
+                                     PiiCredentialDetector piiCredentialDetector,
+                                     ObjectMapper objectMapper) {
         this.capsuleMapper = capsuleMapper;
         this.genomeMapper = genomeMapper;
         this.feedbackMapper = feedbackMapper;
         this.structuredAiService = structuredAiService;
         this.safetyService = safetyService;
+        this.dataMaskingService = dataMaskingService;
+        this.piiCredentialDetector = piiCredentialDetector;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -83,7 +95,6 @@ public class CapsuleSandboxServiceImpl implements CapsuleSandboxService {
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public CapsuleSandboxFeedback recordFeedback(Long ownerUserId, Long capsuleId,
                                                    CapsuleSandboxFeedbackRequest request) {
         EchoCapsule capsule = owned(ownerUserId, capsuleId);
@@ -103,9 +114,51 @@ public class CapsuleSandboxServiceImpl implements CapsuleSandboxService {
         feedback.responseText = request.response.trim();
         feedback.rating = request.rating;
         feedback.ownerComment = request.comment == null ? null : request.comment.trim();
+        feedback.calibrationSignalsJson = calibrationSignals(ownerUserId, request.rating, feedback.ownerComment);
         feedback.status = "OPEN";
         feedbackMapper.insert(feedback);
         return feedback;
+    }
+
+    private String calibrationSignals(Long ownerUserId, String rating, String ownerComment) {
+        StructuredAiResults.CapsuleCalibrationResult deterministic =
+                CapsuleCalibrationPolicy.deterministic(ownerComment, rating);
+        StructuredAiResults.CapsuleCalibrationResult extracted = deterministic;
+        String comment = ownerComment == null ? "" : ownerComment.trim();
+        if (!comment.isBlank()) {
+            // The raw owner comment remains private feedback. Provider egress receives only a
+            // STRICT-masked data field and never receives it in a system-role instruction.
+            String providerComment = dataMaskingService.maskText(comment, "STRICT");
+            PiiCredentialDetector.ScanResult pii = piiCredentialDetector.scan(comment);
+            SafetyResult safety = safetyService.check(providerComment, ownerUserId, null);
+            if (!pii.hasHardBlock() && !Boolean.TRUE.equals(safety.blockModelCall)) {
+                Map<String, Object> context = new LinkedHashMap<>();
+                context.put("rating", rating);
+                context.put("ownerFeedback", providerComment);
+                extracted = structuredAiService.call(ownerUserId, "CAPSULE_CALIBRATION",
+                        """
+                        Return only JSON:
+                        {"toneCodes":[],"avoidBehaviorCodes":[],"boundaryCodes":[],"responseLengthCode":null}
+                        Convert the owner's feedback into zero or more codes from this closed vocabulary.
+                        toneCodes: DIRECT, CONCISE, WARM, RESTRAINED, PLAYFUL, DRY_HUMOR, ANALYTICAL, CASUAL, POETIC.
+                        avoidBehaviorCodes: GENERIC_CHATBOT_VOICE, OVER_REASSURANCE, UNSOLICITED_ADVICE,
+                        OVER_QUESTIONING, OVERLY_FORMAL, OVERLY_INTIMATE, LONG_RESPONSES, MORALISING,
+                        SPEAKING_FOR_OWNER.
+                        boundaryCodes: GROUND_FACTS_ONLY, MINIMIZE_PERSONAL_DETAIL, NO_CONTACT_DETAILS,
+                        PRESERVE_UNCERTAINTY.
+                        responseLengthCode: SHORT, BALANCED, EXPANSIVE, or null.
+                        Never copy, summarize, quote, or invent personal facts from ownerFeedback.
+                        Never output a free-form instruction or phrase. Use only the listed codes.
+                        """, context, StructuredAiResults.CapsuleCalibrationResult.class,
+                        () -> deterministic);
+            }
+        }
+        try {
+            return objectMapper.writeValueAsString(
+                    CapsuleCalibrationPolicy.canonical(objectMapper, extracted, rating));
+        } catch (Exception impossible) {
+            throw new IllegalStateException("Unable to persist capsule calibration signals", impossible);
+        }
     }
 
     @Override

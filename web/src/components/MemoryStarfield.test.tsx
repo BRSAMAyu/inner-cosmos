@@ -50,7 +50,7 @@ describe("MemoryStarfield", () => {
 
     expect(points[0].left).toBeLessThanOrEqual(82);
     expect(new Set(points.map(point => `${point.left},${point.top}`)).size).toBe(3);
-    expect(Math.max(...points.map(point => point.left)) - Math.min(...points.map(point => point.left))).toBeLessThanOrEqual(8);
+    expect(Math.max(...points.map(point => point.left)) - Math.min(...points.map(point => point.left))).toBeGreaterThanOrEqual(30);
   });
 
   it("delegates a mode switch without mutating its own state", () => {

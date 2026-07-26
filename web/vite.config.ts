@@ -59,9 +59,12 @@ export default defineConfig(({ mode }) => {
     emptyOutDir: true,
     rollupOptions: {
       output: {
-        entryFileNames: "assets/app.js",
-        chunkFileNames: "assets/[name].js",
-        assetFileNames: "assets/[name][extname]"
+        // Every deployed shell must reference immutable, content-addressed assets. Fixed
+        // app.js/index.css names were emitted into Workbox with `revision: null`, allowing a
+        // returning browser to keep an old dark-theme stylesheet after a new build.
+        entryFileNames: "assets/[name]-[hash].js",
+        chunkFileNames: "assets/[name]-[hash].js",
+        assetFileNames: "assets/[name]-[hash][extname]"
       }
     }
   },

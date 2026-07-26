@@ -4,6 +4,7 @@ import {
   type RelationHealth, type RelationMention, type RelationTimelinePoint, type SlowLetter, type SocialConnection, type SocialGroup
 } from "../api";
 import { sendComposedLetter, type DraftedLetterState } from "../composeAndSend";
+import type { Locale } from "../i18n";
 import { useBusyKeys } from "./useBusyKeys";
 
 // Extracted from AuroraApp.tsx (B1 domain-hook decomposition, second slice): the "connections/letters"
@@ -22,13 +23,16 @@ export type UseConnectionsAndLettersOptions = {
   /** The app-wide status banner is a cross-cutting concern (see web/src/loading.tsx's B1 loading-audit
    * checkpoint); this hook only ever writes to it, never reads it. */
   setStatus: (status: string) => void;
+  locale?: Locale;
 };
 
 // Gemini audit 4.9 (CONFIRMED/P1): a discriminated fetch status so "still loading" and "genuinely
 // empty successful response" can never be conflated by a UI reading `someList.length === 0`.
 export type FetchStatus = "idle" | "loading" | "success" | "error";
 
-export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLettersOptions) {
+export function useConnectionsAndLetters({ setStatus, locale = "zh-CN" }: UseConnectionsAndLettersOptions) {
+  const copy = useCallback((english: string, chinese: string) =>
+    locale === "en-SG" ? english : chinese, [locale]);
   const [connectionRequests, setConnectionRequests] = useState<ConnectionRequests>({ incoming: [], outgoing: [] });
   const [friends, setFriends] = useState<SocialConnection[]>([]);
   const [people, setPeople] = useState<DiscoverablePerson[]>([]);
@@ -125,11 +129,12 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
       setLetterOutbox(outbox);
       setLetterThreads(threads);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "暂时无法刷新慢信，请稍后再试");
+      setStatus(error instanceof Error ? error.message
+        : copy("Could not refresh slow letters. Please try again shortly.", "暂时无法刷新慢信，请稍后再试"));
     } finally {
       setLettersRefreshing(false);
     }
-  }, [setStatus]);
+  }, [copy, setStatus]);
 
   // Re-fetches the three connection-shaped lists together, still as one concurrent Promise.all
   // (matching the original shape). One deliberate, documented improvement over the original: the
@@ -153,9 +158,12 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
     try {
       await api.requestFriend(userId);
       await refreshConnections();
-      setStatus("邀请已发出。对方同意前不会开放任何私密内容，也不会变成即时聊天。");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法发出这个邀请"); }
-  }), [peopleBusyKeys, refreshConnections, setStatus]);
+      setStatus(copy(
+        "Invitation sent. No private content is shared before they agree, and this will not become instant chat.",
+        "邀请已发出。对方同意前不会开放任何私密内容，也不会变成即时聊天。"));
+    } catch (error) { setStatus(error instanceof Error ? error.message
+      : copy("Could not send this invitation yet.", "暂时无法发出这个邀请")); }
+  }), [copy, peopleBusyKeys, refreshConnections, setStatus]);
 
   const openRelation = useCallback(async (label: string) => {
     const generation = ++relationGenerationRef.current;
@@ -171,9 +179,10 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
       setRelationTimeline(timeline); setRelationHealth(health);
     } catch (error) {
       if (!isCurrent()) return;
-      setStatus(error instanceof Error ? error.message : "暂时读不到这段关系的时间线");
+      setStatus(error instanceof Error ? error.message
+        : copy("Could not read this relationship timeline yet.", "暂时读不到这段关系的时间线"));
     } finally { if (isCurrent()) setRelationBusy(false); }
-  }, [setStatus]);
+  }, [copy, setStatus]);
 
   const openThread = useCallback(async (threadId: number) => {
     const generation = ++threadGenerationRef.current;
@@ -186,17 +195,19 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
     } catch (error) {
       if (!isCurrent()) return;
       setThreadLettersStatus("error");
-      setStatus(error instanceof Error ? error.message : "暂时读不到这段往来");
+      setStatus(error instanceof Error ? error.message
+        : copy("Could not read this exchange yet.", "暂时读不到这段往来"));
     }
-  }, [setStatus]);
+  }, [copy, setStatus]);
 
   const sendDraft = useCallback((id: number) => draftBusyKeys.run(id, async () => {
     try {
       await api.sendSlowLetter(id);
       await api.letterOutbox().then(setLetterOutbox).catch(() => undefined);
-      setStatus("这封信已经启程，会按慢信的节奏抵达。");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法寄出这封草稿"); }
-  }), [draftBusyKeys, setStatus]);
+      setStatus(copy("This letter is on its way and will arrive at a slow-letter pace.", "这封信已经启程，会按慢信的节奏抵达。"));
+    } catch (error) { setStatus(error instanceof Error ? error.message
+      : copy("Could not send this draft yet.", "暂时无法寄出这封草稿")); }
+  }), [copy, draftBusyKeys, setStatus]);
 
   const actOnLetter = useCallback((letter: SlowLetter, action: "read" | "decline" | "block" | "archive") =>
     letterActionBusyKeys.run(letter.id, async () => {
@@ -204,16 +215,24 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
         const updated = await api.transitionLetter(letter.id, action);
         setLetterInbox(rows => rows.map(row => row.id === updated.id ? updated : row));
         setLetterOutbox(rows => rows.map(row => row.id === updated.id ? updated : row));
-        setStatus(action === "block" ? "已屏蔽来信者；后续慢信也会被阻断。" : "慢信边界已更新。 ");
-      } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法更新这封信"); }
-    }), [letterActionBusyKeys, setStatus]);
+        setStatus(action === "block"
+          ? copy("Sender blocked; future slow letters will also be stopped.", "已屏蔽来信者；后续慢信也会被阻断。")
+          : copy("Slow-letter boundary updated.", "慢信边界已更新。 "));
+      } catch (error) { setStatus(error instanceof Error ? error.message
+        : copy("Could not update this letter yet.", "暂时无法更新这封信")); }
+    }), [copy, letterActionBusyKeys, setStatus]);
 
   const reportLetter = useCallback((letter: SlowLetter) => letterActionBusyKeys.run(letter.id, async () => {
     try {
-      await api.reportLetter(letter.id, "收件人从 Aurora 界面举报慢信");
-      setStatus("已提交举报。举报不会自动公开信件内容，交由受限审核处理。 ");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法提交举报"); }
-  }), [letterActionBusyKeys, setStatus]);
+      await api.reportLetter(letter.id, copy(
+        "Recipient reported this slow letter from the Aurora interface.",
+        "收件人从 Aurora 界面举报慢信"));
+      setStatus(copy(
+        "Report submitted. The letter is not automatically exposed; review remains restricted.",
+        "已提交举报。举报不会自动公开信件内容，交由受限审核处理。 "));
+    } catch (error) { setStatus(error instanceof Error ? error.message
+      : copy("Could not submit this report yet.", "暂时无法提交举报")); }
+  }), [copy, letterActionBusyKeys, setStatus]);
 
   // W1 slow-letter voice reuse: tap-to-play a delivered letter's body read aloud. The recipient's
   // tap is the user gesture that authorizes autoplay on arrival. Per-letter busy guard so playing
@@ -227,9 +246,10 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
       const { audio } = await api.letterVoice(letter.id);
       setLetterVoiceAudio(audio);
     } catch (error) {
-      setLetterVoiceError(error instanceof Error ? error.message : "暂时无法朗读这封信");
+      setLetterVoiceError(error instanceof Error ? error.message
+        : copy("Could not read this letter aloud yet.", "暂时无法朗读这封信"));
     }
-  }), [letterVoiceBusyKeys]);
+  }), [copy, letterVoiceBusyKeys]);
 
   const replyWithLetter = useCallback(async (letter: SlowLetter) => {
     const body = replyDrafts[letter.id]?.trim();
@@ -242,7 +262,8 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
       await sendComposedLetter({
         pending: replyDraftsRef.current[letter.id] ?? null,
         onDraftCreated: next => { replyDraftsRef.current = { ...replyDraftsRef.current, [letter.id]: next }; },
-        createDraft: idempotencyKey => api.replyWithSlowLetter(letter.id, `回复：${letter.title}`, body, idempotencyKey),
+        createDraft: idempotencyKey => api.replyWithSlowLetter(
+          letter.id, copy(`Reply: ${letter.title}`, `回复：${letter.title}`), body, idempotencyKey),
         sendDraft: (draftId, idempotencyKey) => api.sendSlowLetter(draftId, idempotencyKey)
       });
       const { [letter.id]: _discard, ...rest } = replyDraftsRef.current;
@@ -251,14 +272,17 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
       setLetterInbox(rows => rows.map(row => row.id === updated.id ? updated : row));
       void api.letterOutbox().then(setLetterOutbox).catch(() => undefined);
       setReplyDrafts(drafts => ({ ...drafts, [letter.id]: "" }));
-      setStatus("回复慢信已启程。它仍会经过时间，而不是变成即时聊天。 ");
+      setStatus(copy(
+        "Your slow-letter reply is on its way. It still travels through time instead of becoming instant chat.",
+        "回复慢信已启程。它仍会经过时间，而不是变成即时聊天。 "));
     } catch (error) {
       // replyDraftsRef.current[letter.id] is intentionally left set (if a draft was created) so
       // retrying this same letter's reply reuses the same draft rather than creating another.
-      setStatus(error instanceof Error ? error.message : "回复慢信没有启程");
+      setStatus(error instanceof Error ? error.message
+        : copy("The slow-letter reply did not depart.", "回复慢信没有启程"));
     }
     finally { setReplyBusyId(null); }
-  }, [replyDrafts, setStatus]);
+  }, [copy, replyDrafts, setStatus]);
 
   const updateReplyDraft = useCallback((letterId: number, value: string) => {
     setReplyDrafts(drafts => ({ ...drafts, [letterId]: value }));
@@ -268,25 +292,32 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
     try {
       await api.requestConnectionFromLetter(letter.id);
       await refreshConnections();
-      setStatus("连接邀请已发出。只有对方明确接受后，双方才会成为真实连接。 ");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法发出连接邀请"); }
-  }), [letterConnectionBusyKeys, refreshConnections, setStatus]);
+      setStatus(copy(
+        "Connection invitation sent. You become a real connection only after the other person explicitly accepts.",
+        "连接邀请已发出。只有对方明确接受后，双方才会成为真实连接。 "));
+    } catch (error) { setStatus(error instanceof Error ? error.message
+      : copy("Could not send the connection invitation yet.", "暂时无法发出连接邀请")); }
+  }), [copy, letterConnectionBusyKeys, refreshConnections, setStatus]);
 
   const decideConnection = useCallback((id: number, decision: "accept" | "decline") => connectionDecisionBusyKeys.run(id, async () => {
     try {
       await api.decideConnection(id, decision);
       await refreshConnections();
-      setStatus(decision === "accept" ? "双方都已同意这段连接。" : "已婉拒；不会自动建立任何关系。 ");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法处理连接邀请"); }
-  }), [connectionDecisionBusyKeys, refreshConnections, setStatus]);
+      setStatus(decision === "accept"
+        ? copy("Both people have agreed to this connection.", "双方都已同意这段连接。")
+        : copy("Declined; no relationship was created automatically.", "已婉拒；不会自动建立任何关系。 "));
+    } catch (error) { setStatus(error instanceof Error ? error.message
+      : copy("Could not process this connection invitation yet.", "暂时无法处理连接邀请")); }
+  }), [connectionDecisionBusyKeys, copy, refreshConnections, setStatus]);
 
   const leaveConnection = useCallback((id: number) => connectionLeaveBusyKeys.run(id, async () => {
     try {
       await api.leaveConnection(id);
       await refreshConnections();
-      setStatus("已退出这段连接。 ");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法退出连接"); }
-  }), [connectionLeaveBusyKeys, refreshConnections, setStatus]);
+      setStatus(copy("You left this connection.", "已退出这段连接。 "));
+    } catch (error) { setStatus(error instanceof Error ? error.message
+      : copy("Could not leave this connection yet.", "暂时无法退出连接")); }
+  }), [connectionLeaveBusyKeys, copy, refreshConnections, setStatus]);
 
   const createGroup = useCallback(async (groupName: string) => {
     const name = groupName.trim();
@@ -295,10 +326,11 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
     try {
       const created = await api.createGroup(name);
       setGroups(current => [created, ...current]);
-      setStatus("群组已创建。");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法创建群组"); }
+      setStatus(copy("Group created.", "群组已创建。"));
+    } catch (error) { setStatus(error instanceof Error ? error.message
+      : copy("Could not create this group yet.", "暂时无法创建群组")); }
     finally { setGroupCreateBusy(false); }
-  }, [setStatus]);
+  }, [copy, setStatus]);
 
   const openGroup = useCallback(async (groupId: number) => {
     const generation = ++groupGenerationRef.current;
@@ -311,16 +343,18 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
     } catch (error) {
       if (!isCurrent()) return;
       setGroupMembersStatus("error");
-      setStatus(error instanceof Error ? error.message : "暂时读不到这个群组的成员");
+      setStatus(error instanceof Error ? error.message
+        : copy("Could not read this group's members yet.", "暂时读不到这个群组的成员"));
     }
-  }, [setStatus]);
+  }, [copy, setStatus]);
 
   const inviteToGroup = useCallback((groupId: number, userId: number) => groupInviteBusyKeys.run(groupId, async () => {
     try {
       await api.inviteToGroup(groupId, userId);
-      setStatus("邀请已发出，等待对方接受。");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法邀请这位朋友"); }
-  }), [groupInviteBusyKeys, setStatus]);
+      setStatus(copy("Invitation sent; waiting for them to accept.", "邀请已发出，等待对方接受。"));
+    } catch (error) { setStatus(error instanceof Error ? error.message
+      : copy("Could not invite this friend yet.", "暂时无法邀请这位朋友")); }
+  }), [copy, groupInviteBusyKeys, setStatus]);
 
   const respondToGroupInvite = useCallback((memberId: number, decision: "accept" | "decline") =>
     groupInviteDecisionBusyKeys.run(memberId, async () => {
@@ -328,18 +362,22 @@ export function useConnectionsAndLetters({ setStatus }: UseConnectionsAndLetters
         await api.respondToGroupInvite(memberId, decision);
         setGroupInvites(current => current.filter(invite => invite.memberId !== memberId));
         if (decision === "accept") await loadGroups();
-        setStatus(decision === "accept" ? "已加入群组。" : "已婉拒这个群组邀请。 ");
-      } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法处理这个邀请"); }
-    }), [groupInviteDecisionBusyKeys, loadGroups, setStatus]);
+        setStatus(decision === "accept"
+          ? copy("Joined the group.", "已加入群组。")
+          : copy("Group invitation declined.", "已婉拒这个群组邀请。 "));
+      } catch (error) { setStatus(error instanceof Error ? error.message
+        : copy("Could not process this invitation yet.", "暂时无法处理这个邀请")); }
+    }), [copy, groupInviteDecisionBusyKeys, loadGroups, setStatus]);
 
   const leaveGroup = useCallback((groupId: number) => groupLeaveBusyKeys.run(groupId, async () => {
     try {
       await api.leaveGroup(groupId);
       setGroups(current => current.filter(group => group.id !== groupId));
       if (selectedGroupId === groupId) { setSelectedGroupId(null); setGroupMembers([]); }
-      setStatus("已退出这个群组。 ");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法退出这个群组"); }
-  }), [groupLeaveBusyKeys, selectedGroupId, setStatus]);
+      setStatus(copy("You left the group.", "已退出这个群组。 "));
+    } catch (error) { setStatus(error instanceof Error ? error.message
+      : copy("Could not leave this group yet.", "暂时无法退出这个群组")); }
+  }), [copy, groupLeaveBusyKeys, selectedGroupId, setStatus]);
 
   return {
     connectionRequests, friends, people, isPersonBusy: peopleBusyKeys.isBusy,

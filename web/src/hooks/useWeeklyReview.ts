@@ -1,14 +1,16 @@
 import { useCallback, useState } from "react";
 import { api, type WeeklyReviewV2 } from "../api";
+import type { Locale } from "../i18n";
 
 // Phase 3 legacy-page port: src/main/resources/static/pages/weekly-review.html.
 // Uses /api/daily-record/weekly/v2/* (WeeklyReviewV2VO), not the plain V1 weekly/latest+generate
 // the legacy page's own api.js called -- see api.ts's WeeklyReviewV2 doc comment for why.
 export type UseWeeklyReviewOptions = {
   setStatus: (status: string) => void;
+  locale?: Locale;
 };
 
-export function useWeeklyReview({ setStatus }: UseWeeklyReviewOptions) {
+export function useWeeklyReview({ setStatus, locale = "zh-CN" }: UseWeeklyReviewOptions) {
   const [weeklyReview, setWeeklyReview] = useState<WeeklyReviewV2 | null>(null);
   const [weeklyReviewBusy, setWeeklyReviewBusy] = useState(false);
 
@@ -19,10 +21,11 @@ export function useWeeklyReview({ setStatus }: UseWeeklyReviewOptions) {
     try {
       const review = await api.generateWeeklyReviewV2();
       setWeeklyReview(review);
-      setStatus("这周的成长周报已经生成。");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法生成这周的周报"); }
+      setStatus(locale === "en-SG" ? "This week's growth review is ready." : "这周的成长周报已经生成。");
+    } catch (error) { setStatus(error instanceof Error ? error.message
+      : locale === "en-SG" ? "Could not generate this week's review yet." : "暂时无法生成这周的周报"); }
     finally { setWeeklyReviewBusy(false); }
-  }, [setStatus]);
+  }, [locale, setStatus]);
 
   return { weeklyReview, weeklyReviewBusy, loadWeeklyReview, generateWeeklyReview };
 }

@@ -8,6 +8,7 @@ import com.innercosmos.mapper.VoiceTranscriptionMapper;
 import com.innercosmos.service.MemorySettlementService;
 import com.innercosmos.service.VoiceTranscriptionService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class VoiceTranscriptionServiceImpl implements VoiceTranscriptionService {
@@ -46,11 +47,17 @@ public class VoiceTranscriptionServiceImpl implements VoiceTranscriptionService 
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void submitFinal(Long id, Long userId, String finalContent) {
         VoiceTranscription vt = getOwned(id, userId);
+        if ("SUBMITTED".equals(vt.status) && vt.editedText != null
+                && !vt.editedText.equals(finalContent)) {
+            throw new BusinessException(ErrorCode.CONFLICT,
+                    "这篇日记已经沉淀；如需修正，请通过记忆版本操作保留变更轨迹");
+        }
         vt.editedText = finalContent;
         vt.status = "SUBMITTED";
         transcriptionMapper.updateById(vt);
-        memorySettlementService.settleDiary(userId, finalContent);
+        memorySettlementService.settleDiary(userId, id, finalContent);
     }
 }

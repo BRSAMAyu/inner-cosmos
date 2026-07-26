@@ -31,6 +31,11 @@ export type AuroraMemoryTrace = {
 
 const terminal = new Set<TurnStatus>(["COMPLETED", "INTERRUPTED", "CANCELLED"]);
 
+const RETURN_DEFAULTS: Record<SkillLocale, { when: string; purpose: string }> = {
+  "zh-CN": { when: "明天早上 8:30", purpose: "继续这一刻未说完的话" },
+  "en-SG": { when: "Tomorrow at 8:30 AM", purpose: "Continue what we left unfinished" }
+};
+
 const STATUS_COPY: Record<SkillLocale, {
   reconnecting: string; restoringEvent: (eventType: string) => string;
   recoveredCompleted: string; recoveredInterrupted: string; stillGenerating: string;
@@ -98,8 +103,9 @@ export type UseAuroraSessionOptions = {
   /** The app-wide status banner is a cross-cutting concern shared by every domain (see
    * web/src/loading.tsx's B1 loading-audit checkpoint); this hook only ever writes to it. */
   setStatus: (status: string) => void;
-  /** Called only after the explicit "settle today" memory write succeeds. */
-  onMemorySettled?: () => void | Promise<void>;
+  /** Called only after the explicit "settle today" memory write succeeds. The mode is captured
+   * from the settled conversation so callers can continue the right user journey. */
+  onMemorySettled?: (settledMode: string) => void | Promise<void>;
 };
 
 export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion, setStatus, onMemorySettled }: UseAuroraSessionOptions) {
@@ -114,10 +120,9 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
   const [runtimeSignal, setRuntimeSignal] = useState<AuroraRuntimeSignal>({ stage: "idle", runtime: "single" });
   const [wakeIntents, setWakeIntents] = useState<WakeIntent[]>([]);
   const [wakeBusy, setWakeBusy] = useState(false);
-  const [returnWhen, setReturnWhen] = useState(
-    skillLocale === "en-SG" ? "Tomorrow at 8:30 AM" : "明天早上 8:30");
-  const [returnPurpose, setReturnPurpose] = useState(
-    skillLocale === "en-SG" ? "Continue what was left unsaid in this moment" : "继续这一刻未说完的话");
+  const [returnWhen, setReturnWhen] = useState(RETURN_DEFAULTS[skillLocale].when);
+  const [returnPurpose, setReturnPurpose] = useState(RETURN_DEFAULTS[skillLocale].purpose);
+  const returnLocaleRef = useRef<SkillLocale>(skillLocale);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [safetyAlert, setSafetyAlert] = useState<AuroraSafetyAlert | null>(null);
   const dismissSafetyAlert = useCallback(() => setSafetyAlert(null), []);
@@ -126,6 +131,18 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
   const [goodbyeResult, setGoodbyeResult] = useState<GoodbyeResult | null>(null);
   const [goodbyeBusy, setGoodbyeBusy] = useState(false);
   const dismissGoodbye = useCallback(() => setGoodbyeResult(null), []);
+
+  // Keep untouched defaults aligned when the user changes language, without overwriting a custom
+  // time or purpose they already typed.
+  useEffect(() => {
+    const previousLocale = returnLocaleRef.current;
+    if (previousLocale === skillLocale) return;
+    setReturnWhen(current => current === RETURN_DEFAULTS[previousLocale].when
+      ? RETURN_DEFAULTS[skillLocale].when : current);
+    setReturnPurpose(current => current === RETURN_DEFAULTS[previousLocale].purpose
+      ? RETURN_DEFAULTS[skillLocale].purpose : current);
+    returnLocaleRef.current = skillLocale;
+  }, [skillLocale]);
 
   const abortRef = useRef<AbortController | null>(null);
   const activeTurnRef = useRef<number | null>(null);
@@ -318,14 +335,14 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
       if (messages.some(message => message.speaker === "USER" && message.text.trim())) {
         setStatus(skillLocale === "en-SG" ? "Placing this moment into your starfield…" : "正在把这一刻放进你的星空…");
         await api.settleAuroraSession(sessionId);
-        await onMemorySettled?.();
+        await onMemorySettled?.(mode);
       }
     } catch (error) {
       setStatus(error instanceof Error ? error.message : t.goodbyeFailed);
     } finally {
       setGoodbyeBusy(false);
     }
-  }, [goodbyeBusy, messages, onMemorySettled, sessionId, setStatus, skillLocale, t]);
+  }, [goodbyeBusy, messages, mode, onMemorySettled, sessionId, setStatus, skillLocale, t]);
 
   const handleEvent = useCallback((event: AuroraStreamEvent, generation: number) => {
     if (!isCurrentGeneration(generation)) return; // 4.1: stale (superseded) turn -- ignore entirely.
@@ -507,8 +524,12 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
     try {
       const created = await api.negotiateWakeIntent({
         when: returnWhen, purpose: returnPurpose,
-        reasonForUser: `因为“${returnPurpose}”，Aurora 会在 ${returnWhen} 回来`,
-        content: "我回来了。刚才没有说完的部分，我们可以慢慢接着说。",
+        reasonForUser: skillLocale === "en-SG"
+          ? `Aurora will return as agreed (${returnWhen}) to “${returnPurpose}”.`
+          : `因为“${returnPurpose}”，Aurora 会在 ${returnWhen} 回来`,
+        content: skillLocale === "en-SG"
+          ? "I’m back. We can continue the part we left unfinished, at your pace."
+          : "我回来了。刚才没有说完的部分，我们可以慢慢接着说。",
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Shanghai",
         contextSessionId: sessionId
       });

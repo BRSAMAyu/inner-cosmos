@@ -25,6 +25,13 @@ public class AuroraReplyVO {
     public Boolean memoryReferenced;
     public List<Long> referencedMemoryIds;
     public AuroraMemoryContextVO memoryContext;
+    /** Confirmation-gated action metadata. Only the type/summary/status are client-visible. */
+    public String proposedActionType;
+    public String proposedActionSummary;
+    public String proposedActionStatus;
+    /** Owner-private execution payload copied into the durable TurnPlan, never returned to clients. */
+    @JsonIgnore
+    public String proposedActionPayloadJson;
     /** In-process only: consumed after {@code turn.completed}; never part of the public API. */
     @JsonIgnore
     public AuroraDualKernelRuntime.InnerVoiceRequest innerVoiceRequest;

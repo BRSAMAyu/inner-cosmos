@@ -140,11 +140,19 @@ class CapsuleEmbeddingRetirementTest {
 
         assertEquals(0, embeddingMapper.selectCount(new QueryWrapper<CapsuleEmbedding>()
                 .eq("capsule_id", capsule.id)), "forgetting the source memory must erase the derived vector");
-        DataRetractionReceipt receipt = onlyReceipt(owner);
-        assertEquals(DataRetractionReceiptService.SUBJECT_MEMORY, receipt.subjectType);
-        assertEquals(card.id, receipt.subjectId);
-        assertEquals(DataRetractionReceiptService.DERIVATIVE_CAPSULE_MATCH_INDEX, receipt.derivativeType);
-        assertEquals(1, receipt.affectedCount);
+        List<DataRetractionReceipt> receipts = receiptMapper.selectList(
+                new QueryWrapper<DataRetractionReceipt>().eq("user_id", owner));
+        assertEquals(2, receipts.size(),
+                "forget records both the direct memory-retrieval derivative and dependent capsule index");
+        DataRetractionReceipt capsuleReceipt = receipts.stream()
+                .filter(row -> DataRetractionReceiptService.DERIVATIVE_CAPSULE_MATCH_INDEX
+                        .equals(row.derivativeType))
+                .findFirst().orElseThrow();
+        assertEquals(DataRetractionReceiptService.SUBJECT_MEMORY, capsuleReceipt.subjectType);
+        assertEquals(card.id, capsuleReceipt.subjectId);
+        assertEquals(1, capsuleReceipt.affectedCount);
+        assertTrue(receipts.stream().anyMatch(row ->
+                DataRetractionReceiptService.DERIVATIVE_MEMORY_EMBEDDING.equals(row.derivativeType)));
     }
 
     // ----- helpers -----

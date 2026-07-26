@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { loadLocale, type Locale } from "../i18n";
+import { useEffect, useState } from "react";
+import { loadLocale, LOCALE_CHANGE_EVENT, type Locale } from "../i18n";
 
 // B5-pwa-mobile: a plain, controlled presentational component for the versioned-update flow.
 // Owns no service-worker/registration logic itself (see PwaUpdateNotice.tsx for the container
@@ -30,7 +30,12 @@ export function UpdateBanner({
 }: UpdateBannerProps) {
   // Rendered from main.tsx, outside AuroraApp's own locale state, so it reads the same
   // persisted preference AuroraApp's skillLocale initializes from (see web/src/i18n.ts).
-  const [locale] = useState<Locale>(() => loadLocale());
+  const [locale, setLocale] = useState<Locale>(() => loadLocale());
+  useEffect(() => {
+    const syncLocale = (event: Event) => setLocale((event as CustomEvent<Locale>).detail);
+    window.addEventListener(LOCALE_CHANGE_EVENT, syncLocale);
+    return () => window.removeEventListener(LOCALE_CHANGE_EVENT, syncLocale);
+  }, []);
   const t = COPY[locale];
   // A pending update always takes priority over the one-time offline-ready FYI -- if both are
   // somehow true at once (e.g. install completed just as an update lands), the actionable

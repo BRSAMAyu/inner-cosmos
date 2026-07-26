@@ -31,6 +31,8 @@ class CapsuleRuntimeContextComposerTest {
         assertEquals(List.of(12L), manifest.get("selectedMemoryIds"));
         assertFalse(String.valueOf(result.get("selectedContext")).contains("99"),
                 "style evidence outside the manifest must not ride along with the selected feature");
+        assertTrue(String.valueOf(result.get("selectedContext")).contains("RESTRAINED"),
+                "the selected immutable Genome's bounded calibration must reach PersonaChat runtime");
     }
 
     @Test
@@ -52,7 +54,13 @@ class CapsuleRuntimeContextComposerTest {
         genome.versionNo = 3;
         genome.compilerVersion = "capsule-genome.v3";
         genome.styleProfileJson = objectMapper.writeValueAsString(Map.of(
-                "voice", "克制、具体", "voiceEvidence", Map.of("未选择主题", List.of(99L))));
+                "voice", "克制、具体",
+                "voiceEvidence", Map.of("未选择主题", List.of(99L)),
+                "calibration", Map.of(
+                        "schemaVersion", "capsule-calibration-signals.v1",
+                        "toneCodes", List.of("RESTRAINED"),
+                        "avoidBehaviorCodes", List.of("OVER_REASSURANCE"),
+                        "sourceFeedbackIds", List.of(41L))));
         genome.contextPreviewJson = objectMapper.writeValueAsString(Map.of(
                 "schemaVersion", "capsule-context-preview.v3",
                 "genomeIr", Map.of(

@@ -115,7 +115,7 @@ export function AsyncButton({ busy, busyText, children, disabled, type, ...rest 
     <button {...rest} type={type ?? "button"} disabled={disabled || busy} aria-busy={busy || undefined}>
       {showBusy ? (
         <span className="async-busy">
-          {busyText ?? "处理中"}
+          {busyText ?? children}
           <LoadingDots animated={phase === "anim"} />
         </span>
       ) : (

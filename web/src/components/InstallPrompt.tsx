@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { loadLocale, type Locale } from "../i18n";
+import { loadLocale, LOCALE_CHANGE_EVENT, type Locale } from "../i18n";
 
 const COPY: Record<Locale, { title: string; detail: string; install: string; dismiss: string }> = {
   "zh-CN": { title: "把内宇宙装到桌面/主屏幕", detail: "像原生应用一样打开，离线也能进入。", install: "安装内宇宙", dismiss: "不用了" },
@@ -18,10 +18,11 @@ type BeforeInstallPromptEvent = Event & {
 export function InstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [dismissed, setDismissed] = useState(false);
-  const [locale] = useState<Locale>(() => loadLocale());
+  const [locale, setLocale] = useState<Locale>(() => loadLocale());
   const t = COPY[locale];
 
   useEffect(() => {
+    const syncLocale = (event: Event) => setLocale((event as CustomEvent<Locale>).detail);
     // The browser fires this at most once per page load, and only when it has decided the
     // app is installable. Per the MDN/web.dev contract: call preventDefault() synchronously
     // inside this handler (not after an await or a later tick) or the browser's own automatic
@@ -41,9 +42,11 @@ export function InstallPrompt() {
     }
     window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
     window.addEventListener("appinstalled", onAppInstalled);
+    window.addEventListener(LOCALE_CHANGE_EVENT, syncLocale);
     return () => {
       window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
       window.removeEventListener("appinstalled", onAppInstalled);
+      window.removeEventListener(LOCALE_CHANGE_EVENT, syncLocale);
     };
   }, []);
 

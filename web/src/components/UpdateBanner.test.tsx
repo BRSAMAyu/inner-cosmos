@@ -1,5 +1,6 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { saveLocale } from "../i18n";
 import { UpdateBanner } from "./UpdateBanner";
 
 // B5-pwa-mobile: pins the versioned-update affordance's visibility logic given the
@@ -128,5 +129,15 @@ describe("UpdateBanner", () => {
     );
     expect(screen.getByText("Inner Cosmos has an update")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reload now" })).toBeInTheDocument();
+  });
+
+  it("updates a visible notice immediately when the user changes language", () => {
+    render(
+      <UpdateBanner needRefresh={false} offlineReady onReload={vi.fn()} onDismissRefresh={vi.fn()} onDismissOfflineReady={vi.fn()} />
+    );
+    expect(screen.getByText("内宇宙现在可以离线打开了")).toBeInTheDocument();
+    act(() => saveLocale("en-SG"));
+    expect(screen.getByText("Inner Cosmos can now open offline")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Got it" })).toBeInTheDocument();
   });
 });

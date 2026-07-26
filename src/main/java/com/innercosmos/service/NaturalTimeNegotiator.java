@@ -39,6 +39,9 @@ public class NaturalTimeNegotiator {
                 hour = Integer.parseInt(clock.group(1));
                 if (clock.group(2) != null) minute = Integer.parseInt(clock.group(2));
                 if ((raw.contains("下午") || raw.contains("晚上")) && hour < 12) hour += 12;
+                String lower = raw.toLowerCase(Locale.ROOT);
+                if (lower.contains("pm") && hour < 12) hour += 12;
+                if (lower.contains("am") && hour == 12) hour = 0;
             }
             if (hour < 0 || hour > 23 || minute > 59) throw bad("无法确定时间，请尝试“明天 8:30”或“2 小时后”");
             LocalDate date = now.toLocalDate().plusDays(tomorrow ? 1 : 0);

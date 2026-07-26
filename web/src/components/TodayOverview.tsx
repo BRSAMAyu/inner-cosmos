@@ -12,6 +12,9 @@ export function TodayOverview({ memoryCount, latestMemory, arrivedLetters, lates
   locale?: Locale;
 }) {
   const en = locale === "en-SG";
+  const localisedLatestMemory = en && latestMemory === "今日沉淀"
+    ? "Today's reflection"
+    : latestMemory;
   return <section className="today-overview" aria-label={en ? "Your Inner Cosmos today" : "今天的内宇宙概览"}>
     <div className="today-overview-heading">
       <div><span className="eyebrow">{en ? "YOUR COSMOS, TODAY" : "今日 · 内宇宙"}</span>
@@ -24,7 +27,7 @@ export function TodayOverview({ memoryCount, latestMemory, arrivedLetters, lates
       <button type="button" onClick={onOpenCosmos}>
         <span>{en ? "Memory alive" : "正在生长的记忆"}</span>
         <strong>{memoryCount}</strong>
-        <small>{latestMemory ?? (en ? "Start by telling Aurora what happened today." : "从告诉 Aurora 今天发生了什么开始")}</small>
+        <small>{localisedLatestMemory ?? (en ? "Start by telling Aurora what happened today." : "从告诉 Aurora 今天发生了什么开始")}</small>
         <em>{en ? "Open the cosmos" : "进入内宇宙 →"}</em>
       </button>
       <button type="button" onClick={onOpenLetters}>

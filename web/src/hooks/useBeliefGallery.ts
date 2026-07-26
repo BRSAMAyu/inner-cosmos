@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { api, type BeliefContradiction, type BeliefPattern } from "../api";
+import type { Locale } from "../i18n";
 
 // Port of the belief-pattern-browsing half of src/main/resources/static/pages/beliefs.html
 // (BeliefController: /api/belief/list, /by-category, /strong, /contradictions). See api.ts's
@@ -8,7 +9,7 @@ import { api, type BeliefContradiction, type BeliefPattern } from "../api";
 
 export type BeliefFilter = "all" | "strong" | "byCategory";
 
-export function useBeliefGallery({ setStatus }: { setStatus: (status: string) => void }) {
+export function useBeliefGallery({ setStatus, locale = "zh-CN" }: { setStatus: (status: string) => void; locale?: Locale }) {
   const [beliefs, setBeliefs] = useState<BeliefPattern[]>([]);
   const [contradictions, setContradictions] = useState<BeliefContradiction[]>([]);
   const [filter, setFilter] = useState<BeliefFilter>("all");
@@ -31,11 +32,12 @@ export function useBeliefGallery({ setStatus }: { setStatus: (status: string) =>
     try {
       setBeliefs(next === "strong" ? await api.beliefStrong(0.5) : await api.beliefList());
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "暂时无法加载信念");
+      setStatus(error instanceof Error ? error.message
+        : locale === "en-SG" ? "Could not load beliefs yet." : "暂时无法加载信念");
     } finally {
       setBusy(false);
     }
-  }, [setStatus]);
+  }, [locale, setStatus]);
 
   const selectCategory = useCallback(async (category: string) => {
     setSelectedCategory(category);
@@ -43,11 +45,12 @@ export function useBeliefGallery({ setStatus }: { setStatus: (status: string) =>
     try {
       setCategoryBeliefs(await api.beliefByCategory(category));
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "暂时无法加载这个分类");
+      setStatus(error instanceof Error ? error.message
+        : locale === "en-SG" ? "Could not load this category yet." : "暂时无法加载这个分类");
     } finally {
       setBusy(false);
     }
-  }, [setStatus]);
+  }, [locale, setStatus]);
 
   return {
     beliefs, contradictions, filter, categories, selectedCategory, categoryBeliefs, busy,

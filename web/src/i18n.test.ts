@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { detectLocale, DEFAULT_LOCALE, normalizeLocale } from "./i18n";
+import { detectLocale, DEFAULT_LOCALE, normalizeLocale, syncDocumentLocale } from "./i18n";
 
 describe("i18n", () => {
   it("normalizes exact, prefixed and unknown locale values", () => {
@@ -23,5 +23,14 @@ describe("i18n", () => {
     expect(detectLocale({ stored: "fr-FR", nav: "en-GB" })).toBe("en-SG");
     expect(detectLocale({ stored: null, nav: "fr-FR" })).toBe(DEFAULT_LOCALE);
     expect(detectLocale()).toBe(DEFAULT_LOCALE);
+  });
+
+  it("keeps the document language metadata aligned with the rendered locale", () => {
+    syncDocumentLocale("en-SG");
+    expect(document.documentElement.lang).toBe("en-SG");
+    expect(document.documentElement.dir).toBe("ltr");
+
+    syncDocumentLocale("zh-CN");
+    expect(document.documentElement.lang).toBe("zh-CN");
   });
 });

@@ -96,7 +96,7 @@ class VoiceTranscriptionServiceImplTest {
         assertEquals("最终版日记内容", row.editedText);
         assertEquals("SUBMITTED", row.status);
         verify(mapper).updateById(row);
-        verify(settlement).settleDiary(7L, "最终版日记内容");
+        verify(settlement).settleDiary(7L, 42L, "最终版日记内容");
     }
 
     @Test
@@ -111,6 +111,25 @@ class VoiceTranscriptionServiceImplTest {
         assertThrows(BusinessException.class, () -> service.submitFinal(42L, 7L, "不该写入"));
 
         verify(mapper, never()).updateById(any(VoiceTranscription.class));
-        verify(settlement, never()).settleDiary(anyLong(), eq("不该写入"));
+        verify(settlement, never()).settleDiary(anyLong(), any(), eq("不该写入"));
+    }
+
+    @Test
+    void submittedDiaryCannotBeSilentlyRewrittenWithoutAVersionedMemoryOperation() {
+        VoiceTranscriptionMapper mapper = mock(VoiceTranscriptionMapper.class);
+        VoiceTranscription row = new VoiceTranscription();
+        row.userId = 7L;
+        row.status = "SUBMITTED";
+        row.editedText = "已经沉淀的版本";
+        when(mapper.selectById(42L)).thenReturn(row);
+        MemorySettlementService settlement = mock(MemorySettlementService.class);
+        var service = new VoiceTranscriptionServiceImpl(mapper, settlement);
+
+        BusinessException failure = assertThrows(BusinessException.class,
+                () -> service.submitFinal(42L, 7L, "偷偷覆盖成另一版"));
+
+        assertEquals("CONFLICT", failure.code);
+        verify(mapper, never()).updateById(any(VoiceTranscription.class));
+        verify(settlement, never()).settleDiary(anyLong(), any(), any());
     }
 }

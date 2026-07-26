@@ -29,4 +29,10 @@ describe("TodayOverview locale closure", () => {
     render(<TodayOverview {...props} locale="en-SG" />);
     expect(screen.getByText("YOUR COSMOS, TODAY")).toBeVisible();
   });
+
+  it("localises the legacy system-generated memory title in the English view", () => {
+    render(<TodayOverview {...props} latestMemory="今日沉淀" locale="en-SG" />);
+    expect(screen.getByText("Today's reflection")).toBeVisible();
+    expect(screen.queryByText("今日沉淀")).not.toBeInTheDocument();
+  });
 });

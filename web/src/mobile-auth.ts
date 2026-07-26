@@ -318,7 +318,7 @@ export class MobileOidcClient {
       }
     }
     await this.clear();
-    if (!revoked) throw new Error("已清除本机凭据，但身份提供方未确认远程撤销");
+    if (!revoked) throw new Error("OIDC_REMOTE_REVOCATION_UNCONFIRMED");
   }
 
   private async handleCallback(event: Pick<URLOpenListenerEvent, "url">): Promise<void> {

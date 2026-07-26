@@ -44,7 +44,7 @@ const COPY: Record<Locale, {
 
 export function AdminConsole({ locale = "zh-CN", onBack }: { locale?: Locale; onBack: () => void }) {
   const t = COPY[locale];
-  const admin = useAdminConsole();
+  const admin = useAdminConsole(locale);
   const [tab, setTab] = useState<TabKey>("users");
 
   useEffect(() => { void admin.loadAll(); }, [admin.loadAll]);

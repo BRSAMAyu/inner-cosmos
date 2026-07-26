@@ -38,11 +38,15 @@ export function layoutMemoryStars(stars: StarfieldStar[], mode: StarfieldScene["
     }
 
     const candidates = mode === "TIME"
-      ? [[0, 0], [0, -14], [0, 14], [-8, -8], [-8, 8], [8, -8], [8, 8], [-13, 0], [13, 0]]
+      // A classroom burst often settles many memories at nearly the same "now" coordinate.
+      // Fan those collisions back across the timeline instead of stacking two label columns
+      // against the right edge. The offsets deliberately exceed one 140px label width.
+      ? [[0, 0], [-18, -18], [-36, 18], [-18, 28], [-36, -28], [-54, 0],
+        [-54, -36], [-54, 36], [4, -30], [4, 30], [-36, 42], [-36, -42]]
       : [[0, 0], [0, -14], [0, 14], [-12, -8], [12, 8], [-12, 8], [12, -8]];
     const candidate = candidates
       .map(([dx, dy]) => ({ left: clamp(anchor.left + dx, 12, 82), top: clamp(anchor.top + dy, 14, 86) }))
-      .find(point => occupied.every(other => Math.abs(point.left - other.left) >= 14 || Math.abs(point.top - other.top) >= 12))
+      .find(point => occupied.every(other => Math.abs(point.left - other.left) >= 17 || Math.abs(point.top - other.top) >= 15))
       ?? { left: clamp(anchor.left - 15, 12, 82), top: clamp(anchor.top + 16, 14, 86) };
     occupied.push(candidate);
     positions.set(star.id, candidate);

@@ -16,6 +16,11 @@ Redis 和 AI Provider 网关；Cloudflare Quick Tunnel 提供临时公网 HTTPS 
 这里的“完成”以现场核心轨迹可用为准，不以 AWS、商店发布、长期生产运维或新加坡
 合规签字为前置条件。
 
+云原生课程展示是独立但相连的第二段：Windows 公网 Demo 负责真实用户与真实 AI，
+预先准备的 kind/Academy 环境负责 Pod 恢复、KEDA、OpenTelemetry、Argo 和 Kyverno
+证据。两段的完整编排、30 人并发门禁与不可夸大边界见
+[`CLOUD-NATIVE-PRESENTATION-RUNBOOK.md`](CLOUD-NATIVE-PRESENTATION-RUNBOOK.md)。
+
 ## 一次性准备
 
 Windows 需要：

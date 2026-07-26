@@ -31,7 +31,7 @@ import { AccountSettings, type AccountBusy } from "./components/AccountSettings"
 import { DataRightsPanel } from "./components/DataRightsPanel";
 import { LocaleToggle } from "./components/LocaleToggle";
 import type { DataRetractionReceipt, TtsPreferences, TtsPreferencesPatch, UserProfileSettings } from "./api";
-import { loadLocale, saveLocale, type Locale } from "./i18n";
+import { loadLocale, saveLocale, syncDocumentLocale, type Locale } from "./i18n";
 import { APP_COPY, type DialogMode } from "./appCopy";
 import { AuthGate } from "./components/AuthGate";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -58,6 +58,7 @@ import { userVisiblePublicCapsules, userVisibleResonanceMatches } from "./demoFi
 import { DemoPersonaChooser } from "./components/DemoPersonaChooser";
 import { TodayOverview } from "./components/TodayOverview";
 import { InnerCosmosOverview } from "./components/InnerCosmosOverview";
+import { capsuleDraftDefaults, journeyStepsFromFacts, latestSettledMemory } from "./newUserJourney";
 
 // The Aurora conversation/session domain (message list, streaming/turn status, interrupt/stop,
 // mode picker, WakeIntent negotiate, session bootstrap/replay) has been extracted into
@@ -68,6 +69,26 @@ const modes = [
   ["ACTION_SPLIT", "行动"], ["RELATION_REVIEW", "关系"], ["CAPSULE_SHAPING", "塑造侧影"]
 ] as const;
 
+const INITIAL_DRAFT_COPY: Record<Locale, {
+  connecting: string;
+  sandboxQuestion: string;
+  personaDraft: string;
+  letterTitle: string;
+}> = {
+  "zh-CN": {
+    connecting: "正在连接你的内宇宙…",
+    sandboxQuestion: "当你被误解时，通常会怎样表达自己的边界？",
+    personaDraft: "最近有什么让你觉得自己被认真理解了？",
+    letterTitle: "想把刚才的共鸣慢慢写下来"
+  },
+  "en-SG": {
+    connecting: "Connecting to your inner cosmos…",
+    sandboxQuestion: "When you feel misunderstood, how do you usually express a boundary?",
+    personaDraft: "What has recently made you feel genuinely understood?",
+    letterTitle: "I want to let this resonance arrive slowly"
+  }
+};
+
 export function AuroraApp() {
   // Real client routing (react-router HashRouter, mounted in main.tsx): the active space is
   // derived from the current route on every render instead of being copied into state once
@@ -76,12 +97,14 @@ export function AuroraApp() {
   // `authenticated` flips back to true, `productSpace` is still whatever the URL says.
   const location = useLocation();
   const navigate = useNavigate();
+  const initialLocale = useMemo(() => loadLocale(), []);
+  const initialDrafts = INITIAL_DRAFT_COPY[initialLocale];
   const productSpace = useMemo(() => productSpaceFromPath(location.pathname), [location.pathname]);
   const cosmosTab = useMemo(() => cosmosTabFromPath(location.pathname), [location.pathname]);
   const resonanceTab = useMemo(() => resonanceTabFromPath(location.pathname), [location.pathname]);
   const connectionTab = useMemo(() => connectionTabFromSearch(location.search), [location.search]);
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
-  const [status, setStatus] = useState("正在连接你的内宇宙…");
+  const [status, setStatus] = useState(initialDrafts.connecting);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
   const [selfEvolution, setSelfEvolution] = useState<SelfEvolution | null>(null);
   const [selfBusy, setSelfBusy] = useState(false);
@@ -135,7 +158,7 @@ export function AuroraApp() {
   const [capsuleBusy, setCapsuleBusy] = useState(false);
   const [capsuleBoundary, setCapsuleBoundary] = useState<CapsuleBoundary | null>(null);
   const [boundaryBusy, setBoundaryBusy] = useState(false);
-  const [sandboxQuestion, setSandboxQuestion] = useState("当你被误解时，通常会怎样表达自己的边界？");
+  const [sandboxQuestion, setSandboxQuestion] = useState(initialDrafts.sandboxQuestion);
   const [sandboxResult, setSandboxResult] = useState<CapsuleSandbox | null>(null);
   const [sandboxFeedback, setSandboxFeedback] = useState<string | null>(null);
   const [resonanceMatches, setResonanceMatches] = useState<CapsuleMatch[]>([]);
@@ -145,7 +168,7 @@ export function AuroraApp() {
   const [visitorMatchId, setVisitorMatchId] = useState<number | null>(null);
   const [personaSession, setPersonaSession] = useState<PersonaSession | null>(null);
   const [personaMessages, setPersonaMessages] = useState<PersonaMessage[]>([]);
-  const [personaDraft, setPersonaDraft] = useState("最近有什么让你觉得自己被认真理解了？");
+  const [personaDraft, setPersonaDraft] = useState(initialDrafts.personaDraft);
   const [personaQuota, setPersonaQuota] = useState<CapsuleQuota | null>(null);
   // W1 capsule-voice reuse: on-demand synthesized audio of the latest capsule reply, fetched only
   // when the visitor taps play (opt-in/visible, never autoplay-surprising). Cleared on each new
@@ -153,7 +176,7 @@ export function AuroraApp() {
   const [personaVoiceAudio, setPersonaVoiceAudio] = useState<string | null>(null);
   const [personaVoiceBusy, setPersonaVoiceBusy] = useState(false);
   const [personaVoiceError, setPersonaVoiceError] = useState<string | null>(null);
-  const [letterTitle, setLetterTitle] = useState("想把刚才的共鸣慢慢写下来");
+  const [letterTitle, setLetterTitle] = useState(initialDrafts.letterTitle);
   const [letterBody, setLetterBody] = useState("");
   const [sentLetter, setSentLetter] = useState<SlowLetter | null>(null);
   // Gemini audit 4.5 (CONFIRMED/P1): persists the draft id + idempotency key across a failed
@@ -169,7 +192,7 @@ export function AuroraApp() {
   const [skillRetention, setSkillRetention] = useState<PsychologyRetention>("DISCARD_AFTER_SESSION");
   const [skillBusy, setSkillBusy] = useState(false);
   const [skillSuggestion, setSkillSuggestion] = useState<PsychologySkillSuggestion | null>(null);
-  const [skillLocale, setSkillLocale] = useState<SkillLocale>(() => loadLocale());
+  const [skillLocale, setSkillLocale] = useState<SkillLocale>(initialLocale);
   const [visitorBusy, setVisitorBusy] = useState(false);
   const [mobileState, setMobileState] = useState<MobileRuntimeState>(initialMobileState);
   const [memoryThemes, setMemoryThemes] = useState<MemoryThemeRow[]>([]);
@@ -177,21 +200,42 @@ export function AuroraApp() {
   const bootstrapCallRef = useRef(0);
   const draftRestoredRef = useRef(false);
 
+  useEffect(() => {
+    syncDocumentLocale(skillLocale);
+  }, [skillLocale]);
+
   // Aurora conversation/session domain (message list, streaming/turn status, interrupt/stop, mode
   // picker, WakeIntent negotiate, session bootstrap/replay) -- extracted into its own hook; see
   // web/src/hooks/useAuroraSession.ts.
   const auroraSession = useAuroraSession({
     authenticated, skillLocale, onSkillSuggestion: setSkillSuggestion, setStatus,
-    onMemorySettled: async () => {
+    onMemorySettled: async settledMode => {
       const [scene, cards, operations] = await Promise.all([
         api.starfield("TIME"), api.memoryCards(), api.memoryOperations()
       ]);
       setStarfield(scene);
       setMemories(cards);
       setMemoryOperations(operations);
+      if (settledMode === "CAPSULE_SHAPING") {
+        const latestMemory = latestSettledMemory(memories, cards);
+        const defaults = capsuleDraftDefaults(latestMemory, skillLocale);
+        setSelectedCapsuleId(null);
+        setCapsulePreview(null);
+        setSelectedMemoryIds(latestMemory ? [latestMemory.id] : []);
+        setCapsuleName(defaults.name);
+        setCapsuleIntro(defaults.intro);
+        navigate(resonanceTabPath("mine"));
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        setStatus(skillLocale === "en-SG"
+          ? "Your newest memory is selected in a private capsule draft. Review the preview, then compile it when it feels right — nothing is published automatically."
+          : "最新记忆已选入一个私密共鸣体草稿。确认授权预览后再由你决定是否编译；系统不会自动发布。");
+        return;
+      }
       navigate(cosmosTabPath("starfield"));
       window.scrollTo({ top: 0, behavior: "smooth" });
-      setStatus(`已经把这一刻沉淀成 ${cards.length} 颗可追溯的记忆星；点星体可以查看它来自哪里。`);
+      setStatus(skillLocale === "en-SG"
+        ? `This moment is now ${cards.length} traceable memory ${cards.length === 1 ? "star" : "stars"}. Open a star to see where it came from.`
+        : `已经把这一刻沉淀成 ${cards.length} 颗可追溯的记忆星；点星体可以查看它来自哪里。`);
     }
   });
 
@@ -205,21 +249,21 @@ export function AuroraApp() {
   // Connections/letters domain (People Discovery, relation mentions/timeline, connection
   // requests/friends, slow-letter inbox/outbox/threads) -- extracted into its own hook; see
   // web/src/hooks/useConnectionsAndLetters.ts.
-  const connectionsAndLetters = useConnectionsAndLetters({ setStatus });
+  const connectionsAndLetters = useConnectionsAndLetters({ setStatus, locale: skillLocale });
 
   // Phase 3 legacy-page port (timeline.html / weekly-review.html / daily-record.html /
   // thought-shredder.html) -- three small domain hooks for the "cosmos" space's growth-timeline,
   // weekly-review and thought-shredder sections; see web/src/hooks/useDailyRecord.ts,
   // useWeeklyReview.ts and useThoughtShredder.ts.
-  const dailyRecord = useDailyRecord({ setStatus });
-  const weeklyReview = useWeeklyReview({ setStatus });
-  const thoughtShredder = useThoughtShredder({ setStatus });
+  const dailyRecord = useDailyRecord({ setStatus, locale: skillLocale });
+  const weeklyReview = useWeeklyReview({ setStatus, locale: skillLocale });
+  const thoughtShredder = useThoughtShredder({ setStatus, locale: skillLocale });
   // Legacy static-page ports (Phase 3, legacy batch B): todo.html, heart-diary.html, and the
   // belief-pattern-browsing half of beliefs.html. Each domain gets its own small hook, matching the
   // precedent set by useConnectionsAndLetters.ts.
-  const todoBoard = useTodoBoard({ setStatus });
-  const heartDiary = useHeartDiary({ setStatus });
-  const beliefGallery = useBeliefGallery({ setStatus });
+  const todoBoard = useTodoBoard({ setStatus, locale: skillLocale });
+  const heartDiary = useHeartDiary({ setStatus, locale: skillLocale });
+  const beliefGallery = useBeliefGallery({ setStatus, locale: skillLocale });
 
   const navigateSpace = useCallback((space: ProductSpace) => {
     navigate(spacePath(space));
@@ -389,11 +433,13 @@ export function AuroraApp() {
       if (call !== bootstrapCallRef.current) return;
       if (/authentication|unauthori[sz]ed|\b401\b/i.test(String(error))) {
         setAuthenticated(false);
-        setStatus("请先登录");
+        setStatus(skillLocale === "en-SG" ? "Please sign in first." : "请先登录");
       } else {
         // 非鉴权失败：过去只更新 status 却把 authenticated 停在 null，用户会永久卡在连接加载屏。
         // 现在进入明确的"错误态"，连接屏据此渲染错误 + 重试（恢复态）。
-        const message = error instanceof Error ? error.message : "暂时无法连接你的内宇宙";
+        const message = error instanceof Error ? error.message : skillLocale === "en-SG"
+          ? "Inner Cosmos is temporarily unreachable."
+          : "暂时无法连接你的内宇宙";
         setBootstrapError(message);
         setStatus(message);
       }
@@ -419,13 +465,31 @@ export function AuroraApp() {
   // A capsule opened from the public plaza directory (not the curated match set) is wrapped in a
   // synthetic match so the existing visitor workbench (persona chat + slow letter) works unchanged.
   const directoryMatch: CapsuleMatch | null = directoryPick && !resonanceMatches.some(match => match.capsule.id === directoryPick.id)
-    ? { capsule: directoryPick, matchScore: 0, matchReasons: [], matchSummary: "你在广场里主动找到了它，而不是被推荐的。",
-        resonant: false, strategy: "SERENDIPITY", strategyLabel: "主动发现", strategyDescription: "你在共鸣广场里主动走近了它。" }
+    ? { capsule: directoryPick, matchScore: 0, matchReasons: [],
+        matchSummary: skillLocale === "en-SG"
+          ? "You found this presence in the plaza rather than through a recommendation."
+          : "你在广场里主动找到了它，而不是被推荐的。",
+        resonant: false, strategy: "SERENDIPITY",
+        strategyLabel: skillLocale === "en-SG" ? "Discovered by you" : "主动发现",
+        strategyDescription: skillLocale === "en-SG"
+          ? "You chose to move closer to this presence in the resonance plaza."
+          : "你在共鸣广场里主动走近了它。" }
     : null;
   const visitorMatch = resonanceMatches.find(match => match.capsule.id === visitorMatchId)
     ?? (directoryMatch && directoryMatch.capsule.id === visitorMatchId ? directoryMatch : null)
     ?? resonanceMatches[0] ?? null;
   const selectedSkill = skills.find(skill => skill.id === selectedSkillId) ?? skills[0] ?? null;
+  const completedJourneySteps = useMemo(() => journeyStepsFromFacts({
+    hasUserMessage: auroraSession.messages.some(message => message.speaker === "USER" && Boolean(message.text.trim())),
+    hasMemory: memories.length > 0,
+    hasActiveCapsule: capsules.some(capsule => capsule.visibilityStatus !== "ARCHIVED"),
+    hasVisitorSession: personaSession !== null,
+    hasResonantMatch: resonanceMatches.some(match => match.resonant),
+    hasSentLetter: sentLetter !== null || connectionsAndLetters.letterOutbox.length > 0
+  }), [
+    auroraSession.messages, capsules, connectionsAndLetters.letterOutbox.length, memories.length,
+    personaSession, resonanceMatches, sentLetter
+  ]);
 
   useEffect(() => {
     if (!selectedCapsule) { setGenomeHistory([]); setFidelitySummary([]); setCapsuleBoundary(null); return; }
@@ -434,7 +498,9 @@ export function AuroraApp() {
     setSandboxResult(null);
     setSandboxFeedback(null);
     void api.capsuleGenomeHistory(selectedCapsule.id).then(setGenomeHistory)
-      .catch(error => setStatus(error instanceof Error ? error.message : "暂时无法读取共鸣体版本"));
+      .catch(error => setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+        ? "Capsule versions are temporarily unavailable."
+        : "暂时无法读取共鸣体版本"));
     void api.capsuleFidelity(selectedCapsule.id).then(setFidelitySummary).catch(() => setFidelitySummary([]));
     void api.capsuleBoundary(selectedCapsule.id).then(setCapsuleBoundary).catch(() => setCapsuleBoundary(null));
   }, [selectedCapsuleId, selectedCapsule?.activeGenomeVersionId]);
@@ -445,8 +511,12 @@ export function AuroraApp() {
     try {
       await api.updateCapsuleBoundary(selectedCapsule.id, boundary);
       setCapsuleBoundary(await api.capsuleBoundary(selectedCapsule.id));
-      setStatus("边界已更新。只有你能改动它，公开人格会按新的边界回应访客。");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法保存这个共鸣体的边界"); }
+      setStatus(skillLocale === "en-SG"
+        ? "Boundaries updated. Only you can change them; the public facet will use them with visitors."
+        : "边界已更新。只有你能改动它，公开人格会按新的边界回应访客。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+      ? "These capsule boundaries could not be saved."
+      : "暂时无法保存这个共鸣体的边界"); }
     finally { setBoundaryBusy(false); }
   };
 
@@ -471,7 +541,9 @@ export function AuroraApp() {
       return bootstrap();
     }).catch(error => {
       setAuthenticated(false);
-      setStatus(error instanceof Error ? error.message : "移动认证初始化失败");
+      setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+        ? "Mobile authentication could not be initialized."
+        : "移动认证初始化失败");
     });
     return () => { if (dispose) void dispose(); };
   }, [bootstrap]);
@@ -500,13 +572,17 @@ export function AuroraApp() {
       onResume: resumeFromDurableState,
       onWakeIntent: auroraSession.openMobileWakeIntent,
       onPushToken: () => {
-        if (!cancelled) setStatus("设备已向系统通知服务注册；真实远程投递仍取决于当前环境的 APNs / FCM 配置。");
+        if (!cancelled) setStatus(skillLocale === "en-SG"
+          ? "This device is registered for notifications; remote delivery still depends on APNs / FCM being configured in this environment."
+          : "设备已向系统通知服务注册；真实远程投递仍取决于当前环境的 APNs / FCM 配置。");
       }
     }).then(stopRuntime => {
       if (cancelled) void stopRuntime();
       else cleanup = stopRuntime;
     }).catch(error => {
-      if (!cancelled) setStatus(error instanceof Error ? error.message : "移动端运行时暂时不可用");
+      if (!cancelled) setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+        ? "The mobile runtime is temporarily unavailable."
+        : "移动端运行时暂时不可用");
     });
     return () => {
       cancelled = true;
@@ -551,16 +627,28 @@ export function AuroraApp() {
 
   const requestMobilePush = async () => {
     const permission = await mobileRuntime.requestPushRegistration();
-    setStatus(permission === "granted" ? "通知权限已开启，Aurora 可以在真实投递配置就绪后按约定回来。"
-      : permission === "denied" ? "通知权限没有开启；回来约定仍会保留在应用内。"
-        : permission === "unavailable" ? "当前浏览器不使用系统推送；回来约定仍会在应用内出现。" : "暂时无法完成通知注册。");
+    setStatus(skillLocale === "en-SG"
+      ? (permission === "granted" ? "Notifications enabled. Aurora can return as arranged once remote delivery is configured."
+        : permission === "denied" ? "Notifications remain off; return arrangements still stay inside the app."
+          : permission === "unavailable" ? "This browser does not use system push; return arrangements still appear in the app."
+            : "Notification registration could not be completed.")
+      : (permission === "granted" ? "通知权限已开启，Aurora 可以在真实投递配置就绪后按约定回来。"
+        : permission === "denied" ? "通知权限没有开启；回来约定仍会保留在应用内。"
+          : permission === "unavailable" ? "当前浏览器不使用系统推送；回来约定仍会在应用内出现。"
+            : "暂时无法完成通知注册。"));
   };
 
   const requestMobileMicrophone = async () => {
     const permission = await mobileRuntime.requestMicrophonePermission();
-    setStatus(permission === "granted" ? "麦克风已准备好；本次授权检查没有保存任何录音。"
-      : permission === "denied" ? "麦克风权限没有开启，你仍然可以继续打字。"
-        : permission === "unavailable" ? "当前环境不支持麦克风输入，你仍然可以继续打字。" : "暂时无法检查麦克风权限。");
+    setStatus(skillLocale === "en-SG"
+      ? (permission === "granted" ? "Microphone ready; this permission check did not save any recording."
+        : permission === "denied" ? "Microphone access is off; you can keep typing."
+          : permission === "unavailable" ? "Microphone input is unavailable here; you can keep typing."
+            : "Microphone permission could not be checked.")
+      : (permission === "granted" ? "麦克风已准备好；本次授权检查没有保存任何录音。"
+        : permission === "denied" ? "麦克风权限没有开启，你仍然可以继续打字。"
+          : permission === "unavailable" ? "当前环境不支持麦克风输入，你仍然可以继续打字。"
+            : "暂时无法检查麦克风权限。"));
   };
 
   const evolve = async (action: () => Promise<SelfEvolution>, success: string) => {
@@ -569,16 +657,24 @@ export function AuroraApp() {
       setSelfEvolution(await action());
       setStatus(success);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "这次变化没有通过");
+      setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+        ? "This change did not pass review."
+        : "这次变化没有通过");
     } finally { setSelfBusy(false); }
   };
 
   const correctionCommand = (): CorrectionCommand => correctionTarget ? {
     targetType: "MEMORY_CARD", targetId: correctionTarget.id, fieldName: "summary",
-    oldValue: null, newValue: correctionNew.trim(), reason: "用户在记忆星空中直接纠正这条记忆"
+    oldValue: null, newValue: correctionNew.trim(),
+    reason: skillLocale === "en-SG"
+      ? "The user corrected this memory directly in the memory starfield."
+      : "用户在记忆星空中直接纠正这条记忆"
   } : {
     targetType: "AURORA_UNDERSTANDING", targetId: 0, fieldName: "self_understanding",
-    oldValue: correctionOld.trim() || null, newValue: correctionNew.trim(), reason: "用户在 Inner Cosmos 中主动校准"
+    oldValue: correctionOld.trim() || null, newValue: correctionNew.trim(),
+    reason: skillLocale === "en-SG"
+      ? "The user actively calibrated Aurora's understanding in Inner Cosmos."
+      : "用户在 Inner Cosmos 中主动校准"
   };
 
   const beginMemoryCorrection = (star: StarfieldStar) => {
@@ -594,8 +690,12 @@ export function AuroraApp() {
     setCorrectionBusy(true);
     try {
       setCorrectionImpact(await api.previewCorrection(correctionCommand()));
-      setStatus("先看清影响范围；只有确认后，Aurora 的理解才会改变。");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法预览这次纠正"); }
+      setStatus(skillLocale === "en-SG"
+        ? "Review the impact first. Aurora's understanding changes only after you confirm."
+        : "先看清影响范围；只有确认后，Aurora 的理解才会改变。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+      ? "This correction preview is temporarily unavailable."
+      : "暂时无法预览这次纠正"); }
     finally { setCorrectionBusy(false); }
   };
 
@@ -615,8 +715,12 @@ export function AuroraApp() {
       }
       void api.recentCorrections().then(setCorrections).catch(() => undefined);
       setCorrectionImpact(null); setCorrectionOld(""); setCorrectionNew(""); setCorrectionTarget(null);
-      setStatus("已校准。旧理解仍可追溯，Aurora、星空与共鸣体上下文会按确认结果同步。");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "这次纠正没有保存，任何下游都未改变"); }
+      setStatus(skillLocale === "en-SG"
+        ? "Calibrated. The earlier understanding remains traceable; Aurora, the starfield and capsule context will follow your confirmed correction."
+        : "已校准。旧理解仍可追溯，Aurora、星空与共鸣体上下文会按确认结果同步。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+      ? "The correction was not saved; nothing downstream changed."
+      : "这次纠正没有保存，任何下游都未改变"); }
     finally { setCorrectionBusy(false); }
   };
 
@@ -631,8 +735,12 @@ export function AuroraApp() {
       ]);
       setCorrections(freshCorrections);
       setClaims(freshClaims);
-      setStatus("这条更正已退休。Aurora 不再据此调整对你的理解，之前被它替代的理解会重新成为当前事实。");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法让这条更正退休"); }
+      setStatus(skillLocale === "en-SG"
+        ? "Correction retired. Aurora no longer uses it; the understanding it replaced is current again."
+        : "这条更正已退休。Aurora 不再据此调整对你的理解，之前被它替代的理解会重新成为当前事实。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+      ? "This correction could not be retired."
+      : "暂时无法让这条更正退休"); }
     finally { setRetiringCorrectionId(null); }
   };
 
@@ -645,8 +753,12 @@ export function AuroraApp() {
       setClaimCandidates(current => current.filter(candidate => candidate.id !== id));
       setClaims(current => [result.activeClaim, ...current]);
       void api.recentCorrections().then(setCorrections).catch(() => undefined);
-      setStatus("已记住。这条理解现在是你确认的事实，会影响以后每次对话。");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "这条理解没能保存"); }
+      setStatus(skillLocale === "en-SG"
+        ? "Saved. This is now a fact you confirmed, and it can shape future conversations."
+        : "已记住。这条理解现在是你确认的事实，会影响以后每次对话。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+      ? "This understanding could not be saved."
+      : "这条理解没能保存"); }
     finally { setClaimCandidateBusyId(null); }
   };
 
@@ -655,8 +767,12 @@ export function AuroraApp() {
     try {
       await api.dismissClaimCandidate(id);
       setClaimCandidates(current => current.filter(candidate => candidate.id !== id));
-      setStatus("好的，我不会把这条当作对你的理解。");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法忽略这条理解"); }
+      setStatus(skillLocale === "en-SG"
+        ? "Understood. Aurora will not treat this as an understanding of you."
+        : "好的，我不会把这条当作对你的理解。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+      ? "This understanding could not be dismissed."
+      : "暂时无法忽略这条理解"); }
     finally { setClaimCandidateBusyId(null); }
   };
 
@@ -665,7 +781,9 @@ export function AuroraApp() {
     try { setPortraitHistory(current => ({ ...current, [dim]: [] })); // mark as loading/loaded to avoid duplicate fetches
       const rows = await api.portraitHistory(dim);
       setPortraitHistory(current => ({ ...current, [dim]: rows }));
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法回看这一面的变化"); }
+    } catch (error) { setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+      ? "The history for this facet is temporarily unavailable."
+      : "暂时无法回看这一面的变化"); }
   };
 
   const submitPortraitCalibration = async (dim: string, oldValue: string, newValue: string) => {
@@ -675,37 +793,60 @@ export function AuroraApp() {
     try {
       await api.confirmCorrection({
         targetType: "PORTRAIT_DIM", targetId: 0, fieldName: dim,
-        oldValue: oldValue || null, newValue: trimmed, reason: "用户在「Aurora 眼中的你」页面校准了这一维度"
+        oldValue: oldValue || null, newValue: trimmed,
+        reason: skillLocale === "en-SG"
+          ? "The user calibrated this facet in Aurora's view of them."
+          : "用户在「Aurora 眼中的你」页面校准了这一维度"
       });
       // The correction coexists alongside Aurora's own observation rather than overwriting it
       // (RUN-006 semantics). Refresh the real corrections list so portraitCalibrated (derived
       // from it above) picks this up immediately and survives a reload, instead of a local-only
       // flag that used to vanish the moment the page refreshed.
       setCorrections(await api.recentCorrections());
-      setStatus("记下了。我会带着你这份看法继续理解你。");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "没能存下，待会儿再试一次"); }
+      setStatus(skillLocale === "en-SG"
+        ? "Noted. Aurora will carry your own view forward while continuing to understand you."
+        : "记下了。我会带着你这份看法继续理解你。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+      ? "This was not saved; try again in a moment."
+      : "没能存下，待会儿再试一次"); }
     finally { setPortraitBusy(null); }
   };
 
   const loadDataRightsReceipts = async () => {
     setDataRightsLoading(true);
     try { setDataRightsReceipts(await api.dataRightsReceipts()); setDataRightsLoaded(true); }
-    catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法读取数据权利回执"); }
+    catch (error) { setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+      ? "Data-rights receipts are temporarily unavailable."
+      : "暂时无法读取数据权利回执"); }
     finally { setDataRightsLoading(false); }
   };
 
   // App-wide language: initialized from detection (loadLocale), overridable + persisted here so the
   // choice survives reloads. skillLocale is the single shared locale state (see i18n.ts).
-  const changeLocale = (locale: Locale) => { setSkillLocale(locale); saveLocale(locale); };
+  const changeLocale = (locale: Locale) => {
+    const previousDefaults = INITIAL_DRAFT_COPY[skillLocale];
+    const nextDefaults = INITIAL_DRAFT_COPY[locale];
+    setSandboxQuestion(value => value === previousDefaults.sandboxQuestion ? nextDefaults.sandboxQuestion : value);
+    setPersonaDraft(value => value === previousDefaults.personaDraft ? nextDefaults.personaDraft : value);
+    setLetterTitle(value => value === previousDefaults.letterTitle ? nextDefaults.letterTitle : value);
+    setSkillLocale(locale);
+    saveLocale(locale);
+  };
 
   // Gemini audit 4.10 (CONFIRMED/P1): returns null on confirmed success or the error message on
   // failure -- AccountSettings.tsx awaits this before deciding whether to close/clear its own form
   // (only on success) or keep it open with the user's input and this message inline (on failure).
   const changeAccountPassword = async (oldPassword: string, newPassword: string): Promise<string | null> => {
     setAccountBusy("password");
-    try { await api.changePassword(oldPassword, newPassword); setAccountMessage("密码已更新"); return null; }
+    try {
+      await api.changePassword(oldPassword, newPassword);
+      setAccountMessage(skillLocale === "en-SG" ? "Password updated." : "密码已更新");
+      return null;
+    }
     catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "密码修改失败";
+      const errorMessage = error instanceof Error ? error.message : skillLocale === "en-SG"
+        ? "Password update failed."
+        : "密码修改失败";
       setAccountMessage(errorMessage);
       return errorMessage;
     }
@@ -722,8 +863,10 @@ export function AuroraApp() {
       anchor.href = url; anchor.download = `inner-cosmos-export-${new Date().toISOString().slice(0, 10)}.json`;
       anchor.click();
       URL.revokeObjectURL(url);
-      setAccountMessage("数据已导出");
-    } catch (error) { setAccountMessage(error instanceof Error ? error.message : "导出失败"); }
+      setAccountMessage(skillLocale === "en-SG" ? "Data exported." : "数据已导出");
+    } catch (error) { setAccountMessage(error instanceof Error ? error.message : skillLocale === "en-SG"
+      ? "Export failed."
+      : "导出失败"); }
     finally { setAccountBusy(null); }
   };
 
@@ -737,7 +880,9 @@ export function AuroraApp() {
       setAccountMessage(null);
       return null;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "账户删除失败";
+      const errorMessage = error instanceof Error ? error.message : skillLocale === "en-SG"
+        ? "Account deletion failed."
+        : "账户删除失败";
       setAccountMessage(errorMessage);
       return errorMessage;
     }
@@ -749,10 +894,12 @@ export function AuroraApp() {
     try {
       const updated = await api.updateProfile(patch);
       setUserProfile(updated);
-      setAccountMessage("偏好设置已保存");
+      setAccountMessage(skillLocale === "en-SG" ? "Preferences saved." : "偏好设置已保存");
       return true;
     } catch (error) {
-      setAccountMessage(error instanceof Error ? error.message : "偏好设置未能保存");
+      setAccountMessage(error instanceof Error ? error.message : skillLocale === "en-SG"
+        ? "Preferences could not be saved."
+        : "偏好设置未能保存");
       return false;
     }
     finally { setProfileBusy(false); }
@@ -767,10 +914,12 @@ export function AuroraApp() {
     try {
       const updated = await api.updateTtsPreferences(patch);
       setTtsPreferences(updated);
-      setAccountMessage("语音偏好已保存");
+      setAccountMessage(skillLocale === "en-SG" ? "Voice preferences saved." : "语音偏好已保存");
       return null;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "语音偏好未能保存";
+      const errorMessage = error instanceof Error ? error.message : skillLocale === "en-SG"
+        ? "Voice preferences could not be saved."
+        : "语音偏好未能保存";
       setAccountMessage(errorMessage);
       return errorMessage;
     } finally { setTtsBusy(false); }
@@ -782,14 +931,20 @@ export function AuroraApp() {
     if (starfield?.mode === nextMode) return;
     setStarfieldBusy(true);
     setStarfieldDetail(null);
-    const viewLabel = nextMode === "TIME" ? "时间" : nextMode === "THEME" ? "主题" : "人物";
-    setStatus(`正在切换到${viewLabel}视角…`);
+    const viewLabel = skillLocale === "en-SG"
+      ? (nextMode === "TIME" ? "time" : nextMode === "THEME" ? "theme" : "people")
+      : (nextMode === "TIME" ? "时间" : nextMode === "THEME" ? "主题" : "人物");
+    setStatus(skillLocale === "en-SG"
+      ? `Switching to the ${viewLabel} view…`
+      : `正在切换到${viewLabel}视角…`);
     navigate(`${cosmosTabPath("starfield")}?view=${nextMode.toLowerCase()}`, { replace: true });
     try {
       setStarfield(await api.starfield(nextMode));
-      setStatus(`已进入${viewLabel}视角`);
+      setStatus(skillLocale === "en-SG" ? `Now viewing by ${viewLabel}.` : `已进入${viewLabel}视角`);
     }
-    catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法切换星空视角"); }
+    catch (error) { setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+      ? "The starfield view could not be changed."
+      : "暂时无法切换星空视角"); }
     finally { setStarfieldBusy(false); }
   };
 
@@ -799,15 +954,21 @@ export function AuroraApp() {
       const result = await api.rollbackMemoryOperation(operation.id);
       setMemoryOperations(await api.memoryOperations());
       setStarfield(await api.starfield(starfield?.mode ?? "TIME"));
-      setStatus(`已撤回这次${operation.operationType}；${result.projectionReceipts.length} 个下游投影留下了重建或复核回执。`);
-    } catch (error) { setStatus(error instanceof Error ? error.message : "这次记忆变更无法安全撤回"); }
+      setStatus(skillLocale === "en-SG"
+        ? `Reverted ${operation.operationType}; ${result.projectionReceipts.length} downstream projection receipts remain for rebuild or review.`
+        : `已撤回这次${operation.operationType}；${result.projectionReceipts.length} 个下游投影留下了重建或复核回执。`);
+    } catch (error) { setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+      ? "This memory change could not be reverted safely."
+      : "这次记忆变更无法安全撤回"); }
     finally { setRollbackBusy(null); }
   };
 
   const revealStar = async (id: number) => {
     setDetailBusy(id);
     try { setStarfieldDetail(await api.starfieldDetail(id)); }
-    catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法打开这颗记忆的来源"); }
+    catch (error) { setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+      ? "This memory's source is temporarily unavailable."
+      : "暂时无法打开这颗记忆的来源"); }
     finally { setDetailBusy(null); }
   };
 
@@ -829,8 +990,12 @@ export function AuroraApp() {
       ]);
       setStarfield(scene);
       setStarfieldDetail(detail);
-      setStatus("重要度已更新，这颗星的引力随之调整。");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法调整这颗记忆的重要度"); }
+      setStatus(skillLocale === "en-SG"
+        ? "Importance updated; this star's gravity has shifted with it."
+        : "重要度已更新，这颗星的引力随之调整。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+      ? "This memory's importance could not be updated."
+      : "暂时无法调整这颗记忆的重要度"); }
     finally { setImportanceBusy(null); }
   };
 
@@ -846,8 +1011,12 @@ export function AuroraApp() {
       setStarfield(scene);
       setMemoryOperations(ops);
       setStarfieldDetail(null);
-      setStatus("这颗记忆已归档，不再出现在当前星空；你可以在“最近的记忆变更”里撤回。");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法归档这颗记忆"); }
+      setStatus(skillLocale === "en-SG"
+        ? "Memory archived. It has left the current starfield; you can revert this under Recent memory changes."
+        : "这颗记忆已归档，不再出现在当前星空；你可以在“最近的记忆变更”里撤回。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+      ? "This memory could not be archived."
+      : "暂时无法归档这颗记忆"); }
     finally { setArchiveBusy(null); }
   };
 
@@ -869,8 +1038,12 @@ export function AuroraApp() {
       setCapsulePreview(preview);
       if (!capsuleName.trim()) setCapsuleName(preview.suggestedPseudonym);
       if (!capsuleIntro.trim()) setCapsuleIntro(preview.abstractSummary);
-      setStatus("Aurora 已用最近的可授权记忆生成私密草稿；敏感项已移除，还没有公开任何内容。");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法生成授权预览"); }
+      setStatus(skillLocale === "en-SG"
+        ? "Aurora created a private draft from your latest eligible memories. Sensitive details were removed; nothing has been published."
+        : "Aurora 已用最近的可授权记忆生成私密草稿；敏感项已移除，还没有公开任何内容。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+      ? "The authorization preview could not be generated."
+      : "暂时无法生成授权预览"); }
     finally { setCapsuleBusy(false); }
   };
 
@@ -889,8 +1062,12 @@ export function AuroraApp() {
       setSelectedCapsuleId(created.id);
       setCapsulePreview(null); setCapsuleName(""); setCapsuleIntro("");
       setCapsuleOwnerNote(""); setCapsuleStandIn(false); setCapsuleContactPolicy("LETTER_ONLY");
-      setStatus("共鸣体已作为私密版本编译。先在沙盒里判断像不像你，再决定是否公开。");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "共鸣体没有创建，授权未改变"); }
+      setStatus(skillLocale === "en-SG"
+        ? "The capsule was compiled as a private version. Test whether it feels like you before deciding to publish."
+        : "共鸣体已作为私密版本编译。先在沙盒里判断像不像你，再决定是否公开。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+      ? "The capsule was not created; your authorization is unchanged."
+      : "共鸣体没有创建，授权未改变"); }
     finally { setCapsuleBusy(false); }
   };
 
@@ -900,8 +1077,12 @@ export function AuroraApp() {
     try {
       await api.updateCapsuleContext(selectedCapsule.id, patch);
       await refreshSelectedCapsule(selectedCapsule.id);
-      setStatus("背景说明与联系方式设置已保存。");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法保存这些设置"); }
+      setStatus(skillLocale === "en-SG"
+        ? "Background and contact preferences saved."
+        : "背景说明与联系方式设置已保存。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+      ? "These settings could not be saved."
+      : "暂时无法保存这些设置"); }
     finally { setCapsuleBusy(false); }
   };
 
@@ -916,8 +1097,12 @@ export function AuroraApp() {
     try {
       await api.recompileCapsule(selectedCapsule.id, selectedMemoryIds);
       await refreshSelectedCapsule(selectedCapsule.id);
-      setStatus("已生成新的私密 Genome 版本。历史版本仍可追溯，请先试聊再公开。");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "重新编译失败，原版本仍保持不变"); }
+      setStatus(skillLocale === "en-SG"
+        ? "A new private Genome version is ready. Earlier versions remain traceable; test it before publishing."
+        : "已生成新的私密 Genome 版本。历史版本仍可追溯，请先试聊再公开。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+      ? "Recompile failed; the previous version remains unchanged."
+      : "重新编译失败，原版本仍保持不变"); }
     finally { setCapsuleBusy(false); }
   };
 
@@ -927,8 +1112,12 @@ export function AuroraApp() {
     try {
       await api.setCapsuleVisibility(selectedCapsule.id, "PUBLIC", true);
       await refreshSelectedCapsule(selectedCapsule.id);
-      setStatus("已发布。访客会清楚看到这是授权 AI 共鸣体，不是真人实时在线。");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "当前版本还不能安全发布"); }
+      setStatus(skillLocale === "en-SG"
+        ? "Published. Visitors will clearly see an authorized AI capsule, not a person replying live."
+        : "已发布。访客会清楚看到这是授权 AI 共鸣体，不是真人实时在线。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+      ? "This version cannot be published safely yet."
+      : "当前版本还不能安全发布"); }
     finally { setCapsuleBusy(false); }
   };
 
@@ -938,8 +1127,12 @@ export function AuroraApp() {
     try {
       await api.setCapsuleVisibility(selectedCapsule.id, "PRIVATE", false);
       await refreshSelectedCapsule(selectedCapsule.id);
-      setStatus("已暂停公开。Genome 和反馈仍保留，访客暂时不会再发现它。");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法暂停公开"); }
+      setStatus(skillLocale === "en-SG"
+        ? "Publishing paused. The Genome and feedback remain, but visitors cannot discover it."
+        : "已暂停公开。Genome 和反馈仍保留，访客暂时不会再发现它。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+      ? "Publishing could not be paused."
+      : "暂时无法暂停公开"); }
     finally { setCapsuleBusy(false); }
   };
 
@@ -950,8 +1143,12 @@ export function AuroraApp() {
       await api.archiveCapsule(selectedCapsule.id);
       const rows = await api.myCapsules(); setCapsules(rows);
       setSelectedCapsuleId(rows.find(row => row.visibilityStatus !== "ARCHIVED")?.id ?? null);
-      setStatus("已撤回。公开发现和既有会话都不能再让这个共鸣体代表你回应。");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法撤回共鸣体"); }
+      setStatus(skillLocale === "en-SG"
+        ? "Withdrawn. Discovery and existing conversations can no longer let this capsule respond for you."
+        : "已撤回。公开发现和既有会话都不能再让这个共鸣体代表你回应。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+      ? "The capsule could not be withdrawn."
+      : "暂时无法撤回共鸣体"); }
     finally { setCapsuleBusy(false); }
   };
 
@@ -960,23 +1157,31 @@ export function AuroraApp() {
     setCapsuleBusy(true); setSandboxFeedback(null);
     try {
       setSandboxResult(await api.sandboxCapsule(selectedCapsule.id, sandboxQuestion.trim()));
-      setStatus("这段回应只在你的沙盒里。它不会发送给其他人，也不会自动改变 Genome。");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "沙盒暂时无法回应"); }
+      setStatus(skillLocale === "en-SG"
+        ? "This response exists only in your sandbox. It was not sent to anyone and cannot change the Genome automatically."
+        : "这段回应只在你的沙盒里。它不会发送给其他人，也不会自动改变 Genome。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+      ? "The sandbox cannot respond right now."
+      : "沙盒暂时无法回应"); }
     finally { setCapsuleBusy(false); }
   };
 
-  const rateCapsuleSandbox = async (rating: string) => {
+  const rateCapsuleSandbox = async (rating: string, comment?: string) => {
     if (!selectedCapsule || !sandboxResult) return;
     setCapsuleBusy(true);
     try {
       await api.feedbackCapsuleSandbox(selectedCapsule.id, {
         genomeVersionId: sandboxResult.genomeVersionId, question: sandboxResult.question,
-        response: sandboxResult.reply, rating
+        response: sandboxResult.reply, rating, comment
       });
       setSandboxFeedback(rating);
       void api.capsuleFidelity(selectedCapsule.id).then(setFidelitySummary).catch(() => undefined);
-      setStatus("反馈已保存为下一次 Genome 改进信号；当前公开版本没有暗中漂移。");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "反馈暂时没有保存"); }
+      setStatus(skillLocale === "en-SG"
+        ? "Feedback saved as a signal for your next Genome version; the public version has not drifted."
+        : "反馈已保存为下一次 Genome 改进信号；当前公开版本没有暗中漂移。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+      ? "The feedback was not saved."
+      : "反馈暂时没有保存"); }
     finally { setCapsuleBusy(false); }
   };
 
@@ -989,7 +1194,9 @@ export function AuroraApp() {
   const openDirectoryCapsule = (capsule: PublicCapsule) => {
     setDirectoryPick(capsule);
     chooseVisitorMatch(capsule.id);
-    setStatus(`你从广场走近了「${capsule.pseudonym}」。它是授权 AI 共鸣体，不是真人实时在线。`);
+    setStatus(skillLocale === "en-SG"
+      ? `You found “${capsule.pseudonym}” in the plaza. It is an authorized AI capsule, not a person replying live.`
+      : `你从广场走近了「${capsule.pseudonym}」。它是授权 AI 共鸣体，不是真人实时在线。`);
     navigate(resonanceTabPath("encounters"));
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -1002,8 +1209,12 @@ export function AuroraApp() {
       setVisitorMatchId(matches[0]?.capsule.id ?? null);
       setPersonaSession(null); setPersonaMessages([]); setPersonaQuota(null); setSentLetter(null); setLetterBody(""); setPersonaTurnError(null);
       letterDraftRef.current = null; // 4.5: a different compose target invalidates any pending draft for the previous one.
-      setStatus(matches[0]?.strategyDescription ?? "已经切换相遇方式");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法切换相遇方式"); }
+      setStatus(skillLocale === "en-SG"
+        ? "Meeting approach changed; the candidates have been refreshed."
+        : (matches[0]?.strategyDescription ?? "已经切换相遇方式"));
+    } catch (error) { setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+      ? "The meeting approach could not be changed."
+      : "暂时无法切换相遇方式"); }
     finally { setVisitorBusy(false); }
   };
 
@@ -1016,8 +1227,12 @@ export function AuroraApp() {
       ]);
       setPersonaSession(session); setPersonaQuota(quota); setPersonaMessages([]); setPersonaTurnError(null);
       setPersonaVoiceAudio(null); setPersonaVoiceError(null);
-      setStatus(`你正在和「${visitorMatch.capsule.pseudonym}」的授权 AI 共鸣体对话，不是真人实时在线。`);
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法进入这个共鸣体"); }
+      setStatus(skillLocale === "en-SG"
+        ? `You are talking with the authorized AI capsule “${visitorMatch.capsule.pseudonym}”, not a person replying live.`
+        : `你正在和「${visitorMatch.capsule.pseudonym}」的授权 AI 共鸣体对话，不是真人实时在线。`);
+    } catch (error) { setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+      ? "This capsule is temporarily unavailable."
+      : "暂时无法进入这个共鸣体"); }
     finally { setVisitorBusy(false); }
   };
 
@@ -1032,17 +1247,27 @@ export function AuroraApp() {
       setPersonaMessages(history); setPersonaQuota(quota); setPersonaDraft("");
       // Clear the previous reply's synthesized audio so the play affordance reappears for the new reply.
       setPersonaVoiceAudio(null); setPersonaVoiceError(null);
-      setStatus("回应来自授权 Genome；你可以继续验证共鸣，也可以把真正想说的内容写成慢信。 ");
-    } catch (error) { setPersonaTurnError(error instanceof Error ? error.message : "这轮对话没有送达，草稿内容仍在这里"); }
+      setStatus(skillLocale === "en-SG"
+        ? "The response came from an authorized Genome. Keep testing the resonance, or put what matters into a slow letter."
+        : "回应来自授权 Genome；你可以继续验证共鸣，也可以把真正想说的内容写成慢信。 ");
+    } catch (error) { setPersonaTurnError(error instanceof Error ? error.message : skillLocale === "en-SG"
+      ? "This turn was not delivered; your draft is still here."
+      : "这轮对话没有送达，草稿内容仍在这里"); }
     finally { setVisitorBusy(false); }
   };
 
   const reportPersonaSession = async () => {
     if (!personaSession) return;
     try {
-      await api.reportPersonaSession(personaSession.id, "访客在对话中举报了这个共鸣体");
-      setStatus("已提交举报。举报不会自动公开对话内容，交由受限审核处理。 ");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法提交举报"); }
+      await api.reportPersonaSession(personaSession.id, skillLocale === "en-SG"
+        ? "A visitor reported this capsule during the conversation."
+        : "访客在对话中举报了这个共鸣体");
+      setStatus(skillLocale === "en-SG"
+        ? "Report submitted. Conversation content is not published; access is restricted to review."
+        : "已提交举报。举报不会自动公开对话内容，交由受限审核处理。 ");
+    } catch (error) { setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+      ? "The report could not be submitted."
+      : "暂时无法提交举报"); }
   };
 
   const blockPersonaSession = async () => {
@@ -1050,8 +1275,12 @@ export function AuroraApp() {
     try {
       await api.blockPersonaSession(personaSession.id);
       setPersonaSession(null); setPersonaMessages([]); setPersonaQuota(null);
-      setStatus("已屏蔽这个共鸣体；它不会再出现在你的相遇候选里。");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法屏蔽"); }
+      setStatus(skillLocale === "en-SG"
+        ? "Capsule blocked. It will no longer appear among your meeting candidates."
+        : "已屏蔽这个共鸣体；它不会再出现在你的相遇候选里。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+      ? "The capsule could not be blocked."
+      : "暂时无法屏蔽"); }
   };
 
   const playPersonaVoice = async () => {
@@ -1061,7 +1290,9 @@ export function AuroraApp() {
       const { audio } = await api.personaVoice(personaSession.id);
       setPersonaVoiceAudio(audio);
     } catch (error) {
-      setPersonaVoiceError(error instanceof Error ? error.message : "共鸣体语音暂时不可用");
+      setPersonaVoiceError(error instanceof Error ? error.message : skillLocale === "en-SG"
+        ? "Capsule voice is temporarily unavailable."
+        : "共鸣体语音暂时不可用");
     } finally { setPersonaVoiceBusy(false); }
   };
 
@@ -1081,11 +1312,15 @@ export function AuroraApp() {
       letterDraftRef.current = null; // sent successfully -- clear so the next compose starts fresh.
       setSentLetter(sent);
       void connectionsAndLetters.loadLetterOutbox();
-      setStatus("慢信已经启程。收件人看到的是你的原话和安全预览，不是 AI 代写的统一模板。 ");
+      setStatus(skillLocale === "en-SG"
+        ? "Your slow letter is on its way. The recipient sees your words and a safety preview, not a uniform AI-written template."
+        : "慢信已经启程。收件人看到的是你的原话和安全预览，不是 AI 代写的统一模板。 ");
     } catch (error) {
       // letterDraftRef.current is intentionally left set (if a draft was created) so the user's
       // next click on "send" retries the send against the SAME draft rather than creating another.
-      setStatus(error instanceof Error ? error.message : "慢信没有发送，草稿内容仍在这里");
+      setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+        ? "The slow letter was not sent; your draft is still here."
+        : "慢信没有发送，草稿内容仍在这里");
     }
     finally { setVisitorBusy(false); }
   };
@@ -1095,13 +1330,17 @@ export function AuroraApp() {
     try {
       if ((Capacitor.isNativePlatform() || isTauriRuntime()) && !demoModeBuild) {
         try { await mobileOidc.logout(); }
-        catch (error) { remoteWarning = error instanceof Error ? error.message : "远程撤销未确认"; }
+        catch { remoteWarning = skillLocale === "en-SG"
+          ? "Remote revocation was not confirmed."
+          : "远程撤销未确认"; }
       }
       else await api.logout();
       await mobileRuntime.clearPrivateState();
       setAuthenticated(false); auroraSession.resetSession(); setPersonaSession(null); setPersonaMessages([]);
-      setStatus(remoteWarning ?? "已安全退出");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法退出"); }
+      setStatus(remoteWarning ?? (skillLocale === "en-SG" ? "Signed out safely." : "已安全退出"));
+    } catch (error) { setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+      ? "Could not sign out right now."
+      : "暂时无法退出"); }
   };
 
   const runPsychologySkill = async () => {
@@ -1119,7 +1358,9 @@ export function AuroraApp() {
       setStatus(run.status === "ESCALATED"
         ? (skillLocale === "en-SG" ? "This exercise has paused. Put safety and real-world support first." : "这项练习已经暂停。先把安全和现实中的支持放在第一位。 ")
         : (skillLocale === "en-SG" ? "Reflection complete. It is not a diagnosis; you can continue with Aurora, save, or revoke it." : "反思完成。它不是诊断；你可以继续和 Aurora 谈、保存，或撤回。 "));
-    } catch (error) { setStatus(error instanceof Error ? error.message : "这项反思暂时没有完成"); }
+    } catch (error) { setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+      ? "This reflection could not be completed."
+      : "这项反思暂时没有完成"); }
     finally { setSkillBusy(false); }
   };
 
@@ -1129,7 +1370,9 @@ export function AuroraApp() {
       const revoked = await api.revokePsychologySkillRun(runId);
       setSkillRuns(current => current.map(run => run.id === runId ? revoked : run));
       setStatus(skillLocale === "en-SG" ? "This Skill result has been revoked and its saved content cleared." : "这次 Skill 结果已经撤回，保存的结果内容已清除。 ");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法撤回这次结果"); }
+    } catch (error) { setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+      ? "This result could not be revoked."
+      : "暂时无法撤回这次结果"); }
     finally { setSkillBusy(false); }
   };
 
@@ -1154,9 +1397,18 @@ export function AuroraApp() {
   const tt = APP_COPY[skillLocale];
   if (mobileState.native && (!hasConfiguredApiBase || apiConfigurationError)) return <main className="login-shell"><div className="login mobile-gate" role="alert">
     <span className="eyebrow">{skillLocale === "en-SG" ? "MOBILE ENVIRONMENT GATE" : "移动环境安全门"}</span>
-    <h1>这台设备还没有安全后端入口</h1>
-    <p>{apiConfigurationError ?? <>应用壳、深链与恢复能力已经就绪，但本次构建没有注入 <code>VITE_API_BASE_URL</code>。</>} 为避免把凭据和会话发往错误地址，Aurora 不会尝试登录。</p>
-    <small>请使用经过验证的 HTTPS API 域重新构建；推送凭据与商店签名也必须由授权环境提供。</small>
+    <h1>{skillLocale === "en-SG"
+      ? "This device does not have a secure backend endpoint yet"
+      : "这台设备还没有安全后端入口"}</h1>
+    <p>{apiConfigurationError ?? (skillLocale === "en-SG"
+      ? <>The app shell, deep links and recovery are ready, but this build has no <code>VITE_API_BASE_URL</code>.</>
+      : <>应用壳、深链与恢复能力已经就绪，但本次构建没有注入 <code>VITE_API_BASE_URL</code>。</>)}
+      {skillLocale === "en-SG"
+        ? " Aurora will not attempt to sign in because that could send credentials and sessions to the wrong host."
+        : " 为避免把凭据和会话发往错误地址，Aurora 不会尝试登录。"}</p>
+    <small>{skillLocale === "en-SG"
+      ? "Rebuild with a verified HTTPS API domain. Push credentials and store signing must also come from an authorised environment."
+      : "请使用经过验证的 HTTPS API 域重新构建；推送凭据与商店签名也必须由授权环境提供。"}</small>
   </div></main>;
   if (authenticated === null) return <main className="login-shell"><div className="login">
     {bootstrapError
@@ -1259,6 +1511,7 @@ export function AuroraApp() {
       <StartHereJourney
         locale={skillLocale}
         isDemoSandbox={Boolean(userProfile?.username?.startsWith("sandbox-"))}
+        completedSteps={completedJourneySteps}
         onStep={(step: JourneyStep) => {
           if (step === "aurora") {
             document.querySelector(".composer")?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -1349,10 +1602,12 @@ export function AuroraApp() {
           <label>{skillLocale === "en-SG" ? "What should Aurora return for?" : "这次回来，想继续什么"}
             <select aria-label={skillLocale === "en-SG" ? "Return purpose" : "回来约定的目的"}
               value={auroraSession.returnPurpose} onChange={event => auroraSession.setReturnPurpose(event.target.value)}>
-              <option value="继续这一刻未说完的话">{skillLocale === "en-SG" ? "Continue what we left unfinished" : "继续这一刻未说完的话"}</option>
-              <option value="看看今天最难的事有没有松一点">{skillLocale === "en-SG" ? "Check whether the hardest thing has eased" : "看看今天最难的事有没有松一点"}</option>
-              <option value="陪我开始一个很小的行动">{skillLocale === "en-SG" ? "Help me begin one small action" : "陪我开始一个很小的行动"}</option>
-              <option value="在一天结束时一起收尾">{skillLocale === "en-SG" ? "Close the day together" : "在一天结束时一起收尾"}</option>
+              {(skillLocale === "en-SG"
+                ? ["Continue what we left unfinished", "Check whether the hardest thing has eased",
+                  "Help me begin one small action", "Close the day together"]
+                : ["继续这一刻未说完的话", "看看今天最难的事有没有松一点",
+                  "陪我开始一个很小的行动", "在一天结束时一起收尾"])
+                .map(purpose => <option key={purpose} value={purpose}>{purpose}</option>)}
             </select></label>
           <label>{tt.whenLabel}<input aria-label={tt.returnTimeAria} value={auroraSession.returnWhen} onChange={event => auroraSession.setReturnWhen(event.target.value)} /></label>
           <button type="button" disabled={auroraSession.wakeBusy || !auroraSession.returnWhen.trim()} onClick={() => void auroraSession.scheduleReturn()}>{tt.scheduleBtn}</button></div></div>
@@ -1491,7 +1746,7 @@ export function AuroraApp() {
         onToggleMemory={toggleCapsuleMemory} onCapsuleName={setCapsuleName} onCapsuleIntro={setCapsuleIntro}
         onPreviewNewCapsule={() => void previewNewCapsule()} onCancelPreview={() => setCapsulePreview(null)} onCreateCapsule={() => void createCapsule()}
         onRecompile={() => void recompileSelectedCapsule()} onSandboxQuestion={setSandboxQuestion} onRunSandbox={() => void runCapsuleSandbox()}
-        onRateSandbox={rating => void rateCapsuleSandbox(rating)} onPublish={() => void publishSelectedCapsule()}
+        onRateSandbox={(rating, comment) => void rateCapsuleSandbox(rating, comment)} onPublish={() => void publishSelectedCapsule()}
         onPause={() => void pauseSelectedCapsule()} onArchive={() => void archiveSelectedCapsule()}
         boundary={capsuleBoundary} boundaryBusy={boundaryBusy} onSaveBoundary={boundary => void saveCapsuleBoundary(boundary)}
         capsuleOwnerNote={capsuleOwnerNote} onCapsuleOwnerNote={setCapsuleOwnerNote}

@@ -231,6 +231,13 @@ public class StructuredAiService {
             request.timeoutMs = 6_000;
             request.maxTokens = 512;
             request.retryEnabled = Boolean.FALSE;
+        } else if (normalized.startsWith("CAPSULE_CALIBRATION")) {
+            // A calibration click is foreground UX and the schema is tiny. Do not let a provider
+            // retry hold the owner in a spinner; the deterministic closed-vocabulary extractor is
+            // a truthful local fallback.
+            request.timeoutMs = 6_000;
+            request.maxTokens = 384;
+            request.retryEnabled = Boolean.FALSE;
         }
     }
 

@@ -77,7 +77,8 @@ class AgentContextAssemblerMemoryRetrievalTest {
     void usesTaskAwareEvidencePackInsteadOfGravityQuery() {
         when(userProfileMapper.selectOne(any())).thenReturn(null);
         var evidence = new MemoryEvidencePackVO.Evidence(91L, "展示准备", "上次先做两分钟演练后更安心",
-                "PROCEDURAL", 0.87, List.of("适合当前任务 1.0"), 3, "dialog:501");
+                "PROCEDURAL", 0.87, List.of("适合当前任务 1.0"), 3,
+                "AURORA_PRIVATE", "dialog:501");
         when(memoryRetrievalService.retrieve(any(), any())).thenReturn(new MemoryEvidencePackVO(
                 "AURORA_ACTION", "明天考试，我该做什么", 800, 32, List.of(evidence),
                 List.of("FORGOTTEN", "SUPERSEDED", "ARCHIVED", "CONTRADICTED")));

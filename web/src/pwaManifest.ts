@@ -27,21 +27,23 @@ export type PwaManifest = {
   icons: PwaManifestIcon[];
 };
 
-// --surface-canvas (night, default theme) and --accent-aurora from web/src/styles.css.
-const SURFACE_CANVAS_NIGHT = "#211A18";
+// Use the light canvas for the OS-controlled launch splash. The app applies the real local-time
+// theme immediately after boot; a dark manifest background would otherwise flash a black panel
+// even when the user explicitly chose day mode.
+const SURFACE_CANVAS_LAUNCH = "#F5F4EF";
 const ACCENT_AURORA = "#C79A68";
 
 export function buildPwaManifest(): PwaManifest {
   return {
-    name: "Inner Cosmos · 内宇宙",
-    short_name: "内宇宙",
-    description: "Inner Cosmos — 与 Aurora 保持连续、可打断的真实对话",
+    name: "Inner Cosmos",
+    short_name: "Inner Cosmos",
+    description: "A continuous, interruptible conversation with Aurora",
     start_url: ".",
     scope: ".",
     display: "standalone",
-    background_color: SURFACE_CANVAS_NIGHT,
+    background_color: SURFACE_CANVAS_LAUNCH,
     theme_color: ACCENT_AURORA,
-    lang: "zh-CN",
+    lang: "en",
     icons: [
       { src: "icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
       { src: "icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },

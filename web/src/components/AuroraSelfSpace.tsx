@@ -38,8 +38,10 @@ export function AuroraSelfSpace({ evolution, busy, onPropose, onEvaluate, onActi
   const t = COPY[locale];
   const active = evolution.versions.find(version => version.status === "ACTIVE");
   const narrative = active?.publicNarrative;
+  const legacyBaselineNarrative = "Aurora 的连续自我从这里开始；后续变化会说明来源、评测与回退路径。";
   const localisedNarrative = !narrative
     || narrative === COPY["zh-CN"].baselineNarrative
+    || narrative === legacyBaselineNarrative
     || narrative === COPY["en-SG"].baselineNarrative
     ? t.baselineNarrative : narrative;
   const statusLabel = (status: string) => status === "DRAFT" ? t.statusDraft

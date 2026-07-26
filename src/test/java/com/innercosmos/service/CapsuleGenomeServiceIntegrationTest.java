@@ -6,6 +6,7 @@ import com.innercosmos.dto.CapsuleCreateRequest;
 import com.innercosmos.dto.CapsuleSandboxFeedbackRequest;
 import com.innercosmos.entity.CapsuleGenomeVersion;
 import com.innercosmos.entity.CapsuleBoundary;
+import com.innercosmos.entity.CapsuleSandboxFeedback;
 import com.innercosmos.entity.EchoCapsule;
 import com.innercosmos.exception.BusinessException;
 import com.innercosmos.vo.CapsuleSandboxVO;
@@ -137,7 +138,7 @@ class CapsuleGenomeServiceIntegrationTest {
 
     @Test
     @Transactional
-    void ownerSandboxIsIsolatedAndFeedbackDoesNotMutateGenome() {
+    void ownerSandboxFeedbackCalibratesOnlyExplicitNewVersionsAndKeepsProvenance() throws Exception {
         Long owner = seedUser("sandbox-owner");
         Long stranger = seedUser("sandbox-stranger");
         Long memory = seedMemory(owner, "遇到压力时会先把问题拆小，再慢慢说明自己的边界", "AURORA_PRIVATE");
@@ -162,11 +163,55 @@ class CapsuleGenomeServiceIntegrationTest {
         feedback.question = response.question();
         feedback.response = response.reply();
         feedback.rating = "TONE_WRONG";
-        feedback.comment = "更克制一点";
-        assertEquals("OPEN", sandboxService.recordFeedback(owner, capsule.id, feedback).status);
+        feedback.comment = "我不会这么安慰人。更克制、更直接、短一点，也不要替我做决定。PRIVATE_RAW_MARKER";
+        CapsuleSandboxFeedback first = sandboxService.recordFeedback(owner, capsule.id, feedback);
+        assertEquals("OPEN", first.status);
+        JsonNode firstSignals = objectMapper.readTree(first.calibrationSignalsJson);
+        assertTrue(firstSignals.path("toneCodes").toString().contains("RESTRAINED"));
+        assertTrue(firstSignals.path("toneCodes").toString().contains("DIRECT"));
+        assertEquals("SHORT", firstSignals.path("responseLengthCode").asText());
+        assertTrue(firstSignals.path("avoidBehaviorCodes").toString().contains("SPEAKING_FOR_OWNER"));
+        assertFalse(first.calibrationSignalsJson.contains("PRIVATE_RAW_MARKER"),
+                "raw owner feedback must never become runnable calibration data");
         assertEquals(1, sandboxService.feedback(owner, capsule.id).size());
         assertEquals(before.id, genomeService.current(capsule.id).id,
                 "sandbox feedback is a proposal signal and must not drift the live Genome");
+
+        CapsuleGenomeVersion calibrated = capsuleService.recompileGenome(owner, capsule.id, List.of(memory));
+        JsonNode calibration = objectMapper.readTree(calibrated.styleProfileJson).path("calibration");
+        assertEquals(2, calibrated.versionNo);
+        assertTrue(calibration.path("toneCodes").toString().contains("RESTRAINED"));
+        assertTrue(calibration.path("toneCodes").toString().contains("DIRECT"));
+        assertEquals("SHORT", calibration.path("responseLengthCode").asText());
+        assertTrue(calibration.path("avoidBehaviorCodes").toString().contains("SPEAKING_FOR_OWNER"));
+        assertEquals(List.of(first.id), StreamSupport.stream(
+                        calibration.path("sourceFeedbackIds").spliterator(), false)
+                .map(JsonNode::asLong).toList());
+        assertFalse(calibrated.styleProfileJson.contains("PRIVATE_RAW_MARKER"));
+        assertFalse(calibrated.compiledPersonaPrompt.contains("PRIVATE_RAW_MARKER"));
+        CapsuleSandboxFeedback appliedFirst = sandboxService.feedback(owner, capsule.id).getFirst();
+        assertEquals("APPLIED", appliedFirst.status);
+        assertEquals(calibrated.id, appliedFirst.appliedGenomeVersionId);
+        EchoCapsule stillPrivate = capsuleService.getOwnedCapsule(owner, capsule.id);
+        assertEquals("PRIVATE", stillPrivate.visibilityStatus);
+        assertFalse(stillPrivate.isPublic);
+
+        CapsuleSandboxFeedbackRequest nextFeedback = new CapsuleSandboxFeedbackRequest();
+        nextFeedback.genomeVersionId = calibrated.id;
+        nextFeedback.question = "再校准一次";
+        nextFeedback.response = "第二版回答";
+        nextFeedback.rating = "TOO_EXPOSED";
+        nextFeedback.comment = "少放个人细节，保留不确定性";
+        CapsuleSandboxFeedback second = sandboxService.recordFeedback(owner, capsule.id, nextFeedback);
+        CapsuleGenomeVersion calibratedAgain =
+                capsuleService.recompileGenome(owner, capsule.id, List.of(memory));
+        JsonNode cumulative = objectMapper.readTree(calibratedAgain.styleProfileJson).path("calibration");
+        assertEquals(List.of(first.id, second.id), StreamSupport.stream(
+                        cumulative.path("sourceFeedbackIds").spliterator(), false)
+                .map(JsonNode::asLong).toList(),
+                "new Genome versions must retain calibration provenance from earlier versions");
+        assertTrue(cumulative.path("boundaryCodes").toString().contains("MINIMIZE_PERSONAL_DETAIL"));
+        assertTrue(cumulative.path("boundaryCodes").toString().contains("NO_CONTACT_DETAILS"));
     }
 
     @Test

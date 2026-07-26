@@ -239,7 +239,8 @@ export type CapsuleSandbox = {
   providerAvailable: boolean; identityNotice: string;
 };
 export type CapsuleSandboxFeedback = {
-  id: number; genomeVersionId: number; rating: string; ownerComment: string | null; status: string;
+  id: number; genomeVersionId: number; rating: string; ownerComment: string | null;
+  calibrationSignalsJson: string | null; appliedGenomeVersionId: number | null; status: string;
 };
 export type PublicCapsule = {
   id: number; pseudonym: string; intro: string; capsuleType: string; publicTags: string;
@@ -591,18 +592,36 @@ export type AdminAbTestGroupStats = {
 };
 export type AdminAbTestStats = Record<string, AdminAbTestGroupStats>;
 
+function englishUi(): boolean {
+  return typeof document !== "undefined"
+    && document.documentElement.lang.toLowerCase().startsWith("en");
+}
+
+function apiCopy(english: string, chinese: string): string {
+  return englishUi() ? english : chinese;
+}
+
 function nonJsonResponseError(response: Response, responseText: string): Error {
   const normalized = responseText.toLowerCase();
   const tunnelUnavailable = response.status === 530
     || normalized.includes("cloudflare tunnel")
     || normalized.includes("error 1033");
   if (tunnelUnavailable) {
-    return new Error("这次临时演示连接已经失效。请打开最新的演示链接；你的操作没有被提交。");
+    return new Error(apiCopy(
+      "This temporary demo connection has expired. Open the latest demo link; your action was not submitted.",
+      "这次临时演示连接已经失效。请打开最新的演示链接；你的操作没有被提交。"
+    ));
   }
   if (response.status >= 500) {
-    return new Error(`服务暂时没有返回可用内容（HTTP ${response.status}）。请稍后重试。`);
+    return new Error(apiCopy(
+      `The service did not return usable content (HTTP ${response.status}). Please try again shortly.`,
+      `服务暂时没有返回可用内容（HTTP ${response.status}）。请稍后重试。`
+    ));
   }
-  return new Error(`服务返回了无法识别的内容（HTTP ${response.status}）。`);
+  return new Error(apiCopy(
+    `The service returned an unrecognised response (HTTP ${response.status}).`,
+    `服务返回了无法识别的内容（HTTP ${response.status}）。`
+  ));
 }
 
 async function request<T>(url: string, init: RequestInit = {}, retriedCsrf = false, retriedBearer = false): Promise<T> {
@@ -662,7 +681,10 @@ async function getCsrf(): Promise<Csrf> {
     throw nonJsonResponseError(response, responseText);
   }
   if (!response.ok) throw new Error(body.message ?? `HTTP ${response.status}`);
-  if (!body.success) throw new Error(body.message ?? "无法建立安全会话");
+  if (!body.success) throw new Error(body.message ?? apiCopy(
+    "Could not establish a secure session.",
+    "无法建立安全会话"
+  ));
   if (!body.data
       || typeof body.data.token !== "string"
       || typeof body.data.headerName !== "string") {
@@ -767,7 +789,10 @@ export const api = {
   dataRightsReceipts: (limit?: number) => request<DataRetractionReceipt[]>(
     "/api/me/data-rights/receipts" + (limit ? `?limit=${limit}` : "")),
   createSession: () => request<{ id: number }>("/api/dialog/session/create", {
-    method: "POST", body: JSON.stringify({ title: "Aurora 对话", sessionType: "AURORA_CHAT" })
+    method: "POST", body: JSON.stringify({
+      title: apiCopy("Aurora conversation", "Aurora 对话"),
+      sessionType: "AURORA_CHAT"
+    })
   }),
   auroraForeground: (input: { sessionId: number; message: string; mode: string }) =>
     request<AuroraForeground>("/api/v1/aurora/foreground", {
@@ -865,7 +890,10 @@ export const api = {
     & Pick<CoreCapsuleCreateRequest, "ownerContextNote" | "standInEnabled" | "realContactPolicy" | "visibilityStatus">) => {
     const body: CoreCapsuleCreateRequest = {
       ...input, visibilityStatus: input.visibilityStatus ?? "PRIVATE", isPublic: false, privacyLevel: "STRICT",
-      allowTopics: ["自我观察", "日常支持"], blockedTopics: ["真实身份", "联系方式", "心理诊断"]
+      allowTopics: englishUi() ? ["self-reflection", "everyday support"] : ["自我观察", "日常支持"],
+      blockedTopics: englishUi()
+        ? ["real-world identity", "contact details", "psychological diagnosis"]
+        : ["真实身份", "联系方式", "心理诊断"]
     };
     return request<EchoCapsule>("/api/v1/capsule/create-from-memory", { method: "POST", body: JSON.stringify(body) });
   },
@@ -1061,7 +1089,10 @@ export async function transcribeAudio(blob: Blob): Promise<AsrResult> {
   });
   if (!response.ok) throw new Error(`ASR HTTP ${response.status}`);
   const env = await response.json() as ApiEnvelope<AsrResult>;
-  if (!env.success) throw new Error(env.message ?? "语音转写失败");
+  if (!env.success) throw new Error(env.message ?? apiCopy(
+    "Voice transcription failed.",
+    "语音转写失败"
+  ));
   return env.data;
 }
 
@@ -1085,7 +1116,10 @@ export async function diaryTranscribeAudio(blob: Blob): Promise<VoiceTranscripti
   } catch {
     throw new Error(`Diary ASR HTTP ${response.status}`);
   }
-  if (!response.ok || !env.success) throw new Error(env.message ?? "语音转写失败");
+  if (!response.ok || !env.success) throw new Error(env.message ?? apiCopy(
+    "Voice transcription failed.",
+    "语音转写失败"
+  ));
   return env.data;
 }
 

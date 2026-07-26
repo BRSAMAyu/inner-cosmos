@@ -4,6 +4,7 @@ import {
   type AdminAuditLog, type AdminCapsuleRow, type AdminModelConfigRow, type AdminOverview,
   type AdminReport, type AdminSafetyEvent, type AdminUserRow
 } from "../api";
+import type { Locale } from "../i18n";
 
 // Data-fetching/action state for the admin console (Phase 3 port of the legacy static
 // /pages/admin.html, 8 tabs -- see web/src/components/admin/AdminConsole.tsx for the shell that
@@ -11,7 +12,8 @@ import {
 // status banner (unlike useConnectionsAndLetters, which writes into the app-wide `setStatus`)
 // because AdminConsole is a standalone route (like SafetyHarborPage), not one of the five
 // ProductShell spaces, and should be usable/testable without wiring the whole app shell.
-export function useAdminConsole() {
+export function useAdminConsole(locale: Locale = "zh-CN") {
+  const copy = (english: string, chinese: string) => locale === "en-SG" ? english : chinese;
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [users, setUsers] = useState<AdminUserRow[]>([]);
   const [capsules, setCapsules] = useState<AdminCapsuleRow[]>([]);
@@ -63,30 +65,33 @@ export function useAdminConsole() {
     try {
       await api.adminHideCapsule(id, reason);
       await Promise.all([loadCapsules(), loadAuditLogs()]);
-      setStatus("已隐藏");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法隐藏这个共鸣体"); }
+      setStatus(copy("Capsule hidden.", "已隐藏"));
+    } catch (error) { setStatus(error instanceof Error ? error.message
+      : copy("Could not hide this capsule yet.", "暂时无法隐藏这个共鸣体")); }
     finally { setBusyId(null); }
-  }, [loadCapsules, loadAuditLogs]);
+  }, [loadCapsules, loadAuditLogs, locale]);
 
   const restoreCapsule = useCallback(async (id: number, reason: string) => {
     setBusyId(id);
     try {
       await api.adminRestoreCapsule(id, reason);
       await Promise.all([loadCapsules(), loadAuditLogs()]);
-      setStatus("已恢复");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法恢复这个共鸣体"); }
+      setStatus(copy("Capsule restored.", "已恢复"));
+    } catch (error) { setStatus(error instanceof Error ? error.message
+      : copy("Could not restore this capsule yet.", "暂时无法恢复这个共鸣体")); }
     finally { setBusyId(null); }
-  }, [loadCapsules, loadAuditLogs]);
+  }, [loadCapsules, loadAuditLogs, locale]);
 
   const resolveReport = useCallback(async (id: number, action: string, reason: string) => {
     setBusyId(id);
     try {
       await api.adminResolveReport(id, action, reason);
       await Promise.all([loadReports(), loadCapsules(), loadAuditLogs()]);
-      setStatus("举报已处理");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法处理这条举报"); }
+      setStatus(copy("Report resolved.", "举报已处理"));
+    } catch (error) { setStatus(error instanceof Error ? error.message
+      : copy("Could not resolve this report yet.", "暂时无法处理这条举报")); }
     finally { setBusyId(null); }
-  }, [loadReports, loadCapsules, loadAuditLogs]);
+  }, [loadReports, loadCapsules, loadAuditLogs, locale]);
 
   const changeReportStatusFilter = useCallback((next: string) => {
     setReportStatusFilter(next);
@@ -98,10 +103,13 @@ export function useAdminConsole() {
     try {
       await api.abtestToggle(id, enabled);
       await loadAbTest();
-      setStatus(enabled ? "测试已启用" : "测试已暂停");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法切换这个测试"); }
+      setStatus(enabled
+        ? copy("Test enabled.", "测试已启用")
+        : copy("Test paused.", "测试已暂停"));
+    } catch (error) { setStatus(error instanceof Error ? error.message
+      : copy("Could not change this test yet.", "暂时无法切换这个测试")); }
     finally { setBusyId(null); }
-  }, [loadAbTest]);
+  }, [loadAbTest, locale]);
 
   return {
     overview, users, capsules, reports, reportStatusFilter, auditLogs, safetyEvents,

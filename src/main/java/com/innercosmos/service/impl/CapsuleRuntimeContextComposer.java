@@ -140,7 +140,8 @@ public class CapsuleRuntimeContextComposer {
         try {
             JsonNode style = objectMapper.readTree(json);
             Map<String, Object> bounded = new LinkedHashMap<>();
-            for (String key : List.of("voice", "dominantSentiment", "confidence", "notBeautified", "boundary")) {
+            for (String key : List.of("voice", "dominantSentiment", "confidence", "notBeautified",
+                    "boundary", "calibration")) {
                 if (style.has(key)) bounded.put(key, objectMapper.convertValue(style.get(key), Object.class));
             }
             return bounded;

@@ -3,6 +3,7 @@ package com.innercosmos.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.innercosmos.ai.context.AgentContext;
 import com.innercosmos.ai.context.AgentContextAssembler;
+import com.innercosmos.ai.action.AuroraNaturalActionService;
 import com.innercosmos.ai.goodbye.GoodbyeOrchestrator;
 import com.innercosmos.ai.goodbye.GoodbyeTriggerDetector;
 import com.innercosmos.ai.mode.ModeRegistry;
@@ -27,9 +28,11 @@ import com.innercosmos.dto.ChatRequest;
 import com.innercosmos.entity.AgentUserRelationship;
 import com.innercosmos.entity.DialogMessage;
 import com.innercosmos.entity.DialogSession;
+import com.innercosmos.entity.User;
 import com.innercosmos.entity.UserPortrait;
 import com.innercosmos.entity.UserProfile;
 import com.innercosmos.mapper.DialogSessionMapper;
+import com.innercosmos.mapper.UserMapper;
 import com.innercosmos.mapper.UserProfileMapper;
 import com.innercosmos.service.AuroraAgentService;
 import com.innercosmos.service.AuroraConstitutionService;
@@ -115,6 +118,16 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     private com.innercosmos.service.PromptVersionService promptVersionService; // M-052
     @Autowired(required = false)
     private com.innercosmos.service.EmotionBaselineService emotionBaselineService;
+    /** Confirmation-gated natural-language bridge to real memories, reminders and settings. */
+    @Autowired(required = false)
+    private AuroraNaturalActionService naturalActionService;
+    /**
+     * Optional only for constructor-level unit tests. The registered account owns the user's
+     * chosen nickname, while {@link UserProfile} owns the QuickHello calibration; both must reach
+     * the same first-turn context so two fresh users do not receive an interchangeable opening.
+     */
+    @Autowired(required = false)
+    private UserMapper userMapper;
     /** Optional only for constructor-level legacy unit tests; Spring always wires it. */
     @Autowired(required = false)
     private ConversationChoreographyService choreographyService;
@@ -268,6 +281,19 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             return vo;
         }
 
+        // Natural-language side effects are a deterministic, owner-confirmed branch. The parser
+        // can only propose an allow-listed action; a real write happens solely when the immediately
+        // following owner turn explicitly says Confirm/确认. Ordinary messages still reach the
+        // real LLM path below unchanged.
+        if (naturalActionService != null && turnId != null) {
+            AuroraReplyVO actionReply = naturalActionService.intercept(
+                    userId, request.sessionId, turnId, request.message);
+            if (actionReply != null) {
+                return completeNaturalActionTurn(userId, request, userMessageId, turnId,
+                        persistImmediately, actionReply, turnStartNanos);
+            }
+        }
+
         UserProfile profile = loadProfile(userId);
         String mode = normalizeMode(request.mode);
         boolean allowMemory = allowMemory(profile);
@@ -291,11 +317,13 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         String stateSignal = currentStateSignal(request.message);
         com.innercosmos.ai.semantic.EmotionBaseline baseline = safeBaseline(userId);
 
+        String userNickname = loadUserNickname(userId);
+        Map<String, Object> userCalibration = userCalibration(profile, userNickname);
         PromptBuilder promptBuilder = new PromptBuilder().withPromptVersionService(promptVersionService)
                 .withSystemBoundary()
                 .withConversationMode(mode)
                 .withModeSegment(modeStrategy)
-                .withUserProfile(profileBrief(profile))
+                .withUserProfile(profileBrief(profile, userNickname))
                 .withUserPortrait(portrait)
                 .withUserCorrections(safeCorrections(userId))
                 .withConfirmedUnderstandingClaims(safeConfirmedClaims(userId))
@@ -333,6 +361,11 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         turnContext.put("relationshipStageLabel",
                 relationship == null ? "" : AgentUserRelationshipService.stageLabel(relationship.relationshipStage));
         turnContext.put("currentStateSignal", stateSignal);
+        // User-owned values remain data inside the structured request as well as a compact,
+        // sanitised profile summary in the system prompt. This makes the calibration available
+        // to both the single-pass and dual-kernel runtimes without turning any value into a new
+        // instruction.
+        turnContext.put("userCalibration", userCalibration);
         turnContext.put("memoryRecallAllowed", allowMemory);
         turnContext.put("unifiedAgentContext", agentContext);
         turnContext.put("realWeatherLabel", agentContext.realWeatherLabel);
@@ -479,6 +512,43 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         afterMessage(userId, request.sessionId, request.message);
 
         recordTurnMetrics("chat", vo, resolved, mode, fallbackUsed, turnStartNanos);
+        return vo;
+    }
+
+    private AuroraReplyVO completeNaturalActionTurn(Long userId, ChatRequest request,
+                                                    Long userMessageId, Long turnId,
+                                                    boolean persistImmediately, AuroraReplyVO vo,
+                                                    long turnStartNanos) {
+        vo.turnId = turnId;
+        if (turnId != null && choreographyService != null) {
+            TurnTimelineVO planned = choreographyService.commitPlan(userId, turnId, vo);
+            if (planned.activePlan == null) {
+                vo.cancelled = true;
+                vo.messages = List.of();
+                return vo;
+            }
+            vo.planId = planned.activePlan.id;
+        }
+        if (persistImmediately) {
+            List<DialogMessage> persistedBubbles = new ArrayList<>();
+            for (int i = 0; i < vo.messages.size(); i++) {
+                if (turnId != null && choreographyService != null) {
+                    int order = i + 1;
+                    String text = vo.messages.get(i);
+                    choreographyService.deliverBubble(userId, turnId, order,
+                            () -> dialogService.saveAuroraMessage(userId, request.sessionId, text));
+                } else {
+                    persistedBubbles.add(dialogService.saveAuroraMessage(
+                            userId, request.sessionId, vo.messages.get(i)));
+                }
+            }
+            if (turnId != null && choreographyService != null) {
+                choreographyService.completeTurn(userId, turnId);
+            } else {
+                recordChoreography(userId, request.sessionId, userMessageId, vo, persistedBubbles);
+            }
+        }
+        recordTurnMetrics("natural-action", vo, null, normalizeMode(request.mode), false, turnStartNanos);
         return vo;
     }
 
@@ -894,7 +964,8 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         String timeLabel = timeLabel();
         ModeStrategy modeStrategy = modeRegistry.get(normalizedMode);
         ResolvedModel resolved = modelRouter.resolve(userId, sessionId);
-        Map<String, Object> grounding = greetingGrounding(profile, agentContext);
+        Map<String, Object> grounding = greetingGrounding(
+                profile, agentContext, loadUserNickname(userId));
 
         String prompt = new PromptBuilder().withPromptVersionService(promptVersionService)
                 .withSystemBoundary()
@@ -948,11 +1019,20 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     }
 
     static Map<String, Object> greetingGrounding(UserProfile profile, AgentContext context) {
+        return greetingGrounding(profile, context, "");
+    }
+
+    static Map<String, Object> greetingGrounding(UserProfile profile, AgentContext context,
+                                                  String userNickname) {
         Map<String, Object> grounding = new LinkedHashMap<>();
+        grounding.putAll(userCalibration(profile, userNickname));
         grounding.put("profileInterests", context == null ? List.of()
                 : context.themeSignals.stream().filter(java.util.Objects::nonNull).limit(4).toList());
         grounding.put("profileBio", profile == null ? "" : abbreviateGreeting(profile.bio, 280));
-        grounding.put("currentEnvironment", context == null ? "" : greetingValue(context.environmentLabel));
+        String assembledEnvironment = context == null ? "" : greetingValue(context.environmentLabel);
+        String calibratedEnvironment = profile == null ? "" : greetingValue(profile.currentEnvironmentLabel);
+        grounding.put("currentEnvironment", assembledEnvironment.isBlank()
+                ? calibratedEnvironment : assembledEnvironment);
         grounding.put("currentEmotion", context == null ? "" : greetingValue(context.momentEmotionLabel));
         grounding.put("nearestUnfinishedItem", context == null ? "" : greetingValue(context.nearestTodo));
         grounding.put("unfinishedItems", context == null ? List.of()
@@ -960,6 +1040,24 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         grounding.put("recentObservations", context == null ? List.of()
                 : context.dailyObservations.stream().filter(java.util.Objects::nonNull).limit(3).toList());
         return grounding;
+    }
+
+    /**
+     * The complete, bounded first-run calibration shared by proactive greeting and normal turns.
+     * Values are data, never behavioural instructions. Keeping the keys stable also gives tests
+     * and observability a precise contract for what should make two users' first turns differ.
+     */
+    static Map<String, Object> userCalibration(UserProfile profile, String userNickname) {
+        Map<String, Object> calibration = new LinkedHashMap<>();
+        calibration.put("userNickname", abbreviateGreeting(userNickname, 80));
+        calibration.put("auroraTone", profile == null ? "" : abbreviateGreeting(profile.auroraTone, 80));
+        calibration.put("proactiveSensitivity",
+                profile == null || profile.proactiveSensitivity == null ? "" : profile.proactiveSensitivity);
+        calibration.put("reflectionDepth",
+                profile == null || profile.reflectionDepth == null ? "" : profile.reflectionDepth);
+        calibration.put("currentEnvironment",
+                profile == null ? "" : abbreviateGreeting(profile.currentEnvironmentLabel, 280));
+        return calibration;
     }
 
     private static String greetingValue(Object value) {
@@ -979,6 +1077,9 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 Grounding contract:
                 1. Use only greetingGrounding. Prefer, in order: an unfinished item, current
                    environment/state, then an established interest/theme.
+                   Let userNickname, auroraTone, proactiveSensitivity and reflectionDepth shape
+                   how you address the user, how directly you open, and how deep the invitation is.
+                   Never recite these settings or force the nickname into every opening.
                 2. Mention at most one concrete hook. Phrase it as an invitation, never as
                    surveillance, certainty, diagnosis, or a claim that the user feels something now.
                 3. If all grounding fields are empty, offer a neutral specific choice of where to
@@ -2023,12 +2124,42 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         return result;
     }
 
-    private String profileBrief(UserProfile profile) {
-        if (profile == null) return "默认：温柔、具体、不过度分析；允许在相关时透明引用记忆。";
-        String name = isBlank(profile.auroraName) ? "Aurora" : profile.auroraName;
-        String tone = isBlank(profile.auroraTone) ? "温柔、具体、像朋友" : profile.auroraTone;
+    static String profileBrief(UserProfile profile, String userNickname) {
+        if (profile == null) {
+            return "userNickname=" + safeProfileValue(userNickname, 80)
+                    + "; defaultStyle=gentle, concrete, no over-analysis; memoryRecall=transparent-when-relevant.";
+        }
+        String name = greetingValue(profile.auroraName).isBlank() ? "Aurora" : profile.auroraName;
+        String tone = greetingValue(profile.auroraTone).isBlank() ? "温柔、具体、像朋友" : profile.auroraTone;
         String memory = Boolean.FALSE.equals(profile.allowMemoryRecall) ? "不要主动引用长期记忆" : "可以在相关时透明引用长期记忆";
-        return "称呼：" + name + "；陪伴风格：" + tone + "；反思深度：" + profile.reflectionDepth + "；" + memory + "。";
+        return "userNickname=" + safeProfileValue(userNickname, 80)
+                + "; auroraName=" + safeProfileValue(name, 80)
+                + "; responseTone=" + safeProfileValue(tone, 80)
+                + "; proactiveSensitivity=" + (profile.proactiveSensitivity == null ? "" : profile.proactiveSensitivity)
+                + "; reflectionDepth=" + (profile.reflectionDepth == null ? "" : profile.reflectionDepth)
+                + "; currentEnvironment=" + safeProfileValue(profile.currentEnvironmentLabel, 280)
+                + "; memoryPolicy=" + memory + ".";
+    }
+
+    private static String safeProfileValue(String value, int max) {
+        String compact = greetingValue(value).replaceAll("\\s+", " ");
+        compact = compact.replaceAll("(?i)\\b(system|ignore|instructions?)\\b", "");
+        compact = compact.replaceAll("(忽略|以上|你是|you are now|new role)", "");
+        compact = compact.trim();
+        return compact.length() > max ? compact.substring(0, max) + "..." : compact;
+    }
+
+    private String loadUserNickname(Long userId) {
+        if (userId == null || userMapper == null) return "";
+        try {
+            User user = userMapper.selectById(userId);
+            return user == null ? "" : greetingValue(user.nickname);
+        } catch (Exception unavailable) {
+            // Nickname enrichment is useful but must never make an otherwise healthy Aurora turn
+            // fail. Do not log the nickname or any other user-owned value.
+            log.warn("Aurora nickname enrichment unavailable for user id {}", userId);
+            return "";
+        }
     }
 
     private String voiceMetadata(ChatRequest request) {

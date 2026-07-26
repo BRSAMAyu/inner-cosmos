@@ -35,6 +35,7 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
     private final DailyRecordMapper dailyRecordMapper;
     private final DialogMessageMapper dialogMessageMapper;
     private final DialogSessionMapper dialogSessionMapper;
+    private final VoiceTranscriptionMapper voiceTranscriptionMapper;
     private final GravityService gravityService;
     private final ThemeAggregationService themeAggregationService;
     private final StructuredAiService structuredAiService;
@@ -50,6 +51,7 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
                                        DailyRecordMapper dailyRecordMapper,
                                        DialogMessageMapper dialogMessageMapper,
                                        DialogSessionMapper dialogSessionMapper,
+                                       VoiceTranscriptionMapper voiceTranscriptionMapper,
                                        GravityService gravityService,
                                        ThemeAggregationService themeAggregationService,
                                        StructuredAiService structuredAiService,
@@ -64,6 +66,7 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
         this.dailyRecordMapper = dailyRecordMapper;
         this.dialogMessageMapper = dialogMessageMapper;
         this.dialogSessionMapper = dialogSessionMapper;
+        this.voiceTranscriptionMapper = voiceTranscriptionMapper;
         this.gravityService = gravityService;
         this.themeAggregationService = themeAggregationService;
         this.structuredAiService = structuredAiService;
@@ -536,9 +539,30 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void settleDiary(Long userId, String diaryText) {
+    public void settleDiary(Long userId, Long sourceTranscriptionId, String diaryText) {
         if (diaryText == null || diaryText.isBlank()) {
             return;
+        }
+        if (sourceTranscriptionId != null) {
+            VoiceTranscription source = voiceTranscriptionMapper.selectById(sourceTranscriptionId);
+            if (source == null || !userId.equals(source.userId)
+                    || !"SUBMITTED".equals(source.status)) {
+                throw new com.innercosmos.exception.BusinessException(
+                        com.innercosmos.common.ErrorCode.UNAUTHORIZED,
+                        "日记来源不存在、尚未提交或不属于当前用户");
+            }
+        }
+        String provenance = diaryProvenance(sourceTranscriptionId);
+        if (sourceTranscriptionId != null) {
+            MemoryCard existing = memoryCardMapper.selectOne(new QueryWrapper<MemoryCard>()
+                    .eq("user_id", userId)
+                    .eq("provenance_refs", provenance)
+                    .last("LIMIT 1"));
+            if (existing != null) {
+                // Submission retries are idempotent. A forgotten source never resurrects through
+                // a replayed HTTP request; corrections must use the versioned lifecycle API.
+                return;
+            }
         }
 
         StructuredAiResults.SettlementResult ai = structuredAiService.call(userId, "DIARY_SETTLEMENT",
@@ -572,6 +596,11 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
         card.lastTouchedAt = LocalDateTime.now();
         card.visibilityLevel = "PRIVATE";
         card.status = "ACTIVE";
+        card.versionNo = 1;
+        card.memoryLayer = "EPISODIC";
+        card.confidence = 0.85;
+        card.consentScope = "AURORA_PRIVATE";
+        card.provenanceRefs = provenance;
         memoryCardMapper.insert(card);
 
         // Create structured assets: fragments
@@ -670,6 +699,13 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
 
         // Update themes
         themeAggregationService.aggregateThemes(userId);
+    }
+
+    private String diaryProvenance(Long sourceTranscriptionId) {
+        String source = sourceTranscriptionId == null
+                ? "HEART_DIARY:UNLINKED"
+                : "VOICE_TRANSCRIPTION:" + sourceTranscriptionId;
+        return source + " · source-version:1 · consent:AURORA_PRIVATE";
     }
 
     /**

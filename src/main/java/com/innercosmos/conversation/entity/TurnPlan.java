@@ -15,6 +15,17 @@ public class TurnPlan extends BaseEntity {
     public String intent;
     public String posture;
     public String stopCondition;
+    /** Allow-listed side effect proposed by this turn; never executed before explicit confirmation. */
+    public String proposedActionType;
+    /** Owner-private JSON data for the proposed action. Model output is validated before it enters here. */
+    public String proposedActionPayload;
+    /** Human-readable, bounded confirmation summary. */
+    public String proposedActionSummary;
+    /** PENDING_CONFIRMATION / EXECUTED / CANCELLED / EXPIRED / SUPERSEDED. */
+    public String actionStatus;
+    public LocalDateTime actionConfirmedAt;
+    /** Opaque reference such as memory:42 or wake-intent:17; never stores credentials. */
+    public String actionResultRef;
     public LocalDateTime committedAt;
     public LocalDateTime cancelledAt;
 }

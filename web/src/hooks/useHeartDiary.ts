@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { api, diaryTranscribeAudio } from "../api";
+import type { Locale } from "../i18n";
 
 // Port of src/main/resources/static/pages/heart-diary.html into the AppShell (Phase 3, legacy batch
 // B): voice/text diary entry with AI transcription, level-based polish (0=raw, 1=cleaned, 2=organized,
@@ -11,7 +12,8 @@ import { api, diaryTranscribeAudio } from "../api";
 // selected. This intentionally differs from the legacy page's own quirk of wiping every polish cache
 // entry on every keystroke (its "input" listener called onRawTextChanged unconditionally) -- here,
 // only an explicit onTextChange (typing while at level 0, or a fresh transcription) resets the cache.
-export function useHeartDiary({ setStatus }: { setStatus: (status: string) => void }) {
+export function useHeartDiary({ setStatus, locale = "zh-CN" }: { setStatus: (status: string) => void; locale?: Locale }) {
+  const en = locale === "en-SG";
   const [rawText, setRawText] = useState("");
   const [displayText, setDisplayText] = useState("");
   const [transcriptionId, setTranscriptionId] = useState<number | null>(null);
@@ -38,11 +40,11 @@ export function useHeartDiary({ setStatus }: { setStatus: (status: string) => vo
       setPolishedByLevel({});
       setActiveLevel(0);
       setSubmitted(false);
-      setStatus("语音已转成文字，可以继续润色或修改。");
+      setStatus(en ? "Voice converted to text. You can refine or edit it." : "语音已转成文字，可以继续润色或修改。");
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "语音转写失败，请稍后再试。");
+      setStatus(error instanceof Error ? error.message : en ? "Voice transcription failed. Please try again shortly." : "语音转写失败，请稍后再试。");
     }
-  }, [setStatus]);
+  }, [en, setStatus]);
 
   const switchLevel = useCallback(async (level: number) => {
     setActiveLevel(level);
@@ -61,16 +63,16 @@ export function useHeartDiary({ setStatus }: { setStatus: (status: string) => vo
       setPolishedByLevel(current => ({ ...current, [level]: result.polishedText }));
       setDisplayText(result.polishedText);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "润色暂时失败了，原文仍然保留。");
+      setStatus(error instanceof Error ? error.message : en ? "Refinement failed, but your original text is still here." : "润色暂时失败了，原文仍然保留。");
     } finally {
       setPolishBusy(false);
     }
-  }, [rawText, polishedByLevel, transcriptionId, setStatus]);
+  }, [en, rawText, polishedByLevel, transcriptionId, setStatus]);
 
   const submit = useCallback(async (): Promise<boolean> => {
     const content = displayText.trim();
     if (content.length < 5) {
-      setStatus("心声内容太短，多写几句吧");
+      setStatus(en ? "This entry is a little too short. Add a few more words." : "心声内容太短，多写几句吧");
       return false;
     }
     setSubmitBusy(true);
@@ -83,15 +85,15 @@ export function useHeartDiary({ setStatus }: { setStatus: (status: string) => vo
       }
       await api.diarySubmit(id, content);
       setSubmitted(true);
-      setStatus("心声已凝聚为星斗，流淌入记忆宇宙");
+      setStatus(en ? "Your entry is now a traceable star in memory." : "心声已凝聚为星斗，流淌入记忆宇宙");
       return true;
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "暂时无法保存这段心声");
+      setStatus(error instanceof Error ? error.message : en ? "Could not save this entry yet." : "暂时无法保存这段心声");
       return false;
     } finally {
       setSubmitBusy(false);
     }
-  }, [displayText, rawText, transcriptionId, setStatus]);
+  }, [displayText, en, rawText, transcriptionId, setStatus]);
 
   return {
     rawText, displayText, transcriptionId, activeLevel, polishBusy, submitBusy, submitted,

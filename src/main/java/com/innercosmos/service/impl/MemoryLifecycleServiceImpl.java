@@ -354,8 +354,15 @@ public class MemoryLifecycleServiceImpl implements MemoryLifecycleService {
         relationMentionMapper.delete(new QueryWrapper<com.innercosmos.entity.RelationMention>().eq("memory_card_id", card.id));
         linkMapper.delete(new QueryWrapper<MemoryLink>().eq("user_id", card.userId)
                 .and(q -> q.eq("source_memory_id", card.id).or().eq("target_memory_id", card.id)));
-        embeddingMapper.delete(new QueryWrapper<com.innercosmos.entity.MemoryEmbedding>()
+        int erasedEmbeddings = embeddingMapper.delete(new QueryWrapper<com.innercosmos.entity.MemoryEmbedding>()
                 .eq("user_id", card.userId).eq("memory_id", card.id));
+        // Every forget operation must produce an owner-visible receipt, even when there was no
+        // vector yet. Besides closing the audit trail, this publishes data.retracted.v1 to the
+        // transactional outbox when enabled, so remote projections cannot retain stale recall.
+        retractionReceiptService.record(card.userId, DataRetractionReceiptService.SUBJECT_MEMORY,
+                card.id, DataRetractionReceiptService.DERIVATIVE_MEMORY_EMBEDDING,
+                DataRetractionReceiptService.ACTION_ERASED, erasedEmbeddings,
+                "source memory forgotten by owner");
 
         for (Long capsuleId : affectedCapsuleIds) {
             withdrawCapsuleForForgottenMemory(card.userId, card.id, capsuleId);

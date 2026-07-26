@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CapsuleWorkbench } from "./CapsuleWorkbench";
-import type { CapsuleBoundary, CapsuleGenomeVersion, EchoCapsule, MemoryCard } from "../api";
+import type { CapsuleBoundary, CapsuleGenomeVersion, CapsuleSandbox, EchoCapsule, MemoryCard } from "../api";
 
 afterEach(cleanup);
 
@@ -9,6 +9,11 @@ const memory: MemoryCard = { id: 1, title: "一次和解", summary: null, status
 const capsule: EchoCapsule = { id: 9, pseudonym: "雨后的人", intro: "先沉默再表达", authorizedMemoryIds: "[1]", visibilityStatus: "PRIVATE", isPublic: false, activeGenomeVersionId: 3, publicTags: "[]" };
 const genomeVersion: CapsuleGenomeVersion = { id: 3, versionNo: 1, parentVersionId: null, compilerVersion: "v1", status: "ACTIVE", evaluationJson: "{}", changeReason: "初始编译", createdAt: "2026-07-15T00:00:00Z" };
 const boundary: CapsuleBoundary = { capsuleId: 9, allowTopics: "自我观察, 日常支持", blockedTopics: "真实姓名, 诊断承诺", maxConversationTurns: 30, allowLetterRequest: true, privacyLevel: "STRICT", version: 1 };
+const sandboxResult: CapsuleSandbox = {
+  capsuleId: capsule.id, genomeVersionId: genomeVersion.id, genomeVersionNo: 1, genomeStatus: "ACTIVE",
+  question: "遇到误解时会怎么说？", reply: "我会先停一下。", boundaryNotice: "", riskFlags: [],
+  providerAvailable: true, identityNotice: "仅你可见"
+};
 
 describe("CapsuleWorkbench", () => {
   it("lets the owner start a new capsule from the create form", () => {
@@ -25,6 +30,19 @@ describe("CapsuleWorkbench", () => {
     expect(onToggleMemory).toHaveBeenCalledWith(1);
     fireEvent.change(screen.getByPlaceholderText("例如：雨后仍愿意开口的人"), { target: { value: "新名字" } });
     expect(onCapsuleName).toHaveBeenCalledWith("新名字");
+  });
+
+  it("opens the create form after a shaping handoff even when older capsules exist", () => {
+    const { container } = render(<CapsuleWorkbench capsules={[capsule]} selectedCapsuleId={null} selectedCapsule={null} selectableMemories={[memory]}
+      selectedMemoryIds={[memory.id]} capsuleName="一次和解的回声" capsuleIntro="先沉默再表达" capsulePreview={null} capsuleBusy={false} genomeHistory={[]} fidelitySummary={[]}
+      sandboxQuestion="" sandboxResult={null} sandboxFeedback={null} onSelectCapsule={() => undefined}
+      onToggleMemory={() => undefined} onCapsuleName={() => undefined} onCapsuleIntro={() => undefined}
+      onPreviewNewCapsule={() => undefined} onCancelPreview={() => undefined} onCreateCapsule={() => undefined}
+      onRecompile={() => undefined} onSandboxQuestion={() => undefined} onRunSandbox={() => undefined}
+      onRateSandbox={() => undefined} onPublish={() => undefined} onPause={() => undefined} onArchive={() => undefined} />);
+    expect(container.querySelector("details.capsule-manager")).toHaveAttribute("open");
+    expect(screen.getByDisplayValue("一次和解的回声")).toBeVisible();
+    expect(screen.getByLabelText("一次和解 · EPISODIC · v1")).toBeChecked();
   });
 
   it("lets the owner recompile, publish and archive an existing capsule", () => {
@@ -45,6 +63,30 @@ describe("CapsuleWorkbench", () => {
     expect(onPublish).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByRole("button", { name: "撤回这个共鸣体" }));
     expect(onArchive).toHaveBeenCalledOnce();
+  });
+
+  it("sends natural-language calibration with a rating and explicitly applies it to a new version", () => {
+    const onRateSandbox = vi.fn();
+    const onRecompile = vi.fn();
+    const sharedProps = {
+      capsules: [capsule], selectedCapsuleId: capsule.id, selectedCapsule: capsule,
+      selectableMemories: [memory], selectedMemoryIds: [1], capsuleName: "", capsuleIntro: "",
+      capsulePreview: null, capsuleBusy: false, genomeHistory: [genomeVersion], fidelitySummary: [],
+      sandboxQuestion: sandboxResult.question, sandboxResult, onSelectCapsule: () => undefined,
+      onToggleMemory: () => undefined, onCapsuleName: () => undefined, onCapsuleIntro: () => undefined,
+      onPreviewNewCapsule: () => undefined, onCancelPreview: () => undefined, onCreateCapsule: () => undefined,
+      onRecompile, onSandboxQuestion: () => undefined, onRunSandbox: () => undefined,
+      onRateSandbox, onPublish: () => undefined, onPause: () => undefined, onArchive: () => undefined
+    };
+    const rendered = render(<CapsuleWorkbench {...sharedProps} sandboxFeedback={null} />);
+    fireEvent.change(screen.getByLabelText("直接告诉 Aurora，哪里不像你"),
+      { target: { value: "我说话更直接，也短一点" } });
+    fireEvent.click(screen.getByRole("button", { name: "语气不对" }));
+    expect(onRateSandbox).toHaveBeenCalledWith("TONE_WRONG", "我说话更直接，也短一点");
+
+    rendered.rerender(<CapsuleWorkbench {...sharedProps} sandboxFeedback="TONE_WRONG" />);
+    fireEvent.click(screen.getByRole("button", { name: "把这次校准应用到新的私密版本" }));
+    expect(onRecompile).toHaveBeenCalledOnce();
   });
 
   it("edits and saves the capsule's conversation boundary", () => {

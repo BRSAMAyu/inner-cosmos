@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { api, type DailyRecordDetail, type DailyRecordEntry } from "../api";
+import type { Locale } from "../i18n";
 
 // Phase 3 legacy-page port: src/main/resources/static/pages/daily-record.html.
 //
@@ -12,9 +13,11 @@ import { api, type DailyRecordDetail, type DailyRecordEntry } from "../api";
 // ever show the fields that actually exist on the plain DailyRecord entity.
 export type UseDailyRecordOptions = {
   setStatus: (status: string) => void;
+  locale?: Locale;
 };
 
-export function useDailyRecord({ setStatus }: UseDailyRecordOptions) {
+export function useDailyRecord({ setStatus, locale = "zh-CN" }: UseDailyRecordOptions) {
+  const copy = (english: string, chinese: string) => locale === "en-SG" ? english : chinese;
   const [dailyRecords, setDailyRecords] = useState<DailyRecordEntry[]>([]);
   const [dailyRecordDetail, setDailyRecordDetail] = useState<DailyRecordDetail | null>(null);
   const [dailyRecordIndex, setDailyRecordIndex] = useState(0);
@@ -33,29 +36,31 @@ export function useDailyRecord({ setStatus }: UseDailyRecordOptions) {
 
   const acceptDailyRecord = useCallback(async () => {
     const record = dailyRecords[dailyRecordIndex];
-    if (!record) { setStatus("没有可保存的记录"); return; }
+    if (!record) { setStatus(copy("There is no record to save.", "没有可保存的记录")); return; }
     setDailyRecordAcceptBusy(true);
     try {
       await api.acceptDailyRecordEntry(record.id);
       setDailyRecords(rows => rows.map(row => row.id === record.id ? { ...row, userAccepted: true } : row));
-      setStatus("记录已接受并保存");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "暂时无法保存这条记录"); }
+      setStatus(copy("Record accepted and saved.", "记录已接受并保存"));
+    } catch (error) { setStatus(error instanceof Error ? error.message
+      : copy("Could not save this record yet.", "暂时无法保存这条记录")); }
     finally { setDailyRecordAcceptBusy(false); }
-  }, [dailyRecords, dailyRecordIndex, setStatus]);
+  }, [dailyRecords, dailyRecordIndex, locale, setStatus]);
 
   const editDailyRecordField = useCallback(async (field: "theme" | "event", value: string) => {
     const record = dailyRecords[dailyRecordIndex];
-    if (!record) { setStatus("没有可编辑的记录"); return; }
+    if (!record) { setStatus(copy("There is no record to edit.", "没有可编辑的记录")); return; }
     setDailyRecordEditBusy(field);
     try {
       const patch = field === "theme" ? { theme: value } : { cognitiveSummary: value };
       const updated = await api.editDailyRecord(record.id, patch);
       setDailyRecords(rows => rows.map(row => row.id === record.id ? updated : row));
       if (dailyRecordIndex === 0) await loadLatestDailyRecord();
-      setStatus("已保存");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "保存失败"); }
+      setStatus(copy("Saved.", "已保存"));
+    } catch (error) { setStatus(error instanceof Error ? error.message
+      : copy("Save failed.", "保存失败")); }
     finally { setDailyRecordEditBusy(null); }
-  }, [dailyRecords, dailyRecordIndex, loadLatestDailyRecord, setStatus]);
+  }, [dailyRecords, dailyRecordIndex, loadLatestDailyRecord, locale, setStatus]);
 
   return {
     dailyRecords, dailyRecordDetail, dailyRecordIndex, dailyRecordAcceptBusy, dailyRecordEditBusy,

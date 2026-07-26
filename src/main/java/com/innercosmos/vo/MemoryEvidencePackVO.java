@@ -17,5 +17,6 @@ public record MemoryEvidencePackVO(
             double score,
             List<String> contributions,
             Integer versionNo,
+            String consentScope,
             String provenanceRefs) {}
 }

@@ -534,11 +534,12 @@ describe("useAuroraSession -- goodbye ritual", () => {
     await act(async () => { await result.current.resolveSession(); });
     vi.mocked(api.messages).mockResolvedValue([{ id: 1, sessionId: 100, speaker: "USER", textContent: "我很在乎明天的展示" } as never]);
     await act(async () => { await result.current.replaceFromHistory(100); });
+    act(() => { result.current.setMode("CAPSULE_SHAPING"); });
 
     await act(async () => { await result.current.triggerGoodbye(); });
 
     expect(api.settleAuroraSession).toHaveBeenCalledExactlyOnceWith(100);
-    expect(onMemorySettled).toHaveBeenCalledOnce();
+    expect(onMemorySettled).toHaveBeenCalledExactlyOnceWith("CAPSULE_SHAPING");
   });
 
   it("does nothing without an active session", async () => {
@@ -636,6 +637,29 @@ describe("useAuroraSession -- WakeIntent negotiate", () => {
     expect(result.current.wakeIntents).toHaveLength(1);
     expect(result.current.wakeBusy).toBe(false);
     expect(setStatus).toHaveBeenCalledWith(expect.stringContaining("约好了"));
+  });
+
+  it("writes and later displays an English WakeIntent receipt when the interface is English", async () => {
+    vi.mocked(api.negotiateWakeIntent).mockImplementation(async request => wakeIntent({
+      id: 8,
+      purpose: request.purpose,
+      reasonForUser: request.reasonForUser,
+      content: request.content,
+      preferredAt: "2026-07-19T09:00:00"
+    }));
+    const { result, setStatus } = setup("en-SG");
+
+    expect(result.current.returnPurpose).toBe("Continue what we left unfinished");
+    await act(async () => { await result.current.scheduleReturn(); });
+
+    expect(api.negotiateWakeIntent).toHaveBeenCalledWith(expect.objectContaining({
+      when: "Tomorrow at 8:30 AM",
+      purpose: "Continue what we left unfinished",
+      reasonForUser: "Aurora will return as agreed (Tomorrow at 8:30 AM) to “Continue what we left unfinished”.",
+      content: "I’m back. We can continue the part we left unfinished, at your pace."
+    }));
+    expect(result.current.wakeIntents[0].reasonForUser).not.toMatch(/[\u4e00-\u9fff]/);
+    expect(setStatus).toHaveBeenCalledWith(expect.stringContaining("arranged"));
   });
 
   it("postponeReturn shifts the intent's window by one hour", async () => {

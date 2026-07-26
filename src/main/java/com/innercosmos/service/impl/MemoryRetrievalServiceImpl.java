@@ -30,6 +30,8 @@ import java.util.Set;
 @Service
 public class MemoryRetrievalServiceImpl implements MemoryRetrievalService {
     private static final Set<String> CURRENT = Set.of("ACTIVE");
+    private static final Set<String> PROVIDER_FORBIDDEN_CONSENT =
+            Set.of("LOCAL_ONLY", "NO_EXTERNAL_PROCESSING", "SIMULATOR_AUTHORIZED");
     private final MemoryCardMapper memoryMapper;
     private final MemoryEmbeddingIndexService embeddingIndex;
 
@@ -52,7 +54,16 @@ public class MemoryRetrievalServiceImpl implements MemoryRetrievalService {
                 .ne("status", "FORGOTTEN").ne("status", "SUPERSEDED").ne("status", "ARCHIVED");
         if (!includeContradicted) db.in("status", CURRENT);
         if (!layers.isEmpty()) db.in("memory_layer", layers);
-        List<MemoryCard> candidates = memoryMapper.selectList(db);
+        // Defense in depth: the DB predicate keeps forbidden rows out of the usual query, while
+        // the Java filter protects mocked/custom mappers and legacy rows returned by another
+        // candidate source. Aurora's Evidence Pack can reach a real provider, so local-only or
+        // no-external-processing content must never become prompt context.
+        db.and(q -> q.isNull("consent_scope")
+                .or().notIn("consent_scope", PROVIDER_FORBIDDEN_CONSENT));
+        List<MemoryCard> candidates = memoryMapper.selectList(db).stream()
+                .filter(card -> !PROVIDER_FORBIDDEN_CONSENT.contains(
+                        safe(card.consentScope).toUpperCase(Locale.ROOT)))
+                .toList();
         Map<Long, Double> providerSemantic = embeddingIndex.similarities(userId, text, candidates);
         List<Scored> scored = candidates.stream()
                 .map(card -> score(card, text, task, providerSemantic.get(card.id))).filter(row -> text.isBlank() || row.score > 0.08)
@@ -69,11 +80,15 @@ public class MemoryRetrievalServiceImpl implements MemoryRetrievalService {
             if (!selected.isEmpty() && used + cost > budget) continue;
             used += cost; layerCounts.merge(layer, 1, Integer::sum);
             selected.add(new MemoryEvidencePackVO.Evidence(row.card.id, row.card.title, row.card.summary,
-                    layer, round(row.score), row.contributions, row.card.versionNo, row.card.provenanceRefs));
+                    layer, round(row.score), row.contributions, row.card.versionNo,
+                    row.card.consentScope, row.card.provenanceRefs));
         }
-        return new MemoryEvidencePackVO(task, text, budget, used, selected,
-                includeContradicted ? List.of("FORGOTTEN", "SUPERSEDED", "ARCHIVED")
-                        : List.of("FORGOTTEN", "SUPERSEDED", "ARCHIVED", "CONTRADICTED"));
+        List<String> exclusions = new ArrayList<>(List.of(
+                "FORGOTTEN", "SUPERSEDED", "ARCHIVED",
+                "CONSENT_LOCAL_ONLY", "CONSENT_NO_EXTERNAL_PROCESSING",
+                "CONSENT_SIMULATOR_ONLY"));
+        if (!includeContradicted) exclusions.add("CONTRADICTED");
+        return new MemoryEvidencePackVO(task, text, budget, used, selected, exclusions);
     }
 
     private Scored score(MemoryCard card, String query, String task, Double providerSimilarity) {

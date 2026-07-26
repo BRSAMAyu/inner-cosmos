@@ -20,6 +20,8 @@ type WorkbenchCopy = {
   rvStep1Title: string; rvStep1Note: string; blockedMem2: string; recompileBusy: string; recompileBtn: string;
   rvStep2Title: string; rvStep2Note: string; askAria: string; sandboxRunBusy: string; sandboxRunBtn: string;
   sandboxAnswer: (v: number, notice: string) => string; ratingsAria: string; rating: Record<string, string>; providerUnavailable: string;
+  calibrationLabel: string; calibrationPlaceholder: string; calibrationNote: string;
+  applyCalibrationBusy: string; applyCalibration: string;
   step4Title: string; step4Note: string; publishBusy: string; publishBtn: string; pauseBusy: string; pauseBtn: string; archiveBusy: string; archiveBtn: string;
   // boundary editor
   step3Title: string; step3Note: string; allowLabel: string; allowPlaceholder: string; blockLabel: string; blockPlaceholder: string;
@@ -50,6 +52,10 @@ const COPY: Record<Locale, WorkbenchCopy> = {
     sandboxAnswer: (v, notice) => `v${v} 的回答 · ${notice}`, ratingsAria: "这段回应像不像我",
     rating: { LIKE_ME: "像我", NOT_ME: "不像我", FACT_WRONG: "事实不对", TOO_EXPOSED: "太暴露", TONE_WRONG: "语气不对" },
     providerUnavailable: "真实模型暂时不可用，这次回应不会被当作拟真证据。",
+    calibrationLabel: "直接告诉 Aurora，哪里不像你",
+    calibrationPlaceholder: "例如：我不会这么安慰人。我说话更直接、短一点，偶尔会有冷幽默，也不会替别人做决定。",
+    calibrationNote: "你的原话只作为私密反馈保存；系统只把受限的语气、行为与边界代码带入下一版。当前公开版本不会暗中改变。",
+    applyCalibrationBusy: "正在生成改进版本", applyCalibration: "把这次校准应用到新的私密版本",
     step4Title: "决定它是否可以被别人遇见", step4Note: "发布不会开放真实身份、联系方式或未授权记忆；撤回会立即阻止新旧会话继续代表你。",
     publishBusy: "正在发布", publishBtn: "确认并发布当前版本", pauseBusy: "正在暂停", pauseBtn: "暂停公开", archiveBusy: "正在撤回", archiveBtn: "撤回这个共鸣体",
     step3Title: "设定它在对话里的边界", step3Note: "这些只有你能改：它可以谈什么、要避开什么、每天最多聊几轮、别人能否请求给你写慢信。",
@@ -83,6 +89,10 @@ const COPY: Record<Locale, WorkbenchCopy> = {
     sandboxAnswer: (v, notice) => `v${v}'s answer · ${notice}`, ratingsAria: "Does this response feel like me",
     rating: { LIKE_ME: "Like me", NOT_ME: "Not me", FACT_WRONG: "Fact wrong", TOO_EXPOSED: "Too exposed", TONE_WRONG: "Tone wrong" },
     providerUnavailable: "The real model is unavailable right now; this response won't count as fidelity evidence.",
+    calibrationLabel: "Tell Aurora what does not sound like you",
+    calibrationPlaceholder: "e.g. I wouldn't reassure people like this. I'm more direct and brief, with dry humour, and I don't decide for them.",
+    calibrationNote: "Your words stay as private feedback. Only bounded tone, behaviour and boundary codes enter the next version; the public version never drifts silently.",
+    applyCalibrationBusy: "Generating an improved version", applyCalibration: "Apply this calibration to a new private version",
     step4Title: "Decide whether others can meet it", step4Note: "Publishing never exposes your real identity, contact details or unauthorized memories; withdrawing immediately stops old and new sessions from representing you.",
     publishBusy: "Publishing", publishBtn: "Confirm and publish this version", pauseBusy: "Pausing", pauseBtn: "Pause publishing", archiveBusy: "Withdrawing", archiveBtn: "Withdraw this capsule",
     step3Title: "Set its boundaries in conversation", step3Note: "Only you can change these: what it may discuss, what to avoid, the daily turn cap, and whether others may request a slow letter to you.",
@@ -187,7 +197,7 @@ export function CapsuleWorkbench({ capsules, selectedCapsuleId, selectedCapsule,
   onCapsuleName: (value: string) => void; onCapsuleIntro: (value: string) => void;
   onPreviewNewCapsule: () => void; onCancelPreview: () => void; onCreateCapsule: () => void;
   onRecompile: () => void; onSandboxQuestion: (value: string) => void; onRunSandbox: () => void;
-  onRateSandbox: (rating: string) => void; onPublish: () => void; onPause: () => void; onArchive: () => void;
+  onRateSandbox: (rating: string, comment?: string) => void; onPublish: () => void; onPause: () => void; onArchive: () => void;
   boundary?: CapsuleBoundary | null; boundaryBusy?: boolean; onSaveBoundary?: (boundary: Partial<CapsuleBoundary>) => void;
   capsuleOwnerNote?: string; onCapsuleOwnerNote?: (value: string) => void;
   capsuleStandIn?: boolean; onCapsuleStandIn?: (value: boolean) => void;
@@ -196,6 +206,7 @@ export function CapsuleWorkbench({ capsules, selectedCapsuleId, selectedCapsule,
   locale?: Locale;
 }) {
   const t = COPY[locale];
+  const [calibrationComment, setCalibrationComment] = useState("");
   const activeFidelity = fidelityLabel(fidelitySummary.find(summary => summary.genomeVersionId === genomeHistory[0]?.id), t);
   const tabStatus = (status: string) => status === "PUBLIC" ? t.tabPublic : status === "NEEDS_REVIEW" ? t.tabReview : t.tabPrivate;
   const summaryStatus = (status: string) => status === "PUBLIC" ? t.statusPublic : status === "NEEDS_REVIEW" ? t.statusReview : t.statusPrivate;
@@ -214,7 +225,7 @@ export function CapsuleWorkbench({ capsules, selectedCapsuleId, selectedCapsule,
         </button>)}
     </div>}
 
-    <details className="capsule-manager" open={capsules.length === 0}>
+    <details className="capsule-manager" open={capsules.length === 0 || !selectedCapsule}>
       <summary>{capsules.length === 0
         ? (locale === "en-SG" ? "Create your first capsule" : "创建第一个共鸣侧影")
         : (locale === "en-SG" ? "Edit, test or create a capsule" : "编辑、试聊或新建共鸣体")}</summary>
@@ -286,8 +297,17 @@ export function CapsuleWorkbench({ capsules, selectedCapsuleId, selectedCapsule,
       {sandboxResult && <article className="sandbox-response"><span>{t.sandboxAnswer(sandboxResult.genomeVersionNo, sandboxResult.identityNotice)}</span><p>{sandboxResult.reply}</p>
         {sandboxResult.boundaryNotice && <small>{sandboxResult.boundaryNotice}</small>}
         {sandboxResult.providerAvailable ? <div className="sandbox-ratings" aria-label={t.ratingsAria}>
+          <label className="sandbox-calibration">{t.calibrationLabel}
+            <textarea value={calibrationComment} onChange={event => setCalibrationComment(event.target.value)}
+              aria-label={t.calibrationLabel} maxLength={1000} placeholder={t.calibrationPlaceholder} />
+            <small>{t.calibrationNote}</small>
+          </label>
           {sandboxRatingOrder.map(value =>
-            <button type="button" className={sandboxFeedback === value ? "active" : ""} disabled={capsuleBusy} key={value} onClick={() => onRateSandbox(value)}>{t.rating[value]}</button>)}</div> :
+            <button type="button" className={sandboxFeedback === value ? "active" : ""} disabled={capsuleBusy} key={value}
+              onClick={() => onRateSandbox(value, calibrationComment.trim() || undefined)}>{t.rating[value]}</button>)}
+          {sandboxFeedback && <AsyncButton className="resonance-secondary" busy={capsuleBusy}
+            busyText={t.applyCalibrationBusy} onClick={onRecompile}>{t.applyCalibration}</AsyncButton>}
+        </div> :
           <p className="preview-warning">{t.providerUnavailable}</p>}
       </article>}
 

@@ -46,4 +46,13 @@ describe("StartHereJourney", () => {
     expect(screen.getByRole("button", { name: /Write a slow letter/ })).toBeVisible();
     expect(screen.queryByText("开始倾诉")).not.toBeInTheDocument();
   });
+
+  it("shows journey progress and identifies the next private, user-controlled step", () => {
+    render(<StartHereJourney locale="en-SG" completedSteps={["aurora", "memory"]}
+      onStep={() => undefined} />);
+
+    expect(screen.getByText("2/5 complete")).toBeVisible();
+    expect(screen.getAllByRole("button", { name: /Complete/ })).toHaveLength(2);
+    expect(screen.getByRole("button", { name: /Shape a facet · Up next/ })).toBeVisible();
+  });
 });

@@ -2,8 +2,13 @@ package com.innercosmos.ai.agent;
 
 import com.innercosmos.ai.client.LlmClient;
 import com.innercosmos.ai.client.LlmRequest;
+import com.innercosmos.ai.router.ResolvedModel;
+import com.innercosmos.ai.router.SessionModelRouter;
 import com.innercosmos.ai.structured.StructuredAiService;
+import com.innercosmos.common.ErrorCode;
+import com.innercosmos.config.LlmConfig;
 import com.innercosmos.entity.EchoCapsule;
+import com.innercosmos.exception.BusinessException;
 import com.innercosmos.vo.PersonaChatVO;
 import org.springframework.stereotype.Component;
 
@@ -20,45 +25,66 @@ import java.util.Map;
 @Component
 public class CapsuleAgent {
     private final StructuredAiService structuredAiService;
-    private final LlmClient llmClient;
+    private final SessionModelRouter modelRouter;
+    private final LlmConfig llmConfig;
 
-    public CapsuleAgent(StructuredAiService structuredAiService, LlmClient llmClient) {
+    public CapsuleAgent(StructuredAiService structuredAiService, SessionModelRouter modelRouter,
+                        LlmConfig llmConfig) {
         this.structuredAiService = structuredAiService;
-        this.llmClient = llmClient;
+        this.modelRouter = modelRouter;
+        this.llmConfig = llmConfig;
     }
 
     public String generateUserPersona(Long userId, List<String> memorySummaries, String pseudonym, String intro) {
-        if (memorySummaries == null || memorySummaries.isEmpty()) {
-            return "你是共鸣体\"" + pseudonym + "\".你是一枚数字回声,陪伴用户.简介:" + intro;
-        }
-
-        String memoryContext = String.join("\n- ", memorySummaries);
+        List<String> evidence = memorySummaries == null ? List.of() : memorySummaries;
+        String memoryContext = evidence.isEmpty()
+                ? "(No authorized memory evidence. Use only the owner-written name and introduction.)"
+                : String.join("\n- ", evidence);
         String instruction = String.format("""
-            根据以下用户的代表性记忆卡片摘要，为该用户量身定制一个“拟合其真实灵魂”的 EchoCapsule (共鸣体) 智能体画像(System Prompt)。
-            共鸣体名称: %s
-            简介: %s
-            
-            用户代表记忆:
+            Create the private runtime persona specification for an Echo Capsule: a bounded,
+            consent-based digital facet of its owner. This is not the owner, must never claim to
+            be the owner replying live, and must not invent traits that are absent from the
+            supplied evidence.
+
+            Capsule name: %s
+            Owner-written introduction: %s
+
+            Authorized, privacy-scrubbed evidence:
             - %s
-            
-            要求：
-            1. 仔细阅读上述记忆，提炼用户的性格特质、语言风格口吻、核心困惑、处境偏好。
-            2. 用中文写一段精细且有深度的“智能体系统设定提示词(System Prompt)”。
-            3. 该提示词必须命令智能体扮演该用户的数字化身，并带入这些情绪背景和语言特征，以此和访问他的其他用户共鸣对话。
-            4. 语气需要符合该用户的性格特质（可能是内敛、敏感、逻辑理性等），在最多5轮的对话中给访问者一种“灵魂对撞”和“理解万岁”的慢社交体验。
-            5. 直接返回生成的 System Prompt 纯文本，不要包含任何 JSON、Markdown 包裹（如 ``` 等）。
+
+            Requirements:
+            1. Infer only evidence-supported voice, values, tensions, boundaries and conversational
+               habits. Mark uncertainty instead of filling gaps with a flattering archetype.
+            2. Write in the dominant language of the owner-written introduction and evidence.
+               If they mix languages, preserve that natural pattern; never force Chinese or English.
+            3. Describe how the capsule should respond with emotional intelligence and precision,
+               without therapy clichés, clinginess, diagnosis, identity disclosure or fabricated memories.
+            4. The capsule may create resonance, but must remain transparent that it is an authorized
+               AI facet and may only use the evidence above.
+            5. Return only the system specification as plain text, without Markdown fences or JSON.
             """, pseudonym, intro, memoryContext);
 
+        ResolvedModel resolved = modelRouter.resolve(userId, null);
+        if (resolved == null || !resolved.isResolved()
+                || (llmConfig.isProdMode() && "MOCK".equalsIgnoreCase(resolved.provider()))) {
+            throw new BusinessException(ErrorCode.AI_PROVIDER_ERROR,
+                    "真实模型暂时不可用，共鸣体仍保持私密草稿，未生成可发布人格");
+        }
         try {
             LlmRequest req = new LlmRequest(userId, "CAPSULE_PERSONA_SYNTHESIS", instruction);
-            String persona = llmClient.chat(req);
+            req.preferredProvider = resolved.provider();
+            req.thinkingEnabled = false;
+            String persona = resolved.client().chat(req);
             if (persona != null && !persona.isBlank()) {
                 return persona.trim();
             }
         } catch (Exception e) {
-            // log fallback
+            if (e instanceof BusinessException businessException) throw businessException;
+            throw new BusinessException(ErrorCode.AI_PROVIDER_ERROR,
+                    "真实模型没有完成共鸣体生成；未创建模板替身，请稍后重试");
         }
-        return buildPersonaPrompt(pseudonym, intro); // Fallback
+        throw new BusinessException(ErrorCode.AI_PROVIDER_ERROR,
+                "真实模型返回了空的人格结果；未创建模板替身，请稍后重试");
     }
 
     /**

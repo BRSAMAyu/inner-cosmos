@@ -71,6 +71,18 @@ public class SessionModelRouter {
         if (named == null || !named.containsKey(normalized)) {
             normalized = llmConfig.activeProvider().toUpperCase();
         }
+        // A dev/test profile may intentionally name a real provider without supplying a key so
+        // offline tests exercise the same routing path and then use the explicitly labelled
+        // Mock client. Production/local-complete never permit this: effective fallback is false,
+        // leaving the model unresolved so callers fail closed instead of creating fake output.
+        if (named != null
+                && !named.containsKey(normalized)
+                && llmConfig.isEffectiveFallbackAllowed()
+                && named.containsKey("MOCK")) {
+            log.info("SessionModelRouter: provider {} is unavailable; using labelled dev fallback MOCK",
+                    normalized);
+            normalized = "MOCK";
+        }
         LlmClient client = pick(normalized);
         if (client == null) {
             log.warn("SessionModelRouter: no client found for provider {}, falling back to system default", normalized);

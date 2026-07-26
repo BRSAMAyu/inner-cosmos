@@ -96,6 +96,18 @@ public final class StructuredAiResults {
         public List<String> riskFlags = new ArrayList<>();
     }
 
+    /**
+     * A deliberately closed vocabulary for turning an owner's free-form sandbox correction into
+     * auditable calibration data. Callers must still allow-list every value before persistence:
+     * model output is data, never authority.
+     */
+    public static class CapsuleCalibrationResult {
+        public List<String> toneCodes = new ArrayList<>();
+        public List<String> avoidBehaviorCodes = new ArrayList<>();
+        public List<String> boundaryCodes = new ArrayList<>();
+        public String responseLengthCode;
+    }
+
     public static class LetterGuardResult {
         public Boolean allow;
         public String reason;

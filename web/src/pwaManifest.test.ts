@@ -10,8 +10,8 @@ describe("buildPwaManifest", () => {
   const manifest = buildPwaManifest();
 
   it("names the product consistently with index.html's <title>", () => {
-    expect(manifest.name).toBe("Inner Cosmos · 内宇宙");
-    expect(manifest.short_name).toBe("内宇宙");
+    expect(manifest.name).toBe("Inner Cosmos");
+    expect(manifest.short_name).toBe("Inner Cosmos");
   });
 
   it("is scoped under /app/aurora/, not the site root", () => {
@@ -25,9 +25,8 @@ describe("buildPwaManifest", () => {
     expect(manifest.display).toBe("standalone");
   });
 
-  it("uses the existing warm night-theme tokens, not invented colors", () => {
-    // --surface-canvas (night default) and --accent-aurora from web/src/styles.css.
-    expect(manifest.background_color).toBe("#211A18");
+  it("uses a light launch canvas so day mode never flashes a dark splash", () => {
+    expect(manifest.background_color).toBe("#F5F4EF");
     expect(manifest.theme_color).toBe("#C79A68");
   });
 

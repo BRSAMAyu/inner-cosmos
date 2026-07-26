@@ -1,13 +1,17 @@
 package com.innercosmos.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.innercosmos.ai.capsule.CapsuleCalibrationPolicy;
 import com.innercosmos.entity.CapsuleGenomeVersion;
+import com.innercosmos.entity.CapsuleSandboxFeedback;
 import com.innercosmos.entity.EchoCapsule;
 import com.innercosmos.entity.MemoryCard;
 import com.innercosmos.exception.BusinessException;
 import com.innercosmos.mapper.CapsuleGenomeVersionMapper;
+import com.innercosmos.mapper.CapsuleSandboxFeedbackMapper;
 import com.innercosmos.mapper.EchoCapsuleMapper;
 import com.innercosmos.mapper.DataUseGrantMapper;
 import com.innercosmos.entity.DataUseGrant;
@@ -30,15 +34,18 @@ public class CapsuleGenomeServiceImpl implements CapsuleGenomeService {
     private final EchoCapsuleMapper capsuleMapper;
     private final ObjectMapper objectMapper;
     private final DataUseGrantMapper grantMapper;
+    private final CapsuleSandboxFeedbackMapper feedbackMapper;
 
     public CapsuleGenomeServiceImpl(CapsuleGenomeVersionMapper genomeMapper,
                                     EchoCapsuleMapper capsuleMapper,
                                     ObjectMapper objectMapper,
-                                    DataUseGrantMapper grantMapper) {
+                                    DataUseGrantMapper grantMapper,
+                                    CapsuleSandboxFeedbackMapper feedbackMapper) {
         this.genomeMapper = genomeMapper;
         this.capsuleMapper = capsuleMapper;
         this.objectMapper = objectMapper;
         this.grantMapper = grantMapper;
+        this.feedbackMapper = feedbackMapper;
     }
 
     @Override
@@ -72,6 +79,26 @@ public class CapsuleGenomeServiceImpl implements CapsuleGenomeService {
         genome.parentVersionId = previous == null ? null : previous.id;
         genome.compilerVersion = COMPILER_VERSION;
         genome.status = "ACTIVE";
+        List<CapsuleSandboxFeedback> pendingCalibration = feedbackMapper.selectList(
+                new QueryWrapper<CapsuleSandboxFeedback>()
+                        .eq("capsule_id", capsule.id)
+                        .eq("owner_user_id", capsule.ownerUserId)
+                        .eq("status", "OPEN")
+                        .isNotNull("calibration_signals_json")
+                        .orderByAsc("id"));
+        List<Long> calibrationFeedbackIds = pendingCalibration.stream().map(row -> row.id).toList();
+        String calibrationBaseStyle = CapsuleCalibrationPolicy.carryForwardCalibration(
+                objectMapper,
+                capsule.styleProfileJson,
+                previous == null ? null : previous.styleProfileJson);
+        String calibratedStyle = pendingCalibration.isEmpty()
+                ? calibrationBaseStyle
+                : CapsuleCalibrationPolicy.mergeIntoStyle(
+                        objectMapper,
+                        calibrationBaseStyle,
+                        pendingCalibration.stream().map(row -> row.calibrationSignalsJson).toList(),
+                        calibrationFeedbackIds,
+                        genome.versionNo);
         List<Long> memoryIds = authorizedCards.stream().map(card -> card.id).toList();
         List<DataUseGrant> grants = memoryIds.isEmpty() ? List.of() : grantMapper.selectList(
                 new QueryWrapper<DataUseGrant>().eq("owner_user_id", capsule.ownerUserId)
@@ -90,7 +117,7 @@ public class CapsuleGenomeServiceImpl implements CapsuleGenomeService {
                         "resourceId", grant.resourceId, "resourceVersion", grant.resourceVersion,
                         "purpose", grant.purpose, "status", grant.status)).toList()));
         genome.compiledPersonaPrompt = capsule.personaPrompt == null ? "" : capsule.personaPrompt;
-        genome.styleProfileJson = capsule.styleProfileJson;
+        genome.styleProfileJson = calibratedStyle;
         genome.contextPreviewJson = capsule.contextPreviewJson;
         Map<String, Object> evaluation = new LinkedHashMap<>();
         evaluation.put("schemaVersion", "capsule-compiler-evaluation.v3");
@@ -99,14 +126,28 @@ public class CapsuleGenomeServiceImpl implements CapsuleGenomeService {
         evaluation.put("authorizedMemoryCount", authorizedCards.size());
         evaluation.put("identityDisclosureAllowed", false);
         evaluation.put("runtimeEligible", true);
+        evaluation.put("calibrationFeedbackCount", pendingCalibration.size());
+        evaluation.put("calibrationFeedbackIds", calibrationFeedbackIds);
         // Real structural feature-extraction metrics — measurable and improvable independent
         // of any LLM provider (对齐文档/16 Campaign C punch-list item 2).
         evaluation.putAll(compilerMetrics(capsule.contextPreviewJson));
         genome.evaluationJson = write(evaluation);
-        genome.changeReason = reason;
+        genome.changeReason = pendingCalibration.isEmpty()
+                ? reason
+                : reason + "; applied " + pendingCalibration.size() + " owner calibration signal(s)";
         genomeMapper.insert(genome);
         capsule.activeGenomeVersionId = genome.id;
+        capsule.styleProfileJson = calibratedStyle;
         capsuleMapper.updateById(capsule);
+        if (!calibrationFeedbackIds.isEmpty()) {
+            feedbackMapper.update(null, new UpdateWrapper<CapsuleSandboxFeedback>()
+                    .in("id", calibrationFeedbackIds)
+                    .eq("capsule_id", capsule.id)
+                    .eq("owner_user_id", capsule.ownerUserId)
+                    .eq("status", "OPEN")
+                    .set("status", "APPLIED")
+                    .set("applied_genome_version_id", genome.id));
+        }
         return genome;
     }
 

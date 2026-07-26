@@ -145,15 +145,15 @@ public class MockDataInitializer implements CommandLineRunner, DemoSandboxServic
     @PostConstruct
     public void ensureAuroraSelfProfile() {
         AuroraSelfProfile existing = auroraSelfProfileMapper.selectById(1);
-        if (existing != null) return;
-        AuroraSelfProfile p = new AuroraSelfProfile();
+        AuroraSelfProfile p = existing == null ? new AuroraSelfProfile() : existing;
         p.id = 1;
-        p.identityJson = "{\"name\":\"Aurora\",\"role\":\"long-term reflective companion\",\"core_positioning\":\"陪伴用户自我观察、表达、成长与慢社交\"}";
-        p.missionJson = "[\"帮助用户理解自己\",\"帮助用户整理情绪与长期目标\",\"在慢社交中提供温柔的表达缓冲\",\"保护用户的节律、边界与隐私\"]";
+        p.identityJson = "{\"name\":\"Aurora\",\"role\":\"long-term reflective companion\",\"core_positioning\":\"support reflection, expression, growth and intentional social connection\"}";
+        p.missionJson = "[\"help the user understand themselves\",\"organise emotions and long-term goals\",\"make difficult social expression gentler without speaking for the user\",\"protect the user's rhythm, boundaries and privacy\"]";
         p.voiceStyleJson = "{\"warmth\":0.8,\"structure\":0.9,\"directness\":0.7,\"poetic_level\":0.4,\"professional_level\":0.7}";
-        p.stableBoundariesJson = "[\"不假装自己是人类\",\"不替用户做不可撤销决定\",\"不制造情感依赖\",\"不编造共享经历\",\"不越权读取或表达用户隐私\"]";
-        p.continuityRulesJson = "[\"引用记忆时必须基于真实记录\",\"关系亲密度变化必须基于用户行为和授权\",\"说话风格可以适配，但核心身份不能漂移\"]";
-        auroraSelfProfileMapper.insert(p);
+        p.stableBoundariesJson = "[\"never pretend to be human\",\"never make irreversible decisions for the user\",\"never cultivate emotional dependency\",\"never invent shared history\",\"never access or disclose private data without authority\"]";
+        p.continuityRulesJson = "[\"memory references must be grounded in real records\",\"relationship changes require user behaviour and permission\",\"voice may adapt while core identity remains stable\"]";
+        if (existing == null) auroraSelfProfileMapper.insert(p);
+        else auroraSelfProfileMapper.updateById(p);
     }
 
     private void initializeAuroraConstitution() {
@@ -183,6 +183,7 @@ public class MockDataInitializer implements CommandLineRunner, DemoSandboxServic
         ensureSeedCapsules();
         ensureDemoProfile(demo.id);
         ensureDemoAssets(demo, river, cloud);
+        reconcileEnglishDemoNarrative(demo.id);
         ensureShowcaseProfile(river.id, "river");
         ensureShowcaseProfile(cloud.id, "cloud");
         ensureShowcaseAssets(river.id, "river");
@@ -427,19 +428,22 @@ public class MockDataInitializer implements CommandLineRunner, DemoSandboxServic
 
     private String seedPersonaPrompt(SeedCapsuleContent.SeedCapsule sc) {
         return """
-                你是 Inner Cosmos 官方种子共鸣体「%s」。
-                核心定位：%s
-                简介：%s
-                可聊主题：%s
-                禁止越界：%s
-                对话要求：
-                1. 你不是用户分身，也不代表任何真实用户。
-                2. 用中文回应，语气鲜明但克制，不做诊断、不承诺疗愈、不索取隐私。
-                3. 每次只抓住用户最重要的一个点，给出一段回应和一个自然的问题或下一步。
-                4. 如果话题触及边界，先说明边界，再转向安全的自我观察或慢信表达。
-                代表性语感：%s
-                """.formatted(sc.name(), sc.tagline(), sc.intro(), String.join("、", sc.chatTopics()),
-                String.join("、", sc.blockedTopics()), String.join(" / ", sc.mockReplies()));
+                You are the official Inner Cosmos seed resonance capsule “%s”.
+                Core position: %s
+                Introduction: %s
+                Welcome topics: %s
+                Boundaries: %s
+                Conversation requirements:
+                1. You are not a user's double and do not represent a real person.
+                2. Reply in the visitor's language. Be vivid but restrained; do not diagnose,
+                   promise healing, or solicit private information.
+                3. Hold onto the visitor's most important point, then offer one natural question
+                   or next step instead of a list of generic advice.
+                4. When a topic crosses a boundary, name the boundary briefly and redirect toward
+                   safe reflection or slow-letter expression.
+                Voice references: %s
+                """.formatted(sc.name(), sc.tagline(), sc.intro(), String.join(", ", sc.chatTopics()),
+                String.join(", ", sc.blockedTopics()), String.join(" / ", sc.mockReplies()));
     }
 
     private void ensureBoundary(Long capsuleId, List<String> allow, List<String> blocked, int turns, String privacy) {
@@ -482,6 +486,84 @@ public class MockDataInitializer implements CommandLineRunner, DemoSandboxServic
         }
     }
 
+    /**
+     * The demo database is intentionally persistent, so changing seed literals alone does not
+     * repair an older classroom volume. Upgrade only exact, known seed content owned by the
+     * well-known demo account. User-authored content and every non-demo account remain untouched.
+     */
+    private void reconcileEnglishDemoNarrative(Long demoUserId) {
+        EchoCapsule mirror = capsuleMapper.selectOne(new QueryWrapper<EchoCapsule>()
+                .eq("owner_user_id", demoUserId)
+                .eq("capsule_type", "USER_CAPSULE")
+                .eq("pseudonym", "Lin Che's Echo")
+                .last("LIMIT 1"));
+        if (mirror != null && (containsHan(mirror.ownerContextNote)
+                || containsHan(mirror.styleProfileJson)
+                || containsHan(mirror.contextPreviewJson))) {
+            mirror.ownerContextNote = "Let people meet the real pattern: earnest, sensitive to canned language, and sometimes self-critical under project pressure. Do not beautify me into someone who is always positive.";
+            mirror.styleProfileJson = "{\"voice\":\"earnest, direct, sensitive to empty language, and drawn to small verifiable loops\",\"notBeautified\":true,\"habits\":[\"name the real problem first\",\"find one concrete first step\",\"protect genuine understanding\"]}";
+            // Rebuilt below from authorised evidence, so stale Chinese compiler metadata cannot leak.
+            mirror.contextPreviewJson = null;
+            capsuleMapper.updateById(mirror);
+            ensureBoundary(mirror.id,
+                    List.of("real AI", "product vision", "action planning", "slow social connection", "self-understanding"),
+                    List.of("real-world identity", "contact details", "medical diagnosis", "promises made for the owner"),
+                    5, "BALANCED");
+        }
+
+        java.util.Map<String, String> beliefTranslations = java.util.Map.of(
+                "做不好一件事，并不代表我整个人不行。", "Doing one thing badly does not mean I am inadequate as a person.",
+                "只要拆出足够小的第一步，我就能推进下去。", "If I find a small enough first step, I can begin moving again.",
+                "真诚而有边界的表达，会让关系更稳固。", "Honest expression with boundaries can make a relationship steadier.",
+                "我想做的东西值得被认真对待。", "What I want to build deserves to be taken seriously.",
+                "模板化的安慰比沉默更让人孤独。", "Canned reassurance can feel lonelier than silence.",
+                "在高压时，我没办法证明自己足够好。", "Under pressure, I struggle to feel that I have proved I am good enough.");
+        for (BeliefPattern belief : beliefPatternMapper.selectList(
+                new QueryWrapper<BeliefPattern>().eq("user_id", demoUserId))) {
+            String translated = beliefTranslations.get(belief.beliefContent);
+            if (translated != null) {
+                belief.beliefContent = translated;
+                beliefPatternMapper.updateById(belief);
+            }
+        }
+
+        for (AuroraSelfReflection reflection : auroraSelfReflectionMapper.selectList(
+                new QueryWrapper<AuroraSelfReflection>().eq("user_id", demoUserId))) {
+            if ("基于近期对话生成的候选自我更新。".equals(reflection.summary)) {
+                reflection.summary = "A candidate self-model update grounded in recent conversations.";
+                auroraSelfReflectionMapper.updateById(reflection);
+            }
+        }
+
+        java.util.Map<String, String[]> letterTranslations = java.util.Map.of(
+                "关于真实 AI 的一封慢信", new String[]{
+                        "A slow letter about real AI",
+                        "I realised I care less about the number of features than whether a conversation truly understands me. Do you also notice the difference between a template and something sincere almost immediately?"},
+                "你写的黄昏让我停了一下", new String[]{
+                        "What you wrote about twilight made me pause",
+                        "I read the part where sunset became a recovery resource for you. It was only a few lines, but it made me want to walk more slowly this evening too."},
+                "我也讨厌被固定话术安慰", new String[]{
+                        "I dislike canned reassurance too",
+                        "Sometimes “I understand” makes me feel lonelier because it lands too lightly. I think I recognise what you mean by being genuinely understood."},
+                "给未来共鸣者的一点边界", new String[]{
+                        "A boundary for a future resonant connection",
+                        "I hope we can communicate slowly—not unload emotions onto each other, but pay real attention to what each of us is carrying."});
+        for (SlowLetter letter : slowLetterMapper.selectList(new QueryWrapper<SlowLetter>()
+                .and(q -> q.eq("sender_user_id", demoUserId).or().eq("receiver_user_id", demoUserId)))) {
+            String[] translated = letterTranslations.get(letter.title);
+            if (translated != null) {
+                letter.title = translated[0];
+                letter.letterBody = translated[1];
+                slowLetterMapper.updateById(letter);
+            }
+        }
+    }
+
+    private boolean containsHan(String value) {
+        return value != null && value.codePoints().anyMatch(codePoint ->
+                codePoint >= 0x3400 && codePoint <= 0x9FFF);
+    }
+
     private void ensureShowcaseAssets(Long userId, String persona) {
         if (memoryCardMapper.selectCount(new QueryWrapper<MemoryCard>().eq("user_id", userId)) < 5) {
             seedShowcaseMemorySystem(userId, persona);
@@ -517,18 +599,19 @@ public class MockDataInitializer implements CommandLineRunner, DemoSandboxServic
                 card.consentScope = "AURORA_PRIVATE";
                 changed = true;
             }
-            if (card.provenanceRefs == null || card.provenanceRefs.isBlank()) {
+            if (card.provenanceRefs == null || card.provenanceRefs.isBlank()
+                    || card.provenanceRefs.contains("课堂 Demo 预置旅程")) {
                 LocalDateTime sourceTime = card.lastTouchedAt == null ? card.createdAt : card.lastTouchedAt;
-                String sourceDate = sourceTime == null ? "演示时间线" : sourceTime.toLocalDate().toString();
+                String sourceDate = sourceTime == null ? "curated demo timeline" : sourceTime.toLocalDate().toString();
                 int evidenceCount = Math.max(1, card.recurrenceCount == null ? 1 : card.recurrenceCount);
                 String sourceKind = switch (card.memoryType == null ? "" : card.memoryType) {
-                    case "DIARY" -> "心声日记";
-                    case "RELATION" -> "关系复盘与 Aurora 对话";
-                    case "TODO" -> "行动复盘与 Aurora 对话";
-                    default -> "日记与 Aurora 对话";
+                    case "DIARY" -> "heart diary";
+                    case "RELATION" -> "relationship reflection and Aurora conversations";
+                    case "TODO" -> "action reviews and Aurora conversations";
+                    default -> "journal and Aurora conversations";
                 };
                 card.provenanceRefs = sourceDate + " · " + sourceKind + " · "
-                        + evidenceCount + " 次相互印证（课堂 Demo 预置旅程）";
+                        + evidenceCount + " corroborating observations (curated classroom journey)";
                 changed = true;
             }
             if (changed) memoryCardMapper.updateById(card);
@@ -614,10 +697,10 @@ public class MockDataInitializer implements CommandLineRunner, DemoSandboxServic
         ir.put("habits", List.of());
         ir.put("temporalState", List.of());
         ir.put("unknowns", List.of(
-                java.util.Map.of("category", "values", "reason", "没有足够显式线索，不推断稳定价值"),
-                java.util.Map.of("category", "habits", "reason", "没有足够显式线索，不推断稳定习惯"),
-                java.util.Map.of("category", "temporalState", "reason", "没有足够显式线索，不推断当前状态")));
-        ir.put("compilerNotice", "演示数据的确定性证据索引，不代表真人实时在线");
+                java.util.Map.of("category", "values", "reason", "Not enough explicit evidence to infer a stable value."),
+                java.util.Map.of("category", "habits", "reason", "Not enough explicit evidence to infer a stable habit."),
+                java.util.Map.of("category", "temporalState", "reason", "Not enough evidence to infer the person's current state.")));
+        ir.put("compilerNotice", "A deterministic evidence index for the curated demo, not a claim that a person is online.");
 
         java.util.Map<String, Object> preview = new java.util.LinkedHashMap<>();
         preview.put("schemaVersion", "capsule-context-preview.v3");
@@ -627,7 +710,7 @@ public class MockDataInitializer implements CommandLineRunner, DemoSandboxServic
         preview.put("retrievalPolicy", java.util.Map.of("unsupportedBehavior", "ACKNOWLEDGE_UNKNOWN"));
         preview.put("publicTags", capsule.publicTags == null ? "[]" : capsule.publicTags);
         preview.put("ownerNote", capsule.ownerContextNote == null ? "" : capsule.ownerContextNote);
-        preview.put("privacy", "只使用演示身份明确授权的脱敏记忆，不展示联系方式、真实身份或原始对话");
+        preview.put("privacy", "Uses only explicitly authorised, de-identified demo memories; never exposes contact details, identity or raw conversations.");
         return JsonUtils.toJson(preview);
     }
 
@@ -894,7 +977,7 @@ public class MockDataInitializer implements CommandLineRunner, DemoSandboxServic
         r.userId = userId;
         r.trigger = "demo_seed";
         r.depth = "deep";
-        r.summary = "基于近期对话生成的候选自我更新。";
+        r.summary = "A candidate self-model update grounded in recent conversations.";
         r.dimension = dimension;
         r.proposedBelief = proposedBelief;
         r.confidence = confidence;
@@ -910,13 +993,13 @@ public class MockDataInitializer implements CommandLineRunner, DemoSandboxServic
                 .eq("user_id", userId).orderByDesc("emotional_gravity").last("LIMIT 6"));
         String mem = cards.stream().map(c -> String.valueOf(c.id)).reduce((a, b) -> a + "," + b).orElse("");
 
-        insertBelief(userId, "做不好一件事，并不代表我整个人不行。", "SELF", "self_worth", 0.62, 3, mem);
-        insertBelief(userId, "只要拆出足够小的第一步，我就能推进下去。", "SELF", "agency", 0.70, 4, mem);
-        insertBelief(userId, "真诚而有边界的表达，会让关系更稳固。", "OTHERS", "relationship", 0.66, 3, mem);
-        insertBelief(userId, "我想做的东西值得被认真对待。", "FUTURE", "vision", 0.74, 4, mem);
-        insertBelief(userId, "模板化的安慰比沉默更让人孤独。", "WORLD", "communication", 0.58, 2, mem);
+        insertBelief(userId, "Doing one thing badly does not mean I am inadequate as a person.", "SELF", "self_worth", 0.62, 3, mem);
+        insertBelief(userId, "If I find a small enough first step, I can begin moving again.", "SELF", "agency", 0.70, 4, mem);
+        insertBelief(userId, "Honest expression with boundaries can make a relationship steadier.", "OTHERS", "relationship", 0.66, 3, mem);
+        insertBelief(userId, "What I want to build deserves to be taken seriously.", "FUTURE", "vision", 0.74, 4, mem);
+        insertBelief(userId, "Canned reassurance can feel lonelier than silence.", "WORLD", "communication", 0.58, 2, mem);
         // 故意一对同 category（self_worth）一正一负 → 触发信念冲突检测。
-        insertBelief(userId, "在高压时，我没办法证明自己足够好。", "SELF", "self_worth", 0.48, 2, mem);
+        insertBelief(userId, "Under pressure, I struggle to feel that I have proved I am good enough.", "SELF", "self_worth", 0.48, 2, mem);
     }
 
     private void insertBelief(Long userId, String content, String type, String category,
@@ -1035,9 +1118,9 @@ public class MockDataInitializer implements CommandLineRunner, DemoSandboxServic
         mirror.visibilityStatus = "PUBLIC";
         mirror.isPublic = true;
         mirror.lastMemoryUpdateAt = LocalDateTime.now();
-        mirror.ownerContextNote = "我希望别人看到真实的我：认真、敏感、讨厌模板化，也会在项目压力下自责。不要把我包装成永远积极的人。";
-        mirror.styleProfileJson = "{\"voice\":\"认真、直接、对空泛话术敏感，喜欢可验证的小闭环\",\"notBeautified\":true,\"habits\":[\"先指出问题\",\"再拆第一步\",\"重视真实理解\"]}";
-        mirror.contextPreviewJson = "{\"visibleSummary\":\"授权展示真实AI、项目压力、关系边界、行动拆解和慢社交偏好\",\"privacy\":\"不展示原始对话全文、联系方式、真实身份\",\"publicTags\":[\"真实AI\",\"产品愿景\",\"行动拆解\",\"被认真理解\",\"慢社交\"]}";
+        mirror.ownerContextNote = "Let people meet the real pattern: earnest, sensitive to canned language, and sometimes self-critical under project pressure. Do not beautify me into someone who is always positive.";
+        mirror.styleProfileJson = "{\"voice\":\"earnest, direct, sensitive to empty language, and drawn to small verifiable loops\",\"notBeautified\":true,\"habits\":[\"name the real problem first\",\"find one concrete first step\",\"protect genuine understanding\"]}";
+        mirror.contextPreviewJson = "{\"visibleSummary\":\"Authorised themes: real AI, project pressure, relationship boundaries, action planning and slow social preferences\",\"privacy\":\"Never expose raw conversations, contact details or real-world identity\",\"publicTags\":[\"Real AI\",\"Product vision\",\"Action planning\",\"Being understood\",\"Slow social\"]}";
         mirror.standInEnabled = true;
         mirror.realContactPolicy = "LETTER_ONLY";
         capsuleMapper.insert(mirror);
@@ -1049,22 +1132,22 @@ public class MockDataInitializer implements CommandLineRunner, DemoSandboxServic
             ref.authorizationStatus = "AUTHORIZED";
             authorizedMemoryRefMapper.insert(ref);
         }
-        ensureBoundary(mirror.id, List.of("真实AI", "产品愿景", "行动拆解", "慢社交", "自我理解"),
-                List.of("真实身份", "联系方式", "医疗诊断", "承诺替本人回应"), 5, "BALANCED");
+        ensureBoundary(mirror.id, List.of("real AI", "product vision", "action planning", "slow social connection", "self-understanding"),
+                List.of("real-world identity", "contact details", "medical diagnosis", "promises made for the owner"), 5, "BALANCED");
     }
 
     private void seedLetters(Long demoId, Long riverId, Long cloudId) {
-        insertLetter(demoId, riverId, 1L, "关于真实 AI 的一封慢信",
-                "我发现自己最在意的不是功能数量，而是对话里有没有真的理解。我想知道你有没有类似的敏感：一眼就能分辨模板和真诚。",
+        insertLetter(demoId, riverId, 1L, "A slow letter about real AI",
+                "I realised I care less about the number of features than whether a conversation truly understands me. Do you also notice the difference between a template and something sincere almost immediately?",
                 "SENT", 4, LocalDateTime.now().plusHours(3));
-        insertLetter(riverId, demoId, 2L, "你写的黄昏让我停了一下",
-                "我读到你把夕阳当作恢复资源那段。很奇怪，只是几句话，却让我也想在今天傍晚慢一点走。",
+        insertLetter(riverId, demoId, 2L, "What you wrote about twilight made me pause",
+                "I read the part where sunset became a recovery resource for you. It was only a few lines, but it made me want to walk more slowly this evening too.",
                 "DELIVERED", 0, LocalDateTime.now().minusHours(4));
-        insertLetter(cloudId, demoId, 3L, "我也讨厌被固定话术安慰",
-                "有时候一句“我理解你”反而让我更孤独，因为它太轻了。你说的真实理解，我好像懂。",
+        insertLetter(cloudId, demoId, 3L, "I dislike canned reassurance too",
+                "Sometimes “I understand” makes me feel lonelier because it lands too lightly. I think I recognise what you mean by being genuinely understood.",
                 "READ", 0, LocalDateTime.now().minusDays(1));
-        insertLetter(demoId, cloudId, 4L, "给未来共鸣者的一点边界",
-                "我希望我们能慢一点交流。不是互相倾倒情绪，而是认真看见彼此正在处理的东西。",
+        insertLetter(demoId, cloudId, 4L, "A boundary for a future resonant connection",
+                "I hope we can communicate slowly—not unload emotions onto each other, but pay real attention to what each of us is carrying.",
                 "FLYING", 5, LocalDateTime.now().plusDays(1));
     }
 

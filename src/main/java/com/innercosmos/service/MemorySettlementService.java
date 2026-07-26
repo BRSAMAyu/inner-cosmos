@@ -9,5 +9,15 @@ public interface MemorySettlementService {
 
     void updateThemeAggregation(Long userId);
 
-    void settleDiary(Long userId, String diaryText);
+    /**
+     * Settles an explicitly submitted diary into private long-term memory.
+     *
+     * @param sourceTranscriptionId owner-scoped VoiceTranscription source, or null only for legacy
+     *                              service callers that have no persisted transcription artifact
+     */
+    void settleDiary(Long userId, Long sourceTranscriptionId, String diaryText);
+
+    default void settleDiary(Long userId, String diaryText) {
+        settleDiary(userId, null, diaryText);
+    }
 }

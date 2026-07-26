@@ -12,6 +12,7 @@ export const LOCALES: readonly Locale[] = ["zh-CN", "en-SG"] as const;
 const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === "true";
 export const DEFAULT_LOCALE: Locale = DEMO_MODE ? "en-SG" : "zh-CN";
 const STORAGE_KEY = "ic.locale";
+export const LOCALE_CHANGE_EVENT = "inner-cosmos:locale-change";
 
 /** Coerce any raw value (a stored pref or a navigator.language tag) to a supported Locale, or null. */
 export function normalizeLocale(value: string | null | undefined): Locale | null {
@@ -39,4 +40,14 @@ export function loadLocale(): Locale {
 
 export function saveLocale(locale: Locale): void {
   if (typeof localStorage !== "undefined") localStorage.setItem(STORAGE_KEY, locale);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent<Locale>(LOCALE_CHANGE_EVENT, { detail: locale }));
+  }
+}
+
+/** Keep browser/accessibility metadata aligned with the language rendered by React. */
+export function syncDocumentLocale(locale: Locale): void {
+  if (typeof document === "undefined") return;
+  document.documentElement.lang = locale;
+  document.documentElement.dir = "ltr";
 }
