@@ -73,7 +73,7 @@ class AuroraInnerVoiceEnabledStreamTest {
         int deepPlanAt = body.indexOf("event:turn.plan");
         assertTrue(acknowledgementAt >= 0 && deepPlanAt >= 0 && acknowledgementAt < deepPlanAt,
                 "the fast non-thinking expression kernel must surface before the deep dual-kernel plan; got:\n" + body);
-        assertTrue(body.contains("\"runtime\":\"dual-kernel.v1\""),
+        assertTrue(body.contains("\"runtime\":\"dual-kernel.pipeline.v2\""),
                 "progressive acknowledgement must not replace or bypass the authoritative dual kernel; got:\n" + body);
         // Voice-polish fix: inner_voice must arrive AFTER turn.completed (not before), so a
         // slow-but-successful TTS synthesis never delays the turn's formal closeout. The frontend

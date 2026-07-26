@@ -35,4 +35,7 @@ public class AuroraReplyVO {
     /** In-process only: consumed after {@code turn.completed}; never part of the public API. */
     @JsonIgnore
     public AuroraDualKernelRuntime.InnerVoiceRequest innerVoiceRequest;
+    /** Background planner result consumed only after the visible turn has completed. */
+    @JsonIgnore
+    public java.util.concurrent.CompletableFuture<AuroraDualKernelRuntime.InnerVoiceRequest> deferredInnerVoiceRequest;
 }

@@ -147,7 +147,7 @@ class AuroraStreamControllerTest {
                 "meta must carry agentLoop for the perception panel on stream; got:\n" + body);
         assertTrue(body.contains("\"referencedMemoryIds\""),
                 "meta must carry exact owner-scoped memory ids so the client can show provenance; got:\n" + body);
-        assertTrue(body.contains("\"runtime\":\"dual-kernel.v1\""),
+        assertTrue(body.contains("\"runtime\":\"dual-kernel.pipeline.v2\""),
                 "meta must expose the observable dual-kernel runtime without internal reasoning; got:\n" + body);
         assertTrue(body.contains("\"criticRepaired\""),
                 "meta must expose the safe critic outcome field; got:\n" + body);
@@ -155,6 +155,10 @@ class AuroraStreamControllerTest {
                 "meta must reveal whether the planning kernel used a deterministic fallback; got:\n" + body);
         assertTrue(body.contains("\"speakerFallbackUsed\""),
                 "meta must reveal whether the speaking kernel used a deterministic fallback; got:\n" + body);
+        assertTrue(body.contains("\"backgroundPlannerScheduled\":true"),
+                "meta must prove the planner is scheduled off the visible critical path; got:\n" + body);
+        assertTrue(body.contains("\"guidanceSource\""),
+                "meta must reveal whether speaker used bootstrap or prior-turn guidance; got:\n" + body);
     }
 
     @Test

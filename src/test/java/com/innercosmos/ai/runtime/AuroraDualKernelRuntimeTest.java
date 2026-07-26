@@ -124,6 +124,27 @@ class AuroraDualKernelRuntimeTest {
     }
 
     @Test
+    void preservesNaturalSpeakerBubblesInsteadOfConcatenatingToThePlannedCount() {
+        ABTestService ab = mock(ABTestService.class);
+        when(ab.assignGroup(anyLong(), anyString())).thenReturn("REMOTE");
+        LlmConfig config = new LlmConfig();
+        config.mode = "prod";
+        BubbleOverproductionClient client = new BubbleOverproductionClient();
+        StructuredAiService structured = new StructuredAiService(client, ab, config);
+        AuroraDualKernelRuntime runtime = new AuroraDualKernelRuntime(structured);
+
+        var generation = runtime.generate(7L, "DAILY_TALK",
+                Map.of("userMessage", "今天午饭还不错"),
+                client, StructuredAiResults.AuroraResult::new);
+
+        assertThat(generation.result().segments)
+                .containsExactly("那家小店今天没有踩雷。", "你点了什么？", "看来可以先记住它。");
+        assertThat(generation.result().speakCount).isEqualTo(3);
+        assertThat(client.modules).containsExactly(
+                "AURORA_PLAN_DAILY_TALK", "AURORA_SPEAKER_DAILY_TALK");
+    }
+
+    @Test
     void deterministicGateOverridesACriticThatLetsCompanionClichesPass() {
         ABTestService ab = mock(ABTestService.class);
         when(ab.assignGroup(anyLong(), anyString())).thenReturn("REMOTE");
@@ -972,6 +993,28 @@ class AuroraDualKernelRuntimeTest {
                  "segments":["好，我先停在这里接住你，不往下分析。"],"speakCount":1,
                  "continueReason":"repair","detectedTheme":"害怕","memoryReferenced":false,
                  "referencedMemoryIds":[],"riskFlags":[]}}
+                """;
+        }
+
+        @Override public SseEmitter streamChat(LlmRequest request) { return new SseEmitter(); }
+    }
+
+    private static final class BubbleOverproductionClient implements LlmClient {
+        private final List<String> modules = new ArrayList<>();
+
+        @Override
+        public String chat(LlmRequest request) {
+            modules.add(request.moduleName);
+            if (request.moduleName.startsWith("AURORA_PLAN")) return """
+                {"userIntent":"分享午饭","emotionalNeed":"自然回应","relationshipMove":"轻松接话",
+                 "responseConstraints":[],"bubblePurposes":["接住这件小事"],"relevantMemoryIds":[],
+                 "uncertainty":"","needsCritic":false,"innerVoiceWorthy":false,"innerVoiceSeed":""}
+                """;
+            return """
+                {"segments":["那家小店今天没有踩雷。","你点了什么？","看来可以先记住它。"],
+                 "speakCount":3,"continueReason":"继续闲聊","detectedTheme":"午饭",
+                 "nextQuestion":"你点了什么？","smallStep":"","featureSuggestion":"","featureTarget":"",
+                 "memoryReferenced":false,"referencedMemoryIds":[],"riskFlags":[]}
                 """;
         }
 

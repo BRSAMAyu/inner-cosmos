@@ -55,6 +55,7 @@ import com.innercosmos.vo.SafetyResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -99,6 +100,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     private final DialogSessionMapper sessionMapper;
     private final LlmConfig llmConfig;
     private final Executor aiExecutor;
+    private Executor streamExecutor;
     private final AgentContextAssembler agentContextAssembler;
     private final SessionModelRouter modelRouter;
     private final PortraitReflectionService portraitReflection;
@@ -158,6 +160,11 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         this.liveEventStore = liveEventStore;
     }
 
+    @Autowired
+    void setStreamExecutor(@Qualifier("sseExecutor") Executor streamExecutor) {
+        this.streamExecutor = streamExecutor;
+    }
+
     public AuroraAgentServiceImpl(StructuredAiService structuredAiService,
                                   DialogService dialogService,
                                   SafetyService safetyService,
@@ -187,6 +194,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         this.sessionMapper = sessionMapper;
         this.llmConfig = llmConfig;
         this.aiExecutor = aiExecutor;
+        this.streamExecutor = aiExecutor;
         this.agentContextAssembler = agentContextAssembler;
         this.modelRouter = modelRouter;
         this.portraitReflection = portraitReflection;
@@ -355,6 +363,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         turnContext.put("auroraSystemPrompt", systemPrompt);
         turnContext.put("userMessage", request.message == null ? "" : request.message);
         turnContext.put("mode", mode);
+        turnContext.put("sessionId", request.sessionId == null ? 0L : request.sessionId);
         // M-012: thread the active mode's sampling temperature so it actually reaches the
         // model (StructuredAiService reads "modeTemperature" → LlmRequest.temperature →
         // provider body). Null-safe: when the mode has no strategy, the key is absent and
@@ -398,6 +407,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         io.micrometer.observation.Observation.Scope providerScope = providerObservation == null
                 ? null : providerObservation.openScope();
         AuroraDualKernelRuntime.InnerVoiceRequest innerVoiceRequest = null;
+        java.util.concurrent.CompletableFuture<AuroraDualKernelRuntime.InnerVoiceRequest> deferredInnerVoiceRequest = null;
         try {
             StructuredAiResults.AuroraResult ai;
             if (dualKernelRuntime != null && dualKernelRuntime.shouldUseDualKernelForTurn(turnContext)) {
@@ -420,7 +430,10 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 runtimeMeta.put("plannerFallbackUsed", generation.plannerFallbackUsed());
                 runtimeMeta.put("speakerFallbackUsed", generation.speakerFallbackUsed());
                 runtimeMeta.put("criticFallbackUsed", generation.criticFallbackUsed());
+                runtimeMeta.put("backgroundPlannerScheduled", generation.backgroundPlannerScheduled());
+                runtimeMeta.put("guidanceSource", generation.guidanceSource());
                 innerVoiceRequest = generation.innerVoiceRequest();
+                deferredInnerVoiceRequest = generation.deferredInnerVoiceRequest();
             } else {
                 ai = callWithRetry(userId, mode, turnContext, resolved, request, gravityMemories,
                     memoryContext, allowMemory, stateSignal);
@@ -429,6 +442,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             vo = toReply(profile, ai, request, mode, memoryContext, gravityMemories, allowMemory);
             vo = sanitizeLlmOutput(vo, userId);
             vo.innerVoiceRequest = innerVoiceRequest;
+            vo.deferredInnerVoiceRequest = deferredInnerVoiceRequest;
             if (Boolean.FALSE.equals(agentContext.multiMessageAllowed) && vo.messages.size() > 1) {
                 vo.messages = List.of(vo.messages.get(0));
                 vo.agentLoop = Map.of(
@@ -639,7 +653,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         if (Boolean.TRUE.equals(safety.blockModelCall)) {
             // Emit ONE safety/resource event asynchronously (uniform SSE contract).
             // Do NOT stream chat — crisis must never arrive as free-form consolation.
-            aiExecutor.execute(() -> {
+            streamExecutor.execute(() -> {
                 saveUserAndBlockedAurora(userId, sessionId, message, mode, safety);
                 sendOnce(emitter, "safety", jsonSafety(safety));
                 sendOnce(emitter, "done", "{\"message\":\"done\"}");
@@ -651,7 +665,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         // Non-blocked: save the user turn, then build + persist the full reply exactly
         // as the POST path does, and finally drip the (already-persisted) segments
         // server-side over real SSE transport — no client-side fake typewriter.
-        aiExecutor.execute(() -> {
+        streamExecutor.execute(() -> {
             Long turnId = null;
             try {
                 ChatRequest request = new ChatRequest();
@@ -794,10 +808,23 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 // and TTS both run AFTER meta/turn.completed (and before final done/close), so a
                 // slow-but-successful enrichment can only delay its own audio. The frontend SSE
                 // reader reads until connection close, so it still receives this late event.
-                if (clientConnected.get() && reply.innerVoiceRequest != null) {
+                AuroraDualKernelRuntime.InnerVoiceRequest resolvedInnerVoiceRequest = reply.innerVoiceRequest;
+                if (resolvedInnerVoiceRequest == null && reply.deferredInnerVoiceRequest != null
+                        && clientConnected.get()) {
+                    try {
+                        // The visible reply and turn.completed have already been delivered. Waiting here can
+                        // delay only the optional side-channel, never the conversational critical path.
+                        resolvedInnerVoiceRequest = reply.deferredInnerVoiceRequest.get(
+                                8, java.util.concurrent.TimeUnit.SECONDS);
+                    } catch (Exception plannerStillWorking) {
+                        log.debug("Background planner did not yield an inner voice within the side-channel budget: {}",
+                                plannerStillWorking.getMessage());
+                    }
+                }
+                if (clientConnected.get() && resolvedInnerVoiceRequest != null) {
                     try {
                         if (ttsClient != null && ttsClient.available()) {
-                            String innerVoiceText = dualKernelRuntime.composeInnerVoice(reply.innerVoiceRequest);
+                            String innerVoiceText = dualKernelRuntime.composeInnerVoice(resolvedInnerVoiceRequest);
                             if (innerVoiceText != null && !innerVoiceText.isBlank()) {
                                 String voiceId = preferredTtsVoiceIdFor(loadProfile(userId));
                                 byte[] audio = ttsClient.synthesize(innerVoiceText, voiceId);
@@ -1599,9 +1626,10 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             + "7. If the user explicitly asks for no advice, do not smuggle in a plan, exercise, feature, or follow-up question.\n\n"
             + "[Message Count & Shape — friend-style flow]\n"
             + "Max " + segmentCount + " segments. Count is determined by context, not fixed.\n"
-            + "第一条必须先「接住情绪」：用一两句温柔地共情、确认你听见了TA此刻的感受，不要急着分析、不要立刻给建议或下判断。就像朋友先轻轻接住你，再慢慢聊。\n"
-            + "之后可以再补 1-2 条短消息（这正是连发的意义，别把想说的都压成一条）：补一个想法 / 多一点关心 / 连接一条旧线索（说『我想到一个线索』）/ 自然时才提功能。每条像一条微信消息，短、口语、有呼吸感。\n"
-            + "并且尽量在最后给出一个温柔的 nextQuestion——像朋友一样轻轻反问一句，把对话递回给TA，而不是把话说死。nextQuestion 要具体、贴着TA刚说的内容，别空泛（避免『你还好吗』这类）。\n"
+            + "第一条先回应用户此刻最具体的东西：有明显情绪时自然接住，没有情绪时直接接话、回答或顺着细节走；不要强行共情，也不要急着下判断。\n"
+            + "气泡数必须有真实变化：普通短交流优先 1 条；只有一个独立推进值得补充时用 2 条；仅当用户同时提出多个问题或内容确实复杂、三条各有不可合并的作用时才用 3 条。不要为了制造连发感把一句完整的话拆成三条，也不要凑数。\n"
+            + "表达要有活气：句长和停顿可以变化，偶尔允许克制的幽默、具体联想或一句意外但贴切的话；不必每次追问，也不要固定走『共情—分析—提问』。像真实朋友一样，有时只接一句，有时多走半步，有时知道在哪里停。\n"
+            + "nextQuestion 不是每轮必需：只有一个具体问题真的能让对话自然向前时才问；否则留空并在合适处停住。提问要贴着用户刚说的内容，避免『你还好吗』这类空泛追问。\n"
             + "If a follow-up is not good enough, just empty or repetitive, write [[SILENCE]].\n\n"
             + "[Emergence — how you are with THIS person]\n"
             + "你与这个人相处的方式——安静陪着 / 轻轻追问 / 帮忙整理 / 先共情再轻指一步——应从你对TA的了解（画像）、你们的关系、TA此刻的状态、以及共享的记忆里自然长出来。"
@@ -1851,6 +1879,8 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         boolean plannerFallbackUsed = loop != null && Boolean.TRUE.equals(loop.get("plannerFallbackUsed"));
         boolean speakerFallbackUsed = loop != null && Boolean.TRUE.equals(loop.get("speakerFallbackUsed"));
         boolean criticFallbackUsed = loop != null && Boolean.TRUE.equals(loop.get("criticFallbackUsed"));
+        boolean backgroundPlannerScheduled = loop != null && Boolean.TRUE.equals(loop.get("backgroundPlannerScheduled"));
+        String guidanceSource = loop != null && loop.get("guidanceSource") instanceof String gs ? gs : "";
         @SuppressWarnings("unchecked")
         List<String> criticIssues = loop != null && loop.get("criticIssues") instanceof List<?> issues
                 ? issues.stream().filter(String.class::isInstance).map(String.class::cast).toList()
@@ -1865,6 +1895,8 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 .append(",\"plannerFallbackUsed\":").append(plannerFallbackUsed)
                 .append(",\"speakerFallbackUsed\":").append(speakerFallbackUsed)
                 .append(",\"criticFallbackUsed\":").append(criticFallbackUsed)
+                .append(",\"backgroundPlannerScheduled\":").append(backgroundPlannerScheduled)
+                .append(",\"guidanceSource\":\"").append(escape(guidanceSource)).append("\"")
                 .append(",\"criticIssues\":").append(jsonStringArray(criticIssues)).append("}");
         // aiState block.
         if (reply.aiState != null) {

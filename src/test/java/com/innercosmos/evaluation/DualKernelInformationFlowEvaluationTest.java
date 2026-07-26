@@ -36,11 +36,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * Offline, deterministic acceptance for the structural claim behind Aurora's adaptive dual kernel.
+ * Offline, deterministic acceptance for Aurora's legacy same-turn dual-kernel harness.
  *
- * <p>This deliberately gives forced-single and adaptive-dual the same input and the same visible
- * final reply. It therefore cannot "win" by authoring a nicer dual-kernel sentence. What it proves
- * is narrower and directly observable:
+ * <p>This deliberately gives forced-single and legacy adaptive-dual the same input and the same visible
+ * final reply. It does not execute Spring production wiring and therefore does not describe the
+ * current pipelined runtime. What it proves is narrower and directly observable:
  *
  * <ul>
  *   <li>both variants receive the same raw perception/context signals;</li>
@@ -65,7 +65,7 @@ class DualKernelInformationFlowEvaluationTest {
     private static final String FEATURE_TARGET = "todo";
 
     @Test
-    void sameInputProducesARealPlanSpeakerCriticHandoffWithoutClaimingAQualityWin() throws Exception {
+    void legacySameTurnHarnessProducesPlanSpeakerCriticHandoffWithoutClaimingProductionOrdering() throws Exception {
         Map<String, Object> sameInput = richTurnContext();
 
         Variant single = runSingle(sameInput);
@@ -225,13 +225,14 @@ class DualKernelInformationFlowEvaluationTest {
     private void writeReport(Variant single, Variant dual, ObservabilityEvidence observability)
             throws Exception {
         Map<String, Object> report = new LinkedHashMap<>();
-        report.put("suite", "dual-kernel-information-flow-v1");
-        report.put("claim", "same raw context; dual adds an explicit plan/speaker/critic decision chain");
+        report.put("suite", "dual-kernel-information-flow-legacy-v1");
+        report.put("claim", "legacy direct-construction harness exposes a plan/speaker/critic decision chain");
         report.put("notClaimed", List.of(
                 "dual output is semantically better",
                 "dual acquires external facts that single cannot access",
                 "smallStep or featureTarget is automatically executed",
-                "offline scripted provider represents real-provider quality"));
+                "offline scripted provider represents real-provider quality",
+                "legacy same-turn call order represents the Spring-wired production pipeline"));
         report.put("sameVisibleOutputHeldConstant", true);
         report.put("single", single.asReportRow());
         report.put("adaptiveDual", dual.asReportRow());
@@ -239,7 +240,8 @@ class DualKernelInformationFlowEvaluationTest {
         report.put("apiEvidence", Map.of(
                 "providerTruth", "aiState.provider/model/mode/apiKeyConfigured/fallbackAllowed",
                 "kernelTruth", "agentLoop.runtime/relationshipMove/critic*/stageLatenciesMs",
-                "importantBoundary", "aiState alone does not prove that planner/speaker/critic ran"));
+                "importantBoundary", "this direct-construction test bypasses production plannerExecutor wiring"));
+        report.put("productionPathEvidence", "AuroraPipelinedDualKernelRuntimeTest");
         report.put("remainingGaps", List.of(
                 "production OTel has a runtime-tagged aurora.turn completion span but no per-stage planner/speaker/critic spans",
                 "inner.cosmos.ai.provider identifies provider and mode, not individual kernel stage",

@@ -3,6 +3,8 @@ package com.innercosmos.ai.runtime;
 import com.innercosmos.ai.client.LlmClient;
 import com.innercosmos.ai.structured.StructuredAiResults;
 import com.innercosmos.ai.structured.StructuredAiService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -10,13 +12,20 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
 /**
- * Campaign A runtime: a compact understanding/planning kernel followed by a separate
- * relationship/expression kernel, with a bounded critic only when the plan says risk
- * or the generated response violates observable quality constraints.
+ * Aurora's pipelined dual-kernel runtime. The foreground expression kernel answers the current
+ * turn directly from live context plus the previous background guidance. After that candidate is
+ * ready, the planning kernel observes both sides of the exchange and refreshes guidance for the
+ * next turn; optional critic and inner-voice work remain off the visible reply's critical path.
  *
  * <p><b>Runtime mode</b> ({@code inner-cosmos.aurora.runtime}, default {@code dual}):
  * {@code single} always uses the caller's single-pass path, {@code dual}
@@ -28,10 +37,21 @@ import java.util.function.Supplier;
 @Component
 public class AuroraDualKernelRuntime {
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AuroraDualKernelRuntime.class);
+    private static final long BACKGROUND_PLAN_TTL_MS = 6L * 60L * 60L * 1000L;
+    private static final int MAX_BACKGROUND_PLANS = 4096;
+    private static final Set<String> HARD_QUALITY_ISSUES = Set.of(
+            "empty_response", "bubble_too_long", "unauthorized_memory_expansion",
+            "unsupported_third_party_inference", "unsupported_user_behavior_inference",
+            "unsupported_user_emotion_inference", "unsupported_duration_inference",
+            "advice_boundary_violation", "quiet_disclosure_boundary_violation",
+            "single_action_scope_violation");
 
     private final StructuredAiService ai;
     private final InnerVoiceComposer innerVoiceComposer;
     private final DualKernelBudgetPolicy budgetPolicy = new DualKernelBudgetPolicy();
+    private final ConcurrentMap<PlannerKey, StoredPlan> backgroundPlans = new ConcurrentHashMap<>();
+    private final ConcurrentMap<PlannerKey, AtomicLong> planRevisions = new ConcurrentHashMap<>();
+    private volatile Executor plannerExecutor;
 
     @Value("${inner-cosmos.aurora.runtime:dual}")
     private String runtimeMode = "dual";
@@ -42,6 +62,12 @@ public class AuroraDualKernelRuntime {
         // here rather than requiring a second constructor param, which would force every existing
         // `new AuroraDualKernelRuntime(ai)` call site (tests included) to change.
         this.innerVoiceComposer = new InnerVoiceComposer(ai);
+    }
+
+    /** Production wiring: tests that construct the runtime directly retain the legacy synchronous harness. */
+    @Autowired
+    public void setPlannerExecutor(@Qualifier("aiExecutor") Executor plannerExecutor) {
+        this.plannerExecutor = plannerExecutor;
     }
 
     /**
@@ -93,7 +119,11 @@ public class AuroraDualKernelRuntime {
                                LlmClient client, Supplier<StructuredAiResults.AuroraResult> fallback,
                                boolean composeInnerVoice) {
         if (!enabled()) return new Generation(fallback.get(), "single-fallback", "", false,
-                List.of(), null, Map.of("total", 0L), true, true, false);
+                List.of(), null, null, Map.of("total", 0L), true, true, false,
+                false, "none");
+        if (plannerExecutor != null) {
+            return generatePipelined(userId, mode, assembledContext, client, fallback, composeInnerVoice);
+        }
 
         long totalStart = System.nanoTime();
         AtomicBoolean plannerFallbackUsed = new AtomicBoolean(false);
@@ -163,6 +193,9 @@ public class AuroraDualKernelRuntime {
             repaired = true;
             observableIssues = finalIssues;
         }
+        // Preserve the model's natural 1/2/3-message rhythm; only remove blanks and cap invalid
+        // overproduction. Do not concatenate surplus text into an unrelated final bubble.
+        enforcePlannedBubbleCadence(spoken, plan);
         InnerVoiceRequest innerVoiceRequest = composeInnerVoice && Boolean.TRUE.equals(plan.innerVoiceWorthy)
                 ? new InnerVoiceRequest(userId, mode, plan, spoken, client)
                 : null;
@@ -173,8 +206,137 @@ public class AuroraDualKernelRuntime {
         stageLatenciesMs.put("total", elapsedMs(totalStart));
         return new Generation(spoken, "dual-kernel.v1", safe(plan.relationshipMove), repaired,
             observableIssues == null ? List.of() : List.copyOf(observableIssues), innerVoiceRequest,
-            Map.copyOf(stageLatenciesMs), plannerFallbackUsed.get(), speakerFallbackUsed.get(),
-            criticFallbackUsed.get());
+            null, Map.copyOf(stageLatenciesMs), plannerFallbackUsed.get(), speakerFallbackUsed.get(),
+            criticFallbackUsed.get(), false, "same-turn-plan");
+    }
+
+    private Generation generatePipelined(Long userId, String mode, Map<String, Object> assembledContext,
+                                         LlmClient client,
+                                         Supplier<StructuredAiResults.AuroraResult> fallback,
+                                         boolean composeInnerVoice) {
+        long totalStart = System.nanoTime();
+        PlannerKey key = plannerKey(userId, mode, assembledContext);
+        pruneBackgroundPlans(System.currentTimeMillis());
+        StoredPlan stored = backgroundPlans.get(key);
+        StructuredAiResults.AuroraPlanResult guidance = stored == null
+                ? fallbackPlan(assembledContext)
+                : stored.plan();
+        String guidanceSource = stored == null ? "bootstrap-current-context" : "background-previous-turn";
+
+        AtomicBoolean speakerFallbackUsed = new AtomicBoolean(false);
+        Map<String, Object> speakerContext = new LinkedHashMap<>(assembledContext);
+        speakerContext.remove("auroraPrompt");
+        speakerContext.put("dialogueGuidance", guidance);
+        speakerContext.put("guidanceSource", guidanceSource);
+        speakerContext.put("runtimeContract", "dual-kernel.pipeline.v2");
+        long speakerStart = System.nanoTime();
+        var spoken = ai.call(userId, "AURORA_SPEAKER_" + mode, speakerInstruction(), speakerContext,
+                StructuredAiResults.AuroraResult.class, () -> {
+                    speakerFallbackUsed.set(true);
+                    return fallback.get();
+                }, client);
+        long speakerMs = elapsedMs(speakerStart);
+
+        enforceContextualBubbleCadence(spoken, assembledContext);
+        List<String> observableIssues = qualityIssues(spoken, guidance, assembledContext);
+        List<String> hardIssues = observableIssues.stream()
+                .filter(HARD_QUALITY_ISSUES::contains)
+                .toList();
+        boolean repaired = false;
+        if (!hardIssues.isEmpty()) {
+            spoken = deterministicQualityRepair(spoken, safe(assembledContext.get("userMessage")));
+            repaired = true;
+        }
+
+        long storedRevision = stored == null ? 0L : stored.revision();
+        AtomicLong revisionCounter = planRevisions.compute(key, (ignored, current) -> {
+            if (current == null) return new AtomicLong(storedRevision);
+            current.accumulateAndGet(storedRevision, Math::max);
+            return current;
+        });
+        long revision = revisionCounter.incrementAndGet();
+        StructuredAiResults.AuroraResult delivered = spoken;
+        List<String> deliveredIssues = List.copyOf(observableIssues);
+        CompletableFuture<InnerVoiceRequest> deferredInnerVoice = CompletableFuture.supplyAsync(
+                () -> refreshBackgroundPlan(key, revision, userId, mode, assembledContext,
+                        guidance, delivered, deliveredIssues, client, composeInnerVoice),
+                plannerExecutor);
+
+        Map<String, Long> latencies = new LinkedHashMap<>();
+        latencies.put("speaker", speakerMs);
+        latencies.put("criticalPathTotal", elapsedMs(totalStart));
+        return new Generation(spoken, "dual-kernel.pipeline.v2", safe(guidance.relationshipMove), repaired,
+                deliveredIssues, null, deferredInnerVoice, Map.copyOf(latencies), false,
+                speakerFallbackUsed.get(), false, true, guidanceSource);
+    }
+
+    private InnerVoiceRequest refreshBackgroundPlan(PlannerKey key, long revision, Long userId, String mode,
+                                                     Map<String, Object> assembledContext,
+                                                     StructuredAiResults.AuroraPlanResult previousGuidance,
+                                                     StructuredAiResults.AuroraResult delivered,
+                                                     List<String> observableIssues,
+                                                     LlmClient client, boolean composeInnerVoice) {
+        try {
+            Map<String, Object> plannerContext = new LinkedHashMap<>(assembledContext);
+            plannerContext.remove("auroraPrompt");
+            plannerContext.put("previousGuidance", previousGuidance);
+            plannerContext.put("speakerDelivered", delivered);
+            plannerContext.put("observableIssues", observableIssues);
+            plannerContext.put("planningHorizon", "next-turn");
+            var next = ai.call(userId, "AURORA_PLAN_" + mode, planInstruction(), plannerContext,
+                    StructuredAiResults.AuroraPlanResult.class,
+                    () -> fallbackPlan(plannerContext), client);
+            normalizePlan(next, plannerContext);
+
+            if (Boolean.TRUE.equals(next.needsCritic) || !observableIssues.isEmpty()) {
+                Map<String, Object> criticContext = new LinkedHashMap<>();
+                criticContext.put("plan", next);
+                criticContext.put("candidate", delivered);
+                criticContext.put("observableIssues", observableIssues);
+                criticContext.put("userInput", assembledContext.getOrDefault("userMessage", ""));
+                var critique = ai.call(userId, "AURORA_CRITIC_" + mode, criticInstruction(), criticContext,
+                        StructuredAiResults.AuroraCriticResult.class,
+                        () -> deterministicCritic(delivered, observableIssues, StructuredAiResults.AuroraResult::new),
+                        client);
+                if (critique != null && critique.issues != null && !critique.issues.isEmpty()) {
+                    List<String> constraints = new ArrayList<>(next.responseConstraints == null
+                            ? List.of() : next.responseConstraints);
+                    constraints.add("上一轮监督提醒：" + String.join(",", critique.issues));
+                    next.responseConstraints = List.copyOf(constraints);
+                }
+            }
+
+            long now = System.currentTimeMillis();
+            backgroundPlans.compute(key, (ignored, current) ->
+                    current == null || revision >= current.revision()
+                            ? new StoredPlan(revision, next, now) : current);
+            pruneBackgroundPlans(now);
+            return composeInnerVoice && Boolean.TRUE.equals(next.innerVoiceWorthy)
+                    ? new InnerVoiceRequest(userId, mode, next, delivered, client)
+                    : null;
+        } catch (Exception failure) {
+            log.warn("Background planner failed for user {} mode {}: {}", userId, mode, failure.getMessage());
+            return null;
+        } finally {
+            planRevisions.computeIfPresent(key, (ignored, current) ->
+                    current.get() == revision ? null : current);
+        }
+    }
+
+    private void pruneBackgroundPlans(long now) {
+        backgroundPlans.entrySet().removeIf(
+                entry -> now - entry.getValue().updatedAtEpochMs() > BACKGROUND_PLAN_TTL_MS);
+        int overflow = backgroundPlans.size() - MAX_BACKGROUND_PLANS;
+        if (overflow <= 0) return;
+        backgroundPlans.entrySet().stream()
+                .sorted(java.util.Comparator.comparingLong(entry -> entry.getValue().updatedAtEpochMs()))
+                .limit(overflow)
+                .forEach(entry -> backgroundPlans.remove(entry.getKey(), entry.getValue()));
+    }
+
+    private PlannerKey plannerKey(Long userId, String mode, Map<String, Object> context) {
+        Object sessionId = context.getOrDefault("sessionId", 0L);
+        return new PlannerKey(userId == null ? 0L : userId, String.valueOf(sessionId), safe(mode));
     }
 
     /**
@@ -195,18 +357,23 @@ public class AuroraDualKernelRuntime {
 
     private String planInstruction() {
         return """
-            你是 Aurora 的理解与规划核。只输出严格 JSON，不要 markdown 代码块，不写最终回复，
+            你是 Aurora 的后台理解与规划核。你在用户已经收到本轮回复后运行，观察 userMessage、speakerDelivered、previousGuidance 与 observableIssues，为下一轮对话形成策略。只输出严格 JSON，不要 markdown 代码块，不写最终回复，
             也不暴露逐步思维、不输出 JSON 之外的任何文字。必须严格匹配以下字段名和结构（示例）：
             {"userIntent":"用户当前意图，一句话","emotionalNeed":"用户最需要被怎样回应",
              "relationshipMove":"这一轮的关系动作，如稳稳接住/温和追问/接受打断重规划",
              "responseConstraints":["不诊断","不制造依赖"],
-             "bubblePurposes":["第一条消息的作用","第二条消息的作用（没有则省略此项）"],
+             "bubblePurposes":["这一轮唯一一条消息的作用"],
              "relevantMemoryIds":[7,12],
              "uncertainty":"尚不确定的地方，没有则填空字符串","needsCritic":false,
              "innerVoiceWorthy":false,"innerVoiceSeed":""}
 
             提取用户当前意图、最需要被怎样回应、关系动作、回复约束、每个气泡的作用、
             可用记忆 ID 和不确定性。打断发生时以最新输入重规划，未说出的旧计划不得当作共同经历。
+            bubblePurposes 的数量就是本轮气泡预算，必须在 1、2、3 之间主动选择，而不是固定写满：
+            - 简短问候、日常一句话、直接事实回答、轻轻接住即可的表达：优先 1 条；
+            - 需要“回应 + 一个真正有价值的推进”时用 2 条，这是有内容对话的常见形态；
+            - 只有用户同时提出多个问题、内容确实复杂，且三条各有不可合并的独立作用时才用 3 条。
+            不要为了显得丰富把同一段话拆开，也不要把“回应、共情、追问”机械地各占一条。
             若最新一条是对之前表达的纠正、边界或替换性决定，responseConstraints 里原样记下用户这次
             实际使用的关键词（例如用户说了"纠正"就写"纠正"，不要只转述成同义词），供表达核直接引用确认。
             needsCritic 仅在安全、边界、强推断、关系修复或记忆不确定时为 true。
@@ -219,12 +386,12 @@ public class AuroraDualKernelRuntime {
 
     private String speakerInstruction() {
         return """
-            你是 Aurora 的表达与关系核。严格依据 responsePlan 生成最终结构化 JSON，
+            你是 Aurora 的前台表达与关系核。直接根据当前用户输入和完整上下文生成本轮回复；dialogueGuidance 是上一轮后台核留下的参考策略，只能辅助理解关系节奏，当前用户的新表达永远优先。
             只输出严格 JSON，不要 markdown 代码块，不写计划本身、不输出 JSON 之外的任何文字。
             foregroundAcknowledgementAlreadySent 为 true 时，前台已经先接住了用户。不要再次用
             “我听到了/我理解/听起来”开场，不重复安慰；直接从用户最具体的细节或矛盾向前走半步。
             必须严格匹配以下字段名和结构（示例）：
-            {"segments":["最多三条自然中文消息"],"speakCount":1,
+            {"segments":["按当前语境生成自然中文消息"],"speakCount":1,
              "continueReason":"继续或停止的简短原因","detectedTheme":"具体主题，一个词或短语",
              "nextQuestion":"至多一个温和追问，没有则空字符串",
              "smallStep":"只有需要拆解行动或用户卡住时给出，否则空字符串",
@@ -233,7 +400,12 @@ public class AuroraDualKernelRuntime {
              "memoryReferenced":false,"referencedMemoryIds":[],"riskFlags":[]}
 
             segments 是 1-3 条自然中文消息，每条承担不同作用；先贴合此刻，再自然推进。
-            不诊断、不制造依赖、不假装人类、不复述内部计划。只引用 responsePlan 允许的记忆 ID。
+            通常只写 1 条或 2 条；只有当前用户同时提出多个问题、内容确实复杂且有三个不可合并的作用时才写 3 条。不要凑数，不要为了制造聊天感把一个完整句群切成三条；
+            少一条但更准确，优先于三条平庸消息。
+            表达要灵动，但不表演：句长可以忽短忽长，允许自然停顿、轻微反问、具体联想、克制的幽默
+            或一句出人意料但贴切的话；不要每轮都按“共情—分析—追问”排队。可以只回应，可以顺着
+            一个细节岔开半步，也可以在最合适处停住。避免连续使用相同开头、对称句、总结腔和咨询师腔。
+            不诊断、不制造依赖、不假装人类、不复述内部计划。只能引用当前上下文真实提供且授权的记忆 ID。
             不用“好，我在”“这很正常”“我陪着你”“说明了一切”等通用陪伴套话；不要为了显得懂
             用户而虚构“准备了很久、一直以来”等未提供的时间或经历。真正像朋友，是抓住用户原话里
             一个具体对象和一个并存张力，少说一句正确的空话，多说一句只有这一轮才成立的话。
@@ -253,7 +425,7 @@ public class AuroraDualKernelRuntime {
             只给一条消息和一个 smallStep，二者表达同一个不超过十分钟的具体动作；不要列多个选项，
             不要把原任务清单重新排列，也不要问用户想先选哪一个。动作必须真实减少不确定性或留下
             可继续使用的工作片段；“加 TODO/待修复注释、改字体、整理桌面”等占位动作不算推进。
-            referencedMemoryIds 必须是 responsePlan 里 relevantMemoryIds 的子集。
+            referencedMemoryIds 必须来自当前上下文真实提供且授权的记忆 ID；后台旧策略没有新增记忆权限。
             """;
     }
 
@@ -314,6 +486,28 @@ public class AuroraDualKernelRuntime {
         if (plan.relevantMemoryIds == null) plan.relevantMemoryIds = List.of();
         if (plan.innerVoiceWorthy == null) plan.innerVoiceWorthy = false;
         if (plan.innerVoiceSeed == null) plan.innerVoiceSeed = "";
+    }
+
+    private void enforceContextualBubbleCadence(StructuredAiResults.AuroraResult result,
+                                                 Map<String, Object> context) {
+        normalizeBubbleCount(result);
+    }
+
+    private void enforcePlannedBubbleCadence(StructuredAiResults.AuroraResult result,
+                                              StructuredAiResults.AuroraPlanResult plan) {
+        normalizeBubbleCount(result);
+    }
+
+    /** Keep the model's natural 1/2/3 rhythm; only discard blanks and cap invalid overproduction. */
+    private void normalizeBubbleCount(StructuredAiResults.AuroraResult result) {
+        if (result == null || result.segments == null) return;
+        List<String> normalized = result.segments.stream()
+                .filter(segment -> segment != null && !segment.isBlank())
+                .map(String::strip)
+                .limit(3)
+                .toList();
+        result.segments = normalized;
+        result.speakCount = normalized.size();
     }
 
     private List<String> qualityIssues(StructuredAiResults.AuroraResult result,
@@ -658,10 +852,16 @@ public class AuroraDualKernelRuntime {
                                     StructuredAiResults.AuroraResult spoken,
                                     LlmClient client) {}
 
-    /** @param innerVoiceRequest null unless deferred inner-voice composition was requested. */
+    private record PlannerKey(long userId, String sessionId, String mode) {}
+    private record StoredPlan(long revision, StructuredAiResults.AuroraPlanResult plan, long updatedAtEpochMs) {}
+
+    /** @param innerVoiceRequest null unless legacy same-turn planning produced it immediately. */
     public record Generation(StructuredAiResults.AuroraResult result, String runtime,
                               String relationshipMove, boolean repaired, List<String> criticIssues,
-                              InnerVoiceRequest innerVoiceRequest, Map<String, Long> stageLatenciesMs,
+                              InnerVoiceRequest innerVoiceRequest,
+                              CompletableFuture<InnerVoiceRequest> deferredInnerVoiceRequest,
+                              Map<String, Long> stageLatenciesMs,
                               boolean plannerFallbackUsed, boolean speakerFallbackUsed,
-                              boolean criticFallbackUsed) {}
+                              boolean criticFallbackUsed, boolean backgroundPlannerScheduled,
+                              String guidanceSource) {}
 }
