@@ -6,11 +6,31 @@
 
 ---
 
+## 0. 实现状态(2026-07-26 21:58 后核实)
+
+本设计成稿期间,`963a0b1 fix: harden Aurora streaming and response quality` 已独立闭合了其中
+最严重的两项。以下状态经实际运行测试核实,非推断:
+
+| 项 | 状态 | 证据 |
+|---|---|---|
+| §1.1 线程池死锁 | **已闭合** | 三池分离(`aiExecutor` / `taskExecutor` / `sseExecutor`)+ `queue-capacity=0` 使池可真正扩容;`stream()` 两个入口(`:656`、`:668`)已改用 `streamExecutor`;`ThreadPoolIsolationTest` 1/1 绿 |
+| §1.2 质量门摧毁正常回复 | **已闭合** | `AuroraRuntimeQualityRegressionTest` 3/3 绿,断言 `repaired()==false` 且 `criticIssues()` 非空 —— 即"打点但不改写";第 4 条气泡截断而非拼接 |
+| §8.5 无界 Map | **已闭合** | `AuroraDualKernelRuntime:327-334` 已有 TTL + 容量上限驱逐 |
+| §1.3 `Thread.sleep` 延迟 | 未动 | `sleep(30)` 仍在 `:1787`,`sleep(220)` 仍在 `:762` |
+| §3 `reasoning_effort` | 未做 | 全代码库无下发 |
+| §3 模型默认 | 未改 | `application.yml:181` 仍为 `deepseek-v4-flash` |
+| §8.3 `plannerFallbackUsed` | 未修 | pipeline 分支(`:268`)仍硬编码 `false` |
+
+**结论:阻塞级问题已清除,剩余工作全部是"把体验做快"和"让深核真的在工作"。**
+第 1 节保留原始诊断作为设计依据的记录;已闭合项标注见上表,不必重做。
+
+---
+
 ## 1. 为什么要重设计
 
 三个已实测确认的问题,不是推测:
 
-### 1.1 四个并发对话即锁死线程池(阻塞级)
+### 1.1 四个并发对话即锁死线程池(阻塞级)— 已于 963a0b1 闭合
 
 `aiExecutor` 为 core=4 / max=20 / queue=100(`ThreadPoolConfig.java:15`、`application.yml:63-67`)。
 `ThreadPoolExecutor` 在队列未满前不会扩容超过 core,因此实际只有 4 个线程。
@@ -34,7 +54,7 @@ poolActive=4  queued=4  poolSize=4
 4 个线程全部阻塞在自己排在队列中的子任务上,队列仅 4 项(远未到 100),池不扩容 → 永久死锁,直到 `SseEmitter` 120s 超时。
 现有 1269 个测试无一能发现此问题;`closure-campaign-state.yml` 中"30-user burst"仍在 `remaining_machine_work`,该路径从未被并发压过。
 
-### 1.2 确定性质量门在摧毁正常回复
+### 1.2 确定性质量门在摧毁正常回复 — 已于 963a0b1 闭合
 
 `AuroraDualKernelRuntime.qualityIssues()`(`:506-680`)为约 40 条硬编码中文子串/正则。命中后
 `deterministicQualityRepair()` 将**整条回复替换为约 10 句固定文案之一**。
@@ -220,17 +240,18 @@ speaker「本轮无跨轮策略,贴着用户说」。诚实优于伪造。
 
 ## 8. 前置修复
 
-### 8.1 SSE 外层移出 `aiExecutor`(阻塞项)
+### 8.1 SSE 外层移出 `aiExecutor` — **已闭合,无需实现**
 
-```java
-@Bean("auroraTurnExecutor")
-Executor auroraTurnExecutor() { return Executors.newVirtualThreadPerTaskExecutor(); }
-```
+`963a0b1` 采用的方案比本设计原提的虚拟线程更保守,且更好:
 
-SSE 外层轮次(几乎全是阻塞等待)跑在虚拟线程上,数量不设限;真正的 provider 调用仍受
-`aiExecutor` 的 4/20 限流保护。两个关注点分离,饥饿从结构上消失,且无需猜一个"够大"的线程数。
+- `aiExecutor`(8/32/**queue=0**)、`taskExecutor`(4/20/queue=100,仅遗留 `@Async`)、
+  `sseExecutor`(8/64/**queue=0**)三池分离;
+- `queue-capacity=0` 是关键:`SynchronousQueue` 让池在需要时立刻扩容到 max,
+  而非"队列满之前不扩容"—— 直接消除了原始死锁的根因,而不只是把线程数调大;
+- `CallerRunsPolicy` 保留:超出 max 时在调用者线程上跑,退化为串行而非死锁;
+- `stream()` 的两个入口(`:656` safety 分支、`:668` 主分支)均已改用 `streamExecutor`。
 
-**注:此项为 Java 21 特性,项目已在 21;但属编排层结构性改动,需在实现计划中单独评审。**
+不再需要虚拟线程改造。原提案作废。
 
 ### 8.2 深核预算必须先量,不能拍
 
@@ -246,7 +267,13 @@ SSE 外层轮次(几乎全是阻塞等待)跑在虚拟线程上,数量不设限;
 pipeline 路径在 `AuroraDualKernelRuntime:251` 硬编码传 `false`。必须改为真值并出指标,
 否则"深核在工作"无法证明,只能相信。
 
-### 8.4 删除死文案与风格类正则
+### 8.4 删除死文案与风格类正则 — **已闭合**
+
+`963a0b1` 已实现"打点但不改写",并已去掉气泡拼接。`AuroraRuntimeQualityRegressionTest` 3/3 绿,
+断言正是本设计要的行为:命中风格启发式时 `repaired()==false`、`criticIssues()` 非空、原句原样交付;
+第 4 条气泡被丢弃而非并入第 3 条。
+
+保留在本节的仅为设计意图记录:
 
 删除 `deterministicQualityRepair()` 的 10 句固定文案,及 `qualityIssues()` 中的风格类规则。
 保留 4 条硬拦(空回复、单条超长、超 3 条、记忆 ID 越权)。
@@ -260,10 +287,10 @@ pipeline 路径在 `AuroraDualKernelRuntime:251` 硬编码传 `false`。必须�
 气泡数改由 prompt 引导模型自行决定(`PromptBuilder` 与 speaker instruction 中已有相应措辞);
 硬拦层对超 3 条的处理是**丢弃第 4 条及以后,不合并**。
 
-### 8.5 无界 Map
+### 8.5 无界 Map — **已闭合**
 
-`backgroundPlans` / `planRevisions` 按 `(userId, sessionId, mode)` 累积且永不清理;
-`StoredPlan.updatedAtEpochMs`(`:849`)已存但无人读取。加入基于该时间戳的过期驱逐。
+`AuroraDualKernelRuntime:327-334` 已实现基于 `updatedAtEpochMs` 的 TTL 驱逐 + 容量上限驱逐
+(`BACKGROUND_PLAN_TTL_MS` / `MAX_BACKGROUND_PLANS`)。无需再做。
 
 ### 8.6 drip 参数外置
 
