@@ -44,6 +44,7 @@ export function useThoughtShredder({ setStatus, locale = "zh-CN" }: UseThoughtSh
   const deleteShred = useCallback(async (id: number) => {
     try {
       await api.shredderDelete(id);
+      setShredderResult(current => current?.memoryCard.id === id ? null : current);
       setStatus(copy("Record deleted.", "记录已删除"));
       await loadShredderHistory();
     } catch (error) { setStatus(error instanceof Error ? error.message

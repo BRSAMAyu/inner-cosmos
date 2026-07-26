@@ -7,7 +7,7 @@ afterEach(cleanup);
 
 const capsule = (over: Partial<PublicCapsule> = {}): PublicCapsule => ({
   id: 1, pseudonym: "雨后的人", intro: "先沉默再表达边界", capsuleType: "USER_CAPSULE",
-  publicTags: "[\"自我观察\",\"关系\"]", echoEnergy: 12, freshnessScore: 0.8, conversationLimitPerDay: 30,
+  publicTags: "[\"自我观察\",\"关系\"]", echoEnergy: 0.72, freshnessScore: 0.8, conversationLimitPerDay: 30,
   lastActivityAt: "2026-07-15T00:00:00Z", ...over
 });
 
@@ -40,23 +40,28 @@ describe("PlazaDirectory", () => {
     expect(screen.getByText("B")).toBeVisible();
   });
 
-  it("puts real-person paths before official practice facets and keeps the plaza compact", () => {
+  it("sorts by the selected key instead of forcing real-person capsules to the front", () => {
     const capsules = [
       ...Array.from({ length: 6 }, (_, index) => capsule({
         id: index + 1,
         pseudonym: `官方 ${index + 1}`,
         capsuleType: "SEED_CAPSULE",
-        echoEnergy: 99 - index
+        echoEnergy: .99 - index / 100,
+        freshnessScore: .2 + index / 100,
+        lastActivityAt: `2026-07-${10 + index}T00:00:00Z`
       })),
-      capsule({ id: 20, pseudonym: "真实侧影", capsuleType: "USER_CAPSULE", echoEnergy: 1 })
+      capsule({ id: 20, pseudonym: "真实侧影", capsuleType: "USER_CAPSULE", echoEnergy: .3, freshnessScore: 1, lastActivityAt: "2026-07-20T00:00:00Z" })
     ];
     render(<PlazaDirectory capsules={capsules} activeCapsuleId={null} busy={false} onOpenCapsule={() => undefined} />);
 
-    const cards = screen.getAllByRole("listitem");
-    expect(cards).toHaveLength(6);
-    expect(cards[0]).toHaveTextContent("真实侧影");
+    expect(screen.getAllByRole("listitem")[0]).toHaveTextContent("官方 1");
+    expect(screen.getAllByTitle("回声能量")[0]).toHaveTextContent("99%");
+    fireEvent.click(screen.getByRole("button", { name: "新鲜度" }));
+    expect(screen.getAllByRole("listitem")[0]).toHaveTextContent("真实侧影");
+    fireEvent.click(screen.getByRole("button", { name: "最近活跃" }));
+    expect(screen.getAllByRole("listitem")[0]).toHaveTextContent("真实侧影");
     expect(screen.getByText("可以写信给本人")).toBeVisible();
-    expect(screen.queryByText("官方 6")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("listitem")).toHaveLength(6);
     fireEvent.click(screen.getByRole("button", { name: "继续浏览另外 1 个侧影" }));
     expect(screen.getAllByRole("listitem")).toHaveLength(7);
     expect(screen.getByText("官方 6")).toBeVisible();

@@ -29,7 +29,7 @@ const entry = (overrides: Partial<DailyRecordEntry> = {}): DailyRecordEntry => (
 
 const detail = (overrides: Partial<DailyRecordDetail> = {}): DailyRecordDetail => ({
   theme: "今天", auroraSummary: "继续加油", mainMemory: null, fragments: [], emotions: [], todos: [],
-  capsuleSuggested: false, ...overrides
+  relations: [], capsuleSuggested: false, ...overrides
 });
 
 describe("useDailyRecord", () => {

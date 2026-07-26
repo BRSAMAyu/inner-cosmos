@@ -5,16 +5,22 @@ import com.innercosmos.entity.AiInteractionLog;
 import com.innercosmos.mapper.AiInteractionLogMapper;
 import com.innercosmos.service.AiLogService;
 import com.innercosmos.util.DataMaskingUtils;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Tags;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.util.List;
+import java.util.Locale;
 
 @Service
 public class AiLogServiceImpl implements AiLogService {
     private final AiInteractionLogMapper mapper;
+    private final MeterRegistry meterRegistry;
 
-    public AiLogServiceImpl(AiInteractionLogMapper mapper) {
+    public AiLogServiceImpl(AiInteractionLogMapper mapper, MeterRegistry meterRegistry) {
         this.mapper = mapper;
+        this.meterRegistry = meterRegistry;
     }
 
     @Override
@@ -47,7 +53,11 @@ public class AiLogServiceImpl implements AiLogService {
         log.latencyMs = latencyMs;
         log.tokenInputEstimate = prompt == null ? 0 : Math.max(1, prompt.length() / 2);
         log.tokenOutputEstimate = response == null ? 0 : Math.max(1, response.length() / 2);
-        mapper.insert(log);
+        try {
+            mapper.insert(log);
+        } finally {
+            recordMetrics(log);
+        }
     }
 
     @Override
@@ -86,5 +96,30 @@ public class AiLogServiceImpl implements AiLogService {
         }
         query.orderByDesc("id").last("LIMIT 1");
         return mapper.selectOne(query);
+    }
+
+    private void recordMetrics(AiInteractionLog log) {
+        String outcome = Boolean.TRUE.equals(log.success) ? "success" : "error";
+        Tags base = Tags.of(
+                "module", bounded(log.moduleName),
+                "provider", bounded(log.provider),
+                "outcome", outcome,
+                "fallback", Boolean.toString(Boolean.TRUE.equals(log.fallbackUsed)));
+        meterRegistry.counter("inner.cosmos.ai.provider.calls", base).increment();
+        meterRegistry.timer("inner.cosmos.ai.provider.latency", base)
+                .record(Duration.ofMillis(Math.max(0L, log.latencyMs == null ? 0L : log.latencyMs)));
+        meterRegistry.counter("inner.cosmos.ai.tokens.estimated",
+                        base.and("direction", "input"))
+                .increment(Math.max(0, log.tokenInputEstimate == null ? 0 : log.tokenInputEstimate));
+        meterRegistry.counter("inner.cosmos.ai.tokens.estimated",
+                        base.and("direction", "output"))
+                .increment(Math.max(0, log.tokenOutputEstimate == null ? 0 : log.tokenOutputEstimate));
+    }
+
+    private static String bounded(String value) {
+        if (value == null || value.isBlank()) return "unknown";
+        String normalized = value.trim().toLowerCase(Locale.ROOT)
+                .replaceAll("[^a-z0-9._-]", "_");
+        return normalized.substring(0, Math.min(normalized.length(), 48));
     }
 }

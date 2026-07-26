@@ -55,11 +55,14 @@ describe("useThoughtShredder", () => {
   });
 
   it("deletes a memory card and refreshes history", async () => {
+    vi.mocked(api.shredderProcess).mockResolvedValue(shredResult());
     vi.mocked(api.shredderDelete).mockResolvedValue(undefined);
     vi.mocked(api.shredderHistory).mockResolvedValue([]);
     const { result, setStatus } = setup();
+    await act(async () => { await result.current.processShred("今天很累", "KEEP_ONLY_RESULT"); });
     await act(async () => { await result.current.deleteShred(5); });
     expect(api.shredderDelete).toHaveBeenCalledExactlyOnceWith(5);
     expect(setStatus).toHaveBeenCalledWith("记录已删除");
+    expect(result.current.shredderResult).toBeNull();
   });
 });

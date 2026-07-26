@@ -213,6 +213,10 @@ export interface components {
             emotionHint?: string;
             mode?: string;
             clientMessageId?: string;
+            /** @enum {string} */
+            locale?: "zh-CN" | "en-SG";
+            /** @enum {string} */
+            region?: "CN" | "SG";
             timezone?: string;
             localTimeLabel?: string;
             weatherType?: string;
@@ -237,6 +241,7 @@ export interface components {
             allowLetterRequest?: boolean;
             privacyLevel?: string;
             memoryIds: number[];
+            personaClaimIds?: number[];
             /** @enum {string} */
             visibilityStatus?: "PRIVATE" | "PUBLIC";
             isPublic?: boolean;

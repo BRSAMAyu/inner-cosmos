@@ -1,0 +1,60 @@
+{
+  "uid": "inner-cosmos-events",
+  "title": "Work Pressure Contract · Outbox & KEDA",
+  "tags": ["inner-cosmos", "outbox", "keda"],
+  "schemaVersion": 39,
+  "refresh": "5s",
+  "time": {"from": "now-30m", "to": "now"},
+  "panels": [
+    {
+      "id": 1, "type": "text", "title": "", "gridPos": {"h": 4, "w": 24, "x": 0, "y": 0},
+      "options": {"mode": "markdown", "content": "# Scale on user waiting, not machine busyness\nConversation finish creates durable projection work. KEDA follows **ready backlog** and **oldest ready age**; outbox lease + inbox uniqueness + idempotent handlers preserve correctness while replicas change."},
+      "transparent": true
+    },
+    {
+      "id": 2, "type": "stat", "title": "Ready events", "gridPos": {"h": 5, "w": 6, "x": 0, "y": 4},
+      "targets": [{"refId": "A", "expr": "max(inner_cosmos_outbox_ready)"}],
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 20}, {"color": "red", "value": 100}]}}}
+    },
+    {
+      "id": 3, "type": "stat", "title": "Oldest ready age", "gridPos": {"h": 5, "w": 6, "x": 6, "y": 4},
+      "targets": [{"refId": "A", "expr": "max(inner_cosmos_outbox_oldest_ready_age_seconds)"}],
+      "fieldConfig": {"defaults": {"unit": "s", "color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 30}, {"color": "red", "value": 120}]}}}
+    },
+    {
+      "id": 4, "type": "stat", "title": "Worker replicas", "gridPos": {"h": 5, "w": 6, "x": 12, "y": 4},
+      "targets": [{"refId": "A", "expr": "max(kube_deployment_status_replicas_available{namespace=\"inner-cosmos-w3\",deployment=\"inner-cosmos-worker\"})"}],
+      "fieldConfig": {"defaults": {"color": {"mode": "continuous-BlYlRd"}}}
+    },
+    {
+      "id": 5, "type": "stat", "title": "Dead letters", "gridPos": {"h": 5, "w": 6, "x": 18, "y": 4},
+      "targets": [{"refId": "A", "expr": "max(inner_cosmos_outbox_dead)"}],
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}}
+    },
+    {
+      "id": 6, "type": "timeseries", "title": "Backlog drains as workers scale", "gridPos": {"h": 10, "w": 16, "x": 0, "y": 9},
+      "targets": [
+        {"refId": "A", "expr": "max(inner_cosmos_outbox_ready)", "legendFormat": "ready events"},
+        {"refId": "B", "expr": "max(inner_cosmos_outbox_oldest_ready_age_seconds)", "legendFormat": "oldest age (s)"},
+        {"refId": "C", "expr": "max(kube_deployment_status_replicas_available{namespace=\"inner-cosmos-w3\",deployment=\"inner-cosmos-worker\"})", "legendFormat": "worker replicas"}
+      ],
+      "fieldConfig": {"defaults": {"custom": {"lineWidth": 3, "fillOpacity": 15}}}
+    },
+    {
+      "id": 7, "type": "state-timeline", "title": "Worker Pod lifecycle", "gridPos": {"h": 10, "w": 8, "x": 16, "y": 9},
+      "targets": [{"refId": "A", "expr": "kube_pod_status_phase{namespace=\"inner-cosmos-w3\",pod=~\"inner-cosmos-worker.*\",phase=~\"Pending|Running|Failed|Unknown\"} == 1", "legendFormat": "{{pod}} · {{phase}}"}]
+    },
+    {
+      "id": 8, "type": "timeseries", "title": "Worker resource pressure", "gridPos": {"h": 8, "w": 12, "x": 0, "y": 19},
+      "targets": [
+        {"refId": "A", "expr": "sum by (pod) (process_cpu_usage{namespace=\"inner-cosmos-w3\",component=\"worker\"})", "legendFormat": "{{pod}} CPU"},
+        {"refId": "B", "expr": "sum by (pod) (jvm_memory_used_bytes{namespace=\"inner-cosmos-w3\",component=\"worker\",area=\"heap\"})", "legendFormat": "{{pod}} heap"}
+      ]
+    },
+    {
+      "id": 9, "type": "timeseries", "title": "Projection HTTP finish signal", "description": "Shows the API action that creates durable downstream work.", "gridPos": {"h": 8, "w": 12, "x": 12, "y": 19},
+      "targets": [{"refId": "A", "expr": "sum(rate(http_server_requests_seconds_count{uri=~\".*/dialog/session/.*/finish\"}[1m]))", "legendFormat": "conversation finish / s"}],
+      "fieldConfig": {"defaults": {"custom": {"lineWidth": 3, "fillOpacity": 18}}}
+    }
+  ]
+}

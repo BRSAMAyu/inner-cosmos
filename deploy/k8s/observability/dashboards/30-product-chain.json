@@ -1,0 +1,65 @@
+{
+  "uid": "inner-cosmos-product",
+  "title": "Product Chain · Conversation → Memory → Resonance → Connection",
+  "tags": ["inner-cosmos", "product", "journey"],
+  "schemaVersion": 39,
+  "refresh": "5s",
+  "time": {"from": "now-30m", "to": "now"},
+  "panels": [
+    {
+      "id": 1, "type": "text", "title": "", "gridPos": {"h": 4, "w": 24, "x": 0, "y": 0},
+      "options": {"mode": "markdown", "content": "# One product loop, observed live\nAurora conversation → inspectable memory/profile → authorized Echo Capsule → resonance discovery → Slow Letter / human connection. HTTP route labels are aggregated; no user identity or content enters the dashboard."},
+      "transparent": true
+    },
+    {
+      "id": 2, "type": "stat", "title": "Aurora actions · 5m", "gridPos": {"h": 5, "w": 5, "x": 0, "y": 4},
+      "targets": [{"refId": "A", "expr": "sum(increase(http_server_requests_seconds_count{uri=~\".*/aurora/.*\"}[5m])) or vector(0)"}]
+    },
+    {
+      "id": 3, "type": "stat", "title": "Memory & profile · 5m", "gridPos": {"h": 5, "w": 5, "x": 5, "y": 4},
+      "targets": [{"refId": "A", "expr": "sum(increase(http_server_requests_seconds_count{uri=~\".*(memory|portrait|correction|understanding).*\"}[5m])) or vector(0)"}]
+    },
+    {
+      "id": 4, "type": "stat", "title": "Capsule & resonance · 5m", "gridPos": {"h": 5, "w": 5, "x": 10, "y": 4},
+      "targets": [{"refId": "A", "expr": "sum(increase(http_server_requests_seconds_count{uri=~\".*(capsule|plaza|persona).*\"}[5m])) or vector(0)"}]
+    },
+    {
+      "id": 5, "type": "stat", "title": "Letters & social · 5m", "gridPos": {"h": 5, "w": 5, "x": 15, "y": 4},
+      "targets": [{"refId": "A", "expr": "sum(increase(http_server_requests_seconds_count{uri=~\".*(letter|social|relation|group).*\"}[5m])) or vector(0)"}]
+    },
+    {
+      "id": 6, "type": "stat", "title": "Safety / rejected · 5m", "gridPos": {"h": 5, "w": 4, "x": 20, "y": 4},
+      "targets": [{"refId": "A", "expr": "sum(increase(http_server_requests_seconds_count{status=~\"4..\",uri=~\".*(aurora|capsule|letter|social).*\"}[5m])) or vector(0)"}],
+      "fieldConfig": {"defaults": {"color": {"mode": "continuous-YlRd"}}}
+    },
+    {
+      "id": 7, "type": "timeseries", "title": "Golden-loop traffic by domain", "gridPos": {"h": 10, "w": 16, "x": 0, "y": 9},
+      "targets": [
+        {"refId": "A", "expr": "sum(rate(http_server_requests_seconds_count{uri=~\".*/aurora/.*\"}[1m]))", "legendFormat": "Aurora"},
+        {"refId": "B", "expr": "sum(rate(http_server_requests_seconds_count{uri=~\".*(memory|portrait|correction|understanding).*\"}[1m]))", "legendFormat": "Memory / profile"},
+        {"refId": "C", "expr": "sum(rate(http_server_requests_seconds_count{uri=~\".*(capsule|plaza|persona).*\"}[1m]))", "legendFormat": "Capsule / resonance"},
+        {"refId": "D", "expr": "sum(rate(http_server_requests_seconds_count{uri=~\".*(letter|social|relation|group).*\"}[1m]))", "legendFormat": "Connection"}
+      ],
+      "fieldConfig": {"defaults": {"custom": {"lineWidth": 3, "fillOpacity": 16}}}
+    },
+    {
+      "id": 8, "type": "timeseries", "title": "Journey errors by route", "gridPos": {"h": 10, "w": 8, "x": 16, "y": 9},
+      "targets": [{"refId": "A", "expr": "sum by (uri, status) (increase(http_server_requests_seconds_count{status=~\"4..|5..\",uri=~\".*(aurora|memory|capsule|persona|letter|social|relation).*\"}[5m]))", "legendFormat": "{{status}} · {{uri}}"}],
+      "fieldConfig": {"defaults": {"custom": {"drawStyle": "bars", "fillOpacity": 35}}}
+    },
+    {
+      "id": 9, "type": "timeseries", "title": "Projection pressure after conversation finish", "gridPos": {"h": 8, "w": 12, "x": 0, "y": 19},
+      "targets": [
+        {"refId": "A", "expr": "max(inner_cosmos_outbox_ready)", "legendFormat": "ready"},
+        {"refId": "B", "expr": "max(inner_cosmos_outbox_oldest_ready_age_seconds)", "legendFormat": "oldest age (s)"},
+        {"refId": "C", "expr": "max(inner_cosmos_outbox_dead)", "legendFormat": "dead"}
+      ],
+      "fieldConfig": {"defaults": {"custom": {"lineWidth": 3, "fillOpacity": 14}}}
+    },
+    {
+      "id": 10, "type": "timeseries", "title": "Aurora live + durable replay", "gridPos": {"h": 8, "w": 12, "x": 12, "y": 19},
+      "targets": [{"refId": "A", "expr": "sum by (route, resume) (inner_cosmos_sse_connections_active) or vector(0)", "legendFormat": "{{route}} · resume={{resume}}"}],
+      "fieldConfig": {"defaults": {"custom": {"lineWidth": 3, "fillOpacity": 18}}}
+    }
+  ]
+}

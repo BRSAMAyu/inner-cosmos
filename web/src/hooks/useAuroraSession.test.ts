@@ -9,6 +9,10 @@ import { useAuroraSession } from "./useAuroraSession";
 vi.mock("../api", () => ({
   api: {
     createSession: vi.fn(),
+    dialogSessions: vi.fn(),
+    dialogSession: vi.fn(),
+    currentDialogSession: vi.fn(),
+    updateDialogSession: vi.fn(),
     auroraForeground: vi.fn(),
     messages: vi.fn(),
     wakeIntent: vi.fn(),
@@ -53,6 +57,8 @@ const notification = (overrides: Partial<Notification> = {}): Notification => ({
 
 beforeEach(() => {
   vi.mocked(api.createSession).mockResolvedValue({ id: 100 });
+  vi.mocked(api.currentDialogSession).mockResolvedValue(null);
+  vi.mocked(api.dialogSessions).mockResolvedValue([]);
   vi.mocked(api.auroraForeground).mockResolvedValue({
     text: "眼前这份累已经很具体了。",
     source: "model-fast",
@@ -97,6 +103,34 @@ describe("useAuroraSession -- session bootstrap/replay", () => {
     expect(result.current.sessionId).toBe(100);
   });
 
+  it("resolveSession restores the latest durable active conversation after a normal refresh", async () => {
+    vi.mocked(api.currentDialogSession).mockResolvedValue({
+      id: 42, title: "昨天没说完的事", status: "ACTIVE", messageCount: 4,
+      preview: "我们明天继续", activeTurnId: null, startedAt: "2026-07-26T10:00:00",
+      lastActivityAt: "2026-07-26T10:10:00", archivedAt: null, pinnedAt: null,
+      updatedAt: "2026-07-26T10:10:00"
+    });
+    const { result } = setup();
+    await act(async () => { await result.current.resolveSession(); });
+    expect(result.current.sessionId).toBe(42);
+    expect(api.createSession).not.toHaveBeenCalled();
+  });
+
+  it("resolveSession honors a conversation deep link so switching history survives refresh", async () => {
+    vi.mocked(api.dialogSession).mockResolvedValue({
+      id: 7, title: "Pinned context", status: "ACTIVE", messageCount: 2,
+      preview: "continue here", activeTurnId: null, startedAt: "2026-07-26T10:00:00",
+      lastActivityAt: "2026-07-26T10:10:00", archivedAt: null, pinnedAt: null,
+      updatedAt: "2026-07-26T10:10:00"
+    });
+    window.history.pushState({}, "", "/?conversation=7");
+    const { result } = setup();
+    await act(async () => { await result.current.resolveSession(); });
+    expect(api.dialogSession).toHaveBeenCalledExactlyOnceWith(7);
+    expect(api.currentDialogSession).not.toHaveBeenCalled();
+    expect(result.current.sessionId).toBe(7);
+  });
+
   it("resolveSession resumes the WakeIntent's own context session when ?wakeIntent= is present", async () => {
     vi.mocked(api.wakeIntent).mockResolvedValue(wakeIntent({ contextSessionId: 42 }));
     window.history.pushState({}, "", "/?wakeIntent=7");
@@ -126,8 +160,8 @@ describe("useAuroraSession -- session bootstrap/replay", () => {
     const { result } = setup();
     await act(async () => { await result.current.replaceFromHistory(100); });
     expect(result.current.messages).toEqual([
-      { key: "db-1", speaker: "USER", text: "你好" },
-      { key: "db-2", speaker: "AURORA", text: "我在" }
+      { key: "db-1", id: 1, speaker: "USER", text: "你好" },
+      { key: "db-2", id: 2, speaker: "AURORA", text: "我在" }
     ]);
   });
 
@@ -171,10 +205,18 @@ describe("useAuroraSession -- send / streaming / interrupt", () => {
       sessionId: 100,
       message: "今天有点累",
       mode: "DAILY_TALK",
+      clientMessageId: expect.any(String),
+      locale: "zh-CN",
+      region: "CN",
       foregroundAcknowledgementSent: true,
       foregroundAcknowledgementText: "眼前这份累已经很具体了。",
       foregroundAcknowledgementSource: "model-fast"
     });
+    expect(api.auroraForeground).toHaveBeenCalledWith(expect.objectContaining({
+      clientMessageId: vi.mocked(streamAurora).mock.calls[0]?.[0].clientMessageId,
+      locale: "zh-CN",
+      region: "CN"
+    }));
 
     act(() => { capturedOnEvent!({ id: "1", type: "turn.started", payload: { turnId: 9 } }); });
     expect(result.current.activeTurnId).toBe(9);
@@ -527,6 +569,16 @@ describe("useAuroraSession -- safety resources", () => {
     expect(result.current.safetyResources).toEqual([
       "如果你正处于紧急危险中，请立即拨打 110（报警），或联系身边可信赖的人。"
     ]);
+    expect(api.safetyResources).toHaveBeenCalledWith("zh-CN", "CN");
+  });
+
+  it("requests Singapore English resources for en-SG", async () => {
+    vi.mocked(api.safetyResources).mockResolvedValue([
+      "Samaritans of Singapore (SOS) · 24-hour hotline: 1767."
+    ]);
+    const { result } = setup("en-SG");
+    await act(async () => { await result.current.loadSafetyResources(); });
+    expect(api.safetyResources).toHaveBeenCalledWith("en-SG", "SG");
   });
 });
 

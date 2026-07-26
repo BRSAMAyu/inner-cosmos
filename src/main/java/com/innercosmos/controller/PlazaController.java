@@ -21,10 +21,11 @@ public class PlazaController extends BaseController {
     }
 
     @GetMapping("/capsules")
-    public ApiResponse<List<EchoCapsuleVO>> capsules() {
+    public ApiResponse<List<EchoCapsuleVO>> capsules(HttpSession session) {
         // M-004: project to a public-safe VO — never expose personaPrompt/ownerContextNote/
         // style*/context*/authorizedMemoryIds on the unauthenticated plaza list.
-        return ApiResponse.ok(capsuleService.plazaCapsules().stream().map(EchoCapsuleVO::fromPublic).toList());
+        return ApiResponse.ok(capsuleService.plazaCapsules(optionalCurrentUserId(session)).stream()
+                .map(EchoCapsuleVO::fromPublic).toList());
     }
 
     @GetMapping("/matches")

@@ -104,10 +104,10 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
         MemoryCard card = new MemoryCard();
         card.userId = userId;
         card.sourceSessionId = sessionId;
-        card.title = blank(ai.memoryCard.title, "Today's reflection");
+        card.title = blank(ai.memoryCard.title, "今日沉淀");
         card.summary = blank(ai.memoryCard.summary, firstSentence(raw));
         card.memoryType = blank(ai.memoryCard.memoryType, inferType(raw));
-        card.emotionTags = jsonArray(ai.memoryCard.emotionTags, List.of("self-observation"));
+        card.emotionTags = jsonArray(ai.memoryCard.emotionTags, List.of("自我观察"));
         card.keywordTags = jsonArray(ai.memoryCard.keywordTags, fallbackKeywords(raw));
         card.peopleTags = jsonArray(ai.memoryCard.peopleTags, List.of());
         card.intensityScore = clamp(ai.memoryCard.intensityScore == null ? inferIntensity(raw) : ai.memoryCard.intensityScore, 0, 10);
@@ -118,6 +118,7 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
         card.lastTouchedAt = LocalDateTime.now();
         card.visibilityLevel = "PRIVATE";
         card.status = "ACTIVE";
+        applyConversationLifecycle(card, sessionId);
         // M-008 (Phase-6 fix): idempotent on (user_id, source_session_id) — settle may run after
         // the finish() listener already inserted a card for this session (would trip the UNIQUE).
         MemoryCard existing = memoryCardMapper.selectOne(
@@ -125,6 +126,7 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
                         .eq("user_id", userId).eq("source_session_id", sessionId).last("LIMIT 1"));
         if (existing != null) {
             card.id = existing.id;
+            preserveExistingLifecycle(card, existing);
             memoryCardMapper.updateById(card);
         } else {
             memoryCardMapper.insert(card);
@@ -280,6 +282,11 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
         todoQuery.eq("source_memory_card_id", card.id).orderByAsc("id");
         vo.todos = todoItemMapper.selectList(todoQuery);
 
+        // Load this card's own relationship cues (never the user's all-time mentions)
+        QueryWrapper<RelationMention> relationQuery = new QueryWrapper<>();
+        relationQuery.eq("user_id", userId).eq("memory_card_id", card.id).orderByAsc("id");
+        vo.relations = relationMentionMapper.selectList(relationQuery);
+
         // Save to tb_daily_record
         DailyRecord record = new DailyRecord();
         record.userId = userId;
@@ -317,10 +324,10 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
 
     private StructuredAiResults.SettlementResult fallbackSettlement(String raw) {
         StructuredAiResults.SettlementResult result = new StructuredAiResults.SettlementResult();
-        result.memoryCard.title = "Today's reflection";
+        result.memoryCard.title = "今日沉淀";
         result.memoryCard.summary = firstSentence(raw);
         result.memoryCard.memoryType = inferType(raw);
-        result.memoryCard.emotionTags = List.of("self-observation");
+        result.memoryCard.emotionTags = List.of("自我观察");
         result.memoryCard.keywordTags = fallbackKeywords(raw);
         result.memoryCard.peopleTags = List.of();
         result.memoryCard.intensityScore = inferIntensity(raw);
@@ -588,7 +595,9 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
         card.emotionTags = jsonArray(ai.memoryCard.emotionTags, List.of("diary-reflection"));
         card.keywordTags = jsonArray(ai.memoryCard.keywordTags, fallbackKeywords(diaryText));
         card.peopleTags = jsonArray(ai.memoryCard.peopleTags, List.of());
-        card.intensityScore = ai.memoryCard.intensityScore == null ? inferIntensity(diaryText) : ai.memoryCard.intensityScore;
+        card.intensityScore = clamp(
+                ai.memoryCard.intensityScore == null ? inferIntensity(diaryText) : ai.memoryCard.intensityScore,
+                0, 10);
         card.recurrenceCount = 1;
         card.userImportance = ai.memoryCard.userImportance == null ? 4.0 : ai.memoryCard.userImportance;
         card.triggerCount = 1;
@@ -706,6 +715,33 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
                 ? "HEART_DIARY:UNLINKED"
                 : "VOICE_TRANSCRIPTION:" + sourceTranscriptionId;
         return source + " · source-version:1 · consent:AURORA_PRIVATE";
+    }
+
+    private void applyConversationLifecycle(MemoryCard card, Long sessionId) {
+        card.versionNo = 1;
+        card.memoryLayer = "EPISODIC";
+        card.confidence = 0.85;
+        card.consentScope = "AURORA_PRIVATE";
+        card.provenanceRefs = "AURORA_SESSION:" + sessionId
+                + " · source-version:1 · consent:AURORA_PRIVATE";
+    }
+
+    private void preserveExistingLifecycle(MemoryCard target, MemoryCard existing) {
+        if (existing.versionNo != null) target.versionNo = existing.versionNo;
+        if (existing.memoryLayer != null && !existing.memoryLayer.isBlank()) {
+            target.memoryLayer = existing.memoryLayer;
+        }
+        if (existing.confidence != null) target.confidence = existing.confidence;
+        if (existing.consentScope != null && !existing.consentScope.isBlank()) {
+            target.consentScope = existing.consentScope;
+        }
+        if (existing.provenanceRefs != null && !existing.provenanceRefs.isBlank()) {
+            target.provenanceRefs = existing.provenanceRefs;
+        }
+        if (existing.status != null && !existing.status.isBlank()) target.status = existing.status;
+        target.supersededById = existing.supersededById;
+        target.archivedAt = existing.archivedAt;
+        target.forgottenAt = existing.forgottenAt;
     }
 
     /**

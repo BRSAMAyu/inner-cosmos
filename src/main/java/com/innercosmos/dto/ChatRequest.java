@@ -16,6 +16,8 @@ public class ChatRequest {
     public String emotionHint;
     public String mode;
     public String clientMessageId;
+    public String locale;
+    public String region;
     public String timezone;
     public String localTimeLabel;
     public String weatherType;

@@ -5,6 +5,7 @@ import com.innercosmos.ai.structured.StructuredAiResults;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -22,8 +23,16 @@ class MockLlmClientStructuredDataBoundaryTest {
 
         assertNotNull(result);
         assertNotNull(result.memoryCard);
+        assertEquals("今日沉淀", result.memoryCard.title);
+        assertEquals("日常", result.memoryCard.keywordTags.getFirst());
         assertTrue(result.memoryCard.summary.contains("课堂展示"), result.memoryCard.summary);
         assertFalse(result.memoryCard.summary.contains("Input JSON"), result.memoryCard.summary);
+        assertTrue(result.fragments.stream()
+                .noneMatch(fragment -> java.util.Set.of("一次表达", "自我判断", "下一步")
+                        .contains(fragment.rawExcerpt)));
+        assertTrue(result.fragments.stream()
+                .anyMatch(fragment -> fragment.rawExcerpt != null
+                        && fragment.rawExcerpt.contains("课堂展示")));
     }
 
     @Test

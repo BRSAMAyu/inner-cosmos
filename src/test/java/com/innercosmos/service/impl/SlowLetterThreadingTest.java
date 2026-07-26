@@ -12,6 +12,7 @@ import com.innercosmos.letterstate.LetterStateRegistry;
 import com.innercosmos.safety.PiiCredentialDetector;
 import com.innercosmos.mapper.EchoCapsuleMapper;
 import com.innercosmos.mapper.BlockRelationMapper;
+import com.innercosmos.mapper.CapsuleBoundaryMapper;
 import com.innercosmos.mapper.LetterStatusLogMapper;
 import com.innercosmos.mapper.LetterThreadMapper;
 import com.innercosmos.mapper.ReportRecordMapper;
@@ -54,13 +55,15 @@ class SlowLetterThreadingTest {
     @Mock private LetterSafetyFilter letterSafetyFilter;
     @Mock private EchoCapsuleMapper capsuleMapper;
     @Mock private BlockRelationMapper blockRelationMapper;
+    @Mock private CapsuleBoundaryMapper boundaryMapper;
 
     private SlowLetterServiceImpl newService() {
         LetterSafetyFilter.FilterResult safe = new LetterSafetyFilter.FilterResult();
         safe.passed = true;
         org.mockito.Mockito.lenient().when(letterSafetyFilter.filter(any(), any(), any())).thenReturn(safe);
         return new SlowLetterServiceImpl(letterMapper, logMapper, stateRegistry,
-                guardAgent, threadMapper, reportRecordMapper, letterSafetyFilter, capsuleMapper, blockRelationMapper, new PiiCredentialDetector(),
+                guardAgent, threadMapper, reportRecordMapper, letterSafetyFilter, capsuleMapper, blockRelationMapper,
+                boundaryMapper, new PiiCredentialDetector(),
                 Clock.systemUTC());
     }
 
@@ -143,6 +146,42 @@ class SlowLetterThreadingTest {
 
         assertEquals("NOT_FOUND", ex.code);
         verify(letterMapper, never()).insert(any(SlowLetter.class));
+    }
+
+    @Test
+    @DisplayName("draft: disabled allowLetterRequest is an enforced owner boundary")
+    void draft_rejectsWhenLetterRequestsDisabled() {
+        EchoCapsule capsule = new EchoCapsule();
+        capsule.id = 77L;
+        capsule.ownerUserId = 20L;
+        capsule.isPublic = true;
+        capsule.visibilityStatus = "PUBLIC";
+        when(capsuleMapper.selectById(77L)).thenReturn(capsule);
+        when(guardAgent.allow(any())).thenReturn(true);
+        com.innercosmos.entity.CapsuleBoundary boundary = new com.innercosmos.entity.CapsuleBoundary();
+        boundary.allowLetterRequest = false;
+        when(boundaryMapper.selectOne(any())).thenReturn(boundary);
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> newService().draft(10L, replyRequest()));
+
+        assertEquals("FORBIDDEN", error.code);
+        verify(letterMapper, never()).insert(any(SlowLetter.class));
+    }
+
+    @Test
+    @DisplayName("send: a block created after drafting is rechecked before the letter can depart")
+    void send_rechecksBlockAfterDraft() {
+        SlowLetter draft = original(5L, 10L, 20L, 77L);
+        draft.status = "DRAFT";
+        when(letterMapper.selectById(5L)).thenReturn(draft);
+        when(blockRelationMapper.selectCount(any())).thenReturn(1L);
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> newService().transition(10L, 5L, "SENT"));
+
+        assertEquals("FORBIDDEN", error.code);
+        verify(letterMapper, never()).update(any(), any());
     }
 
     @Test

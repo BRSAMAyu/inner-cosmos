@@ -47,9 +47,10 @@ const COPY = {
  * evidence and how sure it is) and confirm it into an authoritative understanding or dismiss it.
  * Purely presentational; bilingual via the shared {@link SkillLocale}.
  */
-export function ClaimCandidateReview({ candidates, locale = "zh-CN", busyId = null, onConfirm, onDismiss }: {
+export function ClaimCandidateReview({ candidates, locale = "zh-CN", busyId = null,
+  onConfirm, onConfirmAll, onDismiss }: {
   candidates: ClaimCandidate[]; locale?: SkillLocale; busyId?: number | null;
-  onConfirm: (id: number) => void; onDismiss: (id: number) => void;
+  onConfirm: (id: number) => void; onConfirmAll?: () => void; onDismiss: (id: number) => void;
 }) {
   const [dismissingId, setDismissingId] = useState<number | null>(null);
   if (candidates.length === 0) return null;
@@ -62,6 +63,10 @@ export function ClaimCandidateReview({ candidates, locale = "zh-CN", busyId = nu
       <span>{t.pending(candidates.length)}</span>
     </div>
     <p>{t.intro}</p>
+    {onConfirmAll && <AsyncButton className="btn-candidate-confirm" busy={busyId === -1}
+      busyText={t.confirming} onClick={onConfirmAll}>
+      {locale === "en-SG" ? "Confirm all for my capsule" : "全部确认并用于共鸣体"}
+    </AsyncButton>}
     {candidates.map(candidate => {
       const busy = busyId === candidate.id;
       const confidencePct = Math.round(Math.max(0, Math.min(1, candidate.confidence)) * 100);
@@ -72,7 +77,10 @@ export function ClaimCandidateReview({ candidates, locale = "zh-CN", busyId = nu
           {candidate.alreadyActive && <span className="candidate-known">{t.known}</span>}
           <span className="candidate-authority">{authorityLabel[candidate.authorityLevel] ?? candidate.authorityLevel}</span>
         </div>
-        <p className="candidate-value">{candidate.value}</p>
+        <p className="candidate-value">{candidate.capsuleSafeValue || candidate.value}</p>
+        {candidate.capsuleSafeValue && candidate.capsuleSafeValue !== candidate.value &&
+          <details><summary>{locale === "en-SG" ? "View source wording" : "查看来源原话"}</summary>
+            <p className="candidate-value">{candidate.value}</p></details>}
         {candidate.evidenceText && <p className="candidate-evidence">{t.evidence}{candidate.evidenceText}</p>}
         <div className="candidate-confidence" role="img" aria-label={t.sure(confidencePct)}>
           <span className="candidate-confidence-bar"><span style={{ width: `${confidencePct}%` }} /></span>

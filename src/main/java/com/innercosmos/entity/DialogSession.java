@@ -14,6 +14,11 @@ public class DialogSession extends BaseEntity {
     public Integer tokenEstimate;
     public LocalDateTime startedAt;
     public LocalDateTime endedAt;
+    /** Last durable user/Aurora activity; used to resume the user's current conversation. */
+    public LocalDateTime lastActivityAt;
+    /** User-managed conversation organization without destroying the underlying transcript. */
+    public LocalDateTime archivedAt;
+    public LocalDateTime pinnedAt;
     /**
      * Preferred LLM provider (MINIMAX, MIMO, GLM, DEEPSEEK, MOCK).
      * null = fall back to the user profile preference, then the system default.

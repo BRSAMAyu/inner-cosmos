@@ -25,6 +25,7 @@ spec:
             - --config.file=/etc/prometheus/prometheus.yml
             - --storage.tsdb.path=/prometheus
             - --storage.tsdb.retention.time=6h
+            - --enable-feature=exemplar-storage
           securityContext:
             readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false

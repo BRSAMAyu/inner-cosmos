@@ -20,6 +20,7 @@ const COPY: Record<Locale, {
   empty: Record<TodoTab, string>; statusLabel: Record<TodoItem["status"], string>;
   start: string; finish: string; split: string; edit: string; letGo: string;
   reopen: string; pickUp: string; delete: string; save: string; cancel: string; overdue: string;
+  unscheduled: string;
 }> = {
   "zh-CN": {
     aria: "待办清单", heading: "待办清单", intro: "待办不是自我审判，而是把下一步变小。",
@@ -31,7 +32,8 @@ const COPY: Record<Locale, {
     empty: { today: "今天没有待办。可以先休息。", week: "本周没有待办。", done: "还没有完成的事项。", letgo: "没有放下的事项。" },
     statusLabel: { TODO: "待开始", DOING: "正在做", DONE: "已完成", CANCELLED: "已放下" },
     start: "开始", finish: "完成", split: "拆第一步", edit: "编辑", letGo: "放下",
-    reopen: "重新打开", pickUp: "重新拾起", delete: "删除", save: "保存修改", cancel: "取消", overdue: "已过期"
+    reopen: "重新打开", pickUp: "重新拾起", delete: "删除", save: "保存修改", cancel: "取消", overdue: "已过期",
+    unscheduled: "未设截止时间 · 本周规划池"
   },
   "en-SG": {
     aria: "Todo list", heading: "Todo list", intro: "A todo isn't self-judgment — it just makes the next step smaller.",
@@ -43,7 +45,8 @@ const COPY: Record<Locale, {
     empty: { today: "Nothing due today. You can rest.", week: "Nothing due this week.", done: "Nothing finished yet.", letgo: "Nothing let go yet." },
     statusLabel: { TODO: "Not started", DOING: "In progress", DONE: "Done", CANCELLED: "Let go" },
     start: "Start", finish: "Finish", split: "Split first step", edit: "Edit", letGo: "Let go",
-    reopen: "Reopen", pickUp: "Pick back up", delete: "Delete", save: "Save changes", cancel: "Cancel", overdue: "Overdue"
+    reopen: "Reopen", pickUp: "Pick back up", delete: "Delete", save: "Save changes", cancel: "Cancel", overdue: "Overdue",
+    unscheduled: "No deadline · weekly planning pool"
   }
 };
 
@@ -73,10 +76,20 @@ export function TodoBoard({ todos, tab, busy, splitBusyId, onSelectTab, onCreate
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState<Draft>(emptyDraft);
 
+  const now = new Date();
+  const endOfToday = new Date(now);
+  endOfToday.setHours(23, 59, 59, 999);
+  const endOfWeek = new Date(endOfToday);
+  endOfWeek.setDate(endOfWeek.getDate() + (7 - endOfWeek.getDay()) % 7);
+
   const filtered = todos.filter(item => {
     if (tab === "done") return item.status === "DONE";
     if (tab === "letgo") return item.status === "CANCELLED";
-    return item.status === "TODO" || item.status === "DOING";
+    if (item.status !== "TODO" && item.status !== "DOING") return false;
+    if (!item.deadline) return tab === "week";
+    const deadline = new Date(item.deadline).getTime();
+    if (tab === "today") return deadline <= endOfToday.getTime();
+    return deadline > endOfToday.getTime() && deadline <= endOfWeek.getTime();
   });
   const doneCount = todos.filter(item => item.status === "DONE").length;
 
@@ -160,6 +173,7 @@ export function TodoBoard({ todos, tab, busy, splitBusyId, onSelectTab, onCreate
               {item.deadline && <span className={`todo-deadline${isOverdue(item) ? " overdue" : ""}`}>
                 {isOverdue(item) ? t.overdue + " · " : ""}{new Date(item.deadline).toLocaleString(locale)}
               </span>}
+              {!item.deadline && <span className="todo-deadline">{t.unscheduled}</span>}
             </div>
             <div className="todo-actions">
               {(tab === "today" || tab === "week") && <>

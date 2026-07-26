@@ -172,7 +172,7 @@ public class AuroraChatController extends BaseController {
                 Map.of("key", "SOCRATIC", "label", "苏格拉底追问", "description", "温和追问一个关键假设，帮你看清想法从哪里来。"),
                 Map.of("key", "ACTION_SPLIT", "label", "行动拆解", "description", "把压力拆成十分钟内能开始的第一步。"),
                 Map.of("key", "RELATION_REVIEW", "label", "关系复盘", "description", "区分事实、感受、需要和边界，避免替任何人下定论。"),
-                Map.of("key", "CAPSULE_SHAPING", "label", "共鸣体塑形", "description", "通过自然对话，在十分钟内形成第一版立体侧影。")
+                Map.of("key", "CAPSULE_SHAPING", "label", "共鸣体塑形", "description", "通过自然对话，在五分钟左右形成第一版立体侧影。")
         ));
     }
 

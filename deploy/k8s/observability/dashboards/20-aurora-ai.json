@@ -1,0 +1,58 @@
+{
+  "uid": "inner-cosmos-ai",
+  "title": "Semantic Health Contract · Aurora AI",
+  "tags": ["inner-cosmos", "aurora", "ai"],
+  "schemaVersion": 39,
+  "refresh": "5s",
+  "time": {"from": "now-30m", "to": "now"},
+  "panels": [
+    {
+      "id": 1, "type": "text", "title": "", "gridPos": {"h": 4, "w": 24, "x": 0, "y": 0},
+      "options": {"mode": "markdown", "content": "## A green JVM is not enough\nThis board exposes provider outcome, fallback, latency, runtime route and **estimated** token volume. Token values are explicitly estimated from text length; they are not billed-provider usage."},
+      "transparent": true
+    },
+    {
+      "id": 2, "type": "stat", "title": "Provider calls · 5m", "gridPos": {"h": 5, "w": 6, "x": 0, "y": 4},
+      "targets": [{"refId": "A", "expr": "sum(increase(inner_cosmos_ai_provider_calls_total[5m])) or vector(0)"}]
+    },
+    {
+      "id": 3, "type": "stat", "title": "Provider errors · 5m", "gridPos": {"h": 5, "w": 6, "x": 6, "y": 4},
+      "targets": [{"refId": "A", "expr": "sum(increase(inner_cosmos_ai_provider_calls_total{outcome=\"error\"}[5m])) or vector(0)"}],
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}}
+    },
+    {
+      "id": 4, "type": "stat", "title": "Fallbacks · 5m", "gridPos": {"h": 5, "w": 6, "x": 12, "y": 4},
+      "targets": [{"refId": "A", "expr": "sum(increase(inner_cosmos_ai_provider_calls_total{fallback=\"true\"}[5m])) or vector(0)"}],
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}}
+    },
+    {
+      "id": 5, "type": "stat", "title": "Estimated tokens · 5m", "gridPos": {"h": 5, "w": 6, "x": 18, "y": 4},
+      "targets": [{"refId": "A", "expr": "sum(increase(inner_cosmos_ai_tokens_estimated_total[5m])) or vector(0)"}],
+      "fieldConfig": {"defaults": {"unit": "short"}}
+    },
+    {
+      "id": 6, "type": "timeseries", "title": "Provider latency · p50 / p95 / p99", "description": "Click an exemplar marker to open the matching privacy-safe trace.", "gridPos": {"h": 9, "w": 12, "x": 0, "y": 9},
+      "targets": [
+        {"refId": "A", "expr": "histogram_quantile(0.50, sum by (le) (rate(inner_cosmos_ai_provider_latency_seconds_bucket[5m])))", "legendFormat": "p50", "exemplar": true},
+        {"refId": "B", "expr": "histogram_quantile(0.95, sum by (le) (rate(inner_cosmos_ai_provider_latency_seconds_bucket[5m])))", "legendFormat": "p95", "exemplar": true},
+        {"refId": "C", "expr": "histogram_quantile(0.99, sum by (le) (rate(inner_cosmos_ai_provider_latency_seconds_bucket[5m])))", "legendFormat": "p99", "exemplar": true}
+      ],
+      "fieldConfig": {"defaults": {"unit": "s", "custom": {"lineWidth": 3, "fillOpacity": 10}}}
+    },
+    {
+      "id": 7, "type": "timeseries", "title": "Provider outcomes · calls/s", "gridPos": {"h": 9, "w": 12, "x": 12, "y": 9},
+      "targets": [{"refId": "A", "expr": "sum by (provider, outcome, fallback) (rate(inner_cosmos_ai_provider_calls_total[1m]))", "legendFormat": "{{provider}} · {{outcome}} · fallback={{fallback}}"}],
+      "fieldConfig": {"defaults": {"custom": {"lineWidth": 2, "fillOpacity": 18}}}
+    },
+    {
+      "id": 8, "type": "barchart", "title": "Estimated token flow by module", "gridPos": {"h": 8, "w": 12, "x": 0, "y": 18},
+      "targets": [{"refId": "A", "expr": "sum by (module, direction) (increase(inner_cosmos_ai_tokens_estimated_total[15m]))", "legendFormat": "{{module}} · {{direction}}"}],
+      "options": {"orientation": "horizontal", "groupWidth": 0.7}
+    },
+    {
+      "id": 9, "type": "timeseries", "title": "Aurora runtime routing", "gridPos": {"h": 8, "w": 12, "x": 12, "y": 18},
+      "targets": [{"refId": "A", "expr": "sum by (runtime, provider, mode, fallback) (rate(aurora_turn_count_total[5m]))", "legendFormat": "{{runtime}} · {{provider}} · {{mode}} · fallback={{fallback}}"}],
+      "fieldConfig": {"defaults": {"custom": {"lineWidth": 2, "fillOpacity": 15}}}
+    }
+  ]
+}

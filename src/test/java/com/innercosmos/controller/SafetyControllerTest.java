@@ -68,6 +68,17 @@ class SafetyControllerTest {
                 .andExpect(jsonPath("$.data").isArray());
     }
 
+    @Test
+    void resources_enSingapore_returnsVerifiedLocalNumbersWithoutChineseCopy() throws Exception {
+        mockMvc.perform(get("/api/safety/resources")
+                        .param("locale", "en-SG")
+                        .param("region", "SG"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0]").value(org.hamcrest.Matchers.containsString("999")))
+                .andExpect(jsonPath("$.data[1]").value(org.hamcrest.Matchers.containsString("995")))
+                .andExpect(jsonPath("$.data[2]").value(org.hamcrest.Matchers.containsString("1767")));
+    }
+
     // ---------------- Check ----------------
 
     @Test

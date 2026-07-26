@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Fragment, useEffect, useRef, useState, type FormEvent } from "react";
 import { AsyncButton } from "../loading";
+import type { ClaimCandidate } from "../api";
 import type { Locale } from "../i18n";
 import { PcmWavRecorder } from "../audio-recorder";
 import { InlineAudioPlayer } from "./shared/InlineAudioPlayer";
@@ -8,7 +9,7 @@ import { InlineAudioPlayer } from "./shared/InlineAudioPlayer";
 // normal reply -- see the "inner_voice" SSE event case in useAuroraSession.ts. `audio`/`voiceId`
 // are only ever populated on this variant.
 export type AuroraUiMessage = {
-  key: string; speaker: "USER" | "AURORA" | "AURORA_INNER"; text: string; partial?: boolean;
+  key: string; id?: number; speaker: "USER" | "AURORA" | "AURORA_INNER"; text: string; partial?: boolean;
   audio?: string; voiceId?: string;
 };
 
@@ -48,7 +49,8 @@ const COPY: Record<Locale, {
 };
 
 export function AuroraConversation({ messages, activeTurnId, thinkingStage = null, draft, sessionReady, onDraftChange, onSubmit, onStop, onTranscribe, onGoodbye, goodbyeBusy = false,
-  innerVoiceEnabled = false, innerVoiceMode = "AMBIENT", locale = "zh-CN" }: {
+  innerVoiceEnabled = false, innerVoiceMode = "AMBIENT", claimCandidates = [],
+  claimCandidateBusyId = null, onConfirmClaim, onDismissClaim, locale = "zh-CN" }: {
   messages: AuroraUiMessage[];
   activeTurnId: number | null;
   /** Derived from the session runtime signal; drives an inline "thinking" beat where the user is
@@ -70,6 +72,10 @@ export function AuroraConversation({ messages, activeTurnId, thinkingStage = nul
    * all here -- never even the reveal affordance. */
   innerVoiceEnabled?: boolean;
   innerVoiceMode?: "AMBIENT" | "ON_DEMAND";
+  claimCandidates?: ClaimCandidate[];
+  claimCandidateBusyId?: number | null;
+  onConfirmClaim?: (id: number) => void;
+  onDismissClaim?: (id: number) => void;
   locale?: Locale;
 }) {
   const t = COPY[locale];
@@ -83,7 +89,8 @@ export function AuroraConversation({ messages, activeTurnId, thinkingStage = nul
   // independently across however many inner-voice bubbles a session accumulates.
   const [revealedInnerVoice, setRevealedInnerVoice] = useState<Set<string>>(new Set());
   const recorderRef = useRef<PcmWavRecorder | null>(null);
-  const bottomRef = useRef<HTMLDivElement | null>(null);
+  const conversationRef = useRef<HTMLElement | null>(null);
+  const shouldFollowConversationRef = useRef(true);
   const draftRef = useRef(draft);
   draftRef.current = draft;
   // Gemini audit 4.6 (CONFIRMED/P2): mountedRef + a per-attempt generation counter guard the
@@ -95,7 +102,13 @@ export function AuroraConversation({ messages, activeTurnId, thinkingStage = nul
   const generationRef = useRef(0);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ block: "end" });
+    const conversation = conversationRef.current;
+    if (conversation && shouldFollowConversationRef.current) {
+      // Keep the movement inside the transcript. scrollIntoView() can also move the page when the
+      // conversation lives below overview content, which makes every streamed token steal the
+      // reader's document position.
+      conversation.scrollTop = conversation.scrollHeight;
+    }
   }, [messages, thinkingStage]);
   const voiceSupported = typeof navigator !== "undefined"
     && !!navigator.mediaDevices?.getUserMedia && typeof AudioContext !== "undefined";
@@ -138,8 +151,14 @@ export function AuroraConversation({ messages, activeTurnId, thinkingStage = nul
   };
 
   return <>
-    <section className={`conversation ${messages.length === 0 ? "empty-state" : "has-messages"}`}
-      aria-label={t.convAria}>
+    <section ref={conversationRef}
+      className={`conversation ${messages.length === 0 ? "empty-state" : "has-messages"}`}
+      aria-label={t.convAria}
+      onScroll={event => {
+        const conversation = event.currentTarget;
+        const distanceFromBottom = conversation.scrollHeight - conversation.scrollTop - conversation.clientHeight;
+        shouldFollowConversationRef.current = distanceFromBottom <= 80;
+      }}>
       {messages.length === 0 && <div className="empty"><span>✦</span><p>{t.empty}</p></div>}
       {messages.map(message => {
         if (message.speaker === "AURORA_INNER") {
@@ -159,18 +178,42 @@ export function AuroraConversation({ messages, activeTurnId, thinkingStage = nul
               ariaLabel={revealed ? undefined : t.innerVoiceReveal} onPlayAttempt={reveal} />}
           </article>;
         }
-        return <article className={`message ${message.speaker.toLowerCase()} ${message.partial ? "partial" : ""}`} key={message.key}
-          aria-live={message.partial ? "polite" : undefined}>
-          <span className="speaker">{message.speaker === "AURORA" ? "Aurora" : t.speakerYou}</span>
-          <p className="ugc-text">{message.text || "…"}</p>
-          {message.partial && message.text && <small>{t.partialHint}</small>}
-        </article>;
+        const attached = message.id == null ? [] : claimCandidates.filter(candidate =>
+          candidate.provenanceMessageIds.length > 0
+          && Math.max(...candidate.provenanceMessageIds) === message.id);
+        return <Fragment key={message.key}>
+          <article className={`message ${message.speaker.toLowerCase()} ${message.partial ? "partial" : ""}`}
+            aria-live={message.partial ? "polite" : undefined}>
+            <span className="speaker">{message.speaker === "AURORA" ? "Aurora" : t.speakerYou}</span>
+            <p className="ugc-text">{message.text || "…"}</p>
+            {message.partial && message.text && <small>{t.partialHint}</small>}
+          </article>
+          {attached.map(candidate => <article className="candidate-card candidate-card-inline"
+            key={`claim-${candidate.id}`}>
+            <div className="candidate-card-head"><span className="candidate-type">{candidate.claimType}</span>
+              <small>{Math.round(candidate.confidence * 100)}%</small></div>
+            <p className="candidate-value">{candidate.capsuleSafeValue || candidate.value}</p>
+            {candidate.capsuleSafeValue && candidate.capsuleSafeValue !== candidate.value &&
+              <details><summary>{locale === "en-SG" ? "Source wording" : "来源原话"}</summary>
+                <p>{candidate.value}</p></details>}
+            {candidate.evidenceText && <small>{candidate.evidenceText}</small>}
+            <div className="candidate-actions">
+              <button type="button" disabled={claimCandidateBusyId === candidate.id}
+                onClick={() => onDismissClaim?.(candidate.id)}>
+                {locale === "en-SG" ? "Not me" : "不太是我"}
+              </button>
+              <button type="button" disabled={claimCandidateBusyId === candidate.id}
+                onClick={() => onConfirmClaim?.(candidate.id)}>
+                {locale === "en-SG" ? "Yes, that's me" : "对，就是我"}
+              </button>
+            </div>
+          </article>)}
+        </Fragment>;
       })}
       {activeTurnId !== null && thinkingStage && <article className={`message aurora thinking ${thinkingStage}`} aria-label={t.thinkingAria}>
         <span className="speaker">Aurora</span>
         <p><span className="thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span>{thinkingStage === "understanding" ? t.understanding : t.composing}</p>
       </article>}
-      <div ref={bottomRef} aria-hidden="true" />
     </section>
     <form className="composer" onSubmit={onSubmit}>
       <textarea value={draft} onChange={event => onDraftChange(event.target.value)}

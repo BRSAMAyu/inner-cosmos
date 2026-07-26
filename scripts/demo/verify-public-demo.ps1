@@ -120,7 +120,7 @@ $webApp = Invoke-PublicReadyCheck "Public Web App" {
     Invoke-WebRequest -UseBasicParsing -Uri "$origin/app/aurora/" -TimeoutSec 30
 }
 if ($webApp.StatusCode -ne 200 -or
-    $webApp.Content -notmatch '["'']\/app\/aurora\/assets\/app\.js["'']') {
+    $webApp.Content -notmatch '["'']\/app\/aurora\/assets\/[^"'']+\.js["'']') {
     throw "Public Web App is not using the /app/aurora browser bundle; in-app navigation may reload to a 404."
 }
 $apkHead = Invoke-PublicReadyCheck "Public APK download" {
@@ -137,7 +137,9 @@ $null = Invoke-Envelope $demoSession "POST" "/api/public/demo/enter/lin-che"
 $lin = Invoke-Envelope $demoSession "GET" "/api/v1/auth/current"
 $null = Invoke-Envelope $demoSession "POST" "/api/public/demo/enter/shen-yan"
 $shen = Invoke-Envelope $demoSession "GET" "/api/v1/auth/current"
-if ($lin.username -ne "demo" -or $shen.username -ne "river" -or [long]$lin.id -eq [long]$shen.id) {
+if (-not $lin.username.StartsWith("sandbox-") -or $lin.nickname -ne "Lin Che" -or
+    -not $shen.username.StartsWith("sandbox-") -or $shen.nickname -ne "Shen Yan" -or
+    [long]$lin.id -eq [long]$shen.id) {
     throw "Passwordless Demo persona switching did not establish two distinct real sessions."
 }
 
@@ -147,7 +149,8 @@ $null = Invoke-Envelope $linDemoSession "POST" "/api/public/demo/enter/lin-che"
 $null = Invoke-Envelope $cloudDemoSession "POST" "/api/public/demo/enter/xia-yu"
 $linDemo = Invoke-Envelope $linDemoSession "GET" "/api/v1/auth/current"
 $cloudDemo = Invoke-Envelope $cloudDemoSession "GET" "/api/v1/auth/current"
-if ($linDemo.username -ne "demo" -or $cloudDemo.username -ne "cloud" -or
+if (-not $linDemo.username.StartsWith("sandbox-") -or $linDemo.nickname -ne "Lin Che" -or
+    -not $cloudDemo.username.StartsWith("sandbox-") -or $cloudDemo.nickname -ne "Xia Yu" -or
     [long]$linDemo.id -eq [long]$cloudDemo.id) {
     throw "Curated slow-letter proof requires two distinct Lin Che and Xia Yu sessions."
 }
@@ -182,10 +185,9 @@ foreach ($spec in $curatedCapsuleSpecs) {
     })
 }
 
-# Prove the intended showcase path with the curated, months-old identities themselves:
-# Xia Yu's already-read slow letter lets Lin Che ask to meet, Xia Yu accepts, and both sides
-# see the relationship. Normalize and restore the relationship so this gate is repeatable and
-# never leaves the shared classroom personas in a verifier-mutated state.
+# Prove the intended showcase path between two isolated curated-persona sandboxes:
+# Xia Yu writes a real 30-second letter, Lin Che receives and reads it, then asks to connect.
+# This matches the current personal-sandbox contract instead of assuming shared seed user IDs.
 $curatedConnection = "NOT_RUN"
 try {
     $existingFriends = @(Invoke-Envelope $linDemoSession "GET" "/api/social/friends")
@@ -193,26 +195,37 @@ try {
         $null = Invoke-Envelope $linDemoSession "POST" "/api/social/friends/$($friend.id)/leave"
     }
 
-    $linRequests = Invoke-Envelope $linDemoSession "GET" "/api/social/requests"
-    $cloudRequests = Invoke-Envelope $cloudDemoSession "GET" "/api/social/requests"
-    foreach ($request in @($linRequests.incoming | Where-Object { [long]$_.userId -eq [long]$cloudDemo.id })) {
-        $null = Invoke-Envelope $linDemoSession "POST" "/api/social/friends/$($request.id)/decline"
+    $letterKey = "public-demo-curated-letter-$suffix"
+    $curatedLetter = Invoke-Envelope $cloudDemoSession "POST" "/api/v1/letters/draft" @{
+        receiverUserId = [long]$linDemo.id
+        title = "A slow note from Xia Yu"
+        letterBody = "A real note between two isolated demo journeys, sent slowly and without pressure."
+        deliveryPreset = "DEMO_30S"
+        timeZone = "Asia/Shanghai"
+        idempotencyKey = $letterKey
     }
-    foreach ($request in @($cloudRequests.incoming | Where-Object { [long]$_.userId -eq [long]$linDemo.id })) {
-        $null = Invoke-Envelope $cloudDemoSession "POST" "/api/social/friends/$($request.id)/decline"
-    }
-
-    $linInbox = @(Invoke-Envelope $linDemoSession "GET" "/api/letters/inbox")
-    $seedLetter = @($linInbox | Where-Object {
-        [long]$_.senderUserId -eq [long]$cloudDemo.id -and
-        [long]$_.receiverUserId -eq [long]$linDemo.id -and
-        $_.status -in @("READ", "REPLIED")
-    })
-    if ($seedLetter.Count -ne 1) {
-        throw "The curated Xia Yu to Lin Che read slow letter is missing or ambiguous."
+    $sentCuratedLetter = Invoke-Envelope $cloudDemoSession "POST" "/api/letters/$($curatedLetter.id)/send" @{}
+    if ($sentCuratedLetter.status -notin @("SENT", "FLYING", "DELIVERED")) {
+        throw "The curated sandbox slow letter did not enter its delivery lifecycle."
     }
 
-    $requested = Invoke-Envelope $linDemoSession "POST" "/api/social/connections/from-letter/$($seedLetter[0].id)"
+    $arrivalDeadline = (Get-Date).AddSeconds(55)
+    $arrivedLetter = $null
+    do {
+        Start-Sleep -Seconds 5
+        $linInbox = @(Invoke-Envelope $linDemoSession "GET" "/api/letters/inbox")
+        $arrivedLetter = $linInbox | Where-Object {
+            [long]$_.id -eq [long]$curatedLetter.id -and $_.status -in @("DELIVERED", "READ", "REPLIED")
+        } | Select-Object -First 1
+    } while (-not $arrivedLetter -and (Get-Date) -lt $arrivalDeadline)
+    if (-not $arrivedLetter) {
+        throw "The real Xia Yu to Lin Che 30-second slow letter did not arrive."
+    }
+    if ($arrivedLetter.status -eq "DELIVERED") {
+        $arrivedLetter = Invoke-Envelope $linDemoSession "POST" "/api/letters/$($arrivedLetter.id)/read"
+    }
+
+    $requested = Invoke-Envelope $linDemoSession "POST" "/api/social/connections/from-letter/$($arrivedLetter.id)"
     if ($requested.status -ne "PENDING" -or
         [long]$requested.requesterId -ne [long]$linDemo.id -or
         [long]$requested.addresseeId -ne [long]$cloudDemo.id) {
@@ -223,7 +236,7 @@ try {
     $incomingFromLin = @($cloudRequests.incoming | Where-Object {
         [long]$_.id -eq [long]$requested.id -and
         [long]$_.userId -eq [long]$linDemo.id -and
-        $_.source -eq "SLOW_LETTER:$($seedLetter[0].id)"
+        $_.source -eq "SLOW_LETTER:$($arrivedLetter.id)"
     })
     if ($incomingFromLin.Count -ne 1) {
         throw "Xia Yu did not receive the connection request created from the slow letter."
@@ -238,7 +251,7 @@ try {
         -not ($cloudFriends | Where-Object {
             [long]$_.id -eq [long]$requested.id -and [long]$_.userId -eq [long]$linDemo.id
         })) {
-        throw "The curated slow-letter connection is not visible to both personas."
+        throw "The slow-letter connection is not visible to both personas."
     }
     $curatedConnection = "LETTER_TO_FRIEND_ACCEPTED"
 }
@@ -250,7 +263,7 @@ finally {
         }
     }
     catch {
-        Write-Warning "Could not restore the curated Lin Che / Xia Yu friendship baseline: $($_.Exception.Message)"
+        Write-Warning "Could not restore the isolated Lin Che / Xia Yu friendship baseline: $($_.Exception.Message)"
     }
 }
 

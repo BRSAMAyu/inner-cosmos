@@ -53,11 +53,50 @@ public final class ClaimCandidateExtractor {
             if (isNonClaim(text)) continue;
             detect(text, message.id, byKey);
         }
+        addExpressionStyle(messages, byKey);
         List<ClaimCandidate> out = new ArrayList<>();
         for (Acc acc : byKey.values()) {
             out.add(acc.toCandidate());
         }
         return out;
+    }
+
+    /**
+     * Provider-independent style evidence for classroom/mock mode. This reports only directly
+     * measurable expression form (length and punctuation rhythm), never a personality judgement.
+     */
+    private static void addExpressionStyle(List<DialogMessage> messages, Map<String, Acc> byKey) {
+        List<DialogMessage> userMessages = messages.stream()
+                .filter(message -> message != null && message.id != null
+                        && "USER".equalsIgnoreCase(message.speaker)
+                        && message.textContent != null && !message.textContent.isBlank())
+                .toList();
+        if (userMessages.size() < 2) return;
+
+        double averageLength = userMessages.stream()
+                .mapToInt(message -> message.textContent.strip().length())
+                .average().orElse(0.0);
+        long expressiveMarks = userMessages.stream()
+                .map(message -> message.textContent)
+                .filter(text -> text.contains("！") || text.contains("!")
+                        || text.contains("……") || text.contains("…"))
+                .count();
+        String value;
+        if (averageLength <= 24) {
+            value = "表达通常简短直接";
+        } else if (averageLength >= 60) {
+            value = "表达通常会展开上下文再说明重点";
+        } else {
+            value = expressiveMarks * 2 >= userMessages.size()
+                    ? "表达节奏适中，会用标点传达停顿和强调"
+                    : "表达节奏适中，倾向用完整句说明";
+        }
+        String key = ClaimTypes.EXPRESSION_STYLE + ":" + value.replaceAll("\\s", "");
+        Acc style = new Acc(ClaimTypes.EXPRESSION_STYLE, key, value,
+                ClaimAuthority.REPEATED_BEHAVIOR, 0.65,
+                "基于本会话多轮表达的句长与标点节奏", false);
+        userMessages.stream().limit(8).map(message -> message.id).forEach(style.ids::add);
+        byKey.put(key, style);
     }
 
     /** Precision gates: never turn a question, a hypothetical or someone else's words into a claim. */

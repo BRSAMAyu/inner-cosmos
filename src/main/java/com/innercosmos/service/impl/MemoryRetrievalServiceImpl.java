@@ -29,6 +29,12 @@ import java.util.Set;
  */
 @Service
 public class MemoryRetrievalServiceImpl implements MemoryRetrievalService {
+    /**
+     * Retrieval relevance is an admission gate, not merely one feature in a global score.
+     * Freshness, salience and task fit may order relevant memories, but must never make an
+     * unrelated memory eligible for prompt injection.
+     */
+    private static final double MIN_RELEVANCE = 0.18;
     private static final Set<String> CURRENT = Set.of("ACTIVE");
     private static final Set<String> PROVIDER_FORBIDDEN_CONSENT =
             Set.of("LOCAL_ONLY", "NO_EXTERNAL_PROCESSING", "SIMULATOR_AUTHORIZED");
@@ -66,7 +72,8 @@ public class MemoryRetrievalServiceImpl implements MemoryRetrievalService {
                 .toList();
         Map<Long, Double> providerSemantic = embeddingIndex.similarities(userId, text, candidates);
         List<Scored> scored = candidates.stream()
-                .map(card -> score(card, text, task, providerSemantic.get(card.id))).filter(row -> text.isBlank() || row.score > 0.08)
+                .map(card -> score(card, text, task, providerSemantic.get(card.id)))
+                .filter(row -> !text.isBlank() && row.relevance() >= MIN_RELEVANCE)
                 .sorted(Comparator.comparingDouble(Scored::score).reversed()).toList();
 
         List<MemoryEvidencePackVO.Evidence> selected = new ArrayList<>();
@@ -96,6 +103,7 @@ public class MemoryRetrievalServiceImpl implements MemoryRetrievalService {
         double lexical = lexical(query, document);
         double localSemantic = cosine(ngrams(query), ngrams(document));
         double semantic = providerSimilarity == null ? localSemantic : Math.max(localSemantic, Math.max(0, providerSimilarity));
+        double relevance = Math.max(lexical, semantic);
         double taskFit = taskFit(task, card);
         double freshness = freshness(card.lastTouchedAt == null ? card.createdAt : card.lastTouchedAt);
         double salience = Math.min(1, value(card.emotionalGravity) / 3.0);
@@ -110,7 +118,7 @@ public class MemoryRetrievalServiceImpl implements MemoryRetrievalService {
         if (taskFit > 0.4) why.add("适合当前任务 " + round(taskFit));
         if (freshness > 0.6) why.add("近期仍活跃");
         if (authority > 0.8) why.add("高置信或用户确认");
-        return new Scored(card, score, why);
+        return new Scored(card, score, relevance, why);
     }
 
     private static double taskFit(String task, MemoryCard card) {
@@ -161,5 +169,5 @@ public class MemoryRetrievalServiceImpl implements MemoryRetrievalService {
     private static String safe(String value) { return value == null ? "" : value; }
     private static double value(Double value) { return value == null ? 0.5 : value; }
     private static double round(double value) { return Math.round(value * 1000.0) / 1000.0; }
-    private record Scored(MemoryCard card, double score, List<String> contributions) {}
+    private record Scored(MemoryCard card, double score, double relevance, List<String> contributions) {}
 }

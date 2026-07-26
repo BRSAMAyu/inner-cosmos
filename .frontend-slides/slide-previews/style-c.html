@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>从容器编排到语义可靠性</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@300;400;500&family=Noto+Serif+SC:wght@300;400;500;600&family=Noto+Sans+SC:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+/* === FIXED 16:9 STAGE (subset of viewport-base.css) === */
+html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#08090a}
+.deck-viewport{position:fixed;inset:0;overflow:hidden;background:#08090a}
+.deck-stage{position:absolute;left:0;top:0;width:1920px;height:1080px;overflow:hidden;transform-origin:0 0;background:#111312}
+.slide{position:absolute;inset:0;width:1920px;height:1080px;overflow:hidden;visibility:hidden;opacity:0;pointer-events:none;background:#111312}
+.slide.active{visibility:visible;opacity:1;pointer-events:auto;z-index:1}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms !important;transition-duration:.2s !important}}
+
+/* === PALETTE: two semantic accents only ===
+   amber  = 已实测 / 证据      brick = 边界 / 不可声称 */
+:root{
+  --ink:#111312;
+  --ink-2:#191b1a;
+  --text:#EDE9E1;
+  --text-2:#9AA09C;
+  --text-3:#5F6663;
+  --rule:rgba(237,233,225,.10);
+  --amber:#D9A24A;
+  --brick:#B4543A;
+  --font-display:'Instrument Serif','Noto Serif SC',serif;
+  --font-body:'IBM Plex Sans','Noto Sans SC',sans-serif;
+  --font-mono:'IBM Plex Mono','Noto Sans SC',monospace;
+}
+
+/* === ATMOSPHERE: warm instrument glow + ledger hairlines === */
+.surface{position:absolute;inset:0;background:
+  radial-gradient(1100px 700px at 82% 8%,rgba(217,162,74,.11),transparent 62%),
+  radial-gradient(900px 600px at 6% 96%,rgba(180,84,58,.07),transparent 60%),
+  linear-gradient(168deg,#141615 0%,#111312 48%,#0d0f0e 100%)}
+.ledger{position:absolute;inset:0;pointer-events:none;opacity:.55;
+  background:repeating-linear-gradient(to bottom,transparent 0 59px,var(--rule) 59px 60px)}
+
+/* === CHROME === */
+.chrome-t{position:absolute;left:110px;right:110px;top:56px;display:flex;justify-content:space-between;align-items:center;
+  padding-bottom:20px;border-bottom:1px solid var(--rule)}
+.chrome-t .mark{font-family:var(--font-mono);font-weight:400;font-size:20px;letter-spacing:.2em;color:var(--text);text-transform:uppercase}
+.chrome-t .env{display:flex;gap:26px;font-family:var(--font-mono);font-size:17px;letter-spacing:.06em;color:var(--text-3)}
+.chrome-t .env b{color:var(--amber);font-weight:400}
+
+/* === CONTRACT RAIL: persistent orientation device === */
+.rail{position:absolute;right:110px;top:196px;width:392px}
+.rail .rhead{font-family:var(--font-mono);font-size:16px;letter-spacing:.2em;color:var(--text-3);text-transform:uppercase;margin-bottom:20px}
+.rail .seg{display:flex;gap:16px;align-items:flex-start;padding:17px 0;border-top:1px solid var(--rule)}
+.rail .seg:last-child{border-bottom:1px solid var(--rule)}
+.rail .seg .k{font-family:var(--font-mono);font-size:16px;color:var(--text-3);flex:none;width:24px;padding-top:5px}
+.rail .seg .b{flex:none;width:3px;align-self:stretch;background:var(--text-3);opacity:.35}
+.rail .seg .n{font-family:var(--font-body);font-weight:500;font-size:25px;color:var(--text);line-height:1.25}
+.rail .seg .n em{display:block;font-style:normal;font-family:var(--font-mono);font-size:15px;color:var(--text-3);margin-top:6px;letter-spacing:.03em}
+.rail .seg.on .b{background:var(--amber);opacity:1}
+.rail .seg.on .k{color:var(--amber)}
+
+/* === TITLE === */
+.cover{position:absolute;left:110px;top:206px;width:1180px}
+.cover .eyebrow{display:inline-flex;align-items:center;gap:14px;font-family:var(--font-mono);font-size:19px;
+  letter-spacing:.22em;color:var(--amber);text-transform:uppercase}
+.cover .eyebrow::before{content:"";width:56px;height:1px;background:var(--amber)}
+.cover h1{margin:30px 0 0;font-family:var(--font-display);font-weight:400;font-size:130px;line-height:1.0;letter-spacing:.005em;color:var(--text)}
+.cover h1 i{font-style:italic;color:var(--amber)}
+.cover .sub{margin-top:34px;font-family:var(--font-body);font-weight:300;font-size:41px;line-height:1.4;color:var(--text)}
+.cover .ctx{margin-top:24px;font-family:var(--font-body);font-weight:300;font-size:23px;line-height:1.75;color:var(--text-2);max-width:1010px}
+.cover .ctx b{color:var(--text);font-weight:400}
+
+/* === THE MAP: deck spine, dimmed on the cover, lit segment-by-segment later === */
+.map{position:absolute;left:110px;right:110px;bottom:112px;height:118px}
+.map .mlabel{position:absolute;left:0;top:-34px;font-family:var(--font-mono);font-size:15px;letter-spacing:.18em;
+  color:var(--text-3);text-transform:uppercase}
+.map svg{position:absolute;left:0;top:16px;width:100%;height:74px;overflow:visible}
+.map .lane{stroke:rgba(237,233,225,.20);stroke-width:1}
+.map .node{fill:#111312;stroke:rgba(237,233,225,.42);stroke-width:1.4}
+.map .node-on{fill:var(--amber);stroke:var(--amber)}
+.map .nlab{font-family:'IBM Plex Mono',monospace;font-size:15px;fill:var(--text-3);letter-spacing:.04em}
+.map .nlab-on{fill:var(--amber)}
+
+/* === FOOT === */
+.foot{position:absolute;left:110px;right:110px;bottom:50px;display:flex;justify-content:space-between;
+  font-family:var(--font-mono);font-size:16px;color:var(--text-3);letter-spacing:.06em}
+.foot .bd{color:var(--brick)}
+
+/* === ENTRANCE === */
+@keyframes riseIn{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
+@keyframes wipeX{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes glowIn{from{opacity:0;transform:scale(.4)}to{opacity:1;transform:none}}
+@keyframes drawLine{from{stroke-dashoffset:1600}to{stroke-dashoffset:0}}
+.slide.active .chrome-t{transform-origin:left;animation:wipeX .66s cubic-bezier(.22,1,.36,1) both}
+.slide.active .cover .eyebrow{animation:riseIn .55s ease-out .22s both}
+.slide.active .cover h1{animation:riseIn .8s cubic-bezier(.22,1,.36,1) .32s both}
+.slide.active .cover .sub{animation:riseIn .6s ease-out .5s both}
+.slide.active .cover .ctx{animation:riseIn .6s ease-out .6s both}
+.slide.active .rail .rhead{animation:fadeIn .5s ease-out .56s both}
+.slide.active .rail .seg:nth-of-type(1){animation:riseIn .5s ease-out .64s both}
+.slide.active .rail .seg:nth-of-type(2){animation:riseIn .5s ease-out .72s both}
+.slide.active .rail .seg:nth-of-type(3){animation:riseIn .5s ease-out .80s both}
+.slide.active .rail .seg:nth-of-type(4){animation:riseIn .5s ease-out .88s both}
+.slide.active .map .mlabel{animation:fadeIn .5s ease-out .9s both}
+.slide.active .map .lane{stroke-dasharray:1600;animation:drawLine 1.5s cubic-bezier(.22,1,.36,1) .92s both}
+.slide.active .map .node,.slide.active .map .nlab{animation:fadeIn .5s ease-out 1.3s both}
+.slide.active .map .node-on{animation:glowIn .5s cubic-bezier(.34,1.56,.64,1) 1.5s both;transform-box:fill-box;transform-origin:center}
+.slide.active .foot{animation:fadeIn .6s ease-out 1.5s both}
+</style>
+</head>
+<body>
+<div class="deck-viewport">
+  <div class="deck-stage" id="stage">
+    <section class="slide active">
+      <div class="surface"></div>
+      <div class="ledger"></div>
+
+      <div class="chrome-t">
+        <div class="mark">Inner Cosmos</div>
+        <div class="env"><span>local-kind <b>live</b></span><span>academy-eks</span><span>commercial-sg</span></div>
+      </div>
+
+      <div class="cover">
+        <div class="eyebrow">Semantic Reliability</div>
+        <h1>从容器编排<br><i>到语义可靠性</i></h1>
+        <div class="sub">先进 AI Agent 的云原生运行范式</div>
+        <div class="ctx">以 Inner Cosmos 的长期对话、异步记忆与安全发布为实验场。此处<b>"语义"指业务语义与领域不变量</b>，不是自然语言语义。</div>
+      </div>
+
+      <!-- Persistent four-contract rail: tells the room where we are, all deck long -->
+      <div class="rail">
+        <div class="rhead">Four Contracts</div>
+        <div class="seg on"><div class="k">01</div><div class="b"></div><div class="n">连续性<em>Pod 消失，什么必须继续存在</em></div></div>
+        <div class="seg"><div class="k">02</div><div class="b"></div><div class="n">语义健康<em>进程活着 ≠ 版本仍值得流量</em></div></div>
+        <div class="seg"><div class="k">03</div><div class="b"></div><div class="n">工作压力<em>CPU 不能代表用户在等待</em></div></div>
+        <div class="seg"><div class="k">04</div><div class="b"></div><div class="n">因果可观测<em>一次行为跨越多个运行角色</em></div></div>
+      </div>
+
+      <!-- The map: reused on every chain slide with a different segment lit -->
+      <div class="map">
+        <div class="mlabel">One user turn · the path every experiment walks</div>
+        <svg viewBox="0 0 1700 74" preserveAspectRatio="none">
+          <line class="lane" x1="14" y1="26" x2="1686" y2="26"/>
+          <g>
+            <circle class="node node-on" cx="14" cy="26" r="7"/>
+            <circle class="node" cx="253" cy="26" r="6"/>
+            <circle class="node" cx="492" cy="26" r="6"/>
+            <circle class="node" cx="731" cy="26" r="6"/>
+            <circle class="node" cx="970" cy="26" r="6"/>
+            <circle class="node" cx="1209" cy="26" r="6"/>
+            <circle class="node" cx="1448" cy="26" r="6"/>
+            <circle class="node" cx="1686" cy="26" r="6"/>
+          </g>
+          <g>
+            <text class="nlab nlab-on" x="14" y="60">AppShell</text>
+            <text class="nlab" x="253" y="60">API / SSE</text>
+            <text class="nlab" x="492" y="60">Aurora Runtime</text>
+            <text class="nlab" x="731" y="60">Retrieval</text>
+            <text class="nlab" x="970" y="60">Provider</text>
+            <text class="nlab" x="1209" y="60">Outbox</text>
+            <text class="nlab" x="1448" y="60">Worker</text>
+            <text class="nlab" x="1600" y="60">WakeIntent</text>
+          </g>
+        </svg>
+      </div>
+
+      <div class="foot">
+        <span>1269 tests · 0 assertion failures</span>
+        <span class="bd">3 disclosed boundaries</span>
+      </div>
+    </section>
+  </div>
+</div>
+<script>
+/* Uniform scale of the fixed 1920x1080 stage — never reflow content. */
+(function(){
+  var stage=document.getElementById('stage');
+  function fit(){
+    var s=Math.min(innerWidth/1920,innerHeight/1080);
+    stage.style.transform='translate('+((innerWidth-1920*s)/2)+'px,'+((innerHeight-1080*s)/2)+'px) scale('+s+')';
+  }
+  addEventListener('resize',fit);fit();
+})();
+</script>
+</body>
+</html>

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { DailyRecordEntry, MemoryThemeRow } from "../api";
 import type { Locale } from "../i18n";
+import { emotionWeatherPresentation } from "../emotionWeather";
 import { LocalizedTemporalInput } from "./shared/LocalizedTemporalInput";
 
 // Phase 3 legacy-page port: src/main/resources/static/pages/timeline.html. Read-only merge of
@@ -20,15 +21,6 @@ const COPY: Record<Locale, {
     empty: "After a conversation with Aurora or a diary entry, real sediment will appear here."
   }
 };
-
-const WEATHER_ICON: Record<string, string> = {
-  SUNNY: "☀️", CLOUDY: "☁️", RAINY: "🌧️", STORMY: "⛈️", SNOWY: "❄️", FOGGY: "🌫️", WINDY: "🌬️"
-};
-
-function weatherIcon(type: string | null): string {
-  if (!type) return "🌤️";
-  return WEATHER_ICON[type] ?? "🌤️";
-}
 
 export function TimelineSection({ dailyRecords, themes, locale = "zh-CN" }: {
   dailyRecords: DailyRecordEntry[]; themes: MemoryThemeRow[]; locale?: Locale;
@@ -84,11 +76,13 @@ export function TimelineSection({ dailyRecords, themes, locale = "zh-CN" }: {
             <div className="panel axis-card">
               <div className="flex-between mb-1">
                 <h3>{record.theme || "—"}</h3>
-                <span className="weather-icon">{weatherIcon(record.emotionWeather)}</span>
+                <span className="weather-icon" aria-label={emotionWeatherPresentation(record.emotionWeather, locale).label}>
+                  {emotionWeatherPresentation(record.emotionWeather, locale).icon}
+                </span>
               </div>
               <p className="muted">{record.auroraSummary || record.eventSummary || record.cognitiveSummary || ""}</p>
               <div className="pill-row mt-1">
-                {record.emotionWeather && <span className="pill">{record.emotionWeather}</span>}
+                {record.emotionWeather && <span className="pill">{emotionWeatherPresentation(record.emotionWeather, locale).label}</span>}
                 {record.todoSummary && <span className="pill">{record.todoSummary}</span>}
                 {record.capsuleSuggested && <span className="pill">{locale === "en-SG" ? "Good fit for a capsule" : "适合编织共鸣体"}</span>}
               </div>

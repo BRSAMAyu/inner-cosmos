@@ -1,13 +1,6 @@
 import type { DailyRecordEntry, MemoryThemeRow, StarfieldScene } from "../api";
 import type { Locale } from "../i18n";
-
-const WEATHER: Record<string, { zh: string; en: string; mark: string }> = {
-  CLEAR: { zh: "清朗", en: "Clear", mark: "◌" },
-  SUNNY: { zh: "明亮", en: "Bright", mark: "☼" },
-  CLOUDY: { zh: "有云", en: "Clouded", mark: "◒" },
-  RAINY: { zh: "有雨", en: "Rainy", mark: "⌁" },
-  STORMY: { zh: "风暴", en: "Stormy", mark: "≈" }
-};
+import { emotionWeatherPresentation } from "../emotionWeather";
 
 export function InnerCosmosOverview({ starfield, dailyRecords, themes, locale = "zh-CN",
   onOpenMemory, onOpenDaily, onOpenWeekly, onOpenBeliefs }: {
@@ -22,7 +15,7 @@ export function InnerCosmosOverview({ starfield, dailyRecords, themes, locale = 
 }) {
   const en = locale === "en-SG";
   const latest = [...dailyRecords].sort((a, b) => b.recordDate.localeCompare(a.recordDate))[0] ?? null;
-  const weather = WEATHER[latest?.emotionWeather ?? ""] ?? { zh: "尚未命名", en: "Not named yet", mark: "·" };
+  const weather = emotionWeatherPresentation(latest?.emotionWeather, locale);
   const mainThemes = [...themes]
     .filter(theme => theme.status == null || theme.status === "ACTIVE")
     .sort((a, b) => (b.averageGravity ?? 0) - (a.averageGravity ?? 0))
@@ -44,7 +37,7 @@ export function InnerCosmosOverview({ starfield, dailyRecords, themes, locale = 
     <div className="inner-cosmos-overview-grid">
       <button type="button" onClick={onOpenDaily}>
         <span>{en ? "Emotional weather" : "此刻的情绪天气"}</span>
-        <strong><i aria-hidden="true">{weather.mark}</i>{en ? weather.en : weather.zh}</strong>
+        <strong><i aria-hidden="true">{weather.mark}</i>{weather.label}</strong>
         <small>{latest?.theme ?? (en ? "One honest check-in will name it." : "完成一次真实记录后，它会在这里成形")}</small>
         <em>{en ? "Open today's record" : "查看今日记录 →"}</em>
       </button>

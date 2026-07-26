@@ -102,7 +102,8 @@ public class AgentContextAssembler {
     }
 
     public AgentContext assemble(Long userId, Long sessionId, String currentMessage, boolean includeMemory) {
-        return assemble(userId, sessionId, currentMessage, includeMemory, null, null);
+        return assemble(userId, sessionId, currentMessage, includeMemory,
+                null, null, null, null, null);
     }
 
     /**
@@ -112,6 +113,18 @@ public class AgentContextAssembler {
      */
     public AgentContext assemble(Long userId, Long sessionId, String currentMessage,
                                  boolean includeMemory, Double lat, Double lon) {
+        return assemble(userId, sessionId, currentMessage, includeMemory,
+                lat, lon, null, null, null);
+    }
+
+    /**
+     * Full assembly with turn-scoped temporal hints. A valid request timezone represents the
+     * current device for this conversation and wins over a possibly stale persisted timezone.
+     * The client-rendered time label is validation-only and never supplies the current instant.
+     */
+    public AgentContext assemble(Long userId, Long sessionId, String currentMessage,
+                                 boolean includeMemory, Double lat, Double lon,
+                                 String requestTimezone, String locale, String clientLocalTimeLabel) {
         AgentContext context = new AgentContext();
         context.userId = userId;
         UserProfile profile = profile(userId);
@@ -120,13 +133,31 @@ public class AgentContextAssembler {
         context.proactiveSensitivity = profile == null || profile.proactiveSensitivity == null ? 3 : profile.proactiveSensitivity;
         // Perception: real time, sleep inference, nearest todo.
         TimeContext time = timeContextService.now(
-                focusWindowActive(profile == null ? null : profile.focusWindowsJson),
-                nearestTodoTitle(userId)
-        );
-        context.timeLabel = Boolean.FALSE.equals(profile == null ? null : profile.timeAwarenessEnabled)
-                ? "用户关闭了时间感知"
-                : time.label() + "（" + time.dateLabel() + "）";
-        context.sleepInferred = time.isSleep();
+                requestTimezone,
+                profile == null ? null : profile.timezone,
+                locale,
+                clientLocalTimeLabel,
+                false,
+                nearestTodoTitle(userId),
+                // BaseEntity.createdAt is a zone-less LocalDateTime and the current JDBC/meta-fill
+                // contract does not guarantee UTC across local-complete and containers. Keep this
+                // structured field empty instead of fabricating an elapsed duration.
+                null);
+        java.time.OffsetDateTime localNow = java.time.OffsetDateTime.parse(time.localDateTime());
+        boolean timeAwarenessEnabled =
+                !Boolean.FALSE.equals(profile == null ? null : profile.timeAwarenessEnabled);
+        context.locale = time.localeTag();
+        context.timeLabel = timeAwarenessEnabled
+                ? time.label() + "（" + time.dateLabel() + "，" + time.zoneId() + "）"
+                : ("en-SG".equals(time.localeTag())
+                    ? "The user has disabled time awareness."
+                    : "用户关闭了时间感知");
+        context.timezone = timeAwarenessEnabled ? time.zoneId() : null;
+        context.localDateTime = timeAwarenessEnabled ? time.localDateTime() : "";
+        context.lastInteractionLabel = timeAwarenessEnabled ? time.lastInteractionLabel() : "";
+        context.clientTimeHintStatus =
+                timeAwarenessEnabled ? time.clientTimeHintStatus() : "DISABLED";
+        context.sleepInferred = timeAwarenessEnabled && time.isSleep();
         context.nearestTodo = time.nearestTodo();
         context.weatherLabel = weatherLabel(userId, profile);
         context.momentEmotionLabel = momentEmotionLabel(userId, profile);
@@ -134,8 +165,8 @@ public class AgentContextAssembler {
                 ? inferEnvironment(currentMessage)
                 : profile.currentEnvironmentLabel;
         context.profileSummary = profileSummary(profile);
-        context.quietPolicy = quietPolicy(profile);
-        context.focusPolicy = focusPolicy(profile, currentMessage);
+        context.quietPolicy = quietPolicy(profile, localNow.toLocalTime());
+        context.focusPolicy = focusPolicy(profile, currentMessage, localNow.toLocalTime());
         // Perception: real-world location + real weather, only when client supplied lat/lon
         // and the user has not opted out. Falls back to "未知" / CLEAR if anything fails.
         boolean latLonProvided = lat != null && lon != null;
@@ -151,7 +182,7 @@ public class AgentContextAssembler {
         context.recentMessages = recentMessages(sessionId);
         context.activeTodos = activeTodos(userId);
         context.completedTodoLessons = completedTodoLessons(userId);
-        context.dailyObservations = dailyObservations(userId);
+        context.dailyObservations = dailyObservations(userId, localNow.toLocalDate());
         context.weeklyObservations = weeklyObservations(userId);
         context.relationSignals = relationSignals(userId);
         context.themeSignals = themeSignals(userId);
@@ -184,19 +215,22 @@ public class AgentContextAssembler {
      */
     private void addTaskAwareMemories(AgentContext context, Long userId, String currentMessage) {
         if (memoryRetrievalService == null || userId == null) return;
+        String retrievalQuery = retrievalQuery(currentMessage, context.recentMessages);
+        if (retrievalQuery.isBlank()) return;
+        String task = retrievalTask(retrievalQuery);
         MemoryEvidencePackVO pack;
         Observation observation = observationRegistry == null ? null
                 : Observation.createNotStarted("inner.cosmos.memory.retrieve", observationRegistry)
-                .lowCardinalityKeyValue("task", retrievalTask(currentMessage))
+                .lowCardinalityKeyValue("task", task)
                 .start();
         try {
             if (observation == null) {
                 pack = memoryRetrievalService.retrieve(userId, new MemoryRetrievalQuery(
-                        safe(currentMessage), retrievalTask(currentMessage), List.of(), 8, 800, false));
+                        retrievalQuery, task, List.of(), 8, 800, false));
             } else {
                 try (Observation.Scope ignored = observation.openScope()) {
                     pack = memoryRetrievalService.retrieve(userId, new MemoryRetrievalQuery(
-                            safe(currentMessage), retrievalTask(currentMessage), List.of(), 8, 800, false));
+                            retrievalQuery, task, List.of(), 8, 800, false));
                 }
             }
         } catch (RuntimeException unavailable) {
@@ -212,6 +246,41 @@ public class AgentContextAssembler {
                     + "：" + abbreviate(evidence.summary(), 180));
             context.evidenceMemoryIds.add(evidence.memoryId());
         }
+    }
+
+    /**
+     * Deictic continuation turns ("然后呢", "继续", "go on") have no safe standalone
+     * retrieval meaning. Expand them only with the two immediately preceding conversation
+     * messages; if there is no local history, fail closed instead of searching all memories.
+     */
+    private String retrievalQuery(String currentMessage, List<String> recentMessages) {
+        String current = safe(currentMessage).trim();
+        if (!isLowInformationContinuation(current)) return current;
+        if (recentMessages == null || recentMessages.isEmpty()) return "";
+        List<String> available = recentMessages.stream()
+                .filter(message -> message != null && !message.isBlank())
+                .filter(message -> !sameConversationMessage(message, current))
+                .map(message -> abbreviate(message, 140))
+                .toList();
+        List<String> prior = available.stream()
+                .skip(Math.max(0, available.size() - 2L))
+                .toList();
+        if (prior.isEmpty()) return "";
+        return abbreviate(String.join(" ", prior) + " 用户续接：" + current, 320);
+    }
+
+    private boolean isLowInformationContinuation(String message) {
+        String normalized = safe(message).toLowerCase(java.util.Locale.ROOT)
+                .replaceAll("[\\p{P}\\p{S}\\s]+", "");
+        return normalized.length() <= 12 && containsAny(normalized, List.of(
+                "然后呢", "后来呢", "继续", "接着", "再说说", "还有呢", "为什么呢",
+                "goon", "continue", "andthen", "whatnext", "tellmemore"));
+    }
+
+    private boolean sameConversationMessage(String formattedMessage, String current) {
+        String normalizedFormatted = safe(formattedMessage).replaceAll("\\s+", "");
+        String normalizedCurrent = safe(current).replaceAll("\\s+", "");
+        return !normalizedCurrent.isBlank() && normalizedFormatted.endsWith(normalizedCurrent);
     }
 
     private String retrievalTask(String currentMessage) {
@@ -288,10 +357,10 @@ public class AgentContextAssembler {
                 .toList();
     }
 
-    private List<String> dailyObservations(Long userId) {
+    private List<String> dailyObservations(Long userId, LocalDate userLocalDate) {
         return dailyRecordMapper.selectList(new QueryWrapper<DailyRecord>()
                         .eq("user_id", userId)
-                        .ge("record_date", LocalDate.now().minusDays(7))
+                        .ge("record_date", userLocalDate.minusDays(7))
                         .orderByDesc("record_date")
                         .last("LIMIT 5"))
                 .stream()
@@ -395,20 +464,20 @@ public class AgentContextAssembler {
         return String.valueOf(Math.round(intensity * 10) / 10.0);
     }
 
-    private String quietPolicy(UserProfile profile) {
+    private String quietPolicy(UserProfile profile, LocalTime userLocalTime) {
         if (profile == null || blank(profile.quietHoursStart) || blank(profile.quietHoursEnd)) {
             return "无安静时段限制";
         }
-        return inWindow(profile.quietHoursStart, profile.quietHoursEnd)
+        return inWindow(profile.quietHoursStart, profile.quietHoursEnd, userLocalTime)
                 ? "当前处于安静时段，不主动打扰，只回应用户主动输入"
                 : "当前不在安静时段";
     }
 
-    private String focusPolicy(UserProfile profile, String message) {
+    private String focusPolicy(UserProfile profile, String message, LocalTime userLocalTime) {
         if (profile == null || !Boolean.TRUE.equals(profile.focusModeEnabled)) {
             return "专注模式未开启";
         }
-        boolean inFocus = focusWindowActive(profile.focusWindowsJson);
+        boolean inFocus = focusWindowActive(profile.focusWindowsJson, userLocalTime);
         if (!inFocus) return "专注模式开启，但当前不在专注时段";
         boolean taskRelated = containsAny(message, List.of("学习", "作业", "考试", "项目", "代码", "复习", "任务", "论文"));
         return taskRelated
@@ -416,18 +485,13 @@ public class AgentContextAssembler {
                 : "当前在专注时段；如用户只是闲聊，应像朋友一样温柔提醒回到专注";
     }
 
-    private boolean focusWindowActive(String json) {
+    private boolean focusWindowActive(String json, LocalTime userLocalTime) {
         if (blank(json)) return false;
-        LocalTime now = LocalTime.now();
         java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("(\\d{2}:\\d{2})\\s*-\\s*(\\d{2}:\\d{2})").matcher(json);
         while (matcher.find()) {
-            if (inWindow(matcher.group(1), matcher.group(2), now)) return true;
+            if (inWindow(matcher.group(1), matcher.group(2), userLocalTime)) return true;
         }
         return false;
-    }
-
-    private boolean inWindow(String start, String end) {
-        return inWindow(start, end, LocalTime.now());
     }
 
     private boolean inWindow(String start, String end, LocalTime now) {

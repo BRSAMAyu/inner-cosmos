@@ -25,6 +25,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.lenient;
 
 /**
  * Gemini audit 3.9 (CONFIRMED/P1): proves SafetyServiceImpl actually wires the session-scoped
@@ -51,7 +54,7 @@ class SafetyServiceSessionEscalationTest {
         safetyService = new SafetyServiceImpl(safetyEventMapper, safetyBoundaryFilter,
                 safetyReviewService, distressSignalDetector,
                 new SessionRiskAggregator(Clock.systemUTC()), true);
-        when(safetyEventMapper.insert(any(SafetyEvent.class))).thenReturn(1);
+        lenient().when(safetyEventMapper.insert(any(SafetyEvent.class))).thenReturn(1);
     }
 
     @Test
@@ -112,6 +115,43 @@ class SafetyServiceSessionEscalationTest {
                             "field '" + field.getName() + "' must never contain the raw risk-triggering text");
                 }
             }
+        }
+    }
+
+    @Test
+    @DisplayName("foreground and stream reuse one safety decision for the same client message")
+    void duplicateClientMessageId_reusesDecisionWithoutReinspectionOrRiskInflation() {
+        when(safetyBoundaryFilter.inspect(any()))
+                .thenReturn(SafetyMatch.hit("OTHER", "MEDIUM", "other_rule", "FLAG"));
+
+        SafetyResult foreground = safetyService.check(
+                "现在真的很难受", USER_ID, SESSION_ID, "turn-1", "zh-CN", "CN");
+        SafetyResult stream = safetyService.check(
+                "现在真的很难受", USER_ID, SESSION_ID, "turn-1", "zh-CN", "CN");
+        SafetyResult secondUniqueTurn = safetyService.check(
+                "还是很难受", USER_ID, SESSION_ID, "turn-2", "zh-CN", "CN");
+
+        assertEquals("MEDIUM", foreground.riskLevel);
+        assertEquals("MEDIUM", stream.riskLevel);
+        assertEquals("MEDIUM", secondUniqueTurn.riskLevel,
+                "two unique MEDIUM turns must not be inflated into three by foreground+stream");
+        verify(safetyBoundaryFilter, times(2)).inspect(any());
+    }
+
+    @Test
+    @DisplayName("twenty ordinary Chinese and English turns do not create a session escalation")
+    void ordinaryChineseAndEnglish_twentyTurnsEach_neverEscalate() {
+        when(safetyBoundaryFilter.inspect(any())).thenReturn(SafetyMatch.safe());
+
+        for (int i = 0; i < 20; i++) {
+            SafetyResult zh = safetyService.check(
+                    "继续聊小说第 " + i + " 段", USER_ID, 701L, "zh-" + i, "zh-CN", "CN");
+            SafetyResult en = safetyService.check(
+                    "Continue with chapter " + i, USER_ID, 702L, "en-" + i, "en-SG", "SG");
+            assertEquals("LOW", zh.riskLevel);
+            assertEquals("LOW", en.riskLevel);
+            assertFalse(zh.blockModelCall);
+            assertFalse(en.blockModelCall);
         }
     }
 }

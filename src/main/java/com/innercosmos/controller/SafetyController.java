@@ -19,18 +19,25 @@ public class SafetyController extends BaseController {
     }
 
     @GetMapping("/resources")
-    public ApiResponse<List<String>> resources() {
-        return ApiResponse.ok(safetyService.resources());
+    public ApiResponse<List<String>> resources(
+            @RequestParam(required = false) String locale,
+            @RequestParam(required = false) String region) {
+        return ApiResponse.ok(safetyService.resources(locale, region));
     }
 
     @PostMapping("/check")
     public ApiResponse<Boolean> check(@RequestBody SafetyCheckRequest request, HttpSession session) {
-        safetyService.checkText(currentUserId(session), request.sessionId, request.text);
+        SafetyResult result = safetyService.check(request.text, currentUserId(session), request.sessionId,
+                request.clientMessageId, request.locale, request.region);
+        if (Boolean.TRUE.equals(result.blockModelCall)) {
+            throw new com.innercosmos.exception.SafetyBlockedException(result.safeMessage);
+        }
         return ApiResponse.ok(true);
     }
 
     @PostMapping("/inspect")
     public ApiResponse<SafetyResult> inspect(@RequestBody SafetyCheckRequest request, HttpSession session) {
-        return ApiResponse.ok(safetyService.check(request.text, currentUserId(session), request.sessionId));
+        return ApiResponse.ok(safetyService.check(request.text, currentUserId(session), request.sessionId,
+                request.clientMessageId, request.locale, request.region));
     }
 }

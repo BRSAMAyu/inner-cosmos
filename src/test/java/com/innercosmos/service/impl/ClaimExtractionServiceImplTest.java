@@ -39,10 +39,15 @@ class ClaimExtractionServiceImplTest {
                 user(1L, "我特别喜欢在下雨天读书"),
                 user(2L, "我是不是太敏感了？")));
 
-        assertThat(out).hasSize(1);
-        assertThat(out.getFirst().claimType()).isEqualTo(ClaimTypes.PREFERENCE);
-        assertThat(out.getFirst().value()).contains("读书");
-        assertThat(out.getFirst().provenanceMessageIds()).containsExactly(1L);
+        assertThat(out).extracting(ClaimCandidate::claimType)
+                .containsExactlyInAnyOrder(ClaimTypes.PREFERENCE, ClaimTypes.EXPRESSION_STYLE);
+        ClaimCandidate preference = out.stream()
+                .filter(candidate -> ClaimTypes.PREFERENCE.equals(candidate.claimType())).findFirst().orElseThrow();
+        assertThat(preference.value()).contains("读书");
+        assertThat(preference.provenanceMessageIds()).containsExactly(1L);
+        ClaimCandidate style = out.stream()
+                .filter(candidate -> ClaimTypes.EXPRESSION_STYLE.equals(candidate.claimType())).findFirst().orElseThrow();
+        assertThat(style.provenanceMessageIds()).containsExactly(1L, 2L);
     }
 
     @Test

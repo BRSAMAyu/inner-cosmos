@@ -55,4 +55,31 @@ describe("StartHereJourney", () => {
     expect(screen.getAllByRole("button", { name: /Complete/ })).toHaveLength(2);
     expect(screen.getByRole("button", { name: /Shape a facet · Up next/ })).toBeVisible();
   });
+
+  it("defaults a completed journey to collapsed and keeps it collapsed on rerender", () => {
+    const completedSteps = ["aurora", "memory", "capsule", "match", "letter"] as const;
+    const { rerender } = render(<StartHereJourney locale="en-SG" completedSteps={[...completedSteps]}
+      onStep={() => undefined} />);
+
+    expect(screen.getByRole("button", { name: "Expand the five-step journey" }))
+      .toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("list")).not.toBeInTheDocument();
+
+    rerender(<StartHereJourney locale="en-SG" completedSteps={[...completedSteps]}
+      onStep={() => undefined} />);
+    expect(screen.queryByRole("list")).not.toBeInTheDocument();
+  });
+
+  it("collapses when the final journey step becomes complete", () => {
+    const { rerender } = render(<StartHereJourney locale="en-SG"
+      completedSteps={["aurora", "memory", "capsule", "match"]} onStep={() => undefined} />);
+    expect(screen.getByRole("list")).toBeVisible();
+
+    rerender(<StartHereJourney locale="en-SG"
+      completedSteps={["aurora", "memory", "capsule", "match", "letter"]} onStep={() => undefined} />);
+
+    expect(screen.getByRole("button", { name: "Expand the five-step journey" }))
+      .toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("list")).not.toBeInTheDocument();
+  });
 });

@@ -16,16 +16,24 @@ public abstract class BaseController {
     protected UserService userService;
 
     protected Long currentUserId(HttpSession session) {
+        Long userId = optionalCurrentUserId(session);
+        if (userId != null) {
+            return userId;
+        }
+        throw new BusinessException(ErrorCode.UNAUTHORIZED, "not logged in");
+    }
+
+    protected Long optionalCurrentUserId(HttpSession session) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication != null && authentication.isAuthenticated()
                 && authentication.getPrincipal() instanceof User user && user.id != null) {
             return user.id;
         }
-        Object value = session.getAttribute(Constants.SESSION_USER_KEY);
+        Object value = session == null ? null : session.getAttribute(Constants.SESSION_USER_KEY);
         if (value instanceof Long userId && userId > 0) {
             return userId;
         }
-        throw new BusinessException(ErrorCode.UNAUTHORIZED, "not logged in");
+        return null;
     }
 
     protected void requireAdmin(HttpSession session) {

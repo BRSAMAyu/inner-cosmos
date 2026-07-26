@@ -3,11 +3,16 @@ package com.innercosmos.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.innercosmos.entity.EchoCapsule;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 
 import java.util.List;
 
 @Mapper
 public interface EchoCapsuleMapper extends BaseMapper<EchoCapsule> {
+
+    @Select("SELECT * FROM tb_echo_capsule WHERE id = #{id} FOR UPDATE")
+    EchoCapsule selectByIdForUpdate(@Param("id") Long id);
 
     default List<EchoCapsule> findByOwner(Long userId) {
         return selectList(new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<EchoCapsule>()

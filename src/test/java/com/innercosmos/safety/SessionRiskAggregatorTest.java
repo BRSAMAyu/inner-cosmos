@@ -112,4 +112,31 @@ class SessionRiskAggregatorTest {
         var result = aggregator.observe(null, "HIGH", "anything");
         assertFalse(result.escalate());
     }
+
+    @Test
+    @DisplayName("ordinary LOW/NONE messages in Chinese and English never accumulate")
+    void ordinaryMessages_twentyTurnsPerLanguage_neverEscalate() {
+        SessionRiskAggregator aggregator = new SessionRiskAggregator(Clock.systemUTC());
+        for (int i = 0; i < 20; i++) {
+            assertFalse(aggregator.observe(20L, "zh-" + i, "LOW",
+                    "今天继续聊《驱魔人》的第 " + i + " 段").escalate());
+            assertFalse(aggregator.observe(21L, "en-" + i, "NONE",
+                    "Let's continue discussing chapter " + i).escalate());
+        }
+    }
+
+    @Test
+    @DisplayName("the same client message observation is counted exactly once")
+    void duplicateObservationId_isIdempotent() {
+        SessionRiskAggregator aggregator = new SessionRiskAggregator(Clock.systemUTC());
+
+        var foreground = aggregator.observe(30L, "turn-1", "MEDIUM", "现在真的很难受");
+        var stream = aggregator.observe(30L, "turn-1", "MEDIUM", "现在真的很难受");
+        var secondTurn = aggregator.observe(30L, "turn-2", "MEDIUM", "还是很难受");
+
+        assertFalse(foreground.escalate());
+        assertFalse(stream.escalate());
+        assertTrue(stream.score() < 0.5, "duplicate observation must return the original one-turn score");
+        assertFalse(secondTurn.escalate(), "two unique MEDIUM turns remain below the threshold");
+    }
 }

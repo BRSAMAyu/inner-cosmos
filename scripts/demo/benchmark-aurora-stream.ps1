@@ -52,7 +52,12 @@ function Invoke-DemoApi {
             $csrfText = $csrfResponse.Content.ReadAsStringAsync().GetAwaiter().GetResult()
             $csrfResponse.EnsureSuccessStatusCode()
             $csrf = ($csrfText | ConvertFrom-Json).data
-            [void]$request.Headers.TryAddWithoutValidation($csrf.headerName, $csrf.token)
+            if ($csrf -and
+                -not [string]::IsNullOrWhiteSpace([string]$csrf.headerName) -and
+                -not [string]::IsNullOrWhiteSpace([string]$csrf.token)) {
+                [void]$request.Headers.TryAddWithoutValidation(
+                    [string]$csrf.headerName, [string]$csrf.token)
+            }
             [void]$request.Headers.TryAddWithoutValidation("Idempotency-Key", [Guid]::NewGuid().ToString())
         }
         if ($null -ne $Body) {

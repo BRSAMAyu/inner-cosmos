@@ -9,6 +9,18 @@ const rollbackExcluded = new Set(["FORGET", "LINK", "NO_OP", "ROLLBACK"]);
 type StarPosition = { left: number; top: number };
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+const timeCollisionOffsets: Array<[number, number]> = [
+  [0, 0], [-18, -18], [-36, 18], [-18, 28], [-36, -28], [-54, 0],
+  ...Array.from({ length: 63 }, (_, index): [number, number] => {
+    const column = Math.floor(index / 9);
+    const row = index % 9 - 4;
+    return [-18 * column, row * 16];
+  })
+];
+
+export function memoryStarDiameter(gravity: number): number {
+  return clamp(10 + Math.max(0, gravity) * 6, 10, 30);
+}
 
 /**
  * Turns the service's -100…100 projection into label-safe percentages. Time remains horizontal,
@@ -37,12 +49,11 @@ export function layoutMemoryStars(stars: StarfieldStar[], mode: StarfieldScene["
       };
     }
 
-    const candidates = mode === "TIME"
+    const candidates: Array<[number, number]> = mode === "TIME"
       // A classroom burst often settles many memories at nearly the same "now" coordinate.
       // Fan those collisions back across the timeline instead of stacking two label columns
-      // against the right edge. The offsets deliberately exceed one 140px label width.
-      ? [[0, 0], [-18, -18], [-36, 18], [-18, 28], [-36, -28], [-54, 0],
-        [-54, -36], [-54, 36], [4, -30], [4, 30], [-36, 42], [-36, -42]]
+      // against the right edge. The generated grid keeps working beyond the old 12-star ceiling.
+      ? timeCollisionOffsets
       : [[0, 0], [0, -14], [0, 14], [-12, -8], [12, 8], [-12, 8], [12, -8]];
     const candidate = candidates
       .map(([dx, dy]) => ({ left: clamp(anchor.left + dx, 12, 82), top: clamp(anchor.top + dy, 14, 86) }))
@@ -174,7 +185,9 @@ export function MemoryStarfield({ starfield, starfieldBusy, onChangeMode, starfi
       "关系里的回声": "Echoes in relationships",
       "正在成形的理解": "An understanding taking shape",
       "被命名的感受": "A feeling given a name",
-      "需要被轻轻推进的事": "Something that needs a gentle next step",
+      // Keys must match MemoryServiceImpl#starTheme exactly; the older
+      // "需要被轻轻推进的事" wording no longer reaches the client.
+      "需要温柔推进的下一步": "Something that needs a gentle next step",
       "今日沉淀": "Today's reflection",
       "情景记忆": "Episodic memory",
       "语义记忆": "Semantic memory",
@@ -193,6 +206,10 @@ export function MemoryStarfield({ starfield, starfieldBusy, onChangeMode, starfi
   const visibleMemories = starfield.accessibleList.slice(0, 3);
   const foldedMemories = starfield.accessibleList.slice(3);
   const starPositions = layoutMemoryStars(starfield.stars, starfield.mode);
+  const visibleStarIds = new Set(starfield.stars.map(star => star.id));
+  const links = starfield.stars.flatMap(star => star.connectedMemoryIds
+    .filter(targetId => visibleStarIds.has(targetId) && star.id < targetId)
+    .map(targetId => ({ sourceId: star.id, targetId })));
   return <section className="cosmos-space" aria-label={t.aria}>
     <div className="cosmos-heading"><div><span className="eyebrow">MEMORY, ALIVE</span><h2>{t.heading}</h2></div>
       <span>{t.count(starfield.stars.length)}</span></div>
@@ -203,6 +220,17 @@ export function MemoryStarfield({ starfield, starfieldBusy, onChangeMode, starfi
     </div>
     <p className="cosmos-explanation">{t.modeExplanation[starfield.mode]}</p>
     <div className="cosmos-map" aria-label={t.listAria}>
+      {links.length > 0 && <svg className="cosmos-links" aria-hidden="true" viewBox="0 0 100 100"
+        preserveAspectRatio="none">
+        {links.map(link => {
+          const source = starPositions.get(link.sourceId);
+          const target = starPositions.get(link.targetId);
+          return source && target
+            ? <line key={`${link.sourceId}-${link.targetId}`} x1={source.left} y1={source.top}
+              x2={target.left} y2={target.top} />
+            : null;
+        })}
+      </svg>}
       {starfield.stars.map(star => {
         const position = starPositions.get(star.id) ?? { left: 50, top: 50 };
         return <button type="button" className="cosmos-star" key={star.id}
@@ -212,8 +240,8 @@ export function MemoryStarfield({ starfield, starfieldBusy, onChangeMode, starfi
         left: `${position.left}%`, top: `${position.top}%`,
         color: star.color, opacity: Math.max(.45, star.glow ?? .7)
       }}><span className="cosmos-star-core" aria-hidden="true" style={{
-          width: `${Math.max(9, Math.min(26, 9 + star.gravity * 3))}px`,
-          height: `${Math.max(9, Math.min(26, 9 + star.gravity * 3))}px`,
+          width: `${memoryStarDiameter(star.gravity)}px`,
+          height: `${memoryStarDiameter(star.gravity)}px`,
           background: star.color
         }} /><span className="cosmos-star-label" aria-hidden="true">{englishStarText(star.title)}</span></button>;
       })}

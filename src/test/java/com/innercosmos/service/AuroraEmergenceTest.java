@@ -112,8 +112,8 @@ class AuroraEmergenceTest {
 
     @SuppressWarnings("unchecked")
     private void stubCommonDeps() {
-        when(agentContextAssembler.assemble(anyLong(), anyLong(), anyString(), anyBoolean(), any(), any()))
-                .thenReturn(new AgentContext());
+        when(agentContextAssembler.assemble(anyLong(), anyLong(), anyString(), anyBoolean(),
+                any(), any(), any(), any(), any())).thenReturn(new AgentContext());
         when(dialogService.recentMessages(anyLong(), anyInt())).thenReturn(List.of());
         when(dialogService.messages(anyLong())).thenReturn(List.of());
         when(memoryContextService.buildContext(anyLong(), anyLong(), anyString(), anyInt(), anyInt()))
@@ -136,7 +136,8 @@ class AuroraEmergenceTest {
     @Test
     @DisplayName("prompt + turnContext now contain portrait, relationship, and current-state signal (seeded user)")
     void produceReply_feedsPortraitRelationshipState() {
-        when(safetyService.check(anyString(), anyLong(), anyLong())).thenReturn(safe());
+        when(safetyService.check(anyString(), anyLong(), anyLong(),
+                any(), any(), any())).thenReturn(safe());
         stubCommonDeps();
 
         // Seeded portrait: two high-confidence dims.
@@ -179,7 +180,8 @@ class AuroraEmergenceTest {
     @Test
     @DisplayName("two same-mode users with different portraits now get DIFFERENT prompts (gap closed)")
     void produceReply_sameModeDifferentUsers_differentPrompt() {
-        when(safetyService.check(anyString(), anyLong(), anyLong())).thenReturn(safe());
+        when(safetyService.check(anyString(), anyLong(), anyLong(),
+                any(), any(), any())).thenReturn(safe());
         stubCommonDeps();
         when(structuredAiService.call(anyLong(), anyString(), anyString(), any(),
                 eq(StructuredAiResults.AuroraResult.class), any(), any())).thenReturn(okResult());
@@ -224,7 +226,8 @@ class AuroraEmergenceTest {
     @DisplayName("model context contains current expression once and keeps one compact personalization copy")
     void produceReply_contextIsBoundedAndNonDuplicated() {
         String current = "CURRENT_EXPRESSION_X9";
-        when(safetyService.check(anyString(), anyLong(), anyLong())).thenReturn(safe());
+        when(safetyService.check(anyString(), anyLong(), anyLong(),
+                any(), any(), any())).thenReturn(safe());
         stubCommonDeps();
 
         AgentContext source = new AgentContext();
@@ -236,8 +239,8 @@ class AuroraEmergenceTest {
                 .toList();
         source.threeModelBlock = "PORTRAIT_UNIQUE RELATIONSHIP_UNIQUE CONSTITUTION_UNIQUE";
         source.constitutionBlock = "CONSTITUTION_UNIQUE";
-        when(agentContextAssembler.assemble(anyLong(), anyLong(), anyString(), anyBoolean(), any(), any()))
-                .thenReturn(source);
+        when(agentContextAssembler.assemble(anyLong(), anyLong(), anyString(), anyBoolean(),
+                any(), any(), any(), any(), any())).thenReturn(source);
 
         UserPortrait portrait = portrait("PORTRAIT_UNIQUE", "confirmed-value", 0.9, 0.8);
         when(userPortraitService.getAll(USER_A)).thenReturn(List.of(portrait));
@@ -274,7 +277,8 @@ class AuroraEmergenceTest {
     @Test
     @DisplayName("mock fallback stays coherent with the state signal when the LLM path fails")
     void fallback_reflectsStateSignal() {
-        when(safetyService.check(anyString(), anyLong(), anyLong())).thenReturn(safe());
+        when(safetyService.check(anyString(), anyLong(), anyLong(),
+                any(), any(), any())).thenReturn(safe());
         stubCommonDeps();
         when(userPortraitService.getAll(anyLong())).thenReturn(List.of());
         when(relationshipService.getOrInit(anyLong())).thenReturn(new AgentUserRelationship());

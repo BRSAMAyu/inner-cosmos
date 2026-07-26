@@ -23,8 +23,17 @@ public interface ClaimCandidateService {
     /** Pending candidates for the owner, newest first. */
     List<ClaimCandidateVO> listCandidates(Long userId);
 
+    /** Pending candidates sourced from one owned dialog session, newest first. */
+    List<ClaimCandidateVO> listCandidates(Long userId, Long sessionId);
+
+    /** Same session-scoped view, with the exact privacy tier used for the capsule-safe preview. */
+    List<ClaimCandidateVO> listCandidates(Long userId, Long sessionId, String privacyLevel);
+
     /** Promote a candidate to an ACTIVE claim via the correction confirm path; retires the candidate. */
     CorrectionConfirmationVO confirmCandidate(Long userId, Long candidateId);
+
+    /** Confirm every still-pending candidate from one owned session and return its ACTIVE claim ids. */
+    List<Long> confirmSessionCandidates(Long userId, Long sessionId);
 
     /** Dismiss a candidate the user rejects; it is marked DISMISSED, not hard-deleted. */
     void dismissCandidate(Long userId, Long candidateId);

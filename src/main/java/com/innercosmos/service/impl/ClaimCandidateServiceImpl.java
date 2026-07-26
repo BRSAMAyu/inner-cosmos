@@ -14,6 +14,7 @@ import com.innercosmos.mapper.DialogMessageMapper;
 import com.innercosmos.mapper.UnderstandingClaimMapper;
 import com.innercosmos.service.ClaimCandidateService;
 import com.innercosmos.service.ClaimExtractionService;
+import com.innercosmos.service.DataMaskingService;
 import com.innercosmos.service.DialogService;
 import com.innercosmos.service.UserCorrectionService;
 import com.innercosmos.vo.ClaimCandidateVO;
@@ -26,6 +27,7 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -52,6 +54,10 @@ public class ClaimCandidateServiceImpl implements ClaimCandidateService {
     private final UnderstandingClaimMapper claimMapper;
     private final UserCorrectionService correctionService;
     private final ObjectMapper objectMapper;
+    @Autowired(required = false)
+    private DataMaskingService dataMaskingService;
+    @Autowired(required = false)
+    private CapsuleThirdPartyAnonymizer thirdPartyAnonymizer;
 
     public ClaimCandidateServiceImpl(DialogService dialogService, DialogMessageMapper messageMapper,
                                      ClaimExtractionService extractionService,
@@ -126,26 +132,47 @@ public class ClaimCandidateServiceImpl implements ClaimCandidateService {
      */
     @Override
     public List<ClaimCandidateVO> listCandidates(Long userId) {
-        List<UnderstandingClaim> rows = claimMapper.selectList(new QueryWrapper<UnderstandingClaim>()
-                .eq("user_id", userId).eq("status", STATUS_CANDIDATE).orderByDesc("id"));
+        return listCandidates(userId, null);
+    }
+
+    @Override
+    public List<ClaimCandidateVO> listCandidates(Long userId, Long sessionId) {
+        return listCandidates(userId, sessionId, "STRICT");
+    }
+
+    @Override
+    public List<ClaimCandidateVO> listCandidates(Long userId, Long sessionId, String privacyLevel) {
+        if (sessionId != null) {
+            dialogService.verifyOwnership(userId, sessionId);
+        }
+        QueryWrapper<UnderstandingClaim> query = new QueryWrapper<UnderstandingClaim>()
+                .eq("user_id", userId).eq("status", STATUS_CANDIDATE);
+        if (sessionId != null) {
+            query.eq("source_id", sessionId);
+        }
+        List<UnderstandingClaim> rows = claimMapper.selectList(query.orderByDesc("id"));
         LocalDateTime now = LocalDateTime.now();
         List<ClaimCandidateVO> out = new ArrayList<>();
+        CapsuleThirdPartyAnonymizer.Session aliases = thirdPartyAnonymizer == null
+                ? null : thirdPartyAnonymizer.beginSnapshot();
         for (UnderstandingClaim row : rows) {
             double base = row.confidence == null ? 0.0 : row.confidence;
             LocalDateTime reference = row.updatedAt != null ? row.updatedAt : row.createdAt;
             double effective = ClaimConfidenceDecayPolicy.effectiveConfidence(base, row.authorityLevel, reference, now);
             if (ClaimConfidenceDecayPolicy.isStale(effective)) {
-                row.status = STATUS_DISMISSED;
-                claimMapper.updateById(row);
-                log.debug("Auto-dismissed stale claim candidate {} for user {} (effective confidence {})",
-                        row.id, userId, effective);
+                // Candidate GETs are intentionally pure. The scheduled sweep owns lifecycle writes;
+                // high-frequency post-turn polling must never mutate the understanding ledger.
                 continue;
             }
             JsonNode value = readTree(row.valueJson);
+            String rawValue = value.path("value").asText("");
+            String maskedValue = dataMaskingService == null ? rawValue
+                    : dataMaskingService.maskText(rawValue, safePrivacy(privacyLevel));
+            String capsuleSafeValue = aliases == null ? maskedValue : aliases.anonymize(maskedValue);
             boolean alreadyActive = claimMapper.selectCount(new QueryWrapper<UnderstandingClaim>()
                     .eq("user_id", userId).eq("claim_key", row.claimKey).eq("status", STATUS_ACTIVE)) > 0;
-            out.add(new ClaimCandidateVO(row.id, row.claimType,
-                    value.path("value").asText(""), row.authorityLevel,
+            out.add(new ClaimCandidateVO(row.id, row.claimType, rawValue, capsuleSafeValue,
+                    row.authorityLevel,
                     effective,
                     decodeIds(value.path("provenanceMessageIds")),
                     value.path("evidenceText").asText(""),
@@ -154,6 +181,11 @@ public class ClaimCandidateServiceImpl implements ClaimCandidateService {
                     row.createdAt == null ? null : row.createdAt.toString()));
         }
         return out;
+    }
+
+    private String safePrivacy(String value) {
+        return "OPEN".equals(value) || "BALANCED".equals(value) || "STRICT".equals(value)
+                ? value : "STRICT";
     }
 
     /**
@@ -198,10 +230,35 @@ public class ClaimCandidateServiceImpl implements ClaimCandidateService {
         CorrectionCommand command = new CorrectionCommand("AURORA_UNDERSTANDING", 0L,
                 candidate.claimKey, null, newValue, "确认 Aurora 自动理解：" + candidate.claimType);
         CorrectionConfirmationVO result = correctionService.confirm(userId, command);
+        UnderstandingClaim active = result.activeClaim();
+        // Preserve the candidate's structured origin on the promoted row. The generic correction
+        // target remains on UserCorrection for propagation/audit, while the ACTIVE claim retains
+        // the 11-dimensional type and AUTO_EXTRACTION provenance that consumers filter on.
+        active.claimType = candidate.claimType;
+        active.sourceType = SOURCE_AUTO;
+        active.sourceId = candidate.sourceId;
+        active.evidenceRefs = candidate.evidenceRefs;
+        claimMapper.updateById(active);
         candidate.status = STATUS_CONFIRMED;
         claimMapper.updateById(candidate);
         log.debug("Promoted auto claim candidate {} to ACTIVE for user {}", candidateId, userId);
         return result;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public List<Long> confirmSessionCandidates(Long userId, Long sessionId) {
+        dialogService.verifyOwnership(userId, sessionId);
+        List<Long> pendingIds = claimMapper.selectList(new QueryWrapper<UnderstandingClaim>()
+                        .eq("user_id", userId).eq("source_id", sessionId)
+                        .eq("status", STATUS_CANDIDATE).orderByAsc("id"))
+                .stream().map(row -> row.id).toList();
+        for (Long pendingId : pendingIds) confirmCandidate(userId, pendingId);
+        return claimMapper.selectList(new QueryWrapper<UnderstandingClaim>()
+                        .eq("user_id", userId).eq("source_id", sessionId)
+                        .eq("status", STATUS_ACTIVE).eq("source_type", SOURCE_AUTO)
+                        .orderByAsc("id"))
+                .stream().map(row -> row.id).toList();
     }
 
     @Override

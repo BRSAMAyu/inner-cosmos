@@ -72,6 +72,9 @@ public class MockLlmClient implements LlmClient {
         // (proactive greeting); the legacy "AURORA_CHAT"/"AURORA_GREETING" names are kept
         // for back-compat. buildAuroraChatJson self-distinguishes greeting vs chat via the
         // "主动发起对话" marker embedded in the prompt text, so all Aurora modules route here.
+        if (module.contains("AURORA_FOREGROUND")) {
+            return buildAuroraForegroundJson(textToAnalyze);
+        }
         if (module.contains("AURORA_PLAN")) {
             return buildAuroraPlanJson(analysis, textToAnalyze);
         }
@@ -107,6 +110,30 @@ public class MockLlmClient implements LlmClient {
             return "今天先到这里，我会把重要的部分留在你的星空里。";
         }
         return null;
+    }
+
+    /**
+     * The foreground contract is intentionally different from the full AuroraResult contract.
+     * Returning {@code segments} here parses as a non-null AuroraForegroundResult with a null
+     * {@code text} field (unknown fields are ignored), which silently turns every Mock foreground
+     * call into a local generic acknowledgement. Keep the deterministic demo honest and
+     * input-grounded by emitting the exact one-field schema the real fast kernel is asked for.
+     */
+    private String buildAuroraForegroundJson(String text) {
+        String clause = firstSentence(text);
+        if (clause == null || clause.isBlank()) {
+            return "{\"text\":\"\"}";
+        }
+        int[] codePoints = clause.codePoints().toArray();
+        if (codePoints.length > 30) {
+            clause = new String(codePoints, 0, 30) + "…";
+        }
+        boolean chinese = clause.codePoints()
+                .anyMatch(cp -> Character.UnicodeScript.of(cp) == Character.UnicodeScript.HAN);
+        String acknowledgement = chinese
+                ? "你刚才说到「" + clause + "」，我先跟着这一点继续。"
+                : "I’ll stay with the part about “" + clause + "” as we continue.";
+        return "{\"text\":\"" + escapeJson(acknowledgement) + "\"}";
     }
 
     /**
@@ -357,13 +384,13 @@ public class MockLlmClient implements LlmClient {
 
         return String.format("""
                 {
-                  "memoryCard": {"title":"Today's reflection","summary":"%s","memoryType":"%s","emotionTags":["%s"],"keywordTags":["Daily life"],"peopleTags":[],"intensityScore":%.1f,"userImportance":4.0},
+                  "memoryCard": {"title":"今日沉淀","summary":"%s","memoryType":"%s","emotionTags":["%s"],"keywordTags":["日常"],"peopleTags":[],"intensityScore":%.1f,"userImportance":4.0},
                   "emotionTrace": {"emotionName":"%s","emotionScore":%.1f,"weatherType":"%s","triggerScene":"用户完成了一次自我表达."},
                   "fragments": [
-                    {"type":"FACT","rawExcerpt":"一次表达","analysis":"从表达中抽取出的事实片段.","reframe":"先区分事实和解释."},
+                    {"type":"FACT","rawExcerpt":"%s","analysis":"从这次具体表达中抽取出的事实片段.","reframe":"先区分事实和解释."},
                     {"type":"FEELING","rawExcerpt":"%s","analysis":"表达里出现的主要感受线索.","reframe":"允许感受存在."},
-                    {"type":"BELIEF","rawExcerpt":"自我判断","analysis":"可能有过快的自我判断.","reframe":"把事件和自我价值分开."},
-                    {"type":"ACTION","rawExcerpt":"下一步","analysis":"可以轻轻推进一步.","reframe":"下一步小到十分钟内能开始."}
+                    {"type":"BELIEF","rawExcerpt":"%s","analysis":"这句话里可能夹着对自己的快速判断.","reframe":"把事件和自我价值分开."},
+                    {"type":"ACTION","rawExcerpt":"%s","analysis":"可以从原表达里留下一个具体的小动作.","reframe":"下一步小到十分钟内能开始."}
                   ],
                   "eventCards": [],
                   "relationMentions": [],
@@ -377,8 +404,24 @@ public class MockLlmClient implements LlmClient {
             escapeJson(getEmotionName(analysis.sentimentLabel)),
             analysis.intensityScore,
             weatherType,
-            escapeJson(getEmotionName(analysis.sentimentLabel))
+            escapeJson(firstSentence(text)),
+            escapeJson(getEmotionName(analysis.sentimentLabel)),
+            escapeJson(beliefExcerpt(text)),
+            escapeJson(actionExcerpt(text, analysis))
         ).replace("\n", "");
+    }
+
+    private String beliefExcerpt(String text) {
+        if (containsAny(text, List.of("没做好", "不行", "失败", "总是", "从来"))) {
+            return firstSentence(text);
+        }
+        return "我正在理解这件事为什么会牵动自己";
+    }
+
+    private String actionExcerpt(String text, AnalysisResult analysis) {
+        if ("TASK_STRESS".equals(analysis.primaryIntent)) return "把任务打开，先推进十分钟";
+        if ("RELATION_ISSUE".equals(analysis.primaryIntent)) return "写下发生的事和自己的感受";
+        return "把今天最重的一句话留下来";
     }
 
     /**

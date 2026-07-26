@@ -10,7 +10,8 @@ import java.util.List;
  * @param alreadyActive true when the user already has an ACTIVE claim for the same auto key, so the
  *                      UI can present this as a reinforcement rather than a fresh discovery.
  */
-public record ClaimCandidateVO(Long id, String claimType, String value, String authorityLevel,
+public record ClaimCandidateVO(Long id, String claimType, String value, String capsuleSafeValue,
+                               String authorityLevel,
                                double confidence, List<Long> provenanceMessageIds, String evidenceText,
                                boolean uncertain, boolean alreadyActive, String createdAt) {
 }

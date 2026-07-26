@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -31,13 +32,25 @@ public class ClaimCandidateController extends BaseController {
     }
 
     @GetMapping
-    public ApiResponse<List<ClaimCandidateVO>> list(HttpSession session) {
-        return ApiResponse.ok(claimCandidateService.listCandidates(currentUserId(session)));
+    public ApiResponse<List<ClaimCandidateVO>> list(
+            @RequestParam(required = false) Long sessionId,
+            @RequestParam(defaultValue = "STRICT") String privacyLevel,
+            HttpSession session) {
+        Long userId = currentUserId(session);
+        return ApiResponse.ok(sessionId == null
+                ? claimCandidateService.listCandidates(userId)
+                : claimCandidateService.listCandidates(userId, sessionId, privacyLevel));
     }
 
     @PostMapping("/{id}/confirm")
     public ApiResponse<CorrectionConfirmationVO> confirm(@PathVariable Long id, HttpSession session) {
         return ApiResponse.ok(claimCandidateService.confirmCandidate(currentUserId(session), id));
+    }
+
+    @PostMapping("/confirm-session")
+    public ApiResponse<List<Long>> confirmSession(@RequestParam Long sessionId, HttpSession session) {
+        return ApiResponse.ok(claimCandidateService.confirmSessionCandidates(
+                currentUserId(session), sessionId));
     }
 
     @DeleteMapping("/{id}")

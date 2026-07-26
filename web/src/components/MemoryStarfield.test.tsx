@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { layoutMemoryStars, MemoryStarfield } from "./MemoryStarfield";
+import { layoutMemoryStars, memoryStarDiameter, MemoryStarfield } from "./MemoryStarfield";
 import type { MemoryOperation, StarfieldDetail, StarfieldScene } from "../api";
 
 afterEach(cleanup);
@@ -51,6 +51,36 @@ describe("MemoryStarfield", () => {
     expect(points[0].left).toBeLessThanOrEqual(82);
     expect(new Set(points.map(point => `${point.left},${point.top}`)).size).toBe(3);
     expect(Math.max(...points.map(point => point.left)) - Math.min(...points.map(point => point.left))).toBeGreaterThanOrEqual(30);
+  });
+
+  it("keeps a large same-moment burst readable beyond twelve memories", () => {
+    const burst = Array.from({ length: 18 }, (_, index) => ({
+      ...starfield.stars[0], id: index + 1, x: 90, y: 0, occurredAt: "2026-07-15T08:00:00Z"
+    }));
+    const points = burst.map(item => layoutMemoryStars(burst, "TIME").get(item.id)!);
+    expect(new Set(points.map(point => `${point.left},${point.top}`)).size).toBe(18);
+  });
+
+  it("makes emotional gravity visibly change star size without unbounded growth", () => {
+    expect(memoryStarDiameter(0)).toBe(10);
+    expect(memoryStarDiameter(1)).toBe(16);
+    expect(memoryStarDiameter(2)).toBe(22);
+    expect(memoryStarDiameter(99)).toBe(30);
+  });
+
+  it("draws each visible memory relationship once", () => {
+    const linked = {
+      ...starfield,
+      stars: [
+        { ...starfield.stars[0], connectedMemoryIds: [2] },
+        { ...starfield.stars[0], id: 2, title: "星2", connectedMemoryIds: [1] }
+      ]
+    };
+    const { container } = render(<MemoryStarfield starfield={linked} starfieldBusy={false}
+      onChangeMode={() => undefined} starfieldDetail={null} detailBusy={null}
+      onRevealStar={() => undefined} onCloseDetail={() => undefined} memoryOperations={[]}
+      rollbackBusy={null} onRollback={() => undefined} onCorrectMemory={() => undefined} />);
+    expect(container.querySelectorAll(".cosmos-links line")).toHaveLength(1);
   });
 
   it("delegates a mode switch without mutating its own state", () => {

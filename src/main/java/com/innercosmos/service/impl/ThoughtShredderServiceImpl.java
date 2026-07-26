@@ -92,25 +92,47 @@ public class ThoughtShredderServiceImpl implements ThoughtShredderService {
         card.lastTouchedAt = LocalDateTime.now();
         card.visibilityLevel = "PRIVATE";
         card.status = displayOnce ? "TRANSIENT" : "ACTIVE";
-        memoryCardMapper.insert(card);
+        card.versionNo = 1;
+        card.memoryLayer = "EPISODIC";
+        card.confidence = 0.78;
+        card.consentScope = "AURORA_PRIVATE";
+        card.provenanceRefs = "THOUGHT_SHREDDER:" + mode
+                + " · source-version:1 · consent:AURORA_PRIVATE";
+        boolean persistResult = !displayOnce;
+        if (persistResult) {
+            memoryCardMapper.insert(card);
+        }
 
         List<ThoughtFragment> fragments = new ArrayList<>();
         if (ai.fragments != null && !ai.fragments.isEmpty()) {
             for (StructuredAiResults.Fragment fragment : ai.fragments) {
                 fragments.add(createFragment(userId, card.id, blank(fragment.type, "OBSERVATION"),
-                        blank(fragment.rawExcerpt, firstSentence(raw)),
+                        excerptForMode(mode, raw, fragment.rawExcerpt, fragment.type, coreFeeling, hiddenNeed),
                         blank(fragment.analysis, "这是模型从混乱表达里整理出的片段."),
-                        blank(fragment.reframe, "先把它放成一个可以看见的形状.")));
+                        blank(fragment.reframe, "先把它放成一个可以看见的形状."),
+                        persistResult));
             }
         }
         while (fragments.size() < 4) {
-            if (fragments.size() == 0) fragments.add(createFragment(userId, card.id, "FEELING", firstSentence(raw), "混乱里最先需要被承认的是:" + coreFeeling, "先允许这个感受存在,不急着证明它合理."));
-            else if (fragments.size() == 1) fragments.add(createFragment(userId, card.id, "NEED", hiddenNeed, "这段表达背后可能有一个尚未被满足的需要.", "需要被看见并不等于脆弱,它只是说明这件事对你有重量."));
-            else if (fragments.size() == 2) fragments.add(createFragment(userId, card.id, "BELIEF", inferBelief(raw), "这里可能有一个过快的自我判断.", "把事情没做好和我这个人不行暂时分开."));
-            else fragments.add(createFragment(userId, card.id, "ACTION", inferAction(raw), "可以留下一个很小的下一步.", "下一步只需要小到十分钟内能开始."));
+            if (fragments.size() == 0) fragments.add(createFragment(userId, card.id, "FEELING",
+                    excerptForMode(mode, raw, null, "FEELING", coreFeeling, hiddenNeed),
+                    "混乱里最先需要被承认的是:" + coreFeeling,
+                    "先允许这个感受存在,不急着证明它合理.", persistResult));
+            else if (fragments.size() == 1) fragments.add(createFragment(userId, card.id, "NEED",
+                    excerptForMode(mode, raw, null, "NEED", coreFeeling, hiddenNeed),
+                    "这段表达背后可能有一个尚未被满足的需要.",
+                    "需要被看见并不等于脆弱,它只是说明这件事对你有重量.", persistResult));
+            else if (fragments.size() == 2) fragments.add(createFragment(userId, card.id, "BELIEF",
+                    excerptForMode(mode, raw, null, "BELIEF", coreFeeling, hiddenNeed),
+                    "这里可能有一个过快的自我判断.",
+                    "把事情没做好和我这个人不行暂时分开.", persistResult));
+            else fragments.add(createFragment(userId, card.id, "ACTION",
+                    excerptForMode(mode, raw, null, "ACTION", coreFeeling, hiddenNeed),
+                    "可以留下一个很小的下一步.",
+                    "下一步只需要小到十分钟内能开始.", persistResult));
         }
 
-        TodoItem todo = maybeCreateTodo(userId, card.id, raw, hiddenNeed, ai.suggestedTodo);
+        TodoItem todo = maybeCreateTodo(userId, card.id, raw, hiddenNeed, ai.suggestedTodo, persistResult);
 
         ShredderResultVO result = new ShredderResultVO();
         result.originalHandlingMode = mode;
@@ -152,7 +174,8 @@ public class ThoughtShredderServiceImpl implements ThoughtShredderService {
         memoryCardMapper.deleteById(memoryCardId);
     }
 
-    private ThoughtFragment createFragment(Long userId, Long cardId, String type, String rawExcerpt, String analysis, String reframe) {
+    private ThoughtFragment createFragment(Long userId, Long cardId, String type, String rawExcerpt,
+                                           String analysis, String reframe, boolean persist) {
         ThoughtFragment fragment = new ThoughtFragment();
         fragment.userId = userId;
         fragment.memoryCardId = cardId;
@@ -160,12 +183,14 @@ public class ThoughtShredderServiceImpl implements ThoughtShredderService {
         fragment.rawExcerpt = rawExcerpt;
         fragment.aiAnalysis = analysis;
         fragment.reframeText = reframe;
-        thoughtFragmentMapper.insert(fragment);
+        if (persist) {
+            thoughtFragmentMapper.insert(fragment);
+        }
         return fragment;
     }
 
     private TodoItem maybeCreateTodo(Long userId, Long cardId, String raw, String hiddenNeed,
-                                     StructuredAiResults.TodoSuggestion suggestion) {
+                                     StructuredAiResults.TodoSuggestion suggestion, boolean persist) {
         if (suggestion == null && !containsAny(raw, List.of("作业", "考试", "任务", "ddl", "截止", "明天", "拖延", "项目", "提交"))) {
             return null;
         }
@@ -182,7 +207,9 @@ public class ThoughtShredderServiceImpl implements ThoughtShredderService {
                 ? (containsAny(raw, List.of("考试", "截止", "ddl")) ? "HIGH" : "MEDIUM")
                 : suggestion.priority;
         todo.status = "TODO";
-        todoItemMapper.insert(todo);
+        if (persist) {
+            todoItemMapper.insert(todo);
+        }
         return todo;
     }
 
@@ -201,7 +228,44 @@ public class ThoughtShredderServiceImpl implements ThoughtShredderService {
         result.noiseToDrop = noiseToDrop(raw);
         result.intensityScore = inferIntensity(raw);
         result.memoryType = "SHREDDER";
+        result.fragments.add(fragment("FEELING", firstSentence(raw),
+                "这段具体表达里最先需要被承认的是" + result.coreFeeling + ".",
+                "先允许这个感受存在."));
+        result.fragments.add(fragment("NEED", result.hiddenNeed,
+                "这段表达背后可能有一个尚未被满足的需要.",
+                "需要被看见并不等于脆弱."));
+        result.fragments.add(fragment("BELIEF", inferBelief(raw),
+                "这段表达里可能夹着一个过快的自我判断.",
+                "把事件和自我价值暂时分开."));
+        result.fragments.add(fragment("ACTION", inferAction(raw),
+                "可以从这段表达里留下一个具体的小动作.",
+                "下一步只需要小到十分钟内能开始."));
         return result;
+    }
+
+    private StructuredAiResults.Fragment fragment(String type, String rawExcerpt,
+                                                   String analysis, String reframe) {
+        StructuredAiResults.Fragment fragment = new StructuredAiResults.Fragment();
+        fragment.type = type;
+        fragment.rawExcerpt = rawExcerpt;
+        fragment.analysis = analysis;
+        fragment.reframe = reframe;
+        return fragment;
+    }
+
+    private String excerptForMode(String mode, String raw, String providerExcerpt, String type,
+                                  String coreFeeling, String hiddenNeed) {
+        if ("KEEP_RAW".equals(mode) || "DISPLAY_ONCE".equals(mode)) {
+            return blank(providerExcerpt, firstSentence(raw));
+        }
+        String normalizedType = type == null ? "" : type.toUpperCase(java.util.Locale.ROOT);
+        return switch (normalizedType) {
+            case "FEELING" -> coreFeeling;
+            case "NEED" -> hiddenNeed;
+            case "BELIEF" -> inferBelief(raw);
+            case "ACTION" -> inferAction(raw);
+            default -> "整理后的认知片段";
+        };
     }
 
     private String blank(String value, String fallback) {

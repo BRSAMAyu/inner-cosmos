@@ -3,7 +3,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { CapsuleWorkbench } from "./CapsuleWorkbench";
 import type { CapsuleBoundary, CapsuleGenomeVersion, CapsuleSandbox, EchoCapsule, MemoryCard } from "../api";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 const memory: MemoryCard = { id: 1, title: "一次和解", summary: null, status: "ACTIVE", versionNo: 1, consentScope: "SHARED", memoryLayer: "EPISODIC", confidence: .8 };
 const capsule: EchoCapsule = { id: 9, pseudonym: "雨后的人", intro: "先沉默再表达", authorizedMemoryIds: "[1]", visibilityStatus: "PRIVATE", isPublic: false, activeGenomeVersionId: 3, publicTags: "[]" };
@@ -61,8 +64,54 @@ describe("CapsuleWorkbench", () => {
     expect(onRecompile).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByRole("button", { name: "确认并发布当前版本" }));
     expect(onPublish).toHaveBeenCalledOnce();
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     fireEvent.click(screen.getByRole("button", { name: "撤回这个共鸣体" }));
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining("无法恢复"));
     expect(onArchive).toHaveBeenCalledOnce();
+  });
+
+  it("requires explicit confirmation before the irreversible archive", () => {
+    const onArchive = vi.fn();
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+    render(<CapsuleWorkbench capsules={[capsule]} selectedCapsuleId={capsule.id} selectedCapsule={capsule} selectableMemories={[memory]}
+      selectedMemoryIds={[1]} capsuleName="" capsuleIntro="" capsulePreview={null} capsuleBusy={false} genomeHistory={[genomeVersion]} fidelitySummary={[]}
+      sandboxQuestion="" sandboxResult={null} sandboxFeedback={null} onSelectCapsule={() => undefined}
+      onToggleMemory={() => undefined} onCapsuleName={() => undefined} onCapsuleIntro={() => undefined}
+      onPreviewNewCapsule={() => undefined} onCancelPreview={() => undefined} onCreateCapsule={() => undefined}
+      onRecompile={() => undefined} onSandboxQuestion={() => undefined} onRunSandbox={() => undefined}
+      onRateSandbox={() => undefined} onPublish={() => undefined} onPause={() => undefined} onArchive={onArchive} />);
+    fireEvent.click(screen.getByRole("button", { name: "撤回这个共鸣体" }));
+    expect(onArchive).not.toHaveBeenCalled();
+  });
+
+  it("shows every eligible memory instead of silently truncating after ten", () => {
+    const memories = Array.from({ length: 11 }, (_, index): MemoryCard => ({
+      ...memory, id: index + 1, title: `记忆 ${index + 1}`
+    }));
+    render(<CapsuleWorkbench capsules={[]} selectedCapsuleId={null} selectedCapsule={null} selectableMemories={memories}
+      selectedMemoryIds={[]} capsuleName="" capsuleIntro="" capsulePreview={null} capsuleBusy={false} genomeHistory={[]} fidelitySummary={[]}
+      sandboxQuestion="" sandboxResult={null} sandboxFeedback={null} onSelectCapsule={() => undefined}
+      onToggleMemory={() => undefined} onCapsuleName={() => undefined} onCapsuleIntro={() => undefined}
+      onPreviewNewCapsule={() => undefined} onCancelPreview={() => undefined} onCreateCapsule={() => undefined}
+      onRecompile={() => undefined} onSandboxQuestion={() => undefined} onRunSandbox={() => undefined}
+      onRateSandbox={() => undefined} onPublish={() => undefined} onPause={() => undefined} onArchive={() => undefined} />);
+    expect(screen.getByLabelText("记忆 11 · EPISODIC · v1")).toBeVisible();
+  });
+
+  it("explains a Genome history failure, keeps publish disabled, and offers retry", () => {
+    const onRetry = vi.fn();
+    render(<CapsuleWorkbench capsules={[capsule]} selectedCapsuleId={capsule.id} selectedCapsule={capsule} selectableMemories={[memory]}
+      selectedMemoryIds={[1]} capsuleName="" capsuleIntro="" capsulePreview={null} capsuleBusy={false} genomeHistory={[]}
+      genomeHistoryError fidelitySummary={[]} sandboxQuestion="" sandboxResult={null} sandboxFeedback={null} onSelectCapsule={() => undefined}
+      onToggleMemory={() => undefined} onCapsuleName={() => undefined} onCapsuleIntro={() => undefined}
+      onPreviewNewCapsule={() => undefined} onCancelPreview={() => undefined} onCreateCapsule={() => undefined}
+      onRecompile={() => undefined} onSandboxQuestion={() => undefined} onRunSandbox={() => undefined}
+      onRateSandbox={() => undefined} onPublish={() => undefined} onPause={() => undefined} onArchive={() => undefined}
+      onRetryGenomeHistory={onRetry} />);
+    expect(screen.getByRole("alert")).toHaveTextContent("无法确认当前版本是否可安全发布");
+    expect(screen.getByRole("button", { name: "确认并发布当前版本" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "重新读取 Genome 版本" }));
+    expect(onRetry).toHaveBeenCalledOnce();
   });
 
   it("sends natural-language calibration with a rating and explicitly applies it to a new version", () => {
@@ -160,7 +209,9 @@ describe("CapsuleWorkbench", () => {
     expect(note.value).toBe("先前的备注");
     fireEvent.change(note, { target: { value: "更新后的备注" } });
     fireEvent.click(screen.getByRole("button", { name: "保存背景与联系设置" }));
-    expect(onSaveContext).toHaveBeenCalledWith({ ownerContextNote: "更新后的备注", standInEnabled: false, realContactPolicy: "LETTER_ONLY" });
+    expect(onSaveContext).toHaveBeenCalledWith({
+      ownerContextNote: "更新后的备注", standInEnabled: false, realContactPolicy: "LETTER_ONLY", conversationLimitPerDay: 30
+    });
   });
 
   // W2 UIUX audit follow-up: each memory checkbox's <label> wrapped <strong>title</strong>

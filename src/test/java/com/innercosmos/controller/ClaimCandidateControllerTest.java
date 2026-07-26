@@ -56,8 +56,12 @@ class ClaimCandidateControllerTest {
 
         mockMvc.perform(get("/api/aurora/claims/candidates").session(owner))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data.length()").value(3))
                 .andExpect(jsonPath("$.data[0].provenanceMessageIds").isArray());
+        mockMvc.perform(get("/api/aurora/claims/candidates")
+                        .param("sessionId", String.valueOf(session.id)).session(owner))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(3));
         // A different user sees none of the owner's candidates.
         mockMvc.perform(get("/api/aurora/claims/candidates").session(intruder))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(0));
@@ -70,11 +74,12 @@ class ClaimCandidateControllerTest {
         mockMvc.perform(post("/api/aurora/claims/candidates/{id}/confirm", candidateId).session(owner))
                 .andExpect(status().isOk());
         mockMvc.perform(get("/api/aurora/claims/candidates").session(owner))
-                .andExpect(jsonPath("$.data.length()").value(1));
+                .andExpect(jsonPath("$.data.length()").value(2));
 
-        Long remaining = claimCandidateService.listCandidates(ownerId).getFirst().id();
-        mockMvc.perform(delete("/api/aurora/claims/candidates/{id}", remaining).session(owner))
-                .andExpect(status().isOk());
+        for (ClaimCandidateVO remaining : claimCandidateService.listCandidates(ownerId)) {
+            mockMvc.perform(delete("/api/aurora/claims/candidates/{id}", remaining.id()).session(owner))
+                    .andExpect(status().isOk());
+        }
         mockMvc.perform(get("/api/aurora/claims/candidates").session(owner))
                 .andExpect(jsonPath("$.data.length()").value(0));
     }

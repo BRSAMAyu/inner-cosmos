@@ -68,11 +68,12 @@ class ClaimCandidateServiceImplIntegrationTest {
         seedMessage(sessionId, userId, "USER", "我是不是太敏感了？"); // question — must not become a claim
 
         int staged = service.stageForSession(userId, sessionId);
-        assertThat(staged).isEqualTo(1);
+        assertThat(staged).isEqualTo(2);
 
         List<ClaimCandidateVO> candidates = service.listCandidates(userId);
-        assertThat(candidates).hasSize(1);
-        ClaimCandidateVO preference = candidates.getFirst();
+        assertThat(candidates).hasSize(2);
+        ClaimCandidateVO preference = candidates.stream()
+                .filter(candidate -> ClaimTypes.PREFERENCE.equals(candidate.claimType())).findFirst().orElseThrow();
         assertThat(preference.claimType()).isEqualTo(ClaimTypes.PREFERENCE);
         assertThat(preference.value()).contains("读书");
         assertThat(preference.provenanceMessageIds()).isNotEmpty();
@@ -80,10 +81,10 @@ class ClaimCandidateServiceImplIntegrationTest {
 
         // Re-staging the same session must not create a second CANDIDATE row for the same claim key.
         service.stageForSession(userId, sessionId);
-        assertThat(service.listCandidates(userId)).hasSize(1);
+        assertThat(service.listCandidates(userId)).hasSize(2);
         long candidateRows = claimMapper.selectCount(new QueryWrapper<UnderstandingClaim>()
                 .eq("user_id", userId).eq("status", "CANDIDATE"));
-        assertThat(candidateRows).isEqualTo(1);
+        assertThat(candidateRows).isEqualTo(2);
     }
 
     @Test
@@ -100,9 +101,31 @@ class ClaimCandidateServiceImplIntegrationTest {
         UnderstandingClaim promoted = claimMapper.selectById(candidateId);
         assertThat(promoted.status).isEqualTo("CONFIRMED");
         assertThat(service.listCandidates(userId)).isEmpty();
-        long activeClaims = claimMapper.selectCount(new QueryWrapper<UnderstandingClaim>()
-                .eq("user_id", userId).eq("status", "ACTIVE").eq("authority_level", "USER_CORRECTION"));
-        assertThat(activeClaims).isEqualTo(1);
+        UnderstandingClaim active = claimMapper.selectOne(new QueryWrapper<UnderstandingClaim>()
+                .eq("user_id", userId).eq("status", "ACTIVE").last("LIMIT 1"));
+        assertThat(active).isNotNull();
+        assertThat(active.authorityLevel).isEqualTo("USER_CORRECTION");
+        assertThat(active.claimType).isEqualTo(ClaimTypes.VALUE);
+        assertThat(active.sourceType).isEqualTo("AUTO_EXTRACTION");
+        assertThat(active.evidenceRefs).isNotBlank();
+    }
+
+    @Test
+    void batchConfirmReturnsOnlyActiveAutoClaimsFromOwnedSession() {
+        long userId = USER_SEQ.incrementAndGet();
+        long sessionId = seedSession(userId);
+        seedMessage(sessionId, userId, "USER", "我觉得诚实特别重要");
+        seedMessage(sessionId, userId, "USER", "我还是觉得坦诚和认真回应很重要");
+        service.stageForSession(userId, sessionId);
+
+        List<Long> activeIds = service.confirmSessionCandidates(userId, sessionId);
+
+        assertThat(activeIds).isNotEmpty();
+        assertThat(service.listCandidates(userId, sessionId)).isEmpty();
+        assertThat(claimMapper.selectList(new QueryWrapper<UnderstandingClaim>()
+                .in("id", activeIds))).allMatch(row ->
+                "ACTIVE".equals(row.status) && "AUTO_EXTRACTION".equals(row.sourceType)
+                        && Long.valueOf(sessionId).equals(row.sourceId));
     }
 
     @Test
@@ -132,7 +155,7 @@ class ClaimCandidateServiceImplIntegrationTest {
     }
 
     @Test
-    void longUnconfirmedCandidateDecaysBelowThresholdAndIsAutoDismissedOnRead() {
+    void candidateReadIsPureAndScheduledSweepOwnsAutoDismissal() {
         long userId = USER_SEQ.incrementAndGet();
         long sessionId = seedSession(userId);
         // HABIT / REPEATED_BEHAVIOR, 60-day half-life, base confidence 0.6.
@@ -145,7 +168,27 @@ class ClaimCandidateServiceImplIntegrationTest {
 
         assertThat(service.listCandidates(userId)).isEmpty();
         UnderstandingClaim row = claimMapper.selectById(candidateId);
-        assertThat(row.status).isEqualTo("DISMISSED");
+        assertThat(row.status).isEqualTo("CANDIDATE");
+        service.sweepStaleCandidates(500);
+        assertThat(claimMapper.selectById(candidateId).status).isEqualTo("DISMISSED");
+    }
+
+    @Test
+    void candidatesCanBeFilteredByOwnedSourceSession() {
+        long userId = USER_SEQ.incrementAndGet();
+        long first = seedSession(userId);
+        long second = seedSession(userId);
+        seedMessage(first, userId, "USER", "我特别喜欢在下雨天读书");
+        seedMessage(second, userId, "USER", "我觉得诚实特别重要");
+        service.stageForSession(userId, first);
+        service.stageForSession(userId, second);
+
+        assertThat(service.listCandidates(userId, first))
+                .allMatch(candidate -> candidate.claimType().equals(ClaimTypes.PREFERENCE));
+        assertThat(service.listCandidates(userId, second))
+                .allMatch(candidate -> candidate.claimType().equals(ClaimTypes.VALUE));
+        assertThatThrownBy(() -> service.listCandidates(USER_SEQ.incrementAndGet(), first))
+                .isInstanceOf(BusinessException.class);
     }
 
     @Test

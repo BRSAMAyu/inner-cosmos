@@ -46,21 +46,26 @@ public class DataMaskingServiceImpl implements DataMaskingService {
         preview.publicTags = new ArrayList<>();
         preview.riskWarnings = new ArrayList<>();
 
-        // A capsule preview must never surface content the owner marked LOCAL_ONLY or
-        // NO_EXTERNAL_PROCESSING, even though these are the same ids createFromMemory/
-        // recompileGenome already exclude — this preview must not be the one leak point.
+        // A normal/public capsule preview must never surface content whose consent is scoped
+        // to local processing, no external processing, or the isolated simulator. The exclusion
+        // is disclosed by NAME: "some memories were restricted" leaves the owner guessing which
+        // consent decision of theirs took effect, so each excluded scope reports its own reason.
         List<MemoryCard> cards = new ArrayList<>();
-        boolean anyConsentRestricted = false;
+        List<String> restrictedReasons = new ArrayList<>();
         for (MemoryCard card : loaded) {
-            if ("LOCAL_ONLY".equalsIgnoreCase(card.consentScope) || "NO_EXTERNAL_PROCESSING".equalsIgnoreCase(card.consentScope)) {
-                anyConsentRestricted = true;
+            String reason = excludedScopeReason(card.consentScope);
+            if (reason != null) {
+                addUnique(restrictedReasons, reason);
             } else {
                 cards.add(card);
             }
         }
-        if (anyConsentRestricted) {
-            preview.riskWarnings.add("部分选中的记忆标记为仅本地使用/禁止外部处理，不会进入这次预览或共鸣体");
-            preview.removedSensitiveItems.add("仅本地使用的记忆");
+        if (!restrictedReasons.isEmpty()) {
+            preview.riskWarnings.add("部分选中的记忆标记为" + String.join("/", restrictedReasons)
+                    + "，不会进入这次预览或公开共鸣体");
+            for (String reason : restrictedReasons) {
+                addUnique(preview.removedSensitiveItems, reason + "的记忆");
+            }
         }
 
         // Generate abstract summary with masking applied
@@ -97,11 +102,11 @@ public class DataMaskingServiceImpl implements DataMaskingService {
         // Check for risk warnings
         for (MemoryCard card : cards) {
             if (card.intensityScore != null && card.intensityScore > 7.0) {
-                preview.riskWarnings.add("包含高情绪强度记忆,建议谨慎公开");
+                addUnique(preview.riskWarnings, "包含高情绪强度记忆,建议谨慎公开");
             }
             if (containsSensitiveContent(card.summary)) {
-                preview.riskWarnings.add("部分内容可能包含敏感信息,已自动脱敏");
-                preview.removedSensitiveItems.add("个人识别信息");
+                addUnique(preview.riskWarnings, "部分内容可能包含敏感信息,已自动脱敏");
+                addUnique(preview.removedSensitiveItems, "个人识别信息");
             }
         }
 
@@ -110,8 +115,8 @@ public class DataMaskingServiceImpl implements DataMaskingService {
             for (String blocked : blockedTopics) {
                 for (MemoryCard card : cards) {
                     if (card.keywordTags != null && card.keywordTags.contains(blocked)) {
-                        preview.riskWarnings.add("包含被限制话题:" + blocked);
-                        preview.removedSensitiveItems.add(blocked);
+                        addUnique(preview.riskWarnings, "包含被限制话题:" + blocked);
+                        addUnique(preview.removedSensitiveItems, blocked);
                     }
                 }
             }
@@ -131,6 +136,7 @@ public class DataMaskingServiceImpl implements DataMaskingService {
         if ("STRICT".equalsIgnoreCase(privacyLevel)) {
             // Strict masking: remove names, places, schools, dates, contact info
             result = maskPatterns(result);
+            result = maskNames(result);
         } else if ("MODERATE".equalsIgnoreCase(privacyLevel) || "BALANCED".equalsIgnoreCase(privacyLevel)) {
             // Moderate masking: remove names and contact info only. "BALANCED" is
             // CapsuleBoundary's actual middle-tier enum value (CapsuleServiceImpl.safePrivacy
@@ -167,10 +173,30 @@ public class DataMaskingServiceImpl implements DataMaskingService {
     }
 
     private String maskNames(String text) {
-        // Simple approach: mask common name patterns after certain keywords
-        text = text.replaceAll("叫(.{2,4})(的|了|是|,|.|\\s)", "叫***$2");
-        text = text.replaceAll("我是(.{2,4})(的|了|是|,|.|\\s)", "我是***$2");
+        // Stop at explicit punctuation/whitespace (or the sentence end). The previous `.` branch
+        // matched any character and the greedy capture consumed part of the following sentence.
+        String name = "([^，,。.！!？?\\s]{2,4})(?=的|了|是|[，,。.！!？?\\s]|$)";
+        text = text.replaceAll("叫" + name, "叫***");
+        text = text.replaceAll("我是" + name, "我是***");
         return text;
+    }
+
+    /**
+     * The owner-facing reason a memory cannot enter a normal/public capsule preview, or null when
+     * the scope is eligible. Keep the wording aligned with the consent labels the owner actually
+     * chose — it is the only signal telling them which of their own decisions applied.
+     */
+    private String excludedScopeReason(String consentScope) {
+        if ("LOCAL_ONLY".equalsIgnoreCase(consentScope)) return "仅本地使用";
+        if ("NO_EXTERNAL_PROCESSING".equalsIgnoreCase(consentScope)) return "禁止外部处理";
+        if ("SIMULATOR_AUTHORIZED".equalsIgnoreCase(consentScope)) return "仅限模拟器测试";
+        return null;
+    }
+
+    private void addUnique(List<String> values, String value) {
+        if (!values.contains(value)) {
+            values.add(value);
+        }
     }
 
     private boolean isSensitive(String keyword) {

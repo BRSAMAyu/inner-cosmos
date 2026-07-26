@@ -160,4 +160,62 @@ class PersonaChatServiceImplReportBlockTest {
         assertEquals("UNAUTHORIZED", error.code);
         verifyNoInteractions(blockRelationMapper);
     }
+
+    @Test
+    @DisplayName("create rejects chatting with one's own capsule")
+    void create_rejectsSelfCapsule() {
+        EchoCapsule capsule = new EchoCapsule();
+        capsule.id = 210L;
+        capsule.ownerUserId = 1L;
+        capsule.isPublic = true;
+        capsule.visibilityStatus = "PUBLIC";
+        when(capsuleMapper.selectById(210L)).thenReturn(capsule);
+
+        BusinessException error = assertThrows(BusinessException.class, () -> service.create(1L, 210L));
+
+        assertEquals("FORBIDDEN", error.code);
+        verify(sessionMapper, never()).insert(any(PersonaChatSession.class));
+    }
+
+    @Test
+    @DisplayName("create rejects either direction of a block relation")
+    void create_rejectsBidirectionalBlock() {
+        EchoCapsule capsule = new EchoCapsule();
+        capsule.id = 211L;
+        capsule.ownerUserId = 55L;
+        capsule.isPublic = true;
+        capsule.visibilityStatus = "PUBLIC";
+        when(capsuleMapper.selectById(211L)).thenReturn(capsule);
+        when(blockRelationMapper.selectCount(any())).thenReturn(1L);
+
+        BusinessException error = assertThrows(BusinessException.class, () -> service.create(1L, 211L));
+
+        assertEquals("FORBIDDEN", error.code);
+        verify(sessionMapper, never()).insert(any(PersonaChatSession.class));
+    }
+
+    @Test
+    @DisplayName("active-session only restores the latest ACTIVE session owned by the current visitor")
+    void activeSession_isOwnerAndStatusScoped() {
+        EchoCapsule capsule = new EchoCapsule();
+        capsule.id = 212L;
+        capsule.ownerUserId = 55L;
+        capsule.isPublic = true;
+        capsule.visibilityStatus = "PUBLIC";
+        when(capsuleMapper.selectById(212L)).thenReturn(capsule);
+        PersonaChatSession active = session(90L, 1L, 212L);
+        when(sessionMapper.selectOne(any())).thenReturn(active);
+
+        assertSame(active, service.activeSession(1L, 212L));
+
+        @SuppressWarnings("rawtypes")
+        ArgumentCaptor<com.baomidou.mybatisplus.core.conditions.query.QueryWrapper> query =
+                ArgumentCaptor.forClass(com.baomidou.mybatisplus.core.conditions.query.QueryWrapper.class);
+        verify(sessionMapper).selectOne(query.capture());
+        String sql = query.getValue().getSqlSegment();
+        assertTrue(sql.contains("visitor_user_id"));
+        assertTrue(sql.contains("capsule_id"));
+        assertTrue(sql.contains("status"));
+        assertTrue(sql.contains("ORDER BY id DESC"));
+    }
 }

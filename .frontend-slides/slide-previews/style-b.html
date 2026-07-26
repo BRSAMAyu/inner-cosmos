@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>从容器编排到语义可靠性</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;1,6..72,300&family=Hanken+Grotesk:wght@400;500;600&family=DM+Mono:wght@300;400;500&family=Noto+Serif+SC:wght@300;400;500;600&family=Noto+Sans+SC:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+/* === FIXED 16:9 STAGE (subset of viewport-base.css) === */
+html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#1d1a13}
+.deck-viewport{position:fixed;inset:0;overflow:hidden;background:#1d1a13}
+.deck-stage{position:absolute;left:0;top:0;width:1920px;height:1080px;overflow:hidden;transform-origin:0 0;background:#F0EBDE}
+.slide{position:absolute;inset:0;width:1920px;height:1080px;overflow:hidden;visibility:hidden;opacity:0;pointer-events:none;background:#F0EBDE}
+.slide.active{visibility:visible;opacity:1;pointer-events:auto;z-index:1}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms !important;transition-duration:.2s !important}}
+
+/* === PALETTE + TYPE === */
+:root{
+  --paper:#F0EBDE;
+  --paper-2:#E6E0CE;
+  --ink:#1F2BE0;
+  --ink-soft:#5560E5;
+  --text:#16171f;
+  --text-2:#5a5c68;
+  --font-display:'Newsreader','Noto Serif SC',serif;
+  --font-body:'Hanken Grotesk','Noto Sans SC',sans-serif;
+  --font-mono:'DM Mono','Noto Sans SC',monospace;
+}
+
+/* === PERMANENT GRAPH-PAPER GRID (non-optional) === */
+.stage-surface{position:absolute;inset:0;background:var(--paper)}
+.stage-surface::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.10;
+  background-image:
+    linear-gradient(to right,var(--ink) 0 1px,transparent 1px 100%),
+    linear-gradient(to bottom,var(--ink) 0 1px,transparent 1px 100%);
+  background-size:40px 40px,40px 40px}
+
+/* === HAIRLINE FRAME: signature top + bottom cobalt rules === */
+.frame-t,.frame-b{position:absolute;left:96px;right:96px;height:1.5px;background:var(--ink)}
+.frame-t{top:74px}.frame-b{bottom:74px}
+
+/* === TICKER CHROME === */
+.ticker{position:absolute;left:96px;right:96px;top:34px;display:flex;justify-content:space-between;
+  font-family:var(--font-mono);font-weight:400;font-size:19px;letter-spacing:.1em;color:var(--ink);text-transform:uppercase}
+.footchrome{position:absolute;left:96px;right:96px;bottom:32px;display:flex;justify-content:space-between;
+  font-family:var(--font-mono);font-size:18px;letter-spacing:.08em;color:var(--text-2)}
+
+/* === COVER === */
+.cover{position:absolute;left:96px;top:150px;width:1180px}
+.cover .eyebrow{font-family:var(--font-mono);font-size:21px;letter-spacing:.2em;color:var(--ink);text-transform:uppercase}
+.cover .topbar{margin:20px 0 34px;height:1.5px;background:var(--ink);transform-origin:left}
+.cover h1{margin:0;font-family:var(--font-display);font-weight:400;font-size:118px;line-height:1.02;letter-spacing:0;color:var(--text)}
+.cover h1 em{font-style:italic;font-weight:300;color:var(--ink)}
+.cover .sub{margin-top:34px;font-family:var(--font-display);font-weight:400;font-size:44px;line-height:1.42;color:var(--text)}
+.cover .ctx{margin-top:26px;font-family:var(--font-body);font-weight:400;font-size:24px;line-height:1.72;color:var(--text-2);max-width:1000px}
+
+/* === INDEX ROWS: faint cobalt dividers === */
+.index{position:absolute;right:96px;top:236px;width:472px}
+.index .ihead{font-family:var(--font-mono);font-size:18px;letter-spacing:.16em;color:var(--ink);text-transform:uppercase;padding-bottom:12px;border-bottom:1.5px solid var(--ink)}
+.index .row{display:flex;gap:18px;align-items:baseline;padding:19px 0;border-bottom:1px solid rgba(31,43,224,.22)}
+.index .row .num{font-family:var(--font-mono);font-size:17px;color:var(--ink-soft);flex:none;width:26px}
+.index .row .lbl{font-family:var(--font-display);font-size:29px;font-weight:400;color:var(--text);line-height:1.2}
+.index .row .lbl span{display:block;font-family:var(--font-body);font-size:17px;color:var(--text-2);margin-top:5px;line-height:1.45}
+
+/* === PIXEL-GLITCH COLUMN: signature decoration, right edge === */
+.glitch{position:absolute;right:34px;top:300px;width:30px;height:470px}
+.glitch i{position:absolute;right:0;display:block;background:var(--ink);opacity:.85}
+.glitch i:nth-child(1){top:0;width:30px;height:7px}
+.glitch i:nth-child(2){top:14px;width:20px;height:7px}
+.glitch i:nth-child(3){top:28px;width:26px;height:7px}
+.glitch i:nth-child(4){top:56px;width:12px;height:7px}
+.glitch i:nth-child(5){top:70px;width:30px;height:7px}
+.glitch i:nth-child(6){top:98px;width:17px;height:7px}
+.glitch i:nth-child(7){top:126px;width:24px;height:7px;opacity:.45}
+.glitch i:nth-child(8){top:154px;width:9px;height:7px}
+/* QR-style 8x8 patch */
+.qr{position:absolute;right:34px;bottom:150px;width:64px;height:64px;
+  background-image:
+    linear-gradient(to right,var(--ink) 0 8px,transparent 8px 16px),
+    linear-gradient(to bottom,var(--ink) 0 8px,transparent 8px 16px);
+  background-size:16px 16px;opacity:.28}
+
+/* === ENTRANCE === */
+@keyframes riseIn{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
+@keyframes wipeX{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.slide.active .frame-t,.slide.active .frame-b{transform-origin:left;animation:wipeX .7s cubic-bezier(.22,1,.36,1) both}
+.slide.active .ticker,.slide.active .footchrome{animation:fadeIn .6s ease-out .3s both}
+.slide.active .cover .eyebrow{animation:riseIn .55s ease-out .2s both}
+.slide.active .cover .topbar{animation:wipeX .6s cubic-bezier(.22,1,.36,1) .3s both}
+.slide.active .cover h1{animation:riseIn .8s cubic-bezier(.22,1,.36,1) .36s both}
+.slide.active .cover .sub{animation:riseIn .6s ease-out .54s both}
+.slide.active .cover .ctx{animation:riseIn .6s ease-out .64s both}
+.slide.active .index .ihead{animation:riseIn .5s ease-out .6s both}
+.slide.active .index .row:nth-child(2){animation:riseIn .5s ease-out .70s both}
+.slide.active .index .row:nth-child(3){animation:riseIn .5s ease-out .78s both}
+.slide.active .index .row:nth-child(4){animation:riseIn .5s ease-out .86s both}
+.slide.active .index .row:nth-child(5){animation:riseIn .5s ease-out .94s both}
+.slide.active .glitch i{animation:fadeIn .4s ease-out both}
+.slide.active .glitch i:nth-child(n){animation-delay:1.0s}
+.slide.active .qr{animation:fadeIn .6s ease-out 1.1s both}
+</style>
+</head>
+<body>
+<div class="deck-viewport">
+  <div class="deck-stage" id="stage">
+    <section class="slide active">
+      <div class="stage-surface"></div>
+      <div class="frame-t"></div>
+      <div class="frame-b"></div>
+
+      <div class="ticker">
+        <span>Inner Cosmos</span>
+        <span>Cloud-Native Runtime Paradigm</span>
+        <span>2026</span>
+      </div>
+
+      <div class="cover">
+        <div class="eyebrow">Semantic Reliability</div>
+        <div class="topbar"></div>
+        <h1>从容器编排<br><em>到语义可靠性</em></h1>
+        <div class="sub">先进 AI Agent 的云原生运行范式</div>
+        <div class="ctx">以 Inner Cosmos 的长期对话、异步记忆与安全发布为实验场。此处"语义"指业务语义与领域不变量，不是自然语言语义。</div>
+      </div>
+
+      <div class="index">
+        <div class="ihead">Four Contracts</div>
+        <div class="row"><div class="num">01</div><div class="lbl">连续性<span>Pod 消失，什么必须继续存在</span></div></div>
+        <div class="row"><div class="num">02</div><div class="lbl">语义健康<span>进程活着不等于版本仍值得流量</span></div></div>
+        <div class="row"><div class="num">03</div><div class="lbl">工作压力<span>CPU 不能代表用户在等待</span></div></div>
+        <div class="row"><div class="num">04</div><div class="lbl">因果可观测<span>一次行为跨越多个运行角色</span></div></div>
+      </div>
+
+      <div class="glitch"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="qr"></div>
+
+      <div class="footchrome">
+        <span>kind · academy-eks · commercial-sg</span>
+        <span>01</span>
+      </div>
+    </section>
+  </div>
+</div>
+<script>
+/* Uniform scale of the fixed 1920x1080 stage — never reflow content. */
+(function(){
+  var stage=document.getElementById('stage');
+  function fit(){
+    var s=Math.min(innerWidth/1920,innerHeight/1080);
+    stage.style.transform='translate('+((innerWidth-1920*s)/2)+'px,'+((innerHeight-1080*s)/2)+'px) scale('+s+')';
+  }
+  addEventListener('resize',fit);fit();
+})();
+</script>
+</body>
+</html>

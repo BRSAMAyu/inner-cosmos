@@ -32,6 +32,13 @@ export function DemoPersonaChooser({ compact = false,
     try {
       await api.enterDemoPersona(key);
       await onEntered();
+      try {
+        setPersonas(await api.demoPersonas());
+      } catch {
+        // Entering already succeeded; keep the cards usable if refreshing the
+        // active marker is temporarily unavailable.
+      }
+      setBusyKey(null);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message
         : locale === "en-SG" ? "Couldn't enter this story." : "暂时无法进入这段故事。");
@@ -57,6 +64,7 @@ export function DemoPersonaChooser({ compact = false,
         const active = Boolean(persona.active);
         return <button type="button" key={persona.key} className={active ? "active" : ""}
           aria-current={active ? "true" : undefined}
+          aria-busy={busyKey === persona.key ? "true" : undefined}
           disabled={Boolean(busyKey) || active} onClick={() => void enter(persona.key)}>
           <span className="demo-persona-name">{persona.name}</span>
           <strong>{persona.headline}</strong>

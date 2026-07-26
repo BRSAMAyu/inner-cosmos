@@ -11,3 +11,4 @@ llm:
 inner-cosmos:
   demo:
     seed-enabled: true
+    public-entry-enabled: true

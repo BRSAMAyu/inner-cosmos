@@ -71,6 +71,16 @@ spring:
       await-termination-period: 30s
 
 management:
+  metrics:
+    distribution:
+      percentiles-histogram:
+        aurora.turn.latency: true
+        inner.cosmos.ai.provider.latency: true
+        inner.cosmos.sse.connection.duration: true
+      slo:
+        aurora.turn.latency: 250ms,500ms,1s,2s,5s,10s,30s,60s
+        inner.cosmos.ai.provider.latency: 250ms,500ms,1s,2s,5s,10s,30s,60s
+        inner.cosmos.sse.connection.duration: 1s,5s,15s,30s,60s,120s
   endpoints:
     web:
       exposure:

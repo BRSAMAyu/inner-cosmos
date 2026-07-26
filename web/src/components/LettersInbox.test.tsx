@@ -29,7 +29,7 @@ describe("LettersInbox", () => {
     expect(onActOnLetter).toHaveBeenCalledWith(letter, "block");
   });
 
-  it("offers a direct entry to compose a new slow letter", () => {
+  it("explains that composing without a connection routes to meeting people", () => {
     const onComposeNew = vi.fn();
     render(<LettersInbox letterInbox={[]} replyDrafts={{}} onComposeNew={onComposeNew}
       connectionRequests={{ incoming: [], outgoing: [] }} friends={[]}
@@ -37,7 +37,8 @@ describe("LettersInbox", () => {
       onReplyDraftChange={() => undefined} onReply={() => undefined} onActOnLetter={() => undefined}
       onReportLetter={() => undefined} onRequestConnection={() => undefined}
       onDecideConnection={() => undefined} onLeaveConnection={() => undefined} />);
-    fireEvent.click(screen.getByRole("button", { name: "写一封慢信" }));
+    expect(screen.getByText("还没有可直接写信的连接；先去共鸣相遇，建立连接后再写。")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "先去遇见可以写信的人" }));
     expect(onComposeNew).toHaveBeenCalledOnce();
   });
 
@@ -54,7 +55,8 @@ describe("LettersInbox", () => {
       onReportLetter={() => undefined} onRequestConnection={() => undefined}
       onDecideConnection={() => undefined} onLeaveConnection={() => undefined} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "写一封慢信" }));
+    expect(screen.getByText("在当前页面打开写信表单，收信人只来自双方同意的连接。")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "写给已连接的好友" }));
     expect(onComposeNew).not.toHaveBeenCalled();
     fireEvent.change(screen.getByLabelText("选择一位好友"), { target: { value: "30" } });
     fireEvent.change(screen.getByLabelText("信的标题"), { target: { value: "近况" } });
@@ -65,6 +67,42 @@ describe("LettersInbox", () => {
       30, "近况", "最近还好吗？",
       expect.objectContaining({ deliveryPreset: "DEMO_30S", timeZone: expect.any(String) })
     ));
+  });
+
+  it("does not show a compose entry when neither direct compose nor a discovery route is actionable", () => {
+    render(<LettersInbox letterInbox={[]} replyDrafts={{}}
+      connectionRequests={{ incoming: [], outgoing: [] }} friends={[]}
+      onSendDirectLetter={vi.fn()}
+      isDraftBusy={() => false} isLetterActionBusy={() => false} isConnectionDecisionBusy={() => false}
+      isConnectionLeaveBusy={() => false} isLetterConnectionBusy={() => false}
+      onReplyDraftChange={() => undefined} onReply={() => undefined} onActOnLetter={() => undefined}
+      onReportLetter={() => undefined} onRequestConnection={() => undefined}
+      onDecideConnection={() => undefined} onLeaveConnection={() => undefined} />);
+    expect(screen.queryByRole("button", { name: /写信|慢信|遇见/ })).not.toBeInTheDocument();
+  });
+
+  it("makes the two compose destinations explicit in English too", () => {
+    const { rerender } = render(<LettersInbox locale="en-SG" letterInbox={[]} replyDrafts={{}}
+      connectionRequests={{ incoming: [], outgoing: [] }} friends={[]} onComposeNew={() => undefined}
+      isDraftBusy={() => false} isLetterActionBusy={() => false} isConnectionDecisionBusy={() => false}
+      isConnectionLeaveBusy={() => false} isLetterConnectionBusy={() => false}
+      onReplyDraftChange={() => undefined} onReply={() => undefined} onActOnLetter={() => undefined}
+      onReportLetter={() => undefined} onRequestConnection={() => undefined}
+      onDecideConnection={() => undefined} onLeaveConnection={() => undefined} />);
+    expect(screen.getByRole("button", { name: "Meet someone you can write to" })).toBeVisible();
+    expect(screen.getByText("No direct recipient yet. Meet through resonance and connect before writing.")).toBeVisible();
+
+    rerender(<LettersInbox locale="en-SG" letterInbox={[]} replyDrafts={{}}
+      connectionRequests={{ incoming: [], outgoing: [] }}
+      friends={[{ id: 3, status: "ACCEPTED", userId: 30, nickname: "Mira", username: "mira", source: "SOCIAL_PAGE" }]}
+      onComposeNew={() => undefined} onSendDirectLetter={vi.fn().mockResolvedValue(true)}
+      isDraftBusy={() => false} isLetterActionBusy={() => false} isConnectionDecisionBusy={() => false}
+      isConnectionLeaveBusy={() => false} isLetterConnectionBusy={() => false}
+      onReplyDraftChange={() => undefined} onReply={() => undefined} onActOnLetter={() => undefined}
+      onReportLetter={() => undefined} onRequestConnection={() => undefined}
+      onDecideConnection={() => undefined} onLeaveConnection={() => undefined} />);
+    expect(screen.getByRole("button", { name: "Write to a connection" })).toBeVisible();
+    expect(screen.getByText("Opens the composer here. Recipients are limited to mutual connections.")).toBeVisible();
   });
 
   it("marks the reply button busy (disabled + aria-busy) for the letter being sent", () => {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { AiHealth, ShredderHistoryEntry, ShredderResult } from "../api";
 import type { Locale } from "../i18n";
 import { AsyncButton } from "../loading";
@@ -12,7 +12,7 @@ const COPY: Record<Locale, {
   resultHeading: string; resultPlaceholder: string; coreFeeling: string; hiddenNeed: string;
   noise: string; keepSentence: string; settle: string; delete: string; historyHeading: string;
   historyEmpty: string; gravity: string; notConfigured: string; configured: string;
-  fallbackOn: string; fallbackOff: string; failed: string;
+  fallbackOn: string; fallbackOff: string; failed: string; onceOnlyNote: string;
 }> = {
   "zh-CN": {
     heading: "思维碎纸机", intro: "把混乱、愤怒、焦虑、碎碎念一次性倒进来。它会帮你把噪音和真正的需求分开。",
@@ -22,7 +22,8 @@ const COPY: Record<Locale, {
     hiddenNeed: "隐藏需求", noise: "可以放下的噪音", keepSentence: "值得保留的一句话", settle: "沉淀到记忆",
     delete: "删除", historyHeading: "历史粉碎记录", historyEmpty: "还没有粉碎记录。", gravity: "重力",
     notConfigured: "未配置真实模型密钥", configured: "真实模型已配置", fallbackOn: "开发 fallback 可用",
-    fallbackOff: "fallback 关闭", failed: "粉碎未能完成，请重试。"
+    fallbackOff: "fallback 关闭", failed: "粉碎未能完成，请重试。",
+    onceOnlyNote: "这次是「仅看一次」：原文和结果都没有写入数据库。离开这个页面后它不会再出现，也无法沉淀或找回。"
   },
   "en-SG": {
     heading: "Thought Shredder", intro: "Pour in the chaos, anger, anxiety, or rambling all at once. It helps separate the noise from the real need.",
@@ -32,7 +33,8 @@ const COPY: Record<Locale, {
     hiddenNeed: "Hidden need", noise: "Noise you can drop", keepSentence: "A sentence worth keeping", settle: "Settle into memory",
     delete: "Delete", historyHeading: "Shredding history", historyEmpty: "No shredding records yet.", gravity: "gravity",
     notConfigured: "no real model key configured", configured: "real model configured", fallbackOn: "dev fallback available",
-    fallbackOff: "fallback off", failed: "Shredding didn't complete. Please try again."
+    fallbackOff: "fallback off", failed: "Shredding didn't complete. Please try again.",
+    onceOnlyNote: "This was a view-once shred: neither your text nor this result was written to the database. Once you leave this page it is gone — it cannot be settled or recovered."
   }
 };
 
@@ -44,6 +46,14 @@ export function ThoughtShredderSection({ aiHealth, history, result, busy, onShre
   const t = COPY[locale];
   const [text, setText] = useState("");
   const [saveMode, setSaveMode] = useState<SaveMode>("KEEP_ONLY_RESULT");
+
+  // A new result is the success receipt from the backend. Clear the sensitive source only then,
+  // so a failed request still leaves the user's text available for a retry. Keyed on the result
+  // object, not its card id -- a DISPLAY_ONCE shred has no id, so two of them in a row would
+  // otherwise look like the same dependency value.
+  useEffect(() => {
+    if (result) setText("");
+  }, [result]);
 
   return <section className="thought-shredder-section" aria-label={t.heading}>
     <h2>{t.heading}</h2>
@@ -85,10 +95,14 @@ export function ThoughtShredderSection({ aiHealth, history, result, busy, onShre
               <p className="muted">{result.noiseToDrop.join("；")}</p>
               <h4 className="mt-2">{t.keepSentence}</h4>
               <p className="teal">{result.sentenceToKeep}</p>
-              <div className="row gap-sm mt-2">
-                <button type="button" onClick={() => onSettle(result.memoryCard.id)}>{t.settle}</button>
-                <button type="button" onClick={() => onDelete(result.memoryCard.id)}>{t.delete}</button>
-              </div>
+              {/* A DISPLAY_ONCE shred was never persisted, so there is no row to settle or delete.
+                  Offering the buttons would post to /api/thought-shredder/null/... and fail. */}
+              {result.memoryCard.id === null
+                ? <p className="muted mt-2">{t.onceOnlyNote}</p>
+                : <div className="row gap-sm mt-2">
+                    <button type="button" onClick={() => onSettle(result.memoryCard.id as number)}>{t.settle}</button>
+                    <button type="button" onClick={() => onDelete(result.memoryCard.id as number)}>{t.delete}</button>
+                  </div>}
             </div>}
       </article>
     </div>

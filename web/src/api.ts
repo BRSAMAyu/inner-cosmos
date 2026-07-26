@@ -146,7 +146,8 @@ export type CorrectionConfirmation = {
   propagation: Array<{ id: number; targetKind: string; status: string; detail: string }>;
 };
 export type ClaimCandidate = {
-  id: number; claimType: string; value: string; authorityLevel: string; confidence: number;
+  id: number; claimType: string; value: string; capsuleSafeValue?: string;
+  authorityLevel: string; confidence: number;
   provenanceMessageIds: number[]; evidenceText: string; uncertain: boolean;
   alreadyActive: boolean; createdAt: string | null;
 };
@@ -181,7 +182,9 @@ export type TodoItemRow = { id: number; taskName: string; description: string | 
 // real DailyRecord id from the dailyRecords() list (its first/most-recent entry), not from this VO.
 export type DailyRecordDetail = {
   theme: string | null; auroraSummary: string | null; mainMemory: MemoryCard | null;
-  fragments: ThoughtFragmentRow[]; emotions: EmotionTraceRow[]; todos: TodoItemRow[]; capsuleSuggested: boolean;
+  fragments: ThoughtFragmentRow[]; emotions: EmotionTraceRow[]; todos: TodoItemRow[];
+  // Scoped to this day's memory card by DailyRecordVO -- not the all-time /api/relation/list.
+  relations: RelationMention[]; capsuleSuggested: boolean;
 };
 export type WeeklyDailySnapshot = {
   date: string; dayLabel: string; emotionWeather: string | null; theme: string | null;
@@ -202,7 +205,12 @@ export type WeeklyReviewV2 = {
 };
 export type ShredderResult = {
   originalHandlingMode: string; coreFeeling: string; hiddenNeed: string; noiseToDrop: string[];
-  sentenceToKeep: string; memoryCard: MemoryCard; fragments: ThoughtFragmentRow[]; suggestedTodo: TodoItemRow | null;
+  sentenceToKeep: string;
+  // A DISPLAY_ONCE ("仅看一次") shred is deliberately never inserted, so the returned card carries
+  // no id (ThoughtShredderServiceImpl#process). Settle/delete are only addressable for a shred
+  // that actually persisted -- the nullable id is what tells the two apart.
+  memoryCard: Omit<MemoryCard, "id"> & { id: number | null };
+  fragments: ThoughtFragmentRow[]; suggestedTodo: TodoItemRow | null;
 };
 export type ShredderHistoryEntry = { id: number; title: string; summary: string | null; memoryType: string | null; emotionalGravity: number | null };
 // Full shape of AiHealthVO (see AiHealthController#health) -- ThoughtShredderSection only reads
@@ -216,7 +224,7 @@ export type EchoCapsule = {
   id: number; pseudonym: string; intro: string; authorizedMemoryIds: string;
   visibilityStatus: "PRIVATE" | "PUBLIC" | "NEEDS_REVIEW" | "HIDDEN" | "ARCHIVED";
   isPublic: boolean; activeGenomeVersionId: number | null; publicTags: string;
-  ownerContextNote?: string | null; standInEnabled?: boolean; realContactPolicy?: string;
+  ownerContextNote?: string | null; standInEnabled?: boolean; realContactPolicy?: string; conversationLimitPerDay?: number;
 };
 export type CapsuleGenomeVersion = {
   id: number; versionNo: number; parentVersionId: number | null; compilerVersion: string;
@@ -245,16 +253,31 @@ export type CapsuleSandboxFeedback = {
 export type PublicCapsule = {
   id: number; pseudonym: string; intro: string; capsuleType: string; publicTags: string;
   echoEnergy: number; freshnessScore: number; conversationLimitPerDay: number; lastActivityAt: string | null;
+  allowLetterRequest?: boolean;
 };
 export type ResonanceStrategy = "MIRROR" | "COMPLEMENT" | "GROWTH_EDGE" | "SERENDIPITY" | "CONTEXTUAL";
 export type CapsuleMatch = {
   capsule: PublicCapsule; matchScore: number; matchReasons: string[]; matchSummary: string; resonant: boolean;
   strategy: ResonanceStrategy; strategyLabel: string; strategyDescription: string;
+  matchTier?: "FULL" | "PARTIAL" | "NONE";
 };
 export type PersonaSession = { id: number; capsuleId: number; status: string; turnCount: number; dailyLimit: number };
 export type PersonaMessage = { id: number; sessionId: number; senderType: "VISITOR" | "CAPSULE"; textContent: string };
 export type CapsuleQuota = {
   turnCount: number; remaining: number; dailyLimit: number; seed: boolean; quotaDate: string;
+};
+export type DialogSessionSummary = {
+  id: number;
+  title: string;
+  status: string;
+  messageCount: number;
+  preview: string | null;
+  activeTurnId: number | null;
+  startedAt: string | null;
+  lastActivityAt: string | null;
+  archivedAt: string | null;
+  pinnedAt: string | null;
+  updatedAt: string | null;
 };
 export type SlowLetter = {
   id: number; senderUserId: number; receiverUserId: number; receiverCapsuleId: number; title: string; letterBody: string; status: string;
@@ -804,7 +827,8 @@ export const api = {
   updateProfile: (patch: Partial<UserProfileSettings>) => request<UserProfileSettings>("/api/user/profile", {
     method: "PUT", body: JSON.stringify(patch)
   }),
-  safetyResources: () => request<string[]>("/api/safety/resources"),
+  safetyResources: (locale: "zh-CN" | "en-SG" = "zh-CN", region: "CN" | "SG" = "CN") =>
+    request<string[]>(`/api/safety/resources?locale=${encodeURIComponent(locale)}&region=${encodeURIComponent(region)}`),
   ttsPreferences: () => request<TtsPreferences>("/api/me/tts/voices"),
   updateTtsPreferences: (patch: TtsPreferencesPatch) => request<TtsPreferences>("/api/me/tts/preferences", {
     method: "PATCH", body: JSON.stringify(patch)
@@ -820,7 +844,20 @@ export const api = {
       sessionType: "AURORA_CHAT"
     })
   }),
-  auroraForeground: (input: { sessionId: number; message: string; mode: string }) =>
+  dialogSessions: (includeArchived = false) => request<DialogSessionSummary[]>(
+    `/api/dialog/session?limit=50&includeArchived=${includeArchived}`),
+  currentDialogSession: () => request<DialogSessionSummary | null>("/api/dialog/session/current"),
+  dialogSession: (sessionId: number) => request<DialogSessionSummary>(`/api/dialog/session/${sessionId}`),
+  updateDialogSession: (sessionId: number, patch: {
+    title?: string; archived?: boolean; pinned?: boolean;
+  }) => request<DialogSessionSummary>(`/api/dialog/session/${sessionId}`, {
+    method: "PATCH", body: JSON.stringify(patch)
+  }),
+  auroraForeground: (input: {
+    sessionId: number; message: string; mode: string; clientMessageId: string;
+    locale: "zh-CN" | "en-SG"; region: "CN" | "SG";
+    timezone?: string; localTimeLabel?: string;
+  }) =>
     request<AuroraForeground>("/api/v1/aurora/foreground", {
       method: "POST", body: JSON.stringify(input)
     }),
@@ -893,8 +930,13 @@ export const api = {
   understandingClaims: () => request<UnderstandingClaim[]>("/api/aurora/corrections/claims"),
   recentCorrections: () => request<UserCorrection[]>("/api/aurora/corrections"),
   retireCorrection: (id: number) => request<void>(`/api/aurora/corrections/${id}`, { method: "DELETE" }),
-  claimCandidates: () => request<ClaimCandidate[]>("/api/aurora/claims/candidates"),
+  claimCandidates: (sessionId?: number, privacyLevel: "STRICT" | "BALANCED" | "OPEN" = "STRICT") =>
+    request<ClaimCandidate[]>(`/api/aurora/claims/candidates?privacyLevel=${encodeURIComponent(privacyLevel)}${
+      sessionId == null ? "" : `&sessionId=${encodeURIComponent(String(sessionId))}`}`),
   confirmClaimCandidate: (id: number) => request<CorrectionConfirmation>(`/api/aurora/claims/candidates/${id}/confirm`, { method: "POST" }),
+  confirmSessionClaimCandidates: (sessionId: number) => request<number[]>(
+    `/api/aurora/claims/candidates/confirm-session?sessionId=${encodeURIComponent(String(sessionId))}`,
+    { method: "POST" }),
   dismissClaimCandidate: (id: number) => request<{ dismissed: number }>(`/api/aurora/claims/candidates/${id}`, { method: "DELETE" }),
   portrait: () => request<PortraitDimension[]>("/api/portrait"),
   portraitHistory: (dim: string) => request<PortraitHistoryEntry[]>(`/api/portrait/history?dim=${encodeURIComponent(dim)}`),
@@ -909,13 +951,14 @@ export const api = {
   myCapsules: () => request<EchoCapsule[]>("/api/capsule/my"),
   capsuleGenomeHistory: (id: number) => request<CapsuleGenomeVersion[]>(`/api/capsule/${id}/genome-history`),
   capsuleFidelity: (id: number) => request<CapsuleFidelitySummary[]>(`/api/capsule/${id}/sandbox/fidelity`),
-  previewCapsule: (memoryIds: number[]) => request<CapsulePreview>("/api/capsule/preview-from-memory", {
-    method: "POST", body: JSON.stringify({ memoryIds, privacyLevel: "STRICT", allowTopics: [], blockedTopics: [] })
+  previewCapsule: (memoryIds: number[], privacyLevel: "STRICT" | "BALANCED" | "OPEN") => request<CapsulePreview>("/api/capsule/preview-from-memory", {
+    method: "POST", body: JSON.stringify({ memoryIds, privacyLevel, allowTopics: [], blockedTopics: [] })
   }),
   createCapsule: (input: Required<Pick<CoreCapsuleCreateRequest, "pseudonym" | "intro" | "memoryIds" | "publicTags">>
-    & Pick<CoreCapsuleCreateRequest, "ownerContextNote" | "standInEnabled" | "realContactPolicy" | "visibilityStatus">) => {
+    & Pick<CoreCapsuleCreateRequest, "ownerContextNote" | "standInEnabled" | "realContactPolicy" | "visibilityStatus">
+    & { personaClaimIds?: number[]; privacyLevel: "STRICT" | "BALANCED" | "OPEN" }) => {
     const body: CoreCapsuleCreateRequest = {
-      ...input, visibilityStatus: input.visibilityStatus ?? "PRIVATE", isPublic: false, privacyLevel: "STRICT",
+      ...input, visibilityStatus: input.visibilityStatus ?? "PRIVATE", isPublic: false,
       allowTopics: englishUi() ? ["self-reflection", "everyday support"] : ["自我观察", "日常支持"],
       blockedTopics: englishUi()
         ? ["real-world identity", "contact details", "psychological diagnosis"]
@@ -923,7 +966,7 @@ export const api = {
     };
     return request<EchoCapsule>("/api/v1/capsule/create-from-memory", { method: "POST", body: JSON.stringify(body) });
   },
-  updateCapsuleContext: (id: number, patch: { ownerContextNote?: string; standInEnabled?: boolean; realContactPolicy?: string }) =>
+  updateCapsuleContext: (id: number, patch: { ownerContextNote?: string; standInEnabled?: boolean; realContactPolicy?: string; conversationLimitPerDay?: number }) =>
     request<EchoCapsule>(`/api/capsule/${id}/context`, { method: "POST", body: JSON.stringify(patch) }),
   recompileCapsule: (id: number, memoryIds: number[]) => request<CapsuleGenomeVersion>(`/api/capsule/${id}/genome/recompile`, {
     method: "POST", body: JSON.stringify({ memoryIds })
@@ -942,6 +985,10 @@ export const api = {
   resonanceMatches: (strategy: ResonanceStrategy = "MIRROR") =>
     request<CapsuleMatch[]>(`/api/plaza/matches?strategy=${encodeURIComponent(strategy)}`),
   plazaCapsules: () => request<PublicCapsule[]>("/api/plaza/capsules"),
+  markLanded: (capsuleId: number) =>
+    request<{ echoEnergy: number }>(`/api/echo/${capsuleId}/landed`, { method: "POST" }),
+  activePersonaSession: (capsuleId: number) =>
+    request<PersonaSession | null>(`/api/persona-chat/capsule/${capsuleId}/active-session`),
   createPersonaSession: (capsuleId: number) => request<PersonaSession>("/api/v1/persona-chat/session/create", {
     method: "POST", body: JSON.stringify({ capsuleId })
   }),
@@ -1185,6 +1232,11 @@ export async function diaryTranscribeAudio(blob: Blob): Promise<VoiceTranscripti
 export async function streamAurora(
   input: Pick<CoreChatRequest, "sessionId" | "message"> & {
     mode: string;
+    clientMessageId?: string;
+    locale?: "zh-CN" | "en-SG";
+    region?: "CN" | "SG";
+    timezone?: string;
+    localTimeLabel?: string;
     foregroundAcknowledgementSent?: boolean;
     foregroundAcknowledgementText?: string;
     foregroundAcknowledgementSource?: string;

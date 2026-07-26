@@ -118,9 +118,13 @@ class TrackAClaimDecayAblationEvaluationTest {
             backdate(candidateId, backdated);
 
             // --- real production path ---
+            // Candidate reads are deliberately pure because the UI polls them after every turn.
+            // Lifecycle mutation belongs to the bounded maintenance sweep.
             List<ClaimCandidateVO> stillListed = claimCandidateService.listCandidates(userId);
-            boolean realRetiredIt = stillListed.isEmpty();
+            boolean hiddenFromRead = stillListed.isEmpty();
+            claimCandidateService.sweepStaleCandidates(500);
             UnderstandingClaim afterRead = claimMapper.selectById(candidateId);
+            boolean realRetiredIt = hiddenFromRead;
             boolean realMarkedDismissed = "DISMISSED".equals(afterRead.status);
             boolean realPass = realRetiredIt && realMarkedDismissed;
             rows.add(row(scenarioId, scenarioType, "with_decay_policy", realPass,

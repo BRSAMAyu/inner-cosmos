@@ -92,15 +92,29 @@ kubectl -n observability port-forward svc/grafana 3000:3000
 kubectl -n observability port-forward svc/prometheus 9090:9090
 ```
 
+Grafana 的匿名 `Viewer` 可以直接查看五张答辩看板，但不能进入 `Explore`。若要从
+exemplar 跳转到 Trace，演示前应使用本地 kind 展柜的 Grafana 管理员会话登录；若不希望
+在投影画面暴露登录过程，则直接使用下方独立 Jaeger 页面。这个限制只影响交互入口，不影响
+Grafana 通过已配置 datasource 查询 Jaeger。
+
 展示：
 
-- API/worker/scheduler 各角色存活；
-- HTTP 请求率、5xx、JVM heap/CPU；
-- `inner_cosmos_outbox_ready`、`inner_cosmos_outbox_oldest_ready_age_seconds`、
-  `inner_cosmos_outbox_dead`。
+- `/d/inner-cosmos-defense`：四个契约总览，API/worker、5xx、SSE、outbox 与 Aurora
+  p95 同屏；
+- `/d/inner-cosmos-recovery`：普通 Pod 删除专用，观察 Ready `2→1→2`、逐 Pod
+  heartbeat、Pod phase、active/replay SSE 与 5xx；
+- `/d/inner-cosmos-ai`：Provider 调用、错误、fallback、延迟与明确标为 `estimated`
+  的 token 量；
+- `/d/inner-cosmos-product`：Aurora → 记忆/画像 → 共鸣体/匹配 → 慢信/连接的低基数
+  HTTP 聚合；
+- `/d/inner-cosmos-events`：outbox ready/oldest/dead 与 worker 副本联动画面。
 
-现有 Grafana 主看板尚未提供完整 AI token 成本、embedding 延迟和匹配质量面板。
-这些指标可以在 Prometheus 查询，但不能声称 OPS 可观测性已经全部产品化。
+Prometheus 在本地课堂展柜以 5 秒间隔采样，Pod 状态由 kube-state-metrics 提供；Grafana
+同时注册 Jaeger datasource，带 trace exemplar 的延迟样本可以在同一界面下钻。实时
+token 值仍是 `prompt/response length / 2` 的粗估，面板和指标名都明确包含
+`estimated`；不得把它称作 Provider 账单用量或真实成本。Capsule 匹配质量、embedding
+召回率和完整 AI 语义发布门仍没有实时生产指标，不能因看板变多而声称 OPS
+可观测性已经全部关闭。
 
 ### 6:15–7:30：Jaeger 追踪 Aurora 到异步画像
 
@@ -168,6 +182,10 @@ kubectl -n inner-cosmos-w3 delete pod $pod
 - 正常 Pod 删除通过 readiness、`preStop`、45 秒 graceful termination 完成当前 SSE；
 - 真正 SIGKILL 时，scheduler 会把孤儿 turn 标为 `INTERRUPTED`，重连收到
   `replay.completed`，不会无限转圈。
+
+现场看板中 active SSE 是当前连接数，不代表 HTTP 连接能迁移到另一 Pod。普通删除依靠
+graceful drain 让当前流在原 Pod 上结束；硬 SIGKILL 则依靠客户端 cursor、Redis live
+buffer、PostgreSQL timeline 与 Recovery Job 在重连后恢复/结算。两种实验必须分开讲。
 
 课堂只做普通 Pod 删除。SIGKILL 已有真实证据，不应临场进入 kind 节点杀宿主 PID。
 兜底材料：

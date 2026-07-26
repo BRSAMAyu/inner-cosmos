@@ -1,13 +1,23 @@
 package com.innercosmos.service;
 
 import com.innercosmos.dto.ChatRequest;
+import com.innercosmos.dto.DialogSessionUpdateRequest;
 import com.innercosmos.dto.SessionCreateRequest;
 import com.innercosmos.entity.DialogMessage;
 import com.innercosmos.entity.DialogSession;
+import com.innercosmos.vo.DialogSessionSummaryVO;
 import java.util.List;
 
 public interface DialogService {
     DialogSession create(Long userId, SessionCreateRequest request);
+
+    List<DialogSessionSummaryVO> sessions(Long userId, Long beforeId, int limit, boolean includeArchived);
+
+    DialogSessionSummaryVO current(Long userId);
+
+    DialogSessionSummaryVO get(Long userId, Long sessionId);
+
+    DialogSessionSummaryVO update(Long userId, Long sessionId, DialogSessionUpdateRequest request);
 
     DialogMessage saveUserMessage(Long userId, ChatRequest request);
 

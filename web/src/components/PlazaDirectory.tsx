@@ -84,10 +84,7 @@ export function PlazaDirectory({ capsules, activeCapsuleId, busy, onOpenCapsule,
       .filter(capsule => !tag || parseTags(capsule.publicTags).includes(tag))
       .filter(capsule => !q || `${capsule.pseudonym} ${capsule.intro}`.toLowerCase().includes(q))
       .slice()
-      .sort((a, b) => {
-        const relationshipPath = Number(b.capsuleType === "USER_CAPSULE") - Number(a.capsuleType === "USER_CAPSULE");
-        return relationshipPath || rank(b) - rank(a);
-      });
+      .sort((a, b) => rank(b) - rank(a) || a.pseudonym.localeCompare(b.pseudonym, locale));
   }, [capsules, query, tag, sort]);
   const displayed = capsulesExpanded || visible.length <= 6 ? visible : visible.slice(0, 6);
   const plazaHeading = locale === "en-SG"
@@ -134,7 +131,7 @@ export function PlazaDirectory({ capsules, activeCapsuleId, busy, onOpenCapsule,
           const tags = parseTags(capsule.publicTags);
           return <article className={activeCapsuleId === capsule.id ? "plaza-card active" : "plaza-card"} role="listitem" key={capsule.id}>
             <div className="plaza-card-head"><strong>{capsule.pseudonym}</strong>
-              <span className="plaza-energy" title={t.energyTitle}>✦ {Math.round(capsule.echoEnergy)}</span></div>
+              <span className="plaza-energy" title={t.energyTitle}>✦ {Math.round(capsule.echoEnergy * 100)}%</span></div>
             <span className={capsule.capsuleType === "USER_CAPSULE" ? "plaza-kind real" : "plaza-kind practice"}>
               {capsule.capsuleType === "USER_CAPSULE" ? t.realPersonPath : t.practiceCapsule}
             </span>

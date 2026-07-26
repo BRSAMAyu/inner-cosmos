@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -43,13 +44,14 @@ public class SessionRiskAggregator {
 
     private static final double HIGH_WEIGHT = 1.0;
     private static final double MEDIUM_WEIGHT = 0.45;
-    private static final double LOW_WEIGHT = 0.15;
+    private static final double LOW_WEIGHT = 0.0;
     /** Escalate when the accumulated score reaches this, even though the current turn alone is lower. */
     private static final double ESCALATION_THRESHOLD = 1.0;
     private static final Duration HALF_LIFE = Duration.ofMinutes(10);
     /** Opportunistic sweep of long-idle sessions so this map cannot grow unboundedly over uptime. */
     private static final Duration SWEEP_IDLE_RETENTION = Duration.ofHours(2);
     private static final long SWEEP_EVERY_N_CALLS = 500;
+    private static final int MAX_OBSERVATIONS_PER_SESSION = 128;
 
     private static final Pattern NEGATION_OR_PAST = Pattern.compile(
             "曾经|以前|过去|不再|已经不|现在不会|used to|not anymore|no longer|not any more|used, not");
@@ -75,24 +77,62 @@ public class SessionRiskAggregator {
      *                  negation/past-tense or third-party-quote context; never stored or logged
      */
     public Escalation observe(Long sessionId, String riskLevel, String text) {
+        return observe(sessionId, null, riskLevel, text);
+    }
+
+    /**
+     * Idempotent variant for a user turn that can pass through more than one synchronous gate
+     * (for example Aurora's foreground acknowledgement followed by its authoritative stream).
+     * Reusing the same observation id returns the first decision without adding the signal twice.
+     */
+    public Escalation observe(Long sessionId, String observationId, String riskLevel, String text) {
         maybeSweep();
         if (sessionId == null) {
             return Escalation.none();
         }
+        double rawWeight = weightFor(riskLevel);
+        // Ordinary LOW/NONE messages are not evidence of a concerning multi-turn pattern.
+        // Avoid creating session state for them at all.
+        if (rawWeight <= 0) {
+            return Escalation.none();
+        }
         SessionState state = sessions.computeIfAbsent(sessionId, id -> new SessionState());
         synchronized (state) {
+            String stableObservationId = normalizeObservationId(observationId);
+            if (stableObservationId != null) {
+                Escalation previous = state.observations.get(stableObservationId);
+                if (previous != null) {
+                    return previous;
+                }
+            }
             Instant now = Instant.now(clock);
             decay(state, now);
-            double weight = adjustForContext(weightFor(riskLevel), text);
+            double weight = adjustForContext(rawWeight, text);
             state.score += weight;
             state.lastUpdate = now;
             boolean alreadyHigh = "HIGH".equals(riskLevel);
             boolean escalate = !alreadyHigh && state.score >= ESCALATION_THRESHOLD;
-            return escalate
+            Escalation result = escalate
                     ? new Escalation(true, round(state.score),
                             "session-level pattern: repeated concerning signals accumulated past threshold")
                     : new Escalation(false, round(state.score), null);
+            if (stableObservationId != null) {
+                state.observations.put(stableObservationId, result);
+                while (state.observations.size() > MAX_OBSERVATIONS_PER_SESSION) {
+                    String oldest = state.observations.keySet().iterator().next();
+                    state.observations.remove(oldest);
+                }
+            }
+            return result;
         }
+    }
+
+    private String normalizeObservationId(String observationId) {
+        if (observationId == null || observationId.isBlank()) {
+            return null;
+        }
+        String normalized = observationId.trim();
+        return normalized.length() <= 128 ? normalized : normalized.substring(0, 128);
     }
 
     private void decay(SessionState state, Instant now) {
@@ -160,6 +200,7 @@ public class SessionRiskAggregator {
     private static final class SessionState {
         double score;
         Instant lastUpdate;
+        final Map<String, Escalation> observations = new LinkedHashMap<>();
     }
 
     /**

@@ -29,6 +29,13 @@ describe("TimelineSection", () => {
     expect(screen.getByText("Aurora 观察到你今天很平静")).toBeVisible();
   });
 
+  it("renders backend STORM weather with a Chinese label instead of a mild fallback", () => {
+    render(<TimelineSection dailyRecords={[record({ emotionWeather: "STORM" })]} themes={[]} />);
+    expect(screen.getByLabelText("风暴")).toHaveTextContent("⛈️");
+    expect(screen.getByText("风暴", { selector: ".pill" })).toBeVisible();
+    expect(screen.queryByText("STORM")).not.toBeInTheDocument();
+  });
+
   it("renders the theme evolution labels", () => {
     render(<TimelineSection dailyRecords={[record()]} themes={[theme({ themeName: "情绪节律" })]} />);
     expect(screen.getByText(/情绪节律/)).toBeVisible();

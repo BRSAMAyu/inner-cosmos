@@ -59,7 +59,7 @@ logging:
     org.springframework.web: WARN
     org.springframework.security: WARN
   pattern:
-    console: '{"time":"%d{yyyy-MM-dd HH:mm:ss.SSS}","level":"%level","logger":"%logger{36}","msg":"%msg","thread":"%thread"}%n'
+    console: '{"time":"%d{yyyy-MM-dd HH:mm:ss.SSS}","level":"%level","logger":"%logger{36}","trace_id":"%X{traceId:-}","span_id":"%X{spanId:-}","msg":"%msg","thread":"%thread"}%n'
   file:
     name: /var/log/inner-cosmos/app.log
     max-size: 100MB

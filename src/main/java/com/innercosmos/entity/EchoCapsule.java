@@ -1,6 +1,7 @@
 package com.innercosmos.entity;
 
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.TableField;
 import java.time.LocalDateTime;
 
 @TableName("tb_echo_capsule")
@@ -30,4 +31,7 @@ public class EchoCapsule extends BaseEntity {
     // compiled from explicitly SIMULATOR_AUTHORIZED memories for testing/research. Permanently
     // excluded from publish, plaza listing, matching and real visitor persona chat.
     public Boolean simulatorOnly;
+    /** Public projection hint, hydrated from tb_capsule_boundary; never persisted on this table. */
+    @TableField(exist = false)
+    public Boolean allowLetterRequest;
 }

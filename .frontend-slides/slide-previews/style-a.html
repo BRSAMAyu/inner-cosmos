@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>从容器编排到语义可靠性</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800;900&family=Nunito:wght@400;600;700&family=Noto+Sans+SC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* === FIXED 16:9 STAGE (subset of viewport-base.css) === */
+html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#0a0a0a}
+.deck-viewport{position:fixed;inset:0;overflow:hidden;background:#0a0a0a}
+.deck-stage{position:absolute;left:0;top:0;width:1920px;height:1080px;overflow:hidden;transform-origin:0 0;background:#fff}
+.slide{position:absolute;inset:0;width:1920px;height:1080px;overflow:hidden;visibility:hidden;opacity:0;pointer-events:none;background:#fff}
+.slide.active{visibility:visible;opacity:1;pointer-events:auto;z-index:1}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms !important;transition-duration:.2s !important}}
+
+/* === PALETTE + TYPE === */
+:root{
+  --paper:#ffffff;
+  --ink:#0a0a0a;
+  --ink-2:#5a5a5a;
+  --rule:#d8d8d8;
+  --signal:#ff3300;
+  --font-display:'Archivo','Noto Sans SC',sans-serif;
+  --font-body:'Nunito','Noto Sans SC',sans-serif;
+  --font-mono:'JetBrains Mono',monospace;
+}
+
+/* === VISIBLE STRUCTURAL GRID (Swiss) === */
+.grid-overlay{position:absolute;inset:0;pointer-events:none;
+  background:
+    repeating-linear-gradient(to right,transparent 0 239px,var(--rule) 239px 240px),
+    linear-gradient(to bottom,transparent 0 119px,var(--rule) 119px 120px);
+  background-repeat:repeat,repeat-y;opacity:.5}
+
+/* === COVER LAYOUT: asymmetric, 12-col logic === */
+.cover{position:absolute;inset:0;background:var(--paper)}
+.masthead{position:absolute;left:120px;top:84px;right:120px;display:flex;justify-content:space-between;align-items:baseline;
+  padding-bottom:22px;border-bottom:3px solid var(--ink)}
+.masthead .mark{font-family:var(--font-display);font-weight:900;font-size:26px;letter-spacing:.14em;text-transform:uppercase}
+.masthead .meta{font-family:var(--font-mono);font-size:20px;color:var(--ink-2);letter-spacing:.06em}
+
+/* Red block: the single committed accent */
+.blockmark{position:absolute;left:120px;top:236px;width:132px;height:132px;background:var(--signal)}
+.blockmark::after{content:"04";position:absolute;right:14px;bottom:6px;font-family:var(--font-display);font-weight:900;
+  font-size:64px;line-height:1;color:var(--paper)}
+
+.title{position:absolute;left:300px;top:210px;width:1360px}
+.title .kicker{font-family:var(--font-mono);font-size:22px;letter-spacing:.22em;text-transform:uppercase;color:var(--signal);margin-bottom:26px}
+.title h1{margin:0;font-family:var(--font-display);font-weight:900;font-size:132px;line-height:.94;letter-spacing:-.01em;color:var(--ink)}
+.title h1 .flip{display:block;color:var(--signal)}
+.title .sub{margin-top:38px;font-family:var(--font-body);font-weight:600;font-size:40px;line-height:1.38;color:var(--ink);max-width:1180px}
+.title .ctx{margin-top:20px;font-family:var(--font-body);font-weight:400;font-size:26px;line-height:1.6;color:var(--ink-2);max-width:1080px}
+
+/* Bottom rail: the four contracts, as structure not decoration */
+.rail{position:absolute;left:120px;right:120px;bottom:96px;display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-top:3px solid var(--ink)}
+.rail .cell{padding:22px 30px 0 0;border-right:1px solid var(--rule)}
+.rail .cell:last-child{border-right:none}
+.rail .n{font-family:var(--font-mono);font-size:18px;color:var(--signal);letter-spacing:.14em}
+.rail .t{margin-top:8px;font-family:var(--font-display);font-weight:800;font-size:31px;color:var(--ink);letter-spacing:.01em}
+.rail .d{margin-top:7px;font-family:var(--font-body);font-size:19px;color:var(--ink-2);line-height:1.45}
+
+/* === ENTRANCE === */
+@keyframes riseIn{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:none}}
+@keyframes wipeR{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes popIn{from{opacity:0;transform:scale(.82)}to{opacity:1;transform:none}}
+.slide.active .masthead{transform-origin:left center;animation:wipeR .62s cubic-bezier(.22,1,.36,1) both}
+.slide.active .blockmark{animation:popIn .5s cubic-bezier(.34,1.56,.64,1) .18s both}
+.slide.active .title .kicker{animation:riseIn .6s ease-out .28s both}
+.slide.active .title h1{animation:riseIn .72s cubic-bezier(.22,1,.36,1) .36s both}
+.slide.active .title .sub{animation:riseIn .6s ease-out .52s both}
+.slide.active .title .ctx{animation:riseIn .6s ease-out .62s both}
+.slide.active .rail .cell:nth-child(1){animation:riseIn .5s ease-out .74s both}
+.slide.active .rail .cell:nth-child(2){animation:riseIn .5s ease-out .82s both}
+.slide.active .rail .cell:nth-child(3){animation:riseIn .5s ease-out .90s both}
+.slide.active .rail .cell:nth-child(4){animation:riseIn .5s ease-out .98s both}
+</style>
+</head>
+<body>
+<div class="deck-viewport">
+  <div class="deck-stage" id="stage">
+    <section class="slide active">
+      <div class="cover">
+        <div class="grid-overlay"></div>
+
+        <div class="masthead">
+          <div class="mark">Inner Cosmos</div>
+          <div class="meta">Kubernetes / Cloud-Native · 2026</div>
+        </div>
+
+        <div class="blockmark"></div>
+
+        <div class="title">
+          <div class="kicker">Semantic Reliability</div>
+          <h1>从容器编排<span class="flip">到语义可靠性</span></h1>
+          <div class="sub">先进 AI Agent 的云原生运行范式</div>
+          <div class="ctx">以 Inner Cosmos 的长期对话、异步记忆与安全发布为实验场。<br>此处"语义"指业务语义与领域不变量，不是自然语言语义。</div>
+        </div>
+
+        <div class="rail">
+          <div class="cell"><div class="n">01</div><div class="t">连续性</div><div class="d">Pod 消失，什么必须继续存在</div></div>
+          <div class="cell"><div class="n">02</div><div class="t">语义健康</div><div class="d">进程活着不等于版本仍值得流量</div></div>
+          <div class="cell"><div class="n">03</div><div class="t">工作压力</div><div class="d">CPU 不能代表用户在等待</div></div>
+          <div class="cell"><div class="n">04</div><div class="t">因果可观测</div><div class="d">一次行为跨越多个运行角色</div></div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+<script>
+/* Uniform scale of the fixed 1920x1080 stage — never reflow content. */
+(function(){
+  var stage=document.getElementById('stage');
+  function fit(){
+    var s=Math.min(innerWidth/1920,innerHeight/1080);
+    stage.style.transform='translate('+((innerWidth-1920*s)/2)+'px,'+((innerHeight-1080*s)/2)+'px) scale('+s+')';
+  }
+  addEventListener('resize',fit);fit();
+})();
+</script>
+</body>
+</html>

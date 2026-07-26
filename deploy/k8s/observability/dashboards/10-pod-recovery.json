@@ -1,0 +1,62 @@
+{
+  "uid": "inner-cosmos-recovery",
+  "title": "Continuity Contract · Pod Recovery Live",
+  "tags": ["inner-cosmos", "continuity", "pod-delete"],
+  "schemaVersion": 39,
+  "refresh": "2s",
+  "time": {"from": "now-10m", "to": "now"},
+  "panels": [
+    {
+      "id": 1, "type": "text", "title": "", "gridPos": {"h": 3, "w": 24, "x": 0, "y": 0},
+      "options": {"mode": "markdown", "content": "## Watch the invariant, not only the Pod\n**Expected:** one Pod leaves Ready → Service keeps a healthy endpoint → Aurora SSE remains usable → replacement becomes Ready → no unexpected 5xx."},
+      "transparent": true
+    },
+    {
+      "id": 2, "type": "stat", "title": "Ready API Pods", "gridPos": {"h": 5, "w": 6, "x": 0, "y": 3},
+      "targets": [{"refId": "A", "expr": "sum(kube_pod_status_ready{namespace=\"inner-cosmos-w3\",condition=\"true\",pod=~\"inner-cosmos-api.*\"})"}],
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "red", "value": null}, {"color": "orange", "value": 1}, {"color": "green", "value": 2}]}}}
+    },
+    {
+      "id": 3, "type": "stat", "title": "Deployment · available / desired", "gridPos": {"h": 5, "w": 6, "x": 6, "y": 3},
+      "targets": [
+        {"refId": "A", "expr": "max(kube_deployment_status_replicas_available{namespace=\"inner-cosmos-w3\",deployment=\"inner-cosmos-api\"})", "legendFormat": "available"},
+        {"refId": "B", "expr": "max(kube_deployment_spec_replicas{namespace=\"inner-cosmos-w3\",deployment=\"inner-cosmos-api\"})", "legendFormat": "desired"}
+      ],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "values": false}, "orientation": "horizontal"}
+    },
+    {
+      "id": 4, "type": "stat", "title": "Active Aurora SSE", "gridPos": {"h": 5, "w": 6, "x": 12, "y": 3},
+      "targets": [{"refId": "A", "expr": "sum(inner_cosmos_sse_connections_active{route=~\"aurora_.*\"}) or vector(0)"}],
+      "fieldConfig": {"defaults": {"color": {"mode": "continuous-BlPu"}}}
+    },
+    {
+      "id": 5, "type": "stat", "title": "Unexpected 5xx", "description": "The user-facing invariant: this should remain zero during graceful deletion.", "gridPos": {"h": 5, "w": 6, "x": 18, "y": 3},
+      "targets": [{"refId": "A", "expr": "sum(increase(http_server_requests_seconds_count{status=~\"5..\"}[5m])) or vector(0)"}],
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}}
+    },
+    {
+      "id": 6, "type": "timeseries", "title": "Per-Pod scrape heartbeat", "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "targets": [{"refId": "A", "expr": "up{namespace=\"inner-cosmos-w3\",component=\"api\"}", "legendFormat": "{{pod}}"}],
+      "fieldConfig": {"defaults": {"min": 0, "max": 1, "custom": {"lineWidth": 3, "fillOpacity": 20}}}
+    },
+    {
+      "id": 7, "type": "timeseries", "title": "SSE active / reconnect / failure", "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "targets": [
+        {"refId": "A", "expr": "sum(inner_cosmos_sse_connections_active{route=~\"aurora_.*\"}) or vector(0)", "legendFormat": "active"},
+        {"refId": "B", "expr": "sum(increase(inner_cosmos_sse_connections_total{resume=\"true\"}[1m])) or vector(0)", "legendFormat": "resume requests"},
+        {"refId": "C", "expr": "sum(increase(inner_cosmos_sse_connections_closed_total{outcome=~\"error|timeout\"}[1m])) or vector(0)", "legendFormat": "error / timeout"}
+      ],
+      "fieldConfig": {"defaults": {"custom": {"lineWidth": 3, "fillOpacity": 18}}}
+    },
+    {
+      "id": 8, "type": "state-timeline", "title": "Pod phase state machine", "gridPos": {"h": 8, "w": 16, "x": 0, "y": 16},
+      "targets": [{"refId": "A", "expr": "kube_pod_status_phase{namespace=\"inner-cosmos-w3\",pod=~\"inner-cosmos-api.*\",phase=~\"Pending|Running|Failed|Unknown\"} == 1", "legendFormat": "{{pod}} · {{phase}}"}],
+      "fieldConfig": {"defaults": {"mappings": [{"type": "value", "options": {"1": {"text": "active"}}}]}}
+    },
+    {
+      "id": 9, "type": "timeseries", "title": "Container restarts", "gridPos": {"h": 8, "w": 8, "x": 16, "y": 16},
+      "targets": [{"refId": "A", "expr": "kube_pod_container_status_restarts_total{namespace=\"inner-cosmos-w3\",pod=~\"inner-cosmos-api.*\"}", "legendFormat": "{{pod}}"}],
+      "fieldConfig": {"defaults": {"custom": {"drawStyle": "bars", "fillOpacity": 35}}}
+    }
+  ]
+}

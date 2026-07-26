@@ -145,6 +145,9 @@ CREATE TABLE IF NOT EXISTS tb_dialog_session (
   token_estimate INT DEFAULT 0,
   started_at TIMESTAMP NULL,
   ended_at TIMESTAMP NULL,
+  last_activity_at TIMESTAMP NULL,
+  archived_at TIMESTAMP NULL,
+  pinned_at TIMESTAMP NULL,
   goodbye_trigger VARCHAR(32),
   current_mode VARCHAR(32) DEFAULT 'DAILY_TALK',
   preferred_model VARCHAR(64),
@@ -894,7 +897,7 @@ CREATE TABLE IF NOT EXISTS tb_letter_thread (
   INDEX idx_thread_participants (participant_a, participant_b)
 );
 
-CREATE TABLE IF NOT EXISTS tb_block_relation (
+  CREATE TABLE IF NOT EXISTS tb_block_relation (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   blocker_user_id BIGINT NOT NULL,
   blocked_user_id BIGINT NOT NULL,
@@ -902,7 +905,19 @@ CREATE TABLE IF NOT EXISTS tb_block_relation (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_block_blocker (blocker_user_id)
-);
+  );
+
+  CREATE TABLE IF NOT EXISTS tb_capsule_landing (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    capsule_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_capsule_landing_user (capsule_id, user_id),
+    INDEX idx_capsule_landing_user (user_id, created_at),
+    CONSTRAINT fk_capsule_landing_capsule FOREIGN KEY (capsule_id) REFERENCES tb_echo_capsule(id) ON DELETE CASCADE,
+    CONSTRAINT fk_capsule_landing_user FOREIGN KEY (user_id) REFERENCES tb_user(id) ON DELETE CASCADE
+  );
 
 CREATE TABLE IF NOT EXISTS tb_belief_pattern (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,

@@ -220,11 +220,15 @@ public class AuroraDualKernelRuntime {
         pruneBackgroundPlans(System.currentTimeMillis());
         StoredPlan stored = backgroundPlans.get(key);
         PlannerRunEvidence priorEvidence = backgroundPlannerEvidence.get(key);
-        boolean hasRealGuidance = stored != null && priorEvidence != null
+        boolean hasMatchingStoredGuidance = stored != null
+                && guidanceAppliesToCurrentTurn(stored, safe(assembledContext.get("userMessage")));
+        boolean rejectedForTopicShift = stored != null && !hasMatchingStoredGuidance;
+        boolean hasRealGuidance = hasMatchingStoredGuidance && priorEvidence != null
                 && priorEvidence.status() == PlannerStatus.SUCCEEDED
                 && stored.revision() == priorEvidence.revision();
         StructuredAiResults.AuroraPlanResult guidance = hasRealGuidance ? stored.plan() : null;
-        String guidanceSource = guidanceSource(hasRealGuidance, priorEvidence);
+        String guidanceSource = rejectedForTopicShift
+                ? "topic-shift" : guidanceSource(hasRealGuidance, priorEvidence);
 
         AtomicBoolean speakerFallbackUsed = new AtomicBoolean(false);
         Map<String, Object> speakerContext = new LinkedHashMap<>(assembledContext);
@@ -295,7 +299,8 @@ public class AuroraDualKernelRuntime {
         latencies.put("speaker", speakerMs);
         latencies.put("criticalPathTotal", elapsedMs(totalStart));
         boolean currentGuidanceFallback = "fallback".equals(guidanceSource)
-                || "failed".equals(guidanceSource);
+                || "failed".equals(guidanceSource)
+                || "topic-shift".equals(guidanceSource);
         return new Generation(spoken, "dual-kernel.pipeline.v2",
                 hasRealGuidance ? safe(guidance.relationshipMove) : "", repaired,
                 deliveredIssues, null, deferredInnerVoice, Map.copyOf(latencies),
@@ -354,9 +359,11 @@ public class AuroraDualKernelRuntime {
             }
 
             long now = System.currentTimeMillis();
+            String sourceUserMessage = safe(assembledContext.get("userMessage"));
             backgroundPlans.compute(key, (ignored, current) ->
                     current == null || revision >= current.revision()
-                            ? new StoredPlan(revision, next, now) : current);
+                            ? new StoredPlan(revision, next, now, sourceUserMessage,
+                            topicAnchors(sourceUserMessage)) : current);
             PlannerRunEvidence evidence = new PlannerRunEvidence(revision, PlannerStatus.SUCCEEDED,
                     outcome.detail(), elapsedMs(started), now);
             updatePlannerEvidence(key, evidence);
@@ -414,6 +421,76 @@ public class AuroraDualKernelRuntime {
     private PlannerKey plannerKey(Long userId, String mode, Map<String, Object> context) {
         Object sessionId = context.getOrDefault("sessionId", 0L);
         return new PlannerKey(userId == null ? 0L : userId, String.valueOf(sessionId), safe(mode));
+    }
+
+    /**
+     * Previous-turn guidance is scoped to the topic that produced it. This deterministic gate
+     * prevents a stale plan from crossing an explicit topic switch or a named-topic boundary;
+     * the model is never asked to decide whether it should ignore contaminated context.
+     */
+    private static boolean guidanceAppliesToCurrentTurn(StoredPlan stored, String currentMessage) {
+        String current = normalizeTopicText(currentMessage);
+        if (current.isBlank() || explicitTopicSwitch(current)) return false;
+
+        Set<String> currentAnchors = topicAnchors(currentMessage);
+        if (!stored.topicAnchors().isEmpty() && !currentAnchors.isEmpty()) {
+            return currentAnchors.stream().anyMatch(stored.topicAnchors()::contains);
+        }
+        if (isContinuationTurn(current)) return true;
+
+        Set<String> sourceTerms = topicTerms(stored.sourceUserMessage());
+        Set<String> currentTerms = topicTerms(currentMessage);
+        if (sourceTerms.isEmpty() || currentTerms.isEmpty()) return false;
+        long overlap = currentTerms.stream().filter(sourceTerms::contains).count();
+        return (double) overlap / Math.min(sourceTerms.size(), currentTerms.size()) >= 0.20;
+    }
+
+    private static boolean explicitTopicSwitch(String normalized) {
+        return containsAny(normalized, List.of(
+                "换个话题", "换一个话题", "说点别的", "不说这个", "聊点别的", "转个话题",
+                "newtopic", "changethetopic", "switchtopics", "talkaboutsomethingelse"));
+    }
+
+    private static boolean isContinuationTurn(String normalized) {
+        return normalized.length() <= 18 && containsAny(normalized, List.of(
+                "然后呢", "后来呢", "继续", "接着", "再说说", "还有呢", "为什么呢",
+                "但是", "不过", "可是", "而且", "但",
+                "goon", "continue", "andthen", "tellmemore", "but", "however", "also"));
+    }
+
+    private static Set<String> topicAnchors(String message) {
+        Set<String> anchors = new java.util.LinkedHashSet<>();
+        java.util.regex.Matcher bookTitle = java.util.regex.Pattern.compile("《([^》]{1,40})》")
+                .matcher(safe(message));
+        while (bookTitle.find()) anchors.add(normalizeTopicText(bookTitle.group(1)));
+        java.util.regex.Matcher quoted = java.util.regex.Pattern
+                .compile("[\"“]([^\"”]{2,40})[\"”]")
+                .matcher(safe(message));
+        while (quoted.find()) anchors.add(normalizeTopicText(quoted.group(1)));
+        return Set.copyOf(anchors);
+    }
+
+    private static Set<String> topicTerms(String message) {
+        String normalized = normalizeTopicText(message);
+        if (normalized.isBlank()) return Set.of();
+        Set<String> terms = new java.util.LinkedHashSet<>();
+        for (String token : normalized.split("[^\\p{L}\\p{N}]+")) {
+            if (token.codePointCount(0, token.length()) >= 2) terms.add(token);
+        }
+        int[] cps = normalized.replaceAll("[^\\p{L}\\p{N}]", "").codePoints().toArray();
+        for (int i = 0; i + 1 < cps.length; i++) {
+            terms.add(new String(cps, i, 2));
+        }
+        return terms;
+    }
+
+    private static String normalizeTopicText(String value) {
+        return safe(value).toLowerCase(java.util.Locale.ROOT)
+                .replaceAll("[\\p{P}\\p{S}\\s]+", "");
+    }
+
+    private static boolean containsAny(String value, List<String> candidates) {
+        return candidates.stream().anyMatch(value::contains);
     }
 
     /**
@@ -933,7 +1010,9 @@ public class AuroraDualKernelRuntime {
                                     LlmClient client) {}
 
     private record PlannerKey(long userId, String sessionId, String mode) {}
-    private record StoredPlan(long revision, StructuredAiResults.AuroraPlanResult plan, long updatedAtEpochMs) {}
+    private record StoredPlan(long revision, StructuredAiResults.AuroraPlanResult plan,
+                              long updatedAtEpochMs, String sourceUserMessage,
+                              Set<String> topicAnchors) {}
     private record PlannerRefreshResult(PlannerRunEvidence evidence, InnerVoiceRequest innerVoiceRequest) {}
 
     public enum PlannerStatus {

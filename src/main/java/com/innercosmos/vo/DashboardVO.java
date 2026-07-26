@@ -1,6 +1,5 @@
 package com.innercosmos.vo;
 
-import com.innercosmos.entity.EchoCapsule;
 import com.innercosmos.entity.MemoryCard;
 import com.innercosmos.entity.TodoItem;
 import java.util.ArrayList;
@@ -16,5 +15,5 @@ public class DashboardVO {
     public long aiLogCount;
     public List<MemoryCard> highGravityMemories = new ArrayList<>();
     public List<TodoItem> todos = new ArrayList<>();
-    public List<EchoCapsule> recommendations = new ArrayList<>();
+    public List<EchoCapsuleVO> recommendations = new ArrayList<>();
 }

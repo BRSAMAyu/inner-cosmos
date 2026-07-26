@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import type {
   ConnectionRequests, DeliveryPreset, DeliverySchedule, LetterThread, LiveChatInvites, LiveChatMessage,
   LiveChatSession, SlowLetter, SocialConnection
@@ -26,7 +26,9 @@ const COPY: Record<Locale, {
   threadsIntro: string; threadsEmpty: string; threadItem: (id: number) => string; threadItemAria: (label: string, statusText: string) => string;
   threadPickPrompt: string; threadLoading: string;
   threadLettersEmpty: string; threadLettersError: string;
-  refresh: string; refreshBusy: string; autoRefreshNote: string; composeNew: string; safetyActions: string;
+  refresh: string; refreshBusy: string; autoRefreshNote: string;
+  composeDirect: string; composeDirectHint: string; composeDiscover: string; composeDiscoverHint: string;
+  safetyActions: string;
   directTo: string; directPick: string; directTitle: string; directBody: string; directSend: string; directBusy: string; directCancel: string;
   deliveryRhythm: string; deliveryHint: string; customArrival: string;
   deliveryOptions: Record<DeliveryPreset, string>; sealNote: string; countdown: (value: string) => string;
@@ -52,7 +54,9 @@ const COPY: Record<Locale, {
     threadPickPrompt: "选一段往来，看你们之间的慢信。", threadLoading: "正在读取这段往来…",
     threadLettersEmpty: "这段往来里还没有信件。", threadLettersError: "暂时读不到这段往来，请稍后再试。",
     refresh: "刷新慢信", refreshBusy: "正在刷新", autoRefreshNote: "停留在这里时会自动同步抵达与回信。",
-    composeNew: "写一封慢信", safetyActions: "边界与安全",
+    composeDirect: "写给已连接的好友", composeDirectHint: "在当前页面打开写信表单，收信人只来自双方同意的连接。",
+    composeDiscover: "先去遇见可以写信的人", composeDiscoverHint: "还没有可直接写信的连接；先去共鸣相遇，建立连接后再写。",
+    safetyActions: "边界与安全",
     directTo: "写给已连接的好友", directPick: "选择一位好友", directTitle: "信的标题",
     directBody: "写下你真正想说的话…", directSend: "让慢信启程", directBusy: "正在启程", directCancel: "取消",
     deliveryRhythm: "选择抵达的节奏", deliveryHint: "Demo 可选 30 秒或 3 分钟；正式节奏仍由服务端锁定，不会用前端假装抵达。自定义时间按你当前设备时区填写。", customArrival: "自定义抵达时间（当前时区）",
@@ -80,7 +84,9 @@ const COPY: Record<Locale, {
     threadPickPrompt: "Pick a thread to see the letters between you.", threadLoading: "Loading this thread…",
     threadLettersEmpty: "No letters in this thread yet.", threadLettersError: "Couldn't load this thread right now -- try again shortly.",
     refresh: "Refresh letters", refreshBusy: "Refreshing", autoRefreshNote: "Arrivals and replies sync automatically while you stay here.",
-    composeNew: "Write a slow letter", safetyActions: "Boundaries & safety",
+    composeDirect: "Write to a connection", composeDirectHint: "Opens the composer here. Recipients are limited to mutual connections.",
+    composeDiscover: "Meet someone you can write to", composeDiscoverHint: "No direct recipient yet. Meet through resonance and connect before writing.",
+    safetyActions: "Boundaries & safety",
     directTo: "Write to a connection", directPick: "Choose a connection", directTitle: "Letter title",
     directBody: "Write what you genuinely want to say…", directSend: "Send slow letter", directBusy: "Sending", directCancel: "Cancel",
     deliveryRhythm: "Choose its arrival rhythm", deliveryHint: "Use 30 seconds or 3 minutes for the demo. The server still locks the real arrival time. Custom times use your current device time zone.", customArrival: "Custom arrival (current time zone)",
@@ -147,6 +153,7 @@ export function LettersInbox({ letterInbox, letterOutbox = [], threads = [], thr
   const [deliveryPreset, setDeliveryPreset] = useState<DeliveryPreset>("DEMO_30S");
   const [customArrival, setCustomArrival] = useState("");
   const [now, setNow] = useState(Date.now());
+  const composeHintId = useId();
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1_000);
     return () => window.clearInterval(timer);
@@ -155,13 +162,21 @@ export function LettersInbox({ letterInbox, letterOutbox = [], threads = [], thr
   const sent = letterOutbox.filter(l => l.status !== "DRAFT");
   const counts: Record<string, string> = { inbox: t.counts.inbox(letterInbox.length), outbox: t.counts.outbox(sent.length), drafts: t.counts.drafts(drafts.length), threads: t.counts.threads(threads.length) };
   const status = (s: string) => t.outboxStatus[s] ?? s;
+  const canComposeDirect = friends.length > 0 && Boolean(onSendDirectLetter);
+  const canDiscoverRecipient = Boolean(onComposeNew);
+  const showComposeEntry = canComposeDirect || canDiscoverRecipient;
   return <section className="letter-inbox" aria-label={t.aria}>
     <div className="resonance-heading"><div><span className="eyebrow">{locale === "en-SG" ? "LETTERS, ARRIVED" : "慢信抵达"}</span><h2>{t.heading}</h2></div>
       <div className="letter-sync"><span>{counts[tab]}</span>
-        {(onSendDirectLetter || onComposeNew) && <button type="button" className="letter-compose-entry"
-          onClick={() => friends.length > 0 && onSendDirectLetter ? setDirectComposeOpen(true) : onComposeNew?.()}>
-          {t.composeNew}
-        </button>}
+        {showComposeEntry && <div className="letter-compose-entry-group">
+          <button type="button" className="letter-compose-entry" aria-describedby={composeHintId}
+            onClick={() => canComposeDirect ? setDirectComposeOpen(true) : onComposeNew?.()}>
+            {canComposeDirect ? t.composeDirect : t.composeDiscover}
+          </button>
+          <small id={composeHintId} className="letter-compose-hint">
+            {canComposeDirect ? t.composeDirectHint : t.composeDiscoverHint}
+          </small>
+        </div>}
         {onRefresh && <AsyncButton className="quiet" busy={refreshBusy} busyText={t.refreshBusy}
           onClick={onRefresh}>{t.refresh}</AsyncButton>}
       </div></div>

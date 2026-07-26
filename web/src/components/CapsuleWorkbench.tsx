@@ -6,7 +6,7 @@ import { AsyncButton } from "../loading";
 const sandboxRatingOrder = ["LIKE_ME", "NOT_ME", "FACT_WRONG", "TOO_EXPOSED", "TONE_WRONG"] as const;
 const privacyOrder = ["STRICT", "BALANCED", "OPEN"] as const;
 const contactPolicyOrder = ["LETTER_ONLY", "STAND_IN_FIRST", "DIRECT_REQUEST", "NO_REAL_CONTACT"] as const;
-const blockedScopes = new Set(["LOCAL_ONLY", "NO_EXTERNAL_PROCESSING"]);
+const blockedScopes = new Set(["LOCAL_ONLY", "NO_EXTERNAL_PROCESSING", "SIMULATOR_AUTHORIZED"]);
 
 type WorkbenchCopy = {
   aria: string; heading: string; count: (n: number) => string; intro: string; tabsAria: string;
@@ -25,7 +25,8 @@ type WorkbenchCopy = {
   step4Title: string; step4Note: string; publishBusy: string; publishBtn: string; pauseBusy: string; pauseBtn: string; archiveBusy: string; archiveBtn: string;
   // boundary editor
   step3Title: string; step3Note: string; allowLabel: string; allowPlaceholder: string; blockLabel: string; blockPlaceholder: string;
-  privacyLabel: string; privacy: Record<string, string>; maxTurnsLabel: string; allowLetterCheck: string; boundarySaveBusy: string; boundarySave: string;
+  privacyLabel: string; privacy: Record<string, string>; maxTurnsLabel: string; maxTurnsNote: string; allowLetterCheck: string; boundarySaveBusy: string; boundarySave: string;
+  genomeLoadError: string; genomeRetry: string; archiveConfirm: string;
   ownerNoteLabel: string; ownerNotePlaceholder: string; standInCheck: string; contactPolicyLabel: string;
   contactPolicy: Record<string, string>; contextStepTitle: string; contextStepNote: string; contextSaveBusy: string; contextSave: string;
 };
@@ -58,10 +59,14 @@ const COPY: Record<Locale, WorkbenchCopy> = {
     applyCalibrationBusy: "正在生成改进版本", applyCalibration: "把这次校准应用到新的私密版本",
     step4Title: "决定它是否可以被别人遇见", step4Note: "发布不会开放真实身份、联系方式或未授权记忆；撤回会立即阻止新旧会话继续代表你。",
     publishBusy: "正在发布", publishBtn: "确认并发布当前版本", pauseBusy: "正在暂停", pauseBtn: "暂停公开", archiveBusy: "正在撤回", archiveBtn: "撤回这个共鸣体",
-    step3Title: "设定它在对话里的边界", step3Note: "这些只有你能改：它可以谈什么、要避开什么、每天最多聊几轮、别人能否请求给你写慢信。",
+    step3Title: "设定它在对话里的边界", step3Note: "这些只有你能改：它可以谈什么、要避开什么、单次会话最多聊几轮、别人能否请求给你写慢信。改变隐私等级会暂停公开并要求重新编译。",
     allowLabel: "允许谈论的话题", allowPlaceholder: "例如：自我观察, 日常支持, 温柔建议", blockLabel: "明确避开的话题", blockPlaceholder: "例如：真实姓名, 诊断承诺, 强迫即时回应",
-    privacyLabel: "隐私等级", privacy: { STRICT: "严格保护", BALANCED: "均衡保护", OPEN: "开放一点" }, maxTurnsLabel: "每日对话轮数",
+    privacyLabel: "隐私等级", privacy: { STRICT: "严格保护", BALANCED: "均衡保护", OPEN: "开放一点" }, maxTurnsLabel: "单次会话轮数",
+    maxTurnsNote: "这是单次会话边界；每日总额度可在下方背景与联系设置中单独配置。",
     allowLetterCheck: "允许访客读完后请求给你写一封慢信", boundarySaveBusy: "保存中…", boundarySave: "保存边界设置",
+    genomeLoadError: "Genome 版本读取失败，无法确认当前版本是否可安全发布。请重试后再发布。",
+    genomeRetry: "重新读取 Genome 版本",
+    archiveConfirm: "撤回后无法恢复：Genome、记忆授权和公开入口都会被永久撤销。确定仍要撤回这个共鸣体吗？",
     ownerNoteLabel: "给它的额外背景说明", ownerNotePlaceholder: "只有你能看到；帮助它更准确地表达这个侧面。",
     standInCheck: "允许它先作为回声代你回应", contactPolicyLabel: "真人联系方式",
     contactPolicy: { LETTER_ONLY: "只能引导慢信", STAND_IN_FIRST: "先作为回声回应", DIRECT_REQUEST: "可以请求真人连接", NO_REAL_CONTACT: "不开放真人联系" },
@@ -95,10 +100,14 @@ const COPY: Record<Locale, WorkbenchCopy> = {
     applyCalibrationBusy: "Generating an improved version", applyCalibration: "Apply this calibration to a new private version",
     step4Title: "Decide whether others can meet it", step4Note: "Publishing never exposes your real identity, contact details or unauthorized memories; withdrawing immediately stops old and new sessions from representing you.",
     publishBusy: "Publishing", publishBtn: "Confirm and publish this version", pauseBusy: "Pausing", pauseBtn: "Pause publishing", archiveBusy: "Withdrawing", archiveBtn: "Withdraw this capsule",
-    step3Title: "Set its boundaries in conversation", step3Note: "Only you can change these: what it may discuss, what to avoid, the daily turn cap, and whether others may request a slow letter to you.",
+    step3Title: "Set its boundaries in conversation", step3Note: "Only you can change these: what it may discuss, what to avoid, the per-session turn cap, and whether others may request a slow letter. Changing privacy pauses publishing until recompile.",
     allowLabel: "Topics it may discuss", allowPlaceholder: "e.g. self-observation, everyday support, gentle suggestions", blockLabel: "Topics to explicitly avoid", blockPlaceholder: "e.g. real name, diagnostic promises, forced instant replies",
-    privacyLabel: "Privacy level", privacy: { STRICT: "Strict", BALANCED: "Balanced", OPEN: "More open" }, maxTurnsLabel: "Daily conversation turns",
+    privacyLabel: "Privacy level", privacy: { STRICT: "Strict", BALANCED: "Balanced", OPEN: "More open" }, maxTurnsLabel: "Turns per session",
+    maxTurnsNote: "This is a per-session boundary; configure the separate daily total in the context and contact settings below.",
     allowLetterCheck: "Let a visitor request a slow letter to you after reading", boundarySaveBusy: "Saving…", boundarySave: "Save boundary settings",
+    genomeLoadError: "Genome versions could not be loaded, so this version cannot be confirmed safe to publish. Retry before publishing.",
+    genomeRetry: "Reload Genome versions",
+    archiveConfirm: "This cannot be undone: the Genome, memory authorizations and public entry point will be permanently withdrawn. Withdraw this capsule anyway?",
     ownerNoteLabel: "Extra background for it", ownerNotePlaceholder: "Only you see this; it helps the facet speak more accurately.",
     standInCheck: "Let it answer as a stand-in on your behalf first", contactPolicyLabel: "Real-contact policy",
     contactPolicy: { LETTER_ONLY: "Only guide to a slow letter", STAND_IN_FIRST: "Stand in first", DIRECT_REQUEST: "May request a real connection", NO_REAL_CONTACT: "No real contact" },
@@ -129,7 +138,7 @@ function topicsToText(value: string | null): string {
 // Owner-private boundary editor for a selected capsule. Local state is seeded from the loaded
 // boundary and reset per capsule via key={capsuleId}.
 function CapsuleBoundaryEditor({ boundary, boundaryBusy, onSaveBoundary, t }: {
-  boundary: CapsuleBoundary | null; boundaryBusy: boolean;
+  boundary: CapsuleBoundary; boundaryBusy: boolean;
   onSaveBoundary: (boundary: Partial<CapsuleBoundary>) => void; t: WorkbenchCopy;
 }) {
   const [allowTopics, setAllowTopics] = useState(topicsToText(boundary?.allowTopics ?? null));
@@ -148,6 +157,7 @@ function CapsuleBoundaryEditor({ boundary, boundaryBusy, onSaveBoundary, t }: {
         <label>{t.maxTurnsLabel}<input type="number" min={2} max={50} value={maxTurns}
           onChange={event => setMaxTurns(Number(event.target.value))} /></label>
       </div>
+      <small className="boundary-note">{t.maxTurnsNote}</small>
       <label className="boundary-check"><input type="checkbox" checked={allowLetter}
         onChange={event => setAllowLetter(event.target.checked)} />{t.allowLetterCheck}</label>
       <AsyncButton className="resonance-secondary" busy={boundaryBusy} busyText={t.boundarySaveBusy}
@@ -162,11 +172,12 @@ function CapsuleBoundaryEditor({ boundary, boundaryBusy, onSaveBoundary, t }: {
 // capsule via key={capsuleId}, mirroring CapsuleBoundaryEditor above.
 function CapsuleContextEditor({ capsule, capsuleBusy, onSaveContext, t }: {
   capsule: EchoCapsule; capsuleBusy: boolean;
-  onSaveContext: (patch: { ownerContextNote: string; standInEnabled: boolean; realContactPolicy: string }) => void; t: WorkbenchCopy;
+  onSaveContext: (patch: { ownerContextNote: string; standInEnabled: boolean; realContactPolicy: string; conversationLimitPerDay: number }) => void; t: WorkbenchCopy;
 }) {
   const [ownerNote, setOwnerNote] = useState(capsule.ownerContextNote ?? "");
   const [standIn, setStandIn] = useState(capsule.standInEnabled ?? false);
   const [contactPolicy, setContactPolicy] = useState(capsule.realContactPolicy ?? "LETTER_ONLY");
+  const [dailyLimit, setDailyLimit] = useState(capsule.conversationLimitPerDay ?? 30);
   return <>
     <div className="capsule-step"><span>4</span><div><strong>{t.contextStepTitle}</strong><small>{t.contextStepNote}</small></div></div>
     <div className="boundary-editor">
@@ -175,34 +186,42 @@ function CapsuleContextEditor({ capsule, capsuleBusy, onSaveContext, t }: {
         onChange={event => setStandIn(event.target.checked)} />{t.standInCheck}</label>
       <label>{t.contactPolicyLabel}<select value={contactPolicy} onChange={event => setContactPolicy(event.target.value)}>
         {contactPolicyOrder.map(value => <option key={value} value={value}>{t.contactPolicy[value]}</option>)}</select></label>
+      <label>{t === COPY["en-SG"] ? "Daily turn cap across all sessions" : "每日总对话轮数（跨会话）"}
+        <input type="number" min={2} max={50} value={dailyLimit} onChange={event => setDailyLimit(Number(event.target.value))} />
+      </label>
       <AsyncButton className="resonance-secondary" busy={capsuleBusy} busyText={t.contextSaveBusy}
-        onClick={() => onSaveContext({ ownerContextNote: ownerNote, standInEnabled: standIn, realContactPolicy: contactPolicy })}>
+        onClick={() => onSaveContext({ ownerContextNote: ownerNote, standInEnabled: standIn, realContactPolicy: contactPolicy, conversationLimitPerDay: dailyLimit })}>
         {t.contextSave}</AsyncButton>
     </div>
   </>;
 }
 
 export function CapsuleWorkbench({ capsules, selectedCapsuleId, selectedCapsule, selectableMemories, selectedMemoryIds,
-  capsuleName, capsuleIntro, capsulePreview, capsuleBusy, genomeHistory, fidelitySummary, sandboxQuestion, sandboxResult, sandboxFeedback,
+  capsuleName, capsuleIntro, capsulePreview, capsuleBusy, genomeHistory, genomeHistoryError = false, fidelitySummary, sandboxQuestion, sandboxResult, sandboxFeedback,
   onSelectCapsule, onToggleMemory, onCapsuleName, onCapsuleIntro, onPreviewNewCapsule, onCancelPreview, onCreateCapsule,
   onRecompile, onSandboxQuestion, onRunSandbox, onRateSandbox, onPublish, onPause, onArchive,
-  boundary = null, boundaryBusy = false, onSaveBoundary,
+  onRetryGenomeHistory, boundary = null, boundaryBusy = false, boundaryLoadFailed = false, onRetryBoundary, onSaveBoundary,
   capsuleOwnerNote = "", onCapsuleOwnerNote, capsuleStandIn = false, onCapsuleStandIn,
-  capsuleContactPolicy = "LETTER_ONLY", onCapsuleContactPolicy, onSaveContext, locale = "zh-CN" }: {
+  capsuleContactPolicy = "LETTER_ONLY", onCapsuleContactPolicy,
+  capsulePrivacy = "STRICT", onCapsulePrivacy, onSaveContext, locale = "zh-CN" }: {
   capsules: EchoCapsule[]; selectedCapsuleId: number | null; selectedCapsule: EchoCapsule | null;
   selectableMemories: MemoryCard[]; selectedMemoryIds: number[]; capsuleName: string; capsuleIntro: string;
-  capsulePreview: CapsulePreview | null; capsuleBusy: boolean; genomeHistory: CapsuleGenomeVersion[];
+  capsulePreview: CapsulePreview | null; capsuleBusy: boolean; genomeHistory: CapsuleGenomeVersion[]; genomeHistoryError?: boolean;
   fidelitySummary: CapsuleFidelitySummary[]; sandboxQuestion: string; sandboxResult: CapsuleSandbox | null; sandboxFeedback: string | null;
   onSelectCapsule: (id: number | null) => void; onToggleMemory: (id: number) => void;
   onCapsuleName: (value: string) => void; onCapsuleIntro: (value: string) => void;
   onPreviewNewCapsule: () => void; onCancelPreview: () => void; onCreateCapsule: () => void;
   onRecompile: () => void; onSandboxQuestion: (value: string) => void; onRunSandbox: () => void;
   onRateSandbox: (rating: string, comment?: string) => void; onPublish: () => void; onPause: () => void; onArchive: () => void;
-  boundary?: CapsuleBoundary | null; boundaryBusy?: boolean; onSaveBoundary?: (boundary: Partial<CapsuleBoundary>) => void;
+  boundary?: CapsuleBoundary | null; boundaryBusy?: boolean; boundaryLoadFailed?: boolean; onRetryBoundary?: () => void;
+  onSaveBoundary?: (boundary: Partial<CapsuleBoundary>) => void;
+  onRetryGenomeHistory?: () => void;
   capsuleOwnerNote?: string; onCapsuleOwnerNote?: (value: string) => void;
   capsuleStandIn?: boolean; onCapsuleStandIn?: (value: boolean) => void;
   capsuleContactPolicy?: string; onCapsuleContactPolicy?: (value: string) => void;
-  onSaveContext?: (patch: { ownerContextNote: string; standInEnabled: boolean; realContactPolicy: string }) => void;
+  capsulePrivacy?: "STRICT" | "BALANCED" | "OPEN";
+  onCapsulePrivacy?: (value: "STRICT" | "BALANCED" | "OPEN") => void;
+  onSaveContext?: (patch: { ownerContextNote: string; standInEnabled: boolean; realContactPolicy: string; conversationLimitPerDay: number }) => void;
   locale?: Locale;
 }) {
   const t = COPY[locale];
@@ -240,7 +259,7 @@ export function CapsuleWorkbench({ capsules, selectedCapsuleId, selectedCapsule,
 
     {!selectedCapsule ? <div className="capsule-create" role="region" aria-label={t.createAria}>
       <div className="capsule-step"><span>1</span><div><strong>{t.step1Title}</strong><small>{t.step1Note}</small></div></div>
-      <div className="memory-consent-list">{selectableMemories.length === 0 ? <p>{t.noMemories}</p> : selectableMemories.slice(0, 10).map(memory => {
+      <div className="memory-consent-list">{selectableMemories.length === 0 ? <p>{t.noMemories}</p> : selectableMemories.map(memory => {
         const blocked = blockedScopes.has((memory.consentScope ?? "").toUpperCase());
         const meta = blocked ? t.blockedMem : `${memory.memoryLayer ?? t.memoryFallback} · v${memory.versionNo}`;
         // W2 UIUX audit: same run-on-naming shape as ProductShellNavigation's five-space tabs --
@@ -255,6 +274,10 @@ export function CapsuleWorkbench({ capsules, selectedCapsuleId, selectedCapsule,
       <div className="capsule-step"><span>2</span><div><strong>{t.step2Title}</strong><small>{t.step2Note}</small></div></div>
       <div className="capsule-fields"><label>{t.nameLabel}<input value={capsuleName} onChange={event => onCapsuleName(event.target.value)} placeholder={t.namePlaceholder} /></label>
         <label>{t.introLabel}<textarea value={capsuleIntro} onChange={event => onCapsuleIntro(event.target.value)} placeholder={t.introPlaceholder} /></label></div>
+      <div className="capsule-fields"><label>{t.privacyLabel}<select value={capsulePrivacy}
+        onChange={event => onCapsulePrivacy?.(event.target.value as "STRICT" | "BALANCED" | "OPEN")}>
+        {privacyOrder.map(value => <option key={value} value={value}>{t.privacy[value]}</option>)}
+      </select></label></div>
       <details className="capsule-advanced"><summary>{locale === "en-SG" ? "Optional: background and contact preferences" : "可选：背景与联系偏好"}</summary>
         <div className="capsule-fields">
         <label>{t.ownerNoteLabel}<textarea value={capsuleOwnerNote} onChange={event => onCapsuleOwnerNote?.(event.target.value)} placeholder={t.ownerNotePlaceholder} /></label>
@@ -281,7 +304,7 @@ export function CapsuleWorkbench({ capsules, selectedCapsuleId, selectedCapsule,
       })}</details>
 
       <div className="capsule-step"><span>1</span><div><strong>{t.rvStep1Title}</strong><small>{t.rvStep1Note}</small></div></div>
-      <div className="memory-consent-list compact">{selectableMemories.slice(0, 10).map(memory => {
+      <div className="memory-consent-list compact">{selectableMemories.map(memory => {
         const blocked = blockedScopes.has((memory.consentScope ?? "").toUpperCase());
         const meta = blocked ? t.blockedMem2 : `v${memory.versionNo}`;
         // W2 UIUX audit: same run-on-naming fix as the create-tab memory list above.
@@ -311,15 +334,29 @@ export function CapsuleWorkbench({ capsules, selectedCapsuleId, selectedCapsule,
           <p className="preview-warning">{t.providerUnavailable}</p>}
       </article>}
 
-      {onSaveBoundary && <CapsuleBoundaryEditor key={`${selectedCapsule.id}:${boundary?.capsuleId ?? "loading"}`}
+      {onSaveBoundary && boundary && <CapsuleBoundaryEditor key={`${selectedCapsule.id}:${boundary.capsuleId}`}
         boundary={boundary} boundaryBusy={boundaryBusy} onSaveBoundary={onSaveBoundary} t={t} />}
+      {onSaveBoundary && !boundary && <p className="preview-warning">
+        {boundaryLoadFailed
+          ? (locale === "en-SG" ? "Boundary settings could not be loaded. Nothing can be saved until they are reloaded." : "边界设置加载失败。重新加载成功前不会显示可保存的默认值。")
+          : (locale === "en-SG" ? "Loading boundary settings…" : "正在加载边界设置…")}
+        {boundaryLoadFailed && <button type="button" onClick={onRetryBoundary}>{locale === "en-SG" ? "Retry" : "重新加载"}</button>}
+      </p>}
       {onSaveContext && <CapsuleContextEditor key={`context:${selectedCapsule.id}`}
         capsule={selectedCapsule} capsuleBusy={capsuleBusy} onSaveContext={onSaveContext} t={t} />}
 
       <div className="capsule-step"><span>5</span><div><strong>{t.step4Title}</strong><small>{t.step4Note}</small></div></div>
-      <div className="resonance-actions">{selectedCapsule.visibilityStatus !== "PUBLIC" && <AsyncButton className="resonance-primary" busy={capsuleBusy} disabled={genomeHistory[0]?.status !== "ACTIVE"} busyText={t.publishBusy} onClick={onPublish}>{t.publishBtn}</AsyncButton>}
+      {genomeHistoryError && <div className="preview-warning" role="alert"><p>{t.genomeLoadError}</p>
+        {onRetryGenomeHistory && <button type="button" className="quiet" onClick={onRetryGenomeHistory}>{t.genomeRetry}</button>}</div>}
+      <div className="resonance-actions">{selectedCapsule.visibilityStatus !== "PUBLIC" && <AsyncButton className="resonance-primary" busy={capsuleBusy} disabled={genomeHistoryError || genomeHistory[0]?.status !== "ACTIVE"} busyText={t.publishBusy} onClick={onPublish}>{t.publishBtn}</AsyncButton>}
         {selectedCapsule.visibilityStatus === "PUBLIC" && <AsyncButton busy={capsuleBusy} busyText={t.pauseBusy} onClick={onPause}>{t.pauseBtn}</AsyncButton>}
-        <AsyncButton className="danger-quiet" busy={capsuleBusy} busyText={t.archiveBusy} onClick={onArchive}>{t.archiveBtn}</AsyncButton></div>
+        <AsyncButton className="danger-quiet" busy={capsuleBusy} busyText={t.archiveBusy}
+          onClick={() => { if (window.confirm(t.archiveConfirm)) onArchive(); }}>{t.archiveBtn}</AsyncButton></div>
+      {selectedCapsule.visibilityStatus !== "PUBLIC" && genomeHistory[0]?.status !== "ACTIVE" && <p className="preview-warning">
+        {genomeHistory.length === 0
+          ? (locale === "en-SG" ? "Publish is unavailable until a Genome version loads or is compiled." : "尚未读取或编译 Genome 版本，因此暂时不能发布。")
+          : (locale === "en-SG" ? "Publish is unavailable because the latest Genome needs review or is withdrawn. Recompile and review it first." : "最新 Genome 需要复核或已撤回；请先重新编译并复核，再发布。")}
+      </p>}
     </div>}
     </details>
   </section>;

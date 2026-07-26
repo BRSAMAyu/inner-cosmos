@@ -29,6 +29,9 @@ public interface CapsuleService {
 
     List<EchoCapsule> plazaCapsules();
 
+    /** Anonymous-safe when viewerId is null; authenticated viewers exclude self and both-way blocks. */
+    List<EchoCapsule> plazaCapsules(Long viewerId);
+
     List<Map<String, Object>> matchedCapsules(Long userId);
 
     List<Map<String, Object>> matchedCapsules(Long userId, ResonanceMatchStrategy strategy);

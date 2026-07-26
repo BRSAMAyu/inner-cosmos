@@ -27,6 +27,11 @@ public class PersonaChatController extends BaseController {
         return ApiResponse.ok(personaChatService.create(currentUserId(session), request.capsuleId));
     }
 
+    @GetMapping("/capsule/{capsuleId}/active-session")
+    public ApiResponse<PersonaChatSession> activeSession(@PathVariable Long capsuleId, HttpSession session) {
+        return ApiResponse.ok(personaChatService.activeSession(currentUserId(session), capsuleId));
+    }
+
     @PostMapping("/message")
     public ApiResponse<PersonaChatMessage> message(@Valid @RequestBody PersonaChatRequest request, HttpSession session) {
         return ApiResponse.ok(personaChatService.reply(currentUserId(session), request.sessionId, request.message));

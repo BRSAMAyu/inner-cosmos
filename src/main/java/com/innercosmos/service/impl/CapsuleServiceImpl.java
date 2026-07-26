@@ -10,11 +10,13 @@ import com.innercosmos.entity.EchoCapsule;
 import com.innercosmos.entity.BlockRelation;
 import com.innercosmos.mapper.BlockRelationMapper;
 import com.innercosmos.mapper.CapsuleBoundaryMapper;
+import com.innercosmos.mapper.CapsuleLandingMapper;
 import com.innercosmos.mapper.EchoCapsuleMapper;
 import com.innercosmos.mapper.MemoryCardMapper;
 import com.innercosmos.mapper.UserPortraitMapper;
 import com.innercosmos.mapper.AuthorizedMemoryRefMapper;
 import com.innercosmos.entity.AuthorizedMemoryRef;
+import com.innercosmos.entity.CapsuleLanding;
 import com.innercosmos.entity.MemoryCard;
 import com.innercosmos.entity.UserPortrait;
 import com.innercosmos.ai.semantic.PseudoSemanticAnalyzer;
@@ -30,6 +32,7 @@ import com.innercosmos.util.DataMaskingUtils;
 import com.innercosmos.vo.CapsulePreviewVO;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -48,6 +51,7 @@ import java.util.Arrays;
 public class CapsuleServiceImpl implements CapsuleService {
     private final EchoCapsuleMapper capsuleMapper;
     private final CapsuleBoundaryMapper boundaryMapper;
+    private final CapsuleLandingMapper capsuleLandingMapper;
     private final CapsuleAgent capsuleAgent;
     private final MemoryCardMapper memoryCardMapper;
     private final UserPortraitMapper userPortraitMapper;
@@ -64,9 +68,14 @@ public class CapsuleServiceImpl implements CapsuleService {
     // memory title/summary straight to the persona-synthesis LLM provider and into persisted
     // genome artifacts, with at most DataMaskingUtils.maskContact's digit/email-only masking.
     private final DataMaskingService dataMaskingService;
+    /** Optional only for legacy unit constructors; production snapshots persona claims here. */
+    @Autowired(required = false)
+    private CapsulePersonaLayerCompiler personaLayerCompiler;
 
+    @Autowired
     public CapsuleServiceImpl(EchoCapsuleMapper capsuleMapper,
                               CapsuleBoundaryMapper boundaryMapper,
+                              CapsuleLandingMapper capsuleLandingMapper,
                               CapsuleAgent capsuleAgent,
                               MemoryCardMapper memoryCardMapper,
                               UserPortraitMapper userPortraitMapper,
@@ -80,6 +89,7 @@ public class CapsuleServiceImpl implements CapsuleService {
                               DataMaskingService dataMaskingService) {
         this.capsuleMapper = capsuleMapper;
         this.boundaryMapper = boundaryMapper;
+        this.capsuleLandingMapper = capsuleLandingMapper;
         this.capsuleAgent = capsuleAgent;
         this.memoryCardMapper = memoryCardMapper;
         this.userPortraitMapper = userPortraitMapper;
@@ -91,6 +101,25 @@ public class CapsuleServiceImpl implements CapsuleService {
         this.capsuleEmbeddingIndexService = capsuleEmbeddingIndexService;
         this.retractionReceiptService = retractionReceiptService;
         this.dataMaskingService = dataMaskingService;
+    }
+
+    /** Test/backward-compatible constructor; production injection supplies the landing mapper. */
+    public CapsuleServiceImpl(EchoCapsuleMapper capsuleMapper,
+                              CapsuleBoundaryMapper boundaryMapper,
+                              CapsuleAgent capsuleAgent,
+                              MemoryCardMapper memoryCardMapper,
+                              UserPortraitMapper userPortraitMapper,
+                              AuthorizedMemoryRefMapper authorizedMemoryRefMapper,
+                              CapsuleGenomeService genomeService,
+                              DataUseGrantService dataUseGrantService,
+                              BlockRelationMapper blockRelationMapper,
+                              ObjectMapper objectMapper,
+                              CapsuleEmbeddingIndexService capsuleEmbeddingIndexService,
+                              DataRetractionReceiptService retractionReceiptService,
+                              DataMaskingService dataMaskingService) {
+        this(capsuleMapper, boundaryMapper, null, capsuleAgent, memoryCardMapper, userPortraitMapper,
+                authorizedMemoryRefMapper, genomeService, dataUseGrantService, blockRelationMapper,
+                objectMapper, capsuleEmbeddingIndexService, retractionReceiptService, dataMaskingService);
     }
 
     /**
@@ -142,10 +171,16 @@ public class CapsuleServiceImpl implements CapsuleService {
         capsule.publicTags = toJsonArray(request.publicTags, "self-resonance");
         capsule.authorizedMemoryIds = toJsonArray(authorizedCards.stream().map(card -> String.valueOf(card.id)).toList());
         capsule.ownerContextNote = request.ownerContextNote;
-        capsule.styleProfileJson = request.styleProfileJson == null ? inferStyleProfile(authorizedCards) : request.styleProfileJson;
-        capsule.contextPreviewJson = request.contextPreviewJson == null
-                ? buildContextPreview(authorizedCards, capsule.publicTags, capsule.ownerContextNote, privacyLevel)
-                : request.contextPreviewJson;
+        List<Map<String, Object>> personaLayer = compilePersonaLayer(
+                userId, request.personaClaimIds, privacyLevel);
+        capsule.styleProfileJson = request.styleProfileJson == null
+                ? inferStyleProfile(authorizedCards, personaLayer) : request.styleProfileJson;
+        // The compiler, not the client, is authoritative for runtime evidence. Accepting an
+        // arbitrary contextPreviewJson here would let a caller smuggle unsupported facts into
+        // the immutable Genome while bypassing memory and claim authorization.
+        String baseContextPreview = buildContextPreview(
+                authorizedCards, capsule.publicTags, capsule.ownerContextNote, privacyLevel);
+        capsule.contextPreviewJson = attachPersonaLayer(baseContextPreview, personaLayer);
         capsule.standInEnabled = request.standInEnabled == null ? false : request.standInEnabled;
         capsule.realContactPolicy = request.realContactPolicy == null ? "LETTER_ONLY" : request.realContactPolicy;
         capsule.echoEnergy = 0.72;
@@ -209,10 +244,13 @@ public class CapsuleServiceImpl implements CapsuleService {
         capsule.publicTags = toJsonArray(request.publicTags, "simulator-only");
         capsule.authorizedMemoryIds = toJsonArray(authorizedCards.stream().map(card -> String.valueOf(card.id)).toList());
         capsule.ownerContextNote = request.ownerContextNote;
-        capsule.styleProfileJson = request.styleProfileJson == null ? inferStyleProfile(authorizedCards) : request.styleProfileJson;
-        capsule.contextPreviewJson = request.contextPreviewJson == null
-                ? buildContextPreview(authorizedCards, capsule.publicTags, capsule.ownerContextNote, privacyLevel)
-                : request.contextPreviewJson;
+        List<Map<String, Object>> personaLayer = compilePersonaLayer(
+                userId, request.personaClaimIds, privacyLevel);
+        capsule.styleProfileJson = request.styleProfileJson == null
+                ? inferStyleProfile(authorizedCards, personaLayer) : request.styleProfileJson;
+        String baseContextPreview = buildContextPreview(
+                authorizedCards, capsule.publicTags, capsule.ownerContextNote, privacyLevel);
+        capsule.contextPreviewJson = attachPersonaLayer(baseContextPreview, personaLayer);
         capsule.standInEnabled = false;
         capsule.realContactPolicy = "LETTER_ONLY";
         capsule.echoEnergy = 0.0;
@@ -253,6 +291,14 @@ public class CapsuleServiceImpl implements CapsuleService {
         if (body.containsKey("contextPreviewJson")) capsule.contextPreviewJson = stringValue(body.get("contextPreviewJson"));
         if (body.containsKey("standInEnabled")) capsule.standInEnabled = Boolean.TRUE.equals(body.get("standInEnabled"));
         if (body.containsKey("realContactPolicy")) capsule.realContactPolicy = safeContactPolicy(stringValue(body.get("realContactPolicy")));
+        if (body.containsKey("conversationLimitPerDay")) {
+            Object value = body.get("conversationLimitPerDay");
+            if (!(value instanceof Number number)) {
+                throw new com.innercosmos.exception.BusinessException(
+                        com.innercosmos.common.ErrorCode.BAD_REQUEST, "每日对话上限必须是数字");
+            }
+            capsule.conversationLimitPerDay = safeTurns(number.intValue(), false);
+        }
         if (body.containsKey("publicTags")) capsule.publicTags = toJsonArray(castStringList(body.get("publicTags")), "self-resonance");
         if (body.containsKey("authorizedMemoryIds")) {
             List<Long> requested = parseLongIds(toJsonArray(castStringList(body.get("authorizedMemoryIds"))));
@@ -313,7 +359,8 @@ public class CapsuleServiceImpl implements CapsuleService {
     public EchoCapsule updateVisibility(Long userId, Long capsuleId, String visibilityStatus, Boolean isPublic) {
         EchoCapsule capsule = getOwnedCapsule(userId, capsuleId);
         if (capsule == null) {
-            return null;
+            throw new com.innercosmos.exception.BusinessException(
+                    com.innercosmos.common.ErrorCode.NOT_FOUND, "共鸣体不存在或无权访问");
         }
         if ("PUBLIC".equals(visibilityStatus) && (!currentAuthorizationsValid(capsule)
                 || (capsule.activeGenomeVersionId != null && genomeService.current(capsuleId) == null))) {
@@ -340,9 +387,27 @@ public class CapsuleServiceImpl implements CapsuleService {
 
     @Override
     public List<EchoCapsule> plazaCapsules() {
+        return plazaCapsules(null);
+    }
+
+    @Override
+    public List<EchoCapsule> plazaCapsules(Long viewerId) {
         QueryWrapper<EchoCapsule> query = new QueryWrapper<>();
         query.eq("is_public", true).eq("visibility_status", "PUBLIC").orderByDesc("echo_energy");
-        return capsuleMapper.selectList(query);
+        List<EchoCapsule> capsules = capsuleMapper.selectList(query);
+        Set<Long> blocked = viewerId == null ? Set.of() : blockedCounterparties(viewerId);
+        return capsules.stream()
+                .filter(c -> viewerId == null || !viewerId.equals(c.ownerUserId))
+                .filter(c -> c.ownerUserId == null || !blocked.contains(c.ownerUserId))
+                .peek(this::hydratePublicBoundary)
+                .toList();
+    }
+
+    private void hydratePublicBoundary(EchoCapsule capsule) {
+        CapsuleBoundary boundary = boundaryMapper.selectOne(new QueryWrapper<CapsuleBoundary>()
+                .eq("capsule_id", capsule.id).last("LIMIT 1"));
+        capsule.allowLetterRequest = capsule.ownerUserId != null
+                && (boundary == null || !Boolean.FALSE.equals(boundary.allowLetterRequest));
     }
 
     // IC-CAP-003 smart-matching constants. Deterministic, no LLM.
@@ -426,7 +491,7 @@ public class CapsuleServiceImpl implements CapsuleService {
         // public/visible; block state is a viewer-specific safety signal that belongs in matching.
         Set<Long> blockedUserIds = blockedCounterparties(userId);
 
-        List<EchoCapsule> all = plazaCapsules();
+        List<EchoCapsule> all = plazaCapsules(userId);
         // Pre-filter to the exact candidate set the scoring loop below will consider, BEFORE
         // asking the embedding index for similarities — a blocked or self-owned capsule must never
         // even be sent to the embedding path, let alone surface via a semantic score.
@@ -439,8 +504,9 @@ public class CapsuleServiceImpl implements CapsuleService {
         // Consent-scoped query text: the same memories driving userThemeProfile, minus any memory
         // whose consentScope forbids external processing — mirrors the exact filter
         // MemoryEmbeddingIndexServiceImpl already applies before sending memory text to a provider.
-        String semanticQueryText = consentScopedSemanticQueryText(memories);
-        Map<Long, Double> semanticScores = capsuleEmbeddingIndexService.similarities(semanticQueryText, eligible);
+        Map<Long, Double> semanticScores = strategy == ResonanceMatchStrategy.MIRROR
+                ? capsuleEmbeddingIndexService.similarities(consentScopedSemanticQueryText(memories), eligible)
+                : Map.of();
 
         List<Map<String, Object>> scored = new ArrayList<>();
         for (EchoCapsule capsule : eligible) {
@@ -644,6 +710,9 @@ public class CapsuleServiceImpl implements CapsuleService {
             return new StrategySignal(mirrorRelevance, mirrorReasons);
         }
         if (strategy == ResonanceMatchStrategy.COMPLEMENT) {
+            if (userThemes.isEmpty()) {
+                return new StrategySignal(0.0, List.of("先积累一些轨迹，再寻找互补方向"));
+            }
             List<String> missing = FAMILY_ORDER.stream()
                     .filter(capsuleThemes::contains).filter(theme -> !userThemes.containsKey(theme)).limit(5)
                     .map(theme -> "带来·" + theme).toList();
@@ -660,8 +729,12 @@ public class CapsuleServiceImpl implements CapsuleService {
             List<String> reasons = new ArrayList<>();
             reasons.add("为熟悉轨迹留出意外");
             capsuleThemes.stream().limit(2).map(theme -> "可能遇见·" + theme).forEach(reasons::add);
-            double stableVariation = Math.floorMod(capsuleId == null ? 0L : capsuleId, 7L) * 0.02;
-            return new StrategySignal(0.22 + stableVariation, reasons);
+            if (userThemes.isEmpty()) {
+                return new StrategySignal(0.0, reasons);
+            }
+            long novelThemes = capsuleThemes.stream().filter(theme -> !userThemes.containsKey(theme)).count();
+            double stableVariation = Math.floorMod(capsuleId == null ? 0L : capsuleId, 7L) * 0.01;
+            return new StrategySignal(Math.min(0.32, novelThemes * 0.10 + stableVariation), reasons);
         }
         Set<String> context = portraitThemes.isEmpty()
                 ? userThemes.entrySet().stream()
@@ -836,16 +909,19 @@ public class CapsuleServiceImpl implements CapsuleService {
     public CapsuleBoundary getBoundary(Long userId, Long capsuleId) {
         // M-023: boundary (allowTopics/blockedTopics/visibility) is owner-private config —
         // verify ownership before returning it.
-        if (getOwnedCapsule(userId, capsuleId) == null) {
+        EchoCapsule capsule = getOwnedCapsule(userId, capsuleId);
+        if (capsule == null) {
             throw new com.innercosmos.exception.BusinessException(
                     com.innercosmos.common.ErrorCode.NOT_FOUND, "共鸣体不存在或无权访问");
         }
         QueryWrapper<CapsuleBoundary> query = new QueryWrapper<>();
         query.eq("capsule_id", capsuleId).last("LIMIT 1");
-        return boundaryMapper.selectOne(query);
+        CapsuleBoundary boundary = boundaryMapper.selectOne(query);
+        return boundary;
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public CapsuleBoundary updateBoundary(Long userId, Long capsuleId, CapsuleBoundary boundary, Integer expectedVersion) {
         EchoCapsule capsule = getOwnedCapsule(userId, capsuleId);
         if (capsule == null) {
@@ -865,9 +941,11 @@ public class CapsuleServiceImpl implements CapsuleService {
         }
         if (boundary.allowTopics != null) existing.allowTopics = boundary.allowTopics;
         if (boundary.blockedTopics != null) existing.blockedTopics = boundary.blockedTopics;
-        if (boundary.maxConversationTurns != null) existing.maxConversationTurns = boundary.maxConversationTurns;
+        if (boundary.maxConversationTurns != null) existing.maxConversationTurns = safeTurns(boundary.maxConversationTurns, false);
         if (boundary.allowLetterRequest != null) existing.allowLetterRequest = boundary.allowLetterRequest;
-        if (boundary.privacyLevel != null) existing.privacyLevel = boundary.privacyLevel;
+        String previousPrivacy = safePrivacy(existing.privacyLevel);
+        if (boundary.privacyLevel != null) existing.privacyLevel = safePrivacy(boundary.privacyLevel);
+        boolean privacyChanged = !previousPrivacy.equals(existing.privacyLevel);
         int updated = boundaryMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<CapsuleBoundary>()
                 .eq("id", existing.id).eq("version", currentVersion)
                 .set("allow_topics", existing.allowTopics)
@@ -880,6 +958,16 @@ public class CapsuleServiceImpl implements CapsuleService {
         if (updated != 1) {
             throw new com.innercosmos.exception.BusinessException(
                     com.innercosmos.common.ErrorCode.CONFLICT, "capsule boundary changed concurrently");
+        }
+        // A privacy tier is a compiler input. Keeping a genome compiled under an older, looser
+        // tier ACTIVE would leave its persisted prompt/context publicly runnable after the owner
+        // tightened privacy. Fail closed: delist and require an explicit recompile/review.
+        if (privacyChanged) {
+            capsule.visibilityStatus = "NEEDS_REVIEW";
+            capsule.isPublic = false;
+            capsuleMapper.updateById(capsule);
+            genomeService.markNeedsReview(capsuleId,
+                    "privacy level changed from " + previousPrivacy + " to " + existing.privacyLevel);
         }
         return getBoundary(userId, capsuleId);
     }
@@ -963,14 +1051,30 @@ public class CapsuleServiceImpl implements CapsuleService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public Double markLanded(Long userId, Long capsuleId) {
-        // M-067: "this landed for me" — a closed resonance signal. Verify the capsule is public,
-        // then atomically bump echoEnergy by 0.02 (capped at 1.0) in a single SQL statement.
-        EchoCapsule capsule = capsuleMapper.selectById(capsuleId);
+        // Serialize signals for one capsule so an idempotent retry can never leave a receipt
+        // without its corresponding energy increment (or increment twice).
+        EchoCapsule capsule = capsuleMapper.selectByIdForUpdate(capsuleId);
         if (capsule == null || !Boolean.TRUE.equals(capsule.isPublic)) {
             throw new com.innercosmos.exception.BusinessException(
                     com.innercosmos.common.ErrorCode.NOT_FOUND, "共鸣体不存在或不可见");
         }
+        if (userId.equals(capsule.ownerUserId)) {
+            throw new com.innercosmos.exception.BusinessException(
+                    com.innercosmos.common.ErrorCode.BAD_REQUEST, "不能给自己的共鸣体标记落地");
+        }
+        boolean alreadyLanded = capsuleLandingMapper.selectCount(new QueryWrapper<CapsuleLanding>()
+                .eq("capsule_id", capsuleId)
+                .eq("user_id", userId)) > 0;
+        if (alreadyLanded) {
+            Double current = capsule.echoEnergy;
+            return current == null ? 0.0 : current;
+        }
+        CapsuleLanding landing = new CapsuleLanding();
+        landing.capsuleId = capsuleId;
+        landing.userId = userId;
+        capsuleLandingMapper.insert(landing);
         capsuleMapper.update(null, new UpdateWrapper<EchoCapsule>()
                 .eq("id", capsuleId)
                 .setSql("echo_energy = LEAST(1.0, COALESCE(echo_energy, 0) + 0.02)"));
@@ -1003,9 +1107,13 @@ public class CapsuleServiceImpl implements CapsuleService {
         List<String> summaries = cards.stream().map(card -> scrubbedMemoryLine(card, privacyLevel)).toList();
         capsule.personaPrompt = capsuleAgent.generateUserPersona(
                 userId, summaries, capsule.pseudonym, capsule.intro);
-        capsule.styleProfileJson = inferStyleProfile(cards);
-        capsule.contextPreviewJson = buildContextPreview(
-                cards, capsule.publicTags, capsule.ownerContextNote, privacyLevel);
+        List<Long> personaClaimIds = personaLayerCompiler == null ? List.of()
+                : personaLayerCompiler.claimIdsFromPreview(capsule.contextPreviewJson);
+        List<Map<String, Object>> personaLayer = compilePersonaLayer(
+                userId, personaClaimIds, privacyLevel);
+        capsule.styleProfileJson = inferStyleProfile(cards, personaLayer);
+        capsule.contextPreviewJson = attachPersonaLayer(buildContextPreview(
+                cards, capsule.publicTags, capsule.ownerContextNote, privacyLevel), personaLayer);
         capsule.visibilityStatus = "PRIVATE";
         capsule.isPublic = false;
         capsule.lastMemoryUpdateAt = LocalDateTime.now();
@@ -1128,6 +1236,10 @@ public class CapsuleServiceImpl implements CapsuleService {
      * (claims/values/habits/temporal state/unknowns), not that whole structure yet.
      */
     private String inferStyleProfile(List<MemoryCard> cards) {
+        return inferStyleProfile(cards, List.of());
+    }
+
+    private String inferStyleProfile(List<MemoryCard> cards, List<Map<String, Object>> personaLayer) {
         Map<String, Integer> themeFreq = new LinkedHashMap<>();
         Map<String, List<Long>> themeEvidence = new LinkedHashMap<>();
         Map<String, Double> sentimentWeight = new LinkedHashMap<>();
@@ -1177,15 +1289,35 @@ public class CapsuleServiceImpl implements CapsuleService {
 
         Map<String, Object> profile = new LinkedHashMap<>();
         profile.put("voice", String.join("，", style));
+        String confirmedExpressionStyle = personaLayer.stream()
+                .filter(item -> "EXPRESSION_STYLE".equals(item.get("claimType")))
+                .map(item -> String.valueOf(item.get("capsuleSafeValue")))
+                .filter(value -> !value.isBlank())
+                .findFirst().orElse(null);
+        if (confirmedExpressionStyle != null) {
+            profile.put("voice", confirmedExpressionStyle);
+        }
         profile.put("voiceEvidence", voiceEvidence);
         profile.put("dominantSentiment", dominantSentiment);
         profile.put("themeSignals", themeFreq);
         profile.put("unknowns", unknowns);
-        profile.put("sampleSize", cards.size());
-        profile.put("confidence", Math.round(Math.min(1.0, cards.size() / 5.0) * 100.0) / 100.0);
+        profile.put("sampleSize", cards.size() + personaLayer.size());
+        profile.put("confidence", Math.round(
+                Math.min(1.0, (cards.size() + personaLayer.size()) / 5.0) * 100.0) / 100.0);
         profile.put("notBeautified", true);
         profile.put("boundary", "只呈现授权后的真实片段，不替本人承诺");
         return write(profile);
+    }
+
+    private List<Map<String, Object>> compilePersonaLayer(Long userId, List<Long> claimIds,
+                                                           String privacyLevel) {
+        return personaLayerCompiler == null ? List.of()
+                : personaLayerCompiler.compile(userId, claimIds, privacyLevel);
+    }
+
+    private String attachPersonaLayer(String contextPreviewJson, List<Map<String, Object>> personaLayer) {
+        return personaLayerCompiler == null ? contextPreviewJson
+                : personaLayerCompiler.attach(contextPreviewJson, personaLayer);
     }
 
     /**

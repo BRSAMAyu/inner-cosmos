@@ -2,7 +2,7 @@ package com.innercosmos.ai.mode;
 
 import org.springframework.stereotype.Component;
 
-/** Conversation-first path for shaping a vivid first resonance capsule in about ten minutes. */
+/** Conversation-first path for shaping a vivid first resonance capsule in about five minutes. */
 @Component
 public class CapsuleShapingStrategy implements ModeStrategy {
     @Override

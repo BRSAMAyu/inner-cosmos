@@ -39,7 +39,10 @@ export function SafetyResourceCard({ alert, resources, locale, onDismiss, onOpen
   onDismiss: () => void;
   onOpenHarbor?: () => void;
 }) {
-  if (!alert) return null;
+  // Only a HIGH decision earns a persistent, interruptive resource wall. MEDIUM support stays
+  // inside Aurora's conversation; LOW/NONE remain invisible. This guard also protects the UI if
+  // a future transport accidentally emits a non-blocking safety event.
+  if (!alert || alert.riskLevel !== "HIGH") return null;
   const t = COPY[locale];
   return (
     <aside className="safety-resource-card" role="alert" aria-live="assertive" lang={locale}>

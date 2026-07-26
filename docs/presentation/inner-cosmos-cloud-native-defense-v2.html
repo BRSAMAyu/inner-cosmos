@@ -1,0 +1,743 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Cloud-Native Architecture for Advanced AI Systems · Inner Cosmos</title>
+  <style>
+    :root{
+      --bg:#09111f;
+      --panel:#111e31;
+      --panel-2:#16263c;
+      --text:#f7f3e9;
+      --muted:#b9c5d6;
+      --line:#354760;
+      --cyan:#63d8d0;
+      --blue:#6fa8ff;
+      --amber:#ffbd66;
+      --danger:#ff7d7d;
+      --green:#8ee0a5;
+      --stage-w:1920;
+      --stage-h:1080;
+      --edge:92px;
+    }
+
+    *{box-sizing:border-box}
+    html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#040812}
+    body{font-family:Inter,"Segoe UI",Arial,sans-serif;color:var(--text)}
+    .viewport{position:fixed;inset:0}
+    .stage{
+      position:absolute;left:0;top:0;width:1920px;height:1080px;overflow:hidden;
+      transform-origin:0 0;background:
+        radial-gradient(circle at 78% 15%,rgba(99,216,208,.09),transparent 25%),
+        linear-gradient(135deg,#09111f 0%,#0b1627 58%,#08101d 100%);
+    }
+    .stage::before{
+      content:"";position:absolute;inset:0;pointer-events:none;opacity:.2;
+      background-image:
+        linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),
+        linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px);
+      background-size:48px 48px;
+    }
+    .slide{
+      position:absolute;inset:0;display:none;padding:72px var(--edge) 88px;
+      background:transparent;
+    }
+    .slide.active{display:block}
+    .chrome{position:absolute;inset:0;z-index:20;pointer-events:none}
+    .progress{position:absolute;top:0;left:0;height:8px;background:var(--cyan);width:5%}
+    .brand{position:absolute;left:var(--edge);top:28px;font-size:20px;font-weight:700;letter-spacing:.11em;color:var(--cyan)}
+    .counter{position:absolute;right:var(--edge);bottom:31px;font:600 20px/1 ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--muted)}
+    .section-label{font-size:22px;font-weight:800;letter-spacing:.13em;text-transform:uppercase;color:var(--cyan)}
+    .speaker{font-size:21px;font-weight:700;color:var(--amber)}
+    .topline{display:flex;align-items:center;justify-content:space-between;margin-bottom:34px}
+
+    h1,h2,h3,p{margin-top:0}
+    h1{font-size:108px;line-height:1.02;letter-spacing:-.045em;margin-bottom:34px;max-width:1500px}
+    h2{font-size:64px;line-height:1.08;letter-spacing:-.028em;margin-bottom:26px}
+    h3{font-size:34px;line-height:1.2;margin-bottom:12px}
+    p{font-size:30px;line-height:1.45;color:var(--muted)}
+    .lead{font-size:38px;line-height:1.42;max-width:1450px;color:var(--text)}
+    .small{font-size:25px;line-height:1.4}
+    .tiny{font-size:22px;line-height:1.35}
+    .mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+    .accent{color:var(--cyan)}
+    .amber{color:var(--amber)}
+    .blue{color:var(--blue)}
+    .green{color:var(--green)}
+    .danger{color:var(--danger)}
+    .muted{color:var(--muted)}
+    .eyebrow{font-size:23px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--cyan);margin-bottom:18px}
+    .tag{
+      display:inline-flex;align-items:center;gap:10px;padding:9px 15px;border:2px solid var(--line);
+      font-size:22px;font-weight:750;color:var(--text);background:rgba(255,255,255,.025)
+    }
+    .tag.cyan{border-color:var(--cyan);color:var(--cyan)}
+    .tag.amber{border-color:var(--amber);color:var(--amber)}
+
+    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:34px}
+    .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:28px}
+    .grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:24px}
+    .card{
+      background:linear-gradient(145deg,rgba(22,38,60,.96),rgba(15,27,45,.96));
+      border:2px solid var(--line);padding:28px;min-height:150px;
+    }
+    .card.cyan{border-top:7px solid var(--cyan)}
+    .card.blue{border-top:7px solid var(--blue)}
+    .card.amber{border-top:7px solid var(--amber)}
+    .card.green{border-top:7px solid var(--green)}
+    .num{
+      display:inline-grid;place-items:center;width:50px;height:50px;background:var(--cyan);
+      color:#07111d;font-size:24px;font-weight:900;margin-bottom:18px
+    }
+    .result{
+      font-size:60px;line-height:1;font-weight:900;letter-spacing:-.035em;color:var(--text);
+      margin-bottom:10px
+    }
+    .result-label{font-size:24px;font-weight:750;color:var(--muted)}
+    .rule{height:2px;background:var(--line);margin:26px 0}
+
+    .hero-layout{height:100%;display:grid;grid-template-columns:1.3fr .7fr;align-items:center;gap:80px}
+    .hero-orbit{position:relative;height:650px}
+    .orb{position:absolute;border:2px solid rgba(99,216,208,.5);border-radius:50%}
+    .orb.a{width:560px;height:560px;right:20px;top:40px}
+    .orb.b{width:400px;height:400px;right:100px;top:120px;border-color:rgba(111,168,255,.5)}
+    .orb.c{width:230px;height:230px;right:185px;top:205px;background:radial-gradient(circle at 35% 30%,#b9fff9,var(--cyan) 24%,#1f6b72 62%,#0c2536 100%);box-shadow:0 0 90px rgba(99,216,208,.26)}
+    .orbit-label{position:absolute;font-size:23px;font-weight:750;color:var(--muted)}
+
+    .product-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px;height:750px}
+    .shot{
+      position:relative;overflow:hidden;border:2px solid var(--line);background:#050a12;
+    }
+    .shot img{width:100%;height:100%;object-fit:cover;display:block}
+    .shot::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 58%,rgba(4,8,18,.82))}
+    .shot-label{position:absolute;left:24px;bottom:20px;z-index:2;font-size:27px;font-weight:850;color:white}
+
+    .journey{display:grid;grid-template-columns:repeat(6,1fr);align-items:stretch;margin-top:72px}
+    .journey-step{position:relative;padding:26px 22px;border-top:4px solid var(--line);min-height:285px}
+    .journey-step:not(:last-child)::after{
+      content:"→";position:absolute;right:-17px;top:94px;z-index:4;font-size:34px;color:var(--cyan)
+    }
+    .journey-step.active{border-color:var(--cyan);background:rgba(99,216,208,.055)}
+    .journey-step .icon{font-size:38px;color:var(--cyan);margin-bottom:24px}
+    .journey-step h3{font-size:30px}
+    .journey-step p{font-size:23px;line-height:1.35}
+
+    .map-table{display:grid;grid-template-columns:1.08fr 70px 1fr;margin-top:45px;border:2px solid var(--line)}
+    .map-row{display:contents}
+    .map-cell{padding:24px 28px;border-bottom:2px solid var(--line);font-size:28px;line-height:1.28}
+    .map-cell.arrow{text-align:center;color:var(--cyan);font-size:34px;font-weight:900}
+    .map-row:last-child .map-cell{border-bottom:0}
+    .map-cell strong{display:block;color:var(--text);font-size:29px;margin-bottom:6px}
+
+    .architecture{display:grid;grid-template-rows:auto auto auto auto;gap:20px;margin-top:26px}
+    .arch-row{display:grid;grid-template-columns:215px 1fr;gap:24px;align-items:center}
+    .arch-label{font-size:24px;font-weight:850;color:var(--cyan);text-transform:uppercase;letter-spacing:.08em}
+    .arch-boxes{display:flex;gap:18px;align-items:stretch}
+    .arch-box{
+      flex:1;display:grid;place-items:center;text-align:center;padding:20px;min-height:84px;
+      border:2px solid var(--line);background:var(--panel);font-size:25px;font-weight:760
+    }
+    .arch-box.highlight{border-color:var(--cyan);background:rgba(99,216,208,.08)}
+    .arch-arrow{text-align:center;color:var(--cyan);font-size:28px}
+
+    .cap-card{position:relative;min-height:475px;padding:38px}
+    .cap-card .cap-id{font-size:72px;font-weight:950;color:rgba(255,255,255,.11);position:absolute;right:28px;top:20px}
+    .cap-card h3{font-size:38px;max-width:360px}
+    .cap-card p{font-size:27px}
+    .cap-card ul{padding-left:25px;color:var(--muted);font-size:25px;line-height:1.55}
+
+    .timeline{position:relative;margin-top:58px;padding-top:72px}
+    .timeline::before{content:"";position:absolute;left:60px;right:60px;top:104px;height:5px;background:var(--line)}
+    .time-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:20px}
+    .time-node{position:relative;text-align:center;padding-top:68px}
+    .time-node::before{
+      content:"";position:absolute;top:15px;left:50%;transform:translateX(-50%);
+      width:34px;height:34px;background:var(--bg);border:6px solid var(--cyan);border-radius:50%;
+    }
+    .time-node.failure::before{border-color:var(--danger)}
+    .time-node h3{font-size:29px}
+    .time-node p{font-size:23px}
+
+    .layers{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:48px}
+    .layer{padding:27px 24px;border:2px solid var(--line);background:var(--panel);min-height:330px}
+    .layer .layer-name{font-size:23px;font-weight:850;color:var(--cyan);text-transform:uppercase;margin-bottom:20px}
+    .layer h3{font-size:32px}
+    .layer p{font-size:24px}
+
+    .comparison{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:28px}
+    .comparison .side{border:2px solid var(--line);padding:32px;background:var(--panel)}
+    .comparison .side.good{border-top:7px solid var(--green)}
+    .comparison .side.bad{border-top:7px solid var(--danger)}
+    .check-list{display:grid;gap:17px;margin-top:24px}
+    .check{display:grid;grid-template-columns:38px 1fr;gap:12px;font-size:26px;line-height:1.3;color:var(--text)}
+    .check .mark{font-weight:900;color:var(--green)}
+    .check .mark.warn{color:var(--amber)}
+
+    .chart-pair{display:grid;grid-template-columns:1fr 1fr;gap:80px;margin-top:44px}
+    .chart{border:2px solid var(--line);padding:28px;background:var(--panel)}
+    .chart-title{font-size:30px;font-weight:850;margin-bottom:12px}
+    .chart-sub{font-size:23px;color:var(--muted);margin-bottom:24px}
+    .bars{height:350px;display:flex;align-items:flex-end;gap:18px;border-left:3px solid var(--line);border-bottom:3px solid var(--line);padding:20px 18px 0}
+    .bar{flex:1;background:linear-gradient(180deg,var(--cyan),#238a92);min-height:20px}
+    .bar.cpu{background:linear-gradient(180deg,var(--blue),#315ea5)}
+    .axis{display:flex;gap:18px;padding:12px 18px 0}
+    .axis span{flex:1;text-align:center;font:600 20px ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--muted)}
+
+    .flow{display:flex;align-items:center;gap:20px;margin-top:48px}
+    .flow-box{
+      flex:1;min-height:150px;display:grid;place-items:center;text-align:center;padding:22px;
+      border:2px solid var(--line);background:var(--panel);font-size:28px;font-weight:800
+    }
+    .flow-box.active{border-color:var(--cyan)}
+    .flow-box.failed{border-color:var(--danger)}
+    .flow-arrow{font-size:42px;color:var(--cyan);font-weight:900}
+    .flow-arrow.failed{color:var(--danger)}
+
+    .trace-stack{display:grid;gap:24px;margin-top:40px}
+    .trace-row{display:grid;grid-template-columns:180px 1fr;gap:22px;align-items:center}
+    .trace-name{font-size:27px;font-weight:900;color:var(--cyan)}
+    .trace-line{display:flex;align-items:center;gap:12px}
+    .span{padding:17px 20px;border:2px solid var(--line);background:var(--panel);font-size:24px;font-weight:750;white-space:nowrap}
+    .span.active{border-color:var(--cyan)}
+    .trace-arrow{font-size:30px;color:var(--cyan)}
+
+    .tree{margin-top:42px;display:grid;grid-template-columns:1.2fr .8fr;gap:70px}
+    .tree-box{border:2px solid var(--line);padding:28px;background:var(--panel)}
+    .tree-node{padding:15px 20px;border:2px solid var(--cyan);font:750 23px/1.2 ui-monospace,SFMono-Regular,Consolas,monospace;background:#0d192a;margin-bottom:14px}
+    .tree-node.indent-1{margin-left:55px}
+    .tree-node.indent-2{margin-left:110px}
+    .tree-connector{margin-left:75px;height:18px;border-left:3px solid var(--cyan)}
+
+    .privacy{display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-top:38px}
+    .privacy-col{padding:30px;border:2px solid var(--line);background:var(--panel)}
+    .privacy-col.keep{border-top:7px solid var(--cyan)}
+    .privacy-col.drop{border-top:7px solid var(--amber)}
+    .privacy-item{padding:14px 0;border-bottom:1px solid var(--line);font-size:27px}
+    .privacy-item:last-child{border-bottom:0}
+
+    .gate-grid{display:grid;grid-template-columns:1fr 1fr;gap:34px;margin-top:40px}
+    .gate{padding:34px;border:2px solid var(--line);background:var(--panel)}
+    .gate h3{font-size:42px}
+    .gate ul{font-size:27px;line-height:1.55;color:var(--muted)}
+
+    .learning-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:38px}
+    .learning{display:grid;grid-template-columns:70px 1fr;gap:20px;align-items:start;padding:28px;border:2px solid var(--line);background:var(--panel)}
+    .learning .index{font-size:46px;font-weight:950;color:var(--cyan)}
+    .learning h3{font-size:31px}
+    .learning p{font-size:24px;margin-bottom:0}
+
+    .demo-track{margin-top:42px;display:grid;gap:18px}
+    .demo-row{display:grid;grid-template-columns:170px 1fr 235px;gap:18px;align-items:center}
+    .demo-time{font:800 27px ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--cyan)}
+    .demo-action{padding:20px 24px;background:var(--panel);border-left:7px solid var(--cyan);font-size:27px;font-weight:760}
+    .demo-owner{font-size:24px;color:var(--amber);font-weight:800}
+
+    .notes{
+      display:none;position:absolute;z-index:50;left:80px;right:80px;bottom:70px;max-height:300px;
+      overflow:auto;background:rgba(3,8,18,.97);border:2px solid var(--amber);padding:24px 30px;
+      font-size:24px;line-height:1.45;color:var(--text)
+    }
+    body.notes-visible .slide.active .notes{display:block}
+    .navhint{position:absolute;left:var(--edge);bottom:29px;font-size:18px;color:#77869b}
+
+    @media print{
+      html,body{overflow:visible;background:white}
+      .viewport{position:static}
+      .stage{position:static;transform:none!important}
+      .slide{position:relative;display:block!important;page-break-after:always}
+      .chrome{display:none}
+      .notes{display:none!important}
+    }
+  </style>
+</head>
+<body>
+<div class="viewport">
+  <main class="stage" id="stage">
+    <div class="chrome">
+      <div class="progress" id="progress"></div>
+      <div class="brand">INNER COSMOS · CLOUD-NATIVE AI</div>
+      <div class="navhint">← → navigate · N notes · Home / End</div>
+      <div class="counter" id="counter">01 / 20</div>
+    </div>
+
+    <section class="slide active" data-label="Opening">
+      <div class="hero-layout">
+        <div>
+          <div class="eyebrow">Advanced AI Systems on Kubernetes</div>
+          <h1>Cloud-Native Architecture for Advanced AI Systems</h1>
+          <p class="lead">How Inner Cosmos achieves continuity, elasticity, observability and controlled delivery on Kubernetes.</p>
+          <div style="display:flex;gap:16px;margin-top:44px">
+            <span class="tag cyan">Java 21 · Spring Boot</span>
+            <span class="tag cyan">PostgreSQL · pgvector</span>
+            <span class="tag cyan">Redis · Kubernetes</span>
+          </div>
+        </div>
+        <div class="hero-orbit">
+          <div class="orb a"></div><div class="orb b"></div><div class="orb c"></div>
+          <div class="orbit-label" style="right:430px;top:88px">CONVERSATION</div>
+          <div class="orbit-label" style="right:475px;top:482px">MEMORY</div>
+          <div class="orbit-label" style="right:38px;top:496px">RESONANCE</div>
+        </div>
+      </div>
+      <aside class="notes">Opening: Inner Cosmos is the product context, not a decorative demo. The presentation explains how its AI workload changes the requirements placed on Kubernetes.</aside>
+    </section>
+
+    <section class="slide" data-label="Product">
+      <div class="topline"><span class="section-label">01 · The Product</span><span class="speaker">Main speaker · 40 sec</span></div>
+      <h2>From self-understanding to human connection</h2>
+      <div class="product-grid">
+        <div class="shot"><img src="../../evidence/g9/FINAL-E2E-001/screenshots/aurora-en-SG-desktop.png" alt="Aurora conversation interface"><div class="shot-label">Aurora · Interruptible AI conversation</div></div>
+        <div class="shot"><img src="../../evidence/g9/FINAL-E2E-001/screenshots/cosmos-en-SG-desktop.png" alt="Memory and inner cosmos interface"><div class="shot-label">Inner Cosmos · Correctable memory</div></div>
+        <div class="shot"><img src="../../evidence/g9/FINAL-E2E-001/screenshots/resonance-en-SG-desktop.png" alt="Echo Capsule interface"><div class="shot-label">Resonance · Versioned Echo Capsules</div></div>
+        <div class="shot"><img src="../../evidence/g9/FINAL-E2E-001/screenshots/letters-en-SG-desktop.png" alt="Slow social and letters interface"><div class="shot-label">Connection · Slow letters and consent</div></div>
+      </div>
+      <aside class="notes">Do not explain every screen. Establish that this is one coherent product with real Web and mobile surfaces: conversation, long-term understanding, authorized resonance and low-pressure human connection.</aside>
+    </section>
+
+    <section class="slide" data-label="Product journey">
+      <div class="topline"><span class="section-label">01 · The Product</span><span class="speaker">Main speaker · 45 sec</span></div>
+      <h2>One continuous product journey</h2>
+      <p class="lead">The output of one stage becomes governed input to the next.</p>
+      <div class="journey">
+        <div class="journey-step active"><div class="icon">01</div><h3>Conversation</h3><p>Typed multi-message SSE with interruption and replanning.</p></div>
+        <div class="journey-step active"><div class="icon">02</div><h3>Memory</h3><p>Claims retain source, confidence and correction history.</p></div>
+        <div class="journey-step active"><div class="icon">03</div><h3>User Model</h3><p>Longitudinal views of values, relationships and goals.</p></div>
+        <div class="journey-step active"><div class="icon">04</div><h3>Consent</h3><p>The user selects what may enter a Capsule.</p></div>
+        <div class="journey-step active"><div class="icon">05</div><h3>Resonance</h3><p>A versioned AI facet enables low-risk discovery.</p></div>
+        <div class="journey-step active"><div class="icon">06</div><h3>Connection</h3><p>Slow letters precede mutual human contact.</p></div>
+      </div>
+      <aside class="notes">Emphasize governance between stages. Conversation text does not automatically become public social data. Consent and correction are part of the data flow.</aside>
+    </section>
+
+    <section class="slide" data-label="AI runtime">
+      <div class="topline"><span class="section-label">01 · The Product</span><span class="speaker">Main speaker · 70 sec</span></div>
+      <h2>The AI runtime behind the experience</h2>
+      <div class="grid-3" style="margin-top:42px">
+        <div class="card cyan" style="min-height:510px">
+          <div class="num">A</div><h3>Living Aurora</h3>
+          <p>Fast and slow reasoning kernels coordinate through typed conversation plans.</p>
+          <div class="rule"></div>
+          <p class="small"><strong class="accent">Runtime mechanisms</strong><br>Multi-bubble choreography<br>Interrupt / stop / replan<br>Durable WakeIntent</p>
+        </div>
+        <div class="card blue" style="min-height:510px">
+          <div class="num" style="background:var(--blue)">B</div><h3>Correctable Inner Model</h3>
+          <p>Retrieval returns evidence, not an untraceable personality summary.</p>
+          <div class="rule"></div>
+          <p class="small"><strong class="blue">Runtime mechanisms</strong><br>MemoryEvidencePack<br>PostgreSQL + pgvector<br>Provenance and correction</p>
+        </div>
+        <div class="card amber" style="min-height:510px">
+          <div class="num" style="background:var(--amber)">C</div><h3>Authorized Resonance</h3>
+          <p>A Capsule is a versioned compilation of explicitly authorized evidence.</p>
+          <div class="rule"></div>
+          <p class="small"><strong class="amber">Runtime mechanisms</strong><br>Capsule Genome<br>Sandbox and withdrawal<br>Explainable matching</p>
+        </div>
+      </div>
+      <div style="display:flex;gap:18px;margin-top:28px">
+        <span class="tag">Real AI providers</span><span class="tag">Web + Android</span><span class="tag">Durable user data</span><span class="tag">Asynchronous projections</span>
+      </div>
+      <aside class="notes">The application is not a single prompt. These three runtimes create the state, latency, side effects and privacy constraints that the cloud-native design must handle.</aside>
+    </section>
+
+    <section class="slide" data-label="Requirements">
+      <div class="topline"><span class="section-label">02 · Engineering Requirements</span><span class="speaker">Main speaker · 60 sec</span></div>
+      <h2>AI workload characteristics become engineering requirements</h2>
+      <div class="map-table">
+        <div class="map-row">
+          <div class="map-cell"><strong>Long-lived streaming</strong>An Aurora turn keeps intermediate state for tens of seconds.</div>
+          <div class="map-cell arrow">→</div>
+          <div class="map-cell"><strong>Runtime continuity</strong>Pod replacement must not create silent or ambiguous turns.</div>
+        </div>
+        <div class="map-row">
+          <div class="map-cell"><strong>Asynchronous projections</strong>Memory and profile work continues after the user leaves.</div>
+          <div class="map-cell arrow">→</div>
+          <div class="map-cell"><strong>Workload-aware elasticity</strong>Scaling must follow queued work and user waiting.</div>
+        </div>
+        <div class="map-row">
+          <div class="map-cell"><strong>Multiple runtime roles</strong>One journey crosses API, worker and scheduler processes.</div>
+          <div class="map-cell arrow">→</div>
+          <div class="map-cell"><strong>Causal observability</strong>Context must survive asynchronous boundaries.</div>
+        </div>
+        <div class="map-row">
+          <div class="map-cell"><strong>Versioned AI behavior</strong>Models, prompts and runtime policies change independently.</div>
+          <div class="map-cell arrow">→</div>
+          <div class="map-cell"><strong>Controlled delivery</strong>Admission and rollout decisions require explicit signals.</div>
+        </div>
+      </div>
+      <aside class="notes">This replaces the “semantic mismatch” argument. Kubernetes remains domain-agnostic; the application must expose signals that represent its own workload and correctness requirements.</aside>
+    </section>
+
+    <section class="slide" data-label="Architecture">
+      <div class="topline"><span class="section-label">02 · Engineering Requirements</span><span class="speaker">Main speaker · 60 sec</span></div>
+      <h2>Runtime architecture on Kubernetes</h2>
+      <div class="architecture">
+        <div class="arch-row"><div class="arch-label">Experience</div><div class="arch-boxes"><div class="arch-box">React Web / PWA</div><div class="arch-box">Capacitor Android</div><div class="arch-box">Temporary HTTPS Edge</div></div></div>
+        <div class="arch-arrow">↓</div>
+        <div class="arch-row"><div class="arch-label">Interaction</div><div class="arch-boxes"><div class="arch-box highlight">API / SSE</div><div class="arch-box highlight">Aurora Runtime</div><div class="arch-box">Memory Retrieval</div><div class="arch-box">AI Provider Gateway</div></div></div>
+        <div class="arch-arrow">↓ transactional state　　↓ transactional outbox</div>
+        <div class="arch-row"><div class="arch-label">Processing</div><div class="arch-boxes"><div class="arch-box">PostgreSQL + pgvector</div><div class="arch-box">Redis Sessions / Buffer</div><div class="arch-box highlight">Worker</div><div class="arch-box highlight">Scheduler / WakeIntent</div></div></div>
+        <div class="arch-arrow">↓</div>
+        <div class="arch-row"><div class="arch-label">Control Plane</div><div class="arch-boxes"><div class="arch-box">Kubernetes</div><div class="arch-box">KEDA</div><div class="arch-box">OpenTelemetry</div><div class="arch-box">Kyverno</div><div class="arch-box">Argo Rollouts</div></div></div>
+      </div>
+      <aside class="notes">The same Java artifact can run as API, worker, scheduler or migration roles. PostgreSQL is authoritative; Redis contains short-lived session and live-stream state.</aside>
+    </section>
+
+    <section class="slide" data-label="Capabilities">
+      <div class="topline"><span class="section-label">03 · Three Core Capabilities</span><span class="speaker">Team handoff · 40 sec</span></div>
+      <h2>Three cloud-native capabilities carry the technical argument</h2>
+      <div class="grid-3" style="margin-top:38px">
+        <div class="card cap-card cyan">
+          <div class="cap-id">01</div><span class="tag cyan">TEAM MEMBER 1 · 3–3.5 MIN</span>
+          <h3 style="margin-top:30px">Streaming continuity during Pod replacement</h3>
+          <ul><li>Active SSE turn</li><li>Graceful termination</li><li>Hard-failure reconciliation</li></ul>
+        </div>
+        <div class="card cap-card blue">
+          <div class="cap-id">02</div><span class="tag" style="border-color:var(--blue);color:var(--blue)">TEAM MEMBER 2 · 2.5–3 MIN</span>
+          <h3 style="margin-top:30px">Event-driven autoscaling from business backlog</h3>
+          <ul><li>Outbox pressure</li><li>KEDA scale-out</li><li>Lease and inbox correctness</li></ul>
+        </div>
+        <div class="card cap-card amber">
+          <div class="cap-id">03</div><span class="tag amber">TEAM MEMBER 3 · 3–4 MIN</span>
+          <h3 style="margin-top:30px">Distributed tracing across asynchronous boundaries</h3>
+          <ul><li>W3C trace context</li><li>API / worker / scheduler</li><li>Privacy-safe attributes</li></ul>
+        </div>
+      </div>
+      <aside class="notes">Make the team structure explicit. Each member owns a user-visible problem, a design and a measured result—not a list of Kubernetes components.</aside>
+    </section>
+
+    <section class="slide" data-label="Continuity">
+      <div class="topline"><span class="section-label">Capability 1 · Runtime Continuity</span><span class="speaker">Team member 1 · 55 sec</span></div>
+      <h2>What happens when a Pod disappears during an SSE turn?</h2>
+      <div class="timeline">
+        <div class="time-grid">
+          <div class="time-node"><h3>Active turn</h3><p>Multi-bubble response is streaming.</p></div>
+          <div class="time-node"><h3>Readiness changes</h3><p>New Service traffic stops entering.</p></div>
+          <div class="time-node failure"><h3>Pod termination</h3><p>The serving process begins shutdown.</p></div>
+          <div class="time-node"><h3>Existing stream</h3><p>Graceful shutdown allows it to drain.</p></div>
+          <div class="time-node"><h3>Replacement</h3><p>Deployment restores desired capacity.</p></div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:65px;display:flex;align-items:center;justify-content:space-between">
+        <p class="lead" style="margin:0">Routine Pod replacement and abrupt process failure require different recovery paths.</p>
+        <span class="tag amber">GRACEFUL ≠ SIGKILL</span>
+      </div>
+      <aside class="notes">Begin with the user-visible scenario. A graceful Kubernetes termination can drain an existing connection. A true process crash cannot; it requires durable state and reconciliation.</aside>
+    </section>
+
+    <section class="slide" data-label="Continuity design">
+      <div class="topline"><span class="section-label">Capability 1 · Runtime Continuity</span><span class="speaker">Team member 1 · 65 sec</span></div>
+      <h2>Continuity requires Kubernetes and application state</h2>
+      <div class="layers">
+        <div class="layer"><div class="layer-name">Traffic</div><h3>Readiness</h3><p>Remove the terminating Pod from new Service traffic.</p><span class="tag">Kubernetes</span></div>
+        <div class="layer"><div class="layer-name">Process</div><h3>Graceful drain</h3><p><span class="mono">preStop</span>, termination grace and graceful server shutdown.</p><span class="tag">Kubernetes + JVM</span></div>
+        <div class="layer"><div class="layer-name">Live session</div><h3>Redis buffer</h3><p>Preserve session identity, recent events and reconnect context.</p><span class="tag">Application</span></div>
+        <div class="layer"><div class="layer-name">Conversation</div><h3>Durable timeline</h3><p>Persist turn, bubble and event state; reconcile orphaned turns.</p><span class="tag">PostgreSQL</span></div>
+      </div>
+      <div class="card" style="margin-top:32px;border-left:8px solid var(--cyan)">
+        <p class="lead" style="margin:0"><strong>Kubernetes restores serving capacity.</strong> The application restores conversation semantics.</p>
+      </div>
+      <aside class="notes">Explain responsibility boundaries. No individual mechanism provides continuity. The user-visible behavior is a composition of traffic draining, durable state, reconnect semantics and orphan reconciliation.</aside>
+    </section>
+
+    <section class="slide" data-label="Continuity results">
+      <div class="topline"><span class="section-label">Capability 1 · Runtime Continuity</span><span class="speaker">Team member 1 · 70 sec</span></div>
+      <h2>Observed behavior under graceful termination and SIGKILL</h2>
+      <div class="comparison">
+        <div class="side good">
+          <div class="eyebrow green">Graceful Pod termination</div>
+          <div class="result green">COMPLETED</div>
+          <div class="check-list">
+            <div class="check"><span class="mark">✓</span><span>2 of 2 bubbles committed</span></div>
+            <div class="check"><span class="mark">✓</span><span>0 duplicated messages</span></div>
+            <div class="check"><span class="mark">✓</span><span>0 content loss</span></div>
+            <div class="check"><span class="mark">✓</span><span>Deployment restored the replica</span></div>
+          </div>
+        </div>
+        <div class="side bad">
+          <div class="eyebrow danger">Direct JVM SIGKILL</div>
+          <div class="result danger">INTERRUPTED</div>
+          <div class="check-list">
+            <div class="check"><span class="mark warn">!</span><span>The active stream was interrupted</span></div>
+            <div class="check"><span class="mark">✓</span><span>RecoveryJob reached a terminal state in ~22 s</span></div>
+            <div class="check"><span class="mark">✓</span><span>Reconnect returned the terminal state in 1.62 s</span></div>
+            <div class="check"><span class="mark">✓</span><span>No silent two-minute hang</span></div>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:26px"><span class="tag cyan">VALIDATED ON LOCAL KIND · POSTGRESQL + REDIS</span></div>
+      <aside class="notes">Do not call the SIGKILL path “seamless.” The stream cannot continue. The achievement is explicit terminal recovery instead of an indefinite spinner.</aside>
+    </section>
+
+    <section class="slide" data-label="Autoscaling signal">
+      <div class="topline"><span class="section-label">Capability 2 · Workload-Aware Elasticity</span><span class="speaker">Team member 2 · 70 sec</span></div>
+      <h2>API CPU does not represent asynchronous work pressure</h2>
+      <div class="chart-pair">
+        <div class="chart">
+          <div class="chart-title">Oldest ready job age</div>
+          <div class="chart-sub">The user-visible wait continues to rise.</div>
+          <div class="bars">
+            <div class="bar" style="height:9%"></div><div class="bar" style="height:14%"></div><div class="bar" style="height:28%"></div><div class="bar" style="height:45%"></div><div class="bar" style="height:63%"></div><div class="bar" style="height:78%"></div><div class="bar" style="height:91%"></div><div class="bar" style="height:100%"></div>
+          </div>
+          <div class="axis"><span>t0</span><span>t1</span><span>t2</span><span>t3</span><span>t4</span><span>t5</span><span>t6</span><span>t7</span></div>
+        </div>
+        <div class="chart">
+          <div class="chart-title">API CPU utilization</div>
+          <div class="chart-sub">The API remains mostly idle.</div>
+          <div class="bars">
+            <div class="bar cpu" style="height:10%"></div><div class="bar cpu" style="height:9%"></div><div class="bar cpu" style="height:15%"></div><div class="bar cpu" style="height:11%"></div><div class="bar cpu" style="height:10%"></div><div class="bar cpu" style="height:16%"></div><div class="bar cpu" style="height:12%"></div><div class="bar cpu" style="height:11%"></div>
+          </div>
+          <div class="axis"><span>t0</span><span>t1</span><span>t2</span><span>t3</span><span>t4</span><span>t5</span><span>t6</span><span>t7</span></div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:26px;border-left:8px solid var(--blue)"><p class="lead" style="margin:0">Users wait for memory and profile projections—not for CPU utilization.</p></div>
+      <aside class="notes">The API request has already completed. CPU-based HPA can remain flat while memory and profile projections accumulate in the transactional outbox.</aside>
+    </section>
+
+    <section class="slide" data-label="Autoscaling results">
+      <div class="topline"><span class="section-label">Capability 2 · Workload-Aware Elasticity</span><span class="speaker">Team member 2 · 90 sec</span></div>
+      <h2>KEDA scales throughput; idempotency preserves correctness</h2>
+      <div class="flow">
+        <div class="flow-box active">PostgreSQL Outbox<br><span class="small muted">ready count · oldest age</span></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box">OutboxQueueMetrics<br><span class="small muted">Prometheus signal</span></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box active">KEDA ScaledObject</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box active">Worker replicas<br><span class="small muted">1 → 6 → 3 → 1</span></div>
+      </div>
+      <div class="grid-4" style="margin-top:54px">
+        <div class="card"><div class="result">135 → 0</div><div class="result-label">Backlog drained</div></div>
+        <div class="card"><div class="result">~15 s</div><div class="result-label">Scale-out to 6</div></div>
+        <div class="card"><div class="result">1</div><div class="result-label">Inbox receipt</div></div>
+        <div class="card"><div class="result">0</div><div class="result-label">Duplicate groups</div></div>
+      </div>
+      <div class="card" style="margin-top:28px;display:flex;justify-content:space-between;align-items:center">
+        <p style="margin:0;font-size:27px;color:var(--text)">Expired leases were reclaimed after a worker was deleted.</p>
+        <span class="tag cyan">SYNTHETIC BACKLOG · REAL WORKER PATH</span>
+      </div>
+      <aside class="notes">The backlog was synthetic, but it passed through the real schema, repository, lease, worker and inbox path. Scaling does not provide exactly-once effects; the lease and inbox design protects correctness while concurrency changes.</aside>
+    </section>
+
+    <section class="slide" data-label="Tracing topology">
+      <div class="topline"><span class="section-label">Capability 3 · Causal Observability</span><span class="speaker">Team member 3 · 70 sec</span></div>
+      <h2>One user journey spans multiple runtime roles and traces</h2>
+      <div style="display:grid;grid-template-columns:1.45fr .55fr;gap:44px;align-items:stretch">
+        <div class="trace-stack">
+          <div class="trace-row">
+            <div class="trace-name">Trace A</div>
+            <div class="trace-line"><div class="span active">HTTP / SSE</div><span class="trace-arrow">→</span><div class="span">Memory Retrieval</div><span class="trace-arrow">→</span><div class="span">AI Provider</div></div>
+          </div>
+          <div class="trace-row">
+            <div class="trace-name">Trace B</div>
+            <div class="trace-line"><div class="span active">Finish Request</div><span class="trace-arrow">→</span><div class="span">Outbox</div><span class="trace-arrow">→</span><div class="span">Worker</div><span class="trace-arrow">→</span><div class="span">Memory / Profile</div></div>
+          </div>
+          <div class="trace-row">
+            <div class="trace-name">Trace C</div>
+            <div class="trace-line"><div class="span active">Scheduler</div><span class="trace-arrow">→</span><div class="span">WakeIntent Delivery</div></div>
+          </div>
+        </div>
+        <div class="card amber" style="margin-top:40px">
+          <div class="eyebrow amber">Causal rule</div>
+          <p class="small" style="color:var(--text)"><strong>Parent / child</strong><br>Only when one operation causally continues another.</p>
+          <div class="rule"></div>
+          <p class="small" style="color:var(--text)"><strong>Separate trace</strong><br>When a later scheduler action starts a new causal operation.</p>
+        </div>
+      </div>
+      <div class="card" style="margin-top:52px;border-left:8px solid var(--amber)">
+        <p class="lead" style="margin:0">A user journey may contain multiple traces. Only real causal parent-child relationships form one trace tree.</p>
+      </div>
+      <aside class="notes">Correct the previous deck explicitly: the provider/retrieval request, the finish/outbox projection and WakeIntent delivery are not one trace. The important cross-process proof is Trace B.</aside>
+    </section>
+
+    <section class="slide" data-label="Outbox tracing">
+      <div class="topline"><span class="section-label">Capability 3 · Causal Observability</span><span class="speaker">Team member 3 · 85 sec</span></div>
+      <h2>W3C trace context survives the transactional outbox</h2>
+      <div class="tree">
+        <div class="tree-box">
+          <div class="eyebrow">Selected trace · 8 spans</div>
+          <div class="tree-node">API · POST /dialog/session/{id}/finish</div>
+          <div class="tree-connector"></div>
+          <div class="tree-node indent-1">API · secured request</div>
+          <div class="tree-connector" style="margin-left:130px"></div>
+          <div class="tree-node indent-2">WORKER · outbox.consume [CONSUMER]</div>
+          <div class="tree-connector" style="margin-left:185px"></div>
+          <div class="tree-node indent-2" style="margin-left:165px">WORKER · projection.memory</div>
+          <div class="tree-node indent-2" style="margin-left:165px">WORKER · projection.profile</div>
+        </div>
+        <div>
+          <div class="card cyan">
+            <h3>At transaction time</h3>
+            <p>The API stores only the W3C <span class="mono accent">traceparent</span> in the outbox row.</p>
+          </div>
+          <div class="flow-arrow" style="text-align:center;margin:14px 0">↓</div>
+          <div class="card cyan">
+            <h3>At consumption time</h3>
+            <p>The worker restores a remote parent and starts a real <span class="mono accent">CONSUMER</span> span.</p>
+          </div>
+          <p class="small" style="margin-top:26px;color:var(--text)">No manually fabricated synchronous call tree.</p>
+        </div>
+      </div>
+      <aside class="notes">The parent span ID was verified, not inferred from a shared trace ID. Span links are more appropriate for fan-out, batching or long-window derivations—not for this direct remote-parent continuation.</aside>
+    </section>
+
+    <section class="slide" data-label="Tracing privacy">
+      <div class="topline"><span class="section-label">Capability 3 · Causal Observability</span><span class="speaker">Team member 3 · 70 sec</span></div>
+      <h2>Preserve causality without recording user content</h2>
+      <div class="privacy">
+        <div class="privacy-col keep">
+          <h3 class="accent">Recorded</h3>
+          <div class="privacy-item">Runtime role and operation type</div>
+          <div class="privacy-item">Provider category</div>
+          <div class="privacy-item">Model, prompt and strategy version</div>
+          <div class="privacy-item">Latency, fallback and result category</div>
+        </div>
+        <div class="privacy-col drop">
+          <h3 class="amber">Never recorded</h3>
+          <div class="privacy-item">Conversation content</div>
+          <div class="privacy-item">Prompt or completion content</div>
+          <div class="privacy-item">Stable user identifiers</div>
+          <div class="privacy-item">Request bodies or full SQL statements</div>
+        </div>
+      </div>
+      <div class="grid-3" style="margin-top:32px">
+        <div class="card"><div class="result">3</div><div class="result-label">Runtime roles exported</div></div>
+        <div class="card"><div class="result">0</div><div class="result-label">Forbidden attribute keys</div></div>
+        <div class="card"><div class="result">2×</div><div class="result-label">Application + Collector filtering</div></div>
+      </div>
+      <aside class="notes">Trace context contains no baggage or user content. The Collector deletes known sensitive attributes again before export as defense in depth.</aside>
+    </section>
+
+    <section class="slide" data-label="Safe changes">
+      <div class="topline"><span class="section-label">04 · Controlled Change</span><span class="speaker">Main speaker · 75 sec</span></div>
+      <h2>Two controls govern runtime changes</h2>
+      <div class="gate-grid">
+        <div class="gate">
+          <div class="eyebrow accent">Before admission</div>
+          <h3>Kyverno</h3>
+          <p>Reject workloads that violate the validated deployment contract.</p>
+          <ul>
+            <li>Reject root containers</li>
+            <li>Require resource requests and limits</li>
+            <li>Reject <span class="mono">:latest</span> and tag-less images</li>
+          </ul>
+        </div>
+        <div class="gate">
+          <div class="eyebrow amber">After admission</div>
+          <h3>Argo Rollouts</h3>
+          <p>Increase exposure only while the revision remains eligible for traffic.</p>
+          <ul>
+            <li>Weighted canary: 25 → 50 → 100</li>
+            <li>Prometheus availability AnalysisRun</li>
+            <li>Readiness and progress-deadline abort</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card" style="margin-top:30px;border-left:8px solid var(--amber)">
+        <p style="margin:0;font-size:27px;color:var(--text)"><strong>Current proof:</strong> admission, availability and readiness. Model-quality scoring is not part of the validated rollback path.</p>
+      </div>
+      <aside class="notes">Keep this exact. The live Kyverno proof covers three policies, not digest-only or the full Pod Security Standard. The Rollouts proof uses availability AnalysisRun and readiness/progress deadline—not an AI quality metric.</aside>
+    </section>
+
+    <section class="slide" data-label="Rollout result">
+      <div class="topline"><span class="section-label">04 · Controlled Change</span><span class="speaker">Main speaker · 60 sec</span></div>
+      <h2>A 25% canary weight produced 0% canary traffic</h2>
+      <div class="flow" style="margin-top:68px">
+        <div class="flow-box active">HTTPRoute<br><span class="small muted">setWeight 25</span></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box failed">Canary Pod<br><span class="small danger">0 / 1 Ready</span></div>
+        <div class="flow-arrow failed">→</div>
+        <div class="flow-box failed">Service endpoints<br><span class="small danger">0</span></div>
+        <div class="flow-arrow failed">→</div>
+        <div class="flow-box">Actual canary traffic<br><span class="small green">0%</span></div>
+      </div>
+      <div class="grid-3" style="margin-top:62px">
+        <div class="card"><div class="result">~60 s</div><div class="result-label">Progress deadline</div></div>
+        <div class="card"><div class="result">ABORT</div><div class="result-label">Failed revision removed</div></div>
+        <div class="card"><div class="result">4</div><div class="result-label">Stable Pods kept serving</div></div>
+      </div>
+      <div class="card" style="margin-top:30px;border-left:8px solid var(--cyan)"><p class="lead" style="margin:0"><strong>Traffic weight is configuration.</strong> Service endpoints determine actual routing.</p></div>
+      <aside class="notes">The bad canary never entered the Service endpoint set because readiness failed. Rollouts aborted it after the progress deadline while four stable replicas continued serving.</aside>
+    </section>
+
+    <section class="slide" data-label="Lessons">
+      <div class="topline"><span class="section-label">05 · Engineering Lessons</span><span class="speaker">Main speaker · 90 sec</span></div>
+      <h2>What building Inner Cosmos taught us about cloud-native AI</h2>
+      <div class="learning-grid">
+        <div class="learning"><div class="index">01</div><div><h3>Separate infrastructure recovery from application recovery</h3><p>A replacement Pod cannot determine whether an AI turn is complete.</p></div></div>
+        <div class="learning"><div class="index">02</div><div><h3>Scale from user-visible work pressure</h3><p>Queue age represents waiting more directly than API CPU.</p></div></div>
+        <div class="learning"><div class="index">03</div><div><h3>Propagate causality across asynchronous boundaries</h3><p>Per-service dashboards cannot reconstruct a cross-role outcome.</p></div></div>
+        <div class="learning"><div class="index">04</div><div><h3>Connect every platform component to a product invariant</h3><p>A component is useful only when its success and failure are observable.</p></div></div>
+      </div>
+      <aside class="notes">This is the intellectual conclusion for the advisor. Avoid component counting. The learning is how product invariants become control signals, recovery responsibilities and verifiable outcomes.</aside>
+    </section>
+
+    <section class="slide" data-label="Demo">
+      <div class="topline"><span class="section-label">06 · Live Demonstration</span><span class="speaker">All speakers · 10–12 min</span></div>
+      <h2>Demo roadmap</h2>
+      <p class="lead">Start the slow control loop first; use the waiting time to demonstrate continuity and tracing.</p>
+      <div class="demo-track">
+        <div class="demo-row"><div class="demo-time">00:00</div><div class="demo-action">Inject outbox backlog and start observing KEDA in the background.</div><div class="demo-owner">Team member 2</div></div>
+        <div class="demo-row"><div class="demo-time">00:40</div><div class="demo-action">Open an Aurora SSE turn and terminate the serving API Pod.</div><div class="demo-owner">Team member 1</div></div>
+        <div class="demo-row"><div class="demo-time">03:40</div><div class="demo-action">Inspect API and worker traces; verify the outbox parent relationship.</div><div class="demo-owner">Team member 3</div></div>
+        <div class="demo-row"><div class="demo-time">07:00</div><div class="demo-action">Return to KEDA: observe 1 → 6, backlog drain and lease recovery.</div><div class="demo-owner">Team member 2</div></div>
+        <div class="demo-row"><div class="demo-time">09:30</div><div class="demo-action">Show canary isolation and the saved rollback result.</div><div class="demo-owner">Main speaker</div></div>
+      </div>
+      <aside class="notes">Do not wait for KEDA cooldown on a blank screen. Start it first, then run H1 and H3. Return when scale-out and drain are visible. Use saved evidence only if the live control loop exceeds the rehearsal bound.</aside>
+    </section>
+
+    <section class="slide" data-label="Closing">
+      <div class="hero-layout">
+        <div>
+          <div class="eyebrow">Conclusion</div>
+          <h1 style="font-size:96px">Advanced AI systems need more than container orchestration.</h1>
+          <p class="lead">They need application-aware continuity, workload-aware elasticity, causal observability and controlled change.</p>
+          <div style="display:flex;gap:14px;margin-top:42px"><span class="tag cyan">CONTINUITY</span><span class="tag cyan">ELASTICITY</span><span class="tag cyan">OBSERVABILITY</span><span class="tag cyan">DELIVERY</span></div>
+        </div>
+        <div class="hero-orbit">
+          <div class="orb a"></div><div class="orb b"></div><div class="orb c"></div>
+        </div>
+      </div>
+      <aside class="notes">Final sentence: Kubernetes provides reliable control loops; advanced AI systems must expose the application state and signals those control loops need.</aside>
+    </section>
+  </main>
+</div>
+
+<script>
+(() => {
+  const stage = document.getElementById('stage');
+  const slides = [...document.querySelectorAll('.slide')];
+  const counter = document.getElementById('counter');
+  const progress = document.getElementById('progress');
+  let current = 0;
+
+  function fit(){
+    const scale = Math.min(innerWidth / 1920, innerHeight / 1080);
+    stage.style.transform = `translate(${(innerWidth - 1920 * scale) / 2}px,${(innerHeight - 1080 * scale) / 2}px) scale(${scale})`;
+  }
+  function show(index){
+    current = Math.max(0, Math.min(slides.length - 1, index));
+    slides.forEach((slide, i) => slide.classList.toggle('active', i === current));
+    counter.textContent = `${String(current + 1).padStart(2,'0')} / ${String(slides.length).padStart(2,'0')}`;
+    progress.style.width = `${((current + 1) / slides.length) * 100}%`;
+    history.replaceState(null, '', `#${current + 1}`);
+  }
+  addEventListener('resize', fit);
+  addEventListener('keydown', event => {
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+    if (['ArrowRight','PageDown',' '].includes(event.key)){ show(current + 1); event.preventDefault(); }
+    if (['ArrowLeft','PageUp'].includes(event.key)){ show(current - 1); event.preventDefault(); }
+    if (event.key === 'Home'){ show(0); event.preventDefault(); }
+    if (event.key === 'End'){ show(slides.length - 1); event.preventDefault(); }
+    if (event.key.toLowerCase() === 'n'){ document.body.classList.toggle('notes-visible'); event.preventDefault(); }
+  });
+  addEventListener('click', event => {
+    if (document.body.classList.contains('notes-visible')) return;
+    show(event.clientX > innerWidth / 2 ? current + 1 : current - 1);
+  });
+  fit();
+  const requested = Number.parseInt(location.hash.replace('#',''),10);
+  show(Number.isFinite(requested) ? requested - 1 : 0);
+})();
+</script>
+</body>
+</html>

@@ -15,3 +15,15 @@ resources:
   - prometheus.yaml
   - grafana-config.yaml
   - grafana.yaml
+  - kube-state-metrics.yaml
+configMapGenerator:
+  - name: grafana-dashboards
+    namespace: observability
+    files:
+      - dashboards/00-defense-overview.json
+      - dashboards/10-pod-recovery.json
+      - dashboards/20-aurora-ai.json
+      - dashboards/30-product-chain.json
+      - dashboards/40-event-pressure.json
+generatorOptions:
+  disableNameSuffixHash: true

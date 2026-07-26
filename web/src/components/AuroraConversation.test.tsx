@@ -75,21 +75,66 @@ describe("AuroraConversation", () => {
     expect(screen.getByRole("button", { name: "打断并发送" })).toBeEnabled();
   });
 
-  it("auto-scrolls to the newest message as the conversation grows, so a long thread never leaves the reply hidden below the fold", () => {
+  it("auto-follows new messages inside the conversation without scrolling the document", () => {
     const scrollIntoView = vi.spyOn(Element.prototype, "scrollIntoView").mockImplementation(() => {});
     const props = { activeTurnId: null, draft: "", sessionReady: true,
       onDraftChange: () => undefined, onSubmit: (event: FormEvent<HTMLFormElement>) => event.preventDefault(),
       onStop: () => undefined };
     const { rerender } = render(<AuroraConversation {...props} messages={[{ key: "u1", speaker: "USER", text: "第一句" }]} />);
-    expect(scrollIntoView).toHaveBeenCalled();
-    scrollIntoView.mockClear();
+    const conversation = screen.getByRole("region", { name: "与 Aurora 的对话" });
+    Object.defineProperty(conversation, "scrollHeight", { configurable: true, value: 640 });
+    Object.defineProperty(conversation, "clientHeight", { configurable: true, value: 240 });
 
     rerender(<AuroraConversation {...props} messages={[
       { key: "u1", speaker: "USER", text: "第一句" },
       { key: "a1", speaker: "AURORA", text: "第二句", partial: true }
     ]} />);
-    expect(scrollIntoView).toHaveBeenCalled();
+    expect(conversation.scrollTop).toBe(640);
+    expect(scrollIntoView).not.toHaveBeenCalled();
     scrollIntoView.mockRestore();
+  });
+
+  it("stops auto-following when the reader scrolls away from the bottom", () => {
+    const props = { activeTurnId: 7, draft: "", sessionReady: true,
+      onDraftChange: () => undefined, onSubmit: (event: FormEvent<HTMLFormElement>) => event.preventDefault(),
+      onStop: () => undefined };
+    const { rerender } = render(<AuroraConversation {...props} messages={[
+      { key: "u1", speaker: "USER", text: "第一句" },
+      { key: "a1", speaker: "AURORA", text: "正在生成", partial: true }
+    ]} />);
+    const conversation = screen.getByRole("region", { name: "与 Aurora 的对话" });
+    Object.defineProperty(conversation, "scrollHeight", { configurable: true, value: 1000 });
+    Object.defineProperty(conversation, "clientHeight", { configurable: true, value: 300 });
+    conversation.scrollTop = 200;
+    fireEvent.scroll(conversation);
+
+    rerender(<AuroraConversation {...props} messages={[
+      { key: "u1", speaker: "USER", text: "第一句" },
+      { key: "a1", speaker: "AURORA", text: "正在生成更多内容", partial: true }
+    ]} thinkingStage="composing" />);
+
+    expect(conversation.scrollTop).toBe(200);
+  });
+
+  it("resumes auto-following after the reader returns near the bottom", () => {
+    const props = { activeTurnId: 7, draft: "", sessionReady: true,
+      onDraftChange: () => undefined, onSubmit: (event: FormEvent<HTMLFormElement>) => event.preventDefault(),
+      onStop: () => undefined };
+    const { rerender } = render(<AuroraConversation {...props} messages={[
+      { key: "u1", speaker: "USER", text: "第一句" }
+    ]} />);
+    const conversation = screen.getByRole("region", { name: "与 Aurora 的对话" });
+    Object.defineProperty(conversation, "scrollHeight", { configurable: true, value: 1000 });
+    Object.defineProperty(conversation, "clientHeight", { configurable: true, value: 300 });
+    conversation.scrollTop = 650;
+    fireEvent.scroll(conversation);
+
+    rerender(<AuroraConversation {...props} messages={[
+      { key: "u1", speaker: "USER", text: "第一句" },
+      { key: "a1", speaker: "AURORA", text: "第二句", partial: true }
+    ]} />);
+
+    expect(conversation.scrollTop).toBe(1000);
   });
 
   it("offers a goodbye-ritual trigger only when idle and ready, never mid-stream", () => {

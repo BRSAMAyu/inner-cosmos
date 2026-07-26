@@ -18,7 +18,7 @@ const detail = (overrides: Partial<DailyRecordDetail> = {}): DailyRecordDetail =
   fragments: [{ id: 1, fragmentType: "EMOTION", rawExcerpt: "有点累", aiAnalysis: null, reframeText: "先允许自己休息" }],
   emotions: [{ id: 1, emotionName: "疲惫", emotionScore: 6, weatherType: "CLOUDY", triggerScene: "赶作业" }],
   todos: [{ id: 1, taskName: "推进作业", description: "十分钟", priority: "MEDIUM", status: "TODO" }],
-  capsuleSuggested: false, ...overrides
+  relations: [], capsuleSuggested: false, ...overrides
 });
 
 describe("DailyRecordSection", () => {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Locale } from "../i18n";
 
 export type JourneyStep = "aurora" | "memory" | "capsule" | "match" | "letter";
@@ -55,6 +55,8 @@ const COPY: Record<Locale, JourneyCopy> = {
   }
 };
 
+const JOURNEY_STEPS: JourneyStep[] = ["aurora", "memory", "capsule", "match", "letter"];
+
 export function StartHereJourney({
   locale = "zh-CN",
   isDemoSandbox = false,
@@ -68,10 +70,17 @@ export function StartHereJourney({
   completedSteps?: JourneyStep[];
   onStep: (step: JourneyStep) => void;
 }) {
-  const [expanded, setExpanded] = useState(!isDemoSandbox);
   const t = COPY[locale];
-  const completed = new Set(completedSteps);
+  const completed = new Set(completedSteps.filter(step => JOURNEY_STEPS.includes(step)));
+  const journeyComplete = JOURNEY_STEPS.every(step => completed.has(step));
+  const [expanded, setExpanded] = useState(() => !isDemoSandbox && !journeyComplete);
   const firstIncomplete = t.steps.find(step => !completed.has(step.id))?.id;
+
+  useEffect(() => {
+    // Completion is authoritative user data supplied by the parent. Collapse both when a finished
+    // journey first mounts and when the final step completes while this component is open.
+    if (journeyComplete) setExpanded(false);
+  }, [journeyComplete]);
 
   if (isDemoSandbox && demoPresentation === "hidden") return null;
 

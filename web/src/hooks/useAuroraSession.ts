@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { flushSync } from "react-dom";
 import {
   api, replayTurnEvents, streamAurora, subscribeProactive,
-  type GoodbyeResult, type Notification, type PsychologySkillSuggestion, type WakeIntent
+  type DialogSessionSummary, type GoodbyeResult, type Notification,
+  type PsychologySkillSuggestion, type WakeIntent
 } from "../api";
 import type { AuroraStreamEvent, DialogMessage, TurnStatus } from "../protocol";
 import type { AuroraInnerVoice, AuroraUiMessage } from "../components/AuroraConversation";
@@ -30,6 +31,18 @@ export type AuroraMemoryTrace = {
 };
 
 const terminal = new Set<TurnStatus>(["COMPLETED", "INTERRUPTED", "CANCELLED"]);
+
+function localTimeOfDayLabel(hour: number, locale: SkillLocale): string {
+  const english = locale === "en-SG";
+  if (hour >= 5 && hour < 7) return english ? "dawn" : "清晨";
+  if (hour >= 7 && hour < 9) return english ? "early morning" : "早晨";
+  if (hour >= 9 && hour < 12) return english ? "morning" : "上午";
+  if (hour >= 12 && hour < 14) return english ? "noon" : "中午";
+  if (hour >= 14 && hour < 18) return english ? "afternoon" : "下午";
+  if (hour >= 18 && hour < 20) return english ? "evening" : "傍晚";
+  if (hour >= 20 && hour < 23) return english ? "night" : "晚上";
+  return english ? "late night" : "深夜";
+}
 
 const RETURN_DEFAULTS: Record<SkillLocale, { when: string; purpose: string }> = {
   "zh-CN": { when: "明天早上 8:30", purpose: "继续这一刻未说完的话" },
@@ -88,7 +101,7 @@ const STATUS_COPY: Record<SkillLocale, {
 };
 
 function toUi(rows: DialogMessage[]): AuroraUiMessage[] {
-  return rows.map(row => ({ key: `db-${row.id}`, speaker: row.speaker, text: row.textContent }));
+  return rows.map(row => ({ key: `db-${row.id}`, id: row.id, speaker: row.speaker, text: row.textContent }));
 }
 
 export type ResolvedSession = { sessionId: number; returning: WakeIntent | null; aborted: boolean };
@@ -115,6 +128,9 @@ export function useAuroraSession({
 }: UseAuroraSessionOptions) {
   const t = STATUS_COPY[skillLocale];
   const [sessionId, setSessionId] = useState<number | null>(null);
+  const [sessions, setSessions] = useState<DialogSessionSummary[]>([]);
+  const [sessionsBusy, setSessionsBusy] = useState(false);
+  const includeArchivedSessionsRef = useRef(false);
   const [messages, setMessages] = useState<AuroraUiMessage[]>([]);
   const [innerVoice, setInnerVoice] = useState<AuroraInnerVoice | null>(null);
   const [memoryTrace, setMemoryTrace] = useState<AuroraMemoryTrace | null>(null);
@@ -131,7 +147,9 @@ export function useAuroraSession({
   const [safetyAlert, setSafetyAlert] = useState<AuroraSafetyAlert | null>(null);
   const dismissSafetyAlert = useCallback(() => setSafetyAlert(null), []);
   const [safetyResources, setSafetyResources] = useState<string[]>([]);
-  const loadSafetyResources = useCallback(() => api.safetyResources().then(setSafetyResources), []);
+  const loadSafetyResources = useCallback(() =>
+    api.safetyResources(skillLocale, skillLocale === "en-SG" ? "SG" : "CN")
+      .then(setSafetyResources), [skillLocale]);
   const [goodbyeResult, setGoodbyeResult] = useState<GoodbyeResult | null>(null);
   const [goodbyeBusy, setGoodbyeBusy] = useState(false);
   const dismissGoodbye = useCallback(() => setGoodbyeResult(null), []);
@@ -154,6 +172,7 @@ export function useAuroraSession({
   const eventIdsRef = useRef(new Set<string>());
   const lastEventIdRef = useRef("");
   const reconnectingRef = useRef(false);
+  const pendingResumeTurnRef = useRef<number | null>(null);
   const handleEventRef = useRef<(event: AuroraStreamEvent, generation: number) => void>(() => undefined);
   // Gemini audit 4.1 (CONFIRMED/P0): a per-turn generation counter. Every async continuation that
   // can outlive its own turn (recover()'s bounded poll, streamAurora's live event callback, the
@@ -172,6 +191,12 @@ export function useAuroraSession({
 
   const replaceFromHistory = useCallback(async (sid: number) => {
     setMessages(toUi(await api.messages(sid)));
+  }, []);
+
+  const rememberConversationInUrl = useCallback((sid: number) => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("conversation", String(sid));
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
   }, []);
 
   const greet = useCallback(async () => {
@@ -196,14 +221,28 @@ export function useAuroraSession({
   // initial load in one Promise.all, exactly as it did before this extraction, so the original
   // concurrency (and the "abort before the mega-fetch starts" race guard) is preserved.
   const resolveSession = useCallback(async (isStale?: () => boolean): Promise<ResolvedSession> => {
-    const wakeId = Number(new URLSearchParams(window.location.search).get("wakeIntent"));
+    const search = new URLSearchParams(window.location.search);
+    const wakeId = Number(search.get("wakeIntent"));
+    const linkedSessionId = Number(search.get("conversation"));
     const returning = Number.isFinite(wakeId) && wakeId > 0 ? await api.wakeIntent(wakeId) : null;
-    const created = returning?.contextSessionId ? { id: returning.contextSessionId } : await api.createSession();
-    if (isStale?.()) return { sessionId: created.id, returning, aborted: true };
-    setSessionId(created.id);
-    return { sessionId: created.id, returning, aborted: false };
-  }, []);
+    const linked = !returning?.contextSessionId && Number.isFinite(linkedSessionId) && linkedSessionId > 0
+      ? await api.dialogSession(linkedSessionId).catch(() => null)
+      : null;
+    const resumable = returning?.contextSessionId
+      ? { id: returning.contextSessionId, activeTurnId: null }
+      : linked ?? await api.currentDialogSession();
+    const selected = resumable ?? { ...(await api.createSession()), activeTurnId: null };
+    if (isStale?.()) return { sessionId: selected.id, returning, aborted: true };
+    pendingResumeTurnRef.current = selected.activeTurnId;
+    setSessionId(selected.id);
+    rememberConversationInUrl(selected.id);
+    return { sessionId: selected.id, returning, aborted: false };
+  }, [rememberConversationInUrl]);
 
+  const loadSessions = useCallback((includeArchived = false) => {
+    includeArchivedSessionsRef.current = includeArchived;
+    return api.dialogSessions(includeArchived).then(setSessions);
+  }, []);
   const loadWakeIntents = useCallback(() => api.wakeIntents().then(setWakeIntents), []);
   // No .catch() here to match the original bootstrap Promise.all entry: a failure here should
   // fail the whole bootstrap (surfaced via AuroraApp.tsx's bootstrapError), not be swallowed.
@@ -268,6 +307,68 @@ export function useAuroraSession({
       reconnectingRef.current = false;
     }
   }, [finishTurn, isCurrentGeneration, replaceFromHistory, setStatus, t]);
+
+  // A normal page refresh now resumes the server-selected active conversation. If that
+  // conversation was mid-turn, reconnect to its durable timeline after React has committed the
+  // restored session id. PostgreSQL remains transcript truth; Redis only accelerates the live hop.
+  useEffect(() => {
+    const turnId = pendingResumeTurnRef.current;
+    if (!sessionId || !turnId) return;
+    pendingResumeTurnRef.current = null;
+    const generation = beginNewTurnGeneration();
+    activeTurnRef.current = turnId;
+    setActiveTurnId(turnId);
+    void recover(turnId, sessionId, generation);
+  }, [beginNewTurnGeneration, recover, sessionId]);
+
+  const openSession = useCallback(async (selected: DialogSessionSummary) => {
+    abortRef.current?.abort();
+    const generation = beginNewTurnGeneration();
+    activeTurnRef.current = selected.activeTurnId;
+    setActiveTurnId(selected.activeTurnId);
+    setSessionId(selected.id);
+    rememberConversationInUrl(selected.id);
+    setMemoryTrace(null);
+    eventIdsRef.current.clear();
+    lastEventIdRef.current = "";
+    await replaceFromHistory(selected.id);
+    if (selected.activeTurnId) await recover(selected.activeTurnId, selected.id, generation);
+  }, [beginNewTurnGeneration, recover, rememberConversationInUrl, replaceFromHistory]);
+
+  const newConversation = useCallback(async () => {
+    setSessionsBusy(true);
+    try {
+      const created = await api.createSession();
+      const selected: DialogSessionSummary = {
+        id: created.id, title: skillLocale === "en-SG" ? "Aurora conversation" : "Aurora 对话",
+        status: "ACTIVE", messageCount: 0, preview: null, activeTurnId: null,
+        startedAt: new Date().toISOString(), lastActivityAt: new Date().toISOString(),
+        archivedAt: null, pinnedAt: null, updatedAt: new Date().toISOString()
+      };
+      setSessions(current => [selected, ...current]);
+      await openSession(selected);
+    } finally {
+      setSessionsBusy(false);
+    }
+  }, [openSession, skillLocale]);
+
+  const renameConversation = useCallback(async (selected: DialogSessionSummary, title: string) => {
+    const updated = await api.updateDialogSession(selected.id, { title });
+    setSessions(current => current.map(row => row.id === updated.id ? updated : row));
+  }, []);
+
+  const pinConversation = useCallback(async (selected: DialogSessionSummary) => {
+    const updated = await api.updateDialogSession(selected.id, { pinned: !selected.pinnedAt });
+    setSessions(current => current.map(row => row.id === updated.id ? updated : row));
+  }, []);
+
+  const archiveConversation = useCallback(async (selected: DialogSessionSummary) => {
+    const updated = await api.updateDialogSession(selected.id, { archived: !selected.archivedAt });
+    setSessions(current => updated.archivedAt && !includeArchivedSessionsRef.current
+      ? current.filter(row => row.id !== updated.id)
+      : current.map(row => row.id === updated.id ? updated : row));
+    if (selected.id === sessionId) await newConversation();
+  }, [newConversation, sessionId]);
 
   const openMobileWakeIntent = useCallback(async (wakeIntentId: number) => {
     try {
@@ -438,25 +539,28 @@ export function useAuroraSession({
         setStatus(t.interrupted);
         break;
       case "turn.completed":
+        if (sessionId) void replaceFromHistory(sessionId);
       case "done":
         finishTurn(generation);
         setStatus(t.completed);
         break;
       case "safety":
         finishTurn(generation);
-        setSafetyAlert({
-          riskLevel: event.payload.riskLevel,
-          featureTarget: event.payload.featureTarget,
-          safeMessage: event.payload.safeMessage
-        });
-        setStatus(t.safetyStatus);
+        if (event.payload.riskLevel === "HIGH") {
+          setSafetyAlert({
+            riskLevel: event.payload.riskLevel,
+            featureTarget: event.payload.featureTarget,
+            safeMessage: event.payload.safeMessage
+          });
+          setStatus(t.safetyStatus);
+        }
         break;
       case "error":
         finishTurn(generation);
         setStatus(event.payload.message || t.streamErrorFallback);
         break;
     }
-  }, [finishTurn, isCurrentGeneration, onNaturalActionExecuted, setStatus, t]);
+  }, [finishTurn, isCurrentGeneration, onNaturalActionExecuted, replaceFromHistory, sessionId, setStatus, t]);
   handleEventRef.current = handleEvent;
 
   // Deliberately NOT wrapped in useCallback -- matches the original AuroraApp.tsx, where `send`
@@ -486,10 +590,18 @@ export function useAuroraSession({
     lastEventIdRef.current = "";
     const controller = new AbortController();
     abortRef.current = controller;
+    const clientMessageId = crypto.randomUUID();
+    const region = skillLocale === "en-SG" ? "SG" : "CN";
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Shanghai";
+    // Validation hint only: the server derives the authoritative instant from its injected Clock.
+    const localTimeLabel = localTimeOfDayLabel(new Date().getHours(), skillLocale);
     try {
       let foreground: Awaited<ReturnType<typeof api.auroraForeground>> | null = null;
       try {
-        foreground = await api.auroraForeground({ sessionId, message: text, mode });
+        foreground = await api.auroraForeground({
+          sessionId, message: text, mode, clientMessageId, locale: skillLocale, region,
+          timezone, localTimeLabel
+        });
       } catch {
         // The authoritative stream still owns safety and the complete reply. If the fast lane
         // is unavailable, continue without manufacturing a client-side conversational bubble.
@@ -509,6 +621,11 @@ export function useAuroraSession({
         sessionId,
         message: text,
         mode,
+        clientMessageId,
+        locale: skillLocale,
+        region,
+        timezone,
+        localTimeLabel,
         foregroundAcknowledgementSent: Boolean(foreground?.text && !foreground.safetyBlocked),
         foregroundAcknowledgementText: foreground?.text ?? "",
         foregroundAcknowledgementSource: foreground?.source ?? ""
@@ -617,6 +734,7 @@ export function useAuroraSession({
     abortRef.current?.abort();
     beginNewTurnGeneration();
     setSessionId(null);
+    setSessions([]);
     setMessages([]);
     setInnerVoice(null);
     setMemoryTrace(null);
@@ -631,14 +749,15 @@ export function useAuroraSession({
   }, [beginNewTurnGeneration]);
 
   return {
-    sessionId, messages, innerVoice, dismissInnerVoice: () => setInnerVoice(null),
+    sessionId, sessions, sessionsBusy, messages, innerVoice, dismissInnerVoice: () => setInnerVoice(null),
     memoryTrace, dismissMemoryTrace: () => setMemoryTrace(null),
     draft, setDraft, mode, setMode, activeTurnId, runtimeSignal,
     wakeIntents, wakeBusy, returnWhen, setReturnWhen, returnPurpose, setReturnPurpose,
     notifications, safetyAlert, dismissSafetyAlert,
     safetyResources, loadSafetyResources, goodbyeResult, goodbyeBusy, dismissGoodbye, triggerGoodbye,
     send, stop, scheduleReturn, respondToReturn, postponeReturn, cancelReturn,
-    resolveSession, replaceFromHistory, loadWakeIntents, loadNotifications, refreshNotifications,
+    resolveSession, replaceFromHistory, loadSessions, loadWakeIntents, loadNotifications, refreshNotifications,
+    openSession, newConversation, renameConversation, pinConversation, archiveConversation,
     resumeConversation, openMobileWakeIntent, resetSession, greet
   };
 }

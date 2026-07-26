@@ -84,7 +84,7 @@ public class StarfieldExplorerServiceImpl implements StarfieldExplorerService {
 
     private static double layerBand(String layer) {
         return switch (safe(layer).toUpperCase(Locale.ROOT)) {
-            case "EMOTIONAL" -> -55; case "RELATIONAL" -> -25; case "SEMANTIC" -> 5;
+            case "EMOTIONAL" -> -55; case "RELATIONAL" -> -25; case "EPISODIC" -> -5; case "SEMANTIC" -> 15;
             case "PROCEDURAL" -> 35; case "PROSPECTIVE" -> 60; default -> 15;
         };
     }

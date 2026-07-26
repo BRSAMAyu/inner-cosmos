@@ -3,7 +3,77 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#17221f" />
+    <meta name="theme-color" content="#332B28" />
+    <!--
+      Runs before Vite's stylesheet/module so the first paint uses the saved
+      preview, legacy period lock and day/night preference. It has no dynamic
+      code execution and can be authorized by a stable CSP script hash.
+    -->
+    <script id="adaptive-theme-prepaint">
+      (() => {
+        const periods = ["dawn", "morning", "noon", "evening", "dusk", "night", "deep-night"];
+        const periodForHour = (value) => {
+          const hour = ((Math.floor(value) % 24) + 24) % 24;
+          if (hour >= 5 && hour < 7) return "dawn";
+          if (hour >= 7 && hour < 11) return "morning";
+          if (hour >= 11 && hour < 15) return "noon";
+          if (hour >= 15 && hour < 17) return "evening";
+          if (hour >= 17 && hour < 19) return "dusk";
+          if (hour >= 19 && hour < 23) return "night";
+          return "deep-night";
+        };
+        const presentation = {
+          dawn: ["slow", "east", "sparse", .72, .72, "18%", "12%", .28],
+          morning: ["awake", "east", "balanced", 1.08, .9, "30%", "8%", .42],
+          noon: ["still", "overhead", "sparse", .82, .62, "52%", "0%", .06],
+          evening: ["flowing", "west", "balanced", .94, .86, "78%", "12%", -.3],
+          dusk: ["slow", "west", "rich", .78, 1.08, "88%", "22%", -.44],
+          night: ["flowing", "diffuse", "rich", .66, 1.2, "68%", "10%", -.16],
+          "deep-night": ["still", "diffuse", "sparse", .42, .58, "50%", "18%", .04],
+        };
+        let storedHour = null;
+        let storedPeriod = null;
+        let storedScheme = null;
+        try {
+          const rawHour = localStorage.getItem("ic-theme-preview-hour");
+          const parsedHour = rawHour === null ? NaN : Number(rawHour);
+          if (Number.isInteger(parsedHour) && parsedHour >= 0 && parsedHour <= 23) storedHour = parsedHour;
+          const rawPeriod = localStorage.getItem("ic-theme-lock");
+          if (periods.includes(rawPeriod)) storedPeriod = rawPeriod;
+          const rawScheme = localStorage.getItem("ic-color-scheme");
+          if (rawScheme === "day" || rawScheme === "night") storedScheme = rawScheme;
+        } catch {
+          // Storage may be unavailable in privacy-restricted webviews.
+        }
+        const time = storedHour === null
+          ? (storedPeriod || periodForHour(new Date().getHours()))
+          : periodForHour(storedHour);
+        const theme = storedScheme || (time === "night" || time === "deep-night" ? "night" : "day");
+        const values = presentation[time];
+        const root = document.documentElement;
+        root.dataset.time = time;
+        root.dataset.theme = theme;
+        root.dataset.timeMotion = values[0];
+        root.dataset.lightDirection = values[1];
+        root.dataset.ambientDensity = values[2];
+        root.dataset.timeCopy = time;
+        root.style.setProperty("--time-motion-rhythm", String(values[3]));
+        root.style.setProperty("--time-ambient-density", String(values[4]));
+        root.style.setProperty("--time-light-x", values[5]);
+        root.style.setProperty("--time-light-y", values[6]);
+        root.style.setProperty("--time-drift-x", String(values[7]));
+        root.style.colorScheme = theme === "day" ? "light" : "dark";
+        const dayColors = {
+          dawn: "#F7EEE6", morning: "#F3F0E8", noon: "#F6F4EE",
+          evening: "#F4EEE4", dusk: "#F2E7DF",
+        };
+        const nightColors = { night: "#3A302B", "deep-night": "#332E32" };
+        const themeColor = theme === "day"
+          ? (dayColors[time] || "#F7F2EC")
+          : (nightColors[time] || "#332B28");
+        document.querySelector('meta[name="theme-color"]').setAttribute("content", themeColor);
+      })();
+    </script>
     <meta name="description" content="Inner Cosmos — 与 Aurora 保持连续、可打断的真实对话" />
     <title>Aurora · Inner Cosmos</title>
   </head>

@@ -49,6 +49,7 @@ class CapsuleMatchingTest {
     @Mock CapsuleGenomeService genomeService;
     @Mock DataUseGrantService dataUseGrantService;
     @Mock com.innercosmos.mapper.BlockRelationMapper blockRelationMapper;
+    @Mock com.innercosmos.mapper.CapsuleLandingMapper capsuleLandingMapper;
     @Mock com.innercosmos.service.CapsuleEmbeddingIndexService capsuleEmbeddingIndexService;
     @Mock com.innercosmos.service.DataRetractionReceiptService retractionReceiptService;
 
@@ -60,7 +61,7 @@ class CapsuleMatchingTest {
 
     @BeforeEach
     void setUp() {
-        service = new CapsuleServiceImpl(echoCapsuleMapper, boundaryMapper, capsuleAgent,
+        service = new CapsuleServiceImpl(echoCapsuleMapper, boundaryMapper, capsuleLandingMapper, capsuleAgent,
                 memoryCardMapper, userPortraitMapper, authorizedMemoryRefMapper, genomeService, dataUseGrantService,
                 blockRelationMapper, new com.fasterxml.jackson.databind.ObjectMapper(), capsuleEmbeddingIndexService,
                 retractionReceiptService,
@@ -501,6 +502,33 @@ class CapsuleMatchingTest {
 
         assertEquals(scoreOf(first), scoreOf(second));
         assertEquals("为熟悉轨迹留出意外", reasonsOf(first).get(0));
+        assertFalse((Boolean) first.get("resonant"), "cold-start exploration is explicit backfill, not fake resonance");
+    }
+
+    @Test
+    void nonMirrorStrategiesDoNotCallEmbeddingProvider() {
+        stubMemories(memory(1, "复习", "考试压力", "考试", "焦虑"));
+        stubPlaza(capsule(1410L, 999L, "USER_CAPSULE", "远望", "梦想与希望", "[]", 0.5));
+
+        service.matchedCapsules(USER_ID, ResonanceMatchStrategy.COMPLEMENT);
+
+        verify(capsuleEmbeddingIndexService, never()).similarities(any(), any());
+    }
+
+    @Test
+    void markLandedRejectsSelfAndDeduplicatesConcurrentRetries() {
+        EchoCapsule own = capsule(1500L, USER_ID, "USER_CAPSULE", "自己", "intro", "[]", 0.5);
+        when(echoCapsuleMapper.selectByIdForUpdate(1500L)).thenReturn(own);
+        assertEquals("BAD_REQUEST", assertThrows(com.innercosmos.exception.BusinessException.class,
+                () -> service.markLanded(USER_ID, 1500L)).code);
+
+        EchoCapsule other = capsule(1501L, 999L, "USER_CAPSULE", "他人", "intro", "[]", 0.6);
+        when(echoCapsuleMapper.selectByIdForUpdate(1501L)).thenReturn(other);
+        when(capsuleLandingMapper.selectCount(any())).thenReturn(1L);
+
+        assertEquals(0.6, service.markLanded(USER_ID, 1501L));
+        verify(capsuleLandingMapper, never()).insert(any(com.innercosmos.entity.CapsuleLanding.class));
+        verify(echoCapsuleMapper, never()).update(argThat(w -> true), any());
     }
 
     @Test

@@ -6,6 +6,7 @@ import com.innercosmos.mapper.*;
 import com.innercosmos.service.CapsuleService;
 import com.innercosmos.service.DashboardService;
 import com.innercosmos.vo.DashboardVO;
+import com.innercosmos.vo.EchoCapsuleVO;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -56,11 +57,12 @@ public class DashboardServiceImpl implements DashboardService {
         for (Map<String, Object> item : capsuleService.matchedCapsules(userId).stream().limit(3).toList()) {
             Object capsule = item.get("capsule");
             if (capsule instanceof EchoCapsule echoCapsule) {
-                vo.recommendations.add(echoCapsule);
+                vo.recommendations.add(EchoCapsuleVO.fromPublic(echoCapsule));
             }
         }
         if (vo.recommendations.isEmpty()) {
-            vo.recommendations = capsuleMapper.selectList(new QueryWrapper<EchoCapsule>().eq("is_public", true).eq("visibility_status", "PUBLIC").orderByDesc("echo_energy").last("LIMIT 3"));
+            vo.recommendations = capsuleService.plazaCapsules(userId).stream().limit(3)
+                    .map(EchoCapsuleVO::fromPublic).toList();
         }
 
         EmotionTrace trace = emotionTraceMapper.selectOne(new QueryWrapper<EmotionTrace>().eq("user_id", userId).orderByDesc("id").last("LIMIT 1"));

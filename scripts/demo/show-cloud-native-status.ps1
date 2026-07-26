@@ -98,6 +98,8 @@ try {
         -Label "keda_scaledobject"
     Test-OptionalResource -Arguments @("-n", "observability", "get", "deploy,svc") `
         -Label "prometheus_grafana"
+    Test-OptionalResource -Arguments @("-n", "observability", "get", "deployment", "kube-state-metrics") `
+        -Label "kubernetes_pod_state_metrics"
     Test-OptionalResource -Arguments @("-n", $Namespace, "get", "deploy,svc", "-l", "app.kubernetes.io/component=trace-backend") `
         -Label "jaeger"
     Test-OptionalResource -Arguments @("-n", "inner-cosmos-rollouts", "get", "rollout,analysisrun") `
@@ -106,6 +108,8 @@ try {
         -Label "kyverno_policies"
 
     Write-Host "CLOUD_NATIVE_CLUSTER_STATUS_COMPLETE"
+    Write-Host "Grafana dashboard: /d/inner-cosmos-defense"
+    Write-Host "Continuity scene: /d/inner-cosmos-recovery"
     Write-Host "Next: follow docs/demo/CLOUD-NATIVE-PRESENTATION-RUNBOOK.md. This script performs no cluster writes."
 } finally {
     Pop-Location

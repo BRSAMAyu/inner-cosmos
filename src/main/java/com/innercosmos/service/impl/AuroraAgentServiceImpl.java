@@ -56,10 +56,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.time.LocalTime;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -124,6 +124,8 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     private com.innercosmos.service.PromptVersionService promptVersionService; // M-052
     @Autowired(required = false)
     private com.innercosmos.service.EmotionBaselineService emotionBaselineService;
+    @Autowired(required = false)
+    private ApplicationEventPublisher eventPublisher;
     /** Confirmation-gated natural-language bridge to real memories, reminders and settings. */
     @Autowired(required = false)
     private AuroraNaturalActionService naturalActionService;
@@ -221,13 +223,21 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         cancelPreviousTurn(userId, request.sessionId);
         // SAFETY FIRST (VS-003 §1): synchronous safety gate before any model call.
         // recheckSync for distress-bearing messages also completes here, synchronously.
-        SafetyResult safety = safetyService.check(request.message, userId, request.sessionId);
+        SafetyResult safety = safetyService.check(
+                request.message, userId, request.sessionId, request.clientMessageId,
+                request.locale, request.region);
         DialogMessage userMessage = dialogService.saveUserMessage(userId, request);
         Long turnId = beginChoreography(userId, request.sessionId, userMessage);
         if (Boolean.TRUE.equals(safety.blockModelCall)) {
-            return blockedReply(userId, request, safety, userMessage == null ? null : userMessage.id, turnId);
+            AuroraReplyVO blocked = blockedReply(
+                    userId, request, safety, userMessage == null ? null : userMessage.id, turnId);
+            publishTurnPersisted(userId, request.sessionId, userMessage);
+            return blocked;
         }
-        return produceReply(userId, request, safety, userMessage == null ? null : userMessage.id, turnId, true);
+        AuroraReplyVO reply = produceReply(
+                userId, request, safety, userMessage == null ? null : userMessage.id, turnId, true);
+        publishTurnPersisted(userId, request.sessionId, userMessage);
+        return reply;
     }
 
     @Override
@@ -236,7 +246,10 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         SafetyResult safety = safetyService.check(
                 request == null ? null : request.message,
                 userId,
-                request == null ? null : request.sessionId);
+                request == null ? null : request.sessionId,
+                request == null ? null : request.clientMessageId,
+                request == null ? null : request.locale,
+                request == null ? null : request.region);
         if (Boolean.TRUE.equals(safety.blockModelCall)) {
             vo.safetyBlocked = true;
             return vo;
@@ -318,7 +331,8 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         boolean allowMemory = allowMemory(profile);
         AgentContext agentContext = agentContextAssembler.assemble(
                 userId, request.sessionId, request.message, allowMemory,
-                request.latitude, request.longitude);
+                request.latitude, request.longitude,
+                request.timezone, request.locale, request.localTimeLabel);
         AgentContext modelAgentContext = compactAgentContext(agentContext, request.message);
         List<String> gravityMemories = allowMemory ? List.copyOf(modelAgentContext.longTermMemories) : List.of();
         AuroraMemoryContextVO memoryContext = allowMemory
@@ -644,7 +658,11 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         // never stream as free-form consolation (vision §8.5).
         SafetyResult safety;
         try {
-            safety = safetyService.check(message, userId, sessionId);
+            safety = safetyService.check(
+                    message, userId, sessionId,
+                    richContext == null ? null : richContext.clientMessageId,
+                    richContext == null ? null : richContext.locale,
+                    richContext == null ? null : richContext.region);
         } catch (Exception e) {
             log.error("Aurora stream safety check failed: {}", e.getMessage(), e);
             sendOnce(emitter, "error", "{\"message\":\"safety check failed\"}");
@@ -682,8 +700,13 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                     request.speechRate = richContext.speechRate;
                     request.pauseCount = richContext.pauseCount;
                     request.longPauseCount = richContext.longPauseCount;
+                    request.locale = richContext.locale;
+                    request.region = richContext.region;
                     request.timezone = richContext.timezone;
                     request.localTimeLabel = richContext.localTimeLabel;
+                    request.clientMessageId = richContext.clientMessageId;
+                    request.locale = richContext.locale;
+                    request.region = richContext.region;
                     request.weatherType = richContext.weatherType;
                     request.weatherDescription = richContext.weatherDescription;
                     request.temperature = richContext.temperature;
@@ -790,6 +813,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 if (choreographyService != null && reply.turnId != null) {
                     choreographyService.completeTurn(userId, reply.turnId);
                 }
+                publishTurnPersisted(userId, sessionId, userMessage);
                 // VS-003b — meta now carries the full perception payload (agentLoop,
                 // aiState, voice/weather/location/timezone) so the frontend can render
                 // the same panels on stream as on the POST fallback path. Emitted (with
@@ -862,6 +886,13 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             }
         });
         return emitter;
+    }
+
+    private void publishTurnPersisted(Long userId, Long sessionId, DialogMessage userMessage) {
+        if (eventPublisher != null && sessionId != null) {
+            eventPublisher.publishEvent(new com.innercosmos.event.DialogTurnPersistedEvent(
+                    userId, sessionId, userMessage == null ? null : userMessage.id));
+        }
     }
 
     /**
@@ -1060,13 +1091,15 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         UserProfile profile = loadProfile(userId);
         String normalizedMode = normalizeMode(mode);
         boolean allowMemory = allowMemory(profile);
-        AgentContext agentContext = agentContextAssembler.assemble(userId, sessionId, "", allowMemory);
+        AgentContext agentContext = agentContextAssembler.assemble(
+                userId, sessionId, "", allowMemory,
+                null, null, null, outputLanguage(), null);
         AgentContext modelAgentContext = compactAgentContext(agentContext, "");
         List<String> gravityMemories = allowMemory ? List.copyOf(modelAgentContext.longTermMemories) : List.of();
         AuroraMemoryContextVO memoryContext = allowMemory
                 ? alignMemoryContext(memoryContextService.buildContext(userId, sessionId, "", 6, 0), agentContext)
                 : null;
-        String timeLabel = timeLabel();
+        String timeLabel = agentContext.timeLabel;
         ModeStrategy modeStrategy = modeRegistry.get(normalizedMode);
         ResolvedModel resolved = modelRouter.resolve(userId, sessionId);
         Map<String, Object> grounding = greetingGrounding(
@@ -1302,7 +1335,8 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     private ForegroundAcknowledgement fastForegroundAcknowledgement(Long userId, ChatRequest request) {
         long start = System.nanoTime();
         String message = request == null || request.message == null ? "" : request.message.strip();
-        String fallback = localForegroundAcknowledgement(message);
+        ForegroundContinuity continuity = foregroundContinuity(userId, request, message);
+        String fallback = localForegroundAcknowledgement(message, continuity);
         if (message.isBlank()) {
             return new ForegroundAcknowledgement(fallback, "local-empty", elapsedMillis(start));
         }
@@ -1315,7 +1349,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                     fallback, "local-relationship-boundary", elapsedMillis(start));
         }
         CompletableFuture<String> modelCall = CompletableFuture.supplyAsync(
-                () -> modelForegroundAcknowledgement(userId, request, message, fallback), aiExecutor);
+                () -> modelForegroundAcknowledgement(userId, request, message, continuity, fallback), aiExecutor);
         try {
             String candidate = modelCall.get(2_400, TimeUnit.MILLISECONDS);
             String safe = safeForegroundAcknowledgement(candidate, fallback, message);
@@ -1334,12 +1368,14 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     }
 
     private String modelForegroundAcknowledgement(Long userId, ChatRequest request,
-                                                  String message, String fallback) {
+                                                   String message, ForegroundContinuity continuity,
+                                                   String fallback) {
         ResolvedModel resolved = modelRouter.resolve(userId, request.sessionId);
         Map<String, Object> context = new LinkedHashMap<>();
         context.put("userMessage", message);
         context.put("mode", normalizeMode(request.mode));
         context.put("preferredProvider", resolved.provider());
+        context.put("recentConversation", continuity.recentMessages());
         StructuredAiResults.AuroraForegroundResult result = structuredAiService.call(
                 userId,
                 "AURORA_FOREGROUND_" + normalizeMode(request.mode),
@@ -1358,9 +1394,13 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 summary lines about “making space” or “giving each other room”. Do not paraphrase the
                 whole input or invent experience. If advice was explicitly declined, leave one quiet
                 landing point. Even when action advice is requested, this fast kernel only meets the
-                pressure of several tasks arriving together; concrete action belongs to the deep
-                kernel that has seen the full plan.
-                """,
+                 pressure of several tasks arriving together; concrete action belongs to the deep
+                 kernel that has seen the full plan.
+                 A bounded recentConversation may be present only to resolve references such as
+                 “then?”, “continue”, or “what happened next?”. Never introduce a person, work,
+                 event or topic absent from both the current input and recentConversation. If the
+                 current input explicitly changes topic, follow it and ignore the old topic.
+                 """,
                 context,
                 StructuredAiResults.AuroraForegroundResult.class,
                 () -> {
@@ -1373,11 +1413,23 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         return result == null ? null : result.text;
     }
 
-    private String localForegroundAcknowledgement(String message) {
+    private String localForegroundAcknowledgement(String message, ForegroundContinuity continuity) {
         if (message == null || message.isBlank()) {
             return foregroundAcknowledgementFallback().segments.get(0);
         }
         boolean english = !containsHan(message);
+        if (isLowInformationContinuation(message) && !continuity.anchor().isBlank()) {
+            String work = firstNamedWork(continuity.anchor());
+            if (!work.isBlank()) {
+                return english ? "We’ll stay with " + work + " and continue from there."
+                        : "我们继续沿着" + work + "往下说，不换到别的话题。";
+            }
+            String prior = firstConcreteClause(continuity.anchor());
+            if (!prior.isBlank()) {
+                return english ? "I’ll continue from the previous point about “" + prior + "”."
+                        : "我们就接着刚才「" + prior + "」这一点往下说。";
+            }
+        }
 
         boolean noAdvice = message.contains("先别") && (message.contains("方案") || message.contains("建议"))
                 || message.contains("不要给") && (message.contains("方案") || message.contains("建议"))
@@ -1421,6 +1473,43 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                     : "你说的「" + clause + "」，我先不急着替它下结论。";
         }
         return foregroundAcknowledgementFallback().segments.get(0);
+    }
+
+    private ForegroundContinuity foregroundContinuity(Long userId, ChatRequest request, String currentMessage) {
+        if (request == null || request.sessionId == null) return ForegroundContinuity.empty();
+        try {
+            List<DialogMessage> rows = dialogService.messages(request.sessionId);
+            if (rows == null || rows.isEmpty()) return ForegroundContinuity.empty();
+            List<DialogMessage> eligible = rows.stream()
+                    .filter(java.util.Objects::nonNull)
+                    .filter(row -> row.userId == null || userId == null || userId.equals(row.userId))
+                    .filter(row -> row.textContent != null && !row.textContent.isBlank())
+                    .filter(row -> currentMessage == null || !currentMessage.strip().equals(row.textContent.strip()))
+                    .toList();
+            List<String> bounded = eligible.stream()
+                    .skip(Math.max(0, eligible.size() - 4L))
+                    .map(row -> ("USER".equalsIgnoreCase(row.speaker) ? "User: " : "Aurora: ")
+                            + abbreviate(row.textContent, 180))
+                    .toList();
+            if (bounded.isEmpty()) return ForegroundContinuity.empty();
+            String anchor = bounded.get(bounded.size() - 1).replaceFirst("^(?:User|Aurora):\\s*", "");
+            return new ForegroundContinuity(bounded, anchor);
+        } catch (RuntimeException unavailable) {
+            log.debug("Fast foreground continuity unavailable: {}", unavailable.getMessage());
+            return ForegroundContinuity.empty();
+        }
+    }
+
+    private boolean isLowInformationContinuation(String message) {
+        if (message == null) return false;
+        String normalized = message.replaceAll("[\\s，。！？!?…]+", "").toLowerCase(Locale.ROOT);
+        return normalized.matches("(然后呢|继续|继续说|接着呢|接着说|后来呢|往下说|goon|continue|andthen|whatnext)");
+    }
+
+    private String firstNamedWork(String text) {
+        if (text == null || text.isBlank()) return "";
+        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("《[^》\\r\\n]{1,40}》").matcher(text);
+        return matcher.find() ? matcher.group() : "";
     }
 
     private boolean containsHan(String value) {
@@ -1485,6 +1574,11 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     }
 
     private record ForegroundAcknowledgement(String text, String source, long latencyMs) {}
+    private record ForegroundContinuity(List<String> recentMessages, String anchor) {
+        private static ForegroundContinuity empty() {
+            return new ForegroundContinuity(List.of(), "");
+        }
+    }
 
     private static long elapsedMillis(long startedAtNanos) {
         return Math.max(0L, (System.nanoTime() - startedAtNanos) / 1_000_000L);
@@ -1981,6 +2075,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         if (richCtx != null) {
             sb.append(",\"voiceMetadata\":\"").append(escape(voiceMetadata(richCtx))).append("\"");
             sb.append(",\"timezone\":\"").append(escape(richCtx.timezone == null ? "" : richCtx.timezone)).append("\"");
+            sb.append(",\"locale\":\"").append(escape(richCtx.locale == null ? "" : richCtx.locale)).append("\"");
             sb.append(",\"localTimeLabel\":\"").append(escape(richCtx.localTimeLabel == null ? "" : richCtx.localTimeLabel)).append("\"");
             sb.append(",\"weatherType\":\"").append(escape(richCtx.weatherType == null ? "" : richCtx.weatherType)).append("\"");
             sb.append(",\"weatherDescription\":\"").append(escape(richCtx.weatherDescription == null ? "" : richCtx.weatherDescription)).append("\"");
@@ -2340,17 +2435,6 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         if (ai.referencedMemoryIds != null && !ai.referencedMemoryIds.isEmpty()) return ai.referencedMemoryIds;
         if (context != null && context.referencedMemoryIds != null) return context.referencedMemoryIds;
         return List.of();
-    }
-
-    private String timeLabel() {
-        int hour = LocalTime.now().getHour();
-        if (hour < 5) return "深夜";
-        if (hour < 9) return "早晨";
-        if (hour < 12) return "上午";
-        if (hour < 14) return "中午";
-        if (hour < 18) return "下午";
-        if (hour < 22) return "晚上";
-        return "夜里";
     }
 
     private String abbreviate(String text, int max) {

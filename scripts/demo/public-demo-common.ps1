@@ -80,7 +80,12 @@ function Test-PublicDemoHttp {
     try {
         $response = Invoke-WebRequest -UseBasicParsing -Uri "$($Origin.TrimEnd('/'))/actuator/health" `
             -TimeoutSec $TimeoutSec -MaximumRedirection 2
-        $healthy = $response.StatusCode -eq 200 -and $response.Content -match '"status"\s*:\s*"UP"'
+        $content = if ($response.Content -is [byte[]]) {
+            [Text.Encoding]::UTF8.GetString($response.Content)
+        } else {
+            [string]$response.Content
+        }
+        $healthy = $response.StatusCode -eq 200 -and $content -match '"status"\s*:\s*"UP"'
         return [pscustomobject]@{
             Healthy = $healthy
             StatusCode = [int]$response.StatusCode

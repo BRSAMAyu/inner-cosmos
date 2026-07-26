@@ -24,6 +24,38 @@ const SPACE_LABELS_EN: Record<ProductSpace, [string, string]> = {
   me: ["Me", "Control & boundaries"]
 };
 
+export type ProductSpaceStatus = {
+  /** Optional visual count. Omit it for a status-only dot. Zero is treated as no active status. */
+  count?: number;
+  /** Localized announcement, for example "3 unread slow letters". */
+  label: string;
+};
+
+function SpaceGlyph({ space, className = "space-tab-icon" }: {
+  space: ProductSpace; className?: string;
+}) {
+  const shared = {
+    className, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor",
+    strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const,
+    "aria-hidden": true, focusable: false
+  };
+  if (space === "aurora") return <svg {...shared}>
+    <circle cx="12" cy="12" r="4.25" /><path d="M12 2.75v2M12 19.25v2M2.75 12h2M19.25 12h2M5.45 5.45l1.42 1.42M17.13 17.13l1.42 1.42" />
+  </svg>;
+  if (space === "cosmos") return <svg {...shared}>
+    <circle cx="12" cy="12" r="2.6" /><path d="M3.5 12c2.1-4.5 6.1-7 10-5.7 3.8 1.3 5.4 5.8 3.4 9.3-2.1 3.6-7 4.6-10.2 2.2" /><circle cx="18.25" cy="7.25" r=".8" fill="currentColor" stroke="none" />
+  </svg>;
+  if (space === "resonance") return <svg {...shared}>
+    <circle cx="8.2" cy="12" r="3.2" /><circle cx="15.8" cy="12" r="3.2" /><path d="M10.65 9.95c.9-.75 1.8-.75 2.7 0M10.65 14.05c.9.75 1.8.75 2.7 0" />
+  </svg>;
+  if (space === "letters") return <svg {...shared}>
+    <rect x="3.25" y="5.5" width="17.5" height="13" rx="2.25" /><path d="m4.5 7 7.5 5.75L19.5 7" />
+  </svg>;
+  return <svg {...shared}>
+    <circle cx="12" cy="8" r="3.25" /><path d="M5.75 20c.45-4 2.55-6 6.25-6s5.8 2 6.25 6" />
+  </svg>;
+}
+
 export function initialProductSpace(search = window.location.search): ProductSpace {
   const value = new URLSearchParams(search).get("space");
   return productSpaces.some(([space]) => space === value) ? value as ProductSpace : "aurora";
@@ -107,21 +139,30 @@ export function letterThreadPath(id: number): string {
   return `${spacePaths.letters}/thread/${id}`;
 }
 
-export function ProductShellNavigation({ active, onNavigate, locale = "zh-CN" }: {
+export function ProductShellNavigation({ active, onNavigate, locale = "zh-CN", spaceStatus }: {
   active: ProductSpace; onNavigate: (space: ProductSpace) => void; locale?: Locale;
+  spaceStatus?: Partial<Record<ProductSpace, ProductSpaceStatus>>;
 }) {
   return <nav className="app-shell-nav" aria-label={locale === "en-SG" ? "Inner Cosmos, five spaces" : "Inner Cosmos 五个空间"}>
-    <div className="app-mark"><span aria-hidden="true">✦</span><strong>Inner Cosmos</strong></div>
+    <div className="app-mark"><SpaceGlyph space="aurora" className="app-mark-icon" /><strong>Inner Cosmos</strong></div>
     <div className="space-tabs">{productSpaces.map(([value, zhLabel, zhDescription]) => {
       const [label, description] = locale === "en-SG" ? SPACE_LABELS_EN[value] : [zhLabel, zhDescription];
+      const status = spaceStatus?.[value];
+      const hasStatus = Boolean(status && (status.count == null || status.count > 0));
+      const accessibleLabel = `${label} · ${description}${hasStatus ? ` · ${status!.label}` : ""}`;
       // W2 UIUX audit: <strong>label</strong><small>description</small> sit adjacent with no
       // whitespace in the DOM, so a screen reader concatenates them into one run-on word (verified
       // live: textContent === "今天Aurora"). An explicit aria-label gives assistive tech a properly
       // separated announcement while the two-line visual layout is unchanged for sighted users.
       return <button type="button" key={value} className={active === value ? "active" : ""}
-        aria-current={active === value ? "page" : undefined} aria-label={`${label} · ${description}`}
+        aria-current={active === value ? "page" : undefined} aria-label={accessibleLabel}
+        data-has-status={hasStatus ? "true" : undefined}
         onClick={() => onNavigate(value)}>
+        <SpaceGlyph space={value} />
         <strong aria-hidden="true">{label}</strong><small aria-hidden="true">{description}</small>
+        {hasStatus && <span className="space-tab-status" aria-hidden="true">
+          {status!.count == null ? <i /> : status!.count > 99 ? "99+" : status!.count}
+        </span>}
       </button>;
     })}</div>
   </nav>;
@@ -208,6 +249,51 @@ export function ConnectionSubNav({ active, onNavigate, locale = "zh-CN" }: {
   </nav>;
 }
 
+export type MeTab = "overview" | "profile" | "account" | "appearance" | "data";
+
+export const meTabs: Array<[MeTab, string, string, string]> = [
+  ["overview", "总览", "Overview", ""],
+  ["profile", "画像与理解", "Profile & understanding", "profile"],
+  ["account", "账户与设备", "Account & devices", "account"],
+  ["appearance", "语言与外观", "Language & appearance", "appearance"],
+  ["data", "数据权利", "Data rights", "data-rights"]
+];
+
+export function meTabPath(tab: MeTab): string {
+  const segment = meTabs.find(([value]) => value === tab)?.[3] ?? "";
+  return segment ? `${spacePaths.me}/${segment}` : spacePaths.me;
+}
+
+export function meTabFromPath(pathname: string): MeTab {
+  const resource = resourceFromPath(pathname).resource;
+  return meTabs.find(([, , , segment]) => segment === (resource ?? ""))?.[0] ?? "overview";
+}
+
+export function MeSubNav({ active, onNavigate, locale = "zh-CN" }: {
+  active: MeTab; onNavigate: (tab: MeTab) => void; locale?: Locale;
+}) {
+  return <nav className="cosmos-sub-nav me-sub-nav"
+    aria-label={locale === "en-SG" ? "Me sections" : "我的空间分区导航"}>
+    {meTabs.map(([value, zh, en]) =>
+      <button type="button" key={value} className={active === value ? "active" : ""}
+        aria-current={active === value ? "page" : undefined}
+        onClick={() => onNavigate(value)}>{locale === "en-SG" ? en : zh}</button>)}
+  </nav>;
+}
+
+export function AppearanceSettings({ locale = "zh-CN" }: { locale?: Locale }) {
+  const en = locale === "en-SG";
+  return <section className="controls-space appearance-settings"
+    aria-label={en ? "Language and appearance" : "语言与外观"}>
+    <span className="eyebrow">{en ? "LANGUAGE & APPEARANCE" : "语言与外观"}</span>
+    <h1>{en ? "Let the interface meet your light and language." : "让界面适应你的光线与语言。"}</h1>
+    <p>{en
+      ? "Choose a steady light or let the atmosphere follow local time. Language stays a separate, reversible preference."
+      : "你可以固定光线，也可以让氛围跟随当地时间；语言始终是独立、可随时更改的偏好。"}</p>
+    <AppearanceToggle locale={locale} />
+  </section>;
+}
+
 const ME_COPY: Record<Locale, {
   ariaLabel: string; eyebrow: string; heading: string; intro: string;
   device: string; deviceNative: string; deviceWeb: string; online: string; offline: string;
@@ -259,7 +345,6 @@ export function MeSpace({ native, connected, wakeIntentCount, activeClaimCount, 
       <article><strong>{t.resonance}</strong><span>{t.resonanceValue(publicCapsuleCount, friendCount)}</span><button type="button" onClick={() => onNavigate("resonance")}>{t.resonanceAction}</button></article>
       <article><strong>{t.safety}</strong><span>{t.safetyValue}</span><button type="button" onClick={onOpenSafetyHarbor}>{t.safetyAction}</button></article>
     </div>
-    <AppearanceToggle locale={locale} />
     {native && <div className="mobile-actions"><button type="button" onClick={onRequestPush}>{t.push}</button><button type="button" onClick={onRequestMicrophone}>{t.mic}</button></div>}
     <button type="button" className="danger-quiet" onClick={onLogout}>{t.logout}</button>
   </section>;

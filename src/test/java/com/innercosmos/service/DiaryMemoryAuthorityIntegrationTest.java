@@ -55,7 +55,7 @@ class DiaryMemoryAuthorityIntegrationTest {
                 .eq("user_id", owner).eq("provenance_refs", provenance))).isEqualTo(1);
 
         var beforeForget = retrievalService.retrieve(owner, new MemoryRetrievalQuery(
-                "", "AURORA_CONVERSATION", List.of(), 8, 800, false));
+                diaryText, "AURORA_CONVERSATION", List.of(), 8, 800, false));
         assertThat(beforeForget.evidence()).anySatisfy(evidence -> {
             assertThat(evidence.memoryId()).isEqualTo(card.id);
             assertThat(evidence.versionNo()).isEqualTo(1);
@@ -72,7 +72,7 @@ class DiaryMemoryAuthorityIntegrationTest {
         assertThat(forgotten.versionNo).isEqualTo(2);
         assertThat(forgotten.provenanceRefs).isNull();
         assertThat(retrievalService.retrieve(owner, new MemoryRetrievalQuery(
-                "", "AURORA_CONVERSATION", List.of(), 8, 800, false)).evidence())
+                diaryText, "AURORA_CONVERSATION", List.of(), 8, 800, false)).evidence())
                 .noneMatch(evidence -> evidence.memoryId().equals(card.id));
         assertThat(lifecycleService.history(owner, card.id))
                 .anySatisfy(operation -> {

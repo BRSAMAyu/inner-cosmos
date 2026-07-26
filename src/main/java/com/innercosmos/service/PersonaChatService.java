@@ -8,6 +8,9 @@ import java.util.List;
 public interface PersonaChatService {
     PersonaChatSession create(Long userId, Long capsuleId);
 
+    /** Latest resumable ACTIVE session owned by this visitor, or null. */
+    PersonaChatSession activeSession(Long userId, Long capsuleId);
+
     PersonaChatMessage reply(Long userId, Long sessionId, String message);
 
     List<PersonaChatMessage> messages(Long sessionId);

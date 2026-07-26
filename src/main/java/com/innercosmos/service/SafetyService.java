@@ -9,4 +9,13 @@ public interface SafetyService {
     List<String> resources();
 
     SafetyResult check(String text, Long userId, Long sessionId);
+
+    default List<String> resources(String locale, String region) {
+        return resources();
+    }
+
+    default SafetyResult check(String text, Long userId, Long sessionId, String observationId,
+                               String locale, String region) {
+        return check(text, userId, sessionId);
+    }
 }

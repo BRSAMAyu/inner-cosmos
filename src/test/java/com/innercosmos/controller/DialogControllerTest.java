@@ -18,6 +18,7 @@ import java.util.UUID;
 
 import static org.hamcrest.Matchers.notNullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -77,6 +78,47 @@ class DialogControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.title").value("My custom title"));
+    }
+
+    @Test
+    void refreshCurrentSession_returnsLatestActiveConversationInsteadOfCreatingAnother() throws Exception {
+        long sessionId = createSession("Refresh-safe conversation");
+
+        mockMvc.perform(get("/api/dialog/session/current").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(sessionId))
+                .andExpect(jsonPath("$.data.title").value("Refresh-safe conversation"));
+    }
+
+    @Test
+    void sessionHistory_supportsRenamePinAndArchiveWithoutDeletingMessages() throws Exception {
+        long sessionId = createSession("Organize me");
+
+        mockMvc.perform(patch("/api/dialog/session/" + sessionId)
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Renamed conversation\",\"pinned\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.title").value("Renamed conversation"))
+                .andExpect(jsonPath("$.data.pinnedAt").isNotEmpty());
+
+        mockMvc.perform(get("/api/dialog/session").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value(sessionId));
+
+        mockMvc.perform(patch("/api/dialog/session/" + sessionId)
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"archived\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.archivedAt").isNotEmpty());
+
+        mockMvc.perform(get("/api/dialog/session").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isEmpty());
+
+        mockMvc.perform(get("/api/dialog/session/" + sessionId + "/messages").session(session))
+                .andExpect(status().isOk());
     }
 
     // ---------------- Messages ----------------

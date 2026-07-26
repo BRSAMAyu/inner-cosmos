@@ -84,8 +84,49 @@ describe("ResonanceNetwork", () => {
       onStartPersonaConversation={() => undefined} onPersonaDraftChange={() => undefined} onSendPersonaTurn={() => undefined}
       onLetterTitleChange={() => undefined} onLetterBodyChange={() => undefined} onSendLetter={() => undefined} />);
 
-    expect(screen.getByText("今天还可以聊 0 轮")).toBeVisible();
+    expect(screen.getByText(/今天的对话额度已用完/)).toBeVisible();
     expect(screen.getByRole("button", { name: "发送这一轮" })).toBeDisabled();
+  });
+
+  it("uses the server match tier as a friendly visible badge", () => {
+    render(<ResonanceNetwork resonanceMatches={[{ ...match, matchTier: "NONE", resonant: false }]} resonanceStrategy="MIRROR"
+      visitorBusy={false} visitorMatch={null} personaSession={null} personaMessages={[]} personaDraft="" personaQuota={null}
+      letterTitle="" letterBody="" sentLetter={null} onChooseStrategy={() => undefined} onChooseMatch={() => undefined}
+      onStartPersonaConversation={() => undefined} onPersonaDraftChange={() => undefined} onSendPersonaTurn={() => undefined}
+      onLetterTitleChange={() => undefined} onLetterBodyChange={() => undefined} onSendLetter={() => undefined} />);
+    expect(screen.getByText("探索相遇")).toBeVisible();
+  });
+
+  it("lets a capsule reply be marked as landed once and then disables repeat taps", () => {
+    const onMarkLanded = vi.fn();
+    const session: PersonaSession = { id: 1, capsuleId: 4, status: "ACTIVE", turnCount: 1, dailyLimit: 5 };
+    const messages: PersonaMessage[] = [{ id: 1, sessionId: 1, senderType: "CAPSULE", textContent: "谢谢你愿意说" }];
+    const props = {
+      resonanceMatches: [match], resonanceStrategy: "MIRROR" as const, visitorBusy: false, visitorMatch: match,
+      personaSession: session, personaMessages: messages, personaDraft: "", personaQuota: { turnCount: 1, remaining: 4, dailyLimit: 5, seed: false, quotaDate: "2026-07-25" },
+      letterTitle: "", letterBody: "", sentLetter: null, onChooseStrategy: () => undefined, onChooseMatch: () => undefined,
+      onStartPersonaConversation: () => undefined, onPersonaDraftChange: () => undefined, onSendPersonaTurn: () => undefined,
+      onLetterTitleChange: () => undefined, onLetterBodyChange: () => undefined, onSendLetter: () => undefined,
+      onMarkLanded
+    };
+    const rendered = render(<ResonanceNetwork {...props} landed={false} />);
+    fireEvent.click(screen.getByRole("button", { name: "这条落在了我心里" }));
+    expect(onMarkLanded).toHaveBeenCalledOnce();
+    rendered.rerender(<ResonanceNetwork {...props} landed />);
+    expect(screen.getByRole("button", { name: "已留下回声" })).toBeDisabled();
+  });
+
+  it("does not render a slow-letter entry when the owner's boundary explicitly forbids it", () => {
+    const noLetterMatch: CapsuleMatch = { ...match, capsule: { ...match.capsule, allowLetterRequest: false } };
+    const session: PersonaSession = { id: 1, capsuleId: 4, status: "ACTIVE", turnCount: 1, dailyLimit: 5 };
+    render(<ResonanceNetwork resonanceMatches={[noLetterMatch]} resonanceStrategy="MIRROR" visitorBusy={false}
+      visitorMatch={noLetterMatch} personaSession={session}
+      personaMessages={[{ id: 1, sessionId: 1, senderType: "CAPSULE", textContent: "谢谢你愿意说" }]}
+      personaDraft="" personaQuota={{ turnCount: 1, remaining: 4, dailyLimit: 5, seed: false, quotaDate: "2026-07-25" }}
+      letterTitle="题目" letterBody="" sentLetter={null} onChooseStrategy={() => undefined} onChooseMatch={() => undefined}
+      onStartPersonaConversation={() => undefined} onPersonaDraftChange={() => undefined} onSendPersonaTurn={() => undefined}
+      onLetterTitleChange={() => undefined} onLetterBodyChange={() => undefined} onSendLetter={() => undefined} />);
+    expect(screen.queryByLabelText("慢信正文")).not.toBeInTheDocument();
   });
 
   it("lets a visitor report or block mid-chat, without waiting for a delivered letter", () => {

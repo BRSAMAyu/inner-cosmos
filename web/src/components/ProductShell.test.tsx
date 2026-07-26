@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { capsulePath, connectionTabFromSearch, connectionTabPath, ConnectionSubNav, initialProductSpace, letterThreadPath, MeSpace, productSpaceFromPath, ProductShellNavigation, resonanceTabFromPath, resonanceTabPath, ResonanceSubNav, resourceFromPath, spacePath } from "./ProductShell";
+import { capsulePath, connectionTabFromSearch, connectionTabPath, ConnectionSubNav, initialProductSpace, letterThreadPath, MeSpace, meTabFromPath, meTabPath, MeSubNav, productSpaceFromPath, ProductShellNavigation, resonanceTabFromPath, resonanceTabPath, ResonanceSubNav, resourceFromPath, spacePath } from "./ProductShell";
 
 afterEach(cleanup);
 
@@ -117,6 +117,34 @@ describe("ProductShell", () => {
     expect(onNavigate).toHaveBeenCalledWith("resonance");
   });
 
+  it("uses one decorative SVG glyph system for all five spaces without emoji text", () => {
+    render(<ProductShellNavigation active="aurora" onNavigate={() => undefined} />);
+    const buttons = screen.getAllByRole("button");
+    expect(buttons).toHaveLength(5);
+    for (const button of buttons) {
+      const glyph = button.querySelector("svg.space-tab-icon");
+      expect(glyph).toBeInTheDocument();
+      expect(glyph).toHaveAttribute("aria-hidden", "true");
+      expect(glyph).toHaveAttribute("focusable", "false");
+    }
+    expect(document.querySelector(".app-mark svg.app-mark-icon")).toBeInTheDocument();
+    expect(document.querySelector(".app-mark")?.textContent).toBe("Inner Cosmos");
+  });
+
+  it("exposes optional unread or status information visually and in the accessible tab name", () => {
+    render(<ProductShellNavigation active="aurora" onNavigate={() => undefined}
+      spaceStatus={{
+        letters: { count: 3, label: "3 封未读慢信" },
+        resonance: { label: "有新的共鸣" }
+      }} />);
+    expect(screen.getByRole("button", { name: "连接 · 慢信与关系 · 3 封未读慢信" }))
+      .toHaveAttribute("data-has-status", "true");
+    expect(screen.getByRole("button", { name: "共鸣 · 共鸣体与相遇 · 有新的共鸣" }))
+      .toHaveAttribute("data-has-status", "true");
+    expect(screen.getByText("3")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByRole("button", { name: "今天 · Aurora" })).not.toHaveAttribute("data-has-status");
+  });
+
   // W2 UIUX audit: <strong>label</strong><small>description</small> sit adjacent with no
   // whitespace in the DOM (verified live: textContent === "今天Aurora"), so a screen reader would
   // concatenate them into one run-on word. An explicit aria-label with a separator gives assistive
@@ -177,6 +205,26 @@ describe("ProductShell", () => {
     render(<MeSpace {...props} locale="zh-CN" />);
     fireEvent.click(screen.getByRole("button", { name: /安全避风港/ }));
     expect(onOpenSafetyHarbor).toHaveBeenCalledOnce();
+  });
+
+  it("provides shareable Me sections for profile, account, appearance and data rights", () => {
+    expect(meTabFromPath("/me")).toBe("overview");
+    expect(meTabFromPath("/me/profile")).toBe("profile");
+    expect(meTabFromPath("/me/account")).toBe("account");
+    expect(meTabFromPath("/me/appearance")).toBe("appearance");
+    expect(meTabFromPath("/me/data-rights")).toBe("data");
+    expect(meTabFromPath("/me/unknown")).toBe("overview");
+    expect(meTabPath("overview")).toBe("/me");
+    expect(meTabPath("data")).toBe("/me/data-rights");
+  });
+
+  it("renders a concise bilingual Me secondary navigation", () => {
+    const onNavigate = vi.fn();
+    const { rerender } = render(<MeSubNav active="overview" onNavigate={onNavigate} />);
+    fireEvent.click(screen.getByRole("button", { name: "画像与理解" }));
+    expect(onNavigate).toHaveBeenCalledWith("profile");
+    rerender(<MeSubNav active="data" onNavigate={onNavigate} locale="en-SG" />);
+    expect(screen.getByRole("button", { name: "Data rights" })).toHaveAttribute("aria-current", "page");
   });
 
   // W2 UIUX audit follow-up: the earlier run-on-naming fix (above) swapped the space tab's label

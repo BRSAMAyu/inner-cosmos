@@ -11,7 +11,7 @@ kind: ConfigMap
 metadata:
   name: inner-cosmos-config
 data:
-  INNER_COSMOS_EXPECTED_SCHEMA_VERSION: "23"
+  INNER_COSMOS_EXPECTED_SCHEMA_VERSION: "31"
   SPRING_PROFILES_ACTIVE: dev,postgres
   SPRING_DATASOURCE_URL: jdbc:postgresql://inner-cosmos-postgres:5432/inner_cosmos
   SPRING_DATASOURCE_USERNAME: inner_cosmos

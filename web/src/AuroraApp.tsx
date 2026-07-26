@@ -5,8 +5,10 @@ import { api, apiConfigurationError, configureBearerAuth, demoModeBuild, hasConf
 import { initialMobileState, mobileRuntime, type MobileRuntimeState } from "./mobile";
 import { mobileOidc } from "./mobile-auth";
 import { isTauriRuntime } from "./desktop-runtime";
-import { capsulePath, connectionTabFromSearch, connectionTabPath, ConnectionSubNav, letterThreadPath, MeSpace, productSpaceFromPath, productSpaces, ProductShellNavigation, resourceFromPath, spacePath, type ConnectionTab, type ProductSpace, type CosmosTab, cosmosTabFromPath, cosmosTabPath, CosmosSubNav, type ResonanceTab, resonanceTabFromPath, resonanceTabPath, ResonanceSubNav } from "./components/ProductShell";
+import { reloadPersonaCandidates, resumeOrCreatePersonaConversation } from "./personaExperience";
+import { AppearanceSettings, capsulePath, connectionTabFromSearch, connectionTabPath, ConnectionSubNav, letterThreadPath, MeSpace, meTabFromPath, meTabPath, MeSubNav, productSpaceFromPath, productSpaces, ProductShellNavigation, resourceFromPath, spacePath, type ConnectionTab, type ProductSpace, type CosmosTab, cosmosTabFromPath, cosmosTabPath, CosmosSubNav, type ResonanceTab, resonanceTabFromPath, resonanceTabPath, ResonanceSubNav } from "./components/ProductShell";
 import { AuroraConversation } from "./components/AuroraConversation";
+import { ConversationHistory } from "./components/ConversationHistory";
 import { QuickHello } from "./components/QuickHello";
 import { StartHereJourney, type JourneyStep } from "./components/StartHereJourney";
 import { AuroraInnerVoiceAside } from "./components/AuroraInnerVoiceAside";
@@ -103,8 +105,10 @@ export function AuroraApp() {
   const cosmosTab = useMemo(() => cosmosTabFromPath(location.pathname), [location.pathname]);
   const resonanceTab = useMemo(() => resonanceTabFromPath(location.pathname), [location.pathname]);
   const connectionTab = useMemo(() => connectionTabFromSearch(location.search), [location.search]);
+  const meTab = useMemo(() => meTabFromPath(location.pathname), [location.pathname]);
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [status, setStatus] = useState(initialDrafts.connecting);
+  const [statusVisible, setStatusVisible] = useState(true);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
   const [selfEvolution, setSelfEvolution] = useState<SelfEvolution | null>(null);
   const [selfBusy, setSelfBusy] = useState(false);
@@ -118,6 +122,7 @@ export function AuroraApp() {
   const [retiringCorrectionId, setRetiringCorrectionId] = useState<number | null>(null);
   const [claimCandidates, setClaimCandidates] = useState<ClaimCandidate[]>([]);
   const [claimCandidateBusyId, setClaimCandidateBusyId] = useState<number | null>(null);
+  const [capsulePersonaClaimIds, setCapsulePersonaClaimIds] = useState<number[]>([]);
   const [portrait, setPortrait] = useState<PortraitDimension[]>([]);
   const [portraitHistory, setPortraitHistory] = useState<Record<string, PortraitHistoryEntry[]>>({});
   const [portraitBusy, setPortraitBusy] = useState<string | null>(null);
@@ -146,6 +151,7 @@ export function AuroraApp() {
   const [capsules, setCapsules] = useState<EchoCapsule[]>([]);
   const [selectedCapsuleId, setSelectedCapsuleId] = useState<number | null>(null);
   const [genomeHistory, setGenomeHistory] = useState<CapsuleGenomeVersion[]>([]);
+  const [genomeHistoryError, setGenomeHistoryError] = useState(false);
   const [fidelitySummary, setFidelitySummary] = useState<CapsuleFidelitySummary[]>([]);
   const [selectedMemoryIds, setSelectedMemoryIds] = useState<number[]>([]);
   const [capsuleName, setCapsuleName] = useState("");
@@ -153,11 +159,13 @@ export function AuroraApp() {
   const [capsuleOwnerNote, setCapsuleOwnerNote] = useState("");
   const [capsuleStandIn, setCapsuleStandIn] = useState(false);
   const [capsuleContactPolicy, setCapsuleContactPolicy] = useState("LETTER_ONLY");
+  const [capsulePrivacy, setCapsulePrivacy] = useState<"STRICT" | "BALANCED" | "OPEN">("STRICT");
   const [personaTurnError, setPersonaTurnError] = useState<string | null>(null);
   const [capsulePreview, setCapsulePreview] = useState<CapsulePreview | null>(null);
   const [capsuleBusy, setCapsuleBusy] = useState(false);
   const [capsuleBoundary, setCapsuleBoundary] = useState<CapsuleBoundary | null>(null);
   const [boundaryBusy, setBoundaryBusy] = useState(false);
+  const [boundaryLoadFailed, setBoundaryLoadFailed] = useState(false);
   const [sandboxQuestion, setSandboxQuestion] = useState(initialDrafts.sandboxQuestion);
   const [sandboxResult, setSandboxResult] = useState<CapsuleSandbox | null>(null);
   const [sandboxFeedback, setSandboxFeedback] = useState<string | null>(null);
@@ -176,6 +184,8 @@ export function AuroraApp() {
   const [personaVoiceAudio, setPersonaVoiceAudio] = useState<string | null>(null);
   const [personaVoiceBusy, setPersonaVoiceBusy] = useState(false);
   const [personaVoiceError, setPersonaVoiceError] = useState<string | null>(null);
+  const [landedCapsuleIds, setLandedCapsuleIds] = useState<Set<number>>(() => new Set());
+  const [landedBusyId, setLandedBusyId] = useState<number | null>(null);
   const [letterTitle, setLetterTitle] = useState(initialDrafts.letterTitle);
   const [letterBody, setLetterBody] = useState("");
   const [sentLetter, setSentLetter] = useState<SlowLetter | null>(null);
@@ -199,10 +209,17 @@ export function AuroraApp() {
   const bootstrappedRef = useRef(false);
   const bootstrapCallRef = useRef(0);
   const draftRestoredRef = useRef(false);
+  const lastCandidatePollTurnRef = useRef("");
 
   useEffect(() => {
     syncDocumentLocale(skillLocale);
   }, [skillLocale]);
+
+  useEffect(() => {
+    setStatusVisible(true);
+    const timer = window.setTimeout(() => setStatusVisible(false), 7000);
+    return () => window.clearTimeout(timer);
+  }, [status]);
 
   // Aurora conversation/session domain (message list, streaming/turn status, interrupt/stop, mode
   // picker, WakeIntent negotiate, session bootstrap/replay) -- extracted into its own hook; see
@@ -235,7 +252,9 @@ export function AuroraApp() {
         setCapsulePreview(null);
         setSelectedMemoryIds(latestMemory ? [latestMemory.id] : []);
         setCapsuleName(defaults.name);
-        setCapsuleIntro(defaults.intro);
+        setCapsuleIntro(skillLocale === "en-SG"
+          ? "A private facet shaped from memories I chose to authorize."
+          : "一个由我主动授权的记忆编织而成的私密侧影。");
         navigate(resonanceTabPath("mine"));
         window.scrollTo({ top: 0, behavior: "smooth" });
         setStatus(skillLocale === "en-SG"
@@ -250,6 +269,29 @@ export function AuroraApp() {
         : `已经把这一刻沉淀成 ${cards.length} 颗可追溯的记忆星；点星体可以查看它来自哪里。`);
     }
   });
+
+  // Candidate extraction is asynchronous after the complete turn is persisted. Poll only this
+  // conversation on a bounded 0/500/1500ms schedule; GET is pure and never changes claim state.
+  useEffect(() => {
+    if (!auroraSession.sessionId || auroraSession.activeTurnId !== null) return;
+    const last = auroraSession.messages.at(-1);
+    if (!last || last.id == null || last.speaker !== "AURORA" || last.partial) return;
+    const turnKey = `${auroraSession.sessionId}:${last.key}:${capsulePrivacy}`;
+    if (lastCandidatePollTurnRef.current === turnKey) return;
+    lastCandidatePollTurnRef.current = turnKey;
+    let cancelled = false;
+    const timers = [0, 500, 1500].map(delay => window.setTimeout(() => {
+      if (!cancelled && auroraSession.sessionId) {
+        void api.claimCandidates(auroraSession.sessionId, capsulePrivacy).then(rows => {
+          if (!cancelled) setClaimCandidates(rows);
+        }).catch(() => undefined);
+      }
+    }, delay));
+    return () => {
+      cancelled = true;
+      timers.forEach(timer => window.clearTimeout(timer));
+    };
+  }, [auroraSession.activeTurnId, auroraSession.messages, auroraSession.sessionId, capsulePrivacy]);
 
   useEffect(() => {
     if (!authenticated) return;
@@ -420,6 +462,7 @@ export function AuroraApp() {
       let loadedSkills: PsychologySkillManifest[] = [];
       await Promise.all([
         auroraSession.replaceFromHistory(resolved.sessionId),
+        auroraSession.loadSessions(),
         auroraSession.loadWakeIntents(),
         auroraSession.loadNotifications(),
         auroraSession.loadSafetyResources(),
@@ -493,7 +536,7 @@ export function AuroraApp() {
         setStatus(message);
       }
     }
-  }, [auroraSession.resolveSession, auroraSession.replaceFromHistory, auroraSession.loadWakeIntents, auroraSession.loadNotifications,
+  }, [auroraSession.resolveSession, auroraSession.replaceFromHistory, auroraSession.loadSessions, auroraSession.loadWakeIntents, auroraSession.loadNotifications,
       auroraSession.loadSafetyResources,
       connectionsAndLetters.loadLetterInbox, connectionsAndLetters.loadConnectionRequests, connectionsAndLetters.loadFriends,
       connectionsAndLetters.loadLetterOutbox, connectionsAndLetters.loadPeople, connectionsAndLetters.loadRelations, connectionsAndLetters.loadLetterThreads]);
@@ -541,26 +584,68 @@ export function AuroraApp() {
   ]);
 
   useEffect(() => {
-    if (!selectedCapsule) { setGenomeHistory([]); setFidelitySummary([]); setCapsuleBoundary(null); return; }
+    if (!selectedCapsule) {
+      setGenomeHistory([]);
+      setGenomeHistoryError(false);
+      setFidelitySummary([]);
+      setCapsuleBoundary(null);
+      setBoundaryLoadFailed(false);
+      return;
+    }
     const ids = [...selectedCapsule.authorizedMemoryIds.matchAll(/\d+/g)].map(match => Number(match[0]));
     setSelectedMemoryIds(ids);
     setSandboxResult(null);
     setSandboxFeedback(null);
-    void api.capsuleGenomeHistory(selectedCapsule.id).then(setGenomeHistory)
-      .catch(error => setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+    setGenomeHistory([]);
+    setGenomeHistoryError(false);
+    void api.capsuleGenomeHistory(selectedCapsule.id).then(history => {
+      setGenomeHistory(history);
+      setGenomeHistoryError(false);
+    }).catch(error => {
+      setGenomeHistoryError(true);
+      setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
         ? "Capsule versions are temporarily unavailable."
-        : "暂时无法读取共鸣体版本"));
+        : "暂时无法读取共鸣体版本");
+    });
     void api.capsuleFidelity(selectedCapsule.id).then(setFidelitySummary).catch(() => setFidelitySummary([]));
-    void api.capsuleBoundary(selectedCapsule.id).then(setCapsuleBoundary).catch(() => setCapsuleBoundary(null));
+    setCapsuleBoundary(null);
+    setBoundaryLoadFailed(false);
+    void api.capsuleBoundary(selectedCapsule.id).then(value => {
+      setCapsuleBoundary(value);
+      setBoundaryLoadFailed(value === null);
+    }).catch(() => { setCapsuleBoundary(null); setBoundaryLoadFailed(true); });
   }, [selectedCapsuleId, selectedCapsule?.activeGenomeVersionId]);
+
+  const retryGenomeHistory = async () => {
+    if (!selectedCapsule) return;
+    setCapsuleBusy(true);
+    try {
+      setGenomeHistory(await api.capsuleGenomeHistory(selectedCapsule.id));
+      setGenomeHistoryError(false);
+    } catch (error) {
+      setGenomeHistoryError(true);
+      setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+        ? "Capsule versions are still unavailable. Check the connection and retry."
+        : "仍然无法读取 Genome 版本，请检查连接后重试。");
+    } finally {
+      setCapsuleBusy(false);
+    }
+  };
 
   const saveCapsuleBoundary = async (boundary: Partial<CapsuleBoundary>) => {
     if (!selectedCapsule) return;
     setBoundaryBusy(true);
     try {
+      const privacyChanged = boundary.privacyLevel != null && boundary.privacyLevel !== capsuleBoundary?.privacyLevel;
       await api.updateCapsuleBoundary(selectedCapsule.id, boundary);
       setCapsuleBoundary(await api.capsuleBoundary(selectedCapsule.id));
-      setStatus(skillLocale === "en-SG"
+      setBoundaryLoadFailed(false);
+      if (privacyChanged) await refreshSelectedCapsule(selectedCapsule.id);
+      setStatus(privacyChanged
+        ? (skillLocale === "en-SG"
+          ? "Privacy changed. Publishing is paused until you recompile and review the new private version."
+          : "隐私等级已改变。公开已暂停，请重新编译并复核新的私密版本。")
+        : skillLocale === "en-SG"
         ? "Boundaries updated. Only you can change them; the public facet will use them with visitors."
         : "边界已更新。只有你能改动它，公开人格会按新的边界回应访客。");
     } catch (error) { setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
@@ -801,6 +886,8 @@ export function AuroraApp() {
       // candidate leaves the pending list. Refresh claims so the confirmed understanding shows.
       setClaimCandidates(current => current.filter(candidate => candidate.id !== id));
       setClaims(current => [result.activeClaim, ...current]);
+      setCapsulePersonaClaimIds(current => current.includes(result.activeClaim.id)
+        ? current : [...current, result.activeClaim.id]);
       void api.recentCorrections().then(setCorrections).catch(() => undefined);
       setStatus(skillLocale === "en-SG"
         ? "Saved. This is now a fact you confirmed, and it can shape future conversations."
@@ -809,6 +896,27 @@ export function AuroraApp() {
       ? "This understanding could not be saved."
       : "这条理解没能保存"); }
     finally { setClaimCandidateBusyId(null); }
+  };
+
+  const confirmAllSessionCandidates = async () => {
+    if (!auroraSession.sessionId) return;
+    setClaimCandidateBusyId(-1);
+    try {
+      const ids = await api.confirmSessionClaimCandidates(auroraSession.sessionId);
+      setCapsulePersonaClaimIds(current => Array.from(new Set([...current, ...ids])));
+      const [freshCandidates, freshClaims] = await Promise.all([
+        api.claimCandidates(auroraSession.sessionId, capsulePrivacy), api.understandingClaims()
+      ]);
+      setClaimCandidates(freshCandidates);
+      setClaims(freshClaims);
+      setStatus(skillLocale === "en-SG"
+        ? "Confirmed. These reviewed traits can be snapshotted into your next private capsule."
+        : "已确认。这些经过你审核的特征可以进入下一个私密共鸣体快照。");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Could not confirm this session's candidates.");
+    } finally {
+      setClaimCandidateBusyId(null);
+    }
   };
 
   const dismissClaimCandidate = async (id: number) => {
@@ -1083,10 +1191,9 @@ export function AuroraApp() {
         : selectableMemories.filter(memory => !["LOCAL_ONLY", "NO_EXTERNAL_PROCESSING"].includes((memory.consentScope ?? "").toUpperCase()))
           .slice(0, 3).map(memory => memory.id);
       if (memoryIds.length > 0) setSelectedMemoryIds(memoryIds);
-      const preview = await api.previewCapsule(memoryIds);
+      const preview = await api.previewCapsule(memoryIds, capsulePrivacy);
       setCapsulePreview(preview);
       if (!capsuleName.trim()) setCapsuleName(preview.suggestedPseudonym);
-      if (!capsuleIntro.trim()) setCapsuleIntro(preview.abstractSummary);
       setStatus(skillLocale === "en-SG"
         ? "Aurora created a private draft from your latest eligible memories. Sensitive details were removed; nothing has been published."
         : "Aurora 已用最近的可授权记忆生成私密草稿；敏感项已移除，还没有公开任何内容。");
@@ -1102,15 +1209,19 @@ export function AuroraApp() {
     try {
       const created = await api.createCapsule({
         pseudonym: capsuleName.trim() || capsulePreview.suggestedPseudonym,
-        intro: capsuleIntro.trim() || capsulePreview.abstractSummary,
+        intro: capsuleIntro.trim() || (skillLocale === "en-SG"
+          ? "A facet shaped from memories I chose to authorize."
+          : "一个由我主动授权的记忆编织而成的侧影。"),
         memoryIds: selectedMemoryIds, publicTags: capsulePreview.publicTags,
         ownerContextNote: capsuleOwnerNote.trim() || undefined, standInEnabled: capsuleStandIn,
-        realContactPolicy: capsuleContactPolicy
+        realContactPolicy: capsuleContactPolicy, privacyLevel: capsulePrivacy,
+        personaClaimIds: capsulePersonaClaimIds
       });
       setCapsules(current => [created, ...current]);
       setSelectedCapsuleId(created.id);
       setCapsulePreview(null); setCapsuleName(""); setCapsuleIntro("");
       setCapsuleOwnerNote(""); setCapsuleStandIn(false); setCapsuleContactPolicy("LETTER_ONLY");
+      setCapsulePersonaClaimIds([]);
       setStatus(skillLocale === "en-SG"
         ? "The capsule was compiled as a private version. Test whether it feels like you before deciding to publish."
         : "共鸣体已作为私密版本编译。先在沙盒里判断像不像你，再决定是否公开。");
@@ -1120,7 +1231,7 @@ export function AuroraApp() {
     finally { setCapsuleBusy(false); }
   };
 
-  const saveCapsuleContext = async (patch: { ownerContextNote: string; standInEnabled: boolean; realContactPolicy: string }) => {
+  const saveCapsuleContext = async (patch: { ownerContextNote: string; standInEnabled: boolean; realContactPolicy: string; conversationLimitPerDay: number }) => {
     if (!selectedCapsule) return;
     setCapsuleBusy(true);
     try {
@@ -1137,7 +1248,7 @@ export function AuroraApp() {
 
   const refreshSelectedCapsule = async (id: number) => {
     const [rows, history] = await Promise.all([api.myCapsules(), api.capsuleGenomeHistory(id)]);
-    setCapsules(rows); setGenomeHistory(history);
+    setCapsules(rows); setGenomeHistory(history); setGenomeHistoryError(false);
   };
 
   const recompileSelectedCapsule = async () => {
@@ -1147,8 +1258,8 @@ export function AuroraApp() {
       await api.recompileCapsule(selectedCapsule.id, selectedMemoryIds);
       await refreshSelectedCapsule(selectedCapsule.id);
       setStatus(skillLocale === "en-SG"
-        ? "A new private Genome version is ready. Earlier versions remain traceable; test it before publishing."
-        : "已生成新的私密 Genome 版本。历史版本仍可追溯，请先试聊再公开。");
+        ? "A new private Genome version is ready. The capsule has been taken off the plaza; review and test it, then publish it again."
+        : "已生成新的私密 Genome 版本，共鸣体也已从广场下架。请复核并试聊后重新发布。");
     } catch (error) { setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
       ? "Recompile failed; the previous version remains unchanged."
       : "重新编译失败，原版本仍保持不变"); }
@@ -1271,14 +1382,22 @@ export function AuroraApp() {
     if (!visitorMatch) return;
     setVisitorBusy(true);
     try {
-      const [session, quota] = await Promise.all([
-        api.createPersonaSession(visitorMatch.capsule.id), api.capsuleQuota(visitorMatch.capsule.id)
-      ]);
-      setPersonaSession(session); setPersonaQuota(quota); setPersonaMessages([]); setPersonaTurnError(null);
+      const capsuleId = visitorMatch.capsule.id;
+      const { session, quota, history, resumed } = await resumeOrCreatePersonaConversation(capsuleId, {
+        activeSession: api.activePersonaSession,
+        createSession: api.createPersonaSession,
+        messages: api.personaMessages,
+        quota: api.capsuleQuota
+      });
+      setPersonaSession(session); setPersonaQuota(quota); setPersonaMessages(history); setPersonaTurnError(null);
       setPersonaVoiceAudio(null); setPersonaVoiceError(null);
       setStatus(skillLocale === "en-SG"
-        ? `You are talking with the authorized AI capsule “${visitorMatch.capsule.pseudonym}”, not a person replying live.`
-        : `你正在和「${visitorMatch.capsule.pseudonym}」的授权 AI 共鸣体对话，不是真人实时在线。`);
+        ? resumed
+          ? `Your recent conversation with “${visitorMatch.capsule.pseudonym}” has been restored. It is an authorized AI capsule, not a person replying live.`
+          : `You are talking with the authorized AI capsule “${visitorMatch.capsule.pseudonym}”, not a person replying live.`
+        : resumed
+          ? `已恢复你和「${visitorMatch.capsule.pseudonym}」最近的对话。它是授权 AI 共鸣体，不是真人实时在线。`
+          : `你正在和「${visitorMatch.capsule.pseudonym}」的授权 AI 共鸣体对话，不是真人实时在线。`);
     } catch (error) { setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
       ? "This capsule is temporarily unavailable."
       : "暂时无法进入这个共鸣体"); }
@@ -1322,14 +1441,61 @@ export function AuroraApp() {
   const blockPersonaSession = async () => {
     if (!personaSession) return;
     try {
+      const blockedCapsuleId = personaSession.capsuleId;
       await api.blockPersonaSession(personaSession.id);
       setPersonaSession(null); setPersonaMessages([]); setPersonaQuota(null);
-      setStatus(skillLocale === "en-SG"
-        ? "Capsule blocked. It will no longer appear among your meeting candidates."
-        : "已屏蔽这个共鸣体；它不会再出现在你的相遇候选里。");
+      setPersonaDraft(initialDrafts.personaDraft); setPersonaTurnError(null);
+      setPersonaVoiceAudio(null); setPersonaVoiceError(null);
+      setSentLetter(null); setLetterBody(""); letterDraftRef.current = null;
+      // A block is owner-level, not capsule-level. Clear every visible candidate immediately so
+      // another capsule from the same owner cannot remain actionable while the authoritative
+      // viewer-filtered lists are refreshed.
+      setResonanceMatches([]);
+      setPublicCapsules([]);
+      setDirectoryPick(current => current?.id === blockedCapsuleId ? null : current);
+      setVisitorMatchId(null);
+      try {
+        const { matches, plaza } = await reloadPersonaCandidates(resonanceStrategy, {
+          matches: api.resonanceMatches,
+          plaza: api.plazaCapsules
+        });
+        setResonanceMatches(userVisibleResonanceMatches(matches));
+        setPublicCapsules(userVisiblePublicCapsules(plaza));
+        setStatus(skillLocale === "en-SG"
+          ? "Capsule owner blocked. Their capsules were removed from meetings and the plaza."
+          : "已屏蔽该共鸣体的主人；对方的共鸣体已从相遇和广场候选中移除。");
+      } catch {
+        setStatus(skillLocale === "en-SG"
+          ? "The block succeeded. Candidate refresh failed, so meeting and plaza results stay hidden until they can be safely reloaded."
+          : "屏蔽已成功，但候选刷新失败；为避免再次显示对方，相遇与广场会保持隐藏，直到能够安全重载。");
+      }
     } catch (error) { setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
       ? "The capsule could not be blocked."
       : "暂时无法屏蔽"); }
+  };
+
+  const markCurrentCapsuleLanded = async () => {
+    if (!visitorMatch || landedCapsuleIds.has(visitorMatch.capsule.id) || landedBusyId !== null) return;
+    const capsuleId = visitorMatch.capsule.id;
+    setLandedBusyId(capsuleId);
+    try {
+      const { echoEnergy } = await api.markLanded(capsuleId);
+      setLandedCapsuleIds(current => new Set(current).add(capsuleId));
+      setResonanceMatches(rows => rows.map(match => match.capsule.id === capsuleId
+        ? { ...match, capsule: { ...match.capsule, echoEnergy } }
+        : match));
+      setPublicCapsules(rows => rows.map(capsule => capsule.id === capsuleId ? { ...capsule, echoEnergy } : capsule));
+      setDirectoryPick(current => current?.id === capsuleId ? { ...current, echoEnergy } : current);
+      setStatus(skillLocale === "en-SG"
+        ? "You left one meaningful echo. Repeated taps cannot add more."
+        : "这条共鸣已被认真记下；重复点击不会继续增加能量。");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+        ? "The echo was not recorded. You can retry."
+        : "这条回声还没有记下，可以重试。");
+    } finally {
+      setLandedBusyId(null);
+    }
   };
 
   const playPersonaVoice = async () => {
@@ -1498,7 +1664,7 @@ export function AuroraApp() {
   }
 
   return (
-    <main className="shell" data-product-space={productSpace} aria-label="Authenticated Inner Cosmos">
+    <main className={`shell space-${productSpace}`} data-product-space={productSpace} aria-label="Authenticated Inner Cosmos">
       {/* Real routes for the five spaces. Each space's content below still mounts
           unconditionally and toggles via `hidden` (not <Route element>) so switching
           spaces never remounts/loses in-progress state (draft text, scroll position,
@@ -1517,13 +1683,15 @@ export function AuroraApp() {
       </Routes>
       <ProductShellNavigation active={productSpace} onNavigate={navigateSpace} locale={skillLocale} />
       <DemoPersonaChooser compact currentUsername={userProfile?.username ?? null} locale={skillLocale}
-        onEntered={() => window.location.reload()} />
+        onEntered={bootstrap} />
 
       {/* Gemini audit 4.7: each product space gets its own ErrorBoundary so a crash rendering one
           space (all five are always mounted, just `hidden`, to preserve scroll/edit state across
           tab switches) never takes the other four -- or the shared nav/footer below -- down too. */}
       <ErrorBoundary variant="space" locale={skillLocale}>
-      <div className="product-space" hidden={productSpace !== "aurora"}>
+      <div className="product-space aurora-space" hidden={productSpace !== "aurora"}>
+      <div className="aurora-stage">
+      <section className="aurora-primary" aria-label={skillLocale === "en-SG" ? "Aurora conversation" : "Aurora 对话主舞台"}>
       <header className="hero">
         <div>
           <span className="eyebrow">{tt.heroEyebrow}</span>
@@ -1539,52 +1707,19 @@ export function AuroraApp() {
         <div className="orb" aria-hidden="true"><span /></div>
       </header>
 
-      {userProfile && <QuickHello profile={userProfile} locale={skillLocale} onSave={saveProfile}
-        onBegin={() => void auroraSession.greet()} />}
-
-      <TodayOverview memoryCount={memories.length} latestMemory={memories[0]?.title ?? null}
-        arrivedLetters={connectionsAndLetters.letterInbox.length}
-        latestLetter={connectionsAndLetters.letterInbox[0]?.title ?? null}
-        publicCapsules={capsules.filter(capsule => capsule.visibilityStatus === "PUBLIC").length}
-        wakeIntents={auroraSession.wakeIntents.length}
-        onOpenCosmos={() => navigateSpace("cosmos")}
-        onOpenLetters={() => navigate(connectionTabPath("letters"))}
-        onOpenResonance={() => navigateSpace("resonance")}
-        onWriteLetter={() => {
-          navigate(resonanceTabPath("encounters"));
-          window.scrollTo({ top: 0, behavior: "smooth" });
-        }}
-        onOpenReturns={() => document.querySelector(".returns")?.scrollIntoView({ behavior: "smooth", block: "start" })}
-        locale={skillLocale} />
-
-      <StartHereJourney
-        locale={skillLocale}
-        isDemoSandbox={Boolean(userProfile?.username?.startsWith("sandbox-"))}
-        completedSteps={completedJourneySteps}
-        onStep={(step: JourneyStep) => {
-          if (step === "aurora") {
-            document.querySelector(".composer")?.scrollIntoView({ behavior: "smooth", block: "center" });
-            return;
-          }
-          if (step === "memory") {
-            navigate(cosmosTabPath("starfield"));
-            return;
-          }
-          if (step === "capsule") {
-            auroraSession.setMode("CAPSULE_SHAPING");
-            document.querySelector(".modes")?.scrollIntoView({ behavior: "smooth", block: "center" });
-            return;
-          }
-          navigate(resonanceTabPath("encounters"));
-          window.scrollTo({ top: 0, behavior: "smooth" });
-        }}
-      />
-
       <nav className="modes" aria-label={tt.modesAria}>
         {modes.map(([value]) => <button key={value} className={auroraSession.mode === value ? "active" : ""} onClick={() => auroraSession.setMode(value)}>{tt.modeLabel[value as DialogMode]}</button>)}
       </nav>
+      <ConversationHistory sessions={auroraSession.sessions} currentSessionId={auroraSession.sessionId}
+        busy={auroraSession.sessionsBusy} locale={skillLocale}
+        onOpen={session => void auroraSession.openSession(session)}
+        onNew={() => void auroraSession.newConversation()}
+        onRename={auroraSession.renameConversation}
+        onPin={session => void auroraSession.pinConversation(session)}
+        onArchive={session => void auroraSession.archiveConversation(session)}
+        onReload={auroraSession.loadSessions} />
       {auroraSession.mode === "CAPSULE_SHAPING" && <section className="capsule-shaping-intro" aria-label={skillLocale === "en-SG" ? "Shape a capsule with Aurora" : "和 Aurora 一起塑造共鸣体"}>
-        <div><span className="eyebrow">{skillLocale === "en-SG" ? "10-MINUTE LIVING PORTRAIT" : "十分钟 · 鲜活侧影"}</span>
+        <div><span className="eyebrow">{skillLocale === "en-SG" ? "5-MINUTE LIVING PORTRAIT" : "五分钟 · 鲜活侧影"}</span>
           <strong>{skillLocale === "en-SG" ? "Tell stories, not personality labels." : "讲故事，不填人格问卷。"}</strong>
           <p>{skillLocale === "en-SG"
             ? "Aurora notices what is still thin—values, tensions, voice, boundaries and who you hope to meet—and asks one natural question at a time."
@@ -1629,7 +1764,56 @@ export function AuroraApp() {
         }} onGoodbye={() => void auroraSession.triggerGoodbye()} goodbyeBusy={auroraSession.goodbyeBusy}
         innerVoiceEnabled={ttsPreferences?.innerVoiceEnabled ?? false}
         innerVoiceMode={ttsPreferences?.innerVoiceMode ?? "AMBIENT"}
+        claimCandidates={claimCandidates} claimCandidateBusyId={claimCandidateBusyId}
+        onConfirmClaim={id => void confirmClaimCandidate(id)}
+        onDismissClaim={id => void dismissClaimCandidate(id)}
         locale={skillLocale} />
+      </section>
+
+      <aside className="aurora-context-rail" aria-label={skillLocale === "en-SG" ? "Today and next steps" : "今日概览与下一步"}>
+        {userProfile && <QuickHello profile={userProfile} locale={skillLocale} onSave={saveProfile}
+          onBegin={() => void auroraSession.greet()} />}
+
+        <TodayOverview memoryCount={memories.length} latestMemory={memories[0]?.title ?? null}
+          arrivedLetters={connectionsAndLetters.letterInbox.length}
+          latestLetter={connectionsAndLetters.letterInbox[0]?.title ?? null}
+          publicCapsules={capsules.filter(capsule => capsule.visibilityStatus === "PUBLIC").length}
+          wakeIntents={auroraSession.wakeIntents.length}
+          onOpenCosmos={() => navigateSpace("cosmos")}
+          onOpenLetters={() => navigate(connectionTabPath("letters"))}
+          onOpenResonance={() => navigateSpace("resonance")}
+          onWriteLetter={() => navigate(connectionTabPath("letters"))}
+          onOpenReturns={() => document.querySelector(".returns")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+          locale={skillLocale} />
+
+        <StartHereJourney
+          locale={skillLocale}
+          isDemoSandbox={Boolean(userProfile?.username?.startsWith("sandbox-"))}
+          completedSteps={completedJourneySteps}
+          onStep={(step: JourneyStep) => {
+            if (step === "aurora") {
+              document.querySelector(".composer")?.scrollIntoView({ behavior: "smooth", block: "center" });
+              return;
+            }
+            if (step === "memory") {
+              navigate(cosmosTabPath("starfield"));
+              return;
+            }
+            if (step === "capsule") {
+              auroraSession.setMode("CAPSULE_SHAPING");
+              document.querySelector(".modes")?.scrollIntoView({ behavior: "smooth", block: "center" });
+              return;
+            }
+            if (step === "letter") {
+              navigate(connectionTabPath("letters"));
+              return;
+            }
+            navigate(resonanceTabPath("encounters"));
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
+        />
+      </aside>
+      </div>
 
       {(mobileState.native || !mobileState.connected) && <section className={`mobile-presence ${mobileState.connected ? "online" : "offline"}`} aria-label={tt.mobileAria}>
         <div>
@@ -1759,7 +1943,8 @@ export function AuroraApp() {
 
       <div hidden={cosmosTab !== "beliefs"}>
         <ClaimCandidateReview candidates={claimCandidates} locale={skillLocale} busyId={claimCandidateBusyId}
-          onConfirm={id => void confirmClaimCandidate(id)} onDismiss={id => void dismissClaimCandidate(id)} />
+          onConfirm={id => void confirmClaimCandidate(id)} onConfirmAll={() => void confirmAllSessionCandidates()}
+          onDismiss={id => void dismissClaimCandidate(id)} />
         <UnderstandingCorrection claims={claims} oldValue={correctionOld} newValue={correctionNew} impact={correctionImpact} busy={correctionBusy} target={correctionTarget}
           corrections={corrections} retiringId={retiringCorrectionId}
           onOldValue={value => { setCorrectionOld(value); setCorrectionImpact(null); }} onNewValue={value => { setCorrectionNew(value); setCorrectionImpact(null); }}
@@ -1785,7 +1970,8 @@ export function AuroraApp() {
       <div hidden={resonanceTab !== "mine"}>
       <CapsuleWorkbench capsules={capsules} selectedCapsuleId={selectedCapsuleId} selectedCapsule={selectedCapsule}
         selectableMemories={selectableMemories} selectedMemoryIds={selectedMemoryIds} capsuleName={capsuleName} capsuleIntro={capsuleIntro}
-        capsulePreview={capsulePreview} capsuleBusy={capsuleBusy} genomeHistory={genomeHistory} fidelitySummary={fidelitySummary} sandboxQuestion={sandboxQuestion}
+        capsulePreview={capsulePreview} capsuleBusy={capsuleBusy} genomeHistory={genomeHistory} genomeHistoryError={genomeHistoryError}
+        fidelitySummary={fidelitySummary} sandboxQuestion={sandboxQuestion}
         sandboxResult={sandboxResult} sandboxFeedback={sandboxFeedback}
         onSelectCapsule={id => {
           setSelectedCapsuleId(id);
@@ -1797,10 +1983,22 @@ export function AuroraApp() {
         onRecompile={() => void recompileSelectedCapsule()} onSandboxQuestion={setSandboxQuestion} onRunSandbox={() => void runCapsuleSandbox()}
         onRateSandbox={(rating, comment) => void rateCapsuleSandbox(rating, comment)} onPublish={() => void publishSelectedCapsule()}
         onPause={() => void pauseSelectedCapsule()} onArchive={() => void archiveSelectedCapsule()}
-        boundary={capsuleBoundary} boundaryBusy={boundaryBusy} onSaveBoundary={boundary => void saveCapsuleBoundary(boundary)}
+        boundary={capsuleBoundary} boundaryBusy={boundaryBusy} boundaryLoadFailed={boundaryLoadFailed}
+        onRetryBoundary={() => {
+          if (!selectedCapsule) return;
+          setBoundaryLoadFailed(false);
+          void api.capsuleBoundary(selectedCapsule.id).then(value => {
+            setCapsuleBoundary(value); setBoundaryLoadFailed(value === null);
+          }).catch(() => setBoundaryLoadFailed(true));
+        }}
+        onRetryGenomeHistory={() => void retryGenomeHistory()}
+        onSaveBoundary={boundary => void saveCapsuleBoundary(boundary)}
         capsuleOwnerNote={capsuleOwnerNote} onCapsuleOwnerNote={setCapsuleOwnerNote}
         capsuleStandIn={capsuleStandIn} onCapsuleStandIn={setCapsuleStandIn}
         capsuleContactPolicy={capsuleContactPolicy} onCapsuleContactPolicy={setCapsuleContactPolicy}
+        capsulePrivacy={capsulePrivacy} onCapsulePrivacy={value => {
+          setCapsulePrivacy(value); setCapsulePreview(null);
+        }}
         onSaveContext={patch => void saveCapsuleContext(patch)} locale={skillLocale} />
       </div>
 
@@ -1819,7 +2017,10 @@ export function AuroraApp() {
         onSendLetter={() => void sendLetterToMatch()} onReportSession={() => void reportPersonaSession()}
         onBlockSession={() => void blockPersonaSession()} personaTurnError={personaTurnError}
         personaVoiceAudio={personaVoiceAudio} personaVoiceBusy={personaVoiceBusy} personaVoiceError={personaVoiceError}
-        onPlayPersonaVoice={() => void playPersonaVoice()} locale={skillLocale} />
+        onPlayPersonaVoice={() => void playPersonaVoice()}
+        landed={visitorMatch ? landedCapsuleIds.has(visitorMatch.capsule.id) : false}
+        landedBusy={visitorMatch?.capsule.id === landedBusyId}
+        onMarkLanded={() => void markCurrentCapsuleLanded()} locale={skillLocale} />
       </div>
       </div>
       </ErrorBoundary>
@@ -1887,26 +2088,46 @@ export function AuroraApp() {
 
       <ErrorBoundary variant="space" locale={skillLocale}>
       <div className="product-space" hidden={productSpace !== "me"}>
+        <MeSubNav active={meTab} onNavigate={tab => navigate(meTabPath(tab))} locale={skillLocale} />
+        <div hidden={meTab !== "overview"}>
         <MeSpace native={mobileState.native} connected={mobileState.connected} wakeIntentCount={auroraSession.wakeIntents.length}
           activeClaimCount={claims.filter(claim => claim.status === "ACTIVE").length}
           publicCapsuleCount={capsules.filter(capsule => capsule.visibilityStatus === "PUBLIC").length}
           friendCount={connectionsAndLetters.friends.length} onNavigate={navigateSpace} onRequestPush={() => void requestMobilePush()}
           onRequestMicrophone={() => void requestMobileMicrophone()} onLogout={() => void logout()}
           onOpenSafetyHarbor={() => navigate("/safety-harbor")} locale={skillLocale} />
+        </div>
+        <div hidden={meTab !== "profile"}>
         <PortraitView dimensions={portrait} history={portraitHistory} calibrated={portraitCalibrated} busyDim={portraitBusy}
           onLoadHistory={dim => void loadPortraitHistory(dim)} onCalibrate={(dim, oldValue, newValue) => void submitPortraitCalibration(dim, oldValue, newValue)} locale={skillLocale} />
+        </div>
+        <div hidden={meTab !== "account"}>
         <AccountSettings busy={accountBusy} message={accountMessage} onChangePassword={(oldPassword, newPassword) => changeAccountPassword(oldPassword, newPassword)}
           onExportData={() => void exportAccountData()} onDeleteAccount={password => deleteAccount(password)}
           profile={userProfile} profileBusy={profileBusy} onSaveProfile={patch => void saveProfile(patch)}
           ttsPreferences={ttsPreferences} ttsBusy={ttsBusy}
           onUpdateTtsPreferences={patch => updateTtsPreferences(patch)} onPreviewVoice={voiceId => previewTtsVoice(voiceId)}
           locale={skillLocale} />
+        </div>
+        <div hidden={meTab !== "appearance"} className="me-appearance-panel">
+        <AppearanceSettings locale={skillLocale} />
         <LocaleToggle locale={skillLocale} onChange={changeLocale} />
+        </div>
+        <div hidden={meTab !== "data"}>
         <DataRightsPanel receipts={dataRightsReceipts} loading={dataRightsLoading} loaded={dataRightsLoaded}
           onLoad={() => void loadDataRightsReceipts()} locale={skillLocale} />
+        </div>
       </div>
       </ErrorBoundary>
-      <div className="state global-state" role="status"><i className={auroraSession.activeTurnId ? "pulse" : ""} />{status}</div>
+      {statusVisible ? (
+        <div className="state global-state visible" role="status"
+          aria-live="polite" aria-atomic="true">
+          <i className={auroraSession.activeTurnId ? "pulse" : ""} />
+          <span>{status}</span>
+          <button type="button" onClick={() => setStatusVisible(false)}
+            aria-label={skillLocale === "en-SG" ? "Dismiss status" : "关闭状态提示"}>×</button>
+        </div>
+      ) : null}
     </main>
   );
 }

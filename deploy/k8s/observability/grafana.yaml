@@ -63,7 +63,6 @@ spec:
         - name: dashboards
           configMap:
             name: grafana-dashboards
-            items: [{key: inner-cosmos-app.json, path: inner-cosmos-app.json}]
 ---
 apiVersion: v1
 kind: Service

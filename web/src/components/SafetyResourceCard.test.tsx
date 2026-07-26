@@ -20,6 +20,19 @@ describe("SafetyResourceCard", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it("does not render an interruptive resource wall for a non-HIGH decision", () => {
+    const { container } = render(
+      <SafetyResourceCard
+        alert={{ riskLevel: "MEDIUM", featureTarget: "AURORA_CHAT", safeMessage: "慢一点说" }}
+        resources={resources}
+        locale="zh-CN"
+        onDismiss={vi.fn()}
+      />
+    );
+    expect(container).toBeEmptyDOMElement();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("renders a persistent, high-visibility alert with the server's safe message and the real backend crisis resources (zh-CN)", () => {
     render(
       <SafetyResourceCard
@@ -48,6 +61,27 @@ describe("SafetyResourceCard", () => {
       />
     );
     expect(screen.getByText(/if you are in immediate danger/i)).toBeInTheDocument();
+  });
+
+  it("renders verified Singapore English resources without injecting Chinese resource copy", () => {
+    const singaporeResources = [
+      "If you are in immediate danger, call Singapore Police at 999.",
+      "For emergency ambulance or fire services, call 995.",
+      "Samaritans of Singapore (SOS) · 24-hour hotline: 1767."
+    ];
+    render(
+      <SafetyResourceCard
+        alert={{ riskLevel: "HIGH", featureTarget: "safety-harbor", safeMessage: "Your safety comes first." }}
+        resources={singaporeResources}
+        locale="en-SG"
+        onDismiss={vi.fn()}
+      />
+    );
+    expect(screen.getByText("Your safety comes first.")).toBeVisible();
+    expect(screen.getByRole("link", { name: /999/ })).toHaveAttribute("href", "tel:999");
+    expect(screen.getByRole("link", { name: /995/ })).toHaveAttribute("href", "tel:995");
+    expect(screen.getByRole("link", { name: /1767/ })).toHaveAttribute("href", "tel:1767");
+    expect(screen.queryByText(/心理援助/)).not.toBeInTheDocument();
   });
 
   it("stays visible until the user explicitly dismisses it", () => {

@@ -38,6 +38,32 @@ describe("ThoughtShredderSection", () => {
     expect(onShred).toHaveBeenCalledExactlyOnceWith("今天很累", "KEEP_RAW");
   });
 
+  it("clears the source text only after a successful result arrives", () => {
+    const props = { aiHealth: null, history: [], busy: false, onShred: vi.fn(),
+      onSettle: () => undefined, onDelete: () => undefined };
+    const { rerender } = render(<ThoughtShredderSection {...props} result={null} />);
+    const input = screen.getByLabelText("把想法倒进来") as HTMLTextAreaElement;
+    fireEvent.change(input, { target: { value: "今天很乱" } });
+    expect(input.value).toBe("今天很乱");
+    rerender(<ThoughtShredderSection {...props} result={result()} />);
+    expect(input.value).toBe("");
+  });
+
+  // A DISPLAY_ONCE shred is never inserted, so its card has no id. Offering settle/delete would
+  // post to /api/thought-shredder/null/... and fail; the user must be told it is not recoverable.
+  it("offers no settle/delete actions for a view-once shred that was never persisted", () => {
+    const onSettle = vi.fn();
+    const onDelete = vi.fn();
+    render(<ThoughtShredderSection aiHealth={null} history={[]} busy={false} onShred={() => undefined}
+      onSettle={onSettle} onDelete={onDelete}
+      result={result({ originalHandlingMode: "DISPLAY_ONCE", memoryCard: { ...result().memoryCard, id: null, status: "TRANSIENT" } })} />);
+    expect(screen.queryByRole("button", { name: /沉淀到记忆/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^删除$/ })).not.toBeInTheDocument();
+    expect(screen.getByText(/没有写入数据库/)).toBeVisible();
+    expect(onSettle).not.toHaveBeenCalled();
+    expect(onDelete).not.toHaveBeenCalled();
+  });
+
   it("renders a shredded result with settle/delete actions", () => {
     const onSettle = vi.fn();
     const onDelete = vi.fn();

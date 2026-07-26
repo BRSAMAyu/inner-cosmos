@@ -12,7 +12,7 @@ const COPY: Record<Locale, {
   exploreMeet: string; matchCardAria: (pseudonym: string, summary: string) => string;
   entryP: string; enterBusy: string; enterBtn: string;
   realPersonPath: string; practiceCapsule: string; userIdentityNotice: string; seedIdentityNotice: string;
-  quotaComfort: string; quotaLow: (remaining: number) => string; quotaLoading: string; quotaNote: string;
+  quotaComfort: string; quotaLow: (remaining: number) => string; quotaExhausted: string; quotaLoading: string; quotaNote: string;
   personaHistAria: string; historyStart: string;
   speakerYou: string; writeToCapsule: string; sendBusy: string; sendTurn: string; letterStepTitle: string;
   letterStepNote: string; seedWarning: string; letterFlightTitle: string; letterArrival: (time: string, status: string) => string;
@@ -20,6 +20,7 @@ const COPY: Record<Locale, {
   letterTitleDetails: string; deliveryPromise: string; deliveryStatus: Record<string, string>;
   sendLetterBusy: string; sendLetterBtn: string; reportSession: string; blockSession: string;
   playCapsuleVoice: string; capsuleVoiceBusy: string; capsuleVoiceAria: string;
+  landedBtn: string; landedBusy: string; landedDone: string;
   showMoreMatches: (n: number) => string; showFewerMatches: string;
 }> = {
   "zh-CN": {
@@ -35,6 +36,7 @@ const COPY: Record<Locale, {
     entryP: "先问一两个真正重要的问题。它只能使用创建者明确授权的侧面，也不会把你的 Aurora 私有画像带进这段对话。",
     enterBusy: "正在进入", enterBtn: "先和这个侧影聊几句",
     quotaComfort: "可以自然聊，不用赶进度", quotaLow: r => `今天还可以聊 ${r} 轮`,
+    quotaExhausted: "今天的对话额度已用完；明天会自动恢复。你仍可回看这段对话。",
     quotaLoading: "正在确认今天的交流节奏",
     quotaNote: "只有接近每日防刷上限时才会提醒；模型故障不会扣次数。", personaHistAria: "共鸣体对话记录",
     historyStart: "可以从一个具体时刻开始，而不是交换完整履历。", speakerYou: "你", writeToCapsule: "写给共鸣体",
@@ -49,6 +51,7 @@ const COPY: Record<Locale, {
     reportSession: "举报这段对话", blockSession: "屏蔽这个共鸣体",
     playCapsuleVoice: "▶ 听这条回声", capsuleVoiceBusy: "正在合成…",
     capsuleVoiceAria: "听到这个共鸣体的回复（与 Aurora 不同的声音）",
+    landedBtn: "这条落在了我心里", landedBusy: "正在留下回声", landedDone: "已留下回声",
     showMoreMatches: n => `查看其余 ${n} 个候选`, showFewerMatches: "收起，只看最相关的 3 个"
   },
   "en-SG": {
@@ -64,6 +67,7 @@ const COPY: Record<Locale, {
     entryP: "Start with one or two questions that truly matter. It can only use facets the creator explicitly authorized, and won't bring your private Aurora portrait into this conversation.",
     enterBusy: "Entering", enterBtn: "Talk with this facet first",
     quotaComfort: "Talk naturally — there is no need to rush", quotaLow: r => `${r} turn${r === 1 ? "" : "s"} left today`,
+    quotaExhausted: "Today's conversation quota is used up; it resets tomorrow. You can still reread this conversation.",
     quotaLoading: "Checking today's conversation rhythm",
     quotaNote: "The limit only appears when you are close to the daily anti-abuse cap; model failures never cost a turn.", personaHistAria: "Capsule conversation log",
     historyStart: "You can start from one concrete moment, rather than exchanging full resumes.", speakerYou: "You", writeToCapsule: "Write to the capsule",
@@ -78,6 +82,7 @@ const COPY: Record<Locale, {
     reportSession: "Report this conversation", blockSession: "Block this capsule",
     playCapsuleVoice: "▶ Hear this echo", capsuleVoiceBusy: "Synthesizing…",
     capsuleVoiceAria: "Hear this capsule's reply spoken (a voice distinct from Aurora)",
+    landedBtn: "This landed with me", landedBusy: "Leaving an echo", landedDone: "Echo left",
     showMoreMatches: n => `View ${n} more candidate${n === 1 ? "" : "s"}`, showFewerMatches: "Show only the top 3"
   }
 };
@@ -86,7 +91,8 @@ export function ResonanceNetwork({ resonanceMatches, resonanceStrategy, visitorB
   personaMessages, personaDraft, personaQuota, letterTitle, letterBody, sentLetter,
   onChooseStrategy, onChooseMatch, onStartPersonaConversation, onPersonaDraftChange, onSendPersonaTurn,
   onLetterTitleChange, onLetterBodyChange, onSendLetter, onReportSession, onBlockSession, personaTurnError = null,
-  personaVoiceAudio = null, personaVoiceBusy = false, personaVoiceError = null, onPlayPersonaVoice, locale = "zh-CN" }: {
+  personaVoiceAudio = null, personaVoiceBusy = false, personaVoiceError = null, onPlayPersonaVoice,
+  landed = false, landedBusy = false, onMarkLanded, locale = "zh-CN" }: {
   resonanceMatches: CapsuleMatch[]; resonanceStrategy: ResonanceStrategy; visitorBusy: boolean;
   visitorMatch: CapsuleMatch | null; personaSession: PersonaSession | null; personaMessages: PersonaMessage[];
   personaDraft: string; personaQuota: CapsuleQuota | null; letterTitle: string; letterBody: string; sentLetter: SlowLetter | null;
@@ -96,12 +102,20 @@ export function ResonanceNetwork({ resonanceMatches, resonanceStrategy, visitorB
   onReportSession?: () => void; onBlockSession?: () => void; personaTurnError?: string | null; locale?: Locale;
   personaVoiceAudio?: string | null; personaVoiceBusy?: boolean; personaVoiceError?: string | null;
   onPlayPersonaVoice?: () => void;
+  landed?: boolean; landedBusy?: boolean; onMarkLanded?: () => void;
 }) {
   const t = COPY[locale];
   const [showAllMatches, setShowAllMatches] = useState(false);
+  const matchTierLabel = (match: CapsuleMatch) => {
+    if (!match.matchTier) return match.resonant ? t.resonantNow : t.exploreMeet;
+    if (locale === "en-SG") return match.matchTier === "FULL" ? "Strong resonance"
+      : match.matchTier === "PARTIAL" ? "Some resonance" : "Explore this meeting";
+    return match.matchTier === "FULL" ? "深度共鸣" : match.matchTier === "PARTIAL" ? "部分共鸣" : "探索相遇";
+  };
   const isUserCapsule = visitorMatch?.capsule.capsuleType === "USER_CAPSULE";
   const quotaExhausted = personaQuota?.remaining === 0;
   const quotaLabel = !personaQuota ? t.quotaLoading
+    : personaQuota.remaining === 0 ? t.quotaExhausted
     : personaQuota.remaining <= 5 ? t.quotaLow(personaQuota.remaining)
     : t.quotaComfort;
   const visibleMatches = useMemo(() => {
@@ -135,7 +149,7 @@ export function ResonanceNetwork({ resonanceMatches, resonanceStrategy, visitorB
         {visibleMatches.map(match => <button type="button" role="listitem" key={match.capsule.id}
           className={visitorMatch?.capsule.id === match.capsule.id ? "match-card active" : "match-card"}
           aria-label={t.matchCardAria(match.capsule.pseudonym, match.matchSummary)}
-          onClick={() => onChooseMatch(match.capsule.id)}><span aria-hidden="true">{match.resonant ? t.resonantNow : t.exploreMeet}</span>
+          onClick={() => onChooseMatch(match.capsule.id)}><span aria-hidden="true">{matchTierLabel(match)}</span>
           <em className={match.capsule.capsuleType === "USER_CAPSULE" ? "real" : "practice"} aria-hidden="true">
             {match.capsule.capsuleType === "USER_CAPSULE" ? t.realPersonPath : t.practiceCapsule}
           </em>
@@ -181,7 +195,10 @@ export function ResonanceNetwork({ resonanceMatches, resonanceStrategy, visitorB
           <div className="sandbox-composer"><textarea aria-label={t.writeToCapsule} value={personaDraft} onChange={event => onPersonaDraftChange(event.target.value)} />
             <AsyncButton className="resonance-primary" busy={visitorBusy} disabled={!personaDraft.trim() || quotaExhausted} busyText={t.sendBusy} onClick={onSendPersonaTurn}>{t.sendTurn}</AsyncButton></div>
           {personaTurnError && <p className="preview-warning" role="alert">{personaTurnError}</p>}
-          {personaMessages.some(message => message.senderType === "CAPSULE") && <div className="slow-letter-compose">
+          {personaMessages.some(message => message.senderType === "CAPSULE") && onMarkLanded && <AsyncButton
+            className="resonance-secondary" busy={landedBusy} disabled={landed} busyText={t.landedBusy}
+            onClick={onMarkLanded}>{landed ? t.landedDone : t.landedBtn}</AsyncButton>}
+          {personaMessages.some(message => message.senderType === "CAPSULE") && visitorMatch.capsule.allowLetterRequest !== false && <div className="slow-letter-compose">
             <div className="capsule-step"><span>✉</span><div><strong>{t.letterStepTitle}</strong><small>{t.letterStepNote}</small></div></div>
             {visitorMatch.capsule.capsuleType !== "USER_CAPSULE" ? <p className="preview-warning">{t.seedWarning}</p> : sentLetter ?
               <div className="letter-flight" role="status"><strong>{t.letterFlightTitle}</strong><span>{sentLetter.title}</span><small>{t.letterArrival(new Date(sentLetter.estimatedArrivalAt).toLocaleString(locale), t.deliveryStatus[sentLetter.status] ?? sentLetter.status)}</small></div> : <>

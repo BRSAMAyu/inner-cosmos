@@ -47,6 +47,7 @@ import java.time.ZoneId;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -199,6 +200,7 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         if (!Boolean.TRUE.equals(capsule.isPublic) || !"PUBLIC".equals(capsule.visibilityStatus)) {
             throw new BusinessException("FORBIDDEN", "该共鸣体未公开,无法发起对话");
         }
+        assertVisitorAllowed(userId, capsule);
         requireRunnableCapsule(capsule);
         PersonaChatSession session = new PersonaChatSession();
         session.visitorUserId = userId;
@@ -213,10 +215,52 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         return session;
     }
 
+    @Override
+    public PersonaChatSession activeSession(Long userId, Long capsuleId) {
+        EchoCapsule capsule = capsuleMapper.selectById(capsuleId);
+        if (capsule == null || !Boolean.TRUE.equals(capsule.isPublic)
+                || !"PUBLIC".equals(capsule.visibilityStatus)) {
+            return null;
+        }
+        assertVisitorAllowed(userId, capsule);
+        return sessionMapper.selectOne(new QueryWrapper<PersonaChatSession>()
+                .eq("visitor_user_id", userId)
+                .eq("capsule_id", capsuleId)
+                .eq("status", "ACTIVE")
+                .orderByDesc("id")
+                .last("LIMIT 1"));
+    }
+
+    private void assertVisitorAllowed(Long userId, EchoCapsule capsule) {
+        if (capsule == null) {
+            throw new BusinessException("NOT_FOUND", "共鸣体不存在");
+        }
+        if (userId.equals(capsule.ownerUserId)) {
+            throw new BusinessException("FORBIDDEN", "不能与自己的共鸣体发起访客对话");
+        }
+        Long count = capsule.ownerUserId == null ? 0L : blockRelationMapper.selectCount(
+                new QueryWrapper<BlockRelation>().and(w -> w
+                        .nested(n -> n.eq("blocker_user_id", userId)
+                                .eq("blocked_user_id", capsule.ownerUserId))
+                        .or(n -> n.eq("blocker_user_id", capsule.ownerUserId)
+                                .eq("blocked_user_id", userId))));
+        if (count != null && count > 0) {
+            throw new BusinessException("FORBIDDEN", "屏蔽关系生效，不能继续访问这个共鸣体");
+        }
+    }
+
     // Gemini audit 2.4: JSON-only system instruction for the persona-chat provider call,
     // extracted to a constant now that the call site (reply(), outside any transaction) and the
     // prompt-assembly site (prepareTurn(), short tx #1) are different methods.
     private static final String PERSONA_CHAT_INSTRUCTION = """
+            groundingLevel is a hard authorization boundary:
+            EPISODIC_MEMORY may describe only the selected episode evidence.
+            PERSONA_CLAIM may make only the selected, user-confirmed self-description.
+            STYLE_ONLY may shape the wording of this reply but MUST NOT state what the owner
+            believes, values, prefers, needs, feels, or has experienced.
+            For an EMOTION_PATTERN, preserve its temporalQualifier, say only that this has been
+            happening recently, and never turn it into a stable trait or diagnostic description.
+            UNSUPPORTED must acknowledge uncertainty and MUST NOT invent owner facts or traits.
             只返回 JSON：{"reply":"","boundaryNotice":"","letterSuggested":false,"riskFlags":[]}
             你正在驱动一个共鸣体，不是真人实时回复，也不是治疗师。
             必须基于 personaPrompt、本轮选中的 authorizedMemorySummary、styleProfile、contextBuildManifest 和 boundary 回应。
@@ -261,6 +305,7 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         LocalDate quotaDate;
         Map<String, Object> aiContext;
         String safetyPrefix;
+        List<String> blockedTopics;
     }
 
     /**
@@ -279,6 +324,7 @@ public class PersonaChatServiceImpl implements PersonaChatService {
             throw new BusinessException("UNAUTHORIZED", "无权操作此会话");
         }
         EchoCapsule capsule = capsuleMapper.selectById(session.capsuleId);
+        assertVisitorAllowed(userId, capsule);
         CapsuleGenomeVersion genome = requireRunnableCapsule(capsule);
         SafetyResult safety = safetyService.check(message, userId, null);
 
@@ -304,12 +350,19 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         // EchoCapsule.conversationLimitPerDay (a *daily*, cross-session cap). The two are distinct
         // owner-facing concepts and must be enforced independently and atomically.
         Integer sessionCap = boundary == null ? null : boundary.maxConversationTurns;
+        List<String> blockedTopics = parseBoundaryTopics(boundary == null ? null : boundary.blockedTopics);
 
         if (Boolean.TRUE.equals(safety.blockModelCall)) {
             // Safety path: preserve prior behavior — the visitor message is recorded.
             messageMapper.insert(userMessage);
             capsuleMessage.textContent = safety.safeMessage;
             session.status = "SAFETY_GUIDED";
+            return finishWithoutAi(session, capsuleMessage);
+        }
+        if (containsBlockedTopic(message, blockedTopics)) {
+            // A configured blocked topic is an enforceable boundary, not prompt advice. Do not
+            // persist or send the blocked visitor text to a provider and do not consume quota.
+            capsuleMessage.textContent = "这个话题在主人设置的边界之外，我不会继续展开。你可以换一个方向，或者写一封慢信。";
             return finishWithoutAi(session, capsuleMessage);
         }
         if (!tryReserveSessionTurn(sessionId, sessionCap)) {
@@ -360,6 +413,7 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         aiContext.put("styleProfile", runtimeContext.get("selectedContext"));
         aiContext.put("contextPreview", runtimeContext.get("selectedContext"));
         aiContext.put("contextBuildManifest", runtimeContext.get("contextBuildManifest"));
+        aiContext.put("groundingLevel", runtimeContext.get("groundingLevel"));
         aiContext.put("retrievalUnsupported", runtimeContext.get("unsupported"));
         aiContext.put("retrievalFallbackPolicy", runtimeContext.get("fallbackPolicy"));
         aiContext.put("standInEnabled", capsule != null && Boolean.TRUE.equals(capsule.standInEnabled));
@@ -382,6 +436,7 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         prep.quotaDate = today;
         prep.aiContext = aiContext;
         prep.safetyPrefix = "MEDIUM".equals(safety.riskLevel) ? "我会先把这段话放回到安全和尊重的边界里. " : "";
+        prep.blockedTopics = blockedTopics;
         return prep;
     }
 
@@ -416,7 +471,8 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         capsuleMessage.sessionId = prep.sessionId;
         capsuleMessage.senderType = "CAPSULE";
 
-        boolean stillEligible = session != null && !"BLOCKED".equals(session.status)
+        boolean blocked = capsule != null && hasBlockRelation(prep.userId, capsule.ownerUserId);
+        boolean stillEligible = session != null && !"BLOCKED".equals(session.status) && !blocked
                 && capsule != null && Boolean.TRUE.equals(capsule.isPublic) && "PUBLIC".equals(capsule.visibilityStatus);
         if (!stillEligible) {
             compensateQuota(prep.userId, prep.capsuleId, prep.quotaDate);
@@ -442,7 +498,9 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         // already be mid-exfiltration.
         boolean leaked = PromptLeakageGuard.leaksInternalSchema(ai.reply)
                 || PromptLeakageGuard.leaksInternalSchema(ai.boundaryNotice);
-        String boundaryText = leaked || ai.boundaryNotice == null || ai.boundaryNotice.isBlank()
+        boolean crossedBlockedTopic = containsBlockedTopic(ai.reply, prep.blockedTopics)
+                || containsBlockedTopic(ai.boundaryNotice, prep.blockedTopics);
+        String boundaryText = leaked || crossedBlockedTopic || ai.boundaryNotice == null || ai.boundaryNotice.isBlank()
                 ? "" : ai.boundaryNotice + " ";
         String identityNotice = "USER_CAPSULE".equals(capsule.capsuleType)
                 ? "（这是授权共鸣体的回应，不是真人实时在线。）"
@@ -455,6 +513,8 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         // AiLogServiceImpl already uses for logged AI responses.
         String reply = leaked
                 ? "这段回应可能越过了边界，我不会照着说出来。如果愿意，可以换个方式再问一次，或者写一封慢信。"
+                : crossedBlockedTopic
+                ? "生成的回应触碰了主人设置的回避话题，我不会展示它。你可以换一个方向，或者写一封慢信。"
                 : DataMaskingUtils.maskContact(blank(ai.reply,
                         "真实模型暂时不可用，我不想用模板伪装成这个共鸣体。请稍后再试，或者写一封慢信。"));
         capsuleMessage.textContent = prep.safetyPrefix + boundaryText + reply + identityNotice;
@@ -496,6 +556,14 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         sessionMapper.update(null, new UpdateWrapper<PersonaChatSession>()
                 .eq("id", session.id).set("status", session.status));
         return capsuleMessage;
+    }
+
+    private boolean hasBlockRelation(Long a, Long b) {
+        if (a == null || b == null) return false;
+        Long count = blockRelationMapper.selectCount(new QueryWrapper<BlockRelation>().and(w -> w
+                .nested(n -> n.eq("blocker_user_id", a).eq("blocked_user_id", b))
+                .or(n -> n.eq("blocker_user_id", b).eq("blocked_user_id", a))));
+        return count != null && count > 0;
     }
 
     /**
@@ -614,16 +682,19 @@ public class PersonaChatServiceImpl implements PersonaChatService {
 
     private Map<String, Object> seedRuntimeContext() {
         Map<String, Object> manifest = new LinkedHashMap<>();
-        manifest.put("schemaVersion", "context-build-manifest.v1");
+        manifest.put("schemaVersion", "context-build-manifest.v2");
         manifest.put("queryIntent", "SEED_PERSONA");
         manifest.put("selectedCategories", List.of());
         manifest.put("selectedMemoryIds", List.of());
+        manifest.put("selectedClaimIds", List.of());
+        manifest.put("groundingLevel", "PERSONA_CLAIM");
         manifest.put("unsupported", false);
         manifest.put("selectionReason", "OFFICIAL_SEED_PERSONA_HAS_NO_OWNER_MEMORY");
         return Map.of(
                 "selectedEvidenceSummary", "",
                 "selectedContext", Map.of("schemaVersion", "capsule-runtime-context.v1", "seedPersona", true),
                 "contextBuildManifest", manifest,
+                "groundingLevel", "PERSONA_CLAIM",
                 "unsupported", false,
                 "fallbackPolicy", "NOT_APPLICABLE");
     }
@@ -683,6 +754,24 @@ public class PersonaChatServiceImpl implements PersonaChatService {
 
     private String nullToEmpty(String value) {
         return value == null ? "" : value;
+    }
+
+    private List<String> parseBoundaryTopics(String raw) {
+        if (raw == null || raw.isBlank()) return List.of();
+        String normalized = raw.replace("[", "").replace("]", "").replace("\"", "");
+        return Pattern.compile("[,，;；\\r\\n]+").splitAsStream(normalized)
+                .map(String::trim)
+                .filter(topic -> !topic.isBlank())
+                .distinct()
+                .toList();
+    }
+
+    private boolean containsBlockedTopic(String text, List<String> blockedTopics) {
+        if (text == null || text.isBlank() || blockedTopics == null || blockedTopics.isEmpty()) return false;
+        String normalized = text.toLowerCase(Locale.ROOT);
+        return blockedTopics.stream()
+                .map(topic -> topic.toLowerCase(Locale.ROOT))
+                .anyMatch(normalized::contains);
     }
 
     private String nullToDefault(String value, String fallback) {

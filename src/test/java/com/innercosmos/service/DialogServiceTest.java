@@ -9,6 +9,7 @@ import com.innercosmos.event.DialogFinishedEvent;
 import com.innercosmos.exception.BusinessException;
 import com.innercosmos.mapper.DialogMessageMapper;
 import com.innercosmos.mapper.DialogSessionMapper;
+import com.innercosmos.mapper.ConversationTurnMapper;
 import com.innercosmos.service.impl.DialogServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -35,6 +36,9 @@ class DialogServiceTest {
     private DialogMessageMapper messageMapper;
 
     @Mock
+    private ConversationTurnMapper turnMapper;
+
+    @Mock
     private ApplicationEventPublisher eventPublisher;
 
     private DialogServiceImpl dialogService;
@@ -45,7 +49,7 @@ class DialogServiceTest {
 
     @BeforeEach
     void setUp() {
-        dialogService = new DialogServiceImpl(sessionMapper, messageMapper, eventPublisher);
+        dialogService = new DialogServiceImpl(sessionMapper, messageMapper, turnMapper, eventPublisher);
     }
 
     private DialogSession buildOwnedSession() {

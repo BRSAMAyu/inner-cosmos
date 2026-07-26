@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  ADAPTIVE_THEME_EVENT,
   applyColorScheme,
   applyAdaptiveTheme,
   applyTimeOfDayTheme,
@@ -11,6 +12,8 @@ import {
   setColorScheme,
   setPreviewHour,
   setThemeLock,
+  themeColorFor,
+  timePresentationFor,
   timeOfDayForHour,
   type TimeOfDay,
 } from "./theme";
@@ -104,6 +107,17 @@ describe("applyTimeOfDayTheme", () => {
     applyTimeOfDayTheme(root, new Date(2026, 0, 1, 13, 0, 0));
     expect(root.dataset.time).toBe("dawn");
   });
+
+  it("exposes non-color time semantics as data attributes and CSS variables", () => {
+    const root = document.createElement("html");
+    applyTimeOfDayTheme(root, new Date(2026, 0, 1, 18, 0, 0));
+    expect(root.dataset.timeMotion).toBe("slow");
+    expect(root.dataset.lightDirection).toBe("west");
+    expect(root.dataset.ambientDensity).toBe("rich");
+    expect(root.dataset.timeCopy).toBe("dusk");
+    expect(root.style.getPropertyValue("--time-light-x")).toBe("88%");
+    expect(root.style.getPropertyValue("--time-motion-rhythm")).toBe("0.78");
+  });
 });
 
 describe("color scheme (明暗轴)", () => {
@@ -163,5 +177,33 @@ describe("color scheme (明暗轴)", () => {
     applyAdaptiveTheme(root);
     expect(root.dataset.time).toBe("deep-night");
     expect(root.dataset.theme).toBe("night");
+  });
+
+  it("updates browser chrome color and emits a refresh event", () => {
+    const root = document.documentElement;
+    const meta = document.createElement("meta");
+    meta.name = "theme-color";
+    document.head.appendChild(meta);
+    const events: Event[] = [];
+    root.addEventListener(ADAPTIVE_THEME_EVENT, event => events.push(event), { once: true });
+
+    setPreviewHour(8);
+    applyAdaptiveTheme(root);
+
+    expect(meta.content).toBe(themeColorFor("day", "morning"));
+    expect(events).toHaveLength(1);
+    expect(root.style.colorScheme).toBe("light");
+    meta.remove();
+  });
+});
+
+describe("semantic time presentation", () => {
+  it("changes rhythm, light direction and density beyond palette", () => {
+    const noon = timePresentationFor("noon");
+    const night = timePresentationFor("night");
+    expect(noon.lightDirection).toBe("overhead");
+    expect(night.lightDirection).toBe("diffuse");
+    expect(noon.ambientDensity).toBeLessThan(night.ambientDensity);
+    expect(noon.motionRhythm).not.toBe(night.motionRhythm);
   });
 });

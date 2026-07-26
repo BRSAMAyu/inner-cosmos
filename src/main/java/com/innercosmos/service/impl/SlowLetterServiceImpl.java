@@ -18,6 +18,7 @@ import com.innercosmos.exception.BusinessException;
 import com.innercosmos.exception.SafetyBlockedException;
 import com.innercosmos.letterstate.LetterStateRegistry;
 import com.innercosmos.mapper.BlockRelationMapper;
+import com.innercosmos.mapper.CapsuleBoundaryMapper;
 import com.innercosmos.mapper.EchoCapsuleMapper;
 import com.innercosmos.mapper.LetterStatusLogMapper;
 import com.innercosmos.mapper.LetterThreadMapper;
@@ -28,6 +29,7 @@ import com.innercosmos.service.LetterSafetyFilter;
 import com.innercosmos.service.SlowLetterService;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
@@ -39,6 +41,7 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class SlowLetterServiceImpl implements SlowLetterService {
@@ -63,6 +66,7 @@ public class SlowLetterServiceImpl implements SlowLetterService {
     private final LetterSafetyFilter letterSafetyFilter;
     private final EchoCapsuleMapper capsuleMapper;
     private final BlockRelationMapper blockRelationMapper;
+    private final CapsuleBoundaryMapper boundaryMapper;
     // Gemini audit 3.3 (CONFIRMED/P1): detect-and-gate for credentials/PII at SEND time. Never
     // rewrites/redacts the letter body -- see the SENT branch of transition() for the hard-block
     // vs. soft-confirm handling.
@@ -94,7 +98,8 @@ public class SlowLetterServiceImpl implements SlowLetterService {
             "DELIVERED", "READ", "REPLIED", "DECLINED", "BLOCKED", "ARCHIVED");
 
 
-    public SlowLetterServiceImpl(SlowLetterMapper letterMapper, LetterStatusLogMapper logMapper, LetterStateRegistry stateRegistry, LetterGuardAgent guardAgent, LetterThreadMapper threadMapper, ReportRecordMapper reportRecordMapper, LetterSafetyFilter letterSafetyFilter, EchoCapsuleMapper capsuleMapper, BlockRelationMapper blockRelationMapper, PiiCredentialDetector piiCredentialDetector, Clock clock) {
+    @Autowired
+    public SlowLetterServiceImpl(SlowLetterMapper letterMapper, LetterStatusLogMapper logMapper, LetterStateRegistry stateRegistry, LetterGuardAgent guardAgent, LetterThreadMapper threadMapper, ReportRecordMapper reportRecordMapper, LetterSafetyFilter letterSafetyFilter, EchoCapsuleMapper capsuleMapper, BlockRelationMapper blockRelationMapper, CapsuleBoundaryMapper boundaryMapper, PiiCredentialDetector piiCredentialDetector, Clock clock) {
         this.letterMapper = letterMapper;
         this.logMapper = logMapper;
         this.stateRegistry = stateRegistry;
@@ -104,8 +109,15 @@ public class SlowLetterServiceImpl implements SlowLetterService {
         this.letterSafetyFilter = letterSafetyFilter;
         this.capsuleMapper = capsuleMapper;
         this.blockRelationMapper = blockRelationMapper;
+        this.boundaryMapper = boundaryMapper;
         this.piiCredentialDetector = piiCredentialDetector;
         this.clock = clock;
+    }
+
+    /** Test/backward-compatible constructor; production injection always supplies the boundary mapper. */
+    public SlowLetterServiceImpl(SlowLetterMapper letterMapper, LetterStatusLogMapper logMapper, LetterStateRegistry stateRegistry, LetterGuardAgent guardAgent, LetterThreadMapper threadMapper, ReportRecordMapper reportRecordMapper, LetterSafetyFilter letterSafetyFilter, EchoCapsuleMapper capsuleMapper, BlockRelationMapper blockRelationMapper, PiiCredentialDetector piiCredentialDetector, Clock clock) {
+        this(letterMapper, logMapper, stateRegistry, guardAgent, threadMapper, reportRecordMapper,
+                letterSafetyFilter, capsuleMapper, blockRelationMapper, null, piiCredentialDetector, clock);
     }
 
     @Override
@@ -133,6 +145,13 @@ public class SlowLetterServiceImpl implements SlowLetterService {
                 throw new com.innercosmos.exception.BusinessException(
                         com.innercosmos.common.ErrorCode.NOT_FOUND, "官方种子共鸣体没有真人收件人");
             }
+            com.innercosmos.entity.CapsuleBoundary boundary = boundaryMapper == null ? null : boundaryMapper.selectOne(
+                    new QueryWrapper<com.innercosmos.entity.CapsuleBoundary>()
+                            .eq("capsule_id", capsule.id).last("LIMIT 1"));
+            if (boundary != null && Boolean.FALSE.equals(boundary.allowLetterRequest)) {
+                throw new com.innercosmos.exception.BusinessException(
+                        com.innercosmos.common.ErrorCode.FORBIDDEN, "这个共鸣体没有开放慢信请求");
+            }
             if (receiverUserId != null && !capsule.ownerUserId.equals(receiverUserId)) {
                 throw new com.innercosmos.exception.BusinessException(
                         com.innercosmos.common.ErrorCode.BAD_REQUEST, "慢信收件人与共鸣体授权者不一致");
@@ -142,6 +161,10 @@ public class SlowLetterServiceImpl implements SlowLetterService {
         if (receiverUserId == null || userId.equals(receiverUserId)) {
             throw new com.innercosmos.exception.BusinessException(
                     com.innercosmos.common.ErrorCode.BAD_REQUEST, "请选择可以接收慢信的共鸣者");
+        }
+        if (hasBlockRelation(userId, receiverUserId)) {
+            throw new com.innercosmos.exception.BusinessException(
+                    com.innercosmos.common.ErrorCode.FORBIDDEN, "屏蔽关系生效，不能创建慢信");
         }
         SlowLetter letter = new SlowLetter();
         letter.senderUserId = userId;
@@ -392,6 +415,9 @@ public class SlowLetterServiceImpl implements SlowLetterService {
         if ("SENT".equals(targetStatus) && "SENT".equals(letter.status)) {
             return letter;
         }
+        if ("SENT".equals(targetStatus) && hasBlockRelation(letter.senderUserId, letter.receiverUserId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "屏蔽关系已生效，这封慢信不能启程");
+        }
         // Gemini audit 3.3 (CONFIRMED/P1): detect-and-gate for credentials/PII, never a keyword
         // -deletion sanitize -- the letter body itself is never rewritten or redacted.
         java.util.List<String> piiConsentCategories = java.util.List.of();
@@ -498,6 +524,7 @@ public class SlowLetterServiceImpl implements SlowLetterService {
 
     @Override
     public List<SlowLetter> inbox(Long userId) {
+        Set<Long> blocked = blockedCounterparties(userId);
         QueryWrapper<SlowLetter> query = new QueryWrapper<>();
         query.eq("receiver_user_id", userId)
                 // Reuses DELIVERED_TO_RECEIVER_STATUSES -- the single source of truth for "delivered
@@ -505,7 +532,29 @@ public class SlowLetterServiceImpl implements SlowLetterService {
                 // drift apart on which states count as "arrived".
                 .in("status", DELIVERED_TO_RECEIVER_STATUSES)
                 .orderByDesc("id");
+        if (!blocked.isEmpty()) {
+            query.notIn("sender_user_id", blocked);
+        }
         return letterMapper.selectList(query);
+    }
+
+    private boolean hasBlockRelation(Long a, Long b) {
+        Long count = blockRelationMapper.selectCount(new QueryWrapper<BlockRelation>().and(w -> w
+                .nested(n -> n.eq("blocker_user_id", a).eq("blocked_user_id", b))
+                .or(n -> n.eq("blocker_user_id", b).eq("blocked_user_id", a))));
+        return count != null && count > 0;
+    }
+
+    private Set<Long> blockedCounterparties(Long userId) {
+        Set<Long> ids = new java.util.HashSet<>();
+        List<BlockRelation> outgoing = blockRelationMapper.selectList(
+                new QueryWrapper<BlockRelation>().eq("blocker_user_id", userId));
+        if (outgoing != null) outgoing.forEach(r -> ids.add(r.blockedUserId));
+        List<BlockRelation> incoming = blockRelationMapper.selectList(
+                new QueryWrapper<BlockRelation>().eq("blocked_user_id", userId));
+        if (incoming != null) incoming.forEach(r -> ids.add(r.blockerUserId));
+        ids.remove(null);
+        return ids;
     }
 
     @Override
@@ -678,7 +727,11 @@ public class SlowLetterServiceImpl implements SlowLetterService {
     public List<LetterThread> listThreads(Long userId) {
         QueryWrapper<LetterThread> query = new QueryWrapper<>();
         query.eq("participant_a", userId).or().eq("participant_b", userId).orderByDesc("id");
-        return threadMapper.selectList(query);
+        Set<Long> blocked = blockedCounterparties(userId);
+        return threadMapper.selectList(query).stream()
+                .filter(thread -> !blocked.contains(userId.equals(thread.participantA)
+                        ? thread.participantB : thread.participantA))
+                .toList();
     }
 
     @Override
@@ -689,6 +742,10 @@ public class SlowLetterServiceImpl implements SlowLetterService {
         }
         if (!userId.equals(thread.participantA) && !userId.equals(thread.participantB)) {
             throw new com.innercosmos.exception.BusinessException(com.innercosmos.common.ErrorCode.UNAUTHORIZED, "无权查看此对话");
+        }
+        Long counterpart = userId.equals(thread.participantA) ? thread.participantB : thread.participantA;
+        if (hasBlockRelation(userId, counterpart)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "屏蔽关系生效，不能继续访问这段慢信对话");
         }
         QueryWrapper<SlowLetter> query = new QueryWrapper<>();
         // thread_id matches every reply; the anchor (first) letter may predate the back-fill.

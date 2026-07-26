@@ -1,0 +1,1476 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>从容器编排到语义可靠性 · Inner Cosmos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..500;1,6..72,400..500&family=Hanken+Grotesk:wght@400..700&family=DM+Mono:wght@400;500&family=Noto+Serif+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* ==========================================================================
+   FIXED 16:9 STAGE — MANDATORY BASE (full contents of viewport-base.css)
+   Slides are authored at 1920x1080 and scaled as a whole. Never reflow.
+   ========================================================================== */
+html,body{width:100%;height:100%;margin:0;overflow:hidden;background:var(--stage-bg,#000)}
+.deck-viewport{position:fixed;inset:0;overflow:hidden;background:var(--stage-bg,#000)}
+.deck-stage{position:absolute;left:0;top:0;width:1920px;height:1080px;overflow:hidden;transform-origin:0 0;background:var(--slide-bg,#fff)}
+.slide{position:absolute;inset:0;width:1920px;height:1080px;overflow:hidden;display:block;visibility:hidden;opacity:0;pointer-events:none;background:var(--slide-bg,#fff)}
+.slide.active,.slide.visible{visibility:visible;opacity:1;pointer-events:auto;z-index:1}
+img,video,canvas,svg{max-width:100%;max-height:100%}
+.deck-controls{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:1000}
+@media print{
+  html,body{width:1920px;height:auto;overflow:visible;background:#fff}
+  .deck-viewport{position:static;overflow:visible;background:#fff}
+  .deck-stage{position:static;width:auto;height:auto;transform:none !important;background:none}
+  .slide{position:relative;display:block !important;visibility:visible !important;opacity:1 !important;pointer-events:auto !important;width:1920px;height:1080px;break-after:page;page-break-after:always}
+  .slide:last-child{break-after:auto;page-break-after:auto}
+  .deck-controls{display:none !important}
+}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms !important;transition-duration:.2s !important}}
+
+/* ==========================================================================
+   COBALT GRID — TOKENS
+   Strictly two colours: cream paper + electric cobalt ink. No third hue.
+   Emphasis comes from size, family switch, or opacity — never colour.
+   ========================================================================== */
+:root{
+  --paper:#F0EBDE;
+  --paper-2:#E6E0CE;
+  --ink:#1F2BE0;
+  --ink-soft:#5560E5;
+  --grid:rgba(31,43,224,.10);
+  --faint:rgba(31,43,224,.18);
+  --stage-bg:#1a1710;          /* letterbox surround */
+  --slide-bg:transparent;       /* paper lives on .deck-stage */
+
+  --edge:80px;
+  --pad-top:132px;
+  --pad-bottom:150px;
+
+  --font-display:"Newsreader","Noto Serif SC",Georgia,serif;
+  --font-body:"Hanken Grotesk","Noto Serif SC",sans-serif;
+  --font-mono:"DM Mono",ui-monospace,monospace;
+}
+
+/* ==========================================================================
+   STAGE SURFACE + PERMANENT GRAPH-PAPER GRID
+   The grid is the canvas tone. It is never disabled.
+   ========================================================================== */
+.deck-stage{background:var(--paper)}
+.deck-stage::before{
+  content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
+  background-image:
+    linear-gradient(to right,var(--grid) 1px,transparent 1px),
+    linear-gradient(to bottom,var(--grid) 1px,transparent 1px);
+  background-size:40px 40px;
+}
+
+/* ==========================================================================
+   UNIVERSAL CHROME — authored once, not per slide
+   Top + bottom 1.5px cobalt hairlines, page number, nav hint.
+   ========================================================================== */
+.chrome{position:absolute;inset:0;z-index:5;pointer-events:none}
+.chrome::before,.chrome::after{content:"";position:absolute;left:var(--edge);right:var(--edge);height:1.5px;background:var(--ink)}
+.chrome::before{top:28px}
+.chrome::after{bottom:22px}
+.pagenum{position:absolute;right:var(--edge);bottom:52px;font:400 17px/1 var(--font-mono);letter-spacing:.06em;color:var(--ink)}
+.navhint{position:absolute;left:var(--edge);bottom:52px;font:400 16px/1 var(--font-mono);letter-spacing:.08em;color:var(--ink);opacity:.4}
+
+/* ==========================================================================
+   TYPE SCALE — translated from the design system to 1920x1080 coordinates.
+   Newsreader runs at 400 for Latin; Hanzi falls through to Noto Serif SC,
+   which needs 700 at display sizes and 400 at body sizes (per the CJK spec).
+   .lat spans inside display headings pull Latin back to Newsreader 400.
+   Body sizes are raised above the source clamp caps for projector legibility.
+   ========================================================================== */
+.d-hero{margin:0;font-family:var(--font-display);font-weight:700;font-size:150px;line-height:1.0;letter-spacing:-.008em;color:var(--ink)}
+.d-chapter{margin:0;font-family:var(--font-display);font-weight:700;font-size:104px;line-height:1.04;letter-spacing:-.005em;color:var(--ink)}
+.d-closing{margin:0;font-family:var(--font-display);font-weight:700;font-size:118px;line-height:1.06;letter-spacing:-.005em;color:var(--ink)}
+.d-manifesto{margin:0;font-family:var(--font-display);font-weight:700;font-size:88px;line-height:1.22;letter-spacing:-.005em;color:var(--ink)}
+.d-quote{margin:0;font-family:var(--font-display);font-weight:700;font-size:80px;line-height:1.24;letter-spacing:-.005em;color:var(--ink)}
+.h-line{margin:0;font-family:var(--font-display);font-weight:700;font-size:60px;line-height:1.1;color:var(--ink)}
+.vbig{font-family:var(--font-display);font-weight:700;font-size:130px;line-height:.92;letter-spacing:-.015em;color:var(--ink)}
+.vbig .u{font-size:52px;letter-spacing:0}
+.ed-callout{margin:0;font-family:var(--font-display);font-weight:500;font-size:44px;line-height:1.38;color:var(--ink)}
+.row-h{font-family:var(--font-display);font-weight:500;font-size:36px;line-height:1.24;color:var(--ink)}
+.tb-name{font-family:var(--font-display);font-weight:500;font-size:29px;line-height:1.3;color:var(--ink)}
+.lat{font-family:"Newsreader",Georgia,serif;font-weight:400}
+
+.body{font-family:var(--font-body);font-weight:400;font-size:23px;line-height:1.72;color:var(--ink)}
+.body-lede{font-family:var(--font-body);font-weight:400;font-size:28px;line-height:1.68;color:var(--ink)}
+.body-sm{font-family:var(--font-body);font-weight:400;font-size:20px;line-height:1.6;color:var(--ink)}
+.micro{font-family:var(--font-body);font-weight:600;font-size:19px;line-height:1;letter-spacing:.18em;text-transform:uppercase;color:var(--ink)}
+.micro-sm{font-family:var(--font-body);font-weight:600;font-size:16px;line-height:1;letter-spacing:.18em;text-transform:uppercase;color:var(--ink)}
+/* Hanzi labels: no case transform, no tracking — per the CJK spec */
+.micro.cjk,.micro-sm.cjk{letter-spacing:0;text-transform:none}
+.mono{font-family:var(--font-mono);font-weight:400;font-size:19px;line-height:1;letter-spacing:.05em;color:var(--ink)}
+.mono-sm{font-family:var(--font-mono);font-weight:400;font-size:16px;line-height:1;letter-spacing:.06em;color:var(--ink)}
+.dim{opacity:.55}
+.dimmer{opacity:.35}
+
+/* ==========================================================================
+   STRUCTURE — frame, topbar, dividers
+   ========================================================================== */
+.frame{position:absolute;top:var(--pad-top);left:var(--edge);right:var(--edge);bottom:var(--pad-bottom);z-index:2}
+/* .spread fills the frame: topbar pinned top, closing note pinned bottom,
+   content distributed between. Without it, short content leaves the lower
+   third empty and the slide reads as an unfinished wireframe. */
+.frame.spread{display:flex;flex-direction:column;justify-content:space-between}
+.topbar{display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:20px;border-bottom:1.5px solid var(--ink)}
+.rowdiv{border-bottom:1px solid var(--faint)}
+.rule-solid{border-top:1px solid var(--ink)}
+
+/* ==========================================================================
+   PIXEL-GLITCH COLUMN — the signature decoration on declarative slides.
+   Stair-stepped rectangles of cobalt scanlines on cream.
+   ========================================================================== */
+.glitch{position:absolute;z-index:3;pointer-events:none}
+.glitch .step{position:absolute;right:0;
+  background-image:repeating-linear-gradient(to right,var(--ink) 0 2px,transparent 2px 9px)}
+
+/* ==========================================================================
+   QR-BLOCK — 8x8 mosaic punctuation. Paper fill + 1.5px paper outset so it
+   stays readable over the glitch column. The only shadow-like effect used.
+   ========================================================================== */
+.qr{display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);
+  gap:1.5px;background:var(--paper);padding:4px;box-shadow:0 0 0 1.5px var(--paper);z-index:4}
+.qr i{background:transparent}
+.qr i.on{background:var(--ink)}
+
+/* ==========================================================================
+   PIXEL-STACK BARS — the system's only chart primitive.
+   Cells: off = 10% cobalt, on = solid cobalt. Data as grid units.
+   ========================================================================== */
+.pstack-row{display:flex;align-items:flex-end;gap:28px}
+.pstack{display:flex;flex-direction:column-reverse;gap:4px;width:66px}
+.pstack i{display:block;height:15px;background:var(--grid)}
+.pstack i.on{background:var(--ink)}
+.pstack-axis{margin-top:14px;border-top:1.5px solid var(--ink);display:flex;gap:28px;padding-top:12px}
+.pstack-axis span{width:66px;text-align:center;font:400 16px/1 var(--font-mono);letter-spacing:.04em;color:var(--ink)}
+
+/* ==========================================================================
+   THE MAP — one architecture diagram, reused, with a different segment lit.
+   Zero circles: nodes are grid-unit rectangles.
+   ========================================================================== */
+.map{position:relative;width:100%}
+.map svg{width:100%;display:block;overflow:visible}
+.map .lane{stroke:var(--ink);stroke-width:1.5;opacity:.42}
+.map .nbox{fill:var(--paper);stroke:var(--ink);stroke-width:1.5;opacity:.4}
+.map .nbox.on{fill:var(--ink);stroke:var(--ink);opacity:1}
+.map .nlab{font-family:"DM Mono",monospace;font-size:16px;fill:var(--ink);opacity:.45;letter-spacing:.03em}
+.map .nlab.on{opacity:1}
+.map .seam{stroke:var(--ink);stroke-width:1.5;stroke-dasharray:5 5}
+.map .seamlab{font-family:"Hanken Grotesk",sans-serif;font-weight:600;font-size:16px;fill:var(--ink)}
+
+/* ==========================================================================
+   STAT BLOCKS — evidence numerals. Solid = proven. Outline = boundary.
+   The "cannot claim" register is opacity + an em-dash prefix, never a colour.
+   ========================================================================== */
+.stats{display:grid;gap:0}
+.stat{padding:26px 34px 26px 0}
+.stat .lbl{font-family:var(--font-body);font-weight:600;font-size:17px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink);margin-bottom:14px}
+.stat .lbl.cjk{letter-spacing:0;text-transform:none;font-size:19px}
+.stat .desc{margin-top:14px;font-family:var(--font-body);font-weight:400;font-size:20px;line-height:1.6;color:var(--ink)}
+.bound{opacity:.62}
+.bound .k::before{content:"— ";opacity:.6}
+
+/* ==========================================================================
+   TWO-COLUMN OPPOSITION — the four semantic mismatches.
+   Left column dimmed (the default ops model), right column solid (reality).
+   ========================================================================== */
+.opp{display:grid;grid-template-columns:1fr 96px 1.15fr;align-items:center;gap:0;padding:24px 0}
+.opp .old{font-family:var(--font-body);font-weight:400;font-size:23px;line-height:1.55;color:var(--ink);opacity:.5;padding-right:34px}
+.opp .arrow{font-family:var(--font-mono);font-size:22px;color:var(--ink);text-align:center}
+.opp .new{font-family:var(--font-body);font-weight:400;font-size:23px;line-height:1.55;color:var(--ink);padding-left:34px;border-left:1.5px solid var(--ink)}
+.opp .ct{margin-top:10px;font-family:var(--font-display);font-weight:500;font-size:30px;color:var(--ink)}
+
+/* ==========================================================================
+   LEDGER TABLE — dense rows for the five-layer responsibility model.
+   ========================================================================== */
+.ledger{display:flex;flex-direction:column}
+.lrow{display:grid;grid-template-columns:64px 1.05fr 1.15fr 1fr 1.35fr;gap:26px;align-items:start;
+  padding:21px 0;border-bottom:1px solid var(--faint)}
+.lrow.head{border-bottom:1.5px solid var(--ink);padding-bottom:14px}
+.lrow .num{font:400 17px/1.4 var(--font-mono);letter-spacing:.04em;color:var(--ink);opacity:.6}
+
+/* ==========================================================================
+   INDEX LIST — numbered rows with a serif headline + sans body.
+   ========================================================================== */
+.index{display:flex;flex-direction:column}
+.irow{display:grid;grid-template-columns:70px 1fr;gap:28px;align-items:start;padding:25px 0;border-bottom:1px solid var(--faint)}
+.irow .num{font:400 18px/1.5 var(--font-mono);letter-spacing:.04em;color:var(--ink);opacity:.6}
+.irow .sp{margin-top:9px;font:400 18px/1 var(--font-mono);letter-spacing:.05em;color:var(--ink);opacity:.55}
+
+/* ==========================================================================
+   CUT-TO-LIVE — deliberately sparse slides that hand off to the terminal.
+   ========================================================================== */
+.live{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;justify-content:center;
+  padding:0 var(--edge)}
+.live .watch{margin-top:56px;padding-top:26px;border-top:1.5px solid var(--ink);display:flex;gap:64px}
+.live .watch .w{max-width:480px}
+.live .watch .w .k{font-family:var(--font-body);font-weight:600;font-size:18px;letter-spacing:.16em;text-transform:uppercase;margin-bottom:12px}
+
+/* ==========================================================================
+   ENTRANCE ANIMATION — one orchestrated load per slide, staggered.
+   ========================================================================== */
+@keyframes riseIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+@keyframes wipeX{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes drawLane{from{stroke-dashoffset:1800}to{stroke-dashoffset:0}}
+.slide.active [data-a]{animation:riseIn .58s cubic-bezier(.22,1,.36,1) both}
+.slide.active [data-a="1"]{animation-delay:.06s}
+.slide.active [data-a="2"]{animation-delay:.16s}
+.slide.active [data-a="3"]{animation-delay:.26s}
+.slide.active [data-a="4"]{animation-delay:.36s}
+.slide.active [data-a="5"]{animation-delay:.46s}
+.slide.active [data-a="6"]{animation-delay:.56s}
+.slide.active [data-a="7"]{animation-delay:.66s}
+.slide.active [data-a="8"]{animation-delay:.76s}
+.slide.active [data-w]{transform-origin:left;animation:wipeX .62s cubic-bezier(.22,1,.36,1) both;animation-delay:.1s}
+.slide.active [data-f]{animation:fadeIn .6s ease-out both;animation-delay:.7s}
+.slide.active .map .lane{stroke-dasharray:1800;animation:drawLane 1.2s cubic-bezier(.22,1,.36,1) .2s both}
+</style>
+</head>
+<body>
+<div class="deck-viewport">
+<div class="deck-stage" id="stage">
+
+  <!-- ===== UNIVERSAL CHROME (authored once) ===== -->
+  <div class="chrome">
+    <span class="navhint">← → / space</span>
+    <span class="pagenum" id="pagenum">01</span>
+  </div>
+
+  <!-- ==================================================================
+       01 · COVER — declarative layout, pixel-glitch + QR punctuation
+       ================================================================== -->
+  <section class="slide active" data-label="Cover">
+    <div class="glitch" style="right:0;top:150px;width:420px;height:640px">
+      <div class="step" style="top:0;width:420px;height:78px;opacity:.85"></div>
+      <div class="step" style="top:96px;width:300px;height:78px;opacity:.7"></div>
+      <div class="step" style="top:192px;width:368px;height:78px;opacity:.9"></div>
+      <div class="step" style="top:288px;width:210px;height:78px;opacity:.55"></div>
+      <div class="step" style="top:384px;width:330px;height:78px;opacity:.75"></div>
+      <div class="step" style="top:480px;width:150px;height:78px;opacity:.5"></div>
+      <div class="step" style="top:576px;width:262px;height:64px;opacity:.65"></div>
+    </div>
+    <div class="qr" style="position:absolute;right:80px;top:64px;width:86px;height:86px">
+      <i class="on"></i><i></i><i class="on"></i><i class="on"></i><i></i><i class="on"></i><i></i><i class="on"></i>
+      <i></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i><i></i><i class="on"></i><i></i>
+      <i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i class="on"></i><i></i><i class="on"></i>
+      <i></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i class="on"></i><i></i>
+      <i class="on"></i><i></i><i></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i><i></i>
+      <i></i><i class="on"></i><i class="on"></i><i></i><i class="on"></i><i></i><i></i><i class="on"></i>
+      <i class="on"></i><i></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i><i></i><i></i>
+      <i></i><i class="on"></i><i></i><i class="on"></i><i></i><i></i><i class="on"></i><i class="on"></i>
+    </div>
+
+    <div style="position:absolute;left:var(--edge);top:96px;z-index:2" class="mono">Inner Cosmos</div>
+
+    <div style="position:absolute;left:var(--edge);top:216px;width:1180px;z-index:2">
+      <div class="micro" data-a="1">Semantic Reliability</div>
+      <div style="height:1.5px;background:var(--ink);margin:22px 0 40px" data-w></div>
+      <h1 class="d-hero" data-a="2">从容器编排<br>到语义可靠性</h1>
+      <p class="ed-callout" style="margin-top:44px" data-a="3">先进 <span class="lat">AI Agent</span> 的云原生运行范式</p>
+      <p class="body" style="margin:26px 0 0;max-width:1130px" data-a="4">
+        以 Inner Cosmos 的长期对话、异步记忆与安全发布为实验场。此处「语义」指<span class="tb-name" style="font-size:23px">业务语义与领域不变量</span>，不是自然语言语义。
+      </p>
+    </div>
+
+    <div style="position:absolute;left:var(--edge);bottom:110px;right:520px;z-index:2;display:flex;gap:56px" data-f>
+      <span class="mono-sm">local-kind · live</span>
+      <span class="mono-sm dim">academy-eks</span>
+      <span class="mono-sm dim">commercial-sg</span>
+    </div>
+  </section>
+
+  <!-- ==================================================================
+       02 · CHAPTER 01
+       ================================================================== -->
+  <section class="slide" data-label="Chapter 01">
+    <div class="glitch" style="right:0;top:260px;width:300px;height:400px">
+      <div class="step" style="top:0;width:300px;height:66px;opacity:.7"></div>
+      <div class="step" style="top:84px;width:196px;height:66px;opacity:.55"></div>
+      <div class="step" style="top:168px;width:264px;height:66px;opacity:.8"></div>
+      <div class="step" style="top:252px;width:130px;height:66px;opacity:.45"></div>
+      <div class="step" style="top:336px;width:222px;height:64px;opacity:.6"></div>
+    </div>
+    <div class="frame" style="display:flex;flex-direction:column;justify-content:center">
+      <div class="mono" data-a="1">01 / 05</div>
+      <div style="height:1.5px;background:var(--ink);margin:24px 0 44px;max-width:1180px" data-w></div>
+      <h2 class="d-chapter" data-a="2">这是一个什么样的<br><span class="lat">AI</span> 系统</h2>
+      <p class="body-lede" style="margin:44px 0 0;max-width:920px" data-a="3">
+        先看产品与 <span class="lat">AI</span> 运行时。四个属性会从图里自己掉出来——它们就是后面四种语义失配的前提。
+      </p>
+    </div>
+  </section>
+
+  <!-- ==================================================================
+       03 · THE MAP (full) — the deck's spine, first complete appearance
+       ================================================================== -->
+  <section class="slide" data-label="The Map">
+    <div class="frame spread">
+      <div class="topbar" data-a="1">
+        <h2 class="h-line">一次用户 <span class="lat">turn</span> 走过的全链路</h2>
+        <span class="mono-sm">FIG. 01 · THE MAP</span>
+      </div>
+
+      <div class="map" style="margin-top:24px" data-a="2">
+        <svg viewBox="0 0 1720 300" preserveAspectRatio="xMidYMid meet" style="height:340px">
+          <line class="lane" x1="30" y1="60" x2="1690" y2="60"/>
+          <!-- nodes as grid-unit rectangles: zero circles in this system -->
+          <rect class="nbox on" x="8"    y="44" width="44" height="32"/>
+          <rect class="nbox on" x="248"  y="44" width="44" height="32"/>
+          <rect class="nbox on" x="488"  y="44" width="44" height="32"/>
+          <rect class="nbox on" x="728"  y="44" width="44" height="32"/>
+          <rect class="nbox on" x="968"  y="44" width="44" height="32"/>
+          <rect class="nbox on" x="1208" y="44" width="44" height="32"/>
+          <rect class="nbox on" x="1448" y="44" width="44" height="32"/>
+          <rect class="nbox on" x="1668" y="44" width="44" height="32"/>
+          <text class="nlab on" x="8"    y="112">AppShell</text>
+          <text class="nlab on" x="248"  y="112">API / SSE</text>
+          <text class="nlab on" x="488"  y="112">Aurora Runtime</text>
+          <text class="nlab on" x="728"  y="112">Retrieval</text>
+          <text class="nlab on" x="968"  y="112">Provider</text>
+          <text class="nlab on" x="1208" y="112">Outbox</text>
+          <text class="nlab on" x="1448" y="112">Worker</text>
+          <text class="nlab on" x="1600" y="112">Projection</text>
+          <!-- sync | async seam -->
+          <line class="seam" x1="1130" y1="14" x2="1130" y2="150"/>
+          <text class="seamlab" x="960"  y="182">同步</text>
+          <text class="seamlab" x="1150" y="182">异步派生</text>
+        </svg>
+      </div>
+
+      <div style="margin-top:52px;display:grid;grid-template-columns:repeat(3,1fr);gap:56px" data-f>
+        <div>
+          <div class="micro cjk">五空间 AppShell</div>
+          <p class="body-sm" style="margin:12px 0 0">对话、记忆、画像、共鸣、慢信同处一个外壳，不是五个独立页面。</p>
+        </div>
+        <div>
+          <div class="micro cjk">Aurora Runtime</div>
+          <p class="body-sm" style="margin:12px 0 0">不是回复生成器，而是可恢复的 <span class="lat">Agent</span> 运行时：上下文装配、检索、多气泡编排。</p>
+        </div>
+        <div>
+          <div class="micro cjk">异步派生</div>
+          <p class="body-sm" style="margin:12px 0 0">对话结束后，记忆、画像、共鸣体在 <span class="lat">outbox</span> 之后才生成。</p>
+        </div>
+      </div>
+
+      <p class="mono-sm dim" style="margin:0" data-f>这张图会在后面每条实验链路里重新出现，每次点亮不同的一段。</p>
+    </div>
+  </section>
+
+  <!-- ==================================================================
+       04 · MEMORY IS INSPECTABLE
+       ================================================================== -->
+  <section class="slide" data-label="Inspectable memory">
+    <div class="frame spread">
+      <div class="topbar" data-a="1">
+        <h2 class="h-line">不是「记得越多」，而是理解可被检查</h2>
+        <span class="mono-sm">FIG. 02</span>
+      </div>
+
+      <div style="margin-top:72px;display:grid;grid-template-columns:1.15fr 1fr;gap:96px">
+        <div data-a="2">
+          <!-- provenance chain, drawn in the system's rectangles + hairlines -->
+          <svg viewBox="0 0 760 420" style="width:100%;height:430px;overflow:visible">
+            <text class="nlab on" x="0" y="18" style="font-size:15px">对话原文</text>
+            <rect class="nbox on" x="0" y="34" width="240" height="46"/>
+            <text x="14" y="63" style="font-family:'Hanken Grotesk',sans-serif;font-size:17px;fill:#F0EBDE">「最近总睡不好」</text>
+
+            <line class="lane" x1="120" y1="80" x2="120" y2="128" style="stroke:var(--ink);opacity:.5"/>
+            <text class="nlab on" x="136" y="112" style="font-size:14px">extract</text>
+
+            <text class="nlab on" x="0" y="150" style="font-size:15px">候选 claim（待确认）</text>
+            <rect class="nbox" x="0" y="166" width="330" height="46" style="opacity:1;stroke-dasharray:5 4"/>
+            <text x="14" y="195" style="font-family:'Hanken Grotesk',sans-serif;font-size:17px;fill:#1F2BE0">睡眠质量下降 · 置信度中</text>
+
+            <line class="lane" x1="165" y1="212" x2="165" y2="260" style="stroke:var(--ink);opacity:.5"/>
+            <text class="nlab on" x="181" y="244" style="font-size:14px">用户确认 / 纠正 / 撤回</text>
+
+            <text class="nlab on" x="0" y="282" style="font-size:15px">长期记忆（带出处）</text>
+            <rect class="nbox on" x="0" y="298" width="330" height="46"/>
+            <text x="14" y="327" style="font-family:'Hanken Grotesk',sans-serif;font-size:17px;fill:#F0EBDE">睡眠 · 来源可回溯到那一句</text>
+
+            <line class="lane" x1="330" y1="321" x2="470" y2="321" style="stroke:var(--ink);opacity:.5"/>
+            <rect class="nbox" x="470" y="298" width="200" height="46" style="opacity:1;stroke-dasharray:5 4"/>
+            <text x="484" y="327" style="font-family:'Hanken Grotesk',sans-serif;font-size:17px;fill:#1F2BE0">可随时删除</text>
+          </svg>
+        </div>
+
+        <div data-a="3" style="padding-top:16px">
+          <p class="d-quote" style="font-size:52px;line-height:1.32">我们不追求记得更多，而追求理解可以被检查和纠正</p>
+          <div class="rule-solid" style="margin-top:44px;padding-top:22px">
+            <p class="body" style="margin:0">每一条长期记忆都能回溯到产生它的那一句话。用户可以确认、修正或撤回——模型对人的理解不是黑箱推断，而是一份可以校对的档案。</p>
+          </div>
+        </div>
+      </div>
+      <p class="mono-sm dim" style="margin:0" data-f>可纠正性不是产品功能，它是后面「语义健康契约」成立的前提。</p>
+    </div>
+  </section>
+
+  <!-- ==================================================================
+       05 · ECHO CAPSULE → SLOW CONNECTION
+       ================================================================== -->
+  <section class="slide" data-label="Echo Capsule">
+    <div class="frame spread">
+      <div class="topbar" data-a="1">
+        <h2 class="h-line">先低风险地理解，再决定是否成为人际连接</h2>
+        <span class="mono-sm">FIG. 03</span>
+      </div>
+
+      <div class="map" style="margin-top:24px" data-a="2">
+        <svg viewBox="0 0 1720 250" style="height:280px">
+          <line class="lane" x1="120" y1="56" x2="1600" y2="56" style="stroke:var(--ink);opacity:.35"/>
+
+          <rect class="nbox on" x="20" y="30" width="200" height="52"/>
+          <text x="42" y="63" style="font-family:'Hanken Grotesk',sans-serif;font-weight:600;font-size:19px;fill:#F0EBDE">用户模型</text>
+          <text class="nlab on" x="20" y="118" style="font-size:15px">记忆 · 价值 · 关系 · 情绪 · 目标</text>
+
+          <rect class="nbox" x="440" y="30" width="230" height="52" style="opacity:1;stroke-dasharray:5 4"/>
+          <text x="462" y="63" style="font-family:'Hanken Grotesk',sans-serif;font-weight:600;font-size:19px;fill:#1F2BE0">明确授权</text>
+          <text class="nlab on" x="440" y="118" style="font-size:15px">用户逐项决定可编译什么</text>
+
+          <rect class="nbox on" x="890" y="30" width="240" height="52"/>
+          <text x="912" y="63" style="font-family:'Hanken Grotesk',sans-serif;font-weight:600;font-size:19px;fill:#F0EBDE">Echo Capsule</text>
+          <text class="nlab on" x="890" y="118" style="font-size:15px">有界 · 可撤回 · 不含正文</text>
+
+          <rect class="nbox on" x="1350" y="30" width="250" height="52"/>
+          <text x="1372" y="63" style="font-family:'Hanken Grotesk',sans-serif;font-weight:600;font-size:19px;fill:#F0EBDE">共鸣 → 慢信</text>
+          <text class="nlab on" x="1350" y="118" style="font-size:15px">先共鸣，再决定是否成为人</text>
+
+          <text class="nlab on" x="248" y="44" style="font-size:15px">→</text>
+          <text class="nlab on" x="700" y="44" style="font-size:15px">→</text>
+          <text class="nlab on" x="1160" y="44" style="font-size:15px">→</text>
+
+          <line class="seam" x1="1600" y1="20" x2="1600" y2="140"/>
+          <text class="seamlab" x="1612" y="90" style="font-size:15px">人</text>
+        </svg>
+      </div>
+
+      <div style="margin-top:64px;padding-top:26px;border-top:1.5px solid var(--ink)" data-f>
+        <p class="ed-callout" style="max-width:1300px">社交不是即时曝光。数据也不是单向流出——每一步都可撤回。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================================================================
+       06 · FOUR PROPERTIES — extracted from what was just shown
+       ================================================================== -->
+  <section class="slide" data-label="Four properties">
+    <div class="frame spread">
+      <div class="topbar" data-a="1">
+        <h2 class="h-line">于是它有四个很硬的属性</h2>
+        <span class="mono-sm">WHY THIS WORKLOAD</span>
+      </div>
+      <div class="index" style="margin-top:56px">
+        <div class="irow" data-a="2">
+          <div class="num">01</div>
+          <div><div class="row-h">数十秒的长连接</div>
+            <p class="body-sm" style="margin:10px 0 0;max-width:1300px">一次 Aurora <span class="lat">turn</span> 是多气泡 <span class="lat">SSE</span>，逐字滴出，服务端持有跨 <span class="lat">token</span> 的中间状态。</p></div>
+        </div>
+        <div class="irow" data-a="3">
+          <div class="num">02</div>
+          <div><div class="row-h">副作用不可朴素重放</div>
+            <p class="body-sm" style="margin:10px 0 0;max-width:1300px">重试会二次调用模型（真金白银），也会二次写入长期记忆（污染对人的理解）。</p></div>
+        </div>
+        <div class="irow" data-a="4">
+          <div class="num">03</div>
+          <div><div class="row-h">对话结束后才异步派生</div>
+            <p class="body-sm" style="margin:10px 0 0;max-width:1300px">记忆、画像、共鸣体在 <span class="lat">outbox</span> 之后生成。积压不是机器现象，是用户在等。</p></div>
+        </div>
+        <div class="irow" data-a="5" style="border-bottom:none">
+          <div class="num">04</div>
+          <div><div class="row-h">语义带版本</div>
+            <p class="body-sm" style="margin:10px 0 0;max-width:1300px"><span class="lat">Prompt</span>、模型、策略都有版本。它可以完全不崩溃，只是变笨了。</p></div>
+        </div>
+      </div>
+      <p class="mono-sm dim" style="margin:0" data-f>它不是套了聊天界面的普通 Web 应用。</p>
+    </div>
+  </section>
+
+  <!-- ==================================================================
+       07 · CHAPTER 02
+       ================================================================== -->
+  <section class="slide" data-label="Chapter 02">
+    <div class="glitch" style="right:0;top:240px;width:340px;height:470px">
+      <div class="step" style="top:0;width:340px;height:70px;opacity:.75"></div>
+      <div class="step" style="top:88px;width:210px;height:70px;opacity:.5"></div>
+      <div class="step" style="top:176px;width:296px;height:70px;opacity:.85"></div>
+      <div class="step" style="top:264px;width:146px;height:70px;opacity:.45"></div>
+      <div class="step" style="top:352px;width:250px;height:70px;opacity:.65"></div>
+    </div>
+    <div class="frame" style="display:flex;flex-direction:column;justify-content:center">
+      <div class="mono" data-a="1">02 / 05</div>
+      <div style="height:1.5px;background:var(--ink);margin:24px 0 44px;max-width:1180px" data-w></div>
+      <h2 class="d-chapter" data-a="2">四种语义失配</h2>
+      <p class="body-lede" style="margin:44px 0 0;max-width:1000px" data-a="3">
+        我们不主张 <span class="lat">Kubernetes</span> 不适合 <span class="lat">AI</span>。它的控制循环是<span class="tb-name" style="font-size:28px">有意 domain-agnostic</span> 的——所以把领域不变量暴露给控制循环，是设计上应由应用承担的职责。
+      </p>
+    </div>
+  </section>
+
+  <!-- ==================================================================
+       08 · THE FOUR MISMATCHES — opposition diagram, not a table
+       ================================================================== -->
+  <section class="slide" data-label="Four mismatches">
+    <div class="frame spread">
+      <div class="topbar" data-a="1">
+        <h2 class="h-line">常见运维抽象　→　<span class="lat">AI Agent</span> 的真实情况</h2>
+        <span class="mono-sm">FIG. 04</span>
+      </div>
+      <div style="margin-top:40px">
+        <div class="opp rowdiv" data-a="2">
+          <div class="old">请求生命周期短，失败后可以重新请求</div>
+          <div class="arrow">→</div>
+          <div class="new">长连接、有中间状态、有成本和副作用；朴素重试会重复模型调用与记忆写入
+            <div class="ct">连续性契约</div></div>
+        </div>
+        <div class="opp rowdiv" data-a="3">
+          <div class="old"><span class="lat">Pod</span> 活着，服务就健康</div>
+          <div class="arrow">→</div>
+          <div class="new"><span class="lat">Prompt</span>、解析率、<span class="lat">fallback</span>、<span class="lat">TTFT</span> 已退化，而 <span class="lat">JVM / HTTP / liveness</span> 全绿
+            <div class="ct">语义健康契约</div></div>
+        </div>
+        <div class="opp rowdiv" data-a="4">
+          <div class="old"><span class="lat">CPU / QPS</span> 可以代表负载</div>
+          <div class="arrow">→</div>
+          <div class="new">真正影响用户的是 <span class="lat">projection</span> 的 <span class="lat">backlog</span> 与 <span class="lat">oldest age</span>
+            <div class="ct">工作压力契约</div></div>
+        </div>
+        <div class="opp" data-a="5">
+          <div class="old">单服务指标足以解释问题</div>
+          <div class="arrow">→</div>
+          <div class="new">一次 <span class="lat">turn</span> 横跨 <span class="lat">HTTP</span>、检索、<span class="lat">Provider</span>、<span class="lat">outbox</span>、<span class="lat">Worker</span>、投影与 <span class="lat">WakeIntent</span>
+            <div class="ct">因果可观测契约</div></div>
+        </div>
+      </div>
+      <p class="mono-sm dim" style="margin:0" data-f>Kubernetes 提供通用控制循环；应用必须把自己的业务不变量显式暴露给这些控制循环。</p>
+    </div>
+  </section>
+
+  <!-- ==================================================================
+       09 · FOUR CONTRACTS + WHO SPEAKS — doubles as the team slide
+       ================================================================== -->
+  <section class="slide" data-label="Four contracts">
+    <div class="frame spread">
+      <div class="topbar" data-a="1">
+        <h2 class="h-line">四个契约，四条现场实验</h2>
+        <span class="mono-sm">AGENDA · LIVE ON KIND</span>
+      </div>
+      <div class="index" style="margin-top:52px">
+        <div class="irow" data-a="2">
+          <div class="num">01<div class="sp">H1</div></div>
+          <div><div class="row-h">连续性契约</div>
+            <p class="body-sm" style="margin:10px 0 0"><span class="lat">Pod</span> 消失，什么必须继续存在　·　现场删 <span class="lat">Pod</span> 与真 <span class="lat">SIGKILL</span></p></div>
+        </div>
+        <div class="irow" data-a="3">
+          <div class="num">03<div class="sp">H2</div></div>
+          <div><div class="row-h">工作压力契约</div>
+            <p class="body-sm" style="margin:10px 0 0"><span class="lat">CPU</span> 不能代表用户在等待　·　现场 <span class="lat">KEDA</span> 按 <span class="lat">outbox</span> 扩缩</p></div>
+        </div>
+        <div class="irow" data-a="4">
+          <div class="num">04<div class="sp">H3</div></div>
+          <div><div class="row-h">因果可观测契约</div>
+            <p class="body-sm" style="margin:10px 0 0">一次行为跨越多个运行角色　·　现场跨角色 <span class="lat">trace</span></p></div>
+        </div>
+        <div class="irow" data-a="5" style="border-bottom:none">
+          <div class="num">02</div>
+          <div><div class="row-h">语义健康契约</div>
+            <p class="body-sm" style="margin:10px 0 0">进程活着 ≠ 版本仍值得接收流量　·　<span class="lat">Kyverno</span> 准入前 + <span class="lat">Rollouts</span> 准入后</p></div>
+        </div>
+      </div>
+      <p class="mono-sm dim" style="margin:0" data-f>三条 Hero 链路在 kind 集群现场实跑；Rollouts 用已实测的 AnalysisRun 与回滚时间线讲解。</p>
+    </div>
+  </section>
+
+  <!-- ==================================================================
+       10 · CUT TO LIVE — H1
+       ================================================================== -->
+  <section class="slide" data-label="Cut to live H1">
+    <div class="glitch" style="right:0;top:0;width:230px;height:1080px;opacity:.5">
+      <div class="step" style="top:180px;width:230px;height:80px;opacity:.7"></div>
+      <div class="step" style="top:290px;width:140px;height:80px;opacity:.5"></div>
+      <div class="step" style="top:400px;width:200px;height:80px;opacity:.8"></div>
+      <div class="step" style="top:510px;width:96px;height:80px;opacity:.45"></div>
+      <div class="step" style="top:620px;width:170px;height:80px;opacity:.6"></div>
+    </div>
+    <div class="live">
+      <div class="micro" data-a="1">H1 · Live on kind</div>
+      <h2 class="d-manifesto" style="margin-top:34px;max-width:1340px" data-a="2">当承载一次 Aurora 对话的 <span class="lat">Pod</span> 消失，究竟什么必须继续存在？</h2>
+      <div class="watch" data-a="4">
+        <div class="w">
+          <div class="k">请看这里 · 1</div>
+          <p class="body-sm" style="margin:0">左侧终端的 <span class="lat">SSE</span> 输出——它是否中断。窗口只有零点几秒，我会报数。</p>
+        </div>
+        <div class="w">
+          <div class="k">请看这里 · 2</div>
+          <p class="body-sm" style="margin:0"><span class="lat">Pod</span> 的 <span class="lat">Ready</span> 状态，以及 <span class="lat">turn</span> 落库后的终态。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================================================================
+       11 · MAP LIT — H1 segment
+       ================================================================== -->
+  <section class="slide" data-label="Map · H1">
+    <div class="frame spread">
+      <div class="topbar" data-a="1">
+        <h2 class="h-line">我们在这条线的这一段</h2>
+        <span class="mono-sm">H1 · CONTINUITY</span>
+      </div>
+      <div class="map" style="margin-top:24px" data-a="2">
+        <svg viewBox="0 0 1720 300" style="height:330px">
+          <line class="lane" x1="30" y1="60" x2="1690" y2="60"/>
+          <rect class="nbox on" x="8"    y="44" width="44" height="32"/>
+          <rect class="nbox on" x="248"  y="44" width="44" height="32"/>
+          <rect class="nbox on" x="488"  y="44" width="44" height="32"/>
+          <rect class="nbox"    x="728"  y="44" width="44" height="32"/>
+          <rect class="nbox"    x="968"  y="44" width="44" height="32"/>
+          <rect class="nbox"    x="1208" y="44" width="44" height="32"/>
+          <rect class="nbox"    x="1448" y="44" width="44" height="32"/>
+          <rect class="nbox"    x="1668" y="44" width="44" height="32"/>
+          <text class="nlab on" x="8"    y="112">AppShell</text>
+          <text class="nlab on" x="248"  y="112">API / SSE</text>
+          <text class="nlab on" x="488"  y="112">Aurora Runtime</text>
+          <text class="nlab"    x="728"  y="112">Retrieval</text>
+          <text class="nlab"    x="968"  y="112">Provider</text>
+          <text class="nlab"    x="1208" y="112">Outbox</text>
+          <text class="nlab"    x="1448" y="112">Worker</text>
+          <text class="nlab"    x="1600" y="112">Projection</text>
+          <text class="seamlab" x="8" y="182">客户端 cursor　·　Redis live buffer　·　PostgreSQL timeline</text>
+        </svg>
+      </div>
+      <div style="margin-top:56px;padding-top:26px;border-top:1.5px solid var(--ink);display:grid;grid-template-columns:repeat(4,1fr);gap:44px" data-f>
+        <div><div class="micro-sm cjk">readiness 摘流</div><p class="body-sm" style="margin:10px 0 0">先不接新流量</p></div>
+        <div><div class="micro-sm cjk">graceful shutdown</div><p class="body-sm" style="margin:10px 0 0">preStop 15s / grace 45s</p></div>
+        <div><div class="micro-sm cjk">Deployment 补副本</div><p class="body-sm" style="margin:10px 0 0">PDB + topology spread</p></div>
+        <div><div class="micro-sm cjk">Redis session</div><p class="body-sm" style="margin:10px 0 0">换副本后会话仍有效</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================================================================
+       12 · H1 RESULT — graceful delete
+       ================================================================== -->
+  <section class="slide" data-label="H1 result · graceful">
+    <div class="frame spread">
+      <div class="topbar" data-a="1">
+        <h2 class="h-line">优雅删除正在服务的 <span class="lat">Pod</span></h2>
+        <span class="mono-sm">CN-ZERO-LOSS-DRAIN-001</span>
+      </div>
+      <div class="stats" style="margin-top:70px;grid-template-columns:repeat(3,1fr)">
+        <div class="stat" data-a="2" style="border-right:1px solid var(--faint)">
+          <div class="lbl cjk">turn 终态</div>
+          <div class="vbig" style="font-size:96px">COMPLETED</div>
+          <p class="desc">流没有中断，这一次 <span class="lat">turn</span> 正常跑完。</p>
+        </div>
+        <div class="stat" data-a="3" style="padding-left:44px;border-right:1px solid var(--faint)">
+          <div class="lbl cjk">气泡</div>
+          <div class="vbig">2<span class="u"> / 2 COMMITTED</span></div>
+          <p class="desc">两个气泡都完整落库，<span class="lat">delivered_chars</span> 33 / 34。</p>
+        </div>
+        <div class="stat" data-a="4" style="padding-left:44px">
+          <div class="lbl cjk">内容丢失</div>
+          <div class="vbig">0</div>
+          <p class="desc">没有伪造内容，也没有丢内容。</p>
+        </div>
+      </div>
+      <div style="margin-top:60px;padding-top:26px;border-top:1.5px solid var(--ink)" data-f>
+        <p class="ed-callout" style="max-width:1420px">但这次「通过」的理由是错的——我们后来才发现故障根本没注入进去</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================================================================
+       13 · THE --force DISCOVERY
+       ================================================================== -->
+  <section class="slide" data-label="The --force discovery">
+    <div class="frame spread">
+      <div class="topbar" data-a="1">
+        <h2 class="h-line"><span class="lat">--force --grace-period=0</span> 到底做了什么</h2>
+        <span class="mono-sm">FIG. 05</span>
+      </div>
+      <div style="margin-top:78px;display:grid;grid-template-columns:1fr 1fr;gap:0">
+        <div data-a="2" style="padding-right:64px">
+          <div class="micro cjk">我们以为</div>
+          <svg viewBox="0 0 620 250" style="width:100%;height:230px;margin-top:26px;overflow:visible">
+            <rect class="nbox on" x="0" y="20" width="230" height="52"/>
+            <text x="20" y="53" style="font-family:'DM Mono',monospace;font-size:17px;fill:#F0EBDE">delete --force</text>
+            <line class="lane" x1="230" y1="46" x2="330" y2="46" style="stroke:var(--ink);opacity:.5"/>
+            <rect class="nbox on" x="330" y="20" width="250" height="52"/>
+            <text x="350" y="53" style="font-family:'Hanken Grotesk',sans-serif;font-size:18px;fill:#F0EBDE">进程立即消失</text>
+            <line class="lane" x1="455" y1="72" x2="455" y2="132" style="stroke:var(--ink);opacity:.5"/>
+            <rect class="nbox on" x="330" y="132" width="250" height="52"/>
+            <text x="350" y="165" style="font-family:'Hanken Grotesk',sans-serif;font-size:18px;fill:#F0EBDE">SSE 硬断</text>
+          </svg>
+        </div>
+        <div data-a="3" style="padding-left:64px;border-left:1.5px solid var(--ink)">
+          <div class="micro cjk">实测是</div>
+          <svg viewBox="0 0 620 250" style="width:100%;height:230px;margin-top:26px;overflow:visible">
+            <rect class="nbox on" x="0" y="20" width="230" height="52"/>
+            <text x="20" y="53" style="font-family:'DM Mono',monospace;font-size:17px;fill:#F0EBDE">delete --force</text>
+            <line class="lane" x1="230" y1="46" x2="330" y2="46" style="stroke:var(--ink);opacity:.5"/>
+            <rect class="nbox on" x="330" y="20" width="280" height="52"/>
+            <text x="350" y="53" style="font-family:'Hanken Grotesk',sans-serif;font-size:18px;fill:#F0EBDE">只删掉 API 对象</text>
+            <line class="lane" x1="470" y1="72" x2="470" y2="132" style="stroke:var(--ink);opacity:.5"/>
+            <rect class="nbox" x="330" y="132" width="280" height="52" style="opacity:1;stroke-dasharray:5 4"/>
+            <text x="350" y="165" style="font-family:'Hanken Grotesk',sans-serif;font-size:18px;fill:#1F2BE0">kubelet 照样跑完 grace</text>
+            <text class="nlab on" x="330" y="212" style="font-size:15px">terminationGracePeriodSeconds: 45 · preStop: sleep 15</text>
+          </svg>
+        </div>
+      </div>
+      <div style="margin-top:56px;padding-top:26px;border-top:1.5px solid var(--ink)" data-f>
+        <p class="ed-callout" style="max-width:1440px">于是我们改用 <span class="lat">docker exec kill -9</span> 真正硬杀 JVM——这一次，系统暴露了一个真 bug</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================================================================
+       14 · H1 RESULT — SIGKILL. Solid = proven, outlined = boundary.
+       ================================================================== -->
+  <section class="slide" data-label="H1 result · SIGKILL">
+    <div class="frame spread">
+      <div class="topbar" data-a="1">
+        <h2 class="h-line">真 <span class="lat">SIGKILL</span> 之后</h2>
+        <span class="mono-sm">CN-ZERO-LOSS-DRAIN-002</span>
+      </div>
+      <div class="stats" style="margin-top:64px;grid-template-columns:repeat(3,1fr)">
+        <div class="stat" data-a="2" style="border-right:1px solid var(--faint)">
+          <div class="lbl cjk">孤儿 turn 结算</div>
+          <div class="vbig">22<span class="u"> s</span></div>
+          <p class="desc">scheduler 的 <span class="lat">ConversationTurnRecoveryJob</span> 把它落到终态 <span class="lat">INTERRUPTED</span>。阈值 <span class="lat">stale-after</span> 可配，测试设 20 秒。</p>
+        </div>
+        <div class="stat" data-a="3" style="padding-left:44px;border-right:1px solid var(--faint)">
+          <div class="lbl cjk">重连拿到终止信号</div>
+          <div class="vbig">1.62<span class="u"> s</span></div>
+          <p class="desc">显式 <span class="lat">turnStatus: INTERRUPTED</span>，而不是静默悬挂。修复前挂到 120 秒 <span class="lat">SseEmitter</span> 超时。</p>
+        </div>
+        <div class="stat bound" data-a="4" style="padding-left:44px">
+          <div class="lbl cjk k">这一次 turn 无法续流</div>
+          <div class="vbig">—</div>
+          <p class="desc">进程硬崩时正在生成的内容无法恢复。我们保证的是它进入终态、客户端不悬挂——这条边界公开留着。</p>
+        </div>
+      </div>
+      <div style="margin-top:52px;padding-top:26px;border-top:1.5px solid var(--ink);display:flex;gap:64px" data-f>
+        <p class="body-sm" style="margin:0;max-width:760px">已缓冲的 live <span class="lat">token</span> 原样回放，然后流诚实报告 <span class="lat">turn</span> 的真实终态。<b style="font-weight:400;font-family:var(--font-display);font-size:26px">没有伪造内容，也没有丢内容。</b></p>
+        <p class="mono-sm dim" style="margin:0">修复 6832043 · 此前只有单元/组件测试覆盖</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================================================================
+       15 · LESSON 01 — manifesto layout, deliberately sparse
+       ================================================================== -->
+  <section class="slide" data-label="Lesson 01">
+    <div class="glitch" style="right:0;top:120px;width:260px;height:840px;opacity:.45">
+      <div class="step" style="top:0;width:260px;height:88px;opacity:.7"></div>
+      <div class="step" style="top:120px;width:160px;height:88px;opacity:.5"></div>
+      <div class="step" style="top:240px;width:224px;height:88px;opacity:.8"></div>
+      <div class="step" style="top:360px;width:104px;height:88px;opacity:.45"></div>
+      <div class="step" style="top:480px;width:192px;height:88px;opacity:.6"></div>
+      <div class="step" style="top:600px;width:132px;height:88px;opacity:.4"></div>
+    </div>
+    <div class="live">
+      <div class="micro" data-a="1">Lesson 01 · Continuity</div>
+      <h2 class="d-manifesto" style="margin-top:36px;max-width:1310px" data-a="2">零损失不是 <span class="lat">PDB</span> 或 <span class="lat">graceful shutdown</span> 的单项能力，而是一个组合性质</h2>
+      <div class="rule-solid" style="margin-top:56px;padding-top:26px;max-width:1310px" data-a="4">
+        <p class="body" style="margin:0"><span class="lat">Kubernetes</span> 能替换 <span class="lat">Pod</span>，但不知道一次 Aurora <span class="lat">turn</span> 是否已完成。<span class="lat">PostgreSQL</span> 能保存 <span class="lat">turn</span>，但不会告诉客户端如何恢复。<span class="lat">Last-Event-ID</span> 能表达游标，但没有统一事件序列和 <span class="lat">terminal event</span>，客户端仍会悬挂。四者缺一即失效。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================================================================
+       16 · MAP LIT — H2 segment
+       ================================================================== -->
+  <section class="slide" data-label="Map · H2">
+    <div class="frame spread">
+      <div class="topbar" data-a="1">
+        <h2 class="h-line">同一张图，这次点亮异步派生段</h2>
+        <span class="mono-sm">H2 · WORK PRESSURE</span>
+      </div>
+      <div class="map" style="margin-top:24px" data-a="2">
+        <svg viewBox="0 0 1720 300" style="height:330px">
+          <line class="lane" x1="30" y1="60" x2="1690" y2="60"/>
+          <rect class="nbox"    x="8"    y="44" width="44" height="32"/>
+          <rect class="nbox"    x="248"  y="44" width="44" height="32"/>
+          <rect class="nbox"    x="488"  y="44" width="44" height="32"/>
+          <rect class="nbox"    x="728"  y="44" width="44" height="32"/>
+          <rect class="nbox"    x="968"  y="44" width="44" height="32"/>
+          <rect class="nbox on" x="1208" y="44" width="44" height="32"/>
+          <rect class="nbox on" x="1448" y="44" width="44" height="32"/>
+          <rect class="nbox on" x="1668" y="44" width="44" height="32"/>
+          <text class="nlab"    x="8"    y="112">AppShell</text>
+          <text class="nlab"    x="248"  y="112">API / SSE</text>
+          <text class="nlab"    x="488"  y="112">Aurora Runtime</text>
+          <text class="nlab"    x="728"  y="112">Retrieval</text>
+          <text class="nlab"    x="968"  y="112">Provider</text>
+          <text class="nlab on" x="1208" y="112">Outbox</text>
+          <text class="nlab on" x="1448" y="112">Worker</text>
+          <text class="nlab on" x="1600" y="112">Projection</text>
+          <line class="seam" x1="1130" y1="14" x2="1130" y2="150"/>
+          <text class="seamlab" x="1150" y="182">用户已经离开对话，但记忆还没生成</text>
+        </svg>
+      </div>
+      <div style="margin-top:56px;padding-top:26px;border-top:1.5px solid var(--ink)" data-f>
+        <p class="ed-callout" style="max-width:1440px">用户不关心 <span class="lat">CPU</span> 只有 20%。用户关心：为什么我结束对话后，Aurora 过了很久还没形成新的记忆</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================================================================
+       17 · THE CHART — CPU flat vs backlog rising. Pixel-stack primitive.
+       ================================================================== -->
+  <section class="slide" data-label="CPU vs backlog">
+    <div class="frame spread">
+      <div class="topbar" data-a="1">
+        <h2 class="h-line">机器现象　与　用户体验现象</h2>
+        <span class="mono-sm">FIG. 06 · SAME TIME AXIS</span>
+      </div>
+
+      <div style="margin-top:58px;display:grid;grid-template-columns:1fr 1fr;gap:80px">
+        <!-- Series A: outbox oldest age — rising -->
+        <div data-a="2">
+          <div class="micro cjk">outbox oldest ready age</div>
+          <p class="mono-sm dim" style="margin:10px 0 26px">KEDA 真正读的信号</p>
+          <div class="pstack-row">
+            <div class="pstack"><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="pstack"><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="pstack"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="pstack"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="pstack"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i></div>
+            <div class="pstack"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></div>
+            <div class="pstack"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></div>
+            <div class="pstack"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></div>
+          </div>
+          <div class="pstack-axis"><span>t0</span><span>t1</span><span>t2</span><span>t3</span><span>t4</span><span>t5</span><span>t6</span><span>t7</span></div>
+        </div>
+
+        <!-- Series B: API CPU — flat -->
+        <div data-a="4">
+          <div class="micro cjk">API CPU utilisation</div>
+          <p class="mono-sm dim" style="margin:10px 0 26px">同一时间轴上，几乎没有变化</p>
+          <div class="pstack-row">
+            <div class="pstack"><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="pstack"><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="pstack"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="pstack"><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="pstack"><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="pstack"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="pstack"><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="pstack"><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          </div>
+          <div class="pstack-axis"><span>t0</span><span>t1</span><span>t2</span><span>t3</span><span>t4</span><span>t5</span><span>t6</span><span>t7</span></div>
+        </div>
+      </div>
+
+      <div style="margin-top:56px;padding-top:24px;border-top:1.5px solid var(--ink)" data-f>
+        <p class="ed-callout" style="max-width:1500px"><span class="lat">OutboxQueueMetrics</span> 只导出 <span class="lat">backlog count</span> 与 <span class="lat">oldest ready age</span>——不导出 <span class="lat">CPU</span></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================================================================
+       18 · KEDA RESULT + EXACTLY-ONCE COMPOSITION
+       ================================================================== -->
+  <section class="slide" data-label="KEDA result">
+    <div class="frame spread">
+      <div class="topbar" data-a="1">
+        <h2 class="h-line">扩容只增加吞吐，正确性来自另一套东西</h2>
+        <span class="mono-sm">CN-EVENT-DRIVEN-AUTOSCALING-001</span>
+      </div>
+
+      <div class="stats" style="margin-top:52px;grid-template-columns:repeat(4,1fr)">
+        <div class="stat" data-a="2" style="border-right:1px solid var(--faint)">
+          <div class="lbl cjk">worker 副本</div>
+          <div class="vbig" style="font-size:104px">1<span class="u"> → </span>6</div>
+          <p class="desc">约 15 秒</p>
+        </div>
+        <div class="stat" data-a="3" style="padding-left:38px;border-right:1px solid var(--faint)">
+          <div class="lbl cjk">积压</div>
+          <div class="vbig" style="font-size:104px">135<span class="u"> → 0</span></div>
+          <p class="desc">清空后 6 → 3 → 1</p>
+        </div>
+        <div class="stat" data-a="4" style="padding-left:38px;border-right:1px solid var(--faint)">
+          <div class="lbl cjk">重复 inbox receipt</div>
+          <div class="vbig" style="font-size:104px">0</div>
+          <p class="desc">删 worker 后 lease 被接管</p>
+        </div>
+        <div class="stat bound" data-a="5" style="padding-left:38px">
+          <div class="lbl cjk k">积压是合成注入的</div>
+          <div class="vbig" style="font-size:104px">—</div>
+          <p class="desc">但走真实 schema / repository / worker / lease / inbox 路径</p>
+        </div>
+      </div>
+
+      <div style="margin-top:56px;padding-top:26px;border-top:1.5px solid var(--ink)" data-f>
+        <div class="micro cjk" style="margin-bottom:22px">端到端一次效果 = 五件事共同保证</div>
+        <div style="display:flex;align-items:center;gap:0">
+          <span class="tb-name">outbox</span><span class="mono dim" style="margin:0 20px">+</span>
+          <span class="tb-name">lease</span><span class="mono dim" style="margin:0 20px">+</span>
+          <span class="tb-name">SKIP LOCKED</span><span class="mono dim" style="margin:0 20px">+</span>
+          <span class="tb-name">inbox 唯一约束</span><span class="mono dim" style="margin:0 20px">+</span>
+          <span class="tb-name">handler 幂等</span>
+          <span class="mono-sm dim" style="margin-left:36px">外部 Provider 副作用仍需独立幂等或 receipt</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================================================================
+       19 · LESSON 03
+       ================================================================== -->
+  <section class="slide" data-label="Lesson 03">
+    <div class="glitch" style="right:0;top:120px;width:250px;height:840px;opacity:.45">
+      <div class="step" style="top:0;width:250px;height:88px;opacity:.65"></div>
+      <div class="step" style="top:120px;width:150px;height:88px;opacity:.45"></div>
+      <div class="step" style="top:240px;width:214px;height:88px;opacity:.8"></div>
+      <div class="step" style="top:360px;width:98px;height:88px;opacity:.4"></div>
+      <div class="step" style="top:480px;width:182px;height:88px;opacity:.6"></div>
+    </div>
+    <div class="live">
+      <div class="micro" data-a="1">Lesson 03 · Work pressure</div>
+      <h2 class="d-manifesto" style="margin-top:36px;max-width:1330px" data-a="2"><span class="lat">exactly-once</span> 是端到端的业务效果，不是任何单一组件的开关</h2>
+      <div class="rule-solid" style="margin-top:56px;padding-top:26px;max-width:1330px" data-a="4">
+        <p class="body" style="margin:0">扩缩应该追踪<span class="tb-name" style="font-size:26px">用户等待</span>，而不是机器忙碌——<span class="lat">CPU</span> 是资源现象，<span class="lat">oldest age</span> 是用户体验现象。<span class="lat">KEDA</span> 的价值不只是自动扩容，而是把用户可感知的等待翻译成控制信号。而让扩容安全的，是一套与扩缩正交的机制。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================================================================
+       20 · MAP LIT — H3, whole chain with the sync/async seam
+       ================================================================== -->
+  <section class="slide" data-label="Map · H3">
+    <div class="frame spread">
+      <div class="topbar" data-a="1">
+        <h2 class="h-line">整条链，以及那道同步／异步接缝</h2>
+        <span class="mono-sm">H3 · CAUSAL OBSERVABILITY</span>
+      </div>
+      <div class="map" style="margin-top:24px" data-a="2">
+        <svg viewBox="0 0 1720 300" style="height:330px">
+          <line class="lane" x1="30" y1="60" x2="1690" y2="60"/>
+          <rect class="nbox on" x="8"    y="44" width="44" height="32"/>
+          <rect class="nbox on" x="248"  y="44" width="44" height="32"/>
+          <rect class="nbox on" x="488"  y="44" width="44" height="32"/>
+          <rect class="nbox on" x="728"  y="44" width="44" height="32"/>
+          <rect class="nbox on" x="968"  y="44" width="44" height="32"/>
+          <rect class="nbox on" x="1208" y="44" width="44" height="32"/>
+          <rect class="nbox on" x="1448" y="44" width="44" height="32"/>
+          <rect class="nbox on" x="1668" y="44" width="44" height="32"/>
+          <text class="nlab on" x="8"    y="112">AppShell</text>
+          <text class="nlab on" x="248"  y="112">API / SSE</text>
+          <text class="nlab on" x="488"  y="112">Aurora Runtime</text>
+          <text class="nlab on" x="728"  y="112">Retrieval</text>
+          <text class="nlab on" x="968"  y="112">Provider</text>
+          <text class="nlab on" x="1208" y="112">Outbox</text>
+          <text class="nlab on" x="1448" y="112">Worker</text>
+          <text class="nlab on" x="1600" y="112">Projection</text>
+          <line class="seam" x1="1130" y1="4" x2="1130" y2="200"/>
+          <text class="seamlab" x="1150" y="228">outbox 行只携带 W3C traceparent　·　worker 从该远程父起 CONSUMER span</text>
+          <text class="seamlab" x="700" y="228">同一个 trace</text>
+        </svg>
+      </div>
+      <div style="margin-top:52px;padding-top:26px;border-top:1.5px solid var(--ink);display:flex;gap:72px" data-f>
+        <p class="body-sm" style="margin:0;max-width:900px">如果系统无法保留一次 <span class="lat">AI</span> 行为跨同步与异步边界的因果关系，我们就无法判断一次回复为什么慢、一条记忆为什么迟、一个主动回访为什么没有发生。</p>
+        <p class="mono-sm dim" style="margin:0;max-width:420px">一对多 fan-out、批处理或跨长时间窗口的派生任务，才应使用 span link，以避免伪造同步调用树。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================================================================
+       21 · THE TRACE TREE
+       ================================================================== -->
+  <section class="slide" data-label="Trace tree">
+    <div class="frame spread">
+      <div class="topbar" data-a="1">
+        <h2 class="h-line">一次 <span class="lat">turn</span>，三个运行角色，一棵真实因果树</h2>
+        <span class="mono-sm">trace a86c…b994 · 8 spans</span>
+      </div>
+
+      <div style="margin-top:64px;display:grid;grid-template-columns:1.5fr 1fr;gap:80px">
+        <div data-a="2">
+          <svg viewBox="0 0 900 430" style="width:100%;height:430px;overflow:visible">
+            <!-- role 1: api -->
+            <text class="nlab on" x="0" y="14" style="font-size:15px">inner-cosmos-api</text>
+            <rect class="nbox on" x="0" y="26" width="620" height="40"/>
+            <text x="16" y="52" style="font-family:'DM Mono',monospace;font-size:16px;fill:#F0EBDE">http post /api/dialog/session/{id}/finish</text>
+
+            <line class="lane" x1="26" y1="66" x2="26" y2="98" style="stroke:var(--ink);opacity:.5"/>
+            <rect class="nbox on" x="40" y="86" width="470" height="40"/>
+            <text x="56" y="112" style="font-family:'DM Mono',monospace;font-size:16px;fill:#F0EBDE">secured request</text>
+
+            <!-- the seam -->
+            <line class="seam" x1="66" y1="126" x2="66" y2="172"/>
+            <text class="seamlab" x="82" y="156" style="font-size:15px">traceparent 跨过 outbox</text>
+
+            <!-- role 2: worker -->
+            <text class="nlab on" x="80" y="188" style="font-size:15px">inner-cosmos-worker</text>
+            <rect class="nbox on" x="80" y="200" width="470" height="40"/>
+            <text x="96" y="226" style="font-family:'DM Mono',monospace;font-size:16px;fill:#F0EBDE">inner.cosmos.outbox.consume</text>
+
+            <line class="lane" x1="106" y1="240" x2="106" y2="272" style="stroke:var(--ink);opacity:.5"/>
+            <rect class="nbox on" x="120" y="260" width="410" height="40"/>
+            <text x="136" y="286" style="font-family:'DM Mono',monospace;font-size:16px;fill:#F0EBDE">inner.cosmos.projection.memory</text>
+
+            <line class="lane" x1="106" y1="300" x2="106" y2="332" style="stroke:var(--ink);opacity:.5"/>
+            <rect class="nbox on" x="120" y="320" width="410" height="40"/>
+            <text x="136" y="346" style="font-family:'DM Mono',monospace;font-size:16px;fill:#F0EBDE">inner.cosmos.projection.profile</text>
+
+            <!-- role 3: scheduler -->
+            <text class="nlab on" x="0" y="400" style="font-size:15px">inner-cosmos-scheduler　·　inner.cosmos.wake-intent.deliver</text>
+          </svg>
+        </div>
+
+        <div data-a="4" style="padding-top:10px">
+          <div class="micro cjk">这棵树没有伪造</div>
+          <p class="body" style="margin:18px 0 0">worker 的 <span class="lat">CONSUMER span</span> 是从 <span class="lat">outbox</span> 行里的 <span class="lat">W3C traceparent</span> 恢复出的<span class="tb-name" style="font-size:23px">远程父</span>，不是我们手工缝起来的同步调用树。</p>
+          <div class="rule-solid" style="margin-top:40px;padding-top:22px">
+            <div class="micro-sm cjk">三个 role 各自独立 service resource</div>
+            <p class="mono-sm" style="margin:14px 0 0;line-height:1.9">inner-cosmos-api<br>inner-cosmos-worker<br>inner-cosmos-scheduler</p>
+          </div>
+        </div>
+      </div>
+      <p class="mono-sm dim" style="margin:0" data-f>span count 8　·　forbidden attribute keys 0　·　Collector 在导出前再删一遍敏感属性</p>
+    </div>
+  </section>
+
+  <!-- ==================================================================
+       22 · PRIVACY — solid = kept, outlined/dim = never recorded
+       ================================================================== -->
+  <section class="slide" data-label="Privacy">
+    <div class="frame spread">
+      <div class="topbar" data-a="1">
+        <h2 class="h-line">可解释，不等于可泄露</h2>
+        <span class="mono-sm">forbidden attribute keys : 0</span>
+      </div>
+
+      <div style="margin-top:64px;display:grid;grid-template-columns:1fr 1fr;gap:0">
+        <div data-a="2" style="padding-right:72px">
+          <div class="micro cjk" style="margin-bottom:30px">trace 保留</div>
+          <div class="index">
+            <div class="irow" style="grid-template-columns:1fr;padding:15px 0"><div class="tb-name">运行角色</div></div>
+            <div class="irow" style="grid-template-columns:1fr;padding:15px 0"><div class="tb-name">Provider 类型</div></div>
+            <div class="irow" style="grid-template-columns:1fr;padding:15px 0"><div class="tb-name">Prompt / 策略版本</div></div>
+            <div class="irow" style="grid-template-columns:1fr;padding:15px 0"><div class="tb-name">延迟 · fallback · backlog</div></div>
+            <div class="irow" style="grid-template-columns:1fr;padding:15px 0;border-bottom:none"><div class="tb-name">result category</div></div>
+          </div>
+        </div>
+        <div data-a="4" style="padding-left:72px;border-left:1.5px solid var(--ink)">
+          <div class="micro cjk" style="margin-bottom:30px">trace 不保留</div>
+          <div class="index bound">
+            <div class="irow" style="grid-template-columns:1fr;padding:15px 0"><div class="tb-name k">原始对话正文</div></div>
+            <div class="irow" style="grid-template-columns:1fr;padding:15px 0"><div class="tb-name k">prompt / completion 正文</div></div>
+            <div class="irow" style="grid-template-columns:1fr;padding:15px 0"><div class="tb-name k">稳定用户标识</div></div>
+            <div class="irow" style="grid-template-columns:1fr;padding:15px 0"><div class="tb-name k">完整数据库语句</div></div>
+            <div class="irow" style="grid-template-columns:1fr;padding:15px 0;border-bottom:none"><div class="tb-name k">高基数维度</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:52px;padding-top:24px;border-top:1.5px solid var(--ink)" data-f>
+        <p class="body-sm" style="margin:0">Collector 在导出前再删一遍已知敏感属性——纵深防御。<span class="mono-sm dim" style="margin-left:24px">用户只用短期不可逆相关键。</span></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================================================================
+       23 · LESSON 04
+       ================================================================== -->
+  <section class="slide" data-label="Lesson 04">
+    <div class="glitch" style="right:0;top:150px;width:240px;height:780px;opacity:.45">
+      <div class="step" style="top:0;width:240px;height:86px;opacity:.7"></div>
+      <div class="step" style="top:118px;width:142px;height:86px;opacity:.45"></div>
+      <div class="step" style="top:236px;width:206px;height:86px;opacity:.8"></div>
+      <div class="step" style="top:354px;width:94px;height:86px;opacity:.4"></div>
+      <div class="step" style="top:472px;width:176px;height:86px;opacity:.6"></div>
+    </div>
+    <div class="live">
+      <div class="micro" data-a="1">Lesson 04 · Causal observability</div>
+      <h2 class="d-manifesto" style="margin-top:36px;max-width:1320px" data-a="2"><span class="lat">AI</span> 系统最容易为了调试，把用户的一切都塞进 <span class="lat">trace</span></h2>
+      <div class="rule-solid" style="margin-top:56px;padding-top:26px;max-width:1320px" data-a="4">
+        <p class="body" style="margin:0">因果必须保留，否则无法解释一条用户体验是怎样产生的；但正文、<span class="lat">prompt</span>、稳定标识一旦进入 <span class="lat">label</span>、<span class="lat">trace attribute</span>、高基数维度或日志，就再也收不回来。<span class="tb-name" style="font-size:26px">可解释与可泄露之间没有中间状态。</span></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================================================================
+       24 · CHAPTER 03
+       ================================================================== -->
+  <section class="slide" data-label="Chapter 03">
+    <div class="glitch" style="right:0;top:250px;width:330px;height:460px">
+      <div class="step" style="top:0;width:330px;height:70px;opacity:.75"></div>
+      <div class="step" style="top:88px;width:200px;height:70px;opacity:.5"></div>
+      <div class="step" style="top:176px;width:288px;height:70px;opacity:.85"></div>
+      <div class="step" style="top:264px;width:140px;height:70px;opacity:.45"></div>
+      <div class="step" style="top:352px;width:244px;height:70px;opacity:.65"></div>
+    </div>
+    <div class="frame" style="display:flex;flex-direction:column;justify-content:center">
+      <div class="mono" data-a="1">03 / 05</div>
+      <div style="height:1.5px;background:var(--ink);margin:24px 0 44px;max-width:1180px" data-w></div>
+      <h2 class="d-chapter" data-a="2">第四个契约<br>语义健康</h2>
+      <p class="body-lede" style="margin:44px 0 0;max-width:980px" data-a="3">
+        一个版本即使能够运行，也不代表它仍然值得接收用户流量。这个契约有两道门。
+      </p>
+    </div>
+  </section>
+
+  <!-- ==================================================================
+       25 · TWO GATES
+       ================================================================== -->
+  <section class="slide" data-label="Two gates">
+    <div class="frame spread">
+      <div class="topbar" data-a="1">
+        <h2 class="h-line">准入前　与　准入后</h2>
+        <span class="mono-sm">FIG. 07</span>
+      </div>
+      <div style="margin-top:72px;display:grid;grid-template-columns:1fr 1fr;gap:0">
+        <div data-a="2" style="padding-right:72px">
+          <div class="mono" style="margin-bottom:16px">Gate 1 · admission</div>
+          <div class="row-h" style="font-size:44px">Kyverno</div>
+          <p class="body" style="margin:22px 0 34px">不安全的版本根本进不来。</p>
+          <div class="index">
+            <div class="irow" style="grid-template-columns:1fr;padding:13px 0"><div class="body-sm">non-root · read-only rootfs · drop capabilities</div></div>
+            <div class="irow" style="grid-template-columns:1fr;padding:13px 0"><div class="body-sm">digest-only，禁 <span class="lat">:latest</span> 与可变 tag</div></div>
+            <div class="irow" style="grid-template-columns:1fr;padding:13px 0"><div class="body-sm">必须声明 resources</div></div>
+            <div class="irow" style="grid-template-columns:1fr;padding:13px 0;border-bottom:none"><div class="body-sm">production 禁 mock provider / 明文 Secret</div></div>
+          </div>
+        </div>
+        <div data-a="4" style="padding-left:72px;border-left:1.5px solid var(--ink)">
+          <div class="mono" style="margin-bottom:16px">Gate 2 · post-admission</div>
+          <div class="row-h" style="font-size:44px">Argo Rollouts</div>
+          <p class="body" style="margin:22px 0 34px">已经进来、但运行质量正在退化的版本要能自动退出。</p>
+          <div class="index">
+            <div class="irow" style="grid-template-columns:1fr;padding:13px 0"><div class="body-sm">weighted canary：25 → 50 → 100</div></div>
+            <div class="irow" style="grid-template-columns:1fr;padding:13px 0"><div class="body-sm"><span class="lat">AnalysisRun</span> 打真 Prometheus</div></div>
+            <div class="irow" style="grid-template-columns:1fr;padding:13px 0"><div class="body-sm"><span class="lat">progressDeadlineAbort</span> 自动 abort + rollback</div></div>
+            <div class="irow bound" style="grid-template-columns:1fr;padding:13px 0;border-bottom:none"><div class="body-sm k">AI 质量指标驱动的语义回滚：设计方向，未实证</div></div>
+          </div>
+        </div>
+      </div>
+      <p class="mono-sm dim" style="margin:0" data-f>Kyverno 阻止不该进来的版本；Rollouts 让已经进来的坏版本自己退出。同一个契约的两端。</p>
+    </div>
+  </section>
+
+  <!-- ==================================================================
+       26 · WEIGHT IS INTENT, ENDPOINTS ARE REALITY
+       ================================================================== -->
+  <section class="slide" data-label="Weight vs endpoints">
+    <div class="frame spread">
+      <div class="topbar" data-a="1">
+        <h2 class="h-line">坏版本配了 25% 权重，却收到 0 流量</h2>
+        <span class="mono-sm">CN-PROGRESSIVE-DELIVERY-001</span>
+      </div>
+
+      <div class="map" style="margin-top:24px" data-a="2">
+        <svg viewBox="0 0 1720 260" style="height:290px">
+          <rect class="nbox on" x="0" y="40" width="300" height="60"/>
+          <text x="24" y="78" style="font-family:'Hanken Grotesk',sans-serif;font-weight:600;font-size:20px;fill:#F0EBDE">HTTPRoute setWeight 25</text>
+          <text class="nlab on" x="0" y="132" style="font-size:15px">控制面的意图</text>
+
+          <line class="lane" x1="300" y1="70" x2="560" y2="70" style="stroke:var(--ink);opacity:.5"/>
+          <text class="nlab on" x="390" y="58" style="font-size:15px">→</text>
+
+          <rect class="nbox" x="560" y="40" width="330" height="60" style="opacity:1;stroke-dasharray:6 4"/>
+          <text x="584" y="78" style="font-family:'Hanken Grotesk',sans-serif;font-weight:600;font-size:20px;fill:#1F2BE0">canary Pod　0/1 Ready</text>
+          <text class="nlab on" x="560" y="132" style="font-size:15px">readiness 从未通过</text>
+
+          <line class="lane" x1="890" y1="70" x2="1150" y2="70" style="stroke:var(--ink);opacity:.5"/>
+          <text class="nlab on" x="980" y="58" style="font-size:15px">✕</text>
+
+          <rect class="nbox" x="1150" y="40" width="330" height="60" style="opacity:.4;stroke-dasharray:6 4"/>
+          <text x="1174" y="78" style="font-family:'Hanken Grotesk',sans-serif;font-weight:600;font-size:20px;fill:#1F2BE0;opacity:.6">Service endpoints</text>
+          <text class="nlab" x="1150" y="132" style="font-size:15px">从未进入</text>
+
+          <text class="seamlab" x="0" y="212" style="font-size:19px">t+~60s　progressDeadlineSeconds(60) + progressDeadlineAbort　→　ABORT　·　canary RS 1 → 0　·　4 个 stable Pod 全程正常服务</text>
+        </svg>
+      </div>
+
+      <div style="margin-top:64px;padding-top:26px;border-top:1.5px solid var(--ink)" data-f>
+        <p class="d-quote" style="font-size:62px">权重是意图，<span class="lat">endpoints</span> 才是现实</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================================================================
+       27 · LESSON 02
+       ================================================================== -->
+  <section class="slide" data-label="Lesson 02">
+    <div class="glitch" style="right:0;top:140px;width:250px;height:800px;opacity:.45">
+      <div class="step" style="top:0;width:250px;height:86px;opacity:.7"></div>
+      <div class="step" style="top:118px;width:148px;height:86px;opacity:.45"></div>
+      <div class="step" style="top:236px;width:212px;height:86px;opacity:.8"></div>
+      <div class="step" style="top:354px;width:98px;height:86px;opacity:.4"></div>
+      <div class="step" style="top:472px;width:180px;height:86px;opacity:.6"></div>
+    </div>
+    <div class="live">
+      <div class="micro" data-a="1">Lesson 02 · Semantic health</div>
+      <h2 class="d-manifesto" style="margin-top:36px;max-width:1330px" data-a="2">最危险的 <span class="lat">AI</span> 故障不返回 <span class="lat">500</span></h2>
+      <div class="rule-solid" style="margin-top:56px;padding-top:26px;max-width:1330px" data-a="4">
+        <p class="body" style="margin:0"><span class="lat">Prompt</span> 退化、结构化输出解析率下降、<span class="lat">Provider fallback</span> 增多、<span class="lat">TTFT</span> 变慢、记忆召回相关性下降、安全输出质量退化——<span class="lat">JVM</span>、<span class="lat">HTTP</span> 与 <span class="lat">liveness</span> 全程绿灯。所以部署判断必须从「<span class="lat">Pod</span> 是否 <span class="lat">Running</span>」升级为「<span class="tb-name" style="font-size:26px">这个版本是否仍然维持用户体验和安全不变量</span>」。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================================================================
+       28 · FIVE-LAYER RESPONSIBILITY MODEL — the synthesis, as a ledger
+       ================================================================== -->
+  <section class="slide" data-label="Five layers">
+    <div class="frame spread">
+      <div class="topbar" data-a="1">
+        <h2 class="h-line">三条链路合起来告诉我们：责任该怎么分</h2>
+        <span class="mono-sm">FIG. 08 · THE SYNTHESIS</span>
+      </div>
+
+      <div class="ledger" style="margin-top:40px">
+        <div class="lrow head">
+          <div class="num"></div>
+          <div class="micro-sm cjk">状态层</div>
+          <div class="micro-sm cjk">权威位置</div>
+          <div class="micro-sm cjk">恢复参与者</div>
+          <div class="micro-sm cjk">关键机制</div>
+        </div>
+        <div class="lrow" data-a="2">
+          <div class="num">01</div>
+          <div class="tb-name">实时展示状态</div>
+          <div class="body-sm">Redis live buffer + 客户端 cursor</div>
+          <div class="body-sm">客户端与 API 共同恢复</div>
+          <div class="body-sm">event ID · Last-Event-ID · 去重 · terminal event</div>
+        </div>
+        <div class="lrow" data-a="3">
+          <div class="num">02</div>
+          <div class="tb-name">Turn 权威状态</div>
+          <div class="body-sm">PostgreSQL timeline</div>
+          <div class="body-sm">API + Recovery Job</div>
+          <div class="body-sm">turn / bubble / event 持久化 · 孤儿对账 · INTERRUPTED</div>
+        </div>
+        <div class="lrow" data-a="4">
+          <div class="num">03</div>
+          <div class="tb-name">长期派生状态</div>
+          <div class="body-sm">PostgreSQL outbox / inbox</div>
+          <div class="body-sm">Worker</div>
+          <div class="body-sm">lease · SKIP LOCKED · 幂等 · projection receipt</div>
+        </div>
+        <div class="lrow" data-a="5">
+          <div class="num">04</div>
+          <div class="tb-name">语义版本状态</div>
+          <div class="body-sm">镜像 · Prompt / 模型 / 策略版本</div>
+          <div class="body-sm">发布控制面 + 应用质量信号</div>
+          <div class="body-sm">progressive delivery · quality gate · rollback</div>
+        </div>
+        <div class="lrow" data-a="6" style="border-bottom:none">
+          <div class="num">05</div>
+          <div class="tb-name">部署安全状态</div>
+          <div class="body-sm">Admission policy / CI</div>
+          <div class="body-sm">Kubernetes 控制面</div>
+          <div class="body-sm">Kyverno · digest · non-root · resources · kill switch</div>
+        </div>
+      </div>
+      <p class="mono-sm dim" style="margin:0" data-f>不要求 Kubernetes 自动保住一切，而是要求每一层状态都有明确的权威位置、恢复责任、终止语义和证据。</p>
+    </div>
+  </section>
+
+  <!-- ==================================================================
+       29 · THE THREE DEFECTS THE DRILLS FOUND
+       ================================================================== -->
+  <section class="slide" data-label="Three defects">
+    <div class="frame spread">
+      <div class="topbar" data-a="1">
+        <h2 class="h-line">三条链路，各自撞出一个真缺陷</h2>
+        <span class="mono-sm">WHAT THE DRILLS ACTUALLY PRODUCED</span>
+      </div>
+      <div class="index" style="margin-top:56px">
+        <div class="irow" data-a="2">
+          <div class="num">H1</div>
+          <div><div class="row-h"><span class="lat">--force</span> 没有绕过 grace period</div>
+            <p class="body-sm" style="margin:10px 0 0;max-width:1320px">于是改用真 <span class="lat">SIGKILL</span>——发现孤儿 <span class="lat">turn</span> 永久停在 <span class="lat">PLANNED</span>，客户端重连一直悬挂。修复 <span class="lat">ConversationTurnRecoveryJob</span> + 显式 terminal event。</p></div>
+        </div>
+        <div class="irow" data-a="3">
+          <div class="num">H3</div>
+          <div><div class="row-h"><span class="lat">trace</span> 从来没有导出过</div>
+            <p class="body-sm" style="margin:10px 0 0;max-width:1320px"><span class="lat">kind-full</span> 激活的是 <span class="lat">dev,postgres</span> profile，而 <span class="lat">alias</span> 只写在 <span class="lat">application-prod.yml</span> 里。<span class="lat">overlay</span> 改为直接绑定 <span class="lat">MANAGEMENT_OTLP_*</span> 后才真正 export。</p></div>
+        </div>
+        <div class="irow" data-a="4" style="border-bottom:none">
+          <div class="num">E1</div>
+          <div><div class="row-h">readiness health group 列了 <span class="lat">redis</span></div>
+            <p class="body-sm" style="margin:10px 0 0;max-width:1320px"><span class="lat">w3-otel</span> 镜像首次 canary 直接崩——不是 Rollouts 的问题，是我们自己的健康组配置。</p></div>
+        </div>
+      </div>
+      <p class="mono-sm dim" style="margin:0" data-f>三条链路都不是「配好就跑通」。每一条都在真集群上撞出了一个单元测试看不见的缺陷。</p>
+    </div>
+  </section>
+
+  <!-- ==================================================================
+       30 · THE ACE — a drill's value is falsification
+       ================================================================== -->
+  <section class="slide" data-label="Falsification">
+    <div class="glitch" style="right:0;top:110px;width:270px;height:860px;opacity:.5">
+      <div class="step" style="top:0;width:270px;height:90px;opacity:.75"></div>
+      <div class="step" style="top:122px;width:162px;height:90px;opacity:.5"></div>
+      <div class="step" style="top:244px;width:232px;height:90px;opacity:.85"></div>
+      <div class="step" style="top:366px;width:106px;height:90px;opacity:.45"></div>
+      <div class="step" style="top:488px;width:196px;height:90px;opacity:.65"></div>
+      <div class="step" style="top:610px;width:138px;height:90px;opacity:.4"></div>
+    </div>
+    <div class="live">
+      <div class="micro" data-a="1">The point</div>
+      <h2 class="d-manifesto" style="margin-top:36px;max-width:1300px" data-a="2">故障演练的价值不是证明我们原来就是对的，而是设计一个足以推翻自己的实验</h2>
+      <div class="rule-solid" style="margin-top:56px;padding-top:26px;max-width:1300px" data-a="4">
+        <p class="body" style="margin:0">我们第一次执行 <span class="lat">delete --force</span> 后，实验「通过」了，<span class="lat">SSE</span> 完整结束。当时很容易直接写 <span class="lat">PASS</span>。<br>进一步检查才发现真正的硬故障根本没有发生——而当我们让它真正发生时，系统立刻暴露了一个我们原本不知道的 bug。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================================================================
+       31 · CLAIM BOUNDARY — three environments + three disclosures
+       ================================================================== -->
+  <section class="slide" data-label="Claim boundary">
+    <div class="frame spread">
+      <div class="topbar" data-a="1">
+        <h2 class="h-line">我们先说这次证明不了什么</h2>
+        <span class="mono-sm">CLAIM BOUNDARY</span>
+      </div>
+
+      <div style="margin-top:52px;display:grid;grid-template-columns:repeat(3,1fr);gap:0">
+        <div data-a="2" style="padding-right:48px;border-right:1px solid var(--faint)">
+          <div class="mono" style="margin-bottom:18px">local-kind</div>
+          <div style="height:14px;background:var(--ink);margin-bottom:22px"></div>
+          <p class="body-sm" style="margin:0">证明插件、故障与业务语义<span class="tb-name" style="font-size:20px">真运行</span>。不证明 AWS 托管生产。</p>
+        </div>
+        <div data-a="3" style="padding:0 48px;border-right:1px solid var(--faint)">
+          <div class="mono" style="margin-bottom:18px">academy-eks</div>
+          <div style="height:14px;background:var(--grid);border:1px solid var(--ink);box-sizing:border-box;margin-bottom:22px"></div>
+          <p class="body-sm" style="margin:0">只证明当次 session 的权限、容量、CNI / controller 下实测通过的能力。</p>
+        </div>
+        <div data-a="4" style="padding-left:48px">
+          <div class="mono dim" style="margin-bottom:18px">commercial-sg</div>
+          <div style="height:14px;background:var(--grid);border:1px dashed var(--ink);box-sizing:border-box;margin-bottom:22px"></div>
+          <p class="body-sm dim" style="margin:0">当前是生产目标，不是运行结论。未获账号时保持设计或 external gate。</p>
+        </div>
+      </div>
+
+      <div style="margin-top:64px;padding-top:30px;border-top:1.5px solid var(--ink)" data-a="6">
+        <div class="micro cjk" style="margin-bottom:26px">三条主动公开的边界</div>
+        <div class="index bound">
+          <div class="irow" style="grid-template-columns:44px 1fr;padding:15px 0">
+            <div class="num k"></div><div class="body-sm"><span class="lat">kill -9</span> 时正在生成的那一次 <span class="lat">turn</span> 无法续流；保证的是约 22 秒内进入终态、重连不悬挂</div>
+          </div>
+          <div class="irow" style="grid-template-columns:44px 1fr;padding:15px 0">
+            <div class="num k"></div><div class="body-sm"><span class="lat">Rollouts</span> 的自动回滚由坏 <span class="lat">readiness</span> + <span class="lat">progressDeadlineAbort</span> 实证；AI 质量指标驱动的语义回滚尚未实证</div>
+          </div>
+          <div class="irow" style="grid-template-columns:44px 1fr;padding:15px 0;border-bottom:none">
+            <div class="num k"></div><div class="body-sm"><span class="lat">KEDA</span> 的积压是合成注入的（走真实 <span class="lat">schema / worker / lease / inbox</span> 路径）；Academy 可移植性单独声明</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================================================================
+       32 · WHAT WE DELIBERATELY DID NOT BUILD
+       ================================================================== -->
+  <section class="slide" data-label="Not built">
+    <div class="frame spread">
+      <div class="topbar" data-a="1">
+        <h2 class="h-line">工程成熟度也体现在知道什么暂时不值得采用</h2>
+        <span class="mono-sm">DELIBERATELY NOT BUILT</span>
+      </div>
+      <div class="index bound" style="margin-top:56px">
+        <div class="irow" data-a="2" style="grid-template-columns:56px 1fr;padding:22px 0">
+          <div class="num k"></div><div><div class="row-h">没有为展示云原生把模块化单体强拆成微服务</div></div>
+        </div>
+        <div class="irow" data-a="3" style="grid-template-columns:56px 1fr;padding:22px 0">
+          <div class="num k"></div><div><div class="row-h">没有为增加名词数量引入 <span class="lat">Kafka / Dapr / Service Mesh / Knative</span></div></div>
+        </div>
+        <div class="irow" data-a="4" style="grid-template-columns:56px 1fr;padding:22px 0">
+          <div class="num k"></div><div><div class="row-h">没有把同节点静态 <span class="lat">PV</span> 备份包装成跨区域灾备</div></div>
+        </div>
+        <div class="irow" data-a="5" style="grid-template-columns:56px 1fr;padding:22px 0;border-bottom:none">
+          <div class="num k"></div><div><div class="row-h">Academy 无权限安装 controller 时，没有伪称 <span class="lat">KEDA / Kyverno</span> 已运行</div></div>
+        </div>
+      </div>
+      <div style="padding-top:26px;border-top:1.5px solid var(--ink)" data-f>
+        <p class="body" style="margin:0;max-width:1560px">一个组件只有同时具备<span class="tb-name" style="font-size:23px">产品连接、真实成功证据、失败证据、资源边界、kill switch 和环境 fallback</span>，才值得进入主演示。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================================================================
+       33 · COLOPHON — closing. Glitch mirrors to the left edge.
+       ================================================================== -->
+  <section class="slide" data-label="Closing">
+    <div class="glitch" style="left:0;top:150px;width:400px;height:700px">
+      <div class="step" style="left:0;right:auto;top:0;width:400px;height:84px;opacity:.85"></div>
+      <div class="step" style="left:0;right:auto;top:112px;width:270px;height:84px;opacity:.6"></div>
+      <div class="step" style="left:0;right:auto;top:224px;width:348px;height:84px;opacity:.9"></div>
+      <div class="step" style="left:0;right:auto;top:336px;width:180px;height:84px;opacity:.5"></div>
+      <div class="step" style="left:0;right:auto;top:448px;width:306px;height:84px;opacity:.75"></div>
+      <div class="step" style="left:0;right:auto;top:560px;width:132px;height:84px;opacity:.45"></div>
+    </div>
+    <div class="frame" style="display:flex;flex-direction:column;justify-content:center;align-items:flex-end;text-align:right">
+      <div class="micro" data-a="1">In closing</div>
+      <h2 class="d-closing" style="margin-top:32px;max-width:1290px" data-a="2"><span class="lat">AI Agent</span> 的云原生化，不是把模型服务装进 <span class="lat">Pod</span></h2>
+      <div class="rule-solid" style="margin-top:52px;padding-top:28px;max-width:1290px;border-top-color:var(--ink)" data-a="4">
+        <p class="body-lede" style="margin:0">而是把<span class="tb-name" style="font-size:28px">连续性、语义健康、业务压力、因果关系和恢复责任</span>，变成控制面可以观察、决策和验证的契约。</p>
+      </div>
+      <div style="margin-top:56px;display:flex;gap:56px" data-f>
+        <span class="mono-sm">Inner Cosmos</span>
+        <span class="mono-sm dim">1269 tests · 0 assertion failures</span>
+        <span class="mono-sm dim">3 disclosed boundaries</span>
+      </div>
+    </div>
+  </section>
+
+</div><!-- /.deck-stage -->
+</div><!-- /.deck-viewport -->
+
+<script>
+/* ==========================================================================
+   DECK CONTROLLER
+   - uniform scale of the fixed 1920x1080 stage (letterbox, never reflow)
+   - keyboard: arrows / space / pgup / pgdn / home / end / r
+   - click right half = next, left half = prev
+   - page number is authored once in .chrome and updated per slide
+   ========================================================================== */
+(function(){
+  var stage   = document.getElementById('stage');
+  var slides  = Array.prototype.slice.call(stage.querySelectorAll('.slide'));
+  var pagenum = document.getElementById('pagenum');
+  var i = 0;
+
+  function fit(){
+    var s = Math.min(innerWidth/1920, innerHeight/1080);
+    stage.style.transform = 'translate(' + ((innerWidth-1920*s)/2) + 'px,'
+                                         + ((innerHeight-1080*s)/2) + 'px) scale(' + s + ')';
+  }
+
+  function pad(n){ return (n<10?'0':'') + n; }
+
+  function show(n){
+    i = Math.max(0, Math.min(slides.length-1, n));
+    slides.forEach(function(s,k){ s.classList.toggle('active', k===i); });
+    pagenum.textContent = pad(i+1) + ' / ' + pad(slides.length);
+    try { history.replaceState(null,'','#'+(i+1)); } catch(e){}
+  }
+
+  addEventListener('resize', fit);
+  addEventListener('keydown', function(e){
+    if (e.metaKey||e.ctrlKey||e.altKey) return;
+    var k = e.key;
+    if (k==='ArrowRight'||k==='PageDown'||k===' '||k==='Spacebar'){ show(i+1); e.preventDefault(); }
+    else if (k==='ArrowLeft'||k==='PageUp'){ show(i-1); e.preventDefault(); }
+    else if (k==='Home'){ show(0); e.preventDefault(); }
+    else if (k==='End'){ show(slides.length-1); e.preventDefault(); }
+    else if (k==='r'||k==='R'){ show(0); e.preventDefault(); }
+  });
+  addEventListener('click', function(e){ show(e.clientX > innerWidth/2 ? i+1 : i-1); });
+
+  fit();
+  var h = parseInt((location.hash||'').replace('#',''),10);
+  show(isNaN(h) ? 0 : h-1);
+})();
+</script>
+</body>
+</html>

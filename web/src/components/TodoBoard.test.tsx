@@ -1,13 +1,20 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TodoBoard } from "./TodoBoard";
 import type { TodoItem } from "../api";
 
-afterEach(cleanup);
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date("2026-07-27T09:00:00+08:00"));
+});
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 const todo = (overrides: Partial<TodoItem> = {}): TodoItem => ({
   id: 1, taskName: "整理考试范围第一章", description: "只列标题，不要求立刻背。", priority: "HIGH",
-  status: "TODO", deadline: null, sourceMemoryCardId: null, ...overrides
+  status: "TODO", deadline: "2026-07-27T10:00:00+08:00", sourceMemoryCardId: null, ...overrides
 });
 
 function baseProps() {
@@ -51,6 +58,24 @@ describe("TodoBoard", () => {
     expect(onUpdateStatus).toHaveBeenCalledExactlyOnceWith(1, "DONE");
   });
 
+  it("separates today, this week and undated planning items by deadline", () => {
+    const rows = [
+      todo({ id: 1, taskName: "今天截止", deadline: "2026-07-27T18:00:00+08:00" }),
+      todo({ id: 2, taskName: "本周截止", deadline: "2026-07-30T18:00:00+08:00" }),
+      todo({ id: 3, taskName: "尚未排期", deadline: null })
+    ];
+    const { rerender } = render(<TodoBoard {...baseProps()} todos={rows} />);
+    expect(screen.getByText("今天截止")).toBeVisible();
+    expect(screen.queryByText("本周截止")).not.toBeInTheDocument();
+    expect(screen.queryByText("尚未排期")).not.toBeInTheDocument();
+
+    rerender(<TodoBoard {...baseProps()} tab="week" todos={rows} />);
+    expect(screen.queryByText("今天截止")).not.toBeInTheDocument();
+    expect(screen.getByText("本周截止")).toBeVisible();
+    expect(screen.getByText("尚未排期")).toBeVisible();
+    expect(screen.getByText("未设截止时间 · 本周规划池")).toBeVisible();
+  });
+
   it("calls onSplit for the 'split first step' action", () => {
     const onSplit = vi.fn();
     render(<TodoBoard {...baseProps()} todos={[todo()]} onSplit={onSplit} />);
@@ -78,13 +103,13 @@ describe("TodoBoard", () => {
     fireEvent.change(within(form).getByLabelText("任务名称"), { target: { value: "整理考试范围第一、二章" } });
     fireEvent.click(within(form).getByRole("button", { name: "保存修改" }));
     expect(onUpdate).toHaveBeenCalledExactlyOnceWith(1, {
-      taskName: "整理考试范围第一、二章", priority: "HIGH", deadline: null, description: "只列标题，不要求立刻背。"
+      taskName: "整理考试范围第一、二章", priority: "HIGH", deadline: "2026-07-27T02:00:00.000Z", description: "只列标题，不要求立刻背。"
     });
   });
 
   it("shows reopen/delete actions on the let-go tab", () => {
     const onDelete = vi.fn();
-    render(<TodoBoard {...baseProps()} tab="letgo" todos={[todo({ status: "CANCELLED" })]} onDelete={onDelete} />);
+    render(<TodoBoard {...baseProps()} tab="letgo" todos={[todo({ status: "CANCELLED", deadline: null })]} onDelete={onDelete} />);
     fireEvent.click(screen.getByRole("button", { name: "删除" }));
     expect(onDelete).toHaveBeenCalledExactlyOnceWith(1);
   });

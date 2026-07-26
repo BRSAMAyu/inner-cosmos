@@ -72,8 +72,12 @@ class AgentContextAssemblerMomentEmotionTest {
         ReflectionTestUtils.setField(assembler, "emotionInsightService", emotionInsightService);
 
         // Quiet, valid neighbours so assemble() runs end-to-end.
-        TimeContext time = new TimeContext("下午", "2026-06-19", false, false, null);
-        lenient().when(timeContextService.now(anyBoolean(), any())).thenReturn(time);
+        TimeContext time = new TimeContext(
+                "下午", "2026-06-19 星期五 14:00", "Asia/Shanghai", "zh-CN",
+                false, false, null, "", "NOT_PROVIDED",
+                "2026-06-19T14:00:00+08:00");
+        lenient().when(timeContextService.now(any(), any(), any(), any(), anyBoolean(), any(), any()))
+                .thenReturn(time);
         lenient().when(dialogMessageMapper.selectList(any())).thenReturn(List.of());
         lenient().when(todoItemMapper.selectList(any())).thenReturn(List.of());
         lenient().when(todoItemMapper.selectOne(any())).thenReturn(null);

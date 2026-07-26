@@ -18,6 +18,7 @@ public class EchoCapsuleVO {
     public Double freshnessScore;
     public Integer conversationLimitPerDay;
     public LocalDateTime lastActivityAt;
+    public Boolean allowLetterRequest;
 
     /** Map a full entity to the public projection, dropping every internals field. */
     public static EchoCapsuleVO fromPublic(EchoCapsule c) {
@@ -31,6 +32,7 @@ public class EchoCapsuleVO {
         vo.freshnessScore = c.freshnessScore;
         vo.conversationLimitPerDay = c.conversationLimitPerDay;
         vo.lastActivityAt = c.lastActivityAt;
+        vo.allowLetterRequest = c.allowLetterRequest;
         return vo;
     }
 }

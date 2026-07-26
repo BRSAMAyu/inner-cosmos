@@ -7,6 +7,16 @@ public class AgentContext {
     public Long userId;
     public String profileSummary;
     public String timeLabel;
+    /** IANA region timezone used to derive this turn's local time. */
+    public String timezone;
+    /** Supported locale used for temporal wording: zh-CN or en-SG. */
+    public String locale;
+    /** Server-instant-derived ISO local date-time with offset; never copied from the client. */
+    public String localDateTime;
+    /** Elapsed time since the prior Aurora reply, or empty when a reliable timestamp is unavailable. */
+    public String lastInteractionLabel;
+    /** MATCHED, MISMATCH_IGNORED or NOT_PROVIDED; client time text is validation-only. */
+    public String clientTimeHintStatus;
     public String weatherLabel;
     /**
      * IC-EMO-002: the richer "此刻情绪" perception — primary emotion + 0..10 intensity

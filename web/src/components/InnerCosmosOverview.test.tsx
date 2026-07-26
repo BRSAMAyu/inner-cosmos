@@ -39,4 +39,15 @@ describe("InnerCosmosOverview", () => {
     fireEvent.click(screen.getByRole("button", { name: /工作室里不敢交出的那张图/ }));
     expect(onOpenMemory).toHaveBeenCalledExactlyOnceWith(9);
   });
+
+  it("names the backend FOGGY weather in the overview", () => {
+    render(<InnerCosmosOverview starfield={starfield}
+      dailyRecords={[{ id: 1, recordDate: "2026-07-25", theme: "焦虑的一天", eventSummary: "",
+        emotionWeather: "FOGGY", cognitiveSummary: "", todoSummary: "", auroraSummary: "",
+        capsuleSuggested: false, userAccepted: true, status: "ACTIVE" }]}
+      themes={[]} onOpenMemory={() => undefined} onOpenDaily={() => undefined}
+      onOpenWeekly={() => undefined} onOpenBeliefs={() => undefined} />);
+    expect(screen.getByText("有雾")).toBeVisible();
+    expect(screen.queryByText("尚未命名")).not.toBeInTheDocument();
+  });
 });

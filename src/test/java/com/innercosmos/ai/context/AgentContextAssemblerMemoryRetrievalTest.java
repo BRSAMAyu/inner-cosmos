@@ -4,6 +4,7 @@ import com.innercosmos.ai.perception.GeocodingService;
 import com.innercosmos.ai.perception.TimeContextService;
 import com.innercosmos.ai.perception.WeatherContextService;
 import com.innercosmos.dto.MemoryRetrievalQuery;
+import com.innercosmos.entity.DialogMessage;
 import com.innercosmos.entity.UserProfile;
 import com.innercosmos.mapper.DailyRecordMapper;
 import com.innercosmos.mapper.DialogMessageMapper;
@@ -25,6 +26,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
+import java.util.ArrayList;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -61,8 +63,11 @@ class AgentContextAssemblerMemoryRetrievalTest {
                 timeContextService);
         ReflectionTestUtils.setField(assembler, "memoryRetrievalService", memoryRetrievalService);
 
-        lenient().when(timeContextService.now(anyBoolean(), any()))
-                .thenReturn(new TimeContextService.TimeContext("下午", "2026-07-21", false, false, null));
+        lenient().when(timeContextService.now(any(), any(), any(), any(), anyBoolean(), any(), any()))
+                .thenReturn(new TimeContextService.TimeContext(
+                        "下午", "2026-07-21 周二 14:00", "Asia/Shanghai", "zh-CN",
+                        false, false, null, "", "NOT_PROVIDED",
+                        "2026-07-21T14:00:00+08:00"));
         lenient().when(dialogMessageMapper.selectList(any())).thenReturn(List.of());
         lenient().when(todoItemMapper.selectList(any())).thenReturn(List.of());
         lenient().when(todoItemMapper.selectOne(any())).thenReturn(null);
@@ -122,5 +127,65 @@ class AgentContextAssemblerMemoryRetrievalTest {
         assertThat(context.longTermMemories).isEmpty();
         assertThat(context.evidenceMemoryIds).isEmpty();
         verifyNoInteractions(memoryCardMapper);
+    }
+
+    @Test
+    void timeAwarenessOptOutKeepsStructuredTemporalGroundingOutOfModelContext() {
+        UserProfile profile = new UserProfile();
+        profile.timeAwarenessEnabled = false;
+        profile.timezone = "America/New_York";
+        when(userProfileMapper.selectOne(any())).thenReturn(profile);
+        when(timeContextService.now(any(), any(),
+                org.mockito.ArgumentMatchers.eq("en-SG"), any(), anyBoolean(), any(), any()))
+                .thenReturn(new TimeContextService.TimeContext(
+                        "afternoon", "Mon, 27 Jul 2026 14:00", "Asia/Singapore", "en-SG",
+                        false, false, null, "", "MATCHED",
+                        "2026-07-27T14:00:00+08:00"));
+
+        AgentContext context = assembler.assemble(
+                7L, 11L, "hello", false, null, null,
+                "Asia/Singapore", "en-SG", "afternoon");
+
+        assertThat(context.timeLabel).isEqualTo("The user has disabled time awareness.");
+        assertThat(context.timezone).isNull();
+        assertThat(context.localDateTime).isEmpty();
+        assertThat(context.lastInteractionLabel).isEmpty();
+        assertThat(context.clientTimeHintStatus).isEqualTo("DISABLED");
+        assertThat(context.sleepInferred).isFalse();
+    }
+
+    @Test
+    void lowInformationContinuationUsesOnlyRecentConversationAsRetrievalQuery() {
+        when(userProfileMapper.selectOne(any())).thenReturn(null);
+        DialogMessage user = new DialogMessage();
+        user.speaker = "USER";
+        user.textContent = "《驱魔人》里梅林神父为什么回来？";
+        DialogMessage aurora = new DialogMessage();
+        aurora.speaker = "AURORA";
+        aurora.textContent = "因为他选择再次面对自己的信仰。";
+        DialogMessage current = new DialogMessage();
+        current.speaker = "USER";
+        current.textContent = "然后呢？";
+        when(dialogMessageMapper.selectList(any()))
+                .thenReturn(new ArrayList<>(List.of(current, aurora, user)));
+        when(memoryRetrievalService.retrieve(any(), any())).thenReturn(new MemoryEvidencePackVO(
+                "AURORA_CONVERSATION", "", 800, 0, List.of(), List.of()));
+
+        assembler.assemble(7L, 11L, "然后呢？", true);
+
+        ArgumentCaptor<MemoryRetrievalQuery> query = ArgumentCaptor.forClass(MemoryRetrievalQuery.class);
+        verify(memoryRetrievalService).retrieve(org.mockito.ArgumentMatchers.eq(7L), query.capture());
+        assertThat(query.getValue().query())
+                .contains("《驱魔人》", "梅林神父", "因为他选择再次面对自己的信仰", "然后呢")
+                .doesNotContain("千与千寻");
+    }
+
+    @Test
+    void lowInformationContinuationWithoutRecentContextSkipsLongTermRetrieval() {
+        when(userProfileMapper.selectOne(any())).thenReturn(null);
+
+        assembler.assemble(7L, 11L, "继续", true);
+
+        verify(memoryRetrievalService, never()).retrieve(any(), any());
     }
 }

@@ -1,6 +1,7 @@
 package com.innercosmos.ai.client;
 
 import com.innercosmos.ai.prompt.StructuredOutputParser;
+import com.innercosmos.ai.structured.StructuredAiResults.AuroraForegroundResult;
 import com.innercosmos.ai.structured.StructuredAiResults.AuroraResult;
 import org.junit.jupiter.api.Test;
 
@@ -106,6 +107,19 @@ class MockLlmClientAuroraDispatchTest {
         assertNotNull(result, "AURORA_PROACTIVE_GREETING_* output must parse into AuroraResult");
         assertFalse(result.segments.isEmpty(), "Greeting must contain segments");
         assertFalse(result.riskFlags.contains("FALLBACK_USED"));
+    }
+
+    @Test
+    void foregroundModule_usesItsOwnTextSchemaAndStaysGroundedInTheCurrentInput() {
+        MockLlmClient client = new MockLlmClient(DIRECT_EXECUTOR);
+
+        String raw = client.chat(request("AURORA_FOREGROUND_DAILY_TALK", "我们刚才还在讨论《驱魔人》的叙事视角"));
+        AuroraForegroundResult result = StructuredOutputParser.parse(raw, AuroraForegroundResult.class);
+
+        assertNotNull(result);
+        assertNotNull(result.text, "foreground JSON must populate text rather than full-reply segments");
+        assertTrue(result.text.contains("驱魔人"), result.text);
+        assertFalse(result.text.contains("千与千寻"), result.text);
     }
 
     @Test

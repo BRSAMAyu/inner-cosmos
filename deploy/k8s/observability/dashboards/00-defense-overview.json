@@ -1,0 +1,65 @@
+{
+  "uid": "inner-cosmos-defense",
+  "title": "Inner Cosmos · Semantic Reliability Command Center",
+  "tags": ["inner-cosmos", "defense", "live"],
+  "schemaVersion": 39,
+  "refresh": "5s",
+  "time": {"from": "now-15m", "to": "now"},
+  "links": [
+    {"title": "Pod recovery", "type": "link", "url": "/d/inner-cosmos-recovery", "keepTime": true},
+    {"title": "Aurora AI", "type": "link", "url": "/d/inner-cosmos-ai", "keepTime": true},
+    {"title": "Product chain", "type": "link", "url": "/d/inner-cosmos-product", "keepTime": true},
+    {"title": "Event pressure", "type": "link", "url": "/d/inner-cosmos-events", "keepTime": true},
+    {"title": "Trace explorer", "type": "link", "url": "/explore?left=%7B%22datasource%22:%22jaeger%22%7D", "targetBlank": true}
+  ],
+  "panels": [
+    {
+      "id": 1, "type": "text", "title": "", "gridPos": {"h": 4, "w": 24, "x": 0, "y": 0},
+      "options": {"mode": "markdown", "content": "# From orchestration to semantic reliability\n**Continuity** keeps Aurora recoverable · **Semantic health** keeps bad versions away · **Work pressure** follows user waiting · **Causality** stays traceable without exposing private content."},
+      "transparent": true
+    },
+    {
+      "id": 2, "type": "stat", "title": "API · Ready", "gridPos": {"h": 5, "w": 6, "x": 0, "y": 4},
+      "targets": [{"refId": "A", "expr": "sum(kube_pod_status_ready{namespace=\"inner-cosmos-w3\",condition=\"true\",pod=~\"inner-cosmos-api.*\"})"}],
+      "fieldConfig": {"defaults": {"unit": "short", "color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "red", "value": null}, {"color": "orange", "value": 1}, {"color": "green", "value": 2}]}}}
+    },
+    {
+      "id": 3, "type": "stat", "title": "Worker · Available", "gridPos": {"h": 5, "w": 6, "x": 6, "y": 4},
+      "targets": [{"refId": "A", "expr": "max(kube_deployment_status_replicas_available{namespace=\"inner-cosmos-w3\",deployment=\"inner-cosmos-worker\"})"}],
+      "fieldConfig": {"defaults": {"color": {"mode": "continuous-GrYlRd"}, "thresholds": {"steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}}
+    },
+    {
+      "id": 4, "type": "stat", "title": "Projection backlog", "description": "Business pressure, not CPU.", "gridPos": {"h": 5, "w": 6, "x": 12, "y": 4},
+      "targets": [{"refId": "A", "expr": "max(inner_cosmos_outbox_ready)"}],
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 20}, {"color": "red", "value": 100}]}}}
+    },
+    {
+      "id": 5, "type": "stat", "title": "5xx · last 5m", "gridPos": {"h": 5, "w": 6, "x": 18, "y": 4},
+      "targets": [{"refId": "A", "expr": "sum(increase(http_server_requests_seconds_count{status=~\"5..\"}[5m])) or vector(0)"}],
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}}
+    },
+    {
+      "id": 6, "type": "timeseries", "title": "User traffic · requests/s", "gridPos": {"h": 8, "w": 12, "x": 0, "y": 9},
+      "targets": [{"refId": "A", "expr": "sum by (status) (rate(http_server_requests_seconds_count{component=\"api\"}[1m]))", "legendFormat": "HTTP {{status}}"}],
+      "fieldConfig": {"defaults": {"custom": {"lineWidth": 2, "fillOpacity": 18}}}
+    },
+    {
+      "id": 7, "type": "timeseries", "title": "Aurora stream continuity", "description": "Active SSE connections by live/replay path. A graceful Pod delete should preserve the user-visible stream.", "gridPos": {"h": 8, "w": 12, "x": 12, "y": 9},
+      "targets": [
+        {"refId": "A", "expr": "sum by (route) (inner_cosmos_sse_connections_active) or vector(0)", "legendFormat": "{{route}} active"},
+        {"refId": "B", "expr": "sum(rate(inner_cosmos_sse_connections_closed_total{outcome=~\"error|timeout\"}[1m])) or vector(0)", "legendFormat": "error / timeout"}
+      ],
+      "fieldConfig": {"defaults": {"custom": {"lineWidth": 3, "fillOpacity": 20}}}
+    },
+    {
+      "id": 8, "type": "timeseries", "title": "Aurora turn latency · p95", "description": "Exemplars link latency samples to the privacy-safe Jaeger trace.", "gridPos": {"h": 7, "w": 12, "x": 0, "y": 17},
+      "targets": [{"refId": "A", "expr": "histogram_quantile(0.95, sum by (le) (rate(aurora_turn_latency_seconds_bucket[5m]))) or vector(0)", "legendFormat": "p95 / no recent sample", "exemplar": true}],
+      "fieldConfig": {"defaults": {"unit": "s", "custom": {"lineWidth": 3, "fillOpacity": 12}}}
+    },
+    {
+      "id": 9, "type": "timeseries", "title": "Cross-role runtime · CPU", "gridPos": {"h": 7, "w": 12, "x": 12, "y": 17},
+      "targets": [{"refId": "A", "expr": "sum by (component) (process_cpu_usage{namespace=\"inner-cosmos-w3\"})", "legendFormat": "{{component}}"}],
+      "fieldConfig": {"defaults": {"unit": "percentunit", "custom": {"lineWidth": 2, "fillOpacity": 15}}}
+    }
+  ]
+}

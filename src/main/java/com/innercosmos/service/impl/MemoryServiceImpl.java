@@ -104,11 +104,11 @@ public class MemoryServiceImpl implements MemoryService {
         MemoryCard card = new MemoryCard();
         card.userId = userId;
         card.sourceSessionId = sessionId;
-        card.title = "Today's reflection";
+        card.title = "今日沉淀";
         card.summary = extractAgent.summarize(raw);
         card.memoryType = inferType(raw);
-        card.emotionTags = "[\"self-observation\"]";
-        card.keywordTags = "[\"aurora\",\"daily\"]";
+        card.emotionTags = "[\"自我观察\"]";
+        card.keywordTags = "[\"Aurora\",\"日常\"]";
         card.peopleTags = "[]";
         card.intensityScore = raw.contains("很") || raw.contains("特别") ? 7.0 : 4.5;
         card.recurrenceCount = 1;
@@ -118,12 +118,14 @@ public class MemoryServiceImpl implements MemoryService {
         card.lastTouchedAt = LocalDateTime.now();
         card.visibilityLevel = "PRIVATE";
         card.status = "ACTIVE";
+        applyConversationLifecycle(card, sessionId);
         // M-008 (Phase-6 fix): idempotent on (user_id, source_session_id) — a session that is
         // both finished (listener) and explicitly settled must not trip the UNIQUE -> 500.
         MemoryCard existing = memoryCardMapper.selectOne(new QueryWrapper<MemoryCard>()
                 .eq("user_id", userId).eq("source_session_id", sessionId).last("LIMIT 1"));
         if (existing != null) {
             card.id = existing.id;
+            preserveExistingLifecycle(card, existing);
             memoryCardMapper.updateById(card);
         } else {
             memoryCardMapper.insert(card);
@@ -186,7 +188,11 @@ public class MemoryServiceImpl implements MemoryService {
     @Override
     public DailyRecordVO latestDailyRecord(Long userId) {
         QueryWrapper<MemoryCard> memoryQuery = new QueryWrapper<>();
-        memoryQuery.eq("user_id", userId).orderByDesc("id").last("LIMIT 1");
+        memoryQuery.eq("user_id", userId)
+                .eq("status", "ACTIVE")
+                .ne("memory_type", "SHREDDER")
+                .orderByDesc("id")
+                .last("LIMIT 1");
         MemoryCard card = memoryCardMapper.selectOne(memoryQuery);
         DailyRecordVO vo = new DailyRecordVO();
         if (card == null) {
@@ -210,6 +216,10 @@ public class MemoryServiceImpl implements MemoryService {
         QueryWrapper<TodoItem> todoQuery = new QueryWrapper<>();
         todoQuery.eq("source_memory_card_id", card.id).orderByAsc("id");
         vo.todos = todoItemMapper.selectList(todoQuery);
+
+        vo.relations = relationMentionMapper.selectList(
+                new QueryWrapper<com.innercosmos.entity.RelationMention>()
+                        .eq("user_id", userId).eq("memory_card_id", card.id).orderByAsc("id"));
         return vo;
     }
 
@@ -318,7 +328,7 @@ public class MemoryServiceImpl implements MemoryService {
     }
 
     private String starTheme(String memoryType) {
-        if ("TODO".equals(memoryType)) return "Something that needs a gentle next step";
+        if ("TODO".equals(memoryType)) return "需要温柔推进的下一步";
         if ("RELATION".equals(memoryType)) return "关系里的回声";
         if ("COGNITION".equals(memoryType)) return "正在成形的理解";
         return "被命名的感受";
@@ -420,6 +430,33 @@ public class MemoryServiceImpl implements MemoryService {
 
     private String displayMetric(Double value) {
         return value == null ? "0.0" : String.format("%.1f", value);
+    }
+
+    private void applyConversationLifecycle(MemoryCard card, Long sessionId) {
+        card.versionNo = 1;
+        card.memoryLayer = "EPISODIC";
+        card.confidence = 0.85;
+        card.consentScope = "AURORA_PRIVATE";
+        card.provenanceRefs = "AURORA_SESSION:" + sessionId
+                + " · source-version:1 · consent:AURORA_PRIVATE";
+    }
+
+    private void preserveExistingLifecycle(MemoryCard target, MemoryCard existing) {
+        if (existing.versionNo != null) target.versionNo = existing.versionNo;
+        if (existing.memoryLayer != null && !existing.memoryLayer.isBlank()) {
+            target.memoryLayer = existing.memoryLayer;
+        }
+        if (existing.confidence != null) target.confidence = existing.confidence;
+        if (existing.consentScope != null && !existing.consentScope.isBlank()) {
+            target.consentScope = existing.consentScope;
+        }
+        if (existing.provenanceRefs != null && !existing.provenanceRefs.isBlank()) {
+            target.provenanceRefs = existing.provenanceRefs;
+        }
+        if (existing.status != null && !existing.status.isBlank()) target.status = existing.status;
+        target.supersededById = existing.supersededById;
+        target.archivedAt = existing.archivedAt;
+        target.forgottenAt = existing.forgottenAt;
     }
 
     @Override
