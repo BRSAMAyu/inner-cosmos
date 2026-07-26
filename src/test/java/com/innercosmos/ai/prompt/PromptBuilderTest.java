@@ -861,5 +861,8 @@ class PromptBuilderTest {
         assertTrue(prompt.contains("does not need emotional interpretation"));
         assertTrue(prompt.contains("Do not praise disclosure"));
         assertTrue(prompt.contains("end every turn with a question"));
+        assertTrue(prompt.contains("There is no default message count"));
+        assertTrue(prompt.contains("all three counts should appear naturally"));
+        assertTrue(prompt.contains("never split one thought merely to fill bubbles or follow a quota"));
     }
 }

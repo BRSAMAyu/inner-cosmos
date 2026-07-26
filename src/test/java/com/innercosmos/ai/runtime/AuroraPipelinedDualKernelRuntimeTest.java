@@ -54,11 +54,15 @@ class AuroraPipelinedDualKernelRuntimeTest {
         assertThat(first.guidanceSource()).isEqualTo("bootstrap");
         assertThat(first.backgroundPlannerStatus()).isEqualTo("SCHEDULED");
         assertThat(client.plannerStarted.await(1, TimeUnit.SECONDS)).isTrue();
+        assertThat(client.latestSpeakerSystemPrompt)
+                .contains("没有默认数量", "不要把 1 条当作最安全答案", "禁止随机抽数");
         assertThat(first.deferredInnerVoiceRequest()).isNull();
 
         client.releasePlanner.countDown();
         assertThat(first.backgroundPlannerEvidence().get(2, TimeUnit.SECONDS).status())
                 .isEqualTo(AuroraDualKernelRuntime.PlannerStatus.SUCCEEDED);
+        assertThat(client.latestPlannerSystemPrompt)
+                .contains("没有默认数量", "让 1、2、3 条随真实语义自然变化", "不得随机抽数");
 
         AuroraDualKernelRuntime.Generation second = runtime.generate(7L, "DAILY_TALK",
                 Map.of("sessionId", 91L, "userMessage", "但下午又困了",
@@ -74,11 +78,14 @@ class AuroraPipelinedDualKernelRuntimeTest {
         private final CountDownLatch plannerStarted = new CountDownLatch(1);
         private final CountDownLatch releasePlanner = new CountDownLatch(1);
         private volatile String latestSpeakerRequestJson = "";
+        private volatile String latestSpeakerSystemPrompt = "";
+        private volatile String latestPlannerSystemPrompt = "";
 
         @Override
         public String chat(LlmRequest request) {
             if (request.moduleName.startsWith("AURORA_SPEAKER")) {
                 latestSpeakerRequestJson = request.requestJson;
+                latestSpeakerSystemPrompt = request.systemPrompt;
                 return """
                     {"segments":["午饭这次选对了。"],"speakCount":1,
                      "continueReason":"自然接话","detectedTheme":"午饭","nextQuestion":"",
@@ -87,6 +94,7 @@ class AuroraPipelinedDualKernelRuntimeTest {
                     """;
             }
             if (request.moduleName.startsWith("AURORA_PLAN")) {
+                latestPlannerSystemPrompt = request.systemPrompt;
                 plannerStarted.countDown();
                 try {
                     releasePlanner.await(2, TimeUnit.SECONDS);
