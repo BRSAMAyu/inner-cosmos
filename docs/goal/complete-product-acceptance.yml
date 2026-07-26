@@ -1,28 +1,25 @@
 schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 authority: goal-objective.md
-status: IN_PROGRESS
-last_reconciled_at: 2026-07-24T06:10:00+08:00
-last_reconciled_commit: c7cc650
+status: RELEASE_CANDIDATE_BLOCKED_BY_HUMAN_GATE
+last_reconciled_at: 2026-07-26T20:34:31+08:00
+last_reconciled_commit: 9f632f6
 current_fact_baseline: 对齐文档/24-完全体最终收敛与云原生课程战役.md
 current_execution_plan: 对齐文档/24-完全体最终收敛与云原生课程战役.md
 parallel_state: docs/goal/closure-campaign-state.yml
 reconciliation_boundary: >-
-  W0 integration of the four exact Claude branches is DONE on branch codex/w0-integration
-  (commit 28c4987; not yet merged to main) -- see closure-campaign-state.yml's integrated_head
-  for exact test commands/counts and known non-blocking findings. W0V (the Gemini audit's 36
-  numbered findings) is now fully DONE as of commit 3ce6ac7: all P0, P1 and P2/P3 items are
-  closed (28 confirmed items fixed, 6 partial items fixed to their corrected scope, 1 duplicate
-  not double-counted, 1 false item rejected with a permanent regression-guard test) -- see
-  closure-campaign-state.yml's current_front for the exact commit per item and
-  p0_verification/p1_verification/p2_p3_verification for exact test counts. VERIFIED-STATE-
-  CONCURRENCY, VERIFIED-AI-DATA-BOUNDARY, VERIFIED-CLIENT-RESILIENCE and VERIFIED-STORAGE-
-  EVOLUTION below are all PASS. Full ./mvnw test (1089/1089, 0 failures, 1 pre-existing
-  environment-gated skip) was independently re-run twice (once by the closing sub-agent, once by
-  the Supervisor in parallel) with an identical result; web suite is 475/475 (69 files), tsc
-  clean, one clean rebuilt bundle; scripts/scan-secrets.ps1 PASS with 0 findings. W1/W2/W3 are
-  now READY per closure-campaign-state.yml's campaigns list. Historical counts and evidence
-  predating 642f034 remain valid only for their recorded commits.
+  Windows pulled and fast-forwarded the four commits from origin/codex/english-demo-i18n onto
+  the current main lineage without conflict. Commit 9f632f6 closes the two machine-solvable
+  natural-action experience gates: action/confirmation turns no longer emit an unrelated fast
+  acknowledgement, and authoritative EXECUTED receipts immediately refresh memory, return-intent
+  or settings state. Windows verification: focused backend 18/18; web 597/597 across 84 files;
+  TypeScript and production PWA build PASS; secret scan 0 findings. Full Maven is not a full PASS:
+  1269 total, 0 assertion failures, 11 Docker/Testcontainers environment errors and 8 environment
+  skips because the Docker daemon never became Ready. The stale Quick Tunnel URLs returned HTTP
+  404, no current real-Provider call was executed, and 30-user, physical Android cellular and
+  non-author gates remain open. The only honest legal state is therefore
+  RELEASE_CANDIDATE_BLOCKED_BY_HUMAN_GATE; historical evidence remains scoped to its recorded
+  commit/environment and cannot close the current runtime gates.
 
 status_semantics:
   UNASSESSED: current HEAD and target environment have not been verified
