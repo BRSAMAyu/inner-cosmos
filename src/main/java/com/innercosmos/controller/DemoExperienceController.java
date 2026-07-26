@@ -26,15 +26,15 @@ import java.util.Map;
 @RequestMapping("/api/public/demo")
 public class DemoExperienceController {
     private static final List<DemoPersona> PERSONAS = List.of(
-            new DemoPersona("lin-che", "林澈", "把理想做成作品的人",
-                    "课程项目、审美坚持与行动压力交织的四个月",
-                    List.of("创造", "自我要求", "真实 AI", "边界")),
-            new DemoPersona("shen-yan", "沈砚", "在异乡重新辨认自己",
-                    "交换生活、作品集与孤独感缓慢变化的五个月",
-                    List.of("异乡", "独处", "创作", "归属")),
-            new DemoPersona("xia-yu", "夏榆", "总在照顾别人的人",
-                    "新工作、家庭照护与不带愧疚地休息的三个月",
-                    List.of("照护", "关系", "疲惫", "自我边界"))
+            new DemoPersona("lin-che", "Lin Che", "Turning ideals into something real",
+                    "Four months where a course project, creative standards and the pressure to act became intertwined",
+                    List.of("Making", "Self-expectation", "Real AI", "Boundaries")),
+            new DemoPersona("shen-yan", "Shen Yan", "Finding herself again, far from home",
+                    "Five months of exchange life, portfolio work and a slowly changing sense of loneliness",
+                    List.of("Elsewhere", "Solitude", "Creative work", "Belonging")),
+            new DemoPersona("xia-yu", "Xia Yu", "The person who always looks after everyone",
+                    "Three months of a new job, family care and learning to rest without guilt",
+                    List.of("Care", "Relationships", "Fatigue", "Personal boundaries"))
     );
     private static final Map<String, String> USERNAMES = Map.of(
             "lin-che", "demo",
@@ -58,15 +58,15 @@ public class DemoExperienceController {
     public ApiResponse<UserProfileVO> enter(@org.springframework.web.bind.annotation.PathVariable String key,
                                              HttpServletRequest request) {
         if (!enabled()) {
-            throw new BusinessException(ErrorCode.NOT_FOUND, "Demo 体验入口未开启");
+            throw new BusinessException(ErrorCode.NOT_FOUND, "The Demo experience is not enabled");
         }
         String username = USERNAMES.get(key);
         if (username == null) {
-            throw new BusinessException(ErrorCode.NOT_FOUND, "未找到这个体验角色");
+            throw new BusinessException(ErrorCode.NOT_FOUND, "Demo persona not found");
         }
         User user = userService.findPublicDemoPersona(username);
         if (user == null) {
-            throw new BusinessException(ErrorCode.NOT_FOUND, "体验角色尚未准备好");
+            throw new BusinessException(ErrorCode.NOT_FOUND, "This Demo persona is not ready yet");
         }
         HttpSession session = request.getSession(true);
         // These three accounts are deliberately public, equal-privilege classroom stories. A

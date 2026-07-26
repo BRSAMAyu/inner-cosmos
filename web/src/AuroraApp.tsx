@@ -370,8 +370,12 @@ export function AuroraApp() {
       setVisitorMatchId(current => current ?? loadedMatches[0]?.capsule.id ?? null);
       setSelectedSkillId(current => current ?? loadedSkills[0]?.id ?? null);
       setStatus(resolved.returning
-        ? `Aurora 按约定回来了：${resolved.returning.purpose}`
-        : "Aurora 在这里。你可以随时打断，她会重新理解。 ");
+        ? (skillLocale === "en-SG"
+          ? `Aurora returned as agreed: ${resolved.returning.purpose}`
+          : `Aurora 按约定回来了：${resolved.returning.purpose}`)
+        : (skillLocale === "en-SG"
+          ? "Aurora is here. Interrupt at any time; she will listen again."
+          : "Aurora 在这里。你可以随时打断，她会重新理解。 "));
     } catch (error) {
       if (call !== bootstrapCallRef.current) return;
       if (/authentication|unauthori[sz]ed|\b401\b/i.test(String(error))) {
@@ -1330,10 +1334,22 @@ export function AuroraApp() {
         </section>)}
 
       {selfEvolution && <AuroraSelfSpace evolution={selfEvolution} busy={selfBusy}
-        onPropose={candidateId => void evolve(() => api.proposeSelfEvolution(candidateId, "让 Aurora 在相似时刻更连续、更贴近双方已经形成的相处方式"), "这还只是一个提案。你可以先看它会怎样改变 Aurora。")}
-        onEvaluate={proposalId => void evolve(() => api.evaluateSelfEvolution(proposalId), "沙盒评测完成。变化不会在你确认前生效。")}
-        onActivate={proposalId => void evolve(() => api.activateSelfEvolution(proposalId), "这次变化已经成为新的 Aurora 版本，并且仍然可以回退。")}
-        onRollback={(versionId, versionNo) => void evolve(() => api.rollbackSelfEvolution(versionId), `已回到第 ${versionNo} 版；回退本身也留下了可追溯的新版本。`)} locale={skillLocale} />}
+        onPropose={candidateId => void evolve(
+          () => api.proposeSelfEvolution(candidateId, skillLocale === "en-SG"
+            ? "Help Aurora stay continuous in similar moments and faithful to the way this relationship has actually developed."
+            : "让 Aurora 在相似时刻更连续、更贴近双方已经形成的相处方式"),
+          skillLocale === "en-SG"
+            ? "This is still only a proposal. You can inspect how it would change Aurora first."
+            : "这还只是一个提案。你可以先看它会怎样改变 Aurora。")}
+        onEvaluate={proposalId => void evolve(() => api.evaluateSelfEvolution(proposalId), skillLocale === "en-SG"
+          ? "Sandbox evaluation is complete. Nothing changes until you confirm it."
+          : "沙盒评测完成。变化不会在你确认前生效。")}
+        onActivate={proposalId => void evolve(() => api.activateSelfEvolution(proposalId), skillLocale === "en-SG"
+          ? "This change is now part of Aurora's new version, and it can still be rolled back."
+          : "这次变化已经成为新的 Aurora 版本，并且仍然可以回退。")}
+        onRollback={(versionId, versionNo) => void evolve(() => api.rollbackSelfEvolution(versionId), skillLocale === "en-SG"
+          ? `Returned to version ${versionNo}; the rollback itself remains traceable as a new version.`
+          : `已回到第 ${versionNo} 版；回退本身也留下了可追溯的新版本。`)} locale={skillLocale} />}
       </div>
       </ErrorBoundary>
 
@@ -1343,7 +1359,7 @@ export function AuroraApp() {
           real shareable /cosmos/<tab> URL, mounted-but-hidden like the five top-level spaces so
           switching back and forth keeps scroll/edit state. Each tab's data lazy-loads on first
           visit -- see the cosmosTabLoadedRef effect above -- instead of blocking login bootstrap. */}
-      <CosmosSubNav active={cosmosTab} onNavigate={navigateCosmosTab} />
+      <CosmosSubNav active={cosmosTab} onNavigate={navigateCosmosTab} locale={skillLocale} />
 
       <div hidden={cosmosTab !== "starfield"}>
         {starfield && <InnerCosmosOverview starfield={starfield}

@@ -42,7 +42,11 @@ public class LetterDeliveryJob {
         this.clock = fixedClock;
     }
 
-    @Scheduled(fixedRate = 60000)
+    // Do not run on ContextRefreshedEvent: the dev profile upgrades long-lived H2 files through
+    // ordered ApplicationRunner schema initializers. An immediate first tick can otherwise query
+    // newly added columns before those runners finish. Waiting one normal polling interval also
+    // matches the operator-facing "every minute" delivery contract.
+    @Scheduled(fixedRate = 60000, initialDelay = 60000)
     @SchedulerLock(name = "letter-delivery", lockAtMostFor = "PT5M", lockAtLeastFor = "PT55S")
     public void deliverArrivedLetters() {
         LocalDateTime now = LocalDateTime.now(clock);

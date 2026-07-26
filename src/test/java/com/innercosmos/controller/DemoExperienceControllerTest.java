@@ -55,6 +55,24 @@ class DemoExperienceControllerTest {
     }
 
     @Test
+    void enabledDemoAdvertisesAnEnglishClassroomJourney() {
+        UserService users = mock(UserService.class);
+        Environment env = mock(Environment.class);
+        when(env.getActiveProfiles()).thenReturn(new String[]{"dev"});
+        when(env.getProperty("inner-cosmos.demo.public-entry-enabled", Boolean.class, false))
+                .thenReturn(true);
+
+        var personas = new DemoExperienceController(users, env).personas().data;
+
+        assertThat(personas).hasSize(3);
+        assertThat(personas).allSatisfy(persona -> {
+            assertThat(persona.name()).doesNotContainPattern("[\\p{IsHan}]");
+            assertThat(persona.headline()).doesNotContainPattern("[\\p{IsHan}]");
+            assertThat(persona.story()).doesNotContainPattern("[\\p{IsHan}]");
+        });
+    }
+
+    @Test
     void prodProfileRefusesPublicDemoEvenWhenFlagWasSet() {
         UserService users = mock(UserService.class);
         Environment env = mock(Environment.class);
@@ -67,6 +85,6 @@ class DemoExperienceControllerTest {
 
         assertThat(controller.personas().data).isEmpty();
         assertThatThrownBy(() -> controller.enter("lin-che", request))
-                .hasMessageContaining("未开启");
+                .hasMessageContaining("not enabled");
     }
 }

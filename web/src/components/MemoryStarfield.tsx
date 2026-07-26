@@ -6,6 +6,50 @@ import { AsyncButton } from "../loading";
 const modeOptions: Array<StarfieldScene["mode"]> = ["TIME", "THEME", "PEOPLE"];
 const rollbackExcluded = new Set(["FORGET", "LINK", "NO_OP", "ROLLBACK"]);
 
+type StarPosition = { left: number; top: number };
+
+const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+
+/**
+ * Turns the service's -100…100 projection into label-safe percentages. Time remains horizontal,
+ * but records without an exact occurrence time form a small, deterministic constellation instead
+ * of all inheriting the service's "now" coordinate at the far right.
+ */
+export function layoutMemoryStars(stars: StarfieldStar[], mode: StarfieldScene["mode"]): Map<number, StarPosition> {
+  const positions = new Map<number, StarPosition>();
+  const occupied: StarPosition[] = [];
+  const unknownTime = mode === "TIME"
+    ? [...stars].filter(star => !star.occurredAt).sort((a, b) => a.id - b.id)
+    : [];
+  const unknownIndex = new Map(unknownTime.map((star, index) => [star.id, index]));
+
+  [...stars].sort((a, b) => a.id - b.id).forEach(star => {
+    const floatingIndex = unknownIndex.get(star.id);
+    let anchor: StarPosition;
+    if (floatingIndex !== undefined) {
+      const angle = -Math.PI * .82 + floatingIndex * 2.399963229728653;
+      const radius = unknownTime.length === 1 ? 0 : 18 + (floatingIndex % 3) * 4;
+      anchor = { left: 48 + Math.cos(angle) * radius, top: 50 + Math.sin(angle) * radius * .78 };
+    } else {
+      anchor = {
+        left: 46 + clamp(star.x, -100, 100) * .32,
+        top: 50 + clamp(star.y, -100, 100) * .34
+      };
+    }
+
+    const candidates = mode === "TIME"
+      ? [[0, 0], [0, -14], [0, 14], [-8, -8], [-8, 8], [8, -8], [8, 8], [-13, 0], [13, 0]]
+      : [[0, 0], [0, -14], [0, 14], [-12, -8], [12, 8], [-12, 8], [12, -8]];
+    const candidate = candidates
+      .map(([dx, dy]) => ({ left: clamp(anchor.left + dx, 12, 82), top: clamp(anchor.top + dy, 14, 86) }))
+      .find(point => occupied.every(other => Math.abs(point.left - other.left) >= 14 || Math.abs(point.top - other.top) >= 12))
+      ?? { left: clamp(anchor.left - 15, 12, 82), top: clamp(anchor.top + 16, 14, 86) };
+    occupied.push(candidate);
+    positions.set(star.id, candidate);
+  });
+  return positions;
+}
+
 const COPY: Record<Locale, {
   aria: string; heading: string; count: (n: number) => string; modesAria: string; modeLabel: Record<StarfieldScene["mode"], string>;
   listAria: string; confidence: (pct: number, v: number) => string; revealBusy: string; revealBtn: string; inaccurate: string;
@@ -17,6 +61,8 @@ const COPY: Record<Locale, {
   rollbackBusy: string; rollbackBtn: string; forgetNote: string;
   emptyTitle: Record<StarfieldScene["mode"], string>; emptyBody: Record<StarfieldScene["mode"], string>;
   emptyAction: string; openStar: (title: string) => string;
+  modeExplanation: Record<StarfieldScene["mode"], string>;
+  legend: Array<[string, string]>;
 }> = {
   "zh-CN": {
     aria: "记忆星空", heading: "你的记忆不是档案柜", count: n => `${n} 颗当前记忆`, modesAria: "星空视角",
@@ -38,7 +84,14 @@ const COPY: Record<Locale, {
       THEME: "当两段以上的记忆出现相似线索，主题视角会把它们聚在一起，而不是重复堆放。",
       PEOPLE: "只有你确认过的关系线索才会进入人物视角；原始对话不会公开。"
     },
-    emptyAction: "回到 Aurora 留下第一颗星", openStar: title => `打开记忆：${title}`
+    emptyAction: "回到 Aurora 留下第一颗星", openStar: title => `打开记忆：${title}`,
+    modeExplanation: {
+      TIME: "从左到右沿时间展开；同一时刻会错落排开，时间未定的记忆停留在中央柔和轨道。",
+      THEME: "相似线索会聚成主题，帮助你看见反复出现的关注与变化。",
+      PEOPLE: "只展示你确认过的人物线索；原始对话不会进入这里。"
+    },
+    legend: [["尺寸", "情感重力与长期重要性"], ["亮度", "近期活跃程度"], ["边缘", "理解置信度"],
+      ["连线", "合并、延续或人物关联"], ["距离", "从右侧列表打开可访问详情"]]
   },
   "en-SG": {
     aria: "Memory starfield", heading: "Your memory isn't a filing cabinet", count: n => `${n} current memor${n === 1 ? "y" : "ies"}`,
@@ -60,7 +113,15 @@ const COPY: Record<Locale, {
       THEME: "Once two or more memories share a cue, this view groups them into a theme instead of stacking duplicates.",
       PEOPLE: "Only relationship cues you confirm enter this view; raw conversations never become public."
     },
-    emptyAction: "Return to Aurora and leave the first star", openStar: title => `Open memory: ${title}`
+    emptyAction: "Return to Aurora and leave the first star", openStar: title => `Open memory: ${title}`,
+    modeExplanation: {
+      TIME: "Time flows left to right. Memories from the same moment fan apart, while those without an exact time rest in a gentle central orbit.",
+      THEME: "Related cues gather into themes, revealing recurring concerns and change over time.",
+      PEOPLE: "Only people cues you have confirmed appear here; raw conversations never enter this view."
+    },
+    legend: [["Size", "Emotional gravity and long-term importance"], ["Glow", "Recent activity"],
+      ["Edge", "Understanding confidence"], ["Links", "Merge, continuity or people relationships"],
+      ["Distance", "Open an accessible detail from the list on the right"]]
   }
 };
 
@@ -103,7 +164,22 @@ export function MemoryStarfield({ starfield, starfieldBusy, onChangeMode, starfi
   importanceBusy?: number | null; archiveBusy?: number | null; locale?: Locale;
 }) {
   const t = COPY[locale];
-  const renderMemoryRow = (star: StarfieldStar) => <li key={star.id}><div><strong>{star.title}</strong><span>{star.theme} · {star.memoryLayer}</span></div>
+  const englishStarText = (value: string) => {
+    if (locale !== "en-SG") return value;
+    const fixed: Record<string, string> = {
+      "关系里的回声": "Echoes in relationships",
+      "正在成形的理解": "An understanding taking shape",
+      "被命名的感受": "A feeling given a name",
+      "需要被轻轻推进的事": "Something that needs a gentle next step",
+      "今日沉淀": "Today's reflection",
+      "情景记忆": "Episodic memory",
+      "语义记忆": "Semantic memory",
+      "程序记忆": "Procedural memory",
+      "情绪记忆": "Emotional memory",
+    };
+    return fixed[value] ?? value;
+  };
+  const renderMemoryRow = (star: StarfieldStar) => <li key={star.id}><div><strong>{englishStarText(star.title)}</strong><span>{englishStarText(star.theme)} · {englishStarText(star.memoryLayer)}</span></div>
     <small>{t.confidence(Math.round(star.confidence * 100), star.versionNo)}</small><p className="ugc-text">{star.summary}</p>
     <div className="cosmos-list-actions">
       <AsyncButton disabled={detailBusy !== null} busy={detailBusy === star.id} busyText={t.revealBusy}
@@ -112,6 +188,7 @@ export function MemoryStarfield({ starfield, starfieldBusy, onChangeMode, starfi
     </div></li>;
   const visibleMemories = starfield.accessibleList.slice(0, 3);
   const foldedMemories = starfield.accessibleList.slice(3);
+  const starPositions = layoutMemoryStars(starfield.stars, starfield.mode);
   return <section className="cosmos-space" aria-label={t.aria}>
     <div className="cosmos-heading"><div><span className="eyebrow">MEMORY, ALIVE</span><h2>{t.heading}</h2></div>
       <span>{t.count(starfield.stars.length)}</span></div>
@@ -120,25 +197,30 @@ export function MemoryStarfield({ starfield, starfieldBusy, onChangeMode, starfi
         <button type="button" disabled={starfieldBusy} aria-pressed={starfield.mode === value} key={value}
           className={starfield.mode === value ? "active" : ""} onClick={() => onChangeMode(value)}>{t.modeLabel[value]}</button>)}
     </div>
-    <p className="cosmos-explanation">{starfield.modeExplanation}</p>
+    <p className="cosmos-explanation">{t.modeExplanation[starfield.mode]}</p>
     <div className="cosmos-map" aria-label={t.listAria}>
-      {starfield.stars.map(star => <button type="button" className="cosmos-star" key={star.id}
-        aria-label={t.openStar(star.title)} title={star.ariaLabel} disabled={detailBusy !== null}
+      {starfield.stars.map(star => {
+        const position = starPositions.get(star.id) ?? { left: 50, top: 50 };
+        return <button type="button" className="cosmos-star" key={star.id}
+        aria-label={t.openStar(englishStarText(star.title))}
+        title={locale === "en-SG" ? t.openStar(englishStarText(star.title)) : star.ariaLabel} disabled={detailBusy !== null}
         onClick={() => onRevealStar(star.id)} style={{
-        left: `${50 + Math.max(-46, Math.min(46, star.x / 2))}%`, top: `${50 + Math.max(-42, Math.min(42, star.y / 2))}%`,
+        left: `${position.left}%`, top: `${position.top}%`,
         color: star.color, opacity: Math.max(.45, star.glow ?? .7)
       }}><span className="cosmos-star-core" aria-hidden="true" style={{
           width: `${Math.max(9, Math.min(26, 9 + star.gravity * 3))}px`,
           height: `${Math.max(9, Math.min(26, 9 + star.gravity * 3))}px`,
           background: star.color
-        }} /><span className="cosmos-star-label" aria-hidden="true">{star.title}</span></button>)}
+        }} /><span className="cosmos-star-label" aria-hidden="true">{englishStarText(star.title)}</span></button>;
+      })}
       {starfield.stars.length === 0 && <div className="cosmos-empty">
         <strong>{t.emptyTitle[starfield.mode]}</strong>
         <p>{t.emptyBody[starfield.mode]}</p>
         {onStartMemory && <button type="button" onClick={onStartMemory}>{t.emptyAction}</button>}
       </div>}
     </div>
-    <div className="cosmos-legend">{Object.entries(starfield.legend).map(([key, value]) => <span key={key}><strong>{key}</strong>{value}</span>)}</div>
+    <div className="cosmos-legend">{(locale === "en-SG" ? t.legend : Object.entries(starfield.legend))
+      .map(([key, value]) => <span key={key}><strong>{key}</strong>{value}</span>)}</div>
     <ol className="cosmos-list" aria-label={t.listAria}>
       {visibleMemories.map(renderMemoryRow)}
     </ol>
@@ -148,8 +230,8 @@ export function MemoryStarfield({ starfield, starfieldBusy, onChangeMode, starfi
     </details>}
     {starfieldDetail && <aside className="provenance-panel" aria-label={t.provAria}>
       <div><span className="eyebrow">WHY THIS STAR</span><button type="button" onClick={onCloseDetail} aria-label={t.closeProv}>×</button></div>
-      <h3>{starfieldDetail.card.title}</h3><p>{starfieldDetail.provenanceExplanation}</p>
-      <dl><div><dt>{t.curVersion}</dt><dd>v{starfieldDetail.card.versionNo}</dd></div><div><dt>{t.confidenceLabel}</dt><dd>{Math.round(starfieldDetail.card.confidence * 100)}%</dd></div><div><dt>{t.memLayer}</dt><dd>{starfieldDetail.card.memoryLayer}</dd></div></dl>
+      <h3>{englishStarText(starfieldDetail.card.title)}</h3><p>{starfieldDetail.provenanceExplanation}</p>
+      <dl><div><dt>{t.curVersion}</dt><dd>v{starfieldDetail.card.versionNo}</dd></div><div><dt>{t.confidenceLabel}</dt><dd>{Math.round(starfieldDetail.card.confidence * 100)}%</dd></div><div><dt>{t.memLayer}</dt><dd>{englishStarText(starfieldDetail.card.memoryLayer)}</dd></div></dl>
       <details open><summary>{t.observation}</summary><p>{starfieldDetail.auroraObservation}</p></details>
       <details open><summary>{t.whyHere}</summary><p>{starfieldDetail.gravityExplanation}</p></details>
       <details><summary>{t.changeHistory(starfieldDetail.versionHistory.length)}</summary>{starfieldDetail.versionHistory.length === 0 ? <p>{t.noChanges}</p> : starfieldDetail.versionHistory.map(operation => <p key={operation.id}><strong>{operation.operationType}</strong> · v{operation.oldVersion} → v{operation.newVersion} · {operation.status}</p>)}</details>

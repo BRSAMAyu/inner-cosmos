@@ -90,5 +90,13 @@ describe("TodoBoard", () => {
   it("renders in English when locale is en-SG", () => {
     render(<TodoBoard {...baseProps()} locale="en-SG" />);
     expect(screen.getByText("Nothing due today. You can rest.")).toBeVisible();
+    expect(screen.getByLabelText("Deadline")).toHaveAttribute("lang", "en-SG");
+  });
+
+  it("keeps the edit deadline picker localized too", () => {
+    render(<TodoBoard {...baseProps()} locale="en-SG" todos={[todo({ taskName: "Revise chapter one" })]} />);
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    const editForm = screen.getByRole("button", { name: "Save changes" }).closest("form")!;
+    expect(within(editForm).getByLabelText("Deadline")).toHaveAttribute("lang", "en-SG");
   });
 });

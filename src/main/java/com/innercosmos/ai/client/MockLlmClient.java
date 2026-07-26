@@ -35,14 +35,25 @@ public class MockLlmClient implements LlmClient {
     private String structuredJson(LlmRequest request, String text) {
         String module = request.moduleName == null ? "" : request.moduleName.toUpperCase();
 
-        // For LETTER_GUARD, extract the actual letter text from requestJson for analysis
+        // StructuredAiService deliberately keeps behavioral instructions in the system role and
+        // puts untrusted data only in requestJson. The deterministic client must mirror that
+        // boundary too: analysing request.prompt would analyse the fixed "Input JSON (data
+        // only...)" wrapper and can leak that internal marker into user-visible demo content.
         String textToAnalyze = text;
         if (module.contains("LETTER_GUARD") && request.requestJson != null) {
             textToAnalyze = extractLetterText(request.requestJson);
-        }
-
-        if (module.contains("AURORA") && request.requestJson != null) {
+        } else if (module.contains("AURORA") && request.requestJson != null) {
             textToAnalyze = extractAuroraUserText(request.requestJson, text);
+        } else if (module.contains("MEMORY_SETTLEMENT") && request.requestJson != null) {
+            textToAnalyze = jsonTextOrFallback(request.requestJson, text, "userMessages", "rawText");
+        } else if (module.contains("THOUGHT_SHREDDER") && request.requestJson != null) {
+            textToAnalyze = jsonTextOrFallback(request.requestJson, text, "rawText");
+        } else if (module.contains("THEME_CLUSTER") && request.requestJson != null) {
+            textToAnalyze = decodeUnicodeEscapes(request.requestJson);
+        } else if ((module.contains("PERSONA_CHAT") || module.contains("CAPSULE_SANDBOX"))
+                && request.requestJson != null) {
+            textToAnalyze = jsonTextOrFallback(
+                    request.requestJson, text, "visitorMessage", "userMessage", "question");
         }
 
         // Analyze input for semantic understanding
@@ -75,19 +86,25 @@ public class MockLlmClient implements LlmClient {
             return buildAuroraChatJson(textToAnalyze, analysis, greeting);
         }
         if (module.contains("THOUGHT_SHREDDER")) {
-            return buildThoughtShredderJson(text, analysis);
+            return buildThoughtShredderJson(textToAnalyze, analysis);
         }
         if (module.contains("MEMORY_SETTLEMENT")) {
-            return buildMemorySettlementJson(text, analysis);
+            return buildMemorySettlementJson(textToAnalyze, analysis);
         }
         if (module.contains("WEEKLY_REVIEW")) {
             return buildWeeklyReviewJson(analysis);
         }
+        if (module.contains("THEME_CLUSTER")) {
+            return buildThemeClusterJson(analysis, extractJsonInteger(request.requestJson, "cardCount"));
+        }
         if (module.contains("PERSONA_CHAT") || module.contains("CAPSULE_SANDBOX")) {
-            return buildPersonaChatJson(text, analysis);
+            return buildPersonaChatJson(textToAnalyze, analysis);
         }
         if (module.contains("LETTER_GUARD")) {
             return buildLetterGuardJson(textToAnalyze, analysis);
+        }
+        if (module.contains("GOODBYE_LINE")) {
+            return "今天先到这里，我会把重要的部分留在你的星空里。";
         }
         return null;
     }
@@ -340,7 +357,7 @@ public class MockLlmClient implements LlmClient {
 
         return String.format("""
                 {
-                  "memoryCard": {"title":"今日沉淀","summary":"%s","memoryType":"%s","emotionTags":["%s"],"keywordTags":["日常"],"peopleTags":[],"intensityScore":%.1f,"userImportance":4.0},
+                  "memoryCard": {"title":"Today's reflection","summary":"%s","memoryType":"%s","emotionTags":["%s"],"keywordTags":["Daily life"],"peopleTags":[],"intensityScore":%.1f,"userImportance":4.0},
                   "emotionTrace": {"emotionName":"%s","emotionScore":%.1f,"weatherType":"%s","triggerScene":"用户完成了一次自我表达."},
                   "fragments": [
                     {"type":"FACT","rawExcerpt":"一次表达","analysis":"从表达中抽取出的事实片段.","reframe":"先区分事实和解释."},
@@ -377,6 +394,37 @@ public class MockLlmClient implements LlmClient {
             escapeJson(dominantTheme),
             emotionTrend
         ).replace("\n", "");
+    }
+
+    private String buildThemeClusterJson(AnalysisResult analysis, int cardCount) {
+        String name;
+        String type;
+        if ("TASK_STRESS".equals(analysis.primaryIntent)) {
+            name = "任务";
+            type = "WORK";
+        } else if ("RELATION_ISSUE".equals(analysis.primaryIntent)) {
+            name = "关系";
+            type = "RELATION";
+        } else if ("COGNITIVE_CLARITY".equals(analysis.primaryIntent)) {
+            name = "思考";
+            type = "GROWTH";
+        } else if (!analysis.detectedThemes.isEmpty() && !"日常分享".equals(analysis.detectedThemes.get(0))) {
+            name = analysis.detectedThemes.get(0);
+            type = "EMOTION";
+        } else {
+            name = "日常";
+            type = "DAILY";
+        }
+
+        List<String> indices = new ArrayList<>();
+        for (int i = 0; i < Math.max(1, cardCount); i++) {
+            indices.add(String.valueOf(i));
+        }
+        String keyword = analysis.extractedKeywords.isEmpty() ? name : analysis.extractedKeywords.get(0);
+        return String.format(
+                "{\"themes\":[{\"name\":\"%s\",\"type\":\"%s\",\"summary\":\"%s相关的记忆正在形成可观察的线索.\",\"keywords\":[\"%s\"],\"cardIndices\":[%s]}]}",
+                escapeJson(name), escapeJson(type), escapeJson(name), escapeJson(keyword),
+                String.join(",", indices));
     }
 
     /**
@@ -519,6 +567,33 @@ public class MockLlmClient implements LlmClient {
             }
         }
         return null;
+    }
+
+    private String jsonTextOrFallback(String requestJson, String fallback, String... keys) {
+        for (String key : keys) {
+            String value = extractJsonString(requestJson, key);
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return fallback == null ? "" : fallback;
+    }
+
+    private int extractJsonInteger(String json, String key) {
+        if (json == null || key == null) return 0;
+        String marker = "\"" + key + "\":";
+        int start = json.indexOf(marker);
+        if (start < 0) return 0;
+        start += marker.length();
+        while (start < json.length() && Character.isWhitespace(json.charAt(start))) start++;
+        int end = start;
+        while (end < json.length() && Character.isDigit(json.charAt(end))) end++;
+        if (end == start) return 0;
+        try {
+            return Integer.parseInt(json.substring(start, end));
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
     }
 
     private String decodeUnicodeEscapes(String value) {

@@ -98,9 +98,14 @@ try {
     # bundle before Docker snapshots src/main/resources/static.
     Push-Location $web
     try {
+        $previousDemoMode = $env:VITE_DEMO_MODE
+        $env:VITE_DEMO_MODE = "true"
         & npm.cmd run build:classroom
         if ($LASTEXITCODE -ne 0) { throw "Public Demo web bundle failed." }
-    } finally { Pop-Location }
+    } finally {
+        $env:VITE_DEMO_MODE = $previousDemoMode
+        Pop-Location
+    }
 
     $keys = Get-Content -LiteralPath $keyFile -Encoding utf8
     $qwenLine = $keys | Where-Object { $_ -match "^\s*qwen\s*:" } | Select-Object -First 1

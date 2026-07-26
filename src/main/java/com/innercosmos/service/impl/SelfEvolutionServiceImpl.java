@@ -196,7 +196,8 @@ public class SelfEvolutionServiceImpl implements SelfEvolutionService {
         rollback.rollbackTargetVersionId = target.id;
         rollback.genomeJson = write(genome);
         rollback.constitutionHash = constitutionHash();
-        rollback.publicNarrative = "Aurora 已按你的选择回到第 " + target.versionNo + " 版自我理解；这次回退也被保留为新版本。";
+        rollback.publicNarrative = "Aurora returned to self-understanding version " + target.versionNo
+            + " by your choice; the rollback remains traceable as a new version.";
         rollback.status = "ACTIVE";
         rollback.activatedAt = LocalDateTime.now();
         versions.insert(rollback);
@@ -207,7 +208,7 @@ public class SelfEvolutionServiceImpl implements SelfEvolutionService {
         if (activeVersion(userId, false) != null) return;
         try {
             createVersion(userId, 1, null, null, null, "ACTIVE",
-                "Aurora 的连续自我从这里开始；后续变化会说明来源、评测与回退路径。");
+                "Aurora's continuous self begins here. Every later change will show its source, evaluation and rollback path.");
         } catch (DuplicateKeyException concurrentInitializer) {
             if (activeVersion(userId, false) == null) throw concurrentInitializer;
         }
@@ -352,17 +353,18 @@ public class SelfEvolutionServiceImpl implements SelfEvolutionService {
     private String narrative(Map<String, Object> genome) {
         Object raw = genome.get("models");
         if (!(raw instanceof List<?> rows) || rows.isEmpty()) {
-            return "Aurora 仍在形成与你相处的连续理解；她不会把随机念头冒充成长。";
+            return "Aurora is still forming a continuous understanding of being with you; she will not mistake a passing thought for growth.";
         }
         String beliefs = rows.stream().limit(3).map(item -> {
             Map<?, ?> row = (Map<?, ?>) item;
             return String.valueOf(row.get("belief"));
-        }).collect(Collectors.joining("；"));
-        return "她最近学会了：" + beliefs;
+        }).collect(Collectors.joining("; "));
+        return "What she has recently learned: " + beliefs;
     }
 
     private static String sandbox(String label, String belief) {
-        return label + "版本在相似时刻会依据这条理解回应：" + (belief == null ? "尚无稳定理解" : belief);
+        return label + " version would respond in a similar moment from this understanding: "
+            + (belief == null ? "No stable understanding yet" : belief);
     }
 
     private List<String> readStrings(String value) {

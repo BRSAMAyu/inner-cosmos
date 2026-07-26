@@ -53,9 +53,9 @@ class CuratedDemoCapsuleJourneyTest {
         JsonNode capsules = objectMapper.readTree(plazaResult.getResponse().getContentAsString()).path("data");
 
         for (String pseudonym : new String[]{
-                "林澈的回声分身",
-                "沿河缓慢生活的人",
-                "把自己放回照护里的人"
+                "Lin Che's Echo",
+                "The One Who Walks by the River",
+                "The One Learning to Include Herself in Care"
         }) {
             JsonNode selected = null;
             for (JsonNode capsule : capsules) {
@@ -84,9 +84,9 @@ class CuratedDemoCapsuleJourneyTest {
 
     @Test
     void everyCuratedPersonaStartsWithAnArrivedStorySpecificSlowLetter() throws Exception {
-        assertInboxContains("demo", "把很大的愿景拆成今天的一小格");
-        assertInboxContains("river", "你没有急着选一座城市，让我松了一口气");
-        assertInboxContains("cloud", "你说照护不该靠耗尽证明");
+        assertInboxContains("demo", "Turning a large vision into one small square of today");
+        assertInboxContains("river", "You didn't rush to choose one city, and I felt myself exhale");
+        assertInboxContains("cloud", "You said care should not have to prove itself through exhaustion");
     }
 
     private void assertInboxContains(String username, String title) throws Exception {

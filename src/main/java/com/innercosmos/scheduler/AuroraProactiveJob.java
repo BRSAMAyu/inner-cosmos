@@ -44,7 +44,9 @@ public class AuroraProactiveJob {
     @Autowired
     private PrivateTimerMapper timerMapper;
 
-    @Scheduled(fixedDelay = 90 * 1000) // every 90 seconds
+    // The first tick waits for the normal interval so non-Flyway dev schema initializers can
+    // finish upgrading an existing H2 file before this job selects newly added profile columns.
+    @Scheduled(fixedDelay = 90 * 1000, initialDelay = 90 * 1000) // every 90 seconds
     @SchedulerLock(name = "aurora-proactive", lockAtMostFor = "PT10M", lockAtLeastFor = "PT85S")
     public void run() {
         // 1) Iterate active users and tick each

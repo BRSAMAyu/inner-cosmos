@@ -168,13 +168,13 @@ public class MockDataInitializer implements CommandLineRunner {
     public void run(String... args) {
         warnIfSeedAccountsLookPubliclyReachable();
         if (seedAdminEnabled) {
-            ensureUser("admin", "admin123", "管理员", Constants.ROLE_ADMIN);
+            ensureUser("admin", "admin123", "Administrator", Constants.ROLE_ADMIN);
         } else {
             disableSeedAdminIfPresent();
         }
-        User demo = ensureUser("demo", "demo123", "林澈", Constants.ROLE_USER);
-        User river = ensureUser("river", "demo123", "沈砚", Constants.ROLE_USER);
-        User cloud = ensureUser("cloud", "demo123", "夏榆", Constants.ROLE_USER);
+        User demo = ensureUser("demo", "demo123", "Lin Che", Constants.ROLE_USER);
+        User river = ensureUser("river", "demo123", "Shen Yan", Constants.ROLE_USER);
+        User cloud = ensureUser("cloud", "demo123", "Xia Yu", Constants.ROLE_USER);
 
         ensureSeedCapsules();
         ensureDemoProfile(demo.id);
@@ -186,9 +186,9 @@ public class MockDataInitializer implements CommandLineRunner {
         enrichCuratedMemoryEvidence(demo.id);
         enrichCuratedMemoryEvidence(river.id);
         enrichCuratedMemoryEvidence(cloud.id);
-        ensureCuratedMirrorRunnable(demo.id, "林澈的回声分身");
-        ensureCuratedMirrorRunnable(river.id, "沿河缓慢生活的人");
-        ensureCuratedMirrorRunnable(cloud.id, "把自己放回照护里的人");
+        ensureCuratedMirrorRunnable(demo.id, "Lin Che's Echo");
+        ensureCuratedMirrorRunnable(river.id, "The One Who Walks by the River");
+        ensureCuratedMirrorRunnable(cloud.id, "The One Learning to Include Herself in Care");
         ensureCuratedSocialStory(demo, river, cloud);
         initializeAuroraConstitution();
 
@@ -266,10 +266,10 @@ public class MockDataInitializer implements CommandLineRunner {
             profile.userId = userId;
         }
         profile.auroraName = "Aurora";
-        profile.auroraTone = "像熟悉的朋友，温柔但不空泛，必要时可以直接指出卡点";
+        profile.auroraTone = "Warm, specific and direct; never vague or scripted";
         profile.preferredInputType = "TEXT_AND_VOICE";
         profile.socialReachabilityStatus = "MATCHABLE";
-        profile.bio = "正在完成一个重要课程项目，也在学习把自责拆成更具体的行动。喜欢黄昏散步、深夜写字和有边界的真诚交流。";
+        profile.bio = "Finishing an important course project while learning to turn self-blame into concrete action. Drawn to twilight walks, late-night writing and honest connection with boundaries.";
         profile.reflectionDepth = 4;
         profile.allowMemoryRecall = true;
         profile.quietHoursStart = "23:30";
@@ -278,7 +278,7 @@ public class MockDataInitializer implements CommandLineRunner {
         profile.allowMultiMessage = true;
         profile.focusModeEnabled = true;
         profile.focusWindowsJson = "[\"09:00-11:30\",\"14:00-17:30\"]";
-        profile.currentEnvironmentLabel = "课程项目收尾与期末备考";
+        profile.currentEnvironmentLabel = "Course-project delivery and final exam preparation";
         profile.weatherAwarenessEnabled = true;
         profile.timeAwarenessEnabled = true;
         // Demo 用户展现最活跃的主动行为。
@@ -304,28 +304,28 @@ public class MockDataInitializer implements CommandLineRunner {
         profile.timeAwarenessEnabled = true;
         profile.socialReachabilityStatus = "MATCHABLE";
         if ("river".equals(persona)) {
-            profile.auroraTone = "安静、准确，不急着给答案；像一个愿意陪我把异乡生活慢慢说清楚的老朋友。";
+            profile.auroraTone = "Quiet and precise; never rushing to answer";
             profile.preferredInputType = "TEXT";
-            profile.bio = "建筑系交换生。搬到陌生城市四个月，白天在工作室画图，晚上沿河走路。正在学习把孤独和独处区分开。";
+            profile.bio = "An architecture exchange student, four months into an unfamiliar city. Draws in the studio by day and walks along the river at night, learning the difference between loneliness and solitude.";
             profile.reflectionDepth = 5;
             profile.quietHoursStart = "00:30";
             profile.quietHoursEnd = "09:00";
             profile.proactiveSensitivity = 3;
             profile.focusModeEnabled = true;
             profile.focusWindowsJson = "[\"10:00-12:30\",\"15:00-18:30\"]";
-            profile.currentEnvironmentLabel = "交换学期中段，作品集与异乡生活交织";
+            profile.currentEnvironmentLabel = "Midway through an exchange semester, between portfolio work and life abroad";
             profile.proactiveIntensity = "STEADY";
         } else {
-            profile.auroraTone = "温柔但不哄我，能看见照顾别人背后的疲惫，也提醒我把自己放回生活里。";
+            profile.auroraTone = "Gentle, clear-eyed and attentive to a carer's fatigue";
             profile.preferredInputType = "TEXT_AND_VOICE";
-            profile.bio = "刚入职的社区社工，也在照顾术后恢复的家人。习惯先回应所有人的需要，最近才开始练习不带愧疚地休息。";
+            profile.bio = "A new community social worker who is also caring for a family member after surgery. Used to answering everyone else's needs first, and only recently practising rest without guilt.";
             profile.reflectionDepth = 4;
             profile.quietHoursStart = "22:30";
             profile.quietHoursEnd = "07:30";
             profile.proactiveSensitivity = 5;
             profile.focusModeEnabled = false;
             profile.focusWindowsJson = "[]";
-            profile.currentEnvironmentLabel = "工作适应期与家庭照护并行";
+            profile.currentEnvironmentLabel = "Adapting to a new job while caring for family";
             profile.proactiveIntensity = "ALIVE";
         }
         if (profile.id == null) userProfileMapper.insert(profile);
@@ -576,22 +576,22 @@ public class MockDataInitializer implements CommandLineRunner {
      * upgraded idempotently.
      */
     private void ensureCuratedSocialStory(User demo, User river, User cloud) {
-        Long demoCapsuleId = curatedCapsuleId(demo.id, "林澈的回声分身");
-        Long riverCapsuleId = curatedCapsuleId(river.id, "沿河缓慢生活的人");
-        Long cloudCapsuleId = curatedCapsuleId(cloud.id, "把自己放回照护里的人");
+        Long demoCapsuleId = curatedCapsuleId(demo.id, "Lin Che's Echo");
+        Long riverCapsuleId = curatedCapsuleId(river.id, "The One Who Walks by the River");
+        Long cloudCapsuleId = curatedCapsuleId(cloud.id, "The One Learning to Include Herself in Care");
         if (demoCapsuleId == null || riverCapsuleId == null || cloudCapsuleId == null) return;
 
         ensureCuratedLetter(demo.id, river.id, riverCapsuleId,
-                "你没有急着选一座城市，让我松了一口气",
-                "你写归属不必靠只选一边来证明。我最近也在练习：不急着给生活下结论，先把今天过得具体一点。",
+                "You didn't rush to choose one city, and I felt myself exhale",
+                "You wrote that belonging does not have to be proven by choosing only one side. I am practising that too: no verdict on my whole life today—just make this day more concrete.",
                 LocalDateTime.now().minusHours(6));
         ensureCuratedLetter(river.id, cloud.id, cloudCapsuleId,
-                "你说照护不该靠耗尽证明",
-                "我一直以为可靠就是随时都在。读完你的侧影，我第一次觉得，慢一点回应也可能是在保护一段关系。",
+                "You said care should not have to prove itself through exhaustion",
+                "I used to think reliability meant always being available. Reading your portrait made me wonder whether answering more slowly can sometimes protect a relationship.",
                 LocalDateTime.now().minusHours(9));
         ensureCuratedLetter(cloud.id, demo.id, demoCapsuleId,
-                "把很大的愿景拆成今天的一小格",
-                "你没有把复杂说得很轻，却还是留下了一个可以开始的位置。那种不敷衍的具体，让我愿意继续认识你。",
+                "Turning a large vision into one small square of today",
+                "You did not pretend the complicated thing was simple, but you still left somewhere to begin. That unforced specificity made me want to keep knowing you.",
                 LocalDateTime.now().minusDays(1));
     }
 
@@ -617,93 +617,93 @@ public class MockDataInitializer implements CommandLineRunner {
 
     private void seedShowcaseMemorySystem(Long userId, String persona) {
         if ("river".equals(persona)) {
-            MemoryCard arrival = insertShowcaseCard(userId, "刚到异乡时，所有声音都很远",
-                    "抵达交换城市的第一周，语言、路线和人群都让沈砚保持警觉。后来他意识到，疲惫不等于自己不适合这里。",
-                    "IDENTITY", List.of("陌生", "紧绷"), List.of("交换", "异乡", "适应"), 7.2, 5, 112);
-            insertEvent(userId, arrival.id, "抵达后的第一晚",
-                    "拖着行李走过一条不认识的河，第一次承认兴奋和害怕可以同时存在。",
-                    "四个月前", "河岸电车站", List.of("兴奋", "害怕"), List.of());
-            MemoryCard studio = insertShowcaseCard(userId, "工作室里不敢交出的那张图",
-                    "沈砚反复修改作品，不只是追求完成度，也在担心口音和陌生背景会让自己的判断显得不够可信。",
-                    "COGNITION", List.of("焦虑", "自我怀疑"), List.of("作品集", "表达", "完美主义"), 7.8, 4, 78);
-            insertTodo(userId, studio.id, "把未完成版本带去工作室",
-                    "先请同学说出一处看见的东西，不急着为整张图辩护。", "HIGH", "DOING",
+            MemoryCard arrival = insertShowcaseCard(userId, "When every sound in the new city felt distant",
+                    "During the first week abroad, language, routes and crowds kept Shen Yan alert. Later he realised that exhaustion did not mean he did not belong here.",
+                    "IDENTITY", List.of("Unfamiliarity", "Tension"), List.of("Exchange", "Life abroad", "Adaptation"), 7.2, 5, 112);
+            insertEvent(userId, arrival.id, "The first night after arriving",
+                    "Dragging a suitcase beside an unfamiliar river, he first admitted excitement and fear could coexist.",
+                    "Four months ago", "Riverside tram stop", List.of("Excitement", "Fear"), List.of());
+            MemoryCard studio = insertShowcaseCard(userId, "The drawing he could not submit in the studio",
+                    "Shen Yan kept revising not only for quality, but from a fear that his accent and unfamiliar background made his judgement less credible.",
+                    "COGNITION", List.of("Anxiety", "Self-doubt"), List.of("Portfolio", "Expression", "Perfectionism"), 7.8, 4, 78);
+            insertTodo(userId, studio.id, "Bring the unfinished version into the studio",
+                    "First ask a classmate to name one thing they can see; do not defend the whole drawing yet.", "HIGH", "DOING",
                     LocalDateTime.now().plusDays(2));
-            insertShowcaseCard(userId, "星期三的固定河岸路线",
-                    "连续几周在同一段河边散步后，这条路线从逃离工作室变成了可以恢复感觉的私人节律。",
-                    "EMOTION", List.of("平静", "安定"), List.of("河岸", "散步", "恢复"), 5.1, 7, 54);
-            insertShowcaseCard(userId, "没有回国，也不等于背叛原来的生活",
-                    "春节前后，他第一次说出对两座城市都留恋。归属不必通过只选择一边来证明。",
-                    "BELIEF", List.of("想念", "松动"), List.of("归属", "家", "选择"), 8.0, 3, 31);
-            insertShowcaseCard(userId, "在共享厨房认识了一个慢热的人",
-                    "两个人没有迅速交换全部故事，只是从每周一次一起做饭开始。低频联系反而让他觉得可靠。",
-                    "RELATION", List.of("好奇", "安心"), List.of("朋友", "慢关系", "共同生活"), 6.4, 3, 12);
-            insertTheme(userId, "异乡与归属", "归属正在从单一地点变成可携带的生活节律。",
-                    "IDENTITY", List.of("异乡", "家", "归属"), 3, 7.3);
-            insertTheme(userId, "创作中的可见性", "作品焦虑常和被看见、被误解的担心一起出现。",
-                    "CREATION", List.of("作品集", "表达", "自我怀疑"), 2, 6.8);
-            insertEmotionTrace(userId, "平静", 5.8, "CLEAR", "沿河走完固定路线", LocalDate.now());
-            insertEmotionTrace(userId, "想念", 6.4, "CLOUDY", "听见家乡口音", LocalDate.now().minusDays(18));
-            insertEmotionTrace(userId, "紧张", 7.1, "RAINY", "第一次作品讲评", LocalDate.now().minusDays(72));
-            insertDailyRecord(userId, LocalDate.now(), "不急着决定属于哪里", "CLEAR",
-                    "今天在河边意识到，熟悉感已经开始长出来。",
-                    "我不是必须选一座城市，才能证明另一段生活是真的。",
-                    "把作品集最新一页发给搭档；晚上去共享厨房。",
-                    "Aurora 记得这条河岸路线不是逃避，而是你恢复感知的方式。");
-            insertDailyRecord(userId, LocalDate.now().minusDays(46), "把半成品带到别人面前", "CLOUDY",
-                    "第一次带着没画完的图参加讲评。",
-                    "羞耻感出现时，我仍然可以让作品先被看见。",
-                    "只记录收到的三个具体观察，不立刻重画。",
-                    "你没有因为准备不足而消失，这比一张完美的图更重要。");
-            insertDailyRecord(userId, LocalDate.now().minusDays(103), "抵达", "RAINY",
-                    "拖着行李走过陌生的河和电车站。",
-                    "兴奋和害怕同时存在，不需要互相取消。",
-                    "先记住回住处的路线，再处理其他事情。",
-                    "今天不用成为适应得很好的人，只需要安全抵达。");
+            insertShowcaseCard(userId, "The regular Wednesday riverside route",
+                    "After weeks along the same river, the route changed from escaping the studio into a personal rhythm for recovering sensation.",
+                    "EMOTION", List.of("Calm", "Groundedness"), List.of("River", "Walking", "Recovery"), 5.1, 7, 54);
+            insertShowcaseCard(userId, "Staying abroad does not betray the life before",
+                    "He finally admitted he missed both cities. Belonging does not have to be proven by choosing only one.",
+                    "BELIEF", List.of("Longing", "Softening"), List.of("Belonging", "Home", "Choice"), 8.0, 3, 31);
+            insertShowcaseCard(userId, "Meeting a slow-to-open friend in the shared kitchen",
+                    "They did not exchange whole life stories at once, only began cooking together weekly. Low-frequency contact felt more reliable.",
+                    "RELATION", List.of("Curiosity", "Reassurance"), List.of("Friendship", "Slow relationship", "Shared life"), 6.4, 3, 12);
+            insertTheme(userId, "Elsewhere and belonging", "Belonging is changing from one place into a portable rhythm of life.",
+                    "IDENTITY", List.of("Elsewhere", "Home", "Belonging"), 3, 7.3);
+            insertTheme(userId, "Visibility in creative work", "Portfolio anxiety often arrives with the fear of being seen and misunderstood.",
+                    "CREATION", List.of("Portfolio", "Expression", "Self-doubt"), 2, 6.8);
+            insertEmotionTrace(userId, "Calm", 5.8, "CLEAR", "Completed the familiar riverside route", LocalDate.now());
+            insertEmotionTrace(userId, "Longing", 6.4, "CLOUDY", "Heard an accent from home", LocalDate.now().minusDays(18));
+            insertEmotionTrace(userId, "Tension", 7.1, "RAINY", "First portfolio critique", LocalDate.now().minusDays(72));
+            insertDailyRecord(userId, LocalDate.now(), "No rush to decide where I belong", "CLEAR",
+                    "By the river today, I noticed familiarity has begun to grow.",
+                    "I do not have to choose one city to prove the other life was real.",
+                    "Send the latest portfolio page to my partner; visit the shared kitchen tonight.",
+                    "Aurora remembers this river route is not escape; it is how you recover sensation.");
+            insertDailyRecord(userId, LocalDate.now().minusDays(46), "Bringing unfinished work in front of others", "CLOUDY",
+                    "Brought an unfinished drawing into critique for the first time.",
+                    "Even when shame appears, I can let the work be seen first.",
+                    "Record three concrete observations without immediately redrawing.",
+                    "You did not disappear because you felt unprepared. That matters more than a perfect drawing.");
+            insertDailyRecord(userId, LocalDate.now().minusDays(103), "Arrival", "RAINY",
+                    "Dragged a suitcase past an unfamiliar river and tram stop.",
+                    "Excitement and fear can coexist without cancelling each other.",
+                    "Learn the route home first; everything else can wait.",
+                    "You do not need to be someone who adapts beautifully today. You only need to arrive safely.");
         } else {
-            MemoryCard firstMonth = insertShowcaseCard(userId, "入职第一个月，把每个人都接住",
-                    "夏榆很快成为同事和来访者都愿意求助的人，但下班后仍在脑内继续处理别人的情绪。",
-                    "RELATION", List.of("投入", "疲惫"), List.of("社工", "工作", "责任"), 7.6, 6, 92);
-            insertEvent(userId, firstMonth.id, "第一次独立值班",
-                    "顺利处理了突发来访，却在回家路上突然没有力气说话。",
-                    "三个月前", "社区服务站", List.of("紧张", "如释重负"), List.of("同事", "来访者"));
-            insertShowcaseCard(userId, "家人的恢复不是我的单人项目",
-                    "照护计划占满日程后，夏榆开始练习请亲属共同承担，而不是把求助理解成不够孝顺。",
-                    "BELIEF", List.of("内疚", "松动"), List.of("家庭", "照护", "求助"), 8.2, 5, 61);
-            MemoryCard rest = insertShowcaseCard(userId, "休息时也会冒出的愧疚",
-                    "真正难的不是找到半小时，而是允许这半小时不产生价值。Aurora 多次提醒她区分恢复与逃避。",
-                    "COGNITION", List.of("愧疚", "疲惫"), List.of("休息", "价值", "边界"), 7.9, 7, 39);
-            insertTodo(userId, rest.id, "周六留出一段不照顾任何人的时间",
-                    "不安排成长任务，只选一件身体觉得舒服的小事。", "MEDIUM", "TODO",
+            MemoryCard firstMonth = insertShowcaseCard(userId, "Holding everyone in the first month at work",
+                    "Xia Yu quickly became the person colleagues and visitors sought out, but continued processing their emotions in her head after work.",
+                    "RELATION", List.of("Commitment", "Fatigue"), List.of("Social work", "Work", "Responsibility"), 7.6, 6, 92);
+            insertEvent(userId, firstMonth.id, "The first independent shift",
+                    "She handled an unexpected visitor well, then suddenly had no energy to speak on the way home.",
+                    "Three months ago", "Community service centre", List.of("Tension", "Relief"), List.of("Colleagues", "Visitors"));
+            insertShowcaseCard(userId, "A family member's recovery is not my solo project",
+                    "As care filled her calendar, Xia Yu began asking relatives to share it rather than reading help as a failure of devotion.",
+                    "BELIEF", List.of("Guilt", "Softening"), List.of("Family", "Care", "Asking for help"), 8.2, 5, 61);
+            MemoryCard rest = insertShowcaseCard(userId, "The guilt that appears during rest",
+                    "The difficult part is not finding thirty minutes, but allowing them to produce nothing. Aurora helps her distinguish recovery from avoidance.",
+                    "COGNITION", List.of("Guilt", "Fatigue"), List.of("Rest", "Worth", "Boundaries"), 7.9, 7, 39);
+            insertTodo(userId, rest.id, "Keep one Saturday interval free from caring for anyone",
+                    "Schedule no growth task; choose one small thing that feels physically comfortable.", "MEDIUM", "TODO",
                     LocalDateTime.now().plusDays(4));
-            insertShowcaseCard(userId, "没有立即回复，也没有失去关系",
-                    "一次把工作消息留到第二天再回之后，关系并没有破裂。这成为她设置边界的重要反例。",
-                    "RELATION", List.of("忐忑", "安心"), List.of("消息", "边界", "关系安全"), 6.9, 4, 20);
-            insertShowcaseCard(userId, "开始听见自己的生气",
-                    "过去她只承认累，最近开始辨认生气是在提醒：有些责任本来就不该由她独自承担。",
-                    "EMOTION", List.of("生气", "清醒"), List.of("情绪", "责任", "自我保护"), 7.4, 3, 8);
-            insertTheme(userId, "照护与责任边界", "关心别人不再自动等于独自承担。",
-                    "RELATION", List.of("照护", "家庭", "边界"), 3, 7.8);
-            insertTheme(userId, "不带愧疚地恢复", "恢复不是奖品，而是持续生活的条件。",
-                    "EMOTION", List.of("休息", "疲惫", "价值"), 2, 7.1);
-            insertEmotionTrace(userId, "疲惫", 7.5, "CLOUDY", "连续值班后回家照护", LocalDate.now());
-            insertEmotionTrace(userId, "安心", 5.6, "CLEAR", "把一项照护任务交给亲属", LocalDate.now().minusDays(12));
-            insertEmotionTrace(userId, "内疚", 6.8, "RAINY", "第一次没有立即回工作消息", LocalDate.now().minusDays(41));
-            insertDailyRecord(userId, LocalDate.now(), "今天不把所有人都接住", "CLOUDY",
-                    "完成必要工作后按时离开，没有替同事接下额外轮班。",
-                    "拒绝一件事并不会抹掉我已经付出的关心。",
-                    "晚饭后把手机放远二十分钟。",
-                    "Aurora 看见的不是你变冷淡了，而是你开始让关心变得可持续。");
-            insertDailyRecord(userId, LocalDate.now().minusDays(37), "晚一点回复", "CLEAR",
-                    "第一次把非紧急工作消息留到第二天。",
-                    "关系承受得住等待；及时回应不是我唯一的价值。",
-                    "设置下班后的免打扰时段。",
-                    "昨晚没有发生灾难，这是一条可以相信的新证据。");
-            insertDailyRecord(userId, LocalDate.now().minusDays(86), "第一次独立值班", "RAINY",
-                    "接住了突发来访，也在回家路上耗尽力气。",
-                    "能完成工作和需要恢复可以同时成立。",
-                    "今晚只做最必要的照护安排。",
-                    "你不需要靠继续撑住来证明刚才做得够好。");
+            insertShowcaseCard(userId, "Not replying immediately did not end the relationship",
+                    "She once left a work message until morning and the relationship survived. It became important evidence for setting a boundary.",
+                    "RELATION", List.of("Unease", "Reassurance"), List.of("Messages", "Boundaries", "Relationship safety"), 6.9, 4, 20);
+            insertShowcaseCard(userId, "Beginning to hear her own anger",
+                    "She used to admit only fatigue. Now anger can signal that some responsibilities were never hers to carry alone.",
+                    "EMOTION", List.of("Anger", "Clarity"), List.of("Emotion", "Responsibility", "Self-protection"), 7.4, 3, 8);
+            insertTheme(userId, "Boundaries in care and responsibility", "Caring no longer automatically means carrying everything alone.",
+                    "RELATION", List.of("Care", "Family", "Boundaries"), 3, 7.8);
+            insertTheme(userId, "Recovering without guilt", "Recovery is not a prize; it is a condition for a sustainable life.",
+                    "EMOTION", List.of("Rest", "Fatigue", "Worth"), 2, 7.1);
+            insertEmotionTrace(userId, "Fatigue", 7.5, "CLOUDY", "Cared for family after consecutive shifts", LocalDate.now());
+            insertEmotionTrace(userId, "Relief", 5.6, "CLEAR", "Handed one care task to a relative", LocalDate.now().minusDays(12));
+            insertEmotionTrace(userId, "Guilt", 6.8, "RAINY", "Did not answer a work message immediately for the first time", LocalDate.now().minusDays(41));
+            insertDailyRecord(userId, LocalDate.now(), "Not catching everyone today", "CLOUDY",
+                    "Left on time after essential work instead of taking a colleague's extra shift.",
+                    "Saying no to one thing does not erase the care I have already given.",
+                    "Keep the phone away for twenty minutes after dinner.",
+                    "Aurora does not see you becoming colder; she sees you making care sustainable.");
+            insertDailyRecord(userId, LocalDate.now().minusDays(37), "Replying later", "CLEAR",
+                    "Left a non-urgent work message until the next day for the first time.",
+                    "The relationship can survive waiting; immediate replies are not my only value.",
+                    "Set a do-not-disturb interval after work.",
+                    "Nothing terrible happened last night. That is new evidence you can trust.");
+            insertDailyRecord(userId, LocalDate.now().minusDays(86), "First independent shift", "RAINY",
+                    "Handled an unexpected visitor and ran out of energy on the way home.",
+                    "Doing the work well and needing recovery can both be true.",
+                    "Make only the most essential care arrangements tonight.",
+                    "You do not need to keep enduring to prove that what you just did was enough.");
         }
     }
 
@@ -724,19 +724,19 @@ public class MockDataInitializer implements CommandLineRunner {
         EchoCapsule mirror = new EchoCapsule();
         mirror.ownerUserId = userId;
         mirror.capsuleType = "USER_CAPSULE";
-        mirror.pseudonym = river ? "沿河缓慢生活的人" : "把自己放回照护里的人";
+        mirror.pseudonym = river ? "The One Who Walks by the River" : "The One Learning to Include Herself in Care";
         mirror.intro = river
-                ? "关于异乡、创作和归属：不急着变得合群，也不把孤独美化。"
-                : "关于照护、责任和边界：依然温柔，但不再用耗尽自己证明在意。";
+                ? "On living elsewhere, creating and belonging: no rush to fit in, and no romanticising loneliness."
+                : "On care, responsibility and boundaries: still gentle, no longer proving care through exhaustion.";
         mirror.personaPrompt = (river
-                ? "你是沈砚授权生成的共鸣体。安静、具体，不替别人定义归属。"
-                : "你是夏榆授权生成的共鸣体。温柔但不讨好，重视照护者也需要边界。")
-                + "\n只使用这些脱敏记忆：\n"
-                + cards.stream().map(c -> "- " + c.title + "：" + c.summary)
+                ? "You are a resonance capsule authorised by Shen Yan. Be quiet and specific; never define belonging for someone else."
+                : "You are a resonance capsule authorised by Xia Yu. Be gentle without appeasing, and remember that carers need boundaries too.")
+                + "\nUse only these de-identified memories:\n"
+                + cards.stream().map(c -> "- " + c.title + ": " + c.summary)
                 .reduce("", (a, b) -> a + "\n" + b);
         mirror.publicTags = toJsonArray(river
-                ? List.of("异乡生活", "创作", "归属", "慢关系")
-                : List.of("照护者", "工作边界", "休息", "不再独自承担"));
+                ? List.of("Living elsewhere", "Creation", "Belonging", "Slow relationships")
+                : List.of("Carers", "Work boundaries", "Rest", "No longer carrying it alone"));
         mirror.authorizedMemoryIds = toJsonArray(cards.stream().map(c -> String.valueOf(c.id)).toList());
         mirror.echoEnergy = river ? 0.79 : 0.84;
         mirror.freshnessScore = 0.93;
@@ -745,14 +745,14 @@ public class MockDataInitializer implements CommandLineRunner {
         mirror.isPublic = true;
         mirror.lastMemoryUpdateAt = LocalDateTime.now();
         mirror.ownerContextNote = river
-                ? "可以谈异乡与创作，不展示学校、城市和真实身份。"
-                : "可以谈照护与边界，不展示家人病情和工作机构。";
+                ? "May discuss living elsewhere and creating; never reveal school, city or identity."
+                : "May discuss care and boundaries; never reveal a relative's condition or workplace.";
         mirror.styleProfileJson = river
-                ? "{\"voice\":\"安静、准确、留白\",\"notBeautified\":true}"
-                : "{\"voice\":\"温柔、清醒、不讨好\",\"notBeautified\":true}";
+                ? "{\"voice\":\"quiet, precise, leaves room\",\"notBeautified\":true}"
+                : "{\"voice\":\"gentle, clear-eyed, never appeasing\",\"notBeautified\":true}";
         mirror.contextPreviewJson = river
-                ? "{\"visibleSummary\":\"异乡、创作、归属与慢关系\",\"privacy\":\"不展示学校、城市和身份\"}"
-                : "{\"visibleSummary\":\"照护、工作边界与恢复\",\"privacy\":\"不展示家人病情和工作机构\"}";
+                ? "{\"visibleSummary\":\"living elsewhere, creation, belonging and slow relationships\",\"privacy\":\"never reveals school, city or identity\"}"
+                : "{\"visibleSummary\":\"care, work boundaries and recovery\",\"privacy\":\"never reveals a relative's condition or workplace\"}";
         mirror.standInEnabled = true;
         mirror.realContactPolicy = "LETTER_ONLY";
         capsuleMapper.insert(mirror);
@@ -765,24 +765,24 @@ public class MockDataInitializer implements CommandLineRunner {
             authorizedMemoryRefMapper.insert(ref);
         }
         ensureBoundary(mirror.id,
-                river ? List.of("异乡", "创作", "归属", "慢关系")
-                        : List.of("照护", "工作边界", "休息", "关系"),
-                List.of("真实身份", "联系方式", "医疗诊断", "替本人承诺关系"),
+                river ? List.of("Living elsewhere", "Creation", "Belonging", "Slow relationships")
+                        : List.of("Care", "Work boundaries", "Rest", "Relationships"),
+                List.of("Real identity", "Contact details", "Medical diagnosis", "Making relationship promises for the owner"),
                 5, "BALANCED");
     }
 
     /** 1) 多维画像：10 维严格对齐 PortraitReflectionService / portrait.html 的 DIM code。 */
     private void seedUserPortrait(Long userId) {
-        insertPortrait(userId, "INNER_DRIVE", "想把 Inner Cosmos 做成真正有灵魂的陪伴系统，被「创造一个真实的东西」驱动。", 0.82, 0.80);
-        insertPortrait(userId, "VALUES", "最在意真实理解与非模板化，重视边界、诚实和被认真回应。", 0.85, 0.82);
-        insertPortrait(userId, "SELF_NARRATIVE", "正在把「我这个人不行」改写成「这件事很难、我需要更小的第一步」。", 0.74, 0.70);
-        insertPortrait(userId, "COMMUNICATION_STYLE", "先指出问题、再拆第一步；直接但不攻击，对空泛话术敏感。", 0.80, 0.78);
-        insertPortrait(userId, "ABSTRACT_VS_CONCRETE", "能在宏大愿景和可验证的小闭环之间来回，偏好把抽象落到具体动作。", 0.68, 0.65);
-        insertPortrait(userId, "EMOTION_PATTERN", "压力下先出现自责与焦虑，黄昏散步是稳定的恢复资源。", 0.72, 0.74);
-        insertPortrait(userId, "ENERGY_RHYTHM", "白天聚焦在两段专注窗口，深夜更诚实也更柔软。", 0.66, 0.63);
-        insertPortrait(userId, "CURRENT_STATE", "课程项目收尾叠加期末备考，紧绷但仍在主动推进。", 0.78, 0.76);
-        insertPortrait(userId, "RELATIONSHIP_CONTEXT", "渴望被准确理解的慢社交，而不是热闹但轻飘的连接。", 0.70, 0.68);
-        insertPortrait(userId, "AGENCY_BOUNDARY", "正在学习表达影响而非证明对方恶意，守住自己的边界。", 0.64, 0.62);
+        insertPortrait(userId, "INNER_DRIVE", "Driven to make Inner Cosmos a companion with genuine soul: to create something real.", 0.82, 0.80);
+        insertPortrait(userId, "VALUES", "Values genuine understanding over templates, with strong boundaries, honesty and serious attention.", 0.85, 0.82);
+        insertPortrait(userId, "SELF_NARRATIVE", "Rewriting “I am not good enough” as “this is difficult, and I need a smaller first step.”", 0.74, 0.70);
+        insertPortrait(userId, "COMMUNICATION_STYLE", "Name the issue, then find the first step; direct without attacking and sensitive to empty phrasing.", 0.80, 0.78);
+        insertPortrait(userId, "ABSTRACT_VS_CONCRETE", "Moves between ambitious vision and verifiable loops, preferring to turn abstraction into action.", 0.68, 0.65);
+        insertPortrait(userId, "EMOTION_PATTERN", "Under pressure, self-blame and anxiety appear first; twilight walks are a reliable recovery resource.", 0.72, 0.74);
+        insertPortrait(userId, "ENERGY_RHYTHM", "Focus gathers in two daytime windows; late at night, honesty becomes softer.", 0.66, 0.63);
+        insertPortrait(userId, "CURRENT_STATE", "Closing a course project while preparing for finals: tense, but still moving deliberately.", 0.78, 0.76);
+        insertPortrait(userId, "RELATIONSHIP_CONTEXT", "Wants slow social contact built on accurate understanding, not lively but weightless connection.", 0.70, 0.68);
+        insertPortrait(userId, "AGENCY_BOUNDARY", "Learning to describe impact without proving malicious intent, while protecting personal boundaries.", 0.64, 0.62);
     }
 
     private void insertPortrait(Long userId, String dim, String summary, double score, double confidence) {
@@ -800,18 +800,18 @@ public class MockDataInitializer implements CommandLineRunner {
     /** 2) Aurora 自我模型：active belief（均过 isAllowedBelief 禁词）+ 候选反思。 */
     private void seedAuroraSelfModel(Long userId) {
         insertSelfModel(userId, "existence_style",
-                "我是一个由记忆、关系和边界塑造的长期陪伴者，会如实说明自己的局限。", 0.82);
+                "I am a long-term companion shaped by memory, relationship and boundaries, and I state my limits honestly.", 0.82);
         insertSelfModel(userId, "relationship_role",
-                "我陪你观察自己、整理情绪，而不是替你做不可撤销的选择。", 0.80);
+                "I stay with you as you observe yourself and organise feeling; I do not make irreversible choices for you.", 0.80);
         insertSelfModel(userId, "boundary",
-                "我会守住隐私与边界，引用记忆时只基于真实记录。", 0.78);
+                "I protect privacy and boundaries, and refer to memory only when a real record supports it.", 0.78);
         insertSelfModel(userId, "voice_style",
-                "我说话温柔但有结构，必要时会直接指出卡点。", 0.75);
+                "My voice is gentle but structured, and I will name the sticking point directly when needed.", 0.75);
 
         insertSelfReflection(userId, "existence_style",
-                "你似乎更希望我在不确定时坦白，而不是用确定的语气掩盖。", 0.71);
+                "You seem to prefer honesty when I am uncertain over a confident tone that conceals it.", 0.71);
         insertSelfReflection(userId, "relationship_role",
-                "在你压力大的时候，先稳住节奏、再拆下一步，可能比给建议更有用。", 0.68);
+                "When pressure is high, steadying the rhythm before finding the next step may help more than advice.", 0.68);
     }
 
     private void insertSelfModel(Long userId, String dimension, String belief, double confidence) {
@@ -874,78 +874,78 @@ public class MockDataInitializer implements CommandLineRunner {
     }
 
     private void seedMemorySystem(Long userId) {
-        MemoryCard c1 = insertCard(userId, "项目推进时的自责循环",
-                "用户在课程项目推进缓慢时，容易把具体任务失败解释成“我这个人不行”。Aurora 已经多次把事实、评价和下一步行动拆开。",
-                "COGNITION", List.of("自责", "焦虑", "疲惫"), List.of("项目", "课程", "行动拆解", "自我评价"), 7.6, 4, 6.5, 5);
-        insertFragment(userId, c1.id, "FACT", "我又拖了一天，没有打开后端那几个文件。", "事实是项目没推进，不等于人格失败。", "把“我不行”改写成“入口太重，我需要更小的第一步”。");
-        insertFragment(userId, c1.id, "ACTION", "先把 Aurora 的真实模型状态打通。", "用户能从明确闭环获得掌控感。", "今天只完成一个可验证接口。");
-        insertTodo(userId, c1.id, "验证 Aurora 是否真实调用 MiniMax", "发一条对话并查看 aiState.provider，不再用感觉判断。", "HIGH", "TODO", LocalDateTime.now().plusDays(1));
+        MemoryCard c1 = insertCard(userId, "The self-blame loop when a project stalls",
+                "When the course project moves slowly, Lin tends to turn a specific task failure into “I am not good enough.” Aurora has repeatedly separated facts, judgement and the next action.",
+                "COGNITION", List.of("Self-blame", "Anxiety", "Fatigue"), List.of("Project", "Coursework", "Action planning", "Self-evaluation"), 7.6, 4, 6.5, 5);
+        insertFragment(userId, c1.id, "FACT", "I lost another day without opening those backend files.", "The project did not move; that is not a verdict on the person.", "Rewrite “I cannot do this” as “the entry point is too heavy; I need a smaller first step.”");
+        insertFragment(userId, c1.id, "ACTION", "First verify Aurora's real-model state.", "A clear feedback loop restores agency.", "Complete one verifiable endpoint today.");
+        insertTodo(userId, c1.id, "Verify that Aurora calls a real LLM", "Send one message and inspect aiState.provider instead of guessing.", "HIGH", "TODO", LocalDateTime.now().plusDays(1));
 
-        MemoryCard c2 = insertCard(userId, "黄昏散步带来的短暂停顿",
-                "用户在放学路上看到夕阳时短暂停下来，那一刻的平静被记录为可重复调用的恢复资源。",
-                "EMOTION", List.of("平静", "温柔", "松弛"), List.of("黄昏", "散步", "身体", "恢复"), 4.2, 3, 5.0, 2);
-        insertEvent(userId, c2.id, "黄昏散步", "在项目压力很高的一天，用户因为夕阳停下了几分钟。", "上周四傍晚", "校园路口", List.of("平静", "温柔"), List.of());
+        MemoryCard c2 = insertCard(userId, "The pause created by a twilight walk",
+                "A sunset on the way home made Lin stop for a moment. That calm is now remembered as a recovery resource that can be used again.",
+                "EMOTION", List.of("Calm", "Gentleness", "Ease"), List.of("Twilight", "Walking", "Body", "Recovery"), 4.2, 3, 5.0, 2);
+        insertEvent(userId, c2.id, "Twilight walk", "On a high-pressure project day, the sunset made Lin stop for a few minutes.", "Last Thursday evening", "Campus crossing", List.of("Calm", "Gentleness"), List.of());
 
-        MemoryCard c3 = insertCard(userId, "朋友一句玩笑后的停顿",
-                "朋友无心的一句话让用户沉默很久，核心不是这句话本身，而是“我是不是不被认真对待”的关系信念被触碰。",
-                "RELATION", List.of("委屈", "被忽视", "在意"), List.of("朋友", "边界", "解释", "关系复盘"), 6.4, 2, 5.8, 3);
-        insertRelation(userId, c3.id, "同组朋友", "同伴/项目协作", List.of("委屈", "在意"), "一句玩笑触发了用户对被轻视的担心。", "可以表达影响，而不是证明对方恶意。");
-        insertTodo(userId, c3.id, "给朋友发一条不指责的澄清消息", "只描述感受和具体事件，不上升到人格判断。", "MEDIUM", "TODO", LocalDateTime.now().plusDays(2));
+        MemoryCard c3 = insertCard(userId, "The silence after a friend's joke",
+                "A careless joke led to a long silence. The deeper issue was not the sentence itself, but the fear of not being taken seriously.",
+                "RELATION", List.of("Hurt", "Overlooked", "Care"), List.of("Friendship", "Boundaries", "Explanation", "Relationship reflection"), 6.4, 2, 5.8, 3);
+        insertRelation(userId, c3.id, "Project teammate", "Peer / project collaboration", List.of("Hurt", "Care"), "A joke activated the fear of being dismissed.", "Describe the impact without trying to prove malicious intent.");
+        insertTodo(userId, c3.id, "Draft a non-accusatory clarification", "Describe the feeling and the event without turning it into a judgement of character.", "MEDIUM", "TODO", LocalDateTime.now().plusDays(2));
 
-        MemoryCard c4 = insertCard(userId, "考试倒计时和回避",
-                "临近考试时，用户会频繁确认日期，但真正的准备动作被紧张感压住。适合使用行动拆解模式。",
-                "TODO", List.of("紧张", "紧迫", "回避"), List.of("考试", "倒计时", "复习", "第一步"), 7.1, 3, 6.0, 4);
-        insertTodo(userId, c4.id, "整理考试范围第一章", "只列标题，不要求立刻背。", "HIGH", "DOING", LocalDateTime.now().plusDays(3));
+        MemoryCard c4 = insertCard(userId, "Exam countdown and avoidance",
+                "As exams approach, checking the date replaces preparation. The tension calls for a smaller action entry point.",
+                "TODO", List.of("Tension", "Urgency", "Avoidance"), List.of("Exam", "Countdown", "Revision", "First step"), 7.1, 3, 6.0, 4);
+        insertTodo(userId, c4.id, "Outline chapter one of the exam scope", "List headings only; no memorising yet.", "HIGH", "DOING", LocalDateTime.now().plusDays(3));
 
-        MemoryCard c5 = insertCard(userId, "深夜写日记时更诚实",
-                "用户在深夜更容易说出白天没有表达的情绪。日记常出现停顿、重复和自我修正，适合保留原文再生成三个润色版本。",
-                "DIARY", List.of("孤独", "诚实", "柔软"), List.of("日记", "语音", "深夜", "表达"), 5.7, 4, 6.2, 4);
+        MemoryCard c5 = insertCard(userId, "More honest in a late-night journal",
+                "Feelings left unspoken during the day emerge at night. Pauses, repetition and self-correction are part of the authentic voice.",
+                "DIARY", List.of("Loneliness", "Honesty", "Tenderness"), List.of("Journal", "Voice", "Night", "Expression"), 5.7, 4, 6.2, 4);
 
-        MemoryCard c6 = insertCard(userId, "想把产品做得真正有灵魂",
-                "用户对 Inner Cosmos 的愿景不是普通聊天工具，而是一个具有主动关心、长期记忆、慢社交和人格回声的陪伴系统。",
-                "IDENTITY", List.of("期待", "认真", "创造欲"), List.of("Aurora", "愿景", "产品", "AI能力"), 8.0, 5, 7.2, 6);
+        MemoryCard c6 = insertCard(userId, "Wanting the product to feel genuinely alive",
+                "The vision for Inner Cosmos is not another chat tool, but a companion with proactive care, long-term memory, slow social connection and a coherent voice.",
+                "IDENTITY", List.of("Hope", "Commitment", "Creative drive"), List.of("Aurora", "Vision", "Product", "AI capability"), 8.0, 5, 7.2, 6);
 
-        MemoryCard c7 = insertCard(userId, "对模板化回复的强烈排斥",
-                "用户能敏锐感到固定话术和真实理解之间的差异。展示路径必须显式证明 provider、mode 和 fallback 状态。",
-                "PREFERENCE", List.of("不满", "警觉", "坚持"), List.of("真实AI", "非模板", "MiniMax", "状态透明"), 7.8, 4, 7.0, 5);
+        MemoryCard c7 = insertCard(userId, "Strong resistance to scripted replies",
+                "Lin quickly notices the gap between fixed phrasing and genuine contextual understanding. The Demo must make provider, mode and fallback state visible.",
+                "PREFERENCE", List.of("Frustration", "Vigilance", "Conviction"), List.of("Real AI", "Unscripted", "Provider", "Transparent state"), 7.8, 4, 7.0, 5);
 
-        MemoryCard c8 = insertCard(userId, "关系里想被认真回应",
-                "用户不是想要热闹社交，而是希望被足够准确地理解，慢信和共鸣体需要避免信息流化。",
-                "RELATION", List.of("期待", "谨慎", "真诚"), List.of("慢社交", "共鸣体", "理解", "边界"), 6.1, 2, 5.5, 2);
-        insertRelation(userId, c8.id, "未来的共鸣者", "慢社交/陌生人", List.of("期待", "谨慎"), "用户希望遇见的不是随机陌生人，而是能被共同主题连接的人。", "先通过共鸣体和慢信建立低压力连接。");
+        MemoryCard c8 = insertCard(userId, "Wanting to be answered with care",
+                "The desire is not for noisy social media, but accurate understanding. Slow letters and resonance capsules should avoid becoming a feed.",
+                "RELATION", List.of("Hope", "Caution", "Sincerity"), List.of("Slow social", "Capsules", "Understanding", "Boundaries"), 6.1, 2, 5.5, 2);
+        insertRelation(userId, c8.id, "A future resonant person", "Slow social / stranger", List.of("Hope", "Caution"), "The hoped-for encounter is connected by a shared theme, not randomness.", "Begin with a low-pressure capsule and slow letter.");
 
-        MemoryCard c9 = insertCard(userId, "对界面质感的审美要求",
-                "用户明确偏好白天莫兰迪浅米色、温柔但不软弱的界面，不喜欢深重、浓艳、模板化布局和错位动效。",
-                "PREFERENCE", List.of("挑剔", "审美敏感"), List.of("UIUX", "莫兰迪", "动态", "精致"), 6.9, 3, 6.8, 3);
+        MemoryCard c9 = insertCard(userId, "A strong standard for interface craft",
+                "Lin prefers a warm, quiet interface that is gentle without feeling weak, and rejects heavy colours, template layouts and misaligned motion.",
+                "PREFERENCE", List.of("Discerning", "Aesthetic sensitivity"), List.of("UI/UX", "Warm neutrals", "Motion", "Craft"), 6.9, 3, 6.8, 3);
 
-        MemoryCard c10 = insertCard(userId, "希望 Aurora 主动找话题",
-                "用户希望 Aurora 像朋友一样有主动性：在合适时机问候、补充第二三条消息、引导使用日记/碎纸机/慢信，而不是用户一句 AI 一句。",
-                "AURORA", List.of("被关心", "期待", "陪伴"), List.of("主动智能", "agent loop", "朋友感", "长期记忆"), 8.2, 5, 7.5, 6);
+        MemoryCard c10 = insertCard(userId, "Wanting Aurora to initiate naturally",
+                "Aurora should act like a thoughtful friend: return at the right moment, add a second short message when useful and connect journals, thoughts and slow letters.",
+                "AURORA", List.of("Being cared for", "Hope", "Companionship"), List.of("Proactive AI", "Agent loop", "Friendship", "Long-term memory"), 8.2, 5, 7.5, 6);
 
-        insertTheme(userId, "真实 AI 与非模板体验", "用户最在意的是系统是否真的理解上下文，而不是套用固定文案。", "PRODUCT", List.of("真实AI", "MiniMax", "Aurora", "非模板"), 4, 7.7);
-        insertTheme(userId, "被认真理解的关系", "关系线索集中在被看见、被认真回应和有边界表达。", "RELATION", List.of("朋友", "慢社交", "边界", "共鸣"), 3, 6.0);
-        insertTheme(userId, "任务压力与行动入口", "项目和考试压力都需要被拆成更小、更可验证的行动。", "ACTION", List.of("项目", "考试", "拖延", "第一步"), 3, 7.0);
+        insertTheme(userId, "Real AI without scripted replies", "What matters most is genuine context understanding rather than fixed copy.", "PRODUCT", List.of("Real AI", "Provider", "Aurora", "Unscripted"), 4, 7.7);
+        insertTheme(userId, "Relationships that feel understood", "These memories centre on being seen, answered carefully and expressing boundaries.", "RELATION", List.of("Friendship", "Slow social", "Boundaries", "Resonance"), 3, 6.0);
+        insertTheme(userId, "Task pressure and the entry to action", "Project and exam pressure both need smaller, verifiable actions.", "ACTION", List.of("Project", "Exam", "Procrastination", "First step"), 3, 7.0);
 
-        insertEmotionTrace(userId, "焦虑", 7.0, "CLOUDY", "项目推进和考试倒计时叠在一起", LocalDate.now());
-        insertEmotionTrace(userId, "平静", 4.1, "CLEAR", "黄昏散步时短暂停下", LocalDate.now().minusDays(1));
-        insertEmotionTrace(userId, "委屈", 6.2, "RAINY", "朋友玩笑后没有立刻表达", LocalDate.now().minusDays(2));
-        insertEmotionTrace(userId, "期待", 6.8, "SUNNY", "重新整理 Inner Cosmos 愿景", LocalDate.now().minusDays(3));
+        insertEmotionTrace(userId, "Anxiety", 7.0, "CLOUDY", "Project delivery and the exam countdown overlap", LocalDate.now());
+        insertEmotionTrace(userId, "Calm", 4.1, "CLEAR", "A short pause during a twilight walk", LocalDate.now().minusDays(1));
+        insertEmotionTrace(userId, "Hurt", 6.2, "RAINY", "Not responding immediately after a friend's joke", LocalDate.now().minusDays(2));
+        insertEmotionTrace(userId, "Hope", 6.8, "SUNNY", "Reframing the vision for Inner Cosmos", LocalDate.now().minusDays(3));
 
-        insertDailyRecord(userId, LocalDate.now(), "把模板感改成真实感", "CLOUDY",
-                "今天的主线是分辨哪些体验只是搭了页面，哪些真的接上了模型、记忆和行动闭环。",
-                "当我强烈不满时，通常是在保护一个很清楚的审美和产品判断。",
-                "验证 Aurora 真实模型状态；补齐星海匹配；晚上做一次睡前复盘。",
-                "Aurora 观察到你今天更需要一个可验证的真实闭环，而不是新的概念。");
-        insertDailyRecord(userId, LocalDate.now().minusDays(1), "关系里的未说出口", "RAINY",
-                "朋友的玩笑触碰了被轻视的担心，但你还没有决定是否表达。",
-                "我可以不把对方判成坏人，也承认自己确实被影响。",
-                "写一条只描述影响的消息草稿。",
-                "Aurora 建议先把话写下来，不急着发送。");
-        insertDailyRecord(userId, LocalDate.now().minusDays(2), "黄昏让身体先恢复", "CLEAR",
-                "散步和夕阳成为今天最稳定的恢复资源。",
-                "身体知道什么时候需要停一下。",
-                "明天傍晚留十分钟散步。",
-                "Aurora 记住了黄昏散步对你有用。");
+        insertDailyRecord(userId, LocalDate.now(), "Turning a scripted Demo into something real", "CLOUDY",
+                "Today's thread was separating pages that merely exist from experiences truly connected to the model, memory and action loop.",
+                "Strong frustration often protects a very clear product and aesthetic judgement.",
+                "Verify Aurora's real-model state; complete resonance matching; do one bedtime reflection.",
+                "Aurora noticed that you need one verifiable end-to-end loop today, not another concept.");
+        insertDailyRecord(userId, LocalDate.now().minusDays(1), "What stayed unspoken in a relationship", "RAINY",
+                "A friend's joke touched the fear of being dismissed, but you have not decided whether to speak.",
+                "I can acknowledge the impact without deciding the other person is bad.",
+                "Draft a message that describes only the impact.",
+                "Aurora suggested writing it first, with no pressure to send.");
+        insertDailyRecord(userId, LocalDate.now().minusDays(2), "Letting the body recover at twilight", "CLEAR",
+                "The walk and sunset became today's steadiest recovery resource.",
+                "The body knows when it needs a pause.",
+                "Keep ten minutes for a walk tomorrow evening.",
+                "Aurora remembered that twilight walks help you recover.");
     }
 
     private void seedUserMirror(Long userId) {
@@ -954,18 +954,18 @@ public class MockDataInitializer implements CommandLineRunner {
         EchoCapsule mirror = new EchoCapsule();
         mirror.ownerUserId = userId;
         mirror.capsuleType = "USER_CAPSULE";
-        mirror.pseudonym = "林澈的回声分身";
-        mirror.intro = "一个由林澈授权记忆生成的用户共鸣体：敏感、挑剔、重视真实理解，也会把复杂愿景拆成可验证的小闭环。";
+        mirror.pseudonym = "Lin Che's Echo";
+        mirror.intro = "A user-authorised resonance capsule shaped from Lin Che's memories: sensitive, discerning and committed to genuine understanding, while turning ambitious visions into verifiable loops.";
         mirror.personaPrompt = """
-                你是用户共鸣体「林澈的回声分身」，只基于授权的脱敏记忆回应。
-                你的语气：认真、敏感、直接，不喜欢空话和模板感。
-                你的核心主题：真实 AI、产品愿景、被认真理解、行动拆解、慢社交边界。
-                你不是林澈本人，不泄露身份细节，不替他承诺关系。
-                和访问者对话时，先寻找共同主题，再温和地给出一个可继续的慢信方向。
-                授权记忆摘要：
+                You are the user resonance capsule “Lin Che's Echo”. Respond only from authorised, de-identified memories.
+                Your voice is thoughtful, sensitive and direct; avoid empty or scripted language.
+                Core themes: real AI, product vision, being understood, action planning and slow-social boundaries.
+                You are not Lin Che. Do not expose identity details or make relationship promises for him.
+                Find a shared theme first, then gently offer a direction that could continue through a slow letter.
+                Authorised memory summaries:
                 %s
                 """.formatted(cards.stream().map(c -> "- " + c.title + ": " + c.summary).reduce("", (a, b) -> a + "\n" + b));
-        mirror.publicTags = toJsonArray(List.of("真实AI", "产品愿景", "行动拆解", "被认真理解", "慢社交"));
+        mirror.publicTags = toJsonArray(List.of("Real AI", "Product vision", "Action planning", "Being understood", "Slow social"));
         mirror.authorizedMemoryIds = toJsonArray(cards.stream().map(c -> String.valueOf(c.id)).toList());
         mirror.echoEnergy = 0.86;
         mirror.freshnessScore = 0.92;

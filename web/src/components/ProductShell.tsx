@@ -127,11 +127,15 @@ export function ProductShellNavigation({ active, onNavigate, locale = "zh-CN" }:
   </nav>;
 }
 
-export function CosmosSubNav({ active, onNavigate }: { active: CosmosTab; onNavigate: (tab: CosmosTab) => void }) {
-  return <nav className="cosmos-sub-nav" aria-label="内宇宙分区导航">
-    {cosmosTabs.map(([value, label]) =>
+export function CosmosSubNav({ active, onNavigate, locale = "zh-CN" }: {
+  active: CosmosTab; onNavigate: (tab: CosmosTab) => void; locale?: Locale;
+}) {
+  return <nav className="cosmos-sub-nav"
+    aria-label={locale === "en-SG" ? "Cosmos sections" : "内宇宙分区导航"}>
+    {cosmosTabs.map(([value, zh, en]) =>
       <button type="button" key={value} className={active === value ? "active" : ""}
-        aria-current={active === value ? "page" : undefined} onClick={() => onNavigate(value)}>{label}</button>)}
+        aria-current={active === value ? "page" : undefined}
+        onClick={() => onNavigate(value)}>{locale === "en-SG" ? en : zh}</button>)}
   </nav>;
 }
 

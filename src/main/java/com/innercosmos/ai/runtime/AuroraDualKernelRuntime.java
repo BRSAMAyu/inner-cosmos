@@ -507,13 +507,26 @@ public class AuroraDualKernelRuntime {
         String input = safe(userInput);
         boolean singleAction = explicitlyRequestsSingleAction(input);
         boolean rejectsAdvice = (input.contains("先别") || input.contains("不要") || input.contains("不用"))
-                && (input.contains("方案") || input.contains("建议") || input.contains("分析") || input.contains("解决"));
+                && (input.contains("方案") || input.contains("建议") || input.contains("分析") || input.contains("解决"))
+                || input.toLowerCase().matches("(?s).*(don't|do not|no)\\s+(reassure|advise|give me advice).*");
         boolean presentation = input.matches("(?s).*(展示|演示|汇报|答辩|上台|presentation|demo).*");
         boolean relationship = isRelationshipContext(input);
         boolean relationshipAmbiguity = relationship && protectsRelationshipAmbiguity(input);
         boolean pressure = input.matches("(?s).*(紧张|焦虑|压力|害怕|撑不住|累|慌).*");
+        boolean english = input.codePoints()
+                .noneMatch(cp -> Character.UnicodeScript.of(cp) == Character.UnicodeScript.HAN);
         String repairedText;
-        if (singleAction) {
+        if (english && rejectsAdvice && presentation) {
+            repairedText = "You are not asking for reassurance. One rough edge has become a verdict on whether the whole project has a soul.";
+        } else if (english && rejectsAdvice) {
+            repairedText = "You are not asking for an answer. You want the unsmoothed part of this to remain visible.";
+        } else if (english && presentation) {
+            repairedText = "The coming demo and this tension are now tied together. The sharpest part is still worth naming.";
+        } else if (english && pressure) {
+            repairedText = "The pressure has already entered the way you are holding yourself. The most concrete part can stay unsolved for a moment.";
+        } else if (english) {
+            repairedText = "There is still an unopened part in that sentence. You can continue from there.";
+        } else if (singleAction) {
             repairedText = deterministicSingleAction(input);
         } else if (rejectsAdvice && presentation) {
             repairedText = "你不是来找答案的，只是想让“展示前很紧张”这件事有个落点。现在它有了。";

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { DailyRecordEntry, MemoryThemeRow } from "../api";
 import type { Locale } from "../i18n";
+import { LocalizedTemporalInput } from "./shared/LocalizedTemporalInput";
 
 // Phase 3 legacy-page port: src/main/resources/static/pages/timeline.html. Read-only merge of
 // GET /api/memory/daily-records and GET /api/memory/themes into one growth timeline -- no writes.
@@ -43,7 +44,7 @@ export function TimelineSection({ dailyRecords, themes, locale = "zh-CN" }: {
   const topThemes = themes.slice(0, 7);
   const maxCount = Math.max(1, ...topThemes.map(theme => theme.memoryCount ?? 1));
 
-  return <section className="timeline-section" aria-label={t.heading}>
+  return <section className="timeline-section" aria-label={t.heading} lang={locale}>
     <div className="flex-between" style={{ flexWrap: "wrap", gap: 12 }}>
       <div>
         <span className="route-hint">{t.routeHint}</span>
@@ -51,7 +52,8 @@ export function TimelineSection({ dailyRecords, themes, locale = "zh-CN" }: {
         <p className="muted">{t.intro}</p>
       </div>
       <div className="row gap-sm">
-        <input type="date" aria-label={t.dateLabel} value={date} onChange={event => setDate(event.target.value)} />
+        <LocalizedTemporalInput type="date" label={t.dateLabel} locale={locale}
+          value={date} onChange={event => setDate(event.target.value)} />
         {/* Disabled while already unfiltered: setDate("") on an already-empty date is a same-value
             no-op React bails out of, producing no observable response (dead-button-scan regression). */}
         <button type="button" disabled={!date} onClick={() => setDate("")}>{t.all}</button>

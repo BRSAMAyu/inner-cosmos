@@ -1,6 +1,5 @@
-// 七时段时间感知主题（§1.1 时间感知系统 / UIUXdesign §3）。
-// 本版：按本地钟点把 <html data-time> 设为七时段之一，CSS 据此平滑切换暖色色温。
-// 日落算法（NOAA）为后置增强（UIUXdesign §3.2 允许）；用户可锁定某一时段。
+// 七时段时间感知主题（UIUX §2）。
+// 默认跟随设备本地时间；课堂演示可以临时拨动小时，随时恢复实时。
 export type TimeOfDay =
   | "dawn"
   | "morning"
@@ -20,15 +19,24 @@ export const TIME_OF_DAY_ORDER: TimeOfDay[] = [
   "deep-night",
 ];
 
+export const TIME_OF_DAY_HOURS: Record<TimeOfDay, number> = {
+  dawn: 6,
+  morning: 8,
+  noon: 12,
+  evening: 16,
+  dusk: 18,
+  night: 21,
+  "deep-night": 1,
+};
+
 const LOCK_KEY = "ic-theme-lock";
+const PREVIEW_HOUR_KEY = "ic-theme-preview-hour";
 const SCHEME_KEY = "ic-color-scheme";
 
-// 明暗轴：与七时段(data-time)正交。默认 null=跟随（当前=暖夜暗色系）；
-// "day"=白昼莫兰迪浅色；"night"=强制暖夜暗色。仅 "day" 时写 <html data-theme="day">，
-// 让 styles.css 的浅色 token 覆盖生效；默认不写属性，暗色行为 100% 不变。
+// 明暗轴与七时段正交。null 表示真正跟随时间；用户仍可强制白昼或夜色。
 export type ColorScheme = "day" | "night";
 
-/** 纯函数：给定本地小时(0-23)返回时段。可测试。 */
+/** 纯函数：给定本地小时(0-23)返回时段。 */
 export function timeOfDayForHour(hour: number): TimeOfDay {
   const h = ((Math.floor(hour) % 24) + 24) % 24;
   if (h >= 5 && h < 7) return "dawn";
@@ -37,28 +45,62 @@ export function timeOfDayForHour(hour: number): TimeOfDay {
   if (h >= 15 && h < 17) return "evening";
   if (h >= 17 && h < 19) return "dusk";
   if (h >= 19 && h < 23) return "night";
-  return "deep-night"; // 23:00–05:00
+  return "deep-night";
 }
 
 export function currentTimeOfDay(now: Date = new Date()): TimeOfDay {
   return timeOfDayForHour(now.getHours());
 }
 
-/** 读取用户锁定的时段（无锁定或非法值返回 null）。 */
-export function getLockedTimeOfDay(): TimeOfDay | null {
+/** 晨曦到黄昏使用浅暖纸色；夜晚才进入柔和的暖夜色。 */
+export function colorSchemeForTimeOfDay(tod: TimeOfDay): ColorScheme {
+  return tod === "night" || tod === "deep-night" ? "night" : "day";
+}
+
+export function getPreviewHour(): number | null {
   try {
-    const v = localStorage.getItem(LOCK_KEY);
-    return v && (TIME_OF_DAY_ORDER as string[]).includes(v)
-      ? (v as TimeOfDay)
+    const raw = localStorage.getItem(PREVIEW_HOUR_KEY);
+    if (raw === null) return null;
+    const hour = Number(raw);
+    return Number.isInteger(hour) && hour >= 0 && hour <= 23 ? hour : null;
+  } catch {
+    return null;
+  }
+}
+
+/** 设置课堂预览小时；null 恢复设备实时。 */
+export function setPreviewHour(hour: number | null): void {
+  try {
+    if (hour === null) {
+      localStorage.removeItem(PREVIEW_HOUR_KEY);
+      localStorage.removeItem(LOCK_KEY);
+      return;
+    }
+    const normalized = ((Math.round(hour) % 24) + 24) % 24;
+    localStorage.setItem(PREVIEW_HOUR_KEY, String(normalized));
+    localStorage.removeItem(LOCK_KEY);
+  } catch {
+    /* localStorage 不可用时静默降级 */
+  }
+}
+
+/** 兼容原有时段锁定 API；新的演示控件优先保存精确小时。 */
+export function getLockedTimeOfDay(): TimeOfDay | null {
+  const previewHour = getPreviewHour();
+  if (previewHour !== null) return timeOfDayForHour(previewHour);
+  try {
+    const value = localStorage.getItem(LOCK_KEY);
+    return value && (TIME_OF_DAY_ORDER as string[]).includes(value)
+      ? (value as TimeOfDay)
       : null;
   } catch {
     return null;
   }
 }
 
-/** 锁定到某时段；传 null 解除锁定，恢复跟随本地时间。 */
 export function setThemeLock(tod: TimeOfDay | null): void {
   try {
+    localStorage.removeItem(PREVIEW_HOUR_KEY);
     if (tod) localStorage.setItem(LOCK_KEY, tod);
     else localStorage.removeItem(LOCK_KEY);
   } catch {
@@ -66,27 +108,28 @@ export function setThemeLock(tod: TimeOfDay | null): void {
   }
 }
 
-/** 把当前应生效的时段写到 <html data-time>，返回该时段。 */
+function resolvedTimeOfDay(now: Date): TimeOfDay {
+  return getLockedTimeOfDay() ?? currentTimeOfDay(now);
+}
+
 export function applyTimeOfDayTheme(
   root: HTMLElement = document.documentElement,
   now: Date = new Date()
 ): TimeOfDay {
-  const tod = getLockedTimeOfDay() ?? currentTimeOfDay(now);
+  const tod = resolvedTimeOfDay(now);
   root.dataset.time = tod;
   return tod;
 }
 
-/** 读取用户选择的明暗方案（无选择或非法值返回 null=跟随）。 */
 export function getColorScheme(): ColorScheme | null {
   try {
-    const v = localStorage.getItem(SCHEME_KEY);
-    return v === "day" || v === "night" ? v : null;
+    const value = localStorage.getItem(SCHEME_KEY);
+    return value === "day" || value === "night" ? value : null;
   } catch {
     return null;
   }
 }
 
-/** 设置明暗方案；传 null 恢复跟随（暖夜暗色系）。 */
 export function setColorScheme(scheme: ColorScheme | null): void {
   try {
     if (scheme) localStorage.setItem(SCHEME_KEY, scheme);
@@ -96,20 +139,32 @@ export function setColorScheme(scheme: ColorScheme | null): void {
   }
 }
 
-/** 把明暗方案写到 <html data-theme>：仅 "day" 写 data-theme="day"，否则移除(暗色默认)。 */
-export function applyColorScheme(root: HTMLElement = document.documentElement): ColorScheme | null {
-  const scheme = getColorScheme();
-  if (scheme === "day") root.dataset.theme = "day";
-  else delete root.dataset.theme;
-  return scheme;
+/** 应用明暗：未手动锁定时，根据真实/预览时段自动选择。 */
+export function applyColorScheme(
+  root: HTMLElement = document.documentElement,
+  now: Date = new Date()
+): ColorScheme | null {
+  const chosen = getColorScheme();
+  const effective = chosen ?? colorSchemeForTimeOfDay(resolvedTimeOfDay(now));
+  root.dataset.theme = effective;
+  return chosen;
 }
 
-/** 启动：立即应用时段主题 + 明暗方案，并每分钟刷新时段；返回停止函数。 */
+/** 原子更新时段与明暗，避免切换时出现一次暗色闪烁。 */
+export function applyAdaptiveTheme(
+  root: HTMLElement = document.documentElement,
+  now: Date = new Date()
+): TimeOfDay {
+  const tod = applyTimeOfDayTheme(root, now);
+  applyColorScheme(root, now);
+  return tod;
+}
+
+/** 启动：立即应用，并每分钟刷新实时主题。 */
 export function startTimeOfDayTheme(
   root: HTMLElement = document.documentElement
 ): () => void {
-  applyTimeOfDayTheme(root);
-  applyColorScheme(root);
-  const id = window.setInterval(() => applyTimeOfDayTheme(root), 60_000);
+  applyAdaptiveTheme(root);
+  const id = window.setInterval(() => applyAdaptiveTheme(root), 60_000);
   return () => window.clearInterval(id);
 }

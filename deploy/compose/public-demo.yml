@@ -69,6 +69,10 @@ services:
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       GLM_API_KEY: ${GLM_API_KEY:-}
       LLM_ALLOW_FALLBACK: "false"
+      # The classroom UI and seed journey default to English, while Aurora follows the language
+      # used in the current user input. The provider boundary still overrides legacy prompts that
+      # hard-code Chinese output.
+      LLM_PROMPT_LANGUAGE: auto
       MEMORY_EMBEDDING_ENABLED: "true"
       MEMORY_EMBEDDING_API_KEY: ${MEMORY_EMBEDDING_API_KEY:?loaded locally by run-public-demo.ps1}
       MEMORY_EMBEDDING_BASE_URL: ${MEMORY_EMBEDDING_BASE_URL}

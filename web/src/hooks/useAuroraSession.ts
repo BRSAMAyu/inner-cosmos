@@ -114,8 +114,10 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
   const [runtimeSignal, setRuntimeSignal] = useState<AuroraRuntimeSignal>({ stage: "idle", runtime: "single" });
   const [wakeIntents, setWakeIntents] = useState<WakeIntent[]>([]);
   const [wakeBusy, setWakeBusy] = useState(false);
-  const [returnWhen, setReturnWhen] = useState("明天早上 8:30");
-  const [returnPurpose, setReturnPurpose] = useState("继续这一刻未说完的话");
+  const [returnWhen, setReturnWhen] = useState(
+    skillLocale === "en-SG" ? "Tomorrow at 8:30 AM" : "明天早上 8:30");
+  const [returnPurpose, setReturnPurpose] = useState(
+    skillLocale === "en-SG" ? "Continue what was left unsaid in this moment" : "继续这一刻未说完的话");
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [safetyAlert, setSafetyAlert] = useState<AuroraSafetyAlert | null>(null);
   const dismissSafetyAlert = useCallback(() => setSafetyAlert(null), []);

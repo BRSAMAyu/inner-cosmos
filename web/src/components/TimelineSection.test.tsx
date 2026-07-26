@@ -62,5 +62,6 @@ describe("TimelineSection", () => {
   it("renders in English when locale is en-SG", () => {
     render(<TimelineSection locale="en-SG" dailyRecords={[]} themes={[]} />);
     expect(screen.getByRole("heading", { name: "Growth Timeline" })).toBeVisible();
+    expect(screen.getByLabelText("Filter by date")).toHaveAttribute("lang", "en-SG");
   });
 });

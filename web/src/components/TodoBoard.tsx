@@ -3,6 +3,7 @@ import type { TodoDraft, TodoItem } from "../api";
 import type { Locale } from "../i18n";
 import type { TodoTab } from "../hooks/useTodoBoard";
 import { AsyncButton } from "../loading";
+import { LocalizedTemporalInput } from "./shared/LocalizedTemporalInput";
 
 // Port of src/main/resources/static/pages/todo.html into the AppShell (Phase 3, legacy batch B).
 
@@ -101,7 +102,7 @@ export function TodoBoard({ todos, tab, busy, splitBusyId, onSelectTab, onCreate
     setEditingId(null);
   };
 
-  return <section className="todo-board-space" aria-label={t.aria}>
+  return <section className="todo-board-space" aria-label={t.aria} lang={locale}>
     <span className="eyebrow">TODO · NEXT SMALL STEP</span>
     <h2>{t.heading}</h2>
     <p>{t.intro}</p>
@@ -116,7 +117,7 @@ export function TodoBoard({ todos, tab, busy, splitBusyId, onSelectTab, onCreate
         <option value="MEDIUM">{t.priorityShort.MEDIUM}</option>
         <option value="LOW">{t.priorityShort.LOW}</option>
       </select>
-      <input type="datetime-local" aria-label={t.deadlineLabel}
+      <LocalizedTemporalInput type="datetime-local" label={t.deadlineLabel} locale={locale}
         value={createDraft.deadline} onChange={event => setCreateDraft(d => ({ ...d, deadline: event.target.value }))} />
       <textarea aria-label={t.descriptionLabel} placeholder={t.descriptionPlaceholder}
         value={createDraft.description} onChange={event => setCreateDraft(d => ({ ...d, description: event.target.value }))} />
@@ -141,7 +142,7 @@ export function TodoBoard({ todos, tab, busy, splitBusyId, onSelectTab, onCreate
               <option value="MEDIUM">{t.priorityShort.MEDIUM}</option>
               <option value="LOW">{t.priorityShort.LOW}</option>
             </select>
-            <input type="datetime-local" aria-label={t.deadlineLabel} value={editDraft.deadline}
+            <LocalizedTemporalInput type="datetime-local" label={t.deadlineLabel} locale={locale} value={editDraft.deadline}
               onChange={event => setEditDraft(d => ({ ...d, deadline: event.target.value }))} />
             <textarea aria-label={t.descriptionLabel} value={editDraft.description}
               onChange={event => setEditDraft(d => ({ ...d, description: event.target.value }))} />

@@ -104,7 +104,7 @@ public class MemoryServiceImpl implements MemoryService {
         MemoryCard card = new MemoryCard();
         card.userId = userId;
         card.sourceSessionId = sessionId;
-        card.title = "今日沉淀";
+        card.title = "Today's reflection";
         card.summary = extractAgent.summarize(raw);
         card.memoryType = inferType(raw);
         card.emotionTags = "[\"self-observation\"]";
@@ -318,7 +318,7 @@ public class MemoryServiceImpl implements MemoryService {
     }
 
     private String starTheme(String memoryType) {
-        if ("TODO".equals(memoryType)) return "需要被轻轻推进的事";
+        if ("TODO".equals(memoryType)) return "Something that needs a gentle next step";
         if ("RELATION".equals(memoryType)) return "关系里的回声";
         if ("COGNITION".equals(memoryType)) return "正在成形的理解";
         return "被命名的感受";

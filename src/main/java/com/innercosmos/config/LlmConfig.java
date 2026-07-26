@@ -25,6 +25,7 @@ public class LlmConfig {
     public String apiKey;
     public String baseUrl;
     public String model;
+    public PromptProperties prompt = new PromptProperties();
     public boolean allowFallback = true;
     public String asrProvider = "mimo";
     public GlmProperties glm = new GlmProperties();
@@ -73,6 +74,14 @@ public class LlmConfig {
 
     public void setModel(String model) {
         this.model = model;
+    }
+
+    public PromptProperties getPrompt() {
+        return prompt;
+    }
+
+    public void setPrompt(PromptProperties prompt) {
+        this.prompt = prompt;
     }
 
     public boolean isAllowFallback() {
@@ -269,6 +278,13 @@ public class LlmConfig {
         public void setTimeoutMs(int timeoutMs) { this.timeoutMs = timeoutMs; }
     }
 
+    public static class PromptProperties {
+        public String language = "auto";
+
+        public String getLanguage() { return language; }
+        public void setLanguage(String language) { this.language = language; }
+    }
+
     // --- Factory method ---
 
     @Bean
@@ -356,7 +372,7 @@ public class LlmConfig {
         }
 
         // Wrap with A/B test handler
-        return new ABTestLlmClientWrapper(actualClient, aiLogService, aiExecutor);
+        return languageAware(new ABTestLlmClientWrapper(actualClient, aiLogService, aiExecutor));
     }
 
     private LlmClient failoverClient(String activeProvider, AiLogService aiLogService, Executor aiExecutor) {
@@ -416,19 +432,23 @@ public class LlmConfig {
         // keyless provider and 401 every time; with keyless providers absent from the map the
         // SessionModelRouter cleanly falls back to the system default (see resolve()).
         if (!resolveKey(minimax.apiKey).isBlank()) {
-            m.put("MINIMAX", new ABTestLlmClientWrapper(createProviderClient("minimax", false, aiLogService, aiExecutor), aiLogService, aiExecutor));
+            m.put("MINIMAX", languageAware(new ABTestLlmClientWrapper(createProviderClient("minimax", false, aiLogService, aiExecutor), aiLogService, aiExecutor)));
         }
         if (!resolveKey(mimo.apiKey).isBlank()) {
-            m.put("MIMO", new ABTestLlmClientWrapper(createProviderClient("mimo", false, aiLogService, aiExecutor), aiLogService, aiExecutor));
+            m.put("MIMO", languageAware(new ABTestLlmClientWrapper(createProviderClient("mimo", false, aiLogService, aiExecutor), aiLogService, aiExecutor)));
         }
         if (!resolveKey(glm.apiKey).isBlank()) {
-            m.put("GLM", new ABTestLlmClientWrapper(createProviderClient("glm", false, aiLogService, aiExecutor), aiLogService, aiExecutor));
+            m.put("GLM", languageAware(new ABTestLlmClientWrapper(createProviderClient("glm", false, aiLogService, aiExecutor), aiLogService, aiExecutor)));
         }
         if (!resolveKey(deepseek.apiKey).isBlank()) {
-            m.put("DEEPSEEK", new ABTestLlmClientWrapper(createProviderClient("deepseek", false, aiLogService, aiExecutor), aiLogService, aiExecutor));
+            m.put("DEEPSEEK", languageAware(new ABTestLlmClientWrapper(createProviderClient("deepseek", false, aiLogService, aiExecutor), aiLogService, aiExecutor)));
         }
-        m.put("MOCK", new MockLlmClient(aiExecutor));
+        m.put("MOCK", languageAware(new MockLlmClient(aiExecutor)));
         return m;
+    }
+
+    private LlmClient languageAware(LlmClient client) {
+        return new PromptLanguageLlmClient(client, prompt == null ? "auto" : prompt.language);
     }
 
     public List<String> orderedProviderNames() {

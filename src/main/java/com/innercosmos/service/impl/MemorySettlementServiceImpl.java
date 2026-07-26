@@ -101,7 +101,7 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
         MemoryCard card = new MemoryCard();
         card.userId = userId;
         card.sourceSessionId = sessionId;
-        card.title = blank(ai.memoryCard.title, "今日沉淀");
+        card.title = blank(ai.memoryCard.title, "Today's reflection");
         card.summary = blank(ai.memoryCard.summary, firstSentence(raw));
         card.memoryType = blank(ai.memoryCard.memoryType, inferType(raw));
         card.emotionTags = jsonArray(ai.memoryCard.emotionTags, List.of("self-observation"));
@@ -314,7 +314,7 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
 
     private StructuredAiResults.SettlementResult fallbackSettlement(String raw) {
         StructuredAiResults.SettlementResult result = new StructuredAiResults.SettlementResult();
-        result.memoryCard.title = "今日沉淀";
+        result.memoryCard.title = "Today's reflection";
         result.memoryCard.summary = firstSentence(raw);
         result.memoryCard.memoryType = inferType(raw);
         result.memoryCard.emotionTags = List.of("self-observation");

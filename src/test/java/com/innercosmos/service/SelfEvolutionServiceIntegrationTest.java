@@ -70,7 +70,7 @@ class SelfEvolutionServiceIntegrationTest {
         var rollback = service.rollback(85001L, baseline.versions().getFirst().id(), false);
         assertThat(rollback.versionNo).isEqualTo(3);
         assertThat(rollback.rollbackTargetVersionId).isEqualTo(baseline.versions().getFirst().id());
-        assertThat(rollback.publicNarrative).contains("回到第 1 版");
+        assertThat(rollback.publicNarrative).contains("version 1");
         assertThat(models.selectCount(new QueryWrapper<AuroraSelfModel>().eq("user_id", 85001L).eq("status", "active")))
             .isZero();
     }

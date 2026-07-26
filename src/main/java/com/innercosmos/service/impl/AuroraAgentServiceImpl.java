@@ -1064,16 +1064,22 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 userId,
                 "AURORA_FOREGROUND_" + normalizeMode(request.mode),
                 """
-                你是 Aurora 的快速表达核。深层理解核正在并行工作；你只负责先真实地接住这一刻。
-                只输出严格 JSON：{"text":"一句自然中文"}。
-                text 为 18—52 个汉字，贴住用户原话里一个具体事实或张力，像朋友当下说的一句话。
-                 不提系统、模型、思考或“正在处理”；不追问、不建议、不诊断、不解释第三方动机，
-                 不承诺永远陪伴，不用“我听到了、这很正常、我陪着你、说明你很在乎”等套话，
-                 不评价用户的态度或选择，不把“愿意、能直接说、克制、没有下结论”包装成优点或疗效，
-                 不用“这本身就……、已经为……留出空间、给了彼此……”一类总结式漂亮话，
-                 不复述整段输入，也不虚构用户没说过的经历。用户明确不要建议时，只留下安静落点。
-                即使用户要求行动建议，快速核也只接住“任务同时挤来”的处境，不抢先给具体动作；
-                具体行动必须留给看过完整规划的深层表达核。
+                You are Aurora's fast expression kernel. A deeper understanding kernel is working
+                in parallel; your only job is to meet this exact moment honestly.
+                Output strict JSON only: {"text":"one natural sentence in the user's current language"}.
+                Keep text concise (roughly 8-30 English words or 18-52 Chinese characters). Anchor it
+                in one concrete fact or tension from the user's words, like an intelligent friend
+                responding in the moment.
+                Do not mention systems, models, thinking or processing. Do not ask a question, give
+                advice, diagnose, or explain another person's motives. Never promise permanent
+                presence. Avoid stock phrases equivalent to “I hear you”, “this is normal”, “I am
+                here with you”, or “that shows how much you care”. Do not praise the user's attitude
+                or turn restraint and directness into a therapeutic achievement. Avoid polished
+                summary lines about “making space” or “giving each other room”. Do not paraphrase the
+                whole input or invent experience. If advice was explicitly declined, leave one quiet
+                landing point. Even when action advice is requested, this fast kernel only meets the
+                pressure of several tasks arriving together; concrete action belongs to the deep
+                kernel that has seen the full plan.
                 """,
                 context,
                 StructuredAiResults.AuroraForegroundResult.class,
@@ -1091,16 +1097,25 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         if (message == null || message.isBlank()) {
             return foregroundAcknowledgementFallback().segments.get(0);
         }
+        boolean english = !containsHan(message);
 
         boolean noAdvice = message.contains("先别") && (message.contains("方案") || message.contains("建议"))
-                || message.contains("不要给") && (message.contains("方案") || message.contains("建议"));
+                || message.contains("不要给") && (message.contains("方案") || message.contains("建议"))
+                || english && message.toLowerCase().matches("(?s).*(don't|do not|no)\\s+(reassure|advise|give me advice).*");
         boolean actionRequested = message.matches(
-                "(?s).*(十分钟|先动哪|先做哪|拆出|只拆).*(一步|开始|任务).*");
+                "(?s).*(十分钟|先动哪|先做哪|拆出|只拆).*(一步|开始|任务).*")
+                || english && message.toLowerCase().matches("(?s).*(first|one|small).*(step|action|task).*");
         if (actionRequested) {
-            return "几件任务同时挤在眼前，先不用把它们全部铺开。";
+            return english ? "Several tasks are crowding the same moment; they do not all need to be unfolded at once."
+                    : "几件任务同时挤在眼前，先不用把它们全部铺开。";
         }
         if (message.contains("展示") || message.contains("汇报") || message.contains("答辩")
-                || message.toLowerCase().contains("presentation")) {
+                || message.toLowerCase().contains("presentation") || message.toLowerCase().contains("demo")) {
+            if (english) {
+                return noAdvice
+                        ? "No reassurance: one rough edge has become evidence, in your mind, for the seriousness of the whole project."
+                        : "The project is about to be seen, so this tension has become very specific.";
+            }
             return noAdvice
                     ? "先不谈方案。明天要把项目交到别人面前，紧张先留在这里。"
                     : "项目就要交到别人面前了，这一刻的紧张很具体。";
@@ -1116,14 +1131,21 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                     : "眼前这份重量已经很具体了，先不用急着把它变成答案。";
         }
         if (noAdvice) {
-            return "先不谈方案。你刚才放下的这句话，我不急着把它推向下一步。";
+            return english ? "No advice. I will leave the weight of that sentence intact for a moment."
+                    : "先不谈方案。你刚才放下的这句话，我不急着把它推向下一步。";
         }
 
         String clause = firstConcreteClause(message);
         if (!clause.isBlank()) {
-            return "你说的「" + clause + "」，我先不急着替它下结论。";
+            return english ? "The part about “" + clause + "” feels like the live wire; I would not smooth it over yet."
+                    : "你说的「" + clause + "」，我先不急着替它下结论。";
         }
         return foregroundAcknowledgementFallback().segments.get(0);
+    }
+
+    private boolean containsHan(String value) {
+        if (value == null) return false;
+        return value.codePoints().anyMatch(cp -> Character.UnicodeScript.of(cp) == Character.UnicodeScript.HAN);
     }
 
     private String safeForegroundAcknowledgement(String candidate, String fallback, String userMessage) {
@@ -2134,4 +2156,3 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         return null;
     }
 }
-

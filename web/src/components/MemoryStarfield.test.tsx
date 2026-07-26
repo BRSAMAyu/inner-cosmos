@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { MemoryStarfield } from "./MemoryStarfield";
+import { layoutMemoryStars, MemoryStarfield } from "./MemoryStarfield";
 import type { MemoryOperation, StarfieldDetail, StarfieldScene } from "../api";
 
 afterEach(cleanup);
@@ -29,6 +29,30 @@ const detail: StarfieldDetail = {
 };
 
 describe("MemoryStarfield", () => {
+  it("fans missing-time memories into a stable, label-safe constellation", () => {
+    const missingTimeStars = [1, 2, 3].map(id => ({
+      ...starfield.stars[0], id, x: 90, y: 15, occurredAt: null
+    }));
+    const positions = layoutMemoryStars(missingTimeStars, "TIME");
+    const points = missingTimeStars.map(item => positions.get(item.id)!);
+
+    expect(new Set(points.map(point => `${point.left},${point.top}`)).size).toBe(3);
+    expect(points.every(point => point.left >= 12 && point.left <= 82)).toBe(true);
+    expect(points.every(point => point.top >= 14 && point.top <= 86)).toBe(true);
+    expect(layoutMemoryStars([...missingTimeStars].reverse(), "TIME")).toEqual(positions);
+  });
+
+  it("keeps known time on the horizontal axis while separating collisions", () => {
+    const sameMoment = [1, 2, 3].map(id => ({
+      ...starfield.stars[0], id, x: 90, y: 0, occurredAt: "2026-07-15T08:00:00Z"
+    }));
+    const points = sameMoment.map(item => layoutMemoryStars(sameMoment, "TIME").get(item.id)!);
+
+    expect(points[0].left).toBeLessThanOrEqual(82);
+    expect(new Set(points.map(point => `${point.left},${point.top}`)).size).toBe(3);
+    expect(Math.max(...points.map(point => point.left)) - Math.min(...points.map(point => point.left))).toBeLessThanOrEqual(8);
+  });
+
   it("delegates a mode switch without mutating its own state", () => {
     const onChangeMode = vi.fn();
     render(<MemoryStarfield starfield={starfield} starfieldBusy={false} onChangeMode={onChangeMode}
@@ -137,5 +161,9 @@ describe("MemoryStarfield", () => {
     expect(screen.getByRole("button", { name: "This isn't accurate" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Recent memory changes" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Undo this change" })).toBeVisible();
+    expect(screen.getByText("Time flows left to right. Memories from the same moment fan apart, while those without an exact time rest in a gentle central orbit.")).toBeVisible();
+    expect(screen.getByText("Emotional gravity and long-term importance")).toBeVisible();
+    expect(screen.queryByText("按时间排列")).not.toBeInTheDocument();
+    expect(screen.queryByText("情景记忆")).not.toBeInTheDocument();
   });
 });

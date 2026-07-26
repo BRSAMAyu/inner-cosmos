@@ -3,12 +3,31 @@ import { AsyncButton } from "../loading";
 import type { Locale } from "../i18n";
 import type { TtsPreferences, TtsPreferencesPatch, UserProfileSettings } from "../api";
 import { InlineAudioPlayer } from "./shared/InlineAudioPlayer";
+import { LocalizedTemporalInput } from "./shared/LocalizedTemporalInput";
 
 export type AccountBusy = "password" | "export" | "delete" | null;
 
 const toneOrder = ["", "温柔安静", "理性清晰", "朋友式直接", "哲学式追问", "行动导向"] as const;
 const reachabilityOrder = ["PUBLIC", "PRIVATE"] as const;
 const innerVoiceModeOrder = ["AMBIENT", "ON_DEMAND"] as const;
+
+const ENGLISH_VOICE_NAMES: Record<string, string> = {
+  warm_gentle_female: "Warm & gentle · Xiaochun",
+  calm_steady_female: "Calm & steady · Wan'er",
+  deep_soothing_male: "Deep & soothing · Chengran",
+  bright_young_female: "Bright & youthful · Yueyue",
+  bright_young_male: "Bright & upbeat · Angyang",
+  warm_expressive_female: "Warm & expressive · Anhuan"
+};
+
+function englishVoiceName(voiceId: string): string {
+  const knownName = ENGLISH_VOICE_NAMES[voiceId];
+  if (knownName) return knownName;
+  const words = voiceId.replace(/[^a-zA-Z0-9]+/g, " ").trim().split(/\s+/).filter(Boolean);
+  return words.length > 0
+    ? words.map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(" ")
+    : "Aurora voice";
+}
 
 type AccountCopy = {
   aria: string; heading: string; exportTitle: string; exportDesc: string; exportBusy: string; exportBtn: string;
@@ -88,9 +107,9 @@ const COPY: Record<Locale, AccountCopy> = {
 
 // Owner-private Aurora preference editor. Local state is seeded from the loaded profile and reset
 // per profile via key={profile.id} (mirrors CapsuleWorkbench's CapsuleBoundaryEditor pattern).
-function AuroraPreferencesEditor({ profile, profileBusy, onSaveProfile, t }: {
+function AuroraPreferencesEditor({ profile, profileBusy, onSaveProfile, locale, t }: {
   profile: UserProfileSettings; profileBusy: boolean;
-  onSaveProfile: (patch: Partial<UserProfileSettings>) => void; t: AccountCopy;
+  onSaveProfile: (patch: Partial<UserProfileSettings>) => void; locale: Locale; t: AccountCopy;
 }) {
   const [tone, setTone] = useState(profile.auroraTone ?? "");
   const [depth, setDepth] = useState(profile.reflectionDepth ?? 3);
@@ -119,8 +138,10 @@ function AuroraPreferencesEditor({ profile, profileBusy, onSaveProfile, t }: {
     <label>{t.proactiveLabel}<input type="range" min={1} max={5} value={proactive} onChange={event => setProactive(Number(event.target.value))} /></label><small>{t.proactiveHint}</small>
     <label>{t.reachabilityLabel}<select value={reachability} onChange={event => setReachability(event.target.value)}>
       {reachabilityOrder.map(value => <option key={value} value={value}>{t.reachability[value]}</option>)}</select></label>
-    <label>{t.quietStartLabel}<input type="time" value={quietStart} onChange={event => setQuietStart(event.target.value)} /></label>
-    <label>{t.quietEndLabel}<input type="time" value={quietEnd} onChange={event => setQuietEnd(event.target.value)} /></label>
+    <label>{t.quietStartLabel}<LocalizedTemporalInput type="time" label={t.quietStartLabel} locale={locale}
+      value={quietStart} onChange={event => setQuietStart(event.target.value)} /></label>
+    <label>{t.quietEndLabel}<LocalizedTemporalInput type="time" label={t.quietEndLabel} locale={locale}
+      value={quietEnd} onChange={event => setQuietEnd(event.target.value)} /></label>
     <label className="account-toggle"><input type="checkbox" checked={focusMode} onChange={event => setFocusMode(event.target.checked)} />{t.focusModeLabel}</label>
     <label className="account-toggle"><input type="checkbox" checked={weatherAware} onChange={event => setWeatherAware(event.target.checked)} />{t.weatherLabel}</label>
     <label className="account-toggle"><input type="checkbox" checked={timeAware} onChange={event => setTimeAware(event.target.checked)} />{t.timeAwareLabel}</label>
@@ -219,15 +240,18 @@ function VoicePreferencesEditor({ ttsPreferences, ttsBusy, onUpdateTtsPreference
     <fieldset disabled={!enabled}>
       <legend>{t.voicePickLabel}</legend>
       <ul className="voice-preset-list">
-        {ttsPreferences.voices.map(voice => <li key={voice.id} className="voice-preset-option">
+        {ttsPreferences.voices.map(voice => {
+          const displayName = locale === "en-SG" ? englishVoiceName(voice.id) : voice.label;
+          return <li key={voice.id} className="voice-preset-option">
           <label><input type="radio" name="inner-voice-preset" value={voice.id} checked={voiceId === voice.id}
-            disabled={ttsBusy} onChange={() => changeVoice(voice.id)} />{voice.label}</label>
+            disabled={ttsBusy} onChange={() => changeVoice(voice.id)} />{displayName}</label>
           <AsyncButton busy={previewingId === voice.id} busyText={t.voicePreviewBusy}
             disabled={previewingId !== null && previewingId !== voice.id}
             onClick={() => void preview(voice.id)}>{t.voicePreview}</AsyncButton>
           {previewAudio?.voiceId === voice.id && <InlineAudioPlayer key={previewAudio.token}
             audio={previewAudio.audio} autoPlay locale={locale} />}
-        </li>)}
+          </li>;
+        })}
       </ul>
       {previewError && <span className="voice-error" role="alert">{previewError}</span>}
     </fieldset>
@@ -300,7 +324,7 @@ export function AccountSettings({ busy, message, onChangePassword, onExportData,
     } finally { setDeleteSubmitting(false); }
   };
 
-  return <section className="account-settings" aria-label={t.aria}>
+  return <section className="account-settings" aria-label={t.aria} lang={locale}>
     <span className="eyebrow">ACCOUNT &amp; DATA</span>
     <h2>{t.heading}</h2>
     {message && <p className="account-message">{message}</p>}
@@ -344,7 +368,8 @@ export function AccountSettings({ busy, message, onChangePassword, onExportData,
           </div>}
       </article>
 
-      {profile && onSaveProfile && <AuroraPreferencesEditor key={profile.id} profile={profile} profileBusy={profileBusy} onSaveProfile={onSaveProfile} t={t} />}
+      {profile && onSaveProfile && <AuroraPreferencesEditor key={profile.id} profile={profile} profileBusy={profileBusy}
+        onSaveProfile={onSaveProfile} locale={locale} t={t} />}
       {ttsPreferences && onUpdateTtsPreferences && onPreviewVoice &&
         <VoicePreferencesEditor ttsPreferences={ttsPreferences} ttsBusy={ttsBusy}
           onUpdateTtsPreferences={onUpdateTtsPreferences} onPreviewVoice={onPreviewVoice} locale={locale} t={t} />}

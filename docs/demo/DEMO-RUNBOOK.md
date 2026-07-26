@@ -37,6 +37,11 @@ AMD64 版本到被 Git 忽略的 `scripts/demo/bin/`。密钥只注入当前 Doc
 .\scripts\demo\run-public-demo.ps1
 ```
 
+> 从 2026-07-26 之前的中文种子升级到英文课堂 Demo 时，需先执行一次
+> `.\scripts\demo\stop-public-demo.ps1 -DeleteData`。演示数据保存在 PostgreSQL volume
+> 中；仅 `git pull` 和重建镜像不会改写已经沉淀的中文记忆。清理后脚本会重新生成
+> 英文三角色、记忆、共鸣体与慢信数据。此操作只删除课堂 Demo compose 的数据卷。
+
 脚本以单并发 Gradle 和单并发 Compose 构建为默认，依次完成：
 
 1. 生成临时公网 HTTPS 地址；
@@ -44,7 +49,8 @@ AMD64 版本到被 Git 忽略的 `scripts/demo/bin/`。密钥只注入当前 Doc
 3. 构建 Capacitor Android 应用；
 4. 启动 PostgreSQL 16 + pgvector、Redis 和 Spring Boot；
 5. 启用 Redis Session、限流、幂等、Aurora 流和 JDBC Outbox；
-6. 使用真实 DeepSeek 对话、Qwen embedding 和 Qwen TTS，禁用 Mock fallback；
+6. 使用真实 DeepSeek 对话、Qwen embedding 和 Qwen TTS，禁用 Mock fallback；界面与
+   种子默认 en-SG，Aurora 在 Provider 边界按用户当前主要语言自然回应；
 7. 自动验证公网健康、首页、APK 下载、双用户注册、好友、群组、Aurora、记忆沉淀、
    共鸣体发布/发现/对话以及慢信发送；
 8. 打印三个可分享地址和 APK SHA-256。

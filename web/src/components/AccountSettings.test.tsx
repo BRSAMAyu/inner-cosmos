@@ -223,6 +223,14 @@ describe("AccountSettings", () => {
     expect(screen.getByText("New password must be at least 8 characters")).toBeVisible();
     expect(onChangePassword).not.toHaveBeenCalled();
   });
+
+  it("localizes native quiet-hour controls in English mode", () => {
+    render(<AccountSettings locale="en-SG" busy={null} message={null}
+      onChangePassword={() => Promise.resolve(null)} onExportData={() => undefined}
+      onDeleteAccount={() => Promise.resolve(null)} profile={profile} onSaveProfile={() => undefined} />);
+    expect(screen.getByLabelText("Quiet hours start")).toHaveAttribute("lang", "en-SG");
+    expect(screen.getByLabelText("Quiet hours end")).toHaveAttribute("lang", "en-SG");
+  });
 });
 
 describe("AccountSettings -- W2 voice preferences", () => {
@@ -260,6 +268,28 @@ describe("AccountSettings -- W2 voice preferences", () => {
     expect((screen.getByLabelText("含蓄浮现 - 轻触后才展开，声音仍由你点按") as HTMLInputElement).checked).toBe(false);
     expect((screen.getByLabelText("温和 A") as HTMLInputElement).checked).toBe(true);
     expect((screen.getByLabelText("沉静 B") as HTMLInputElement).checked).toBe(false);
+  });
+
+  it("derives natural English voice names from stable ids instead of backend Chinese labels", () => {
+    const productionVoices: TtsPreferences = {
+      ...ttsPreferences,
+      voices: [
+        { id: "warm_gentle_female", label: "温柔女声 · 小春", language: "zh", previewText: "你好。" },
+        { id: "deep_soothing_male", label: "低沉男声 · 成然", language: "zh", previewText: "我在。" },
+        { id: "future_voice_c", label: "未来中文标签", language: "zh", previewText: "你好。" }
+      ],
+      currentVoiceId: "warm_gentle_female"
+    };
+    render(<AccountSettings locale="en-SG" busy={null} message={null}
+      onChangePassword={() => Promise.resolve(null)} onExportData={() => undefined}
+      onDeleteAccount={() => Promise.resolve(null)} ttsPreferences={productionVoices}
+      onUpdateTtsPreferences={() => Promise.resolve(null)}
+      onPreviewVoice={() => Promise.resolve("data:audio/mpeg;base64,AAA")} />);
+
+    expect(screen.getByLabelText("Warm & gentle · Xiaochun")).toBeChecked();
+    expect(screen.getByLabelText("Deep & soothing · Chengran")).not.toBeChecked();
+    expect(screen.getByLabelText("Future Voice C")).not.toBeChecked();
+    expect(screen.queryByText(/温柔女声|低沉男声|未来中文标签/)).not.toBeInTheDocument();
   });
 
   // (a) toggling delivery mode calls PATCH with the right body.

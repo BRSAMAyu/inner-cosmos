@@ -1,11 +1,15 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
   applyColorScheme,
+  applyAdaptiveTheme,
   applyTimeOfDayTheme,
+  colorSchemeForTimeOfDay,
   currentTimeOfDay,
   getColorScheme,
   getLockedTimeOfDay,
+  getPreviewHour,
   setColorScheme,
+  setPreviewHour,
   setThemeLock,
   timeOfDayForHour,
   type TimeOfDay,
@@ -45,7 +49,10 @@ describe("timeOfDayForHour", () => {
 });
 
 describe("theme lock", () => {
-  afterEach(() => setThemeLock(null));
+  afterEach(() => {
+    setThemeLock(null);
+    setPreviewHour(null);
+  });
 
   it("round-trips a valid lock", () => {
     setThemeLock("dusk");
@@ -60,6 +67,24 @@ describe("theme lock", () => {
   it("clears the lock with null", () => {
     setThemeLock("night");
     setThemeLock(null);
+    expect(getLockedTimeOfDay()).toBeNull();
+  });
+});
+
+describe("classroom time preview", () => {
+  afterEach(() => setPreviewHour(null));
+
+  it("stores an exact preview hour and resolves its period", () => {
+    setPreviewHour(16);
+    expect(getPreviewHour()).toBe(16);
+    expect(getLockedTimeOfDay()).toBe("evening");
+  });
+
+  it("normalizes hours and restores live time with null", () => {
+    setPreviewHour(25);
+    expect(getPreviewHour()).toBe(1);
+    setPreviewHour(null);
+    expect(getPreviewHour()).toBeNull();
     expect(getLockedTimeOfDay()).toBeNull();
   });
 });
@@ -82,7 +107,10 @@ describe("applyTimeOfDayTheme", () => {
 });
 
 describe("color scheme (明暗轴)", () => {
-  afterEach(() => setColorScheme(null));
+  afterEach(() => {
+    setColorScheme(null);
+    setPreviewHour(null);
+  });
 
   it("默认(跟随)返回 null", () => {
     expect(getColorScheme()).toBeNull();
@@ -100,17 +128,40 @@ describe("color scheme (明暗轴)", () => {
     expect(getColorScheme()).toBeNull();
   });
 
-  it('applyColorScheme: 仅 day 写 data-theme="day"，否则移除', () => {
+  it("maps the five daylight periods to day and the two late periods to night", () => {
+    expect(colorSchemeForTimeOfDay("dawn")).toBe("day");
+    expect(colorSchemeForTimeOfDay("dusk")).toBe("day");
+    expect(colorSchemeForTimeOfDay("night")).toBe("night");
+    expect(colorSchemeForTimeOfDay("deep-night")).toBe("night");
+  });
+
+  it("follow time is warm-light by day and soft-night after dark", () => {
+    const root = document.createElement("html");
+    applyColorScheme(root, new Date(2026, 0, 1, 13, 0, 0));
+    expect(root.dataset.theme).toBe("day");
+    applyColorScheme(root, new Date(2026, 0, 1, 21, 0, 0));
+    expect(root.dataset.theme).toBe("night");
+  });
+
+  it("manual day/night overrides follow-time", () => {
     const root = document.createElement("html");
     setColorScheme("day");
     applyColorScheme(root);
     expect(root.dataset.theme).toBe("day");
     setColorScheme("night");
     applyColorScheme(root);
-    expect(root.dataset.theme).toBeUndefined(); // 夜色=默认，不写属性
-    setColorScheme(null);
-    root.dataset.theme = "day"; // 预置以验证被清除
-    applyColorScheme(root);
-    expect(root.dataset.theme).toBeUndefined();
+    expect(root.dataset.theme).toBe("night");
+  });
+
+  it("preview hour atomically updates period and follow-time light mode", () => {
+    const root = document.createElement("html");
+    setPreviewHour(8);
+    applyAdaptiveTheme(root);
+    expect(root.dataset.time).toBe("morning");
+    expect(root.dataset.theme).toBe("day");
+    setPreviewHour(1);
+    applyAdaptiveTheme(root);
+    expect(root.dataset.time).toBe("deep-night");
+    expect(root.dataset.theme).toBe("night");
   });
 });

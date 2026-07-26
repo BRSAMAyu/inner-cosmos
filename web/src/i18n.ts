@@ -7,7 +7,10 @@
 
 export type Locale = "zh-CN" | "en-SG";
 export const LOCALES: readonly Locale[] = ["zh-CN", "en-SG"] as const;
-export const DEFAULT_LOCALE: Locale = "zh-CN";
+// Classroom/public-demo bundles open in English on a fresh origin. The normal product keeps its
+// existing Chinese default and either build still respects an explicit user choice in storage.
+const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === "true";
+export const DEFAULT_LOCALE: Locale = DEMO_MODE ? "en-SG" : "zh-CN";
 const STORAGE_KEY = "ic.locale";
 
 /** Coerce any raw value (a stored pref or a navigator.language tag) to a supported Locale, or null. */
@@ -29,7 +32,9 @@ export function detectLocale(opts?: { stored?: string | null; nav?: string | nul
 export function loadLocale(): Locale {
   const stored = typeof localStorage !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
   const nav = typeof navigator !== "undefined" ? navigator.language : null;
-  return detectLocale({ stored, nav });
+  // Classroom Demo is intentionally English-first even when the presenting laptop/browser uses
+  // Chinese. An explicit in-product choice still wins and remains persisted.
+  return detectLocale({ stored, nav: DEMO_MODE ? null : nav });
 }
 
 export function saveLocale(locale: Locale): void {
