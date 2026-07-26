@@ -71,19 +71,19 @@ class SlowLetterServiceImplClockTest {
     }
 
     @Test
-    @DisplayName("1.7: draft() stamps estimatedArrivalAt as exactly now(injected clock) + the named parallax flight duration")
-    void draft_usesInjectedClock_forEstimatedArrival() {
+    @DisplayName("draft keeps delivery intent unanchored until the actual send")
+    void draft_doesNotStartTheFlightClockEarly() {
         when(guardAgent.allow(any())).thenReturn(true);
 
         SlowLetter created = service().draft(1L, request(2L));
 
-        LocalDateTime expected = LocalDateTime.now(FIXED_CLOCK).plus(SlowLetterServiceImpl.PARALLAX_FLIGHT_DURATION);
-        assertEquals(expected, created.estimatedArrivalAt,
-                "estimatedArrivalAt must be computed off the injected Clock, not the wall clock");
+        assertEquals("DEMO_3M", created.deliveryPreset);
+        assertEquals(null, created.estimatedArrivalAt,
+                "a draft must not consume the selected flight time before it is sent");
 
         ArgumentCaptor<SlowLetter> captor = ArgumentCaptor.forClass(SlowLetter.class);
         verify(letterMapper).insert(captor.capture());
-        assertEquals(expected, captor.getValue().estimatedArrivalAt);
+        assertEquals(null, captor.getValue().estimatedArrivalAt);
     }
 
     @Test

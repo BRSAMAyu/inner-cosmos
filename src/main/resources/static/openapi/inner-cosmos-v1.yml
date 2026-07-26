@@ -365,6 +365,17 @@ components:
         receiverUserId: {type: integer, format: int64}
         title: {type: string}
         letterBody: {type: string}
+        deliveryPreset:
+          type: string
+          enum: [DEMO_30S, DEMO_3M, TONIGHT, TOMORROW, CUSTOM]
+          default: DEMO_3M
+        customArrivalAt:
+          type: string
+          format: date-time
+          description: Required for CUSTOM; absolute instant with an explicit offset.
+        timeZone:
+          type: string
+          description: IANA timezone used to resolve TONIGHT and TOMORROW.
     PersonaMessageRequest:
       type: object
       required: [sessionId, message]

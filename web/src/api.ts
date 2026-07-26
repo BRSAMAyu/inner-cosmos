@@ -258,7 +258,13 @@ export type CapsuleQuota = {
 };
 export type SlowLetter = {
   id: number; senderUserId: number; receiverUserId: number; receiverCapsuleId: number; title: string; letterBody: string; status: string;
-  parallaxDistance: number; estimatedArrivalAt: string;
+  parallaxDistance: number; estimatedArrivalAt: string; scheduledArrivalAt?: string | null; deliveryPreset?: DeliveryPreset | null;
+};
+export type DeliveryPreset = "DEMO_30S" | "DEMO_3M" | "TONIGHT" | "TOMORROW" | "CUSTOM";
+export type DeliverySchedule = {
+  deliveryPreset: DeliveryPreset;
+  customArrivalAt?: string;
+  timeZone?: string;
 };
 export type SocialConnection = {
   id: number; status: string; userId: number; nickname: string; username: string; source: string;
@@ -272,6 +278,22 @@ export type GroupMember = { userId: number; memberRole: string; nickname: string
 export type GroupMessage = {
   id: number; groupId: number; senderUserId: number; senderNickname: string;
   messageBody: string; createdAt: string | null;
+};
+export type LiveChatInvite = {
+  id: number; inviterUserId: number; inviterNickname: string; inviteeUserId: number; inviteeNickname: string;
+  durationMinutes: 10 | 15; status: "PENDING" | "ACCEPTED" | "DECLINED" | "EXPIRED";
+  expiresAt: string; respondedAt: string | null; createdAt: string;
+};
+export type LiveChatInvites = { incoming: LiveChatInvite[]; outgoing: LiveChatInvite[] };
+export type LiveChatSession = {
+  id: number; inviteId: number; participantOneId: number; participantOneNickname: string;
+  participantTwoId: number; participantTwoNickname: string; durationMinutes: number;
+  status: "ACTIVE" | "ENDED" | "EXPIRED"; startedAt: string; endsAt: string;
+  endedAt: string | null; endedByUserId: number | null;
+};
+export type LiveChatMessage = {
+  id: number; sessionId: number; senderUserId: number; senderNickname: string;
+  messageBody: string; createdAt: string;
 };
 export type ConnectionRequests = { incoming: SocialConnection[]; outgoing: SocialConnection[] };
 export type DiscoverablePerson = { id: number; username: string; nickname: string; relationStatus: string };
@@ -953,8 +975,8 @@ export const api = {
       headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : undefined
     });
   },
-  draftSlowLetterToUser: (receiverUserId: number, title: string, letterBody: string, idempotencyKey?: string) => {
-    const body: CoreSlowLetterDraftRequest = { receiverUserId, title, letterBody };
+  draftSlowLetterToUser: (receiverUserId: number, title: string, letterBody: string, idempotencyKey?: string, delivery?: DeliverySchedule) => {
+    const body = { receiverUserId, title, letterBody, ...delivery } as CoreSlowLetterDraftRequest & Partial<DeliverySchedule>;
     return request<SlowLetter>("/api/v1/letters/draft", {
       method: "POST", body: JSON.stringify(body),
       headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : undefined
@@ -976,8 +998,8 @@ export const api = {
   reportLetter: (id: number, reason: string) => request<void>(`/api/letters/${id}/report`, {
     method: "POST", body: JSON.stringify({ reason })
   }),
-  replyWithSlowLetter: (id: number, title: string, letterBody: string, idempotencyKey?: string) => request<SlowLetter>(`/api/letters/${id}/reply-with-letter`, {
-    method: "POST", body: JSON.stringify({ title, letterBody }),
+  replyWithSlowLetter: (id: number, title: string, letterBody: string, idempotencyKey?: string, delivery?: DeliverySchedule) => request<SlowLetter>(`/api/letters/${id}/reply-with-letter`, {
+    method: "POST", body: JSON.stringify({ title, letterBody, ...delivery }),
     headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : undefined
   }),
   discoverPeople: () => request<DiscoverablePerson[]>("/api/social/people"),
@@ -1006,6 +1028,20 @@ export const api = {
   sendGroupMessage: (groupId: number, messageBody: string) => request<GroupMessage>(`/api/social/groups/${groupId}/messages`, {
     method: "POST", body: JSON.stringify({ messageBody })
   }),
+  liveChatInvites: () => request<LiveChatInvites>("/api/social/live-chat/invites"),
+  inviteLiveChat: (targetUserId: number, durationMinutes: 10 | 15) => request<LiveChatInvite>("/api/social/live-chat/invites", {
+    method: "POST", body: JSON.stringify({ targetUserId, durationMinutes })
+  }),
+  respondLiveChatInvite: (id: number, decision: "accept" | "decline") =>
+    request<LiveChatSession | null>(`/api/social/live-chat/invites/${id}/respond`, {
+      method: "POST", body: JSON.stringify({ decision })
+    }),
+  activeLiveChatSessions: () => request<LiveChatSession[]>("/api/social/live-chat/sessions/active"),
+  liveChatMessages: (sessionId: number) => request<LiveChatMessage[]>(`/api/social/live-chat/sessions/${sessionId}/messages`),
+  sendLiveChatMessage: (sessionId: number, messageBody: string) => request<LiveChatMessage>(`/api/social/live-chat/sessions/${sessionId}/messages`, {
+    method: "POST", body: JSON.stringify({ messageBody })
+  }),
+  endLiveChatSession: (sessionId: number) => request<LiveChatSession>(`/api/social/live-chat/sessions/${sessionId}/end`, { method: "POST" }),
   relations: () => request<RelationMention[]>("/api/relation/list"),
   relationStats: () => request<Record<string, number>>("/api/relation/stats"),
   relationHighEmotion: () => request<RelationMention[]>("/api/relation/high-emotion"),

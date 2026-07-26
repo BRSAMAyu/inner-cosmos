@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import {
-  api, type ConnectionRequests, type DiscoverablePerson, type GroupInvite, type GroupMember, type GroupMessage, type LetterThread,
+  api, type ConnectionRequests, type DeliverySchedule, type DiscoverablePerson, type GroupInvite, type GroupMember, type GroupMessage,
+  type LetterThread, type LiveChatInvites, type LiveChatMessage, type LiveChatSession,
   type RelationHealth, type RelationMention, type RelationTimelinePoint, type SlowLetter, type SocialConnection, type SocialGroup
 } from "../api";
 import { sendComposedLetter, type DraftedLetterState } from "../composeAndSend";
@@ -70,6 +71,11 @@ export function useConnectionsAndLetters({ setStatus, locale = "zh-CN" }: UseCon
   const [groupMembersStatus, setGroupMembersStatus] = useState<FetchStatus>("idle");
   const [groupMessages, setGroupMessages] = useState<GroupMessage[]>([]);
   const [groupMessagesStatus, setGroupMessagesStatus] = useState<FetchStatus>("idle");
+  const [liveChatInvites, setLiveChatInvites] = useState<LiveChatInvites>({ incoming: [], outgoing: [] });
+  const [liveChatSessions, setLiveChatSessions] = useState<LiveChatSession[]>([]);
+  const [selectedLiveChatSessionId, setSelectedLiveChatSessionId] = useState<number | null>(null);
+  const [liveChatMessages, setLiveChatMessages] = useState<LiveChatMessage[]>([]);
+  const [liveChatStatus, setLiveChatStatus] = useState<FetchStatus>("idle");
   const [groupCreateBusy, setGroupCreateBusy] = useState(false); // no resource id -- one create form
 
   // Gemini audit 4.8 (CONFIRMED/P1): "多个 social action 使用普通 button，无 per-resource busy
@@ -90,6 +96,10 @@ export function useConnectionsAndLetters({ setStatus, locale = "zh-CN" }: UseCon
   const groupInviteDecisionBusyKeys = useBusyKeys<number>(); // keyed by memberId (respondToGroupInvite)
   const groupLeaveBusyKeys = useBusyKeys<number>(); // keyed by groupId (leaveGroup)
   const groupMessageBusyKeys = useBusyKeys<number>(); // keyed by groupId (sendGroupMessage)
+  const liveChatInviteBusyKeys = useBusyKeys<number>(); // keyed by target userId
+  const liveChatDecisionBusyKeys = useBusyKeys<number>(); // keyed by invite id
+  const liveChatMessageBusyKeys = useBusyKeys<number>(); // keyed by session id
+  const liveChatEndBusyKeys = useBusyKeys<number>(); // keyed by session id
 
   // Gemini audit 4.4 (CONFIRMED/P1): relation/thread/group loaders had no request epoch, so a slow
   // response for a stale selection could overwrite the currently-selected resource's state (e.g.
@@ -220,7 +230,8 @@ export function useConnectionsAndLetters({ setStatus, locale = "zh-CN" }: UseCon
       : copy("Could not send this draft yet.", "暂时无法寄出这封草稿")); }
   }), [copy, draftBusyKeys, setStatus]);
 
-  const sendDirectLetter = useCallback(async (receiverUserId: number, title: string, body: string) => {
+  const sendDirectLetter = useCallback(async (receiverUserId: number, title: string, body: string,
+    delivery: DeliverySchedule = { deliveryPreset: "DEMO_3M", timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Shanghai" }) => {
     if (!receiverUserId || !title.trim() || !body.trim() || directLetterBusy) return false;
     setDirectLetterBusy(true);
     try {
@@ -228,7 +239,7 @@ export function useConnectionsAndLetters({ setStatus, locale = "zh-CN" }: UseCon
         pending: directLetterDraftRef.current,
         onDraftCreated: next => { directLetterDraftRef.current = next; },
         createDraft: idempotencyKey => api.draftSlowLetterToUser(
-          receiverUserId, title.trim(), body.trim(), idempotencyKey),
+          receiverUserId, title.trim(), body.trim(), idempotencyKey, delivery),
         sendDraft: (draftId, idempotencyKey) => api.sendSlowLetter(draftId, idempotencyKey)
       });
       directLetterDraftRef.current = null;
@@ -245,6 +256,100 @@ export function useConnectionsAndLetters({ setStatus, locale = "zh-CN" }: UseCon
       setDirectLetterBusy(false);
     }
   }, [copy, directLetterBusy, setStatus]);
+
+  const refreshLiveChats = useCallback(async () => {
+    try {
+      const [invites, sessions] = await Promise.all([
+        api.liveChatInvites(), api.activeLiveChatSessions()
+      ]);
+      setLiveChatInvites(invites);
+      setLiveChatSessions(sessions);
+      const sessionId = sessions.some(session => session.id === selectedLiveChatSessionId)
+        ? selectedLiveChatSessionId
+        : sessions[0]?.id ?? null;
+      setSelectedLiveChatSessionId(sessionId);
+      if (sessionId === null) {
+        setLiveChatMessages([]);
+        setLiveChatStatus("success");
+        return;
+      }
+      const messages = await api.liveChatMessages(sessionId);
+      setLiveChatMessages(messages);
+      setLiveChatStatus("success");
+    } catch {
+      setLiveChatStatus("error");
+    }
+  }, [selectedLiveChatSessionId]);
+
+  const inviteLiveChat = useCallback((targetUserId: number, durationMinutes: 10 | 15) =>
+    liveChatInviteBusyKeys.run(targetUserId, async () => {
+      try {
+        await api.inviteLiveChat(targetUserId, durationMinutes);
+        await refreshLiveChats();
+        setStatus(copy(
+          "Invitation sent. The conversation opens only if they accept.",
+          "「此刻聊聊」邀请已送达；只有对方接受后，实时会话才会打开。"));
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message
+          : copy("Could not send this invitation yet.", "暂时无法发出「此刻聊聊」邀请。"));
+      }
+    }), [copy, liveChatInviteBusyKeys, refreshLiveChats, setStatus]);
+
+  const respondLiveChatInvite = useCallback((inviteId: number, decision: "accept" | "decline") =>
+    liveChatDecisionBusyKeys.run(inviteId, async () => {
+      try {
+        const session = await api.respondLiveChatInvite(inviteId, decision);
+        if (session) setSelectedLiveChatSessionId(session.id);
+        await refreshLiveChats();
+        setStatus(decision === "accept"
+          ? copy("You're both here. This conversation has a gentle time boundary.", "你们都在此刻，会话已经开启，也有清楚的时间边界。")
+          : copy("Invitation declined.", "已婉拒这次即时会面。"));
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message
+          : copy("Could not respond to this invitation.", "暂时无法回应这次邀请。"));
+      }
+    }), [copy, liveChatDecisionBusyKeys, refreshLiveChats, setStatus]);
+
+  const selectLiveChatSession = useCallback(async (sessionId: number) => {
+    setSelectedLiveChatSessionId(sessionId);
+    setLiveChatStatus("loading");
+    try {
+      setLiveChatMessages(await api.liveChatMessages(sessionId));
+      setLiveChatStatus("success");
+    } catch {
+      setLiveChatStatus("error");
+    }
+  }, []);
+
+  const sendLiveChatMessage = useCallback((sessionId: number, messageBody: string) =>
+    liveChatMessageBusyKeys.run(sessionId, async () => {
+      const body = messageBody.trim();
+      if (!body) return false;
+      try {
+        const sent = await api.sendLiveChatMessage(sessionId, body);
+        setLiveChatMessages(current => current.some(message => message.id === sent.id)
+          ? current : [...current, sent]);
+        return true;
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message
+          : copy("Could not send this message.", "这句话暂时没有送达，请再试一次。"));
+        return false;
+      }
+    }), [copy, liveChatMessageBusyKeys, setStatus]);
+
+  const endLiveChatSession = useCallback((sessionId: number) =>
+    liveChatEndBusyKeys.run(sessionId, async () => {
+      try {
+        await api.endLiveChatSession(sessionId);
+        await refreshLiveChats();
+        setStatus(copy(
+          "This moment ended quietly. You can continue with a slow letter.",
+          "这次相聚已经安静结束；想继续的话，可以写成一封慢信。"));
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message
+          : copy("Could not end this conversation.", "暂时无法结束这次会话。"));
+      }
+    }), [copy, liveChatEndBusyKeys, refreshLiveChats, setStatus]);
 
   const actOnLetter = useCallback((letter: SlowLetter, action: "read" | "decline" | "block" | "archive") =>
     letterActionBusyKeys.run(letter.id, async () => {
@@ -472,15 +577,21 @@ export function useConnectionsAndLetters({ setStatus, locale = "zh-CN" }: UseCon
     letterVoiceLetterId, letterVoiceAudio, letterVoiceError, isLetterVoiceBusy: letterVoiceBusyKeys.isBusy,
     groups, groupInvites, selectedGroupId, groupMembers, groupMembersStatus,
     groupMessages, groupMessagesStatus, directLetterBusy,
+    liveChatInvites, liveChatSessions, selectedLiveChatSessionId, liveChatMessages, liveChatStatus,
     groupCreateBusy, isGroupInviteBusy: groupInviteBusyKeys.isBusy,
     isGroupInviteDecisionBusy: groupInviteDecisionBusyKeys.isBusy, isGroupLeaveBusy: groupLeaveBusyKeys.isBusy,
     isGroupMessageBusy: groupMessageBusyKeys.isBusy,
+    isLiveChatInviteBusy: liveChatInviteBusyKeys.isBusy,
+    isLiveChatDecisionBusy: liveChatDecisionBusyKeys.isBusy,
+    isLiveChatMessageBusy: liveChatMessageBusyKeys.isBusy,
+    isLiveChatEndBusy: liveChatEndBusyKeys.isBusy,
     loadLetterInbox, loadConnectionRequests, loadFriends, loadLetterOutbox, loadPeople, loadRelations, loadLetterThreads,
     loadGroups, loadGroupInvites,
-    refreshConnections, refreshGroups, refreshSelectedGroupContext, refreshLetters,
+    refreshConnections, refreshGroups, refreshSelectedGroupContext, refreshLetters, refreshLiveChats,
     requestPersonConnection, openRelation, openThread, sendDraft, sendDirectLetter,
     actOnLetter, reportLetter, replyWithLetter, updateReplyDraft, playLetterVoice,
     requestConnection, decideConnection, leaveConnection,
-    createGroup, openGroup, inviteToGroup, respondToGroupInvite, leaveGroup, sendGroupMessage
+    createGroup, openGroup, inviteToGroup, respondToGroupInvite, leaveGroup, sendGroupMessage,
+    inviteLiveChat, respondLiveChatInvite, selectLiveChatSession, sendLiveChatMessage, endLiveChatSession
   };
 }

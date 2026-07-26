@@ -118,4 +118,16 @@ describe("SocialGroupsView", () => {
     await waitFor(() => expect(onSendMessage).toHaveBeenCalledExactlyOnceWith(1, "好，下午三点。"));
     await waitFor(() => expect(screen.getByLabelText("写给小组成员…")).toHaveValue(""));
   });
+
+  it("offers a clearly local, non-fake hearth ritual above the real group conversation", () => {
+    render(<SocialGroupsView groups={[group()]} invites={[]} friends={[]} selectedGroupId={1}
+      members={[]} messages={[]} messagesStatus="success" createBusy={false}
+      isInviteBusy={() => false} isInviteDecisionBusy={() => false} isLeaveBusy={() => false}
+      currentUserId={1} onSelectGroup={() => undefined} onCreateGroup={() => undefined}
+      onInvite={() => undefined} onRespondInvite={() => undefined} onLeaveGroup={() => undefined} />);
+    expect(screen.getByText("本地仪式 · 不代表成员在线")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "开启围炉" }));
+    expect(screen.getByText(/炉火还会亮/)).toBeVisible();
+    expect(screen.getByRole("button", { name: "结束围炉" })).toBeVisible();
+  });
 });

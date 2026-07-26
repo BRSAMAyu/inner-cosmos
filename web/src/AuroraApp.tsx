@@ -305,6 +305,16 @@ export function AuroraApp() {
     return () => window.clearInterval(timer);
   }, [authenticated, productSpace, connectionTab, connectionsAndLetters.refreshLetters]);
 
+  // "此刻聊聊" is intentionally the one fast lane in Connect: short foreground polling makes
+  // invitations and messages feel live in the classroom demo without turning every relationship
+  // into an always-on chat channel. The poll disappears as soon as the user leaves this tab.
+  useEffect(() => {
+    if (!authenticated || productSpace !== "letters" || connectionTab !== "letters") return;
+    void connectionsAndLetters.refreshLiveChats();
+    const timer = window.setInterval(() => void connectionsAndLetters.refreshLiveChats(), 2_000);
+    return () => window.clearInterval(timer);
+  }, [authenticated, productSpace, connectionTab, connectionsAndLetters.refreshLiveChats]);
+
   // Friend requests and group invitations are created by another signed-in user, so local mutation
   // callbacks alone can never make them appear. Keep the Connect space fresh while it is visible;
   // this bounded foreground poll is intentionally scoped to the product space (and stops on unmount)
@@ -1856,7 +1866,20 @@ export function AuroraApp() {
         isLetterVoiceBusy={connectionsAndLetters.isLetterVoiceBusy} onPlayLetterVoice={letter => void connectionsAndLetters.playLetterVoice(letter)}
         refreshBusy={connectionsAndLetters.lettersRefreshing} onRefresh={() => void connectionsAndLetters.refreshLetters()}
         directLetterBusy={connectionsAndLetters.directLetterBusy}
-        onSendDirectLetter={(receiverUserId, title, body) => connectionsAndLetters.sendDirectLetter(receiverUserId, title, body)}
+        onSendDirectLetter={(receiverUserId, title, body, delivery) => connectionsAndLetters.sendDirectLetter(receiverUserId, title, body, delivery)}
+        liveChatInvites={connectionsAndLetters.liveChatInvites} liveChatSessions={connectionsAndLetters.liveChatSessions}
+        selectedLiveChatSessionId={connectionsAndLetters.selectedLiveChatSessionId}
+        liveChatMessages={connectionsAndLetters.liveChatMessages} liveChatStatus={connectionsAndLetters.liveChatStatus}
+        currentUserId={userProfile?.id ?? null}
+        isLiveChatInviteBusy={connectionsAndLetters.isLiveChatInviteBusy}
+        isLiveChatDecisionBusy={connectionsAndLetters.isLiveChatDecisionBusy}
+        isLiveChatMessageBusy={connectionsAndLetters.isLiveChatMessageBusy}
+        isLiveChatEndBusy={connectionsAndLetters.isLiveChatEndBusy}
+        onInviteLiveChat={(userId, duration) => void connectionsAndLetters.inviteLiveChat(userId, duration)}
+        onRespondLiveChatInvite={(inviteId, decision) => void connectionsAndLetters.respondLiveChatInvite(inviteId, decision)}
+        onSelectLiveChatSession={sessionId => void connectionsAndLetters.selectLiveChatSession(sessionId)}
+        onSendLiveChatMessage={(sessionId, body) => connectionsAndLetters.sendLiveChatMessage(sessionId, body)}
+        onEndLiveChatSession={sessionId => void connectionsAndLetters.endLiveChatSession(sessionId)}
         onComposeNew={() => navigate("/resonance/encounters")} />
       </div>
       </div>

@@ -93,6 +93,47 @@ CREATE TABLE IF NOT EXISTS tb_social_group_message (
   INDEX idx_group_message_group_id (group_id, id)
 );
 
+CREATE TABLE IF NOT EXISTS tb_live_chat_invite (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  inviter_user_id BIGINT NOT NULL,
+  invitee_user_id BIGINT NOT NULL,
+  duration_minutes INT NOT NULL,
+  status VARCHAR(24) NOT NULL,
+  expires_at TIMESTAMP NOT NULL,
+  responded_at TIMESTAMP NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_live_chat_invite_invitee_status (invitee_user_id, status, id),
+  INDEX idx_live_chat_invite_inviter_status (inviter_user_id, status, id)
+);
+
+CREATE TABLE IF NOT EXISTS tb_live_chat_session (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  invite_id BIGINT NOT NULL UNIQUE,
+  participant_one_id BIGINT NOT NULL,
+  participant_two_id BIGINT NOT NULL,
+  duration_minutes INT NOT NULL,
+  status VARCHAR(24) NOT NULL,
+  started_at TIMESTAMP NOT NULL,
+  ends_at TIMESTAMP NOT NULL,
+  ended_at TIMESTAMP NULL,
+  ended_by_user_id BIGINT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_live_chat_session_participant_one (participant_one_id, status, id),
+  INDEX idx_live_chat_session_participant_two (participant_two_id, status, id)
+);
+
+CREATE TABLE IF NOT EXISTS tb_live_chat_message (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  session_id BIGINT NOT NULL,
+  sender_user_id BIGINT NOT NULL,
+  message_body VARCHAR(2000) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_live_chat_message_session_id (session_id, id)
+);
+
 CREATE TABLE IF NOT EXISTS tb_dialog_session (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT NOT NULL,
@@ -540,6 +581,9 @@ CREATE TABLE IF NOT EXISTS tb_slow_letter (
   letter_body TEXT,
   status VARCHAR(32),
   parallax_distance INT DEFAULT 0,
+  delivery_preset VARCHAR(32) NOT NULL DEFAULT 'DEMO_3M',
+  delivery_time_zone VARCHAR(64) NULL,
+  scheduled_arrival_at TIMESTAMP NULL,
   estimated_arrival_at TIMESTAMP NULL,
   sent_at TIMESTAMP NULL,
   delivered_at TIMESTAMP NULL,

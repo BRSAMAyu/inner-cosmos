@@ -61,7 +61,10 @@ describe("LettersInbox", () => {
     fireEvent.change(screen.getByLabelText("写下你真正想说的话…"), { target: { value: "最近还好吗？" } });
     fireEvent.click(screen.getByRole("button", { name: "让慢信启程" }));
 
-    await waitFor(() => expect(onSendDirectLetter).toHaveBeenCalledExactlyOnceWith(30, "近况", "最近还好吗？"));
+    await waitFor(() => expect(onSendDirectLetter).toHaveBeenCalledExactlyOnceWith(
+      30, "近况", "最近还好吗？",
+      expect.objectContaining({ deliveryPreset: "DEMO_30S", timeZone: expect.any(String) })
+    ));
   });
 
   it("marks the reply button busy (disabled + aria-busy) for the letter being sent", () => {

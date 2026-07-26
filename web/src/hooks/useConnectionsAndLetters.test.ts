@@ -33,7 +33,14 @@ vi.mock("../api", () => ({
     leaveGroup: vi.fn(),
     groupMembers: vi.fn(),
     groupMessages: vi.fn(),
-    sendGroupMessage: vi.fn()
+    sendGroupMessage: vi.fn(),
+    liveChatInvites: vi.fn(),
+    inviteLiveChat: vi.fn(),
+    respondLiveChatInvite: vi.fn(),
+    activeLiveChatSessions: vi.fn(),
+    liveChatMessages: vi.fn(),
+    sendLiveChatMessage: vi.fn(),
+    endLiveChatSession: vi.fn()
   }
 }));
 
@@ -409,7 +416,8 @@ describe("useConnectionsAndLetters -- letters", () => {
 
     expect(sent).toBe(true);
     expect(api.draftSlowLetterToUser).toHaveBeenCalledExactlyOnceWith(
-      30, "近况", "最近还好吗？", expect.any(String));
+      30, "近况", "最近还好吗？", expect.any(String),
+      expect.objectContaining({ deliveryPreset: "DEMO_3M", timeZone: expect.any(String) }));
     expect(api.sendSlowLetter).toHaveBeenCalledWith(8, expect.any(String));
     expect(result.current.letterOutbox).toHaveLength(1);
     expect(setStatus).toHaveBeenCalledWith(expect.stringContaining("直接寄给"));
@@ -758,5 +766,33 @@ describe("useConnectionsAndLetters -- groups", () => {
     expect(api.sendGroupMessage).toHaveBeenCalledExactlyOnceWith(5, "周六下午见");
     expect(result.current.groupMessages[0].messageBody).toBe("周六下午见");
     expect(result.current.isGroupMessageBusy(5)).toBe(false);
+  });
+});
+
+describe("useConnectionsAndLetters -- talk now", () => {
+  it("loads an active session and sends a message through the real session endpoint", async () => {
+    const session = {
+      id: 8, inviteId: 3, participantOneId: 1, participantOneNickname: "我",
+      participantTwoId: 2, participantTwoNickname: "阿哲", durationMinutes: 10,
+      status: "ACTIVE" as const, startedAt: "2026-07-26T12:00:00Z",
+      endsAt: "2026-07-26T12:10:00Z", endedAt: null, endedByUserId: null
+    };
+    vi.mocked(api.liveChatInvites).mockResolvedValue({ incoming: [], outgoing: [] });
+    vi.mocked(api.activeLiveChatSessions).mockResolvedValue([session]);
+    vi.mocked(api.liveChatMessages).mockResolvedValue([]);
+    vi.mocked(api.sendLiveChatMessage).mockResolvedValue({
+      id: 9, sessionId: 8, senderUserId: 1, senderNickname: "我",
+      messageBody: "我在。", createdAt: "2026-07-26T12:01:00Z"
+    });
+    const { result } = setup();
+
+    await act(async () => { await result.current.refreshLiveChats(); });
+    let sent = false;
+    await act(async () => { sent = await result.current.sendLiveChatMessage(8, "  我在。  "); });
+
+    expect(result.current.selectedLiveChatSessionId).toBe(8);
+    expect(sent).toBe(true);
+    expect(api.sendLiveChatMessage).toHaveBeenCalledExactlyOnceWith(8, "我在。");
+    expect(result.current.liveChatMessages[0].messageBody).toBe("我在。");
   });
 });

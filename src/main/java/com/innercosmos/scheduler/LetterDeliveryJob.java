@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 @Component
@@ -38,18 +39,31 @@ public class LetterDeliveryJob {
         this.logMapper = logMapper;
     }
 
+    /**
+     * Production uses the application's UTC clock, matching the UTC LocalDateTime persisted by
+     * SlowLetterServiceImpl. Keeping the small test hook below avoids wall-clock sleeps in the
+     * existing scheduler tests.
+     */
+    @org.springframework.beans.factory.annotation.Autowired
+    void configureClock(Clock applicationClock) {
+        this.clock = applicationClock;
+    }
+
     void useClock(Clock fixedClock) {
         this.clock = fixedClock;
     }
 
-    // Do not run on ContextRefreshedEvent: the dev profile upgrades long-lived H2 files through
-    // ordered ApplicationRunner schema initializers. An immediate first tick can otherwise query
-    // newly added columns before those runners finish. Waiting one normal polling interval also
-    // matches the operator-facing "every minute" delivery contract.
-    @Scheduled(fixedRate = 60000, initialDelay = 60000)
-    @SchedulerLock(name = "letter-delivery", lockAtMostFor = "PT5M", lockAtLeastFor = "PT55S")
+    // Five-second polling keeps the truthful DEMO_30S journey visibly near 30 seconds without
+    // client-side fakery. Both values remain operator-configurable for a larger deployment.
+    @Scheduled(
+            fixedDelayString = "${inner-cosmos.letters.delivery-poll-ms:5000}",
+            initialDelayString = "${inner-cosmos.letters.delivery-initial-delay-ms:5000}")
+    @SchedulerLock(
+            name = "letter-delivery",
+            lockAtMostFor = "PT5M",
+            lockAtLeastFor = "${inner-cosmos.letters.delivery-lock-at-least:PT4S}")
     public void deliverArrivedLetters() {
-        LocalDateTime now = LocalDateTime.now(clock);
+        LocalDateTime now = LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
         // Gemini audit 1.2 (CONFIRMED/P1): the old Stage 1 query gated SENT->FLYING on
         // `estimated_arrival_at <= now` -- the SAME condition that should gate arrival -- so a
         // letter only ever became visibly FLYING once it had ALREADY matured, and Stage 2 (below)
@@ -107,7 +121,9 @@ public class LetterDeliveryJob {
                 UpdateWrapper<SlowLetter> claim = new UpdateWrapper<SlowLetter>()
                         .eq("id", letter.id).eq("status", fromStatus)
                         .set("status", toStatus);
-                if (setDeliveredAt) claim.set("delivered_at", LocalDateTime.now());
+                if (setDeliveredAt) {
+                    claim.set("delivered_at", LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC));
+                }
                 int updated = letterMapper.update(null, claim);
                 if (updated == 0) {
                     // Never retry a lost race: the letter is no longer at fromStatus, so a

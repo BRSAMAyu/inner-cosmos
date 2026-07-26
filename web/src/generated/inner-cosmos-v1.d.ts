@@ -276,6 +276,18 @@ export interface components {
             receiverUserId?: number;
             title: string;
             letterBody: string;
+            /**
+             * @default DEMO_3M
+             * @enum {string}
+             */
+            deliveryPreset?: "DEMO_30S" | "DEMO_3M" | "TONIGHT" | "TOMORROW" | "CUSTOM";
+            /**
+             * Format: date-time
+             * @description Required for CUSTOM; absolute instant with an explicit offset.
+             */
+            customArrivalAt?: string;
+            /** @description IANA timezone used to resolve TONIGHT and TOMORROW. */
+            timeZone?: string;
         } | unknown | unknown;
         PersonaMessageRequest: {
             /** Format: int64 */

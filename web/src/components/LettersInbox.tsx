@@ -1,8 +1,13 @@
-import { useState } from "react";
-import type { ConnectionRequests, LetterThread, SlowLetter, SocialConnection } from "../api";
+import { useEffect, useState } from "react";
+import type {
+  ConnectionRequests, DeliveryPreset, DeliverySchedule, LetterThread, LiveChatInvites, LiveChatMessage,
+  LiveChatSession, SlowLetter, SocialConnection
+} from "../api";
 import type { Locale } from "../i18n";
 import { AsyncButton, LoadingText } from "../loading";
+import { formatSlowLetterInstant, secondsUntilSlowLetterArrival, toLocalDateTimeInputValue } from "../slowLetterTime";
 import { InlineAudioPlayer } from "./shared/InlineAudioPlayer";
+import { LiveChatPanel } from "./LiveChatPanel";
 
 const repliable = new Set(["READ", "REPLIED"]);
 const declinable = new Set(["DELIVERED", "READ"]);
@@ -23,6 +28,8 @@ const COPY: Record<Locale, {
   threadLettersEmpty: string; threadLettersError: string;
   refresh: string; refreshBusy: string; autoRefreshNote: string; composeNew: string; safetyActions: string;
   directTo: string; directPick: string; directTitle: string; directBody: string; directSend: string; directBusy: string; directCancel: string;
+  deliveryRhythm: string; deliveryHint: string; customArrival: string;
+  deliveryOptions: Record<DeliveryPreset, string>; sealNote: string; countdown: (value: string) => string;
   consentAria: string; awaitingYou: string; noIncoming: string; wantsToKnow: (name: string) => string; accept: string; acceptBusy: string; declineConn: string; declineConnBusy: string;
   awaitingThem: string; noOutgoing: string; notYetAgreed: string; bothAgreed: string; noFriends: string; leave: string; leaveBusy: string;
 }> = {
@@ -48,6 +55,9 @@ const COPY: Record<Locale, {
     composeNew: "写一封慢信", safetyActions: "边界与安全",
     directTo: "写给已连接的好友", directPick: "选择一位好友", directTitle: "信的标题",
     directBody: "写下你真正想说的话…", directSend: "让慢信启程", directBusy: "正在启程", directCancel: "取消",
+    deliveryRhythm: "选择抵达的节奏", deliveryHint: "Demo 可选 30 秒或 3 分钟；正式节奏仍由服务端锁定，不会用前端假装抵达。自定义时间按你当前设备时区填写。", customArrival: "自定义抵达时间（当前时区）",
+    deliveryOptions: { DEMO_30S: "演示片刻后 · 30 秒", DEMO_3M: "稍后抵达 · 3 分钟", TONIGHT: "今晚抵达", TOMORROW: "明天此时", CUSTOM: "自定义时间" },
+    sealNote: "寄出时会短暂封缄，然后进入旅途。动画不会阻碍你继续浏览。", countdown: value => `还有 ${value} 抵达`,
     consentAria: "双向连接同意", awaitingYou: "等待你决定", noIncoming: "没有新的连接邀请", wantsToKnow: name => `${name} 想在慢信之后认识你`, accept: "我也愿意", acceptBusy: "正在同意", declineConn: "暂不连接", declineConnBusy: "正在婉拒",
     awaitingThem: "等待对方决定", noOutgoing: "没有等待中的邀请", notYetAgreed: "尚未同意，不会提前开放真人连接", bothAgreed: "双方已同意", noFriends: "还没有建立真人连接", leave: "退出连接", leaveBusy: "正在退出"
   },
@@ -73,6 +83,9 @@ const COPY: Record<Locale, {
     composeNew: "Write a slow letter", safetyActions: "Boundaries & safety",
     directTo: "Write to a connection", directPick: "Choose a connection", directTitle: "Letter title",
     directBody: "Write what you genuinely want to say…", directSend: "Send slow letter", directBusy: "Sending", directCancel: "Cancel",
+    deliveryRhythm: "Choose its arrival rhythm", deliveryHint: "Use 30 seconds or 3 minutes for the demo. The server still locks the real arrival time. Custom times use your current device time zone.", customArrival: "Custom arrival (current time zone)",
+    deliveryOptions: { DEMO_30S: "Demo moment · 30 seconds", DEMO_3M: "A little later · 3 minutes", TONIGHT: "Tonight", TOMORROW: "This time tomorrow", CUSTOM: "Custom time" },
+    sealNote: "Sending briefly seals the letter before its journey. The animation never blocks the rest of the app.", countdown: value => `Arrives in ${value}`,
     consentAria: "Mutual connection consent", awaitingYou: "Awaiting your decision", noIncoming: "No new connection invitations", wantsToKnow: name => `${name} would like to know you after the letters`, accept: "I'd like to too", acceptBusy: "Accepting", declineConn: "Not yet", declineConnBusy: "Declining",
     awaitingThem: "Awaiting their decision", noOutgoing: "No pending invitations", notYetAgreed: "Not yet agreed — a real connection won't open early", bothAgreed: "Both agreed", noFriends: "No real connections yet", leave: "Leave connection", leaveBusy: "Leaving"
   }
@@ -85,7 +98,12 @@ export function LettersInbox({ letterInbox, letterOutbox = [], threads = [], thr
   onSendDraft, onOpenThread, locale = "zh-CN",
   letterVoiceLetterId = null, letterVoiceAudio = null, letterVoiceError = null,
   isLetterVoiceBusy = () => false, onPlayLetterVoice, refreshBusy = false, onRefresh, onComposeNew,
-  directLetterBusy = false, onSendDirectLetter }: {
+  directLetterBusy = false, onSendDirectLetter,
+  liveChatInvites = { incoming: [], outgoing: [] }, liveChatSessions = [], selectedLiveChatSessionId = null,
+  liveChatMessages = [], liveChatStatus = "idle", currentUserId = null,
+  isLiveChatInviteBusy = () => false, isLiveChatDecisionBusy = () => false,
+  isLiveChatMessageBusy = () => false, isLiveChatEndBusy = () => false,
+  onInviteLiveChat, onRespondLiveChatInvite, onSelectLiveChatSession, onSendLiveChatMessage, onEndLiveChatSession }: {
   letterInbox: SlowLetter[]; letterOutbox?: SlowLetter[]; threads?: LetterThread[]; threadLetters?: SlowLetter[];
   threadLettersStatus?: "idle" | "loading" | "success" | "error";
   selectedThreadId?: number | null; replyBusyId?: number | null;
@@ -108,7 +126,17 @@ export function LettersInbox({ letterInbox, letterOutbox = [], threads = [], thr
   isLetterVoiceBusy?: (letterId: number) => boolean; onPlayLetterVoice?: (letter: SlowLetter) => void;
   refreshBusy?: boolean; onRefresh?: () => void; onComposeNew?: () => void;
   directLetterBusy?: boolean;
-  onSendDirectLetter?: (receiverUserId: number, title: string, body: string) => Promise<boolean>;
+  onSendDirectLetter?: (receiverUserId: number, title: string, body: string, delivery: DeliverySchedule) => Promise<boolean>;
+  liveChatInvites?: LiveChatInvites; liveChatSessions?: LiveChatSession[];
+  selectedLiveChatSessionId?: number | null; liveChatMessages?: LiveChatMessage[];
+  liveChatStatus?: "idle" | "loading" | "success" | "error"; currentUserId?: number | null;
+  isLiveChatInviteBusy?: (userId: number) => boolean; isLiveChatDecisionBusy?: (inviteId: number) => boolean;
+  isLiveChatMessageBusy?: (sessionId: number) => boolean; isLiveChatEndBusy?: (sessionId: number) => boolean;
+  onInviteLiveChat?: (userId: number, duration: 10 | 15) => void;
+  onRespondLiveChatInvite?: (inviteId: number, decision: "accept" | "decline") => void;
+  onSelectLiveChatSession?: (sessionId: number) => void;
+  onSendLiveChatMessage?: (sessionId: number, body: string) => Promise<boolean>;
+  onEndLiveChatSession?: (sessionId: number) => void;
 }) {
   const t = COPY[locale];
   const [tab, setTab] = useState<"inbox" | "outbox" | "drafts" | "threads">("inbox");
@@ -116,6 +144,13 @@ export function LettersInbox({ letterInbox, letterOutbox = [], threads = [], thr
   const [directReceiverId, setDirectReceiverId] = useState("");
   const [directTitle, setDirectTitle] = useState("");
   const [directBody, setDirectBody] = useState("");
+  const [deliveryPreset, setDeliveryPreset] = useState<DeliveryPreset>("DEMO_30S");
+  const [customArrival, setCustomArrival] = useState("");
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1_000);
+    return () => window.clearInterval(timer);
+  }, []);
   const drafts = letterOutbox.filter(l => l.status === "DRAFT");
   const sent = letterOutbox.filter(l => l.status !== "DRAFT");
   const counts: Record<string, string> = { inbox: t.counts.inbox(letterInbox.length), outbox: t.counts.outbox(sent.length), drafts: t.counts.drafts(drafts.length), threads: t.counts.threads(threads.length) };
@@ -141,12 +176,30 @@ export function LettersInbox({ letterInbox, letterOutbox = [], threads = [], thr
         onChange={event => setDirectTitle(event.target.value)} />
       <textarea aria-label={t.directBody} placeholder={t.directBody} value={directBody}
         onChange={event => setDirectBody(event.target.value)} />
+      <fieldset className="letter-delivery-rhythm">
+        <legend>{t.deliveryRhythm}</legend>
+        <div>{(Object.keys(t.deliveryOptions) as DeliveryPreset[]).map(option =>
+          <button type="button" key={option} aria-pressed={deliveryPreset === option}
+            onClick={() => setDeliveryPreset(option)}>{t.deliveryOptions[option]}</button>)}</div>
+        {deliveryPreset === "CUSTOM" && <label>{t.customArrival}
+          <input type="datetime-local" value={customArrival} min={toLocalDateTimeInputValue(new Date(Date.now() + 60_000))}
+            onChange={event => setCustomArrival(event.target.value)} />
+        </label>}
+        <small>{t.deliveryHint}</small>
+      </fieldset>
+      <div className="letter-seal-preview" aria-hidden="true"><span>✦</span><i /></div>
+      <small className="letter-seal-note">{t.sealNote}</small>
       <div>
         <button type="button" className="quiet" onClick={() => setDirectComposeOpen(false)}>{t.directCancel}</button>
         <AsyncButton busy={directLetterBusy} busyText={t.directBusy}
-          disabled={!directReceiverId || !directTitle.trim() || !directBody.trim()}
+          disabled={!directReceiverId || !directTitle.trim() || !directBody.trim() || (deliveryPreset === "CUSTOM" && !customArrival)}
           onClick={() => {
-            void onSendDirectLetter(Number(directReceiverId), directTitle, directBody).then(sent => {
+            const delivery: DeliverySchedule = {
+              deliveryPreset,
+              timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Shanghai",
+              ...(deliveryPreset === "CUSTOM" ? { customArrivalAt: new Date(customArrival).toISOString() } : {})
+            };
+            void onSendDirectLetter(Number(directReceiverId), directTitle, directBody, delivery).then(sent => {
               if (!sent) return;
               setDirectComposeOpen(false); setDirectReceiverId(""); setDirectTitle(""); setDirectBody("");
               setTab("outbox");
@@ -197,14 +250,24 @@ export function LettersInbox({ letterInbox, letterOutbox = [], threads = [], thr
     </> : tab === "outbox" ? <>
       <p className="resonance-intro">{t.outboxIntro}</p>
       {sent.length === 0 ? <div className="network-empty">{t.outboxEmpty}</div> : <div className="inbox-list outbox-list">
-        {sent.map(letter => <article key={letter.id}><header><strong>{letter.title}</strong>
+        {sent.map(letter => {
+          const eta = letter.scheduledArrivalAt || letter.estimatedArrivalAt;
+          const remainingSeconds = eta ? secondsUntilSlowLetterArrival(eta, now) : 0;
+          const remaining = `${String(Math.floor(remainingSeconds / 60)).padStart(2, "0")}:${String(remainingSeconds % 60).padStart(2, "0")}`;
+          const stage = letter.status === "READ" || letter.status === "REPLIED" ? 3
+            : letter.status === "DELIVERED" ? 2 : letter.status === "FLYING" || letter.status === "SENT" ? 1 : 0;
+          return <article key={letter.id} className={`letter-ritual-card stage-${stage}`}><header><strong>{letter.title}</strong>
           <span className="outbox-status">{status(letter.status)}</span></header>
           <p className="ugc-text">{letter.letterBody}</p>
+          <div className="letter-ritual-steps" aria-label={`${status(letter.status)} · ${eta ? t.arrivalEta(formatSlowLetterInstant(eta, { locale })) : ""}`}>
+            {["封缄", "旅途", "抵达", "开启"].map((label, index) =>
+              <span key={label} className={index <= stage ? "is-reached" : ""}><i />{locale === "en-SG" ? ["Sealed", "Journey", "Arrived", "Opened"][index] : label}</span>)}
+          </div>
           {letter.status === "FLYING" && <div className="letter-flying-transit" aria-hidden="true"><span className="letter-flying-point" /></div>}
-          {letter.estimatedArrivalAt && (letter.status === "FLYING" || letter.status === "SENT") &&
-            <small>{t.arrivalEta(new Date(letter.estimatedArrivalAt).toLocaleString(locale))}</small>}
+          {eta && (letter.status === "FLYING" || letter.status === "SENT") &&
+            <div className="letter-arrival-clock"><strong>{t.countdown(remaining)}</strong><small>{t.arrivalEta(formatSlowLetterInstant(eta, { locale }))}</small></div>}
           {archivableFromOutbox.has(letter.status) && <AsyncButton busy={isLetterActionBusy(letter.id)} busyText={t.archiveBusy} onClick={() => onActOnLetter(letter, "archive")}>{t.archiveLetter}</AsyncButton>}
-        </article>)}
+        </article>;})}
       </div>}
     </> : tab === "drafts" ? <>
       <p className="resonance-intro">{t.draftsIntro}</p>
@@ -255,5 +318,13 @@ export function LettersInbox({ letterInbox, letterOutbox = [], threads = [], thr
       <div><strong>{t.awaitingThem}</strong>{connectionRequests.outgoing.length === 0 ? <small>{t.noOutgoing}</small> : connectionRequests.outgoing.map(item => <article key={item.id}><span>{item.nickname}</span><small>{t.notYetAgreed}</small></article>)}</div>
       <div><strong>{t.bothAgreed}</strong>{friends.length === 0 ? <small>{t.noFriends}</small> : friends.map(item => <article key={item.id}><span>{item.nickname}</span><AsyncButton busy={isConnectionLeaveBusy(item.id)} busyText={t.leaveBusy} onClick={() => onLeaveConnection(item.id)}>{t.leave}</AsyncButton></article>)}</div>
     </div>
+    {onInviteLiveChat && onRespondLiveChatInvite && onSelectLiveChatSession && onSendLiveChatMessage && onEndLiveChatSession &&
+      <LiveChatPanel friends={friends} invites={liveChatInvites} sessions={liveChatSessions}
+        selectedSessionId={selectedLiveChatSessionId} messages={liveChatMessages} status={liveChatStatus}
+        currentUserId={currentUserId} isInviteBusy={isLiveChatInviteBusy} isDecisionBusy={isLiveChatDecisionBusy}
+        isMessageBusy={isLiveChatMessageBusy} isEndBusy={isLiveChatEndBusy}
+        onWriteLetter={userId => { setDirectReceiverId(String(userId)); setDirectComposeOpen(true); }}
+        onInvite={onInviteLiveChat} onRespond={onRespondLiveChatInvite} onSelectSession={onSelectLiveChatSession}
+        onSendMessage={onSendLiveChatMessage} onEndSession={onEndLiveChatSession} locale={locale} />}
   </section>;
 }

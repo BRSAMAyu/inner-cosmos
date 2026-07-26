@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { GroupInvite, GroupMember, GroupMessage, SocialConnection, SocialGroup } from "../api";
 import type { Locale } from "../i18n";
 import { AsyncButton, LoadingText } from "../loading";
@@ -13,6 +13,8 @@ const COPY: Record<Locale, {
   membersLoading: string; membersError: string;
   conversationHeading: string; conversationEmpty: string; conversationLoading: string; conversationError: string;
   messagePlaceholder: string; messageBusy: string; sendMessage: string;
+  hearthHeading: string; hearthIntro: string; hearthStart: string; hearthClose: string;
+  hearthDuration: string; hearthLocal: string; hearthRemaining: (value: string) => string;
 }> = {
   "zh-CN": {
     aria: "慢群组", heading: "一小群人，也可以认真地聊在一起", count: n => `${n} 个群组`,
@@ -26,7 +28,10 @@ const COPY: Record<Locale, {
     membersLoading: "正在读取成员…", membersError: "暂时读不到成员列表，请稍后再试。",
     conversationHeading: "群聊", conversationEmpty: "还没有消息。你可以先认真地说一句。",
     conversationLoading: "正在读取群聊…", conversationError: "暂时读不到群聊，请稍后再试。",
-    messagePlaceholder: "写给小组成员…", messageBusy: "正在发送", sendMessage: "发送"
+    messagePlaceholder: "写给小组成员…", messageBusy: "正在发送", sendMessage: "发送",
+    hearthHeading: "围炉", hearthIntro: "把群聊暂时变成一段共同在场的专注时间。消息仍写真正的群聊；这一轮计时只保存在你的设备上，不会伪装其他成员在线。",
+    hearthStart: "开启围炉", hearthClose: "结束围炉", hearthDuration: "围炉时长", hearthLocal: "本地仪式 · 不代表成员在线",
+    hearthRemaining: value => `炉火还会亮 ${value}`
   },
   "en-SG": {
     aria: "Slow groups", heading: "A small circle can still talk meaningfully together", count: n => `${n} group${n === 1 ? "" : "s"}`,
@@ -40,7 +45,10 @@ const COPY: Record<Locale, {
     membersLoading: "Loading members…", membersError: "Couldn't load the member list right now -- try again shortly.",
     conversationHeading: "Group conversation", conversationEmpty: "No messages yet. You can begin with one considered note.",
     conversationLoading: "Loading the conversation…", conversationError: "Couldn't load the group conversation right now.",
-    messagePlaceholder: "Write to the group…", messageBusy: "Sending", sendMessage: "Send"
+    messagePlaceholder: "Write to the group…", messageBusy: "Sending", sendMessage: "Send",
+    hearthHeading: "Hearth", hearthIntro: "Turn the group into a shared period of focused presence. Messages remain real group messages; this timer stays on your device and never pretends others are online.",
+    hearthStart: "Light the hearth", hearthClose: "Close the hearth", hearthDuration: "Hearth length", hearthLocal: "Local ritual · not an online claim",
+    hearthRemaining: value => `The hearth stays lit for ${value}`
   }
 };
 
@@ -71,6 +79,14 @@ export function SocialGroupsView({ groups, invites, friends, selectedGroupId, me
   const [name, setName] = useState("");
   const [inviteUserId, setInviteUserId] = useState("");
   const [messageBody, setMessageBody] = useState("");
+  const [hearthMinutes, setHearthMinutes] = useState<10 | 15>(10);
+  const [hearthEndsAt, setHearthEndsAt] = useState<number | null>(null);
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  useEffect(() => setHearthEndsAt(null), [selectedGroupId]);
   const selectedGroup = groups.find(g => g.id === selectedGroupId) ?? null;
   // Regression (Gemini audit / remaining-work-handoff.md 2.2.4): the backend correctly rejects
   // OWNER leave-group (must transfer ownership or disband first), but this button rendered
@@ -127,6 +143,19 @@ export function SocialGroupsView({ groups, invites, friends, selectedGroupId, me
             onClick={() => { onInvite(selectedGroup.id, Number(inviteUserId)); setInviteUserId(""); }}>{t.invite}</AsyncButton>
         </div>}
         {friends.length === 0 && <p className="muted">{t.noFriends}</p>}
+        <section className={"group-hearth" + (hearthEndsAt && hearthEndsAt > now ? " is-lit" : "")}
+          aria-label={t.hearthHeading}>
+          <div className="group-hearth-flame" aria-hidden="true"><i /><i /><i /></div>
+          <div><h3>{t.hearthHeading}</h3><p>{t.hearthIntro}</p><small>{t.hearthLocal}</small></div>
+          {hearthEndsAt && hearthEndsAt > now
+            ? <div className="group-hearth-active"><strong>{t.hearthRemaining(`${String(Math.floor((hearthEndsAt - now) / 60_000)).padStart(2, "0")}:${String(Math.floor((hearthEndsAt - now) / 1000) % 60).padStart(2, "0")}`)}</strong>
+              <button type="button" className="quiet" onClick={() => setHearthEndsAt(null)}>{t.hearthClose}</button></div>
+            : <div className="group-hearth-controls"><label>{t.hearthDuration}<select value={hearthMinutes}
+                onChange={event => setHearthMinutes(Number(event.target.value) as 10 | 15)}>
+                <option value={10}>10 min</option><option value={15}>15 min</option>
+              </select></label>
+              <button type="button" onClick={() => setHearthEndsAt(Date.now() + hearthMinutes * 60_000)}>{t.hearthStart}</button></div>}
+        </section>
         <div className="group-conversation" aria-label={t.conversationHeading}>
           <h3>{t.conversationHeading}</h3>
           <div className="group-message-list" aria-live="polite">

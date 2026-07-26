@@ -7,6 +7,7 @@ import com.innercosmos.ai.tts.TtsClient;
 import com.innercosmos.ai.tts.TtsVoicePresets;
 import com.innercosmos.common.ErrorCode;
 import com.innercosmos.dto.LetterCreateRequest;
+import com.innercosmos.dto.LetterDeliveryPreset;
 import com.innercosmos.entity.BlockRelation;
 import com.innercosmos.entity.EchoCapsule;
 import com.innercosmos.entity.LetterStatusLog;
@@ -31,7 +32,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.List;
 
 @Service
@@ -43,6 +49,10 @@ public class SlowLetterServiceImpl implements SlowLetterService {
      * flight duration"), not an arbitrary constant, so it is named and defined once here.
      */
     static final Duration PARALLAX_FLIGHT_DURATION = Duration.ofMinutes(3);
+    static final Duration DEMO_SHORT_FLIGHT_DURATION = Duration.ofSeconds(30);
+    static final Duration MAX_CUSTOM_FLIGHT_DURATION = Duration.ofDays(365);
+    static final ZoneId DEFAULT_DELIVERY_ZONE = ZoneId.of("Asia/Shanghai");
+    static final LocalTime TONIGHT_ARRIVAL_TIME = LocalTime.of(21, 0);
 
     private final SlowLetterMapper letterMapper;
     private final LetterStatusLogMapper logMapper;
@@ -141,11 +151,121 @@ public class SlowLetterServiceImpl implements SlowLetterService {
         letter.letterBody = request.letterBody;
         letter.status = "DRAFT";
         letter.parallaxDistance = 3;
-        letter.estimatedArrivalAt = LocalDateTime.now(clock).plus(PARALLAX_FLIGHT_DURATION);
+        applyDeliveryIntent(letter, request);
         letter.versionNo = 0;
         letter.idempotencyKey = blankToNull(request.idempotencyKey);
         insertIdempotently(letter, userId);
         return letter;
+    }
+
+    /**
+     * Persist only the sender's delivery intent while the letter is editable. Relative presets
+     * are deliberately not anchored to draft creation: a draft left open for five minutes must
+     * not arrive immediately when it is finally sent.
+     */
+    private void applyDeliveryIntent(SlowLetter letter, LetterCreateRequest request) {
+        LetterDeliveryPreset preset = request.deliveryPreset == null
+                ? LetterDeliveryPreset.DEMO_3M
+                : request.deliveryPreset;
+        letter.deliveryPreset = preset.name();
+        letter.deliveryTimeZone = usesCalendarZone(preset)
+                ? resolveZone(request.timeZone).getId()
+                : null;
+        letter.estimatedArrivalAt = null;
+        letter.scheduledArrivalAt = null;
+
+        if (preset == LetterDeliveryPreset.CUSTOM) {
+            if (request.customArrivalAt == null) {
+                throw new BusinessException(ErrorCode.BAD_REQUEST, "自定义抵达时间不能为空");
+            }
+            validateCustomArrival(request.customArrivalAt);
+            letter.scheduledArrivalAt = utcDateTime(request.customArrivalAt);
+        } else if (request.customArrivalAt != null) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "只有自定义节奏可以指定抵达时间");
+        }
+    }
+
+    /**
+     * Resolve and lock the authoritative due time at the actual SENT transition. The scheduler
+     * continues to gate real delivery solely on estimated_arrival_at; no API or UI may skip the
+     * SENT -> FLYING -> DELIVERED lifecycle.
+     */
+    private LocalDateTime resolveArrivalAtSend(SlowLetter letter) {
+        LetterDeliveryPreset preset = parsePreset(letter.deliveryPreset);
+        Instant now = clock.instant();
+        Instant arrival;
+        switch (preset) {
+            case DEMO_30S -> arrival = now.plus(DEMO_SHORT_FLIGHT_DURATION);
+            case DEMO_3M -> arrival = now.plus(PARALLAX_FLIGHT_DURATION);
+            case TONIGHT -> {
+                ZoneId zone = resolveZone(letter.deliveryTimeZone);
+                ZonedDateTime localNow = now.atZone(zone);
+                ZonedDateTime candidate = localNow.toLocalDate().atTime(TONIGHT_ARRIVAL_TIME).atZone(zone);
+                if (!candidate.toInstant().isAfter(now)) {
+                    candidate = candidate.plusDays(1);
+                }
+                arrival = candidate.toInstant();
+                letter.deliveryTimeZone = zone.getId();
+            }
+            case TOMORROW -> {
+                ZoneId zone = resolveZone(letter.deliveryTimeZone);
+                arrival = now.atZone(zone).plusDays(1).withSecond(0).withNano(0).toInstant();
+                letter.deliveryTimeZone = zone.getId();
+            }
+            case CUSTOM -> {
+                if (letter.scheduledArrivalAt == null) {
+                    throw new BusinessException(ErrorCode.BAD_REQUEST, "自定义抵达时间不能为空");
+                }
+                arrival = letter.scheduledArrivalAt.toInstant(ZoneOffset.UTC);
+                validateCustomArrival(arrival);
+            }
+            default -> throw new BusinessException(ErrorCode.BAD_REQUEST, "不支持的慢信抵达节奏");
+        }
+        LocalDateTime resolved = utcDateTime(arrival);
+        letter.deliveryPreset = preset.name();
+        letter.scheduledArrivalAt = resolved;
+        letter.estimatedArrivalAt = resolved;
+        return resolved;
+    }
+
+    private void validateCustomArrival(Instant arrival) {
+        Instant now = clock.instant();
+        if (!arrival.isAfter(now)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "抵达时间必须晚于现在");
+        }
+        if (arrival.isAfter(now.plus(MAX_CUSTOM_FLIGHT_DURATION))) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "抵达时间不能超过一年");
+        }
+    }
+
+    private static boolean usesCalendarZone(LetterDeliveryPreset preset) {
+        return preset == LetterDeliveryPreset.TONIGHT || preset == LetterDeliveryPreset.TOMORROW;
+    }
+
+    private static LetterDeliveryPreset parsePreset(String value) {
+        if (value == null || value.isBlank()) {
+            return LetterDeliveryPreset.DEMO_3M;
+        }
+        try {
+            return LetterDeliveryPreset.valueOf(value);
+        } catch (IllegalArgumentException invalid) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "不支持的慢信抵达节奏");
+        }
+    }
+
+    private static ZoneId resolveZone(String value) {
+        if (value == null || value.isBlank()) {
+            return DEFAULT_DELIVERY_ZONE;
+        }
+        try {
+            return ZoneId.of(value);
+        } catch (java.time.DateTimeException invalid) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "无效的时区");
+        }
+    }
+
+    private static LocalDateTime utcDateTime(Instant instant) {
+        return LocalDateTime.ofInstant(instant, ZoneOffset.UTC);
     }
 
     /** Returns the caller's own existing letter for this idempotency key, or null if none/blank. */
@@ -187,6 +307,9 @@ public class SlowLetterServiceImpl implements SlowLetterService {
         target.id = winner.id;
         target.status = winner.status;
         target.threadId = winner.threadId;
+        target.deliveryPreset = winner.deliveryPreset;
+        target.deliveryTimeZone = winner.deliveryTimeZone;
+        target.scheduledArrivalAt = winner.scheduledArrivalAt;
         target.estimatedArrivalAt = winner.estimatedArrivalAt;
         target.versionNo = winner.versionNo;
         target.title = winner.title;
@@ -298,12 +421,19 @@ public class SlowLetterServiceImpl implements SlowLetterService {
         // M-022: atomic conditional UPDATE — only applies if status is still `from`, so a concurrent
         // transition (e.g. user /read racing the scheduler SENT->DELIVERED) cannot both pass
         // validate() and clobber each other. rowsAffected==0 means we lost the race.
-        java.time.LocalDateTime now = java.time.LocalDateTime.now(clock);
+        java.time.LocalDateTime now = java.time.LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
         com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<SlowLetter> w =
                 new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<SlowLetter>()
                         .eq("id", id).eq("status", from)
                         .set("status", targetStatus);
-        if ("SENT".equals(targetStatus)) w.set("sent_at", now);
+        if ("SENT".equals(targetStatus)) {
+            LocalDateTime arrival = resolveArrivalAtSend(letter);
+            w.set("sent_at", now)
+                    .set("delivery_preset", letter.deliveryPreset)
+                    .set("delivery_time_zone", letter.deliveryTimeZone)
+                    .set("scheduled_arrival_at", arrival)
+                    .set("estimated_arrival_at", arrival);
+        }
         if ("DELIVERED".equals(targetStatus)) w.set("delivered_at", now);
         if ("READ".equals(targetStatus)) w.set("read_at", now);
         int updated = letterMapper.update(null, w);
@@ -477,7 +607,7 @@ public class SlowLetterServiceImpl implements SlowLetterService {
         reply.letterBody = request.letterBody;
         reply.status = "DRAFT";
         reply.parallaxDistance = 3;
-        reply.estimatedArrivalAt = LocalDateTime.now(clock).plus(PARALLAX_FLIGHT_DURATION);
+        applyDeliveryIntent(reply, request);
         reply.versionNo = 0;
         // Gemini audit 1.8: links this reply to the letter it replies to, so its OWN later SENT
         // transition can atomically flip `original` to REPLIED -- never optimistically here, at

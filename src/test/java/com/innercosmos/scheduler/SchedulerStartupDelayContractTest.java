@@ -11,7 +11,11 @@ class SchedulerStartupDelayContractTest {
 
     @Test
     void legacyH2ReadersWaitForApplicationRunnerSchemaUpgrades() throws Exception {
-        assertSchedule(LetterDeliveryJob.class, "deliverArrivedLetters", 60_000L, 60_000L);
+        Method letterDelivery = LetterDeliveryJob.class.getDeclaredMethod("deliverArrivedLetters");
+        Scheduled deliverySchedule = letterDelivery.getAnnotation(Scheduled.class);
+        assertEquals("${inner-cosmos.letters.delivery-poll-ms:5000}", deliverySchedule.fixedDelayString());
+        assertEquals("${inner-cosmos.letters.delivery-initial-delay-ms:5000}",
+                deliverySchedule.initialDelayString());
         assertSchedule(AuroraProactiveJob.class, "run", 90_000L, 90_000L);
     }
 
