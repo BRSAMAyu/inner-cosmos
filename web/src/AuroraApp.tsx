@@ -209,6 +209,18 @@ export function AuroraApp() {
   // web/src/hooks/useAuroraSession.ts.
   const auroraSession = useAuroraSession({
     authenticated, skillLocale, onSkillSuggestion: setSkillSuggestion, setStatus,
+    onNaturalActionExecuted: async featureTarget => {
+      if (featureTarget === "memory-starfield") {
+        const [scene, cards, operations] = await Promise.all([
+          api.starfield("TIME"), api.memoryCards(), api.memoryOperations()
+        ]);
+        setStarfield(scene);
+        setMemories(cards);
+        setMemoryOperations(operations);
+      } else if (featureTarget === "settings") {
+        setUserProfile(await api.getProfile());
+      }
+    },
     onMemorySettled: async settledMode => {
       const [scene, cards, operations] = await Promise.all([
         api.starfield("TIME"), api.memoryCards(), api.memoryOperations()

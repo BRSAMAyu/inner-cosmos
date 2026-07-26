@@ -106,9 +106,13 @@ export type UseAuroraSessionOptions = {
   /** Called only after the explicit "settle today" memory write succeeds. The mode is captured
    * from the settled conversation so callers can continue the right user journey. */
   onMemorySettled?: (settledMode: string) => void | Promise<void>;
+  /** Called after a confirmation-gated natural action really executed on the server. */
+  onNaturalActionExecuted?: (featureTarget: string) => void | Promise<void>;
 };
 
-export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion, setStatus, onMemorySettled }: UseAuroraSessionOptions) {
+export function useAuroraSession({
+  authenticated, skillLocale, onSkillSuggestion, setStatus, onMemorySettled, onNaturalActionExecuted
+}: UseAuroraSessionOptions) {
   const t = STATUS_COPY[skillLocale];
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [messages, setMessages] = useState<AuroraUiMessage[]>([]);
@@ -378,6 +382,14 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
           relationshipMove: typeof safe.relationshipMove === "string" ? safe.relationshipMove : undefined,
           repaired: safe.criticRepaired === true
         }));
+        if (event.payload.proposedActionStatus === "EXECUTED") {
+          const target = typeof event.payload.featureTarget === "string"
+            ? event.payload.featureTarget : "";
+          if (target === "aurora-returns") {
+            void api.wakeIntents().then(setWakeIntents).catch(() => undefined);
+          }
+          void Promise.resolve(onNaturalActionExecuted?.(target)).catch(() => undefined);
+        }
         break;
       }
       case "segment": {
@@ -444,7 +456,7 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
         setStatus(event.payload.message || t.streamErrorFallback);
         break;
     }
-  }, [finishTurn, isCurrentGeneration, setStatus, t]);
+  }, [finishTurn, isCurrentGeneration, onNaturalActionExecuted, setStatus, t]);
   handleEventRef.current = handleEvent;
 
   // Deliberately NOT wrapped in useCallback -- matches the original AuroraApp.tsx, where `send`

@@ -57,6 +57,16 @@ class AuroraNaturalActionServiceTest {
     }
 
     @Test
+    void foregroundStaysSilentForNaturalActionsAndConfirmationTurns() {
+        when(messages.selectOne(any())).thenReturn(null);
+
+        assertThat(service.shouldSuppressForeground(7L, 9L,
+                "Remember that I prefer direct questions.")).isTrue();
+        assertThat(service.shouldSuppressForeground(7L, 9L, "确认")).isTrue();
+        assertThat(service.shouldSuppressForeground(7L, 9L, "今天有点累")).isFalse();
+    }
+
+    @Test
     void explicitAdjacentConfirmationCreatesPrivateAuditedMemoryOnce() throws Exception {
         currentTurn(21L);
         TurnPlan pending = pending(10L, AuroraNaturalActionParser.REMEMBER,
@@ -76,6 +86,9 @@ class AuroraNaturalActionServiceTest {
                         && command.evidenceRefs().equals("turn-plan:10")));
         assertThat(pending.actionStatus).isEqualTo("EXECUTED");
         assertThat(pending.actionResultRef).isEqualTo("memory:88");
+        assertThat(reply.proposedActionType).isEqualTo("REMEMBER");
+        assertThat(reply.proposedActionStatus).isEqualTo("EXECUTED");
+        assertThat(reply.featureTarget).isEqualTo("memory-starfield");
         assertThat(reply.messages.getFirst()).contains("仅你可见").contains("没有自动公开");
     }
 
@@ -110,6 +123,8 @@ class AuroraNaturalActionServiceTest {
                 "check the build", "Asia/Singapore", 9L);
         assertThat(pending.actionStatus).isEqualTo("EXECUTED");
         assertThat(pending.actionResultRef).isEqualTo("wake-intent:55");
+        assertThat(reply.proposedActionStatus).isEqualTo("EXECUTED");
+        assertThat(reply.featureTarget).isEqualTo("aurora-returns");
         assertThat(reply.messages.getFirst()).contains("Jul 26 at 5:00 PM").doesNotContain("T17:00");
     }
 

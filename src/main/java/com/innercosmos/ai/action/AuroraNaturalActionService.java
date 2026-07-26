@@ -120,6 +120,18 @@ public class AuroraNaturalActionService {
         return proposal(decision.intent());
     }
 
+    /**
+     * Keep the foreground lane silent for confirmation-gated product actions so an unrelated
+     * acknowledgement cannot appear immediately before the authoritative proposal or receipt.
+     */
+    public boolean shouldSuppressForeground(Long userId, Long sessionId, String message) {
+        if (message == null || message.isBlank()) return false;
+        String normalized = confirmationKey(message);
+        if (CONFIRM.contains(normalized) || CANCEL.contains(normalized)) return true;
+        String previous = latestUserMessage(userId, sessionId);
+        return parser.parse(message, previous, profileTimezone(userId)).recognized();
+    }
+
     private AuroraReplyVO proposal(AuroraNaturalActionParser.ActionIntent intent) {
         AuroraReplyVO vo = reply(intent.english()
                 ? intent.summary() + "\nPlease reply “Confirm” to execute it, or “Cancel”. Nothing changes before confirmation."
@@ -129,12 +141,7 @@ public class AuroraNaturalActionService {
         vo.proposedActionSummary = intent.summary();
         vo.proposedActionPayloadJson = json(intent.payload());
         vo.proposedActionStatus = "PENDING_CONFIRMATION";
-        vo.featureTarget = switch (intent.type()) {
-            case AuroraNaturalActionParser.REMEMBER -> "memory-starfield";
-            case AuroraNaturalActionParser.REMINDER -> "aurora-returns";
-            case AuroraNaturalActionParser.PROFILE_SETTING -> "settings";
-            default -> "";
-        };
+        vo.featureTarget = featureTarget(intent.type());
         return vo;
     }
 
@@ -189,7 +196,11 @@ public class AuroraNaturalActionService {
         pending.plan.actionConfirmedAt = LocalDateTime.now();
         pending.plan.actionResultRef = resultRef;
         planMapper.updateById(pending.plan);
-        return reply(message, "action-completed");
+        AuroraReplyVO completed = reply(message, "action-completed");
+        completed.proposedActionType = pending.plan.proposedActionType;
+        completed.proposedActionStatus = "EXECUTED";
+        completed.featureTarget = featureTarget(pending.plan.proposedActionType);
+        return completed;
     }
 
     private void applyProfileSetting(Long userId, String setting, String value) {
@@ -260,6 +271,14 @@ public class AuroraNaturalActionService {
         return previous == null ? null : previous.textContent;
     }
 
+    private String latestUserMessage(Long userId, Long sessionId) {
+        if (userId == null || sessionId == null) return null;
+        DialogMessage previous = messageMapper.selectOne(new QueryWrapper<DialogMessage>()
+                .eq("user_id", userId).eq("session_id", sessionId).eq("speaker", "USER")
+                .orderByDesc("id").last("LIMIT 1"));
+        return previous == null ? null : previous.textContent;
+    }
+
     private String profileTimezone(Long userId) {
         UserProfile profile = users.getProfile(userId);
         return profile == null || profile.timezone == null || profile.timezone.isBlank()
@@ -317,6 +336,15 @@ public class AuroraNaturalActionService {
 
     private static boolean isEnglishSummary(String value) {
         return value != null && value.codePoints().noneMatch(codePoint -> codePoint >= 0x4E00 && codePoint <= 0x9FFF);
+    }
+
+    private static String featureTarget(String actionType) {
+        return switch (actionType == null ? "" : actionType) {
+            case AuroraNaturalActionParser.REMEMBER -> "memory-starfield";
+            case AuroraNaturalActionParser.REMINDER -> "aurora-returns";
+            case AuroraNaturalActionParser.PROFILE_SETTING -> "settings";
+            default -> "";
+        };
     }
 
     private record Pending(TurnPlan plan, boolean english) {}

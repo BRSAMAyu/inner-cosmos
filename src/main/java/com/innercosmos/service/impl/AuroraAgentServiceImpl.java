@@ -229,6 +229,13 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             vo.safetyBlocked = true;
             return vo;
         }
+        if (naturalActionService != null
+                && naturalActionService.shouldSuppressForeground(userId, request.sessionId, request.message)) {
+            vo.text = "";
+            vo.source = "natural-action-authoritative-turn";
+            vo.latencyMs = 0L;
+            return vo;
+        }
         ForegroundAcknowledgement acknowledgement = fastForegroundAcknowledgement(userId, request);
         vo.text = acknowledgement.text();
         vo.source = acknowledgement.source();
@@ -1817,6 +1824,8 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         sb.append("\"speakCount\":").append(speakCount);
         sb.append(",\"detectedTheme\":\"").append(escape(reply.detectedTheme)).append("\"");
         sb.append(",\"featureTarget\":\"").append(escape(reply.featureTarget)).append("\"");
+        sb.append(",\"proposedActionType\":\"").append(escape(reply.proposedActionType)).append("\"");
+        sb.append(",\"proposedActionStatus\":\"").append(escape(reply.proposedActionStatus)).append("\"");
         sb.append(",\"replyTone\":\"").append(escape(reply.replyTone)).append("\"");
         sb.append(",\"nextQuestion\":\"").append(escape(reply.nextQuestion)).append("\"");
         sb.append(",\"smallStep\":\"").append(escape(reply.smallStep)).append("\"");

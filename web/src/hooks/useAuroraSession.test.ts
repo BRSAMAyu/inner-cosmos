@@ -31,13 +31,13 @@ vi.mock("../api", () => ({
   subscribeProactive: vi.fn(() => () => undefined)
 }));
 
-function setup(skillLocale: "zh-CN" | "en-SG" = "zh-CN") {
+function setup(skillLocale: "zh-CN" | "en-SG" = "zh-CN", onNaturalActionExecuted = vi.fn()) {
   const setStatus = vi.fn();
   const onSkillSuggestion = vi.fn();
   const { result } = renderHook(() => useAuroraSession({
-    authenticated: true, skillLocale, onSkillSuggestion, setStatus
+    authenticated: true, skillLocale, onSkillSuggestion, setStatus, onNaturalActionExecuted
   }));
-  return { result, setStatus, onSkillSuggestion };
+  return { result, setStatus, onSkillSuggestion, onNaturalActionExecuted };
 }
 
 const wakeIntent = (overrides: Partial<WakeIntent> = {}): WakeIntent => ({
@@ -212,6 +212,32 @@ describe("useAuroraSession -- send / streaming / interrupt", () => {
       referencedMemoryIds: [17, 23], detectedTheme: "恢复"
     });
     expect(setStatus).toHaveBeenLastCalledWith("Aurora 在这里，等你接着说");
+  });
+
+  it("refreshes the affected domain only after an executed natural-action receipt", async () => {
+    let capturedOnEvent: ((event: AuroraStreamEvent) => void) | undefined;
+    vi.mocked(streamAurora).mockImplementation(async (_input, _signal, onEvent) => {
+      capturedOnEvent = onEvent;
+      return "TERMINAL_EVENT";
+    });
+    vi.mocked(api.psychologySkillSuggestion).mockResolvedValue(null);
+    vi.mocked(api.wakeIntents).mockResolvedValue([wakeIntent({ id: 12 })]);
+    const { result, onNaturalActionExecuted } = setup();
+    await act(async () => { await result.current.resolveSession(); });
+    act(() => { result.current.setDraft("确认"); });
+    await act(async () => { await result.current.send({ preventDefault: () => undefined } as never); });
+
+    await act(async () => {
+      capturedOnEvent!({ id: "1", type: "meta", payload: {
+        proposedActionStatus: "EXECUTED", proposedActionType: "REMINDER",
+        featureTarget: "aurora-returns", agentLoop: { runtime: "aurora-action.v1" }
+      } });
+      await Promise.resolve();
+    });
+
+    expect(api.wakeIntents).toHaveBeenCalled();
+    expect(result.current.wakeIntents).toEqual([wakeIntent({ id: 12 })]);
+    expect(onNaturalActionExecuted).toHaveBeenCalledExactlyOnceWith("aurora-returns");
   });
 
   it("a safety event sets a persistent safetyAlert that survives later status updates until dismissed", async () => {
