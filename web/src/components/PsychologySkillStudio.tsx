@@ -58,7 +58,7 @@ export function PsychologySkillStudio({ skills, skillRuns, selectedSkill, skillA
 }) {
   const text = skillCopy[skillLocale];
   return <section className="skill-studio" aria-label={skillLocale === "en-SG" ? "Psychology-informed self reflection" : "心理学启发的自我探索"} lang={skillLocale === "en-SG" ? "en-SG" : "zh-CN"}>
-    <div className="skill-heading"><div><span className="eyebrow">PSYCHOLOGY SKILLS</span><h2>{text.heading}</h2></div>
+    <div className="skill-heading"><div><span className="eyebrow">{skillLocale === "en-SG" ? "PSYCHOLOGY SKILLS" : "心理探索工具"}</span><h2>{text.heading}</h2></div>
       <div className="skill-heading-tools"><span>{skills.length} {text.count}</span><div className="skill-locale" role="group" aria-label="Skill language"><button type="button" className={skillLocale === "zh-CN" ? "active" : ""} aria-pressed={skillLocale === "zh-CN"} onClick={() => onLocaleChange("zh-CN")}>中文</button><button type="button" className={skillLocale === "en-SG" ? "active" : ""} aria-pressed={skillLocale === "en-SG"} onClick={() => onLocaleChange("en-SG")}>English</button></div></div></div>
     <p>{text.intro}</p>
     <div className="skill-layout">

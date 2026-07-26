@@ -62,6 +62,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -81,7 +82,8 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     private static final com.fasterxml.jackson.databind.ObjectMapper INNER_VOICE_MAPPER =
             new com.fasterxml.jackson.databind.ObjectMapper();
     private static final List<String> MODES = List.of(
-            "DAILY_TALK", "THOUGHT_CLARIFY", "SLEEP_REVIEW", "SOCRATIC", "ACTION_SPLIT", "RELATION_REVIEW"
+            "DAILY_TALK", "THOUGHT_CLARIFY", "SLEEP_REVIEW", "SOCRATIC", "ACTION_SPLIT",
+            "RELATION_REVIEW", "CAPSULE_SHAPING"
     );
 
     private final StructuredAiService structuredAiService;
@@ -891,29 +893,27 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 : null;
         String timeLabel = timeLabel();
         ModeStrategy modeStrategy = modeRegistry.get(normalizedMode);
+        ResolvedModel resolved = modelRouter.resolve(userId, sessionId);
+        Map<String, Object> grounding = greetingGrounding(profile, agentContext);
 
         String prompt = new PromptBuilder().withPromptVersionService(promptVersionService)
                 .withSystemBoundary()
                 .withConversationMode(normalizedMode)
                 .withModeSegment(modeStrategy)
-                .withUserProfile(profileBrief(profile))
-                .withUserPortrait(safePortrait(userId))
-                .withUserCorrections(safeCorrections(userId))
-                .withConfirmedUnderstandingClaims(safeConfirmedClaims(userId))
-                .withPortraitCalibrations(safePortraitCalibrations(userId))
-                .withGravityMemories(gravityMemories)
-                .withMemoryContext(memoryContext)
                 .withOutputSchema()
                 .build()
-                + "\n\n现在是" + timeLabel + "。请 Aurora 主动发起对话，像朋友轻轻来找用户，而不是等待用户提问。";
+                + "\n\nCurrent time: " + timeLabel + ". Generate one grounded opening using only greetingGrounding.";
 
         Map<String, Object> greetingContext = new LinkedHashMap<>();
-        greetingContext.put("auroraPrompt", prompt);
+        // PromptBuilder output contains identity/safety/mode instructions, so keep it in the
+        // provider's system role. The user-owned grounding below remains data-only.
+        greetingContext.put("auroraSystemPrompt", prompt);
         greetingContext.put("mode", normalizedMode);
         greetingContext.put("timeLabel", timeLabel);
         greetingContext.put("memoryRecallAllowed", allowMemory);
-        greetingContext.put("unifiedAgentContext", agentContext);
-        greetingContext.put("providerPolicy", providerPolicy(null));
+        greetingContext.put("greetingGrounding", grounding);
+        greetingContext.put("requireRemoteProvider", true);
+        greetingContext.put("providerPolicy", providerPolicy(resolved));
         // M-012: the proactive greeting also samples at the active mode's temperature
         // (null-safe — absent key keeps the provider client's hardcoded default).
         if (modeStrategy != null) {
@@ -921,17 +921,23 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         }
 
         AuroraReplyVO vo;
-        try {
+        if (resolved == null || !resolved.isResolved() || "MOCK".equalsIgnoreCase(resolved.provider())) {
+            vo = toReply(profile, unavailableGreeting(outputLanguage()), null, normalizedMode,
+                    memoryContext, gravityMemories, allowMemory);
+        } else try {
             StructuredAiResults.AuroraResult ai = structuredAiService.call(userId, "AURORA_PROACTIVE_GREETING_" + normalizedMode,
-                    auroraInstruction(true),
+                    greetingInstruction(),
                     greetingContext,
                     StructuredAiResults.AuroraResult.class,
-                    () -> fallbackGreeting(normalizedMode, timeLabel, gravityMemories, allowMemory));
+                    () -> unavailableGreeting(outputLanguage()),
+                    resolved.client());
             vo = toReply(profile, ai, null, normalizedMode, memoryContext, gravityMemories, allowMemory);
         } catch (Exception e) {
-            log.error("Aurora greeting call failed, using emergency fallback: {}", e.getMessage(), e);
-            vo = emergencyFallback("", normalizedMode);
+            log.error("Aurora greeting provider unavailable: {}", e.getMessage(), e);
+            vo = toReply(profile, unavailableGreeting(outputLanguage()), null, normalizedMode,
+                    memoryContext, gravityMemories, allowMemory);
         }
+        vo.aiState = aiState(resolved);
         vo.suggestSettle = false;
         if (sessionId != null) {
             for (String msg : vo.messages) {
@@ -939,6 +945,74 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             }
         }
         return vo;
+    }
+
+    static Map<String, Object> greetingGrounding(UserProfile profile, AgentContext context) {
+        Map<String, Object> grounding = new LinkedHashMap<>();
+        grounding.put("profileInterests", context == null ? List.of()
+                : context.themeSignals.stream().filter(java.util.Objects::nonNull).limit(4).toList());
+        grounding.put("profileBio", profile == null ? "" : abbreviateGreeting(profile.bio, 280));
+        grounding.put("currentEnvironment", context == null ? "" : greetingValue(context.environmentLabel));
+        grounding.put("currentEmotion", context == null ? "" : greetingValue(context.momentEmotionLabel));
+        grounding.put("nearestUnfinishedItem", context == null ? "" : greetingValue(context.nearestTodo));
+        grounding.put("unfinishedItems", context == null ? List.of()
+                : context.activeTodos.stream().filter(java.util.Objects::nonNull).limit(4).toList());
+        grounding.put("recentObservations", context == null ? List.of()
+                : context.dailyObservations.stream().filter(java.util.Objects::nonNull).limit(3).toList());
+        return grounding;
+    }
+
+    private static String greetingValue(Object value) {
+        return value == null ? "" : value.toString().trim();
+    }
+
+    private static String abbreviateGreeting(String value, int max) {
+        String text = greetingValue(value);
+        return text.length() > max ? text.substring(0, max) + "..." : text;
+    }
+
+    private String greetingInstruction() {
+        return """
+                You generate Aurora's initial opening before the user has sent a message.
+                Return only valid AuroraResult JSON with 1-2 short natural-language segments.
+
+                Grounding contract:
+                1. Use only greetingGrounding. Prefer, in order: an unfinished item, current
+                   environment/state, then an established interest/theme.
+                2. Mention at most one concrete hook. Phrase it as an invitation, never as
+                   surveillance, certainty, diagnosis, or a claim that the user feels something now.
+                3. If all grounding fields are empty, offer a neutral specific choice of where to
+                   begin. Do not invent a memory, interest, event, relationship, or unfinished topic.
+                4. Do not say "I remembered you", "I was thinking about you", or imply sentience.
+                5. referencedMemoryIds must be empty unless the supplied context contains explicit
+                   evidence ids; memoryReferenced must match it.
+                6. This path requires a real provider. Never imitate personalisation with a template.
+                """;
+    }
+
+    private String outputLanguage() {
+        return llmConfig.prompt == null ? "auto" : llmConfig.prompt.language;
+    }
+
+    static StructuredAiResults.AuroraResult unavailableGreeting(String language) {
+        StructuredAiResults.AuroraResult result = new StructuredAiResults.AuroraResult();
+        boolean english = language == null || language.isBlank()
+                || language.toLowerCase(Locale.ROOT).startsWith("auto")
+                || language.toLowerCase(Locale.ROOT).startsWith("en");
+        result.segments = List.of(english
+                ? "AI-generated opening is unavailable right now. You can start with whatever matters to you."
+                : "AI 生成的开场暂时不可用。你可以从此刻最想说的事情开始。");
+        result.speakCount = 1;
+        result.continueReason = "provider-unavailable";
+        result.detectedTheme = "provider-status";
+        result.nextQuestion = "";
+        result.smallStep = "";
+        result.featureSuggestion = "";
+        result.featureTarget = "";
+        result.memoryReferenced = false;
+        result.referencedMemoryIds = List.of();
+        result.riskFlags = List.of("PROVIDER_UNAVAILABLE");
+        return result;
     }
 
     private AuroraReplyVO blockedReply(Long userId, ChatRequest request, SafetyResult safety,
@@ -1365,26 +1439,6 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         return result;
     }
 
-    private StructuredAiResults.AuroraResult fallbackGreeting(String mode, String timeLabel, List<String> gravityMemories, boolean allowMemory) {
-        StructuredAiResults.AuroraResult result = new StructuredAiResults.AuroraResult();
-        List<String> segments = new ArrayList<>();
-        segments.add(timeLabel + "好。我刚刚想起你，想先来问问：今天你心里最占地方的是什么？");
-        if (allowMemory && gravityMemories != null && !gravityMemories.isEmpty()) {
-            segments.add("如果你愿意，我们也可以从最近反复出现的那个主题继续；不愿意也没关系，今天可以只聊很轻的一点。");
-        }
-        result.segments = segments.stream().limit(2).toList();
-        result.speakCount = result.segments.size();
-        result.continueReason = "proactive-care";
-        result.detectedTheme = "主动关心";
-        result.nextQuestion = "今天你想从重一点的地方开始，还是从轻一点的地方开始？";
-        result.smallStep = "";
-        result.featureSuggestion = "也可以先写一段心声日记，我会帮你整理而不是评判。";
-        result.featureTarget = "heart-diary";
-        result.memoryReferenced = allowMemory && gravityMemories != null && !gravityMemories.isEmpty();
-        result.referencedMemoryIds = List.of();
-        return result;
-    }
-
     private List<String> fallbackSegments(String message, String mode, boolean hasMemory, String stateSignal) {
         List<String> segments = new ArrayList<>();
         String text = message == null ? "" : message.trim();
@@ -1392,7 +1446,10 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         // deterministic path stays coherent with the richer prompt context. The
         // signal is a perception ("此刻偏疲惫/脆弱/平静/开放"), never a clinical label.
         String state = stateSignal == null ? "" : stateSignal.trim();
-        if ("ACTION_SPLIT".equals(mode)) {
+        if ("CAPSULE_SHAPING".equals(mode)) {
+            segments.add("不用把自己总结成几条标签。先讲一个最近很像你的具体瞬间。");
+            segments.add("我会从故事里慢慢辨认你的声音、在意和边界；材料够了就一起生成第一版私密侧影。");
+        } else if ("ACTION_SPLIT".equals(mode)) {
             segments.add("我先不把它变成一整套计划。我们只找一个十分钟内能开始的小动作。");
             segments.add("你现在最容易动起来的第一步，可能不是\"解决它\"，而是先把它写成一句可执行的话。");
         } else if ("SOCRATIC".equals(mode)) {
@@ -1426,7 +1483,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         return ("You are the Aurora structured dialogue engine. Generate high-quality responses based on context.\n\n"
             + "[Absolute Rules]\n"
             + "1. Return only valid JSON. No Markdown wrapping, no code blocks, no thinking tags.\n"
-            + "2. segments = Chinese chat bubbles, not article paragraphs. Each message should feel like a WeChat message.\n"
+            + "2. segments = natural chat bubbles in the user's current language, not article paragraphs. Each should feel like a message from an unusually perceptive friend.\n"
             + "3. referencedMemoryIds = number array only, e.g. [7, 12]. No strings, no #7 format.\n"
             + "4. No text outside the JSON.\n\n"
             + "5. Never open with generic assistant phrases such as “我听到了”, “我理解你的感受”, or “听起来”. Anchor one concrete detail or contrast from the user's own situation.\n"
@@ -1989,6 +2046,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         if (mode.contains("苏格拉底")) return "SOCRATIC";
         if (mode.contains("行动")) return "ACTION_SPLIT";
         if (mode.contains("关系")) return "RELATION_REVIEW";
+        if (mode.contains("共鸣体") || mode.contains("侧影") || mode.toLowerCase().contains("capsule")) return "CAPSULE_SHAPING";
         return "DAILY_TALK";
     }
 
@@ -1999,6 +2057,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             case "SOCRATIC" -> "苏格拉底追问";
             case "ACTION_SPLIT" -> "行动拆解";
             case "RELATION_REVIEW" -> "关系复盘";
+            case "CAPSULE_SHAPING" -> "共鸣体塑形";
             default -> "今日倾诉";
         };
     }
@@ -2010,6 +2069,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             case "SOCRATIC" -> "Socratic";
             case "ACTION_SPLIT" -> "Action Split";
             case "RELATION_REVIEW" -> "Relation Review";
+            case "CAPSULE_SHAPING" -> "Capsule Shaping";
             default -> "Daily Talk";
         };
     }
@@ -2021,6 +2081,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             case "SOCRATIC" -> "补充一个温和追问";
             case "SLEEP_REVIEW" -> "补充睡前收束";
             case "RELATION_REVIEW" -> "补充关系边界视角";
+            case "CAPSULE_SHAPING" -> "继续补全一个最有信息量的侧面";
             default -> "Aurora 觉得还需要多陪一小段";
         };
     }

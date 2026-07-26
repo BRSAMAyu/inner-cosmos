@@ -151,7 +151,9 @@ llm:
   asr-provider: ${ASR_PROVIDER:mock}
   failover-providers: ${LLM_FAILOVER_PROVIDERS:glm,minimax}
   prompt:
-    language: ${LLM_PROMPT_LANGUAGE:zh-CN}
+    # Auto follows the user's latest meaningful language. Classroom operators may still pin
+    # en-SG/zh-CN explicitly, but a multilingual product must not force every account globally.
+    language: ${LLM_PROMPT_LANGUAGE:auto}
   mimo:
     api-key: ${MIMO_API_KEY:}
     model: ${MIMO_MODEL:mimo-v2.5}

@@ -32,10 +32,13 @@ export type UserProfileSettings = {
   weatherAwarenessEnabled: boolean | null; timeAwarenessEnabled: boolean | null; timezone: string | null;
 };
 export type DemoPersona = {
-  key: string; name: string; headline: string; story: string; themes: string[];
+  key: string; name: string; headline: string; story: string; themes: string[]; active?: boolean;
 };
 export type AuroraForeground = {
   text: string; source: string; latencyMs: number; safetyBlocked: boolean;
+};
+export type AuroraGreeting = {
+  messages: string[]; riskFlags?: string[]; aiState?: Record<string, unknown>;
 };
 export type GoodbyeResult = {
   success: boolean; line: string; stepsCompleted: string[]; confirmed: boolean; reverted: boolean;
@@ -769,6 +772,10 @@ export const api = {
   auroraForeground: (input: { sessionId: number; message: string; mode: string }) =>
     request<AuroraForeground>("/api/v1/aurora/foreground", {
       method: "POST", body: JSON.stringify(input)
+    }),
+  auroraGreeting: (sessionId: number, mode: string) =>
+    request<AuroraGreeting>("/api/aurora/greeting", {
+      method: "POST", body: JSON.stringify({ sessionId, mode })
     }),
   messages: (sessionId: number) => request<DialogMessage[]>(`/api/dialog/session/${sessionId}/messages`),
   timeline: (turnId: number) => request<TurnTimeline>(`/api/v1/aurora/turns/${turnId}/timeline`),

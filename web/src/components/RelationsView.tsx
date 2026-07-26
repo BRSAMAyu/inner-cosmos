@@ -55,7 +55,7 @@ export function RelationsView({ relations, selected, timeline, health, busy, onS
   };
   return <section className="relations-view" aria-label={t.aria}>
     <div className="resonance-heading">
-      <div><span className="eyebrow">RELATIONSHIPS</span><h2>{t.heading}</h2></div>
+      <div><span className="eyebrow">{locale === "en-SG" ? "RELATIONSHIPS" : "关系"}</span><h2>{t.heading}</h2></div>
       <span>{t.count(relations.length)}</span>
     </div>
     <p className="resonance-intro">{t.intro}</p>

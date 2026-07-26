@@ -63,7 +63,7 @@ export function UnderstandingCorrection({ claims, oldValue, newValue, impact, bu
   const activeClaims = claims.filter(claim => claim.status === "ACTIVE");
   const [confirmingId, setConfirmingId] = useState<number | null>(null);
   return <section className="understanding-space" aria-label={t.aria}>
-    <div className="understanding-heading"><div><span className="eyebrow">YOUR INNER COSMOS</span><h2>{t.heading}</h2></div>
+    <div className="understanding-heading"><div><span className="eyebrow">{locale === "en-SG" ? "YOUR INNER COSMOS" : "你的内宇宙"}</span><h2>{t.heading}</h2></div>
       <span>{t.confirmedCount(activeClaims.length)}</span></div>
     <p>{t.intro}</p>
     {target && <div className="correction-target">

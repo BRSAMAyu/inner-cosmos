@@ -27,7 +27,7 @@ export function PeopleDiscovery({ people, isBusy, onRequest, locale = "zh-CN" }:
 }) {
   const t = COPY[locale];
   return <section className="people-discovery" aria-label={t.aria}>
-    <div className="resonance-heading"><div><span className="eyebrow">PEOPLE, SLOWLY</span><h2>{t.heading}</h2></div>
+    <div className="resonance-heading"><div><span className="eyebrow">{locale === "en-SG" ? "PEOPLE, SLOWLY" : "慢慢认识人"}</span><h2>{t.heading}</h2></div>
       <span>{t.count(people.length)}</span></div>
     <p className="resonance-intro">{t.intro}</p>
     {people.length === 0 ? <div className="network-empty">{t.empty}</div> : <div className="people-list" role="list">

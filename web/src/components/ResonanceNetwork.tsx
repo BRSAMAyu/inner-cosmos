@@ -115,7 +115,7 @@ export function ResonanceNetwork({ resonanceMatches, resonanceStrategy, visitorB
     return ordered.slice(0, 3);
   }, [resonanceMatches, showAllMatches, visitorMatch]);
   return <section className="resonance-network" aria-label={t.aria}>
-    <div className="resonance-heading"><div><span className="eyebrow">RESONANCE NETWORK</span><h2>{t.heading}</h2></div>
+    <div className="resonance-heading"><div><span className="eyebrow">{locale === "en-SG" ? "RESONANCE NETWORK" : "共鸣网络"}</span><h2>{t.heading}</h2></div>
       <span>{t.count(resonanceMatches.length)}</span></div>
     <p className="resonance-intro">{t.intro}</p>
     <div className="strategy-switcher" role="group" aria-label={t.strategyAria}>

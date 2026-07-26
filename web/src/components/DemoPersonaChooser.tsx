@@ -1,14 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { api, type DemoPersona } from "../api";
 import type { Locale } from "../i18n";
 
-const USERNAME_BY_KEY: Record<string, string> = {
-  "lin-che": "demo",
-  "shen-yan": "river",
-  "xia-yu": "cloud"
-};
-
-export function DemoPersonaChooser({ currentUsername = null, compact = false,
+export function DemoPersonaChooser({ compact = false,
   locale = "zh-CN", onEntered }: {
   currentUsername?: string | null;
   compact?: boolean;
@@ -29,12 +23,10 @@ export function DemoPersonaChooser({ currentUsername = null, compact = false,
     return () => { alive = false; };
   }, []);
 
-  const currentKey = useMemo(() => Object.entries(USERNAME_BY_KEY)
-    .find(([, username]) => username === currentUsername)?.[0] ?? null, [currentUsername]);
   if (personas.length === 0) return null;
 
   const enter = async (key: string) => {
-    if (busyKey || key === currentKey) return;
+    if (busyKey || personas.some(persona => persona.key === key && persona.active)) return;
     setBusyKey(key);
     setError("");
     try {
@@ -50,7 +42,7 @@ export function DemoPersonaChooser({ currentUsername = null, compact = false,
   return <section className={`demo-persona-chooser ${compact ? "compact" : ""}`}
     aria-label={locale === "en-SG" ? "Demo stories" : "Demo 体验角色"}>
     <div className="demo-persona-heading">
-      <span className="eyebrow">LIVED-IN DEMO</span>
+      <span className="eyebrow">{locale === "en-SG" ? "LIVED-IN DEMO" : "有生活痕迹的体验"}</span>
       <div>
         <strong>{compact
           ? (locale === "en-SG" ? "Switch lived story" : "切换体验角色")
@@ -62,7 +54,7 @@ export function DemoPersonaChooser({ currentUsername = null, compact = false,
     </div>
     <div className="demo-persona-grid">
       {personas.map(persona => {
-        const active = persona.key === currentKey;
+        const active = Boolean(persona.active);
         return <button type="button" key={persona.key} className={active ? "active" : ""}
           aria-current={active ? "true" : undefined}
           disabled={Boolean(busyKey) || active} onClick={() => void enter(persona.key)}>

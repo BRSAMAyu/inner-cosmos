@@ -60,7 +60,7 @@ export function BeliefGallery({ beliefs, contradictions, filter, categories, sel
   </article>;
 
   return <section className="belief-gallery-space" aria-label={t.aria}>
-    <span className="eyebrow">BELIEF PATTERNS</span>
+    <span className="eyebrow">{locale === "en-SG" ? "BELIEF PATTERNS" : "信念模式"}</span>
     <h2>{t.heading}</h2>
     <p>{t.intro}</p>
 

@@ -46,16 +46,20 @@ import com.innercosmos.mapper.UserProfileMapper;
 import com.innercosmos.service.GravityService;
 import com.innercosmos.service.CapsuleGenomeService;
 import com.innercosmos.service.DataUseGrantService;
+import com.innercosmos.service.DemoSandboxService;
 import com.innercosmos.service.UserService;
 import com.innercosmos.util.JsonUtils;
 import jakarta.annotation.PostConstruct;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
+import java.util.UUID;
 
-public class MockDataInitializer implements CommandLineRunner {
+public class MockDataInitializer implements CommandLineRunner, DemoSandboxService {
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(MockDataInitializer.class);
     private final UserMapper userMapper;
     private final UserProfileMapper userProfileMapper;
@@ -248,6 +252,64 @@ public class MockDataInitializer implements CommandLineRunner {
         };
         userMapper.updateById(user);
         return user;
+    }
+
+    /**
+     * Generates a fresh owner-scoped story. Shared demo identities are templates only: visitors
+     * never authenticate as them and therefore cannot overwrite one another's memories.
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public User createPersonalSandbox(String templateKey) {
+        String normalized = templateKey == null ? "" : templateKey.trim().toLowerCase(Locale.ROOT);
+        String persona = switch (normalized) {
+            case "lin-che" -> "demo";
+            case "shen-yan" -> "river";
+            case "xia-yu" -> "cloud";
+            default -> throw new IllegalArgumentException("Unknown demo template");
+        };
+        String nickname = switch (persona) {
+            case "demo" -> "Lin Che";
+            case "river" -> "Shen Yan";
+            default -> "Xia Yu";
+        };
+        RegisterRequest request = new RegisterRequest();
+        request.username = "sandbox-" + UUID.randomUUID().toString().replace("-", "").substring(0, 20);
+        request.password = UUID.randomUUID() + "-demo";
+        request.nickname = nickname;
+        User sandbox = userService.register(request);
+        sandbox.accountKind = "SANDBOX";
+        userMapper.updateById(sandbox);
+
+        if ("demo".equals(persona)) {
+            ensureDemoProfile(sandbox.id);
+            seedMemorySystem(sandbox.id);
+            seedUserMirror(sandbox.id);
+            seedUserPortrait(sandbox.id);
+            seedAuroraSelfModel(sandbox.id);
+            seedBeliefPatterns(sandbox.id);
+            ensureCuratedMirrorRunnable(sandbox.id, "Lin Che's Echo");
+        } else {
+            ensureShowcaseProfile(sandbox.id, persona);
+            seedShowcaseMemorySystem(sandbox.id, persona);
+            seedShowcaseMirror(sandbox.id, persona);
+            ensureCuratedMirrorRunnable(sandbox.id, "river".equals(persona)
+                    ? "The One Who Walks by the River"
+                    : "The One Learning to Include Herself in Care");
+        }
+        // A copied story starts private. The visitor can deliberately review and publish it later,
+        // without filling the public plaza or real-people discovery with disposable demo actors.
+        privatizeSandboxCapsules(capsuleMapper, sandbox.id);
+        return sandbox;
+    }
+
+    static void privatizeSandboxCapsules(EchoCapsuleMapper capsuleMapper, Long ownerUserId) {
+        for (EchoCapsule capsule : capsuleMapper.selectList(new QueryWrapper<EchoCapsule>()
+                .eq("owner_user_id", ownerUserId))) {
+            capsule.visibilityStatus = "PRIVATE";
+            capsule.isPublic = false;
+            capsuleMapper.updateById(capsule);
+        }
     }
 
     private void disableSeedAdminIfPresent() {

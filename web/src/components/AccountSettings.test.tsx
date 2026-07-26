@@ -42,6 +42,8 @@ describe("AccountSettings", () => {
       onExportData={onExportData} onDeleteAccount={() => Promise.resolve(null)} />);
     fireEvent.click(screen.getByRole("button", { name: "导出数据" }));
     expect(onExportData).toHaveBeenCalledOnce();
+    expect(screen.getByText("账户与数据", { selector: ".eyebrow" })).toBeVisible();
+    expect(screen.queryByText("ACCOUNT & DATA")).not.toBeInTheDocument();
   });
 
   it("validates password length and confirmation match before calling onChangePassword", () => {
@@ -191,6 +193,7 @@ describe("AccountSettings", () => {
     expect(screen.getByLabelText("专注模式")).not.toBeChecked();
     expect(screen.getByLabelText("感知天气")).toBeChecked();
     expect(screen.getByLabelText("感知时间")).toBeChecked();
+    expect(screen.getByText("Aurora 偏好").closest("details")).not.toHaveAttribute("open");
 
     fireEvent.change(screen.getByLabelText("对话风格"), { target: { value: "理性清晰" } });
     fireEvent.click(screen.getByLabelText("专注模式"));
@@ -261,13 +264,13 @@ describe("AccountSettings -- W2 voice preferences", () => {
     expect(screen.queryByText("Aurora 的心声")).not.toBeInTheDocument();
   });
 
-  it("seeds the voice picker and delivery-mode radios from the loaded preferences", () => {
+  it("seeds the compact voice and delivery-mode selects from the loaded preferences", () => {
     renderVoiceSettings();
+    expect(screen.getByText("Aurora 的心声").closest("details")).not.toHaveAttribute("open");
     expect(screen.getByLabelText("允许心声浮现")).toBeChecked();
-    expect((screen.getByLabelText("自然浮现 - 出现时直接展示，声音仍由你点按") as HTMLInputElement).checked).toBe(true);
-    expect((screen.getByLabelText("含蓄浮现 - 轻触后才展开，声音仍由你点按") as HTMLInputElement).checked).toBe(false);
-    expect((screen.getByLabelText("温和 A") as HTMLInputElement).checked).toBe(true);
-    expect((screen.getByLabelText("沉静 B") as HTMLInputElement).checked).toBe(false);
+    expect(screen.getByLabelText("浮现方式")).toHaveValue("AMBIENT");
+    expect(screen.getByLabelText("选择音色")).toHaveValue("warm-a");
+    expect(screen.getAllByRole("button", { name: "▶ 试听" })).toHaveLength(1);
   });
 
   it("derives natural English voice names from stable ids instead of backend Chinese labels", () => {
@@ -286,22 +289,23 @@ describe("AccountSettings -- W2 voice preferences", () => {
       onUpdateTtsPreferences={() => Promise.resolve(null)}
       onPreviewVoice={() => Promise.resolve("data:audio/mpeg;base64,AAA")} />);
 
-    expect(screen.getByLabelText("Warm & gentle · Xiaochun")).toBeChecked();
-    expect(screen.getByLabelText("Deep & soothing · Chengran")).not.toBeChecked();
-    expect(screen.getByLabelText("Future Voice C")).not.toBeChecked();
+    expect(screen.getByLabelText("Choose a voice")).toHaveValue("warm_gentle_female");
+    expect(screen.getByRole("option", { name: "Warm & gentle · Xiaochun" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Deep & soothing · Chengran" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Future Voice C" })).toBeInTheDocument();
     expect(screen.queryByText(/温柔女声|低沉男声|未来中文标签/)).not.toBeInTheDocument();
   });
 
   // (a) toggling delivery mode calls PATCH with the right body.
   it("calls PATCH with the right body when the delivery mode is toggled", () => {
     const { onUpdateTtsPreferences } = renderVoiceSettings();
-    fireEvent.click(screen.getByLabelText("含蓄浮现 - 轻触后才展开，声音仍由你点按"));
+    fireEvent.change(screen.getByLabelText("浮现方式"), { target: { value: "ON_DEMAND" } });
     expect(onUpdateTtsPreferences).toHaveBeenCalledExactlyOnceWith({ innerVoiceMode: "ON_DEMAND" });
   });
 
   it("calls PATCH with the right body when a different voice preset is picked", () => {
     const { onUpdateTtsPreferences } = renderVoiceSettings();
-    fireEvent.click(screen.getByLabelText("沉静 B"));
+    fireEvent.change(screen.getByLabelText("选择音色"), { target: { value: "calm-b" } });
     expect(onUpdateTtsPreferences).toHaveBeenCalledExactlyOnceWith({ voiceId: "calm-b" });
   });
 
@@ -316,26 +320,24 @@ describe("AccountSettings -- W2 voice preferences", () => {
   it("preserves the previous delivery-mode selection and shows an inline error when the PATCH fails", async () => {
     const pending = deferred<string | null>();
     renderVoiceSettings({ onUpdateTtsPreferences: vi.fn().mockReturnValue(pending.promise) });
-    const ambient = screen.getByLabelText("自然浮现 - 出现时直接展示，声音仍由你点按") as HTMLInputElement;
-    const onDemand = screen.getByLabelText("含蓄浮现 - 轻触后才展开，声音仍由你点按") as HTMLInputElement;
-    fireEvent.click(onDemand);
+    const modeSelect = screen.getByLabelText("浮现方式");
+    fireEvent.change(modeSelect, { target: { value: "ON_DEMAND" } });
 
     await act(async () => { pending.resolve("网络错误，暂时无法保存"); await pending.promise; });
 
     expect(screen.getByRole("alert")).toHaveTextContent("网络错误，暂时无法保存");
     // Rolled back to the last server-confirmed selection, with a visible reason -- not a silent,
     // unexplained snap-back and not a crash.
-    expect(ambient.checked).toBe(true);
-    expect(onDemand.checked).toBe(false);
+    expect(modeSelect).toHaveValue("AMBIENT");
   });
 
   it("keeps a successful selection applied without any error banner", async () => {
     const onUpdateTtsPreferences = vi.fn().mockResolvedValue(null);
     renderVoiceSettings({ onUpdateTtsPreferences });
-    const onDemand = screen.getByLabelText("含蓄浮现 - 轻触后才展开，声音仍由你点按") as HTMLInputElement;
-    fireEvent.click(onDemand);
+    const modeSelect = screen.getByLabelText("浮现方式");
+    fireEvent.change(modeSelect, { target: { value: "ON_DEMAND" } });
     await waitFor(() => expect(onUpdateTtsPreferences).toHaveBeenCalledOnce());
-    expect(onDemand.checked).toBe(true);
+    expect(modeSelect).toHaveValue("ON_DEMAND");
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 

@@ -3,12 +3,14 @@ import type { Locale } from "../i18n";
 
 const COPY: Record<Locale, {
   aria: string; heading: string; forming: (pct: number) => string; previewChange: string;
+  baselineNarrative: string;
   statusDraft: string; statusEvaluated: string; statusActivated: string; statusRejected: string;
   whyResult: string; scores: (cont: number, qual: number, dec: string) => string;
   runEval: string; allowRemember: string; backTo: (v: number, narr: string) => string;
 }> = {
   "zh-CN": {
     aria: "Aurora 的连续自我", heading: "她最近学会了什么", forming: p => `正在形成的理解 · ${p}%`,
+    baselineNarrative: "Aurora 的连续自我从这里开始；后续每一次变化都会说明来源、评测与回退路径。",
     previewChange: "预览这次变化", statusDraft: "等待沙盒评测", statusEvaluated: "评测通过，等你确认",
     statusActivated: "已经成为 Aurora 的一部分", statusRejected: "没有通过边界评测", whyResult: "为什么得到这个结果",
     scores: (c, q, d) => `连续性 ${c} · 质量 ${q} · 安全 ${d}`, runEval: "运行变化评测",
@@ -16,6 +18,7 @@ const COPY: Record<Locale, {
   },
   "en-SG": {
     aria: "Aurora's continuous self", heading: "What she's recently learned", forming: p => `An understanding taking shape · ${p}%`,
+    baselineNarrative: "Aurora's continuous self begins here. Every later change will show its source, evaluation and rollback path.",
     previewChange: "Preview this change", statusDraft: "Awaiting sandbox evaluation", statusEvaluated: "Passed evaluation — awaiting your confirmation",
     statusActivated: "Now part of Aurora", statusRejected: "Did not pass the boundary evaluation", whyResult: "Why this result",
     scores: (c, q, d) => `Continuity ${c} · Quality ${q} · Safety ${d}`, runEval: "Run change evaluation",
@@ -34,12 +37,17 @@ export function AuroraSelfSpace({ evolution, busy, onPropose, onEvaluate, onActi
 }) {
   const t = COPY[locale];
   const active = evolution.versions.find(version => version.status === "ACTIVE");
+  const narrative = active?.publicNarrative;
+  const localisedNarrative = !narrative
+    || narrative === COPY["zh-CN"].baselineNarrative
+    || narrative === COPY["en-SG"].baselineNarrative
+    ? t.baselineNarrative : narrative;
   const statusLabel = (status: string) => status === "DRAFT" ? t.statusDraft
     : status === "EVALUATED" ? t.statusEvaluated : status === "ACTIVATED" ? t.statusActivated : t.statusRejected;
   return <section className="self-space" aria-label={t.aria}>
-    <div className="self-heading"><div><span className="eyebrow">AURORA, BECOMING</span><h2>{t.heading}</h2></div>
+    <div className="self-heading"><div><span className="eyebrow">{locale === "en-SG" ? "AURORA, BECOMING" : "Aurora，正在成为"}</span><h2>{t.heading}</h2></div>
       <span className="self-version">v{active?.versionNo ?? 1}</span></div>
-    <p className="self-narrative">{active?.publicNarrative}</p>
+    <p className="self-narrative">{localisedNarrative}</p>
     {evolution.candidates.filter(candidate => !evolution.proposals.some(proposal => proposal.sourceReflectionId === candidate.id)).map(candidate =>
       <article className="self-card candidate" key={candidate.id}>
         <span>{t.forming(Math.round(candidate.confidence * 100))}</span><p>{candidate.proposedBelief}</p>

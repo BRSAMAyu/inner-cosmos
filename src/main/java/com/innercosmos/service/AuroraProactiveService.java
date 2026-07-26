@@ -30,7 +30,10 @@ public class AuroraProactiveService {
             return null;
         }
         Long hours = hoursSinceLastSession == null ? 24L : hoursSinceLastSession;
-        return new ProactiveGreeting(userId, composeGreeting(hours), hours, now);
+        // Eligibility only. The visible copy must come from AuroraAgentService's real-provider,
+        // profile-grounded generation path; this service must not impersonate that understanding
+        // with a deterministic "I remember..." template.
+        return new ProactiveGreeting(userId, null, hours, now);
     }
 
     private boolean inQuietHours(UserProfile profile, LocalTime now) {
@@ -47,13 +50,6 @@ public class AuroraProactiveService {
         } catch (Exception e) {
             return false;
         }
-    }
-
-    private String composeGreeting(Long hoursSinceLastSession) {
-        long days = Math.max(1, hoursSinceLastSession / 24);
-        if (days >= 7) return String.format("已经 %d 天没见了。最近一切还好吗？想说点什么吗？", days);
-        if (days >= 3) return "好几天没聊了。我还记得你之前提过的一些事，那些后来怎么样了？";
-        return "今天有什么想说的吗？我在这里。";
     }
 
     private UserProfile loadProfile(Long userId) {

@@ -218,7 +218,7 @@ const ME_COPY: Record<Locale, {
   push: string; mic: string; logout: string;
 }> = {
   "zh-CN": {
-    ariaLabel: "我的控制与边界", eyebrow: "ME · CONTROL & BOUNDARIES", heading: "由你决定，Aurora 怎样参与。",
+    ariaLabel: "我的控制与边界", eyebrow: "我的 · 控制与边界", heading: "由你决定，Aurora 怎样参与。",
     intro: "身份、设备权限、主动回来和数据边界都集中在这里。关闭一项能力不会删除你的创新体验，也不会暗中改写已有记忆。",
     device: "登录与设备", deviceNative: "OIDC + PKCE · 安全存储", deviceWeb: "安全 Web Session",
     online: "当前在线", offline: "当前离线，时间线会在恢复后续接",

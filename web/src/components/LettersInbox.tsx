@@ -109,7 +109,7 @@ export function LettersInbox({ letterInbox, letterOutbox = [], threads = [], thr
   const counts: Record<string, string> = { inbox: t.counts.inbox(letterInbox.length), outbox: t.counts.outbox(sent.length), drafts: t.counts.drafts(drafts.length), threads: t.counts.threads(threads.length) };
   const status = (s: string) => t.outboxStatus[s] ?? s;
   return <section className="letter-inbox" aria-label={t.aria}>
-    <div className="resonance-heading"><div><span className="eyebrow">LETTERS, ARRIVED</span><h2>{t.heading}</h2></div>
+    <div className="resonance-heading"><div><span className="eyebrow">{locale === "en-SG" ? "LETTERS, ARRIVED" : "慢信抵达"}</span><h2>{t.heading}</h2></div>
       <div className="letter-sync"><span>{counts[tab]}</span>
         {onComposeNew && <button type="button" className="letter-compose-entry" onClick={onComposeNew}>{t.composeNew}</button>}
         {onRefresh && <AsyncButton className="quiet" busy={refreshBusy} busyText={t.refreshBusy}

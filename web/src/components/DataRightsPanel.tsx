@@ -33,7 +33,7 @@ const COPY: Record<Locale, {
   items: (n: number) => string;
 }> = {
   "zh-CN": {
-    eyebrow: "YOUR DATA, ACCOUNTED FOR",
+    eyebrow: "数据使用 · 有据可查",
     heading: "Aurora 停止使用了什么",
     intro: "当你忘记一段记忆、归档共鸣体、撤回授权或纠正理解时，Aurora 会立刻停止使用由它派生出来的向量与画像，并在这里留下不含原文的回执。",
     load: "查看数据权利回执",

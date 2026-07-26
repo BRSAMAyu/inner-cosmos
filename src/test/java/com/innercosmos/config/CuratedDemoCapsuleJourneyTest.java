@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.innercosmos.mapper.EchoCapsuleMapper;
 import com.innercosmos.service.CapsuleGenomeService;
+import com.innercosmos.service.DemoSandboxService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -15,6 +16,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -41,8 +44,28 @@ class CuratedDemoCapsuleJourneyTest {
     @Autowired MockMvc mockMvc;
     @Autowired CapsuleGenomeService capsuleGenomeService;
     @Autowired EchoCapsuleMapper echoCapsuleMapper;
+    @Autowired DemoSandboxService demoSandboxService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Test
+    void sameStoryCreatesSeparateOwnersAndStartsWithPrivateCapsules() {
+        var first = demoSandboxService.createPersonalSandbox("lin-che");
+        var second = demoSandboxService.createPersonalSandbox("lin-che");
+
+        assertNotEquals(first.id, second.id);
+        assertNotEquals(first.username, second.username);
+        assertTrue(first.username.startsWith("sandbox-"));
+        assertTrue(second.username.startsWith("sandbox-"));
+        for (var owner : java.util.List.of(first, second)) {
+            var capsules = echoCapsuleMapper.selectList(
+                    new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<com.innercosmos.entity.EchoCapsule>()
+                            .eq("owner_user_id", owner.id));
+            assertFalse(capsules.isEmpty());
+            assertTrue(capsules.stream().allMatch(capsule ->
+                    "PRIVATE".equals(capsule.visibilityStatus) && !Boolean.TRUE.equals(capsule.isPublic)));
+        }
+    }
 
     @Test
     void everyCuratedMirrorHasGrantsGenomeIrAndCanStartAConversation() throws Exception {

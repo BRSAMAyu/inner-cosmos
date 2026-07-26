@@ -153,6 +153,21 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
     setMessages(toUi(await api.messages(sid)));
   }, []);
 
+  const greet = useCallback(async () => {
+    if (!sessionId) return false;
+    setRuntimeSignal(current => ({ ...current, stage: "composing" }));
+    try {
+      await api.auroraGreeting(sessionId, mode);
+      await replaceFromHistory(sessionId);
+      return true;
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : t.streamErrorFallback);
+      return false;
+    } finally {
+      setRuntimeSignal(current => ({ ...current, stage: "idle" }));
+    }
+  }, [mode, replaceFromHistory, sessionId, setStatus, t.streamErrorFallback]);
+
   // Resolves (or creates) the session to resume -- a WakeIntent return if `?wakeIntent=` is
   // present, otherwise a fresh session -- and sets `sessionId` unless a newer bootstrap call has
   // superseded this one (`isStale`). Deliberately does NOT also load messages/wakeIntents/
@@ -591,6 +606,6 @@ export function useAuroraSession({ authenticated, skillLocale, onSkillSuggestion
     safetyResources, loadSafetyResources, goodbyeResult, goodbyeBusy, dismissGoodbye, triggerGoodbye,
     send, stop, scheduleReturn, respondToReturn, postponeReturn, cancelReturn,
     resolveSession, replaceFromHistory, loadWakeIntents, loadNotifications, refreshNotifications,
-    resumeConversation, openMobileWakeIntent, resetSession
+    resumeConversation, openMobileWakeIntent, resetSession, greet
   };
 }

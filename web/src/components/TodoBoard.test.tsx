@@ -22,6 +22,8 @@ describe("TodoBoard", () => {
   it("shows an empty state for the active tab", () => {
     render(<TodoBoard {...baseProps()} />);
     expect(screen.getByText("今天没有待办。可以先休息。")).toBeVisible();
+    expect(screen.getByText("待办 · 下一小步")).toBeVisible();
+    expect(screen.queryByText("TODO · NEXT SMALL STEP")).not.toBeInTheDocument();
   });
 
   it("creates a todo from the form and resets it", () => {

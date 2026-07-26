@@ -156,6 +156,8 @@ describe("ProductShell", () => {
     const { rerender } = render(<MeSpace {...props} locale="zh-CN" />);
     expect(screen.getByRole("heading", { name: "由你决定，Aurora 怎样参与。" })).toBeVisible();
     expect(screen.getByText("1 个有效约定")).toBeVisible();
+    expect(screen.getByText("我的 · 控制与边界")).toBeVisible();
+    expect(screen.queryByText("ME · CONTROL & BOUNDARIES")).not.toBeInTheDocument();
 
     rerender(<MeSpace {...props} locale="en-SG" />);
     expect(screen.getByRole("heading", { name: "You decide how Aurora takes part." })).toBeVisible();

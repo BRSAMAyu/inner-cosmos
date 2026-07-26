@@ -43,12 +43,12 @@ type AccountCopy = {
   prefsSaveBusy: string; prefsSave: string;
   voiceTitle: string; voiceNote: string; voiceEnabledLabel: string; voiceEnabledHint: string;
   voiceModeLabel: string; voiceMode: Record<string, string>; voicePickLabel: string;
-  voicePreview: string; voicePreviewBusy: string; voicePreviewError: string; voiceSaveError: string;
+  voicePreview: string; voicePreviewBusy: string; voicePreviewError: string; voiceSaveError: string; eyebrow: string;
 };
 
 const COPY: Record<Locale, AccountCopy> = {
   "zh-CN": {
-    aria: "账户与数据", heading: "账户与数据",
+    aria: "账户与数据", heading: "账户与数据", eyebrow: "账户与数据",
     exportTitle: "导出我的数据", exportDesc: "把你的记忆、画像、共鸣体和慢信打包成一份 JSON 文件。",
     exportBusy: "正在导出", exportBtn: "导出数据",
     pwTitle: "修改密码", pwOpen: "修改密码", pwCurrent: "当前密码", pwNew: "新密码（至少 8 位）",
@@ -76,7 +76,7 @@ const COPY: Record<Locale, AccountCopy> = {
     voicePreviewError: "试听暂时失败，请再试一次", voiceSaveError: "语音偏好未能保存"
   },
   "en-SG": {
-    aria: "Account & data", heading: "Account & data",
+    aria: "Account & data", heading: "Account & data", eyebrow: "ACCOUNT & DATA",
     exportTitle: "Export my data", exportDesc: "Package your memories, portrait, capsules and slow letters into one JSON file.",
     exportBusy: "Exporting", exportBtn: "Export data",
     pwTitle: "Change password", pwOpen: "Change password", pwCurrent: "Current password", pwNew: "New password (at least 8 characters)",
@@ -125,9 +125,9 @@ function AuroraPreferencesEditor({ profile, profileBusy, onSaveProfile, locale, 
   const [weatherAware, setWeatherAware] = useState(profile.weatherAwarenessEnabled ?? true);
   const [timeAware, setTimeAware] = useState(profile.timeAwarenessEnabled ?? true);
 
-  return <article className="account-preferences">
-    <strong>{t.prefsTitle}</strong>
-    <p className="muted">{t.prefsNote}</p>
+  return <details className="account-preferences settings-disclosure">
+    <summary><strong>{t.prefsTitle}</strong><small>{t.prefsNote}</small></summary>
+    <div className="settings-disclosure-body">
     <label>{t.toneLabel}<select value={tone} onChange={event => setTone(event.target.value)}>
       {toneOrder.map(value => <option key={value} value={value}>{t.tone[value]}</option>)}</select></label>
     <label>{t.depthLabel}<input type="range" min={1} max={5} value={depth} onChange={event => setDepth(Number(event.target.value))} /></label>
@@ -151,7 +151,8 @@ function AuroraPreferencesEditor({ profile, profileBusy, onSaveProfile, locale, 
       quietHoursStart: quietStart, quietHoursEnd: quietEnd,
       focusModeEnabled: focusMode, weatherAwarenessEnabled: weatherAware, timeAwarenessEnabled: timeAware
     })}>{t.prefsSave}</AsyncButton>
-  </article>;
+    </div>
+  </details>;
 }
 
 // W2 voice feature: mirrors the password/delete-account async-lifecycle contract exactly --
@@ -222,40 +223,38 @@ function VoicePreferencesEditor({ ttsPreferences, ttsBusy, onUpdateTtsPreference
     }
   };
 
-  return <article className="account-preferences">
-    <strong>{t.voiceTitle}</strong>
-    <p className="muted">{t.voiceNote}</p>
+  const selectedVoice = ttsPreferences.voices.find(voice => voice.id === voiceId);
+
+  return <details className="account-preferences settings-disclosure">
+    <summary><strong>{t.voiceTitle}</strong><small>{t.voiceNote}</small></summary>
+    <div className="settings-disclosure-body">
     <div className="account-toggle"><label><input type="checkbox" checked={enabled}
       disabled={ttsBusy} onChange={event => changeEnabled(event.target.checked)} />
       {t.voiceEnabledLabel}</label><small>{t.voiceEnabledHint}</small></div>
     {error && <span className="voice-error" role="alert">{error}</span>}
-    <fieldset disabled={!enabled}>
-      <legend>{t.voiceModeLabel}</legend>
-      {innerVoiceModeOrder.map(value => <label key={value} className="account-toggle">
-        <input type="radio" name="inner-voice-mode" value={value} checked={mode === value}
-          disabled={ttsBusy} onChange={() => changeMode(value)} />
-        {t.voiceMode[value]}
-      </label>)}
-    </fieldset>
-    <fieldset disabled={!enabled}>
-      <legend>{t.voicePickLabel}</legend>
-      <ul className="voice-preset-list">
-        {ttsPreferences.voices.map(voice => {
-          const displayName = locale === "en-SG" ? englishVoiceName(voice.id) : voice.label;
-          return <li key={voice.id} className="voice-preset-option">
-          <label><input type="radio" name="inner-voice-preset" value={voice.id} checked={voiceId === voice.id}
-            disabled={ttsBusy} onChange={() => changeVoice(voice.id)} />{displayName}</label>
-          <AsyncButton busy={previewingId === voice.id} busyText={t.voicePreviewBusy}
-            disabled={previewingId !== null && previewingId !== voice.id}
-            onClick={() => void preview(voice.id)}>{t.voicePreview}</AsyncButton>
-          {previewAudio?.voiceId === voice.id && <InlineAudioPlayer key={previewAudio.token}
-            audio={previewAudio.audio} autoPlay locale={locale} />}
-          </li>;
-        })}
-      </ul>
+    <fieldset className="voice-compact-grid" disabled={!enabled}>
+      <label>{t.voiceModeLabel}<select value={mode} disabled={ttsBusy}
+        onChange={event => changeMode(event.target.value as TtsPreferences["innerVoiceMode"])}>
+        {innerVoiceModeOrder.map(value => <option key={value} value={value}>{t.voiceMode[value]}</option>)}
+      </select></label>
+      <label>{t.voicePickLabel}<select value={voiceId} disabled={ttsBusy}
+        onChange={event => changeVoice(event.target.value)}>
+        {ttsPreferences.voices.map(voice => <option key={voice.id} value={voice.id}>
+          {locale === "en-SG" ? englishVoiceName(voice.id) : voice.label}
+        </option>)}
+      </select></label>
+      <AsyncButton busy={previewingId === voiceId} busyText={t.voicePreviewBusy}
+        disabled={previewingId !== null}
+        onClick={() => void preview(voiceId)}>{t.voicePreview}</AsyncButton>
+      {previewAudio?.voiceId === voiceId && <InlineAudioPlayer key={previewAudio.token}
+        audio={previewAudio.audio} autoPlay locale={locale} />}
       {previewError && <span className="voice-error" role="alert">{previewError}</span>}
     </fieldset>
-  </article>;
+    {selectedVoice && <small className="voice-selection-note">
+      {locale === "en-SG" ? englishVoiceName(selectedVoice.id) : selectedVoice.label}
+    </small>}
+    </div>
+  </details>;
 }
 
 export function AccountSettings({ busy, message, onChangePassword, onExportData, onDeleteAccount,
@@ -325,7 +324,7 @@ export function AccountSettings({ busy, message, onChangePassword, onExportData,
   };
 
   return <section className="account-settings" aria-label={t.aria} lang={locale}>
-    <span className="eyebrow">ACCOUNT &amp; DATA</span>
+    <span className="eyebrow">{t.eyebrow}</span>
     <h2>{t.heading}</h2>
     {message && <p className="account-message">{message}</p>}
     <div className="account-actions-grid">

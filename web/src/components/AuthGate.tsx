@@ -21,6 +21,7 @@ const COPY: Record<Locale, {
   username: string; nickname: string; password: string; confirm: string;
   errFill: string; errLen: string; errMismatch: string; loginFail: string; registerFail: string;
   loginBusy: string; registerBusy: string; loginBtn: string; registerBtn: string;
+  nativeErrorPrefix: string; nativeOpening: string; nativeContinue: string;
 }> = {
   "zh-CN": {
     loginH1: "回到你的内宇宙", registerH1: "开始你的内宇宙",
@@ -32,7 +33,8 @@ const COPY: Record<Locale, {
     username: "用户名", nickname: "昵称（可选，默认使用用户名）", password: "密码", confirm: "确认密码",
     errFill: "请填写用户名和密码。", errLen: "密码至少 8 位。", errMismatch: "两次输入的密码不一致。",
     loginFail: "登录失败", registerFail: "注册失败，请换个用户名试试。",
-    loginBusy: "正在登录", registerBusy: "正在创建", loginBtn: "登录", registerBtn: "创建账号"
+    loginBusy: "正在登录", registerBusy: "正在创建", loginBtn: "登录", registerBtn: "创建账号",
+    nativeErrorPrefix: "登录错误：", nativeOpening: "正在打开安全登录…", nativeContinue: "请在系统浏览器中继续"
   },
   "en-SG": {
     loginH1: "Back to your inner cosmos", registerH1: "Begin your inner cosmos",
@@ -44,7 +46,8 @@ const COPY: Record<Locale, {
     username: "Username", nickname: "Nickname (optional, defaults to your username)", password: "Password", confirm: "Confirm password",
     errFill: "Enter your username and password.", errLen: "Password must be at least 8 characters.", errMismatch: "The two passwords do not match.",
     loginFail: "Sign-in failed", registerFail: "Sign-up failed — try a different username.",
-    loginBusy: "Signing in", registerBusy: "Creating", loginBtn: "Log in", registerBtn: "Create account"
+    loginBusy: "Signing in", registerBusy: "Creating", loginBtn: "Log in", registerBtn: "Create account",
+    nativeErrorPrefix: "Sign-in error:", nativeOpening: "Opening secure sign-in…", nativeContinue: "Continue in the system browser"
   }
 };
 
@@ -65,14 +68,14 @@ export function AuthGate({ native, onSuccess, locale = "zh-CN", externalError = 
     <span className="eyebrow">INNER COSMOS</span><h1>{t.loginH1}</h1>
     <p>{t.nativeP}</p>
     {(error || externalError) && <p className="error" role="alert" data-testid="native-auth-error">
-      Sign-in error: {error || externalError}
+      {t.nativeErrorPrefix} {error || externalError}
     </p>}
     {nativeProgress && !error && !externalError && <p role="status">{nativeProgress}</p>}
     <button className="send" type="button" onClick={() => {
       setError("");
-      setNativeProgress("Opening secure sign-in…");
+      setNativeProgress(t.nativeOpening);
       void mobileOidc.beginLogin()
-        .then(() => setNativeProgress("Continue in the system browser"))
+        .then(() => setNativeProgress(t.nativeContinue))
         .catch(reason => {
           setNativeProgress("");
           setError(reason instanceof Error ? reason.message : t.nativeErr);

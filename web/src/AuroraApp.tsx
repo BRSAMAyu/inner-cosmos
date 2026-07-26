@@ -7,6 +7,8 @@ import { mobileOidc } from "./mobile-auth";
 import { isTauriRuntime } from "./desktop-runtime";
 import { capsulePath, connectionTabFromSearch, connectionTabPath, ConnectionSubNav, letterThreadPath, MeSpace, productSpaceFromPath, productSpaces, ProductShellNavigation, resourceFromPath, spacePath, type ConnectionTab, type ProductSpace, type CosmosTab, cosmosTabFromPath, cosmosTabPath, CosmosSubNav, type ResonanceTab, resonanceTabFromPath, resonanceTabPath, ResonanceSubNav } from "./components/ProductShell";
 import { AuroraConversation } from "./components/AuroraConversation";
+import { QuickHello } from "./components/QuickHello";
+import { StartHereJourney, type JourneyStep } from "./components/StartHereJourney";
 import { AuroraInnerVoiceAside } from "./components/AuroraInnerVoiceAside";
 import { AuroraMemoryTrace } from "./components/AuroraMemoryTrace";
 import { SafetyResourceCard } from "./components/SafetyResourceCard";
@@ -63,7 +65,7 @@ import { InnerCosmosOverview } from "./components/InnerCosmosOverview";
 // docs/goal/tracks/track-b-status.yml and evidence/track-b/README.md for what moved and why.
 const modes = [
   ["DAILY_TALK", "倾诉"], ["THOUGHT_CLARIFY", "整理"], ["SOCRATIC", "追问"],
-  ["ACTION_SPLIT", "行动"], ["RELATION_REVIEW", "关系"]
+  ["ACTION_SPLIT", "行动"], ["RELATION_REVIEW", "关系"], ["CAPSULE_SHAPING", "塑造侧影"]
 ] as const;
 
 export function AuroraApp() {
@@ -192,6 +194,13 @@ export function AuroraApp() {
       setStatus(`已经把这一刻沉淀成 ${cards.length} 颗可追溯的记忆星；点星体可以查看它来自哪里。`);
     }
   });
+
+  useEffect(() => {
+    if (!authenticated) return;
+    setStatus(skillLocale === "en-SG"
+      ? "Aurora is here. Interrupt at any time; she will listen again."
+      : "Aurora 在这里。你可以随时打断，她会重新理解。");
+  }, [authenticated, skillLocale]);
 
   // Connections/letters domain (People Discovery, relation mentions/timeline, connection
   // requests/friends, slow-letter inbox/outbox/threads) -- extracted into its own hook; see
@@ -741,7 +750,11 @@ export function AuroraApp() {
       const updated = await api.updateProfile(patch);
       setUserProfile(updated);
       setAccountMessage("偏好设置已保存");
-    } catch (error) { setAccountMessage(error instanceof Error ? error.message : "偏好设置未能保存"); }
+      return true;
+    } catch (error) {
+      setAccountMessage(error instanceof Error ? error.message : "偏好设置未能保存");
+      return false;
+    }
     finally { setProfileBusy(false); }
   };
 
@@ -1140,7 +1153,7 @@ export function AuroraApp() {
 
   const tt = APP_COPY[skillLocale];
   if (mobileState.native && (!hasConfiguredApiBase || apiConfigurationError)) return <main className="login-shell"><div className="login mobile-gate" role="alert">
-    <span className="eyebrow">MOBILE ENVIRONMENT GATE</span>
+    <span className="eyebrow">{skillLocale === "en-SG" ? "MOBILE ENVIRONMENT GATE" : "移动环境安全门"}</span>
     <h1>这台设备还没有安全后端入口</h1>
     <p>{apiConfigurationError ?? <>应用壳、深链与恢复能力已经就绪，但本次构建没有注入 <code>VITE_API_BASE_URL</code>。</>} 为避免把凭据和会话发往错误地址，Aurora 不会尝试登录。</p>
     <small>请使用经过验证的 HTTPS API 域重新构建；推送凭据与商店签名也必须由授权环境提供。</small>
@@ -1212,7 +1225,7 @@ export function AuroraApp() {
       <div className="product-space" hidden={productSpace !== "aurora"}>
       <header className="hero">
         <div>
-          <span className="eyebrow">INNER COSMOS · AURORA</span>
+          <span className="eyebrow">{tt.heroEyebrow}</span>
           <h1>{tt.heroLine1}<br />{tt.heroLine2}</h1>
           <p>{tt.heroP}</p>
           <div className={`runtime-signal ${auroraSession.runtimeSignal.stage}`} aria-label={tt.runtimeAria}>
@@ -1224,6 +1237,9 @@ export function AuroraApp() {
         </div>
         <div className="orb" aria-hidden="true"><span /></div>
       </header>
+
+      {userProfile && <QuickHello profile={userProfile} locale={skillLocale} onSave={saveProfile}
+        onBegin={() => void auroraSession.greet()} />}
 
       <TodayOverview memoryCount={memories.length} latestMemory={memories[0]?.title ?? null}
         arrivedLetters={connectionsAndLetters.letterInbox.length}
@@ -1240,9 +1256,41 @@ export function AuroraApp() {
         onOpenReturns={() => document.querySelector(".returns")?.scrollIntoView({ behavior: "smooth", block: "start" })}
         locale={skillLocale} />
 
+      <StartHereJourney
+        locale={skillLocale}
+        isDemoSandbox={Boolean(userProfile?.username?.startsWith("sandbox-"))}
+        onStep={(step: JourneyStep) => {
+          if (step === "aurora") {
+            document.querySelector(".composer")?.scrollIntoView({ behavior: "smooth", block: "center" });
+            return;
+          }
+          if (step === "memory") {
+            navigate(cosmosTabPath("starfield"));
+            return;
+          }
+          if (step === "capsule") {
+            auroraSession.setMode("CAPSULE_SHAPING");
+            document.querySelector(".modes")?.scrollIntoView({ behavior: "smooth", block: "center" });
+            return;
+          }
+          navigate(resonanceTabPath("encounters"));
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }}
+      />
+
       <nav className="modes" aria-label={tt.modesAria}>
         {modes.map(([value]) => <button key={value} className={auroraSession.mode === value ? "active" : ""} onClick={() => auroraSession.setMode(value)}>{tt.modeLabel[value as DialogMode]}</button>)}
       </nav>
+      {auroraSession.mode === "CAPSULE_SHAPING" && <section className="capsule-shaping-intro" aria-label={skillLocale === "en-SG" ? "Shape a capsule with Aurora" : "和 Aurora 一起塑造共鸣体"}>
+        <div><span className="eyebrow">{skillLocale === "en-SG" ? "10-MINUTE LIVING PORTRAIT" : "十分钟 · 鲜活侧影"}</span>
+          <strong>{skillLocale === "en-SG" ? "Tell stories, not personality labels." : "讲故事，不填人格问卷。"}</strong>
+          <p>{skillLocale === "en-SG"
+            ? "Aurora notices what is still thin—values, tensions, voice, boundaries and who you hope to meet—and asks one natural question at a time."
+            : "Aurora 会感知价值、张力、表达方式、边界与期待遇见的人中哪里还单薄，每次只自然地聊一个最值得补充的部分。"}</p></div>
+        <button type="button" className="quiet" onClick={() => navigate(resonanceTabPath("mine"))}>
+          {skillLocale === "en-SG" ? "Preview the capsule workspace" : "先看看共鸣体工作台"}
+        </button>
+      </section>}
 
       <AuroraInnerVoiceAside voice={auroraSession.innerVoice}
         enabled={ttsPreferences?.innerVoiceEnabled ?? false}
@@ -1283,7 +1331,7 @@ export function AuroraApp() {
 
       {(mobileState.native || !mobileState.connected) && <section className={`mobile-presence ${mobileState.connected ? "online" : "offline"}`} aria-label={tt.mobileAria}>
         <div>
-          <span className="eyebrow">AURORA, WITH YOU</span>
+          <span className="eyebrow">{tt.presenceEyebrow}</span>
           <strong>{mobileState.connected ? tt.mobileConnected : tt.mobileOffline}</strong>
           <p>{mobileState.connected
             ? tt.mobileConnectedP(mobileState.platform.toUpperCase(), mobileState.connectionType)
@@ -1296,7 +1344,7 @@ export function AuroraApp() {
       </section>}
 
       <section className="returns" aria-label={tt.returnsAria}>
-        <div className="returns-head"><div><span className="eyebrow">AURORA RETURNS</span><h2>{tt.returnsTitle}</h2></div>
+        <div className="returns-head"><div><span className="eyebrow">{tt.returnsEyebrow}</span><h2>{tt.returnsTitle}</h2></div>
           <div className="return-negotiate">
           <label>{skillLocale === "en-SG" ? "What should Aurora return for?" : "这次回来，想继续什么"}
             <select aria-label={skillLocale === "en-SG" ? "Return purpose" : "回来约定的目的"}
@@ -1326,7 +1374,7 @@ export function AuroraApp() {
 
       {auroraSession.notifications.filter(notice => notice.refType === "WAKE_INTENT").map(notice =>
         <section className="return-arrival" aria-label={tt.arrivalAria} key={notice.id}>
-          <span className="eyebrow">AURORA RETURNED</span><h2>{notice.title}</h2><p>{notice.body}</p>
+          <span className="eyebrow">{tt.returnedEyebrow}</span><h2>{notice.title}</h2><p>{notice.body}</p>
           <a href={`?wakeIntent=${notice.refId}`}>{tt.backToUnfinished}</a>
           <div className="return-actions"><button disabled={auroraSession.wakeBusy} onClick={() => void auroraSession.respondToReturn(notice, "MATCHED")}>{tt.matched}</button>
             <button disabled={auroraSession.wakeBusy} onClick={() => void auroraSession.respondToReturn(notice, "LATER")}>{tt.later}</button>

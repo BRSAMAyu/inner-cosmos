@@ -159,4 +159,10 @@ describe("AuthGate -- native (Capacitor OIDC) mode is untouched", () => {
     expect(screen.queryByRole("tablist", { name: "登录或注册" })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("用户名")).not.toBeInTheDocument();
   });
+
+  it("localizes the native error prefix in Chinese mode", () => {
+    render(<AuthGate native={true} onSuccess={vi.fn()} externalError="令牌已过期" locale="zh-CN" />);
+    expect(screen.getByRole("alert")).toHaveTextContent("登录错误： 令牌已过期");
+    expect(screen.getByRole("alert")).not.toHaveTextContent("Sign-in error");
+  });
 });

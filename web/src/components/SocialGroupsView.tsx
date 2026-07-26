@@ -65,7 +65,7 @@ export function SocialGroupsView({ groups, invites, friends, selectedGroupId, me
   const isOwner = Boolean(selectedGroup && currentUserId !== null && selectedGroup.ownerUserId === currentUserId);
 
   return <section className="social-groups" aria-label={t.aria}>
-    <div className="resonance-heading"><div><span className="eyebrow">SLOW GROUPS</span><h2>{t.heading}</h2></div>
+    <div className="resonance-heading"><div><span className="eyebrow">{locale === "en-SG" ? "SLOW GROUPS" : "慢小组"}</span><h2>{t.heading}</h2></div>
       <span>{t.count(groups.length)}</span></div>
     <p className="resonance-intro">{t.intro}</p>
 

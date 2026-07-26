@@ -49,7 +49,8 @@ public class AuroraProactiveController extends BaseController {
         } else {
             AuroraReplyVO reply = auroraAgentService.generateGreeting(userId, null, "DAILY_TALK");
             data.put("shouldGreet", true);
-            data.put("greeting", reply.messages == null || reply.messages.isEmpty() ? g.greeting : reply.messages.get(0));
+            data.put("greeting", reply.messages == null || reply.messages.isEmpty()
+                    ? "AI greeting is unavailable right now." : reply.messages.get(0));
             data.put("reply", reply);
             data.put("hoursSinceLastSession", g.hoursSinceLastSession);
         }

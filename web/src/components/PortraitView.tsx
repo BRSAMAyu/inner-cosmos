@@ -77,7 +77,7 @@ export function PortraitView({ dimensions, history, calibrated, busyDim, onLoadH
   const sorted = dimensions.filter(d => d.dim).slice().sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0));
 
   return <section className="portrait-space" aria-label={t.aria}>
-    <span className="eyebrow">AURORA · SELF MIRROR</span>
+    <span className="eyebrow">{locale === "en-SG" ? "AURORA · SELF MIRROR" : "Aurora · 自我之镜"}</span>
     <h2>{t.heading}</h2>
     <p>{t.intro}</p>
     {!sorted.length ? <p className="portrait-empty">{t.empty}</p> :

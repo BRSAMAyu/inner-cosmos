@@ -54,7 +54,8 @@ public class StructuredAiService {
                       Class<T> resultType, Supplier<T> fallback, LlmClient clientOverride) {
         LlmClient active = clientOverride != null ? clientOverride : llmClient;
         String assignedGroup = abTestService.assignGroup(userId, moduleName);
-        if (llmConfig.isProdMode()) {
+        boolean requireRemoteProvider = requiresRemoteProvider(context);
+        if (llmConfig.isProdMode() || requireRemoteProvider) {
             assignedGroup = "REMOTE";
         }
         long startTime = System.currentTimeMillis();
@@ -80,7 +81,7 @@ public class StructuredAiService {
             request.temperature = modeTemperature(context);
             request.thinkingEnabled = thinkingEnabled(moduleName);
             applyLatencyContract(request, moduleName, false);
-            if ("MOCK".equals(assignedGroup)) {
+            if ("MOCK".equals(assignedGroup) && !requireRemoteProvider) {
                 request.forceMock = true;
             }
 
@@ -105,7 +106,7 @@ public class StructuredAiService {
             // Repairing malformed JSON is formatting work, not another deep-reasoning pass.
             retry.thinkingEnabled = Boolean.FALSE;
             applyLatencyContract(retry, moduleName, true);
-            if ("MOCK".equals(assignedGroup)) {
+            if ("MOCK".equals(assignedGroup) && !requireRemoteProvider) {
                 retry.forceMock = true;
             }
 
@@ -138,6 +139,11 @@ public class StructuredAiService {
                 log.debug("Failed to record A/B test metrics: {}", e.getMessage());
             }
         }
+    }
+
+    private boolean requiresRemoteProvider(Object context) {
+        return context instanceof Map<?, ?> map
+                && Boolean.TRUE.equals(map.get("requireRemoteProvider"));
     }
 
     private String preferredProvider(Object context) {

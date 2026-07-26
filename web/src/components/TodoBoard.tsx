@@ -103,7 +103,7 @@ export function TodoBoard({ todos, tab, busy, splitBusyId, onSelectTab, onCreate
   };
 
   return <section className="todo-board-space" aria-label={t.aria} lang={locale}>
-    <span className="eyebrow">TODO · NEXT SMALL STEP</span>
+    <span className="eyebrow">{locale === "en-SG" ? "TODO · NEXT SMALL STEP" : "待办 · 下一小步"}</span>
     <h2>{t.heading}</h2>
     <p>{t.intro}</p>
     <p className="todo-progress-label">{t.progress(doneCount, todos.length)}</p>

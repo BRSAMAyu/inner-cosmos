@@ -14,7 +14,7 @@ export function TodayOverview({ memoryCount, latestMemory, arrivedLetters, lates
   const en = locale === "en-SG";
   return <section className="today-overview" aria-label={en ? "Your Inner Cosmos today" : "今天的内宇宙概览"}>
     <div className="today-overview-heading">
-      <div><span className="eyebrow">YOUR COSMOS, TODAY</span>
+      <div><span className="eyebrow">{en ? "YOUR COSMOS, TODAY" : "今日 · 内宇宙"}</span>
         <h2>{en ? "Nothing important is buried." : "重要的变化，不必再翻很久才能看见"}</h2></div>
       <button type="button" className="today-write-letter" onClick={onWriteLetter}>
         {en ? "Write a slow letter" : "写一封慢信"}

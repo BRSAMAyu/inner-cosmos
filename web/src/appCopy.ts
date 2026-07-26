@@ -4,7 +4,7 @@ import type { Locale } from "./i18n";
 // mobile-presence section, the returns/wake-intent cards and the footer). Kept here rather than in
 // AuroraApp so the 1000-line shell stays readable and the copy is one localizable table. Transient
 // setStatus toast messages in async handlers are intentionally NOT here yet (a separate follow-up).
-export type DialogMode = "DAILY_TALK" | "THOUGHT_CLARIFY" | "SOCRATIC" | "ACTION_SPLIT" | "RELATION_REVIEW";
+export type DialogMode = "DAILY_TALK" | "THOUGHT_CLARIFY" | "SOCRATIC" | "ACTION_SPLIT" | "RELATION_REVIEW" | "CAPSULE_SHAPING";
 
 export const APP_COPY: Record<Locale, {
   connecting: string; modeLabel: Record<DialogMode, string>;
@@ -17,10 +17,12 @@ export const APP_COPY: Record<Locale, {
   returnsEmpty: string; postpone: string; cancel: string;
   arrivalAria: string; backToUnfinished: string; matched: string; later: string; stopSimilar: string;
   footerTagline: string; footerSignOut: string;
+  heroEyebrow: string; presenceEyebrow: string; returnsEyebrow: string; returnedEyebrow: string;
 }> = {
   "zh-CN": {
-    connecting: "正在连接你的内宇宙…",
-    modeLabel: { DAILY_TALK: "倾诉", THOUGHT_CLARIFY: "整理", SOCRATIC: "追问", ACTION_SPLIT: "行动", RELATION_REVIEW: "关系" },
+    connecting: "正在连接你的内宇宙…", heroEyebrow: "内宇宙 · Aurora", presenceEyebrow: "Aurora，与你同在",
+    returnsEyebrow: "Aurora 的回来约定", returnedEyebrow: "Aurora 如约回来",
+    modeLabel: { DAILY_TALK: "倾诉", THOUGHT_CLARIFY: "整理", SOCRATIC: "追问", ACTION_SPLIT: "行动", RELATION_REVIEW: "关系", CAPSULE_SHAPING: "塑造侧影" },
     heroLine1: "可以被打断的陪伴，", heroLine2: "才是真的在听。",
     heroP: "你不需要等 Aurora 说完。新消息会成为新的理解输入，而不是错误。", runtimeAria: "Aurora 当前回应状态",
     runtimeUnderstanding: "正在理解", runtimeComposing: "正在组织", runtimeSpeaking: "正在回应", runtimeHere: "在这里",
@@ -37,8 +39,9 @@ export const APP_COPY: Record<Locale, {
     footerTagline: "五空间 AppShell · 数据与能力持续保留", footerSignOut: "安全退出"
   },
   "en-SG": {
-    connecting: "Connecting to your inner cosmos…",
-    modeLabel: { DAILY_TALK: "Confide", THOUGHT_CLARIFY: "Sort out", SOCRATIC: "Probe", ACTION_SPLIT: "Act", RELATION_REVIEW: "Relate" },
+    connecting: "Connecting to your inner cosmos…", heroEyebrow: "INNER COSMOS · AURORA", presenceEyebrow: "AURORA, WITH YOU",
+    returnsEyebrow: "AURORA RETURNS", returnedEyebrow: "AURORA RETURNED",
+    modeLabel: { DAILY_TALK: "Confide", THOUGHT_CLARIFY: "Sort out", SOCRATIC: "Probe", ACTION_SPLIT: "Act", RELATION_REVIEW: "Relate", CAPSULE_SHAPING: "Shape capsule" },
     heroLine1: "Companionship you can interrupt", heroLine2: "is what truly listens.",
     heroP: "You don't have to wait for Aurora to finish. A new message becomes fresh input for understanding, not an error.", runtimeAria: "Aurora's current response state",
     runtimeUnderstanding: "Understanding", runtimeComposing: "Composing", runtimeSpeaking: "Responding", runtimeHere: "Here",

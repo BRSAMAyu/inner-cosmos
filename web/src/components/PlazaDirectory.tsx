@@ -98,7 +98,7 @@ export function PlazaDirectory({ capsules, activeCapsuleId, busy, onOpenCapsule,
     : "广场让你主动浏览所有公开共鸣体；「相遇」则是 Aurora 为你筛出的少量候选。你可以只和侧影聊，也可以写一封慢信；只有双方都愿意，才会走向真人连接。";
 
   return <section className="plaza-directory" aria-label={t.aria}>
-    <div className="resonance-heading"><div><span className="eyebrow">RESONANCE PLAZA</span><h2>{plazaHeading}</h2></div>
+    <div className="resonance-heading"><div><span className="eyebrow">{locale === "en-SG" ? "RESONANCE PLAZA" : "共鸣广场"}</span><h2>{plazaHeading}</h2></div>
       <span>{t.count(capsules.length)}</span></div>
     <p className="resonance-intro">{plazaIntro}</p>
     <div className="plaza-path" aria-label={locale === "en-SG" ? "Possible relationship path" : "可能的关系路径"}>

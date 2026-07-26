@@ -200,7 +200,7 @@ export function CapsuleWorkbench({ capsules, selectedCapsuleId, selectedCapsule,
   const tabStatus = (status: string) => status === "PUBLIC" ? t.tabPublic : status === "NEEDS_REVIEW" ? t.tabReview : t.tabPrivate;
   const summaryStatus = (status: string) => status === "PUBLIC" ? t.statusPublic : status === "NEEDS_REVIEW" ? t.statusReview : t.statusPrivate;
   return <section className="resonance-space" aria-label={t.aria}>
-    <div className="resonance-heading"><div><span className="eyebrow">YOUR RESONANCE</span>
+    <div className="resonance-heading"><div><span className="eyebrow">{locale === "en-SG" ? "YOUR RESONANCE" : "你的共鸣"}</span>
       <h2>{locale === "en-SG" ? "The facets that can meet others for you" : "那些可以替你先去相遇的侧影"}</h2></div>
       <span>{t.count(capsules.filter(capsule => capsule.visibilityStatus !== "ARCHIVED").length)}</span></div>
     {capsules.length > 0 && <div className="capsule-glance" role="list">
@@ -253,7 +253,7 @@ export function CapsuleWorkbench({ capsules, selectedCapsuleId, selectedCapsule,
           onChange={event => onCapsuleStandIn?.(event.target.checked)} />{t.standInCheck}</label>
       </details>
       {!capsulePreview ? <AsyncButton className="resonance-primary" busy={capsuleBusy} busyText={t.previewBusy} onClick={onPreviewNewCapsule}>{t.previewBtn}</AsyncButton> :
-        <div className="capsule-preview" aria-label={t.previewAria}><span className="eyebrow">WHAT IT MAY USE</span><p>{capsulePreview.abstractSummary}</p>
+        <div className="capsule-preview" aria-label={t.previewAria}><span className="eyebrow">{locale === "en-SG" ? "WHAT IT MAY USE" : "它可能使用的内容"}</span><p>{capsulePreview.abstractSummary}</p>
           <div className="preview-tags">{capsulePreview.publicTags.map(tag => <span key={tag}>{tag}</span>)}</div>
           {capsulePreview.removedSensitiveItems.length > 0 && <small>{t.removedPrefix}{capsulePreview.removedSensitiveItems.join("、")}</small>}
           {capsulePreview.riskWarnings.map(warning => <p className="preview-warning" key={warning}>{warning}</p>)}

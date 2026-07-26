@@ -1,6 +1,7 @@
 package com.innercosmos.ai.strategy;
 
 import com.innercosmos.ai.mode.ActionSplitStrategy;
+import com.innercosmos.ai.mode.CapsuleShapingStrategy;
 import com.innercosmos.ai.mode.DailyTalkStrategy;
 import com.innercosmos.ai.mode.ModeRegistry;
 import com.innercosmos.ai.mode.ModeStrategy;
@@ -50,6 +51,16 @@ class ModeStrategyTest {
     @Test
     void sleepReviewName() {
         assertEquals("SLEEP_REVIEW", new SleepReviewStrategy().name());
+    }
+
+    @Test
+    void capsuleShapingIsConversationFirstAndBounded() {
+        ModeStrategy strategy = new CapsuleShapingStrategy();
+        assertEquals("CAPSULE_SHAPING", strategy.name());
+        assertTrue(strategy.segment().contains("never a questionnaire"));
+        assertTrue(strategy.segment().contains("one natural"));
+        assertTrue(strategy.segment().contains("privacy/contact boundaries"));
+        assertFalse(strategy.requiresMultiTurnAcknowledgement());
     }
 
     // --- segment() is non-null and non-empty ---
@@ -155,7 +166,8 @@ class ModeStrategyTest {
             new ThoughtClarifyStrategy(),
             new ActionSplitStrategy(),
             new RelationReviewStrategy(),
-            new SleepReviewStrategy()
+            new SleepReviewStrategy(),
+            new CapsuleShapingStrategy()
         );
         for (ModeStrategy s : all) {
             assertTrue(s.temperature() >= 0.0 && s.temperature() <= 1.0,
@@ -205,7 +217,8 @@ class ModeStrategyTest {
             new ThoughtClarifyStrategy(),
             new ActionSplitStrategy(),
             new RelationReviewStrategy(),
-            new SleepReviewStrategy()
+            new SleepReviewStrategy(),
+            new CapsuleShapingStrategy()
         ));
 
         assertNotNull(registry.get("DAILY_TALK"));
@@ -214,6 +227,7 @@ class ModeStrategyTest {
         assertNotNull(registry.get("ACTION_SPLIT"));
         assertNotNull(registry.get("RELATION_REVIEW"));
         assertNotNull(registry.get("SLEEP_REVIEW"));
+        assertNotNull(registry.get("CAPSULE_SHAPING"));
     }
 
     @Test

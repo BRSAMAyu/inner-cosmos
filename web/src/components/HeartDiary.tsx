@@ -97,7 +97,7 @@ export function HeartDiary({ rawText, displayText, activeLevel, polishBusy, subm
   const showPolish = rawText.trim().length > 5;
 
   return <section className="heart-diary-space" aria-label={t.aria}>
-    <span className="eyebrow">HEART DIARY</span>
+    <span className="eyebrow">{locale === "en-SG" ? "HEART DIARY" : "心声日记"}</span>
     <h2>{t.heading}</h2>
     <p>{t.intro}</p>
 

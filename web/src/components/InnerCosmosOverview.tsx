@@ -35,7 +35,7 @@ export function InnerCosmosOverview({ starfield, dailyRecords, themes, locale = 
 
   return <section className="inner-cosmos-overview" aria-label={en ? "Current inner cosmos" : "此刻的内宇宙"}>
     <header>
-      <div><span className="eyebrow">YOUR INNER COSMOS · NOW</span>
+      <div><span className="eyebrow">{en ? "YOUR INNER COSMOS · NOW" : "你的内宇宙 · 此刻"}</span>
         <h1>{en ? "See what is alive before opening every memory." : "先看见此刻，再进入每一颗记忆"}</h1></div>
       <p>{en
         ? "A living reading of weather, recurring constellations, unfinished gravity and recent change."
