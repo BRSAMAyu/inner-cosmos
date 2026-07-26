@@ -21,6 +21,7 @@ vi.mock("../api", () => ({
     decideConnection: vi.fn(),
     leaveConnection: vi.fn(),
     sendSlowLetter: vi.fn(),
+    draftSlowLetterToUser: vi.fn(),
     transitionLetter: vi.fn(),
     reportLetter: vi.fn(),
     replyWithSlowLetter: vi.fn(),
@@ -30,7 +31,9 @@ vi.mock("../api", () => ({
     inviteToGroup: vi.fn(),
     respondToGroupInvite: vi.fn(),
     leaveGroup: vi.fn(),
-    groupMembers: vi.fn()
+    groupMembers: vi.fn(),
+    groupMessages: vi.fn(),
+    sendGroupMessage: vi.fn()
   }
 }));
 
@@ -88,6 +91,7 @@ beforeEach(() => {
   vi.mocked(api.connectionRequests).mockResolvedValue(requests());
   vi.mocked(api.friends).mockResolvedValue([]);
   vi.mocked(api.discoverPeople).mockResolvedValue([]);
+  vi.mocked(api.groupMessages).mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -394,6 +398,23 @@ describe("useConnectionsAndLetters -- letters", () => {
     expect(setStatus).toHaveBeenCalledWith(expect.stringContaining("已经启程"));
   });
 
+  it("sends a new slow letter directly to an accepted friend's user id", async () => {
+    vi.mocked(api.draftSlowLetterToUser).mockResolvedValue(letter({ id: 8, receiverUserId: 30, status: "DRAFT" }));
+    vi.mocked(api.sendSlowLetter).mockResolvedValue(letter({ id: 8, receiverUserId: 30, status: "SENT" }));
+    vi.mocked(api.letterOutbox).mockResolvedValue([letter({ id: 8, receiverUserId: 30, status: "SENT" })]);
+    const { result, setStatus } = setup();
+
+    let sent = false;
+    await act(async () => { sent = await result.current.sendDirectLetter(30, "近况", "最近还好吗？"); });
+
+    expect(sent).toBe(true);
+    expect(api.draftSlowLetterToUser).toHaveBeenCalledExactlyOnceWith(
+      30, "近况", "最近还好吗？", expect.any(String));
+    expect(api.sendSlowLetter).toHaveBeenCalledWith(8, expect.any(String));
+    expect(result.current.letterOutbox).toHaveLength(1);
+    expect(setStatus).toHaveBeenCalledWith(expect.stringContaining("直接寄给"));
+  });
+
   // Gemini audit 4.8 (CONFIRMED/P1): sendDraft previously used a single shared `draftBusy` boolean
   // -- sending draft 1 would disable draft 2's send button too, even though they're unrelated
   // drafts a user could otherwise send independently.
@@ -572,10 +593,12 @@ describe("useConnectionsAndLetters -- groups", () => {
 
   it("openGroup selects the group and loads its members", async () => {
     vi.mocked(api.groupMembers).mockResolvedValue([{ userId: 1, memberRole: "OWNER", nickname: "我" }]);
+    vi.mocked(api.groupMessages).mockResolvedValue([{ id: 9, groupId: 5, senderUserId: 1, senderNickname: "我", messageBody: "欢迎", createdAt: null }]);
     const { result } = setup();
     await act(async () => { await result.current.openGroup(5); });
     expect(result.current.selectedGroupId).toBe(5);
     expect(result.current.groupMembers).toHaveLength(1);
+    expect(result.current.groupMessages[0].messageBody).toBe("欢迎");
   });
 
   // Gemini audit 4.9 sibling (same conflation as threadLetters): `groupMembers.length === 0` was
@@ -697,5 +720,43 @@ describe("useConnectionsAndLetters -- groups", () => {
 
     await act(async () => { slow.resolve(); await leaveStarted; });
     expect(result.current.isGroupLeaveBusy(5)).toBe(false);
+  });
+
+  it("refreshes both members and messages for the selected group", async () => {
+    vi.mocked(api.groupMembers)
+      .mockResolvedValueOnce([{ userId: 1, memberRole: "OWNER", nickname: "Owner" }])
+      .mockResolvedValueOnce([
+        { userId: 1, memberRole: "OWNER", nickname: "Owner" },
+        { userId: 2, memberRole: "MEMBER", nickname: "New member" }
+      ]);
+    vi.mocked(api.groupMessages)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{
+        id: 9, groupId: 5, senderUserId: 2, senderNickname: "New member",
+        messageBody: "I accepted the invitation.", createdAt: "2026-07-26T20:00:00"
+      }]);
+    const { result } = setup();
+
+    await act(async () => { await result.current.openGroup(5); });
+    await act(async () => { await result.current.refreshSelectedGroupContext(); });
+
+    expect(result.current.groupMembers).toHaveLength(2);
+    expect(result.current.groupMessages[0].messageBody).toBe("I accepted the invitation.");
+  });
+
+  it("sends a group message and appends the authoritative server row", async () => {
+    vi.mocked(api.sendGroupMessage).mockResolvedValue({
+      id: 12, groupId: 5, senderUserId: 20, senderNickname: "我",
+      messageBody: "周六下午见", createdAt: "2026-07-26T20:00:00"
+    });
+    const { result } = setup();
+
+    let sent = false;
+    await act(async () => { sent = await result.current.sendGroupMessage(5, "  周六下午见  "); });
+
+    expect(sent).toBe(true);
+    expect(api.sendGroupMessage).toHaveBeenCalledExactlyOnceWith(5, "周六下午见");
+    expect(result.current.groupMessages[0].messageBody).toBe("周六下午见");
+    expect(result.current.isGroupMessageBusy(5)).toBe(false);
   });
 });

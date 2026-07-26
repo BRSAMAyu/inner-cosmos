@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import {
-  api, type ConnectionRequests, type DiscoverablePerson, type GroupInvite, type GroupMember, type LetterThread,
+  api, type ConnectionRequests, type DiscoverablePerson, type GroupInvite, type GroupMember, type GroupMessage, type LetterThread,
   type RelationHealth, type RelationMention, type RelationTimelinePoint, type SlowLetter, type SocialConnection, type SocialGroup
 } from "../api";
 import { sendComposedLetter, type DraftedLetterState } from "../composeAndSend";
@@ -61,11 +61,15 @@ export function useConnectionsAndLetters({ setStatus, locale = "zh-CN" }: UseCon
   // reply's created-draft id + idempotency key across a failed send-retry (see
   // web/src/composeAndSend.ts) -- a retry must reuse the same reply draft, not create another one.
   const replyDraftsRef = useRef<Record<number, DraftedLetterState>>({});
+  const directLetterDraftRef = useRef<DraftedLetterState | null>(null);
+  const [directLetterBusy, setDirectLetterBusy] = useState(false);
   const [groups, setGroups] = useState<SocialGroup[]>([]);
   const [groupInvites, setGroupInvites] = useState<GroupInvite[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
   const [groupMembersStatus, setGroupMembersStatus] = useState<FetchStatus>("idle");
+  const [groupMessages, setGroupMessages] = useState<GroupMessage[]>([]);
+  const [groupMessagesStatus, setGroupMessagesStatus] = useState<FetchStatus>("idle");
   const [groupCreateBusy, setGroupCreateBusy] = useState(false); // no resource id -- one create form
 
   // Gemini audit 4.8 (CONFIRMED/P1): "多个 social action 使用普通 button，无 per-resource busy
@@ -85,6 +89,7 @@ export function useConnectionsAndLetters({ setStatus, locale = "zh-CN" }: UseCon
   const groupInviteBusyKeys = useBusyKeys<number>(); // keyed by groupId (inviteToGroup)
   const groupInviteDecisionBusyKeys = useBusyKeys<number>(); // keyed by memberId (respondToGroupInvite)
   const groupLeaveBusyKeys = useBusyKeys<number>(); // keyed by groupId (leaveGroup)
+  const groupMessageBusyKeys = useBusyKeys<number>(); // keyed by groupId (sendGroupMessage)
 
   // Gemini audit 4.4 (CONFIRMED/P1): relation/thread/group loaders had no request epoch, so a slow
   // response for a stale selection could overwrite the currently-selected resource's state (e.g.
@@ -154,6 +159,12 @@ export function useConnectionsAndLetters({ setStatus, locale = "zh-CN" }: UseCon
     setPeople(current => discoverable.ok ? discoverable.rows : current);
   }, []);
 
+  const refreshGroups = useCallback(async () => {
+    const [groupRows, inviteRows] = await Promise.all([api.myGroups(), api.groupInvites()]);
+    setGroups(groupRows);
+    setGroupInvites(inviteRows);
+  }, []);
+
   const requestPersonConnection = useCallback((userId: number) => peopleBusyKeys.run(userId, async () => {
     try {
       await api.requestFriend(userId);
@@ -208,6 +219,32 @@ export function useConnectionsAndLetters({ setStatus, locale = "zh-CN" }: UseCon
     } catch (error) { setStatus(error instanceof Error ? error.message
       : copy("Could not send this draft yet.", "暂时无法寄出这封草稿")); }
   }), [copy, draftBusyKeys, setStatus]);
+
+  const sendDirectLetter = useCallback(async (receiverUserId: number, title: string, body: string) => {
+    if (!receiverUserId || !title.trim() || !body.trim() || directLetterBusy) return false;
+    setDirectLetterBusy(true);
+    try {
+      await sendComposedLetter({
+        pending: directLetterDraftRef.current,
+        onDraftCreated: next => { directLetterDraftRef.current = next; },
+        createDraft: idempotencyKey => api.draftSlowLetterToUser(
+          receiverUserId, title.trim(), body.trim(), idempotencyKey),
+        sendDraft: (draftId, idempotencyKey) => api.sendSlowLetter(draftId, idempotencyKey)
+      });
+      directLetterDraftRef.current = null;
+      await api.letterOutbox().then(setLetterOutbox).catch(() => undefined);
+      setStatus(copy(
+        "Your slow letter is on its way to this connection.",
+        "慢信已直接寄给这位好友，正在按它自己的节奏前往。"));
+      return true;
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message
+        : copy("The slow letter did not depart; your words are still here.", "慢信没有启程，你写的内容仍保留在这里。"));
+      return false;
+    } finally {
+      setDirectLetterBusy(false);
+    }
+  }, [copy, directLetterBusy, setStatus]);
 
   const actOnLetter = useCallback((letter: SlowLetter, action: "read" | "decline" | "block" | "archive") =>
     letterActionBusyKeys.run(letter.id, async () => {
@@ -335,18 +372,59 @@ export function useConnectionsAndLetters({ setStatus, locale = "zh-CN" }: UseCon
   const openGroup = useCallback(async (groupId: number) => {
     const generation = ++groupGenerationRef.current;
     const isCurrent = () => groupGenerationRef.current === generation;
-    setSelectedGroupId(groupId); setGroupMembers([]); setGroupMembersStatus("loading");
+    setSelectedGroupId(groupId);
+    setGroupMembers([]); setGroupMembersStatus("loading");
+    setGroupMessages([]); setGroupMessagesStatus("loading");
     try {
-      const members = await api.groupMembers(groupId);
+      const [members, messages] = await Promise.all([
+        api.groupMembers(groupId),
+        api.groupMessages(groupId)
+      ]);
       if (!isCurrent()) return; // 4.4: a newer selection superseded this one -- discard silently.
       setGroupMembers(members); setGroupMembersStatus("success");
+      setGroupMessages(messages); setGroupMessagesStatus("success");
     } catch (error) {
       if (!isCurrent()) return;
       setGroupMembersStatus("error");
+      setGroupMessagesStatus("error");
       setStatus(error instanceof Error ? error.message
-        : copy("Could not read this group's members yet.", "暂时读不到这个群组的成员"));
+        : copy("Could not open this group yet.", "暂时无法打开这个群组"));
     }
   }, [copy, setStatus]);
+
+  const refreshSelectedGroupContext = useCallback(async () => {
+    if (selectedGroupId === null) return;
+    try {
+      const [members, messages] = await Promise.all([
+        api.groupMembers(selectedGroupId),
+        api.groupMessages(selectedGroupId)
+      ]);
+      setGroupMembers(members);
+      setGroupMembersStatus("success");
+      setGroupMessages(messages);
+      setGroupMessagesStatus("success");
+    } catch {
+      // Background sync is intentionally quiet; an explicit open/send still surfaces errors.
+    }
+  }, [selectedGroupId]);
+
+  const sendGroupMessage = useCallback((groupId: number, messageBody: string) =>
+    groupMessageBusyKeys.run(groupId, async () => {
+      const body = messageBody.trim();
+      if (!body) return false;
+      try {
+        const sent = await api.sendGroupMessage(groupId, body);
+        setGroupMessages(current => current.some(message => message.id === sent.id)
+          ? current
+          : [...current, sent]);
+        setGroupMessagesStatus("success");
+        return true;
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message
+          : copy("Could not send this group message yet.", "暂时无法发送这条群消息"));
+        return false;
+      }
+    }), [copy, groupMessageBusyKeys, setStatus]);
 
   const inviteToGroup = useCallback((groupId: number, userId: number) => groupInviteBusyKeys.run(groupId, async () => {
     try {
@@ -373,7 +451,9 @@ export function useConnectionsAndLetters({ setStatus, locale = "zh-CN" }: UseCon
     try {
       await api.leaveGroup(groupId);
       setGroups(current => current.filter(group => group.id !== groupId));
-      if (selectedGroupId === groupId) { setSelectedGroupId(null); setGroupMembers([]); }
+      if (selectedGroupId === groupId) {
+        setSelectedGroupId(null); setGroupMembers([]); setGroupMessages([]);
+      }
       setStatus(copy("You left the group.", "已退出这个群组。 "));
     } catch (error) { setStatus(error instanceof Error ? error.message
       : copy("Could not leave this group yet.", "暂时无法退出这个群组")); }
@@ -391,13 +471,16 @@ export function useConnectionsAndLetters({ setStatus, locale = "zh-CN" }: UseCon
     isLetterConnectionBusy: letterConnectionBusyKeys.isBusy,
     letterVoiceLetterId, letterVoiceAudio, letterVoiceError, isLetterVoiceBusy: letterVoiceBusyKeys.isBusy,
     groups, groupInvites, selectedGroupId, groupMembers, groupMembersStatus,
+    groupMessages, groupMessagesStatus, directLetterBusy,
     groupCreateBusy, isGroupInviteBusy: groupInviteBusyKeys.isBusy,
     isGroupInviteDecisionBusy: groupInviteDecisionBusyKeys.isBusy, isGroupLeaveBusy: groupLeaveBusyKeys.isBusy,
+    isGroupMessageBusy: groupMessageBusyKeys.isBusy,
     loadLetterInbox, loadConnectionRequests, loadFriends, loadLetterOutbox, loadPeople, loadRelations, loadLetterThreads,
     loadGroups, loadGroupInvites,
-    refreshConnections, refreshLetters, requestPersonConnection, openRelation, openThread, sendDraft,
+    refreshConnections, refreshGroups, refreshSelectedGroupContext, refreshLetters,
+    requestPersonConnection, openRelation, openThread, sendDraft, sendDirectLetter,
     actOnLetter, reportLetter, replyWithLetter, updateReplyDraft, playLetterVoice,
     requestConnection, decideConnection, leaveConnection,
-    createGroup, openGroup, inviteToGroup, respondToGroupInvite, leaveGroup
+    createGroup, openGroup, inviteToGroup, respondToGroupInvite, leaveGroup, sendGroupMessage
   };
 }

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { LettersInbox } from "./LettersInbox";
 import type { SlowLetter } from "../api";
@@ -39,6 +39,29 @@ describe("LettersInbox", () => {
       onDecideConnection={() => undefined} onLeaveConnection={() => undefined} />);
     fireEvent.click(screen.getByRole("button", { name: "写一封慢信" }));
     expect(onComposeNew).toHaveBeenCalledOnce();
+  });
+
+  it("lets an accepted connection compose a slow letter here without jumping to a capsule", async () => {
+    const onComposeNew = vi.fn();
+    const onSendDirectLetter = vi.fn().mockResolvedValue(true);
+    render(<LettersInbox letterInbox={[]} replyDrafts={{}} onComposeNew={onComposeNew}
+      onSendDirectLetter={onSendDirectLetter}
+      connectionRequests={{ incoming: [], outgoing: [] }}
+      friends={[{ id: 3, status: "ACCEPTED", userId: 30, nickname: "阿哲", username: "azhe", source: "SOCIAL_PAGE" }]}
+      isDraftBusy={() => false} isLetterActionBusy={() => false} isConnectionDecisionBusy={() => false}
+      isConnectionLeaveBusy={() => false} isLetterConnectionBusy={() => false}
+      onReplyDraftChange={() => undefined} onReply={() => undefined} onActOnLetter={() => undefined}
+      onReportLetter={() => undefined} onRequestConnection={() => undefined}
+      onDecideConnection={() => undefined} onLeaveConnection={() => undefined} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "写一封慢信" }));
+    expect(onComposeNew).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText("选择一位好友"), { target: { value: "30" } });
+    fireEvent.change(screen.getByLabelText("信的标题"), { target: { value: "近况" } });
+    fireEvent.change(screen.getByLabelText("写下你真正想说的话…"), { target: { value: "最近还好吗？" } });
+    fireEvent.click(screen.getByRole("button", { name: "让慢信启程" }));
+
+    await waitFor(() => expect(onSendDirectLetter).toHaveBeenCalledExactlyOnceWith(30, "近况", "最近还好吗？"));
   });
 
   it("marks the reply button busy (disabled + aria-busy) for the letter being sent", () => {

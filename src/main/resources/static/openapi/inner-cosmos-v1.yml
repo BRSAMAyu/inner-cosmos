@@ -356,9 +356,13 @@ components:
         updatedAt: {type: [string, 'null'], format: date-time}
     SlowLetterDraftRequest:
       type: object
-      required: [receiverCapsuleId, title, letterBody]
+      required: [title, letterBody]
+      anyOf:
+        - required: [receiverCapsuleId]
+        - required: [receiverUserId]
       properties:
         receiverCapsuleId: {type: integer, format: int64}
+        receiverUserId: {type: integer, format: int64}
         title: {type: string}
         letterBody: {type: string}
     PersonaMessageRequest:

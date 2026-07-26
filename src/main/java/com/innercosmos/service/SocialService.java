@@ -98,4 +98,20 @@ public interface SocialService {
      *         active member of the group.
      */
     List<Map<String, Object>> listGroupMembers(Long userId, Long groupId);
+
+    /**
+     * Returns the latest bounded group conversation in chronological order.
+     *
+     * @throws com.innercosmos.exception.BusinessException UNAUTHORIZED unless the caller is an
+     *         active member of the group.
+     */
+    List<Map<String, Object>> listGroupMessages(Long userId, Long groupId);
+
+    /**
+     * Adds one user-authored message to a group the caller has actively joined.
+     *
+     * @throws com.innercosmos.exception.BusinessException UNAUTHORIZED unless the caller is an
+     *         active member, BAD_REQUEST when the message is blank or exceeds the bounded length.
+     */
+    Map<String, Object> sendGroupMessage(Long userId, Long groupId, String messageBody);
 }

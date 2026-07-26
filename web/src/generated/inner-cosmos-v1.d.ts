@@ -271,10 +271,12 @@ export interface components {
         };
         SlowLetterDraftRequest: {
             /** Format: int64 */
-            receiverCapsuleId: number;
+            receiverCapsuleId?: number;
+            /** Format: int64 */
+            receiverUserId?: number;
             title: string;
             letterBody: string;
-        };
+        } | unknown | unknown;
         PersonaMessageRequest: {
             /** Format: int64 */
             sessionId: number;

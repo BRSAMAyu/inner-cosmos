@@ -83,6 +83,16 @@ CREATE TABLE IF NOT EXISTS tb_social_group_member (
   INDEX idx_group_member_user (user_id)
 );
 
+CREATE TABLE IF NOT EXISTS tb_social_group_message (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  group_id BIGINT NOT NULL,
+  sender_user_id BIGINT NOT NULL,
+  message_body VARCHAR(2000) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_group_message_group_id (group_id, id)
+);
+
 CREATE TABLE IF NOT EXISTS tb_dialog_session (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT NOT NULL,

@@ -94,4 +94,21 @@ class SocialGroupControllerTest {
         assertEquals("我", members.get(0).get("nickname"));
         verify(socialService).listGroupMembers(20L, 5L);
     }
+
+    @Test
+    void groupMessagesDelegateToTheServiceWithoutTrustingAClientSenderId() {
+        Map<String, Object> message = Map.of(
+                "id", 9L, "groupId", 5L, "senderUserId", 20L,
+                "senderNickname", "我", "messageBody", "晚上见");
+        when(socialService.listGroupMessages(20L, 5L)).thenReturn(java.util.List.of(message));
+        when(socialService.sendGroupMessage(20L, 5L, "晚上见")).thenReturn(message);
+
+        var listed = controller.groupMessages(5L, session).data;
+        var sent = controller.sendGroupMessage(5L, Map.of("messageBody", "晚上见"), session).data;
+
+        assertEquals(1, listed.size());
+        assertSame(message, sent);
+        verify(socialService).listGroupMessages(20L, 5L);
+        verify(socialService).sendGroupMessage(20L, 5L, "晚上见");
+    }
 }

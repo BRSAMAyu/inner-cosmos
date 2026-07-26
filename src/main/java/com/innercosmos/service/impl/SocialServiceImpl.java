@@ -8,6 +8,7 @@ import com.innercosmos.entity.FriendRelation;
 import com.innercosmos.entity.SlowLetter;
 import com.innercosmos.entity.SocialGroup;
 import com.innercosmos.entity.SocialGroupMember;
+import com.innercosmos.entity.SocialGroupMessage;
 import com.innercosmos.entity.User;
 import com.innercosmos.exception.BusinessException;
 import com.innercosmos.mapper.BlockRelationMapper;
@@ -15,6 +16,7 @@ import com.innercosmos.mapper.FriendRelationMapper;
 import com.innercosmos.mapper.SlowLetterMapper;
 import com.innercosmos.mapper.SocialGroupMapper;
 import com.innercosmos.mapper.SocialGroupMemberMapper;
+import com.innercosmos.mapper.SocialGroupMessageMapper;
 import com.innercosmos.mapper.UserMapper;
 import com.innercosmos.service.SocialService;
 import org.springframework.stereotype.Service;
@@ -23,6 +25,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.Collections;
 
 @Service
 public class SocialServiceImpl implements SocialService {
@@ -30,6 +34,7 @@ public class SocialServiceImpl implements SocialService {
     private final FriendRelationMapper friendMapper;
     private final SocialGroupMapper groupMapper;
     private final SocialGroupMemberMapper memberMapper;
+    private final SocialGroupMessageMapper messageMapper;
     private final SlowLetterMapper letterMapper;
     private final BlockRelationMapper blockMapper;
 
@@ -37,12 +42,14 @@ public class SocialServiceImpl implements SocialService {
                              FriendRelationMapper friendMapper,
                              SocialGroupMapper groupMapper,
                              SocialGroupMemberMapper memberMapper,
+                             SocialGroupMessageMapper messageMapper,
                              SlowLetterMapper letterMapper,
                              BlockRelationMapper blockMapper) {
         this.userMapper = userMapper;
         this.friendMapper = friendMapper;
         this.groupMapper = groupMapper;
         this.memberMapper = memberMapper;
+        this.messageMapper = messageMapper;
         this.letterMapper = letterMapper;
         this.blockMapper = blockMapper;
     }
@@ -288,9 +295,7 @@ public class SocialServiceImpl implements SocialService {
 
     @Override
     public List<Map<String, Object>> listGroupMembers(Long userId, Long groupId) {
-        long myCount = memberMapper.selectCount(new QueryWrapper<SocialGroupMember>()
-                .eq("group_id", groupId).eq("user_id", userId).eq("status", "ACTIVE"));
-        if (myCount == 0) throw new BusinessException(ErrorCode.UNAUTHORIZED, "无权查看此群组成员");
+        requireActiveGroupMember(userId, groupId);
         List<SocialGroupMember> members = memberMapper.selectList(new QueryWrapper<SocialGroupMember>()
                 .eq("group_id", groupId).eq("status", "ACTIVE"));
         List<Long> userIds = members.stream().map(m -> m.userId).toList();
@@ -304,6 +309,58 @@ public class SocialServiceImpl implements SocialService {
             row.put("nickname", user == null ? "" : user.nickname);
             return row;
         }).toList();
+    }
+
+    @Override
+    public List<Map<String, Object>> listGroupMessages(Long userId, Long groupId) {
+        requireActiveGroupMember(userId, groupId);
+        List<SocialGroupMessage> latest = new ArrayList<>(messageMapper.selectList(
+                new QueryWrapper<SocialGroupMessage>()
+                        .eq("group_id", groupId)
+                        .orderByDesc("id")
+                        .last("LIMIT 100")));
+        Collections.reverse(latest);
+        return latest.stream().map(this::groupMessageView).toList();
+    }
+
+    @Override
+    public Map<String, Object> sendGroupMessage(Long userId, Long groupId, String messageBody) {
+        requireActiveGroupMember(userId, groupId);
+        String trimmed = messageBody == null ? "" : messageBody.trim();
+        if (trimmed.isBlank()) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "群聊消息不能为空");
+        }
+        if (trimmed.length() > 2000) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "群聊消息不能超过 2000 个字符");
+        }
+        SocialGroupMessage message = new SocialGroupMessage();
+        message.groupId = groupId;
+        message.senderUserId = userId;
+        message.messageBody = trimmed;
+        messageMapper.insert(message);
+        return groupMessageView(message);
+    }
+
+    private void requireActiveGroupMember(Long userId, Long groupId) {
+        long myCount = memberMapper.selectCount(new QueryWrapper<SocialGroupMember>()
+                .eq("group_id", groupId).eq("user_id", userId).eq("status", "ACTIVE"));
+        if (myCount == 0) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "只有群组成员可以查看和参与群聊");
+        }
+    }
+
+    private Map<String, Object> groupMessageView(SocialGroupMessage message) {
+        User sender = userMapper.selectById(message.senderUserId);
+        Map<String, Object> row = new HashMap<>();
+        row.put("id", message.id);
+        row.put("groupId", message.groupId);
+        row.put("senderUserId", message.senderUserId);
+        row.put("senderNickname", sender == null
+                ? "未知用户"
+                : (sender.nickname == null ? sender.username : sender.nickname));
+        row.put("messageBody", message.messageBody);
+        row.put("createdAt", message.createdAt);
+        return row;
     }
 
     private String relationStatus(Long userId, Long other) {

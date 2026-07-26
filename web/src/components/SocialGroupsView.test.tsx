@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SocialGroupsView } from "./SocialGroupsView";
 import type { GroupInvite, GroupMember, SocialConnection, SocialGroup } from "../api";
@@ -97,7 +97,25 @@ describe("SocialGroupsView", () => {
     render(<SocialGroupsView locale="en-SG" groups={[group()]} invites={[]} friends={[]} selectedGroupId={null} members={[]} createBusy={false} isInviteBusy={() => false} isInviteDecisionBusy={() => false} isLeaveBusy={() => false} currentUserId={1}
       onSelectGroup={() => undefined} onCreateGroup={() => undefined} onInvite={() => undefined}
       onRespondInvite={() => undefined} onLeaveGroup={() => undefined} />);
-    expect(screen.getByRole("heading", { name: "Slow groups, not group chat noise" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "A small circle can still talk meaningfully together" })).toBeVisible();
     expect(screen.getByPlaceholderText("Group name")).toBeVisible();
+  });
+
+  it("renders the selected group's conversation and lets a member send a message", async () => {
+    const onSendMessage = vi.fn().mockResolvedValue(true);
+    render(<SocialGroupsView groups={[group()]} invites={[]} friends={[]} selectedGroupId={1}
+      members={[{ userId: 1, memberRole: "OWNER", nickname: "我" }]}
+      messages={[{ id: 7, groupId: 1, senderUserId: 30, senderNickname: "阿哲", messageBody: "周末一起散步吗？", createdAt: "2026-07-26T19:00:00" }]}
+      messagesStatus="success" createBusy={false} isInviteBusy={() => false}
+      isInviteDecisionBusy={() => false} isLeaveBusy={() => false} isMessageBusy={() => false} currentUserId={1}
+      onSelectGroup={() => undefined} onCreateGroup={() => undefined} onInvite={() => undefined}
+      onRespondInvite={() => undefined} onLeaveGroup={() => undefined} onSendMessage={onSendMessage} />);
+
+    expect(screen.getByText("周末一起散步吗？")).toBeVisible();
+    fireEvent.change(screen.getByLabelText("写给小组成员…"), { target: { value: "好，下午三点。" } });
+    fireEvent.click(screen.getByRole("button", { name: "发送" }));
+
+    await waitFor(() => expect(onSendMessage).toHaveBeenCalledExactlyOnceWith(1, "好，下午三点。"));
+    await waitFor(() => expect(screen.getByLabelText("写给小组成员…")).toHaveValue(""));
   });
 });

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { GroupInvite, GroupMember, SocialConnection, SocialGroup } from "../api";
+import type { GroupInvite, GroupMember, GroupMessage, SocialConnection, SocialGroup } from "../api";
 import type { Locale } from "../i18n";
 import { AsyncButton, LoadingText } from "../loading";
 
@@ -11,52 +11,66 @@ const COPY: Record<Locale, {
   inviteAria: string; invitePlaceholder: string; inviteBusy: string; invite: string;
   leaveBusy: string; leave: string; noMembers: string; noFriends: string;
   membersLoading: string; membersError: string;
+  conversationHeading: string; conversationEmpty: string; conversationLoading: string; conversationError: string;
+  messagePlaceholder: string; messageBusy: string; sendMessage: string;
 }> = {
   "zh-CN": {
-    aria: "慢群组", heading: "慢慢认识的一小群人，不是群聊噪音", count: n => `${n} 个群组`,
-    intro: "群组是你和一小群人之间的边界，不会自动变成实时群聊——邀请和加入都需要明确同意。",
+    aria: "慢群组", heading: "一小群人，也可以认真地聊在一起", count: n => `${n} 个群组`,
+    intro: "只有明确接受邀请的成员才能进入小组。群聊保留每个人的原话与时间，不制造刷屏压力，也不会向组外泄露。",
     empty: "还没有加入任何群组。",
     namePlaceholder: "群组名字", createBusy: "正在创建", create: "创建群组",
     invitesHeading: "等待你回应的群组邀请", acceptBusy: "正在加入", accept: "接受", declineBusy: "正在婉拒", decline: "婉拒",
     membersHeading: "成员", roleOwner: "群主", roleMember: "成员",
     inviteAria: "邀请朋友加入", invitePlaceholder: "选择一位朋友", inviteBusy: "正在邀请", invite: "邀请",
     leaveBusy: "正在退出", leave: "退出群组", noMembers: "还没有成员。", noFriends: "还没有可邀请的朋友。",
-    membersLoading: "正在读取成员…", membersError: "暂时读不到成员列表，请稍后再试。"
+    membersLoading: "正在读取成员…", membersError: "暂时读不到成员列表，请稍后再试。",
+    conversationHeading: "群聊", conversationEmpty: "还没有消息。你可以先认真地说一句。",
+    conversationLoading: "正在读取群聊…", conversationError: "暂时读不到群聊，请稍后再试。",
+    messagePlaceholder: "写给小组成员…", messageBusy: "正在发送", sendMessage: "发送"
   },
   "en-SG": {
-    aria: "Slow groups", heading: "Slow groups, not group chat noise", count: n => `${n} group${n === 1 ? "" : "s"}`,
-    intro: "A group is a boundary between you and a small circle — it never silently becomes a live group chat; invites and joining both need explicit consent.",
+    aria: "Slow groups", heading: "A small circle can still talk meaningfully together", count: n => `${n} group${n === 1 ? "" : "s"}`,
+    intro: "Only people who explicitly accept an invite enter the group. The conversation keeps each person's words and timing without creating feed pressure or exposing them outside the group.",
     empty: "You haven't joined any groups yet.",
     namePlaceholder: "Group name", createBusy: "Creating", create: "Create group",
     invitesHeading: "Group invites awaiting your response", acceptBusy: "Joining", accept: "Accept", declineBusy: "Declining", decline: "Decline",
     membersHeading: "Members", roleOwner: "Owner", roleMember: "Member",
     inviteAria: "Invite a friend to join", invitePlaceholder: "Choose a friend", inviteBusy: "Inviting", invite: "Invite",
     leaveBusy: "Leaving", leave: "Leave group", noMembers: "No members yet.", noFriends: "No friends to invite yet.",
-    membersLoading: "Loading members…", membersError: "Couldn't load the member list right now -- try again shortly."
+    membersLoading: "Loading members…", membersError: "Couldn't load the member list right now -- try again shortly.",
+    conversationHeading: "Group conversation", conversationEmpty: "No messages yet. You can begin with one considered note.",
+    conversationLoading: "Loading the conversation…", conversationError: "Couldn't load the group conversation right now.",
+    messagePlaceholder: "Write to the group…", messageBusy: "Sending", sendMessage: "Send"
   }
 };
 
 export function SocialGroupsView({ groups, invites, friends, selectedGroupId, members, membersStatus = "idle",
+  messages = [], messagesStatus = "idle",
   createBusy, isInviteBusy, isInviteDecisionBusy, isLeaveBusy, currentUserId,
-  onSelectGroup, onCreateGroup, onInvite, onRespondInvite, onLeaveGroup, locale = "zh-CN" }: {
+  isMessageBusy, onSelectGroup, onCreateGroup, onInvite, onRespondInvite, onLeaveGroup,
+  onSendMessage, locale = "zh-CN" }: {
   groups: SocialGroup[]; invites: GroupInvite[]; friends: SocialConnection[];
   selectedGroupId: number | null; members: GroupMember[]; membersStatus?: "idle" | "loading" | "success" | "error";
+  messages?: GroupMessage[]; messagesStatus?: "idle" | "loading" | "success" | "error";
   // Gemini audit 4.8 (CONFIRMED/P1): each busy check is keyed by the SPECIFIC resource the action
   // targets (memberId for an invite decision, groupId for invite-to-group/leave-group) -- a single
   // shared `busy` boolean used to disable every action for every group/invite/friend at once the
   // moment ANY one of them was in flight.
   createBusy: boolean; isInviteBusy: (groupId: number) => boolean;
   isInviteDecisionBusy: (memberId: number) => boolean; isLeaveBusy: (groupId: number) => boolean;
+  isMessageBusy?: (groupId: number) => boolean;
   currentUserId: number | null;
   onSelectGroup: (id: number) => void; onCreateGroup: (name: string) => void;
   onInvite: (groupId: number, userId: number) => void;
   onRespondInvite: (memberId: number, decision: "accept" | "decline") => void;
   onLeaveGroup: (groupId: number) => void;
+  onSendMessage?: (groupId: number, messageBody: string) => Promise<boolean>;
   locale?: Locale;
 }) {
   const t = COPY[locale];
   const [name, setName] = useState("");
   const [inviteUserId, setInviteUserId] = useState("");
+  const [messageBody, setMessageBody] = useState("");
   const selectedGroup = groups.find(g => g.id === selectedGroupId) ?? null;
   // Regression (Gemini audit / remaining-work-handoff.md 2.2.4): the backend correctly rejects
   // OWNER leave-group (must transfer ownership or disband first), but this button rendered
@@ -113,6 +127,37 @@ export function SocialGroupsView({ groups, invites, friends, selectedGroupId, me
             onClick={() => { onInvite(selectedGroup.id, Number(inviteUserId)); setInviteUserId(""); }}>{t.invite}</AsyncButton>
         </div>}
         {friends.length === 0 && <p className="muted">{t.noFriends}</p>}
+        <div className="group-conversation" aria-label={t.conversationHeading}>
+          <h3>{t.conversationHeading}</h3>
+          <div className="group-message-list" aria-live="polite">
+            {messagesStatus === "loading"
+              ? <LoadingText busy className="network-empty">{t.conversationLoading}</LoadingText>
+              : messagesStatus === "error"
+                ? <div className="network-empty" role="alert">{t.conversationError}</div>
+                : messages.length === 0
+                  ? <div className="network-empty">{t.conversationEmpty}</div>
+                  : messages.map(message => <article
+                      key={message.id}
+                      className={message.senderUserId === currentUserId ? "is-mine" : ""}>
+                      <header>
+                        <strong>{message.senderNickname}</strong>
+                        {message.createdAt && <time>{new Date(message.createdAt).toLocaleString(locale, { hour12: false })}</time>}
+                      </header>
+                      <p className="ugc-text">{message.messageBody}</p>
+                    </article>)}
+          </div>
+          {onSendMessage && <div className="group-message-compose">
+            <textarea value={messageBody} maxLength={2000}
+              aria-label={t.messagePlaceholder} placeholder={t.messagePlaceholder}
+              onChange={event => setMessageBody(event.target.value)} />
+            <AsyncButton busy={isMessageBusy?.(selectedGroup.id) ?? false} busyText={t.messageBusy}
+              disabled={!messageBody.trim()} onClick={() => {
+                void onSendMessage(selectedGroup.id, messageBody).then(sent => {
+                  if (sent) setMessageBody("");
+                });
+              }}>{t.sendMessage}</AsyncButton>
+          </div>}
+        </div>
         {!isOwner && <AsyncButton className="danger-quiet" busy={isLeaveBusy(selectedGroup.id)} busyText={t.leaveBusy} onClick={() => onLeaveGroup(selectedGroup.id)}>{t.leave}</AsyncButton>}
       </div>}
     </div>}

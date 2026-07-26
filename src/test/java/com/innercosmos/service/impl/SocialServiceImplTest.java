@@ -4,6 +4,7 @@ import com.innercosmos.entity.FriendRelation;
 import com.innercosmos.entity.SlowLetter;
 import com.innercosmos.entity.SocialGroup;
 import com.innercosmos.entity.SocialGroupMember;
+import com.innercosmos.entity.SocialGroupMessage;
 import com.innercosmos.entity.User;
 import com.innercosmos.exception.BusinessException;
 import com.innercosmos.mapper.BlockRelationMapper;
@@ -11,6 +12,7 @@ import com.innercosmos.mapper.FriendRelationMapper;
 import com.innercosmos.mapper.SlowLetterMapper;
 import com.innercosmos.mapper.SocialGroupMapper;
 import com.innercosmos.mapper.SocialGroupMemberMapper;
+import com.innercosmos.mapper.SocialGroupMessageMapper;
 import com.innercosmos.mapper.UserMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,6 +40,7 @@ class SocialServiceImplTest {
     @Mock FriendRelationMapper friendMapper;
     @Mock SocialGroupMapper groupMapper;
     @Mock SocialGroupMemberMapper memberMapper;
+    @Mock SocialGroupMessageMapper messageMapper;
     @Mock SlowLetterMapper letterMapper;
     @Mock BlockRelationMapper blockMapper;
 
@@ -45,7 +48,7 @@ class SocialServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new SocialServiceImpl(userMapper, friendMapper, groupMapper, memberMapper, letterMapper, blockMapper);
+        service = new SocialServiceImpl(userMapper, friendMapper, groupMapper, memberMapper, messageMapper, letterMapper, blockMapper);
     }
 
     private SlowLetter letter(Long sender, Long receiver, String status) {
@@ -359,5 +362,60 @@ class SocialServiceImplTest {
         assertEquals(20L, members.get(0).get("userId"));
         assertEquals("我", members.get(0).get("nickname"));
         assertEquals("OWNER", members.get(0).get("memberRole"));
+    }
+
+    @Test
+    void onlyAnActiveMemberCanReadOrSendGroupMessages() {
+        when(memberMapper.selectCount(any())).thenReturn(0L);
+
+        BusinessException readError = assertThrows(BusinessException.class,
+                () -> service.listGroupMessages(20L, 5L));
+        BusinessException sendError = assertThrows(BusinessException.class,
+                () -> service.sendGroupMessage(20L, 5L, "hello"));
+
+        assertEquals("UNAUTHORIZED", readError.code);
+        assertEquals("UNAUTHORIZED", sendError.code);
+        verifyNoInteractions(messageMapper);
+    }
+
+    @Test
+    void activeMemberCanSendTrimmedMessageAndReadChronologicalConversation() {
+        when(memberMapper.selectCount(any())).thenReturn(1L);
+        User me = new User(); me.id = 20L; me.nickname = "我";
+        when(userMapper.selectById(20L)).thenReturn(me);
+        doAnswer(invocation -> {
+            SocialGroupMessage inserted = invocation.getArgument(0);
+            inserted.id = 9L;
+            return 1;
+        }).when(messageMapper).insert(any(SocialGroupMessage.class));
+
+        Map<String, Object> sent = service.sendGroupMessage(20L, 5L, "  今晚一起复盘吗？  ");
+
+        ArgumentCaptor<SocialGroupMessage> inserted = ArgumentCaptor.forClass(SocialGroupMessage.class);
+        verify(messageMapper).insert(inserted.capture());
+        assertEquals("今晚一起复盘吗？", inserted.getValue().messageBody);
+        assertEquals("我", sent.get("senderNickname"));
+
+        SocialGroupMessage newer = new SocialGroupMessage();
+        newer.id = 2L; newer.groupId = 5L; newer.senderUserId = 20L; newer.messageBody = "第二条";
+        SocialGroupMessage older = new SocialGroupMessage();
+        older.id = 1L; older.groupId = 5L; older.senderUserId = 20L; older.messageBody = "第一条";
+        when(messageMapper.selectList(any())).thenReturn(List.of(newer, older));
+
+        List<Map<String, Object>> messages = service.listGroupMessages(20L, 5L);
+
+        assertEquals(List.of("第一条", "第二条"),
+                messages.stream().map(row -> row.get("messageBody")).toList());
+    }
+
+    @Test
+    void blankGroupMessageIsRejected() {
+        when(memberMapper.selectCount(any())).thenReturn(1L);
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> service.sendGroupMessage(20L, 5L, "   "));
+
+        assertEquals("BAD_REQUEST", error.code);
+        verifyNoInteractions(messageMapper);
     }
 }

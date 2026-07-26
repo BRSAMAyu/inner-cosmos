@@ -101,4 +101,17 @@ public class SocialController extends BaseController {
     public ApiResponse<List<Map<String, Object>>> groupMembers(@PathVariable Long id, HttpSession session) {
         return ApiResponse.ok(socialService.listGroupMembers(currentUserId(session), id));
     }
+
+    @GetMapping("/groups/{id}/messages")
+    public ApiResponse<List<Map<String, Object>>> groupMessages(@PathVariable Long id, HttpSession session) {
+        return ApiResponse.ok(socialService.listGroupMessages(currentUserId(session), id));
+    }
+
+    @PostMapping("/groups/{id}/messages")
+    public ApiResponse<Map<String, Object>> sendGroupMessage(@PathVariable Long id,
+                                                              @RequestBody Map<String, String> body,
+                                                              HttpSession session) {
+        return ApiResponse.ok(socialService.sendGroupMessage(
+                currentUserId(session), id, body.get("messageBody")));
+    }
 }

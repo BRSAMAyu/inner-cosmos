@@ -305,6 +305,29 @@ export function AuroraApp() {
     return () => window.clearInterval(timer);
   }, [authenticated, productSpace, connectionTab, connectionsAndLetters.refreshLetters]);
 
+  // Friend requests and group invitations are created by another signed-in user, so local mutation
+  // callbacks alone can never make them appear. Keep the Connect space fresh while it is visible;
+  // this bounded foreground poll is intentionally scoped to the product space (and stops on unmount)
+  // so accepting an invitation never requires a full website reload.
+  useEffect(() => {
+    if (!authenticated || productSpace !== "letters") return;
+    void connectionsAndLetters.refreshConnections();
+    const timer = window.setInterval(() => void connectionsAndLetters.refreshConnections(), 5_000);
+    return () => window.clearInterval(timer);
+  }, [authenticated, productSpace, connectionsAndLetters.refreshConnections]);
+
+  useEffect(() => {
+    if (!authenticated || productSpace !== "letters" || connectionTab !== "groups") return;
+    const refresh = () => {
+      void connectionsAndLetters.refreshGroups();
+      void connectionsAndLetters.refreshSelectedGroupContext();
+    };
+    refresh();
+    const timer = window.setInterval(refresh, 5_000);
+    return () => window.clearInterval(timer);
+  }, [authenticated, productSpace, connectionTab, connectionsAndLetters.refreshGroups,
+    connectionsAndLetters.refreshSelectedGroupContext]);
+
   // Lazy per-tab fetch: each cosmos sub-tab's data loads only the first time it is actually
   // visited, not eagerly in the shared login bootstrap (doc 24 section 3.3 forbids adding
   // non-first-screen requests to that awaited Promise.all). Sections stay mounted (`hidden`,
@@ -443,7 +466,11 @@ export function AuroraApp() {
           : "Aurora 在这里。你可以随时打断，她会重新理解。 "));
     } catch (error) {
       if (call !== bootstrapCallRef.current) return;
-      if (/authentication|unauthori[sz]ed|\b401\b/i.test(String(error))) {
+      // Spring Security's CSRF filter can reject the first unauthenticated POST (createSession)
+      // with 403 before the authentication entry point has a chance to return 401. That is still
+      // an unauthenticated bootstrap, not a product connection failure; show AuthGate so a fresh
+      // browser can actually register/sign in.
+      if (/authentication|unauthori[sz]ed|\b40[13]\b/i.test(String(error))) {
         setAuthenticated(false);
         setStatus(skillLocale === "en-SG" ? "Please sign in first." : "请先登录");
       } else {
@@ -1802,13 +1829,17 @@ export function AuroraApp() {
       <div hidden={connectionTab !== "groups"}>
         <SocialGroupsView groups={connectionsAndLetters.groups} invites={connectionsAndLetters.groupInvites} friends={connectionsAndLetters.friends}
         selectedGroupId={connectionsAndLetters.selectedGroupId} members={connectionsAndLetters.groupMembers} membersStatus={connectionsAndLetters.groupMembersStatus}
+        messages={connectionsAndLetters.groupMessages} messagesStatus={connectionsAndLetters.groupMessagesStatus}
         createBusy={connectionsAndLetters.groupCreateBusy} isInviteBusy={connectionsAndLetters.isGroupInviteBusy}
         isInviteDecisionBusy={connectionsAndLetters.isGroupInviteDecisionBusy} isLeaveBusy={connectionsAndLetters.isGroupLeaveBusy}
+        isMessageBusy={connectionsAndLetters.isGroupMessageBusy}
         currentUserId={userProfile?.id ?? null}
         onSelectGroup={id => void connectionsAndLetters.openGroup(id)} onCreateGroup={name => void connectionsAndLetters.createGroup(name)}
         onInvite={(groupId, userId) => void connectionsAndLetters.inviteToGroup(groupId, userId)}
         onRespondInvite={(memberId, decision) => void connectionsAndLetters.respondToGroupInvite(memberId, decision)}
-        onLeaveGroup={id => void connectionsAndLetters.leaveGroup(id)} locale={skillLocale} />
+        onLeaveGroup={id => void connectionsAndLetters.leaveGroup(id)}
+        onSendMessage={(groupId, messageBody) => connectionsAndLetters.sendGroupMessage(groupId, messageBody)}
+        locale={skillLocale} />
       </div>
 
       <div hidden={connectionTab !== "letters"}>
@@ -1824,6 +1855,8 @@ export function AuroraApp() {
         letterVoiceLetterId={connectionsAndLetters.letterVoiceLetterId} letterVoiceAudio={connectionsAndLetters.letterVoiceAudio} letterVoiceError={connectionsAndLetters.letterVoiceError}
         isLetterVoiceBusy={connectionsAndLetters.isLetterVoiceBusy} onPlayLetterVoice={letter => void connectionsAndLetters.playLetterVoice(letter)}
         refreshBusy={connectionsAndLetters.lettersRefreshing} onRefresh={() => void connectionsAndLetters.refreshLetters()}
+        directLetterBusy={connectionsAndLetters.directLetterBusy}
+        onSendDirectLetter={(receiverUserId, title, body) => connectionsAndLetters.sendDirectLetter(receiverUserId, title, body)}
         onComposeNew={() => navigate("/resonance/encounters")} />
       </div>
       </div>

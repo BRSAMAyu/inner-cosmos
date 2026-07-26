@@ -269,6 +269,10 @@ export type FriendRelation = {
 export type SocialGroup = { id: number; ownerUserId: number; groupName: string; intro: string; visibility: string };
 export type GroupInvite = { memberId: number; groupId: number; groupName: string };
 export type GroupMember = { userId: number; memberRole: string; nickname: string };
+export type GroupMessage = {
+  id: number; groupId: number; senderUserId: number; senderNickname: string;
+  messageBody: string; createdAt: string | null;
+};
 export type ConnectionRequests = { incoming: SocialConnection[]; outgoing: SocialConnection[] };
 export type DiscoverablePerson = { id: number; username: string; nickname: string; relationStatus: string };
 export type RelationMention = { id: number; relationLabel: string; relationType: string | null; emotionTags: string | null; triggerSummary: string | null; boundaryHint: string | null };
@@ -949,6 +953,13 @@ export const api = {
       headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : undefined
     });
   },
+  draftSlowLetterToUser: (receiverUserId: number, title: string, letterBody: string, idempotencyKey?: string) => {
+    const body: CoreSlowLetterDraftRequest = { receiverUserId, title, letterBody };
+    return request<SlowLetter>("/api/v1/letters/draft", {
+      method: "POST", body: JSON.stringify(body),
+      headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : undefined
+    });
+  },
   sendSlowLetter: (id: number, idempotencyKey?: string) => request<SlowLetter>(`/api/letters/${id}/send`, {
     method: "POST", headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : undefined
   }),
@@ -991,6 +1002,10 @@ export const api = {
   }),
   leaveGroup: (groupId: number) => request<void>(`/api/social/groups/${groupId}/leave`, { method: "POST" }),
   groupMembers: (groupId: number) => request<GroupMember[]>(`/api/social/groups/${groupId}/members`),
+  groupMessages: (groupId: number) => request<GroupMessage[]>(`/api/social/groups/${groupId}/messages`),
+  sendGroupMessage: (groupId: number, messageBody: string) => request<GroupMessage>(`/api/social/groups/${groupId}/messages`, {
+    method: "POST", body: JSON.stringify({ messageBody })
+  }),
   relations: () => request<RelationMention[]>("/api/relation/list"),
   relationStats: () => request<Record<string, number>>("/api/relation/stats"),
   relationHighEmotion: () => request<RelationMention[]>("/api/relation/high-emotion"),
