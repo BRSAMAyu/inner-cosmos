@@ -50,7 +50,8 @@ class PostgresFlywayBaselineTest {
         // idempotency_key (owner-scoped draft PATCH + compose idempotency + atomic auto-REPLIED).
         // W1: V23 adds tb_user_profile.preferred_tts_voice_id/inner_voice_enabled/inner_voice_mode.
         // Classroom Demo: V24 reconciles historical verifier/benchmark accounts to SYNTHETIC.
-        assertEquals(24, flyway.migrate().migrationsExecuted);
+        // V25-V29 add orchestration, outbox, social-group messages, slow-letter presets and live chat.
+        assertEquals(29, flyway.migrate().migrationsExecuted);
         assertEquals(0, flyway.migrate().migrationsExecuted);
 
         String source = readClasspath("schema.sql");
@@ -75,7 +76,7 @@ class PostgresFlywayBaselineTest {
                     WHERE constraint_schema='public' AND constraint_type='FOREIGN KEY'
                     """);
 
-            assertEquals(82, expectedTables.size(), "source schema table inventory changed");
+            assertEquals(86, expectedTables.size(), "source schema table inventory changed");
             assertEquals(expectedTables, actualTables, "PostgreSQL baseline table drift");
             assertTrue(actualIndexes.containsAll(expectedIndexes),
                     () -> "missing PostgreSQL indexes: " + difference(expectedIndexes, actualIndexes));
@@ -151,8 +152,8 @@ class PostgresFlywayBaselineTest {
                 .locations("classpath:db/migration/postgresql")
                 .load();
         // No .target(): migrates from V19 all the way to the current latest
-        // (V20, V21, V22, V23 and the V24 provenance reconciliation).
-        assertEquals(5, v20.migrate().migrationsExecuted);
+        // (V20 through V29, including provenance, orchestration and social delivery).
+        assertEquals(10, v20.migrate().migrationsExecuted);
         try (Connection migrated = DriverManager.getConnection(
                 jdbcUrl, POSTGRES.getUsername(), POSTGRES.getPassword())) {
             assertEquals(2, scalar(migrated,

@@ -75,8 +75,9 @@ class PostgresApplicationSmokeTest {
 
         // V10 adds provider embeddings; V13 adds consent-bound Psychology Skill run audit;
         // V19 adds tb_data_retraction_receipt (A5 data-rights audit trail); V21 adds
-        // tb_device_registration/tb_push_delivery (mobile/desktop push delivery).
-        assertEquals(82L, jdbcTemplate.queryForObject("""
+        // tb_device_registration/tb_push_delivery (mobile/desktop push delivery); V27 and V29 add
+        // social-group and live-chat messaging tables.
+        assertEquals(86L, jdbcTemplate.queryForObject("""
                 SELECT COUNT(*) FROM information_schema.tables
                 WHERE table_schema='public' AND table_name LIKE 'tb_%'
                 """, Long.class));
