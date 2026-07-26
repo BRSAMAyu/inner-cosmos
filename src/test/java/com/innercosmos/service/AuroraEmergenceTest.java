@@ -32,6 +32,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.core.task.SyncTaskExecutor;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
@@ -164,21 +165,15 @@ class AuroraEmergenceTest {
                 eq(StructuredAiResults.AuroraResult.class), any(), any());
         Map<String, Object> turnContext = ctxCap.getValue();
 
-        // (1) The built prompt carries the portrait dim + the relationship stage label + the state signal.
-        String prompt = String.valueOf(turnContext.get("auroraPrompt"));
-        assertTrue(prompt.contains("INNER_DRIVE"), "prompt must include the user's portrait dimension");
-        assertTrue(prompt.contains("亲近的朋友"), "prompt must include the relationship stage label");
-        assertTrue(prompt.contains("状态感知"), "prompt must include the current-state signal block");
-        // The state signal reflects "偏疲惫/脆弱" for a 累/撑不住 message.
-        assertTrue(prompt.contains("疲惫") || prompt.contains("脆弱") || prompt.contains("承着"),
-                "state signal should reflect the tired/fragile read of this message");
-
-        // (2) The turnContext map itself carries the three new keys (mock + observability).
+        // Personalization remains in one structured copy; the old prose prompt duplicate is gone.
+        assertFalse(turnContext.containsKey("auroraPrompt"));
+        assertFalse(turnContext.containsKey("recentAuroraMessages"));
         assertEquals("INNER_DRIVE:稳定的好奇心与长期坚持；ENERGY_RHYTHM:深夜更有灵感，早晨偏慢",
                 turnContext.get("userPortrait"));
-        assertEquals("亲近的朋友", turnContext.get("relationshipStageLabel"));
+        assertTrue(String.valueOf(turnContext.get("relationship")).contains("close_friend"));
         String sig = String.valueOf(turnContext.get("currentStateSignal"));
         assertFalse(sig.isBlank(), "current-state signal must be non-blank for this message");
+        assertTrue(sig.contains("疲惫") || sig.contains("脆弱") || sig.contains("承着"));
     }
 
     @Test
@@ -212,14 +207,70 @@ class AuroraEmergenceTest {
         verify(structuredAiService, times(2)).call(anyLong(), anyString(), anyString(), cap.capture(),
                 eq(StructuredAiResults.AuroraResult.class), any(), any());
         List<Map<String, Object>> contexts = cap.getAllValues();
-        String promptA = String.valueOf(contexts.get(0).get("auroraPrompt"));
-        String promptB = String.valueOf(contexts.get(1).get("auroraPrompt"));
+        String portraitA = String.valueOf(contexts.get(0).get("userPortrait"));
+        String portraitB = String.valueOf(contexts.get(1).get("userPortrait"));
+        String relationshipA = String.valueOf(contexts.get(0).get("relationship"));
+        String relationshipB = String.valueOf(contexts.get(1).get("relationship"));
 
-        assertNotEquals(promptA, promptB, "same-mode users with different portraits MUST get different prompts");
-        assertTrue(promptA.contains("INNER_DRIVE") && promptA.contains("亲近的朋友"));
-        assertTrue(promptB.contains("AGENCY_BOUNDARY") && promptB.contains("刚认识"));
+        assertNotEquals(portraitA, portraitB, "different confirmed portraits must remain distinguishable");
+        assertTrue(portraitA.contains("INNER_DRIVE"));
+        assertTrue(portraitB.contains("AGENCY_BOUNDARY"));
+        assertNotEquals(relationshipA, relationshipB, "different relationships must remain distinguishable");
+        assertFalse(contexts.get(0).containsKey("auroraPrompt"));
+        assertFalse(contexts.get(1).containsKey("auroraPrompt"));
     }
 
+    @Test
+    @DisplayName("model context contains current expression once and keeps one compact personalization copy")
+    void produceReply_contextIsBoundedAndNonDuplicated() {
+        String current = "CURRENT_EXPRESSION_X9";
+        when(safetyService.check(anyString(), anyLong(), anyLong())).thenReturn(safe());
+        stubCommonDeps();
+
+        AgentContext source = new AgentContext();
+        source.recentMessages = new java.util.ArrayList<>();
+        for (int i = 0; i < 10; i++) source.recentMessages.add("user: old-message-" + i);
+        source.recentMessages.add("user: " + current);
+        source.longTermMemories = java.util.stream.IntStream.range(0, 10)
+                .mapToObj(i -> "memory-" + i + "-" + "x".repeat(400))
+                .toList();
+        source.threeModelBlock = "PORTRAIT_UNIQUE RELATIONSHIP_UNIQUE CONSTITUTION_UNIQUE";
+        source.constitutionBlock = "CONSTITUTION_UNIQUE";
+        when(agentContextAssembler.assemble(anyLong(), anyLong(), anyString(), anyBoolean(), any(), any()))
+                .thenReturn(source);
+
+        UserPortrait portrait = portrait("PORTRAIT_UNIQUE", "confirmed-value", 0.9, 0.8);
+        when(userPortraitService.getAll(USER_A)).thenReturn(List.of(portrait));
+        AgentUserRelationship relationship = new AgentUserRelationship();
+        relationship.relationshipStage = "RELATIONSHIP_UNIQUE";
+        relationship.intimacyLevel = 4;
+        relationship.trustLevel = 5;
+        relationship.familiarityLevel = 6;
+        relationship.userDisclosureLevel = 3;
+        when(relationshipService.getOrInit(USER_A)).thenReturn(relationship);
+        when(structuredAiService.call(anyLong(), anyString(), anyString(), any(),
+                eq(StructuredAiResults.AuroraResult.class), any(), any())).thenReturn(okResult());
+
+        service.replyRich(USER_A, request(current));
+
+        ArgumentCaptor<Map<String, Object>> cap = ArgumentCaptor.forClass(Map.class);
+        verify(structuredAiService).call(anyLong(), anyString(), anyString(), cap.capture(),
+                eq(StructuredAiResults.AuroraResult.class), any(), any());
+        Map<String, Object> providerContext = new LinkedHashMap<>(cap.getValue());
+        providerContext.remove("auroraSystemPrompt");
+        String json = com.innercosmos.util.JsonUtils.toJson(providerContext);
+
+        assertEquals(1, occurrences(json, current), "current user expression must appear exactly once");
+        assertEquals(1, occurrences(json, "PORTRAIT_UNIQUE"), "confirmed portrait must have one source");
+        assertEquals(1, occurrences(json, "RELATIONSHIP_UNIQUE"), "relationship must have one source");
+        assertEquals(1, occurrences(json, "CONSTITUTION_UNIQUE"), "constitution must have one source");
+        assertFalse(providerContext.containsKey("auroraPrompt"));
+        assertFalse(providerContext.containsKey("recentAuroraMessages"));
+        AgentContext compact = (AgentContext) providerContext.get("unifiedAgentContext");
+        assertEquals(6, compact.recentMessages.size());
+        assertEquals(4, compact.longTermMemories.size());
+        assertTrue(json.length() < 7_000, "bounded model context unexpectedly large: " + json.length());
+    }
     @Test
     @DisplayName("mock fallback stays coherent with the state signal when the LLM path fails")
     void fallback_reflectsStateSignal() {
@@ -243,6 +294,11 @@ class AuroraEmergenceTest {
         assertTrue(vo.riskFlags.contains("EMERGENCY_FALLBACK"));
     }
 
+    private int occurrences(String text, String needle) {
+        int count = 0;
+        for (int at = text.indexOf(needle); at >= 0; at = text.indexOf(needle, at + needle.length())) count++;
+        return count;
+    }
     private UserPortrait portrait(String dim, String valueJson, double confidence, double score) {
         UserPortrait p = new UserPortrait();
         p.dim = dim;

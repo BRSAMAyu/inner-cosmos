@@ -39,10 +39,10 @@ class AuroraDualKernelRuntimeTest {
         assertThat(client.thinkingModes).containsEntry("AURORA_PLAN_DAILY_TALK", true)
                 .containsEntry("AURORA_SPEAKER_DAILY_TALK", false)
                 .containsEntry("AURORA_CRITIC_DAILY_TALK", false);
-        assertThat(client.timeouts).containsEntry("AURORA_PLAN_DAILY_TALK", 30_000)
+        assertThat(client.timeouts).containsEntry("AURORA_PLAN_DAILY_TALK", 45_000)
                 .containsEntry("AURORA_SPEAKER_DAILY_TALK", 8_000)
                 .containsEntry("AURORA_CRITIC_DAILY_TALK", 6_000);
-        assertThat(client.maxTokens).containsEntry("AURORA_PLAN_DAILY_TALK", 2_048)
+        assertThat(client.maxTokens).containsEntry("AURORA_PLAN_DAILY_TALK", 4_096)
                 .containsEntry("AURORA_SPEAKER_DAILY_TALK", 1_536)
                 .containsEntry("AURORA_CRITIC_DAILY_TALK", 1_536);
         assertThat(client.retryModes.values()).containsOnly(false);

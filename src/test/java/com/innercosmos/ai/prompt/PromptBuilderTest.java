@@ -851,4 +851,15 @@ class PromptBuilderTest {
         p.score = score;
         return p;
     }
+    @Test
+    void systemBoundaryPrioritizesCurrentExpressionAndNaturalOrdinaryTalk() {
+        String prompt = new PromptBuilder().withSystemBoundary().buildSystemPrompt();
+
+        assertTrue(prompt.contains("latest sentence is the primary evidence"));
+        assertTrue(prompt.contains("Do not invent feelings, motives, relationship causes"));
+        assertTrue(prompt.contains("Answer ordinary talk ordinarily"));
+        assertTrue(prompt.contains("does not need emotional interpretation"));
+        assertTrue(prompt.contains("Do not praise disclosure"));
+        assertTrue(prompt.contains("end every turn with a question"));
+    }
 }

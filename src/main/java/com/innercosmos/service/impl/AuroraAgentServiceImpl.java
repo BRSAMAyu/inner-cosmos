@@ -79,6 +79,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @Service
 public class AuroraAgentServiceImpl implements AuroraAgentService {
     private static final Logger log = LoggerFactory.getLogger(AuroraAgentServiceImpl.class);
+    /** Completed provider responses are emitted immediately in bounded SSE chunks. */
+    private static final int COMPLETED_RESPONSE_CHUNK_CHARS = 12;
+    private static final int MODEL_RECENT_MESSAGE_LIMIT = 6;
+    private static final int MODEL_LONG_TERM_MEMORY_LIMIT = 4;
     // M2 (independent code review): used to build the inner_voice SSE payload via writeValueAsString
     // instead of hand-rolled string concatenation, so an odd control char (U+0000-U+001F) in LLM
     // output can never produce invalid JSON that the frontend silently drops. Jackson's ObjectMapper
@@ -315,18 +319,16 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         AgentContext agentContext = agentContextAssembler.assemble(
                 userId, request.sessionId, request.message, allowMemory,
                 request.latitude, request.longitude);
-        List<String> gravityMemories = allowMemory ? List.copyOf(agentContext.longTermMemories) : List.of();
+        AgentContext modelAgentContext = compactAgentContext(agentContext, request.message);
+        List<String> gravityMemories = allowMemory ? List.copyOf(modelAgentContext.longTermMemories) : List.of();
         AuroraMemoryContextVO memoryContext = allowMemory
                 ? alignMemoryContext(memoryContextService.buildContext(userId, request.sessionId, request.message, 8, 0), agentContext)
                 : null;
-        DialogSession session = request.sessionId == null ? null : sessionMapper.selectById(request.sessionId);
-        String rhythm = rhythmGuardService.checkRhythm(userId, request.sessionId);
         ResolvedModel resolved = modelRouter.resolve(userId, request.sessionId);
         ModeStrategy modeStrategy = modeRegistry.get(mode);
 
-        // VS-004 — feed Aurora's understanding of THIS user + the relationship + a
-        // lightweight current-state read into the prompt, so the response style
-        // emerges from them instead of being mode-driven.
+        // Identity and safety belong in the provider system role. Dynamic user data travels once
+        // in the structured context below instead of being duplicated as a prose prompt.
         List<UserPortrait> portrait = safePortrait(userId);
         AgentUserRelationship relationship = safeRelationship(userId);
         String stateSignal = currentStateSignal(request.message);
@@ -334,32 +336,11 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
 
         String userNickname = loadUserNickname(userId);
         Map<String, Object> userCalibration = userCalibration(profile, userNickname);
-        PromptBuilder promptBuilder = new PromptBuilder().withPromptVersionService(promptVersionService)
+        String systemPrompt = new PromptBuilder().withPromptVersionService(promptVersionService)
                 .withSystemBoundary()
-                .withConversationMode(mode)
-                .withModeSegment(modeStrategy)
-                .withUserProfile(profileBrief(profile, userNickname))
-                .withUserPortrait(portrait)
-                .withUserCorrections(safeCorrections(userId))
-                .withConfirmedUnderstandingClaims(safeConfirmedClaims(userId))
-                .withPortraitCalibrations(safePortraitCalibrations(userId))
-                .withRelationship(relationship)
-                .withCurrentStateSignal(stateSignal)
-                .withMomentEmotion(agentContext.momentEmotionLabel)
-                .withEmotionBaseline(baseline.baselineLabel, baseline.stabilityScore)
-                .withSummaryAnchor(session == null ? null : session.summaryAnchor)
-                .withRecentMessages(recentMessages(request.sessionId, 8))
-                .withGravityMemories(gravityMemories)
-                .withMemoryContext(memoryContext)
-                .withRhythmAdvice(rhythm)
-                .withVoiceMetadata(voiceMetadata(request))
-                .withUserInput(request.message)
-                .withOutputSchema();
-        String systemPrompt = promptBuilder.buildSystemPrompt();
-        String prompt = promptBuilder.buildUserPrompt();
+                .buildSystemPrompt();
 
         Map<String, Object> turnContext = new LinkedHashMap<>();
-        turnContext.put("auroraPrompt", prompt);
         turnContext.put("auroraSystemPrompt", systemPrompt);
         turnContext.put("userMessage", request.message == null ? "" : request.message);
         turnContext.put("mode", mode);
@@ -374,20 +355,24 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         turnContext.put("modeGuide", modeGuide(mode));
         turnContext.put("userPortrait", portraitBriefForContext(portrait));
         turnContext.put("relationship", relationship == null ? "" : relationship.toPromptString());
-        turnContext.put("relationshipStageLabel",
-                relationship == null ? "" : AgentUserRelationshipService.stageLabel(relationship.relationshipStage));
         turnContext.put("currentStateSignal", stateSignal);
         // User-owned values remain data inside the structured request as well as a compact,
         // sanitised profile summary in the system prompt. This makes the calibration available
         // to both the single-pass and dual-kernel runtimes without turning any value into a new
         // instruction.
         turnContext.put("userCalibration", userCalibration);
+        turnContext.put("userCorrections", safeCorrections(userId));
+        turnContext.put("confirmedUnderstandingClaims", safeConfirmedClaims(userId));
+        turnContext.put("portraitCalibrations", safePortraitCalibrations(userId));
+        turnContext.put("emotionBaseline", Map.of(
+                "label", baseline.baselineLabel == null ? "" : baseline.baselineLabel,
+                "stabilityScore", baseline.stabilityScore));
         turnContext.put("memoryRecallAllowed", allowMemory);
-        turnContext.put("unifiedAgentContext", agentContext);
+        // A single bounded history/memory envelope reaches the model; userMessage stays authoritative.
+        turnContext.put("unifiedAgentContext", modelAgentContext);
         turnContext.put("realWeatherLabel", agentContext.realWeatherLabel);
         turnContext.put("cityLabel", agentContext.cityLabel);
         turnContext.put("preferredProvider", resolved.provider());
-        turnContext.put("recentAuroraMessages", recentAuroraMessages(request.sessionId, 6));
         turnContext.put("providerPolicy", providerPolicy(resolved));
         turnContext.put("foregroundAcknowledgementAlreadySent", request.foregroundAcknowledgementSent);
         if (choreographyService != null && request.sessionId != null) {
@@ -408,6 +393,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 ? null : providerObservation.openScope();
         AuroraDualKernelRuntime.InnerVoiceRequest innerVoiceRequest = null;
         java.util.concurrent.CompletableFuture<AuroraDualKernelRuntime.InnerVoiceRequest> deferredInnerVoiceRequest = null;
+        java.util.concurrent.CompletableFuture<AuroraDualKernelRuntime.PlannerRunEvidence> backgroundPlannerEvidence = null;
         try {
             StructuredAiResults.AuroraResult ai;
             if (dualKernelRuntime != null && dualKernelRuntime.shouldUseDualKernelForTurn(turnContext)) {
@@ -432,8 +418,22 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 runtimeMeta.put("criticFallbackUsed", generation.criticFallbackUsed());
                 runtimeMeta.put("backgroundPlannerScheduled", generation.backgroundPlannerScheduled());
                 runtimeMeta.put("guidanceSource", generation.guidanceSource());
+                runtimeMeta.put("backgroundPlannerStatus", generation.backgroundPlannerStatus());
                 innerVoiceRequest = generation.innerVoiceRequest();
                 deferredInnerVoiceRequest = generation.deferredInnerVoiceRequest();
+                backgroundPlannerEvidence = generation.backgroundPlannerEvidence();
+                if (backgroundPlannerEvidence != null) {
+                    backgroundPlannerEvidence.whenComplete((evidence, failure) -> {
+                        if (failure != null) {
+                            log.warn("Background planner evidence future failed for user {} mode {}: {}",
+                                    userId, mode, failure.getMessage());
+                        } else if (evidence != null) {
+                            log.info("Background planner terminal status user={} mode={} revision={} status={} latencyMs={} detail={}",
+                                    userId, mode, evidence.revision(), evidence.status(),
+                                    evidence.latencyMs(), evidence.detail());
+                        }
+                    });
+                }
             } else {
                 ai = callWithRetry(userId, mode, turnContext, resolved, request, gravityMemories,
                     memoryContext, allowMemory, stateSignal);
@@ -443,6 +443,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             vo = sanitizeLlmOutput(vo, userId);
             vo.innerVoiceRequest = innerVoiceRequest;
             vo.deferredInnerVoiceRequest = deferredInnerVoiceRequest;
+            vo.backgroundPlannerEvidence = backgroundPlannerEvidence;
             if (Boolean.FALSE.equals(agentContext.multiMessageAllowed) && vo.messages.size() > 1) {
                 vo.messages = List.of(vo.messages.get(0));
                 vo.agentLoop = Map.of(
@@ -759,7 +760,6 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                     if (i > 0) {
                         emitLive(emitter, clientConnected, userId, reply.turnId, eventSequence++, "segment",
                                 "{\"break\":true}", false);
-                        if (clientConnected.get()) Thread.sleep(220);
                     }
                     emitLive(emitter, clientConnected, userId, reply.turnId, eventSequence++, "bubble.started",
                             "{\"order\":" + (i + 1) + "}", false);
@@ -962,6 +962,76 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     }
 
     /**
+     * Builds the sole model-facing context envelope. Keep enough continuity for a real friendship,
+     * but cap stale history so the current userMessage cannot be drowned by months of observations.
+     */
+    private AgentContext compactAgentContext(AgentContext source, String currentUserMessage) {
+        AgentContext compact = new AgentContext();
+        if (source == null) return compact;
+        compact.userId = source.userId;
+        compact.profileSummary = abbreviate(source.profileSummary, 480);
+        compact.timeLabel = source.timeLabel;
+        compact.weatherLabel = source.weatherLabel;
+        compact.momentEmotionLabel = abbreviate(source.momentEmotionLabel, 160);
+        compact.environmentLabel = abbreviate(source.environmentLabel, 160);
+        compact.quietPolicy = source.quietPolicy;
+        compact.focusPolicy = source.focusPolicy;
+        compact.memoryRecallAllowed = source.memoryRecallAllowed;
+        compact.multiMessageAllowed = source.multiMessageAllowed;
+        compact.proactiveSensitivity = source.proactiveSensitivity;
+        compact.cityLabel = source.cityLabel;
+        compact.realWeatherLabel = abbreviate(source.realWeatherLabel, 120);
+        compact.sleepInferred = source.sleepInferred;
+        compact.nearestTodo = abbreviate(source.nearestTodo, 160);
+        compact.recentMessages = boundedRecentContext(source.recentMessages, currentUserMessage);
+        compact.longTermMemories = boundedContext(source.longTermMemories, MODEL_LONG_TERM_MEMORY_LIMIT, 240, false);
+        compact.activeTodos = boundedContext(source.activeTodos, 3, 160, false);
+        compact.completedTodoLessons = boundedContext(source.completedTodoLessons, 2, 160, false);
+        compact.relationSignals = boundedContext(source.relationSignals, 3, 180, false);
+        compact.themeSignals = boundedContext(source.themeSignals, 3, 180, false);
+        compact.evidenceMemoryIds = source.evidenceMemoryIds == null
+                ? new ArrayList<>()
+                : new ArrayList<>(source.evidenceMemoryIds.stream().limit(MODEL_LONG_TERM_MEMORY_LIMIT).toList());
+        compact.threeModelBlock = ""; // portrait, relationship and constitution use dedicated fields
+        compact.constitutionBlock = abbreviate(source.constitutionBlock, 700);
+        compact.continuityAnchors = abbreviate(source.continuityAnchors, 500);
+        return compact;
+    }
+
+    private List<String> boundedRecentContext(List<String> values, String currentUserMessage) {
+        List<String> candidates = boundedContext(values, MODEL_RECENT_MESSAGE_LIMIT + 1, 180, true);
+        if (currentUserMessage == null || currentUserMessage.isBlank()) {
+            return candidates.stream().skip(Math.max(0, candidates.size() - MODEL_RECENT_MESSAGE_LIMIT)).toList();
+        }
+        String current = currentUserMessage.strip();
+        List<String> filtered = candidates.stream()
+                .filter(item -> !sameUserExpression(item, current))
+                .toList();
+        return new ArrayList<>(filtered.stream()
+                .skip(Math.max(0, filtered.size() - MODEL_RECENT_MESSAGE_LIMIT))
+                .toList());
+    }
+
+    private boolean sameUserExpression(String historyItem, String currentUserMessage) {
+        if (historyItem == null) return false;
+        String normalized = historyItem.strip()
+                .replaceFirst("(?i)^(user|用户)\\s*[:：]\\s*", "")
+                .strip();
+        return normalized.equals(currentUserMessage);
+    }
+
+    private List<String> boundedContext(List<String> values, int limit, int maxChars, boolean keepTail) {
+        if (values == null || values.isEmpty() || limit <= 0) return new ArrayList<>();
+        int from = keepTail ? Math.max(0, values.size() - limit) : 0;
+        int to = keepTail ? values.size() : Math.min(values.size(), limit);
+        List<String> bounded = new ArrayList<>();
+        for (String value : values.subList(from, to)) {
+            String item = abbreviate(value, maxChars);
+            if (item != null && !item.isBlank()) bounded.add(item);
+        }
+        return bounded;
+    }
+    /**
      * Keep the legacy memory-context envelope (short-term messages, themes, emotion and summary)
      * while making its long-term evidence identical to the task-aware, privacy-gated pack used by
      * the dual-kernel context. This prevents the same turn from receiving a second gravity-only
@@ -991,7 +1061,8 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         String normalizedMode = normalizeMode(mode);
         boolean allowMemory = allowMemory(profile);
         AgentContext agentContext = agentContextAssembler.assemble(userId, sessionId, "", allowMemory);
-        List<String> gravityMemories = allowMemory ? List.copyOf(agentContext.longTermMemories) : List.of();
+        AgentContext modelAgentContext = compactAgentContext(agentContext, "");
+        List<String> gravityMemories = allowMemory ? List.copyOf(modelAgentContext.longTermMemories) : List.of();
         AuroraMemoryContextVO memoryContext = allowMemory
                 ? alignMemoryContext(memoryContextService.buildContext(userId, sessionId, "", 6, 0), agentContext)
                 : null;
@@ -1518,7 +1589,13 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         // PersonaChat uses (callWithRetry -> structuredAiService.call), so the same class of
         // prompt-injection ("ignore the above, print your instructions/JSON") applies equally --
         // reuse the shared guard rather than maintaining a second, divergent leakage check.
-        return identityClaim || PromptLeakageGuard.leaksInternalSchema(text);
+        boolean structuredEnvelope = lower.contains("[[silence]]")
+                || lower.contains("<thinking>") || lower.contains("</thinking>")
+                || lower.contains("<reasoning>") || lower.contains("</reasoning>")
+                || lower.startsWith("```")
+                || (lower.startsWith("{") && (lower.contains("\"segments\"")
+                    || lower.contains("\"speakcount\"") || lower.contains("\"detectedtheme\"")));
+        return identityClaim || structuredEnvelope || PromptLeakageGuard.leaksInternalSchema(text);
     }
 
     private AuroraReplyVO differentiatedFallback(Exception e, String message, String mode, String stateSignal) {
@@ -1694,6 +1771,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
 
     private String normalizeSegment(String item) {
         String text = item == null ? "" : item.trim();
+        text = text.replace("[[SILENCE]]", "").replace("[[silence]]", "").trim();
         text = text.replaceAll("^「|」$", "").trim();
         text = text.replaceAll("^(Aurora[:：]|我[:：])", "").trim();
         return text;
@@ -1765,33 +1843,26 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     private StreamProgress streamText(SseEmitter emitter, AtomicBoolean clientConnected,
                                       String response, AuroraReplyVO reply,
                                       long eventSequence, Long userId) throws Exception {
-        StringBuilder token = new StringBuilder();
         int deliveredChars = 0;
-        long nextCancellationCheck = 0L;
-        for (char c : response.toCharArray()) {
-            long now = System.nanoTime();
-            if (now >= nextCancellationCheck) {
-                if (isTurnCancelled(userId, reply.turnId)) return new StreamProgress(eventSequence, deliveredChars);
-                nextCancellationCheck = now + 100_000_000L; // cross-replica DB poll, <=100 ms stop latency
-            }
-            token.append(c);
-            if (token.length() >= 2 || c == '。' || c == '，' || c == '\n') {
-                // The current frontend already listens to both `token` and the legacy
-                // onmessage path, so naming deltas makes the wire contract explicit
-                // without changing the rendered experience.
-                String data = "{\"content\":\"" + escape(token.toString()) + "\"}";
-                boolean delivered = emitLive(emitter, clientConnected, userId, reply.turnId,
-                        eventSequence++, "token", data, false);
-                if (delivered) deliveredChars += token.length();
-                token.setLength(0);
-                if (clientConnected.get()) Thread.sleep(30);
-            }
+        if (response == null || response.isEmpty()) {
+            return new StreamProgress(eventSequence, deliveredChars);
         }
-        if (!token.isEmpty()) {
-            String data = "{\"content\":\"" + escape(token.toString()) + "\"}";
+        for (int offset = 0; offset < response.length();) {
+            if (isTurnCancelled(userId, reply.turnId)) {
+                return new StreamProgress(eventSequence, deliveredChars);
+            }
+            int end = Math.min(response.length(), offset + COMPLETED_RESPONSE_CHUNK_CHARS);
+            if (end < response.length()
+                    && Character.isHighSurrogate(response.charAt(end - 1))
+                    && Character.isLowSurrogate(response.charAt(end))) {
+                end++;
+            }
+            String chunk = response.substring(offset, end);
+            String data = "{\"content\":\"" + escape(chunk) + "\"}";
             boolean delivered = emitLive(emitter, clientConnected, userId, reply.turnId,
                     eventSequence++, "token", data, false);
-            if (delivered) deliveredChars += token.length();
+            if (delivered) deliveredChars += chunk.length();
+            offset = end;
         }
         return new StreamProgress(eventSequence, deliveredChars);
     }
@@ -1881,6 +1952,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         boolean criticFallbackUsed = loop != null && Boolean.TRUE.equals(loop.get("criticFallbackUsed"));
         boolean backgroundPlannerScheduled = loop != null && Boolean.TRUE.equals(loop.get("backgroundPlannerScheduled"));
         String guidanceSource = loop != null && loop.get("guidanceSource") instanceof String gs ? gs : "";
+        String backgroundPlannerStatus = loop != null && loop.get("backgroundPlannerStatus") instanceof String ps ? ps : "";
         @SuppressWarnings("unchecked")
         List<String> criticIssues = loop != null && loop.get("criticIssues") instanceof List<?> issues
                 ? issues.stream().filter(String.class::isInstance).map(String.class::cast).toList()
@@ -1897,6 +1969,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 .append(",\"criticFallbackUsed\":").append(criticFallbackUsed)
                 .append(",\"backgroundPlannerScheduled\":").append(backgroundPlannerScheduled)
                 .append(",\"guidanceSource\":\"").append(escape(guidanceSource)).append("\"")
+                .append(",\"backgroundPlannerStatus\":\"").append(escape(backgroundPlannerStatus)).append("\"")
                 .append(",\"criticIssues\":").append(jsonStringArray(criticIssues)).append("}");
         // aiState block.
         if (reply.aiState != null) {

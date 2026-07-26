@@ -30,6 +30,12 @@ public class LlmRequest {
      */
     public Boolean thinkingEnabled;
     /**
+     * Optional provider reasoning-effort hint for background work. It is deliberately separate
+     * from {@link #thinkingEnabled}: callers may enable thinking without claiming a measured
+     * high-effort budget. Provider clients must omit this field when it is blank.
+     */
+    public String reasoningEffort;
+    /**
      * Optional output-token budget for this module. Null preserves the provider-wide generous
      * reply budget, while structured multi-kernel stages can reserve only the room their schema
      * needs. This is separate from {@link #thinkingEnabled}: the background planner may still

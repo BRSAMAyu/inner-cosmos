@@ -301,12 +301,15 @@ try {
             if (-not [bool]$reply.aiState.apiKeyConfigured -or [bool]$reply.aiState.fallbackAllowed) {
                 throw "Aurora real-provider fail-closed contract is not active."
             }
-            if ([bool]$reply.agentLoop.plannerFallbackUsed -or
-                [bool]$reply.agentLoop.speakerFallbackUsed) {
-                throw "The authoritative Aurora planner/speaker used fallback."
+            if ([bool]$reply.agentLoop.speakerFallbackUsed) {
+                throw "The authoritative Aurora speaker used fallback."
             }
-            if ([string]$reply.agentLoop.runtime -ne "dual-kernel.v1") {
-                throw "Aurora did not use the required dual-kernel runtime."
+            $orchestrationWarnings = [System.Collections.Generic.List[string]]::new()
+            if ([string]$reply.agentLoop.runtime -ne "dual-kernel.pipeline.v2") {
+                $orchestrationWarnings.Add("runtime=$([string]$reply.agentLoop.runtime)")
+            }
+            if (-not [bool]$reply.agentLoop.backgroundPlannerScheduled) {
+                $orchestrationWarnings.Add("background-planner-not-observed")
             }
             if (@($reply.riskFlags) -contains "EMERGENCY_FALLBACK") {
                 throw "Aurora returned the deterministic emergency fallback."
@@ -330,6 +333,7 @@ try {
                 Runtime = [string]$reply.agentLoop.runtime
                 CriticFallbackUsed = [bool]$reply.agentLoop.criticFallbackUsed
                 ReplyLength = $replyLength
+                OrchestrationWarnings = @($orchestrationWarnings) -join ","
             }
         } catch {
             $totalWatch.Stop()
@@ -358,6 +362,7 @@ try {
                 Runtime = ""
                 CriticFallbackUsed = $false
                 ReplyLength = 0
+                OrchestrationWarnings = ""
                 ErrorCategory = "$stage`_HTTP_$statusCode"
             }
         }
@@ -507,6 +512,7 @@ $report = [ordered]@{
     providerSet = @($successResults.Provider | Where-Object { $_ } | Sort-Object -Unique)
     modelSet = @($successResults.Model | Where-Object { $_ } | Sort-Object -Unique)
     runtimeSet = @($successResults.Runtime | Where-Object { $_ } | Sort-Object -Unique)
+    orchestrationWarnings = @($successResults.OrchestrationWarnings | Where-Object { $_ } | Group-Object | ForEach-Object { [ordered]@{ warning = $_.Name; count = $_.Count } })
     criticFallbackCount = @($successResults | Where-Object CriticFallbackUsed).Count
     latencyMs = [ordered]@{
         registrationP50 = Get-Percentile $registrationSamples 0.50

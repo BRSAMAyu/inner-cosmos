@@ -51,18 +51,20 @@ class AuroraPipelinedDualKernelRuntimeTest {
         assertThat(first.result().segments).containsExactly("午饭这次选对了。");
         assertThat(first.runtime()).isEqualTo("dual-kernel.pipeline.v2");
         assertThat(first.backgroundPlannerScheduled()).isTrue();
-        assertThat(first.guidanceSource()).isEqualTo("bootstrap-current-context");
+        assertThat(first.guidanceSource()).isEqualTo("bootstrap");
+        assertThat(first.backgroundPlannerStatus()).isEqualTo("SCHEDULED");
         assertThat(client.plannerStarted.await(1, TimeUnit.SECONDS)).isTrue();
-        assertThat(first.deferredInnerVoiceRequest()).isNotCompleted();
+        assertThat(first.deferredInnerVoiceRequest()).isNull();
 
         client.releasePlanner.countDown();
-        first.deferredInnerVoiceRequest().get(2, TimeUnit.SECONDS);
+        assertThat(first.backgroundPlannerEvidence().get(2, TimeUnit.SECONDS).status())
+                .isEqualTo(AuroraDualKernelRuntime.PlannerStatus.SUCCEEDED);
 
         AuroraDualKernelRuntime.Generation second = runtime.generate(7L, "DAILY_TALK",
                 Map.of("sessionId", 91L, "userMessage", "但下午又困了",
                         "agentLoopPolicy", "按语境选择数量"),
                 client, StructuredAiResults.AuroraResult::new);
-        assertThat(second.guidanceSource()).isEqualTo("background-previous-turn");
+        assertThat(second.guidanceSource()).isEqualTo("real");
         assertThat(client.latestSpeakerRequestJson).contains("下一轮少分析，顺着具体感受接话");
 
         plannerPool.shutdownNow();

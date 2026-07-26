@@ -36,11 +36,13 @@ class DeepSeekLlmClientThinkingModeTest {
         LlmRequest request = new LlmRequest(7L, "AURORA_PLAN_DAILY_TALK", "{}");
         request.thinkingEnabled = true;
         request.temperature = 0.55;
+        request.reasoningEffort = "high";
 
         Map<String, Object> body = client.requestBody(request,
                 List.of(Map.of("role", "user", "content", "{}")), false);
 
         assertThat(body.get("thinking")).isEqualTo(Map.of("type", "enabled"));
+        assertThat(body.get("reasoning_effort")).isEqualTo("high");
         assertThat(body).doesNotContainKey("temperature");
     }
 

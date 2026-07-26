@@ -227,9 +227,23 @@ public class DeepSeekLlmClient implements LlmClient {
             throw new RuntimeException("DeepSeek API returned status " + httpResponse.statusCode() + ": " + httpResponse.body());
         }
         JsonNode root = objectMapper.readTree(httpResponse.body());
-        JsonNode content = root.path("choices").path(0).path("message").path("content");
+        JsonNode choice = root.path("choices").path(0);
+        JsonNode message = choice.path("message");
+        JsonNode content = message.path("content");
+        String finishReason = choice.path("finish_reason").asText("");
+        boolean reasoningPresent = !message.path("reasoning_content").asText("").isBlank();
+        int completionTokens = root.path("usage").path("completion_tokens").asInt(-1);
+        if ("length".equalsIgnoreCase(finishReason)) {
+            throw new RuntimeException("DeepSeek completion exhausted output budget"
+                    + " (finish_reason=length, completion_tokens=" + completionTokens
+                    + ", content_blank=" + content.asText("").isBlank()
+                    + ", reasoning_content_present=" + reasoningPresent + ")");
+        }
         if (content.isMissingNode() || content.asText().isBlank()) {
-            throw new RuntimeException("Unexpected DeepSeek response format: " + httpResponse.body());
+            throw new RuntimeException("DeepSeek completion contained no usable content"
+                    + " (finish_reason=" + (finishReason.isBlank() ? "unknown" : finishReason)
+                    + ", completion_tokens=" + completionTokens
+                    + ", reasoning_content_present=" + reasoningPresent + ")");
         }
         return content.asText();
     }
@@ -242,6 +256,9 @@ public class DeepSeekLlmClient implements LlmClient {
         body.put("max_tokens", request.maxTokensOr(LlmClient.RESPONSE_MAX_TOKENS));
         body.put("stream", stream);
         body.put("thinking", Map.of("type", thinking ? "enabled" : "disabled"));
+        if (thinking && request.reasoningEffort != null && !request.reasoningEffort.isBlank()) {
+            body.put("reasoning_effort", request.reasoningEffort.trim());
+        }
         // DeepSeek thinking mode does not support temperature. Omitting it avoids a misleading
         // no-op parameter while preserving the foreground speaker's tuned sampling.
         if (!thinking) {

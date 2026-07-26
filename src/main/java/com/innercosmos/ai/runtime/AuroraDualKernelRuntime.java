@@ -50,6 +50,7 @@ public class AuroraDualKernelRuntime {
     private final InnerVoiceComposer innerVoiceComposer;
     private final DualKernelBudgetPolicy budgetPolicy = new DualKernelBudgetPolicy();
     private final ConcurrentMap<PlannerKey, StoredPlan> backgroundPlans = new ConcurrentHashMap<>();
+    private final ConcurrentMap<PlannerKey, PlannerRunEvidence> backgroundPlannerEvidence = new ConcurrentHashMap<>();
     private final ConcurrentMap<PlannerKey, AtomicLong> planRevisions = new ConcurrentHashMap<>();
     private volatile Executor plannerExecutor;
 
@@ -66,7 +67,7 @@ public class AuroraDualKernelRuntime {
 
     /** Production wiring: tests that construct the runtime directly retain the legacy synchronous harness. */
     @Autowired
-    public void setPlannerExecutor(@Qualifier("aiExecutor") Executor plannerExecutor) {
+    public void setPlannerExecutor(@Qualifier("plannerExecutor") Executor plannerExecutor) {
         this.plannerExecutor = plannerExecutor;
     }
 
@@ -120,7 +121,7 @@ public class AuroraDualKernelRuntime {
                                boolean composeInnerVoice) {
         if (!enabled()) return new Generation(fallback.get(), "single-fallback", "", false,
                 List.of(), null, null, Map.of("total", 0L), true, true, false,
-                false, "none");
+                false, "none", PlannerStatus.FAILED.name(), null);
         if (plannerExecutor != null) {
             return generatePipelined(userId, mode, assembledContext, client, fallback, composeInnerVoice);
         }
@@ -207,7 +208,7 @@ public class AuroraDualKernelRuntime {
         return new Generation(spoken, "dual-kernel.v1", safe(plan.relationshipMove), repaired,
             observableIssues == null ? List.of() : List.copyOf(observableIssues), innerVoiceRequest,
             null, Map.copyOf(stageLatenciesMs), plannerFallbackUsed.get(), speakerFallbackUsed.get(),
-            criticFallbackUsed.get(), false, "same-turn-plan");
+            criticFallbackUsed.get(), false, "same-turn-plan", PlannerStatus.SUCCEEDED.name(), null);
     }
 
     private Generation generatePipelined(Long userId, String mode, Map<String, Object> assembledContext,
@@ -218,15 +219,21 @@ public class AuroraDualKernelRuntime {
         PlannerKey key = plannerKey(userId, mode, assembledContext);
         pruneBackgroundPlans(System.currentTimeMillis());
         StoredPlan stored = backgroundPlans.get(key);
-        StructuredAiResults.AuroraPlanResult guidance = stored == null
-                ? fallbackPlan(assembledContext)
-                : stored.plan();
-        String guidanceSource = stored == null ? "bootstrap-current-context" : "background-previous-turn";
+        PlannerRunEvidence priorEvidence = backgroundPlannerEvidence.get(key);
+        boolean hasRealGuidance = stored != null && priorEvidence != null
+                && priorEvidence.status() == PlannerStatus.SUCCEEDED
+                && stored.revision() == priorEvidence.revision();
+        StructuredAiResults.AuroraPlanResult guidance = hasRealGuidance ? stored.plan() : null;
+        String guidanceSource = guidanceSource(hasRealGuidance, priorEvidence);
 
         AtomicBoolean speakerFallbackUsed = new AtomicBoolean(false);
         Map<String, Object> speakerContext = new LinkedHashMap<>(assembledContext);
         speakerContext.remove("auroraPrompt");
-        speakerContext.put("dialogueGuidance", guidance);
+        if (hasRealGuidance) {
+            speakerContext.put("dialogueGuidance", guidance);
+        } else {
+            speakerContext.put("guidanceUnavailable", guidanceSource);
+        }
         speakerContext.put("guidanceSource", guidanceSource);
         speakerContext.put("runtimeContract", "dual-kernel.pipeline.v2");
         long speakerStart = System.nanoTime();
@@ -237,8 +244,10 @@ public class AuroraDualKernelRuntime {
                 }, client);
         long speakerMs = elapsedMs(speakerStart);
 
+        StructuredAiResults.AuroraPlanResult qualityPlan = hasRealGuidance
+                ? guidance : fallbackPlan(assembledContext);
         enforceContextualBubbleCadence(spoken, assembledContext);
-        List<String> observableIssues = qualityIssues(spoken, guidance, assembledContext);
+        List<String> observableIssues = qualityIssues(spoken, qualityPlan, assembledContext);
         List<String> hardIssues = observableIssues.stream()
                 .filter(HARD_QUALITY_ISSUES::contains)
                 .toList();
@@ -255,39 +264,77 @@ public class AuroraDualKernelRuntime {
             return current;
         });
         long revision = revisionCounter.incrementAndGet();
+        long scheduledAt = System.currentTimeMillis();
+        updatePlannerEvidence(key, new PlannerRunEvidence(revision, PlannerStatus.SCHEDULED,
+                "background_planner_scheduled", 0L, scheduledAt));
         StructuredAiResults.AuroraResult delivered = spoken;
         List<String> deliveredIssues = List.copyOf(observableIssues);
-        CompletableFuture<InnerVoiceRequest> deferredInnerVoice = CompletableFuture.supplyAsync(
-                () -> refreshBackgroundPlan(key, revision, userId, mode, assembledContext,
-                        guidance, delivered, deliveredIssues, client, composeInnerVoice),
-                plannerExecutor);
+        StructuredAiResults.AuroraPlanResult previousRealGuidance = guidance;
+        CompletableFuture<PlannerRefreshResult> refreshFuture;
+        try {
+            refreshFuture = CompletableFuture.supplyAsync(
+                    () -> refreshBackgroundPlan(key, revision, userId, mode, assembledContext,
+                            previousRealGuidance, delivered, deliveredIssues, client, composeInnerVoice),
+                    plannerExecutor);
+        } catch (java.util.concurrent.RejectedExecutionException rejected) {
+            PlannerRunEvidence rejectedEvidence = new PlannerRunEvidence(revision, PlannerStatus.FAILED,
+                    "planner_executor_saturated", 0L, System.currentTimeMillis());
+            updatePlannerEvidence(key, rejectedEvidence);
+            refreshFuture = CompletableFuture.completedFuture(
+                    new PlannerRefreshResult(rejectedEvidence, null));
+            planRevisions.computeIfPresent(key, (ignored, current) ->
+                    current.get() == revision ? null : current);
+        }
+        CompletableFuture<InnerVoiceRequest> deferredInnerVoice = composeInnerVoice
+                ? refreshFuture.thenApply(PlannerRefreshResult::innerVoiceRequest)
+                : null;
+        CompletableFuture<PlannerRunEvidence> plannerEvidenceFuture = refreshFuture
+                .thenApply(PlannerRefreshResult::evidence);
 
         Map<String, Long> latencies = new LinkedHashMap<>();
         latencies.put("speaker", speakerMs);
         latencies.put("criticalPathTotal", elapsedMs(totalStart));
-        return new Generation(spoken, "dual-kernel.pipeline.v2", safe(guidance.relationshipMove), repaired,
-                deliveredIssues, null, deferredInnerVoice, Map.copyOf(latencies), false,
-                speakerFallbackUsed.get(), false, true, guidanceSource);
+        boolean currentGuidanceFallback = "fallback".equals(guidanceSource)
+                || "failed".equals(guidanceSource);
+        return new Generation(spoken, "dual-kernel.pipeline.v2",
+                hasRealGuidance ? safe(guidance.relationshipMove) : "", repaired,
+                deliveredIssues, null, deferredInnerVoice, Map.copyOf(latencies),
+                currentGuidanceFallback, speakerFallbackUsed.get(), false, true, guidanceSource,
+                PlannerStatus.SCHEDULED.name(), plannerEvidenceFuture);
     }
 
-    private InnerVoiceRequest refreshBackgroundPlan(PlannerKey key, long revision, Long userId, String mode,
-                                                     Map<String, Object> assembledContext,
-                                                     StructuredAiResults.AuroraPlanResult previousGuidance,
-                                                     StructuredAiResults.AuroraResult delivered,
-                                                     List<String> observableIssues,
-                                                     LlmClient client, boolean composeInnerVoice) {
+    private PlannerRefreshResult refreshBackgroundPlan(PlannerKey key, long revision, Long userId, String mode,
+                                                         Map<String, Object> assembledContext,
+                                                         StructuredAiResults.AuroraPlanResult previousGuidance,
+                                                         StructuredAiResults.AuroraResult delivered,
+                                                         List<String> observableIssues,
+                                                         LlmClient client, boolean composeInnerVoice) {
+        long started = System.nanoTime();
+        updatePlannerEvidence(key, new PlannerRunEvidence(revision, PlannerStatus.RUNNING,
+                "provider_call_running", 0L, System.currentTimeMillis()));
         try {
             Map<String, Object> plannerContext = new LinkedHashMap<>(assembledContext);
             plannerContext.remove("auroraPrompt");
-            plannerContext.put("previousGuidance", previousGuidance);
+            if (previousGuidance != null) plannerContext.put("previousGuidance", previousGuidance);
             plannerContext.put("speakerDelivered", delivered);
             plannerContext.put("observableIssues", observableIssues);
             plannerContext.put("planningHorizon", "next-turn");
-            var next = ai.call(userId, "AURORA_PLAN_" + mode, planInstruction(), plannerContext,
+            var outcome = ai.callObserved(userId, "AURORA_PLAN_" + mode, planInstruction(), plannerContext,
                     StructuredAiResults.AuroraPlanResult.class,
                     () -> fallbackPlan(plannerContext), client);
-            normalizePlan(next, plannerContext);
+            if (outcome.status() != StructuredAiService.CallStatus.SUCCESS) {
+                PlannerStatus status = outcome.status() == StructuredAiService.CallStatus.FAILED
+                        ? PlannerStatus.FAILED : PlannerStatus.FALLBACK;
+                PlannerRunEvidence evidence = new PlannerRunEvidence(revision, status,
+                        outcome.detail(), elapsedMs(started), System.currentTimeMillis());
+                updatePlannerEvidence(key, evidence);
+                log.warn("Background planner {} for user {} mode {}: {}",
+                        status, userId, mode, outcome.detail());
+                return new PlannerRefreshResult(evidence, null);
+            }
 
+            StructuredAiResults.AuroraPlanResult next = outcome.value();
+            normalizePlan(next, plannerContext);
             if (Boolean.TRUE.equals(next.needsCritic) || !observableIssues.isEmpty()) {
                 Map<String, Object> criticContext = new LinkedHashMap<>();
                 criticContext.put("plan", next);
@@ -310,21 +357,51 @@ public class AuroraDualKernelRuntime {
             backgroundPlans.compute(key, (ignored, current) ->
                     current == null || revision >= current.revision()
                             ? new StoredPlan(revision, next, now) : current);
+            PlannerRunEvidence evidence = new PlannerRunEvidence(revision, PlannerStatus.SUCCEEDED,
+                    outcome.detail(), elapsedMs(started), now);
+            updatePlannerEvidence(key, evidence);
             pruneBackgroundPlans(now);
-            return composeInnerVoice && Boolean.TRUE.equals(next.innerVoiceWorthy)
+            InnerVoiceRequest innerVoice = composeInnerVoice && Boolean.TRUE.equals(next.innerVoiceWorthy)
                     ? new InnerVoiceRequest(userId, mode, next, delivered, client)
                     : null;
+            return new PlannerRefreshResult(evidence, innerVoice);
         } catch (Exception failure) {
-            log.warn("Background planner failed for user {} mode {}: {}", userId, mode, failure.getMessage());
-            return null;
+            PlannerRunEvidence evidence = new PlannerRunEvidence(revision, PlannerStatus.FAILED,
+                    boundedPlannerFailure(failure), elapsedMs(started), System.currentTimeMillis());
+            updatePlannerEvidence(key, evidence);
+            log.warn("Background planner failed for user {} mode {}: {}", userId, mode, evidence.detail());
+            return new PlannerRefreshResult(evidence, null);
         } finally {
             planRevisions.computeIfPresent(key, (ignored, current) ->
                     current.get() == revision ? null : current);
         }
     }
 
+    private void updatePlannerEvidence(PlannerKey key, PlannerRunEvidence evidence) {
+        backgroundPlannerEvidence.compute(key, (ignored, current) ->
+                current == null || evidence.revision() >= current.revision() ? evidence : current);
+    }
+
+    private String guidanceSource(boolean hasRealGuidance, PlannerRunEvidence evidence) {
+        if (hasRealGuidance) return "real";
+        if (evidence == null) return "bootstrap";
+        return switch (evidence.status()) {
+            case FALLBACK -> "fallback";
+            case FAILED -> "failed";
+            case SUCCEEDED -> "failed"; // success without a matching stored plan is inconsistent
+            case SCHEDULED, RUNNING -> "bootstrap";
+        };
+    }
+
+    private static String boundedPlannerFailure(Exception failure) {
+        if (failure == null || failure.getMessage() == null) return "unknown_planner_failure";
+        String detail = failure.getMessage();
+        return detail.length() <= 500 ? detail : detail.substring(0, 500);
+    }
     private void pruneBackgroundPlans(long now) {
         backgroundPlans.entrySet().removeIf(
+                entry -> now - entry.getValue().updatedAtEpochMs() > BACKGROUND_PLAN_TTL_MS);
+        backgroundPlannerEvidence.entrySet().removeIf(
                 entry -> now - entry.getValue().updatedAtEpochMs() > BACKGROUND_PLAN_TTL_MS);
         int overflow = backgroundPlans.size() - MAX_BACKGROUND_PLANS;
         if (overflow <= 0) return;
@@ -854,6 +931,19 @@ public class AuroraDualKernelRuntime {
 
     private record PlannerKey(long userId, String sessionId, String mode) {}
     private record StoredPlan(long revision, StructuredAiResults.AuroraPlanResult plan, long updatedAtEpochMs) {}
+    private record PlannerRefreshResult(PlannerRunEvidence evidence, InnerVoiceRequest innerVoiceRequest) {}
+
+    public enum PlannerStatus {
+        SCHEDULED,
+        RUNNING,
+        SUCCEEDED,
+        FALLBACK,
+        FAILED
+    }
+
+    /** Safe, bounded evidence for the asynchronous deep kernel; contains no chain-of-thought. */
+    public record PlannerRunEvidence(long revision, PlannerStatus status, String detail,
+                                     long latencyMs, long updatedAtEpochMs) {}
 
     /** @param innerVoiceRequest null unless legacy same-turn planning produced it immediately. */
     public record Generation(StructuredAiResults.AuroraResult result, String runtime,
@@ -863,5 +953,6 @@ public class AuroraDualKernelRuntime {
                               Map<String, Long> stageLatenciesMs,
                               boolean plannerFallbackUsed, boolean speakerFallbackUsed,
                               boolean criticFallbackUsed, boolean backgroundPlannerScheduled,
-                              String guidanceSource) {}
+                              String guidanceSource, String backgroundPlannerStatus,
+                              CompletableFuture<PlannerRunEvidence> backgroundPlannerEvidence) {}
 }

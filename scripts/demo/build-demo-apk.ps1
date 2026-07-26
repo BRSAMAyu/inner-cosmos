@@ -33,10 +33,11 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Demo web bundle failed." }
     & npx.cmd --no-install cap sync android
     if ($LASTEXITCODE -ne 0) { throw "Capacitor Android sync failed." }
-    $nativeBundle = Join-Path $web "android\app\src\main\assets\public\assets\app.js"
-    if (-not (Test-Path -LiteralPath $nativeBundle) -or
-        -not (Select-String -LiteralPath $nativeBundle -Pattern $origin -SimpleMatch -Quiet) -or
-        -not (Select-String -LiteralPath $nativeBundle -Pattern "/api/public/demo/personas" -SimpleMatch -Quiet)) {
+    $nativeAssetRoot = Join-Path $web "android\app\src\main\assets\public"
+    $nativeScripts = @(Get-ChildItem -LiteralPath $nativeAssetRoot -Recurse -File -Filter "*.js")
+    $originEmbedded = $nativeScripts | Select-String -Pattern $origin -SimpleMatch -Quiet
+    $personaEntryEmbedded = $nativeScripts | Select-String -Pattern "/api/public/demo/personas" -SimpleMatch -Quiet
+    if ($nativeScripts.Count -eq 0 -or -not $originEmbedded -or -not $personaEntryEmbedded) {
         throw "Synced Android bundle is missing the public Demo origin or passwordless persona entry."
     }
     Push-Location "android"

@@ -6,14 +6,30 @@ $root = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $stateDir = Join-Path $root ".demo-runtime"
 $compose = Join-Path $root "deploy\compose\public-demo.yml"
 $runtimeEnvFile = Join-Path $stateDir "infrastructure.env"
+. (Join-Path $PSScriptRoot "public-demo-common.ps1")
 $runtimeEnv = if (Test-Path $runtimeEnvFile) {
     Get-Content -LiteralPath $runtimeEnvFile -Raw | ConvertFrom-StringData
 } else { @{} }
 
-if (Test-Path (Join-Path $stateDir "cloudflared.pid")) {
-    $pidValue = (Get-Content (Join-Path $stateDir "cloudflared.pid") -Raw).Trim()
-    if ($pidValue -match "^\d+$") {
-        Stop-Process -Id ([int]$pidValue) -Force -ErrorAction SilentlyContinue
+$infoFile = Join-Path $stateDir "demo-info.txt"
+$info = Read-DemoInfo -Path $infoFile
+$mode = if ($info["tunnel_mode"] -in @("quick", "named")) { [string]$info["tunnel_mode"] } else { "quick" }
+$cloudflared = Join-Path $root "scripts\demo\bin\cloudflared.exe"
+$tunnelPidFile = Join-Path $stateDir "cloudflared.pid"
+$recordedPort = if ($info["port"] -match "^\d+$") { [int]$info["port"] } else { 0 }
+$tunnelEvidence = Get-TunnelProcessEvidence -PidFile $tunnelPidFile `
+    -ExpectedExecutable $cloudflared -Mode $mode -Port $recordedPort
+if ($tunnelEvidence.Valid) {
+    Stop-Process -Id ([int]$tunnelEvidence.Pid) -Force -ErrorAction SilentlyContinue
+}
+$watchdogPidFile = Join-Path $stateDir "watchdog.pid"
+if (Test-Path -LiteralPath $watchdogPidFile) {
+    $watchdogPid = (Get-Content -LiteralPath $watchdogPidFile -Raw).Trim()
+    if ($watchdogPid -match "^\d+$") {
+        $watchdogProcess = Get-CimInstance Win32_Process -Filter "ProcessId=$watchdogPid" -ErrorAction SilentlyContinue
+        if ($watchdogProcess -and [string]$watchdogProcess.CommandLine -match "watch-public-demo\.ps1") {
+            Stop-Process -Id ([int]$watchdogPid) -Force -ErrorAction SilentlyContinue
+        }
     }
 }
 $env:SPRING_DATASOURCE_PASSWORD = if ($env:SPRING_DATASOURCE_PASSWORD) {
@@ -39,6 +55,8 @@ if ($LASTEXITCODE -ne 0) { throw "Unable to stop the public demo compose project
 if ($DeleteData -and (Test-Path $stateDir)) {
     Remove-Item -LiteralPath $stateDir -Recurse -Force
 } elseif (Test-Path $stateDir) {
-    Remove-Item -LiteralPath (Join-Path $stateDir "cloudflared.pid") -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $tunnelPidFile -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $watchdogPidFile -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $infoFile -Force -ErrorAction SilentlyContinue
 }
 Write-Host "PUBLIC_DEMO_STOPPED data_deleted=$($DeleteData.IsPresent)"

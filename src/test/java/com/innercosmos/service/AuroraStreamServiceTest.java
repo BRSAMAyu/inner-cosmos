@@ -106,12 +106,9 @@ class AuroraStreamServiceTest {
     private void stubReplyDeps(StructuredAiResults.AuroraResult ai) {
         when(agentContextAssembler.assemble(anyLong(), anyLong(), anyString(), anyBoolean(),
                 any(), any())).thenReturn(new AgentContext());
-        when(dialogService.recentMessages(anyLong(), anyInt())).thenReturn(List.of());
         when(dialogService.messages(anyLong())).thenReturn(List.of());
         when(memoryContextService.buildContext(anyLong(), anyLong(), anyString(), anyInt(), anyInt()))
                 .thenReturn(null);
-        when(sessionMapper.selectById(anyLong())).thenReturn(null);
-        when(rhythmGuardService.checkRhythm(anyLong(), anyLong())).thenReturn("");
         when(rhythmGuardService.shouldSuggestSettle(any(), anyLong())).thenReturn(false);
         ResolvedModel resolved = mock(ResolvedModel.class);
         when(resolved.provider()).thenReturn("MOCK");
@@ -194,6 +191,70 @@ class AuroraStreamServiceTest {
         verify(safetyService).check(eq("今天有点累"), eq(USER_ID), eq(SESSION_ID));
     }
 
+    @Test
+    @DisplayName("ordinary replies preserve genuine 1, 2 and 3 bubble variation")
+    void replyRich_preservesOneTwoThreeBubbleVariation() {
+        when(safetyService.check(anyString(), anyLong(), anyLong())).thenReturn(safe());
+
+        StructuredAiResults.AuroraResult one = new StructuredAiResults.AuroraResult();
+        one.segments = List.of("先把今天过完，别急着给它下结论。");
+        stubReplyDeps(one);
+        assertEquals(1, service.replyRich(USER_ID, request("今天只想安静一下")).messages.size());
+
+        StructuredAiResults.AuroraResult two = new StructuredAiResults.AuroraResult();
+        two.segments = List.of("这杯咖啡显然选错了时机。", "先喝两口水，等脑子重新上线。");
+        stubReplyDeps(two);
+        assertEquals(2, service.replyRich(USER_ID, request("下午喝咖啡反而更困了")).messages.size());
+
+        StructuredAiResults.AuroraResult three = new StructuredAiResults.AuroraResult();
+        three.segments = List.of("先回答你第一个问题：可以改。", "第二件事要看明天的时间。", "至于第三个，我们先别替对方做决定。");
+        stubReplyDeps(three);
+        assertEquals(3, service.replyRich(USER_ID, request("我有三个不同的问题")).messages.size());
+    }
+
+    @Test
+    @DisplayName("SILENCE markers are control metadata and never reach a visible bubble")
+    void replyRich_silenceMetadataNeverLeaks() {
+        ChatRequest request = request("你不用每句话都接");
+        when(safetyService.check(anyString(), anyLong(), anyLong())).thenReturn(safe());
+        StructuredAiResults.AuroraResult ai = new StructuredAiResults.AuroraResult();
+        ai.segments = List.of("那我就停在这里。", "[[SILENCE]]", "这一句保留 [[SILENCE]] 但标记不能显示");
+        stubReplyDeps(ai);
+
+        AuroraReplyVO vo = service.replyRich(USER_ID, request);
+
+        assertEquals(2, vo.messages.size());
+        assertTrue(vo.messages.stream().noneMatch(message -> message.toLowerCase().contains("silence")));
+    }
+
+    @Test
+    @DisplayName("completed responses are delivered immediately without artificial typewriter sleep")
+    void stream_completedResponseHasNoArtificialDelay() {
+        String message = "请把三件事分开说";
+        when(safetyService.check(eq(message), eq(USER_ID), eq(SESSION_ID))).thenReturn(safe());
+        StructuredAiResults.AuroraResult ai = new StructuredAiResults.AuroraResult();
+        ai.segments = List.of("甲".repeat(80), "乙".repeat(80), "丙".repeat(80));
+        stubReplyDeps(ai);
+        ChatRequest rich = new ChatRequest();
+        rich.foregroundAcknowledgementSent = true;
+
+        long started = System.nanoTime();
+        service.stream(USER_ID, SESSION_ID, message, "DAILY_TALK", rich);
+        long elapsedMs = java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
+
+        assertTrue(elapsedMs < 800, "already-generated response was artificially delayed by " + elapsedMs + " ms");
+        verify(dialogService).saveAuroraMessage(USER_ID, SESSION_ID, "甲".repeat(80));
+        verify(dialogService).saveAuroraMessage(USER_ID, SESSION_ID, "乙".repeat(80));
+        verify(dialogService).saveAuroraMessage(USER_ID, SESSION_ID, "丙".repeat(80));
+    }
+
+    private ChatRequest request(String message) {
+        ChatRequest request = new ChatRequest();
+        request.sessionId = SESSION_ID;
+        request.message = message;
+        request.mode = "DAILY_TALK";
+        return request;
+    }
     @Test
     @DisplayName("fast foreground rejects praise-shaped relationship inference and uses factual local acknowledgement")
     void foreground_relationshipPraiseShape_isReplacedByQualityGate() {

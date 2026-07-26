@@ -12,6 +12,7 @@ $origin = $originUri.GetLeftPart([UriPartial]::Authority)
 $suffix = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
 $password = "Demo-proof-$suffix!"
 $verificationActors = [System.Collections.Generic.List[object]]::new()
+$verificationWarnings = [System.Collections.Generic.List[string]]::new()
 
 function Invoke-Envelope {
     param(
@@ -355,11 +356,20 @@ if (-not $SkipAurora) {
         throw "Aurora violated the quiet-disclosure boundary during public acceptance: reply='$replyText'; nextQuestion='$($reply.nextQuestion)'; smallStep='$($reply.smallStep)'."
     }
     $auroraRuntime = [string]$reply.agentLoop.runtime
-    if ($auroraRuntime -ne "dual-kernel.v1") {
-        throw "Aurora did not use the required dual-kernel runtime (got '$auroraRuntime')."
+    $auroraProvider = [string]$reply.aiState.provider
+    $auroraModel = [string]$reply.aiState.model
+    if ([string]::IsNullOrWhiteSpace($auroraProvider) -or
+        $auroraProvider.ToLowerInvariant() -eq "mock") {
+        throw "Aurora did not identify a real provider."
     }
-    if ([bool]$reply.agentLoop.plannerFallbackUsed) {
-        throw "Aurora planning kernel fell back during public acceptance."
+    if (-not [bool]$reply.aiState.apiKeyConfigured -or [bool]$reply.aiState.fallbackAllowed) {
+        throw "Aurora real-provider fail-closed contract is not active."
+    }
+    if ($auroraRuntime -ne "dual-kernel.pipeline.v2") {
+        $verificationWarnings.Add("Aurora runtime is '$auroraRuntime'; expected the pipelined runtime.")
+    }
+    if (-not [bool]$reply.agentLoop.backgroundPlannerScheduled) {
+        $verificationWarnings.Add("Aurora did not report background planner scheduling.")
     }
     if ([bool]$reply.agentLoop.speakerFallbackUsed) {
         throw "Aurora speaking kernel fell back during public acceptance."
@@ -456,7 +466,7 @@ $null = Invoke-Envelope $a.Session "DELETE" "/api/user/account" @{ password = $p
 $verificationActors.Clear()
 
 [pscustomobject]@{
-    Status = "PASS"
+    Status = if ($verificationWarnings.Count -eq 0) { "PASS" } else { "PASS_WITH_WARNINGS" }
     Origin = $origin
     Health = $health.status
     ApkDownload = "PASS"
@@ -466,8 +476,12 @@ $verificationActors.Clear()
     Friendship = "BIDIRECTIONAL_ACCEPTED"
     GroupMembers = 2
     AuroraReplyLength = $auroraReplyLength
+    AuroraProvider = $auroraProvider
+    AuroraModel = $auroraModel
     AuroraRuntime = $auroraRuntime
+    BackgroundPlannerScheduled = [bool]$reply.agentLoop.backgroundPlannerScheduled
     AuroraFallbacks = $auroraFallbacks
+    Warnings = @($verificationWarnings) -join " | "
     MemoryCards = $memoryCards
     CapsulePublished = $capsulePublished
     CapsuleChatReplyLength = $capsuleChatReplyLength

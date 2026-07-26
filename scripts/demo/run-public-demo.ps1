@@ -4,8 +4,13 @@ param(
     [string]$Provider = "deepseek",
     [int]$Port = 8080,
     [int]$MaxBuildWorkers = 1,
+    [ValidateSet("quick", "named")]
+    [string]$TunnelMode = "quick",
+    [string]$PublicOrigin,
     [switch]$ReuseTunnel,
-    [switch]$SkipVerification
+    [switch]$SkipVerification,
+    [switch]$StrictVerification,
+    [switch]$NoWatchdog
 )
 
 $ErrorActionPreference = "Stop"
@@ -16,15 +21,30 @@ $compose = Join-Path $root "deploy\compose\public-demo.yml"
 $cloudflared = Join-Path $root "scripts\demo\bin\cloudflared.exe"
 $tunnelPidFile = Join-Path $stateDir "cloudflared.pid"
 $demoInfoFile = Join-Path $stateDir "demo-info.txt"
+. (Join-Path $PSScriptRoot "public-demo-common.ps1")
 $origin = $null
 $tunnel = $null
 $keyFile = Get-ChildItem -LiteralPath $root -File |
     Where-Object { $_.Name.StartsWith("API", [StringComparison]::OrdinalIgnoreCase) -and $_.Extension -eq ".txt" } |
     Select-Object -First 1 -ExpandProperty FullName
 
+if ($TunnelMode -eq "named") {
+    if ([string]::IsNullOrWhiteSpace($PublicOrigin) -or -not (Test-CleanHttpsOrigin $PublicOrigin)) {
+        throw "Named Tunnel requires -PublicOrigin with a clean fixed HTTPS origin."
+    }
+    $originUri = [Uri]$PublicOrigin
+    if ($originUri.Host.EndsWith(".trycloudflare.com", [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Named Tunnel cannot use a temporary trycloudflare.com hostname."
+    }
+    $origin = $originUri.GetLeftPart([UriPartial]::Authority)
+} elseif (-not [string]::IsNullOrWhiteSpace($PublicOrigin)) {
+    throw "-PublicOrigin is only valid with -TunnelMode named."
+}
+
 if (Test-Path $tunnelPidFile) {
-    $existingPid = (Get-Content -LiteralPath $tunnelPidFile -Raw).Trim()
-    if ($existingPid -match "^\d+$" -and (Get-Process -Id ([int]$existingPid) -ErrorAction SilentlyContinue)) {
+    $existingEvidence = Get-TunnelProcessEvidence -PidFile $tunnelPidFile `
+        -ExpectedExecutable $cloudflared -Mode $TunnelMode -Port $Port
+    if ($existingEvidence.Valid) {
         if (-not $ReuseTunnel) {
             throw "A public demo tunnel is already running. Use -ReuseTunnel for an in-place rebuild, or stop-public-demo.ps1 first."
         }
@@ -34,9 +54,13 @@ if (Test-Path $tunnelPidFile) {
         $savedInfo = Get-Content -LiteralPath $demoInfoFile -Encoding utf8 |
             Where-Object { $_ -match "^origin=https://" } | Select-Object -First 1
         if (-not $savedInfo) { throw "Cannot reuse the tunnel because its public origin is unknown." }
-        $origin = ($savedInfo -replace "^origin=", "").Trim()
+        $savedOrigin = ($savedInfo -replace "^origin=", "").Trim()
+        if ($TunnelMode -eq "named" -and $savedOrigin -ne $origin) {
+            throw "The running Named Tunnel origin does not match -PublicOrigin."
+        }
+        $origin = $savedOrigin
     } elseif ($ReuseTunnel) {
-        throw "Cannot reuse the tunnel because its recorded process is no longer running."
+        throw "Cannot reuse the tunnel: $($existingEvidence.Reason)."
     } else {
         Remove-Item -LiteralPath $tunnelPidFile -Force -ErrorAction SilentlyContinue
     }
@@ -69,21 +93,29 @@ New-Item -ItemType Directory -Force -Path $stateDir | Out-Null
 $stdout = Join-Path $stateDir "cloudflared.stdout.log"
 $stderr = Join-Path $stateDir "cloudflared.stderr.log"
 if (-not $ReuseTunnel) {
+    # Invalidate shareable metadata before replacing a tunnel. The status command
+    # must never present yesterday's URL or APK as live during a rebuild.
+    Remove-Item -LiteralPath $demoInfoFile -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $tunnelPidFile -Force -ErrorAction SilentlyContinue
     Remove-Item $stdout, $stderr -Force -ErrorAction SilentlyContinue
-    $tunnel = Start-Process -FilePath $cloudflared -ArgumentList @(
-        "tunnel", "--no-autoupdate", "--url", "http://127.0.0.1:$Port"
-    ) -RedirectStandardOutput $stdout -RedirectStandardError $stderr -WindowStyle Hidden -PassThru
+    $tunnel = Start-DemoTunnel -Executable $cloudflared -Mode $TunnelMode -Port $Port `
+        -Stdout $stdout -Stderr $stderr
     $tunnel.Id | Set-Content -Encoding ascii $tunnelPidFile
 
-    $deadline = (Get-Date).AddMinutes(2)
-    do {
-        Start-Sleep -Milliseconds 750
-        $log = ((Get-Content $stdout, $stderr -Raw -ErrorAction SilentlyContinue) -join "`n")
-        $match = [regex]::Match($log, "https://[a-z0-9-]+\.trycloudflare\.com")
-        if ($match.Success) { $origin = $match.Value }
-        if ($tunnel.HasExited) { throw "cloudflared exited before assigning a public URL. See $stderr" }
-    } while (-not $origin -and (Get-Date) -lt $deadline)
-    if (-not $origin) { throw "Timed out waiting for a Cloudflare quick-tunnel URL." }
+    if ($TunnelMode -eq "quick") {
+        $deadline = (Get-Date).AddMinutes(2)
+        do {
+            Start-Sleep -Milliseconds 750
+            $log = ((Get-Content $stdout, $stderr -Raw -ErrorAction SilentlyContinue) -join "`n")
+            $match = [regex]::Match($log, "https://[a-z0-9-]+\.trycloudflare\.com")
+            if ($match.Success) { $origin = $match.Value }
+            if ($tunnel.HasExited) { throw "cloudflared exited before assigning a public URL. See $stderr" }
+        } while (-not $origin -and (Get-Date) -lt $deadline)
+        if (-not $origin) { throw "Timed out waiting for a Cloudflare Quick Tunnel URL." }
+    } else {
+        Start-Sleep -Seconds 2
+        if ($tunnel.HasExited) { throw "Named Tunnel exited during startup. See $stderr" }
+    }
 }
 
 try {
@@ -156,6 +188,15 @@ try {
     & docker compose -p inner-cosmos-public-demo -f $compose up -d --build --wait
     if ($LASTEXITCODE -ne 0) { throw "Public demo compose startup failed." }
 
+    $publicDeadline = (Get-Date).AddMinutes(2)
+    do {
+        $publicHealth = Test-PublicDemoHttp -Origin $origin -TimeoutSec 10
+        if (-not $publicHealth.Healthy) { Start-Sleep -Seconds 2 }
+    } while (-not $publicHealth.Healthy -and (Get-Date) -lt $publicDeadline)
+    if (-not $publicHealth.Healthy) {
+        throw "Tunnel origin did not reach an UP application: $($publicHealth.Reason)"
+    }
+
     # The container image and APK now own the tunnel-specific bundle. Restore the
     # checked-in web output to the normal same-origin build so a random URL never
     # leaks into a later commit.
@@ -165,9 +206,16 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "Default web bundle restore failed." }
     } finally { Pop-Location }
 
+    $verificationStatus = if ($SkipVerification) { "SKIPPED" } else { "PASS" }
     if (-not $SkipVerification) {
-        & (Join-Path $PSScriptRoot "verify-public-demo.ps1") -Origin $origin
-        if ($LASTEXITCODE -ne 0) { throw "Public demo journey verification failed." }
+        try {
+            & (Join-Path $PSScriptRoot "verify-public-demo.ps1") -Origin $origin
+            if ($LASTEXITCODE -ne 0) { throw "Public demo journey verification failed." }
+        } catch {
+            $verificationStatus = "WARN"
+            if ($StrictVerification) { throw }
+            Write-Warning ("Public demo remains available, but automated verification reported: " + $_.Exception.Message)
+        }
     }
 
     $apk = Join-Path $root "src\main\resources\static\downloads\inner-cosmos-demo.apk"
@@ -178,16 +226,42 @@ try {
         "apk=$origin/downloads/inner-cosmos-demo.apk"
         "apk_sha256=$hash"
         "provider=$Provider"
+        "tunnel_mode=$TunnelMode"
+        "port=$Port"
+        "verification=$verificationStatus"
         "started_at=$((Get-Date).ToString("o"))"
     ) | Set-Content -Encoding utf8 (Join-Path $stateDir "demo-info.txt")
 
+    if (-not $NoWatchdog) {
+        $watchdogPidFile = Join-Path $stateDir "watchdog.pid"
+        if (Test-Path -LiteralPath $watchdogPidFile) {
+            $oldWatchdogPid = (Get-Content -LiteralPath $watchdogPidFile -Raw).Trim()
+            if ($oldWatchdogPid -match "^\d+$") {
+                Stop-Process -Id ([int]$oldWatchdogPid) -Force -ErrorAction SilentlyContinue
+            }
+        }
+        $watchdogOut = Join-Path $stateDir "watchdog.stdout.log"
+        $watchdogErr = Join-Path $stateDir "watchdog.stderr.log"
+        $watchdogArgs = @(
+            "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+            ('"' + (Join-Path $PSScriptRoot "watch-public-demo.ps1") + '"')
+        )
+        if ($TunnelMode -eq "named") { $watchdogArgs += "-RestartNamedTunnel" }
+        $watchdog = Start-Process -FilePath "powershell.exe" -ArgumentList $watchdogArgs `
+            -RedirectStandardOutput $watchdogOut -RedirectStandardError $watchdogErr `
+            -WindowStyle Hidden -PassThru
+        $watchdog.Id | Set-Content -Encoding ascii $watchdogPidFile
+    }
+
     Write-Host ""
-    Write-Host "PUBLIC_DEMO_READY"
+    Write-Host $(if ($verificationStatus -eq "PASS") { "PUBLIC_DEMO_READY" } else { "PUBLIC_DEMO_READY_WITH_$verificationStatus" })
     Write-Host "Landing: $origin/"
     Write-Host "Web App: $origin/app/aurora/"
     Write-Host "Android: $origin/downloads/inner-cosmos-demo.apk"
     Write-Host "Stop:    .\scripts\demo\stop-public-demo.ps1"
 } catch {
     if ($tunnel) { Stop-Process -Id $tunnel.Id -Force -ErrorAction SilentlyContinue }
+    Remove-Item -LiteralPath $tunnelPidFile -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $demoInfoFile -Force -ErrorAction SilentlyContinue
     throw
 }

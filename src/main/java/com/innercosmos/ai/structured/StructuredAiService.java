@@ -52,6 +52,18 @@ public class StructuredAiService {
      */
     public <T> T call(Long userId, String moduleName, String instruction, Object context,
                       Class<T> resultType, Supplier<T> fallback, LlmClient clientOverride) {
+        return callObserved(userId, moduleName, instruction, context, resultType, fallback, clientOverride).value();
+    }
+
+    /**
+     * Structured call with truthful outcome metadata. The regular {@link #call} API remains
+     * source-compatible, while asynchronous runtimes can distinguish a real provider result from
+     * blank output, invalid JSON and provider failure instead of storing a deterministic fallback
+     * as if it were deep-kernel guidance.
+     */
+    public <T> CallOutcome<T> callObserved(Long userId, String moduleName, String instruction,
+                                           Object context, Class<T> resultType,
+                                           Supplier<T> fallback, LlmClient clientOverride) {
         LlmClient active = clientOverride != null ? clientOverride : llmClient;
         String assignedGroup = abTestService.assignGroup(userId, moduleName);
         boolean requireRemoteProvider = requiresRemoteProvider(context);
@@ -63,74 +75,54 @@ public class StructuredAiService {
 
         try {
             String contextJson = JsonUtils.toJson(modelContext(context));
-            // Gemini audit 3.4/3.5 (CONFIRMED/P0): `instruction` carries this call's actual
-            // behavioral rules (for PersonaChat, e.g. "must not use unselected Genome
-            // categories/memories"). It used to be concatenated into the same "user" role
-            // message as `contextJson` -- which embeds attacker-influenced free text (e.g.
-            // PersonaChatServiceImpl's "visitorMessage") -- so the behavioral rules and the
-            // untrusted data shared one message with no provider-level priority between them.
-            // Moving `instruction` into the system role gives it the same provider-native
-            // system-vs-user separation `auroraSystemPrompt` already got below; `request.prompt`
-            // (user role) now carries ONLY the JSON context -- data, never instructions.
             String prompt = buildPrompt(contextJson, null);
 
             LlmRequest request = new LlmRequest(userId, moduleName, prompt);
-            request.systemPrompt = systemPrompt(instruction, context);
-            request.requestJson = contextJson;
-            request.preferredProvider = preferredProvider(context);
-            request.temperature = modeTemperature(context);
-            request.thinkingEnabled = thinkingEnabled(moduleName);
-            applyLatencyContract(request, moduleName, false);
-            if ("MOCK".equals(assignedGroup) && !requireRemoteProvider) {
-                request.forceMock = true;
-            }
+            configureRequest(request, instruction, context, moduleName, false, assignedGroup,
+                    requireRemoteProvider, contextJson);
 
             String raw = active.chat(request);
             if (raw == null || raw.isBlank()) {
                 log.warn("[BAD_AI_OUTPUT] Structured AI returned blank/null for module {}", moduleName);
                 badOutputCounter.incrementAndGet();
-                return fallback.get();
+                return new CallOutcome<>(fallback.get(), CallStatus.FALLBACK_BLANK, "blank_provider_output");
             }
             T parsed = StructuredOutputParser.parse(raw, resultType);
             if (parsed != null) {
                 success = true;
-                return parsed;
+                return new CallOutcome<>(parsed, CallStatus.SUCCESS, "provider_json");
             }
 
             LlmRequest retry = new LlmRequest(userId, moduleName + "_JSON_REPAIR",
                     buildPrompt(contextJson, raw));
-            retry.systemPrompt = systemPrompt(instruction, context);
-            retry.requestJson = contextJson;
-            retry.preferredProvider = preferredProvider(context);
-            retry.temperature = modeTemperature(context);
-            // Repairing malformed JSON is formatting work, not another deep-reasoning pass.
+            configureRequest(retry, instruction, context, moduleName, true, assignedGroup,
+                    requireRemoteProvider, contextJson);
             retry.thinkingEnabled = Boolean.FALSE;
-            applyLatencyContract(retry, moduleName, true);
-            if ("MOCK".equals(assignedGroup) && !requireRemoteProvider) {
-                retry.forceMock = true;
-            }
+            retry.reasoningEffort = null;
 
             String repaired = active.chat(retry);
             parsed = StructuredOutputParser.parse(repaired, resultType);
             if (parsed != null) {
                 success = true;
-                return parsed;
+                return new CallOutcome<>(parsed, CallStatus.SUCCESS, "provider_json_repaired");
             }
 
             log.warn("[BAD_AI_OUTPUT] Structured AI output for {} was not valid JSON after repair (raw truncated): {}",
                     moduleName, truncate(repaired, 500));
             badOutputCounter.incrementAndGet();
-            return fallback.get();
+            return new CallOutcome<>(fallback.get(), CallStatus.FALLBACK_INVALID_JSON,
+                    "invalid_json_after_repair");
         } catch (Exception exception) {
             badOutputCounter.incrementAndGet();
+            String detail = boundedFailureDetail(exception);
             if (llmConfig.isProdMode()) {
                 log.error("Structured AI call for {} failed in prod; returning explicit business fallback: {}",
-                        moduleName, exception.getMessage(), exception);
-                return fallback.get();
+                        moduleName, detail, exception);
+            } else {
+                log.warn("Structured AI call for {} fell back to deterministic extraction: {}",
+                        moduleName, detail, exception);
             }
-            log.warn("Structured AI call for {} fell back to deterministic extraction: {}",
-                    moduleName, exception.getMessage(), exception);
-            return fallback.get();
+            return new CallOutcome<>(fallback.get(), CallStatus.FAILED, detail);
         } finally {
             double latency = System.currentTimeMillis() - startTime;
             try {
@@ -141,6 +133,57 @@ public class StructuredAiService {
         }
     }
 
+    private void configureRequest(LlmRequest request, String instruction, Object context,
+                                  String moduleName, boolean jsonRepair, String assignedGroup,
+                                  boolean requireRemoteProvider, String contextJson) {
+        request.systemPrompt = systemPrompt(instruction, context);
+        request.requestJson = contextJson;
+        request.preferredProvider = preferredProvider(context);
+        request.temperature = modeTemperature(context);
+        request.thinkingEnabled = jsonRepair ? Boolean.FALSE : thinkingEnabled(moduleName);
+        request.reasoningEffort = jsonRepair ? null : reasoningEffort(moduleName, context);
+        applyLatencyContract(request, moduleName, jsonRepair);
+        if ("MOCK".equals(assignedGroup) && !requireRemoteProvider) {
+            request.forceMock = true;
+        }
+    }
+
+    private String reasoningEffort(String moduleName, Object context) {
+        if (moduleName == null || !(context instanceof Map<?, ?> map)) return null;
+        String normalized = moduleName.toUpperCase(java.util.Locale.ROOT);
+        if (!normalized.startsWith("AURORA_PLAN_")) return null;
+        Object configured = map.get("plannerReasoningEffort");
+        if (configured == null) return null;
+        String effort = String.valueOf(configured).trim().toLowerCase(java.util.Locale.ROOT);
+        return switch (effort) {
+            case "low", "medium", "high" -> effort;
+            default -> null;
+        };
+    }
+
+    private static String boundedFailureDetail(Exception exception) {
+        if (exception == null) return "unknown_failure";
+        Throwable cursor = exception;
+        String best = null;
+        while (cursor != null) {
+            if (cursor.getMessage() != null && !cursor.getMessage().isBlank()) best = cursor.getMessage();
+            cursor = cursor.getCause();
+        }
+        return truncate(best == null ? exception.getClass().getSimpleName() : best, 500);
+    }
+
+    public enum CallStatus {
+        SUCCESS,
+        FALLBACK_BLANK,
+        FALLBACK_INVALID_JSON,
+        FAILED
+    }
+
+    public record CallOutcome<T>(T value, CallStatus status, String detail) {
+        public boolean usedFallback() {
+            return status != CallStatus.SUCCESS;
+        }
+    }
     private boolean requiresRemoteProvider(Object context) {
         return context instanceof Map<?, ?> map
                 && Boolean.TRUE.equals(map.get("requireRemoteProvider"));
@@ -206,18 +249,13 @@ public class StructuredAiService {
             request.maxTokens = 256;
             request.retryEnabled = Boolean.FALSE;
         } else if (normalized.startsWith("AURORA_PLAN_")) {
-            // The planner emits a compact JSON contract, not a user-facing essay. A 1K-token
-            // reasoning budget was enough for the real DeepSeek relationship and disclosure
-            // journeys, while 2K regularly spent the full 18 seconds on task-splitting and then
-            // fell back. Keep thinking enabled, but bound it so the foreground acknowledgement
-            // is followed by a real plan rather than a late timeout.
-            // DeepSeek v4-flash can spend the first 1K tokens entirely in reasoning_content and
-            // finish with no JSON (finish_reason=length). The public acceptance caught that exact
-            // failure. Preserve enough budget for both thinking and the compact plan; the 30s
-            // deadline only protects a genuinely stalled request. Foreground acknowledgement is
-            // immediate, so this background budget improves quality without blocking first paint.
-            request.timeoutMs = 30_000;
-            request.maxTokens = 2_048;
+            // The planner emits a compact JSON contract, not a user-facing essay. DeepSeek can
+            // spend the entire completion envelope in reasoning_content and finish
+            // with finish_reason=length before emitting JSON. Give the background-only stage
+            // separate room while keeping a hard deadline. reasoning_effort remains unset unless
+            // an explicit measured plannerReasoningEffort is supplied in context.
+            request.timeoutMs = 45_000;
+            request.maxTokens = 4_096;
             request.retryEnabled = Boolean.FALSE;
         } else if (normalized.startsWith("AURORA_SPEAKER_")) {
             request.timeoutMs = 8_000;

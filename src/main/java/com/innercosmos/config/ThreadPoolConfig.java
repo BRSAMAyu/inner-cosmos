@@ -23,6 +23,20 @@ public class ThreadPoolConfig {
         return buildExecutor(coreSize, maxSize, queueCapacity, "inner-cosmos-ai-");
     }
 
+    /**
+     * Slow, background-only Aurora planning never consumes foreground model workers. The bounded
+     * queue protects the classroom host during bursts; AbortPolicy is intentional so saturation
+     * becomes explicit FAILED evidence instead of CallerRunsPolicy moving a 45-second planner
+     * onto the user-facing speaker thread.
+     */
+    @Bean(name = "plannerExecutor")
+    public Executor plannerExecutor(
+            @Value("${inner-cosmos.executors.planner.core-size:4}") int coreSize,
+            @Value("${inner-cosmos.executors.planner.max-size:8}") int maxSize,
+            @Value("${inner-cosmos.executors.planner.queue-capacity:8}") int queueCapacity) {
+        return buildExecutor(coreSize, maxSize, queueCapacity, "inner-cosmos-planner-",
+                new ThreadPoolExecutor.AbortPolicy());
+    }
     /** Legacy @Async projections keep their own back-pressured queue. */
     @Bean(name = "taskExecutor")
     public Executor taskExecutor(
@@ -42,13 +56,19 @@ public class ThreadPoolConfig {
     }
 
     private Executor buildExecutor(int coreSize, int maxSize, int queueCapacity, String prefix) {
+        return buildExecutor(coreSize, maxSize, queueCapacity, prefix,
+                new ThreadPoolExecutor.CallerRunsPolicy());
+    }
+
+    private Executor buildExecutor(int coreSize, int maxSize, int queueCapacity, String prefix,
+                                   java.util.concurrent.RejectedExecutionHandler rejectedHandler) {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         int normalizedCoreSize = Math.max(1, coreSize);
         executor.setCorePoolSize(normalizedCoreSize);
         executor.setMaxPoolSize(Math.max(normalizedCoreSize, maxSize));
         executor.setQueueCapacity(Math.max(0, queueCapacity));
         executor.setThreadNamePrefix(prefix);
-        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        executor.setRejectedExecutionHandler(rejectedHandler);
         executor.setWaitForTasksToCompleteOnShutdown(true);
         executor.initialize();
         return executor;

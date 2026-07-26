@@ -38,4 +38,7 @@ public class AuroraReplyVO {
     /** Background planner result consumed only after the visible turn has completed. */
     @JsonIgnore
     public java.util.concurrent.CompletableFuture<AuroraDualKernelRuntime.InnerVoiceRequest> deferredInnerVoiceRequest;
+    /** In-process truthful lifecycle evidence for the background planner. */
+    @JsonIgnore
+    public java.util.concurrent.CompletableFuture<AuroraDualKernelRuntime.PlannerRunEvidence> backgroundPlannerEvidence;
 }
