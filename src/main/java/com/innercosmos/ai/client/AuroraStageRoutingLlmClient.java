@@ -26,7 +26,11 @@ public final class AuroraStageRoutingLlmClient implements LlmClient {
                                        LlmClient speaker, LlmClient thinker) {
         this(fallback, fast, speaker, thinker,
                 new StageProfile(false, "minimal", 0.25, 256),
-                new StageProfile(true, "medium", 0.82, 6_144),
+                // The planner has already done the reflective work. Asking the visible speaker
+                // to reason again duplicated latency and repeatedly crossed the classroom
+                // eight-second deadline. Keep this stage expressive, but make it a bounded
+                // plan-to-language pass.
+                new StageProfile(false, "minimal", 0.78, 2_048),
                 new StageProfile(true, "high", 0.10, 8_192),
                 new StageProfile(true, "high", 0.05, 2_048));
     }

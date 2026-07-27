@@ -42,6 +42,7 @@ describe("DemoPersonaChooser", () => {
 
     await vi.waitFor(() => expect(screen.getAllByRole("button")).toHaveLength(3));
     fireEvent.click(screen.getByRole("button", { name: /沈砚/ }));
+    expect(screen.getByText("正在复制私密记忆…")).toBeVisible();
 
     await vi.waitFor(() => {
       expect(api.enterDemoPersona).toHaveBeenCalledWith("shen-yan");

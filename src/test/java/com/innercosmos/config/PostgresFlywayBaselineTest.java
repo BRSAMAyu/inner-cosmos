@@ -53,9 +53,10 @@ class PostgresFlywayBaselineTest {
         // V25-V33 add orchestration, social delivery, session management, safety idempotency,
         // and fenced cross-Pod conversation takeover.
         // V34 renames tb_capsule_landing's two auto-named foreign keys to schema.sql's names.
+        // V35 enforces one unordered friendship and one pending live invite per user pair.
         // It exists as a forward migration rather than an in-place edit of V30 because V30 is
         // already committed and rewriting it would break Flyway checksums on live databases.
-        assertEquals(34, flyway.migrate().migrationsExecuted);
+        assertEquals(35, flyway.migrate().migrationsExecuted);
         assertEquals(0, flyway.migrate().migrationsExecuted);
 
         String source = readClasspath("schema.sql");
@@ -156,9 +157,9 @@ class PostgresFlywayBaselineTest {
                 .locations("classpath:db/migration/postgresql")
                 .load();
         // No .target(): migrates from V19 all the way to the current latest
-        // (V20 through V34, including provenance, orchestration, safety, Pod takeover and the
-        // capsule-landing foreign-key rename).
-        assertEquals(15, v20.migrate().migrationsExecuted);
+        // (V20 through V35, including provenance, orchestration, safety, Pod takeover,
+        // capsule-landing foreign-key rename and classroom social pair integrity).
+        assertEquals(16, v20.migrate().migrationsExecuted);
         try (Connection migrated = DriverManager.getConnection(
                 jdbcUrl, POSTGRES.getUsername(), POSTGRES.getPassword())) {
             assertEquals(2, scalar(migrated,

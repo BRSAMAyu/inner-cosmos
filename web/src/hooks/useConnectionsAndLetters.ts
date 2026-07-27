@@ -126,6 +126,17 @@ export function useConnectionsAndLetters({ setStatus, locale = "zh-CN" }: UseCon
   // The backend applies persisted account provenance (HUMAN/SHOWCASE only). Do not
   // re-infer identity from usernames in the browser.
   const loadPeople = useCallback(() => api.discoverPeople().then(setPeople).catch(() => undefined), []);
+  const searchPeople = useCallback(async (query: string) => {
+    try {
+      const rows = await api.discoverPeople(query);
+      setPeople(rows);
+      return rows.length;
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message
+        : copy("Could not find that classroom partner yet.", "暂时没能找到这位课堂伙伴。"));
+      return 0;
+    }
+  }, [copy, setStatus]);
   const loadRelations = useCallback(() => api.relations().then(setRelations).catch(() => undefined), []);
   const loadLetterThreads = useCallback(() => api.letterThreads().then(setLetterThreads).catch(() => undefined), []);
   const loadGroups = useCallback(() => api.myGroups().then(setGroups).catch(() => undefined), []);
@@ -497,6 +508,22 @@ export function useConnectionsAndLetters({ setStatus, locale = "zh-CN" }: UseCon
     }
   }, [copy, setStatus]);
 
+  const joinClassroomGroup = useCallback(async () => {
+    try {
+      const group = await api.joinClassroomGroup();
+      await loadGroups();
+      await openGroup(group.id);
+      setStatus(copy(
+        "You joined the live classroom group. Everyone here can now read and reply.",
+        "你已加入现场共同小组，现在全场都可以看见并回复消息。"));
+      return true;
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message
+        : copy("Could not join the classroom group yet.", "暂时没能加入现场共同小组。"));
+      return false;
+    }
+  }, [copy, loadGroups, openGroup, setStatus]);
+
   const refreshSelectedGroupContext = useCallback(async () => {
     if (selectedGroupId === null) return;
     try {
@@ -585,13 +612,13 @@ export function useConnectionsAndLetters({ setStatus, locale = "zh-CN" }: UseCon
     isLiveChatDecisionBusy: liveChatDecisionBusyKeys.isBusy,
     isLiveChatMessageBusy: liveChatMessageBusyKeys.isBusy,
     isLiveChatEndBusy: liveChatEndBusyKeys.isBusy,
-    loadLetterInbox, loadConnectionRequests, loadFriends, loadLetterOutbox, loadPeople, loadRelations, loadLetterThreads,
+    loadLetterInbox, loadConnectionRequests, loadFriends, loadLetterOutbox, loadPeople, searchPeople, loadRelations, loadLetterThreads,
     loadGroups, loadGroupInvites,
     refreshConnections, refreshGroups, refreshSelectedGroupContext, refreshLetters, refreshLiveChats,
     requestPersonConnection, openRelation, openThread, sendDraft, sendDirectLetter,
     actOnLetter, reportLetter, replyWithLetter, updateReplyDraft, playLetterVoice,
     requestConnection, decideConnection, leaveConnection,
-    createGroup, openGroup, inviteToGroup, respondToGroupInvite, leaveGroup, sendGroupMessage,
+    createGroup, joinClassroomGroup, openGroup, inviteToGroup, respondToGroupInvite, leaveGroup, sendGroupMessage,
     inviteLiveChat, respondLiveChatInvite, selectLiveChatSession, sendLiveChatMessage, endLiveChatSession
   };
 }

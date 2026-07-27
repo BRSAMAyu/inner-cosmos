@@ -51,6 +51,7 @@ import com.innercosmos.service.UserService;
 import com.innercosmos.util.JsonUtils;
 import jakarta.annotation.PostConstruct;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -59,6 +60,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
+@Order(100)
 public class MockDataInitializer implements CommandLineRunner, DemoSandboxService {
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(MockDataInitializer.class);
     private final UserMapper userMapper;

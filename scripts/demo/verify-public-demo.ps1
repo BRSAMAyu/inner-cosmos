@@ -295,17 +295,14 @@ if (-not ($aFriends | Where-Object { [long]$_.userId -eq $bId }) -or
     throw "Accepted friendship is not visible to both peers."
 }
 
-$group = Invoke-Envelope $a.Session "POST" "/api/social/groups" @{
-    groupName = "Demo cohort $suffix"; intro = "Public demo verification"; visibility = "PRIVATE"
+$group = Invoke-Envelope $a.Session "POST" "/api/public/demo/classroom-group/join"
+$groupAtB = Invoke-Envelope $b.Session "POST" "/api/public/demo/classroom-group/join"
+if ([long]$group.id -ne [long]$groupAtB.id -or $group.visibility -ne "CLASSROOM") {
+    throw "Registered attendees did not join the same classroom group."
 }
-$null = Invoke-Envelope $a.Session "POST" "/api/social/groups/$($group.id)/invite" @{ userId = "$bId" }
-$invites = @(Invoke-Envelope $b.Session "GET" "/api/social/groups/invites")
-$invite = @($invites | Where-Object { [long]$_.groupId -eq [long]$group.id })
-if ($invite.Count -ne 1) { throw "Group invitation did not reach the peer." }
-$null = Invoke-Envelope $b.Session "POST" "/api/social/groups/invites/$($invite[0].memberId)/respond" @{ decision = "accept" }
 $members = @(Invoke-Envelope $a.Session "GET" "/api/social/groups/$($group.id)/members")
 if (@($members | Where-Object { [long]$_.userId -in @($aId, $bId) }).Count -ne 2) {
-    throw "Accepted group membership is incomplete."
+    throw "Classroom group membership is incomplete."
 }
 
 $groupMessage = Invoke-Envelope $a.Session "POST" "/api/social/groups/$($group.id)/messages" @{
@@ -548,7 +545,8 @@ $verificationActors.Clear()
     CuratedSlowLetterConnection = $curatedConnection
     RegisteredUsers = 2
     Friendship = "BIDIRECTIONAL_ACCEPTED"
-    GroupMembers = 2
+    ClassroomGroupId = [long]$group.id
+    ClassroomGroupMembers = $members.Count
     GroupMessages = $groupMessagesAtB.Count
     LiveChat = "INVITED_ACCEPTED_BIDIRECTIONAL_ENDED"
     LiveChatMessages = $liveMessagesAtA.Count

@@ -18,7 +18,7 @@ describe("Aurora full-viewport conversation contract", () => {
     expect(demo).toBeGreaterThan(support);
     expect(returns).toBeGreaterThan(support);
     expect(appSource).not.toContain("<TodayOverview");
-    expect(appSource).not.toContain("<QuickHello");
+    expect(appSource).toContain('<div className="quick-hello-backdrop"');
     expect(appSource).not.toContain("<StartHereJourney");
   });
 

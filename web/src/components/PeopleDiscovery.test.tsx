@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PeopleDiscovery } from "./PeopleDiscovery";
 import type { DiscoverablePerson } from "../api";
@@ -58,5 +58,17 @@ describe("PeopleDiscovery", () => {
     expect(screen.getByRole("heading", { name: "Reach out to people, without rushing any relationship" })).toBeVisible();
     expect(screen.getByText("1 person to get to know")).toBeVisible();
     expect(screen.getByText("Invite sent")).toBeVisible();
+  });
+
+  it("finds a classroom partner by exact username", async () => {
+    const onSearch = vi.fn().mockResolvedValue(1);
+    render(<PeopleDiscovery people={[]} isBusy={() => false} onRequest={() => undefined}
+      onSearch={onSearch} />);
+
+    fireEvent.change(screen.getByPlaceholderText("输入用户名或昵称"),
+      { target: { value: "ming" } });
+    fireEvent.click(screen.getByRole("button", { name: "寻找" }));
+
+    await waitFor(() => expect(onSearch).toHaveBeenCalledWith("ming"));
   });
 });

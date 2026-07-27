@@ -7,11 +7,12 @@ type QuickHelloProps = {
   locale?: Locale;
   onSave: (patch: Partial<UserProfileSettings>) => Promise<boolean>;
   onBegin?: () => void;
+  onDismiss?: () => void;
 };
 
 const COPY = {
   "zh-CN": {
-    eyebrow: "45–90 秒 · 可随时跳过",
+    eyebrow: "45–60 秒 · 可随时跳过",
     heading: "先让 Aurora 认识此刻的你",
     intro: "不做人格问卷。四个轻选择，让 Aurora 知道怎么靠近你、从哪里自然聊起。",
     tone: "你希望她怎么回应？",
@@ -28,7 +29,7 @@ const COPY = {
     skip: "暂时跳过", save: "就这样开始", saving: "正在记住…", error: "暂时没能保存，你仍可以直接开始对话。",
   },
   "en-SG": {
-    eyebrow: "45–90 SEC · ALWAYS SKIPPABLE",
+    eyebrow: "45–60 SEC · ALWAYS SKIPPABLE",
     heading: "Let Aurora meet you as you are now",
     intro: "No personality test. Four light choices tell Aurora how to meet you and where a real conversation might begin.",
     tone: "How should she respond?",
@@ -50,18 +51,22 @@ function onboardingKey(id: number): string {
   return `ic.quick-hello.${id}`;
 }
 
-function isFreshProfile(profile: UserProfileSettings): boolean {
+export function hasCompletedQuickHello(id: number): boolean {
+  try { return localStorage.getItem(onboardingKey(id)) === "done"; }
+  catch { return false; }
+}
+
+export function isFreshProfile(profile: UserProfileSettings): boolean {
   return !profile.auroraTone
     && profile.reflectionDepth == null
     && profile.proactiveSensitivity == null
     && !profile.currentEnvironmentLabel;
 }
 
-export function QuickHello({ profile, locale = "zh-CN", onSave, onBegin }: QuickHelloProps) {
+export function QuickHello({ profile, locale = "zh-CN", onSave, onBegin, onDismiss }: QuickHelloProps) {
   const t = COPY[locale];
   const [dismissed, setDismissed] = useState(() => {
-    try { return localStorage.getItem(onboardingKey(profile.id)) === "done"; }
-    catch { return false; }
+    return hasCompletedQuickHello(profile.id);
   });
   const [tone, setTone] = useState("温柔安静");
   const [pace, setPace] = useState(3);
@@ -80,6 +85,7 @@ export function QuickHello({ profile, locale = "zh-CN", onSave, onBegin }: Quick
   const finish = () => {
     try { localStorage.setItem(onboardingKey(profile.id), "done"); } catch { /* optional preference */ }
     setDismissed(true);
+    onDismiss?.();
   };
 
   const save = async () => {

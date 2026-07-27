@@ -55,7 +55,7 @@ const COPY: Record<Locale, {
 export function SocialGroupsView({ groups, invites, friends, selectedGroupId, members, membersStatus = "idle",
   messages = [], messagesStatus = "idle",
   createBusy, isInviteBusy, isInviteDecisionBusy, isLeaveBusy, currentUserId,
-  isMessageBusy, onSelectGroup, onCreateGroup, onInvite, onRespondInvite, onLeaveGroup,
+  isMessageBusy, onSelectGroup, onCreateGroup, onJoinClassroomGroup, onInvite, onRespondInvite, onLeaveGroup,
   onSendMessage, locale = "zh-CN" }: {
   groups: SocialGroup[]; invites: GroupInvite[]; friends: SocialConnection[];
   selectedGroupId: number | null; members: GroupMember[]; membersStatus?: "idle" | "loading" | "success" | "error";
@@ -69,6 +69,7 @@ export function SocialGroupsView({ groups, invites, friends, selectedGroupId, me
   isMessageBusy?: (groupId: number) => boolean;
   currentUserId: number | null;
   onSelectGroup: (id: number) => void; onCreateGroup: (name: string) => void;
+  onJoinClassroomGroup?: () => Promise<boolean>;
   onInvite: (groupId: number, userId: number) => void;
   onRespondInvite: (memberId: number, decision: "accept" | "decline") => void;
   onLeaveGroup: (groupId: number) => void;
@@ -81,6 +82,7 @@ export function SocialGroupsView({ groups, invites, friends, selectedGroupId, me
   const [messageBody, setMessageBody] = useState("");
   const [hearthMinutes, setHearthMinutes] = useState<10 | 15>(10);
   const [hearthEndsAt, setHearthEndsAt] = useState<number | null>(null);
+  const [classroomBusy, setClassroomBusy] = useState(false);
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1_000);
@@ -98,6 +100,18 @@ export function SocialGroupsView({ groups, invites, friends, selectedGroupId, me
     <div className="resonance-heading"><div><span className="eyebrow">{locale === "en-SG" ? "SLOW GROUPS" : "慢小组"}</span><h2>{t.heading}</h2></div>
       <span>{t.count(groups.length)}</span></div>
     <p className="resonance-intro">{t.intro}</p>
+    {onJoinClassroomGroup && <section className="classroom-group-entry">
+      <div><strong>{locale === "en-SG" ? "One room for everyone here" : "全场共同的小组"}</strong>
+        <p>{locale === "en-SG"
+          ? "Join with your registered username. Everyone in the room can read and reply; Aurora's private memory stays separate."
+          : "用注册用户名自愿加入，全场都能看到并回复；这里的消息不会进入 Aurora 的私密记忆。"}</p></div>
+      <button type="button" disabled={classroomBusy} onClick={() => {
+        setClassroomBusy(true);
+        void onJoinClassroomGroup().finally(() => setClassroomBusy(false));
+      }}>{classroomBusy
+        ? (locale === "en-SG" ? "Joining…" : "正在加入…")
+        : (locale === "en-SG" ? "Join the live room" : "加入现场共同星球")}</button>
+    </section>}
 
     {invites.length > 0 && <div className="group-invites">
       <strong>{t.invitesHeading}</strong>

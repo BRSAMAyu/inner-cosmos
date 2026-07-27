@@ -12,6 +12,7 @@ export function DemoPersonaChooser({ compact = false,
 }) {
   const [personas, setPersonas] = useState<DemoPersona[]>([]);
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [busyPhase, setBusyPhase] = useState(0);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -23,6 +24,15 @@ export function DemoPersonaChooser({ compact = false,
     });
     return () => { alive = false; };
   }, []);
+
+  useEffect(() => {
+    if (!busyKey) {
+      setBusyPhase(0);
+      return;
+    }
+    const timer = window.setInterval(() => setBusyPhase(value => Math.min(value + 1, 2)), 650);
+    return () => window.clearInterval(timer);
+  }, [busyKey]);
 
   if (personas.length === 0) return null;
   const displayPersonas = personas.map(persona => localizeDemoPersona(persona, locale));
@@ -60,7 +70,9 @@ export function DemoPersonaChooser({ compact = false,
       <em>{active
         ? (locale === "en-SG" ? "Current" : "当前")
         : busyKey === persona.key
-          ? (locale === "en-SG" ? "Entering…" : "正在进入…")
+          ? (locale === "en-SG"
+              ? ["Cloning private memories…", "Weaving voice and boundaries…", "Opening your private capsule…"][busyPhase]
+              : ["正在复制私密记忆…", "正在编织表达与边界…", "正在生成你的私有共鸣体…"][busyPhase])
           : (locale === "en-SG" ? "Enter" : "切换")}</em>
     </button>;
   });

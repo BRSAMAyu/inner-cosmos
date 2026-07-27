@@ -25,10 +25,10 @@ class AuroraStageRoutingLlmClientTest {
 
         LlmRequest spoken = request("AURORA_SPEAKER_DAILY_TALK");
         assertThat(router.chat(spoken)).isEqualTo("speaker");
-        assertThat(spoken.thinkingEnabled).isTrue();
-        assertThat(spoken.reasoningEffort).isEqualTo("medium");
-        assertThat(spoken.temperature).isEqualTo(0.82);
-        assertThat(spoken.maxTokens).isEqualTo(6_144);
+        assertThat(spoken.thinkingEnabled).isFalse();
+        assertThat(spoken.reasoningEffort).isEqualTo("minimal");
+        assertThat(spoken.temperature).isEqualTo(0.78);
+        assertThat(spoken.maxTokens).isEqualTo(2_048);
 
         LlmRequest plan = request("AURORA_PLAN_DAILY_TALK");
         assertThat(router.chat(plan)).isEqualTo("thinker");

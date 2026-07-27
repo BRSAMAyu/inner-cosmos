@@ -634,6 +634,15 @@ footer { padding: 18px 4px; display: flex; justify-content: space-between; color
   background: color-mix(in srgb, var(--surface-overlay) 72%, var(--accent-sage) 8%);
 }
 .demo-persona-grid button.active { border-color: var(--accent-sage); background: color-mix(in srgb, var(--surface-raised) 82%, var(--accent-sage) 18%); }
+.demo-persona-grid button[aria-busy="true"] {
+  border-color: color-mix(in srgb, var(--accent-aurora) 64%, var(--hairline-mid));
+  background:
+    linear-gradient(100deg, transparent 10%, color-mix(in srgb, var(--accent-aurora) 14%, transparent) 45%, transparent 75%),
+    color-mix(in srgb, var(--surface-raised) 86%, var(--accent-aurora) 14%);
+  background-size: 220% 100%, auto;
+  animation: demo-weave 1.2s linear infinite;
+}
+@keyframes demo-weave { to { background-position: -120% 0, 0 0; } }
 .demo-persona-name { color: var(--accent-sage-soft); font-weight: 750; letter-spacing: .08em; }
 .demo-persona-grid button strong { font: 600 1.02rem/1.45 var(--font-title); }
 .demo-persona-grid button small { color: var(--text-muted); line-height: 1.55; }
@@ -2531,6 +2540,79 @@ input[type="range"]::-moz-range-thumb {
 .global-state button:focus-visible {
   color: var(--text-primary);
   background: var(--surface-action);
+}
+.quick-hello-backdrop {
+  position: fixed;
+  z-index: 90;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  overflow: auto;
+  background:
+    radial-gradient(circle at 50% 20%, color-mix(in srgb, var(--accent-aurora) 14%, transparent), transparent 42%),
+    color-mix(in srgb, #101019 72%, transparent);
+  backdrop-filter: blur(12px);
+}
+.quick-hello-backdrop > .quick-hello {
+  width: min(760px, 100%);
+  max-height: calc(100dvh - 40px);
+  overflow: auto;
+}
+.people-search {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+  margin: 14px 0;
+}
+.people-search label {
+  display: grid;
+  flex: 1;
+  gap: 5px;
+  color: var(--text-muted);
+  font-size: .72rem;
+}
+.people-search input {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 12px;
+  border: 1px solid var(--border-control);
+  border-radius: 12px;
+  color: var(--text-primary);
+  background: var(--surface-input);
+}
+.people-search button {
+  min-height: 42px;
+  padding: 8px 14px;
+  border: 1px solid var(--border-control);
+  border-radius: 12px;
+}
+.classroom-group-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 14px 0 18px;
+  padding: 16px 18px;
+  border: 1px solid color-mix(in srgb, var(--accent-aurora) 38%, var(--border-subtle));
+  border-radius: 18px;
+  background: linear-gradient(120deg,
+    color-mix(in srgb, var(--accent-aurora) 12%, var(--surface-raised)),
+    var(--surface-raised));
+}
+.classroom-group-entry p { margin: 5px 0 0; color: var(--text-muted); font-size: .78rem; }
+.classroom-group-entry button {
+  flex: none;
+  min-height: 44px;
+  padding: 9px 15px;
+  border: 0;
+  border-radius: 13px;
+  color: var(--on-action);
+  background: var(--action-fill);
+}
+@media (max-width: 560px) {
+  .people-search { align-items: stretch; flex-direction: column; }
+  .classroom-group-entry { align-items: stretch; flex-direction: column; }
 }
 .continuity-recovery {
   position: fixed;

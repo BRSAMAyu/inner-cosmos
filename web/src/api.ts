@@ -1052,7 +1052,12 @@ export const api = {
     method: "POST", body: JSON.stringify({ title, letterBody, ...delivery }),
     headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : undefined
   }),
-  discoverPeople: () => request<DiscoverablePerson[]>("/api/social/people"),
+  discoverPeople: (query?: string) => request<DiscoverablePerson[]>(
+    `/api/social/people${query?.trim() ? `?query=${encodeURIComponent(query.trim())}` : ""}`
+  ),
+  joinClassroomGroup: () => request<SocialGroup>("/api/public/demo/classroom-group/join", {
+    method: "POST"
+  }),
   requestFriend: (userId: number) => request<FriendRelation>("/api/social/friends/request", {
     method: "POST", body: JSON.stringify({ userId, source: "SOCIAL_PAGE" })
   }),

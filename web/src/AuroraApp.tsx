@@ -60,6 +60,7 @@ import { DemoPersonaChooser } from "./components/DemoPersonaChooser";
 import { InnerCosmosOverview } from "./components/InnerCosmosOverview";
 import { capsuleDraftDefaults, latestSettledMemory } from "./newUserJourney";
 import { GuideCenter, OnboardingGuide, hasCompletedOnboarding, type GuideDestination } from "./components/OnboardingGuide";
+import { QuickHello, hasCompletedQuickHello, isFreshProfile } from "./components/QuickHello";
 
 // The Aurora conversation/session domain (message list, streaming/turn status, interrupt/stop,
 // mode picker, WakeIntent negotiate, session bootstrap/replay) has been extracted into
@@ -133,6 +134,7 @@ export function AuroraApp() {
   const [userProfile, setUserProfile] = useState<UserProfileSettings | null>(null);
   const [profileBusy, setProfileBusy] = useState(false);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const [quickHelloOpen, setQuickHelloOpen] = useState(false);
   const onboardingCheckedUserRef = useRef<number | null>(null);
   // W2 voice feature: the user's TTS voice/inner-voice preferences. Both AccountSettings' voice
   // picker AND AuroraConversation's inner-voice bubble read from this single fetched-once source
@@ -356,8 +358,18 @@ export function AuroraApp() {
   useEffect(() => {
     if (!authenticated || !userProfile?.id || onboardingCheckedUserRef.current === userProfile.id) return;
     onboardingCheckedUserRef.current = userProfile.id;
-    if (!hasCompletedOnboarding(userProfile.id)) setOnboardingOpen(true);
-  }, [authenticated, userProfile?.id]);
+    // Curated stories must open directly into their lived-in state. A genuinely new HUMAN,
+    // however, gets one short relationship calibration instead of a five-page feature tour.
+    if (userProfile.username.startsWith("sandbox-")) {
+      setOnboardingOpen(false);
+      setQuickHelloOpen(false);
+    } else if (isFreshProfile(userProfile) && !hasCompletedQuickHello(userProfile.id)) {
+      setQuickHelloOpen(true);
+      setOnboardingOpen(false);
+    } else if (!hasCompletedOnboarding(userProfile.id)) {
+      setOnboardingOpen(true);
+    }
+  }, [authenticated, userProfile]);
 
   // Delivery is advanced by the backend scheduler, so keep the visible inbox/outbox honest while
   // the user stays on this tab. The immediate refresh covers returning from another space; the
@@ -2009,7 +2021,9 @@ export function AuroraApp() {
       <ConnectionSubNav active={connectionTab} onNavigate={navigateConnectionTab} locale={skillLocale} />
 
       <div hidden={connectionTab !== "people"}>
-        <PeopleDiscovery people={connectionsAndLetters.people} isBusy={connectionsAndLetters.isPersonBusy} onRequest={userId => void connectionsAndLetters.requestPersonConnection(userId)} locale={skillLocale} />
+        <PeopleDiscovery people={connectionsAndLetters.people} isBusy={connectionsAndLetters.isPersonBusy}
+          onRequest={userId => void connectionsAndLetters.requestPersonConnection(userId)}
+          onSearch={connectionsAndLetters.searchPeople} locale={skillLocale} />
       </div>
 
       <div hidden={connectionTab !== "relations"}>
@@ -2025,6 +2039,7 @@ export function AuroraApp() {
         isMessageBusy={connectionsAndLetters.isGroupMessageBusy}
         currentUserId={userProfile?.id ?? null}
         onSelectGroup={id => void connectionsAndLetters.openGroup(id)} onCreateGroup={name => void connectionsAndLetters.createGroup(name)}
+        onJoinClassroomGroup={demoModeBuild ? connectionsAndLetters.joinClassroomGroup : undefined}
         onInvite={(groupId, userId) => void connectionsAndLetters.inviteToGroup(groupId, userId)}
         onRespondInvite={(memberId, decision) => void connectionsAndLetters.respondToGroupInvite(memberId, decision)}
         onLeaveGroup={id => void connectionsAndLetters.leaveGroup(id)}
@@ -2121,6 +2136,16 @@ export function AuroraApp() {
       {userProfile?.id && <OnboardingGuide open={onboardingOpen} userId={userProfile.id}
         locale={skillLocale} onClose={() => setOnboardingOpen(false)}
         onNavigate={navigateFromGuide} />}
+      {quickHelloOpen && userProfile && <div className="quick-hello-backdrop" role="presentation">
+        <QuickHello profile={userProfile} locale={skillLocale} onSave={saveProfile}
+          onDismiss={() => setQuickHelloOpen(false)}
+          onBegin={() => {
+            setQuickHelloOpen(false);
+            auroraSession.setDraft(skillLocale === "en-SG"
+              ? "I am here. What would you genuinely like to know about me first?"
+              : "我来了。你最想先真实地认识我哪一部分？");
+          }} />
+      </div>}
       <AuroraContinuityRecovery signal={auroraSession.continuitySignal}
         locale={skillLocale} onDismiss={auroraSession.dismissContinuitySignal} />
       {statusVisible ? (

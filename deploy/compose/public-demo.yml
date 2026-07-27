@@ -43,9 +43,8 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       REDIS_SESSION_ENABLED: "true"
       REDIS_RATE_LIMIT_ENABLED: "true"
-      # Curated Demo identities are intentionally shared by several classroom visitors.
-      # Keep distributed protection in place, but size it for simultaneous exploration
-      # so one visitor cannot consume another visitor's Aurora or persona-switch quota.
+      # Each browser receives an owner-isolated SANDBOX cloned from a curated story.
+      # Keep distributed protection in place and size it for simultaneous exploration.
       RATE_LIMIT_USER_CAPACITY: "300"
       RATE_LIMIT_USER_REFILL_PER_MINUTE: "300"
       RATE_LIMIT_USER_ADVERTISED: "300"
@@ -70,6 +69,10 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GLM_API_KEY: ${GLM_API_KEY:-}
       LLM_ALLOW_FALLBACK: "false"
+      # Simple first-meeting turns use the measured single-pass path; memory-heavy, ambiguous,
+      # interrupted and safety-sensitive turns retain the planner -> speaker path. This is the
+      # classroom capacity profile, not a change to the product-wide dual-kernel default.
+      AURORA_RUNTIME_MODE: adaptive
       # The classroom UI and seed journey default to English, while Aurora follows the language
       # used in the current user input. The provider boundary still overrides legacy prompts that
       # hard-code Chinese output.
