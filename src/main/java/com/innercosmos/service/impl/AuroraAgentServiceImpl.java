@@ -1851,9 +1851,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         // (VS-004 mock-fallback coherence; perception only, not a clinical label -- vision §9/§13).
         AiFailureContract.Category category = AiFailureContract.classify(e);
         String flag = category.riskFlag;
-        String fallbackMsg = category == AiFailureContract.Category.PROVIDER_UNAVAILABLE
-                ? fallbackAwareMessage(stateSignal)
-                : category.defaultUserMessage;
+        String fallbackMsg = failureUserMessage(category, message, stateSignal);
         AuroraReplyVO vo = new AuroraReplyVO();
         vo.messages = List.of(fallbackMsg);
         vo.replyTone = "warm, specific, friend-like";
@@ -1872,6 +1870,22 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         return vo;
     }
 
+    private String failureUserMessage(AiFailureContract.Category category, String userMessage,
+                                      String stateSignal) {
+        boolean chinese = userMessage != null && userMessage.codePoints().anyMatch(cp ->
+                Character.UnicodeScript.of(cp) == Character.UnicodeScript.HAN);
+        if (!chinese) {
+            return category == AiFailureContract.Category.PROVIDER_UNAVAILABLE
+                    ? fallbackAwareMessage(stateSignal) : category.defaultUserMessage;
+        }
+        return switch (category) {
+            case TIMEOUT -> "你的消息已经保存，但这次回复超过了等待时间。请稍后重试；Aurora 会从这条消息继续。";
+            case RATE_LIMITED -> "你的消息已经保存。当前模型线路繁忙，请稍后重试。";
+            case MALFORMED_OUTPUT -> "你的消息已经保存，但这次回复没有通过完整性检查，请重试一次。";
+            case PROVIDER_UNAVAILABLE -> "你的消息已经保存，但 Aurora 暂时无法连接模型线路。恢复后可以从这里继续。";
+        };
+    }
+
     private AuroraReplyVO emergencyFallback(String message, String mode) {
         return differentiatedFallback(new RuntimeException("generic"), message, mode, null);
     }
@@ -1883,16 +1897,20 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                                                                   boolean allowMemory,
                                                                   String stateSignal) {
         StructuredAiResults.AuroraResult result = new StructuredAiResults.AuroraResult();
-        result.segments = fallbackSegments(message, mode, allowMemory && gravityMemories != null && !gravityMemories.isEmpty(), stateSignal);
-        result.speakCount = result.segments.size();
-        result.continueReason = "fallback-explicit";
+        boolean chinese = message != null && message.codePoints().anyMatch(cp ->
+                Character.UnicodeScript.of(cp) == Character.UnicodeScript.HAN);
+        result.segments = List.of(chinese
+                ? "你的消息已经保存，但 Aurora 刚才没有完成回复。请稍后重试；恢复后会从这条消息继续。"
+                : "Your message is saved, but Aurora could not finish the reply. Please retry in a moment; recovery will continue from this message.");
+        result.speakCount = 1;
+        result.continueReason = "provider-recovery-required";
         result.detectedTheme = modeLabel(mode);
-        result.nextQuestion = "你愿意把此刻最需要被听见的那一部分再说一点吗？";
-        result.smallStep = "先写下一句最真实的话。";
-        result.featureSuggestion = "如果这件事很乱，可以把它送进思维碎纸机，让 Aurora 帮你整理成可回看的线索。";
-        result.featureTarget = "thought-shredder";
-        result.memoryReferenced = allowMemory && gravityMemories != null && !gravityMemories.isEmpty();
-        result.referencedMemoryIds = memoryContext == null || memoryContext.referencedMemoryIds == null ? List.of() : memoryContext.referencedMemoryIds;
+        result.nextQuestion = "";
+        result.smallStep = "";
+        result.featureSuggestion = "";
+        result.featureTarget = "";
+        result.memoryReferenced = false;
+        result.referencedMemoryIds = List.of();
         result.riskFlags = List.of("FALLBACK_USED");
         return result;
     }

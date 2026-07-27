@@ -65,9 +65,20 @@ services:
       LLM_MODE: dev
       LLM_PROVIDER: ${LLM_PROVIDER:?selected by run-public-demo.ps1}
       LLM_API_KEY: ${LLM_API_KEY:?loaded locally by run-public-demo.ps1}
+      LLM_REAL_PROVIDER_FAILOVER_ENABLED: "true"
+      LLM_FAILOVER_PROVIDERS: ${LLM_FAILOVER_PROVIDERS:-gemini,deepseek,minimax,glm,mimo}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.6-flash}
       GLM_API_KEY: ${GLM_API_KEY:-}
+      MINIMAX_API_KEY: ${MINIMAX_API_KEY:-}
+      MIMO_API_KEY: ${MIMO_API_KEY:-}
+      ASR_PROVIDER: ${ASR_PROVIDER:-mimo}
+      AURORA_FAST_MODEL: ${AURORA_FAST_MODEL:-gemini-3.6-flash}
+      AURORA_SPEAKER_MODEL: ${AURORA_SPEAKER_MODEL:-gemini-3.6-flash}
+      AURORA_THINKER_MODEL: ${AURORA_THINKER_MODEL:-gemini-3.6-flash}
+      AURORA_SPEAKER_THINKING_LEVEL: ${AURORA_SPEAKER_THINKING_LEVEL:-minimal}
+      AURORA_SPEAKER_MAX_TOKENS: ${AURORA_SPEAKER_MAX_TOKENS:-2048}
       LLM_ALLOW_FALLBACK: "false"
       # Simple first-meeting turns use the measured single-pass path; memory-heavy, ambiguous,
       # interrupted and safety-sensitive turns retain the planner -> speaker path. This is the
@@ -77,11 +88,9 @@ services:
       # used in the current user input. The provider boundary still overrides legacy prompts that
       # hard-code Chinese output.
       LLM_PROMPT_LANGUAGE: auto
-      MEMORY_EMBEDDING_ENABLED: "true"
-      MEMORY_EMBEDDING_API_KEY: ${MEMORY_EMBEDDING_API_KEY:?loaded locally by run-public-demo.ps1}
-      MEMORY_EMBEDDING_BASE_URL: ${MEMORY_EMBEDDING_BASE_URL}
-      MEMORY_EMBEDDING_MODEL: ${MEMORY_EMBEDDING_MODEL:-text-embedding-v4}
-      MEMORY_EMBEDDING_DIMENSIONS: "1536"
+      # Deliberately off for the classroom closure: curated lexical/theme retrieval is stable,
+      # while background vector rebuilds add an external dependency with no proven demo benefit.
+      MEMORY_EMBEDDING_ENABLED: "false"
       TTS_ENABLED: "true"
       TTS_API_KEY: ${TTS_API_KEY:?loaded locally by run-public-demo.ps1}
       TTS_WS_URL: ${TTS_WS_URL}

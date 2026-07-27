@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FormEvent } from "react";
+import type { ClaimCandidate } from "../api";
 import { AuroraConversation } from "./AuroraConversation";
 
 const recorder = vi.hoisted(() => ({ start: vi.fn(), stop: vi.fn() }));
@@ -33,6 +34,34 @@ afterEach(() => {
 });
 
 describe("AuroraConversation", () => {
+  it("keeps understanding candidates out of the primary conversation timeline", () => {
+    const candidate: ClaimCandidate = {
+      id: 31,
+      claimType: "EXPRESSION_STYLE",
+      value: "Usually concise and direct",
+      authorityLevel: "MODEL_INFERENCE",
+      confidence: 0.65,
+      provenanceMessageIds: [101],
+      evidenceText: "Based on sentence length and punctuation",
+      uncertain: false,
+      alreadyActive: false,
+      createdAt: "2026-07-27T12:00:00Z"
+    };
+    render(<AuroraConversation locale="en-SG" messages={[
+      { key: "u1", id: 101, speaker: "USER", text: "I need to talk." },
+      { key: "a1", id: 102, speaker: "AURORA", text: "I'm here." }
+    ]} claimCandidates={[candidate]} claimCandidateBusyId={31}
+      onConfirmClaim={() => undefined} onDismissClaim={() => undefined}
+      activeTurnId={null} draft="" sessionReady
+      onDraftChange={() => undefined} onSubmit={event => event.preventDefault()} onStop={() => undefined} />);
+
+    expect(screen.getByText("I need to talk.")).toBeVisible();
+    expect(screen.getByText("I'm here.")).toBeVisible();
+    expect(screen.queryByText("EXPRESSION_STYLE")).not.toBeInTheDocument();
+    expect(screen.queryByText("Usually concise and direct")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Yes, that's me" })).not.toBeInTheDocument();
+  });
+
   it("uses compact invitation spacing only before the first message", () => {
     const props = { activeTurnId: null, draft: "", sessionReady: true,
       onDraftChange: () => undefined, onSubmit: (event: FormEvent<HTMLFormElement>) => event.preventDefault(),

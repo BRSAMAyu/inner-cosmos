@@ -26,9 +26,10 @@ $demoInfoFile = Join-Path $stateDir "demo-info.txt"
 . (Join-Path $PSScriptRoot "public-demo-common.ps1")
 $origin = $null
 $tunnel = $null
-$keyFile = Get-ChildItem -LiteralPath $root -File |
+$keyFiles = @(Get-ChildItem -LiteralPath $root -File |
     Where-Object { $_.Name.StartsWith("API", [StringComparison]::OrdinalIgnoreCase) -and $_.Extension -eq ".txt" } |
-    Select-Object -First 1 -ExpandProperty FullName
+    Sort-Object Name |
+    Select-Object -ExpandProperty FullName)
 
 if ($TunnelMode -eq "named") {
     if ([string]::IsNullOrWhiteSpace($PublicOrigin) -or -not (Test-CleanHttpsOrigin $PublicOrigin)) {
@@ -84,7 +85,7 @@ if (-not $ReuseTunnel -and -not (Test-Path $cloudflared)) {
         Remove-Item -LiteralPath $download -Force -ErrorAction SilentlyContinue
     }
 }
-if (-not $keyFile -or -not (Test-Path $keyFile)) {
+if ($keyFiles.Count -eq 0) {
     throw "Operator key file is missing (expected an API*.txt file at the repository root)."
 }
 if ($Port -lt 1024 -or $Port -gt 65535) { throw "Port must be between 1024 and 65535." }
@@ -145,13 +146,27 @@ try {
         Pop-Location
     }
 
-    $keys = Get-Content -LiteralPath $keyFile -Encoding utf8
-    $qwenLine = $keys | Where-Object { $_ -match "^\s*qwen\s*:" } | Select-Object -First 1
-    $glmLine = $keys | Where-Object { $_ -match "^\s*glm\s*:" } | Select-Object -First 1
+    # Merge all ignored operator files so a small API.local.txt can safely override or extend the
+    # historical documentation-heavy credential file without editing that large artifact.
+    $keys = @($keyFiles | ForEach-Object { Get-Content -LiteralPath $_ -Encoding utf8 })
+    $dashscopeLine = $keys | Where-Object { $_ -match "(?i)^\s*(dashscope|qwen)\s*:" } | Select-Object -First 1
+    $glmLine = $keys | Where-Object { $_ -match "(?i)^\s*glm" } | Select-Object -First 1
+    $minimaxLine = $keys | Where-Object { $_ -match "(?i)^\s*minimax" } | Select-Object -First 1
+    $mimoLine = $keys | Where-Object { $_ -match "(?i)^\s*mimo" } | Select-Object -First 1
     $geminiLine = $keys | Where-Object { $_ -match "^\s*gemini\s*:" } | Select-Object -First 1
     $deepseekLine = $keys | Where-Object { $_ -match "(?i)deepseek.*apikey\s*:" } | Select-Object -First 1
-    $qwenKey = if ($qwenLine) { ($qwenLine -replace "^\s*qwen\s*:\s*", "").Trim() } else { "" }
-    $glmKey = if ($glmLine) { ($glmLine -replace "^\s*glm\s*:\s*", "").Trim() } else { "" }
+    $dashscopeKey = if ($dashscopeLine) {
+        ($dashscopeLine -replace "(?i)^\s*(dashscope|qwen)\s*:\s*", "").Trim().TrimEnd([char]0x3001)
+    } else { "" }
+    $glmKey = if ($glmLine -and $glmLine -match "([0-9a-fA-F]{32}\.[A-Za-z0-9_-]+)") {
+        $Matches[1]
+    } elseif ($glmLine) { ($glmLine -replace "(?i)^\s*glm\s*:\s*", "").Trim() } else { "" }
+    $minimaxKey = if ($minimaxLine -and $minimaxLine -match "(sk-[A-Za-z0-9._-]+)") {
+        $Matches[1]
+    } else { "" }
+    $mimoKey = if ($mimoLine -and $mimoLine -match "(tp-[A-Za-z0-9._-]+)") {
+        $Matches[1]
+    } else { "" }
     $geminiKey = if ($geminiLine) { ($geminiLine -replace "^\s*gemini\s*:\s*", "").Trim() } else { "" }
     $deepseekKey = if ($deepseekLine) { ($deepseekLine -replace "(?i)^.*apikey\s*:\s*", "").Trim() } else { "" }
     $chatKey = switch ($Provider) {
@@ -160,7 +175,7 @@ try {
         "gemini" { $geminiKey }
     }
     if ([string]::IsNullOrWhiteSpace($chatKey)) { throw "No $Provider key was found in the local operator file." }
-    if ([string]::IsNullOrWhiteSpace($qwenKey)) { throw "No Qwen key was found for embedding/TTS." }
+    if ([string]::IsNullOrWhiteSpace($dashscopeKey)) { throw "No DashScope/Qwen key was found for TTS." }
 
     function New-Secret {
         $bytes = New-Object byte[] 32
@@ -186,16 +201,28 @@ try {
     }
     $env:LLM_PROVIDER = $Provider
     $env:LLM_API_KEY = $chatKey
-    # Aurora may use a different provider per temporal layer: Gemini Flash-Lite for the fast
-    # acknowledgement, Gemini Flash for the visible speaker and DeepSeek for deliberation.
-    # Missing optional stage credentials degrade to the selected primary provider without Mock.
+    # The classroom Gemini profile keeps every Aurora temporal layer in the same provider family:
+    # minimal-thinking Flash for visible latency, and high-thinking Flash for planning/review.
+    # Missing optional credentials degrade to the selected primary provider without Mock.
     $env:DEEPSEEK_API_KEY = $deepseekKey
     $env:GEMINI_API_KEY = $geminiKey
-    $env:GLM_API_KEY = if ($Provider -eq "glm") { $glmKey } else { "" }
-    $env:MEMORY_EMBEDDING_API_KEY = $qwenKey
-    $env:MEMORY_EMBEDDING_BASE_URL = "https://llm-errus8cw2pf66bx9.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"
-    $env:MEMORY_EMBEDDING_MODEL = "text-embedding-v4"
-    $env:TTS_API_KEY = $qwenKey
+    $env:GLM_API_KEY = $glmKey
+    $env:MINIMAX_API_KEY = $minimaxKey
+    $env:MIMO_API_KEY = $mimoKey
+    $env:ASR_PROVIDER = "mimo"
+    $env:LLM_REAL_PROVIDER_FAILOVER_ENABLED = "true"
+    $env:LLM_FAILOVER_PROVIDERS = "gemini,deepseek,minimax,glm,mimo"
+    $env:GEMINI_MODEL = "gemini-3.6-flash"
+    $env:AURORA_FAST_MODEL = "gemini-3.6-flash"
+    $env:AURORA_SPEAKER_MODEL = "gemini-3.6-flash"
+    $env:AURORA_THINKER_MODEL = "gemini-3.6-flash"
+    $env:AURORA_SPEAKER_THINKING_LEVEL = "minimal"
+    $env:AURORA_SPEAKER_MAX_TOKENS = "2048"
+    # Classroom closure intentionally disables provider embeddings. Lexical/theme retrieval is
+    # deterministic and sufficient for the curated journey; vector rebuild calls added latency
+    # and an unrelated external failure mode without a verified positive demo effect.
+    $env:MEMORY_EMBEDDING_ENABLED = "false"
+    $env:TTS_API_KEY = $dashscopeKey
     $env:TTS_WS_URL = "wss://llm-errus8cw2pf66bx9.cn-beijing.maas.aliyuncs.com/api-ws/v1/inference"
     if ($EnableLiveObservability) {
         if (-not (Test-NetConnection -ComputerName 127.0.0.1 -Port 4318 -InformationLevel Quiet)) {

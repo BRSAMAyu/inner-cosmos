@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { AsyncButton } from "../loading";
 import type { ClaimCandidate } from "../api";
 import type { Locale } from "../i18n";
@@ -52,8 +52,7 @@ const COPY: Record<Locale, {
 export function AuroraConversation({ messages, activeTurnId, thinkingStage = null, draft, sessionReady, onDraftChange, onSubmit, onStop, onTranscribe, onGoodbye, goodbyeBusy = false,
   innerVoice = null, onDismissInnerVoice = () => undefined,
   innerVoiceEnabled = false, innerVoiceMode = "AMBIENT", runtime = "single",
-  foregroundText, foregroundSource, claimCandidates = [],
-  claimCandidateBusyId = null, onConfirmClaim, onDismissClaim, locale = "zh-CN" }: {
+  foregroundText, foregroundSource, locale = "zh-CN" }: {
   messages: AuroraUiMessage[];
   activeTurnId: number | null;
   /** Derived from the session runtime signal; drives an inline "thinking" beat where the user is
@@ -196,37 +195,15 @@ export function AuroraConversation({ messages, activeTurnId, thinkingStage = nul
               ariaLabel={revealed ? undefined : t.innerVoiceReveal} onPlayAttempt={reveal} />}
           </article>;
         }
-        const attached = message.id == null ? [] : claimCandidates.filter(candidate =>
-          candidate.provenanceMessageIds.length > 0
-          && Math.max(...candidate.provenanceMessageIds) === message.id);
-        return <Fragment key={message.key}>
-          <article className={`message ${message.speaker.toLowerCase()} ${message.partial ? "partial" : ""}`}
+        // Understanding candidates remain available in the dedicated review surface. They must
+        // not interrupt the primary conversation timeline or look like part of Aurora's reply.
+        return <article key={message.key}
+            className={`message ${message.speaker.toLowerCase()} ${message.partial ? "partial" : ""}`}
             aria-live={message.partial ? "polite" : undefined}>
             <span className="speaker">{message.speaker === "AURORA" ? "Aurora" : t.speakerYou}</span>
             <p className="ugc-text">{message.text || "…"}</p>
             {message.partial && message.text && <small>{t.partialHint}</small>}
-          </article>
-          {attached.map(candidate => <article className="candidate-card candidate-card-inline"
-            key={`claim-${candidate.id}`}>
-            <div className="candidate-card-head"><span className="candidate-type">{candidate.claimType}</span>
-              <small>{Math.round(candidate.confidence * 100)}%</small></div>
-            <p className="candidate-value">{candidate.capsuleSafeValue || candidate.value}</p>
-            {candidate.capsuleSafeValue && candidate.capsuleSafeValue !== candidate.value &&
-              <details><summary>{locale === "en-SG" ? "Source wording" : "来源原话"}</summary>
-                <p>{candidate.value}</p></details>}
-            {candidate.evidenceText && <small>{candidate.evidenceText}</small>}
-            <div className="candidate-actions">
-              <button type="button" disabled={claimCandidateBusyId === candidate.id}
-                onClick={() => onDismissClaim?.(candidate.id)}>
-                {locale === "en-SG" ? "Not me" : "不太是我"}
-              </button>
-              <button type="button" disabled={claimCandidateBusyId === candidate.id}
-                onClick={() => onConfirmClaim?.(candidate.id)}>
-                {locale === "en-SG" ? "Yes, that's me" : "对，就是我"}
-              </button>
-            </div>
-          </article>)}
-        </Fragment>;
+          </article>;
       })}
     </section>
     {((innerVoiceEnabled && innerVoice !== null) || (activeTurnId !== null && thinkingStage !== null)) &&

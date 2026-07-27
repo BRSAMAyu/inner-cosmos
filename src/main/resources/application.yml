@@ -217,6 +217,7 @@ llm:
   base-url: ${LLM_BASE_URL:}
   model: ${LLM_MODEL:mock-inner-cosmos}
   allow-fallback: ${LLM_ALLOW_FALLBACK:true}
+  real-provider-failover-enabled: ${LLM_REAL_PROVIDER_FAILOVER_ENABLED:false}
   disable-thinking-mode: ${LLM_DISABLE_THINKING_MODE:true}
   asr-provider: ${ASR_PROVIDER:mock}
   failover-providers: ${LLM_FAILOVER_PROVIDERS:gemini,minimax,mimo,glm,deepseek}
@@ -248,10 +249,10 @@ llm:
     timeout-ms: ${GEMINI_TIMEOUT_MS:30000}
   aurora-stages:
     enabled: ${AURORA_STAGE_ROUTING_ENABLED:true}
-    fast-model: ${AURORA_FAST_MODEL:gemini-3.5-flash-lite}
+    fast-model: ${AURORA_FAST_MODEL:gemini-3.6-flash}
     speaker-model: ${AURORA_SPEAKER_MODEL:gemini-3.6-flash}
-    thinker-model: ${AURORA_THINKER_MODEL:deepseek-v4-pro}
-    speaker-thinking-level: ${AURORA_SPEAKER_THINKING_LEVEL:medium}
+    thinker-model: ${AURORA_THINKER_MODEL:gemini-3.6-flash}
+    speaker-thinking-level: ${AURORA_SPEAKER_THINKING_LEVEL:minimal}
     thinker-reasoning-effort: ${AURORA_THINKER_REASONING_EFFORT:high}
     # Sampling is applied only by providers/models that support it. Gemini 3.5/3.6
     # intentionally omit deprecated temperature/top-p/top-k fields.
@@ -260,7 +261,7 @@ llm:
     thinker-temperature: ${AURORA_THINKER_TEMPERATURE:0.10}
     critic-temperature: ${AURORA_CRITIC_TEMPERATURE:0.05}
     fast-max-tokens: ${AURORA_FAST_MAX_TOKENS:256}
-    speaker-max-tokens: ${AURORA_SPEAKER_MAX_TOKENS:6144}
+    speaker-max-tokens: ${AURORA_SPEAKER_MAX_TOKENS:2048}
     thinker-max-tokens: ${AURORA_THINKER_MAX_TOKENS:8192}
     critic-max-tokens: ${AURORA_CRITIC_MAX_TOKENS:2048}
   mimo:

@@ -142,7 +142,7 @@ public class StructuredAiService {
         request.temperature = modeTemperature(context);
         request.thinkingEnabled = jsonRepair ? Boolean.FALSE : thinkingEnabled(moduleName);
         request.reasoningEffort = jsonRepair ? null : reasoningEffort(moduleName, context);
-        applyLatencyContract(request, moduleName, jsonRepair);
+        applyLatencyContract(request, moduleName, jsonRepair, context);
         if ("MOCK".equals(assignedGroup) && !requireRemoteProvider) {
             request.forceMock = true;
         }
@@ -231,21 +231,26 @@ public class StructuredAiService {
                 || normalized.startsWith("AURORA_CRITIC_");
     }
 
-    private void applyLatencyContract(LlmRequest request, String moduleName, boolean jsonRepair) {
+    private void applyLatencyContract(LlmRequest request, String moduleName, boolean jsonRepair,
+                                      Object context) {
         if (request == null || moduleName == null) return;
         String normalized = moduleName.toUpperCase(java.util.Locale.ROOT);
+        boolean complexTurn = isComplexTurn(context);
         if (jsonRepair && normalized.startsWith("AURORA_FOREGROUND_")) {
             request.timeoutMs = 1_000;
+            request.totalTimeoutMs = 2_000;
             request.maxTokens = 256;
             request.retryEnabled = Boolean.FALSE;
         } else if (jsonRepair && normalized.startsWith("AURORA_")) {
-            request.timeoutMs = 6_000;
+            request.timeoutMs = complexTurn ? 15_000 : 10_000;
+            request.totalTimeoutMs = complexTurn ? 30_000 : 20_000;
             request.maxTokens = 1_024;
             request.retryEnabled = Boolean.FALSE;
         } else if (normalized.startsWith("AURORA_FOREGROUND_")) {
             // This is the user's first real conversational feedback, not a status label.
             // Keep it non-thinking and tightly bounded while the planner runs in parallel.
             request.timeoutMs = 2_500;
+            request.totalTimeoutMs = 3_000;
             request.maxTokens = 256;
             request.retryEnabled = Boolean.FALSE;
         } else if (normalized.startsWith("AURORA_PLAN_")) {
@@ -254,19 +259,23 @@ public class StructuredAiService {
             // with finish_reason=length before emitting JSON. Give the background-only stage
             // separate room while keeping a hard deadline. reasoning_effort remains unset unless
             // an explicit measured plannerReasoningEffort is supplied in context.
-            request.timeoutMs = 45_000;
+            request.timeoutMs = complexTurn ? 45_000 : 30_000;
+            request.totalTimeoutMs = complexTurn ? 120_000 : 90_000;
             request.maxTokens = 8_192;
-            request.retryEnabled = Boolean.FALSE;
+            request.retryEnabled = Boolean.TRUE;
         } else if (normalized.startsWith("AURORA_SPEAKER_")) {
-            request.timeoutMs = 8_000;
-            request.maxTokens = 6_144;
-            request.retryEnabled = Boolean.FALSE;
+            request.timeoutMs = complexTurn ? 25_000 : 10_000;
+            request.totalTimeoutMs = complexTurn ? 70_000 : 35_000;
+            request.maxTokens = complexTurn ? 4_096 : 2_048;
+            request.retryEnabled = Boolean.TRUE;
         } else if (normalized.startsWith("AURORA_CRITIC_")) {
-            request.timeoutMs = 6_000;
-            request.maxTokens = 2_048;
-            request.retryEnabled = Boolean.FALSE;
+            request.timeoutMs = complexTurn ? 15_000 : 10_000;
+            request.totalTimeoutMs = complexTurn ? 45_000 : 30_000;
+            request.maxTokens = complexTurn ? 2_048 : 1_024;
+            request.retryEnabled = Boolean.TRUE;
         } else if (normalized.startsWith("AURORA_INNER_VOICE_")) {
-            request.timeoutMs = 6_000;
+            request.timeoutMs = 10_000;
+            request.totalTimeoutMs = 20_000;
             request.maxTokens = 512;
             request.retryEnabled = Boolean.FALSE;
         } else if (normalized.startsWith("CURATED_PERSONA_CHAT")) {
@@ -284,6 +293,22 @@ public class StructuredAiService {
             request.maxTokens = 384;
             request.retryEnabled = Boolean.FALSE;
         }
+    }
+
+    static boolean isComplexTurn(Object context) {
+        if (!(context instanceof Map<?, ?> map)) return false;
+        Object rawUserMessage = map.get("userMessage");
+        String userMessage = rawUserMessage == null ? "" : String.valueOf(rawUserMessage);
+        if (userMessage.length() >= 240) return true;
+        Object history = map.get("conversationHistory");
+        if (history instanceof java.util.Collection<?> rows && rows.size() >= 6) return true;
+        Object memories = map.get("relevantMemoryIds");
+        if (memories instanceof java.util.Collection<?> rows && rows.size() >= 2) return true;
+        String lowered = userMessage.toLowerCase(java.util.Locale.ROOT);
+        return lowered.contains("深入") || lowered.contains("详细")
+                || lowered.contains("分析") || lowered.contains("帮我理清")
+                || lowered.contains("deeply") || lowered.contains("in detail")
+                || lowered.contains("analyze");
     }
 
     public String getCurrentTestGroup(Long userId) {

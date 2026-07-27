@@ -23,16 +23,36 @@ public class FailoverLlmClient implements LlmClient {
     @Override
     public String chat(LlmRequest request) {
         List<String> errors = new ArrayList<>();
-        for (ProviderCandidate candidate : orderedCandidates(request)) {
-            try {
-                if (candidate.client == null) continue;
-                log.info("LLM attempt provider={} model={} module={}", candidate.provider, candidate.model, request.moduleName);
-                return candidate.client.chat(request);
-            } catch (Exception exception) {
-                String message = candidate.provider + "/" + candidate.model + ": " + exception.getMessage();
-                errors.add(message);
-                log.warn("LLM provider attempt failed: {}", message);
+        int originalAttemptTimeout = request == null ? 30_000 : request.timeoutMsOr(30_000);
+        long totalBudgetMs = request == null
+                ? 60_000L : request.totalTimeoutMsOr(Math.max(originalAttemptTimeout, 60_000));
+        long deadlineNanos = System.nanoTime() + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(totalBudgetMs);
+        try {
+            for (ProviderCandidate candidate : orderedCandidates(request)) {
+                long remainingMs = java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(
+                        Math.max(0L, deadlineNanos - System.nanoTime()));
+                if (remainingMs <= 0L) {
+                    errors.add("failover total deadline exhausted");
+                    break;
+                }
+                try {
+                    if (candidate.client == null) continue;
+                    if (request != null) {
+                        request.timeoutMs = (int) Math.max(1L,
+                                Math.min(originalAttemptTimeout, remainingMs));
+                    }
+                    log.info("LLM attempt provider={} model={} module={} remainingBudgetMs={}",
+                            candidate.provider, candidate.model,
+                            request == null ? "" : request.moduleName, remainingMs);
+                    return candidate.client.chat(request);
+                } catch (Exception exception) {
+                    String message = candidate.provider + "/" + candidate.model + ": " + exception.getMessage();
+                    errors.add(message);
+                    log.warn("LLM provider attempt failed: {}", message);
+                }
             }
+        } finally {
+            if (request != null) request.timeoutMs = originalAttemptTimeout;
         }
         throw new AiProviderException("All LLM providers failed: " + String.join(" | ", errors));
     }

@@ -27,6 +27,8 @@ public class LlmConfig {
     public String model;
     public PromptProperties prompt = new PromptProperties();
     public boolean allowFallback = true;
+    /** Enables failover across configured real providers without enabling Mock fallback. */
+    public boolean realProviderFailoverEnabled = false;
     public String asrProvider = "mimo";
     public GlmProperties glm = new GlmProperties();
     public MimoProperties mimo = new MimoProperties();
@@ -105,6 +107,14 @@ public class LlmConfig {
 
     public boolean isEffectiveFallbackAllowed() {
         return allowFallback && !isProdMode();
+    }
+
+    public boolean isRealProviderFailoverEnabled() {
+        return realProviderFailoverEnabled;
+    }
+
+    public void setRealProviderFailoverEnabled(boolean value) {
+        this.realProviderFailoverEnabled = value;
     }
 
     public String getAsrProvider() {
@@ -339,17 +349,17 @@ public class LlmConfig {
      */
     public static class AuroraStageProperties {
         public boolean enabled = true;
-        public String fastModel = "gemini-3.5-flash-lite";
+        public String fastModel = "gemini-3.6-flash";
         public String speakerModel = "gemini-3.6-flash";
-        public String thinkerModel = "deepseek-v4-pro";
-        public String speakerThinkingLevel = "medium";
+        public String thinkerModel = "gemini-3.6-flash";
+        public String speakerThinkingLevel = "minimal";
         public String thinkerReasoningEffort = "high";
         public double fastTemperature = 0.25;
         public double speakerTemperature = 0.82;
         public double thinkerTemperature = 0.10;
         public double criticTemperature = 0.05;
         public int fastMaxTokens = 256;
-        public int speakerMaxTokens = 6_144;
+        public int speakerMaxTokens = 2_048;
         public int thinkerMaxTokens = 8_192;
         public int criticMaxTokens = 2_048;
 
@@ -445,7 +455,7 @@ public class LlmConfig {
                 configured(deepseekKey), configured(geminiKey), configured(apiKey));
         if ("mock".equalsIgnoreCase(activeProvider)) {
             actualClient = new MockLlmClient(aiExecutor);
-        } else if (isProdMode()) {
+        } else if (isProdMode() || realProviderFailoverEnabled) {
             actualClient = failoverClient(activeProvider, aiLogService, aiExecutor);
         } else {
             switch (activeProvider.toLowerCase()) {
@@ -535,6 +545,9 @@ public class LlmConfig {
         List<String> orderedProviders = orderedProviders(activeProvider);
         List<FailoverLlmClient.ProviderCandidate> candidates = new ArrayList<>();
         for (String providerName : orderedProviders) {
+            if (providerKey(providerName, providerSpecificKey(providerName)).isBlank()) {
+                continue;
+            }
             LlmClient client = createProviderClient(providerName, false, aiLogService, aiExecutor);
             if (client != null) {
                 candidates.add(new FailoverLlmClient.ProviderCandidate(providerName.toUpperCase(), activeModelFor(providerName), client));
@@ -680,22 +693,60 @@ public class LlmConfig {
                 geminiKey, gemini.baseUrl, auroraStages.speakerModel,
                 auroraStages.speakerThinkingLevel, gemini.timeoutMs,
                 false, aiLogService, aiExecutor);
-        LlmClient thinker = deepseekKey.isBlank() ? null : new DeepSeekLlmClient(
-                deepseekKey, deepseek.baseUrl, auroraStages.thinkerModel,
-                deepseek.timeoutMs, false, aiLogService, aiExecutor);
+        boolean allGeminiStages = "gemini".equalsIgnoreCase(activeProvider());
+        LlmClient thinker = allGeminiStages
+                ? (geminiKey.isBlank() ? null : new GeminiLlmClient(
+                        geminiKey, gemini.baseUrl, auroraStages.thinkerModel,
+                        auroraStages.thinkerReasoningEffort, gemini.timeoutMs,
+                        false, aiLogService, aiExecutor))
+                : (deepseekKey.isBlank() ? null : new DeepSeekLlmClient(
+                        deepseekKey, deepseek.baseUrl, auroraStages.thinkerModel,
+                        deepseek.timeoutMs, false, aiLogService, aiExecutor));
+        fast = resilientStageClient("GEMINI", auroraStages.fastModel, fast, fallback, aiExecutor);
+        speaker = resilientStageClient("GEMINI", auroraStages.speakerModel,
+                speaker, fallback, aiExecutor);
+        thinker = resilientStageClient(allGeminiStages ? "GEMINI" : "DEEPSEEK",
+                auroraStages.thinkerModel, thinker, fallback, aiExecutor);
         return new AuroraStageRoutingLlmClient(fallback, fast, speaker, thinker,
                 new AuroraStageRoutingLlmClient.StageProfile(
                         false, "minimal", auroraStages.fastTemperature,
                         auroraStages.fastMaxTokens),
                 new AuroraStageRoutingLlmClient.StageProfile(
-                        true, auroraStages.speakerThinkingLevel,
-                        auroraStages.speakerTemperature, auroraStages.speakerMaxTokens),
+                        false, "minimal", auroraStages.speakerTemperature,
+                        Math.min(auroraStages.speakerMaxTokens, 2_048)),
                 new AuroraStageRoutingLlmClient.StageProfile(
                         true, auroraStages.thinkerReasoningEffort,
                         auroraStages.thinkerTemperature, auroraStages.thinkerMaxTokens),
                 new AuroraStageRoutingLlmClient.StageProfile(
                         true, auroraStages.thinkerReasoningEffort,
                         auroraStages.criticTemperature, auroraStages.criticMaxTokens));
+    }
+
+    private LlmClient resilientStageClient(String primaryProvider, String primaryModel,
+                                           LlmClient primary, LlmClient fallback,
+                                           Executor aiExecutor) {
+        if (primary == null) return fallback;
+        if (!realProviderFailoverEnabled || fallback == null || fallback == primary) return primary;
+        // The global real-provider chain already starts with the configured primary
+        // provider. Re-wrapping it behind another copy of that provider would turn one
+        // bounded retry into four attempts before failover and exhaust the stage budget.
+        if (fallback instanceof FailoverLlmClient) return fallback;
+        return new FailoverLlmClient(List.of(
+                new FailoverLlmClient.ProviderCandidate(primaryProvider, primaryModel, primary),
+                new FailoverLlmClient.ProviderCandidate("REAL_FAILOVER_CHAIN",
+                        "configured-real-providers", fallback)
+        ), aiExecutor);
+    }
+
+    private String providerSpecificKey(String providerName) {
+        return switch (providerName.toLowerCase()) {
+            case "minimax" -> minimax.apiKey;
+            case "mimo" -> mimo.apiKey;
+            case "glm" -> glm.apiKey;
+            case "deepseek" -> deepseek.apiKey;
+            case "gemini" -> gemini.apiKey;
+            default -> "";
+        };
     }
 
     private String resolveKey(String key) {

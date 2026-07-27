@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Demo: start the Inner Cosmos backend on the laptop with REAL providers (GLM chat + Qwen embedding
-# + Qwen TTS), reading keys at runtime from the operator's gitignored API及文档.txt. Never writes a
+# Demo: start the Inner Cosmos backend on the laptop with a REAL chat provider, reading keys at
+# runtime from the operator's gitignored API及文档.txt. Never writes a
 # key into any committed file. Use this for the in-class demo so the experience runs on real models.
 #
 # Usage: bash scripts/demo/run-demo-server.sh [PORT]   (default 8080)
@@ -18,11 +18,11 @@ if [ ! -f "$KEYS" ]; then
 fi
 
 # Extract keys without echoing the values (length only, for confirmation).
-QWEN_KEY="$(grep '^qwen:' "$KEYS" | head -1 | cut -d: -f2-)"
+QWEN_KEY="$(grep -Ei '^(dashscope|qwen):' "$KEYS" | head -1 | cut -d: -f2- | sed 's/、$//')"
 GLM_KEY="$(grep -i '^glm' "$KEYS" | head -1 | sed -E 's/^[Gg][Ll][Mm][:：] *//')"
 DS_KEY="$(grep -i 'deepseek' "$KEYS" | head -1 | sed -E 's/.*apikey[:：] *//')"
 if [ -z "$QWEN_KEY" ]; then
-  echo "ERROR: could not find the qwen: line in $KEYS (needed for embedding + TTS)." >&2
+  echo "ERROR: could not find the dashscope/qwen line in $KEYS (needed for TTS)." >&2
   exit 1
 fi
 # Chat provider: DeepSeek by default (proven 0 schema-drift on this HEAD, see
@@ -40,13 +40,10 @@ case "$DEMO_PROVIDER" in
     echo "WARNING: GLM has known schema-drift (~3 fallbacks/run); DeepSeek is the recommended demo provider." >&2 ;;
   *) echo "ERROR: DEMO_PROVIDER must be deepseek or glm (got: $DEMO_PROVIDER)." >&2; exit 1 ;;
 esac
-echo "Loaded keys: qwen(len=${#QWEN_KEY}) ${DEMO_PROVIDER}(len=${#CHAT_KEY}) — values not printed."
+echo "Loaded key: ${DEMO_PROVIDER}(len=${#CHAT_KEY}) — value not printed."
 
-# Point embedding + TTS at this account's private Aliyun/DashScope gateway (from API及文档.txt).
-export MEMORY_EMBEDDING_ENABLED=true
-export MEMORY_EMBEDDING_API_KEY="$QWEN_KEY"
-export MEMORY_EMBEDDING_BASE_URL="https://llm-errus8cw2pf66bx9.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"
-export MEMORY_EMBEDDING_MODEL="text-embedding-v4"
+# Keep provider embeddings off; TTS remains enabled.
+export MEMORY_EMBEDDING_ENABLED=false
 export TTS_ENABLED=true
 export TTS_API_KEY="$QWEN_KEY"
 export TTS_WS_URL="wss://llm-errus8cw2pf66bx9.cn-beijing.maas.aliyuncs.com/api-ws/v1/inference"
@@ -80,7 +77,7 @@ if [ -z "${JAVA_HOME:-}" ] && [ -d "/c/Program Files/Java/jdk-21.0.10" ]; then
   export JAVA_HOME="/c/Program Files/Java/jdk-21.0.10"
 fi
 
-echo "Starting Inner Cosmos on :${PORT} with LLM_PROVIDER=${DEMO_PROVIDER} + real embedding + real TTS..."
+echo "Starting Inner Cosmos on :${PORT} with LLM_PROVIDER=${DEMO_PROVIDER} + embedding disabled + real TTS..."
 echo "Health check:  http://localhost:${PORT}/actuator/health"
 echo "App:           http://localhost:${PORT}/app/aurora/"
 echo "(Keep this terminal open. Stop with Ctrl+C.)"

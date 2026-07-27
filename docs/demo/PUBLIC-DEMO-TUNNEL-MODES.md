@@ -20,24 +20,43 @@ Tunnel。故障后必须重新运行完整启动脚本，并重新分享新 APK�
 
 ## Named Tunnel：固定地址
 
-先在 Cloudflare 控制台建立 remotely-managed Tunnel，将固定 hostname 路由到
-`http://127.0.0.1:8080`。token 只注入当前操作者环境，禁止写入仓库、脚本、日志或
-`demo-info.txt`：
+先在 Cloudflare 控制台建立 remotely-managed Tunnel，将一个易读的固定 hostname（例如
+`https://aurora.example.com`）路由到 `http://127.0.0.1:8080`。推荐首次只配置一次：
 
 ```powershell
-$env:CLOUDFLARED_TUNNEL_TOKEN = "<external secret>"
-.\scripts\demo\run-public-demo.ps1 `
-  -TunnelMode named `
-  -PublicOrigin "https://demo.example.com"
+powershell.exe -NoProfile -ExecutionPolicy Bypass `
+  -File ".\scripts\demo\set-fixed-public-demo.ps1" `
+  -PublicOrigin "https://aurora.example.com"
 ```
 
-启动脚本通过子进程环境变量将 token 交给 `cloudflared`，不会把 token 放进命令行。
+脚本会在控制台安全提示中读取 token。固定域名保存在被 Git 忽略的
+`.demo-runtime/fixed-tunnel.json`，token 则由 Windows DPAPI 以当前用户身份加密；文件不能
+复制给另一台电脑或另一个 Windows 用户使用。之后每次启动、网络恢复或电脑重启，只需：
+
+```powershell
+.\scripts\demo\start-fixed-public-demo.ps1
+```
+
+启动脚本解密 token 后只通过子进程环境变量交给 `cloudflared`，不会把 token 放进命令行、
+日志或 `demo-info.txt`。若隧道仍健康，它会自动走 `-ReuseTunnel`，因此不会因为重复启动
+而换地址。
 Named Tunnel 地址固定；默认 watchdog 在 `cloudflared` 进程退出时最多重启六次，并继续
 检查公网 `/actuator/health`。Docker Compose 的 app、PostgreSQL 和 Redis 仍采用
 `restart: unless-stopped`。
 
-这条路径需要人工提供 Cloudflare 账号、Tunnel、DNS/hostname 和有效 token。仓库不能
-自动创建这些外部资源。
+可选安装“当前 Windows 用户登录 60 秒后启动”的任务（Docker Desktop 仍需配置为登录后
+启动）：
+
+```powershell
+.\scripts\demo\install-fixed-public-demo-autostart.ps1
+
+# 删除自动启动任务
+.\scripts\demo\install-fixed-public-demo-autostart.ps1 -Remove
+```
+
+这条路径需要操作者在 Cloudflare 控制台提供账号、Tunnel、DNS/hostname 和有效 token。
+仓库不会自动修改外部账户或 DNS。固定域名负责“短、易记、不随重启变化”；不要再为课堂
+分享 Quick Tunnel 的随机 `trycloudflare.com` 地址，也不要额外依赖会过期的第三方短链。
 
 ## 实时状态与停止
 

@@ -10,6 +10,9 @@ $files = @(
     "status-public-demo.ps1",
     "stop-public-demo.ps1",
     "watch-public-demo.ps1",
+    "set-fixed-public-demo.ps1",
+    "start-fixed-public-demo.ps1",
+    "install-fixed-public-demo-autostart.ps1",
     "verify-public-demo.ps1",
     "test-30-user-burst.ps1"
 )
@@ -69,11 +72,22 @@ $run = Get-Content -LiteralPath (Join-Path $PSScriptRoot "run-public-demo.ps1") 
 $status = Get-Content -LiteralPath (Join-Path $PSScriptRoot "status-public-demo.ps1") -Raw
 $verify = Get-Content -LiteralPath (Join-Path $PSScriptRoot "verify-public-demo.ps1") -Raw
 $burst = Get-Content -LiteralPath (Join-Path $PSScriptRoot "test-30-user-burst.ps1") -Raw
+$fixedConfig = Get-Content -LiteralPath (Join-Path $PSScriptRoot "set-fixed-public-demo.ps1") -Raw
+$fixedStart = Get-Content -LiteralPath (Join-Path $PSScriptRoot "start-fixed-public-demo.ps1") -Raw
+$fixedAutostart = Get-Content -LiteralPath (Join-Path $PSScriptRoot "install-fixed-public-demo-autostart.ps1") -Raw
 if ($common -match '--token(?:\s|")') {
     throw "Named Tunnel token must not appear in the cloudflared command line."
 }
 if ($common -notmatch 'CLOUDFLARED_TUNNEL_TOKEN' -or $common -notmatch 'TUNNEL_TOKEN') {
     throw "Named Tunnel must consume an external operator token."
+}
+if ($fixedConfig -notmatch 'ConvertFrom-SecureString' -or
+    $fixedConfig -match 'protectedTunnelToken\s*=\s*["'']' -or
+    $fixedStart -notmatch 'ConvertTo-SecureString' -or
+    $fixedStart -notmatch 'TunnelMode\s*=\s*"named"' -or
+    $fixedStart -notmatch 'CLOUDFLARED_TUNNEL_TOKEN' -or
+    $fixedAutostart -notmatch 'New-ScheduledTaskTrigger -AtLogOn') {
+    throw "Fixed Tunnel persistence must use current-user DPAPI, Named mode, and optional logon startup."
 }
 if ($run -notmatch 'Remove-Item -LiteralPath \$demoInfoFile' -or
     $run -notmatch 'tunnel_mode=\$TunnelMode' -or

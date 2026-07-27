@@ -53,12 +53,14 @@ class AuroraDualKernelRuntimeTest {
                 .containsEntry("AURORA_SPEAKER_DAILY_TALK", true)
                 .containsEntry("AURORA_CRITIC_DAILY_TALK", true);
         assertThat(client.timeouts).containsEntry("AURORA_PLAN_DAILY_TALK", 45_000)
-                .containsEntry("AURORA_SPEAKER_DAILY_TALK", 8_000)
-                .containsEntry("AURORA_CRITIC_DAILY_TALK", 6_000);
+                .containsEntry("AURORA_SPEAKER_DAILY_TALK", 25_000)
+                .containsEntry("AURORA_CRITIC_DAILY_TALK", 10_000);
         assertThat(client.maxTokens).containsEntry("AURORA_PLAN_DAILY_TALK", 8_192)
-                .containsEntry("AURORA_SPEAKER_DAILY_TALK", 6_144)
-                .containsEntry("AURORA_CRITIC_DAILY_TALK", 2_048);
-        assertThat(client.retryModes.values()).containsOnly(false);
+                .containsEntry("AURORA_SPEAKER_DAILY_TALK", 4_096)
+                .containsEntry("AURORA_CRITIC_DAILY_TALK", 1_024);
+        assertThat(client.retryModes).containsEntry("AURORA_PLAN_DAILY_TALK", true)
+                .containsEntry("AURORA_SPEAKER_DAILY_TALK", true)
+                .containsEntry("AURORA_CRITIC_DAILY_TALK", true);
         assertThat(client.requestJsons.get("AURORA_PLAN_DAILY_TALK"))
                 .doesNotContain("LEGACY_SINGLE_PASS_SEGMENTS_SCHEMA");
         assertThat(generation.runtime()).isEqualTo("dual-kernel.current-turn.v2");
@@ -95,7 +97,7 @@ class AuroraDualKernelRuntimeTest {
     }
 
     @Test
-    void criticFailureRepairsObservableViolationWithSafeFallback() {
+    void criticFailureKeepsHardMemoryBoundaryWithoutErasingIntoUnsafeSpeakerText() {
         ABTestService ab = mock(ABTestService.class);
         when(ab.assignGroup(anyLong(), anyString())).thenReturn("REMOTE");
         LlmConfig config = new LlmConfig();
@@ -111,7 +113,8 @@ class AuroraDualKernelRuntimeTest {
 
         assertThat(generation.repaired()).isTrue();
         assertThat(generation.criticIssues()).contains("unauthorized_memory_expansion");
-        assertThat(generation.result().segments).isEqualTo(safe.segments);
+        assertThat(generation.result().memoryReferenced).isFalse();
+        assertThat(generation.result().referencedMemoryIds).isEmpty();
         assertThat(generation.criticFallbackUsed()).isTrue();
     }
 

@@ -66,7 +66,16 @@ public final class GeminiLlmClient implements LlmClient {
         String error = null;
         try {
             if (apiKey.isBlank()) throw new IllegalStateException("Gemini API key is empty");
-            response = doChat(request);
+            try {
+                response = doChat(request);
+            } catch (Exception firstFailure) {
+                if (request == null || !request.retryEnabledOrDefault() || !isRetryable(firstFailure)) {
+                    throw firstFailure;
+                }
+                log.warn("Gemini transient call failed; retrying once: {}",
+                        firstFailure.getMessage());
+                response = doChat(request);
+            }
             success = true;
             return response;
         } catch (Exception failure) {
@@ -191,6 +200,22 @@ public final class GeminiLlmClient implements LlmClient {
 
     private String systemPrompt() {
         return "You are Aurora in Inner Cosmos. Follow the supplied JSON contract exactly.";
+    }
+
+    static boolean isRetryable(Throwable failure) {
+        for (Throwable cursor = failure; cursor != null;
+             cursor = cursor.getCause() == cursor ? null : cursor.getCause()) {
+            String type = cursor.getClass().getName().toLowerCase(java.util.Locale.ROOT);
+            String message = cursor.getMessage() == null
+                    ? "" : cursor.getMessage().toLowerCase(java.util.Locale.ROOT);
+            if (type.contains("timeout") || type.contains("connect")
+                    || message.contains("timed out") || message.contains("timeout")
+                    || message.contains("status 429")
+                    || message.matches("(?s).*status 5\\d\\d.*")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String escape(String value) {

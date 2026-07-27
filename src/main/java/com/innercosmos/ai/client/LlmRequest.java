@@ -49,6 +49,11 @@ public class LlmRequest {
      */
     public Integer timeoutMs;
     /**
+     * Optional wall-clock budget for the complete real-provider chain. Each provider still gets
+     * its own attempt timeout, but failover must stop once this shared deadline is exhausted.
+     */
+    public Integer totalTimeoutMs;
+    /**
      * Optional same-request provider retry switch. Null preserves legacy retry-once behavior.
      * Structured Aurora stages set false because their next stage already has a deterministic
      * business fallback and retrying a 30-second reasoning request harms the live experience.
@@ -71,6 +76,10 @@ public class LlmRequest {
 
     public int maxTokensOr(int fallback) {
         return maxTokens == null || maxTokens <= 0 ? fallback : maxTokens;
+    }
+
+    public int totalTimeoutMsOr(int fallback) {
+        return totalTimeoutMs == null || totalTimeoutMs <= 0 ? fallback : totalTimeoutMs;
     }
 
     public boolean retryEnabledOrDefault() {

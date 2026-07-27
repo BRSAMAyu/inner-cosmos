@@ -16,6 +16,7 @@ application-dev.yml
 
 # operator-owned real API keys/docs -- never committed, per CLAUDE.md secret policy
 API及文档.txt
+/API*.txt
 
 # Operator credentials and generated deployment identity material
 .aws/

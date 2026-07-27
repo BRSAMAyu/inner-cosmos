@@ -219,7 +219,7 @@ public class AuroraDualKernelRuntime {
                 StructuredAiResults.AuroraCriticResult.class,
                 () -> {
                     criticFallbackUsed.set(true);
-                    return deterministicCritic(criticCandidate, issuesAtCriticStart, fallback);
+                    return criticUnavailable(criticCandidate, issuesAtCriticStart);
                 }, client);
             criticMs = elapsedMs(criticStart);
             if (critique != null && Boolean.FALSE.equals(critique.pass) && critique.repaired != null
@@ -241,7 +241,7 @@ public class AuroraDualKernelRuntime {
                         || ("unearned_comparative_praise".equals(issue)
                         && isRelationshipContext(safe(assembledContext.get("userMessage")))))
                 .toList();
-        if (!finalHardIssues.isEmpty()) {
+        if (!finalHardIssues.isEmpty() && !speakerFallbackUsed.get()) {
             spoken = deterministicQualityRepair(spoken, safe(assembledContext.get("userMessage")));
             repaired = true;
         }
@@ -431,7 +431,7 @@ public class AuroraDualKernelRuntime {
                 criticContext.put("userInput", assembledContext.getOrDefault("userMessage", ""));
                 var critique = ai.call(userId, "AURORA_CRITIC_" + mode, criticInstruction(), criticContext,
                         StructuredAiResults.AuroraCriticResult.class,
-                        () -> deterministicCritic(delivered, observableIssues, StructuredAiResults.AuroraResult::new),
+                        () -> criticUnavailable(delivered, observableIssues),
                         client);
                 if (critique != null && critique.issues != null && !critique.issues.isEmpty()) {
                     List<String> constraints = new ArrayList<>(next.responseConstraints == null
@@ -1083,13 +1083,15 @@ public class AuroraDualKernelRuntime {
         return issues;
     }
 
-    private StructuredAiResults.AuroraCriticResult deterministicCritic(StructuredAiResults.AuroraResult spoken,
-                                                                         List<String> issues,
-                                                                         Supplier<StructuredAiResults.AuroraResult> fallback) {
+    private StructuredAiResults.AuroraCriticResult criticUnavailable(
+            StructuredAiResults.AuroraResult spoken, List<String> issues) {
         var result = new StructuredAiResults.AuroraCriticResult();
         result.pass = issues == null || issues.isEmpty();
         result.issues = issues == null ? List.of() : List.copyOf(issues);
-        result.repaired = result.pass ? spoken : fallback.get();
+        // A failed supervisor has no authority to erase a successful real-provider speaker.
+        // Keep the candidate and surface the unresolved issues in observability; deterministic
+        // hard safety gates below remain independently enforced.
+        result.repaired = null;
         return result;
     }
 
@@ -1139,6 +1141,11 @@ public class AuroraDualKernelRuntime {
         }
         result.segments = List.of(repairedText);
         result.speakCount = 1;
+        // A deterministic repair must not retain provenance claims from the rejected candidate.
+        // Otherwise the text can be safe while the response metadata still falsely claims that an
+        // unauthorized memory was used.
+        result.memoryReferenced = false;
+        result.referencedMemoryIds = List.of();
         if (singleAction) {
             result.continueReason = "只给一个十分钟内可开始的动作";
             result.nextQuestion = "";
