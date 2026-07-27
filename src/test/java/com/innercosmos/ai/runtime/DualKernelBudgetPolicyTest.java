@@ -69,6 +69,16 @@ class DualKernelBudgetPolicyTest {
     }
 
     @Test
+    void explicitQuietDisclosureBoundaryForcesDualKernelReview() {
+        var decision = policy.decide(DualKernelBudgetPolicy.Signals.simple(
+                "明天要展示这个项目，我很紧张。先别给建议，我只是想把这句话说出来。"));
+
+        assertThat(decision.budget()).isEqualTo(DualKernelBudgetPolicy.Budget.DUAL_KERNEL);
+        assertThat(decision.reasons()).contains("boundary:quiet_disclosure");
+        assertThat(decision.score()).isGreaterThanOrEqualTo(DualKernelBudgetPolicy.DUAL_KERNEL_THRESHOLD);
+    }
+
+    @Test
     void interruptionAloneForcesDualKernel() {
         var decision = policy.decide(new DualKernelBudgetPolicy.Signals(
                 "等等，我想先说另一件事", true, 0, 0));

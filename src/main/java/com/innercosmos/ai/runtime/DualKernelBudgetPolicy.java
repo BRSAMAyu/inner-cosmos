@@ -101,6 +101,7 @@ public class DualKernelBudgetPolicy {
 
     private static final int RISK_WEIGHT = 3;
     private static final int AMBIGUITY_WEIGHT = 2;
+    private static final int RELATIONAL_BOUNDARY_WEIGHT = 2;
     private static final int INTERRUPTION_WEIGHT = 2;
     private static final int MEMORY_WEIGHT_PER_ITEM = 1;
     private static final int MEMORY_WEIGHT_CAP = 2;
@@ -117,6 +118,16 @@ public class DualKernelBudgetPolicy {
     private static final List<String> AMBIGUITY_MARKERS = List.of(
             "说不清楚", "说不清", "不清楚", "不确定", "说不好", "说不上来", "拿不准",
             "不知道该", "不知道是不是", "还是只是"
+    );
+
+    /**
+     * Explicit conversational boundaries deserve the reviewed path even when the disclosure is
+     * otherwise simple. The phrases are intentionally narrow and describe response behavior.
+     */
+    private static final List<String> QUIET_DISCLOSURE_BOUNDARIES = List.of(
+            "先别给建议", "不要给建议", "不用给建议", "不需要建议",
+            "只是想说出来", "只想说出来", "只是想把这句话说出来", "只想把这句话说出来",
+            "先听我说", "不用问我", "先别问"
     );
 
     private final CrisisKeywordRule crisisKeywordRule = new CrisisKeywordRule();
@@ -148,6 +159,11 @@ public class DualKernelBudgetPolicy {
             reasons.add("ambiguity:marker");
         }
 
+        if (containsQuietDisclosureBoundary(message)) {
+            score += RELATIONAL_BOUNDARY_WEIGHT;
+            reasons.add("boundary:quiet_disclosure");
+        }
+
         if (signals.interruptionPresent()) {
             score += INTERRUPTION_WEIGHT;
             reasons.add("continuity:interruption");
@@ -171,6 +187,13 @@ public class DualKernelBudgetPolicy {
 
     private static boolean containsAmbiguityMarker(String message) {
         for (String marker : AMBIGUITY_MARKERS) {
+            if (message.contains(marker)) return true;
+        }
+        return false;
+    }
+
+    private static boolean containsQuietDisclosureBoundary(String message) {
+        for (String marker : QUIET_DISCLOSURE_BOUNDARIES) {
             if (message.contains(marker)) return true;
         }
         return false;
