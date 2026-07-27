@@ -8,7 +8,7 @@ param(
     [string]$ExpectedContext = "kind-kubedeploy",
 
     [ValidateRange(100, 5000)]
-    [int]$KedaEventCount = 3000,
+    [int]$KedaEventCount = 1200,
 
     [switch]$HoldViews
 )
@@ -118,6 +118,24 @@ function Invoke-Api {
     return ($response.Content | ConvertFrom-Json)
 }
 
+function New-W3cTraceContext {
+    $traceBytes = New-Object byte[] 16
+    $spanBytes = New-Object byte[] 8
+    $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+    try {
+        $rng.GetBytes($traceBytes)
+        $rng.GetBytes($spanBytes)
+    } finally {
+        $rng.Dispose()
+    }
+    $traceId = ([BitConverter]::ToString($traceBytes) -replace "-", "").ToLowerInvariant()
+    $spanId = ([BitConverter]::ToString($spanBytes) -replace "-", "").ToLowerInvariant()
+    return [pscustomobject]@{
+        TraceId = $traceId
+        Traceparent = "00-$traceId-$spanId-01"
+    }
+}
+
 function Get-CsrfHeader {
     param(
         [string]$BaseUrl,
@@ -167,15 +185,21 @@ function New-DemoConversation {
     if ($CreateRichReply) {
         $headers = Get-CsrfHeader -BaseUrl $BaseUrl -Session $session
         $headers["Idempotency-Key"] = "$runId-observability-message"
+        $traceContext = New-W3cTraceContext
+        $headers["traceparent"] = $traceContext.Traceparent
+        $clientTimer = [Diagnostics.Stopwatch]::StartNew()
         $reply = Invoke-Api -BaseUrl $BaseUrl -Path "/api/v1/aurora/message-rich" -Method POST `
             -Session $session -Headers $headers -Body @{
                 sessionId = $result.SessionId
                 message = "Please turn this demo pressure into one action I can begin in ten minutes."
                 mode = "ACTION_SPLIT"
             }
+        $clientTimer.Stop()
         if (-not $reply.success) {
             throw "Fresh observability conversation failed."
         }
+        $result | Add-Member -NotePropertyName AuroraTraceId -NotePropertyValue $traceContext.TraceId
+        $result | Add-Member -NotePropertyName AuroraClientLatencyMs -NotePropertyValue ([long]$clientTimer.Elapsed.TotalMilliseconds)
     }
     return $result
 }
@@ -244,6 +268,7 @@ function Invoke-Psql {
 }
 
 function Assert-Preflight {
+    param([switch]$AllowShowcaseBacklog)
     Write-Scene "PRE-FLIGHT | fail closed before any experiment"
     foreach ($command in @("kubectl", "curl.exe")) {
         if (-not (Get-Command $command -ErrorAction SilentlyContinue)) {
@@ -265,10 +290,20 @@ function Assert-Preflight {
     Invoke-Kubectl @("-n", $Namespace, "get", "deployment", "inner-cosmos-jaeger", "inner-cosmos-otel-collector") | Out-Null
 
     $outbox = Invoke-Psql "SELECT count(*) FROM tb_outbox_event WHERE status IN ('PENDING','PROCESSING','RETRY','DEAD');"
-    if ([int]$outbox -ne 0) {
+    $nonShowcaseOutbox = Invoke-Psql @"
+SELECT count(*)
+FROM tb_outbox_event
+WHERE status IN ('PENDING','PROCESSING','RETRY','DEAD')
+  AND dedup_key NOT LIKE 'hero-%-keda-%';
+"@
+    if ([int]$nonShowcaseOutbox -ne 0 -or ((-not $AllowShowcaseBacklog) -and [int]$outbox -ne 0)) {
         throw "Outbox baseline is not idle ($outbox outstanding events). Rehearse only from a clean baseline."
     }
-    Write-Host "outbox_baseline=0 PASS"
+    if ([int]$outbox -eq 0) {
+        Write-Host "outbox_baseline=0 PASS"
+    } else {
+        Write-Host "outbox_showcase_backlog=$outbox ALLOWED_FOR_H3"
+    }
     Write-Host "PREFLIGHT_READY" -ForegroundColor Green
 }
 
@@ -320,7 +355,9 @@ function Invoke-ContinuityScene {
     $sseOut = Join-Path $tempRoot "continuity-sse.log"
     $sseErr = Join-Path $tempRoot "continuity-sse.err.log"
     $sseUrl = "$podUrl/api/v1/aurora/stream?token=$([Uri]::EscapeDataString($stage.data.token))"
-    $curlArgs = "-sS -N --max-time 45 -H `"Cookie: $cookieHeader`" `"$sseUrl`""
+    $traceContext = New-W3cTraceContext
+    $curlArgs = "-sS -N --max-time 45 -H `"Cookie: $cookieHeader`" -H `"traceparent: $($traceContext.Traceparent)`" `"$sseUrl`""
+    $clientTimer = [Diagnostics.Stopwatch]::StartNew()
     $curl = Start-Process -FilePath "curl.exe" -ArgumentList $curlArgs `
         -RedirectStandardOutput $sseOut -RedirectStandardError $sseErr -WindowStyle Hidden -PassThru
     $ownedProcesses.Add($curl)
@@ -342,6 +379,7 @@ function Invoke-ContinuityScene {
         $curl.Kill()
         throw "The continuity SSE did not terminate within 45 seconds."
     }
+    $clientTimer.Stop()
     $streamText = Read-SharedText $sseOut
     if ($streamText -notmatch "event:\s*turn\.completed" -or $streamText -notmatch "event:\s*done") {
         throw "The live turn did not complete after Pod deletion. Inspect $sseOut."
@@ -357,6 +395,8 @@ function Invoke-ContinuityScene {
     }
     Write-Host "t+done history=RESTORED user_messages=$userCount aurora_messages=$auroraCount"
     Write-Host "HERO_1_PASS | current SSE finished; another Pod served durable history" -ForegroundColor Green
+    $account | Add-Member -NotePropertyName AuroraTraceId -NotePropertyValue $traceContext.TraceId
+    $account | Add-Member -NotePropertyName AuroraClientLatencyMs -NotePropertyValue ([long]$clientTimer.Elapsed.TotalMilliseconds)
 
     $headers = Get-CsrfHeader -BaseUrl $serviceUrl -Session $account.Session
     $null = Invoke-Api -BaseUrl $serviceUrl -Path "/api/dialog/session/$($account.SessionId)/finish" `
@@ -408,7 +448,6 @@ DELETE FROM tb_outbox_event WHERE dedup_key LIKE '$Prefix-%';
 COMMIT;
 "@
         Invoke-Kubectl @("-n", $Namespace, "set", "env", "deployment/inner-cosmos-worker",
-            "INNER_COSMOS_EVENTS_OUTBOX_SMOKE_PROBE_ENABLED-",
             "JDBC_OUTBOX_POLL_DELAY_MS-") | Out-Null
         Invoke-Kubectl @("apply", "-k", "deploy/k8s/extensions/keda") | Out-Null
         Invoke-Kubectl @("-n", $Namespace, "annotate", "scaledobject", "inner-cosmos-worker-outbox",
@@ -432,13 +471,20 @@ function Invoke-KedaScene {
     $prefix = "$runId-keda"
     $script:kedaDirty = $true
     try {
-        Invoke-Kubectl @("-n", $Namespace, "annotate", "scaledobject", "inner-cosmos-worker-outbox",
-            "autoscaling.keda.sh/paused=true", "--overwrite") | Out-Null
-        Invoke-Kubectl @("-n", $Namespace, "set", "env", "deployment/inner-cosmos-worker",
-            "INNER_COSMOS_EVENTS_OUTBOX_SMOKE_PROBE_ENABLED=true",
-            "JDBC_OUTBOX_POLL_DELAY_MS=3000") | Out-Null
-        Invoke-Kubectl @("-n", $Namespace, "rollout", "status", "deployment/inner-cosmos-worker", "--timeout=90s") | Out-Null
-        Invoke-Kubectl @("-n", $Namespace, "scale", "deployment/inner-cosmos-worker", "--replicas=0") | Out-Null
+        $baseline = Get-KedaSnapshot -Prefix $prefix
+        $baselineParts = $baseline.Replicas -split ","
+        if ([int]$baselineParts[0] -ne 1 -or [int]$baselineParts[1] -ne 1) {
+            throw "KEDA scene requires a 1/1 worker baseline; current desired/available=$($baseline.Replicas)."
+        }
+        $scaledObjectReady = Invoke-Kubectl @("-n", $Namespace, "get", "scaledobject",
+            "inner-cosmos-worker-outbox", "-o", "jsonpath={.status.conditions[?(@.type=='Ready')].status}")
+        if ($scaledObjectReady -ne "True") {
+            throw "KEDA ScaledObject is not Ready."
+        }
+        $grafanaPort = Start-PortForward -TargetNamespace "observability" -Resource "svc/grafana" -RemotePort 3000
+        Write-Host "Audience board: http://127.0.0.1:$grafanaPort/d/inner-cosmos-events/work-pressure-contract-c2b7-outbox-and-keda?orgId=1&refresh=5s&from=now-5m&to=now&viewPanel=6"
+        Write-Host "Goal: business backlog -> worker 1/1 to at least 3/3 in under 45 seconds."
+        $timer = [Diagnostics.Stopwatch]::StartNew()
 
         $null = Invoke-Psql @"
 INSERT INTO tb_outbox_event(
@@ -463,52 +509,34 @@ SELECT
   CURRENT_TIMESTAMP
 FROM generate_series(1, $KedaEventCount) AS g;
 "@
-        Invoke-Kubectl @("-n", $Namespace, "scale", "deployment/inner-cosmos-worker", "--replicas=1") | Out-Null
-        Invoke-Kubectl @("-n", $Namespace, "rollout", "status", "deployment/inner-cosmos-worker", "--timeout=90s") | Out-Null
-        Invoke-Kubectl @("-n", $Namespace, "annotate", "scaledobject", "inner-cosmos-worker-outbox",
-            "autoscaling.keda.sh/paused-") | Out-Null
 
-        $timer = [Diagnostics.Stopwatch]::StartNew()
         $sawScaleOut = $false
-        $deadline = (Get-Date).AddSeconds(160)
+        $deadline = (Get-Date).AddSeconds(40)
         do {
             $snapshot = Get-KedaSnapshot -Prefix $prefix
             Write-Host ("t+{0,3}s worker={1,-5} outstanding={2,-5} published={3}" -f
                 [int]$timer.Elapsed.TotalSeconds, $snapshot.Replicas,
                 $snapshot.Outstanding, $snapshot.Published)
-            $desired = [int](($snapshot.Replicas -split ",")[0])
-            if ($desired -ge 3) {
+            $replicaParts = $snapshot.Replicas -split ","
+            $desired = [int]$replicaParts[0]
+            $available = if ($replicaParts.Count -gt 1 -and $replicaParts[1]) { [int]$replicaParts[1] } else { 0 }
+            if ($desired -ge 3 -and $available -ge 3) {
                 $sawScaleOut = $true
-            }
-            if ($snapshot.Outstanding -eq 0) {
                 break
             }
-            Start-Sleep -Seconds 5
+            Start-Sleep -Seconds 2
         } until ((Get-Date) -ge $deadline)
+        $timer.Stop()
 
         if (-not $sawScaleOut) {
-            throw "KEDA did not scale the worker above the baseline."
+            throw "KEDA did not reach desired/available >= 3/3 inside the 40-second experiment gate."
         }
-        if ($snapshot.Outstanding -ne 0 -or $snapshot.Published -ne $KedaEventCount) {
-            throw "KEDA workload did not drain exactly: outstanding=$($snapshot.Outstanding), published=$($snapshot.Published)."
-        }
-        $duplicates = Invoke-Psql @"
-SELECT count(*) FROM (
-  SELECT event_id, consumer_name, count(*)
-  FROM tb_inbox_receipt
-  WHERE event_id IN (
-    SELECT event_id FROM tb_outbox_event WHERE dedup_key LIKE '$prefix-%'
-  )
-  GROUP BY event_id, consumer_name
-  HAVING count(*) > 1
-) d;
-"@
-        if ([int]$duplicates -ne 0) {
-            throw "Duplicate consumer receipts were detected: $duplicates"
-        }
-        Write-Host "HERO_2_PASS | 1-to-N workers, backlog-to-0, duplicate_receipts=0" -ForegroundColor Green
-    } finally {
+        Write-Host ("KEDA_SCALE_OUT_PASS elapsed_ms={0} worker={1} outstanding={2}" -f
+            [long]$timer.Elapsed.TotalMilliseconds, $snapshot.Replicas, $snapshot.Outstanding) -ForegroundColor Green
+        Write-Host "The backlog now drains naturally; HPA stabilization and scale-in remain visible for HERO 3."
+    } catch {
         Restore-KedaScene -Prefix $prefix
+        throw
     }
 }
 
@@ -527,6 +555,43 @@ function Invoke-ObservabilityScene {
         $headers = Get-CsrfHeader -BaseUrl $serviceUrl -Session $account.Session
         $null = Invoke-Api -BaseUrl $serviceUrl -Path "/api/dialog/session/$($account.SessionId)/finish" `
             -Method POST -Session $account.Session -Headers $headers -Body @{}
+    } else {
+        # H1 uses the real SSE path, whose generation deliberately crosses executor
+        # boundaries. H3 creates a fresh synchronous business turn so one controlled
+        # W3C trace deterministically contains HTTP + memory + provider latency.
+        $headers = Get-CsrfHeader -BaseUrl $serviceUrl -Session $account.Session
+        $dialog = Invoke-Api -BaseUrl $serviceUrl -Path "/api/dialog/session/create" -Method POST `
+            -Session $account.Session -Headers $headers -Body @{ title = "Hero 3 Business Trace" }
+        if (-not $dialog.success) {
+            throw "Unable to create the H3 trace dialog."
+        }
+        $account.SessionId = [long]$dialog.data.id
+        $headers = Get-CsrfHeader -BaseUrl $serviceUrl -Session $account.Session
+        $headers["Idempotency-Key"] = "$runId-observability-message"
+        $traceContext = New-W3cTraceContext
+        $headers["traceparent"] = $traceContext.Traceparent
+        $clientTimer = [Diagnostics.Stopwatch]::StartNew()
+        $reply = Invoke-Api -BaseUrl $serviceUrl -Path "/api/v1/aurora/message-rich" -Method POST `
+            -Session $account.Session -Headers $headers -Body @{
+                sessionId = $account.SessionId
+                message = "Please turn this demo pressure into one action I can begin in ten minutes."
+                mode = "ACTION_SPLIT"
+            }
+        $clientTimer.Stop()
+        if (-not $reply.success) {
+            throw "Fresh H3 Aurora business trace failed."
+        }
+        $account | Add-Member -NotePropertyName AuroraTraceId -NotePropertyValue $traceContext.TraceId -Force
+        $account | Add-Member -NotePropertyName AuroraClientLatencyMs `
+            -NotePropertyValue ([long]$clientTimer.Elapsed.TotalMilliseconds) -Force
+        $headers = Get-CsrfHeader -BaseUrl $serviceUrl -Session $account.Session
+        $null = Invoke-Api -BaseUrl $serviceUrl -Path "/api/dialog/session/$($account.SessionId)/finish" `
+            -Method POST -Session $account.Session -Headers $headers -Body @{}
+    }
+
+    $auroraTraceId = $account.AuroraTraceId
+    if ([string]::IsNullOrWhiteSpace($auroraTraceId)) {
+        throw "No controlled Aurora trace id was captured for the user action."
     }
 
     $traceparent = ""
@@ -568,8 +633,12 @@ LIMIT 1;
                 $candidateTrace.processes.PSObject.Properties.Value.serviceName |
                     Sort-Object -Unique
             )
+            $candidateOperations = @($candidateTrace.spans.operationName)
             if ($candidateServices -contains "inner-cosmos-api" -and
-                $candidateServices -contains "inner-cosmos-worker") {
+                $candidateServices -contains "inner-cosmos-worker" -and
+                $candidateOperations -contains "inner.cosmos.outbox.consume" -and
+                $candidateOperations -contains "inner.cosmos.projection.memory" -and
+                $candidateOperations -contains "inner.cosmos.projection.profile") {
                 $traceReady = $true
                 break
             }
@@ -580,12 +649,42 @@ LIMIT 1;
         throw "Jaeger did not expose a complete API-to-worker trace $traceId in time."
     }
 
+    $auroraTrace = $null
+    $auroraTraceReady = $false
+    $deadline = (Get-Date).AddSeconds(45)
+    do {
+        try {
+            $auroraTrace = Invoke-RestMethod -Uri "http://127.0.0.1:$jaegerPort/api/traces/$auroraTraceId" -TimeoutSec 10
+        } catch {
+            $auroraTrace = $null
+        }
+        if ($null -ne $auroraTrace -and @($auroraTrace.data).Count -gt 0) {
+            $auroraOperations = @(@($auroraTrace.data)[0].spans.operationName)
+            if ($auroraOperations -contains "inner.cosmos.ai.provider") {
+                $auroraTraceReady = $true
+                break
+            }
+        }
+        Start-Sleep -Seconds 2
+    } until ((Get-Date) -ge $deadline)
+    if (-not $auroraTraceReady) {
+        throw "Jaeger did not expose the complete user-to-Aurora trace $auroraTraceId in time."
+    }
+
+    # Jaeger is eventually consistent. If the controlled user turn and the durable
+    # continuation share a W3C trace, prefer the later, richer snapshot.
+    if ($traceId -eq $auroraTraceId) {
+        $trace = $auroraTrace
+    } else {
+        $trace = Invoke-RestMethod -Uri "http://127.0.0.1:$jaegerPort/api/traces/$traceId" -TimeoutSec 10
+    }
     $firstTrace = @($trace.data)[0]
     $services = @($firstTrace.processes.PSObject.Properties.Value.serviceName | Sort-Object -Unique)
     $spans = @($firstTrace.spans)
+    $forbiddenPattern = "user\.id|enduser\.id|message\.content|request\.body|response\.body|db\.statement|gen_ai\.prompt|gen_ai\.completion|url\.query|prompt|completion"
     $forbidden = @(
         $spans.tags |
-            Where-Object { $_.key -match "user\.id|request\.body|response\.body|db\.statement|prompt|completion" }
+            Where-Object { $_.key -match $forbiddenPattern }
     ).Count
     if ($services -notcontains "inner-cosmos-api" -or $services -notcontains "inner-cosmos-worker") {
         throw "Trace does not cross both API and worker: $($services -join ', ')."
@@ -594,24 +693,75 @@ LIMIT 1;
         throw "Trace privacy contract failed: $forbidden forbidden tags."
     }
 
+    $firstAuroraTrace = @($auroraTrace.data)[0]
+    $auroraSpans = @($firstAuroraTrace.spans)
+    $auroraForbidden = @(
+        $auroraSpans.tags |
+            Where-Object { $_.key -match $forbiddenPattern }
+    ).Count
+    if ($auroraForbidden -ne 0) {
+        throw "Aurora trace privacy contract failed: $auroraForbidden forbidden tags."
+    }
+    $traceStart = ($auroraSpans | Measure-Object -Property startTime -Minimum).Minimum
+    $waterfall = @($auroraSpans | Sort-Object startTime | ForEach-Object {
+        $serviceName = $firstAuroraTrace.processes.($_.processID).serviceName
+        [pscustomobject]@{
+            OffsetMs = [Math]::Round(($_.startTime - $traceStart) / 1000.0, 1)
+            DurationMs = [Math]::Round($_.duration / 1000.0, 1)
+            Service = $serviceName
+            Operation = $_.operationName
+        }
+    })
+    $providerSpan = $auroraSpans | Where-Object operationName -eq "inner.cosmos.ai.provider" |
+        Sort-Object duration -Descending | Select-Object -First 1
+    $memorySpan = $auroraSpans | Where-Object operationName -eq "inner.cosmos.memory.retrieve" |
+        Sort-Object duration -Descending | Select-Object -First 1
+    $httpSpan = $auroraSpans | Sort-Object duration -Descending | Select-Object -First 1
+    $requestMs = $httpSpan.duration / 1000.0
+    $providerMs = $providerSpan.duration / 1000.0
+    $memoryMs = if ($null -ne $memorySpan) { $memorySpan.duration / 1000.0 } else { 0.0 }
+    $platformMs = [Math]::Max(0.0, $requestMs - $providerMs - $memoryMs)
+    $providerShare = if ($requestMs -gt 0) { 100.0 * $providerMs / $requestMs } else { 0.0 }
+    $consumeSpan = $spans | Where-Object operationName -eq "inner.cosmos.outbox.consume" |
+        Sort-Object duration -Descending | Select-Object -First 1
+    $memoryProjection = $spans | Where-Object operationName -eq "inner.cosmos.projection.memory" |
+        Sort-Object duration -Descending | Select-Object -First 1
+    $profileProjection = $spans | Where-Object operationName -eq "inner.cosmos.projection.profile" |
+        Sort-Object duration -Descending | Select-Object -First 1
+
     $metricUrl = "http://127.0.0.1:$prometheusPort/api/v1/query?query=" +
         [Uri]::EscapeDataString('max(kube_deployment_status_replicas_available{namespace="inner-cosmos-w3",deployment="inner-cosmos-api"})')
     $metric = Invoke-RestMethod -Uri $metricUrl -TimeoutSec 10
     $apiReplicas = $metric.data.result[0].value[1]
 
+    Write-Host ""
+    Write-Host "USER ACTION | message -> Aurora -> durable reply" -ForegroundColor Cyan
+    Write-Host ("client_end_to_end_ms={0} traced_request_ms={1:N1} memory_ms={2:N1} provider_ms={3:N1} platform_overhead_ms={4:N1} provider_share_pct={5:N1}" -f
+        $account.AuroraClientLatencyMs,
+        $requestMs, $memoryMs, $providerMs, $platformMs, $providerShare)
+    $waterfall | Format-Table OffsetMs, DurationMs, Service, Operation -AutoSize
+    Write-Host "Aurora trace: http://127.0.0.1:$jaegerPort/trace/$auroraTraceId"
+    Write-Host ""
+    Write-Host "ASYNC CONTINUATION | finish dialog -> outbox -> worker projections" -ForegroundColor Cyan
     Write-Host "trace_id=$traceId"
+    if ($null -ne $consumeSpan) {
+        Write-Host ("worker_consume_ms={0:N1} memory_projection_ms={1:N1} profile_projection_ms={2:N1}" -f
+            ($consumeSpan.duration / 1000.0),
+            $(if ($null -ne $memoryProjection) { $memoryProjection.duration / 1000.0 } else { 0.0 }),
+            $(if ($null -ne $profileProjection) { $profileProjection.duration / 1000.0 } else { 0.0 }))
+    }
     Write-Host "services=$($services -join ',') spans=$($spans.Count) forbidden_tags=$forbidden"
     Write-Host "prometheus_api_available_replicas=$apiReplicas"
-    Write-Host "Grafana KEDA: http://127.0.0.1:$grafanaPort/d/inner-cosmos-events/work-pressure-contract-c2b7-outbox-and-keda?orgId=1&refresh=5s"
+    Write-Host "Grafana KEDA: http://127.0.0.1:$grafanaPort/d/inner-cosmos-events/work-pressure-contract-c2b7-outbox-and-keda?orgId=1&refresh=5s&from=now-15m&to=now&viewPanel=6"
     Write-Host "Grafana recovery: http://127.0.0.1:$grafanaPort/d/inner-cosmos-recovery/continuity-contract-c2b7-pod-recovery-live?orgId=1&refresh=5s"
     Write-Host "Jaeger trace: http://127.0.0.1:$jaegerPort/trace/$traceId"
-    Write-Host "HERO_3_PASS | fresh API-to-Worker trace; privacy scan=0" -ForegroundColor Green
+    Write-Host "HERO_3_PASS | real Aurora latency waterfall + API-to-Worker continuation; privacy scan=0" -ForegroundColor Green
 }
 
 New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
 Push-Location $root
 try {
-    Assert-Preflight
+    Assert-Preflight -AllowShowcaseBacklog:($Scene -eq "Observability")
     switch ($Scene) {
         "Preflight" {
             Write-Host "No cluster writes were performed."
@@ -621,9 +771,17 @@ try {
         }
         "Keda" {
             Invoke-KedaScene
+            if ($HoldViews) {
+                Write-Host "H2 is holding the workload while H3 shows drain and scale-in."
+                $null = Read-Host "After H3, press Enter to clean synthetic rows and restore worker=1"
+            }
         }
         "Observability" {
             Invoke-ObservabilityScene
+            if ($HoldViews) {
+                Write-Host "H3 trace and dashboards are being held for the presenter."
+                $null = Read-Host "Press Enter after the audience has inspected both traces"
+            }
         }
         "All" {
             $continuityAccount = Invoke-ContinuityScene

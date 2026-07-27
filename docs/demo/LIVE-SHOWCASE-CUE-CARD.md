@@ -130,21 +130,25 @@ Pod；故障、接管、fencing、持久化与客户端恢复路径仍全部真�
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass `
   -File '.\scripts\demo\run-three-hero-showcase.ps1' `
-  -Scene Keda
+  -Scene Keda `
+  -HoldViews
 ```
 
-只盯三项：
+脚本只把“扩容被观测到”作为 H2 的终点，40 秒硬门，不等待所有任务排空。只盯三项：
 
-- Ready events：上升后下降到 0；
-- Oldest ready age：先升后归零；
-- Worker replicas：从 `1` 扩到至少 `3`，上限为 `6`；现场峰值由队列增长与消费速度决定。
+- Ready events：注入后立即上升；
+- Worker replicas：从 `1/1` 扩到至少 `3/3`，上限为 `6`；
+- 终端出现 `KEDA_SCALE_OUT_PASS elapsed_ms=...`，证明扩容在 45 秒预算内完成。
 
 讲解句：
 
 > 我们不按 CPU 扩容，而按用户真正等待的 durable work 数量和最老等待时间扩容。多
 > Worker 用 lease/`SKIP LOCKED` 竞争，inbox uniqueness 保证副作用只提交一次。
 
-脚本必须以 `duplicate_receipts=0` 和 `keda_cleanup=PASS` 收尾。
+`-HoldViews` 会让这个 H2 终端停住，但 worker 和 KEDA 控制循环继续运行。不要按 Enter：
+积压排空和按 HPA 稳定窗口策略自然缩容留给 H3 面板回看。H3 结束后才回到这个窗口按 Enter，
+脚本会删除 synthetic rows、恢复 worker 基线，并以 `keda_cleanup=PASS` 收尾。全量 drain 与
+零重复 receipt 属于预演/离场验收，不占现场 45 秒。
 
 ## 10:00–12:00：可观测性——回看刚才真实发生的事
 
@@ -163,7 +167,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
 - `forbidden_privacy_tags=0`；
 - 最新 trace 的 Jaeger 直达地址。
 
-再展示 kind 内部跨角色 trace：
+再展示两条互补的真实业务 trace：
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass `
@@ -172,8 +176,20 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
   -HoldViews
 ```
 
-指出同一个 trace 中的 API finish、outbox consume、memory projection 和 profile
-projection。边界：目前没有把后续每一个 scheduler 周期强行拼成一棵虚假的单 trace。
+终端首先打印一条真实 Aurora 业务请求的时延瀑布：
+
+- `client_end_to_end_ms`：用户从发送到拿到回复的感知时延；
+- `traced_request_ms`：服务端 HTTP 关键路径；
+- `inner.cosmos.memory.retrieve`：记忆上下文检索；
+- `inner.cosmos.ai.provider`：模型生成，真实 Provider 下通常是主要耗时段；demo/mock 以现场数字为准；
+- `aurora.turn` 只是完成标记，不能误讲成整轮时延。
+
+随后打开第二条 trace，指出 API finish、outbox consume、memory projection 和 profile
+projection 如何跨 API/Worker Pod 延续。两条 trace 都执行敏感标签扫描并要求结果为 0。
+慢信发送与定时投递目前没有传播为同一条 trace，本轮不把它包装成“完整生命周期”。
+
+此时切回 KEDA 面板，用 `from=now-15m` 回看 backlog 下降和 worker 按稳定窗口策略回落；不承诺
+严格在某一秒缩容。H3 看完先在 H3 窗口按 Enter，再回 H2 窗口按 Enter完成清理。
 
 ## 屏幕设计
 

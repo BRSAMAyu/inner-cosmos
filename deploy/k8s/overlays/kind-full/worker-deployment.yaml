@@ -52,6 +52,9 @@ spec:
             - secretRef: {name: inner-cosmos-runtime}
           env:
             - {name: INNER_COSMOS_RUNTIME_ROLE, value: worker}
+            # Safe, opt-in handler for the synthetic backlog used by the live KEDA scene.
+            # Pre-wiring it avoids a Deployment rollout while the audience is watching.
+            - {name: INNER_COSMOS_EVENTS_OUTBOX_SMOKE_PROBE_ENABLED, value: "true"}
             - {name: OTEL_SERVICE_NAME, value: inner-cosmos-worker}
             - {name: MANAGEMENT_OPENTELEMETRY_RESOURCE_ATTRIBUTES_SERVICE_NAME, value: inner-cosmos-worker}
             - {name: MANAGEMENT_OPENTELEMETRY_RESOURCE_ATTRIBUTES_INNER_COSMOS_RUNTIME_ROLE, value: worker}

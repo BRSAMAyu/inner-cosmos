@@ -35,10 +35,20 @@
       "id": 6, "type": "timeseries", "title": "Backlog drains as workers scale", "gridPos": {"h": 10, "w": 16, "x": 0, "y": 9},
       "targets": [
         {"refId": "A", "expr": "max(inner_cosmos_outbox_ready)", "legendFormat": "ready events"},
-        {"refId": "B", "expr": "max(inner_cosmos_outbox_oldest_ready_age_seconds)", "legendFormat": "oldest age (s)"},
         {"refId": "C", "expr": "max(kube_deployment_status_replicas_available{namespace=\"inner-cosmos-w3\",deployment=\"inner-cosmos-worker\"})", "legendFormat": "worker replicas"}
       ],
-      "fieldConfig": {"defaults": {"custom": {"lineWidth": 3, "fillOpacity": 15}}}
+      "fieldConfig": {
+        "defaults": {"custom": {"lineWidth": 3, "fillOpacity": 15}},
+        "overrides": [{
+          "matcher": {"id": "byFrameRefID", "options": "C"},
+          "properties": [
+            {"id": "custom.axisPlacement", "value": "right"},
+            {"id": "min", "value": 0},
+            {"id": "max", "value": 6},
+            {"id": "decimals", "value": 0}
+          ]
+        }]
+      }
     },
     {
       "id": 7, "type": "state-timeline", "title": "Worker Pod lifecycle", "gridPos": {"h": 10, "w": 8, "x": 16, "y": 9},
