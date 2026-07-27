@@ -26,9 +26,13 @@ $http = if ($info["origin"]) {
 $actualHash = if (Test-Path -LiteralPath $apk) {
     (Get-FileHash -LiteralPath $apk -Algorithm SHA256).Hash.ToLowerInvariant()
 } else { "" }
-$apkMatches = -not [string]::IsNullOrWhiteSpace($actualHash) -and
+$apkRequired = -not [string]::IsNullOrWhiteSpace([string]$info["apk"]) -or
+    -not [string]::IsNullOrWhiteSpace([string]$info["apk_sha256"])
+$apkMatches = -not $apkRequired -or (
+    -not [string]::IsNullOrWhiteSpace($actualHash) -and
     -not [string]::IsNullOrWhiteSpace([string]$info["apk_sha256"]) -and
     $actualHash -eq ([string]$info["apk_sha256"]).ToLowerInvariant()
+)
 $ready = $dockerReachable -and $tunnel.Valid -and $http.Healthy -and $apkMatches
 
 Write-Output "demo_state=$(if ($ready) { 'READY' } else { 'STALE_OR_UNAVAILABLE' })"
@@ -37,12 +41,15 @@ Write-Output "tunnel_process_valid=$($tunnel.Valid)"
 Write-Output "tunnel_reason=$($tunnel.Reason)"
 Write-Output "public_http_healthy=$($http.Healthy)"
 Write-Output "public_http_status=$($http.StatusCode)"
-Write-Output "apk_sha256_matches=$apkMatches"
-Write-Output "apk_sha256_actual=$actualHash"
+Write-Output "apk_required=$apkRequired"
+if ($apkRequired) {
+    Write-Output "apk_sha256_matches=$apkMatches"
+    Write-Output "apk_sha256_actual=$actualHash"
+}
 if ($ready) {
     Write-Output "origin=$($info["origin"])"
     Write-Output "app=$($info["app"])"
-    Write-Output "apk=$($info["apk"])"
+    if ($apkRequired) { Write-Output "apk=$($info["apk"])" }
     Write-Output "provider=$($info["provider"])"
     Write-Output "verification=$($info["verification"])"
 } elseif ($info["origin"]) {

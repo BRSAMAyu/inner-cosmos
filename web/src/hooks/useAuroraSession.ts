@@ -322,17 +322,28 @@ export function useAuroraSession({
       setStatus(t.reconnecting);
     }
     try {
-      lastEventIdRef.current = await replayTurnEvents(turnId, lastEventIdRef.current, event => {
-        if (!isCurrentGeneration(generation)) return; // 4.1: stale turn -- ignore replayed events.
-        if (event.type === "timeline.event") {
-          setStatus(t.restoringEvent(event.payload.eventType));
-        } else {
-          handleEventRef.current(event, generation);
-        }
-      });
+      try {
+        lastEventIdRef.current = await replayTurnEvents(turnId, lastEventIdRef.current, event => {
+          if (!isCurrentGeneration(generation)) return; // 4.1: stale turn -- ignore replayed events.
+          if (event.type === "timeline.event") {
+            setStatus(t.restoringEvent(event.payload.eventType));
+          } else {
+            handleEventRef.current(event, generation);
+          }
+        });
+      } catch {
+        // A hard Pod loss can also tear down the local transport carrying this first replay call.
+        // The durable timeline remains authoritative, so continue into the bounded poll below.
+      }
       for (let attempt = 0; attempt < 40; attempt++) {
         if (!isCurrentGeneration(generation)) return; // 4.1: a newer turn superseded this recovery.
-        const timeline = await api.timeline(turnId);
+        let timeline: Awaited<ReturnType<typeof api.timeline>>;
+        try {
+          timeline = await api.timeline(turnId);
+        } catch {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          continue;
+        }
         if (!isCurrentGeneration(generation)) return;
         const recovered = timeline.bubbles
           .filter(b => b.status === "COMMITTED" || b.deliveredChars > 0)

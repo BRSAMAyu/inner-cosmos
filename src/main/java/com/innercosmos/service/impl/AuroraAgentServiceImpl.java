@@ -337,6 +337,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     private AuroraReplyVO produceReply(Long userId, ChatRequest request, SafetyResult safety,
                                        Long userMessageId, Long turnId, boolean persistImmediately,
                                        GenerationAuthority generationAuthority) {
+        holdInitialGenerationLeaseForH1Demo(generationAuthority);
         long turnStartNanos = System.nanoTime();
         boolean fallbackUsed = false;
         // M7: Hard boundary protection — right to refuse identity violation
@@ -2198,7 +2199,6 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             throw new BusinessException(ErrorCode.CONFLICT,
                     "Aurora generation is already continuing on another runtime");
         }
-        holdGenerationLeaseForH1Demo();
         return new GenerationAuthority(lease.owner(), lease.fencingToken());
     }
 
@@ -2207,8 +2207,9 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
      * generation lease observable long enough for a presenter to inject SIGKILL into the exact
      * serving Pod. Production and the public audience instance keep the default value of zero.
      */
-    private void holdGenerationLeaseForH1Demo() {
-        if (h1DemoArmDelayMs <= 0L) return;
+    private void holdInitialGenerationLeaseForH1Demo(GenerationAuthority authority) {
+        if (h1DemoArmDelayMs <= 0L || authority == null || authority.owner() == null
+                || !authority.owner().contains(":generation:")) return;
         try {
             Thread.sleep(Math.min(h1DemoArmDelayMs, 10_000L));
         } catch (InterruptedException interrupted) {

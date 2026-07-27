@@ -92,12 +92,14 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
 lease 精确识别真正承载这次生成的 Pod，然后把即将执行的完整命令打印出来：
 
 ```text
-kubectl -n inner-cosmos-w3 exec <active-pod> -c app -- kill -9 1
+kubectl -n inner-cosmos-w3 delete pod <active-pod> --grace-period=0 --force --wait=false
 ```
 
-这是容器 PID 1 的真实 `SIGKILL`，比普通 Pod 删除更严格，也更适合展示客户端恢复路径。
+这是对精确目标 Pod 的 0 秒 grace 强制删除，比普通 Pod 删除更严格，也更适合展示客户端恢复路径。
 kind 展柜配置了 5 秒 H1 定位窗口，只用于让脚本稳定读到真实 generation lease 并锁定承载它的
 Pod；故障、接管、fencing、持久化与客户端恢复路径仍全部真实执行，不是预制结果。
+本地 `kubectl port-forward` 本质上也会绑定某个 Pod；强删后脚本会自动把 8081 展示入口重新
+挂到存活实例，模拟课堂外部负载均衡器的稳定入口，并打印 `CLIENT_INGRESS_REATTACHED`。
 脚本随后持续显示：
 
 - `available / desired` API；

@@ -109,6 +109,6 @@ Write-Host "KEDA dashboard: http://127.0.0.1:3000/d/inner-cosmos-events/work-pre
 Write-Host "Jaeger:         http://127.0.0.1:16686/search"
 Write-Host ""
 Write-Host "Start the audience demo with:"
-Write-Host "  .\scripts\demo\run-public-demo.ps1 -EnableLiveObservability"
+Write-Host "  .\scripts\demo\run-public-demo.ps1 -EnableLiveObservability -SkipApkBuild"
 Write-Host "Stop all fixed forwards with:"
 Write-Host "  .\scripts\demo\stop-live-showcase.ps1"

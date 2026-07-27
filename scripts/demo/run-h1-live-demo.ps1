@@ -33,6 +33,49 @@ function Invoke-Psql {
     )
 }
 
+function Reset-KindApiForward {
+    $root = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+    $stateFile = Join-Path $root ".demo-runtime\live-showcase.json"
+    if (-not (Test-Path -LiteralPath $stateFile)) {
+        throw "Live-showcase state is missing; cannot reattach the local H1 client ingress."
+    }
+    $state = Get-Content -LiteralPath $stateFile -Raw -Encoding utf8 | ConvertFrom-Json
+    $forward = @($state.forwards | Where-Object { $_.name -eq "kind-api" }) | Select-Object -First 1
+    if ($null -eq $forward) { throw "kind-api forward is missing from live-showcase state." }
+
+    $oldProcess = Get-Process -Id ([int]$forward.pid) -ErrorAction SilentlyContinue
+    if ($null -ne $oldProcess -and $oldProcess.ProcessName -eq "kubectl") {
+        Stop-Process -Id $oldProcess.Id -Force
+    }
+    $portDeadline = (Get-Date).AddSeconds(8)
+    while ((Test-NetConnection 127.0.0.1 -Port ([int]$forward.localPort) -InformationLevel Quiet) -and
+        (Get-Date) -lt $portDeadline) {
+        Start-Sleep -Milliseconds 150
+    }
+
+    $stdout = Join-Path $root ".demo-runtime\kind-api.stdout.log"
+    $stderr = Join-Path $root ".demo-runtime\kind-api.stderr.log"
+    $process = Start-Process -FilePath "kubectl.exe" -ArgumentList @(
+        "-n", [string]$forward.namespace, "port-forward", [string]$forward.resource,
+        "$($forward.localPort):$($forward.remotePort)", "--address=127.0.0.1"
+    ) -RedirectStandardOutput $stdout -RedirectStandardError $stderr -WindowStyle Hidden -PassThru
+    $deadline = (Get-Date).AddSeconds(15)
+    do {
+        if ($process.HasExited) {
+            $detail = Get-Content -LiteralPath $stderr -Raw -ErrorAction SilentlyContinue
+            throw "Replacement kind-api forward exited early: $detail"
+        }
+        Start-Sleep -Milliseconds 150
+    } until ((Test-NetConnection 127.0.0.1 -Port ([int]$forward.localPort) -InformationLevel Quiet) -or
+        (Get-Date) -ge $deadline)
+    if (-not (Test-NetConnection 127.0.0.1 -Port ([int]$forward.localPort) -InformationLevel Quiet)) {
+        throw "Replacement kind-api forward did not become ready."
+    }
+    $forward.pid = $process.Id
+    $state | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $stateFile -Encoding utf8
+    Write-Host "CLIENT_INGRESS_REATTACHED=127.0.0.1:$($forward.localPort) pid=$($process.Id)"
+}
+
 $context = (Invoke-Kube @("config", "current-context")).Trim()
 if ($context -ne $ExpectedContext) {
     throw "Current context '$context' is not '$ExpectedContext'."
@@ -84,24 +127,17 @@ LIMIT 1;
 "@
 $turnParts = $turn -split "\|"
 $turnId = [long]$turnParts[0]
-$restartBefore = [int](Invoke-Kube @(
-    "-n", $Namespace, "get", "pod", $targetPod,
-    "-o", "jsonpath={.status.containerStatuses[0].restartCount}"
-))
-
 Write-Host ""
 Write-Host "TARGET_LOCKED turn=$turnId pod=$targetPod lease_owner=$lease"
 if ($FaultMode -eq "HardCrash") {
-    Write-Host "COMMAND: kubectl -n $Namespace exec $targetPod -c app -- kill -9 1"
+    Write-Host "COMMAND: kubectl -n $Namespace delete pod $targetPod --grace-period=0 --force --wait=false"
     Write-Host "EXPECTED: client detects loss -> durable replay -> recovered; another API remains Ready."
-    $previous = $ErrorActionPreference
-    $ErrorActionPreference = "Continue"
-    try {
-        & kubectl -n $Namespace exec $targetPod -c app -- kill -9 1 2>&1 | Out-Null
-    } finally {
-        $ErrorActionPreference = $previous
-    }
-    Write-Host "FAULT_INJECTED=container_pid1_sigkill"
+    Invoke-Kube @(
+        "-n", $Namespace, "delete", "pod", $targetPod,
+        "--grace-period=0", "--force", "--wait=false"
+    ) | Out-Null
+    Write-Host "FAULT_INJECTED=forced_pod_delete_zero_grace"
+    Reset-KindApiForward
 } else {
     Write-Host "COMMAND: kubectl -n $Namespace delete pod $targetPod --wait=false"
     Write-Host "EXPECTED: graceful drain normally finishes without showing a client error."
@@ -117,15 +153,11 @@ do {
         "-o", "jsonpath={.status.availableReplicas}/{.spec.replicas}"
     )
     $turnStatus = Invoke-Psql "SELECT status FROM tb_conversation_turn WHERE id = $turnId;"
-    $restartNow = if ($FaultMode -eq "HardCrash") {
-        [int](Invoke-Kube @(
-            "-n", $Namespace, "get", "pod", $targetPod,
-            "-o", "jsonpath={.status.containerStatuses[0].restartCount}"
-        ))
-    } else { $restartBefore }
-    Write-Host "api=$ready target_restarts=$restartNow turn=$turnStatus"
+    $targetExists = (& kubectl -n $Namespace get pod $targetPod --ignore-not-found -o name 2>$null)
+    $targetState = if ([string]::IsNullOrWhiteSpace(($targetExists -join ""))) { "deleted" } else { "present" }
+    Write-Host "api=$ready target=$targetState turn=$turnStatus"
     if ($turnStatus -eq "COMPLETED" -and $ready -eq "2/2" -and
-        ($FaultMode -ne "HardCrash" -or $restartNow -gt $restartBefore)) {
+        ($FaultMode -ne "HardCrash" -or $targetState -eq "deleted")) {
         break
     }
     Start-Sleep -Seconds 2
