@@ -188,6 +188,9 @@ public class MockDataInitializer implements CommandLineRunner, DemoSandboxServic
         ensureShowcaseProfile(cloud.id, "cloud");
         ensureShowcaseAssets(river.id, "river");
         ensureShowcaseAssets(cloud.id, "cloud");
+        ensureMatureStoryAssets(demo.id, "demo");
+        ensureMatureStoryAssets(river.id, "river");
+        ensureMatureStoryAssets(cloud.id, "cloud");
         enrichCuratedMemoryEvidence(demo.id);
         enrichCuratedMemoryEvidence(river.id);
         enrichCuratedMemoryEvidence(cloud.id);
@@ -298,9 +301,11 @@ public class MockDataInitializer implements CommandLineRunner, DemoSandboxServic
                     ? "The One Who Walks by the River"
                     : "The One Learning to Include Herself in Care");
         }
+        ensureMatureStoryAssets(sandbox.id, persona);
         // A copied story starts private. The visitor can deliberately review and publish it later,
         // without filling the public plaza or real-people discovery with disposable demo actors.
         privatizeSandboxCapsules(capsuleMapper, sandbox.id);
+        seedSandboxSocialClue(sandbox, persona);
         return sandbox;
     }
 
@@ -575,6 +580,65 @@ public class MockDataInitializer implements CommandLineRunner, DemoSandboxServic
                 .eq("owner_user_id", userId).eq("capsule_type", "USER_CAPSULE")) == 0) {
             seedShowcaseMirror(userId, persona);
         }
+    }
+
+    /**
+     * Keeps all three lived-in stories structurally comparable without making them copies.
+     *
+     * <p>The mature Demo is a product fixture, not an empty-account smoke test. Every story must
+     * therefore support the same visible surfaces (portrait, Aurora relationship model and belief
+     * gallery), while its language and evidence remain specific to that person's history. Count
+     * guards also reconcile an older persistent classroom volume without duplicating rows.</p>
+     */
+    private void ensureMatureStoryAssets(Long userId, String persona) {
+        if (userPortraitMapper.selectCount(new QueryWrapper<UserPortrait>().eq("user_id", userId)) == 0) {
+            if ("demo".equals(persona)) seedUserPortrait(userId);
+            else seedShowcasePortrait(userId, persona);
+        }
+        if (auroraSelfModelMapper.selectCount(new QueryWrapper<AuroraSelfModel>()
+                .eq("user_id", userId).eq("status", "active")) == 0) {
+            if ("demo".equals(persona)) seedAuroraSelfModel(userId);
+            else seedShowcaseAuroraSelfModel(userId, persona);
+        }
+        if (beliefPatternMapper.selectCount(new QueryWrapper<BeliefPattern>().eq("user_id", userId)) == 0) {
+            if ("demo".equals(persona)) seedBeliefPatterns(userId);
+            else seedShowcaseBeliefPatterns(userId, persona);
+        }
+    }
+
+    /**
+     * Gives a personal sandbox one readable social clue without publishing its copied capsule.
+     * The sender is one of the repository-owned showcase identities; the receiver and referenced
+     * capsule are always the isolated sandbox owner, so audience sessions never share mutable data.
+     */
+    private void seedSandboxSocialClue(User sandbox, String persona) {
+        String senderUsername = switch (persona) {
+            case "demo" -> "cloud";
+            case "river" -> "demo";
+            default -> "river";
+        };
+        User sender = userMapper.selectOne(new QueryWrapper<User>()
+                .eq("username", senderUsername).last("LIMIT 1"));
+        if (sender == null) return;
+        String pseudonym = switch (persona) {
+            case "demo" -> "Lin Che's Echo";
+            case "river" -> "The One Who Walks by the River";
+            default -> "The One Learning to Include Herself in Care";
+        };
+        Long receiverCapsuleId = curatedCapsuleId(sandbox.id, pseudonym);
+        if (receiverCapsuleId == null) return;
+        String title = switch (persona) {
+            case "demo" -> "Turning a large vision into one small square of today";
+            case "river" -> "You didn't rush to choose one city, and I felt myself exhale";
+            default -> "You said care should not have to prove itself through exhaustion";
+        };
+        String body = switch (persona) {
+            case "demo" -> "You did not pretend the complicated thing was simple, but you still left somewhere to begin. That unforced specificity made me want to keep knowing you.";
+            case "river" -> "You wrote that belonging does not have to be proven by choosing only one side. I am practising that too: no verdict on my whole life today—just make this day more concrete.";
+            default -> "I used to think reliability meant always being available. Reading your portrait made me wonder whether answering more slowly can sometimes protect a relationship.";
+        };
+        ensureCuratedLetter(sender.id, sandbox.id, receiverCapsuleId, title, body,
+                LocalDateTime.now().minusHours(4));
     }
 
     /**
@@ -937,6 +1001,32 @@ public class MockDataInitializer implements CommandLineRunner, DemoSandboxServic
         insertPortrait(userId, "AGENCY_BOUNDARY", "Learning to describe impact without proving malicious intent, while protecting personal boundaries.", 0.64, 0.62);
     }
 
+    private void seedShowcasePortrait(Long userId, String persona) {
+        if ("river".equals(persona)) {
+            insertPortrait(userId, "INNER_DRIVE", "Wants creative work to carry an honest judgement, even before belonging feels settled.", 0.78, 0.77);
+            insertPortrait(userId, "VALUES", "Values quiet accuracy, patient observation and relationships that do not demand instant intimacy.", 0.84, 0.81);
+            insertPortrait(userId, "SELF_NARRATIVE", "Learning that being unfamiliar with a place does not make his perception less credible.", 0.75, 0.73);
+            insertPortrait(userId, "COMMUNICATION_STYLE", "Uses physical detail before interpretation and leaves room rather than filling every silence.", 0.83, 0.82);
+            insertPortrait(userId, "ABSTRACT_VS_CONCRETE", "Finds abstract questions of belonging through repeated routes, drawings and shared meals.", 0.76, 0.72);
+            insertPortrait(userId, "EMOTION_PATTERN", "Uncertainty first appears as over-revision and tiredness; calm returns through familiar sensory routes.", 0.72, 0.75);
+            insertPortrait(userId, "ENERGY_RHYTHM", "Protects late mornings and works in long studio windows; Wednesday river walks reset attention.", 0.69, 0.68);
+            insertPortrait(userId, "CURRENT_STATE", "Midway through exchange life, allowing two places to matter without forcing a verdict.", 0.81, 0.79);
+            insertPortrait(userId, "RELATIONSHIP_CONTEXT", "Trust grows through low-frequency repetition: cooking, walking and showing unfinished work.", 0.74, 0.72);
+            insertPortrait(userId, "AGENCY_BOUNDARY", "Will not let a stranger decide whether he belongs or romanticise loneliness on his behalf.", 0.79, 0.76);
+        } else {
+            insertPortrait(userId, "INNER_DRIVE", "Wants care to remain generous without requiring her to disappear inside other people's needs.", 0.82, 0.80);
+            insertPortrait(userId, "VALUES", "Values reliability, tenderness and a form of responsibility that can be shared.", 0.86, 0.83);
+            insertPortrait(userId, "SELF_NARRATIVE", "Learning that needing rest and help does not make her less loving or competent.", 0.77, 0.75);
+            insertPortrait(userId, "COMMUNICATION_STYLE", "Warm and everyday, but willing to say the uncomfortable sentence without appeasing.", 0.84, 0.82);
+            insertPortrait(userId, "ABSTRACT_VS_CONCRETE", "Tests boundaries through ordinary evidence: one delayed reply, one shared care task, one quiet half-hour.", 0.75, 0.73);
+            insertPortrait(userId, "EMOTION_PATTERN", "Fatigue used to hide anger; anger is becoming information about responsibilities that are not hers alone.", 0.78, 0.76);
+            insertPortrait(userId, "ENERGY_RHYTHM", "Energy drops sharply after care-heavy shifts; device-free evenings make recovery more believable.", 0.72, 0.70);
+            insertPortrait(userId, "CURRENT_STATE", "Settling into a new helping role while renegotiating family care and work availability.", 0.82, 0.80);
+            insertPortrait(userId, "RELATIONSHIP_CONTEXT", "Often becomes the dependable one, and is practising relationships that survive a slower reply.", 0.76, 0.74);
+            insertPortrait(userId, "AGENCY_BOUNDARY", "Separates caring from carrying and rejects the idea that goodness must be proved through exhaustion.", 0.83, 0.81);
+        }
+    }
+
     private void insertPortrait(Long userId, String dim, String summary, double score, double confidence) {
         UserPortrait p = new UserPortrait();
         p.userId = userId;
@@ -964,6 +1054,28 @@ public class MockDataInitializer implements CommandLineRunner, DemoSandboxServic
                 "You seem to prefer honesty when I am uncertain over a confident tone that conceals it.", 0.71);
         insertSelfReflection(userId, "relationship_role",
                 "When pressure is high, steadying the rhythm before finding the next step may help more than advice.", 0.68);
+    }
+
+    private void seedShowcaseAuroraSelfModel(Long userId, String persona) {
+        boolean river = "river".equals(persona);
+        insertSelfModel(userId, "existence_style", river
+                ? "With Shen Yan, I notice patiently and leave silence intact instead of turning uncertainty into a verdict."
+                : "With Xia Yu, I stay warm but clear-eyed and never reward self-erasure as proof of care.", 0.82);
+        insertSelfModel(userId, "relationship_role", river
+                ? "I help repeated places and sensory details become continuity without deciding where he belongs."
+                : "I help separate caring from carrying, while leaving family and work decisions in her hands.", 0.80);
+        insertSelfModel(userId, "boundary", river
+                ? "I do not romanticise loneliness, define belonging, or invent details about his city, school or studio."
+                : "I do not diagnose fatigue, judge relatives, or turn rest into another performance target.", 0.79);
+        insertSelfModel(userId, "voice_style", river
+                ? "My voice with him is quiet, precise and grounded in one physical detail at a time."
+                : "My voice with her is gentle, direct and willing to name resentment without blame.", 0.77);
+        insertSelfReflection(userId, "existence_style", river
+                ? "He responds better when I let an image or route carry meaning before naming the feeling."
+                : "She responds better when I recognise the cost of care without praising endurance.", 0.72);
+        insertSelfReflection(userId, "relationship_role", river
+                ? "Showing one unfinished thing may matter more here than offering a confident interpretation."
+                : "One piece of evidence that a relationship survived waiting may be more useful than a self-care list.", 0.69);
     }
 
     private void insertSelfModel(Long userId, String dimension, String belief, double confidence) {
@@ -1007,6 +1119,28 @@ public class MockDataInitializer implements CommandLineRunner, DemoSandboxServic
         insertBelief(userId, "Canned reassurance can feel lonelier than silence.", "WORLD", "communication", 0.58, 2, mem);
         // 故意一对同 category（self_worth）一正一负 → 触发信念冲突检测。
         insertBelief(userId, "Under pressure, I struggle to feel that I have proved I am good enough.", "SELF", "self_worth", 0.48, 2, mem);
+    }
+
+    private void seedShowcaseBeliefPatterns(Long userId, String persona) {
+        List<MemoryCard> cards = memoryCardMapper.selectList(new QueryWrapper<MemoryCard>()
+                .eq("user_id", userId).orderByDesc("emotional_gravity").last("LIMIT 6"));
+        String mem = cards.stream().map(c -> String.valueOf(c.id))
+                .reduce((a, b) -> a + "," + b).orElse("");
+        if ("river".equals(persona)) {
+            insertBelief(userId, "Belonging can grow through repetition without requiring a final choice of home.", "WORLD", "belonging", 0.73, 4, mem);
+            insertBelief(userId, "An unfinished drawing can still carry a judgement worth showing.", "SELF", "creative_authority", 0.67, 3, mem);
+            insertBelief(userId, "A repeated route can become a real form of orientation.", "WORLD", "place", 0.71, 5, mem);
+            insertBelief(userId, "Low-frequency friendship can be more trustworthy than instant disclosure.", "OTHERS", "relationship", 0.69, 3, mem);
+            insertBelief(userId, "When I am unfamiliar, I sometimes assume my judgement counts less.", "SELF", "creative_authority", 0.46, 2, mem);
+            insertBelief(userId, "Missing two cities does not make either attachment false.", "SELF", "belonging", 0.70, 3, mem);
+        } else {
+            insertBelief(userId, "Care remains real when responsibility is shared.", "OTHERS", "care", 0.76, 5, mem);
+            insertBelief(userId, "A relationship can survive a reply that waits until morning.", "OTHERS", "relationship_safety", 0.72, 4, mem);
+            insertBelief(userId, "Anger can be information about an unfair load, not a failure of kindness.", "SELF", "emotion", 0.68, 3, mem);
+            insertBelief(userId, "Rest does not have to produce improvement to be legitimate.", "SELF", "rest_worth", 0.65, 3, mem);
+            insertBelief(userId, "If I do not respond immediately, I fear I am letting someone down.", "SELF", "relationship_safety", 0.47, 2, mem);
+            insertBelief(userId, "Being dependable does not require being the only person available.", "WORLD", "care", 0.74, 4, mem);
+        }
     }
 
     private void insertBelief(Long userId, String content, String type, String category,

@@ -2,7 +2,20 @@ package com.innercosmos.config;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.innercosmos.entity.AuroraSelfModel;
+import com.innercosmos.entity.BeliefPattern;
+import com.innercosmos.entity.DailyRecord;
+import com.innercosmos.entity.MemoryCard;
+import com.innercosmos.entity.SlowLetter;
+import com.innercosmos.entity.UserPortrait;
+import com.innercosmos.mapper.AuroraSelfModelMapper;
+import com.innercosmos.mapper.BeliefPatternMapper;
+import com.innercosmos.mapper.DailyRecordMapper;
 import com.innercosmos.mapper.EchoCapsuleMapper;
+import com.innercosmos.mapper.MemoryCardMapper;
+import com.innercosmos.mapper.SlowLetterMapper;
+import com.innercosmos.mapper.UserPortraitMapper;
 import com.innercosmos.service.CapsuleGenomeService;
 import com.innercosmos.service.DemoSandboxService;
 import org.junit.jupiter.api.Test;
@@ -45,6 +58,12 @@ class CuratedDemoCapsuleJourneyTest {
     @Autowired CapsuleGenomeService capsuleGenomeService;
     @Autowired EchoCapsuleMapper echoCapsuleMapper;
     @Autowired DemoSandboxService demoSandboxService;
+    @Autowired UserPortraitMapper userPortraitMapper;
+    @Autowired AuroraSelfModelMapper auroraSelfModelMapper;
+    @Autowired BeliefPatternMapper beliefPatternMapper;
+    @Autowired MemoryCardMapper memoryCardMapper;
+    @Autowired DailyRecordMapper dailyRecordMapper;
+    @Autowired SlowLetterMapper slowLetterMapper;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -65,6 +84,59 @@ class CuratedDemoCapsuleJourneyTest {
             assertTrue(capsules.stream().allMatch(capsule ->
                     "PRIVATE".equals(capsule.visibilityStatus) && !Boolean.TRUE.equals(capsule.isPublic)));
         }
+    }
+
+    @Test
+    void everyPersonalSandboxCarriesTheSameMatureSurfacesWithDifferentStoryEvidence() {
+        java.util.Map<String, String> expectedLetterTitles = java.util.Map.of(
+                "lin-che", "Turning a large vision into one small square of today",
+                "shen-yan", "You didn't rush to choose one city, and I felt myself exhale",
+                "xia-yu", "You said care should not have to prove itself through exhaustion");
+        java.util.Set<String> portraitSignatures = new java.util.LinkedHashSet<>();
+        java.util.Set<String> beliefSignatures = new java.util.LinkedHashSet<>();
+
+        for (String key : expectedLetterTitles.keySet()) {
+            var owner = demoSandboxService.createPersonalSandbox(key);
+
+            var portraits = userPortraitMapper.selectList(new QueryWrapper<UserPortrait>()
+                    .eq("user_id", owner.id));
+            var selfModels = auroraSelfModelMapper.selectList(new QueryWrapper<AuroraSelfModel>()
+                    .eq("user_id", owner.id).eq("status", "active"));
+            var beliefs = beliefPatternMapper.selectList(new QueryWrapper<BeliefPattern>()
+                    .eq("user_id", owner.id));
+            var memories = memoryCardMapper.selectList(new QueryWrapper<MemoryCard>()
+                    .eq("user_id", owner.id).eq("status", "ACTIVE"));
+            var records = dailyRecordMapper.selectList(new QueryWrapper<DailyRecord>()
+                    .eq("user_id", owner.id).eq("status", "ACTIVE"));
+            var letters = slowLetterMapper.selectList(new QueryWrapper<SlowLetter>()
+                    .eq("receiver_user_id", owner.id));
+
+            assertTrue(portraits.size() >= 10, key + " must expose the complete portrait surface");
+            assertTrue(selfModels.size() >= 4, key + " must expose Aurora relationship continuity");
+            assertTrue(beliefs.size() >= 6, key + " must expose a lived-in belief gallery");
+            assertTrue(memories.size() >= 5, key + " must expose a non-empty memory cosmos");
+            assertTrue(records.size() >= 3, key + " must expose a multi-date lived timeline");
+            assertTrue(letters.stream().anyMatch(letter ->
+                            expectedLetterTitles.get(key).equals(letter.title)
+                                    && "DELIVERED".equals(letter.status)
+                                    && letter.receiverCapsuleId != null),
+                    key + " must carry its own readable, capsule-grounded social clue");
+
+            portraitSignatures.add(portraits.stream().map(row -> row.valueJson)
+                    .sorted().reduce("", (left, right) -> left + right));
+            beliefSignatures.add(beliefs.stream().map(row -> row.beliefContent)
+                    .sorted().reduce("", (left, right) -> left + right));
+
+            var capsules = echoCapsuleMapper.selectList(new QueryWrapper<com.innercosmos.entity.EchoCapsule>()
+                    .eq("owner_user_id", owner.id));
+            assertTrue(capsules.stream().allMatch(capsule ->
+                    "PRIVATE".equals(capsule.visibilityStatus) && !Boolean.TRUE.equals(capsule.isPublic)));
+        }
+
+        assertTrue(portraitSignatures.size() == 3,
+                "the three mature stories must not share one generic portrait");
+        assertTrue(beliefSignatures.size() == 3,
+                "the three mature stories must not share one generic belief set");
     }
 
     @Test
