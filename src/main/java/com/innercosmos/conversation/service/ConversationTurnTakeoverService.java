@@ -17,12 +17,13 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class ConversationTurnTakeoverService {
-    private static final Duration GENERATION_LEASE_TTL = Duration.ofMinutes(2);
     private final ConversationChoreographyService choreography;
     private final DialogService dialogService;
     private final AuroraAgentService auroraAgentService;
     private final Duration leaseTtl;
     private final String instanceId;
+    @Value("${inner-cosmos.aurora.turn-recovery.generation-lease-ttl:PT2M}")
+    private Duration generationLeaseTtl = Duration.ofMinutes(2);
 
     public ConversationTurnTakeoverService(
             ConversationChoreographyService choreography,
@@ -53,7 +54,7 @@ public class ConversationTurnTakeoverService {
             }
             ConversationChoreographyService.DeliveryLease generationLease =
                     choreography.claimGenerationLease(
-                            userId, turnId, owner, GENERATION_LEASE_TTL);
+                            userId, turnId, owner, generationLeaseTtl);
             if (generationLease == null) return choreography.timeline(userId, turnId);
             auroraAgentService.resumeExistingTurn(
                     userId, snapshot, generationLease.owner(), generationLease.fencingToken());

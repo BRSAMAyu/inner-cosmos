@@ -59,6 +59,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -86,7 +87,6 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     private static final int COMPLETED_RESPONSE_CHUNK_CHARS = 12;
     private static final int MODEL_LONG_TERM_MEMORY_LIMIT = 4;
     private static final Duration DELIVERY_LEASE_TTL = Duration.ofSeconds(15);
-    private static final Duration GENERATION_LEASE_TTL = Duration.ofMinutes(2);
     private static final String GENERATION_CONTEXT_VERSION = "aurora-context.v1";
     // M2 (independent code review): used to build the inner_voice SSE payload via writeValueAsString
     // instead of hand-rolled string concatenation, so an odd control char (U+0000-U+001F) in LLM
@@ -162,6 +162,8 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     private AuroraStreamStageStore streamStageStore =
             new InMemoryAuroraStreamStageStore(Duration.ofMinutes(1), 1024);
     private AuroraLiveEventStore liveEventStore = new InMemoryAuroraLiveEventStore(1024);
+    @Value("${inner-cosmos.aurora.turn-recovery.generation-lease-ttl:PT2M}")
+    private Duration generationLeaseTtl = Duration.ofMinutes(2);
 
     @Autowired
     void setStreamStageStore(AuroraStreamStageStore streamStageStore) {
@@ -654,7 +656,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 choreographyService.stageDeliberationFenced(
                         userId, turnId, expectedRevision, userSafeJson,
                         generationAuthority.owner(), generationAuthority.fencingToken(),
-                        GENERATION_LEASE_TTL);
+                        generationLeaseTtl);
             }
         } catch (com.fasterxml.jackson.core.JsonProcessingException serializationFailure) {
             throw new BusinessException(ErrorCode.BAD_REQUEST,
@@ -2184,7 +2186,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 GENERATION_CONTEXT_VERSION, request.foregroundAcknowledgementSent);
         String owner = "generation:" + java.util.UUID.randomUUID();
         var lease = choreographyService.claimGenerationLease(
-                userId, turnId, owner, GENERATION_LEASE_TTL);
+                userId, turnId, owner, generationLeaseTtl);
         if (lease == null) {
             throw new BusinessException(ErrorCode.CONFLICT,
                     "Aurora generation is already continuing on another runtime");
