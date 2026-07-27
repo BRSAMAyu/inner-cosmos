@@ -1,0 +1,29 @@
+H1 LIVE DEMO ARMED
+Client:    http://127.0.0.1:8081/app/aurora/
+Dashboard: http://127.0.0.1:3000/d/inner-cosmos-recovery/continuity-contract-c2b7-pod-recovery-live?orgId=1&refresh=2s
+
+ACTION FOR PRESENTER: send one Aurora message now.
+baseline_turn_id=39 api=2/2
+Waiting for the next durable generation lease to identify the exact serving Pod...
+
+TARGET_LOCKED turn=40 pod=inner-cosmos-api-5db84ddb9-dmlx9 lease_owner=inner-cosmos-api-5db84ddb9-dmlx9:generation:6d72eb99-c057-42cb-a083-85c25fc8efd0
+COMMAND: kubectl -n inner-cosmos-w3 delete pod inner-cosmos-api-5db84ddb9-dmlx9 --grace-period=0 --force --wait=false
+EXPECTED: client detects loss -> durable replay -> recovered; another API remains Ready.
+FAULT_INJECTED=forced_pod_delete_zero_grace
+WARNING: TCP connect to (127.0.0.1 : 8081) failed
+CLIENT_INGRESS_REATTACHED=127.0.0.1:8081 pid=61324
+api=1/2 target=deleted turn=GENERATING
+api=1/2 target=deleted turn=GENERATING
+api=1/2 target=deleted turn=GENERATING
+api=1/2 target=deleted turn=GENERATING
+api=1/2 target=deleted turn=GENERATING
+api=1/2 target=deleted turn=GENERATING
+api=1/2 target=deleted turn=GENERATING
+api=2/2 target=deleted turn=GENERATING
+api=2/2 target=deleted turn=GENERATING
+api=2/2 target=deleted turn=GENERATING
+api=2/2 target=deleted turn=GENERATING
+api=2/2 target=deleted turn=COMPLETED
+
+H1_LIVE_PASS turn=40 final_status=COMPLETED api=2/2
+Explain: Redis carries live cursor/session state; PostgreSQL is transcript truth; fencing prevents duplicate commits.

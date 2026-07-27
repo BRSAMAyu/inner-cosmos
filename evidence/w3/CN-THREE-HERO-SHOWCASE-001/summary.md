@@ -132,3 +132,27 @@ The final script now fails closed on observability deployment readiness and KEDA
 `ScaledObject` readiness, reuses the fixed live-showcase ports when available, treats cleanup or
 post-scale invariants as command failures, and prints explicit `H2_PRESENTER_READY` /
 `H3_PRESENTER_READY` markers.
+
+## 2026-07-28 frozen classroom backup
+
+The final runtime snapshot was rechecked on `kind-kubedeploy` with API `2/2`, worker `1/1`,
+`LLM_PROVIDER=gemini`, `GEMINI_MODEL=gemini-3.6-flash`, Mock fallback disabled and memory
+embedding disabled. This provider note applies to the final 2026-07-28 H1/H3 runs; it does not
+retroactively change the Mock-AI boundary of the older 2026-07-27 rehearsals above.
+
+The offline backup is now self-contained in the repository:
+
+- machine-readable result: `final-results-2026-07-28.json`;
+- raw H1 terminal log: `h1-live-final-run-2026-07-28.txt`;
+- H1 restored client and Grafana screenshots;
+- H2 Grafana screenshot;
+- H3 Jaeger screenshot;
+- public Demo screenshots for lived-in stories, Aurora, memory, resonance and connections;
+- presenter deck: `docs/demo/HERO-EXPERIMENT-OFFLINE-BACKUP.html`;
+- claim/evidence/new-experiment matrix: `docs/demo/EXPERIMENT-EVIDENCE-PACK.md`.
+
+The H3 screenshot shows `31` total spans because account-cleanup requests reused the same injected
+trace context after the script had already passed its required `21`-span application contract.
+Jaeger's `Incomplete` badge describes the unexported external client root span; the rehearsal
+independently failed closed unless every API, Aurora, provider, memory, outbox and worker projection
+span required by the claim was present.

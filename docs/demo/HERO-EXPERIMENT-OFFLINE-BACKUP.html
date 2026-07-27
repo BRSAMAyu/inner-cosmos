@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Inner Cosmos · Hero 实验离线证据</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #f5f1e8;
+      --muted: #b9b3aa;
+      --panel: rgba(37, 32, 38, .92);
+      --line: rgba(255, 255, 255, .13);
+      --mint: #b8d0c2;
+      --gold: #d8b77f;
+      --green: #7fd69b;
+      --red: #e49595;
+    }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+    body {
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 12% 12%, rgba(101, 128, 116, .26), transparent 34%),
+        radial-gradient(circle at 88% 80%, rgba(125, 84, 101, .24), transparent 32%),
+        #151217;
+      font-family: Inter, "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif;
+    }
+    .deck { height: 100%; }
+    .slide {
+      display: none;
+      height: 100%;
+      padding: 38px 48px 34px;
+      grid-template-rows: auto 1fr auto;
+      gap: 22px;
+    }
+    .slide.active { display: grid; }
+    .kicker {
+      color: var(--mint);
+      letter-spacing: .18em;
+      font-size: 14px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    h1, h2 { font-family: Georgia, "Noto Serif SC", serif; margin: 0; font-weight: 500; }
+    h1 { font-size: clamp(42px, 5vw, 74px); line-height: 1.03; max-width: 1100px; }
+    h2 { font-size: clamp(34px, 4vw, 58px); line-height: 1.08; }
+    .subtitle { color: var(--muted); font-size: 19px; line-height: 1.6; max-width: 1100px; margin-top: 14px; }
+    .content { min-height: 0; display: grid; gap: 18px; align-items: stretch; }
+    .two, .three { display: grid; }
+    .two { grid-template-columns: minmax(0, 1.15fr) minmax(320px, .85fr); }
+    .three { grid-template-columns: repeat(3, 1fr); }
+    .panel {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 22px;
+      padding: 22px;
+      min-width: 0;
+      overflow: hidden;
+    }
+    .image-panel { padding: 10px; display: flex; align-items: center; justify-content: center; }
+    .image-panel img { width: 100%; height: 100%; object-fit: contain; border-radius: 14px; }
+    .stack { display: grid; grid-template-rows: 1fr 1fr; gap: 14px; min-height: 0; }
+    .metric-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 13px; margin-top: 18px; }
+    .metric { border: 1px solid var(--line); border-radius: 16px; padding: 15px; background: rgba(255,255,255,.025); }
+    .metric strong { display: block; color: var(--gold); font-size: clamp(24px, 2.8vw, 44px); line-height: 1.05; }
+    .metric span { color: var(--muted); font-size: 14px; }
+    .three .metric strong { font-size: clamp(21px, 2vw, 30px); }
+    .claim { border-left: 4px solid var(--green); padding-left: 16px; font-size: 22px; line-height: 1.55; }
+    .boundary { border-left-color: var(--red); }
+    ul { margin: 14px 0 0; padding-left: 24px; }
+    li { margin: 8px 0; color: var(--muted); line-height: 1.45; }
+    code { color: var(--mint); font-family: "Cascadia Mono", Consolas, monospace; }
+    .footer { color: #8d868d; display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
+    .badge { display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; border: 1px solid rgba(127,214,155,.35); color: var(--green); border-radius: 999px; font-size: 13px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+    .proof-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; min-height: 0; }
+    .proof-strip img { width: 100%; height: 100%; object-fit: cover; object-position: top; border-radius: 16px; border: 1px solid var(--line); }
+    .page { color: var(--gold); }
+    .speaker { font-size: 17px; color: var(--muted); line-height: 1.55; }
+    @media (max-width: 900px) {
+      .slide { padding: 24px; }
+      .two, .three { grid-template-columns: 1fr; }
+      .proof-strip { grid-template-columns: 1fr 1fr; }
+      .content { overflow: auto; }
+    }
+  </style>
+</head>
+<body>
+<main class="deck" aria-label="Inner Cosmos 离线实验备份">
+  <section class="slide active">
+    <header>
+      <div class="kicker">Frozen runtime evidence · 2026-07-28</div>
+      <h1>三个 Hero 实验，即使现场失败也能用原始结果讲清楚</h1>
+      <p class="subtitle">同一代码基线的真实日志、Grafana、Jaeger 与产品页面。不是模拟动画，不把 local kind 外推成生产云。</p>
+    </header>
+    <div class="content">
+      <div class="three">
+        <article class="panel">
+          <span class="badge"><span class="dot"></span>H1 PASS</span>
+          <h2 style="margin-top:18px">跨 Pod 续写</h2>
+          <p class="speaker">强删精确承载 Pod；同一 durable turn 完成；历史与回复气泡仍在。</p>
+          <div class="metric-grid">
+            <div class="metric"><strong>2→1→2</strong><span>Ready API Pods</span></div>
+            <div class="metric"><strong>COMPLETED</strong><span>final turn</span></div>
+          </div>
+        </article>
+        <article class="panel">
+          <span class="badge"><span class="dot"></span>H2 PASS × 2</span>
+          <h2 style="margin-top:18px">KEDA 弹性</h2>
+          <p class="speaker">真实 durable backlog 驱动 worker 扩容，处理完成后无重复收据。</p>
+          <div class="metric-grid">
+            <div class="metric"><strong>1→6</strong><span>desired workers</span></div>
+            <div class="metric"><strong>0</strong><span>duplicate receipts</span></div>
+          </div>
+        </article>
+        <article class="panel">
+          <span class="badge"><span class="dot"></span>H3 PASS × 2</span>
+          <h2 style="margin-top:18px">端到端 Trace</h2>
+          <p class="speaker">Aurora、Gemini、memory、outbox、worker projections 在同一 W3C 轨迹。</p>
+          <div class="metric-grid">
+            <div class="metric"><strong>13.890s</strong><span>client end-to-end</span></div>
+            <div class="metric"><strong>0</strong><span>forbidden tags</span></div>
+          </div>
+        </article>
+      </div>
+    </div>
+    <footer class="footer"><span>← / → 切换 · F11 全屏</span><span class="page">1 / 7</span></footer>
+  </section>
+
+  <section class="slide">
+    <header>
+      <div class="kicker">Demo fallback</div>
+      <h2>公网产品 Demo：冻结真实的核心产品面</h2>
+    </header>
+    <div class="content">
+      <div class="proof-strip">
+        <img src="../../evidence/w3/CN-THREE-HERO-SHOWCASE-001/public-demo-lived-in-stories-2026-07-28.png" alt="三个预置故事">
+        <img src="../../evidence/w3/CN-THREE-HERO-SHOWCASE-001/public-demo-memory-cosmos-2026-07-28.png" alt="记忆与内宇宙">
+        <img src="../../evidence/w3/CN-THREE-HERO-SHOWCASE-001/public-demo-resonance-2026-07-28.png" alt="共鸣体">
+        <img src="../../evidence/w3/CN-THREE-HERO-SHOWCASE-001/public-demo-connections-2026-07-28.png" alt="慢信与连接">
+      </div>
+      <div class="panel claim">三个 lived-in story 按浏览器 Session 创建独立 SANDBOX；Aurora、记忆、共鸣体、慢信和连接都来自实际公网 Demo 页面。</div>
+    </div>
+    <footer class="footer"><span>断网时先展示产品闭环，再进入工程证据</span><span class="page">2 / 7</span></footer>
+  </section>
+
+  <section class="slide">
+    <header>
+      <div class="kicker">H1 · resource reliability → semantic continuity</div>
+      <h2>Pod 消失，但用户的句子没有消失</h2>
+    </header>
+    <div class="content two">
+      <div class="image-panel panel">
+        <img src="../../evidence/w3/CN-THREE-HERO-SHOWCASE-001/h1-client-restored-history-2026-07-28.png" alt="H1 恢复后的客户端">
+      </div>
+      <div class="stack">
+        <div class="panel">
+          <div class="claim">turn 40：强制删除 lease owner Pod 后，最终 <code>COMPLETED</code>；原用户消息与两条 Aurora 气泡仍可见。</div>
+          <div class="metric-grid">
+            <div class="metric"><strong>2/2</strong><span>final API Ready</span></div>
+            <div class="metric"><strong>1 + 2</strong><span>user + Aurora bubbles</span></div>
+          </div>
+        </div>
+        <div class="panel speaker">
+          <b style="color:var(--ink)">一句机制：</b><br>
+          Redis 保存游标与 Session；PostgreSQL 是 transcript truth；generation lease 与 fencing token 阻止两个 Pod 重复提交。
+        </div>
+      </div>
+    </div>
+    <footer class="footer"><span>原始日志：H1_LIVE_PASS turn=40 final_status=COMPLETED api=2/2</span><span class="page">3 / 7</span></footer>
+  </section>
+
+  <section class="slide">
+    <header>
+      <div class="kicker">H1 · system view</div>
+      <h2>我们观测的是连续性不变量，不只是 Pod 名字</h2>
+    </header>
+    <div class="content two">
+      <div class="image-panel panel">
+        <img src="../../evidence/w3/CN-THREE-HERO-SHOWCASE-001/h1-recovery-dashboard-2026-07-28.png" alt="H1 Grafana">
+      </div>
+      <div class="panel">
+        <div class="metric-grid">
+          <div class="metric"><strong>2→1→2</strong><span>Ready API trajectory</span></div>
+          <div class="metric"><strong>0</strong><span>unexpected 5xx</span></div>
+          <div class="metric"><strong>16.677s</strong><span>历史 SIGKILL durable completion</span></div>
+          <div class="metric"><strong>1.546s</strong><span>历史 replay completion</span></div>
+        </div>
+        <ul>
+          <li>现场新鲜 run 证明最终状态和历史完整性。</li>
+          <li>16.677s / 1.546s 来自更严格的历史 JVM SIGKILL 量化 run，不能与本次时钟混写。</li>
+          <li>证据边界：single-node kind，不是多地域 failover。</li>
+        </ul>
+      </div>
+    </div>
+    <footer class="footer"><span>用户体验 + Kubernetes 状态同时成立</span><span class="page">4 / 7</span></footer>
+  </section>
+
+  <section class="slide">
+    <header>
+      <div class="kicker">H2 · business-pressure elasticity</div>
+      <h2>业务 backlog 上升，worker 在 45 秒内扩容</h2>
+    </header>
+    <div class="content two">
+      <div class="image-panel panel">
+        <img src="../../evidence/w3/CN-THREE-HERO-SHOWCASE-001/h2-keda-dashboard-6h-2026-07-28.png" alt="H2 KEDA Grafana">
+      </div>
+      <div class="panel">
+        <div class="metric-grid">
+          <div class="metric"><strong>25.872s</strong><span>scale-out run 1</span></div>
+          <div class="metric"><strong>33.287s</strong><span>scale-out run 2</span></div>
+          <div class="metric"><strong>1200/1200</strong><span>published / receipts</span></div>
+          <div class="metric"><strong>0</strong><span>duplicates / rows after cleanup</span></div>
+        </div>
+        <p class="speaker">黄色 worker 线从 1 上升，绿色 ready events 随后下降。现场只等扩容，不等待 cooldown 缩容。</p>
+      </div>
+    </div>
+    <footer class="footer"><span>实际业务指标驱动，不是只看 CPU</span><span class="page">5 / 7</span></footer>
+  </section>
+
+  <section class="slide">
+    <header>
+      <div class="kicker">H3 · explain one user journey</div>
+      <h2>13.890 秒到底花在哪里，我们可以回答</h2>
+    </header>
+    <div class="content two">
+      <div class="image-panel panel">
+        <img src="../../evidence/w3/CN-THREE-HERO-SHOWCASE-001/h3-jaeger-trace-89d2d47-2026-07-28.png" alt="H3 Jaeger trace">
+      </div>
+      <div class="panel">
+        <div class="metric-grid">
+          <div class="metric"><strong>8.733s</strong><span>Gemini provider · 63.1%</span></div>
+          <div class="metric"><strong>5.105s</strong><span>platform overhead</span></div>
+          <div class="metric"><strong>5.108s</strong><span>worker consume</span></div>
+          <div class="metric"><strong>0</strong><span>forbidden privacy tags</span></div>
+        </div>
+        <p class="speaker"><b style="color:var(--ink)">关于 Incomplete：</b>外部客户端注入的 W3C root span 不导出；脚本仍独立要求并验证所有用于主张的应用 spans。PASS 时 21 spans，清理请求后页面累计 31 spans。</p>
+      </div>
+    </div>
+    <footer class="footer"><span>API + worker · Depth 4 · trace 89d2d47…</span><span class="page">6 / 7</span></footer>
+  </section>
+
+  <section class="slide">
+    <header>
+      <div class="kicker">Claim boundaries</div>
+      <h2>证据让我们更敢说，也让我们知道不能说什么</h2>
+    </header>
+    <div class="content two">
+      <div class="panel">
+        <div class="claim">
+          已证明：跨 Pod durable continuity、业务压力驱动扩容、端到端可观测与隐私标签合同。
+        </div>
+        <ul>
+          <li>H1/H2/H3 均是 local kind 的真实运行结果。</li>
+          <li>H2、H3 在最终收敛版本连续两次 PASS。</li>
+          <li>原始日志、机器可读 JSON、Grafana、Jaeger 与产品截图全部保留。</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <div class="claim boundary">
+          尚未证明：生产云 SLA、Aurora 人类偏好优势、中英质量等价、30–50 人公网稳定容量。
+        </div>
+        <ul>
+          <li>下一优先：同模型盲化配对 A/B，48 pairs × 3 reviewers。</li>
+          <li>中英 difference-in-differences；人评为主，自动 judge 为辅。</li>
+          <li>30 用户 + 50 隔离故事 Session 连续两次公网 burst。</li>
+        </ul>
+      </div>
+    </div>
+    <footer class="footer"><span>完整设计：docs/demo/EXPERIMENT-EVIDENCE-PACK.md</span><span class="page">7 / 7</span></footer>
+  </section>
+</main>
+<script>
+  const slides = [...document.querySelectorAll(".slide")];
+  let index = 0;
+  function show(next) {
+    index = (next + slides.length) % slides.length;
+    slides.forEach((slide, i) => slide.classList.toggle("active", i === index));
+  }
+  addEventListener("keydown", event => {
+    if (["ArrowRight", "PageDown", " ", "Enter"].includes(event.key)) show(index + 1);
+    if (["ArrowLeft", "PageUp", "Backspace"].includes(event.key)) show(index - 1);
+    if (event.key === "Home") show(0);
+    if (event.key === "End") show(slides.length - 1);
+  });
+  addEventListener("click", event => show(index + (event.clientX < innerWidth / 2 ? -1 : 1)));
+</script>
+</body>
+</html>
