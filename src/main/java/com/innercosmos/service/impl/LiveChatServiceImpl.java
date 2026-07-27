@@ -19,6 +19,7 @@ import com.innercosmos.mapper.LiveChatSessionMapper;
 import com.innercosmos.mapper.UserMapper;
 import com.innercosmos.service.LiveChatService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -100,7 +101,12 @@ public class LiveChatServiceImpl implements LiveChatService {
         invite.durationMinutes = durationMinutes;
         invite.status = "PENDING";
         invite.expiresAt = now().plusMinutes(INVITE_TTL_MINUTES);
-        inviteMapper.insert(invite);
+        try {
+            inviteMapper.insert(invite);
+        } catch (DuplicateKeyException concurrentPairInvite) {
+            throw new BusinessException(ErrorCode.CONFLICT,
+                    "双方已经同时发出邀请，请回应现有邀请");
+        }
         return inviteView(invite, Map.of(userId, inviter, targetUserId, invitee));
     }
 

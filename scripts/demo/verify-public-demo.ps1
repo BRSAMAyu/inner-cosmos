@@ -275,9 +275,10 @@ $b = Register-Actor "demoproofb$suffix" "Demo B $suffix"
 $aId = [long]$a.User.id
 $bId = [long]$b.User.id
 
-$people = @(Invoke-Envelope $a.Session "GET" "/api/social/people")
-if (-not ($people | Where-Object { [long]$_.id -eq $bId })) {
-    throw "Newly registered peer is not discoverable."
+$peerQuery = [Uri]::EscapeDataString([string]$b.User.username)
+$people = @(Invoke-Envelope $a.Session "GET" "/api/social/people?query=$peerQuery")
+if ($people.Count -ne 1 -or [long]$people[0].id -ne $bId) {
+    throw "Exact classroom username lookup did not return precisely the intended HUMAN peer."
 }
 $relation = Invoke-Envelope $a.Session "POST" "/api/social/friends/request" @{
     userId = $bId; source = "PUBLIC_DEMO_VERIFICATION"
@@ -305,6 +306,63 @@ $null = Invoke-Envelope $b.Session "POST" "/api/social/groups/invites/$($invite[
 $members = @(Invoke-Envelope $a.Session "GET" "/api/social/groups/$($group.id)/members")
 if (@($members | Where-Object { [long]$_.userId -in @($aId, $bId) }).Count -ne 2) {
     throw "Accepted group membership is incomplete."
+}
+
+$groupMessage = Invoke-Envelope $a.Session "POST" "/api/social/groups/$($group.id)/messages" @{
+    messageBody = "A real message inside the accepted classroom group."
+}
+$groupMessagesAtB = @(Invoke-Envelope $b.Session "GET" "/api/social/groups/$($group.id)/messages")
+if (-not ($groupMessagesAtB | Where-Object {
+        [long]$_.id -eq [long]$groupMessage.id -and
+        [long]$_.senderUserId -eq $aId -and
+        $_.messageBody -eq "A real message inside the accepted classroom group."
+    })) {
+    throw "The accepted group member could not read the real group message."
+}
+
+$liveInvite = Invoke-Envelope $a.Session "POST" "/api/social/live-chat/invites" @{
+    targetUserId = $bId; durationMinutes = 10
+}
+$liveInvitesAtB = Invoke-Envelope $b.Session "GET" "/api/social/live-chat/invites"
+$incomingLiveInvite = @($liveInvitesAtB.incoming | Where-Object {
+    [long]$_.id -eq [long]$liveInvite.id -and $_.status -eq "PENDING"
+})
+if ($incomingLiveInvite.Count -ne 1) {
+    throw "The consent-gated live-chat invitation did not reach the intended peer."
+}
+$liveSession = Invoke-Envelope $b.Session "POST" "/api/social/live-chat/invites/$($liveInvite.id)/respond" @{
+    decision = "accept"
+}
+if ($liveSession.status -ne "ACTIVE" -or
+    @([long]$liveSession.participantOneId, [long]$liveSession.participantTwoId) -notcontains $aId -or
+    @([long]$liveSession.participantOneId, [long]$liveSession.participantTwoId) -notcontains $bId) {
+    throw "Accepting the live-chat invitation did not create the intended two-person session."
+}
+$liveMessageA = Invoke-Envelope $a.Session "POST" "/api/social/live-chat/sessions/$($liveSession.id)/messages" @{
+    messageBody = "A is here in the time-boxed conversation."
+}
+$liveMessagesAtB = @(Invoke-Envelope $b.Session "GET" "/api/social/live-chat/sessions/$($liveSession.id)/messages")
+if (-not ($liveMessagesAtB | Where-Object {
+        [long]$_.id -eq [long]$liveMessageA.id -and [long]$_.senderUserId -eq $aId
+    })) {
+    throw "The second participant could not read the first live-chat message."
+}
+$liveMessageB = Invoke-Envelope $b.Session "POST" "/api/social/live-chat/sessions/$($liveSession.id)/messages" @{
+    messageBody = "B is here too; the conversation is bidirectional."
+}
+$liveMessagesAtA = @(Invoke-Envelope $a.Session "GET" "/api/social/live-chat/sessions/$($liveSession.id)/messages")
+if (@($liveMessagesAtA | Where-Object {
+        [long]$_.id -in @([long]$liveMessageA.id, [long]$liveMessageB.id)
+    }).Count -ne 2) {
+    throw "The first participant could not read the complete bidirectional live-chat exchange."
+}
+$endedLiveSession = Invoke-Envelope $b.Session "POST" "/api/social/live-chat/sessions/$($liveSession.id)/end"
+if ($endedLiveSession.status -ne "ENDED") {
+    throw "The live-chat session did not end cleanly."
+}
+$activeLiveSessions = @(Invoke-Envelope $a.Session "GET" "/api/social/live-chat/sessions/active")
+if ($activeLiveSessions | Where-Object { [long]$_.id -eq [long]$liveSession.id }) {
+    throw "The ended live-chat session remained visible as active."
 }
 
 $auroraReplyLength = 0
@@ -491,6 +549,9 @@ $verificationActors.Clear()
     RegisteredUsers = 2
     Friendship = "BIDIRECTIONAL_ACCEPTED"
     GroupMembers = 2
+    GroupMessages = $groupMessagesAtB.Count
+    LiveChat = "INVITED_ACCEPTED_BIDIRECTIONAL_ENDED"
+    LiveChatMessages = $liveMessagesAtA.Count
     AuroraReplyLength = $auroraReplyLength
     AuroraProvider = $auroraProvider
     AuroraModel = $auroraModel

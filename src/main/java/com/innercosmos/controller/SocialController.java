@@ -21,8 +21,10 @@ public class SocialController extends BaseController {
     }
 
     @GetMapping("/people")
-    public ApiResponse<List<Map<String, Object>>> people(HttpSession session) {
-        return ApiResponse.ok(socialService.discoverPeople(currentUserId(session)));
+    public ApiResponse<List<Map<String, Object>>> people(
+            @RequestParam(required = false) String query,
+            HttpSession session) {
+        return ApiResponse.ok(socialService.discoverPeople(currentUserId(session), query));
     }
 
     @GetMapping("/friends")

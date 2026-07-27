@@ -15,8 +15,14 @@ import java.util.Map;
  */
 public interface SocialService {
 
-    /** Up to 30 discoverable human/showcase accounts (not the caller) with the caller's relation status. */
+    /** A bounded list of active, discoverable human accounts (not the caller). */
     List<Map<String, Object>> discoverPeople(Long userId);
+
+    /**
+     * Exact classroom lookup by username/seat code or full nickname. A blank query preserves the
+     * bounded discovery list; a non-blank query never widens beyond active HUMAN accounts.
+     */
+    List<Map<String, Object>> discoverPeople(Long userId, String exactQuery);
 
     /** The caller's accepted friend connections. */
     List<Map<String, Object>> listFriends(Long userId);

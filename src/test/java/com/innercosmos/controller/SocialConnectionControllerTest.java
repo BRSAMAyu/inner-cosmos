@@ -81,10 +81,19 @@ class SocialConnectionControllerTest {
 
     @Test
     void peopleDelegatesToTheServiceWithTheCallerId() {
-        when(socialService.discoverPeople(20L)).thenReturn(java.util.List.of());
+        when(socialService.discoverPeople(20L, null)).thenReturn(java.util.List.of());
 
-        controller.people(session);
+        controller.people(null, session);
 
-        verify(socialService).discoverPeople(20L);
+        verify(socialService).discoverPeople(20L, null);
+    }
+
+    @Test
+    void peoplePassesAnExactClassroomLookupToTheService() {
+        when(socialService.discoverPeople(20L, "seat-b17")).thenReturn(java.util.List.of());
+
+        controller.people("seat-b17", session);
+
+        verify(socialService).discoverPeople(20L, "seat-b17");
     }
 }

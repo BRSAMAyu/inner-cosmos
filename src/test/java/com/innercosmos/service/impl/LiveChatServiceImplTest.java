@@ -18,6 +18,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DuplicateKeyException;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -72,6 +73,18 @@ class LiveChatServiceImplTest {
         assertEquals("小岚", result.inviterNickname());
         assertEquals("阿川", result.inviteeNickname());
         assertEquals(OffsetDateTime.parse("2026-07-26T15:05:00Z"), result.expiresAt());
+    }
+
+    @Test
+    void concurrentReverseInviteIsRejectedAsAConflictInsteadOfCreatingTwoRooms() {
+        stubUsersAndFriendship();
+        when(inviteMapper.insert(any(LiveChatInvite.class)))
+                .thenThrow(new DuplicateKeyException("unordered pending pair already exists"));
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> service.invite(1L, 2L, 10));
+
+        assertEquals("CONFLICT", error.code);
     }
 
     @Test

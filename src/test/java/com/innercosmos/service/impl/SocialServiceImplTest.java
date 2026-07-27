@@ -20,6 +20,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DuplicateKeyException;
 
 import java.util.List;
 import java.util.Map;
@@ -142,10 +143,42 @@ class SocialServiceImplTest {
                 ArgumentCaptor.forClass(com.baomidou.mybatisplus.core.conditions.query.QueryWrapper.class);
         verify(userMapper).selectList(query.capture());
         String sql = query.getValue().getTargetSql().toLowerCase(java.util.Locale.ROOT);
-        assertTrue(sql.contains("account_kind in"), sql);
+        assertTrue(sql.contains("account_kind"), sql);
         assertTrue(query.getValue().getParamNameValuePairs().containsValue("HUMAN"));
-        assertTrue(query.getValue().getParamNameValuePairs().containsValue("SHOWCASE"));
+        assertFalse(query.getValue().getParamNameValuePairs().containsValue("SHOWCASE"));
         assertTrue(sql.contains("last_login_at"), sql);
+        assertTrue(sql.contains("limit 60"), sql);
+    }
+
+    @Test
+    void exactPeopleLookupUsesBoundCaseInsensitiveUsernameOrNicknameAndStaysHumanOnly() {
+        when(userMapper.selectList(any())).thenReturn(List.of());
+
+        service.discoverPeople(20L, "seat-b17");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<User>> query =
+                ArgumentCaptor.forClass(com.baomidou.mybatisplus.core.conditions.query.QueryWrapper.class);
+        verify(userMapper).selectList(query.capture());
+        String sql = query.getValue().getTargetSql().toLowerCase(java.util.Locale.ROOT);
+        assertTrue(sql.contains("lower(username) = lower"), sql);
+        assertTrue(sql.contains("lower(nickname) = lower"), sql);
+        assertTrue(sql.contains("limit 10"), sql);
+        assertTrue(query.getValue().getParamNameValuePairs().containsValue("seat-b17"));
+        assertTrue(query.getValue().getParamNameValuePairs().containsValue("HUMAN"));
+    }
+
+    @Test
+    void concurrentReverseFriendRequestReturnsTheDatabaseWinner() {
+        FriendRelation winner = relation(9L, 10L, 20L, "PENDING");
+        when(friendMapper.selectOne(any())).thenReturn(null, winner);
+        when(friendMapper.insert(any(FriendRelation.class)))
+                .thenThrow(new DuplicateKeyException("unordered pair already exists"));
+
+        FriendRelation result = service.requestFriend(20L, 10L, "SOCIAL_PAGE");
+
+        assertSame(winner, result);
+        verify(friendMapper, times(2)).selectOne(any());
     }
 
     // -- groups --

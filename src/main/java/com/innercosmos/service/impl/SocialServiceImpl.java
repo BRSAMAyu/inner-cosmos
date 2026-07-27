@@ -19,6 +19,7 @@ import com.innercosmos.mapper.SocialGroupMemberMapper;
 import com.innercosmos.mapper.SocialGroupMessageMapper;
 import com.innercosmos.mapper.UserMapper;
 import com.innercosmos.service.SocialService;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -56,13 +57,30 @@ public class SocialServiceImpl implements SocialService {
 
     @Override
     public List<Map<String, Object>> discoverPeople(Long userId) {
-        List<User> users = userMapper.selectList(new QueryWrapper<User>()
+        return discoverPeople(userId, null);
+    }
+
+    @Override
+    public List<Map<String, Object>> discoverPeople(Long userId, String exactQuery) {
+        String queryText = exactQuery == null ? "" : exactQuery.trim();
+        if (queryText.length() > 120) return List.of();
+        QueryWrapper<User> query = new QueryWrapper<User>()
                 .ne("id", userId)
                 .eq("status", "ACTIVE")
-                .in("account_kind", "HUMAN", "SHOWCASE")
-                .orderByDesc("last_login_at")
-                .orderByDesc("id")
-                .last("LIMIT 30"));
+                .eq("account_kind", "HUMAN");
+        if (!queryText.isBlank()) {
+            query.and(q -> q.apply("LOWER(username) = LOWER({0})", queryText)
+                    .or()
+                    .apply("LOWER(nickname) = LOWER({0})", queryText))
+                    .orderByDesc("last_login_at")
+                    .orderByDesc("id")
+                    .last("LIMIT 10");
+        } else {
+            query.orderByDesc("last_login_at")
+                    .orderByDesc("id")
+                    .last("LIMIT 60");
+        }
+        List<User> users = userMapper.selectList(query);
         return users.stream().map(u -> {
             Map<String, Object> item = new HashMap<>();
             item.put("id", u.id);
@@ -116,18 +134,21 @@ public class SocialServiceImpl implements SocialService {
     }
 
     private FriendRelation createOrResumeRequest(Long userId, Long targetUserId, String source) {
-        FriendRelation relation = friendMapper.selectOne(new QueryWrapper<FriendRelation>()
-                .and(q -> q.eq("requester_id", userId).eq("addressee_id", targetUserId)
-                        .or()
-                        .eq("requester_id", targetUserId).eq("addressee_id", userId))
-                .last("LIMIT 1"));
+        FriendRelation relation = findRelationBetween(userId, targetUserId);
         if (relation == null) {
             relation = new FriendRelation();
             relation.requesterId = userId;
             relation.addresseeId = targetUserId;
             relation.status = "PENDING";
             relation.source = source;
-            friendMapper.insert(relation);
+            try {
+                friendMapper.insert(relation);
+            } catch (DuplicateKeyException concurrentPairRequest) {
+                FriendRelation winner = findRelationBetween(userId, targetUserId);
+                if (winner != null) return winner;
+                throw new BusinessException(ErrorCode.CONFLICT,
+                        "双方正在同时发起连接，请刷新后回应已有邀请");
+            }
         } else if (List.of("DECLINED", "WITHDRAWN").contains(relation.status)) {
             relation.requesterId = userId;
             relation.addresseeId = targetUserId;
@@ -136,6 +157,15 @@ public class SocialServiceImpl implements SocialService {
             friendMapper.updateById(relation);
         }
         return relation;
+    }
+
+    private FriendRelation findRelationBetween(Long firstUserId, Long secondUserId) {
+        return friendMapper.selectOne(new QueryWrapper<FriendRelation>()
+                .and(q -> q.eq("requester_id", firstUserId).eq("addressee_id", secondUserId)
+                        .or()
+                        .eq("requester_id", secondUserId).eq("addressee_id", firstUserId))
+                .orderByDesc("id")
+                .last("LIMIT 1"));
     }
 
     @Override
