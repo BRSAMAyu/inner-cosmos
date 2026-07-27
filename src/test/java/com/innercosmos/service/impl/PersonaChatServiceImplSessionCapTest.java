@@ -152,8 +152,9 @@ class PersonaChatServiceImplSessionCapTest {
 
         PersonaChatMessage result = service.reply(USER_ID, SESSION_ID, "one more thing");
 
-        assertTrue(result.textContent.contains("慢信"), "must guide to a slow letter when the session cap is hit");
-        assertTrue(result.textContent.contains("轮次上限") || result.textContent.contains("主人设置"),
+        assertTrue(CapsuleRuntimeCopy.guidesToSlowLetter(result.textContent), "must guide to a slow letter when the session cap is hit");
+        assertTrue(result.textContent.contains("轮次上限") || result.textContent.contains("主人设置")
+                        || result.textContent.contains("per-session turn limit the owner set"),
                 "message should explain this is the owner's session-turn cap, distinct from the daily cap");
         verify(structuredAiService, never()).call(any(), any(), any(), any(), any(), any());
         // The daily-quota table must never even be queried/written when the session cap already blocks the turn.
@@ -175,7 +176,7 @@ class PersonaChatServiceImplSessionCapTest {
 
         PersonaChatMessage result = service.reply(USER_ID, SESSION_ID, "hello");
 
-        assertFalse(result.textContent.contains("慢信"));
+        assertFalse(CapsuleRuntimeCopy.guidesToSlowLetter(result.textContent));
         verify(jdbcTemplate).update(eq(SESSION_RESERVE_SQL), eq(SESSION_ID), eq(5));
         verify(structuredAiService).call(any(), any(), any(), any(), any(), any());
     }
@@ -197,7 +198,7 @@ class PersonaChatServiceImplSessionCapTest {
 
         PersonaChatMessage result = service.reply(USER_ID, SESSION_ID, "hello");
 
-        assertTrue(result.textContent.contains("慢信"));
+        assertTrue(CapsuleRuntimeCopy.guidesToSlowLetter(result.textContent));
         verify(structuredAiService, never()).call(any(), any(), any(), any(), any(), any());
         // The session turn reserved above must be given back since it was never actually used.
         verify(jdbcTemplate).update(eq(SESSION_COMPENSATE_SQL), eq(SESSION_ID));
@@ -244,8 +245,8 @@ class PersonaChatServiceImplSessionCapTest {
         PersonaChatMessage first = service.reply(USER_ID, SESSION_ID, "first");
         PersonaChatMessage second = service.reply(USER_ID, SESSION_ID, "second, racing for the same last slot");
 
-        assertFalse(first.textContent.contains("慢信"), "the winner of the race gets a real reply");
-        assertTrue(second.textContent.contains("慢信"), "the loser of the race is guided to a slow letter, not double-served");
+        assertFalse(CapsuleRuntimeCopy.guidesToSlowLetter(first.textContent), "the winner of the race gets a real reply");
+        assertTrue(CapsuleRuntimeCopy.guidesToSlowLetter(second.textContent), "the loser of the race is guided to a slow letter, not double-served");
     }
 
     @Test
@@ -260,7 +261,7 @@ class PersonaChatServiceImplSessionCapTest {
 
         PersonaChatMessage result = service.reply(USER_ID, SESSION_ID, "hello");
 
-        assertFalse(result.textContent.contains("慢信"));
+        assertFalse(CapsuleRuntimeCopy.guidesToSlowLetter(result.textContent));
         // Uncapped path: unconditional increment, never the capped 2-param conditional form.
         verify(jdbcTemplate).update(
                 eq("UPDATE tb_persona_chat_session SET turn_count = turn_count + 1 WHERE id = ?"), eq(SESSION_ID));

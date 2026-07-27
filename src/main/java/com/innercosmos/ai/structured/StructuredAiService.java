@@ -269,6 +269,13 @@ public class StructuredAiService {
             request.timeoutMs = 6_000;
             request.maxTokens = 512;
             request.retryEnabled = Boolean.FALSE;
+        } else if (normalized.startsWith("CURATED_PERSONA_CHAT")) {
+            // The three classroom showcase capsules run on their own stage so the authored voice
+            // gets room to be a person rather than a truncated one: a wider completion envelope
+            // than the structured default, and a deadline that tolerates a reflective provider.
+            // Ordinary user capsules keep the untouched PERSONA_CHAT defaults.
+            request.timeoutMs = 30_000;
+            request.maxTokens = 2_048;
         } else if (normalized.startsWith("CAPSULE_CALIBRATION")) {
             // A calibration click is foreground UX and the schema is tiny. Do not let a provider
             // retry hold the owner in a spinner; the deterministic closed-vocabulary extractor is

@@ -134,7 +134,7 @@ class PersonaChatServiceImplOutputLeakageGateTest {
 
         assertFalse(result.textContent.contains("contextBuildManifest"), "leaked schema field name must never reach the visitor");
         assertFalse(result.textContent.contains("authorizedMemorySummary"), "leaked schema field name must never reach the visitor");
-        assertTrue(result.textContent.contains("越过了边界"), "a safe fallback message must be shown instead");
+        assertTrue(CapsuleRuntimeCopy.refusedForBoundary(result.textContent), "a safe fallback message must be shown instead");
     }
 
     @Test
@@ -153,7 +153,7 @@ class PersonaChatServiceImplOutputLeakageGateTest {
 
         assertFalse(result.textContent.contains("riskFlags"));
         assertFalse(result.textContent.contains("personaPrompt"));
-        assertTrue(result.textContent.contains("越过了边界"));
+        assertTrue(CapsuleRuntimeCopy.refusedForBoundary(result.textContent));
     }
 
     @Test
@@ -171,6 +171,6 @@ class PersonaChatServiceImplOutputLeakageGateTest {
         PersonaChatMessage result = service.reply(USER_ID, SESSION_ID, "最近还好吗");
 
         assertTrue(result.textContent.contains("我记得你上次提到过这件事"));
-        assertFalse(result.textContent.contains("越过了边界"));
+        assertFalse(CapsuleRuntimeCopy.refusedForBoundary(result.textContent));
     }
 }

@@ -238,7 +238,7 @@ class PersonaChatServiceImplPhaseBTest {
         PersonaChatMessage result = service.reply(userId, sessionId, "over the limit");
 
         verify(structuredAiService, never()).call(any(), any(), any(), any(), any(), any());
-        assertTrue(result.textContent.contains("慢信"));
+        assertTrue(CapsuleRuntimeCopy.guidesToSlowLetter(result.textContent));
 
         // Regression (Gemini audit 1.4): the session-turn reservation itself succeeded, then got
         // compensated (given back) once the day-quota gate rejected the turn -- net-zero reserve
@@ -326,7 +326,7 @@ class PersonaChatServiceImplPhaseBTest {
 
         // Reserved via the retry UPDATE → AI is called, not letter-guided.
         verify(structuredAiService).call(any(), any(), any(), any(), any(), any());
-        assertFalse(result.textContent.contains("慢信"));
+        assertFalse(CapsuleRuntimeCopy.guidesToSlowLetter(result.textContent));
         // The conditional UPDATE ran twice (initial + retry).
         verify(jdbcTemplate, times(2)).update(contains("UPDATE tb_capsule_usage_quota SET turn_count = turn_count + 1"),
                 any(Object.class), any(Object.class), any(Object.class), any(Object.class));

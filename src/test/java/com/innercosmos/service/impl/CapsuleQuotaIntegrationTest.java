@@ -101,12 +101,12 @@ class CapsuleQuotaIntegrationTest {
 
         // First reply
         PersonaChatMessage msg1 = personaChatService.reply(visitor, session.id, "hello");
-        assertFalse(msg1.textContent.contains("慢信"), "First reply should succeed");
+        assertFalse(CapsuleRuntimeCopy.guidesToSlowLetter(msg1.textContent), "First reply should succeed");
         assertEquals(1, quotaTurnCount(visitor, capsuleId), "Quota should be 1 after first reply");
 
         // Second reply
         PersonaChatMessage msg2 = personaChatService.reply(visitor, session.id, "second");
-        assertFalse(msg2.textContent.contains("慢信"), "Second reply should succeed");
+        assertFalse(CapsuleRuntimeCopy.guidesToSlowLetter(msg2.textContent), "Second reply should succeed");
         assertEquals(2, quotaTurnCount(visitor, capsuleId), "Quota should be 2 after second reply");
     }
 
@@ -128,7 +128,7 @@ class CapsuleQuotaIntegrationTest {
         // Exhaust quota
         for (int i = 0; i < dailyLimit; i++) {
             PersonaChatMessage msg = personaChatService.reply(visitor, session.id, "msg " + i);
-            assertFalse(msg.textContent.contains("慢信"), "Reply " + i + " should succeed");
+            assertFalse(CapsuleRuntimeCopy.guidesToSlowLetter(msg.textContent), "Reply " + i + " should succeed");
         }
 
         // Quota should be at limit
@@ -136,8 +136,8 @@ class CapsuleQuotaIntegrationTest {
 
         // Next reply should be blocked
         PersonaChatMessage blocked = personaChatService.reply(visitor, session.id, "over limit");
-        assertTrue(blocked.textContent.contains("慢信"),
-                "Reply over daily limit must return letter-guided message containing '慢信'");
+        assertTrue(CapsuleRuntimeCopy.guidesToSlowLetter(blocked.textContent),
+                "Reply over daily limit must return the letter-guided message");
 
         // Quota should NOT have increased past the limit
         assertEquals(dailyLimit, quotaTurnCount(visitor, capsuleId),
@@ -163,7 +163,7 @@ class CapsuleQuotaIntegrationTest {
         PersonaChatSession session1 = personaChatService.create(visitor, capsuleId);
         for (int i = 0; i < dailyLimit; i++) {
             PersonaChatMessage msg = personaChatService.reply(visitor, session1.id, "session1 msg " + i);
-            assertFalse(msg.textContent.contains("慢信"), "Session 1 reply " + i + " should succeed");
+            assertFalse(CapsuleRuntimeCopy.guidesToSlowLetter(msg.textContent), "Session 1 reply " + i + " should succeed");
         }
         assertEquals(dailyLimit, quotaTurnCount(visitor, capsuleId));
 
@@ -173,7 +173,7 @@ class CapsuleQuotaIntegrationTest {
 
         // But the cross-session daily quota is already at dailyLimit
         PersonaChatMessage blocked = personaChatService.reply(visitor, session2.id, "second session bypass attempt");
-        assertTrue(blocked.textContent.contains("慢信"),
+        assertTrue(CapsuleRuntimeCopy.guidesToSlowLetter(blocked.textContent),
                 "Second session must be blocked by cross-session daily quota even though session.turnCount=0");
 
         // Quota count stays at dailyLimit — did not increment
@@ -212,7 +212,7 @@ class CapsuleQuotaIntegrationTest {
         PersonaChatSession session = personaChatService.create(visitor, capsuleId);
         PersonaChatMessage blocked = personaChatService.reply(visitor, session.id, "beyond seed limit");
 
-        assertTrue(blocked.textContent.contains("慢信"),
+        assertTrue(CapsuleRuntimeCopy.guidesToSlowLetter(blocked.textContent),
                 "SEED capsule must be blocked at 50 daily turns (not unlimited at 0)");
     }
 
@@ -238,7 +238,7 @@ class CapsuleQuotaIntegrationTest {
         // visitor2 is a separate user — should still get their quota
         PersonaChatSession session2 = personaChatService.create(visitor2, capsuleId);
         PersonaChatMessage msg2 = personaChatService.reply(visitor2, session2.id, "visitor2 msg");
-        assertFalse(msg2.textContent.contains("慢信"),
+        assertFalse(CapsuleRuntimeCopy.guidesToSlowLetter(msg2.textContent),
                 "visitor2 must have an independent quota from visitor1");
         assertEquals(1, quotaTurnCount(visitor2, capsuleId));
     }

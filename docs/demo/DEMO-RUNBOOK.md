@@ -164,9 +164,29 @@ Quick Tunnel 进程停止、电脑休眠、网络切换或重启后，旧公网�
 重新运行 `run-public-demo.ps1` 会生成新地址和新 APK。需要跨重启的固定地址时，应另行
 配置命名 Cloudflare Tunnel；这不是现场单次演示的阻塞项。
 
+## 三个主角共鸣体（现场主线）
+
+广场里 `Lin Che's Echo`、`The One Who Walks by the River`、
+`The One Learning to Include Herself in Care` 是现场主线，任何用户都能访问：
+
+- 未登录访客可以浏览广场（三个共鸣体按 `echo_energy` 排在最前）；
+- 注册用户和故事沙盒访客都可以直接与它们对话；
+- 这三个共鸣体走独立的 `CURATED_PERSONA_CHAT` 通道：手写人物层
+  （`CuratedPersonaCatalog`）+ 更宽的 token/超时预算 + 强制真实 Provider，
+  仍然受授权记忆、边界、泄露与脱敏门禁约束，不绕过任何安全路径；
+- 共鸣体回复跟随访客语言（`VisitorLanguage`）：中文提问得到中文回复与中文免责声明，
+  英文提问得到英文回复与英文免责声明。配额、轮次上限与边界拒绝文案同样跟随。
+
+普通用户共鸣体不受影响，仍走原来的 `PERSONA_CHAT` 编译人格链路。
+
 ## 常见故障
 
 - `Docker Desktop is not reachable`：启动 Docker Desktop，等待 Engine 就绪后重试。
+- **公网地址能打开、但内容是旧版本**：先确认容器真的绑上了宿主端口
+  （`docker inspect inner-cosmos-public-demo-app-1 --format "{{json .NetworkSettings.Ports}}"`，
+  为空表示没绑上）。WSL 的 Ubuntu 发行版里可能有自带 dockerd 留下的孤儿容器占着 8080，
+  Windows 的 `netstat` 看不到它。处理：`wsl -u root -e systemctl stop docker.service docker.socket`，
+  然后 `docker compose ... up -d --force-recreate app`。电脑重启后该服务会自动拉起，需再确认一次。
 - `A public demo tunnel is already running`：先运行状态脚本；确需重建时先停止旧 Demo。
 - 找不到 Provider Key：确认根目录的 `API*.txt` 未被移动，且没有提交到 Git。
 - 网页可用但 App 登录失败：不要手动构建普通 mobile APK；重新运行完整启动脚本。

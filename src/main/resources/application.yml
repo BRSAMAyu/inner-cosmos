@@ -66,6 +66,16 @@ spring:
         max-size: 20
         queue-capacity: 100
       thread-name-prefix: async-
+    # Spring Boot's default @Scheduled pool is a SINGLE thread, so every job in
+    # com.innercosmos.scheduler was serialised onto it. A slow neighbour (AuroraProactiveJob makes
+    # real provider calls; the embedding rebuild and turn-recovery jobs scan tables) starved
+    # LetterDeliveryJob's 5-second poll down to roughly one run every 80-90 seconds -- which is why
+    # the advertised DEMO_30S slow letter was arriving about a minute late on stage. Sizing the pool
+    # lets the short polling jobs keep their own cadence.
+    scheduling:
+      pool:
+        size: ${SCHEDULING_POOL_SIZE:8}
+      thread-name-prefix: scheduling-
     shutdown:
       await-termination: true
       await-termination-period: 30s

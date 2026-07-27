@@ -886,7 +886,11 @@ public class MockDataInitializer implements CommandLineRunner, DemoSandboxServic
                 ? List.of("Living elsewhere", "Creation", "Belonging", "Slow relationships")
                 : List.of("Carers", "Work boundaries", "Rest", "No longer carrying it alone"));
         mirror.authorizedMemoryIds = toJsonArray(cards.stream().map(c -> String.valueOf(c.id)).toList());
-        mirror.echoEnergy = river ? 0.79 : 0.84;
+        // Plaza order is echo_energy desc (CapsuleServiceImpl#plazaCapsules). The ten official
+        // seed agents sit at 0.88-0.98, which used to push the three lived-in showcase capsules --
+        // the ones with months of authorised memory behind them, and the whole point of the demo --
+        // to the bottom of the plaza. They lead it now.
+        mirror.echoEnergy = river ? 0.97 : 0.98;
         mirror.freshnessScore = 0.93;
         mirror.conversationLimitPerDay = 30;
         mirror.visibilityStatus = "PUBLIC";
@@ -1115,7 +1119,9 @@ public class MockDataInitializer implements CommandLineRunner, DemoSandboxServic
                 """.formatted(cards.stream().map(c -> "- " + c.title + ": " + c.summary).reduce("", (a, b) -> a + "\n" + b));
         mirror.publicTags = toJsonArray(List.of("Real AI", "Product vision", "Action planning", "Being understood", "Slow social"));
         mirror.authorizedMemoryIds = toJsonArray(cards.stream().map(c -> String.valueOf(c.id)).toList());
-        mirror.echoEnergy = 0.86;
+        // See seedShowcaseMirror: the three lived-in showcase capsules lead the plaza ahead of the
+        // official seed agents, because they are what the demo is actually about.
+        mirror.echoEnergy = 0.99;
         mirror.freshnessScore = 0.92;
         mirror.conversationLimitPerDay = 30;
         mirror.visibilityStatus = "PUBLIC";

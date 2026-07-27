@@ -281,14 +281,38 @@ class PersonaChatServiceImplQuotaTest {
 
         PersonaChatMessage result = service.reply(userId, sessionId, "hello");
 
-        assertTrue(result.textContent.contains("慢信"),
-                "Response must contain '慢信' when daily limit is reached");
+        assertTrue(CapsuleRuntimeCopy.guidesToSlowLetter(result.textContent),
+                "Response must guide to a slow letter when the daily limit is reached");
         assertEquals("LETTER_GUIDED", session.status);
 
         // AI must NOT have been called
         verify(structuredAiService, never()).call(any(), any(), any(), any(), any(), any());
         // quotaMapper.insert must NOT be called — we only use jdbcTemplate now
         verify(quotaMapper, never()).insert(any(CapsuleUsageQuota.class));
+    }
+
+    @Test
+    @DisplayName("Runtime copy mirrors the visitor's language: Chinese in, Chinese guidance out; English in, English out")
+    void reply_quotaAtLimit_mirrorsVisitorLanguage() {
+        EchoCapsule capsule = publicCapsuleWithLimit(302L, "USER_CAPSULE", 5);
+        when(safetyService.check(any(), any(), any())).thenReturn(safePassed());
+        when(capsuleMapper.selectById(302L)).thenReturn(capsule);
+        mockQuotaAtLimit();
+
+        PersonaChatSession chineseSession = activeSession(202L, 12L, 302L, 0, 5);
+        when(sessionMapper.selectById(202L)).thenReturn(chineseSession);
+        PersonaChatMessage chinese = service.reply(12L, 202L, "我今天还想再说一点");
+
+        PersonaChatSession englishSession = activeSession(203L, 13L, 302L, 0, 5);
+        when(sessionMapper.selectById(203L)).thenReturn(englishSession);
+        PersonaChatMessage english = service.reply(13L, 203L, "I want to keep going for a bit");
+
+        assertTrue(chinese.textContent.contains("慢信"),
+                "a Chinese visitor must not be answered in English");
+        assertFalse(chinese.textContent.toLowerCase().contains("slow letter"));
+        assertTrue(english.textContent.toLowerCase().contains("slow letter"),
+                "an English visitor must not receive the Chinese system sentence");
+        assertFalse(english.textContent.contains("慢信"));
     }
 
     @Test
@@ -313,7 +337,7 @@ class PersonaChatServiceImplQuotaTest {
         PersonaChatMessage result = service.reply(userId, sessionId, "hello");
 
         assertNotNull(result.textContent);
-        assertFalse(result.textContent.contains("慢信"),
+        assertFalse(CapsuleRuntimeCopy.guidesToSlowLetter(result.textContent),
                 "Should NOT return letter-guided message when quota is below limit");
 
         // Quota must be incremented via atomic conditional UPDATE
@@ -376,7 +400,7 @@ class PersonaChatServiceImplQuotaTest {
         PersonaChatMessage result = service.reply(userId, sessionId2, "second session msg");
 
         // Even though the session's own turnCount is 0, the cross-session daily quota blocks it
-        assertTrue(result.textContent.contains("慢信"),
+        assertTrue(CapsuleRuntimeCopy.guidesToSlowLetter(result.textContent),
                 "Cross-session quota must be enforced: second session can't bypass daily limit");
     }
 
@@ -398,7 +422,7 @@ class PersonaChatServiceImplQuotaTest {
 
         PersonaChatMessage result = service.reply(userId, sessionId, "msg");
 
-        assertTrue(result.textContent.contains("慢信"),
+        assertTrue(CapsuleRuntimeCopy.guidesToSlowLetter(result.textContent),
                 "SEED capsule must be blocked at 50 (not unlimited) when quota is at 50");
     }
 

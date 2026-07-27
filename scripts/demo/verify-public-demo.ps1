@@ -158,10 +158,13 @@ if (-not $linDemo.username.StartsWith("sandbox-") -or $linDemo.nickname -ne "Lin
 # The three months-lived Demo identities are the actual product showcase. A fresh synthetic
 # capsule passing below must never mask a curated card that is visible in the plaza but blocked by
 # stale memory/data-use grants. Create a real visitor session for every curated mirror on every run.
+# These are the English classroom seed pseudonyms (MockDataInitializer#seedUserMirror /
+# seedShowcaseMirror). The earlier Chinese names were the pre-2026-07-26 seed and made this gate
+# fail against a correctly seeded English demo.
 $curatedCapsuleSpecs = @(
-    @{ Name = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String("5p6X5r6I55qE5Zue5aOw5YiG6Lqr")); Visitor = "cloud" },
-    @{ Name = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String("5rK/5rKz57yT5oWi55Sf5rS755qE5Lq6")); Visitor = "lin" },
-    @{ Name = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String("5oqK6Ieq5bex5pS+5Zue54Wn5oqk6YeM55qE5Lq6")); Visitor = "lin" }
+    @{ Name = "Lin Che's Echo"; Visitor = "cloud" },
+    @{ Name = "The One Who Walks by the River"; Visitor = "lin" },
+    @{ Name = "The One Learning to Include Herself in Care"; Visitor = "lin" }
 )
 $curatedPlaza = @(Invoke-Envelope $linDemoSession "GET" "/api/plaza/capsules")
 $curatedPersonaSessions = [System.Collections.Generic.List[object]]::new()
