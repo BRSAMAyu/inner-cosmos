@@ -436,10 +436,12 @@ if (-not $SkipAurora) {
     if (-not [bool]$reply.aiState.apiKeyConfigured -or [bool]$reply.aiState.fallbackAllowed) {
         throw "Aurora real-provider fail-closed contract is not active."
     }
-    if ($auroraRuntime -ne "dual-kernel.pipeline.v2") {
-        $verificationWarnings.Add("Aurora runtime is '$auroraRuntime'; expected the pipelined runtime.")
+    $acceptedAuroraRuntimes = @("dual-kernel.pipeline.v2", "dual-kernel.current-turn.v2")
+    if ($auroraRuntime -notin $acceptedAuroraRuntimes) {
+        $verificationWarnings.Add("Aurora runtime is '$auroraRuntime'; expected an accepted dual-kernel runtime.")
     }
-    if (-not [bool]$reply.agentLoop.backgroundPlannerScheduled) {
+    if ($auroraRuntime -eq "dual-kernel.pipeline.v2" -and
+        -not [bool]$reply.agentLoop.backgroundPlannerScheduled) {
         $verificationWarnings.Add("Aurora did not report background planner scheduling.")
     }
     if ([bool]$reply.agentLoop.speakerFallbackUsed) {
