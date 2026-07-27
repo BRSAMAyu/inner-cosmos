@@ -1,0 +1,98 @@
+{
+  "status": "HUMAN_REVIEW_PENDING",
+  "effectiveness_claim": false,
+  "provider_called": true,
+  "fallback_used": false,
+  "model": "gemini-3.6-flash",
+  "pair_count": 48,
+  "successful_pairs": 48,
+  "failed_pairs": 0,
+  "by_language": {
+    "zh-CN": {
+      "pairs": 24,
+      "successful_pairs": 24
+    },
+    "en-US": {
+      "pairs": 24,
+      "successful_pairs": 24
+    }
+  },
+  "systems": {
+    "DIRECT": {
+      "successes": 48,
+      "failures": 0,
+      "success_rate": 1.0,
+      "business_failures": 0,
+      "fallback_used": 0,
+      "latency_ms": {
+        "p50": 8349,
+        "p95": 13880,
+        "max": 16965
+      },
+      "diagnostic_language_match_rate": 1.0,
+      "diagnostic_possible_advice_boundary_violations": 2,
+      "diagnostic_meta_ai_phrases": 0,
+      "by_language": {
+        "zh-CN": {
+          "successes": 24,
+          "failures": 0,
+          "business_failures": 0,
+          "fallback_used": 0,
+          "diagnostic_language_matches": 24
+        },
+        "en-US": {
+          "successes": 24,
+          "failures": 0,
+          "business_failures": 0,
+          "fallback_used": 0,
+          "diagnostic_language_matches": 24
+        }
+      }
+    },
+    "FULL_AURORA": {
+      "successes": 48,
+      "failures": 0,
+      "success_rate": 1.0,
+      "business_failures": 0,
+      "fallback_used": 0,
+      "latency_ms": {
+        "p50": 3695,
+        "p95": 9847,
+        "max": 15148
+      },
+      "diagnostic_language_match_rate": 1.0,
+      "diagnostic_possible_advice_boundary_violations": 0,
+      "diagnostic_meta_ai_phrases": 0,
+      "by_language": {
+        "zh-CN": {
+          "successes": 24,
+          "failures": 0,
+          "business_failures": 0,
+          "fallback_used": 0,
+          "diagnostic_language_matches": 24
+        },
+        "en-US": {
+          "successes": 24,
+          "failures": 0,
+          "business_failures": 0,
+          "fallback_used": 0,
+          "diagnostic_language_matches": 24
+        }
+      }
+    }
+  },
+  "human_gate": {
+    "required_independent_reviewers": 3,
+    "all_failures_remain_in_denominator": true,
+    "primary_metric": "FULL_AURORA preference rate excluding ties",
+    "preregistered_threshold": ">=0.60 and Wilson 95% lower bound >0.50",
+    "no_dimension_regression": true,
+    "bilingual_full_win_rate_gap_max": 0.1
+  },
+  "contract_version": "aurora-bilingual-direct-vs-full.v1",
+  "dataset_sha256": "96f12ab65ef2dae218a563e0fb32f202fe12fc3b06c4c6f9617a45433f44f3ad",
+  "git_sha": "cf598d4ace3caf8323af6042851560cc99af86e1",
+  "started_at": "2026-07-27T22:09:11.766904+00:00",
+  "completed_at": "2026-07-27T22:11:38.661573+00:00",
+  "ledger_sha256": "27bcee03222011fedc3b76ff45afe82f5669674868b0b01a3b4bc7158117131a"
+}

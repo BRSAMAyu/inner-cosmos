@@ -1,7 +1,7 @@
 # Inner Cosmos 实验、证据与现场兜底包
 
 版本：2026-07-28  
-代码基线：`main@36ad2737`  
+代码基线：以本证据包所在提交为准（历史冻结结果仍保留各自 source commit）
 当前课堂实验环境：`kind-kubedeploy / inner-cosmos-w3`  
 当前实验 Provider：`gemini / gemini-3.6-flash`，Mock fallback 关闭，memory embedding 关闭
 
@@ -10,12 +10,12 @@
 | 项目 | 当前证据等级 | 可以说什么 | 不能说什么 |
 |---|---|---|---|
 | H1 跨 Pod 续写 | **现场 PASS，另有多轮历史复验** | 强删正在生成的 API Pod 后，同一 turn 最终 `COMPLETED`，原消息和回复气泡仍在，API 回到 `2/2` | 不能外推成多地域、多可用区容灾 |
-| H2 KEDA 弹性 | **连续两次 PASS** | 业务 outbox backlog 驱动 worker `1 → 3 → 6`，两次扩容分别为 `25.872s`、`33.287s`，1200 条任务无重复消费并清理归零 | 不能外推成 AWS 生产容量或成本最优 |
-| H3 可观测性 | **连续两次 PASS** | 一个 W3C trace 串起 Gemini 调用、Aurora turn、memory、outbox、worker projections；真实请求 `13.890s`，其中 Provider `8.733s`，隐私禁用标签 `0` | trace 不能证明回答语义更好；Jaeger 当前为内存后端 |
-| 公网产品 Demo | **当前真机可访问，已冻结离线画面** | 三个隔离故事、Aurora、记忆、共鸣体、慢信/连接的实际页面存在并可走核心路径 | Quick Tunnel 和短链是临时入口，不是长期域名 SLA |
-| Aurora 回复更好 | **真实 Provider 先导实验，盲评未完成** | 双内核真实调用已跑通，并有确定性安全/状态合同证据 | 目前不能说“人类更偏好”或“显著优于基线” |
-| 中英双语更好 | **功能存在，正式对照实验未完成** | 产品和共鸣体可按访客语言输出 | 目前不能说中英质量等价或优于其他产品 |
-| 30 人并发 | **脚本与门禁已就绪，当前结果待新鲜复跑** | 可以立即做 30 账户、50 隔离故事 Session 的公网突发实验 | 未产生新鲜报告前不能说已经证明 30–50 人稳定 |
+| H2 KEDA 弹性 | **历史连续两次 + 本轮新鲜 PASS** | 业务 outbox backlog 驱动 worker `1 → 3 → 6`；本轮 `39.222s` 达到 `6/3`，1200 条任务无重复消费并清理归零 | 不能外推成 AWS 生产容量或成本最优 |
+| H3 可观测性 | **历史连续两次 + 本轮新鲜 PASS** | 新 trace 串起 Gemini、Aurora turn、memory、outbox、worker projections；请求 `19.568s`，Provider `13.974s`，隐私禁用标签 `0` | trace 不能证明回答语义更好；Jaeger 当前为内存后端 |
+| 公网产品 Demo | **最新 Gemini 构建自检 PASS，已冻结离线画面** | 三个隔离故事、Aurora、记忆、共鸣体、慢信/连接的实际页面存在并可走核心路径 | Quick Tunnel 是临时入口，不是长期域名 SLA |
+| Aurora 回复更好 | **48 对正式材料已生成，三人盲评待完成** | 同模型 Direct/Full 两路均 48/48 完成，失败与 fallback 为 0；可进入人评 | 机器可靠性不能替代人类偏好，当前不能说“显著优于基线” |
+| 中英双语更好 | **可靠性与语言门禁 PASS，人评待完成** | 中文 24/24、英文 24/24 Full Aurora 均完成并匹配目标语言 | 目前不能说中英主观质量等价或优于其他产品 |
+| 30 人并发 | **连续两次新鲜 PASS** | 本机公网 Demo 两轮均完成 30/30 Gemini Aurora、50/50 隔离 Sandbox、30/30 discovery/好友环，HTTP 429 为 0 | 只能声称本机、当时网络与 Provider 配额下的课堂突发结果，不是任意生产负载承诺 |
 
 证据等级统一使用：
 
@@ -65,12 +65,13 @@
 
 > 我们不是看到 CPU 高才盲目扩容；系统把 durable outbox backlog 暴露为隐私安全的业务指标，KEDA 根据待处理业务量增加 worker，并保持 exactly-once inbox 收据。
 
-### 2026-07-28 连续两次结果
+### 2026-07-28 历史连续两次 + 本轮新鲜结果
 
 | 复验 | 达到 worker desired/available | 用时 | 40 秒机器门禁 | 45 秒讲解预算 |
 |---|---:|---:|---:|---:|
 | Run 1 | `6/3` | `25.872s` | PASS | PASS |
 | Run 2 | `6/3` | `33.287s` | PASS | PASS |
+| Fresh rerun | `6/3` | `39.222s` | PASS | PASS |
 
 第二次完整收尾：
 
@@ -85,6 +86,7 @@
 
 - [KEDA 六小时实测曲线](../../evidence/w3/CN-THREE-HERO-SHOWCASE-001/h2-keda-dashboard-6h-2026-07-28.png)
 - [最终三场景结果 JSON](../../evidence/w3/CN-THREE-HERO-SHOWCASE-001/final-results-2026-07-28.json)
+- [本轮 H2/H3 新鲜复验](../../evidence/w3/CN-THREE-HERO-SHOWCASE-001/fresh-rerun-2026-07-28.md)
 - [KEDA 机制与早期完整扩缩容证据](../../evidence/w3/CN-EVENT-DRIVEN-AUTOSCALING-001/summary.md)
 
 ### 现场只讲 35–45 秒
@@ -100,7 +102,7 @@
 
 > 我们可以从一个用户的 Aurora 请求追到真实 Gemini Provider，再追到 dialog finish、outbox consumer、memory projection 和 profile projection，并量化时间花在了哪里，同时不把正文、prompt、用户 ID 或 SQL 放进 trace 标签。
 
-### 2026-07-28 连续两次结果
+### 2026-07-28 历史连续两次 + 本轮新鲜结果
 
 - 最终 trace：`89d2d4740f9e7cefa75b279aef0305cc`。
 - PASS 时要求并验证 `21` 个应用 spans，跨 `inner-cosmos-api`、`inner-cosmos-worker` 两个服务。
@@ -116,6 +118,11 @@
 - `forbidden_tags=0`。
 - 场景脚本总时长：`28.561s`，低于 60 秒门禁。
 
+本轮再次复验的 trace 为 `34f2a2dcf9b0c39fcdebbc68c93c3324`：应用
+spans `21`、跨 API/worker 两个服务，client end-to-end `19.605s`，
+traced request `19.5677s`，Provider `13.9736s`（`71.4%`），
+worker consume `8.8677s`，隐私禁用标签 `0`，场景总时长 `36.041s`。
+
 Jaeger 截图上的 `Incomplete` 不是“应用 span 丢了”。演示脚本从客户端注入一个 W3C
 `traceparent`，但这个外部客户端根 span 本身不导出，所以 Jaeger 提示缺少外部父节点。脚本会独立检查上述所有应用 span，任何一个缺失都会 FAIL。现场应主动解释这一点，不要等导师质疑。
 
@@ -123,6 +130,7 @@ Jaeger 截图上的 `Incomplete` 不是“应用 span 丢了”。演示脚本�
 
 - [Jaeger 实际 trace](../../evidence/w3/CN-THREE-HERO-SHOWCASE-001/h3-jaeger-trace-89d2d47-2026-07-28.png)
 - [最终三场景结果 JSON](../../evidence/w3/CN-THREE-HERO-SHOWCASE-001/final-results-2026-07-28.json)
+- [本轮 H2/H3 新鲜复验](../../evidence/w3/CN-THREE-HERO-SHOWCASE-001/fresh-rerun-2026-07-28.md)
 - [OTel 合同与隐私扫描说明](../../evidence/w3/CN-OTEL-SEMANTIC-TRACE-001/summary.md)
 
 ### 现场只讲 35–45 秒
@@ -160,15 +168,18 @@ Start-Process (Resolve-Path '.\docs\demo\HERO-EXPERIMENT-OFFLINE-BACKUP.html')
 
 ### A. 正常入口
 
-- 当前短链：`https://cleanuri.com/nmkDed`
-- 当前 Quick Tunnel：`https://forecasts-milwaukee-tennessee-speeds.trycloudflare.com/app/aurora/`
-- 演示当天必须先运行 `.\scripts\demo\status-public-demo.ps1`，再用手机蜂窝网络验证短链。
+- 当前 Quick Tunnel：`https://participating-beverly-susan-saint.trycloudflare.com/app/aurora/`
+- 当前已验证第三方短链：**无**。CleanURI 返回的新短链现场复核为 HTTP 404，
+  is.gd/TinyURL 拒绝 `trycloudflare.com`，所以不把失效短链交给观众。
+- 演示当天必须先运行 `.\scripts\demo\status-public-demo.ps1`，再用手机蜂窝网络验证
+  Quick Tunnel；现场优先投二维码，避免听众输入随机长域名。
 
-短链和 Quick Tunnel 都可能在重启后变化，不能把它们当永久域名。现场二维码应在最终 Preflight 后生成。
+Quick Tunnel 在重启后会变化，不能把它当永久域名。要得到真正稳定、简短的入口，
+仍需 Cloudflare Named Tunnel + 自有短域名；现场二维码应在最终 Preflight 后生成。
 
 ### B. 隧道坏、应用仍在
 
-- 主讲电脑直接打开 `http://127.0.0.1:8080/app/aurora/`。
+- 主讲电脑直接打开 `http://127.0.0.1:8082/app/aurora/`。
 - 听众停止自由访问，改为投屏演示一个预置故事和一个新用户核心路径。
 - 明确说明“公网入口故障，产品本机服务仍健康”，不要把本机访问伪装成公网成功。
 
@@ -199,7 +210,10 @@ Start-Process (Resolve-Path '.\docs\demo\HERO-EXPERIMENT-OFFLINE-BACKUP.html')
 | Argo Rollouts | 25% → 50% → 100% 健康发布；坏 readiness revision 在约 60s 自动 abort，稳定 4 Pods 持续服务 | 本地 H2，不证明共享 PostgreSQL expand-contract |
 | Kyverno Policy-as-Code | root、无资源限制、`:latest` 三类违规 Pod 均被 Admission 拒绝；合规 Pod 运行 | local kind admission 证据 |
 | 依赖故障的探针语义 | PostgreSQL 停约 2 分钟，readiness 503、liveness UP、无新增重启；恢复约 15s 后 Ready | 单节点 kind |
-| 内存检索并发 | 10 虚拟用户、180 calls、24 threads；两次约 159–160 calls/s，p95 `243.9/257.6ms`，0 timeout、0 budget violation、0 prohibited leakage | H2 in-memory；不是当前 PostgreSQL 绝对性能 |
+| 记忆检索并发 | 10 虚拟用户、180 calls、24 threads；in-memory `209.18 calls/s / p95 204.23ms`，PostgreSQL 16 + Redis 7.4 `202.10 calls/s / p95 315.95ms`；timeout、budget violation、leak、miss 均为 0 | 本机测试负载，不是生产容量 |
+| 记忆 authority 消融 | correction/withdrawal 2/2 通过；naive baseline 按预期暴露陈旧/已撤回记忆 | 小规模机制实验，不是用户长期效果研究 |
+| 主动式决策门禁 | quiet-hours、long-gap、preference-change 3/3 通过 | 证明策略合同，不证明用户主观帮助率 |
+| 共鸣体 genome 机制 | 动态机制 5/5；4 个 groundedness 场景泄漏 0；6 个运行时检索场景选择准确率 1.0 | 真实 Gemini 人物回复 6/6 成功，但尚无人类 fidelity 盲评 |
 | 确定性双内核合同 | 16 个合成场景中 dual `16/16`，single `4/16` | 只证明合同检查，不证明人类更喜欢 |
 
 对应证据：
@@ -209,9 +223,10 @@ Start-Process (Resolve-Path '.\docs\demo\HERO-EXPERIMENT-OFFLINE-BACKUP.html')
 - [Kyverno](../../evidence/w3/CN-POLICY-AS-CODE-001/run-log.txt)
 - [探针与 NetworkPolicy](../../evidence/w3/CN-CREDIBILITY-001/summary.md)
 - [内存检索并发](../../evidence/innovation/INNO-INNER-010/retrieval-load-2026-07-23.md)
+- [本轮记忆、主动式与共鸣体机制复验](../../evidence/experiments/P1-MECHANISM-RERUN-2026-07-28/summary.md)
 - [双内核合同](../../evidence/track-a/A0-quality-laboratory/runtime-ablation-report.json)
 
-## 下一批最值得做的实验
+## 质量实验：机器门禁已完成，人工盲评待完成
 
 ### P0-1：Aurora 回复质量——同模型、盲化、配对 A/B
 
@@ -239,6 +254,12 @@ Start-Process (Resolve-Path '.\docs\demo\HERO-EXPERIMENT-OFFLINE-BACKUP.html')
 
 不要把 LLM-as-a-judge 当主裁判。它可以做二级诊断，但多语言开放式回答仍需要双语人类盲评。配对盲评和多指标报告分别与 [Chatbot Arena](https://arxiv.org/abs/2403.04132) 和 [HELM](https://arxiv.org/abs/2211.09110) 的方法论方向一致。
 
+当前进度：冻结的 48 对数据、failure-inclusive ledger、三份独立盲评表和
+unblinding key 已生成。最终修复后 `-006` 中 Direct Gemini 与 Full Aurora
+均为 `48/48` 成功，Full Aurora fallback/business failure 为 `0`；三位评审
+尚未填写，因此 `effectiveness_claim=false`。见
+[最终双语可靠性结果](../../evidence/innovation/INNO-EVAL-GEMINI-BILINGUAL-006/RESULTS.md)。
+
 ### P0-2：中英双语“等价收益”实验
 
 目的：不是证明翻译能力，而是证明同一个伴侣系统在中文和英文里都能保持理解、记忆、边界和语言自然度。
@@ -254,6 +275,12 @@ Start-Process (Resolve-Path '.\docs\demo\HERO-EXPERIMENT-OFFLINE-BACKUP.html')
 - 报告 bilingual reviewer agreement；不以 BLEU/ROUGE 作为开放式陪伴回复的主指标。
 
 多语言评估中，人评与自动评估可能不一致，因此主结论应以盲化人评为准；可参考 [PARIKSHA](https://aclanthology.org/2024.emnlp-main.451/) 的多语言人类/LLM 评价比较。
+
+当前机器门禁：Direct 与 Full 两路的中文、英文可见回复语言匹配均为
+`48/48`；Full Aurora 中文 `24/24`、英文 `24/24` 完成。Full Aurora p50
+`3.695s`、p95 `9.847s`；Direct p50 `8.349s`、p95 `13.880s`。这些数字只
+证明本轮可靠性、语言遵从和测得时延，不证明语义质量等价；中英 Aurora
+benefit 差值仍需三人盲评后计算。
 
 ### P0-3：30 人公网突发与 50 个隔离故事 Session
 
@@ -277,7 +304,31 @@ pwsh .\scripts\demo\test-30-user-burst.ps1 `
 - 30 人相互发现和环形连接；
 - 报告落盘到 `.demo-runtime/burst-30-report.json`。
 
-正式证据需要同一版本、同一网络下连续两次 PASS。应额外记录 5xx、Provider 错误分类、DB/Redis/线程池峰值和总成本。通过后可以说“在该笔记本、该网络和该 Provider 配额下完成 30 人突发”，不能直接说“生产可承载任意 50 人”。
+2026-07-28 修复前的 run-01 至 run-05 全部按失败保留，其中 run-04/run-05
+准确暴露了一个配置缺陷：`DEMO_UNLIMITED_USAGE_ENABLED=true` 当时没有被
+`ApiRateLimitFilter` 消费，同一公网 IP 会撞到 login bucket。修复后，非 prod
+课堂 Demo 会旁路应用额度过滤器，但认证、授权、CSRF、隐私和危机安全链保留；
+prod 即使误配该开关也仍强制限流。
+
+正式连续 clean passes：
+
+| 复验 | Gemini Aurora | HTTP 429 | Aurora p95 | Sandbox | discovery / 好友环 | 清理 |
+|---|---:|---:|---:|---:|---:|---:|
+| run-07 | `30/30` | `0` | `17.897s` | `50/50` 唯一 | `30/30 / 30/30` | `30/30` 账号、0 Sandbox 失败 |
+| run-08 | `30/30` | `0` | `12.848s` | `50/50` 唯一 | `30/30 / 30/30` | `30/30` 账号、0 Sandbox 失败 |
+
+run-06 也通过，但因与被中断的双语评测有短暂额外并发，只标记为
+`CONCURRENT_EXTRA_LOAD_PASS`，不计入两次严格同条件复现。完整失败台账和最终
+结果见 [公网 burst 总结](../../evidence/experiments/PUBLIC-BURST-30X50-001/summary.md)。
+
+最终重试修复部署后又执行 run-09 `FINAL_CODE_SMOKE`：30/30 Gemini、429=0、
+Aurora p95 `7.186s`、50/50 Sandbox、discovery/好友环 30/30，fallback、
+stage failure、business failure 均为 0。它证明最终代码没有容量/隔离回归，
+但不替代 run-07/run-08 的两次连续容量证据。
+
+可以说“在该笔记本、该网络和该 Gemini 配额下连续两次完成 30 人课堂突发”，
+不能直接说“生产可承载任意 50 人”。DB/Redis/线程池峰值和总成本仍未纳入本轮
+报告。
 
 ### P1-1：纵向记忆、纠正与遗忘
 

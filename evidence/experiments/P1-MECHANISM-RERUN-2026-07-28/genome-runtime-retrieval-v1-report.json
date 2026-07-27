@@ -1,0 +1,51 @@
+{
+  "datasetVersion" : "genome-runtime-retrieval.v1",
+  "scenarioCount" : 6,
+  "intentAccuracy" : 1.0,
+  "selectionAccuracy" : 1.0,
+  "evidenceLeakCount" : 0,
+  "unsupportedFallbackAccuracy" : 1.0,
+  "cases" : [ {
+    "intentMatch" : true,
+    "key" : "habit",
+    "selectionMatch" : true,
+    "unsupported" : false,
+    "expectedMemoryIds" : [ 13 ],
+    "selectedMemoryIds" : [ 13 ]
+  }, {
+    "intentMatch" : true,
+    "key" : "value",
+    "selectionMatch" : true,
+    "unsupported" : false,
+    "expectedMemoryIds" : [ 12 ],
+    "selectedMemoryIds" : [ 12 ]
+  }, {
+    "intentMatch" : true,
+    "key" : "temporal",
+    "selectionMatch" : true,
+    "unsupported" : false,
+    "expectedMemoryIds" : [ 14 ],
+    "selectedMemoryIds" : [ 14 ]
+  }, {
+    "intentMatch" : true,
+    "key" : "episode",
+    "selectionMatch" : true,
+    "unsupported" : false,
+    "expectedMemoryIds" : [ 11 ],
+    "selectedMemoryIds" : [ 11 ]
+  }, {
+    "intentMatch" : true,
+    "key" : "unfamiliar-sport",
+    "selectionMatch" : true,
+    "unsupported" : true,
+    "expectedMemoryIds" : [ ],
+    "selectedMemoryIds" : [ ]
+  }, {
+    "intentMatch" : true,
+    "key" : "unfamiliar-music",
+    "selectionMatch" : true,
+    "unsupported" : true,
+    "expectedMemoryIds" : [ ],
+    "selectedMemoryIds" : [ ]
+  } ]
+}

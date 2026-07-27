@@ -1,0 +1,10 @@
+{
+  "microRecallAt3" : 1.0,
+  "mrr" : 1.0,
+  "prohibitedLeakage" : 0,
+  "datasetVersion" : "memory-retrieval-v1",
+  "p95Millis" : 24.4444,
+  "cases" : 10,
+  "macroRecallAt3" : 1.0,
+  "budgetViolations" : 0
+}

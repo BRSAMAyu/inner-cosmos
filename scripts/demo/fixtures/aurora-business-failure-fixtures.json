@@ -1,0 +1,68 @@
+[
+  {
+    "id": "normal",
+    "payload": {
+      "messages": ["You do not need to solve the whole night at once."],
+      "riskFlags": [],
+      "agentLoop": {"continueReason": "complete", "fallbackReason": ""},
+      "aiState": {"status": "READY", "fallbackUsed": false}
+    },
+    "response": "You do not need to solve the whole night at once.",
+    "expected_failure": false
+  },
+  {
+    "id": "english-template",
+    "payload": {
+      "messages": ["Your message is saved, but Aurora could not finish the reply. Please retry in a moment; recovery will continue from this message."],
+      "riskFlags": [],
+      "agentLoop": {"continueReason": "complete", "fallbackReason": ""},
+      "aiState": {}
+    },
+    "response": "Your message is saved, but Aurora could not finish the reply. Please retry in a moment; recovery will continue from this message.",
+    "expected_failure": true
+  },
+  {
+    "id": "chinese-template",
+    "payload": {
+      "messages": ["你的消息已经保存，但 Aurora 刚才没有完成回复。请稍后重试。"],
+      "riskFlags": [],
+      "agentLoop": {"continueReason": "complete", "fallbackReason": ""},
+      "aiState": {}
+    },
+    "response": "你的消息已经保存，但 Aurora 刚才没有完成回复。请稍后重试。",
+    "expected_failure": true
+  },
+  {
+    "id": "risk-flag",
+    "payload": {
+      "messages": ["A calm local response."],
+      "riskFlags": ["FALLBACK_USED"],
+      "agentLoop": {},
+      "aiState": {}
+    },
+    "response": "A calm local response.",
+    "expected_failure": true
+  },
+  {
+    "id": "agent-loop",
+    "payload": {
+      "messages": ["A calm local response."],
+      "riskFlags": [],
+      "agentLoop": {"continueReason": "provider-recovery-required"},
+      "aiState": {}
+    },
+    "response": "A calm local response.",
+    "expected_failure": true
+  },
+  {
+    "id": "ai-state",
+    "payload": {
+      "messages": ["A calm local response."],
+      "riskFlags": [],
+      "agentLoop": {},
+      "aiState": {"status": "DEGRADED"}
+    },
+    "response": "A calm local response.",
+    "expected_failure": true
+  }
+]

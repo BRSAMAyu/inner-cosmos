@@ -1,0 +1,17 @@
+{
+  "suite" : "track-a-proactive-decision-quiet-hours",
+  "runs" : [ {
+    "scenarioId" : "TA-QH-DEV-01",
+    "scenarioType" : "quiet_hours",
+    "variant" : "gate_enforced",
+    "pass" : true,
+    "detail" : "no push/schedule call during quiet hours"
+  }, {
+    "scenarioId" : "TA-QH-DEV-01",
+    "scenarioType" : "quiet_hours",
+    "variant" : "naive_ask_model_first_baseline",
+    "pass" : false,
+    "detail" : "a hypothetical ask-first design has no pre-LLM gate (expected false — this IS why the real engine checks quiet hours before calling the model)"
+  } ],
+  "unexpectedFailureLedger" : [ ]
+}

@@ -1,0 +1,82 @@
+{
+  "status": "FAIL",
+  "generatedAt": "2026-07-27T20:56:53.4638452+00:00",
+  "originAuthority": "causing-weighted-gotta-matrix.trycloudflare.com",
+  "requestedUsers": 30,
+  "throttleLimit": 30,
+  "successfulRealAuroraUsers": 0,
+  "http429Count": 0,
+  "providerSet": [],
+  "modelSet": [],
+  "runtimeSet": [],
+  "orchestrationWarnings": [],
+  "criticFallbackCount": 0,
+  "latencyMs": {
+    "registrationP50": 0,
+    "registrationP95": 0,
+    "calibrationP50": 0,
+    "calibrationP95": 0,
+    "auroraTotalP50": 0,
+    "auroraTotalP95": 0,
+    "auroraTotalP99": 0,
+    "fullTrajectoryP95": 0
+  },
+  "thresholdsMs": {
+    "registrationP95": 15000,
+    "calibrationP95": 10000,
+    "auroraTotalP95": 90000
+  },
+  "sandboxIsolation": {
+    "requestedSessions": 50,
+    "enteredSessions": 0,
+    "uniqueOwnerIds": 0,
+    "cleanupFailures": 0,
+    "isolated": false
+  },
+  "social": {
+    "discoveryChecks": 0,
+    "expectedDiscoveryChecks": 30,
+    "acceptedRingConnections": 0,
+    "expectedRingConnections": 30,
+    "nobodyLeftAlone": false
+  },
+  "cleanup": {
+    "keptByOperator": false,
+    "deletedAccounts": 0,
+    "absentOrNotRegistered": 0
+  },
+  "stageFailures": [],
+  "failures": [
+    "Fatal verifier error: The SSL connection could not be established, see inner exception.",
+    "Cleanup failed for actor index 29.",
+    "Cleanup failed for actor index 28.",
+    "Cleanup failed for actor index 27.",
+    "Cleanup failed for actor index 26.",
+    "Cleanup failed for actor index 25.",
+    "Cleanup failed for actor index 24.",
+    "Cleanup failed for actor index 23.",
+    "Cleanup failed for actor index 22.",
+    "Cleanup failed for actor index 21.",
+    "Cleanup failed for actor index 20.",
+    "Cleanup failed for actor index 19.",
+    "Cleanup failed for actor index 18.",
+    "Cleanup failed for actor index 17.",
+    "Cleanup failed for actor index 16.",
+    "Cleanup failed for actor index 15.",
+    "Cleanup failed for actor index 14.",
+    "Cleanup failed for actor index 13.",
+    "Cleanup failed for actor index 12.",
+    "Cleanup failed for actor index 11.",
+    "Cleanup failed for actor index 10.",
+    "Cleanup failed for actor index 9.",
+    "Cleanup failed for actor index 8.",
+    "Cleanup failed for actor index 7.",
+    "Cleanup failed for actor index 6.",
+    "Cleanup failed for actor index 5.",
+    "Cleanup failed for actor index 4.",
+    "Cleanup failed for actor index 3.",
+    "Cleanup failed for actor index 2.",
+    "Cleanup failed for actor index 1.",
+    "Cleanup failed for actor index 0."
+  ]
+}

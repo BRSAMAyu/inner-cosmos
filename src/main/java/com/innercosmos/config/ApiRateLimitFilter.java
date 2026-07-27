@@ -15,6 +15,8 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -40,13 +42,31 @@ public final class ApiRateLimitFilter extends OncePerRequestFilter {
 
     private final RateLimitStore store;
     private final RateLimitProperties properties;
+    private final boolean unlimitedClassroomDemo;
 
     @Value("${inner-cosmos.security.trusted-proxy-enabled:false}")
     private boolean trustedProxyConfigured;
 
+    @Autowired
+    public ApiRateLimitFilter(RateLimitStore store, RateLimitProperties properties,
+                              Environment environment) {
+        this(store, properties,
+                environment.getProperty(
+                        "inner-cosmos.demo.unlimited-usage-enabled", Boolean.class, false)
+                        && java.util.Arrays.stream(environment.getActiveProfiles())
+                        .noneMatch("prod"::equalsIgnoreCase));
+    }
+
+    /** Unit-test/default constructor: quotas remain enabled unless explicitly opted out. */
     public ApiRateLimitFilter(RateLimitStore store, RateLimitProperties properties) {
+        this(store, properties, false);
+    }
+
+    ApiRateLimitFilter(RateLimitStore store, RateLimitProperties properties,
+                       boolean unlimitedClassroomDemo) {
         this.store = store;
         this.properties = properties;
+        this.unlimitedClassroomDemo = unlimitedClassroomDemo;
     }
 
     @Override
@@ -55,6 +75,15 @@ public final class ApiRateLimitFilter extends OncePerRequestFilter {
                                     FilterChain chain) throws IOException, ServletException {
         String path = requestPath(request);
         if (!path.startsWith("/api/")) {
+            chain.doFilter(request, response);
+            return;
+        }
+
+        // Classroom-only capacity mode. This bypasses only the application quota filter; the
+        // request still traverses authentication/authorization, CSRF (where enabled), privacy,
+        // idempotency and crisis/safety boundaries. The default is false, and the constructor
+        // refuses to activate it under the prod profile even if an operator sets the flag.
+        if (unlimitedClassroomDemo) {
             chain.doFilter(request, response);
             return;
         }

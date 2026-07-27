@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.mock.env.MockEnvironment;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 
@@ -106,9 +107,73 @@ class ApiRateLimitFilterTest {
         assertThat(store.keys).containsExactly(RateLimitKey.forSubject("aurora", "42"));
     }
 
+    @Test
+    void unlimitedClassroomDemoBypassesLoginPublicDemoAndAuthenticatedBusinessQuotas()
+            throws Exception {
+        RejectingStore store = new RejectingStore();
+        MockEnvironment environment = new MockEnvironment()
+                .withProperty("inner-cosmos.demo.unlimited-usage-enabled", "true");
+        ApiRateLimitFilter filter = new ApiRateLimitFilter(
+                store, new RateLimitProperties(), environment);
+
+        List<MockHttpServletRequest> requests = List.of(
+                post("/api/public/demo/enter/lin-che"),
+                post("/api/v1/auth/login"),
+                post("/api/public/demo/sandbox"),
+                authenticatedPost("/api/v1/aurora/message-rich", 42L),
+                authenticatedPost("/api/social/friends/request", 42L));
+
+        for (MockHttpServletRequest request : requests) {
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            MockFilterChain chain = new MockFilterChain();
+            filter.doFilter(request, response, chain);
+            assertThat(chain.getRequest()).as(request.getRequestURI()).isNotNull();
+            assertThat(response.getStatus()).as(request.getRequestURI()).isEqualTo(200);
+        }
+        assertThat(store.keys).isEmpty();
+    }
+
+    @Test
+    void defaultModeStillRejectsRequestsWhenQuotaStoreDeniesThem() throws Exception {
+        RejectingStore store = new RejectingStore();
+        ApiRateLimitFilter filter = new ApiRateLimitFilter(store, new RateLimitProperties());
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        filter.doFilter(post("/api/public/demo/enter/lin-che"), response, chain);
+
+        assertThat(response.getStatus()).isEqualTo(429);
+        assertThat(response.getContentAsString()).contains("RATE_LIMIT_EXCEEDED");
+        assertThat(chain.getRequest()).isNull();
+        assertThat(store.keys).containsExactly(RateLimitKey.forSubject("login", "127.0.0.1"));
+    }
+
+    @Test
+    void prodProfileKeepsQuotaProtectionEvenIfDemoFlagIsMisconfiguredTrue() throws Exception {
+        RejectingStore store = new RejectingStore();
+        MockEnvironment environment = new MockEnvironment()
+                .withProperty("inner-cosmos.demo.unlimited-usage-enabled", "true");
+        environment.setActiveProfiles("prod");
+        ApiRateLimitFilter filter = new ApiRateLimitFilter(
+                store, new RateLimitProperties(), environment);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(post("/api/public/demo/enter/lin-che"),
+                response, new MockFilterChain());
+
+        assertThat(response.getStatus()).isEqualTo(429);
+        assertThat(store.keys).containsExactly(RateLimitKey.forSubject("login", "127.0.0.1"));
+    }
+
     private MockHttpServletRequest post(String path) {
         MockHttpServletRequest request = new MockHttpServletRequest("POST", path);
         request.setServletPath(path);
+        return request;
+    }
+
+    private MockHttpServletRequest authenticatedPost(String path, Long userId) {
+        MockHttpServletRequest request = post(path);
+        request.getSession(true).setAttribute(Constants.SESSION_USER_KEY, userId);
         return request;
     }
 
@@ -119,6 +184,16 @@ class ApiRateLimitFilterTest {
         public RateLimitDecision consume(String key, com.innercosmos.ratelimit.RateLimitPolicy policy) {
             keys.add(key);
             return new RateLimitDecision(true, policy.capacity() - 1);
+        }
+    }
+
+    private static final class RejectingStore implements RateLimitStore {
+        private final List<String> keys = new ArrayList<>();
+
+        @Override
+        public RateLimitDecision consume(String key, com.innercosmos.ratelimit.RateLimitPolicy policy) {
+            keys.add(key);
+            return new RateLimitDecision(false, 0);
         }
     }
 }

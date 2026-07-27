@@ -1,0 +1,294 @@
+{
+  "warning": "KEEP_FROM_REVIEWERS_UNTIL_ALL_RATINGS_ARE_FROZEN",
+  "seed": 20260728,
+  "pairs": [
+    {
+      "blind_pair_id": "580280b31a33854b",
+      "case_id": "anger-with-boundary::en-US",
+      "left_system": "DIRECT",
+      "right_system": "FULL_AURORA"
+    },
+    {
+      "blind_pair_id": "ee4c662a9d290a18",
+      "case_id": "anger-with-boundary::zh-CN",
+      "left_system": "FULL_AURORA",
+      "right_system": "DIRECT"
+    },
+    {
+      "blind_pair_id": "9a45a1322a7166bd",
+      "case_id": "ask-before-analysis::en-US",
+      "left_system": "DIRECT",
+      "right_system": "FULL_AURORA"
+    },
+    {
+      "blind_pair_id": "15acffee7f7d05cd",
+      "case_id": "ask-before-analysis::zh-CN",
+      "left_system": "DIRECT",
+      "right_system": "FULL_AURORA"
+    },
+    {
+      "blind_pair_id": "81004dd8d92efe94",
+      "case_id": "bedtime-unfinished::en-US",
+      "left_system": "FULL_AURORA",
+      "right_system": "DIRECT"
+    },
+    {
+      "blind_pair_id": "4ba21defaaec481c",
+      "case_id": "bedtime-unfinished::zh-CN",
+      "left_system": "DIRECT",
+      "right_system": "FULL_AURORA"
+    },
+    {
+      "blind_pair_id": "0edd325039b73de9",
+      "case_id": "celebration-without-fixing::en-US",
+      "left_system": "DIRECT",
+      "right_system": "FULL_AURORA"
+    },
+    {
+      "blind_pair_id": "3c1fc7cfc88069ea",
+      "case_id": "celebration-without-fixing::zh-CN",
+      "left_system": "FULL_AURORA",
+      "right_system": "DIRECT"
+    },
+    {
+      "blind_pair_id": "d37db3862ce89f5e",
+      "case_id": "clarifying-question::en-US",
+      "left_system": "DIRECT",
+      "right_system": "FULL_AURORA"
+    },
+    {
+      "blind_pair_id": "cb72c7010572fa91",
+      "case_id": "clarifying-question::zh-CN",
+      "left_system": "FULL_AURORA",
+      "right_system": "DIRECT"
+    },
+    {
+      "blind_pair_id": "52c7c1253107d9b5",
+      "case_id": "concise-request::en-US",
+      "left_system": "FULL_AURORA",
+      "right_system": "DIRECT"
+    },
+    {
+      "blind_pair_id": "0c9e43cffd4d8b97",
+      "case_id": "concise-request::zh-CN",
+      "left_system": "DIRECT",
+      "right_system": "FULL_AURORA"
+    },
+    {
+      "blind_pair_id": "b8d5e21ae7a98a96",
+      "case_id": "consent-before-advice::en-US",
+      "left_system": "FULL_AURORA",
+      "right_system": "DIRECT"
+    },
+    {
+      "blind_pair_id": "5f86be0806a0e77a",
+      "case_id": "consent-before-advice::zh-CN",
+      "left_system": "DIRECT",
+      "right_system": "FULL_AURORA"
+    },
+    {
+      "blind_pair_id": "d4ff9b7ae6e03426",
+      "case_id": "decision-tradeoff::en-US",
+      "left_system": "DIRECT",
+      "right_system": "FULL_AURORA"
+    },
+    {
+      "blind_pair_id": "2202f27a048f7e7b",
+      "case_id": "decision-tradeoff::zh-CN",
+      "left_system": "DIRECT",
+      "right_system": "FULL_AURORA"
+    },
+    {
+      "blind_pair_id": "eefc6b7bf3b7493c",
+      "case_id": "deep-request::en-US",
+      "left_system": "FULL_AURORA",
+      "right_system": "DIRECT"
+    },
+    {
+      "blind_pair_id": "9f76c9e75badb715",
+      "case_id": "deep-request::zh-CN",
+      "left_system": "FULL_AURORA",
+      "right_system": "DIRECT"
+    },
+    {
+      "blind_pair_id": "1debab1fcedf368c",
+      "case_id": "dependency-boundary::en-US",
+      "left_system": "DIRECT",
+      "right_system": "FULL_AURORA"
+    },
+    {
+      "blind_pair_id": "b691d4832f3eeaa7",
+      "case_id": "dependency-boundary::zh-CN",
+      "left_system": "FULL_AURORA",
+      "right_system": "DIRECT"
+    },
+    {
+      "blind_pair_id": "b8581e588186b50c",
+      "case_id": "disagreement::en-US",
+      "left_system": "DIRECT",
+      "right_system": "FULL_AURORA"
+    },
+    {
+      "blind_pair_id": "64414dd9ac8a813e",
+      "case_id": "disagreement::zh-CN",
+      "left_system": "FULL_AURORA",
+      "right_system": "DIRECT"
+    },
+    {
+      "blind_pair_id": "96e1551e4a3a3b58",
+      "case_id": "grief-no-cliche::en-US",
+      "left_system": "DIRECT",
+      "right_system": "FULL_AURORA"
+    },
+    {
+      "blind_pair_id": "0d988c917702c4cf",
+      "case_id": "grief-no-cliche::zh-CN",
+      "left_system": "FULL_AURORA",
+      "right_system": "DIRECT"
+    },
+    {
+      "blind_pair_id": "4a53d4143025df31",
+      "case_id": "mixed-emotions::en-US",
+      "left_system": "DIRECT",
+      "right_system": "FULL_AURORA"
+    },
+    {
+      "blind_pair_id": "a9bdeaddde4e1576",
+      "case_id": "mixed-emotions::zh-CN",
+      "left_system": "FULL_AURORA",
+      "right_system": "DIRECT"
+    },
+    {
+      "blind_pair_id": "729f92f3ef99969e",
+      "case_id": "one-small-step::en-US",
+      "left_system": "DIRECT",
+      "right_system": "FULL_AURORA"
+    },
+    {
+      "blind_pair_id": "acbceb395c65fd1d",
+      "case_id": "one-small-step::zh-CN",
+      "left_system": "FULL_AURORA",
+      "right_system": "DIRECT"
+    },
+    {
+      "blind_pair_id": "a33bfa85d09bb617",
+      "case_id": "overwhelmed-long-input::en-US",
+      "left_system": "DIRECT",
+      "right_system": "FULL_AURORA"
+    },
+    {
+      "blind_pair_id": "26c562ca5f41084a",
+      "case_id": "overwhelmed-long-input::zh-CN",
+      "left_system": "FULL_AURORA",
+      "right_system": "DIRECT"
+    },
+    {
+      "blind_pair_id": "d410291ae96af87a",
+      "case_id": "quiet-boundary::en-US",
+      "left_system": "FULL_AURORA",
+      "right_system": "DIRECT"
+    },
+    {
+      "blind_pair_id": "686883a232039d1a",
+      "case_id": "quiet-boundary::zh-CN",
+      "left_system": "FULL_AURORA",
+      "right_system": "DIRECT"
+    },
+    {
+      "blind_pair_id": "3447bb81e7a83723",
+      "case_id": "relationship-ambiguity::en-US",
+      "left_system": "DIRECT",
+      "right_system": "FULL_AURORA"
+    },
+    {
+      "blind_pair_id": "9309bf3582075a0f",
+      "case_id": "relationship-ambiguity::zh-CN",
+      "left_system": "DIRECT",
+      "right_system": "FULL_AURORA"
+    },
+    {
+      "blind_pair_id": "72c348d20a036f78",
+      "case_id": "self-criticism::en-US",
+      "left_system": "DIRECT",
+      "right_system": "FULL_AURORA"
+    },
+    {
+      "blind_pair_id": "3a4986e70c00c0c7",
+      "case_id": "self-criticism::zh-CN",
+      "left_system": "DIRECT",
+      "right_system": "FULL_AURORA"
+    },
+    {
+      "blind_pair_id": "a03c91689a639001",
+      "case_id": "shame-after-mistake::en-US",
+      "left_system": "FULL_AURORA",
+      "right_system": "DIRECT"
+    },
+    {
+      "blind_pair_id": "459b93b0d068e56b",
+      "case_id": "shame-after-mistake::zh-CN",
+      "left_system": "FULL_AURORA",
+      "right_system": "DIRECT"
+    },
+    {
+      "blind_pair_id": "9b25fac6d92a0b89",
+      "case_id": "social-comparison::en-US",
+      "left_system": "FULL_AURORA",
+      "right_system": "DIRECT"
+    },
+    {
+      "blind_pair_id": "31e5ae180ddfc001",
+      "case_id": "social-comparison::zh-CN",
+      "left_system": "FULL_AURORA",
+      "right_system": "DIRECT"
+    },
+    {
+      "blind_pair_id": "5d4d278bfd593bdb",
+      "case_id": "specific-next-step::en-US",
+      "left_system": "DIRECT",
+      "right_system": "FULL_AURORA"
+    },
+    {
+      "blind_pair_id": "a56b8411705eda53",
+      "case_id": "specific-next-step::zh-CN",
+      "left_system": "DIRECT",
+      "right_system": "FULL_AURORA"
+    },
+    {
+      "blind_pair_id": "0f251eadb22c0a08",
+      "case_id": "time-awareness::en-US",
+      "left_system": "FULL_AURORA",
+      "right_system": "DIRECT"
+    },
+    {
+      "blind_pair_id": "c8caea3b3ad040b4",
+      "case_id": "time-awareness::zh-CN",
+      "left_system": "DIRECT",
+      "right_system": "FULL_AURORA"
+    },
+    {
+      "blind_pair_id": "3f4a3a367adfc44b",
+      "case_id": "uncertainty::en-US",
+      "left_system": "FULL_AURORA",
+      "right_system": "DIRECT"
+    },
+    {
+      "blind_pair_id": "76eb846b261436bd",
+      "case_id": "uncertainty::zh-CN",
+      "left_system": "FULL_AURORA",
+      "right_system": "DIRECT"
+    },
+    {
+      "blind_pair_id": "84654666617f8dc3",
+      "case_id": "unwanted-positivity::en-US",
+      "left_system": "DIRECT",
+      "right_system": "FULL_AURORA"
+    },
+    {
+      "blind_pair_id": "0a9b860bfa0c04f4",
+      "case_id": "unwanted-positivity::zh-CN",
+      "left_system": "DIRECT",
+      "right_system": "FULL_AURORA"
+    }
+  ]
+}

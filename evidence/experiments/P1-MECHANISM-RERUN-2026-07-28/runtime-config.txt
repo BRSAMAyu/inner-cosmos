@@ -1,0 +1,12 @@
+Captured at 2026-07-28 05:01 Asia/Shanghai
+git_commit=cf598d4a
+public_demo_llm_provider=gemini
+public_demo_gemini_model=gemini-3.6-flash
+public_demo_llm_allow_fallback=false
+public_demo_memory_embedding_enabled=false
+
+Source commands:
+docker exec inner-cosmos-public-demo-app-1 printenv LLM_PROVIDER LLM_MODEL LLM_ALLOW_FALLBACK MEMORY_EMBEDDING_ENABLED
+docker exec inner-cosmos-public-demo-app-1 printenv GEMINI_MODEL GEMINI_FLASH_MODEL LLM_GEMINI_MODEL LLM_PROVIDER LLM_ALLOW_FALLBACK MEMORY_EMBEDDING_ENABLED
+
+No credential variable was requested or recorded.

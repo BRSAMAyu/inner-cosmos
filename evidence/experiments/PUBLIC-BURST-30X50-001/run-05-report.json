@@ -1,0 +1,93 @@
+{
+  "status": "FAIL",
+  "generatedAt": "2026-07-27T21:15:23.5911662+00:00",
+  "originAuthority": "manitoba-nevertheless-teeth-info.trycloudflare.com",
+  "requestedUsers": 30,
+  "throttleLimit": 30,
+  "successfulRealAuroraUsers": 30,
+  "http429Count": 0,
+  "providerSet": [
+    "GEMINI"
+  ],
+  "modelSet": [
+    "gemini-3.6-flash"
+  ],
+  "runtimeSet": [
+    "single-pass.v1"
+  ],
+  "orchestrationWarnings": [
+    {
+      "warning": "runtime=single-pass.v1,background-planner-not-observed",
+      "count": 30
+    }
+  ],
+  "criticFallbackCount": 0,
+  "latencyMs": {
+    "registrationP50": 1116.72,
+    "registrationP95": 1299.09,
+    "calibrationP50": 451.97,
+    "calibrationP95": 809.84,
+    "auroraTotalP50": 7076.69,
+    "auroraTotalP95": 15712.25,
+    "auroraTotalP99": 16481.29,
+    "fullTrajectoryP95": 17685.68
+  },
+  "thresholdsMs": {
+    "registrationP95": 15000,
+    "calibrationP95": 10000,
+    "auroraTotalP95": 90000
+  },
+  "sandboxIsolation": {
+    "requestedSessions": 50,
+    "enteredSessions": 5,
+    "uniqueOwnerIds": 5,
+    "cleanupFailures": 0,
+    "isolated": false
+  },
+  "social": {
+    "discoveryChecks": 0,
+    "expectedDiscoveryChecks": 30,
+    "acceptedRingConnections": 0,
+    "expectedRingConnections": 30,
+    "nobodyLeftAlone": false
+  },
+  "cleanup": {
+    "keptByOperator": false,
+    "deletedAccounts": 2,
+    "absentOrNotRegistered": 0
+  },
+  "stageFailures": [],
+  "failures": [
+    "Isolated story entry succeeded for 5/50 sessions.",
+    "Story entry returned 5 unique owners for 50 sessions.",
+    "Fatal verifier error: Response status code does not indicate success: 429 (Too Many Requests).",
+    "Cleanup failed for actor index 29.",
+    "Cleanup failed for actor index 28.",
+    "Cleanup failed for actor index 27.",
+    "Cleanup failed for actor index 26.",
+    "Cleanup failed for actor index 25.",
+    "Cleanup failed for actor index 24.",
+    "Cleanup failed for actor index 23.",
+    "Cleanup failed for actor index 22.",
+    "Cleanup failed for actor index 21.",
+    "Cleanup failed for actor index 19.",
+    "Cleanup failed for actor index 18.",
+    "Cleanup failed for actor index 17.",
+    "Cleanup failed for actor index 16.",
+    "Cleanup failed for actor index 15.",
+    "Cleanup failed for actor index 14.",
+    "Cleanup failed for actor index 13.",
+    "Cleanup failed for actor index 12.",
+    "Cleanup failed for actor index 11.",
+    "Cleanup failed for actor index 10.",
+    "Cleanup failed for actor index 9.",
+    "Cleanup failed for actor index 8.",
+    "Cleanup failed for actor index 6.",
+    "Cleanup failed for actor index 5.",
+    "Cleanup failed for actor index 4.",
+    "Cleanup failed for actor index 3.",
+    "Cleanup failed for actor index 2.",
+    "Cleanup failed for actor index 1.",
+    "Cleanup failed for actor index 0."
+  ]
+}

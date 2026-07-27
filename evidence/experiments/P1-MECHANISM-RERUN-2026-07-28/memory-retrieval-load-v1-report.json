@@ -1,0 +1,17 @@
+{
+  "scenario" : "memory-retrieval-load-v1",
+  "concurrency" : 24,
+  "users" : 10,
+  "noiseCardsPerUser" : 200,
+  "totalCalls" : 180,
+  "timeouts" : 0,
+  "wallSeconds" : 0.86,
+  "throughputCallsPerSec" : 209.18,
+  "p50Millis" : 97.27,
+  "p95Millis" : 204.23,
+  "p99Millis" : 215.25,
+  "maxMillis" : 218.52,
+  "budgetViolations" : 0,
+  "prohibitedLeakage" : 0,
+  "relevantMisses" : 0
+}

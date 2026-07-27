@@ -1,0 +1,17 @@
+{
+  "scenario" : "memory-retrieval-load-postgres-redis-v1",
+  "concurrency" : 24,
+  "users" : 10,
+  "noiseCardsPerUser" : 200,
+  "totalCalls" : 180,
+  "timeouts" : 0,
+  "wallSeconds" : 0.89,
+  "throughputCallsPerSec" : 202.1,
+  "p50Millis" : 80.61,
+  "p95Millis" : 315.95,
+  "p99Millis" : 318.02,
+  "maxMillis" : 318.3,
+  "budgetViolations" : 0,
+  "prohibitedLeakage" : 0,
+  "relevantMisses" : 0
+}

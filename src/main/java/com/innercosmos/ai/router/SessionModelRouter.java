@@ -1,5 +1,6 @@
 package com.innercosmos.ai.router;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.innercosmos.ai.client.LlmClient;
 import com.innercosmos.config.LlmConfig;
 import com.innercosmos.entity.DialogSession;
@@ -57,7 +58,13 @@ public class SessionModelRouter {
             if (s != null) chosen = s.preferredModel;
         }
         if ((chosen == null || chosen.isBlank()) && userId != null) {
-            UserProfile u = userMapper.selectById(userId);
+            // tb_user_profile.id is its own surrogate primary key; it is not guaranteed to
+            // equal tb_user.id. Looking up a profile with selectById(userId) can therefore
+            // load another person's row and leak their preferred_model into this user's turn.
+            // UserServiceImpl already uses the authoritative user_id lookup for the same field.
+            UserProfile u = userMapper.selectOne(new QueryWrapper<UserProfile>()
+                    .eq("user_id", userId)
+                    .last("LIMIT 1"));
             if (u != null) chosen = u.preferredModel;
         }
         if (chosen == null || chosen.isBlank()) {

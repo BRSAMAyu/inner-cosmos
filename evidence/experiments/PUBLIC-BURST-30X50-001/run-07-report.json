@@ -1,0 +1,61 @@
+{
+  "status": "PASS",
+  "generatedAt": "2026-07-27T21:30:10.2096029+00:00",
+  "originAuthority": "participating-beverly-susan-saint.trycloudflare.com",
+  "requestedUsers": 30,
+  "throttleLimit": 30,
+  "successfulRealAuroraUsers": 30,
+  "http429Count": 0,
+  "providerSet": [
+    "GEMINI"
+  ],
+  "modelSet": [
+    "gemini-3.6-flash"
+  ],
+  "runtimeSet": [
+    "single-pass.v1"
+  ],
+  "orchestrationWarnings": [
+    {
+      "warning": "runtime=single-pass.v1,background-planner-not-observed",
+      "count": 30
+    }
+  ],
+  "criticFallbackCount": 0,
+  "latencyMs": {
+    "registrationP50": 868.66,
+    "registrationP95": 1080.48,
+    "calibrationP50": 442.93,
+    "calibrationP95": 721.6,
+    "auroraTotalP50": 7302.17,
+    "auroraTotalP95": 17896.85,
+    "auroraTotalP99": 21070.08,
+    "fullTrajectoryP95": 19540.73
+  },
+  "thresholdsMs": {
+    "registrationP95": 15000,
+    "calibrationP95": 10000,
+    "auroraTotalP95": 90000
+  },
+  "sandboxIsolation": {
+    "requestedSessions": 50,
+    "enteredSessions": 50,
+    "uniqueOwnerIds": 50,
+    "cleanupFailures": 0,
+    "isolated": true
+  },
+  "social": {
+    "discoveryChecks": 30,
+    "expectedDiscoveryChecks": 30,
+    "acceptedRingConnections": 30,
+    "expectedRingConnections": 30,
+    "nobodyLeftAlone": true
+  },
+  "cleanup": {
+    "keptByOperator": false,
+    "deletedAccounts": 30,
+    "absentOrNotRegistered": 0
+  },
+  "stageFailures": [],
+  "failures": []
+}

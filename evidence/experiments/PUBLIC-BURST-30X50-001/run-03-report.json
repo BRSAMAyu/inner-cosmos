@@ -1,0 +1,95 @@
+{
+  "status": "FAIL",
+  "generatedAt": "2026-07-27T20:58:44.5343600+00:00",
+  "originAuthority": "causing-weighted-gotta-matrix.trycloudflare.com",
+  "requestedUsers": 30,
+  "throttleLimit": 30,
+  "successfulRealAuroraUsers": 30,
+  "http429Count": 0,
+  "providerSet": [
+    "DEEPSEEK"
+  ],
+  "modelSet": [
+    "deepseek-v4-flash"
+  ],
+  "runtimeSet": [
+    "dual-kernel.v1"
+  ],
+  "orchestrationWarnings": [
+    {
+      "warning": "runtime=dual-kernel.v1,background-planner-not-observed",
+      "count": 30
+    }
+  ],
+  "criticFallbackCount": 0,
+  "latencyMs": {
+    "registrationP50": 690.02,
+    "registrationP95": 890.42,
+    "calibrationP50": 333.09,
+    "calibrationP95": 1182.19,
+    "auroraTotalP50": 16573.94,
+    "auroraTotalP95": 20698.74,
+    "auroraTotalP99": 29605.58,
+    "fullTrajectoryP95": 21993.69
+  },
+  "thresholdsMs": {
+    "registrationP95": 15000,
+    "calibrationP95": 10000,
+    "auroraTotalP95": 90000
+  },
+  "sandboxIsolation": {
+    "requestedSessions": 50,
+    "enteredSessions": 50,
+    "uniqueOwnerIds": 3,
+    "cleanupFailures": 50,
+    "isolated": false
+  },
+  "social": {
+    "discoveryChecks": 30,
+    "expectedDiscoveryChecks": 30,
+    "acceptedRingConnections": 0,
+    "expectedRingConnections": 30,
+    "nobodyLeftAlone": false
+  },
+  "cleanup": {
+    "keptByOperator": false,
+    "deletedAccounts": 30,
+    "absentOrNotRegistered": 0
+  },
+  "stageFailures": [],
+  "failures": [
+    "Story entry returned 3 unique owners for 50 sessions.",
+    "Story entry exposed a curated template identity.",
+    "50 isolated Demo sandboxes could not be removed.",
+    "Discovery actor 0 sees 15/29 expected burst peers.",
+    "Discovery actor 1 sees 15/29 expected burst peers.",
+    "Discovery actor 2 sees 15/29 expected burst peers.",
+    "Discovery actor 3 sees 15/29 expected burst peers.",
+    "Discovery actor 4 sees 15/29 expected burst peers.",
+    "Discovery actor 5 sees 15/29 expected burst peers.",
+    "Discovery actor 6 sees 15/29 expected burst peers.",
+    "Discovery actor 7 sees 15/29 expected burst peers.",
+    "Discovery actor 8 sees 15/29 expected burst peers.",
+    "Discovery actor 9 sees 15/29 expected burst peers.",
+    "Discovery actor 10 sees 15/29 expected burst peers.",
+    "Discovery actor 11 sees 15/29 expected burst peers.",
+    "Discovery actor 12 sees 15/29 expected burst peers.",
+    "Discovery actor 13 sees 15/29 expected burst peers.",
+    "Discovery actor 14 sees 15/29 expected burst peers.",
+    "Discovery actor 15 sees 15/29 expected burst peers.",
+    "Discovery actor 16 sees 15/29 expected burst peers.",
+    "Discovery actor 17 sees 15/29 expected burst peers.",
+    "Discovery actor 18 sees 15/29 expected burst peers.",
+    "Discovery actor 19 sees 15/29 expected burst peers.",
+    "Discovery actor 20 sees 15/29 expected burst peers.",
+    "Discovery actor 21 sees 15/29 expected burst peers.",
+    "Discovery actor 22 sees 15/29 expected burst peers.",
+    "Discovery actor 23 sees 15/29 expected burst peers.",
+    "Discovery actor 24 sees 15/29 expected burst peers.",
+    "Discovery actor 25 sees 15/29 expected burst peers.",
+    "Discovery actor 26 sees 15/29 expected burst peers.",
+    "Discovery actor 27 sees 15/29 expected burst peers.",
+    "Discovery actor 28 sees 15/29 expected burst peers.",
+    "Discovery actor 29 sees 15/29 expected burst peers."
+  ]
+}

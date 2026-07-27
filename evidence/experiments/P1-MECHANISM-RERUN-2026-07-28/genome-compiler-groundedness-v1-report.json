@@ -1,0 +1,36 @@
+{
+  "datasetVersion" : "genome-compiler-groundedness-v1",
+  "scenarios" : 4,
+  "ungroundedCitations" : 0,
+  "requestedButExcludedStillCounted" : 0,
+  "perCase" : {
+    "other-user-memory-requested" : {
+      "legitimateCount" : 2,
+      "illegitimateRequested" : 1,
+      "ungroundedCitations" : [ ],
+      "persistedAuthorizedCount" : 2,
+      "excludedStillCounted" : false
+    },
+    "local-only-memory-requested" : {
+      "legitimateCount" : 1,
+      "illegitimateRequested" : 1,
+      "ungroundedCitations" : [ ],
+      "persistedAuthorizedCount" : 1,
+      "excludedStillCounted" : false
+    },
+    "no-external-processing-memory-requested" : {
+      "legitimateCount" : 1,
+      "illegitimateRequested" : 1,
+      "ungroundedCitations" : [ ],
+      "persistedAuthorizedCount" : 1,
+      "excludedStillCounted" : false
+    },
+    "simulator-only-memory-requested" : {
+      "legitimateCount" : 2,
+      "illegitimateRequested" : 1,
+      "ungroundedCitations" : [ ],
+      "persistedAuthorizedCount" : 2,
+      "excludedStillCounted" : false
+    }
+  }
+}

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.innercosmos.ai.context.AgentContext;
 import com.innercosmos.ai.context.AgentContextAssembler;
 import com.innercosmos.ai.context.AuroraConversationContextPolicy;
+import com.innercosmos.ai.client.PromptLanguageLlmClient;
 import com.innercosmos.ai.action.AuroraNaturalActionService;
 import com.innercosmos.ai.goodbye.GoodbyeOrchestrator;
 import com.innercosmos.ai.goodbye.GoodbyeTriggerDetector;
@@ -457,6 +458,12 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         Map<String, Object> turnContext = new LinkedHashMap<>();
         turnContext.put("auroraSystemPrompt", systemPrompt);
         turnContext.put("userMessage", request.message == null ? "" : request.message);
+        // Freeze the latest user-authored language before the message is embedded in a much
+        // larger planner/speaker envelope containing legacy Chinese schemas and examples. The
+        // provider-boundary decorator consumes this explicit contract for every visible stage,
+        // so an English turn cannot be pulled back to Chinese by prompt-volume majority.
+        turnContext.put("outputLanguage", PromptLanguageLlmClient.normalizeOutputLanguage(
+                request.locale, request.message));
         turnContext.put("mode", mode);
         turnContext.put("sessionId", request.sessionId == null ? 0L : request.sessionId);
         // M-012: thread the active mode's sampling temperature so it actually reaches the
@@ -578,6 +585,13 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             }
             vo = toReply(profile, ai, request, mode, memoryContext, gravityMemories, allowMemory);
             vo = sanitizeLlmOutput(vo, userId);
+            if (replyIndicatesContentFallback(vo)) {
+                // A structured call may return normally while yielding no user-visible segment.
+                // Promote that content-level fallback before aiState/provenance are computed;
+                // otherwise the deterministic recovery text is incorrectly disclosed as REAL_MODEL.
+                fallbackUsed = true;
+                runtimeMeta.put("contentFallbackUsed", true);
+            }
             vo.innerVoiceRequest = innerVoiceRequest;
             vo.deferredInnerVoiceRequest = deferredInnerVoiceRequest;
             vo.backgroundPlannerEvidence = backgroundPlannerEvidence;
@@ -1488,8 +1502,20 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         List<String> recentAurora = request == null ? List.of() : recentAuroraMessages(request.sessionId, 8);
         List<String> messages = cleanSegments(safeAi.segments, recentAurora);
         if (messages.isEmpty()) {
-            String userText = request == null ? "" : request.message;
-            messages = fallbackAuroraResult(userText, mode, gravityMemories, memoryContext, allowMemory, null).segments;
+            String retained = firstVisibleRawSegment(safeAi.segments);
+            if (!retained.isBlank()) {
+                // De-duplication is a presentation preference, not authority to erase a real
+                // provider response and pretend the provider failed. Retain one bounded,
+                // normalized segment; sanitizeLlmOutput still runs immediately after toReply.
+                messages = List.of(retained);
+            } else {
+                // Truly empty/SILENCE output is an honest content fallback. Replace the complete
+                // result so riskFlags and continueReason survive into agentLoop and aiState.
+                String userText = request == null ? "" : request.message;
+                safeAi = fallbackAuroraResult(
+                        userText, mode, gravityMemories, memoryContext, allowMemory, null);
+                messages = safeAi.segments;
+            }
         }
 
         AuroraReplyVO vo = new AuroraReplyVO();
@@ -1807,12 +1833,24 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         Exception lastException = null;
         for (int attempt = 0; attempt <= maxRetries; attempt++) {
             try {
-                return structuredAiService.call(userId, "AURORA_AGENT_LOOP_" + mode,
+                StructuredAiResults.AuroraResult result = structuredAiService.call(
+                        userId, "AURORA_AGENT_LOOP_" + mode,
                         auroraInstruction(false),
                         turnContext,
                         StructuredAiResults.AuroraResult.class,
                         () -> fallbackAuroraResult(request.message, mode, gravityMemories, memoryContext, allowMemory, stateSignal),
                         resolved.client());
+                boolean contentFallback = result == null
+                        || (result.riskFlags != null && result.riskFlags.stream().anyMatch(flag ->
+                        "FALLBACK_USED".equalsIgnoreCase(flag)
+                                || "EMERGENCY_FALLBACK".equalsIgnoreCase(flag)))
+                        || firstVisibleRawSegment(result.segments).isBlank();
+                if (!contentFallback || attempt >= maxRetries) {
+                    return result;
+                }
+                log.warn("Aurora structured result requires retry (attempt {}/{}): no usable real-model segment",
+                        attempt + 1, maxRetries + 1);
+                Thread.sleep(500L * (attempt + 1));
             } catch (RuntimeException e) {
                 Throwable cause = e.getCause();
                 boolean isRetryable = isRetryableError(e.getMessage()) ||
@@ -1821,6 +1859,9 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 lastException = e;
                 log.warn("Aurora LLM retryable error (attempt {}/{}): {}", attempt + 1, maxRetries + 1, e.getMessage());
                 try { Thread.sleep(500L * (attempt + 1)); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); throw new RuntimeException(ie); }
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException(interrupted);
             }
         }
         throw new RuntimeException("LLM call failed after " + (maxRetries + 1) + " attempts", lastException);
@@ -2069,6 +2110,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                                          boolean fallbackUsed) {
         String provider = resolved == null || resolved.provider() == null
                 ? llmConfig.activeProvider() : resolved.provider();
+        if (Boolean.TRUE.equals(runtimeMeta.get("contentFallbackUsed"))) return "no-usable-segment";
         if (fallbackUsed) return "provider-call-failed";
         if (Boolean.TRUE.equals(runtimeMeta.get("speakerFallbackUsed"))) return "speaker-fallback";
         if ("mock".equalsIgnoreCase(safeDiagnosticValue(provider))) {
@@ -2103,6 +2145,33 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             if (unique.size() >= 3) break;
         }
         return new ArrayList<>(unique);
+    }
+
+    private String firstVisibleRawSegment(List<String> raw) {
+        if (raw == null) return "";
+        for (String item : raw) {
+            String text = normalizeSegment(item);
+            if (text.isBlank()
+                    || "[[SILENCE]]".equalsIgnoreCase(text)
+                    || "SILENCE".equalsIgnoreCase(text)) {
+                continue;
+            }
+            return text.length() > 260 ? text.substring(0, 260) : text;
+        }
+        return "";
+    }
+
+    private boolean replyIndicatesContentFallback(AuroraReplyVO reply) {
+        if (reply == null) return false;
+        if (reply.riskFlags != null && reply.riskFlags.stream().anyMatch(flag ->
+                "FALLBACK_USED".equalsIgnoreCase(flag)
+                        || "EMERGENCY_FALLBACK".equalsIgnoreCase(flag))) {
+            return true;
+        }
+        if (reply.agentLoop == null) return false;
+        Object reason = reply.agentLoop.get("continueReason");
+        String normalized = reason == null ? "" : String.valueOf(reason).toLowerCase(Locale.ROOT);
+        return normalized.contains("fallback") || normalized.contains("recovery-required");
     }
 
     private String normalizeSegment(String item) {

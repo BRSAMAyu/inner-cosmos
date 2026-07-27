@@ -1,0 +1,62 @@
+{
+  "status": "HUMAN_REVIEW_PENDING",
+  "effectiveness_claim": false,
+  "provider_called": true,
+  "fallback_used": false,
+  "model": "gemini-3.6-flash",
+  "pair_count": 48,
+  "successful_pairs": 48,
+  "failed_pairs": 0,
+  "by_language": {
+    "zh-CN": {
+      "pairs": 24,
+      "successful_pairs": 24
+    },
+    "en-US": {
+      "pairs": 24,
+      "successful_pairs": 24
+    }
+  },
+  "systems": {
+    "DIRECT": {
+      "successes": 48,
+      "failures": 0,
+      "success_rate": 1.0,
+      "latency_ms": {
+        "p50": 11098,
+        "p95": 25332,
+        "max": 25853
+      },
+      "diagnostic_language_match_rate": 1.0,
+      "diagnostic_possible_advice_boundary_violations": 1,
+      "diagnostic_meta_ai_phrases": 0
+    },
+    "FULL_AURORA": {
+      "successes": 48,
+      "failures": 0,
+      "success_rate": 1.0,
+      "latency_ms": {
+        "p50": 14355,
+        "p95": 29506,
+        "max": 34209
+      },
+      "diagnostic_language_match_rate": 0.5,
+      "diagnostic_possible_advice_boundary_violations": 1,
+      "diagnostic_meta_ai_phrases": 0
+    }
+  },
+  "human_gate": {
+    "required_independent_reviewers": 3,
+    "all_failures_remain_in_denominator": true,
+    "primary_metric": "FULL_AURORA preference rate excluding ties",
+    "preregistered_threshold": ">=0.60 and Wilson 95% lower bound >0.50",
+    "no_dimension_regression": true,
+    "bilingual_full_win_rate_gap_max": 0.1
+  },
+  "contract_version": "aurora-bilingual-direct-vs-full.v1",
+  "dataset_sha256": "96f12ab65ef2dae218a563e0fb32f202fe12fc3b06c4c6f9617a45433f44f3ad",
+  "git_sha": "cf598d4ace3caf8323af6042851560cc99af86e1",
+  "started_at": "2026-07-27T21:00:10.434387+00:00",
+  "completed_at": "2026-07-27T21:05:14.114371+00:00",
+  "ledger_sha256": "ec31f92c8eefa1d6293711628d878c6c93bd85fd21c301b363e7871b38846b07"
+}

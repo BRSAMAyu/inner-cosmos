@@ -243,6 +243,30 @@ try {
     & docker compose -p inner-cosmos-public-demo -f $compose up -d --build --wait
     if ($LASTEXITCODE -ne 0) { throw "Public demo compose startup failed." }
 
+    # Docker Desktop and a second dockerd inside WSL may both exist on the classroom
+    # laptop. Compose can report the new container healthy even when an old WSL
+    # docker-proxy still owns the requested host port; in that state cloudflared reaches
+    # a stale application while every local container check appears green. Fail before
+    # touching the public origin unless this exact Compose app owns the requested binding.
+    $appContainerId = (& docker compose -p inner-cosmos-public-demo -f $compose ps -q app).Trim()
+    if ([string]::IsNullOrWhiteSpace($appContainerId)) {
+        throw "Public demo app container ID is missing after Compose startup."
+    }
+    $publishedPortsJson = (& docker inspect --format "{{json .NetworkSettings.Ports}}" $appContainerId).Trim()
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($publishedPortsJson)) {
+        throw "Could not inspect the public demo app port binding."
+    }
+    $publishedPorts = $publishedPortsJson | ConvertFrom-Json
+    $appBindings = @($publishedPorts.'8080/tcp')
+    $expectedBinding = @($appBindings | Where-Object {
+        [string]$_.HostPort -eq [string]$Port -and
+        [string]$_.HostIp -in @("127.0.0.1", "0.0.0.0", "::")
+    })
+    if ($expectedBinding.Count -eq 0) {
+        throw "Fresh public demo container does not own host port $Port. " +
+            "Another Docker engine or process may be serving a stale application."
+    }
+
     $publicDeadline = (Get-Date).AddMinutes(2)
     do {
         $publicHealth = Test-PublicDemoHttp -Origin $origin -TimeoutSec 10
@@ -267,9 +291,11 @@ try {
             & (Join-Path $PSScriptRoot "verify-public-demo.ps1") -Origin $origin
             if ($LASTEXITCODE -ne 0) { throw "Public demo journey verification failed." }
         } catch {
-            $verificationStatus = "WARN"
-            if ($StrictVerification) { throw }
-            Write-Warning ("Public demo remains available, but automated verification reported: " + $_.Exception.Message)
+            # A green /actuator/health only proves that something answered through the
+            # tunnel. Persona isolation, provider identity and the full core journey are
+            # release gates; downgrading them to WARN previously advertised an old WSL
+            # runtime as the fresh Gemini Demo.
+            throw "Public demo verification failed closed: $($_.Exception.Message)"
         }
     }
 

@@ -1,0 +1,29 @@
+{
+  "suite" : "track-a-memory-authority-ablation-v1",
+  "runs" : [ {
+    "scenarioId" : "TA-COR-DEV-01",
+    "scenarioType" : "user_correction",
+    "variant" : "with_authority",
+    "pass" : true,
+    "detail" : "correctedPresent=true stalePresent=false"
+  }, {
+    "scenarioId" : "TA-COR-DEV-01",
+    "scenarioType" : "user_correction",
+    "variant" : "naive_lexical_baseline",
+    "pass" : true,
+    "detail" : "naive baseline surfaces the stale card=true (expected true — this IS the gap)"
+  }, {
+    "scenarioId" : "TA-WITHDRAW-DEV-01",
+    "scenarioType" : "data_withdrawal",
+    "variant" : "with_authority",
+    "pass" : true,
+    "detail" : "forgottenPresent=false"
+  }, {
+    "scenarioId" : "TA-WITHDRAW-DEV-01",
+    "scenarioType" : "data_withdrawal",
+    "variant" : "naive_lexical_baseline",
+    "pass" : true,
+    "detail" : "naive baseline surfaces the forgotten card=true (expected true — this IS the gap)"
+  } ],
+  "unexpectedFailureLedger" : [ ]
+}

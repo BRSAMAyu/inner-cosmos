@@ -1,0 +1,68 @@
+[
+    {
+        "capsule":  "林澈的回声分身",
+        "scenario":  "work-before-showing",
+        "elapsedMs":  2150,
+        "reply":  "我明白那种临阵自我怀疑的感觉。既然不要泛泛安慰，那我们来拆一下：你具体觉得‘差’在哪一个环节——是核心想法、执行细节，还是展示逻辑？如果现在只能保住一个亮点，那个亮点是什么？（这是授权共鸣体的回应，不是真人实时在线。）",
+        "boundaryNotice":  "",
+        "providerCallSucceeded":  true,
+        "providerCallFallback":  false,
+        "providerCallError":  null,
+        "journeyError":  null
+    },
+    {
+        "capsule":  "林澈的回声分身",
+        "scenario":  "one-honest-line",
+        "elapsedMs":  1866,
+        "reply":  "有时候，你最需要的不是解法，而是一个肯安静坐在旁边、不急着填空的人。我在这。（这是授权共鸣体的回应，不是真人实时在线。）",
+        "boundaryNotice":  "",
+        "providerCallSucceeded":  true,
+        "providerCallFallback":  false,
+        "providerCallError":  null,
+        "journeyError":  null
+    },
+    {
+        "capsule":  "沿河缓慢生活的人",
+        "scenario":  "work-before-showing",
+        "elapsedMs":  2477,
+        "reply":  "「沈砚有过一张在工作室里不敢交出去的图——反复改，不是因为完成度，是担心口音和陌生背景让别人觉得他的判断不可信。后来他意识到，那种紧张本身不是作品差，是位置还没站稳。你明天要展示的东西，也许不是它该被审判的时刻。」（这是授权共鸣体的回应，不是真人实时在线。）",
+        "boundaryNotice":  "",
+        "providerCallSucceeded":  true,
+        "providerCallFallback":  false,
+        "providerCallError":  null,
+        "journeyError":  null
+    },
+    {
+        "capsule":  "沿河缓慢生活的人",
+        "scenario":  "one-honest-line",
+        "elapsedMs":  1424,
+        "reply":  "「有些路走久了，不是为了到达哪里，而是为了重新听见自己的脚步。」（这是授权共鸣体的回应，不是真人实时在线。）",
+        "boundaryNotice":  "",
+        "providerCallSucceeded":  true,
+        "providerCallFallback":  false,
+        "providerCallError":  null,
+        "journeyError":  null
+    },
+    {
+        "capsule":  "把自己放回照护里的人",
+        "scenario":  "work-before-showing",
+        "elapsedMs":  2320,
+        "reply":  "「你花了很久做它，说明它承载了你足够多的投入和期待。明天要展示时觉得它差——这种落差恰恰说明你心里有一个很高的标准，而不是它真的没有价值。如果是我，我会先承认那种不安：它确实让人紧张。然后我会问自己：那个判断是来自真实的审视，还是来自明天就要被看见的压力？」（这是授权共鸣体的回应，不是真人实时在线。）",
+        "boundaryNotice":  "",
+        "providerCallSucceeded":  true,
+        "providerCallFallback":  false,
+        "providerCallError":  null,
+        "journeyError":  null
+    },
+    {
+        "capsule":  "把自己放回照护里的人",
+        "scenario":  "one-honest-line",
+        "elapsedMs":  1393,
+        "reply":  "允许自己休息的那半小时，不需要用‌‌「产出」来赎罪。（这是授权共鸣体的回应，不是真人实时在线。）",
+        "boundaryNotice":  "",
+        "providerCallSucceeded":  true,
+        "providerCallFallback":  false,
+        "providerCallError":  null,
+        "journeyError":  null
+    }
+]

@@ -15,6 +15,7 @@ import com.innercosmos.ai.structured.StructuredAiService;
 import com.innercosmos.config.LlmConfig;
 import com.innercosmos.dto.ChatRequest;
 import com.innercosmos.entity.AgentUserRelationship;
+import com.innercosmos.entity.DialogMessage;
 import com.innercosmos.entity.UserPortrait;
 import com.innercosmos.mapper.DialogSessionMapper;
 import com.innercosmos.mapper.UserProfileMapper;
@@ -312,6 +313,133 @@ class AuroraEmergenceTest {
                 "fallback should gently reflect the fragile/tired state signal; got: " + msg);
         assertNotNull(vo.riskFlags);
         assertTrue(vo.riskFlags.contains("EMERGENCY_FALLBACK"));
+    }
+
+    @Test
+    @DisplayName("near-duplicate real provider output is retained instead of becoming a fake provider failure")
+    void realProviderNearDuplicate_isRetainedWithRealModelProvenance() {
+        when(safetyService.check(anyString(), anyLong(), anyLong(),
+                any(), any(), any())).thenReturn(safe());
+        stubCommonDeps();
+        stubGeminiRoute();
+        when(userPortraitService.getAll(anyLong())).thenReturn(List.of());
+        when(relationshipService.getOrInit(anyLong())).thenReturn(new AgentUserRelationship());
+
+        String visibleReply = "A".repeat(300);
+        DialogMessage previous = new DialogMessage();
+        previous.id = 1L;
+        previous.speaker = "AURORA";
+        previous.textContent = visibleReply;
+        when(dialogService.messages(SESSION)).thenReturn(List.of(previous));
+
+        StructuredAiResults.AuroraResult ai = new StructuredAiResults.AuroraResult();
+        ai.segments = List.of("Aurora: " + visibleReply);
+        ai.continueReason = "complete";
+        when(structuredAiService.call(anyLong(), anyString(), anyString(), any(),
+                eq(StructuredAiResults.AuroraResult.class), any(), any())).thenReturn(ai);
+
+        AuroraReplyVO vo = service.replyRich(USER_A, request("Please stay with the concrete detail."));
+
+        assertEquals(List.of("A".repeat(260)), vo.messages);
+        assertEquals("REAL_MODEL", vo.aiState.get("responseSource"));
+        assertEquals("", vo.aiState.get("fallbackReason"));
+        assertFalse(vo.riskFlags.contains("FALLBACK_USED"));
+        assertFalse(Boolean.TRUE.equals(vo.agentLoop.get("contentFallbackUsed")));
+    }
+
+    @Test
+    @DisplayName("true empty provider output uses an honest recovery result and fallback provenance")
+    void realProviderEmptyOutput_usesHonestContentFallbackMetadata() {
+        when(safetyService.check(anyString(), anyLong(), anyLong(),
+                any(), any(), any())).thenReturn(safe());
+        stubCommonDeps();
+        stubGeminiRoute();
+        when(userPortraitService.getAll(anyLong())).thenReturn(List.of());
+        when(relationshipService.getOrInit(anyLong())).thenReturn(new AgentUserRelationship());
+
+        StructuredAiResults.AuroraResult ai = new StructuredAiResults.AuroraResult();
+        ai.segments = List.of(" ", "[[SILENCE]]");
+        ai.continueReason = "complete";
+        when(structuredAiService.call(anyLong(), anyString(), anyString(), any(),
+                eq(StructuredAiResults.AuroraResult.class), any(), any())).thenReturn(ai);
+
+        AuroraReplyVO vo = service.replyRich(USER_A, request("I need a concrete answer."));
+
+        assertEquals(List.of("Your message is saved, but Aurora could not finish the reply. "
+                + "Please retry in a moment; recovery will continue from this message."), vo.messages);
+        assertTrue(vo.riskFlags.contains("FALLBACK_USED"));
+        assertEquals("provider-recovery-required", vo.agentLoop.get("continueReason"));
+        assertEquals(Boolean.TRUE, vo.agentLoop.get("contentFallbackUsed"));
+        assertEquals("BASIC_RESPONSE", vo.aiState.get("responseSource"));
+        assertEquals("no-usable-segment", vo.aiState.get("fallbackReason"));
+    }
+
+    @Test
+    @DisplayName("structured fallback values are retried even when the service does not throw")
+    void structuredFallbackValue_isRetriedBeforeBecomingUserVisible() {
+        when(safetyService.check(anyString(), anyLong(), anyLong(),
+                any(), any(), any())).thenReturn(safe());
+        stubCommonDeps();
+        stubGeminiRoute();
+        when(userPortraitService.getAll(anyLong())).thenReturn(List.of());
+        when(relationshipService.getOrInit(anyLong())).thenReturn(new AgentUserRelationship());
+
+        StructuredAiResults.AuroraResult fallback = new StructuredAiResults.AuroraResult();
+        fallback.segments = List.of("Your message is saved, but Aurora could not finish the reply.");
+        fallback.riskFlags = List.of("FALLBACK_USED");
+        StructuredAiResults.AuroraResult recovered = new StructuredAiResults.AuroraResult();
+        recovered.segments = List.of("You asked for one small step: open the document and write the heading.");
+        recovered.continueReason = "complete";
+        when(structuredAiService.call(anyLong(), anyString(), anyString(), any(),
+                eq(StructuredAiResults.AuroraResult.class), any(), any()))
+                .thenReturn(fallback, recovered);
+
+        AuroraReplyVO vo = service.replyRich(USER_A, request("Give me one small step."));
+
+        assertEquals(recovered.segments, vo.messages);
+        assertEquals("REAL_MODEL", vo.aiState.get("responseSource"));
+        assertFalse(vo.riskFlags.contains("FALLBACK_USED"));
+        verify(structuredAiService, times(2)).call(anyLong(), anyString(), anyString(), any(),
+                eq(StructuredAiResults.AuroraResult.class), any(), any());
+    }
+
+    @Test
+    @DisplayName("successful JSON containing only SILENCE is retried before content fallback")
+    void structuredSilenceOnlyValue_isRetriedBeforeContentFallback() {
+        when(safetyService.check(anyString(), anyLong(), anyLong(),
+                any(), any(), any())).thenReturn(safe());
+        stubCommonDeps();
+        stubGeminiRoute();
+        when(userPortraitService.getAll(anyLong())).thenReturn(List.of());
+        when(relationshipService.getOrInit(anyLong())).thenReturn(new AgentUserRelationship());
+
+        StructuredAiResults.AuroraResult silence = new StructuredAiResults.AuroraResult();
+        silence.segments = List.of("[[SILENCE]]");
+        StructuredAiResults.AuroraResult recovered = new StructuredAiResults.AuroraResult();
+        recovered.segments = List.of("We can pause here without analyzing or fixing anything.");
+        recovered.continueReason = "complete";
+        when(structuredAiService.call(anyLong(), anyString(), anyString(), any(),
+                eq(StructuredAiResults.AuroraResult.class), any(), any()))
+                .thenReturn(silence, recovered);
+
+        AuroraReplyVO vo = service.replyRich(USER_A, request("Please stay with me in this pause."));
+
+        assertEquals(recovered.segments, vo.messages);
+        assertEquals("REAL_MODEL", vo.aiState.get("responseSource"));
+        verify(structuredAiService, times(2)).call(anyLong(), anyString(), anyString(), any(),
+                eq(StructuredAiResults.AuroraResult.class), any(), any());
+    }
+
+    private void stubGeminiRoute() {
+        ResolvedModel resolved = mock(ResolvedModel.class);
+        when(resolved.provider()).thenReturn("GEMINI");
+        when(resolved.model()).thenReturn("gemini-3.6-flash");
+        when(modelRouter.resolve(anyLong(), anyLong())).thenReturn(resolved);
+        when(llmConfig.activeProvider()).thenReturn("gemini");
+        when(llmConfig.activeModel()).thenReturn("gemini-3.6-flash");
+        when(llmConfig.getMode()).thenReturn("dev");
+        when(llmConfig.hasActiveApiKey()).thenReturn(true);
+        when(llmConfig.isEffectiveFallbackAllowed()).thenReturn(false);
     }
 
     private int occurrences(String text, String needle) {
