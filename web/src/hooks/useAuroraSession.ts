@@ -44,6 +44,11 @@ export type AuroraMemoryTrace = {
   detectedTheme?: string;
 };
 
+export type AuroraContinuitySignal = {
+  phase: "recovering" | "recovered" | "interrupted";
+  turnId: number;
+};
+
 const terminal = new Set<TurnStatus>(["COMPLETED", "INTERRUPTED", "CANCELLED", "FAILED"]);
 
 function recoveryCursorKey(turnId: number): string {
@@ -172,6 +177,7 @@ export function useAuroraSession({
   const [mode, setMode] = useState("DAILY_TALK");
   const [activeTurnId, setActiveTurnId] = useState<number | null>(null);
   const [runtimeSignal, setRuntimeSignal] = useState<AuroraRuntimeSignal>({ stage: "idle", runtime: "single" });
+  const [continuitySignal, setContinuitySignal] = useState<AuroraContinuitySignal | null>(null);
   const [wakeIntents, setWakeIntents] = useState<WakeIntent[]>([]);
   const [wakeBusy, setWakeBusy] = useState(false);
   const [returnWhen, setReturnWhen] = useState(RETURN_DEFAULTS[skillLocale].when);
@@ -210,6 +216,7 @@ export function useAuroraSession({
   const eventIdsRef = useRef(new Set<string>());
   const lastEventIdRef = useRef("");
   const reconnectingRef = useRef(false);
+  const continuityDismissTimerRef = useRef<number | null>(null);
   const pendingResumeTurnRef = useRef<number | null>(null);
   const handleEventRef = useRef<(event: AuroraStreamEvent, generation: number) => void>(() => undefined);
   // Gemini audit 4.1 (CONFIRMED/P0): a per-turn generation counter. Every async continuation that
@@ -306,7 +313,14 @@ export function useAuroraSession({
     if (reconnectingRef.current) return;
     reconnectingRef.current = true;
     if (!lastEventIdRef.current) lastEventIdRef.current = storedRecoveryCursor(turnId);
-    if (isCurrentGeneration(generation)) setStatus(t.reconnecting);
+    if (isCurrentGeneration(generation)) {
+      if (continuityDismissTimerRef.current !== null) {
+        window.clearTimeout(continuityDismissTimerRef.current);
+        continuityDismissTimerRef.current = null;
+      }
+      setContinuitySignal({ phase: "recovering", turnId });
+      setStatus(t.reconnecting);
+    }
     try {
       lastEventIdRef.current = await replayTurnEvents(turnId, lastEventIdRef.current, event => {
         if (!isCurrentGeneration(generation)) return; // 4.1: stale turn -- ignore replayed events.
@@ -342,6 +356,14 @@ export function useAuroraSession({
                     ? "The previous runtime stopped before a reply was safely generated. Please send the message again."
                     : "上一运行实例在回复安全生成前停止了，请重新发送这句话。")
                 : t.recoveredInterrupted);
+            setContinuitySignal({
+              phase: timeline.turn.status === "COMPLETED" ? "recovered" : "interrupted",
+              turnId
+            });
+            continuityDismissTimerRef.current = window.setTimeout(
+              () => setContinuitySignal(null),
+              12_000
+            );
           }
           finishTurn(generation);
           clearRecoveryCursor(turnId);
@@ -859,6 +881,7 @@ export function useAuroraSession({
     setMessages([]);
     setInnerVoice(null);
     setMemoryTrace(null);
+    setContinuitySignal(null);
   }, [beginNewTurnGeneration]);
 
   // Gemini audit 4.1: unmount must cancel any in-flight stream/recovery the same way logout does
@@ -866,6 +889,9 @@ export function useAuroraSession({
   // async continuation writing to refs (not state) wouldn't even warn, silently leaking work.
   useEffect(() => () => {
     abortRef.current?.abort();
+    if (continuityDismissTimerRef.current !== null) {
+      window.clearTimeout(continuityDismissTimerRef.current);
+    }
     beginNewTurnGeneration();
   }, [beginNewTurnGeneration]);
 
@@ -873,6 +899,7 @@ export function useAuroraSession({
     sessionId, sessions, sessionsBusy, messages, innerVoice, dismissInnerVoice: () => setInnerVoice(null),
     memoryTrace, dismissMemoryTrace: () => setMemoryTrace(null),
     draft, setDraft, mode, setMode, activeTurnId, runtimeSignal,
+    continuitySignal, dismissContinuitySignal: () => setContinuitySignal(null),
     wakeIntents, wakeBusy, returnWhen, setReturnWhen, returnPurpose, setReturnPurpose,
     notifications, safetyAlert, dismissSafetyAlert,
     safetyResources, loadSafetyResources, goodbyeResult, goodbyeBusy, dismissGoodbye, triggerGoodbye,

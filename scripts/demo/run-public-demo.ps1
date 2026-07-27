@@ -10,7 +10,9 @@ param(
     [switch]$ReuseTunnel,
     [switch]$SkipVerification,
     [switch]$StrictVerification,
-    [switch]$NoWatchdog
+    [switch]$NoWatchdog,
+    [switch]$EnableLiveObservability,
+    [switch]$SkipApkBuild
 )
 
 $ErrorActionPreference = "Stop"
@@ -119,8 +121,12 @@ if (-not $ReuseTunnel) {
 }
 
 try {
-    & (Join-Path $PSScriptRoot "build-demo-apk.ps1") -ServerOrigin $origin -MaxWorkers $MaxBuildWorkers
-    if ($LASTEXITCODE -ne 0) { throw "Demo APK build failed." }
+    if (-not $SkipApkBuild) {
+        & (Join-Path $PSScriptRoot "build-demo-apk.ps1") -ServerOrigin $origin -MaxWorkers $MaxBuildWorkers
+        if ($LASTEXITCODE -ne 0) { throw "Demo APK build failed." }
+    } else {
+        Write-Host "WEB_ONLY_MODE=APK_BUILD_SKIPPED"
+    }
 
     # build-demo-apk.ps1 intentionally emits a native-shell bundle (basename "/")
     # before syncing it into Android. Do not put that bundle into the server image:
@@ -191,6 +197,21 @@ try {
     $env:MEMORY_EMBEDDING_MODEL = "text-embedding-v4"
     $env:TTS_API_KEY = $qwenKey
     $env:TTS_WS_URL = "wss://llm-errus8cw2pf66bx9.cn-beijing.maas.aliyuncs.com/api-ws/v1/inference"
+    if ($EnableLiveObservability) {
+        if (-not (Test-NetConnection -ComputerName 127.0.0.1 -Port 4318 -InformationLevel Quiet)) {
+            throw "Live observability requires the loopback OTLP bridge on port 4318. Run start-live-showcase.ps1 first."
+        }
+        $env:OTLP_TRACING_ENABLED = "true"
+        $env:OTLP_TRACING_ENDPOINT = "http://host.docker.internal:4318/v1/traces"
+        $env:TRACING_SAMPLING_PROBABILITY = "1.0"
+        $env:OTEL_SERVICE_NAME = "inner-cosmos-public-demo"
+        $env:DEPLOYMENT_ENVIRONMENT = "classroom-public-demo"
+    } else {
+        $env:OTLP_TRACING_ENABLED = "false"
+        $env:TRACING_SAMPLING_PROBABILITY = "0.10"
+        $env:OTEL_SERVICE_NAME = "inner-cosmos-public-demo"
+        $env:DEPLOYMENT_ENVIRONMENT = "classroom-public-demo"
+    }
 
     & docker compose -p inner-cosmos-public-demo -f $compose up -d --build --wait
     if ($LASTEXITCODE -ne 0) { throw "Public demo compose startup failed." }
@@ -204,7 +225,7 @@ try {
         throw "Tunnel origin did not reach an UP application: $($publicHealth.Reason)"
     }
 
-    # The container image and APK now own the tunnel-specific bundle. Restore the
+    # The container image (and the APK, when requested) now owns the tunnel-specific bundle. Restore the
     # checked-in web output to the normal same-origin build so a random URL never
     # leaks into a later commit.
     Push-Location (Join-Path $root "web")
@@ -225,19 +246,23 @@ try {
         }
     }
 
-    $apk = Join-Path $root "src\main\resources\static\downloads\inner-cosmos-demo.apk"
-    $hash = (Get-FileHash -LiteralPath $apk -Algorithm SHA256).Hash.ToLowerInvariant()
-    @(
+    $demoInfo = @(
         "origin=$origin"
         "app=$origin/app/aurora/"
-        "apk=$origin/downloads/inner-cosmos-demo.apk"
-        "apk_sha256=$hash"
         "provider=$Provider"
         "tunnel_mode=$TunnelMode"
         "port=$Port"
         "verification=$verificationStatus"
+        "live_observability=$([bool]$EnableLiveObservability)"
         "started_at=$((Get-Date).ToString("o"))"
-    ) | Set-Content -Encoding utf8 (Join-Path $stateDir "demo-info.txt")
+    )
+    if (-not $SkipApkBuild) {
+        $apk = Join-Path $root "src\main\resources\static\downloads\inner-cosmos-demo.apk"
+        $hash = (Get-FileHash -LiteralPath $apk -Algorithm SHA256).Hash.ToLowerInvariant()
+        $demoInfo += "apk=$origin/downloads/inner-cosmos-demo.apk"
+        $demoInfo += "apk_sha256=$hash"
+    }
+    $demoInfo | Set-Content -Encoding utf8 (Join-Path $stateDir "demo-info.txt")
 
     if (-not $NoWatchdog) {
         $watchdogPidFile = Join-Path $stateDir "watchdog.pid"
@@ -264,7 +289,9 @@ try {
     Write-Host $(if ($verificationStatus -eq "PASS") { "PUBLIC_DEMO_READY" } else { "PUBLIC_DEMO_READY_WITH_$verificationStatus" })
     Write-Host "Landing: $origin/"
     Write-Host "Web App: $origin/app/aurora/"
-    Write-Host "Android: $origin/downloads/inner-cosmos-demo.apk"
+    if (-not $SkipApkBuild) {
+        Write-Host "Android: $origin/downloads/inner-cosmos-demo.apk"
+    }
     Write-Host "Stop:    .\scripts\demo\stop-public-demo.ps1"
 } catch {
     if ($tunnel) { Stop-Process -Id $tunnel.Id -Force -ErrorAction SilentlyContinue }

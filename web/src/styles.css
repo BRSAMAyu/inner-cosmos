@@ -2495,6 +2495,156 @@ input[type="range"]::-moz-range-thumb {
   color: var(--text-primary);
   background: var(--surface-action);
 }
+.continuity-recovery {
+  position: fixed;
+  z-index: 92;
+  left: 50%;
+  bottom: max(24px, env(safe-area-inset-bottom));
+  width: min(680px, calc(100vw - 32px));
+  padding: 18px 20px 17px;
+  color: var(--text-primary);
+  background:
+    linear-gradient(135deg,
+      color-mix(in srgb, var(--surface-raised) 96%, var(--accent-aurora) 4%),
+      color-mix(in srgb, var(--surface-raised) 90%, transparent));
+  border: 1px solid color-mix(in srgb, var(--accent-aurora) 45%, var(--border-control));
+  border-radius: 22px;
+  box-shadow: 0 26px 80px color-mix(in srgb, #000 46%, transparent);
+  backdrop-filter: blur(24px);
+  transform: translateX(-50%);
+  animation: continuity-enter 320ms var(--ease-flow) both;
+}
+.continuity-recovery.recovered {
+  border-color: color-mix(in srgb, #73c69c 64%, var(--border-control));
+  box-shadow: 0 26px 80px color-mix(in srgb, #143828 35%, transparent);
+}
+.continuity-recovery header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+.continuity-recovery header > div {
+  display: grid;
+  gap: 2px;
+}
+.continuity-recovery small {
+  color: var(--accent-aurora-soft);
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.continuity-recovery strong {
+  font-family: var(--font-display);
+  font-size: clamp(1rem, 2vw, 1.22rem);
+  line-height: 1.28;
+}
+.continuity-recovery-mark {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--surface-raised);
+  background: var(--accent-aurora);
+  box-shadow: 0 0 0 7px color-mix(in srgb, var(--accent-aurora) 13%, transparent);
+  animation: continuity-pulse 1.4s ease-in-out infinite;
+}
+.continuity-recovery.recovered .continuity-recovery-mark {
+  background: #73c69c;
+  animation: none;
+}
+.continuity-recovery header button {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 11px;
+  color: var(--text-muted);
+  background: transparent;
+  font-size: 1.2rem;
+}
+.continuity-recovery header button:hover,
+.continuity-recovery header button:focus-visible {
+  color: var(--text-primary);
+  background: var(--surface-action);
+}
+.continuity-recovery > p {
+  margin: 11px 0 14px 50px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+.continuity-recovery ol {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.continuity-recovery li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 9px 10px;
+  border: 1px solid var(--hairline-mid);
+  border-radius: 13px;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--surface-action) 70%, transparent);
+  font-size: .78rem;
+}
+.continuity-recovery li i {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 50%;
+  font-style: normal;
+}
+.continuity-recovery li.done {
+  color: var(--text-primary);
+  border-color: color-mix(in srgb, #73c69c 38%, var(--hairline-mid));
+}
+.continuity-recovery li.done i {
+  color: #123326;
+  background: #73c69c;
+}
+.continuity-recovery li.active {
+  color: var(--text-primary);
+  border-color: color-mix(in srgb, var(--accent-aurora) 58%, var(--hairline-mid));
+}
+.continuity-recovery li.active i {
+  color: var(--surface-raised);
+  background: var(--accent-aurora);
+  animation: continuity-spin 1s linear infinite;
+}
+.continuity-recovery li.safe {
+  color: var(--text-secondary);
+}
+@keyframes continuity-enter {
+  from { opacity: 0; transform: translate(-50%, 20px) scale(.98); }
+  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+@keyframes continuity-pulse {
+  50% { box-shadow: 0 0 0 12px color-mix(in srgb, var(--accent-aurora) 4%, transparent); }
+}
+@keyframes continuity-spin {
+  to { transform: rotate(360deg); }
+}
+@media (max-width: 640px) {
+  .continuity-recovery {
+    padding: 16px;
+  }
+  .continuity-recovery > p {
+    margin-left: 0;
+  }
+  .continuity-recovery ol {
+    grid-template-columns: 1fr;
+  }
+}
 .space-tabs button {
   position: relative;
   min-height: 48px;

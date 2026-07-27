@@ -164,6 +164,12 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     private AuroraLiveEventStore liveEventStore = new InMemoryAuroraLiveEventStore(1024);
     @Value("${inner-cosmos.aurora.turn-recovery.generation-lease-ttl:PT2M}")
     private Duration generationLeaseTtl = Duration.ofMinutes(2);
+    /** Pod/runtime identity is persisted only in the diagnostic lease owner, never user content. */
+    @Value("${inner-cosmos.instance-id:${HOSTNAME:local}}")
+    private String instanceId = "local";
+
+    @Value("${inner-cosmos.demo.h1-arm-delay-ms:0}")
+    private long h1DemoArmDelayMs;
 
     @Autowired
     void setStreamStageStore(AuroraStreamStageStore streamStageStore) {
@@ -2184,14 +2190,31 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 userId, turnId, request.sessionId, userMessage.id,
                 normalizeMode(request.mode), request.locale, request.region, request.timezone,
                 GENERATION_CONTEXT_VERSION, request.foregroundAcknowledgementSent);
-        String owner = "generation:" + java.util.UUID.randomUUID();
+        String runtimeOwner = instanceId == null || instanceId.isBlank() ? "local" : instanceId;
+        String owner = runtimeOwner + ":generation:" + java.util.UUID.randomUUID();
         var lease = choreographyService.claimGenerationLease(
                 userId, turnId, owner, generationLeaseTtl);
         if (lease == null) {
             throw new BusinessException(ErrorCode.CONFLICT,
                     "Aurora generation is already continuing on another runtime");
         }
+        holdGenerationLeaseForH1Demo();
         return new GenerationAuthority(lease.owner(), lease.fencingToken());
+    }
+
+    /**
+     * Local kind showcase hook only. A short, explicitly configured pause makes the real
+     * generation lease observable long enough for a presenter to inject SIGKILL into the exact
+     * serving Pod. Production and the public audience instance keep the default value of zero.
+     */
+    private void holdGenerationLeaseForH1Demo() {
+        if (h1DemoArmDelayMs <= 0L) return;
+        try {
+            Thread.sleep(Math.min(h1DemoArmDelayMs, 10_000L));
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("H1 demo lease hold was interrupted", interrupted);
+        }
     }
 
     private TurnTimelineVO commitPlanAuthorized(

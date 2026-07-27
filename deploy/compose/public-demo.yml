@@ -94,6 +94,13 @@ services:
       INNER_COSMOS_SECURITY_CSRF_ENABLED: "false"
       SERVER_FORWARD_HEADERS_STRATEGY: framework
       MANAGEMENT_HEALTH_REDIS_ENABLED: "true"
+      # Optional classroom bridge into the already-running kind OTel Collector. The host port is
+      # loopback-only; the app container reaches it through Docker Desktop's host gateway.
+      OTLP_TRACING_ENABLED: ${OTLP_TRACING_ENABLED:-false}
+      OTLP_TRACING_ENDPOINT: ${OTLP_TRACING_ENDPOINT:-http://host.docker.internal:4318/v1/traces}
+      TRACING_SAMPLING_PROBABILITY: ${TRACING_SAMPLING_PROBABILITY:-0.10}
+      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-inner-cosmos-public-demo}
+      DEPLOYMENT_ENVIRONMENT: ${DEPLOYMENT_ENVIRONMENT:-classroom-public-demo}
       # Classroom-only lived-in personas. Public passwordless entry is limited to the three
       # non-admin SHOWCASE identities; the production profile still refuses this controller.
       SEED_ENABLED: "true"

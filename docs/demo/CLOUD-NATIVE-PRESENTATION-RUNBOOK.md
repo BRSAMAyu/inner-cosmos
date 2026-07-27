@@ -1,5 +1,9 @@
 # Inner Cosmos 云原生课堂展示 Runbook
 
+> **最新现场顺序**：5 分钟真实观众体验 → H1 → KEDA → 可观测性。OTel 从观众入场前
+> 就开始采集；分屏布局、逐幕命令和讲解词以
+> [`LIVE-SHOWCASE-CUE-CARD.md`](LIVE-SHOWCASE-CUE-CARD.md) 为准。
+
 ## 三幕 Hero 快速模式（优先）
 
 课堂需要在最短时间证明核心能力时，只演示以下三幕，不再穿插 APK、Argo、Kyverno 或

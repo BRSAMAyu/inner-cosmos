@@ -9,6 +9,7 @@ import { reloadPersonaCandidates, resumeOrCreatePersonaConversation } from "./pe
 import { AppearanceSettings, capsulePath, connectionTabFromSearch, connectionTabPath, ConnectionSubNav, letterThreadPath, MeSpace, meTabFromPath, meTabPath, MeSubNav, productSpaceFromPath, productSpaces, ProductShellNavigation, resourceFromPath, spacePath, type ConnectionTab, type ProductSpace, type CosmosTab, cosmosTabFromPath, cosmosTabPath, CosmosSubNav, type ResonanceTab, resonanceTabFromPath, resonanceTabPath, ResonanceSubNav } from "./components/ProductShell";
 import { AuroraConversation } from "./components/AuroraConversation";
 import { AuroraRuntimeDisclosure } from "./components/AuroraRuntimeDisclosure";
+import { AuroraContinuityRecovery } from "./components/AuroraContinuityRecovery";
 import { ConversationHistory } from "./components/ConversationHistory";
 import { AuroraMemoryTrace } from "./components/AuroraMemoryTrace";
 import { SafetyResourceCard } from "./components/SafetyResourceCard";
@@ -2102,6 +2103,8 @@ export function AuroraApp() {
       {userProfile?.id && <OnboardingGuide open={onboardingOpen} userId={userProfile.id}
         locale={skillLocale} onClose={() => setOnboardingOpen(false)}
         onNavigate={navigateFromGuide} />}
+      <AuroraContinuityRecovery signal={auroraSession.continuitySignal}
+        locale={skillLocale} onDismiss={auroraSession.dismissContinuitySignal} />
       {statusVisible ? (
         <div className="state global-state visible" role="status"
           aria-live="polite" aria-atomic="true">

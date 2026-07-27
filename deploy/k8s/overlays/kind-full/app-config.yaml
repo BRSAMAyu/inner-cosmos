@@ -15,6 +15,9 @@ data:
   INNER_COSMOS_AURORA_TURN_RECOVERY_GENERATION_LEASE_TTL: "PT15S"
   INNER_COSMOS_AURORA_TURN_RECOVERY_STALE_AFTER: "PT10S"
   INNER_COSMOS_AURORA_TURN_RECOVERY_POLL_DELAY_MS: "5000"
+  # Deterministic fault-injection window for the local H1 showcase only. This does not fake
+  # recovery; it keeps the real generation lease visible while the presenter targets its Pod.
+  INNER_COSMOS_DEMO_H1_ARM_DELAY_MS: "5000"
   SPRING_PROFILES_ACTIVE: dev,postgres
   SPRING_DATASOURCE_URL: jdbc:postgresql://inner-cosmos-postgres:5432/inner_cosmos
   SPRING_DATASOURCE_USERNAME: inner_cosmos
