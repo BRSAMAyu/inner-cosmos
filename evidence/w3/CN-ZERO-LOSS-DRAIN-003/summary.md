@@ -1,7 +1,7 @@
 # CN-ZERO-LOSS-DRAIN-003 — Cross-Pod Aurora takeover
 
 Date: 2026-07-27
-Candidate commit: `ab87ddcc0373d641260db15baaa34633d7f59320` plus the configurable Demo lease follow-up
+Candidate commit: `9069faf` plus this evidence-only update
 Environment: local `kind-kubedeploy`, namespace `inner-cosmos-w3`, 2 API replicas, PostgreSQL 16 + Redis, schema V34, dev + Mock-AI
 
 ## Expected
@@ -26,6 +26,14 @@ Environment: local `kind-kubedeploy`, namespace `inner-cosmos-w3`, 2 API replica
 - A reconnect through the Service replayed the durable timeline and ended with `replay.completed` / `COMPLETED`.
 - Final database state: 1 distinct USER message, 2 distinct AURORA messages, 2 distinct bubble IDs, orders and contents.
 - The first run used the former fixed two-minute generation lease and completed in `121.365s`; this directly motivated a configurable lease.
+
+### Final fast-takeover retest
+
+- Turn `12`, session `2001`: direct JVM `SIGKILL` again occurred after only `turn.started` and `foreground.status`; the original live stream had no terminal event.
+- The durable turn reached `COMPLETED` in `16.677s` from its database `started_at`.
+- A reconnect through the surviving Service returned `replay.completed` / `COMPLETED` in `1.546s`.
+- Final database state remained exact: 1 distinct USER message, 2 distinct AURORA messages, 2 distinct bubble IDs, orders and contents.
+- The API Deployment returned to 2 ready, available and updated replicas.
 
 ## Demo convergence
 
