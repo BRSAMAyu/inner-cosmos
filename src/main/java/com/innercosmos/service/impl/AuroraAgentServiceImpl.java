@@ -74,6 +74,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
@@ -82,6 +86,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 @Service
 public class AuroraAgentServiceImpl implements AuroraAgentService {
+    private static final ScheduledExecutorService GENERATION_LEASE_HEARTBEAT =
+            Executors.newSingleThreadScheduledExecutor(task -> {
+                Thread thread = new Thread(task, "aurora-generation-lease-heartbeat");
+                thread.setDaemon(true);
+                return thread;
+            });
     private static final Logger log = LoggerFactory.getLogger(AuroraAgentServiceImpl.class);
     /** Completed provider responses are emitted immediately in bounded SSE chunks. */
     private static final int COMPLETED_RESPONSE_CHUNK_CHARS = 12;
@@ -341,6 +351,8 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 ? null : aiTurnObservation.startTurn();
         io.micrometer.observation.Observation.Scope turnScope = turnObservation == null
                 ? null : turnObservation.openScope();
+        GenerationLeaseHeartbeat leaseHeartbeat =
+                startGenerationLeaseHeartbeat(userId, turnId, generationAuthority);
         try {
             return produceReplyWithinTurn(
                     userId, request, safety, userMessageId, turnId, persistImmediately,
@@ -349,6 +361,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             if (turnObservation != null) turnObservation.error(failure);
             throw failure;
         } finally {
+            leaseHeartbeat.close();
             if (turnScope != null) turnScope.close();
             if (turnObservation != null) turnObservation.stop();
         }
@@ -2274,6 +2287,47 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     }
 
     private record GenerationAuthority(String owner, long fencingToken) {}
+
+    /**
+     * Keeps a healthy Pod's generation authority alive across real Provider calls. Without this,
+     * the intentionally short H1 failure-detection lease can expire during a normal 15-30 second
+     * planner/speaker call and the recovery scheduler will fence out the still-healthy runtime.
+     * A hard Pod death stops this daemon heartbeat immediately, so another Pod can still take over
+     * after the short configured TTL.
+     */
+    private GenerationLeaseHeartbeat startGenerationLeaseHeartbeat(
+            Long userId, Long turnId, GenerationAuthority authority) {
+        if (choreographyService == null || userId == null || turnId == null || authority == null) {
+            return GenerationLeaseHeartbeat.NONE;
+        }
+        long ttlMillis = Math.max(3_000L, generationLeaseTtl.toMillis());
+        long intervalMillis = Math.max(1_000L, Math.min(5_000L, ttlMillis / 3L));
+        ScheduledFuture<?> future = GENERATION_LEASE_HEARTBEAT.scheduleAtFixedRate(() -> {
+            try {
+                choreographyService.renewDeliveryLease(
+                        userId, turnId, authority.owner(), authority.fencingToken(),
+                        generationLeaseTtl);
+            } catch (RuntimeException renewalFailure) {
+                log.debug("Generation lease heartbeat stopped renewing turn {}: {}",
+                        turnId, renewalFailure.getMessage());
+            }
+        }, intervalMillis, intervalMillis, TimeUnit.MILLISECONDS);
+        return new GenerationLeaseHeartbeat(future);
+    }
+
+    private static final class GenerationLeaseHeartbeat implements AutoCloseable {
+        private static final GenerationLeaseHeartbeat NONE = new GenerationLeaseHeartbeat(null);
+        private final ScheduledFuture<?> future;
+
+        private GenerationLeaseHeartbeat(ScheduledFuture<?> future) {
+            this.future = future;
+        }
+
+        @Override
+        public void close() {
+            if (future != null) future.cancel(false);
+        }
+    }
 
     private void cancelPreviousTurn(Long userId, Long sessionId) {
         if (choreographyService != null && sessionId != null) {
