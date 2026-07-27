@@ -1,5 +1,34 @@
 # Inner Cosmos 云原生课堂展示 Runbook
 
+## 三幕 Hero 快速模式（优先）
+
+课堂需要在最短时间证明核心能力时，只演示以下三幕，不再穿插 APK、Argo、Kyverno 或
+临时造数命令：
+
+```powershell
+# 课前：只读检查，失败即停止
+.\scripts\demo\run-three-hero-showcase.ps1 -Scene Preflight
+
+# 现场：唯一入口；第三幕画面保持到讲解人按 Enter，随后自动清理
+.\scripts\demo\run-three-hero-showcase.ps1 -Scene All -HoldViews
+```
+
+三幕的唯一观察重点：
+
+1. **跨 Pod 连续性**：`stream=STARTED` → 删除承载流的 Pod → `history=RESTORED`。
+2. **KEDA 业务压力弹性**：outbox backlog 上升时 worker `1 → N`，随后 backlog 降到 0，
+   并且 `duplicate_receipts=0`。
+3. **可观测性**：同一 Jaeger trace 同时出现 `inner-cosmos-api` 与
+   `inner-cosmos-worker`，最后显示 `forbidden_tags=0`。
+
+建议讲解时间为 30 秒 + 45 秒 + 30 秒；KEDA 的 cooldown 与脚本清理由机器继续完成，
+不占用口头展示时间。实测记录、时间线和边界见
+[`../../evidence/w3/CN-THREE-HERO-SHOWCASE-001/summary.md`](../../evidence/w3/CN-THREE-HERO-SHOWCASE-001/summary.md)。
+
+默认连续性场景使用普通 Pod 删除，证明现场用户体验且避免节点级危险操作。直接 JVM
+`SIGKILL` 后由另一 Pod 快速接管并把同一 durable turn 完成到 `COMPLETED` 已在
+`CN-ZERO-LOSS-DRAIN-003` 真实验证；课堂不再临时进入 kind 节点杀 PID。
+
 > 目标：用一条不会混淆证据的课堂叙事证明两件事——真实用户确实可以通过
 > Inner Cosmos 产生连接；Kubernetes/CNCF 能力确实保护了这条产品链路。
 >
