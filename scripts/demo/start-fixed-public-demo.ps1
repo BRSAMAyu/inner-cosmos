@@ -69,7 +69,6 @@ $previousToken = $env:CLOUDFLARED_TUNNEL_TOKEN
 try {
     $env:CLOUDFLARED_TUNNEL_TOKEN = $plainToken
     & (Join-Path $PSScriptRoot "run-public-demo.ps1") @arguments
-    if ($LASTEXITCODE -ne 0) { throw "Fixed public Demo startup failed with exit code $LASTEXITCODE." }
 } finally {
     $env:CLOUDFLARED_TUNNEL_TOKEN = $previousToken
     $plainToken = $null
