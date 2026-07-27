@@ -13,9 +13,14 @@
 # 课前：只读检查，失败即停止
 .\scripts\demo\run-three-hero-showcase.ps1 -Scene Preflight
 
-# 现场：唯一入口；第三幕画面保持到讲解人按 Enter，随后自动清理
+# 离场全链路彩排入口；正式现场不要使用 All
 .\scripts\demo\run-three-hero-showcase.ps1 -Scene All -HoldViews
 ```
+
+正式现场以 [`LIVE-SHOWCASE-CUE-CARD.md`](LIVE-SHOWCASE-CUE-CARD.md) 的冻结协议为唯一入口：
+H1 使用专用硬故障脚本，H2 与 H3 分别在两个 PowerShell 窗口运行。这样 H2 的 backlog
+排空与缩容能在 H3 期间继续展示，并避免 `All` 中旧的普通 Pod 删除场景替代当前 H1
+跨 Pod 续写合同。
 
 三幕的唯一观察重点：
 

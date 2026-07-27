@@ -102,3 +102,33 @@ failover, managed EKS capacity, production persistence of Jaeger, or live extern
 The kind profile uses the labelled Mock provider. The current trace is a real
 conversation-finish-to-worker-projection tree, not a fabricated single tree covering every later
 embedding, matching, capsule, and slow-letter scheduler phase.
+
+## 2026-07-28 final H2/H3 closure rehearsal
+
+Environment: `kind-kubedeploy`, namespace `inner-cosmos-w3`, source baseline
+`916991db` plus the presenter-script closure in this change.
+
+Two consecutive H2 scale-out rehearsals passed:
+
+- run 1 reached desired/available worker `6/3` in `25,872 ms`;
+- run 2 reached desired/available worker `6/3` in `33,287 ms`;
+- both were below the 40-second machine gate and the 45-second presenter budget;
+- the final run drained `1,200/1,200` events, produced `1,200/1,200` inbox receipts,
+  reported `duplicate_receipts=0`, removed every synthetic row, and restored worker baseline `1`.
+
+Two consecutive H3 rehearsals also passed. The final closure run:
+
+- completed in `28,561 ms`, below the 60-second presenter gate;
+- used stable presenter endpoints `8081`, `16686`, `9090`, and `3000`;
+- produced trace `89d2d4740f9e7cefa75b279aef0305cc`;
+- showed `21` spans across `inner-cosmos-api` and `inner-cosmos-worker`;
+- included the HTTP Aurora request, `aurora.turn`, memory retrieval, provider call,
+  dialog finish, outbox consume, memory projection, and profile projection;
+- measured `13,890 ms` client end-to-end, `8,733 ms` provider time, and `5,107.6 ms`
+  worker consume time;
+- reported `forbidden_tags=0` and cleaned the isolated demo account.
+
+The final script now fails closed on observability deployment readiness and KEDA
+`ScaledObject` readiness, reuses the fixed live-showcase ports when available, treats cleanup or
+post-scale invariants as command failures, and prints explicit `H2_PRESENTER_READY` /
+`H3_PRESENTER_READY` markers.

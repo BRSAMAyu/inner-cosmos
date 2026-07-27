@@ -201,6 +201,61 @@ projection 如何跨 API/Worker Pod 延续。两条 trace 都执行敏感标签�
 终端字号至少 20，窗口预先清屏。不要现场手敲长命令；脚本会先打印实际执行的
 `kubectl` 命令，组员逐段解释 `namespace → target Pod → container → signal`，再执行。
 
+## H2/H3 唯一现场协议（2026-07-28 冻结）
+
+正式展示不要使用 `-Scene All`。H1 使用专用的 `run-h1-live-demo.ps1`；H2 与 H3
+分别在两个 PowerShell 窗口运行，才能让 KEDA 的排空/缩容曲线在 H3 期间继续可见。
+
+课前唯一启动门槛：
+
+```powershell
+Set-Location -LiteralPath 'D:\code\inner cosmos'
+
+powershell.exe -NoProfile -ExecutionPolicy Bypass `
+  -File '.\scripts\demo\run-three-hero-showcase.ps1' `
+  -Scene Preflight
+
+powershell.exe -NoProfile -ExecutionPolicy Bypass `
+  -File '.\scripts\demo\start-live-showcase.ps1'
+```
+
+只有同时看到 `PREFLIGHT_READY` 和 `LIVE_SHOWCASE_READY` 才能开始。固定展示地址为：
+
+- KEDA：`http://127.0.0.1:3000/d/inner-cosmos-events/work-pressure-contract-c2b7-outbox-and-keda?orgId=1&refresh=5s`
+- Jaeger：`http://127.0.0.1:16686/search`
+
+H2 窗口：
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass `
+  -File '.\scripts\demo\run-three-hero-showcase.ps1' `
+  -Scene Keda `
+  -HoldViews
+```
+
+看到 `H2_PRESENTER_READY` 后只看三件事：backlog 上升、worker 从 `1/1` 扩到至少
+`3/3`、终端在 40 秒硬门槛内出现 `KEDA_SCALE_OUT_PASS`。出现 PASS 后立刻切 H3，
+不要在台上等待排空或缩容，也不要在 H2 窗口按 Enter。
+
+H3 窗口：
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass `
+  -File '.\scripts\demo\run-three-hero-showcase.ps1' `
+  -Scene Observability `
+  -HoldViews
+```
+
+看到 `H3_PRESENTER_READY` 后等待 `HERO_3_PASS elapsed_ms=...`；硬门槛为 60 秒。
+在固定 Jaeger 直达链接中只指四处：HTTP/Aurora turn、memory retrieval、provider、
+API → outbox → Worker 的 memory/profile projections。最后指向
+`services=inner-cosmos-api,inner-cosmos-worker`、`forbidden_tags=0`。
+
+H3 讲完后先在 H3 窗口按 Enter，再回 H2 窗口按 Enter。H2 必须以
+`keda_drain=PASS ... duplicate_receipts=0` 和
+`keda_cleanup=PASS worker_baseline=1 synthetic_rows=0` 收尾。任一 PASS 缺失、超过硬门槛、
+或脚本非零退出，都停止现场写操作并切换到已留存 evidence，不临时手工修集群。
+
 ## 收尾
 
 ```powershell

@@ -20,6 +20,7 @@ $tempRoot = Join-Path ([IO.Path]::GetTempPath()) "inner-cosmos-$runId"
 $ownedProcesses = [Collections.Generic.List[Diagnostics.Process]]::new()
 $demoAccount = $null
 $kedaDirty = $false
+$kedaScalePassed = $false
 
 function Write-Scene {
     param([string]$Title)
@@ -90,6 +91,55 @@ function Start-PortForward {
         throw "Port-forward for $Resource did not become ready on 127.0.0.1:$localPort."
     }
     return $localPort
+}
+
+function Get-LiveShowcasePort {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][int]$ExpectedPort
+    )
+    $stateFile = Join-Path $root ".demo-runtime\live-showcase.json"
+    if (-not (Test-Path -LiteralPath $stateFile)) {
+        return $null
+    }
+    try {
+        $state = Get-Content -LiteralPath $stateFile -Raw -Encoding utf8 | ConvertFrom-Json
+        if ($state.context -ne $ExpectedContext) {
+            return $null
+        }
+        $forward = @($state.forwards | Where-Object name -eq $Name | Select-Object -First 1)
+        if ($forward.Count -ne 1 -or [int]$forward[0].localPort -ne $ExpectedPort) {
+            return $null
+        }
+        $process = Get-Process -Id ([int]$forward[0].pid) -ErrorAction SilentlyContinue
+        if ($null -eq $process -or $process.ProcessName -ne "kubectl") {
+            return $null
+        }
+        if (-not (Test-NetConnection -ComputerName 127.0.0.1 -Port $ExpectedPort -InformationLevel Quiet)) {
+            return $null
+        }
+        return $ExpectedPort
+    } catch {
+        return $null
+    }
+}
+
+function Get-OrStartServicePort {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][int]$StablePort,
+        [Parameter(Mandatory = $true)][string]$TargetNamespace,
+        [Parameter(Mandatory = $true)][string]$Resource,
+        [Parameter(Mandatory = $true)][int]$RemotePort
+    )
+    $livePort = Get-LiveShowcasePort -Name $Name -ExpectedPort $StablePort
+    if ($null -ne $livePort) {
+        Write-Host "view=$Name port=$livePort source=live-showcase"
+        return [int]$livePort
+    }
+    $temporaryPort = Start-PortForward -TargetNamespace $TargetNamespace -Resource $Resource -RemotePort $RemotePort
+    Write-Host "view=$Name port=$temporaryPort source=temporary"
+    return [int]$temporaryPort
 }
 
 function Invoke-Api {
@@ -285,9 +335,20 @@ function Assert-Preflight {
         Invoke-Kubectl @("-n", $Namespace, "rollout", "status", "deployment/$deployment", "--timeout=60s") | Out-Null
         Write-Host "$deployment=READY"
     }
-    Invoke-Kubectl @("-n", $Namespace, "get", "scaledobject", "inner-cosmos-worker-outbox") | Out-Null
-    Invoke-Kubectl @("-n", "observability", "get", "deployment", "prometheus", "grafana") | Out-Null
-    Invoke-Kubectl @("-n", $Namespace, "get", "deployment", "inner-cosmos-jaeger", "inner-cosmos-otel-collector") | Out-Null
+    foreach ($deployment in @("prometheus", "grafana")) {
+        Invoke-Kubectl @("-n", "observability", "rollout", "status", "deployment/$deployment", "--timeout=60s") | Out-Null
+        Write-Host "$deployment=READY"
+    }
+    foreach ($deployment in @("inner-cosmos-jaeger", "inner-cosmos-otel-collector")) {
+        Invoke-Kubectl @("-n", $Namespace, "rollout", "status", "deployment/$deployment", "--timeout=60s") | Out-Null
+        Write-Host "$deployment=READY"
+    }
+    $scaledObjectReady = Invoke-Kubectl @("-n", $Namespace, "get", "scaledobject",
+        "inner-cosmos-worker-outbox", "-o", "jsonpath={.status.conditions[?(@.type=='Ready')].status}")
+    if ($scaledObjectReady -ne "True") {
+        throw "KEDA ScaledObject is not Ready."
+    }
+    Write-Host "inner-cosmos-worker-outbox=READY"
 
     $outbox = Invoke-Psql "SELECT count(*) FROM tb_outbox_event WHERE status IN ('PENDING','PROCESSING','RETRY','DEAD');"
     $nonShowcaseOutbox = Invoke-Psql @"
@@ -425,6 +486,44 @@ WHERE dedup_key LIKE '$Prefix-%';
     }
 }
 
+function Assert-KedaDrainInvariant {
+    param(
+        [Parameter(Mandatory = $true)][string]$Prefix,
+        [ValidateRange(30, 180)][int]$TimeoutSeconds = 120
+    )
+    if (-not $script:kedaScalePassed) {
+        return
+    }
+    Write-Host "keda_drain_validation=START"
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    do {
+        $snapshot = Get-KedaSnapshot -Prefix $Prefix
+        if ($snapshot.Outstanding -eq 0) {
+            break
+        }
+        Start-Sleep -Seconds 2
+    } until ((Get-Date) -ge $deadline)
+    if ($snapshot.Outstanding -ne 0 -or $snapshot.Published -ne $KedaEventCount) {
+        throw "KEDA drain invariant failed: outstanding=$($snapshot.Outstanding) published=$($snapshot.Published) expected=$KedaEventCount."
+    }
+    $receiptStats = Invoke-Psql @"
+SELECT
+  count(*),
+  count(DISTINCT receipt.event_id)
+FROM tb_inbox_receipt receipt
+JOIN tb_outbox_event event ON event.event_id = receipt.event_id
+WHERE event.dedup_key LIKE '$Prefix-%';
+"@
+    $receiptParts = $receiptStats -split "\|"
+    $receiptCount = [int]$receiptParts[0]
+    $distinctReceiptCount = [int]$receiptParts[1]
+    $duplicateReceipts = $receiptCount - $distinctReceiptCount
+    if ($receiptCount -ne $KedaEventCount -or $duplicateReceipts -ne 0) {
+        throw "KEDA inbox invariant failed: receipts=$receiptCount expected=$KedaEventCount duplicate_receipts=$duplicateReceipts."
+    }
+    Write-Host "keda_drain=PASS published=$($snapshot.Published) receipts=$receiptCount duplicate_receipts=0"
+}
+
 function Restore-KedaScene {
     param([string]$Prefix)
     if (-not $script:kedaDirty) {
@@ -432,7 +531,13 @@ function Restore-KedaScene {
     }
     Write-Host "keda_cleanup=START"
     $cleanupSucceeded = $false
+    $invariantError = $null
     try {
+        try {
+            Assert-KedaDrainInvariant -Prefix $Prefix
+        } catch {
+            $invariantError = $_
+        }
         Invoke-Kubectl @("-n", $Namespace, "annotate", "scaledobject", "inner-cosmos-worker-outbox",
             "autoscaling.keda.sh/paused=true", "--overwrite") | Out-Null
         Invoke-Kubectl @("-n", $Namespace, "scale", "deployment/inner-cosmos-worker", "--replicas=0") | Out-Null
@@ -459,9 +564,13 @@ COMMIT;
         }
         Write-Host "keda_cleanup=PASS worker_baseline=1 synthetic_rows=0"
         $cleanupSucceeded = $true
+        if ($null -ne $invariantError) {
+            throw $invariantError
+        }
     } finally {
         if ($cleanupSucceeded) {
             $script:kedaDirty = $false
+            $script:kedaScalePassed = $false
         }
     }
 }
@@ -481,9 +590,11 @@ function Invoke-KedaScene {
         if ($scaledObjectReady -ne "True") {
             throw "KEDA ScaledObject is not Ready."
         }
-        $grafanaPort = Start-PortForward -TargetNamespace "observability" -Resource "svc/grafana" -RemotePort 3000
+        $grafanaPort = Get-OrStartServicePort -Name "grafana" -StablePort 3000 `
+            -TargetNamespace "observability" -Resource "svc/grafana" -RemotePort 3000
         Write-Host "Audience board: http://127.0.0.1:$grafanaPort/d/inner-cosmos-events/work-pressure-contract-c2b7-outbox-and-keda?orgId=1&refresh=5s&from=now-5m&to=now&viewPanel=6"
         Write-Host "Goal: business backlog -> worker 1/1 to at least 3/3 in under 45 seconds."
+        Write-Host "H2_PRESENTER_READY baseline=1/1 scaledobject=Ready scale_gate=40s" -ForegroundColor Green
         $timer = [Diagnostics.Stopwatch]::StartNew()
 
         $null = Invoke-Psql @"
@@ -533,6 +644,7 @@ FROM generate_series(1, $KedaEventCount) AS g;
         }
         Write-Host ("KEDA_SCALE_OUT_PASS elapsed_ms={0} worker={1} outstanding={2}" -f
             [long]$timer.Elapsed.TotalMilliseconds, $snapshot.Replicas, $snapshot.Outstanding) -ForegroundColor Green
+        $script:kedaScalePassed = $true
         Write-Host "The backlog now drains naturally; HPA stabilization and scale-in remain visible for HERO 3."
     } catch {
         Restore-KedaScene -Prefix $prefix
@@ -543,12 +655,15 @@ FROM generate_series(1, $KedaEventCount) AS g;
 function Invoke-ObservabilityScene {
     param([object]$ExistingAccount)
     Write-Scene "HERO 3 | one trace crosses API and Worker"
+    $sceneTimer = [Diagnostics.Stopwatch]::StartNew()
     $servicePort = if ($null -ne $ExistingAccount) {
         ([Uri]$ExistingAccount.BaseUrl).Port
     } else {
-        Start-PortForward -TargetNamespace $Namespace -Resource "svc/inner-cosmos-api" -RemotePort 8080
+        Get-OrStartServicePort -Name "kind-api" -StablePort 8081 `
+            -TargetNamespace $Namespace -Resource "svc/inner-cosmos-api" -RemotePort 8080
     }
     $serviceUrl = "http://127.0.0.1:$servicePort"
+    Write-Host "H3_PRESENTER_READY api=$serviceUrl completion_gate=60s" -ForegroundColor Green
     $account = $ExistingAccount
     if ($null -eq $account) {
         $account = New-DemoConversation -BaseUrl $serviceUrl -CreateRichReply
@@ -614,9 +729,12 @@ LIMIT 1;
     }
     $traceId = $Matches[1]
 
-    $jaegerPort = Start-PortForward -TargetNamespace $Namespace -Resource "svc/inner-cosmos-jaeger" -RemotePort 16686
-    $prometheusPort = Start-PortForward -TargetNamespace "observability" -Resource "svc/prometheus" -RemotePort 9090
-    $grafanaPort = Start-PortForward -TargetNamespace "observability" -Resource "svc/grafana" -RemotePort 3000
+    $jaegerPort = Get-OrStartServicePort -Name "jaeger" -StablePort 16686 `
+        -TargetNamespace $Namespace -Resource "svc/inner-cosmos-jaeger" -RemotePort 16686
+    $prometheusPort = Get-OrStartServicePort -Name "prometheus" -StablePort 9090 `
+        -TargetNamespace "observability" -Resource "svc/prometheus" -RemotePort 9090
+    $grafanaPort = Get-OrStartServicePort -Name "grafana" -StablePort 3000 `
+        -TargetNamespace "observability" -Resource "svc/grafana" -RemotePort 3000
 
     $trace = $null
     $traceReady = $false
@@ -755,9 +873,15 @@ LIMIT 1;
     Write-Host "Grafana KEDA: http://127.0.0.1:$grafanaPort/d/inner-cosmos-events/work-pressure-contract-c2b7-outbox-and-keda?orgId=1&refresh=5s&from=now-15m&to=now&viewPanel=6"
     Write-Host "Grafana recovery: http://127.0.0.1:$grafanaPort/d/inner-cosmos-recovery/continuity-contract-c2b7-pod-recovery-live?orgId=1&refresh=5s"
     Write-Host "Jaeger trace: http://127.0.0.1:$jaegerPort/trace/$traceId"
-    Write-Host "HERO_3_PASS | real Aurora latency waterfall + API-to-Worker continuation; privacy scan=0" -ForegroundColor Green
+    $sceneTimer.Stop()
+    if ($sceneTimer.Elapsed.TotalSeconds -gt 60) {
+        throw "H3 exceeded the 60-second presenter gate: $([long]$sceneTimer.Elapsed.TotalMilliseconds) ms."
+    }
+    Write-Host ("HERO_3_PASS elapsed_ms={0} | actual Aurora request path + API-to-Worker continuation; privacy scan=0" -f
+        [long]$sceneTimer.Elapsed.TotalMilliseconds) -ForegroundColor Green
 }
 
+$showcaseError = $null
 New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
 Push-Location $root
 try {
@@ -795,12 +919,18 @@ try {
             }
         }
     }
+} catch {
+    $showcaseError = $_
 } finally {
     if ($kedaDirty) {
         try {
             Restore-KedaScene -Prefix "$runId-keda"
         } catch {
-            Write-Warning "Emergency KEDA cleanup failed: $($_.Exception.Message)"
+            if ($null -eq $showcaseError) {
+                $showcaseError = $_
+            } else {
+                Write-Warning "Emergency KEDA cleanup also failed: $($_.Exception.Message)"
+            }
         }
     }
     Remove-DemoAccount
@@ -815,4 +945,7 @@ try {
     }
     Pop-Location
     Write-Host "temporary_artifacts=$tempRoot"
+}
+if ($null -ne $showcaseError) {
+    throw $showcaseError
 }
