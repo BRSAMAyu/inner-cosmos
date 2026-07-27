@@ -131,11 +131,25 @@ describe("MemoryStarfield", () => {
 
   it("shows an immediate visible loading drawer while a clicked star is being fetched", () => {
     render(<MemoryStarfield starfield={starfield} starfieldBusy={false} onChangeMode={() => undefined}
-      starfieldDetail={null} detailBusy={1} onRevealStar={() => undefined} onCloseDetail={() => undefined}
+      starfieldDetail={null} detailBusy={1} selectedStarId={1}
+      onRevealStar={() => undefined} onCloseDetail={() => undefined}
       memoryOperations={[]} rollbackBusy={null} onRollback={() => undefined} onCorrectMemory={() => undefined} />);
     expect(screen.getByRole("dialog", { name: "记忆来源与变化" })).toHaveAttribute("aria-busy", "true");
     expect(screen.getByRole("dialog", { name: "记忆来源与变化" })).toHaveFocus();
-    expect(screen.getByRole("status")).toHaveTextContent("正在追溯");
+    expect(screen.getByRole("status")).toHaveTextContent("正在补充");
+  });
+
+  it("keeps a useful local preview and retry action when provenance loading fails", () => {
+    const onRevealStar = vi.fn();
+    render(<MemoryStarfield locale="en-SG" starfield={starfield} starfieldBusy={false}
+      onChangeMode={() => undefined} starfieldDetail={null} detailBusy={null} selectedStarId={1}
+      detailError="HTTP 503" onRevealStar={onRevealStar} onCloseDetail={() => undefined}
+      memoryOperations={[]} rollbackBusy={null} onRollback={() => undefined} onCorrectMemory={() => undefined} />);
+
+    expect(screen.getByRole("dialog")).toHaveTextContent("摘要");
+    expect(screen.getByRole("alert")).toHaveTextContent("The source detail did not load");
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(onRevealStar).toHaveBeenCalledExactlyOnceWith(1);
   });
 
   it("explains an empty view and offers a direct route back to Aurora", () => {
@@ -209,6 +223,8 @@ describe("MemoryStarfield", () => {
       memoryOperations={[operation]} rollbackBusy={null} onRollback={() => undefined} onCorrectMemory={() => undefined}
       onUpdateImportance={() => undefined} onArchive={() => undefined} />);
     expect(screen.getByRole("heading", { name: "Your memory isn't a filing cabinet" })).toBeVisible();
+    expect(screen.getByText(/Each star is an understanding Aurora formed/)).toBeVisible();
+    expect(screen.getByText(/Choose a star to see how this memory shapes/)).toBeVisible();
     expect(screen.getByText("1 current memory")).toBeVisible(); // singular
     expect(screen.getByRole("button", { name: "Time" })).toBeVisible();
     expect(screen.getByRole("button", { name: "View source & changes" })).toBeVisible();

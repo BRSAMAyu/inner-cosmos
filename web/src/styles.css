@@ -1489,6 +1489,26 @@ input[type="range"]::-moz-range-thumb {
 
 /* Stars keep their atmosphere but now name themselves, so the map is semantic rather than five
    anonymous dots. The compact list keeps three readable anchors and folds the long tail. */
+.cosmos-purpose {
+  max-width: 720px;
+  margin: 10px 0 4px;
+  color: var(--text-primary);
+  font-size: .92rem;
+  line-height: 1.65;
+}
+.cosmos-select-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 7px 10px;
+  color: var(--accent-sage-soft);
+  border: 1px solid color-mix(in srgb,var(--accent-sage) 24%,var(--border-subtle));
+  border-radius: 999px;
+  background: color-mix(in srgb,var(--accent-sage) 7%,transparent);
+  font-size: .75rem;
+}
+.cosmos-select-hint::before { content: "✦"; }
 .cosmos-map {
   min-height: clamp(280px,38vw,390px);
   isolation: isolate;
@@ -1547,6 +1567,23 @@ input[type="range"]::-moz-range-thumb {
   box-shadow: 0 5px 18px color-mix(in srgb,var(--surface-canvas) 24%,transparent);
 }
 .cosmos-star:hover,.cosmos-star:focus-visible { transform: translate(-50%,-50%) scale(1.06); }
+.memory-preview-panel .memory-preview-summary {
+  padding: 12px 14px;
+  border-left: 2px solid var(--accent-aurora);
+  border-radius: 0 12px 12px 0;
+  background: var(--surface-panel-soft);
+  font-size: 1rem;
+  line-height: 1.65;
+}
+.memory-preview-meaning { color: var(--text-muted); line-height: 1.6; }
+.memory-preview-error {
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb,var(--accent-aurora) 40%,var(--border-subtle));
+  border-radius: 12px;
+  background: color-mix(in srgb,var(--accent-aurora) 8%,var(--surface-panel));
+}
+.memory-preview-error p { margin-top: 0; }
 .cosmos-more-memories { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--border-subtle); border-radius: 14px; background: var(--surface-panel-soft); }
 .cosmos-more-memories > summary { color: var(--text-muted); cursor: pointer; font-size: .8rem; }
 .cosmos-more-memories[open] > summary { margin-bottom: 10px; }

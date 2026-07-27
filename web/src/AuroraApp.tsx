@@ -146,6 +146,8 @@ export function AuroraApp() {
   const [rollbackBusy, setRollbackBusy] = useState<number | null>(null);
   const [starfieldDetail, setStarfieldDetail] = useState<StarfieldDetail | null>(null);
   const [detailBusy, setDetailBusy] = useState<number | null>(null);
+  const [selectedStarId, setSelectedStarId] = useState<number | null>(null);
+  const [starfieldDetailError, setStarfieldDetailError] = useState<string | null>(null);
   const [importanceBusy, setImportanceBusy] = useState<number | null>(null);
   const [archiveBusy, setArchiveBusy] = useState<number | null>(null);
   const [memories, setMemories] = useState<MemoryCard[]>([]);
@@ -1096,6 +1098,8 @@ export function AuroraApp() {
     if (starfield?.mode === nextMode) return;
     setStarfieldBusy(true);
     setStarfieldDetail(null);
+    setSelectedStarId(null);
+    setStarfieldDetailError(null);
     const viewLabel = skillLocale === "en-SG"
       ? (nextMode === "TIME" ? "time" : nextMode === "THEME" ? "theme" : "people")
       : (nextMode === "TIME" ? "时间" : nextMode === "THEME" ? "主题" : "人物");
@@ -1129,12 +1133,25 @@ export function AuroraApp() {
   };
 
   const revealStar = async (id: number) => {
+    setSelectedStarId(id);
+    setStarfieldDetail(null);
+    setStarfieldDetailError(null);
     setDetailBusy(id);
     try { setStarfieldDetail(await api.starfieldDetail(id)); }
-    catch (error) { setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
-      ? "This memory's source is temporarily unavailable."
-      : "暂时无法打开这颗记忆的来源"); }
+    catch (error) {
+      const message = error instanceof Error ? error.message : skillLocale === "en-SG"
+        ? "This memory's source is temporarily unavailable."
+        : "暂时无法打开这颗记忆的来源";
+      setStarfieldDetailError(message);
+      setStatus(message);
+    }
     finally { setDetailBusy(null); }
+  };
+
+  const closeStarDetail = () => {
+    setStarfieldDetail(null);
+    setSelectedStarId(null);
+    setStarfieldDetailError(null);
   };
 
   const openMemoryEvidence = (id: number) => {
@@ -1867,7 +1884,8 @@ export function AuroraApp() {
           onOpenBeliefs={() => navigateCosmosTab("beliefs")} />}
 
         {starfield && <MemoryStarfield starfield={starfield} starfieldBusy={starfieldBusy} onChangeMode={mode => void changeStarfieldMode(mode)}
-          starfieldDetail={starfieldDetail} detailBusy={detailBusy} onRevealStar={id => void revealStar(id)} onCloseDetail={() => setStarfieldDetail(null)}
+          starfieldDetail={starfieldDetail} detailBusy={detailBusy} selectedStarId={selectedStarId}
+          detailError={starfieldDetailError} onRevealStar={id => void revealStar(id)} onCloseDetail={closeStarDetail}
           memoryOperations={memoryOperations} rollbackBusy={rollbackBusy} onRollback={operation => void rollbackMemoryOperation(operation)} onCorrectMemory={beginMemoryCorrection}
           onUpdateImportance={(id, importance) => void updateMemoryImportance(id, importance)} onArchive={id => void archiveMemory(id)}
           onStartMemory={() => navigateSpace("aurora")} importanceBusy={importanceBusy} archiveBusy={archiveBusy} locale={skillLocale} />}

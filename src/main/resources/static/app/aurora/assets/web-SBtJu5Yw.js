@@ -1,0 +1,1 @@
+import{l as e}from"./index-CmKF96_F.js";var t=class extends e{async show(e){}async hide(e){}};export{t as SplashScreenWeb};

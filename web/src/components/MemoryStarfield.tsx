@@ -77,6 +77,8 @@ const COPY: Record<Locale, {
   rollbackBusy: string; rollbackBtn: string; forgetNote: string;
   emptyTitle: Record<StarfieldScene["mode"], string>; emptyBody: Record<StarfieldScene["mode"], string>;
   emptyAction: string; openStar: (title: string) => string;
+  purpose: string; selectHint: string; previewEyebrow: string; previewMeaning: string;
+  previewLoading: string; previewError: string; retry: string;
   modeExplanation: Record<StarfieldScene["mode"], string>;
   legend: Array<[string, string]>;
 }> = {
@@ -101,6 +103,13 @@ const COPY: Record<Locale, {
       PEOPLE: "只有你确认过的关系线索才会进入人物视角；原始对话不会公开。"
     },
     emptyAction: "回到 Aurora 留下第一颗星", openStar: title => `打开记忆：${title}`,
+    purpose: "每颗星都是 Aurora 从对话中形成的一条可检查理解。点开它，可以看见记住了什么、为什么重要，并随时纠正或归档。",
+    selectHint: "选择一颗星，查看这段记忆如何影响 Aurora 对你的理解。",
+    previewEyebrow: "这颗星代表什么",
+    previewMeaning: "这是 Aurora 当前保留的一条结构化理解，不是原始对话，也不会自动公开。",
+    previewLoading: "正在补充它的来源、变化记录与影响范围…",
+    previewError: "来源详情暂时没有加载出来；这颗星的摘要仍可查看，也可以重试。",
+    retry: "重试加载",
     modeExplanation: {
       TIME: "从左到右沿时间展开；同一时刻会错落排开，时间未定的记忆停留在中央柔和轨道。",
       THEME: "相似线索会聚成主题，帮助你看见反复出现的关注与变化。",
@@ -130,6 +139,13 @@ const COPY: Record<Locale, {
       PEOPLE: "Only relationship cues you confirm enter this view; raw conversations never become public."
     },
     emptyAction: "Return to Aurora and leave the first star", openStar: title => `Open memory: ${title}`,
+    purpose: "Each star is an understanding Aurora formed from your conversations. Open one to see what it remembers, why it matters, and correct or archive it.",
+    selectHint: "Choose a star to see how this memory shapes Aurora's understanding of you.",
+    previewEyebrow: "WHAT THIS STAR MEANS",
+    previewMeaning: "This is a structured understanding Aurora currently keeps — not your raw conversation, and never public by default.",
+    previewLoading: "Adding its source, change history and downstream impact…",
+    previewError: "The source detail did not load. You can still review this star's summary or try again.",
+    retry: "Try again",
     modeExplanation: {
       TIME: "Time flows left to right. Memories from the same moment fan apart, while those without an exact time rest in a gentle central orbit.",
       THEME: "Related cues gather into themes, revealing recurring concerns and change over time.",
@@ -169,10 +185,11 @@ function MemoryDetailActions({ card, importanceBusy, archiveBusy, onUpdateImport
 }
 
 export function MemoryStarfield({ starfield, starfieldBusy, onChangeMode, starfieldDetail, detailBusy,
-  onRevealStar, onCloseDetail, memoryOperations, rollbackBusy, onRollback, onCorrectMemory,
+  selectedStarId, detailError, onRevealStar, onCloseDetail, memoryOperations, rollbackBusy, onRollback, onCorrectMemory,
   onUpdateImportance, onArchive, onStartMemory, importanceBusy = null, archiveBusy = null, locale = "zh-CN" }: {
   starfield: StarfieldScene; starfieldBusy: boolean; onChangeMode: (mode: StarfieldScene["mode"]) => void;
   starfieldDetail: StarfieldDetail | null; detailBusy: number | null; onRevealStar: (id: number) => void;
+  selectedStarId?: number | null; detailError?: string | null;
   onCloseDetail: () => void; memoryOperations: MemoryOperation[]; rollbackBusy: number | null;
   onRollback: (operation: MemoryOperation) => void; onCorrectMemory: (star: StarfieldStar) => void;
   onUpdateImportance?: (id: number, importance: number) => void; onArchive?: (id: number) => void;
@@ -248,18 +265,25 @@ export function MemoryStarfield({ starfield, starfieldBusy, onChangeMode, starfi
   const foldedMemories = starfield.accessibleList.slice(3);
   const starPositions = layoutMemoryStars(starfield.stars, starfield.mode);
   const visibleStarIds = new Set(starfield.stars.map(star => star.id));
+  const selectedStar = selectedStarId === null || selectedStarId === undefined
+    ? null
+    : starfield.accessibleList.find(star => star.id === selectedStarId)
+      ?? starfield.stars.find(star => star.id === selectedStarId)
+      ?? null;
   const links = starfield.stars.flatMap(star => star.connectedMemoryIds
     .filter(targetId => visibleStarIds.has(targetId) && star.id < targetId)
     .map(targetId => ({ sourceId: star.id, targetId })));
   return <section className="cosmos-space" aria-label={t.aria}>
     <div className="cosmos-heading"><div><span className="eyebrow">MEMORY, ALIVE</span><h2>{t.heading}</h2></div>
       <span>{t.count(starfield.stars.length)}</span></div>
+    <p className="cosmos-purpose">{t.purpose}</p>
     <div className="cosmos-modes" aria-label={t.modesAria}>
       {modeOptions.map(value =>
         <button type="button" disabled={starfieldBusy} aria-pressed={starfield.mode === value} key={value}
           className={starfield.mode === value ? "active" : ""} onClick={() => onChangeMode(value)}>{t.modeLabel[value]}</button>)}
     </div>
     <p className="cosmos-explanation">{t.modeExplanation[starfield.mode]}</p>
+    {starfield.stars.length > 0 && <p className="cosmos-select-hint">{t.selectHint}</p>}
     <div className="cosmos-map" aria-label={t.listAria}>
       {links.length > 0 && <svg className="cosmos-links" aria-hidden="true" viewBox="0 0 100 100"
         preserveAspectRatio="none">
@@ -301,14 +325,26 @@ export function MemoryStarfield({ starfield, starfieldBusy, onChangeMode, starfi
       <summary>{t.moreMemories(foldedMemories.length)}</summary>
       <ol className="cosmos-list">{foldedMemories.map(renderMemoryRow)}</ol>
     </details>}
-    {detailBusy !== null && <div className="memory-detail-backdrop" role="presentation">
-      <aside ref={loadingDialogRef} className="provenance-panel" role="dialog" aria-modal="true"
-        aria-label={t.provAria} aria-busy="true" tabIndex={-1}>
-        <div><span className="eyebrow">MEMORY SOURCE</span></div>
-        <p role="status" aria-live="polite">{t.revealBusy}</p>
+    {selectedStar && !starfieldDetail && <div className="memory-detail-backdrop" role="presentation"
+      onMouseDown={event => { if (event.target === event.currentTarget) onCloseDetail(); }}>
+      <aside ref={loadingDialogRef} className="provenance-panel memory-preview-panel" role="dialog" aria-modal="true"
+        aria-label={t.provAria} aria-busy={detailBusy !== null ? "true" : undefined} tabIndex={-1}>
+        <div><span className="eyebrow">{t.previewEyebrow}</span><button type="button"
+          onClick={onCloseDetail} aria-label={t.closeProv}>×</button></div>
+        <h3>{englishStarText(selectedStar.title)}</h3>
+        <p className="memory-preview-summary ugc-text">{demoContentText(selectedStar.summary, locale)}</p>
+        <p className="memory-preview-meaning">{t.previewMeaning}</p>
+        <dl><div><dt>{t.confidenceLabel}</dt><dd>{Math.round(selectedStar.confidence * 100)}%</dd></div>
+          <div><dt>{t.memLayer}</dt><dd>{englishStarText(selectedStar.memoryLayer)}</dd></div></dl>
+        {detailBusy !== null && <p role="status" aria-live="polite">{t.previewLoading}</p>}
+        {detailBusy === null && detailError && <div className="memory-preview-error" role="alert">
+          <p>{t.previewError}</p>
+          <button type="button" onClick={() => onRevealStar(selectedStar.id)}>{t.retry}</button>
+        </div>}
+        <button type="button" className="quiet" onClick={() => onCorrectMemory(selectedStar)}>{t.inaccurate}</button>
       </aside>
     </div>}
-    {detailBusy === null && starfieldDetail && <div className="memory-detail-backdrop" role="presentation"
+    {starfieldDetail && <div className="memory-detail-backdrop" role="presentation"
       onMouseDown={event => { if (event.target === event.currentTarget) onCloseDetail(); }}>
     <aside ref={detailDialogRef} className="provenance-panel" role="dialog" aria-modal="true" aria-label={t.provAria}>
       <div><span className="eyebrow">WHY THIS STAR</span><button ref={detailCloseRef} type="button"
