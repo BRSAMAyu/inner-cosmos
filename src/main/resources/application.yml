@@ -373,6 +373,10 @@ inner-cosmos:
     seed-enabled: ${SEED_ENABLED:false}
     seed-admin-enabled: ${DEMO_SEED_ADMIN_ENABLED:true}
     public-entry-enabled: ${DEMO_PUBLIC_ENTRY_ENABLED:false}
+    # Curated DEMO/SHOWCASE identities are template sources, not shared visitor accounts, in the
+    # public classroom runtime. Local development keeps legacy password login unless explicitly
+    # disabled by that runtime.
+    template-password-login-enabled: ${DEMO_TEMPLATE_PASSWORD_LOGIN_ENABLED:true}
   scheduler:
     redis-lock:
       enabled: ${REDIS_SCHEDULER_LOCK_ENABLED:false}

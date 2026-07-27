@@ -68,6 +68,7 @@ $common = Get-Content -LiteralPath (Join-Path $PSScriptRoot "public-demo-common.
 $run = Get-Content -LiteralPath (Join-Path $PSScriptRoot "run-public-demo.ps1") -Raw
 $status = Get-Content -LiteralPath (Join-Path $PSScriptRoot "status-public-demo.ps1") -Raw
 $verify = Get-Content -LiteralPath (Join-Path $PSScriptRoot "verify-public-demo.ps1") -Raw
+$burst = Get-Content -LiteralPath (Join-Path $PSScriptRoot "test-30-user-burst.ps1") -Raw
 if ($common -match '--token(?:\s|")') {
     throw "Named Tunnel token must not appear in the cloudflared command line."
 }
@@ -88,6 +89,12 @@ if ($status -notmatch '\$tunnel\.Valid' -or
 if ($verify -notmatch 'verificationWarnings' -or
     $verify -match 'did not use the required dual-kernel runtime') {
     throw "Default launch verification still hard-blocks an observability runtime label."
+}
+if ($burst -notmatch '\[int\]\$SandboxEntryUsers = 50' -or
+    $burst -notmatch '/api/public/demo/enter/\$key' -or
+    $burst -notmatch '/api/public/demo/sandbox' -or
+    $burst -notmatch '\[Math\]::Min\(\$UserCount - 1, 29\)') {
+    throw "Classroom burst script does not pin 50-session sandbox isolation and bounded discovery."
 }
 
 Write-Output "PUBLIC_DEMO_SCRIPT_CONTRACTS_PASS files=$($files.Count)"

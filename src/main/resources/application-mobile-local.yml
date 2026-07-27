@@ -53,6 +53,9 @@ inner-cosmos:
       redirect-uri: ${OIDC_MOBILE_REDIRECT_URI:innercosmos://oauth/callback}
       scopes: openid,profile,email
   demo:
+    # mobile-local backs the public classroom server: curated identities are clone sources,
+    # never shared mutable password accounts. Override only for an explicit local fixture.
+    template-password-login-enabled: ${DEMO_TEMPLATE_PASSWORD_LOGIN_ENABLED:false}
     # Remains off by default, but the explicitly operated classroom public-demo compose may
     # enable curated lived-in personas. The prod profile still structurally excludes seeding.
     seed-enabled: ${SEED_ENABLED:false}

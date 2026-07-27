@@ -9,6 +9,12 @@ param(
     [ValidateRange(1, 100)]
     [int]$ThrottleLimit = 30,
 
+    [ValidateRange(0, 100)]
+    [int]$SandboxEntryUsers = 50,
+
+    [ValidateRange(1, 100)]
+    [int]$SandboxEntryThrottleLimit = 50,
+
     [ValidateRange(1000, 120000)]
     [int]$MaxRegistrationP95Ms = 15000,
 
@@ -57,6 +63,8 @@ $socialDiscoveryChecks = 0
 $socialDiscoveryFailed = $false
 $socialConnectionFailed = $false
 $ringConnections = 0
+$sandboxEntryResults = @()
+$sandboxCleanupFailures = 0
 
 function Invoke-Envelope {
     param(
@@ -153,6 +161,106 @@ try {
     $health = Invoke-RestMethod -Uri "$origin/actuator/health" -TimeoutSec 30
     if ($health.status -ne "UP") {
         throw "Public health is not UP."
+    }
+
+    # The three curated stories are immutable templates. Prove that a classroom-sized burst gets
+    # one owner-isolated SANDBOX per browser session, never one shared demo/river/cloud identity.
+    # Each runspace removes only its own sandbox through the public-demo lifecycle endpoint, so a
+    # rehearsal cannot permanently accumulate 50 copies in PostgreSQL.
+    if ($SandboxEntryUsers -gt 0) {
+        $sandboxEntryResults = @(0..($SandboxEntryUsers - 1) | ForEach-Object -Parallel {
+            $index = $_
+            $originLocal = $using:origin
+            $keys = @("lin-che", "shen-yan", "xia-yu")
+            $session = [Microsoft.PowerShell.Commands.WebRequestSession]::new()
+            $entered = $false
+            $cleaned = $false
+            $userId = 0L
+            $username = ""
+            $errorMessage = ""
+
+            function Invoke-SandboxEnvelope {
+                param(
+                    [Microsoft.PowerShell.Commands.WebRequestSession]$Session,
+                    [string]$Method,
+                    [string]$Path
+                )
+                $headers = @{ "Idempotency-Key" = [Guid]::NewGuid().ToString() }
+                if ($Method -notin @("GET", "HEAD")) {
+                    $csrf = Invoke-RestMethod -Uri "$originLocal/api/v1/auth/csrf" `
+                        -WebSession $Session -TimeoutSec 20
+                    if ($csrf.data -and
+                        -not [string]::IsNullOrWhiteSpace([string]$csrf.data.headerName) -and
+                        -not [string]::IsNullOrWhiteSpace([string]$csrf.data.token)) {
+                        $headers[[string]$csrf.data.headerName] = [string]$csrf.data.token
+                    }
+                }
+                $web = Invoke-WebRequest -Uri "$originLocal$Path" -Method $Method `
+                    -WebSession $Session -Headers $headers -TimeoutSec 150 -UseBasicParsing
+                $bytes = if ($web.RawContentStream) {
+                    $web.RawContentStream.ToArray()
+                } else {
+                    [Text.Encoding]::UTF8.GetBytes($web.Content)
+                }
+                $response = ([Text.Encoding]::UTF8.GetString($bytes) | ConvertFrom-Json)
+                if (-not $response.success) { throw "API envelope failed at $Path." }
+                return $response.data
+            }
+
+            try {
+                $key = $keys[$index % $keys.Count]
+                $sandbox = Invoke-SandboxEnvelope $session "POST" "/api/public/demo/enter/$key"
+                $userId = [long]$sandbox.id
+                $username = [string]$sandbox.username
+                $entered = $true
+                if ($userId -le 0 -or -not $username.StartsWith("sandbox-")) {
+                    throw "Story entry returned a non-sandbox identity."
+                }
+            } catch {
+                $errorMessage = $_.Exception.Message
+            } finally {
+                if ($entered) {
+                    try {
+                        $null = Invoke-SandboxEnvelope $session "DELETE" "/api/public/demo/sandbox"
+                        $cleaned = $true
+                    } catch {
+                        if ([string]::IsNullOrWhiteSpace($errorMessage)) {
+                            $errorMessage = "sandbox cleanup failed: $($_.Exception.Message)"
+                        }
+                    }
+                }
+            }
+            [pscustomobject]@{
+                Index = $index
+                UserId = $userId
+                Username = $username
+                Entered = $entered
+                Cleaned = $cleaned
+                Error = $errorMessage
+            }
+        } -ThrottleLimit $SandboxEntryThrottleLimit)
+
+        $enteredSandboxes = @($sandboxEntryResults | Where-Object Entered)
+        $uniqueSandboxIds = @($enteredSandboxes.UserId | Sort-Object -Unique)
+        $sandboxCleanupFailures = @($sandboxEntryResults | Where-Object {
+            $_.Entered -and -not $_.Cleaned
+        }).Count
+        if ($enteredSandboxes.Count -ne $SandboxEntryUsers) {
+            $failureMessages.Add(
+                "Isolated story entry succeeded for $($enteredSandboxes.Count)/$SandboxEntryUsers sessions.")
+        }
+        if ($uniqueSandboxIds.Count -ne $SandboxEntryUsers) {
+            $failureMessages.Add(
+                "Story entry returned $($uniqueSandboxIds.Count) unique owners for $SandboxEntryUsers sessions.")
+        }
+        if (@($enteredSandboxes | Where-Object {
+            -not ([string]$_.Username).StartsWith("sandbox-")
+        }).Count -gt 0) {
+            $failureMessages.Add("Story entry exposed a curated template identity.")
+        }
+        if ($sandboxCleanupFailures -gt 0) {
+            $failureMessages.Add("$sandboxCleanupFailures isolated Demo sandboxes could not be removed.")
+        }
     }
 
     # One runspace owns one WebRequestSession for its complete register -> calibrate ->
@@ -402,8 +510,10 @@ try {
     }
 
     # Social proof starts only when every burst actor completed the real-provider path.
-    # Logging in all 30 immediately before discovery makes them the newest HUMAN accounts;
-    # /api/social/people has a deliberate LIMIT 30, so each actor must see the other 29.
+    # /api/social/people deliberately returns at most 30 rows. For a 50-user run, requiring every
+    # actor to see all other 49 would manufacture a failure unrelated to capacity. Prove the
+    # bounded discovery contract (29 burst peers) and then prove the full 30/50-user connection
+    # ring directly by owner id.
     if ($successful.Count -eq $UserCount) {
         foreach ($spec in $specs) {
             $socialSessions.Add((New-AuthenticatedSession $spec))
@@ -412,12 +522,14 @@ try {
         foreach ($actor in $socialSessions) {
             $people = @(Invoke-Envelope $actor.Session "GET" "/api/social/people")
             $visibleIds = @($people | ForEach-Object { [long]$_.id })
-            $expectedIds = @($allUserIds | Where-Object { $_ -ne [long]$actor.UserId })
-            $missing = @($expectedIds | Where-Object { $_ -notin $visibleIds })
-            if ($missing.Count -gt 0) {
+            $visibleBurstPeers = @($allUserIds | Where-Object {
+                $_ -ne [long]$actor.UserId -and $_ -in $visibleIds
+            })
+            $expectedVisiblePeers = [Math]::Min($UserCount - 1, 29)
+            if ($visibleBurstPeers.Count -lt $expectedVisiblePeers) {
                 $socialDiscoveryFailed = $true
                 $failureMessages.Add(
-                    "Discovery actor $($actor.Index) cannot see $($missing.Count) of the other burst users.")
+                    "Discovery actor $($actor.Index) sees $($visibleBurstPeers.Count)/$expectedVisiblePeers expected burst peers.")
             }
             $socialDiscoveryChecks++
         }
@@ -528,6 +640,19 @@ $report = [ordered]@{
         registrationP95 = $MaxRegistrationP95Ms
         calibrationP95 = $MaxCalibrationP95Ms
         auroraTotalP95 = $MaxAuroraP95Ms
+    }
+    sandboxIsolation = [ordered]@{
+        requestedSessions = $SandboxEntryUsers
+        enteredSessions = @($sandboxEntryResults | Where-Object Entered).Count
+        uniqueOwnerIds = @($sandboxEntryResults | Where-Object Entered |
+            Select-Object -ExpandProperty UserId | Sort-Object -Unique).Count
+        cleanupFailures = $sandboxCleanupFailures
+        isolated = (
+            @($sandboxEntryResults | Where-Object Entered).Count -eq $SandboxEntryUsers -and
+            @($sandboxEntryResults | Where-Object Entered |
+                Select-Object -ExpandProperty UserId | Sort-Object -Unique).Count -eq $SandboxEntryUsers -and
+            $sandboxCleanupFailures -eq 0
+        )
     }
     social = [ordered]@{
         discoveryChecks = $socialDiscoveryChecks

@@ -10,6 +10,7 @@ import com.innercosmos.exception.BusinessException;
 import com.innercosmos.mapper.*;
 import com.innercosmos.service.UserService;
 import com.innercosmos.vo.UserProfileVO;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -57,6 +58,13 @@ public class UserServiceImpl implements UserService {
     private final CapsuleEmbeddingMapper capsuleEmbeddingMapper;
     private final DataRetractionReceiptMapper dataRetractionReceiptMapper;
     private final PasswordEncoder passwordEncoder;
+    /**
+     * Curated DEMO/SHOWCASE rows are immutable template sources in the public classroom runtime.
+     * Local development and legacy tests retain password login unless the operator explicitly
+     * disables it (the public-demo compose does).
+     */
+    @Value("${inner-cosmos.demo.template-password-login-enabled:true}")
+    private boolean templatePasswordLoginEnabled = true;
 
     public UserServiceImpl(UserMapper userMapper,
                            UserProfileMapper userProfileMapper,
@@ -175,6 +183,8 @@ public class UserServiceImpl implements UserService {
         if (user == null || !passwordEncoder.matches(request.password, user.passwordHash)) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED, "用户名或密码不正确");
         }
+        assertTemplateAccountMutable(user,
+                "Public Demo templates cannot be entered with a shared password. Use the isolated story entry.");
         if (!Constants.STATUS_ACTIVE.equals(user.status)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "该账户已被停用");
         }
@@ -223,6 +233,7 @@ public class UserServiceImpl implements UserService {
     public void changePassword(Long userId, String oldPassword, String newPassword) {
         // M-032: change the current user's password, requiring the old one.
         User user = userMapper.selectById(userId);
+        assertTemplateAccountMutable(user, "Public Demo template credentials are immutable.");
         if (user == null || oldPassword == null || oldPassword.isBlank()
                 || !passwordEncoder.matches(oldPassword, user.passwordHash)) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED, "原密码不正确");
@@ -422,6 +433,8 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void deleteAccount(Long userId) {
+        assertTemplateAccountMutable(userMapper.selectById(userId),
+                "Public Demo templates cannot be deleted.");
         // Persona chat messages and sessions
         List<PersonaChatSession> personaSessions = personaChatSessionMapper.selectList(
                 new QueryWrapper<PersonaChatSession>().eq("visitor_user_id", userId));
@@ -524,6 +537,12 @@ public class UserServiceImpl implements UserService {
 
         // Finally delete user account
         userMapper.deleteById(userId);
+    }
+
+    private void assertTemplateAccountMutable(User user, String message) {
+        if (!templatePasswordLoginEnabled && isPublicDemoPersona(user)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, message);
+        }
     }
 
 }
