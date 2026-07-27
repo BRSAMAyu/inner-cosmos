@@ -32,6 +32,14 @@ describe("useWeeklyReview", () => {
     expect(result.current.weeklyReview).toBeNull();
   });
 
+  it("turns a failed legacy weekly-review load into a recoverable status instead of a module crash", async () => {
+    vi.mocked(api.weeklyReviewV2Latest).mockRejectedValue(new Error("周报数据暂时不可用"));
+    const { result, setStatus } = setup();
+    await act(async () => { await result.current.loadWeeklyReview(); });
+    expect(result.current.weeklyReview).toBeNull();
+    expect(setStatus).toHaveBeenCalledWith("周报数据暂时不可用");
+  });
+
   it("generates a fresh review and surfaces a status message", async () => {
     vi.mocked(api.generateWeeklyReviewV2).mockResolvedValue(review());
     const { result, setStatus } = setup();

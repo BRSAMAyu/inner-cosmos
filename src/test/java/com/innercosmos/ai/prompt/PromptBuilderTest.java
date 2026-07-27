@@ -861,8 +861,9 @@ class PromptBuilderTest {
         assertTrue(prompt.contains("does not need emotional interpretation"));
         assertTrue(prompt.contains("Do not praise disclosure"));
         assertTrue(prompt.contains("end every turn with a question"));
-        assertTrue(prompt.contains("There is no default message count"));
-        assertTrue(prompt.contains("all three counts should appear naturally"));
-        assertTrue(prompt.contains("never split one thought merely to fill bubbles or follow a quota"));
+        assertTrue(prompt.contains("There is no default count"));
+        assertTrue(prompt.contains("three to six"));
+        assertTrue(prompt.contains("never compress a long message into a stock acknowledgement plus one question"));
+        assertTrue(prompt.contains("never split one thought merely to fill bubbles"));
     }
 }

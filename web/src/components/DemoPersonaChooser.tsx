@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, type DemoPersona } from "../api";
+import { localizeDemoPersona } from "../demoContentLocale";
 import type { Locale } from "../i18n";
 
 export function DemoPersonaChooser({ compact = false,
@@ -24,6 +25,7 @@ export function DemoPersonaChooser({ compact = false,
   }, []);
 
   if (personas.length === 0) return null;
+  const displayPersonas = personas.map(persona => localizeDemoPersona(persona, locale));
 
   const enter = async (key: string) => {
     if (busyKey || personas.some(persona => persona.key === key && persona.active)) return;
@@ -46,7 +48,38 @@ export function DemoPersonaChooser({ compact = false,
     }
   };
 
-  return <section className={`demo-persona-chooser ${compact ? "compact" : ""}`}
+  const personaButtons = displayPersonas.map(persona => {
+    const active = Boolean(persona.active);
+    return <button type="button" key={persona.key} className={active ? "active" : ""}
+      aria-current={active ? "true" : undefined}
+      aria-busy={busyKey === persona.key ? "true" : undefined}
+      disabled={Boolean(busyKey) || active} onClick={() => void enter(persona.key)}>
+      <span className="demo-persona-name">{persona.name}</span>
+      {!compact && <><strong>{persona.headline}</strong><small>{persona.story}</small>
+        <span className="demo-persona-themes">{persona.themes.join(" · ")}</span></>}
+      <em>{active
+        ? (locale === "en-SG" ? "Current" : "当前")
+        : busyKey === persona.key
+          ? (locale === "en-SG" ? "Entering…" : "正在进入…")
+          : (locale === "en-SG" ? "Enter" : "切换")}</em>
+    </button>;
+  });
+
+  if (compact) {
+    const activeName = displayPersonas.find(persona => persona.active)?.name
+      ?? (locale === "en-SG" ? "Choose a story" : "选择体验角色");
+    return <section className="demo-persona-chooser compact"
+      aria-label={locale === "en-SG" ? "Demo stories" : "Demo 体验角色"}>
+      <details>
+        <summary>{locale === "en-SG" ? "Demo story" : "体验角色"} · <strong>{activeName}</strong>
+          <span>{locale === "en-SG" ? "Switch" : "切换"}</span></summary>
+        <div className="demo-persona-grid">{personaButtons}</div>
+      </details>
+      {error && <p className="error" role="alert">{error}</p>}
+    </section>;
+  }
+
+  return <section className="demo-persona-chooser"
     aria-label={locale === "en-SG" ? "Demo stories" : "Demo 体验角色"}>
     <div className="demo-persona-heading">
       <span className="eyebrow">{locale === "en-SG" ? "LIVED-IN DEMO" : "有生活痕迹的体验"}</span>
@@ -59,25 +92,7 @@ export function DemoPersonaChooser({ compact = false,
           : "每个角色都有不同的记忆、生活节律、共鸣体与慢信；无需注册或补资料。"}</p>}
       </div>
     </div>
-    <div className="demo-persona-grid">
-      {personas.map(persona => {
-        const active = Boolean(persona.active);
-        return <button type="button" key={persona.key} className={active ? "active" : ""}
-          aria-current={active ? "true" : undefined}
-          aria-busy={busyKey === persona.key ? "true" : undefined}
-          disabled={Boolean(busyKey) || active} onClick={() => void enter(persona.key)}>
-          <span className="demo-persona-name">{persona.name}</span>
-          <strong>{persona.headline}</strong>
-          {!compact && <><small>{persona.story}</small>
-            <span className="demo-persona-themes">{persona.themes.join(" · ")}</span></>}
-          <em>{active
-            ? (locale === "en-SG" ? "You are here" : "当前故事")
-            : busyKey === persona.key
-              ? (locale === "en-SG" ? "Entering…" : "正在进入…")
-              : (locale === "en-SG" ? "Enter" : "进入体验")}</em>
-        </button>;
-      })}
-    </div>
+    <div className="demo-persona-grid">{personaButtons}</div>
     {error && <p className="error" role="alert">{error}</p>}
   </section>;
 }

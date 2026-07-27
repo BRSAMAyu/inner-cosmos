@@ -27,7 +27,8 @@ Windows 需要：
 
 - Docker Desktop 已启动；
 - JDK 21、Node.js 22、Android SDK（只有构建/安装 APK 时需要）；
-- 仓库根目录存在被 `.gitignore` 排除的 `API*.txt`，包含 DeepSeek 与 Qwen 凭据；
+- 仓库根目录存在被 `.gitignore` 排除的 `API*.txt`，包含 DeepSeek、Gemini 与 Qwen
+  凭据；格式使用独立的 `deepseek...apikey:`、`gemini:`、`qwen:` 行，真实值不进入 Git；
 - 电脑不能休眠，网络需允许访问 Cloudflare 和模型 Provider。
 
 脚本在缺少 `cloudflared.exe` 时，会从 Cloudflare 官方 GitHub Release 下载 Windows
@@ -54,8 +55,9 @@ AMD64 版本到被 Git 忽略的 `scripts/demo/bin/`。密钥只注入当前 Doc
 3. 构建 Capacitor Android 应用；
 4. 启动 PostgreSQL 16 + pgvector、Redis 和 Spring Boot；
 5. 启用 Redis Session、限流、幂等、Aurora 流和 JDBC Outbox；
-6. 使用真实 DeepSeek 对话、Qwen embedding 和 Qwen TTS，禁用 Mock fallback；界面与
-   种子默认 en-SG，Aurora 在 Provider 边界按用户当前主要语言自然回应；
+6. 使用 Gemini 3.5 Flash-Lite minimal 处理快核、Gemini 3.6 Flash medium 处理可见
+   Speaker、DeepSeek V4 Pro high 处理思考核，并使用 Qwen embedding/TTS，禁用 Mock
+   fallback；任一专用凭据缺失时该层明确降级到所选真实主 Provider，而不是伪装成功；
 7. 自动验证公网健康、首页、APK 下载、双用户注册、好友、群组、Aurora、记忆沉淀、
    共鸣体发布/发现/对话以及慢信发送；
 8. 打印三个可分享地址和 APK SHA-256。

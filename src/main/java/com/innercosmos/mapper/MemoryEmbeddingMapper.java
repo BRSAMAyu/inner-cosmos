@@ -14,7 +14,7 @@ public interface MemoryEmbeddingMapper extends BaseMapper<MemoryEmbedding> {
             SELECT c.id
             FROM tb_memory_card c
             WHERE c.status = 'ACTIVE'
-              AND UPPER(COALESCE(c.consent_scope, '')) NOT IN ('LOCAL_ONLY', 'NO_EXTERNAL_PROCESSING')
+              AND UPPER(COALESCE(c.consent_scope, '')) NOT IN ('LOCAL_ONLY', 'NO_EXTERNAL_PROCESSING', 'SIMULATOR_AUTHORIZED')
               AND NOT EXISTS (
                 SELECT 1 FROM tb_memory_embedding e
                 WHERE e.memory_id = c.id
@@ -36,7 +36,7 @@ public interface MemoryEmbeddingMapper extends BaseMapper<MemoryEmbedding> {
             SELECT COUNT(*)
             FROM tb_memory_card c
             WHERE c.status = 'ACTIVE'
-              AND UPPER(COALESCE(c.consent_scope, '')) NOT IN ('LOCAL_ONLY', 'NO_EXTERNAL_PROCESSING')
+              AND UPPER(COALESCE(c.consent_scope, '')) NOT IN ('LOCAL_ONLY', 'NO_EXTERNAL_PROCESSING', 'SIMULATOR_AUTHORIZED')
               AND NOT EXISTS (
                 SELECT 1 FROM tb_memory_embedding e
                 WHERE e.memory_id = c.id

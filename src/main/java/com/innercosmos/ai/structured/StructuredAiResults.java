@@ -24,6 +24,20 @@ public final class StructuredAiResults {
 
     /** User-safe plan contract: decisions and constraints, never hidden chain-of-thought. */
     public static class AuroraPlanResult {
+        /** Versioned, user-safe deliberation contract. This is a decision summary, never CoT. */
+        public String contractVersion = "aurora.deliberation.v2";
+        public TopicState topicState = new TopicState();
+        public UserState userState = new UserState();
+        public AuroraState auroraState = new AuroraState();
+        public MemoryDecision memoryDecision = new MemoryDecision();
+        public ResponsePlan responsePlan = new ResponsePlan();
+        public InterruptionPlan interruptionPlan = new InterruptionPlan();
+        public SafetyContract safetyContract = new SafetyContract();
+
+        /*
+         * Compatibility fields retained while stored plans and older providers migrate to v2.
+         * AuroraDualKernelRuntime normalizes both representations into the typed contract.
+         */
         public String userIntent;
         public String emotionalNeed;
         public String relationshipMove;
@@ -36,6 +50,64 @@ public final class StructuredAiResults {
         public Boolean innerVoiceWorthy;
         /** A bounded seed for the later side-channel composer; never exposed directly. */
         public String innerVoiceSeed;
+    }
+
+    public static class TopicState {
+        public String activeTopicId;
+        public List<String> anchors = new ArrayList<>();
+        public List<String> unresolvedThreads = new ArrayList<>();
+        public String competingAnchor;
+        public Double confidence;
+    }
+
+    public static class UserState {
+        public String intent;
+        public String emotionalNeed;
+        public String desiredDepth;
+        public Boolean correctionDetected;
+    }
+
+    public static class AuroraState {
+        public String currentIntention;
+        /** AGREE / DISAGREE / NUANCE / CHALLENGE_GENTLY / DECLINE_CERTAINTY / ACKNOWLEDGE_ONLY. */
+        public String stanceMode;
+        public String stanceReason;
+        public List<String> selfAnchorRefs = new ArrayList<>();
+        public List<String> evidenceRefs = new ArrayList<>();
+        public String uncertainty;
+        public String changeMindIf;
+        public String userAutonomyBoundary;
+    }
+
+    public static class MemoryDecision {
+        public List<Long> admittedIds = new ArrayList<>();
+        public List<Long> rejectedTopCandidates = new ArrayList<>();
+        public List<String> rejectionReasons = new ArrayList<>();
+    }
+
+    public static class ResponsePlan {
+        public List<String> bubblePurposes = new ArrayList<>();
+        public Integer maxBubbles;
+        public Boolean askQuestion;
+        public String stopCondition;
+    }
+
+    public static class InterruptionPlan {
+        public Long priorPlanRevision;
+        public String deliveredSummary;
+        public List<String> cancelledPurposes = new ArrayList<>();
+        /** CONTINUE / PARK / SWITCH / MERGE. */
+        public String continuityDecision;
+        public List<String> changedFacts = new ArrayList<>();
+        public List<String> mustNotRepeat = new ArrayList<>();
+        public Long planRevision;
+    }
+
+    public static class SafetyContract {
+        public Boolean responseAllowed;
+        public Boolean gentleCheckIn;
+        public Boolean resourceOffer;
+        public String blockingReason;
     }
 
     public static class AuroraCriticResult {

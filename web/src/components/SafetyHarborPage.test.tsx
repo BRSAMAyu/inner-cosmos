@@ -4,7 +4,12 @@ import { SafetyHarborPage } from "./SafetyHarborPage";
 
 afterEach(cleanup);
 
-const resources = ["如果你正处于紧急危险中，请立即拨打 110（报警），或联系身边可信赖的人。"];
+const resources = [{
+  id: "cn-police", label: "如果你正处于紧急危险中，请立即拨打 110（报警），或联系身边可信赖的人。",
+  phone: "110", authorityUrl: "https://example.gov/110", verifiedAt: "2026-07-27",
+  region: "CN" as const, audience: "ALL", hours: "24/7", channel: "PHONE" as const,
+  category: "EMERGENCY" as const
+}];
 
 describe("SafetyHarborPage", () => {
   it("renders the breathing exercise, 5-4-3-2-1 grounding steps, self-care suggestions and resources (zh-CN)", () => {

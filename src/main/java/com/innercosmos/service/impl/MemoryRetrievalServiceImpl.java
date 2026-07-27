@@ -3,11 +3,13 @@ package com.innercosmos.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.innercosmos.dto.MemoryRetrievalQuery;
 import com.innercosmos.entity.MemoryCard;
+import com.innercosmos.config.MemorySemanticCalibrationConfig;
 import com.innercosmos.mapper.MemoryCardMapper;
 import com.innercosmos.service.MemoryRetrievalService;
 import com.innercosmos.service.MemoryEmbeddingIndexService;
 import com.innercosmos.vo.MemoryEvidencePackVO;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -40,10 +42,19 @@ public class MemoryRetrievalServiceImpl implements MemoryRetrievalService {
             Set.of("LOCAL_ONLY", "NO_EXTERNAL_PROCESSING", "SIMULATOR_AUTHORIZED");
     private final MemoryCardMapper memoryMapper;
     private final MemoryEmbeddingIndexService embeddingIndex;
+    private final MemorySemanticCalibrationConfig semanticCalibration;
 
     public MemoryRetrievalServiceImpl(MemoryCardMapper memoryMapper, MemoryEmbeddingIndexService embeddingIndex) {
+        this(memoryMapper, embeddingIndex, new MemorySemanticCalibrationConfig());
+    }
+
+    @Autowired
+    public MemoryRetrievalServiceImpl(MemoryCardMapper memoryMapper,
+                                      MemoryEmbeddingIndexService embeddingIndex,
+                                      MemorySemanticCalibrationConfig semanticCalibration) {
         this.memoryMapper = memoryMapper;
         this.embeddingIndex = embeddingIndex;
+        this.semanticCalibration = semanticCalibration;
     }
 
     @Override
@@ -71,9 +82,10 @@ public class MemoryRetrievalServiceImpl implements MemoryRetrievalService {
                         safe(card.consentScope).toUpperCase(Locale.ROOT)))
                 .toList();
         Map<Long, Double> providerSemantic = embeddingIndex.similarities(userId, text, candidates);
+        Map<Long, Double> admittedProviderSemantic = calibratedProviderAdmission(text, providerSemantic);
         List<Scored> scored = candidates.stream()
-                .map(card -> score(card, text, task, providerSemantic.get(card.id)))
-                .filter(row -> !text.isBlank() && row.relevance() >= MIN_RELEVANCE)
+                .map(card -> score(card, text, task, admittedProviderSemantic.get(card.id)))
+                .filter(row -> !text.isBlank() && row.admitted())
                 .sorted(Comparator.comparingDouble(Scored::score).reversed()).toList();
 
         List<MemoryEvidencePackVO.Evidence> selected = new ArrayList<>();
@@ -98,12 +110,43 @@ public class MemoryRetrievalServiceImpl implements MemoryRetrievalService {
         return new MemoryEvidencePackVO(task, text, budget, used, selected, exclusions);
     }
 
+    private Map<Long, Double> calibratedProviderAdmission(String query, Map<Long, Double> raw) {
+        if (raw == null || raw.isEmpty()) return Map.of();
+        String locale = query.codePoints().anyMatch(cp -> Character.UnicodeScript.of(cp)
+                == Character.UnicodeScript.HAN) ? "zh-CN" : "en";
+        var threshold = semanticCalibration.threshold(embeddingIndex.identity(), locale);
+        if (threshold.isEmpty()) return Map.of();
+        List<Map.Entry<Long, Double>> ranked = raw.entrySet().stream()
+                .filter(entry -> entry.getKey() != null && entry.getValue() != null
+                        && Double.isFinite(entry.getValue()))
+                .sorted(Map.Entry.<Long, Double>comparingByValue().reversed()
+                        .thenComparing(Map.Entry::getKey))
+                .toList();
+        if (ranked.isEmpty()) return Map.of();
+        double top1 = ranked.get(0).getValue();
+        double top2 = ranked.size() > 1 ? ranked.get(1).getValue() : 0.0;
+        var rule = threshold.get();
+        if (top1 < rule.absoluteThreshold) return Map.of();
+        // A margin requirement is an opt-in anomaly guard, not a default. When an operator does fit
+        // one, an ambiguous top of the ranking still suppresses the whole provider signal.
+        if (rule.minTop1Top2Margin > 0 && top1 - top2 < rule.minTop1Top2Margin) return Map.of();
+        // Admit every memory that clears the threshold, in rank order. Admitting only the exact
+        // top1 tie capped the vector channel at a single evidence item however many were relevant,
+        // which threw away most of the recall the provider embeddings were paid for.
+        Map<Long, Double> admitted = new LinkedHashMap<>();
+        for (Map.Entry<Long, Double> entry : ranked) {
+            if (entry.getValue() < rule.absoluteThreshold) break;
+            admitted.put(entry.getKey(), entry.getValue());
+        }
+        return Map.copyOf(admitted);
+    }
+
     private Scored score(MemoryCard card, String query, String task, Double providerSimilarity) {
         String document = String.join(" ", safe(card.title), safe(card.summary), safe(card.keywordTags), safe(card.peopleTags));
         double lexical = lexical(query, document);
         double localSemantic = cosine(ngrams(query), ngrams(document));
         double semantic = providerSimilarity == null ? localSemantic : Math.max(localSemantic, Math.max(0, providerSimilarity));
-        double relevance = Math.max(lexical, semantic);
+        boolean admitted = lexical >= MIN_RELEVANCE || providerSimilarity != null;
         double taskFit = taskFit(task, card);
         double freshness = freshness(card.lastTouchedAt == null ? card.createdAt : card.lastTouchedAt);
         double salience = Math.min(1, value(card.emotionalGravity) / 3.0);
@@ -118,7 +161,7 @@ public class MemoryRetrievalServiceImpl implements MemoryRetrievalService {
         if (taskFit > 0.4) why.add("适合当前任务 " + round(taskFit));
         if (freshness > 0.6) why.add("近期仍活跃");
         if (authority > 0.8) why.add("高置信或用户确认");
-        return new Scored(card, score, relevance, why);
+        return new Scored(card, score, admitted, why);
     }
 
     private static double taskFit(String task, MemoryCard card) {
@@ -164,10 +207,34 @@ public class MemoryRetrievalServiceImpl implements MemoryRetrievalService {
         long days = Math.max(0, Duration.between(time, LocalDateTime.now()).toDays());
         return Math.exp(-days / 45.0);
     }
-    private static int estimate(MemoryCard card) { return Math.max(8, (safe(card.title).length() + safe(card.summary).length()) / 3); }
+    private static int estimate(MemoryCard card) {
+        return Math.max(8, approximateTokens(safe(card.title)) + approximateTokens(safe(card.summary)));
+    }
+    /**
+     * Script-aware token estimate. A flat characters/3 rule is roughly right for Latin text but
+     * under-counts CJK by about 3x -- one Han character is close to one token, not a third of one.
+     * On a Chinese-first product that silently let an Evidence Pack overrun its declared budget.
+     */
+    private static int approximateTokens(String text) {
+        int han = 0;
+        int other = 0;
+        for (int index = 0; index < text.length(); ) {
+            int codePoint = text.codePointAt(index);
+            index += Character.charCount(codePoint);
+            if (isDenseScript(codePoint)) han++; else other++;
+        }
+        return han + (other + 3) / 4;
+    }
+    private static boolean isDenseScript(int codePoint) {
+        Character.UnicodeScript script = Character.UnicodeScript.of(codePoint);
+        return script == Character.UnicodeScript.HAN
+                || script == Character.UnicodeScript.HIRAGANA
+                || script == Character.UnicodeScript.KATAKANA
+                || script == Character.UnicodeScript.HANGUL;
+    }
     private static int clamp(Integer value, int min, int max, int fallback) { return value == null ? fallback : Math.max(min, Math.min(max, value)); }
     private static String safe(String value) { return value == null ? "" : value; }
     private static double value(Double value) { return value == null ? 0.5 : value; }
     private static double round(double value) { return Math.round(value * 1000.0) / 1000.0; }
-    private record Scored(MemoryCard card, double score, double relevance, List<String> contributions) {}
+    private record Scored(MemoryCard card, double score, boolean admitted, List<String> contributions) {}
 }

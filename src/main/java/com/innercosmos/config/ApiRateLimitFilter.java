@@ -22,6 +22,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.regex.Pattern;
 
 /**
  * Application-level abuse protection. The filter runs after bearer/session authentication,
@@ -29,6 +30,13 @@ import java.nio.charset.StandardCharsets;
  */
 @Component
 public final class ApiRateLimitFilter extends OncePerRequestFilter {
+
+    // Path-variable endpoints ("{id}") can't be matched with startsWith -- these match the
+    // exact segment shape of the routes below regardless of the numeric/opaque id in between.
+    private static final Pattern CAPSULE_SANDBOX_RESPOND = Pattern.compile("/api/capsule/[^/]+/sandbox/respond");
+    private static final Pattern CAPSULE_SANDBOX_FEEDBACK = Pattern.compile("/api/capsule/[^/]+/sandbox/feedback");
+    private static final Pattern CAPSULE_GENOME_RECOMPILE = Pattern.compile("/api/capsule/[^/]+/genome/recompile");
+    private static final Pattern TODO_SPLIT = Pattern.compile("/api/todos/[^/]+/split");
 
     private final RateLimitStore store;
     private final RateLimitProperties properties;
@@ -65,22 +73,42 @@ public final class ApiRateLimitFilter extends OncePerRequestFilter {
             }
 
             boolean aurora = isAuroraLlm(path);
-            if ("GET".equalsIgnoreCase(request.getMethod()) && !aurora) {
+            boolean modelBacked = isModelBackedEndpoint(path);
+            String userId = authenticatedUserId(request);
+            // 2026-07-27 audit (P2, CONFIRMED): the GET exemption used to be unconditional, so
+            // every anonymously-reachable read endpoint had no ceiling at all. /api/plaza/capsules
+            // is permitAll and lists every published capsule, which made bulk enumeration of the
+            // whole plaza free and untracked.
+            //
+            // Authenticated GETs stay exempt on purpose: a single AppShell load legitimately fires
+            // dozens of reads, and those requests are already tied to an accountable identity that
+            // the write-side bands cover. Anonymous GETs now fall through to the anonymous band
+            // below, keyed on client IP -- generous for the handful of endpoints an anonymous
+            // caller can actually reach (plaza, safety resources, /api/public/**), but no longer
+            // unlimited.
+            if ("GET".equalsIgnoreCase(request.getMethod()) && !modelBacked && userId != null) {
                 chain.doFilter(request, response);
                 return;
             }
 
-            String userId = authenticatedUserId(request);
             RateLimitPolicy policy;
             String scope;
             String subject;
             if (userId != null) {
-                policy = aurora ? properties.aurora() : properties.user();
-                scope = aurora ? "aurora" : "user";
+                if (aurora) {
+                    policy = properties.aurora();
+                    scope = "aurora";
+                } else if (modelBacked) {
+                    policy = properties.modelBacked();
+                    scope = "model-backed";
+                } else {
+                    policy = properties.user();
+                    scope = "user";
+                }
                 subject = userId;
             } else {
                 policy = properties.anonymous();
-                scope = aurora ? "anonymous-aurora" : "anonymous";
+                scope = aurora ? "anonymous-aurora" : modelBacked ? "anonymous-model-backed" : "anonymous";
                 subject = clientIp(request);
             }
 
@@ -140,11 +168,33 @@ public final class ApiRateLimitFilter extends OncePerRequestFilter {
     }
 
     private boolean isAuroraLlm(String path) {
-        String normalized = path.replaceFirst("^/api/v1/", "/api/");
+        String normalized = normalizeApiPath(path);
         return normalized.startsWith("/api/aurora/chat")
                 || normalized.startsWith("/api/aurora/stream")
                 || normalized.startsWith("/api/aurora/greeting")
                 || normalized.startsWith("/api/aurora/message");
+    }
+
+    /**
+     * Every endpoint -- Aurora's own chat loop AND every other module that also calls a real AI
+     * provider synchronously in the request path -- that must never fall into the generic "user"
+     * band. 2026-07-27 audit (P2): thought-shredder, persona-chat, capsule sandbox/genome
+     * recompile and todo-split all call a provider exactly like Aurora chat does, but previously
+     * shared the 8x more generous 40/min "user" bucket instead.
+     */
+    private boolean isModelBackedEndpoint(String path) {
+        String normalized = normalizeApiPath(path);
+        return isAuroraLlm(path)
+                || normalized.startsWith("/api/thought-shredder/process")
+                || normalized.startsWith("/api/persona-chat/message")
+                || CAPSULE_SANDBOX_RESPOND.matcher(normalized).matches()
+                || CAPSULE_SANDBOX_FEEDBACK.matcher(normalized).matches()
+                || CAPSULE_GENOME_RECOMPILE.matcher(normalized).matches()
+                || TODO_SPLIT.matcher(normalized).matches();
+    }
+
+    private String normalizeApiPath(String path) {
+        return path.replaceFirst("^/api/v1/", "/api/");
     }
 
     private String clientIp(HttpServletRequest request) {

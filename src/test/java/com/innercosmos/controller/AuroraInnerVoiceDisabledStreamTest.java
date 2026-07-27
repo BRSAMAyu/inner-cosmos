@@ -13,7 +13,6 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
@@ -23,10 +22,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * W1 — with no real TTS provider configured (the default: {@code tts.enabled=false}), the Aurora
- * SSE turn stream must NEVER emit {@code inner_voice} and the turn must still complete cleanly.
- * Companion to {@link AuroraInnerVoiceEnabledStreamTest}, which proves the event DOES fire with a
- * fake available {@code TtsClient}.
+ * With no real TTS provider configured (the default: {@code tts.enabled=false}), Aurora's textual
+ * heart-voice must still surface. Audio is an optional sensory layer, not a gate for the feature.
+ * Companion to {@link AuroraInnerVoiceEnabledStreamTest}, which proves the same event additionally
+ * carries audio when a provider is available.
  */
 @SpringBootTest(properties = {
         "llm.mode=dev",
@@ -46,15 +45,17 @@ class AuroraInnerVoiceDisabledStreamTest {
     @Autowired MockMvc mockMvc;
 
     @Test
-    void stream_neverEmitsInnerVoiceEventWhenNoProviderConfigured() throws Exception {
+    void stream_emitsTextOnlyInnerVoiceWhenNoAudioProviderConfigured() throws Exception {
         MockHttpSession session = registerAndLogin("innervoiceoff_");
         long sessionId = createSession(session);
-        String body = performStream(session, sessionId, "今天有点累，想聊聊");
+        String body = performStream(session, sessionId, "今天压力好大，感觉快撑不住了");
 
-        // The dual-kernel runtime still composes an inner-voice TEXT internally (best-effort),
-        // but with no real TtsClient the turn must complete cleanly with NO inner_voice event.
-        assertFalse(body.contains("event:inner_voice"),
-                "no inner_voice event may be emitted when tts.enabled=false; got:\n" + body);
+        assertTrue(body.contains("event:inner_voice"),
+                "the textual inner voice must not disappear when TTS is unavailable; got:\n" + body);
+        assertTrue(body.contains("\"audio\":\"\""),
+                "text-only inner voice must carry an empty audio field; got:\n" + body);
+        assertTrue(body.contains("\"voiceId\":\"\""),
+                "text-only inner voice must not pretend a voice was synthesized; got:\n" + body);
         assertTrue(body.contains("event:turn.completed"), "turn must still complete normally; got:\n" + body);
     }
 

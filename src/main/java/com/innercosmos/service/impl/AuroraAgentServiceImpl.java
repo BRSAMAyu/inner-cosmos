@@ -3,6 +3,7 @@ package com.innercosmos.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.innercosmos.ai.context.AgentContext;
 import com.innercosmos.ai.context.AgentContextAssembler;
+import com.innercosmos.ai.context.AuroraConversationContextPolicy;
 import com.innercosmos.ai.action.AuroraNaturalActionService;
 import com.innercosmos.ai.goodbye.GoodbyeOrchestrator;
 import com.innercosmos.ai.goodbye.GoodbyeTriggerDetector;
@@ -22,6 +23,7 @@ import com.innercosmos.ai.tts.TtsClient;
 import com.innercosmos.ai.tts.TtsVoicePresets;
 import com.innercosmos.ai.portrait.PortraitReflectionService;
 import com.innercosmos.config.LlmConfig;
+import com.innercosmos.common.ErrorCode;
 import com.innercosmos.conversation.service.ConversationChoreographyService;
 import com.innercosmos.conversation.vo.TurnTimelineVO;
 import com.innercosmos.dto.ChatRequest;
@@ -31,6 +33,7 @@ import com.innercosmos.entity.DialogSession;
 import com.innercosmos.entity.User;
 import com.innercosmos.entity.UserPortrait;
 import com.innercosmos.entity.UserProfile;
+import com.innercosmos.exception.BusinessException;
 import com.innercosmos.mapper.DialogSessionMapper;
 import com.innercosmos.mapper.UserMapper;
 import com.innercosmos.mapper.UserProfileMapper;
@@ -81,8 +84,10 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     private static final Logger log = LoggerFactory.getLogger(AuroraAgentServiceImpl.class);
     /** Completed provider responses are emitted immediately in bounded SSE chunks. */
     private static final int COMPLETED_RESPONSE_CHUNK_CHARS = 12;
-    private static final int MODEL_RECENT_MESSAGE_LIMIT = 6;
     private static final int MODEL_LONG_TERM_MEMORY_LIMIT = 4;
+    private static final Duration DELIVERY_LEASE_TTL = Duration.ofSeconds(15);
+    private static final Duration GENERATION_LEASE_TTL = Duration.ofMinutes(2);
+    private static final String GENERATION_CONTEXT_VERSION = "aurora-context.v1";
     // M2 (independent code review): used to build the inner_voice SSE payload via writeValueAsString
     // instead of hand-rolled string concatenation, so an odd control char (U+0000-U+001F) in LLM
     // output can never produce invalid JSON that the frontend silently drops. Jackson's ObjectMapper
@@ -124,6 +129,8 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     private com.innercosmos.service.PromptVersionService promptVersionService; // M-052
     @Autowired(required = false)
     private com.innercosmos.service.EmotionBaselineService emotionBaselineService;
+    @Autowired(required = false)
+    private AuroraConversationContextPolicy conversationContextPolicy;
     @Autowired(required = false)
     private ApplicationEventPublisher eventPublisher;
     /** Confirmation-gated natural-language bridge to real memories, reminders and settings. */
@@ -234,10 +241,55 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             publishTurnPersisted(userId, request.sessionId, userMessage);
             return blocked;
         }
+        GenerationAuthority generationAuthority =
+                stageAndClaimGeneration(userId, turnId, request, userMessage);
         AuroraReplyVO reply = produceReply(
-                userId, request, safety, userMessage == null ? null : userMessage.id, turnId, true);
+                userId, request, safety, userMessage == null ? null : userMessage.id, turnId, true,
+                generationAuthority);
         publishTurnPersisted(userId, request.sessionId, userMessage);
         return reply;
+    }
+
+    @Override
+    public AuroraReplyVO resumeExistingTurn(
+            Long userId,
+            ConversationChoreographyService.GenerationRequestSnapshot snapshot,
+            String generationLeaseOwner,
+            long generationFencingToken) {
+        if (snapshot == null || snapshot.turnId() == null
+                || snapshot.sessionId() == null || snapshot.userMessageId() == null) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST,
+                    "Recoverable Aurora generation request is missing");
+        }
+        DialogMessage referencedUserMessage = dialogService.messages(snapshot.sessionId()).stream()
+                .filter(message -> snapshot.userMessageId().equals(message.id))
+                .filter(message -> userId.equals(message.userId))
+                .filter(message -> "USER".equals(message.speaker))
+                .findFirst()
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.NOT_FOUND,
+                        "Referenced Aurora user message is unavailable"));
+        ChatRequest request = new ChatRequest();
+        request.sessionId = snapshot.sessionId();
+        request.message = referencedUserMessage.textContent;
+        request.inputType = referencedUserMessage.inputType;
+        request.audioDurationSec = referencedUserMessage.audioDurationSec;
+        request.speechRate = referencedUserMessage.speechRate;
+        request.pauseCount = referencedUserMessage.pauseCount;
+        request.longPauseCount = referencedUserMessage.longPauseCount;
+        request.mode = normalizeMode(snapshot.mode());
+        request.locale = snapshot.locale();
+        request.region = snapshot.region();
+        request.timezone = snapshot.timezone();
+        request.foregroundAcknowledgementSent = snapshot.foregroundAcknowledgementSent();
+        GenerationAuthority authority =
+                new GenerationAuthority(generationLeaseOwner, generationFencingToken);
+        // The synchronous safety gate ran before the referenced message and turn were persisted.
+        // Recovery never creates another user message or another turn; it regenerates only because
+        // no assistant plan or visible assistant content exists.
+        return produceReply(
+                userId, request, new SafetyResult(), referencedUserMessage.id,
+                snapshot.turnId(), false, authority);
     }
 
     @Override
@@ -275,7 +327,8 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
      * portrait/goodbye post-hooks exactly as before.
      */
     private AuroraReplyVO produceReply(Long userId, ChatRequest request, SafetyResult safety,
-                                       Long userMessageId, Long turnId, boolean persistImmediately) {
+                                       Long userMessageId, Long turnId, boolean persistImmediately,
+                                       GenerationAuthority generationAuthority) {
         long turnStartNanos = System.nanoTime();
         boolean fallbackUsed = false;
         // M7: Hard boundary protection — right to refuse identity violation
@@ -297,7 +350,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             vo.agentLoop = Map.of("speakCount", 1, "continueReason", "boundary-refusal", "mode", normalizeMode(request.mode), "modeLabel", modeLabel(normalizeMode(request.mode)));
             vo.aiState = aiState(null);
             vo.turnId = turnId;
-            if (turnId != null && choreographyService != null) choreographyService.commitPlan(userId, turnId, vo);
+            commitPlanAuthorized(userId, turnId, vo, generationAuthority);
             if (persistImmediately) {
                 if (turnId != null && choreographyService != null) {
                     choreographyService.deliverBubble(userId, turnId, 1,
@@ -322,7 +375,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                     userId, request.sessionId, turnId, request.message);
             if (actionReply != null) {
                 return completeNaturalActionTurn(userId, request, userMessageId, turnId,
-                        persistImmediately, actionReply, turnStartNanos);
+                        persistImmediately, actionReply, turnStartNanos, generationAuthority);
             }
         }
 
@@ -367,8 +420,11 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             turnContext.put("modeTemperature", modeStrategy.temperature());
         }
         turnContext.put("modeGuide", modeGuide(mode));
-        turnContext.put("userPortrait", portraitBriefForContext(portrait));
-        turnContext.put("relationship", relationship == null ? "" : relationship.toPromptString());
+        boolean hasIntegratedContinuity = modelAgentContext.threeModelBlock != null
+                && !modelAgentContext.threeModelBlock.isBlank();
+        turnContext.put("userPortrait", hasIntegratedContinuity ? "" : portraitBriefForContext(portrait));
+        turnContext.put("relationship", hasIntegratedContinuity || relationship == null
+                ? "" : relationship.toPromptString());
         turnContext.put("currentStateSignal", stateSignal);
         // User-owned values remain data inside the structured request as well as a compact,
         // sanitised profile summary in the system prompt. This makes the calibration available
@@ -390,14 +446,35 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         turnContext.put("providerPolicy", providerPolicy(resolved));
         turnContext.put("foregroundAcknowledgementAlreadySent", request.foregroundAcknowledgementSent);
         if (choreographyService != null && request.sessionId != null) {
-            String interruptionContext = choreographyService.latestInterruptionContext(userId, request.sessionId);
+            String interruptionContext = choreographyService.latestInterruptionContext(
+                    userId, request.sessionId, request.message);
             if (interruptionContext != null && !interruptionContext.isBlank()) {
                 turnContext.put("interruptionContext", interruptionContext);
             }
         }
         turnContext.put("agentLoopPolicy", Boolean.FALSE.equals(agentContext.multiMessageAllowed)
                 ? "用户关闭了多条消息，本轮只能输出 1 条 segments。"
-                : "你可以选择只说一条，也可以继续补充第二条或第三条。若某个后续想法不值得说，写 [[SILENCE]]，系统不会展示。不要固定数量。");
+                : "你可以按语义选择 1-6 条消息。用户输入很长、包含多个问题或要求深入讨论时，"
+                + "应使用更完整的长气泡或 3-6 个独立节拍；不要把长输入压成一句套话和一个问题。"
+                + "若某个后续想法不值得说，写 [[SILENCE]]，系统不会展示。不要固定数量。");
+        AuroraConversationContextPolicy policy = conversationContextPolicy == null
+                ? new AuroraConversationContextPolicy(llmConfig, new TokenEstimationServiceImpl())
+                : conversationContextPolicy;
+        AuroraConversationContextPolicy.Selection sessionContext = policy.select(
+                agentContext.recentMessages, request.message, systemPrompt, turnContext,
+                resolved.provider(), resolved.model());
+        turnContext.put("userMessage", sessionContext.modelUserMessage());
+        // Keep the provider-cache prefix stable: immutable system role first, then the
+        // chronological session history. Per-turn state and the latest user message follow it.
+        Map<String, Object> cacheFriendlyContext = new LinkedHashMap<>();
+        cacheFriendlyContext.put("auroraSystemPrompt", systemPrompt);
+        cacheFriendlyContext.put("conversationHistory", sessionContext.messages());
+        turnContext.forEach((key, value) -> {
+            if (!"auroraSystemPrompt".equals(key)) cacheFriendlyContext.put(key, value);
+        });
+        cacheFriendlyContext.put("conversationContextBudget", sessionContext.metadata());
+        turnContext.clear();
+        turnContext.putAll(cacheFriendlyContext);
 
         AuroraReplyVO vo;
         Map<String, Object> runtimeMeta = new LinkedHashMap<>();
@@ -411,16 +488,15 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         try {
             StructuredAiResults.AuroraResult ai;
             if (dualKernelRuntime != null && dualKernelRuntime.shouldUseDualKernelForTurn(turnContext)) {
-                // Capture only the inputs needed for a post-turn inner-voice call. Do not spend
-                // the extra provider round trip unless this is a live stream with an available
-                // TTS provider; composition itself runs after turn.completed in stream().
+                // Capture only the inputs needed for a post-turn inner-voice call. Text is the
+                // core experience; TTS is an optional layer added later in stream(). Composition
+                // itself still runs after turn.completed, off the conversational critical path.
                 boolean composeInnerVoice = !persistImmediately
-                        && innerVoiceEnabledFor(profile)
-                        && ttsClient != null
-                        && ttsClient.available();
+                        && innerVoiceEnabledFor(profile);
                 var generation = dualKernelRuntime.generate(userId, mode, turnContext, resolved.client(),
                     () -> fallbackAuroraResult(request.message, mode, gravityMemories, memoryContext, allowMemory, stateSignal),
-                    composeInnerVoice);
+                    composeInnerVoice,
+                    plan -> stageDeliberationSnapshot(userId, turnId, plan, generationAuthority));
                 ai = generation.result();
                 runtimeMeta.put("runtime", generation.runtime());
                 runtimeMeta.put("relationshipMove", generation.relationshipMove());
@@ -476,11 +552,22 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             if (providerScope != null) providerScope.close();
             if (providerObservation != null) providerObservation.stop();
         }
-        // Tag the response with the resolved provider/model for the UI
-        vo.aiState = aiState(resolved);
+        // F7: preserve two layers of provenance. The default UI receives a bounded response-source
+        // label (live model / demo mode / basic response), while the expandable team diagnostic
+        // view can inspect the exact provider, model and fallback reason without exposing hidden
+        // reasoning. This must be computed after generation so speaker/provider fallback is known.
+        String fallbackReason = runtimeFallbackReason(resolved, runtimeMeta, fallbackUsed);
+        String responseSource = responseSource(resolved, runtimeMeta, fallbackUsed);
+        runtimeMeta.put("foregroundSource", safeDiagnosticValue(request.foregroundAcknowledgementSource));
+        runtimeMeta.put("fallbackReason", fallbackReason);
+        Map<String, Object> disclosedAiState = new LinkedHashMap<>(aiState(resolved));
+        disclosedAiState.put("responseSource", responseSource);
+        disclosedAiState.put("fallbackReason", fallbackReason);
+        vo.aiState = Map.copyOf(disclosedAiState);
         vo.turnId = turnId;
         if (turnId != null && choreographyService != null) {
-            TurnTimelineVO planned = choreographyService.commitPlan(userId, turnId, vo);
+            TurnTimelineVO planned = commitPlanAuthorized(
+                    userId, turnId, vo, generationAuthority);
             if (planned.activePlan == null) {
                 vo.cancelled = true;
                 vo.messages = List.of();
@@ -551,13 +638,39 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         return vo;
     }
 
+    private void stageDeliberationSnapshot(
+            Long userId, Long turnId, StructuredAiResults.AuroraPlanResult plan,
+            GenerationAuthority generationAuthority) {
+        if (turnId == null || choreographyService == null || plan == null) return;
+        try {
+            String userSafeJson = INNER_VOICE_MAPPER.writeValueAsString(plan);
+            if (generationAuthority == null) {
+                choreographyService.stageDeliberation(userId, turnId, 0, userSafeJson);
+            } else {
+                int expectedRevision = choreographyService.timeline(userId, turnId).deliberations.stream()
+                        .map(snapshot -> snapshot.planRevision == null ? 0 : snapshot.planRevision)
+                        .max(Integer::compareTo)
+                        .orElse(0);
+                choreographyService.stageDeliberationFenced(
+                        userId, turnId, expectedRevision, userSafeJson,
+                        generationAuthority.owner(), generationAuthority.fencingToken(),
+                        GENERATION_LEASE_TTL);
+            }
+        } catch (com.fasterxml.jackson.core.JsonProcessingException serializationFailure) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST,
+                    "Aurora deliberation snapshot could not be serialized");
+        }
+    }
+
     private AuroraReplyVO completeNaturalActionTurn(Long userId, ChatRequest request,
                                                     Long userMessageId, Long turnId,
                                                     boolean persistImmediately, AuroraReplyVO vo,
-                                                    long turnStartNanos) {
+                                                    long turnStartNanos,
+                                                    GenerationAuthority generationAuthority) {
         vo.turnId = turnId;
         if (turnId != null && choreographyService != null) {
-            TurnTimelineVO planned = choreographyService.commitPlan(userId, turnId, vo);
+            TurnTimelineVO planned = commitPlanAuthorized(
+                    userId, turnId, vo, generationAuthority);
             if (planned.activePlan == null) {
                 vo.cancelled = true;
                 vo.messages = List.of();
@@ -680,6 +793,11 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             });
             return emitter;
         }
+        if ("GENTLE_CHECK_IN".equals(safety.safetyState)) {
+            // Non-blocking, low-interruption support offer. The normal Aurora response continues;
+            // only HIGH_CONFIRMED takes over the turn and closes the ordinary stream.
+            sendOnce(emitter, "safety", jsonSafety(safety));
+        }
 
         // Non-blocked: save the user turn, then build + persist the full reply exactly
         // as the POST path does, and finally drip the (already-persisted) segments
@@ -719,6 +837,9 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 }
                 DialogMessage userMessage = dialogService.saveUserMessage(userId, request);
                 turnId = beginChoreography(userId, sessionId, userMessage);
+                request.foregroundAcknowledgementSent = true;
+                GenerationAuthority generationAuthority =
+                        stageAndClaimGeneration(userId, turnId, request, userMessage);
                 if (turnId != null) {
                     emitLive(emitter, clientConnected, userId, turnId, 0L, "turn.started",
                             "{\"turnId\":" + turnId + "}", false);
@@ -733,17 +854,12 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 boolean foregroundAcknowledgementAlreadyVisible =
                         richContext != null && richContext.foregroundAcknowledgementSent;
                 request.foregroundAcknowledgementSent = true;
-                if (foregroundAcknowledgementAlreadyVisible
-                        && request.foregroundAcknowledgementText != null
-                        && !request.foregroundAcknowledgementText.isBlank()) {
-                    dialogService.saveAuroraMessage(
-                            userId, sessionId, request.foregroundAcknowledgementText.strip());
-                }
                 final Long generationTurnId = turnId;
                 final Long generationUserMessageId = userMessage == null ? null : userMessage.id;
                 CompletableFuture<AuroraReplyVO> deepReply = CompletableFuture.supplyAsync(
                         () -> produceReply(userId, request, safety,
-                                generationUserMessageId, generationTurnId, false),
+                                generationUserMessageId, generationTurnId, false,
+                                generationAuthority),
                         aiExecutor);
 
                 long eventSequence = 1L;
@@ -751,18 +867,14 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                         ? null : fastForegroundAcknowledgement(userId, request);
                 if (acknowledgement != null && !acknowledgement.text().isBlank()
                         && !isTurnCancelled(userId, turnId)) {
-                    AuroraReplyVO acknowledgementReply = new AuroraReplyVO();
-                    acknowledgementReply.turnId = turnId;
-                    emitLive(emitter, clientConnected, userId, turnId, eventSequence++, "bubble.started",
-                            "{\"order\":0,\"kind\":\"foreground-acknowledgement\",\"source\":\""
-                                    + escape(acknowledgement.source()) + "\",\"latencyMs\":"
-                                    + acknowledgement.latencyMs() + "}", false);
-                    StreamProgress acknowledgementProgress = streamText(emitter, clientConnected,
-                            acknowledgement.text(), acknowledgementReply, eventSequence, userId);
-                    eventSequence = acknowledgementProgress.nextEventSequence();
-                    dialogService.saveAuroraMessage(userId, sessionId, acknowledgement.text());
-                    emitLive(emitter, clientConnected, userId, turnId, eventSequence++, "bubble.completed",
-                            "{\"order\":0,\"kind\":\"foreground-acknowledgement\"}", false);
+                    // Retain the same source in terminal meta so diagnostics survive after this
+                    // transient status event leaves the screen.
+                    request.foregroundAcknowledgementSource = acknowledgement.source();
+                    emitLive(emitter, clientConnected, userId, turnId, eventSequence++,
+                            "foreground.status",
+                            "{\"text\":\"" + escape(acknowledgement.text())
+                                    + "\",\"source\":\"" + escape(acknowledgement.source())
+                                    + "\",\"latencyMs\":" + acknowledgement.latencyMs() + "}", false);
                 }
 
                 AuroraReplyVO reply = deepReply.join();
@@ -772,6 +884,20 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                             "{\"reason\":\"USER_INTERRUPTED\"}", true);
                     completeQuietly(emitter);
                     return;
+                }
+
+                if (choreographyService != null && reply.turnId != null) {
+                    String deliveryOwner = "stream:" + java.util.UUID.randomUUID();
+                    var lease = choreographyService.claimDeliveryLease(
+                            userId, reply.turnId, deliveryOwner, DELIVERY_LEASE_TTL);
+                    if (lease == null) {
+                        sendOnce(emitter, "error",
+                                "{\"message\":\"turn delivery is continuing on another runtime\"}");
+                        completeQuietly(emitter);
+                        return;
+                    }
+                    reply.deliveryLeaseOwner = lease.owner();
+                    reply.deliveryLeaseToken = lease.fencingToken();
                 }
 
                 emitLive(emitter, clientConnected, userId, reply.turnId, eventSequence++, "turn.plan",
@@ -787,16 +913,24 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                     emitLive(emitter, clientConnected, userId, reply.turnId, eventSequence++, "bubble.started",
                             "{\"order\":" + (i + 1) + "}", false);
                     StreamProgress progress = streamText(emitter, clientConnected,
-                            reply.messages.get(i), reply, eventSequence, userId);
+                            reply.messages.get(i), reply, eventSequence, userId, i + 1);
                     eventSequence = progress.nextEventSequence();
                     if (choreographyService != null && reply.turnId != null) {
-                        choreographyService.recordBubbleProgress(userId, reply.turnId, i + 1, progress.deliveredChars());
+                        // Progress is persisted per emitted chunk by streamText. This final write is
+                        // idempotent and keeps compatibility with zero-token/empty bubble paths.
+                        choreographyService.recordBubbleProgressFenced(
+                                userId, reply.turnId, i + 1, progress.deliveredChars(),
+                                reply.deliveryLeaseOwner, reply.deliveryLeaseToken,
+                                DELIVERY_LEASE_TTL);
                     }
                     if (isTurnCancelled(userId, reply.turnId)) break;
                     if (choreographyService != null && reply.turnId != null) {
                         int bubbleOrder = i + 1;
                         String bubbleText = reply.messages.get(i);
-                        choreographyService.deliverBubble(userId, reply.turnId, bubbleOrder,
+                        choreographyService.deliverBubbleFenced(
+                                userId, reply.turnId, bubbleOrder,
+                                reply.deliveryLeaseOwner, reply.deliveryLeaseToken,
+                                DELIVERY_LEASE_TTL,
                                 () -> dialogService.saveAuroraMessage(userId, sessionId, bubbleText));
                     } else {
                         dialogService.saveAuroraMessage(userId, sessionId, reply.messages.get(i));
@@ -811,7 +945,9 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                     return;
                 }
                 if (choreographyService != null && reply.turnId != null) {
-                    choreographyService.completeTurn(userId, reply.turnId);
+                    choreographyService.completeTurnFenced(
+                            userId, reply.turnId,
+                            reply.deliveryLeaseOwner, reply.deliveryLeaseToken);
                 }
                 publishTurnPersisted(userId, sessionId, userMessage);
                 // VS-003b — meta now carries the full perception payload (agentLoop,
@@ -829,8 +965,8 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                         "{\"message\":\"done\"}", true);
                 // W1 — Aurora's "inner voice" (心声): at most one inner_voice event per turn,
                 // strictly additive and NON-BLOCKING to turn completion. The deferred model call
-                // and TTS both run AFTER meta/turn.completed (and before final done/close), so a
-                // slow-but-successful enrichment can only delay its own audio. The frontend SSE
+                // composition and optional TTS both run AFTER meta/turn.completed (and before
+                // final done/close), so a slow enrichment can only delay its own side channel. The frontend SSE
                 // reader reads until connection close, so it still receives this late event.
                 AuroraDualKernelRuntime.InnerVoiceRequest resolvedInnerVoiceRequest = reply.innerVoiceRequest;
                 if (resolvedInnerVoiceRequest == null && reply.deferredInnerVoiceRequest != null
@@ -847,22 +983,34 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 }
                 if (clientConnected.get() && resolvedInnerVoiceRequest != null) {
                     try {
-                        if (ttsClient != null && ttsClient.available()) {
-                            String innerVoiceText = dualKernelRuntime.composeInnerVoice(resolvedInnerVoiceRequest);
-                            if (innerVoiceText != null && !innerVoiceText.isBlank()) {
-                                String voiceId = preferredTtsVoiceIdFor(loadProfile(userId));
-                                byte[] audio = ttsClient.synthesize(innerVoiceText, voiceId);
-                                String audioDataUri = "data:audio/mpeg;base64,"
-                                        + java.util.Base64.getEncoder().encodeToString(audio);
-                                // M2 (code review): build the payload via ObjectMapper so a raw control
-                                // char in the LLM-composed text can never produce invalid JSON.
-                                String innerVoicePayload = buildInnerVoicePayload(innerVoiceText, audioDataUri, voiceId);
-                                emitLive(emitter, clientConnected, userId, reply.turnId, eventSequence++,
-                                        "inner_voice", innerVoicePayload, false);
+                        String innerVoiceText = dualKernelRuntime.composeInnerVoice(resolvedInnerVoiceRequest);
+                        if (innerVoiceText != null && !innerVoiceText.isBlank()) {
+                            String audioDataUri = "";
+                            String voiceId = "";
+                            if (ttsClient != null && ttsClient.available()) {
+                                try {
+                                    voiceId = preferredTtsVoiceIdFor(loadProfile(userId));
+                                    byte[] audio = ttsClient.synthesize(innerVoiceText, voiceId);
+                                    audioDataUri = "data:audio/mpeg;base64,"
+                                            + java.util.Base64.getEncoder().encodeToString(audio);
+                                } catch (Exception audioFailure) {
+                                    // The text is the product's heart-voice; speech is an optional
+                                    // sensory layer. A provider outage must not make the thought
+                                    // itself disappear from the user's experience.
+                                    log.warn("Inner-voice audio synthesis failed for user {} turn {}; emitting text only: {}",
+                                            userId, reply.turnId, audioFailure.getMessage());
+                                    audioDataUri = "";
+                                    voiceId = "";
+                                }
                             }
+                            // M2 (code review): build the payload via ObjectMapper so a raw control
+                            // char in the LLM-composed text can never produce invalid JSON.
+                            String innerVoicePayload = buildInnerVoicePayload(innerVoiceText, audioDataUri, voiceId);
+                            emitLive(emitter, clientConnected, userId, reply.turnId, eventSequence++,
+                                    "inner_voice", innerVoicePayload, false);
                         }
                     } catch (Exception innerVoiceFailure) {
-                        log.warn("Inner-voice synthesis failed for user {} turn {}, omitting inner_voice event: {}",
+                        log.warn("Inner-voice composition failed for user {} turn {}, omitting inner_voice event: {}",
                                 userId, reply.turnId, innerVoiceFailure.getMessage());
                     }
                 }
@@ -872,7 +1020,9 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 completeQuietly(emitter);
             } catch (Exception e) {
                 log.error("Aurora stream failed: {}", e.getMessage(), e);
-                if (turnId != null && choreographyService != null) {
+                boolean leaseSuperseded = e instanceof BusinessException business
+                        && ErrorCode.CONFLICT.equals(business.code);
+                if (turnId != null && choreographyService != null && !leaseSuperseded) {
                     try {
                         choreographyService.cancelTurn(userId, turnId, "STREAM_FAILED");
                     } catch (Exception stateError) {
@@ -962,16 +1112,19 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                     SseEmitter.event().id("legacy:" + sequence).name(name).data(data));
         }
         String id = turnId + ":live:" + sequence;
+        boolean publishedForReplay = false;
         try {
             liveEventStore.publish(new AuroraLiveEvent(userId, turnId, sequence, id, name, data, terminal));
+            publishedForReplay = true;
         } catch (Exception transportFailure) {
             // The connected client and PostgreSQL choreography remain available. Redis reconnect
             // degrades to the durable timeline rather than aborting a safe in-flight response.
             log.warn("Aurora cross-Pod stream publish unavailable for turn {} sequence {}: {}",
                     turnId, sequence, transportFailure.getMessage());
         }
-        return sendStream(emitter, clientConnected,
+        boolean deliveredDirectly = sendStream(emitter, clientConnected,
                 SseEmitter.event().id(id).name(name).data(data));
+        return publishedForReplay || deliveredDirectly;
     }
 
     private void completeQuietly(SseEmitter emitter) {
@@ -988,6 +1141,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         return "{\"riskLevel\":\"" + escape(safety.riskLevel) + "\""
                 + ",\"riskType\":\"" + escape(safety.riskType) + "\""
                 + ",\"handledAction\":\"" + escape(safety.handledAction) + "\""
+                + ",\"safetyState\":\"" + escape(safety.safetyState) + "\""
                 + ",\"featureTarget\":\"safety-harbor\""
                 + ",\"safeMessage\":\"" + escape(safe) + "\"}";
     }
@@ -1002,6 +1156,11 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         compact.userId = source.userId;
         compact.profileSummary = abbreviate(source.profileSummary, 480);
         compact.timeLabel = source.timeLabel;
+        compact.timezone = source.timezone;
+        compact.locale = source.locale;
+        compact.localDateTime = source.localDateTime;
+        compact.lastInteractionLabel = source.lastInteractionLabel;
+        compact.clientTimeHintStatus = source.clientTimeHintStatus;
         compact.weatherLabel = source.weatherLabel;
         compact.momentEmotionLabel = abbreviate(source.momentEmotionLabel, 160);
         compact.environmentLabel = abbreviate(source.environmentLabel, 160);
@@ -1014,41 +1173,25 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         compact.realWeatherLabel = abbreviate(source.realWeatherLabel, 120);
         compact.sleepInferred = source.sleepInferred;
         compact.nearestTodo = abbreviate(source.nearestTodo, 160);
-        compact.recentMessages = boundedRecentContext(source.recentMessages, currentUserMessage);
+        // Full current-session history travels once in the cache-friendly top-level
+        // conversationHistory envelope after provider-aware budgeting.
+        compact.recentMessages = new ArrayList<>();
         compact.longTermMemories = boundedContext(source.longTermMemories, MODEL_LONG_TERM_MEMORY_LIMIT, 240, false);
         compact.activeTodos = boundedContext(source.activeTodos, 3, 160, false);
         compact.completedTodoLessons = boundedContext(source.completedTodoLessons, 2, 160, false);
+        compact.dailyObservations = boundedContext(source.dailyObservations, 3, 220, true);
+        compact.weeklyObservations = boundedContext(source.weeklyObservations, 2, 260, true);
         compact.relationSignals = boundedContext(source.relationSignals, 3, 180, false);
         compact.themeSignals = boundedContext(source.themeSignals, 3, 180, false);
         compact.evidenceMemoryIds = source.evidenceMemoryIds == null
                 ? new ArrayList<>()
                 : new ArrayList<>(source.evidenceMemoryIds.stream().limit(MODEL_LONG_TERM_MEMORY_LIMIT).toList());
-        compact.threeModelBlock = ""; // portrait, relationship and constitution use dedicated fields
-        compact.constitutionBlock = abbreviate(source.constitutionBlock, 700);
+        compact.threeModelBlock = abbreviate(source.threeModelBlock, 1_800);
+        compact.constitutionBlock = compact.threeModelBlock == null || compact.threeModelBlock.isBlank()
+                ? abbreviate(source.constitutionBlock, 700)
+                : "";
         compact.continuityAnchors = abbreviate(source.continuityAnchors, 500);
         return compact;
-    }
-
-    private List<String> boundedRecentContext(List<String> values, String currentUserMessage) {
-        List<String> candidates = boundedContext(values, MODEL_RECENT_MESSAGE_LIMIT + 1, 180, true);
-        if (currentUserMessage == null || currentUserMessage.isBlank()) {
-            return candidates.stream().skip(Math.max(0, candidates.size() - MODEL_RECENT_MESSAGE_LIMIT)).toList();
-        }
-        String current = currentUserMessage.strip();
-        List<String> filtered = candidates.stream()
-                .filter(item -> !sameUserExpression(item, current))
-                .toList();
-        return new ArrayList<>(filtered.stream()
-                .skip(Math.max(0, filtered.size() - MODEL_RECENT_MESSAGE_LIMIT))
-                .toList());
-    }
-
-    private boolean sameUserExpression(String historyItem, String currentUserMessage) {
-        if (historyItem == null) return false;
-        String normalized = historyItem.strip()
-                .replaceFirst("(?i)^(user|用户)\\s*[:：]\\s*", "")
-                .strip();
-        return normalized.equals(currentUserMessage);
     }
 
     private List<String> boundedContext(List<String> values, int limit, int maxChars, boolean keepTail) {
@@ -1781,11 +1924,11 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         if (hasMemory && segments.size() < 3) {
             segments.add("这也让我想到你之前留下过的一些线索；我会把它当作可能的连接，而不是替你下结论。");
         }
-        return segments.stream().limit(3).toList();
+        return segments.stream().limit(AuroraDualKernelRuntime.MAX_REPLY_BUBBLES).toList();
     }
 
     private String auroraInstruction(boolean greeting) {
-        String segmentCount = greeting ? "1-2" : "1-3";
+        String segmentCount = greeting ? "1-2" : "1-6";
         return ("You are the Aurora structured dialogue engine. Generate high-quality responses based on context.\n\n"
             + "[Absolute Rules]\n"
             + "1. Return only valid JSON. No Markdown wrapping, no code blocks, no thinking tags.\n"
@@ -1798,7 +1941,8 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             + "[Message Count & Shape — friend-style flow]\n"
             + "Max " + segmentCount + " segments. Count is determined by context, not fixed.\n"
             + "第一条先回应用户此刻最具体的东西：有明显情绪时自然接住，没有情绪时直接接话、回答或顺着细节走；不要强行共情，也不要急着下判断。\n"
-            + "气泡数必须有真实变化：普通短交流优先 1 条；只有一个独立推进值得补充时用 2 条；仅当用户同时提出多个问题或内容确实复杂、三条各有不可合并的作用时才用 3 条。不要为了制造连发感把一句完整的话拆成三条，也不要凑数。\n"
+            + "气泡数必须有真实变化：普通短交流可用 1 条；一个独立推进用 2 条；长叙述、多个问题、价值冲突或明确要求深入分析时允许 3-6 条。每条可以是完整段落，不要把长输入压成一句安慰加一个问题，也不要为了连发感拆碎完整句子。\n"
+            + "第一句话必须直接处理用户输入中的一个具体事实、判断或张力，不得用“我听到了、听起来、这很正常、谢谢你分享、我在这里”等套话占位。\n"
             + "表达要有活气：句长和停顿可以变化，偶尔允许克制的幽默、具体联想或一句意外但贴切的话；不必每次追问，也不要固定走『共情—分析—提问』。像真实朋友一样，有时只接一句，有时多走半步，有时知道在哪里停。\n"
             + "nextQuestion 不是每轮必需：只有一个具体问题真的能让对话自然向前时才问；否则留空并在合适处停住。提问要贴着用户刚说的内容，避免『你还好吗』这类空泛追问。\n"
             + "If a follow-up is not good enough, just empty or repetitive, write [[SILENCE]].\n\n"
@@ -1833,13 +1977,46 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     private Map<String, Object> aiState(ResolvedModel resolved) {
         String provider = resolved == null || resolved.provider() == null ? llmConfig.activeProvider() : resolved.provider();
         String model = resolved == null || resolved.model() == null ? llmConfig.activeModel() : resolved.model();
-        return Map.of(
-                "provider", provider,
-                "model", model,
-                "mode", llmConfig.getMode() == null ? "" : llmConfig.getMode(),
-                "apiKeyConfigured", llmConfig.hasActiveApiKey(),
-                "fallbackAllowed", llmConfig.isEffectiveFallbackAllowed()
-        );
+        Map<String, Object> state = new LinkedHashMap<>();
+        state.put("provider", provider);
+        state.put("configuredProvider", llmConfig.activeProvider());
+        state.put("model", model);
+        state.put("mode", llmConfig.getMode() == null ? "" : llmConfig.getMode());
+        state.put("apiKeyConfigured", llmConfig.hasActiveApiKey());
+        state.put("fallbackAllowed", llmConfig.isEffectiveFallbackAllowed());
+        return state;
+    }
+
+    private String responseSource(ResolvedModel resolved, Map<String, Object> runtimeMeta, boolean fallbackUsed) {
+        String provider = resolved == null || resolved.provider() == null
+                ? llmConfig.activeProvider() : resolved.provider();
+        if ("mock".equalsIgnoreCase(safeDiagnosticValue(provider))) {
+            return "mock".equalsIgnoreCase(safeDiagnosticValue(llmConfig.activeProvider()))
+                    ? "DEMO_MODE" : "BASIC_RESPONSE";
+        }
+        if (fallbackUsed || Boolean.TRUE.equals(runtimeMeta.get("speakerFallbackUsed"))) {
+            return "BASIC_RESPONSE";
+        }
+        return "REAL_MODEL";
+    }
+
+    private String runtimeFallbackReason(ResolvedModel resolved, Map<String, Object> runtimeMeta,
+                                         boolean fallbackUsed) {
+        String provider = resolved == null || resolved.provider() == null
+                ? llmConfig.activeProvider() : resolved.provider();
+        if (fallbackUsed) return "provider-call-failed";
+        if (Boolean.TRUE.equals(runtimeMeta.get("speakerFallbackUsed"))) return "speaker-fallback";
+        if ("mock".equalsIgnoreCase(safeDiagnosticValue(provider))) {
+            return "mock".equalsIgnoreCase(safeDiagnosticValue(llmConfig.activeProvider()))
+                    ? "configured-mock" : "configured-provider-unavailable";
+        }
+        if (Boolean.TRUE.equals(runtimeMeta.get("criticFallbackUsed"))) return "critic-fallback";
+        if (Boolean.TRUE.equals(runtimeMeta.get("plannerFallbackUsed"))) return "planner-fallback";
+        return "";
+    }
+
+    private String safeDiagnosticValue(String value) {
+        return value == null ? "" : value.strip();
     }
 
     private List<String> cleanSegments(List<String> raw, List<String> recentAuroraMessages) {
@@ -1936,7 +2113,7 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
 
     private StreamProgress streamText(SseEmitter emitter, AtomicBoolean clientConnected,
                                       String response, AuroraReplyVO reply,
-                                      long eventSequence, Long userId) throws Exception {
+                                      long eventSequence, Long userId, int bubbleOrder) throws Exception {
         int deliveredChars = 0;
         if (response == null || response.isEmpty()) {
             return new StreamProgress(eventSequence, deliveredChars);
@@ -1955,7 +2132,16 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
             String data = "{\"content\":\"" + escape(chunk) + "\"}";
             boolean delivered = emitLive(emitter, clientConnected, userId, reply.turnId,
                     eventSequence++, "token", data, false);
-            if (delivered) deliveredChars += chunk.length();
+            if (delivered) {
+                deliveredChars += chunk.length();
+                if (bubbleOrder > 0 && choreographyService != null
+                        && reply.deliveryLeaseOwner != null && reply.deliveryLeaseToken != null) {
+                    choreographyService.recordBubbleProgressFenced(
+                            userId, reply.turnId, bubbleOrder, deliveredChars,
+                            reply.deliveryLeaseOwner, reply.deliveryLeaseToken,
+                            DELIVERY_LEASE_TTL);
+                }
+            }
             offset = end;
         }
         return new StreamProgress(eventSequence, deliveredChars);
@@ -1985,6 +2171,40 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         if (choreographyService == null || sessionId == null || userMessage == null || userMessage.id == null) return null;
         return choreographyService.beginTurn(userId, sessionId, userMessage.id).turn.id;
     }
+
+    private GenerationAuthority stageAndClaimGeneration(
+            Long userId, Long turnId, ChatRequest request, DialogMessage userMessage) {
+        if (choreographyService == null || turnId == null || request == null
+                || request.sessionId == null || userMessage == null || userMessage.id == null) {
+            return null;
+        }
+        choreographyService.stageGenerationRequest(
+                userId, turnId, request.sessionId, userMessage.id,
+                normalizeMode(request.mode), request.locale, request.region, request.timezone,
+                GENERATION_CONTEXT_VERSION, request.foregroundAcknowledgementSent);
+        String owner = "generation:" + java.util.UUID.randomUUID();
+        var lease = choreographyService.claimGenerationLease(
+                userId, turnId, owner, GENERATION_LEASE_TTL);
+        if (lease == null) {
+            throw new BusinessException(ErrorCode.CONFLICT,
+                    "Aurora generation is already continuing on another runtime");
+        }
+        return new GenerationAuthority(lease.owner(), lease.fencingToken());
+    }
+
+    private TurnTimelineVO commitPlanAuthorized(
+            Long userId, Long turnId, AuroraReplyVO reply,
+            GenerationAuthority generationAuthority) {
+        if (turnId == null || choreographyService == null) return null;
+        if (generationAuthority == null) {
+            return choreographyService.commitPlan(userId, turnId, reply);
+        }
+        return choreographyService.commitPlanFenced(
+                userId, turnId, reply,
+                generationAuthority.owner(), generationAuthority.fencingToken());
+    }
+
+    private record GenerationAuthority(String owner, long fencingToken) {}
 
     private void cancelPreviousTurn(Long userId, Long sessionId) {
         if (choreographyService != null && sessionId != null) {
@@ -2047,6 +2267,21 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         boolean backgroundPlannerScheduled = loop != null && Boolean.TRUE.equals(loop.get("backgroundPlannerScheduled"));
         String guidanceSource = loop != null && loop.get("guidanceSource") instanceof String gs ? gs : "";
         String backgroundPlannerStatus = loop != null && loop.get("backgroundPlannerStatus") instanceof String ps ? ps : "";
+        String foregroundSource = loop != null && loop.get("foregroundSource") instanceof String fs ? fs : "";
+        if (foregroundSource.isBlank() && richCtx != null) {
+            foregroundSource = safeDiagnosticValue(richCtx.foregroundAcknowledgementSource);
+        }
+        String fallbackReason = loop != null && loop.get("fallbackReason") instanceof String fr ? fr : "";
+        @SuppressWarnings("unchecked")
+        Map<String, Long> stageLatenciesMs = loop != null && loop.get("stageLatenciesMs") instanceof Map<?, ?> stages
+                ? stages.entrySet().stream()
+                    .filter(entry -> entry.getKey() instanceof String && entry.getValue() instanceof Number)
+                    .collect(java.util.stream.Collectors.toMap(
+                            entry -> (String) entry.getKey(),
+                            entry -> ((Number) entry.getValue()).longValue(),
+                            (left, right) -> right,
+                            LinkedHashMap::new))
+                : Map.of();
         @SuppressWarnings("unchecked")
         List<String> criticIssues = loop != null && loop.get("criticIssues") instanceof List<?> issues
                 ? issues.stream().filter(String.class::isInstance).map(String.class::cast).toList()
@@ -2064,6 +2299,9 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 .append(",\"backgroundPlannerScheduled\":").append(backgroundPlannerScheduled)
                 .append(",\"guidanceSource\":\"").append(escape(guidanceSource)).append("\"")
                 .append(",\"backgroundPlannerStatus\":\"").append(escape(backgroundPlannerStatus)).append("\"")
+                .append(",\"foregroundSource\":\"").append(escape(foregroundSource)).append("\"")
+                .append(",\"fallbackReason\":\"").append(escape(fallbackReason)).append("\"")
+                .append(",\"stageLatenciesMs\":").append(jsonLongMap(stageLatenciesMs))
                 .append(",\"criticIssues\":").append(jsonStringArray(criticIssues)).append("}");
         // aiState block.
         if (reply.aiState != null) {
@@ -2110,6 +2348,13 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 .filter(java.util.Objects::nonNull)
                 .map(String::valueOf)
                 .collect(java.util.stream.Collectors.joining(",", "[", "]"));
+    }
+
+    private String jsonLongMap(Map<String, Long> items) {
+        if (items == null || items.isEmpty()) return "{}";
+        return items.entrySet().stream()
+                .map(entry -> "\"" + escape(entry.getKey()) + "\":" + Math.max(0L, entry.getValue()))
+                .collect(java.util.stream.Collectors.joining(",", "{", "}"));
     }
 
     private String jsonObject(Map<String, Object> map) {

@@ -16,11 +16,9 @@ import java.util.regex.Pattern;
  * Gemini audit 3.9 (CONFIRMED/P1): the existing per-message crisis/abuse detection
  * (SafetyBoundaryFilter / CrisisKeywordRule / AbuseKeywordRule / DistressSignalDetector, all
  * Unicode-hardened by commit 05f55fc) is single-message/stateless -- it has no notion that SEVERAL
- * lower-tier signals across one session can add up to something that deserves the same response
- * as a single high-tier signal. This class is an ADDITIVE session-scoped layer on top: it never
- * duplicates or replaces any existing keyword/semantic match, it only decides whether the
- * ACCUMULATED pattern across a session should escalate the effective risk level for the current
- * turn.
+ * lower-tier signals across one session can justify a gentle direct safety check-in. This class
+ * never upgrades repeated medium distress into a crisis block: HIGH remains reserved for explicit
+ * or semantically confirmed acute evidence.
  *
  * <p>Deliberately NOT a diagnosis: this holds a small numeric score and a timestamp per session,
  * nothing else. Nothing here is persisted to a database or written to a metrics/analytics sink --
@@ -45,8 +43,8 @@ public class SessionRiskAggregator {
     private static final double HIGH_WEIGHT = 1.0;
     private static final double MEDIUM_WEIGHT = 0.45;
     private static final double LOW_WEIGHT = 0.0;
-    /** Escalate when the accumulated score reaches this, even though the current turn alone is lower. */
-    private static final double ESCALATION_THRESHOLD = 1.0;
+    /** Repeated medium evidence earns a gentle check-in, never an automatic crisis block. */
+    private static final double GENTLE_CHECK_IN_THRESHOLD = 1.0;
     private static final Duration HALF_LIFE = Duration.ofMinutes(10);
     /** Opportunistic sweep of long-idle sessions so this map cannot grow unboundedly over uptime. */
     private static final Duration SWEEP_IDLE_RETENTION = Duration.ofHours(2);
@@ -68,7 +66,7 @@ public class SessionRiskAggregator {
 
     /**
      * Feeds this turn's per-message risk level into the session's rolling state and reports
-     * whether the accumulated pattern should escalate the EFFECTIVE risk level for this turn.
+     * the legacy view of the rolling state. It deliberately never auto-escalates to HIGH.
      *
      * @param sessionId session key; {@code null} means "no session to track", never escalates
      * @param riskLevel this turn's own per-message risk level (LOW/MEDIUM/HIGH/NONE) as already
@@ -86,21 +84,28 @@ public class SessionRiskAggregator {
      * Reusing the same observation id returns the first decision without adding the signal twice.
      */
     public Escalation observe(Long sessionId, String observationId, String riskLevel, String text) {
+        Observation observation = observeState(sessionId, observationId, riskLevel, text);
+        // Kept for callers compiled against the previous contract. Session patterns no longer
+        // auto-escalate to HIGH; only explicit or semantically confirmed acute evidence may block.
+        return new Escalation(false, observation.score(), observation.reason());
+    }
+
+    public Observation observeState(Long sessionId, String observationId, String riskLevel, String text) {
         maybeSweep();
         if (sessionId == null) {
-            return Escalation.none();
+            return Observation.normal();
         }
         double rawWeight = weightFor(riskLevel);
         // Ordinary LOW/NONE messages are not evidence of a concerning multi-turn pattern.
         // Avoid creating session state for them at all.
         if (rawWeight <= 0) {
-            return Escalation.none();
+            return Observation.normal();
         }
         SessionState state = sessions.computeIfAbsent(sessionId, id -> new SessionState());
         synchronized (state) {
             String stableObservationId = normalizeObservationId(observationId);
             if (stableObservationId != null) {
-                Escalation previous = state.observations.get(stableObservationId);
+                Observation previous = state.observations.get(stableObservationId);
                 if (previous != null) {
                     return previous;
                 }
@@ -110,12 +115,19 @@ public class SessionRiskAggregator {
             double weight = adjustForContext(rawWeight, text);
             state.score += weight;
             state.lastUpdate = now;
-            boolean alreadyHigh = "HIGH".equals(riskLevel);
-            boolean escalate = !alreadyHigh && state.score >= ESCALATION_THRESHOLD;
-            Escalation result = escalate
-                    ? new Escalation(true, round(state.score),
-                            "session-level pattern: repeated concerning signals accumulated past threshold")
-                    : new Escalation(false, round(state.score), null);
+            RiskState riskState;
+            String reason = null;
+            if ("HIGH".equals(riskLevel)) {
+                riskState = RiskState.HIGH_CONFIRMED;
+            } else if (weight <= 0) {
+                riskState = RiskState.NORMAL;
+            } else if (state.score >= GENTLE_CHECK_IN_THRESHOLD) {
+                riskState = RiskState.GENTLE_CHECK_IN;
+                reason = "repeated medium distress signals warrant a gentle direct safety check-in";
+            } else {
+                riskState = RiskState.DISTRESS_WATCH;
+            }
+            Observation result = new Observation(riskState, round(state.score), reason);
             if (stableObservationId != null) {
                 state.observations.put(stableObservationId, result);
                 while (state.observations.size() > MAX_OBSERVATIONS_PER_SESSION) {
@@ -200,7 +212,7 @@ public class SessionRiskAggregator {
     private static final class SessionState {
         double score;
         Instant lastUpdate;
-        final Map<String, Escalation> observations = new LinkedHashMap<>();
+        final Map<String, Observation> observations = new LinkedHashMap<>();
     }
 
     /**
@@ -213,6 +225,23 @@ public class SessionRiskAggregator {
     public record Escalation(boolean escalate, double score, String reason) {
         static Escalation none() {
             return new Escalation(false, 0.0, null);
+        }
+    }
+
+    public enum RiskState {
+        NORMAL,
+        DISTRESS_WATCH,
+        GENTLE_CHECK_IN,
+        HIGH_CONFIRMED
+    }
+
+    public record Observation(RiskState state, double score, String reason) {
+        public boolean gentleCheckIn() {
+            return state == RiskState.GENTLE_CHECK_IN;
+        }
+
+        static Observation normal() {
+            return new Observation(RiskState.NORMAL, 0.0, null);
         }
     }
 }

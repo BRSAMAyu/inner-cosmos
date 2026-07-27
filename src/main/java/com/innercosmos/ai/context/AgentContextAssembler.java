@@ -139,10 +139,7 @@ public class AgentContextAssembler {
                 clientLocalTimeLabel,
                 false,
                 nearestTodoTitle(userId),
-                // BaseEntity.createdAt is a zone-less LocalDateTime and the current JDBC/meta-fill
-                // contract does not guarantee UTC across local-complete and containers. Keep this
-                // structured field empty instead of fabricating an elapsed duration.
-                null);
+                previousAuroraInteraction(sessionId));
         java.time.OffsetDateTime localNow = java.time.OffsetDateTime.parse(time.localDateTime());
         boolean timeAwarenessEnabled =
                 !Boolean.FALSE.equals(profile == null ? null : profile.timeAwarenessEnabled);
@@ -310,12 +307,26 @@ public class AgentContextAssembler {
         if (sessionId == null) return List.of();
         List<DialogMessage> rows = dialogMessageMapper.selectList(new QueryWrapper<DialogMessage>()
                 .eq("session_id", sessionId)
-                .orderByDesc("id")
-                .last("LIMIT 10"));
+                .orderByDesc("id"));
         java.util.Collections.reverse(rows);
         return rows.stream()
-                .map(m -> ("USER".equals(m.speaker) ? "用户" : "Aurora") + "：" + abbreviate(m.textContent, 140))
+                .map(m -> "#" + (m.id == null ? "unknown" : m.id) + " "
+                        + ("USER".equals(m.speaker) ? "用户" : "Aurora") + "：" + safe(m.textContent))
                 .toList();
+    }
+
+    private java.time.Instant previousAuroraInteraction(Long sessionId) {
+        if (sessionId == null) return null;
+        DialogMessage previous = dialogMessageMapper.selectOne(new QueryWrapper<DialogMessage>()
+                .eq("session_id", sessionId)
+                .eq("speaker", "AURORA")
+                .orderByDesc("id")
+                .last("LIMIT 1"));
+        if (previous == null || previous.createdAt == null) return null;
+        // createdAt is a server-local LocalDateTime in both Java meta-fill and the database
+        // default. Interpreting it in the server zone reconstructs the elapsed instant without
+        // trusting a client clock or pretending it was UTC.
+        return previous.createdAt.atZone(java.time.ZoneId.systemDefault()).toInstant();
     }
 
     private List<String> activeTodos(Long userId) {

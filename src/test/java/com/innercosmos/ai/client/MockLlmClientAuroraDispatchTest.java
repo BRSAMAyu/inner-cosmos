@@ -78,6 +78,29 @@ class MockLlmClientAuroraDispatchTest {
     }
 
     @Test
+    void sixUserFacingModesAreBlindlyDistinguishableInOfflineDemo() {
+        MockLlmClient client = new MockLlmClient(DIRECT_EXECUTOR);
+        String sameInput = "这件事一直放在我心里，我还不知道该怎么面对。";
+        java.util.Map<String, AuroraResult> results = new java.util.LinkedHashMap<>();
+        for (String mode : java.util.List.of(
+                "DAILY_TALK", "THOUGHT_CLARIFY", "SOCRATIC",
+                "ACTION_SPLIT", "RELATION_REVIEW", "CAPSULE_SHAPING")) {
+            results.put(mode, StructuredOutputParser.parse(
+                    client.chat(request("AURORA_AGENT_LOOP_" + mode, sameInput)),
+                    AuroraResult.class));
+        }
+
+        assertTrue(results.get("DAILY_TALK").segments.getFirst().contains("我在"));
+        assertTrue(results.get("THOUGHT_CLARIFY").segments.getFirst().contains("事实"));
+        assertTrue(results.get("SOCRATIC").segments.getFirst().contains("最强事实"));
+        assertTrue(results.get("ACTION_SPLIT").segments.getFirst().contains("十分钟"));
+        assertTrue(results.get("RELATION_REVIEW").segments.getFirst().contains("四层"));
+        assertTrue(results.get("CAPSULE_SHAPING").segments.getFirst().contains("人格标签"));
+        assertEquals(6, results.values().stream()
+                .map(result -> String.join("", result.segments)).distinct().count());
+    }
+
+    @Test
     void mixedEmotionPresentationRequestIsGroundedAndActionable() {
         MockLlmClient client = new MockLlmClient(DIRECT_EXECUTOR);
 

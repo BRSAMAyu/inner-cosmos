@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { DailyRecordEntry, MemoryThemeRow } from "../api";
 import type { Locale } from "../i18n";
+import { demoContentText } from "../demoContentLocale";
 import { emotionWeatherPresentation } from "../emotionWeather";
 import { LocalizedTemporalInput } from "./shared/LocalizedTemporalInput";
 
@@ -59,10 +60,10 @@ export function TimelineSection({ dailyRecords, themes, locale = "zh-CN" }: {
         : <>
             <div className="chart-bars mt-1 mb-1" style={{ height: 68 }}>
               {topThemes.map(theme => <div key={theme.id} className="chart-bar"
-                title={theme.themeName ?? ""} style={{ height: `${Math.round(((theme.memoryCount ?? 1) / maxCount) * 100)}%` }} />)}
+                title={demoContentText(theme.themeName, locale)} style={{ height: `${Math.round(((theme.memoryCount ?? 1) / maxCount) * 100)}%` }} />)}
             </div>
             <p className="muted" style={{ fontSize: ".84rem" }}>
-              {topThemes.map(theme => (theme.themeName ?? "").slice(0, 6)).join(" / ")}
+              {topThemes.map(theme => demoContentText(theme.themeName, locale).slice(0, 8)).join(" / ")}
             </p>
           </>}
     </div>
@@ -75,15 +76,15 @@ export function TimelineSection({ dailyRecords, themes, locale = "zh-CN" }: {
             <div className={`axis-node${(record.eventSummary?.length ?? 0) > 8 ? " major" : ""}`} />
             <div className="panel axis-card">
               <div className="flex-between mb-1">
-                <h3>{record.theme || "—"}</h3>
+                <h3>{demoContentText(record.theme, locale) || "—"}</h3>
                 <span className="weather-icon" aria-label={emotionWeatherPresentation(record.emotionWeather, locale).label}>
                   {emotionWeatherPresentation(record.emotionWeather, locale).icon}
                 </span>
               </div>
-              <p className="muted">{record.auroraSummary || record.eventSummary || record.cognitiveSummary || ""}</p>
+              <p className="muted">{demoContentText(record.auroraSummary || record.eventSummary || record.cognitiveSummary, locale)}</p>
               <div className="pill-row mt-1">
                 {record.emotionWeather && <span className="pill">{emotionWeatherPresentation(record.emotionWeather, locale).label}</span>}
-                {record.todoSummary && <span className="pill">{record.todoSummary}</span>}
+                {record.todoSummary && <span className="pill">{demoContentText(record.todoSummary, locale)}</span>}
                 {record.capsuleSuggested && <span className="pill">{locale === "en-SG" ? "Good fit for a capsule" : "适合编织共鸣体"}</span>}
               </div>
             </div>

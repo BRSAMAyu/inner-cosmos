@@ -14,7 +14,10 @@ export function useWeeklyReview({ setStatus, locale = "zh-CN" }: UseWeeklyReview
   const [weeklyReview, setWeeklyReview] = useState<WeeklyReviewV2 | null>(null);
   const [weeklyReviewBusy, setWeeklyReviewBusy] = useState(false);
 
-  const loadWeeklyReview = useCallback(() => api.weeklyReviewV2Latest().then(setWeeklyReview).catch(() => undefined), []);
+  const loadWeeklyReview = useCallback(() => api.weeklyReviewV2Latest().then(setWeeklyReview).catch(error => {
+    setStatus(error instanceof Error ? error.message
+      : locale === "en-SG" ? "Could not open the weekly review." : "暂时无法打开周报，请稍后再试");
+  }), [locale, setStatus]);
 
   const generateWeeklyReview = useCallback(async () => {
     setWeeklyReviewBusy(true);

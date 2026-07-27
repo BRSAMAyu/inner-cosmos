@@ -9,8 +9,8 @@ const COPY: Record<Locale, {
   runEval: string; allowRemember: string; backTo: (v: number, narr: string) => string;
 }> = {
   "zh-CN": {
-    aria: "Aurora 的连续自我", heading: "她最近学会了什么", forming: p => `正在形成的理解 · ${p}%`,
-    baselineNarrative: "Aurora 的连续自我从这里开始；后续每一次变化都会说明来源、评测与回退路径。",
+    aria: "Aurora 的记忆版本", heading: "记忆与回应方式", forming: p => `待确认的记忆 · ${p}%`,
+    baselineNarrative: "这里记录 Aurora 回应方式的版本。只有你确认过的变化才会生效，并且随时可以撤回。",
     previewChange: "预览这次变化", statusDraft: "等待沙盒评测", statusEvaluated: "评测通过，等你确认",
     statusActivated: "已经成为 Aurora 的一部分", statusRejected: "没有通过边界评测", whyResult: "为什么得到这个结果",
     scores: (c, q, d) => `连续性 ${c} · 质量 ${q} · 安全 ${d}`, runEval: "运行变化评测",
@@ -47,7 +47,7 @@ export function AuroraSelfSpace({ evolution, busy, onPropose, onEvaluate, onActi
   const statusLabel = (status: string) => status === "DRAFT" ? t.statusDraft
     : status === "EVALUATED" ? t.statusEvaluated : status === "ACTIVATED" ? t.statusActivated : t.statusRejected;
   return <section className="self-space" aria-label={t.aria}>
-    <div className="self-heading"><div><span className="eyebrow">{locale === "en-SG" ? "AURORA, BECOMING" : "Aurora，正在成为"}</span><h2>{t.heading}</h2></div>
+    <div className="self-heading"><div><span className="eyebrow">{locale === "en-SG" ? "AURORA MEMORY VERSIONS" : "Aurora 记忆版本"}</span><h2>{t.heading}</h2></div>
       <span className="self-version">v{active?.versionNo ?? 1}</span></div>
     <p className="self-narrative">{localisedNarrative}</p>
     {evolution.candidates.filter(candidate => !evolution.proposals.some(proposal => proposal.sourceReflectionId === candidate.id)).map(candidate =>

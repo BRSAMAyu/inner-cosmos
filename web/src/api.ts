@@ -213,6 +213,7 @@ export type ShredderResult = {
   fragments: ThoughtFragmentRow[]; suggestedTodo: TodoItemRow | null;
 };
 export type ShredderHistoryEntry = { id: number; title: string; summary: string | null; memoryType: string | null; emotionalGravity: number | null };
+export type SafetyResource = CoreApiSchemas["SafetyResource"];
 // Full shape of AiHealthVO (see AiHealthController#health) -- ThoughtShredderSection only reads
 // the first four fields, AdminAiLogsTab/AdminModelTab read the rest; one canonical type for both.
 export type AiHealth = {
@@ -829,6 +830,8 @@ export const api = {
   }),
   safetyResources: (locale: "zh-CN" | "en-SG" = "zh-CN", region: "CN" | "SG" = "CN") =>
     request<string[]>(`/api/safety/resources?locale=${encodeURIComponent(locale)}&region=${encodeURIComponent(region)}`),
+  safetyResourceCatalog: (locale: "zh-CN" | "en-SG", region: "CN" | "SG") =>
+    request<SafetyResource[]>(`/api/v1/safety/resources/catalog?locale=${encodeURIComponent(locale)}&region=${encodeURIComponent(region)}`),
   ttsPreferences: () => request<TtsPreferences>("/api/me/tts/voices"),
   updateTtsPreferences: (patch: TtsPreferencesPatch) => request<TtsPreferences>("/api/me/tts/preferences", {
     method: "PATCH", body: JSON.stringify(patch)

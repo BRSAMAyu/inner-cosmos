@@ -14,15 +14,15 @@ const COPY: Record<Locale, {
   realPersonPath: string; practiceCapsule: string; showMoreCapsules: (n: number) => string; showFewerCapsules: string;
 }> = {
   "zh-CN": {
-    aria: "共鸣广场 · 浏览所有公开共鸣体", heading: "主动走进广场，而不是只等推荐", count: n => `${n} 个公开共鸣体`,
-    intro: "这里是所有愿意被遇见的公开侧面。你可以按主题或状态自己找，而不是只看系统推给你的。每个都是授权 AI 共鸣体，不是真人实时在线。",
-    searchPlaceholder: "搜索名字或它想表达的侧面", searchAria: "搜索公开共鸣体", sortAria: "排序方式",
-    sort: { ENERGY: "回声能量", FRESH: "新鲜度", RECENT: "最近活跃" }, tagAria: "按主题筛选", all: "全部",
-    emptyNone: "广场上还没有公开的共鸣体。当有人愿意被遇见时，它会出现在这里。",
+    aria: "共鸣广场 · 浏览所有公开共鸣体", heading: "选择一个共鸣体开始对话", count: n => `${n} 个公开共鸣体`,
+    intro: "共鸣体是由创建者授权资料生成的 AI 对话角色。官方练习共鸣体可以直接体验；用户共鸣体聊过后可以写信给创建者。",
+    searchPlaceholder: "搜索名称或话题", searchAria: "搜索公开共鸣体", sortAria: "排序方式",
+    sort: { ENERGY: "推荐", FRESH: "内容新鲜度", RECENT: "最近更新" }, tagAria: "按主题筛选", all: "全部",
+    emptyNone: "目前没有公开共鸣体。",
     emptyFilter: "没有符合当前筛选的共鸣体。换个主题或清空搜索试试。", energyTitle: "回声能量",
     openBusy: "正在打开", open: "开始对话", showMoreTags: n => `展开另外 ${n} 个主题`, showFewerTags: "收起主题",
-    realPersonPath: "可以写信给本人", practiceCapsule: "官方练习侧影",
-    showMoreCapsules: n => `继续浏览另外 ${n} 个侧影`, showFewerCapsules: "收起，只看最适合开始的 6 个"
+    realPersonPath: "用户创建 · 可写慢信", practiceCapsule: "官方练习共鸣体",
+    showMoreCapsules: n => `再显示 ${n} 个共鸣体`, showFewerCapsules: "只显示前 6 个"
   },
   "en-SG": {
     aria: "Resonance plaza · browse all public capsules", heading: "Walk into the plaza yourself, don't only wait for recommendations", count: n => `${n} public capsule${n === 1 ? "" : "s"}`,
@@ -88,20 +88,20 @@ export function PlazaDirectory({ capsules, activeCapsuleId, busy, onOpenCapsule,
   }, [capsules, query, tag, sort]);
   const displayed = capsulesExpanded || visible.length <= 6 ? visible : visible.slice(0, 6);
   const plazaHeading = locale === "en-SG"
-    ? "Meet a facet first; decide about the person later"
-    : "先遇见一个人的侧影，再决定要不要靠近本人";
+    ? "Choose a capsule and start a conversation"
+    : "选择一个共鸣体开始对话";
   const plazaIntro = locale === "en-SG"
-    ? "The plaza lets you browse every public capsule. Encounters are Aurora's smaller shortlist for you. A capsule chat can stay here, become a slow letter, or—only if both people want—open a real connection."
-    : "广场让你主动浏览所有公开共鸣体；「相遇」则是 Aurora 为你筛出的少量候选。你可以只和侧影聊，也可以写一封慢信；只有双方都愿意，才会走向真人连接。";
+    ? "A capsule is an AI conversation role built from information its creator chose to share. Official practice capsules are ready to try; user capsules can lead to a slow letter."
+    : "共鸣体只使用创建者主动授权的资料。官方练习共鸣体可直接体验；用户共鸣体聊过后可以写慢信。";
 
   return <section className="plaza-directory" aria-label={t.aria}>
     <div className="resonance-heading"><div><span className="eyebrow">{locale === "en-SG" ? "RESONANCE PLAZA" : "共鸣广场"}</span><h2>{plazaHeading}</h2></div>
       <span>{t.count(capsules.length)}</span></div>
     <p className="resonance-intro">{plazaIntro}</p>
     <div className="plaza-path" aria-label={locale === "en-SG" ? "Possible relationship path" : "可能的关系路径"}>
-      <span>{locale === "en-SG" ? "Browse a facet" : "浏览侧影"}</span><i aria-hidden="true">→</i>
-      <span>{locale === "en-SG" ? "A few honest turns" : "聊几句真话"}</span><i aria-hidden="true">→</i>
-      <span>{locale === "en-SG" ? "Slow letter, if wanted" : "想继续，再写慢信"}</span>
+      <span>{locale === "en-SG" ? "Choose a capsule" : "选择共鸣体"}</span><i aria-hidden="true">→</i>
+      <span>{locale === "en-SG" ? "Try a conversation" : "体验对话"}</span><i aria-hidden="true">→</i>
+      <span>{locale === "en-SG" ? "Write a slow letter" : "需要时写慢信"}</span>
     </div>
 
     <div className="plaza-controls">
@@ -136,10 +136,10 @@ export function PlazaDirectory({ capsules, activeCapsuleId, busy, onOpenCapsule,
               {capsule.capsuleType === "USER_CAPSULE" ? t.realPersonPath : t.practiceCapsule}
             </span>
             <p className="ugc-text">{capsule.intro}</p>
-            <small className="plaza-topic-label">{locale === "en-SG" ? "You might talk about" : "你们可能会聊起"}</small>
+            <small className="plaza-topic-label">{locale === "en-SG" ? "Topics" : "可聊话题"}</small>
             {tags.length > 0 && <div className="plaza-card-tags">{tags.map(tagName => <span key={tagName}>{tagName}</span>)}</div>}
             <AsyncButton className="resonance-secondary" busy={busy} busyText={t.openBusy}
-              onClick={() => onOpenCapsule(capsule)}>{locale === "en-SG" ? "Talk to this facet" : "和这个侧影聊聊"}</AsyncButton>
+              onClick={() => onOpenCapsule(capsule)}>{locale === "en-SG" ? "Talk to this capsule" : "开始体验"}</AsyncButton>
           </article>;
         })}
       </div>

@@ -3,12 +3,14 @@ import type { DialogSessionSummary } from "../api";
 import type { Locale } from "../i18n";
 
 export function ConversationHistory({
-  sessions, currentSessionId, busy, locale, onOpen, onNew, onRename, onPin, onArchive, onReload
+  sessions, currentSessionId, busy, locale, compact = false,
+  onOpen, onNew, onRename, onPin, onArchive, onReload
 }: {
   sessions: DialogSessionSummary[];
   currentSessionId: number | null;
   busy: boolean;
   locale: Locale;
+  compact?: boolean;
   onOpen: (session: DialogSessionSummary) => void;
   onNew: () => void;
   onRename: (session: DialogSessionSummary, title: string) => Promise<void>;
@@ -32,18 +34,29 @@ export function ConversationHistory({
     await onRename(session, title);
     setEditingId(null);
   };
+  const open = (session: DialogSessionSummary) => {
+    setExpanded(false);
+    setEditingId(null);
+    onOpen(session);
+  };
+  const create = () => {
+    setExpanded(false);
+    setEditingId(null);
+    onNew();
+  };
   const ordered = [...sessions].sort((a, b) =>
     Number(Boolean(b.pinnedAt)) - Number(Boolean(a.pinnedAt))
     || String(b.lastActivityAt ?? "").localeCompare(String(a.lastActivityAt ?? "")));
 
-  return <section className="conversation-history" aria-label={english ? "Conversation history" : "会话记录"}>
+  return <section className={compact ? "conversation-history compact" : "conversation-history"}
+    aria-label={english ? "Conversation history" : "会话记录"}>
     <div className="conversation-history-head">
       <button type="button" className="quiet history-toggle" aria-expanded={expanded}
         onClick={() => setExpanded(value => !value)}>
         <span>{english ? "Conversations" : "会话记录"}</span>
         <small>{sessions.length} · {expanded ? (english ? "hide" : "收起") : (english ? "manage" : "管理")}</small>
       </button>
-      <button type="button" className="history-new" disabled={busy} onClick={onNew}>
+      <button type="button" className="history-new" disabled={busy} onClick={create}>
         {english ? "＋ New" : "＋ 新对话"}
       </button>
     </div>
@@ -65,7 +78,7 @@ export function ConversationHistory({
             {english ? "Cancel" : "取消"}
           </button>
         </form> : <>
-          <button type="button" className="history-open" onClick={() => onOpen(session)}
+          <button type="button" className="history-open" onClick={() => open(session)}
             aria-current={session.id === currentSessionId ? "page" : undefined}>
             <strong>{session.pinnedAt ? "✦ " : ""}{session.title}</strong>
             <span>{session.preview || (english ? "No messages yet" : "还没有消息")}</span>

@@ -200,6 +200,9 @@ CREATE TABLE IF NOT EXISTS tb_conversation_turn (
   active_plan_id BIGINT,
   status VARCHAR(32) NOT NULL,
   next_event_sequence INT NOT NULL DEFAULT 1,
+  lease_owner VARCHAR(160),
+  lease_token BIGINT NOT NULL DEFAULT 0,
+  lease_expires_at TIMESTAMP NULL,
   started_at TIMESTAMP NULL,
   completed_at TIMESTAMP NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -237,6 +240,43 @@ CREATE TABLE IF NOT EXISTS tb_turn_plan (
   INDEX idx_turn_plan_pending_action (user_id, action_status, id),
   CONSTRAINT ck_turn_plan_commit_slot CHECK ((status = 'COMMITTED' AND commit_slot = 1) OR (status <> 'COMMITTED' AND commit_slot IS NULL)),
   CONSTRAINT fk_turn_plan_turn FOREIGN KEY (turn_id) REFERENCES tb_conversation_turn(id) ON DELETE CASCADE
+);
+
+-- Recovery-B persists no duplicated prompt or user text: only the protected dialog-message
+-- reference and bounded routing metadata needed to rebuild the authoritative request.
+CREATE TABLE IF NOT EXISTS tb_turn_generation_request (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  turn_id BIGINT NOT NULL,
+  user_id BIGINT NOT NULL,
+  session_id BIGINT NOT NULL,
+  user_message_id BIGINT NOT NULL,
+  mode VARCHAR(32) NOT NULL,
+  locale VARCHAR(24),
+  region VARCHAR(16),
+  timezone VARCHAR(64),
+  context_version VARCHAR(48) NOT NULL,
+  foreground_acknowledgement_sent BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_turn_generation_request (turn_id),
+  INDEX idx_turn_generation_request_owner (user_id, turn_id),
+  CONSTRAINT fk_turn_generation_request_turn FOREIGN KEY (turn_id)
+    REFERENCES tb_conversation_turn(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS tb_turn_deliberation_snapshot (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  turn_id BIGINT NOT NULL,
+  user_id BIGINT NOT NULL,
+  plan_revision INT NOT NULL,
+  status VARCHAR(32) NOT NULL,
+  snapshot_json TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_turn_deliberation_revision (turn_id, plan_revision),
+  INDEX idx_turn_deliberation_owner (user_id, turn_id, plan_revision),
+  CONSTRAINT fk_turn_deliberation_turn FOREIGN KEY (turn_id)
+    REFERENCES tb_conversation_turn(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS tb_message_bubble (
@@ -641,6 +681,8 @@ CREATE TABLE IF NOT EXISTS tb_safety_event (
   user_id BIGINT,
   session_id BIGINT,
   message_id BIGINT,
+  client_message_id VARCHAR(128),
+  safety_scope VARCHAR(32),
   risk_type VARCHAR(64),
   risk_level VARCHAR(32),
   matched_rule VARCHAR(160),
@@ -648,7 +690,8 @@ CREATE TABLE IF NOT EXISTS tb_safety_event (
   trigger_scene TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_safety_event_user (user_id)
+  INDEX idx_safety_event_user (user_id),
+  UNIQUE KEY uq_safety_event_client_scope (user_id, client_message_id, safety_scope)
 );
 
 CREATE TABLE IF NOT EXISTS tb_report_record (
@@ -897,7 +940,7 @@ CREATE TABLE IF NOT EXISTS tb_letter_thread (
   INDEX idx_thread_participants (participant_a, participant_b)
 );
 
-  CREATE TABLE IF NOT EXISTS tb_block_relation (
+CREATE TABLE IF NOT EXISTS tb_block_relation (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   blocker_user_id BIGINT NOT NULL,
   blocked_user_id BIGINT NOT NULL,
@@ -905,9 +948,9 @@ CREATE TABLE IF NOT EXISTS tb_letter_thread (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_block_blocker (blocker_user_id)
-  );
+);
 
-  CREATE TABLE IF NOT EXISTS tb_capsule_landing (
+CREATE TABLE IF NOT EXISTS tb_capsule_landing (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     capsule_id BIGINT NOT NULL,
     user_id BIGINT NOT NULL,
@@ -917,7 +960,7 @@ CREATE TABLE IF NOT EXISTS tb_letter_thread (
     INDEX idx_capsule_landing_user (user_id, created_at),
     CONSTRAINT fk_capsule_landing_capsule FOREIGN KEY (capsule_id) REFERENCES tb_echo_capsule(id) ON DELETE CASCADE,
     CONSTRAINT fk_capsule_landing_user FOREIGN KEY (user_id) REFERENCES tb_user(id) ON DELETE CASCADE
-  );
+);
 
 CREATE TABLE IF NOT EXISTS tb_belief_pattern (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,

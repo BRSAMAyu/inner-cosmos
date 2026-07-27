@@ -42,7 +42,7 @@ describe("AccountSettings", () => {
       onExportData={onExportData} onDeleteAccount={() => Promise.resolve(null)} />);
     fireEvent.click(screen.getByRole("button", { name: "导出数据" }));
     expect(onExportData).toHaveBeenCalledOnce();
-    expect(screen.getByText("账户与数据", { selector: ".eyebrow" })).toBeVisible();
+    expect(screen.getByText("设置", { selector: ".eyebrow" })).toBeVisible();
     expect(screen.queryByText("ACCOUNT & DATA")).not.toBeInTheDocument();
   });
 
@@ -217,7 +217,7 @@ describe("AccountSettings", () => {
     const onChangePassword = vi.fn();
     render(<AccountSettings locale="en-SG" busy={null} message={null} onChangePassword={onChangePassword}
       onExportData={() => undefined} onDeleteAccount={() => Promise.resolve(null)} />);
-    expect(screen.getByRole("heading", { name: "Account & data" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Aurora & account settings" })).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "Change password" }));
     fireEvent.change(screen.getByPlaceholderText("Current password"), { target: { value: "old-pass" } });
     fireEvent.change(screen.getByPlaceholderText("New password (at least 8 characters)"), { target: { value: "short" } });
@@ -261,13 +261,13 @@ describe("AccountSettings -- W2 voice preferences", () => {
   it("does not render the voice section before tts preferences have loaded", () => {
     render(<AccountSettings busy={null} message={null} onChangePassword={() => Promise.resolve(null)}
       onExportData={() => undefined} onDeleteAccount={() => Promise.resolve(null)} />);
-    expect(screen.queryByText("Aurora 的心声")).not.toBeInTheDocument();
+    expect(screen.queryByText("Aurora 的声音")).not.toBeInTheDocument();
   });
 
   it("seeds the compact voice and delivery-mode selects from the loaded preferences", () => {
     renderVoiceSettings();
-    expect(screen.getByText("Aurora 的心声").closest("details")).not.toHaveAttribute("open");
-    expect(screen.getByLabelText("允许心声浮现")).toBeChecked();
+    expect(screen.getByText("Aurora 的声音").closest("details")).toHaveAttribute("open");
+    expect(screen.getByLabelText("允许对话外的心声")).toBeChecked();
     expect(screen.getByLabelText("浮现方式")).toHaveValue("AMBIENT");
     expect(screen.getByLabelText("选择音色")).toHaveValue("warm-a");
     expect(screen.getAllByRole("button", { name: "▶ 试听" })).toHaveLength(1);
@@ -309,10 +309,22 @@ describe("AccountSettings -- W2 voice preferences", () => {
     expect(onUpdateTtsPreferences).toHaveBeenCalledExactlyOnceWith({ voiceId: "calm-b" });
   });
 
+  it("rolls a failed voice change back to the last saved voice and explains why", async () => {
+    const pending = deferred<string | null>();
+    renderVoiceSettings({ onUpdateTtsPreferences: vi.fn().mockReturnValue(pending.promise) });
+    const voiceSelect = screen.getByLabelText("选择音色");
+    fireEvent.change(voiceSelect, { target: { value: "calm-b" } });
+    expect(voiceSelect).toHaveValue("calm-b");
+    await act(async () => { pending.resolve("声线未能保存"); await pending.promise; });
+    expect(voiceSelect).toHaveValue("warm-a");
+    expect(screen.getByRole("alert")).toHaveTextContent("声线未能保存");
+  });
+
   it("calls PATCH with the right body when the overall mute switch is toggled", () => {
     const { onUpdateTtsPreferences } = renderVoiceSettings();
-    fireEvent.click(screen.getByLabelText("允许心声浮现"));
+    fireEvent.click(screen.getByLabelText("允许对话外的心声"));
     expect(onUpdateTtsPreferences).toHaveBeenCalledExactlyOnceWith({ innerVoiceEnabled: false });
+    expect(screen.getByLabelText("选择音色")).not.toBeDisabled();
   });
 
   // (b) a failed PATCH preserves the previous UI selection and shows an inline error, rather than

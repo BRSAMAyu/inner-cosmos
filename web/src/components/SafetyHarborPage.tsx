@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Locale } from "../i18n";
+import type { SafetyResource } from "../api";
 import { SafetyResourceList } from "./SafetyResourceList";
 
 // Port of src/main/resources/static/pages/safety-harbor.html into the AppShell (Phase 0,
@@ -63,7 +64,7 @@ const COPY = {
 } as const;
 
 export function SafetyHarborPage({ resources, locale, onBack, onTalkToAurora }: {
-  resources: string[];
+  resources: SafetyResource[];
   locale: Locale;
   onBack: () => void;
   onTalkToAurora: () => void;

@@ -44,4 +44,28 @@ class OpenAiCompatibleMemoryEmbeddingClientTest {
             assertTrue(requestBody.get().contains("private text never logged"));
         } finally { server.stop(0); }
     }
+
+    /**
+     * The query embed runs synchronously on the interactive Aurora turn. Spring's default
+     * RestClient request factory applies no read timeout, so an accepted-but-never-answered socket
+     * used to hang that turn (and its thread) indefinitely -- and the callers' catch-and-degrade
+     * never fires, because a hang is not an exception.
+     */
+    @Test
+    void unresponsiveProviderFailsFastInsteadOfHangingTheTurn() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        // Accept the request, then never write a response.
+        server.createContext("/v1/embeddings", exchange -> { });
+        server.start();
+        try {
+            var client = new OpenAiCompatibleMemoryEmbeddingClient(
+                    "http://127.0.0.1:" + server.getAddress().getPort() + "/v1", "test-only-key",
+                    "embedding-contract-model", "v1", 8, new ObjectMapper(), 1000, 900);
+            long started = System.nanoTime();
+            assertThrows(RuntimeException.class, () -> client.embed("never answered"));
+            long elapsedMillis = (System.nanoTime() - started) / 1_000_000L;
+            assertTrue(elapsedMillis < 10_000L,
+                    "an unresponsive provider must surface within the read timeout, took " + elapsedMillis + "ms");
+        } finally { server.stop(0); }
+    }
 }

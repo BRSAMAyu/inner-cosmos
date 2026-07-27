@@ -7,7 +7,7 @@ import type { Locale } from "./i18n";
 export type DialogMode = "DAILY_TALK" | "THOUGHT_CLARIFY" | "SOCRATIC" | "ACTION_SPLIT" | "RELATION_REVIEW" | "CAPSULE_SHAPING";
 
 export const APP_COPY: Record<Locale, {
-  connecting: string; modeLabel: Record<DialogMode, string>;
+  connecting: string; modeLabel: Record<DialogMode, string>; modeHint: Record<DialogMode, string>;
   heroLine1: string; heroLine2: string; heroP: string; runtimeAria: string;
   runtimeUnderstanding: string; runtimeComposing: string; runtimeSpeaking: string; runtimeHere: string;
   dualCore: string; relationshipMovePrefix: string; repaired: string; modesAria: string; transcribeUnavailable: string;
@@ -23,9 +23,17 @@ export const APP_COPY: Record<Locale, {
     connecting: "正在连接你的内宇宙…", heroEyebrow: "内宇宙 · Aurora", presenceEyebrow: "Aurora，与你同在",
     returnsEyebrow: "Aurora 的回来约定", returnedEyebrow: "Aurora 如约回来",
     modeLabel: { DAILY_TALK: "倾诉", THOUGHT_CLARIFY: "整理", SOCRATIC: "追问", ACTION_SPLIT: "行动", RELATION_REVIEW: "关系", CAPSULE_SHAPING: "塑造侧影" },
-    heroLine1: "可以被打断的陪伴，", heroLine2: "才是真的在听。",
-    heroP: "你不需要等 Aurora 说完。新消息会成为新的理解输入，而不是错误。", runtimeAria: "Aurora 当前回应状态",
-    runtimeUnderstanding: "正在理解", runtimeComposing: "正在组织", runtimeSpeaking: "正在回应", runtimeHere: "在这里",
+    modeHint: {
+      DAILY_TALK: "只听你说，不急着分析或给建议。",
+      THOUGHT_CLARIFY: "把事实、感受、担心与需要一条条理清。",
+      SOCRATIC: "一次追问一个关键假设，答案仍由你发现。",
+      ACTION_SPLIT: "不做长计划，只选一个十分钟内能开始的动作。",
+      RELATION_REVIEW: "分清事实、感受、需要与边界，不替任何人站队。",
+      CAPSULE_SHAPING: "从真实故事里提取表达、价值与边界，形成私密侧影。"
+    },
+    heroLine1: "今天，", heroLine2: "想从哪里说起？",
+    heroP: "Aurora 会记住上下文；你也可以随时打断、换一种合作方式。", runtimeAria: "Aurora 当前回应状态",
+    runtimeUnderstanding: "正在理解", runtimeComposing: "正在组织", runtimeSpeaking: "正在回应", runtimeHere: "Aurora 已就绪",
     dualCore: "理解与表达双核协作", relationshipMovePrefix: "关系动作 · ", repaired: "回应已通过边界复核",
     modesAria: "对话模式", transcribeUnavailable: "语音转写暂时不可用",
     mobileAria: "移动端连接状态", mobileConnected: "移动端已连接", mobileOffline: "网络暂时离开了",
@@ -42,9 +50,17 @@ export const APP_COPY: Record<Locale, {
     connecting: "Connecting to your inner cosmos…", heroEyebrow: "INNER COSMOS · AURORA", presenceEyebrow: "AURORA, WITH YOU",
     returnsEyebrow: "AURORA RETURNS", returnedEyebrow: "AURORA RETURNED",
     modeLabel: { DAILY_TALK: "Confide", THOUGHT_CLARIFY: "Sort out", SOCRATIC: "Probe", ACTION_SPLIT: "Act", RELATION_REVIEW: "Relate", CAPSULE_SHAPING: "Shape capsule" },
-    heroLine1: "Companionship you can interrupt", heroLine2: "is what truly listens.",
-    heroP: "You don't have to wait for Aurora to finish. A new message becomes fresh input for understanding, not an error.", runtimeAria: "Aurora's current response state",
-    runtimeUnderstanding: "Understanding", runtimeComposing: "Composing", runtimeSpeaking: "Responding", runtimeHere: "Here",
+    modeHint: {
+      DAILY_TALK: "Be heard without rushing into analysis or advice.",
+      THOUGHT_CLARIFY: "Separate facts, feelings, worries and needs.",
+      SOCRATIC: "Test one key assumption at a time; the answer stays yours.",
+      ACTION_SPLIT: "Skip the long plan and choose one ten-minute action.",
+      RELATION_REVIEW: "Separate facts, feelings, needs and boundaries without taking sides.",
+      CAPSULE_SHAPING: "Use real stories to shape a private voice, values and boundaries."
+    },
+    heroLine1: "What would you like", heroLine2: "to say today?",
+    heroP: "Aurora keeps the context. Interrupt at any time or change how you work together.", runtimeAria: "Aurora's current response state",
+    runtimeUnderstanding: "Understanding", runtimeComposing: "Composing", runtimeSpeaking: "Responding", runtimeHere: "Aurora ready",
     dualCore: "Dual-core: understanding + expression", relationshipMovePrefix: "Relationship move · ", repaired: "Response passed boundary review",
     modesAria: "Conversation modes", transcribeUnavailable: "Voice transcription is unavailable right now",
     mobileAria: "Mobile connection status", mobileConnected: "Mobile connected", mobileOffline: "The network stepped away",

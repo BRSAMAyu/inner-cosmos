@@ -73,7 +73,10 @@ export function StartHereJourney({
   const t = COPY[locale];
   const completed = new Set(completedSteps.filter(step => JOURNEY_STEPS.includes(step)));
   const journeyComplete = JOURNEY_STEPS.every(step => completed.has(step));
-  const [expanded, setExpanded] = useState(() => !isDemoSandbox && !journeyComplete);
+  // The first-orbit overlay already introduces the full path. Keep this persistent reminder
+  // compact on every account so it never competes with the Aurora conversation for first-screen
+  // space; the user can deliberately expand it when they want the detailed checklist.
+  const [expanded, setExpanded] = useState(false);
   const firstIncomplete = t.steps.find(step => !completed.has(step.id))?.id;
 
   useEffect(() => {

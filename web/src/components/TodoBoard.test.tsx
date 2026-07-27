@@ -76,6 +76,20 @@ describe("TodoBoard", () => {
     expect(screen.getByText("未设截止时间 · 本周规划池")).toBeVisible();
   });
 
+  it("keeps the week tab meaningful on a Sunday via a rolling 7-day window", () => {
+    // 2026-07-26 is a Sunday: the old `(7 - getDay()) % 7` arithmetic collapsed endOfWeek to
+    // endOfToday on Sundays, so the week tab showed only undated items even with dated ones due
+    // later this week. "本周" is defined as a rolling 7 days from today, not the calendar week.
+    vi.setSystemTime(new Date("2026-07-26T09:00:00+08:00"));
+    const rows = [
+      todo({ id: 1, taskName: "周三截止", deadline: "2026-07-29T18:00:00+08:00" }),
+      todo({ id: 2, taskName: "下下周截止", deadline: "2026-08-05T18:00:00+08:00" })
+    ];
+    render(<TodoBoard {...baseProps()} tab="week" todos={rows} />);
+    expect(screen.getByText("周三截止")).toBeVisible();
+    expect(screen.queryByText("下下周截止")).not.toBeInTheDocument();
+  });
+
   it("calls onSplit for the 'split first step' action", () => {
     const onSplit = vi.fn();
     render(<TodoBoard {...baseProps()} todos={[todo()]} onSplit={onSplit} />);
@@ -110,8 +124,27 @@ describe("TodoBoard", () => {
   it("shows reopen/delete actions on the let-go tab", () => {
     const onDelete = vi.fn();
     render(<TodoBoard {...baseProps()} tab="letgo" todos={[todo({ status: "CANCELLED", deadline: null })]} onDelete={onDelete} />);
+    expect(screen.getByRole("button", { name: "重新拾起" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "删除" })).toBeVisible();
+  });
+
+  it("requires a second confirming click before an irreversible delete fires", () => {
+    const onDelete = vi.fn();
+    render(<TodoBoard {...baseProps()} tab="letgo" todos={[todo({ status: "CANCELLED", deadline: null })]} onDelete={onDelete} />);
     fireEvent.click(screen.getByRole("button", { name: "删除" }));
+    expect(onDelete).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "确认删除？" }));
     expect(onDelete).toHaveBeenCalledExactlyOnceWith(1);
+  });
+
+  it("lets the owner back out of a pending delete confirmation", () => {
+    const onDelete = vi.fn();
+    render(<TodoBoard {...baseProps()} tab="letgo" todos={[todo({ status: "CANCELLED", deadline: null })]} onDelete={onDelete} />);
+    fireEvent.click(screen.getByRole("button", { name: "删除" }));
+    fireEvent.click(screen.getByRole("button", { name: "取消" }));
+    expect(onDelete).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "删除" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "确认删除？" })).not.toBeInTheDocument();
   });
 
   it("renders in English when locale is en-SG", () => {

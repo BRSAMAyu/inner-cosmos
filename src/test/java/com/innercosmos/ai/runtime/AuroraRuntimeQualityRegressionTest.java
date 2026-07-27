@@ -48,12 +48,12 @@ class AuroraRuntimeQualityRegressionTest {
     }
 
     @Test
-    void invalidFourthBubbleIsCappedWithoutConcatenatingItIntoTheThird() throws Exception {
+    void invalidSeventhBubbleIsCappedWithoutConcatenatingItIntoTheSixth() throws Exception {
         AuroraDualKernelRuntime.Generation generation = generate(
-                List.of("一", "二", "三", "不应拼进第三条"), 13L);
+                List.of("一", "二", "三", "四", "五", "六", "不应拼进第六条"), 13L);
 
-        assertThat(generation.result().segments).containsExactly("一", "二", "三");
-        assertThat(generation.result().segments.get(2)).doesNotContain("不应拼进第三条");
+        assertThat(generation.result().segments).containsExactly("一", "二", "三", "四", "五", "六");
+        assertThat(generation.result().segments.get(5)).doesNotContain("不应拼进第六条");
     }
 
     private AuroraDualKernelRuntime.Generation generate(List<String> segments, long sessionId) throws Exception {

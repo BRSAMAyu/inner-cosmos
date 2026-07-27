@@ -18,6 +18,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -202,16 +203,39 @@ class SafetyServiceTest {
     }
 
     @Test
-    @DisplayName("resources includes at least one dialable crisis hotline number (M-002)")
-    void resources_containsHotlineNumber() {
-        // Safety-of-life contract: the crisis funnel must surface a real, dialable number,
-        // and it must match the tel-link regex in safety-harbor.html so it renders clickable.
-        List<String> result = safetyService.resources();
-        boolean hasPhone = result.stream().anyMatch(r ->
-                r.matches(".*\\d{3,4}[-\\s]?\\d{7,8}.*")              // e.g. 010-82951332
-                        || r.matches(".*\\d{3}[-\\s]?\\d{3}[-\\s]?\\d{4}.*")  // e.g. 400-161-9995
-                        || r.matches(".*\\b(?:110|120|119|12320|12355|988)\\b.*")); // short codes
-        assertTrue(hasPhone, "resources() must include at least one dialable crisis hotline number");
+    @DisplayName("F4: China catalog covers every required category with authority and verification")
+    void resources_chinaContractIsComplete() {
+        var result = safetyService.resourceCatalog("zh-CN", "CN");
+        assertEquals(Set.of("110", "120", "12356", "12355"),
+                result.stream().map(resource -> resource.phone).filter(java.util.Objects::nonNull)
+                        .collect(java.util.stream.Collectors.toSet()));
+        assertTrue(result.stream().allMatch(resource -> "CN".equals(resource.region)));
+        assertTrue(result.stream().allMatch(resource ->
+                resource.authorityUrl.startsWith("https://") && "2026-07-27".equals(resource.verifiedAt)));
+        assertTrue(result.stream().anyMatch(resource -> "PRODUCT_BOUNDARY".equals(resource.category)));
+    }
+
+    @Test
+    @DisplayName("F4: Singapore catalog is local-only and complete")
+    void resources_singaporeContractIsComplete() {
+        var result = safetyService.resourceCatalog("en-SG", "SG");
+        assertEquals(Set.of("999", "995", "1767", "91511767"),
+                result.stream().map(resource -> resource.phone).filter(java.util.Objects::nonNull)
+                        .collect(java.util.stream.Collectors.toSet()));
+        assertTrue(result.stream().allMatch(resource -> "SG".equals(resource.region)));
+        assertTrue(result.stream().noneMatch(resource ->
+                resource.label.contains("110") || resource.label.contains("120")
+                        || resource.label.contains("12356") || resource.label.contains("12355")));
+    }
+
+    @Test
+    @DisplayName("F4: a missing or conflicting locale-region contract never guesses local numbers")
+    void resources_unknownContractUsesNumberFreeFallback() {
+        var missing = safetyService.resourceCatalog(null, null);
+        var conflicting = safetyService.resourceCatalog("en-SG", "CN");
+        assertTrue(missing.stream().allMatch(resource -> resource.phone == null));
+        assertTrue(conflicting.stream().allMatch(resource -> resource.phone == null));
+        assertTrue(conflicting.stream().allMatch(resource -> "GLOBAL".equals(resource.region)));
     }
 
     // --- safety event recording ---

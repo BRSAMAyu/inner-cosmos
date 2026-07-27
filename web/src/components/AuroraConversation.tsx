@@ -4,6 +4,8 @@ import type { ClaimCandidate } from "../api";
 import type { Locale } from "../i18n";
 import { PcmWavRecorder } from "../audio-recorder";
 import { InlineAudioPlayer } from "./shared/InlineAudioPlayer";
+import { AuroraInnerVoiceAside } from "./AuroraInnerVoiceAside";
+import { AuroraThinkingState, type AuroraThinkingStage } from "./AuroraThinkingState";
 
 // "AURORA_INNER" (W2 voice): Aurora's occasional spoken inner-monologue line, distinct from her
 // normal reply -- see the "inner_voice" SSE event case in useAuroraSession.ts. `audio`/`voiceId`
@@ -18,8 +20,7 @@ export type AuroraInnerVoice = {
   key: string; text: string; audio?: string; voiceId?: string;
 };
 
-/** The two pre-speech beats worth showing inline; `null` while idle or actively streaming tokens. */
-export type AuroraThinkingStage = "understanding" | "composing" | null;
+export type { AuroraThinkingStage } from "./AuroraThinkingState";
 
 const COPY: Record<Locale, {
   convAria: string; empty: string; speakerYou: string; partialHint: string; thinkingAria: string;
@@ -49,13 +50,15 @@ const COPY: Record<Locale, {
 };
 
 export function AuroraConversation({ messages, activeTurnId, thinkingStage = null, draft, sessionReady, onDraftChange, onSubmit, onStop, onTranscribe, onGoodbye, goodbyeBusy = false,
-  innerVoiceEnabled = false, innerVoiceMode = "AMBIENT", claimCandidates = [],
+  innerVoice = null, onDismissInnerVoice = () => undefined,
+  innerVoiceEnabled = false, innerVoiceMode = "AMBIENT", runtime = "single",
+  foregroundText, foregroundSource, claimCandidates = [],
   claimCandidateBusyId = null, onConfirmClaim, onDismissClaim, locale = "zh-CN" }: {
   messages: AuroraUiMessage[];
   activeTurnId: number | null;
   /** Derived from the session runtime signal; drives an inline "thinking" beat where the user is
    * looking, instead of only a far-away hero badge. */
-  thinkingStage?: AuroraThinkingStage;
+  thinkingStage?: AuroraThinkingStage | null;
   draft: string;
   sessionReady: boolean;
   onDraftChange: (value: string) => void;
@@ -72,6 +75,11 @@ export function AuroraConversation({ messages, activeTurnId, thinkingStage = nul
    * all here -- never even the reveal affordance. */
   innerVoiceEnabled?: boolean;
   innerVoiceMode?: "AMBIENT" | "ON_DEMAND";
+  innerVoice?: AuroraInnerVoice | null;
+  onDismissInnerVoice?: () => void;
+  runtime?: "single" | "dual";
+  foregroundText?: string;
+  foregroundSource?: string;
   claimCandidates?: ClaimCandidate[];
   claimCandidateBusyId?: number | null;
   onConfirmClaim?: (id: number) => void;
@@ -91,6 +99,7 @@ export function AuroraConversation({ messages, activeTurnId, thinkingStage = nul
   const recorderRef = useRef<PcmWavRecorder | null>(null);
   const conversationRef = useRef<HTMLElement | null>(null);
   const shouldFollowConversationRef = useRef(true);
+  const transcriptFirstMessageKeyRef = useRef<string | null>(null);
   const draftRef = useRef(draft);
   draftRef.current = draft;
   // Gemini audit 4.6 (CONFIRMED/P2): mountedRef + a per-attempt generation counter guard the
@@ -103,13 +112,22 @@ export function AuroraConversation({ messages, activeTurnId, thinkingStage = nul
 
   useEffect(() => {
     const conversation = conversationRef.current;
+    const transcriptFirstMessageKey = messages[0]?.key ?? null;
+    // Opening or creating another conversation reuses this mounted component so draft and audio
+    // state survive navigation. Reset only the transcript-follow preference at that boundary;
+    // otherwise someone who had scrolled up in the previous session would land above the newest
+    // reply in the newly opened session.
+    if (transcriptFirstMessageKeyRef.current !== transcriptFirstMessageKey) {
+      shouldFollowConversationRef.current = true;
+      transcriptFirstMessageKeyRef.current = transcriptFirstMessageKey;
+    }
     if (conversation && shouldFollowConversationRef.current) {
       // Keep the movement inside the transcript. scrollIntoView() can also move the page when the
       // conversation lives below overview content, which makes every streamed token steal the
       // reader's document position.
       conversation.scrollTop = conversation.scrollHeight;
     }
-  }, [messages, thinkingStage]);
+  }, [messages, thinkingStage, innerVoice?.key]);
   const voiceSupported = typeof navigator !== "undefined"
     && !!navigator.mediaDevices?.getUserMedia && typeof AudioContext !== "undefined";
 
@@ -210,11 +228,15 @@ export function AuroraConversation({ messages, activeTurnId, thinkingStage = nul
           </article>)}
         </Fragment>;
       })}
-      {activeTurnId !== null && thinkingStage && <article className={`message aurora thinking ${thinkingStage}`} aria-label={t.thinkingAria}>
-        <span className="speaker">Aurora</span>
-        <p><span className="thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span>{thinkingStage === "understanding" ? t.understanding : t.composing}</p>
-      </article>}
     </section>
+    {((innerVoiceEnabled && innerVoice !== null) || (activeTurnId !== null && thinkingStage !== null)) &&
+      <div className="aurora-live-layer">
+        <AuroraInnerVoiceAside voice={innerVoice} enabled={innerVoiceEnabled}
+          mode={innerVoiceMode} locale={locale} onDismiss={onDismissInnerVoice} />
+      {activeTurnId !== null && thinkingStage && <AuroraThinkingState stage={thinkingStage}
+        runtime={runtime} locale={locale} acknowledgement={foregroundText}
+        acknowledgementSource={foregroundSource} onStop={onStop} />}
+      </div>}
     <form className="composer" onSubmit={onSubmit}>
       <textarea value={draft} onChange={event => onDraftChange(event.target.value)}
         placeholder={activeTurnId ? t.placeholderActive : t.placeholderIdle}

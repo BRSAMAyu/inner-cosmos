@@ -82,6 +82,8 @@ public class DualKernelBudgetPolicy {
         }
 
         private static int recentThreadDepth(Map<String, Object> context) {
+            Object chronological = context.get("conversationHistory");
+            if (chronological instanceof List<?> list) return list.size();
             Object unified = context.get("unifiedAgentContext");
             if (unified instanceof AgentContext agentContext && agentContext.recentMessages != null) {
                 return agentContext.recentMessages.size();

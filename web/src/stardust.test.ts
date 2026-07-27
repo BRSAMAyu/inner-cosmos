@@ -129,5 +129,7 @@ describe("time-responsive stardust profile", () => {
     expect(night.density).toBeGreaterThan(deepNight.density);
     expect(night.speed).toBeGreaterThan(deepNight.speed);
     expect(night.driftX).not.toBe(deepNight.driftX);
+    expect(night.meteorInterval).toBeGreaterThan(0);
+    expect(stardustProfileForTimeOfDay("noon").meteorInterval).toBe(0);
   });
 });

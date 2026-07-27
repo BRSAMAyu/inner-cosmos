@@ -24,9 +24,14 @@ spec:
         # role carries this same annotation triple so Prometheus discovers api/worker/
         # scheduler pods identically; the "component" label on the scrape target is what
         # lets a role-specific dashboard/alert query distinguish them (see prometheus-config.yaml).
+        # 2026-07-27 audit (P1): the api component is the one Service/HTTPRoute actually route
+        # public Gateway traffic to (worker/scheduler have no Service at all), so actuator here
+        # moves to its own "management" port (application-academy-eks.yml sets
+        # management.server.port) that the Service/HTTPRoute never map -- Prometheus (in-cluster,
+        # pod-IP scraping, bypassing the Service) follows it to the new port.
         prometheus.io/scrape: "true"
         prometheus.io/path: /actuator/prometheus
-        prometheus.io/port: "8080"
+        prometheus.io/port: "8090"
     spec:
       serviceAccountName: inner-cosmos
       automountServiceAccountToken: false
@@ -78,6 +83,11 @@ spec:
           ports:
             - name: http
               containerPort: 8080
+            # Actuator (health/metrics/prometheus/info) — see application-academy-eks.yml's
+            # management.server.port. Not Service/HTTPRoute-mapped: only kubelet (probes below)
+            # and in-cluster Prometheus (pod-IP scrape, see the annotation above) reach this port.
+            - name: management
+              containerPort: 8090
           envFrom:
             - configMapRef:
                 name: inner-cosmos-config
@@ -103,20 +113,20 @@ spec:
           startupProbe:
             httpGet:
               path: /actuator/health/readiness
-              port: http
+              port: management
             periodSeconds: 5
             failureThreshold: 24
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
-              port: http
+              port: management
             periodSeconds: 10
             timeoutSeconds: 3
             failureThreshold: 3
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness
-              port: http
+              port: management
             periodSeconds: 20
             timeoutSeconds: 3
             failureThreshold: 3

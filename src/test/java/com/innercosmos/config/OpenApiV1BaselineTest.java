@@ -31,6 +31,7 @@ class OpenApiV1BaselineTest {
                 "/api/v1/aurora/message",
                 "/api/v1/aurora/stream-stage",
                 "/api/v1/aurora/turns/{turnId}/events",
+                "/api/v1/safety/resources/catalog",
                 "/api/v1/capsule/create-from-memory",
                 "/api/v1/capsule/{id}/boundary",
                 "/api/v1/letters/draft",

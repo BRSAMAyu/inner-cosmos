@@ -1,5 +1,44 @@
 spring.config.activate.on-profile: academy-eks
 
+# 2026-07-27 audit (P1, CONFIRMED): the Gateway/HTTPRoute in this overlay routes
+# PathPrefix "/" straight to the api Deployment's app port (deploy/k8s/overlays/academy-eks/
+# http-route.yml -> deploy/k8s/base/app-service.yml, both port 8080), and application-prod.yml
+# exposes metrics/prometheus/info for in-cluster scraping -- so without this, any anonymous
+# internet caller through the Gateway could read them with zero credential. Moving actuator onto
+# its own port means the Service/HTTPRoute (which only ever map port 8080) are structurally
+# unable to reach it, regardless of any Spring Security rule. Kubelet liveness/readiness probes
+# and in-cluster Prometheus scraping talk to the pod IP directly (bypassing the Service), so they
+# keep working by targeting this port -- see deploy/k8s/base/app-deployment.yml's "management"
+# containerPort/probes, the prometheus.io/port annotation, and deploy/k8s/base/app-network-
+# policy.yml's added ingress rule for it. eks-prod reuses this same profile/ConfigMap, so it gets
+# the identical split. NOTE: Spring Boot does not automatically apply the main SecurityFilterChain
+# (SecurityConfig)'s ADMIN-role rules to a separate management port -- see SecurityConfig's
+# comment on /actuator/prometheus. The guaranteed defense here is network topology (this port is
+# never Service/HTTPRoute-mapped), not Spring Security; that has not been independently verified
+# against a real cluster in this change (no kubectl apply was run), only via
+# `kubectl kustomize`.
+management:
+  server:
+    port: ${MANAGEMENT_SERVER_PORT:8090}
+  # 2026-07-27 audit follow-up: the split management port carries no Spring Security filter chain
+  # (see the note above), so it is not enough to gate /actuator/metrics and /actuator/info with
+  # hasRole("ADMIN") in SecurityConfig -- those rules simply do not run here, and this profile
+  # otherwise inherits prod's `health,metrics,prometheus,info`.
+  #
+  # Rather than bolt a child-context SecurityFilterChain onto an unsecured port, do not PUBLISH
+  # the sensitive endpoints on it at all. An endpoint that was never exposed cannot leak, which is
+  # a stronger and far more verifiable guarantee than an authorization check. What remains is
+  # exactly what the cluster needs and nothing more:
+  #   health     -> kubelet startup/readiness/liveness probes
+  #   prometheus -> in-cluster scraping (unauthenticated by design; the scrape config carries no
+  #                 credential, and the port is never Service/HTTPRoute-mapped)
+  # /actuator/metrics and /actuator/info remain available on the main port, where SecurityConfig
+  # does apply and gates them behind ADMIN.
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+
 inner-cosmos:
   runtime:
     role: ${INNER_COSMOS_RUNTIME_ROLE:api}

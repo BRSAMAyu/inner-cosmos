@@ -50,8 +50,12 @@ class PostgresFlywayBaselineTest {
         // idempotency_key (owner-scoped draft PATCH + compose idempotency + atomic auto-REPLIED).
         // W1: V23 adds tb_user_profile.preferred_tts_voice_id/inner_voice_enabled/inner_voice_mode.
         // Classroom Demo: V24 reconciles historical verifier/benchmark accounts to SYNTHETIC.
-        // V25-V29 add orchestration, outbox, social-group messages, slow-letter presets and live chat.
-        assertEquals(29, flyway.migrate().migrationsExecuted);
+        // V25-V33 add orchestration, social delivery, session management, safety idempotency,
+        // and fenced cross-Pod conversation takeover.
+        // V34 renames tb_capsule_landing's two auto-named foreign keys to schema.sql's names.
+        // It exists as a forward migration rather than an in-place edit of V30 because V30 is
+        // already committed and rewriting it would break Flyway checksums on live databases.
+        assertEquals(34, flyway.migrate().migrationsExecuted);
         assertEquals(0, flyway.migrate().migrationsExecuted);
 
         String source = readClasspath("schema.sql");
@@ -76,12 +80,12 @@ class PostgresFlywayBaselineTest {
                     WHERE constraint_schema='public' AND constraint_type='FOREIGN KEY'
                     """);
 
-            assertEquals(86, expectedTables.size(), "source schema table inventory changed");
+            assertEquals(89, expectedTables.size(), "source schema table inventory changed");
             assertEquals(expectedTables, actualTables, "PostgreSQL baseline table drift");
             assertTrue(actualIndexes.containsAll(expectedIndexes),
                     () -> "missing PostgreSQL indexes: " + difference(expectedIndexes, actualIndexes));
             assertEquals(expectedForeignKeys, actualForeignKeys, "PostgreSQL foreign-key drift");
-            assertEquals(80, scalar(connection, """
+            assertEquals(82, scalar(connection, """
                     SELECT COUNT(*) FROM information_schema.columns
                     WHERE table_schema='public' AND is_identity='YES'
                     """));
@@ -152,8 +156,9 @@ class PostgresFlywayBaselineTest {
                 .locations("classpath:db/migration/postgresql")
                 .load();
         // No .target(): migrates from V19 all the way to the current latest
-        // (V20 through V29, including provenance, orchestration and social delivery).
-        assertEquals(10, v20.migrate().migrationsExecuted);
+        // (V20 through V34, including provenance, orchestration, safety, Pod takeover and the
+        // capsule-landing foreign-key rename).
+        assertEquals(15, v20.migrate().migrationsExecuted);
         try (Connection migrated = DriverManager.getConnection(
                 jdbcUrl, POSTGRES.getUsername(), POSTGRES.getPassword())) {
             assertEquals(2, scalar(migrated,
@@ -190,6 +195,24 @@ class PostgresFlywayBaselineTest {
                 duplicateRejected = true;
             }
             assertTrue(duplicateRejected, "unique owner profile must be enforced by PostgreSQL");
+
+            statement.executeUpdate("""
+                    INSERT INTO tb_safety_event(user_id,client_message_id,safety_scope,risk_type,risk_level)
+                    SELECT id,'same-client-turn','AURORA_INPUT','CRISIS_KEYWORD','HIGH'
+                    FROM tb_user WHERE username='postgres-owner'
+                    """);
+            boolean duplicateSafetyDecisionRejected = false;
+            try {
+                statement.executeUpdate("""
+                        INSERT INTO tb_safety_event(user_id,client_message_id,safety_scope,risk_type,risk_level)
+                        SELECT id,'same-client-turn','AURORA_INPUT','CRISIS_KEYWORD','HIGH'
+                        FROM tb_user WHERE username='postgres-owner'
+                        """);
+            } catch (Exception expected) {
+                duplicateSafetyDecisionRejected = true;
+            }
+            assertTrue(duplicateSafetyDecisionRejected,
+                    "cross-Pod duplicate safety decisions must be rejected by PostgreSQL");
         }
     }
 

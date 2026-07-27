@@ -56,7 +56,7 @@ export function useTodoBoard({ setStatus, locale = "zh-CN" }: UseTodoBoardOption
     try {
       await api.splitTodo(id);
       await loadTodos();
-      setStatus(en ? "Aurora found a smaller first step." : "Aurora 已把它拆成更小的第一步");
+      setStatus(en ? "A smaller first step is ready." : "已经拆出更小的第一步");
     } catch (error) { setStatus(error instanceof Error ? error.message : en ? "Could not split this to-do yet." : "暂时无法拆分这个待办"); }
     finally { setSplitBusyId(null); }
   }, [en, loadTodos, setStatus]);

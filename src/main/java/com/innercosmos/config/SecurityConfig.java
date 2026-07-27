@@ -90,13 +90,33 @@ public class SecurityConfig {
                         "/api/v1/auth/login", "/api/v1/auth/register", "/api/v1/auth/csrf").permitAll()
                 .requestMatchers("/api/public/**").permitAll()
                 .requestMatchers("/api/plaza/capsules").permitAll()
-                .requestMatchers("/api/safety/resources").permitAll()
+                .requestMatchers("/api/safety/resources", "/api/safety/resources/catalog",
+                        "/api/v1/safety/resources", "/api/v1/safety/resources/catalog").permitAll()
                 .requestMatchers("/h2-console/**").denyAll()
-                // Actuator — health/metrics open, write ops require admin
+                // Actuator — health stays open (show-details/show-components are already gated
+                // to ADMIN in application.yml), everything else requires ADMIN.
+                // 2026-07-27 audit (P1, CONFIRMED): /actuator/metrics and /actuator/info leak
+                // per-URI request counts, AI-provider latency histograms, SSE connection counts
+                // and JVM/DB-pool internals -- there is no legitimate anonymous caller for
+                // either, so both are gated the same as the rest of /actuator/**.
                 .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
-                .requestMatchers("/actuator/metrics/**").permitAll()
+                .requestMatchers("/actuator/metrics/**").hasRole("ADMIN")
+                .requestMatchers("/actuator/info").hasRole("ADMIN")
+                // /actuator/prometheus is deliberately left permitAll at THIS layer: Prometheus
+                // scrapes it with no credential at all (deploy/k8s/observability/prometheus-
+                // config.yaml has no Authorization header configured), so requiring ADMIN here
+                // would break in-cluster scraping outright with nothing to compensate for it.
+                // The public-exposure risk this endpoint poses is closed at the network layer
+                // instead, for profiles that opt into a split management port (see
+                // application-academy-eks.yml + deploy/k8s/base/app-deployment.yml's separate
+                // "management" containerPort/NetworkPolicy rule): the Gateway/Service in that
+                // deployment only ever route to the app port, so anonymous internet traffic is
+                // structurally unable to reach this path at all, regardless of this permitAll.
+                // Profiles that do NOT split the management port (plain local dev, any profile
+                // that never sets management.server.port) still rely on this permitAll being
+                // reachable at :8080 -- that residual is an accepted, pre-existing trade-off for
+                // this one endpoint, not a regression introduced here.
                 .requestMatchers("/actuator/prometheus").permitAll()
-                .requestMatchers("/actuator/info").permitAll()
                 .requestMatchers("/actuator/**").hasRole("ADMIN")
                 // All API requires authentication
                 .requestMatchers("/api/**").authenticated()

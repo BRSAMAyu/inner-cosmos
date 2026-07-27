@@ -18,7 +18,35 @@ tags:
   - {name: Capsule}
   - {name: Letter}
   - {name: Persona}
+  - {name: Safety}
 paths:
+  /api/v1/safety/resources/catalog:
+    get:
+      tags: [Safety]
+      operationId: safetyResourceCatalog
+      security: []
+      parameters:
+        - in: query
+          name: locale
+          required: true
+          schema: {type: string, enum: [zh-CN, en-SG]}
+        - in: query
+          name: region
+          required: true
+          schema: {type: string, enum: [CN, SG]}
+      responses:
+        '200':
+          description: Region-bound, authority-backed crisis and emergency resource catalog.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  data:
+                    type: array
+                    items: {$ref: '#/components/schemas/SafetyResource'}
+        '400': {$ref: '#/components/responses/Error'}
   /api/v1/auth/login:
     post:
       tags: [Auth]
@@ -309,6 +337,20 @@ components:
         latitude: {type: number, format: double}
         longitude: {type: number, format: double}
         aiProviderPreference: {type: string}
+    SafetyResource:
+      type: object
+      required: [id, label, authorityUrl, verifiedAt, region, audience, hours, channel, category]
+      properties:
+        id: {type: string}
+        label: {type: string}
+        phone: {type: [string, 'null']}
+        authorityUrl: {type: string, format: uri}
+        verifiedAt: {type: string, format: date}
+        region: {type: string, enum: [CN, SG, GLOBAL]}
+        audience: {type: string}
+        hours: {type: string}
+        channel: {type: string, enum: [PHONE, WHATSAPP, IN_PERSON, NOTICE]}
+        category: {type: string, enum: [EMERGENCY, CRISIS_SUPPORT, YOUTH_SUPPORT, PRODUCT_BOUNDARY]}
     CapsuleCreateRequest:
       type: object
       required: [memoryIds]

@@ -92,7 +92,19 @@ $env:GLM_API_KEY = (Get-Content -Raw "$HOME\.inner-cosmos\glm.key").Trim()
 .\mvnw.cmd spring-boot:run
 ```
 
-Equivalent provider-specific variables include `MINIMAX_API_KEY`, `DEEPSEEK_API_KEY`, `MIMO_API_KEY`, and `GLM_ASR_API_KEY`. `prod` and `local-complete` disable Mock fallback and fail fast when required identity, database, Redis, TLS, or provider configuration is missing.
+Equivalent provider-specific variables include `GEMINI_API_KEY`, `MINIMAX_API_KEY`,
+`DEEPSEEK_API_KEY`, `MIMO_API_KEY`, and `GLM_ASR_API_KEY`. Aurora can route its fast acknowledgement,
+visible speaker, and reflective planner independently with `AURORA_FAST_MODEL`,
+`AURORA_SPEAKER_MODEL`, and `AURORA_THINKER_MODEL`; defaults are Gemini 3.5 Flash-Lite
+(`minimal`), Gemini 3.6 Flash (`medium`), and DeepSeek V4 Pro (`high`). Credentials remain
+provider-specific environment variables—never reuse one vendor's generic key for another.
+Each stage also has an independent response budget and sampling profile:
+`AURORA_FAST_TEMPERATURE`, `AURORA_SPEAKER_TEMPERATURE`,
+`AURORA_THINKER_TEMPERATURE`, `AURORA_CRITIC_TEMPERATURE`, plus the matching
+`*_MAX_TOKENS` variables. Gemini 3.5/3.6 uses thinking level and token budget as its
+primary distinction because its current API does not accept the deprecated sampling fields.
+`prod` and `local-complete` disable Mock fallback and fail fast when required identity, database,
+Redis, TLS, or provider configuration is missing.
 
 ## Deployment profiles
 

@@ -20,10 +20,10 @@ const COPY: Record<Locale, {
   emptyFragments: string; emptyToday: string; intensityLabel: string; analysisLabel: string; emptyAurora: string;
 }> = {
   "zh-CN": {
-    routeHint: "我被整理清楚了", heading: "今日记录卡", intro: "它不是诊断，也不是给你贴标签。它只是在帮你把今天摊平。",
+    routeHint: "今日记录", heading: "今天保存了什么", intro: "这里汇总今天的主题、情绪和行动线索。内容不准确时可以直接修改。",
     accept: "接受并保存", viewStarfield: "查看星图", previous: "前一天", next: "后一天", today: "今天",
     themeHeading: "今日主题", edit: "编辑", weatherHeading: "情绪天气", eventHeading: "今日理解",
-    fragmentsHeading: "认知碎片", fragmentsIntro: "每一段想法都被温柔地拆解了。", relationsHeading: "关系线索",
+    fragmentsHeading: "对话中的关键信息", fragmentsIntro: "按事实、感受、需要和行动分类，方便检查。", relationsHeading: "关系线索",
     todosHeading: "待办线索", auroraHeading: "Aurora 观察记录", save: "保存", cancel: "取消",
     editThemeLabel: "编辑主题", editEventLabel: "编辑今日理解", emptyTheme: "今天还没有记录",
     emptySummary: "和 Aurora 聊一次天后，这里会出现你的今日记录。", emptyRelations: "今天没有特别的关系线索。",

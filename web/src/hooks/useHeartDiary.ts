@@ -85,7 +85,7 @@ export function useHeartDiary({ setStatus, locale = "zh-CN" }: { setStatus: (sta
       }
       await api.diarySubmit(id, content);
       setSubmitted(true);
-      setStatus(en ? "Your entry is now a traceable star in memory." : "心声已凝聚为星斗，流淌入记忆宇宙");
+      setStatus(en ? "Your entry was saved and added to the memory starfield." : "记录已保存，并加入记忆星空。");
       return true;
     } catch (error) {
       setStatus(error instanceof Error ? error.message : en ? "Could not save this entry yet." : "暂时无法保存这段心声");

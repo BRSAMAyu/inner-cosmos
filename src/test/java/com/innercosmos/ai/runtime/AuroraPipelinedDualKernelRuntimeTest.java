@@ -37,6 +37,7 @@ class AuroraPipelinedDualKernelRuntimeTest {
         AuroraDualKernelRuntime runtime = new AuroraDualKernelRuntime(structured);
         ExecutorService plannerPool = Executors.newSingleThreadExecutor();
         runtime.setPlannerExecutor(plannerPool);
+        runtime.setDeliberationExecution("legacy-next-turn");
 
         Map<String, Object> firstContext = Map.of(
                 "sessionId", 91L,
@@ -55,14 +56,14 @@ class AuroraPipelinedDualKernelRuntimeTest {
         assertThat(first.backgroundPlannerStatus()).isEqualTo("SCHEDULED");
         assertThat(client.plannerStarted.await(1, TimeUnit.SECONDS)).isTrue();
         assertThat(client.latestSpeakerSystemPrompt)
-                .contains("没有默认数量", "不要把 1 条当作最安全答案", "禁止随机抽数");
+                .contains("没有默认数量", "短交流可用 1 条", "禁止随机抽数");
         assertThat(first.deferredInnerVoiceRequest()).isNull();
 
         client.releasePlanner.countDown();
         assertThat(first.backgroundPlannerEvidence().get(2, TimeUnit.SECONDS).status())
                 .isEqualTo(AuroraDualKernelRuntime.PlannerStatus.SUCCEEDED);
         assertThat(client.latestPlannerSystemPrompt)
-                .contains("没有默认数量", "让 1、2、3 条随真实语义自然变化", "不得随机抽数");
+                .contains("没有默认数量", "让 1-6 条随真实语义自然变化", "不得随机抽数");
 
         AuroraDualKernelRuntime.Generation second = runtime.generate(7L, "DAILY_TALK",
                 Map.of("sessionId", 91L, "userMessage", "但下午又困了",
@@ -158,6 +159,7 @@ class AuroraPipelinedDualKernelRuntimeTest {
         AuroraDualKernelRuntime runtime = new AuroraDualKernelRuntime(structured);
         ExecutorService pool = Executors.newSingleThreadExecutor();
         runtime.setPlannerExecutor(pool);
+        runtime.setDeliberationExecution("legacy-next-turn");
         return new RuntimeFixture(runtime, client, pool);
     }
 

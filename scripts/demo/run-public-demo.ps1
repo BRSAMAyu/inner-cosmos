@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet("deepseek", "glm")]
+    [ValidateSet("deepseek", "glm", "gemini")]
     [string]$Provider = "deepseek",
     [int]$Port = 8080,
     [int]$MaxBuildWorkers = 1,
@@ -142,11 +142,17 @@ try {
     $keys = Get-Content -LiteralPath $keyFile -Encoding utf8
     $qwenLine = $keys | Where-Object { $_ -match "^\s*qwen\s*:" } | Select-Object -First 1
     $glmLine = $keys | Where-Object { $_ -match "^\s*glm\s*:" } | Select-Object -First 1
+    $geminiLine = $keys | Where-Object { $_ -match "^\s*gemini\s*:" } | Select-Object -First 1
     $deepseekLine = $keys | Where-Object { $_ -match "(?i)deepseek.*apikey\s*:" } | Select-Object -First 1
     $qwenKey = if ($qwenLine) { ($qwenLine -replace "^\s*qwen\s*:\s*", "").Trim() } else { "" }
     $glmKey = if ($glmLine) { ($glmLine -replace "^\s*glm\s*:\s*", "").Trim() } else { "" }
+    $geminiKey = if ($geminiLine) { ($geminiLine -replace "^\s*gemini\s*:\s*", "").Trim() } else { "" }
     $deepseekKey = if ($deepseekLine) { ($deepseekLine -replace "(?i)^.*apikey\s*:\s*", "").Trim() } else { "" }
-    $chatKey = if ($Provider -eq "deepseek") { $deepseekKey } else { $glmKey }
+    $chatKey = switch ($Provider) {
+        "deepseek" { $deepseekKey }
+        "glm" { $glmKey }
+        "gemini" { $geminiKey }
+    }
     if ([string]::IsNullOrWhiteSpace($chatKey)) { throw "No $Provider key was found in the local operator file." }
     if ([string]::IsNullOrWhiteSpace($qwenKey)) { throw "No Qwen key was found for embedding/TTS." }
 
@@ -174,10 +180,11 @@ try {
     }
     $env:LLM_PROVIDER = $Provider
     $env:LLM_API_KEY = $chatKey
-    $env:DEEPSEEK_API_KEY = if ($Provider -eq "deepseek") { $deepseekKey } else { "" }
-    # Only expose the selected chat provider to the in-app model selector. A stale key for an
-    # unselected provider must not create a clickable model that only returns deterministic
-    # fallbacks during a classroom demo.
+    # Aurora may use a different provider per temporal layer: Gemini Flash-Lite for the fast
+    # acknowledgement, Gemini Flash for the visible speaker and DeepSeek for deliberation.
+    # Missing optional stage credentials degrade to the selected primary provider without Mock.
+    $env:DEEPSEEK_API_KEY = $deepseekKey
+    $env:GEMINI_API_KEY = $geminiKey
     $env:GLM_API_KEY = if ($Provider -eq "glm") { $glmKey } else { "" }
     $env:MEMORY_EMBEDDING_API_KEY = $qwenKey
     $env:MEMORY_EMBEDDING_BASE_URL = "https://llm-errus8cw2pf66bx9.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"

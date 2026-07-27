@@ -84,6 +84,50 @@ describe("CapsuleWorkbench", () => {
     expect(onArchive).not.toHaveBeenCalled();
   });
 
+  it("labels 'current version' fidelity from the ACTIVE genome version, not merely the newest one", () => {
+    // genomeHistory is ordered version_no DESC by the backend: index 0 is the newest (here, a
+    // recompile still awaiting owner review), while the older v1 is the one actually ACTIVE.
+    const needsReviewVersion: CapsuleGenomeVersion = {
+      id: 4, versionNo: 2, parentVersionId: 3, compilerVersion: "v1", status: "NEEDS_REVIEW",
+      evaluationJson: "{}", changeReason: "记忆更新后重新编译", createdAt: "2026-07-20T00:00:00Z"
+    };
+    render(<CapsuleWorkbench capsules={[capsule]} selectedCapsuleId={capsule.id} selectedCapsule={capsule} selectableMemories={[memory]}
+      selectedMemoryIds={[1]} capsuleName="" capsuleIntro="" capsulePreview={null} capsuleBusy={false}
+      genomeHistory={[needsReviewVersion, genomeVersion]}
+      fidelitySummary={[
+        { genomeVersionId: 4, versionNo: 2, totalRatings: 9, likeMeCount: 1, notMeCount: 8, factWrongCount: 0, tooExposedCount: 0, toneWrongCount: 0, fidelityScore: 0.11 },
+        { genomeVersionId: 3, versionNo: 1, totalRatings: 2, likeMeCount: 1, notMeCount: 1, factWrongCount: 0, tooExposedCount: 0, toneWrongCount: 0, fidelityScore: 0.5 }
+      ]}
+      sandboxQuestion="" sandboxResult={null} sandboxFeedback={null} onSelectCapsule={() => undefined}
+      onToggleMemory={() => undefined} onCapsuleName={() => undefined} onCapsuleIntro={() => undefined}
+      onPreviewNewCapsule={() => undefined} onCancelPreview={() => undefined} onCreateCapsule={() => undefined}
+      onRecompile={() => undefined} onSandboxQuestion={() => undefined} onRunSandbox={() => undefined}
+      onRateSandbox={() => undefined} onPublish={() => undefined} onPause={() => undefined} onArchive={() => undefined} />);
+    expect(screen.getAllByText(/当前版本 · 2 次反馈 · 50% 像我/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/当前版本 · 9 次反馈 · 11% 像我/)).not.toBeInTheDocument();
+  });
+
+  it("shows no 'current version' fidelity note when no genome version is ACTIVE", () => {
+    const needsReviewVersion: CapsuleGenomeVersion = {
+      id: 4, versionNo: 2, parentVersionId: 3, compilerVersion: "v1", status: "NEEDS_REVIEW",
+      evaluationJson: "{}", changeReason: "记忆更新后重新编译", createdAt: "2026-07-20T00:00:00Z"
+    };
+    const withdrawnVersion: CapsuleGenomeVersion = { ...genomeVersion, status: "WITHDRAWN" };
+    render(<CapsuleWorkbench capsules={[capsule]} selectedCapsuleId={capsule.id} selectedCapsule={capsule} selectableMemories={[memory]}
+      selectedMemoryIds={[1]} capsuleName="" capsuleIntro="" capsulePreview={null} capsuleBusy={false}
+      genomeHistory={[needsReviewVersion, withdrawnVersion]}
+      fidelitySummary={[
+        { genomeVersionId: 4, versionNo: 2, totalRatings: 9, likeMeCount: 1, notMeCount: 8, factWrongCount: 0, tooExposedCount: 0, toneWrongCount: 0, fidelityScore: 0.11 },
+        { genomeVersionId: 3, versionNo: 1, totalRatings: 2, likeMeCount: 1, notMeCount: 1, factWrongCount: 0, tooExposedCount: 0, toneWrongCount: 0, fidelityScore: 0.5 }
+      ]}
+      sandboxQuestion="" sandboxResult={null} sandboxFeedback={null} onSelectCapsule={() => undefined}
+      onToggleMemory={() => undefined} onCapsuleName={() => undefined} onCapsuleIntro={() => undefined}
+      onPreviewNewCapsule={() => undefined} onCancelPreview={() => undefined} onCreateCapsule={() => undefined}
+      onRecompile={() => undefined} onSandboxQuestion={() => undefined} onRunSandbox={() => undefined}
+      onRateSandbox={() => undefined} onPublish={() => undefined} onPause={() => undefined} onArchive={() => undefined} />);
+    expect(screen.queryByText(/当前版本 ·/)).not.toBeInTheDocument();
+  });
+
   it("shows every eligible memory instead of silently truncating after ten", () => {
     const memories = Array.from({ length: 11 }, (_, index): MemoryCard => ({
       ...memory, id: index + 1, title: `记忆 ${index + 1}`

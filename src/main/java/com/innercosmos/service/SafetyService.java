@@ -1,6 +1,7 @@
 package com.innercosmos.service;
 
 import com.innercosmos.vo.SafetyResult;
+import com.innercosmos.vo.SafetyResourceVO;
 import java.util.List;
 
 public interface SafetyService {
@@ -12,6 +13,10 @@ public interface SafetyService {
 
     default List<String> resources(String locale, String region) {
         return resources();
+    }
+
+    default List<SafetyResourceVO> resourceCatalog(String locale, String region) {
+        return List.of();
     }
 
     default SafetyResult check(String text, Long userId, Long sessionId, String observationId,

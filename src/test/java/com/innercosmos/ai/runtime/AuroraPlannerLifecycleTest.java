@@ -75,6 +75,7 @@ class AuroraPlannerLifecycleTest {
         runtime.setPlannerExecutor(command -> {
             throw new java.util.concurrent.RejectedExecutionException("saturated");
         });
+        runtime.setDeliberationExecution("legacy-next-turn");
 
         AuroraDualKernelRuntime.Generation generation = runtime.generate(7L, "DAILY_TALK",
                 context("池满时也要先回复"), client, StructuredAiResults.AuroraResult::new);
@@ -99,6 +100,7 @@ class AuroraPlannerLifecycleTest {
         AuroraDualKernelRuntime runtime = new AuroraDualKernelRuntime(structured);
         ExecutorService pool = Executors.newSingleThreadExecutor();
         runtime.setPlannerExecutor(pool);
+        runtime.setDeliberationExecution("legacy-next-turn");
         return new Harness(runtime, pool);
     }
 

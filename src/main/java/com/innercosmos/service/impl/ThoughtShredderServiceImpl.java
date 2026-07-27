@@ -14,6 +14,7 @@ import com.innercosmos.mapper.TodoItemMapper;
 import com.innercosmos.service.GravityService;
 import com.innercosmos.service.SafetyService;
 import com.innercosmos.service.ThoughtShredderService;
+import com.innercosmos.util.JsonUtils;
 import com.innercosmos.vo.SafetyResult;
 import com.innercosmos.vo.ShredderResultVO;
 import org.springframework.stereotype.Service;
@@ -24,6 +25,11 @@ import java.util.List;
 
 @Service
 public class ThoughtShredderServiceImpl implements ThoughtShredderService {
+    // FIX 3 (robustness audit): mirrors CapsuleSandboxRequest's @Size(max = 2000) precedent for
+    // free-text sent to an AI provider and persisted -- keeps the shredder's raw vent input
+    // bounded without introducing a new request DTO.
+    private static final int MAX_TEXT_LENGTH = 2000;
+
     private final MemoryCardMapper memoryCardMapper;
     private final ThoughtFragmentMapper thoughtFragmentMapper;
     private final TodoItemMapper todoItemMapper;
@@ -47,6 +53,21 @@ public class ThoughtShredderServiceImpl implements ThoughtShredderService {
 
     @Override
     public ShredderResultVO process(Long userId, String rawText, String originalHandlingMode) {
+        // FIX 3 (robustness audit): a blank/missing `text` (e.g. client posts `{}`) used to sail
+        // through SafetyServiceImpl (null-safe, returns LOW risk) and then normalize() silently
+        // substituted a placeholder sentence -- burning a real AI provider call and persisting a
+        // memory card the user never wrote. Reject it here, in the service, so every current and
+        // future caller of process() (today there is exactly one: ThoughtShredderController) gets
+        // the same guarantee, following the same service-layer-validation + BusinessException +
+        // ErrorCode.BAD_REQUEST convention as TodoServiceImpl.create.
+        if (rawText == null || rawText.isBlank()) {
+            throw new com.innercosmos.exception.BusinessException(
+                    com.innercosmos.common.ErrorCode.BAD_REQUEST, "内容不能为空，先写下一点想法再交给思维碎纸机吧");
+        }
+        if (rawText.trim().length() > MAX_TEXT_LENGTH) {
+            throw new com.innercosmos.exception.BusinessException(
+                    com.innercosmos.common.ErrorCode.BAD_REQUEST, "内容过长，思维碎纸机一次最多处理" + MAX_TEXT_LENGTH + "字，请精简后重试");
+        }
         SafetyResult safety = safetyService.check(rawText, userId, null);
         if (Boolean.TRUE.equals(safety.blockModelCall)) {
             com.innercosmos.exception.SafetyBlockedException blocked =
@@ -78,15 +99,34 @@ public class ThoughtShredderServiceImpl implements ThoughtShredderService {
         card.title = "从混乱里留下的一句话";
         card.summary = sentenceToKeep;
         card.memoryType = blank(ai.memoryType, "SHREDDER");
-        card.emotionTags = "[\"" + json(coreFeeling) + "\"]";
-        card.keywordTags = "[\"thought-shredder\",\"" + json(hiddenNeed) + "\"]";
+        // FIX 2 (robustness audit): coreFeeling/hiddenNeed can come straight from a real AI
+        // provider (see `blank(ai.coreFeeling, ...)` above), so a value containing a newline,
+        // tab, or other control character broke the old hand-rolled
+        // "[\"" + json(...) + "\"]" concatenation (json() only escaped backslash/quote) into
+        // syntactically invalid JSON. JsonUtils.toJson serialises through Jackson, which escapes
+        // every control character, and still produces the exact same `["a","b"]` shape the
+        // regex-based readers (EmotionTimelineServiceImpl#fallbackEmotionAggregation,
+        // CapsuleServiceImpl#parseTags) already strip brackets/quotes/commas from for ordinary
+        // values -- so this is a drop-in, byte-compatible replacement for normal tags.
+        card.emotionTags = JsonUtils.toJson(List.of(coreFeeling));
+        card.keywordTags = JsonUtils.toJson(List.of("thought-shredder", hiddenNeed));
         card.peopleTags = "[]";
         card.intensityScore = intensity;
         card.recurrenceCount = 1;
         card.userImportance = 3.0;
         card.triggerCount = 1;
-        // M-026: DISPLAY_ONCE (TRANSIENT) cards are a one-time vent, not a weighted memory —
-        // give them zero gravity so they never surface in the starfield.
+        // M-026: DISPLAY_ONCE ("看一次就好") is a one-time vent, not a weighted memory -- and it is
+        // NEVER persisted at all (see `persistResult` below, which gates every insert in this
+        // method). The comment here used to say these cards are "given zero gravity so they never
+        // surface in the starfield", which was misleading: a card that is never inserted cannot
+        // surface regardless of its gravity/status field. status="TRANSIENT" and
+        // emotionalGravity=0.0 below only describe the in-memory `card` object that is returned to
+        // the caller inside `ShredderResultVO.memoryCard` -- they make the API response payload
+        // obviously non-canonical (paired with a null `id`) for any client that inspects it, but no
+        // row with this status ever reaches the database. The frontend
+        // (web/src/components/ThoughtShredderSection.tsx) actually keys its "not saved" UI off
+        // `memoryCard.id === null`, not off `status`; that null id is the real, load-bearing
+        // contract of this mode.
         boolean displayOnce = "DISPLAY_ONCE".equals(mode);
         card.emotionalGravity = displayOnce ? 0.0 : gravityService.calculateGravity(intensity, 1, 3, 1, 0);
         card.lastTouchedAt = LocalDateTime.now();
@@ -98,6 +138,8 @@ public class ThoughtShredderServiceImpl implements ThoughtShredderService {
         card.consentScope = "AURORA_PRIVATE";
         card.provenanceRefs = "THOUGHT_SHREDDER:" + mode
                 + " · source-version:1 · consent:AURORA_PRIVATE";
+        // persistResult also gates ThoughtFragment/TodoItem inserts below -- DISPLAY_ONCE persists
+        // nothing anywhere, by design.
         boolean persistResult = !displayOnce;
         if (persistResult) {
             memoryCardMapper.insert(card);
@@ -148,8 +190,17 @@ public class ThoughtShredderServiceImpl implements ThoughtShredderService {
 
     @Override
     public List<MemoryCard> history(Long userId) {
+        // FIX 1 (robustness audit): this used to also filter `.ne("status", "TRANSIENT")`, under
+        // the (false) assumption that a DISPLAY_ONCE row could reach the table with that status.
+        // It never can: `process()` above only ever assigns status="TRANSIENT" to the in-memory
+        // `card` object it returns for DISPLAY_ONCE, and that exact branch (`persistResult =
+        // !displayOnce`) is what skips `memoryCardMapper.insert(card)` for it. Confirmed no other
+        // writer in the codebase persists memory_type=SHREDDER with status=TRANSIENT either
+        // (checked MockDataInitializer and every other MemoryCard insert site). So the filter
+        // matched zero rows, ever -- removed as dead code rather than kept as misleading defensive
+        // clutter.
         QueryWrapper<MemoryCard> query = new QueryWrapper<>();
-        query.eq("user_id", userId).eq("memory_type", "SHREDDER").ne("status", "TRANSIENT").orderByDesc("id");
+        query.eq("user_id", userId).eq("memory_type", "SHREDDER").orderByDesc("id");
         return memoryCardMapper.selectList(query);
     }
 
@@ -404,9 +455,5 @@ public class ThoughtShredderServiceImpl implements ThoughtShredderService {
             if (text != null && text.contains(keyword)) return true;
         }
         return false;
-    }
-
-    private String json(String text) {
-        return text.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 }

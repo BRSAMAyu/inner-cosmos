@@ -15,11 +15,20 @@ const review = (overrides: Partial<WeeklyReviewV2> = {}): WeeklyReviewV2 => ({
 });
 
 describe("WeeklyReviewSection", () => {
+  it("renders an incomplete older V2 response without crashing the whole cosmos space", () => {
+    const incomplete = {
+      ...review(),
+      topThemes: 42,
+      dailySnapshots: [null, undefined]
+    } as unknown as WeeklyReviewV2;
+    render(<WeeklyReviewSection review={incomplete} busy={false} onGenerate={vi.fn()} />);
+    expect(screen.getByText("这周还没有每日记录")).toBeVisible();
+  });
   it("shows an empty state and lets the user generate a review", () => {
     const onGenerate = vi.fn();
     render(<WeeklyReviewSection review={null} busy={false} onGenerate={onGenerate} />);
-    expect(screen.getByText(/还没有生成过周报/)).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: /重新生成这一周/ }));
+    expect(screen.getByText(/还没有周报/)).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: /生成本周周报/ }));
     expect(onGenerate).toHaveBeenCalledOnce();
   });
 
@@ -37,7 +46,7 @@ describe("WeeklyReviewSection", () => {
 
   it("disables the regenerate button while busy", () => {
     render(<WeeklyReviewSection review={review()} busy={true} onGenerate={() => undefined} />);
-    expect(screen.getByRole("button", { name: /重新生成这一周/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /生成本周周报/ })).toBeDisabled();
   });
 
   it("renders in English when locale is en-SG", () => {

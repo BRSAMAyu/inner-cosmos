@@ -18,7 +18,7 @@ import java.util.Set;
 public final class ProductionStartupGuard implements ApplicationRunner {
 
     private static final Set<String> REAL_PROVIDERS =
-            Set.of("glm", "mimo", "minimax", "deepseek", "openai-compatible");
+            Set.of("glm", "mimo", "minimax", "deepseek", "gemini", "openai-compatible");
     private static final Set<String> RUNTIME_ROLES =
             Set.of("all", "api", "worker", "scheduler", "migration");
 

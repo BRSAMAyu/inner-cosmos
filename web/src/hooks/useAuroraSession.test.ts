@@ -19,6 +19,7 @@ vi.mock("../api", () => ({
     wakeIntents: vi.fn(),
     notifications: vi.fn(),
     safetyResources: vi.fn(),
+    safetyResourceCatalog: vi.fn(),
     timeline: vi.fn(),
     stop: vi.fn(),
     negotiateWakeIntent: vi.fn(),
@@ -68,6 +69,7 @@ beforeEach(() => {
   vi.mocked(api.messages).mockResolvedValue([]);
   vi.mocked(api.wakeIntents).mockResolvedValue([]);
   vi.mocked(api.notifications).mockResolvedValue([]);
+  vi.mocked(api.safetyResourceCatalog).mockResolvedValue([]);
   window.history.pushState({}, "", "/");
 });
 
@@ -198,7 +200,12 @@ describe("useAuroraSession -- send / streaming / interrupt", () => {
     expect(result.current.draft).toBe("");
     expect(result.current.messages.some(m => m.speaker === "USER" && m.text === "今天有点累")).toBe(true);
     expect(result.current.messages.some(m =>
-      m.speaker === "AURORA" && m.text === "眼前这份累已经很具体了。")).toBe(true);
+      m.speaker === "AURORA" && m.text === "眼前这份累已经很具体了。")).toBe(false);
+    expect(result.current.runtimeSignal).toMatchObject({
+      stage: "understanding",
+      foregroundText: "眼前这份累已经很具体了。",
+      foregroundSource: "model-fast"
+    });
     expect(onSkillSuggestion).toHaveBeenCalledWith(null);
     expect(streamAurora).toHaveBeenCalledOnce();
     expect(vi.mocked(streamAurora).mock.calls[0]?.[0]).toMatchObject({
@@ -240,20 +247,76 @@ describe("useAuroraSession -- send / streaming / interrupt", () => {
 
     act(() => { capturedOnEvent!({ id: "4d", type: "meta", payload: {
       memoryReferenced: true, referencedMemoryIds: [17, 23, "bad"],
-      detectedTheme: "恢复", agentLoop: { runtime: "dual-kernel.v1" }
+      detectedTheme: "恢复",
+      aiState: {
+        provider: "mock", model: "aurora-demo", responseSource: "DEMO_MODE",
+        fallbackReason: "configured-mock"
+      },
+      agentLoop: {
+        runtime: "dual-kernel.v1", foregroundSource: "local-timeout",
+        backgroundPlannerStatus: "SCHEDULED", guidanceSource: "bootstrap",
+        fallbackReason: "configured-mock",
+        stageLatenciesMs: { speaker: 18, criticalPathTotal: 24, invalid: "bad" }
+      }
     } }); });
     expect(result.current.memoryTrace).toEqual({
       referencedMemoryIds: [17, 23], detectedTheme: "恢复"
     });
     expect(result.current.runtimeSignal.runtime).toBe("dual");
+    expect(result.current.runtimeSignal).toMatchObject({
+      responseSource: "DEMO_MODE",
+      foregroundSource: "local-timeout",
+      diagnostics: {
+        provider: "mock",
+        model: "aurora-demo",
+        foregroundSource: "local-timeout",
+        plannerStatus: "SCHEDULED",
+        guidanceSource: "bootstrap",
+        fallbackReason: "configured-mock",
+        stageLatenciesMs: { speaker: 18, criticalPathTotal: 24 }
+      }
+    });
 
     act(() => { capturedOnEvent!({ id: "5", type: "turn.completed", payload: { message: "done" } }); });
     expect(result.current.activeTurnId).toBeNull();
     expect(result.current.runtimeSignal.stage).toBe("idle");
+    expect(result.current.runtimeSignal.responseSource).toBe("DEMO_MODE");
+    expect(result.current.runtimeSignal.diagnostics?.fallbackReason).toBe("configured-mock");
     expect(result.current.memoryTrace).toEqual({
       referencedMemoryIds: [17, 23], detectedTheme: "恢复"
     });
     expect(setStatus).toHaveBeenLastCalledWith("Aurora 在这里，等你接着说");
+  });
+
+  it("shows an interruptible understanding state during foreground latency", async () => {
+    let resolveForeground!: (value: Awaited<ReturnType<typeof api.auroraForeground>>) => void;
+    vi.mocked(api.auroraForeground).mockImplementation(() => new Promise(resolve => {
+      resolveForeground = resolve;
+    }));
+    vi.mocked(api.psychologySkillSuggestion).mockResolvedValue(null);
+    vi.mocked(streamAurora).mockResolvedValue("TERMINAL_EVENT");
+    const { result } = setup();
+    await act(async () => { await result.current.resolveSession(); });
+    act(() => { result.current.setDraft("我现在有点乱"); });
+
+    let sendPromise!: Promise<void>;
+    await act(async () => {
+      sendPromise = result.current.send({ preventDefault: () => undefined } as never);
+      await Promise.resolve();
+    });
+
+    expect(result.current.activeTurnId).toBe(-1);
+    expect(result.current.runtimeSignal.stage).toBe("understanding");
+
+    await act(async () => {
+      resolveForeground({
+        text: "我先陪你把它放在这里。",
+        source: "model-fast",
+        latencyMs: 320,
+        safetyBlocked: false
+      });
+      await sendPromise;
+    });
   });
 
   it("refreshes the affected domain only after an executed natural-action receipt", async () => {
@@ -313,6 +376,31 @@ describe("useAuroraSession -- send / streaming / interrupt", () => {
 
     act(() => { result.current.dismissSafetyAlert(); });
     expect(result.current.safetyAlert).toBeNull();
+  });
+
+  it("a GENTLE_CHECK_IN support offer does not terminate the active Aurora turn", async () => {
+    let capturedOnEvent: ((event: AuroraStreamEvent) => void) | undefined;
+    vi.mocked(streamAurora).mockImplementation(async (_input, _signal, onEvent) => {
+      capturedOnEvent = onEvent;
+      return "TERMINAL_EVENT";
+    });
+    vi.mocked(api.psychologySkillSuggestion).mockResolvedValue(null);
+    const { result } = setup("en-SG");
+    await act(async () => { await result.current.resolveSession(); });
+    act(() => { result.current.setDraft("I still feel hopeless today"); });
+    await act(async () => { await result.current.send({ preventDefault: () => undefined } as never); });
+    act(() => { capturedOnEvent!({ id: "1", type: "turn.started", payload: { turnId: 19 } }); });
+
+    act(() => { capturedOnEvent!({
+      id: "2", type: "safety", payload: {
+        riskLevel: "MEDIUM", riskType: "GENTLE_CHECK_IN", handledAction: "SUPPORT_OFFER",
+        safetyState: "GENTLE_CHECK_IN", featureTarget: "safety-harbor",
+        safeMessage: "Can I gently check: are you safe right now?"
+      }
+    }); });
+
+    expect(result.current.activeTurnId).toBe(19);
+    expect(result.current.safetyAlert?.safetyState).toBe("GENTLE_CHECK_IN");
   });
 
   // W2 voice: the "inner_voice" SSE event is purely additive -- it must never block, delay, or
@@ -560,25 +648,25 @@ describe("useAuroraSession -- send / streaming / interrupt", () => {
 
 describe("useAuroraSession -- safety resources", () => {
   it("loadSafetyResources fetches and stores the real backend crisis-resource list", async () => {
-    vi.mocked(api.safetyResources).mockResolvedValue([
-      "如果你正处于紧急危险中，请立即拨打 110（报警），或联系身边可信赖的人。"
-    ]);
+    const resource = {
+      id: "cn-emergency", label: "紧急报警", phone: "110",
+      authorityUrl: "https://www.gov.cn/", verifiedAt: "2026-07-27",
+      region: "CN", audience: "所有人", hours: "24/7",
+      channel: "PHONE", category: "EMERGENCY"
+    } as const;
+    vi.mocked(api.safetyResourceCatalog).mockResolvedValue([resource]);
     const { result } = setup();
     expect(result.current.safetyResources).toEqual([]);
     await act(async () => { await result.current.loadSafetyResources(); });
-    expect(result.current.safetyResources).toEqual([
-      "如果你正处于紧急危险中，请立即拨打 110（报警），或联系身边可信赖的人。"
-    ]);
-    expect(api.safetyResources).toHaveBeenCalledWith("zh-CN", "CN");
+    expect(result.current.safetyResources).toEqual([resource]);
+    expect(api.safetyResourceCatalog).toHaveBeenCalledWith("zh-CN", "CN");
   });
 
   it("requests Singapore English resources for en-SG", async () => {
-    vi.mocked(api.safetyResources).mockResolvedValue([
-      "Samaritans of Singapore (SOS) · 24-hour hotline: 1767."
-    ]);
+    vi.mocked(api.safetyResourceCatalog).mockResolvedValue([]);
     const { result } = setup("en-SG");
     await act(async () => { await result.current.loadSafetyResources(); });
-    expect(api.safetyResources).toHaveBeenCalledWith("en-SG", "SG");
+    expect(api.safetyResourceCatalog).toHaveBeenCalledWith("en-SG", "SG");
   });
 });
 

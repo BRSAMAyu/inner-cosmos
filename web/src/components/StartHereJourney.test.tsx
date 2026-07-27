@@ -5,11 +5,13 @@ import { StartHereJourney } from "./StartHereJourney";
 afterEach(cleanup);
 
 describe("StartHereJourney", () => {
-  it("shows an expanded, actionable five-step journey for an ordinary new user", () => {
+  it("stays compact beside Aurora until an ordinary user deliberately expands the journey", () => {
     const onStep = vi.fn();
     render(<StartHereJourney locale="zh-CN" onStep={onStep} />);
 
     expect(screen.getByRole("region", { name: "从这里开始：完整旅程" })).toBeVisible();
+    expect(screen.queryByRole("list")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "展开五步旅程" }));
     expect(screen.getAllByRole("listitem")).toHaveLength(5);
     expect(screen.getByText("和 Aurora 说")).toBeVisible();
     expect(screen.getByText("留下记忆")).toBeVisible();
@@ -38,6 +40,7 @@ describe("StartHereJourney", () => {
 
   it("renders the complete journey in English without Chinese action labels", () => {
     render(<StartHereJourney locale="en-SG" onStep={() => undefined} />);
+    fireEvent.click(screen.getByRole("button", { name: "Expand the five-step journey" }));
     expect(screen.getByText("START HERE")).toBeVisible();
     expect(screen.getByRole("button", { name: /Start talking/ })).toBeVisible();
     expect(screen.getByRole("button", { name: /See memories/ })).toBeVisible();
@@ -52,6 +55,7 @@ describe("StartHereJourney", () => {
       onStep={() => undefined} />);
 
     expect(screen.getByText("2/5 complete")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Expand the five-step journey" }));
     expect(screen.getAllByRole("button", { name: /Complete/ })).toHaveLength(2);
     expect(screen.getByRole("button", { name: /Shape a facet · Up next/ })).toBeVisible();
   });
@@ -73,6 +77,7 @@ describe("StartHereJourney", () => {
   it("collapses when the final journey step becomes complete", () => {
     const { rerender } = render(<StartHereJourney locale="en-SG"
       completedSteps={["aurora", "memory", "capsule", "match"]} onStep={() => undefined} />);
+    fireEvent.click(screen.getByRole("button", { name: "Expand the five-step journey" }));
     expect(screen.getByRole("list")).toBeVisible();
 
     rerender(<StartHereJourney locale="en-SG"

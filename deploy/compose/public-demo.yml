@@ -67,6 +67,7 @@ services:
       LLM_PROVIDER: ${LLM_PROVIDER:?selected by run-public-demo.ps1}
       LLM_API_KEY: ${LLM_API_KEY:?loaded locally by run-public-demo.ps1}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GLM_API_KEY: ${GLM_API_KEY:-}
       LLM_ALLOW_FALLBACK: "false"
       # The classroom UI and seed journey default to English, while Aurora follows the language

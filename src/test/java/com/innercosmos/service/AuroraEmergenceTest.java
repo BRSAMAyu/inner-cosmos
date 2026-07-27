@@ -237,6 +237,13 @@ class AuroraEmergenceTest {
         source.longTermMemories = java.util.stream.IntStream.range(0, 10)
                 .mapToObj(i -> "memory-" + i + "-" + "x".repeat(400))
                 .toList();
+        source.timezone = "Asia/Shanghai";
+        source.locale = "zh-CN";
+        source.localDateTime = "2026-07-27T20:15:00+08:00";
+        source.lastInteractionLabel = "距离上次互动 2 小时";
+        source.clientTimeHintStatus = "MATCHED";
+        source.dailyObservations = List.of("daily-old", "daily-mid", "daily-latest");
+        source.weeklyObservations = List.of("weekly-old", "weekly-latest");
         source.threeModelBlock = "PORTRAIT_UNIQUE RELATIONSHIP_UNIQUE CONSTITUTION_UNIQUE";
         source.constitutionBlock = "CONSTITUTION_UNIQUE";
         when(agentContextAssembler.assemble(anyLong(), anyLong(), anyString(), anyBoolean(),
@@ -270,9 +277,18 @@ class AuroraEmergenceTest {
         assertFalse(providerContext.containsKey("auroraPrompt"));
         assertFalse(providerContext.containsKey("recentAuroraMessages"));
         AgentContext compact = (AgentContext) providerContext.get("unifiedAgentContext");
-        assertEquals(6, compact.recentMessages.size());
+        assertTrue(compact.recentMessages.isEmpty(), "session history must not be duplicated inside AgentContext");
+        assertEquals(10, ((List<?>) providerContext.get("conversationHistory")).size());
         assertEquals(4, compact.longTermMemories.size());
-        assertTrue(json.length() < 7_000, "bounded model context unexpectedly large: " + json.length());
+        assertEquals("Asia/Shanghai", compact.timezone);
+        assertEquals("zh-CN", compact.locale);
+        assertEquals("2026-07-27T20:15:00+08:00", compact.localDateTime);
+        assertEquals("距离上次互动 2 小时", compact.lastInteractionLabel);
+        assertEquals("MATCHED", compact.clientTimeHintStatus);
+        assertEquals(List.of("daily-old", "daily-mid", "daily-latest"), compact.dailyObservations);
+        assertEquals(List.of("weekly-old", "weekly-latest"), compact.weeklyObservations);
+        assertEquals("PORTRAIT_UNIQUE RELATIONSHIP_UNIQUE CONSTITUTION_UNIQUE", compact.threeModelBlock);
+        assertTrue(json.length() < 10_000, "bounded model context unexpectedly large: " + json.length());
     }
     @Test
     @DisplayName("mock fallback stays coherent with the state signal when the LLM path fails")

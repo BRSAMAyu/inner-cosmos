@@ -119,6 +119,7 @@ public class SessionModelRouter {
             case "MIMO"    -> llmConfig.mimo.model;
             case "GLM"     -> llmConfig.glm.model;
             case "DEEPSEEK"-> llmConfig.deepseek.model;
+            case "GEMINI"  -> llmConfig.gemini.model;
             case "MOCK"    -> "mock-inner-cosmos";
             default        -> llmConfig.model;
         };

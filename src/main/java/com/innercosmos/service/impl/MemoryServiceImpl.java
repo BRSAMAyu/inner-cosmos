@@ -206,15 +206,19 @@ public class MemoryServiceImpl implements MemoryService {
         vo.capsuleSuggested = card.emotionalGravity != null && card.emotionalGravity > 1.1;
 
         QueryWrapper<ThoughtFragment> fragmentQuery = new QueryWrapper<>();
-        fragmentQuery.eq("memory_card_id", card.id).orderByAsc("id");
+        fragmentQuery.eq("user_id", userId).eq("memory_card_id", card.id).orderByAsc("id");
         vo.fragments = thoughtFragmentMapper.selectList(fragmentQuery);
 
         QueryWrapper<EmotionTrace> emotionQuery = new QueryWrapper<>();
-        emotionQuery.eq("source_session_id", card.sourceSessionId).orderByDesc("id");
+        emotionQuery.eq("user_id", userId).eq("source_session_id", card.sourceSessionId).orderByDesc("id");
         vo.emotions = emotionTraceMapper.selectList(emotionQuery);
 
+        // SECURITY (cross-tenant content injection): scoping by source_memory_card_id alone lets
+        // another user's todo (whose sourceMemoryCardId was pointed at this card) leak into this
+        // owner's private daily record. Defence-in-depth alongside the create()-time validation
+        // in TodoServiceImpl.
         QueryWrapper<TodoItem> todoQuery = new QueryWrapper<>();
-        todoQuery.eq("source_memory_card_id", card.id).orderByAsc("id");
+        todoQuery.eq("user_id", userId).eq("source_memory_card_id", card.id).orderByAsc("id");
         vo.todos = todoItemMapper.selectList(todoQuery);
 
         vo.relations = relationMentionMapper.selectList(
@@ -371,19 +375,24 @@ public class MemoryServiceImpl implements MemoryService {
         detail.card = card;
 
         QueryWrapper<ThoughtFragment> fragmentQuery = new QueryWrapper<>();
-        fragmentQuery.eq("memory_card_id", cardId).orderByAsc("id");
+        fragmentQuery.eq("user_id", userId).eq("memory_card_id", cardId).orderByAsc("id");
         detail.fragments = thoughtFragmentMapper.selectList(fragmentQuery);
 
+        // SECURITY (cross-tenant content injection): scoping by source_memory_card_id alone lets
+        // another user's todo (whose sourceMemoryCardId was pointed at this card) leak into this
+        // owner's private 星图详情. Defence-in-depth alongside the create()-time validation in
+        // TodoServiceImpl.
         QueryWrapper<TodoItem> todoQuery = new QueryWrapper<>();
-        todoQuery.eq("source_memory_card_id", cardId).orderByAsc("id");
+        todoQuery.eq("user_id", userId).eq("source_memory_card_id", cardId).orderByAsc("id");
         detail.todos = todoItemMapper.selectList(todoQuery);
 
         QueryWrapper<EmotionTrace> emotionQuery = new QueryWrapper<>();
-        emotionQuery.eq("source_session_id", card.sourceSessionId).orderByDesc("id");
+        emotionQuery.eq("user_id", userId).eq("source_session_id", card.sourceSessionId).orderByDesc("id");
         detail.emotions = emotionTraceMapper.selectList(emotionQuery);
 
         detail.relations = relationMentionMapper.selectList(
-                new QueryWrapper<com.innercosmos.entity.RelationMention>().eq("memory_card_id", cardId));
+                new QueryWrapper<com.innercosmos.entity.RelationMention>()
+                        .eq("user_id", userId).eq("memory_card_id", cardId));
         detail.themes = themeAggregationService.themesForCard(cardId);
         if (memoryOperationMapper != null) {
             detail.versionHistory = memoryOperationMapper.selectList(

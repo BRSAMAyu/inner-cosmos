@@ -2,6 +2,7 @@ package com.innercosmos.controller;
 
 import com.innercosmos.common.ApiResponse;
 import com.innercosmos.conversation.service.ConversationChoreographyService;
+import com.innercosmos.conversation.service.ConversationTurnTakeoverService;
 import com.innercosmos.conversation.vo.TurnTimelineVO;
 import com.innercosmos.streaming.AuroraLiveEvent;
 import com.innercosmos.streaming.AuroraLiveEventStore;
@@ -17,6 +18,7 @@ import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -34,15 +36,31 @@ public class ConversationTimelineController extends BaseController {
     private final ObjectMapper objectMapper;
     private final AuroraLiveEventStore liveEventStore;
     private final Executor streamExecutor;
+    private final ConversationTurnTakeoverService takeoverService;
 
+    @Autowired
     public ConversationTimelineController(ConversationChoreographyService choreographyService,
                                           ObjectMapper objectMapper,
                                           AuroraLiveEventStore liveEventStore,
-                                          @Qualifier("aiExecutor") Executor streamExecutor) {
+                                          @Qualifier("aiExecutor") Executor streamExecutor,
+                                          ConversationTurnTakeoverService takeoverService) {
         this.choreographyService = choreographyService;
         this.objectMapper = objectMapper;
         this.liveEventStore = liveEventStore;
         this.streamExecutor = streamExecutor;
+        this.takeoverService = takeoverService;
+    }
+
+    /** Compatibility constructor for focused MVC tests. */
+    public ConversationTimelineController(ConversationChoreographyService choreographyService,
+                                          ObjectMapper objectMapper,
+                                          AuroraLiveEventStore liveEventStore,
+                                          Executor streamExecutor) {
+        this.choreographyService = choreographyService;
+        this.objectMapper = objectMapper;
+        this.liveEventStore = liveEventStore;
+        this.streamExecutor = streamExecutor;
+        this.takeoverService = null;
     }
 
     @GetMapping("/{turnId}/timeline")
@@ -114,8 +132,11 @@ public class ConversationTimelineController extends BaseController {
                     if (emptyWindows >= allowedEmptyWindows) {
                         LocalDateTime cutoff = LocalDateTime.now().minusSeconds(
                                 "GENERATING".equals(current.turn.status) ? 120 : 20);
-                        current = choreographyService.interruptIfStale(
-                                userId, turnId, cutoff, "STREAM_ORPHANED_AFTER_RECONNECT");
+                        current = takeoverService == null
+                                ? choreographyService.interruptIfStale(
+                                    userId, turnId, cutoff, "STREAM_ORPHANED_AFTER_RECONNECT")
+                                : takeoverService.resumeOrFail(
+                                    userId, turnId, cutoff, "PROVIDER_GENERATION_LOST_AFTER_RECONNECT");
                         if (isTerminal(current.turn.status)) {
                             replayDurableSnapshot(emitter, turnId, 0, current);
                             return;
@@ -176,7 +197,8 @@ public class ConversationTimelineController extends BaseController {
     }
 
     private boolean isTerminal(String status) {
-        return "COMPLETED".equals(status) || "CANCELLED".equals(status) || "INTERRUPTED".equals(status);
+        return "COMPLETED".equals(status) || "CANCELLED".equals(status)
+                || "INTERRUPTED".equals(status) || "FAILED".equals(status);
     }
 
     private ResumeCursor cursor(String eventId, int afterSequence) {

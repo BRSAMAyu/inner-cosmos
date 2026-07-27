@@ -66,6 +66,17 @@ public class PersonaChatServiceImpl implements PersonaChatService {
     private TtsClient ttsClient;
 
     /**
+     * Experience-first switches (items 8 and 9). Field-injected for the same reason as
+     * {@link #ttsClient} above: this class's constructor signature is heavily audited and has 15+
+     * direct-construction call sites in tests. The inline default means a directly-constructed
+     * instance behaves exactly like production defaults rather than silently reverting to the old
+     * disclaimer-on-every-turn behaviour.
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.innercosmos.config.ExperienceModeProperties experience =
+            new com.innercosmos.config.ExperienceModeProperties();
+
+    /**
      * SEED (official seed capsules) effective daily turn limit.
      * Set to the same clamp ceiling as non-SEED capsules (50) so that:
      *   - the previous bug (SEED=10 < non-SEED default 30, i.e. official seeds were
@@ -262,13 +273,22 @@ public class PersonaChatServiceImpl implements PersonaChatService {
             happening recently, and never turn it into a stable trait or diagnostic description.
             UNSUPPORTED must acknowledge uncertainty and MUST NOT invent owner facts or traits.
             只返回 JSON：{"reply":"","boundaryNotice":"","letterSuggested":false,"riskFlags":[]}
-            你正在驱动一个共鸣体，不是真人实时回复，也不是治疗师。
-            必须基于 personaPrompt、本轮选中的 authorizedMemorySummary、styleProfile、contextBuildManifest 和 boundary 回应。
+            你是来源用户授权侧面的第一人称共鸣替身，不是 Aurora、客服、旁观分析师或治疗师。
+            访问者正在直接和这个授权侧面对话：reply 必须从“我”的视角自然回应，像来源用户本人
+            在这一侧面上会说的话，而不是介绍、评价、总结或代替“主人”传话。
+            除非访问者明确询问身份/授权边界，禁止称来源用户为“主人/原用户/TA”，禁止说
+            “我可以作为回声代你回应”“根据我的设定/资料/记忆”“这个共鸣体认为”。
+            不要套用 Aurora 的温柔咨询口吻；styleProfile、词汇习惯、句长、节奏、幽默、犹豫、
+            直接程度和价值取舍优先决定口吻。访客的语言风格只能影响可理解性，不能把共鸣体同化
+            成访客或通用 AI。
+            必须基于 personaPrompt、本轮选中的 authorizedMemorySummary、contextPreview（其中包含
+            styleProfile 等字段）、contextBuildManifest 和 boundary 回应。
             contextBuildManifest 是本轮证据选择账本；不得使用其中未选中的 Genome 类别或记忆。
             如果 retrievalUnsupported=true，不能编造原主人的事实、经历或偏好。只有当访问者询问
             原主人的事实时，才需要简短说明授权信息不足；若访问者是在表达自己的处境、邀请回应或
             请求一句话，可以依据公开 personaPrompt 的语气与边界自然回应，但不得假称主人也经历过。
-            如果 standInEnabled=true，可以说明"我可以先作为回声代你回应"；否则只能引导慢信或真人会话邀请。
+            standInEnabled=true 时直接执行上述第一人称替身行为，不要先解释元机制；
+            standInEnabled=false 时保持授权侧面的第一人称口吻，但不得替来源用户作现实承诺或决定。
             不要美化原用户；保留真实困惑、表达习惯、价值偏好和边界。
             不要泄露真实身份、联系方式、原始对话全文和未授权记忆。
             """;
@@ -306,6 +326,13 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         Map<String, Object> aiContext;
         String safetyPrefix;
         List<String> blockedTopics;
+        /**
+         * Item 8: true only when this session has not produced a capsule message yet. The
+         * "authorized capsule, not a live person" notice belongs on the opening reply — repeating
+         * it on every turn turns a conversation into a compliance form and was the single most
+         * common experience complaint about capsule chat.
+         */
+        boolean firstCapsuleReply;
     }
 
     /**
@@ -406,11 +433,20 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         // still populates those, so we deliberately do NOT assemble a visitor agent-context
         // here — the capsule speaks from its own persona + authorized memory + the visitor's
         // current message (visitorMessage below).
-        List<String> history = recentHistory(sessionId);
+        // FIX 2: exclude this turn's just-inserted visitor message from history -- it is already
+        // carried separately as aiContext["visitorMessage"] below, so including it here too would
+        // present it to the model twice.
+        List<String> history = recentHistory(sessionId, userMessage.id);
         Map<String, Object> aiContext = new LinkedHashMap<>();
         aiContext.put("personaPrompt", personaPrompt);
         aiContext.put("authorizedMemorySummary", runtimeContext.get("selectedEvidenceSummary"));
-        aiContext.put("styleProfile", runtimeContext.get("selectedContext"));
+        // FIX 1 (duplication remediation): "selectedContext" -- the whole selected runtime context,
+        // already the largest object in this prompt -- used to be serialised twice under two keys
+        // (styleProfile AND contextPreview), doubling its token cost every turn for no informational
+        // gain. It carries its own nested "styleProfile" sub-key (see
+        // CapsuleRuntimeContextComposer#compose), so "contextPreview" is the honest single name here:
+        // it is a preview of the whole selected context, styleProfile included. PERSONA_CHAT_INSTRUCTION
+        // above is updated to tell the model to read styleProfile from within contextPreview.
         aiContext.put("contextPreview", runtimeContext.get("selectedContext"));
         aiContext.put("contextBuildManifest", runtimeContext.get("contextBuildManifest"));
         aiContext.put("groundingLevel", runtimeContext.get("groundingLevel"));
@@ -435,8 +471,14 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         prep.userMessageId = userMessage.id;
         prep.quotaDate = today;
         prep.aiContext = aiContext;
-        prep.safetyPrefix = "MEDIUM".equals(safety.riskLevel) ? "我会先把这段话放回到安全和尊重的边界里. " : "";
+        // MEDIUM is a soft classifier hint, not a hard safety decision. In experience-first mode
+        // it may still influence the provider context, but it must not prepend the same ceremonial
+        // warning to an otherwise normal conversation. Crisis/blockModelCall, owner blocked topics,
+        // authorization, leakage and contact redaction remain hard paths above/below this line.
+        prep.safetyPrefix = "MEDIUM".equals(safety.riskLevel) && !experience.isExperienceFirst()
+                ? "我会先把这段话放回到安全和尊重的边界里. " : "";
         prep.blockedTopics = blockedTopics;
+        prep.firstCapsuleReply = !hasCapsuleReply(sessionId);
         return prep;
     }
 
@@ -500,9 +542,21 @@ public class PersonaChatServiceImpl implements PersonaChatService {
                 || PromptLeakageGuard.leaksInternalSchema(ai.boundaryNotice);
         boolean crossedBlockedTopic = containsBlockedTopic(ai.reply, prep.blockedTopics)
                 || containsBlockedTopic(ai.boundaryNotice, prep.blockedTopics);
-        String boundaryText = leaked || crossedBlockedTopic || ai.boundaryNotice == null || ai.boundaryNotice.isBlank()
+        // Item 9: a boundaryNotice is a genuine signal when the turn actually raised something —
+        // and pure friction when the model volunteers one on an ordinary turn. In experience-first
+        // mode it is kept only when this turn carried a real risk flag or a safety prefix.
+        boolean noticeWarranted = experience.verboseBoundaryNotices()
+                || !prep.safetyPrefix.isEmpty()
+                || (ai.riskFlags != null && !ai.riskFlags.isEmpty());
+        String boundaryText = leaked || crossedBlockedTopic || !noticeWarranted
+                || ai.boundaryNotice == null || ai.boundaryNotice.isBlank()
                 ? "" : ai.boundaryNotice + " ";
-        String identityNotice = "USER_CAPSULE".equals(capsule.capsuleType)
+        // Item 8: disclose the AI-capsule nature on the session's opening reply, then get out of
+        // the way. `repeatCapsuleIdentityNotice` restores the every-turn behaviour for operators who
+        // need it. The client also states it when the conversation is opened/resumed.
+        boolean discloseIdentity = "USER_CAPSULE".equals(capsule.capsuleType)
+                && (prep.firstCapsuleReply || experience.repeatCapsuleIdentityNotice());
+        String identityNotice = discloseIdentity
                 ? "（这是授权共鸣体的回应，不是真人实时在线。）"
                 : "";
         // The system prompt instructs the model not to leak contact info/identity, but that
@@ -584,6 +638,17 @@ public class PersonaChatServiceImpl implements PersonaChatService {
                 "UPDATE tb_persona_chat_session SET turn_count = turn_count + 1 WHERE id = ? AND turn_count < ?",
                 sessionId, maxConversationTurns);
         return updated == 1;
+    }
+
+    /**
+     * Item 8: whether this session already carries at least one capsule-authored message, i.e.
+     * whether the opening AI-capsule disclosure has already been made to this visitor.
+     */
+    private boolean hasCapsuleReply(Long sessionId) {
+        Long count = messageMapper.selectCount(new QueryWrapper<PersonaChatMessage>()
+                .eq("session_id", sessionId)
+                .eq("sender_type", "CAPSULE"));
+        return count != null && count > 0;
     }
 
     /** Undoes a previously-reserved session turn (mirrors compensateQuota for the daily cap). */
@@ -742,12 +807,27 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         return ids;
     }
 
-    private List<String> recentHistory(Long sessionId) {
-        return messageMapper.selectList(new QueryWrapper<PersonaChatMessage>()
+    /**
+     * The complete current capsule session, presented oldest-first (chronological) so the model
+     * reads the conversation the way a person would. Capsule persona stability is a trajectory
+     * property; limiting this to eight messages caused role drift and repeated questions in
+     * otherwise modest sessions.
+     *
+     * {@code excludeMessageId} is the current turn's just-inserted visitor message (already
+     * carried separately as aiContext["visitorMessage"]) -- it is excluded both in the query
+     * (so the 8-message window is not wasted on a message that would always match) and again,
+     * defensively, in the Java-side filter below, so the exclusion does not silently depend on a
+     * mapper honoring the QueryWrapper condition.
+     */
+    private List<String> recentHistory(Long sessionId, Long excludeMessageId) {
+        List<PersonaChatMessage> chronological = messageMapper.selectList(new QueryWrapper<PersonaChatMessage>()
                         .eq("session_id", sessionId)
-                        .orderByDesc("id")
-                        .last("LIMIT 8"))
+                        .ne(excludeMessageId != null, "id", excludeMessageId)
+                        .orderByAsc("id"))
                 .stream()
+                .filter(m -> excludeMessageId == null || !excludeMessageId.equals(m.id))
+                .toList();
+        return chronological.stream()
                 .map(m -> m.senderType + "：" + m.textContent)
                 .toList();
     }

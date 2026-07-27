@@ -79,6 +79,37 @@ class SafetyControllerTest {
                 .andExpect(jsonPath("$.data[2]").value(org.hamcrest.Matchers.containsString("1767")));
     }
 
+    @Test
+    void resourceCatalog_enSingapore_hasExactLocalReachabilityContract() throws Exception {
+        mockMvc.perform(get("/api/v1/safety/resources/catalog")
+                        .param("locale", "en-SG")
+                        .param("region", "SG"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(5))
+                .andExpect(jsonPath("$.data[0].phone").value("999"))
+                .andExpect(jsonPath("$.data[0].category").value("EMERGENCY"))
+                .andExpect(jsonPath("$.data[1].phone").value("995"))
+                .andExpect(jsonPath("$.data[2].phone").value("1767"))
+                .andExpect(jsonPath("$.data[3].phone").value("91511767"))
+                .andExpect(jsonPath("$.data[4].category").value("PRODUCT_BOUNDARY"))
+                .andExpect(jsonPath("$.data[*].region",
+                        org.hamcrest.Matchers.everyItem(org.hamcrest.Matchers.is("SG"))))
+                .andExpect(jsonPath("$.data[*].verifiedAt",
+                        org.hamcrest.Matchers.everyItem(org.hamcrest.Matchers.is("2026-07-27"))));
+    }
+
+    @Test
+    void resourceCatalog_conflictingContract_fallsBackWithoutLocalNumbers() throws Exception {
+        mockMvc.perform(get("/api/v1/safety/resources/catalog")
+                        .param("locale", "en-SG")
+                        .param("region", "CN"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[*].region",
+                        org.hamcrest.Matchers.everyItem(org.hamcrest.Matchers.is("GLOBAL"))))
+                .andExpect(jsonPath("$.data[*].phone",
+                        org.hamcrest.Matchers.everyItem(org.hamcrest.Matchers.nullValue())));
+    }
+
     // ---------------- Check ----------------
 
     @Test

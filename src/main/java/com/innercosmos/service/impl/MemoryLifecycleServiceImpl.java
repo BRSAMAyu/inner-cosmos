@@ -349,9 +349,15 @@ public class MemoryLifecycleServiceImpl implements MemoryLifecycleService {
 
         dataUseGrantService.revokeForMemory(card.id, "source memory forgotten by owner");
         authorizedMemoryRefMapper.delete(new QueryWrapper<AuthorizedMemoryRef>().eq("memory_card_id", card.id));
-        thoughtFragmentMapper.delete(new QueryWrapper<com.innercosmos.entity.ThoughtFragment>().eq("memory_card_id", card.id));
-        todoItemMapper.delete(new QueryWrapper<com.innercosmos.entity.TodoItem>().eq("source_memory_card_id", card.id));
-        relationMentionMapper.delete(new QueryWrapper<com.innercosmos.entity.RelationMention>().eq("memory_card_id", card.id));
+        thoughtFragmentMapper.delete(new QueryWrapper<com.innercosmos.entity.ThoughtFragment>()
+                .eq("user_id", card.userId).eq("memory_card_id", card.id));
+        // SECURITY (cross-tenant content injection, reverse direction): without the user_id guard
+        // here, forgetting a memory card that a DIFFERENT user's todo was maliciously pointed at
+        // (via sourceMemoryCardId) would delete that other user's row from their own board.
+        todoItemMapper.delete(new QueryWrapper<com.innercosmos.entity.TodoItem>()
+                .eq("user_id", card.userId).eq("source_memory_card_id", card.id));
+        relationMentionMapper.delete(new QueryWrapper<com.innercosmos.entity.RelationMention>()
+                .eq("user_id", card.userId).eq("memory_card_id", card.id));
         linkMapper.delete(new QueryWrapper<MemoryLink>().eq("user_id", card.userId)
                 .and(q -> q.eq("source_memory_id", card.id).or().eq("target_memory_id", card.id)));
         int erasedEmbeddings = embeddingMapper.delete(new QueryWrapper<com.innercosmos.entity.MemoryEmbedding>()

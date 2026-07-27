@@ -74,6 +74,12 @@ public class SafetyReviewService {
      */
     @Transactional(rollbackFor = Exception.class)
     public SafetyMatch recheckSync(Long userId, String text, SafetyMatch initialMatch) {
+        return recheckSync(userId, text, initialMatch, null);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public SafetyMatch recheckSync(Long userId, String text, SafetyMatch initialMatch,
+                                   String clientMessageId) {
         try {
             // Gemini audit 3.7 (CONFIRMED/P0): raw text (even truncated) must never enter a
             // normal application log -- this line used to include up to 50 raw characters of
@@ -140,7 +146,7 @@ public class SafetyReviewService {
 
             String newRiskLevel = determineFinalLevel(initialMatch.riskLevel, result.riskLevel);
 
-            recordRecheck(userId, initialMatch, result, newRiskLevel);
+            recordRecheck(userId, clientMessageId, initialMatch, result, newRiskLevel);
 
             String resolvedType = (result.riskType != null && !result.riskType.isBlank())
                     ? result.riskType
@@ -290,16 +296,23 @@ public class SafetyReviewService {
     /**
      * Record LLM re-check result in SafetyEvent.
      */
-    private void recordRecheck(Long userId, SafetyMatch initialMatch, SafetyReviewResult result, String finalLevel) {
+    private void recordRecheck(Long userId, String clientMessageId, SafetyMatch initialMatch,
+                               SafetyReviewResult result, String finalLevel) {
         SafetyEvent event = new SafetyEvent();
         event.userId = userId;
+        event.clientMessageId = clientMessageId;
+        event.safetyScope = clientMessageId == null ? null : "SAFETY_REVIEW";
         event.riskType = "LLM_REVIEW:" + result.riskType;
         event.riskLevel = finalLevel;
         event.matchedRule = (initialMatch.matchedRule == null ? "DISTRESS_SIGNAL" : initialMatch.matchedRule)
                 + " -> " + finalLevel;
         event.handledAction = result.requiresBlock ? "BLOCKED" : "ALLOWED";
         event.triggerScene = result.explanation;
-        safetyEventMapper.insert(event);
+        try {
+            safetyEventMapper.insert(event);
+        } catch (org.springframework.dao.DuplicateKeyException duplicate) {
+            // Another Pod already persisted this exact review decision.
+        }
         log.debug("LLM re-check result recorded: riskType={}, finalLevel={}", result.riskType, finalLevel);
     }
 

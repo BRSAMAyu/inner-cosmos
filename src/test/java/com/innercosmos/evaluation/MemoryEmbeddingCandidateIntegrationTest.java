@@ -35,7 +35,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:embedding-candidate;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1",
-        "spring.sql.init.mode=always", "spring.task.scheduling.enabled=false", "llm.provider=mock"
+        "spring.sql.init.mode=always", "spring.task.scheduling.enabled=false", "llm.provider=mock",
+        "memory.retrieval.semantic-calibration.enabled=true",
+        "memory.retrieval.semantic-calibration.provider=synthetic-contract",
+        "memory.retrieval.semantic-calibration.model=provider-contract-model",
+        "memory.retrieval.semantic-calibration.version=v1",
+        "memory.retrieval.semantic-calibration.locales.en.absolute-threshold=0.8",
+        "memory.retrieval.semantic-calibration.locales.en.min-top1-top2-margin=0.0"
 })
 @Import(MemoryEmbeddingCandidateIntegrationTest.FakeEmbeddingConfig.class)
 class MemoryEmbeddingCandidateIntegrationTest {
@@ -161,6 +167,7 @@ class MemoryEmbeddingCandidateIntegrationTest {
     static class FakeMemoryEmbeddingClient implements MemoryEmbeddingClient {
         final AtomicInteger calls = new AtomicInteger();
         public boolean available() { return true; }
+        public String providerName() { return "synthetic-contract"; }
         public String modelName() { return "provider-contract-model"; }
         public String modelVersion() { return "v1"; }
         public int dimensions() { return 8; }

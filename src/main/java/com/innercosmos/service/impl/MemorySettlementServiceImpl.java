@@ -269,17 +269,21 @@ public class MemorySettlementServiceImpl implements MemorySettlementService {
 
         // Load fragments
         QueryWrapper<ThoughtFragment> fragmentQuery = new QueryWrapper<>();
-        fragmentQuery.eq("memory_card_id", card.id).orderByAsc("id");
+        fragmentQuery.eq("user_id", userId).eq("memory_card_id", card.id).orderByAsc("id");
         vo.fragments = thoughtFragmentMapper.selectList(fragmentQuery);
 
         // Load emotions
         QueryWrapper<EmotionTrace> emotionQuery = new QueryWrapper<>();
-        emotionQuery.eq("source_session_id", sessionId).orderByDesc("id");
+        emotionQuery.eq("user_id", userId).eq("source_session_id", sessionId).orderByDesc("id");
         vo.emotions = emotionTraceMapper.selectList(emotionQuery);
 
         // Load todos
+        // SECURITY (cross-tenant content injection): scoping by source_memory_card_id alone lets
+        // another user's todo (whose sourceMemoryCardId was pointed at this card) leak into this
+        // owner's private daily record. Defence-in-depth alongside the create()-time validation
+        // in TodoServiceImpl.
         QueryWrapper<TodoItem> todoQuery = new QueryWrapper<>();
-        todoQuery.eq("source_memory_card_id", card.id).orderByAsc("id");
+        todoQuery.eq("user_id", userId).eq("source_memory_card_id", card.id).orderByAsc("id");
         vo.todos = todoItemMapper.selectList(todoQuery);
 
         // Load this card's own relationship cues (never the user's all-time mentions)

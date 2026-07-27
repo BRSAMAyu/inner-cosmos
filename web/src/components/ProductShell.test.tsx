@@ -155,7 +155,7 @@ describe("ProductShell", () => {
     expect(screen.getByRole("button", { name: "内宇宙 · 记忆与自我理解" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "共鸣 · 共鸣体与相遇" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "连接 · 慢信与关系" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "我的 · 控制与边界" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "我的 · 设置与隐私" })).toBeInTheDocument();
   });
 
   // W2 UIUX audit (doc 24 section 5.1: "中文和 en-SG 均无硬编码"): live-verified with the app's own
@@ -168,7 +168,7 @@ describe("ProductShell", () => {
     expect(screen.getByRole("button", { name: "Cosmos · Memory & self-understanding" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Resonance · Capsules & encounters" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Connect · Slow letters & relationships" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Me · Control & boundaries" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Me · Settings & privacy" })).toBeInTheDocument();
     unmount();
     render(<ProductShellNavigation active="aurora" onNavigate={() => undefined} />);
     expect(screen.getByRole("button", { name: "今天 · Aurora" })).toBeInTheDocument();
@@ -182,9 +182,9 @@ describe("ProductShell", () => {
       onOpenSafetyHarbor: () => undefined
     };
     const { rerender } = render(<MeSpace {...props} locale="zh-CN" />);
-    expect(screen.getByRole("heading", { name: "由你决定，Aurora 怎样参与。" })).toBeVisible();
-    expect(screen.getByText("1 个有效约定")).toBeVisible();
-    expect(screen.getByText("我的 · 控制与边界")).toBeVisible();
+    expect(screen.getByRole("heading", { name: "设置你的账户和使用体验" })).toBeVisible();
+    expect(screen.getByText("1 个已开启约定")).toBeVisible();
+    expect(screen.getByText("我的")).toBeVisible();
     expect(screen.queryByText("ME · CONTROL & BOUNDARIES")).not.toBeInTheDocument();
 
     rerender(<MeSpace {...props} locale="en-SG" />);
@@ -203,19 +203,56 @@ describe("ProductShell", () => {
       onOpenSafetyHarbor
     };
     render(<MeSpace {...props} locale="zh-CN" />);
-    fireEvent.click(screen.getByRole("button", { name: /安全避风港/ }));
+    fireEvent.click(screen.getByRole("button", { name: "打开支持工具" }));
     expect(onOpenSafetyHarbor).toHaveBeenCalledOnce();
+  });
+
+  it("requires an explicit second confirmation before signing out", () => {
+    const onLogout = vi.fn();
+    render(<MeSpace native={false} connected wakeIntentCount={0} activeClaimCount={0}
+      publicCapsuleCount={0} friendCount={0} onNavigate={() => undefined}
+      onRequestPush={() => undefined} onRequestMicrophone={() => undefined}
+      onLogout={onLogout} onOpenSafetyHarbor={() => undefined} locale="zh-CN" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "安全退出这台设备" }));
+    expect(screen.getByRole("alertdialog", { name: "确认安全退出" })).toBeVisible();
+    expect(onLogout).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "继续留在这里" }));
+    expect(screen.queryByRole("alertdialog", { name: "确认安全退出" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "安全退出这台设备" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认退出" }));
+    expect(onLogout).toHaveBeenCalledOnce();
+  });
+
+  it("keeps keyboard focus inside sign-out confirmation, closes on Escape, and restores focus", () => {
+    render(<MeSpace native={false} connected wakeIntentCount={0} activeClaimCount={0}
+      publicCapsuleCount={0} friendCount={0} onNavigate={() => undefined}
+      onRequestPush={() => undefined} onRequestMicrophone={() => undefined}
+      onLogout={() => undefined} onOpenSafetyHarbor={() => undefined} locale="zh-CN" />);
+    const trigger = screen.getByRole("button", { name: "安全退出这台设备" });
+    fireEvent.click(trigger);
+    const stay = screen.getByRole("button", { name: "继续留在这里" });
+    const confirm = screen.getByRole("button", { name: "确认退出" });
+    expect(stay).toHaveFocus();
+    confirm.focus();
+    fireEvent.keyDown(document, { key: "Tab" });
+    expect(stay).toHaveFocus();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
   });
 
   it("provides shareable Me sections for profile, account, appearance and data rights", () => {
     expect(meTabFromPath("/me")).toBe("overview");
     expect(meTabFromPath("/me/profile")).toBe("profile");
     expect(meTabFromPath("/me/account")).toBe("account");
+    expect(meTabFromPath("/me/guide")).toBe("guide");
     expect(meTabFromPath("/me/appearance")).toBe("appearance");
     expect(meTabFromPath("/me/data-rights")).toBe("data");
     expect(meTabFromPath("/me/unknown")).toBe("overview");
     expect(meTabPath("overview")).toBe("/me");
     expect(meTabPath("data")).toBe("/me/data-rights");
+    expect(meTabPath("guide")).toBe("/me/guide");
   });
 
   it("renders a concise bilingual Me secondary navigation", () => {

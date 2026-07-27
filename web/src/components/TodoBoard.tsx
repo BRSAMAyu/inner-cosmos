@@ -19,7 +19,7 @@ const COPY: Record<Locale, {
   descriptionPlaceholder: string; create: string; tabsAria: string; tabs: Record<TodoTab, string>;
   empty: Record<TodoTab, string>; statusLabel: Record<TodoItem["status"], string>;
   start: string; finish: string; split: string; edit: string; letGo: string;
-  reopen: string; pickUp: string; delete: string; save: string; cancel: string; overdue: string;
+  reopen: string; pickUp: string; delete: string; deleteConfirm: string; save: string; cancel: string; overdue: string;
   unscheduled: string;
 }> = {
   "zh-CN": {
@@ -32,7 +32,7 @@ const COPY: Record<Locale, {
     empty: { today: "今天没有待办。可以先休息。", week: "本周没有待办。", done: "还没有完成的事项。", letgo: "没有放下的事项。" },
     statusLabel: { TODO: "待开始", DOING: "正在做", DONE: "已完成", CANCELLED: "已放下" },
     start: "开始", finish: "完成", split: "拆第一步", edit: "编辑", letGo: "放下",
-    reopen: "重新打开", pickUp: "重新拾起", delete: "删除", save: "保存修改", cancel: "取消", overdue: "已过期",
+    reopen: "重新打开", pickUp: "重新拾起", delete: "删除", deleteConfirm: "确认删除？", save: "保存修改", cancel: "取消", overdue: "已过期",
     unscheduled: "未设截止时间 · 本周规划池"
   },
   "en-SG": {
@@ -45,7 +45,7 @@ const COPY: Record<Locale, {
     empty: { today: "Nothing due today. You can rest.", week: "Nothing due this week.", done: "Nothing finished yet.", letgo: "Nothing let go yet." },
     statusLabel: { TODO: "Not started", DOING: "In progress", DONE: "Done", CANCELLED: "Let go" },
     start: "Start", finish: "Finish", split: "Split first step", edit: "Edit", letGo: "Let go",
-    reopen: "Reopen", pickUp: "Pick back up", delete: "Delete", save: "Save changes", cancel: "Cancel", overdue: "Overdue",
+    reopen: "Reopen", pickUp: "Pick back up", delete: "Delete", deleteConfirm: "Confirm delete?", save: "Save changes", cancel: "Cancel", overdue: "Overdue",
     unscheduled: "No deadline · weekly planning pool"
   }
 };
@@ -75,12 +75,16 @@ export function TodoBoard({ todos, tab, busy, splitBusyId, onSelectTab, onCreate
   const [createDraft, setCreateDraft] = useState<Draft>(emptyDraft);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState<Draft>(emptyDraft);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
   const now = new Date();
   const endOfToday = new Date(now);
   endOfToday.setHours(23, 59, 59, 999);
+  // "本周" is a rolling 7-day window from today rather than the calendar week ending on Sunday --
+  // that avoids the edge case where, on a Sunday, `(7 - getDay()) % 7 === 0` collapses the window
+  // to nothing and the tab shows only undated items even when dated items are due tomorrow.
   const endOfWeek = new Date(endOfToday);
-  endOfWeek.setDate(endOfWeek.getDate() + (7 - endOfWeek.getDay()) % 7);
+  endOfWeek.setDate(endOfWeek.getDate() + 7);
 
   const filtered = todos.filter(item => {
     if (tab === "done") return item.status === "DONE";
@@ -140,7 +144,7 @@ export function TodoBoard({ todos, tab, busy, splitBusyId, onSelectTab, onCreate
     <div className="todo-tab-bar" role="tablist" aria-label={t.tabsAria}>
       {(["today", "week", "done", "letgo"] as TodoTab[]).map(value =>
         <button key={value} type="button" role="tab" aria-selected={tab === value}
-          className={tab === value ? "active" : ""} onClick={() => onSelectTab(value)}>{t.tabs[value]}</button>)}
+          className={tab === value ? "active" : ""} onClick={() => { setConfirmDeleteId(null); onSelectTab(value); }}>{t.tabs[value]}</button>)}
     </div>
 
     {filtered.length === 0 ? <p className="todo-empty">{t.empty[tab]}</p> :
@@ -189,7 +193,11 @@ export function TodoBoard({ todos, tab, busy, splitBusyId, onSelectTab, onCreate
               </>}
               {tab === "letgo" && <>
                 <button type="button" onClick={() => onUpdateStatus(item.id, "TODO")}>{t.pickUp}</button>
-                <button type="button" className="quiet" onClick={() => onDelete(item.id)}>{t.delete}</button>
+                {confirmDeleteId === item.id ? <>
+                  <button type="button" className="quiet danger-confirm"
+                    onClick={() => { onDelete(item.id); setConfirmDeleteId(null); }}>{t.deleteConfirm}</button>
+                  <button type="button" className="quiet" onClick={() => setConfirmDeleteId(null)}>{t.cancel}</button>
+                </> : <button type="button" className="quiet" onClick={() => setConfirmDeleteId(item.id)}>{t.delete}</button>}
               </>}
             </div>
           </>}

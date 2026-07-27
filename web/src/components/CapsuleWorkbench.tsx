@@ -226,7 +226,11 @@ export function CapsuleWorkbench({ capsules, selectedCapsuleId, selectedCapsule,
 }) {
   const t = COPY[locale];
   const [calibrationComment, setCalibrationComment] = useState("");
-  const activeFidelity = fidelityLabel(fidelitySummary.find(summary => summary.genomeVersionId === genomeHistory[0]?.id), t);
+  // The newest history entry (genomeHistory[0], list is version_no DESC) is not necessarily the
+  // one currently in effect -- a recompile can sit in NEEDS_REVIEW awaiting owner review while the
+  // prior version keeps serving. Label "current version" from the ACTIVE entry, not the newest one.
+  const activeGenomeVersion = genomeHistory.find(version => version.status === "ACTIVE");
+  const activeFidelity = fidelityLabel(fidelitySummary.find(summary => summary.genomeVersionId === activeGenomeVersion?.id), t);
   const tabStatus = (status: string) => status === "PUBLIC" ? t.tabPublic : status === "NEEDS_REVIEW" ? t.tabReview : t.tabPrivate;
   const summaryStatus = (status: string) => status === "PUBLIC" ? t.statusPublic : status === "NEEDS_REVIEW" ? t.statusReview : t.statusPrivate;
   return <section className="resonance-space" aria-label={t.aria}>

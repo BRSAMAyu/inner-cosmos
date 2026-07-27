@@ -32,7 +32,10 @@ public class LlmConfig {
     public MimoProperties mimo = new MimoProperties();
     public MinimaxProperties minimax = new MinimaxProperties();
     public DeepSeekProperties deepseek = new DeepSeekProperties();
-    public String failoverProviders = "minimax,mimo,glm,deepseek";
+    public GeminiProperties gemini = new GeminiProperties();
+    public AuroraStageProperties auroraStages = new AuroraStageProperties();
+    public ContextProperties context = new ContextProperties();
+    public String failoverProviders = "gemini,minimax,mimo,glm,deepseek";
 
     // --- Getters / Setters for top-level fields ---
 
@@ -128,6 +131,7 @@ public class LlmConfig {
         String activeProvider = activeProvider().toLowerCase();
         if ("minimax".equals(activeProvider)) return minimax.model;
         if ("deepseek".equals(activeProvider)) return deepseek.model;
+        if ("gemini".equals(activeProvider)) return gemini.model;
         if ("glm".equals(activeProvider)) return glm.model;
         if ("mimo".equals(activeProvider)) return mimo.model;
         return model;
@@ -138,6 +142,7 @@ public class LlmConfig {
         if ("mock".equals(activeProvider)) return false;
         if ("minimax".equals(activeProvider)) return !resolveKey(minimax.apiKey).isBlank();
         if ("deepseek".equals(activeProvider)) return !resolveKey(deepseek.apiKey).isBlank();
+        if ("gemini".equals(activeProvider)) return !resolveKey(gemini.apiKey).isBlank();
         if ("glm".equals(activeProvider)) return !resolveKey(glm.apiKey).isBlank();
         if ("mimo".equals(activeProvider)) return !resolveKey(mimo.apiKey).isBlank();
         return !resolveKey(apiKey).isBlank();
@@ -192,6 +197,30 @@ public class LlmConfig {
 
     public void setDeepseek(DeepSeekProperties deepseek) {
         this.deepseek = deepseek;
+    }
+
+    public GeminiProperties getGemini() {
+        return gemini;
+    }
+
+    public void setGemini(GeminiProperties gemini) {
+        this.gemini = gemini;
+    }
+
+    public AuroraStageProperties getAuroraStages() {
+        return auroraStages;
+    }
+
+    public void setAuroraStages(AuroraStageProperties auroraStages) {
+        this.auroraStages = auroraStages;
+    }
+
+    public ContextProperties getContext() {
+        return context;
+    }
+
+    public void setContext(ContextProperties context) {
+        this.context = context;
     }
 
     // --- Nested property classes ---
@@ -285,6 +314,118 @@ public class LlmConfig {
         public void setLanguage(String language) { this.language = language; }
     }
 
+    public static class GeminiProperties {
+        public String apiKey = "";
+        public String model = "gemini-3.6-flash";
+        public String baseUrl = "https://generativelanguage.googleapis.com/v1beta";
+        public String thinkingLevel = "medium";
+        public int timeoutMs = 30000;
+
+        public String getApiKey() { return apiKey; }
+        public void setApiKey(String value) { this.apiKey = value; }
+        public String getModel() { return model; }
+        public void setModel(String value) { this.model = value; }
+        public String getBaseUrl() { return baseUrl; }
+        public void setBaseUrl(String value) { this.baseUrl = value; }
+        public String getThinkingLevel() { return thinkingLevel; }
+        public void setThinkingLevel(String value) { this.thinkingLevel = value; }
+        public int getTimeoutMs() { return timeoutMs; }
+        public void setTimeoutMs(int value) { this.timeoutMs = value; }
+    }
+
+    /**
+     * Aurora's three temporal layers. Credentials remain provider-owned fields; this block
+     * only selects model identities and reasoning levels.
+     */
+    public static class AuroraStageProperties {
+        public boolean enabled = true;
+        public String fastModel = "gemini-3.5-flash-lite";
+        public String speakerModel = "gemini-3.6-flash";
+        public String thinkerModel = "deepseek-v4-pro";
+        public String speakerThinkingLevel = "medium";
+        public String thinkerReasoningEffort = "high";
+        public double fastTemperature = 0.25;
+        public double speakerTemperature = 0.82;
+        public double thinkerTemperature = 0.10;
+        public double criticTemperature = 0.05;
+        public int fastMaxTokens = 256;
+        public int speakerMaxTokens = 6_144;
+        public int thinkerMaxTokens = 8_192;
+        public int criticMaxTokens = 2_048;
+
+        public boolean isEnabled() { return enabled; }
+        public void setEnabled(boolean value) { this.enabled = value; }
+        public String getFastModel() { return fastModel; }
+        public void setFastModel(String value) { this.fastModel = value; }
+        public String getSpeakerModel() { return speakerModel; }
+        public void setSpeakerModel(String value) { this.speakerModel = value; }
+        public String getThinkerModel() { return thinkerModel; }
+        public void setThinkerModel(String value) { this.thinkerModel = value; }
+        public String getSpeakerThinkingLevel() { return speakerThinkingLevel; }
+        public void setSpeakerThinkingLevel(String value) { this.speakerThinkingLevel = value; }
+        public String getThinkerReasoningEffort() { return thinkerReasoningEffort; }
+        public void setThinkerReasoningEffort(String value) { this.thinkerReasoningEffort = value; }
+        public double getFastTemperature() { return fastTemperature; }
+        public void setFastTemperature(double value) { this.fastTemperature = value; }
+        public double getSpeakerTemperature() { return speakerTemperature; }
+        public void setSpeakerTemperature(double value) { this.speakerTemperature = value; }
+        public double getThinkerTemperature() { return thinkerTemperature; }
+        public void setThinkerTemperature(double value) { this.thinkerTemperature = value; }
+        public double getCriticTemperature() { return criticTemperature; }
+        public void setCriticTemperature(double value) { this.criticTemperature = value; }
+        public int getFastMaxTokens() { return fastMaxTokens; }
+        public void setFastMaxTokens(int value) { this.fastMaxTokens = value; }
+        public int getSpeakerMaxTokens() { return speakerMaxTokens; }
+        public void setSpeakerMaxTokens(int value) { this.speakerMaxTokens = value; }
+        public int getThinkerMaxTokens() { return thinkerMaxTokens; }
+        public void setThinkerMaxTokens(int value) { this.thinkerMaxTokens = value; }
+        public int getCriticMaxTokens() { return criticMaxTokens; }
+        public void setCriticMaxTokens(int value) { this.criticMaxTokens = value; }
+    }
+
+    /**
+     * Aurora's input window policy. Provider windows include both input and output; the
+     * effective input cap therefore always subtracts the response reserve and safety margin.
+     */
+    public static class ContextProperties {
+        public int hardMaxInputTokens = 200_000;
+        public int outputReserveTokens = 4_096;
+        public int safetyMarginTokens = 4_096;
+        public int defaultProviderWindowTokens = 128_000;
+        public int openingAnchorTokens = 2_048;
+        public int criticalAnchorTokens = 4_096;
+        public Map<String, Integer> providerWindowTokens = new LinkedHashMap<>(Map.of(
+                "deepseek", 1_000_000,
+                "glm", 200_000,
+                "mimo", 1_000_000,
+                "minimax", 204_800,
+                "gemini", 1_048_576,
+                "mock", 200_000
+        ));
+
+        public int getHardMaxInputTokens() { return hardMaxInputTokens; }
+        public void setHardMaxInputTokens(int value) { this.hardMaxInputTokens = value; }
+        public int getOutputReserveTokens() { return outputReserveTokens; }
+        public void setOutputReserveTokens(int value) { this.outputReserveTokens = value; }
+        public int getSafetyMarginTokens() { return safetyMarginTokens; }
+        public void setSafetyMarginTokens(int value) { this.safetyMarginTokens = value; }
+        public int getDefaultProviderWindowTokens() { return defaultProviderWindowTokens; }
+        public void setDefaultProviderWindowTokens(int value) { this.defaultProviderWindowTokens = value; }
+        public int getOpeningAnchorTokens() { return openingAnchorTokens; }
+        public void setOpeningAnchorTokens(int value) { this.openingAnchorTokens = value; }
+        public int getCriticalAnchorTokens() { return criticalAnchorTokens; }
+        public void setCriticalAnchorTokens(int value) { this.criticalAnchorTokens = value; }
+        public Map<String, Integer> getProviderWindowTokens() { return providerWindowTokens; }
+        public void setProviderWindowTokens(Map<String, Integer> value) {
+            this.providerWindowTokens = value == null ? new LinkedHashMap<>() : new LinkedHashMap<>(value);
+        }
+
+        public int providerWindow(String provider) {
+            String key = provider == null ? "" : provider.trim().toLowerCase(java.util.Locale.ROOT);
+            return Math.max(8_192, providerWindowTokens.getOrDefault(key, defaultProviderWindowTokens));
+        }
+    }
+
     // --- Factory method ---
 
     @Bean
@@ -294,13 +435,14 @@ public class LlmConfig {
                 activeProvider, mode, isEffectiveFallbackAllowed());
 
         LlmClient actualClient;
-        String minimaxKey = resolveKey(minimax.apiKey);
-        String mimoKey = resolveKey(mimo.apiKey);
-        String glmKey = resolveKey(glm.apiKey);
-        String deepseekKey = resolveKey(deepseek.apiKey);
-        log.info("Resolved LLM credential configuration: minimax={}, mimo={}, glm={}, deepseek={}, topLevelApiKey={}",
+        String minimaxKey = providerKey("minimax", minimax.apiKey);
+        String mimoKey = providerKey("mimo", mimo.apiKey);
+        String glmKey = providerKey("glm", glm.apiKey);
+        String deepseekKey = providerKey("deepseek", deepseek.apiKey);
+        String geminiKey = providerKey("gemini", gemini.apiKey);
+        log.info("Resolved LLM credential configuration: minimax={}, mimo={}, glm={}, deepseek={}, gemini={}, topLevelApiKey={}",
                 configured(minimaxKey), configured(mimoKey), configured(glmKey),
-                configured(deepseekKey), configured(apiKey));
+                configured(deepseekKey), configured(geminiKey), configured(apiKey));
         if ("mock".equalsIgnoreCase(activeProvider)) {
             actualClient = new MockLlmClient(aiExecutor);
         } else if (isProdMode()) {
@@ -353,6 +495,18 @@ public class LlmConfig {
                         aiExecutor
                 );
                 break;
+            case "gemini":
+                actualClient = new GeminiLlmClient(
+                        resolveKey(gemini.apiKey),
+                        gemini.baseUrl,
+                        gemini.model,
+                        gemini.thinkingLevel,
+                        gemini.timeoutMs,
+                        isEffectiveFallbackAllowed(),
+                        aiLogService,
+                        aiExecutor
+                );
+                break;
             case "openai-compatible":
                 actualClient = new GlmLlmClient(
                         resolveKey(apiKey),
@@ -372,7 +526,9 @@ public class LlmConfig {
         }
 
         // Wrap with A/B test handler
-        return languageAware(new ABTestLlmClientWrapper(actualClient, aiLogService, aiExecutor));
+        return languageAware(new ABTestLlmClientWrapper(
+                auroraStageRouter(actualClient, aiLogService, aiExecutor),
+                aiLogService, aiExecutor));
     }
 
     private LlmClient failoverClient(String activeProvider, AiLogService aiLogService, Executor aiExecutor) {
@@ -401,14 +557,16 @@ public class LlmConfig {
     public LlmClient createProviderClient(String providerName, boolean fallbackAllowed,
                                           AiLogService aiLogService, Executor aiExecutor) {
         return switch (providerName.toLowerCase()) {
-            case "minimax" -> new MiniMaxLlmClient(resolveKey(minimax.apiKey), minimax.baseUrl, minimax.model,
+            case "minimax" -> new MiniMaxLlmClient(providerKey("minimax", minimax.apiKey), minimax.baseUrl, minimax.model,
                     minimax.timeoutMs, fallbackAllowed, aiLogService, aiExecutor);
-            case "mimo" -> new GlmLlmClient(resolveKey(mimo.apiKey), mimo.baseUrl, mimo.model,
+            case "mimo" -> new GlmLlmClient(providerKey("mimo", mimo.apiKey), mimo.baseUrl, mimo.model,
                     mimo.timeoutMs, fallbackAllowed, "MIMO", aiLogService, aiExecutor);
-            case "glm" -> new GlmLlmClient(resolveKey(glm.apiKey), glm.baseUrl, glm.model,
+            case "glm" -> new GlmLlmClient(providerKey("glm", glm.apiKey), glm.baseUrl, glm.model,
                     glm.timeoutMs, fallbackAllowed, "GLM", aiLogService, aiExecutor);
-            case "deepseek" -> new DeepSeekLlmClient(resolveKey(deepseek.apiKey), deepseek.baseUrl, deepseek.model,
+            case "deepseek" -> new DeepSeekLlmClient(providerKey("deepseek", deepseek.apiKey), deepseek.baseUrl, deepseek.model,
                     deepseek.timeoutMs, fallbackAllowed, aiLogService, aiExecutor);
+            case "gemini" -> new GeminiLlmClient(providerKey("gemini", gemini.apiKey), gemini.baseUrl, gemini.model,
+                    gemini.thinkingLevel, gemini.timeoutMs, fallbackAllowed, aiLogService, aiExecutor);
             default -> null;
         };
     }
@@ -431,17 +589,30 @@ public class LlmConfig {
         // per-session preferred_model (e.g. a seeded "DEEPSEEK") would route real calls to a
         // keyless provider and 401 every time; with keyless providers absent from the map the
         // SessionModelRouter cleanly falls back to the system default (see resolve()).
-        if (!resolveKey(minimax.apiKey).isBlank()) {
-            m.put("MINIMAX", languageAware(new ABTestLlmClientWrapper(createProviderClient("minimax", false, aiLogService, aiExecutor), aiLogService, aiExecutor)));
+        if (!providerKey("minimax", minimax.apiKey).isBlank()) {
+            LlmClient base = createProviderClient("minimax", false, aiLogService, aiExecutor);
+            m.put("MINIMAX", languageAware(new ABTestLlmClientWrapper(
+                    auroraStageRouter(base, aiLogService, aiExecutor), aiLogService, aiExecutor)));
         }
-        if (!resolveKey(mimo.apiKey).isBlank()) {
-            m.put("MIMO", languageAware(new ABTestLlmClientWrapper(createProviderClient("mimo", false, aiLogService, aiExecutor), aiLogService, aiExecutor)));
+        if (!providerKey("mimo", mimo.apiKey).isBlank()) {
+            LlmClient base = createProviderClient("mimo", false, aiLogService, aiExecutor);
+            m.put("MIMO", languageAware(new ABTestLlmClientWrapper(
+                    auroraStageRouter(base, aiLogService, aiExecutor), aiLogService, aiExecutor)));
         }
-        if (!resolveKey(glm.apiKey).isBlank()) {
-            m.put("GLM", languageAware(new ABTestLlmClientWrapper(createProviderClient("glm", false, aiLogService, aiExecutor), aiLogService, aiExecutor)));
+        if (!providerKey("glm", glm.apiKey).isBlank()) {
+            LlmClient base = createProviderClient("glm", false, aiLogService, aiExecutor);
+            m.put("GLM", languageAware(new ABTestLlmClientWrapper(
+                    auroraStageRouter(base, aiLogService, aiExecutor), aiLogService, aiExecutor)));
         }
-        if (!resolveKey(deepseek.apiKey).isBlank()) {
-            m.put("DEEPSEEK", languageAware(new ABTestLlmClientWrapper(createProviderClient("deepseek", false, aiLogService, aiExecutor), aiLogService, aiExecutor)));
+        if (!providerKey("deepseek", deepseek.apiKey).isBlank()) {
+            LlmClient base = createProviderClient("deepseek", false, aiLogService, aiExecutor);
+            m.put("DEEPSEEK", languageAware(new ABTestLlmClientWrapper(
+                    auroraStageRouter(base, aiLogService, aiExecutor), aiLogService, aiExecutor)));
+        }
+        if (!providerKey("gemini", gemini.apiKey).isBlank()) {
+            LlmClient base = createProviderClient("gemini", false, aiLogService, aiExecutor);
+            m.put("GEMINI", languageAware(new ABTestLlmClientWrapper(
+                    auroraStageRouter(base, aiLogService, aiExecutor), aiLogService, aiExecutor)));
         }
         m.put("MOCK", languageAware(new MockLlmClient(aiExecutor)));
         return m;
@@ -489,12 +660,58 @@ public class LlmConfig {
             case "mimo" -> mimo.model;
             case "glm" -> glm.model;
             case "deepseek" -> deepseek.model;
+            case "gemini" -> gemini.model;
             default -> model;
         };
     }
 
+    private LlmClient auroraStageRouter(LlmClient fallback, AiLogService aiLogService,
+                                        Executor aiExecutor) {
+        if (auroraStages == null || !auroraStages.enabled) return fallback;
+        // Stage routing spans multiple providers, so provider-specific credentials are
+        // mandatory here. The generic llm.api-key may authenticate the selected primary
+        // provider, but reusing it for another vendor would create misleading 401/fallbacks.
+        String geminiKey = gemini.apiKey == null ? "" : gemini.apiKey.trim();
+        String deepseekKey = deepseek.apiKey == null ? "" : deepseek.apiKey.trim();
+        LlmClient fast = geminiKey.isBlank() ? null : new GeminiLlmClient(
+                geminiKey, gemini.baseUrl, auroraStages.fastModel, "minimal",
+                gemini.timeoutMs, false, aiLogService, aiExecutor);
+        LlmClient speaker = geminiKey.isBlank() ? null : new GeminiLlmClient(
+                geminiKey, gemini.baseUrl, auroraStages.speakerModel,
+                auroraStages.speakerThinkingLevel, gemini.timeoutMs,
+                false, aiLogService, aiExecutor);
+        LlmClient thinker = deepseekKey.isBlank() ? null : new DeepSeekLlmClient(
+                deepseekKey, deepseek.baseUrl, auroraStages.thinkerModel,
+                deepseek.timeoutMs, false, aiLogService, aiExecutor);
+        return new AuroraStageRoutingLlmClient(fallback, fast, speaker, thinker,
+                new AuroraStageRoutingLlmClient.StageProfile(
+                        false, "minimal", auroraStages.fastTemperature,
+                        auroraStages.fastMaxTokens),
+                new AuroraStageRoutingLlmClient.StageProfile(
+                        true, auroraStages.speakerThinkingLevel,
+                        auroraStages.speakerTemperature, auroraStages.speakerMaxTokens),
+                new AuroraStageRoutingLlmClient.StageProfile(
+                        true, auroraStages.thinkerReasoningEffort,
+                        auroraStages.thinkerTemperature, auroraStages.thinkerMaxTokens),
+                new AuroraStageRoutingLlmClient.StageProfile(
+                        true, auroraStages.thinkerReasoningEffort,
+                        auroraStages.criticTemperature, auroraStages.criticMaxTokens));
+    }
+
     private String resolveKey(String key) {
         return (key != null && !key.isBlank()) ? key : (apiKey != null ? apiKey : "");
+    }
+
+    /**
+     * The generic key belongs only to the selected provider. It must never make every named
+     * vendor appear configured or send one vendor's credential to another vendor's endpoint.
+     */
+    private String providerKey(String providerName, String providerSpecificKey) {
+        if (providerSpecificKey != null && !providerSpecificKey.isBlank()) {
+            return providerSpecificKey;
+        }
+        return providerName != null && providerName.equalsIgnoreCase(activeProvider())
+                ? (apiKey == null ? "" : apiKey) : "";
     }
 
     private String configured(String key) {

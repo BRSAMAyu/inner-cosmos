@@ -28,6 +28,8 @@ public class MemoryEmbeddingConfig {
     public String model = "text-embedding-v4";
     public String version = "2026-01";
     public int dimensions = 1536;
+    public int connectTimeoutMs = 3000;
+    public int readTimeoutMs = 8000;
 
     @Bean
     public MemoryEmbeddingClient memoryEmbeddingClient(ObjectMapper objectMapper) {
@@ -35,7 +37,8 @@ public class MemoryEmbeddingConfig {
         if (apiKey == null || apiKey.isBlank())
             throw new IllegalStateException("MEMORY_EMBEDDING_ENABLED requires MEMORY_EMBEDDING_API_KEY");
         if (dimensions < 8 || dimensions > 1536) throw new IllegalStateException("memory embedding dimensions must be between 8 and 1536");
-        return new OpenAiCompatibleMemoryEmbeddingClient(baseUrl, apiKey, model, version, dimensions, objectMapper);
+        return new OpenAiCompatibleMemoryEmbeddingClient(baseUrl, apiKey, model, version, dimensions,
+                objectMapper, connectTimeoutMs, readTimeoutMs);
     }
 
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
@@ -44,4 +47,6 @@ public class MemoryEmbeddingConfig {
     public void setModel(String model) { this.model = model; }
     public void setVersion(String version) { this.version = version; }
     public void setDimensions(int dimensions) { this.dimensions = dimensions; }
+    public void setConnectTimeoutMs(int connectTimeoutMs) { this.connectTimeoutMs = connectTimeoutMs; }
+    public void setReadTimeoutMs(int readTimeoutMs) { this.readTimeoutMs = readTimeoutMs; }
 }

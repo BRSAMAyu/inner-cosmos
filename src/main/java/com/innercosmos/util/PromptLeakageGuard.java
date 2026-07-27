@@ -1,5 +1,7 @@
 package com.innercosmos.util;
 
+import java.util.Locale;
+
 /**
  * Gemini audit 3.5/3.8 (CONFIRMED/P0): a deterministic, code-level output leakage gate, shared by
  * every module built on {@link com.innercosmos.ai.structured.StructuredAiService} (PersonaChat's
@@ -50,8 +52,13 @@ public final class PromptLeakageGuard {
         if (reply == null || reply.isBlank()) {
             return false;
         }
+        // Case-insensitive on both sides: a model emitting "PersonaPrompt" or
+        // "CONTEXTBUILDMANIFEST" is reciting the same camelCase JSON field, just re-cased --
+        // toLowerCase(Locale.ROOT) is safe here because the CJK markers are unaffected by
+        // case-folding (Chinese script has no case), so their matching is unchanged.
+        String normalizedReply = reply.toLowerCase(Locale.ROOT);
         for (String marker : INTERNAL_SCHEMA_MARKERS) {
-            if (reply.contains(marker)) {
+            if (normalizedReply.contains(marker.toLowerCase(Locale.ROOT))) {
                 return true;
             }
         }

@@ -5,6 +5,7 @@ import com.innercosmos.conversation.entity.ConversationTurn;
 import com.innercosmos.conversation.entity.GenerationAttempt;
 import com.innercosmos.conversation.entity.MessageBubble;
 import com.innercosmos.conversation.entity.TurnPlan;
+import com.innercosmos.conversation.entity.TurnDeliberationSnapshot;
 import java.util.List;
 
 /** Owner-scoped, replayable view of one Aurora conversation turn. */
@@ -14,4 +15,7 @@ public class TurnTimelineVO {
     public List<MessageBubble> bubbles = List.of();
     public List<ConversationEvent> events = List.of();
     public List<GenerationAttempt> generationAttempts = List.of();
+    public List<TurnDeliberationSnapshot> deliberations = List.of();
+    /** Present only for interrupted/cancelled turns; contains no unsent bubble text. */
+    public InterruptionDeltaVO interruptionDelta;
 }

@@ -41,14 +41,29 @@ describe("DemoPersonaChooser", () => {
     render(<DemoPersonaChooser onEntered={onEntered} />);
 
     await vi.waitFor(() => expect(screen.getAllByRole("button")).toHaveLength(3));
-    fireEvent.click(screen.getByRole("button", { name: /Shen Yan/ }));
+    fireEvent.click(screen.getByRole("button", { name: /沈砚/ }));
 
     await vi.waitFor(() => {
       expect(api.enterDemoPersona).toHaveBeenCalledWith("shen-yan");
       expect(onEntered).toHaveBeenCalledOnce();
       expect(api.demoPersonas).toHaveBeenCalledTimes(2);
     });
-    expect(screen.getByRole("button", { name: /Shen Yan/ })).toBeDisabled();
-    expect(screen.getByText("当前故事")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /沈砚/ })).toBeDisabled();
+    expect(screen.getByText("当前")).toBeInTheDocument();
+  });
+
+  it("collapses the compact demo switcher so Aurora keeps the first viewport", async () => {
+    vi.mocked(api.demoPersonas).mockResolvedValue([
+      { key: "lin-che", name: "Lin Che", headline: "把理想变成真实", story: "课程项目", themes: ["创造"], active: true },
+      { key: "shen-yan", name: "Shen Yan", headline: "在远方重新找到自己", story: "交换生活", themes: ["归属"], active: false },
+      { key: "xia-yu", name: "Xia Yu", headline: "总在照顾别人的人", story: "新的工作", themes: ["边界"], active: false }
+    ]);
+
+    render(<DemoPersonaChooser compact onEntered={vi.fn()} />);
+
+    const region = await screen.findByRole("region", { name: "Demo 体验角色" });
+    expect(region.querySelector("summary")).toHaveTextContent("体验角色 · 林澈切换");
+    expect(screen.queryByText("把理想变成真实")).not.toBeInTheDocument();
+    expect(region.querySelector("details")).not.toHaveAttribute("open");
   });
 });

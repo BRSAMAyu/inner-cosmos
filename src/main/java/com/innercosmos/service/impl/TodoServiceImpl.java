@@ -4,8 +4,10 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.innercosmos.ai.client.LlmClient;
 import com.innercosmos.ai.client.LlmRequest;
 import com.innercosmos.common.ErrorCode;
+import com.innercosmos.entity.MemoryCard;
 import com.innercosmos.entity.TodoItem;
 import com.innercosmos.exception.BusinessException;
+import com.innercosmos.mapper.MemoryCardMapper;
 import com.innercosmos.mapper.TodoItemMapper;
 import com.innercosmos.service.TodoService;
 import org.springframework.stereotype.Service;
@@ -16,20 +18,38 @@ import java.util.Set;
 @Service
 public class TodoServiceImpl implements TodoService {
     private static final Set<String> VALID_STATUSES = Set.of("TODO", "DOING", "IN_PROGRESS", "DONE", "CANCELLED", "DROPPED");
+    // TASK 2e: explicit semantic status order (alphabetical order via orderByAsc("status")
+    // put CANCELLED before DOING/DONE/TODO, so "已放下" sorted first and "待开始" last).
+    // Sorted in Java (not SQL) so the ordering is portable across H2 (MODE=MySQL) and PostgreSQL.
+    private static final List<String> STATUS_ORDER = List.of("TODO", "DOING", "DONE", "CANCELLED");
 
     private final TodoItemMapper todoItemMapper;
     private final LlmClient llmClient;
+    private final MemoryCardMapper memoryCardMapper;
 
-    public TodoServiceImpl(TodoItemMapper todoItemMapper, LlmClient llmClient) {
+    public TodoServiceImpl(TodoItemMapper todoItemMapper, LlmClient llmClient, MemoryCardMapper memoryCardMapper) {
         this.todoItemMapper = todoItemMapper;
         this.llmClient = llmClient;
+        this.memoryCardMapper = memoryCardMapper;
     }
 
     @Override
     public List<TodoItem> list(Long userId) {
         QueryWrapper<TodoItem> query = new QueryWrapper<>();
-        query.eq("user_id", userId).orderByAsc("status").orderByDesc("id");
-        return todoItemMapper.selectList(query);
+        query.eq("user_id", userId);
+        List<TodoItem> items = new java.util.ArrayList<>(todoItemMapper.selectList(query));
+        items.sort((a, b) -> {
+            int rankA = statusRank(a.status);
+            int rankB = statusRank(b.status);
+            if (rankA != rankB) return Integer.compare(rankA, rankB);
+            return Long.compare(b.id, a.id);
+        });
+        return items;
+    }
+
+    private int statusRank(String status) {
+        int rank = STATUS_ORDER.indexOf(status);
+        return rank < 0 ? STATUS_ORDER.size() : rank;
     }
 
     @Override
@@ -50,6 +70,16 @@ public class TodoServiceImpl implements TodoService {
     public TodoItem create(Long userId, TodoItem item) {
         if (item.taskName == null || item.taskName.isBlank()) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "任务名称不能为空");
+        }
+        // SECURITY (cross-tenant content injection): sourceMemoryCardId is a public field on the
+        // request body. Without this check, a client could attach an arbitrary task to another
+        // user's memory card id, and that task would then render inside the card owner's private
+        // 今日记录/星图详情 (see MemoryServiceImpl/MemorySettlementServiceImpl todo queries).
+        if (item.sourceMemoryCardId != null) {
+            MemoryCard card = memoryCardMapper.selectById(item.sourceMemoryCardId);
+            if (card == null || !userId.equals(card.userId)) {
+                throw new BusinessException(ErrorCode.BAD_REQUEST, "关联的记忆卡不存在或不属于你");
+            }
         }
         item.userId = userId;
         item.status = normalizeStatus(item.status == null || item.status.isBlank() ? "TODO" : item.status);
@@ -87,11 +117,26 @@ public class TodoServiceImpl implements TodoService {
             step = "先打开一个空白页，把这件事写成一个最小动作。";
         }
         String prefix = "Aurora 拆出的第一步：";
-        String current = item.description == null ? "" : item.description.trim();
+        // TASK 2d: REPLACE any previously-appended split block instead of accumulating one per
+        // click. The split block is always appended last (see below), so stripping everything
+        // from the first occurrence of the prefix onward removes exactly one prior block and
+        // nothing of the user's own original text before it.
+        String current = stripPreviousSplitBlock(item.description, prefix).trim();
         item.description = current.isBlank() ? prefix + step.trim() : current + "\n\n" + prefix + step.trim();
         item.status = "TODO";
         todoItemMapper.updateById(item);
         return item;
+    }
+
+    private String stripPreviousSplitBlock(String description, String prefix) {
+        if (description == null) {
+            return "";
+        }
+        int idx = description.indexOf(prefix);
+        if (idx < 0) {
+            return description;
+        }
+        return description.substring(0, idx);
     }
 
     private TodoItem requireOwned(Long userId, Long id) {

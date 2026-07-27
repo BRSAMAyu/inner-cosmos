@@ -12,6 +12,14 @@ spec:
     - ports:
         - protocol: TCP
           port: 8080
+        # Actuator's separate "management" port (application-academy-eks.yml's
+        # management.server.port, deploy/k8s/base/app-deployment.yml's "management"
+        # containerPort/probes). Not Service/HTTPRoute-mapped -- only kubelet probes and
+        # in-cluster Prometheus reach it, both of which this policy has no way to distinguish
+        # from any other in-cluster caller by port alone (same as the existing 8080 rule below,
+        # which is equally unrestricted by source).
+        - protocol: TCP
+          port: 8090
   egress:
     - to:
         - namespaceSelector: {}

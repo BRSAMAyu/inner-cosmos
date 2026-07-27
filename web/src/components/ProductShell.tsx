@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { AppearanceToggle } from "./AppearanceToggle";
 import type { Locale } from "../i18n";
 
@@ -6,7 +7,7 @@ export type ProductSpace = "aurora" | "cosmos" | "resonance" | "letters" | "me";
 export const productSpaces: Array<[ProductSpace, string, string]> = [
   ["aurora", "今天", "Aurora"], ["cosmos", "内宇宙", "记忆与自我理解"],
   ["resonance", "共鸣", "共鸣体与相遇"], ["letters", "连接", "慢信与关系"],
-  ["me", "我的", "控制与边界"]
+  ["me", "我的", "设置与隐私"]
 ];
 
 // W2 UIUX audit (doc 24 section 5.1: "中文和 en-SG 均无硬编码"): live-verified with the app's own
@@ -21,7 +22,7 @@ const SPACE_LABELS_EN: Record<ProductSpace, [string, string]> = {
   cosmos: ["Cosmos", "Memory & self-understanding"],
   resonance: ["Resonance", "Capsules & encounters"],
   letters: ["Connect", "Slow letters & relationships"],
-  me: ["Me", "Control & boundaries"]
+  me: ["Me", "Settings & privacy"]
 };
 
 export type ProductSpaceStatus = {
@@ -249,12 +250,13 @@ export function ConnectionSubNav({ active, onNavigate, locale = "zh-CN" }: {
   </nav>;
 }
 
-export type MeTab = "overview" | "profile" | "account" | "appearance" | "data";
+export type MeTab = "overview" | "guide" | "profile" | "account" | "appearance" | "data";
 
 export const meTabs: Array<[MeTab, string, string, string]> = [
   ["overview", "总览", "Overview", ""],
+  ["guide", "引导", "Guides", "guide"],
   ["profile", "画像与理解", "Profile & understanding", "profile"],
-  ["account", "账户与设备", "Account & devices", "account"],
+  ["account", "Aurora 与账户", "Aurora & account", "account"],
   ["appearance", "语言与外观", "Language & appearance", "appearance"],
   ["data", "数据权利", "Data rights", "data-rights"]
 ];
@@ -304,14 +306,14 @@ const ME_COPY: Record<Locale, {
   push: string; mic: string; logout: string;
 }> = {
   "zh-CN": {
-    ariaLabel: "我的控制与边界", eyebrow: "我的 · 控制与边界", heading: "由你决定，Aurora 怎样参与。",
-    intro: "身份、设备权限、主动回来和数据边界都集中在这里。关闭一项能力不会删除你的创新体验，也不会暗中改写已有记忆。",
+    ariaLabel: "我的设置", eyebrow: "我的", heading: "设置你的账户和使用体验",
+    intro: "声线、外观、通知、记忆授权、数据与退出都在这里管理。",
     device: "登录与设备", deviceNative: "OIDC + PKCE · 安全存储", deviceWeb: "安全 Web Session",
     online: "当前在线", offline: "当前离线，时间线会在恢复后续接",
-    returns: "主动回来", returnsValue: n => `${n} 个有效约定`, returnsAction: "查看和调整",
-    understanding: "理解与记忆", understandingValue: n => `${n} 条已确认理解`, understandingAction: "纠正、追溯或撤回",
-    resonance: "共鸣与连接", resonanceValue: (p, f) => `${p} 个公开共鸣体 · ${f} 个双向连接`, resonanceAction: "管理授权",
-    safety: "需要先停一下？", safetyValue: "呼吸练习、着陆练习与支持资源，随时可用", safetyAction: "打开安全避风港",
+    returns: "Aurora 主动联系", returnsValue: n => `${n} 个已开启约定`, returnsAction: "查看和调整",
+    understanding: "记忆管理", understandingValue: n => `${n} 条已确认记忆`, understandingAction: "查看、纠正或撤回",
+    resonance: "共鸣授权", resonanceValue: (p, f) => `${p} 个公开共鸣体 · ${f} 个好友`, resonanceAction: "管理授权",
+    safety: "支持工具", safetyValue: "呼吸、着陆练习与求助资源", safetyAction: "打开支持工具",
     push: "管理通知权限", mic: "管理麦克风权限", logout: "安全退出这台设备"
   },
   "en-SG": {
@@ -335,6 +337,42 @@ export function MeSpace({ native, connected, wakeIntentCount, activeClaimCount, 
   onOpenSafetyHarbor: () => void; locale?: Locale;
 }) {
   const t = ME_COPY[locale];
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+  const logoutTriggerRef = useRef<HTMLButtonElement>(null);
+  const logoutDialogRef = useRef<HTMLElement>(null);
+  const staySignedInRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!logoutConfirmOpen) return;
+    staySignedInRef.current?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setLogoutConfirmOpen(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const controls = Array.from(logoutDialogRef.current?.querySelectorAll<HTMLElement>(
+        "button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])"
+      ) ?? []);
+      if (controls.length === 0) return;
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      logoutTriggerRef.current?.focus();
+    };
+  }, [logoutConfirmOpen]);
+
   return <section className="controls-space" aria-label={t.ariaLabel}>
     <span className="eyebrow">{t.eyebrow}</span><h1>{t.heading}</h1>
     <p>{t.intro}</p>
@@ -346,6 +384,23 @@ export function MeSpace({ native, connected, wakeIntentCount, activeClaimCount, 
       <article><strong>{t.safety}</strong><span>{t.safetyValue}</span><button type="button" onClick={onOpenSafetyHarbor}>{t.safetyAction}</button></article>
     </div>
     {native && <div className="mobile-actions"><button type="button" onClick={onRequestPush}>{t.push}</button><button type="button" onClick={onRequestMicrophone}>{t.mic}</button></div>}
-    <button type="button" className="danger-quiet" onClick={onLogout}>{t.logout}</button>
+    <button ref={logoutTriggerRef} type="button" className="danger-quiet"
+      onClick={() => setLogoutConfirmOpen(true)}>{t.logout}</button>
+    {logoutConfirmOpen && <div className="confirm-backdrop" role="presentation"
+      onMouseDown={event => { if (event.target === event.currentTarget) setLogoutConfirmOpen(false); }}>
+      <section ref={logoutDialogRef} className="confirm-dialog" role="alertdialog" aria-modal="true"
+        aria-label={locale === "en-SG" ? "Confirm sign out" : "确认安全退出"}>
+        <span className="eyebrow">{locale === "en-SG" ? "SIGN OUT" : "安全退出"}</span>
+        <h2>{locale === "en-SG" ? "Sign out of this device?" : "要退出这台设备吗？"}</h2>
+        <p>{locale === "en-SG"
+          ? "Unsent text stays only in this browser. Your saved conversations and memories remain in your account."
+          : "未发送的文字只留在当前浏览器；已保存的对话和记忆仍会保留在账户中。"}</p>
+        <div><button ref={staySignedInRef} type="button" className="quiet" onClick={() => setLogoutConfirmOpen(false)}>
+          {locale === "en-SG" ? "Stay signed in" : "继续留在这里"}
+        </button><button type="button" className="danger-quiet" onClick={() => { setLogoutConfirmOpen(false); onLogout(); }}>
+          {locale === "en-SG" ? "Sign out" : "确认退出"}
+        </button></div>
+      </section>
+    </div>}
   </section>;
 }

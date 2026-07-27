@@ -2,6 +2,7 @@ package com.innercosmos.service.impl;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.innercosmos.config.ExperienceModeProperties;
 import com.innercosmos.entity.CapsuleGenomeVersion;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -28,9 +29,18 @@ public class CapsuleRuntimeContextComposer {
     private static final Set<String> STYLE_TYPES = Set.of("EXPRESSION_STYLE", "BOUNDARY");
 
     private final ObjectMapper objectMapper;
+    private final ExperienceModeProperties experience;
 
-    public CapsuleRuntimeContextComposer(ObjectMapper objectMapper) {
+    @org.springframework.beans.factory.annotation.Autowired
+    public CapsuleRuntimeContextComposer(ObjectMapper objectMapper,
+                                         ExperienceModeProperties experience) {
         this.objectMapper = objectMapper;
+        this.experience = experience;
+    }
+
+    /** Compatibility constructor for focused evaluations that instantiate the composer directly. */
+    public CapsuleRuntimeContextComposer(ObjectMapper objectMapper) {
+        this(objectMapper, new ExperienceModeProperties());
     }
 
     public Map<String, Object> compose(CapsuleGenomeVersion genome, String visitorMessage) {
@@ -47,6 +57,20 @@ public class CapsuleRuntimeContextComposer {
             String category = CATEGORY_KEY.get(intent);
             List<JsonNode> selectedMemories = selectMemories(ir, category, visitorMessage);
             List<JsonNode> personaClaims = selectPersonaClaims(preview.path("personaLayer"), visitorMessage);
+            // Experience-first (item 9 "拟真度非常低 / 老是说 unsupported"): a lexical-overlap miss is
+            // not the same thing as "this capsule has nothing it is allowed to say". When nothing
+            // matched literally but the owner DID authorize self-description/voice claims, fall back
+            // to that authorized voice instead of collapsing to UNSUPPORTED and answering every
+            // ordinary opener with a disclaimer. This never widens authorization: the candidates are
+            // exactly the compiled personaLayer entries the owner already selected.
+            boolean expressiveFallback = false;
+            boolean hasSelectedSelfDescription =
+                    personaClaims.stream().anyMatch(this::isSelfDescriptionClaim);
+            if (!hasSelectedSelfDescription && selectedMemories.isEmpty()
+                    && experience.expressiveGrounding()) {
+                personaClaims = authorizedVoiceFallback(preview.path("personaLayer"));
+                expressiveFallback = !personaClaims.isEmpty();
+            }
             boolean hasSelfDescription = personaClaims.stream().anyMatch(this::isSelfDescriptionClaim);
             boolean hasStyle = personaClaims.stream().anyMatch(this::isStyleClaim);
 
@@ -81,7 +105,10 @@ public class CapsuleRuntimeContextComposer {
             result.put("selectedContext", selectedContext);
             result.put("contextBuildManifest", manifest(genome, intent, categories, memoryIds, claimIds,
                     groundingLevel, unsupported, unsupported
-                            ? "NO_RELEVANT_GROUNDED_FEATURE" : groundingLevel + "_MATCH"));
+                            ? "NO_RELEVANT_GROUNDED_FEATURE"
+                            : expressiveFallback
+                            ? "AUTHORIZED_VOICE_FALLBACK"
+                            : groundingLevel + "_MATCH"));
             result.put("groundingLevel", groundingLevel);
             result.put("unsupported", unsupported);
             result.put("fallbackPolicy", FALLBACK);
@@ -98,7 +125,45 @@ public class CapsuleRuntimeContextComposer {
         for (JsonNode feature : ir.path(category)) {
             if (hasMeaningfulOverlap(normalized, feature.path("statement").asText(""))) selected.add(feature);
         }
+        // A category-wide question such as “你最近怎么样” or “你最重视什么” can be
+        // semantically precise while sharing only the category cue with the stored statement.
+        // In that case returning the bounded, already-authorized slice of that exact category is
+        // safer and more accurate than weakening the global overlap gate (which protects against
+        // unrelated generic bigram matches). CLAIM remains exact-overlap only.
+        if (selected.isEmpty() && (explicitCategoryQuestion(category, normalized)
+                || ("claims".equals(category) && hasSpecificClaimOverlap(ir.path(category), normalized)))) {
+            ir.path(category).forEach(selected::add);
+        }
         return selected.size() > 3 ? new ArrayList<>(selected.subList(0, 3)) : selected;
+    }
+
+    private boolean explicitCategoryQuestion(String category, String normalized) {
+        String intent = switch (category) {
+            case "temporalState" -> "TEMPORAL";
+            case "habits" -> "HABIT";
+            case "values" -> "VALUE";
+            default -> "";
+        };
+        return !intent.isBlank() && INTENT_CUES.get(intent).stream().anyMatch(normalized::contains);
+    }
+
+    /**
+     * A claim question may name one compact entity (for example a two-character city) while the
+     * stored episode phrases the action differently. Keep the general two-token privacy gate, but
+     * allow the already-authorized claim slice when a non-generic exact entity bigram is shared.
+     */
+    private boolean hasSpecificClaimOverlap(JsonNode claims, String normalized) {
+        Set<String> queryTokens = tokens(normalized);
+        Set<String> generic = Set.of("经历", "发生", "记得", "做过", "去过", "住在",
+                "experience", "happened");
+        for (JsonNode claim : claims) {
+            Set<String> overlap = tokens(claim.path("statement").asText("").toLowerCase(Locale.ROOT));
+            overlap.retainAll(queryTokens);
+            if (overlap.stream().anyMatch(token -> token.length() >= 2 && !generic.contains(token))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private List<JsonNode> selectPersonaClaims(JsonNode personaLayer, String message) {
@@ -132,6 +197,32 @@ public class CapsuleRuntimeContextComposer {
         return selected.size() > 3 ? new ArrayList<>(selected.subList(0, 3)) : selected;
     }
 
+    /**
+     * The capsule's own authorized voice, used when this turn matched nothing lexically.
+     * Prefers EXPRESSION_STYLE (how the owner sounds — safe for any utterance) plus at most two
+     * highest-confidence self-description claims, so the capsule can answer "hi, how are you?" as
+     * itself rather than as a refusal. Anything not in the compiled personaLayer is unreachable
+     * here, exactly as before.
+     */
+    private List<JsonNode> authorizedVoiceFallback(JsonNode personaLayer) {
+        if (!personaLayer.isArray()) return List.of();
+        List<JsonNode> style = new ArrayList<>();
+        List<JsonNode> selfDescription = new ArrayList<>();
+        for (JsonNode claim : personaLayer) {
+            String type = claim.path("claimType").asText("");
+            if (STYLE_TYPES.contains(type)) style.add(claim);
+            else if (SELF_DESCRIPTION_TYPES.contains(type)) selfDescription.add(claim);
+        }
+        selfDescription.sort((left, right) -> Double.compare(
+                right.path("confidence").asDouble(0), left.path("confidence").asDouble(0)));
+        List<JsonNode> selected = new ArrayList<>(style);
+        for (JsonNode claim : selfDescription) {
+            if (selected.size() >= 3) break;
+            selected.add(claim);
+        }
+        return selected.size() > 3 ? new ArrayList<>(selected.subList(0, 3)) : selected;
+    }
+
     private boolean containsAny(String value, String... cues) {
         for (String cue : cues) if (value.contains(cue)) return true;
         return false;
@@ -156,17 +247,82 @@ public class CapsuleRuntimeContextComposer {
         return "UNFAMILIAR";
     }
 
+    // FIX 5 (privacy-minimisation / relevance tightening): the number of DISTINCT overlapping
+    // tokens required before a single shared 2-character bigram is trusted as evidence relevance.
+    // A lone shared bigram (e.g. one common Chinese word like "最近"/"自己"/"工作") is common
+    // enough between totally unrelated sentences that it must NOT be sufficient by itself -- see
+    // hasMeaningfulOverlap for the full rule.
+    private static final int MIN_OVERLAP_COUNT = 2;
+
+    /**
+     * FIX 5b (informativeness, replacing a pure count threshold): 2-character tokens that carry
+     * almost no topical signal on their own. Two unrelated Chinese sentences share one of these
+     * routinely, so a lone match on one of them must not select an owner's memory as evidence.
+     *
+     * <p>Deliberately contains every 2-character member of {@link #INTENT_CUES}: those words
+     * already did their job in {@link #classify}, routing the turn to a category. Re-counting the
+     * same word as independent *evidence* inside that category is double-dipping on one signal.
+     *
+     * <p>What is NOT here matters just as much: a specific 2-character token such as a place name
+     * ("成都") or a proper noun is genuinely informative, and a lone match on it is real topical
+     * relevance -- so it stays sufficient. This is the difference between counting overlaps and
+     * weighing them, and it is why the rule below is not simply "require two".
+     */
+    private static final Set<String> LOW_INFORMATION_TOKENS = Set.of(
+            // every 2-character INTENT_CUES entry (TEMPORAL / HABIT / VALUE / CLAIM)
+            "最近", "现在", "目前", "近况", "习惯", "通常", "总是", "倾向",
+            "重视", "看重", "在意", "原则", "价值", "重要", "经历", "发生",
+            "记得", "做过", "去过", "住在",
+            // generic high-frequency fillers with no topical content
+            "自己", "我们", "他们", "这个", "那个", "什么", "怎么", "可以",
+            "一个", "一次", "时候", "事情", "问题", "感觉", "觉得", "没有",
+            "有些", "这样", "那样", "开始", "还是", "已经", "因为", "所以");
+
+    /**
+     * FIX 5: previously a single shared 2-character bigram was enough to treat `left` and `right`
+     * as meaningfully related, which for Chinese meant one common short word (temporal fillers
+     * like "最近"/"现在", generic nouns like "自己"/"工作") could pull an owner's private episodic
+     * memory in as "evidence" for a loosely-related visitor question -- a relevance/fidelity and
+     * privacy-minimisation problem, not an authorization-boundary problem (only compiled,
+     * authorized evidence can ever be selected in the first place).
+     *
+     * <p>Tightened, conservative rule -- true only when at least one of:
+     * <ul>
+     *   <li>(a) at least {@link #MIN_OVERLAP_COUNT} distinct overlapping tokens, i.e. two
+     *       independently-matching short words rather than one coincidental common word; or</li>
+     *   <li>(b) any single overlapping token that is itself length &gt;= 3 -- a genuine
+     *       length&gt;=3 exact substring (a real Chinese trigram, now also produced by
+     *       {@link #tokens}) or an English word of length &gt;= 3. A verbatim 3+-character run
+     *       shared between two texts is far less likely to be coincidental than one common
+     *       2-character word, so it is treated as sufficient on its own.</li>
+     * </ul>
+     * This still allows a genuinely on-topic short message (two matching cues, or one specific
+     * shared phrase/word) to select evidence -- it only rejects the single-generic-bigram case.
+     */
     private boolean hasMeaningfulOverlap(String left, String right) {
         Set<String> leftTokens = tokens(left);
         Set<String> rightTokens = tokens(right.toLowerCase(Locale.ROOT));
         leftTokens.retainAll(rightTokens);
-        return !leftTokens.isEmpty();
+        if (leftTokens.isEmpty()) return false;
+        if (leftTokens.size() >= MIN_OVERLAP_COUNT) return true;
+        if (leftTokens.stream().anyMatch(token -> token.length() >= 3)) return true;
+        // (c) FIX 5b: a SINGLE 2-character token still counts when the token itself is
+        // informative. Judging a lone overlap by what the word is beats judging it by how many
+        // overlaps there happen to be: "成都" alone is real topical relevance, "最近" alone is not.
+        // Without this, asking "你有住在成都的经历吗？" refuses to surface the owner's own
+        // explicitly-authorized 成都 episode -- a false negative that makes the capsule useless
+        // on precisely the specific questions it should answer best.
+        return leftTokens.stream().noneMatch(LOW_INFORMATION_TOKENS::contains);
     }
 
     private Set<String> tokens(String text) {
         String normalized = text.replaceAll("[\\p{P}\\p{S}\\s]+", "");
         Set<String> tokens = new LinkedHashSet<>();
         for (int i = 0; i + 1 < normalized.length(); i++) tokens.add(normalized.substring(i, i + 2));
+        // FIX 5: trigrams let a genuinely contiguous 3-character shared run count as a strong
+        // signal on its own (see hasMeaningfulOverlap rule (b)) instead of needing two separate
+        // bigram matches to clear MIN_OVERLAP_COUNT.
+        for (int i = 0; i + 2 < normalized.length(); i++) tokens.add(normalized.substring(i, i + 3));
         for (String word : text.split("[^a-z0-9]+")) if (word.length() >= 3) tokens.add(word);
         return tokens;
     }

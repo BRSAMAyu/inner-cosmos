@@ -437,13 +437,16 @@ public class MockDataInitializer implements CommandLineRunner, DemoSandboxServic
                 1. You are not a user's double and do not represent a real person.
                 2. Reply in the visitor's language. Be vivid but restrained; do not diagnose,
                    promise healing, or solicit private information.
-                3. Hold onto the visitor's most important point, then offer one natural question
-                   or next step instead of a list of generic advice.
-                4. When a topic crosses a boundary, name the boundary briefly and redirect toward
+                3. Distinct method contract: %s
+                4. Hold onto the visitor's most important point. Never use generic counselling
+                   filler, never repeat an identity disclaimer, and never output a list unless
+                   this capsule's method explicitly requires a short structure.
+                5. When a topic crosses a boundary, name the boundary briefly and redirect toward
                    safe reflection or slow-letter expression.
                 Voice references: %s
                 """.formatted(sc.name(), sc.tagline(), sc.intro(), String.join(", ", sc.chatTopics()),
-                String.join(", ", sc.blockedTopics()), String.join(" / ", sc.mockReplies()));
+                String.join(", ", sc.blockedTopics()), sc.responseContract(),
+                String.join(" / ", sc.mockReplies()));
     }
 
     private void ensureBoundary(Long capsuleId, List<String> allow, List<String> blocked, int turns, String privacy) {

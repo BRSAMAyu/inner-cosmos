@@ -1,6 +1,6 @@
 export type TurnStatus =
   | "GENERATING" | "PLANNED" | "STREAMING" | "PARTIAL"
-  | "COMPLETED" | "INTERRUPTED" | "CANCELLED";
+  | "COMPLETED" | "INTERRUPTED" | "CANCELLED" | "FAILED";
 
 export interface DialogMessage {
   id: number;
@@ -31,6 +31,7 @@ type EventBase<T extends string, P> = {
 export type AuroraStreamEvent =
   | EventBase<"turn.started", { turnId: number }>
   | EventBase<"turn.plan", { turnId: number; planId: number }>
+  | EventBase<"foreground.status", { text: string; source: string; latencyMs: number }>
   | EventBase<"bubble.started", { order: number }>
   | EventBase<"token", { content: string }>
   | EventBase<"segment", { break: true }>
@@ -38,13 +39,16 @@ export type AuroraStreamEvent =
   | EventBase<"meta", Record<string, unknown>>
   | EventBase<"turn.interrupted", { reason: string }>
   | EventBase<"turn.completed", { message: string }>
-  | EventBase<"safety", { riskLevel: string; featureTarget: string; safeMessage?: string }>
+  | EventBase<"safety", {
+      riskLevel: string; riskType?: string; handledAction?: string;
+      safetyState?: string; featureTarget: string; safeMessage?: string;
+    }>
   | EventBase<"error", { message: string }>
   | EventBase<"done", { message: string }>
   // W2 voice: at most once per turn, only when the backend composed a genuinely distinct
   // inner-monologue line AND the user has it enabled. Deliberately NOT a terminal event (see
   // TERMINAL_EVENT_TYPES below) -- its absence must never block or delay normal turn completion.
-  | EventBase<"inner_voice", { text: string; audio: string; voiceId: string }>
+  | EventBase<"inner_voice", { text: string; audio?: string; voiceId?: string }>
   | EventBase<"timeline.event", {
       turnId: number;
       sequence: number;

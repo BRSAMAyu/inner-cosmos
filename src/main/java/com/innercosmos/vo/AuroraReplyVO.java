@@ -11,6 +11,12 @@ public class AuroraReplyVO {
     public Long turnId;
     public Long planId;
     public Boolean cancelled;
+    /** In-process delivery fencing authority; never serialized to a client. */
+    @JsonIgnore
+    public Long deliveryLeaseToken;
+    /** In-process owner paired with deliveryLeaseToken; never serialized to a client. */
+    @JsonIgnore
+    public String deliveryLeaseOwner;
     public List<String> messages;
     public String replyTone;
     public String detectedTheme;

@@ -18,7 +18,7 @@ describe("PlazaDirectory", () => {
     render(<PlazaDirectory capsules={[c]} activeCapsuleId={null} busy={false} onOpenCapsule={onOpenCapsule} />);
     expect(screen.getByText("雨后的人")).toBeVisible();
     expect(screen.getByText("自我观察", { selector: ".plaza-card-tags span" })).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "和这个侧影聊聊" }));
+    fireEvent.click(screen.getByRole("button", { name: "开始体验" }));
     expect(onOpenCapsule).toHaveBeenCalledExactlyOnceWith(c);
   });
 
@@ -56,13 +56,13 @@ describe("PlazaDirectory", () => {
 
     expect(screen.getAllByRole("listitem")[0]).toHaveTextContent("官方 1");
     expect(screen.getAllByTitle("回声能量")[0]).toHaveTextContent("99%");
-    fireEvent.click(screen.getByRole("button", { name: "新鲜度" }));
+    fireEvent.click(screen.getByRole("button", { name: "内容新鲜度" }));
     expect(screen.getAllByRole("listitem")[0]).toHaveTextContent("真实侧影");
-    fireEvent.click(screen.getByRole("button", { name: "最近活跃" }));
+    fireEvent.click(screen.getByRole("button", { name: "最近更新" }));
     expect(screen.getAllByRole("listitem")[0]).toHaveTextContent("真实侧影");
-    expect(screen.getByText("可以写信给本人")).toBeVisible();
+    expect(screen.getByText("用户创建 · 可写慢信")).toBeVisible();
     expect(screen.getAllByRole("listitem")).toHaveLength(6);
-    fireEvent.click(screen.getByRole("button", { name: "继续浏览另外 1 个侧影" }));
+    fireEvent.click(screen.getByRole("button", { name: "再显示 1 个共鸣体" }));
     expect(screen.getAllByRole("listitem")).toHaveLength(7);
     expect(screen.getByText("官方 6")).toBeVisible();
   });
@@ -83,14 +83,14 @@ describe("PlazaDirectory", () => {
   it("shows an empty state when there are no public capsules", () => {
     render(<PlazaDirectory capsules={[]} activeCapsuleId={null} busy={false} onOpenCapsule={() => undefined} />);
     expect(screen.queryByRole("button", { name: "开始对话" })).not.toBeInTheDocument();
-    expect(screen.getByText(/还没有/)).toBeVisible();
+    expect(screen.getByText("目前没有公开共鸣体。")).toBeVisible();
   });
 
   it("renders headings, sort controls and cards in English when locale is en-SG", () => {
     render(<PlazaDirectory locale="en-SG" capsules={[capsule()]} activeCapsuleId={null} busy={false} onOpenCapsule={() => undefined} />);
-    expect(screen.getByRole("heading", { name: /Meet a facet first/ })).toBeVisible();
+    expect(screen.getByRole("heading", { name: /Choose a capsule/ })).toBeVisible();
     expect(screen.getByText("1 public capsule")).toBeVisible();
     expect(screen.getByRole("button", { name: "Echo energy" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Talk to this facet" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Talk to this capsule" })).toBeVisible();
   });
 });

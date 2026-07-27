@@ -71,8 +71,37 @@ class DualKernelInformationFlowEvaluationTest {
         Variant single = runSingle(sameInput);
         Variant adaptiveDual = runAdaptive(sameInput);
 
-        assertEquals(single.rawContext(), adaptiveDual.rawContext(),
-                "both variants must start from the same assembled information");
+        // 2026-07-27 audit: this was a raw assertEquals over the two context objects. The dual
+        // path now adds one key of its own (modeExecutionContract), so byte equality can never
+        // hold again -- but byte equality was never the guarantee worth having. The guarantee is
+        // that the dual variant starts from the SAME ASSEMBLED INFORMATION: it must not be handed
+        // any external fact the single-pass baseline did not also get, or the comparison between
+        // them is confounded. modeExecutionContract is a pure function of `mode`, which both
+        // variants already hold, so it introduces no new information -- and it must remain the
+        // ONLY difference. That is now pinned explicitly instead of resting on incidental
+        // equality, which makes this assertion strictly stronger than the one it replaces.
+        java.util.Set<String> singleFields = new java.util.LinkedHashSet<>();
+        single.rawContext().fieldNames().forEachRemaining(singleFields::add);
+        java.util.Set<String> dualFields = new java.util.LinkedHashSet<>();
+        adaptiveDual.rawContext().fieldNames().forEachRemaining(dualFields::add);
+
+        for (String field : singleFields) {
+            assertEquals(single.rawContext().get(field), adaptiveDual.rawContext().get(field),
+                    "both variants must start from the same value for '" + field + "'");
+        }
+        java.util.Set<String> extraFields = new java.util.LinkedHashSet<>(dualFields);
+        extraFields.removeAll(singleFields);
+        assertEquals(java.util.Set.of("modeExecutionContract"), extraFields,
+                "the dual path may add its own mode-derived contract and nothing else; any other "
+                        + "extra key would mean the variants no longer start from the same "
+                        + "assembled information");
+        // Mode-derived, not turn-derived: every stage must receive the identical contract string.
+        assertEquals(adaptiveDual.rawContext().path("modeExecutionContract"),
+                adaptiveDual.stageContexts().get("AURORA_SPEAKER_DAILY_TALK")
+                        .path("modeExecutionContract"),
+                "modeExecutionContract must be a pure function of mode, identical across stages");
+        assertTrue(!adaptiveDual.rawContext().path("modeExecutionContract").asText().isBlank(),
+                "the mode contract must actually carry the mode's behavioural commitment");
         assertEquals(single.visibleSegments(), adaptiveDual.visibleSegments(),
                 "the fixture holds visible output constant; this suite is not a quality preference test");
         assertEquals(List.of("AURORA_CHAT_DAILY_TALK"), single.modules());
@@ -106,7 +135,7 @@ class DualKernelInformationFlowEvaluationTest {
         assertEquals(sameInput.get("userMessage"), critic.path("userInput").asText());
         assertTrue(critic.path("observableIssues").isArray());
 
-        assertEquals("dual-kernel.v1", adaptiveDual.runtime());
+        assertEquals("dual-kernel.current-turn.v2", adaptiveDual.runtime());
         assertEquals("接受打断，停止旧计划，只推进一个动作",
                 adaptiveDual.relationshipMove());
         assertEquals(SMALL_STEP, adaptiveDual.smallStep());
@@ -195,7 +224,7 @@ class DualKernelInformationFlowEvaluationTest {
         assertEquals(1.0, meters.find("aurora.turn.count")
                 .tag("runtime", "single-pass.v1").counter().count());
         assertEquals(1.0, meters.find("aurora.turn.count")
-                .tag("runtime", "dual-kernel.v1").counter().count());
+                .tag("runtime", "dual-kernel.current-turn.v2").counter().count());
 
         TestObservationRegistry singleRegistry = TestObservationRegistry.create();
         new AiTurnObservation(singleRegistry).record(
@@ -211,7 +240,7 @@ class DualKernelInformationFlowEvaluationTest {
                 "chat", dual.runtime(), "offline-scripted", MODE, false, false, 1);
         assertThat(dualRegistry)
                 .hasObservationWithNameEqualTo("aurora.turn").that()
-                .hasLowCardinalityKeyValue("runtime", "dual-kernel.v1")
+                .hasLowCardinalityKeyValue("runtime", "dual-kernel.current-turn.v2")
                 .doesNotHaveLowCardinalityKeyValueWithKey("message")
                 .doesNotHaveLowCardinalityKeyValueWithKey("userId");
 
@@ -219,7 +248,7 @@ class DualKernelInformationFlowEvaluationTest {
                 List.of("aurora.turn.count", "aurora.turn.latency"),
                 "aurora.turn",
                 "runtime",
-                List.of("single-pass.v1", "dual-kernel.v1"));
+                List.of("single-pass.v1", "dual-kernel.current-turn.v2"));
     }
 
     private void writeReport(Variant single, Variant dual, ObservabilityEvidence observability)

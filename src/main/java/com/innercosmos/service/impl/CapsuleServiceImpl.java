@@ -52,6 +52,12 @@ public class CapsuleServiceImpl implements CapsuleService {
     private final EchoCapsuleMapper capsuleMapper;
     private final CapsuleBoundaryMapper boundaryMapper;
     private final CapsuleLandingMapper capsuleLandingMapper;
+    // Read-only, used solely by markLanded's "did this visitor actually experience the capsule"
+    // gate. Nullable for the same reason capsuleLandingMapper is: the legacy 13-arg constructor
+    // below passes null, and it is only used by a unit test that never calls markLanded. Spring
+    // always injects both in production.
+    private final com.innercosmos.mapper.PersonaChatSessionMapper personaChatSessionMapper;
+    private final com.innercosmos.mapper.PersonaChatMessageMapper personaChatMessageMapper;
     private final CapsuleAgent capsuleAgent;
     private final MemoryCardMapper memoryCardMapper;
     private final UserPortraitMapper userPortraitMapper;
@@ -76,6 +82,8 @@ public class CapsuleServiceImpl implements CapsuleService {
     public CapsuleServiceImpl(EchoCapsuleMapper capsuleMapper,
                               CapsuleBoundaryMapper boundaryMapper,
                               CapsuleLandingMapper capsuleLandingMapper,
+                              com.innercosmos.mapper.PersonaChatSessionMapper personaChatSessionMapper,
+                              com.innercosmos.mapper.PersonaChatMessageMapper personaChatMessageMapper,
                               CapsuleAgent capsuleAgent,
                               MemoryCardMapper memoryCardMapper,
                               UserPortraitMapper userPortraitMapper,
@@ -90,6 +98,8 @@ public class CapsuleServiceImpl implements CapsuleService {
         this.capsuleMapper = capsuleMapper;
         this.boundaryMapper = boundaryMapper;
         this.capsuleLandingMapper = capsuleLandingMapper;
+        this.personaChatSessionMapper = personaChatSessionMapper;
+        this.personaChatMessageMapper = personaChatMessageMapper;
         this.capsuleAgent = capsuleAgent;
         this.memoryCardMapper = memoryCardMapper;
         this.userPortraitMapper = userPortraitMapper;
@@ -117,7 +127,7 @@ public class CapsuleServiceImpl implements CapsuleService {
                               CapsuleEmbeddingIndexService capsuleEmbeddingIndexService,
                               DataRetractionReceiptService retractionReceiptService,
                               DataMaskingService dataMaskingService) {
-        this(capsuleMapper, boundaryMapper, null, capsuleAgent, memoryCardMapper, userPortraitMapper,
+        this(capsuleMapper, boundaryMapper, null, null, null, capsuleAgent, memoryCardMapper, userPortraitMapper,
                 authorizedMemoryRefMapper, genomeService, dataUseGrantService, blockRelationMapper,
                 objectMapper, capsuleEmbeddingIndexService, retractionReceiptService, dataMaskingService);
     }
@@ -362,18 +372,41 @@ public class CapsuleServiceImpl implements CapsuleService {
             throw new com.innercosmos.exception.BusinessException(
                     com.innercosmos.common.ErrorCode.NOT_FOUND, "共鸣体不存在或无权访问");
         }
-        if ("PUBLIC".equals(visibilityStatus) && (!currentAuthorizationsValid(capsule)
+        // FIX 4: compute the caller's actual intent FIRST -- requesting public via EITHER field
+        // counts as "requesting public". Both the authorization-review gate below and the
+        // simulator-only gate must see this combined intent, not just the literal
+        // visibilityStatus string; otherwise {"visibilityStatus":"NEEDS_REVIEW","isPublic":true}
+        // (or the reverse, {"visibilityStatus":"PUBLIC","isPublic":false}) could reach a gate
+        // that a plain {"visibilityStatus":"PUBLIC"} request would have had to pass.
+        boolean requestsPublic = "PUBLIC".equals(visibilityStatus) || Boolean.TRUE.equals(isPublic);
+        if (requestsPublic && (!currentAuthorizationsValid(capsule)
                 || (capsule.activeGenomeVersionId != null && genomeService.current(capsuleId) == null))) {
             throw new com.innercosmos.exception.BusinessException(
                     com.innercosmos.common.ErrorCode.BAD_REQUEST, "授权记忆需要复核后才能重新公开");
         }
-        boolean requestsPublic = "PUBLIC".equals(visibilityStatus) || Boolean.TRUE.equals(isPublic);
         if (Boolean.TRUE.equals(capsule.simulatorOnly) && requestsPublic) {
             throw new com.innercosmos.exception.BusinessException(
                     com.innercosmos.common.ErrorCode.BAD_REQUEST, "模拟器共鸣体仅供隔离测试，永远不能公开或被真实访客发现");
         }
-        capsule.visibilityStatus = safeVisibility(visibilityStatus);
-        capsule.isPublic = isPublic == null ? !"PRIVATE".equals(capsule.visibilityStatus) : isPublic;
+        // Invariant (FIX 4): isPublic is true IF AND ONLY IF visibilityStatus is PUBLIC. Every
+        // visitor-facing read gate in this codebase (create(), requireRunnableCapsule(),
+        // plazaCapsules(), markLanded()) already checks BOTH fields together and fails closed if
+        // either disagrees, so a mismatched pair was never actually exploitable -- but it is still
+        // a corrupt, ambiguous persisted state. Deriving both fields from the single
+        // `requestsPublic` decision above (which has ALREADY passed the review/simulator gates
+        // whenever it is true) keeps them mutually consistent, and guarantees every path that
+        // ends up with isPublic=true was covered by the same review gate a plain
+        // {"visibilityStatus":"PUBLIC"} request goes through.
+        if (requestsPublic) {
+            capsule.visibilityStatus = "PUBLIC";
+            capsule.isPublic = true;
+        } else {
+            // safeVisibility() fails closed to PRIVATE for anything unrecognized. visibilityStatus
+            // cannot be "PUBLIC" in this branch (that would have made requestsPublic true above),
+            // so this can never resolve back to PUBLIC while isPublic is forced false here.
+            capsule.visibilityStatus = safeVisibility(visibilityStatus);
+            capsule.isPublic = false;
+        }
         capsuleMapper.updateById(capsule);
         return capsule;
     }
@@ -1056,7 +1089,12 @@ public class CapsuleServiceImpl implements CapsuleService {
         // Serialize signals for one capsule so an idempotent retry can never leave a receipt
         // without its corresponding energy increment (or increment twice).
         EchoCapsule capsule = capsuleMapper.selectByIdForUpdate(capsuleId);
-        if (capsule == null || !Boolean.TRUE.equals(capsule.isPublic)) {
+        // FIX 3: same two-part visitor-facing gate as create(), requireRunnableCapsule() and
+        // plazaCapsules() -- isPublic==true alone is not sufficient. A capsule can have
+        // isPublic=true while visibilityStatus is NEEDS_REVIEW/HIDDEN/ARCHIVED (e.g. mid-review
+        // after an authorization change), and such a capsule must not be able to accumulate
+        // resonance energy from a landing signal.
+        if (capsule == null || !Boolean.TRUE.equals(capsule.isPublic) || !"PUBLIC".equals(capsule.visibilityStatus)) {
             throw new com.innercosmos.exception.BusinessException(
                     com.innercosmos.common.ErrorCode.NOT_FOUND, "共鸣体不存在或不可见");
         }
@@ -1064,6 +1102,17 @@ public class CapsuleServiceImpl implements CapsuleService {
             throw new com.innercosmos.exception.BusinessException(
                     com.innercosmos.common.ErrorCode.BAD_REQUEST, "不能给自己的共鸣体标记落地");
         }
+        // 2026-07-27 audit (P3, CONFIRMED): "this landed for me" used to require no interaction at
+        // all -- any authenticated account could POST /api/echo/{id}/landed and add +0.02 to a
+        // stranger's echoEnergy, which ranks the plaza and feeds match scoring. Idempotency capped
+        // one account at one bump, so the cheap abuse was breadth (many accounts), not depth.
+        //
+        // The gate below is what the UI already implies but never enforced: ResonanceNetwork only
+        // renders the landing affordance once the visitor has actually received a capsule reply
+        // (`personaMessages.some(m => m.senderType === "CAPSULE")`). Requiring that server-side
+        // means farming a bump now costs a real, daily-quota-limited AI turn per account instead
+        // of one unauthenticated-cost POST.
+        requireExperiencedCapsule(userId, capsuleId);
         boolean alreadyLanded = capsuleLandingMapper.selectCount(new QueryWrapper<CapsuleLanding>()
                 .eq("capsule_id", capsuleId)
                 .eq("user_id", userId)) > 0;
@@ -1080,6 +1129,35 @@ public class CapsuleServiceImpl implements CapsuleService {
                 .setSql("echo_energy = LEAST(1.0, COALESCE(echo_energy, 0) + 0.02)"));
         Double updated = capsuleMapper.selectById(capsuleId).echoEnergy;
         return updated == null ? 1.0 : updated;
+    }
+
+    /**
+     * A landing signal may only come from someone who actually heard this capsule speak: they must
+     * own a persona-chat session with it that has produced at least one CAPSULE reply.
+     *
+     * <p>Checked as two owner-scoped reads rather than a join because the mappers are plain
+     * MyBatis-Plus {@code BaseMapper}s (no XML in this codebase). The session lookup is already
+     * filtered to this visitor, so the message lookup can never see another visitor's session.
+     */
+    private void requireExperiencedCapsule(Long userId, Long capsuleId) {
+        if (personaChatSessionMapper == null || personaChatMessageMapper == null) {
+            return; // legacy 13-arg constructor (unit tests only); Spring always wires these
+        }
+        List<Long> sessionIds = personaChatSessionMapper.selectList(
+                        new QueryWrapper<com.innercosmos.entity.PersonaChatSession>()
+                                .select("id")
+                                .eq("visitor_user_id", userId)
+                                .eq("capsule_id", capsuleId))
+                .stream().map(session -> session.id).toList();
+        boolean heardIt = !sessionIds.isEmpty() && personaChatMessageMapper.selectCount(
+                new QueryWrapper<com.innercosmos.entity.PersonaChatMessage>()
+                        .in("session_id", sessionIds)
+                        .eq("sender_type", "CAPSULE")) > 0;
+        if (!heardIt) {
+            throw new com.innercosmos.exception.BusinessException(
+                    com.innercosmos.common.ErrorCode.BAD_REQUEST,
+                    "先和这个共鸣体聊过,才能标记它落地");
+        }
     }
 
     @Override
@@ -1175,7 +1253,7 @@ public class CapsuleServiceImpl implements CapsuleService {
     private String buildMatchSummary(EchoCapsule capsule, ResonanceMatchStrategy strategy,
                                      List<String> themeFamilies) {
         if (themeFamilies == null || themeFamilies.isEmpty()) {
-            return strategy.label + "暂未找到强信号；这是安全回填，不代表高度契合。";
+            return strategy.label + "：当前信息还不足以判断是否契合，可以先聊几句再决定。";
         }
         String type = "SEED_CAPSULE".equals(capsule.capsuleType) ? "官方种子" : "用户回声";
         return type + " · " + strategy.label + "：" + String.join("、", themeFamilies.stream().limit(3).toList()) + "。";

@@ -48,7 +48,7 @@ type AccountCopy = {
 
 const COPY: Record<Locale, AccountCopy> = {
   "zh-CN": {
-    aria: "账户与数据", heading: "账户与数据", eyebrow: "账户与数据",
+    aria: "Aurora 与账户设置", heading: "Aurora 与账户设置", eyebrow: "设置",
     exportTitle: "导出我的数据", exportDesc: "把你的记忆、画像、共鸣体和慢信打包成一份 JSON 文件。",
     exportBusy: "正在导出", exportBtn: "导出数据",
     pwTitle: "修改密码", pwOpen: "修改密码", pwCurrent: "当前密码", pwNew: "新密码（至少 8 位）",
@@ -68,15 +68,15 @@ const COPY: Record<Locale, AccountCopy> = {
     quietStartLabel: "安静时段开始", quietEndLabel: "安静时段结束",
     focusModeLabel: "专注模式", weatherLabel: "感知天气", timeAwareLabel: "感知时间",
     prefsSaveBusy: "保存中…", prefsSave: "保存偏好设置",
-    voiceTitle: "Aurora 的心声", voiceNote: "深层理解偶尔会留下一句没有说出口的心声。它独立于聊天，也不要求你回应。",
-    voiceEnabledLabel: "允许心声浮现", voiceEnabledHint: "关闭后，心声不会出现；开启也不会每轮打扰你。",
+    voiceTitle: "Aurora 的声音", voiceNote: "先选一个你愿意长期听见的声线。可以随时试听和更换。",
+    voiceEnabledLabel: "允许对话外的心声", voiceEnabledHint: "开启后，Aurora 偶尔会留下一句额外想法；不会每轮出现，也不会自动播放。",
     voiceModeLabel: "浮现方式",
     voiceMode: { AMBIENT: "自然浮现 - 出现时直接展示，声音仍由你点按", ON_DEMAND: "含蓄浮现 - 轻触后才展开，声音仍由你点按" },
     voicePickLabel: "选择音色", voicePreview: "▶ 试听", voicePreviewBusy: "试听中…",
     voicePreviewError: "试听暂时失败，请再试一次", voiceSaveError: "语音偏好未能保存"
   },
   "en-SG": {
-    aria: "Account & data", heading: "Account & data", eyebrow: "ACCOUNT & DATA",
+    aria: "Aurora & account settings", heading: "Aurora & account settings", eyebrow: "SETTINGS",
     exportTitle: "Export my data", exportDesc: "Package your memories, portrait, capsules and slow letters into one JSON file.",
     exportBusy: "Exporting", exportBtn: "Export data",
     pwTitle: "Change password", pwOpen: "Change password", pwCurrent: "Current password", pwNew: "New password (at least 8 characters)",
@@ -96,8 +96,8 @@ const COPY: Record<Locale, AccountCopy> = {
     quietStartLabel: "Quiet hours start", quietEndLabel: "Quiet hours end",
     focusModeLabel: "Focus mode", weatherLabel: "Weather awareness", timeAwareLabel: "Time awareness",
     prefsSaveBusy: "Saving…", prefsSave: "Save preferences",
-    voiceTitle: "Aurora's heart-voice", voiceNote: "Deep understanding may occasionally leave one unsaid line. It lives outside the chat and asks nothing from you.",
-    voiceEnabledLabel: "Allow heart-voice", voiceEnabledHint: "When off it never appears; when on it still does not interrupt every turn.",
+    voiceTitle: "Aurora's voice", voiceNote: "Choose a voice you would enjoy hearing over time. Preview or change it whenever you like.",
+    voiceEnabledLabel: "Allow thoughts outside chat", voiceEnabledHint: "Aurora may occasionally leave one extra thought. It never appears every turn or auto-plays.",
     voiceModeLabel: "How it surfaces",
     voiceMode: { AMBIENT: "Ambient -- reveal the line, with audio still under your control", ON_DEMAND: "Veiled -- tap to reveal, with audio still under your control" },
     voicePickLabel: "Choose a voice", voicePreview: "▶ Preview", voicePreviewBusy: "Previewing…",
@@ -225,15 +225,15 @@ function VoicePreferencesEditor({ ttsPreferences, ttsBusy, onUpdateTtsPreference
 
   const selectedVoice = ttsPreferences.voices.find(voice => voice.id === voiceId);
 
-  return <details className="account-preferences settings-disclosure">
+  return <details className="account-preferences settings-disclosure" open>
     <summary><strong>{t.voiceTitle}</strong><small>{t.voiceNote}</small></summary>
     <div className="settings-disclosure-body">
     <div className="account-toggle"><label><input type="checkbox" checked={enabled}
       disabled={ttsBusy} onChange={event => changeEnabled(event.target.checked)} />
       {t.voiceEnabledLabel}</label><small>{t.voiceEnabledHint}</small></div>
     {error && <span className="voice-error" role="alert">{error}</span>}
-    <fieldset className="voice-compact-grid" disabled={!enabled}>
-      <label>{t.voiceModeLabel}<select value={mode} disabled={ttsBusy}
+    <fieldset className="voice-compact-grid">
+      <label>{t.voiceModeLabel}<select value={mode} disabled={ttsBusy || !enabled}
         onChange={event => changeMode(event.target.value as TtsPreferences["innerVoiceMode"])}>
         {innerVoiceModeOrder.map(value => <option key={value} value={value}>{t.voiceMode[value]}</option>)}
       </select></label>
@@ -328,6 +328,12 @@ export function AccountSettings({ busy, message, onChangePassword, onExportData,
     <h2>{t.heading}</h2>
     {message && <p className="account-message">{message}</p>}
     <div className="account-actions-grid">
+      {ttsPreferences && onUpdateTtsPreferences && onPreviewVoice &&
+        <VoicePreferencesEditor ttsPreferences={ttsPreferences} ttsBusy={ttsBusy}
+          onUpdateTtsPreferences={onUpdateTtsPreferences} onPreviewVoice={onPreviewVoice} locale={locale} t={t} />}
+      {profile && onSaveProfile && <AuroraPreferencesEditor key={profile.id} profile={profile} profileBusy={profileBusy}
+        onSaveProfile={onSaveProfile} locale={locale} t={t} />}
+
       <article>
         <strong>{t.exportTitle}</strong>
         <p className="muted">{t.exportDesc}</p>
@@ -366,12 +372,6 @@ export function AccountSettings({ busy, message, onChangePassword, onExportData,
             </div>
           </div>}
       </article>
-
-      {profile && onSaveProfile && <AuroraPreferencesEditor key={profile.id} profile={profile} profileBusy={profileBusy}
-        onSaveProfile={onSaveProfile} locale={locale} t={t} />}
-      {ttsPreferences && onUpdateTtsPreferences && onPreviewVoice &&
-        <VoicePreferencesEditor ttsPreferences={ttsPreferences} ttsBusy={ttsBusy}
-          onUpdateTtsPreferences={onUpdateTtsPreferences} onPreviewVoice={onPreviewVoice} locale={locale} t={t} />}
     </div>
   </section>;
 }

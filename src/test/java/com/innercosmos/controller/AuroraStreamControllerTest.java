@@ -147,7 +147,7 @@ class AuroraStreamControllerTest {
                 "meta must carry agentLoop for the perception panel on stream; got:\n" + body);
         assertTrue(body.contains("\"referencedMemoryIds\""),
                 "meta must carry exact owner-scoped memory ids so the client can show provenance; got:\n" + body);
-        assertTrue(body.contains("\"runtime\":\"dual-kernel.pipeline.v2\""),
+        assertTrue(body.contains("\"runtime\":\"dual-kernel.current-turn.v2\""),
                 "meta must expose the observable dual-kernel runtime without internal reasoning; got:\n" + body);
         assertTrue(body.contains("\"criticRepaired\""),
                 "meta must expose the safe critic outcome field; got:\n" + body);
@@ -155,10 +155,22 @@ class AuroraStreamControllerTest {
                 "meta must reveal whether the planning kernel used a deterministic fallback; got:\n" + body);
         assertTrue(body.contains("\"speakerFallbackUsed\""),
                 "meta must reveal whether the speaking kernel used a deterministic fallback; got:\n" + body);
-        assertTrue(body.contains("\"backgroundPlannerScheduled\":true"),
-                "meta must prove the planner is scheduled off the visible critical path; got:\n" + body);
+        assertTrue(body.contains("\"backgroundPlannerScheduled\":false"),
+                "current-turn planning must not masquerade as legacy next-turn background work; got:\n" + body);
         assertTrue(body.contains("\"guidanceSource\""),
                 "meta must reveal whether speaker used bootstrap or prior-turn guidance; got:\n" + body);
+        assertTrue(body.contains("\"provider\":\"MOCK\"")
+                        && body.contains("\"configuredProvider\":\"minimax\"")
+                        && body.contains("\"model\""),
+                "meta must expose actual and configured provider/model provenance; got:\n" + body);
+        assertTrue(body.contains("\"responseSource\":\"BASIC_RESPONSE\""),
+                "a provider fallback must remain visibly distinguishable from a live-model response; got:\n" + body);
+        assertTrue(body.contains("\"foregroundSource\""),
+                "terminal meta must retain the transient foreground source; got:\n" + body);
+        assertTrue(body.contains("\"fallbackReason\""),
+                "meta must expose a bounded fallback reason without hidden reasoning; got:\n" + body);
+        assertTrue(body.contains("\"stageLatenciesMs\":{") && body.contains("\"speaker\":"),
+                "meta must deliver bounded per-stage latency diagnostics; got:\n" + body);
     }
 
     @Test

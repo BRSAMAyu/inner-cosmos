@@ -188,4 +188,26 @@ class AgentContextAssemblerMemoryRetrievalTest {
 
         verify(memoryRetrievalService, never()).retrieve(any(), any());
     }
+
+    @Test
+    void loadsTheWholeCurrentSessionWithoutTenMessageOrPerMessageTruncation() {
+        when(userProfileMapper.selectOne(any())).thenReturn(null);
+        List<DialogMessage> descending = new ArrayList<>();
+        for (long id = 15; id >= 1; id--) {
+            DialogMessage message = new DialogMessage();
+            message.id = id;
+            message.speaker = id % 2 == 0 ? "AURORA" : "USER";
+            message.textContent = "message-" + id + "-" + "完整内容".repeat(80);
+            descending.add(message);
+        }
+        when(dialogMessageMapper.selectList(any())).thenReturn(descending);
+        when(memoryRetrievalService.retrieve(any(), any())).thenReturn(null);
+
+        AgentContext context = assembler.assemble(7L, 11L, "新的当前消息", true);
+
+        assertThat(context.recentMessages).hasSize(15);
+        assertThat(context.recentMessages.get(0)).startsWith("#1 用户：message-1-");
+        assertThat(context.recentMessages.get(14)).startsWith("#15 用户：message-15-");
+        assertThat(context.recentMessages.get(0).length()).isGreaterThan(140);
+    }
 }

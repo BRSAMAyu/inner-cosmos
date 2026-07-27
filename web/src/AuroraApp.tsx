@@ -8,10 +8,8 @@ import { isTauriRuntime } from "./desktop-runtime";
 import { reloadPersonaCandidates, resumeOrCreatePersonaConversation } from "./personaExperience";
 import { AppearanceSettings, capsulePath, connectionTabFromSearch, connectionTabPath, ConnectionSubNav, letterThreadPath, MeSpace, meTabFromPath, meTabPath, MeSubNav, productSpaceFromPath, productSpaces, ProductShellNavigation, resourceFromPath, spacePath, type ConnectionTab, type ProductSpace, type CosmosTab, cosmosTabFromPath, cosmosTabPath, CosmosSubNav, type ResonanceTab, resonanceTabFromPath, resonanceTabPath, ResonanceSubNav } from "./components/ProductShell";
 import { AuroraConversation } from "./components/AuroraConversation";
+import { AuroraRuntimeDisclosure } from "./components/AuroraRuntimeDisclosure";
 import { ConversationHistory } from "./components/ConversationHistory";
-import { QuickHello } from "./components/QuickHello";
-import { StartHereJourney, type JourneyStep } from "./components/StartHereJourney";
-import { AuroraInnerVoiceAside } from "./components/AuroraInnerVoiceAside";
 import { AuroraMemoryTrace } from "./components/AuroraMemoryTrace";
 import { SafetyResourceCard } from "./components/SafetyResourceCard";
 import { GoodbyeRitualCard } from "./components/GoodbyeRitualCard";
@@ -58,9 +56,9 @@ import { HeartDiary } from "./components/HeartDiary";
 import { BeliefGallery } from "./components/BeliefGallery";
 import { userVisiblePublicCapsules, userVisibleResonanceMatches } from "./demoFixtureVisibility";
 import { DemoPersonaChooser } from "./components/DemoPersonaChooser";
-import { TodayOverview } from "./components/TodayOverview";
 import { InnerCosmosOverview } from "./components/InnerCosmosOverview";
-import { capsuleDraftDefaults, journeyStepsFromFacts, latestSettledMemory } from "./newUserJourney";
+import { capsuleDraftDefaults, latestSettledMemory } from "./newUserJourney";
+import { GuideCenter, OnboardingGuide, hasCompletedOnboarding, type GuideDestination } from "./components/OnboardingGuide";
 
 // The Aurora conversation/session domain (message list, streaming/turn status, interrupt/stop,
 // mode picker, WakeIntent negotiate, session bootstrap/replay) has been extracted into
@@ -133,6 +131,8 @@ export function AuroraApp() {
   const [accountMessage, setAccountMessage] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfileSettings | null>(null);
   const [profileBusy, setProfileBusy] = useState(false);
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const onboardingCheckedUserRef = useRef<number | null>(null);
   // W2 voice feature: the user's TTS voice/inner-voice preferences. Both AccountSettings' voice
   // picker AND AuroraConversation's inner-voice bubble read from this single fetched-once source
   // (there is no dedicated shared preference context/store in this codebase yet -- see
@@ -336,6 +336,25 @@ export function AuroraApp() {
     navigate(resonanceTabPath(tab));
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [navigate]);
+
+  const navigateFromGuide = useCallback((destination: GuideDestination) => {
+    if (destination === "voice") {
+      navigate(meTabPath("account"));
+    } else if (destination === "privacy") {
+      navigate(meTabPath("data"));
+    } else if (destination === "resonance") {
+      navigate(resonanceTabPath("plaza"));
+    } else {
+      navigateSpace(destination);
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [navigate, navigateSpace]);
+
+  useEffect(() => {
+    if (!authenticated || !userProfile?.id || onboardingCheckedUserRef.current === userProfile.id) return;
+    onboardingCheckedUserRef.current = userProfile.id;
+    if (!hasCompletedOnboarding(userProfile.id)) setOnboardingOpen(true);
+  }, [authenticated, userProfile?.id]);
 
   // Delivery is advanced by the backend scheduler, so keep the visible inbox/outbox honest while
   // the user stays on this tab. The immediate refresh covers returning from another space; the
@@ -571,18 +590,6 @@ export function AuroraApp() {
     ?? (directoryMatch && directoryMatch.capsule.id === visitorMatchId ? directoryMatch : null)
     ?? resonanceMatches[0] ?? null;
   const selectedSkill = skills.find(skill => skill.id === selectedSkillId) ?? skills[0] ?? null;
-  const completedJourneySteps = useMemo(() => journeyStepsFromFacts({
-    hasUserMessage: auroraSession.messages.some(message => message.speaker === "USER" && Boolean(message.text.trim())),
-    hasMemory: memories.length > 0,
-    hasActiveCapsule: capsules.some(capsule => capsule.visibilityStatus !== "ARCHIVED"),
-    hasVisitorSession: personaSession !== null,
-    hasResonantMatch: resonanceMatches.some(match => match.resonant),
-    hasSentLetter: sentLetter !== null || connectionsAndLetters.letterOutbox.length > 0
-  }), [
-    auroraSession.messages, capsules, connectionsAndLetters.letterOutbox.length, memories.length,
-    personaSession, resonanceMatches, sentLetter
-  ]);
-
   useEffect(() => {
     if (!selectedCapsule) {
       setGenomeHistory([]);
@@ -1393,11 +1400,11 @@ export function AuroraApp() {
       setPersonaVoiceAudio(null); setPersonaVoiceError(null);
       setStatus(skillLocale === "en-SG"
         ? resumed
-          ? `Your recent conversation with “${visitorMatch.capsule.pseudonym}” has been restored. It is an authorized AI capsule, not a person replying live.`
-          : `You are talking with the authorized AI capsule “${visitorMatch.capsule.pseudonym}”, not a person replying live.`
+          ? `Your recent conversation with “${visitorMatch.capsule.pseudonym}” has been restored.`
+          : `Your conversation with “${visitorMatch.capsule.pseudonym}” has started. Begin with one concrete moment.`
         : resumed
-          ? `已恢复你和「${visitorMatch.capsule.pseudonym}」最近的对话。它是授权 AI 共鸣体，不是真人实时在线。`
-          : `你正在和「${visitorMatch.capsule.pseudonym}」的授权 AI 共鸣体对话，不是真人实时在线。`);
+          ? `已恢复你和「${visitorMatch.capsule.pseudonym}」最近的对话。`
+          : `你和「${visitorMatch.capsule.pseudonym}」的对话已开始。可以从一个具体时刻说起。`);
     } catch (error) { setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
       ? "This capsule is temporarily unavailable."
       : "暂时无法进入这个共鸣体"); }
@@ -1416,8 +1423,8 @@ export function AuroraApp() {
       // Clear the previous reply's synthesized audio so the play affordance reappears for the new reply.
       setPersonaVoiceAudio(null); setPersonaVoiceError(null);
       setStatus(skillLocale === "en-SG"
-        ? "The response came from an authorized Genome. Keep testing the resonance, or put what matters into a slow letter."
-        : "回应来自授权 Genome；你可以继续验证共鸣，也可以把真正想说的内容写成慢信。 ");
+        ? "This turn has been delivered — see for yourself whether it feels like the capsule. Keep testing the resonance, or put what matters into a slow letter."
+        : "这轮回应已送达；你可以自己感受它像不像共鸣体本人，也可以继续验证共鸣，或者把真正想说的内容写成慢信。");
     } catch (error) { setPersonaTurnError(error instanceof Error ? error.message : skillLocale === "en-SG"
       ? "This turn was not delivered; your draft is still here."
       : "这轮对话没有送达，草稿内容仍在这里"); }
@@ -1682,8 +1689,6 @@ export function AuroraApp() {
         <Route path="*" element={<Navigate to={spacePath("aurora")} replace />} />
       </Routes>
       <ProductShellNavigation active={productSpace} onNavigate={navigateSpace} locale={skillLocale} />
-      <DemoPersonaChooser compact currentUsername={userProfile?.username ?? null} locale={skillLocale}
-        onEntered={bootstrap} />
 
       {/* Gemini audit 4.7: each product space gets its own ErrorBoundary so a crash rendering one
           space (all five are always mounted, just `hidden`, to preserve scroll/edit state across
@@ -1691,33 +1696,39 @@ export function AuroraApp() {
       <ErrorBoundary variant="space" locale={skillLocale}>
       <div className="product-space aurora-space" hidden={productSpace !== "aurora"}>
       <div className="aurora-stage">
-      <section className="aurora-primary" aria-label={skillLocale === "en-SG" ? "Aurora conversation" : "Aurora 对话主舞台"}>
+      <section className={`aurora-primary ${auroraSession.messages.length > 0 ? "has-conversation" : "is-empty"}`}
+        aria-label={skillLocale === "en-SG" ? "Aurora conversation" : "Aurora 对话主舞台"}>
       <header className="hero">
         <div>
           <span className="eyebrow">{tt.heroEyebrow}</span>
-          <h1>{tt.heroLine1}<br />{tt.heroLine2}</h1>
+          <h1>{tt.heroLine1}{skillLocale === "en-SG" ? " " : ""}<span>{tt.heroLine2}</span></h1>
           <p>{tt.heroP}</p>
-          <div className={`runtime-signal ${auroraSession.runtimeSignal.stage}`} aria-label={tt.runtimeAria}>
-            <span>{auroraSession.runtimeSignal.stage === "understanding" ? tt.runtimeUnderstanding : auroraSession.runtimeSignal.stage === "composing" ? tt.runtimeComposing : auroraSession.runtimeSignal.stage === "speaking" ? tt.runtimeSpeaking : tt.runtimeHere}</span>
-            {auroraSession.runtimeSignal.runtime === "dual" && <small>{tt.dualCore}</small>}
-            {auroraSession.runtimeSignal.relationshipMove && <small>{tt.relationshipMovePrefix}{auroraSession.runtimeSignal.relationshipMove}</small>}
-            {auroraSession.runtimeSignal.repaired && <small>{tt.repaired}</small>}
-          </div>
         </div>
         <div className="orb" aria-hidden="true"><span /></div>
       </header>
 
-      <nav className="modes" aria-label={tt.modesAria}>
-        {modes.map(([value]) => <button key={value} className={auroraSession.mode === value ? "active" : ""} onClick={() => auroraSession.setMode(value)}>{tt.modeLabel[value as DialogMode]}</button>)}
-      </nav>
-      <ConversationHistory sessions={auroraSession.sessions} currentSessionId={auroraSession.sessionId}
-        busy={auroraSession.sessionsBusy} locale={skillLocale}
-        onOpen={session => void auroraSession.openSession(session)}
-        onNew={() => void auroraSession.newConversation()}
-        onRename={auroraSession.renameConversation}
-        onPin={session => void auroraSession.pinConversation(session)}
-        onArchive={session => void auroraSession.archiveConversation(session)}
-        onReload={auroraSession.loadSessions} />
+      <div className="aurora-toolbar">
+        <div className={`runtime-signal ${auroraSession.runtimeSignal.stage}`} aria-label={tt.runtimeAria}>
+          <span>{auroraSession.runtimeSignal.stage === "understanding" ? tt.runtimeUnderstanding : auroraSession.runtimeSignal.stage === "composing" ? tt.runtimeComposing : auroraSession.runtimeSignal.stage === "speaking" ? tt.runtimeSpeaking : tt.runtimeHere}</span>
+          {auroraSession.runtimeSignal.runtime === "dual" && <small>{tt.dualCore}</small>}
+          {auroraSession.runtimeSignal.relationshipMove && <small>{tt.relationshipMovePrefix}{auroraSession.runtimeSignal.relationshipMove}</small>}
+          {auroraSession.runtimeSignal.repaired && <small>{tt.repaired}</small>}
+          <AuroraRuntimeDisclosure signal={auroraSession.runtimeSignal} locale={skillLocale} />
+        </div>
+        <nav className="modes" aria-label={tt.modesAria}>
+          {modes.map(([value]) => <button key={value} className={auroraSession.mode === value ? "active" : ""}
+            onClick={() => auroraSession.setMode(value)}>{tt.modeLabel[value as DialogMode]}</button>)}
+        </nav>
+        <ConversationHistory compact sessions={auroraSession.sessions} currentSessionId={auroraSession.sessionId}
+          busy={auroraSession.sessionsBusy} locale={skillLocale}
+          onOpen={session => void auroraSession.openSession(session)}
+          onNew={() => void auroraSession.newConversation()}
+          onRename={auroraSession.renameConversation}
+          onPin={session => void auroraSession.pinConversation(session)}
+          onArchive={session => void auroraSession.archiveConversation(session)}
+          onReload={auroraSession.loadSessions} />
+      </div>
+      <p className="mode-hint" role="status">{tt.modeHint[auroraSession.mode as DialogMode]}</p>
       {auroraSession.mode === "CAPSULE_SHAPING" && <section className="capsule-shaping-intro" aria-label={skillLocale === "en-SG" ? "Shape a capsule with Aurora" : "和 Aurora 一起塑造共鸣体"}>
         <div><span className="eyebrow">{skillLocale === "en-SG" ? "5-MINUTE LIVING PORTRAIT" : "五分钟 · 鲜活侧影"}</span>
           <strong>{skillLocale === "en-SG" ? "Tell stories, not personality labels." : "讲故事，不填人格问卷。"}</strong>
@@ -1728,12 +1739,6 @@ export function AuroraApp() {
           {skillLocale === "en-SG" ? "Preview the capsule workspace" : "先看看共鸣体工作台"}
         </button>
       </section>}
-
-      <AuroraInnerVoiceAside voice={auroraSession.innerVoice}
-        enabled={ttsPreferences?.innerVoiceEnabled ?? false}
-        mode={ttsPreferences?.innerVoiceMode ?? "AMBIENT"}
-        locale={skillLocale}
-        onDismiss={auroraSession.dismissInnerVoice} />
 
       <AuroraMemoryTrace trace={auroraSession.memoryTrace} memories={memories}
         locale={skillLocale} onOpenMemory={openMemoryEvidence}
@@ -1755,65 +1760,35 @@ export function AuroraApp() {
       <GoodbyeRitualCard result={auroraSession.goodbyeResult} locale={skillLocale} onDismiss={auroraSession.dismissGoodbye} />
 
       <AuroraConversation messages={auroraSession.messages} activeTurnId={auroraSession.activeTurnId}
-        thinkingStage={auroraSession.activeTurnId !== null && (auroraSession.runtimeSignal.stage === "understanding" || auroraSession.runtimeSignal.stage === "composing") ? auroraSession.runtimeSignal.stage : null}
+        thinkingStage={auroraSession.activeTurnId !== null && auroraSession.runtimeSignal.stage !== "idle"
+          ? auroraSession.runtimeSignal.stage : null}
         draft={auroraSession.draft} sessionReady={Boolean(auroraSession.sessionId)}
         onDraftChange={auroraSession.setDraft} onSubmit={auroraSession.send} onStop={() => void auroraSession.stop()}
         onTranscribe={async blob => {
           try { const result = await transcribeAudio(blob); return result.text; }
           catch (error) { setStatus(error instanceof Error ? error.message : tt.transcribeUnavailable); return ""; }
         }} onGoodbye={() => void auroraSession.triggerGoodbye()} goodbyeBusy={auroraSession.goodbyeBusy}
+        innerVoice={auroraSession.innerVoice} onDismissInnerVoice={auroraSession.dismissInnerVoice}
         innerVoiceEnabled={ttsPreferences?.innerVoiceEnabled ?? false}
         innerVoiceMode={ttsPreferences?.innerVoiceMode ?? "AMBIENT"}
+        runtime={auroraSession.runtimeSignal.runtime}
+        foregroundText={auroraSession.runtimeSignal.foregroundText}
+        foregroundSource={auroraSession.runtimeSignal.foregroundSource}
         claimCandidates={claimCandidates} claimCandidateBusyId={claimCandidateBusyId}
         onConfirmClaim={id => void confirmClaimCandidate(id)}
         onDismissClaim={id => void dismissClaimCandidate(id)}
         locale={skillLocale} />
       </section>
-
-      <aside className="aurora-context-rail" aria-label={skillLocale === "en-SG" ? "Today and next steps" : "今日概览与下一步"}>
-        {userProfile && <QuickHello profile={userProfile} locale={skillLocale} onSave={saveProfile}
-          onBegin={() => void auroraSession.greet()} />}
-
-        <TodayOverview memoryCount={memories.length} latestMemory={memories[0]?.title ?? null}
-          arrivedLetters={connectionsAndLetters.letterInbox.length}
-          latestLetter={connectionsAndLetters.letterInbox[0]?.title ?? null}
-          publicCapsules={capsules.filter(capsule => capsule.visibilityStatus === "PUBLIC").length}
-          wakeIntents={auroraSession.wakeIntents.length}
-          onOpenCosmos={() => navigateSpace("cosmos")}
-          onOpenLetters={() => navigate(connectionTabPath("letters"))}
-          onOpenResonance={() => navigateSpace("resonance")}
-          onWriteLetter={() => navigate(connectionTabPath("letters"))}
-          onOpenReturns={() => document.querySelector(".returns")?.scrollIntoView({ behavior: "smooth", block: "start" })}
-          locale={skillLocale} />
-
-        <StartHereJourney
-          locale={skillLocale}
-          isDemoSandbox={Boolean(userProfile?.username?.startsWith("sandbox-"))}
-          completedSteps={completedJourneySteps}
-          onStep={(step: JourneyStep) => {
-            if (step === "aurora") {
-              document.querySelector(".composer")?.scrollIntoView({ behavior: "smooth", block: "center" });
-              return;
-            }
-            if (step === "memory") {
-              navigate(cosmosTabPath("starfield"));
-              return;
-            }
-            if (step === "capsule") {
-              auroraSession.setMode("CAPSULE_SHAPING");
-              document.querySelector(".modes")?.scrollIntoView({ behavior: "smooth", block: "center" });
-              return;
-            }
-            if (step === "letter") {
-              navigate(connectionTabPath("letters"));
-              return;
-            }
-            navigate(resonanceTabPath("encounters"));
-            window.scrollTo({ top: 0, behavior: "smooth" });
-          }}
-        />
-      </aside>
       </div>
+
+      <details className="aurora-support-drawer">
+      <summary>
+        <span>{skillLocale === "en-SG" ? "Outside this conversation" : "对话之外"}</span>
+        <small>{skillLocale === "en-SG" ? "Demo story and return plans" : "体验角色与回来约定"}</small>
+      </summary>
+      <div className="aurora-support-content">
+      <DemoPersonaChooser compact currentUsername={userProfile?.username ?? null} locale={skillLocale}
+        onEntered={bootstrap} />
 
       {(mobileState.native || !mobileState.connected) && <section className={`mobile-presence ${mobileState.connected ? "online" : "offline"}`} aria-label={tt.mobileAria}>
         <div>
@@ -1859,6 +1834,8 @@ export function AuroraApp() {
             <div className="return-actions"><button type="button" disabled={auroraSession.wakeBusy} onClick={() => void auroraSession.postponeReturn(intent)}>{tt.postpone}</button><button type="button" disabled={auroraSession.wakeBusy} onClick={() => void auroraSession.cancelReturn(intent)}>{tt.cancel}</button></div>
           </article>)}</div>}
       </section>
+      </div>
+      </details>
 
       {auroraSession.notifications.filter(notice => notice.refType === "WAKE_INTENT").map(notice =>
         <section className="return-arrival" aria-label={tt.arrivalAria} key={notice.id}>
@@ -1869,23 +1846,6 @@ export function AuroraApp() {
             <button disabled={auroraSession.wakeBusy} onClick={() => void auroraSession.respondToReturn(notice, "STOP_SIMILAR")}>{tt.stopSimilar}</button></div>
         </section>)}
 
-      {selfEvolution && <AuroraSelfSpace evolution={selfEvolution} busy={selfBusy}
-        onPropose={candidateId => void evolve(
-          () => api.proposeSelfEvolution(candidateId, skillLocale === "en-SG"
-            ? "Help Aurora stay continuous in similar moments and faithful to the way this relationship has actually developed."
-            : "让 Aurora 在相似时刻更连续、更贴近双方已经形成的相处方式"),
-          skillLocale === "en-SG"
-            ? "This is still only a proposal. You can inspect how it would change Aurora first."
-            : "这还只是一个提案。你可以先看它会怎样改变 Aurora。")}
-        onEvaluate={proposalId => void evolve(() => api.evaluateSelfEvolution(proposalId), skillLocale === "en-SG"
-          ? "Sandbox evaluation is complete. Nothing changes until you confirm it."
-          : "沙盒评测完成。变化不会在你确认前生效。")}
-        onActivate={proposalId => void evolve(() => api.activateSelfEvolution(proposalId), skillLocale === "en-SG"
-          ? "This change is now part of Aurora's new version, and it can still be rolled back."
-          : "这次变化已经成为新的 Aurora 版本，并且仍然可以回退。")}
-        onRollback={(versionId, versionNo) => void evolve(() => api.rollbackSelfEvolution(versionId), skillLocale === "en-SG"
-          ? `Returned to version ${versionNo}; the rollback itself remains traceable as a new version.`
-          : `已回到第 ${versionNo} 版；回退本身也留下了可追溯的新版本。`)} locale={skillLocale} />}
       </div>
       </ErrorBoundary>
 
@@ -2097,6 +2057,26 @@ export function AuroraApp() {
           onRequestMicrophone={() => void requestMobileMicrophone()} onLogout={() => void logout()}
           onOpenSafetyHarbor={() => navigate("/safety-harbor")} locale={skillLocale} />
         </div>
+        <div hidden={meTab !== "guide"}>
+        <GuideCenter locale={skillLocale} onReplay={() => setOnboardingOpen(true)}
+          onNavigate={navigateFromGuide} />
+        {selfEvolution && <details className="advanced-aurora-settings">
+          <summary>{skillLocale === "en-SG" ? "Advanced · Aurora continuity versions" : "高级 · Aurora 连续性版本"}</summary>
+          <AuroraSelfSpace evolution={selfEvolution} busy={selfBusy}
+            onPropose={candidateId => void evolve(
+              () => api.proposeSelfEvolution(candidateId, skillLocale === "en-SG"
+                ? "Help Aurora stay continuous in similar moments and faithful to the way this relationship has actually developed."
+                : "让 Aurora 在相似时刻更连续、更贴近双方已经形成的相处方式"),
+              skillLocale === "en-SG" ? "Proposal ready for review." : "提案已生成，可以先查看影响。")}
+            onEvaluate={proposalId => void evolve(() => api.evaluateSelfEvolution(proposalId),
+              skillLocale === "en-SG" ? "Sandbox evaluation complete." : "沙盒评测完成。")}
+            onActivate={proposalId => void evolve(() => api.activateSelfEvolution(proposalId),
+              skillLocale === "en-SG" ? "Aurora continuity version updated." : "Aurora 连续性版本已更新。")}
+            onRollback={(versionId, versionNo) => void evolve(() => api.rollbackSelfEvolution(versionId),
+              skillLocale === "en-SG" ? `Returned to version ${versionNo}.` : `已回到第 ${versionNo} 版。`)}
+            locale={skillLocale} />
+        </details>}
+        </div>
         <div hidden={meTab !== "profile"}>
         <PortraitView dimensions={portrait} history={portraitHistory} calibrated={portraitCalibrated} busyDim={portraitBusy}
           onLoadHistory={dim => void loadPortraitHistory(dim)} onCalibrate={(dim, oldValue, newValue) => void submitPortraitCalibration(dim, oldValue, newValue)} locale={skillLocale} />
@@ -2119,6 +2099,9 @@ export function AuroraApp() {
         </div>
       </div>
       </ErrorBoundary>
+      {userProfile?.id && <OnboardingGuide open={onboardingOpen} userId={userProfile.id}
+        locale={skillLocale} onClose={() => setOnboardingOpen(false)}
+        onNavigate={navigateFromGuide} />}
       {statusVisible ? (
         <div className="state global-state visible" role="status"
           aria-live="polite" aria-atomic="true">

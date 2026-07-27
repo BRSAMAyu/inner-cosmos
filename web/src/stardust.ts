@@ -22,7 +22,11 @@ export type StardustProfile = {
   speed: number;
   driftX: number;
   twinkle: number;
+  /** Average seconds between restrained shooting-star events; 0 disables them. */
+  meteorInterval: number;
 };
+
+type Meteor = { x: number; y: number; vx: number; vy: number; life: number; maxLife: number };
 
 /** Maps the semantic time presentation onto restrained canvas behavior. */
 export function stardustProfileForTimeOfDay(tod: TimeOfDay): StardustProfile {
@@ -33,6 +37,7 @@ export function stardustProfileForTimeOfDay(tod: TimeOfDay): StardustProfile {
     speed: presentation.motionRhythm,
     driftX: presentation.driftX,
     twinkle: tod === "night" ? 1.12 : tod === "deep-night" ? 0.62 : 0.82,
+    meteorInterval: tod === "night" ? 18 : tod === "dusk" ? 34 : tod === "deep-night" ? 46 : 0,
   };
 }
 
@@ -110,7 +115,9 @@ export function startStardust(doc: Document = document): () => void {
   let width = 0;
   let height = 0;
   let particles: Particle[] = [];
+  let meteors: Meteor[] = [];
   let profile = stardustProfileForTimeOfDay(timeOfDayFromDocument(doc));
+  let nextMeteorAt = 0;
 
   const warm = () => {
     try {
@@ -132,6 +139,9 @@ export function startStardust(doc: Document = document): () => void {
     );
     canvas.dataset.time = profile.time;
     tint = warm();
+    meteors = [];
+    nextMeteorAt = (view.performance ? view.performance.now() : Date.now())
+      + (profile.meteorInterval || 9999) * 1000 * (.72 + Math.random() * .56);
   };
 
   const resize = () => {
@@ -169,6 +179,35 @@ export function startStardust(doc: Document = document): () => void {
       ctx.arc(x, particle.y, particle.r, 0, Math.PI * 2);
       ctx.fill();
     }
+    if (profile.meteorInterval > 0 && now >= nextMeteorAt && meteors.length === 0) {
+      const fromRight = Math.random() > .5;
+      meteors.push({
+        x: fromRight ? width * (.65 + Math.random() * .3) : width * (.1 + Math.random() * .25),
+        y: height * (.06 + Math.random() * .28),
+        vx: (fromRight ? -1 : 1) * (260 + Math.random() * 120),
+        vy: 150 + Math.random() * 90,
+        life: 0,
+        maxLife: .75 + Math.random() * .45,
+      });
+      nextMeteorAt = now + profile.meteorInterval * 1000 * (.72 + Math.random() * .56);
+    }
+    meteors = meteors.filter(meteor => {
+      meteor.life += dt;
+      meteor.x += meteor.vx * dt;
+      meteor.y += meteor.vy * dt;
+      if (meteor.life >= meteor.maxLife) return false;
+      const alpha = Math.sin(Math.PI * meteor.life / meteor.maxLife) * .62;
+      const length = 58;
+      const magnitude = Math.hypot(meteor.vx, meteor.vy) || 1;
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = tint;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(meteor.x, meteor.y);
+      ctx.lineTo(meteor.x - meteor.vx / magnitude * length, meteor.y - meteor.vy / magnitude * length);
+      ctx.stroke();
+      return true;
+    });
     ctx.globalAlpha = 1;
     raf = view.requestAnimationFrame(frame);
   };

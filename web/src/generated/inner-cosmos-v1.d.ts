@@ -4,6 +4,22 @@
  */
 
 export interface paths {
+    "/api/v1/safety/resources/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["safetyResourceCatalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/login": {
         parameters: {
             query?: never;
@@ -230,6 +246,23 @@ export interface components {
             longitude?: number;
             aiProviderPreference?: string;
         };
+        SafetyResource: {
+            id: string;
+            label: string;
+            phone?: string | null;
+            /** Format: uri */
+            authorityUrl: string;
+            /** Format: date */
+            verifiedAt: string;
+            /** @enum {string} */
+            region: "CN" | "SG" | "GLOBAL";
+            audience: string;
+            hours: string;
+            /** @enum {string} */
+            channel: "PHONE" | "WHATSAPP" | "IN_PERSON" | "NOTICE";
+            /** @enum {string} */
+            category: "EMERGENCY" | "CRISIS_SUPPORT" | "YOUTH_SUPPORT" | "PRODUCT_BOUNDARY";
+        };
         CapsuleCreateRequest: {
             pseudonym?: string;
             intro?: string;
@@ -327,6 +360,33 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    safetyResourceCatalog: {
+        parameters: {
+            query: {
+                locale: "zh-CN" | "en-SG";
+                region: "CN" | "SG";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Region-bound, authority-backed crisis and emergency resource catalog. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        data?: components["schemas"]["SafetyResource"][];
+                    };
+                };
+            };
+            400: components["responses"]["Error"];
+        };
+    };
     login: {
         parameters: {
             query?: never;

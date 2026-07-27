@@ -105,6 +105,21 @@ describe("MemoryStarfield", () => {
     expect(onCloseDetail).toHaveBeenCalledOnce();
   });
 
+  it("moves focus into a loaded star detail and lets Escape close it", () => {
+    const onCloseDetail = vi.fn();
+    render(<MemoryStarfield starfield={starfield} starfieldBusy={false} onChangeMode={() => undefined}
+      starfieldDetail={detail} detailBusy={null} onRevealStar={() => undefined} onCloseDetail={onCloseDetail}
+      memoryOperations={[]} rollbackBusy={null} onRollback={() => undefined} onCorrectMemory={() => undefined} />);
+    const close = screen.getByRole("button", { name: "关闭记忆来源" });
+    expect(close).toHaveFocus();
+    const summaries = screen.getByRole("dialog").querySelectorAll("summary");
+    (summaries[summaries.length - 1] as HTMLElement).focus();
+    fireEvent.keyDown(document, { key: "Tab" });
+    expect(close).toHaveFocus();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onCloseDetail).toHaveBeenCalledOnce();
+  });
+
   it("opens a memory when the user clicks its visible star, not only the list action", () => {
     const onRevealStar = vi.fn();
     render(<MemoryStarfield starfield={starfield} starfieldBusy={false} onChangeMode={() => undefined}
@@ -112,6 +127,15 @@ describe("MemoryStarfield", () => {
       memoryOperations={[]} rollbackBusy={null} onRollback={() => undefined} onCorrectMemory={() => undefined} />);
     fireEvent.click(screen.getByRole("button", { name: "打开记忆：星1" }));
     expect(onRevealStar).toHaveBeenCalledExactlyOnceWith(1);
+  });
+
+  it("shows an immediate visible loading drawer while a clicked star is being fetched", () => {
+    render(<MemoryStarfield starfield={starfield} starfieldBusy={false} onChangeMode={() => undefined}
+      starfieldDetail={null} detailBusy={1} onRevealStar={() => undefined} onCloseDetail={() => undefined}
+      memoryOperations={[]} rollbackBusy={null} onRollback={() => undefined} onCorrectMemory={() => undefined} />);
+    expect(screen.getByRole("dialog", { name: "记忆来源与变化" })).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByRole("dialog", { name: "记忆来源与变化" })).toHaveFocus();
+    expect(screen.getByRole("status")).toHaveTextContent("正在追溯");
   });
 
   it("explains an empty view and offers a direct route back to Aurora", () => {

@@ -125,7 +125,7 @@ describe("useHeartDiary -- submit", () => {
     expect(ok).toBe(true);
     expect(api.diaryTranscribe).toHaveBeenCalledExactlyOnceWith("今天发生了很多事");
     expect(api.diarySubmit).toHaveBeenCalledExactlyOnceWith(21, "今天发生了很多事");
-    expect(setStatus).toHaveBeenCalledWith(expect.stringContaining("记忆宇宙"));
+    expect(setStatus).toHaveBeenCalledWith("记录已保存，并加入记忆星空。");
     expect(result.current.submitted).toBe(true);
   });
 

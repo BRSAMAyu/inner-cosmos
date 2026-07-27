@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import type { CapsuleMatch, CapsuleQuota, PersonaMessage, PersonaSession, ResonanceStrategy, SlowLetter } from "../api";
+import { demoContentText } from "../demoContentLocale";
 import type { Locale } from "../i18n";
 import { AsyncButton } from "../loading";
 import { InlineAudioPlayer } from "./shared/InlineAudioPlayer";
@@ -24,23 +25,23 @@ const COPY: Record<Locale, {
   showMoreMatches: (n: number) => string; showFewerMatches: string;
 }> = {
   "zh-CN": {
-    aria: "发现共鸣并写一封慢信", heading: "不是刷卡片，是理解为什么会相遇", count: n => `${n} 个此刻的候选`,
-    intro: "这里没有热度排行。系统只展示脱敏侧面、共同主题和边界；先与授权 AI 共鸣体确认是否真的想继续，再决定要不要把话写给本人。",
+    aria: "发现共鸣并写一封慢信", heading: "遇见可能聊得来的人", count: n => `为你推荐 ${n} 个共鸣体`,
+    intro: "选一种相遇方式，先和共鸣体聊几句；如果真的投缘，再写一封慢信。",
     strategyAria: "选择共鸣匹配方式",
     strategy: { MIRROR: "相似共鸣", COMPLEMENT: "有意义的互补", GROWTH_EDGE: "成长边缘", SERENDIPITY: "温和偶遇", CONTEXTUAL: "阶段同行" },
-    emptyMatches: "暂时没有足够安全的相遇候选。Inner Cosmos 不会用随机陌生人填满这里。", railAria: "共鸣候选",
-    resonantNow: "此刻同行", exploreMeet: "探索相遇", matchCardAria: (name, summary) => `${name} · ${summary}`,
-    realPersonPath: "聊过后可写信给本人", practiceCapsule: "官方练习侧影",
+    emptyMatches: "暂时没有合适的推荐。换一种相遇方式再看看。", railAria: "共鸣候选",
+    resonantNow: "最可能聊得来", exploreMeet: "认识一下", matchCardAria: (name, summary) => `${name} · ${summary}`,
+    realPersonPath: "聊过后可写信给本人", practiceCapsule: "官方练习共鸣体",
     userIdentityNotice: "由一位真实用户授权形成 · 聊过后可以写信给本人",
-    seedIdentityNotice: "官方练习侧影 · 没有真人收件人",
-    entryP: "先问一两个真正重要的问题。它只能使用创建者明确授权的侧面，也不会把你的 Aurora 私有画像带进这段对话。",
+    seedIdentityNotice: "官方练习共鸣体 · 没有真人收件人",
+    entryP: "可以从一个具体时刻、一件最近发生的事，或一个你真正好奇的问题开始。",
     enterBusy: "正在进入", enterBtn: "先和这个侧影聊几句",
     quotaComfort: "可以自然聊，不用赶进度", quotaLow: r => `今天还可以聊 ${r} 轮`,
     quotaExhausted: "今天的对话额度已用完；明天会自动恢复。你仍可回看这段对话。",
     quotaLoading: "正在确认今天的交流节奏",
     quotaNote: "只有接近每日防刷上限时才会提醒；模型故障不会扣次数。", personaHistAria: "共鸣体对话记录",
     historyStart: "可以从一个具体时刻开始，而不是交换完整履历。", speakerYou: "你", writeToCapsule: "写给共鸣体",
-    sendBusy: "正在发送", sendTurn: "发送这一轮", letterStepTitle: "如果仍想继续，把话交给时间",
+    sendBusy: "正在发送", sendTurn: "发送这一轮", letterStepTitle: "如果想联系创建者，可以写一封慢信",
     letterStepNote: "这封信会送给创建者本人。共鸣体不会替对方承诺回复，也不会泄露联系方式。",
     seedWarning: "这是官方种子共鸣体，没有对应的真人收件人；你仍可继续对话，但不能把它当作认识真人的入口。",
     letterFlightTitle: "慢信已启程", letterArrival: (t, s) => `预计 ${t} 到达 · 状态 ${s}`,
@@ -51,8 +52,8 @@ const COPY: Record<Locale, {
     reportSession: "举报这段对话", blockSession: "屏蔽这个共鸣体",
     playCapsuleVoice: "▶ 听这条回声", capsuleVoiceBusy: "正在合成…",
     capsuleVoiceAria: "听到这个共鸣体的回复（与 Aurora 不同的声音）",
-    landedBtn: "这条落在了我心里", landedBusy: "正在留下回声", landedDone: "已留下回声",
-    showMoreMatches: n => `查看其余 ${n} 个候选`, showFewerMatches: "收起，只看最相关的 3 个"
+    landedBtn: "这条回复有共鸣", landedBusy: "正在记录", landedDone: "已记录",
+    showMoreMatches: n => `再看 ${n} 个`, showFewerMatches: "收起，只看最相关的 3 个"
   },
   "en-SG": {
     aria: "Discover resonance and write a slow letter", heading: "Not swiping cards — understanding why you'd meet", count: n => `${n} candidate${n === 1 ? "" : "s"} right now`,
@@ -137,7 +138,7 @@ export function ResonanceNetwork({ resonanceMatches, resonanceStrategy, visitorB
         <button type="button" key={value} aria-pressed={resonanceStrategy === value} disabled={visitorBusy}
           onClick={() => { setShowAllMatches(false); onChooseStrategy(value); }}>{t.strategy[value]}</button>)}
     </div>
-    {resonanceMatches[0] && <p className="strategy-explanation"><strong>{resonanceMatches[0].strategyLabel}</strong> · {resonanceMatches[0].strategyDescription}</p>}
+    {resonanceMatches[0] && <p className="strategy-explanation"><strong>{demoContentText(resonanceMatches[0].strategyLabel, locale)}</strong> · {demoContentText(resonanceMatches[0].strategyDescription, locale)}</p>}
     {resonanceMatches.length === 0 ? <div className="network-empty">{t.emptyMatches}</div> : <>
       <div className="match-rail" role="list" aria-label={t.railAria}>
         {/* W2 UIUX audit: same run-on-naming shape as ProductShellNavigation's five-space tabs, but
@@ -148,21 +149,21 @@ export function ResonanceNetwork({ resonanceMatches, resonanceStrategy, visitorB
             visual card layout is unchanged. */}
         {visibleMatches.map(match => <button type="button" role="listitem" key={match.capsule.id}
           className={visitorMatch?.capsule.id === match.capsule.id ? "match-card active" : "match-card"}
-          aria-label={t.matchCardAria(match.capsule.pseudonym, match.matchSummary)}
+          aria-label={t.matchCardAria(demoContentText(match.capsule.pseudonym, locale), demoContentText(match.matchSummary, locale))}
           onClick={() => onChooseMatch(match.capsule.id)}><span aria-hidden="true">{matchTierLabel(match)}</span>
           <em className={match.capsule.capsuleType === "USER_CAPSULE" ? "real" : "practice"} aria-hidden="true">
             {match.capsule.capsuleType === "USER_CAPSULE" ? t.realPersonPath : t.practiceCapsule}
           </em>
-          <strong aria-hidden="true">{match.capsule.pseudonym}</strong><p className="ugc-text" aria-hidden="true">{match.capsule.intro}</p>
-          <small aria-hidden="true">{match.matchSummary}</small></button>)}
+          <strong aria-hidden="true">{demoContentText(match.capsule.pseudonym, locale)}</strong><p className="ugc-text" aria-hidden="true">{demoContentText(match.capsule.intro, locale)}</p>
+          <small aria-hidden="true">{demoContentText(match.matchSummary, locale)}</small></button>)}
       </div>
       {resonanceMatches.length > 3 && <button type="button" className="match-rail-toggle"
         aria-expanded={showAllMatches} onClick={() => setShowAllMatches(value => !value)}>
         {showAllMatches ? t.showFewerMatches : t.showMoreMatches(resonanceMatches.length - visibleMatches.length)}
       </button>}
       {visitorMatch && <div className="visitor-workbench">
-        <header><div><span className="identity-notice">{isUserCapsule ? t.userIdentityNotice : t.seedIdentityNotice}</span><h3>{visitorMatch.capsule.pseudonym}</h3>
-          <p className="ugc-text">{visitorMatch.capsule.intro}</p></div><div className="match-reasons">{visitorMatch.matchReasons.map(reason => <span key={reason}>{reason}</span>)}</div></header>
+        <header><div><span className="identity-notice">{isUserCapsule ? t.userIdentityNotice : t.seedIdentityNotice}</span><h3>{demoContentText(visitorMatch.capsule.pseudonym, locale)}</h3>
+          <p className="ugc-text">{demoContentText(visitorMatch.capsule.intro, locale)}</p></div><div className="match-reasons">{visitorMatch.matchReasons.map(reason => <span key={reason}>{demoContentText(reason, locale)}</span>)}</div></header>
         {!personaSession ? <div className="visitor-entry"><p>{t.entryP}</p>
           <AsyncButton className="resonance-primary" busy={visitorBusy} busyText={t.enterBusy} onClick={onStartPersonaConversation}>{t.enterBtn}</AsyncButton></div> : <>
           <div className="visitor-quota"><span>{quotaLabel}</span><small>{t.quotaNote}</small>
@@ -178,7 +179,7 @@ export function ResonanceNetwork({ resonanceMatches, resonanceStrategy, visitorB
             return personaMessages.map(message => {
               const isLatestCapsule = message.senderType === "CAPSULE" && message.id === lastCapsuleId;
               return <article className={message.senderType === "VISITOR" ? "visitor" : "capsule"} key={message.id}>
-                <span>{message.senderType === "VISITOR" ? t.speakerYou : visitorMatch.capsule.pseudonym}</span>
+                <span>{message.senderType === "VISITOR" ? t.speakerYou : demoContentText(visitorMatch.capsule.pseudonym, locale)}</span>
                 <p className="ugc-text">{message.textContent}</p>
                 {isLatestCapsule && onPlayPersonaVoice && <div className="capsule-voice">
                   {personaVoiceAudio

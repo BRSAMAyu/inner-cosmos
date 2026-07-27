@@ -39,7 +39,7 @@ describe("ResonanceNetwork", () => {
       onLetterBodyChange={() => undefined} onSendLetter={() => undefined} />);
     expect(screen.getAllByRole("listitem")).toHaveLength(3);
     expect(screen.queryByRole("listitem", { name: "同行者 4 · 匹配理由 4" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "查看其余 2 个候选" }));
+    fireEvent.click(screen.getByRole("button", { name: "再看 2 个" }));
     expect(screen.getAllByRole("listitem")).toHaveLength(5);
     expect(screen.getByRole("listitem", { name: "同行者 5 · 匹配理由 5" })).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "收起，只看最相关的 3 个" }));
@@ -110,10 +110,10 @@ describe("ResonanceNetwork", () => {
       onMarkLanded
     };
     const rendered = render(<ResonanceNetwork {...props} landed={false} />);
-    fireEvent.click(screen.getByRole("button", { name: "这条落在了我心里" }));
+    fireEvent.click(screen.getByRole("button", { name: "这条回复有共鸣" }));
     expect(onMarkLanded).toHaveBeenCalledOnce();
     rendered.rerender(<ResonanceNetwork {...props} landed />);
-    expect(screen.getByRole("button", { name: "已留下回声" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "已记录" })).toBeDisabled();
   });
 
   it("does not render a slow-letter entry when the owner's boundary explicitly forbids it", () => {

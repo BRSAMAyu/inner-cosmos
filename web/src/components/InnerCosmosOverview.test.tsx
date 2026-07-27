@@ -33,7 +33,8 @@ describe("InnerCosmosOverview", () => {
     expect(screen.getByText("异乡与归属")).toBeVisible();
     expect(screen.getByText("工作室里不敢交出的那张图")).toBeVisible();
     expect(screen.getByText("归属不必只选一边")).toBeVisible();
-    expect(screen.getByText("你的内宇宙 · 此刻")).toBeVisible();
+    expect(screen.getByText("你的记忆宇宙")).toBeVisible();
+    expect(screen.getByText(/每颗星来自一次对话或记录/)).toBeVisible();
     expect(screen.queryByText("YOUR INNER COSMOS · NOW")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /工作室里不敢交出的那张图/ }));

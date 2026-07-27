@@ -97,9 +97,12 @@ public class CapsuleEmbeddingIndexServiceImpl implements CapsuleEmbeddingIndexSe
     public RebuildResult rebuildMissing(int requestedBatchSize) {
         if (!client.available()) return new RebuildResult(0, 0, 0, 0);
         int batchSize = Math.max(1, Math.min(500, requestedBatchSize));
-        List<EchoCapsule> missing = missingPublicCapsules().stream()
-                .limit(batchSize)
-                .toList();
+        // missingPublicCapsules() loads every public capsule and every active embedding row into
+        // the JVM to diff them. Do that ONCE per run and derive the remaining count arithmetically
+        // -- calling pendingCount() at the end ran the whole scan a second time, so this scheduled
+        // job was doing twice the necessary work every tick.
+        List<EchoCapsule> allMissing = missingPublicCapsules();
+        List<EchoCapsule> missing = allMissing.stream().limit(batchSize).toList();
         int indexed = 0;
         int failed = 0;
         for (EchoCapsule capsule : missing) {
@@ -111,7 +114,7 @@ public class CapsuleEmbeddingIndexServiceImpl implements CapsuleEmbeddingIndexSe
                         capsule.id, failure.getClass().getSimpleName());
             }
         }
-        return new RebuildResult(missing.size(), indexed, failed, pendingCount());
+        return new RebuildResult(missing.size(), indexed, failed, Math.max(0, allMissing.size() - indexed));
     }
 
     @Override

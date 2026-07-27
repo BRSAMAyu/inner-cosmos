@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
-import { flushSync } from "react-dom";
 import {
   api, replayTurnEvents, streamAurora, subscribeProactive,
   type DialogSessionSummary, type GoodbyeResult, type Notification,
-  type PsychologySkillSuggestion, type WakeIntent
+  type PsychologySkillSuggestion, type SafetyResource, type WakeIntent
 } from "../api";
 import type { AuroraStreamEvent, DialogMessage, TurnStatus } from "../protocol";
 import type { AuroraInnerVoice, AuroraUiMessage } from "../components/AuroraConversation";
@@ -22,15 +21,50 @@ export type AuroraRuntimeSignal = {
   runtime: "single" | "dual";
   relationshipMove?: string;
   repaired?: boolean;
+  foregroundText?: string;
+  foregroundSource?: string;
+  responseSource?: "REAL_MODEL" | "DEMO_MODE" | "BASIC_RESPONSE" | "UNKNOWN";
+  diagnostics?: {
+    provider?: string;
+    model?: string;
+    foregroundSource?: string;
+    plannerStatus?: string;
+    guidanceSource?: string;
+    fallbackReason?: string;
+    stageLatenciesMs?: Record<string, number>;
+  };
 };
 
-export type AuroraSafetyAlert = { riskLevel: string; featureTarget: string; safeMessage?: string };
+export type AuroraSafetyAlert = {
+  riskLevel: string; riskType?: string; handledAction?: string; safetyState?: string;
+  featureTarget: string; safeMessage?: string;
+};
 export type AuroraMemoryTrace = {
   referencedMemoryIds: number[];
   detectedTheme?: string;
 };
 
-const terminal = new Set<TurnStatus>(["COMPLETED", "INTERRUPTED", "CANCELLED"]);
+const terminal = new Set<TurnStatus>(["COMPLETED", "INTERRUPTED", "CANCELLED", "FAILED"]);
+
+function recoveryCursorKey(turnId: number): string {
+  return `inner-cosmos:aurora:turn:${turnId}:last-confirmed-event`;
+}
+
+function storedRecoveryCursor(turnId: number): string {
+  try { return sessionStorage.getItem(recoveryCursorKey(turnId)) ?? ""; }
+  catch { return ""; }
+}
+
+function storeRecoveryCursor(turnId: number, eventId: string): void {
+  if (!eventId) return;
+  try { sessionStorage.setItem(recoveryCursorKey(turnId), eventId); }
+  catch { /* private-mode storage can be unavailable; replay from zero remains safe */ }
+}
+
+function clearRecoveryCursor(turnId: number): void {
+  try { sessionStorage.removeItem(recoveryCursorKey(turnId)); }
+  catch { /* no-op */ }
+}
 
 function localTimeOfDayLabel(hour: number, locale: SkillLocale): string {
   const english = locale === "en-SG";
@@ -146,10 +180,14 @@ export function useAuroraSession({
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [safetyAlert, setSafetyAlert] = useState<AuroraSafetyAlert | null>(null);
   const dismissSafetyAlert = useCallback(() => setSafetyAlert(null), []);
-  const [safetyResources, setSafetyResources] = useState<string[]>([]);
+  const [safetyResources, setSafetyResources] = useState<SafetyResource[]>([]);
   const loadSafetyResources = useCallback(() =>
-    api.safetyResources(skillLocale, skillLocale === "en-SG" ? "SG" : "CN")
+    api.safetyResourceCatalog(skillLocale, skillLocale === "en-SG" ? "SG" : "CN")
       .then(setSafetyResources), [skillLocale]);
+  useEffect(() => {
+    setSafetyResources([]);
+    void loadSafetyResources().catch(() => setSafetyResources([]));
+  }, [loadSafetyResources]);
   const [goodbyeResult, setGoodbyeResult] = useState<GoodbyeResult | null>(null);
   const [goodbyeBusy, setGoodbyeBusy] = useState(false);
   const dismissGoodbye = useCallback(() => setGoodbyeResult(null), []);
@@ -210,7 +248,9 @@ export function useAuroraSession({
       setStatus(error instanceof Error ? error.message : t.streamErrorFallback);
       return false;
     } finally {
-      setRuntimeSignal(current => ({ ...current, stage: "idle" }));
+      setRuntimeSignal(current => ({
+        ...current, stage: "idle", foregroundText: undefined, foregroundSource: undefined
+      }));
     }
   }, [mode, replaceFromHistory, sessionId, setStatus, t.streamErrorFallback]);
 
@@ -257,12 +297,15 @@ export function useAuroraSession({
     activeTurnRef.current = null;
     setActiveTurnId(null);
     bubbleKeyRef.current = null;
-    setRuntimeSignal(current => ({ ...current, stage: "idle" }));
+    setRuntimeSignal(current => ({
+      ...current, stage: "idle", foregroundText: undefined
+    }));
   }, [isCurrentGeneration]);
 
   const recover = useCallback(async (turnId: number, sid: number, generation: number) => {
     if (reconnectingRef.current) return;
     reconnectingRef.current = true;
+    if (!lastEventIdRef.current) lastEventIdRef.current = storedRecoveryCursor(turnId);
     if (isCurrentGeneration(generation)) setStatus(t.reconnecting);
     try {
       lastEventIdRef.current = await replayTurnEvents(turnId, lastEventIdRef.current, event => {
@@ -292,9 +335,16 @@ export function useAuroraSession({
         if (terminal.has(timeline.turn.status)) {
           await replaceFromHistory(sid);
           if (isCurrentGeneration(generation)) {
-            setStatus(timeline.turn.status === "COMPLETED" ? t.recoveredCompleted : t.recoveredInterrupted);
+            setStatus(timeline.turn.status === "COMPLETED"
+              ? t.recoveredCompleted
+              : timeline.turn.status === "FAILED"
+                ? (skillLocale === "en-SG"
+                    ? "The previous runtime stopped before a reply was safely generated. Please send the message again."
+                    : "上一运行实例在回复安全生成前停止了，请重新发送这句话。")
+                : t.recoveredInterrupted);
           }
           finishTurn(generation);
+          clearRecoveryCursor(turnId);
           return;
         }
         await new Promise(resolve => setTimeout(resolve, 500));
@@ -306,7 +356,7 @@ export function useAuroraSession({
     } finally {
       reconnectingRef.current = false;
     }
-  }, [finishTurn, isCurrentGeneration, replaceFromHistory, setStatus, t]);
+  }, [finishTurn, isCurrentGeneration, replaceFromHistory, setStatus, skillLocale, t]);
 
   // A normal page refresh now resumes the server-selected active conversation. If that
   // conversation was mid-turn, reconnect to its durable timeline after React has committed the
@@ -454,6 +504,9 @@ export function useAuroraSession({
     if (event.id && eventIdsRef.current.has(event.id)) return;
     if (event.id) eventIdsRef.current.add(event.id);
     if (event.id) lastEventIdRef.current = event.id;
+    if (event.id && activeTurnRef.current) {
+      storeRecoveryCursor(activeTurnRef.current, event.id);
+    }
     switch (event.type) {
       case "turn.started":
       case "turn.plan": {
@@ -462,6 +515,16 @@ export function useAuroraSession({
         setActiveTurnId(turnId);
         setRuntimeSignal(current => ({ ...current, stage: event.type === "turn.started" ? "understanding" : "composing" }));
         setStatus(event.type === "turn.started" ? t.turnStarted : t.turnPlanned);
+        break;
+      }
+      case "foreground.status": {
+        setRuntimeSignal(current => ({
+          ...current,
+          stage: "understanding",
+          foregroundText: event.payload.text,
+          foregroundSource: event.payload.source,
+          diagnostics: { ...current.diagnostics, foregroundSource: event.payload.source }
+        }));
         break;
       }
       case "meta": {
@@ -477,11 +540,40 @@ export function useAuroraSession({
         const loop = event.payload.agentLoop;
         if (!loop || typeof loop !== "object") break;
         const safe = loop as Record<string, unknown>;
+        const rawAiState = event.payload.aiState;
+        const aiState = rawAiState && typeof rawAiState === "object"
+          ? rawAiState as Record<string, unknown> : {};
+        const rawStages = safe.stageLatenciesMs;
+        const stageLatenciesMs = rawStages && typeof rawStages === "object"
+          ? Object.fromEntries(Object.entries(rawStages as Record<string, unknown>)
+              .filter((entry): entry is [string, number] =>
+                typeof entry[1] === "number" && Number.isFinite(entry[1]) && entry[1] >= 0))
+          : undefined;
+        const responseSource = typeof aiState.responseSource === "string"
+          && ["REAL_MODEL", "DEMO_MODE", "BASIC_RESPONSE"].includes(aiState.responseSource)
+          ? aiState.responseSource as "REAL_MODEL" | "DEMO_MODE" | "BASIC_RESPONSE"
+          : "UNKNOWN";
         setRuntimeSignal(current => ({
           ...current,
           runtime: typeof safe.runtime === "string" && safe.runtime.startsWith("dual") ? "dual" : "single",
           relationshipMove: typeof safe.relationshipMove === "string" ? safe.relationshipMove : undefined,
-          repaired: safe.criticRepaired === true
+          repaired: safe.criticRepaired === true,
+          responseSource,
+          foregroundSource: typeof safe.foregroundSource === "string" && safe.foregroundSource
+            ? safe.foregroundSource : current.foregroundSource,
+          diagnostics: {
+            provider: typeof aiState.provider === "string" ? aiState.provider : undefined,
+            model: typeof aiState.model === "string" ? aiState.model : undefined,
+            foregroundSource: typeof safe.foregroundSource === "string" && safe.foregroundSource
+              ? safe.foregroundSource : current.foregroundSource,
+            plannerStatus: typeof safe.backgroundPlannerStatus === "string"
+              ? safe.backgroundPlannerStatus : undefined,
+            guidanceSource: typeof safe.guidanceSource === "string" ? safe.guidanceSource : undefined,
+            fallbackReason: typeof safe.fallbackReason === "string" && safe.fallbackReason
+              ? safe.fallbackReason : (typeof aiState.fallbackReason === "string"
+                ? aiState.fallbackReason : undefined),
+            stageLatenciesMs
+          }
         }));
         if (event.payload.proposedActionStatus === "EXECUTED") {
           const target = typeof event.payload.featureTarget === "string"
@@ -545,14 +637,26 @@ export function useAuroraSession({
         setStatus(t.completed);
         break;
       case "safety":
-        finishTurn(generation);
         if (event.payload.riskLevel === "HIGH") {
+          finishTurn(generation);
           setSafetyAlert({
             riskLevel: event.payload.riskLevel,
+            riskType: event.payload.riskType,
+            handledAction: event.payload.handledAction,
+            safetyState: event.payload.safetyState,
             featureTarget: event.payload.featureTarget,
             safeMessage: event.payload.safeMessage
           });
           setStatus(t.safetyStatus);
+        } else if (event.payload.safetyState === "GENTLE_CHECK_IN") {
+          setSafetyAlert({
+            riskLevel: event.payload.riskLevel,
+            riskType: event.payload.riskType,
+            handledAction: event.payload.handledAction,
+            safetyState: event.payload.safetyState,
+            featureTarget: event.payload.featureTarget,
+            safeMessage: event.payload.safeMessage
+          });
         }
         break;
       case "error":
@@ -590,6 +694,17 @@ export function useAuroraSession({
     lastEventIdRef.current = "";
     const controller = new AbortController();
     abortRef.current = controller;
+    // The foreground acknowledgement is a real network hop too. Surface a public, interruptible
+    // "understanding" state immediately instead of leaving the user with a frozen composer until
+    // the server allocates the authoritative turn id. -1 is UI-only and is replaced by
+    // turn.started; activeTurnRef deliberately remains null so it is never sent to the API.
+    setActiveTurnId(-1);
+    setRuntimeSignal(current => ({
+      ...current,
+      stage: "understanding",
+      foregroundText: undefined,
+      foregroundSource: undefined
+    }));
     const clientMessageId = crypto.randomUUID();
     const region = skillLocale === "en-SG" ? "SG" : "CN";
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Shanghai";
@@ -607,15 +722,15 @@ export function useAuroraSession({
         // is unavailable, continue without manufacturing a client-side conversational bubble.
       }
       if (foreground?.text && !foreground.safetyBlocked && isCurrentGeneration(generation)) {
-        // React may otherwise keep this update in the async event batch until the long SSE
-        // promise settles. Commit the latency-facing bubble before opening that transport so the
-        // user actually sees the fast core's response when it arrives.
-        flushSync(() => {
-          setMessages(current => [
-            ...current,
-            { key: `foreground-${crypto.randomUUID()}`, speaker: "AURORA", text: foreground.text }
-          ]);
-        });
+        // Foreground feedback is an honest, interruptible status, not an Aurora answer. Keeping
+        // it out of the transcript prevents a local timeout/template from masquerading as model
+        // understanding and keeps refresh/history free of synthetic bubbles.
+        setRuntimeSignal(current => ({
+          ...current,
+          stage: "understanding",
+          foregroundText: foreground.text,
+          foregroundSource: foreground.source
+        }));
       }
       const outcome = await streamAurora({
         sessionId,
@@ -637,14 +752,20 @@ export function useAuroraSession({
         // throw path below, within this same turn's timeline.
         const turnId = activeTurnRef.current;
         if (turnId) await recover(turnId, sessionId, generation);
-        else if (isCurrentGeneration(generation)) setStatus(t.noTimelineRetry);
+        else if (isCurrentGeneration(generation)) {
+          finishTurn(generation);
+          setStatus(t.noTimelineRetry);
+        }
       }
     } catch (error) {
       if ((error as Error).name === "AbortError") return;
       if (!isCurrentGeneration(generation)) return;
       const turnId = activeTurnRef.current;
       if (turnId) await recover(turnId, sessionId, generation);
-      else setStatus(t.noTimelineRetry);
+      else {
+        finishTurn(generation);
+        setStatus(t.noTimelineRetry);
+      }
     }
   };
 

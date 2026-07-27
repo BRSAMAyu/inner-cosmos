@@ -137,6 +137,28 @@ describe("AuroraConversation", () => {
     expect(conversation.scrollTop).toBe(1000);
   });
 
+  it("resets transcript following when another conversation is opened", () => {
+    const props = { activeTurnId: null, draft: "", sessionReady: true,
+      onDraftChange: () => undefined, onSubmit: (event: FormEvent<HTMLFormElement>) => event.preventDefault(),
+      onStop: () => undefined };
+    const { rerender } = render(<AuroraConversation {...props} messages={[
+      { key: "old-u1", speaker: "USER", text: "旧会话" },
+      { key: "old-a1", speaker: "AURORA", text: "旧回复" }
+    ]} />);
+    const conversation = screen.getByRole("region", { name: "与 Aurora 的对话" });
+    Object.defineProperty(conversation, "scrollHeight", { configurable: true, value: 1000 });
+    Object.defineProperty(conversation, "clientHeight", { configurable: true, value: 300 });
+    conversation.scrollTop = 200;
+    fireEvent.scroll(conversation);
+
+    rerender(<AuroraConversation {...props} messages={[
+      { key: "new-u1", speaker: "USER", text: "新会话" },
+      { key: "new-a1", speaker: "AURORA", text: "新回复" }
+    ]} />);
+
+    expect(conversation.scrollTop).toBe(1000);
+  });
+
   it("offers a goodbye-ritual trigger only when idle and ready, never mid-stream", () => {
     const onGoodbye = vi.fn();
     const props = { draft: "", onDraftChange: () => undefined, onSubmit: (event: FormEvent<HTMLFormElement>) => event.preventDefault(),
@@ -158,7 +180,7 @@ describe("AuroraConversation", () => {
     ]} activeTurnId={7} thinkingStage="composing" draft="a new thought" sessionReady
       onDraftChange={() => undefined} onSubmit={event => event.preventDefault()} onStop={() => undefined} />);
     expect(screen.getByLabelText("Write to Aurora")).toBeVisible();
-    expect(screen.getByText("Aurora is composing the next line…")).toBeVisible();
+    expect(screen.getByText("Pulling the main points together")).toBeVisible();
     expect(screen.getByRole("button", { name: "Stop responding" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Interrupt & send" })).toBeEnabled();
   });
@@ -174,28 +196,33 @@ describe("AuroraConversation", () => {
     expect(onStop).toHaveBeenCalledOnce();
   });
 
-  it("shows an inline thinking beat only while a turn is active and pre-speech", () => {
+  it("shows an inline living-state path throughout an active turn", () => {
     const { rerender } = render(<AuroraConversation messages={[{ key: "u1", speaker: "USER", text: "在吗" }]}
       activeTurnId={7} thinkingStage="understanding" draft="" sessionReady
       onDraftChange={() => undefined} onSubmit={event => event.preventDefault()} onStop={() => undefined} />);
-    expect(screen.getByLabelText("Aurora 正在思考")).toBeVisible();
-    expect(screen.getByText("Aurora 正在理解这一刻…")).toBeVisible();
+    expect(screen.getByLabelText("Aurora 当前回应状态")).toBeVisible();
+    expect(screen.getByText("正在理解你刚才说的话")).toBeVisible();
 
     rerender(<AuroraConversation messages={[{ key: "u1", speaker: "USER", text: "在吗" }]}
       activeTurnId={7} thinkingStage="composing" draft="" sessionReady
       onDraftChange={() => undefined} onSubmit={event => event.preventDefault()} onStop={() => undefined} />);
-    expect(screen.getByText("Aurora 正在组织下一句…")).toBeVisible();
+    expect(screen.getByText("正在整理重点")).toBeVisible();
 
-    // No beat once the turn ends, and none while actively streaming tokens (thinkingStage null).
+    rerender(<AuroraConversation messages={[{ key: "u1", speaker: "USER", text: "在吗" }]}
+      activeTurnId={7} thinkingStage="speaking" draft="" sessionReady
+      onDraftChange={() => undefined} onSubmit={event => event.preventDefault()} onStop={() => undefined} />);
+    expect(screen.getByText("回应正在生成")).toBeVisible();
+
+    // No state once the turn ends, or when the caller explicitly supplies no public stage.
     rerender(<AuroraConversation messages={[{ key: "u1", speaker: "USER", text: "在吗" }]}
       activeTurnId={null} thinkingStage="understanding" draft="" sessionReady
       onDraftChange={() => undefined} onSubmit={event => event.preventDefault()} onStop={() => undefined} />);
-    expect(screen.queryByLabelText("Aurora 正在思考")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Aurora 当前回应状态")).not.toBeInTheDocument();
 
     rerender(<AuroraConversation messages={[{ key: "u1", speaker: "USER", text: "在吗" }]}
       activeTurnId={7} thinkingStage={null} draft="" sessionReady
       onDraftChange={() => undefined} onSubmit={event => event.preventDefault()} onStop={() => undefined} />);
-    expect(screen.queryByLabelText("Aurora 正在思考")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Aurora 当前回应状态")).not.toBeInTheDocument();
   });
 
   it("hides the mic button when voice capture is unsupported", () => {

@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { MemoryOperation, StarfieldDetail, StarfieldScene, StarfieldStar } from "../api";
 import type { Locale } from "../i18n";
+import { demoContentText } from "../demoContentLocale";
 import { AsyncButton } from "../loading";
 
 const modeOptions: Array<StarfieldScene["mode"]> = ["TIME", "THEME", "PEOPLE"];
@@ -179,8 +180,48 @@ export function MemoryStarfield({ starfield, starfieldBusy, onChangeMode, starfi
   importanceBusy?: number | null; archiveBusy?: number | null; locale?: Locale;
 }) {
   const t = COPY[locale];
+  const lastStarTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const loadingDialogRef = useRef<HTMLElement>(null);
+  const detailDialogRef = useRef<HTMLElement>(null);
+  const detailCloseRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (detailBusy !== null) loadingDialogRef.current?.focus();
+  }, [detailBusy]);
+
+  useEffect(() => {
+    if (!starfieldDetail || detailBusy !== null) return;
+    detailCloseRef.current?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onCloseDetail();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const controls = Array.from(detailDialogRef.current?.querySelectorAll<HTMLElement>(
+        "button:not([disabled]), summary, input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])"
+      ) ?? []);
+      if (controls.length === 0) return;
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      lastStarTriggerRef.current?.focus();
+    };
+  }, [detailBusy, onCloseDetail, starfieldDetail]);
+
   const englishStarText = (value: string) => {
-    if (locale !== "en-SG") return value;
+    if (locale === "zh-CN") return demoContentText(value, locale);
     const fixed: Record<string, string> = {
       "关系里的回声": "Echoes in relationships",
       "正在成形的理解": "An understanding taking shape",
@@ -197,10 +238,10 @@ export function MemoryStarfield({ starfield, starfieldBusy, onChangeMode, starfi
     return fixed[value] ?? value;
   };
   const renderMemoryRow = (star: StarfieldStar) => <li key={star.id}><div><strong>{englishStarText(star.title)}</strong><span>{englishStarText(star.theme)} · {englishStarText(star.memoryLayer)}</span></div>
-    <small>{t.confidence(Math.round(star.confidence * 100), star.versionNo)}</small><p className="ugc-text">{star.summary}</p>
+    <small>{t.confidence(Math.round(star.confidence * 100), star.versionNo)}</small><p className="ugc-text">{demoContentText(star.summary, locale)}</p>
     <div className="cosmos-list-actions">
       <AsyncButton disabled={detailBusy !== null} busy={detailBusy === star.id} busyText={t.revealBusy}
-        onClick={() => onRevealStar(star.id)}>{t.revealBtn}</AsyncButton>
+        onClick={event => { lastStarTriggerRef.current = event.currentTarget; onRevealStar(star.id); }}>{t.revealBtn}</AsyncButton>
       <button type="button" className="quiet" onClick={() => onCorrectMemory(star)}>{t.inaccurate}</button>
     </div></li>;
   const visibleMemories = starfield.accessibleList.slice(0, 3);
@@ -235,8 +276,8 @@ export function MemoryStarfield({ starfield, starfieldBusy, onChangeMode, starfi
         const position = starPositions.get(star.id) ?? { left: 50, top: 50 };
         return <button type="button" className="cosmos-star" key={star.id}
         aria-label={t.openStar(englishStarText(star.title))}
-        title={locale === "en-SG" ? t.openStar(englishStarText(star.title)) : star.ariaLabel} disabled={detailBusy !== null}
-        onClick={() => onRevealStar(star.id)} style={{
+        title={t.openStar(englishStarText(star.title))} disabled={detailBusy !== null}
+        onClick={event => { lastStarTriggerRef.current = event.currentTarget; onRevealStar(star.id); }} style={{
         left: `${position.left}%`, top: `${position.top}%`,
         color: star.color, opacity: Math.max(.45, star.glow ?? .7)
       }}><span className="cosmos-star-core" aria-hidden="true" style={{
@@ -260,12 +301,22 @@ export function MemoryStarfield({ starfield, starfieldBusy, onChangeMode, starfi
       <summary>{t.moreMemories(foldedMemories.length)}</summary>
       <ol className="cosmos-list">{foldedMemories.map(renderMemoryRow)}</ol>
     </details>}
-    {starfieldDetail && <aside className="provenance-panel" aria-label={t.provAria}>
-      <div><span className="eyebrow">WHY THIS STAR</span><button type="button" onClick={onCloseDetail} aria-label={t.closeProv}>×</button></div>
-      <h3>{englishStarText(starfieldDetail.card.title)}</h3><p>{starfieldDetail.provenanceExplanation}</p>
+    {detailBusy !== null && <div className="memory-detail-backdrop" role="presentation">
+      <aside ref={loadingDialogRef} className="provenance-panel" role="dialog" aria-modal="true"
+        aria-label={t.provAria} aria-busy="true" tabIndex={-1}>
+        <div><span className="eyebrow">MEMORY SOURCE</span></div>
+        <p role="status" aria-live="polite">{t.revealBusy}</p>
+      </aside>
+    </div>}
+    {detailBusy === null && starfieldDetail && <div className="memory-detail-backdrop" role="presentation"
+      onMouseDown={event => { if (event.target === event.currentTarget) onCloseDetail(); }}>
+    <aside ref={detailDialogRef} className="provenance-panel" role="dialog" aria-modal="true" aria-label={t.provAria}>
+      <div><span className="eyebrow">WHY THIS STAR</span><button ref={detailCloseRef} type="button"
+        onClick={onCloseDetail} aria-label={t.closeProv}>×</button></div>
+      <h3>{englishStarText(starfieldDetail.card.title)}</h3><p>{demoContentText(starfieldDetail.provenanceExplanation, locale)}</p>
       <dl><div><dt>{t.curVersion}</dt><dd>v{starfieldDetail.card.versionNo}</dd></div><div><dt>{t.confidenceLabel}</dt><dd>{Math.round(starfieldDetail.card.confidence * 100)}%</dd></div><div><dt>{t.memLayer}</dt><dd>{englishStarText(starfieldDetail.card.memoryLayer)}</dd></div></dl>
-      <details open><summary>{t.observation}</summary><p>{starfieldDetail.auroraObservation}</p></details>
-      <details open><summary>{t.whyHere}</summary><p>{starfieldDetail.gravityExplanation}</p></details>
+      <details open><summary>{t.observation}</summary><p>{demoContentText(starfieldDetail.auroraObservation, locale)}</p></details>
+      <details open><summary>{t.whyHere}</summary><p>{demoContentText(starfieldDetail.gravityExplanation, locale)}</p></details>
       <details><summary>{t.changeHistory(starfieldDetail.versionHistory.length)}</summary>{starfieldDetail.versionHistory.length === 0 ? <p>{t.noChanges}</p> : starfieldDetail.versionHistory.map(operation => <p key={operation.id}><strong>{operation.operationType}</strong> · v{operation.oldVersion} → v{operation.newVersion} · {operation.status}</p>)}</details>
       <details><summary>{t.downstream(starfieldDetail.projectionReceipts.length)}</summary>{starfieldDetail.projectionReceipts.length === 0
         ? <p>{t.noDownstream}</p>
@@ -273,7 +324,7 @@ export function MemoryStarfield({ starfield, starfieldBusy, onChangeMode, starfi
       <MemoryDetailActions key={starfieldDetail.card.id} card={starfieldDetail.card}
         importanceBusy={importanceBusy} archiveBusy={archiveBusy}
         onUpdateImportance={onUpdateImportance} onArchive={onArchive} locale={locale} />
-    </aside>}
+    </aside></div>}
     {memoryOperations.length > 0 && <div className="memory-history" aria-label={t.historyAria}>
       <h3>{t.recentChanges}</h3><p>{t.historyHint}</p>
       {memoryOperations.slice(0, 5).map(operation => <article key={operation.id}>

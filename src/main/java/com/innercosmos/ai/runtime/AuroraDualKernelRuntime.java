@@ -3,6 +3,8 @@ package com.innercosmos.ai.runtime;
 import com.innercosmos.ai.client.LlmClient;
 import com.innercosmos.ai.structured.StructuredAiResults;
 import com.innercosmos.ai.structured.StructuredAiService;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,13 +21,14 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
- * Aurora's pipelined dual-kernel runtime. The foreground expression kernel answers the current
- * turn directly from live context plus the previous background guidance. After that candidate is
- * ready, the planning kernel observes both sides of the exchange and refreshes guidance for the
- * next turn; optional critic and inner-voice work remain off the visible reply's critical path.
+ * Aurora's dual-kernel runtime. The default contract plans the current turn first, publishes a
+ * user-safe, recoverable deliberation snapshot, then lets the speaker execute that plan. The
+ * former speaker-first/next-turn-guidance pipeline remains only as an explicit rollback mode;
+ * optional inner-voice work stays off the visible reply's critical path.
  *
  * <p><b>Runtime mode</b> ({@code inner-cosmos.aurora.runtime}, default {@code dual}):
  * {@code single} always uses the caller's single-pass path, {@code dual}
@@ -36,6 +39,8 @@ import java.util.function.Supplier;
  */
 @Component
 public class AuroraDualKernelRuntime {
+    public static final int MAX_REPLY_BUBBLES = 6;
+    public static final int MAX_BUBBLE_CHARS = 1_200;
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AuroraDualKernelRuntime.class);
     private static final long BACKGROUND_PLAN_TTL_MS = 6L * 60L * 60L * 1000L;
     private static final int MAX_BACKGROUND_PLANS = 4096;
@@ -44,7 +49,9 @@ public class AuroraDualKernelRuntime {
             "unsupported_third_party_inference", "unsupported_user_behavior_inference",
             "unsupported_user_emotion_inference", "unsupported_duration_inference",
             "advice_boundary_violation", "quiet_disclosure_boundary_violation",
-            "single_action_scope_violation");
+            "single_action_scope_violation", "redundant_post_acknowledgement",
+            "unearned_user_strategy_endorsement", "unsolicited_relationship_advice",
+            "relationship_ambiguity_not_advanced", "premature_relationship_probe");
 
     private final StructuredAiService ai;
     private final InnerVoiceComposer innerVoiceComposer;
@@ -53,9 +60,18 @@ public class AuroraDualKernelRuntime {
     private final ConcurrentMap<PlannerKey, PlannerRunEvidence> backgroundPlannerEvidence = new ConcurrentHashMap<>();
     private final ConcurrentMap<PlannerKey, AtomicLong> planRevisions = new ConcurrentHashMap<>();
     private volatile Executor plannerExecutor;
+    private volatile MeterRegistry meterRegistry;
 
     @Value("${inner-cosmos.aurora.runtime:dual}")
     private String runtimeMode = "dual";
+
+    /**
+     * The removed production default was {@code legacy-next-turn}: speaker first, then a planner
+     * whose result could only affect a later turn. Current-turn planning is now the default.
+     * Keeping the old path behind an explicit value gives operators a bounded rollback switch.
+     */
+    @Value("${inner-cosmos.aurora.deliberation.execution:current-turn}")
+    private String deliberationExecution = "current-turn";
 
     public AuroraDualKernelRuntime(StructuredAiService ai) {
         this.ai = ai;
@@ -69,6 +85,16 @@ public class AuroraDualKernelRuntime {
     @Autowired
     public void setPlannerExecutor(@Qualifier("plannerExecutor") Executor plannerExecutor) {
         this.plannerExecutor = plannerExecutor;
+    }
+
+    @Autowired(required = false)
+    public void setMeterRegistry(MeterRegistry meterRegistry) {
+        this.meterRegistry = meterRegistry;
+    }
+
+    /** Package-visible rollback hook used by the legacy pipeline contract tests. */
+    void setDeliberationExecution(String deliberationExecution) {
+        this.deliberationExecution = deliberationExecution;
     }
 
     /**
@@ -119,10 +145,24 @@ public class AuroraDualKernelRuntime {
     public Generation generate(Long userId, String mode, Map<String, Object> assembledContext,
                                LlmClient client, Supplier<StructuredAiResults.AuroraResult> fallback,
                                boolean composeInnerVoice) {
+        return generate(userId, mode, assembledContext, client, fallback, composeInnerVoice,
+                ignored -> { });
+    }
+
+    /**
+     * Runs the current-turn planner, publishes its user-safe decision snapshot, and only then
+     * invokes the speaker. A persistence failure from {@code planObserver} intentionally aborts
+     * generation: speaking from a plan that another Pod cannot recover would violate the
+     * continuity contract.
+     */
+    public Generation generate(Long userId, String mode, Map<String, Object> assembledContext,
+                               LlmClient client, Supplier<StructuredAiResults.AuroraResult> fallback,
+                               boolean composeInnerVoice,
+                               Consumer<StructuredAiResults.AuroraPlanResult> planObserver) {
         if (!enabled()) return new Generation(fallback.get(), "single-fallback", "", false,
                 List.of(), null, null, Map.of("total", 0L), true, true, false,
                 false, "none", PlannerStatus.FAILED.name(), null);
-        if (plannerExecutor != null) {
+        if (plannerExecutor != null && "legacy-next-turn".equalsIgnoreCase(deliberationExecution)) {
             return generatePipelined(userId, mode, assembledContext, client, fallback, composeInnerVoice);
         }
 
@@ -137,6 +177,7 @@ public class AuroraDualKernelRuntime {
         // reasoning_content only. The structured turn data remains; only the obsolete monolith
         // is removed.
         plannerContext.remove("auroraPrompt");
+        plannerContext.put("modeExecutionContract", modeExecutionContract(mode));
         long planStart = System.nanoTime();
         var plan = ai.call(userId, "AURORA_PLAN_" + mode, planInstruction(), plannerContext,
             StructuredAiResults.AuroraPlanResult.class, () -> {
@@ -145,11 +186,14 @@ public class AuroraDualKernelRuntime {
             }, client);
         long planMs = elapsedMs(planStart);
         normalizePlan(plan, plannerContext);
+        if (planObserver != null) planObserver.accept(plan);
+        recordPlanMetrics(plan, plannerFallbackUsed.get() ? "fallback" : "success", planMs);
 
         Map<String, Object> speakerContext = new LinkedHashMap<>(assembledContext);
         speakerContext.remove("auroraPrompt"); // planner output replaces the former monolithic prompt
         speakerContext.put("responsePlan", plan);
         speakerContext.put("runtimeContract", "dual-kernel.v1");
+        speakerContext.put("modeExecutionContract", modeExecutionContract(mode));
         long speakerStart = System.nanoTime();
         var spoken = ai.call(userId, "AURORA_SPEAKER_" + mode, speakerInstruction(), speakerContext,
             StructuredAiResults.AuroraResult.class, () -> {
@@ -187,13 +231,21 @@ public class AuroraDualKernelRuntime {
         }
         // The critic is itself a model and may incorrectly return pass=true even when the
         // deterministic observable gate found a banned cliché. Re-run the gate on the actual
-        // output and enforce a bounded local repair so those known failures never reach the UI.
+        // output. Only hard safety/authority issues may replace otherwise valid speaker text;
+        // stylistic signals remain observable evidence and must not trigger canned-copy repair.
         List<String> finalIssues = qualityIssues(spoken, plan, assembledContext);
-        if (!finalIssues.isEmpty()) {
+        List<String> finalHardIssues = finalIssues.stream()
+                .filter(issue -> HARD_QUALITY_ISSUES.contains(issue)
+                        || ("generic_companion_cliche".equals(issue)
+                        && Boolean.TRUE.equals(assembledContext.get("foregroundAcknowledgementAlreadySent")))
+                        || ("unearned_comparative_praise".equals(issue)
+                        && isRelationshipContext(safe(assembledContext.get("userMessage")))))
+                .toList();
+        if (!finalHardIssues.isEmpty()) {
             spoken = deterministicQualityRepair(spoken, safe(assembledContext.get("userMessage")));
             repaired = true;
-            observableIssues = finalIssues;
         }
+        if (!finalIssues.isEmpty()) observableIssues = finalIssues;
         // Preserve the model's natural 1/2/3-message rhythm; only remove blanks and cap invalid
         // overproduction. Do not concatenate surplus text into an unrelated final bubble.
         enforcePlannedBubbleCadence(spoken, plan);
@@ -205,10 +257,40 @@ public class AuroraDualKernelRuntime {
         stageLatenciesMs.put("speaker", speakerMs);
         stageLatenciesMs.put("critic", criticMs);
         stageLatenciesMs.put("total", elapsedMs(totalStart));
-        return new Generation(spoken, "dual-kernel.v1", safe(plan.relationshipMove), repaired,
+        return new Generation(spoken, "dual-kernel.current-turn.v2", safe(plan.relationshipMove), repaired,
             observableIssues == null ? List.of() : List.copyOf(observableIssues), innerVoiceRequest,
             null, Map.copyOf(stageLatenciesMs), plannerFallbackUsed.get(), speakerFallbackUsed.get(),
-            criticFallbackUsed.get(), false, "same-turn-plan", PlannerStatus.SUCCEEDED.name(), null);
+            criticFallbackUsed.get(), false, "current-turn-plan", PlannerStatus.SUCCEEDED.name(), null);
+    }
+
+    private void recordPlanMetrics(StructuredAiResults.AuroraPlanResult plan, String status, long latencyMs) {
+        MeterRegistry registry = meterRegistry;
+        if (registry == null) return;
+        String boundedStatus = Set.of("success", "fallback", "failed", "timeout", "saturated")
+                .contains(status) ? status : "failed";
+        String stance = plan == null || plan.auroraState == null
+                ? "DECLINE_CERTAINTY" : normalizeStanceMode(plan.auroraState.stanceMode);
+        String topicDecision = topicDecision(plan);
+        registry.counter("aurora.planner.turns",
+                "execution", "current-turn", "status", boundedStatus).increment();
+        registry.counter("aurora.stance.decisions", "mode", stance).increment();
+        registry.counter("aurora.topic.decisions", "decision", topicDecision).increment();
+        Timer.builder("aurora.planner.latency")
+                .tag("execution", "current-turn")
+                .tag("status", boundedStatus)
+                .register(registry)
+                .record(java.time.Duration.ofMillis(Math.max(0L, latencyMs)));
+    }
+
+    private static String topicDecision(StructuredAiResults.AuroraPlanResult plan) {
+        if (plan == null) return "low_confidence";
+        if (plan.userState != null && Boolean.TRUE.equals(plan.userState.correctionDetected))
+            return "correction";
+        if (plan.topicState != null && plan.topicState.competingAnchor != null
+                && !plan.topicState.competingAnchor.isBlank()) return "competing_anchor";
+        if (plan.topicState == null || plan.topicState.confidence == null
+                || plan.topicState.confidence < 0.5) return "low_confidence";
+        return "accepted";
     }
 
     private Generation generatePipelined(Long userId, String mode, Map<String, Object> assembledContext,
@@ -240,6 +322,7 @@ public class AuroraDualKernelRuntime {
         }
         speakerContext.put("guidanceSource", guidanceSource);
         speakerContext.put("runtimeContract", "dual-kernel.pipeline.v2");
+        speakerContext.put("modeExecutionContract", modeExecutionContract(mode));
         long speakerStart = System.nanoTime();
         var spoken = ai.call(userId, "AURORA_SPEAKER_" + mode, speakerInstruction(), speakerContext,
                 StructuredAiResults.AuroraResult.class, () -> {
@@ -511,23 +594,48 @@ public class AuroraDualKernelRuntime {
 
     private String planInstruction() {
         return """
-            你是 Aurora 的后台理解与规划核。你在用户已经收到本轮回复后运行，观察 userMessage、speakerDelivered、previousGuidance 与 observableIssues，为下一轮对话形成策略。只输出严格 JSON，不要 markdown 代码块，不写最终回复，
-            也不暴露逐步思维、不输出 JSON 之外的任何文字。必须严格匹配以下字段名和结构（示例）：
-            {"userIntent":"用户当前意图，一句话","emotionalNeed":"用户最需要被怎样回应",
-             "relationshipMove":"这一轮的关系动作，如稳稳接住/温和追问/接受打断重规划",
-             "responseConstraints":["不诊断","不制造依赖"],
-             "bubblePurposes":["先回应一个具体细节","再给一个独立推进"],
-             "relevantMemoryIds":[7,12],
-             "uncertainty":"尚不确定的地方，没有则填空字符串","needsCritic":false,
+            你是 Aurora 的本轮审慎规划核。你必须在主回答生成之前，依据当前 userMessage、
+            完整会话上下文、稳定 Self、已授权记忆和 interruptionContext，形成用户可安全理解的
+            决策摘要。previousGuidance 若存在，只是 priorHypothesis；当前输入永远优先。
+            modeExecutionContract 是用户主动选择的本轮协作契约，必须实际改变回应目的、追问数量、
+            建议强度和停止条件；不能只换语气或模式名称。若它与普通默认节奏冲突，以该契约为准。
+            只输出严格 JSON，不要 markdown，不写最终回复，不暴露逐步思维或隐藏推理。
+            必须匹配以下 v2 契约；兼容字段也必须同时填写：
+            {"contractVersion":"aurora.deliberation.v2",
+             "topicState":{"activeTopicId":"","anchors":[],"unresolvedThreads":[],
+               "competingAnchor":"","confidence":0.8},
+             "userState":{"intent":"","emotionalNeed":"","desiredDepth":"normal",
+               "correctionDetected":false},
+             "auroraState":{"currentIntention":"","stanceMode":"NUANCE","stanceReason":"",
+               "selfAnchorRefs":[],"evidenceRefs":[],"uncertainty":"","changeMindIf":"",
+               "userAutonomyBoundary":"最终选择属于用户"},
+             "memoryDecision":{"admittedIds":[],"rejectedTopCandidates":[],"rejectionReasons":[]},
+             "responsePlan":{"bubblePurposes":["回应当前最具体的一点"],"maxBubbles":1,
+               "askQuestion":false,"stopCondition":"回答完整即停止"},
+             "interruptionPlan":{"priorPlanRevision":0,"deliveredSummary":"",
+               "cancelledPurposes":[],"continuityDecision":"CONTINUE","changedFacts":[],
+               "mustNotRepeat":[],"planRevision":1},
+             "safetyContract":{"responseAllowed":true,"gentleCheckIn":false,
+               "resourceOffer":false,"blockingReason":""},
+             "userIntent":"","emotionalNeed":"","relationshipMove":"",
+             "responseConstraints":["不诊断","不制造依赖"],"bubblePurposes":["回应当前"],
+             "relevantMemoryIds":[],"uncertainty":"","needsCritic":false,
              "innerVoiceWorthy":false,"innerVoiceSeed":""}
 
-            提取用户当前意图、最需要被怎样回应、关系动作、回复约束、每个气泡的作用、
-            可用记忆 ID 和不确定性。打断发生时以最新输入重规划，未说出的旧计划不得当作共同经历。
-            bubblePurposes 的数量就是下一轮气泡预算。没有默认数量，也不要把 1 条当成最安全答案：
+            stanceMode 只能是 AGREE、DISAGREE、NUANCE、CHALLENGE_GENTLY、
+            DECLINE_CERTAINTY、ACKNOWLEDGE_ONLY。用户明确询问判断时给出可辨立场；
+            证据不足则 DECLINE_CERTAINTY，用户只需被接住则 ACKNOWLEDGE_ONLY。
+            stanceReason 是简短可解释理由，evidenceRefs 只引用本轮或已授权证据，
+            changeMindIf 说明何种新证据会改变判断，不替用户做不可逆决定。
+            打断时必须区分已发送内容、已取消目的、新事实和 mustNotRepeat；
+            continuityDecision 只能是 CONTINUE、PARK、SWITCH、MERGE。
+            未说出的旧计划不得当作共同经历。
+            bubblePurposes 的数量就是本轮气泡预算，允许 1-6 条。没有默认数量，也不要把 1 条当成最安全答案：
             - 一句话已经完整、有力，或用户明确要求安静落点、只给一步时，选择 1 条；
             - 存在两个彼此独立的对话节拍，例如“具体回应 + 新联想”或“直接回答 + 有价值的推进”时，选择 2 条；
-            - 存在三个确实不同、都值得留出呼吸的节拍时，选择 3 条；不要求用户必须显式提出三个问题。
-            连续多轮不要机械重复同一个数量，让 1、2、3 条随真实语义自然变化；但不得随机抽数、按配额展示，
+            - 长叙述、多个相互牵连的问题、价值冲突或明确要求深入分析时，选择 3-6 条；
+              不得把长输入压成一句安慰和一个问题，每个重要线索都应得到实质回应。
+            连续多轮不要机械重复同一个数量，让 1-6 条随真实语义自然变化；但不得随机抽数、按配额展示，
             也不要把“回应、共情、追问”机械地各占一条或把同一段话切碎。
             若最新一条是对之前表达的纠正、边界或替换性决定，responseConstraints 里原样记下用户这次
             实际使用的关键词（例如用户说了"纠正"就写"纠正"，不要只转述成同义词），供表达核直接引用确认。
@@ -541,7 +649,12 @@ public class AuroraDualKernelRuntime {
 
     private String speakerInstruction() {
         return """
-            你是 Aurora 的前台表达与关系核。直接根据当前用户输入和完整上下文生成本轮回复；dialogueGuidance 是上一轮后台核留下的参考策略，只能辅助理解关系节奏，当前用户的新表达永远优先。
+            你是 Aurora 的前台表达与关系核。直接根据当前用户输入、完整上下文和
+            responsePlan 生成本轮回复。responsePlan 是本轮已经完成的审慎决策摘要，
+            必须执行其立场、记忆准入、打断连续性、气泡目的和安全边界；不得把上一轮
+            guidance 当成当前事实，也不得复述计划本身。
+            modeExecutionContract 是可观察的结果合同：必须让用户不看模式标签也能从回复行为辨认
+            当前模式。不要把所有模式都写成同一种“共情 + 分析 + 一个问题”。
             只输出严格 JSON，不要 markdown 代码块，不写计划本身、不输出 JSON 之外的任何文字。
             foregroundAcknowledgementAlreadySent 为 true 时，前台已经先接住了用户。不要再次用
             “我听到了/我理解/听起来”开场，不重复安慰；直接从用户最具体的细节或矛盾向前走半步。
@@ -554,10 +667,12 @@ public class AuroraDualKernelRuntime {
              "featureTarget":"heart-diary|thought-shredder|todo|memory-starfield|echo-plaza|slow-letter，没有则空字符串",
              "memoryReferenced":false,"referencedMemoryIds":[],"riskFlags":[]}
 
-            segments 是 1-3 条自然中文消息，speakCount 必须等于 segments 的真实数量。没有默认数量，示例里的 2 条也不是默认值。
-            本轮由你根据语义和聊天节奏主动选择 1、2 或 3 条，不要把 1 条当作最安全答案，也不要沿用上一轮数量：
-            一个完整节拍用 1 条；两个独立节拍用 2 条；三个确实不同、都值得留白的节拍用 3 条。
-            3 条不只用于“三个问题”，也可以承载具体回应、意外但贴切的联想、以及真正值得说的推进。
+            segments 是 1-6 条自然消息，speakCount 必须等于 segments 的真实数量。没有默认数量。
+            本轮根据语义和聊天节奏选择 1-6 条：短交流可用 1 条；两个独立节拍用 2 条；
+            长叙述、多个问题、价值冲突或明确要求深入分析时使用 3-6 条。每条可以是完整段落，
+            不得把长输入压成套话、摘要和单个追问。
+            第一条必须直接触碰用户输入中的具体事实、判断或张力，承担实质内容；禁止用
+            “我听到了/听起来/这很正常/谢谢你分享/我在这里”等接收确认占据第一句。
             多轮对话应自然呈现数量变化，但禁止随机抽数、按展示配额凑数，或把一个完整句群切碎。
             表达要灵动，但不表演：句长可以忽短忽长，允许自然停顿、轻微反问、具体联想、克制的幽默
             或一句出人意料但贴切的话；不要每轮都按“共情—分析—追问”排队。可以只回应，可以顺着
@@ -586,12 +701,35 @@ public class AuroraDualKernelRuntime {
             """;
     }
 
+    static String modeExecutionContract(String mode) {
+        return switch (safe(mode).toUpperCase(java.util.Locale.ROOT)) {
+            case "THOUGHT_CLARIFY" -> """
+                    整理：先从用户原话中分出事实、感受、担心、需要；本轮只推进最混乱的一层。
+                    可以清晰命名结构，但不得一次输出完整五步表或抢先给方案。至多一个澄清问题。""";
+            case "SOCRATIC" -> """
+                    追问：不直接给答案、不列建议；只检验一个最关键假设，提出恰好一个真正能改变
+                    看法的问题。用户抗拒或情绪强烈时停止追问，改为简短承接。""";
+            case "ACTION_SPLIT" -> """
+                    行动：替用户选定一个十分钟内可开始、会留下可用结果的低后悔动作。
+                    只给一个动作，segments 与 smallStep 表达同一件事；不列清单、不让用户再选、不追问。""";
+            case "RELATION_REVIEW" -> """
+                    关系：明确区分已发生的事实、用户感受、未说出的需要和可选择的边界。
+                    不猜第三方动机、不站队、不急着劝沟通；至多追问一个尚缺的关键层。""";
+            case "CAPSULE_SHAPING" -> """
+                    塑造侧影：从一个具体故事中提取独特措辞、价值取舍或边界；每轮先指出一个
+                    只有这段故事才成立的细节，再问一个信息量最高的问题。禁止人格问卷和抽象标签堆叠。""";
+            default -> """
+                    倾诉：优先回应用户此刻最具体的一点；不自动分析、不布置行动、不以问题结尾。
+                    只有用户明确邀请建议时才推进，允许一句有分寸的回应后停住。""";
+        };
+    }
+
     private String criticInstruction() {
         return """
             你是有界的 Aurora critic。只输出严格 JSON，不要 markdown 代码块，不输出分析过程。
             必须严格匹配以下字段名和结构（示例，通过时 repaired 可省略或为 null）：
             {"pass":false,"issues":["违反计划的具体问题"],
-             "repaired":{"segments":["修复后的最多三条自然中文消息"],"speakCount":1,
+             "repaired":{"segments":["修复后的自然消息"],"speakCount":1,
               "continueReason":"...","detectedTheme":"...","nextQuestion":"","smallStep":"",
               "featureSuggestion":"","featureTarget":"","memoryReferenced":false,
               "referencedMemoryIds":[],"riskFlags":[]}}
@@ -630,10 +768,36 @@ public class AuroraDualKernelRuntime {
         plan.needsCritic = context.containsKey("interruptionContext");
         plan.innerVoiceWorthy = false;
         plan.innerVoiceSeed = "";
+        plan.topicState.activeTopicId = "current-turn";
+        plan.topicState.confidence = 0.5;
+        plan.userState.intent = plan.userIntent;
+        plan.userState.emotionalNeed = plan.emotionalNeed;
+        plan.userState.desiredDepth = "normal";
+        plan.userState.correctionDetected = false;
+        plan.auroraState.currentIntention = plan.relationshipMove;
+        plan.auroraState.stanceMode = "ACKNOWLEDGE_ONLY";
+        plan.auroraState.stanceReason = "真实规划暂不可用，先保持低承诺并回应用户明确表达";
+        plan.auroraState.uncertainty = plan.uncertainty;
+        plan.auroraState.changeMindIf = "获得更明确的用户意图或可靠证据";
+        plan.auroraState.userAutonomyBoundary = "最终选择属于用户";
+        plan.memoryDecision.admittedIds = List.of();
+        plan.responsePlan.bubblePurposes = plan.bubblePurposes;
+        plan.responsePlan.maxBubbles = plan.bubblePurposes.size();
+        plan.responsePlan.askQuestion = false;
+        plan.responsePlan.stopCondition = "完成低承诺回应即停止";
+        plan.interruptionPlan.continuityDecision =
+                context.containsKey("interruptionContext") ? "MERGE" : "CONTINUE";
+        plan.interruptionPlan.planRevision = 1L;
+        plan.safetyContract.responseAllowed = true;
+        plan.safetyContract.gentleCheckIn = false;
+        plan.safetyContract.resourceOffer = false;
+        plan.safetyContract.blockingReason = "";
         return plan;
     }
 
     private void normalizePlan(StructuredAiResults.AuroraPlanResult plan, Map<String, Object> context) {
+        if (plan.contractVersion == null || plan.contractVersion.isBlank())
+            plan.contractVersion = "aurora.deliberation.v2";
         if (plan.userIntent == null || plan.userIntent.isBlank()) plan.userIntent = safe(context.get("userMessage"));
         if (plan.emotionalNeed == null || plan.emotionalNeed.isBlank()) plan.emotionalNeed = "回应用户明确表达的需要";
         if (plan.relationshipMove == null || plan.relationshipMove.isBlank()) plan.relationshipMove = "保持连续并交还选择权";
@@ -643,6 +807,80 @@ public class AuroraDualKernelRuntime {
         if (plan.relevantMemoryIds == null) plan.relevantMemoryIds = List.of();
         if (plan.innerVoiceWorthy == null) plan.innerVoiceWorthy = false;
         if (plan.innerVoiceSeed == null) plan.innerVoiceSeed = "";
+        if (plan.topicState == null) plan.topicState = new StructuredAiResults.TopicState();
+        if (plan.topicState.anchors == null) plan.topicState.anchors = List.of();
+        if (plan.topicState.unresolvedThreads == null) plan.topicState.unresolvedThreads = List.of();
+        if (plan.topicState.confidence == null) plan.topicState.confidence = 0.5;
+        if (plan.userState == null) plan.userState = new StructuredAiResults.UserState();
+        if (plan.userState.intent == null || plan.userState.intent.isBlank())
+            plan.userState.intent = plan.userIntent;
+        if (plan.userState.emotionalNeed == null || plan.userState.emotionalNeed.isBlank())
+            plan.userState.emotionalNeed = plan.emotionalNeed;
+        if (plan.userState.desiredDepth == null || plan.userState.desiredDepth.isBlank())
+            plan.userState.desiredDepth = "normal";
+        if (plan.userState.correctionDetected == null) plan.userState.correctionDetected = false;
+        if (plan.auroraState == null) plan.auroraState = new StructuredAiResults.AuroraState();
+        if (plan.auroraState.currentIntention == null || plan.auroraState.currentIntention.isBlank())
+            plan.auroraState.currentIntention = plan.relationshipMove;
+        plan.auroraState.stanceMode = normalizeStanceMode(plan.auroraState.stanceMode);
+        if (plan.auroraState.stanceReason == null) plan.auroraState.stanceReason = "";
+        if (plan.auroraState.selfAnchorRefs == null) plan.auroraState.selfAnchorRefs = List.of();
+        if (plan.auroraState.evidenceRefs == null) plan.auroraState.evidenceRefs = List.of();
+        if (plan.auroraState.uncertainty == null) plan.auroraState.uncertainty = safe(plan.uncertainty);
+        if (plan.auroraState.changeMindIf == null) plan.auroraState.changeMindIf = "";
+        if (plan.auroraState.userAutonomyBoundary == null
+                || plan.auroraState.userAutonomyBoundary.isBlank())
+            plan.auroraState.userAutonomyBoundary = "最终选择属于用户";
+        if (plan.memoryDecision == null) plan.memoryDecision = new StructuredAiResults.MemoryDecision();
+        if (plan.memoryDecision.admittedIds == null || plan.memoryDecision.admittedIds.isEmpty())
+            plan.memoryDecision.admittedIds = List.copyOf(plan.relevantMemoryIds);
+        if (plan.memoryDecision.rejectedTopCandidates == null)
+            plan.memoryDecision.rejectedTopCandidates = List.of();
+        if (plan.memoryDecision.rejectionReasons == null) plan.memoryDecision.rejectionReasons = List.of();
+        plan.relevantMemoryIds = List.copyOf(plan.memoryDecision.admittedIds);
+        if (plan.responsePlan == null) plan.responsePlan = new StructuredAiResults.ResponsePlan();
+        if (plan.responsePlan.bubblePurposes == null || plan.responsePlan.bubblePurposes.isEmpty())
+            plan.responsePlan.bubblePurposes = List.copyOf(plan.bubblePurposes);
+        plan.responsePlan.maxBubbles = Math.max(1, Math.min(MAX_REPLY_BUBBLES,
+                plan.responsePlan.maxBubbles == null
+                        ? plan.responsePlan.bubblePurposes.size() : plan.responsePlan.maxBubbles));
+        plan.responsePlan.bubblePurposes = plan.responsePlan.bubblePurposes.stream()
+                .filter(value -> value != null && !value.isBlank())
+                .limit(plan.responsePlan.maxBubbles)
+                .toList();
+        if (plan.responsePlan.bubblePurposes.isEmpty())
+            plan.responsePlan.bubblePurposes = List.of("回应当下");
+        plan.bubblePurposes = List.copyOf(plan.responsePlan.bubblePurposes);
+        if (plan.responsePlan.askQuestion == null) plan.responsePlan.askQuestion = false;
+        if (plan.responsePlan.stopCondition == null || plan.responsePlan.stopCondition.isBlank())
+            plan.responsePlan.stopCondition = "完成计划中的气泡目的即停止";
+        if (plan.interruptionPlan == null)
+            plan.interruptionPlan = new StructuredAiResults.InterruptionPlan();
+        if (plan.interruptionPlan.cancelledPurposes == null)
+            plan.interruptionPlan.cancelledPurposes = List.of();
+        if (plan.interruptionPlan.changedFacts == null) plan.interruptionPlan.changedFacts = List.of();
+        if (plan.interruptionPlan.mustNotRepeat == null) plan.interruptionPlan.mustNotRepeat = List.of();
+        plan.interruptionPlan.continuityDecision =
+                normalizeContinuityDecision(plan.interruptionPlan.continuityDecision);
+        if (plan.interruptionPlan.planRevision == null) plan.interruptionPlan.planRevision = 1L;
+        if (plan.safetyContract == null) plan.safetyContract = new StructuredAiResults.SafetyContract();
+        if (plan.safetyContract.responseAllowed == null) plan.safetyContract.responseAllowed = true;
+        if (plan.safetyContract.gentleCheckIn == null) plan.safetyContract.gentleCheckIn = false;
+        if (plan.safetyContract.resourceOffer == null) plan.safetyContract.resourceOffer = false;
+        if (plan.safetyContract.blockingReason == null) plan.safetyContract.blockingReason = "";
+    }
+
+    private static String normalizeStanceMode(String value) {
+        String normalized = safe(value).toUpperCase(java.util.Locale.ROOT);
+        return Set.of("AGREE", "DISAGREE", "NUANCE", "CHALLENGE_GENTLY",
+                        "DECLINE_CERTAINTY", "ACKNOWLEDGE_ONLY").contains(normalized)
+                ? normalized : "DECLINE_CERTAINTY";
+    }
+
+    private static String normalizeContinuityDecision(String value) {
+        String normalized = safe(value).toUpperCase(java.util.Locale.ROOT);
+        return Set.of("CONTINUE", "PARK", "SWITCH", "MERGE").contains(normalized)
+                ? normalized : "CONTINUE";
     }
 
     private void enforceContextualBubbleCadence(StructuredAiResults.AuroraResult result,
@@ -655,13 +893,13 @@ public class AuroraDualKernelRuntime {
         normalizeBubbleCount(result);
     }
 
-    /** Keep the model's natural 1/2/3 rhythm; only discard blanks and cap invalid overproduction. */
+    /** Keep the model's natural 1-6 rhythm; only discard blanks and cap invalid overproduction. */
     private void normalizeBubbleCount(StructuredAiResults.AuroraResult result) {
         if (result == null || result.segments == null) return;
         List<String> normalized = result.segments.stream()
                 .filter(segment -> segment != null && !segment.isBlank())
                 .map(String::strip)
-                .limit(3)
+                .limit(MAX_REPLY_BUBBLES)
                 .toList();
         result.segments = normalized;
         result.speakCount = normalized.size();
@@ -672,8 +910,10 @@ public class AuroraDualKernelRuntime {
                                        Map<String, Object> assembledContext) {
         List<String> issues = new ArrayList<>();
         if (result == null || result.segments == null || result.segments.isEmpty()) issues.add("empty_response");
-        if (result != null && result.segments != null && result.segments.size() > 3) issues.add("too_many_bubbles");
-        if (result != null && result.segments != null && result.segments.stream().anyMatch(s -> s != null && s.length() > 300))
+        if (result != null && result.segments != null
+                && result.segments.size() > MAX_REPLY_BUBBLES) issues.add("too_many_bubbles");
+        if (result != null && result.segments != null && result.segments.stream()
+                .anyMatch(s -> s != null && s.length() > MAX_BUBBLE_CHARS))
             issues.add("bubble_too_long");
         if (result != null && result.referencedMemoryIds != null && plan.relevantMemoryIds != null
                 && !plan.relevantMemoryIds.containsAll(result.referencedMemoryIds)) issues.add("unauthorized_memory_expansion");

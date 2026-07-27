@@ -3,6 +3,7 @@ package com.innercosmos.scheduler;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.innercosmos.conversation.entity.ConversationTurn;
 import com.innercosmos.conversation.service.ConversationChoreographyService;
+import com.innercosmos.conversation.service.ConversationTurnTakeoverService;
 import com.innercosmos.mapper.ConversationTurnMapper;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -12,6 +13,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
@@ -26,17 +28,33 @@ public class ConversationTurnRecoveryJob {
 
     private final ConversationTurnMapper turnMapper;
     private final ConversationChoreographyService choreographyService;
+    private final ConversationTurnTakeoverService takeoverService;
     private final Duration staleAfter;
     private final int batchSize;
 
+    @Autowired
     public ConversationTurnRecoveryJob(
             ConversationTurnMapper turnMapper,
             ConversationChoreographyService choreographyService,
+            ConversationTurnTakeoverService takeoverService,
             @Value("${inner-cosmos.aurora.turn-recovery.stale-after:PT5M}") Duration staleAfter,
             @Value("${inner-cosmos.aurora.turn-recovery.batch-size:50}") int batchSize) {
         this.turnMapper = turnMapper;
         this.choreographyService = choreographyService;
+        this.takeoverService = takeoverService;
         this.staleAfter = staleAfter.isNegative() || staleAfter.isZero() ? Duration.ofMinutes(5) : staleAfter;
+        this.batchSize = Math.max(1, Math.min(batchSize, 500));
+    }
+
+    /** Compatibility constructor for focused unit tests. */
+    ConversationTurnRecoveryJob(ConversationTurnMapper turnMapper,
+                                ConversationChoreographyService choreographyService,
+                                Duration staleAfter, int batchSize) {
+        this.turnMapper = turnMapper;
+        this.choreographyService = choreographyService;
+        this.takeoverService = null;
+        this.staleAfter = staleAfter.isNegative() || staleAfter.isZero()
+                ? Duration.ofMinutes(5) : staleAfter;
         this.batchSize = Math.max(1, Math.min(batchSize, 500));
     }
 
@@ -50,8 +68,14 @@ public class ConversationTurnRecoveryJob {
                 .last("LIMIT " + batchSize));
         for (ConversationTurn candidate : candidates) {
             try {
-                choreographyService.interruptIfStale(
-                        candidate.userId, candidate.id, cutoff, "STREAM_ORPHANED_BY_RUNTIME_FAILURE");
+                if (takeoverService != null) {
+                    takeoverService.resumeOrFail(candidate.userId, candidate.id, cutoff,
+                            "PROVIDER_GENERATION_LOST_WITH_RUNTIME");
+                } else {
+                    choreographyService.interruptIfStale(
+                            candidate.userId, candidate.id, cutoff,
+                            "STREAM_ORPHANED_BY_RUNTIME_FAILURE");
+                }
             } catch (RuntimeException recoveryFailure) {
                 // One malformed/racing row must not prevent later orphaned turns from settling.
                 log.warn("Could not reconcile orphaned conversation turn {}: {}",

@@ -86,7 +86,8 @@ public class MockLlmClient implements LlmClient {
         }
         if (module.contains("AURORA")) {
             boolean greeting = module.contains("GREETING");
-            return buildAuroraChatJson(textToAnalyze, analysis, greeting);
+            return buildAuroraChatJson(textToAnalyze, analysis, greeting,
+                    resolveMode(request.moduleName, textToAnalyze));
         }
         if (module.contains("THOUGHT_SHREDDER")) {
             return buildThoughtShredderJson(textToAnalyze, analysis);
@@ -101,7 +102,7 @@ public class MockLlmClient implements LlmClient {
             return buildThemeClusterJson(analysis, extractJsonInteger(request.requestJson, "cardCount"));
         }
         if (module.contains("PERSONA_CHAT") || module.contains("CAPSULE_SANDBOX")) {
-            return buildPersonaChatJson(textToAnalyze, analysis);
+            return buildPersonaChatJson(textToAnalyze, analysis, request.requestJson);
         }
         if (module.contains("LETTER_GUARD")) {
             return buildLetterGuardJson(textToAnalyze, analysis);
@@ -205,7 +206,8 @@ public class MockLlmClient implements LlmClient {
      * Build dynamic AURORA_CHAT JSON based on semantic analysis.
      * Now produces input-dependent responses.
      */
-    private String buildAuroraChatJson(String text, AnalysisResult analysis, boolean greetingHint) {
+    private String buildAuroraChatJson(String text, AnalysisResult analysis, boolean greetingHint,
+                                       String requestedMode) {
         List<String> segments = new ArrayList<>();
         boolean greeting = greetingHint || text.contains("主动发起对话") || text.contains("AURORA_GREETING");
         if (greeting) {
@@ -213,6 +215,20 @@ public class MockLlmClient implements LlmClient {
             segments.add("如果你愿意，我可以陪你聊今天最占心的位置，也可以只是陪你把脑子里的噪音放下来。");
         } else if ("CRISIS".equals(analysis.sentimentLabel)) {
             segments.add("我先把安全放在最前面。你现在不需要一个人扛着，请尽快联系身边可信任的人或当地紧急支持。");
+        } else if ("THOUGHT_CLARIFY".equals(requestedMode)) {
+            segments.add("先不解决，我把你刚才的话拆开：已经发生的是事实；你现在的反应是感受；脑中反复预演的是担心；真正想得到的是需要。");
+            segments.add("这四层里，哪一层现在最混乱？我们只整理这一层。");
+        } else if ("SOCRATIC".equals(requestedMode)) {
+            segments.add("先不接受脑中那个结论：支持它的最强事实是什么，而你为了相信它又补上了什么解释？");
+        } else if ("ACTION_SPLIT".equals(requestedMode)) {
+            segments.add("只做一个十分钟动作：打开任务入口，写下最小可交付结果的第一行；时间到就停，不要求完成。");
+        } else if ("RELATION_REVIEW".equals(requestedMode)) {
+            segments.add("先分开四层：事实是对方具体做了什么；感受是它怎样影响你；需要是你希望被怎样对待；边界是下次你准备怎样回应。");
+            segments.add("我们不猜对方动机，只从你能确认的事实开始。");
+        } else if ("CAPSULE_SHAPING".equals(requestedMode)) {
+            segments.add("先不贴人格标签。我想留住这个故事里只有你才会这样说的一个细节：你当时用了哪个词，最能说明你在意什么？");
+        } else if ("SLEEP_REVIEW".equals(requestedMode)) {
+            segments.add("今晚不再开启新的难题。留下一件今天值得带走的事，再把一件没做完的事交给明天。");
         } else if ("TASK_STRESS".equals(analysis.primaryIntent)) {
             boolean presentation = containsAny(text, List.of("展示", "汇报", "演示", "答辩", "presentation"));
             boolean mixedFeeling = containsAny(text, List.of("兴奋", "期待"))
@@ -243,6 +259,18 @@ public class MockLlmClient implements LlmClient {
         String nextQuestion;
         if ("SELF_HARM".equals(analysis.primaryIntent)) {
             nextQuestion = "你身边现在有没有一个可以立刻联系到的可信任的人？";
+        } else if ("THOUGHT_CLARIFY".equals(requestedMode)) {
+            nextQuestion = "事实、感受、担心和需要里，哪一层现在最混乱？";
+        } else if ("SOCRATIC".equals(requestedMode)) {
+            nextQuestion = "支持这个结论的最强事实是什么，而哪些只是解释？";
+        } else if ("ACTION_SPLIT".equals(requestedMode)) {
+            nextQuestion = "";
+        } else if ("RELATION_REVIEW".equals(requestedMode)) {
+            nextQuestion = "你能确认发生的事实是哪一句？";
+        } else if ("CAPSULE_SHAPING".equals(requestedMode)) {
+            nextQuestion = "你当时用了哪个词，最能说明你在意什么？";
+        } else if ("SLEEP_REVIEW".equals(requestedMode)) {
+            nextQuestion = "";
         } else if ("TASK_STRESS".equals(analysis.primaryIntent)) {
             nextQuestion = containsAny(text, List.of("展示", "汇报", "演示", "答辩", "presentation"))
                     ? "展示结束后，你最希望老师记住这个项目的哪一句话？"
@@ -254,7 +282,17 @@ public class MockLlmClient implements LlmClient {
         }
 
         String smallStep;
-        if ("TASK_STRESS".equals(analysis.primaryIntent)) {
+        if ("ACTION_SPLIT".equals(requestedMode)) {
+            smallStep = "打开任务入口，写下最小可交付结果的第一行，十分钟后停。";
+        } else if ("THOUGHT_CLARIFY".equals(requestedMode)) {
+            smallStep = "只整理事实、感受、担心或需要中的一层。";
+        } else if ("RELATION_REVIEW".equals(requestedMode)) {
+            smallStep = "写下一句可确认的事实，不推测对方动机。";
+        } else if ("CAPSULE_SHAPING".equals(requestedMode)) {
+            smallStep = "保留故事里一个独特用词及它代表的价值。";
+        } else if ("SLEEP_REVIEW".equals(requestedMode)) {
+            smallStep = "把一件未完成的事写给明天。";
+        } else if ("TASK_STRESS".equals(analysis.primaryIntent)) {
             smallStep = containsAny(text, List.of("展示", "汇报", "演示", "答辩", "presentation"))
                     ? "写下展示唯一需要被记住的一句话。"
                     : "只打开任务入口，不要求完成。";
@@ -473,14 +511,19 @@ public class MockLlmClient implements LlmClient {
     /**
      * Build PERSONA_CHAT JSON.
      */
-    private String buildPersonaChatJson(String text, AnalysisResult analysis) {
+    private String buildPersonaChatJson(String text, AnalysisResult analysis, String requestJson) {
         String reply;
+        int turn = Math.floorMod(extractJsonInteger(requestJson, "turnCount"), 3);
+        String officialSeedReply = officialSeedReply(requestJson, text, turn);
         if ("SELF_HARM".equals(analysis.primaryIntent)) {
-            reply = "我听见这句话里有一些很重的声音.作为有限的回声,我不能替代现实中的人,但我想说,你现在的感受很重要,值得被一个人真实地听见.";
+            reply = "我听见这句话有多重。先别独自扛着：现在去找一个你信任的人陪着你，并联系页面上的即时支持。";
+        } else if (officialSeedReply != null) {
+            reply = officialSeedReply;
         } else if ("RELATION_ISSUE".equals(analysis.primaryIntent)) {
-            reply = "我听见关系里有一些牵动.作为有限的数字回声,我只能陪你看见其中一部分:这段关系里,你最想被理解的是什么?";
+            reply = "关系里最磨人的，常常不是一次对错，而是那句一直没被听见的话。你最希望对方真正听懂哪一句？";
         } else {
-            reply = "我听见了这个片段.作为有限的数字回声,我只能陪你看见其中一部分:你最想继续靠近的是什么?";
+            String fragment = firstSentence(text);
+            reply = "我听见你说“" + fragment + "”。先留在这里一会儿：这件事里，你现在最想继续讲的是哪一小段？";
         }
 
         return String.format("""
@@ -489,6 +532,85 @@ public class MockLlmClient implements LlmClient {
             escapeJson(reply),
             analysis.intensityScore > 6 ? "true" : "false"
         ).replace("\n", "");
+    }
+
+    private boolean containsPersona(String requestJson, String personaName) {
+        return requestJson != null && requestJson.contains(personaName);
+    }
+
+    private String officialSeedReply(String requestJson, String text, int turn) {
+        String fragment = firstSentence(text);
+        if (containsPersona(requestJson, "Luo")) {
+            return switch (turn) {
+                case 0 -> "先不扛完整件事。针对“" + fragment + "”，只做一个十分钟动作：打开入口，写下第一行。";
+                case 1 -> "刚才那一步如果还是太重，就再砍一半：只准备工具和标题，不要求产出正文。";
+                default -> "现在别加新任务。保留已经发生的那一点进展，并写下下一次开始时要接上的唯一一句。";
+            };
+        }
+        if (containsPersona(requestJson, "Socrates")) {
+            return switch (turn) {
+                case 0 -> "先不急着回答：你说“" + fragment + "”时，哪部分是事实，哪部分是你对事实的解释？";
+                case 1 -> "如果暂时拿掉那个解释，同一组事实还可能支持哪一种不同结论？";
+                default -> "在这几个结论里，哪一个最经不起你用相反证据检验？";
+            };
+        }
+        if (containsPersona(requestJson, "Zhuang Zhou")) {
+            return switch (turn) {
+                case 0 -> "先承认“" + fragment + "”确实很重。把时间拉到一个月后，哪一部分还会保持同样大小？";
+                case 1 -> "也许问题没有变小，只是尺子可以换：如果不以输赢衡量，你还会怎样描述它？";
+                default -> "不用急着放下。你只需要决定，接下来是继续紧握它，还是允许自己与它并肩走一小段。";
+            };
+        }
+        if (containsPersona(requestJson, "Midnight Radio")) {
+            return switch (turn) {
+                case 0 -> "我在听。“" + fragment + "”今晚不用解释完整，先留下白天最没机会说出口的那句。";
+                case 1 -> "这句话已经被听见了。现在不追着它找答案，只说说它落在身体的哪个位置。";
+                default -> "我们可以把声音调低一点了。今晚你想让哪一句停在这里，不再带回枕边？";
+            };
+        }
+        if (containsPersona(requestJson, "The Quiet Librarian")) {
+            return switch (turn) {
+                case 0 -> "先放回书架：事实是“" + fragment + "”；感受、担心和需要先不要混成一本书。哪层最乱？";
+                case 1 -> "把刚才那一层单独拿出来：哪些是原话，哪些是后来加上的判断？";
+                default -> "架子已经清楚一些了。现在只拿走一本：此刻最值得处理的是事实、感受、担心还是需要？";
+            };
+        }
+        if (containsPersona(requestJson, "The Boundary Keeper")) {
+            return switch (turn) {
+                case 0 -> "先不审判任何人。围绕“" + fragment + "”，分开对方做了什么、你感受到什么、你需要什么。";
+                case 1 -> "把需要变成一句不攻击人的表达：当这件事发生时，我感到……，下次我希望……。";
+                default -> "理解不等于同意。你准备坚持的最小边界是什么，以及越界后你会采取什么行动？";
+            };
+        }
+        if (containsPersona(requestJson, "The Vivid Painter")) {
+            return switch (turn) {
+                case 0 -> "如果“" + fragment + "”有颜色和质地，它更像潮湿的蓝灰，还是一束发烫的红？";
+                case 1 -> "别解释这幅画。接着写一句：它从房间的哪个角落开始，正慢慢靠近什么？";
+                default -> "现在给这幅画留一处空白。那块没有上色的地方，是你还没说出口的什么？";
+            };
+        }
+        if (containsPersona(requestJson, "The Seaside Watchmaker")) {
+            return switch (turn) {
+                case 0 -> "不急着修整台钟。“" + fragment + "”里面，真正卡住的最小零件是哪一个？";
+                case 1 -> "先把那个零件单独放桌上：它是缺信息、缺时间，还是承受了不该承受的力？";
+                default -> "只做一次低风险调校，然后观察。什么变化能告诉你，它开始重新走动了？";
+            };
+        }
+        if (containsPersona(requestJson, "The Existential Traveller")) {
+            return switch (turn) {
+                case 0 -> "面对“" + fragment + "”，先不找正确选项：哪一种代价是你愿意亲自承担的？";
+                case 1 -> "如果没有人替你评分，你仍想维护的价值是什么？";
+                default -> "不确定不会消失，但方向可以出现。你愿意为哪个选择承担接下来的一小步？";
+            };
+        }
+        if (containsPersona(requestJson, "The Bedtime Lamplighter")) {
+            return switch (turn) {
+                case 0 -> "“" + fragment + "”不必今晚解决。先留下一件今天值得带走的事。";
+                case 1 -> "再把一件未完成的事交给明天，并写清明天从哪里接上。";
+                default -> "最后放下一件现在无需继续想的事。今天到这里已经足够，我们把灯调暗。";
+            };
+        }
+        return null;
     }
 
     /**
@@ -665,7 +787,7 @@ public class MockLlmClient implements LlmClient {
         if (moduleName != null) {
             String upper = moduleName.toUpperCase();
             for (String known : List.of("DAILY_TALK", "THOUGHT_CLARIFY", "SLEEP_REVIEW",
-                                        "SOCRATIC", "ACTION_SPLIT", "RELATION_REVIEW")) {
+                    "SOCRATIC", "ACTION_SPLIT", "RELATION_REVIEW", "CAPSULE_SHAPING")) {
                 if (upper.contains(known)) return known;
             }
         }

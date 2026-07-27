@@ -3,8 +3,10 @@ package com.innercosmos.service;
 import com.innercosmos.ai.client.LlmClient;
 import com.innercosmos.ai.client.LlmRequest;
 import com.innercosmos.common.ErrorCode;
+import com.innercosmos.entity.MemoryCard;
 import com.innercosmos.entity.TodoItem;
 import com.innercosmos.exception.BusinessException;
+import com.innercosmos.mapper.MemoryCardMapper;
 import com.innercosmos.mapper.TodoItemMapper;
 import com.innercosmos.service.impl.TodoServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,15 +32,19 @@ class TodoServiceTest {
     @Mock
     private LlmClient llmClient;
 
+    @Mock
+    private MemoryCardMapper memoryCardMapper;
+
     private TodoServiceImpl todoService;
 
     private static final Long USER_ID = 1L;
     private static final Long OTHER_USER_ID = 2L;
     private static final Long ITEM_ID = 100L;
+    private static final Long CARD_ID = 500L;
 
     @BeforeEach
     void setUp() {
-        todoService = new TodoServiceImpl(todoItemMapper, llmClient);
+        todoService = new TodoServiceImpl(todoItemMapper, llmClient, memoryCardMapper);
     }
 
     private TodoItem buildOwnedItem() {
@@ -140,6 +146,57 @@ class TodoServiceTest {
         TodoItem result = todoService.create(USER_ID, item);
 
         assertEquals("MEDIUM", result.priority);
+    }
+
+    @Test
+    @DisplayName("create with sourceMemoryCardId owned by the caller succeeds")
+    void create_sourceMemoryCardOwnedByCaller_succeeds() {
+        TodoItem item = new TodoItem();
+        item.taskName = "Task linked to my own memory";
+        item.sourceMemoryCardId = CARD_ID;
+        MemoryCard card = new MemoryCard();
+        card.id = CARD_ID;
+        card.userId = USER_ID;
+        when(memoryCardMapper.selectById(CARD_ID)).thenReturn(card);
+        when(todoItemMapper.insert(any(TodoItem.class))).thenReturn(1);
+
+        TodoItem result = todoService.create(USER_ID, item);
+
+        assertEquals(CARD_ID, result.sourceMemoryCardId);
+        verify(todoItemMapper).insert(any(TodoItem.class));
+    }
+
+    @Test
+    @DisplayName("create with sourceMemoryCardId owned by another user is rejected (cross-tenant injection)")
+    void create_sourceMemoryCardOwnedByOtherUser_throwsException() {
+        TodoItem item = new TodoItem();
+        item.taskName = "Malicious task pointing at someone else's memory";
+        item.sourceMemoryCardId = CARD_ID;
+        MemoryCard card = new MemoryCard();
+        card.id = CARD_ID;
+        card.userId = OTHER_USER_ID;
+        when(memoryCardMapper.selectById(CARD_ID)).thenReturn(card);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> todoService.create(USER_ID, item));
+
+        assertEquals(ErrorCode.BAD_REQUEST, ex.code);
+        verify(todoItemMapper, never()).insert(any(TodoItem.class));
+    }
+
+    @Test
+    @DisplayName("create with a non-existent sourceMemoryCardId is rejected")
+    void create_sourceMemoryCardMissing_throwsException() {
+        TodoItem item = new TodoItem();
+        item.taskName = "Task pointing at a made-up memory id";
+        item.sourceMemoryCardId = CARD_ID;
+        when(memoryCardMapper.selectById(CARD_ID)).thenReturn(null);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> todoService.create(USER_ID, item));
+
+        assertEquals(ErrorCode.BAD_REQUEST, ex.code);
+        verify(todoItemMapper, never()).insert(any(TodoItem.class));
     }
 
     // --- updateStatus ---
@@ -336,5 +393,30 @@ class TodoServiceTest {
 
         assertNotNull(result.description);
         assertTrue(result.description.length() > 0);
+    }
+
+    @Test
+    @DisplayName("splitFirstStep replaces a previously-appended split block instead of accumulating it")
+    void splitFirstStep_calledTwice_replacesPriorBlockInsteadOfAccumulating() {
+        TodoItem item = buildOwnedItem();
+        item.description = "My own original notes";
+        when(todoItemMapper.selectById(ITEM_ID)).thenReturn(item);
+        when(todoItemMapper.updateById(any(TodoItem.class))).thenReturn(1);
+
+        when(llmClient.chat(any(LlmRequest.class))).thenReturn("First step suggestion");
+        TodoItem afterFirst = todoService.splitFirstStep(USER_ID, ITEM_ID);
+        assertTrue(afterFirst.description.contains("My own original notes"));
+        assertTrue(afterFirst.description.contains("First step suggestion"));
+
+        when(llmClient.chat(any(LlmRequest.class))).thenReturn("Second step suggestion");
+        TodoItem afterSecond = todoService.splitFirstStep(USER_ID, ITEM_ID);
+
+        assertTrue(afterSecond.description.contains("My own original notes"),
+                "the user's own original text must survive repeated splits");
+        assertTrue(afterSecond.description.contains("Second step suggestion"));
+        assertFalse(afterSecond.description.contains("First step suggestion"),
+                "a second split must replace, not accumulate on top of, the previous split block");
+        long occurrences = afterSecond.description.split("Aurora 拆出的第一步：", -1).length - 1;
+        assertEquals(1, occurrences, "only one split block should ever be present");
     }
 }

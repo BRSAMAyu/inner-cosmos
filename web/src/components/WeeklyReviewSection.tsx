@@ -11,9 +11,9 @@ const COPY: Record<Locale, {
   recommendationHeading: string; noThemes: string;
 }> = {
   "zh-CN": {
-    routeHint: "一周的内在总结", heading: "成长周报",
-    intro: "过去 7 天你的内在宇宙发生了什么。系统会从记忆、情绪、待办、主题等多个维度生成一份只属于你的总结。",
-    regenerate: "重新生成这一周", empty: "还没有生成过周报。点击「重新生成」开始整理过去 7 天的内在轨迹。",
+    routeHint: "最近 7 天", heading: "周报与变化",
+    intro: "汇总最近 7 天的记忆、情绪、待办和反复出现的主题。",
+    regenerate: "生成本周周报", empty: "还没有周报。生成后可以查看最近 7 天的变化。",
     memoryCount: "记忆数", completedTodos: "待办进度", themeCount: "主题数", dominantEmotion: "主导情绪",
     trajectoryHeading: "本周轨迹", noTrajectory: "这周还没有每日记录", observationLabel: "Aurora 的观察：",
     recommendationHeading: "下周的微小建议", noThemes: "这周还没有聚类出主题"
@@ -28,8 +28,8 @@ const COPY: Record<Locale, {
   }
 };
 
-function themeList(topThemes: string): string[] {
-  return topThemes.split(/[,，]/).map(s => s.trim()).filter(Boolean);
+function themeList(topThemes: string | null | undefined): string[] {
+  return (typeof topThemes === "string" ? topThemes : "").split(/[,，]/).map(s => s.trim()).filter(Boolean);
 }
 
 export function WeeklyReviewSection({ review, busy, onGenerate, locale = "zh-CN" }: {
@@ -37,6 +37,12 @@ export function WeeklyReviewSection({ review, busy, onGenerate, locale = "zh-CN"
 }) {
   const t = COPY[locale];
   const themes = review ? themeList(review.topThemes) : [];
+  // Older demo databases and partially-generated provider responses may omit this V2 field.
+  // Treat that as a valid empty week instead of throwing during render and taking down the
+  // entire Inner Cosmos space through its error boundary.
+  const dailySnapshots = Array.isArray(review?.dailySnapshots)
+    ? review.dailySnapshots.filter(day => day != null && typeof day === "object")
+    : [];
 
   return <section className="weekly-review-section" aria-label={t.heading}>
     <span className="route-hint">{t.routeHint}</span>
@@ -68,11 +74,11 @@ export function WeeklyReviewSection({ review, busy, onGenerate, locale = "zh-CN"
           <div className="wr-section">
             <h3>{t.trajectoryHeading}</h3>
             <div className="wr-timeline">
-              {review.dailySnapshots.length === 0
+              {dailySnapshots.length === 0
                 ? <p className="muted">{t.noTrajectory}</p>
-                : review.dailySnapshots.map(day => <div className="wr-day" key={day.date}>
+                : dailySnapshots.map((day, index) => <div className="wr-day" key={day.date || index}>
                     <div>
-                      <div className="date">{day.date.slice(5)}</div>
+                      <div className="date">{day.date ? day.date.slice(5) : "—"}</div>
                       <div className="weather">{day.emotionWeather ? "🌤️" : "·"}</div>
                     </div>
                     <div>

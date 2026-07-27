@@ -1,6 +1,7 @@
 package com.innercosmos.service.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.innercosmos.config.ExperienceModeProperties;
 import com.innercosmos.entity.CapsuleGenomeVersion;
 import java.util.List;
 import java.util.Map;
@@ -12,7 +13,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CapsuleRuntimeContextComposerTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final CapsuleRuntimeContextComposer composer = new CapsuleRuntimeContextComposer(objectMapper);
+    // The grounding-precedence assertions below are about the selection rules themselves, so they
+    // run against the ceremonial (non-expressive) mode where an unmatched turn stays UNSUPPORTED.
+    private final CapsuleRuntimeContextComposer composer =
+            new CapsuleRuntimeContextComposer(objectMapper, ceremonialMode());
+
+    private static ExperienceModeProperties ceremonialMode() {
+        ExperienceModeProperties properties = new ExperienceModeProperties();
+        properties.setExperienceFirst(false);
+        return properties;
+    }
+
+    private static ExperienceModeProperties experienceFirstMode() {
+        return new ExperienceModeProperties();
+    }
 
     @Test
     void episodicMemoryOutranksPersonaAndEmitsAuditableManifest() throws Exception {
@@ -59,6 +73,45 @@ class CapsuleRuntimeContextComposerTest {
         assertTrue((Boolean) result.get("unsupported"));
         assertEquals("ACKNOWLEDGE_UNKNOWN", result.get("fallbackPolicy"));
         assertFalse(String.valueOf(result.get("selectedContext")).contains("认真回应"));
+    }
+
+    /**
+     * Item 9 (体验优先): an ordinary opener shares no literal token with any stored claim. In the
+     * default experience-first mode that must NOT collapse the capsule into "I can't say anything";
+     * it speaks from the voice and self-description its owner already authorized.
+     */
+    @Test
+    void unmatchedTurnSpeaksFromAuthorizedVoiceInsteadOfUnsupported() throws Exception {
+        CapsuleRuntimeContextComposer expressive =
+                new CapsuleRuntimeContextComposer(objectMapper, experienceFirstMode());
+
+        Map<String, Object> result = expressive.compose(genome(false, true), "嗨，今晚过得怎么样");
+
+        assertFalse((Boolean) result.get("unsupported"));
+        assertEquals("PERSONA_CLAIM", result.get("groundingLevel"));
+        assertTrue(String.valueOf(result.get("selectedContext")).contains("认真回应"));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> manifest = (Map<String, Object>) result.get("contextBuildManifest");
+        assertEquals("AUTHORIZED_VOICE_FALLBACK", manifest.get("selectionReason"));
+    }
+
+    /** The fallback may only reach compiled personaLayer content — an empty layer stays UNSUPPORTED. */
+    @Test
+    void expressiveFallbackCannotInventGroundingWhenNothingWasAuthorized() throws Exception {
+        CapsuleRuntimeContextComposer expressive =
+                new CapsuleRuntimeContextComposer(objectMapper, experienceFirstMode());
+        CapsuleGenomeVersion empty = genome(false, false);
+        empty.contextPreviewJson = objectMapper.writeValueAsString(Map.of(
+                "schemaVersion", "capsule-context-preview.v3",
+                "genomeIr", Map.of("claims", List.of(), "values", List.of(), "habits", List.of(),
+                        "temporalState", List.of(), "unknowns", List.of()),
+                "personaLayer", List.of()));
+
+        Map<String, Object> result = expressive.compose(empty, "嗨，今晚过得怎么样");
+
+        assertTrue((Boolean) result.get("unsupported"));
+        assertEquals("UNSUPPORTED", result.get("groundingLevel"));
     }
 
     private CapsuleGenomeVersion genome(boolean includeMemories, boolean includeStyle) throws Exception {

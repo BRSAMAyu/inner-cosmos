@@ -19,6 +19,19 @@ import static org.mockito.Mockito.*;
 
 class AuroraDualKernelRuntimeTest {
     @Test
+    void modesExposeDistinctObservableBehaviorContracts() {
+        String daily = AuroraDualKernelRuntime.modeExecutionContract("DAILY_TALK");
+        String socratic = AuroraDualKernelRuntime.modeExecutionContract("SOCRATIC");
+        String action = AuroraDualKernelRuntime.modeExecutionContract("ACTION_SPLIT");
+        String relation = AuroraDualKernelRuntime.modeExecutionContract("RELATION_REVIEW");
+
+        assertThat(socratic).contains("恰好一个").contains("不直接给答案");
+        assertThat(action).contains("十分钟").contains("只给一个动作").contains("不追问");
+        assertThat(relation).contains("事实").contains("感受").contains("边界");
+        assertThat(List.of(daily, socratic, action, relation)).doesNotHaveDuplicates();
+    }
+
+    @Test
     void separatesPlanningSpeakingAndBoundedRepair() {
         ABTestService ab = mock(ABTestService.class);
         when(ab.assignGroup(anyLong(), anyString())).thenReturn("REMOTE");
@@ -37,24 +50,48 @@ class AuroraDualKernelRuntimeTest {
         assertThat(client.modules).containsExactly(
             "AURORA_PLAN_DAILY_TALK", "AURORA_SPEAKER_DAILY_TALK", "AURORA_CRITIC_DAILY_TALK");
         assertThat(client.thinkingModes).containsEntry("AURORA_PLAN_DAILY_TALK", true)
-                .containsEntry("AURORA_SPEAKER_DAILY_TALK", false)
-                .containsEntry("AURORA_CRITIC_DAILY_TALK", false);
+                .containsEntry("AURORA_SPEAKER_DAILY_TALK", true)
+                .containsEntry("AURORA_CRITIC_DAILY_TALK", true);
         assertThat(client.timeouts).containsEntry("AURORA_PLAN_DAILY_TALK", 45_000)
                 .containsEntry("AURORA_SPEAKER_DAILY_TALK", 8_000)
                 .containsEntry("AURORA_CRITIC_DAILY_TALK", 6_000);
-        assertThat(client.maxTokens).containsEntry("AURORA_PLAN_DAILY_TALK", 4_096)
-                .containsEntry("AURORA_SPEAKER_DAILY_TALK", 1_536)
-                .containsEntry("AURORA_CRITIC_DAILY_TALK", 1_536);
+        assertThat(client.maxTokens).containsEntry("AURORA_PLAN_DAILY_TALK", 8_192)
+                .containsEntry("AURORA_SPEAKER_DAILY_TALK", 6_144)
+                .containsEntry("AURORA_CRITIC_DAILY_TALK", 2_048);
         assertThat(client.retryModes.values()).containsOnly(false);
         assertThat(client.requestJsons.get("AURORA_PLAN_DAILY_TALK"))
                 .doesNotContain("LEGACY_SINGLE_PASS_SEGMENTS_SCHEMA");
-        assertThat(generation.runtime()).isEqualTo("dual-kernel.v1");
+        assertThat(generation.runtime()).isEqualTo("dual-kernel.current-turn.v2");
         assertThat(generation.stageLatenciesMs()).containsKeys("plan", "speaker", "critic", "total");
         assertThat(generation.plannerFallbackUsed()).isFalse();
         assertThat(generation.speakerFallbackUsed()).isFalse();
         assertThat(generation.criticFallbackUsed()).isFalse();
         assertThat(generation.repaired()).isTrue();
         assertThat(generation.result().segments).containsExactly("好，我先停在这里接住你，不往下分析。");
+    }
+
+    @Test
+    void productionPlannerExecutorStillUsesTheCurrentTurnPlanBeforeSpeaking() {
+        ABTestService ab = mock(ABTestService.class);
+        when(ab.assignGroup(anyLong(), anyString())).thenReturn("REMOTE");
+        LlmConfig config = new LlmConfig();
+        config.mode = "prod";
+        RecordingClient client = new RecordingClient();
+        AuroraDualKernelRuntime runtime = new AuroraDualKernelRuntime(
+                new StructuredAiService(client, ab, config));
+        runtime.setPlannerExecutor(Runnable::run);
+
+        var generation = runtime.generate(7L, "DAILY_TALK",
+                Map.of("sessionId", 77L, "userMessage", "请明确说说你的看法"),
+                client, StructuredAiResults.AuroraResult::new);
+
+        assertThat(client.modules.get(0)).isEqualTo("AURORA_PLAN_DAILY_TALK");
+        assertThat(client.modules.get(1)).isEqualTo("AURORA_SPEAKER_DAILY_TALK");
+        assertThat(client.requestJsons.get("AURORA_SPEAKER_DAILY_TALK"))
+                .contains("responsePlan", "aurora.deliberation.v2");
+        assertThat(generation.runtime()).isEqualTo("dual-kernel.current-turn.v2");
+        assertThat(generation.guidanceSource()).isEqualTo("current-turn-plan");
+        assertThat(generation.backgroundPlannerScheduled()).isFalse();
     }
 
     @Test

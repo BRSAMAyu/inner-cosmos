@@ -218,17 +218,17 @@ public class StructuredAiService {
     }
 
     /**
-     * Keep deep reasoning behind the interaction boundary. The visible speaker and optional
-     * inner voice must answer in non-thinking mode; only the planner and bounded critic may spend
-     * a reasoning budget. The critic is a fast independent supervisor: it sees the compact plan,
-     * candidate and deterministic findings, so making it perform another long reasoning pass adds
-     * latency without adding a second source of evidence. All other structured modules default to
-     * non-thinking until explicitly classified as background work.
+     * The foreground acknowledgement stays minimal/non-thinking. The visible speaker may use a
+     * bounded fast-thinking model, while planner/critic use the reflective model selected by the
+     * stage router. The router is the final authority because providers expose reasoning controls
+     * differently.
      */
     private Boolean thinkingEnabled(String moduleName) {
         if (moduleName == null) return Boolean.FALSE;
         String normalized = moduleName.toUpperCase(java.util.Locale.ROOT);
-        return normalized.startsWith("AURORA_PLAN_");
+        return normalized.startsWith("AURORA_PLAN_")
+                || normalized.startsWith("AURORA_SPEAKER_")
+                || normalized.startsWith("AURORA_CRITIC_");
     }
 
     private void applyLatencyContract(LlmRequest request, String moduleName, boolean jsonRepair) {
@@ -255,15 +255,15 @@ public class StructuredAiService {
             // separate room while keeping a hard deadline. reasoning_effort remains unset unless
             // an explicit measured plannerReasoningEffort is supplied in context.
             request.timeoutMs = 45_000;
-            request.maxTokens = 4_096;
+            request.maxTokens = 8_192;
             request.retryEnabled = Boolean.FALSE;
         } else if (normalized.startsWith("AURORA_SPEAKER_")) {
             request.timeoutMs = 8_000;
-            request.maxTokens = 1_536;
+            request.maxTokens = 6_144;
             request.retryEnabled = Boolean.FALSE;
         } else if (normalized.startsWith("AURORA_CRITIC_")) {
             request.timeoutMs = 6_000;
-            request.maxTokens = 1_536;
+            request.maxTokens = 2_048;
             request.retryEnabled = Boolean.FALSE;
         } else if (normalized.startsWith("AURORA_INNER_VOICE_")) {
             request.timeoutMs = 6_000;

@@ -50,6 +50,8 @@ class CapsuleMatchingTest {
     @Mock DataUseGrantService dataUseGrantService;
     @Mock com.innercosmos.mapper.BlockRelationMapper blockRelationMapper;
     @Mock com.innercosmos.mapper.CapsuleLandingMapper capsuleLandingMapper;
+    @Mock com.innercosmos.mapper.PersonaChatSessionMapper personaChatSessionMapper;
+    @Mock com.innercosmos.mapper.PersonaChatMessageMapper personaChatMessageMapper;
     @Mock com.innercosmos.service.CapsuleEmbeddingIndexService capsuleEmbeddingIndexService;
     @Mock com.innercosmos.service.DataRetractionReceiptService retractionReceiptService;
 
@@ -61,7 +63,8 @@ class CapsuleMatchingTest {
 
     @BeforeEach
     void setUp() {
-        service = new CapsuleServiceImpl(echoCapsuleMapper, boundaryMapper, capsuleLandingMapper, capsuleAgent,
+        service = new CapsuleServiceImpl(echoCapsuleMapper, boundaryMapper, capsuleLandingMapper,
+                personaChatSessionMapper, personaChatMessageMapper, capsuleAgent,
                 memoryCardMapper, userPortraitMapper, authorizedMemoryRefMapper, genomeService, dataUseGrantService,
                 blockRelationMapper, new com.fasterxml.jackson.databind.ObjectMapper(), capsuleEmbeddingIndexService,
                 retractionReceiptService,
@@ -525,10 +528,47 @@ class CapsuleMatchingTest {
         EchoCapsule other = capsule(1501L, 999L, "USER_CAPSULE", "他人", "intro", "[]", 0.6);
         when(echoCapsuleMapper.selectByIdForUpdate(1501L)).thenReturn(other);
         when(capsuleLandingMapper.selectCount(any())).thenReturn(1L);
+        givenVisitorHeardCapsuleSpeak();
 
         assertEquals(0.6, service.markLanded(USER_ID, 1501L));
         verify(capsuleLandingMapper, never()).insert(any(com.innercosmos.entity.CapsuleLanding.class));
         verify(echoCapsuleMapper, never()).update(argThat(w -> true), any());
+    }
+
+    /** The visitor owns a session with this capsule that already produced a CAPSULE reply. */
+    private void givenVisitorHeardCapsuleSpeak() {
+        com.innercosmos.entity.PersonaChatSession session = new com.innercosmos.entity.PersonaChatSession();
+        session.id = 9100L;
+        when(personaChatSessionMapper.selectList(any())).thenReturn(List.of(session));
+        when(personaChatMessageMapper.selectCount(any())).thenReturn(1L);
+    }
+
+    @Test
+    void markLandedRequiresHavingActuallyHeardTheCapsule() {
+        // 2026-07-27 audit (P3): +0.02 echoEnergy used to be reachable by any authenticated
+        // account with a bare POST, so a pool of accounts could farm plaza ranking for free.
+        EchoCapsule other = capsule(1502L, 999L, "USER_CAPSULE", "他人", "intro", "[]", 0.6);
+        when(echoCapsuleMapper.selectByIdForUpdate(1502L)).thenReturn(other);
+        when(personaChatSessionMapper.selectList(any())).thenReturn(List.of());
+
+        assertEquals("BAD_REQUEST", assertThrows(com.innercosmos.exception.BusinessException.class,
+                () -> service.markLanded(USER_ID, 1502L)).code);
+        verify(capsuleLandingMapper, never()).insert(any(com.innercosmos.entity.CapsuleLanding.class));
+        verify(echoCapsuleMapper, never()).update(argThat(w -> true), any());
+    }
+
+    @Test
+    void markLandedRejectsAVisitorWhoOpenedASessionButNeverGotAReply() {
+        EchoCapsule other = capsule(1503L, 999L, "USER_CAPSULE", "他人", "intro", "[]", 0.6);
+        when(echoCapsuleMapper.selectByIdForUpdate(1503L)).thenReturn(other);
+        com.innercosmos.entity.PersonaChatSession session = new com.innercosmos.entity.PersonaChatSession();
+        session.id = 9101L;
+        when(personaChatSessionMapper.selectList(any())).thenReturn(List.of(session));
+        when(personaChatMessageMapper.selectCount(any())).thenReturn(0L);
+
+        assertEquals("BAD_REQUEST", assertThrows(com.innercosmos.exception.BusinessException.class,
+                () -> service.markLanded(USER_ID, 1503L)).code);
+        verify(capsuleLandingMapper, never()).insert(any(com.innercosmos.entity.CapsuleLanding.class));
     }
 
     @Test

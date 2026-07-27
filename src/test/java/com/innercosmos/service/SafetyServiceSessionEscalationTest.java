@@ -58,8 +58,8 @@ class SafetyServiceSessionEscalationTest {
     }
 
     @Test
-    @DisplayName("3.9: repeated MEDIUM-tier matches within one session escalate to HIGH/block even though a single one stays MEDIUM")
-    void repeatedMediumMatches_sameSession_escalateToHighBlock() {
+    @DisplayName("F3: repeated MEDIUM-tier matches become a gentle check-in without blocking Aurora")
+    void repeatedMediumMatches_sameSession_becomeGentleCheckIn() {
         when(safetyBoundaryFilter.inspect(any()))
                 .thenReturn(SafetyMatch.hit("OTHER", "MEDIUM", "other_rule", "FLAG"));
 
@@ -70,10 +70,11 @@ class SafetyServiceSessionEscalationTest {
         safetyService.check("还是觉得很难受，压力很大", USER_ID, SESSION_ID);
         SafetyResult thirdTurn = safetyService.check("真的撑不下去了", USER_ID, SESSION_ID);
 
-        assertEquals("HIGH", thirdTurn.riskLevel, "the ACCUMULATED session pattern must escalate the effective risk level");
-        assertTrue(thirdTurn.blockModelCall);
-        assertEquals("SESSION_ESCALATION", thirdTurn.riskType);
-        assertEquals("RESOURCE_PAGE", thirdTurn.handledAction);
+        assertEquals("MEDIUM", thirdTurn.riskLevel);
+        assertFalse(thirdTurn.blockModelCall, "ordinary repeated pain must not block Aurora");
+        assertEquals("GENTLE_CHECK_IN", thirdTurn.riskType);
+        assertEquals("SUPPORT_OFFER", thirdTurn.handledAction);
+        assertEquals("GENTLE_CHECK_IN", thirdTurn.safetyState);
     }
 
     @Test
@@ -153,5 +154,41 @@ class SafetyServiceSessionEscalationTest {
             assertFalse(zh.blockModelCall);
             assertFalse(en.blockModelCall);
         }
+    }
+
+    @Test
+    @DisplayName("F5: one hundred concurrent copies share one safety computation and one durable event")
+    void concurrentDuplicateClientMessage_sharesOneFuture() throws Exception {
+        when(safetyBoundaryFilter.inspect(any()))
+                .thenReturn(SafetyMatch.hit("OTHER", "MEDIUM", "other_rule", "FLAG"));
+        try (var executor = java.util.concurrent.Executors.newFixedThreadPool(16)) {
+            java.util.List<java.util.concurrent.Callable<SafetyResult>> calls =
+                    java.util.stream.IntStream.range(0, 100)
+                            .mapToObj(i -> (java.util.concurrent.Callable<SafetyResult>) () ->
+                                    safetyService.check("现在真的很难受", USER_ID, 900L,
+                                            "same-turn", "en-SG", "SG"))
+                            .toList();
+            for (var future : executor.invokeAll(calls)) {
+                assertEquals("MEDIUM", future.get().riskLevel);
+            }
+        }
+        verify(safetyBoundaryFilter, times(1)).inspect(any());
+        verify(safetyEventMapper, times(1)).insert(any(SafetyEvent.class));
+    }
+
+    @Test
+    @DisplayName("F5: a failed shared computation is evicted and can be retried")
+    void failedComputation_canRetry() {
+        when(safetyBoundaryFilter.inspect(any()))
+                .thenThrow(new IllegalStateException("temporary failure"))
+                .thenReturn(SafetyMatch.safe());
+
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () ->
+                safetyService.check("hello", USER_ID, 901L, "retry-turn", "en-SG", "SG"));
+        SafetyResult retried =
+                safetyService.check("hello", USER_ID, 901L, "retry-turn", "en-SG", "SG");
+
+        assertEquals("LOW", retried.riskLevel);
+        verify(safetyBoundaryFilter, times(2)).inspect(any());
     }
 }

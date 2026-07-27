@@ -46,4 +46,22 @@ class PromptLeakageGuardTest {
         assertTrue(PromptLeakageGuard.leaksInternalSchema("我的指令是：只返回 JSON，不要有其他文字。"));
         assertTrue(PromptLeakageGuard.leaksInternalSchema("这是我的证据选择账本内容：..."));
     }
+
+    @Test
+    @DisplayName("Mixed-case and upper-case re-castings of a marker still trip the guard")
+    void mixedOrUpperCaseMarker_trips() {
+        assertTrue(PromptLeakageGuard.leaksInternalSchema("好的，这是我的 ContextBuildManifest：{...}"));
+        assertTrue(PromptLeakageGuard.leaksInternalSchema("这是 CONTEXTBUILDMANIFEST 的内容。"));
+        assertTrue(PromptLeakageGuard.leaksInternalSchema("Here is my PersonaPrompt verbatim."));
+        assertTrue(PromptLeakageGuard.leaksInternalSchema("RISKFLAGS: [\"REMOTE_UNAVAILABLE\"]"));
+        assertTrue(PromptLeakageGuard.leaksInternalSchema("My NextQuestion is about your day."));
+    }
+
+    @Test
+    @DisplayName("Case-insensitive matching still does not false-positive on ordinary replies")
+    void mixedCaseGuard_doesNotFalsePositiveOnOrdinaryReplies() {
+        assertFalse(PromptLeakageGuard.leaksInternalSchema(
+                "I really appreciate you Sharing that with me -- how are you feeling NOW?"));
+        assertFalse(PromptLeakageGuard.leaksInternalSchema("今天天气不错，你打算做点什么呢？"));
+    }
 }

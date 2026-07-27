@@ -4,13 +4,14 @@ import com.innercosmos.common.ApiResponse;
 import com.innercosmos.dto.SafetyCheckRequest;
 import com.innercosmos.service.SafetyService;
 import com.innercosmos.vo.SafetyResult;
+import com.innercosmos.vo.SafetyResourceVO;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/safety")
+@RequestMapping({"/api/safety", "/api/v1/safety"})
 public class SafetyController extends BaseController {
     private final SafetyService safetyService;
 
@@ -23,6 +24,13 @@ public class SafetyController extends BaseController {
             @RequestParam(required = false) String locale,
             @RequestParam(required = false) String region) {
         return ApiResponse.ok(safetyService.resources(locale, region));
+    }
+
+    @GetMapping("/resources/catalog")
+    public ApiResponse<List<SafetyResourceVO>> resourceCatalog(
+            @RequestParam(required = false) String locale,
+            @RequestParam(required = false) String region) {
+        return ApiResponse.ok(safetyService.resourceCatalog(locale, region));
     }
 
     @PostMapping("/check")

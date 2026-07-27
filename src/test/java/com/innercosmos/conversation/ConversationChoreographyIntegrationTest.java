@@ -12,8 +12,12 @@ import com.innercosmos.exception.BusinessException;
 import com.innercosmos.mapper.DialogMessageMapper;
 import com.innercosmos.mapper.DialogSessionMapper;
 import com.innercosmos.mapper.TurnPlanMapper;
+import com.innercosmos.mapper.ConversationTurnMapper;
 import com.innercosmos.vo.AuroraReplyVO;
 import java.time.LocalDateTime;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -30,6 +34,7 @@ class ConversationChoreographyIntegrationTest {
     @Autowired DialogSessionMapper sessionMapper;
     @Autowired DialogMessageMapper messageMapper;
     @Autowired TurnPlanMapper planMapper;
+    @Autowired ConversationTurnMapper turnMapper;
 
     @Test
     void persistsReplayableOneToThreeBubbleLifecycleWithoutChangingContent() {
@@ -153,10 +158,18 @@ class ConversationChoreographyIntegrationTest {
                 .containsExactlyElementsOf(fixture.reply.messages);
         assertThat(stopped.events).extracting(e -> e.eventType)
                 .contains("BUBBLE_COMMITTED", "BUBBLE_CANCELLED", "TURN_INTERRUPTED");
-        assertThat(choreography.latestInterruptionContext(fixture.userId, fixture.session.id))
-                .contains("已说出的内容：已经说出的第一条 / 不再发送")
-                .contains("原计划但未发送的内容：的第二条 / 不再发送的第三条")
-                .contains("不要重复已说内容");
+        String interruption = choreography.latestInterruptionContext(
+                fixture.userId, fixture.session.id, "等等，我现在想说另一件事");
+        assertThat(interruption)
+                .contains("\"deliveredContent\"")
+                .contains("\"cancelledBubblePurposes\"")
+                .contains("\"newUserMessage\":\"等等，我现在想说另一件事\"")
+                .contains("\"continuityDecision\":\"MERGE\"")
+                .contains("\"changedFacts\"")
+                .contains("\"mustNotRepeat\"")
+                .doesNotContain("的第二条", "不再发送的第三条");
+        assertThat(stopped.interruptionDelta).isNotNull();
+        assertThat(stopped.interruptionDelta.deliveredContent).isNotEmpty();
     }
 
     @Test
@@ -213,6 +226,157 @@ class ConversationChoreographyIntegrationTest {
 
         assertThat(invoked).isFalse();
         assertThat(result.bubbles).singleElement().extracting(b -> b.status).isEqualTo("COMMITTED");
+    }
+
+    @Test
+    void expiredLeaseIsTakenOverWithHigherFenceAndOldPodCannotCommit() {
+        Fixture fixture = fixture(81010L, List.of("已经安全生成，等待接管交付"));
+        TurnTimelineVO started = choreography.beginTurn(
+                fixture.userId, fixture.session.id, fixture.userMessage.id);
+        choreography.commitPlan(fixture.userId, started.turn.id, fixture.reply);
+        var first = choreography.claimDeliveryLease(
+                fixture.userId, started.turn.id, "pod-a", Duration.ofSeconds(30));
+
+        var persisted = turnMapper.selectById(started.turn.id);
+        persisted.leaseExpiresAt = LocalDateTime.ofInstant(
+                Instant.now().minusSeconds(1), ZoneOffset.UTC);
+        turnMapper.updateById(persisted);
+        var takeover = choreography.claimDeliveryLease(
+                fixture.userId, started.turn.id, "pod-b", Duration.ofSeconds(30));
+
+        assertThat(takeover.fencingToken()).isGreaterThan(first.fencingToken());
+        AtomicBoolean staleSupplierInvoked = new AtomicBoolean(false);
+        assertThatThrownBy(() -> choreography.deliverBubbleFenced(
+                fixture.userId, started.turn.id, 1,
+                first.owner(), first.fencingToken(), Duration.ofSeconds(30), () -> {
+                    staleSupplierInvoked.set(true);
+                    return fixture.auroraMessages.getFirst();
+                })).isInstanceOf(BusinessException.class)
+                .hasMessageContaining("superseded");
+        assertThat(staleSupplierInvoked).isFalse();
+
+        TurnTimelineVO delivered = choreography.deliverBubbleFenced(
+                fixture.userId, started.turn.id, 1,
+                takeover.owner(), takeover.fencingToken(), Duration.ofSeconds(30),
+                () -> fixture.auroraMessages.getFirst());
+        TurnTimelineVO completed = choreography.completeTurnFenced(
+                fixture.userId, started.turn.id, takeover.owner(), takeover.fencingToken());
+
+        assertThat(delivered.bubbles).singleElement()
+                .extracting(b -> b.status).isEqualTo("COMMITTED");
+        assertThat(completed.turn.status).isEqualTo("COMPLETED");
+        assertThat(completed.events).extracting(e -> e.eventType)
+                .contains("DELIVERY_LEASE_CLAIMED", "BUBBLE_COMMITTED", "TURN_COMPLETED");
+    }
+
+    @Test
+    void secondPodCannotClaimAnUnexpiredAuthoritativeLease() {
+        Fixture fixture = fixture(81011L, List.of("同一权威回合"));
+        TurnTimelineVO started = choreography.beginTurn(
+                fixture.userId, fixture.session.id, fixture.userMessage.id);
+        choreography.commitPlan(fixture.userId, started.turn.id, fixture.reply);
+
+        var first = choreography.claimDeliveryLease(
+                fixture.userId, started.turn.id, "pod-a", Duration.ofSeconds(30));
+        var competing = choreography.claimDeliveryLease(
+                fixture.userId, started.turn.id, "pod-b", Duration.ofSeconds(30));
+
+        assertThat(first).isNotNull();
+        assertThat(competing).isNull();
+        assertThat(choreography.timeline(fixture.userId, started.turn.id).turn.leaseOwner)
+                .isEqualTo("pod-a");
+    }
+
+    @Test
+    void providerCrashBeforeFirstAssistantContentRegeneratesUnderOneGenerationFence() {
+        Fixture fixture = fixture(81014L, List.of("鍙湁鎺ョ Pod 鍙互鎻愪氦杩欎釜璁″垝"));
+        TurnTimelineVO started = choreography.beginTurn(
+                fixture.userId, fixture.session.id, fixture.userMessage.id);
+        var snapshot = choreography.stageGenerationRequest(
+                fixture.userId, started.turn.id, fixture.session.id, fixture.userMessage.id,
+                "DAILY_TALK", "zh-CN", "CN", "Asia/Shanghai",
+                "aurora-context.v1", true);
+        var oldProvider = choreography.claimGenerationLease(
+                fixture.userId, started.turn.id, "pod-a:generation", Duration.ofSeconds(30));
+
+        var persisted = turnMapper.selectById(started.turn.id);
+        persisted.leaseExpiresAt = LocalDateTime.ofInstant(
+                Instant.now().minusSeconds(1), ZoneOffset.UTC);
+        turnMapper.updateById(persisted);
+        var takeover = choreography.claimGenerationLease(
+                fixture.userId, started.turn.id, "pod-b:generation", Duration.ofSeconds(30));
+
+        assertThat(snapshot.userMessageId()).isEqualTo(fixture.userMessage.id);
+        assertThat(snapshot.contextVersion()).isEqualTo("aurora-context.v1");
+        assertThat(takeover.fencingToken()).isGreaterThan(oldProvider.fencingToken());
+        assertThatThrownBy(() -> choreography.commitPlanFenced(
+                fixture.userId, started.turn.id, fixture.reply,
+                oldProvider.owner(), oldProvider.fencingToken()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("superseded");
+
+        TurnTimelineVO regenerated = choreography.commitPlanFenced(
+                fixture.userId, started.turn.id, fixture.reply,
+                takeover.owner(), takeover.fencingToken());
+        var immediateDelivery = choreography.claimDeliveryLease(
+                fixture.userId, started.turn.id, "pod-b:delivery", Duration.ofSeconds(30));
+
+        assertThat(regenerated.activePlan).isNotNull();
+        assertThat(regenerated.bubbles).hasSize(1);
+        assertThat(immediateDelivery)
+                .as("committed generation must release its lease without timestamp rounding residue")
+                .isNotNull();
+        assertThat(immediateDelivery.fencingToken()).isGreaterThan(takeover.fencingToken());
+        assertThat(regenerated.events).extracting(e -> e.eventType)
+                .contains("GENERATION_REQUEST_STAGED", "GENERATION_LEASE_CLAIMED", "PLAN_COMMITTED");
+    }
+
+    @Test
+    void staleProviderGenerationWithoutPersistedPlanFailsExplicitly() {
+        Fixture fixture = fixture(81012L, List.of("provider 尚未安全生成"));
+        TurnTimelineVO started = choreography.beginTurn(
+                fixture.userId, fixture.session.id, fixture.userMessage.id);
+
+        TurnTimelineVO failed = choreography.failUnrecoverableGeneration(
+                fixture.userId, started.turn.id, LocalDateTime.now().plusMinutes(1),
+                "PROVIDER_GENERATION_LOST_WITH_RUNTIME");
+
+        assertThat(failed.turn.status).isEqualTo("FAILED");
+        assertThat(failed.activePlan).isNull();
+        assertThat(failed.bubbles).isEmpty();
+        assertThat(failed.events).extracting(e -> e.eventType)
+                .contains("GENERATION_DISCARDED", "TURN_FAILED");
+    }
+
+    @Test
+    void userSafeDeliberationSnapshotsAreMonotonicAndRejectHiddenReasoning() {
+        Fixture fixture = fixture(81013L, List.of("speaker 尚未开始"));
+        TurnTimelineVO started = choreography.beginTurn(
+                fixture.userId, fixture.session.id, fixture.userMessage.id);
+
+        TurnTimelineVO revisionOne = choreography.stageDeliberation(
+                fixture.userId, started.turn.id, 0,
+                "{\"topicState\":{\"activeTopicId\":\"novel\"},"
+                        + "\"responsePlan\":{\"bubblePurposes\":[\"continue-current-thread\"]}}");
+
+        assertThat(revisionOne.deliberations).singleElement()
+                .satisfies(snapshot -> {
+                    assertThat(snapshot.planRevision).isEqualTo(1);
+                    assertThat(snapshot.status).isEqualTo("STAGED");
+                    assertThat(snapshot.snapshotJson).contains("continue-current-thread");
+                });
+        assertThat(revisionOne.events).extracting(e -> e.eventType)
+                .contains("DELIBERATION_STAGED");
+        assertThatThrownBy(() -> choreography.stageDeliberation(
+                fixture.userId, started.turn.id, 0,
+                "{\"responsePlan\":{}}"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("superseded");
+        assertThatThrownBy(() -> choreography.stageDeliberation(
+                fixture.userId, started.turn.id, 1,
+                "{\"chainOfThought\":\"hidden provider reasoning\"}"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("forbidden");
     }
 
     private Fixture fixture(Long userId, List<String> replies) {

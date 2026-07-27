@@ -1,3 +1,4 @@
+import { demoContentText } from "../demoContentLocale";
 import type { Locale } from "../i18n";
 
 export function TodayOverview({ memoryCount, latestMemory, arrivedLetters, latestLetter,
@@ -14,18 +15,19 @@ export function TodayOverview({ memoryCount, latestMemory, arrivedLetters, lates
   const en = locale === "en-SG";
   const localisedLatestMemory = en && latestMemory === "今日沉淀"
     ? "Today's reflection"
-    : latestMemory;
-  return <section className="today-overview" aria-label={en ? "Your Inner Cosmos today" : "今天的内宇宙概览"}>
+    : demoContentText(latestMemory, locale);
+  const localisedLatestLetter = demoContentText(latestLetter, locale);
+  return <section className="today-overview" aria-label={en ? "Today outside the conversation" : "今天的其他更新"}>
     <div className="today-overview-heading">
-      <div><span className="eyebrow">{en ? "YOUR COSMOS, TODAY" : "今日 · 内宇宙"}</span>
-        <h2>{en ? "Nothing important is buried." : "重要的变化，不必再翻很久才能看见"}</h2></div>
+      <div><span className="eyebrow">{en ? "TODAY'S UPDATES" : "今天的其他更新"}</span>
+        <h2>{en ? "Continue when you need to" : "需要时再继续"}</h2></div>
       <button type="button" className="today-write-letter" onClick={onWriteLetter}>
         {en ? "Write a slow letter" : "写一封慢信"}
       </button>
     </div>
     <div className="today-overview-grid">
       <button type="button" onClick={onOpenCosmos}>
-        <span>{en ? "Memory alive" : "正在生长的记忆"}</span>
+        <span>{en ? "Saved memories" : "已保存的记忆"}</span>
         <strong>{memoryCount}</strong>
         <small>{localisedLatestMemory ?? (en ? "Start by telling Aurora what happened today." : "从告诉 Aurora 今天发生了什么开始")}</small>
         <em>{en ? "Open the cosmos" : "进入内宇宙 →"}</em>
@@ -33,13 +35,13 @@ export function TodayOverview({ memoryCount, latestMemory, arrivedLetters, lates
       <button type="button" onClick={onOpenLetters}>
         <span>{en ? "Letters arrived" : "抵达的慢信"}</span>
         <strong>{arrivedLetters}</strong>
-        <small>{latestLetter ?? (en ? "No new arrival; waiting is part of the letter." : "还没有新抵达；等待也是信的一部分")}</small>
+        <small>{localisedLatestLetter || (en ? "No new letters have arrived." : "还没有新抵达的慢信")}</small>
         <em>{en ? "Read and reply" : "阅读与回信 →"}</em>
       </button>
       <button type="button" onClick={onOpenResonance}>
-        <span>{en ? "Resonance in the world" : "在星海里的侧影"}</span>
+        <span>{en ? "Public capsules" : "公开共鸣体"}</span>
         <strong>{publicCapsules}</strong>
-        <small>{en ? "Meet a facet before deciding about a person." : "先遇见一个侧影，再决定要不要靠近一个人"}</small>
+        <small>{en ? "Try a conversation with an authorised AI capsule." : "和授权的 AI 共鸣体体验一次对话"}</small>
         <em>{en ? "Go to resonance" : "去共鸣广场 →"}</em>
       </button>
       <button type="button" onClick={onOpenReturns}>

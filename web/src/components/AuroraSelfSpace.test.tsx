@@ -22,7 +22,7 @@ describe("AuroraSelfSpace", () => {
   it("renders the continuous-self surface in Chinese by default", () => {
     render(<AuroraSelfSpace evolution={evolution} busy={false} onPropose={() => undefined}
       onEvaluate={() => undefined} onActivate={() => undefined} onRollback={() => undefined} />);
-    expect(screen.getByRole("heading", { name: "她最近学会了什么" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "记忆与回应方式" })).toBeVisible();
     expect(screen.getByText("评测通过，等你确认")).toBeVisible();
     expect(screen.getByRole("button", { name: "允许她记住这次成长" })).toBeEnabled();
   });

@@ -71,6 +71,13 @@ spring:
       await-termination-period: 30s
 
 management:
+  # Keep the scrape contract explicit. Exposure alone only publishes an endpoint that has an
+  # exporter-backed registry; without this bean /actuator/prometheus is a real 404 even though
+  # "prometheus" appears in management.endpoints.web.exposure.include.
+  prometheus:
+    metrics:
+      export:
+        enabled: true
   metrics:
     distribution:
       percentiles-histogram:
@@ -138,6 +145,30 @@ memory:
     dimensions: ${MEMORY_EMBEDDING_DIMENSIONS:1536}
     rebuild-batch-size: ${MEMORY_EMBEDDING_REBUILD_BATCH_SIZE:50}
     rebuild-delay-ms: ${MEMORY_EMBEDDING_REBUILD_DELAY_MS:60000}
+    # The query embed runs on the interactive Aurora turn, so both phases are bounded. Without a
+    # read timeout an unresponsive provider socket hangs the turn (and the thread) indefinitely.
+    connect-timeout-ms: ${MEMORY_EMBEDDING_CONNECT_TIMEOUT_MS:3000}
+    read-timeout-ms: ${MEMORY_EMBEDDING_READ_TIMEOUT_MS:8000}
+  retrieval:
+    semantic-calibration:
+      # Leave disabled to use MemorySemanticCalibrationConfig's built-in starting thresholds, which
+      # let provider vectors contribute out of the box. Enable this ONLY with thresholds fitted on
+      # labeled data for the exact provider/model/version below -- once enabled, an identity
+      # mismatch (e.g. after a model upgrade) deliberately falls back to lexical-only retrieval
+      # rather than reusing thresholds fitted against a different model.
+      enabled: ${MEMORY_SEMANTIC_CALIBRATION_ENABLED:false}
+      provider: ${MEMORY_SEMANTIC_CALIBRATION_PROVIDER:}
+      model: ${MEMORY_SEMANTIC_CALIBRATION_MODEL:}
+      version: ${MEMORY_SEMANTIC_CALIBRATION_VERSION:}
+      locales:
+        # Only read when `enabled` is true. Cosine similarity cannot exceed 1.0, so the previous
+        # 1.1 defaults meant "enabled" still admitted nothing -- these are reachable values.
+        zh-CN:
+          absolute-threshold: ${MEMORY_SEMANTIC_CALIBRATION_ZH_ABSOLUTE:0.50}
+          min-top1-top2-margin: ${MEMORY_SEMANTIC_CALIBRATION_ZH_MARGIN:0.0}
+        en:
+          absolute-threshold: ${MEMORY_SEMANTIC_CALIBRATION_EN_ABSOLUTE:0.45}
+          min-top1-top2-margin: ${MEMORY_SEMANTIC_CALIBRATION_EN_MARGIN:0.0}
 
 capsule:
   embedding:
@@ -159,11 +190,50 @@ llm:
   allow-fallback: ${LLM_ALLOW_FALLBACK:true}
   disable-thinking-mode: ${LLM_DISABLE_THINKING_MODE:true}
   asr-provider: ${ASR_PROVIDER:mock}
-  failover-providers: ${LLM_FAILOVER_PROVIDERS:glm,minimax}
+  failover-providers: ${LLM_FAILOVER_PROVIDERS:gemini,minimax,mimo,glm,deepseek}
   prompt:
     # Auto follows the user's latest meaningful language. Classroom operators may still pin
     # en-SG/zh-CN explicitly, but a multilingual product must not force every account globally.
     language: ${LLM_PROMPT_LANGUAGE:auto}
+  context:
+    # Product hard ceiling. The actual input limit is the minimum of this value and the
+    # selected provider window after reserving output tokens and a safety margin.
+    hard-max-input-tokens: ${AURORA_CONTEXT_HARD_MAX_INPUT_TOKENS:200000}
+    output-reserve-tokens: ${AURORA_CONTEXT_OUTPUT_RESERVE_TOKENS:8192}
+    safety-margin-tokens: ${AURORA_CONTEXT_SAFETY_MARGIN_TOKENS:4096}
+    default-provider-window-tokens: ${AURORA_CONTEXT_DEFAULT_PROVIDER_WINDOW_TOKENS:128000}
+    opening-anchor-tokens: ${AURORA_CONTEXT_OPENING_ANCHOR_TOKENS:2048}
+    critical-anchor-tokens: ${AURORA_CONTEXT_CRITICAL_ANCHOR_TOKENS:4096}
+    provider-window-tokens:
+      deepseek: ${DEEPSEEK_CONTEXT_WINDOW_TOKENS:1000000}
+      glm: ${GLM_CONTEXT_WINDOW_TOKENS:200000}
+      mimo: ${MIMO_CONTEXT_WINDOW_TOKENS:1000000}
+      minimax: ${MINIMAX_CONTEXT_WINDOW_TOKENS:204800}
+      gemini: ${GEMINI_CONTEXT_WINDOW_TOKENS:1048576}
+      mock: ${MOCK_CONTEXT_WINDOW_TOKENS:200000}
+  gemini:
+    api-key: ${GEMINI_API_KEY:}
+    model: ${GEMINI_MODEL:gemini-3.6-flash}
+    base-url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com/v1beta}
+    thinking-level: ${GEMINI_THINKING_LEVEL:medium}
+    timeout-ms: ${GEMINI_TIMEOUT_MS:30000}
+  aurora-stages:
+    enabled: ${AURORA_STAGE_ROUTING_ENABLED:true}
+    fast-model: ${AURORA_FAST_MODEL:gemini-3.5-flash-lite}
+    speaker-model: ${AURORA_SPEAKER_MODEL:gemini-3.6-flash}
+    thinker-model: ${AURORA_THINKER_MODEL:deepseek-v4-pro}
+    speaker-thinking-level: ${AURORA_SPEAKER_THINKING_LEVEL:medium}
+    thinker-reasoning-effort: ${AURORA_THINKER_REASONING_EFFORT:high}
+    # Sampling is applied only by providers/models that support it. Gemini 3.5/3.6
+    # intentionally omit deprecated temperature/top-p/top-k fields.
+    fast-temperature: ${AURORA_FAST_TEMPERATURE:0.25}
+    speaker-temperature: ${AURORA_SPEAKER_TEMPERATURE:0.82}
+    thinker-temperature: ${AURORA_THINKER_TEMPERATURE:0.10}
+    critic-temperature: ${AURORA_CRITIC_TEMPERATURE:0.05}
+    fast-max-tokens: ${AURORA_FAST_MAX_TOKENS:256}
+    speaker-max-tokens: ${AURORA_SPEAKER_MAX_TOKENS:6144}
+    thinker-max-tokens: ${AURORA_THINKER_MAX_TOKENS:8192}
+    critic-max-tokens: ${AURORA_CRITIC_MAX_TOKENS:2048}
   mimo:
     api-key: ${MIMO_API_KEY:}
     model: ${MIMO_MODEL:mimo-v2.5}
@@ -193,10 +263,19 @@ llm:
     timeout-ms: ${DEEPSEEK_TIMEOUT_MS:30000}
 
 inner-cosmos:
+  experience:
+    # Demo/product default: remove repeated disclaimers and lexical "UNSUPPORTED" dead ends while
+    # retaining crisis interception, authorization, leakage gates and blocked-topic enforcement.
+    # Set false for the older compliance-heavy presentation without changing code.
+    experience-first: ${INNER_COSMOS_EXPERIENCE_FIRST:true}
+    default-capsule-privacy: ${INNER_COSMOS_DEFAULT_CAPSULE_PRIVACY:BALANCED}
   aurora:
     # The dual kernel is the product path. Adaptive/single remain explicit experiment modes only;
     # latency is handled through progressive foreground acknowledgement, not by bypassing depth.
     runtime: ${AURORA_RUNTIME_MODE:dual}
+    deliberation:
+      # Current-turn planning is the product default. The legacy next-turn pipeline is rollback-only.
+      execution: ${AURORA_DELIBERATION_EXECUTION:current-turn}
     stream:
       redis:
         enabled: ${REDIS_AURORA_STREAM_ENABLED:false}
@@ -253,6 +332,10 @@ inner-cosmos:
         capacity: ${RATE_LIMIT_AURORA_CAPACITY:5}
         refill-per-minute: ${RATE_LIMIT_AURORA_REFILL_PER_MINUTE:5}
         advertised-limit: ${RATE_LIMIT_AURORA_ADVERTISED:120}
+      model-backed:
+        capacity: ${RATE_LIMIT_MODEL_BACKED_CAPACITY:10}
+        refill-per-minute: ${RATE_LIMIT_MODEL_BACKED_REFILL_PER_MINUTE:10}
+        advertised-limit: ${RATE_LIMIT_MODEL_BACKED_ADVERTISED:60}
       login:
         capacity: ${RATE_LIMIT_LOGIN_CAPACITY:10}
         refill-per-minute: ${RATE_LIMIT_LOGIN_REFILL_PER_MINUTE:10}

@@ -106,6 +106,53 @@ class CuratedDemoCapsuleJourneyTest {
     }
 
     @Test
+    void allOfficialSeedsAppearPubliclyAndOneCompletesAThreeTurnDemoTrajectory() throws Exception {
+        MockHttpSession visitor = loginAsAdmin();
+        JsonNode capsules = objectMapper.readTree(mockMvc.perform(get("/api/plaza/capsules").session(visitor))
+                        .andExpect(status().isOk()).andReturn().getResponse().getContentAsString())
+                .path("data");
+        java.util.Map<String, Long> visible = new java.util.LinkedHashMap<>();
+        for (JsonNode capsule : capsules) {
+            String name = capsule.path("pseudonym").asText();
+            if (SeedCapsuleContent.seeds().stream().anyMatch(seed -> seed.name().equals(name))) {
+                visible.put(name, capsule.path("id").asLong());
+            }
+        }
+        assertTrue(visible.size() == 10, "the plaza must expose all ten official seed capsules: " + visible.keySet());
+        for (var seed : SeedCapsuleContent.seeds()) {
+            var entity = echoCapsuleMapper.selectById(visible.get(seed.name()));
+            assertTrue(Boolean.TRUE.equals(entity.isPublic));
+            assertTrue("PUBLIC".equals(entity.visibilityStatus));
+            assertTrue("SEED_CAPSULE".equals(entity.capsuleType));
+        }
+
+        long luoId = visible.get("Luo");
+        MvcResult created = mockMvc.perform(post("/api/v1/persona-chat/session/create")
+                        .session(visitor)
+                        .header("Idempotency-Key", "official-seed-trajectory")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"capsuleId\":" + luoId + "}"))
+                .andExpect(status().isOk()).andReturn();
+        long sessionId = objectMapper.readTree(created.getResponse().getContentAsString())
+                .path("data").path("id").asLong();
+        java.util.Set<String> replies = new java.util.LinkedHashSet<>();
+        int turn = 0;
+        for (String message : java.util.List.of("论文完全写不动了", "还是觉得第一步很重", "我已经写下标题了")) {
+            MvcResult response = mockMvc.perform(post("/api/v1/persona-chat/message")
+                            .session(visitor)
+                            .header("Idempotency-Key", "official-seed-turn-" + (++turn))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(java.util.Map.of(
+                                    "sessionId", sessionId, "message", message))))
+                    .andExpect(status().isOk()).andReturn();
+            replies.add(objectMapper.readTree(response.getResponse().getContentAsString())
+                    .path("data").path("textContent").asText());
+        }
+        assertTrue(replies.size() == 3, "three real service turns must not repeat: " + replies);
+        assertTrue(replies.stream().noneMatch(reply -> reply.contains("有限的数字回声")));
+    }
+
+    @Test
     void everyCuratedPersonaStartsWithAnArrivedStorySpecificSlowLetter() throws Exception {
         assertInboxContains("demo", "Turning a large vision into one small square of today");
         assertInboxContains("river", "You didn't rush to choose one city, and I felt myself exhale");

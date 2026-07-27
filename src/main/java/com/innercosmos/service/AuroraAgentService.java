@@ -1,6 +1,7 @@
 package com.innercosmos.service;
 
 import com.innercosmos.dto.ChatRequest;
+import com.innercosmos.conversation.service.ConversationChoreographyService;
 import com.innercosmos.vo.AuroraReplyVO;
 import com.innercosmos.vo.AuroraForegroundVO;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -28,4 +29,14 @@ public interface AuroraAgentService {
     ChatRequest consumeStage(Long userId, String token);
 
     AuroraReplyVO generateGreeting(Long userId, Long sessionId, String mode);
+
+    /**
+     * Regenerate an existing turn from its minimal durable request reference. This entry never
+     * saves another user message and never begins another turn.
+     */
+    AuroraReplyVO resumeExistingTurn(
+            Long userId,
+            ConversationChoreographyService.GenerationRequestSnapshot snapshot,
+            String generationLeaseOwner,
+            long generationFencingToken);
 }

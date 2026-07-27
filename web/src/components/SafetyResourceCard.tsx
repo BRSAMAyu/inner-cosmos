@@ -1,4 +1,6 @@
+import { useEffect, useRef } from "react";
 import type { AuroraSafetyAlert } from "../hooks/useAuroraSession";
+import type { SafetyResource } from "../api";
 import type { Locale } from "../i18n";
 import { SafetyResourceList } from "./SafetyResourceList";
 
@@ -9,15 +11,12 @@ import { SafetyResourceList } from "./SafetyResourceList";
 // deliberately persistent (stays mounted until the user explicitly dismisses it) and visually distinct
 // (role="alert", warm-but-urgent accent, not just more banner text).
 //
-// `resources` is the real, already-vetted list from GET /api/safety/resources (SafetyServiceImpl.resources()
-// -- see its own M-002 comment), the same content the legacy safety-harbor.html rendered -- never
-// invented here. Only the generic "contact local emergency services" line below is hardcoded, because
-// it needs no locale-specific verification. Singapore-specific resources are a separate, tracked gap
-// (ledger item SG-PRODUCT) pending local/legal verification -- do not add specific SG hotline numbers
-// here until that sign-off exists.
+// `resources` comes from the region-bound catalog and carries its own verified authority metadata.
 const COPY = {
   "zh-CN": {
     heading: "先照顾好自己",
+    gentleHeading: "先确认一下此刻的安全",
+    gentleResources: "需要时展开支持资源",
     genericSafety: "如果你现在有生命危险，请立即拨打当地紧急电话，或前往最近的急诊室。",
     dial: "拨打 ",
     openHarbor: "打开安全避风港（呼吸练习与着陆练习）",
@@ -25,6 +24,8 @@ const COPY = {
   },
   "en-SG": {
     heading: "Take care of yourself first",
+    gentleHeading: "A gentle safety check-in",
+    gentleResources: "Expand local support when you want it",
     genericSafety: "If you are in immediate danger, please call your local emergency number now, or go to the nearest emergency department.",
     dial: "Call ",
     openHarbor: "Open the safety harbor (breathing & grounding exercises)",
@@ -34,19 +35,37 @@ const COPY = {
 
 export function SafetyResourceCard({ alert, resources, locale, onDismiss, onOpenHarbor }: {
   alert: AuroraSafetyAlert | null;
-  resources: string[];
+  resources: SafetyResource[];
   locale: Locale;
   onDismiss: () => void;
   onOpenHarbor?: () => void;
 }) {
-  // Only a HIGH decision earns a persistent, interruptive resource wall. MEDIUM support stays
-  // inside Aurora's conversation; LOW/NONE remain invisible. This guard also protects the UI if
-  // a future transport accidentally emits a non-blocking safety event.
-  if (!alert || alert.riskLevel !== "HIGH") return null;
+  const urgentRef = useRef<HTMLElement>(null);
+  const high = alert?.riskLevel === "HIGH";
+  const gentle = alert?.safetyState === "GENTLE_CHECK_IN";
+  useEffect(() => {
+    if (high) urgentRef.current?.focus();
+  }, [high]);
+  if (!alert || (!high && !gentle)) return null;
   const t = COPY[locale];
+  if (gentle) {
+    return (
+      <aside className="safety-resource-card is-gentle" role="status" aria-live="polite" lang={locale}>
+        <strong>{t.gentleHeading}</strong>
+        {alert.safeMessage && <p>{alert.safeMessage}</p>}
+        <details>
+          <summary>{t.gentleResources}</summary>
+          <SafetyResourceList resources={resources} dialLabel={t.dial} />
+          {onOpenHarbor && <button type="button" className="quiet" onClick={onOpenHarbor}>{t.openHarbor}</button>}
+        </details>
+        <button type="button" className="quiet" onClick={onDismiss}>{t.dismiss}</button>
+      </aside>
+    );
+  }
   return (
-    <aside className="safety-resource-card" role="alert" aria-live="assertive" lang={locale}>
-      <strong>{t.heading}</strong>
+    <aside ref={urgentRef} tabIndex={-1} className="safety-resource-card" role="alert"
+      aria-live="assertive" aria-labelledby="urgent-safety-heading" lang={locale}>
+      <strong id="urgent-safety-heading">{t.heading}</strong>
       {alert.safeMessage && <p>{alert.safeMessage}</p>}
       <p>{t.genericSafety}</p>
       <SafetyResourceList resources={resources} dialLabel={t.dial} />
