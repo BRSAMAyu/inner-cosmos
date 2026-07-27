@@ -17,6 +17,22 @@ describe("ClaimCandidateReview", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it("hides a low-evidence expression-style guess from older deployments", () => {
+    const { container } = render(<ClaimCandidateReview candidates={[candidate({
+      claimType: "EXPRESSION_STYLE", confidence: 0.65, provenanceMessageIds: [101, 102]
+    })]} onConfirm={() => undefined} onDismiss={() => undefined} />);
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("shows expression style only after six distinct evidence messages", () => {
+    render(<ClaimCandidateReview candidates={[candidate({
+      claimType: "EXPRESSION_STYLE", confidence: 0.8,
+      provenanceMessageIds: [101, 102, 103, 104, 105, 106]
+    })]} locale="en-SG" onConfirm={() => undefined} onDismiss={() => undefined} />);
+    expect(screen.getByText("Expression style")).toBeVisible();
+    expect(screen.getByText(/from 6 moments/)).toBeVisible();
+  });
+
   it("shows the friendly type, value, evidence, confidence and provenance count", () => {
     render(<ClaimCandidateReview candidates={[candidate()]} onConfirm={() => undefined} onDismiss={() => undefined} />);
     expect(screen.getByText("偏好")).toBeVisible();

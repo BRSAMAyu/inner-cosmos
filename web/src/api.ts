@@ -265,7 +265,7 @@ export type CapsuleMatch = {
 export type PersonaSession = { id: number; capsuleId: number; status: string; turnCount: number; dailyLimit: number };
 export type PersonaMessage = { id: number; sessionId: number; senderType: "VISITOR" | "CAPSULE"; textContent: string };
 export type CapsuleQuota = {
-  turnCount: number; remaining: number; dailyLimit: number; seed: boolean; quotaDate: string;
+  turnCount: number; remaining: number; dailyLimit: number; seed: boolean; quotaDate: string; unlimited?: boolean;
 };
 export type DialogSessionSummary = {
   id: number;
@@ -651,6 +651,27 @@ function apiCopy(english: string, chinese: string): string {
   return englishUi() ? english : chinese;
 }
 
+export class ApiRateLimitError extends Error {
+  constructor(public readonly retryAfterSeconds: number) {
+    super(apiCopy(
+      `Aurora is receiving messages too quickly. Please retry in about ${retryAfterSeconds} seconds; your draft is still here.`,
+      `消息发送得太快了，请约 ${retryAfterSeconds} 秒后重试；你的输入仍然保留。`
+    ));
+    this.name = "ApiRateLimitError";
+  }
+}
+
+function retryAfterSeconds(response: Response, body?: ApiEnvelope<unknown>): number {
+  const header = Number.parseInt(response.headers.get("Retry-After") ?? "", 10);
+  if (Number.isFinite(header) && header > 0) return header;
+  const data = body?.data;
+  if (data && typeof data === "object" && "retryAfter" in data) {
+    const value = Number((data as { retryAfter?: unknown }).retryAfter);
+    if (Number.isFinite(value) && value > 0) return Math.ceil(value);
+  }
+  return 60;
+}
+
 function nonJsonResponseError(response: Response, responseText: string): Error {
   const normalized = responseText.toLowerCase();
   const tunnelUnavailable = response.status === 530
@@ -714,6 +735,9 @@ async function request<T>(url: string, init: RequestInit = {}, retriedCsrf = fal
   if (response.status === 403 && (body.code === "CSRF_INVALID" || body.error === "CSRF_INVALID") && !retriedCsrf) {
     await refreshCsrf(requestCsrf?.token);
     return request<T>(url, { ...init, headers }, true);
+  }
+  if (response.status === 429) {
+    throw new ApiRateLimitError(retryAfterSeconds(response, body as ApiEnvelope<unknown>));
   }
   if (!response.ok || !body.success) throw new Error(body.message ?? `HTTP ${response.status}`);
   return body.data;
@@ -1268,6 +1292,13 @@ export async function streamAurora(
     if (token) response = await fetch(apiUrl(`/api/v1/aurora/stream?${query}`), {
       credentials: "omit", headers: { Accept: "text/event-stream", Authorization: `Bearer ${token}` }, signal
     });
+  }
+  if (response.status === 429) {
+    let body: ApiEnvelope<unknown> | undefined;
+    try {
+      body = await response.clone().json() as ApiEnvelope<unknown>;
+    } catch { /* the Retry-After header remains authoritative */ }
+    throw new ApiRateLimitError(retryAfterSeconds(response, body));
   }
   if (!response.ok || !response.body) throw new Error(`SSE HTTP ${response.status}`);
   const decoder = new SseDecoder();

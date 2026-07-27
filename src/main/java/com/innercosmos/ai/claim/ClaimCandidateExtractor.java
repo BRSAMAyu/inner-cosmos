@@ -71,7 +71,11 @@ public final class ClaimCandidateExtractor {
                         && "USER".equalsIgnoreCase(message.speaker)
                         && message.textContent != null && !message.textContent.isBlank())
                 .toList();
-        if (userMessages.size() < 2) return;
+        // Style is a longitudinal behaviour signal, not something two arbitrary messages can
+        // establish. The old two-message threshold created a 65%-confidence card almost every
+        // time someone started chatting, making the feature feel random. Require a meaningful
+        // sample before proposing a reviewable style candidate.
+        if (userMessages.size() < 6) return;
 
         double averageLength = userMessages.stream()
                 .mapToInt(message -> message.textContent.strip().length())
@@ -93,7 +97,7 @@ public final class ClaimCandidateExtractor {
         }
         String key = ClaimTypes.EXPRESSION_STYLE + ":" + value.replaceAll("\\s", "");
         Acc style = new Acc(ClaimTypes.EXPRESSION_STYLE, key, value,
-                ClaimAuthority.REPEATED_BEHAVIOR, 0.65,
+                ClaimAuthority.REPEATED_BEHAVIOR, 0.8,
                 "基于本会话多轮表达的句长与标点节奏", false);
         userMessages.stream().limit(8).map(message -> message.id).forEach(style.ids::add);
         byKey.put(key, style);

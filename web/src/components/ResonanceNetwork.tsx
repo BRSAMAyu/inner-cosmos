@@ -14,6 +14,7 @@ const COPY: Record<Locale, {
   entryP: string; enterBusy: string; enterBtn: string;
   realPersonPath: string; practiceCapsule: string; userIdentityNotice: string; seedIdentityNotice: string;
   quotaComfort: string; quotaLow: (remaining: number) => string; quotaExhausted: string; quotaLoading: string; quotaNote: string;
+  quotaUnlimited: string; quotaUnlimitedNote: string;
   personaHistAria: string; historyStart: string;
   speakerYou: string; writeToCapsule: string; sendBusy: string; sendTurn: string; letterStepTitle: string;
   letterStepNote: string; seedWarning: string; letterFlightTitle: string; letterArrival: (time: string, status: string) => string;
@@ -40,6 +41,8 @@ const COPY: Record<Locale, {
     quotaExhausted: "今天的对话额度已用完；明天会自动恢复。你仍可回看这段对话。",
     quotaLoading: "正在确认今天的交流节奏",
     quotaNote: "只有接近每日防刷上限时才会提醒；模型故障不会扣次数。", personaHistAria: "共鸣体对话记录",
+    quotaUnlimited: "现场演示不限对话轮次",
+    quotaUnlimitedNote: "不会因应用内额度中断；可以自然地继续聊。",
     historyStart: "可以从一个具体时刻开始，而不是交换完整履历。", speakerYou: "你", writeToCapsule: "写给共鸣体",
     sendBusy: "正在发送", sendTurn: "发送这一轮", letterStepTitle: "如果想联系创建者，可以写一封慢信",
     letterStepNote: "这封信会送给创建者本人。共鸣体不会替对方承诺回复，也不会泄露联系方式。",
@@ -71,6 +74,8 @@ const COPY: Record<Locale, {
     quotaExhausted: "Today's conversation quota is used up; it resets tomorrow. You can still reread this conversation.",
     quotaLoading: "Checking today's conversation rhythm",
     quotaNote: "The limit only appears when you are close to the daily anti-abuse cap; model failures never cost a turn.", personaHistAria: "Capsule conversation log",
+    quotaUnlimited: "Unlimited turns in this live demo",
+    quotaUnlimitedNote: "No in-app quota will interrupt this conversation.",
     historyStart: "You can start from one concrete moment, rather than exchanging full resumes.", speakerYou: "You", writeToCapsule: "Write to the capsule",
     sendBusy: "Sending", sendTurn: "Send this turn", letterStepTitle: "If you still want to continue, entrust it to time",
     letterStepNote: "This letter goes to the creator themselves. The capsule won't promise a reply on their behalf, nor reveal contact details.",
@@ -114,8 +119,9 @@ export function ResonanceNetwork({ resonanceMatches, resonanceStrategy, visitorB
     return match.matchTier === "FULL" ? "深度共鸣" : match.matchTier === "PARTIAL" ? "部分共鸣" : "探索相遇";
   };
   const isUserCapsule = visitorMatch?.capsule.capsuleType === "USER_CAPSULE";
-  const quotaExhausted = personaQuota?.remaining === 0;
+  const quotaExhausted = !personaQuota?.unlimited && personaQuota?.remaining === 0;
   const quotaLabel = !personaQuota ? t.quotaLoading
+    : personaQuota.unlimited ? t.quotaUnlimited
     : personaQuota.remaining === 0 ? t.quotaExhausted
     : personaQuota.remaining <= 5 ? t.quotaLow(personaQuota.remaining)
     : t.quotaComfort;
@@ -166,7 +172,7 @@ export function ResonanceNetwork({ resonanceMatches, resonanceStrategy, visitorB
           <p className="ugc-text">{demoContentText(visitorMatch.capsule.intro, locale)}</p></div><div className="match-reasons">{visitorMatch.matchReasons.map(reason => <span key={reason}>{demoContentText(reason, locale)}</span>)}</div></header>
         {!personaSession ? <div className="visitor-entry"><p>{t.entryP}</p>
           <AsyncButton className="resonance-primary" busy={visitorBusy} busyText={t.enterBusy} onClick={onStartPersonaConversation}>{t.enterBtn}</AsyncButton></div> : <>
-          <div className="visitor-quota"><span>{quotaLabel}</span><small>{t.quotaNote}</small>
+          <div className="visitor-quota"><span>{quotaLabel}</span><small>{personaQuota?.unlimited ? t.quotaUnlimitedNote : t.quotaNote}</small>
             {(onReportSession || onBlockSession) && <div className="persona-safety-actions">
               {onReportSession && <button type="button" className="quiet" onClick={onReportSession}>{t.reportSession}</button>}
               {onBlockSession && <button type="button" className="quiet" onClick={onBlockSession}>{t.blockSession}</button>}

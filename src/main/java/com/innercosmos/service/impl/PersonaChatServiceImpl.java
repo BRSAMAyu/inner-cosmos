@@ -80,6 +80,14 @@ public class PersonaChatServiceImpl implements PersonaChatService {
             new com.innercosmos.config.ExperienceModeProperties();
 
     /**
+     * Classroom/demo switch: removes usage-count ceilings only. It deliberately does not bypass
+     * authentication, owner/capsule visibility, blocked topics, crisis safety, leakage guards,
+     * contact redaction, or revocation checks.
+     */
+    @org.springframework.beans.factory.annotation.Value("${inner-cosmos.demo.unlimited-usage-enabled:false}")
+    private boolean unlimitedDemoUsage;
+
+    /**
      * Owner lookup for the curated showcase voice. Field-injected for the same reason as
      * {@link #ttsClient}: the constructor of this class is heavily audited and has many
      * direct-construction call sites in tests, where a null mapper simply means "no curated
@@ -251,7 +259,7 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         session.status = "ACTIVE";
         session.turnCount = 0;
         boolean isSeed = "SEED_CAPSULE".equals(capsule.capsuleType) || "SEED".equals(capsule.capsuleType);
-        session.dailyLimit = isSeed
+        session.dailyLimit = unlimitedDemoUsage ? 0 : isSeed
                 ? SEED_EFFECTIVE_DAILY_LIMIT
                 : Math.max(2, Math.min(50, capsule.conversationLimitPerDay != null ? capsule.conversationLimitPerDay : 30));
         sessionMapper.insert(session);
@@ -399,6 +407,7 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         Long capsuleId;
         Long userMessageId;
         LocalDate quotaDate;
+        boolean dailyQuotaReserved;
         Map<String, Object> aiContext;
         String safetyPrefix;
         List<String> blockedTopics;
@@ -469,7 +478,7 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         // then never read again anywhere in this class — every enforcement path only ever checked
         // EchoCapsule.conversationLimitPerDay (a *daily*, cross-session cap). The two are distinct
         // owner-facing concepts and must be enforced independently and atomically.
-        Integer sessionCap = boundary == null ? null : boundary.maxConversationTurns;
+        Integer sessionCap = unlimitedDemoUsage || boundary == null ? null : boundary.maxConversationTurns;
         List<String> blockedTopics = parseBoundaryTopics(boundary == null ? null : boundary.blockedTopics);
 
         if (Boolean.TRUE.equals(safety.blockModelCall)) {
@@ -501,7 +510,8 @@ public class PersonaChatServiceImpl implements PersonaChatService {
 
         // Atomically try to reserve a turn before calling AI
         LocalDate today = todayFor(userId);
-        boolean reserved = tryReserveQuota(userId, session.capsuleId, today, dailyLimit);
+        boolean reserved = unlimitedDemoUsage
+                || tryReserveQuota(userId, session.capsuleId, today, dailyLimit);
 
         if (!reserved) {
             // IC-CAP-002 MAJOR-2: over-limit → do NOT persist the visitor message.
@@ -592,6 +602,7 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         prep.capsuleId = session.capsuleId;
         prep.userMessageId = userMessage.id;
         prep.quotaDate = today;
+        prep.dailyQuotaReserved = !unlimitedDemoUsage;
         prep.aiContext = aiContext;
         // MEDIUM is a soft classifier hint, not a hard safety decision. In experience-first mode
         // it may still influence the provider context, but it must not prepend the same ceremonial
@@ -639,7 +650,7 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         boolean stillEligible = session != null && !"BLOCKED".equals(session.status) && !blocked
                 && capsule != null && Boolean.TRUE.equals(capsule.isPublic) && "PUBLIC".equals(capsule.visibilityStatus);
         if (!stillEligible) {
-            compensateQuota(prep.userId, prep.capsuleId, prep.quotaDate);
+            compensateQuotaIfReserved(prep);
             compensateSessionTurn(prep.sessionId);
             if (prep.userMessageId != null) {
                 messageMapper.deleteById(prep.userMessageId);
@@ -712,7 +723,7 @@ public class PersonaChatServiceImpl implements PersonaChatService {
                 || ai.reply == null || ai.reply.isBlank();
 
         if (aiUnavailable) {
-            compensateQuota(prep.userId, prep.capsuleId, prep.quotaDate);
+            compensateQuotaIfReserved(prep);
             compensateSessionTurn(prep.sessionId);
             // IC-CAP RUN-003 polish (FIX-B): make AI-unavailable symmetric with the
             // over-limit (LETTER_GUIDED) branch — an unanswered turn must leave NO
@@ -850,6 +861,12 @@ public class PersonaChatServiceImpl implements PersonaChatService {
                 "UPDATE tb_capsule_usage_quota SET turn_count = turn_count - 1, updated_at = CURRENT_TIMESTAMP " +
                 "WHERE visitor_user_id = ? AND capsule_id = ? AND quota_date = ? AND turn_count > 0",
                 userId, capsuleId, today);
+    }
+
+    private void compensateQuotaIfReserved(TurnPreparation prep) {
+        if (prep.dailyQuotaReserved) {
+            compensateQuota(prep.userId, prep.capsuleId, prep.quotaDate);
+        }
     }
 
     /**
@@ -1101,6 +1118,9 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         boolean seed = capsule != null
                 && ("SEED_CAPSULE".equals(capsule.capsuleType) || "SEED".equals(capsule.capsuleType));
         LocalDate today = todayFor(userId);
+        if (unlimitedDemoUsage) {
+            return new CapsuleQuotaVO(0, 0, -1, seed, today.toString(), true);
+        }
         CapsuleUsageQuota row = quotaMapper.selectOne(
                 new QueryWrapper<CapsuleUsageQuota>()
                         .eq("visitor_user_id", userId)

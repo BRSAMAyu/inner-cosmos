@@ -1,10 +1,12 @@
 package com.innercosmos.ai.observability;
 
 import io.micrometer.observation.tck.TestObservationRegistry;
+import io.micrometer.observation.Observation;
 import org.junit.jupiter.api.Test;
 
 import static io.micrometer.observation.tck.TestObservationRegistryAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * A6: the AI turn observation (→ span with a tracer) must be emitted with the declared bounded,
@@ -87,5 +89,46 @@ class AiTurnObservationTest {
                 .doesNotHaveLowCardinalityKeyValueWithKey("userId")
                 .doesNotHaveLowCardinalityKeyValueWithKey("message")
                 .doesNotHaveLowCardinalityKeyValueWithKey("prompt");
+    }
+
+    @Test
+    void turnLivesAroundProviderAndBothRemainChildrenOfTheIncomingHttpObservation() {
+        TestObservationRegistry registry = TestObservationRegistry.create();
+        AiTurnObservation observations = new AiTurnObservation(registry);
+        Observation http = Observation.start("http.server.requests", registry);
+        try (var httpScope = http.openScope()) {
+            Observation turn = observations.startTurn();
+            try (var turnScope = turn.openScope()) {
+                Observation provider = observations.startProvider("gemini", "COMPANION");
+                try (var providerScope = provider.openScope()) {
+                    // The real provider call executes here.
+                } finally {
+                    provider.stop();
+                }
+                observations.record("chat", "dual-kernel.v1", "gemini", "COMPANION",
+                        false, true, 1200);
+            } finally {
+                turn.stop();
+            }
+        } finally {
+            http.stop();
+        }
+
+        assertThat(registry).hasHandledContextsThatSatisfy(contexts -> {
+            var httpContext = contexts.stream()
+                    .filter(context -> "http.server.requests".equals(context.getName()))
+                    .findFirst().orElseThrow();
+            var turnContext = contexts.stream()
+                    .filter(context -> "aurora.turn".equals(context.getName()))
+                    .findFirst().orElseThrow();
+            var providerContext = contexts.stream()
+                    .filter(context -> "inner.cosmos.ai.provider".equals(context.getName()))
+                    .findFirst().orElseThrow();
+
+            assertNotNull(turnContext.getParentObservation());
+            assertEquals(httpContext, turnContext.getParentObservation().getContextView());
+            assertNotNull(providerContext.getParentObservation());
+            assertEquals(turnContext, providerContext.getParentObservation().getContextView());
+        });
     }
 }

@@ -11,10 +11,10 @@ import org.springframework.stereotype.Component;
  * kernel runtime, provider, mode, fallback, memory-referenced, and a coarse duration bucket) — never
  * message text, prompts, retrieval content, memory ids or the user id.
  *
- * <p>The observation is emitted at turn completion, paired with the {@link AiTurnMetrics} timer that
- * remains the authoritative latency signal; the span's value is trace correlation + the bounded
- * attributes, so the exact per-turn latency is exposed as a coarse {@code duration_bucket} tag rather
- * than a high-cardinality millisecond value.
+ * <p>The observation starts before turn generation so provider observations are its children. The
+ * {@link AiTurnMetrics} timer remains the authoritative latency signal; the span's value is trace
+ * correlation + bounded attributes, so exact latency is exposed only as a coarse
+ * {@code duration_bucket} tag rather than a high-cardinality millisecond value.
  */
 @Component
 public class AiTurnObservation {
@@ -24,6 +24,11 @@ public class AiTurnObservation {
 
     public AiTurnObservation(ObservationRegistry registry) {
         this.registry = registry;
+    }
+
+    /** Starts the parent span for one Aurora turn. The caller owns its scope and lifecycle. */
+    public Observation startTurn() {
+        return Observation.createNotStarted(NAME, registry).start();
     }
 
     /**
@@ -39,15 +44,37 @@ public class AiTurnObservation {
 
     public void record(String route, String runtime, String provider, String mode,
                        boolean fallbackUsed, boolean memoryReferenced, long durationMs) {
-        Observation.createNotStarted(NAME, registry)
-                .lowCardinalityKeyValue("route", safe(route))
+        Observation current = registry.getCurrentObservation();
+        if (current != null && NAME.equals(current.getContext().getName())) {
+            attachCompletionTags(current, route, runtime, provider, mode,
+                    fallbackUsed, memoryReferenced, durationMs);
+            return;
+        }
+        Observation completion = startTurn();
+        try (Observation.Scope ignored = completion.openScope()) {
+            attachCompletionTags(completion, route, runtime, provider, mode,
+                    fallbackUsed, memoryReferenced, durationMs);
+        } finally {
+            completion.stop();
+        }
+    }
+
+    private static void attachCompletionTags(
+            Observation observation,
+            String route,
+            String runtime,
+            String provider,
+            String mode,
+            boolean fallbackUsed,
+            boolean memoryReferenced,
+            long durationMs) {
+        observation.lowCardinalityKeyValue("route", safe(route))
                 .lowCardinalityKeyValue("runtime", safe(runtime))
                 .lowCardinalityKeyValue("provider", safe(provider))
                 .lowCardinalityKeyValue("mode", safe(mode))
                 .lowCardinalityKeyValue("fallback", Boolean.toString(fallbackUsed))
                 .lowCardinalityKeyValue("memory_referenced", Boolean.toString(memoryReferenced))
-                .lowCardinalityKeyValue("duration_bucket", durationBucket(durationMs))
-                .observe(() -> { /* completion event; the timed work already ran */ });
+                .lowCardinalityKeyValue("duration_bucket", durationBucket(durationMs));
     }
 
     private static String safe(String value) {

@@ -1,5 +1,5 @@
 # kind-full: a real-Postgres + real-Redis, 3-role (api/worker/scheduler) local kind profile
-# that stays offline-safe (dev + Mock AI, no OIDC/TLS/cloud) so the W3 hero-gate fault
+# that uses the same real-provider Aurora path as the classroom Demo so the W3 hero-gate fault
 # injections (pod delete mid-SSE-turn, outbox-driven autoscaling) exercise genuine
 # cross-pod durable state instead of each pod's own isolated H2 file (kind-dev's profile).
 # Known, disclosed boundary: no TLS and no password on the in-namespace Postgres/Redis,
@@ -26,15 +26,29 @@ data:
   REDIS_PORT: "6379"
   REDIS_SESSION_ENABLED: "true"
   REDIS_IDEMPOTENCY_ENABLED: "true"
-  REDIS_RATE_LIMIT_ENABLED: "true"
+  # H1/H2/H3 are classroom experiments: do not turn normal exploration into 429s.
+  REDIS_RATE_LIMIT_ENABLED: "false"
+  DEMO_UNLIMITED_USAGE_ENABLED: "true"
   REDIS_AURORA_STREAM_ENABLED: "true"
   REDIS_SCHEDULER_LOCK_ENABLED: "true"
   REDIS_SESSION_NAMESPACE: inner-cosmos:w3:session
-  REDIS_RATE_LIMIT_NAMESPACE: inner-cosmos:w3:rate-limit:v1
   REDIS_SCHEDULER_LOCK_NAMESPACE: inner-cosmos-w3-scheduler-v1
   JDBC_OUTBOX_ENABLED: "true"
   LLM_MODE: dev
-  LLM_PROVIDER: mock
+  LLM_PROVIDER: gemini
+  LLM_ALLOW_FALLBACK: "false"
+  LLM_REAL_PROVIDER_FAILOVER_ENABLED: "true"
+  LLM_FAILOVER_PROVIDERS: gemini,deepseek,minimax,glm,mimo
+  GEMINI_MODEL: gemini-3.6-flash
+  AURORA_FAST_MODEL: gemini-3.6-flash
+  AURORA_SPEAKER_MODEL: gemini-3.6-flash
+  AURORA_THINKER_MODEL: gemini-3.6-flash
+  AURORA_SPEAKER_THINKING_LEVEL: minimal
+  AURORA_SPEAKER_MAX_TOKENS: "2048"
+  ASR_PROVIDER: mimo
+  MEMORY_EMBEDDING_ENABLED: "false"
+  TTS_ENABLED: "true"
+  TTS_WS_URL: wss://llm-errus8cw2pf66bx9.cn-beijing.maas.aliyuncs.com/api-ws/v1/inference
   MANAGEMENT_HEALTH_REDIS_ENABLED: "true"
   SEED_ENABLED: "false"
   COOKIE_SECURE: "false"

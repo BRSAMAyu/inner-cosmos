@@ -75,6 +75,15 @@ public final class ApiRateLimitFilter extends OncePerRequestFilter {
             boolean aurora = isAuroraLlm(path);
             boolean modelBacked = isModelBackedEndpoint(path);
             String userId = authenticatedUserId(request);
+            // A streamed Aurora turn is a two-request protocol: POST /stream-stage reserves the
+            // durable turn context, then GET /stream consumes that one-time token and attaches to
+            // the same turn. Charging both requests made a 5-token bucket reject the third chat
+            // turn even though the user only initiated three generations. The continuation cannot
+            // create model work without a valid staged token, so charge exactly once at stage.
+            if (isAuroraStreamContinuation(request, path)) {
+                chain.doFilter(request, response);
+                return;
+            }
             // 2026-07-27 audit (P2, CONFIRMED): the GET exemption used to be unconditional, so
             // every anonymously-reachable read endpoint had no ceiling at all. /api/plaza/capsules
             // is permitAll and lists every published capsule, which made bulk enumeration of the
@@ -173,6 +182,12 @@ public final class ApiRateLimitFilter extends OncePerRequestFilter {
                 || normalized.startsWith("/api/aurora/stream")
                 || normalized.startsWith("/api/aurora/greeting")
                 || normalized.startsWith("/api/aurora/message");
+    }
+
+    private boolean isAuroraStreamContinuation(HttpServletRequest request, String path) {
+        String normalized = normalizeApiPath(path);
+        return "GET".equalsIgnoreCase(request.getMethod())
+                && "/api/aurora/stream".equals(normalized);
     }
 
     /**

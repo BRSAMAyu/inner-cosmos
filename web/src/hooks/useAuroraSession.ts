@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import {
-  api, replayTurnEvents, streamAurora, subscribeProactive,
+  api, ApiRateLimitError, replayTurnEvents, streamAurora, subscribeProactive,
   type DialogSessionSummary, type GoodbyeResult, type Notification,
   type PsychologySkillSuggestion, type SafetyResource, type WakeIntent
 } from "../api";
@@ -797,7 +797,10 @@ export function useAuroraSession({
       if (turnId) await recover(turnId, sessionId, generation);
       else {
         finishTurn(generation);
-        setStatus(t.noTimelineRetry);
+        if (error instanceof ApiRateLimitError) {
+          setDraft(current => current || text);
+        }
+        setStatus(error instanceof ApiRateLimitError ? error.message : t.noTimelineRetry);
       }
     }
   };

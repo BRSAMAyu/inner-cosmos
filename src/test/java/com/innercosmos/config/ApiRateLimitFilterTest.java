@@ -89,6 +89,23 @@ class ApiRateLimitFilterTest {
         assertThat(chain.getRequest()).isNull();
     }
 
+    @Test
+    void auroraStreamProtocolConsumesExactlyOneQuotaTokenPerTurn() throws Exception {
+        CapturingStore store = new CapturingStore();
+        ApiRateLimitFilter filter = new ApiRateLimitFilter(store, new RateLimitProperties());
+        MockHttpServletRequest stage = post("/api/v1/aurora/stream-stage");
+        stage.getSession(true).setAttribute(Constants.SESSION_USER_KEY, 42L);
+        MockHttpServletRequest continuation = new MockHttpServletRequest(
+                "GET", "/api/v1/aurora/stream");
+        continuation.setServletPath("/api/v1/aurora/stream");
+        continuation.getSession(true).setAttribute(Constants.SESSION_USER_KEY, 42L);
+
+        filter.doFilter(stage, new MockHttpServletResponse(), new MockFilterChain());
+        filter.doFilter(continuation, new MockHttpServletResponse(), new MockFilterChain());
+
+        assertThat(store.keys).containsExactly(RateLimitKey.forSubject("aurora", "42"));
+    }
+
     private MockHttpServletRequest post(String path) {
         MockHttpServletRequest request = new MockHttpServletRequest("POST", path);
         request.setServletPath(path);

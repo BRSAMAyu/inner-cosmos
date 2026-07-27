@@ -359,8 +359,8 @@ inner-cosmos:
         refill-per-minute: ${RATE_LIMIT_ANON_REFILL_PER_MINUTE:20}
         advertised-limit: ${RATE_LIMIT_ANON_ADVERTISED:60}
       aurora:
-        capacity: ${RATE_LIMIT_AURORA_CAPACITY:5}
-        refill-per-minute: ${RATE_LIMIT_AURORA_REFILL_PER_MINUTE:5}
+        capacity: ${RATE_LIMIT_AURORA_CAPACITY:20}
+        refill-per-minute: ${RATE_LIMIT_AURORA_REFILL_PER_MINUTE:20}
         advertised-limit: ${RATE_LIMIT_AURORA_ADVERTISED:120}
       model-backed:
         capacity: ${RATE_LIMIT_MODEL_BACKED_CAPACITY:10}
@@ -374,6 +374,9 @@ inner-cosmos:
     seed-enabled: ${SEED_ENABLED:false}
     seed-admin-enabled: ${DEMO_SEED_ADMIN_ENABLED:true}
     public-entry-enabled: ${DEMO_PUBLIC_ENTRY_ENABLED:false}
+    # Classroom/public-demo only: removes product usage quotas without weakening
+    # authorization, privacy, crisis safety, idempotency, or data-consistency gates.
+    unlimited-usage-enabled: ${DEMO_UNLIMITED_USAGE_ENABLED:false}
     # Curated DEMO/SHOWCASE identities are template sources, not shared visitor accounts, in the
     # public classroom runtime. Local development keeps legacy password login unless explicitly
     # disabled by that runtime.

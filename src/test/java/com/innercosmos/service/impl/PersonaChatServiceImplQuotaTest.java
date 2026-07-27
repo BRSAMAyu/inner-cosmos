@@ -17,6 +17,7 @@ import com.innercosmos.mapper.UserProfileMapper;
 import com.innercosmos.service.CapsuleGenomeService;
 import com.innercosmos.service.SafetyService;
 import com.innercosmos.service.DataUseGrantService;
+import com.innercosmos.vo.CapsuleQuotaVO;
 import com.innercosmos.vo.SafetyResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -28,6 +29,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
 import java.time.LocalDate;
@@ -262,6 +264,21 @@ class PersonaChatServiceImplQuotaTest {
                 contains("INSERT INTO tb_capsule_usage_quota"),
                 any(Object.class), any(Object.class), any(Object.class)))
                 .thenReturn(1);
+    }
+
+    @Test
+    @DisplayName("Classroom unlimited mode exposes an unlimited contract without reading or reserving quota")
+    void quota_demoUnlimited_doesNotTouchQuotaTable() {
+        EchoCapsule capsule = publicCapsuleWithLimit(399L, "USER_CAPSULE", 2);
+        when(capsuleMapper.selectById(399L)).thenReturn(capsule);
+        ReflectionTestUtils.setField(service, "unlimitedDemoUsage", true);
+
+        CapsuleQuotaVO result = service.quota(10L, 399L);
+
+        assertTrue(result.unlimited);
+        assertEquals(0, result.dailyLimit);
+        assertEquals(-1, result.remaining);
+        verify(quotaMapper, never()).selectOne(any());
     }
 
     @Test

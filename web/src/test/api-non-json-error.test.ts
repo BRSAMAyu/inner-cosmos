@@ -43,4 +43,20 @@ describe("API non-JSON error presentation", () => {
       "This temporary demo connection has expired. Open the latest demo link; your action was not submitted."
     );
   });
+
+  it("turns HTTP 429 into a retry countdown instead of a connection failure", async () => {
+    document.documentElement.lang = "zh-CN";
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
+      success: false, code: "RATE_LIMIT_EXCEEDED", message: "too fast",
+      data: { retryAfter: 17 }
+    }), {
+      status: 429,
+      headers: { "Content-Type": "application/json", "Retry-After": "17" }
+    })));
+
+    const { api, ApiRateLimitError } = await import("../api");
+    const pending = api.getProfile();
+    await expect(pending).rejects.toBeInstanceOf(ApiRateLimitError);
+    await expect(pending).rejects.toThrow("约 17 秒后重试");
+  });
 });

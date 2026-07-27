@@ -42,21 +42,10 @@ services:
       REDIS_PORT: "6379"
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       REDIS_SESSION_ENABLED: "true"
-      REDIS_RATE_LIMIT_ENABLED: "true"
-      # Each browser receives an owner-isolated SANDBOX cloned from a curated story.
-      # Keep distributed protection in place and size it for simultaneous exploration.
-      RATE_LIMIT_USER_CAPACITY: "300"
-      RATE_LIMIT_USER_REFILL_PER_MINUTE: "300"
-      RATE_LIMIT_USER_ADVERTISED: "300"
-      RATE_LIMIT_ANON_CAPACITY: "120"
-      RATE_LIMIT_ANON_REFILL_PER_MINUTE: "120"
-      RATE_LIMIT_ANON_ADVERTISED: "120"
-      RATE_LIMIT_AURORA_CAPACITY: "60"
-      RATE_LIMIT_AURORA_REFILL_PER_MINUTE: "60"
-      RATE_LIMIT_AURORA_ADVERTISED: "60"
-      RATE_LIMIT_LOGIN_CAPACITY: "120"
-      RATE_LIMIT_LOGIN_REFILL_PER_MINUTE: "120"
-      RATE_LIMIT_LOGIN_ADVERTISED: "120"
+      # The classroom runtime intentionally has no application-level request bucket.
+      # Provider-side 429s are handled by retry/failover instead of surfacing as fake disconnects.
+      REDIS_RATE_LIMIT_ENABLED: "false"
+      DEMO_UNLIMITED_USAGE_ENABLED: "true"
       REDIS_SCHEDULER_LOCK_ENABLED: "true"
       REDIS_AURORA_STREAM_ENABLED: "true"
       REDIS_IDEMPOTENCY_ENABLED: "true"

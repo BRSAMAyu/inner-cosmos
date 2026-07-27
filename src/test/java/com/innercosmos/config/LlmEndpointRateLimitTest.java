@@ -77,6 +77,13 @@ class LlmEndpointRateLimitTest {
     }
 
     @Test
+    void auroraDefaultPolicyAllowsARealMultiTurnDemo() {
+        RateLimitPolicy policy = new RateLimitProperties().aurora();
+        assertThat(policy.capacity()).isGreaterThanOrEqualTo(20);
+        assertThat(policy.refillPerMinute()).isGreaterThanOrEqualTo(20);
+    }
+
+    @Test
     void ordinaryCapsuleContextEndpointStaysOnTheGenericUserBand() throws Exception {
         // Negative control: an overly broad regex could accidentally sweep other
         // /api/capsule/{id}/** routes into the model-backed band. It must not.

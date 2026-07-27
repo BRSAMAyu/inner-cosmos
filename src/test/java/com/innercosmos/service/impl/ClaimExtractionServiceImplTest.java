@@ -27,6 +27,12 @@ class ClaimExtractionServiceImplTest {
         return m;
     }
 
+    private DialogMessage aurora(long id, String text) {
+        DialogMessage m = user(id, text);
+        m.speaker = "AURORA";
+        return m;
+    }
+
     @Test
     void mockModeFallsBackToDeterministicExtractor() {
         StructuredAiService structured = mock(StructuredAiService.class);
@@ -40,14 +46,60 @@ class ClaimExtractionServiceImplTest {
                 user(2L, "我是不是太敏感了？")));
 
         assertThat(out).extracting(ClaimCandidate::claimType)
-                .containsExactlyInAnyOrder(ClaimTypes.PREFERENCE, ClaimTypes.EXPRESSION_STYLE);
+                .containsExactly(ClaimTypes.PREFERENCE);
         ClaimCandidate preference = out.stream()
                 .filter(candidate -> ClaimTypes.PREFERENCE.equals(candidate.claimType())).findFirst().orElseThrow();
         assertThat(preference.value()).contains("读书");
         assertThat(preference.provenanceMessageIds()).containsExactly(1L);
+    }
+
+    @Test
+    void expressionStyleRequiresSixDistinctEvidenceMessages() {
+        StructuredAiService structured = mock(StructuredAiService.class);
+        when(structured.call(eq(5L), any(), any(), any(), eq(ClaimExtractionResult.class), any()))
+                .thenAnswer(inv -> ((Supplier<?>) inv.getArgument(5)).get());
+        ClaimExtractionServiceImpl service = new ClaimExtractionServiceImpl(structured);
+
+        List<ClaimCandidate> out = service.extract(5L, List.of(
+                user(1L, "a"), user(2L, "b"), user(3L, "c"),
+                user(4L, "d"), user(5L, "e"), user(6L, "f")));
+
         ClaimCandidate style = out.stream()
-                .filter(candidate -> ClaimTypes.EXPRESSION_STYLE.equals(candidate.claimType())).findFirst().orElseThrow();
-        assertThat(style.provenanceMessageIds()).containsExactly(1L, 2L);
+                .filter(candidate -> ClaimTypes.EXPRESSION_STYLE.equals(candidate.claimType()))
+                .findFirst().orElseThrow();
+        assertThat(style.confidence()).isGreaterThanOrEqualTo(0.8);
+        assertThat(style.provenanceMessageIds()).containsExactly(1L, 2L, 3L, 4L, 5L, 6L);
+    }
+
+    @Test
+    void sanitizeRejectsProviderStyleGuessFromSparseEvidence() {
+        StructuredAiService structured = mock(StructuredAiService.class);
+        ClaimExtractionResult sparseGuess = new ClaimExtractionResult(List.of(
+                new ClaimCandidate(ClaimTypes.EXPRESSION_STYLE, "style:short", "brief",
+                        ClaimAuthority.MODEL_INFERENCE, 0.99, List.of(1L, 2L), "length", false)));
+        when(structured.call(eq(5L), any(), any(), any(), eq(ClaimExtractionResult.class), any()))
+                .thenReturn(sparseGuess);
+        ClaimExtractionServiceImpl service = new ClaimExtractionServiceImpl(structured);
+
+        List<ClaimCandidate> out = service.extract(5L, List.of(user(1L, "a"), user(2L, "b")));
+
+        assertThat(out).isEmpty();
+    }
+
+    @Test
+    void sanitizeRejectsClaimsWhoseOnlyEvidenceWasWrittenByAurora() {
+        StructuredAiService structured = mock(StructuredAiService.class);
+        ClaimExtractionResult reflectedGuess = new ClaimExtractionResult(List.of(
+                new ClaimCandidate(ClaimTypes.FACT, "fact:calm", "calm",
+                        ClaimAuthority.MODEL_INFERENCE, 0.9, List.of(2L), "Aurora said it", false)));
+        when(structured.call(eq(5L), any(), any(), any(), eq(ClaimExtractionResult.class), any()))
+                .thenReturn(reflectedGuess);
+        ClaimExtractionServiceImpl service = new ClaimExtractionServiceImpl(structured);
+
+        List<ClaimCandidate> out = service.extract(5L, List.of(
+                user(1L, "I am unsure"), aurora(2L, "You are a calm person")));
+
+        assertThat(out).isEmpty();
     }
 
     @Test

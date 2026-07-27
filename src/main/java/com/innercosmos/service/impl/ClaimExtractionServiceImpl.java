@@ -47,7 +47,7 @@ public class ClaimExtractionServiceImpl implements ClaimExtractionService {
     public List<ClaimCandidate> extract(Long userId, List<DialogMessage> messages) {
         if (messages == null || messages.isEmpty()) return List.of();
         Set<Long> ownedMessageIds = messages.stream()
-                .filter(m -> m != null && m.id != null)
+                .filter(m -> m != null && m.id != null && "USER".equalsIgnoreCase(m.speaker))
                 .map(m -> m.id).collect(Collectors.toSet());
         if (ownedMessageIds.isEmpty()) return List.of();
 
@@ -84,6 +84,13 @@ public class ClaimExtractionServiceImpl implements ClaimExtractionService {
                     : candidate.provenanceMessageIds().stream().filter(ownedMessageIds::contains).toList();
             if (provenance.isEmpty()) continue;
             double confidence = Math.max(0.0, Math.min(1.0, candidate.confidence()));
+            // Provider output must obey the same longitudinal evidence floor as the deterministic
+            // extractor. Never ask a user to confirm an EXPRESSION_STYLE guess based on one or two
+            // incidental messages, even if a model reports an optimistic confidence.
+            if (ClaimTypes.EXPRESSION_STYLE.equals(candidate.claimType())
+                    && (provenance.stream().distinct().count() < 6 || confidence < 0.75)) {
+                continue;
+            }
             clean.add(new ClaimCandidate(candidate.claimType(), candidate.claimKey(), candidate.value(),
                     candidate.authorityLevel(), confidence, provenance, candidate.evidenceText(),
                     candidate.uncertain()));

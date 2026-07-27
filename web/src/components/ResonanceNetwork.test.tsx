@@ -88,6 +88,19 @@ describe("ResonanceNetwork", () => {
     expect(screen.getByRole("button", { name: "发送这一轮" })).toBeDisabled();
   });
 
+  it("keeps the composer available and labels the classroom runtime when quota is unlimited", () => {
+    const session: PersonaSession = { id: 1, capsuleId: 4, status: "ACTIVE", turnCount: 99, dailyLimit: 0 };
+    render(<ResonanceNetwork resonanceMatches={[match]} resonanceStrategy="MIRROR" visitorBusy={false} visitorMatch={match}
+      personaSession={session} personaMessages={[]} personaDraft="继续聊"
+      personaQuota={{ turnCount: 0, remaining: -1, dailyLimit: 0, seed: false, quotaDate: "2026-07-27", unlimited: true }}
+      letterTitle="" letterBody="" sentLetter={null} onChooseStrategy={() => undefined} onChooseMatch={() => undefined}
+      onStartPersonaConversation={() => undefined} onPersonaDraftChange={() => undefined} onSendPersonaTurn={() => undefined}
+      onLetterTitleChange={() => undefined} onLetterBodyChange={() => undefined} onSendLetter={() => undefined} />);
+
+    expect(screen.getByText("现场演示不限对话轮次")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "发送这一轮" })).toBeEnabled();
+  });
+
   it("uses the server match tier as a friendly visible badge", () => {
     render(<ResonanceNetwork resonanceMatches={[{ ...match, matchTier: "NONE", resonant: false }]} resonanceStrategy="MIRROR"
       visitorBusy={false} visitorMatch={null} personaSession={null} personaMessages={[]} personaDraft="" personaQuota={null}

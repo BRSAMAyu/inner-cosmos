@@ -8,7 +8,9 @@ import org.springframework.stereotype.Component;
 public class RateLimitProperties {
     private final Band user = new Band(40, 40, 240);
     private final Band anonymous = new Band(20, 20, 60);
-    private final Band aurora = new Band(5, 5, 120);
+    // One token represents one user-initiated Aurora turn (the SSE continuation is exempt).
+    // Twenty turns/minute leaves room for a live multi-turn demo while still bounding abuse.
+    private final Band aurora = new Band(20, 20, 120);
     // Every other module that also calls a real AI provider synchronously in the request path
     // (thought-shredder, persona-chat visitor messages, capsule sandbox/genome recompile,
     // todo-split) -- distinct from "aurora" so a user's Aurora chat turns and, say, a thought-

@@ -14,6 +14,8 @@ public class CapsuleQuotaVO {
     public int dailyLimit;
     /** Remaining turns today (>= 0). */
     public int remaining;
+    /** True when this runtime intentionally does not enforce a usage quota. */
+    public boolean unlimited;
     /** Whether this capsule is an official SEED capsule. */
     public boolean seed;
     /** The quota date (today) in ISO format (yyyy-MM-dd). */
@@ -22,11 +24,17 @@ public class CapsuleQuotaVO {
     public CapsuleQuotaVO() {}
 
     public CapsuleQuotaVO(int turnCount, int dailyLimit, int remaining, boolean seed, String quotaDate) {
+        this(turnCount, dailyLimit, remaining, seed, quotaDate, false);
+    }
+
+    public CapsuleQuotaVO(int turnCount, int dailyLimit, int remaining, boolean seed, String quotaDate,
+                          boolean unlimited) {
         this.turnCount = turnCount;
         this.dailyLimit = dailyLimit;
         this.remaining = remaining;
         this.seed = seed;
         this.quotaDate = quotaDate;
+        this.unlimited = unlimited;
     }
 
     public int getTurnCount() { return turnCount; }
@@ -37,6 +45,9 @@ public class CapsuleQuotaVO {
 
     public int getRemaining() { return remaining; }
     public void setRemaining(int remaining) { this.remaining = remaining; }
+
+    public boolean isUnlimited() { return unlimited; }
+    public void setUnlimited(boolean unlimited) { this.unlimited = unlimited; }
 
     public boolean isSeed() { return seed; }
     public void setSeed(boolean seed) { this.seed = seed; }

@@ -337,6 +337,31 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     private AuroraReplyVO produceReply(Long userId, ChatRequest request, SafetyResult safety,
                                        Long userMessageId, Long turnId, boolean persistImmediately,
                                        GenerationAuthority generationAuthority) {
+        io.micrometer.observation.Observation turnObservation = aiTurnObservation == null
+                ? null : aiTurnObservation.startTurn();
+        io.micrometer.observation.Observation.Scope turnScope = turnObservation == null
+                ? null : turnObservation.openScope();
+        try {
+            return produceReplyWithinTurn(
+                    userId, request, safety, userMessageId, turnId, persistImmediately,
+                    generationAuthority);
+        } catch (RuntimeException | Error failure) {
+            if (turnObservation != null) turnObservation.error(failure);
+            throw failure;
+        } finally {
+            if (turnScope != null) turnScope.close();
+            if (turnObservation != null) turnObservation.stop();
+        }
+    }
+
+    /**
+     * Runs with {@code aurora.turn} current, making every provider observation a child of the
+     * same HTTP/SSE trace even when generation arrived through an executor hop.
+     */
+    private AuroraReplyVO produceReplyWithinTurn(
+            Long userId, ChatRequest request, SafetyResult safety,
+            Long userMessageId, Long turnId, boolean persistImmediately,
+            GenerationAuthority generationAuthority) {
         holdInitialGenerationLeaseForH1Demo(generationAuthority);
         long turnStartNanos = System.nanoTime();
         boolean fallbackUsed = false;

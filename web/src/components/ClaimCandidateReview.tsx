@@ -53,21 +53,27 @@ export function ClaimCandidateReview({ candidates, locale = "zh-CN", busyId = nu
   onConfirm: (id: number) => void; onConfirmAll?: () => void; onDismiss: (id: number) => void;
 }) {
   const [dismissingId, setDismissingId] = useState<number | null>(null);
-  if (candidates.length === 0) return null;
+  // Also guard the presentation boundary so low-evidence rows created by an older deployment do
+  // not suddenly reappear after an upgrade. Expression style is only reviewable after a real
+  // longitudinal sample, never from the first couple of messages.
+  const reviewableCandidates = candidates.filter(candidate =>
+    candidate.claimType !== "EXPRESSION_STYLE"
+      || (new Set(candidate.provenanceMessageIds).size >= 6 && candidate.confidence >= 0.75));
+  if (reviewableCandidates.length === 0) return null;
   const t = COPY[locale];
   const typeLabel = CLAIM_TYPE_LABEL[locale];
   const authorityLabel = AUTHORITY_LABEL[locale];
   return <section className="candidate-space" aria-label={t.aria}>
     <div className="candidate-heading">
       <div><span className="eyebrow">{t.eyebrow}</span><h2>{t.heading}</h2></div>
-      <span>{t.pending(candidates.length)}</span>
+      <span>{t.pending(reviewableCandidates.length)}</span>
     </div>
     <p>{t.intro}</p>
     {onConfirmAll && <AsyncButton className="btn-candidate-confirm" busy={busyId === -1}
       busyText={t.confirming} onClick={onConfirmAll}>
       {locale === "en-SG" ? "Confirm all for my capsule" : "全部确认并用于共鸣体"}
     </AsyncButton>}
-    {candidates.map(candidate => {
+    {reviewableCandidates.map(candidate => {
       const busy = busyId === candidate.id;
       const confidencePct = Math.round(Math.max(0, Math.min(1, candidate.confidence)) * 100);
       return <article className="candidate-card" key={candidate.id} aria-label={candidate.value}>
