@@ -335,7 +335,12 @@ export function useAuroraSession({
         // A hard Pod loss can also tear down the local transport carrying this first replay call.
         // The durable timeline remains authoritative, so continue into the bounded poll below.
       }
-      for (let attempt = 0; attempt < 40; attempt++) {
+      // H1 hard-crash recovery can legitimately take longer than the old 20-second client poll:
+      // the surviving scheduler must first observe the stopped heartbeat, wait for the short
+      // fencing lease to expire, claim the turn, and then finish a real Provider call. Keep the
+      // browser attached for 90 seconds so a healthy durable recovery is not abandoned just
+      // before PostgreSQL reaches COMPLETED.
+      for (let attempt = 0; attempt < 180; attempt++) {
         if (!isCurrentGeneration(generation)) return; // 4.1: a newer turn superseded this recovery.
         let timeline: Awaited<ReturnType<typeof api.timeline>>;
         try {
