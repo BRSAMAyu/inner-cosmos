@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -25,6 +26,11 @@ import java.util.List;
  */
 @Component
 @ConditionalOnExpression("'${inner-cosmos.runtime.role:all}' == 'all' or '${inner-cosmos.runtime.role:all}' == 'scheduler'")
+@ConditionalOnProperty(
+        name = "inner-cosmos.aurora.proactive-job-enabled",
+        havingValue = "true",
+        matchIfMissing = true
+)
 public class AuroraProactiveJob {
 
     private static final Logger log = LoggerFactory.getLogger(AuroraProactiveJob.class);

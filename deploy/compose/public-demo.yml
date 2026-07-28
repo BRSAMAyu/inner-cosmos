@@ -69,6 +69,7 @@ services:
       AURORA_SPEAKER_THINKING_LEVEL: ${AURORA_SPEAKER_THINKING_LEVEL:-minimal}
       AURORA_SPEAKER_MAX_TOKENS: ${AURORA_SPEAKER_MAX_TOKENS:-2048}
       LLM_ALLOW_FALLBACK: "false"
+      INNER_COSMOS_AURORA_PROACTIVE_JOB_ENABLED: "false"
       # Simple first-meeting turns use the measured single-pass path; memory-heavy, ambiguous,
       # interrupted and safety-sensitive turns retain the planner -> speaker path. This is the
       # classroom capacity profile, not a change to the product-wide dual-kernel default.

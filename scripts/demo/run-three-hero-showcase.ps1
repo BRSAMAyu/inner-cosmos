@@ -93,6 +93,27 @@ function Start-PortForward {
     return $localPort
 }
 
+function Test-LiveShowcaseEndpoint {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][int]$Port
+    )
+    $path = switch ($Name) {
+        "kind-api" { "/actuator/health/readiness" }
+        "grafana" { "/api/health" }
+        "prometheus" { "/-/ready" }
+        "jaeger" { "/api/services" }
+        default { "/" }
+    }
+    try {
+        $response = Invoke-WebRequest -Uri "http://127.0.0.1:$Port$path" `
+            -UseBasicParsing -TimeoutSec 3
+        return [int]$response.StatusCode -ge 200 -and [int]$response.StatusCode -lt 400
+    } catch {
+        return $false
+    }
+}
+
 function Get-LiveShowcasePort {
     param(
         [Parameter(Mandatory = $true)][string]$Name,
@@ -116,6 +137,12 @@ function Get-LiveShowcasePort {
             return $null
         }
         if (-not (Test-NetConnection -ComputerName 127.0.0.1 -Port $ExpectedPort -InformationLevel Quiet)) {
+            return $null
+        }
+        # A kubectl port-forward can keep its local TCP listener after the selected
+        # Pod disappears. TCP-only checks then report a false positive while every
+        # HTTP request fails. Probe the actual service before reusing a fixed view.
+        if (-not (Test-LiveShowcaseEndpoint -Name $Name -Port $ExpectedPort)) {
             return $null
         }
         return $ExpectedPort

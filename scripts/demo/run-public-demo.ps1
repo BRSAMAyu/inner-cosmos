@@ -213,9 +213,14 @@ try {
     $env:LLM_REAL_PROVIDER_FAILOVER_ENABLED = "true"
     $env:LLM_FAILOVER_PROVIDERS = "gemini,deepseek,minimax,glm,mimo"
     $env:GEMINI_MODEL = "gemini-3.6-flash"
-    $env:AURORA_FAST_MODEL = "gemini-3.6-flash"
-    $env:AURORA_SPEAKER_MODEL = "gemini-3.6-flash"
-    $env:AURORA_THINKER_MODEL = "gemini-3.6-flash"
+    $auroraStageModel = if ($Provider -eq "deepseek") {
+        "deepseek-v4-flash"
+    } else {
+        "gemini-3.6-flash"
+    }
+    $env:AURORA_FAST_MODEL = $auroraStageModel
+    $env:AURORA_SPEAKER_MODEL = $auroraStageModel
+    $env:AURORA_THINKER_MODEL = $auroraStageModel
     $env:AURORA_SPEAKER_THINKING_LEVEL = "minimal"
     $env:AURORA_SPEAKER_MAX_TOKENS = "2048"
     # Classroom closure intentionally disables provider embeddings. Lexical/theme retrieval is

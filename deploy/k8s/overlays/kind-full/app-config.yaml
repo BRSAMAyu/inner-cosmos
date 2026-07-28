@@ -11,7 +11,7 @@ kind: ConfigMap
 metadata:
   name: inner-cosmos-config
 data:
-  INNER_COSMOS_EXPECTED_SCHEMA_VERSION: "34"
+  INNER_COSMOS_EXPECTED_SCHEMA_VERSION: "35"
   INNER_COSMOS_AURORA_TURN_RECOVERY_GENERATION_LEASE_TTL: "PT15S"
   INNER_COSMOS_AURORA_TURN_RECOVERY_STALE_AFTER: "PT10S"
   INNER_COSMOS_AURORA_TURN_RECOVERY_POLL_DELAY_MS: "5000"
@@ -45,6 +45,10 @@ data:
   AURORA_THINKER_MODEL: gemini-3.6-flash
   AURORA_SPEAKER_THINKING_LEVEL: minimal
   AURORA_SPEAKER_MAX_TOKENS: "2048"
+  # Keep the classroom hero experiments deterministic and protect the real-provider
+  # budget for presenter-triggered H1/H3 turns. Proactive behavior remains enabled
+  # in normal product profiles; only this isolated showcase scheduler is disabled.
+  INNER_COSMOS_AURORA_PROACTIVE_JOB_ENABLED: "false"
   ASR_PROVIDER: mimo
   MEMORY_EMBEDDING_ENABLED: "false"
   TTS_ENABLED: "true"
