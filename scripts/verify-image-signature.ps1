@@ -85,7 +85,8 @@ try {
 
     $dockerUserArguments = @()
     if ([IO.Path]::DirectorySeparatorChar -eq '/') {
-        $id = Get-Command id -CommandType Application -ErrorAction SilentlyContinue
+        $id = Get-Command id -CommandType Application -ErrorAction SilentlyContinue |
+            Select-Object -First 1
         if (-not $id) {
             throw "The Unix id command is required to map cosign to the host-owned key directory."
         }
