@@ -1,8 +1,8 @@
 schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 authority: 对齐文档/24-完全体最终收敛与云原生课程战役.md
-status: RELEASE_CANDIDATE_BLOCKED_BY_HUMAN_GATE
-updated_at: 2026-07-31T19:31:17+08:00
+status: IN_PROGRESS
+updated_at: 2026-07-31T22:06:16+08:00
 
 legal_terminal_states:
   - COMPLETE
@@ -16,7 +16,7 @@ demo_delivery_front:
     Historical public-runtime evidence remains valid only for its recorded 2026-07-24 run. On
     2026-07-31 the isolated H2 + Mock teacher-demo passed health, login/session, the React shell,
     the five-space browser journey, memory provenance, a bounded capsule conversation and a
-    390x844 responsive check. GitHub Actions run 30626414452 separately passed Docker-backed
+    390x844 responsive check. GitHub Actions run 30635751921 separately passed Docker-backed
     PostgreSQL/Redis integration, the production-profile image smoke, signature/provenance and
     the final image vulnerability gate. The real-Provider public tunnel, 30-user burst and a
     physical-device rehearsal were not rerun. A fresh public-demo run is still required before
@@ -43,22 +43,22 @@ demo_delivery_front:
     - share the newly generated URL and APK after every Quick Tunnel restart
 
 integrated_head:
-  commit: 73d2081f24ea07f573802ed2d2d37f35e8f322ae
+  commit: 97c57c12e36ab63c63263910f4e563a5be9d7dc0
   branch: main
-  parent_before_integration: 07a9b26ffceacb948510acc19c541fb7170ebfef
-  ci_run: https://github.com/BRSAMAyu/inner-cosmos/actions/runs/30626414452
+  parent_before_integration: e402251b7d16dfd89656f7decf03c55c54717e08
+  ci_run: https://github.com/BRSAMAyu/inner-cosmos/actions/runs/30635751921
   note: >-
-    Commit 73d2081f is the synchronized competition-readiness checkpoint on main. It includes the
-    9fe898b9 product/repository repair, subsequent timezone, capsule-boundary, dependency, IaC,
-    production-smoke and supply-chain corrections. It restores CSRF,
+    Commit 97c57c12 is the synchronized competition-readiness checkpoint on main. It includes the
+    product/repository repair, subsequent timezone, capsule-boundary, Singapore safety-resource,
+    dependency, IaC, production-smoke, Node 24 Actions and supply-chain corrections. It restores CSRF,
     distributed rate limiting, bounded classroom quotas and semantic memory embedding in the
     public-demo profile; fixes the demo readiness contract, month-end token forecasting and
     state-aware Aurora outage copy; standardizes Docker-unavailable Testcontainers behavior; and
     adds judge, verification, security, contribution, documentation-index and poster-source
     assets. The production PWA bundle was rebuilt from the exact validated source tree. GitHub
-    Actions run 30626414452 passed both jobs at this exact commit, including Docker-backed tests,
-    production smoke, signature/provenance and final HIGH/CRITICAL image scanning. Local main and
-    origin/main are synchronized.
+    Actions run 30635751921 passed both jobs at this exact commit, including Docker-backed tests,
+    production smoke, signature/provenance and final HIGH/CRITICAL image scanning; both checks
+    reported zero annotations. Local HEAD, origin/main and remote main are synchronized.
   preserved_preexisting_dirty_paths:
     - docs/AI_ALIGNMENT_TECHNICAL_REFERENCE.md
     - docs/presentation/inner-cosmos-cloud-native-defense-v4-continuity-aligned组员H1改进版.html
@@ -87,12 +87,17 @@ integrated_head:
   acceptance_ledger_changes:
     - Public-demo security bypasses are removed: CSRF and Redis rate limiting are enabled, usage is bounded, and missing CSRF tokens fail closed.
     - Semantic memory embedding is the public-demo default; DisableMemoryEmbedding is an explicit disclosed recovery switch.
-    - Local browser and package evidence is refreshed at 73d2081f without promoting public, provider, device or human gates.
-    - Docker-backed integration, production-image smoke, signature/provenance, SBOM, IaC and image-CVE gates are closed by CI run 30626414452.
+    - Local browser and package evidence is refreshed through 97c57c12 without promoting public, provider, device or human gates.
+    - The en-SG Safety Harbor renders all six current channel-correct contacts with zero application-console findings.
+    - Docker-backed integration, production-image smoke, signature/provenance, SBOM, IaC and image-CVE gates are closed by CI run 30635751921.
+    - Acceptance-state integrity is now treated as machine work: explicit machine gaps prevent a human-gate-only terminal claim.
     - Current public-demo, real-Provider, 30-user, physical-device and non-author gates remain open.
   remaining_machine_work:
     - inject a rotated real Provider secret outside Git and pass the no-fallback probe
     - regenerate a working Quick Tunnel and rerun public verifier plus the short 30-user burst
+    - exercise production-faithful Provider failure with visible degradation and recovery
+    - copy a backup off-cluster and complete a restore drill from that copy
+    - move EKS-IAC from UNASSESSED to reproducible validate/plan evidence before any authorized apply
   remaining_human_gates:
     - physical Android sideload over cellular data
     - non-author no-coaching walkthrough and final aesthetic review

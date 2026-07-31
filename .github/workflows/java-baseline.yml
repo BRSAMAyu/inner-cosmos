@@ -27,6 +27,8 @@ jobs:
         run: corepack enable && corepack prepare pnpm@11.9.0 --activate
       - name: Install frontend and isolated OpenAPI toolchain
         run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Gate acceptance-ledger integrity
+        run: pnpm run acceptance:check
       - name: Gate generated OpenAPI types
         run: pnpm run api:check
       - name: Verify OpenAPI breaking-change rules

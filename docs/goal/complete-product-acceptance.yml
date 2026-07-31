@@ -1,21 +1,22 @@
 schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 authority: goal-objective.md
-status: RELEASE_CANDIDATE_BLOCKED_BY_HUMAN_GATE
-last_reconciled_at: 2026-07-31T19:31:17+08:00
-last_reconciled_commit: 73d2081f24ea07f573802ed2d2d37f35e8f322ae
+status: IN_PROGRESS
+last_reconciled_at: 2026-07-31T22:06:16+08:00
+last_reconciled_commit: 97c57c12e36ab63c63263910f4e563a5be9d7dc0
 current_fact_baseline: 对齐文档/24-完全体最终收敛与云原生课程战役.md
 current_execution_plan: 对齐文档/24-完全体最终收敛与云原生课程战役.md
 parallel_state: docs/goal/closure-campaign-state.yml
 reconciliation_boundary: >-
-  Commit 73d2081f is the synchronized competition-readiness checkpoint on main. It contains the
+  Commit 97c57c12 is the synchronized competition-readiness checkpoint on main. It contains the
   public-demo CSRF boundary, Redis distributed rate limiting, bounded classroom quotas, semantic
   memory embedding, demo-readiness and Aurora fallback repairs, current judge/repository entry
-  points, dependency vulnerability patches, and CI portability/supply-chain corrections. Local
+  points, Singapore crisis-resource corrections, Node 24 Actions, Spring test modernization,
+  dependency vulnerability patches, and CI portability/supply-chain corrections. Local
   Windows verification: backend 1503 total with 0 failures, 0 errors and 31 explicitly skipped
   without Docker; web 696/696 across 93 files; generated OpenAPI types and 6/6 compatibility-rule
   tests PASS; TypeScript/PWA and executable JAR/SBOM builds PASS; local browser acceptance passed
-  desktop and 390x844 mobile with zero application console errors. GitHub Actions run 30626414452
+  desktop and 390x844 mobile with zero application console errors. GitHub Actions run 30635751921
   passed both jobs at this exact commit: Docker-backed clean verify reported 292 suites, 1503
   tests, 0 failures, 0 errors and 1 external-provider skip; PostgreSQL/pgvector and Redis paths,
   100,000-row retrieval, source/history secret scans, Flyway fail-closed, SBOM and IaC gates,
@@ -23,9 +24,10 @@ reconciliation_boundary: >-
   HIGH/CRITICAL scanning all passed. The production smoke observed PostgreSQL 16 + pgvector with
   VERIFY_FULL, Redis 7.4.2 with VERIFIED_CA, Flyway 35 with 0 failed migrations and 89/89 tables,
   0 demo users, appuser, migration role and JDBC outbox worker. This closes the current machine
-  Docker/image/supply-chain gates, but does not close real-Provider, public-tunnel, 30-user,
-  physical-device, legal, psychology, account-owner or non-author gates. The only honest legal
-  state remains RELEASE_CANDIDATE_BLOCKED_BY_HUMAN_GATE.
+  Docker/image/supply-chain gates, but does not close a fresh real-Provider public-tunnel run,
+  operational provider-failure/off-cluster-restore drills, Terraform environment proof,
+  physical-device, legal, psychology, account-owner or non-author gates. Because machine work
+  remains explicit, the honest current state is IN_PROGRESS rather than a human-gate-only terminal.
 
 status_semantics:
   UNASSESSED: current HEAD and target environment have not been verified
@@ -537,7 +539,7 @@ gates:
       - {id: EKS-IAC, target: "Terraform reproducibly creates least-privilege Singapore-region platform dependencies and EKS environments.", status: UNASSESSED, evidence: []}
       - {id: EKS-WORKLOAD, target: "Kustomize workloads enforce probes, resources, PDB, spread, HPA, network policy, secrets, and graceful shutdown.", status: PASS, evidence: [evidence/academy/PROFILE-FOUNDATION-001/, evidence/academy/ACADEMY-RUNTIME-001/, evidence/academy/ACADEMY-LIVE-001/]}
       - {id: OPS-OBSERVABILITY, target: "OpenTelemetry dashboards, alerts, traces, AI cost/quality signals, and runbooks are exercised by non-authors.", status: IN_PROGRESS, evidence: [evidence/g8/OPS-OBSERVABILITY-001/, evidence/w3/CN-OTEL-SEMANTIC-TRACE-001/summary.md], remaining: "Prometheus/Grafana metrics and alerts plus privacy-safe OpenTelemetry cross-role traces are live-proven on kind. Remaining: AI cost/quality signal panels and a non-author runbook rehearsal (tracked in G9 FINAL-OPERATIONS)."}
-      - {id: OPS-RESILIENCE, target: "Canary, rollback, pod/node/provider failure, queue replay, and database/object restore meet declared SLO/RPO/RTO.", status: IN_PROGRESS, evidence: [evidence/g8/OPS-RESILIENCE-001/, evidence/g8/BACKUP-RESTORE-001/], remaining: "2026-07-17: exercised on kind — pod-kill recovery, zero-downtime rolling update (availableReplicas held at 4, maxUnavailable=0), node-drain with PDB minAvailable=1 blocking unsafe eviction + reschedule to another node + continuous HTTP 200, and a full pg_dump->drop->pg_restore backup/restore drill; SLO/RPO/RTO statement recorded. Remaining: canary + automated rollback scripting, provider-failure injection, queue-replay (see G2 EVENT-RELIABLE), off-cluster backup copy, and rerun on real academy-eks."}
+      - {id: OPS-RESILIENCE, target: "Canary, rollback, pod/node/provider failure, queue replay, and database/object restore meet declared SLO/RPO/RTO.", status: IN_PROGRESS, evidence: [evidence/g8/OPS-RESILIENCE-001/, evidence/g8/BACKUP-RESTORE-001/, evidence/w3/CN-PROGRESSIVE-DELIVERY-001/, evidence/g2/EVENT-RELIABLE-001/], remaining: "Reconciled 2026-07-31: kind already proves pod-kill recovery, zero-downtime rolling, node-drain/PDB behavior and PostgreSQL dump/restore; Argo Rollouts evidence proves a successful canary and automatic abort/rollback of a bad revision; JDBC outbox evidence proves DEAD-state exhaustion and exactly-once replay. Remaining: a production-faithful Provider-failure injection with observable user degradation/recovery, an off-cluster backup copy-and-restore drill, and a real Academy EKS/non-author runbook rerun."}
       - id: CN-ZERO-LOSS-DRAIN
         target: "Deleting an API Pod during a live multi-bubble Aurora SSE turn drains and resumes via durable timeline/Last-Event-ID without duplicate bubbles or side effects."
         status: PASS
@@ -561,7 +563,7 @@ gates:
       - {id: CN-OTEL-SEMANTIC-TRACE, target: "A privacy-safe distributed trace links Aurora HTTP/SSE, provider, retrieval, outbox, worker, memory/profile and WakeIntent spans without content or stable user identifiers.", status: PASS, evidence: [evidence/w3/CN-OTEL-SEMANTIC-TRACE-001/summary.md], remaining: "Local kind proof is complete; production backend retention/access policy and Academy availability remain deployment-environment gates."}
       - {id: CN-PROGRESSIVE-DELIVERY, target: "Gateway-weighted stable/canary delivery uses operational and AI-quality analysis to stop or automatically roll back a degrading runtime version.", status: PASS, evidence: [evidence/w3/CN-PROGRESSIVE-DELIVERY-001/, deploy/k8s/extensions/rollouts/], remaining: "2026-07-24 (branch codex/w3-extensions, merged): Argo Rollouts (helm v2.41.1/app v1.9.1) on kind -- a Rollout converting the real API Deployment, weighted canary 25->analysis->50->pause->100 with progressDeadlineAbort. REAL promote (good rev ramped to stable, AnalysisRun Successful on live Prometheus samples) + REAL auto-rollback (bad rev w/ broken readiness probe -> progressDeadlineAbort -> Degraded/aborted, bad RS scaled to 0, canary never took traffic, Service kept serving 4 stable pods -- zero downtime). Product hook + kill switch + resource boundary + Academy fallback (scripted HTTPRoute-weighted canary) all present. Boundary: expand-contract proven at mechanics level (per-pod H2), not against shared Postgres; the exact-match->version-compatible-range schema-compat redesign (CN-CREDIBILITY-001 6.1-6) remains deferred. Single-node local kind, not Academy EKS/multi-AZ."}
       - {id: CN-POLICY-AS-CODE, target: "Cluster or CI admission policy rejects unsigned, mutable, root, over-privileged, unbounded or production-debug workloads with reproducible evidence.", status: PASS, evidence: [evidence/w3/CN-POLICY-AS-CODE-001/, deploy/k8s/extensions/kyverno/], remaining: "2026-07-24 (branch codex/w3-extensions, merged): Kyverno (helm v3.8.2/app v1.18.2, minimal profile) on kind -- three Enforce ClusterPolicies (disallow-root-user, require-resource-limits, disallow-latest-tag). REAL allow (compliant pod/deployment admitted) + REAL rejection (root, no-resources, :latest pods AND a root Deployment all BLOCKED by the admission webhook). Kill switch proven live (delete policy -> :latest admitted; re-apply -> blocked); found+fixed a real Kyverno 1.18 'Unknown key' denial. Resource boundary + Academy fallback (CI-time kyverno CLI/kubeconform when LabRole can't run webhooks). Boundary: background:false (admission-time only, no audit of pre-existing pods); single-node local kind, Academy LabRole live-enforcement not probed."}
-      - {id: CN-EXTENSION-SHOWCASE, target: "Selected advanced cloud-native extensions each have a product hook, real success and failure evidence, kill switch, resource boundary and environment fallback.", status: IN_PROGRESS, evidence: [evidence/w3/CN-POLICY-AS-CODE-001/, evidence/w3/CN-PROGRESSIVE-DELIVERY-001/], remaining: "2026-07-24: two extensions now fully proven to the bar (Kyverno admission policy + Argo Rollouts canary -- each with a product hook, REAL success AND failure/rejection evidence, kill switch, resource boundary, Academy fallback). Additional Tier B/C candidates (Cilium/Hubble, cert-manager/External-Secrets, Falco, Chaos Mesh, Velero, OpenCost, SPIFFE, Indexed Jobs) remain optional choices for the presentation; the two implemented cover the plan's explicitly-prioritized policy + progressive-delivery scoring items."}
+      - {id: CN-EXTENSION-SHOWCASE, target: "Selected advanced cloud-native extensions each have a product hook, real success and failure evidence, kill switch, resource boundary and environment fallback.", status: PASS, evidence: [evidence/w3/CN-POLICY-AS-CODE-001/, evidence/w3/CN-PROGRESSIVE-DELIVERY-001/], remaining: "Reconciled 2026-07-31: the two selected extensions, Kyverno admission policy and Argo Rollouts canary, each have a product hook, real success and failure/rejection evidence, a kill switch, resource boundary and Academy fallback. Tier B/C candidates remain optional gallery choices and are not prerequisites for this acceptance target."}
       - id: SG-PRODUCT
         target: "English-first Singapore timezone experience and current local safety resources work completely."
         status: IN_PROGRESS
@@ -588,14 +590,14 @@ gates:
 
   - id: G9
     name: Complete product acceptance
-    status: UNASSESSED
+    status: IN_PROGRESS
     required: true
     acceptance:
       - {id: FINAL-E2E, target: "Web, PWA, and mobile complete-product journeys pass against a production-like environment.", status: IN_PROGRESS, evidence: [evidence/g9/FINAL-E2E-001/, evidence/innovation/INNO-MOBILE-007/, evidence/innovation/INNO-MOBILE-009/, evidence/demo/PUBLIC-DEMO-001/, evidence/demo/PUBLIC-DEMO-ANDROID-001/], remaining: "2026-07-24 public-Demo update: the real-provider classroom path is now machine-proven over a public HTTPS tunnel with PostgreSQL/pgvector + Redis. Two fresh users completed registration, discovery, friendship, private group membership, Aurora -> memory settlement, capsule publish/discovery/chat and slow-letter send; the exact public APK was installed on Android API 36.1, registered a fresh account inside the shell and received a real Aurora multi-bubble response with zero crash/ANR. Still IN_PROGRESS rather than inflated to PASS: a physical Android sideload/cellular smoke, the standing PKCE-native-shell release path, the one documented shared-seed Playwright flake, and non-author acceptance remain."}
       - {id: FINAL-DEMO, target: "An 8-12 minute reproducible demo proves product differentiation, AI depth, data lineage, and Kubernetes operations.", status: IN_PROGRESS, evidence: [evidence/g9/FINAL-DEMO-001/, evidence/g9/TRACEABILITY-SNAPSHOT-2026-07-17.md, evidence/integration/FINAL-P0-CLOSURE-2026-07-22/, evidence/demo/PUBLIC-DEMO-001/, evidence/demo/PUBLIC-DEMO-ANDROID-001/], remaining: "2026-07-24: scripts/demo/run-public-demo.ps1 is now the classroom authority. One command creates the public HTTPS tunnel, builds an origin-bound Android APK, starts PostgreSQL/pgvector + Redis + real DeepSeek/Qwen services, and self-verifies the full core trajectory including social relations. Android emulator install/in-App registration/Aurora and public-vs-installed APK hash equality are proven. Remaining for PASS: one physical-phone/cellular rehearsal and a non-author delivery of the documented 8-12 minute narrative; the Kubernetes showcase remains a separate presentation segment, not a runtime dependency for this laptop-server Demo."}
       - {id: FINAL-USABILITY, target: "Non-author participants complete core tasks and articulate the unique value without developer explanation.", status: UNASSESSED, evidence: []}
       - {id: FINAL-OPERATIONS, target: "Release, rollback, incident, provider failure, data-rights, and disaster-recovery runbooks are independently exercised.", status: UNASSESSED, evidence: []}
-      - {id: FINAL-TRACEABILITY, target: "Every required acceptance item points to current reproducible evidence and no hidden P0 blocker remains.", status: PASS, evidence: [evidence/g9/FINAL-TRACEABILITY-001/, docs/goal/complete-product-acceptance.yml, docs/audit/2026-07-23-gemini-master-audit-reconciliation.md], remaining: "2026-07-24: traceability snapshot frozen at evidence/g9/FINAL-TRACEABILITY-001/ -- every gate's evidence: array resolves at HEAD; W0V closed all 36 audit findings; two independent reviews ship-as-is (no CRITICAL/HIGH, M2 fixed); self-review fixed 3 voice regressions. The only remaining non-PASS items are the named HG-* external human gates + MOBILE-EXTERNAL-RELEASE + environment-portability proofs needing a real cluster (Academy EKS multi-AZ, commercial-sg SQS, EKS-IAC Terraform apply). No hidden P0 blocker. Ledger is the live cursor."}
+      - {id: FINAL-TRACEABILITY, target: "Every required acceptance item points to current reproducible evidence and no hidden P0 blocker remains.", status: PASS, evidence: [evidence/g9/FINAL-TRACEABILITY-001/, docs/goal/complete-product-acceptance.yml, docs/audit/2026-07-23-gemini-master-audit-reconciliation.md], remaining: "Reconciled 2026-07-31 at verified checkpoint 97c57c12: every repository-path evidence reference resolves; W0V closed all 36 audit findings; current CI, browser and safety evidence expose no hidden P0 blocker. Non-PASS items remain visible in this live ledger and include both named external/human gates and explicit machine/environment work; this traceability PASS does not promote those items or the overall goal to a terminal state."}
 
 completion_rule:
   required_gate_status: PASS

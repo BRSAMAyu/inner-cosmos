@@ -14,6 +14,7 @@
     "build:tauri:local": "tsc -b && vite build --mode tauri-local",
     "build:demo": "tsc -b && vite build --mode demo",
     "test": "vitest run",
+    "acceptance:check": "node scripts/check-acceptance-ledger.mjs",
     "api:generate": "node scripts/generate-openapi.mjs",
     "api:check": "node scripts/check-openapi-generated.mjs",
     "api:diff": "node scripts/check-openapi-breaking.mjs",

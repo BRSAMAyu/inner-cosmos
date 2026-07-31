@@ -2,9 +2,9 @@
 
 This is an evidence snapshot, not a permanent release certificate. It records the exact boundary
 after the competition-readiness repair pass at commit
-[`e402251b`](https://github.com/BRSAMAyu/inner-cosmos/commit/e402251b7d16dfd89656f7decf03c55c54717e08)
+[`97c57c12`](https://github.com/BRSAMAyu/inner-cosmos/commit/97c57c12e36ab63c63263910f4e563a5be9d7dc0)
 and the successful
-[`Java baseline` run 30633725234](https://github.com/BRSAMAyu/inner-cosmos/actions/runs/30633725234).
+[`Java baseline` run 30635751921](https://github.com/BRSAMAyu/inner-cosmos/actions/runs/30635751921).
 
 ## Verified locally
 
@@ -15,6 +15,7 @@ and the successful
 | Focused repaired regressions | `41` tests passed across claim candidates, Aurora fallback, and token forecast. |
 | OpenAPI generated-type gate | Passed. |
 | OpenAPI breaking-rule unit gate | `6` tests passed. |
+| Acceptance-ledger integrity | Passed: `10` parent gates, `69` acceptance items, `5` human gates, and `197` repository evidence paths parsed and resolved. |
 | React/TypeScript production build | Passed; PWA assets and service worker generated. |
 | Executable Spring Boot package | Passed; the repackaged JAR and CycloneDX SBOM were generated. |
 | Local teacher-demo smoke | Passed: health, demo login/session, and React shell. |
@@ -58,12 +59,14 @@ This CI evidence closes the Docker-backed integration, production-image smoke, a
 signature/provenance machine gates for this commit. It is not evidence of an authorized registry
 release, a public classroom tunnel, a real-provider quality review, or a physical-device rehearsal.
 
-## Remaining external and human gates
+## Remaining machine, external, and human gates
 
 | Gate | Status | Reason / next action |
 |---|---|---|
 | Public HTTPS multi-user journey | `NOT-RERUN` | Requires operator credentials, Docker, tunnel, and current device/browser acceptance. |
 | Real-provider semantic quality | `NOT-RERUN` | Requires operator-owned provider keys and the named evaluation harnesses. |
+| Operational resilience completion | `IN_PROGRESS` | Provider-failure degradation/recovery and an off-cluster backup restore still need production-faithful drills. Canary rollback and JDBC dead-letter replay are already proven and are no longer listed as missing. |
+| EKS Terraform | `UNASSESSED` | Repository infrastructure still needs reproducible validate/plan evidence before any owner-authorized apply. |
 | Android physical-device acceptance | `HUMAN-GATED` | Requires a freshly built APK, a real device, permissions, lifecycle, and network-transition checks. |
 | Academy EKS / commercial production | `HUMAN-GATED` | Requires live accounts, current credentials, deployment windows, and owner sign-off. |
 | Independent UX, accessibility, legal/privacy review | `HUMAN-GATED` | Automated tests are supporting evidence, not substitutes. |
@@ -90,6 +93,9 @@ threshold. This is a performance-improvement candidate, not a functional or buil
   telephone actions. See the [dated verification record](SINGAPORE-SAFETY-RESOURCE-VERIFICATION-2026-07-31.md).
 - Upgraded pinned official GitHub Actions to Node 24 releases and migrated Spring test overrides
   from deprecated `@MockBean` to `@MockitoBean`; the final CI run completed with zero annotations.
+- Corrected the governance state from a premature human-gate-only terminal to `IN_PROGRESS`,
+  reconciled completed canary/dead-letter evidence, and added a CI gate that rejects invalid
+  statuses, inconsistent parent/child states, duplicate IDs and missing repository evidence paths.
 
 ## Reproduction
 
@@ -98,6 +104,7 @@ $env:JAVA_HOME = 'C:\Program Files\Java\jdk-21.0.10'
 .\mvnw.cmd test
 
 Push-Location web
+npm.cmd run acceptance:check
 npm.cmd run api:check
 npm.cmd run api:diff:test
 npm.cmd test -- --run
