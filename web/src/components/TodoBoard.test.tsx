@@ -114,6 +114,11 @@ describe("TodoBoard", () => {
     render(<TodoBoard {...baseProps()} todos={[todo()]} onUpdate={onUpdate} />);
     fireEvent.click(screen.getByRole("button", { name: "编辑" }));
     const form = screen.getByRole("button", { name: "保存修改" }).closest("form")!;
+    const sourceInstant = new Date(todo().deadline!);
+    const pad = (part: number) => String(part).padStart(2, "0");
+    const expectedLocalValue = `${sourceInstant.getFullYear()}-${pad(sourceInstant.getMonth() + 1)}-${pad(sourceInstant.getDate())}`
+      + `T${pad(sourceInstant.getHours())}:${pad(sourceInstant.getMinutes())}`;
+    expect(within(form).getByLabelText("截止时间")).toHaveValue(expectedLocalValue);
     fireEvent.change(within(form).getByLabelText("任务名称"), { target: { value: "整理考试范围第一、二章" } });
     fireEvent.click(within(form).getByRole("button", { name: "保存修改" }));
     expect(onUpdate).toHaveBeenCalledExactlyOnceWith(1, {

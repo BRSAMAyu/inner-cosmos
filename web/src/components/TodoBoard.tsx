@@ -53,6 +53,14 @@ const COPY: Record<Locale, {
 type Draft = { taskName: string; priority: TodoItem["priority"]; deadline: string; description: string };
 const emptyDraft: Draft = { taskName: "", priority: "MEDIUM", deadline: "", description: "" };
 
+function toLocalDateTimeDraft(value: string): string {
+  const instant = new Date(value);
+  if (Number.isNaN(instant.getTime())) return value.replace(" ", "T").slice(0, 16);
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${instant.getFullYear()}-${pad(instant.getMonth() + 1)}-${pad(instant.getDate())}`
+    + `T${pad(instant.getHours())}:${pad(instant.getMinutes())}`;
+}
+
 function toTodoDraft(draft: Draft): TodoDraft {
   return {
     taskName: draft.taskName.trim(), priority: draft.priority,
@@ -108,7 +116,10 @@ export function TodoBoard({ todos, tab, busy, splitBusyId, onSelectTab, onCreate
     setEditingId(item.id);
     setEditDraft({
       taskName: item.taskName, priority: item.priority,
-      deadline: item.deadline ? item.deadline.slice(0, 16) : "", description: item.description ?? ""
+      // datetime-local represents a browser-local wall clock. Convert the backend instant before
+      // editing so an unchanged save preserves the same moment in Shanghai, UTC, or any judge's
+      // device timezone instead of silently shifting it.
+      deadline: item.deadline ? toLocalDateTimeDraft(item.deadline) : "", description: item.description ?? ""
     });
   };
 
