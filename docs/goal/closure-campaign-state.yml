@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 authority: 对齐文档/24-完全体最终收敛与云原生课程战役.md
 status: RELEASE_CANDIDATE_BLOCKED_BY_HUMAN_GATE
-updated_at: 2026-07-26T20:34:31+08:00
+updated_at: 2026-07-31T16:35:06+08:00
 
 legal_terminal_states:
   - COMPLETE
@@ -13,9 +13,12 @@ demo_delivery_front:
   status: BLOCKED
   priority: CURRENT
   current_runtime_note: >-
-    Historical machine evidence remains valid for its recorded 2026-07-24 run, but the Windows
-    reconciliation on 2026-07-26 found the stale public URL returning HTTP 404 and Docker daemon
-    unavailable. A fresh real-Provider run is required before classroom Go.
+    Historical public-runtime evidence remains valid only for its recorded 2026-07-24 run. On
+    2026-07-31 the isolated H2 + Mock teacher-demo passed health, login/session, the React shell,
+    the five-space browser journey, memory provenance, a bounded capsule conversation and a
+    390x844 responsive check. Docker remained unavailable, so PostgreSQL/Redis Testcontainers,
+    the real-Provider public tunnel, the 30-user burst and a physical-device rehearsal were not
+    rerun. A fresh public-demo run is still required before classroom Go.
   intent: >-
     Run the Windows laptop as the complete classroom server, expose it through a temporary public
     HTTPS reverse tunnel, and distribute an Android APK bound to the same origin. Teachers and
@@ -38,42 +41,53 @@ demo_delivery_front:
     - share the newly generated URL and APK after every Quick Tunnel restart
 
 integrated_head:
-  commit: 9f632f6
-  branch: codex/windows-final-closure
-  parent_before_integration: 6f243aa
+  commit: 9fe898b941a9210d0fd740529f3d608d19886f1f
+  branch: main
+  parent_before_integration: 07a9b26ffceacb948510acc19c541fb7170ebfef
   note: >-
-    Windows pulled origin/codex/english-demo-i18n and proved it was a direct four-commit
-    descendant of main, then fast-forwarded without conflicts. Commit 9f632f6 closes the two
-    machine-solvable natural-action P0s: action/confirmation turns suppress the unrelated
-    foreground acknowledgement, and an authoritative EXECUTED SSE receipt refreshes only the
-    affected memory, return-intent or settings domain. The production PWA bundle was rebuilt from
-    the exact validated source tree. Final main synchronization occurs after this reconciliation.
+    Commit 9fe898b9 is the scoped competition-readiness checkpoint on main. It restores CSRF,
+    distributed rate limiting, bounded classroom quotas and semantic memory embedding in the
+    public-demo profile; fixes the demo readiness contract, month-end token forecasting and
+    state-aware Aurora outage copy; standardizes Docker-unavailable Testcontainers behavior; and
+    adds judge, verification, security, contribution, documentation-index and poster-source
+    assets. The production PWA bundle was rebuilt from the exact validated source tree. The local
+    branch remains ahead of origin/main; GitHub synchronization is pending because github.com was
+    unreachable and the local gh credential is invalid.
   preserved_preexisting_dirty_paths:
-    - .vscode/ (untracked user workspace settings; not staged)
-    - docs/presentation/ (untracked user presentation artifact; not staged)
+    - docs/AI_ALIGNMENT_TECHNICAL_REFERENCE.md
+    - docs/presentation/inner-cosmos-cloud-native-defense-v4-continuity-aligned组员H1改进版.html
   exact_test_commands_and_counts:
-    - {cmd: ".\\mvnw.cmd -Dtest=<natural action, dual-kernel, greeting> test", result: "18/18, 0 failures, 0 errors"}
-    - {cmd: "cd web; npm.cmd test -- --run", result: "597/597 (84 files)"}
-    - {cmd: "cd web; npm.cmd run build", result: "tsc -b and production PWA build PASS; generated bundle committed"}
-    - {cmd: ".\\mvnw.cmd test", result: "1269 total, 0 assertion failures, 11 Docker/Testcontainers environment errors, 8 environment skips; not full PASS"}
-    - {cmd: ".\\scripts\\scan-secrets.ps1", result: "PASS, 0 findings"}
-    - {cmd: "git diff --check", result: clean}
+    - {cmd: ".\\mvnw.cmd test", result: "1503 total, 0 failures, 0 errors, 31 explicitly skipped without Docker; BUILD SUCCESS"}
+    - {cmd: "cd web; npm.cmd test -- --run", result: "696/696 (93 files)"}
+    - {cmd: "cd web; npm.cmd run api:check; npm.cmd run api:diff:test", result: "generated types current; 6/6 compatibility-rule tests PASS"}
+    - {cmd: "cd web; npm.cmd run build", result: "TypeScript and production PWA build PASS; 22 precache entries; generated bundle committed"}
+    - {cmd: ".\\mvnw.cmd -DskipTests package", result: "executable Spring Boot JAR and CycloneDX SBOM PASS"}
+    - {cmd: ".\\scripts\\scan-secrets.ps1; .\\scripts\\scan-secrets.ps1 -History", result: "both PASS, 0 findings"}
+    - {cmd: ".\\scripts\\academy\\validate-schema-version.ps1; .\\scripts\\academy\\validate-manifests.ps1", result: "V35/manifest 35 PASS; 22 resources, 0 forbidden, 0 missing controls"}
+    - {cmd: "docker compose -f deploy/compose/public-demo.yml config --quiet", result: "PASS with validation-only placeholder environment values; daemon not required"}
+    - {cmd: "git diff --cached --check", result: clean}
   browser_android_desktop_runtime_evidence:
     - Windows Java 21 and Node 22 validation completed natively; no WSL project execution.
-    - Docker Desktop processes existed, but the daemon pipe never became Ready; all 11 full-suite errors share that environment root cause.
-    - The stale Quick Tunnel process remained alive, but its health, App and AI-health URLs all returned HTTP 404.
-    - No current real-Provider call, 30-user burst, physical Android cellular run or non-author walkthrough was completed.
+    - The isolated teacher-demo passed health, demo login/session and React-shell smoke.
+    - A fresh in-app-browser journey passed login, Aurora multi-message reply, memory provenance, resonance discovery and bounded capsule reply, slow-letter space, privacy/settings and all five spaces.
+    - The same journey remained operable at a 390x844 viewport; the accepted browser console had zero application warnings or errors.
+    - This runtime used H2 + Mock and therefore does not prove PostgreSQL/Redis, real-Provider, public-network, multi-user or physical-device behavior.
+    - Docker was unavailable; 31 Docker/external tests were explicitly skipped instead of being mislabeled as product errors.
   acceptance_ledger_changes:
-    - Natural-action immediate UI feedback and action-turn foreground choreography are machine-closed at 9f632f6.
+    - Public-demo security bypasses are removed: CSRF and Redis rate limiting are enabled, usage is bounded, and missing CSRF tokens fail closed.
+    - Semantic memory embedding is the public-demo default; DisableMemoryEmbedding is an explicit disclosed recovery switch.
+    - Local browser and package evidence is refreshed at 9fe898b9 without promoting public, provider, Docker, device or human gates.
     - Current public-demo, real-Provider, Docker-backed integration, 30-user, physical-device and non-author gates remain open.
   remaining_machine_work:
     - restore Docker daemon and rerun all PostgreSQL/Redis Testcontainers tests
     - inject a rotated real Provider secret outside Git and pass the no-fallback probe
     - regenerate a working Quick Tunnel and rerun public verifier plus the short 30-user burst
+    - restore GitHub connectivity and authentication, then push the competition checkpoint plus this reconciliation and inspect remote CI
   remaining_human_gates:
     - physical Android sideload over cellular data
     - non-author no-coaching walkthrough and final aesthetic review
     - two-round 30-person full-journey rehearsal and independent dual-kernel quality review
+    - choose a repository license and approve any coordinated destructive history rewrite or remote-branch deletion
 
 current_front:
   id: W0V-VERIFIED-AUDIT-CLOSURE

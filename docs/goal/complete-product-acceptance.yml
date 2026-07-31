@@ -2,24 +2,28 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 authority: goal-objective.md
 status: RELEASE_CANDIDATE_BLOCKED_BY_HUMAN_GATE
-last_reconciled_at: 2026-07-26T20:34:31+08:00
-last_reconciled_commit: 9f632f6
+last_reconciled_at: 2026-07-31T16:35:06+08:00
+last_reconciled_commit: 9fe898b941a9210d0fd740529f3d608d19886f1f
 current_fact_baseline: 对齐文档/24-完全体最终收敛与云原生课程战役.md
 current_execution_plan: 对齐文档/24-完全体最终收敛与云原生课程战役.md
 parallel_state: docs/goal/closure-campaign-state.yml
 reconciliation_boundary: >-
-  Windows pulled and fast-forwarded the four commits from origin/codex/english-demo-i18n onto
-  the current main lineage without conflict. Commit 9f632f6 closes the two machine-solvable
-  natural-action experience gates: action/confirmation turns no longer emit an unrelated fast
-  acknowledgement, and authoritative EXECUTED receipts immediately refresh memory, return-intent
-  or settings state. Windows verification: focused backend 18/18; web 597/597 across 84 files;
-  TypeScript and production PWA build PASS; secret scan 0 findings. Full Maven is not a full PASS:
-  1269 total, 0 assertion failures, 11 Docker/Testcontainers environment errors and 8 environment
-  skips because the Docker daemon never became Ready. The stale Quick Tunnel URLs returned HTTP
-  404, no current real-Provider call was executed, and 30-user, physical Android cellular and
-  non-author gates remain open. The only honest legal state is therefore
-  RELEASE_CANDIDATE_BLOCKED_BY_HUMAN_GATE; historical evidence remains scoped to its recorded
-  commit/environment and cannot close the current runtime gates.
+  Commit 9fe898b9 is the scoped competition-readiness checkpoint on main. It restores the
+  public-demo CSRF boundary, Redis distributed rate limiting, bounded classroom quotas and
+  semantic memory embedding; fixes demo readiness, month-end token forecasting and state-aware
+  Aurora outage copy; and adds current judge, verification, security, contribution and
+  documentation entry points. Windows verification at this commit: backend 1503 total with
+  0 failures, 0 errors and 31 explicitly skipped without Docker; web 696/696 across 93 files;
+  generated OpenAPI types and 6/6 compatibility-rule tests PASS; TypeScript/PWA and executable
+  JAR/SBOM builds PASS; current-tree and reachable-history secret scans each report 0 findings;
+  Academy V35 and 22-resource structural gates PASS. A fresh isolated H2 + Mock browser journey
+  passed login, Aurora reply, memory provenance, resonance dialogue, slow letters, privacy and
+  all five spaces on desktop plus 390x844 mobile, with zero application console errors. This does
+  not close PostgreSQL/Redis, real-Provider, public-tunnel, 30-user, physical-device or non-author
+  gates. Docker remained unavailable, GitHub push was blocked by network plus an invalid local gh
+  credential, and the local branch remains ahead of origin/main. The only honest legal state is
+  therefore RELEASE_CANDIDATE_BLOCKED_BY_HUMAN_GATE; historical evidence remains scoped to its
+  recorded commit and environment.
 
 status_semantics:
   UNASSESSED: current HEAD and target environment have not been verified
