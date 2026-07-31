@@ -6,6 +6,13 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+$curl = Get-Command -Name curl.exe, curl -CommandType Application -ErrorAction SilentlyContinue |
+    Select-Object -First 1
+if (-not $curl) {
+    throw "curl is required to execute the production HTTP security probe."
+}
+$curlNullDevice = if ([IO.Path]::DirectorySeparatorChar -eq '\') { "NUL" } else { "/dev/null" }
+
 $postgresImage = "pgvector/pgvector:0.8.1-pg16@sha256:33198da2828a14c30348d2ccb4750833d5ed9a44c88d840a0e523d7417120337"
 $redisImage = "redis:7.4.2-alpine@sha256:02419de7eddf55aa5bcf49efb74e88fa8d931b4d77c07eff8a6b2144472b6952"
 $runId = [Guid]::NewGuid().ToString("N").Substring(0, 12)
@@ -302,7 +309,7 @@ chmod 644 redis-server.key redis-server.crt ca.crt
     # A valid session-bound CSRF token lets the login request reach the security-chain
     # limiter. The failed credential check is intentional; the Redis key proves the
     # production filter path is shared and atomic rather than pod-local.
-    $loginStatus = & curl.exe --silent --show-error --output NUL --write-out "%{http_code}" `
+    $loginStatus = & $curl.Source --silent --show-error --output $curlNullDevice --write-out "%{http_code}" `
         --request POST "http://127.0.0.1:$hostPort/api/auth/login" `
         --header "${csrfHeaderName}: $csrfToken" `
         --header "Cookie: SESSION=$sessionCookie" `
