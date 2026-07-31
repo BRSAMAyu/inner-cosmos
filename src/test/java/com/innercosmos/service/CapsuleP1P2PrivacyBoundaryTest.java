@@ -11,8 +11,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -61,7 +61,7 @@ class CapsuleP1P2PrivacyBoundaryTest {
     // calls LlmClient directly, never StructuredAiService -- so mocking StructuredAiService here
     // only intercepts the PersonaChat turn's provider call below, leaving createFromMemory's own
     // real (Mock-provider) compilation path untouched.
-    @MockBean
+    @MockitoBean
     private StructuredAiService structuredAiService;
 
     private static final String CANARY_SUMMARY =

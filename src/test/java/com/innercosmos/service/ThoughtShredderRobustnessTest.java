@@ -11,8 +11,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -43,7 +43,7 @@ import static org.mockito.Mockito.when;
  *
  * <p>Uses a real {@code @SpringBootTest} + H2 (test profile, MODE=MySQL) context, following the
  * same convention as {@link CapsuleP1P2PrivacyBoundaryTest}: {@link StructuredAiService} is
- * {@code @MockBean}-replaced so each test controls the exact AI-provider output deterministically,
+ * {@code @MockitoBean}-replaced so each test controls the exact AI-provider output deterministically,
  * while persistence goes through the real MyBatis-Plus mappers against the real schema.
  */
 @SpringBootTest(properties = {
@@ -59,7 +59,7 @@ class ThoughtShredderRobustnessTest {
     @Autowired
     private ThoughtShredderService thoughtShredderService;
 
-    @MockBean
+    @MockitoBean
     private StructuredAiService structuredAiService;
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -141,7 +141,7 @@ class ThoughtShredderRobustnessTest {
         stubAi(stubShredderResult("累"));
 
         // Deliberately mundane text with no crisis/abuse/distress-signal keyword overlap: those
-        // trigger SafetyReviewService.recheckSync, which also calls the (here @MockBean-replaced)
+        // trigger SafetyReviewService.recheckSync, which also calls the (here @MockitoBean-replaced)
         // StructuredAiService with a different result type -- a second, differently-typed call
         // through the same blanket `any()` stub would return this test's ShredderResult where a
         // safety-review result type is expected.
