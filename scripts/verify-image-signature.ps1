@@ -101,6 +101,7 @@ try {
         "run", "--rm", "--network", "host"
     ) + $dockerUserArguments + @(
         "-e", "COSIGN_PASSWORD=$password",
+        "-e", "HOME=/keys/home",
         "-v", "${resolvedTempRoot}:/keys",
         $cosignImage
     )
