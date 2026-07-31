@@ -1,6 +1,6 @@
 # Inner Cosmos
 
-[中文说明](README.zh-CN.md) · [Agent entry point (CLAUDE.md)](CLAUDE.md) · [Current execution authority](对齐文档/24-完全体最终收敛与云原生课程战役.md) · [Deployment handoff](对齐文档/18-组员与Coding-Agent启动部署交接指南.md) · [Complete-product goal](goal-objective.md) · [Acceptance ledger](docs/goal/complete-product-acceptance.yml)
+[中文说明](README.zh-CN.md) · [Judge guide](docs/competition/JUDGE-GUIDE.md) · [Verification snapshot](docs/competition/VERIFICATION-SNAPSHOT-2026-07-31.md) · [Documentation index](docs/README.md) · [Agent entry point](CLAUDE.md) · [Acceptance ledger](docs/goal/complete-product-acceptance.yml)
 
 Inner Cosmos is an AI-native self-understanding and slow-social platform. Aurora turns natural conversations into a long-lived, user-correctable model of memories, values, relationships, emotions, and goals. With explicit consent, that model can be compiled into bounded Echo Capsules that help people discover meaningful resonance before deciding whether to connect as humans.
 
@@ -14,6 +14,8 @@ open the shared `https://…trycloudflare.com/app/aurora/` URL in any browser (t
 install the shared demo APK on an Android device. Both connect to the operator's own machine acting
 as the server over a public tunnel — there is no separate cloud deployment. If no link was shared
 with you yet, ask the presenter, or follow the "Quick start" section below to run it yourself.
+For a five-minute product route followed by a ten-minute engineering review, use the
+**[competition judge guide](docs/competition/JUDGE-GUIDE.md)**.
 
 ## Why it is different
 
@@ -74,9 +76,10 @@ For frontend work:
 
 ```powershell
 cd web
-npm ci
-npm test
-npm run build
+corepack enable
+pnpm install --frozen-lockfile
+pnpm test
+pnpm run build
 ```
 
 `npm run build` writes the production AppShell bundle into Spring Boot's static resources. The Java application serves the same built UI.
@@ -95,8 +98,9 @@ $env:GLM_API_KEY = (Get-Content -Raw "$HOME\.inner-cosmos\glm.key").Trim()
 Equivalent provider-specific variables include `GEMINI_API_KEY`, `MINIMAX_API_KEY`,
 `DEEPSEEK_API_KEY`, `MIMO_API_KEY`, and `GLM_ASR_API_KEY`. Aurora can route its fast acknowledgement,
 visible speaker, and reflective planner independently with `AURORA_FAST_MODEL`,
-`AURORA_SPEAKER_MODEL`, and `AURORA_THINKER_MODEL`; defaults are Gemini 3.5 Flash-Lite
-(`minimal`), Gemini 3.6 Flash (`medium`), and DeepSeek V4 Pro (`high`). Credentials remain
+`AURORA_SPEAKER_MODEL`, and `AURORA_THINKER_MODEL`; the current defaults use
+`gemini-3.6-flash` for all three stages, while stage-specific thinking levels, token budgets,
+temperatures, or models can be overridden independently. Credentials remain
 provider-specific environment variables—never reuse one vendor's generic key for another.
 Each stage also has an independent response budget and sampling profile:
 `AURORA_FAST_TEMPERATURE`, `AURORA_SPEAKER_TEMPERATURE`,
@@ -135,9 +139,10 @@ Use risk-proportional checks during development:
 
 # Frontend unit/type/build gate
 Push-Location web
-npm ci
-npm test
-npm run build
+corepack enable
+pnpm install --frozen-lockfile
+pnpm test
+pnpm run build
 Pop-Location
 
 # Offline-safe Academy manifest/preflight validation
@@ -146,6 +151,8 @@ Pop-Location
 ```
 
 Some PostgreSQL/Redis integration tests require a working Docker engine. A missing Docker daemon is an infrastructure failure, not permission to mark those tests passed. Current evidence lives under [`evidence/`](evidence/) and every acceptance status must point to reproducible proof.
+The latest consolidated local result and its explicit environment gaps are recorded in
+[`docs/competition/VERIFICATION-SNAPSHOT-2026-07-31.md`](docs/competition/VERIFICATION-SNAPSHOT-2026-07-31.md).
 
 ## Security and secret handling
 

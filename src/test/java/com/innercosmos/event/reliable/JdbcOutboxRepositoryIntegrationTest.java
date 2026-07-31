@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 import java.time.Duration;
@@ -18,6 +19,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@Testcontainers(disabledWithoutDocker = true)
 class JdbcOutboxRepositoryIntegrationTest {
     private static final String IMAGE = "pgvector/pgvector:0.8.1-pg16@sha256:"
             + "33198da2828a14c30348d2ccb4750833d5ed9a44c88d840a0e523d7417120337";

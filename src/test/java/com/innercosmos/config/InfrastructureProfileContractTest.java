@@ -47,6 +47,16 @@ class InfrastructureProfileContractTest {
                 .contains("product-semantics: complete");
     }
 
+    @Test
+    void redisFreeDemoReadinessDoesNotRequireRedisContributor() throws IOException {
+        String demo = resource("application-demo.yml");
+
+        assertThat(demo)
+                .contains("include: readinessState,db,custom")
+                .containsPattern("(?s)redis:\\s+enabled: false")
+                .doesNotContain("include: readinessState,db,redis,custom");
+    }
+
     private String resource(String name) throws IOException {
         return Files.readString(Path.of("src/main/resources", name));
     }

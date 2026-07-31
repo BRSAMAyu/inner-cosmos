@@ -47,6 +47,9 @@ web/*.d.ts
 # Local verification output
 __pycache__/
 *.pyc
+/output/
+/tmp/
+/poster-*.png
 build/mobile-domain-association/
 web/.scratch-*/
 web/pwa-preview.html

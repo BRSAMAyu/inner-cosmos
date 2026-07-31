@@ -42,10 +42,25 @@ services:
       REDIS_PORT: "6379"
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       REDIS_SESSION_ENABLED: "true"
-      # The classroom runtime intentionally has no application-level request bucket.
-      # Provider-side 429s are handled by retry/failover instead of surfacing as fake disconnects.
-      REDIS_RATE_LIMIT_ENABLED: "false"
-      DEMO_UNLIMITED_USAGE_ENABLED: "true"
+      # Keep the same distributed abuse controls as the formal product. Classroom capacity is
+      # expressed through explicit, bounded quotas instead of bypassing the filter.
+      REDIS_RATE_LIMIT_ENABLED: "true"
+      DEMO_UNLIMITED_USAGE_ENABLED: "false"
+      RATE_LIMIT_LOGIN_CAPACITY: "120"
+      RATE_LIMIT_LOGIN_REFILL_PER_MINUTE: "120"
+      RATE_LIMIT_LOGIN_ADVERTISED: "120"
+      RATE_LIMIT_ANON_CAPACITY: "240"
+      RATE_LIMIT_ANON_REFILL_PER_MINUTE: "240"
+      RATE_LIMIT_ANON_ADVERTISED: "240"
+      RATE_LIMIT_USER_CAPACITY: "120"
+      RATE_LIMIT_USER_REFILL_PER_MINUTE: "120"
+      RATE_LIMIT_USER_ADVERTISED: "120"
+      RATE_LIMIT_AURORA_CAPACITY: "30"
+      RATE_LIMIT_AURORA_REFILL_PER_MINUTE: "30"
+      RATE_LIMIT_AURORA_ADVERTISED: "30"
+      RATE_LIMIT_MODEL_BACKED_CAPACITY: "30"
+      RATE_LIMIT_MODEL_BACKED_REFILL_PER_MINUTE: "30"
+      RATE_LIMIT_MODEL_BACKED_ADVERTISED: "30"
       REDIS_SCHEDULER_LOCK_ENABLED: "true"
       REDIS_AURORA_STREAM_ENABLED: "true"
       REDIS_IDEMPOTENCY_ENABLED: "true"
@@ -78,9 +93,11 @@ services:
       # used in the current user input. The provider boundary still overrides legacy prompts that
       # hard-code Chinese output.
       LLM_PROMPT_LANGUAGE: auto
-      # Deliberately off for the classroom closure: curated lexical/theme retrieval is stable,
-      # while background vector rebuilds add an external dependency with no proven demo benefit.
-      MEMORY_EMBEDDING_ENABLED: "false"
+      # Formal semantic retrieval is on by default. The runbook offers an explicit recovery switch
+      # for provider incidents, and records that degraded mode instead of silently changing product
+      # semantics for every presentation.
+      MEMORY_EMBEDDING_ENABLED: ${MEMORY_EMBEDDING_ENABLED:-true}
+      MEMORY_EMBEDDING_API_KEY: ${MEMORY_EMBEDDING_API_KEY:?loaded locally by run-public-demo.ps1}
       TTS_ENABLED: "true"
       TTS_API_KEY: ${TTS_API_KEY:?loaded locally by run-public-demo.ps1}
       TTS_WS_URL: ${TTS_WS_URL}
@@ -88,12 +105,9 @@ services:
       COOKIE_SECURE: "true"
       COOKIE_SAME_SITE: none
       INNER_COSMOS_SECURITY_TRUSTED_PROXY_ENABLED: "true"
-      # These are three public, shared, equal-privilege classroom stories with no real user data.
-      # Session-bound CSRF rotation repeatedly stranded A -> B -> C comparisons during a hard
-      # reload. Keep auth/data ownership/rate limits intact, but remove that production-only
-      # interaction tax in this temporary public-demo compose. Prod still hard-requires CSRF via
-      # ProductionStartupGuard and never consumes this compose file.
-      INNER_COSMOS_SECURITY_CSRF_ENABLED: "false"
+      # The SPA refreshes its synchronizer token after every persona/session transition. Public
+      # presentation traffic therefore keeps the formal CSRF boundary instead of weakening it.
+      INNER_COSMOS_SECURITY_CSRF_ENABLED: "true"
       SERVER_FORWARD_HEADERS_STRATEGY: framework
       MANAGEMENT_HEALTH_REDIS_ENABLED: "true"
       # Optional classroom bridge into the already-running kind OTel Collector. The host port is

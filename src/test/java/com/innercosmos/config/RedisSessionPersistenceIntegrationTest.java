@@ -26,7 +26,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Testcontainers
+@Testcontainers(disabledWithoutDocker = true)
 class RedisSessionPersistenceIntegrationTest {
 
     private static final String IMAGE = "redis:7.4.2-alpine@sha256:"

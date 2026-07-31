@@ -1955,13 +1955,13 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 Character.UnicodeScript.of(cp) == Character.UnicodeScript.HAN);
         if (!chinese) {
             return category == AiFailureContract.Category.PROVIDER_UNAVAILABLE
-                    ? fallbackAwareMessage(stateSignal) : category.defaultUserMessage;
+                    ? fallbackAwareMessage(stateSignal, false) : category.defaultUserMessage;
         }
         return switch (category) {
             case TIMEOUT -> "你的消息已经保存，但这次回复超过了等待时间。请稍后重试；Aurora 会从这条消息继续。";
             case RATE_LIMITED -> "你的消息已经保存。当前模型线路繁忙，请稍后重试。";
             case MALFORMED_OUTPUT -> "你的消息已经保存，但这次回复没有通过完整性检查，请重试一次。";
-            case PROVIDER_UNAVAILABLE -> "你的消息已经保存，但 Aurora 暂时无法连接模型线路。恢复后可以从这里继续。";
+            case PROVIDER_UNAVAILABLE -> fallbackAwareMessage(stateSignal, true);
         };
     }
 
@@ -2736,11 +2736,15 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     }
 
     /** VS-004 fallback coherence: the generic-failure message reflects the state signal. */
-    private String fallbackAwareMessage(String stateSignal) {
-        String base = "I heard you. Things were a bit slow just now, but your words are with me. You can say it again or move on to the next thing.";
+    private String fallbackAwareMessage(String stateSignal, boolean chinese) {
+        String base = chinese
+                ? "你的消息已经保存，但 Aurora 暂时无法连接模型线路。恢复后可以从这里继续。"
+                : "I heard you. Things were a bit slow just now, but your words are with me. You can say it again or move on to the next thing.";
         if (stateSignal == null) return base;
         if (stateSignal.contains("疲惫") || stateSignal.contains("脆弱") || stateSignal.contains("承着")) {
-            return "我听见你了。刚才这边慢了一下，但你不用现在就把话说全——我先把这一刻稳稳接住。";
+            return chinese
+                    ? "我听见你了。你的消息已经保存；刚才这边慢了一下，但你不用现在就把话说全——我先把这一刻稳稳接住。"
+                    : "I heard you, and your message is saved. Things were slow just now; you do not have to explain everything yet. I will hold this moment with you.";
         }
         return base;
     }

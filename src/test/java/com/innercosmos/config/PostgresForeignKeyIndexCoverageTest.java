@@ -30,7 +30,7 @@ import org.testcontainers.utility.DockerImageName;
  * Flyway-applied schema, so a future migration change that silently reorders either composite
  * index (and would quietly break this claim) fails this test instead of going unnoticed.
  */
-@Testcontainers
+@Testcontainers(disabledWithoutDocker = true)
 class PostgresForeignKeyIndexCoverageTest {
 
     private static final String IMAGE = "pgvector/pgvector:0.8.1-pg16@sha256:"

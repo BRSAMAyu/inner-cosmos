@@ -123,8 +123,10 @@ public class TokenEstimationServiceImpl implements TokenEstimationService {
     @Override
     public UsageForecast getForecast(Long userId) {
         DailyUsage usage = dailyUsageStore.getOrDefault(userId, new DailyUsage());
-        int currentDayOfMonth = LocalDate.now().getDayOfMonth();
-        int remainingDays = 30 - currentDayOfMonth;
+        LocalDate today = LocalDate.now();
+        // Include today so the forecast remains meaningful on the last day of every
+        // month, and use the calendar's real month length instead of assuming 30 days.
+        int remainingDays = today.lengthOfMonth() - today.getDayOfMonth() + 1;
 
         int projectedDaily = usage.requestCount > 0 ? usage.totalTokens / usage.requestCount : 500;
         int projectedMonthly = usage.totalTokens + (projectedDaily * remainingDays);

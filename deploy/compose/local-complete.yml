@@ -72,9 +72,8 @@ services:
       SPRING_SSL_BUNDLE_PEM_REDIS_TRUSTSTORE_CERTIFICATE: file:/tls/redis/ca.crt
       REDIS_SESSION_ENABLED: "true"
       # This compose activates the prod guard, so distributed ingress protection stays enabled.
-      # Classroom/public and kind showcase runtimes disable the request bucket entirely.
       REDIS_RATE_LIMIT_ENABLED: "true"
-      DEMO_UNLIMITED_USAGE_ENABLED: "true"
+      DEMO_UNLIMITED_USAGE_ENABLED: "false"
       REDIS_SCHEDULER_LOCK_ENABLED: "true"
       LLM_MODE: prod
       LLM_PROVIDER: ${LLM_PROVIDER:?set a real provider}

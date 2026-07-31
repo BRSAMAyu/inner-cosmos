@@ -100,30 +100,21 @@ describe("CSRF recovery under concurrent Aurora sends", () => {
     expect(csrfLoads).toBe(2);
   });
 
-  it("keeps unsafe Demo requests usable when the classroom profile disables CSRF", async () => {
+  it("fails closed when the server does not issue a CSRF token", async () => {
     vi.resetModules();
     const calls: string[] = [];
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL): Promise<Response> => {
       const url = String(input);
       if (url.endsWith("/api/v1/auth/csrf")) {
-        calls.push("csrf-disabled");
+        calls.push("csrf-missing");
         return envelope(200, {});
-      }
-      if (url.endsWith("/api/public/demo/enter/lin-chuan")) {
-        calls.push(`enter:${new Headers(init?.headers).get("X-CSRF-TOKEN")}`);
-        return envelope(200, { id: 2, username: "river", nickname: "林川", role: "USER" });
       }
       throw new Error(`Unexpected request: ${url}`);
     });
     vi.stubGlobal("fetch", fetchMock);
 
     const { api } = await import("../api");
-    await expect(api.enterDemoPersona("lin-chuan")).resolves.toMatchObject({ username: "river" });
-
-    expect(calls).toEqual([
-      "csrf-disabled",
-      "enter:csrf-disabled",
-      "csrf-disabled"
-    ]);
+    await expect(api.enterDemoPersona("lin-chuan")).rejects.toThrow(/secure session|安全会话/);
+    expect(calls).toEqual(["csrf-missing"]);
   });
 });

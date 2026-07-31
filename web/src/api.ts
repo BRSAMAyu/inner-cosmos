@@ -762,10 +762,10 @@ async function getCsrf(): Promise<Csrf> {
   if (!body.data
       || typeof body.data.token !== "string"
       || typeof body.data.headerName !== "string") {
-    // The temporary public classroom Demo deliberately disables synchronizer-token
-    // validation. Keep the shared request pipeline intact with a harmless placeholder;
-    // production profiles always return a real token and still fail closed at startup.
-    return { token: "csrf-disabled", headerName: "X-CSRF-TOKEN" };
+    throw new Error(apiCopy(
+      "The server did not establish a secure session. Refresh and try again.",
+      "服务器未能建立安全会话，请刷新后重试。"
+    ));
   }
   return body.data;
 }

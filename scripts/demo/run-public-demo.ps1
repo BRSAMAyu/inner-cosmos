@@ -12,6 +12,7 @@ param(
     [switch]$StrictVerification,
     [switch]$NoWatchdog,
     [switch]$EnableLiveObservability,
+    [switch]$DisableMemoryEmbedding,
     [switch]$SkipApkBuild
 )
 
@@ -223,10 +224,11 @@ try {
     $env:AURORA_THINKER_MODEL = $auroraStageModel
     $env:AURORA_SPEAKER_THINKING_LEVEL = "minimal"
     $env:AURORA_SPEAKER_MAX_TOKENS = "2048"
-    # Classroom closure intentionally disables provider embeddings. Lexical/theme retrieval is
-    # deterministic and sufficient for the curated journey; vector rebuild calls added latency
-    # and an unrelated external failure mode without a verified positive demo effect.
-    $env:MEMORY_EMBEDDING_ENABLED = "false"
+    # The same required DashScope/Qwen credential powers the formal semantic-memory path.
+    # Keep it enabled for the competition runtime; the explicit switch is a recovery option,
+    # never a silent classroom default.
+    $env:MEMORY_EMBEDDING_ENABLED = if ($DisableMemoryEmbedding) { "false" } else { "true" }
+    $env:MEMORY_EMBEDDING_API_KEY = $dashscopeKey
     $env:TTS_API_KEY = $dashscopeKey
     $env:TTS_WS_URL = "wss://llm-errus8cw2pf66bx9.cn-beijing.maas.aliyuncs.com/api-ws/v1/inference"
     if ($EnableLiveObservability) {

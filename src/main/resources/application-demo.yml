@@ -5,6 +5,18 @@ llm:
   model: mock-inner-cosmos
   allow-fallback: true
 
+# The explicit demo profile is Redis-free, just like the default dev profile. Its readiness group
+# must not reference a health contributor that this profile disables at launch.
+management:
+  endpoint:
+    health:
+      group:
+        readiness:
+          include: readinessState,db,custom
+  health:
+    redis:
+      enabled: false
+
 # The demo profile is explicitly selected by an operator and is structurally excluded from prod
 # by DemoDataConfiguration. Keeping this here makes a clean demo deterministic instead of relying
 # on an easy-to-miss environment variable or stale local H2 file.

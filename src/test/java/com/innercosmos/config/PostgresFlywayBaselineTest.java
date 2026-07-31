@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-@Testcontainers
+@Testcontainers(disabledWithoutDocker = true)
 class PostgresFlywayBaselineTest {
 
     private static final String IMAGE = "pgvector/pgvector:0.8.1-pg16@sha256:"

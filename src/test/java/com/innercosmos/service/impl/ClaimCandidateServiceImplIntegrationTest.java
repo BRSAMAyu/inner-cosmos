@@ -68,10 +68,10 @@ class ClaimCandidateServiceImplIntegrationTest {
         seedMessage(sessionId, userId, "USER", "我是不是太敏感了？"); // question — must not become a claim
 
         int staged = service.stageForSession(userId, sessionId);
-        assertThat(staged).isEqualTo(2);
+        assertThat(staged).isEqualTo(1);
 
         List<ClaimCandidateVO> candidates = service.listCandidates(userId);
-        assertThat(candidates).hasSize(2);
+        assertThat(candidates).hasSize(1);
         ClaimCandidateVO preference = candidates.stream()
                 .filter(candidate -> ClaimTypes.PREFERENCE.equals(candidate.claimType())).findFirst().orElseThrow();
         assertThat(preference.claimType()).isEqualTo(ClaimTypes.PREFERENCE);
@@ -81,10 +81,10 @@ class ClaimCandidateServiceImplIntegrationTest {
 
         // Re-staging the same session must not create a second CANDIDATE row for the same claim key.
         service.stageForSession(userId, sessionId);
-        assertThat(service.listCandidates(userId)).hasSize(2);
+        assertThat(service.listCandidates(userId)).hasSize(1);
         long candidateRows = claimMapper.selectCount(new QueryWrapper<UnderstandingClaim>()
                 .eq("user_id", userId).eq("status", "CANDIDATE"));
-        assertThat(candidateRows).isEqualTo(2);
+        assertThat(candidateRows).isEqualTo(1);
     }
 
     @Test

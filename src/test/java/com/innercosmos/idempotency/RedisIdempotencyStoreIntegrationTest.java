@@ -17,7 +17,7 @@ import org.testcontainers.utility.DockerImageName;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Testcontainers
+@Testcontainers(disabledWithoutDocker = true)
 class RedisIdempotencyStoreIntegrationTest {
     private static final String IMAGE = "redis:7.4.2-alpine@sha256:"
             + "02419de7eddf55aa5bcf49efb74e88fa8d931b4d77c07eff8a6b2144472b6952";

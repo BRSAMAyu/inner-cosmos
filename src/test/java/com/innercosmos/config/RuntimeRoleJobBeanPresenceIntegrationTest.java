@@ -44,7 +44,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * gates on the bean definitions themselves, not by whether scheduling is turned on, so disabling
  * scheduling does not weaken what this test proves.
  */
-@Testcontainers
+@Testcontainers(disabledWithoutDocker = true)
 class RuntimeRoleJobBeanPresenceIntegrationTest {
 
     private static final String IMAGE = "pgvector/pgvector:0.8.1-pg16@sha256:"

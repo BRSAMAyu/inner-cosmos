@@ -1,6 +1,6 @@
 # Inner Cosmos（内宇宙）
 
-[English README](README.md) · [Agent 入口 (CLAUDE.md)](CLAUDE.md) · [当前执行权威](对齐文档/24-完全体最终收敛与云原生课程战役.md) · [启动部署交接](对齐文档/18-组员与Coding-Agent启动部署交接指南.md) · [完全体总目标](goal-objective.md) · [机器验收账本](docs/goal/complete-product-acceptance.yml)
+[English README](README.md) · [评委指南](docs/competition/JUDGE-GUIDE.md) · [验证快照](docs/competition/VERIFICATION-SNAPSHOT-2026-07-31.md) · [文档导航](docs/README.md) · [Agent 入口](CLAUDE.md) · [机器验收账本](docs/goal/complete-product-acceptance.yml)
 
 Inner Cosmos 是一个以长期自我理解和慢社交为核心的 AI 原生产品。Aurora 将自然对话逐步沉淀为可追溯、可纠正、可撤回的记忆、画像、关系、情绪与目标模型；用户在明确授权后，可以把其中一部分编译成有边界的 Echo Capsule（共鸣体），先形成理解与共鸣，再决定是否接近真人。
 
@@ -13,6 +13,8 @@ Inner Cosmos 是一个以长期自我理解和慢社交为核心的 AI 原生产
 `https://…trycloudflare.com/app/aurora/` 链接（最快的路径），或者在 Android 设备上安装分享的演示
 APK。两者都是连接到操作者自己电脑上通过公网隧道暴露的服务，没有单独的云端部署。如果还没收到链接，
 请向演示者索取，或参考下面的"最快本地启动"章节自行运行。
+若要按“5 分钟产品体验 + 10 分钟工程审查”评阅，请直接使用
+**[比赛评委指南](docs/competition/JUDGE-GUIDE.md)**。
 
 ## 核心差异
 
@@ -56,9 +58,10 @@ macOS/Linux：
 
 ```powershell
 Push-Location web
-npm ci
-npm test
-npm run build
+corepack enable
+pnpm install --frozen-lockfile
+pnpm test
+pnpm run build
 Pop-Location
 ```
 
@@ -98,9 +101,10 @@ $env:GLM_API_KEY = (Get-Content -Raw "$HOME\.inner-cosmos\glm.key").Trim()
 .\mvnw.cmd test
 
 Push-Location web
-npm ci
-npm test
-npm run build
+corepack enable
+pnpm install --frozen-lockfile
+pnpm test
+pnpm run build
 Pop-Location
 
 .\scripts\academy\validate-manifests.ps1
@@ -108,6 +112,8 @@ Pop-Location
 ```
 
 PostgreSQL/Redis Testcontainers 测试依赖可用的 Docker Engine。Docker 缺失只能登记为环境阻塞，不能据此把测试标记为 PASS。
+最近一次整体验证结果及其环境缺口见
+[`docs/competition/VERIFICATION-SNAPSHOT-2026-07-31.md`](docs/competition/VERIFICATION-SNAPSHOT-2026-07-31.md)。
 
 ## Coding Agent 接管顺序
 

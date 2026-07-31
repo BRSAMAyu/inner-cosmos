@@ -53,7 +53,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * real Redis instance live in the same application context (proving the two containers coexist
  * cleanly under this exact load, not just individually).
  */
-@Testcontainers
+@Testcontainers(disabledWithoutDocker = true)
 @ActiveProfiles("postgres")
 @SpringBootTest(properties = {
         "spring.task.scheduling.enabled=false", "llm.provider=mock",
