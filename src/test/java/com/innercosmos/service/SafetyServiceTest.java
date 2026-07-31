@@ -219,13 +219,17 @@ class SafetyServiceTest {
     @DisplayName("F4: Singapore catalog is local-only and complete")
     void resources_singaporeContractIsComplete() {
         var result = safetyService.resourceCatalog("en-SG", "SG");
-        assertEquals(Set.of("999", "995", "1767", "91511767"),
+        assertEquals(Set.of("999", "995", "1771", "66691771", "1767", "91511767"),
                 result.stream().map(resource -> resource.phone).filter(java.util.Objects::nonNull)
                         .collect(java.util.stream.Collectors.toSet()));
         assertTrue(result.stream().allMatch(resource -> "SG".equals(resource.region)));
+        assertTrue(result.stream().allMatch(resource -> "2026-07-31".equals(resource.verifiedAt)));
+        assertTrue(result.stream().filter(resource -> "WHATSAPP".equals(resource.channel))
+                .allMatch(resource -> Set.of("66691771", "91511767").contains(resource.phone)));
         assertTrue(result.stream().noneMatch(resource ->
                 resource.label.contains("110") || resource.label.contains("120")
-                        || resource.label.contains("12356") || resource.label.contains("12355")));
+                        || resource.label.contains("12356") || resource.label.contains("12355")
+                        || resource.label.contains("6389 2222") || resource.label.contains("1777")));
     }
 
     @Test

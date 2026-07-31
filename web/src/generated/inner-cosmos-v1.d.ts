@@ -261,7 +261,7 @@ export interface components {
             /** @enum {string} */
             channel: "PHONE" | "WHATSAPP" | "IN_PERSON" | "NOTICE";
             /** @enum {string} */
-            category: "EMERGENCY" | "CRISIS_SUPPORT" | "YOUTH_SUPPORT" | "PRODUCT_BOUNDARY";
+            category: "EMERGENCY" | "CRISIS_SUPPORT" | "MENTAL_HEALTH_SUPPORT" | "YOUTH_SUPPORT" | "PRODUCT_BOUNDARY";
         };
         CapsuleCreateRequest: {
             pseudonym?: string;

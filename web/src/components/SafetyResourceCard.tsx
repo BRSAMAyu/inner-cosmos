@@ -19,6 +19,7 @@ const COPY = {
     gentleResources: "需要时展开支持资源",
     genericSafety: "如果你现在有生命危险，请立即拨打当地紧急电话，或前往最近的急诊室。",
     dial: "拨打 ",
+    message: "通过 WhatsApp 联系 ",
     openHarbor: "打开安全避风港（呼吸练习与着陆练习）",
     dismiss: "我看到了，先关闭"
   },
@@ -28,6 +29,7 @@ const COPY = {
     gentleResources: "Expand local support when you want it",
     genericSafety: "If you are in immediate danger, please call your local emergency number now, or go to the nearest emergency department.",
     dial: "Call ",
+    message: "Message on WhatsApp ",
     openHarbor: "Open the safety harbor (breathing & grounding exercises)",
     dismiss: "I've seen this, close for now"
   }
@@ -55,7 +57,7 @@ export function SafetyResourceCard({ alert, resources, locale, onDismiss, onOpen
         {alert.safeMessage && <p>{alert.safeMessage}</p>}
         <details>
           <summary>{t.gentleResources}</summary>
-          <SafetyResourceList resources={resources} dialLabel={t.dial} />
+          <SafetyResourceList resources={resources} dialLabel={t.dial} messageLabel={t.message} />
           {onOpenHarbor && <button type="button" className="quiet" onClick={onOpenHarbor}>{t.openHarbor}</button>}
         </details>
         <button type="button" className="quiet" onClick={onDismiss}>{t.dismiss}</button>
@@ -68,7 +70,7 @@ export function SafetyResourceCard({ alert, resources, locale, onDismiss, onOpen
       <strong id="urgent-safety-heading">{t.heading}</strong>
       {alert.safeMessage && <p>{alert.safeMessage}</p>}
       <p>{t.genericSafety}</p>
-      <SafetyResourceList resources={resources} dialLabel={t.dial} />
+      <SafetyResourceList resources={resources} dialLabel={t.dial} messageLabel={t.message} />
       <div className="safety-resource-card-actions">
         {onOpenHarbor && <button type="button" className="quiet" onClick={onOpenHarbor}>{t.openHarbor}</button>}
         <button type="button" onClick={onDismiss}>{t.dismiss}</button>

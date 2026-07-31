@@ -33,7 +33,8 @@ public class SafetyServiceImpl implements SafetyService {
             "也可以拨打全国统一心理援助热线 12356。请尽快联系一位现实中可信任的人。";
     private static final String CRISIS_SAFE_MESSAGE_EN_SG =
             "Your safety comes first. If you are in immediate danger in Singapore, call Police 999 " +
-            "or Emergency Ambulance 995. You can also call Samaritans of Singapore at 1767, 24 hours a day. " +
+            "or Emergency Ambulance 995. For 24-hour mental-health support, call national mindline 1771; " +
+            "for suicide crisis support, call Samaritans of Singapore at 1767. " +
             "Please contact someone you trust in the real world now.";
     private static final String MEDIUM_SAFE_MESSAGE_ZH =
             "我会把安全和尊重放在前面，陪你慢一点说清楚。";
@@ -99,16 +100,20 @@ public class SafetyServiceImpl implements SafetyService {
         ResourceRegion resolved = resolveRegion(locale, region);
         if (resolved == ResourceRegion.SINGAPORE) {
             return List.of(
-                    resource("sg-police", "If you are in immediate danger, call Singapore Police at 999.",
+                    singaporeResource("sg-police", "If you are in immediate danger, call Singapore Police at 999.",
                             "999", "https://www.gov.sg/contact-us/", "SG", "ALL", "24/7", "PHONE", "EMERGENCY"),
-                    resource("sg-ambulance", "For emergency ambulance or fire services, call 995.",
+                    singaporeResource("sg-ambulance", "For emergency ambulance or fire services, call 995.",
                             "995", "https://www.scdf.gov.sg/home/about-scdf/emergency-medical-services", "SG", "ALL", "24/7", "PHONE", "EMERGENCY"),
-                    resource("sg-sos", "Samaritans of Singapore (SOS) · 24-hour hotline: 1767.",
-                            "1767", "https://www.sos.org.sg/contact-us/", "SG", "ALL", "24/7", "PHONE", "CRISIS_SUPPORT"),
-                    resource("sg-sos-caretext", "SOS CareText · 24-hour WhatsApp: 9151 1767.",
-                            "91511767", "https://www.sos.org.sg/contact-us/", "SG", "ALL", "24/7", "WHATSAPP", "CRISIS_SUPPORT"),
-                    resource("sg-boundary", "Inner Cosmos does not provide a diagnosis and does not replace emergency services, doctors, counsellors or crisis lines.",
-                            null, "https://www.sos.org.sg/contact-us/", "SG", "ALL", "ALWAYS", "NOTICE", "PRODUCT_BOUNDARY")
+                    singaporeResource("sg-mindline", "national mindline · 24-hour mental-health hotline: 1771.",
+                            "1771", "https://www.moh.gov.sg/seeking-healthcare/find-a-facility-or-service/mental-health-services/", "SG", "ALL", "24/7", "PHONE", "MENTAL_HEALTH_SUPPORT"),
+                    singaporeResource("sg-mindline-whatsapp", "national mindline · 24-hour WhatsApp: 6669 1771.",
+                            "66691771", "https://www.moh.gov.sg/seeking-healthcare/find-a-facility-or-service/mental-health-services/", "SG", "ALL", "24/7", "WHATSAPP", "MENTAL_HEALTH_SUPPORT"),
+                    singaporeResource("sg-sos", "Samaritans of Singapore (SOS) · 24-hour hotline: 1767.",
+                            "1767", "https://www.sos.org.sg/support-those-in-distress/", "SG", "ALL", "24/7", "PHONE", "CRISIS_SUPPORT"),
+                    singaporeResource("sg-sos-caretext", "SOS CareText · 24-hour WhatsApp: 9151 1767.",
+                            "91511767", "https://www.sos.org.sg/support-those-in-distress/", "SG", "ALL", "24/7", "WHATSAPP", "CRISIS_SUPPORT"),
+                    singaporeResource("sg-boundary", "Inner Cosmos does not provide a diagnosis and does not replace emergency services, doctors, counsellors or crisis lines.",
+                            null, "https://www.moh.gov.sg/seeking-healthcare/find-a-facility-or-service/mental-health-services/", "SG", "ALL", "ALWAYS", "NOTICE", "PRODUCT_BOUNDARY")
             );
         }
         if (resolved == ResourceRegion.UNKNOWN) {
@@ -139,6 +144,13 @@ public class SafetyServiceImpl implements SafetyService {
                                       String region, String audience, String hours,
                                       String channel, String category) {
         return SafetyResourceVO.of(id, label, phone, authorityUrl, "2026-07-27",
+                region, audience, hours, channel, category);
+    }
+
+    private SafetyResourceVO singaporeResource(String id, String label, String phone, String authorityUrl,
+                                               String region, String audience, String hours,
+                                               String channel, String category) {
+        return SafetyResourceVO.of(id, label, phone, authorityUrl, "2026-07-31",
                 region, audience, hours, channel, category);
     }
 

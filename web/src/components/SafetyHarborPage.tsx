@@ -50,7 +50,7 @@ const COPY = {
     breathHeading: "呼吸练习", breathIntro: "跟着圆圈呼吸。吸气时圆圈变大，呼气时变小。",
     groundHeading: "着陆练习 (5-4-3-2-1)", groundIntro: "当你觉得不真实或焦虑上升时，试着找到：",
     careHeading: "你可以先做的事",
-    resourcesHeading: "紧急资源", resourcesIntro: "如果你或身边的人正经历危机，请拨打以下电话。", dial: "拨打 ",
+    resourcesHeading: "紧急资源", resourcesIntro: "如果你或身边的人正经历危机，请通过以下方式联系支持。", dial: "拨打 ", message: "通过 WhatsApp 联系 ",
     talkToAurora: "和 Aurora 聊聊", back: "返回核心"
   },
   "en-SG": {
@@ -58,7 +58,7 @@ const COPY = {
     breathHeading: "Breathing exercise", breathIntro: "Breathe with the circle. It grows as you breathe in, and shrinks as you breathe out.",
     groundHeading: "5-4-3-2-1 grounding", groundIntro: "When things feel unreal or anxiety rises, try to find:",
     careHeading: "Things you can do right now",
-    resourcesHeading: "Emergency resources", resourcesIntro: "If you or someone near you is in crisis, please call one of these.", dial: "Call ",
+    resourcesHeading: "Emergency resources", resourcesIntro: "If you or someone near you is in crisis, use one of these support channels.", dial: "Call ", message: "Message on WhatsApp ",
     talkToAurora: "Talk to Aurora", back: "Back to today"
   }
 } as const;
@@ -87,7 +87,7 @@ export function SafetyHarborPage({ resources, locale, onBack, onTalkToAurora }: 
     <section className="safety-section">
       <h2>{t.resourcesHeading}</h2>
       <p>{t.resourcesIntro}</p>
-      <SafetyResourceList resources={resources} dialLabel={t.dial} />
+      <SafetyResourceList resources={resources} dialLabel={t.dial} messageLabel={t.message} />
     </section>
 
     <section className="safety-section">

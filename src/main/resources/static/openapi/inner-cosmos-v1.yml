@@ -350,7 +350,7 @@ components:
         audience: {type: string}
         hours: {type: string}
         channel: {type: string, enum: [PHONE, WHATSAPP, IN_PERSON, NOTICE]}
-        category: {type: string, enum: [EMERGENCY, CRISIS_SUPPORT, YOUTH_SUPPORT, PRODUCT_BOUNDARY]}
+        category: {type: string, enum: [EMERGENCY, CRISIS_SUPPORT, MENTAL_HEALTH_SUPPORT, YOUTH_SUPPORT, PRODUCT_BOUNDARY]}
     CapsuleCreateRequest:
       type: object
       required: [memoryIds]
