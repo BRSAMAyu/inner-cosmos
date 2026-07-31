@@ -349,7 +349,7 @@ chmod 644 redis-server.key redis-server.crt ca.crt
     $seededUsers = (& docker exec -e "PGPASSWORD=$databasePassword" $postgresName psql `
         -U $databaseUser -d $database -Atc "SELECT COUNT(*) FROM tb_user").Trim()
     $flywayVersion = (& docker exec -e "PGPASSWORD=$databasePassword" $postgresName psql `
-        -U $databaseUser -d $database -Atc 'SELECT MAX(version) FROM flyway_schema_history WHERE success').Trim()
+        -U $databaseUser -d $database -Atc 'SELECT MAX(version::integer) FROM flyway_schema_history WHERE success').Trim()
     $failedMigrations = (& docker exec -e "PGPASSWORD=$databasePassword" $postgresName psql `
         -U $databaseUser -d $database -Atc 'SELECT COUNT(*) FROM flyway_schema_history WHERE NOT success').Trim()
     $runtimeUser = (& docker inspect $appName --format '{{.Config.User}}').Trim()
