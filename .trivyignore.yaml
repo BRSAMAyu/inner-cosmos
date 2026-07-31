@@ -1,0 +1,8 @@
+misconfigurations:
+  - id: KSV-0109
+    paths:
+      - "deploy/k8s/overlays/kind-full/app-config.yaml"
+    statement: >-
+      AURORA_SPEAKER_MAX_TOKENS is a public numeric output-length limit, not a
+      credential. Keep this exception scoped to the one local-kind ConfigMap;
+      runtime provider keys remain in inner-cosmos-runtime Secret.

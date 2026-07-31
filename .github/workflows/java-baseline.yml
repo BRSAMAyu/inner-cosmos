@@ -79,12 +79,17 @@ jobs:
           --exit-code 1
           /workspace/target/sbom/inner-cosmos-0.1.0.json
       - name: Gate High and Critical infrastructure misconfigurations
+        # CN-POLICY-AS-CODE-001 contains deliberately rejected Pod fixtures.
+        # They are proof inputs, not deployable manifests, so the global posture
+        # scan excludes only that directory and continues scanning all runtime IaC.
         run: >-
           docker run --rm
           -v "$PWD:/workspace:ro"
           aquasec/trivy@sha256:be1190afcb28352bfddc4ddeb71470835d16462af68d310f9f4bca710961a41e
           config --skip-version-check --severity HIGH,CRITICAL
           --skip-dirs /workspace/.git --skip-dirs /workspace/target
+          --skip-dirs /workspace/evidence/w3/CN-POLICY-AS-CODE-001
+          --ignorefile /workspace/.trivyignore.yaml
           --exit-code 1 /workspace
       - name: Build Java 21 non-root image
         run: docker build -t inner-cosmos:ci .
