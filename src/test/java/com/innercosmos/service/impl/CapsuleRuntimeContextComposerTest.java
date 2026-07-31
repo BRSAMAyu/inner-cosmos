@@ -114,6 +114,24 @@ class CapsuleRuntimeContextComposerTest {
         assertEquals("UNSUPPORTED", result.get("groundingLevel"));
     }
 
+    @Test
+    void malformedGenomeFailsClosedWithAnAuditableReason() {
+        CapsuleGenomeVersion malformed = new CapsuleGenomeVersion();
+        malformed.id = 77L;
+        malformed.versionNo = 2;
+        malformed.compilerVersion = "capsule-genome.v3";
+        malformed.contextPreviewJson = "{\"genomeIr\":";
+
+        Map<String, Object> result = composer.compose(malformed, "你最近怎么样？");
+
+        assertTrue((Boolean) result.get("unsupported"));
+        assertEquals("UNSUPPORTED", result.get("groundingLevel"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> manifest = (Map<String, Object>) result.get("contextBuildManifest");
+        assertEquals("GENOME_IR_UNREADABLE", manifest.get("selectionReason"));
+        assertEquals(77L, manifest.get("genomeVersionId"));
+    }
+
     private CapsuleGenomeVersion genome(boolean includeMemories, boolean includeStyle) throws Exception {
         CapsuleGenomeVersion genome = new CapsuleGenomeVersion();
         genome.id = 7L;

@@ -1,5 +1,6 @@
 package com.innercosmos.service.impl;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.innercosmos.config.ExperienceModeProperties;
@@ -113,7 +114,7 @@ public class CapsuleRuntimeContextComposer {
             result.put("unsupported", unsupported);
             result.put("fallbackPolicy", FALLBACK);
             return result;
-        } catch (Exception malformedGenome) {
+        } catch (JsonProcessingException | IllegalArgumentException malformedGenome) {
             return unsupported(result, genome, "GENOME_IR_UNREADABLE");
         }
     }
