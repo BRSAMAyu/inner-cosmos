@@ -7,6 +7,7 @@ order in [`../CLAUDE.md`](../CLAUDE.md) and [`../对齐文档/README.md`](../对
 
 - [Competition judge guide](competition/JUDGE-GUIDE.md) — the shortest product and engineering review route.
 - [Current verification snapshot](competition/VERIFICATION-SNAPSHOT-2026-07-31.md) — what passed, what was skipped, and what remains human-gated.
+- [Singapore safety-resource verification](competition/SINGAPORE-SAFETY-RESOURCE-VERIFICATION-2026-07-31.md) — current official sources, exact contact channels, regression exclusions, and the human-review boundary.
 - [Public demo runbook](demo/DEMO-RUNBOOK.md) — operator, browser, APK, recovery, and shutdown steps.
 - [Deployment index](../DEPLOY.md) — local-complete, classroom, Academy EKS, and production boundaries.
 - [Acceptance ledger](goal/complete-product-acceptance.yml) — machine-readable global status.
@@ -18,6 +19,9 @@ order in [`../CLAUDE.md`](../CLAUDE.md) and [`../对齐文档/README.md`](../对
 - [AI alignment specification](INNER_COSMOS_AI_ALIGNMENT_SPEC.md)
 - [AI alignment technical reference](AI_ALIGNMENT_TECHNICAL_REFERENCE.md)
 - [Authoritative alignment-document index](../对齐文档/README.md)
+
+For current Singapore crisis-resource reachability, use the dated safety-resource verification
+above rather than copying telephone numbers from older architecture or alignment notes.
 
 ## Evidence and presentations
 

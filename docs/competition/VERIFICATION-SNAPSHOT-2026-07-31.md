@@ -2,9 +2,9 @@
 
 This is an evidence snapshot, not a permanent release certificate. It records the exact boundary
 after the competition-readiness repair pass at commit
-[`73d2081f`](https://github.com/BRSAMAyu/inner-cosmos/commit/73d2081f24ea07f573802ed2d2d37f35e8f322ae)
+[`e402251b`](https://github.com/BRSAMAyu/inner-cosmos/commit/e402251b7d16dfd89656f7decf03c55c54717e08)
 and the successful
-[`Java baseline` run 30626414452](https://github.com/BRSAMAyu/inner-cosmos/actions/runs/30626414452).
+[`Java baseline` run 30633725234](https://github.com/BRSAMAyu/inner-cosmos/actions/runs/30633725234).
 
 ## Verified locally
 
@@ -18,9 +18,9 @@ and the successful
 | React/TypeScript production build | Passed; PWA assets and service worker generated. |
 | Executable Spring Boot package | Passed; the repackaged JAR and CycloneDX SBOM were generated. |
 | Local teacher-demo smoke | Passed: health, demo login/session, and React shell. |
-| Local browser product journey | Passed in the in-app browser: login, Aurora reply, memory provenance, resonance dialogue, slow-letter space, privacy/settings, and five-space navigation. |
+| Local browser product journey | Passed in the in-app browser: login, Aurora reply, memory provenance, resonance dialogue, slow-letter space, privacy/settings, and five-space navigation. A fresh isolated-demo run also switched through the visible language control to `en-SG` and accepted the complete Safety Harbor. |
 | Mobile responsive journey | Passed at `390 × 844`; bottom navigation and settings content remained operable. |
-| Browser console | `0` application warnings or errors during the accepted journey. |
+| Browser console | `0` application warnings or errors during the accepted journeys. |
 | Public-demo Compose parse | Passed with validation-only placeholder environment values. |
 | Public-demo PowerShell parse | Passed. |
 | Academy schema-version gate | Passed: highest Flyway migration `V35`, manifest expectation `35`, three gated workloads. |
@@ -42,6 +42,7 @@ public-network, multi-user, or physical-device behavior.
 | Gate | Result |
 |---|---|
 | Workflow | Both `web-contract` and `verify` jobs passed at the exact commit above. |
+| Workflow annotations | Both jobs completed with `0` annotations after moving official actions to their current Node 24 releases and replacing deprecated Spring test overrides. |
 | Backend clean verify, JDK 21 | `292` suites, `1503` tests, `0` failures, `0` errors, `1` external-provider skip; SpotBugs gate passed. |
 | PostgreSQL/Redis Testcontainers | Passed against PostgreSQL `16.12` and real Redis-backed integration paths. |
 | pgvector contract and scale gate | Contract suite passed; `100,000`-row benchmark measured p95 `1.014 ms` and p99 `1.077 ms` on the CI runner. |
@@ -83,6 +84,12 @@ threshold. This is a performance-improvement candidate, not a functional or buil
 - Fixed calendar-month token forecasting and state-aware Chinese Aurora outage feedback.
 - Preserved the precision-first six-message threshold for expression-style claims and corrected
   stale tests that still expected the old two-message demo shortcut.
+- Reverified the Singapore safety catalog against MOH, gov.sg, SCDF and SOS primary sources; added
+  national mindline `1771` and WhatsApp `6669 1771`, retained SOS `1767` and CareText `9151 1767`,
+  excluded legacy/confusable numbers, and rendered WhatsApp resources as `wa.me` rather than
+  telephone actions. See the [dated verification record](SINGAPORE-SAFETY-RESOURCE-VERIFICATION-2026-07-31.md).
+- Upgraded pinned official GitHub Actions to Node 24 releases and migrated Spring test overrides
+  from deprecated `@MockBean` to `@MockitoBean`; the final CI run completed with zero annotations.
 
 ## Reproduction
 

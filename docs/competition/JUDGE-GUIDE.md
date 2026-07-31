@@ -18,6 +18,12 @@ the original private conversation.
 5. **Connect slowly.** Explore explainable matching, speak with a Capsule, and—only when its owner
    allows it—send a slow letter or continue into friends/groups.
 
+At any point, open **Me → Safety Harbor**. In English mode the product exposes a region-bound
+Singapore catalog with channel-correct telephone and WhatsApp actions, grounding tools, and a
+visible statement that Inner Cosmos does not replace emergency services or clinicians. The exact
+sources, tested links, and acceptance boundary are recorded in the
+[Singapore safety-resource verification](SINGAPORE-SAFETY-RESOURCE-VERIFICATION-2026-07-31.md).
+
 For a hosted classroom session, use the live URL or APK supplied by the operator and follow the
 [public demo runbook](../demo/DEMO-RUNBOOK.md). If no runtime is available, the repository still
 contains the [self-contained experiment pack](../demo/INNER-COSMOS-SELF-CONTAINED-EXPERIMENT-PACK-2026-07-28.md)
