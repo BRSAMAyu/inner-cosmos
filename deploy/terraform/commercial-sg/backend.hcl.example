@@ -1,0 +1,7 @@
+# Create the backend and key outside this stack, then copy this file outside Git and replace every
+# placeholder. No account identifiers, credentials, state or lock files belong in the repository.
+bucket       = "<owner-approved-terraform-state-bucket>"
+key          = "inner-cosmos/commercial-sg/terraform.tfstate"
+region       = "ap-southeast-1"
+kms_key_id   = "<owner-approved-state-kms-key-arn>"
+use_lockfile = true

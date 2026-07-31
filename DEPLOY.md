@@ -12,7 +12,7 @@ This file is intentionally a short routing page. The handoff guide above is the 
 | `demo` | `SEED_ENABLED=true ./mvnw spring-boot:run -Dspring-boot.run.profiles=demo` | Disposable demo data; never production evidence |
 | `local-complete` | `scripts/local-complete.ps1` | Full product semantics with PostgreSQL/pgvector, TLS Redis, real Provider, OIDC, and no Mock fallback |
 | `academy-eks` | `scripts/academy/preflight.ps1`, then `scripts/academy/deploy.ps1` | Teaching-account Kubernetes behavior on the pre-provisioned `us-east-1` EKS cluster |
-| `commercial-sg` | Acceptance/IaC track | Future Singapore production target; not yet a completed deployable claim |
+| `commercial-sg` | `deploy/terraform/commercial-sg/` | Credential-free Singapore Terraform contract; not a live AWS deployment claim |
 
 ## Safe quick start
 
@@ -38,6 +38,13 @@ Pop-Location
 
 .\scripts\academy\validate-manifests.ps1
 .\scripts\academy\preflight.ps1 -Mode Offline
+
+Push-Location deploy/terraform/commercial-sg
+terraform fmt -check -recursive
+terraform init -backend=false -input=false
+terraform validate -no-color
+terraform test -no-color
+Pop-Location
 ```
 
 ## Non-negotiable boundaries
@@ -46,4 +53,5 @@ Pop-Location
 - `prod` and `local-complete` fail closed without a real Provider, PostgreSQL, Redis, TLS, and OIDC configuration. Do not enable Mock fallback or demo seeds to make them boot.
 - AWS Academy credentials are short-lived human-session credentials. Never inject them into Pods. The Academy event path uses JDBC outbox because workload SQS identity is not available.
 - Academy static `hostPath` PostgreSQL is rebuildable course storage, not commercial durability. Academy results cannot close Singapore production, managed-service, DR, legal, or owner gates.
+- The commercial Terraform mock-plan gate creates no AWS resources. A real plan/apply requires an owner-approved account, budget, backend, short-lived credentials, review and sanitized evidence.
 - A passing build, local smoke, or Kubernetes screenshot is a checkpoint. Acceptance status only changes with current reproducible evidence and required independent review.

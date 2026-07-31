@@ -97,7 +97,7 @@ integrated_head:
     - regenerate a working Quick Tunnel and rerun public verifier plus the short 30-user burst
     - exercise production-faithful Provider failure with visible degradation and recovery
     - copy a backup off-cluster and complete a restore drill from that copy
-    - move EKS-IAC from UNASSESSED to reproducible validate/plan evidence before any authorized apply
+    - run an owner-authorized commercial-sg plan/apply, independent least-privilege review and sanitized failure/cleanup capture; the credential-free Terraform validate/mock-plan contract is complete
   remaining_human_gates:
     - physical Android sideload over cellular data
     - non-author no-coaching walkthrough and final aesthetic review

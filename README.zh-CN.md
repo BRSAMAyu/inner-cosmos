@@ -87,7 +87,7 @@ $env:GLM_API_KEY = (Get-Content -Raw "$HOME\.inner-cosmos\glm.key").Trim()
 | `dev` / `demo` | 快速本地开发 | `./mvnw spring-boot:run` | H2/可选 Mock，不是生产证据 |
 | `local-complete` | 完整产品与真实 Provider 验收 | `scripts/local-complete.ps1` | 需要 Docker、PostgreSQL/pgvector、TLS Redis、OIDC 和本地密钥注入 |
 | `academy-eks` | Learner Lab 课程 Kubernetes 证据 | `scripts/academy/preflight.ps1` + `deploy.ps1` | 固定 `us-east-1`、四小时凭据、静态 PV、Pod 无 SQS 身份，禁止把人的 AWS key 放入 Pod |
-| `commercial-sg` | 新加坡商业生产目标 | 架构/IaC 验收线 | 当前不能宣称已完成；Terraform、托管服务、灾备、法律与所有者门禁仍开放 |
+| `commercial-sg` | 新加坡商业生产目标 | [`deploy/terraform/commercial-sg/`](deploy/terraform/commercial-sg/) | 无凭据 Terraform 契约可复现；真实 AWS plan/apply、灾备、法律与所有者门禁仍开放 |
 
 完整步骤、变量清单、验收命令、Academy 限制和恢复流程见 [`对齐文档/18-组员与Coding-Agent启动部署交接指南.md`](对齐文档/18-组员与Coding-Agent启动部署交接指南.md)。
 
@@ -153,6 +153,7 @@ src/main/resources/            配置、Flyway、构建后的 Web 资产
 web/                           React PWA 与 Capacitor 移动工程
 deploy/compose/                local-complete PostgreSQL/Redis/TLS
 deploy/k8s/                    Kubernetes base 与 Academy overlay
+deploy/terraform/commercial-sg 新加坡商业生产蓝图与 mock-plan 契约
 scripts/                       构建、验证、本地与 Academy 操作脚本
 ai-lab/                        AI 评测和 pairwise 工具
 docs/goal/                     机器验收与单会话恢复状态

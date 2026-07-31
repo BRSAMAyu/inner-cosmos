@@ -1,0 +1,6 @@
+# Non-sensitive example only. Copy outside Git and replace the example account before planning.
+operator_access_principal_arn = "arn:aws:iam::123456789012:role/inner-cosmos-platform-admin"
+alarm_topic_arns              = ["arn:aws:sns:ap-southeast-1:123456789012:inner-cosmos-alerts"]
+
+# Never write redis_auth_token here. Supply it to the current process:
+#   $env:TF_VAR_redis_auth_token = <read from an approved local secret manager>

@@ -119,7 +119,7 @@ Redis, TLS, or provider configuration is missing.
 | `dev` / `demo` | Fast local development | `./mvnw spring-boot:run` | H2 and optional Mock; not production evidence |
 | `local-complete` | Full product and real-provider acceptance | `scripts/local-complete.ps1` | Requires Docker, PostgreSQL/pgvector, TLS Redis, OIDC, and local secret injection |
 | `academy-eks` | Course Kubernetes evidence on the pre-provisioned Learner Lab | `scripts/academy/preflight.ps1`, then `scripts/academy/deploy.ps1` | Fixed `us-east-1`, short-lived credentials, static PV, no workload SQS identity, no human AWS keys in Pods |
-| `commercial-sg` | Future Singapore production | architecture/IaC acceptance track | Not yet a deployable production claim; Terraform, managed services, DR, legal and owner gates remain open |
+| `commercial-sg` | Future Singapore production | [`deploy/terraform/commercial-sg/`](deploy/terraform/commercial-sg/) | Credential-free Terraform contract is reproducible; real AWS plan/apply, DR, legal and owner gates remain open |
 
 The exact teammate/Coding Agent runbook, environment contract, validation commands, EKS limitations, and recovery checklist are in [`对齐文档/18-组员与Coding-Agent启动部署交接指南.md`](对齐文档/18-组员与Coding-Agent启动部署交接指南.md). [`DEPLOY.md`](DEPLOY.md) is the short deployment index.
 
@@ -195,6 +195,7 @@ src/main/resources/            configuration, Flyway migrations, built web asset
 web/                           React PWA and Capacitor mobile projects
 deploy/compose/                local-complete PostgreSQL/Redis/TLS profile
 deploy/k8s/                    Kubernetes base and Academy overlay
+deploy/terraform/commercial-sg future Singapore production blueprint and mock-plan contract
 scripts/                       build, verification, local and Academy operations
 ai-lab/                        reproducible AI evaluations and pairwise tooling
 docs/goal/                     machine-readable acceptance and recovery state

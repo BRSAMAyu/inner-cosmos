@@ -61,5 +61,20 @@ scripts/demo/bin/
 .demo-runtime/
 src/main/resources/static/downloads/*.apk
 
+# Terraform local state, plans, credentials and operator-only inputs
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+
 # Superpowers brainstorming session artifacts
 .superpowers/
