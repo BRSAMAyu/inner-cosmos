@@ -83,8 +83,22 @@ try {
     } | ConvertTo-Json -Depth 8
     [IO.File]::WriteAllText((Join-Path $resolvedTempRoot "provenance.json"), $predicate, [Text.UTF8Encoding]::new($false))
 
+    $dockerUserArguments = @()
+    if ([IO.Path]::DirectorySeparatorChar -eq '/') {
+        $id = Get-Command id -CommandType Application -ErrorAction SilentlyContinue
+        if (-not $id) {
+            throw "The Unix id command is required to map cosign to the host-owned key directory."
+        }
+        $hostUid = (& $id.Source -u).Trim()
+        $hostGid = (& $id.Source -g).Trim()
+        if ($hostUid -notmatch '^\d+$' -or $hostGid -notmatch '^\d+$') {
+            throw "Unable to resolve the Unix UID/GID for the cosign container."
+        }
+        $dockerUserArguments = @("--user", "${hostUid}:${hostGid}")
+    }
     $common = @(
-        "run", "--rm", "--network", "host",
+        "run", "--rm", "--network", "host"
+    ) + $dockerUserArguments + @(
         "-e", "COSIGN_PASSWORD=$password",
         "-v", "${resolvedTempRoot}:/keys",
         $cosignImage
