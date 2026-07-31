@@ -50,6 +50,13 @@ Pod Identity and non-empty alarm destinations. GitHub Actions also
 runs these four checks without AWS credentials. A second negative test proves that an operator
 cannot plan with unrestricted `0.0.0.0/0` external egress.
 
+GitHub Actions run
+[`30642345403`](https://github.com/BRSAMAyu/inner-cosmos/actions/runs/30642345403) passed
+`terraform-contract` (27s), `web-contract` (1m38s) and the full `verify` job (15m23s) at exact
+infrastructure commit `41f5190e56691993e0c04937b536ad8d0b85a891`; all three job pages reported
+zero annotations. The full CI path independently repeated the Terraform checks and the repository
+HIGH/CRITICAL IaC gate before production-image smoke, signing/provenance and final image scanning.
+
 ## Claim boundary and remaining work
 
 No AWS credentials, account, backend, network call to AWS APIs, saved real plan or resource apply was
