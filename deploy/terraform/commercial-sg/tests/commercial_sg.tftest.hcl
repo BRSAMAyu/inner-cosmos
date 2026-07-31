@@ -35,9 +35,10 @@ run "commercial_sg_secure_plan" {
   }
 
   variables {
-    operator_access_principal_arn = "arn:aws:iam::123456789012:role/inner-cosmos-platform-admin"
-    redis_auth_token              = "MockOnly-Redis-Token-32-Characters"
-    alarm_topic_arns              = ["arn:aws:sns:ap-southeast-1:123456789012:inner-cosmos-alerts"]
+    operator_access_principal_arn        = "arn:aws:iam::123456789012:role/inner-cosmos-platform-admin"
+    redis_auth_token                     = "MockOnly-Redis-Token-32-Characters"
+    alarm_topic_arns                     = ["arn:aws:sns:ap-southeast-1:123456789012:inner-cosmos-alerts"]
+    approved_external_https_egress_cidrs = ["203.0.113.10/32"]
   }
 
   assert {
@@ -51,6 +52,17 @@ run "commercial_sg_secure_plan" {
       && !aws_eks_cluster.this.vpc_config[0].endpoint_public_access
     )
     error_message = "EKS must default to a private API endpoint."
+  }
+
+  assert {
+    condition = (
+      length(aws_vpc_endpoint.private_aws_services) == 8
+      && length(aws_vpc_security_group_egress_rule.external_https) == 1
+      && alltrue([
+        for rule in aws_vpc_security_group_egress_rule.external_https : rule.cidr_ipv4 != "0.0.0.0/0"
+      ])
+    )
+    error_message = "Nodes must use private AWS endpoints and owner-approved external HTTPS CIDRs, never unrestricted egress."
   }
 
   assert {
@@ -125,4 +137,17 @@ run "commercial_sg_secure_plan" {
     condition     = aws_cloudwatch_log_group.eks.kms_key_id == aws_kms_key.platform.arn
     error_message = "EKS control-plane logs must use the platform KMS key."
   }
+}
+
+run "reject_unrestricted_external_egress" {
+  command = plan
+
+  variables {
+    operator_access_principal_arn        = "arn:aws:iam::123456789012:role/inner-cosmos-platform-admin"
+    redis_auth_token                     = "MockOnly-Redis-Token-32-Characters"
+    alarm_topic_arns                     = ["arn:aws:sns:ap-southeast-1:123456789012:inner-cosmos-alerts"]
+    approved_external_https_egress_cidrs = ["0.0.0.0/0"]
+  }
+
+  expect_failures = [var.approved_external_https_egress_cidrs]
 }

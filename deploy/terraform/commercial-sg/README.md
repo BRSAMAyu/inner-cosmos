@@ -6,9 +6,11 @@ whereas this stack creates owner-controlled production resources only in `ap-sou
 
 ## What the blueprint contains
 
-- three-AZ VPC, private application/data subnets and one NAT path per AZ;
+- three-AZ VPC, private application/data subnets, one NAT path per AZ and private AWS service endpoints;
 - private-endpoint EKS 1.35, encrypted managed nodes, control-plane logs and explicit operator access;
 - EKS Pod Identity plus resource-scoped SQS, S3, Secrets Manager and KMS permissions;
+- deny-by-default node egress: cluster/data paths, VPC DNS, Amazon Time Sync, S3 prefix list,
+  private AWS endpoints and owner-reviewed Provider/OIDC HTTPS CIDRs only;
 - private Multi-AZ RDS PostgreSQL 16 with forced TLS, managed master secret, PITR backups,
   Performance Insights and deletion protection;
 - TLS/at-rest encrypted three-node Valkey replication group with automatic failover;
@@ -34,13 +36,15 @@ terraform validate -no-color
 terraform test -no-color
 ```
 
-The mock plan asserts Singapore region pinning, private EKS, encrypted private Multi-AZ RDS,
+The mock plan asserts Singapore region pinning, private EKS, constrained node egress, private AWS
+service endpoints, encrypted private Multi-AZ RDS,
 encrypted HA Valkey, SQS/DLQ, private versioned S3, encrypted private nodes, Pod Identity and alarm
 destinations.
 
 ## Owner-authorized plan and apply
 
-1. Obtain AWS account, budget, legal/data-residency and maintenance-window approval.
+1. Obtain AWS account, budget, legal/data-residency and maintenance-window approval; record current,
+   owner-reviewed Provider/OIDC destination CIDRs without using `0.0.0.0/0`.
 2. Bootstrap an encrypted, versioned Terraform-state bucket and KMS key outside this stack.
 3. Copy `backend.hcl.example` and `terraform.tfvars.example` to operator-owned files outside Git.
 4. Export short-lived AWS credentials and `TF_VAR_redis_auth_token` in the current process.

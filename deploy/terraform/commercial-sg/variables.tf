@@ -108,6 +108,18 @@ variable "cluster_endpoint_public_access_cidrs" {
   }
 }
 
+variable "approved_external_https_egress_cidrs" {
+  description = "Owner-reviewed provider/OIDC HTTPS CIDRs. The commercial node security group never permits 0.0.0.0/0 egress."
+  type        = list(string)
+
+  validation {
+    condition = length(var.approved_external_https_egress_cidrs) > 0 && alltrue([
+      for cidr in var.approved_external_https_egress_cidrs : cidr != "0.0.0.0/0" && can(cidrhost(cidr, 0))
+    ])
+    error_message = "Provide at least one valid, owner-reviewed external HTTPS CIDR; 0.0.0.0/0 is forbidden."
+  }
+}
+
 variable "node_instance_types" {
   description = "Allowed on-demand managed-node instance types."
   type        = list(string)

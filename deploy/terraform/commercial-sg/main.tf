@@ -136,17 +136,70 @@ resource "aws_security_group" "eks_nodes" {
   description = "Inner Cosmos EKS worker nodes"
   vpc_id      = aws_vpc.this.id
 
-  egress {
-    description = "Outbound TLS, providers and managed AWS services through per-AZ NAT"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
   lifecycle {
     create_before_destroy = true
   }
+}
+
+resource "aws_vpc_security_group_ingress_rule" "eks_node_mesh" {
+  security_group_id            = aws_security_group.eks_nodes.id
+  referenced_security_group_id = aws_security_group.eks_nodes.id
+  description                  = "EKS control plane, node and Pod traffic inside the cluster security group"
+  ip_protocol                  = "-1"
+}
+
+resource "aws_vpc_security_group_egress_rule" "eks_node_mesh" {
+  security_group_id            = aws_security_group.eks_nodes.id
+  referenced_security_group_id = aws_security_group.eks_nodes.id
+  description                  = "EKS control plane, node and Pod traffic inside the cluster security group"
+  ip_protocol                  = "-1"
+}
+
+resource "aws_vpc_security_group_egress_rule" "vpc_https" {
+  security_group_id = aws_security_group.eks_nodes.id
+  description       = "Private EKS and interface-endpoint HTTPS inside the VPC"
+  cidr_ipv4         = var.vpc_cidr
+  from_port         = 443
+  to_port           = 443
+  ip_protocol       = "tcp"
+}
+
+resource "aws_vpc_security_group_egress_rule" "vpc_dns_udp" {
+  security_group_id = aws_security_group.eks_nodes.id
+  description       = "VPC resolver DNS over UDP"
+  cidr_ipv4         = var.vpc_cidr
+  from_port         = 53
+  to_port           = 53
+  ip_protocol       = "udp"
+}
+
+resource "aws_vpc_security_group_egress_rule" "vpc_dns_tcp" {
+  security_group_id = aws_security_group.eks_nodes.id
+  description       = "VPC resolver DNS over TCP"
+  cidr_ipv4         = var.vpc_cidr
+  from_port         = 53
+  to_port           = 53
+  ip_protocol       = "tcp"
+}
+
+resource "aws_vpc_security_group_egress_rule" "amazon_time_sync" {
+  security_group_id = aws_security_group.eks_nodes.id
+  description       = "Amazon Time Sync Service"
+  cidr_ipv4         = "169.254.169.123/32"
+  from_port         = 123
+  to_port           = 123
+  ip_protocol       = "udp"
+}
+
+resource "aws_vpc_security_group_egress_rule" "external_https" {
+  for_each = toset(var.approved_external_https_egress_cidrs)
+
+  security_group_id = aws_security_group.eks_nodes.id
+  description       = "Owner-approved Provider or OIDC HTTPS destination"
+  cidr_ipv4         = each.value
+  from_port         = 443
+  to_port           = 443
+  ip_protocol       = "tcp"
 }
 
 resource "aws_security_group" "database" {
@@ -162,6 +215,15 @@ resource "aws_security_group" "database" {
 resource "aws_vpc_security_group_ingress_rule" "database_from_eks" {
   security_group_id            = aws_security_group.database.id
   referenced_security_group_id = aws_security_group.eks_nodes.id
+  description                  = "PostgreSQL TLS from EKS nodes"
+  from_port                    = 5432
+  to_port                      = 5432
+  ip_protocol                  = "tcp"
+}
+
+resource "aws_vpc_security_group_egress_rule" "database_from_eks" {
+  security_group_id            = aws_security_group.eks_nodes.id
+  referenced_security_group_id = aws_security_group.database.id
   description                  = "PostgreSQL TLS from EKS nodes"
   from_port                    = 5432
   to_port                      = 5432
@@ -185,6 +247,70 @@ resource "aws_vpc_security_group_ingress_rule" "redis_from_eks" {
   from_port                    = 6379
   to_port                      = 6379
   ip_protocol                  = "tcp"
+}
+
+resource "aws_vpc_security_group_egress_rule" "redis_from_eks" {
+  security_group_id            = aws_security_group.eks_nodes.id
+  referenced_security_group_id = aws_security_group.redis.id
+  description                  = "Valkey TLS from EKS nodes"
+  from_port                    = 6379
+  to_port                      = 6379
+  ip_protocol                  = "tcp"
+}
+
+resource "aws_security_group" "vpc_endpoints" {
+  name_prefix = "${local.name}-endpoints-"
+  description = "Private AWS service endpoints accept TLS only from Inner Cosmos EKS nodes"
+  vpc_id      = aws_vpc.this.id
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_vpc_security_group_ingress_rule" "endpoints_from_eks" {
+  security_group_id            = aws_security_group.vpc_endpoints.id
+  referenced_security_group_id = aws_security_group.eks_nodes.id
+  description                  = "AWS service endpoint TLS from EKS nodes"
+  from_port                    = 443
+  to_port                      = 443
+  ip_protocol                  = "tcp"
+}
+
+resource "aws_vpc_endpoint" "s3" {
+  vpc_id            = aws_vpc.this.id
+  service_name      = "com.amazonaws.${var.aws_region}.s3"
+  vpc_endpoint_type = "Gateway"
+  route_table_ids   = aws_route_table.private[*].id
+}
+
+resource "aws_vpc_security_group_egress_rule" "s3" {
+  security_group_id = aws_security_group.eks_nodes.id
+  description       = "S3 through the regional gateway endpoint"
+  prefix_list_id    = aws_vpc_endpoint.s3.prefix_list_id
+  from_port         = 443
+  to_port           = 443
+  ip_protocol       = "tcp"
+}
+
+resource "aws_vpc_endpoint" "private_aws_services" {
+  for_each = toset([
+    "ecr.api",
+    "ecr.dkr",
+    "eks-auth",
+    "kms",
+    "logs",
+    "secretsmanager",
+    "sqs",
+    "sts",
+  ])
+
+  vpc_id              = aws_vpc.this.id
+  service_name        = "com.amazonaws.${var.aws_region}.${each.value}"
+  vpc_endpoint_type   = "Interface"
+  private_dns_enabled = true
+  subnet_ids          = aws_subnet.private[*].id
+  security_group_ids  = [aws_security_group.vpc_endpoints.id]
 }
 
 data "aws_iam_policy_document" "eks_cluster_assume" {

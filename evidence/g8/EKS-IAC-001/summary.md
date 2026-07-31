@@ -8,7 +8,8 @@
 `deploy/terraform/commercial-sg/` defines a separate future-production stack rather than reusing
 the constrained AWS Academy profile. The resource graph contains:
 
-- a three-AZ VPC with private application/data subnets and per-AZ NAT paths;
+- a three-AZ VPC with private application/data subnets, per-AZ NAT paths and private AWS service
+  endpoints;
 - private-endpoint EKS 1.35 with encrypted managed nodes, control-plane logs, explicit operator
   access and EKS Pod Identity for the application service account;
 - private, encrypted Multi-AZ RDS PostgreSQL 16 with forced TLS, RDS-managed master credentials,
@@ -19,6 +20,9 @@ the constrained AWS Academy profile. The resource graph contains:
   owner-routed CloudWatch alarms;
 - resource-scoped runtime permissions for only the declared queues, bucket prefixes, secrets and
   KMS key.
+- deny-by-default node egress limited to cluster/data paths, VPC DNS, Amazon Time Sync, the S3
+  prefix list, private AWS endpoints and owner-reviewed Provider/OIDC HTTPS CIDRs; `0.0.0.0/0`
+  egress is rejected by variable validation and the mock-plan contract.
 
 Terraform state, plans, operator variable files and secrets are ignored. Repository examples contain
 placeholders only. LLM, OIDC and Redis values are injected outside Terraform; the RDS master password
@@ -34,14 +38,17 @@ The AWS provider is locked to `6.55.0` with signed provider checksums for both `
 terraform fmt -check -recursive  PASS
 terraform init -backend=false    PASS; signed hashicorp/aws v6.55.0
 terraform validate -no-color     PASS
-terraform test -no-color         PASS; 1 passed, 0 failed
+terraform test -no-color         PASS; 2 passed, 0 failed
+Trivy config HIGH/CRITICAL       PASS; 0 findings across 56 tracked-tree-equivalent targets
 ```
 
-The mock-plan test asserts the Singapore region pin, private EKS endpoint, encrypted private nodes,
+The mock-plan test asserts the Singapore region pin, private EKS endpoint, constrained node egress,
+private AWS service endpoints, encrypted private nodes,
 private/encrypted/Multi-AZ RDS, encrypted HA Valkey, exact event-queue-to-DLQ binding, private
 versioned object storage, TLS-only queue/object policies, KMS-encrypted control-plane logs, scoped
 Pod Identity and non-empty alarm destinations. GitHub Actions also
-runs these four checks without AWS credentials.
+runs these four checks without AWS credentials. A second negative test proves that an operator
+cannot plan with unrestricted `0.0.0.0/0` external egress.
 
 ## Claim boundary and remaining work
 
