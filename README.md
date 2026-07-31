@@ -1,5 +1,7 @@
 # Inner Cosmos
 
+[![Java baseline](https://github.com/BRSAMAyu/inner-cosmos/actions/workflows/java-baseline.yml/badge.svg?branch=main)](https://github.com/BRSAMAyu/inner-cosmos/actions/workflows/java-baseline.yml)
+
 [中文说明](README.zh-CN.md) · [Judge guide](docs/competition/JUDGE-GUIDE.md) · [Verification snapshot](docs/competition/VERIFICATION-SNAPSHOT-2026-07-31.md) · [Documentation index](docs/README.md) · [Agent entry point](CLAUDE.md) · [Acceptance ledger](docs/goal/complete-product-acceptance.yml)
 
 Inner Cosmos is an AI-native self-understanding and slow-social platform. Aurora turns natural conversations into a long-lived, user-correctable model of memories, values, relationships, emotions, and goals. With explicit consent, that model can be compiled into bounded Echo Capsules that help people discover meaningful resonance before deciding whether to connect as humans.

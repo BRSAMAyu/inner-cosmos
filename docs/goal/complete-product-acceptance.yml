@@ -2,28 +2,30 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 authority: goal-objective.md
 status: RELEASE_CANDIDATE_BLOCKED_BY_HUMAN_GATE
-last_reconciled_at: 2026-07-31T16:35:06+08:00
-last_reconciled_commit: 9fe898b941a9210d0fd740529f3d608d19886f1f
+last_reconciled_at: 2026-07-31T19:31:17+08:00
+last_reconciled_commit: 73d2081f24ea07f573802ed2d2d37f35e8f322ae
 current_fact_baseline: 对齐文档/24-完全体最终收敛与云原生课程战役.md
 current_execution_plan: 对齐文档/24-完全体最终收敛与云原生课程战役.md
 parallel_state: docs/goal/closure-campaign-state.yml
 reconciliation_boundary: >-
-  Commit 9fe898b9 is the scoped competition-readiness checkpoint on main. It restores the
-  public-demo CSRF boundary, Redis distributed rate limiting, bounded classroom quotas and
-  semantic memory embedding; fixes demo readiness, month-end token forecasting and state-aware
-  Aurora outage copy; and adds current judge, verification, security, contribution and
-  documentation entry points. Windows verification at this commit: backend 1503 total with
-  0 failures, 0 errors and 31 explicitly skipped without Docker; web 696/696 across 93 files;
-  generated OpenAPI types and 6/6 compatibility-rule tests PASS; TypeScript/PWA and executable
-  JAR/SBOM builds PASS; current-tree and reachable-history secret scans each report 0 findings;
-  Academy V35 and 22-resource structural gates PASS. A fresh isolated H2 + Mock browser journey
-  passed login, Aurora reply, memory provenance, resonance dialogue, slow letters, privacy and
-  all five spaces on desktop plus 390x844 mobile, with zero application console errors. This does
-  not close PostgreSQL/Redis, real-Provider, public-tunnel, 30-user, physical-device or non-author
-  gates. Docker remained unavailable, GitHub push was blocked by network plus an invalid local gh
-  credential, and the local branch remains ahead of origin/main. The only honest legal state is
-  therefore RELEASE_CANDIDATE_BLOCKED_BY_HUMAN_GATE; historical evidence remains scoped to its
-  recorded commit and environment.
+  Commit 73d2081f is the synchronized competition-readiness checkpoint on main. It contains the
+  public-demo CSRF boundary, Redis distributed rate limiting, bounded classroom quotas, semantic
+  memory embedding, demo-readiness and Aurora fallback repairs, current judge/repository entry
+  points, dependency vulnerability patches, and CI portability/supply-chain corrections. Local
+  Windows verification: backend 1503 total with 0 failures, 0 errors and 31 explicitly skipped
+  without Docker; web 696/696 across 93 files; generated OpenAPI types and 6/6 compatibility-rule
+  tests PASS; TypeScript/PWA and executable JAR/SBOM builds PASS; local browser acceptance passed
+  desktop and 390x844 mobile with zero application console errors. GitHub Actions run 30626414452
+  passed both jobs at this exact commit: Docker-backed clean verify reported 292 suites, 1503
+  tests, 0 failures, 0 errors and 1 external-provider skip; PostgreSQL/pgvector and Redis paths,
+  100,000-row retrieval, source/history secret scans, Flyway fail-closed, SBOM and IaC gates,
+  production-profile non-root image smoke, Cosign signature/SLSA provenance, and final image
+  HIGH/CRITICAL scanning all passed. The production smoke observed PostgreSQL 16 + pgvector with
+  VERIFY_FULL, Redis 7.4.2 with VERIFIED_CA, Flyway 35 with 0 failed migrations and 89/89 tables,
+  0 demo users, appuser, migration role and JDBC outbox worker. This closes the current machine
+  Docker/image/supply-chain gates, but does not close real-Provider, public-tunnel, 30-user,
+  physical-device, legal, psychology, account-owner or non-author gates. The only honest legal
+  state remains RELEASE_CANDIDATE_BLOCKED_BY_HUMAN_GATE.
 
 status_semantics:
   UNASSESSED: current HEAD and target environment have not been verified
@@ -90,13 +92,13 @@ gates:
 
   - id: G1
     name: Modern platform baseline
-    status: IN_PROGRESS
+    status: PASS
     required: true
     acceptance:
       - {id: BASE-JAVA, target: "Java 21 is both compile and runtime baseline.", status: PASS, evidence: [evidence/m1/M1-BASE-001/], remaining: "pom.xml <java.version>21</java.version> is the current, unchanged compile/runtime baseline at HEAD c7cc650 (2026-07-24); every backend test run this session (including a fresh full-suite run today) ran under JDK 21. No stated gap existed; flipping to PASS."}
       - {id: BASE-BOOT, target: "Spring Boot 3.5 supported patch baseline passes the full suite.", status: PASS, evidence: [evidence/m1/M1-BASE-001/], remaining: "pom.xml spring-boot-starter-parent is 3.5.14 (a currently-supported 3.5.x patch) at HEAD c7cc650. Fresh full-suite re-run today (2026-07-24): 1197/1197 non-real-provider tests (2 failures were both in classes tagged real-provider -- live Qwen TTS network timeout and live GLM real-model schema-drift variance, not a Boot-baseline or code regression). No stated gap existed; flipping to PASS."}
-      - {id: BASE-SUPPLY, target: "SBOM, dependency, SAST, secret, IaC, and container scans are gated.", status: IN_PROGRESS, evidence: [evidence/m1/M1-BASE-001/, evidence/integration/FINAL-P0-CLOSURE-2026-07-22/], remaining: "2026-07-22: ordinary CI enforces 923 executed tests, frontend contract/tests/build, current-tree and history secret scans, SBOM/Trivy, production image smoke/signature and Academy schema drift. The signed tag/manual release workflow now reruns backend/frontend/secret/schema verification and build-sign cannot start unless it passes. Remaining: an actual authorized registry release and independent provenance verification."}
-      - {id: BASE-IMAGE, target: "Signed non-root minimal OCI image passes production-profile smoke.", status: IN_PROGRESS, evidence: [evidence/m1/M1-BASE-001/image-release-summary.txt]}
+      - {id: BASE-SUPPLY, target: "SBOM, dependency, SAST, secret, IaC, and container scans are gated.", status: PASS, evidence: [evidence/m1/M1-BASE-001/, evidence/integration/FINAL-P0-CLOSURE-2026-07-22/, "GitHub Actions run 30626414452"], remaining: "2026-07-31 at commit 73d2081f: CI clean verify and SpotBugs passed; current-tree and reachable-history scans each reported 0 findings; Trivy reported 0 HIGH/CRITICAL Java SBOM vulnerabilities, passed the IaC gate across 54 detected config files, and reported 0 HIGH/CRITICAL vulnerabilities for both the Alpine and JAR image targets. Cosign signature and SLSA provenance both verified. A registry release remains an owner-authorized release action, not an unimplemented machine gate."}
+      - {id: BASE-IMAGE, target: "Signed non-root minimal OCI image passes production-profile smoke.", status: PASS, evidence: [evidence/m1/M1-BASE-001/image-release-summary.txt, "GitHub Actions run 30626414452"], remaining: "2026-07-31 at commit 73d2081f: the CI-built Java 21 image ran as appuser under prod, Health=UP, PostgreSQL 16 + pgvector VERIFY_FULL, Redis 7.4.2 VERIFIED_CA, Flyway 35 with 0 failed migrations and 89/89 schema tables, 0 demo users, migration role PASS and JDBC outbox worker PASS. Cosign 3.0.6 signature and SLSA provenance verified and the temporary private key was not persisted."}
 
   - id: G2
     name: Contracts, data, and runtime roles

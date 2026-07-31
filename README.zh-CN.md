@@ -1,5 +1,7 @@
 # Inner Cosmos（内宇宙）
 
+[![Java baseline](https://github.com/BRSAMAyu/inner-cosmos/actions/workflows/java-baseline.yml/badge.svg?branch=main)](https://github.com/BRSAMAyu/inner-cosmos/actions/workflows/java-baseline.yml)
+
 [English README](README.md) · [评委指南](docs/competition/JUDGE-GUIDE.md) · [验证快照](docs/competition/VERIFICATION-SNAPSHOT-2026-07-31.md) · [文档导航](docs/README.md) · [Agent 入口](CLAUDE.md) · [机器验收账本](docs/goal/complete-product-acceptance.yml)
 
 Inner Cosmos 是一个以长期自我理解和慢社交为核心的 AI 原生产品。Aurora 将自然对话逐步沉淀为可追溯、可纠正、可撤回的记忆、画像、关系、情绪与目标模型；用户在明确授权后，可以把其中一部分编译成有边界的 Echo Capsule（共鸣体），先形成理解与共鸣，再决定是否接近真人。

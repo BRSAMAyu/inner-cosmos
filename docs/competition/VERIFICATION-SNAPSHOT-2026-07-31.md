@@ -1,9 +1,12 @@
 # Verification snapshot — 2026-07-31
 
-This is a local workspace snapshot, not a permanent release certificate. It records the exact
-evidence boundary after the competition-readiness repair pass.
+This is an evidence snapshot, not a permanent release certificate. It records the exact boundary
+after the competition-readiness repair pass at commit
+[`73d2081f`](https://github.com/BRSAMAyu/inner-cosmos/commit/73d2081f24ea07f573802ed2d2d37f35e8f322ae)
+and the successful
+[`Java baseline` run 30626414452](https://github.com/BRSAMAyu/inner-cosmos/actions/runs/30626414452).
 
-## Verified in this workspace
+## Verified locally
 
 | Gate | Result |
 |---|---|
@@ -28,18 +31,36 @@ evidence boundary after the competition-readiness repair pass.
 
 The backend suite now uses `@Testcontainers(disabledWithoutDocker = true)` consistently. This makes
 missing infrastructure explicit as skipped tests instead of misreporting Docker discovery failures
-as product-code errors. CI still executes these tests when Docker is present.
+as product-code errors.
 
 The accepted browser journey used the isolated H2 + Mock teacher-demo profile. It proves the local
 product interaction and failure-free UI path; it does not prove PostgreSQL/Redis, real-provider,
 public-network, multi-user, or physical-device behavior.
 
-## Not live-verified in this workspace
+## Verified in GitHub Actions with Docker
+
+| Gate | Result |
+|---|---|
+| Workflow | Both `web-contract` and `verify` jobs passed at the exact commit above. |
+| Backend clean verify, JDK 21 | `292` suites, `1503` tests, `0` failures, `0` errors, `1` external-provider skip; SpotBugs gate passed. |
+| PostgreSQL/Redis Testcontainers | Passed against PostgreSQL `16.12` and real Redis-backed integration paths. |
+| pgvector contract and scale gate | Contract suite passed; `100,000`-row benchmark measured p95 `1.014 ms` and p99 `1.077 ms` on the CI runner. |
+| Source and history credentials | Current-tree and reachable-history scans each passed with `0` findings. |
+| Dependency SBOM | Trivy found `0` HIGH/CRITICAL Java vulnerabilities. |
+| Infrastructure as code | Trivy evaluated `54` detected config files; the HIGH/CRITICAL gate passed with only explicitly scoped intentional fixtures excluded. |
+| Production-profile image smoke | Passed with `Health=UP`, PostgreSQL 16 + pgvector, database TLS `VERIFY_FULL`, Redis `7.4.2`, Redis TLS `VERIFIED_CA`, Flyway `35`, `0` failed migrations, `89/89` schema tables, `0` demo users, non-root `appuser`, migration role and JDBC outbox worker. |
+| Distributed runtime controls | Smoke observed `1` Redis session key, `1` rate-limit key, and `2` scheduler lease keys. |
+| Signature and provenance | Cosign `3.0.6` signature and SLSA provenance verified against the generated public key; temporary private key persistence was `False`. |
+| Final OCI image scan | Trivy found `0` HIGH/CRITICAL vulnerabilities in both Alpine `3.23.5` and `app/app.jar`. |
+
+This CI evidence closes the Docker-backed integration, production-image smoke, and
+signature/provenance machine gates for this commit. It is not evidence of an authorized registry
+release, a public classroom tunnel, a real-provider quality review, or a physical-device rehearsal.
+
+## Remaining external and human gates
 
 | Gate | Status | Reason / next action |
 |---|---|---|
-| PostgreSQL/Redis Testcontainers | `BLOCKED` | Docker daemon was unavailable; rerun the full Maven gate with Docker Desktop healthy. |
-| Production image smoke and signature | `BLOCKED` | Requires Docker daemon and the CI-style image workflow. |
 | Public HTTPS multi-user journey | `NOT-RERUN` | Requires operator credentials, Docker, tunnel, and current device/browser acceptance. |
 | Real-provider semantic quality | `NOT-RERUN` | Requires operator-owned provider keys and the named evaluation harnesses. |
 | Android physical-device acceptance | `HUMAN-GATED` | Requires a freshly built APK, a real device, permissions, lifecycle, and network-transition checks. |

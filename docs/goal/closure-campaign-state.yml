@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 authority: 对齐文档/24-完全体最终收敛与云原生课程战役.md
 status: RELEASE_CANDIDATE_BLOCKED_BY_HUMAN_GATE
-updated_at: 2026-07-31T16:35:06+08:00
+updated_at: 2026-07-31T19:31:17+08:00
 
 legal_terminal_states:
   - COMPLETE
@@ -16,9 +16,11 @@ demo_delivery_front:
     Historical public-runtime evidence remains valid only for its recorded 2026-07-24 run. On
     2026-07-31 the isolated H2 + Mock teacher-demo passed health, login/session, the React shell,
     the five-space browser journey, memory provenance, a bounded capsule conversation and a
-    390x844 responsive check. Docker remained unavailable, so PostgreSQL/Redis Testcontainers,
-    the real-Provider public tunnel, the 30-user burst and a physical-device rehearsal were not
-    rerun. A fresh public-demo run is still required before classroom Go.
+    390x844 responsive check. GitHub Actions run 30626414452 separately passed Docker-backed
+    PostgreSQL/Redis integration, the production-profile image smoke, signature/provenance and
+    the final image vulnerability gate. The real-Provider public tunnel, 30-user burst and a
+    physical-device rehearsal were not rerun. A fresh public-demo run is still required before
+    classroom Go.
   intent: >-
     Run the Windows laptop as the complete classroom server, expose it through a temporary public
     HTTPS reverse tunnel, and distribute an Android APK bound to the same origin. Teachers and
@@ -41,23 +43,27 @@ demo_delivery_front:
     - share the newly generated URL and APK after every Quick Tunnel restart
 
 integrated_head:
-  commit: 9fe898b941a9210d0fd740529f3d608d19886f1f
+  commit: 73d2081f24ea07f573802ed2d2d37f35e8f322ae
   branch: main
   parent_before_integration: 07a9b26ffceacb948510acc19c541fb7170ebfef
+  ci_run: https://github.com/BRSAMAyu/inner-cosmos/actions/runs/30626414452
   note: >-
-    Commit 9fe898b9 is the scoped competition-readiness checkpoint on main. It restores CSRF,
+    Commit 73d2081f is the synchronized competition-readiness checkpoint on main. It includes the
+    9fe898b9 product/repository repair, subsequent timezone, capsule-boundary, dependency, IaC,
+    production-smoke and supply-chain corrections. It restores CSRF,
     distributed rate limiting, bounded classroom quotas and semantic memory embedding in the
     public-demo profile; fixes the demo readiness contract, month-end token forecasting and
     state-aware Aurora outage copy; standardizes Docker-unavailable Testcontainers behavior; and
     adds judge, verification, security, contribution, documentation-index and poster-source
-    assets. The production PWA bundle was rebuilt from the exact validated source tree. The local
-    branch remains ahead of origin/main; GitHub synchronization is pending because github.com was
-    unreachable and the local gh credential is invalid.
+    assets. The production PWA bundle was rebuilt from the exact validated source tree. GitHub
+    Actions run 30626414452 passed both jobs at this exact commit, including Docker-backed tests,
+    production smoke, signature/provenance and final HIGH/CRITICAL image scanning. Local main and
+    origin/main are synchronized.
   preserved_preexisting_dirty_paths:
     - docs/AI_ALIGNMENT_TECHNICAL_REFERENCE.md
     - docs/presentation/inner-cosmos-cloud-native-defense-v4-continuity-aligned组员H1改进版.html
   exact_test_commands_and_counts:
-    - {cmd: ".\\mvnw.cmd test", result: "1503 total, 0 failures, 0 errors, 31 explicitly skipped without Docker; BUILD SUCCESS"}
+    - {cmd: ".\\mvnw.cmd -B clean verify", result: "local Windows: 1503 total, 0 failures, 0 errors, 31 explicitly skipped without Docker; SpotBugs 0; BUILD SUCCESS"}
     - {cmd: "cd web; npm.cmd test -- --run", result: "696/696 (93 files)"}
     - {cmd: "cd web; npm.cmd run api:check; npm.cmd run api:diff:test", result: "generated types current; 6/6 compatibility-rule tests PASS"}
     - {cmd: "cd web; npm.cmd run build", result: "TypeScript and production PWA build PASS; 22 precache entries; generated bundle committed"}
@@ -65,6 +71,11 @@ integrated_head:
     - {cmd: ".\\scripts\\scan-secrets.ps1; .\\scripts\\scan-secrets.ps1 -History", result: "both PASS, 0 findings"}
     - {cmd: ".\\scripts\\academy\\validate-schema-version.ps1; .\\scripts\\academy\\validate-manifests.ps1", result: "V35/manifest 35 PASS; 22 resources, 0 forbidden, 0 missing controls"}
     - {cmd: "docker compose -f deploy/compose/public-demo.yml config --quiet", result: "PASS with validation-only placeholder environment values; daemon not required"}
+    - {cmd: "GitHub Actions Java baseline / clean verify", result: "292 suites, 1503 tests, 0 failures, 0 errors, 1 external-provider skip; BUILD SUCCESS; SpotBugs PASS"}
+    - {cmd: "GitHub Actions pgvector gate", result: "100,000 rows: p95 1.014 ms, p99 1.077 ms"}
+    - {cmd: "GitHub Actions Trivy gates", result: "SBOM 0 HIGH/CRITICAL; IaC gate PASS across 54 detected config files; final Alpine and JAR image targets each 0 HIGH/CRITICAL"}
+    - {cmd: "GitHub Actions production image smoke", result: "prod UP; PostgreSQL 16 + pgvector VERIFY_FULL; Redis 7.4.2 VERIFIED_CA; Flyway 35; 0 failed migrations; 89/89 schema tables; 0 demo users; appuser; migration and JDBC outbox roles PASS"}
+    - {cmd: "GitHub Actions cosign round trip", result: "Cosign 3.0.6 signature VERIFIED; SLSA provenance VERIFIED; private key persisted False"}
     - {cmd: "git diff --cached --check", result: clean}
   browser_android_desktop_runtime_evidence:
     - Windows Java 21 and Node 22 validation completed natively; no WSL project execution.
@@ -76,13 +87,12 @@ integrated_head:
   acceptance_ledger_changes:
     - Public-demo security bypasses are removed: CSRF and Redis rate limiting are enabled, usage is bounded, and missing CSRF tokens fail closed.
     - Semantic memory embedding is the public-demo default; DisableMemoryEmbedding is an explicit disclosed recovery switch.
-    - Local browser and package evidence is refreshed at 9fe898b9 without promoting public, provider, Docker, device or human gates.
-    - Current public-demo, real-Provider, Docker-backed integration, 30-user, physical-device and non-author gates remain open.
+    - Local browser and package evidence is refreshed at 73d2081f without promoting public, provider, device or human gates.
+    - Docker-backed integration, production-image smoke, signature/provenance, SBOM, IaC and image-CVE gates are closed by CI run 30626414452.
+    - Current public-demo, real-Provider, 30-user, physical-device and non-author gates remain open.
   remaining_machine_work:
-    - restore Docker daemon and rerun all PostgreSQL/Redis Testcontainers tests
     - inject a rotated real Provider secret outside Git and pass the no-fallback probe
     - regenerate a working Quick Tunnel and rerun public verifier plus the short 30-user burst
-    - restore GitHub connectivity and authentication, then push the competition checkpoint plus this reconciliation and inspect remote CI
   remaining_human_gates:
     - physical Android sideload over cellular data
     - non-author no-coaching walkthrough and final aesthetic review
