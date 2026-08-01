@@ -210,4 +210,6 @@ Preserve unrelated working-tree changes, keep secrets external, bind every meani
 
 ## License
 
-No open-source license has been declared yet. Unless a license file is added by the repository owner, treat the code and assets as all rights reserved.
+Inner Cosmos is licensed under the [Apache License 2.0](LICENSE). Repository-authored code,
+documentation and assets are covered unless a file states otherwise. Third-party dependencies and
+bundled materials retain their respective licenses.
