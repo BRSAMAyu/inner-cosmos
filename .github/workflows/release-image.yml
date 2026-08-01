@@ -11,9 +11,7 @@ on:
         type: string
 
 permissions:
-  contents: write
-  packages: write
-  id-token: write
+  contents: read
 
 jobs:
   verify:
@@ -66,6 +64,10 @@ jobs:
     needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
