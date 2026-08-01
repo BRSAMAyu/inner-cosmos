@@ -18,7 +18,7 @@ The repository has one reviewer-facing operational entry point covering the six 
 6. backup and disaster recovery.
 
 `docs/operations/operations-contract.yml` links those scenarios to 15 current repository artifacts and
-37 exact source assertions. `web/scripts/check-operations-contract.mjs` fails when a required scenario,
+42 exact source assertions. `web/scripts/check-operations-contract.mjs` fails when a required scenario,
 runbook heading, owner, prerequisite, success gate, stop condition, recovery action, evidence field,
 artifact, source assertion, remaining-work statement, or evidence boundary drifts. It also rejects
 secret-shaped contract values and false global `PASS` claims.
@@ -36,7 +36,7 @@ npm.cmd run operations:test
 6 tests, 6 pass, 0 fail
 
 npm.cmd run operations:check
-Operations contract PASS: 6 scenarios, 15 artifacts, 37 source assertions; status=IN_PROGRESS
+Operations contract PASS: 6 scenarios, 15 artifacts, 42 source assertions; status=IN_PROGRESS
 
 npm.cmd run acceptance:check
 Acceptance ledger integrity PASS: 10 gates, 69 acceptance items, 5 human gates,

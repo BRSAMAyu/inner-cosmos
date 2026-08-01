@@ -11,7 +11,7 @@ on:
         type: string
 
 permissions:
-  contents: read
+  contents: write
   packages: write
   id-token: write
 
@@ -41,10 +41,20 @@ jobs:
           corepack enable
           corepack prepare pnpm@11.9.0 --activate
           pnpm install --frozen-lockfile --ignore-scripts
+          pnpm run acceptance:check
+          pnpm run operations:test
+          pnpm run operations:check
           pnpm run api:check
           pnpm run api:diff:test
           pnpm test
           pnpm run build
+      - name: Verify Apache-2.0 release identity
+        shell: bash
+        run: |
+          test -f LICENSE
+          grep -Fq 'Apache License' LICENSE
+          grep -Fq '"license": "Apache-2.0"' web/package.json
+          grep -Fq '<name>Apache License, Version 2.0</name>' pom.xml
       - name: Verify secrets and Academy schema contract
         shell: pwsh
         run: |
@@ -118,3 +128,35 @@ jobs:
           echo "- Digest: \`$IMAGE@$DIGEST\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- SBOM: attached by BuildKit" >> "$GITHUB_STEP_SUMMARY"
           echo "- Provenance: mode=max, bound to the signed image index" >> "$GITHUB_STEP_SUMMARY"
+      - name: Create GitHub release record for a pushed tag
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMAGE: ${{ steps.coordinates.outputs.image }}
+          TAG: ${{ steps.coordinates.outputs.tag }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        shell: bash
+        run: |
+          notes="$RUNNER_TEMP/release-notes.md"
+          {
+            echo "## Immutable release identity"
+            echo
+            echo "- Commit: \`$GITHUB_SHA\`"
+            echo "- Image tag: \`$IMAGE:$TAG\`"
+            echo "- Image digest: \`$IMAGE@$DIGEST\`"
+            echo "- Signature: keyless Cosign verification passed"
+            echo "- Supply chain: BuildKit SBOM and max-mode provenance attached"
+            echo "- License: Apache-2.0"
+            echo
+            echo "## Evidence boundary"
+            echo
+            echo "This release candidate is competition-ready machine evidence, not a claim that"
+            echo "physical-device, independent usability, real AWS apply, legal/psychology review,"
+            echo "or production operations human gates are complete. See the acceptance ledger."
+          } > "$notes"
+
+          args=(--verify-tag --title "Inner Cosmos $TAG" --notes-file "$notes")
+          if [[ "$TAG" == *-* ]]; then
+            args+=(--prerelease)
+          fi
+          gh release create "$TAG" "${args[@]}"

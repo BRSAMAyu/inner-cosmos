@@ -18,7 +18,7 @@ scenarios:
     exercise_status: READY_FOR_REHEARSAL
     artifacts:
       - path: .github/workflows/release-image.yml
-        contains: ["name: Release signed OCI image", "cosign sign --yes", "provenance: mode=max", "sbom: true"]
+        contains: ["name: Release signed OCI image", "contents: write", "pnpm run operations:check", "Apache License", "cosign sign --yes", "provenance: mode=max", "sbom: true", "gh release create", "--prerelease"]
       - path: scripts/mobile/verify-release.ps1
         contains: ["ANDROID_RELEASE_AUDIT_PASS", "Get-FileHash -Algorithm SHA256"]
     preconditions: [clean-reviewed-commit, three-required-checks-green, owner-approved-license-and-tag]
