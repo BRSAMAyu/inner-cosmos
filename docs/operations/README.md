@@ -5,7 +5,8 @@ data-rights handling and disaster recovery. It complements the classroom
 [`DEMO-RUNBOOK`](../demo/DEMO-RUNBOOK.md); it does not replace the product journey or cloud-native
 presentation narrative.
 
-Current evidence boundary: **ready for rehearsal, not independently exercised as a complete pack**.
+Current evidence boundary: **the signed release path has been machine-executed; the complete pack is
+not independently exercised**.
 The machine contract in [`operations-contract.yml`](operations-contract.yml) binds every scenario to
 the implementation artifacts that make it possible. CI rejects missing scenarios, source drift,
 missing stop/recovery gates and a premature `PASS` claim.
@@ -46,6 +47,14 @@ release candidates separately run `scripts/mobile/verify-release.ps1` before dis
 
 Success: immutable digest recorded, signature verified, SBOM/provenance attached, mobile leakage
 gate passed where applicable, and sanitized release notes identify the exact commit and CI run.
+
+Executed receipt (2026-08-01): owner-authorized `v0.1.0-rc.1` published commit
+`188b708a220191c34a3f47426363276b16c2526b` as
+`ghcr.io/brsamayu/inner-cosmos@sha256:58499fdee146cf2801c6da164bf90e28f961175feebac32f1c2981d9244dad69`.
+GitHub Actions run `30686402705` rebuilt and reverified the backend, frontend, Apache-2.0 identity,
+secret history and Academy schema; then attached SBOM/max-mode provenance, keyless-signed the digest,
+verified the signature and created a non-draft Pre-release. This closes the machine release execution,
+not independent review or the rollback scenario.
 
 STOP on a dirty/divergent ref, failed check, absent owner approval, mutable tag reuse, secret-shaped
 output or a debug endpoint. Never move a published tag. Mark the candidate rejected, correct it on a

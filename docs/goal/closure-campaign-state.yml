@@ -2,7 +2,7 @@ schema_version: 1
 goal_id: INNER-COSMOS-COMPLETE-PRODUCT
 authority: 对齐文档/24-完全体最终收敛与云原生课程战役.md
 status: IN_PROGRESS
-updated_at: 2026-07-31T23:36:15+08:00
+updated_at: 2026-08-01T14:11:39+08:00
 
 legal_terminal_states:
   - COMPLETE
@@ -43,12 +43,12 @@ demo_delivery_front:
     - share the newly generated URL and APK after every Quick Tunnel restart
 
 integrated_head:
-  commit: 41f5190e56691993e0c04937b536ad8d0b85a891
+  commit: 188b708a220191c34a3f47426363276b16c2526b
   branch: main
-  parent_before_integration: 1de7509f12689d82cf9d679e5f493b6ec473887c
-  ci_run: https://github.com/BRSAMAyu/inner-cosmos/actions/runs/30642345403
+  parent_before_integration: bd208da874a112cfdb5394d8f0d086ecc961d14a
+  ci_run: https://github.com/BRSAMAyu/inner-cosmos/actions/runs/30685860220
   note: >-
-    Commit 41f5190e is the synchronized competition-readiness and commercial-sg Terraform checkpoint
+    Commit 188b708a is the synchronized competition-readiness, release-governance and commercial-sg Terraform checkpoint
     on main. It includes the
     product/repository repair, subsequent timezone, capsule-boundary, Singapore safety-resource,
     dependency, IaC, production-smoke, Node 24 Actions and supply-chain corrections. It restores CSRF,
@@ -56,13 +56,14 @@ integrated_head:
     public-demo profile; fixes the demo readiness contract, month-end token forecasting and
     state-aware Aurora outage copy; standardizes Docker-unavailable Testcontainers behavior; and
     adds judge, verification, security, contribution, documentation-index and poster-source
-    assets. The production PWA bundle was rebuilt from the exact validated source tree. GitHub
+    assets. The production PWA bundle was rebuilt from the exact validated source tree.
     The credential-free Terraform 1.15.8 contract adds private Singapore EKS, managed data services,
     KMS, queues/object storage, private AWS endpoints and deny-by-default node egress. GitHub Actions
-    run 30642345403 passed terraform-contract, web-contract and verify at this exact commit, including
+    run 30685860220 passed terraform-contract, web-contract and verify at this exact commit, including
     Docker-backed tests, production smoke, Terraform/full-tree IaC scanning, signature/provenance and
-    final HIGH/CRITICAL image scanning; all three checks reported zero annotations. Local HEAD,
-    origin/main and remote main are synchronized.
+    final HIGH/CRITICAL image scanning; all three checks reported zero annotations. Tag
+    v0.1.0-rc.1 and its signed release are bound to this exact checkpoint; later reconciliation
+    documentation is metadata-only and does not move the published tag.
   preserved_preexisting_dirty_paths:
     - docs/AI_ALIGNMENT_TECHNICAL_REFERENCE.md
     - docs/presentation/inner-cosmos-cloud-native-defense-v4-continuity-aligned组员H1改进版.html
@@ -95,7 +96,7 @@ integrated_head:
     - Semantic memory embedding is the public-demo default; DisableMemoryEmbedding is an explicit disclosed recovery switch.
     - Local browser and package evidence is refreshed through 97c57c12 without promoting public, provider, device or human gates.
     - The en-SG Safety Harbor renders all six current channel-correct contacts with zero application-console findings.
-    - Docker-backed integration, production-image smoke, signature/provenance, SBOM, IaC and image-CVE gates are closed by CI run 30642345403.
+    - Docker-backed integration, production-image smoke, signature/provenance, SBOM, IaC and image-CVE gates are closed by CI run 30685860220.
     - Acceptance-state integrity is now treated as machine work: explicit machine gaps prevent a human-gate-only terminal claim.
     - Commercial-sg Terraform is now credential-free reproducible and CI-gated; unrestricted EKS node egress is rejected, while real AWS plan/apply remains owner-authorized work.
     - Current public-demo, real-Provider, 30-user, physical-device and non-author gates remain open.
@@ -109,7 +110,40 @@ integrated_head:
     - physical Android sideload over cellular data
     - non-author no-coaching walkthrough and final aesthetic review
     - two-round 30-person full-journey rehearsal and independent dual-kernel quality review
-    - choose a repository license and approve any coordinated destructive history rewrite or remote-branch deletion
+    - re-authenticate a repository-admin GitHub session so the already-authorized main protection can be applied and verified
+
+repository_governance:
+  status: PARTIAL
+  license: Apache-2.0
+  license_commit: 833754de
+  main_ci:
+    run: https://github.com/BRSAMAyu/inner-cosmos/actions/runs/30685860220
+    commit: 188b708a220191c34a3f47426363276b16c2526b
+    required_jobs: [terraform-contract, web-contract, verify]
+    result: PASS
+  release_candidate:
+    tag: v0.1.0-rc.1
+    prerelease: true
+    release: https://github.com/BRSAMAyu/inner-cosmos/releases/tag/v0.1.0-rc.1
+    workflow: https://github.com/BRSAMAyu/inner-cosmos/actions/runs/30686402705
+    image: ghcr.io/brsamayu/inner-cosmos:v0.1.0-rc.1
+    digest: sha256:58499fdee146cf2801c6da164bf90e28f961175feebac32f1c2981d9244dad69
+    signature: KEYLESS_COSIGN_VERIFIED
+    sbom_provenance: ATTACHED
+  remote_branch_cleanup:
+    result: PASS
+    deleted_count: 6
+    deleted: [codex/capsule-persona-layer, codex/english-demo-i18n, codex/track-a-living-intelligence, codex/track-b-complete-experience, codex/w0-integration, codex/windows-final-closure]
+    retained: feat/run006-aurora-self-understanding
+    retained_unique_commits: 2
+    history_rewrite: DEFERRED_BY_OWNER
+  main_protection:
+    status: BLOCKED_BY_GITHUB_ADMIN_AUTHENTICATION
+    owner_authorized: true
+    strict_required_jobs: [terraform-contract, web-contract, verify]
+    force_pushes: DISABLED_TARGET
+    branch_deletion: DISABLED_TARGET
+    blocker: local GitHub CLI account has an invalid cached token; no credential was extracted or repurposed
 
 current_front:
   id: W0V-VERIFIED-AUDIT-CLOSURE

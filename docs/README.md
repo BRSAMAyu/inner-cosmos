@@ -6,7 +6,7 @@ order in [`../CLAUDE.md`](../CLAUDE.md) and [`../对齐文档/README.md`](../对
 ## Start here
 
 - [Competition judge guide](competition/JUDGE-GUIDE.md) — the shortest product and engineering review route.
-- [Current verification snapshot](competition/VERIFICATION-SNAPSHOT-2026-07-31.md) — what passed, what was skipped, and what remains human-gated.
+- [Current verification snapshot](competition/VERIFICATION-SNAPSHOT-2026-08-01.md) — release governance, current gates, explicit failures, and remaining human/external boundaries.
 - [Singapore safety-resource verification](competition/SINGAPORE-SAFETY-RESOURCE-VERIFICATION-2026-07-31.md) — current official sources, exact contact channels, regression exclusions, and the human-review boundary.
 - [Public demo runbook](demo/DEMO-RUNBOOK.md) — operator, browser, APK, recovery, and shutdown steps.
 - [Deployment index](../DEPLOY.md) — local-complete, classroom, Academy EKS, and production boundaries.

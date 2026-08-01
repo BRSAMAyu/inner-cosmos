@@ -23,6 +23,9 @@ historical state documents are evidence, not current authority.
 Push-Location web
 corepack enable
 pnpm install --frozen-lockfile
+pnpm run acceptance:check
+pnpm run operations:test
+pnpm run operations:check
 pnpm run api:check
 pnpm run api:diff:test
 pnpm test

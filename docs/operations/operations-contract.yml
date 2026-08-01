@@ -1,7 +1,7 @@
 schema_version: 1
 status: IN_PROGRESS
 runbook: docs/operations/README.md
-evidence_boundary: READY_FOR_REHEARSAL_NOT_INDEPENDENTLY_EXERCISED
+evidence_boundary: RELEASE_EXECUTED_REMAINING_SCENARIOS_NOT_INDEPENDENTLY_EXERCISED
 
 required_scenarios:
   - release
@@ -15,18 +15,20 @@ scenarios:
   - id: release
     heading: "## 1. Release"
     owner_role: release-owner
-    exercise_status: READY_FOR_REHEARSAL
+    exercise_status: PARTIAL
     artifacts:
       - path: .github/workflows/release-image.yml
         contains: ["name: Release signed OCI image", "contents: write", "pnpm run operations:check", "Apache License", "cosign sign --yes", "provenance: mode=max", "sbom: true", "gh release create", "--prerelease"]
       - path: scripts/mobile/verify-release.ps1
         contains: ["ANDROID_RELEASE_AUDIT_PASS", "Get-FileHash -Algorithm SHA256"]
+      - path: evidence/g9/FINAL-OPERATIONS-001/summary.md
+        contains: ["v0.1.0-rc.1", "188b708a220191c34a3f47426363276b16c2526b", "sha256:58499fdee146cf2801c6da164bf90e28f961175feebac32f1c2981d9244dad69", "GitHub Actions run 30686402705"]
     preconditions: [clean-reviewed-commit, three-required-checks-green, owner-approved-license-and-tag]
     success_gates: [immutable-digest, keyless-signature-verified, sbom-and-provenance-attached, release-evidence-sanitized]
     stop_conditions: [dirty-or-divergent-ref, failed-required-check, missing-owner-approval, unexpected-secret-or-debug-endpoint]
     recovery: [do-not-move-tag, mark-candidate-rejected, correct-on-new-commit, publish-new-version-only-after-reverification]
     evidence_fields: [git_sha, workflow_run, immutable_digest, signature_result, sbom_result, provenance_result, actor, timestamp]
-    remaining: Apache-2.0 and v0.1.0-rc.1 are owner-approved; the complete release checklist still needs a successful signed release and evidence receipt.
+    remaining: The owner-authorized signed OCI release and sanitized receipt are complete; independent reviewer sign-off and the release-to-rollback rehearsal remain open.
 
   - id: rollback
     heading: "## 2. Rollback"

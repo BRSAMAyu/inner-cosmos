@@ -2,7 +2,9 @@
 
 [![Java baseline](https://github.com/BRSAMAyu/inner-cosmos/actions/workflows/java-baseline.yml/badge.svg?branch=main)](https://github.com/BRSAMAyu/inner-cosmos/actions/workflows/java-baseline.yml)
 
-[中文说明](README.zh-CN.md) · [Judge guide](docs/competition/JUDGE-GUIDE.md) · [Verification snapshot](docs/competition/VERIFICATION-SNAPSHOT-2026-07-31.md) · [Documentation index](docs/README.md) · [Agent entry point](CLAUDE.md) · [Acceptance ledger](docs/goal/complete-product-acceptance.yml)
+[Latest release candidate: v0.1.0-rc.1](https://github.com/BRSAMAyu/inner-cosmos/releases/tag/v0.1.0-rc.1) · Apache-2.0 · signed multi-architecture OCI with SBOM and provenance
+
+[中文说明](README.zh-CN.md) · [Judge guide](docs/competition/JUDGE-GUIDE.md) · [Verification snapshot](docs/competition/VERIFICATION-SNAPSHOT-2026-08-01.md) · [Documentation index](docs/README.md) · [Agent entry point](CLAUDE.md) · [Acceptance ledger](docs/goal/complete-product-acceptance.yml)
 
 Inner Cosmos is an AI-native self-understanding and slow-social platform. Aurora turns natural conversations into a long-lived, user-correctable model of memories, values, relationships, emotions, and goals. With explicit consent, that model can be compiled into bounded Echo Capsules that help people discover meaningful resonance before deciding whether to connect as humans.
 
@@ -154,7 +156,7 @@ Pop-Location
 
 Some PostgreSQL/Redis integration tests require a working Docker engine. A missing Docker daemon is an infrastructure failure, not permission to mark those tests passed. Current evidence lives under [`evidence/`](evidence/) and every acceptance status must point to reproducible proof.
 The latest consolidated local result and its explicit environment gaps are recorded in
-[`docs/competition/VERIFICATION-SNAPSHOT-2026-07-31.md`](docs/competition/VERIFICATION-SNAPSHOT-2026-07-31.md).
+[`docs/competition/VERIFICATION-SNAPSHOT-2026-08-01.md`](docs/competition/VERIFICATION-SNAPSHOT-2026-08-01.md).
 
 ## Security and secret handling
 

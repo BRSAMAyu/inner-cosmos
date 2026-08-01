@@ -68,7 +68,7 @@ flowchart LR
 | `BLOCKED` | The named external prerequisite was unavailable and no substitute is claimed. |
 | `HUMAN-GATED` | Requires owner, device, legal, provider-account, or independent-review action. |
 
-See the [current verification snapshot](VERIFICATION-SNAPSHOT-2026-07-31.md) and the
+See the [current verification snapshot](VERIFICATION-SNAPSHOT-2026-08-01.md) and the
 [machine-readable acceptance ledger](../goal/complete-product-acceptance.yml) before quoting a
 completion claim.
 
