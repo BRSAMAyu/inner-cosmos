@@ -36,11 +36,13 @@
         <jackson-bom.version>2.21.4</jackson-bom.version>
         <mybatis-plus.version>3.5.9</mybatis-plus.version>
         <shedlock.version>7.7.0</shedlock.version>
-        <!-- Patch-level bumps closing HIGH CVEs flagged by the SBOM trivy gate:
+        <!-- Patch-level bumps closing HIGH CVEs flagged by the SBOM Trivy gate:
              Spring Framework 6.2.18 -> CVE-2026-41842/41845/41850;
+             Spring Data 2025.0.12 / Commons 3.5.12 -> CVE-2026-41695;
              Netty 4.1.135.Final -> CVE-2026-59901 (bzip2 infinite loop);
              PostgreSQL JDBC 42.7.11 -> CVE-2026-54291 (SCRAM downgrade). -->
         <spring-framework.version>6.2.19</spring-framework.version>
+        <spring-data-bom.version>2025.0.12</spring-data-bom.version>
         <netty.version>4.1.136.Final</netty.version>
         <postgresql.version>42.7.12</postgresql.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
