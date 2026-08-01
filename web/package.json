@@ -15,6 +15,8 @@
     "build:demo": "tsc -b && vite build --mode demo",
     "test": "vitest run",
     "acceptance:check": "node scripts/check-acceptance-ledger.mjs",
+    "operations:check": "node scripts/check-operations-contract.mjs",
+    "operations:test": "node --test scripts/operations-contract-rules.test.mjs",
     "api:generate": "node scripts/generate-openapi.mjs",
     "api:check": "node scripts/check-openapi-generated.mjs",
     "api:diff": "node scripts/check-openapi-breaking.mjs",

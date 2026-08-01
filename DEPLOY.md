@@ -4,6 +4,9 @@
 
 This file is intentionally a short routing page. The handoff guide above is the maintained runbook with prerequisites, environment contracts, exact commands, validation, failure recovery, and AWS Academy cleanup rules.
 
+Release, rollback, incident response, Provider failure, data-rights operations and disaster recovery
+use the CI-gated [`docs/operations/README.md`](docs/operations/README.md) contract.
+
 ## Supported profiles
 
 | Profile | Command entry | Intended evidence |

@@ -50,6 +50,10 @@ jobs:
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Gate acceptance-ledger integrity
         run: pnpm run acceptance:check
+      - name: Gate operational runbook integrity
+        run: |
+          pnpm run operations:test
+          pnpm run operations:check
       - name: Gate generated OpenAPI types
         run: pnpm run api:check
       - name: Verify OpenAPI breaking-change rules

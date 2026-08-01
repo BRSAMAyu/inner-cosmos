@@ -1,0 +1,115 @@
+schema_version: 1
+status: IN_PROGRESS
+runbook: docs/operations/README.md
+evidence_boundary: READY_FOR_REHEARSAL_NOT_INDEPENDENTLY_EXERCISED
+
+required_scenarios:
+  - release
+  - rollback
+  - incident
+  - provider-failure
+  - data-rights
+  - disaster-recovery
+
+scenarios:
+  - id: release
+    heading: "## 1. Release"
+    owner_role: release-owner
+    exercise_status: READY_FOR_REHEARSAL
+    artifacts:
+      - path: .github/workflows/release-image.yml
+        contains: ["name: Release signed OCI image", "cosign sign --yes", "provenance: mode=max", "sbom: true"]
+      - path: scripts/mobile/verify-release.ps1
+        contains: ["ANDROID_RELEASE_AUDIT_PASS", "Get-FileHash -Algorithm SHA256"]
+    preconditions: [clean-reviewed-commit, three-required-checks-green, owner-approved-license-and-tag]
+    success_gates: [immutable-digest, keyless-signature-verified, sbom-and-provenance-attached, release-evidence-sanitized]
+    stop_conditions: [dirty-or-divergent-ref, failed-required-check, missing-owner-approval, unexpected-secret-or-debug-endpoint]
+    recovery: [do-not-move-tag, mark-candidate-rejected, correct-on-new-commit, publish-new-version-only-after-reverification]
+    evidence_fields: [git_sha, workflow_run, immutable_digest, signature_result, sbom_result, provenance_result, actor, timestamp]
+    remaining: Owner must select a license, approve the release identity and independently exercise the complete release checklist.
+
+  - id: rollback
+    heading: "## 2. Rollback"
+    owner_role: platform-operator
+    exercise_status: READY_FOR_REHEARSAL
+    artifacts:
+      - path: deploy/k8s/extensions/rollouts/api-rollout.yaml
+        contains: ["progressDeadlineAbort: true", "maxUnavailable: 0", "abortScaleDownDelaySeconds: 0"]
+      - path: evidence/w3/CN-PROGRESSIVE-DELIVERY-001/run-log.txt
+        contains: ["AUTO-ABORT", "ZERO downtime"]
+    preconditions: [exact-cluster-context-recorded, stable-digest-known, migration-compatibility-reviewed]
+    success_gates: [failed-canary-zero-replicas, stable-remains-ready, health-and-core-read-only-probe-pass, no-destructive-database-reversal]
+    stop_conditions: [unknown-context, irreversible-migration, stateful-corruption, stable-digest-not-known]
+    recovery: [abort-rollout, restore-last-good-digest, keep-expand-contract-schema, record-timeline-and-user-impact]
+    evidence_fields: [cluster_profile, git_sha, stable_digest, rejected_digest, rollout_status, ready_replicas, probe_result, timestamp]
+    remaining: Automatic abort is live-proven on kind; an independent operator must rehearse the documented release rollback and shared-PostgreSQL compatibility decision.
+
+  - id: incident
+    heading: "## 3. Incident response"
+    owner_role: incident-commander
+    exercise_status: READY_FOR_REHEARSAL
+    artifacts:
+      - path: docs/demo/DEMO-RUNBOOK.md
+        contains: ["## 停止与恢复", "stop-public-demo.ps1"]
+      - path: src/main/java/com/innercosmos/controller/AiHealthController.java
+        contains: ["aiLogService.latest(me)", "vo.lastError", "vo.lastLatencyMs"]
+    preconditions: [incident-owner-named, environment-and-start-time-recorded, privacy-safe-channel-open]
+    success_gates: [impact-bounded, p0-content-excluded-from-evidence, recovery-verified, follow-up-owner-and-deadline-recorded]
+    stop_conditions: [suspected-secret-exposure, destructive-command-target-unclear, evidence-would-contain-private-content]
+    recovery: [contain-ingress-or-feature, preserve-sanitized-timeline, restore-one-change-at-a-time, run-core-probes, complete-post-incident-review]
+    evidence_fields: [severity, environment, git_sha, started_at, detected_by, containment, recovery_gate, ended_at, follow_up]
+    remaining: The privacy-safe response flow is ready; a non-author tabletop and one controlled technical incident exercise are still required.
+
+  - id: provider-failure
+    heading: "## 4. Provider failure"
+    owner_role: ai-runtime-operator
+    exercise_status: READY_FOR_REHEARSAL
+    artifacts:
+      - path: deploy/compose/public-demo.yml
+        contains: ["LLM_ALLOW_FALLBACK: \"false\"", "MEMORY_EMBEDDING_ENABLED:"]
+      - path: src/main/java/com/innercosmos/controller/AiHealthController.java
+        contains: ["vo.fallbackAllowed", "vo.mockProvider", "vo.lastFallbackUsed", "vo.lastError"]
+      - path: src/test/java/com/innercosmos/ai/client/FailoverLlmClientTest.java
+        contains: ["class FailoverLlmClientTest"]
+    preconditions: [isolated-staging-or-local-complete, test-only-provider-credential, fallback-disabled, baseline-turn-passes]
+    success_gates: [visible-bounded-user-degradation, no-mock-response, no-silent-fallback, private-content-absent-from-logs, recovery-turn-passes]
+    stop_conditions: [production-credential-at-risk, real-user-session-in-scope, safety-path-degraded, failure-cannot-be-reversed]
+    recovery: [restore-endpoint-or-rotated-secret, verify-ai-health, send-one-recovery-turn, reconcile-failed-outbox-work, record-rto]
+    evidence_fields: [environment, provider, model, fallback_allowed, injection_method, visible_state, sanitized_error_class, recovery_rto, timestamp]
+    remaining: Unit and configuration controls exist, but a production-faithful no-fallback failure/recovery drill with visible UI evidence remains open.
+
+  - id: data-rights
+    heading: "## 5. Data rights"
+    owner_role: privacy-operator
+    exercise_status: READY_FOR_REHEARSAL
+    artifacts:
+      - path: src/main/java/com/innercosmos/controller/UserController.java
+        contains: ["@GetMapping(\"/export\")", "@DeleteMapping(\"/account\")", "passwordEncoder.matches"]
+      - path: src/test/java/com/innercosmos/service/impl/AccountDeletionErasureTest.java
+        contains: ["deletingAnAccountPurgesCompiledDerivativesAndAuditTrail"]
+      - path: src/test/java/com/innercosmos/controller/DataRightsControllerTest.java
+        contains: ["/api/me/data-rights/receipts", "someone else's capsule"]
+    preconditions: [disposable-consented-account, owner-reauthentication-available, no-template-account]
+    success_gates: [export-belongs-only-to-owner, correction-or-withdrawal-receipt-visible, compiled-derivatives-cleared, deletion-invalidates-session]
+    stop_conditions: [identity-uncertain, request-targets-template-or-other-user, export-cannot-be-protected]
+    recovery: [stop-processing, preserve-content-free-audit-only, escalate-scope-mismatch, never-restore-deleted-p0-from-demo-evidence]
+    evidence_fields: [disposable_subject, action, http_result, derivative_counts_before_after, session_result, reviewer, timestamp]
+    remaining: Automated ownership and erasure tests pass; an independent end-to-end operator rehearsal with a disposable account is still required.
+
+  - id: disaster-recovery
+    heading: "## 6. Disaster recovery"
+    owner_role: database-operator
+    exercise_status: READY_FOR_REHEARSAL
+    artifacts:
+      - path: deploy/k8s/backup/pg-backup.yaml
+        contains: ["concurrencyPolicy: Forbid", "pg_dump -Fc", "inner-cosmos-backups"]
+      - path: evidence/g8/BACKUP-RESTORE-001/summary.md
+        contains: ["42", "Off-cluster/object-store copy"]
+      - path: deploy/terraform/commercial-sg/main.tf
+        contains: ["backup_retention_period", "deletion_protection", "aws_s3_bucket_versioning"]
+    preconditions: [backup-checksum-recorded, off-cluster-copy-confirmed, isolated-restore-target, target-version-compatible]
+    success_gates: [checksum-matches, restore-command-succeeds, flyway-and-schema-pass, sanitized-row-counts-match, rpo-rto-recorded]
+    stop_conditions: [restore-target-is-live-database, checksum-mismatch, backup-contains-unapproved-export, destructive-target-unclear]
+    recovery: [destroy-only-verified-isolated-target, retain-failure-inclusive-log, create-new-backup-after-remediation, rerun-from-off-cluster-copy]
+    evidence_fields: [source_profile, backup_id_hash, checksum_result, off_cluster_medium, restore_target, schema_result, rpo, rto, timestamp]
+    remaining: In-cluster dump/restore is live-proven; an encrypted off-cluster copy and restore from that exact copy remain unperformed.

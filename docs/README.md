@@ -10,6 +10,7 @@ order in [`../CLAUDE.md`](../CLAUDE.md) and [`../对齐文档/README.md`](../对
 - [Singapore safety-resource verification](competition/SINGAPORE-SAFETY-RESOURCE-VERIFICATION-2026-07-31.md) — current official sources, exact contact channels, regression exclusions, and the human-review boundary.
 - [Public demo runbook](demo/DEMO-RUNBOOK.md) — operator, browser, APK, recovery, and shutdown steps.
 - [Deployment index](../DEPLOY.md) — local-complete, classroom, Academy EKS, and production boundaries.
+- [Competition operations runbook](operations/README.md) — release, rollback, incident, Provider failure, data rights, and disaster recovery.
 - [Acceptance ledger](goal/complete-product-acceptance.yml) — machine-readable global status.
 
 ## Product and architecture
