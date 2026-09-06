@@ -10,4 +10,5 @@ public record StarfieldSceneVO(
         List<StarfieldVO> stars,
         List<StarfieldVO> accessibleList,
         Map<String, String> legend,
+        boolean emotionEncoding,
         LocalDateTime generatedAt) {}

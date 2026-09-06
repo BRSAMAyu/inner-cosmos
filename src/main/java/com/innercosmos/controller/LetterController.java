@@ -94,8 +94,11 @@ public class LetterController extends BaseController {
     }
 
     @GetMapping("/outbox")
-    public ApiResponse<List<SlowLetter>> outbox(HttpSession session) {
-        return ApiResponse.ok(slowLetterService.outbox(currentUserId(session)));
+    public ApiResponse<List<com.innercosmos.vo.SlowLetterOutboxVO>> outbox(HttpSession session) {
+        // CP-33: sender receipts are privacy-shaped — DECLINED/BLOCKED collapse to CLOSED
+        // (never reveal that the recipient blocked the sender) and bodies are not echoed.
+        return ApiResponse.ok(slowLetterService.outbox(currentUserId(session)).stream()
+                .map(com.innercosmos.vo.SlowLetterOutboxVO::from).toList());
     }
 
     @GetMapping("/{id}")

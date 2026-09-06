@@ -30,6 +30,12 @@ public class StarfieldExplorerServiceImpl implements StarfieldExplorerService {
 
     @Override
     public StarfieldSceneVO explore(Long userId, String rawMode, String query, String layer, String person) {
+        return explore(userId, rawMode, query, layer, person, true);
+    }
+
+    @Override
+    public StarfieldSceneVO explore(Long userId, String rawMode, String query, String layer,
+                                     String person, boolean emotionEncoding) {
         String mode = normalizeMode(rawMode);
         String needle = normalize(query);
         String layerFilter = normalize(layer).toUpperCase(Locale.ROOT);
@@ -48,7 +54,15 @@ public class StarfieldExplorerServiceImpl implements StarfieldExplorerService {
         List<StarfieldVO> accessible = stars.stream()
                 .sorted(Comparator.comparing((StarfieldVO star) -> star.occurredAt,
                         Comparator.nullsLast(Comparator.reverseOrder())).thenComparing(star -> star.title)).toList();
-        return new StarfieldSceneVO(mode, explanation(mode), stars, accessible, legend(mode), LocalDateTime.now());
+        if (!emotionEncoding) {
+            // CP-24: emotional encoding OFF — gravity-driven size is flattened to one neutral
+            // constant so no visual hierarchy by "emotional weight" remains.
+            for (StarfieldVO star : stars) {
+                star.gravity = 0.5;
+            }
+        }
+        return new StarfieldSceneVO(mode, explanation(mode), stars, accessible,
+                legend(mode, emotionEncoding), emotionEncoding, LocalDateTime.now());
     }
 
     private Map<Long, List<Long>> links(Long userId) {
@@ -97,11 +111,19 @@ public class StarfieldExplorerServiceImpl implements StarfieldExplorerService {
         case "PEOPLE" -> "人物标签形成共同轨道；没有人物信息的记忆停留在外围。";
         default -> "从右侧的现在向左回望过去；纵向位置区分记忆层。";
     }; }
-    private static Map<String, String> legend(String mode) {
+    private static Map<String, String> legend(String mode, boolean emotionEncoding) {
         Map<String, String> result = new LinkedHashMap<>();
-        result.put("尺寸", "情感重力与长期重要性"); result.put("亮度", "近期活跃程度");
+        if (emotionEncoding) {
+            result.put("尺寸", "情感重力与长期重要性");
+        } else {
+            result.put("尺寸", "已关闭情绪编码：星体大小统一");
+        }
+        result.put("亮度", "近期活跃程度");
         result.put("边缘", "理解置信度"); result.put("连线", "合并、拆分、矛盾或替代关系");
-        result.put("距离", explanation(mode)); return result;
+        result.put("距离", explanation(mode));
+        // CP-24: the starfield is a life map, never a psychological score or diagnosis.
+        result.put("说明", "星体特征反映记忆的重要性与活跃程度，不是心理评分或医学判断");
+        return result;
     }
     private static boolean contains(String value, String needle) { return safe(value).toLowerCase(Locale.ROOT).contains(needle.toLowerCase(Locale.ROOT)); }
     private static String normalize(String value) { return value == null ? "" : value.trim(); }

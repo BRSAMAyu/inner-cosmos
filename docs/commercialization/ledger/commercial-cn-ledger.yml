@@ -272,8 +272,12 @@ work_packages:
     stage: S1
     depends_on: ["CP-13", "CP-14"]
     vision_ids: ["V07", "V13", "V15"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-16/
+    delivery_record: evidence/commercial-cn/CP-16/2026-09-06-threat-model/delivery-record.md
+    test_command: "./mvnw test -Dtest=SecurityThreatModelNegativeTest"
+    note: "首个增量：九类威胁模型v1+高危自动负测4/4(登录枚举一致/CSRF 403/admin拒绝/凭据硬拦)；MFA与渗透清单后续"
+    next_action: "管理员MFA随身份通道；独立渗透清单CP-63A前"
   - id: CP-17
     title: "国内全链路模型网关"
     owner: "AI平台"
@@ -336,8 +340,12 @@ work_packages:
     stage: S2
     depends_on: ["CP-09", "CP-11", "CP-21", "CP-23"]
     vision_ids: ["V02", "V05", "V06"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-24/
+    delivery_record: evidence/commercial-cn/CP-16/2026-09-06-threat-model/delivery-record.md
+    test_command: "./mvnw test -Dtest=StarfieldEncodingAndLetterReceiptPrivacyTest"
+    note: "首个增量：星空情绪编码开关(关闭=统一中性尺寸)+图例永远声明非心理评分；J05/J06现场验收属CP-12A"
+    next_action: "周报证据与缺失说明；一条纠正贯穿全部视图的旅程测试"
   - id: CP-25
     title: "Aurora人格连续性与受控演化"
     owner: "AI运行时＋产品"
@@ -408,8 +416,12 @@ work_packages:
     stage: S2
     depends_on: ["CP-09", "CP-14", "CP-31", "CP-36"]
     vision_ids: ["V12", "V13"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-33/
+    delivery_record: evidence/commercial-cn/CP-16/2026-09-06-threat-model/delivery-record.md
+    test_command: "./mvnw test -Dtest=StarfieldEncodingAndLetterReceiptPrivacyTest"
+    note: "首个增量：寄件回执隐私(DECLINED/BLOCKED折叠CLOSED不细分,正文不回显,承诺时刻保留)；读回执选择开关待J11联动"
+    next_action: "收件方读回执选择；跨时区/到期未到负测"
   - id: CP-34
     title: "双向关系、拒绝与退场"
     owner: "社交系统＋产品"

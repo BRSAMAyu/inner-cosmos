@@ -56,9 +56,10 @@ public class MemoryController extends BaseController {
             @RequestParam(required = false) String query,
             @RequestParam(required = false) String layer,
             @RequestParam(required = false) String person,
+            @RequestParam(defaultValue = "true") boolean emotionEncoding,
             HttpSession session) {
         return ApiResponse.ok(starfieldExplorerService.explore(
-                currentUserId(session), mode, query, layer, person));
+                currentUserId(session), mode, query, layer, person, emotionEncoding));
     }
 
     @GetMapping("/starfield/{id}/detail")
