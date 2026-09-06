@@ -1,0 +1,1006 @@
+# COMMERCIAL-CN 商业台账 — Inner Cosmos 中国大陆商业化权威执行账本
+# 权威来源：docs/commercialization/01-中国大陆商业化执行蓝图.md（CP-01 建立本台账）
+# 本台账不继承旧账本（docs/goal/complete-product-acceptance.yml）的完成状态；旧 PASS 仅是历史事实。
+# 状态机：NOT_STARTED / IN_PROGRESS / IMPLEMENTED / NOT_RUN / VERIFIED / FAILED / BLOCKED_EXTERNAL
+# 合规附加态：DRAFT / SUBMITTED / REMEDIATION_REQUIRED / 程序完成（不与工程PASS混用）
+schema_version: 1
+ledger_id: COMMERCIAL-CN-LEDGER-2026-09
+created_at: "2026-09-06"
+authority:
+  blueprint: docs/commercialization/01-中国大陆商业化执行蓝图.md
+  vision: docs/commercialization/02-商业化完全体愿景.md
+  migration_evidence: evidence/commercial-cn/CP-01/2026-09-06-authority-migration/
+baseline_freeze:
+  frozen_commit: add4b241338c47dd1ccbafa2880f7b484adb07b0
+  remote: origin/main（与本地HEAD一致）
+  dirty_at_freeze:
+    - "M docs/AI_ALIGNMENT_TECHNICAL_REFERENCE.md"
+    - "M docs/README.md"
+    - "M docs/presentation/inner-cosmos-cloud-native-defense-v4-continuity-aligned组员H1改进版.html"
+    - "M 对齐文档/README.md"
+    - "?? docs/commercialization/（本商业化文档集）"
+  note: 脏改全部为文档；产品代码在冻结SHA上干净。
+
+stage_gates:
+  S0: "立项与适用判断"
+  S1: "内部可信产品"
+  S2: "获准外部试点"
+  S3: "大陆收费首发"
+  S4: "质量／商业验证"
+  S5: "完全体能力与经营验收"
+
+sub_gates:
+  - id: CP-12A
+    stage: S2
+    depends_on: ["CP-10", "CP-11", "CP-24", "CP-33", "CP-51A"]
+    closes: "试点已开放的免费核心J01–J11；真实外部无讲解研究，不含尚未上线的支付"
+    status: NOT_STARTED
+  - id: CP-12B
+    stage: S3
+    depends_on: ["CP-12A", "CP-41", "CP-42", "CP-43", "CP-45", "CP-46", "CP-51A"]
+    closes: "J12真实交易和首发全部声明支持端的完整体验"
+    status: NOT_STARTED
+  - id: CP-50A
+    stage: S2
+    depends_on: ["CP-15", "CP-18", "CP-37", "CP-38", "CP-39", "CP-40", "CP-49"]
+    closes: "应用／Provider故障、权利请求、基础异地恢复"
+    status: NOT_STARTED
+  - id: CP-50B
+    stage: S3
+    depends_on: ["CP-50A", "CP-45", "CP-46", "CP-41", "CP-42", "CP-43"]
+    closes: "当前release全链故障及金融账本／退款／权益恢复与对账"
+    status: NOT_STARTED
+  - id: CP-51A
+    stage: S2
+    depends_on: ["CP-05", "CP-06", "CP-07", "CP-08", "CP-13", "CP-14", "CP-15", "CP-16", "CP-17", "CP-20", "CP-36", "CP-37", "CP-44", "CP-50A"]
+    closes: "外部试点法定程序、同意／身份／撤回／国内路由／危机实装、值班、法务与安全签字；先于任何公众试点"
+    status: NOT_STARTED
+  - id: CP-51B
+    stage: S3
+    depends_on: ["CP-51A"]
+    closes: "每个首发渠道、精确制品、功能范围的所需材料和真实审核结果；不由51A自动晋升"
+    status: NOT_STARTED
+  - id: CP-54A
+    stage: S2
+    depends_on: ["CP-03", "CP-04", "CP-12A", "CP-24", "CP-36", "CP-51A"]
+    closes: "60–100人至少35日私人价值研究"
+    status: NOT_STARTED
+  - id: CP-54B
+    stage: S4
+    depends_on: ["CP-54A", "CP-32", "CP-34"]
+    closes: "至少两成熟队列，验证真实社交、渠道与付费结果"
+    status: NOT_STARTED
+  - id: CP-60A
+    stage: S5
+    depends_on: ["CP-28", "CP-54B"]
+    closes: "至少6项专家审阅技能"
+    status: NOT_STARTED
+  - id: CP-60B
+    stage: S5
+    depends_on: ["CP-41", "CP-42", "CP-43", "CP-44", "CP-54B"]
+    closes: "原生HarmonyOS桥接、release真机、渠道与适用变更程序"
+    status: NOT_STARTED
+  - id: CP-60C
+    stage: S5
+    depends_on: ["CP-60A", "CP-60B"]
+    closes: "完整辅助技术／弱网／跨端J01–J12矩阵"
+    status: NOT_STARTED
+  - id: CP-63A
+    stage: S3
+    depends_on: ["CP-06", "CP-08", "CP-15", "CP-16", "CP-36", "CP-37", "CP-49", "CP-51A"]
+    closes: "首发前独立安全／隐私复核及整改验证"
+    status: NOT_STARTED
+  - id: CP-63B
+    stage: S5
+    depends_on: ["CP-63A", "CP-57", "CP-58", "CP-59", "CP-60", "CP-51B"]
+    closes: "新增能力、全部支持端与监管变更的完全体复核"
+    status: NOT_STARTED
+
+work_packages:
+  - id: CP-01
+    title: "权威迁移与真实能力台账"
+    owner: "集成负责人"
+    stage: S0
+    depends_on: []
+    vision_ids: ["V01", "V16", "V19"]
+    status: IMPLEMENTED
+    evidence_dir: evidence/commercial-cn/CP-01/
+    delivery_record: evidence/commercial-cn/CP-01/2026-09-06-authority-migration/delivery-record.md
+    current_sha: add4b241338c47dd1ccbafa2880f7b484adb07b0
+    reviewed_at: null
+    next_action: "独立复核抽查迁移表；外部访谈属 CP-02"
+  - id: CP-02
+    title: "首发细分与问题验证"
+    owner: "产品研究"
+    stage: S0
+    depends_on: ["CP-01"]
+    vision_ids: ["V01", "V18"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-02/
+  - id: CP-03
+    title: "指标、事件与数据字典"
+    owner: "数据工程＋产品"
+    stage: S1
+    depends_on: ["CP-02", "CP-07"]
+    vision_ids: ["V16", "V17", "V18"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-03/
+  - id: CP-04
+    title: "对标、AI评测与实验治理"
+    owner: "AI评测＋独立研究员"
+    stage: S1
+    depends_on: ["CP-02"]
+    vision_ids: ["V03", "V10", "V11", "V16"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-04/
+  - id: CP-05
+    title: "公司、IP与经营许可路线"
+    owner: "创始人＋法务"
+    stage: S0
+    depends_on: ["CP-01"]
+    vision_ids: ["V01", "V19"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-05/
+  - id: CP-06
+    title: "AI与社交监管程序设计"
+    owner: "法务＋AI负责人"
+    stage: S0
+    depends_on: ["CP-05"]
+    vision_ids: ["V01", "V13", "V19"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-06/
+  - id: CP-07
+    title: "隐私影响评估与同意产品合同"
+    owner: "隐私负责人＋产品"
+    stage: S0
+    depends_on: ["CP-05"]
+    vision_ids: ["V05", "V07", "V13"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-07/
+  - id: CP-08
+    title: "AI标识、成人准入与安全政策"
+    owner: "信任与安全＋法务＋心理专家"
+    stage: S1
+    depends_on: ["CP-06", "CP-07"]
+    vision_ids: ["V01", "V04", "V13"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-08/
+  - id: CP-09
+    title: "设计系统、信息架构与中文文案"
+    owner: "产品设计＋前端"
+    stage: S1
+    depends_on: ["CP-02", "CP-08"]
+    vision_ids: ["V02", "V06", "V14"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-09/
+  - id: CP-10
+    title: "首次价值、设置与权限体验"
+    owner: "产品＋前端"
+    stage: S1
+    depends_on: ["CP-07", "CP-09", "CP-13"]
+    vision_ids: ["V01", "V02", "V07"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-10/
+  - id: CP-11
+    title: "全状态、弱网和性能打磨"
+    owner: "前端＋客户端"
+    stage: S1
+    depends_on: ["CP-09"]
+    vision_ids: ["V02", "V03", "V14"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-11/
+  - id: CP-12
+    title: "非作者可用性与体验封板"
+    owner: "研究负责人＋独立设计评审"
+    stage: S2
+    depends_on: ["CP-10", "CP-11", "CP-24", "CP-33"]
+    vision_ids: ["V02", "V06", "V12", "V14"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-12/
+  - id: CP-13
+    title: "国内身份与多设备账户安全"
+    owner: "后端身份＋移动"
+    stage: S1
+    depends_on: ["CP-05", "CP-07"]
+    vision_ids: ["V01", "V07", "V14"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-13/
+  - id: CP-14
+    title: "全域授权与敏感数据边界"
+    owner: "安全后端"
+    stage: S1
+    depends_on: ["CP-07", "CP-13"]
+    vision_ids: ["V05", "V07", "V10"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-14/
+  - id: CP-15
+    title: "撤回、删除与灾备防复活"
+    owner: "数据后端＋隐私"
+    stage: S1
+    depends_on: ["CP-14", "CP-39"]
+    vision_ids: ["V05", "V07", "V10", "V20"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-15/
+  - id: CP-16
+    title: "应用安全、威胁模型与管理隔离"
+    owner: "安全工程"
+    stage: S1
+    depends_on: ["CP-13", "CP-14"]
+    vision_ids: ["V07", "V13", "V15"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-16/
+  - id: CP-17
+    title: "国内全链路模型网关"
+    owner: "AI平台"
+    stage: S1
+    depends_on: ["CP-06", "CP-07", "CP-14"]
+    vision_ids: ["V03", "V07", "V15", "V16"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-17/
+  - id: CP-18
+    title: "对话编排与真实连续性"
+    owner: "AI运行时＋前端"
+    stage: S1
+    depends_on: ["CP-11", "CP-17", "CP-39"]
+    vision_ids: ["V03", "V14", "V15"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-18/
+  - id: CP-19
+    title: "双核、上下文与中文理解增益"
+    owner: "AI质量"
+    stage: S2
+    depends_on: ["CP-04", "CP-17", "CP-18", "CP-22"]
+    vision_ids: ["V03", "V04", "V16"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-19/
+  - id: CP-20
+    title: "风险连续性与危机处置运行时"
+    owner: "AI安全＋信任与安全"
+    stage: S1
+    depends_on: ["CP-08", "CP-17", "CP-36"]
+    vision_ids: ["V04", "V09", "V13"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-20/
+  - id: CP-21
+    title: "记忆生命周期与来源图"
+    owner: "记忆系统"
+    stage: S1
+    depends_on: ["CP-14", "CP-15", "CP-17"]
+    vision_ids: ["V05", "V06", "V07"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-21/
+  - id: CP-22
+    title: "任务化检索与真实向量质量"
+    owner: "检索工程＋AI评测"
+    stage: S1
+    depends_on: ["CP-04", "CP-14", "CP-17"]
+    vision_ids: ["V03", "V05", "V16"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-22/
+  - id: CP-23
+    title: "可纠正画像与信念变化"
+    owner: "画像系统＋产品"
+    stage: S2
+    depends_on: ["CP-21", "CP-22"]
+    vision_ids: ["V05", "V06", "V11"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-23/
+  - id: CP-24
+    title: "星空、复盘与行动工具闭环"
+    owner: "产品前后端"
+    stage: S2
+    depends_on: ["CP-09", "CP-11", "CP-21", "CP-23"]
+    vision_ids: ["V02", "V05", "V06"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-24/
+  - id: CP-25
+    title: "Aurora人格连续性与受控演化"
+    owner: "AI运行时＋产品"
+    stage: S2
+    depends_on: ["CP-08", "CP-19", "CP-21"]
+    vision_ids: ["V04", "V16"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-25/
+  - id: CP-26
+    title: "时间理解与可控主动关心"
+    owner: "调度＋通知＋产品"
+    stage: S2
+    depends_on: ["CP-13", "CP-20", "CP-21", "CP-38"]
+    vision_ids: ["V04", "V08", "V14"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-26/
+  - id: CP-27
+    title: "中文语音、朗读与隐私"
+    owner: "语音＋客户端"
+    stage: S2
+    depends_on: ["CP-08", "CP-11", "CP-17", "CP-18"]
+    vision_ids: ["V03", "V08", "V14"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-27/
+  - id: CP-28
+    title: "非诊断心理支持技能首批"
+    owner: "技能平台＋心理专家"
+    stage: S2
+    depends_on: ["CP-08", "CP-20", "CP-21"]
+    vision_ids: ["V09", "V16"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-28/
+  - id: CP-29
+    title: "共鸣体编译与授权工作台"
+    owner: "Capsule系统＋产品"
+    stage: S2
+    depends_on: ["CP-08", "CP-15", "CP-21", "CP-23"]
+    vision_ids: ["V07", "V10"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-29/
+  - id: CP-30
+    title: "保真运行时与隐私红队"
+    owner: "Capsule AI＋独立评测"
+    stage: S2
+    depends_on: ["CP-04", "CP-17", "CP-29"]
+    vision_ids: ["V10", "V16"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-30/
+  - id: CP-31
+    title: "公开发现、分享与标识传播"
+    owner: "内容平台＋客户端"
+    stage: S2
+    depends_on: ["CP-08", "CP-29", "CP-36"]
+    vision_ids: ["V07", "V10", "V18"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-31/
+  - id: CP-32
+    title: "多目标匹配与可解释排序"
+    owner: "推荐＋产品"
+    stage: S2
+    depends_on: ["CP-14", "CP-22", "CP-30", "CP-31"]
+    vision_ids: ["V11", "V12", "V18"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-32/
+  - id: CP-33
+    title: "慢信的节律与隐私友好状态"
+    owner: "社交后端＋前端"
+    stage: S2
+    depends_on: ["CP-09", "CP-14", "CP-31", "CP-36"]
+    vision_ids: ["V12", "V13"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-33/
+  - id: CP-34
+    title: "双向关系、拒绝与退场"
+    owner: "社交系统＋产品"
+    stage: S2
+    depends_on: ["CP-13", "CP-14", "CP-33"]
+    vision_ids: ["V11", "V12", "V13"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-34/
+  - id: CP-35
+    title: "小组、邀请与共同活动"
+    owner: "社交系统＋运营"
+    stage: S4
+    depends_on: ["CP-34", "CP-36"]
+    vision_ids: ["V12", "V13", "V18"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-35/
+  - id: CP-36
+    title: "内容审核、反诈与案件后台"
+    owner: "信任与安全＋运营工程"
+    stage: S1
+    depends_on: ["CP-08", "CP-14"]
+    vision_ids: ["V01", "V12", "V13"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-36/
+  - id: CP-37
+    title: "国内主云PoC与基础设施即代码"
+    owner: "SRE＋安全"
+    stage: S1
+    depends_on: ["CP-05", "CP-07"]
+    vision_ids: ["V07", "V15"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-37/
+  - id: CP-38
+    title: "工作负载角色与容量隔离"
+    owner: "SRE＋运行时"
+    stage: S1
+    depends_on: ["CP-37", "CP-39"]
+    vision_ids: ["V08", "V15"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-38/
+  - id: CP-39
+    title: "数据迁移、事件可靠性与兼容发布"
+    owner: "数据平台＋集成负责人"
+    stage: S1
+    depends_on: ["CP-01"]
+    vision_ids: ["V05", "V07", "V15"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-39/
+  - id: CP-40
+    title: "可观测性、成本与用户影响"
+    owner: "SRE＋数据＋AI平台"
+    stage: S2
+    depends_on: ["CP-03", "CP-17", "CP-37", "CP-38"]
+    vision_ids: ["V15", "V16", "V17"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-40/
+  - id: CP-41
+    title: "Android大陆真机与厂商推送"
+    owner: "Android＋通知"
+    stage: S2
+    depends_on: ["CP-11", "CP-13", "CP-26", "CP-27", "CP-44"]
+    vision_ids: ["V08", "V14"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-41/
+  - id: CP-42
+    title: "iOS中国区与系统能力"
+    owner: "iOS＋发行"
+    stage: S3
+    depends_on: ["CP-11", "CP-13", "CP-26", "CP-27", "CP-44", "CP-46"]
+    vision_ids: ["V08", "V14", "V17"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-42/
+  - id: CP-43
+    title: "Web／PWA与Windows正式体验"
+    owner: "Web＋桌面"
+    stage: S3
+    depends_on: ["CP-11", "CP-13", "CP-18", "CP-44"]
+    vision_ids: ["V02", "V14", "V20"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-43/
+  - id: CP-44
+    title: "应用身份、渠道合同与HarmonyOS决策"
+    owner: "发行架构＋创始人"
+    stage: S1
+    depends_on: ["CP-05", "CP-09"]
+    vision_ids: ["V01", "V14", "V19"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-44/
+  - id: CP-45
+    title: "服务端订单与支付事实账本"
+    owner: "支付后端＋财务"
+    stage: S3
+    depends_on: ["CP-05", "CP-13", "CP-16", "CP-39"]
+    vision_ids: ["V17", "V19"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-45/
+  - id: CP-46
+    title: "订阅、IAP与透明配额"
+    owner: "支付产品＋移动"
+    stage: S3
+    depends_on: ["CP-17", "CP-44", "CP-45"]
+    vision_ids: ["V08", "V14", "V17"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-46/
+  - id: CP-47
+    title: "真实单位经济、预算与税务对账"
+    owner: "财务＋数据＋SRE"
+    stage: S3
+    depends_on: ["CP-03", "CP-40", "CP-45", "CP-46"]
+    vision_ids: ["V17", "V19"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-47/
+  - id: CP-48
+    title: "客服、退款与用户沟通"
+    owner: "客户支持＋运营工程"
+    stage: S3
+    depends_on: ["CP-15", "CP-36", "CP-45", "CP-46"]
+    vision_ids: ["V07", "V13", "V17"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-48/
+  - id: CP-49
+    title: "可复现工程与发布供应链"
+    owner: "开发体验＋安全＋发行"
+    stage: S1
+    depends_on: ["CP-01", "CP-16"]
+    vision_ids: ["V15", "V16", "V19"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-49/
+  - id: CP-50
+    title: "真实压力、故障与灾难恢复"
+    owner: "SRE＋独立演练者"
+    stage: S2
+    depends_on: ["CP-15", "CP-18", "CP-37", "CP-38", "CP-39", "CP-40", "CP-49", "CP-46", "CP-41", "CP-42", "CP-43"]
+    vision_ids: ["V07", "V14", "V15", "V20"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-50/
+  - id: CP-51
+    title: "监管材料与逐商店提审"
+    owner: "法务＋发行＋运营主体"
+    stage: S2
+    depends_on: ["CP-05", "CP-06", "CP-07", "CP-08", "CP-13", "CP-14", "CP-15", "CP-16", "CP-17", "CP-20", "CP-36", "CP-37", "CP-44", "CP-50A"]
+    vision_ids: ["V01", "V13", "V14", "V19"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-51/
+  - id: CP-52
+    title: "大陆收费首发总演练与发布"
+    owner: "发布总负责人＋独立验收组"
+    stage: S3
+    depends_on: ["CP-12B", "CP-19", "CP-20", "CP-25", "CP-28", "CP-30", "CP-32", "CP-34", "CP-41", "CP-42", "CP-43", "CP-46", "CP-47", "CP-48", "CP-50B", "CP-51B", "CP-54A", "CP-63A"]
+    vision_ids: ["V01"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-52/
+  - id: CP-53
+    title: "品牌、内容与合规增长素材"
+    owner: "品牌＋增长＋内容审核"
+    stage: S2
+    depends_on: ["CP-02", "CP-08", "CP-09", "CP-31"]
+    vision_ids: ["V01", "V18", "V19"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-53/
+  - id: CP-54
+    title: "真人队列与社交冷启动研究"
+    owner: "用户研究＋社区运营"
+    stage: S2
+    depends_on: ["CP-03", "CP-04", "CP-12A", "CP-24", "CP-36", "CP-51A"]
+    vision_ids: ["V05", "V11", "V12", "V18"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-54/
+  - id: CP-55
+    title: "定价、渠道与PMF推进实验"
+    owner: "增长＋财务＋产品"
+    stage: S4
+    depends_on: ["CP-47", "CP-52", "CP-54"]
+    vision_ids: ["V17", "V18", "V19"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-55/
+  - id: CP-56
+    title: "投资人／导师数据室与商业叙事"
+    owner: "创始人＋财务＋产品研究"
+    stage: S4
+    depends_on: ["CP-05", "CP-04", "CP-47", "CP-53", "CP-54", "CP-55"]
+    vision_ids: ["V16", "V18", "V19"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-56/
+  - id: CP-57
+    title: "90日理解、复盘与检索质量"
+    owner: "记忆AI＋长期研究"
+    stage: S5
+    depends_on: ["CP-19", "CP-23", "CP-24", "CP-54"]
+    vision_ids: ["V03", "V05", "V06", "V16"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-57/
+  - id: CP-58
+    title: "多侧面共鸣与隔离模拟资产"
+    owner: "Capsule系统＋隐私＋研究"
+    stage: S5
+    depends_on: ["CP-15", "CP-30", "CP-54", "CP-63A"]
+    vision_ids: ["V07", "V10", "V16", "V20"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-58/
+  - id: CP-59
+    title: "长期关系与高质量社区"
+    owner: "社交产品＋社区运营"
+    stage: S5
+    depends_on: ["CP-26", "CP-35", "CP-54", "CP-55"]
+    vision_ids: ["V11", "V12", "V13", "V18"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-59/
+  - id: CP-60
+    title: "扩展技能、原生HarmonyOS与完整可达性"
+    owner: "技能平台＋客户端＋专家"
+    stage: S5
+    depends_on: ["CP-28", "CP-41", "CP-42", "CP-43", "CP-44", "CP-54B"]
+    vision_ids: ["V02", "V08", "V09", "V14", "V20"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-60/
+  - id: CP-61
+    title: "愿景全量验收与独立签收"
+    owner: "产品所有者＋独立验收组"
+    stage: S5
+    depends_on: ["CP-52", "CP-56", "CP-57", "CP-58", "CP-59", "CP-60", "CP-62", "CP-63B", "CP-64"]
+    vision_ids: ["V01"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-61/
+  - id: CP-62
+    title: "持续经营、停服与用户资产迁移"
+    owner: "创始人＋SRE＋客服＋法务"
+    stage: S5
+    depends_on: ["CP-15", "CP-43", "CP-47", "CP-48", "CP-50"]
+    vision_ids: ["V07", "V15", "V17", "V20"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-62/
+  - id: CP-63
+    title: "独立安全、隐私与监管复核"
+    owner: "外部安全／隐私专业方＋责任人"
+    stage: S3
+    depends_on: ["CP-06", "CP-08", "CP-15", "CP-16", "CP-36", "CP-37", "CP-49", "CP-51A"]
+    vision_ids: ["V01", "V07", "V13", "V15", "V19"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-63/
+  - id: CP-64
+    title: "商业评审、组织能力与下一阶段决策"
+    owner: "创始人＋财务＋产品＋独立顾问"
+    stage: S5
+    depends_on: ["CP-47", "CP-55", "CP-56", "CP-59"]
+    vision_ids: ["V17", "V18", "V19", "V20"]
+    status: NOT_STARTED
+    evidence_dir: evidence/commercial-cn/CP-64/
+
+# 旧账迁移：docs/goal/complete-product-acceptance.yml（69验收项 + 5人工门 + G0–G9）
+# disposition: KEEP=保留历史证据并在商业环境续用 | REVERIFY=商业环境重验 | REPLACED=被大陆要求替代 | OUT_OF_SCOPE=明确范围外（历史保留）
+migration:
+  old_ledger: docs/goal/complete-product-acceptance.yml
+  old_gates_replaced_by: "G0–G9 综合门由 S0–S5 阶段门 + 13 个阶段子门取代；旧门状态不迁移"
+  items:
+    - old_id: SEC-CURRENT-TREE
+      old_gate: G0
+      disposition: KEEP
+      targets: ["CP-49", "CP-63"]
+      note: "历史PASS保留；商业环境在commercial-cn HEAD重扫（含境内镜像供应链）"
+    - old_id: SEC-ROTATION
+      old_gate: G0
+      disposition: REVERIFY
+      targets: ["CP-16"]
+      note: "轮换程序接到大陆KMS/Secret并保留独立签字（原HG-SECRET-ROTATION语义）"
+    - old_id: SEC-OWNERSHIP
+      old_gate: G0
+      disposition: REVERIFY
+      targets: ["CP-14", "CP-16"]
+      note: "越权测试扩展到P2/P3全状态与威胁模型"
+    - old_id: SEC-PROD-GUARD
+      old_gate: G0
+      disposition: REVERIFY
+      targets: ["CP-37", "CP-49"]
+      note: "prod fail-closed在大陆云与国产Registry重新验证；隧道/H2/Mock禁入commercial-cn"
+    - old_id: GOV-INNOVATION
+      old_gate: G0
+      disposition: KEEP
+      targets: ["CP-61"]
+      note: "治理实践延续；本台账即新权威，终局由CP-61签收"
+    - old_id: BASE-JAVA
+      old_gate: G1
+      disposition: KEEP
+      targets: ["CP-49"]
+      note: "Java 21基线不变，商业CI复跑"
+    - old_id: BASE-BOOT
+      old_gate: G1
+      disposition: KEEP
+      targets: ["CP-49"]
+      note: "Boot 3.5受支持补丁基线不变"
+    - old_id: BASE-SUPPLY
+      old_gate: G1
+      disposition: REVERIFY
+      targets: ["CP-49", "CP-63"]
+      note: "SBOM/签名/扫描在境内ACR链路重验"
+    - old_id: BASE-IMAGE
+      old_gate: G1
+      disposition: REVERIFY
+      targets: ["CP-37", "CP-49"]
+      note: "digest绑定镜像在大陆集群冒烟"
+    - old_id: ARCH-MODULES
+      old_gate: G2
+      disposition: KEEP
+      targets: ["CP-38"]
+      note: "ArchUnit边界继续有效；角色分池在此之上"
+    - old_id: AUTH-OIDC
+      old_gate: G2
+      disposition: REVERIFY
+      targets: ["CP-13", "CP-41", "CP-42"]
+      note: "大陆身份与多设备账户安全接管账户体系；OIDC PKCE在真机重验"
+    - old_id: API-CONTRACT
+      old_gate: G2
+      disposition: REVERIFY
+      targets: ["CP-39"]
+      note: "版本化OpenAPI扩展到全部公共域；游标分页/并发收口"
+    - old_id: VERIFIED-STATE-CONCURRENCY
+      old_gate: G2
+      disposition: KEEP
+      targets: ["CP-33", "CP-39"]
+      note: "历史PASS保留；商业负载下由CP-50复验"
+    - old_id: VERIFIED-AI-DATA-BOUNDARY
+      old_gate: G2
+      disposition: KEEP
+      targets: ["CP-14", "CP-30"]
+      note: "历史PASS保留；隐私红队扩展对抗面"
+    - old_id: VERIFIED-CLIENT-RESILIENCE
+      old_gate: G2
+      disposition: KEEP
+      targets: ["CP-11"]
+      note: "历史PASS保留；全状态/弱网打磨继续"
+    - old_id: VERIFIED-STORAGE-EVOLUTION
+      old_gate: G2
+      disposition: KEEP
+      targets: ["CP-39"]
+      note: "历史PASS保留；expand-contract在共享真实PG继续执行"
+    - old_id: DATA-POSTGRES
+      old_gate: G2
+      disposition: REVERIFY
+      targets: ["CP-37"]
+      note: "事实源不变；迁到境内托管PG并验pgvector/TLS/PITR"
+    - old_id: DATA-REDIS
+      old_gate: G2
+      disposition: REVERIFY
+      targets: ["CP-37"]
+      note: "迁到境内Redis兼容服务"
+    - old_id: EVENT-RELIABLE
+      old_gate: G2
+      disposition: REVERIFY
+      targets: ["CP-39"]
+      note: "JDBC outbox保留；SQS/DLQ属commercial-sg路线，大陆等价物按CP-37/39选型"
+    - old_id: RUNTIME-ROLES
+      old_gate: G2
+      disposition: REVERIFY
+      targets: ["CP-38"]
+      note: "角色独立伸缩在大陆集群实测"
+    - old_id: DATA-RIGHTS
+      old_gate: G2
+      disposition: REPLACED
+      targets: ["CP-07", "CP-15"]
+      note: "被大陆权利体系替代：PIA+同意合同+撤回/删除/防复活全链"
+    - old_id: UX-SHELL
+      old_gate: G3
+      disposition: REVERIFY
+      targets: ["CP-09", "CP-10"]
+      note: "五空间AppShell保留；信息架构与中文文案按商业首发重做"
+    - old_id: UX-CONTRACTS
+      old_gate: G3
+      disposition: KEEP
+      targets: ["CP-09", "CP-10"]
+      note: "旅程合同升级为J01–J12商业体验合同"
+    - old_id: UX-QUALITY
+      old_gate: G3
+      disposition: REVERIFY
+      targets: ["CP-11", "CP-12"]
+      note: "商业质量口径含弱网/真机/非作者可用性"
+    - old_id: UX-VISUAL-SYSTEM
+      old_gate: G3
+      disposition: REVERIFY
+      targets: ["CP-09"]
+      note: "设计系统升级并出商业版规范"
+    - old_id: UX-LEGACY
+      old_gate: G3
+      disposition: OUT_OF_SCOPE
+      targets: []
+      note: "V0.1物理18页已被五空间AppShell替代，历史保留；不属于商业首发范围"
+    - old_id: AURORA-DUAL-KERNEL
+      old_gate: G4
+      disposition: REVERIFY
+      targets: ["CP-19"]
+      note: "双核增益按CP-04冻结判据重测"
+    - old_id: AURORA-CHOREOGRAPHY
+      old_gate: G4
+      disposition: REVERIFY
+      targets: ["CP-18"]
+      note: "编排与真实连续性在国产Provider链路重验"
+    - old_id: AURORA-TEMPORAL
+      old_gate: G4
+      disposition: REVERIFY
+      targets: ["CP-26"]
+      note: "时间理解与可控主动关心"
+    - old_id: AURORA-SELF
+      old_gate: G4
+      disposition: REVERIFY
+      targets: ["CP-23", "CP-25"]
+      note: "自我模型连续性与人格受控演化"
+    - old_id: AURORA-QUALITY
+      old_gate: G4
+      disposition: REPLACED
+      targets: ["CP-04"]
+      note: "被CP-04冻结场景集/盲评/预注册体系替代"
+    - old_id: AURORA-INNER-VOICE
+      old_gate: G4
+      disposition: REVERIFY
+      targets: ["CP-18", "CP-25"]
+      note: "心声保留为可选生成表达，禁止宣传读取AI意识"
+    - old_id: MEMORY-LIFECYCLE
+      old_gate: G5
+      disposition: REVERIFY
+      targets: ["CP-21"]
+      note: "生命周期+来源图"
+    - old_id: PROFILE-MODEL
+      old_gate: G5
+      disposition: REVERIFY
+      targets: ["CP-23"]
+      note: "可纠正画像与信念变化"
+    - old_id: RETRIEVAL-QUALITY
+      old_gate: G5
+      disposition: REVERIFY
+      targets: ["CP-22", "CP-57"]
+      note: "任务化检索；90日长程质量"
+    - old_id: PROFILE-PROPAGATION
+      old_gate: G5
+      disposition: REVERIFY
+      targets: ["CP-21", "CP-23"]
+      note: "修正/撤回传播与派生物失效"
+    - old_id: STARFIELD-V2
+      old_gate: G5
+      disposition: REVERIFY
+      targets: ["CP-24"]
+      note: "星空/复盘/行动工具闭环"
+    - old_id: CAPSULE-COMPILER
+      old_gate: G6
+      disposition: REVERIFY
+      targets: ["CP-29"]
+      note: "编译与授权工作台"
+    - old_id: CAPSULE-RUNTIME
+      old_gate: G6
+      disposition: REVERIFY
+      targets: ["CP-30"]
+      note: "保真运行时"
+    - old_id: CAPSULE-SAFETY
+      old_gate: G6
+      disposition: REVERIFY
+      targets: ["CP-30", "CP-36", "CP-14"]
+      note: "保真+审核后台+敏感边界三线"
+    - old_id: MATCH-MULTI
+      old_gate: G6
+      disposition: REVERIFY
+      targets: ["CP-32"]
+      note: "多目标可解释排序"
+    - old_id: SOCIAL-CLOSED-LOOP
+      old_gate: G6
+      disposition: REVERIFY
+      targets: ["CP-33", "CP-34", "CP-35"]
+      note: "慢信/关系/小组三包承接"
+    - old_id: SIMULATOR-ASSET
+      old_gate: G6
+      disposition: REVERIFY
+      targets: ["CP-58", "CP-04"]
+      note: "多侧面隔离模拟资产；合成数据规则并入评测治理"
+    - old_id: SKILL-RUNTIME
+      old_gate: G7
+      disposition: REVERIFY
+      targets: ["CP-28"]
+      note: "技能运行时"
+    - old_id: SKILL-PRODUCT
+      old_gate: G7
+      disposition: REVERIFY
+      targets: ["CP-28", "CP-60A"]
+      note: "首批非诊断心理支持技能；专家审阅技能平台"
+    - old_id: MOBILE-MACHINE-RUNTIME
+      old_gate: G7
+      disposition: REVERIFY
+      targets: ["CP-41", "CP-43"]
+      note: "大陆中端真机J01–J12"
+    - old_id: MOBILE-EXTERNAL-RELEASE
+      old_gate: G7
+      disposition: REPLACED
+      targets: ["CP-41", "CP-42", "CP-44"]
+      note: "被大陆商店发行体系替代（含HarmonyOS决策）"
+    - old_id: UX-COMPLETE
+      old_gate: G7
+      disposition: REVERIFY
+      targets: ["CP-12"]
+      note: "五空间完整覆盖在商业验收下重验"
+    - old_id: ACADEMY-CAPABILITY
+      old_gate: G8
+      disposition: OUT_OF_SCOPE
+      targets: []
+      note: "AWS Academy为课程资产，冻结保留历史；商业环境为大陆云"
+    - old_id: ACADEMY-WORKLOAD
+      old_gate: G8
+      disposition: OUT_OF_SCOPE
+      targets: []
+      note: "同上"
+    - old_id: ACADEMY-RELIABILITY
+      old_gate: G8
+      disposition: OUT_OF_SCOPE
+      targets: []
+      note: "同上"
+    - old_id: LOCAL-COMPLETE
+      old_gate: G8
+      disposition: KEEP
+      targets: ["CP-37"]
+      note: "本地/演示环境保留用于开发演示；禁止进入commercial-cn"
+    - old_id: EKS-IAC
+      old_gate: G8
+      disposition: OUT_OF_SCOPE
+      targets: []
+      note: "EKS/Terraform属课程/SG路线资产，冻结保留；大陆IaC由CP-37重选ACK/TKE"
+    - old_id: EKS-WORKLOAD
+      old_gate: G8
+      disposition: OUT_OF_SCOPE
+      targets: []
+      note: "同上"
+    - old_id: OPS-OBSERVABILITY
+      old_gate: G8
+      disposition: REVERIFY
+      targets: ["CP-40"]
+      note: "可观测性接到境内OTel/日志/成本核算"
+    - old_id: OPS-RESILIENCE
+      old_gate: G8
+      disposition: REVERIFY
+      targets: ["CP-50"]
+      note: "韧性由CP-50A/B真演练承载"
+    - old_id: CN-ZERO-LOSS-DRAIN
+      old_gate: G8
+      disposition: REVERIFY
+      targets: ["CP-50"]
+      note: "SSE零丢失排水在商业集群演练"
+    - old_id: CN-EVENT-DRIVEN-AUTOSCALING
+      old_gate: G8
+      disposition: REVERIFY
+      targets: ["CP-38"]
+      note: "事件驱动伸缩接真实负载"
+    - old_id: CN-OTEL-SEMANTIC-TRACE
+      old_gate: G8
+      disposition: REVERIFY
+      targets: ["CP-40"]
+      note: "课程展柜语义变为商业生产行为"
+    - old_id: CN-PROGRESSIVE-DELIVERY
+      old_gate: G8
+      disposition: REVERIFY
+      targets: ["CP-37", "CP-49"]
+      note: "digest绑定的渐进发布在大陆集群"
+    - old_id: CN-POLICY-AS-CODE
+      old_gate: G8
+      disposition: REVERIFY
+      targets: ["CP-37", "CP-16"]
+      note: "集群策略按CNI实测执行"
+    - old_id: CN-EXTENSION-SHOWCASE
+      old_gate: G8
+      disposition: OUT_OF_SCOPE
+      targets: []
+      note: "展柜叙事属课程评分资产；对应工程能力由CP-38/40实测承载"
+    - old_id: SG-PRODUCT
+      old_gate: G8
+      disposition: OUT_OF_SCOPE
+      targets: []
+      note: "新加坡优先假设已被大陆优先取代（对齐文档/README §0）"
+    - old_id: SG-RELEASE
+      old_gate: G8
+      disposition: OUT_OF_SCOPE
+      targets: []
+      note: "同上"
+    - old_id: FINAL-E2E
+      old_gate: G9
+      disposition: REVERIFY
+      targets: ["CP-12", "CP-50"]
+      note: "商业E2E口径=非作者可用+全链故障"
+    - old_id: FINAL-DEMO
+      old_gate: G9
+      disposition: KEEP
+      targets: ["CP-52"]
+      note: "课堂demo资产保留历史；商业首发演练由CP-52承载"
+    - old_id: FINAL-USABILITY
+      old_gate: G9
+      disposition: REVERIFY
+      targets: ["CP-12"]
+      note: "可用性封板"
+    - old_id: FINAL-OPERATIONS
+      old_gate: G9
+      disposition: REVERIFY
+      targets: ["CP-48", "CP-50"]
+      note: "真实值班/客服/退款运营"
+    - old_id: FINAL-TRACEABILITY
+      old_gate: G9
+      disposition: REPLACED
+      targets: ["CP-61"]
+      note: "被CP-61愿景全量验收与独立签收替代"
+    - old_id: HG-SECRET-ROTATION
+      old_gate: HG
+      disposition: REVERIFY
+      targets: ["CP-16"]
+      note: "密钥轮换+独立签字保留为外部门"
+    - old_id: HG-PRODUCTION-ACCOUNTS
+      old_gate: HG
+      disposition: REPLACED
+      targets: ["CP-37", "CP-44", "CP-45"]
+      note: "所有者授权对象改为大陆云/商店/支付/主体账户"
+    - old_id: HG-PRIVACY-LEGAL
+      old_gate: HG
+      disposition: REPLACED
+      targets: ["CP-05", "CP-06", "CP-07"]
+      note: "新加坡法务审查被大陆PIPL/生成式AI/拟人化规则程序替代"
+    - old_id: HG-PSYCHOLOGY-REVIEW
+      old_gate: HG
+      disposition: REVERIFY
+      targets: ["CP-28", "CP-60A"]
+      note: "心理技能专家审阅保留且扩展到全部技能"
+    - old_id: HG-REAL-USERS
+      old_gate: HG
+      disposition: REPLACED
+      targets: ["CP-02", "CP-51A", "CP-54"]
+      note: "真人研究拆为访谈(CP-02)/试点法定程序(CP-51A)/队列研究(CP-54)"
+
+open_questions:
+  - id: OQ-01
+    question: "首发细分未定（CP-02访谈前置），影响CP-09/10文案与CP-55渠道优先级"
+    owner: 产品研究
+  - id: OQ-02
+    question: "主云ACK/TKE PoC未启动；影响CP-37起全部基础设施包"
+    owner: 基础设施
+  - id: OQ-03
+    question: "运营主体与许可路线未定（CP-05）；ICP/算法备案/生成式AI程序依赖它"
+    owner: 创始人＋法务
+  - id: OQ-04
+    question: "支付渠道选择（微信/支付宝/IAP混合）未定；影响CP-45/46与CP-12B"
+    owner: 财务＋发行
