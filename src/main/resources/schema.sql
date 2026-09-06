@@ -1571,3 +1571,52 @@ CREATE TABLE IF NOT EXISTS tb_push_delivery (
   CONSTRAINT fk_push_delivery_wake_intent FOREIGN KEY (wake_intent_id) REFERENCES tb_wake_intent(id) ON DELETE SET NULL
 );
 CREATE INDEX IF NOT EXISTS idx_push_delivery_due ON tb_push_delivery (status, next_attempt_at, id);
+
+-- CP-03 commercial-cn metric events (K1-K3, G-SAFE/G-TRUST). H2 twin of V36 PostgreSQL migration.
+CREATE TABLE IF NOT EXISTS tb_commercial_metric_event (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  event_key VARCHAR(180) NOT NULL,
+  metric_code VARCHAR(64) NOT NULL,
+  pathway VARCHAR(16),
+  user_id BIGINT,
+  occurred_at_utc TIMESTAMP NOT NULL,
+  anchor_week VARCHAR(10) NOT NULL,
+  anchor_day VARCHAR(10) NOT NULL,
+  context_type VARCHAR(32),
+  context_id VARCHAR(64),
+  dim_a VARCHAR(32),
+  dim_b VARCHAR(64),
+  props TEXT NOT NULL DEFAULT '{}',
+  analysis_consent_version VARCHAR(32) NOT NULL,
+  ingest_source VARCHAR(24) NOT NULL DEFAULT 'SERVER_CONFIRMED',
+  anonymized BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uq_commercial_metric_event_key UNIQUE (event_key),
+  CONSTRAINT ck_metric_pathway CHECK (pathway IN ('PRIVATE','CONNECTED','PLATFORM')),
+  CONSTRAINT ck_metric_ingest CHECK (ingest_source IN ('SERVER_CONFIRMED','BACKFILL'))
+);
+CREATE INDEX IF NOT EXISTS idx_metric_code_week ON tb_commercial_metric_event (metric_code, anchor_week);
+CREATE INDEX IF NOT EXISTS idx_metric_user_code ON tb_commercial_metric_event (user_id, metric_code);
+
+CREATE TABLE IF NOT EXISTS tb_analysis_consent (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  status VARCHAR(16) NOT NULL,
+  consent_version VARCHAR(32) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uq_analysis_consent_user UNIQUE (user_id),
+  CONSTRAINT ck_analysis_consent_status CHECK (status IN ('GRANTED','DECLINED'))
+);
+
+CREATE TABLE IF NOT EXISTS tb_commercial_metric_rollup (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  metric_code VARCHAR(64) NOT NULL,
+  anchor_week VARCHAR(10) NOT NULL,
+  anonymized_count BIGINT NOT NULL DEFAULT 0,
+  affected_total BIGINT NOT NULL DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uq_commercial_metric_rollup UNIQUE (metric_code, anchor_week)
+);

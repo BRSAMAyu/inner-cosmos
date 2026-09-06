@@ -115,40 +115,58 @@ work_packages:
     stage: S0
     depends_on: ["CP-01"]
     vision_ids: ["V01", "V18"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-02/
+    delivery_record: evidence/commercial-cn/CP-02/2026-09-06-interview-kit/delivery-record.md
+    current_sha: "2f0b61e3 后工作区"
+    note: "访谈工具包与H1-H3判据已冻结；30次真实访谈BLOCKED_EXTERNAL（招募/预算/所有者授权）"
+    next_action: "所有者批准后执行访谈并出细分选择决策记录"
   - id: CP-03
     title: "指标、事件与数据字典"
     owner: "数据工程＋产品"
     stage: S1
     depends_on: ["CP-02", "CP-07"]
     vision_ids: ["V16", "V17", "V18"]
-    status: NOT_STARTED
+    status: IMPLEMENTED
     evidence_dir: evidence/commercial-cn/CP-03/
+    delivery_record: evidence/commercial-cn/CP-03/2026-09-06-metric-pipeline/delivery-record.md
+    test_command: "./mvnw test -Dtest=CommercialMetricFunnelTest"
+    note: "K1/K2/G-SAFE/G-TRUST 全链落地并合成样本验收；K3事件管线就绪待CP-45发射器；CP-07接管同意默认值"
+    next_action: "独立复核；CP-45接入支付事件"
   - id: CP-04
     title: "对标、AI评测与实验治理"
     owner: "AI评测＋独立研究员"
     stage: S1
     depends_on: ["CP-02"]
     vision_ids: ["V03", "V10", "V11", "V16"]
-    status: NOT_STARTED
+    status: IMPLEMENTED
     evidence_dir: evidence/commercial-cn/CP-04/
+    delivery_record: evidence/commercial-cn/CP-04/2026-09-06-scenario-bank-and-registry/delivery-record.md
+    test_command: "./mvnw test -Dtest=CnCommercialBankContractTest"
+    note: "248项场景银行冻结(204核心+32红队+12旅程,SHA锁定)；11项能力预注册；运行执行待CP-17真实Provider"
+    next_action: "CP-17接入后执行BASE-SINGLE-KERNEL基线与红队回放"
   - id: CP-05
     title: "公司、IP与经营许可路线"
     owner: "创始人＋法务"
     stage: S0
     depends_on: ["CP-01"]
     vision_ids: ["V01", "V19"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-05/
+    delivery_record: docs/commercialization/compliance/cp05-entity-ip-rights-checklist.md
+    note: "仓库资产权利链清点草稿完成( Apache-2.0/字体/商标/学校权利/许可矩阵 )；注册签约等全部BLOCKED_EXTERNAL"
+    next_action: "所有者确认未知资产；法务核定许可矩阵"
   - id: CP-06
     title: "AI与社交监管程序设计"
     owner: "法务＋AI负责人"
     stage: S0
     depends_on: ["CP-05"]
     vision_ids: ["V01", "V13", "V19"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-06/
+    delivery_record: docs/commercialization/compliance/cp06-regulatory-route-design.md
+    note: "S0路线设计部分已关闭(逐功能适用判断+程序台账骨架+属地问题单)；真实程序CP-51A收口"
+    next_action: "CP-05确定属地后填受理机关；法务复核判断表"
   - id: CP-07
     title: "隐私影响评估与同意产品合同"
     owner: "隐私负责人＋产品"

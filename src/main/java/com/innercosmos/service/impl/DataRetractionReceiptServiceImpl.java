@@ -17,6 +17,9 @@ public class DataRetractionReceiptServiceImpl implements DataRetractionReceiptSe
 
     private final DataRetractionReceiptMapper mapper;
     private final ApplicationEventPublisher eventPublisher;
+    /** CP-03 G-TRUST metric feed; optional so direct-construction tests keep working. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.innercosmos.service.metric.MetricEventService metricEventService;
 
     public DataRetractionReceiptServiceImpl(DataRetractionReceiptMapper mapper,
                                             ApplicationEventPublisher eventPublisher) {
@@ -40,6 +43,22 @@ public class DataRetractionReceiptServiceImpl implements DataRetractionReceiptSe
         // this same transaction when the outbox is enabled. No listener when disabled -> no-op.
         eventPublisher.publishEvent(new DataRetractedEvent(row.id, userId, subjectType, subjectId,
                 derivativeType, action, row.affectedCount));
+        // CP-03 G-TRUST feed: the completed rights action and its blast radius, no content.
+        if (metricEventService != null) {
+            java.util.Map<String, Object> props = new java.util.HashMap<>();
+            props.put("receiptId", String.valueOf(row.id));
+            props.put("subjectType", subjectType);
+            props.put("affectedCount", String.valueOf(row.affectedCount));
+            metricEventService.record(
+                    com.innercosmos.service.metric.MetricCode.RIGHTS_ACTION_COMPLETED,
+                    userId,
+                    java.time.Instant.now(),
+                    subjectType,
+                    subjectId == null ? null : String.valueOf(subjectId),
+                    action,
+                    derivativeType,
+                    props);
+        }
         return row;
     }
 

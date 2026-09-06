@@ -77,7 +77,9 @@ class PostgresApplicationSmokeTest {
         // V19 adds tb_data_retraction_receipt (A5 data-rights audit trail); V21 adds
         // tb_device_registration/tb_push_delivery (mobile/desktop push delivery); V27 and V29 add
         // social-group and live-chat messaging tables.
-        assertEquals(89L, jdbcTemplate.queryForObject("""
+        // V36 (commercial-cn CP-03) adds tb_commercial_metric_event, tb_analysis_consent and
+        // tb_commercial_metric_rollup for the K1-K3 / G-SAFE / G-TRUST metric pipeline.
+        assertEquals(92L, jdbcTemplate.queryForObject("""
                 SELECT COUNT(*) FROM information_schema.tables
                 WHERE table_schema='public' AND table_name LIKE 'tb_%'
                 """, Long.class));

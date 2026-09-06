@@ -58,6 +58,9 @@ public class SafetyServiceImpl implements SafetyService {
     // the existing per-message detectors above -- never replacing or re-deciding their matches.
     private final SessionRiskAggregator sessionRiskAggregator;
     private final boolean semanticRecheckEnabled;
+    /** CP-03 G-SAFE metric feed; optional so direct-construction tests keep working. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.innercosmos.service.metric.MetricEventService metricEventService;
     private final ConcurrentHashMap<CheckKey, CompletableFuture<CachedCheck>> idempotentChecks =
             new ConcurrentHashMap<>();
     private static final long CHECK_CACHE_TTL_MS = java.time.Duration.ofMinutes(15).toMillis();
@@ -438,6 +441,24 @@ public class SafetyServiceImpl implements SafetyService {
             safetyEventMapper.insert(event);
         } catch (org.springframework.dao.DuplicateKeyException duplicate) {
             // Cross-Pod duplicate delivery: the first durable safety decision already won.
+            return;
+        }
+        // CP-03 G-SAFE feed: counts and severities only — never the triggering text.
+        if (metricEventService != null) {
+            java.util.Map<String, Object> props = new java.util.HashMap<>();
+            if (event.id != null) {
+                props.put("safetyEventId", String.valueOf(event.id));
+            }
+            props.put("triggerScene", event.triggerScene);
+            metricEventService.record(
+                    com.innercosmos.service.metric.MetricCode.SAFETY_INCIDENT,
+                    userId,
+                    java.time.Instant.now(),
+                    "DIALOG_SESSION",
+                    sessionId == null ? null : String.valueOf(sessionId),
+                    level,
+                    type,
+                    props);
         }
     }
 }

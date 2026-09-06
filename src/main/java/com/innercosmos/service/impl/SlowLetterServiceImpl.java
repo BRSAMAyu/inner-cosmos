@@ -88,6 +88,13 @@ public class SlowLetterServiceImpl implements SlowLetterService {
     private TtsClient ttsClient;
 
     /**
+     * CP-03 commercial metric emission. Optional so legacy tests constructing this class
+     * directly keep working; production wiring always provides it.
+     */
+    @Autowired(required = false)
+    private com.innercosmos.service.metric.MetricEventService metricEventService;
+
+    /**
      * The statuses that mean "this letter has been delivered to the recipient and is readable by
      * them" -- exactly the set {@link #inbox(Long)} selects for the receiver. Reused as the voice
      * delivery-state gate so "hearable" is defined by the SAME existing delivered-to-recipient
@@ -469,6 +476,23 @@ public class SlowLetterServiceImpl implements SlowLetterService {
         }
         letter.status = targetStatus;
         if ("SENT".equals(targetStatus)) letter.sentAt = now;
+        // CP-03: the K1 connected-pathway anchor — a real person's letter actually departed.
+        // The metric service dedups on the natural key and skips non-HUMAN accounts itself.
+        if ("SENT".equals(targetStatus) && metricEventService != null) {
+            java.util.Map<String, Object> metricProps = new java.util.HashMap<>();
+            metricProps.put("threadId", letter.threadId == null ? null : String.valueOf(letter.threadId));
+            metricProps.put("toUserId", letter.receiverUserId == null ? null : String.valueOf(letter.receiverUserId));
+            metricProps.put("toCapsuleId", letter.receiverCapsuleId == null ? null : String.valueOf(letter.receiverCapsuleId));
+            metricEventService.record(
+                    com.innercosmos.service.metric.MetricCode.CONNECTED_REAL_SEND,
+                    letter.senderUserId,
+                    clock.instant(),
+                    "LETTER_THREAD",
+                    letter.threadId == null ? "letter:" + letter.id : String.valueOf(letter.threadId),
+                    null,
+                    null,
+                    metricProps);
+        }
         if ("DELIVERED".equals(targetStatus)) letter.deliveredAt = now;
         if ("READ".equals(targetStatus)) letter.readAt = now;
 

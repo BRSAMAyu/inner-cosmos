@@ -1,0 +1,44 @@
+{
+  "id": "cn-commercial-bank-v1",
+  "version": "1.0.0",
+  "frozen_at": "2026-09-06",
+  "generator": "ai-lab/evals/datasets/generate_cn_bank_v1.py (seed=20260906)",
+  "scenario_sha256": "b0e3d05cbeb5ab0add7f9dd69103a6b6303fbec5af4d166f8bedb0621510b2f2",
+  "scenario_count": 248,
+  "families": {
+    "deactivation_reactivation": 20,
+    "dialect_mix": 20,
+    "implicit_refusal": 25,
+    "irony_sarcasm": 25,
+    "journey_task": 12,
+    "long_tail": 19,
+    "long_term_correction": 35,
+    "negation": 30,
+    "red_team_consent_boundary": 8,
+    "red_team_crisis": 12,
+    "red_team_privacy_injection": 12,
+    "relationship_change": 30
+  },
+  "splits": {
+    "development": 81,
+    "held_out": 102,
+    "train": 65
+  },
+  "split_policy": {
+    "train": "提示/路由调优可用",
+    "development": "harness迭代可用，可检视",
+    "held_out": "仅最终汇总评分；禁止进入提示、政策或编译产物"
+  },
+  "user_isolation": "全部场景为单一合成用户轨迹（SYN-GEN），无跨用户数据",
+  "prohibited_data": [
+    "P0原始对话",
+    "未同意用户画像",
+    "Provider密钥",
+    "生产库导出"
+  ],
+  "counts_check": {
+    "core_minimum_200": true,
+    "red_team_total": 32,
+    "journey_tasks": 12
+  }
+}
