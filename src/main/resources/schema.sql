@@ -1637,3 +1637,20 @@ CREATE TABLE IF NOT EXISTS tb_minor_appeal (
 );
 CREATE INDEX IF NOT EXISTS idx_minor_appeal_user ON tb_minor_appeal (user_id);
 CREATE INDEX IF NOT EXISTS idx_minor_appeal_pending ON tb_minor_appeal (status);
+
+-- CP-07 consent center (H2 twin of V38).
+CREATE TABLE IF NOT EXISTS tb_consent_record (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  purpose_code VARCHAR(48) NOT NULL,
+  status VARCHAR(16) NOT NULL,
+  version VARCHAR(32) NOT NULL,
+  granted_at TIMESTAMP NULL,
+  revoked_at TIMESTAMP NULL,
+  evidence_source VARCHAR(64) NOT NULL DEFAULT 'CONSENT_CENTER',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uq_consent_user_purpose UNIQUE (user_id, purpose_code),
+  CONSTRAINT ck_consent_status CHECK (status IN ('GRANTED','DECLINED'))
+);
+CREATE INDEX IF NOT EXISTS idx_consent_user ON tb_consent_record (user_id);

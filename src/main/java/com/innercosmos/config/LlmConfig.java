@@ -439,7 +439,8 @@ public class LlmConfig {
     // --- Factory method ---
 
     @Bean
-    public LlmClient llmClient(AiLogService aiLogService, Executor aiExecutor) {
+    public LlmClient llmClient(AiLogService aiLogService, Executor aiExecutor,
+                               com.innercosmos.service.consent.ConsentCenterService consentCenter) {
         String activeProvider = activeProvider();
         log.info("Creating LlmClient for provider: {}, mode: {}, fallbackAllowed: {}",
                 activeProvider, mode, isEffectiveFallbackAllowed());
@@ -533,6 +534,16 @@ public class LlmConfig {
             default:
                 actualClient = new MockLlmClient(aiExecutor);
             }
+        }
+
+        // CP-07: a real provider chain with a resolved credential carries user content
+        // off-box — wrap it with the egress consent guard. Keyless dev configurations
+        // degrade to the local Mock at call time (nothing ever leaves), so they stay
+        // unwrapped and engineering environments keep working without consent records.
+        if (!"mock".equalsIgnoreCase(activeProvider)
+                && !providerKey(activeProvider, providerSpecificKey(activeProvider)).isBlank()) {
+            actualClient = new com.innercosmos.ai.client.ConsentEnforcingLlmClient(
+                    actualClient, consentCenter);
         }
 
         // Wrap with A/B test handler

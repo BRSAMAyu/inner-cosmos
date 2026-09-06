@@ -21,6 +21,12 @@ public final class ErrorCode {
      * explanation, safety resources and the appeal path instead of a generic denial.
      */
     public static final String ADULT_GATE_REQUIRED = "ADULT_GATE_REQUIRED";
+    /**
+     * CP-07 consent gate: the action needs a consent decision the user has not given
+     * (initially: sending content to a real model provider). Distinct from FORBIDDEN so
+     * clients can route to the consent center instead of showing a dead end.
+     */
+    public static final String CONSENT_REQUIRED = "CONSENT_REQUIRED";
 
     private ErrorCode() {
     }

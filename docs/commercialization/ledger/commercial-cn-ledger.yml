@@ -176,8 +176,10 @@ work_packages:
     status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-07/
     delivery_record: evidence/commercial-cn/CP-07/2026-09-06-pia-and-consent-spec/delivery-record.md
-    note: "PIA+同意矩阵+8用途规格完成；G1(Provider出站同意)/G2(同意中心API)为下轮编码主任务"
-    next_action: "实现tb_consent_record+同意中心API+出站同意核验"
+    delivery_record_2: "evidence/commercial-cn/CP-07/2026-09-06-pia-and-consent-spec/delivery-record.md#增量2"
+    test_command: "./mvnw test -Dtest=ConsentCenterTest"
+    note: "G1/G2已关闭：V38同意记录表+同意中心API(3端点)+Provider出站守卫(有凭证才包装,拒绝响亮不降级)+ANALYTICS与CP-03双写；测试5/5"
+    next_action: "web同意中心页随CP-09/10；VOICE接线随CP-27；版本重同意触发器待首版本变更"
   - id: CP-08
     title: "AI标识、成人准入与安全政策"
     owner: "信任与安全＋法务＋心理专家"
