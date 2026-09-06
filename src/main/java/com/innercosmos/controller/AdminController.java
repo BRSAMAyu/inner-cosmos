@@ -21,11 +21,14 @@ import java.util.stream.Collectors;
 public class AdminController extends BaseController {
     private final AdminService adminService;
     private final com.innercosmos.service.minor.MinorProtectionService minorProtectionService;
+    private final com.innercosmos.service.identity.AccountSecurityService accountSecurityService;
 
     public AdminController(AdminService adminService,
-                           com.innercosmos.service.minor.MinorProtectionService minorProtectionService) {
+                           com.innercosmos.service.minor.MinorProtectionService minorProtectionService,
+                           com.innercosmos.service.identity.AccountSecurityService accountSecurityService) {
         this.adminService = adminService;
         this.minorProtectionService = minorProtectionService;
+        this.accountSecurityService = accountSecurityService;
     }
 
     @GetMapping("/users")
@@ -49,6 +52,28 @@ public class AdminController extends BaseController {
         boolean changed = minorProtectionService.flagMinor(id,
                 body == null ? null : body.get("reason"));
         return ApiResponse.ok(java.util.Map.of("userId", id, "restricted", changed));
+    }
+
+    /** CP-13: freeze an account (login stops immediately); audit-trailed. */
+    @org.springframework.web.bind.annotation.PostMapping("/users/{id}/freeze")
+    public ApiResponse<java.util.Map<String, Object>> freezeUser(
+            @org.springframework.web.bind.annotation.PathVariable Long id,
+            @org.springframework.web.bind.annotation.RequestBody(required = false) java.util.Map<String, String> body,
+            HttpSession session) {
+        requireAdmin(session);
+        boolean changed = accountSecurityService.freeze(id, currentUserId(session),
+                body == null ? null : body.get("reason"));
+        return ApiResponse.ok(java.util.Map.of("userId", id, "frozen", changed));
+    }
+
+    /** CP-13: unfreeze a frozen account (minor-restricted accounts are handled by appeals). */
+    @org.springframework.web.bind.annotation.PostMapping("/users/{id}/unfreeze")
+    public ApiResponse<java.util.Map<String, Object>> unfreezeUser(
+            @org.springframework.web.bind.annotation.PathVariable Long id,
+            HttpSession session) {
+        requireAdmin(session);
+        boolean changed = accountSecurityService.unfreeze(id, currentUserId(session), null);
+        return ApiResponse.ok(java.util.Map.of("userId", id, "unfrozen", changed));
     }
 
     /** CP-08: pending minor-intercept appeals for human review. */

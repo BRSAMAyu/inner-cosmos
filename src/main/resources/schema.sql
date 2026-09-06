@@ -1654,3 +1654,34 @@ CREATE TABLE IF NOT EXISTS tb_consent_record (
   CONSTRAINT ck_consent_status CHECK (status IN ('GRANTED','DECLINED'))
 );
 CREATE INDEX IF NOT EXISTS idx_consent_user ON tb_consent_record (user_id);
+
+-- CP-13 identity verification + account security (H2 twin of V39).
+CREATE TABLE IF NOT EXISTS tb_identity_verification (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  method VARCHAR(32) NOT NULL,
+  provider VARCHAR(48) NOT NULL,
+  provider_reference VARCHAR(128) NOT NULL,
+  status VARCHAR(24) NOT NULL DEFAULT 'PENDING',
+  verified_birth_date DATE NULL,
+  failure_reason VARCHAR(200),
+  verified_at TIMESTAMP NULL,
+  expires_at TIMESTAMP NOT NULL,
+  consumed_at TIMESTAMP NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uq_identity_verification_reference UNIQUE (provider_reference),
+  CONSTRAINT ck_identity_verification_status CHECK (status IN ('PENDING','VERIFIED','REJECTED','EXPIRED'))
+);
+CREATE INDEX IF NOT EXISTS idx_identity_verification_user ON tb_identity_verification (user_id, status);
+
+CREATE TABLE IF NOT EXISTS tb_account_security_event (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  action VARCHAR(48) NOT NULL,
+  actor_id BIGINT,
+  detail VARCHAR(400),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_account_security_event_user ON tb_account_security_event (user_id, id);

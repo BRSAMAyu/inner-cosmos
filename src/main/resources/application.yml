@@ -392,6 +392,11 @@ inner-cosmos:
     # internal registration (legacy behavior) so engineering environments need no birth dates.
   adult-gate:
     required: ${ADULT_GATE_REQUIRED:false}
+  # CP-13: age-verification channel. "sandbox" is the dev/test channel; commercial profiles
+  # must set a contracted real channel -- a non-sandbox value without a provider fails CLOSED
+  # (never degrades to weak verification).
+  identity:
+    age-provider: ${AGE_VERIFICATION_CHANNEL:sandbox}
 
 ---
 # 2026-07-24 8-agent audit (P1-7): CLAUDE.md documents `./mvnw spring-boot:run` (dev profile, H2 +

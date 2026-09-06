@@ -236,8 +236,12 @@ work_packages:
     stage: S1
     depends_on: ["CP-05", "CP-07"]
     vision_ids: ["V01", "V07", "V14"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-13/
+    delivery_record: evidence/commercial-cn/CP-13/2026-09-06-verified-id-chain/delivery-record.md
+    test_command: "./mvnw test -Dtest=IdentityVerificationAndAccountSecurityTest"
+    note: "首个增量：VERIFIED_ID升级链(V39,单次消费/过期/重放/跨账户防护/未成年联动拦截/fail-closed)+全设备撤销/冻结/审计；测试7/7"
+    next_action: "真实通道合同核验后接入；微信/Apple登录与账号合并随商店包"
   - id: CP-14
     title: "全域授权与敏感数据边界"
     owner: "安全后端"

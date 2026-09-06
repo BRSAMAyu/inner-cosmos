@@ -109,6 +109,10 @@ inner-cosmos:
   # CP-08 adult admission: commercial profiles fail closed -- no 18+ birth date, no account.
   adult-gate:
     required: ${ADULT_GATE_REQUIRED:true}
+  # CP-13: prod declares a real channel name; until the contracted provider adapter exists
+  # the service fails CLOSED instead of degrading to sandbox verification.
+  identity:
+    age-provider: ${AGE_VERIFICATION_CHANNEL:operator-sms}
   aurora:
     stream:
       redis:
