@@ -173,8 +173,11 @@ work_packages:
     stage: S0
     depends_on: ["CP-05"]
     vision_ids: ["V05", "V07", "V13"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-07/
+    delivery_record: evidence/commercial-cn/CP-07/2026-09-06-pia-and-consent-spec/delivery-record.md
+    note: "PIA+同意矩阵+8用途规格完成；G1(Provider出站同意)/G2(同意中心API)为下轮编码主任务"
+    next_action: "实现tb_consent_record+同意中心API+出站同意核验"
   - id: CP-08
     title: "AI标识、成人准入与安全政策"
     owner: "信任与安全＋法务＋心理专家"
