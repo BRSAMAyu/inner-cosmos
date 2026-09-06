@@ -248,16 +248,24 @@ work_packages:
     stage: S1
     depends_on: ["CP-07", "CP-13"]
     vision_ids: ["V05", "V07", "V10"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-14/
+    delivery_record: evidence/commercial-cn/CP-14/2026-09-06-boundary-guard-and-tombstones/delivery-record.md
+    test_command: "./mvnw test -Dtest=SensitiveBoundaryAndAntiResurrectionTest"
+    note: "首个增量：读路径审计+统一守卫(状态fail-closed/tombstone优先/属主)+getOwnedCapsule与listCards接线+越权矩阵5/5"
+    next_action: "by-id全量接线；CAPSULE_RUNTIME purpose；缓存键授权版本"
   - id: CP-15
     title: "撤回、删除与灾备防复活"
     owner: "数据后端＋隐私"
     stage: S1
     depends_on: ["CP-14", "CP-39"]
     vision_ids: ["V05", "V07", "V10", "V20"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-15/
+    delivery_record: evidence/commercial-cn/CP-14/2026-09-06-boundary-guard-and-tombstones/delivery-record.md
+    test_command: "./mvnw test -Dtest=SensitiveBoundaryAndAntiResurrectionTest"
+    note: "首个增量：V40 tombstone(水位单调)+主体死亡路径(owner-forget)同事务挂钩+备份复活/晚到消费不复活+catchUpFromWatermark重放；receipt保持纯审计(派生物清理不杀主体)；独立台账DR契约已登记CP-50B"
+    next_action: "资产清单(缓存/对象/导出/推送/Provider副本)+data.retracted.v1幂等消费者"
   - id: CP-16
     title: "应用安全、威胁模型与管理隔离"
     owner: "安全工程"

@@ -138,11 +138,30 @@ public class MemoryServiceImpl implements MemoryService {
         return card;
     }
 
+    /** CP-15 tombstone filter; optional so direct-construction tests keep working. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.innercosmos.service.privacy.RetractionTombstoneService tombstoneService;
+
     @Override
     public List<MemoryCard> listCards(Long userId) {
+        // CP-15: tombstoned (retracted) memories never reach the list even if a backup
+        // restore resurrected their rows — the marker outlives the business data.
+        java.util.Set<Long> blocked = tombstoneService == null
+                ? java.util.Set.of() : tombstoneService.blockedIds("MEMORY", userId);
+        if (!blocked.isEmpty()) {
+            return listCardsFiltered(userId, blocked);
+        }
         QueryWrapper<MemoryCard> query = new QueryWrapper<>();
         query.eq("user_id", userId).orderByDesc("emotional_gravity");
         return memoryCardMapper.selectList(query);
+    }
+
+    private List<MemoryCard> listCardsFiltered(Long userId, java.util.Set<Long> blocked) {
+        QueryWrapper<MemoryCard> query = new QueryWrapper<>();
+        query.eq("user_id", userId).orderByDesc("emotional_gravity");
+        return memoryCardMapper.selectList(query).stream()
+                .filter(card -> !blocked.contains(card.id))
+                .toList();
     }
 
     @Override

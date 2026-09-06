@@ -20,7 +20,6 @@ public class DataRetractionReceiptServiceImpl implements DataRetractionReceiptSe
     /** CP-03 G-TRUST metric feed; optional so direct-construction tests keep working. */
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.innercosmos.service.metric.MetricEventService metricEventService;
-
     public DataRetractionReceiptServiceImpl(DataRetractionReceiptMapper mapper,
                                             ApplicationEventPublisher eventPublisher) {
         this.mapper = mapper;

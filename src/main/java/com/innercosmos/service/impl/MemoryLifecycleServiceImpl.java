@@ -49,6 +49,10 @@ public class MemoryLifecycleServiceImpl implements MemoryLifecycleService {
             "ADD", "UPDATE", "MERGE", "SPLIT", "LINK", "REINFORCE",
             "DECAY", "CONTRADICT", "SUPERSEDE", "ARCHIVE", "FORGET", "NO_OP");
 
+    /** CP-15 anti-resurrection markers; optional so direct-construction tests keep working. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.innercosmos.service.privacy.RetractionTombstoneService tombstoneService;
+
     private final MemoryCardMapper memoryMapper;
     private final MemoryOperationMapper operationMapper;
     private final MemoryProjectionReceiptMapper projectionReceiptMapper;
@@ -209,6 +213,12 @@ public class MemoryLifecycleServiceImpl implements MemoryLifecycleService {
                 card.keywordTags = "[]"; card.peopleTags = "[]"; card.provenanceRefs = null;
                 card.status = "FORGOTTEN"; card.forgottenAt = LocalDateTime.now(); card.versionNo = version(card) + 1;
                 card.emotionalGravity = 0.0; card.userImportance = 0.0;
+                // CP-15: the subject itself dies here — write the anti-resurrection marker
+                // in the same transaction so a backup restore can never bring it back readable.
+                if (tombstoneService != null) {
+                    tombstoneService.record(DataRetractionReceiptService.SUBJECT_MEMORY,
+                            card.id, userId, null, "owner forget");
+                }
                 // MyBatis-Plus updateById skips nulls. A privacy deletion must explicitly
                 // null every sensitive field and bind both id and owner in the UPDATE.
                 memoryMapper.update(null, new UpdateWrapper<MemoryCard>()

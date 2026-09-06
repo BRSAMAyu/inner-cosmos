@@ -1685,3 +1685,18 @@ CREATE TABLE IF NOT EXISTS tb_account_security_event (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_account_security_event_user ON tb_account_security_event (user_id, id);
+
+-- CP-15 retraction tombstones + rights watermark (H2 twin of V40).
+CREATE TABLE IF NOT EXISTS tb_retraction_tombstone (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  subject_type VARCHAR(48) NOT NULL,
+  subject_id BIGINT NOT NULL,
+  owner_user_id BIGINT NOT NULL,
+  consent_version VARCHAR(32) NULL,
+  reason VARCHAR(200),
+  applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uq_retraction_tombstone_subject UNIQUE (subject_type, subject_id)
+);
+CREATE INDEX IF NOT EXISTS idx_retraction_tombstone_owner ON tb_retraction_tombstone (owner_user_id);

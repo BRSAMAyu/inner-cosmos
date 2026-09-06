@@ -358,8 +358,18 @@ public class CapsuleServiceImpl implements CapsuleService {
         );
     }
 
+    /** CP-14 unified boundary guard; optional so direct-construction tests keep working. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.innercosmos.service.privacy.SensitiveDataBoundaryService sensitiveBoundary;
+
     @Override
     public EchoCapsule getOwnedCapsule(Long userId, Long capsuleId) {
+        // CP-14/15: the unified boundary guard decides readability — owner match, requester
+        // state and the retraction tombstone (backup-resurrected capsules stay unreadable).
+        if (sensitiveBoundary != null) {
+            sensitiveBoundary.assertReadable("CAPSULE", capsuleId, userId,
+                    com.innercosmos.service.privacy.SensitiveDataBoundaryService.Purpose.OWNER_READ);
+        }
         QueryWrapper<EchoCapsule> query = new QueryWrapper<>();
         query.eq("id", capsuleId).eq("owner_user_id", userId).last("LIMIT 1");
         return capsuleMapper.selectOne(query);
