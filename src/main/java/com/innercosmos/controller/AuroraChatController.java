@@ -45,6 +45,7 @@ public class AuroraChatController extends BaseController {
     private final EmotionInsightService emotionInsightService;
     private final UserService userService;
     private final DialogService dialogService;
+    private final com.innercosmos.service.minor.MinorProtectionService minorProtectionService;
 
     public AuroraChatController(AuroraAgentService auroraAgentService,
                                 MemoryService memoryService,
@@ -54,7 +55,8 @@ public class AuroraChatController extends BaseController {
                                 UserTriggeredSelfReflection selfReflection,
                                 EmotionInsightService emotionInsightService,
                                 UserService userService,
-                                DialogService dialogService) {
+                                DialogService dialogService,
+                                com.innercosmos.service.minor.MinorProtectionService minorProtectionService) {
         this.auroraAgentService = auroraAgentService;
         this.memoryService = memoryService;
         this.memorySettlementService = memorySettlementService;
@@ -64,27 +66,33 @@ public class AuroraChatController extends BaseController {
         this.emotionInsightService = emotionInsightService;
         this.userService = userService;
         this.dialogService = dialogService;
+        this.minorProtectionService = minorProtectionService;
     }
 
     @PostMapping("/message")
     public ApiResponse<Map<String, Object>> message(@Valid @RequestBody ChatRequest request, HttpSession session) {
         Long userId = currentUserId(session);
         assertOwnsSession(userId, request.sessionId); // M-001: block cross-user session access
+        minorProtectionService.assertAdultAccess(userId); // CP-08: adult-only companion surface
 
         // M4: Route self-reflection questions to UserTriggeredSelfReflection
         if (isSelfReflectionQuestion(request.message)) {
             Long lastMsgId = getLastMessageId(request.sessionId);
             String response = selfReflection.onUserQuestion(userId, request.message, request.sessionId, lastMsgId);
-            return ApiResponse.ok(Map.of("reply", response, "type", "self_reflection"));
+            return ApiResponse.ok(Map.of("reply", response, "type", "self_reflection",
+                    "aiGenerated", true));
         }
 
-        return ApiResponse.ok(Map.of("reply", auroraAgentService.reply(userId, request), "type", "normal"));
+        return ApiResponse.ok(Map.of("reply", auroraAgentService.reply(userId, request), "type", "normal",
+                "aiGenerated", true)); // CP-08: explicit AI-generated labeling on every reply
+
     }
 
     @PostMapping("/message-rich")
     public ApiResponse<AuroraReplyVO> messageRich(@Valid @RequestBody ChatRequest request, HttpSession session) {
         Long userId = currentUserId(session);
         assertOwnsSession(userId, request.sessionId); // M-001
+        minorProtectionService.assertAdultAccess(userId); // CP-08
         return ApiResponse.ok(auroraAgentService.replyRich(userId, request));
     }
 
@@ -106,6 +114,7 @@ public class AuroraChatController extends BaseController {
     public ApiResponse<java.util.Map<String, String>> stageStream(@Valid @RequestBody ChatRequest request, HttpSession session) {
         Long userId = currentUserId(session);
         assertOwnsSession(userId, request.sessionId);
+        minorProtectionService.assertAdultAccess(userId); // CP-08
         String token = auroraAgentService.stageStreamContext(userId, request);
         return ApiResponse.ok(java.util.Map.of("token", token == null ? "" : token));
     }

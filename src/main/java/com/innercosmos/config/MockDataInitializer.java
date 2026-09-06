@@ -245,6 +245,10 @@ public class MockDataInitializer implements CommandLineRunner, DemoSandboxServic
             request.username = username;
             request.password = password;
             request.nickname = nickname;
+            // CP-08: seeded personas are declared adults so the adult gate stays enforceable
+            // in every profile without breaking seed data.
+            request.dateOfBirth = "1994-06-01";
+            request.adultConfirmed = true;
             user = userService.register(request);
         }
         user.role = role;
@@ -283,6 +287,8 @@ public class MockDataInitializer implements CommandLineRunner, DemoSandboxServic
         request.username = "sandbox-" + UUID.randomUUID().toString().replace("-", "").substring(0, 20);
         request.password = UUID.randomUUID() + "-demo";
         request.nickname = nickname;
+        request.dateOfBirth = "1994-06-01"; // CP-08: seeded persona, declared adult
+        request.adultConfirmed = true;
         User sandbox = userService.register(request);
         sandbox.accountKind = "SANDBOX";
         userMapper.updateById(sandbox);

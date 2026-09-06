@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS tb_user (
   role VARCHAR(32) NOT NULL,
   status VARCHAR(32) NOT NULL,
   account_kind VARCHAR(16) NOT NULL DEFAULT 'HUMAN',
+  birth_date DATE NULL,
+  age_gate_method VARCHAR(24) NULL,
   last_login_at TIMESTAMP NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -1620,3 +1622,18 @@ CREATE TABLE IF NOT EXISTS tb_commercial_metric_rollup (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT uq_commercial_metric_rollup UNIQUE (metric_code, anchor_week)
 );
+
+-- CP-08 minor-intercept appeal trail (H2 twin of V37).
+CREATE TABLE IF NOT EXISTS tb_minor_appeal (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  statement TEXT NOT NULL,
+  status VARCHAR(16) NOT NULL DEFAULT 'PENDING',
+  decided_by BIGINT,
+  decision_note VARCHAR(400),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT ck_minor_appeal_status CHECK (status IN ('PENDING','ACCEPTED','REJECTED'))
+);
+CREATE INDEX IF NOT EXISTS idx_minor_appeal_user ON tb_minor_appeal (user_id);
+CREATE INDEX IF NOT EXISTS idx_minor_appeal_pending ON tb_minor_appeal (status);

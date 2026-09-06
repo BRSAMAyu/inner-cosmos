@@ -181,8 +181,12 @@ work_packages:
     stage: S1
     depends_on: ["CP-06", "CP-07"]
     vision_ids: ["V01", "V04", "V13"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-08/
+    delivery_record: evidence/commercial-cn/CP-08/2026-09-06-adult-gate-and-labeling/delivery-record.md
+    test_command: "./mvnw test -Dtest=AdultGateAndMinorProtectionTest"
+    note: "成人门槛(V37,商业profile fail-closed)+未成年拦截/申诉链+aiGenerated标识+政策剧本v1；专业审阅待外部门"
+    next_action: "心理专家/法务审阅；使用时长提醒随CP-11/26"
   - id: CP-09
     title: "设计系统、信息架构与中文文案"
     owner: "产品设计＋前端"

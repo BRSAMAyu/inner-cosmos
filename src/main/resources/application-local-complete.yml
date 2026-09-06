@@ -1,6 +1,10 @@
 spring.config.activate.on-profile: local-complete
 
 inner-cosmos:
+
+  # CP-08 adult admission: commercial profiles fail closed -- no 18+ birth date, no account.
+  adult-gate:
+    required: ${ADULT_GATE_REQUIRED:true}
   runtime:
     role: ${INNER_COSMOS_RUNTIME_ROLE:all}
   events:

@@ -388,6 +388,10 @@ inner-cosmos:
   safety:
     semantic-recheck:
       enabled: ${SAFETY_SEMANTIC_RECHECK_ENABLED:true}
+    # CP-08 adult admission: enforced in commercial profiles; dev/test keep frictionless
+    # internal registration (legacy behavior) so engineering environments need no birth dates.
+  adult-gate:
+    required: ${ADULT_GATE_REQUIRED:false}
 
 ---
 # 2026-07-24 8-agent audit (P1-7): CLAUDE.md documents `./mvnw spring-boot:run` (dev profile, H2 +

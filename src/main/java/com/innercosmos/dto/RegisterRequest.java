@@ -12,6 +12,10 @@ public class RegisterRequest {
     @Size(min = 8, max = 128, message = "密码需为 8-128 位")
     public String password;
     public String nickname;
+    /** CP-08 adult gate: ISO yyyy-MM-dd; required when the gate is enforced (commercial profiles). */
+    public String dateOfBirth;
+    /** CP-08 adult gate: explicit adult self-confirmation; required when the gate is enforced. */
+    public Boolean adultConfirmed;
     @Email(message = "邮箱格式不正确")
     @Size(max = 255)
     public String email;

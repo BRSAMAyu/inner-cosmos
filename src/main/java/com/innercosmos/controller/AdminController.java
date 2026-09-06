@@ -20,9 +20,12 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/admin")
 public class AdminController extends BaseController {
     private final AdminService adminService;
+    private final com.innercosmos.service.minor.MinorProtectionService minorProtectionService;
 
-    public AdminController(AdminService adminService) {
+    public AdminController(AdminService adminService,
+                           com.innercosmos.service.minor.MinorProtectionService minorProtectionService) {
         this.adminService = adminService;
+        this.minorProtectionService = minorProtectionService;
     }
 
     @GetMapping("/users")
@@ -32,6 +35,39 @@ public class AdminController extends BaseController {
                 .map(UserProfileVO::from)
                 .collect(Collectors.toList());
         return ApiResponse.ok(result);
+    }
+
+    /**
+     * CP-08 minor intercept: move an account into MINOR_RESTRICTED (adult companion/social
+     * surfaces stop; safety resources and the appeal path stay available).
+     */
+    @org.springframework.web.bind.annotation.PostMapping("/users/{id}/minor-flag")
+    public ApiResponse<java.util.Map<String, Object>> flagMinor(@org.springframework.web.bind.annotation.PathVariable Long id,
+                                                                @org.springframework.web.bind.annotation.RequestBody(required = false) java.util.Map<String, String> body,
+                                                                HttpSession session) {
+        requireAdmin(session);
+        boolean changed = minorProtectionService.flagMinor(id,
+                body == null ? null : body.get("reason"));
+        return ApiResponse.ok(java.util.Map.of("userId", id, "restricted", changed));
+    }
+
+    /** CP-08: pending minor-intercept appeals for human review. */
+    @GetMapping("/minor-appeals")
+    public ApiResponse<java.util.List<com.innercosmos.entity.MinorAppeal>> minorAppeals(HttpSession session) {
+        requireAdmin(session);
+        return ApiResponse.ok(minorProtectionService.pendingAppeals());
+    }
+
+    /** CP-08: decide an appeal; accepting restores the misjudged adult account. */
+    @org.springframework.web.bind.annotation.PostMapping("/minor-appeals/{appealId}/resolve")
+    public ApiResponse<com.innercosmos.entity.MinorAppeal> resolveMinorAppeal(
+            @org.springframework.web.bind.annotation.PathVariable Long appealId,
+            @org.springframework.web.bind.annotation.RequestBody java.util.Map<String, String> body,
+            HttpSession session) {
+        requireAdmin(session);
+        Long adminId = currentUserId(session);
+        boolean accept = Boolean.parseBoolean(body.get("accept"));
+        return ApiResponse.ok(minorProtectionService.resolve(appealId, accept, adminId, body.get("note")));
     }
 
     @GetMapping("/capsules")

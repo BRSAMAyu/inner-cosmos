@@ -22,6 +22,14 @@ import java.util.Map;
 
 @Service
 public class UserServiceImpl implements UserService {
+    /**
+     * CP-08 adult admission gate. Enforced in commercial profiles (prod/local-complete/
+     * commercial-cn); dev/test keep the historical frictionless registration so the
+     * internal engineering environments stay usable without birth dates.
+     */
+    @Value("${inner-cosmos.adult-gate.required:false}")
+    private boolean adultGateRequired;
+
     private final UserMapper userMapper;
     private final UserProfileMapper userProfileMapper;
     private final MemoryCardMapper memoryCardMapper;
@@ -146,6 +154,10 @@ public class UserServiceImpl implements UserService {
         if (userMapper.selectCount(query) > 0) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "该用户名已被注册");
         }
+        // Internal synthetic personas (SYSTEM/DEMO/SANDBOX/SYNTHETIC...) are not service
+        // users; the 18+ admission gate protects humans only.
+        String accountKind = accountKindForRegistration(request.username);
+        java.time.LocalDate birthDate = "HUMAN".equals(accountKind) ? enforceAdultGate(request) : null;
         User user = new User();
         user.username = request.username;
         user.passwordHash = passwordEncoder.encode(request.password);
@@ -153,9 +165,51 @@ public class UserServiceImpl implements UserService {
         user.email = request.email;
         user.role = Constants.ROLE_USER;
         user.status = Constants.STATUS_ACTIVE;
-        user.accountKind = accountKindForRegistration(request.username);
+        user.birthDate = birthDate;
+        user.ageGateMethod = birthDate == null ? null : "SELF_DECLARED";
+        user.accountKind = accountKind;
         userMapper.insert(user);
         return user;
+    }
+
+    /**
+     * CP-08 adult admission (Asia/Shanghai reckoning):
+     *  - a declared birth date under 18 is ALWAYS rejected (whatever the profile);
+     *  - when the gate is required (commercial profiles), a missing/unparseable date or a
+     *    missing explicit adult confirmation is rejected the same way.
+     */
+    private java.time.LocalDate enforceAdultGate(RegisterRequest request) {
+        java.time.LocalDate birthDate = null;
+        if (request.dateOfBirth != null && !request.dateOfBirth.isBlank()) {
+            try {
+                birthDate = java.time.LocalDate.parse(request.dateOfBirth.strip());
+            } catch (java.time.format.DateTimeParseException malformed) {
+                if (adultGateRequired) {
+                    throw new BusinessException(ErrorCode.ADULT_GATE_REQUIRED,
+                            "出生日期格式不正确，请使用 YYYY-MM-DD");
+                }
+                return null;
+            }
+        }
+        if (adultGateRequired) {
+            if (birthDate == null) {
+                throw new BusinessException(ErrorCode.ADULT_GATE_REQUIRED,
+                        "本服务仅面向成年人，注册需要填写出生日期");
+            }
+            if (!Boolean.TRUE.equals(request.adultConfirmed)) {
+                throw new BusinessException(ErrorCode.ADULT_GATE_REQUIRED,
+                        "请确认你已年满 18 岁后再注册");
+            }
+        }
+        if (birthDate != null) {
+            java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Shanghai"));
+            if (java.time.Period.between(birthDate, today).getYears() < 18) {
+                throw new BusinessException(ErrorCode.ADULT_GATE_REQUIRED,
+                        "本服务仅面向成年人（18 岁以上）。感谢你的理解；如你正处于困难中，"
+                                + "可以拨打全国心理援助热线 12356 寻求支持。");
+            }
+        }
+        return birthDate;
     }
 
     /**

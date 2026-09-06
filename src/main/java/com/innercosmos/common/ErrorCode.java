@@ -15,6 +15,12 @@ public final class ErrorCode {
      * (which is not user-overridable) -- the client should offer a "confirm and send" affordance.
      */
     public static final String PII_CONFIRMATION_REQUIRED = "PII_CONFIRMATION_REQUIRED";
+    /**
+     * CP-08 adult admission: the 18+ gate rejected the registration or the account is in
+     * MINOR_RESTRICTED state. Distinct from FORBIDDEN so clients can show the age-gate
+     * explanation, safety resources and the appeal path instead of a generic denial.
+     */
+    public static final String ADULT_GATE_REQUIRED = "ADULT_GATE_REQUIRED";
 
     private ErrorCode() {
     }

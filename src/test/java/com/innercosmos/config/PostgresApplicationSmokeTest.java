@@ -79,7 +79,7 @@ class PostgresApplicationSmokeTest {
         // social-group and live-chat messaging tables.
         // V36 (commercial-cn CP-03) adds tb_commercial_metric_event, tb_analysis_consent and
         // tb_commercial_metric_rollup for the K1-K3 / G-SAFE / G-TRUST metric pipeline.
-        assertEquals(92L, jdbcTemplate.queryForObject("""
+        assertEquals(93L, jdbcTemplate.queryForObject("""
                 SELECT COUNT(*) FROM information_schema.tables
                 WHERE table_schema='public' AND table_name LIKE 'tb_%'
                 """, Long.class));

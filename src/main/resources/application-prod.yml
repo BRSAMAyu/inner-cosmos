@@ -105,6 +105,10 @@ llm:
   allow-fallback: false
 
 inner-cosmos:
+
+  # CP-08 adult admission: commercial profiles fail closed -- no 18+ birth date, no account.
+  adult-gate:
+    required: ${ADULT_GATE_REQUIRED:true}
   aurora:
     stream:
       redis:
