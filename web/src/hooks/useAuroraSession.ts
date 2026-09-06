@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import {
-  api, ApiRateLimitError, replayTurnEvents, streamAurora, subscribeProactive,
+  api, ApiRateLimitError, isConsentRequiredError, replayTurnEvents, streamAurora, subscribeProactive,
   type DialogSessionSummary, type GoodbyeResult, type Notification,
   type PsychologySkillSuggestion, type SafetyResource, type WakeIntent
 } from "../api";
@@ -148,6 +148,10 @@ export type ResolvedSession = { sessionId: number; returning: WakeIntent | null;
 export type UseAuroraSessionOptions = {
   /** Gates the WakeIntent-arrival SSE subscription; mirrors AuroraApp.tsx's own `authenticated` gate. */
   authenticated: boolean | null;
+  /** CP-07 J01 progressive consent: called when a send is refused with CONSENT_REQUIRED
+   * (real provider egress without a grant). The draft is restored here; the app opens the
+   * consent dialog and the user decides once — never a silent degradation. */
+  onConsentRequired?: () => void;
   /** The psychology-skill-suggestion side effect of sending a message belongs to the (not yet
    * extracted) Skill domain, so it is injected rather than owned here. */
   skillLocale: SkillLocale;
@@ -163,7 +167,8 @@ export type UseAuroraSessionOptions = {
 };
 
 export function useAuroraSession({
-  authenticated, skillLocale, onSkillSuggestion, setStatus, onMemorySettled, onNaturalActionExecuted
+  authenticated, skillLocale, onSkillSuggestion, setStatus, onMemorySettled, onNaturalActionExecuted,
+  onConsentRequired
 }: UseAuroraSessionOptions) {
   const t = STATUS_COPY[skillLocale];
   const [sessionId, setSessionId] = useState<number | null>(null);
@@ -804,6 +809,13 @@ export function useAuroraSession({
         finishTurn(generation);
         if (error instanceof ApiRateLimitError) {
           setDraft(current => current || text);
+        }
+        if (isConsentRequiredError(error)) {
+          // The draft stays; the consent dialog carries the explanation and the one-tap grant.
+          setDraft(current => current || text);
+          onConsentRequired?.();
+          setStatus(error.message);
+          return;
         }
         setStatus(error instanceof ApiRateLimitError ? error.message : t.noTimelineRetry);
       }

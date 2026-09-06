@@ -198,16 +198,22 @@ work_packages:
     stage: S1
     depends_on: ["CP-02", "CP-08"]
     vision_ids: ["V02", "V06", "V14"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-09/
+    delivery_record: evidence/commercial-cn/CP-09/2026-09-06-consent-center-web/delivery-record.md
+    note: "首个增量：同意中心页(双语分组/逐项开关)+AI生成角标+样式体系扩展；web 708/708绿"
+    next_action: "J01 onboarding整合；中文文案审校随访谈结果"
   - id: CP-10
     title: "首次价值、设置与权限体验"
     owner: "产品＋前端"
     stage: S1
     depends_on: ["CP-07", "CP-09", "CP-13"]
     vision_ids: ["V01", "V02", "V07"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-10/
+    delivery_record: evidence/commercial-cn/CP-09/2026-09-06-consent-center-web/delivery-record.md
+    note: "首个增量：J01渐进同意对话框(CONSENT_REQUIRED→草稿保留→逐项授权→重发,无静默降级)；现场验收属CP-12A"
+    next_action: "J01权限理解题与onboarding整合；CP-13身份升级后补VERIFIED_ID显示"
   - id: CP-11
     title: "全状态、弱网和性能打磨"
     owner: "前端＋客户端"

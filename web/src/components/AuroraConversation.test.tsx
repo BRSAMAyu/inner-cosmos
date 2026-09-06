@@ -381,6 +381,17 @@ describe("AuroraConversation -- W2 inner-voice bubble", () => {
     onDraftChange: () => undefined, onSubmit: (event: import("react").FormEvent<HTMLFormElement>) => event.preventDefault(),
     onStop: () => undefined };
 
+  it("labels every Aurora reply with the explicit AI-generated badge (CP-08/09)", () => {
+    render(<AuroraConversation {...props} messages={baseMessages} innerVoiceEnabled={false} />);
+    const badges = screen.getAllByText("AI 生成");
+    expect(badges.length).toBeGreaterThanOrEqual(1);
+    // The badge sits next to the Aurora speaker label, never on the user's own bubbles.
+    const userBubble = screen.getByText("今天有点乱").closest("article");
+    expect(userBubble?.querySelector(".ai-generated-badge")).toBeNull();
+    const auroraBubble = screen.getByText("我在，慢慢说").closest("article");
+    expect(auroraBubble?.querySelector(".ai-generated-badge")).not.toBeNull();
+  });
+
   it("renders nothing for an inner_voice message when innerVoiceEnabled is false, but keeps rendering the normal reply", () => {
     render(<AuroraConversation {...props} messages={baseMessages} innerVoiceEnabled={false} />);
     expect(screen.getByText("我在，慢慢说")).toBeVisible();

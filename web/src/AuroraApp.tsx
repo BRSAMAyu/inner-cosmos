@@ -30,6 +30,9 @@ import { LettersInbox } from "./components/LettersInbox";
 import { PortraitView } from "./components/PortraitView";
 import { AccountSettings, type AccountBusy } from "./components/AccountSettings";
 import { DataRightsPanel } from "./components/DataRightsPanel";
+import { ConsentCenterPanel } from "./components/ConsentCenterPanel";
+import { ConsentRequestDialog } from "./components/ConsentRequestDialog";
+import type { ConsentView } from "./api";
 import { LocaleToggle } from "./components/LocaleToggle";
 import type { DataRetractionReceipt, TtsPreferences, TtsPreferencesPatch, UserProfileSettings } from "./api";
 import { loadLocale, saveLocale, syncDocumentLocale, type Locale } from "./i18n";
@@ -130,6 +133,13 @@ export function AuroraApp() {
   const [dataRightsReceipts, setDataRightsReceipts] = useState<DataRetractionReceipt[]>([]);
   const [dataRightsLoading, setDataRightsLoading] = useState(false);
   const [dataRightsLoaded, setDataRightsLoaded] = useState(false);
+  // CP-07 consent center + J01 progressive-consent dialog (driven by CONSENT_REQUIRED).
+  const [consentViews, setConsentViews] = useState<ConsentView[]>([]);
+  const [consentLoading, setConsentLoading] = useState(false);
+  const [consentLoaded, setConsentLoaded] = useState(false);
+  const [consentBusyPurpose, setConsentBusyPurpose] = useState<string | null>(null);
+  const [consentDialogOpen, setConsentDialogOpen] = useState(false);
+  const [consentDialogBusy, setConsentDialogBusy] = useState(false);
   const [accountMessage, setAccountMessage] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfileSettings | null>(null);
   const [profileBusy, setProfileBusy] = useState(false);
@@ -231,6 +241,7 @@ export function AuroraApp() {
   // web/src/hooks/useAuroraSession.ts.
   const auroraSession = useAuroraSession({
     authenticated, skillLocale, onSkillSuggestion: setSkillSuggestion, setStatus,
+    onConsentRequired: () => setConsentDialogOpen(true),
     onNaturalActionExecuted: async featureTarget => {
       if (featureTarget === "memory-starfield") {
         const [scene, cards, operations] = await Promise.all([
@@ -989,6 +1000,43 @@ export function AuroraApp() {
       ? "This was not saved; try again in a moment."
       : "没能存下，待会儿再试一次"); }
     finally { setPortraitBusy(null); }
+  };
+
+  const loadConsents = async () => {
+    setConsentLoading(true);
+    try { setConsentViews(await api.consents()); setConsentLoaded(true); }
+    catch (error) { setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+      ? "Consent information is temporarily unavailable."
+      : "暂时无法读取同意信息"); }
+    finally { setConsentLoading(false); }
+  };
+
+  const decideConsent = async (purposeCode: string, grant: boolean) => {
+    setConsentBusyPurpose(purposeCode);
+    try {
+      await api.decideConsent(purposeCode, grant);
+      setConsentViews(await api.consents());
+      setConsentLoaded(true);
+    } catch (error) { setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+      ? "Could not record the consent decision."
+      : "没能记录你的选择，请再试一次"); }
+    finally { setConsentBusyPurpose(null); }
+  };
+
+  const grantEgressFromDialog = async () => {
+    setConsentDialogBusy(true);
+    try {
+      await api.decideConsent("AI_PROVIDER_EGRESS", true);
+      setConsentViews(await api.consents());
+      setConsentLoaded(true);
+      setConsentDialogOpen(false);
+      setStatus(skillLocale === "en-SG"
+        ? "Recorded. Send your message again to continue."
+        : "已记录。重新发送你的消息即可继续。");
+    } catch (error) { setStatus(error instanceof Error ? error.message : skillLocale === "en-SG"
+      ? "Could not record the consent decision."
+      : "没能记录你的选择，请再试一次"); }
+    finally { setConsentDialogBusy(false); }
   };
 
   const loadDataRightsReceipts = async () => {
@@ -2130,9 +2178,23 @@ export function AuroraApp() {
         <div hidden={meTab !== "data"}>
         <DataRightsPanel receipts={dataRightsReceipts} loading={dataRightsLoading} loaded={dataRightsLoaded}
           onLoad={() => void loadDataRightsReceipts()} locale={skillLocale} />
+        <ConsentCenterPanel views={consentViews} loading={consentLoading} loaded={consentLoaded}
+          onLoad={() => void loadConsents()} onDecide={(purpose, grant) => void decideConsent(purpose, grant)}
+          busyPurpose={consentBusyPurpose} locale={skillLocale} />
         </div>
       </div>
       </ErrorBoundary>
+      <ConsentRequestDialog open={consentDialogOpen} purposeCode="AI_PROVIDER_EGRESS"
+        description={consentViews.find(view => view.purposeCode === "AI_PROVIDER_EGRESS")?.description
+          ?? (skillLocale === "en-SG"
+            ? "Send your conversation content to the selected mainland model service to generate replies."
+            : "将你的对话内容发送到所选的境内大模型服务以生成回应。")}
+        withdrawalEffect={consentViews.find(view => view.purposeCode === "AI_PROVIDER_EGRESS")?.withdrawalEffect
+          ?? (skillLocale === "en-SG"
+            ? "If declined, AI replies are unavailable; local features and data rights are unaffected."
+            : "拒绝后 AI 回应功能不可用；本地功能与数据权利不受影响。")}
+        busy={consentDialogBusy} onGrant={() => void grantEgressFromDialog()}
+        onDismiss={() => setConsentDialogOpen(false)} locale={skillLocale} />
       {userProfile?.id && <OnboardingGuide open={onboardingOpen} userId={userProfile.id}
         locale={skillLocale} onClose={() => setOnboardingOpen(false)}
         onNavigate={navigateFromGuide} />}

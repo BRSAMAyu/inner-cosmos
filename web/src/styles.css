@@ -3507,3 +3507,40 @@ body {
 .me-appearance-panel[hidden] {
   display: none;
 }
+
+/* CP-07/09: consent center, J01 progressive-consent dialog, AI-generated badge. */
+.ai-generated-badge { display: inline-block; margin-left: 8px; padding: 1px 7px;
+  border: 1px solid #c8b69755; border-radius: 999px; font-size: .66rem;
+  letter-spacing: .08em; color: #c8b697; vertical-align: 1px; }
+.consent-center { margin-top: 18px; padding: 18px; border: 1px solid #ffffff12;
+  border-radius: 16px; background: #241b17b0; }
+.consent-center h3 { margin: 6px 0 4px; font: 500 1.05rem Georgia,"Noto Serif SC",serif; }
+.consent-center .intro { margin: 0 0 10px; color: var(--text-secondary); font-size: .88rem; }
+.consent-group { margin-top: 14px; }
+.consent-group h4 { margin: 0 0 6px; font-size: .78rem; letter-spacing: .12em;
+  color: #c8b697; text-transform: none; }
+.consent-group ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.consent-group li { padding: 10px 12px; border: 1px solid #ffffff10; border-radius: 12px;
+  background: #1d1611; }
+.consent-row-head { display: flex; justify-content: space-between; gap: 8px;
+  align-items: baseline; }
+.consent-row-head strong { font-family: ui-monospace, monospace; font-size: .8rem; }
+.consent-state { font-size: .74rem; }
+.consent-state.granted { color: var(--accent-sage-soft); }
+.consent-state.declined { color: #b8a48c; }
+.consent-description { margin: 6px 0 0; font-size: .84rem; color: var(--text-primary); }
+.consent-withdrawal, .consent-note { margin: 6px 0 0; font-size: .76rem;
+  color: var(--text-secondary); }
+.consent-actions { margin-top: 8px; display: flex; gap: 8px; }
+.consent-center footer { margin-top: 12px; color: var(--text-secondary); }
+.consent-request-backdrop { position: fixed; inset: 0; background: #000000a6;
+  display: flex; align-items: center; justify-content: center; z-index: 60; padding: 20px; }
+.consent-request { max-width: 430px; width: 100%; background: #241b17;
+  border: 1px solid #ffffff14; border-radius: 18px; padding: 22px; }
+.consent-request h4 { margin: 0 0 6px; font: 500 1.05rem Georgia,"Noto Serif SC",serif; }
+.consent-request .consent-purpose { margin: 0 0 8px; font-family: ui-monospace, monospace;
+  font-size: .8rem; color: #c8b697; }
+.consent-request .consent-still-works { margin: 10px 0 0; font-size: .8rem;
+  color: var(--text-secondary); border-top: 1px solid #ffffff10; padding-top: 10px; }
+.consent-request .consent-actions { display: flex; gap: 10px; margin-top: 14px; }
+.consent-request small { display: block; margin-top: 8px; color: var(--text-secondary); }

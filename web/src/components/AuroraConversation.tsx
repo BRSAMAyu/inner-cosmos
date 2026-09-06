@@ -28,10 +28,11 @@ const COPY: Record<Locale, {
   writeAria: string; transcribing: string; micStop: string; micStart: string; recStop: string;
   voice: string; stop: string; interruptSend: string; send: string; goodbye: string;
   innerVoiceLabel: string; innerVoiceAria: string; innerVoiceReveal: string;
+  aiGeneratedBadge: string;
 }> = {
   "zh-CN": {
     convAria: "与 Aurora 的对话", empty: "把现在最真实的一句话放在这里。", speakerYou: "你",
-    partialHint: "停在这里", thinkingAria: "Aurora 正在思考",
+    partialHint: "停在这里", thinkingAria: "Aurora 正在思考", aiGeneratedBadge: "AI 生成",
     understanding: "Aurora 正在理解这一刻…", composing: "Aurora 正在组织下一句…",
     placeholderActive: "直接说出新的想法，Aurora 会停下并重新理解…", placeholderIdle: "此刻，你想从哪里说起？",
     writeAria: "写给 Aurora", transcribing: "转写中…", micStop: "停止录音并转写", micStart: "用语音输入",
@@ -40,7 +41,7 @@ const COPY: Record<Locale, {
   },
   "en-SG": {
     convAria: "Conversation with Aurora", empty: "Put the truest thing you feel right now here.", speakerYou: "You",
-    partialHint: "Paused here", thinkingAria: "Aurora is thinking",
+    partialHint: "Paused here", thinkingAria: "Aurora is thinking", aiGeneratedBadge: "AI-generated",
     understanding: "Aurora is taking in this moment…", composing: "Aurora is composing the next line…",
     placeholderActive: "Just say the new thought — Aurora will pause and re-understand…", placeholderIdle: "Where would you like to begin, right now?",
     writeAria: "Write to Aurora", transcribing: "Transcribing…", micStop: "Stop recording and transcribe", micStart: "Use voice input",
@@ -201,6 +202,9 @@ export function AuroraConversation({ messages, activeTurnId, thinkingStage = nul
             className={`message ${message.speaker.toLowerCase()} ${message.partial ? "partial" : ""}`}
             aria-live={message.partial ? "polite" : undefined}>
             <span className="speaker">{message.speaker === "AURORA" ? "Aurora" : t.speakerYou}</span>
+            {message.speaker === "AURORA" && (
+              <small className="ai-generated-badge" aria-label={t.aiGeneratedBadge}>{t.aiGeneratedBadge}</small>
+            )}
             <p className="ugc-text">{message.text || "…"}</p>
             {message.partial && message.text && <small>{t.partialHint}</small>}
           </article>;

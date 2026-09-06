@@ -48,6 +48,19 @@ export type DeviceRegistration = {
   id: number; installationId: string; platform: string; transport: "FCM" | "APNS" | "LOCAL_EVIDENCE";
   appVersion: string; locale: string; timezone: string; enabled: boolean; revoked: boolean; lastSeenAt: string;
 };
+// CP-07 consent center contract (GET/POST /api/me/consents). Mirrors the backend
+// ConsentPurpose registry: one view row per purpose with group/default semantics.
+export type ConsentView = {
+  purposeCode: string;
+  group: "REQUIRED" | "OPTIONAL_ASK" | "OPTIONAL" | "SENSITIVE" | "MANAGED_ELSEWHERE";
+  granted: boolean;
+  userSettable: boolean;
+  description: string;
+  withdrawalEffect: string;
+  version: string;
+  source: string;
+};
+
 // Consumes Track A contract delta TA-DELTA-001 (GET /api/me/data-rights/receipts). Sensitive-free.
 export type DataRetractionReceipt = {
   id: number;
@@ -651,6 +664,21 @@ function apiCopy(english: string, chinese: string): string {
   return englishUi() ? english : chinese;
 }
 
+/** CP-07: carries the backend business error code (e.g. CONSENT_REQUIRED) so the UI can
+ * route to the right affordance (consent dialog) instead of a generic dead end. */
+export class ApiCodeError extends Error {
+  constructor(message: string, public readonly code: string) {
+    super(message);
+    this.name = "ApiCodeError";
+  }
+}
+
+export const CONSENT_REQUIRED_CODE = "CONSENT_REQUIRED";
+
+export function isConsentRequiredError(error: unknown): error is ApiCodeError {
+  return error instanceof ApiCodeError && error.code === CONSENT_REQUIRED_CODE;
+}
+
 export class ApiRateLimitError extends Error {
   constructor(public readonly retryAfterSeconds: number) {
     super(apiCopy(
@@ -739,7 +767,10 @@ async function request<T>(url: string, init: RequestInit = {}, retriedCsrf = fal
   if (response.status === 429) {
     throw new ApiRateLimitError(retryAfterSeconds(response, body as ApiEnvelope<unknown>));
   }
-  if (!response.ok || !body.success) throw new Error(body.message ?? `HTTP ${response.status}`);
+  if (!response.ok || !body.success) {
+    if (body.code) throw new ApiCodeError(body.message ?? `HTTP ${response.status}`, body.code);
+    throw new Error(body.message ?? `HTTP ${response.status}`);
+  }
   return body.data;
 }
 
@@ -865,6 +896,11 @@ export const api = {
   }),
   dataRightsReceipts: (limit?: number) => request<DataRetractionReceipt[]>(
     "/api/me/data-rights/receipts" + (limit ? `?limit=${limit}` : "")),
+  consents: () => request<ConsentView[]>("/api/me/consents"),
+  decideConsent: (purposeCode: string, grant: boolean) => request<ConsentView>(
+    `/api/me/consents/${encodeURIComponent(purposeCode)}`, {
+      method: "POST", body: JSON.stringify({ grant })
+    }),
   createSession: () => request<{ id: number }>("/api/dialog/session/create", {
     method: "POST", body: JSON.stringify({
       title: apiCopy("Aurora conversation", "Aurora 对话"),
