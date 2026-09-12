@@ -1,0 +1,70 @@
+# CP-43/44 提审材料清单骨架 — Apple 中国区
+
+结构化骨架：status 只允许 PENDING | IN_PROGRESS | WAIVED(需 approved_by)；
+不存在 PASS 状态——审批通过必须以 evidence 中的官方回执为准，由 operator 填入。
+
+items:
+  - id: org-account
+    category: 渠道基础
+    requirement: 组织开发者账户与 DUNS 就绪
+    evidence_required: 账户回执
+    blocks_submission: True
+    status: PENDING
+    evidence: null
+    approved_by: null
+  - id: icp-metadata
+    category: 渠道基础
+    requirement: App 备案信息写入 App Store Connect 元数据
+    evidence_required: 元数据截图
+    blocks_submission: True
+    status: PENDING
+    evidence: null
+    approved_by: null
+  - id: privacy-manifest
+    category: 隐私
+    requirement: 隐私清单与 SDK 数据声明（含第三方 AI 接收方/目的/方式）
+    evidence_required: 隐私清单文件
+    blocks_submission: True
+    status: PENDING
+    evidence: null
+    approved_by: null
+  - id: age-rating
+    category: 合规
+    requirement: 年龄分级与 17+ 策略核对
+    evidence_required: 分级截图
+    blocks_submission: True
+    status: PENDING
+    evidence: null
+    approved_by: null
+  - id: review-account
+    category: 审核
+    requirement: 审核账号与演示数据（不隐藏线上功能）
+    evidence_required: 审核账号凭据
+    blocks_submission: True
+    status: PENDING
+    evidence: null
+    approved_by: null
+  - id: account-deletion
+    category: 权利
+    requirement: 应用内账户删除入口
+    evidence_required: 功能演示记录
+    blocks_submission: True
+    status: PENDING
+    evidence: null
+    approved_by: null
+  - id: content-report
+    category: 信任安全
+    requirement: 内容举报/屏蔽/联系方式
+    evidence_required: 功能演示记录
+    blocks_submission: True
+    status: PENDING
+    evidence: null
+    approved_by: null
+  - id: iap-route
+    category: 支付
+    requirement: 数字服务默认 IAP 路线；外链支付不套用美国区例外
+    evidence_required: 法务确认
+    blocks_submission: True
+    status: PENDING
+    evidence: null
+    approved_by: null

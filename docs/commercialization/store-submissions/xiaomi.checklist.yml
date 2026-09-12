@@ -1,0 +1,46 @@
+# CP-43/44 提审材料清单骨架 — 小米
+
+结构化骨架：status 只允许 PENDING | IN_PROGRESS | WAIVED(需 approved_by)；
+不存在 PASS 状态——审批通过必须以 evidence 中的官方回执为准，由 operator 填入。
+
+items:
+  - id: ai-qualification
+    category: 资质
+    requirement: 生成式 AI 备案/算法材料按该版本官方清单
+    evidence_required: 审批通过截图（非提交截图）
+    blocks_submission: True
+    status: PENDING
+    evidence: null
+    approved_by: null
+  - id: model-label
+    category: 合规
+    requirement: AI 生成内容标识实装
+    evidence_required: 功能演示记录
+    blocks_submission: True
+    status: PENDING
+    evidence: null
+    approved_by: null
+  - id: safety-report
+    category: 资质
+    requirement: 安全评估报告
+    evidence_required: 官方回执
+    blocks_submission: True
+    status: PENDING
+    evidence: null
+    approved_by: null
+  - id: app-filing
+    category: 渠道基础
+    requirement: APP 备案清单项
+    evidence_required: 备案回执
+    blocks_submission: True
+    status: PENDING
+    evidence: null
+    approved_by: null
+  - id: copyright-optional
+    category: 资质
+    requirement: 版权证明（如要求）
+    evidence_required: 证书
+    blocks_submission: False
+    status: PENDING
+    evidence: null
+    approved_by: null

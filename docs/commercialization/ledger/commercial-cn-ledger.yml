@@ -592,7 +592,11 @@ work_packages:
     stage: S3
     depends_on: ["CP-11", "CP-13", "CP-18", "CP-44"]
     vision_ids: ["V02", "V14", "V20"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
+    delivery_record: evidence/commercial-cn/CP-47/2026-09-13-reconciliation-contract/delivery-record.md
+    test_command: "./mvnw test -Dtest=PaymentReconciliationContractTest,StoreSubmissionChecklistContractTest"
+    note: "首个增量：web-pwa渠道提审清单骨架(结构化checklist+结构合同:必填字段/唯一id/诚实状态集/无PASS态)"
+    next_action: "Chrome/Edge/Safari支持矩阵实测；PWA更新与桌面签名验证"
     evidence_dir: evidence/commercial-cn/CP-43/
   - id: CP-44
     title: "应用身份、渠道合同与HarmonyOS决策"
@@ -600,7 +604,11 @@ work_packages:
     stage: S1
     depends_on: ["CP-05", "CP-09"]
     vision_ids: ["V01", "V14", "V19"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
+    delivery_record: evidence/commercial-cn/CP-47/2026-09-13-reconciliation-contract/delivery-record.md
+    test_command: "./mvnw test -Dtest=PaymentReconciliationContractTest,StoreSubmissionChecklistContractTest"
+    note: "首个增量：apple-cn/xiaomi/oppo/huawei/vivo-others五渠道提审清单骨架(30项,evidence_required逐项,结构合同强制无PASS态)"
+    next_action: "身份冻结/渠道合同/HarmonyOS PoC(operator门禁)"
     evidence_dir: evidence/commercial-cn/CP-44/
   - id: CP-45
     title: "服务端订单与支付事实账本"
@@ -624,7 +632,11 @@ work_packages:
     stage: S3
     depends_on: ["CP-03", "CP-40", "CP-45", "CP-46"]
     vision_ids: ["V17", "V19"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
+    delivery_record: evidence/commercial-cn/CP-47/2026-09-13-reconciliation-contract/delivery-record.md
+    test_command: "./mvnw test -Dtest=PaymentReconciliationContractTest,StoreSubmissionChecklistContractTest"
+    note: "首个增量：支付对账内核——HMAC验签(时间戳入签名/新鲜窗/常数时间/fail-closed)+追加式事件账本(provider_event_id幂等,乱序净值无关,漂移DISPUTED),V43迁移实机验证(43/101/94)"
+    next_action: "真实渠道验签适配(CP-45/46联动)；完整结算周期抽样对账"
     evidence_dir: evidence/commercial-cn/CP-47/
   - id: CP-48
     title: "客服、退款与用户沟通"

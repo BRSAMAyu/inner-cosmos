@@ -1750,3 +1750,21 @@ CREATE TABLE IF NOT EXISTS tb_moderation_case (
   CONSTRAINT ck_moderation_case_status CHECK (status IN ('OPEN','ASSIGNED','RESOLVED','DISMISSED','APPEALED'))
 );
 CREATE INDEX IF NOT EXISTS idx_moderation_case_queue ON tb_moderation_case (status, priority, sla_due_at);
+
+-- CP-47 payment event ledger (H2 twin of V43).
+CREATE TABLE IF NOT EXISTS tb_payment_event (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  provider_event_id VARCHAR(128) NOT NULL,
+  provider VARCHAR(32) NOT NULL,
+  order_id VARCHAR(64) NOT NULL,
+  event_type VARCHAR(24) NOT NULL,
+  amount_cents BIGINT NOT NULL,
+  currency CHAR(3) NOT NULL DEFAULT 'CNY',
+  status VARCHAR(16) NOT NULL DEFAULT 'RECORDED',
+  occurred_at TIMESTAMP NOT NULL,
+  received_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (provider_event_id)
+);
+CREATE INDEX IF NOT EXISTS idx_payment_event_order ON tb_payment_event (order_id, event_type);

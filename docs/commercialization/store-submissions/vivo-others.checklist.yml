@@ -1,0 +1,30 @@
+# CP-43/44 提审材料清单骨架 — vivo／应用宝／其他
+
+结构化骨架：status 只允许 PENDING | IN_PROGRESS | WAIVED(需 approved_by)；
+不存在 PASS 状态——审批通过必须以 evidence 中的官方回执为准，由 operator 填入。
+
+items:
+  - id: ledger-entry
+    category: 渠道基础
+    requirement: 独立台账建立（每渠道一文件）
+    evidence_required: 本文件
+    blocks_submission: True
+    status: PENDING
+    evidence: null
+    approved_by: null
+  - id: spec-verification
+    category: 资质
+    requirement: 组织账户内读取当期官方规范/资质/SDK 要求并记录版本
+    evidence_required: 规范版本记录
+    blocks_submission: True
+    status: PENDING
+    evidence: null
+    approved_by: null
+  - id: no-experience-pass
+    category: 审核
+    requirement: 不得凭经验填 PASS；未核验项保持 PENDING
+    evidence_required: 状态纪律
+    blocks_submission: True
+    status: PENDING
+    evidence: null
+    approved_by: null

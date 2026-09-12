@@ -1,0 +1,30 @@
+# CP-43/44 提审材料清单骨架 — OPPO
+
+结构化骨架：status 只允许 PENDING | IN_PROGRESS | WAIVED(需 approved_by)；
+不存在 PASS 状态——审批通过必须以 evidence 中的官方回执为准，由 operator 填入。
+
+items:
+  - id: category-material
+    category: 资质
+    requirement: 社交/AI 分类与评估材料
+    evidence_required: 官方回执
+    blocks_submission: True
+    status: PENDING
+    evidence: null
+    approved_by: null
+  - id: privacy-sdk-list
+    category: 隐私
+    requirement: 隐私/SDK/渠道签名逐项核对（按该渠道当期规范）
+    evidence_required: 核对表
+    blocks_submission: True
+    status: PENDING
+    evidence: null
+    approved_by: null
+  - id: independent-review
+    category: 审核
+    requirement: 不以其他商店通过代替本渠道审核
+    evidence_required: 本渠道审批记录
+    blocks_submission: True
+    status: PENDING
+    evidence: null
+    approved_by: null

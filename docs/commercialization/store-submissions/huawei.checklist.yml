@@ -1,0 +1,38 @@
+# CP-43/44 提审材料清单骨架 — 华为 Android／HarmonyOS
+
+结构化骨架：status 只允许 PENDING | IN_PROGRESS | WAIVED(需 approved_by)；
+不存在 PASS 状态——审批通过必须以 evidence 中的官方回执为准，由 operator 填入。
+
+items:
+  - id: privacy-config
+    category: 隐私
+    requirement: 隐私配置按华为隐私要求
+    evidence_required: 配置截图
+    blocks_submission: True
+    status: PENDING
+    evidence: null
+    approved_by: null
+  - id: android-pkg
+    category: 发布完整性
+    requirement: Android 包：SHA/签名/渠道包可追
+    evidence_required: 制品清单
+    blocks_submission: True
+    status: PENDING
+    evidence: null
+    approved_by: null
+  - id: harmonyos-split
+    category: 决策
+    requirement: HarmonyOS 原生与 Android 兼容环境分开验收；原生不从 APK 推断
+    evidence_required: PoC 缺口记录
+    blocks_submission: True
+    status: PENDING
+    evidence: null
+    approved_by: null
+  - id: push-payment-split
+    category: 支付
+    requirement: 两生态支付/推送能力分别证明
+    evidence_required: 能力证明
+    blocks_submission: False
+    status: PENDING
+    evidence: null
+    approved_by: null
