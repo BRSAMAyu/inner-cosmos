@@ -134,6 +134,9 @@ public class PersonaChatServiceImpl implements PersonaChatService {
     private final CapsuleRuntimeContextComposer runtimeContextComposer;
     private final DataUseGrantService dataUseGrantService;
     private final ReportRecordMapper reportRecordMapper;
+    /** CP-31 withdrawn-capsule guard; optional so direct-construction tests keep working. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.innercosmos.service.privacy.RetractionTombstoneService tombstoneService;
     /** CP-36 case backend; optional so direct-construction tests keep working. */
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.innercosmos.service.moderation.ModerationCaseService moderationCaseService;
@@ -249,6 +252,12 @@ public class PersonaChatServiceImpl implements PersonaChatService {
     public PersonaChatSession create(Long userId, Long capsuleId) {
         EchoCapsule capsule = capsuleMapper.selectById(capsuleId);
         if (capsule == null) {
+            throw new BusinessException("NOT_FOUND", "共鸣体不存在");
+        }
+        // CP-31: a withdrawn capsule stays unreachable even if a backup restore resurrected
+        // its business row as PUBLIC — the tombstone decides at use time (no link penetration).
+        if (tombstoneService != null && tombstoneService.isBlocked(
+                com.innercosmos.service.DataRetractionReceiptService.SUBJECT_CAPSULE, capsuleId)) {
             throw new BusinessException("NOT_FOUND", "共鸣体不存在");
         }
         if (!Boolean.TRUE.equals(capsule.isPublic) || !"PUBLIC".equals(capsule.visibilityStatus)) {

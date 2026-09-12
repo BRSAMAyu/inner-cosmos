@@ -59,10 +59,13 @@ public class RetractionTombstoneServiceImpl implements RetractionTombstoneServic
 
     @Override
     public Set<Long> blockedIds(String subjectType, Long ownerUserId) {
+        QueryWrapper<RetractionTombstone> query = new QueryWrapper<RetractionTombstone>()
+                .eq("subject_type", subjectType);
+        if (ownerUserId != null) {
+            query.eq("owner_user_id", ownerUserId);
+        }
         Set<Long> ids = new HashSet<>();
-        for (RetractionTombstone marker : tombstoneMapper.selectList(
-                new QueryWrapper<RetractionTombstone>()
-                        .eq("subject_type", subjectType).eq("owner_user_id", ownerUserId))) {
+        for (RetractionTombstone marker : tombstoneMapper.selectList(query)) {
             ids.add(marker.subjectId);
         }
         return ids;

@@ -408,32 +408,48 @@ work_packages:
     stage: S2
     depends_on: ["CP-08", "CP-15", "CP-21", "CP-23"]
     vision_ids: ["V07", "V10"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-29/
+    delivery_record: evidence/commercial-cn/CP-29/2026-09-06-resonance-line/delivery-record.md
+    test_command: "./mvnw test -Dtest=ResonanceLineNegativeTest"
+    note: "首个增量：纠正→NEEDS_REVIEW去公开(既有链)+不入发现索引断言；编译失败保稳定版负测列下一步"
+    next_action: "编译失败不替换稳定版本负测；授权快照覆盖/冲突解释"
   - id: CP-30
     title: "保真运行时与隐私红队"
     owner: "Capsule AI＋独立评测"
     stage: S2
     depends_on: ["CP-04", "CP-17", "CP-29"]
     vision_ids: ["V10", "V16"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-30/
+    delivery_record: evidence/commercial-cn/CP-29/2026-09-06-resonance-line/delivery-record.md
+    test_command: "./mvnw test -Dtest=ResonanceLineNegativeTest"
+    note: "首个增量：沙盒确定性主题门(前置于模型/genome/安全,提示词纪律不是边界)；红队RT-CONS精神探针负测"
+    next_action: "保真协议执行(接受门:来源用户偏好≥60%/50%区间,CP-04注册表行)"
   - id: CP-31
     title: "公开发现、分享与标识传播"
     owner: "内容平台＋客户端"
     stage: S2
     depends_on: ["CP-08", "CP-29", "CP-36"]
     vision_ids: ["V07", "V10", "V18"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-31/
+    delivery_record: evidence/commercial-cn/CP-29/2026-09-06-resonance-line/delivery-record.md
+    test_command: "./mvnw test -Dtest=ResonanceLineNegativeTest"
+    note: "首个增量：撤回不穿透(persona入口tombstone+深链NOT_FOUND,含备份复活模拟)+公开索引只收准版本"
+    next_action: "分享/导出/复制链的标识传播与缓存清理"
   - id: CP-32
     title: "多目标匹配与可解释排序"
     owner: "推荐＋产品"
     stage: S2
     depends_on: ["CP-14", "CP-22", "CP-30", "CP-31"]
     vision_ids: ["V11", "V12", "V18"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-32/
+    delivery_record: evidence/commercial-cn/CP-29/2026-09-06-resonance-line/delivery-record.md
+    test_command: "./mvnw test -Dtest=ResonanceLineNegativeTest"
+    note: "首个增量：发现硬过滤三层锁定(自我/双向屏蔽对/NEEDS_REVIEW)；匹配模式与解释排序后续"
+    next_action: "相似/互补/意外模式召回排序+可解释共同点；接受门实验(CP-04注册表行)"
   - id: CP-33
     title: "慢信的节律与隐私友好状态"
     owner: "社交后端＋前端"

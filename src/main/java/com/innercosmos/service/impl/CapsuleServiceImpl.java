@@ -358,6 +358,10 @@ public class CapsuleServiceImpl implements CapsuleService {
         );
     }
 
+    /** CP-31 public-index tombstone filter; optional so direct-construction tests keep working. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.innercosmos.service.privacy.RetractionTombstoneService tombstoneService;
+
     /** CP-14 unified boundary guard; optional so direct-construction tests keep working. */
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.innercosmos.service.privacy.SensitiveDataBoundaryService sensitiveBoundary;
@@ -439,9 +443,15 @@ public class CapsuleServiceImpl implements CapsuleService {
         query.eq("is_public", true).eq("visibility_status", "PUBLIC").orderByDesc("echo_energy");
         List<EchoCapsule> capsules = capsuleMapper.selectList(query);
         Set<Long> blocked = viewerId == null ? Set.of() : blockedCounterparties(viewerId);
+        // CP-31: the public index only serves approved versions — withdrawn capsules stay
+        // out even if a backup restore resurrected their rows as PUBLIC (tombstone decides).
+        Set<Long> withdrawn = tombstoneService == null ? Set.of()
+                : tombstoneService.blockedIds(
+                        com.innercosmos.service.DataRetractionReceiptService.SUBJECT_CAPSULE, null);
         return capsules.stream()
                 .filter(c -> viewerId == null || !viewerId.equals(c.ownerUserId))
                 .filter(c -> c.ownerUserId == null || !blocked.contains(c.ownerUserId))
+                .filter(c -> !withdrawn.contains(c.id))
                 .peek(this::hydratePublicBoundary)
                 .toList();
     }

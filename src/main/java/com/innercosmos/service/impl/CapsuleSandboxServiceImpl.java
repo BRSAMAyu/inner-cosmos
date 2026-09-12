@@ -41,6 +41,38 @@ public class CapsuleSandboxServiceImpl implements CapsuleSandboxService {
     private final SafetyService safetyService;
     private final DataMaskingService dataMaskingService;
     private final PiiCredentialDetector piiCredentialDetector;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.innercosmos.mapper.CapsuleBoundaryMapper boundaryMapperField;
+
+    private com.innercosmos.entity.CapsuleBoundary boundaryOf(Long capsuleId) {
+        return boundaryMapperField == null ? null : boundaryMapperField.selectOne(
+                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<com.innercosmos.entity.CapsuleBoundary>()
+                        .eq("capsule_id", capsuleId).orderByDesc("version").last("LIMIT 1"));
+    }
+
+    /** Deterministic blocked-topic match: the boundary stores JSON arrays of topic strings. */
+    private static String firstBlockedTopicHit(com.innercosmos.entity.CapsuleBoundary boundary,
+                                               String question) {
+        if (boundary == null || boundary.blockedTopics == null || question == null
+                || boundary.blockedTopics.isBlank()) {
+            return null;
+        }
+        String normalized = question.toLowerCase(java.util.Locale.ROOT);
+        try {
+            com.fasterxml.jackson.databind.JsonNode topics = new com.fasterxml.jackson.databind
+                    .ObjectMapper().readTree(boundary.blockedTopics);
+            for (com.fasterxml.jackson.databind.JsonNode topic : topics) {
+                String label = topic.asText("").trim();
+                if (!label.isBlank() && normalized.contains(label.toLowerCase(java.util.Locale.ROOT))) {
+                    return label;
+                }
+            }
+        } catch (Exception malformed) {
+            return null; // a malformed boundary row never blocks everything
+        }
+        return null;
+    }
+
     private final ObjectMapper objectMapper;
 
     public CapsuleSandboxServiceImpl(EchoCapsuleMapper capsuleMapper,
@@ -64,6 +96,16 @@ public class CapsuleSandboxServiceImpl implements CapsuleSandboxService {
     @Override
     public CapsuleSandboxVO respond(Long ownerUserId, Long capsuleId, String question) {
         EchoCapsule capsule = owned(ownerUserId, capsuleId);
+        // CP-30 deterministic topic gate FIRST: a boundary-blocked topic must be refused
+        // before safety, genome selection or any model call — prompt discipline alone is not
+        // a boundary, and the boundary decision never depends on model-version availability.
+        com.innercosmos.entity.CapsuleBoundary boundary = boundaryOf(capsule.id);
+        String blockedHit = firstBlockedTopicHit(boundary, question);
+        if (blockedHit != null) {
+            return new CapsuleSandboxVO(capsule.id, null, null, null,
+                    question, "", "这个话题没有对你开放：『" + blockedHit + "』。可以问这个侧面已授权的范围。",
+                    List.of("TOPIC_BLOCKED"), false, "仅你可见的共鸣体沙盒，不会发送给其他人。");
+        }
         CapsuleGenomeVersion genome = selected(capsule);
         SafetyResult safety = safetyService.check(question, ownerUserId, null);
         if (Boolean.TRUE.equals(safety.blockModelCall)) {
