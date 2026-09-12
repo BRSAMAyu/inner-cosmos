@@ -304,8 +304,8 @@ work_packages:
     evidence_dir: evidence/commercial-cn/CP-18/
     delivery_record: evidence/commercial-cn/CP-18/2026-09-12-continuity-kernel-retrieval/delivery-record.md
     test_command: "./mvnw test -Dtest=ContinuityKernelRetrievalTest"
-    note: "首个增量：SessionContinuityService诚实开场(新用户零伪造/归来者带provenance的PRIOR_SUMMARY+TOPICS/30天静默窗归零)+GET /api/dialog/continuity"
-    next_action: "OpeningContext接入Aurora首条prompt组装；前端开屏消费carry-forward"
+    note: "两增量：①SessionContinuityService诚实开场(零伪造/带provenance carry/30天静默窗)+GET /api/dialog/continuity；②continuityGrounding接入主动问候与首条用户消息轮,诊断只暴露计数"
+    next_action: "前端开屏消费carry-forward与开场行；连续性对用户可见的撤回开关"
   - id: CP-19
     title: "双核、上下文与中文理解增益"
     owner: "AI质量"
@@ -316,8 +316,8 @@ work_packages:
     evidence_dir: evidence/commercial-cn/CP-19/
     delivery_record: evidence/commercial-cn/CP-18/2026-09-12-continuity-kernel-retrieval/delivery-record.md
     test_command: "./mvnw test -Dtest=ContinuityKernelRetrievalTest"
-    note: "首个增量：KernelRoutingPolicy确定性纯函数(SINGLE/DUAL/SUPPORT_FLOW；危机永远走支持流,复杂度三信号才升双核,简单轮次默认单核)"
-    next_action: "按kernel分流Aurora回复编排(单核直答/双核批判重写/支持流旁路)+生产端TurnSignals信号提取"
+    note: "两增量：①KernelRoutingPolicy纯函数(SINGLE/DUAL/SUPPORT_FLOW,危机走支持流,复杂度三信号升双核)；②TurnSignals.from生产提取+adaptive双腿路由+每轮kernelRoute/supportFlowTurn可观测+说话人/规划核指令约束"
+    next_action: "CP-04冻结集上SINGLE vs DUAL真实增益对拍；supportFlowTurn经安全门旁路的端到端演练"
   - id: CP-20
     title: "风险连续性与危机处置运行时"
     owner: "AI安全＋信任与安全"

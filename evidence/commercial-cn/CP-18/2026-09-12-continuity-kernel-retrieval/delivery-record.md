@@ -42,8 +42,22 @@
 - CP-19：路由策略已冻结为纯函数，但回复编排尚未按 kernel 分流（单核直答/双核批判重写/支持流旁路）；TurnSignals 的生产端信号提取（长度/多部分解析/风险上下文）随接线补
 - CP-22：向量检索质量基线（重排、任务化查询改写、中文评测集对拍）依赖 CP-04 冻结集 + 真实向量库；本轮先钉死撤回硬边界这一不可妥协项
 
+## 第二增量（同日）：生产接线（检查点 16）
+
+1. **CP-19 生产信号提取与路由接线**：
+   - `KernelRoutingPolicy.TurnSignals.from(turnContext)`：五信号生产端提取（长度/明确分析请求/多部分/困境信号/危机词），复用与 `DualKernelBudgetPolicy` 相同的 `CrisisKeywordRule`/`DistressSignalDetector` 分类器——单一调优边界，无平行词典
+   - `AuroraDualKernelRuntime.shouldUseDualKernelForTurn` adaptive 模式改为双腿决策：预算评分器（风险/歧义/边界/连续性）OR 内核路由复杂度轴（CP-19）；危机经预算腿保持双核（其 safetyContract 即支持流），绝不退化为单遍分析轮
+   - `AuroraAgentServiceImpl` 每轮计算 kernelRoute 并入 turnContext + runtimeMeta（所有运行时模式下可观测）；SUPPORT_FLOW 置 `supportFlowTurn=true` 供规划/表达核以支持优先
+   - 说话人/规划核指令新增：carry-forward 轻用与 provenance 约束、首次对话禁引"上次"、supportFlowTurn 支持优先语义
+2. **CP-18 开场接线**：
+   - `AuroraAgentServiceImpl.continuityGrounding(OpeningContext)`（public static，两处开场共享）：归来者→provenance 标注 carry notes（数据非指令）；全新用户→`crossSessionContinuityFirstConversation` 守卫；有前次但无存留材料→空 map（既不伪造连续也不谎称首次）
+   - 主动问候 `generateGreeting` 与首条用户消息轮（`recentMessages.size()<=1`）都注入；问候指令新增规则 7/8（轻引一条带日期 provenance、禁"一直记得"、首次对话禁引旧经历）
+   - 隐私：诊断只暴露 carry 条数（`crossSessionContinuityCarry`）与守卫布尔（`firstConversationGuard`），绝不暴露 carry 文本
+3. **测试（AuroraContinuityRoutingWiringTest 6/6）**：TurnSignals.from 五信号提取；真实 replyRich 路径 kernelRoute 可见且复杂度挣得 DUAL；开场轮 carry 计数=2、后续轮归零；新用户首轮守卫、后续轮移除；continuityGrounding 三态诚实性；危机语言被同步安全门拦截于内核路由之前（防御纵深断言）
+4. 全量回归 **1560/1560** 通过（新增 6 测试），1 个既有 Docker 门控跳过；无 schema 变更
+
 ## 状态
 
-- CP-18: IN_PROGRESS（连续性服务+API 落地；prompt/前端接线后续）
-- CP-19: IN_PROGRESS（路由纯函数+测试落地；编排接线与信号提取后续）
+- CP-18: IN_PROGRESS（服务+API+问候/首轮接线完成；前端开屏消费 carry 与开场行展示后续）
+- CP-19: IN_PROGRESS（信号提取+adaptive 路由+全轮可观测完成；CP-04 冻结集上的真实增益对拍后续）
 - CP-22: IN_PROGRESS（撤回硬边界落地；任务化检索与质量评测后续）

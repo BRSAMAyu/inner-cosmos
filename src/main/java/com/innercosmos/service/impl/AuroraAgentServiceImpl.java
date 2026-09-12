@@ -168,6 +168,9 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
     /** A6 privacy-safe AI span (Observation → OTel span with a tracer); Spring always wires it. */
     @Autowired(required = false)
     private com.innercosmos.ai.observability.AiTurnObservation aiTurnObservation;
+    /** CP-18: honest cross-session opening continuity; optional for constructor-level unit tests. */
+    @Autowired(required = false)
+    private com.innercosmos.service.continuity.SessionContinuityService sessionContinuityService;
     private final Map<Long, Integer> turnCounter = new ConcurrentHashMap<>();
     private final Map<Long, Integer> goodbyeConfirmCount = new ConcurrentHashMap<>();
     private AuroraStreamStageStore streamStageStore =
@@ -379,6 +382,9 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         holdInitialGenerationLeaseForH1Demo(generationAuthority);
         long turnStartNanos = System.nanoTime();
         boolean fallbackUsed = false;
+        // CP-18 diagnostics: privacy-safe counts/flags only, never the carry text itself.
+        int crossSessionCarryNoteCount = 0;
+        boolean crossSessionFirstConversationGuard = false;
         // M7: Hard boundary protection — right to refuse identity violation
         String boundaryRefusal = checkHardBoundaries(request.message, userId);
         if (boundaryRefusal != null) {
@@ -511,6 +517,23 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 : "你可以按语义选择 1-6 条消息。用户输入很长、包含多个问题或要求深入讨论时，"
                 + "应使用更完整的长气泡或 3-6 个独立节拍；不要把长输入压成一句套话和一个问题。"
                 + "若某个后续想法不值得说，写 [[SILENCE]]，系统不会展示。不要固定数量。");
+        // CP-18: only the opening turn of a fresh session carries cross-session material, and
+        // only what a real prior FINISHED session actually left behind — provenance-labeled P1
+        // summaries, never P0 raw conversation. Later turns have live history instead. The
+        // just-saved user message is already in recentMessages, so "opening" means no prior
+        // exchange: at most the current message itself.
+        if (sessionContinuityService != null
+                && (agentContext.recentMessages == null || agentContext.recentMessages.size() <= 1)) {
+            Map<String, Object> continuity = continuityGrounding(
+                    sessionContinuityService.openingContext(userId));
+            turnContext.putAll(continuity);
+            Object carry = continuity.get("carryForward");
+            if (carry instanceof List<?> notes) {
+                crossSessionCarryNoteCount = notes.size();
+            } else if (continuity.containsKey("crossSessionContinuityFirstConversation")) {
+                crossSessionFirstConversationGuard = true;
+            }
+        }
         AuroraConversationContextPolicy policy = conversationContextPolicy == null
                 ? new AuroraConversationContextPolicy(llmConfig, new TokenEstimationServiceImpl())
                 : conversationContextPolicy;
@@ -532,6 +555,24 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
 
         AuroraReplyVO vo;
         Map<String, Object> runtimeMeta = new LinkedHashMap<>();
+        // CP-19: the deterministic front router names this turn's kernel before the runtime
+        // picks budgets. Recorded on every turn (all runtime modes) so routing is observable;
+        // SUPPORT_FLOW marks crisis language that reached Aurora and flips the turn
+        // support-first instead of analysis-first.
+        com.innercosmos.ai.router.KernelRoutingPolicy.Kernel kernelRoute =
+                com.innercosmos.ai.router.KernelRoutingPolicy.route(
+                        com.innercosmos.ai.router.KernelRoutingPolicy.TurnSignals.from(turnContext));
+        turnContext.put("kernelRoute", kernelRoute.name());
+        if (kernelRoute == com.innercosmos.ai.router.KernelRoutingPolicy.Kernel.SUPPORT_FLOW) {
+            turnContext.put("supportFlowTurn", true);
+        }
+        runtimeMeta.put("kernelRoute", kernelRoute.name());
+        if (crossSessionCarryNoteCount > 0) {
+            runtimeMeta.put("crossSessionContinuityCarry", crossSessionCarryNoteCount);
+        }
+        if (crossSessionFirstConversationGuard) {
+            runtimeMeta.put("firstConversationGuard", true);
+        }
         io.micrometer.observation.Observation providerObservation = aiTurnObservation == null
                 ? null : aiTurnObservation.startProvider(resolved.provider(), mode);
         io.micrometer.observation.Observation.Scope providerScope = providerObservation == null
@@ -1325,6 +1366,13 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
         greetingContext.put("timeLabel", timeLabel);
         greetingContext.put("memoryRecallAllowed", allowMemory);
         greetingContext.put("greetingGrounding", grounding);
+        // CP-18: the greeting is Aurora's opening — it carries exactly what the prior real
+        // conversation left behind (provenance-labeled), or an explicit first-conversation
+        // guard that forbids fabricated "last time" references for brand-new users.
+        if (sessionContinuityService != null) {
+            greetingContext.putAll(continuityGrounding(
+                    sessionContinuityService.openingContext(userId)));
+        }
         greetingContext.put("requireRemoteProvider", true);
         greetingContext.put("providerPolicy", providerPolicy(resolved));
         // M-012: the proactive greeting also samples at the active mode's temperature
@@ -1362,6 +1410,29 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
 
     static Map<String, Object> greetingGrounding(UserProfile profile, AgentContext context) {
         return greetingGrounding(profile, context, "");
+    }
+
+    /**
+     * CP-18: the cross-session grounding shared by Aurora's two opening surfaces — the
+     * proactive greeting and the first user-authored turn. Data-only, never instructions:
+     * provenance-labeled carry notes from the real prior conversation, or the explicit
+     * first-conversation guard. A prior session whose material did not survive (no summary)
+     * yields an empty map — no fabricated continuity AND no false "first conversation" claim.
+     */
+    public static Map<String, Object> continuityGrounding(
+            com.innercosmos.service.continuity.SessionContinuityService.OpeningContext opening) {
+        if (opening == null) return Map.of();
+        if (opening.hasPrior() && !opening.carryForward().isEmpty()) {
+            List<Map<String, String>> carry = opening.carryForward().stream()
+                    .map(note -> Map.of("kind", note.kind(), "text", note.text(),
+                            "provenance", note.provenance()))
+                    .toList();
+            return Map.of(
+                    "priorActiveAt", opening.priorActiveAt() == null ? "" : opening.priorActiveAt(),
+                    "carryForward", carry);
+        }
+        if (!opening.hasPrior()) return Map.of("crossSessionContinuityFirstConversation", true);
+        return Map.of();
     }
 
     static Map<String, Object> greetingGrounding(UserProfile profile, AgentContext context,
@@ -1430,6 +1501,15 @@ public class AuroraAgentServiceImpl implements AuroraAgentService {
                 5. referencedMemoryIds must be empty unless the supplied context contains explicit
                    evidence ids; memoryReferenced must match it.
                 6. This path requires a real provider. Never imitate personalisation with a template.
+                7. crossSessionContinuity, when present, holds notes from the user's real previous
+                   conversation, each labeled with its provenance (which conversation, which date).
+                   You may lightly acknowledge at most one note when it naturally connects to the
+                   grounding — name it as "your last conversation on <date>", never claim ongoing
+                   memory ("一直记得"). Do not recite the list or open with it when the user's
+                   current environment suggests something else.
+                8. crossSessionContinuityFirstConversation=true means this is genuinely the first
+                   conversation. Never reference "last time", "上次", "之前聊过" or any prior
+                   shared experience; open from the grounding or a neutral invitation only.
                 """;
     }
 

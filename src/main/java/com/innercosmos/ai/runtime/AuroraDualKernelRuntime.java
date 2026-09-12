@@ -120,7 +120,15 @@ public class AuroraDualKernelRuntime {
     public boolean shouldUseDualKernelForTurn(Map<String, Object> turnContext) {
         if ("single".equalsIgnoreCase(runtimeMode)) return false;
         if ("adaptive".equalsIgnoreCase(runtimeMode)) {
-            return budgetPolicy.decide(turnContext).isDualKernel();
+            // Two deterministic legs agree on "this turn earned the slow kernel": the budget
+            // scorer (risk/ambiguity/boundary/continuity) and the kernel router's complexity
+            // axis (length/explicit analysis ask/multi-part, CP-19). Crisis keeps scoring
+            // through the budget leg, so it stays on the dual path whose safetyContract IS
+            // the support flow — it never degrades to a plain single-pass analysis turn.
+            if (budgetPolicy.decide(turnContext).isDualKernel()) return true;
+            return com.innercosmos.ai.router.KernelRoutingPolicy.route(
+                    com.innercosmos.ai.router.KernelRoutingPolicy.TurnSignals.from(turnContext))
+                    == com.innercosmos.ai.router.KernelRoutingPolicy.Kernel.DUAL;
         }
         return true;
     }
@@ -644,6 +652,8 @@ public class AuroraDualKernelRuntime {
             关系感受或内在矛盾”时，innerVoiceWorthy 才为 true，并用 innerVoiceSeed 写一句不超过 24
             个汉字的第一人称种子。普通陪伴、礼貌回应、泛泛关心、重复可见回复时必须为 false 和空字符串。
             relevantMemoryIds 只能包含上下文中真实存在的记忆 ID，没有可用记忆时给空数组 []。
+            crossSessionContinuity 是跨会话材料的唯一事实来源：只能引用其中真实存在的条目并遵守其
+            provenance；crossSessionContinuityFirstConversation 为 true 时视为无任何历史材料。
             """;
     }
 
@@ -698,6 +708,12 @@ public class AuroraDualKernelRuntime {
             不要把原任务清单重新排列，也不要问用户想先选哪一个。动作必须真实减少不确定性或留下
             可继续使用的工作片段；“加 TODO/待修复注释、改字体、整理桌面”等占位动作不算推进。
             referencedMemoryIds 必须来自当前上下文真实提供且授权的记忆 ID；后台旧策略没有新增记忆权限。
+            crossSessionContinuity 存在时，它是用户上一次真实对话的整理（每条带 provenance 标注来源与日期）。
+            只在与用户此刻的话自然相关时轻用其中一条，先回应用户当前说的内容；绝不罗列或复述清单，
+            也不得声称"一直记得"或持续关注。crossSessionContinuityFirstConversation 为 true 时，这是第一次
+            对话：不得引用任何"上次/之前/上次聊过"的经历，开场完全来自当前上下文。
+            supportFlowTurn 为 true 时，本轮以支持优先：简短稳定地在场，允许温和确认与支持资源提示，
+            不做长篇分析、不给行动建议、不追问细节；与 safetyContract 的 gentleCheckIn/resourceOffer 一致。
             """;
     }
 
