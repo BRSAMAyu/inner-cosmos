@@ -63,7 +63,11 @@ public class MemoryRetrievalServiceImpl implements MemoryRetrievalService {
 
     @Override
     public MemoryEvidencePackVO retrieve(Long userId, MemoryRetrievalQuery raw) {
-        String text = raw == null || raw.query() == null ? "" : raw.query().trim();
+        // CP-22: score against the content terms, not the conversational wrapper. The pack
+        // still reports the user's original wording; a meta-only request ("帮我分析一下")
+        // honestly retrieves nothing instead of lexically matching unrelated memories.
+        String rawText = raw == null || raw.query() == null ? "" : raw.query().trim();
+        String text = com.innercosmos.ai.retrieval.RetrievalQueryNormalizer.normalize(rawText);
         String task = raw == null || raw.task() == null ? "AURORA_CONVERSATION" : raw.task().trim().toUpperCase(Locale.ROOT);
         int max = clamp(raw == null ? null : raw.maxResults(), 1, 20, 6);
         int budget = clamp(raw == null ? null : raw.tokenBudget(), 64, 4000, 800);
@@ -117,7 +121,7 @@ public class MemoryRetrievalServiceImpl implements MemoryRetrievalService {
                 "CONSENT_LOCAL_ONLY", "CONSENT_NO_EXTERNAL_PROCESSING",
                 "CONSENT_SIMULATOR_ONLY"));
         if (!includeContradicted) exclusions.add("CONTRADICTED");
-        return new MemoryEvidencePackVO(task, text, budget, used, selected, exclusions);
+        return new MemoryEvidencePackVO(task, rawText, budget, used, selected, exclusions);
     }
 
     private Map<Long, Double> calibratedProviderAdmission(String query, Map<Long, Double> raw) {

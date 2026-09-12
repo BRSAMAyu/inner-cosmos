@@ -352,8 +352,8 @@ work_packages:
     evidence_dir: evidence/commercial-cn/CP-22/
     delivery_record: evidence/commercial-cn/CP-18/2026-09-12-continuity-kernel-retrieval/delivery-record.md
     test_command: "./mvnw test -Dtest=ContinuityKernelRetrievalTest"
-    note: "首个增量：检索撤回硬边界——tombstone读取时拦截,备份复活为ACTIVE的已撤回记忆绝不进入检索证据(抗复活)"
-    next_action: "任务化查询改写+重排+中文评测集对拍(依赖CP-04冻结集)"
+    note: "两增量：①撤回硬边界(tombstone读取时拦截,抗备份复活)；②RetrievalQueryNormalizer任务化查询归一——服务语('帮我分析'类)不再驱动词法准入,meta-only请求诚实返回空,证据包仍报原话"
+    next_action: "带检索相关性标签的评测集建设(冻结集无检索标签,不可直接对拍)；真实provider向量质量校准"
   - id: CP-23
     title: "可纠正画像与信念变化"
     owner: "画像系统＋产品"

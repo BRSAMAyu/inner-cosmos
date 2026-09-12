@@ -56,8 +56,17 @@
 3. **测试（AuroraContinuityRoutingWiringTest 6/6）**：TurnSignals.from 五信号提取；真实 replyRich 路径 kernelRoute 可见且复杂度挣得 DUAL；开场轮 carry 计数=2、后续轮归零；新用户首轮守卫、后续轮移除；continuityGrounding 三态诚实性；危机语言被同步安全门拦截于内核路由之前（防御纵深断言）
 4. 全量回归 **1560/1560** 通过（新增 6 测试），1 个既有 Docker 门控跳过；无 schema 变更
 
+## 第三增量（同日）：CP-22 任务化查询归一（检查点 17）
+
+1. `RetrievalQueryNormalizer`（`com.innercosmos.ai.retrieval`）：确定性剥离对话服务语（"帮我分析/梳理一下/想聊聊/在吗"等紧密清单+语气词与标点折叠）——服务动词不是要找的记忆内容
+2. 接线 `MemoryRetrievalServiceImpl.retrieve()`：词法准入、本地/provider 语义相似度都按归一后的内容词计分；**Evidence Pack 仍报告用户原话**（归一是打分关切，不是用户可见改写）
+3. 精度语义修正：meta-only 请求（"帮我分析一下"）此前可凭"分析"二字词法命中无关记忆（如"朋友说我什么都反复分析"）进入证据包；现在诚实返回空
+4. **测试（MemoryRetrievalQualityTest 4/4）**：归一器边界（null/meta-only/内容保留）；meta-only 诚实空检索+原话透明；内容查询召回正确记忆且动词重叠记忆不入包；ACTION 任务下 PROSPECTIVE/TODO 记忆排序高于同等相关的 EPISODIC
+5. 全量回归 **1564/1564** 通过（新增 4 测试），1 个既有 Docker 门控跳过；无 schema 变更
+6. 诚实边界：冻结集（cn-commercial-bank-v1）是回复行为场景库，无检索相关性标签，不能直接做 precision@k 对拍；真实向量质量评测需要带标签检索集（后续外部门）与真实 provider 向量
+
 ## 状态
 
 - CP-18: IN_PROGRESS（服务+API+问候/首轮接线完成；前端开屏消费 carry 与开场行展示后续）
 - CP-19: IN_PROGRESS（信号提取+adaptive 路由+全轮可观测完成；CP-04 冻结集上的真实增益对拍后续）
-- CP-22: IN_PROGRESS（撤回硬边界落地；任务化检索与质量评测后续）
+- CP-22: IN_PROGRESS（撤回硬边界+查询归一落地；带标签检索评测集与真实向量对拍后续）
