@@ -220,8 +220,12 @@ work_packages:
     stage: S1
     depends_on: ["CP-09"]
     vision_ids: ["V02", "V03", "V14"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-11/
+    delivery_record: evidence/commercial-cn/CP-11/2026-09-06-state-matrix/delivery-record.md
+    test_command: "./mvnw test -Dtest=StateMatrixAndPortraitAndPersonaTest"
+    note: "首个增量：J01-J12×全状态矩阵v1(锚点+缺口)+失败保留输入服务端契约测试(草稿幸存/跨账户隔离/成功才可见)"
+    next_action: "3D退化列表、键盘焦点与200%文本审计、三运营商弱网真机窗口"
   - id: CP-12
     title: "非作者可用性与体验封板"
     owner: "研究负责人＋独立设计评审"
@@ -340,8 +344,12 @@ work_packages:
     stage: S2
     depends_on: ["CP-21", "CP-22"]
     vision_ids: ["V05", "V06", "V11"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-23/
+    delivery_record: evidence/commercial-cn/CP-11/2026-09-06-state-matrix/delivery-record.md
+    test_command: "./mvnw test -Dtest=StateMatrixAndPortraitAndPersonaTest"
+    note: "首个增量：画像四态视图(CONFIRMED/INFERRED/CONFLICTING,SUPERSEDED隐藏)+未知不补齐+无分数+作用域;API /api/aurora/corrections/portrait"
+    next_action: "搁置/删除操作；今日纠正明日全采用(J04)旅程测试"
   - id: CP-24
     title: "星空、复盘与行动工具闭环"
     owner: "产品前后端"
@@ -360,8 +368,12 @@ work_packages:
     stage: S2
     depends_on: ["CP-08", "CP-19", "CP-21"]
     vision_ids: ["V04", "V16"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-25/
+    delivery_record: evidence/commercial-cn/CP-11/2026-09-06-state-matrix/delivery-record.md
+    test_command: "./mvnw test -Dtest=StateMatrixAndPortraitAndPersonaTest"
+    note: "首个增量：人格激活门合同锁定(无确认不可激活/不可重复激活);评测环节随CP-04注册表CP-25行执行"
+    next_action: "评测执行与7/30日轨迹真人审阅(注册表窗口)"
   - id: CP-26
     title: "时间理解与可控主动关心"
     owner: "调度＋通知＋产品"

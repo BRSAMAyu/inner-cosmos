@@ -28,6 +28,10 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/aurora/corrections")
 public class UserCorrectionController extends BaseController {
+
+    /** CP-23 portrait view; optional so direct-construction tests keep working. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.innercosmos.service.portrait.PortraitClaimViewService portraitClaimViewService;
     private static final String DEFAULT_TARGET_TYPE = "AURORA_UNDERSTANDING";
     private static final Long DEFAULT_TARGET_ID = 0L;
     private static final String DEFAULT_FIELD = "self_understanding";
@@ -49,6 +53,14 @@ public class UserCorrectionController extends BaseController {
     public ApiResponse<CorrectionConfirmationVO> confirm(@RequestBody CorrectionCommand command,
                                                          HttpSession session) {
         return ApiResponse.ok(userCorrectionService.confirm(currentUserId(session), command));
+    }
+
+    /** CP-23: the correctable-portrait view — per-claim states, UNKNOWN shown honestly,
+     *  never a personality score or template fill. */
+    @GetMapping("/portrait")
+    public ApiResponse<com.innercosmos.service.portrait.PortraitClaimViewService.PortraitView> portrait(
+            HttpSession session) {
+        return ApiResponse.ok(portraitClaimViewService.view(currentUserId(session)));
     }
 
     @GetMapping("/claims")
