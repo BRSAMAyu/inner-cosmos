@@ -556,7 +556,11 @@ work_packages:
     stage: S2
     depends_on: ["CP-03", "CP-17", "CP-37", "CP-38"]
     vision_ids: ["V15", "V16", "V17"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
+    delivery_record: evidence/commercial-cn/CP-40/2026-09-12-spend-guard/delivery-record.md
+    test_command: "./mvnw test -Dtest=ProviderSpendGuardTest"
+    note: "首个增量：ProviderSpendGuard每日花费护栏——调用数+估算token双硬顶,provider调用前快速失败(AI_SPEND_EXCEEDED,本地功能不受影响文案),StructuredAiService唯一咽喉仅REMOTE计费,ai.spend.*指标,上海日锚"
+    next_action: "OTel贯穿HTTP/SSE/Provider/检索；多Pod Redis预算(CP-37/38联动)；账单对账看板"
     evidence_dir: evidence/commercial-cn/CP-40/
   - id: CP-41
     title: "Android大陆真机与厂商推送"
@@ -636,7 +640,11 @@ work_packages:
     stage: S2
     depends_on: ["CP-15", "CP-18", "CP-37", "CP-38", "CP-39", "CP-40", "CP-49", "CP-46", "CP-41", "CP-42", "CP-43"]
     vision_ids: ["V07", "V14", "V15", "V20"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
+    delivery_record: evidence/commercial-cn/CP-40/2026-09-12-spend-guard/delivery-record.md
+    test_command: "node --check scripts/loadtest/aurora-journey.k6.js && k6 run -e BASE_URL=http://localhost:8080 -e VUS=2 -e DURATION=30s scripts/loadtest/aurora-journey.k6.js"
+    note: "可编码前体：aurora-journey.k6.js压测harness(登录→建会话→Aurora消息→拉取→结算+SSE探测,旅程失败显式SLI阈值草案)；台账勘误:压测为CP-50非49"
+    next_action: "CP-50A真实staging 200并发SSE/24h浸泡/故障注入(operator门禁)"
     evidence_dir: evidence/commercial-cn/CP-50/
   - id: CP-51
     title: "监管材料与逐商店提审"

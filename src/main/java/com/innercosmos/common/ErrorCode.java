@@ -27,6 +27,12 @@ public final class ErrorCode {
      * clients can route to the consent center instead of showing a dead end.
      */
     public static final String CONSENT_REQUIRED = "CONSENT_REQUIRED";
+    /**
+     * CP-40 cost guardrail: the user's daily AI provider budget (calls / estimated tokens) is
+     * exhausted. Distinct from provider errors and rate limiting: nothing failed, the day's
+     * spend is simply spent; local features are unaffected and it resets next day.
+     */
+    public static final String AI_SPEND_EXCEEDED = "AI_SPEND_EXCEEDED";
 
     private ErrorCode() {
     }

@@ -40,6 +40,10 @@ public class StructuredAiService {
         this.llmConfig = llmConfig;
     }
 
+    /** CP-40 cost guardrail; optional so direct-construction tests keep working. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.innercosmos.ai.observability.ProviderSpendGuard spendGuard;
+
     public <T> T call(Long userId, String moduleName, String instruction, Object context,
                       Class<T> resultType, Supplier<T> fallback) {
         return call(userId, moduleName, instruction, context, resultType, fallback, null);
@@ -73,6 +77,13 @@ public class StructuredAiService {
         long startTime = System.currentTimeMillis();
         boolean success = false;
 
+        // CP-40: the budget check runs BEFORE the provider call — an exhausted daily budget
+        // must cost nothing further. Only REMOTE-bound calls carry real provider spend.
+        boolean billable = "REMOTE".equals(assignedGroup);
+        if (billable && spendGuard != null) {
+            spendGuard.tryAcquire(userId, moduleName);
+        }
+
         try {
             String contextJson = JsonUtils.toJson(modelContext(context));
             String prompt = buildPrompt(contextJson, null);
@@ -82,6 +93,10 @@ public class StructuredAiService {
                     requireRemoteProvider, contextJson);
 
             String raw = active.chat(request);
+            if (billable && spendGuard != null) {
+                spendGuard.record(userId, moduleName,
+                        com.innercosmos.util.TokenEstimateUtils.estimate(prompt == null ? "" : prompt));
+            }
             if (raw == null || raw.isBlank()) {
                 log.warn("[BAD_AI_OUTPUT] Structured AI returned blank/null for module {}", moduleName);
                 badOutputCounter.incrementAndGet();
