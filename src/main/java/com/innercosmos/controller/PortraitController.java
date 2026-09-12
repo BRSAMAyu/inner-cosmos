@@ -16,6 +16,36 @@ public class PortraitController extends BaseController {
     @Autowired
     private UserPortraitService portraitService;
 
+    /** CP-23 claim park/restore/delete; optional so direct-construction tests keep working. */
+    @Autowired(required = false)
+    private com.innercosmos.service.portrait.PortraitClaimControlService claimControlService;
+
+    /** CP-23 搁置: park a claim the user does not recognize — hidden from the view and from
+     *  Aurora's per-turn context, row kept for audit. */
+    @PostMapping("/claims/{claimId}/suppress")
+    public ApiResponse<com.innercosmos.entity.UnderstandingClaim> suppress(
+            @PathVariable Long claimId, @RequestBody(required = false) java.util.Map<String, String> body,
+            HttpSession session) {
+        return ApiResponse.ok(claimControlService.suppress(currentUserId(session), claimId,
+                body == null ? null : body.get("reason")));
+    }
+
+    /** CP-23 恢复: un-park a previously suppressed claim. */
+    @PostMapping("/claims/{claimId}/restore")
+    public ApiResponse<com.innercosmos.entity.UnderstandingClaim> restore(
+            @PathVariable Long claimId, HttpSession session) {
+        return ApiResponse.ok(claimControlService.restore(currentUserId(session), claimId));
+    }
+
+    /** CP-23 删除: owner removes a claim outright — soft-deleted with an audit row. */
+    @DeleteMapping("/claims/{claimId}")
+    public ApiResponse<com.innercosmos.entity.UnderstandingClaim> delete(
+            @PathVariable Long claimId, @RequestBody(required = false) java.util.Map<String, String> body,
+            HttpSession session) {
+        return ApiResponse.ok(claimControlService.delete(currentUserId(session), claimId,
+                body == null ? null : body.get("reason")));
+    }
+
     @GetMapping
     public ApiResponse<List<UserPortrait>> get(HttpSession session) {
         return ApiResponse.ok(portraitService.getAll(currentUserId(session)));

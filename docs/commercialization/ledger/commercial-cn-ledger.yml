@@ -316,8 +316,8 @@ work_packages:
     evidence_dir: evidence/commercial-cn/CP-19/
     delivery_record: evidence/commercial-cn/CP-18/2026-09-12-continuity-kernel-retrieval/delivery-record.md
     test_command: "./mvnw test -Dtest=ContinuityKernelRetrievalTest"
-    note: "两增量：①KernelRoutingPolicy纯函数(SINGLE/DUAL/SUPPORT_FLOW,危机走支持流,复杂度三信号升双核)；②TurnSignals.from生产提取+adaptive双腿路由+每轮kernelRoute/supportFlowTurn可观测+说话人/规划核指令约束"
-    next_action: "CP-04冻结集上SINGLE vs DUAL真实增益对拍；supportFlowTurn经安全门旁路的端到端演练"
+    note: "三增量：①KernelRoutingPolicy纯函数(危机走支持流,复杂度三信号升双核)；②TurnSignals.from生产提取+adaptive双腿路由+每轮可观测；③冻结集对拍harness(development分裂81场景两路径模块契约+路由分布如实记录:简单轮次主导81/81 SINGLE,预算腿1 DUAL)"
+    next_action: "真实provider上SINGLE vs DUAL内容增益评分；预算压力fixture(长输入/多部分/风险密集)"
   - id: CP-20
     title: "风险连续性与危机处置运行时"
     owner: "AI安全＋信任与安全"
@@ -364,8 +364,8 @@ work_packages:
     evidence_dir: evidence/commercial-cn/CP-23/
     delivery_record: evidence/commercial-cn/CP-11/2026-09-06-state-matrix/delivery-record.md
     test_command: "./mvnw test -Dtest=StateMatrixAndPortraitAndPersonaTest"
-    note: "首个增量：画像四态视图(CONFIRMED/INFERRED/CONFLICTING,SUPERSEDED隐藏)+未知不补齐+无分数+作用域;API /api/aurora/corrections/portrait"
-    next_action: "搁置/删除操作；今日纠正明日全采用(J04)旅程测试"
+    note: "两增量：①画像四态视图+未知不补齐+无分数;②属主控制——搁置/恢复/删除(API /api/portrait/claims/*,版本+1,PORTRAIT_CLAIM审计行,视图与Aurora上下文双清空)+J04旅程(今日纠正明日全采用,旧推断取代出视野)"
+    next_action: "前端搁置/删除UI；信念变化时间线视图"
   - id: CP-24
     title: "星空、复盘与行动工具闭环"
     owner: "产品前后端"
