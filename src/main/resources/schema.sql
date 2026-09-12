@@ -1730,3 +1730,23 @@ CREATE TABLE IF NOT EXISTS tb_crisis_intervention (
   CONSTRAINT ck_crisis_intervention_action CHECK (action IN ('GENTLE_CHECK_IN','RESOURCES_SHOWN','WATCH_ESCALATED','EMERGENCY_PROTOCOL'))
 );
 CREATE INDEX IF NOT EXISTS idx_crisis_intervention_user ON tb_crisis_intervention (user_id, id);
+
+-- CP-36 moderation case backend (H2 twin of V42).
+CREATE TABLE IF NOT EXISTS tb_moderation_case (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  report_id BIGINT NOT NULL,
+  target_type VARCHAR(48) NOT NULL,
+  target_id BIGINT NOT NULL,
+  priority VARCHAR(4) NOT NULL,
+  status VARCHAR(16) NOT NULL DEFAULT 'OPEN',
+  assignee_id BIGINT,
+  sla_due_at TIMESTAMP NOT NULL,
+  resolution VARCHAR(400),
+  appeal_note VARCHAR(400),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uq_moderation_case_report UNIQUE (report_id),
+  CONSTRAINT ck_moderation_case_priority CHECK (priority IN ('P0','P1','P2')),
+  CONSTRAINT ck_moderation_case_status CHECK (status IN ('OPEN','ASSIGNED','RESOLVED','DISMISSED','APPEALED'))
+);
+CREATE INDEX IF NOT EXISTS idx_moderation_case_queue ON tb_moderation_case (status, priority, sla_due_at);

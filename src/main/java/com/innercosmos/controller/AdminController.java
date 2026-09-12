@@ -22,13 +22,16 @@ public class AdminController extends BaseController {
     private final AdminService adminService;
     private final com.innercosmos.service.minor.MinorProtectionService minorProtectionService;
     private final com.innercosmos.service.identity.AccountSecurityService accountSecurityService;
+    private final com.innercosmos.service.moderation.ModerationCaseService moderationCaseService;
 
     public AdminController(AdminService adminService,
                            com.innercosmos.service.minor.MinorProtectionService minorProtectionService,
-                           com.innercosmos.service.identity.AccountSecurityService accountSecurityService) {
+                           com.innercosmos.service.identity.AccountSecurityService accountSecurityService,
+                           com.innercosmos.service.moderation.ModerationCaseService moderationCaseService) {
         this.adminService = adminService;
         this.minorProtectionService = minorProtectionService;
         this.accountSecurityService = accountSecurityService;
+        this.moderationCaseService = moderationCaseService;
     }
 
     @GetMapping("/users")
@@ -74,6 +77,40 @@ public class AdminController extends BaseController {
         requireAdmin(session);
         boolean changed = accountSecurityService.unfreeze(id, currentUserId(session), null);
         return ApiResponse.ok(java.util.Map.of("userId", id, "unfrozen", changed));
+    }
+
+    /** CP-36: the moderation queue, ordered by priority then SLA due time. */
+    @GetMapping("/moderation/cases")
+    public ApiResponse<java.util.List<com.innercosmos.service.moderation.ModerationCaseService.CaseView>> moderationCases(
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String status,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "50") int limit,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "false")
+            boolean reporterIdentityAuthorized,
+            HttpSession session) {
+        requireAdmin(session);
+        // Reporter identity needs a separate, auditable authorization decision; the default
+        // moderator view never carries it (protect-the-reporter isolation).
+        return ApiResponse.ok(moderationCaseService.views(status, limit, reporterIdentityAuthorized));
+    }
+
+    @org.springframework.web.bind.annotation.PostMapping("/moderation/cases/{caseId}/assign")
+    public ApiResponse<com.innercosmos.entity.ModerationCase> assignModerationCase(
+            @org.springframework.web.bind.annotation.PathVariable Long caseId, HttpSession session) {
+        requireAdmin(session);
+        return ApiResponse.ok(moderationCaseService.assign(caseId, currentUserId(session)));
+    }
+
+    public record ModerationResolveRequest(boolean dismiss, String resolution) {
+    }
+
+    @org.springframework.web.bind.annotation.PostMapping("/moderation/cases/{caseId}/resolve")
+    public ApiResponse<com.innercosmos.entity.ModerationCase> resolveModerationCase(
+            @org.springframework.web.bind.annotation.PathVariable Long caseId,
+            @org.springframework.web.bind.annotation.RequestBody ModerationResolveRequest request,
+            HttpSession session) {
+        requireAdmin(session);
+        return ApiResponse.ok(moderationCaseService.resolve(
+                caseId, currentUserId(session), request.dismiss(), request.resolution()));
     }
 
     /** CP-08: pending minor-intercept appeals for human review. */

@@ -134,7 +134,18 @@ public class SocialServiceImpl implements SocialService {
     }
 
     private FriendRelation createOrResumeRequest(Long userId, Long targetUserId, String source) {
+        // CP-34 unified blocking + re-approach cooldown, indistinguishable to the sender:
+        // "对方暂不接受新的好友请求" covers both an existing block and a recent decline, so
+        // the other party's exact choice (block vs decline) never leaks.
+        if (isBlocked(userId, targetUserId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, GENERIC_NOT_ACCEPTING);
+        }
         FriendRelation relation = findRelationBetween(userId, targetUserId);
+        if (relation != null && "DECLINED".equals(relation.status)
+                && relation.updatedAt != null
+                && relation.updatedAt.isAfter(java.time.LocalDateTime.now().minusDays(30))) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, GENERIC_NOT_ACCEPTING);
+        }
         if (relation == null) {
             relation = new FriendRelation();
             relation.requesterId = userId;
@@ -289,6 +300,15 @@ public class SocialServiceImpl implements SocialService {
         SocialGroupMember member = memberMapper.selectById(memberId);
         if (member == null || !userId.equals(member.userId)) throw new BusinessException(ErrorCode.UNAUTHORIZED, "无权操作此邀请");
         if (!"PENDING".equals(member.status)) throw new BusinessException(ErrorCode.BAD_REQUEST, "该邀请已被处理");
+        // CP-35: invites carry a 7-day validity; an expired one flips to EXPIRED instead of
+        // staying forever-pending, and the invited user is told plainly.
+        if (member.createdAt != null
+                && member.createdAt.isBefore(java.time.LocalDateTime.now().minusDays(7))) {
+            memberMapper.update(null, new UpdateWrapper<SocialGroupMember>()
+                    .eq("id", memberId).eq("status", "PENDING").set("status", "EXPIRED"));
+            throw new BusinessException(ErrorCode.BAD_REQUEST,
+                    "这条邀请已过期（有效期 7 天）。如果对方仍然希望邀请你，需要重新发起。");
+        }
         // Regression (Gemini audit / remaining-work-handoff.md 2.2.4): `"accept".equals(decision)
         // ? ACTIVE : DECLINED` silently treated ANY non-"accept" value -- typos, null, empty -- as
         // a decline, instead of rejecting invalid input. Use an explicit enum of the two legal
@@ -405,6 +425,9 @@ public class SocialServiceImpl implements SocialService {
         }
         return relation.status;
     }
+
+    /** CP-34: the sender-facing reason for both blocked and recently-declined re-approach. */
+    private static final String GENERIC_NOT_ACCEPTING = "对方暂不接受新的好友请求";
 
     private boolean isBlocked(Long first, Long second) {
         Long count = blockMapper.selectCount(new QueryWrapper<BlockRelation>()

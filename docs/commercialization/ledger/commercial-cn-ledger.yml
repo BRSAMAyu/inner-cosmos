@@ -440,24 +440,36 @@ work_packages:
     stage: S2
     depends_on: ["CP-13", "CP-14", "CP-33"]
     vision_ids: ["V11", "V12", "V13"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-34/
+    delivery_record: evidence/commercial-cn/CP-34/2026-09-06-exit-silence-and-moderation/delivery-record.md
+    test_command: "./mvnw test -Dtest=ExitSilenceAndModerationTest"
+    note: "首个增量：直接路径统一屏蔽+拒绝30天冷静期+屏蔽/被拒同文案不细分+静默退场负测；测试3/3"
+    next_action: "关系互动回顾(替代温度分)；纠错需双方同意流程"
   - id: CP-35
     title: "小组、邀请与共同活动"
     owner: "社交系统＋运营"
     stage: S4
     depends_on: ["CP-34", "CP-36"]
     vision_ids: ["V12", "V13", "V18"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-35/
+    delivery_record: evidence/commercial-cn/CP-34/2026-09-06-exit-silence-and-moderation/delivery-record.md
+    test_command: "./mvnw test -Dtest=ExitSilenceAndModerationTest"
+    note: "首个增量：群邀请7天有效期(EXPIRED翻转+重新发起文案)；统一屏蔽已有(invite路径)"
+    next_action: "禁言/移交/解散规则与历史可见范围；主持审核容量门"
   - id: CP-36
     title: "内容审核、反诈与案件后台"
     owner: "信任与安全＋运营工程"
     stage: S1
     depends_on: ["CP-08", "CP-14"]
     vision_ids: ["V01", "V12", "V13"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-36/
+    delivery_record: evidence/commercial-cn/CP-34/2026-09-06-exit-silence-and-moderation/delivery-record.md
+    test_command: "./mvnw test -Dtest=ExitSilenceAndModerationTest"
+    note: "首个增量：V42案件后台(一报一案/P0-P2分诊+SLA时钟/分派-处理-申诉/举报人隔离授权位)+两举报点挂钩+admin队列端点；测试3/3"
+    next_action: "内容安全供应商分层队列；值班表与响应SLA运营化(CP-48/50)"
   - id: CP-37
     title: "国内主云PoC与基础设施即代码"
     owner: "SRE＋安全"

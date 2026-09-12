@@ -63,6 +63,9 @@ public class SlowLetterServiceImpl implements SlowLetterService {
     private final LetterGuardAgent guardAgent;
     private final LetterThreadMapper threadMapper;
     private final ReportRecordMapper reportRecordMapper;
+    /** CP-36 case backend; optional so direct-construction tests keep working. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.innercosmos.service.moderation.ModerationCaseService moderationCaseService;
     private final LetterSafetyFilter letterSafetyFilter;
     private final EchoCapsuleMapper capsuleMapper;
     private final BlockRelationMapper blockRelationMapper;
@@ -795,6 +798,10 @@ public class SlowLetterServiceImpl implements SlowLetterService {
         report.reason = reason;
         report.status = "PENDING";
         reportRecordMapper.insert(report);
+        // CP-36: every report opens exactly one SLA-tracked moderation case.
+        if (moderationCaseService != null) {
+            moderationCaseService.onReport(report.id, report.targetType, report.targetId, reason);
+        }
     }
 
     @Override

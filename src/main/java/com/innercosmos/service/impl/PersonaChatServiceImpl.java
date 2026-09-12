@@ -134,6 +134,9 @@ public class PersonaChatServiceImpl implements PersonaChatService {
     private final CapsuleRuntimeContextComposer runtimeContextComposer;
     private final DataUseGrantService dataUseGrantService;
     private final ReportRecordMapper reportRecordMapper;
+    /** CP-36 case backend; optional so direct-construction tests keep working. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.innercosmos.service.moderation.ModerationCaseService moderationCaseService;
     private final BlockRelationMapper blockRelationMapper;
     // Gemini audit 1.7 (PARTIAL/P1): resolves the VISITOR's own persisted IANA timezone for
     // daily-quota-boundary arithmetic instead of the old hardcoded-for-everyone constant.
@@ -1079,6 +1082,10 @@ public class PersonaChatServiceImpl implements PersonaChatService {
         report.reason = reason;
         report.status = "PENDING";
         reportRecordMapper.insert(report);
+        // CP-36: every report opens exactly one SLA-tracked moderation case.
+        if (moderationCaseService != null) {
+            moderationCaseService.onReport(report.id, report.targetType, report.targetId, reason);
+        }
     }
 
     @Override

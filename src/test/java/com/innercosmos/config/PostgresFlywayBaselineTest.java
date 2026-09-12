@@ -61,9 +61,10 @@ class PostgresFlywayBaselineTest {
         // V39 (CP-13) adds identity verification and account security events.
         // V40 (CP-15) adds retraction tombstones (backup anti-resurrection).
         // V41 (CP-20) adds durable risk continuity and the crisis intervention ledger.
+        // V42 (CP-36) adds the moderation case backend.
         // It exists as a forward migration rather than an in-place edit of V30 because V30 is
         // already committed and rewriting it would break Flyway checksums on live databases.
-        assertEquals(41, flyway.migrate().migrationsExecuted);
+        assertEquals(42, flyway.migrate().migrationsExecuted);
         assertEquals(0, flyway.migrate().migrationsExecuted);
 
         String source = readClasspath("schema.sql");
@@ -88,12 +89,12 @@ class PostgresFlywayBaselineTest {
                     WHERE constraint_schema='public' AND constraint_type='FOREIGN KEY'
                     """);
 
-            assertEquals(99, expectedTables.size(), "source schema table inventory changed");
+            assertEquals(100, expectedTables.size(), "source schema table inventory changed");
             assertEquals(expectedTables, actualTables, "PostgreSQL baseline table drift");
             assertTrue(actualIndexes.containsAll(expectedIndexes),
                     () -> "missing PostgreSQL indexes: " + difference(expectedIndexes, actualIndexes));
             assertEquals(expectedForeignKeys, actualForeignKeys, "PostgreSQL foreign-key drift");
-            assertEquals(92, scalar(connection, """
+            assertEquals(93, scalar(connection, """
                     SELECT COUNT(*) FROM information_schema.columns
                     WHERE table_schema='public' AND is_identity='YES'
                     """));
@@ -164,11 +165,12 @@ class PostgresFlywayBaselineTest {
                 .locations("classpath:db/migration/postgresql")
                 .load();
         // No .target(): migrates from V19 all the way to the current latest
-        // (V20 through V41, including provenance, orchestration, safety, Pod takeover,
+        // (V20 through V42, including provenance, orchestration, safety, Pod takeover,
         // capsule-landing foreign-key rename, classroom social pair integrity, the
         // commercial-cn metric event store, the adult gate, the consent center,
-        // identity verification, retraction tombstones and crisis continuity).
-        assertEquals(22, v20.migrate().migrationsExecuted);
+        // identity verification, retraction tombstones, crisis continuity and the
+        // moderation case backend).
+        assertEquals(23, v20.migrate().migrationsExecuted);
         try (Connection migrated = DriverManager.getConnection(
                 jdbcUrl, POSTGRES.getUsername(), POSTGRES.getPassword())) {
             assertEquals(2, scalar(migrated,
