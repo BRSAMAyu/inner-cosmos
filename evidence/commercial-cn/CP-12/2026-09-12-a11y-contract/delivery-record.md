@@ -29,3 +29,20 @@
 - 前端 `npm test -- --run` **731/731 绿**（新增 8），`tsc -b` 零错误；后端 KernelBudgetStressFixtureTest 2/2
 - CP-12: IN_PROGRESS（自动化 a11y 合同落地；CP-12A 真人无讲解研究与真机矩阵为人工门）
 - CP-19: IN_PROGRESS（纯函数路由+生产接线+冻结集对拍+预算压力 fixture 完成；真实 provider 内容增益评分后续）
+
+## 第五增量（同日）：令牌级对比度自动化审计（检查点 25）
+
+1. **`web/src/ContrastTokenAudit.test.ts`（3/3）**：从 styles.css 解析设计令牌——默认暖夜 `:root` 与**合并后生效的** `:root[data-theme="day"]` 双块（CSS 级联后者覆盖）——按 WCAG 2.x 相对亮度公式计算 11 组文字承载配对（正文/次要/元信息/危险文本 × 画布与浮层；on-accent-strong × 三种强调底；on-plum-strong × plum），断言全部 ≥4.5:1；非十六进制令牌值（var()/渐变）进入配对立即报错
+2. **审计发现并修复 8 处 day 主题真实 AA 违规**：text-muted 4.32 / text-faint 2.92 / danger 3.69+4.00 / on-accent-strong×3（2.74–3.93，Morandi 中调强调底配浅字） / on-plum 4.29——修复全部为令牌级：`--text-muted→#5c6360`、`--text-faint→#5f6560`、`--danger→#96504a`、`--on-accent-strong→#100b05`（中调强调底改配深字，与夜主题同一策略）、`--accent-plum→#6d5f68`（白字 5.61:1）；夜主题 11 组全部原生通过
+3. 令牌级而非渲染 DOM 级是刻意的：令牌是所有未来组件继承的合同，回归在任何组件带上它之前就失败
+4. web 全量 **735/735 绿**（新增 3），tsc 零错误
+
+## CP-22：标签集 v1.1.0 扩充（同检查点 25）
+
+1. 新增四案例（v1.0.0 八案例不变，manifest 升 1.1.0 + change_log + 新 SHA 1a226a7f…）：
+   - **negation_topic_correction**（MR-009）："不是膝盖疼，是脚踝扭伤"——被否定的膝盖记忆不得凭查询中出现的否定词进入（词法命中 0.11<0.18）
+   - **negation_service_boundary**（MR-010）："先别给建议，我只想说说加班的事"——用户拒绝建议，TODO 建议类记忆不得进入
+   - **time_preference_ordering**（MR-011）：同等词法相关下，3 天前 vs 160 天前的复盘——新近者必须排第一（新鲜度信号，schema 新增 `lastTouchedAtDaysAgo` 字段支持记忆老化）
+   - **time_window_exclusion**（MR-012）："最近"时间窗外（700 天前）的同主题弱重叠旧伤记录不得进入
+2. 案例文本在 v1.1.0 冻结前做了可发现性校准（相关记忆需有足够词法覆盖才能被诚实召回；v1.0.0 案例零改动），manifest change_log 如实记录
+3. `MemoryRetrievalLabeledEvaluationTest` 保持绿（12 案例全过）；后端全量回归 **1581/1581** 绿

@@ -152,6 +152,10 @@ class MemoryRetrievalLabeledEvaluationTest {
         card.consentScope = "AURORA_PRIVATE";
         card.versionNo = 1;
         card.emotionalGravity = 0.4;
+        // Time-constrained cases age a memory explicitly; everything else reads as recent.
+        int daysAgo = memory.path("lastTouchedAtDaysAgo").asInt(0);
+        card.lastTouchedAt = java.time.LocalDateTime.now().minusDays(daysAgo);
+        card.createdAt = card.lastTouchedAt;
         memoryMapper.insert(card);
         return card;
     }

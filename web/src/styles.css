@@ -1142,14 +1142,16 @@ footer { padding: 18px 4px; display: flex; justify-content: space-between; color
   --accent-sage-soft: #829287;
   --accent-sky: #77828d;
   --accent-sky-soft: #8c969f;
-  --accent-plum: #7f717a;
+  /* CP-12 contrast audit: text-bearing tokens darkened to >=4.5:1 on day surfaces;
+     mid-tone accents now take the dark on-accent text like the night theme does. */
+  --accent-plum: #6d5f68;
   --accent-plum-soft: #94858e;
   --text-primary: #3c423e;
-  --text-muted: #686f6a;
-  --text-faint: #858b86;
-  --danger: #a8675d;
+  --text-muted: #5c6360;
+  --text-faint: #5f6560;
+  --danger: #96504a;
   --danger-soft: #b87970;
-  --on-accent-strong: #f8faf7;
+  --on-accent-strong: #100b05;
   --on-plum-strong: #f8f6f7;
   --hairline: #46524b12;
   --hairline-mid: #46524b20;
