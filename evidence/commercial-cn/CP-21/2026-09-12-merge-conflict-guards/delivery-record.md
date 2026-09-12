@@ -37,6 +37,17 @@
 - 前端"刷新后重试"的冲突 UI（展示冲突差异）属 CP-11 记忆工作台后续
 - 增量抽取与重复事件去重语义（next_action 另一项）未在本轮展开
 
+## 第三增量（同日）：重复事件去重与版本归并（检查点 20）
+
+1. `MemoryRecurrenceMatcher`（`service/memory`，纯函数）：字符二元组余弦判定"同一事件的重述"；阈值 0.60 校准于两个观测簇——不同事件 <0.3、重述事件（含改写）≥0.6，两侧留边距（错误合并会改写记忆身份，从严）
+2. `MemoryServiceImpl.extractFromSession` 结算管线接线（仅当本会话尚无卡片时）：
+   - **重述折叠**：命中既有 CURRENT 记忆 → 不新建并行 ACTIVE 卡；recurrenceCount/triggerCount +1、versionNo +1、按新频次重算情感重力、lastTouchedAt 更新——同一事件始终是一个带版本的对象
+   - **审计链**：写 REINFORCE 操作行，reasonCode=DUPLICATE_EVENT_DEDUP、evidenceRefs=AURORA_SESSION:重述会话、actorType=SYSTEM——版本链可解释"为什么这次版本+1"
+   - **递归边界**：只写会话键控的情绪轨迹（幂等）；不重复堆叠片段/待办资产（它们属于原始抽取）
+   - **候选门**：仅 CURRENT 且非 tombstone 的记忆可吸收重述——FORGOTTEN 是终态（强化=复活）；备份复活为 ACTIVE 的已撤回行同样不可吸收（tombstone 读取时拦截）
+3. **测试（MemoryRecurrenceDedupTest 5/5）**：重述折叠为单卡（计数/版本/审计操作断言）；不同事件保持分离（计数=1）；FORGOTTEN+备份复活行不吸收重述（重述成为真正的新卡，被撤回行计数不变）；同会话重复结算仍恰好一张卡（M-008 幂等保留）；匹配器阈值确定性与空输入安全
+4. 全量回归 **1574/1574** 通过（新增 5 测试），无 schema 变更
+
 ## 状态
 
-- CP-21: IN_PROGRESS（回放+冲突硬边界完成；增量抽取/去重语义与前端冲突 UI 后续）
+- CP-21: IN_PROGRESS（回放+冲突硬边界+重述去重完成；前端冲突刷新 UI 与真实 LLM 摘要下的阈值校准后续）

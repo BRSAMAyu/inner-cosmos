@@ -123,19 +123,87 @@ public class MemoryServiceImpl implements MemoryService {
         // both finished (listener) and explicitly settled must not trip the UNIQUE -> 500.
         MemoryCard existing = memoryCardMapper.selectOne(new QueryWrapper<MemoryCard>()
                 .eq("user_id", userId).eq("source_session_id", sessionId).last("LIMIT 1"));
+        // CP-21 duplicate-event dedup: only when this session has no card of its own yet, a
+        // re-told event folds into its existing memory (one versioned card with recurrence)
+        // instead of spawning a parallel ACTIVE duplicate.
+        MemoryCard recurrence = existing == null ? matchRecurrence(userId, card.summary) : null;
         if (existing != null) {
             card.id = existing.id;
             preserveExistingLifecycle(card, existing);
             memoryCardMapper.updateById(card);
+            createStructuredAssets(userId, sessionId, card, raw);
+        } else if (recurrence != null) {
+            reinforceRecurrence(userId, recurrence, sessionId);
+            // A recurrence is an increment of an existing memory, not a new extraction: only
+            // the session-scoped emotion trace (idempotent per session) is written — fragment
+            // and todo assets stay with the original extraction, no per-retelling pileup.
+            emotionInsightService.writeTrace(userId, sessionId, emotionInsightService.analyze(userId, raw));
+            card = recurrence;
         } else {
             memoryCardMapper.insert(card);
+            createStructuredAssets(userId, sessionId, card, raw);
         }
-        createStructuredAssets(userId, sessionId, card, raw);
         // IC-CAP-002 B-1: memory changed → trigger a deduped capsule sync proposal.
         if (eventPublisher != null) {
             eventPublisher.publishEvent(new CapsuleSyncTriggerEvent(userId));
         }
         return card;
+    }
+
+    /**
+     * CP-21: recurrence candidates are CURRENT memories only — reinforcing a forgotten
+     * (terminal) memory would be resurrection, and a tombstoned-but-resurrected row must not
+     * absorb new content either. The status filter handles the former; the tombstone check
+     * the backup-resurrection edge of the latter.
+     */
+    private MemoryCard matchRecurrence(Long userId, String newSummary) {
+        List<MemoryCard> active = memoryCardMapper.selectList(new QueryWrapper<MemoryCard>()
+                .eq("user_id", userId).eq("status", "ACTIVE"));
+        if (tombstoneService != null) {
+            java.util.Set<Long> blocked = tombstoneService.blockedIds("MEMORY", userId);
+            if (!blocked.isEmpty()) {
+                active = active.stream().filter(candidate -> !blocked.contains(candidate.id)).toList();
+            }
+        }
+        return com.innercosmos.service.memory.MemoryRecurrenceMatcher.match(active, newSummary);
+    }
+
+    /**
+     * CP-21 version merging for a re-told event: the existing card absorbs the repetition —
+     * recurrence/trigger counts rise, gravity is recomputed with the new recurrence, the
+     * version bumps, and a REINFORCE operation records WHY (DUPLICATE_EVENT_DEDUP) with the
+     * retelling session as evidence so the provenance chain stays auditable.
+     */
+    private void reinforceRecurrence(Long userId, MemoryCard existing, Long sessionId) {
+        int oldVersion = existing.versionNo == null ? 1 : existing.versionNo;
+        existing.recurrenceCount = (existing.recurrenceCount == null ? 0 : existing.recurrenceCount) + 1;
+        existing.triggerCount = (existing.triggerCount == null ? 0 : existing.triggerCount) + 1;
+        existing.versionNo = oldVersion + 1;
+        existing.lastTouchedAt = LocalDateTime.now();
+        existing.emotionalGravity = gravityService.calculateGravity(
+                existing.intensityScore == null ? 4.5 : existing.intensityScore,
+                existing.recurrenceCount,
+                existing.userImportance == null ? 4.0 : existing.userImportance,
+                existing.triggerCount, 0);
+        memoryCardMapper.updateById(existing);
+        if (memoryOperationMapper != null) {
+            com.innercosmos.entity.MemoryOperation operation = new com.innercosmos.entity.MemoryOperation();
+            operation.userId = userId;
+            operation.operationType = "REINFORCE";
+            operation.primaryMemoryId = existing.id;
+            operation.oldVersion = oldVersion;
+            operation.newVersion = existing.versionNo;
+            operation.beforeSnapshot = null;
+            operation.afterSnapshot = null;
+            operation.evidenceRefs = "AURORA_SESSION:" + sessionId;
+            operation.modelName = "none:settlement-dedup";
+            operation.promptVersion = "memory-policy.v1";
+            operation.reasonCode = "DUPLICATE_EVENT_DEDUP";
+            operation.confidence = 1.0;
+            operation.actorType = "SYSTEM";
+            operation.status = "APPLIED";
+            memoryOperationMapper.insert(operation);
+        }
     }
 
     /** CP-15 tombstone filter; optional so direct-construction tests keep working. */

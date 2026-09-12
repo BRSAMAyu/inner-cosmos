@@ -340,8 +340,8 @@ work_packages:
     evidence_dir: evidence/commercial-cn/CP-21/
     delivery_record: evidence/commercial-cn/CP-21/2026-09-12-merge-conflict-guards/delivery-record.md
     test_command: "./mvnw test -Dtest=MemoryLifecycleConflictTest"
-    note: "两增量：①MemoryProvenanceService来源图回放+撤回不可回放；②合并/冲突/并发编辑硬边界——expectedVersion乐观并发(过期锚点=CONFLICT非静默覆盖)+FORGOTTEN终态不可编辑/合并+SUPERSEDED链分叉防护+回退前行核对"
-    next_action: "增量抽取与重复事件去重语义；前端冲突刷新UI(CP-11联动)"
+    note: "三增量：①来源图回放+撤回不可回放；②合并/冲突/并发编辑硬边界(expectedVersion乐观并发+终态/链分叉防护+回退前行核对)；③重复事件去重与版本归并——MemoryRecurrenceMatcher(0.60字符二元组余弦)重述折叠进既有记忆(REINFORCE/DUPLICATE_EVENT_DEDUP审计行),FORGOTTEN与tombstone行不可吸收"
+    next_action: "前端冲突刷新UI(CP-11联动)；真实LLM摘要下的阈值校准"
   - id: CP-22
     title: "任务化检索与真实向量质量"
     owner: "检索工程＋AI评测"
