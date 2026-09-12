@@ -1,10 +1,10 @@
 {
   "id": "memory-retrieval-bank-v1",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "frozen_at": "2026-09-12",
   "generator": "hand-authored project-internal synthetic (no user data)",
-  "scenario_sha256": "1a226a7f1834feb5ba522522407e565ffcb3766f343157d651d822d4aa6a71b8",
-  "scenario_count": 12,
+  "scenario_sha256": "8c28446ddcc21e01c3e9fac2be5e9e05d54bd2c86ad353a2e11bb78ba0b4ec76",
+  "scenario_count": 13,
   "families": {
     "topic_match": 1,
     "meta_discourse": 1,
@@ -17,10 +17,11 @@
     "negation_topic_correction": 1,
     "negation_service_boundary": 1,
     "time_preference_ordering": 1,
-    "time_window_exclusion": 1
+    "time_window_exclusion": 1,
+    "time_window_hard_exclusion": 1
   },
   "purpose": "CP-22 labeled retrieval evaluation: per-case RELEVANT/DISTRACTOR labels drive precision/recall assertions against the real MemoryRetrievalService",
   "license": "project-internal",
   "schema": "memories[] may carry lastTouchedAtDaysAgo (integer) to age the memory",
-  "change_log": "v1.1.0: adds negation_topic_correction, negation_service_boundary, time_preference_ordering, time_window_exclusion (new cases authored and calibrated in this version; v1.0.0 cases unchanged); memories[] gains optional lastTouchedAtDaysAgo"
+  "change_log": "v1.1.0: adds negation_topic_correction, negation_service_boundary, time_preference_ordering, time_window_exclusion (new cases authored and calibrated in this version; v1.0.0 cases unchanged); memories[] gains optional lastTouchedAtDaysAgo | v1.2.0: adds time_window_hard_exclusion (MR-013, hard time-window semantics now enforced by TimeWindowParser in the retrieval service)"
 }

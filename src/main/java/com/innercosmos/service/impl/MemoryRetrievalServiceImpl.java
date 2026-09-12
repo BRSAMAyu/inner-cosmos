@@ -95,6 +95,17 @@ public class MemoryRetrievalServiceImpl implements MemoryRetrievalService {
                 .filter(card -> !PROVIDER_FORBIDDEN_CONSENT.contains(
                         safe(card.consentScope).toUpperCase(Locale.ROOT)))
                 .toList();
+        // CP-22 hard time-window: a measurable recency expression ("这周", "最近三个月"...) is a
+        // constraint, not a preference — candidates outside the window are excluded before
+        // scoring. A bare "最近" opens no window (see TimeWindowParser's javadoc for why).
+        Integer maxAgeDays = com.innercosmos.ai.retrieval.TimeWindowParser.parseMaxAgeDays(rawText);
+        if (maxAgeDays != null) {
+            LocalDateTime cutoff = LocalDateTime.now().minusDays(maxAgeDays);
+            candidates = candidates.stream().filter(card -> {
+                LocalDateTime effective = card.lastTouchedAt == null ? card.createdAt : card.lastTouchedAt;
+                return effective != null && !effective.isBefore(cutoff);
+            }).toList();
+        }
         Map<Long, Double> providerSemantic = embeddingIndex.similarities(userId, text, candidates);
         Map<Long, Double> admittedProviderSemantic = calibratedProviderAdmission(text, providerSemantic);
         List<Scored> scored = candidates.stream()

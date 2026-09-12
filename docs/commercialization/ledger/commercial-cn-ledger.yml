@@ -236,8 +236,8 @@ work_packages:
     evidence_dir: evidence/commercial-cn/CP-12/
     delivery_record: evidence/commercial-cn/CP-12/2026-09-12-a11y-contract/delivery-record.md
     test_command: "cd web && npm test -- --run src/components/NonAuthorUsabilityContract.test.tsx"
-    note: "两增量：①WCAG 2.2 AA 自动化合同(同意对话框焦点契约+控件具名+样式表静态合同)；②令牌级对比度审计——双主题解析令牌+WCAG公式断言11组文字配对≥4.5:1,发现并修复day主题8处真实AA违规(令牌级修复)"
-    next_action: "CP-12A 真人无讲解研究(15人,人工门)；渲染DOM级对比度抽查(组件背景叠加)"
+    note: "三增量：①WCAG 2.2 AA 自动化合同(焦点契约+控件具名+样式表静态合同)；②令牌级对比度审计(修复day主题8处AA违规)；③渲染表面抽查——contrast.ts共享工具+背景叠加链合成断言(修复3个固定暗色表面在day下1.0-1.3:1的真实缺陷,day作用域浅色表面)"
+    next_action: "CP-12A 真人无讲解研究(15人,人工门)"
   - id: CP-13
     title: "国内身份与多设备账户安全"
     owner: "后端身份＋移动"
@@ -356,8 +356,8 @@ work_packages:
     evidence_dir: evidence/commercial-cn/CP-22/
     delivery_record: evidence/commercial-cn/CP-18/2026-09-12-continuity-kernel-retrieval/delivery-record.md
     test_command: "./mvnw test -Dtest=ContinuityKernelRetrievalTest"
-    note: "四增量：①撤回硬边界(抗备份复活)；②任务化查询归一(meta-only诚实空)；③memory-retrieval-bank-v1冻结标签评测集(真实检索服务precision/recall/排序断言)；④v1.1.0扩充否定/时间约束四案例(否定部位不进入/拒绝建议的TODO不进入/新近排序第一/时间窗外排除,SHA重冻结+lastTouchedAtDaysAgo老化)"
-    next_action: "真实provider向量质量校准；时间窗硬约束语义(当前为新鲜度软信号)"
+    note: "五增量：①撤回硬边界(抗备份复活)；②任务化查询归一(meta-only诚实空)；③冻结标签评测集(真实检索服务precision/recall/排序断言)；④v1.1.0否定/时间约束四案例；⑤时间窗硬约束——TimeWindowParser可度量窗口(今天/这周/最近N月…)候选构造性排除,光杆'最近'保持软信号(它常描述回想而非记忆),bank v1.2.0(MR-013硬排除案例)"
+    next_action: "真实provider向量质量校准"
   - id: CP-23
     title: "可纠正画像与信念变化"
     owner: "画像系统＋产品"
