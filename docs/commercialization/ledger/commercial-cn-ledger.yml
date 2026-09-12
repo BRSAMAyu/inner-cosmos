@@ -338,10 +338,10 @@ work_packages:
     vision_ids: ["V05", "V06", "V07"]
     status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-21/
-    delivery_record: evidence/commercial-cn/CP-20/2026-09-06-crisis-continuity/delivery-record.md
-    test_command: "./mvnw test -Dtest=CrisisContinuityAndProvenanceAndProactiveTest"
-    note: "首个增量：MemoryProvenanceService来源图回放(对话→卡片版本链→共鸣体/向量)+撤回不可回放(CP-15联动)；测试4/4"
-    next_action: "合并/冲突/并发编辑负测；增量抽取与重复事件去重语义"
+    delivery_record: evidence/commercial-cn/CP-21/2026-09-12-merge-conflict-guards/delivery-record.md
+    test_command: "./mvnw test -Dtest=MemoryLifecycleConflictTest"
+    note: "两增量：①MemoryProvenanceService来源图回放+撤回不可回放；②合并/冲突/并发编辑硬边界——expectedVersion乐观并发(过期锚点=CONFLICT非静默覆盖)+FORGOTTEN终态不可编辑/合并+SUPERSEDED链分叉防护+回退前行核对"
+    next_action: "增量抽取与重复事件去重语义；前端冲突刷新UI(CP-11联动)"
   - id: CP-22
     title: "任务化检索与真实向量质量"
     owner: "检索工程＋AI评测"

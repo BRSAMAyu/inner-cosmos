@@ -139,6 +139,7 @@ public class MemoryLifecycleServiceImpl implements MemoryLifecycleService {
         MemoryOperationCommand command = normalize(raw);
         MemoryOperationPreviewVO preview = preview(userId, command);
         List<MemoryCard> source = sources(userId, command);
+        assertNoConflict(source, command);
         List<MemoryCard> result = new ArrayList<>();
         int oldVersion = source.isEmpty() ? 0 : source.stream()
                 .mapToInt(MemoryLifecycleServiceImpl::version).max().orElse(0);
@@ -266,6 +267,24 @@ public class MemoryLifecycleServiceImpl implements MemoryLifecycleService {
         after.forEach(card -> affectedIds.add(card.id));
         List<MemoryCard> current = affectedIds.isEmpty() ? List.of() : memoryMapper.selectList(
                 new QueryWrapper<MemoryCard>().eq("user_id", userId).in("id", affectedIds));
+        // CP-21: a rollback restores the before-snapshot over the affected rows. If any of them
+        // has moved on since this operation completed, restoring would silently clobber the
+        // intervening edit(s) — the caller must resolve that conflict first, explicitly.
+        // MERGE/SPLIT bump their source versions but record only the created cards in the
+        // after-snapshot, so their sources' post-operation version is before+1.
+        boolean sourcesBumpedButUnrecorded = Set.of("MERGE", "SPLIT").contains(target.operationType);
+        java.util.Map<Long, Integer> expectedAtOperationEnd = new java.util.LinkedHashMap<>();
+        for (MemoryCard card : before) {
+            expectedAtOperationEnd.put(card.id, sourcesBumpedButUnrecorded ? version(card) + 1 : version(card));
+        }
+        for (MemoryCard card : after) expectedAtOperationEnd.put(card.id, version(card));
+        for (MemoryCard live : current) {
+            Integer expected = expectedAtOperationEnd.get(live.id);
+            if (expected != null && version(live) != expected) {
+                throw new BusinessException(ErrorCode.CONFLICT,
+                        "这条记忆在变更之后又有新的修改（当前版本 " + version(live) + "），直接回退会覆盖它们；请先处理新的变更");
+            }
+        }
         String rollbackBefore = snapshot(current);
 
         Set<Long> sourceIds = before.stream().map(card -> card.id).collect(java.util.stream.Collectors.toSet());
@@ -306,6 +325,41 @@ public class MemoryLifecycleServiceImpl implements MemoryLifecycleService {
         if (memoryId != null) query.and(q -> q.eq("primary_memory_id", memoryId)
                 .or().like("related_memory_ids", "," + memoryId + ","));
         return operationMapper.selectList(query.orderByDesc("id").last("LIMIT 100"));
+    }
+
+    /**
+     * CP-21 conflict gate. Three classes of edit must never happen silently:
+     * (1) an operation on a FORGOTTEN memory would resurrect content the owner asked to
+     * erase — terminal state, nothing may derive from it;
+     * (2) an UPDATE/MERGE/SPLIT/REINFORCE/CONTRADICT/SUPERSEDE on an already-SUPERSEDED
+     * memory forks its successor chain (two "current" versions of the same memory);
+     * (3) an edit pinned to a stale expectedVersion would clobber an intervening edit —
+     * CONFLICT surfaces it to the caller instead of last-writer-wins.
+     */
+    private void assertNoConflict(List<MemoryCard> source, MemoryOperationCommand command) {
+        String op = command.operationType();
+        for (MemoryCard card : source) {
+            if ("FORGOTTEN".equals(card.status)) {
+                throw new BusinessException(ErrorCode.CONFLICT, "这条记忆已被忘记，不能再被修改或合并");
+            }
+        }
+        if (Set.of("UPDATE", "MERGE", "SPLIT", "REINFORCE", "CONTRADICT", "SUPERSEDE").contains(op)) {
+            for (MemoryCard card : source) {
+                if ("SUPERSEDED".equals(card.status)) {
+                    throw new BusinessException(ErrorCode.CONFLICT,
+                            "这条记忆已被合并或替代，请对合并后的新版本进行操作");
+                }
+            }
+        }
+        if (command.expectedVersion() != null) {
+            for (MemoryCard card : source) {
+                if (version(card) != command.expectedVersion()) {
+                    throw new BusinessException(ErrorCode.CONFLICT,
+                            "这条记忆在你编辑期间已有新的变更（当前版本 " + version(card)
+                                    + "，你基于版本 " + command.expectedVersion() + "），请刷新后再试");
+                }
+            }
+        }
     }
 
     private MemoryCard merge(Long userId, List<MemoryCard> sources, MemoryOperationCommand command) {
@@ -527,7 +581,8 @@ public class MemoryLifecycleServiceImpl implements MemoryLifecycleService {
         if (!"ADD".equals(op) && raw.primaryMemoryId() == null)
             throw new BusinessException(ErrorCode.BAD_REQUEST, "请选择要处理的记忆");
         return new MemoryOperationCommand(op, raw.primaryMemoryId(), raw.relatedMemoryIds(), trim(raw.title()),
-                trim(raw.summary()), raw.splitParts(), trim(raw.reason()), raw.confidence(), trim(raw.evidenceRefs()));
+                trim(raw.summary()), raw.splitParts(), trim(raw.reason()), raw.confidence(), trim(raw.evidenceRefs()),
+                raw.expectedVersion());
     }
 
     private String snapshot(Object value) {
