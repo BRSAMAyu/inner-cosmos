@@ -52,6 +52,7 @@ public class WakeIntentServiceImpl implements WakeIntentService {
     public WakeIntent schedule(Long userId, String purpose, String reasonForUser, String content,
                                LocalDateTime earliestAt, LocalDateTime preferredAt, LocalDateTime latestAt,
                                String timezone, String payloadRef) {
+        assertProactiveCareConsented(userId);
         if (userId == null || preferredAt == null) throw bad("preferredAt is required");
         LocalDateTime earliestLocal = earliestAt == null ? preferredAt : earliestAt;
         LocalDateTime latestLocal = latestAt == null ? preferredAt.plusHours(6) : latestAt;
@@ -314,6 +315,36 @@ public class WakeIntentServiceImpl implements WakeIntentService {
         if (value == null || value.isBlank()) throw bad(field + " is required");
         return value.trim();
     }
+
+    /**
+     * CP-26: proactive care is consent-gated. With PROACTIVE_CARE declined (or never granted),
+     * no new intent may be scheduled and queued ones are cancelled — the user's exit stops
+     * the channel, it is never re-opened by a scheduled task (blueprint 5.2).
+     */
+    private void assertProactiveCareConsented(Long userId) {
+        if (userId == null || consentCenter == null) {
+            return;
+        }
+        // Only real human accounts are consent-subject (same isolation rule as the metric
+        // and egress gates); synthetic/test identities without a user row pass.
+        com.innercosmos.entity.User user = userMapper.selectById(userId);
+        if (user == null || !"HUMAN".equals(user.accountKind)) {
+            return;
+        }
+        if (consentCenter.effective(userId,
+                com.innercosmos.service.consent.ConsentPurpose.PROACTIVE_CARE)
+                != com.innercosmos.service.consent.ConsentPurpose.Decision.GRANTED) {
+            throw new com.innercosmos.exception.BusinessException(
+                    com.innercosmos.common.ErrorCode.CONSENT_REQUIRED,
+                    "主动关心未开启。你可以在「我的—数据与同意」中选择是否允许预约提醒。");
+        }
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.innercosmos.mapper.UserMapper userMapper;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.innercosmos.service.consent.ConsentCenterService consentCenter;
 
     private static BusinessException bad(String message) {
         return new BusinessException(ErrorCode.BAD_REQUEST, message);

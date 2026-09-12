@@ -308,16 +308,24 @@ work_packages:
     stage: S1
     depends_on: ["CP-08", "CP-17", "CP-36"]
     vision_ids: ["V04", "V09", "V13"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-20/
+    delivery_record: evidence/commercial-cn/CP-20/2026-09-06-crisis-continuity/delivery-record.md
+    test_command: "./mvnw test -Dtest=CrisisContinuityAndProvenanceAndProactiveTest"
+    note: "首个增量：V41跨会话风险态(24h半衰,读时衰减,否定/第三人语境化)+处置台账(责任人/升级/最小披露)+HIGH强制分支不贴标签+属主状态API；测试4/4"
+    next_action: "专业审阅案例冻结+夜班值班演练(CP-48)；Docker恢复后复跑PG基线"
   - id: CP-21
     title: "记忆生命周期与来源图"
     owner: "记忆系统"
     stage: S1
     depends_on: ["CP-14", "CP-15", "CP-17"]
     vision_ids: ["V05", "V06", "V07"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-21/
+    delivery_record: evidence/commercial-cn/CP-20/2026-09-06-crisis-continuity/delivery-record.md
+    test_command: "./mvnw test -Dtest=CrisisContinuityAndProvenanceAndProactiveTest"
+    note: "首个增量：MemoryProvenanceService来源图回放(对话→卡片版本链→共鸣体/向量)+撤回不可回放(CP-15联动)；测试4/4"
+    next_action: "合并/冲突/并发编辑负测；增量抽取与重复事件去重语义"
   - id: CP-22
     title: "任务化检索与真实向量质量"
     owner: "检索工程＋AI评测"
@@ -360,8 +368,12 @@ work_packages:
     stage: S2
     depends_on: ["CP-13", "CP-20", "CP-21", "CP-38"]
     vision_ids: ["V04", "V08", "V14"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-26/
+    delivery_record: evidence/commercial-cn/CP-20/2026-09-06-crisis-continuity/delivery-record.md
+    test_command: "./mvnw test -Dtest=CrisisContinuityAndProvenanceAndProactiveTest"
+    note: "首个增量：主动关心PROACTIVE_CARE同意门(拒/允/撤三态,退出持久不被任务重启)；测试4/4"
+    next_action: "静默窗/改期/锁屏脱敏与重复领取负测(J07)随web联动"
   - id: CP-27
     title: "中文语音、朗读与隐私"
     owner: "语音＋客户端"

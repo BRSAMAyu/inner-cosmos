@@ -61,6 +61,9 @@ public class SafetyServiceImpl implements SafetyService {
     /** CP-03 G-SAFE metric feed; optional so direct-construction tests keep working. */
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.innercosmos.service.metric.MetricEventService metricEventService;
+    /** CP-20 durable cross-session risk continuity + intervention ledger. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.innercosmos.safety.CrisisContinuityService crisisContinuityService;
     private final ConcurrentHashMap<CheckKey, CompletableFuture<CachedCheck>> idempotentChecks =
             new ConcurrentHashMap<>();
     private static final long CHECK_CACHE_TTL_MS = java.time.Duration.ofMinutes(15).toMillis();
@@ -442,6 +445,11 @@ public class SafetyServiceImpl implements SafetyService {
         } catch (org.springframework.dao.DuplicateKeyException duplicate) {
             // Cross-Pod duplicate delivery: the first durable safety decision already won.
             return;
+        }
+        // CP-20: the same observation feeds the durable cross-session state and the
+        // auditable intervention ledger (contextualized: negation/third-party never lift).
+        if (crisisContinuityService != null) {
+            crisisContinuityService.observe(userId, event.id, level, null);
         }
         // CP-03 G-SAFE feed: counts and severities only — never the triggering text.
         if (metricEventService != null) {

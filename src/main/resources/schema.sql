@@ -1700,3 +1700,33 @@ CREATE TABLE IF NOT EXISTS tb_retraction_tombstone (
   CONSTRAINT uq_retraction_tombstone_subject UNIQUE (subject_type, subject_id)
 );
 CREATE INDEX IF NOT EXISTS idx_retraction_tombstone_owner ON tb_retraction_tombstone (owner_user_id);
+
+-- CP-20 durable risk continuity + intervention ledger (H2 twin of V41).
+CREATE TABLE IF NOT EXISTS tb_user_risk_state (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  level VARCHAR(16) NOT NULL DEFAULT 'NONE',
+  score DOUBLE NOT NULL DEFAULT 0,
+  last_observed_at TIMESTAMP NOT NULL,
+  last_safety_event_id BIGINT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uq_user_risk_state UNIQUE (user_id),
+  CONSTRAINT ck_user_risk_level CHECK (level IN ('NONE','WATCH','ELEVATED'))
+);
+CREATE TABLE IF NOT EXISTS tb_crisis_intervention (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  safety_event_id BIGINT,
+  level VARCHAR(16) NOT NULL,
+  action VARCHAR(48) NOT NULL,
+  responder_id BIGINT,
+  outcome VARCHAR(200),
+  escalation VARCHAR(200),
+  minimal_disclosure VARCHAR(200),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT ck_crisis_intervention_level CHECK (level IN ('NONE','WATCH','ELEVATED','EMERGENCY')),
+  CONSTRAINT ck_crisis_intervention_action CHECK (action IN ('GENTLE_CHECK_IN','RESOURCES_SHOWN','WATCH_ESCALATED','EMERGENCY_PROTOCOL'))
+);
+CREATE INDEX IF NOT EXISTS idx_crisis_intervention_user ON tb_crisis_intervention (user_id, id);

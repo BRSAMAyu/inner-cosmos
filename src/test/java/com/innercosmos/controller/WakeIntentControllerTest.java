@@ -36,6 +36,8 @@ class WakeIntentControllerTest {
     void createListRescheduleCancelAreOwnerScoped() throws Exception {
         MockHttpSession owner = register("wake-owner");
         MockHttpSession other = register("wake-other");
+        // CP-26: proactive care is consent-gated — the owner explicitly opts in first.
+        grantProactiveCare(owner);
         LocalDateTime preferred = LocalDateTime.now().plusHours(2).withNano(0);
         String body = """
             {"purpose":"继续今天的话题","reasonForUser":"Aurora 会按约回来", "content":"我来赴约了。",
@@ -72,6 +74,13 @@ class WakeIntentControllerTest {
         assertThat(LocalDateTime.parse(returnedPreferred)).isEqualTo(moved);
         mockMvc.perform(post("/api/aurora/wake-intents/{id}/cancel", id).session(owner))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("CANCELLED"));
+    }
+
+    private void grantProactiveCare(MockHttpSession session) throws Exception {
+        mockMvc.perform(post("/api/me/consents/PROACTIVE_CARE").session(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"grant\":true}"))
+            .andExpect(status().isOk());
     }
 
     private MockHttpSession register(String prefix) throws Exception {

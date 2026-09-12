@@ -13,6 +13,10 @@ import java.util.List;
 @RestController
 @RequestMapping({"/api/safety", "/api/v1/safety"})
 public class SafetyController extends BaseController {
+
+    /** CP-20 durable risk continuity; optional so direct-construction tests keep working. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.innercosmos.safety.CrisisContinuityService crisisContinuityService;
     private final SafetyService safetyService;
 
     public SafetyController(SafetyService safetyService) {
@@ -24,6 +28,13 @@ public class SafetyController extends BaseController {
             @RequestParam(required = false) String locale,
             @RequestParam(required = false) String region) {
         return ApiResponse.ok(safetyService.resources(locale, region));
+    }
+
+    /** CP-20 owner transparency: my durable risk-continuity status (never a diagnosis). */
+    @org.springframework.web.bind.annotation.GetMapping("/me/status")
+    public ApiResponse<com.innercosmos.safety.CrisisContinuityService.OwnerStatus> myStatus(
+            HttpSession session) {
+        return ApiResponse.ok(crisisContinuityService.ownerStatus(currentUserId(session)));
     }
 
     @GetMapping("/resources/catalog")

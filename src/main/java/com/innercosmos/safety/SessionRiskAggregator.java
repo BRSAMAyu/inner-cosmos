@@ -159,7 +159,7 @@ public class SessionRiskAggregator {
         state.score *= Math.pow(0.5, halfLives);
     }
 
-    private double weightFor(String riskLevel) {
+    static double weightFor(String riskLevel) {
         if (riskLevel == null) {
             return 0.0;
         }
@@ -177,7 +177,7 @@ public class SessionRiskAggregator {
      * -hardened normalization as the rest of the safety pipeline so a zero-width/full-width
      * obfuscation of these cues doesn't defeat them either.
      */
-    private double adjustForContext(double weight, String text) {
+    static double adjustForContext(double weight, String text) {
         if (weight <= 0 || text == null || text.isBlank()) {
             return weight;
         }
