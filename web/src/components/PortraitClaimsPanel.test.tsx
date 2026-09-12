@@ -35,6 +35,7 @@ function setup(overrides: Partial<Parameters<typeof PortraitClaimsPanel>[0]> = {
     view, loading: false, loaded: true, busyClaimId: null,
     onLoad, onSuppress, onRestore, onDelete,
     onLoadHistory: vi.fn(() => Promise.resolve([])),
+    onOpenSourceSession: vi.fn(),
     locale: "zh-CN" as const, ...overrides
   };
   render(<PortraitClaimsPanel {...props} />);
@@ -47,14 +48,14 @@ describe("PortraitClaimsPanel (CP-23)", () => {
     render(<PortraitClaimsPanel view={null} loading={false} loaded={false}
       busyClaimId={null} onLoad={first.onLoad} onSuppress={vi.fn()}
       onRestore={vi.fn()} onDelete={vi.fn()} onLoadHistory={vi.fn(() => Promise.resolve([]))}
-      locale="zh-CN" />);
+      onOpenSourceSession={vi.fn()} locale="zh-CN" />);
     expect(first.onLoad).toHaveBeenCalledOnce();
 
     const second = { onLoad: vi.fn() };
     render(<PortraitClaimsPanel view={null} loading={true} loaded={false}
       busyClaimId={null} onLoad={second.onLoad} onSuppress={vi.fn()}
       onRestore={vi.fn()} onDelete={vi.fn()} onLoadHistory={vi.fn(() => Promise.resolve([]))}
-      locale="zh-CN" />);
+      onOpenSourceSession={vi.fn()} locale="zh-CN" />);
     expect(second.onLoad).not.toHaveBeenCalled();
   });
 
@@ -110,15 +111,18 @@ describe("PortraitClaimsPanel (CP-23)", () => {
     // The API returns the chain newest-first; the panel renders oldest-first.
     const history: UnderstandingClaim[] = [
       { id: 31, claimKey: "表达习惯", valueJson: "\"安静但直接的短句\"", authorityLevel: "USER_CORRECTION",
-        status: "SUPPRESSED", version: 2, createdAt: "2026-09-08T10:00:00" },
+        status: "SUPPRESSED", version: 2, createdAt: "2026-09-08T10:00:00",
+        sourceId: null, sourceType: "USER_CORRECTION" },
       { id: 30, claimKey: "表达习惯", valueJson: "\"喜欢长段落自我分析\"", authorityLevel: "MODEL_INFERENCE",
-        status: "SUPERSEDED", version: 1, createdAt: "2026-09-01T10:00:00" }
+        status: "SUPERSEDED", version: 1, createdAt: "2026-09-01T10:00:00",
+        sourceId: 77, sourceType: "AUTO_EXTRACTION" }
     ];
+    const onOpenSourceSession = vi.fn();
     const onLoadHistory = vi.fn(() => Promise.resolve(history));
     const { userEvent } = { userEvent: null };
     render(<PortraitClaimsPanel view={view} loading={false} loaded={true} busyClaimId={null}
       onLoad={vi.fn()} onSuppress={vi.fn()} onRestore={vi.fn()} onDelete={vi.fn()}
-      onLoadHistory={onLoadHistory} locale="zh-CN" />);
+      onLoadHistory={onLoadHistory} onOpenSourceSession={onOpenSourceSession} locale="zh-CN" />);
 
     const targetRow = screen.getAllByRole("listitem")
       .find(row => within(row).queryByText("推断"))!;
@@ -133,6 +137,13 @@ describe("PortraitClaimsPanel (CP-23)", () => {
     expect(within(entries[1]).getByText(/你纠正后的理解/)).toBeInTheDocument();
     expect(within(entries[1]).getByText(/被搁置/)).toBeInTheDocument();
 
+    // CP-23↔CP-21 cross-link: only the extraction-backed version links to its source
+    // conversation (the provenance chain's root); the corrected version has none.
+    expect(within(entries[0]).getByRole("button", { name: "查看来源对话" })).toBeInTheDocument();
+    expect(within(entries[1]).queryByRole("button", { name: "查看来源对话" })).not.toBeInTheDocument();
+    fireEvent.click(within(entries[0]).getByRole("button", { name: "查看来源对话" }));
+    expect(onOpenSourceSession).toHaveBeenCalledExactlyOnceWith(77);
+
     // Toggling collapses the timeline; a second expand reuses the cached chain.
     fireEvent.click(within(targetRow).getByRole("button", { name: "看它怎么变的" }));
     expect(within(targetRow).queryByRole("list", { name: "看它怎么变的" })).not.toBeInTheDocument();
@@ -146,7 +157,8 @@ describe("PortraitClaimsPanel (CP-23)", () => {
     render(<PortraitClaimsPanel view={{ claims: [], unknownDimensions: 5, explanation: "",
       suppressed: [] }} loading={false} loaded={true} busyClaimId={null}
       onLoad={vi.fn()} onSuppress={vi.fn()} onRestore={vi.fn()} onDelete={vi.fn()}
-      onLoadHistory={vi.fn(() => Promise.resolve([]))} locale="en-SG" />);
+      onLoadHistory={vi.fn(() => Promise.resolve([]))} onOpenSourceSession={vi.fn()}
+      locale="en-SG" />);
     expect(screen.getByText("Aurora hasn't formed any understanding of you yet.")).toBeInTheDocument();
     expect(screen.getByText(/5 more dimensions are honestly unknown/)).toBeInTheDocument();
   });

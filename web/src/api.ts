@@ -118,6 +118,8 @@ export type CorrectionImpact = {
 export type UnderstandingClaim = {
   id: number; claimKey: string; valueJson: string; authorityLevel: string;
   status: "ACTIVE" | "SUPERSEDED" | "RETIRED" | "SUPPRESSED" | "DELETED"; version: number; createdAt: string;
+  /** CP-23↔CP-21: the dialog session the claim was extracted from — the provenance root. */
+  sourceId: number | null; sourceType: string;
 };
 /** CP-23 correctable-portrait view — GET /api/aurora/corrections/portrait. */
 export type PortraitClaimRow = {

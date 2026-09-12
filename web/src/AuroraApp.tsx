@@ -2209,6 +2209,13 @@ export function AuroraApp() {
           busyClaimId={portraitClaimBusyId} onLoad={() => void loadPortraitClaims()}
           onSuppress={suppressPortraitClaim} onRestore={restorePortraitClaim} onDelete={deletePortraitClaim}
           onLoadHistory={claimKey => api.understandingClaimHistory(claimKey)}
+          onOpenSourceSession={sessionId => {
+            void api.dialogSession(sessionId)
+              .then(summary => auroraSession.openSession(summary))
+              .catch(() => setStatus(skillLocale === "en-SG"
+                ? "The source conversation is unavailable."
+                : "来源对话暂时无法打开。"));
+          }}
           locale={skillLocale} />
         </div>
         <div hidden={meTab !== "account"}>

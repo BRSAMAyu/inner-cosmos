@@ -14,6 +14,8 @@ type Props = {
   onDelete: (claimId: number, reason: string) => void;
   /** CP-23: loads one claim's full version chain (oldest→newest evolution). */
   onLoadHistory: (claimKey: string) => Promise<UnderstandingClaim[]>;
+  /** CP-23↔CP-21: opens the dialog session a claim version was extracted from. */
+  onOpenSourceSession: (sessionId: number) => void;
   locale?: Locale;
 };
 
@@ -27,7 +29,7 @@ const COPY: Record<Locale, {
   cancel: string; confirmDelete: string; deleteQuestion: string; reload: string;
   timeline: string; timelineLoading: string; timelineEmpty: string;
   statusActive: string; statusSuperseded: string; statusSuppressedLabel: string;
-  statusDeleted: string; correctedByYou: string;
+  statusDeleted: string; correctedByYou: string; openSourceSession: string;
 }> = {
   "zh-CN": {
     aria: "Aurora 对你的理解（可纠正）", heading: "Aurora 对你的理解（可纠正）",
@@ -44,7 +46,7 @@ const COPY: Record<Locale, {
     reload: "刷新",
     timeline: "看它怎么变的", timelineLoading: "正在取回变化轨迹…", timelineEmpty: "还没有变化记录。",
     statusActive: "当前", statusSuperseded: "已被取代", statusSuppressedLabel: "被搁置",
-    statusDeleted: "已删除", correctedByYou: "你纠正后的理解"
+    statusDeleted: "已删除", correctedByYou: "你纠正后的理解", openSourceSession: "查看来源对话"
   },
   "en-SG": {
     aria: "What Aurora understands about you (correctable)", heading: "What Aurora understands about you (correctable)",
@@ -61,7 +63,8 @@ const COPY: Record<Locale, {
     reload: "Reload",
     timeline: "See how it changed", timelineLoading: "Fetching the change trail…", timelineEmpty: "No change history yet.",
     statusActive: "Current", statusSuperseded: "Superseded", statusSuppressedLabel: "Parked",
-    statusDeleted: "Deleted", correctedByYou: "Your corrected understanding"
+    statusDeleted: "Deleted", correctedByYou: "Your corrected understanding",
+    openSourceSession: "Open the source conversation"
   }
 };
 
@@ -93,7 +96,7 @@ function readableValue(valueJson: string | null): string {
  * the user's language, with delete behind an explicit confirmation.
  */
 export function PortraitClaimsPanel({ view, loading, loaded, busyClaimId, onLoad,
-  onSuppress, onRestore, onDelete, onLoadHistory, locale = "zh-CN" }: Props) {
+  onSuppress, onRestore, onDelete, onLoadHistory, onOpenSourceSession, locale = "zh-CN" }: Props) {
   const t = COPY[locale];
   const [reasonFor, setReasonFor] = useState<number | null>(null);
   const [reason, setReason] = useState("");
@@ -166,6 +169,10 @@ export function PortraitClaimsPanel({ view, loading, loaded, busyClaimId, onLoad
                       + " · " + statusLabelOf(row.status, t)
                       + (row.createdAt ? " · " + new Date(row.createdAt).toLocaleString(locale) : "")}
                   </small>
+                  {typeof row.sourceId === "number" && row.sourceId > 0 && (
+                    <button type="button" className="quiet"
+                      onClick={() => onOpenSourceSession(row.sourceId!)}>{t.openSourceSession}</button>
+                  )}
                 </li>))}
           </ol>)}
       {reasonFor === claim.claimId && !suppressed && <div className="portrait-claim-reason">

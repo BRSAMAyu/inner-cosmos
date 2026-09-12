@@ -41,3 +41,10 @@
 
 - CP-23: IN_PROGRESS（四态视图+属主控制+J04+前端 UI 完成；信念变化时间线视图后续）
 - CP-19: IN_PROGRESS（对拍 harness 完成；真实 provider 增益评分与预算压力 fixture 后续）
+
+## 第七增量（2026-09-12 晚）：时间线↔来源对话交叉链接（CP-21 联动，检查点 28）
+
+1. **交叉节点 = 对话会话**：`UnderstandingClaim.sourceId` 是该理解被抽取出来的对话——也正是 CP-21 来源图回放的根节点（对话→记忆→派生），两图在此交汇
+2. **web**：`UnderstandingClaim` 类型补 `sourceId/sourceType`；时间线条目当且仅当该版本有真实来源会话（`sourceId>0`，即抽取来源）时渲染"查看来源对话"，回调经 AuroraApp `api.dialogSession(id)` → `auroraSession.openSession` 直接打开该对话（打不开时状态条提示，不静默）；用户纠正产生的版本无来源会话，不显示链接（诚实：纠正的来源是用户本人）
+3. **测试**：时间线测试扩展——抽取版有链接且回调收到正确会话 id、纠正版无链接；web 全量 **738/738 绿**，tsc 零错误
+4. 语义：用户现在能从"信念如何演变"走到"这条理解最初来自哪次对话"——与记忆来源图（CP-21 replay）共享同一事实根
