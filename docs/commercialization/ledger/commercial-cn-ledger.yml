@@ -300,16 +300,24 @@ work_packages:
     stage: S1
     depends_on: ["CP-11", "CP-17", "CP-39"]
     vision_ids: ["V03", "V14", "V15"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-18/
+    delivery_record: evidence/commercial-cn/CP-18/2026-09-12-continuity-kernel-retrieval/delivery-record.md
+    test_command: "./mvnw test -Dtest=ContinuityKernelRetrievalTest"
+    note: "首个增量：SessionContinuityService诚实开场(新用户零伪造/归来者带provenance的PRIOR_SUMMARY+TOPICS/30天静默窗归零)+GET /api/dialog/continuity"
+    next_action: "OpeningContext接入Aurora首条prompt组装；前端开屏消费carry-forward"
   - id: CP-19
     title: "双核、上下文与中文理解增益"
     owner: "AI质量"
     stage: S2
     depends_on: ["CP-04", "CP-17", "CP-18", "CP-22"]
     vision_ids: ["V03", "V04", "V16"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-19/
+    delivery_record: evidence/commercial-cn/CP-18/2026-09-12-continuity-kernel-retrieval/delivery-record.md
+    test_command: "./mvnw test -Dtest=ContinuityKernelRetrievalTest"
+    note: "首个增量：KernelRoutingPolicy确定性纯函数(SINGLE/DUAL/SUPPORT_FLOW；危机永远走支持流,复杂度三信号才升双核,简单轮次默认单核)"
+    next_action: "按kernel分流Aurora回复编排(单核直答/双核批判重写/支持流旁路)+生产端TurnSignals信号提取"
   - id: CP-20
     title: "风险连续性与危机处置运行时"
     owner: "AI安全＋信任与安全"
@@ -340,8 +348,12 @@ work_packages:
     stage: S1
     depends_on: ["CP-04", "CP-14", "CP-17"]
     vision_ids: ["V03", "V05", "V16"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-22/
+    delivery_record: evidence/commercial-cn/CP-18/2026-09-12-continuity-kernel-retrieval/delivery-record.md
+    test_command: "./mvnw test -Dtest=ContinuityKernelRetrievalTest"
+    note: "首个增量：检索撤回硬边界——tombstone读取时拦截,备份复活为ACTIVE的已撤回记忆绝不进入检索证据(抗复活)"
+    next_action: "任务化查询改写+重排+中文评测集对拍(依赖CP-04冻结集)"
   - id: CP-23
     title: "可纠正画像与信念变化"
     owner: "画像系统＋产品"

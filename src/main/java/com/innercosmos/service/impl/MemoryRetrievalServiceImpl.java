@@ -31,6 +31,10 @@ import java.util.Set;
  */
 @Service
 public class MemoryRetrievalServiceImpl implements MemoryRetrievalService {
+
+    /** CP-22: withdrawn memories never surface in retrieval, even backup-resurrected. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.innercosmos.service.privacy.RetractionTombstoneService tombstoneService;
     /**
      * Retrieval relevance is an admission gate, not merely one feature in a global score.
      * Freshness, salience and task fit may order relevant memories, but must never make an
@@ -69,6 +73,12 @@ public class MemoryRetrievalServiceImpl implements MemoryRetrievalService {
 
         QueryWrapper<MemoryCard> db = new QueryWrapper<MemoryCard>().eq("user_id", userId)
                 .ne("status", "FORGOTTEN").ne("status", "SUPERSEDED").ne("status", "ARCHIVED");
+        // CP-22: a backup-resurrected row can look ACTIVE — the tombstone decides at use time.
+        java.util.Set<Long> withdrawn = tombstoneService == null ? java.util.Set.of()
+                : tombstoneService.blockedIds("MEMORY", userId);
+        if (!withdrawn.isEmpty()) {
+            db.notIn("id", withdrawn);
+        }
         if (!includeContradicted) db.in("status", CURRENT);
         if (!layers.isEmpty()) db.in("memory_layer", layers);
         // Defense in depth: the DB predicate keeps forbidden rows out of the usual query, while

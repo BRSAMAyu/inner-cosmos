@@ -15,6 +15,17 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/dialog/session")
 public class DialogController extends BaseController {
+
+    /** CP-18 honest cross-session continuity; optional for legacy direct construction. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.innercosmos.service.continuity.SessionContinuityService sessionContinuityService;
+
+    /** CP-18: the honest opening context for the user's next conversation. */
+    @GetMapping("/continuity")
+    public ApiResponse<com.innercosmos.service.continuity.SessionContinuityService.OpeningContext> continuity(
+            HttpSession session) {
+        return ApiResponse.ok(sessionContinuityService.openingContext(currentUserId(session)));
+    }
     private final DialogService dialogService;
 
     public DialogController(DialogService dialogService) {
