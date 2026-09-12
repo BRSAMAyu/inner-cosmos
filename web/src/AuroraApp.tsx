@@ -2208,6 +2208,7 @@ export function AuroraApp() {
         <PortraitClaimsPanel view={portraitClaims} loading={portraitClaimsLoading} loaded={portraitClaimsLoaded}
           busyClaimId={portraitClaimBusyId} onLoad={() => void loadPortraitClaims()}
           onSuppress={suppressPortraitClaim} onRestore={restorePortraitClaim} onDelete={deletePortraitClaim}
+          onLoadHistory={claimKey => api.understandingClaimHistory(claimKey)}
           locale={skillLocale} />
         </div>
         <div hidden={meTab !== "account"}>

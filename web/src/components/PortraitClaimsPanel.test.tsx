@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { PortraitClaimsView } from "../api";
+import type { PortraitClaimsView, UnderstandingClaim } from "../api";
 import { PortraitClaimsPanel } from "./PortraitClaimsPanel";
 
 afterEach(cleanup);
@@ -33,7 +33,9 @@ function setup(overrides: Partial<Parameters<typeof PortraitClaimsPanel>[0]> = {
   const onDelete = vi.fn();
   const props = {
     view, loading: false, loaded: true, busyClaimId: null,
-    onLoad, onSuppress, onRestore, onDelete, locale: "zh-CN" as const, ...overrides
+    onLoad, onSuppress, onRestore, onDelete,
+    onLoadHistory: vi.fn(() => Promise.resolve([])),
+    locale: "zh-CN" as const, ...overrides
   };
   render(<PortraitClaimsPanel {...props} />);
   return { onLoad, onSuppress, onRestore, onDelete };
@@ -44,13 +46,15 @@ describe("PortraitClaimsPanel (CP-23)", () => {
     const first = { onLoad: vi.fn() };
     render(<PortraitClaimsPanel view={null} loading={false} loaded={false}
       busyClaimId={null} onLoad={first.onLoad} onSuppress={vi.fn()}
-      onRestore={vi.fn()} onDelete={vi.fn()} locale="zh-CN" />);
+      onRestore={vi.fn()} onDelete={vi.fn()} onLoadHistory={vi.fn(() => Promise.resolve([]))}
+      locale="zh-CN" />);
     expect(first.onLoad).toHaveBeenCalledOnce();
 
     const second = { onLoad: vi.fn() };
     render(<PortraitClaimsPanel view={null} loading={true} loaded={false}
       busyClaimId={null} onLoad={second.onLoad} onSuppress={vi.fn()}
-      onRestore={vi.fn()} onDelete={vi.fn()} locale="zh-CN" />);
+      onRestore={vi.fn()} onDelete={vi.fn()} onLoadHistory={vi.fn(() => Promise.resolve([]))}
+      locale="zh-CN" />);
     expect(second.onLoad).not.toHaveBeenCalled();
   });
 
@@ -102,10 +106,47 @@ describe("PortraitClaimsPanel (CP-23)", () => {
     expect(onDelete).not.toHaveBeenCalled();
   });
 
+  it("shows the belief-change timeline per claim: versions oldest→newest with sources and statuses", async () => {
+    // The API returns the chain newest-first; the panel renders oldest-first.
+    const history: UnderstandingClaim[] = [
+      { id: 31, claimKey: "表达习惯", valueJson: "\"安静但直接的短句\"", authorityLevel: "USER_CORRECTION",
+        status: "SUPPRESSED", version: 2, createdAt: "2026-09-08T10:00:00" },
+      { id: 30, claimKey: "表达习惯", valueJson: "\"喜欢长段落自我分析\"", authorityLevel: "MODEL_INFERENCE",
+        status: "SUPERSEDED", version: 1, createdAt: "2026-09-01T10:00:00" }
+    ];
+    const onLoadHistory = vi.fn(() => Promise.resolve(history));
+    const { userEvent } = { userEvent: null };
+    render(<PortraitClaimsPanel view={view} loading={false} loaded={true} busyClaimId={null}
+      onLoad={vi.fn()} onSuppress={vi.fn()} onRestore={vi.fn()} onDelete={vi.fn()}
+      onLoadHistory={onLoadHistory} locale="zh-CN" />);
+
+    const targetRow = screen.getAllByRole("listitem")
+      .find(row => within(row).queryByText("推断"))!;
+    fireEvent.click(within(targetRow).getByRole("button", { name: "看它怎么变的" }));
+    expect(onLoadHistory).toHaveBeenCalledExactlyOnceWith("表达习惯");
+    const timeline = await within(targetRow).findByRole("list", { name: "看它怎么变的" });
+    const entries = within(timeline).getAllByRole("listitem");
+    expect(entries).toHaveLength(2);
+    // Oldest first: the superseded inference precedes the corrected version.
+    expect(within(entries[0]).getByText(/来自 Aurora 的观察/)).toBeInTheDocument();
+    expect(within(entries[0]).getByText(/已被取代/)).toBeInTheDocument();
+    expect(within(entries[1]).getByText(/你纠正后的理解/)).toBeInTheDocument();
+    expect(within(entries[1]).getByText(/被搁置/)).toBeInTheDocument();
+
+    // Toggling collapses the timeline; a second expand reuses the cached chain.
+    fireEvent.click(within(targetRow).getByRole("button", { name: "看它怎么变的" }));
+    expect(within(targetRow).queryByRole("list", { name: "看它怎么变的" })).not.toBeInTheDocument();
+    fireEvent.click(within(targetRow).getByRole("button", { name: "看它怎么变的" }));
+    expect(await within(targetRow).findByRole("list", { name: "看它怎么变的" })).toBeInTheDocument();
+    expect(onLoadHistory).toHaveBeenCalledOnce();
+    void userEvent;
+  });
+
   it("is honest when nothing is understood yet", () => {
     render(<PortraitClaimsPanel view={{ claims: [], unknownDimensions: 5, explanation: "",
       suppressed: [] }} loading={false} loaded={true} busyClaimId={null}
-      onLoad={vi.fn()} onSuppress={vi.fn()} onRestore={vi.fn()} onDelete={vi.fn()} locale="en-SG" />);
+      onLoad={vi.fn()} onSuppress={vi.fn()} onRestore={vi.fn()} onDelete={vi.fn()}
+      onLoadHistory={vi.fn(() => Promise.resolve([]))} locale="en-SG" />);
     expect(screen.getByText("Aurora hasn't formed any understanding of you yet.")).toBeInTheDocument();
     expect(screen.getByText(/5 more dimensions are honestly unknown/)).toBeInTheDocument();
   });

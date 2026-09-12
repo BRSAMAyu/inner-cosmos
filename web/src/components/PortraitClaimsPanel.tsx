@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { PortraitClaimRow, PortraitClaimsView } from "../api";
+import type { PortraitClaimRow, PortraitClaimsView, UnderstandingClaim } from "../api";
 import type { Locale } from "../i18n";
 import { AsyncButton } from "../loading";
 
@@ -12,6 +12,8 @@ type Props = {
   onSuppress: (claimId: number, reason: string) => void;
   onRestore: (claimId: number) => void;
   onDelete: (claimId: number, reason: string) => void;
+  /** CP-23: loads one claim's full version chain (oldest→newest evolution). */
+  onLoadHistory: (claimKey: string) => Promise<UnderstandingClaim[]>;
   locale?: Locale;
 };
 
@@ -23,6 +25,9 @@ const COPY: Record<Locale, {
   userSourced: string; modelSourced: string; versionLabel: (v: string | null) => string;
   suppress: string; restore: string; remove: string; reasonPlaceholder: string;
   cancel: string; confirmDelete: string; deleteQuestion: string; reload: string;
+  timeline: string; timelineLoading: string; timelineEmpty: string;
+  statusActive: string; statusSuperseded: string; statusSuppressedLabel: string;
+  statusDeleted: string; correctedByYou: string;
 }> = {
   "zh-CN": {
     aria: "Aurora 对你的理解（可纠正）", heading: "Aurora 对你的理解（可纠正）",
@@ -36,7 +41,10 @@ const COPY: Record<Locale, {
     suppress: "搁置", restore: "恢复", remove: "删除",
     reasonPlaceholder: "可选：为什么这不太是你",
     cancel: "先不", confirmDelete: "确认删除", deleteQuestion: "删除后这条理解从所有当前视图消失（保留审计）。确认？",
-    reload: "刷新"
+    reload: "刷新",
+    timeline: "看它怎么变的", timelineLoading: "正在取回变化轨迹…", timelineEmpty: "还没有变化记录。",
+    statusActive: "当前", statusSuperseded: "已被取代", statusSuppressedLabel: "被搁置",
+    statusDeleted: "已删除", correctedByYou: "你纠正后的理解"
   },
   "en-SG": {
     aria: "What Aurora understands about you (correctable)", heading: "What Aurora understands about you (correctable)",
@@ -50,9 +58,19 @@ const COPY: Record<Locale, {
     suppress: "Park", restore: "Restore", remove: "Delete",
     reasonPlaceholder: "Optional: why this isn't quite you",
     cancel: "Not now", confirmDelete: "Confirm delete", deleteQuestion: "Deleting removes this understanding from every current surface (audit kept). Continue?",
-    reload: "Reload"
+    reload: "Reload",
+    timeline: "See how it changed", timelineLoading: "Fetching the change trail…", timelineEmpty: "No change history yet.",
+    statusActive: "Current", statusSuperseded: "Superseded", statusSuppressedLabel: "Parked",
+    statusDeleted: "Deleted", correctedByYou: "Your corrected understanding"
   }
 };
+
+function statusLabelOf(status: string, t: typeof COPY["zh-CN"]): string {
+  return status === "SUPERSEDED" ? t.statusSuperseded
+    : status === "SUPPRESSED" ? t.statusSuppressedLabel
+    : status === "DELETED" ? t.statusDeleted
+    : t.statusActive;
+}
 
 function readableValue(valueJson: string | null): string {
   if (!valueJson) return "";
@@ -75,11 +93,26 @@ function readableValue(valueJson: string | null): string {
  * the user's language, with delete behind an explicit confirmation.
  */
 export function PortraitClaimsPanel({ view, loading, loaded, busyClaimId, onLoad,
-  onSuppress, onRestore, onDelete, locale = "zh-CN" }: Props) {
+  onSuppress, onRestore, onDelete, onLoadHistory, locale = "zh-CN" }: Props) {
   const t = COPY[locale];
   const [reasonFor, setReasonFor] = useState<number | null>(null);
   const [reason, setReason] = useState("");
   const [confirmingDelete, setConfirmingDelete] = useState<number | null>(null);
+  // CP-23 belief-change timeline: per-claim version chain, fetched lazily and cached.
+  const [timelineFor, setTimelineFor] = useState<string | null>(null);
+  const [timelineBusy, setTimelineBusy] = useState<string | null>(null);
+  const [timelineByClaimKey, setTimelineByClaimKey] = useState<Record<string, UnderstandingClaim[]>>({});
+
+  const openTimeline = (claimKey: string) => {
+    if (timelineFor === claimKey) { setTimelineFor(null); return; }
+    setTimelineFor(claimKey);
+    if (timelineByClaimKey[claimKey] || timelineBusy === claimKey) return;
+    setTimelineBusy(claimKey);
+    onLoadHistory(claimKey)
+      .then(rows => setTimelineByClaimKey(current => ({ ...current, [claimKey]: rows })))
+      .catch(() => setTimelineByClaimKey(current => ({ ...current, [claimKey]: [] })))
+      .finally(() => setTimelineBusy(null));
+  };
 
   useEffect(() => {
     if (!loaded && !loading) onLoad();
@@ -101,6 +134,8 @@ export function PortraitClaimsPanel({ view, loading, loaded, busyClaimId, onLoad
         </small>
       </div>
       <div className="portrait-claim-actions">
+        <button type="button" className="quiet" aria-expanded={timelineFor === claim.claimKey}
+          onClick={() => openTimeline(claim.claimKey)}>{t.timeline}</button>
         {suppressed ? (
           <AsyncButton busy={busyClaimId === claim.claimId}
             onClick={() => onRestore(claim.claimId)}>{t.restore}</AsyncButton>
@@ -116,6 +151,23 @@ export function PortraitClaimsPanel({ view, loading, loaded, busyClaimId, onLoad
           </>
         )}
       </div>
+      {timelineFor === claim.claimKey && (timelineBusy === claim.claimKey
+        ? <p className="muted">{t.timelineLoading}</p>
+        : <ol className="portrait-claim-timeline" aria-label={t.timeline}>
+            {!(timelineByClaimKey[claim.claimKey] ?? []).length
+              ? <li className="muted">{t.timelineEmpty}</li>
+              : timelineByClaimKey[claim.claimKey].slice().reverse().map(row => (
+                <li key={row.id} className={`timeline-status-${row.status.toLowerCase()}`}>
+                  <span className="timeline-version">{t.versionLabel(String(row.version))}</span>
+                  <span className="timeline-value">{readableValue(row.valueJson)}</span>
+                  <small className="muted">
+                    {(row.authorityLevel === "USER_CORRECTION" || row.authorityLevel === "USER_CONFIRMED"
+                      ? t.correctedByYou : t.modelSourced)
+                      + " · " + statusLabelOf(row.status, t)
+                      + (row.createdAt ? " · " + new Date(row.createdAt).toLocaleString(locale) : "")}
+                  </small>
+                </li>))}
+          </ol>)}
       {reasonFor === claim.claimId && !suppressed && <div className="portrait-claim-reason">
         <input type="text" maxLength={120} value={reason} aria-label={t.reasonPlaceholder}
           onChange={event => setReason(event.target.value)} placeholder={t.reasonPlaceholder} />

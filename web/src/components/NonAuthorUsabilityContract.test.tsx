@@ -79,7 +79,8 @@ describe("CP-12 usability contract — screen-reader names on every interactive 
   it("portrait claims panel: every button is named and the reason input has a real label", () => {
     render(<PortraitClaimsPanel view={claimsView} loading={false} loaded={true}
       busyClaimId={null} onLoad={vi.fn()} onSuppress={vi.fn()}
-      onRestore={vi.fn()} onDelete={vi.fn()} locale="zh-CN" />);
+      onRestore={vi.fn()} onDelete={vi.fn()} onLoadHistory={vi.fn(() => Promise.resolve([]))}
+      locale="zh-CN" />);
     const buttons = screen.getAllByRole("button");
     expect(buttons.length).toBeGreaterThan(0);
     for (const button of buttons) {

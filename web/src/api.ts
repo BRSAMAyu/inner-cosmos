@@ -1016,6 +1016,9 @@ export const api = {
     method: "POST", body: JSON.stringify(input)
   }),
   understandingClaims: () => request<UnderstandingClaim[]>("/api/aurora/corrections/claims"),
+  /** CP-23: one claim's full version chain — how the understanding evolved. */
+  understandingClaimHistory: (claimKey: string) => request<UnderstandingClaim[]>(
+    `/api/aurora/corrections/claims?claimKey=${encodeURIComponent(claimKey)}`),
   /** CP-23: the correctable-portrait view, including the owner's parked claims. */
   portraitClaimsView: () => request<PortraitClaimsView>("/api/aurora/corrections/portrait"),
   suppressPortraitClaim: (claimId: number, reason?: string) =>

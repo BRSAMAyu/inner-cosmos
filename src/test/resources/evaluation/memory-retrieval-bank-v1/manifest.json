@@ -1,0 +1,20 @@
+{
+  "id": "memory-retrieval-bank-v1",
+  "version": "1.0.0",
+  "frozen_at": "2026-09-12",
+  "generator": "hand-authored project-internal synthetic (no user data)",
+  "scenario_sha256": "1de23e64deb97cf83b4aed47f6c554d7b51f22cdcfdeeae7afd96a52e00e0cbc",
+  "scenario_count": 8,
+  "families": {
+    "topic_match": 1,
+    "meta_discourse": 1,
+    "meta_only_honest_empty": 1,
+    "task_fit_action": 1,
+    "paraphrase": 1,
+    "multi_relevant": 1,
+    "result_cap": 1,
+    "topic_word_distractor": 1
+  },
+  "purpose": "CP-22 labeled retrieval evaluation: per-case RELEVANT/DISTRACTOR labels drive precision/recall assertions against the real MemoryRetrievalService",
+  "license": "project-internal"
+}

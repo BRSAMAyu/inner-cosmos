@@ -356,8 +356,8 @@ work_packages:
     evidence_dir: evidence/commercial-cn/CP-22/
     delivery_record: evidence/commercial-cn/CP-18/2026-09-12-continuity-kernel-retrieval/delivery-record.md
     test_command: "./mvnw test -Dtest=ContinuityKernelRetrievalTest"
-    note: "两增量：①撤回硬边界(tombstone读取时拦截,抗备份复活)；②RetrievalQueryNormalizer任务化查询归一——服务语('帮我分析'类)不再驱动词法准入,meta-only请求诚实返回空,证据包仍报原话"
-    next_action: "带检索相关性标签的评测集建设(冻结集无检索标签,不可直接对拍)；真实provider向量质量校准"
+    note: "三增量：①撤回硬边界(tombstone读取时拦截,抗备份复活)；②任务化查询归一(服务语不驱动准入,meta-only诚实空)；③memory-retrieval-bank-v1冻结标签评测集(8案例RELEVANT/DISTRACTOR,SHA自锁,真实检索服务precision/recall/排序断言,报告落盘)"
+    next_action: "真实provider向量质量校准；扩充标签集(否定/时间约束查询)"
   - id: CP-23
     title: "可纠正画像与信念变化"
     owner: "画像系统＋产品"
