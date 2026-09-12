@@ -168,6 +168,11 @@ class ConsentCenterTest {
                 guardCalls.incrementAndGet();
                 throw new BusinessException(ErrorCode.CONSENT_REQUIRED, "需要同意");
             }
+
+            @Override
+            public void assertVoiceProcessing(Long userId) {
+                throw new BusinessException(ErrorCode.CONSENT_REQUIRED, "需要语音同意");
+            }
         };
         LlmClient delegate = new LlmClient() {
             @Override

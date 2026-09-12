@@ -35,6 +35,10 @@ import java.util.UUID;
 
 @Service
 public class PsychologySkillServiceImpl implements PsychologySkillService {
+
+    /** CP-28 high-risk context guard; optional so direct-construction tests keep working. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.innercosmos.safety.CrisisContinuityService crisisContinuity;
     private static final Set<String> RETENTION = Set.of("DISCARD_AFTER_SESSION", "SAVE_RESULT", "PROFILE_ELIGIBLE");
     private static final Set<String> LOCALES = Set.of("zh-CN", "en-SG");
     private static final int ANSWER_MAX_CHARS = 1200;
@@ -130,6 +134,15 @@ public class PsychologySkillServiceImpl implements PsychologySkillService {
     public PsychologySkillSuggestionVO suggest(Long userId, String text, String locale) {
         if (text == null || text.isBlank() || text.length() > ANSWER_MAX_CHARS) return null;
         if (safetyBoundaryFilter.inspect(text).matched) return null;
+        // CP-28: in a high-risk context (durable ELEVATED/EMERGENCY continuity state) no
+        // reflection exercise is suggested at all — the flow routes to support, never to a
+        // practice that could aggravate the moment. Suggestions are optional anyway.
+        if (crisisContinuity != null && userId != null) {
+            String level = crisisContinuity.statusOf(userId).level;
+            if ("ELEVATED".equals(level)) {
+                return null;
+            }
+        }
         boolean english = "en-SG".equals(locale);
         String normalized = text.toLowerCase();
         String skillId = null;

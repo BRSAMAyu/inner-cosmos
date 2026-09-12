@@ -16,6 +16,10 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/asr")
 public class AsrController extends BaseController {
+    /** CP-27 voice consent gate; optional so direct-construction tests keep working. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.innercosmos.service.consent.ConsentCenterService consentCenter;
+
     private final AsrClient asrClient;
 
     public AsrController(AsrClient asrClient) {
@@ -31,7 +35,12 @@ public class AsrController extends BaseController {
 
     @PostMapping("/transcribe")
     public ApiResponse<AsrResult> transcribe(@RequestParam("file") MultipartFile file, HttpSession session) throws IOException {
-        currentUserId(session);
+        Long userId = currentUserId(session);
+        // CP-27: voice is a separate (biometric-adjacent) consent — the real egress path is
+        // gated; the mock path stays local and ungated. No consent -> no audio leaves.
+        if (consentCenter != null) {
+            consentCenter.assertVoiceProcessing(userId);
+        }
         if (file == null || file.isEmpty()) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "音频文件不能为空");
         }

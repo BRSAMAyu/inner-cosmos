@@ -36,4 +36,11 @@ public interface ConsentCenterService {
      * userless system calls pass; there is no silent degradation to another route.
      */
     void assertProviderEgress(Long userId);
+
+    /**
+     * CP-27 voice gate: the real ASR/TTS egress path requires the separate VOICE_PROCESSING
+     * consent for real human accounts (biometric-adjacent, PIPL). Synthetic accounts pass;
+     * refusal carries the honest "text still works" pointer.
+     */
+    void assertVoiceProcessing(Long userId);
 }

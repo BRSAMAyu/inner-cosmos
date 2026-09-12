@@ -288,8 +288,12 @@ work_packages:
     stage: S1
     depends_on: ["CP-06", "CP-07", "CP-14"]
     vision_ids: ["V03", "V07", "V15", "V16"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-17/
+    delivery_record: evidence/commercial-cn/CP-27/2026-09-06-voice-skill-gateway/delivery-record.md
+    test_command: "./mvnw test -Dtest=VoiceSkillGatewayTest"
+    note: "首个增量：出站域名白名单(装配期fail-closed,未知主机拒)+调用manifest(user/模块/Provider/用途/数据级/区域,拒答同样入账)"
+    next_action: "合同版本填实；预算/并发/deadline统一治理(CP-38联动)；429/流中断负测"
   - id: CP-18
     title: "对话编排与真实连续性"
     owner: "AI运行时＋前端"
@@ -392,16 +396,24 @@ work_packages:
     stage: S2
     depends_on: ["CP-08", "CP-11", "CP-17", "CP-18"]
     vision_ids: ["V03", "V08", "V14"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-27/
+    delivery_record: evidence/commercial-cn/CP-27/2026-09-06-voice-skill-gateway/delivery-record.md
+    test_command: "./mvnw test -Dtest=VoiceSkillGatewayTest"
+    note: "首个增量：真实ASR路径VOICE_PROCESSING同意门(默认拒/授予通/mock本地无门)+无持久化声明；真实供应商随外部门"
+    next_action: "真实ASR/TTS接入；打断/来电/首音时延窗口"
   - id: CP-28
     title: "非诊断心理支持技能首批"
     owner: "技能平台＋心理专家"
     stage: S2
     depends_on: ["CP-08", "CP-20", "CP-21"]
     vision_ids: ["V09", "V16"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-28/
+    delivery_record: evidence/commercial-cn/CP-27/2026-09-06-voice-skill-gateway/delivery-record.md
+    test_command: "./mvnw test -Dtest=VoiceSkillGatewayTest"
+    note: "首个增量：ELEVATED高风险上下文暂停全部技能建议(转支持流程)；三项技能与专家审阅随外部门窗口"
+    next_action: "技能清单理论依据/skill kill switch；专家审阅(外部门)"
   - id: CP-29
     title: "共鸣体编译与授权工作台"
     owner: "Capsule系统＋产品"

@@ -14,22 +14,48 @@ public class ConsentEnforcingLlmClient implements LlmClient {
 
     private final LlmClient delegate;
     private final ConsentCenterService consentCenter;
+    /** CP-17 call manifest; null in legacy direct-construction tests. */
+    private final com.innercosmos.ai.gateway.GatewayCallLedger ledger;
+    private final String providerLabel;
 
     public ConsentEnforcingLlmClient(LlmClient delegate, ConsentCenterService consentCenter) {
+        this(delegate, consentCenter, null, "configured-provider");
+    }
+
+    public ConsentEnforcingLlmClient(LlmClient delegate, ConsentCenterService consentCenter,
+                                     com.innercosmos.ai.gateway.GatewayCallLedger ledger,
+                                     String providerLabel) {
         this.delegate = delegate;
         this.consentCenter = consentCenter;
+        this.ledger = ledger;
+        this.providerLabel = providerLabel == null ? "configured-provider" : providerLabel;
     }
 
     @Override
     public String chat(LlmRequest request) {
-        guard(request);
-        return delegate.chat(request);
+        try {
+            guard(request);
+            String reply = delegate.chat(request);
+            manifest(request, "OK");
+            return reply;
+        } catch (RuntimeException failure) {
+            // Refusals (consent) and failures are both auditable egress outcomes.
+            manifest(request, "FAILED:" + failure.getClass().getSimpleName());
+            throw failure;
+        }
     }
 
     @Override
     public SseEmitter streamChat(LlmRequest request) {
-        guard(request);
-        return delegate.streamChat(request);
+        try {
+            guard(request);
+            SseEmitter emitter = delegate.streamChat(request);
+            manifest(request, "STREAM_OPENED");
+            return emitter;
+        } catch (RuntimeException failure) {
+            manifest(request, "FAILED:" + failure.getClass().getSimpleName());
+            throw failure;
+        }
     }
 
     private void guard(LlmRequest request) {
@@ -37,5 +63,13 @@ public class ConsentEnforcingLlmClient implements LlmClient {
             return; // A/B experiment forced local mock: no egress on this call.
         }
         consentCenter.assertProviderEgress(request.userId);
+    }
+
+    private void manifest(LlmRequest request, String outcome) {
+        if (ledger != null) {
+            ledger.record(request.userId,
+                    request.moduleName == null ? "unknown" : request.moduleName,
+                    providerLabel, outcome);
+        }
     }
 }

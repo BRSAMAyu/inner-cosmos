@@ -440,7 +440,29 @@ public class LlmConfig {
 
     @Bean
     public LlmClient llmClient(AiLogService aiLogService, Executor aiExecutor,
-                               com.innercosmos.service.consent.ConsentCenterService consentCenter) {
+                               com.innercosmos.service.consent.ConsentCenterService consentCenter,
+                               com.innercosmos.ai.gateway.GatewayEgressGuard egressGuard,
+                               com.innercosmos.ai.gateway.GatewayCallLedger callLedger) {
+        // CP-17: every real-provider base URL is validated at wiring time — unknown hosts
+        // fail closed here, so no unapproved outbound route can ever be constructed.
+        if (!"mock".equalsIgnoreCase(activeProvider())) {
+            // A blank URL is not an egress route (the provider is simply not configured);
+            // any NON-blank URL must be on the allowlist or wiring fails closed.
+            String activeUrl = baseUrlFor(activeProvider());
+            if (activeUrl.isBlank() && baseUrl != null && !baseUrl.isBlank()) {
+                activeUrl = baseUrl;
+            }
+            if (!activeUrl.isBlank()) {
+                egressGuard.validate(activeUrl, "llm." + activeProvider());
+            }
+            for (String providerName : List.of("glm", "mimo", "minimax", "deepseek", "gemini")) {
+                String candidate = providerKey(providerName, providerSpecificKey(providerName));
+                String url = baseUrlFor(providerName);
+                if (!candidate.isBlank() && !url.isBlank()) {
+                    egressGuard.validate(url, "llm." + providerName);
+                }
+            }
+        }
         String activeProvider = activeProvider();
         log.info("Creating LlmClient for provider: {}, mode: {}, fallbackAllowed: {}",
                 activeProvider, mode, isEffectiveFallbackAllowed());
@@ -543,7 +565,7 @@ public class LlmConfig {
         if (!"mock".equalsIgnoreCase(activeProvider)
                 && !providerKey(activeProvider, providerSpecificKey(activeProvider)).isBlank()) {
             actualClient = new com.innercosmos.ai.client.ConsentEnforcingLlmClient(
-                    actualClient, consentCenter);
+                    actualClient, consentCenter, callLedger, activeProvider());
         }
 
         // Wrap with A/B test handler
@@ -747,6 +769,18 @@ public class LlmConfig {
                 new FailoverLlmClient.ProviderCandidate("REAL_FAILOVER_CHAIN",
                         "configured-real-providers", fallback)
         ), aiExecutor);
+    }
+
+    /** CP-17: the configured base URL of a provider (empty string when unset). */
+    private String baseUrlFor(String providerName) {
+        return switch (providerName) {
+            case "glm" -> glm.baseUrl == null ? "" : glm.baseUrl;
+            case "mimo" -> mimo.baseUrl == null ? "" : mimo.baseUrl;
+            case "minimax" -> minimax.baseUrl == null ? "" : minimax.baseUrl;
+            case "deepseek" -> deepseek.baseUrl == null ? "" : deepseek.baseUrl;
+            case "gemini" -> gemini.baseUrl == null ? "" : gemini.baseUrl;
+            default -> "";
+        };
     }
 
     private String providerSpecificKey(String providerName) {

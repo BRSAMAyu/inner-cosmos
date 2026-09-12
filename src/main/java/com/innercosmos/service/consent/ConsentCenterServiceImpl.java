@@ -125,6 +125,21 @@ public class ConsentCenterServiceImpl implements ConsentCenterService {
         }
     }
 
+    @Override
+    public void assertVoiceProcessing(Long userId) {
+        if (userId == null) {
+            return;
+        }
+        User user = userMapper.selectById(userId);
+        if (user == null || !"HUMAN".equals(user.accountKind)) {
+            return;
+        }
+        if (effective(userId, ConsentPurpose.VOICE_PROCESSING) != Decision.GRANTED) {
+            throw new BusinessException(ErrorCode.CONSENT_REQUIRED, """
+                    语音识别需要单独同意（涉及声学特征处理）。你可以在「我的—数据与同意」中选择开启；                    未同意时可以继续使用文字。""");
+        }
+    }
+
     private Map<ConsentPurpose, ConsentRecord> rowsFor(Long userId) {
         Map<ConsentPurpose, ConsentRecord> rows = new EnumMap<>(ConsentPurpose.class);
         for (ConsentRecord row : consentMapper.selectList(new QueryWrapper<ConsentRecord>()
