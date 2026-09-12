@@ -1,0 +1,20 @@
+# CP-38 scheduler role: time-driven jobs (letter delivery, nightly settlement). Single
+# replica — Redis lease (SchedulerLeaseConfiguration) is the correctness mechanism, this is
+# the cost/blast-radius default; no readiness-traffic role, probes unchanged from base.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+spec:
+  replicas: 1
+  template:
+    spec:
+      terminationGracePeriodSeconds: 120  # let the claimed job tick finish; lease expires after
+      containers:
+        - name: app
+          env:
+            - name: INNER_COSMOS_RUNTIME_ROLE
+              value: scheduler
+          resources:
+            requests: { cpu: 100m, memory: 384Mi }
+            limits: { cpu: 500m, memory: 768Mi }

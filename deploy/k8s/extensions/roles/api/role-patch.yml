@@ -1,0 +1,20 @@
+# CP-38 api role: user-facing HTTP/SSE only. Scheduling is disabled at the app level
+# (RuntimeSchedulingConfiguration only enables it for all/worker/scheduler), so this pool
+# never runs background jobs regardless of replicas.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+spec:
+  replicas: 3
+  template:
+    spec:
+      terminationGracePeriodSeconds: 45   # SSE drains: preStop sleep (base) + grace
+      containers:
+        - name: app
+          env:
+            - name: INNER_COSMOS_RUNTIME_ROLE
+              value: api
+          resources:
+            requests: { cpu: 250m, memory: 512Mi }
+            limits: { cpu: "1", memory: 1Gi }

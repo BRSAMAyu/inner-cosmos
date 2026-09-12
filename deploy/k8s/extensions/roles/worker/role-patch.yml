@@ -1,0 +1,19 @@
+# CP-38 worker role: settlement/event/outbox background work. Idempotent handlers + Redis
+# lease make multi-replica contention safe; queue age (KEDA, base extensions) drives scale.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+spec:
+  replicas: 2
+  template:
+    spec:
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: app
+          env:
+            - name: INNER_COSMOS_RUNTIME_ROLE
+              value: worker
+          resources:
+            requests: { cpu: 250m, memory: 512Mi }
+            limits: { cpu: "1", memory: 1Gi }

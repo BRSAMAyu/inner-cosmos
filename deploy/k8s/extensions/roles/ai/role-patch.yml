@@ -1,0 +1,19 @@
+# CP-38 ai role: provider-call pool (dual-kernel turns, capsule compilation). Higher memory
+# for prompt assembly; cost is bounded per-user by ProviderSpendGuard, fleet-bounded by HPA.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+spec:
+  replicas: 2
+  template:
+    spec:
+      terminationGracePeriodSeconds: 90   # in-flight provider turns finish, not aborted
+      containers:
+        - name: app
+          env:
+            - name: INNER_COSMOS_RUNTIME_ROLE
+              value: worker
+          resources:
+            requests: { cpu: 500m, memory: 1Gi }
+            limits: { cpu: "2", memory: 2Gi }

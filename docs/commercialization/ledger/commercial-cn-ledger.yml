@@ -540,7 +540,11 @@ work_packages:
     stage: S1
     depends_on: ["CP-37", "CP-39"]
     vision_ids: ["V08", "V15"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
+    delivery_record: evidence/commercial-cn/CP-49/2026-09-12-supply-chain/delivery-record.md
+    test_command: "cd web && npm test -- --run src/PackageManagerContract.test.ts"
+    note: "首个增量：api/ai/worker/scheduler四角色kustomize派生清单(同一镜像+RUNTIME_ROLE选角,调度应用侧禁用ai/worker外角色,角色化资源/优雅终止grace,探针三段式沿用base,README矩阵)"
+    next_action: "真实集群演练(争抢/租约/排空/预算封顶,CP-50A门禁)；KEDA按队列年龄接入"
     evidence_dir: evidence/commercial-cn/CP-38/
   - id: CP-39
     title: "数据迁移、事件可靠性与兼容发布"
@@ -632,7 +636,11 @@ work_packages:
     stage: S1
     depends_on: ["CP-01", "CP-16"]
     vision_ids: ["V15", "V16", "V19"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
+    delivery_record: evidence/commercial-cn/CP-49/2026-09-12-supply-chain/delivery-record.md
+    test_command: "cd web && npm test -- --run src/PackageManagerContract.test.ts"
+    note: "首个增量：供应链唯一权威——删除并存npm lockfile(pnpm-lock.yaml为唯一),7个latest按锁定版本钉死,PackageManagerContract CI合同(单lockfile/精确packageManager/零浮动区间/禁npm install),SBOM与CVE命令基线"
+    next_action: "发布流程实跑SBOM归档与镜像签名；CVE扫描接入CI(需NVD key)"
     evidence_dir: evidence/commercial-cn/CP-49/
   - id: CP-50
     title: "真实压力、故障与灾难恢复"
