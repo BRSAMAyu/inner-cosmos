@@ -51,7 +51,7 @@ public class PortraitClaimViewServiceImpl implements PortraitClaimViewService {
                 } else {
                     state = "INFERRED";
                 }
-                views.add(new ClaimView(claim.claimKey, claim.claimType, state,
+                views.add(new ClaimView(claim.id, claim.claimKey, claim.claimType, state,
                         claim.authorityLevel, claim.valueJson,
                         claim.version == null ? null : String.valueOf(claim.version),
                         scopeOf(claim.claimType), claim.sourceType));
@@ -59,9 +59,17 @@ public class PortraitClaimViewServiceImpl implements PortraitClaimViewService {
         }
         long covered = KNOWN_DIMENSIONS.stream().filter(byKey::containsKey).count();
         int unknown = KNOWN_DIMENSIONS.size() - (int) covered;
+        List<ClaimView> suppressedRows = claimMapper.selectList(new QueryWrapper<UnderstandingClaim>()
+                        .eq("user_id", userId).eq("status", "SUPPRESSED").orderByDesc("version"))
+                .stream().map(claim -> new ClaimView(claim.id, claim.claimKey, claim.claimType,
+                        "SUPPRESSED", claim.authorityLevel, claim.valueJson,
+                        claim.version == null ? null : String.valueOf(claim.version),
+                        scopeOf(claim.claimType), claim.sourceType))
+                .toList();
         return new PortraitView(views, Math.max(0, unknown),
                 "每项理解都标明来源与状态：已确认/推断/冲突。没有材料的维度显示为未知，"
-                        + "不会用固定人格模板补齐，也不存在整体人格分数。");
+                        + "不会用固定人格模板补齐，也不存在整体人格分数。",
+                suppressedRows);
     }
 
     private static boolean isUserAuthority(String authorityLevel) {

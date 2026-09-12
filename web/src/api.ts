@@ -117,7 +117,20 @@ export type CorrectionImpact = {
 };
 export type UnderstandingClaim = {
   id: number; claimKey: string; valueJson: string; authorityLevel: string;
-  status: "ACTIVE" | "SUPERSEDED" | "RETIRED"; version: number; createdAt: string;
+  status: "ACTIVE" | "SUPERSEDED" | "RETIRED" | "SUPPRESSED" | "DELETED"; version: number; createdAt: string;
+};
+/** CP-23 correctable-portrait view — GET /api/aurora/corrections/portrait. */
+export type PortraitClaimRow = {
+  claimId: number; claimKey: string; claimType: string;
+  state: "CONFIRMED" | "INFERRED" | "CONFLICTING" | "SUPPRESSED" | string;
+  authorityLevel: string; value: string; version: string | null;
+  scope: string; sourceType: string;
+};
+export type PortraitClaimsView = {
+  claims: PortraitClaimRow[];
+  unknownDimensions: number;
+  explanation: string;
+  suppressed: PortraitClaimRow[];
 };
 export type UserCorrection = {
   id: number; targetType: string; fieldName: string;
@@ -1003,6 +1016,18 @@ export const api = {
     method: "POST", body: JSON.stringify(input)
   }),
   understandingClaims: () => request<UnderstandingClaim[]>("/api/aurora/corrections/claims"),
+  /** CP-23: the correctable-portrait view, including the owner's parked claims. */
+  portraitClaimsView: () => request<PortraitClaimsView>("/api/aurora/corrections/portrait"),
+  suppressPortraitClaim: (claimId: number, reason?: string) =>
+    request<UnderstandingClaim>(`/api/portrait/claims/${claimId}/suppress`, {
+      method: "POST", body: JSON.stringify(reason ? { reason } : {})
+    }),
+  restorePortraitClaim: (claimId: number) =>
+    request<UnderstandingClaim>(`/api/portrait/claims/${claimId}/restore`, { method: "POST" }),
+  deletePortraitClaim: (claimId: number, reason?: string) =>
+    request<UnderstandingClaim>(`/api/portrait/claims/${claimId}`, {
+      method: "DELETE", body: JSON.stringify(reason ? { reason } : {})
+    }),
   recentCorrections: () => request<UserCorrection[]>("/api/aurora/corrections"),
   retireCorrection: (id: number) => request<void>(`/api/aurora/corrections/${id}`, { method: "DELETE" }),
   claimCandidates: (sessionId?: number, privacyLevel: "STRICT" | "BALANCED" | "OPEN" = "STRICT") =>

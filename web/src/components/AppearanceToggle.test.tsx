@@ -47,11 +47,16 @@ describe("AppearanceToggle", () => {
 
   it("滑杆可预览七时段并恢复真实时间", () => {
     render(<AppearanceToggle />);
+    // React's change tracker swallows a no-op value set — when the live hour already equals
+    // the demo hour the onChange never fires. Pick a night-bucket hour that differs from the
+    // current live hour so the test is deterministic at any wall clock.
+    const liveHour = new Date().getHours();
+    const demoHour = liveHour === 21 ? 22 : 21;
     const slider = screen.getByRole("slider", { name: "演示时间" });
-    fireEvent.change(slider, { target: { value: "21" } });
+    fireEvent.change(slider, { target: { value: String(demoHour) } });
     expect(document.documentElement.dataset.time).toBe("night");
     expect(document.documentElement.dataset.theme).toBe("night");
-    expect(screen.getByText("演示时间 · 21:00")).toBeVisible();
+    expect(screen.getByText(`演示时间 · ${String(demoHour).padStart(2, "0")}:00`)).toBeVisible();
 
     fireEvent.click(screen.getByRole("button", { name: "恢复实时" }));
     expect(screen.getByText(/实时 ·/)).toBeVisible();

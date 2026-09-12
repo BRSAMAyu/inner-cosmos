@@ -364,8 +364,8 @@ work_packages:
     evidence_dir: evidence/commercial-cn/CP-23/
     delivery_record: evidence/commercial-cn/CP-11/2026-09-06-state-matrix/delivery-record.md
     test_command: "./mvnw test -Dtest=StateMatrixAndPortraitAndPersonaTest"
-    note: "两增量：①画像四态视图+未知不补齐+无分数;②属主控制——搁置/恢复/删除(API /api/portrait/claims/*,版本+1,PORTRAIT_CLAIM审计行,视图与Aurora上下文双清空)+J04旅程(今日纠正明日全采用,旧推断取代出视野)"
-    next_action: "前端搁置/删除UI；信念变化时间线视图"
+    note: "三增量：①画像四态视图+未知不补齐+无分数;②属主控制(搁置/恢复/删除+PORTRAIT_CLAIM审计行+视图与Aurora上下文双清空)+J04旅程;③前端PortraitClaimsPanel(状态徽章/来源/版本/未知计数,搁置带理由,删除需确认,搁置区恢复,懒加载)"
+    next_action: "信念变化时间线视图；非作者评审招募材料(CP-12联动)"
   - id: CP-24
     title: "星空、复盘与行动工具闭环"
     owner: "产品前后端"

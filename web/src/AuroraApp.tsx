@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
-import { api, apiConfigurationError, configureBearerAuth, demoModeBuild, hasConfiguredApiBase, transcribeAudio, type ClaimCandidate, type CapsuleBoundary, type CapsuleFidelitySummary, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type PersonaMessage, type PersonaSession, type PortraitDimension, type PublicCapsule, type PortraitHistoryEntry, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type PsychologySkillSuggestion, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type StarfieldDetail, type StarfieldScene, type StarfieldStar, type UnderstandingClaim, type UserCorrection } from "./api";
+import { api, apiConfigurationError, configureBearerAuth, demoModeBuild, hasConfiguredApiBase, transcribeAudio, type ClaimCandidate, type CapsuleBoundary, type CapsuleFidelitySummary, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type PersonaMessage, type PersonaSession, type PortraitClaimsView, type PortraitDimension, type PublicCapsule, type PortraitHistoryEntry, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type PsychologySkillSuggestion, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type StarfieldDetail, type StarfieldScene, type StarfieldStar, type UnderstandingClaim, type UserCorrection } from "./api";
 import { initialMobileState, mobileRuntime, type MobileRuntimeState } from "./mobile";
 import { mobileOidc } from "./mobile-auth";
 import { isTauriRuntime } from "./desktop-runtime";
@@ -29,6 +29,7 @@ import { PeopleDiscovery } from "./components/PeopleDiscovery";
 import { RelationsView } from "./components/RelationsView";
 import { LettersInbox } from "./components/LettersInbox";
 import { PortraitView } from "./components/PortraitView";
+import { PortraitClaimsPanel } from "./components/PortraitClaimsPanel";
 import { AccountSettings, type AccountBusy } from "./components/AccountSettings";
 import { DataRightsPanel } from "./components/DataRightsPanel";
 import { ConsentCenterPanel } from "./components/ConsentCenterPanel";
@@ -130,6 +131,11 @@ export function AuroraApp() {
   const [portrait, setPortrait] = useState<PortraitDimension[]>([]);
   const [portraitHistory, setPortraitHistory] = useState<Record<string, PortraitHistoryEntry[]>>({});
   const [portraitBusy, setPortraitBusy] = useState<string | null>(null);
+  // CP-23 correctable-portrait claims view + owner park/restore/delete.
+  const [portraitClaims, setPortraitClaims] = useState<PortraitClaimsView | null>(null);
+  const [portraitClaimsLoading, setPortraitClaimsLoading] = useState(false);
+  const [portraitClaimsLoaded, setPortraitClaimsLoaded] = useState(false);
+  const [portraitClaimBusyId, setPortraitClaimBusyId] = useState<number | null>(null);
   const [accountBusy, setAccountBusy] = useState<AccountBusy>(null);
   const [dataRightsReceipts, setDataRightsReceipts] = useState<DataRetractionReceipt[]>([]);
   const [dataRightsLoading, setDataRightsLoading] = useState(false);
@@ -966,6 +972,39 @@ export function AuroraApp() {
       : "暂时无法忽略这条理解"); }
     finally { setClaimCandidateBusyId(null); }
   };
+
+  // CP-23: the correctable-portrait claims view and its owner actions. Every action
+  // refreshes the whole view so state transitions (parked list, unknown count) stay honest.
+  const loadPortraitClaims = async () => {
+    setPortraitClaimsLoading(true);
+    try {
+      setPortraitClaims(await api.portraitClaimsView());
+      setPortraitClaimsLoaded(true);
+    } finally {
+      setPortraitClaimsLoading(false);
+    }
+  };
+  const actOnPortraitClaim = async (claimId: number, action: string,
+    run: () => Promise<unknown>) => {
+    setPortraitClaimBusyId(claimId);
+    try {
+      await run();
+      await loadPortraitClaims();
+      setStatus(skillLocale === "en-SG"
+        ? `Understanding ${action === "delete" ? "deleted" : action === "restore" ? "restored" : "parked"}.`
+        : action === "delete" ? "这条理解已删除。" : action === "restore" ? "这条理解已恢复。" : "这条理解已搁置。");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setPortraitClaimBusyId(null);
+    }
+  };
+  const suppressPortraitClaim = (claimId: number, reason: string) =>
+    void actOnPortraitClaim(claimId, "suppress", () => api.suppressPortraitClaim(claimId, reason || undefined));
+  const restorePortraitClaim = (claimId: number) =>
+    void actOnPortraitClaim(claimId, "restore", () => api.restorePortraitClaim(claimId));
+  const deletePortraitClaim = (claimId: number, reason: string) =>
+    void actOnPortraitClaim(claimId, "delete", () => api.deletePortraitClaim(claimId, reason || undefined));
 
   const loadPortraitHistory = async (dim: string) => {
     if (portraitHistory[dim]) return;
@@ -2166,6 +2205,10 @@ export function AuroraApp() {
         <div hidden={meTab !== "profile"}>
         <PortraitView dimensions={portrait} history={portraitHistory} calibrated={portraitCalibrated} busyDim={portraitBusy}
           onLoadHistory={dim => void loadPortraitHistory(dim)} onCalibrate={(dim, oldValue, newValue) => void submitPortraitCalibration(dim, oldValue, newValue)} locale={skillLocale} />
+        <PortraitClaimsPanel view={portraitClaims} loading={portraitClaimsLoading} loaded={portraitClaimsLoaded}
+          busyClaimId={portraitClaimBusyId} onLoad={() => void loadPortraitClaims()}
+          onSuppress={suppressPortraitClaim} onRestore={restorePortraitClaim} onDelete={deletePortraitClaim}
+          locale={skillLocale} />
         </div>
         <div hidden={meTab !== "account"}>
         <AccountSettings busy={accountBusy} message={accountMessage} onChangePassword={(oldPassword, newPassword) => changeAccountPassword(oldPassword, newPassword)}

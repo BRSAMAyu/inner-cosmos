@@ -11,6 +11,7 @@ import java.util.List;
 public interface PortraitClaimViewService {
 
     record ClaimView(
+            Long claimId,
             String claimKey,
             String claimType,
             String state,
@@ -21,7 +22,12 @@ public interface PortraitClaimViewService {
             String sourceType) {
     }
 
-    record PortraitView(List<ClaimView> claims, int unknownDimensions, String explanation) {
+    /**
+     * @param suppressed the owner's parked claims (status=SUPPRESSED): out of every current
+     *                   surface, listed only here so the owner can restore them.
+     */
+    record PortraitView(List<ClaimView> claims, int unknownDimensions, String explanation,
+                        List<ClaimView> suppressed) {
     }
 
     /**
