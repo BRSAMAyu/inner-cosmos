@@ -293,6 +293,15 @@ export type DialogSessionSummary = {
   pinnedAt: string | null;
   updatedAt: string | null;
 };
+/** CP-18: honest cross-session opening context — GET /api/dialog/continuity. */
+export type DialogContinuityCarryNote = { kind: string; text: string; provenance: string };
+export type DialogContinuity = {
+  hasPrior: boolean;
+  priorSessionId: number | null;
+  priorActiveAt: string | null;
+  carryForward: DialogContinuityCarryNote[];
+  openingLine: string;
+};
 export type SlowLetter = {
   id: number; senderUserId: number; receiverUserId: number; receiverCapsuleId: number; title: string; letterBody: string; status: string;
   parallaxDistance: number; estimatedArrivalAt: string; scheduledArrivalAt?: string | null; deliveryPreset?: DeliveryPreset | null;
@@ -910,6 +919,9 @@ export const api = {
   dialogSessions: (includeArchived = false) => request<DialogSessionSummary[]>(
     `/api/dialog/session?limit=50&includeArchived=${includeArchived}`),
   currentDialogSession: () => request<DialogSessionSummary | null>("/api/dialog/session/current"),
+  /** CP-18: the opening context of a fresh conversation — provenance-labeled carry-forward
+   * from the user's real previous conversation, or an explicit first-conversation state. */
+  dialogContinuity: () => request<DialogContinuity>("/api/dialog/continuity"),
   dialogSession: (sessionId: number) => request<DialogSessionSummary>(`/api/dialog/session/${sessionId}`),
   updateDialogSession: (sessionId: number, patch: {
     title?: string; archived?: boolean; pinned?: boolean;

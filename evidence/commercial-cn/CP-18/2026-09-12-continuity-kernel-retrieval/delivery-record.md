@@ -65,8 +65,16 @@
 5. 全量回归 **1564/1564** 通过（新增 4 测试），1 个既有 Docker 门控跳过；无 schema 变更
 6. 诚实边界：冻结集（cn-commercial-bank-v1）是回复行为场景库，无检索相关性标签，不能直接做 precision@k 对拍；真实向量质量评测需要带标签检索集（后续外部门）与真实 provider 向量
 
+## 第四增量（2026-09-12）：CP-18 前端开屏接线（检查点 18）
+
+1. **API 层**（`web/src/api.ts`）：`DialogContinuity`/`DialogContinuityCarryNote` 类型 + `api.dialogContinuity()` → `GET /api/dialog/continuity`
+2. **组件**（`web/src/components/AuroraOpeningContinuity.tsx`）：诚实开屏卡片——归来者看到开场行 + 每条带"来源：上次对话（M月d日）的整理"标注的 carry 清单 + "想继续，也可以从新的开始——由你决定"；全新用户看到"第一次对话"守卫态与"没有历史包袱"提示，绝不出现伪造的"上次"；有前次但无存留材料也按首次形态呈现（不谎称首次也不伪造）；双语（zh-CN/en-SG）；可手动收起
+3. **Hook**（`web/src/hooks/useAuroraSession.ts`）：新建会话（bootstrap 无可恢复会话 / 显式"新对话"）时拉取 opening context；打开既有会话、用户发出第一条消息、登出时清除——开场卡只属于开场节拍；拉取失败静默为 null，绝不阻塞对话
+4. **接线**（`AuroraApp.tsx`）：卡片渲染于记忆回声卡之后、合成器之前（首次用户无需滚动即可见）；配套 `.opening-continuity` 样式（沿用 continuity-recovery 视觉语言，fresh 态弱化）
+5. **测试**：`AuroraOpeningContinuity.test.tsx` 5/5（null 不渲染/归来者 provenance 双标注/新用户守卫态无伪造/可收起/无存留材料按首次形态）；`useAuroraSession.test.ts` 新增 4 测（新建拉取/恢复既有不拉取/失败不阻塞/新对话重取+打开清除+发言清除）；`npm test -- --run` **717/717 绿**，`tsc -b` 零错误
+
 ## 状态
 
-- CP-18: IN_PROGRESS（服务+API+问候/首轮接线完成；前端开屏消费 carry 与开场行展示后续）
+- CP-18: IN_PROGRESS（服务+API+问候/首轮+前端开屏完成；连续性对用户可见的撤回开关与移动端联动后续）
 - CP-19: IN_PROGRESS（信号提取+adaptive 路由+全轮可观测完成；CP-04 冻结集上的真实增益对拍后续）
 - CP-22: IN_PROGRESS（撤回硬边界+查询归一落地；带标签检索评测集与真实向量对拍后续）

@@ -304,8 +304,8 @@ work_packages:
     evidence_dir: evidence/commercial-cn/CP-18/
     delivery_record: evidence/commercial-cn/CP-18/2026-09-12-continuity-kernel-retrieval/delivery-record.md
     test_command: "./mvnw test -Dtest=ContinuityKernelRetrievalTest"
-    note: "两增量：①SessionContinuityService诚实开场(零伪造/带provenance carry/30天静默窗)+GET /api/dialog/continuity；②continuityGrounding接入主动问候与首条用户消息轮,诊断只暴露计数"
-    next_action: "前端开屏消费carry-forward与开场行；连续性对用户可见的撤回开关"
+    note: "三增量：①SessionContinuityService诚实开场(零伪造/带provenance carry/30天静默窗)+GET /api/dialog/continuity；②continuityGrounding接入主动问候与首条用户消息轮；③前端AuroraOpeningContinuity开屏卡片(归来者carry+provenance+继续/重开选择,新用户首次守卫态,发言/切会话即收起)"
+    next_action: "连续性对用户可见的撤回开关；真机弱网下开屏拉取时序验收"
   - id: CP-19
     title: "双核、上下文与中文理解增益"
     owner: "AI质量"

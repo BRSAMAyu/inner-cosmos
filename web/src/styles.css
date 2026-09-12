@@ -2694,6 +2694,102 @@ input[type="range"]::-moz-range-thumb {
   color: var(--text-secondary);
   line-height: 1.5;
 }
+/* CP-18: the honest opening card of a fresh conversation (in-flow, above the composer). */
+.opening-continuity {
+  display: grid;
+  gap: 12px;
+  padding: 16px 18px;
+  color: var(--text-primary);
+  background:
+    linear-gradient(135deg,
+      color-mix(in srgb, var(--surface-raised) 96%, var(--accent-aurora) 4%),
+      color-mix(in srgb, var(--surface-raised) 90%, transparent));
+  border: 1px solid color-mix(in srgb, var(--accent-aurora) 38%, var(--border-control));
+  border-radius: 18px;
+}
+.opening-continuity.fresh {
+  border-color: var(--hairline-mid);
+  background: color-mix(in srgb, var(--surface-raised) 88%, transparent);
+}
+.opening-continuity header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+.opening-continuity header > div {
+  display: grid;
+  gap: 2px;
+}
+.opening-continuity small {
+  color: var(--accent-aurora-soft);
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.opening-continuity strong {
+  font-family: var(--font-display);
+  font-size: clamp(.98rem, 1.8vw, 1.16rem);
+  line-height: 1.3;
+}
+.opening-continuity-mark {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--surface-raised);
+  background: var(--accent-aurora);
+}
+.opening-continuity.fresh .opening-continuity-mark {
+  color: var(--text-secondary);
+  background: var(--surface-action);
+}
+.opening-continuity header button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  color: var(--text-muted);
+  background: transparent;
+  font-size: 1.15rem;
+}
+.opening-continuity header button:hover,
+.opening-continuity header button:focus-visible {
+  color: var(--text-primary);
+  background: var(--surface-action);
+}
+.opening-continuity ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.opening-continuity li {
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+  border: 1px solid var(--hairline-mid);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--surface-action) 70%, transparent);
+}
+.opening-continuity li .carry-text {
+  color: var(--text-secondary);
+  line-height: 1.5;
+  font-size: .88rem;
+}
+.opening-continuity li .carry-provenance {
+  color: var(--text-muted);
+  font-size: .72rem;
+}
+.opening-continuity .opening-choice {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: .8rem;
+}
 .continuity-recovery ol {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

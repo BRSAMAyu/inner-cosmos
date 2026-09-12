@@ -29,7 +29,8 @@ vi.mock("../api", () => ({
     cancelWakeIntent: vi.fn(),
     psychologySkillSuggestion: vi.fn(),
     triggerGoodbye: vi.fn(),
-    settleAuroraSession: vi.fn()
+    settleAuroraSession: vi.fn(),
+    dialogContinuity: vi.fn()
   },
   streamAurora: vi.fn(),
   replayTurnEvents: vi.fn(),
@@ -70,6 +71,9 @@ beforeEach(() => {
   vi.mocked(api.wakeIntents).mockResolvedValue([]);
   vi.mocked(api.notifications).mockResolvedValue([]);
   vi.mocked(api.safetyResourceCatalog).mockResolvedValue([]);
+  vi.mocked(api.dialogContinuity).mockResolvedValue({
+    hasPrior: false, priorSessionId: null, priorActiveAt: null, carryForward: [], openingLine: "我们从头开始。"
+  });
   window.history.pushState({}, "", "/");
 });
 
@@ -643,6 +647,77 @@ describe("useAuroraSession -- send / streaming / interrupt", () => {
     expect(result.current.activeTurnId).toBeNull();
     expect(setStatus).not.toHaveBeenCalledWith(expect.stringContaining("已从时间线恢复"));
     expect(setStatus).not.toHaveBeenCalledWith(expect.stringContaining("已恢复到打断发生的位置"));
+  });
+});
+
+describe("useAuroraSession -- CP-18 opening continuity", () => {
+  const returningContinuity = {
+    hasPrior: true, priorSessionId: 7, priorActiveAt: "2026-09-10",
+    carryForward: [
+      { kind: "PRIOR_SUMMARY", text: "用户谈到工作转向的犹豫。", provenance: "上次对话（9月10日）的整理" },
+      { kind: "PRIOR_TOPICS", text: "职业转换", provenance: "上次对话（9月10日）的整理" }
+    ],
+    openingLine: "你9月10日聊过一次，我带着那次留下的整理在这里。"
+  };
+
+  it("fetches the opening context when a NEW conversation is created at bootstrap", async () => {
+    vi.mocked(api.dialogContinuity).mockResolvedValue(returningContinuity);
+    const { result } = setup();
+    await act(async () => { await result.current.resolveSession(); });
+    expect(api.dialogContinuity).toHaveBeenCalledOnce();
+    expect(result.current.openingContinuity).toEqual(returningContinuity);
+  });
+
+  it("does not fetch continuity when an existing conversation is resumed", async () => {
+    vi.mocked(api.currentDialogSession).mockResolvedValue({
+      id: 42, title: "昨天没说完的事", status: "ACTIVE", messageCount: 4,
+      preview: null, activeTurnId: null, startedAt: null, lastActivityAt: null,
+      archivedAt: null, pinnedAt: null, updatedAt: null
+    });
+    const { result } = setup();
+    await act(async () => { await result.current.resolveSession(); });
+    expect(api.dialogContinuity).not.toHaveBeenCalled();
+    expect(result.current.openingContinuity).toBeNull();
+  });
+
+  it("a failed continuity fetch never blocks the conversation — falls back to null", async () => {
+    vi.mocked(api.dialogContinuity).mockRejectedValue(new Error("network"));
+    const { result } = setup();
+    let resolved: Awaited<ReturnType<typeof result.current.resolveSession>>;
+    await act(async () => { resolved = await result.current.resolveSession(); });
+    expect(resolved!.aborted).toBe(false);
+    expect(result.current.sessionId).toBe(100);
+    await act(async () => { await Promise.resolve(); });
+    expect(result.current.openingContinuity).toBeNull();
+  });
+
+  it("newConversation refetches continuity; opening an existing conversation clears it; send clears it", async () => {
+    vi.mocked(api.dialogContinuity).mockResolvedValue(returningContinuity);
+    vi.mocked(api.psychologySkillSuggestion).mockResolvedValue(null);
+    vi.mocked(streamAurora).mockResolvedValue("TERMINAL_EVENT");
+    const { result } = setup();
+    await act(async () => { await result.current.resolveSession(); });
+    expect(result.current.openingContinuity).not.toBeNull();
+
+    act(() => { result.current.dismissOpeningContinuity(); });
+    expect(result.current.openingContinuity).toBeNull();
+
+    await act(async () => { await result.current.newConversation(); });
+    expect(api.dialogContinuity).toHaveBeenCalledTimes(2);
+    expect(result.current.openingContinuity).toEqual(returningContinuity);
+
+    await act(async () => { await result.current.openSession({
+      id: 42, title: "旧的对话", status: "ACTIVE", messageCount: 3, preview: null,
+      activeTurnId: null, startedAt: null, lastActivityAt: null,
+      archivedAt: null, pinnedAt: null, updatedAt: null
+    }); });
+    expect(result.current.openingContinuity).toBeNull();
+
+    await act(async () => { await result.current.newConversation(); });
+    expect(result.current.openingContinuity).not.toBeNull();
+    act(() => { result.current.setDraft("我回来了"); });
+    await act(async () => { await result.current.send({ preventDefault: () => undefined } as never); });
+    expect(result.current.openingContinuity).toBeNull();
   });
 });
 

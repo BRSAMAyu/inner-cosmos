@@ -10,6 +10,7 @@ import { AppearanceSettings, capsulePath, connectionTabFromSearch, connectionTab
 import { AuroraConversation } from "./components/AuroraConversation";
 import { AuroraRuntimeDisclosure } from "./components/AuroraRuntimeDisclosure";
 import { AuroraContinuityRecovery } from "./components/AuroraContinuityRecovery";
+import { AuroraOpeningContinuity } from "./components/AuroraOpeningContinuity";
 import { ConversationHistory } from "./components/ConversationHistory";
 import { AuroraMemoryTrace } from "./components/AuroraMemoryTrace";
 import { SafetyResourceCard } from "./components/SafetyResourceCard";
@@ -1821,6 +1822,9 @@ export function AuroraApp() {
       <AuroraMemoryTrace trace={auroraSession.memoryTrace} memories={memories}
         locale={skillLocale} onOpenMemory={openMemoryEvidence}
         onDismiss={auroraSession.dismissMemoryTrace} />
+
+      <AuroraOpeningContinuity continuity={auroraSession.openingContinuity}
+        locale={skillLocale} onDismiss={auroraSession.dismissOpeningContinuity} />
 
       {/* The composer sits directly after the hero/mode-picker, before the WakeIntent and
           Self/Emergence "capability display" panels below, so a first-time user (mobile

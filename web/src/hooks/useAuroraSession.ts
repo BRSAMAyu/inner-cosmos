@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import {
   api, ApiRateLimitError, isConsentRequiredError, replayTurnEvents, streamAurora, subscribeProactive,
-  type DialogSessionSummary, type GoodbyeResult, type Notification,
+  type DialogContinuity, type DialogSessionSummary, type GoodbyeResult, type Notification,
   type PsychologySkillSuggestion, type SafetyResource, type WakeIntent
 } from "../api";
 import type { AuroraStreamEvent, DialogMessage, TurnStatus } from "../protocol";
@@ -202,6 +202,16 @@ export function useAuroraSession({
   const [goodbyeResult, setGoodbyeResult] = useState<GoodbyeResult | null>(null);
   const [goodbyeBusy, setGoodbyeBusy] = useState(false);
   const dismissGoodbye = useCallback(() => setGoodbyeResult(null), []);
+  // CP-18: honest cross-session opening context. Fetched when a NEW conversation is created,
+  // cleared when the user opens an existing conversation, speaks, or logs out — the card
+  // belongs to the opening beat only. A fetch failure never blocks the conversation.
+  const [openingContinuity, setOpeningContinuity] = useState<DialogContinuity | null>(null);
+  const loadOpeningContinuity = useCallback(() => {
+    api.dialogContinuity()
+      .then(setOpeningContinuity)
+      .catch(() => setOpeningContinuity(null));
+  }, []);
+  const dismissOpeningContinuity = useCallback(() => setOpeningContinuity(null), []);
 
   // Keep untouched defaults aligned when the user changes language, without overwriting a custom
   // time or purpose they already typed.
@@ -283,13 +293,15 @@ export function useAuroraSession({
     const resumable = returning?.contextSessionId
       ? { id: returning.contextSessionId, activeTurnId: null }
       : linked ?? await api.currentDialogSession();
+    const createdFresh = !resumable;
     const selected = resumable ?? { ...(await api.createSession()), activeTurnId: null };
+    if (createdFresh) loadOpeningContinuity();
     if (isStale?.()) return { sessionId: selected.id, returning, aborted: true };
     pendingResumeTurnRef.current = selected.activeTurnId;
     setSessionId(selected.id);
     rememberConversationInUrl(selected.id);
     return { sessionId: selected.id, returning, aborted: false };
-  }, [rememberConversationInUrl]);
+  }, [loadOpeningContinuity, rememberConversationInUrl]);
 
   const loadSessions = useCallback((includeArchived = false) => {
     includeArchivedSessionsRef.current = includeArchived;
@@ -422,6 +434,7 @@ export function useAuroraSession({
     setSessionId(selected.id);
     rememberConversationInUrl(selected.id);
     setMemoryTrace(null);
+    setOpeningContinuity(null); // an existing conversation has live history, not an opening beat
     eventIdsRef.current.clear();
     lastEventIdRef.current = "";
     await replaceFromHistory(selected.id);
@@ -440,10 +453,11 @@ export function useAuroraSession({
       };
       setSessions(current => [selected, ...current]);
       await openSession(selected);
+      loadOpeningContinuity(); // after openSession clears it — this conversation is the new opening
     } finally {
       setSessionsBusy(false);
     }
-  }, [openSession, skillLocale]);
+  }, [loadOpeningContinuity, openSession, skillLocale]);
 
   const renameConversation = useCallback(async (selected: DialogSessionSummary, title: string) => {
     const updated = await api.updateDialogSession(selected.id, { title });
@@ -726,6 +740,9 @@ export function useAuroraSession({
     // fast foreground acknowledgement appears, so it can never be mistaken for evidence about
     // the new message while the deep kernel is still working.
     setMemoryTrace(null);
+    // CP-18: the opening beat ends the moment the user speaks — the conversation now has
+    // live context of its own and the carry card would only compete with it.
+    setOpeningContinuity(null);
     setMessages(current => [
       ...current,
       { key: `local-${crypto.randomUUID()}`, speaker: "USER", text }
@@ -913,6 +930,7 @@ export function useAuroraSession({
     setInnerVoice(null);
     setMemoryTrace(null);
     setContinuitySignal(null);
+    setOpeningContinuity(null);
   }, [beginNewTurnGeneration]);
 
   // Gemini audit 4.1: unmount must cancel any in-flight stream/recovery the same way logout does
@@ -934,6 +952,7 @@ export function useAuroraSession({
     wakeIntents, wakeBusy, returnWhen, setReturnWhen, returnPurpose, setReturnPurpose,
     notifications, safetyAlert, dismissSafetyAlert,
     safetyResources, loadSafetyResources, goodbyeResult, goodbyeBusy, dismissGoodbye, triggerGoodbye,
+    openingContinuity, dismissOpeningContinuity,
     send, stop, scheduleReturn, respondToReturn, postponeReturn, cancelReturn,
     resolveSession, replaceFromHistory, loadSessions, loadWakeIntents, loadNotifications, refreshNotifications,
     openSession, newConversation, renameConversation, pinConversation, archiveConversation,
