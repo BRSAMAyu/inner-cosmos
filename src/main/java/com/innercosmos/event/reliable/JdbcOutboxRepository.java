@@ -21,20 +21,41 @@ public class JdbcOutboxRepository {
     private final TransactionTemplate transactions;
 
     public JdbcOutboxRepository(JdbcTemplate jdbc, PlatformTransactionManager transactionManager) {
+        boolean isPostgres;
+        try {
+            isPostgres = jdbc.getDataSource() != null && jdbc.getDataSource().getConnection()
+                    .getMetaData().getURL().contains(":postgresql:");
+        } catch (Exception ignored) {
+            isPostgres = false;
+        }
+        this.postgres = isPostgres;
         this.jdbc = jdbc;
         this.transactions = new TransactionTemplate(transactionManager);
     }
 
+    /** H2 (tests) has no jsonb; PostgreSQL keeps the explicit cast for its jsonb column. */
+    private final boolean postgres;
+
     public boolean append(UUID eventId, String dedupKey, String aggregateType, String aggregateId,
                           String eventType, int schemaVersion, String payload, String traceId) {
-        int inserted = jdbc.update("""
+        String sql = postgres
+                ? """
                 INSERT INTO tb_outbox_event
                     (event_id, dedup_key, aggregate_type, aggregate_id, event_type,
                      schema_version, payload, trace_id, status, available_at)
                 VALUES (?, ?, ?, ?, ?, ?, CAST(? AS jsonb), ?, 'PENDING', CURRENT_TIMESTAMP)
                 ON CONFLICT (dedup_key) DO NOTHING
-                """, eventId, dedupKey, aggregateType, aggregateId, eventType,
-                schemaVersion, payload, traceId);
+                """
+                // H2 twin runs in MySQL compatibility mode: INSERT IGNORE dedups on the
+                // unique dedup_key the same way ON CONFLICT DO NOTHING does on PostgreSQL.
+                : """
+                INSERT IGNORE INTO tb_outbox_event
+                    (event_id, dedup_key, aggregate_type, aggregate_id, event_type,
+                     schema_version, payload, trace_id, status, available_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', CURRENT_TIMESTAMP)
+                """;
+        int inserted = jdbc.update(sql, eventId, dedupKey, aggregateType, aggregateId,
+                eventType, schemaVersion, payload, traceId);
         return inserted == 1;
     }
 

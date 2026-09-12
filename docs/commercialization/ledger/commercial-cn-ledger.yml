@@ -552,7 +552,11 @@ work_packages:
     stage: S1
     depends_on: ["CP-01"]
     vision_ids: ["V05", "V07", "V15"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
+    delivery_record: evidence/commercial-cn/CP-39/2026-09-12-outbox-reliability/delivery-record.md
+    test_command: "./mvnw test -Dtest=OutboxReliabilityContractTest"
+    note: "首个增量：outbox可靠性——补data.retracted.v1缺失handler(v1 schema校验+inbox回执),writer↔handler登记合同,dedup append幂等,方言分支修复(append从未在H2运行过),毒/未知事件入DEAD+replayDead复活(Postgres门控)"
+    next_action: "真实PG空库/旧库升级与N-N-1并行演练(operator门禁)；未知事件DLQ看板(CP-40联动)"
     evidence_dir: evidence/commercial-cn/CP-39/
   - id: CP-40
     title: "可观测性、成本与用户影响"
