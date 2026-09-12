@@ -117,7 +117,7 @@ export function PortraitClaimsPanel({ view, loading, loaded, busyClaimId, onLoad
         )}
       </div>
       {reasonFor === claim.claimId && !suppressed && <div className="portrait-claim-reason">
-        <input type="text" maxLength={120} value={reason}
+        <input type="text" maxLength={120} value={reason} aria-label={t.reasonPlaceholder}
           onChange={event => setReason(event.target.value)} placeholder={t.reasonPlaceholder} />
         <div className="portrait-claim-reason-actions">
           <button type="button" onClick={() => setReasonFor(null)}>{t.cancel}</button>

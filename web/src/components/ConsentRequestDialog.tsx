@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import type { Locale } from "../i18n";
 import { AsyncButton } from "../loading";
 
@@ -5,6 +6,10 @@ import { AsyncButton } from "../loading";
 // CONSENT_REQUIRED (initially: sending content to a real model provider). The refusal copy
 // comes from the consent registry so the dialog never promises more than the contract.
 // Declining is a real choice — the draft stays and local-only features keep working.
+//
+// CP-12 WCAG 2.2 AA keyboard/focus contract: opening the dialog moves focus INTO it (a
+// keyboard user is never left focused behind the modal backdrop), Escape dismisses without
+// granting, and focus returns to the element that opened it when the dialog closes.
 
 const COPY: Record<Locale, {
   title: string; grantAndContinue: string; notNow: string; busy: string;
@@ -37,12 +42,30 @@ export function ConsentRequestDialog({ open, purposeCode, description, withdrawa
   onDismiss: () => void;
   locale?: Locale;
 }) {
+  const previouslyFocused = useRef<HTMLElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    previouslyFocused.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement : null;
+    // Focus lands on the dialog panel itself first — not pre-selecting "grant" — so neither
+    // choice is the keyboard default for a decision that must be the user's own.
+    panelRef.current?.focus();
+    return () => {
+      previouslyFocused.current?.focus?.();
+    };
+  }, [open]);
+
   if (!open) return null;
   const copy = COPY[locale];
   return (
     <div className="consent-request-backdrop" role="dialog" aria-modal="true"
-         aria-labelledby="consent-request-title" data-purpose={purposeCode}>
-      <div className="consent-request">
+         aria-labelledby="consent-request-title" data-purpose={purposeCode}
+         onKeyDown={event => {
+           if (event.key === "Escape" && !busy) onDismiss();
+         }}>
+      <div className="consent-request" ref={panelRef} tabIndex={-1}>
         <h4 id="consent-request-title">{copy.title}</h4>
         <p className="consent-purpose"><strong>{purposeCode}</strong></p>
         <p className="consent-description">{description}</p>

@@ -232,8 +232,12 @@ work_packages:
     stage: S2
     depends_on: ["CP-10", "CP-11", "CP-24", "CP-33"]
     vision_ids: ["V02", "V06", "V12", "V14"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-12/
+    delivery_record: evidence/commercial-cn/CP-12/2026-09-12-a11y-contract/delivery-record.md
+    test_command: "cd web && npm test -- --run src/components/NonAuthorUsabilityContract.test.tsx"
+    note: "首个可编码增量：WCAG 2.2 AA 自动化合同——同意对话框焦点契约(移入不预选/Escape=不授权/busy守卫/焦点归还)+三个新表面控件全具名+样式表静态合同(reduced-motion/focus-visible/根字号不钉死)"
+    next_action: "对比度自动化审计(令牌级)；CP-12A 真人无讲解研究(15人,人工门)"
   - id: CP-13
     title: "国内身份与多设备账户安全"
     owner: "后端身份＋移动"
@@ -316,8 +320,8 @@ work_packages:
     evidence_dir: evidence/commercial-cn/CP-19/
     delivery_record: evidence/commercial-cn/CP-18/2026-09-12-continuity-kernel-retrieval/delivery-record.md
     test_command: "./mvnw test -Dtest=ContinuityKernelRetrievalTest"
-    note: "三增量：①KernelRoutingPolicy纯函数(危机走支持流,复杂度三信号升双核)；②TurnSignals.from生产提取+adaptive双腿路由+每轮可观测；③冻结集对拍harness(development分裂81场景两路径模块契约+路由分布如实记录:简单轮次主导81/81 SINGLE,预算腿1 DUAL)"
-    next_action: "真实provider上SINGLE vs DUAL内容增益评分；预算压力fixture(长输入/多部分/风险密集)"
+    note: "四增量：①KernelRoutingPolicy纯函数(危机走支持流,复杂度三信号升双核)；②TurnSignals.from生产提取+adaptive双腿路由+每轮可观测；③冻结集对拍harness(development分裂81场景,简单轮次主导如实记录)；④预算压力fixture——七类压力轴(长叙述/分析请求/多部分/困境/危机/简单对照)逐轴断言路由与adaptive决策,双核路径模块契约验证"
+    next_action: "真实provider上SINGLE vs DUAL内容增益评分"
   - id: CP-20
     title: "风险连续性与危机处置运行时"
     owner: "AI安全＋信任与安全"
