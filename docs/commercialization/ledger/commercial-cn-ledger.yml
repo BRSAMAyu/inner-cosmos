@@ -672,7 +672,9 @@ work_packages:
     delivery_record: evidence/commercial-cn/CP-49/2026-09-12-supply-chain/delivery-record.md
     test_command: "cd web && npm test -- --run src/PackageManagerContract.test.ts"
     note: "首个增量：供应链唯一权威——删除并存npm lockfile(pnpm-lock.yaml为唯一),7个latest按锁定版本钉死,PackageManagerContract CI合同(单lockfile/精确packageManager/零浮动区间/禁npm install),SBOM与CVE命令基线"
-    next_action: "发布流程实跑SBOM归档与镜像签名；CVE扫描接入CI(需NVD key)"
+    delivery_record: evidence/commercial-cn/CP-49/2026-09-13-release-manifest-and-sbom/delivery-record.md
+    note2: "第二增量：版本化发布清单——generate-release-manifest.ps1(git SHA/双版本/产物与SBOM的SHA256,缺失即absent绝不占位)+assert-release-manifest.ps1(fail-closed:形状/活体漂移守卫/absent不重叠)+release-image.yml接线(双SBOM生成→清单断言→upload-artifact SHA钉扎 if-no-files-found=error)+ReleaseManifestScriptContractTest 2/2文本级钉住接线;本地实跑生成器+断言器通过"
+    next_action: "发布流程实际执行(tag推送)与镜像签名密钥策略为operator门禁；CVE扫描接入CI(需NVD key)"
     evidence_dir: evidence/commercial-cn/CP-49/
   - id: CP-50
     title: "真实压力、故障与灾难恢复"

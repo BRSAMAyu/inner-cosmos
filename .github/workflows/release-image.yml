@@ -59,6 +59,31 @@ jobs:
           ./scripts/scan-secrets.ps1
           ./scripts/scan-secrets.ps1 -History
           ./scripts/academy/validate-schema-version.ps1
+      # CP-49/CP-41 release engineering: dependency SBOMs + a digested release manifest
+      # are part of every release; the manifest asserts its own honesty (absent artifacts
+      # carry no digests) and is archived as a workflow artifact for evidence/CP-49.
+      - name: Generate CycloneDX SBOMs (backend aggregate + web)
+        shell: bash
+        run: |
+          ./mvnw -B org.cyclonedx:cyclonedx-maven-plugin:2.8.0:makeAggregateBom
+          cd web && pnpm dlx @cyclonedx/cyclonedx-npm --output-file cyclonedx.json
+      - name: Generate and assert the release manifest
+        shell: pwsh
+        env:
+          REQUESTED_TAG: ${{ inputs.tag }}
+        run: |
+          $tag = if ("$env:REQUESTED_TAG") { "$env:REQUESTED_TAG" } else { "$env:GITHUB_REF_NAME" }
+          ./scripts/release/generate-release-manifest.ps1 -Version $tag
+          ./scripts/release/assert-release-manifest.ps1
+      - name: Archive release manifest and SBOMs
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-manifest-${{ inputs.tag || github.ref_name }}
+          path: |
+            release-manifest.json
+            target/bom.json
+            web/cyclonedx.json
+          if-no-files-found: error
 
   build-sign:
     needs: verify
