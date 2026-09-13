@@ -1,0 +1,38 @@
+# CP-52 逐渠道 Go/No-Go 台账
+# 契约测试（LaunchGoNoGoContractTest）交叉读取 ../regulatory/submissions.ledger.yml：
+# 任何渠道在 CP-51B 提审 review_outcome ≠ PASSED 时，decision 只能是 NO_GO——
+# Go/No-Go 永远不能跑在提审台账前面（51B 阻断，二者互不晋升的反向版）。
+# decision ∈ {GO, NO_GO}；GO 要求候选 manifest 五方签字齐全、J01-J12 全 PASSED、
+# 六个发布开关全部 available——全部是 operator 事实。
+
+channels:
+  - channel: web-pwa
+    decision: NO_GO
+    rationale: CP-51B 提审未通过（review_outcome=PENDING，blocks_launch=true）
+    decided_by: null
+    decided_at: null
+  - channel: apple-cn
+    decision: NO_GO
+    rationale: CP-51B 提审未通过（review_outcome=PENDING，blocks_launch=true）
+    decided_by: null
+    decided_at: null
+  - channel: xiaomi
+    decision: NO_GO
+    rationale: CP-51B 提审未通过（review_outcome=PENDING，blocks_launch=true）
+    decided_by: null
+    decided_at: null
+  - channel: oppo
+    decision: NO_GO
+    rationale: CP-51B 提审未通过（review_outcome=PENDING，blocks_launch=true）
+    decided_by: null
+    decided_at: null
+  - channel: huawei
+    decision: NO_GO
+    rationale: CP-51B 提审未通过（review_outcome=PENDING，blocks_launch=true）
+    decided_by: null
+    decided_at: null
+  - channel: vivo-others
+    decision: NO_GO
+    rationale: CP-51B 提审未通过（review_outcome=PENDING，blocks_launch=true）
+    decided_by: null
+    decided_at: null

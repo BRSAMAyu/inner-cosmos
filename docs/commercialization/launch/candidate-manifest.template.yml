@@ -1,0 +1,86 @@
+# CP-52 发布候选 manifest 模板（release candidate manifest）
+# 契约测试：src/test/java/com/innercosmos/launch/LaunchGoNoGoContractTest.java
+# 用法：每次候选从本模板复制为 candidate-<version>.yml（如 candidate-v0.2.0.yml），
+# 由发布总负责人维护；verdict/signoff/available 全部为 operator 事实——coding agent
+# 只能建骨架，任何"通过/签字/可用"必须来自真实演练与外部证据（evidence 路径）。
+#
+# 蓝图 CP-52：同一候选的工程、法律、体验、运营、支付与恢复五方签字；没有 P0 缺陷
+# 和未落实的必要人工门；公告/状态页/客服/应用更新/回滚/暂停注册开关均可用。
+
+candidate:
+  candidate_id: null            # 复制时填 candidate-v<x.y.z>
+  release_manifest: release-manifest.json   # 检查点 36 的版本化发布清单（同 SHA 构建绑定）
+  version_tag: null             # v 前缀语义版本，须与 release-manifest.version 一致
+  git_sha: null                 # 40hex，须与 release-manifest.gitSha 一致
+
+five_party_signoffs:            # 五方签字：null 直到真人签字（operator-only）
+  engineering: null             # 工程：构建/测试/镜像/设备矩阵
+  legal: null                   # 法律：CP-51A 程序状态与适用范围
+  experience: null              # 体验：J01-J12 真机重走
+  operations: null              # 运营：客服/值班/公告/状态页
+  payments_and_recovery: null   # 支付与恢复：对账/退款/回滚/权益保留
+
+open_p0_defects: null           # 由缺陷追踪回填实际计数；任何 P0 未清即不得 GO（不是手填声明）
+
+# 十二条跨端验收旅程（蓝图 §3.2）：release 设备 + 真实模型 + 国内生产镜像重走。
+# verdict ∈ {PENDING, PASSED, FAILED}；PASSED 必须带 evidence；FAILED 必须带缺陷链接。
+journeys:
+  - id: J01
+    name: 看懂价值→年龄/账户→渐进同意→首次表达→选择是否记住
+    verdict: PENDING
+    evidence: null
+  - id: J02
+    name: 中文自然倾听；不建议立即生效；打断/停止/断流终态明确
+    verdict: PENDING
+    evidence: null
+  - id: J03
+    name: 麦克风按需；转写可编辑；静音/来电/后台/拒绝可恢复
+    verdict: PENDING
+    evidence: null
+  - id: J04
+    name: 7/30/90 日回访；用户纠正优先；事实/推断/冲突分清
+    verdict: PENDING
+    evidence: null
+  - id: J05
+    name: 星空/列表找来源→纠正→看影响→第二设备同状态
+    verdict: PENDING
+    evidence: null
+  - id: J06
+    name: 一周复盘呈现依据/反例/变化；行动是选择不是作业
+    verdict: PENDING
+    evidence: null
+  - id: J07
+    name: 预约或显式允许的主动关心；可改时间/暂停/取消；锁屏不泄露主题
+    verdict: PENDING
+    evidence: null
+  - id: J08
+    name: 选侧面→逐项授权→公开预览/试聊边界→沙盒→发布
+    verdict: PENDING
+    evidence: null
+  - id: J09
+    name: 撤回记忆/共鸣体→旧会话/缓存/队列停止新使用→逐资产进度
+    verdict: PENDING
+    evidence: null
+  - id: J10
+    name: 找相似/互补/意外→理解推荐→试聊→慢信→双向往来
+    verdict: PENDING
+    evidence: null
+  - id: J11
+    name: 静默退出/拉黑→举报/申诉；各面一致执行不泄露拒绝细节
+    verdict: PENDING
+    evidence: null
+  - id: J12
+    name: 购买/扣款超时→恢复权益→取消/退款→导出/注销；数据权利无付费墙
+    verdict: PENDING
+    evidence: null
+
+# 发布开关：全部 available 才允许任何渠道 GO；available 必须带演练证据。
+launch_switches:
+  announcement: { available: "false", evidence: null }      # 公告
+  status_page: { available: "false", evidence: null }       # 状态页
+  support_ready: { available: "false", evidence: null }     # 客服（CP-48 台账就位）
+  app_update_channel: { available: "false", evidence: null } # 应用更新
+  rollback_plan: { available: "false", evidence: null }     # 回滚（只回退兼容且合法的版本）
+  registration_pause_switch: { available: "false", evidence: null } # 暂停注册开关
+
+abort_thresholds: 预设技术与业务阈值触发 abort；保留已付费权益/退款与数据权利；公开说明真实影响，不把回滚称"从未发生"

@@ -1,0 +1,249 @@
+# CP-56 投资人/导师数据室骨架（investor & mentor data room skeleton）
+# 来源：商业化执行蓝图 §6.4（投资人应看到的公司，而不是项目演示）与 CP-56 工作包。
+# 契约测试：src/test/java/com/innercosmos/investors/DataRoomContractTest.java
+#
+# 诚实规则（结构性强制）：
+# - status ∈ {PENDING, IN_PROGRESS}：不存在 DONE/READY/COMPLETED，更不存在任何
+#   "融资成功"态——"材料完成"只是材料完成，未获融资不等于产品失败
+# - evidence 在 status 推进前必须为 null：证据指针只能由 operator 以真实外部材料
+#   回填；coding agent 只搭结构并在 source_or_pending 里写来源或待验证说明
+# - 数字类项（含 verdict 字段）：每个对外数字必须有 definition/date/denominator/来源；
+#   市场输入未取得时 verdict=PENDING_VALIDATION 且 value=null，不填精确 TAM/SAM
+# - 任何层不得引用 P0 私密对话原文或可重新识别的人格数据；投资人/导师/评委
+#   只使用授权脱敏材料或明确标注合成的演示账户，投资人对 P0 无读取权
+# - 附未关闭事项（open-items-registry）、失败样本（research-failure-samples）、
+#   研究分母与日期（research-denominators），随数据室如实披露
+
+items:
+  # ---------- 层 1：公司/股权/IP ----------
+  - item_id: corporate-structure-equity
+    layer: corporate-equity-ip
+    title: 公司主体、章程、股权结构与期权池（cap table）
+    status: PENDING
+    evidence: null
+    source_or_pending: 待 operator 提供工商登记档案、股东协议与出资凭证；本条目仅先行冻结结构
+  - item_id: ip-catalog
+    layer: corporate-equity-ip
+    title: IP 清单（自研代码权属、商标、域名、软件著作权）
+    status: PENDING
+    evidence: null
+    source_or_pending: 待法务盘点代码权属、商标/软著申请回执与域名登记记录
+  - item_id: third-party-licensing
+    layer: corporate-equity-ip
+    title: 第三方与开源依赖授权及模型服务条款登记
+    status: PENDING
+    evidence: null
+    source_or_pending: 待整理依赖清单与各模型供应商条款（处理位置、可转让性、再授权限制逐项登记）
+
+  # ---------- 层 2：用户研究 ----------
+  - item_id: research-denominators
+    layer: user-research
+    title: 研究分母与日期登记（CP-54A/54B 各批次）
+    status: PENDING
+    evidence: null
+    source_or_pending: 待 CP-54 研究执行后由研究负责人回填每批招募分母、入队人数、失访与剔除口径
+    definition: 每批真人研究的招募触达分母、知情同意入队人数、观察窗起止日期与失访/剔除口径；团队与同学样本、合成账号分别单列
+    date: null
+    denominator: null
+    verdict: PENDING_VALIDATION
+    value: null
+  - item_id: research-synthesis-deidentified
+    layer: user-research
+    title: 用户研究综合报告（授权脱敏访谈与问卷摘要，仅脱敏层）
+    status: PENDING
+    evidence: null
+    source_or_pending: 待 CP-54 产出后脱敏；对外仅提供授权脱敏摘要，不含可重新识别人格数据
+  - item_id: research-failure-samples
+    layer: user-research
+    title: 研究失败样本附录（未成立假设、失访与负面压力记录）
+    status: PENDING
+    evidence: null
+    source_or_pending: 待 CP-54 记录 H1–H3 判定、停止门触发与失败批次；失败样本随数据室如实披露
+  - item_id: synthetic-demo-accounts
+    layer: user-research
+    title: 合成演示账户与外部访问授权登记
+    status: PENDING
+    evidence: null
+    source_or_pending: 待 operator 建立明确标注合成的演示账户，并登记导师/评委/投资人的访问授权与期限
+
+  # ---------- 层 3：产品与竞品证据 ----------
+  - item_id: product-demo-8min
+    layer: product-competitive-evidence
+    title: 8 分钟产品演示脚本与录像（成人场景、隐私边界与取消路径可见）
+    status: PENDING
+    evidence: null
+    source_or_pending: 待 CP-53 素材与真实环境演示录像；演示不使用任何真实用户数据
+  - item_id: competitive-landscape
+    layer: product-competitive-evidence
+    title: 竞品与替代方案证据表（直接竞品与非 AI 替代对照）
+    status: IN_PROGRESS
+    evidence: null
+    source_or_pending: 结构整理中；待产品研究补充逐竞品的功能、定价、边界证据与来源链接
+  - item_id: market-tam-bottomup
+    layer: product-competitive-evidence
+    title: 可达市场 bottom-up 模型（拒绝精确 TAM 宣称）
+    status: PENDING
+    evidence: null
+    source_or_pending: 市场输入未取得；待按目标细分乘以实际可达渠道乘以验证转化建立，不以全部社交用户作 SAM
+    definition: 目标细分成年用户规模乘以实际可达渠道触达乘以已验证转化率推得的可达收入区间；逐个输入列出来源与口径
+    date: null
+    denominator: null
+    verdict: PENDING_VALIDATION
+    value: null
+
+  # ---------- 层 4：队列留存 ----------
+  - item_id: d30-value-retention
+    layer: cohort-retention
+    title: D30 窗口价值留存（真实用户队列）
+    status: PENDING
+    evidence: null
+    source_or_pending: 待 CP-54A 60–100 名成年用户至少 35 日观察窗成熟后回填
+    definition: 35 日观察窗内第 30 日仍完成至少一次预设价值任务的用户数除以期初入队真实成年用户数；团队/同学与合成账号分层单列
+    date: null
+    denominator: null
+    verdict: PENDING_VALIDATION
+    value: null
+  - item_id: cohort-batch-tables
+    layer: cohort-retention
+    title: 分批队列留存表（两批独立观察，原始分母与失访随附）
+    status: PENDING
+    evidence: null
+    source_or_pending: 待 CP-54B 至少两成熟独立批次后由研究负责人产出；不以补贴活跃冒充自然留存
+  - item_id: k1-k2-preregistered
+    layer: cohort-retention
+    title: K1/K2 预注册关键结果登记
+    status: PENDING
+    evidence: null
+    source_or_pending: 待按 CP-54 预注册文档回填指标定义、判定门与结果
+    definition: CP-54 首发前冻结的 K1/K2 关键结果口径与判定门，随附预注册文档指针与统计截止日期
+    date: null
+    denominator: null
+    verdict: PENDING_VALIDATION
+    value: null
+
+  # ---------- 层 5：订单与退款 ----------
+  - item_id: order-refund-ledger
+    layer: orders-refunds
+    title: 订单、实收与退款台账（渠道、税费、退款分列）
+    status: PENDING
+    evidence: null
+    source_or_pending: 待 CP-55 真实交易与完整结算期后由财务从渠道对账单回填
+  - item_id: refund-rate
+    layer: orders-refunds
+    title: 退款率（按月、按渠道）
+    status: PENDING
+    evidence: null
+    source_or_pending: 待完整结算期数据；先冻结计算口径，数值后置
+    definition: 自然月退款金额除以同期不含税实收金额，按渠道分列并附渠道对账单来源
+    date: null
+    denominator: null
+    verdict: PENDING_VALIDATION
+    value: null
+  - item_id: pricing-experiment-results
+    layer: orders-refunds
+    title: CP-55 定价与渠道实验结果（预注册、停止门与真实续费）
+    status: PENDING
+    evidence: null
+    source_or_pending: 待 CP-55 至少两成熟批次与完整结算期；付费意向与真实付款分开列示
+
+  # ---------- 层 6：单位经济与现金计划 ----------
+  - item_id: cost-per-active-task
+    layer: unit-economics-cash-plan
+    title: 每任务与每活跃用户直接成本（真实账单口径）
+    status: PENDING
+    evidence: null
+    source_or_pending: 待按真实供应商账单核算（模型 ID、缓存价、批处理价、币种逐项核对）
+    definition: 按蓝图 §6.2 算法：输入与输出 token 单价加 ASR 分钟费加 TTS 费加 embedding 与审核费加重试失败调用费；免费与付费用户分别核算
+    date: null
+    denominator: null
+    verdict: PENDING_VALIDATION
+    value: null
+  - item_id: contribution-margin
+    layer: unit-economics-cash-plan
+    title: 贡献利润与贡献率（R 减 C，固定支出另计）
+    status: PENDING
+    evidence: null
+    source_or_pending: 待 CP-55 结算数据与真实账单；正贡献率不得表述为净盈利
+    definition: 月净服务收入 R（不含税实收减退款减支付与商店费用）减可变直接成本 C（全部免费与付费用户的模型、语音、按量云、审核与客服）；贡献率为贡献利润除以 R
+    date: null
+    denominator: null
+    verdict: PENDING_VALIDATION
+    value: null
+  - item_id: cash-plan-18m
+    layer: unit-economics-cash-plan
+    title: 18 个月现金计划（月粒度，低、基准、高三情景）
+    status: PENDING
+    evidence: null
+    source_or_pending: 待财务按月列期初现金、实收、退款、成本、薪酬社保、法务测评、获客、税务与期末现金；融资金额从下一组可证实里程碑倒推，不从想要的估值倒推
+
+  # ---------- 层 7：合规与供应商合同 ----------
+  - item_id: compliance-ledger-index
+    layer: compliance-vendor-contracts
+    title: 合规台账索引（法定程序与商店提审状态及未关闭项）
+    status: IN_PROGRESS
+    evidence: null
+    source_or_pending: 引用 docs/commercialization/regulatory/ 台账的真实状态；数据室仅做索引不复制结论
+  - item_id: vendor-contract-register
+    layer: compliance-vendor-contracts
+    title: 供应商合同登记（模型、云、支付、审核，含处理位置与数据条款）
+    status: PENDING
+    evidence: null
+    source_or_pending: 待 operator 提供已签合同或供应商正式报价；未签署的只登记候选与谈判状态
+  - item_id: privacy-consent-versions
+    layer: compliance-vendor-contracts
+    title: 隐私政策、同意版本与数据分层执行说明
+    status: PENDING
+    evidence: null
+    source_or_pending: 待法务定稿隐私政策与同意流版本；对外仅说明分层治理与访问控制，不提供任何用户私密材料
+
+  # ---------- 层 8：架构/安全/事故 ----------
+  - item_id: architecture-overview
+    layer: architecture-security-incidents
+    title: 架构与数据流说明（隐私分层、模型网关、环境分离）
+    status: IN_PROGRESS
+    evidence: null
+    source_or_pending: 依据仓库既有架构文档整理投资人视图；课堂环境与生产边界如实标注
+  - item_id: security-posture
+    layer: architecture-security-incidents
+    title: 安全基线与审计证据（密钥管理、网络隔离实测、备份演练）
+    status: PENDING
+    evidence: null
+    source_or_pending: 待安全测评与演练记录；网络隔离须给出实测结论而非 YAML 渲染成功
+  - item_id: incident-log
+    layer: architecture-security-incidents
+    title: 事故登记与复盘（时间线、影响、处置、复发防止）
+    status: PENDING
+    evidence: null
+    source_or_pending: 待运营期真实事故记录；无事故时记录零事故观察期与观察窗口而非留空
+
+  # ---------- 层 9：团队能力与资金里程碑 ----------
+  - item_id: team-capability-matrix
+    layer: team-funding-milestones
+    title: 团队能力矩阵与关键人员（真实分工、外部顾问）
+    status: PENDING
+    evidence: null
+    source_or_pending: 待创始人提供真实人员与顾问名单；能力矩阵按已证实交付记录而非头衔
+  - item_id: hiring-gaps
+    layer: team-funding-milestones
+    title: 人员缺口与招聘计划（岗位、时机、预算）
+    status: PENDING
+    evidence: null
+    source_or_pending: 待与 18 个月现金计划联动确定；缺口岗位与到岗里程碑同列
+  - item_id: use-of-funds
+    layer: team-funding-milestones
+    title: 融资用途说明（按下一组可证实里程碑倒推）
+    status: PENDING
+    evidence: null
+    source_or_pending: 待现金计划成熟后拆分用途；不从想要的估值倒推虚假收入
+  - item_id: next-round-milestones
+    layer: team-funding-milestones
+    title: 下一轮里程碑（可核验口径、判定门与目标区间）
+    status: PENDING
+    evidence: null
+    source_or_pending: 待与 CP-54、CP-55 结果和现金计划对齐后冻结；每项里程碑须可由外部证据核验
+  - item_id: open-items-registry
+    layer: team-funding-milestones
+    title: 未关闭事项登记（跨层汇总：合规、安全、产品、研究）
+    status: PENDING
+    evidence: null
+    source_or_pending: 待汇总各层未关闭门并逐项给出责任人与关闭口径；数据室内如实随附，不隐藏坏消息

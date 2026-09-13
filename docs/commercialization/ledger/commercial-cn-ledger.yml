@@ -712,7 +712,10 @@ work_packages:
     stage: S3
     depends_on: ["CP-12B", "CP-19", "CP-20", "CP-25", "CP-28", "CP-30", "CP-32", "CP-34", "CP-41", "CP-42", "CP-43", "CP-46", "CP-47", "CP-48", "CP-50B", "CP-51B", "CP-54A", "CP-63A"]
     vision_ids: ["V01"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
+    delivery_record: evidence/commercial-cn/CP-52/2026-09-13-go-no-go-structure/delivery-record.md
+    test_command: "./mvnw test -Dtest=LaunchGoNoGoContractTest"
+    note: "首个增量：候选manifest模板(身份三要素绑定release-manifest.json,五方签字null,J01-J12十二旅程PENDING,六发布开关全false,P0计数null)+逐渠道Go/No-Go台账;契约2/2跨文件一致性——任何渠道CP-51B review_outcome≠PASSED时强制NO_GO(Go/No-Go跑不赢提审台账),GO须决策人/日期,模板一切通过/签字/可用均为operator事实"
     evidence_dir: evidence/commercial-cn/CP-52/
   - id: CP-53
     title: "品牌、内容与合规增长素材"
@@ -747,7 +750,10 @@ work_packages:
     stage: S4
     depends_on: ["CP-05", "CP-04", "CP-47", "CP-53", "CP-54", "CP-55"]
     vision_ids: ["V16", "V18", "V19"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
+    delivery_record: evidence/commercial-cn/CP-56/2026-09-13-data-room/delivery-record.md
+    test_command: "./mvnw test -Dtest=DataRoomContractTest"
+    note: "首个增量：九层数据室骨架30条目(§6.4逐层),7个数字类项全部PENDING_VALIDATION且value=null(市场输入未取得标待验证不填精确TAM),P0禁入规则(投资人对P0无读取权,合成演示账户),失败样本/未关闭事项/融资用途/下一轮里程碑条目;契约5/5无完成态,evidence未回填前为null"
     evidence_dir: evidence/commercial-cn/CP-56/
   - id: CP-57
     title: "90日理解、复盘与检索质量"
