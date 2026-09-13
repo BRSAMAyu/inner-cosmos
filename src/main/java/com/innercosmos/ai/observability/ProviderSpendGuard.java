@@ -43,7 +43,7 @@ public class ProviderSpendGuard {
     private volatile MeterRegistry meterRegistry;
 
     /** Test hook: fixed clock for day-rollover semantics. */
-    void setClock(Clock clock) {
+    public void setClock(Clock clock) {
         this.clock = clock;
     }
 
@@ -99,6 +99,25 @@ public class ProviderSpendGuard {
         DayCounters current = counters.get(userId);
         return current == null ? new DayCounters(LocalDate.now(clock), new AtomicLong(), new AtomicLong())
                 : current;
+    }
+
+    /** CP-46 quota display view: today's usage against both budgets plus the reset
+     *  instant (next start-of-day in the guard's own clock zone — the same anchor the
+     *  day counters roll on). 配额显示剩余与重置时间. */
+    public record DailyQuota(long usedCalls, long callBudget, long usedTokens,
+                             long tokenBudget, java.time.LocalDateTime resetsAtUtc) {
+        public long remainingCalls() {
+            return Math.max(0, callBudget - usedCalls);
+        }
+    }
+
+    public DailyQuota dailyQuota(Long userId) {
+        DayCounters current = snapshot(userId);
+        java.time.ZonedDateTime reset = LocalDate.now(clock).plusDays(1)
+                .atStartOfDay(clock.getZone());
+        return new DailyQuota(current.calls().get(), dailyCallBudget,
+                current.tokens().get(), dailyTokenBudget,
+                reset.withZoneSameInstant(java.time.ZoneOffset.UTC).toLocalDateTime());
     }
 
     private DayCounters today(Long userId) {
