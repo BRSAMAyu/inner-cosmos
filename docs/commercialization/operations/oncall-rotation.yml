@@ -1,0 +1,77 @@
+# CP-48 值班台账（on-call rotation ledger）
+# 结构契约由 src/test/java/com/innercosmos/operations/OnCallRunbookContractTest.java 强制。
+# 真实姓名、电话、即时通讯账号只能由 operator 在外部排班系统中落位后回填证据；
+# coding agent 只能维护角色、时段与交接结构，禁止虚构"已排班/已就位"状态——
+# 因此 status 只有 PENDING / IN_PROGRESS，不存在 FILLED/PASS 之类的伪就位态。
+#
+# 蓝图硬规则：必要危机值班与一般客服时段分开（两套 kind、两套时段，互不顶替）；
+# 一般客服如实公示服务时间，不承诺不存在的 24 小时人工服务。
+
+# 可排班角色登记表：值班 slot、升级阶梯、演练 owner 引用的角色必须都在这里定义。
+duty_roles:
+  - role_id: duty_crisis_responder
+    description: 危机值守响应人（经 CP-20 危机干预培训）
+  - role_id: crisis_lead
+    description: 危机处置负责人（复核与程序授权）
+  - role_id: duty_support
+    description: 一般客服值守
+  - role_id: support_lead
+    description: 客服主管（复核与话术口径）
+  - role_id: payments_engineer
+    description: 支付工程（账本核对、权益补发、渠道处置）
+  - role_id: privacy_officer
+    description: 隐私负责人（数据权利、授权调阅、撤回水位核对）
+  - role_id: founder_on_duty
+    description: 创始人值班（最终升级层）
+
+rotation:
+  - slot_id: crisis-night
+    kind: CRISIS
+    coverage_window: 每日 00:00-08:00（Asia/Shanghai）
+    timezone: Asia/Shanghai
+    primary_role: duty_crisis_responder
+    secondary_role: crisis_lead
+    crisis_hotline_ref: /api/safety/resources/catalog（帮助中心安全资源页同步公示）
+    handover_artifact: evidence/commercial-cn/CP-48/handover/crisis-night.md
+    status: PENDING
+    note: 夜间危机值守；与 CP-20 危机干预台账联动，交接时核对当班未结事件
+  - slot_id: crisis-day
+    kind: CRISIS
+    coverage_window: 每日 08:00-16:00（Asia/Shanghai）
+    timezone: Asia/Shanghai
+    primary_role: duty_crisis_responder
+    secondary_role: crisis_lead
+    crisis_hotline_ref: /api/safety/resources/catalog
+    handover_artifact: evidence/commercial-cn/CP-48/handover/crisis-day.md
+    status: PENDING
+    note: 白天危机值守；与一般客服并行但不混编
+  - slot_id: crisis-evening
+    kind: CRISIS
+    coverage_window: 每日 16:00-24:00（Asia/Shanghai）
+    timezone: Asia/Shanghai
+    primary_role: duty_crisis_responder
+    secondary_role: crisis_lead
+    crisis_hotline_ref: /api/safety/resources/catalog
+    handover_artifact: evidence/commercial-cn/CP-48/handover/crisis-evening.md
+    status: PENDING
+    note: 晚间危机值守
+  - slot_id: general-weekday
+    kind: GENERAL
+    coverage_window: 工作日 10:00-19:00（Asia/Shanghai）
+    timezone: Asia/Shanghai
+    primary_role: duty_support
+    secondary_role: support_lead
+    published_hours: 工作日 10:00-19:00（法定节假日除外；以帮助中心页面公示为准）
+    handover_artifact: evidence/commercial-cn/CP-48/handover/general-weekday.md
+    status: PENDING
+    note: 一般客服时段；明确不承诺 24 小时人工，夜间仅危机通道
+  - slot_id: general-weekend
+    kind: GENERAL
+    coverage_window: 周六/周日 14:00-18:00（Asia/Shanghai）
+    timezone: Asia/Shanghai
+    primary_role: duty_support
+    secondary_role: support_lead
+    published_hours: 周六/周日 14:00-18:00（以帮助中心页面公示为准）
+    handover_artifact: evidence/commercial-cn/CP-48/handover/general-weekend.md
+    status: PENDING
+    note: 周末缩减时段；排队过载时按 README 过载预案限量获客并开人工补偿

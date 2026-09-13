@@ -616,7 +616,11 @@ work_packages:
     stage: S3
     depends_on: ["CP-05", "CP-13", "CP-16", "CP-39"]
     vision_ids: ["V17", "V19"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
+    delivery_record: evidence/commercial-cn/CP-45/2026-09-13-channel-sandbox-adapters/delivery-record.md
+    test_command: "./mvnw test -Dtest=ChannelCallbackSandboxContractTest,PaymentReconciliationContractTest"
+    note: "首个增量：微信/支付宝回调格式适配层——v3通知信封与form-encoded通知解码到CP-47验签内核,商户号/app_id服务端配置比对(空白=全拒),状态闭合映射(未枚举状态隔离待查单),匿名回调端点全信任在fail-closed验签,13/13沙箱契约(篡改/过期/错商户/幂等/隔离零入账)"
+    next_action: "订单/商品/支付尝试表与期望金额校验；真实持牌渠道合同与证书为operator门禁"
     evidence_dir: evidence/commercial-cn/CP-45/
   - id: CP-46
     title: "订阅、IAP与透明配额"
@@ -624,7 +628,11 @@ work_packages:
     stage: S3
     depends_on: ["CP-17", "CP-44", "CP-45"]
     vision_ids: ["V08", "V14", "V17"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
+    delivery_record: evidence/commercial-cn/CP-45/2026-09-13-channel-sandbox-adapters/delivery-record.md
+    test_command: "./mvnw test -Dtest=ChannelCallbackSandboxContractTest"
+    note: "首个增量：境内渠道事件面——TRADE_SUCCESS/TRADE_FINISHED/REFUND_SUCCESS等终态映射到统一账本事实(支付/退款两态,部分退款净额正确),渠道原始状态与服务端事实分离(客户端只能展示不能宣告支付成功的基础已就位)"
+    next_action: "统一服务端权益状态机(待定/试用/续期/宽限/取消/到期/退款撤销/恢复购买)与配额剩余+重置时间展示"
     evidence_dir: evidence/commercial-cn/CP-46/
   - id: CP-47
     title: "真实单位经济、预算与税务对账"
@@ -644,7 +652,11 @@ work_packages:
     stage: S3
     depends_on: ["CP-15", "CP-36", "CP-45", "CP-46"]
     vision_ids: ["V07", "V13", "V17"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
+    delivery_record: evidence/commercial-cn/CP-48/2026-09-13-oncall-runbook/delivery-record.md
+    test_command: "./mvnw test -Dtest=OnCallRunbookContractTest"
+    note: "首个增量：值班/升级运行手册骨架——值班台账(危机3班与一般客服分kind,不承诺24h人工)+四级升级路径(阶梯严格递增,DISPUTED停收款/删除卡住核撤回水位挂入)+9类工单(默认MINIMAL_METADATA不看倾诉,敏感调阅须授权程序)+6演练矩阵,结构契约1/1锁定无伪就位态"
+    next_action: "帮助中心与工单系统真实接线、真实排班与演练回填为operator门禁"
     evidence_dir: evidence/commercial-cn/CP-48/
   - id: CP-49
     title: "可复现工程与发布供应链"

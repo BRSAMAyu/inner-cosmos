@@ -65,7 +65,13 @@ public class SecurityConfig {
                 return authorization != null && authorization.regionMatches(true, 0, "Bearer ", 0, 7);
             };
             http.csrf(csrf -> csrf.csrfTokenRepository(repository)
-                    .ignoringRequestMatchers(bearerRequest));
+                    // Channel payment callbacks are server-to-server POSTs with no session and
+                    // no CSRF token — their entire trust model is the fail-closed CP-47 HMAC
+                    // verification inside ChannelCallbackIngestService. CSRF-exempting them
+                    // changes nothing about who can create a ledger row.
+                    .ignoringRequestMatchers(bearerRequest,
+                            new org.springframework.security.web.util.matcher.AntPathRequestMatcher(
+                                    "/api/payments/callbacks/**")));
         } else {
             http.csrf(csrf -> csrf.disable());
         }
@@ -89,6 +95,11 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/csrf",
                         "/api/v1/auth/login", "/api/v1/auth/register", "/api/v1/auth/csrf").permitAll()
                 .requestMatchers("/api/public/**").permitAll()
+                // Payment channel callbacks (CP-45): anonymous by nature — the channel's
+                // servers have no user session. Trust is the fail-closed signature/merchant/
+                // status pipeline in ChannelCallbackIngestService; an unverified callback can
+                // never produce a ledger row or a success ack.
+                .requestMatchers("/api/payments/callbacks/**").permitAll()
                 .requestMatchers("/api/plaza/capsules").permitAll()
                 .requestMatchers("/api/safety/resources", "/api/safety/resources/catalog",
                         "/api/v1/safety/resources", "/api/v1/safety/resources/catalog").permitAll()

@@ -1,0 +1,56 @@
+# CP-48 升级路径（escalation paths）
+# 每个严重级：确认时限 ack_minutes、进展同步时限 update_minutes、逐级升级阶梯。
+# 契约：阶梯 after_minutes 严格递增；超时未确认自动进入下一级（超时触发升级）；
+# 用户可在工单页查询进展（进展可见是默认，不是恩赐）。角色必须能在值班台账中排班。
+
+paths:
+  - severity: SEV1-safety
+    scope: 用户安全/危机事件（自杀自伤线索、正在发生的伤害）
+    ack_minutes: 10
+    update_minutes: 30
+    ladder:
+      - role: duty_crisis_responder
+        after_minutes: 0
+      - role: crisis_lead
+        after_minutes: 15
+      - role: founder_on_duty
+        after_minutes: 60
+    on_timeout: 15 分钟未确认自动通知 crisis_lead；60 分钟未确认通知创始人
+    privacy_rule: 危机处置按 CP-20 程序授权，仅读取处置必需的最小内容片段
+  - severity: SEV2-payment
+    scope: 支付/资金/账本（错误收费、扣款未解锁、退款、对账 DISPUTED）
+    ack_minutes: 30
+    update_minutes: 240
+    ladder:
+      - role: duty_support
+        after_minutes: 0
+      - role: payments_engineer
+        after_minutes: 60
+      - role: founder_on_duty
+        after_minutes: 480
+    on_timeout: 60 分钟未确认转支付工程；当日未结升级创始人；DISPUTED 订单先暂停该渠道收款（CP-47 恢复规则）
+    privacy_rule: 客服只看订单/账单元数据，绝不看对话内容
+  - severity: SEV3-rights
+    scope: 数据权利（导出、撤回、更正、删除卡住、注销）
+    ack_minutes: 60
+    update_minutes: 480
+    ladder:
+      - role: duty_support
+        after_minutes: 0
+      - role: privacy_officer
+        after_minutes: 240
+      - role: founder_on_duty
+        after_minutes: 1440
+    on_timeout: 4 小时未确认转隐私负责人；24 小时未结升级创始人；删除卡住按 CP-15 独立撤回日志核对水位（CP-50A 规则）
+    privacy_rule: 涉及用户内容的核对按程序授权最小片段，禁止整段调阅
+  - severity: SEV4-general
+    scope: 一般客服（误封申诉、骚扰举报、退订误解、功能咨询）
+    ack_minutes: 240
+    update_minutes: 1440
+    ladder:
+      - role: duty_support
+        after_minutes: 0
+      - role: support_lead
+        after_minutes: 1440
+    on_timeout: 24 小时未结转客服主管复核；申诉类必须在复核时给出理由与依据
+    privacy_rule: 默认只看最小账户元数据与被举报对象的举报上下文摘要

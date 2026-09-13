@@ -1,0 +1,81 @@
+# CP-48 工单分类（help-center ticket categories）
+# 蓝图要求覆盖：账单/退款/权利请求/封禁申诉/安全问题。
+# 隐私硬规则：客服默认只看最小账户/订单元数据，不看倾诉内容；
+# data_visibility=AUTHORIZED_SENSITIVE 的分类必须给出 authorized_procedure（按程序授权）。
+# progress_visibility：每个分类的用户侧进展查询承诺（用户能查询进展）。
+
+categories:
+  - category_id: billing_wrong_charge
+    user_visible_name: 账单与错误收费
+    priority: HIGH
+    escalation_path: SEV2-payment
+    data_visibility: MINIMAL_METADATA
+    sla_feedback_hours: 24
+    progress_visibility: 工单页可见受理/处理中/已结论三态与时间线
+    status: PENDING
+  - category_id: payment_no_unlock
+    user_visible_name: 已扣款未解锁权益
+    priority: HIGH
+    escalation_path: SEV2-payment
+    data_visibility: MINIMAL_METADATA
+    sla_feedback_hours: 12
+    progress_visibility: 工单页可见受理/处理中/已结论三态与时间线
+    status: PENDING
+  - category_id: refund_request
+    user_visible_name: 退款申请
+    priority: HIGH
+    escalation_path: SEV2-payment
+    data_visibility: MINIMAL_METADATA
+    sla_feedback_hours: 48
+    progress_visibility: 工单页可见受理/处理中/已结论三态与时间线
+    status: PENDING
+  - category_id: unsubscribe_misunderstanding
+    user_visible_name: 续费与退订说明
+    priority: MEDIUM
+    escalation_path: SEV2-payment
+    data_visibility: MINIMAL_METADATA
+    sla_feedback_hours: 48
+    progress_visibility: 工单页可见受理/处理中/已结论三态与时间线
+    status: PENDING
+  - category_id: rights_request
+    user_visible_name: 数据权利请求（导出/撤回/更正/注销）
+    priority: HIGH
+    escalation_path: SEV3-rights
+    data_visibility: MINIMAL_METADATA
+    sla_feedback_hours: 72
+    progress_visibility: 工单页可见受理/处理中/已结论三态与时间线
+    status: PENDING
+  - category_id: deletion_stuck
+    user_visible_name: 删除/注销卡住
+    priority: HIGH
+    escalation_path: SEV3-rights
+    data_visibility: MINIMAL_METADATA
+    sla_feedback_hours: 24
+    progress_visibility: 工单页可见受理/处理中/已结论三态与时间线
+    status: PENDING
+  - category_id: ban_appeal
+    user_visible_name: 封禁申诉
+    priority: MEDIUM
+    escalation_path: SEV4-general
+    data_visibility: MINIMAL_METADATA
+    sla_feedback_hours: 72
+    progress_visibility: 申诉页可见受理/复核中/结论与理由
+    status: PENDING
+  - category_id: harassment_report
+    user_visible_name: 骚扰举报
+    priority: HIGH
+    escalation_path: SEV4-general
+    data_visibility: AUTHORIZED_SENSITIVE
+    authorized_procedure: 按 CP-36 内容安全程序授权，仅调阅举报关联的公开互动记录摘要
+    sla_feedback_hours: 48
+    progress_visibility: 举报页可见受理/复核中/处置结果
+    status: PENDING
+  - category_id: safety_crisis
+    user_visible_name: 安全问题与危机转介
+    priority: URGENT
+    escalation_path: SEV1-safety
+    data_visibility: AUTHORIZED_SENSITIVE
+    authorized_procedure: 按 CP-20 危机干预程序授权，最小必要片段用于转介与守护
+    sla_feedback_hours: 2
+    progress_visibility: 立即响应；危机通道不做排队，直接进入值班表 crisis 时段
+    status: PENDING

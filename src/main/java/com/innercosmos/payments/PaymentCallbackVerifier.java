@@ -32,7 +32,7 @@ public class PaymentCallbackVerifier {
         this(secret, Clock.systemUTC());
     }
 
-    PaymentCallbackVerifier(String secret, Clock clock) {
+    public PaymentCallbackVerifier(String secret, Clock clock) {
         this.secret = secret == null ? "" : secret;
         this.clock = clock;
     }

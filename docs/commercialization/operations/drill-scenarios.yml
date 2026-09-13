@@ -1,0 +1,54 @@
+# CP-48 客服/值班演练矩阵（drill scenarios）
+# 蓝图验收要求：错误收费、扣款未解锁、退订误解、删除卡住、误封、骚扰、停服演练。
+# last_drilled 只能由 operator 在真实演练后回填（日期 + evidence 路径）；
+# 结构上不存在"演练通过"的可填状态——通过证据只存在于 evidence/，编码代理不得代填。
+
+drills:
+  - drill_id: drill_wrong_charge_and_unlock
+    covers: billing_wrong_charge, payment_no_unlock
+    cadence: 季度
+    owner_role: payments_engineer
+    script: 沙箱触发一笔支付回调乱序/重复，验证工单受理→账本核对→权益补发→用户侧进展可见
+    last_drilled: null
+    evidence_required: evidence/commercial-cn/CP-48/drills/drill_wrong_charge_and_unlock.md
+    status: PENDING
+  - drill_id: drill_unsubscribe_and_refund
+    covers: unsubscribe_misunderstanding, refund_request
+    cadence: 季度
+    owner_role: duty_support
+    script: 用户退订误解+退款申请全流程：续费提醒口径、退款到账说明、客服话术与隐私边界
+    last_drilled: null
+    evidence_required: evidence/commercial-cn/CP-48/drills/drill_unsubscribe_and_refund.md
+    status: PENDING
+  - drill_id: drill_deletion_stuck
+    covers: deletion_stuck, rights_request
+    cadence: 季度
+    owner_role: privacy_officer
+    script: 删除卡住工单：核对 CP-15 独立撤回日志水位→补偿→回执；超时自动升级路径演练
+    last_drilled: null
+    evidence_required: evidence/commercial-cn/CP-48/drills/drill_deletion_stuck.md
+    status: PENDING
+  - drill_id: drill_ban_and_harassment
+    covers: ban_appeal, harassment_report
+    cadence: 季度
+    owner_role: support_lead
+    script: 误封申诉复核与骚扰举报处置：授权调阅边界（不看倾诉）、复核理由必须书面给出
+    last_drilled: null
+    evidence_required: evidence/commercial-cn/CP-48/drills/drill_ban_and_harassment.md
+    status: PENDING
+  - drill_id: drill_safety_night
+    covers: safety_crisis
+    cadence: 月度
+    owner_role: crisis_lead
+    script: 夜班危机值守演练（CP-20 联动）：高危信号→值班响应时限→安全资源转介→交接台账核对
+    last_drilled: null
+    evidence_required: evidence/commercial-cn/CP-48/drills/drill_safety_night.md
+    status: PENDING
+  - drill_id: drill_service_outage
+    covers: platform_outage
+    cadence: 季度
+    owner_role: support_lead
+    script: 停服演练（CP-50B 联动）：公告口径、工单涌入排队预案、限量获客与人工补偿触发条件
+    last_drilled: null
+    evidence_required: evidence/commercial-cn/CP-48/drills/drill_service_outage.md
+    status: PENDING

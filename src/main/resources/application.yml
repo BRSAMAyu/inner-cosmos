@@ -293,6 +293,16 @@ llm:
     timeout-ms: ${DEEPSEEK_TIMEOUT_MS:30000}
 
 inner-cosmos:
+  payments:
+    # CP-45 payment channel sandbox adapters. All values are operator-injected via
+    # environment/secret manager; blank (the default) fails CLOSED — an unconfigured
+    # channel or secret rejects every callback, and no ledger row can ever be created.
+    callback-secret: ${INNER_COSMOS_PAYMENTS_CALLBACK_SECRET:}
+    channels:
+      wechatpay:
+        mchid: ${INNER_COSMOS_PAYMENTS_WECHATPAY_MCHID:}
+      alipay:
+        app-id: ${INNER_COSMOS_PAYMENTS_ALIPAY_APP_ID:}
   experience:
     # Demo/product default: remove repeated disclaimers and lexical "UNSUPPORTED" dead ends while
     # retaining crisis interception, authorization, leakage gates and blocked-topic enforcement.
