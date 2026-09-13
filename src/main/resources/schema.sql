@@ -1801,3 +1801,19 @@ CREATE TABLE IF NOT EXISTS tb_entitlement_event (
   UNIQUE (channel_notification_id)
 );
 CREATE INDEX IF NOT EXISTS idx_entitlement_event_entitlement ON tb_entitlement_event (entitlement_id);
+
+-- CP-45: server-side order catalog (V45 twin) — expected amount/channel/product authority.
+CREATE TABLE IF NOT EXISTS tb_payment_order (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  order_id VARCHAR(64) NOT NULL,
+  user_id BIGINT NOT NULL,
+  product_id VARCHAR(64) NOT NULL,
+  channel VARCHAR(32) NOT NULL,
+  expected_amount_cents BIGINT NOT NULL,
+  currency CHAR(3) NOT NULL DEFAULT 'CNY',
+  status VARCHAR(16) NOT NULL DEFAULT 'CREATED',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (order_id)
+);
+CREATE INDEX IF NOT EXISTS idx_payment_order_user ON tb_payment_order (user_id, product_id);

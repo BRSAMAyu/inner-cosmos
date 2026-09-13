@@ -28,6 +28,26 @@ public class PaymentLedgerService {
     /** Idempotent record: returns the persisted row; a duplicate provider_event_id is a no-op ack. */
     public PaymentEvent record(String providerEventId, String provider, String orderId,
                                String eventType, long amountCents, LocalDateTime occurredAt) {
+        return record(providerEventId, provider, orderId, eventType, amountCents, occurredAt,
+                "RECORDED");
+    }
+
+    /**
+     * CP-45 drift recording: a verified callback whose amount contradicts the order catalog
+     * still HAPPENED (the channel moved money we did not ask for) — it is recorded as a
+     * DISPUTED fact for reconciliation, never silently absorbed and never acknowledged as a
+     * clean payment. Same idempotency per provider_event_id as {@link #record}.
+     */
+    public PaymentEvent recordDisputed(String providerEventId, String provider, String orderId,
+                                       String eventType, long amountCents,
+                                       LocalDateTime occurredAt) {
+        return record(providerEventId, provider, orderId, eventType, amountCents, occurredAt,
+                "DISPUTED");
+    }
+
+    private PaymentEvent record(String providerEventId, String provider, String orderId,
+                                String eventType, long amountCents, LocalDateTime occurredAt,
+                                String status) {
         PaymentEvent existing = mapper.selectOne(new QueryWrapper<PaymentEvent>()
                 .eq("provider_event_id", providerEventId));
         if (existing != null) return existing;
@@ -38,7 +58,7 @@ public class PaymentLedgerService {
         event.eventType = eventType;
         event.amountCents = amountCents;
         event.occurredAt = occurredAt;
-        event.status = "RECORDED";
+        event.status = status;
         try {
             mapper.insert(event);
             return event;

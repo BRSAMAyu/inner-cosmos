@@ -63,9 +63,10 @@ class PostgresFlywayBaselineTest {
         // V41 (CP-20) adds durable risk continuity and the crisis intervention ledger.
         // V42 (CP-36) adds the moderation case backend.
         // V44 (CP-46) adds the unified entitlement state machine tables.
+        // V45 (CP-45) adds the server-side payment order catalog.
         // It exists as a forward migration rather than an in-place edit of V30 because V30 is
         // already committed and rewriting it would break Flyway checksums on live databases.
-        assertEquals(44, flyway.migrate().migrationsExecuted);
+        assertEquals(45, flyway.migrate().migrationsExecuted);
         assertEquals(0, flyway.migrate().migrationsExecuted);
 
         String source = readClasspath("schema.sql");
@@ -90,12 +91,12 @@ class PostgresFlywayBaselineTest {
                     WHERE constraint_schema='public' AND constraint_type='FOREIGN KEY'
                     """);
 
-            assertEquals(103, expectedTables.size(), "source schema table inventory changed");
+            assertEquals(104, expectedTables.size(), "source schema table inventory changed");
             assertEquals(expectedTables, actualTables, "PostgreSQL baseline table drift");
             assertTrue(actualIndexes.containsAll(expectedIndexes),
                     () -> "missing PostgreSQL indexes: " + difference(expectedIndexes, actualIndexes));
             assertEquals(expectedForeignKeys, actualForeignKeys, "PostgreSQL foreign-key drift");
-            assertEquals(96, scalar(connection, """
+            assertEquals(97, scalar(connection, """
                     SELECT COUNT(*) FROM information_schema.columns
                     WHERE table_schema='public' AND is_identity='YES'
                     """));
@@ -171,7 +172,7 @@ class PostgresFlywayBaselineTest {
         // commercial-cn metric event store, the adult gate, the consent center,
         // identity verification, retraction tombstones, crisis continuity and the
         // moderation case backend).
-        assertEquals(25, v20.migrate().migrationsExecuted);
+        assertEquals(26, v20.migrate().migrationsExecuted);
         try (Connection migrated = DriverManager.getConnection(
                 jdbcUrl, POSTGRES.getUsername(), POSTGRES.getPassword())) {
             assertEquals(2, scalar(migrated,

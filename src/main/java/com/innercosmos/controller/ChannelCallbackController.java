@@ -56,6 +56,9 @@ public class ChannelCallbackController {
             case QUARANTINED_STATUS -> ResponseEntity.ok().contentType(contentType).body(ack);
             case REJECTED_SIGNATURE -> ResponseEntity.status(401).contentType(contentType).body(ack);
             case REJECTED_MERCHANT -> ResponseEntity.status(403).contentType(contentType).body(ack);
+            case REJECTED_ORDER -> ResponseEntity.status(404).contentType(contentType).body(ack);
+            // Verified signature, contradicted amount: kept as DISPUTED, acked as failure.
+            case REJECTED_AMOUNT -> ResponseEntity.status(422).contentType(contentType).body(ack);
             case MALFORMED -> ResponseEntity.badRequest().contentType(contentType).body(ack);
             case UNKNOWN_PROVIDER -> ResponseEntity.status(404).contentType(contentType).body(ack);
         };

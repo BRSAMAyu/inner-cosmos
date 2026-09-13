@@ -617,10 +617,10 @@ work_packages:
     depends_on: ["CP-05", "CP-13", "CP-16", "CP-39"]
     vision_ids: ["V17", "V19"]
     status: IN_PROGRESS
-    delivery_record: evidence/commercial-cn/CP-45/2026-09-13-channel-sandbox-adapters/delivery-record.md
-    test_command: "./mvnw test -Dtest=ChannelCallbackSandboxContractTest,PaymentReconciliationContractTest"
-    note: "首个增量：微信/支付宝回调格式适配层——v3通知信封与form-encoded通知解码到CP-47验签内核,商户号/app_id服务端配置比对(空白=全拒),状态闭合映射(未枚举状态隔离待查单),匿名回调端点全信任在fail-closed验签,13/13沙箱契约(篡改/过期/错商户/幂等/隔离零入账)"
-    next_action: "订单/商品/支付尝试表与期望金额校验；真实持牌渠道合同与证书为operator门禁"
+    delivery_record: evidence/commercial-cn/CP-45/2026-09-13-order-catalog/delivery-record.md
+    test_command: "./mvnw test -Dtest=ChannelCallbackSandboxContractTest,EntitlementStateMachineContractTest,PaymentReconciliationContractTest"
+    note: "第二增量：服务端订单目录(V45 tb_payment_order,POST /api/payments/orders唯一入口,目录价单一来源)接入ingest——未知订单/渠道错配拒收(404零入账),金额漂移与超额退款拒收但账本落DISPUTED事实(漂移可见绝不吸收),支付成功按order.userId/productId自动授予权益(扣款未解锁服务端闭合),全额退款撤销/部分退款保留;15/15+8/8契约,PG基线45/104/97/26实机"
+    next_action: "真实持牌渠道下单/预创建接线与证书为operator门禁；价格版本表与订单过期策略后续批次"
     evidence_dir: evidence/commercial-cn/CP-45/
   - id: CP-46
     title: "订阅、IAP与透明配额"
