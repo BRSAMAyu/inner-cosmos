@@ -686,9 +686,10 @@ work_packages:
     vision_ids: ["V07", "V14", "V15", "V20"]
     status: IN_PROGRESS
     delivery_record: evidence/commercial-cn/CP-40/2026-09-12-spend-guard/delivery-record.md
-    test_command: "node --check scripts/loadtest/aurora-journey.k6.js && k6 run -e BASE_URL=http://localhost:8080 -e VUS=2 -e DURATION=30s scripts/loadtest/aurora-journey.k6.js"
-    note: "可编码前体：aurora-journey.k6.js压测harness(登录→建会话→Aurora消息→拉取→结算+SSE探测,旅程失败显式SLI阈值草案)；台账勘误:压测为CP-50非49"
-    next_action: "CP-50A真实staging 200并发SSE/24h浸泡/故障注入(operator门禁)"
+    delivery_record: evidence/commercial-cn/CP-50/2026-09-13-payments-journey-harness/delivery-record.md
+    test_command: "cp scripts/loadtest/payments-journey.k6.js /tmp/p.mjs && node --check /tmp/p.mjs (语法契约)；k6 实跑属 staging 门禁"
+    note: "第二增量(CP-50B前体)：payments-journey.k6.js——下单→实时HMAC沙箱回调→权益快照→配额resetsAt断言的负载harness；诚实开关把未配置渠道fail-closed拒收计为正确,未配置渠道出现200为零容忍违规(count==0)——压测同时验证验签守门；两k6脚本node语法校验通过"
+    next_action: "CP-50A真实staging 200并发SSE/24h浸泡/故障注入与50B真实交易腿(operator门禁)"
     evidence_dir: evidence/commercial-cn/CP-50/
   - id: CP-51
     title: "监管材料与逐商店提审"
