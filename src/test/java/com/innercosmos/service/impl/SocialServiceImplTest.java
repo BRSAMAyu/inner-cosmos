@@ -1,6 +1,7 @@
 package com.innercosmos.service.impl;
 
 import com.innercosmos.entity.FriendRelation;
+import com.innercosmos.entity.GroupReviewLedger;
 import com.innercosmos.entity.SlowLetter;
 import com.innercosmos.entity.SocialGroup;
 import com.innercosmos.entity.SocialGroupMember;
@@ -9,6 +10,7 @@ import com.innercosmos.entity.User;
 import com.innercosmos.exception.BusinessException;
 import com.innercosmos.mapper.BlockRelationMapper;
 import com.innercosmos.mapper.FriendRelationMapper;
+import com.innercosmos.mapper.GroupReviewLedgerMapper;
 import com.innercosmos.mapper.SlowLetterMapper;
 import com.innercosmos.mapper.SocialGroupMapper;
 import com.innercosmos.mapper.SocialGroupMemberMapper;
@@ -22,6 +24,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DuplicateKeyException;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.time.Clock;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 
@@ -44,12 +50,35 @@ class SocialServiceImplTest {
     @Mock SocialGroupMessageMapper messageMapper;
     @Mock SlowLetterMapper letterMapper;
     @Mock BlockRelationMapper blockMapper;
+    @Mock GroupReviewLedgerMapper reviewLedgerMapper;
 
+    /** Deterministic, pinnable time source for CP-35 mute-expiry tests. */
+    private static final class MutableClock extends Clock {
+        private Instant instant;
+        MutableClock(Instant start) { this.instant = start; }
+        void advance(Duration duration) { instant = instant.plus(duration); }
+        @Override public ZoneId getZone() { return ZoneId.systemDefault(); }
+        @Override public Clock withZone(ZoneId zone) { return this; }
+        @Override public Instant instant() { return instant; }
+    }
+
+    private MutableClock clock;
     private SocialServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new SocialServiceImpl(userMapper, friendMapper, groupMapper, memberMapper, messageMapper, letterMapper, blockMapper);
+        clock = new MutableClock(Instant.parse("2026-09-13T10:00:00Z"));
+        service = new SocialServiceImpl(userMapper, friendMapper, groupMapper, memberMapper,
+                messageMapper, letterMapper, blockMapper, reviewLedgerMapper, clock, 20);
+    }
+
+    private SocialGroup activeGroup(Long id, Long ownerId) {
+        SocialGroup group = new SocialGroup();
+        group.id = id;
+        group.ownerUserId = ownerId;
+        group.groupName = "群";
+        group.status = "ACTIVE";
+        return group;
     }
 
     private SlowLetter letter(Long sender, Long receiver, String status) {
@@ -375,6 +404,7 @@ class SocialServiceImplTest {
 
     @Test
     void onlyAnActiveMemberCanListGroupMembers() {
+        when(groupMapper.selectById(5L)).thenReturn(activeGroup(5L, 20L));
         when(memberMapper.selectCount(any())).thenReturn(0L);
 
         BusinessException error = assertThrows(BusinessException.class, () -> service.listGroupMembers(20L, 5L));
@@ -384,6 +414,7 @@ class SocialServiceImplTest {
 
     @Test
     void listsActiveMembersWithNicknames() {
+        when(groupMapper.selectById(5L)).thenReturn(activeGroup(5L, 20L));
         when(memberMapper.selectCount(any())).thenReturn(1L);
         when(memberMapper.selectList(any())).thenReturn(List.of(member(1L, 5L, 20L, "OWNER", "ACTIVE")));
         User me = new User(); me.id = 20L; me.nickname = "我";
@@ -399,7 +430,8 @@ class SocialServiceImplTest {
 
     @Test
     void onlyAnActiveMemberCanReadOrSendGroupMessages() {
-        when(memberMapper.selectCount(any())).thenReturn(0L);
+        when(groupMapper.selectById(5L)).thenReturn(activeGroup(5L, 20L));
+        when(memberMapper.selectOne(any())).thenReturn(null); // caller not an active member
 
         BusinessException readError = assertThrows(BusinessException.class,
                 () -> service.listGroupMessages(20L, 5L));
@@ -413,7 +445,8 @@ class SocialServiceImplTest {
 
     @Test
     void activeMemberCanSendTrimmedMessageAndReadChronologicalConversation() {
-        when(memberMapper.selectCount(any())).thenReturn(1L);
+        when(groupMapper.selectById(5L)).thenReturn(activeGroup(5L, 20L));
+        when(memberMapper.selectOne(any())).thenReturn(member(1L, 5L, 20L, "OWNER", "ACTIVE"));
         User me = new User(); me.id = 20L; me.nickname = "我";
         when(userMapper.selectById(20L)).thenReturn(me);
         doAnswer(invocation -> {
@@ -443,12 +476,398 @@ class SocialServiceImplTest {
 
     @Test
     void blankGroupMessageIsRejected() {
-        when(memberMapper.selectCount(any())).thenReturn(1L);
+        when(groupMapper.selectById(5L)).thenReturn(activeGroup(5L, 20L));
+        when(memberMapper.selectOne(any())).thenReturn(member(1L, 5L, 20L, "MEMBER", "ACTIVE"));
 
         BusinessException error = assertThrows(BusinessException.class,
                 () -> service.sendGroupMessage(20L, 5L, "   "));
 
         assertEquals("BAD_REQUEST", error.code);
         verifyNoInteractions(messageMapper);
+    }
+
+    // -- CP-35 governance: mute ------------------------------------------------
+
+    @Test
+    void hostCanMuteAMemberForBoundedMinutesAndTheWindowIsStored() {
+        when(groupMapper.selectById(5L)).thenReturn(activeGroup(5L, 20L));
+        when(memberMapper.selectOne(any()))
+                .thenReturn(member(2L, 5L, 30L, "MEMBER", "ACTIVE")); // mute target
+        java.time.LocalDateTime expectedUntil = java.time.LocalDateTime.now(clock).plusMinutes(10);
+
+        service.muteGroupMember(20L, 5L, 30L, 10);
+
+        ArgumentCaptor<com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<SocialGroupMember>> captor =
+                ArgumentCaptor.forClass(com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper.class);
+        verify(memberMapper).update(any(), captor.capture());
+        String sqlSet = captor.getValue().getSqlSet().toLowerCase(java.util.Locale.ROOT);
+        assertTrue(sqlSet.contains("muted_at"), sqlSet);
+        assertTrue(sqlSet.contains("muted_until"), sqlSet);
+        assertTrue(sqlSet.contains("muted_by"), sqlSet);
+        // muted_until = now(clock) + 10min -- zone-independent because the clock is pinned.
+        assertTrue(captor.getValue().getParamNameValuePairs().containsValue(expectedUntil),
+                String.valueOf(captor.getValue().getParamNameValuePairs()));
+    }
+
+    @Test
+    void hostCanMuteAMemberUntilManuallyReleased() {
+        when(groupMapper.selectById(5L)).thenReturn(activeGroup(5L, 20L));
+        when(memberMapper.selectOne(any())).thenReturn(member(2L, 5L, 30L, "MEMBER", "ACTIVE"));
+
+        service.muteGroupMember(20L, 5L, 30L, null);
+
+        verify(memberMapper).update(any(), any());
+    }
+
+    @Test
+    void nonHostCannotMuteAnyone() {
+        when(groupMapper.selectById(5L)).thenReturn(activeGroup(5L, 20L)); // owner is 20, caller 30
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> service.muteGroupMember(30L, 5L, 40L, 10));
+
+        assertEquals("FORBIDDEN", error.code);
+        verify(memberMapper, never()).update(any(), any());
+    }
+
+    @Test
+    void hostCannotMuteSelfOrTheOwnerOrANonMemberAndRejectsNonPositiveDurations() {
+        when(groupMapper.selectById(5L)).thenReturn(activeGroup(5L, 20L));
+
+        assertEquals("BAD_REQUEST", assertThrows(BusinessException.class,
+                () -> service.muteGroupMember(20L, 5L, 20L, 10)).code); // self
+
+        when(memberMapper.selectOne(any())).thenReturn(member(2L, 5L, 30L, "OWNER", "ACTIVE"));
+        assertEquals("BAD_REQUEST", assertThrows(BusinessException.class,
+                () -> service.muteGroupMember(20L, 5L, 30L, 10)).code); // the owner target
+
+        when(memberMapper.selectOne(any())).thenReturn(null);
+        assertEquals("NOT_FOUND", assertThrows(BusinessException.class,
+                () -> service.muteGroupMember(20L, 5L, 30L, 10)).code); // not a member
+
+        // Duration validation happens before the target lookup, so this row stub is only
+        // needed if the order ever flips back -- lenient, not a contract.
+        lenient().when(memberMapper.selectOne(any())).thenReturn(member(2L, 5L, 30L, "MEMBER", "ACTIVE"));
+        assertEquals("BAD_REQUEST", assertThrows(BusinessException.class,
+                () -> service.muteGroupMember(20L, 5L, 30L, 0)).code);
+        assertEquals("BAD_REQUEST", assertThrows(BusinessException.class,
+                () -> service.muteGroupMember(20L, 5L, 30L, -5)).code);
+        verify(memberMapper, never()).update(any(), any());
+    }
+
+    @Test
+    void hostCanLiftAMuteManually() {
+        when(groupMapper.selectById(5L)).thenReturn(activeGroup(5L, 20L));
+        when(memberMapper.selectOne(any())).thenReturn(member(2L, 5L, 30L, "MEMBER", "ACTIVE"));
+
+        service.unmuteGroupMember(20L, 5L, 30L);
+
+        ArgumentCaptor<com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<SocialGroupMember>> captor =
+                ArgumentCaptor.forClass(com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper.class);
+        verify(memberMapper).update(any(), captor.capture());
+        assertTrue(captor.getValue().getSqlSet().toLowerCase(java.util.Locale.ROOT).contains("muted_at"));
+    }
+
+    @Test
+    void mutedMemberSendingIsRefusedLoudlyWithTheRemainingMinutesAndNothingIsPersisted() {
+        when(groupMapper.selectById(5L)).thenReturn(activeGroup(5L, 20L));
+        SocialGroupMember muted = member(2L, 5L, 30L, "MEMBER", "ACTIVE");
+        muted.mutedAt = java.time.LocalDateTime.now(clock);
+        muted.mutedUntil = java.time.LocalDateTime.now(clock).plusMinutes(30);
+        when(memberMapper.selectOne(any())).thenReturn(muted);
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> service.sendGroupMessage(30L, 5L, "还想说话"));
+
+        assertEquals("FORBIDDEN", error.code);
+        assertTrue(error.getMessage().contains("剩余"), error.getMessage());
+        assertTrue(error.getMessage().contains("30"), error.getMessage());
+        verifyNoInteractions(messageMapper); // not swallowed: plainly refused, nothing stored
+    }
+
+    @Test
+    void indefiniteMuteNamesTheManualReleaseRequirement() {
+        when(groupMapper.selectById(5L)).thenReturn(activeGroup(5L, 20L));
+        SocialGroupMember muted = member(2L, 5L, 30L, "MEMBER", "ACTIVE");
+        muted.mutedAt = java.time.LocalDateTime.now(clock);
+        muted.mutedUntil = null;
+        when(memberMapper.selectOne(any())).thenReturn(muted);
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> service.sendGroupMessage(30L, 5L, "还想说话"));
+
+        assertEquals("FORBIDDEN", error.code);
+        assertTrue(error.getMessage().contains("手动解除"), error.getMessage());
+        verifyNoInteractions(messageMapper);
+    }
+
+    @Test
+    void expiredMuteSelfHealsAndSpeechResumesWithoutAJob() {
+        when(groupMapper.selectById(5L)).thenReturn(activeGroup(5L, 20L));
+        SocialGroupMember muted = member(2L, 5L, 30L, "MEMBER", "ACTIVE");
+        muted.mutedAt = java.time.LocalDateTime.now(clock).minusMinutes(10);
+        muted.mutedUntil = java.time.LocalDateTime.now(clock).minusMinutes(1); // already expired
+        when(memberMapper.selectOne(any())).thenReturn(muted);
+        User sender = new User(); sender.id = 30L; sender.nickname = "被禁言过的人";
+        when(userMapper.selectById(30L)).thenReturn(sender);
+        doAnswer(invocation -> {
+            SocialGroupMessage inserted = invocation.getArgument(0);
+            inserted.id = 9L;
+            return 1;
+        }).when(messageMapper).insert(any(SocialGroupMessage.class));
+
+        Map<String, Object> sent = service.sendGroupMessage(30L, 5L, "禁言期满，我回来了");
+
+        assertEquals("禁言期满，我回来了", sent.get("messageBody"));
+        verify(memberMapper).update(any(), any()); // the lazy clear of the stale mute row
+        verify(messageMapper).insert(any(SocialGroupMessage.class));
+    }
+
+    // -- CP-35 governance: ownership transfer ----------------------------------
+
+    @Test
+    void transferPromotesTheTargetAndDemotesTheOldOwnerAtomically() {
+        SocialGroup group = activeGroup(5L, 20L);
+        when(groupMapper.selectById(5L)).thenReturn(group);
+        when(memberMapper.selectOne(any())).thenReturn(member(2L, 5L, 30L, "MEMBER", "ACTIVE"));
+        when(memberMapper.update(any(), any())).thenReturn(1);
+        doAnswer(invocation -> {
+            SocialGroup updated = invocation.getArgument(0);
+            assertEquals(30L, updated.ownerUserId);
+            return 1;
+        }).when(groupMapper).updateById(any(SocialGroup.class));
+
+        service.transferGroupOwnership(20L, 5L, 30L);
+
+        ArgumentCaptor<com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<SocialGroupMember>> captor =
+                ArgumentCaptor.forClass(com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper.class);
+        verify(memberMapper, times(2)).update(any(), captor.capture());
+        List<com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<SocialGroupMember>> updates = captor.getAllValues();
+        // Promote first (role -> OWNER, mute lifted), then demote the old owner (role -> MEMBER).
+        assertTrue(updates.get(0).getParamNameValuePairs().containsValue("OWNER"),
+                String.valueOf(updates.get(0).getParamNameValuePairs()));
+        assertTrue(updates.get(0).getSqlSet().toLowerCase(java.util.Locale.ROOT).contains("muted_at"));
+        assertTrue(updates.get(1).getParamNameValuePairs().containsValue("MEMBER"),
+                String.valueOf(updates.get(1).getParamNameValuePairs()));
+        verify(groupMapper).updateById(any(SocialGroup.class));
+    }
+
+    @Test
+    void nonOwnerCannotTransferOwnership() {
+        when(groupMapper.selectById(5L)).thenReturn(activeGroup(5L, 20L));
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> service.transferGroupOwnership(30L, 5L, 40L));
+
+        assertEquals("FORBIDDEN", error.code);
+        verify(memberMapper, never()).update(any(), any());
+        verify(groupMapper, never()).updateById(any(SocialGroup.class));
+    }
+
+    @Test
+    void transferToSelfOrANonMemberIsRefused() {
+        when(groupMapper.selectById(5L)).thenReturn(activeGroup(5L, 20L));
+
+        assertEquals("BAD_REQUEST", assertThrows(BusinessException.class,
+                () -> service.transferGroupOwnership(20L, 5L, 20L)).code);
+
+        when(memberMapper.selectOne(any())).thenReturn(null);
+        assertEquals("BAD_REQUEST", assertThrows(BusinessException.class,
+                () -> service.transferGroupOwnership(20L, 5L, 30L)).code);
+        verify(memberMapper, never()).update(any(), any());
+    }
+
+    @Test
+    void losingTheConcurrentTransferRaceIsRejectedNotHalfApplied() {
+        when(groupMapper.selectById(5L)).thenReturn(activeGroup(5L, 20L));
+        when(memberMapper.selectOne(any())).thenReturn(member(2L, 5L, 30L, "MEMBER", "ACTIVE"));
+        when(memberMapper.update(any(), any())).thenReturn(0); // the promote UPDATE lost the race
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> service.transferGroupOwnership(20L, 5L, 30L));
+
+        assertEquals("CONFLICT", error.code);
+        verify(groupMapper, never()).updateById(any(SocialGroup.class));
+    }
+
+    // -- CP-35 governance: dissolve --------------------------------------------
+
+    @Test
+    void ownerDissolvingMarksTheGroupAndRemovesEveryMembershipRow() {
+        SocialGroup group = activeGroup(5L, 20L);
+        when(groupMapper.selectById(5L)).thenReturn(group);
+        when(memberMapper.update(any(), any())).thenReturn(3);
+
+        service.dissolveGroup(20L, 5L);
+
+        assertEquals("DISSOLVED", group.status);
+        ArgumentCaptor<com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<SocialGroupMember>> captor =
+                ArgumentCaptor.forClass(com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper.class);
+        verify(memberMapper).update(any(), captor.capture());
+        assertTrue(captor.getValue().getParamNameValuePairs().containsValue("REMOVED"),
+                String.valueOf(captor.getValue().getParamNameValuePairs()));
+    }
+
+    @Test
+    void nonOwnerCannotDissolveAndADissolvedGroupRefusesEverything() {
+        when(groupMapper.selectById(5L)).thenReturn(activeGroup(5L, 20L));
+        assertEquals("FORBIDDEN", assertThrows(BusinessException.class,
+                () -> service.dissolveGroup(30L, 5L)).code);
+
+        SocialGroup dissolved = activeGroup(5L, 20L);
+        dissolved.status = "DISSOLVED";
+        when(groupMapper.selectById(5L)).thenReturn(dissolved);
+        assertEquals("CONFLICT", assertThrows(BusinessException.class,
+                () -> service.dissolveGroup(20L, 5L)).code); // re-dissolve is explicit, not silent
+        BusinessException send = assertThrows(BusinessException.class,
+                () -> service.sendGroupMessage(20L, 5L, "还想说话"));
+        assertEquals("CONFLICT", send.code);
+        assertTrue(send.getMessage().contains("群已解散"), send.getMessage());
+        BusinessException read = assertThrows(BusinessException.class,
+                () -> service.listGroupMessages(20L, 5L));
+        assertEquals("CONFLICT", read.code);
+        assertTrue(read.getMessage().contains("群已解散"), read.getMessage());
+        verifyNoInteractions(messageMapper);
+        verify(memberMapper, never()).update(any(), any());
+    }
+
+    @Test
+    void listGroupsNeverSurfacesADissolvedGroup() {
+        when(memberMapper.selectList(any())).thenReturn(List.of(member(1L, 5L, 20L, "MEMBER", "ACTIVE")));
+
+        service.listGroups(20L);
+
+        ArgumentCaptor<com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<SocialGroup>> captor =
+                ArgumentCaptor.forClass(com.baomidou.mybatisplus.core.conditions.query.QueryWrapper.class);
+        verify(groupMapper).selectList(captor.capture());
+        String sql = captor.getValue().getTargetSql().toLowerCase(java.util.Locale.ROOT);
+        assertTrue(sql.contains("status"), sql);
+        assertTrue(captor.getValue().getParamNameValuePairs().containsValue("ACTIVE"));
+    }
+
+    // -- CP-35 governance: history visibility -----------------------------------
+
+    @Test
+    void ordinaryMembersOnlySeeMessagesFromTheirJoinInstantOnward() {
+        when(groupMapper.selectById(5L)).thenReturn(activeGroup(5L, 20L));
+        SocialGroupMember lateJoiner = member(2L, 5L, 30L, "MEMBER", "ACTIVE");
+        lateJoiner.joinedAt = java.time.LocalDateTime.of(2026, 9, 13, 9, 30);
+        when(memberMapper.selectOne(any())).thenReturn(lateJoiner);
+        when(messageMapper.selectList(any())).thenReturn(List.of());
+        when(blockMapper.selectList(any())).thenReturn(List.of());
+
+        service.listGroupMessages(30L, 5L);
+
+        ArgumentCaptor<com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<SocialGroupMessage>> captor =
+                ArgumentCaptor.forClass(com.baomidou.mybatisplus.core.conditions.query.QueryWrapper.class);
+        verify(messageMapper).selectList(captor.capture());
+        String sql = captor.getValue().getTargetSql().toLowerCase(java.util.Locale.ROOT);
+        assertTrue(sql.contains("created_at >="), sql); // the join instant bounds the window
+        assertTrue(captor.getValue().getParamNameValuePairs().containsValue(lateJoiner.joinedAt));
+    }
+
+    @Test
+    void theHostKeepsTheFullHistoryRegardlessOfJoinInstant() {
+        when(groupMapper.selectById(5L)).thenReturn(activeGroup(5L, 20L));
+        SocialGroupMember host = member(1L, 5L, 20L, "OWNER", "ACTIVE");
+        host.joinedAt = java.time.LocalDateTime.of(2026, 9, 13, 9, 30);
+        when(memberMapper.selectOne(any())).thenReturn(host);
+        when(messageMapper.selectList(any())).thenReturn(List.of());
+        when(blockMapper.selectList(any())).thenReturn(List.of());
+
+        service.listGroupMessages(20L, 5L);
+
+        ArgumentCaptor<com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<SocialGroupMessage>> captor =
+                ArgumentCaptor.forClass(com.baomidou.mybatisplus.core.conditions.query.QueryWrapper.class);
+        verify(messageMapper).selectList(captor.capture());
+        assertFalse(captor.getValue().getTargetSql().toLowerCase(java.util.Locale.ROOT).contains("created_at >="));
+    }
+
+    // -- CP-35 governance: review capacity ledger -------------------------------
+
+    @Test
+    void reportPersistsAPendingLedgerRowWhileUnderTheCapacityBound() {
+        when(groupMapper.selectById(5L)).thenReturn(activeGroup(5L, 20L));
+        when(memberMapper.selectOne(any())).thenReturn(member(2L, 5L, 30L, "MEMBER", "ACTIVE"));
+        SocialGroupMessage reported = new SocialGroupMessage();
+        reported.id = 9L; reported.groupId = 5L; reported.senderUserId = 40L; reported.messageBody = "不当言论";
+        when(messageMapper.selectById(9L)).thenReturn(reported);
+        when(reviewLedgerMapper.selectCount(any())).thenReturn(0L, 0L, 1L);
+        doAnswer(invocation -> {
+            GroupReviewLedger inserted = invocation.getArgument(0);
+            inserted.id = 1L;
+            return 1;
+        }).when(reviewLedgerMapper).insert(any(GroupReviewLedger.class));
+
+        Map<String, Object> view = service.reportGroupMessage(30L, 5L, 9L, "言语攻击");
+
+        assertEquals("PENDING", view.get("status"));
+        assertEquals(40L, view.get("targetUserId"));
+        ArgumentCaptor<GroupReviewLedger> inserted = ArgumentCaptor.forClass(GroupReviewLedger.class);
+        verify(reviewLedgerMapper).insert(inserted.capture());
+        assertEquals("PENDING", inserted.getValue().status);
+        assertEquals(9L, inserted.getValue().targetMessageId);
+    }
+
+    @Test
+    void overCapacityTheNewReportIsExplicitlyRejectedAndNothingIsPersisted() {
+        when(groupMapper.selectById(5L)).thenReturn(activeGroup(5L, 20L));
+        when(memberMapper.selectOne(any())).thenReturn(member(2L, 5L, 30L, "MEMBER", "ACTIVE"));
+        SocialGroupMessage reported = new SocialGroupMessage();
+        reported.id = 9L; reported.groupId = 5L; reported.senderUserId = 40L; reported.messageBody = "x";
+        when(messageMapper.selectById(9L)).thenReturn(reported);
+        when(reviewLedgerMapper.selectCount(any())).thenReturn(0L).thenReturn(20L); // dedup 0, pending at cap
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> service.reportGroupMessage(30L, 5L, 9L, "言语攻击"));
+
+        assertEquals("CONFLICT", error.code);
+        assertTrue(error.getMessage().contains("上限"), error.getMessage());
+        verify(reviewLedgerMapper, never()).insert(any(GroupReviewLedger.class));
+    }
+
+    @Test
+    void duplicatePendingReportsOfTheSameMessageAndForeignMessagesAreRefused() {
+        when(groupMapper.selectById(5L)).thenReturn(activeGroup(5L, 20L));
+        when(memberMapper.selectOne(any())).thenReturn(member(2L, 5L, 30L, "MEMBER", "ACTIVE"));
+        SocialGroupMessage reported = new SocialGroupMessage();
+        reported.id = 9L; reported.groupId = 5L; reported.senderUserId = 40L; reported.messageBody = "x";
+        when(messageMapper.selectById(9L)).thenReturn(reported);
+        when(reviewLedgerMapper.selectCount(any())).thenReturn(1L); // same reporter, same message, PENDING
+
+        assertEquals("BAD_REQUEST", assertThrows(BusinessException.class,
+                () -> service.reportGroupMessage(30L, 5L, 9L, "再报一次")).code);
+
+        SocialGroupMessage foreign = new SocialGroupMessage();
+        foreign.id = 10L; foreign.groupId = 6L; foreign.senderUserId = 40L; foreign.messageBody = "y";
+        when(messageMapper.selectById(10L)).thenReturn(foreign);
+        // A foreign message is refused at the lookup, before the dedup count is consulted.
+        lenient().when(reviewLedgerMapper.selectCount(any())).thenReturn(0L);
+        assertEquals("NOT_FOUND", assertThrows(BusinessException.class,
+                () -> service.reportGroupMessage(30L, 5L, 10L, "别的群的消息")).code);
+        verify(reviewLedgerMapper, never()).insert(any(GroupReviewLedger.class));
+    }
+
+    @Test
+    void hostResolvesAPendingReviewAndFreesTheSlotButOthersCannot() {
+        when(groupMapper.selectById(5L)).thenReturn(activeGroup(5L, 20L));
+        GroupReviewLedger pending = new GroupReviewLedger();
+        pending.id = 3L; pending.groupId = 5L; pending.reporterUserId = 30L;
+        pending.targetMessageId = 9L; pending.reason = "言语攻击"; pending.status = "PENDING";
+        when(reviewLedgerMapper.selectById(3L)).thenReturn(pending);
+        when(reviewLedgerMapper.update(any(), any())).thenReturn(1);
+
+        Map<String, Object> view = service.resolveGroupReview(20L, 5L, 3L, "dismiss", "不构成违规");
+
+        assertEquals("DISMISSED", view.get("status"));
+        assertEquals(20L, view.get("resolvedBy"));
+
+        pending.status = "RESOLVED";
+        assertEquals("BAD_REQUEST", assertThrows(BusinessException.class,
+                () -> service.resolveGroupReview(20L, 5L, 3L, "resolve", null)).code);
+
+        when(groupMapper.selectById(5L)).thenReturn(activeGroup(5L, 99L)); // 99 is not the host
+        assertEquals("FORBIDDEN", assertThrows(BusinessException.class,
+                () -> service.resolveGroupReview(20L, 5L, 3L, "resolve", null)).code);
     }
 }

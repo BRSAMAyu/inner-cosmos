@@ -35,7 +35,10 @@ public interface RelationNetworkService {
     List<RelationMention.TimelinePoint> getRelationTimeline(Long userId, String relationLabel);
 
     /**
-     * Calculate relationship health score (0-1).
+     * CP-34: 关系互动回顾 — counts what actually happened for one relation inside the
+     * trailing window (mentions, distinct active weeks, emotion spectrum, recent
+     * triggers). Replaces the old evaluative health/temperature score: this is a record,
+     * not a verdict.
      */
-    double calculateHealthScore(Long userId, String relationLabel);
+    com.innercosmos.vo.RelationInteractionReviewVO interactionReview(Long userId, String relationLabel, int weeks);
 }

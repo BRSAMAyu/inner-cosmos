@@ -117,7 +117,92 @@ public interface SocialService {
      * Adds one user-authored message to a group the caller has actively joined.
      *
      * @throws com.innercosmos.exception.BusinessException UNAUTHORIZED unless the caller is an
-     *         active member, BAD_REQUEST when the message is blank or exceeds the bounded length.
+     *         active member, BAD_REQUEST when the message is blank or exceeds the bounded length,
+     *         FORBIDDEN when the caller is currently muted (message names the remaining duration
+     *         or the manual-release requirement; the message body is never persisted on refusal),
+     *         CONFLICT when the group is dissolved.
      */
     Map<String, Object> sendGroupMessage(Long userId, Long groupId, String messageBody);
+
+    // ------------------------------------------------------------------
+    // CP-35 group governance (closing-checklist §2-7). "主持人" (host) is the group OWNER --
+    // no separate MODERATOR member role exists in this batch.
+    // ------------------------------------------------------------------
+
+    /**
+     * Host mutes a member for {@code durationMinutes} minutes, or until manual release when
+     * {@code durationMinutes} is null.
+     *
+     * @throws com.innercosmos.exception.BusinessException NOT_FOUND when the group does not
+     *         exist or the target is not an active member, FORBIDDEN unless the caller is the
+     *         group owner, BAD_REQUEST when muting self/the owner or the duration is not a
+     *         positive number of minutes, CONFLICT when the group is dissolved.
+     */
+    void muteGroupMember(Long actorUserId, Long groupId, Long targetUserId, Integer durationMinutes);
+
+    /**
+     * Host lifts a mute before its expiry.
+     *
+     * @throws com.innercosmos.exception.BusinessException NOT_FOUND when the group does not
+     *         exist or the target is not an active member, FORBIDDEN unless the caller is the
+     *         group owner, CONFLICT when the group is dissolved.
+     */
+    void unmuteGroupMember(Long actorUserId, Long groupId, Long targetUserId);
+
+    /**
+     * Atomically hands ownership to an active member: the group row, the new OWNER row and the
+     * old owner's demotion succeed or fail together, and the new owner takes effect immediately.
+     *
+     * @throws com.innercosmos.exception.BusinessException NOT_FOUND when the group does not
+     *         exist, FORBIDDEN unless the caller is the current owner, BAD_REQUEST when the
+     *         target is the caller or not an active member, CONFLICT when the group is
+     *         dissolved or a concurrent transfer already moved the crown.
+     */
+    void transferGroupOwnership(Long ownerUserId, Long groupId, Long targetUserId);
+
+    /**
+     * Marks the group DISSOLVED and flips every membership row (ACTIVE/PENDING) to REMOVED, so
+     * the group disappears from every member's list and all group endpoints answer with an
+     * explicit 「群已解散」 refusal instead of leaving zombie-readable data.
+     *
+     * @throws com.innercosmos.exception.BusinessException NOT_FOUND when the group does not
+     *         exist, FORBIDDEN unless the caller is the owner, CONFLICT when already dissolved.
+     */
+    void dissolveGroup(Long ownerUserId, Long groupId);
+
+    /**
+     * Records one structured review-ledger row (status PENDING) for a group message. Capacity
+     * gate is fail-closed: once the group's PENDING count reaches
+     * {@code inner-cosmos.social.group-review-pending-capacity} the new report is explicitly
+     * REJECTED (CONFLICT naming the bound) and nothing is persisted -- never silently queued,
+     * never silently dropped.
+     *
+     * @throws com.innercosmos.exception.BusinessException NOT_FOUND when the group or the
+     *         reported message does not exist in that group, UNAUTHORIZED unless the caller is
+     *         an active member, BAD_REQUEST for a blank/oversized reason or a duplicate pending
+     *         report of the same message by the same reporter, CONFLICT when the group is
+     *         dissolved or the review capacity is exhausted. A muted member may still report --
+     *         muting silences speech, not the safety valve.
+     */
+    Map<String, Object> reportGroupMessage(Long reporterUserId, Long groupId, Long messageId, String reason);
+
+    /**
+     * Host resolves ({@code decision="resolve"}) or dismisses ({@code decision="dismiss"}) one
+     * pending review, freeing one capacity slot.
+     *
+     * @throws com.innercosmos.exception.BusinessException NOT_FOUND when the group or the review
+     *         does not exist in that group, FORBIDDEN unless the caller is the group owner,
+     *         BAD_REQUEST for an invalid decision, an oversized note, or an already-resolved
+     *         review, CONFLICT when the group is dissolved.
+     */
+    Map<String, Object> resolveGroupReview(Long hostUserId, Long groupId, Long reviewId, String decision, String note);
+
+    /**
+     * Host's structured queue view: the bounded pending count, the configured capacity and the
+     * recent ledger rows.
+     *
+     * @throws com.innercosmos.exception.BusinessException NOT_FOUND when the group does not
+     *         exist, FORBIDDEN unless the caller is the group owner, CONFLICT when dissolved.
+     */
+    Map<String, Object> listGroupReviews(Long hostUserId, Long groupId);
 }

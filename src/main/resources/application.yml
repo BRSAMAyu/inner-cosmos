@@ -415,6 +415,12 @@ inner-cosmos:
     # public classroom runtime. Local development keeps legacy password login unless explicitly
     # disabled by that runtime.
     template-password-login-enabled: ${DEMO_TEMPLATE_PASSWORD_LOGIN_ENABLED:true}
+  social:
+    # CP-35 主持审核容量门: per-group bound on simultaneously PENDING review-ledger rows.
+    # Fail-closed semantics -- once a group reaches the bound, NEW reports are explicitly
+    # rejected (CONFLICT naming the bound) and nothing is persisted: never silently queued,
+    # never silently dropped, no unbounded pile. The host frees slots by resolving/dismissing.
+    group-review-pending-capacity: ${SOCIAL_GROUP_REVIEW_PENDING_CAPACITY:20}
   scheduler:
     redis-lock:
       enabled: ${REDIS_SCHEDULER_LOCK_ENABLED:false}

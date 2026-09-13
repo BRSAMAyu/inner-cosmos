@@ -424,7 +424,17 @@ export type BeliefPattern = {
 };
 export type BeliefContradiction = { beliefA: BeliefPattern; beliefB: BeliefPattern; contradictionReason: string };
 export type RelationTimelinePoint = { timestamp: string; emotions: string | null; summary: string | null };
-export type RelationHealth = { relationLabel: string; healthScore: number };
+/**
+ * CP-34: 关系互动回顾 — counts of what actually happened (mentions, distinct active
+ * weeks, emotion spectrum) inside a trailing window. Replaces the old evaluative
+ * RelationHealth temperature score: this is a record, never a verdict.
+ */
+export type RelationReview = {
+  relationLabel: string; windowStart: string; windowEnd: string;
+  mentionCount: number; weeksActive: number;
+  emotionSpectrum: Record<string, number>;
+  recentTriggers: string[];
+};
 export type LetterThread = { id: number; firstLetterId: number; participantA: number; participantB: number; capsuleId: number | null; status: string; lastLetterAt: string | null };
 export type PsychologySkillManifest = {
   id: string; version: string; owner: string; title: Record<string, string>; description: Record<string, string>;
@@ -1253,7 +1263,8 @@ export const api = {
   relationStats: () => request<Record<string, number>>("/api/relation/stats"),
   relationHighEmotion: () => request<RelationMention[]>("/api/relation/high-emotion"),
   relationTimeline: (label: string) => request<RelationTimelinePoint[]>(`/api/relation/timeline?label=${encodeURIComponent(label)}`),
-  relationHealth: (label: string) => request<RelationHealth>(`/api/relation/health?label=${encodeURIComponent(label)}`),
+  relationReview: (label: string, weeks = 4) =>
+    request<RelationReview>(`/api/relation/review?label=${encodeURIComponent(label)}&weeks=${weeks}`),
 
   /* Admin console (requireAdmin-gated server-side; see AdminController etc.) */
   adminOverview: () => request<AdminOverview>("/api/admin/overview"),

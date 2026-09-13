@@ -68,8 +68,10 @@ CREATE TABLE IF NOT EXISTS tb_social_group (
   group_name VARCHAR(120) NOT NULL,
   intro TEXT,
   visibility VARCHAR(32) DEFAULT 'PRIVATE',
+  status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT ck_social_group_status CHECK (status IN ('ACTIVE','DISSOLVED')),
   INDEX idx_social_group_owner (owner_user_id)
 );
 
@@ -79,6 +81,10 @@ CREATE TABLE IF NOT EXISTS tb_social_group_member (
   user_id BIGINT NOT NULL,
   member_role VARCHAR(32) DEFAULT 'MEMBER',
   status VARCHAR(32) DEFAULT 'ACTIVE',
+  joined_at TIMESTAMP NULL,
+  muted_at TIMESTAMP NULL,
+  muted_until TIMESTAMP NULL,
+  muted_by BIGINT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uk_group_member (group_id, user_id),
@@ -94,6 +100,36 @@ CREATE TABLE IF NOT EXISTS tb_social_group_message (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_group_message_group_id (group_id, id)
 );
+
+-- CP-35 group governance (V50 H2 twin): per-group host review capacity ledger. Capacity is
+-- the number of status='PENDING' rows per group, bounded by
+-- inner-cosmos.social.group-review-pending-capacity (default 20); once bounded, NEW reports
+-- are explicitly rejected -- an over-capacity report is never persisted, so no
+-- PENDING_OVERFLOW state exists in the CHECK constraint on purpose.
+CREATE TABLE IF NOT EXISTS tb_group_review_ledger (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  group_id BIGINT NOT NULL,
+  reporter_user_id BIGINT NOT NULL,
+  target_user_id BIGINT NULL,
+  target_message_id BIGINT NULL,
+  reason VARCHAR(400) NOT NULL,
+  status VARCHAR(16) NOT NULL DEFAULT 'PENDING',
+  resolution_note VARCHAR(400),
+  resolved_by BIGINT NULL,
+  resolved_at TIMESTAMP NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT ck_group_review_status CHECK (status IN ('PENDING','RESOLVED','DISMISSED')),
+  INDEX idx_group_review_pending (group_id, status)
+);
+-- CP-35: existing file databases need the governance columns too (CREATE TABLE IF NOT EXISTS
+-- alone never alters an existing table), so mirror the V50 columns idempotently on every
+-- startup, following the tb_wake_intent ALTER-twin convention above.
+ALTER TABLE tb_social_group ADD COLUMN IF NOT EXISTS status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE';
+ALTER TABLE tb_social_group_member ADD COLUMN IF NOT EXISTS joined_at TIMESTAMP NULL;
+ALTER TABLE tb_social_group_member ADD COLUMN IF NOT EXISTS muted_at TIMESTAMP NULL;
+ALTER TABLE tb_social_group_member ADD COLUMN IF NOT EXISTS muted_until TIMESTAMP NULL;
+ALTER TABLE tb_social_group_member ADD COLUMN IF NOT EXISTS muted_by BIGINT NULL;
 
 CREATE TABLE IF NOT EXISTS tb_live_chat_invite (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -765,6 +801,23 @@ CREATE TABLE IF NOT EXISTS tb_relation_mention (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_relation_mention_user (user_id)
+);
+
+-- CP-34 (V51 twin): both-party-consent relation corrections on shared letter threads.
+CREATE TABLE IF NOT EXISTS tb_relation_correction (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  thread_id BIGINT NOT NULL,
+  proposer_user_id BIGINT NOT NULL,
+  counterpart_user_id BIGINT NOT NULL,
+  correction_field VARCHAR(64) NOT NULL,
+  proposed_value TEXT NOT NULL,
+  note TEXT,
+  status VARCHAR(16) NOT NULL DEFAULT 'PROPOSED',
+  decision_reason TEXT,
+  decided_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_relation_correction_counterpart (counterpart_user_id, status)
 );
 
 CREATE TABLE IF NOT EXISTS tb_memory_theme (

@@ -4,6 +4,7 @@ import com.innercosmos.common.ApiResponse;
 import com.innercosmos.entity.EchoCapsule;
 import com.innercosmos.service.CapsuleService;
 import com.innercosmos.service.ResonanceMatchStrategy;
+import com.innercosmos.service.ResonanceModePreference;
 import com.innercosmos.vo.EchoCapsuleVO;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.web.bind.annotation.*;
@@ -31,11 +32,17 @@ public class PlazaController extends BaseController {
     @GetMapping("/matches")
     public ApiResponse<List<Map<String, Object>>> matches(
             @RequestParam(defaultValue = "MIRROR") String strategy,
+            // CP-32 mode preference: BALANCED (default) lets every candidate surface via its
+            // strongest real signal mode; a specific mode (SIMILAR/COMPLEMENTARY/UNEXPECTED)
+            // re-ranks by that mode's score; NONE restores the pure legacy strategy ordering.
+            // Items carry structured mode explanations regardless of preference.
+            @RequestParam(defaultValue = "BALANCED") String mode,
             HttpSession session) {
         // M-004: project each capsule to a public-safe VO at the egress boundary (the service
         // keeps the full entity internally for scoring/sorting; only the response is projected).
         List<Map<String, Object>> items = capsuleService.matchedCapsules(
-                currentUserId(session), ResonanceMatchStrategy.parse(strategy));
+                currentUserId(session), ResonanceMatchStrategy.parse(strategy),
+                ResonanceModePreference.parse(mode));
         List<Map<String, Object>> safe = new java.util.ArrayList<>();
         for (Map<String, Object> item : items) {
             Map<String, Object> copy = new java.util.LinkedHashMap<>(item);

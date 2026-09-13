@@ -22,6 +22,8 @@ import com.innercosmos.entity.UserPortrait;
 import com.innercosmos.ai.semantic.PseudoSemanticAnalyzer;
 import com.innercosmos.service.CapsuleService;
 import com.innercosmos.service.ResonanceMatchStrategy;
+import com.innercosmos.service.ResonanceModeAssessor;
+import com.innercosmos.service.ResonanceModePreference;
 import com.innercosmos.service.CapsuleGenomeService;
 import com.innercosmos.service.CapsuleEmbeddingIndexService;
 import com.innercosmos.service.DataMaskingService;
@@ -30,6 +32,7 @@ import com.innercosmos.service.DataUseGrantService;
 import com.innercosmos.util.CapsulePublicTextUtils;
 import com.innercosmos.util.DataMaskingUtils;
 import com.innercosmos.vo.CapsulePreviewVO;
+import com.innercosmos.vo.ResonanceMatchExplanationVO;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -516,11 +519,17 @@ public class CapsuleServiceImpl implements CapsuleService {
 
     @Override
     public List<Map<String, Object>> matchedCapsules(Long userId) {
-        return matchedCapsules(userId, ResonanceMatchStrategy.MIRROR);
+        return matchedCapsules(userId, ResonanceMatchStrategy.MIRROR, null);
     }
 
     @Override
     public List<Map<String, Object>> matchedCapsules(Long userId, ResonanceMatchStrategy strategy) {
+        return matchedCapsules(userId, strategy, null);
+    }
+
+    @Override
+    public List<Map<String, Object>> matchedCapsules(Long userId, ResonanceMatchStrategy strategy,
+                                                     ResonanceModePreference modePreference) {
         List<MemoryCard> memories = memoryCardMapper.selectList(new QueryWrapper<MemoryCard>()
                 .eq("user_id", userId)
                 .eq("status", "ACTIVE")
@@ -538,6 +547,24 @@ public class CapsuleServiceImpl implements CapsuleService {
 
         // portrait families (CURRENT_STATE / EMOTION_PATTERN / INNER_DRIVE) for this user.
         Set<String> portraitFamilies = fetchPortraitFamilies(userId);
+
+        // CP-32 three-mode viewer signals, aggregated over the SAME up-to-24 memory sample that
+        // drives userThemeProfile: emotion-tag vocabulary (P1, only ever surfaced back to the
+        // viewer themselves inside explanation reasons) and memory-creation hour buckets. Purely
+        // local and deterministic — no provider calls, no new data dependencies.
+        Map<String, Integer> userEmotionTags = new HashMap<>();
+        Map<String, Integer> userHourBuckets = new HashMap<>();
+        for (MemoryCard memory : memories) {
+            for (String tag : CapsulePublicTextUtils.parseTags(memory.emotionTags)) {
+                userEmotionTags.merge(tag, 1, Integer::sum);
+            }
+            if (memory.createdAt != null) {
+                String bucket = ResonanceModeAssessor.hourBucket(memory.createdAt.getHour());
+                userHourBuckets.merge(bucket, 1, Integer::sum);
+            }
+        }
+        ResonanceModeAssessor.ViewerSignals viewerSignals = new ResonanceModeAssessor.ViewerSignals(
+                userThemeProfile, portraitFamilies, userEmotionTags, userHourBuckets);
 
         // SAFETY-FILTER STAGE: a capsule owned by someone in a block relationship with the viewer
         // (either direction) must never surface as a resonance match. The plaza query only gates
@@ -611,6 +638,17 @@ public class CapsuleServiceImpl implements CapsuleService {
             double paraphraseSignal = Math.min(PARAPHRASE_SIGNAL_CAP,
                     paraphraseFamilies.size() * PARAPHRASE_SIGNAL_UNIT);
 
+            // CP-32 three-mode assessment per candidate. Capsule-side signals are all
+            // public-safe (public text theme families, paraphrase families from the same public
+            // text, public tags, creation hour, and the already-computed semantic signal which
+            // is 0 unless strategy==MIRROR with a configured embedding provider).
+            ResonanceModeAssessor.ModeAssessment assessment = ResonanceModeAssessor.assess(viewerSignals,
+                    new ResonanceModeAssessor.CapsuleSignals(capsuleThemeProfile, paraphraseFamilies,
+                            new LinkedHashSet<>(CapsulePublicTextUtils.parseTags(capsule.publicTags)),
+                            capsule.createdAt == null ? null : capsule.createdAt.getHour(),
+                            semanticSignal));
+            double modeRelevance = assessment.relevance(modePreference);
+
             double energyScore = (capsule.echoEnergy == null ? 0.5 : capsule.echoEnergy) * ENERGY_WEIGHT;
             double relationshipPathBoost = "SEED_CAPSULE".equals(capsule.capsuleType) ? SEED_BOOST : USER_BOOST;
             // FIX-A: relevance is ONLY the genuinely user-specific signal (themeOverlap +
@@ -633,6 +671,21 @@ public class CapsuleServiceImpl implements CapsuleService {
                     mirrorReasons);
             boolean resonant = signal.relevance() > 0.0;
             double score = Math.min(0.99, signal.relevance() + energyScore + relationshipPathBoost);
+            // CP-32 mode preference layer: when active (anything except null/NONE) the mode score
+            // OWNS relevance and ranking — modeRelevance replaces the legacy relevance term in
+            // matchScore (same relevance + energy + boost shape, same 0.99 cap), and a candidate
+            // carrying a real mode signal becomes a genuine non-backfill result even at zero theme
+            // overlap. That is precisely the recall widening COMPLEMENTARY/UNEXPECTED exist for:
+            // a 任务压力 viewer can surface a 希望期待 capsule as a labeled complementary
+            // candidate instead of anonymous backfill. The mode label in modeExplanation always
+            // reports the candidate's TRUE dominant mode even when a different preference drove
+            // the ordering. With null/NONE preference the two lines above stay byte-identical to
+            // the legacy formula, so existing callers and tests are unaffected.
+            boolean modeLayerActive = modePreference != null && modePreference != ResonanceModePreference.NONE;
+            if (modeLayerActive) {
+                resonant = resonant || modeRelevance > 0.0;
+                score = Math.min(0.99, modeRelevance + energyScore + relationshipPathBoost);
+            }
 
             // matchTier: G6.MATCH-MULTI graded neutral/partial-overlap bucket. FULL when every one
             // of the viewer's currently active theme families (userThemeProfile) is represented by
@@ -662,6 +715,13 @@ public class CapsuleServiceImpl implements CapsuleService {
             // cold-start backfill; existing keys (matchScore/matchSummary/matchReasons/capsule)
             // are unchanged so no frontend change is required.
             item.put("resonant", resonant);
+            // CP-32 structured three-mode explanation. mode is null (and confidence
+            // insufficient_signal) when no honest signal fired — never a fabricated label.
+            // modeRelevance is the preference-effective score that actually drove ranking under
+            // an active mode preference (dominant-mode score otherwise).
+            item.put("mode", assessment.mode() == null ? null : assessment.mode().name());
+            item.put("modeExplanation", ResonanceMatchExplanationVO.from(assessment));
+            item.put("modeRelevance", Math.round(modeRelevance * 100.0) / 100.0);
             // Transient feature set for the diversity stage; stripped before returning.
             item.put("__themeKeys", new HashSet<>(capsuleThemeProfile.keySet()));
             scored.add(item);

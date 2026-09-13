@@ -116,4 +116,79 @@ public class SocialController extends BaseController {
         return ApiResponse.ok(socialService.sendGroupMessage(
                 currentUserId(session), id, body.get("messageBody")));
     }
+
+    // ------------------------------------------------------------------
+    // CP-35 group governance (closing-checklist §2-7). Host = group owner.
+    // ------------------------------------------------------------------
+
+    /** durationMinutes omitted/null => muted until the host manually lifts it. */
+    @PostMapping("/groups/{id}/mute")
+    public ApiResponse<Void> muteGroupMember(@PathVariable Long id,
+                                             @RequestBody Map<String, Object> body,
+                                             HttpSession session) {
+        Long targetUserId = Long.valueOf(String.valueOf(body.get("userId")));
+        Integer durationMinutes = parseOptionalMinutes(body.get("durationMinutes"));
+        socialService.muteGroupMember(currentUserId(session), id, targetUserId, durationMinutes);
+        return ApiResponse.ok(null);
+    }
+
+    @PostMapping("/groups/{id}/unmute")
+    public ApiResponse<Void> unmuteGroupMember(@PathVariable Long id,
+                                               @RequestBody Map<String, String> body,
+                                               HttpSession session) {
+        Long targetUserId = Long.valueOf(body.get("userId"));
+        socialService.unmuteGroupMember(currentUserId(session), id, targetUserId);
+        return ApiResponse.ok(null);
+    }
+
+    @PostMapping("/groups/{id}/transfer")
+    public ApiResponse<Void> transferGroupOwnership(@PathVariable Long id,
+                                                    @RequestBody Map<String, String> body,
+                                                    HttpSession session) {
+        Long targetUserId = Long.valueOf(body.get("userId"));
+        socialService.transferGroupOwnership(currentUserId(session), id, targetUserId);
+        return ApiResponse.ok(null);
+    }
+
+    @PostMapping("/groups/{id}/dissolve")
+    public ApiResponse<Void> dissolveGroup(@PathVariable Long id, HttpSession session) {
+        socialService.dissolveGroup(currentUserId(session), id);
+        return ApiResponse.ok(null);
+    }
+
+    @PostMapping("/groups/{id}/reports")
+    public ApiResponse<Map<String, Object>> reportGroupMessage(@PathVariable Long id,
+                                                               @RequestBody Map<String, Object> body,
+                                                               HttpSession session) {
+        Long messageId = Long.valueOf(String.valueOf(body.get("messageId")));
+        String reason = String.valueOf(body.get("reason"));
+        return ApiResponse.ok(socialService.reportGroupMessage(currentUserId(session), id, messageId, reason));
+    }
+
+    @GetMapping("/groups/{id}/reviews")
+    public ApiResponse<Map<String, Object>> groupReviews(@PathVariable Long id, HttpSession session) {
+        return ApiResponse.ok(socialService.listGroupReviews(currentUserId(session), id));
+    }
+
+    @PostMapping("/groups/{id}/reviews/{reviewId}/resolve")
+    public ApiResponse<Map<String, Object>> resolveGroupReview(@PathVariable Long id,
+                                                               @PathVariable Long reviewId,
+                                                               @RequestBody Map<String, String> body,
+                                                               HttpSession session) {
+        String decision = body.get("decision");
+        String note = body.get("note");
+        return ApiResponse.ok(socialService.resolveGroupReview(currentUserId(session), id, reviewId, decision, note));
+    }
+
+    /** Accepts null (manual release), numbers, or numeric strings; anything else is a 400. */
+    private Integer parseOptionalMinutes(Object raw) {
+        if (raw == null) return null;
+        try {
+            return Integer.valueOf(String.valueOf(raw).trim());
+        } catch (NumberFormatException e) {
+            throw new com.innercosmos.exception.BusinessException(
+                    com.innercosmos.common.ErrorCode.BAD_REQUEST,
+                    "durationMinutes 必须是正整数分钟（不传表示需手动解除）");
+        }
+    }
 }

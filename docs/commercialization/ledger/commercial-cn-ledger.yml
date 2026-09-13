@@ -480,10 +480,10 @@ work_packages:
     vision_ids: ["V11", "V12", "V18"]
     status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-32/
-    delivery_record: evidence/commercial-cn/CP-29/2026-09-06-resonance-line/delivery-record.md
-    test_command: "./mvnw test -Dtest=ResonanceLineNegativeTest"
-    note: "首个增量：发现硬过滤三层锁定(自我/双向屏蔽对/NEEDS_REVIEW)；匹配模式与解释排序后续"
-    next_action: "相似/互补/意外模式召回排序+可解释共同点；接受门实验(CP-04注册表行)"
+    delivery_record: evidence/commercial-cn/CP-32/2026-09-13-three-mode-resonance/delivery-record.md
+    test_command: "./mvnw test -Dtest=ResonanceMatchThreeModeTest"
+    note: "首个增量：发现硬过滤三层锁定(自我/双向屏蔽对/NEEDS_REVIEW)；匹配模式与解释排序后续；第二增量：三模式信号分类器(相似/互补/意外,全部既有信号,无桥/弱信号如实0)+解释VO(真实计数理由+confidence分档+insufficient_signal不编造)+mode参数接管排序(遗留公式逐字节守卫)+三层硬过滤零改动；11新测试"
+    next_action: "解释字段前端消费；themeOverlap频次加权空转缺陷处置；UNEXPECTED情绪节律曲线(EmotionTrace时序)后续"
   - id: CP-33
     title: "慢信的节律与隐私友好状态"
     owner: "社交后端＋前端"
@@ -504,10 +504,10 @@ work_packages:
     vision_ids: ["V11", "V12", "V13"]
     status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-34/
-    delivery_record: evidence/commercial-cn/CP-34/2026-09-06-exit-silence-and-moderation/delivery-record.md
-    test_command: "./mvnw test -Dtest=ExitSilenceAndModerationTest"
-    note: "首个增量：直接路径统一屏蔽+拒绝30天冷静期+屏蔽/被拒同文案不细分+静默退场负测；测试3/3"
-    next_action: "关系互动回顾(替代温度分)；纠错需双方同意流程"
+    delivery_record: evidence/commercial-cn/CP-34/2026-09-13-interaction-review-consent-corrections/delivery-record.md
+    test_command: "./mvnw test -Dtest='RelationInteractionReviewTest,RelationCorrectionConsentContractTest'"
+    note: "首个增量：直接路径统一屏蔽+拒绝30天冷静期+屏蔽/被拒同文案不细分+静默退场负测；测试3/3；第二增量：互动回顾替代温度分(真实计数VO+前端全链路+空窗口诚实不伪造0.5,healthScore彻底移除)+双方同意纠错状态机V51(PROPOSED→APPLIED/REJECTED/WITHDRAWN,条件UPDATE竞态恰一胜者,负测5/5)"
+    next_action: "关系标签→平台连接映射打通后接CP-59回轮深度到单关系粒度；纠错提案前端UI"
   - id: CP-35
     title: "小组、邀请与共同活动"
     owner: "社交系统＋运营"
@@ -516,10 +516,10 @@ work_packages:
     vision_ids: ["V12", "V13", "V18"]
     status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-35/
-    delivery_record: evidence/commercial-cn/CP-34/2026-09-06-exit-silence-and-moderation/delivery-record.md
-    test_command: "./mvnw test -Dtest=ExitSilenceAndModerationTest"
-    note: "首个增量：群邀请7天有效期(EXPIRED翻转+重新发起文案)；统一屏蔽已有(invite路径)"
-    next_action: "禁言/移交/解散规则与历史可见范围；主持审核容量门"
+    delivery_record: evidence/commercial-cn/CP-35/2026-09-13-group-governance/delivery-record.md
+    test_command: "./mvnw test -Dtest=GroupGovernanceContractTest"
+    note: "首个增量：群邀请7天有效期(EXPIRED翻转+重新发起文案)；统一屏蔽已有(invite路径)；第二增量：V50禁言(惰性自愈/消息不落库)+移交(三条件UPDATE不可能双主)+解散(DISSOLVED全端点409)+历史可见范围(joined_at为界群主不限,修createdAt语义缺陷)+审核容量台账(默认20,超限显式拒绝不落库)；27新测试"
+    next_action: "治理端点前端接线；MODERATOR角色(如群规模需要)；真库Flyway验证属部署门禁"
   - id: CP-36
     title: "内容审核、反诈与案件后台"
     owner: "信任与安全＋运营工程"

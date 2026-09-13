@@ -1,7 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api";
-import type { ConnectionRequests, DiscoverablePerson, LetterThread, RelationHealth, RelationMention, RelationTimelinePoint, SlowLetter, SocialConnection } from "../api";
+import type { ConnectionRequests, DiscoverablePerson, LetterThread, RelationMention, RelationReview, RelationTimelinePoint, SlowLetter, SocialConnection } from "../api";
 import { useConnectionsAndLetters } from "./useConnectionsAndLetters";
 
 vi.mock("../api", () => ({
@@ -15,7 +15,7 @@ vi.mock("../api", () => ({
     discoverPeople: vi.fn(),
     relations: vi.fn(),
     relationTimeline: vi.fn(),
-    relationHealth: vi.fn(),
+    relationReview: vi.fn(),
     requestFriend: vi.fn(),
     requestConnectionFromLetter: vi.fn(),
     decideConnection: vi.fn(),
@@ -70,9 +70,10 @@ const timelinePoint = (overrides: Partial<RelationTimelinePoint> = {}): Relation
   timestamp: "2026-07-18T00:00:00", emotions: null, summary: null, ...overrides
 } as RelationTimelinePoint);
 
-const health = (overrides: Partial<RelationHealth> = {}): RelationHealth => ({
-  healthScore: 0.8, ...overrides
-} as RelationHealth);
+const review = (overrides: Partial<RelationReview> = {}): RelationReview => ({
+  relationLabel: "妈妈", windowStart: "2026-08-16T00:00:00", windowEnd: "2026-09-13T00:00:00",
+  mentionCount: 2, weeksActive: 2, emotionSpectrum: { 牵挂: 2 }, recentTriggers: [], ...overrides
+} as RelationReview);
 
 const letter = (overrides: Partial<SlowLetter> = {}): SlowLetter => ({
   id: 1, title: "写给你", letterBody: "最近好吗", status: "DELIVERED", ...overrides
@@ -115,7 +116,7 @@ describe("useConnectionsAndLetters -- initial state", () => {
     expect(result.current.relations).toEqual([]);
     expect(result.current.selectedRelation).toBeNull();
     expect(result.current.relationTimeline).toEqual([]);
-    expect(result.current.relationHealth).toBeNull();
+    expect(result.current.relationReview).toBeNull();
     expect(result.current.relationBusy).toBe(false);
     expect(result.current.letterInbox).toEqual([]);
     expect(result.current.letterOutbox).toEqual([]);
@@ -271,24 +272,24 @@ describe("useConnectionsAndLetters -- People Discovery / connections", () => {
 });
 
 describe("useConnectionsAndLetters -- relations", () => {
-  it("openRelation loads the timeline and health for the selected relation", async () => {
+  it("openRelation loads the timeline and the interaction review for the selected relation", async () => {
     vi.mocked(api.relationTimeline).mockResolvedValue([timelinePoint()]);
-    vi.mocked(api.relationHealth).mockResolvedValue(health());
+    vi.mocked(api.relationReview).mockResolvedValue(review());
     const { result } = setup();
     await act(async () => { await result.current.openRelation("妈妈"); });
     expect(result.current.selectedRelation).toBe("妈妈");
     expect(result.current.relationTimeline).toHaveLength(1);
-    expect(result.current.relationHealth).toEqual(health());
+    expect(result.current.relationReview).toEqual(review());
     expect(result.current.relationBusy).toBe(false);
   });
 
-  it("openRelation tolerates a failing relationHealth call (caught individually, timeline still loads)", async () => {
+  it("openRelation tolerates a failing review call (caught individually, timeline still loads)", async () => {
     vi.mocked(api.relationTimeline).mockResolvedValue([timelinePoint()]);
-    vi.mocked(api.relationHealth).mockRejectedValue(new Error("down"));
+    vi.mocked(api.relationReview).mockRejectedValue(new Error("down"));
     const { result } = setup();
     await act(async () => { await result.current.openRelation("妈妈"); });
     expect(result.current.relationTimeline).toHaveLength(1);
-    expect(result.current.relationHealth).toBeNull();
+    expect(result.current.relationReview).toBeNull();
   });
 
   it("openRelation reports an error and clears busy when the timeline call itself fails", async () => {
@@ -301,19 +302,19 @@ describe("useConnectionsAndLetters -- relations", () => {
 
   // Gemini audit 4.4 (CONFIRMED/P1): relation loader has no request epoch. A slow response for a
   // stale selection ("妈妈") that resolves AFTER the user has already moved on to a different
-  // selection ("爸爸") must never overwrite the currently-selected relation's timeline/health.
-  it("a slow openRelation('妈妈') response arriving after openRelation('爸爸') already committed must NOT overwrite '爸爸''s timeline/health", async () => {
+  // selection ("爸爸") must never overwrite the currently-selected relation's timeline/review.
+  it("a slow openRelation('妈妈') response arriving after openRelation('爸爸') already committed must NOT overwrite '爸爸''s timeline/review", async () => {
     const slowTimeline = deferred<RelationTimelinePoint[]>();
-    const slowHealth = deferred<RelationHealth>();
+    const slowReview = deferred<RelationReview>();
     vi.mocked(api.relationTimeline).mockReturnValueOnce(slowTimeline.promise);
-    vi.mocked(api.relationHealth).mockReturnValueOnce(slowHealth.promise);
+    vi.mocked(api.relationReview).mockReturnValueOnce(slowReview.promise);
     const { result } = setup();
 
     let openMomStarted: Promise<void>;
     act(() => { openMomStarted = result.current.openRelation("妈妈"); });
 
     vi.mocked(api.relationTimeline).mockResolvedValueOnce([timelinePoint({ summary: "爸爸的时间线" })]);
-    vi.mocked(api.relationHealth).mockResolvedValueOnce(health({ healthScore: 0.5 }));
+    vi.mocked(api.relationReview).mockResolvedValueOnce(review({ mentionCount: 5 }));
     await act(async () => { await result.current.openRelation("爸爸"); });
     expect(result.current.selectedRelation).toBe("爸爸");
     expect(result.current.relationTimeline[0].summary).toBe("爸爸的时间线");
@@ -321,14 +322,14 @@ describe("useConnectionsAndLetters -- relations", () => {
     // Now let the STALE "妈妈" response finally arrive.
     await act(async () => {
       slowTimeline.resolve([timelinePoint({ summary: "妈妈的时间线（过期）" })]);
-      slowHealth.resolve(health({ healthScore: 0.9 }));
+      slowReview.resolve(review({ mentionCount: 9 }));
       await openMomStarted;
     });
 
     // The stale response must have been discarded -- the UI must still show "爸爸"'s data.
     expect(result.current.selectedRelation).toBe("爸爸");
     expect(result.current.relationTimeline[0].summary).toBe("爸爸的时间线");
-    expect(result.current.relationHealth?.healthScore).toBe(0.5);
+    expect(result.current.relationReview?.mentionCount).toBe(5);
   });
 });
 

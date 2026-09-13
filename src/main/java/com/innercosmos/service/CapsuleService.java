@@ -36,6 +36,15 @@ public interface CapsuleService {
 
     List<Map<String, Object>> matchedCapsules(Long userId, ResonanceMatchStrategy strategy);
 
+    /**
+     * CP-32 三模式重载。modePreference 为 null 或 {@link ResonanceModePreference#NONE} 时与
+     * 双参重载行为完全一致（既有调用方/测试不受影响）；BALANCED/指定模式时模式得分接管
+     * relevance 与排序，每个候选额外携带 mode/modeExplanation/modeRelevance 字段。发现链路的
+     * 三层硬过滤（安全/同意/屏蔽）在本重载中同样前置，不受模式偏好影响。
+     */
+    List<Map<String, Object>> matchedCapsules(Long userId, ResonanceMatchStrategy strategy,
+                                              ResonanceModePreference modePreference);
+
     CapsulePreviewVO previewUserMirror(Long userId);
 
     EchoCapsule updateContext(Long userId, Long capsuleId, Map<String, Object> body);

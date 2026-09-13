@@ -103,27 +103,66 @@ public class RelationNetworkServiceImpl implements RelationNetworkService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * CP-34: 关系互动回顾 — replaces the old temperature/health score. The old score was
+     * an evaluative verdict (positive-share ×1.5) on a relationship; this review only
+     * counts real rows inside the trailing window. Every field is derived from actual
+     * tb_relation_mention data; an empty window produces an honest empty review, never a
+     * fabricated mid-range score (the old code returned 0.5 for "no data").
+     */
     @Override
-    public double calculateHealthScore(Long userId, String relationLabel) {
+    public com.innercosmos.vo.RelationInteractionReviewVO interactionReview(
+            Long userId, String relationLabel, int weeks) {
+        int windowWeeks = Math.min(Math.max(weeks, 1), 26);
+        java.time.LocalDateTime windowEnd = java.time.LocalDateTime.now(java.time.ZoneOffset.UTC);
+        java.time.LocalDateTime windowStart = windowEnd.minusWeeks(windowWeeks);
+
         List<RelationMention> mentions = relationMentionMapper.selectList(
-            new QueryWrapper<RelationMention>()
-                .eq("user_id", userId)
-                .eq("relation_label", relationLabel)
-        );
+                new QueryWrapper<RelationMention>()
+                        .eq("user_id", userId)
+                        .eq("relation_label", relationLabel)
+                        .ge("created_at", windowStart)
+                        .le("created_at", windowEnd)
+                        .orderByDesc("created_at"));
 
-        if (mentions.isEmpty()) return 0.5;
+        if (mentions.isEmpty()) {
+            return com.innercosmos.vo.RelationInteractionReviewVO.empty(
+                    relationLabel, windowStart.toString(), windowEnd.toString());
+        }
 
-        // Simple health calculation based on emotion patterns
-        double positiveCount = 0;
-        double totalCount = mentions.size();
-
-        for (RelationMention m : mentions) {
-            if (m.emotionTags != null && m.emotionTags.contains("积极")) {
-                positiveCount++;
+        Map<String, Long> spectrum = new LinkedHashMap<>();
+        java.util.Set<Integer> isoWeeks = new java.util.TreeSet<>();
+        for (RelationMention mention : mentions) {
+            isoWeeks.add((int) java.time.temporal.WeekFields.ISO.weekOfWeekBasedYear()
+                    .getFrom(mention.createdAt));
+            if (mention.emotionTags == null || mention.emotionTags.isBlank()) {
+                continue;
+            }
+            for (String tag : mention.emotionTags.split("[,，;；]")) {
+                String clean = tag.trim();
+                if (!clean.isEmpty()) {
+                    spectrum.merge(clean, 1L, Long::sum);
+                }
             }
         }
 
-        return Math.min(1.0, Math.max(0.0, positiveCount / totalCount * 1.5));
+        com.innercosmos.vo.RelationInteractionReviewVO vo = new com.innercosmos.vo.RelationInteractionReviewVO();
+        vo.relationLabel = relationLabel;
+        vo.windowStart = windowStart.toString();
+        vo.windowEnd = windowEnd.toString();
+        vo.mentionCount = mentions.size();
+        vo.weeksActive = isoWeeks.size();
+        // Sorted by real counts, descending; ties keep first-seen (insertion) order.
+        vo.emotionSpectrum = spectrum.entrySet().stream()
+                .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue,
+                        (a, b) -> a, LinkedHashMap::new));
+        vo.recentTriggers = mentions.stream()
+                .map(m -> m.triggerSummary)
+                .filter(summary -> summary != null && !summary.isBlank())
+                .limit(3)
+                .collect(Collectors.toList());
+        return vo;
     }
 
     private String buildRelationExtractionPrompt(MemoryCard card) {

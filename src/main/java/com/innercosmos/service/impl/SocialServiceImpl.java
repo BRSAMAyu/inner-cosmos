@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.innercosmos.common.ErrorCode;
 import com.innercosmos.entity.BlockRelation;
 import com.innercosmos.entity.FriendRelation;
+import com.innercosmos.entity.GroupReviewLedger;
 import com.innercosmos.entity.SlowLetter;
 import com.innercosmos.entity.SocialGroup;
 import com.innercosmos.entity.SocialGroupMember;
@@ -13,16 +14,21 @@ import com.innercosmos.entity.User;
 import com.innercosmos.exception.BusinessException;
 import com.innercosmos.mapper.BlockRelationMapper;
 import com.innercosmos.mapper.FriendRelationMapper;
+import com.innercosmos.mapper.GroupReviewLedgerMapper;
 import com.innercosmos.mapper.SlowLetterMapper;
 import com.innercosmos.mapper.SocialGroupMapper;
 import com.innercosmos.mapper.SocialGroupMemberMapper;
 import com.innercosmos.mapper.SocialGroupMessageMapper;
 import com.innercosmos.mapper.UserMapper;
 import com.innercosmos.service.SocialService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -33,6 +39,11 @@ import java.util.Collections;
 
 @Service
 public class SocialServiceImpl implements SocialService {
+    /** tb_social_group.status values (V50). */
+    private static final String GROUP_ACTIVE = "ACTIVE";
+    private static final String GROUP_DISSOLVED = "DISSOLVED";
+    private static final String ROLE_OWNER = "OWNER";
+
     private final UserMapper userMapper;
     private final FriendRelationMapper friendMapper;
     private final SocialGroupMapper groupMapper;
@@ -40,6 +51,11 @@ public class SocialServiceImpl implements SocialService {
     private final SocialGroupMessageMapper messageMapper;
     private final SlowLetterMapper letterMapper;
     private final BlockRelationMapper blockMapper;
+    private final GroupReviewLedgerMapper reviewLedgerMapper;
+    /** CP-35: single injected instant source so mute expiry is testable (ClockConfig). */
+    private final Clock clock;
+    /** CP-35: per-group host pending-review bound, honest fail-closed once reached. */
+    private final int groupReviewPendingCapacity;
 
     public SocialServiceImpl(UserMapper userMapper,
                              FriendRelationMapper friendMapper,
@@ -47,7 +63,11 @@ public class SocialServiceImpl implements SocialService {
                              SocialGroupMemberMapper memberMapper,
                              SocialGroupMessageMapper messageMapper,
                              SlowLetterMapper letterMapper,
-                             BlockRelationMapper blockMapper) {
+                             BlockRelationMapper blockMapper,
+                             GroupReviewLedgerMapper reviewLedgerMapper,
+                             Clock clock,
+                             @Value("${inner-cosmos.social.group-review-pending-capacity:20}")
+                             int groupReviewPendingCapacity) {
         this.userMapper = userMapper;
         this.friendMapper = friendMapper;
         this.groupMapper = groupMapper;
@@ -55,6 +75,9 @@ public class SocialServiceImpl implements SocialService {
         this.messageMapper = messageMapper;
         this.letterMapper = letterMapper;
         this.blockMapper = blockMapper;
+        this.reviewLedgerMapper = reviewLedgerMapper;
+        this.clock = clock;
+        this.groupReviewPendingCapacity = groupReviewPendingCapacity;
     }
 
     @Override
@@ -226,7 +249,10 @@ public class SocialServiceImpl implements SocialService {
                         .eq("user_id", userId).eq("status", "ACTIVE"))
                 .stream().map(m -> m.groupId).toList();
         if (groupIds.isEmpty()) return List.of();
-        return groupMapper.selectList(new QueryWrapper<SocialGroup>().in("id", groupIds).orderByDesc("id"));
+        // CP-35: dissolved groups never appear in a member's list -- belt-and-braces on top of
+        // dissolveGroup flipping every membership row to REMOVED.
+        return groupMapper.selectList(new QueryWrapper<SocialGroup>()
+                .in("id", groupIds).eq("status", GROUP_ACTIVE).orderByDesc("id"));
     }
 
     // Regression (Gemini audit / remaining-work-handoff.md 2.2.4): the group row and its OWNER
@@ -243,12 +269,17 @@ public class SocialServiceImpl implements SocialService {
         group.groupName = trimmedName;
         group.intro = intro == null ? "" : intro;
         group.visibility = visibility == null ? "PRIVATE" : visibility;
+        group.status = GROUP_ACTIVE;
         groupMapper.insert(group);
         SocialGroupMember member = new SocialGroupMember();
         member.groupId = group.id;
         member.userId = userId;
-        member.memberRole = "OWNER";
+        member.memberRole = ROLE_OWNER;
         member.status = "ACTIVE";
+        // CP-35: the owner's history window opens at creation (MybatisMetaObjectHandler's
+        // LocalDateTime.now() source, not the UTC clock bean -- joinedAt is compared in SQL
+        // against message.created_at filled by that same handler).
+        member.joinedAt = LocalDateTime.now();
         memberMapper.insert(member);
         return group;
     }
@@ -278,6 +309,9 @@ public class SocialServiceImpl implements SocialService {
         invite.userId = targetUserId;
         invite.memberRole = "MEMBER";
         invite.status = "PENDING";
+        // CP-35: a resurrected row (re-invite after LEFT/DECLINED) must not keep the previous
+        // stay's join instant -- the new history window opens when THIS invitation is accepted.
+        invite.joinedAt = null;
         if (existing != null) memberMapper.updateById(invite); else memberMapper.insert(invite);
         return invite;
     }
@@ -332,9 +366,16 @@ public class SocialServiceImpl implements SocialService {
         // either writes. Use an atomic conditional UPDATE ... WHERE id=? AND status='PENDING',
         // matching the pattern in DialogServiceImpl#finishSession; 0 rows means someone else
         // already resolved this invite in the race window.
-        int updated = memberMapper.update(null, new UpdateWrapper<SocialGroupMember>()
+        // CP-35: acceptance stamps joined_at -- the history-visibility boundary -- at the
+        // accept instant (LocalDateTime.now(), the same source MybatisMetaObjectHandler uses
+        // for message.created_at so the SQL comparison stays zone-consistent).
+        UpdateWrapper<SocialGroupMember> acceptUpdate = new UpdateWrapper<SocialGroupMember>()
                 .eq("id", memberId).eq("status", "PENDING")
-                .set("status", newStatus));
+                .set("status", newStatus);
+        if (parsed == InviteDecision.ACCEPT) {
+            acceptUpdate.set("joined_at", LocalDateTime.now());
+        }
+        int updated = memberMapper.update(null, acceptUpdate);
         if (updated == 0) throw new BusinessException(ErrorCode.BAD_REQUEST, "该邀请已被处理");
         member.status = newStatus;
         return member;
@@ -352,6 +393,7 @@ public class SocialServiceImpl implements SocialService {
 
     @Override
     public List<Map<String, Object>> listGroupMembers(Long userId, Long groupId) {
+        requireUsableGroup(groupId);
         requireActiveGroupMember(userId, groupId);
         List<SocialGroupMember> members = memberMapper.selectList(new QueryWrapper<SocialGroupMember>()
                 .eq("group_id", groupId).eq("status", "ACTIVE"));
@@ -370,12 +412,22 @@ public class SocialServiceImpl implements SocialService {
 
     @Override
     public List<Map<String, Object>> listGroupMessages(Long userId, Long groupId) {
-        requireActiveGroupMember(userId, groupId);
+        requireUsableGroup(groupId);
+        SocialGroupMember me = requireActiveMembership(userId, groupId);
+        // CP-35 history visibility: the join instant is the boundary -- ordinary members see
+        // only messages created at/after their own joined_at (paging and any future by-id read
+        // path must go through this same query). The host (OWNER) is NOT restricted and keeps
+        // the full history; this is the documented one-choice.
+        QueryWrapper<SocialGroupMessage> query = new QueryWrapper<SocialGroupMessage>()
+                .eq("group_id", groupId);
+        if (!ROLE_OWNER.equals(me.memberRole)) {
+            LocalDateTime since = me.joinedAt != null ? me.joinedAt : me.createdAt;
+            if (since != null) {
+                query.ge("created_at", since);
+            }
+        }
         List<SocialGroupMessage> latest = new ArrayList<>(messageMapper.selectList(
-                new QueryWrapper<SocialGroupMessage>()
-                        .eq("group_id", groupId)
-                        .orderByDesc("id")
-                        .last("LIMIT 100")));
+                query.orderByDesc("id").last("LIMIT 100")));
         // CP-59 拉黑全触达一致: messages from either side of a block relation are
         // hidden from the reader in shared groups, mirroring letters/plaza.
         Set<Long> hidden = blockedCounterpartIds(userId);
@@ -389,7 +441,9 @@ public class SocialServiceImpl implements SocialService {
 
     @Override
     public Map<String, Object> sendGroupMessage(Long userId, Long groupId, String messageBody) {
-        requireActiveGroupMember(userId, groupId);
+        requireUsableGroup(groupId);
+        SocialGroupMember me = requireActiveMembership(userId, groupId);
+        rejectIfMuted(me);
         String trimmed = messageBody == null ? "" : messageBody.trim();
         if (trimmed.isBlank()) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "群聊消息不能为空");
@@ -411,6 +465,65 @@ public class SocialServiceImpl implements SocialService {
         if (myCount == 0) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED, "只有群组成员可以查看和参与群聊");
         }
+    }
+
+    /** The caller's own ACTIVE membership row (CP-35 needs its role, join instant and mute state). */
+    private SocialGroupMember requireActiveMembership(Long userId, Long groupId) {
+        SocialGroupMember membership = memberMapper.selectOne(new QueryWrapper<SocialGroupMember>()
+                .eq("group_id", groupId).eq("user_id", userId).eq("status", "ACTIVE")
+                .last("LIMIT 1"));
+        if (membership == null) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "只有群组成员可以查看和参与群聊");
+        }
+        return membership;
+    }
+
+    /**
+     * CP-35: the group must exist and not be dissolved. Dissolved groups refuse with an
+     * explicit 「群已解散」 semantic (409 CONFLICT) on every group endpoint that reaches this
+     * check -- no zombie-readable data.
+     */
+    private SocialGroup requireUsableGroup(Long groupId) {
+        SocialGroup group = groupMapper.selectById(groupId);
+        if (group == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "群组不存在");
+        }
+        if (GROUP_DISSOLVED.equals(group.status)) {
+            throw new BusinessException(ErrorCode.CONFLICT, "群已解散，无法查看或发言");
+        }
+        return group;
+    }
+
+    /** CP-35 host gate: the group owner is the 主持人. */
+    private SocialGroup requireGroupHost(Long actorUserId, Long groupId) {
+        SocialGroup group = requireUsableGroup(groupId);
+        if (!actorUserId.equals(group.ownerUserId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "只有群主（主持人）可以进行该操作");
+        }
+        return group;
+    }
+
+    /**
+     * CP-35 mute gate, fail-loud: a muted sender gets an explicit FORBIDDEN naming the remaining
+     * duration (or the manual-release requirement) and nothing is persisted -- the message is
+     * never silently swallowed. An expired mute self-heals: the row is lazily cleared so
+     * speaking resumes at expiry without any background job.
+     */
+    private void rejectIfMuted(SocialGroupMember membership) {
+        if (membership.mutedAt == null) return;
+        LocalDateTime now = LocalDateTime.now(clock);
+        if (membership.mutedUntil != null && !membership.mutedUntil.isAfter(now)) {
+            memberMapper.update(null, new UpdateWrapper<SocialGroupMember>()
+                    .eq("id", membership.id).eq("user_id", membership.userId)
+                    .set("muted_at", null).set("muted_until", null).set("muted_by", null));
+            return;
+        }
+        if (membership.mutedUntil == null) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "你已被群内禁言，需群主手动解除后才能发言");
+        }
+        long remainingMinutes = Math.max(1, Duration.between(now, membership.mutedUntil).toMinutes());
+        throw new BusinessException(ErrorCode.FORBIDDEN,
+                "你已被群内禁言，剩余约 " + remainingMinutes + " 分钟");
     }
 
     private Map<String, Object> groupMessageView(SocialGroupMessage message) {
@@ -474,5 +587,227 @@ public class SocialServiceImpl implements SocialService {
         item.put("username", other == null ? "" : other.username);
         item.put("source", relation.source);
         return item;
+    }
+
+    // ------------------------------------------------------------------
+    // CP-35 group governance (closing-checklist §2-7). 主持人 = 群主（OWNER）。
+    // ------------------------------------------------------------------
+
+    @Override
+    public void muteGroupMember(Long actorUserId, Long groupId, Long targetUserId, Integer durationMinutes) {
+        requireGroupHost(actorUserId, groupId);
+        if (actorUserId.equals(targetUserId)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "不能禁言自己");
+        }
+        if (durationMinutes != null && durationMinutes <= 0) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "禁言时长必须是正整数分钟（不传表示需手动解除）");
+        }
+        SocialGroupMember target = memberMapper.selectOne(new QueryWrapper<SocialGroupMember>()
+                .eq("group_id", groupId).eq("user_id", targetUserId).eq("status", "ACTIVE")
+                .last("LIMIT 1"));
+        if (target == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "该成员不在群组中，无法禁言");
+        }
+        if (ROLE_OWNER.equals(target.memberRole)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "不能禁言群主");
+        }
+        // muted_until NULL = muted until the host manually lifts it; a fresh mute overwrites
+        // any previous window (including an unexpired one).
+        LocalDateTime now = LocalDateTime.now(clock);
+        memberMapper.update(null, new UpdateWrapper<SocialGroupMember>()
+                .eq("id", target.id).eq("status", "ACTIVE")
+                .set("muted_at", now)
+                .set("muted_until", durationMinutes == null ? null : now.plusMinutes(durationMinutes))
+                .set("muted_by", actorUserId));
+    }
+
+    @Override
+    public void unmuteGroupMember(Long actorUserId, Long groupId, Long targetUserId) {
+        requireGroupHost(actorUserId, groupId);
+        SocialGroupMember target = memberMapper.selectOne(new QueryWrapper<SocialGroupMember>()
+                .eq("group_id", groupId).eq("user_id", targetUserId).eq("status", "ACTIVE")
+                .last("LIMIT 1"));
+        if (target == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "该成员不在群组中");
+        }
+        memberMapper.update(null, new UpdateWrapper<SocialGroupMember>()
+                .eq("id", target.id).eq("user_id", targetUserId)
+                .set("muted_at", null).set("muted_until", null).set("muted_by", null));
+    }
+
+    // Regression-safe by construction: the group row, the promotion and the demotion are three
+    // conditional UPDATEs inside one transaction -- either the crown moves completely or not
+    // at all, so no window exists with two (or zero) OWNER rows.
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void transferGroupOwnership(Long ownerUserId, Long groupId, Long targetUserId) {
+        requireGroupHost(ownerUserId, groupId);
+        if (ownerUserId.equals(targetUserId)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "不能把群主移交给自己");
+        }
+        SocialGroupMember target = memberMapper.selectOne(new QueryWrapper<SocialGroupMember>()
+                .eq("group_id", groupId).eq("user_id", targetUserId).eq("status", "ACTIVE")
+                .last("LIMIT 1"));
+        if (target == null) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "移交对象必须是群内正式成员");
+        }
+        // Promote first (conditional on the target still being ACTIVE); promotion also lifts
+        // any mute, keeping the "the owner can never be muted" invariant.
+        int promoted = memberMapper.update(null, new UpdateWrapper<SocialGroupMember>()
+                .eq("id", target.id).eq("status", "ACTIVE")
+                .set("member_role", ROLE_OWNER)
+                .set("muted_at", null).set("muted_until", null).set("muted_by", null));
+        if (promoted == 0) {
+            throw new BusinessException(ErrorCode.CONFLICT, "移交失败：对方已不是群内正式成员，请刷新后重试");
+        }
+        int demoted = memberMapper.update(null, new UpdateWrapper<SocialGroupMember>()
+                .eq("group_id", groupId).eq("user_id", ownerUserId).eq("member_role", ROLE_OWNER)
+                .eq("status", "ACTIVE")
+                .set("member_role", "MEMBER"));
+        if (demoted == 0) {
+            throw new BusinessException(ErrorCode.CONFLICT, "群主身份已发生变化，请刷新后重试");
+        }
+        SocialGroup group = new SocialGroup();
+        group.id = groupId;
+        group.ownerUserId = targetUserId;
+        groupMapper.updateById(group);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void dissolveGroup(Long ownerUserId, Long groupId) {
+        SocialGroup group = requireUsableGroup(groupId); // re-dissolve answers 「群已解散」CONFLICT
+        if (!ownerUserId.equals(group.ownerUserId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "只有群主可以解散群组");
+        }
+        group.status = GROUP_DISSOLVED;
+        groupMapper.updateById(group);
+        // Flip every membership row (including still-PENDING invitations) to REMOVED so no
+        // zombie membership survives: the group vanishes from every member's list and no
+        // member-scoped endpoint can still resolve an active membership against it.
+        memberMapper.update(null, new UpdateWrapper<SocialGroupMember>()
+                .eq("group_id", groupId).in("status", "ACTIVE", "PENDING")
+                .set("status", "REMOVED"));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Map<String, Object> reportGroupMessage(Long reporterUserId, Long groupId, Long messageId, String reason) {
+        requireUsableGroup(groupId);
+        requireActiveMembership(reporterUserId, groupId); // a muted member may still report
+        String trimmed = reason == null ? "" : reason.trim();
+        if (trimmed.isBlank()) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "举报理由不能为空");
+        }
+        if (trimmed.length() > 400) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "举报理由不能超过 400 个字符");
+        }
+        SocialGroupMessage message = messageId == null ? null : messageMapper.selectById(messageId);
+        if (message == null || !groupId.equals(message.groupId)) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "被举报的消息不存在或不在这个群组中");
+        }
+        Long duplicate = reviewLedgerMapper.selectCount(new QueryWrapper<GroupReviewLedger>()
+                .eq("group_id", groupId).eq("reporter_user_id", reporterUserId)
+                .eq("target_message_id", messageId).eq("status", "PENDING"));
+        if (duplicate != null && duplicate > 0) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "你已举报过这条消息，正在等待主持人处理");
+        }
+        // CP-35 capacity gate, fail-closed: over the bound the report is explicitly REJECTED
+        // (honest CONFLICT naming the bound) and nothing is persisted -- never silently
+        // queued, never silently dropped, no unbounded pile.
+        long pending = pendingReviewCount(groupId);
+        if (pending >= groupReviewPendingCapacity) {
+            throw new BusinessException(ErrorCode.CONFLICT,
+                    "该群待处理审核已达上限（" + groupReviewPendingCapacity
+                            + " 条），暂不接受新的举报，请等待群主处理积压后重试");
+        }
+        GroupReviewLedger row = new GroupReviewLedger();
+        row.groupId = groupId;
+        row.reporterUserId = reporterUserId;
+        row.targetUserId = message.senderUserId;
+        row.targetMessageId = messageId;
+        row.reason = trimmed;
+        row.status = "PENDING";
+        reviewLedgerMapper.insert(row);
+        // Race re-check inside the same transaction: if a concurrent report squeezed past the
+        // pre-check and pushed the queue over the bound, roll this insert back too.
+        if (pendingReviewCount(groupId) > groupReviewPendingCapacity) {
+            throw new BusinessException(ErrorCode.CONFLICT,
+                    "该群待处理审核已达上限（" + groupReviewPendingCapacity
+                            + " 条），本次举报已被回滚，请稍后重试");
+        }
+        return reviewView(row);
+    }
+
+    @Override
+    public Map<String, Object> resolveGroupReview(Long hostUserId, Long groupId, Long reviewId,
+                                                  String decision, String note) {
+        requireGroupHost(hostUserId, groupId);
+        GroupReviewLedger row = reviewLedgerMapper.selectById(reviewId);
+        if (row == null || !groupId.equals(row.groupId)) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "审核记录不存在");
+        }
+        if (!"PENDING".equals(row.status)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "该审核已处理完毕");
+        }
+        boolean resolve = "resolve".equalsIgnoreCase(decision);
+        boolean dismiss = "dismiss".equalsIgnoreCase(decision);
+        if (!resolve && !dismiss) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "decision 必须是 resolve 或 dismiss");
+        }
+        String trimmedNote = note == null ? "" : note.trim();
+        if (trimmedNote.length() > 400) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "处理说明不能超过 400 个字符");
+        }
+        // Conditional UPDATE: losing a concurrent resolve/dismiss race reads as "already done".
+        int updated = reviewLedgerMapper.update(null, new UpdateWrapper<GroupReviewLedger>()
+                .eq("id", reviewId).eq("status", "PENDING")
+                .set("status", resolve ? "RESOLVED" : "DISMISSED")
+                .set("resolution_note", trimmedNote.isBlank() ? null : trimmedNote)
+                .set("resolved_by", hostUserId)
+                .set("resolved_at", LocalDateTime.now(clock)));
+        if (updated == 0) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "该审核已处理完毕");
+        }
+        row.status = resolve ? "RESOLVED" : "DISMISSED";
+        row.resolutionNote = trimmedNote.isBlank() ? null : trimmedNote;
+        row.resolvedBy = hostUserId;
+        return reviewView(row);
+    }
+
+    @Override
+    public Map<String, Object> listGroupReviews(Long hostUserId, Long groupId) {
+        requireGroupHost(hostUserId, groupId);
+        List<GroupReviewLedger> rows = reviewLedgerMapper.selectList(new QueryWrapper<GroupReviewLedger>()
+                .eq("group_id", groupId).orderByDesc("id").last("LIMIT 100"));
+        Map<String, Object> view = new HashMap<>();
+        view.put("capacity", groupReviewPendingCapacity);
+        view.put("pendingCount", pendingReviewCount(groupId));
+        view.put("reviews", rows.stream().map(this::reviewView).toList());
+        return view;
+    }
+
+    private long pendingReviewCount(Long groupId) {
+        Long count = reviewLedgerMapper.selectCount(new QueryWrapper<GroupReviewLedger>()
+                .eq("group_id", groupId).eq("status", "PENDING"));
+        return count == null ? 0L : count;
+    }
+
+    private Map<String, Object> reviewView(GroupReviewLedger row) {
+        Map<String, Object> view = new HashMap<>();
+        view.put("reviewId", row.id);
+        view.put("groupId", row.groupId);
+        view.put("reporterUserId", row.reporterUserId);
+        view.put("targetUserId", row.targetUserId);
+        view.put("targetMessageId", row.targetMessageId);
+        view.put("reason", row.reason);
+        view.put("status", row.status);
+        view.put("resolutionNote", row.resolutionNote);
+        view.put("resolvedBy", row.resolvedBy);
+        view.put("resolvedAt", row.resolvedAt);
+        view.put("createdAt", row.createdAt);
+        view.put("capacity", groupReviewPendingCapacity);
+        view.put("pendingCount", row.groupId == null ? null : pendingReviewCount(row.groupId));
+        return view;
     }
 }

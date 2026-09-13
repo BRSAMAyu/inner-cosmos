@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import {
   api, type ConnectionRequests, type DeliverySchedule, type DiscoverablePerson, type GroupInvite, type GroupMember, type GroupMessage,
   type LetterThread, type LiveChatInvites, type LiveChatMessage, type LiveChatSession,
-  type RelationHealth, type RelationMention, type RelationTimelinePoint, type SlowLetter, type SlowLetterOutboxRow,
+  type RelationMention, type RelationReview, type RelationTimelinePoint, type SlowLetter, type SlowLetterOutboxRow,
   type SocialConnection, type SocialGroup
 } from "../api";
 import { sendComposedLetter, type DraftedLetterState } from "../composeAndSend";
@@ -41,7 +41,7 @@ export function useConnectionsAndLetters({ setStatus, locale = "zh-CN" }: UseCon
   const [relations, setRelations] = useState<RelationMention[]>([]);
   const [selectedRelation, setSelectedRelation] = useState<string | null>(null);
   const [relationTimeline, setRelationTimeline] = useState<RelationTimelinePoint[]>([]);
-  const [relationHealth, setRelationHealth] = useState<RelationHealth | null>(null);
+  const [relationReview, setRelationReview] = useState<RelationReview | null>(null);
   const [relationBusy, setRelationBusy] = useState(false);
   const [letterInbox, setLetterInbox] = useState<SlowLetter[]>([]);
   // CP-33: the outbox projection is the sender-facing privacy shape (no sent bodies,
@@ -205,14 +205,14 @@ export function useConnectionsAndLetters({ setStatus, locale = "zh-CN" }: UseCon
     const generation = ++relationGenerationRef.current;
     const isCurrent = () => relationGenerationRef.current === generation;
     setSelectedRelation(label); setRelationBusy(true);
-    setRelationTimeline([]); setRelationHealth(null);
+    setRelationTimeline([]); setRelationReview(null);
     try {
-      const [timeline, health] = await Promise.all([
+      const [timeline, review] = await Promise.all([
         api.relationTimeline(label),
-        api.relationHealth(label).catch(() => null)
+        api.relationReview(label).catch(() => null)
       ]);
       if (!isCurrent()) return; // 4.4: a newer selection superseded this one -- discard silently.
-      setRelationTimeline(timeline); setRelationHealth(health);
+      setRelationTimeline(timeline); setRelationReview(review);
     } catch (error) {
       if (!isCurrent()) return;
       setStatus(error instanceof Error ? error.message
@@ -614,7 +614,7 @@ export function useConnectionsAndLetters({ setStatus, locale = "zh-CN" }: UseCon
 
   return {
     connectionRequests, friends, people, isPersonBusy: peopleBusyKeys.isBusy,
-    relations, selectedRelation, relationTimeline, relationHealth, relationBusy,
+    relations, selectedRelation, relationTimeline, relationReview, relationBusy,
     letterInbox, letterOutbox, letterThreads, selectedThreadId, threadLetters, threadLettersStatus,
     lettersRefreshing,
     isDraftBusy: draftBusyKeys.isBusy, replyBusyId, replyDrafts,

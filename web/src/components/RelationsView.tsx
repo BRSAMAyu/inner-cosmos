@@ -1,4 +1,4 @@
-import type { RelationMention, RelationTimelinePoint, RelationHealth } from "../api";
+import type { RelationMention, RelationTimelinePoint, RelationReview } from "../api";
 import type { Locale } from "../i18n";
 import { LoadingText } from "../loading";
 
@@ -15,44 +15,46 @@ function parseTags(raw: string | null): string[] {
 const COPY: Record<Locale, {
   aria: string; heading: string; count: (n: number) => string; intro: string;
   empty: string; pickPrompt: string; loadingTimeline: (label: string) => string;
-  temperature: string; temp: { warm: string; stable: string; cool: string; needsCare: string };
+  review: string; reviewNote: string;
+  mentions: (n: number) => string; activeWeeks: (n: number) => string; emotions: string;
+  reviewEmpty: string; reviewDisclaimer: string;
   timelineTitle: (label: string) => string; timelineEmpty: string;
 }> = {
   "zh-CN": {
-    aria: "关系温度与时间线", heading: "关系的温度，慢慢看清", count: n => `${n} 段被你提到的关系`,
-    intro: "这些是你在对话里自然提到的人。这里不催促你联系谁，只帮你看清每段关系此刻的温度与走向。",
+    aria: "关系互动回顾与时间线", heading: "关系的互动，慢慢看清", count: n => `${n} 段被你提到的关系`,
+    intro: "这些是你在对话里自然提到的人。这里不催促你联系谁，也不评判任何一段关系——只如实呈现这段关系在你记忆里出现的痕迹。",
     empty: "还没有从对话里浮现的关系。多和 Aurora 聊聊你在意的人，这里会慢慢亮起来。",
-    pickPrompt: "选一段关系，看它的温度与时间线。", loadingTimeline: label => `正在读取「${label}」的时间线…`,
-    temperature: "关系温度", temp: { warm: "温暖", stable: "稳定", cool: "微凉", needsCare: "需要关照" },
+    pickPrompt: "选一段关系，看它的互动回顾与时间线。", loadingTimeline: label => `正在读取「${label}」的时间线…`,
+    review: "互动回顾", reviewNote: "这是互动记录的回顾，不是关系好坏的评判。",
+    mentions: n => `近 4 周被提及 ${n} 次`, activeWeeks: n => `分布在 ${n} 个不同的周`,
+    emotions: "情绪痕迹", reviewEmpty: "近 4 周没有提及这段关系的记录。",
+    reviewDisclaimer: "数据只来自你自己的记忆卡片，不会给关系打分。",
     timelineTitle: label => `「${label}」的时间线`, timelineEmpty: "这段关系还没有足够的时间线记录。"
   },
   "en-SG": {
-    aria: "Relationship warmth and timeline", heading: "Relationship warmth, seen slowly",
+    aria: "Relationship interaction review and timeline", heading: "Relationship interactions, seen slowly",
     count: n => `${n} relationship${n === 1 ? "" : "s"} you've mentioned`,
-    intro: "These are people you've naturally mentioned in conversation. Nothing here pushes you to reach out — it just helps you see each relationship's current warmth and direction.",
+    intro: "These are people you've naturally mentioned in conversation. Nothing here pushes you to reach out, and nothing grades any relationship — it only shows where this person has appeared in your memories.",
     empty: "No relationships have surfaced from conversation yet. Talk with Aurora about people who matter to you, and this will slowly light up.",
-    pickPrompt: "Pick a relationship to see its warmth and timeline.", loadingTimeline: label => `Loading ${label}'s timeline…`,
-    temperature: "Relationship warmth", temp: { warm: "Warm", stable: "Stable", cool: "Cooling", needsCare: "Needs care" },
+    pickPrompt: "Pick a relationship to see its interaction review and timeline.", loadingTimeline: label => `Loading ${label}'s timeline…`,
+    review: "Interaction review", reviewNote: "This is a record of interactions, not a verdict on the relationship.",
+    mentions: n => `mentioned ${n} time${n === 1 ? "" : "s"} in the last 4 weeks`, activeWeeks: n => `across ${n} different week${n === 1 ? "" : "s"}`,
+    emotions: "Emotional traces", reviewEmpty: "No mentions of this relationship in the last 4 weeks.",
+    reviewDisclaimer: "Data comes only from your own memory cards; relationships are never scored.",
     timelineTitle: label => `${label}'s timeline`, timelineEmpty: "Not enough timeline records for this relationship yet."
   }
 };
 
-export function RelationsView({ relations, selected, timeline, health, busy, onSelect, locale = "zh-CN" }: {
+export function RelationsView({ relations, selected, timeline, review, busy, onSelect, locale = "zh-CN" }: {
   relations: RelationMention[];
   selected: string | null;
   timeline: RelationTimelinePoint[];
-  health: RelationHealth | null;
+  review: RelationReview | null;
   busy: boolean;
   onSelect: (label: string) => void;
   locale?: Locale;
 }) {
   const t = COPY[locale];
-  // Health score (0..1) -> a warm "relationship temperature" label.
-  const temperature = (score: number): { label: string; pct: number } => {
-    const pct = Math.max(0, Math.min(100, Math.round(score * 100)));
-    const label = pct >= 75 ? t.temp.warm : pct >= 50 ? t.temp.stable : pct >= 25 ? t.temp.cool : t.temp.needsCare;
-    return { label, pct };
-  };
   return <section className="relations-view" aria-label={t.aria}>
     <div className="resonance-heading">
       <div><span className="eyebrow">{locale === "en-SG" ? "RELATIONSHIPS" : "关系"}</span><h2>{t.heading}</h2></div>
@@ -86,12 +88,21 @@ export function RelationsView({ relations, selected, timeline, health, busy, onS
               : busy
                 ? <LoadingText busy className="network-empty">{t.loadingTimeline(selected)}</LoadingText>
                 : <>
-                    {health && <div className="relation-temperature">
+                    {review && <div className="relation-review">
                       <div className="relation-temp-row">
-                        <span>{t.temperature}</span>
-                        <strong>{temperature(health.healthScore).label} · {temperature(health.healthScore).pct}%</strong>
+                        <span>{t.review}</span>
+                        <strong>{review.mentionCount > 0
+                          ? `${t.mentions(review.mentionCount)} · ${t.activeWeeks(review.weeksActive)}`
+                          : t.reviewEmpty}</strong>
                       </div>
-                      <div className="relation-temp-bar"><span style={{ width: `${temperature(health.healthScore).pct}%` }} /></div>
+                      <p className="relation-review-note">{t.reviewNote} {t.reviewDisclaimer}</p>
+                      {Object.keys(review.emotionSpectrum).length > 0 && <>
+                        <span className="relation-review-label">{t.emotions}</span>
+                        <div className="relation-tags">
+                          {Object.entries(review.emotionSpectrum).slice(0, 6).map(([tag, count], i) =>
+                            <span className="relation-tag" key={i}>{tag} ×{count}</span>)}
+                        </div>
+                      </>}
                     </div>}
                     <h3 className="relation-timeline-title">{t.timelineTitle(selected)}</h3>
                     {timeline.length === 0
