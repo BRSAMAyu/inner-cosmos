@@ -629,10 +629,10 @@ work_packages:
     depends_on: ["CP-17", "CP-44", "CP-45"]
     vision_ids: ["V08", "V14", "V17"]
     status: IN_PROGRESS
-    delivery_record: evidence/commercial-cn/CP-45/2026-09-13-channel-sandbox-adapters/delivery-record.md
-    test_command: "./mvnw test -Dtest=ChannelCallbackSandboxContractTest"
-    note: "首个增量：境内渠道事件面——TRADE_SUCCESS/TRADE_FINISHED/REFUND_SUCCESS等终态映射到统一账本事实(支付/退款两态,部分退款净额正确),渠道原始状态与服务端事实分离(客户端只能展示不能宣告支付成功的基础已就位)"
-    next_action: "统一服务端权益状态机(待定/试用/续期/宽限/取消/到期/退款撤销/恢复购买)与配额剩余+重置时间展示"
+    delivery_record: evidence/commercial-cn/CP-46/2026-09-13-entitlement-state-machine/delivery-record.md
+    test_command: "./mvnw test -Dtest=EntitlementStateMachineContractTest,ChannelCallbackSandboxContractTest"
+    note: "第二增量：统一服务端权益状态机(V44:tb_entitlement/tb_entitlement_event)——支付幂等激活/堆叠续期(已付时间不重叠,上海月历月末钳制Jan31→Feb28),渠道七态归一(待定/试用/续期/宽限/取消保留到期末/到期/恢复),退款粘性撤销(恢复通知不可洗白,新支付才复活),通知去重唯一键,惰性到期,EntitlementGates永不付费解锁目录(安全/纠正/导出删除结构不可入付费墙),GET /api/me/entitlements+cancel端点;8/8契约,PG基线44/103/96/25实机"
+    next_action: "按能力计量配额余量与CP-17合流；续费前显著提醒排程；IAP渠道服务器通知接线(需真实渠道账号)"
     evidence_dir: evidence/commercial-cn/CP-46/
   - id: CP-47
     title: "真实单位经济、预算与税务对账"

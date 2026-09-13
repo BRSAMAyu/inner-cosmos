@@ -1768,3 +1768,36 @@ CREATE TABLE IF NOT EXISTS tb_payment_event (
   UNIQUE (provider_event_id)
 );
 CREATE INDEX IF NOT EXISTS idx_payment_event_order ON tb_payment_event (order_id, event_type);
+
+-- CP-46: unified server-side entitlement state machine (V44 twin).
+CREATE TABLE IF NOT EXISTS tb_entitlement (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  product_id VARCHAR(64) NOT NULL,
+  channel VARCHAR(32) NOT NULL,
+  channel_order_id VARCHAR(64),
+  state VARCHAR(24) NOT NULL,
+  period_start TIMESTAMP NOT NULL,
+  period_end TIMESTAMP NOT NULL,
+  auto_renew BOOLEAN NOT NULL DEFAULT TRUE,
+  cancel_at_period_end BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (user_id, product_id)
+);
+CREATE INDEX IF NOT EXISTS idx_entitlement_user ON tb_entitlement (user_id, state);
+
+CREATE TABLE IF NOT EXISTS tb_entitlement_event (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  channel_notification_id VARCHAR(128) NOT NULL,
+  entitlement_id BIGINT NOT NULL,
+  user_id BIGINT NOT NULL,
+  transition VARCHAR(48) NOT NULL,
+  from_state VARCHAR(24) NOT NULL,
+  to_state VARCHAR(24) NOT NULL,
+  occurred_at TIMESTAMP NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (channel_notification_id)
+);
+CREATE INDEX IF NOT EXISTS idx_entitlement_event_entitlement ON tb_entitlement_event (entitlement_id);
