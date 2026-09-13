@@ -108,6 +108,21 @@ public class LetterController extends BaseController {
     }
 
     /**
+     * CP-33 §2-6: the RECIPIENT's per-letter read-receipt preference. Read receipts are the
+     * receiver's opt-in choice, default NEVER (privacy default: the sender is not told the
+     * letter was read). Only the receiver may set it -- the sender gets 403, a third party 401.
+     * Body: {@code {"receiptPolicy":"ALWAYS"|"NEVER"}}. Switching takes effect on the sender's
+     * next view; it never fakes or unfakes the read itself.
+     */
+    @PatchMapping("/{id}/receipt-policy")
+    public ApiResponse<SlowLetter> setReceiptPolicy(@PathVariable Long id,
+                                                    @RequestBody Map<String, String> body,
+                                                    HttpSession session) {
+        String policy = body == null ? null : body.get("receiptPolicy");
+        return ApiResponse.ok(slowLetterService.setReceiptPolicy(currentUserId(session), id, policy));
+    }
+
+    /**
      * W1 slow-letter voice reuse: on-demand MP3 synthesis of a delivered letter's body, read aloud
      * in a warm voice. Tap-to-play (the frontend renders it on the letter body via the shared
      * InlineAudioPlayer), so hearing a letter is opt-in/visible, never autoplay-surprising. Reuses

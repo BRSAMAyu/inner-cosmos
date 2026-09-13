@@ -82,7 +82,7 @@ public class UserDataExportService {
                 new QueryWrapper<SlowLetter>().eq("sender_user_id", userId).orderByAsc("id"))) {
             Map<String, Object> record = record("slowLettersSent", "tb_slow_letter", letter.id,
                     letter.senderUserId, letter);
-            record.put("originalStatus", letter.status);
+            applySenderReceiptMask(record, letter);
             letters.add(record);
         }
         List<Map<String, Object>> transcriptions = new ArrayList<>();
@@ -111,7 +111,29 @@ public class UserDataExportService {
 
     private void putSection(Map<String, Section> sections, String name,
                             List<Map<String, Object>> records) {
-        sections.put(name, new Section(sha256(toJson(records)), records));
+        sections.put(name, new Section(sha256(toJson(records)), records));    }
+
+    /**
+     * CP-33: the export is the SENDER's own data. The recipient's receipt preference and —
+     * under NEVER — the read moment are the recipient's private signals, so the exported
+     * record carries exactly the sender-facing semantics of the outbox view: NEVER hides
+     * READ as DELIVERED and strips readAt; REPLIED stays (the reply itself discloses) but
+     * its read moment stays hidden under NEVER; DECLINED/BLOCKED fold to CLOSED; the
+     * preference itself is never exported. A raw "originalStatus" duplicate would bypass
+     * all of this, so it is gone — the masked status is the only status in the package.
+     */
+    private static void applySenderReceiptMask(Map<String, Object> record, SlowLetter letter) {
+        boolean never = letter.receiptPolicy == null || "NEVER".equals(letter.receiptPolicy);
+        if (never) {
+            record.put("readAt", null);
+            if ("READ".equals(letter.status)) {
+                record.put("status", "DELIVERED");
+            }
+        }
+        record.remove("receiptPolicy");
+        if ("DECLINED".equals(letter.status) || "BLOCKED".equals(letter.status)) {
+            record.put("status", "CLOSED");
+        }
     }
 
     private Map<String, Object> record(String section, String sourceTable, Long sourceId,

@@ -1,7 +1,7 @@
 import { useEffect, useId, useState } from "react";
 import type {
   ConnectionRequests, DeliveryPreset, DeliverySchedule, LetterThread, LiveChatInvites, LiveChatMessage,
-  LiveChatSession, SlowLetter, SocialConnection
+  LiveChatSession, SlowLetter, SlowLetterOutboxRow, SocialConnection
 } from "../api";
 import type { Locale } from "../i18n";
 import { AsyncButton, LoadingText } from "../loading";
@@ -11,7 +11,20 @@ import { LiveChatPanel } from "./LiveChatPanel";
 
 const repliable = new Set(["READ", "REPLIED"]);
 const declinable = new Set(["DELIVERED", "READ"]);
-const archivableFromOutbox = new Set(["READ", "REPLIED", "DECLINED", "BLOCKED"]);
+// DECLINED/BLOCKED arrive folded as CLOSED in the sender projection.
+const archivableFromOutbox = new Set(["READ", "REPLIED", "CLOSED"]);
+
+/**
+ * CP-33 §2-6: the recipient's per-letter read-receipt choice, carried by the backend letter
+ * payload. Absent/null means the persisted default NEVER -- the sender is not told anything.
+ */
+type ReceiptPolicy = "ALWAYS" | "NEVER";
+type ReceiptAwareLetter = SlowLetter & { receiptPolicy?: ReceiptPolicy | null };
+
+/** CP-33 §2-6: honest default -- no field (or null) means no receipt is ever emitted. */
+function receiptPolicyOf(letter: SlowLetter): ReceiptPolicy {
+  return (letter as ReceiptAwareLetter).receiptPolicy === "ALWAYS" ? "ALWAYS" : "NEVER";
+}
 
 const COPY: Record<Locale, {
   outboxStatus: Record<string, string>;
@@ -21,6 +34,8 @@ const COPY: Record<Locale, {
   markRead: string; markReadBusy: string; decline: string; declineBusy: string;
   playLetterVoice: string; letterVoiceBusy: string; letterVoiceAria: string;
   willKnow: string; willKnowBusy: string; block: string; blockBusy: string; report: string; reportBusy: string;
+  receiptControl: string; receiptOffAction: string; receiptOnAction: string;
+  receiptOffHint: string; receiptOnHint: string; receiptBusy: string; outboxReadReceipt: string;
   outboxIntro: string; outboxEmpty: string; arrivalEta: (time: string) => string; archiveLetter: string; archiveBusy: string;
   draftsIntro: string; draftsEmpty: string; untitledDraft: string; draftStatus: string; sendDraftBusy: string; sendDraft: string;
   threadsIntro: string; threadsEmpty: string; threadItem: (id: number) => string; threadItemAria: (label: string, statusText: string) => string;
@@ -36,7 +51,7 @@ const COPY: Record<Locale, {
   awaitingThem: string; noOutgoing: string; notYetAgreed: string; bothAgreed: string; noFriends: string; leave: string; leaveBusy: string;
 }> = {
   "zh-CN": {
-    outboxStatus: { DRAFT: "草稿", SENT: "已寄出", FLYING: "飞行中", DELIVERED: "已抵达", READ: "对方已读", REPLIED: "对方回信了", DECLINED: "被婉拒", BLOCKED: "被屏蔽", ARCHIVED: "已归档" },
+    outboxStatus: { DRAFT: "草稿", SENT: "已寄出", FLYING: "飞行中", DELIVERED: "已抵达", READ: "对方已读", REPLIED: "对方回信了", CLOSED: "已结束", ARCHIVED: "已归档" },
     counts: { inbox: n => `${n} 封已抵达`, outbox: n => `${n} 封已寄出`, drafts: n => `${n} 封草稿`, threads: n => `${n} 段往来` },
     aria: "慢信收件箱与寄件箱", heading: "只在抵达之后，才由你决定关系往哪里走", tabsAria: "慢信方向",
     tabInbox: "收到的", tabOutbox: "寄出的", tabDrafts: "草稿", tabThreads: "往来",
@@ -45,6 +60,9 @@ const COPY: Record<Locale, {
     markRead: "标记已读", markReadBusy: "正在标记", decline: "温和婉拒", declineBusy: "正在婉拒",
     playLetterVoice: "▶ 朗读这封信", letterVoiceBusy: "正在合成…", letterVoiceAria: "听这封慢信被朗读出来",
     willKnow: "愿意认识对方", willKnowBusy: "正在发出", block: "屏蔽后续来信", blockBusy: "正在屏蔽", report: "举报这封信", reportBusy: "正在提交",
+    receiptControl: "已读回执", receiptOffAction: "不告知对方（默认）", receiptOnAction: "愿意告知对方",
+    receiptOffHint: "对方不会收到已读回执；你读没读，寄件人都无从知道。", receiptOnHint: "对方会看到这封信已读；这只影响这一封信。",
+    receiptBusy: "正在设置", outboxReadReceipt: "对方已读（对方选择告知）",
     outboxIntro: "你写出去的信都在这里。它们会按各自的节奏抵达；对方是否回应由对方决定，你不会被催促，也不会看到假装的实时状态。", outboxEmpty: "你还没有寄出任何慢信。",
     arrivalEta: t => `预计 ${t} 抵达`, archiveLetter: "归档", archiveBusy: "正在归档",
     draftsIntro: "还没寄出的信留在这里。你可以慢慢改，准备好了再让它启程——寄出后它会按慢信的节奏抵达。", draftsEmpty: "没有草稿。", untitledDraft: "未命名草稿", draftStatus: "草稿",
@@ -66,7 +84,7 @@ const COPY: Record<Locale, {
     awaitingThem: "等待对方决定", noOutgoing: "没有等待中的邀请", notYetAgreed: "尚未同意，不会提前开放真人连接", bothAgreed: "双方已同意", noFriends: "还没有建立真人连接", leave: "退出连接", leaveBusy: "正在退出"
   },
   "en-SG": {
-    outboxStatus: { DRAFT: "Draft", SENT: "Sent", FLYING: "In flight", DELIVERED: "Delivered", READ: "Read", REPLIED: "Replied", DECLINED: "Declined", BLOCKED: "Blocked", ARCHIVED: "Archived" },
+    outboxStatus: { DRAFT: "Draft", SENT: "Sent", FLYING: "In flight", DELIVERED: "Delivered", READ: "Read", REPLIED: "Replied", CLOSED: "Closed", ARCHIVED: "Archived" },
     counts: { inbox: n => `${n} arrived`, outbox: n => `${n} sent`, drafts: n => `${n} draft${n === 1 ? "" : "s"}`, threads: n => `${n} thread${n === 1 ? "" : "s"}` },
     aria: "Slow-letter inbox and outbox", heading: "Only after it arrives do you decide where the relationship goes", tabsAria: "Slow-letter direction",
     tabInbox: "Received", tabOutbox: "Sent", tabDrafts: "Drafts", tabThreads: "Threads",
@@ -75,6 +93,9 @@ const COPY: Record<Locale, {
     markRead: "Mark read", markReadBusy: "Marking", decline: "Gently decline", declineBusy: "Declining",
     playLetterVoice: "▶ Read this letter aloud", letterVoiceBusy: "Synthesizing…", letterVoiceAria: "Hear this slow letter read aloud",
     willKnow: "Willing to know them", willKnowBusy: "Sending", block: "Block future letters", blockBusy: "Blocking", report: "Report this letter", reportBusy: "Submitting",
+    receiptControl: "Read receipt", receiptOffAction: "Not telling the sender (default)", receiptOnAction: "Tell the sender",
+    receiptOffHint: "The sender won't be told you read this letter.", receiptOnHint: "The sender will see this letter as read. Applies to this letter only.",
+    receiptBusy: "Setting", outboxReadReceipt: "Read (they chose to share)",
     outboxIntro: "Every letter you've sent is here. Each arrives at its own pace; whether they reply is theirs to decide — you're never rushed, and never shown a fake live status.", outboxEmpty: "You haven't sent any slow letters yet.",
     arrivalEta: t => `Arrives ~${t}`, archiveLetter: "Archive", archiveBusy: "Archiving",
     draftsIntro: "Letters not yet sent stay here. Revise slowly and send when ready — once sent, it arrives at a slow letter's pace.", draftsEmpty: "No drafts.", untitledDraft: "Untitled draft", draftStatus: "Draft",
@@ -102,6 +123,7 @@ export function LettersInbox({ letterInbox, letterOutbox = [], threads = [], thr
   replyDrafts, connectionRequests, friends,
   onReplyDraftChange, onReply, onActOnLetter, onReportLetter, onRequestConnection, onDecideConnection, onLeaveConnection,
   onSendDraft, onOpenThread, locale = "zh-CN",
+  onSetReceiptPolicy, isReceiptPolicyBusy,
   letterVoiceLetterId = null, letterVoiceAudio = null, letterVoiceError = null,
   isLetterVoiceBusy = () => false, onPlayLetterVoice, refreshBusy = false, onRefresh, onComposeNew,
   directLetterBusy = false, onSendDirectLetter,
@@ -110,7 +132,7 @@ export function LettersInbox({ letterInbox, letterOutbox = [], threads = [], thr
   isLiveChatInviteBusy = () => false, isLiveChatDecisionBusy = () => false,
   isLiveChatMessageBusy = () => false, isLiveChatEndBusy = () => false,
   onInviteLiveChat, onRespondLiveChatInvite, onSelectLiveChatSession, onSendLiveChatMessage, onEndLiveChatSession }: {
-  letterInbox: SlowLetter[]; letterOutbox?: SlowLetter[]; threads?: LetterThread[]; threadLetters?: SlowLetter[];
+  letterInbox: SlowLetter[]; letterOutbox?: SlowLetterOutboxRow[]; threads?: LetterThread[]; threadLetters?: SlowLetter[];
   threadLettersStatus?: "idle" | "loading" | "success" | "error";
   selectedThreadId?: number | null; replyBusyId?: number | null;
   // Gemini audit 4.8 (CONFIRMED/P1): every busy check here is keyed by the SPECIFIC letter/
@@ -121,7 +143,8 @@ export function LettersInbox({ letterInbox, letterOutbox = [], threads = [], thr
   isLetterConnectionBusy: (letterId: number) => boolean;
   replyDrafts: Record<number, string>; connectionRequests: ConnectionRequests; friends: SocialConnection[];
   onReplyDraftChange: (letterId: number, value: string) => void; onReply: (letter: SlowLetter) => void;
-  onActOnLetter: (letter: SlowLetter, action: "read" | "decline" | "block" | "archive") => void;
+  // Accepts inbox SlowLetter rows AND outbox projection rows -- only the id reaches the API.
+  onActOnLetter: (letter: { id: number }, action: "read" | "decline" | "block" | "archive") => void;
   onReportLetter: (letter: SlowLetter) => void; onRequestConnection: (letter: SlowLetter) => void;
   onDecideConnection: (id: number, decision: "accept" | "decline") => void; onLeaveConnection: (id: number) => void;
   onSendDraft?: (id: number) => void; onOpenThread?: (threadId: number) => void; locale?: Locale;
@@ -131,6 +154,12 @@ export function LettersInbox({ letterInbox, letterOutbox = [], threads = [], thr
   letterVoiceLetterId?: number | null; letterVoiceAudio?: string | null; letterVoiceError?: string | null;
   isLetterVoiceBusy?: (letterId: number) => boolean; onPlayLetterVoice?: (letter: SlowLetter) => void;
   refreshBusy?: boolean; onRefresh?: () => void; onComposeNew?: () => void;
+  // CP-33 §2-6: the recipient's per-letter read-receipt switch. Optional exactly like the
+  // voice props above -- callers not passing it (including existing tests) render unchanged,
+  // i.e. NO receipt control appears. Default state is ALWAYS off (NEVER): the sender is not
+  // told anything unless the recipient opts in, and the copy says so explicitly.
+  onSetReceiptPolicy?: (letter: SlowLetter, policy: ReceiptPolicy) => void;
+  isReceiptPolicyBusy?: (letterId: number) => boolean;
   directLetterBusy?: boolean;
   onSendDirectLetter?: (receiverUserId: number, title: string, body: string, delivery: DeliverySchedule) => Promise<boolean>;
   liveChatInvites?: LiveChatInvites; liveChatSessions?: LiveChatSession[];
@@ -158,8 +187,8 @@ export function LettersInbox({ letterInbox, letterOutbox = [], threads = [], thr
     const timer = window.setInterval(() => setNow(Date.now()), 1_000);
     return () => window.clearInterval(timer);
   }, []);
-  const drafts = letterOutbox.filter(l => l.status === "DRAFT");
-  const sent = letterOutbox.filter(l => l.status !== "DRAFT");
+  const drafts = letterOutbox.filter(l => l.senderStatus === "DRAFT");
+  const sent = letterOutbox.filter(l => l.senderStatus !== "DRAFT");
   const counts: Record<string, string> = { inbox: t.counts.inbox(letterInbox.length), outbox: t.counts.outbox(sent.length), drafts: t.counts.drafts(drafts.length), threads: t.counts.threads(threads.length) };
   const status = (s: string) => t.outboxStatus[s] ?? s;
   const canComposeDirect = friends.length > 0 && Boolean(onSendDirectLetter);
@@ -248,6 +277,21 @@ export function LettersInbox({ letterInbox, letterOutbox = [], threads = [], thr
           {repliable.has(letter.status) && <div className="letter-reply"><textarea aria-label={t.replyAria(letter.title)}
             value={replyDrafts[letter.id] ?? ""} onChange={event => onReplyDraftChange(letter.id, event.target.value)}
             placeholder={t.replyPlaceholder} /><AsyncButton busy={replyBusyId === letter.id} busyText={t.replyBusy} disabled={!replyDrafts[letter.id]?.trim()} onClick={() => onReply(letter)}>{t.replySend}</AsyncButton></div>}
+          {onSetReceiptPolicy && (() => {
+            // CP-33 §2-6: honest default -- absent/null policy means NEVER (no receipt is
+            // emitted). The hint states plainly what the sender currently learns, so "off"
+            // can never masquerade as "they just haven't read it yet".
+            const policy = receiptPolicyOf(letter);
+            return <div className="letter-receipt-preference">
+              <span>{t.receiptControl}</span>
+              <AsyncButton className="quiet" aria-pressed={policy === "ALWAYS"}
+                busy={isReceiptPolicyBusy?.(letter.id) ?? false} busyText={t.receiptBusy}
+                onClick={() => onSetReceiptPolicy(letter, policy === "ALWAYS" ? "NEVER" : "ALWAYS")}>
+                {policy === "ALWAYS" ? t.receiptOnAction : t.receiptOffAction}
+              </AsyncButton>
+              <small>{policy === "ALWAYS" ? t.receiptOnHint : t.receiptOffHint}</small>
+            </div>;
+          })()}
           <div className="letter-primary-actions">
             {letter.status === "DELIVERED" && <AsyncButton busy={isLetterActionBusy(letter.id)} busyText={t.markReadBusy} onClick={() => onActOnLetter(letter, "read")}>{t.markRead}</AsyncButton>}
             {declinable.has(letter.status) && <AsyncButton busy={isLetterActionBusy(letter.id)} busyText={t.declineBusy} onClick={() => onActOnLetter(letter, "decline")}>{t.decline}</AsyncButton>}
@@ -266,22 +310,26 @@ export function LettersInbox({ letterInbox, letterOutbox = [], threads = [], thr
       <p className="resonance-intro">{t.outboxIntro}</p>
       {sent.length === 0 ? <div className="network-empty">{t.outboxEmpty}</div> : <div className="inbox-list outbox-list">
         {sent.map(letter => {
-          const eta = letter.scheduledArrivalAt || letter.estimatedArrivalAt;
+          const eta = letter.scheduledArrivalAt;
           const remainingSeconds = eta ? secondsUntilSlowLetterArrival(eta, now) : 0;
           const remaining = `${String(Math.floor(remainingSeconds / 60)).padStart(2, "0")}:${String(remainingSeconds % 60).padStart(2, "0")}`;
-          const stage = letter.status === "READ" || letter.status === "REPLIED" ? 3
-            : letter.status === "DELIVERED" ? 2 : letter.status === "FLYING" || letter.status === "SENT" ? 1 : 0;
+          const stage = letter.senderStatus === "READ" || letter.senderStatus === "REPLIED" ? 3
+            : letter.senderStatus === "DELIVERED" ? 2 : letter.senderStatus === "FLYING" || letter.senderStatus === "SENT" ? 1 : 0;
           return <article key={letter.id} className={`letter-ritual-card stage-${stage}`}><header><strong>{letter.title}</strong>
-          <span className="outbox-status">{status(letter.status)}</span></header>
-          <p className="ugc-text">{letter.letterBody}</p>
-          <div className="letter-ritual-steps" aria-label={`${status(letter.status)} · ${eta ? t.arrivalEta(formatSlowLetterInstant(eta, { locale })) : ""}`}>
+          {/* CP-33 §2-6: the backend only ever reveals READ when the recipient opted in, so the
+              label says who made that call -- never a passive "已读" that hides the choice. */}
+          <span className="outbox-status">{letter.senderStatus === "READ" ? t.outboxReadReceipt : status(letter.senderStatus)}</span></header>
+          {/* CP-33: sent bodies are not echoed by the list endpoint (privacy projection);
+              a DRAFT still shows its own composing text. */}
+          <p className="ugc-text">{letter.letterBody ?? letter.statusExplanation}</p>
+          <div className="letter-ritual-steps" aria-label={`${status(letter.senderStatus)} · ${eta ? t.arrivalEta(formatSlowLetterInstant(eta, { locale })) : ""}`}>
             {["封缄", "旅途", "抵达", "开启"].map((label, index) =>
               <span key={label} className={index <= stage ? "is-reached" : ""}><i />{locale === "en-SG" ? ["Sealed", "Journey", "Arrived", "Opened"][index] : label}</span>)}
           </div>
-          {letter.status === "FLYING" && <div className="letter-flying-transit" aria-hidden="true"><span className="letter-flying-point" /></div>}
-          {eta && (letter.status === "FLYING" || letter.status === "SENT") &&
+          {letter.senderStatus === "FLYING" && <div className="letter-flying-transit" aria-hidden="true"><span className="letter-flying-point" /></div>}
+          {eta && (letter.senderStatus === "FLYING" || letter.senderStatus === "SENT") &&
             <div className="letter-arrival-clock"><strong>{t.countdown(remaining)}</strong><small>{t.arrivalEta(formatSlowLetterInstant(eta, { locale }))}</small></div>}
-          {archivableFromOutbox.has(letter.status) && <AsyncButton busy={isLetterActionBusy(letter.id)} busyText={t.archiveBusy} onClick={() => onActOnLetter(letter, "archive")}>{t.archiveLetter}</AsyncButton>}
+          {archivableFromOutbox.has(letter.senderStatus) && <AsyncButton busy={isLetterActionBusy(letter.id)} busyText={t.archiveBusy} onClick={() => onActOnLetter(letter, "archive")}>{t.archiveLetter}</AsyncButton>}
         </article>;})}
       </div>}
     </> : tab === "drafts" ? <>

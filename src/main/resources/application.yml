@@ -318,6 +318,15 @@ inner-cosmos:
         mchid: ${INNER_COSMOS_PAYMENTS_WECHATPAY_MCHID:}
       alipay:
         app-id: ${INNER_COSMOS_PAYMENTS_ALIPAY_APP_ID:}
+  wake:
+    # CP-26 静默窗（免打扰时段）：到期唤醒意图在静默窗内不投递，改为在意图行上留下
+    # 可见状态 DEFERRED（deferred_until=窗口结束时间），窗口结束后再投递；绝不静默丢弃。
+    # 平台窗口只是默认兜底 —— 用户在个人资料里配置的 quiet hours 优先生效，
+    # 两者同时生效时取更晚的窗口结束时间。默认关闭 = 完全保持旧行为（窗口无效）。
+    quiet-hours:
+      enabled: ${INNER_COSMOS_WAKE_QUIET_HOURS_ENABLED:false}
+      start: ${INNER_COSMOS_WAKE_QUIET_HOURS_START:22:00}
+      end: ${INNER_COSMOS_WAKE_QUIET_HOURS_END:07:00}
   experience:
     # Demo/product default: remove repeated disclaimers and lexical "UNSUPPORTED" dead ends while
     # retaining crisis interception, authorization, leakage gates and blocked-topic enforcement.

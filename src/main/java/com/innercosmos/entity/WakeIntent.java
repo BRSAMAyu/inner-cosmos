@@ -29,6 +29,13 @@ public class WakeIntent extends BaseEntity {
     public String claimToken;
     public String claimedBy;
     public LocalDateTime claimUntil;
+    /**
+     * CP-26 quiet hours: when a due intent is withheld inside a quiet window, the row keeps a
+     * visible DEFERRED status and this field carries the (UTC) instant the quiet window ends,
+     * after which the claim scan picks it up again. Never null for live rows — a defer is
+     * always explained on the row itself instead of silently re-polled or dropped.
+     */
+    public LocalDateTime deferredUntil;
     public String outcome;
     public String outcomeReason;
     public LocalDateTime firedAt;

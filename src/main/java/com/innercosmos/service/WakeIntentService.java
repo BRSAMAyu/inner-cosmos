@@ -23,7 +23,13 @@ public interface WakeIntentService {
     WakeIntent reschedule(Long userId, Long intentId, LocalDateTime earliestAt,
                           LocalDateTime preferredAt, LocalDateTime latestAt);
     List<WakeIntent> claimDue(String workerId, int batchSize, Duration lease);
-    boolean delay(WakeIntent claimed, LocalDateTime nextPreferredAt, String reason);
+    /**
+     * CP-26 quiet hours: withhold a claimed intent until {@code deferUntilUtc} by moving it to the
+     * visible DEFERRED status (deferred_until = deferUntilUtc). The user's preferred time is kept
+     * untouched; the claim scan re-picks the row once deferred_until elapses and its window still
+     * allows delivery. Fails (returns false) when the caller no longer holds the claim lease.
+     */
+    boolean defer(WakeIntent claimed, LocalDateTime deferUntilUtc, String reason);
     boolean finish(WakeIntent claimed, String outcome, String reason);
     /** Atomically completes a claimed intent and persists its durable in-app delivery. */
     boolean finishWithNotification(WakeIntent claimed, String outcome, String reason,

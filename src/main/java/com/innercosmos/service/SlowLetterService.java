@@ -30,6 +30,19 @@ public interface SlowLetterService {
     SlowLetter getLetter(Long userId, Long id);
 
     /**
+     * CP-33 §2-6: the recipient's own per-letter read-receipt preference. Read receipts are
+     * the RECEIVER's choice, never the sender's: only {@code receiverUserId} may set it, the
+     * accepted values are {@code ALWAYS} (the sender's view may show READ) and {@code NEVER}
+     * (default -- the sender's view keeps showing DELIVERED and never learns the read moment),
+     * and the sender can neither read nor change it. Switching takes effect on the sender's
+     * next view of the letter; the underlying lifecycle/readAt timestamp is never faked.
+     *
+     * @throws com.innercosmos.exception.BusinessException FORBIDDEN when the sender asks,
+     *         UNAUTHORIZED for a third party, BAD_REQUEST for a value other than ALWAYS/NEVER
+     */
+    SlowLetter setReceiptPolicy(Long userId, Long letterId, String receiptPolicy);
+
+    /**
      * W1 slow-letter voice reuse: on-demand MP3 synthesis of a delivered letter's body, read aloud
      * in a warm voice (reuses Aurora's own {@code TtsVoicePresets} -- no new voice catalog). Mirrors
      * the capsule-voice contract: a bounded, tap-to-play extra on top of text the recipient already

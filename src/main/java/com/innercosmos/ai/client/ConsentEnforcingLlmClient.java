@@ -50,7 +50,21 @@ public class ConsentEnforcingLlmClient implements LlmClient {
         try {
             guard(request);
             SseEmitter emitter = delegate.streamChat(request);
-            manifest(request, "STREAM_OPENED");
+            if (ledger != null) {
+                // CP-17: the manifest must record how a stream ENDED, not only that it
+                // opened — a mid-flight break used to leave STREAM_OPENED as the last
+                // word. Spring 6 composite callbacks coexist with any the delegate
+                // registered, and exactly one terminal outcome is appended per stream
+                // (first terminal wins — onCompletion also runs after error/timeout).
+                com.innercosmos.ai.gateway.StreamOutcomeLedger stream =
+                        com.innercosmos.ai.gateway.StreamOutcomeLedger.open(
+                                ledger, request.userId,
+                                request.moduleName == null ? "unknown" : request.moduleName,
+                                providerLabel);
+                emitter.onError(stream::failed);
+                emitter.onTimeout(stream::timedOut);
+                emitter.onCompletion(stream::completed);
+            }
             return emitter;
         } catch (RuntimeException failure) {
             manifest(request, "FAILED:" + failure.getClass().getSimpleName());

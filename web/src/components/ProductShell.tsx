@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { AppearanceToggle } from "./AppearanceToggle";
+import { WakeLockScreenPrivacyToggle } from "./WakeLockScreenPrivacy";
 import type { Locale } from "../i18n";
 
 export type ProductSpace = "aurora" | "cosmos" | "resonance" | "letters" | "me";
@@ -378,7 +379,10 @@ export function MeSpace({ native, connected, wakeIntentCount, activeClaimCount, 
     <p>{t.intro}</p>
     <div className="control-grid">
       <article><strong>{t.device}</strong><span>{native ? t.deviceNative : t.deviceWeb}</span><small>{connected ? t.online : t.offline}</small></article>
-      <article><strong>{t.returns}</strong><span>{t.returnsValue(wakeIntentCount)}</span><button type="button" onClick={() => onNavigate("aurora")}>{t.returnsAction}</button></article>
+      <article><strong>{t.returns}</strong><span>{t.returnsValue(wakeIntentCount)}</span>
+        <button type="button" onClick={() => onNavigate("aurora")}>{t.returnsAction}</button>
+        {/* CP-26：锁屏是最公开的展示面，Aurora 主动联系的通知预览默认脱敏。 */}
+        <WakeLockScreenPrivacyToggle locale={locale} /></article>
       <article><strong>{t.understanding}</strong><span>{t.understandingValue(activeClaimCount)}</span><button type="button" onClick={() => onNavigate("cosmos")}>{t.understandingAction}</button></article>
       <article><strong>{t.resonance}</strong><span>{t.resonanceValue(publicCapsuleCount, friendCount)}</span><button type="button" onClick={() => onNavigate("resonance")}>{t.resonanceAction}</button></article>
       <article><strong>{t.safety}</strong><span>{t.safetyValue}</span><button type="button" onClick={onOpenSafetyHarbor}>{t.safetyAction}</button></article>

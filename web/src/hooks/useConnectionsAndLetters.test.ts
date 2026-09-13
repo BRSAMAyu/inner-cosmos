@@ -163,7 +163,7 @@ describe("useConnectionsAndLetters -- bootstrap loaders", () => {
 
   it("refreshLetters updates inbox, outbox and threads as one scheduler-driven snapshot", async () => {
     vi.mocked(api.letterInbox).mockResolvedValue([letter({ id: 7 })]);
-    vi.mocked(api.letterOutbox).mockResolvedValue([letter({ id: 8, status: "FLYING" })]);
+    vi.mocked(api.letterOutbox).mockResolvedValue([{ id: 8, title: "在途的信", senderStatus: "FLYING" }]);
     vi.mocked(api.letterThreads).mockResolvedValue([thread({ id: 9 })]);
     const { result } = setup();
     await act(async () => { await result.current.refreshLetters(); });
@@ -396,7 +396,7 @@ describe("useConnectionsAndLetters -- letters", () => {
 
   it("sendDraft sends the draft, refreshes the outbox and resets busy", async () => {
     vi.mocked(api.sendSlowLetter).mockResolvedValue(letter({ status: "SENT" }));
-    vi.mocked(api.letterOutbox).mockResolvedValue([letter({ status: "SENT" })]);
+    vi.mocked(api.letterOutbox).mockResolvedValue([{ id: 1, title: "刚寄出的信", senderStatus: "SENT" }]);
     const { result, setStatus } = setup();
     await act(async () => { await result.current.sendDraft(1); });
     expect(api.sendSlowLetter).toHaveBeenCalledExactlyOnceWith(1);
@@ -408,7 +408,7 @@ describe("useConnectionsAndLetters -- letters", () => {
   it("sends a new slow letter directly to an accepted friend's user id", async () => {
     vi.mocked(api.draftSlowLetterToUser).mockResolvedValue(letter({ id: 8, receiverUserId: 30, status: "DRAFT" }));
     vi.mocked(api.sendSlowLetter).mockResolvedValue(letter({ id: 8, receiverUserId: 30, status: "SENT" }));
-    vi.mocked(api.letterOutbox).mockResolvedValue([letter({ id: 8, receiverUserId: 30, status: "SENT" })]);
+    vi.mocked(api.letterOutbox).mockResolvedValue([{ id: 8, title: "直接寄给好友的信", senderStatus: "SENT" }]);
     const { result, setStatus } = setup();
 
     let sent = false;
@@ -440,22 +440,37 @@ describe("useConnectionsAndLetters -- letters", () => {
     expect(result.current.isDraftBusy(1)).toBe(false);
   });
 
-  it("actOnLetter transitions the letter and patches it in place in the inbox", async () => {
-    vi.mocked(api.letterInbox).mockResolvedValue([letter({ id: 1, status: "DELIVERED" })]);
+  it("actOnLetter transitions the letter and settles the inbox on the post-action state", async () => {
+    // The hook patches the row for immediate feedback AND refreshes the projections after
+    // the action; the refreshed inbox is authoritative, so the mock reflects the server's
+    // post-read state on the second fetch.
+    vi.mocked(api.letterThreads).mockResolvedValue([]);
+    vi.mocked(api.letterOutbox).mockResolvedValue([]);
+    vi.mocked(api.letterInbox)
+      .mockResolvedValueOnce([letter({ id: 1, status: "DELIVERED" })])
+      .mockResolvedValue([letter({ id: 1, status: "READ" })]);
     vi.mocked(api.transitionLetter).mockResolvedValue(letter({ id: 1, status: "READ" }));
     const { result } = setup();
     await act(async () => { await result.current.loadLetterInbox(); });
-    await act(async () => { await result.current.actOnLetter(letter({ id: 1 }), "read"); });
+    await act(async () => { await result.current.actOnLetter({ id: 1 }, "read"); });
+    expect(api.transitionLetter).toHaveBeenCalledExactlyOnceWith(1, "read");
     expect(result.current.letterInbox[0].status).toBe("READ");
   });
 
-  it("actOnLetter also patches the letter in the outbox, so archiving a sent letter updates its own list", async () => {
-    vi.mocked(api.letterOutbox).mockResolvedValue([letter({ id: 5, status: "DECLINED" })]);
+  it("actOnLetter refreshes the sender outbox projection after archiving, so the list reflects the server-shaped view", async () => {
+    // CP-33: the outbox is the backend privacy projection (senderStatus, CLOSED fold) --
+    // after an action the hook re-fetches it instead of patching an entity into the row.
+    vi.mocked(api.letterInbox).mockResolvedValue([]);
+    vi.mocked(api.letterThreads).mockResolvedValue([]);
+    vi.mocked(api.letterOutbox)
+      .mockResolvedValueOnce([{ id: 5, title: "已有结果的信", senderStatus: "CLOSED" }])
+      .mockResolvedValue([{ id: 5, title: "已有结果的信", senderStatus: "ARCHIVED" }]);
     vi.mocked(api.transitionLetter).mockResolvedValue(letter({ id: 5, status: "ARCHIVED" }));
     const { result } = setup();
     await act(async () => { await result.current.loadLetterOutbox(); });
-    await act(async () => { await result.current.actOnLetter(letter({ id: 5 }), "archive"); });
-    expect(result.current.letterOutbox[0].status).toBe("ARCHIVED");
+    await act(async () => { await result.current.actOnLetter({ id: 5 }, "archive"); });
+    expect(api.transitionLetter).toHaveBeenCalledExactlyOnceWith(5, "archive");
+    expect(result.current.letterOutbox[0].senderStatus).toBe("ARCHIVED");
   });
 
   it("reportLetter submits the report", async () => {

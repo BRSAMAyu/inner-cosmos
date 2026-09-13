@@ -350,6 +350,18 @@ export type SlowLetter = {
   id: number; senderUserId: number; receiverUserId: number; receiverCapsuleId: number; title: string; letterBody: string; status: string;
   parallaxDistance: number; estimatedArrivalAt: string; scheduledArrivalAt?: string | null; deliveryPreset?: DeliveryPreset | null;
 };
+/**
+ * CP-33: what GET /api/letters/outbox actually returns — the sender-facing privacy
+ * projection, NOT full SlowLetter rows. Bodies are not echoed once sent (only the
+ * sender's own DRAFT body is), DECLINED/BLOCKED arrive folded as CLOSED, and the read
+ * state honors the recipient's receipt choice. Typed after the backend
+ * SlowLetterOutboxVO so the compiler catches the next shape drift.
+ */
+export type SlowLetterOutboxRow = {
+  id: number; title: string; senderStatus: string;
+  statusExplanation?: string | null; letterBody?: string | null;
+  createdAt?: string | null; scheduledArrivalAt?: string | null;
+};
 export type DeliveryPreset = "DEMO_30S" | "DEMO_3M" | "TONIGHT" | "TOMORROW" | "CUSTOM";
 export type DeliverySchedule = {
   deliveryPreset: DeliveryPreset;
@@ -1172,13 +1184,19 @@ export const api = {
   letterThreads: () => request<LetterThread[]>("/api/letters/threads"),
   letterThreadLetters: (threadId: number) => request<SlowLetter[]>(`/api/letters/threads/${threadId}/letters`),
   letterInbox: () => request<SlowLetter[]>("/api/letters/inbox"),
-  letterOutbox: () => request<SlowLetter[]>("/api/letters/outbox"),
+  letterOutbox: () => request<SlowLetterOutboxRow[]>("/api/letters/outbox"),
   // W1 slow-letter voice reuse: on-demand MP3 synthesis of a delivered letter's body, read aloud in
   // a warm voice. Same base64 data-URI shape as personaVoice/previewTtsVoice. No /v1/ prefix (and
   // therefore no idempotency key) -- a side-effect-free synthesis read, matching personaVoice.
   letterVoice: (id: number) => request<TtsPreviewResult>(`/api/letters/${id}/voice`, { method: "POST" }),
   transitionLetter: (id: number, action: "read" | "reply" | "decline" | "block" | "archive") =>
     request<SlowLetter>(`/api/letters/${id}/${action}`, { method: "POST" }),
+  // CP-33: the RECIPIENT's read-receipt choice — NEVER (default) hides the read state
+  // from the sender, ALWAYS shares it. Only the recipient may flip it (403 otherwise).
+  setLetterReceiptPolicy: (id: number, policy: "ALWAYS" | "NEVER") =>
+    request<SlowLetter>(`/api/letters/${id}/receipt-policy`, {
+      method: "PATCH", body: JSON.stringify({ receiptPolicy: policy })
+    }),
   reportLetter: (id: number, reason: string) => request<void>(`/api/letters/${id}/report`, {
     method: "POST", body: JSON.stringify({ reason })
   }),

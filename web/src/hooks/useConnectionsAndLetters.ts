@@ -2,7 +2,8 @@ import { useCallback, useRef, useState } from "react";
 import {
   api, type ConnectionRequests, type DeliverySchedule, type DiscoverablePerson, type GroupInvite, type GroupMember, type GroupMessage,
   type LetterThread, type LiveChatInvites, type LiveChatMessage, type LiveChatSession,
-  type RelationHealth, type RelationMention, type RelationTimelinePoint, type SlowLetter, type SocialConnection, type SocialGroup
+  type RelationHealth, type RelationMention, type RelationTimelinePoint, type SlowLetter, type SlowLetterOutboxRow,
+  type SocialConnection, type SocialGroup
 } from "../api";
 import { sendComposedLetter, type DraftedLetterState } from "../composeAndSend";
 import type { Locale } from "../i18n";
@@ -43,7 +44,9 @@ export function useConnectionsAndLetters({ setStatus, locale = "zh-CN" }: UseCon
   const [relationHealth, setRelationHealth] = useState<RelationHealth | null>(null);
   const [relationBusy, setRelationBusy] = useState(false);
   const [letterInbox, setLetterInbox] = useState<SlowLetter[]>([]);
-  const [letterOutbox, setLetterOutbox] = useState<SlowLetter[]>([]);
+  // CP-33: the outbox projection is the sender-facing privacy shape (no sent bodies,
+  // CLOSED fold, receipt-choice-aware) -- typed after the backend VO, not SlowLetter.
+  const [letterOutbox, setLetterOutbox] = useState<SlowLetterOutboxRow[]>([]);
   const [letterThreads, setLetterThreads] = useState<LetterThread[]>([]);
   const [lettersRefreshing, setLettersRefreshing] = useState(false);
   const [selectedThreadId, setSelectedThreadId] = useState<number | null>(null);
@@ -90,6 +93,7 @@ export function useConnectionsAndLetters({ setStatus, locale = "zh-CN" }: UseCon
   const connectionLeaveBusyKeys = useBusyKeys<number>(); // keyed by connection id (leaveConnection)
   const letterConnectionBusyKeys = useBusyKeys<number>(); // keyed by letter id (requestConnection "willKnow")
   const letterActionBusyKeys = useBusyKeys<number>(); // keyed by letter id (actOnLetter + reportLetter)
+  const receiptPolicyBusyKeys = useBusyKeys<number>(); // keyed by letter id (CP-33 recipient receipt choice)
   const letterVoiceBusyKeys = useBusyKeys<number>(); // keyed by letter id (playLetterVoice)
   const draftBusyKeys = useBusyKeys<number>(); // keyed by draft id (sendDraft)
   const groupInviteBusyKeys = useBusyKeys<number>(); // keyed by groupId (inviteToGroup)
@@ -362,12 +366,14 @@ export function useConnectionsAndLetters({ setStatus, locale = "zh-CN" }: UseCon
       }
     }), [copy, liveChatEndBusyKeys, refreshLiveChats, setStatus]);
 
-  const actOnLetter = useCallback((letter: SlowLetter, action: "read" | "decline" | "block" | "archive") =>
+  // Accepts any letter-shaped row the views hand it (inbox SlowLetter or the outbox
+  // projection) -- only the id reaches the API.
+  const actOnLetter = useCallback((letter: { id: number }, action: "read" | "decline" | "block" | "archive") =>
     letterActionBusyKeys.run(letter.id, async () => {
       try {
         const updated = await api.transitionLetter(letter.id, action);
         setLetterInbox(rows => rows.map(row => row.id === updated.id ? updated : row));
-        setLetterOutbox(rows => rows.map(row => row.id === updated.id ? updated : row));
+        await refreshLetters();
         setStatus(action === "block"
           ? copy("Sender blocked; future slow letters will also be stopped.", "已屏蔽来信者；后续慢信也会被阻断。")
           : copy("Slow-letter boundary updated.", "慢信边界已更新。 "));
@@ -386,6 +392,21 @@ export function useConnectionsAndLetters({ setStatus, locale = "zh-CN" }: UseCon
     } catch (error) { setStatus(error instanceof Error ? error.message
       : copy("Could not submit this report yet.", "暂时无法提交举报")); }
   }), [copy, letterActionBusyKeys, setStatus]);
+
+  // CP-33: the RECIPIENT's per-letter read-receipt choice. NEVER (default) keeps the read
+  // state invisible to the sender. After a flip the three letter projections refresh as one
+  // snapshot so the sender-facing mask (outbox/thread) and the inbox's policy stay coherent.
+  const setReceiptPolicy = useCallback((letter: SlowLetter, policy: "ALWAYS" | "NEVER") =>
+    receiptPolicyBusyKeys.run(letter.id, async () => {
+      try {
+        await api.setLetterReceiptPolicy(letter.id, policy);
+        await refreshLetters();
+        setStatus(policy === "NEVER"
+          ? copy("The sender will not be told when this letter is read.", "对方不会收到这封信的已读回执。")
+          : copy("The sender will be told when this letter is read.", "对方会收到这封信的已读回执。"));
+      } catch (error) { setStatus(error instanceof Error ? error.message
+        : copy("Could not update the read-receipt choice yet.", "暂时无法更新已读回执选择")); }
+    }), [copy, receiptPolicyBusyKeys, refreshLetters, setStatus]);
 
   // W1 slow-letter voice reuse: tap-to-play a delivered letter's body read aloud. The recipient's
   // tap is the user gesture that authorizes autoplay on arrival. Per-letter busy guard so playing
@@ -598,6 +619,7 @@ export function useConnectionsAndLetters({ setStatus, locale = "zh-CN" }: UseCon
     lettersRefreshing,
     isDraftBusy: draftBusyKeys.isBusy, replyBusyId, replyDrafts,
     isLetterActionBusy: letterActionBusyKeys.isBusy,
+    setReceiptPolicy, isReceiptPolicyBusy: receiptPolicyBusyKeys.isBusy,
     isConnectionDecisionBusy: connectionDecisionBusyKeys.isBusy,
     isConnectionLeaveBusy: connectionLeaveBusyKeys.isBusy,
     isLetterConnectionBusy: letterConnectionBusyKeys.isBusy,

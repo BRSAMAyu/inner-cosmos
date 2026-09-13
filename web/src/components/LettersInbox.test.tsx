@@ -129,9 +129,9 @@ describe("LettersInbox", () => {
   });
 
   it("shows letters the user has sent under the outbox tab", () => {
-    const sent: SlowLetter = { id: 12, senderUserId: 1, receiverUserId: 3, receiverCapsuleId: 8,
-      title: "谢谢你愿意在雨里等", letterBody: "我想让你知道那句话我记住了。", status: "IN_FLIGHT",
-      parallaxDistance: 2, estimatedArrivalAt: "2026-07-18T00:00:00Z" };
+    // CP-33: the outbox tab receives the backend privacy projection, not full letters.
+    const sent = { id: 12, title: "谢谢你愿意在雨里等", senderStatus: "SENT",
+      statusExplanation: "SENT/FLYING=在途；DELIVERED=对方可读取；READ/REPLIED 由对方的回执选择决定。" };
     render(<LettersInbox letterInbox={[letter]} letterOutbox={[sent]} replyDrafts={{}}
       connectionRequests={{ incoming: [], outgoing: [] }} friends={[]}
       isDraftBusy={() => false} isLetterActionBusy={() => false} isConnectionDecisionBusy={() => false} isConnectionLeaveBusy={() => false} isLetterConnectionBusy={() => false} onReplyDraftChange={() => undefined} onReply={() => undefined} onActOnLetter={() => undefined}
@@ -147,9 +147,8 @@ describe("LettersInbox", () => {
 
   it("shows the real backend FLYING status translated, with its arrival ETA, not the never-sent IN_FLIGHT literal", () => {
     // The letter-state machine's real in-transit code is FLYING (see FlyingState.java), never IN_FLIGHT.
-    const flying: SlowLetter = { id: 13, senderUserId: 1, receiverUserId: 3, receiverCapsuleId: 8,
-      title: "还在路上的信", letterBody: "还没到呢。", status: "FLYING",
-      parallaxDistance: 2, estimatedArrivalAt: "2026-07-20T00:00:00Z" };
+    const flying = { id: 13, title: "还在路上的信", senderStatus: "FLYING",
+      scheduledArrivalAt: "2026-07-20T00:00:00Z" };
     render(<LettersInbox letterInbox={[]} letterOutbox={[flying]} replyDrafts={{}}
       connectionRequests={{ incoming: [], outgoing: [] }} friends={[]}
       isDraftBusy={() => false} isLetterActionBusy={() => false} isConnectionDecisionBusy={() => false} isConnectionLeaveBusy={() => false} isLetterConnectionBusy={() => false} onReplyDraftChange={() => undefined} onReply={() => undefined} onActOnLetter={() => undefined}
@@ -163,7 +162,7 @@ describe("LettersInbox", () => {
   });
 
   it("does not render the flying transit visual for a letter that has already arrived", () => {
-    render(<LettersInbox letterInbox={[]} letterOutbox={[{ ...letter, id: 40, status: "SENT" }]} replyDrafts={{}}
+    render(<LettersInbox letterInbox={[]} letterOutbox={[{ id: 40, title: letter.title, senderStatus: "SENT" }]} replyDrafts={{}}
       connectionRequests={{ incoming: [], outgoing: [] }} friends={[]}
       isDraftBusy={() => false} isLetterActionBusy={() => false} isConnectionDecisionBusy={() => false} isConnectionLeaveBusy={() => false} isLetterConnectionBusy={() => false} onReplyDraftChange={() => undefined} onReply={() => undefined} onActOnLetter={() => undefined}
       onReportLetter={() => undefined} onRequestConnection={() => undefined}
@@ -174,10 +173,9 @@ describe("LettersInbox", () => {
 
   it("lets the sender archive a concluded outbox letter, but not one still awaiting the recipient", () => {
     const onActOnLetter = vi.fn();
-    const concluded: SlowLetter = { id: 21, senderUserId: 1, receiverUserId: 3, receiverCapsuleId: 8,
-      title: "已经有结果的信", letterBody: "对方回应过了。", status: "DECLINED", parallaxDistance: 1, estimatedArrivalAt: "" };
-    const stillFlying: SlowLetter = { id: 22, senderUserId: 1, receiverUserId: 3, receiverCapsuleId: 8,
-      title: "还没到的信", letterBody: "还在路上。", status: "FLYING", parallaxDistance: 1, estimatedArrivalAt: "2026-07-20T00:00:00Z" };
+    // DECLINED arrives from the projection folded as CLOSED -- still archivable.
+    const concluded = { id: 21, title: "已经有结果的信", senderStatus: "CLOSED", statusExplanation: "这封信已结束，未能继续往来。" };
+    const stillFlying = { id: 22, title: "还没到的信", senderStatus: "FLYING", scheduledArrivalAt: "2026-07-20T00:00:00Z" };
     render(<LettersInbox letterInbox={[]} letterOutbox={[concluded, stillFlying]} replyDrafts={{}}
       connectionRequests={{ incoming: [], outgoing: [] }} friends={[]}
       isDraftBusy={() => false} isLetterActionBusy={() => false} isConnectionDecisionBusy={() => false} isConnectionLeaveBusy={() => false} isLetterConnectionBusy={() => false} onReplyDraftChange={() => undefined} onReply={() => undefined} onActOnLetter={onActOnLetter}
@@ -191,8 +189,7 @@ describe("LettersInbox", () => {
 
   it("lists draft letters under the drafts tab and can send one", () => {
     const onSendDraft = vi.fn();
-    const draft: SlowLetter = { id: 20, senderUserId: 1, receiverUserId: 3, receiverCapsuleId: 8,
-      title: "还没寄出的信", letterBody: "我想慢慢改。", status: "DRAFT", parallaxDistance: 1, estimatedArrivalAt: "" };
+    const draft = { id: 20, title: "还没寄出的信", senderStatus: "DRAFT", letterBody: "我想慢慢改。" };
     render(<LettersInbox letterInbox={[]} letterOutbox={[draft]} replyDrafts={{}}
       connectionRequests={{ incoming: [], outgoing: [] }} friends={[]} onSendDraft={onSendDraft}
       isDraftBusy={() => false} isLetterActionBusy={() => false} isConnectionDecisionBusy={() => false} isConnectionLeaveBusy={() => false} isLetterConnectionBusy={() => false} onReplyDraftChange={() => undefined} onReply={() => undefined} onActOnLetter={() => undefined}
@@ -319,5 +316,106 @@ describe("LettersInbox", () => {
       onReplyDraftChange={() => undefined} onReply={() => undefined} onActOnLetter={() => undefined}
       onReportLetter={() => undefined} onRequestConnection={() => undefined} onDecideConnection={() => undefined} onLeaveConnection={() => undefined} />);
     expect(screen.getByRole("button", { name: "▶ Read this letter aloud" })).toBeVisible();
+  });
+
+  // CP-33 §2-6: the recipient's per-letter read-receipt switch. Default is off (NEVER) and the
+  // copy must say plainly that the sender learns nothing -- an honest "off", never a fake "unread".
+  it("shows the receipt switch off by default with the no-receipt promise, and opting in fires ALWAYS", () => {
+    const onSetReceiptPolicy = vi.fn();
+    render(<LettersInbox letterInbox={[letter]} replyDrafts={{}}
+      connectionRequests={{ incoming: [], outgoing: [] }} friends={[]} onSetReceiptPolicy={onSetReceiptPolicy}
+      isDraftBusy={() => false} isLetterActionBusy={() => false} isConnectionDecisionBusy={() => false} isConnectionLeaveBusy={() => false} isLetterConnectionBusy={() => false}
+      onReplyDraftChange={() => undefined} onReply={() => undefined} onActOnLetter={() => undefined}
+      onReportLetter={() => undefined} onRequestConnection={() => undefined}
+      onDecideConnection={() => undefined} onLeaveConnection={() => undefined} />);
+    // absent receiptPolicy on the payload = persisted default NEVER: control renders OFF.
+    expect(screen.getByText("已读回执")).toBeVisible();
+    const toggle = screen.getByRole("button", { name: "不告知对方（默认）" });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByText("对方不会收到已读回执；你读没读，寄件人都无从知道。")).toBeVisible();
+    fireEvent.click(toggle);
+    expect(onSetReceiptPolicy).toHaveBeenCalledExactlyOnceWith(letter, "ALWAYS");
+  });
+
+  it("shows the opted-in state with its honest consequence and switching back fires NEVER", () => {
+    const onSetReceiptPolicy = vi.fn();
+    const optedIn = { ...letter, receiptPolicy: "ALWAYS" } as SlowLetter;
+    render(<LettersInbox letterInbox={[optedIn]} replyDrafts={{}}
+      connectionRequests={{ incoming: [], outgoing: [] }} friends={[]} onSetReceiptPolicy={onSetReceiptPolicy}
+      isDraftBusy={() => false} isLetterActionBusy={() => false} isConnectionDecisionBusy={() => false} isConnectionLeaveBusy={() => false} isLetterConnectionBusy={() => false}
+      onReplyDraftChange={() => undefined} onReply={() => undefined} onActOnLetter={() => undefined}
+      onReportLetter={() => undefined} onRequestConnection={() => undefined}
+      onDecideConnection={() => undefined} onLeaveConnection={() => undefined} />);
+    const toggle = screen.getByRole("button", { name: "愿意告知对方" });
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("对方会看到这封信已读；这只影响这一封信。")).toBeVisible();
+    fireEvent.click(toggle);
+    expect(onSetReceiptPolicy).toHaveBeenCalledExactlyOnceWith(optedIn, "NEVER");
+  });
+
+  it("renders no receipt control at all when the host app has not wired the callback", () => {
+    render(<LettersInbox letterInbox={[letter]} replyDrafts={{}}
+      connectionRequests={{ incoming: [], outgoing: [] }} friends={[]}
+      isDraftBusy={() => false} isLetterActionBusy={() => false} isConnectionDecisionBusy={() => false} isConnectionLeaveBusy={() => false} isLetterConnectionBusy={() => false}
+      onReplyDraftChange={() => undefined} onReply={() => undefined} onActOnLetter={() => undefined}
+      onReportLetter={() => undefined} onRequestConnection={() => undefined}
+      onDecideConnection={() => undefined} onLeaveConnection={() => undefined} />);
+    expect(screen.queryByText("已读回执")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /不告知对方|愿意告知对方/ })).not.toBeInTheDocument();
+  });
+
+  it("marks the receipt switch busy only for the letter being saved", () => {
+    const { rerender } = render(<LettersInbox letterInbox={[letter]} replyDrafts={{}}
+      connectionRequests={{ incoming: [], outgoing: [] }} friends={[]} onSetReceiptPolicy={() => undefined}
+      isReceiptPolicyBusy={id => id === letter.id}
+      isDraftBusy={() => false} isLetterActionBusy={() => false} isConnectionDecisionBusy={() => false} isConnectionLeaveBusy={() => false} isLetterConnectionBusy={() => false}
+      onReplyDraftChange={() => undefined} onReply={() => undefined} onActOnLetter={() => undefined}
+      onReportLetter={() => undefined} onRequestConnection={() => undefined}
+      onDecideConnection={() => undefined} onLeaveConnection={() => undefined} />);
+    const busy = screen.getByRole("button", { name: "不告知对方（默认）" });
+    expect(busy).toBeDisabled();
+    expect(busy).toHaveAttribute("aria-busy", "true");
+
+    rerender(<LettersInbox letterInbox={[letter]} replyDrafts={{}}
+      connectionRequests={{ incoming: [], outgoing: [] }} friends={[]} onSetReceiptPolicy={() => undefined}
+      isReceiptPolicyBusy={() => false}
+      isDraftBusy={() => false} isLetterActionBusy={() => false} isConnectionDecisionBusy={() => false} isConnectionLeaveBusy={() => false} isLetterConnectionBusy={() => false}
+      onReplyDraftChange={() => undefined} onReply={() => undefined} onActOnLetter={() => undefined}
+      onReportLetter={() => undefined} onRequestConnection={() => undefined}
+      onDecideConnection={() => undefined} onLeaveConnection={() => undefined} />);
+    expect(screen.getByRole("button", { name: "不告知对方（默认）" })).toBeEnabled();
+  });
+
+  it("labels the outbox READ state as the recipient's choice in both locales", () => {
+    const readLetter = { ...letter, id: 55, senderStatus: "READ" };
+    const { rerender } = render(<LettersInbox letterInbox={[]} letterOutbox={[readLetter]} replyDrafts={{}}
+      connectionRequests={{ incoming: [], outgoing: [] }} friends={[]}
+      isDraftBusy={() => false} isLetterActionBusy={() => false} isConnectionDecisionBusy={() => false} isConnectionLeaveBusy={() => false} isLetterConnectionBusy={() => false}
+      onReplyDraftChange={() => undefined} onReply={() => undefined} onActOnLetter={() => undefined}
+      onReportLetter={() => undefined} onRequestConnection={() => undefined}
+      onDecideConnection={() => undefined} onLeaveConnection={() => undefined} />);
+    fireEvent.click(screen.getByRole("tab", { name: /寄出的/ }));
+    expect(screen.getByText("对方已读（对方选择告知）")).toBeVisible();
+
+    rerender(<LettersInbox locale="en-SG" letterInbox={[]} letterOutbox={[readLetter]} replyDrafts={{}}
+      connectionRequests={{ incoming: [], outgoing: [] }} friends={[]}
+      isDraftBusy={() => false} isLetterActionBusy={() => false} isConnectionDecisionBusy={() => false} isConnectionLeaveBusy={() => false} isLetterConnectionBusy={() => false}
+      onReplyDraftChange={() => undefined} onReply={() => undefined} onActOnLetter={() => undefined}
+      onReportLetter={() => undefined} onRequestConnection={() => undefined}
+      onDecideConnection={() => undefined} onLeaveConnection={() => undefined} />);
+    fireEvent.click(screen.getByRole("tab", { name: /Sent/ }));
+    expect(screen.getByText("Read (they chose to share)")).toBeVisible();
+  });
+
+  it("shows the receipt switch in English under en-SG locale", () => {
+    render(<LettersInbox locale="en-SG" letterInbox={[letter]} replyDrafts={{}}
+      connectionRequests={{ incoming: [], outgoing: [] }} friends={[]} onSetReceiptPolicy={() => undefined}
+      isDraftBusy={() => false} isLetterActionBusy={() => false} isConnectionDecisionBusy={() => false} isConnectionLeaveBusy={() => false} isLetterConnectionBusy={() => false}
+      onReplyDraftChange={() => undefined} onReply={() => undefined} onActOnLetter={() => undefined}
+      onReportLetter={() => undefined} onRequestConnection={() => undefined}
+      onDecideConnection={() => undefined} onLeaveConnection={() => undefined} />);
+    expect(screen.getByText("Read receipt")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Not telling the sender (default)" })).toBeVisible();
+    expect(screen.getByText("The sender won't be told you read this letter.")).toBeVisible();
   });
 });

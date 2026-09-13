@@ -107,6 +107,48 @@ public class SlowLetterServiceImpl implements SlowLetterService {
     static final java.util.Set<String> DELIVERED_TO_RECEIVER_STATUSES = java.util.Set.of(
             "DELIVERED", "READ", "REPLIED", "DECLINED", "BLOCKED", "ARCHIVED");
 
+    /**
+     * CP-33 §2-6: the only values {@link #setReceiptPolicy} accepts. NEVER is the privacy
+     * default -- a receipt is emitted to the sender only when the recipient opted in.
+     */
+    static final java.util.Set<String> RECEIPT_POLICIES = java.util.Set.of("ALWAYS", "NEVER");
+
+    /**
+     * CP-33 §2-6: mask a letter down to what its SENDER may see. Read receipts are the
+     * recipient's choice, so while the recipient's policy is anything other than ALWAYS:
+     * a READ letter is presented as DELIVERED (the arrival it did reach -- never a faked
+     * state, never a faked readAt), the read moment is withheld even from later states
+     * (a REPLIED letter still owes the sender nothing about WHEN it was read -- the reply
+     * itself, not the receipt, is what got disclosed), and the recipient's preference
+     * itself is stripped (the sender cannot even query it). Idempotent on its own output
+     * (a masked view is already DELIVERED/null), and the single authority: the controller's
+     * {@link com.innercosmos.vo.SlowLetterOutboxVO} deliberately does NOT re-mask, because
+     * re-applying this rule to an already-masked row would read the stripped policy as
+     * NEVER and wrongly hide an opted-in READ receipt. Applied ONLY to sender-facing views
+     * (outbox, sender's getLetter, letters the caller sent inside a thread) -- the recipient
+     * always sees their own true state.
+     */
+    static SlowLetter applySenderReceiptMask(SlowLetter letter) {
+        if (letter == null) {
+            return null;
+        }
+        if (!"ALWAYS".equals(letter.receiptPolicy)) {
+            if ("READ".equals(letter.status)) {
+                letter.status = "DELIVERED";
+            }
+            letter.readAt = null;
+        }
+        // The preference is the recipient's private setting in every case.
+        letter.receiptPolicy = null;
+        // A rejection must not reveal WHICH way it went (declined vs blocked) -- same fold
+        // the outbox VO applies, so the sender's detail and thread views stay consistent
+        // with the list view. The recipient's own views never pass through this mask.
+        if ("DECLINED".equals(letter.status) || "BLOCKED".equals(letter.status)) {
+            letter.status = "CLOSED";
+        }
+        return letter;
+    }
+
 
     @Autowired
     public SlowLetterServiceImpl(SlowLetterMapper letterMapper, LetterStatusLogMapper logMapper, LetterStateRegistry stateRegistry, LetterGuardAgent guardAgent, LetterThreadMapper threadMapper, ReportRecordMapper reportRecordMapper, LetterSafetyFilter letterSafetyFilter, EchoCapsuleMapper capsuleMapper, BlockRelationMapper blockRelationMapper, CapsuleBoundaryMapper boundaryMapper, PiiCredentialDetector piiCredentialDetector, Clock clock) {
@@ -588,7 +630,13 @@ public class SlowLetterServiceImpl implements SlowLetterService {
     public List<SlowLetter> outbox(Long userId) {
         QueryWrapper<SlowLetter> query = new QueryWrapper<>();
         query.eq("sender_user_id", userId).orderByDesc("id");
-        return letterMapper.selectList(query);
+        // CP-33 §2-6: every row here is a letter the CALLER sent, so every row goes through the
+        // sender-view receipt mask before it leaves the service (the controller's VO re-applies
+        // the same rule defensively). Under NEVER the sender's own outbox never shows a READ
+        // state or readAt -- nothing downstream can leak what was never receipted.
+        return letterMapper.selectList(query).stream()
+                .map(SlowLetterServiceImpl::applySenderReceiptMask)
+                .toList();
     }
 
     @Override
@@ -602,6 +650,54 @@ public class SlowLetterServiceImpl implements SlowLetterService {
         if (!isSender && !isReceiver) {
             throw new com.innercosmos.exception.BusinessException(com.innercosmos.common.ErrorCode.UNAUTHORIZED, "无权查看此信件");
         }
+        // CP-33 §2-6: the sender's view is masked through the recipient's receipt choice -- under
+        // NEVER (the default) a READ letter keeps presenting as DELIVERED and carries no readAt
+        // and no receiptPolicy. The receiver always sees their own true state.
+        if (isSender && !isReceiver) {
+            return applySenderReceiptMask(letter);
+        }
+        // CP-33 §2-6 negative gate: a letter that has not arrived yet must be unreadable by its
+        // recipient -- same delivered-to-recipient boundary the inbox query and the voice gate
+        // already enforce. Pre-delivery (DRAFT/SENT/FLYING) the body stays sealed; there is no
+        // API path around the parallax ritual.
+        if (!DELIVERED_TO_RECEIVER_STATUSES.contains(letter.status)) {
+            throw new BusinessException(ErrorCode.LETTER_STATE_INVALID, "信件抵达后才能阅读");
+        }
+        return letter;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public SlowLetter setReceiptPolicy(Long userId, Long letterId, String receiptPolicy) {
+        SlowLetter letter = letterMapper.selectById(letterId);
+        if (letter == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "信件不存在");
+        }
+        boolean isSender = userId.equals(letter.senderUserId);
+        boolean isReceiver = userId.equals(letter.receiverUserId);
+        if (!isSender && !isReceiver) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "无权操作此信件");
+        }
+        // CP-33 §2-6: the receipt is the RECIPIENT's choice alone. The sender gets an explicit
+        // 403 (not a silent ignore) -- both changing AND querying the preference are refused.
+        if (isSender && !isReceiver) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "回执是收件人的选择，寄件人不能查看或修改");
+        }
+        String normalized = receiptPolicy == null ? "" : receiptPolicy.trim().toUpperCase(java.util.Locale.ROOT);
+        if (!RECEIPT_POLICIES.contains(normalized)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "回执偏好只能是 ALWAYS 或 NEVER");
+        }
+        // Receiver-scoped atomic UPDATE: the column moves only with the recipient's own hand,
+        // and the letter's lifecycle fields (status/readAt) are untouched -- switching the
+        // preference never fakes or unfakes a read, it only re-decides what the sender may see.
+        int updated = letterMapper.update(null, new UpdateWrapper<SlowLetter>()
+                .eq("id", letterId).eq("receiver_user_id", userId)
+                .set("receipt_policy", normalized)
+                .set("updated_at", LocalDateTime.now(clock)));
+        if (updated == 0) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "信件不存在");
+        }
+        letter.receiptPolicy = normalized;
         return letter;
     }
 
@@ -778,7 +874,19 @@ public class SlowLetterServiceImpl implements SlowLetterService {
         // thread_id matches every reply; the anchor (first) letter may predate the back-fill.
         query.and(w -> w.eq("thread_id", threadId).or().eq("id", thread.firstLetterId));
         query.orderByAsc("id");
-        return letterMapper.selectList(query);
+        return letterMapper.selectList(query).stream()
+                // CP-33 §2-6: a letter addressed to this caller that has NOT arrived yet is
+                // withheld entirely -- the thread view must not become a side door around the
+                // sealed-until-arrival parallax ritual (same DELIVERED_TO_RECEIVER_STATUSES
+                // boundary as the inbox and the voice gate).
+                .filter(letter -> !(userId.equals(letter.receiverUserId)
+                        && !DELIVERED_TO_RECEIVER_STATUSES.contains(letter.status)))
+                // CP-33 §2-6: letters the CALLER sent inside the thread go through the same
+                // sender-view receipt mask as the outbox -- a thread must not leak the
+                // counterpart's read state when their policy is NEVER.
+                .map(letter -> userId.equals(letter.senderUserId)
+                        ? applySenderReceiptMask(letter) : letter)
+                .toList();
     }
 
     @Override

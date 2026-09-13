@@ -115,12 +115,13 @@ public class WakeIntentServiceImpl implements WakeIntentService {
         jdbc.queryForList("SELECT id FROM tb_user WHERE id=? FOR UPDATE", Long.class, userId);
         WakeIntent previous = mapper.selectOne(new QueryWrapper<WakeIntent>()
             .eq("user_id", userId).eq("purpose", normalizedPurpose)
-            .in("status", List.of("PLANNED", "CLAIMED"))
+            .in("status", List.of("PLANNED", "CLAIMED", "DEFERRED"))
             .orderByDesc("created_at").last("LIMIT 1"));
         if (previous != null) {
             jdbc.update("UPDATE tb_wake_intent SET status='SUPERSEDED', outcome='DROP', " +
                     "outcome_reason='superseded_by_new_agreement', claim_token=NULL, claimed_by=NULL, " +
-                    "claim_until=NULL, updated_at=? WHERE id=? AND status IN ('PLANNED','CLAIMED')",
+                    "claim_until=NULL, deferred_until=NULL, updated_at=? WHERE id=? " +
+                    "AND status IN ('PLANNED','CLAIMED','DEFERRED')",
                 nowUtc(), previous.id);
         }
         WakeIntent intent = new WakeIntent();
@@ -152,7 +153,7 @@ public class WakeIntentServiceImpl implements WakeIntentService {
     public List<WakeIntent> listActive(Long userId) {
         return mapper.selectList(new QueryWrapper<WakeIntent>()
             .eq("user_id", userId)
-            .in("status", List.of("PLANNED", "CLAIMED"))
+            .in("status", List.of("PLANNED", "CLAIMED", "DEFERRED"))
             .orderByAsc("preferred_at"));
     }
 
@@ -162,7 +163,8 @@ public class WakeIntentServiceImpl implements WakeIntentService {
         WakeIntent owned = owned(userId, intentId);
         int changed = jdbc.update("UPDATE tb_wake_intent SET status='CANCELLED', cancelled_at=?, " +
                 "outcome='CANCELLED_BY_USER', outcome_reason='user_cancelled', claim_token=NULL, " +
-                "claimed_by=NULL, claim_until=NULL, updated_at=? WHERE id=? AND user_id=? AND status IN ('PLANNED','CLAIMED')",
+                "claimed_by=NULL, claim_until=NULL, deferred_until=NULL, updated_at=? WHERE id=? AND user_id=? " +
+                "AND status IN ('PLANNED','CLAIMED','DEFERRED')",
             nowUtc(), nowUtc(), intentId, userId);
         if (changed == 0) throw bad("wake intent is no longer active");
         owned.status = "CANCELLED";
@@ -188,8 +190,9 @@ public class WakeIntentServiceImpl implements WakeIntentService {
         LocalDateTime preferredUtc = strictUtc(preferredAt, zone);
         LocalDateTime latest = strictUtc(latestLocal, zone);
         int changed = jdbc.update("UPDATE tb_wake_intent SET earliest_at=?, preferred_at=?, latest_at=?, " +
-                "status='PLANNED', claim_token=NULL, claimed_by=NULL, claim_until=NULL, outcome=NULL, " +
-                "outcome_reason=NULL, updated_at=? WHERE id=? AND user_id=? AND status IN ('PLANNED','CLAIMED')",
+                "status='PLANNED', claim_token=NULL, claimed_by=NULL, claim_until=NULL, deferred_until=NULL, " +
+                "outcome=NULL, outcome_reason=NULL, updated_at=? WHERE id=? AND user_id=? " +
+                "AND status IN ('PLANNED','CLAIMED','DEFERRED')",
             earliest, preferredUtc, latest, nowUtc(), intentId, userId);
         if (changed == 0) throw bad("wake intent is no longer active");
         owned.earliestAt = earliest;
@@ -199,6 +202,7 @@ public class WakeIntentServiceImpl implements WakeIntentService {
         owned.claimToken = null;
         owned.claimedBy = null;
         owned.claimUntil = null;
+        owned.deferredUntil = null;
         owned.outcome = null;
         owned.outcomeReason = null;
         return owned;
@@ -207,28 +211,37 @@ public class WakeIntentServiceImpl implements WakeIntentService {
     @Override
     public List<WakeIntent> claimDue(String workerId, int batchSize, Duration lease) {
         LocalDateTime now = nowUtc();
-        List<Long> candidates = jdbc.queryForList("SELECT id FROM tb_wake_intent WHERE preferred_at<=? AND " +
-                "earliest_at<=? AND latest_at>=? AND (status='PLANNED' OR (status='CLAIMED' AND claim_until<?)) " +
-                "ORDER BY preferred_at,id LIMIT ?", Long.class, now, now, now, now, Math.max(1, batchSize));
+        // Due = past its preferred time (PLANNED) or past its quiet-hours defer point (DEFERRED),
+        // still inside [earliest, latest]; CLAIMED rows are only reclaimable after lease expiry.
+        List<Long> candidates = jdbc.queryForList("SELECT id FROM tb_wake_intent WHERE earliest_at<=? AND " +
+                "latest_at>=? AND ((status='PLANNED' AND preferred_at<=?) OR (status='DEFERRED' AND " +
+                "deferred_until<=?) OR (status='CLAIMED' AND claim_until<?)) " +
+                "ORDER BY preferred_at,id LIMIT ?", Long.class, now, now, now, now, now, Math.max(1, batchSize));
         List<WakeIntent> claimed = new ArrayList<>();
         for (Long id : candidates) {
             String token = UUID.randomUUID().toString();
             int changed = jdbc.update("UPDATE tb_wake_intent SET status='CLAIMED', claim_token=?, claimed_by=?, " +
-                    "claim_until=?, updated_at=? WHERE id=? AND earliest_at<=? AND preferred_at<=? AND latest_at>=? " +
-                    "AND (status='PLANNED' OR (status='CLAIMED' AND claim_until<?))",
-                token, workerId, now.plus(lease), now, id, now, now, now, now);
+                    "claim_until=?, updated_at=? WHERE id=? AND earliest_at<=? AND latest_at>=? AND " +
+                    "((status='PLANNED' AND preferred_at<=?) OR (status='DEFERRED' AND deferred_until<=?) OR " +
+                    "(status='CLAIMED' AND claim_until<?))",
+                token, workerId, now.plus(lease), now, id, now, now, now, now, now);
             if (changed == 1) claimed.add(mapper.selectById(id));
         }
         return claimed;
     }
 
     @Override
-    public boolean delay(WakeIntent claimed, LocalDateTime nextPreferredAt, String reason) {
-        if (claimed == null || claimed.id == null || claimed.claimToken == null) return false;
-        return jdbc.update("UPDATE tb_wake_intent SET status='PLANNED', preferred_at=?, claim_token=NULL, " +
-                "claimed_by=NULL, claim_until=NULL, outcome='DELAY', outcome_reason=?, updated_at=? " +
+    public boolean defer(WakeIntent claimed, LocalDateTime deferUntilUtc, String reason) {
+        if (claimed == null || claimed.id == null || claimed.claimToken == null
+            || deferUntilUtc == null) {
+            return false;
+        }
+        // Keep preferred_at intact: the user's agreed time stays explainable on the row while
+        // status=DEFERRED + deferred_until carry the visible "held back by quiet hours" state.
+        return jdbc.update("UPDATE tb_wake_intent SET status='DEFERRED', deferred_until=?, outcome='DELAY', " +
+                "outcome_reason=?, claim_token=NULL, claimed_by=NULL, claim_until=NULL, updated_at=? " +
                 "WHERE id=? AND status='CLAIMED' AND claim_token=?",
-            nextPreferredAt, reason, nowUtc(), claimed.id, claimed.claimToken) == 1;
+            deferUntilUtc, reason, nowUtc(), claimed.id, claimed.claimToken) == 1;
     }
 
     @Override
@@ -263,7 +276,7 @@ public class WakeIntentServiceImpl implements WakeIntentService {
         if ("LATER".equals(choice)) {
             WakeIntent newerAgreement = mapper.selectOne(new QueryWrapper<WakeIntent>()
                 .eq("user_id", userId).eq("purpose", owned.purpose)
-                .in("status", List.of("PLANNED", "CLAIMED")).ne("id", intentId)
+                .in("status", List.of("PLANNED", "CLAIMED", "DEFERRED")).ne("id", intentId)
                 .orderByDesc("created_at").last("LIMIT 1"));
             if (newerAgreement != null) return newerAgreement;
             ZoneId zone = validZone(owned.timezone);
@@ -277,10 +290,10 @@ public class WakeIntentServiceImpl implements WakeIntentService {
         if ("STOP_SIMILAR".equals(choice)) {
             jdbc.update("UPDATE tb_wake_intent SET status='CANCELLED', outcome='CANCELLED_BY_USER', " +
                     "outcome_reason='user_muted_similar_returns', claim_token=NULL, claimed_by=NULL, " +
-                    "claim_until=NULL, cancelled_at=?, updated_at=? WHERE user_id=? AND purpose=? " +
-                    "AND status IN ('PLANNED','CLAIMED')",
+                    "claim_until=NULL, deferred_until=NULL, cancelled_at=?, updated_at=? WHERE user_id=? " +
+                    "AND purpose=? AND status IN ('PLANNED','CLAIMED','DEFERRED')",
                 nowUtc(), nowUtc(), userId, owned.purpose);
-            if (List.of("PLANNED", "CLAIMED").contains(owned.status)) owned.status = "CANCELLED";
+            if (List.of("PLANNED", "CLAIMED", "DEFERRED").contains(owned.status)) owned.status = "CANCELLED";
         }
         return owned;
     }
@@ -295,8 +308,8 @@ public class WakeIntentServiceImpl implements WakeIntentService {
     public int expirePastDue() {
         LocalDateTime now = nowUtc();
         return jdbc.update("UPDATE tb_wake_intent SET status='EXPIRED', outcome='DROP', outcome_reason='latest_at_elapsed', " +
-            "claim_token=NULL, claimed_by=NULL, claim_until=NULL, updated_at=? WHERE latest_at<? " +
-            "AND (status='PLANNED' OR (status='CLAIMED' AND claim_until<?))", now, now, now);
+                "claim_token=NULL, claimed_by=NULL, claim_until=NULL, updated_at=? WHERE latest_at<? " +
+                "AND (status='PLANNED' OR status='DEFERRED' OR (status='CLAIMED' AND claim_until<?))", now, now, now);
     }
 
     private WakeIntent owned(Long userId, Long id) {

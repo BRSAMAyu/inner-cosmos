@@ -300,10 +300,10 @@ work_packages:
     vision_ids: ["V03", "V07", "V15", "V16"]
     status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-17/
-    delivery_record: evidence/commercial-cn/CP-17/2026-09-13-gateway-budget-concurrency-deadline/delivery-record.md
+    delivery_record: evidence/commercial-cn/CP-17/2026-09-13-stream-terminal-ledger/delivery-record.md
     test_command: "./mvnw test -Dtest=VoiceSkillGatewayTest"
-    note: "首个增量：出站域名白名单(装配期fail-closed,未知主机拒)+调用manifest(user/模块/Provider/用途/数据级/区域,拒答同样入账)；第二增量：ModelContractVersion封闭枚举(占位不伪造注册态)+并发闸16/429 GATEWAY_BUSY+runWithDeadline(上下文传播)+callObserved三层串行(仅REMOTE)+16负测全零计费fail-closed"
-    next_action: "SSE streamChat治理(emitter onError台账回写在ai/client/)+合同版本待备案后填实(操作者门禁)"
+    note: "首个增量：出站域名白名单(装配期fail-closed,未知主机拒)+调用manifest(user/模块/Provider/用途/数据级/区域,拒答同样入账)；第二增量：ModelContractVersion封闭枚举(占位不伪造注册态)+并发闸16/429 GATEWAY_BUSY+runWithDeadline(上下文传播)+callObserved三层串行(仅REMOTE)+16负测全零计费fail-closed；第三增量：SSE流终态台账回写——StreamOutcomeLedger首终态胜出(死流不再与健流同名)+ConsentEnforcing终态回调注册(Spring6复合回调共存性经实测纠正初版单槽误判)；10新测试"
+    next_action: "合同版本待备案后填实(操作者门禁)；Aurora外层浏览器SSE非Provider出站不进GatewayCallLedger(语义已定)"
   - id: CP-18
     title: "对话编排与真实连续性"
     owner: "AI运行时＋前端"
@@ -408,10 +408,10 @@ work_packages:
     vision_ids: ["V04", "V08", "V14"]
     status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-26/
-    delivery_record: evidence/commercial-cn/CP-20/2026-09-06-crisis-continuity/delivery-record.md
+    delivery_record: evidence/commercial-cn/CP-26/2026-09-13-quiet-hours-defer-idempotency/delivery-record.md
     test_command: "./mvnw test -Dtest=CrisisContinuityAndProvenanceAndProactiveTest"
-    note: "首个增量：主动关心PROACTIVE_CARE同意门(拒/允/撤三态,退出持久不被任务重启)；测试4/4"
-    next_action: "静默窗/改期/锁屏脱敏与重复领取负测(J07)随web联动"
+    note: "首个增量：主动关心PROACTIVE_CARE同意门(拒/允/撤三态,退出持久不被任务重启)；测试4/4；第二增量：静默窗(平台yml默认关∪用户quietHours,跨午夜正确)+DEFERRED状态机(修正delay()改写preferred_at既有缺陷,可见不静默丢)+并发双领取恰一投递(条件UPDATE)+锁屏脱敏默认开fail-closed+V49；17新负测全绿"
+    next_action: "服务端vendor push文案脱敏(与CP-41联动)；J07真机现场验收属操作者门禁"
   - id: CP-27
     title: "中文语音、朗读与隐私"
     owner: "语音＋客户端"
@@ -492,10 +492,10 @@ work_packages:
     vision_ids: ["V12", "V13"]
     status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-33/
-    delivery_record: evidence/commercial-cn/CP-16/2026-09-06-threat-model/delivery-record.md
+    delivery_record: evidence/commercial-cn/CP-33/2026-09-13-recipient-receipt-choice/delivery-record.md
     test_command: "./mvnw test -Dtest=StarfieldEncodingAndLetterReceiptPrivacyTest"
-    note: "首个增量：寄件回执隐私(DECLINED/BLOCKED折叠CLOSED不细分,正文不回显,承诺时刻保留)；读回执选择开关待J11联动"
-    next_action: "收件方读回执选择；跨时区/到期未到负测"
+    note: "首个增量：寄件回执隐私(DECLINED/BLOCKED折叠CLOSED不细分,正文不回显,承诺时刻保留)；读回执选择开关待J11联动；第二增量：收件方回执选择V48(NEVER默认,寄件人掩码单一权威,readAt永不伪造)+未到拒读+UTC口径负测+导出掩码(修originalStatus泄露)+寄件人详情CLOSED折叠+前端outbox投影错配修复(VO typing,仪式条/草稿tab复活)+开关全链路接线；24后端+7前端新测试"
+    next_action: "全局回执偏好入口(user_profile)；服务端push回执语义(与CP-26同批)"
   - id: CP-34
     title: "双向关系、拒绝与退场"
     owner: "社交系统＋产品"

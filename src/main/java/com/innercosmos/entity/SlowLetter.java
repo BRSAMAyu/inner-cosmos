@@ -46,4 +46,13 @@ public class SlowLetter extends BaseEntity {
      * inserting a duplicate letter.
      */
     public String idempotencyKey;
+    /**
+     * CP-33 §2-6: the RECIPIENT's per-letter read-receipt choice (opt-in). {@code ALWAYS} =
+     * the sender's view may show READ once the receiver marks the letter read; {@code NEVER}
+     * (the default) = the sender's view keeps showing DELIVERED and never learns the read
+     * moment. Only the receiver can change it, and sender-facing responses strip the field --
+     * the preference itself is the recipient's private setting. The letter lifecycle is
+     * unchanged; this column only shapes what the sender is allowed to see.
+     */
+    public String receiptPolicy;
 }

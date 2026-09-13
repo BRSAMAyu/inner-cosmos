@@ -637,6 +637,9 @@ CREATE TABLE IF NOT EXISTS tb_slow_letter (
   reply_to_letter_id BIGINT NULL,
   version_no INT DEFAULT 0,
   idempotency_key VARCHAR(128) NULL,
+  -- CP-33 §2-6 H2 twin of V48__letter_read_receipt_policy.sql (PG): the recipient's per-letter
+  -- read-receipt choice. NEVER (default) = the sender never learns the letter was read.
+  receipt_policy VARCHAR(16) NOT NULL DEFAULT 'NEVER',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_letter_sender (sender_user_id),
@@ -644,6 +647,9 @@ CREATE TABLE IF NOT EXISTS tb_slow_letter (
   INDEX idx_letter_status (status),
   INDEX idx_letter_reply_to (reply_to_letter_id)
 );
+-- CP-33 §2-6: existing file databases need the receipt column too (CREATE TABLE IF NOT
+-- EXISTS never alters an existing table), mirrored idempotently for every startup.
+ALTER TABLE tb_slow_letter ADD COLUMN IF NOT EXISTS receipt_policy VARCHAR(16) NOT NULL DEFAULT 'NEVER';
 
 CREATE TABLE IF NOT EXISTS tb_letter_status_log (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -1436,13 +1442,22 @@ CREATE TABLE IF NOT EXISTS tb_wake_intent (
   cancelled_at TIMESTAMP NULL,
   user_feedback VARCHAR(24),
   feedback_at TIMESTAMP NULL,
+  deferred_until TIMESTAMP NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT ck_wake_intent_status CHECK (status IN ('PLANNED','CLAIMED','FIRED','CANCELLED','EXPIRED','SUPERSEDED')),
+  CONSTRAINT ck_wake_intent_status CHECK (status IN ('PLANNED','CLAIMED','DEFERRED','FIRED','CANCELLED','EXPIRED','SUPERSEDED')),
   CONSTRAINT ck_wake_intent_window CHECK (earliest_at <= preferred_at AND preferred_at <= latest_at)
 );
 CREATE INDEX IF NOT EXISTS idx_wake_intent_owner ON tb_wake_intent (user_id, status, preferred_at);
 CREATE INDEX IF NOT EXISTS idx_wake_intent_claim ON tb_wake_intent (status, preferred_at, claim_until, id);
+-- CP-26 quiet hours: existing file databases need the DEFERRED column/constraint too
+-- (CREATE TABLE IF NOT EXISTS alone never alters an existing table), so mirror the new
+-- column and the widened status check idempotently for every startup.
+ALTER TABLE tb_wake_intent ADD COLUMN IF NOT EXISTS deferred_until TIMESTAMP NULL;
+ALTER TABLE tb_wake_intent DROP CONSTRAINT IF EXISTS ck_wake_intent_status;
+ALTER TABLE tb_wake_intent ADD CONSTRAINT ck_wake_intent_status
+  CHECK (status IN ('PLANNED','CLAIMED','DEFERRED','FIRED','CANCELLED','EXPIRED','SUPERSEDED'));
+CREATE INDEX IF NOT EXISTS idx_wake_intent_deferred ON tb_wake_intent (status, deferred_until);
 
 -- Reliable cross-process event delivery (H2 development/test representation).
 CREATE TABLE IF NOT EXISTS tb_outbox_event (

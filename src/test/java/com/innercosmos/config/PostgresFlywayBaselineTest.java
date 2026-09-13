@@ -66,9 +66,11 @@ class PostgresFlywayBaselineTest {
         // V45 (CP-45) adds the server-side payment order catalog.
         // V46 (CP-41) admits mainland vendor push transports into the device registry.
         // V47 (CP-62) adds data-portability import receipts for idempotent re-import.
+        // V48 (CP-33) adds the recipient's read-receipt policy on slow letters.
+        // V49 (CP-26) adds the wake-intent DEFERRED state and quiet-hours deferral column.
         // It exists as a forward migration rather than an in-place edit of V30 because V30 is
         // already committed and rewriting it would break Flyway checksums on live databases.
-        assertEquals(47, flyway.migrate().migrationsExecuted);
+        assertEquals(49, flyway.migrate().migrationsExecuted);
         assertEquals(0, flyway.migrate().migrationsExecuted);
 
         String source = readClasspath("schema.sql");
@@ -169,12 +171,12 @@ class PostgresFlywayBaselineTest {
                 .locations("classpath:db/migration/postgresql")
                 .load();
         // No .target(): migrates from V19 all the way to the current latest
-        // (V20 through V43, including provenance, orchestration, safety, Pod takeover,
+        // (V20 through V49, including provenance, orchestration, safety, Pod takeover,
         // capsule-landing foreign-key rename, classroom social pair integrity, the
         // commercial-cn metric event store, the adult gate, the consent center,
-        // identity verification, retraction tombstones, crisis continuity and the
-        // moderation case backend).
-        assertEquals(28, v20.migrate().migrationsExecuted);
+        // identity verification, retraction tombstones, crisis continuity, the
+        // moderation case backend, slow-letter receipt policy and wake-intent deferral).
+        assertEquals(30, v20.migrate().migrationsExecuted);
         try (Connection migrated = DriverManager.getConnection(
                 jdbcUrl, POSTGRES.getUsername(), POSTGRES.getPassword())) {
             assertEquals(2, scalar(migrated,

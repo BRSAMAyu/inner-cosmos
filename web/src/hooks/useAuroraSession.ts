@@ -7,6 +7,7 @@ import {
 import type { AuroraStreamEvent, DialogMessage, TurnStatus } from "../protocol";
 import type { AuroraInnerVoice, AuroraUiMessage } from "../components/AuroraConversation";
 import type { SkillLocale } from "../components/PsychologySkillStudio";
+import { lockScreenWakeNotice } from "../components/WakeLockScreenPrivacy";
 import { mobileRuntime } from "../mobile";
 
 // Extracted from AuroraApp.tsx (B1 domain-hook decomposition, first slice): everything behind the
@@ -856,8 +857,10 @@ export function useAuroraSession({
       setWakeIntents(current => [...current, created].sort((a, b) => a.preferredAt.localeCompare(b.preferredAt)));
       const notificationAt = new Date(created.preferredAt);
       if (Number.isFinite(notificationAt.getTime()) && notificationAt.getTime() > Date.now()) {
+        // 锁屏预览默认脱敏：reasonForUser 含用户自述的约定内容，不能直接上锁屏。
+        const lockScreen = lockScreenWakeNotice({ title: "Aurora", body: created.reasonForUser }, skillLocale);
         await mobileRuntime.scheduleWakeIntentNotification({
-          wakeIntentId: created.id, title: "Aurora", body: created.reasonForUser, at: notificationAt
+          wakeIntentId: created.id, title: lockScreen.title, body: lockScreen.body, at: notificationAt
         }).catch(() => undefined);
       }
       setStatus(t.returnScheduled);
@@ -876,7 +879,8 @@ export function useAuroraSession({
         setWakeIntents(current => [...current, result]);
         const at = new Date(result.preferredAt);
         if (Number.isFinite(at.getTime()) && at.getTime() > Date.now()) {
-          await mobileRuntime.scheduleWakeIntentNotification({ wakeIntentId: result.id, title: "Aurora", body: result.reasonForUser, at }).catch(() => undefined);
+          const lockScreen = lockScreenWakeNotice({ title: "Aurora", body: result.reasonForUser }, skillLocale);
+          await mobileRuntime.scheduleWakeIntentNotification({ wakeIntentId: result.id, title: lockScreen.title, body: lockScreen.body, at }).catch(() => undefined);
         }
       }
       setStatus(choice === "MATCHED" ? t.returnFeedbackMatched
@@ -899,7 +903,8 @@ export function useAuroraSession({
       await mobileRuntime.cancelWakeIntentNotification(intent.id);
       const at = new Date(changed.preferredAt);
       if (Number.isFinite(at.getTime()) && at.getTime() > Date.now()) {
-        await mobileRuntime.scheduleWakeIntentNotification({ wakeIntentId: changed.id, title: "Aurora", body: changed.reasonForUser, at }).catch(() => undefined);
+        const lockScreen = lockScreenWakeNotice({ title: "Aurora", body: changed.reasonForUser }, skillLocale);
+        await mobileRuntime.scheduleWakeIntentNotification({ wakeIntentId: changed.id, title: lockScreen.title, body: lockScreen.body, at }).catch(() => undefined);
       }
       setWakeIntents(current => current.map(row => row.id === intent.id ? changed : row));
       setStatus(t.returnPostponed);

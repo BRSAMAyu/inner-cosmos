@@ -6,6 +6,7 @@ import com.innercosmos.entity.WakeIntent;
 import com.innercosmos.entity.UserProfile;
 import com.innercosmos.mapper.UserProfileMapper;
 import com.innercosmos.safety.SafetyBoundaryFilter;
+import com.innercosmos.service.WakeIntentQuietHoursPolicy;
 import com.innercosmos.service.WakeIntentService;
 import com.innercosmos.service.WakeIntentRelevanceEvaluator;
 import org.slf4j.Logger;
@@ -35,6 +36,7 @@ public class WakeIntentDeliveryJob {
 
     private final WakeIntentService intents;
     private final QuietWindowResolver quietWindow;
+    private final WakeIntentQuietHoursPolicy quietHours;
     private final ProactiveDeliveryChannel liveChannel;
     private final SafetyBoundaryFilter safety;
     private final UserProfileMapper profiles;
@@ -42,11 +44,12 @@ public class WakeIntentDeliveryJob {
     private final String workerId = ManagementFactory.getRuntimeMXBean().getName();
 
     public WakeIntentDeliveryJob(WakeIntentService intents, QuietWindowResolver quietWindow,
-                                 ProactiveDeliveryChannel liveChannel,
+                                 WakeIntentQuietHoursPolicy quietHours, ProactiveDeliveryChannel liveChannel,
                                  SafetyBoundaryFilter safety, UserProfileMapper profiles,
                                  WakeIntentRelevanceEvaluator relevance) {
         this.intents = intents;
         this.quietWindow = quietWindow;
+        this.quietHours = quietHours;
         this.liveChannel = liveChannel;
         this.safety = safety;
         this.profiles = profiles;
@@ -110,11 +113,27 @@ public class WakeIntentDeliveryJob {
         } catch (RuntimeException invalidZone) {
             zone = ZoneId.of("Asia/Shanghai");
         }
-        QuietWindowResolver.Reason boundary = quietWindow.canPushNow(intent.userId, ZonedDateTime.now(zone));
-        LocalDateTime next = LocalDateTime.now(ZoneOffset.UTC).plusMinutes(15);
-        if (boundary.quiet() && next.isBefore(intent.latestAt)) {
-            intents.delay(intent, next, "boundary:" + boundary.cause());
-            return;
+        ZonedDateTime nowInZone = ZonedDateTime.now(zone);
+        QuietWindowResolver.Reason boundary = quietWindow.canPushNow(intent.userId, nowInZone);
+        // CP-26: the platform/user quiet-hours window applies even when the 4-layer resolver
+        // (quiet hours, sleep, todo, focus) found nothing — and, when it did, supplies the
+        // instant the window ends so the defer is explainable instead of a blind re-poll.
+        WakeIntentQuietHoursPolicy.Decision quietHoursDecision = quietHours.evaluate(intent.userId, nowInZone);
+        boolean inQuietWindow = boundary.quiet() || quietHoursDecision.quiet();
+        if (inQuietWindow) {
+            LocalDateTime deferUntil = quietHoursDecision.deferUntilUtc() != null
+                ? quietHoursDecision.deferUntilUtc()
+                // No computable end (sleep/todo/focus boundary): re-probe shortly rather than guess.
+                : LocalDateTime.now(ZoneOffset.UTC).plusMinutes(15);
+            String cause = boundary.quiet() ? boundary.cause() : quietHoursDecision.cause();
+            if (deferUntil.isBefore(intent.latestAt)) {
+                // The intent row itself records DEFERRED + deferred_until — the withheld return
+                // stays visible to the user and the scan, never silently dropped.
+                intents.defer(intent, deferUntil, "boundary:" + cause);
+                return;
+            }
+            // The quiet window outlasts the agreed latest time: deliver once at the boundary
+            // instead of letting the agreement expire unheard.
         }
 
         // Persist the return before best-effort live fan-out. This survives API/scheduler split,
@@ -122,7 +141,7 @@ public class WakeIntentDeliveryJob {
         boolean live = liveChannel.hasActiveEmitter(intent.userId);
         boolean completed = intents.finishWithNotification(intent,
             live ? "SEND_AND_IN_APP" : "CONVERT_TO_IN_APP",
-            boundary.quiet() ? "latest_window_boundary" : (live ? "live_and_durable" : "user_offline"),
+            inQuietWindow ? "latest_window_boundary" : (live ? "live_and_durable" : "user_offline"),
             intent.reasonForUser, intent.content);
         if (completed && live) liveChannel.push(intent.userId, intent.content, "wake_intent");
     }

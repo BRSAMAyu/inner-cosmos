@@ -2162,6 +2162,7 @@ export function AuroraApp() {
       <div hidden={connectionTab !== "letters"}>
       <LettersInbox letterInbox={connectionsAndLetters.letterInbox} letterOutbox={connectionsAndLetters.letterOutbox} threads={connectionsAndLetters.letterThreads} threadLetters={connectionsAndLetters.threadLetters} threadLettersStatus={connectionsAndLetters.threadLettersStatus} selectedThreadId={connectionsAndLetters.selectedThreadId}
         isDraftBusy={connectionsAndLetters.isDraftBusy} replyBusyId={connectionsAndLetters.replyBusyId}
+        onSetReceiptPolicy={(letter, policy) => void connectionsAndLetters.setReceiptPolicy(letter, policy)} isReceiptPolicyBusy={connectionsAndLetters.isReceiptPolicyBusy}
         isLetterActionBusy={connectionsAndLetters.isLetterActionBusy} isConnectionDecisionBusy={connectionsAndLetters.isConnectionDecisionBusy}
         isConnectionLeaveBusy={connectionsAndLetters.isConnectionLeaveBusy} isLetterConnectionBusy={connectionsAndLetters.isLetterConnectionBusy}
         onSendDraft={id => void connectionsAndLetters.sendDraft(id)} onOpenThread={id => { void connectionsAndLetters.openThread(id); navigate(letterThreadPath(id)); }} replyDrafts={connectionsAndLetters.replyDrafts} connectionRequests={connectionsAndLetters.connectionRequests} friends={connectionsAndLetters.friends}

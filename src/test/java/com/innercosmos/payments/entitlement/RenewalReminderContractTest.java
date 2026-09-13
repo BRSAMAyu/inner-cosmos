@@ -28,7 +28,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class RenewalReminderContractTest {
 
     private static final String PRODUCT = "pro.monthly";
-    private static final AtomicLong USERS = new AtomicLong(970_000_000L);
+
+    /**
+     * Run-unique base: the dev H2 FILE database persists across JVM runs, and a fixed base
+     * made each run re-create the SAME (user, product) entitlement. The reminder's
+     * exactly-one-per-period idempotency then correctly suppressed the "new" fixture's
+     * reminder (lastRemindedAt already set by the previous run) and the test failed on
+     * stale cross-run rows. Seeding from the epoch keeps ids unique per run while staying
+     * in the dedicated large test-id range.
+     */
+    private static final AtomicLong USERS = new AtomicLong(
+            971_000_000L + (System.currentTimeMillis() / 1000L % 900_000L) * 100L);
 
     @Autowired EntitlementStateService entitlements;
     @Autowired EntitlementMapper entitlementMapper;
