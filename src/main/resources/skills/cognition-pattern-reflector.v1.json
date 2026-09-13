@@ -1,0 +1,21 @@
+{
+  "id": "cognition-pattern-reflector",
+  "version": "1.0.0",
+  "owner": "Inner Cosmos Psychology Capability Working Group",
+  "title": {"zh-CN": "认出一个反复出现的念头", "en-SG": "Notice one recurring thought"},
+  "description": {"zh-CN": "把一个反复出现的念头放回它的情境里，试着写出第二种读法，不评判对错。", "en-SG": "Place one recurring thought back in its context and try writing a second reading, without judging it right or wrong."},
+  "estimatedMinutes": 6,
+  "riskTier": "L1",
+  "agentInvocation": "SUGGEST_ONLY",
+  "userInvocation": "EXPLICIT_CONSENT",
+  "requiredScopes": ["current-run-input"],
+  "allowedData": ["answers-entered-in-this-run"],
+  "allowedTools": [],
+  "requiredInputs": ["recurringThought", "triggerSituation", "alternativeReading"],
+  "evidence": ["Beck 1976, Cognitive Therapy and the Emotional Disorders", "Hofmann et al. 2012, DOI 10.1007/s10608-012-9476-1"],
+  "limitations": {"zh-CN": "这是反思练习，不提供心理治疗，也不识别或纠正『认知歪曲』；不适合急性痛苦时使用，反复念头涉及自伤请立即使用安全资源。证据出处与文案待心理专家复核（CP-60A 双专家门禁）。", "en-SG": "This is a reflection exercise: it is not psychotherapy and does not detect or correct \"cognitive distortions\". It is not for acute distress; if a recurring thought involves self-harm, use the safety resources immediately. Evidence citations and wording await psychology expert review (CP-60A dual-expert gate)."},
+  "retentionChoices": ["DISCARD_AFTER_SESSION", "SAVE_RESULT", "PROFILE_ELIGIBLE"],
+  "evaluationSuite": "psychology-contract-v1:cognition-pattern-reflector",
+  "fallback": "DETERMINISTIC_REFLECTION",
+  "escalation": "LOCAL_CRISIS_RESOURCES"
+}

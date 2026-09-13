@@ -16,7 +16,14 @@ public class PsychologySkillRegistry {
     private static final List<String> RESOURCES = List.of(
             "skills/emotion-needs-clarifier.v1.json",
             "skills/values-compass.v1.json",
-            "skills/decision-conflict-map.v1.json");
+            "skills/decision-conflict-map.v1.json",
+            // CP-60A skill expansion (blueprint §7 CP-60 / §8 L324-326): relationship
+            // perspective, support preference and cognition pattern reflection. Registering
+            // a manifest never marks it expert-reviewed — that is the operator-side
+            // dual-expert ledger gate (docs/commercialization/product/skill-expert-review.ledger.yml).
+            "skills/relationship-perspective.v1.json",
+            "skills/support-preference-mapper.v1.json",
+            "skills/cognition-pattern-reflector.v1.json");
 
     private final Map<String, PsychologySkillManifest> currentById;
     private final Map<String, PsychologySkillManifest> byVersion;

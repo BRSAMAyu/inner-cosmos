@@ -1,0 +1,156 @@
+# CP-63 复核日历（review calendar ledger）
+# 来源：蓝图 CP-63（独立安全、隐私与监管复核）——"形成季度内部审计、模型变更检查、
+# 监管年度事项和真实事件触发复核日历"；每法律与商店证据有 owner、适用功能、依据、
+# 生效日、核验日、回执和重验时间。契约测试：
+# src/test/java/com/innercosmos/security/ReviewCalendarContractTest.java
+#
+# 诚实规则（结构性强制）：
+# - status ∈ {PENDING, IN_PROGRESS, REMEDIATION_REQUIRED}——不存在 agent 可写的
+#   VERIFIED/PASSED 终态。独立复核的"核验事实"只能由 operator 以外部回执落位后回填
+#   last_verified_at 与 receipt（本文件当前全部为 null：尚无任何独立核验事实）
+# - 超过法定或内部有效期不能自动沿用旧 PASS：有效期引擎（契约测试中的
+#   effectiveStatus）判定 last_verified_at 非空且评估日晚于 revalidate_due_at 的条目为
+#   EXPIRED；EXPIRED 条目阻断对应 CP 的复核通过宣称，必须重新核验或整改复验
+# - 63A 与 63B 互不覆盖（蓝图子门）：63A 条目只登记 S3 首发基线暴露面，不等待 S5
+#   新增功能；63B 条目的 scope 必须显式覆盖 CP-57/58/59/60 新增暴露面，且不得与 63A
+#   条目共用 scope 描述——不得用 63A 结论覆盖 63B 暴露面
+# - 日历驱动条目（QUARTERLY_INTERNAL_AUDIT / REGULATORY_ANNUAL）必须登记
+#   revalidate_due_at（法定或内部有效期到期日）；事件驱动条目
+#   （MODEL_CHANGE_CHECK / INCIDENT_TRIGGERED）按触发复核，不设日历期限
+#   （revalidate_due_at: null）
+
+reviews:
+  # ---- 季度内部审计（QUARTERLY_INTERNAL_AUDIT）----
+  - review_id: rc-qa-63a-boundary
+    kind: QUARTERLY_INTERNAL_AUDIT
+    scope: CP-63A·CP-14/15/16：P0–P3 读路径授权、数据资产清单与撤回／缓存复活的季度内部审计（S3 首发基线，不含 S5 新增能力）
+    owner: 安全负责人＋外部安全／隐私专业方
+    effective_from: "2026-09-06"
+    last_verified_at: null
+    revalidate_due_at: "2026-12-06"
+    status: IN_PROGRESS
+    receipt: null
+    evidence_path: null
+  - review_id: rc-qa-63a-ops
+    kind: QUARTERLY_INTERNAL_AUDIT
+    scope: CP-63A·CP-37/48/49：安全监测、密钥轮换、值班与事件响应基线的季度内部审计（S3 首发基线）
+    owner: SRE＋安全负责人
+    effective_from: "2026-09-06"
+    last_verified_at: null
+    revalidate_due_at: "2026-12-06"
+    status: PENDING
+    receipt: null
+    evidence_path: null
+  - review_id: rc-qa-63b-multifacet
+    kind: QUARTERLY_INTERNAL_AUDIT
+    scope: CP-63B·CP-58：多侧面隔离不变式（侧面A不得访问B、租借／导出不超许可）与隔离模拟资产的季度复核（S5 新增暴露面，不由 63A 覆盖）
+    owner: Capsule系统＋隐私
+    effective_from: "2026-09-13"
+    last_verified_at: null
+    revalidate_due_at: "2026-12-13"
+    status: PENDING
+    receipt: null
+    evidence_path: null
+  - review_id: rc-qa-63b-retrieval
+    kind: QUARTERLY_INTERNAL_AUDIT
+    scope: CP-63B·CP-57：90日长周期记忆／检索质量证据、预算与权限约束、用户手动保留资产不被遗忘优化删除的季度复核（S5 新增暴露面，不由 63A 覆盖）
+    owner: 记忆AI＋长期研究
+    effective_from: "2026-09-13"
+    last_verified_at: null
+    revalidate_due_at: "2026-12-13"
+    status: PENDING
+    receipt: null
+    evidence_path: null
+  # ---- 模型变更检查（MODEL_CHANGE_CHECK）----
+  - review_id: rc-mc-63a-provider
+    kind: MODEL_CHANGE_CHECK
+    scope: CP-63A·CP-06/17：真实 Provider／模型／系统提示变更时重评——白名单路由、PII 硬拦与红队语料回放（S3 首发基线）
+    owner: AI平台＋安全负责人
+    effective_from: "2026-09-06"
+    last_verified_at: null
+    revalidate_due_at: null
+    status: PENDING
+    receipt: null
+    evidence_path: null
+  - review_id: rc-mc-63a-safety-rules
+    kind: MODEL_CHANGE_CHECK
+    scope: CP-63A·CP-04/20：危机拦截规则与安全边界配置变更时的拦截负测回放（S3 首发基线）
+    owner: 安全边界负责人
+    effective_from: "2026-09-06"
+    last_verified_at: null
+    revalidate_due_at: null
+    status: PENDING
+    receipt: null
+    evidence_path: null
+  - review_id: rc-mc-63b-memory-model
+    kind: MODEL_CHANGE_CHECK
+    scope: CP-63B·CP-57/58：记忆巩固、检索与多侧面模拟的模型或提示变更——跨侧面隔离负测与画像标签漂移复核（S5 新增暴露面，不由 63A 覆盖）
+    owner: 记忆AI＋Capsule系统
+    effective_from: "2026-09-13"
+    last_verified_at: null
+    revalidate_due_at: null
+    status: PENDING
+    receipt: null
+    evidence_path: null
+  - review_id: rc-mc-63b-skill-harmony
+    kind: MODEL_CHANGE_CHECK
+    scope: CP-63B·CP-60A/60B：技能库新增／修改与原生 HarmonyOS 桥接（身份／通知／语音／支付）的权限沙箱与停用门复核（S5 新增暴露面，不由 63A 覆盖）
+    owner: 技能平台＋HarmonyOS客户端
+    effective_from: "2026-09-13"
+    last_verified_at: null
+    revalidate_due_at: null
+    status: PENDING
+    receipt: null
+    evidence_path: null
+  # ---- 监管年度事项（REGULATORY_ANNUAL）----
+  - review_id: rc-ra-63a-genai
+    kind: REGULATORY_ANNUAL
+    scope: CP-63A·CP-51A：生成式AI安全评估、拟人化互动安全评估与算法备案的年度核验（按法定有效期；逾期不能自动沿用旧结论）
+    owner: 法务＋合规
+    effective_from: "2026-09-06"
+    last_verified_at: null
+    revalidate_due_at: "2027-07-15"
+    status: PENDING
+    receipt: null
+    evidence_path: null
+  - review_id: rc-ra-63a-mlps
+    kind: REGULATORY_ANNUAL
+    scope: CP-63A·CP-16/37：网络安全等级保护测评与数据审计的定期复核、云与供应链资质的年度复验（按法定有效期）
+    owner: 安全负责人＋SRE
+    effective_from: "2026-09-06"
+    last_verified_at: null
+    revalidate_due_at: "2027-09-06"
+    status: PENDING
+    receipt: null
+    evidence_path: null
+  - review_id: rc-ra-63b-channel-changes
+    kind: REGULATORY_ANNUAL
+    scope: CP-63B·CP-51B/CP-60B：新增能力上架后的算法应用变更登记、全部声明支持端的渠道审核与商店证据年度复验（S5 新增暴露面，不由 63A 覆盖）
+    owner: 发行＋法务
+    effective_from: "2026-09-13"
+    last_verified_at: null
+    revalidate_due_at: "2027-09-13"
+    status: PENDING
+    receipt: null
+    evidence_path: null
+  # ---- 真实事件触发（INCIDENT_TRIGGERED）----
+  - review_id: rc-it-63a-crisis
+    kind: INCIDENT_TRIGGERED
+    scope: CP-63A·CP-20/49：危机处置失误、严重数据越权或高危缺陷事件触发的即时复核——安全拦截、监测值班与整改复验（S3 首发基线）
+    owner: 安全负责人＋值班
+    effective_from: "2026-09-06"
+    last_verified_at: null
+    revalidate_due_at: null
+    status: PENDING
+    receipt: null
+    evidence_path: null
+  - review_id: rc-it-63b-community
+    kind: INCIDENT_TRIGGERED
+    scope: CP-63B·CP-59/60C：社区骚扰与滥用申诉、反复骚扰治理、全端无障碍（J01–J12）回归的事件触发复核（S5 新增暴露面，不由 63A 覆盖）
+    owner: 社区运营＋无障碍测试
+    effective_from: "2026-09-13"
+    last_verified_at: null
+    revalidate_due_at: null
+    status: PENDING
+    receipt: null
+    evidence_path: null

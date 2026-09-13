@@ -1,0 +1,21 @@
+{
+  "id": "relationship-perspective",
+  "version": "1.0.0",
+  "owner": "Inner Cosmos Psychology Capability Working Group",
+  "title": {"zh-CN": "从三个位置看这段关系", "en-SG": "See the relationship from three seats"},
+  "description": {"zh-CN": "在同一件事里轮流坐到自己、对方和旁观者的位置，练习视角切换，不替对方下结论。", "en-SG": "Take turns in your seat, the other person's seat and an observer's seat to practise perspective-taking, without deciding what they think."},
+  "estimatedMinutes": 6,
+  "riskTier": "L1",
+  "agentInvocation": "SUGGEST_ONLY",
+  "userInvocation": "EXPLICIT_CONSENT",
+  "requiredScopes": ["current-run-input"],
+  "allowedData": ["answers-entered-in-this-run"],
+  "allowedTools": [],
+  "requiredInputs": ["situation", "myStory", "theirPossibleStory"],
+  "evidence": ["Galinsky & Moskowitz 2000, DOI 10.1037/0022-3514.78.4.708", "Pronin, Gilovich & Ross 2004, DOI 10.1037/0033-295X.111.3.781"],
+  "limitations": {"zh-CN": "视角切换是反思练习，不读心、不判断对方动机，也不替代伴侣咨询或家庭治疗；证据出处与文案待心理专家复核（CP-60A 双专家门禁）。", "en-SG": "Perspective-taking here is a reflection exercise: it does not read minds, judge the other person's motives, or replace couples or family counselling. Evidence citations and wording await psychology expert review (CP-60A dual-expert gate)."},
+  "retentionChoices": ["DISCARD_AFTER_SESSION", "SAVE_RESULT", "PROFILE_ELIGIBLE"],
+  "evaluationSuite": "psychology-contract-v1:relationship-perspective",
+  "fallback": "DETERMINISTIC_REFLECTION",
+  "escalation": "LOCAL_CRISIS_RESOURCES"
+}

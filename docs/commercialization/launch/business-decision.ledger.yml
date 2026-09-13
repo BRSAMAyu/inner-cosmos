@@ -1,0 +1,40 @@
+# CP-64 商业决策台账（business decision ledger）
+# 来源：蓝图 CP-64（商业评审、组织能力与下一阶段决策）与 CP-61 验收（PRODUCT_READY／
+# CN_RELEASE_READY／BUSINESS_VALIDATED 分别判定，工程完成不自动等于商业成立）。
+# 契约测试：src/test/java/com/innercosmos/launch/BusinessDecisionContractTest.java
+#
+# 诚实规则（结构性强制）：
+# - **BUSINESS_VALIDATED 不作为本台账的可写状态存在**——status 只有 {PENDING, DRAFT_REVIEWED}。
+#   蓝图 CP-61/CP-64 明确"商业不成立可关闭验证任务但 BUSINESS_VALIDATED 仍不得通过"；
+#   该完成态只能由 CP-61 终验收按成熟用户队列、真实付费和退款、单位经济与可重复获客
+#   另行判定，coding agent 与本台账都不能写入
+# - decision ∈ {FOCUS, SCALE, REPOSITION, STOP, UNDECIDED}；当前 UNDECIDED 且不得有
+#   conclusion——书面决策必须由负责人以真实留存／付费／退款／渠道／安全容量证据作出，
+#   有证据、反例、预算、owner 和复审日期；不把融资金额或用户数据量作为唯一成功证明
+# - evidence_metrics 只能引用 CP-03 指标字典键（K1/K2/K3）
+# - status=PENDING 时 counterexamples 与 budget_impact 必须为 null——反例与预算影响是
+#   真实数据回填的事实，不是 agent 起草的文案
+
+decisions:
+  - decision_id: bd-2026q4-h1h3
+    period: 2026-Q4（S5 商业评审窗）
+    hypothesis_h1:
+      statement: 私密价值独立成立——没有任何陌生人时，用户是否仍主动回来整理生活；不靠假消息、强制分享或签到制造留存
+      evidence_metrics: K1_weekly_confirmed_value
+      counterexamples: null
+      budget_impact: null
+    hypothesis_h2:
+      statement: 长期理解有增量——相比用户已有通用 AI／日记工具，少重讲背景、理解变化是否有明显价值
+      evidence_metrics: K2_d30_window_value_retention
+      counterexamples: null
+      budget_impact: null
+    hypothesis_h3:
+      statement: 授权共鸣改善真人连接——试聊一个获准侧面后，双方是否更愿意、更有内容地交流且压力更低；扩张社交供给须同时通过单位经济（付费不成立即使留存达标也不得扩量）
+      evidence_metrics: K1_weekly_confirmed_value, K2_d30_window_value_retention, K3_monthly_contribution_margin
+      counterexamples: null
+      budget_impact: null
+    decision: UNDECIDED
+    owner: 创始人＋财务＋产品＋独立顾问
+    revalidate_at: null
+    status: PENDING
+    conclusion: null

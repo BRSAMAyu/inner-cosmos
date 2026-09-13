@@ -45,7 +45,7 @@ class PsychologySkillControllerTest {
 
         mockMvc.perform(get("/api/psychology/skills").session(demo))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.length()").value(3))
+                .andExpect(jsonPath("$.data.length()").value(6))
                 .andExpect(jsonPath("$.data[0].userInvocation").value("EXPLICIT_CONSENT"));
 
         Map<String, Object> body = Map.of(

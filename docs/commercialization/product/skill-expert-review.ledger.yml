@@ -1,0 +1,65 @@
+# CP-60A 技能专家签字台账（skill expert review ledger）
+# 冻结口径（docs/commercialization/evaluation/experiment-registry.yml CP-60A）：
+#   "≥6项专家审阅技能上线且边界违反=0"、"每项双专家通过"、样本量 "≥6技能×2专家"。
+# 契约测试：src/test/java/com/innercosmos/product/SkillExpertReviewContractTest.java
+#
+# 诚实规则（结构性强制，照 legal-procedures.ledger.yml 范本）：
+# - verdict ∈ {PENDING, SUBMITTED} —— coding agent 只能推进结构；
+#   "双专家通过"是 operator 门禁：每技能须由两名独立心理专家审阅并签字，
+#   签字/回执只能由 operator 以真实外部证据在 receipt 落位后人工回填。
+#   **不存在 APPROVED/PASSED 状态**，不把"材料已提交"当"专家已通过"，
+#   不由任何 agent 翻转字段来宣称审阅完成。
+# - 在同一技能的两行 receipt 都落位前，该技能不得对外宣称"专家审阅通过"，
+#   也不得据此解除 LIMITED_PREVIEW 之外的任何发布状态。
+# - skill_id 必须与 src/main/resources/skills/*.v1.json 技能注册表逐一对齐；
+#   注册表扩容必须同步扩本台账（每新增 1 技能 = 新增 2 行）。
+
+reviews:
+  - expert_id: EXP-PSY-01
+    skill_id: emotion-needs-clarifier
+    verdict: PENDING
+    receipt: null
+  - expert_id: EXP-PSY-02
+    skill_id: emotion-needs-clarifier
+    verdict: PENDING
+    receipt: null
+  - expert_id: EXP-PSY-01
+    skill_id: values-compass
+    verdict: PENDING
+    receipt: null
+  - expert_id: EXP-PSY-02
+    skill_id: values-compass
+    verdict: PENDING
+    receipt: null
+  - expert_id: EXP-PSY-01
+    skill_id: decision-conflict-map
+    verdict: PENDING
+    receipt: null
+  - expert_id: EXP-PSY-02
+    skill_id: decision-conflict-map
+    verdict: PENDING
+    receipt: null
+  - expert_id: EXP-PSY-01
+    skill_id: relationship-perspective
+    verdict: PENDING
+    receipt: null
+  - expert_id: EXP-PSY-02
+    skill_id: relationship-perspective
+    verdict: PENDING
+    receipt: null
+  - expert_id: EXP-PSY-01
+    skill_id: support-preference-mapper
+    verdict: PENDING
+    receipt: null
+  - expert_id: EXP-PSY-02
+    skill_id: support-preference-mapper
+    verdict: PENDING
+    receipt: null
+  - expert_id: EXP-PSY-01
+    skill_id: cognition-pattern-reflector
+    verdict: PENDING
+    receipt: null
+  - expert_id: EXP-PSY-02
+    skill_id: cognition-pattern-reflector
+    verdict: PENDING
+    receipt: null

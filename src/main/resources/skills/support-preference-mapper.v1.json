@@ -1,0 +1,21 @@
+{
+  "id": "support-preference-mapper",
+  "version": "1.0.0",
+  "owner": "Inner Cosmos Psychology Capability Working Group",
+  "title": {"zh-CN": "记下什么支持真的有用", "en-SG": "Map the support that actually helps"},
+  "description": {"zh-CN": "分清安慰、建议、陪伴和信息各自对你的作用，帮你说清楚想要的支持。", "en-SG": "Tell apart comfort, advice, company and information, so you can ask for the kind of support that fits you."},
+  "estimatedMinutes": 5,
+  "riskTier": "L1",
+  "agentInvocation": "SUGGEST_ONLY",
+  "userInvocation": "EXPLICIT_CONSENT",
+  "requiredScopes": ["current-run-input"],
+  "allowedData": ["answers-entered-in-this-run"],
+  "allowedTools": [],
+  "requiredInputs": ["hardMoment", "helpedMost", "helpedLeast"],
+  "evidence": ["Collins & Feeney 2000, DOI 10.1037/0022-3514.78.6.1053", "Rosenberg 2003, Nonviolent Communication: A Language of Life"],
+  "limitations": {"zh-CN": "支持偏好会随情境和关系变化；这不是依恋类型或关系质量测评，结果也不会自动分享给任何人。证据出处与文案待心理专家复核（CP-60A 双专家门禁）。", "en-SG": "Support preferences change across situations and relationships; this is not an attachment-style or relationship-quality assessment, and the result is never shared with anyone automatically. Evidence citations and wording await psychology expert review (CP-60A dual-expert gate)."},
+  "retentionChoices": ["DISCARD_AFTER_SESSION", "SAVE_RESULT", "PROFILE_ELIGIBLE"],
+  "evaluationSuite": "psychology-contract-v1:support-preference-mapper",
+  "fallback": "DETERMINISTIC_REFLECTION",
+  "escalation": "LOCAL_CRISIS_RESOURCES"
+}

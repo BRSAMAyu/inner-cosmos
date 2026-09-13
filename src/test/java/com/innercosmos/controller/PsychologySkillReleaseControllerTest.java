@@ -54,9 +54,10 @@ class PsychologySkillReleaseControllerTest {
                 .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
         mockMvc.perform(get("/api/admin/psychology/skills/releases").session(admin))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.length()").value(3))
-                .andExpect(jsonPath("$.data[1].skillId").value("emotion-needs-clarifier"))
-                .andExpect(jsonPath("$.data[1].releaseStatus").value("LIMITED_PREVIEW"));
+                .andExpect(jsonPath("$.data.length()").value(6))
+                // Index-free: the registry now carries six skills, so assert the
+                // LIMITED_PREVIEW release row by its identity, not by position.
+                .andExpect(jsonPath("$.data[?(@.skillId=='" + id + "' && @.releaseStatus=='LIMITED_PREVIEW')]").exists());
         mockMvc.perform(post("/api/admin/psychology/skills/releases/{id}/{version}/publish", id, version).session(admin))
                 .andExpect(status().isBadRequest());
         mockMvc.perform(post("/api/admin/psychology/skills/releases/{id}/{version}/review", id, version).session(admin)

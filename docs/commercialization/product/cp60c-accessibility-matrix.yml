@@ -1,0 +1,678 @@
+# CP-60C 可达性矩阵（accessibility matrix：J01–J12 × 五端 × 四维度）
+# 来源：蓝图 §7 CP-60 / §8 子门 CP-60C（"完整辅助技术／弱网／跨端J01–J12矩阵"，
+# 依赖 CP-60A、CP-60B 及各声明支持端）；旅程名称照蓝图 §3.2 L115–L130。
+# 契约测试：src/test/java/com/innercosmos/product/AccessibilityMatrixContractTest.java
+#
+# 诚实规则（结构性强制，照 legal-procedures.ledger.yml 范本）：
+# - status ∈ {NOT_STARTED, AUTOMATED_PASS, MANUAL_PENDING}：
+#     NOT_STARTED   尚未开始（当前全矩阵诚实状态）
+#     AUTOMATED_PASS 仅当对应自动化可达性检查真实通过，且同维度 *_evidence
+#                   必须落位指向可复现实证（CI 作业/报告路径），否则契约测试拒绝
+#     MANUAL_PENDING 辅助技术人工测试（读屏/键盘真实设备操作）已排期或进行中，
+#                   完成证据同样只能由 operator 以外部回执落位
+# - **没有任何"完成/done/passed"汇总字段**：一格一个状态，人工与自动证据分开记录，
+#   不以自动化通过冒充人工辅助技术验证，不以单端通过冒充五端通过
+# - 某平台未满足则该平台对应单元格保持真实状态，不得宣称"完全体多端完成"（CP-60 恢复条款）
+# - 行（journey_id）与蓝图 §3.2 的 J01–J12 一一对应；新增端或维度须同步改契约测试
+
+matrix:
+  - journey_id: J01
+    journey: "看懂价值→年龄/账户→渐进同意→首次表达→选择是否记住"
+    platform: web
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J01
+    journey: "看懂价值→年龄/账户→渐进同意→首次表达→选择是否记住"
+    platform: android
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J01
+    journey: "看懂价值→年龄/账户→渐进同意→首次表达→选择是否记住"
+    platform: ios
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J01
+    journey: "看懂价值→年龄/账户→渐进同意→首次表达→选择是否记住"
+    platform: windows
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J01
+    journey: "看懂价值→年龄/账户→渐进同意→首次表达→选择是否记住"
+    platform: harmonyos
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J02
+    journey: "中文自然倾听；"不建议/只帮我理清"立即生效；打断与断流终态明确"
+    platform: web
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J02
+    journey: "中文自然倾听；"不建议/只帮我理清"立即生效；打断与断流终态明确"
+    platform: android
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J02
+    journey: "中文自然倾听；"不建议/只帮我理清"立即生效；打断与断流终态明确"
+    platform: ios
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J02
+    journey: "中文自然倾听；"不建议/只帮我理清"立即生效；打断与断流终态明确"
+    platform: windows
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J02
+    journey: "中文自然倾听；"不建议/只帮我理清"立即生效；打断与断流终态明确"
+    platform: harmonyos
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J03
+    journey: "麦克风按需申请；转写可编辑；静音/耳机/来电/后台/拒绝权限可恢复"
+    platform: web
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J03
+    journey: "麦克风按需申请；转写可编辑；静音/耳机/来电/后台/拒绝权限可恢复"
+    platform: android
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J03
+    journey: "麦克风按需申请；转写可编辑；静音/耳机/来电/后台/拒绝权限可恢复"
+    platform: ios
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J03
+    journey: "麦克风按需申请；转写可编辑；静音/耳机/来电/后台/拒绝权限可恢复"
+    platform: windows
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J03
+    journey: "麦克风按需申请；转写可编辑；静音/耳机/来电/后台/拒绝权限可恢复"
+    platform: harmonyos
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J04
+    journey: "第7/30/90日回访；用户纠正优先；分清事实、推断、冲突与过去状态"
+    platform: web
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J04
+    journey: "第7/30/90日回访；用户纠正优先；分清事实、推断、冲突与过去状态"
+    platform: android
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J04
+    journey: "第7/30/90日回访；用户纠正优先；分清事实、推断、冲突与过去状态"
+    platform: ios
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J04
+    journey: "第7/30/90日回访；用户纠正优先；分清事实、推断、冲突与过去状态"
+    platform: windows
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J04
+    journey: "第7/30/90日回访；用户纠正优先；分清事实、推断、冲突与过去状态"
+    platform: harmonyos
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J05
+    journey: "星空/列表找到来源→纠正→看影响→第二设备看到同一状态"
+    platform: web
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J05
+    journey: "星空/列表找到来源→纠正→看影响→第二设备看到同一状态"
+    platform: android
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J05
+    journey: "星空/列表找到来源→纠正→看影响→第二设备看到同一状态"
+    platform: ios
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J05
+    journey: "星空/列表找到来源→纠正→看影响→第二设备看到同一状态"
+    platform: windows
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J05
+    journey: "星空/列表找到来源→纠正→看影响→第二设备看到同一状态"
+    platform: harmonyos
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J06
+    journey: "一周复盘呈现依据、反例和变化；允许"不是重点""
+    platform: web
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J06
+    journey: "一周复盘呈现依据、反例和变化；允许"不是重点""
+    platform: android
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J06
+    journey: "一周复盘呈现依据、反例和变化；允许"不是重点""
+    platform: ios
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J06
+    journey: "一周复盘呈现依据、反例和变化；允许"不是重点""
+    platform: windows
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J06
+    journey: "一周复盘呈现依据、反例和变化；允许"不是重点""
+    platform: harmonyos
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J07
+    journey: "预约或显式允许的主动关心；可改时间/暂停/取消；锁屏不泄露主题"
+    platform: web
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J07
+    journey: "预约或显式允许的主动关心；可改时间/暂停/取消；锁屏不泄露主题"
+    platform: android
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J07
+    journey: "预约或显式允许的主动关心；可改时间/暂停/取消；锁屏不泄露主题"
+    platform: ios
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J07
+    journey: "预约或显式允许的主动关心；可改时间/暂停/取消；锁屏不泄露主题"
+    platform: windows
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J07
+    journey: "预约或显式允许的主动关心；可改时间/暂停/取消；锁屏不泄露主题"
+    platform: harmonyos
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J08
+    journey: "选侧面→逐项授权→公开预览/试聊可用/禁止信息→沙盒→发布"
+    platform: web
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J08
+    journey: "选侧面→逐项授权→公开预览/试聊可用/禁止信息→沙盒→发布"
+    platform: android
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J08
+    journey: "选侧面→逐项授权→公开预览/试聊可用/禁止信息→沙盒→发布"
+    platform: ios
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J08
+    journey: "选侧面→逐项授权→公开预览/试聊可用/禁止信息→沙盒→发布"
+    platform: windows
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J08
+    journey: "选侧面→逐项授权→公开预览/试聊可用/禁止信息→沙盒→发布"
+    platform: harmonyos
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J09
+    journey: "撤回记忆/共鸣体→旧会话与排队任务停止新使用→逐资产进度"
+    platform: web
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J09
+    journey: "撤回记忆/共鸣体→旧会话与排队任务停止新使用→逐资产进度"
+    platform: android
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J09
+    journey: "撤回记忆/共鸣体→旧会话与排队任务停止新使用→逐资产进度"
+    platform: ios
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J09
+    journey: "撤回记忆/共鸣体→旧会话与排队任务停止新使用→逐资产进度"
+    platform: windows
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J09
+    journey: "撤回记忆/共鸣体→旧会话与排队任务停止新使用→逐资产进度"
+    platform: harmonyos
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J10
+    journey: "相似/互补/意外→理解推荐→试聊→真人慢信→双向往来"
+    platform: web
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J10
+    journey: "相似/互补/意外→理解推荐→试聊→真人慢信→双向往来"
+    platform: android
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J10
+    journey: "相似/互补/意外→理解推荐→试聊→真人慢信→双向往来"
+    platform: ios
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J10
+    journey: "相似/互补/意外→理解推荐→试聊→真人慢信→双向往来"
+    platform: windows
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J10
+    journey: "相似/互补/意外→理解推荐→试聊→真人慢信→双向往来"
+    platform: harmonyos
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J11
+    journey: "静默退出/拉黑→举报/申诉；好友/群组/推荐/推送一致执行"
+    platform: web
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J11
+    journey: "静默退出/拉黑→举报/申诉；好友/群组/推荐/推送一致执行"
+    platform: android
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J11
+    journey: "静默退出/拉黑→举报/申诉；好友/群组/推荐/推送一致执行"
+    platform: ios
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J11
+    journey: "静默退出/拉黑→举报/申诉；好友/群组/推荐/推送一致执行"
+    platform: windows
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J11
+    journey: "静默退出/拉黑→举报/申诉；好友/群组/推荐/推送一致执行"
+    platform: harmonyos
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J12
+    journey: "购买成功但客户端超时→恢复权益→取消/退款→导出/注销"
+    platform: web
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J12
+    journey: "购买成功但客户端超时→恢复权益→取消/退款→导出/注销"
+    platform: android
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J12
+    journey: "购买成功但客户端超时→恢复权益→取消/退款→导出/注销"
+    platform: ios
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J12
+    journey: "购买成功但客户端超时→恢复权益→取消/退款→导出/注销"
+    platform: windows
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null
+  - journey_id: J12
+    journey: "购买成功但客户端超时→恢复权益→取消/退款→导出/注销"
+    platform: harmonyos
+    screen_reader: NOT_STARTED
+    screen_reader_evidence: null
+    keyboard: NOT_STARTED
+    keyboard_evidence: null
+    contrast: NOT_STARTED
+    contrast_evidence: null
+    weak_network: NOT_STARTED
+    weak_network_evidence: null

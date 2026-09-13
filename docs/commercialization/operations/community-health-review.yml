@@ -1,0 +1,26 @@
+# CP-59 社区健康回顾台账（community health review ledger）
+# 契约测试：src/test/java/com/innercosmos/operations/CommunityHealthReviewContractTest.java
+# 蓝图 CP-59（L861-867）：关系指标快照 + 治理 SLA + 申诉复核 + next_action；
+# 主持人培训、90 日成熟关系样本、双方分别确认为 operator 门禁——不存在 agent 可写的
+# "健康/合格"终态，status 只有 PENDING / IN_PROGRESS。
+
+reviews:
+  - review_id: chr-2026-09
+    period: 2026-09（按月）
+    owner: 社区运营
+    relation_quality:
+      metric: RelationQualityReport.threeRoundTripShare
+      latest_value: null          # 由 metrics.relationQuality(anchorWeek) 运行后回填
+      anchor_week: null
+      ci95: null
+    harassment_rate:
+      metric: RelationQualityReport.harassmentPerActiveThread
+      latest_value: null
+      anchor_week: null
+    moderation_sla:
+      source: ModerationCaseService.slaStats()
+      snapshot: null              # 回填 slaStats() 输出摘要
+    appeals_reviewed: null        # 申诉复核记录（evidence 路径）
+    incidents_open: null
+    next_action: 首次回顾待指标有真实运行数据后进行；当前仅结构就位
+    status: PENDING

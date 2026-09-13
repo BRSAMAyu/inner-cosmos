@@ -230,6 +230,30 @@ public class PsychologySkillServiceImpl implements PsychologySkillService {
                     : "重视一种价值，不等于它自动给出唯一正确答案；现实代价和情境同样重要。 ");
             result.put("smallAction", english ? "Name one reversible step that gathers information without locking in either option."
                     : "为两个选择各写一个可逆、能增加信息但不立即锁死决定的小尝试。 ");
+        } else if ("relationship-perspective".equals(skillId)) {
+            result.put("summary", english
+                    ? "You told it from your seat; “" + a.get("theirPossibleStory") + "” is one possible version from theirs — a guess, not their truth."
+                    : "你刚才在自己的位置讲了一遍；「" + a.get("theirPossibleStory") + "」只是对方位置上的一种可能版本——是猜测，不是对方的真实想法。");
+            result.put("alternative", english ? "Neither story has to be wrong for the other to be real."
+                    : "两个版本可以同时成立，不必用这一个否定那一个。 ");
+            result.put("smallAction", english ? "Ask one low-stakes question instead of testing the guess."
+                    : "用一个不带对错的小问题去核对，而不是用行动去测试这个猜测。 ");
+        } else if ("support-preference-mapper".equals(skillId)) {
+            result.put("summary", english
+                    ? "In “" + a.get("hardMoment") + "”, what helped most was “" + a.get("helpedMost") + "”; what helped least was “" + a.get("helpedLeast") + "”."
+                    : "在「" + a.get("hardMoment") + "」里，最有用的支持是「" + a.get("helpedMost") + "」，最没用的反而是「" + a.get("helpedLeast") + "」。");
+            result.put("alternative", english ? "Preferences can differ by person and by day; this is a note, not a verdict."
+                    : "同样的支持对不同人、不同时刻效果不同；这只是记录，不是结论。 ");
+            result.put("smallAction", english ? "Tell one person who cares about you which kind you prefer right now."
+                    : "把「此刻更需要哪一种」告诉一位真正关心你的人。 ");
+        } else if ("cognition-pattern-reflector".equals(skillId)) {
+            result.put("summary", english
+                    ? "“" + a.get("recurringThought") + "” keeps returning around “" + a.get("triggerSituation") + "”; one alternative reading is “" + a.get("alternativeReading") + "”."
+                    : "「" + a.get("recurringThought") + "」总在「" + a.get("triggerSituation") + "」附近回来；换一种读法是：「" + a.get("alternativeReading") + "」。");
+            result.put("alternative", english ? "A recurring thought is a habit of attention, not evidence about reality."
+                    : "反复出现的念头是一种注意习惯，不是关于事实的证据。 ");
+            result.put("smallAction", english ? "Write the thought down once next time, then reread both readings side by side."
+                    : "下次它出现时先原样写下一句，再把两种读法并排放着看。 ");
         } else {
             result.put("summary", english ? "One part moves towards “" + a.get("pullToward") + "”, while another protects you from “" + a.get("pullAway") + "”."
                     : "这份拉扯里，一股力量把你推向「" + a.get("pullToward") + "」，另一股力量在保护你避开「" + a.get("pullAway") + "」。");

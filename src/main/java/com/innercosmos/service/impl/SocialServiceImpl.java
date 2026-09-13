@@ -24,7 +24,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.Map;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -68,6 +70,11 @@ public class SocialServiceImpl implements SocialService {
                 .ne("id", userId)
                 .eq("status", "ACTIVE")
                 .eq("account_kind", "HUMAN");
+        // CP-59 拉黑全触达一致: discovery never surfaces either side of a block relation.
+        Set<Long> blocked = blockedCounterpartIds(userId);
+        if (!blocked.isEmpty()) {
+            query.notIn("id", blocked);
+        }
         if (!queryText.isBlank()) {
             query.and(q -> q.apply("LOWER(username) = LOWER({0})", queryText)
                     .or()
@@ -369,6 +376,13 @@ public class SocialServiceImpl implements SocialService {
                         .eq("group_id", groupId)
                         .orderByDesc("id")
                         .last("LIMIT 100")));
+        // CP-59 拉黑全触达一致: messages from either side of a block relation are
+        // hidden from the reader in shared groups, mirroring letters/plaza.
+        Set<Long> hidden = blockedCounterpartIds(userId);
+        if (!hidden.isEmpty()) {
+            latest.removeIf(message -> message.senderUserId != null
+                    && hidden.contains(message.senderUserId));
+        }
         Collections.reverse(latest);
         return latest.stream().map(this::groupMessageView).toList();
     }
@@ -428,6 +442,19 @@ public class SocialServiceImpl implements SocialService {
 
     /** CP-34: the sender-facing reason for both blocked and recently-declined re-approach. */
     private static final String GENERIC_NOT_ACCEPTING = "对方暂不接受新的好友请求";
+
+    private Set<Long> blockedCounterpartIds(Long userId) {
+        Set<Long> ids = new HashSet<>();
+        for (BlockRelation relation : blockMapper.selectList(
+                new QueryWrapper<BlockRelation>().eq("blocker_user_id", userId))) {
+            ids.add(relation.blockedUserId);
+        }
+        for (BlockRelation relation : blockMapper.selectList(
+                new QueryWrapper<BlockRelation>().eq("blocked_user_id", userId))) {
+            ids.add(relation.blockerUserId);
+        }
+        return ids;
+    }
 
     private boolean isBlocked(Long first, Long second) {
         Long count = blockMapper.selectCount(new QueryWrapper<BlockRelation>()

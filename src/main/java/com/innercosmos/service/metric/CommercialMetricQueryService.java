@@ -21,6 +21,27 @@ public interface CommercialMetricQueryService {
     /** G-TRUST weekly rights-action counts (promise-window SLA lands with CP-15). */
     GTrustWeeklyReport gTrustWeekly(String anchorWeek);
 
+    /**
+     * CP-59 relation quality for one anchor week: the share of active letter threads
+     * with at least three bidirectional round trips (双向往来 ≥3 轮), reported next to
+     * the harassment-incident rate — the two numbers the community-health review reads
+     * together (不以热度催回复：回轮深度才是关系质量，举报率是并列守门).
+     */
+    RelationQualityReport relationQuality(String anchorWeek);
+
+    record RelationQualityReport(
+            String anchorWeek,
+            long activeThreads,
+            long bidirectionalThreads,
+            long threadsWithThreeRoundTrips,
+            double threeRoundTripShare,
+            /** Wilson 95% interval over thread units (one unit per thread). */
+            double shareCi95Low,
+            double shareCi95High,
+            long harassmentIncidents,
+            double harassmentPerActiveThread) {
+    }
+
     record K1WeeklyReport(
             String anchorWeek,
             long privateDenominator,

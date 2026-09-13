@@ -74,7 +74,10 @@ sub_gates:
     stage: S5
     depends_on: ["CP-28", "CP-54B"]
     closes: "至少6项专家审阅技能"
-    status: NOT_STARTED
+    status: IN_PROGRESS
+    delivery_record: evidence/commercial-cn/CP-60/2026-09-13-skills-and-accessibility/delivery-record.md
+    test_command: "./mvnw test -Dtest='PsychologySkillRegistryTest,SkillDisarmamentTest,SkillExpertReviewContractTest'"
+    note: "首个增量：技能3→6(关系视角/支持偏好/认知模式反思,DOI经Crossref逐一验证,全L1 SUGGEST_ONLY零工具)+停用门测试(禁用后新运行拒绝且记忆零变化,历史审计保留,兄弟技能不受波及)+双专家签字台账(6技能x2专家全PENDING)+evaluate三新分支接线;注册≠专家审阅——CP-60A关门=双专家签字(operator门禁)"
   - id: CP-60B
     stage: S5
     depends_on: ["CP-41", "CP-42", "CP-43", "CP-44", "CP-54B"]
@@ -84,7 +87,10 @@ sub_gates:
     stage: S5
     depends_on: ["CP-60A", "CP-60B"]
     closes: "完整辅助技术／弱网／跨端J01–J12矩阵"
-    status: NOT_STARTED
+    status: IN_PROGRESS
+    delivery_record: evidence/commercial-cn/CP-60/2026-09-13-skills-and-accessibility/delivery-record.md
+    test_command: "./mvnw test -Dtest=AccessibilityMatrixContractTest"
+    note: "首个增量：可达性矩阵J01-J12 x五端x四维度60单元格结构化落盘(全NOT_STARTED无完成态汇总)+契约(AUTOMATED_PASS必须带证据);真人读屏/弱网真机/独立研究为operator门禁"
   - id: CP-63A
     stage: S3
     depends_on: ["CP-06", "CP-08", "CP-15", "CP-16", "CP-36", "CP-37", "CP-49", "CP-51A"]
@@ -783,7 +789,10 @@ work_packages:
     stage: S5
     depends_on: ["CP-26", "CP-35", "CP-54", "CP-55"]
     vision_ids: ["V11", "V12", "V13", "V18"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
+    delivery_record: evidence/commercial-cn/CP-59/2026-09-13-relation-quality-and-block-consistency/delivery-record.md
+    test_command: "./mvnw test -Dtest='RelationQualityMetricTest,BlockConsistencyContractTest,CommunityHealthReviewContractTest'"
+    note: "首个增量：RelationQualityReport(回轮深度=min(两侧发送数)≥3占比+Wilson CI+骚扰举报率并列同源于G-SAFE,合成样本4线程精确核对active=4/bidi=3/q=1)+拉黑全触达一致性契约(好友/群邀/发现/慢信过滤/共鸣体同真值/解除恢复)——评审发现并修复两处真实缺口:discoverPeople不排除拉黑对象、listGroupMessages不过滤拉黑发送者;社区健康回顾台账(回轮share与举报率成对快照,无健康终态);90日双方确认为operator门禁"
     evidence_dir: evidence/commercial-cn/CP-59/
   - id: CP-60
     title: "扩展技能、原生HarmonyOS与完整可达性"
@@ -821,7 +830,10 @@ work_packages:
     stage: S3
     depends_on: ["CP-06", "CP-08", "CP-15", "CP-16", "CP-36", "CP-37", "CP-49", "CP-51A"]
     vision_ids: ["V01", "V07", "V13", "V15", "V19"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
+    delivery_record: evidence/commercial-cn/CP-63/2026-09-13-review-calendar/delivery-record.md
+    test_command: "./mvnw test -Dtest=ReviewCalendarContractTest"
+    note: "首个增量：复核日历台账(13条四类齐全,63A只登记S3基线/63B显式覆盖CP-57-60新增暴露面且scope不重叠)+证据有效期引擎(判定表:核验+超期=EXPIRED不可沿用旧PASS,asOf注入不读钟)+EXPIRED阻断契约(任何PASS形态不可作为字段值);独立渗透/红队执行与回执为外部专业方operator门禁"
     evidence_dir: evidence/commercial-cn/CP-63/
   - id: CP-64
     title: "商业评审、组织能力与下一阶段决策"
@@ -829,7 +841,10 @@ work_packages:
     stage: S5
     depends_on: ["CP-47", "CP-55", "CP-56", "CP-59"]
     vision_ids: ["V17", "V18", "V19", "V20"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
+    delivery_record: evidence/commercial-cn/CP-64/2026-09-13-business-decision-guard/delivery-record.md
+    test_command: "./mvnw test -Dtest=BusinessDecisionContractTest"
+    note: "首个增量：商业决策台账护栏(H1/H2/H3各挂CP-03字典键evidence_metrics,PENDING时反例预算null,UNDECIDED无conclusion)+BUSINESS_VALIDATED不可作为字段值只存在于头注——agent可跑完验证永远不能写商业成立;真实留存付费退款数据与创始人决策为operator门禁"
     evidence_dir: evidence/commercial-cn/CP-64/
 
 # 旧账迁移：docs/goal/complete-product-acceptance.yml（69验收项 + 5人工门 + G0–G9）

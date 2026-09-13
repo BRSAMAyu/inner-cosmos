@@ -237,6 +237,64 @@ public class CommercialMetricQueryServiceImpl implements CommercialMetricQuerySe
         return new GTrustWeeklyReport(anchorWeek, byAction, affected);
     }
 
+    @Override
+    public RelationQualityReport relationQuality(String anchorWeek) {
+        // CP-59: threads active in the anchor week, from CONNECTED_REAL_SEND events
+        // (context = LETTER_THREAD id). A "round trip" is order-insensitive and
+        // human-checkable: min(sends by side A, sends by side B) per thread — 回轮深度.
+        List<MetricProjection> sends = eventMapper.projectRange(
+                MetricCode.CONNECTED_REAL_SEND.name(), anchorWeek, anchorWeek);
+        Map<String, Map<String, Long>> sendCountsByThread = new HashMap<>();
+        for (MetricProjection row : sends) {
+            if (row.getContextId() == null || row.getUserId() == null) {
+                continue;
+            }
+            sendCountsByThread
+                    .computeIfAbsent(row.getContextId(), k -> new HashMap<>())
+                    .merge(String.valueOf(row.getUserId()), 1L, Long::sum);
+        }
+        long active = sendCountsByThread.size();
+        long bidirectional = 0;
+        long threeRounds = 0;
+        for (Map<String, Long> counts : sendCountsByThread.values()) {
+            if (counts.size() < 2) {
+                continue; // one-sided sends never form a round trip
+            }
+            bidirectional++;
+            long min = Long.MAX_VALUE;
+            for (long count : counts.values()) {
+                min = Math.min(min, count);
+            }
+            if (min >= 3) {
+                threeRounds++;
+            }
+        }
+        double share = active == 0 ? 0d : threeRounds * 1d / active;
+        double[] ci = wilson95(threeRounds, active);
+        // Harassment incidents share the week's SAFETY_INCIDENT events (same source
+        // G-SAFE reads: live rows + anonymized rollups) so the two reports never
+        // disagree about what an incident is.
+        long incidents = eventMapper.projectRange(
+                MetricCode.SAFETY_INCIDENT.name(), anchorWeek, anchorWeek).size()
+                + rollupCount(MetricCode.SAFETY_INCIDENT.name(), anchorWeek);
+        double perThread = active == 0 ? 0d : incidents * 1d / active;
+        return new RelationQualityReport(anchorWeek, active, bidirectional, threeRounds,
+                share, ci[0], ci[1], incidents, perThread);
+    }
+
+    private static double[] wilson95(long successes, long trials) {
+        if (trials == 0) {
+            return new double[]{0d, 0d};
+        }
+        double z = 1.959963984540054d;
+        double p = successes * 1d / trials;
+        double denominator = 1 + z * z / trials;
+        double centre = p + z * z / (2 * trials);
+        double margin = z * Math.sqrt(p * (1 - p) / trials + z * z / (4 * trials * trials));
+        return new double[]{Math.max(0d, (centre - margin) / denominator),
+                Math.min(1d, (centre + margin) / denominator)};
+    }
+
     private long rollupCount(String metricCode, String anchorWeek) {
         CommercialMetricRollup rollup = rollupMapper.selectOne(
                 new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<CommercialMetricRollup>()
