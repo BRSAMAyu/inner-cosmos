@@ -9,9 +9,10 @@ type Props = {
   loaded: boolean;
   busyClaimId: number | null;
   onLoad: () => void;
-  onSuppress: (claimId: number, reason: string) => void | Promise<void>;
-  onRestore: (claimId: number) => void | Promise<void>;
-  onDelete: (claimId: number, reason: string) => void | Promise<void>;
+  /** CP-21: receives the full row so the caller pins its version (expectedVersion). */
+  onSuppress: (claim: PortraitClaimRow, reason: string) => void | Promise<void>;
+  onRestore: (claim: PortraitClaimRow) => void | Promise<void>;
+  onDelete: (claim: PortraitClaimRow, reason: string) => void | Promise<void>;
   /** CP-23: loads one claim's full version chain (oldest→newest evolution). */
   onLoadHistory: (claimKey: string) => Promise<UnderstandingClaim[]>;
   /** CP-23↔CP-21: opens the dialog session a claim version was extracted from. */
@@ -176,7 +177,7 @@ export function PortraitClaimsPanel({ view, loading, loaded, busyClaimId, onLoad
           onClick={() => openTimeline(claim.claimKey)}>{t.timeline}</button>
         {suppressed ? (
           <AsyncButton busy={busyClaimId === claim.claimId}
-            onClick={() => void runAction(claim.claimId, () => onRestore(claim.claimId))}>{t.restore}</AsyncButton>
+            onClick={() => void runAction(claim.claimId, () => onRestore(claim))}>{t.restore}</AsyncButton>
         ) : (
           <>
             <button type="button" onClick={() => {
@@ -218,7 +219,7 @@ export function PortraitClaimsPanel({ view, loading, loaded, busyClaimId, onLoad
           <AsyncButton busy={busyClaimId === claim.claimId} onClick={() => {
             // CP-21: the draft is only cleared when the action landed; on a version
             // conflict it survives so the owner can redo it after reviewing the latest.
-            void runAction(claim.claimId, () => onSuppress(claim.claimId, reason.trim()))
+            void runAction(claim.claimId, () => onSuppress(claim, reason.trim()))
               .then(landed => {
                 if (landed) {
                   setReasonFor(null);
@@ -235,7 +236,7 @@ export function PortraitClaimsPanel({ view, loading, loaded, busyClaimId, onLoad
           <AsyncButton busy={busyClaimId === claim.claimId} onClick={() => {
             // CP-21: same landing rule as suppress — a conflicted delete keeps its
             // confirmation open instead of pretending it succeeded.
-            void runAction(claim.claimId, () => onDelete(claim.claimId, reason.trim()))
+            void runAction(claim.claimId, () => onDelete(claim, reason.trim()))
               .then(landed => {
                 if (landed) setConfirmingDelete(null);
               });

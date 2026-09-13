@@ -104,14 +104,15 @@ public class CapsuleSandboxServiceImpl implements CapsuleSandboxService {
         if (blockedHit != null) {
             return new CapsuleSandboxVO(capsule.id, null, null, null,
                     question, "", "这个话题没有对你开放：『" + blockedHit + "』。可以问这个侧面已授权的范围。",
-                    List.of("TOPIC_BLOCKED"), false, "仅你可见的共鸣体沙盒，不会发送给其他人。");
+                    List.of("TOPIC_BLOCKED"), false, "仅你可见的共鸣体沙盒，不会发送给其他人。", false);
         }
         CapsuleGenomeVersion genome = selected(capsule);
         SafetyResult safety = safetyService.check(question, ownerUserId, null);
         if (Boolean.TRUE.equals(safety.blockModelCall)) {
             return new CapsuleSandboxVO(capsule.id, genome.id, genome.versionNo, genome.status,
                     question, safety.safeMessage, "安全边界已优先处理", List.of("SAFETY_BLOCKED"),
-                    false, "仅你可见的共鸣体沙盒，不会发送给其他人。");
+                    false, "仅你可见的共鸣体沙盒，不会发送给其他人。",
+                    false); // canned safe copy, not a model reply
         }
 
         Map<String, Object> context = new LinkedHashMap<>();
@@ -133,7 +134,7 @@ public class CapsuleSandboxServiceImpl implements CapsuleSandboxService {
                 && result.reply != null && !result.reply.isBlank();
         return new CapsuleSandboxVO(capsule.id, genome.id, genome.versionNo, genome.status,
                 question, result.reply, result.boundaryNotice, riskFlags, available,
-                "仅你可见的共鸣体沙盒，不会发送给其他人。");
+                "仅你可见的共鸣体沙盒，不会发送给其他人。", available);
     }
 
     @Override

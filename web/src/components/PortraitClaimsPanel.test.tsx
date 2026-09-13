@@ -91,7 +91,7 @@ describe("PortraitClaimsPanel (CP-23)", () => {
     const reasonInput = within(inferredRow).getByPlaceholderText("可选：为什么这不太是你");
     fireEvent.change(reasonInput, { target: { value: "这不太是我" } });
     fireEvent.click(within(inferredRow).getAllByRole("button", { name: "搁置" }).at(-1)!);
-    expect(onSuppress).toHaveBeenCalledExactlyOnceWith(12, "这不太是我");
+    expect(onSuppress).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ claimId: 12 }), "这不太是我");
   });
 
   it("delete is behind an explicit confirmation", () => {
@@ -101,7 +101,7 @@ describe("PortraitClaimsPanel (CP-23)", () => {
     fireEvent.click(within(row).getByRole("button", { name: "删除" }));
     expect(onDelete).not.toHaveBeenCalled();
     fireEvent.click(within(row).getByRole("button", { name: "确认删除" }));
-    expect(onDelete).toHaveBeenCalledExactlyOnceWith(13, "");
+    expect(onDelete).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ claimId: 13 }), "");
   });
 
   it("parked claims live in their own section with restore, and no park/delete actions", () => {
@@ -113,7 +113,7 @@ describe("PortraitClaimsPanel (CP-23)", () => {
     expect(within(parked).queryByRole("button", { name: "搁置" })).not.toBeInTheDocument();
     expect(within(parked).queryByRole("button", { name: "删除" })).not.toBeInTheDocument();
     fireEvent.click(within(parked).getByRole("button", { name: "恢复" }));
-    expect(onRestore).toHaveBeenCalledExactlyOnceWith(20);
+    expect(onRestore).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ claimId: 20 }));
     expect(onSuppress).not.toHaveBeenCalled();
     expect(onDelete).not.toHaveBeenCalled();
   });

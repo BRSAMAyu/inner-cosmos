@@ -1011,12 +1011,21 @@ export function AuroraApp() {
       setPortraitClaimBusyId(null);
     }
   };
-  const suppressPortraitClaim = (claimId: number, reason: string) =>
-    actOnPortraitClaim(claimId, "suppress", () => api.suppressPortraitClaim(claimId, reason || undefined));
-  const restorePortraitClaim = (claimId: number) =>
-    actOnPortraitClaim(claimId, "restore", () => api.restorePortraitClaim(claimId));
-  const deletePortraitClaim = (claimId: number, reason: string) =>
-    actOnPortraitClaim(claimId, "delete", () => api.deletePortraitClaim(claimId, reason || undefined));
+  // CP-21 full chain: pin the row's version so a concurrent edit surfaces as a 409
+  // conflict (isVersionConflictError) instead of silently overwriting the other writer.
+  const claimVersionPin = (claim: { version: string | null }): number | undefined => {
+    const parsed = claim.version == null ? Number.NaN : Number(claim.version);
+    return Number.isFinite(parsed) ? parsed : undefined; // unparsable/absent -> legacy call
+  };
+  const suppressPortraitClaim = (claim: { claimId: number; version: string | null }, reason: string) =>
+    actOnPortraitClaim(claim.claimId, "suppress",
+      () => api.suppressPortraitClaim(claim.claimId, reason || undefined, claimVersionPin(claim)));
+  const restorePortraitClaim = (claim: { claimId: number; version: string | null }) =>
+    actOnPortraitClaim(claim.claimId, "restore",
+      () => api.restorePortraitClaim(claim.claimId, claimVersionPin(claim)));
+  const deletePortraitClaim = (claim: { claimId: number; version: string | null }, reason: string) =>
+    actOnPortraitClaim(claim.claimId, "delete",
+      () => api.deletePortraitClaim(claim.claimId, reason || undefined, claimVersionPin(claim)));
 
   const loadPortraitHistory = async (dim: string) => {
     if (portraitHistory[dim]) return;

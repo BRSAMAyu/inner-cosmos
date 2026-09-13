@@ -25,25 +25,28 @@ public class PortraitController extends BaseController {
     @PostMapping("/claims/{claimId}/suppress")
     public ApiResponse<com.innercosmos.entity.UnderstandingClaim> suppress(
             @PathVariable Long claimId, @RequestBody(required = false) java.util.Map<String, String> body,
+            @RequestParam(required = false) Integer expectedVersion,
             HttpSession session) {
         return ApiResponse.ok(claimControlService.suppress(currentUserId(session), claimId,
-                body == null ? null : body.get("reason")));
+                body == null ? null : body.get("reason"), expectedVersion));
     }
 
     /** CP-23 恢复: un-park a previously suppressed claim. */
     @PostMapping("/claims/{claimId}/restore")
     public ApiResponse<com.innercosmos.entity.UnderstandingClaim> restore(
-            @PathVariable Long claimId, HttpSession session) {
-        return ApiResponse.ok(claimControlService.restore(currentUserId(session), claimId));
+            @PathVariable Long claimId, @RequestParam(required = false) Integer expectedVersion,
+            HttpSession session) {
+        return ApiResponse.ok(claimControlService.restore(currentUserId(session), claimId, expectedVersion));
     }
 
     /** CP-23 删除: owner removes a claim outright — soft-deleted with an audit row. */
     @DeleteMapping("/claims/{claimId}")
     public ApiResponse<com.innercosmos.entity.UnderstandingClaim> delete(
             @PathVariable Long claimId, @RequestBody(required = false) java.util.Map<String, String> body,
+            @RequestParam(required = false) Integer expectedVersion,
             HttpSession session) {
         return ApiResponse.ok(claimControlService.delete(currentUserId(session), claimId,
-                body == null ? null : body.get("reason")));
+                body == null ? null : body.get("reason"), expectedVersion));
     }
 
     @GetMapping

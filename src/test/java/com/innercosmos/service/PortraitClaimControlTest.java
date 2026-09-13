@@ -70,10 +70,10 @@ class PortraitClaimControlTest {
         UnderstandingClaim claim = inferred(owner, "表达习惯", "喜欢长段落自我分析");
         User stranger = human("cp23x");
 
-        assertThatThrownBy(() -> claimControl.suppress(stranger.id, claim.id, "不是我"))
+        assertThatThrownBy(() -> claimControl.suppress(stranger.id, claim.id, "不是我", null))
                 .hasMessageContaining("找不到");
 
-        var suppressed = claimControl.suppress(owner.id, claim.id, "这不太是我");
+        var suppressed = claimControl.suppress(owner.id, claim.id, "这不太是我", null);
         assertThat(suppressed.status).isEqualTo("SUPPRESSED");
         assertThat(suppressed.version).isEqualTo(2);
 
@@ -94,17 +94,17 @@ class PortraitClaimControlTest {
         assertThat(audit.reason).isEqualTo("这不太是我");
 
         // Restore brings it back — still owner-scoped.
-        assertThatThrownBy(() -> claimControl.restore(stranger.id, claim.id))
+        assertThatThrownBy(() -> claimControl.restore(stranger.id, claim.id, null))
                 .hasMessageContaining("找不到");
-        var restored = claimControl.restore(owner.id, claim.id);
+        var restored = claimControl.restore(owner.id, claim.id, null);
         assertThat(restored.status).isEqualTo("ACTIVE");
         assertThat(restored.version).isEqualTo(3);
         assertThat(portraitView.view(owner.id).claims().stream()
                 .anyMatch(row -> "表达习惯".equals(row.claimKey()))).isTrue();
 
         // Only an ACTIVE claim can be parked; a suppressed one cannot be parked again.
-        claimControl.suppress(owner.id, claim.id, null);
-        assertThatThrownBy(() -> claimControl.suppress(owner.id, claim.id, null))
+        claimControl.suppress(owner.id, claim.id, null, null);
+        assertThatThrownBy(() -> claimControl.suppress(owner.id, claim.id, null, null))
                 .hasMessageContaining("只有当前有效的理解才能");
     }
 
@@ -113,13 +113,13 @@ class PortraitClaimControlTest {
         User owner = human("cp23d");
         UnderstandingClaim claim = inferred(owner, "支持偏好", "需要具体的行动建议");
 
-        var deleted = claimControl.delete(owner.id, claim.id, "我不想保留这条");
+        var deleted = claimControl.delete(owner.id, claim.id, "我不想保留这条", null);
         assertThat(deleted.status).isEqualTo("DELETED");
         assertThat(portraitView.view(owner.id).claims()).isEmpty();
         assertThat(claimMapper.selectList(new QueryWrapper<UnderstandingClaim>()
                 .eq("user_id", owner.id).eq("status", "ACTIVE"))).isEmpty();
 
-        assertThatThrownBy(() -> claimControl.delete(owner.id, claim.id, "again"))
+        assertThatThrownBy(() -> claimControl.delete(owner.id, claim.id, "again", null))
                 .hasMessageContaining("已被删除");
         // The audit row outlives the claim's visibility.
         assertThat(correctionMapper.selectCount(new QueryWrapper<UserCorrection>()

@@ -1105,14 +1105,26 @@ export const api = {
     `/api/aurora/corrections/claims?claimKey=${encodeURIComponent(claimKey)}`),
   /** CP-23: the correctable-portrait view, including the owner's parked claims. */
   portraitClaimsView: () => request<PortraitClaimsView>("/api/aurora/corrections/portrait"),
-  suppressPortraitClaim: (claimId: number, reason?: string) =>
-    request<UnderstandingClaim>(`/api/portrait/claims/${claimId}/suppress`, {
+  /**
+   * CP-21 backend half: the three owner actions are transitions on an existing claim row and
+   * accept `expectedVersion` — the claim's `version` the caller last rendered
+   * (PortraitClaimRow.version, already returned by the view). A stale pin comes back
+   * 409 / code CONFLICT, which isVersionConflictError and the per-claim banner light up on.
+   * Omitted → legacy no-pin call (the server still refuses to lose a racing update).
+   */
+  suppressPortraitClaim: (claimId: number, reason?: string, expectedVersion?: number) =>
+    request<UnderstandingClaim>(`/api/portrait/claims/${claimId}/suppress${
+      expectedVersion == null ? "" : `?expectedVersion=${encodeURIComponent(String(expectedVersion))}`}`, {
       method: "POST", body: JSON.stringify(reason ? { reason } : {})
     }),
-  restorePortraitClaim: (claimId: number) =>
-    request<UnderstandingClaim>(`/api/portrait/claims/${claimId}/restore`, { method: "POST" }),
-  deletePortraitClaim: (claimId: number, reason?: string) =>
-    request<UnderstandingClaim>(`/api/portrait/claims/${claimId}`, {
+  restorePortraitClaim: (claimId: number, expectedVersion?: number) =>
+    request<UnderstandingClaim>(`/api/portrait/claims/${claimId}/restore${
+      expectedVersion == null ? "" : `?expectedVersion=${encodeURIComponent(String(expectedVersion))}`}`, {
+      method: "POST"
+    }),
+  deletePortraitClaim: (claimId: number, reason?: string, expectedVersion?: number) =>
+    request<UnderstandingClaim>(`/api/portrait/claims/${claimId}${
+      expectedVersion == null ? "" : `?expectedVersion=${encodeURIComponent(String(expectedVersion))}`}`, {
       method: "DELETE", body: JSON.stringify(reason ? { reason } : {})
     }),
   recentCorrections: () => request<UserCorrection[]>("/api/aurora/corrections"),

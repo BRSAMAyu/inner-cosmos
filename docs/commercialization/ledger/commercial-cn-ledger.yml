@@ -288,10 +288,10 @@ work_packages:
     vision_ids: ["V07", "V13", "V15"]
     status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-16/
-    delivery_record: evidence/commercial-cn/CP-16/2026-09-06-threat-model/delivery-record.md
-    test_command: "./mvnw test -Dtest=SecurityThreatModelNegativeTest"
-    note: "首个增量：九类威胁模型v1+高危自动负测4/4(登录枚举一致/CSRF 403/admin拒绝/凭据硬拦)；MFA与渗透清单后续"
-    next_action: "管理员MFA随身份通道；独立渗透清单CP-63A前"
+    delivery_record: evidence/commercial-cn/CP-16/2026-09-14-pentest-scope/delivery-record.md
+    test_command: "./mvnw test -Dtest=IndependentPentestScopeContractTest"
+    note: "首个增量：九类威胁模型v1+高危自动负测4/4(登录枚举一致/CSRF 403/admin拒绝/凭据硬拦)；MFA与渗透清单后续；第二增量：独立渗透范围文档9章(攻击面grep实测/S1-S9矩阵映射T1-T9/内部已覆盖30+测试类vs四项必独立验证面/验收SLA/操作者占位符)+契约测试6用例(无已渗透字样)；定位为采购输入非渗透结果"
+    next_action: "独立渗透执行属operator门禁(采购第三方服务按本文档scope)；TOTP MFA骨架可选半边"
   - id: CP-17
     title: "国内全链路模型网关"
     owner: "AI平台"
@@ -348,10 +348,10 @@ work_packages:
     vision_ids: ["V05", "V06"]
     status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-21/
-    delivery_record: evidence/commercial-cn/CP-21/2026-09-13-conflict-refresh-ui/delivery-record.md
-    test_command: "npm test -- --run src/components/PortraitClaimsPanel.test.tsx"
-    note: "三增量：①来源图回放+撤回不可回放；②合并/冲突/并发编辑硬边界(expectedVersion乐观并发+终态/链分叉防护+回退前行核对)；③重复事件去重与版本归并——MemoryRecurrenceMatcher(0.60字符二元组余弦)重述折叠进既有记忆(REINFORCE/DUPLICATE_EVENT_DEDUP审计行),FORGOTTEN与tombstone行不可吸收；第三增量：统一409冲突码通道(不解析中文消息)+PortraitClaimsPanel/BeliefGallery冲突提示条(他人已更新→查看最新)+本地草稿仅在落库后清除(不静默丢弃)；Belief/Portrait端点expectedVersion接入后即完整生效"
-    next_action: "Belief/Portrait编辑端点补expectedVersion乐观锁(服务层)；多标签页冲突的切回可见性验证"
+    delivery_record: evidence/commercial-cn/CP-21/2026-09-14-portrait-optimistic-lock/delivery-record.md
+    test_command: "./mvnw test -Dtest='PortraitClaimOptimisticLockTest,BeliefEditEndpointLockStatusTest'"
+    note: "三增量：①来源图回放+撤回不可回放；②合并/冲突/并发编辑硬边界(expectedVersion乐观并发+终态/链分叉防护+回退前行核对)；③重复事件去重与版本归并——MemoryRecurrenceMatcher(0.60字符二元组余弦)重述折叠进既有记忆(REINFORCE/DUPLICATE_EVENT_DEDUP审计行),FORGOTTEN与tombstone行不可吸收；第三增量：统一409冲突码通道(不解析中文消息)+PortraitClaimsPanel/BeliefGallery冲突提示条(他人已更新→查看最新)+本地草稿仅在落库后清除(不静默丢弃)；Belief/Portrait端点expectedVersion接入后即完整生效；第四增量：portrait三编辑端点真乐观锁(expectedVersion原子条件UPDATE,旧pin 409,legacy兼容,版本列复用既有understanding_claim.version)+前端全链接通(面板传行/AuroraApp传pin)——冲突条端到端生效；belief recalculate无版本列不造假锁停负测层"
+    next_action: "belief recalculate乐观锁待tb_belief_pattern加版本列(schema决策)后接入"
   - id: CP-22
     title: "任务化检索与真实向量质量"
     owner: "检索工程＋AI评测"
@@ -372,10 +372,10 @@ work_packages:
     vision_ids: ["V05", "V06", "V11"]
     status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-23/
-    delivery_record: evidence/commercial-cn/CP-11/2026-09-06-state-matrix/delivery-record.md
-    test_command: "./mvnw test -Dtest=StateMatrixAndPortraitAndPersonaTest"
-    note: "三增量：①画像四态视图+未知不补齐+无分数;②属主控制(搁置/恢复/删除+PORTRAIT_CLAIM审计行+视图与Aurora上下文双清空)+J04旅程;③前端PortraitClaimsPanel(状态徽章/来源/版本/未知计数,搁置带理由,删除需确认,搁置区恢复,懒加载)"
-    next_action: "信念变化时间线视图；非作者评审招募材料(CP-12联动)"
+    delivery_record: evidence/commercial-cn/CP-23/2026-09-14-non-author-recruitment/delivery-record.md
+    test_command: "./mvnw test -Dtest=NonAuthorReviewRecruitmentContractTest"
+    note: "三增量：①画像四态视图+未知不补齐+无分数;②属主控制(搁置/恢复/删除+PORTRAIT_CLAIM审计行+视图与Aurora上下文双清空)+J04旅程;③前端PortraitClaimsPanel(状态徽章/来源/版本/未知计数,搁置带理由,删除需确认,搁置区恢复,懒加载)；第五增量：非作者评审招募材料10章(任务书猜测员工JD被对照清单原文诚实纠正;蓝图CP-12/CP-02逐条映射,使命逐字引用,投放文案占位符,失败保留纪律)+契约测试7用例；员工JD未写因蓝图无编制假设"
+    next_action: "招募执行属CP-12A operator门禁；员工JD如需待操作者定编制"
   - id: CP-24
     title: "星空、复盘与行动工具闭环"
     owner: "产品前后端"
@@ -469,9 +469,9 @@ work_packages:
     status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-31/
     delivery_record: evidence/commercial-cn/CP-31/2026-09-13-ai-labeling-propagation/delivery-record.md
-    test_command: "./mvnw test -Dtest=CapsuleAiGeneratedLabelingTest"
-    note: "首个增量：撤回不穿透(persona入口tombstone+深链NOT_FOUND,含备份复活模拟)+公开索引只收准版本；第二增量：全外流面AI标识传播——三级标注(aiGenerated/systemCompiled/ownerWritten,纠正清单错误假设:contextPreview系规则编译非AI)+persona-chat访客回复aiGenerated+导出包digest前注入+share-card契约字段；缓存排查如实无缓存即无失效面；6新测试"
-    next_action: "CapsuleSandboxVO/user-mirror preview(需service层出处信号)/SyncController待后续；行级provenance列；前端消费标注字段"
+    test_command: "./mvnw test -Dtest='CapsuleAiGeneratedLabelingTest,SandboxAiLabelingTest'"
+    note: "首个增量：撤回不穿透(persona入口tombstone+深链NOT_FOUND,含备份复活模拟)+公开索引只收准版本；第二增量：全外流面AI标识传播——三级标注(aiGenerated/systemCompiled/ownerWritten,纠正清单错误假设:contextPreview系规则编译非AI)+persona-chat访客回复aiGenerated+导出包digest前注入+share-card契约字段；缓存排查如实无缓存即无失效面；6新测试；残余闭合增量：CapsuleSandboxVO补aiGenerated(仅真实模型回复true,topic/safety拦截与unavailable回退的罐头文案恒false)+SandboxAiLabelingTest 2/2；主线程同批修后端星域闭锁根因(编码关闭时color/glow仍泄露gravity,三通道一起中性化)"
+    next_action: "user-mirror/preview的service层出处信号(需重构返回携带provenance)登记后续"
   - id: CP-32
     title: "多目标匹配与可解释排序"
     owner: "推荐＋产品"
