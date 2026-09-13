@@ -219,7 +219,7 @@ work_packages:
     owner: "前端＋客户端"
     stage: S1
     depends_on: ["CP-09"]
-    vision_ids: ["V02", "V03", "V14"]
+    vision_ids: ["V02", "V14"]
     status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-11/
     delivery_record: evidence/commercial-cn/CP-11/2026-09-06-state-matrix/delivery-record.md
@@ -339,7 +339,7 @@ work_packages:
     owner: "记忆系统"
     stage: S1
     depends_on: ["CP-14", "CP-15", "CP-17"]
-    vision_ids: ["V05", "V06", "V07"]
+    vision_ids: ["V05", "V06"]
     status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-21/
     delivery_record: evidence/commercial-cn/CP-21/2026-09-12-merge-conflict-guards/delivery-record.md
@@ -539,7 +539,7 @@ work_packages:
     owner: "SRE＋运行时"
     stage: S1
     depends_on: ["CP-37", "CP-39"]
-    vision_ids: ["V08", "V15"]
+    vision_ids: ["V15"]
     status: IN_PROGRESS
     delivery_record: evidence/commercial-cn/CP-49/2026-09-12-supply-chain/delivery-record.md
     test_command: "cd web && npm test -- --run src/PackageManagerContract.test.ts"
@@ -551,7 +551,7 @@ work_packages:
     owner: "数据平台＋集成负责人"
     stage: S1
     depends_on: ["CP-01"]
-    vision_ids: ["V05", "V07", "V15"]
+    vision_ids: ["V15"]
     status: IN_PROGRESS
     delivery_record: evidence/commercial-cn/CP-39/2026-09-12-outbox-reliability/delivery-record.md
     test_command: "./mvnw test -Dtest=OutboxReliabilityContractTest"
@@ -700,7 +700,7 @@ work_packages:
     owner: "法务＋发行＋运营主体"
     stage: S2
     depends_on: ["CP-05", "CP-06", "CP-07", "CP-08", "CP-13", "CP-14", "CP-15", "CP-16", "CP-17", "CP-20", "CP-36", "CP-37", "CP-44", "CP-50A"]
-    vision_ids: ["V01", "V13", "V14", "V19"]
+    vision_ids: ["V01", "V13", "V19"]
     status: IN_PROGRESS
     delivery_record: evidence/commercial-cn/CP-51/2026-09-13-regulatory-ledgers/delivery-record.md
     test_command: "./mvnw test -Dtest=RegulatoryLedgerContractTest"
@@ -772,7 +772,10 @@ work_packages:
     stage: S5
     depends_on: ["CP-15", "CP-30", "CP-54", "CP-63A"]
     vision_ids: ["V07", "V10", "V16", "V20"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
+    delivery_record: evidence/commercial-cn/CP-58/2026-09-13-facet-isolation/delivery-record.md
+    test_command: "./mvnw test -Dtest='FacetIsolationBankContractTest,FacetIsolationEvaluationTest,FacetRevocationConcurrencyTest'"
+    note: "首个增量：facet-isolation-bank-v1冻结集(10用户x3侧面x450探针,确定性生成器SHA 2eb7cd02,探针不含被钓词项命中必为泄露)+隔离评测(真实路径:simulatorOnly/独立grant/沙盒应答/编译产物全量扫描:确定性泄露0,推断率0.0,CI上界0.0082<0.55,公开拒绝60/60,访客拒绝30/30,广场0上架)+8线程撤回并发(撤回后零命中零复活,回执ERASED,爆炸半径隔离);仅EVALUATION_EXECUTED,来源用户评价/用途合同/B2B为operator门禁"
     evidence_dir: evidence/commercial-cn/CP-58/
   - id: CP-59
     title: "长期关系与高质量社区"
@@ -795,8 +798,11 @@ work_packages:
     owner: "产品所有者＋独立验收组"
     stage: S5
     depends_on: ["CP-52", "CP-56", "CP-57", "CP-58", "CP-59", "CP-60", "CP-62", "CP-63B", "CP-64"]
-    vision_ids: ["V01"]
-    status: NOT_STARTED
+    vision_ids: []
+    status: IN_PROGRESS
+    delivery_record: evidence/commercial-cn/CP-61/2026-09-13-vision-traceability-guard/delivery-record.md
+    test_command: "./mvnw test -Dtest=VisionTraceabilityContractTest"
+    note: "首个增量(结构护栏,早写测试晚关包门)：77节点闭包(子门⇄父包双向隐含边建模,无环)+§11的V01-V20↔台账vision_ids互逆校验+三终局判定(PRODUCT_READY/CN_RELEASE_READY/BUSINESS_VALIDATED)不可作为status存在;护栏即时抓到并修复6包vision_ids漂移(CP-11/21/38/39/51/61,按蓝图权威对齐);独立签字/旅程串联为S5 operator门禁"
     evidence_dir: evidence/commercial-cn/CP-61/
   - id: CP-62
     title: "持续经营、停服与用户资产迁移"

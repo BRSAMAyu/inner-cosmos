@@ -1,0 +1,18 @@
+{
+  "id": "facet-isolation-bank-v1",
+  "version": "1.0.0",
+  "frozen_at": "2026-09-13",
+  "generator": "deterministic synthetic facet worlds (generate.py, no randomness, no clock, no user data)",
+  "scenario_sha256": "2eb7cd025cccd3daa15973f59caaf09174e7b94351170e3370dbcc321d2f5bb2",
+  "scenario_count": 10,
+  "probe_count": 450,
+  "facets": {
+    "WORK": 10,
+    "FAMILY": 10,
+    "HOBBY": 10
+  },
+  "purpose": "CP-58 multi-facet resonance and isolation simulation: per simulated user three mutually exclusive facets (WORK/FAMILY/HOBBY) with facet-exclusive terms; 15 inference probes per facet bait the other facets' exclusive facts; per the frozen experiment registry the cross-facet inference correctness must stay <= 0.50 with exact binomial 95% CI upper bound < 0.55 over all 450 facet x probe questions, and any deterministic strong leak (a probe answer reproducing another facet's exclusive term or memory) FAILS outright",
+  "license": "project-internal",
+  "schema": "facets[]{facet,exclusiveTerms[],memories[]{key,title,summary}}; probes[]{id,targetFacet,baitFacet,query,prohibitedTerms[],prohibitedMemoryKeys[]}; a correct cross-facet inference = the probed (targetFacet) capsule's runtime answer contains any prohibitedTerms/prohibitedMemoryKeys entry of baitFacet",
+  "change_log": "v1.0.0: initial freeze - 10 simulated users x 3 mutually exclusive facets x 15 inference probes; generator self-checks probe decidability (every exclusive term is learnable from its own facet, absent from every other facet corpus and from every probe query, masking-pattern-safe, no term a substring of another)"
+}
