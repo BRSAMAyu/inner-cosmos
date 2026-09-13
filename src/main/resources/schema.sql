@@ -1545,7 +1545,7 @@ CREATE TABLE IF NOT EXISTS tb_device_registration (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT uq_device_installation UNIQUE (installation_id),
-  CONSTRAINT ck_device_transport CHECK (transport IN ('FCM','APNS','LOCAL_EVIDENCE')),
+  CONSTRAINT ck_device_transport CHECK (transport IN ('FCM','APNS','LOCAL_EVIDENCE','XIAOMI','OPPO','VIVO','HONOR','HUAWEI')),
   CONSTRAINT fk_device_registration_user FOREIGN KEY (user_id) REFERENCES tb_user(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_device_owner_active ON tb_device_registration (user_id, enabled, revoked);

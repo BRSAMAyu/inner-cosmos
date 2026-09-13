@@ -576,7 +576,11 @@ work_packages:
     stage: S2
     depends_on: ["CP-11", "CP-13", "CP-26", "CP-27", "CP-44"]
     vision_ids: ["V08", "V14"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
+    delivery_record: evidence/commercial-cn/CP-41/2026-09-13-mainland-vendor-transports/delivery-record.md
+    test_command: "./mvnw test -Dtest=MainlandVendorPushContractTest,MainlandVendorDispatchTest"
+    note: "首个增量：服务端五家大陆厂商传输(小米/OPPO/vivo/荣耀/华为)接入既有V21推送体系——网关凭据门禁fail-closed(EXTERNAL_CREDENTIAL_GATE,不伪造providerMessageId不撤token),V46放开注册白名单@Pattern与CHECK约束,fan-out不分通道(厂商问题投递时裁决);顺带修复既有真bug:enqueueWakeIntent的ON CONFLICT在H2 MySQL模式不可解析→方言分支INSERT IGNORE;5/5契约,PG基线46/104/97/27实机"
+    next_action: "各厂商REST协议接线与密钥为operator渠道合同门禁；真机矩阵(三运营商/前后台/杀进程/通知关闭)为operator门禁"
     evidence_dir: evidence/commercial-cn/CP-41/
   - id: CP-42
     title: "iOS中国区与系统能力"

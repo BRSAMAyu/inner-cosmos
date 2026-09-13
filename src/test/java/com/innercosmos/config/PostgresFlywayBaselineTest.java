@@ -64,9 +64,10 @@ class PostgresFlywayBaselineTest {
         // V42 (CP-36) adds the moderation case backend.
         // V44 (CP-46) adds the unified entitlement state machine tables.
         // V45 (CP-45) adds the server-side payment order catalog.
+        // V46 (CP-41) admits mainland vendor push transports into the device registry.
         // It exists as a forward migration rather than an in-place edit of V30 because V30 is
         // already committed and rewriting it would break Flyway checksums on live databases.
-        assertEquals(45, flyway.migrate().migrationsExecuted);
+        assertEquals(46, flyway.migrate().migrationsExecuted);
         assertEquals(0, flyway.migrate().migrationsExecuted);
 
         String source = readClasspath("schema.sql");
@@ -172,7 +173,7 @@ class PostgresFlywayBaselineTest {
         // commercial-cn metric event store, the adult gate, the consent center,
         // identity verification, retraction tombstones, crisis continuity and the
         // moderation case backend).
-        assertEquals(26, v20.migrate().migrationsExecuted);
+        assertEquals(27, v20.migrate().migrationsExecuted);
         try (Connection migrated = DriverManager.getConnection(
                 jdbcUrl, POSTGRES.getUsername(), POSTGRES.getPassword())) {
             assertEquals(2, scalar(migrated,

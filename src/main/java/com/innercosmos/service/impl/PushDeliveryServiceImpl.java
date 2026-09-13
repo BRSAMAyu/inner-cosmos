@@ -10,7 +10,22 @@ import java.util.List;
 @Service
 public class PushDeliveryServiceImpl implements PushDeliveryService {
     private final JdbcTemplate jdbc;
-    public PushDeliveryServiceImpl(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+    private final boolean postgres;
+    public PushDeliveryServiceImpl(JdbcTemplate jdbc) {
+        this.jdbc = jdbc;
+        this.postgres = detectPostgres(jdbc);
+    }
+
+    /** Same dialect probe as JdbcOutboxRepository: PG keeps ON CONFLICT; H2's MySQL mode
+     *  cannot parse it at all (verified: org.h2 JDBCSQLSyntaxErrorException), so it gets
+     *  INSERT IGNORE — both are the same idempotent-skip-on-unique semantics. */
+    private static boolean detectPostgres(JdbcTemplate jdbc) {
+        try (java.sql.Connection c = jdbc.getDataSource().getConnection()) {
+            return c.getMetaData().getURL().contains(":postgresql:");
+        } catch (Exception e) {
+            return false;
+        }
+    }
 
     @Override @Transactional
     public void enqueueWakeIntent(Long userId, Long wakeIntentId, String title, String body) {
@@ -20,12 +35,19 @@ public class PushDeliveryServiceImpl implements PushDeliveryService {
             "SELECT id FROM tb_device_registration WHERE user_id=? AND enabled=TRUE AND revoked=FALSE",
             Long.class, userId);
         String deepLink = "innercosmos://aurora/wake/" + wakeIntentId;
-        for (Long deviceId : deviceIds) {
-            jdbc.update("""
+        // CP-41 fix: the H2/MySQL twin cannot parse ON CONFLICT (a latent runtime failure
+        // surfaced by the mainland-vendor contract test) — branch like the outbox does.
+        String insert = postgres ? """
                 INSERT INTO tb_push_delivery (user_id,device_id,wake_intent_id,title,body,deep_link,status,next_attempt_at,created_at,updated_at)
                 VALUES (?,?,?,?,?,?,'PENDING',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
                 ON CONFLICT (wake_intent_id,device_id) DO NOTHING
-                """, userId, deviceId, wakeIntentId, title, body, deepLink);
+                """
+                : """
+                INSERT IGNORE INTO tb_push_delivery (user_id,device_id,wake_intent_id,title,body,deep_link,status,next_attempt_at,created_at,updated_at)
+                VALUES (?,?,?,?,?,?,'PENDING',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+                """;
+        for (Long deviceId : deviceIds) {
+            jdbc.update(insert, userId, deviceId, wakeIntentId, title, body, deepLink);
         }
     }
 }
