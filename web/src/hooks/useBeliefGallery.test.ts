@@ -10,7 +10,11 @@ vi.mock("../api", () => ({
     beliefByCategory: vi.fn(),
     beliefStrong: vi.fn(),
     beliefContradictions: vi.fn()
-  }
+  },
+  // Faithful to the real discriminator: only code CONFLICT (the backend's HTTP 409
+  // channel) counts as a version conflict; BAD_REQUEST must never trip it.
+  isVersionConflictError: (error: unknown) =>
+    error instanceof Error && (error as { code?: string }).code === "CONFLICT"
 }));
 
 const belief = (overrides: Partial<BeliefPattern> = {}): BeliefPattern => ({
@@ -93,5 +97,48 @@ describe("useBeliefGallery -- filters", () => {
     const { result, setStatus } = setup();
     await act(async () => { await result.current.selectFilter("strong"); });
     expect(setStatus).toHaveBeenCalledWith("暂时无法加载");
+  });
+});
+
+describe("useBeliefGallery -- CP-21 conflict refresh", () => {
+  const conflictError = () => Object.assign(new Error("version is stale"), { code: "CONFLICT" });
+  const plainError = () => Object.assign(new Error("只有当前有效的理解才能搁置"), { code: "BAD_REQUEST" });
+
+  it("a 409/code-CONFLICT failure raises the conflict state instead of a generic status", async () => {
+    vi.mocked(api.beliefStrong).mockRejectedValue(conflictError());
+    const { result, setStatus } = setup();
+    await act(async () => { await result.current.selectFilter("strong"); });
+    expect(result.current.conflict).toBe(true);
+    expect(setStatus).not.toHaveBeenCalled();
+  });
+
+  it("refreshFromConflict clears the state and re-pulls the lists from the server", async () => {
+    vi.mocked(api.beliefStrong).mockRejectedValueOnce(conflictError());
+    vi.mocked(api.beliefList).mockResolvedValue([belief()]);
+    vi.mocked(api.beliefContradictions).mockResolvedValue([]);
+    const { result } = setup();
+    await act(async () => { await result.current.selectFilter("strong"); });
+    expect(result.current.conflict).toBe(true);
+
+    await act(async () => { result.current.refreshFromConflict(); });
+    expect(result.current.conflict).toBe(false);
+    expect(api.beliefList).toHaveBeenCalled();
+    expect(result.current.beliefs).toHaveLength(1);
+  });
+
+  it("a non-conflict failure keeps the conflict state off (不误报)", async () => {
+    vi.mocked(api.beliefStrong).mockRejectedValue(plainError());
+    const { result, setStatus } = setup();
+    await act(async () => { await result.current.selectFilter("strong"); });
+    expect(result.current.conflict).toBe(false);
+    expect(setStatus).toHaveBeenCalledOnce();
+  });
+
+  it("dismissConflict closes the banner without refetching", async () => {
+    vi.mocked(api.beliefStrong).mockRejectedValueOnce(conflictError());
+    const { result } = setup();
+    await act(async () => { await result.current.selectFilter("strong"); });
+    act(() => { result.current.dismissConflict(); });
+    expect(result.current.conflict).toBe(false);
   });
 });

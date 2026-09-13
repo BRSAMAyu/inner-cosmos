@@ -69,7 +69,10 @@ class PostgresOutboxReliabilityTest {
                 POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
         jdbc = new JdbcTemplate(dataSource);
         repository = new JdbcOutboxRepository(jdbc, new DataSourceTransactionManager(dataSource));
-        retractionHandler = new DataRetractedProjectionHandler(new ObjectMapper());
+        // CP-15: the handler now also drives the per-asset derivative cleanup; this test pins
+        // the outbox lifecycle itself, so it injects a no-op executor (functional interface)
+        // instead of the full H2/Spring-backed implementation.
+        retractionHandler = new DataRetractedProjectionHandler(new ObjectMapper(), command -> List.of());
     }
 
     @Test

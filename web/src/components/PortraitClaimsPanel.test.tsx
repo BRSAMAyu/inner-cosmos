@@ -3,6 +3,17 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PortraitClaimsView, UnderstandingClaim } from "../api";
 import { PortraitClaimsPanel } from "./PortraitClaimsPanel";
 
+// CP-21: the panel detects version conflicts through the api module's code channel
+// (ApiCodeError with code "CONFLICT" — the backend's HTTP 409). The mock keeps the
+// exact same discrimination so a BAD_REQUEST can never masquerade as a conflict.
+vi.mock("../api", () => ({
+  isVersionConflictError: (error: unknown) =>
+    error instanceof Error && (error as { code?: string }).code === "CONFLICT"
+}));
+
+const conflictError = () => Object.assign(new Error("version is stale"), { code: "CONFLICT" });
+const plainError = () => Object.assign(new Error("只有当前有效的理解才能搁置"), { code: "BAD_REQUEST" });
+
 afterEach(cleanup);
 
 const view: PortraitClaimsView = {
@@ -161,5 +172,89 @@ describe("PortraitClaimsPanel (CP-23)", () => {
       locale="en-SG" />);
     expect(screen.getByText("Aurora hasn't formed any understanding of you yet.")).toBeInTheDocument();
     expect(screen.getByText(/5 more dimensions are honestly unknown/)).toBeInTheDocument();
+  });
+});
+
+describe("PortraitClaimsPanel (CP-21 conflict refresh)", () => {
+  function claimRowByState(state: string) {
+    return screen.getAllByRole("listitem").find(row => within(row).queryByText(state))!;
+  }
+
+  it("a 409/version conflict on suppress raises the honest banner and KEEPS the local draft", async () => {
+    const onSuppress = vi.fn(() => Promise.reject(conflictError()));
+    render(<PortraitClaimsPanel view={view} loading={false} loaded={true} busyClaimId={null}
+      onLoad={vi.fn()} onSuppress={onSuppress} onRestore={vi.fn()} onDelete={vi.fn()}
+      onLoadHistory={vi.fn(() => Promise.resolve([]))} onOpenSourceSession={vi.fn()} locale="zh-CN" />);
+
+    const inferredRow = claimRowByState("推断");
+    fireEvent.click(within(inferredRow).getByRole("button", { name: "搁置" }));
+    fireEvent.change(within(inferredRow).getByPlaceholderText("可选：为什么这不太是你"),
+      { target: { value: "这不太是我" } });
+    fireEvent.click(within(inferredRow).getAllByRole("button", { name: "搁置" }).at(-1)!);
+
+    const banner = await within(inferredRow).findByRole("alert");
+    expect(within(banner).getByText("他人在你之前更新了这条内容")).toBeInTheDocument();
+    // 选型：本地草稿保留——理由输入框和文字都还在，刷新后可对着最新状态重做。
+    expect(within(inferredRow).getByPlaceholderText("可选：为什么这不太是你")).toHaveValue("这不太是我");
+  });
+
+  it("「查看最新」 on the banner re-pulls the view and clears the banner", async () => {
+    const onSuppress = vi.fn(() => Promise.reject(conflictError()));
+    const onLoad = vi.fn();
+    render(<PortraitClaimsPanel view={view} loading={false} loaded={true} busyClaimId={null}
+      onLoad={onLoad} onSuppress={onSuppress} onRestore={vi.fn()} onDelete={vi.fn()}
+      onLoadHistory={vi.fn(() => Promise.resolve([]))} onOpenSourceSession={vi.fn()} locale="zh-CN" />);
+
+    const inferredRow = claimRowByState("推断");
+    fireEvent.click(within(inferredRow).getByRole("button", { name: "搁置" }));
+    fireEvent.click(within(inferredRow).getAllByRole("button", { name: "搁置" }).at(-1)!);
+    await within(inferredRow).findByRole("alert");
+
+    fireEvent.click(within(inferredRow).getByRole("button", { name: "查看最新" }));
+    expect(onLoad).toHaveBeenCalledOnce();
+    await vi.waitFor(() => {
+      expect(within(inferredRow).queryByRole("alert")).not.toBeInTheDocument();
+    });
+  });
+
+  it("a conflicted restore shows the banner inside the parked row too", async () => {
+    const onRestore = vi.fn(() => Promise.reject(conflictError()));
+    render(<PortraitClaimsPanel view={view} loading={false} loaded={true} busyClaimId={null}
+      onLoad={vi.fn()} onSuppress={vi.fn()} onRestore={onRestore} onDelete={vi.fn()}
+      onLoadHistory={vi.fn(() => Promise.resolve([]))} onOpenSourceSession={vi.fn()} locale="zh-CN" />);
+
+    const section = screen.getByText("已搁置的理解").closest("details")!;
+    fireEvent.click(screen.getByText("已搁置的理解"));
+    const parked = within(section).getAllByRole("listitem")[0];
+    fireEvent.click(within(parked).getByRole("button", { name: "恢复" }));
+    expect(within(await within(parked).findByRole("alert"))
+      .getByText("他人在你之前更新了这条内容")).toBeInTheDocument();
+  });
+
+  it("a non-conflict failure never raises the conflict banner (不误报)", async () => {
+    const onSuppress = vi.fn(() => Promise.reject(plainError()));
+    render(<PortraitClaimsPanel view={view} loading={false} loaded={true} busyClaimId={null}
+      onLoad={vi.fn()} onSuppress={onSuppress} onRestore={vi.fn()} onDelete={vi.fn()}
+      onLoadHistory={vi.fn(() => Promise.resolve([]))} onOpenSourceSession={vi.fn()} locale="zh-CN" />);
+
+    const inferredRow = claimRowByState("推断");
+    fireEvent.click(within(inferredRow).getByRole("button", { name: "搁置" }));
+    fireEvent.click(within(inferredRow).getAllByRole("button", { name: "搁置" }).at(-1)!);
+    await vi.waitFor(() => {
+      expect(within(inferredRow).queryByRole("alert")).not.toBeInTheDocument();
+    });
+  });
+
+  it("a delete that dies on conflict keeps its confirmation open instead of pretending success", async () => {
+    const onDelete = vi.fn(() => Promise.reject(conflictError()));
+    render(<PortraitClaimsPanel view={view} loading={false} loaded={true} busyClaimId={null}
+      onLoad={vi.fn()} onSuppress={vi.fn()} onRestore={vi.fn()} onDelete={onDelete}
+      onLoadHistory={vi.fn(() => Promise.resolve([]))} onOpenSourceSession={vi.fn()} locale="zh-CN" />);
+
+    const conflictingRow = claimRowByState("冲突");
+    fireEvent.click(within(conflictingRow).getByRole("button", { name: "删除" }));
+    fireEvent.click(within(conflictingRow).getByRole("button", { name: "确认删除" }));
+    await within(conflictingRow).findByRole("alert");
+    expect(within(conflictingRow).getByText(/从所有当前视图消失/)).toBeInTheDocument();
   });
 });

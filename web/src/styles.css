@@ -3716,3 +3716,23 @@ body {
   color: var(--text-secondary); border-top: 1px solid #ffffff10; padding-top: 10px; }
 .consent-request .consent-actions { display: flex; gap: 10px; margin-top: 14px; }
 .consent-request small { display: block; margin-top: 8px; color: var(--text-secondary); }
+
+/* CP-18 §2-13: the withdrawal switch lives on the opening card itself. */
+.opening-continuity-withdraw { display: flex; align-items: center; gap: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--accent-aurora) 18%, transparent); padding-top: 10px; }
+.opening-continuity-withdraw button.quiet { padding: 4px 10px; border: none; background: none;
+  color: var(--text-secondary); font-size: .74rem; text-decoration: underline dotted; cursor: pointer; }
+.opening-continuity-withdraw small { color: var(--warn, #d29922); font-size: .74rem; }
+
+/* CP-21: the honest "someone updated this before you" conflict banners. */
+.portrait-claim-conflict, .belief-conflict-banner {
+  margin-top: 8px; padding: 10px 12px; border-radius: 12px;
+  border: 1px solid color-mix(in srgb, #d29922 55%, transparent);
+  background: color-mix(in srgb, #d29922 12%, transparent);
+}
+.portrait-claim-conflict p, .belief-conflict-banner p { margin: 0 0 8px; font-size: .8rem; }
+.portrait-claim-conflict .muted, .belief-conflict-banner .muted { color: var(--text-secondary); }
+.belief-conflict-actions { display: flex; gap: 8px; }
+.belief-conflict-actions button, .portrait-claim-conflict button {
+  padding: 6px 14px; border: 1px solid #9bb0a24a; border-radius: 999px;
+  color: var(--text-primary); background: #6b5a3f2b; font-size: .78rem; }

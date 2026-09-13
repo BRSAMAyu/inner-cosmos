@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BeliefGallery } from "./BeliefGallery";
 import type { BeliefPattern } from "../api";
@@ -66,5 +66,33 @@ describe("BeliefGallery", () => {
   it("renders in English when locale is en-SG", () => {
     render(<BeliefGallery {...baseProps()} locale="en-SG" beliefs={[belief()]} />);
     expect(screen.getByRole("heading", { name: /belief/i })).toBeVisible();
+  });
+});
+
+describe("BeliefGallery (CP-21 conflict refresh)", () => {
+  it("shows no conflict banner by default — an ordinary view is never misreported as conflicted", () => {
+    render(<BeliefGallery {...baseProps()} beliefs={[belief()]} />);
+    expect(screen.queryByTestId("belief-conflict")).not.toBeInTheDocument();
+  });
+
+  it("a version conflict raises the honest banner with a refresh affordance", () => {
+    const onRefreshConflict = vi.fn();
+    const onDismissConflict = vi.fn();
+    render(<BeliefGallery {...baseProps()} beliefs={[belief()]} conflict={true}
+      onRefreshConflict={onRefreshConflict} onDismissConflict={onDismissConflict} />);
+
+    const banner = screen.getByTestId("belief-conflict");
+    expect(within(banner).getByText("他人在你之前更新了这条内容")).toBeInTheDocument();
+    fireEvent.click(within(banner).getByRole("button", { name: "查看最新" }));
+    expect(onRefreshConflict).toHaveBeenCalledOnce();
+    fireEvent.click(within(banner).getByRole("button", { name: "知道了" }));
+    expect(onDismissConflict).toHaveBeenCalledOnce();
+  });
+
+  it("states the English conflict copy for en-SG users", () => {
+    render(<BeliefGallery {...baseProps()} conflict={true} locale="en-SG"
+      onRefreshConflict={() => undefined} />);
+    expect(screen.getByText("Someone updated this before you")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "See the latest" })).toBeInTheDocument();
   });
 });

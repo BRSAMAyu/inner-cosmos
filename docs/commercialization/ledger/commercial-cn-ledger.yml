@@ -181,11 +181,11 @@ work_packages:
     vision_ids: ["V05", "V07", "V13"]
     status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-07/
-    delivery_record: evidence/commercial-cn/CP-07/2026-09-06-pia-and-consent-spec/delivery-record.md
+    delivery_record: evidence/commercial-cn/CP-07/2026-09-13-versioned-reconsent/delivery-record.md
     delivery_record_2: "evidence/commercial-cn/CP-07/2026-09-06-pia-and-consent-spec/delivery-record.md#增量2"
-    test_command: "./mvnw test -Dtest=ConsentCenterTest"
-    note: "G1/G2已关闭：V38同意记录表+同意中心API(3端点)+Provider出站守卫(有凭证才包装,拒绝响亮不降级)+ANALYTICS与CP-03双写；测试5/5"
-    next_action: "web同意中心页随CP-09/10；VOICE接线随CP-27；版本重同意触发器待首版本变更"
+    test_command: "./mvnw test -Dtest=ConsentVersionedReConsentTest"
+    note: "G1/G2已关闭：V38同意记录表+同意中心API(3端点)+Provider出站守卫(有凭证才包装,拒绝响亮不降级)+ANALYTICS与CP-03双写；测试5/5；版本重同意增量：effective()对stale版本记录回落无决策默认(egress fail-closed,CORE_SERVICE不断服务)+list()出RE_CONSENT_REQUIRED+decide()重盖当前版本恢复；version列NOT NULL用约束测试坐实"
+    next_action: "重同意提示的前端专门呈现(消费RE_CONSENT_REQUIRED)；版本提升运营流程文档化"
   - id: CP-08
     title: "AI标识、成人准入与安全政策"
     owner: "信任与安全＋法务＋心理专家"
@@ -276,10 +276,10 @@ work_packages:
     vision_ids: ["V05", "V07", "V10", "V20"]
     status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-15/
-    delivery_record: evidence/commercial-cn/CP-14/2026-09-06-boundary-guard-and-tombstones/delivery-record.md
-    test_command: "./mvnw test -Dtest=SensitiveBoundaryAndAntiResurrectionTest"
-    note: "首个增量：V40 tombstone(水位单调)+主体死亡路径(owner-forget)同事务挂钩+备份复活/晚到消费不复活+catchUpFromWatermark重放；receipt保持纯审计(派生物清理不杀主体)；独立台账DR契约已登记CP-50B"
-    next_action: "资产清单(缓存/对象/导出/推送/Provider副本)+data.retracted.v1幂等消费者"
+    delivery_record: evidence/commercial-cn/CP-15/2026-09-13-derivative-inventory-cleanup/delivery-record.md
+    test_command: "./mvnw test -Dtest='DataRetractedDerivativeCleanupTest,DerivativeAssetRetractionInventoryContractTest'"
+    note: "首个增量：V40 tombstone(水位单调)+主体死亡路径(owner-forget)同事务挂钩+备份复活/晚到消费不复活+catchUpFromWatermark重放；receipt保持纯审计(派生物清理不杀主体)；独立台账DR契约已登记CP-50B；第二增量：五类派生资产清单(grep证据矩阵,三类如实NOT_APPLICABLE不编造)+消费者逐条清理(tb_retraction_cleanup_result逐资产REQUIRES_NEW,FAILED行不随外层回滚消失,幂等重试)+向量retire复用；V53+孪生"
+    next_action: "wake_intent↔主体链接列(精确推送清理)；ai_interaction_log主体映射(现仅账户级清理)"
   - id: CP-16
     title: "应用安全、威胁模型与管理隔离"
     owner: "安全工程"
@@ -312,10 +312,10 @@ work_packages:
     vision_ids: ["V03", "V14", "V15"]
     status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-18/
-    delivery_record: evidence/commercial-cn/CP-18/2026-09-12-continuity-kernel-retrieval/delivery-record.md
-    test_command: "./mvnw test -Dtest=ContinuityKernelRetrievalTest"
-    note: "三增量：①SessionContinuityService诚实开场(零伪造/带provenance carry/30天静默窗)+GET /api/dialog/continuity；②continuityGrounding接入主动问候与首条用户消息轮；③前端AuroraOpeningContinuity开屏卡片(归来者carry+provenance+继续/重开选择,新用户首次守卫态,发言/切会话即收起)"
-    next_action: "连续性对用户可见的撤回开关；真机弱网下开屏拉取时序验收"
+    delivery_record: evidence/commercial-cn/CP-18/2026-09-13-opening-visibility-switch/delivery-record.md
+    test_command: "./mvnw test -Dtest=SessionContinuityVisibilityToggleTest"
+    note: "三增量：①SessionContinuityService诚实开场(零伪造/带provenance carry/30天静默窗)+GET /api/dialog/continuity；②continuityGrounding接入主动问候与首条用户消息轮；③前端AuroraOpeningContinuity开屏卡片(归来者carry+provenance+继续/重开选择,新用户首次守卫态,发言/切会话即收起)；第三增量：开屏可见撤回开关V52(无行默认开,关=withdrawn标记零材料+事实层原样诚实记录)+前端整卡不渲染+卡内撤回按钮(落库成功才隐藏)+顺手修api路径bug(开屏卡此前从未真正加载)"
+    next_action: "重开开关的设置面入口(AccountSettings接线)；RE_CONSENT_REQUIRED类提示的统一前端呈现"
   - id: CP-19
     title: "双核、上下文与中文理解增益"
     owner: "AI质量"
@@ -348,10 +348,10 @@ work_packages:
     vision_ids: ["V05", "V06"]
     status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-21/
-    delivery_record: evidence/commercial-cn/CP-21/2026-09-12-merge-conflict-guards/delivery-record.md
-    test_command: "./mvnw test -Dtest=MemoryLifecycleConflictTest"
-    note: "三增量：①来源图回放+撤回不可回放；②合并/冲突/并发编辑硬边界(expectedVersion乐观并发+终态/链分叉防护+回退前行核对)；③重复事件去重与版本归并——MemoryRecurrenceMatcher(0.60字符二元组余弦)重述折叠进既有记忆(REINFORCE/DUPLICATE_EVENT_DEDUP审计行),FORGOTTEN与tombstone行不可吸收"
-    next_action: "前端冲突刷新UI(CP-11联动)；真实LLM摘要下的阈值校准"
+    delivery_record: evidence/commercial-cn/CP-21/2026-09-13-conflict-refresh-ui/delivery-record.md
+    test_command: "npm test -- --run src/components/PortraitClaimsPanel.test.tsx"
+    note: "三增量：①来源图回放+撤回不可回放；②合并/冲突/并发编辑硬边界(expectedVersion乐观并发+终态/链分叉防护+回退前行核对)；③重复事件去重与版本归并——MemoryRecurrenceMatcher(0.60字符二元组余弦)重述折叠进既有记忆(REINFORCE/DUPLICATE_EVENT_DEDUP审计行),FORGOTTEN与tombstone行不可吸收；第三增量：统一409冲突码通道(不解析中文消息)+PortraitClaimsPanel/BeliefGallery冲突提示条(他人已更新→查看最新)+本地草稿仅在落库后清除(不静默丢弃)；Belief/Portrait端点expectedVersion接入后即完整生效"
+    next_action: "Belief/Portrait编辑端点补expectedVersion乐观锁(服务层)；多标签页冲突的切回可见性验证"
   - id: CP-22
     title: "任务化检索与真实向量质量"
     owner: "检索工程＋AI评测"

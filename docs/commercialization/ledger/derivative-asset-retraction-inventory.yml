@@ -1,0 +1,58 @@
+# CP-15 撤回派生资产清单（closing-checklist §2-11）
+# 资产类 × 落点 × 撤回时动作 × 清理实现状态。本清单只登记真实存在的派生资产面：
+# 每一行的 evidence 都是仓库内真实文件路径（由 DerivativeAssetRetractionInventoryContractTest
+# 校验存在），不存在的资产面（如无对象存储接入）如实标 NOT_APPLICABLE，不编造清理动作。
+# 消费者执行面：event/reliable/DataRetractedProjectionHandler 收到 data.retracted.v1 后，
+# 逐资产调用 executor（meta.executor），每动作落一行 tb_retraction_cleanup_result
+# （SUCCESS / FAILED / NOT_APPLICABLE + 原因），失败不阻断其他资产，重放幂等。
+meta:
+  schema: derivative-asset-retraction-inventory/1
+  event_type: data.retracted.v1
+  consumer: data-retraction-projection
+  executor: com.innercosmos.service.impl.RetractionDerivativeCleanupServiceImpl
+  result_table: tb_retraction_cleanup_result
+  sync_baseline: 属主事务内同步清理（memory forget/capsule archive/grant revoke）仍是第一现场并记 tb_data_retraction_receipt 回执；本清单与消费者覆盖其下游副本面
+assets:
+  - asset_key: CACHE
+    surfaces: "无长驻缓存面：全仓无 @Cacheable/@EnableCaching/Caffeine/CacheManager（grep 无命中）；Redis 仅承载 TTL 瞬态数据：Aurora 流事件（原子 XADD+EXPIRE，默认 PT15M）、stream stage（默认 PT1M）、幂等键、限流计数、Spring Session（30 分钟失效）"
+    retraction_action: "NOT_APPLICABLE：无按撤回主体寻址的缓存键，瞬态数据随 TTL 自然过期，无物可失效"
+    status: NOT_APPLICABLE
+    action_ref: none
+    reason: "如实标注不适用——缓存类在当前代码库没有可写清理动作的落点，编造缓存失效命令反而制造假覆盖"
+    evidence: "src/main/java/com/innercosmos/streaming/RedisAuroraLiveEventStore.java|src/main/java/com/innercosmos/streaming/InMemoryAuroraStreamStageStore.java|src/main/java/com/innercosmos/idempotency/RedisIdempotencyStore.java|src/main/java/com/innercosmos/config/RedisSessionConfiguration.java"
+  - asset_key: OBJECT_STORAGE
+    surfaces: "无此资产面：全仓 grep OSS/AmazonS3/S3Client/MinIO/对象存储 无接入命中；语音转写仅落文本列（tb_voice_transcription.original_text/edited_text），导出包仅以 MediaRef 引用转写行、从不内联 blob，无媒体外置存储"
+    retraction_action: "NOT_APPLICABLE：没有对象存储副本，无删除目标"
+    status: NOT_APPLICABLE
+    action_ref: none
+    reason: "如实标注无此资产面——接入对象存储之日必须回到本清单补登记与清理动作（契约测试会拦截未登记的资产键）"
+    evidence: "src/main/java/com/innercosmos/export/ExportPackage.java|src/main/java/com/innercosmos/export/UserDataExportService.java"
+  - asset_key: EXPORT_PACKAGE
+    surfaces: "UserDataExportService.build 在内存构建导出包，经 GET /api/me/data/export-package 一次性 HTTP 响应返回；无 tb_export* 表、无落盘调用（grep Files.write/FileOutputStream 于 export 包无命中）；UserDataImportService 落的是导入方自己账户新数据，不是源用户副本"
+    retraction_action: "NOT_APPLICABLE：服务端不落库不落盘，无可失效服务端副本；用户已下载副本离台即平台不可及（归 PROVIDER_COPY 同一口径——不可召回）"
+    status: NOT_APPLICABLE
+    action_ref: none
+    reason: "如实标注不适用——若未来导出包落盘/落库（如异步导出任务），必须回本清单改为 IMPLEMENTED 并补失效动作"
+    evidence: "src/main/java/com/innercosmos/controller/UserDataPortabilityController.java|src/main/java/com/innercosmos/export/UserDataExportService.java|src/main/java/com/innercosmos/export/UserDataImportService.java"
+  - asset_key: PUSH_COPY
+    surfaces: "tb_push_delivery.title/body/deep_link 是 wake 文案副本（由 WakeIntentServiceImpl.finishWithNotification → PushDeliveryServiceImpl.enqueueWakeIntent 写入）；tb_device_registration.token_ciphertext 是设备令牌凭据、非撤回主体派生内容（账户级删除时 revoke，不随主体级撤回动作）"
+    retraction_action: "DELETE 未投递副本：DELETE FROM tb_push_delivery WHERE user_id=? AND status IN ('PENDING','RETRY')；DELIVERED 已出站不可召回（归 PROVIDER_COPY 口径），PROCESSING 为 5 分钟租约在途态、自终止"
+    status: IMPLEMENTED
+    action_ref: "com.innercosmos.service.impl.RetractionDerivativeCleanupServiceImpl#deleteUndeliveredPushCopies"
+    reason: "v1 载荷无 wake_intent 到 memory/capsule 的链接列，按用户清扫未投递副本是诚实可执行范围（宁可少发、不外送已撤回内容）；DELETE 天然幂等，重放记 affectedCount=0"
+    evidence: "src/main/java/com/innercosmos/service/impl/PushDeliveryServiceImpl.java|src/main/java/com/innercosmos/service/push/PushDeliveryRepository.java|src/main/resources/db/migration/postgresql/V21__mobile_device_push_delivery.sql|src/main/java/com/innercosmos/service/impl/WakeIntentServiceImpl.java"
+  - asset_key: PROVIDER_COPY
+    surfaces: "出站 LLM 请求中的用户内容（离开平台边界即平台不可及）；站内 transcript tb_ai_interaction_log.request_prompt/response_text 留有出站副本，但该表无撤回主体映射列，仅账户级删除时整体清理（UserServiceImpl）"
+    retraction_action: "NOT_APPLICABLE（不可召回）：出站内容无法从 Provider 侧删除；管控靠事前——PROVIDER_EGRESS 授权目的、LOCAL_ONLY/NO_EXTERNAL_PROCESSING 授权范围、最小化出站"
+    status: NOT_APPLICABLE
+    action_ref: none
+    reason: "如实标注出站即不可召回，不编造召回动作；站内 transcript 因无主体映射不随主体级撤回删除，防止以主体撤回为名误删 P0 对话记录"
+    evidence: "src/main/java/com/innercosmos/service/impl/DataUseGrantServiceImpl.java|src/main/java/com/innercosmos/service/CapsuleEmbeddingIndexService.java|src/main/java/com/innercosmos/service/impl/UserServiceImpl.java"
+vector_reassert:
+  - action_key: CAPSULE_MATCH_VECTOR
+    surfaces: "tb_capsule_embedding（共鸣体匹配向量）；属主事务内已同步擦除并记 tb_data_retraction_receipt 回执（DataDerivativeRegistry: CAPSULE/CAPSULE_MATCH_INDEX→ERASED）"
+    retraction_action: "重断言（不重写）：复用 CapsuleEmbeddingIndexService.retireForCapsule；subjectType=CAPSULE 时 subjectId 即 capsuleId，subjectType=DATA_USE_GRANT 时经 tb_data_use_grant.consumer_id 解析，subjectType=MEMORY 时不适用（属主路径已对每个受影响共鸣体 retire，v1 载荷不含 capsuleId）"
+    status: IMPLEMENTED
+    reuses: "com.innercosmos.service.CapsuleEmbeddingIndexService#retireForCapsule"
+    reason: "消费者侧重断言闭合并发/重放窗口（远端投影、崩溃窗口）；retireForCapsule 幂等，二次调用返回 0，重放不产生重复删除"
+    evidence: "src/main/java/com/innercosmos/service/impl/CapsuleEmbeddingIndexServiceImpl.java|src/main/java/com/innercosmos/service/DataDerivativeRegistry.java|src/main/java/com/innercosmos/service/impl/MemoryLifecycleServiceImpl.java"

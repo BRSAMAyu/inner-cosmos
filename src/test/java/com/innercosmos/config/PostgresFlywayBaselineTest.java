@@ -70,9 +70,11 @@ class PostgresFlywayBaselineTest {
         // V49 (CP-26) adds the wake-intent DEFERRED state and quiet-hours deferral column.
         // V50 (CP-35) adds group governance (mute/transfer/dissolve/review ledger).
         // V51 (CP-34) adds both-party-consent relation corrections.
+        // V52 (CP-18) adds the continuity opening-visibility preference.
+        // V53 (CP-15) adds per-asset retraction cleanup results.
         // It exists as a forward migration rather than an in-place edit of V30 because V30 is
         // already committed and rewriting it would break Flyway checksums on live databases.
-        assertEquals(51, flyway.migrate().migrationsExecuted);
+        assertEquals(53, flyway.migrate().migrationsExecuted);
         assertEquals(0, flyway.migrate().migrationsExecuted);
 
         String source = readClasspath("schema.sql");
@@ -100,14 +102,16 @@ class PostgresFlywayBaselineTest {
                     WHERE constraint_schema='public' AND constraint_type='FOREIGN KEY'
                     """);
 
-            // V50 tb_group_review_ledger + V51 tb_relation_correction (schema.sql twins).
-            assertEquals(107, expectedTables.size(), "source schema table inventory changed");
+            // V50/V51/V52/V53 twins: group review ledger, relation corrections,
+            // continuity preference, retraction cleanup results.
+            assertEquals(109, expectedTables.size(), "source schema table inventory changed");
             assertEquals(expectedTables, actualTables, "PostgreSQL baseline table drift");
             assertTrue(actualIndexes.containsAll(expectedIndexes),
                     () -> "missing PostgreSQL indexes: " + difference(expectedIndexes, actualIndexes));
             assertEquals(expectedForeignKeys, actualForeignKeys, "PostgreSQL foreign-key drift");
-            // V50 group_review_ledger.id + V51 relation_correction.id are IDENTITY columns.
-            assertEquals(100, scalar(connection, """
+            // V50-V53 add four IDENTITY-PK tables (review ledger, correction,
+            // continuity preference, cleanup result).
+            assertEquals(102, scalar(connection, """
                     SELECT COUNT(*) FROM information_schema.columns
                     WHERE table_schema='public' AND is_identity='YES'
                     """));
@@ -178,13 +182,14 @@ class PostgresFlywayBaselineTest {
                 .locations("classpath:db/migration/postgresql")
                 .load();
         // No .target(): migrates from V19 all the way to the current latest
-        // (V20 through V51, including provenance, orchestration, safety, Pod takeover,
+        // (V20 through V53, including provenance, orchestration, safety, Pod takeover,
         // capsule-landing foreign-key rename, classroom social pair integrity, the
         // commercial-cn metric event store, the adult gate, the consent center,
         // identity verification, retraction tombstones, crisis continuity, the
         // moderation case backend, slow-letter receipt policy, wake-intent deferral,
-        // group governance and relation corrections).
-        assertEquals(32, v20.migrate().migrationsExecuted);
+        // group governance, relation corrections, continuity visibility and retraction
+        // cleanup results).
+        assertEquals(34, v20.migrate().migrationsExecuted);
         try (Connection migrated = DriverManager.getConnection(
                 jdbcUrl, POSTGRES.getUsername(), POSTGRES.getPassword())) {
             assertEquals(2, scalar(migrated,

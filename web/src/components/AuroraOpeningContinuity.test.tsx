@@ -3,6 +3,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DialogContinuity } from "../api";
 import { AuroraOpeningContinuity } from "./AuroraOpeningContinuity";
 
+const setContinuityVisibilityMock = vi.hoisted(() =>
+  vi.fn(() => Promise.resolve({ openingVisible: false })));
+vi.mock("../api", () => ({
+  api: { setContinuityVisibility: setContinuityVisibilityMock }
+}));
+
 afterEach(cleanup);
 
 const returningContinuity: DialogContinuity = {
@@ -76,5 +82,48 @@ describe("AuroraOpeningContinuity (CP-18)", () => {
     const card = screen.getByTestId("opening-continuity");
     expect(card).toHaveClass("fresh");
     expect(screen.queryByRole("listitem")).not.toBeInTheDocument();
+  });
+
+  // CP-18 §2-13: the owner's visibility withdrawal.
+  it("renders nothing at all while the owner withdrew opening visibility — even with real prior material", () => {
+    const { container } = render(<AuroraOpeningContinuity
+      continuity={{ ...returningContinuity, openingVisible: false }}
+      locale="zh-CN" onDismiss={() => undefined} />);
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("renders normally while the switch is explicitly on", () => {
+    render(<AuroraOpeningContinuity
+      continuity={{ ...returningContinuity, openingVisible: true }}
+      locale="zh-CN" onDismiss={() => undefined} />);
+    expect(screen.getByTestId("opening-continuity")).toHaveClass("returning");
+  });
+
+  it("carries the withdrawal switch on the card: turning it off persists the choice, then dismisses", async () => {
+    setContinuityVisibilityMock.mockClear();
+    const dismiss = vi.fn();
+    render(<AuroraOpeningContinuity
+      continuity={returningContinuity} locale="zh-CN" onDismiss={dismiss} />);
+
+    await fireEvent.click(screen.getByRole("button", { name: "不再显示开场回顾" }));
+    await vi.waitFor(() => {
+      expect(setContinuityVisibilityMock).toHaveBeenCalledExactlyOnceWith(false);
+      expect(dismiss).toHaveBeenCalledOnce();
+    });
+  });
+
+  it("keeps the card honest when the withdrawal call fails — no silent success", async () => {
+    setContinuityVisibilityMock.mockImplementationOnce(() =>
+      Promise.reject(new Error("network down")));
+    const dismiss = vi.fn();
+    render(<AuroraOpeningContinuity
+      continuity={returningContinuity} locale="zh-CN" onDismiss={dismiss} />);
+
+    await fireEvent.click(screen.getByRole("button", { name: "不再显示开场回顾" }));
+    await vi.waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent(/暂时没能关闭/);
+    });
+    expect(dismiss).not.toHaveBeenCalled();
+    expect(screen.getByTestId("opening-continuity")).toBeInTheDocument();
   });
 });

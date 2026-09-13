@@ -1003,16 +1003,20 @@ export function AuroraApp() {
         : action === "delete" ? "这条理解已删除。" : action === "restore" ? "这条理解已恢复。" : "这条理解已搁置。");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
+      // CP-21: re-throw so PortraitClaimsPanel can detect a version conflict (409/code
+      // CONFLICT) and show its "someone updated this first → see the latest" banner. The
+      // status line above already covers the generic message for every failure.
+      throw error;
     } finally {
       setPortraitClaimBusyId(null);
     }
   };
   const suppressPortraitClaim = (claimId: number, reason: string) =>
-    void actOnPortraitClaim(claimId, "suppress", () => api.suppressPortraitClaim(claimId, reason || undefined));
+    actOnPortraitClaim(claimId, "suppress", () => api.suppressPortraitClaim(claimId, reason || undefined));
   const restorePortraitClaim = (claimId: number) =>
-    void actOnPortraitClaim(claimId, "restore", () => api.restorePortraitClaim(claimId));
+    actOnPortraitClaim(claimId, "restore", () => api.restorePortraitClaim(claimId));
   const deletePortraitClaim = (claimId: number, reason: string) =>
-    void actOnPortraitClaim(claimId, "delete", () => api.deletePortraitClaim(claimId, reason || undefined));
+    actOnPortraitClaim(claimId, "delete", () => api.deletePortraitClaim(claimId, reason || undefined));
 
   const loadPortraitHistory = async (dim: string) => {
     if (portraitHistory[dim]) return;
@@ -2056,7 +2060,9 @@ export function AuroraApp() {
         <BeliefGallery beliefs={beliefGallery.beliefs} contradictions={beliefGallery.contradictions} filter={beliefGallery.filter}
           categories={beliefGallery.categories} selectedCategory={beliefGallery.selectedCategory} categoryBeliefs={beliefGallery.categoryBeliefs}
           busy={beliefGallery.busy} onSelectFilter={filter => void beliefGallery.selectFilter(filter)}
-          onSelectCategory={category => void beliefGallery.selectCategory(category)} locale={skillLocale} />
+          onSelectCategory={category => void beliefGallery.selectCategory(category)}
+          conflict={beliefGallery.conflict} onRefreshConflict={beliefGallery.refreshFromConflict}
+          onDismissConflict={beliefGallery.dismissConflict} locale={skillLocale} />
         <PsychologySkillStudio skills={skills} skillRuns={skillRuns} selectedSkill={selectedSkill} skillAnswers={skillAnswers}
           skillConsent={skillConsent} skillRetention={skillRetention} skillBusy={skillBusy} skillLocale={skillLocale}
           onLocaleChange={setSkillLocale} onSelectSkill={skillId => { setSelectedSkillId(skillId); setSkillAnswers({}); setSkillConsent(false); }}

@@ -17,6 +17,7 @@ const COPY: Record<Locale, {
   filterAll: string; filterStrong: string; filterByCategory: string; noCategory: string;
   emptyCategory: string; empty: string; loading: string; strength: (pct: number) => string;
   occurrences: (n: number) => string;
+  conflictTitle: string; conflictHint: string; conflictRefresh: string; conflictDismiss: string;
 }> = {
   "zh-CN": {
     aria: "信念画廊", heading: "信念画廊",
@@ -26,7 +27,10 @@ const COPY: Record<Locale, {
     vs: "⚡ vs ⚡", filtersAria: "信念筛选", filterAll: "全部", filterStrong: "强信念（强度 > 0.5）", filterByCategory: "按类别",
     noCategory: "还没有可分类的信念。", emptyCategory: "这个分类下暂时没有信念。",
     empty: "还没有识别出明显的信念模式。聊更多几次，Aurora 会逐渐看到你的底层想法。", loading: "正在加载…",
-    strength: pct => `强度 ${pct}%`, occurrences: n => `出现 ${n} 次`
+    strength: pct => `强度 ${pct}%`, occurrences: n => `出现 ${n} 次`,
+    conflictTitle: "他人在你之前更新了这条内容",
+    conflictHint: "现在看到的不一定是最新版本；刷新后以服务器上的为准，不会静默覆盖。",
+    conflictRefresh: "查看最新", conflictDismiss: "知道了"
   },
   "en-SG": {
     aria: "Belief patterns", heading: "Belief patterns",
@@ -37,15 +41,20 @@ const COPY: Record<Locale, {
     vs: "⚡ vs ⚡", filtersAria: "Belief filters", filterAll: "All", filterStrong: "Strong beliefs (strength > 0.5)", filterByCategory: "By category",
     noCategory: "No categorized beliefs yet.", emptyCategory: "No beliefs in this category yet.",
     empty: "No clear belief patterns yet. Keep talking with Aurora and it will gradually see your underlying thinking.",
-    loading: "Loading…", strength: pct => `Strength ${pct}%`, occurrences: n => `Seen ${n} time${n === 1 ? "" : "s"}`
+    loading: "Loading…", strength: pct => `Strength ${pct}%`, occurrences: n => `Seen ${n === 1 ? "" : "s"} time${n === 1 ? "" : "s"}`,
+    conflictTitle: "Someone updated this before you",
+    conflictHint: "What you see may be stale; refreshing defers to the server's latest — nothing is silently overwritten.",
+    conflictRefresh: "See the latest", conflictDismiss: "Got it"
   }
 };
 
 export function BeliefGallery({ beliefs, contradictions, filter, categories, selectedCategory, categoryBeliefs, busy,
-  onSelectFilter, onSelectCategory, locale = "zh-CN" }: {
+  onSelectFilter, onSelectCategory, conflict = false, onRefreshConflict, onDismissConflict, locale = "zh-CN" }: {
   beliefs: BeliefPattern[]; contradictions: BeliefContradiction[]; filter: BeliefFilter; categories: string[];
   selectedCategory: string | null; categoryBeliefs: BeliefPattern[]; busy: boolean;
-  onSelectFilter: (filter: BeliefFilter) => void; onSelectCategory: (category: string) => void; locale?: Locale;
+  onSelectFilter: (filter: BeliefFilter) => void; onSelectCategory: (category: string) => void;
+  /** CP-21: a belief-surface response hit a version conflict (409) — offer an honest refresh. */
+  conflict?: boolean; onRefreshConflict?: () => void; onDismissConflict?: () => void; locale?: Locale;
 }) {
   const t = COPY[locale];
 
@@ -63,6 +72,17 @@ export function BeliefGallery({ beliefs, contradictions, filter, categories, sel
     <span className="eyebrow">{locale === "en-SG" ? "BELIEF PATTERNS" : "信念模式"}</span>
     <h2>{t.heading}</h2>
     <p>{t.intro}</p>
+
+    {conflict && <div className="belief-conflict-banner" role="alert" data-testid="belief-conflict">
+      <p>
+        <strong>{t.conflictTitle}</strong>
+        <span className="muted"> {t.conflictHint}</span>
+      </p>
+      <div className="belief-conflict-actions">
+        {onRefreshConflict && <button type="button" onClick={onRefreshConflict}>{t.conflictRefresh}</button>}
+        {onDismissConflict && <button type="button" className="quiet" onClick={onDismissConflict}>{t.conflictDismiss}</button>}
+      </div>
+    </div>}
 
     {contradictions.length > 0 && <div className="belief-contradictions" aria-label={t.contradictionsAria}>
       <h3>{t.contradictionsHeading}</h3>

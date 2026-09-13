@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { PortraitClaimRow, PortraitClaimsView, UnderstandingClaim } from "../api";
+import { isVersionConflictError, type PortraitClaimRow, type PortraitClaimsView, type UnderstandingClaim } from "../api";
 import type { Locale } from "../i18n";
 import { AsyncButton } from "../loading";
 
@@ -9,9 +9,9 @@ type Props = {
   loaded: boolean;
   busyClaimId: number | null;
   onLoad: () => void;
-  onSuppress: (claimId: number, reason: string) => void;
-  onRestore: (claimId: number) => void;
-  onDelete: (claimId: number, reason: string) => void;
+  onSuppress: (claimId: number, reason: string) => void | Promise<void>;
+  onRestore: (claimId: number) => void | Promise<void>;
+  onDelete: (claimId: number, reason: string) => void | Promise<void>;
   /** CP-23: loads one claim's full version chain (oldest→newest evolution). */
   onLoadHistory: (claimKey: string) => Promise<UnderstandingClaim[]>;
   /** CP-23↔CP-21: opens the dialog session a claim version was extracted from. */
@@ -30,6 +30,7 @@ const COPY: Record<Locale, {
   timeline: string; timelineLoading: string; timelineEmpty: string;
   statusActive: string; statusSuperseded: string; statusSuppressedLabel: string;
   statusDeleted: string; correctedByYou: string; openSourceSession: string;
+  conflictTitle: string; conflictHint: string; conflictRefresh: string; conflictDismiss: string;
 }> = {
   "zh-CN": {
     aria: "Aurora 对你的理解（可纠正）", heading: "Aurora 对你的理解（可纠正）",
@@ -46,7 +47,10 @@ const COPY: Record<Locale, {
     reload: "刷新",
     timeline: "看它怎么变的", timelineLoading: "正在取回变化轨迹…", timelineEmpty: "还没有变化记录。",
     statusActive: "当前", statusSuperseded: "已被取代", statusSuppressedLabel: "被搁置",
-    statusDeleted: "已删除", correctedByYou: "你纠正后的理解", openSourceSession: "查看来源对话"
+    statusDeleted: "已删除", correctedByYou: "你纠正后的理解", openSourceSession: "查看来源对话",
+    conflictTitle: "他人在你之前更新了这条内容",
+    conflictHint: "你的这次操作没有生效；你本地填的内容（如果有）还留着，看完最新版本后再决定是否重来。",
+    conflictRefresh: "查看最新", conflictDismiss: "知道了"
   },
   "en-SG": {
     aria: "What Aurora understands about you (correctable)", heading: "What Aurora understands about you (correctable)",
@@ -64,7 +68,10 @@ const COPY: Record<Locale, {
     timeline: "See how it changed", timelineLoading: "Fetching the change trail…", timelineEmpty: "No change history yet.",
     statusActive: "Current", statusSuperseded: "Superseded", statusSuppressedLabel: "Parked",
     statusDeleted: "Deleted", correctedByYou: "Your corrected understanding",
-    openSourceSession: "Open the source conversation"
+    openSourceSession: "Open the source conversation",
+    conflictTitle: "Someone updated this before you",
+    conflictHint: "Your action did not land; anything you typed locally is kept — review the latest, then decide whether to redo it.",
+    conflictRefresh: "See the latest", conflictDismiss: "Got it"
   }
 };
 
@@ -101,10 +108,38 @@ export function PortraitClaimsPanel({ view, loading, loaded, busyClaimId, onLoad
   const [reasonFor, setReasonFor] = useState<number | null>(null);
   const [reason, setReason] = useState("");
   const [confirmingDelete, setConfirmingDelete] = useState<number | null>(null);
+  // CP-21: the claim whose last action died on a version conflict (409 / code CONFLICT).
+  // Nothing is silently overwritten: the banner says someone else updated it first and
+  // offers a refresh; the locally typed draft is deliberately KEPT until the owner
+  // decides, so re-doing the action against the latest state costs nothing.
+  const [conflictFor, setConflictFor] = useState<number | null>(null);
   // CP-23 belief-change timeline: per-claim version chain, fetched lazily and cached.
   const [timelineFor, setTimelineFor] = useState<string | null>(null);
   const [timelineBusy, setTimelineBusy] = useState<string | null>(null);
   const [timelineByClaimKey, setTimelineByClaimKey] = useState<Record<string, UnderstandingClaim[]>>({});
+
+  /** CP-21: runs an owner action; resolves true when it LANDED, false when it died on a
+   * version conflict (banner shown, draft kept). The action itself is invoked SYNCHRONOUSLY
+   * so sync handlers keep their original call timing. Non-conflict failures are swallowed
+   * here on purpose — the parent already surfaced them through its status line. */
+  const runAction = (claimId: number, action: () => void | Promise<void>): Promise<boolean> => {
+    let outcome: void | Promise<void>;
+    try {
+      outcome = action();
+    } catch (error) {
+      if (isVersionConflictError(error)) setConflictFor(claimId);
+      return Promise.resolve(false);
+    }
+    return Promise.resolve(outcome)
+      .then(() => {
+        setConflictFor(current => current === claimId ? null : current);
+        return true;
+      })
+      .catch(error => {
+        if (isVersionConflictError(error)) setConflictFor(claimId);
+        return false;
+      });
+  };
 
   const openTimeline = (claimKey: string) => {
     if (timelineFor === claimKey) { setTimelineFor(null); return; }
@@ -141,7 +176,7 @@ export function PortraitClaimsPanel({ view, loading, loaded, busyClaimId, onLoad
           onClick={() => openTimeline(claim.claimKey)}>{t.timeline}</button>
         {suppressed ? (
           <AsyncButton busy={busyClaimId === claim.claimId}
-            onClick={() => onRestore(claim.claimId)}>{t.restore}</AsyncButton>
+            onClick={() => void runAction(claim.claimId, () => onRestore(claim.claimId))}>{t.restore}</AsyncButton>
         ) : (
           <>
             <button type="button" onClick={() => {
@@ -181,9 +216,15 @@ export function PortraitClaimsPanel({ view, loading, loaded, busyClaimId, onLoad
         <div className="portrait-claim-reason-actions">
           <button type="button" onClick={() => setReasonFor(null)}>{t.cancel}</button>
           <AsyncButton busy={busyClaimId === claim.claimId} onClick={() => {
-            onSuppress(claim.claimId, reason.trim());
-            setReasonFor(null);
-            setReason("");
+            // CP-21: the draft is only cleared when the action landed; on a version
+            // conflict it survives so the owner can redo it after reviewing the latest.
+            void runAction(claim.claimId, () => onSuppress(claim.claimId, reason.trim()))
+              .then(landed => {
+                if (landed) {
+                  setReasonFor(null);
+                  setReason("");
+                }
+              });
           }}>{t.suppress}</AsyncButton>
         </div>
       </div>}
@@ -192,9 +233,27 @@ export function PortraitClaimsPanel({ view, loading, loaded, busyClaimId, onLoad
         <div className="portrait-claim-reason-actions">
           <button type="button" onClick={() => setConfirmingDelete(null)}>{t.cancel}</button>
           <AsyncButton busy={busyClaimId === claim.claimId} onClick={() => {
-            onDelete(claim.claimId, reason.trim());
-            setConfirmingDelete(null);
+            // CP-21: same landing rule as suppress — a conflicted delete keeps its
+            // confirmation open instead of pretending it succeeded.
+            void runAction(claim.claimId, () => onDelete(claim.claimId, reason.trim()))
+              .then(landed => {
+                if (landed) setConfirmingDelete(null);
+              });
           }}>{t.confirmDelete}</AsyncButton>
+        </div>
+      </div>}
+      {conflictFor === claim.claimId && <div className="portrait-claim-conflict" role="alert"
+        data-testid="claim-conflict">
+        <p>
+          <strong>{t.conflictTitle}</strong>
+          <span className="muted"> {t.conflictHint}</span>
+        </p>
+        <div className="portrait-claim-reason-actions">
+          <button type="button" onClick={() => {
+            setConflictFor(null);
+            onLoad();
+          }}>{t.conflictRefresh}</button>
+          <button type="button" className="quiet" onClick={() => setConflictFor(null)}>{t.conflictDismiss}</button>
         </div>
       </div>}
     </li>

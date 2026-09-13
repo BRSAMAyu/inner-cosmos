@@ -337,7 +337,10 @@ export type DialogSessionSummary = {
   pinnedAt: string | null;
   updatedAt: string | null;
 };
-/** CP-18: honest cross-session opening context — GET /api/dialog/continuity. */
+/** CP-18: honest cross-session opening context — GET /api/dialog/session/continuity.
+ * CP-18 §2-13: openingVisible=false is the owner's WITHDRAWN marker — the backend supplies
+ * zero prior material on purpose, and the opening card must not render. It is never the
+ * same thing as a genuine first conversation (hasPrior=false + openingVisible=true). */
 export type DialogContinuityCarryNote = { kind: string; text: string; provenance: string };
 export type DialogContinuity = {
   hasPrior: boolean;
@@ -345,7 +348,10 @@ export type DialogContinuity = {
   priorActiveAt: string | null;
   carryForward: DialogContinuityCarryNote[];
   openingLine: string;
+  openingVisible?: boolean;
 };
+/** CP-18 §2-13: the owner's opening-visibility switch — GET/PUT /api/dialog/session/continuity/visibility. */
+export type ContinuityVisibility = { openingVisible: boolean };
 export type SlowLetter = {
   id: number; senderUserId: number; receiverUserId: number; receiverCapsuleId: number; title: string; letterBody: string; status: string;
   parallaxDistance: number; estimatedArrivalAt: string; scheduledArrivalAt?: string | null; deliveryPreset?: DeliveryPreset | null;
@@ -754,6 +760,17 @@ export function isConsentRequiredError(error: unknown): error is ApiCodeError {
   return error instanceof ApiCodeError && error.code === CONSENT_REQUIRED_CODE;
 }
 
+/** CP-21: the backend's unified optimistic-concurrency code (ErrorCode.CONFLICT), which
+ * GlobalExceptionHandler maps to HTTP 409 and the envelope carries as `code` — the same
+ * channel used by every expectedVersion-guarded edit endpoint (letter drafts, capsule
+ * boundaries, state-guarded lifecycle transitions). Detected by CODE, never by parsing a
+ * human message, so a plain 400/BAD_REQUEST can never be misreported as a conflict. */
+export const VERSION_CONFLICT_CODE = "CONFLICT";
+
+export function isVersionConflictError(error: unknown): error is ApiCodeError {
+  return error instanceof ApiCodeError && error.code === VERSION_CONFLICT_CODE;
+}
+
 export class ApiRateLimitError extends Error {
   constructor(public readonly retryAfterSeconds: number) {
     super(apiCopy(
@@ -989,8 +1006,15 @@ export const api = {
     `/api/dialog/session?limit=50&includeArchived=${includeArchived}`),
   currentDialogSession: () => request<DialogSessionSummary | null>("/api/dialog/session/current"),
   /** CP-18: the opening context of a fresh conversation — provenance-labeled carry-forward
-   * from the user's real previous conversation, or an explicit first-conversation state. */
-  dialogContinuity: () => request<DialogContinuity>("/api/dialog/continuity"),
+   * from the user's real previous conversation, or an explicit first-conversation state.
+   * Path fix (§2-13): the endpoint lives under /api/dialog/session (DialogController). */
+  dialogContinuity: () => request<DialogContinuity>("/api/dialog/session/continuity"),
+  /** CP-18 §2-13: the owner's opening-visibility switch — default open, owner-only toggle. */
+  continuityVisibility: () => request<ContinuityVisibility>("/api/dialog/session/continuity/visibility"),
+  setContinuityVisibility: (openingVisible: boolean) =>
+    request<ContinuityVisibility>("/api/dialog/session/continuity/visibility", {
+      method: "PUT", body: JSON.stringify({ openingVisible })
+    }),
   dialogSession: (sessionId: number) => request<DialogSessionSummary>(`/api/dialog/session/${sessionId}`),
   updateDialogSession: (sessionId: number, patch: {
     title?: string; archived?: boolean; pinned?: boolean;

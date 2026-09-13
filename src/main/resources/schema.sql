@@ -1899,3 +1899,32 @@ CREATE TABLE IF NOT EXISTS tb_data_import_receipt (
   UNIQUE (section, source_record_key, target_user_id)
 );
 CREATE INDEX IF NOT EXISTS idx_data_import_target ON tb_data_import_receipt (target_user_id, imported_at);
+
+-- CP-18 §2-13 (V52 twin, PG): the owner's withdrawal switch for VISIBLE cross-session
+-- continuity. No row = default OPEN. FALSE = the opening supply endpoint returns an
+-- explicit withdrawn marker with zero prior material; continuity FACTS are still recorded.
+CREATE TABLE IF NOT EXISTS tb_continuity_preference (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  opening_visible BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (user_id)
+);
+
+-- CP-15 (V53 twin, PG): per-asset retraction cleanup outcomes. The sole-owner executor
+-- also creates this lazily with identical MySQL-mode DDL; the twin keeps schema.sql the
+-- single declarative baseline (PostgresFlywayBaselineTest cross-checks both).
+CREATE TABLE IF NOT EXISTS tb_retraction_cleanup_result (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  outbox_event_id VARCHAR(36) NOT NULL,
+  receipt_id BIGINT NOT NULL,
+  user_id BIGINT NOT NULL,
+  asset_key VARCHAR(48) NOT NULL,
+  outcome VARCHAR(24) NOT NULL,
+  affected_count INT NOT NULL DEFAULT 0,
+  detail VARCHAR(480),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_retraction_cleanup_event_asset (outbox_event_id, asset_key)
+);

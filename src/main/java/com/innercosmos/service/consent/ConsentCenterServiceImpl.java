@@ -95,7 +95,15 @@ public class ConsentCenterServiceImpl implements ConsentCenterService {
         ConsentRecord row = consentMapper.selectOne(new QueryWrapper<ConsentRecord>()
                 .eq("user_id", userId).eq("purpose_code", purpose.name()));
         if (row != null) {
-            return "GRANTED".equals(row.status) ? Decision.GRANTED : Decision.DECLINED;
+            if (!stale(purpose, row)) {
+                return "GRANTED".equals(row.status) ? Decision.GRANTED : Decision.DECLINED;
+            }
+            // CP-07 versioned re-consent: the recorded decision was made under DIFFERENT
+            // purpose texts, so it must not silently keep authorizing anything. Fall back
+            // to the no-decision default (fail-closed for ask-first purposes like
+            // AI_PROVIDER_EGRESS whose default is NOT_GRANTED) and let the consent center
+            // surface the re-consent prompt.
+            return purpose.defaultDecision;
         }
         if (purpose == ConsentPurpose.ANALYTICS) {
             AnalysisConsent analysis = analysisConsentMapper.selectOne(
@@ -165,16 +173,28 @@ public class ConsentCenterServiceImpl implements ConsentCenterService {
                 purpose.userSettable,
                 purpose.description,
                 purpose.withdrawalEffect,
-                row == null ? ConsentPurpose.CURRENT_VERSION : row.version,
-                row == null ? "DEFAULT" : "CONSENT_CENTER");
+                ConsentPurpose.CURRENT_VERSION,
+                row == null ? "DEFAULT" : (stale(purpose, row) ? "RE_CONSENT_REQUIRED" : "CONSENT_CENTER"));
     }
 
     /** Row-level effective decision without extra queries (list path). */
     private Decision effectiveFrom(ConsentPurpose purpose, ConsentRecord row) {
         if (row != null) {
-            return "GRANTED".equals(row.status) ? Decision.GRANTED : Decision.DECLINED;
+            if (!stale(purpose, row)) {
+                return "GRANTED".equals(row.status) ? Decision.GRANTED : Decision.DECLINED;
+            }
+            return purpose.defaultDecision;
         }
         return purpose.defaultDecision;
+    }
+
+    /**
+     * CP-07 versioned re-consent: a recorded decision is stale when its version is not the
+     * registry's current one (null version = pre-versioning legacy row = stale). Stale
+     * grants never authorize; the center must show a re-consent prompt instead.
+     */
+    private static boolean stale(ConsentPurpose purpose, ConsentRecord row) {
+        return !ConsentPurpose.CURRENT_VERSION.equals(row.version);
     }
 
     private void syncAnalysisConsent(Long userId, boolean grant, LocalDateTime now) {

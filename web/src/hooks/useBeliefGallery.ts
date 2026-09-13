@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { api, type BeliefContradiction, type BeliefPattern } from "../api";
+import { api, isVersionConflictError, type BeliefContradiction, type BeliefPattern } from "../api";
 import type { Locale } from "../i18n";
 
 // Port of the belief-pattern-browsing half of src/main/resources/static/pages/beliefs.html
@@ -16,6 +16,10 @@ export function useBeliefGallery({ setStatus, locale = "zh-CN" }: { setStatus: (
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [categoryBeliefs, setCategoryBeliefs] = useState<BeliefPattern[]>([]);
   const [busy, setBusy] = useState(false);
+  // CP-21: a belief-surface response died on an optimistic-concurrency conflict (409 /
+  // code CONFLICT). The gallery never silently keeps stale rows then — it says someone
+  // updated the content first and offers a refresh.
+  const [conflict, setConflict] = useState(false);
 
   const loadAll = useCallback(() => api.beliefList().then(setBeliefs), []);
   const loadContradictions = useCallback(() => api.beliefContradictions().then(setContradictions).catch(() => undefined), []);
@@ -32,7 +36,8 @@ export function useBeliefGallery({ setStatus, locale = "zh-CN" }: { setStatus: (
     try {
       setBeliefs(next === "strong" ? await api.beliefStrong(0.5) : await api.beliefList());
     } catch (error) {
-      setStatus(error instanceof Error ? error.message
+      if (isVersionConflictError(error)) setConflict(true);
+      else setStatus(error instanceof Error ? error.message
         : locale === "en-SG" ? "Could not load beliefs yet." : "暂时无法加载信念");
     } finally {
       setBusy(false);
@@ -45,15 +50,27 @@ export function useBeliefGallery({ setStatus, locale = "zh-CN" }: { setStatus: (
     try {
       setCategoryBeliefs(await api.beliefByCategory(category));
     } catch (error) {
-      setStatus(error instanceof Error ? error.message
+      if (isVersionConflictError(error)) setConflict(true);
+      else setStatus(error instanceof Error ? error.message
         : locale === "en-SG" ? "Could not load this category yet." : "暂时无法加载这个分类");
     } finally {
       setBusy(false);
     }
   }, [locale, setStatus]);
 
+  /** CP-21: "查看最新" — drop the conflict state and re-pull the lists from the server. */
+  const refreshFromConflict = useCallback(() => {
+    setConflict(false);
+    void loadAll().catch(() => undefined);
+    void loadContradictions();
+  }, [loadAll, loadContradictions]);
+
+  /** CP-21: dismiss the banner without refetching (the owner chose to keep reading as-is). */
+  const dismissConflict = useCallback(() => setConflict(false), []);
+
   return {
     beliefs, contradictions, filter, categories, selectedCategory, categoryBeliefs, busy,
+    conflict, refreshFromConflict, dismissConflict,
     loadAll, loadContradictions, selectFilter, selectCategory
   };
 }
