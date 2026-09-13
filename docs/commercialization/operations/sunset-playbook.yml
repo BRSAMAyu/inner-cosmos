@@ -1,0 +1,84 @@
+# CP-62 停服与危机运行手册（sunset playbook）
+# 契约测试：src/test/java/com/innercosmos/operations/SunsetPlaybookContractTest.java
+# 蓝图 L891-894：七类情景 × 触发/首24小时/只读模式/退款批次/联系渠道/法定留存/
+# 最终销毁/演练状态。演练状态与全部"已完成"字段是 operator 事实——status 只有
+# PENDING / IN_PROGRESS，rehearsal 全 null。
+
+scenarios:
+  - scenario_id: ninety-day-cash
+    name: 90 日低现金
+    trigger: 现金跑道 < 90 日（CP-47 现金计划预警）
+    first_24h: 冻结非核心支出；按 CP-55 停止低效投放；评估 CP-64 聚焦/收缩决策
+    readonly_steps: 决定收缩时开 inner-cosmos.readonly-mode.enabled=true（义务路径自动保持）
+    refund_batch: 按账本 tb_payment_event 净额生成退款批次；权益保留至周期末
+    contact_channel: 公告 + 状态页 + 客服工单（CP-48 台账）
+    legal_retention: 法定留存清单见 CP-51 台账 data-audit-classification
+    final_destruction: null
+    rehearsal: null
+    status: PENDING
+  - scenario_id: vendor-exit
+    name: 供应商退出（云/模型/审核）
+    trigger: 关键供应商通知终止或不可用
+    first_24h: 切换备用授权或降级 Mock；评估各端只读；通知用户真实影响
+    readonly_steps: 依赖不可替代时局部只读；不冒充可用
+    refund_batch: 服务中断超承诺窗口按订单净额退款
+    contact_channel: 公告 + 状态页
+    legal_retention: 不变
+    final_destruction: null
+    rehearsal: null
+    status: PENDING
+  - scenario_id: founder-unavailable
+    name: 创始人不可用
+    trigger: 创始人失能/失联超 48 小时
+    first_24h: 按值班台账 crisis 值班接管决策；CP-52 五方签字人替补名单生效
+    readonly_steps: 无需只读——值班体系运行
+    refund_batch: 常规流程
+    contact_channel: 内部值班链
+    legal_retention: 不变
+    final_destruction: null
+    rehearsal: null
+    status: PENDING
+  - scenario_id: cloud-account-frozen
+    name: 云账户冻结
+    trigger: 云服务商冻结账户/欠费停机
+    first_24h: 启用备份域与 CP-50 异地恢复目标；公告真实影响，不隐瞒
+    readonly_steps: 恢复前只读或不服务；绝不无备份硬启
+    refund_batch: 中断期按订单净额退款
+    contact_channel: 公告 + 状态页
+    legal_retention: 备份中的法定留存先于销毁
+    final_destruction: null
+    rehearsal: null
+    status: PENDING
+  - scenario_id: certificate-expiry
+    name: 证书过期（签名/TLS/推送）
+    trigger: 证书到期前 30 日告警未处理
+    first_24h: 更新证书；过期期间暂停对应渠道更新（拒绝未签名更新是产品行为）
+    readonly_steps: 受影响端只读，其余端正常
+    refund_batch: 不适用（不绑购买）
+    contact_channel: 状态页
+    legal_retention: 不变
+    final_destruction: null
+    rehearsal: null
+    status: PENDING
+  - scenario_id: acquisition-merger
+    name: 并购/所有权变更
+    trigger: 具约束力的交易文件签署
+    first_24h: 法务牵头用户告知与数据权利选项；退出/迁移不绑购买（CP-62 导出/导入已就绪）
+    readonly_steps: 视交易条款；用户权利优先
+    refund_batch: 按交易条款与法定义务
+    contact_channel: 公告 + 逐用户通知
+    legal_retention: 交易尽调需要的留存最小化并告知
+    final_destruction: null
+    rehearsal: null
+    status: PENDING
+  - scenario_id: service-sunset
+    name: 正式停服
+    trigger: CP-64 决策 = STOP 且所有者批准
+    first_24h: 停服预告（≥法定提前量）→ 停止续费（renewal-reminder 关闭 + 渠道解绑）→ 权益到期自然终止
+    readonly_steps: 预告期满后全面只读 → 只保留导出/数据权利/退款
+    refund_batch: 未消耗净额全量退款批次；出口/迁移不收费
+    contact_channel: 公告 + 状态页 + 逐用户通知 + 客服（CP-48 值班表随停服缩减但保留至销毁完成）
+    legal_retention: 法定留存期内保留最小数据集
+    final_destruction: 留存期满按 CP-15 tombstone 语义执行最终销毁并留存不可恢复证据
+    rehearsal: null
+    status: PENDING

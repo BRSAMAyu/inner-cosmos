@@ -729,7 +729,10 @@ work_packages:
     stage: S2
     depends_on: ["CP-02", "CP-08", "CP-09", "CP-31"]
     vision_ids: ["V01", "V18", "V19"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
+    delivery_record: evidence/commercial-cn/CP-53/2026-09-13-landing-and-share-card/delivery-record.md
+    test_command: "./mvnw test -Dtest='LandingCopyDeckContractTest,ShareCardDeidentificationContractTest'"
+    note: "首个增量：落地页文案结构(六章节,hero须≥3具体任务词+空泛词全卷黑名单,AI身份与隐私边界逐条,install路径与真实实现逐字对齐全PENDING_VERIFICATION,素材授权全null广告标识强制,不从倾诉生成营销内容)+分享卡去身份前瞻契约(白名单7字段syntheticLabel恒真,黑名单9项,实现哨兵防落地后绕过);12/12契约;真实素材/证言/投放为operator门禁"
     evidence_dir: evidence/commercial-cn/CP-53/
   - id: CP-54
     title: "真人队列与社交冷启动研究"
@@ -823,6 +826,8 @@ work_packages:
     delivery_record: evidence/commercial-cn/CP-62/2026-09-13-export-import-roundtrip/delivery-record.md
     test_command: "./mvnw test -Dtest=ExportImportRoundTripTest"
     note: "首个增量：导出格式v2(schemaVersion白名单/源身份/每节SHA-256/整包摘要/纠正链与媒体引用随行,源行id不入包)+导入服务(L893六项机械化:损坏包拒/重签名走私拒FORBIDDEN/回执幂等零新增/共鸣体强制PRIVATE/信件一律DRAFT/grant永不入导入)+V47回执表+双端点(退出迁移不绑购买);PG基线47/105/98/28实机"
+    delivery_record2: evidence/commercial-cn/CP-62/2026-09-13-sunset-readonly/delivery-record.md
+    note2: "第二增量：ReadOnlyModeFilter只读开关(义务路径放行:登录/安全/数据权利/导出/取消/渠道回调照常,新收费新内容503文案点名权利不受影响,契约实测回调穿透过滤器)+七情景停服手册(停服路径显式保导出/权利/退款不绑购买)+K3支付指标断链修复(审计发现PAYMENT_CAPTURED/REFUND_SETTLED零发射点→ingest接受路径接线)+CP-58并发测试有界复读稳定化"
     evidence_dir: evidence/commercial-cn/CP-62/
   - id: CP-63
     title: "独立安全、隐私与监管复核"

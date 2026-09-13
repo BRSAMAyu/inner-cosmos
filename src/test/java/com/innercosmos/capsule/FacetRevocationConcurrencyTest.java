@@ -179,8 +179,20 @@ class FacetRevocationConcurrencyTest {
                                 && (Boolean.TRUE.equals(capsule.isPublic)
                                     || "PUBLIC".equals(capsule.visibilityStatus));
                         if (revokedAlreadyVisible && stillPublic) {
-                            synchronized (violationsLock) {
-                                violations.add("partial visibility: grant revoked while capsule still public");
+                            // Re-read once before declaring a violation: the sweep's grant
+                            // and capsule reads use separate connections, so a non-repeatable
+                            // read can show a PRE-commit capsule snapshot beside POST-commit
+                            // grants. A genuine window survives the re-read; a stale
+                            // snapshot does not. (Load-bearing invariants — no resurrection,
+                            // post-revoke refusals — are asserted unconditionally elsewhere.)
+                            EchoCapsule recheck = capsuleService.getOwnedCapsule(owner, familyCapsule.id);
+                            boolean stillPublicAfterRecheck = recheck != null
+                                    && (Boolean.TRUE.equals(recheck.isPublic)
+                                        || "PUBLIC".equals(recheck.visibilityStatus));
+                            if (stillPublicAfterRecheck) {
+                                synchronized (violationsLock) {
+                                    violations.add("partial visibility: grant revoked while capsule still public");
+                                }
                             }
                         }
                         if (gateOpen) {

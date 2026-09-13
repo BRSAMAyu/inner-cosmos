@@ -69,7 +69,7 @@ class ChannelCallbackSandboxContractTest {
 
     private ChannelCallbackIngestService configuredIngest(String wechatMchid, String alipayAppId) {
         return new ChannelCallbackIngestService(
-                new PaymentCallbackVerifier(SECRET, NOW), ledger, orders, entitlements,
+                new PaymentCallbackVerifier(SECRET, NOW), ledger, orders, entitlements, null,
                 List.of(new WeChatPayCallbackAdapter(), new AlipayCallbackAdapter()),
                 wechatMchid, alipayAppId);
     }
@@ -361,7 +361,7 @@ class ChannelCallbackSandboxContractTest {
         String order = "BLANK-SEC-" + System.nanoTime();
         String body = wechatBody("wx-bs-" + order, "TRANSACTION.SUCCESS", order, 2500L, null);
         var blankSecretIngest = new ChannelCallbackIngestService(
-                new PaymentCallbackVerifier("", NOW), ledger, orders, entitlements,
+                new PaymentCallbackVerifier("", NOW), ledger, orders, entitlements, null,
                 List.of(new WeChatPayCallbackAdapter(), new AlipayCallbackAdapter()),
                 MCHID, APP_ID);
         assertEquals(Outcome.REJECTED_SIGNATURE, blankSecretIngest

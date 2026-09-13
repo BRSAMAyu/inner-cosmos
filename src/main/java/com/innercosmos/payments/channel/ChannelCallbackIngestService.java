@@ -49,6 +49,7 @@ public class ChannelCallbackIngestService {
     private final PaymentLedgerService ledger;
     private final PaymentOrderService orders;
     private final EntitlementStateService entitlements;
+    private final com.innercosmos.service.metric.MetricEventService metricEvents;
     private final Map<String, ChannelCallbackAdapter> adapters = new HashMap<>();
     private final String wechatMchid;
     private final String alipayAppId;
@@ -59,6 +60,8 @@ public class ChannelCallbackIngestService {
             PaymentLedgerService ledger,
             PaymentOrderService orders,
             EntitlementStateService entitlements,
+            @org.springframework.beans.factory.annotation.Autowired(required = false)
+            com.innercosmos.service.metric.MetricEventService metricEvents,
             List<ChannelCallbackAdapter> adapterList,
             @Value("${inner-cosmos.payments.channels.wechatpay.mchid:}") String wechatMchid,
             @Value("${inner-cosmos.payments.channels.alipay.app-id:}") String alipayAppId) {
@@ -66,6 +69,7 @@ public class ChannelCallbackIngestService {
         this.ledger = ledger;
         this.orders = orders;
         this.entitlements = entitlements;
+        this.metricEvents = metricEvents;
         for (ChannelCallbackAdapter adapter : adapterList) {
             this.adapters.put(adapter.provider(), adapter);
         }
@@ -138,6 +142,21 @@ public class ChannelCallbackIngestService {
         // Idempotent per provider event: a channel retry acks the existing row.
         ledger.record(callback.providerEventId(), provider, callback.orderId(), eventType,
                 callback.amountCents(), callback.occurredAt());
+        // CP-03 x CP-45: every accepted money fact feeds the K3 metric store so
+        // contribution-margin reporting never disagrees with the payment ledger.
+        if (metricEvents != null) {
+            metricEvents.record(
+                    "PAYMENT_SUCCEEDED".equals(eventType)
+                            ? com.innercosmos.service.metric.MetricCode.PAYMENT_CAPTURED
+                            : com.innercosmos.service.metric.MetricCode.REFUND_SETTLED,
+                    order.userId, callback.occurredAt().toInstant(java.time.ZoneOffset.UTC),
+                    "ORDER", callback.orderId(),
+                    provider, null,
+                    java.util.Map.of("orderId", callback.orderId(),
+                            "channel", provider,
+                            "amountCents", callback.amountCents(),
+                            "currency", "CNY"));
+        }
         if ("PAYMENT_SUCCEEDED".equals(eventType)) {
             entitlements.onPaymentSucceeded(order.userId, order.productId, provider,
                     callback.orderId(), callback.providerEventId(), callback.occurredAt());

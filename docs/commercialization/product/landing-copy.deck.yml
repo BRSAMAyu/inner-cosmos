@@ -1,0 +1,77 @@
+# CP-53 品牌、内容与合规增长素材 —— 落地页价值主张结构化落盘（landing copy deck）
+# 来源：docs/commercialization/01-中国大陆商业化执行蓝图.md L810-816（CP-53）
+#   执行："确定中文名称／一句话价值、官网落地页、帮助／信任说明、应用截图与成人场景内容"
+#   验收："落地页说得出具体任务、AI身份和隐私边界，安装／注册／取消路径真实"
+#   恢复："违规或误导素材立即撤下并记录影响；不从用户倾诉自动生成营销内容"
+# 契约测试：src/test/java/com/innercosmos/product/LandingCopyDeckContractTest.java
+#
+# 诚实规则（结构性强制，照 cp60c-accessibility-matrix.yml / legal ledger 范本）：
+# - 每个章节 status ∈ {DRAFT, PENDING_VERIFICATION}，且仅此两值可由 agent 落盘：
+#     DRAFT                文案草稿：措辞仍在打磨，尚未定稿送核
+#     PENDING_VERIFICATION 定稿候选：措辞冻结，等待 operator 按真实发布环境逐字核对回执
+# - 枚举注释位 OPERATOR_APPROVED：不可用状态。发布核对回执只能由 operator 在本文件之外
+#   落位签字，agent 与契约测试都不得把任何字段值写成该态（契约测试做全字段黑名单断言）
+# - install-path 全部指向当前课堂演示隧道（Quick Tunnel 地址随每次启动变化）与 Debug APK，
+#   正式域名与商店渠道未发布，因此整体保持 PENDING_VERIFICATION，绝不自动宣称已验证
+# - 当前真实参照物：src/main/resources/static/index.html（落地页）、
+#   web/src/components/AccountSettings.tsx（删除账户）、DataRightsController（数据权利）
+# - 示例与真实证言区分：当前无任何真实用户证言，所有引语均为合成示例且必须标注；
+#   不从用户倾诉自动生成营销内容（CP-53 恢复条款，结构性写入 evidence-discipline 章节）
+
+sections:
+  - id: hero
+    title: "一句话价值（中文名称＋具体任务）"
+    product_name: "内宇宙 Inner Cosmos"
+    copy: "向 Aurora 倾诉今天的事：一次对话自动沉淀成记忆卡片、待办与情绪轨迹，一周后还能按主题回看自己走过的路。"
+    task_terms: "倾诉对话、沉淀记忆卡片、生成待办、回看情绪轨迹"
+    boundary: "价值落在可演示的真实任务链（倾诉→沉淀→回看），不使用空泛陪伴话术替代具体任务"
+    status: PENDING_VERIFICATION
+  - id: what-it-is
+    title: "AI 身份声明（它是什么、不是什么）"
+    copy: "Aurora 是 Inner Cosmos 提供的 AI 程序，不是真人，也没有人类在线扮演；Inner Cosmos 不是医疗器械，不做心理诊断，不提供治疗建议，不能替代医生、心理咨询师或心理援助热线。"
+    crisis: "处于危机或自伤风险时，安全边界会中断对话并引导至专业援助资源，而不是继续陪伴式聊天。"
+    status: PENDING_VERIFICATION
+  - id: privacy-boundary
+    title: "隐私边界（三行）"
+    line_1: "你与 Aurora 的原始对话（P0）仅你本人可见，不进入星海广场，也不用于训练或投放。"
+    line_2: "共鸣体（EchoCapsule）只能携带你授权后的脱敏抽象信息，发布前可预览全部对外内容。"
+    line_3: "数据权利不设付费墙：导出、更正与删除在免费账户下同样可用。"
+    status: PENDING_VERIFICATION
+  - id: install-path
+    title: "安装／注册／取消路径（当前真实状态）"
+    web_entry: "Web 入口：演示隧道根地址下的 /app/aurora/（例 https://…trycloudflare.com/app/aurora/；课堂 Quick Tunnel 地址随每次启动变化，正式域名未发布）。"
+    android_download: "Android 下载：落地页首屏「下载 Android App」按钮 → /downloads/inner-cosmos-demo.apk（Debug 签名，仅供课堂演示旁加载，未上架商店）。"
+    registration: "注册：入口首页创建账号（须年满 18 周岁），首次使用按渐进同意流程逐项授权，可逐项拒绝。"
+    cancellation: "取消：登录后「账户设置 → 删除账户」删除账号与数据；导出与更正走同一处的数据权利入口，无需联系客服。"
+    verification_note: "待 operator 按真实发布环境核对：入口地址可达、APK 可下载安装、删除账户真实生效，逐项回执后方可移出待核状态。"
+    status: PENDING_VERIFICATION
+  - id: trust-notes
+    title: "帮助／信任说明"
+    copy: "帮助中心与隐私政策正式页面尚未上线；当前以应用内安全提示与仓库文档作临时信任材料，落地页不得链接到不存在的帮助页面。"
+    contact: "客服与申诉渠道未开放，落地页不展示任何客服承诺。"
+    status: DRAFT
+  - id: evidence-discipline
+    title: "示例与真实证言区分"
+    copy: "当前无任何真实用户证言：落地页与所有增长素材中的引语、截图人物与故事均为合成示例，一律标注「示例（AI 合成，非真实用户）」。"
+    no_auto_marketing: "不从用户倾诉自动生成营销内容；素材授权／广告标识／作者权益登记见下方 assets，未登记素材一律不得投放。"
+    takedown: "违规或误导素材立即撤下并记录影响（撤下时间、渠道、曝光量）。"
+    status: PENDING_VERIFICATION
+
+# 素材授权／广告标识登记（CP-53）。authorized 在 operator 外部授权回执落位前恒为 null；
+# ad_label_required 恒为 true —— 素材进入任何付费/推广渠道必须带广告标识。
+assets:
+  - asset_id: landing-hero-visual
+    kind: "落地页首屏视觉（合成示例场景）"
+    authorized: null
+    ad_label_required: true
+    authorship: "作者权益登记待落位（设计稿作者与授权范围）"
+  - asset_id: app-screenshots-adult-scenes
+    kind: "应用截图（成人日常场景，演示账号合成数据）"
+    authorized: null
+    ad_label_required: true
+    authorship: "截图来自演示账号合成数据；真人数据截图需单独授权登记"
+  - asset_id: share-card-template
+    kind: "分享卡模板（实现未落地，前瞻规范见 share-card.schema.md）"
+    authorized: null
+    ad_label_required: true
+    authorship: "分享卡实现属 CP-31，未落地；schema 前瞻契约先行"
