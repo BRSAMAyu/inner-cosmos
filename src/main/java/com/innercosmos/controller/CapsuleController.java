@@ -1,5 +1,7 @@
 package com.innercosmos.controller;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.innercosmos.common.ApiResponse;
 import com.innercosmos.dto.CapsuleCreateRequest;
 import com.innercosmos.dto.CapsuleVisibilityRequest;
@@ -15,6 +17,7 @@ import com.innercosmos.service.DataUseGrantService;
 import com.innercosmos.entity.DataUseGrant;
 import com.innercosmos.entity.CapsuleGenomeVersion;
 import com.innercosmos.entity.CapsuleSandboxFeedback;
+import com.innercosmos.vo.CapsuleAiLabeling;
 import com.innercosmos.vo.CapsuleFidelitySummaryVO;
 import com.innercosmos.vo.CapsulePreviewVO;
 import com.innercosmos.vo.CapsuleSandboxVO;
@@ -24,6 +27,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -35,6 +39,12 @@ public class CapsuleController extends BaseController {
     private final CapsuleGenomeService genomeService;
     private final CapsuleSandboxService sandboxService;
     private final DataUseGrantService dataUseGrantService;
+    private final ObjectMapper objectMapper;
+
+    /** CP-31: serialization shape for {@link #labeled} — the app mapper keeps entity parity. */
+    private static final TypeReference<LinkedHashMap<String, Object>> CAPSULE_PAYLOAD =
+            new TypeReference<>() {
+            };
 
     /** CP-14 unified boundary guard; optional so direct-construction tests keep working. */
     @org.springframework.beans.factory.annotation.Autowired(required = false)
@@ -42,44 +52,58 @@ public class CapsuleController extends BaseController {
 
     public CapsuleController(CapsuleService capsuleService, DataMaskingService dataMaskingService,
                              CapsuleGenomeService genomeService, CapsuleSandboxService sandboxService,
-                             DataUseGrantService dataUseGrantService) {
+                             DataUseGrantService dataUseGrantService, ObjectMapper objectMapper) {
         this.capsuleService = capsuleService;
         this.dataMaskingService = dataMaskingService;
         this.genomeService = genomeService;
         this.sandboxService = sandboxService;
         this.dataUseGrantService = dataUseGrantService;
+        this.objectMapper = objectMapper;
+    }
+
+    /**
+     * CP-31 / closing-checklist §2-9: every EchoCapsule payload leaving this controller is
+     * augmented with field-level AI provenance (aiGenerated / aiGeneratedFields /
+     * systemCompiledFields / ownerWrittenFields / aiLabelingNote) — additive only, every
+     * pre-existing field stays at the top level. Provenance tiers and their honesty limits
+     * are documented on {@link CapsuleAiLabeling}.
+     */
+    private Map<String, Object> labeled(EchoCapsule capsule) {
+        Map<String, Object> payload = objectMapper.convertValue(capsule, CAPSULE_PAYLOAD);
+        return CapsuleAiLabeling.augmentCapsulePayload(payload, capsule.capsuleType);
     }
 
     @GetMapping("/my")
-    public ApiResponse<List<EchoCapsule>> my(HttpSession session) {
-        return ApiResponse.ok(capsuleService.myCapsules(currentUserId(session)));
+    public ApiResponse<List<Map<String, Object>>> my(HttpSession session) {
+        return ApiResponse.ok(capsuleService.myCapsules(currentUserId(session)).stream()
+                .map(this::labeled).toList());
     }
 
     @PostMapping("/create-from-memory")
-    public ApiResponse<EchoCapsule> create(@RequestBody CapsuleCreateRequest request, HttpSession session) {
-        return ApiResponse.ok(capsuleService.createFromMemory(currentUserId(session), request));
+    public ApiResponse<Map<String, Object>> create(@RequestBody CapsuleCreateRequest request, HttpSession session) {
+        return ApiResponse.ok(labeled(capsuleService.createFromMemory(currentUserId(session), request)));
     }
 
     @PostMapping("/create-simulator")
-    public ApiResponse<EchoCapsule> createSimulator(@RequestBody CapsuleCreateRequest request, HttpSession session) {
-        return ApiResponse.ok(capsuleService.createSimulatorCapsule(currentUserId(session), request));
+    public ApiResponse<Map<String, Object>> createSimulator(@RequestBody CapsuleCreateRequest request, HttpSession session) {
+        return ApiResponse.ok(labeled(capsuleService.createSimulatorCapsule(currentUserId(session), request)));
     }
 
     @GetMapping("/{id}")
-    public ApiResponse<EchoCapsule> detail(@PathVariable Long id, HttpSession session) {
-        return ApiResponse.ok(capsuleService.getOwnedCapsule(currentUserId(session), id));
+    public ApiResponse<Map<String, Object>> detail(@PathVariable Long id, HttpSession session) {
+        return ApiResponse.ok(labeled(capsuleService.getOwnedCapsule(currentUserId(session), id)));
     }
 
     @PostMapping("/{id}/visibility")
-    public ApiResponse<EchoCapsule> visibility(@PathVariable Long id,
-                                               @RequestBody CapsuleVisibilityRequest request,
-                                               HttpSession session) {
-        return ApiResponse.ok(capsuleService.updateVisibility(
+    public ApiResponse<Map<String, Object>> visibility(@PathVariable Long id,
+                                                       @RequestBody CapsuleVisibilityRequest request,
+                                                       HttpSession session) {
+        return ApiResponse.ok(labeled(capsuleService.updateVisibility(
                 currentUserId(session),
                 id,
                 request.visibilityStatus,
                 request.isPublic
-        ));
+        )));
     }
 
     @PostMapping("/preview-from-memory")
@@ -103,15 +127,19 @@ public class CapsuleController extends BaseController {
     }
 
     @PostMapping("/{id}/context")
-    public ApiResponse<EchoCapsule> updateContext(@PathVariable Long id,
-                                                  @RequestBody Map<String, Object> body,
-                                                  HttpSession session) {
-        return ApiResponse.ok(capsuleService.updateContext(currentUserId(session), id, body));
+    public ApiResponse<Map<String, Object>> updateContext(@PathVariable Long id,
+                                                          @RequestBody Map<String, Object> body,
+                                                          HttpSession session) {
+        return ApiResponse.ok(labeled(capsuleService.updateContext(currentUserId(session), id, body)));
     }
 
     @GetMapping("/{id}/context-preview")
     public ApiResponse<Map<String, Object>> contextPreview(@PathVariable Long id, HttpSession session) {
-        return ApiResponse.ok(capsuleService.contextPreview(currentUserId(session), id));
+        // CP-31: payload-scoped AI labeling — the service map is immutable (Map.of), so copy
+        // first, then let CapsuleAiLabeling add the honest per-field provenance keys.
+        Map<String, Object> preview = new LinkedHashMap<>(
+                capsuleService.contextPreview(currentUserId(session), id));
+        return ApiResponse.ok(CapsuleAiLabeling.augmentContextPreviewPayload(preview));
     }
 
     @GetMapping("/{id}/boundary")

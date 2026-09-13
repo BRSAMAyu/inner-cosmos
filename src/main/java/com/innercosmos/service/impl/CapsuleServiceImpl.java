@@ -293,6 +293,7 @@ public class CapsuleServiceImpl implements CapsuleService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public EchoCapsule updateContext(Long userId, Long capsuleId, Map<String, Object> body) {
         EchoCapsule capsule = getOwnedCapsule(userId, capsuleId);
         if (capsule == null) {
@@ -315,7 +316,19 @@ public class CapsuleServiceImpl implements CapsuleService {
         if (body.containsKey("publicTags")) capsule.publicTags = toJsonArray(castStringList(body.get("publicTags")), "self-resonance");
         if (body.containsKey("authorizedMemoryIds")) {
             List<Long> requested = parseLongIds(toJsonArray(castStringList(body.get("authorizedMemoryIds"))));
-            replaceAuthorizations(userId, capsule, requested);
+            AuthorizationOutcome outcome = replaceAuthorizations(userId, capsule, requested);
+            if (!outcome.conflicts().isEmpty()) {
+                // CP-29: same explained conflict as recompile -- silently authorizing a
+                // subset of an explicit list would surprise the owner into believing more
+                // of their memories are in the capsule than actually are. Transactional:
+                // the refusal leaves the previous authorization snapshot untouched.
+                String explained = outcome.conflicts().stream()
+                        .map(conflict -> "记忆 " + conflict.memoryId() + "：" + conflict.reason())
+                        .reduce((a, b) -> a + "；" + b).orElse("");
+                throw new com.innercosmos.exception.BusinessException(
+                        com.innercosmos.common.ErrorCode.BAD_REQUEST,
+                        "以下记忆不能用于此共鸣体——" + explained);
+            }
             capsule.visibilityStatus = "NEEDS_REVIEW";
             capsule.isPublic = false;
             genomeService.markNeedsReview(capsule.id, "owner changed authorized memories");
@@ -1111,7 +1124,17 @@ public class CapsuleServiceImpl implements CapsuleService {
                 DataRetractionReceiptService.ACTION_ERASED, erased, "owner archived capsule");
     }
 
-    private List<MemoryCard> replaceAuthorizations(Long userId, EchoCapsule capsule, List<Long> requestedIds) {
+    /**
+     * CP-29: authorization-snapshot replacement outcome -- the accepted memories plus, for
+     * every refused one, the honest category of why. Owners get an explained conflict
+     * instead of one generic line.
+     */
+    public record AuthorizationOutcome(List<MemoryCard> accepted, List<AuthorizationConflict> conflicts) { }
+
+    /** CP-29: one refused memory and the honest category of why (for conflict explanations). */
+    public record AuthorizationConflict(Long memoryId, String reason) { }
+
+    private AuthorizationOutcome replaceAuthorizations(Long userId, EchoCapsule capsule, List<Long> requestedIds) {
         dataUseGrantService.revokeForCapsule(capsule.id, "owner replaced capsule authorization set");
         for (AuthorizedMemoryRef ref : authorizedMemoryRefMapper.selectList(
                 new QueryWrapper<AuthorizedMemoryRef>().eq("capsule_id", capsule.id))) {
@@ -1126,20 +1149,26 @@ public class CapsuleServiceImpl implements CapsuleService {
         // testing-only, reaching real visitors through plaza/matching/persona chat.
         boolean simulatorOnly = Boolean.TRUE.equals(capsule.simulatorOnly);
         List<MemoryCard> accepted = new ArrayList<>();
+        List<AuthorizationConflict> conflicts = new ArrayList<>();
         for (Long id : requestedIds) {
             MemoryCard card = memoryCardMapper.selectById(id);
-            if (card == null || !userId.equals(card.userId) || !"ACTIVE".equalsIgnoreCase(card.status)) continue;
+            if (card == null) { conflicts.add(new AuthorizationConflict(id, "不存在")); continue; }
+            if (!userId.equals(card.userId)) { conflicts.add(new AuthorizationConflict(id, "非本人记忆")); continue; }
+            if (!"ACTIVE".equalsIgnoreCase(card.status)) { conflicts.add(new AuthorizationConflict(id, "已撤回或已失效")); continue; }
             boolean isSimulatorScope = SIMULATOR_CONSENT_SCOPE.equalsIgnoreCase(card.consentScope);
             if (simulatorOnly ? !isSimulatorScope
                     : (isSimulatorScope || "LOCAL_ONLY".equalsIgnoreCase(card.consentScope)
                             || "NO_EXTERNAL_PROCESSING".equalsIgnoreCase(card.consentScope))) {
+                conflicts.add(new AuthorizationConflict(id, simulatorOnly
+                        ? "仅接受 Simulator 测试用途的记忆"
+                        : "该记忆的同意范围禁止用于共鸣体（" + card.consentScope + "）"));
                 continue;
             }
             accepted.add(card);
             authorize(capsule, card);
         }
         capsule.authorizedMemoryIds = toJsonArray(accepted.stream().map(card -> String.valueOf(card.id)).toList());
-        return accepted;
+        return new AuthorizationOutcome(accepted, conflicts);
     }
 
     private boolean currentAuthorizationsValid(EchoCapsule capsule) {
@@ -1249,12 +1278,18 @@ public class CapsuleServiceImpl implements CapsuleService {
                 com.innercosmos.common.ErrorCode.UNAUTHORIZED, "无权重新编译此共鸣体");
         Set<Long> requested = new LinkedHashSet<>(memoryIds == null ? List.of() : memoryIds);
         requested.remove(null);
-        List<MemoryCard> cards = replaceAuthorizations(userId, capsule,
+        AuthorizationOutcome outcome = replaceAuthorizations(userId, capsule,
                 new ArrayList<>(requested));
-        if (cards.size() != requested.size()) {
+        List<MemoryCard> cards = outcome.accepted();
+        if (!outcome.conflicts().isEmpty()) {
+            // CP-29: name every refused memory and the honest reason -- one generic line
+            // hid which part of the owner's own list was the problem.
+            String explained = outcome.conflicts().stream()
+                    .map(conflict -> "记忆 " + conflict.memoryId() + "：" + conflict.reason())
+                    .reduce((a, b) -> a + "；" + b).orElse("");
             throw new com.innercosmos.exception.BusinessException(
                     com.innercosmos.common.ErrorCode.BAD_REQUEST,
-                    "所选记忆包含已撤回、非本人或禁止用于共鸣体的内容");
+                    "以下记忆不能用于此共鸣体——" + explained);
         }
         // Gemini audit 3.1: recompile must scrub with the capsule's OWN configured privacy tier,
         // not a hardcoded default -- an owner who set STRICT at creation must not silently get a

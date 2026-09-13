@@ -444,10 +444,10 @@ work_packages:
     vision_ids: ["V07", "V10"]
     status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-29/
-    delivery_record: evidence/commercial-cn/CP-29/2026-09-06-resonance-line/delivery-record.md
-    test_command: "./mvnw test -Dtest=ResonanceLineNegativeTest"
-    note: "首个增量：纠正→NEEDS_REVIEW去公开(既有链)+不入发现索引断言；编译失败保稳定版负测列下一步"
-    next_action: "编译失败不替换稳定版本负测；授权快照覆盖/冲突解释"
+    delivery_record: evidence/commercial-cn/CP-29/2026-09-13-compile-stability-auth-conflict/delivery-record.md
+    test_command: "./mvnw test -Dtest=CapsuleRecompileStabilityTest"
+    note: "首个增量：纠正→NEEDS_REVIEW去公开(既有链)+不入发现索引断言；编译失败保稳定版负测列下一步；第二增量：编译失败保稳定版负测坐实(spy注入genome失败,消息断言防空过)+updateContext补@Transactional(replaceAuthorizations先吊销后授权,原无事务是真隐患)+授权冲突逐条解释(AuthorizationOutcome按id说原因,updateContext从静默子集改显式拒绝)；3新测试+共鸣体域161绿"
+    next_action: "尽力授权语义如需保留应加显式参数(已在Javadoc写明)；generateUserPersona源头已fail-closed无需重复守卫"
   - id: CP-30
     title: "保真运行时与隐私红队"
     owner: "Capsule AI＋独立评测"
@@ -468,10 +468,10 @@ work_packages:
     vision_ids: ["V07", "V10", "V18"]
     status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-31/
-    delivery_record: evidence/commercial-cn/CP-29/2026-09-06-resonance-line/delivery-record.md
-    test_command: "./mvnw test -Dtest=ResonanceLineNegativeTest"
-    note: "首个增量：撤回不穿透(persona入口tombstone+深链NOT_FOUND,含备份复活模拟)+公开索引只收准版本"
-    next_action: "分享/导出/复制链的标识传播与缓存清理"
+    delivery_record: evidence/commercial-cn/CP-31/2026-09-13-ai-labeling-propagation/delivery-record.md
+    test_command: "./mvnw test -Dtest=CapsuleAiGeneratedLabelingTest"
+    note: "首个增量：撤回不穿透(persona入口tombstone+深链NOT_FOUND,含备份复活模拟)+公开索引只收准版本；第二增量：全外流面AI标识传播——三级标注(aiGenerated/systemCompiled/ownerWritten,纠正清单错误假设:contextPreview系规则编译非AI)+persona-chat访客回复aiGenerated+导出包digest前注入+share-card契约字段；缓存排查如实无缓存即无失效面；6新测试"
+    next_action: "CapsuleSandboxVO/user-mirror preview(需service层出处信号)/SyncController待后续；行级provenance列；前端消费标注字段"
   - id: CP-32
     title: "多目标匹配与可解释排序"
     owner: "推荐＋产品"

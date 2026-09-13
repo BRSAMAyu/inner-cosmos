@@ -3,10 +3,10 @@ package com.innercosmos.controller;
 import com.innercosmos.common.ApiResponse;
 import com.innercosmos.dto.PersonaChatCreateRequest;
 import com.innercosmos.dto.PersonaChatRequest;
-import com.innercosmos.entity.PersonaChatMessage;
 import com.innercosmos.entity.PersonaChatSession;
 import com.innercosmos.service.PersonaChatService;
 import com.innercosmos.vo.CapsuleQuotaVO;
+import com.innercosmos.vo.PersonaChatMessageVO;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
@@ -45,14 +45,20 @@ public class PersonaChatController extends BaseController {
     }
 
     @PostMapping("/message")
-    public ApiResponse<PersonaChatMessage> message(@Valid @RequestBody PersonaChatRequest request, HttpSession session) {
-        return ApiResponse.ok(personaChatService.reply(currentUserId(session), request.sessionId, request.message));
+    public ApiResponse<PersonaChatMessageVO> message(@Valid @RequestBody PersonaChatRequest request, HttpSession session) {
+        // CP-31 / closing-checklist §2-9: the capsule's reply leaves through here, so it
+        // carries the explicit AI-generated marker (same name/meaning as AuroraReplyVO);
+        // visitor-authored messages are labeled false — PersonaChatMessageVO#from decides
+        // per message from senderType.
+        return ApiResponse.ok(PersonaChatMessageVO.from(
+                personaChatService.reply(currentUserId(session), request.sessionId, request.message)));
     }
 
     @GetMapping("/session/{id}/messages")
-    public ApiResponse<List<PersonaChatMessage>> messages(@PathVariable Long id, HttpSession session) {
+    public ApiResponse<List<PersonaChatMessageVO>> messages(@PathVariable Long id, HttpSession session) {
         personaChatService.verifyOwnership(currentUserId(session), id);
-        return ApiResponse.ok(personaChatService.messages(id));
+        return ApiResponse.ok(personaChatService.messages(id).stream()
+                .map(PersonaChatMessageVO::from).toList());
     }
 
     /**

@@ -31,6 +31,11 @@
 - `mood`：情绪色带标签（枚举值，非用户原话）
 - `summaryText`：脱敏摘要文案（≤ 40 字，仅来自授权抽象信息，经预览确认）
 - `syntheticLabel`：恒为 `true`（必含，去不掉）
+- `aiGeneratedFields`：数组，默认 `[]`；当且仅当某字段的文案由 AI（LLM）生成时把该字段名
+  列入（与共鸣体各外流面的 `aiGeneratedFields` 同名同义，见
+  `vo/CapsuleAiLabeling` 的分级纪律）。`summaryText` 若由模板拼装或规则生成而非 LLM，
+  不得列入；若确由 LLM 起草则必须列入。该字段是**字段级出处声明**，与恒真的
+  `syntheticLabel`（合成标注）语义不同、互不替代。
 - `shareScope`：分享范围（枚举）
 - `generatedAt`：生成时间戳
 
@@ -57,9 +62,13 @@ shareCard:
   mood: calm
   summaryText: "示例（AI 合成，非真实用户）：一次被听见的小憩"
   syntheticLabel: true
+  aiGeneratedFields: ["summaryText"]
   shareScope: public-square
   generatedAt: "2026-09-13T00:00:00Z"
 ```
+
+示例中 `summaryText` 假定由 LLM 起草，故如实列入 `aiGeneratedFields`；若实现改为模板/
+规则拼装，则该数组必须回到 `[]`——标注是出处陈述，不是装饰，不得整体谎标。
 
 ## 升级路径
 

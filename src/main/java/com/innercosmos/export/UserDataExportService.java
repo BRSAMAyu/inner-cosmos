@@ -13,6 +13,7 @@ import com.innercosmos.mapper.EchoCapsuleMapper;
 import com.innercosmos.mapper.MemoryCardMapper;
 import com.innercosmos.mapper.SlowLetterMapper;
 import com.innercosmos.mapper.VoiceTranscriptionMapper;
+import com.innercosmos.vo.CapsuleAiLabeling;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -75,6 +76,19 @@ public class UserDataExportService {
             Map<String, Object> record = record("echoCapsules", "tb_echo_capsule", capsule.id,
                     capsule.ownerUserId, capsule);
             record.put("wasPublic", capsule.isPublic);
+            // CP-31 / closing-checklist §2-9: the export is a machine-readable copy that
+            // leaves the platform, so every record carries the same field-level AI provenance
+            // as the API surfaces (CapsuleAiLabeling documents the tiers): personaPrompt is
+            // LLM-compiled for user capsules (SEED templates make no AI claim; value must
+            // actually be present), contextPreviewJson/styleProfileJson are system-compiled
+            // (not LLM), and the owner-written fields are never claimed as AI. Labels are
+            // added BEFORE the section digest is computed, so the package integrity covers
+            // them and the importer (key-reader based) ignores the extra keys on re-import.
+            record.put("aiGenerated", CapsuleAiLabeling.payloadCarriesAiContent(record, capsule.capsuleType));
+            record.put("aiGeneratedFields", CapsuleAiLabeling.aiGeneratedFieldsFor(capsule.capsuleType));
+            record.put("systemCompiledFields", CapsuleAiLabeling.SYSTEM_COMPILED_FIELDS);
+            record.put("ownerWrittenFields", CapsuleAiLabeling.OWNER_WRITTEN_FIELDS);
+            record.put("aiLabelingNote", CapsuleAiLabeling.LABELING_NOTE);
             capsules.add(record);
         }
         List<Map<String, Object>> letters = new ArrayList<>();

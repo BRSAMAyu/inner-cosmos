@@ -101,7 +101,13 @@ class RelationQualityMetricTest {
     }
 
     private String currentIsoWeek() {
-        LocalDate now = LocalDate.now(clock);
+        // The metric store anchors weeks in Asia/Shanghai (MetricEventServiceImpl.ANCHOR_ZONE)
+        // while the injected Clock is UTC. Deriving from the UTC clock disagreed with the
+        // store between Shanghai midnight and UTC midnight (Sunday 16:00-24:00 UTC): events
+        // landed in the next week while the query asked for the UTC-derived one. Derive the
+        // expected label from the SAME zone the store buckets by.
+        LocalDate now = LocalDate.ofInstant(clock.instant(),
+                java.time.ZoneId.of("Asia/Shanghai"));
         LocalDate monday = now.with(java.time.temporal.TemporalAdjusters.previousOrSame(
                 java.time.DayOfWeek.MONDAY));
         int week = monday.get(java.time.temporal.WeekFields.ISO.weekOfWeekBasedYear());

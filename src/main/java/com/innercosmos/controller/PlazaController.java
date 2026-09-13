@@ -50,6 +50,11 @@ public class PlazaController extends BaseController {
             if (c instanceof EchoCapsule ec) {
                 copy.put("capsule", EchoCapsuleVO.fromPublic(ec));
             }
+            // CP-31 / closing-checklist §2-9: a match item exposes only the public-safe VO
+            // (owner-written fields, see EchoCapsuleVO) plus rule-computed mode scores and
+            // explanations — no LLM-written content, labeled explicitly instead of silently.
+            copy.put("aiGenerated", false);
+            copy.put("aiGeneratedFields", List.of());
             safe.add(copy);
         }
         return ApiResponse.ok(safe);
