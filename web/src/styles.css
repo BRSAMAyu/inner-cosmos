@@ -3736,3 +3736,29 @@ body {
 .belief-conflict-actions button, .portrait-claim-conflict button {
   padding: 6px 14px; border: 1px solid #9bb0a24a; border-radius: 999px;
   color: var(--text-primary); background: #6b5a3f2b; font-size: .78rem; }
+
+/* ===== CP-11: starfield presentation toggle & 200% text-scaling guards (append-only) ===== */
+/* The star map is one way to read the starfield, not the only one: "cosmos-view-toggle" lets a
+   user leave the 3D-style map for the plain accessible list (also the default under
+   prefers-reduced-motion). Everything added here uses rem/em/relative units only — browser
+   200% text zoom must reflow these surfaces, never clip them. */
+.cosmos-view-toggle { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.cosmos-view-toggle button {
+  padding: .45rem .9rem;
+  border: 1px solid var(--border-control);
+  border-radius: 999px;
+  color: var(--text-muted);
+  background: var(--surface-panel-soft);
+  font-size: .78rem;
+}
+.cosmos-view-toggle button:hover { color: var(--text-primary); background: var(--surface-selected); }
+.cosmos-view-toggle button.active { color: var(--on-action); border-color: transparent; background: var(--action-fill); }
+/* Star-label chips follow their own font size (em) instead of a fixed px cap, so 200% text zoom
+   widens the chip instead of ellipsising the memory title away. Later rule wins the cascade over
+   the earlier 118px / min(82px,24vw) declarations. */
+.cosmos-star-label { max-width: min(11em, 40vw); }
+/* Emotional-encoding closure (server flag rendered via data-emotion-encoding): even the
+   decorative star glow settles on one neutral halo instead of glowing by emotional weight. */
+.cosmos-space[data-emotion-encoding="off"] .cosmos-star-core {
+  box-shadow: 0 0 10px color-mix(in srgb, var(--text-muted) 45%, transparent);
+}

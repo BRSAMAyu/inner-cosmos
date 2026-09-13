@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AccountSettings } from "./AccountSettings";
-import type { TtsPreferences, UserProfileSettings } from "../api";
+import type { AgeVerificationStatusView, TtsPreferences, UserProfileSettings } from "../api";
 
 // A fully controllable fake Audio -- see InlineAudioPlayer.test.tsx for why jsdom's real
 // HTMLMediaElement.play() (a stub returning undefined) cannot exercise these assertions.
@@ -379,5 +379,88 @@ describe("AccountSettings -- W2 voice preferences", () => {
 
     expect(screen.getByRole("alert")).toHaveTextContent("试听服务暂时不可用");
     expect(button).not.toBeDisabled();
+  });
+});
+
+describe("AccountSettings -- CP-13 VERIFIED_ID badge", () => {
+  const status = (overrides: Partial<AgeVerificationStatusView> = {}): AgeVerificationStatusView => ({
+    ageGateMethod: "SELF_DECLARED", birthDate: null, latestStatus: null,
+    latestFailureReason: null, history: [], ...overrides
+  });
+  const base = {
+    busy: null, message: null,
+    onChangePassword: () => Promise.resolve(null),
+    onExportData: () => undefined,
+    onDeleteAccount: () => Promise.resolve(null)
+  } as const;
+
+  afterEach(cleanup);
+
+  it("shows the verified badge only from the backend's own VERIFIED_ID fact", async () => {
+    render(<AccountSettings {...base} identityStatusLoader={() => Promise.resolve(status({
+      ageGateMethod: "VERIFIED_ID", birthDate: "1995-06-01", latestStatus: "VERIFIED"
+    }))} />);
+    expect(await screen.findByText("实名已验证（VERIFIED_ID）")).toBeVisible();
+    expect(screen.queryByText("未完成实名")).not.toBeInTheDocument();
+    const wrap = document.querySelector(".identity-badge-wrap")!;
+    expect(wrap).toHaveAttribute("data-verified", "true");
+  });
+
+  it("a VERIFIED history row on a non-upgraded account (minor-intercept path) never shows verified", async () => {
+    render(<AccountSettings {...base} identityStatusLoader={() => Promise.resolve(status({
+      latestStatus: "VERIFIED",
+      history: [{ method: "OPERATOR_SMS", provider: "sandbox", status: "VERIFIED",
+        verifiedBirthDate: "2012-01-01", createdAt: "2026-09-01T10:00:00" }]
+    }))} />);
+    expect(await screen.findByText("未完成实名")).toBeVisible();
+    expect(screen.queryByText(/实名已验证/)).not.toBeInTheDocument();
+    expect(document.querySelector(".identity-badge-wrap")).toHaveAttribute("data-verified", "false");
+  });
+
+  it("unverified stays neutral with a hint, and surfaces the backend's PENDING fact", async () => {
+    render(<AccountSettings {...base} identityStatusLoader={() => Promise.resolve(status({
+      latestStatus: "PENDING"
+    }))} />);
+    expect(await screen.findByText("未完成实名")).toBeVisible();
+    expect(screen.getByText(/完成实名年龄核验后，这里会显示已验证徽章/)).toBeVisible();
+    expect(screen.getByText("有一次核验正在进行中，完成后这里会更新。")).toBeVisible();
+  });
+
+  it("shows the backend's own failure reason after a rejected attempt, still without shaming", async () => {
+    render(<AccountSettings {...base} identityStatusLoader={() => Promise.resolve(status({
+      latestStatus: "REJECTED", latestFailureReason: "验证码不匹配"
+    }))} />);
+    expect(await screen.findByText("最近一次核验未通过：验证码不匹配")).toBeVisible();
+    expect(screen.queryByText(/实名已验证/)).not.toBeInTheDocument();
+  });
+
+  it("renders nothing before the status resolves — no premature unverified flash", async () => {
+    let resolveStatus!: (value: AgeVerificationStatusView) => void;
+    const pending = new Promise<AgeVerificationStatusView>(resolve => { resolveStatus = resolve; });
+    render(<AccountSettings {...base} identityStatusLoader={() => pending} />);
+    expect(document.querySelector(".identity-badge-wrap")).toBeNull();
+    expect(screen.queryByText("未完成实名")).not.toBeInTheDocument();
+    // After resolution the badge appears from the real fact.
+    await act(async () => { resolveStatus(status({ ageGateMethod: "VERIFIED_ID" })); await pending; });
+    expect(screen.getByText("实名已验证（VERIFIED_ID）")).toBeVisible();
+  });
+
+  it("a failed load shows a neutral unavailable line with a working retry, never a guessed state", async () => {
+    const loader = vi.fn().mockRejectedValue(new Error("offline"));
+    render(<AccountSettings {...base} identityStatusLoader={loader} />);
+    expect(await screen.findByText("实名状态暂时无法获取。")).toBeVisible();
+    expect(screen.queryByText("未完成实名")).not.toBeInTheDocument();
+    expect(document.querySelector(".identity-badge-wrap")).toHaveAttribute("data-verified", "unknown");
+    loader.mockResolvedValue(status({ ageGateMethod: "VERIFIED_ID" }));
+    fireEvent.click(screen.getByRole("button", { name: "刷新" }));
+    expect(await screen.findByText("实名已验证（VERIFIED_ID）")).toBeVisible();
+    expect(loader).toHaveBeenCalledTimes(2);
+  });
+
+  it("renders the badge states in English", async () => {
+    render(<AccountSettings {...base} locale="en-SG"
+      identityStatusLoader={() => Promise.resolve(status())} />);
+    expect(await screen.findByText("Identity verification not completed")).toBeVisible();
+    expect(screen.getByText(/Once you complete identity \(age\) verification/)).toBeVisible();
   });
 });

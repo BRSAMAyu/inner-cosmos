@@ -194,10 +194,10 @@ work_packages:
     vision_ids: ["V01", "V04", "V13"]
     status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-08/
-    delivery_record: evidence/commercial-cn/CP-08/2026-09-06-adult-gate-and-labeling/delivery-record.md
-    test_command: "./mvnw test -Dtest=AdultGateAndMinorProtectionTest"
-    note: "成人门槛(V37,商业profile fail-closed)+未成年拦截/申诉链+aiGenerated标识+政策剧本v1；专业审阅待外部门"
-    next_action: "心理专家/法务审阅；使用时长提醒随CP-11/26"
+    delivery_record: evidence/commercial-cn/CP-08/2026-09-14-usage-time/delivery-record.md
+    test_command: "./mvnw test -Dtest=UsageTimeServiceTest"
+    note: "成人门槛(V37,商业profile fail-closed)+未成年拦截/申诉链+aiGenerated标识+政策剧本v1；专业审阅待外部门；使用时长增量：服务端按需聚合turn时长(COMPLETED/PARTIAL计入,取消/在途不计,上海锚点,无新表)+/api/me/usage/today透明视图+45分钟克制提醒(一次布尔+平静文案,不锁死不打分)；5新测试"
+    next_action: "前端提醒呈现；时长不进指标库的口径已写明(用户可见非商业指标)"
   - id: CP-09
     title: "设计系统、信息架构与中文文案"
     owner: "产品设计＋前端"
@@ -206,9 +206,9 @@ work_packages:
     vision_ids: ["V02", "V06", "V14"]
     status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-09/
-    delivery_record: evidence/commercial-cn/CP-09/2026-09-06-consent-center-web/delivery-record.md
-    note: "首个增量：同意中心页(双语分组/逐项开关)+AI生成角标+样式体系扩展；web 708/708绿"
-    next_action: "J01 onboarding整合；中文文案审校随访谈结果"
+    delivery_record: evidence/commercial-cn/CP-09/2026-09-14-j01-onboarding-quiz/delivery-record.md
+    note: "首个增量：同意中心页(双语分组/逐项开关)+AI生成角标+样式体系扩展；web 708/708绿；J01增量：引导期渐进同意(三步同意卡走既有consent端点,拒绝合法)+理解题x3硬门(正确答案逐字对应注册表withdrawalEffect,全对才完成,跳步封堵,无跳过捷径——稍后再说不完成)；15+14前端测试"
+    next_action: "理解题题目扩展(随purpose注册表版本演进由CP-07重同意触发)"
   - id: CP-10
     title: "首次价值、设置与权限体验"
     owner: "产品＋前端"
@@ -217,9 +217,9 @@ work_packages:
     vision_ids: ["V01", "V02", "V07"]
     status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-10/
-    delivery_record: evidence/commercial-cn/CP-09/2026-09-06-consent-center-web/delivery-record.md
-    note: "首个增量：J01渐进同意对话框(CONSENT_REQUIRED→草稿保留→逐项授权→重发,无静默降级)；现场验收属CP-12A"
-    next_action: "J01权限理解题与onboarding整合；CP-13身份升级后补VERIFIED_ID显示"
+    delivery_record: evidence/commercial-cn/CP-10/2026-09-14-verified-id-badge/delivery-record.md
+    note: "首个增量：J01渐进同意对话框(CONSENT_REQUIRED→草稿保留→逐项授权→重发,无静默降级)；现场验收属CP-12A；VERIFIED_ID徽章增量：AccountSettings两态+未知态(仅认ageGateMethod,minor-intercept不升级不误显,加载失败如实,无假链接)；30前端测试"
+    next_action: "实名发起入口前端接线(依赖渠道合同operator门禁)"
   - id: CP-11
     title: "全状态、弱网和性能打磨"
     owner: "前端＋客户端"
@@ -228,10 +228,10 @@ work_packages:
     vision_ids: ["V02", "V14"]
     status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-11/
-    delivery_record: evidence/commercial-cn/CP-11/2026-09-06-state-matrix/delivery-record.md
-    test_command: "./mvnw test -Dtest=StateMatrixAndPortraitAndPersonaTest"
-    note: "首个增量：J01-J12×全状态矩阵v1(锚点+缺口)+失败保留输入服务端契约测试(草稿幸存/跨账户隔离/成功才可见)"
-    next_action: "3D退化列表、键盘焦点与200%文本审计、三运营商弱网真机窗口"
+    delivery_record: evidence/commercial-cn/CP-11/2026-09-14-accessible-list-and-scaling/delivery-record.md
+    test_command: "npm test -- --run src/components/MemoryStarfieldTextScalingContract.test.tsx"
+    note: "首个增量：J01-J12×全状态矩阵v1(锚点+缺口)+失败保留输入服务端契约测试(草稿幸存/跨账户隔离/成功才可见)；星域增量：星图/列表视图切换(localStorage持久化+reduced-motion默认列表+列表全量平铺)+情绪编码三通道闭锁(后端根因修复:color/glow此前仍泄露gravity)+200%缩放合同9用例(静态px审计+渲染rem断言)；29+9前端测试"
+    next_action: "真机200%缩放人工验证属CP-12A研究门；api.ts显式传emotionEncoding参数(前端默认true已闭环)"
   - id: CP-12
     title: "非作者可用性与体验封板"
     owner: "研究负责人＋独立设计评审"
@@ -559,10 +559,10 @@ work_packages:
     depends_on: ["CP-01"]
     vision_ids: ["V15"]
     status: IN_PROGRESS
-    delivery_record: evidence/commercial-cn/CP-39/2026-09-12-outbox-reliability/delivery-record.md
-    test_command: "./mvnw test -Dtest=OutboxReliabilityContractTest"
-    note: "首个增量：outbox可靠性——补data.retracted.v1缺失handler(v1 schema校验+inbox回执),writer↔handler登记合同,dedup append幂等,方言分支修复(append从未在H2运行过),毒/未知事件入DEAD+replayDead复活(Postgres门控)"
-    next_action: "真实PG空库/旧库升级与N-N-1并行演练(operator门禁)；未知事件DLQ看板(CP-40联动)"
+    delivery_record: evidence/commercial-cn/CP-39/2026-09-14-dlq-dashboard/delivery-record.md
+    test_command: "./mvnw test -Dtest=OutboxDeadLetterDashboardTest"
+    note: "首个增量：outbox可靠性——补data.retracted.v1缺失handler(v1 schema校验+inbox回执),writer↔handler登记合同,dedup append幂等,方言分支修复(append从未在H2运行过),毒/未知事件入DEAD+replayDead复活(Postgres门控)；DLQ看板增量：admin端点(死信列表+单事件重放,DEAD守卫幂等409/404,空态如实)+retry()的H2 INTERVAL方言真bug修复(PG分支真库验证不回归)；2新测试+27回归"
+    next_action: "CP-40前端看板页面；AdminActionLog审计接入"
     evidence_dir: evidence/commercial-cn/CP-39/
   - id: CP-40
     title: "可观测性、成本与用户影响"

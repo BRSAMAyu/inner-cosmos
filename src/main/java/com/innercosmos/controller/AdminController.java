@@ -1,12 +1,14 @@
 package com.innercosmos.controller;
 
 import com.innercosmos.common.ApiResponse;
+import com.innercosmos.common.ErrorCode;
 import com.innercosmos.entity.AdminActionLog;
 import com.innercosmos.entity.EchoCapsule;
 import com.innercosmos.entity.ModelConfig;
 import com.innercosmos.entity.ReportRecord;
 import com.innercosmos.entity.SafetyEvent;
 import com.innercosmos.service.AdminService;
+import com.innercosmos.exception.BusinessException;
 import com.innercosmos.vo.AdminOverviewVO;
 import com.innercosmos.vo.UserProfileVO;
 import jakarta.servlet.http.HttpSession;
@@ -23,15 +25,21 @@ public class AdminController extends BaseController {
     private final com.innercosmos.service.minor.MinorProtectionService minorProtectionService;
     private final com.innercosmos.service.identity.AccountSecurityService accountSecurityService;
     private final com.innercosmos.service.moderation.ModerationCaseService moderationCaseService;
+    // CP-40 DLQ dashboard: the outbox repository only exists when inner-cosmos.events.outbox.enabled=true
+    // (default false), so it must be resolved lazily — a hard dependency would break every context
+    // that starts AdminController without the outbox.
+    private final org.springframework.beans.factory.ObjectProvider<com.innercosmos.event.reliable.JdbcOutboxRepository> outboxRepositories;
 
     public AdminController(AdminService adminService,
                            com.innercosmos.service.minor.MinorProtectionService minorProtectionService,
                            com.innercosmos.service.identity.AccountSecurityService accountSecurityService,
-                           com.innercosmos.service.moderation.ModerationCaseService moderationCaseService) {
+                           com.innercosmos.service.moderation.ModerationCaseService moderationCaseService,
+                           org.springframework.beans.factory.ObjectProvider<com.innercosmos.event.reliable.JdbcOutboxRepository> outboxRepositories) {
         this.adminService = adminService;
         this.minorProtectionService = minorProtectionService;
         this.accountSecurityService = accountSecurityService;
         this.moderationCaseService = moderationCaseService;
+        this.outboxRepositories = outboxRepositories;
     }
 
     @GetMapping("/users")
@@ -215,5 +223,67 @@ public class AdminController extends BaseController {
     private String reason(Map<String, String> body) {
         if (body == null) return "";
         return body.getOrDefault("reason", "");
+    }
+
+    // ===================== CP-40: outbox dead-letter (DLQ) dashboard =====================
+    // Read/replay surface over the transactional outbox's DEAD rows (poison events that exhausted
+    // their retries and events with no registered handler). Presentation is limited to rows that
+    // really exist in tb_outbox_event; an empty dead-letter queue shows as an honest empty page.
+    // The segment follows the same session-based requireAdmin gate as every other admin endpoint
+    // above (Spring Security only enforces "authenticated" for /api/**).
+
+    /** GET /api/admin/outbox/dead?limit=&offset= — current DEAD rows with failure forensics. */
+    @GetMapping("/outbox/dead")
+    public ApiResponse<Map<String, Object>> outboxDeadLetters(
+            @RequestParam(defaultValue = "50") int limit,
+            @RequestParam(defaultValue = "0") int offset,
+            HttpSession session) {
+        requireAdmin(session);
+        com.innercosmos.event.reliable.JdbcOutboxRepository outbox = outboxRepositories.getIfAvailable();
+        if (outbox == null) {
+            // Outbox disabled (JDBC_OUTBOX_ENABLED=false, the default): report that honestly
+            // instead of pretending there is an empty queue behind a running one.
+            return ApiResponse.ok(Map.of("enabled", false, "total", 0L, "entries", List.of()));
+        }
+        int cappedLimit = Math.min(Math.max(limit, 1), 200);
+        List<com.innercosmos.event.reliable.OutboxDeadLetter> entries = outbox.findDead(cappedLimit, offset);
+        return ApiResponse.ok(Map.of(
+                "enabled", true,
+                "total", outbox.deadCount(),
+                "limit", cappedLimit,
+                "offset", Math.max(offset, 0),
+                "entries", entries));
+    }
+
+    /**
+     * POST /api/admin/outbox/dead/{eventId}/replay — requeue one DEAD event (status back to
+     * PENDING, attempts zeroed, available now). Idempotency semantics: the update only ever
+     * transitions a row that is currently DEAD, so a repeat call for an already-replayed or
+     * otherwise live event is rejected with 409 CONFLICT (and an unknown eventId with 404)
+     * instead of silently resetting live state; duplicate side effects after a replay remain
+     * impossible through the tb_inbox_receipt consumer dedup. Replay requeues the row — whether
+     * it is then processed successfully is the worker's honest outcome, not this endpoint's.
+     */
+    @PostMapping("/outbox/dead/{eventId}/replay")
+    public ApiResponse<Map<String, Object>> replayOutboxDeadLetter(
+            @org.springframework.web.bind.annotation.PathVariable java.util.UUID eventId,
+            HttpSession session) {
+        requireAdmin(session);
+        com.innercosmos.event.reliable.JdbcOutboxRepository outbox = outboxRepositories.getIfAvailable();
+        if (outbox == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "事务性 outbox 未启用，无死信可重放");
+        }
+        boolean replayed = outbox.replayDead(eventId);
+        if (!replayed) {
+            String status = outbox.statusOf(eventId);
+            if (status == null) {
+                throw new BusinessException(ErrorCode.NOT_FOUND, "outbox 事件不存在: " + eventId);
+            }
+            throw new BusinessException(ErrorCode.CONFLICT,
+                    "outbox 事件当前状态为 " + status + "，仅 DEAD 状态可重放");
+        }
+        return ApiResponse.ok(Map.of(
+                "eventId", eventId.toString(),
+                "status", outbox.statusOf(eventId)));
     }
 }

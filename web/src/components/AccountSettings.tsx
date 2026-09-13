@@ -1,7 +1,8 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { api } from "../api";
+import type { AgeVerificationStatusView, TtsPreferences, TtsPreferencesPatch, UserProfileSettings } from "../api";
 import { AsyncButton } from "../loading";
 import type { Locale } from "../i18n";
-import type { TtsPreferences, TtsPreferencesPatch, UserProfileSettings } from "../api";
 import { InlineAudioPlayer } from "./shared/InlineAudioPlayer";
 import { LocalizedTemporalInput } from "./shared/LocalizedTemporalInput";
 
@@ -44,6 +45,9 @@ type AccountCopy = {
   voiceTitle: string; voiceNote: string; voiceEnabledLabel: string; voiceEnabledHint: string;
   voiceModeLabel: string; voiceMode: Record<string, string>; voicePickLabel: string;
   voicePreview: string; voicePreviewBusy: string; voicePreviewError: string; voiceSaveError: string; eyebrow: string;
+  // CP-09/CP-10 · VERIFIED_ID badge (consumes CP-13's read-only status endpoint).
+  identityTitle: string; identityVerified: string; identityUnverified: string; identityUnverifiedHint: string;
+  identityPending: string; identityLastFailed: string; identityLoadFailed: string; identityRefresh: string;
 };
 
 const COPY: Record<Locale, AccountCopy> = {
@@ -73,7 +77,14 @@ const COPY: Record<Locale, AccountCopy> = {
     voiceModeLabel: "浮现方式",
     voiceMode: { AMBIENT: "自然浮现 - 出现时直接展示，声音仍由你点按", ON_DEMAND: "含蓄浮现 - 轻触后才展开，声音仍由你点按" },
     voicePickLabel: "选择音色", voicePreview: "▶ 试听", voicePreviewBusy: "试听中…",
-    voicePreviewError: "试听暂时失败，请再试一次", voiceSaveError: "语音偏好未能保存"
+    voicePreviewError: "试听暂时失败，请再试一次", voiceSaveError: "语音偏好未能保存",
+    identityTitle: "实名与年龄核验", identityVerified: "实名已验证（VERIFIED_ID）",
+    identityUnverified: "未完成实名",
+    identityUnverifiedHint: "完成实名年龄核验后，这里会显示已验证徽章。核验由你主动发起，不会自动进行。",
+    identityPending: "有一次核验正在进行中，完成后这里会更新。",
+    identityLastFailed: "最近一次核验未通过：",
+    identityLoadFailed: "实名状态暂时无法获取。",
+    identityRefresh: "刷新"
   },
   "en-SG": {
     aria: "Aurora & account settings", heading: "Aurora & account settings", eyebrow: "SETTINGS",
@@ -101,7 +112,14 @@ const COPY: Record<Locale, AccountCopy> = {
     voiceModeLabel: "How it surfaces",
     voiceMode: { AMBIENT: "Ambient -- reveal the line, with audio still under your control", ON_DEMAND: "Veiled -- tap to reveal, with audio still under your control" },
     voicePickLabel: "Choose a voice", voicePreview: "▶ Preview", voicePreviewBusy: "Previewing…",
-    voicePreviewError: "Preview failed -- please try again", voiceSaveError: "Voice preferences could not be saved"
+    voicePreviewError: "Preview failed -- please try again", voiceSaveError: "Voice preferences could not be saved",
+    identityTitle: "Identity & age verification", identityVerified: "Identity verified (VERIFIED_ID)",
+    identityUnverified: "Identity verification not completed",
+    identityUnverifiedHint: "Once you complete identity (age) verification, the verified badge appears here. Verification only happens when you start it — never automatically.",
+    identityPending: "A verification attempt is in progress; this updates when it completes.",
+    identityLastFailed: "Most recent attempt failed: ",
+    identityLoadFailed: "Identity status is temporarily unavailable.",
+    identityRefresh: "Refresh"
   }
 };
 
@@ -257,9 +275,53 @@ function VoicePreferencesEditor({ ttsPreferences, ttsBusy, onUpdateTtsPreference
   </details>;
 }
 
+// CP-09/CP-10 · VERIFIED_ID badge. Consumes ONLY the backend's own fact (CP-13's
+// GET /api/me/identity/age-verification): the account is verified iff the backend returned
+// ageGateMethod === "VERIFIED_ID" — it sets that exclusively after a provider-confirmed
+// birth date of 18+. A "VERIFIED" history row alone is the minor-intercept path and must
+// never upgrade the badge; the unverified state stays neutral ("未完成实名"), never a fake
+// or degraded-looking mark. While the status has not loaded, NOTHING is shown — flashing
+// "unverified" before the facts arrive would be its own small dishonesty. No in-app
+// verification entry point exists yet, so the unverified state points at the fact itself
+// rather than fabricating a link.
+function IdentityVerificationBadge({ status, loaded, error, busy, onRefresh, t }: {
+  status: AgeVerificationStatusView | null; loaded: boolean; error: boolean; busy: boolean;
+  onRefresh: () => void; t: AccountCopy;
+}) {
+  const verified = status?.ageGateMethod === "VERIFIED_ID";
+  const badgeStyle = verified
+    ? { border: "1px solid rgba(110,190,150,0.7)", background: "rgba(110,190,150,0.12)", color: "inherit" }
+    : { border: "1px solid rgba(148,163,184,0.5)", background: "transparent", color: "inherit" };
+  if (error) {
+    return <p className="identity-badge-wrap" data-verified="unknown" style={{ margin: "0 0 12px" }}>
+      <small className="muted">{t.identityLoadFailed} </small>
+      <button type="button" className="quiet" style={{ padding: 0 }} disabled={busy}
+        onClick={onRefresh}>{t.identityRefresh}</button>
+    </p>;
+  }
+  if (!loaded) return null;
+  return <div className="identity-badge-wrap" data-verified={verified ? "true" : "false"}
+    style={{ margin: "0 0 14px", display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+    <strong className="eyebrow">{t.identityTitle}</strong>
+    <span className="identity-badge" data-verified-badge={verified ? "verified" : "unverified"}
+      style={{ ...badgeStyle, borderRadius: 999, padding: "2px 10px", fontSize: "0.8em" }}>
+      {verified ? t.identityVerified : t.identityUnverified}
+    </span>
+    {!verified && <>
+      <small className="muted">{t.identityUnverifiedHint}</small>
+      {status?.latestStatus === "PENDING" && <small className="muted">{t.identityPending}</small>}
+      {(status?.latestStatus === "REJECTED" || status?.latestStatus === "EXPIRED")
+        && status.latestFailureReason && <small className="muted">
+          {t.identityLastFailed}{status.latestFailureReason}
+        </small>}
+    </>}
+  </div>;
+}
+
 export function AccountSettings({ busy, message, onChangePassword, onExportData, onDeleteAccount,
   profile = null, profileBusy = false, onSaveProfile,
-  ttsPreferences = null, ttsBusy = false, onUpdateTtsPreferences, onPreviewVoice, locale = "zh-CN" }: {
+  ttsPreferences = null, ttsBusy = false, onUpdateTtsPreferences, onPreviewVoice, locale = "zh-CN",
+  identityStatusLoader = api.ageVerificationStatus }: {
   busy: AccountBusy; message: string | null;
   // Gemini audit 4.10 (CONFIRMED/P1): both return a Promise resolving to `null` on confirmed
   // success or an error message string on failure -- the form below AWAITS this before deciding
@@ -276,6 +338,9 @@ export function AccountSettings({ busy, message, onChangePassword, onExportData,
   onUpdateTtsPreferences?: (patch: TtsPreferencesPatch) => Promise<string | null>;
   onPreviewVoice?: (voiceId: string) => Promise<string>;
   locale?: Locale;
+  // CP-13 status loader for the VERIFIED_ID badge. Defaults to the real endpoint so the
+  // already-mounted AccountSettings gains the badge without caller changes; injectable for tests.
+  identityStatusLoader?: () => Promise<AgeVerificationStatusView>;
 }) {
   const t = COPY[locale];
   const [passwordOpen, setPasswordOpen] = useState(false);
@@ -289,6 +354,24 @@ export function AccountSettings({ busy, message, onChangePassword, onExportData,
   const [deletePassword, setDeletePassword] = useState("");
   const [deleteError, setDeleteError] = useState("");
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+
+  // VERIFIED_ID badge state: self-loading read-only status (same self-fetch pattern as
+  // AuthGate/DemoPersonaChooser). Failures degrade to a neutral "unavailable" line —
+  // never to a guessed verified/unverified claim.
+  const [identityStatus, setIdentityStatus] = useState<AgeVerificationStatusView | null>(null);
+  const [identityLoaded, setIdentityLoaded] = useState(false);
+  const [identityError, setIdentityError] = useState(false);
+  const [identityBusy, setIdentityBusy] = useState(false);
+  const [identityRefreshTick, setIdentityRefreshTick] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    setIdentityBusy(true);
+    identityStatusLoader()
+      .then(status => { if (!cancelled) { setIdentityStatus(status); setIdentityLoaded(true); setIdentityError(false); } })
+      .catch(() => { if (!cancelled) { setIdentityError(true); } })
+      .finally(() => { if (!cancelled) setIdentityBusy(false); });
+    return () => { cancelled = true; };
+  }, [identityStatusLoader, identityRefreshTick]);
 
   const closePasswordForm = () => { setPasswordOpen(false); setOldPassword(""); setNewPassword(""); setNewPassword2(""); setPasswordError(""); };
   const submitPassword = async () => {
@@ -327,6 +410,8 @@ export function AccountSettings({ busy, message, onChangePassword, onExportData,
     <span className="eyebrow">{t.eyebrow}</span>
     <h2>{t.heading}</h2>
     {message && <p className="account-message">{message}</p>}
+    <IdentityVerificationBadge status={identityStatus} loaded={identityLoaded} error={identityError}
+      busy={identityBusy} onRefresh={() => setIdentityRefreshTick(value => value + 1)} t={t} />
     <div className="account-actions-grid">
       {ttsPreferences && onUpdateTtsPreferences && onPreviewVoice &&
         <VoicePreferencesEditor ttsPreferences={ttsPreferences} ttsBusy={ttsBusy}

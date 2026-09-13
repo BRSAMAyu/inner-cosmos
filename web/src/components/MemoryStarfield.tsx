@@ -24,6 +24,34 @@ export function memoryStarDiameter(gravity: number): number {
 }
 
 /**
+ * CP-11 emotional-encoding closure (mirrors CP-24 server semantics). When the scene arrives with
+ * `emotionEncoding: false` the server flattens `gravity` to one neutral constant, but it does NOT
+ * neutralize per-star `color` or `glow` — both still derive from emotional gravity server-side.
+ * The client therefore closes the remaining channels itself: one neutral size, one neutral colour,
+ * one neutral opacity for every star, and no emotion-derived wording on the accessible list.
+ * `NEUTRAL_STAR_DIAMETER` equals memoryStarDiameter(0.5), the size the flattened gravity produces.
+ */
+export const NEUTRAL_STAR_DIAMETER = memoryStarDiameter(0.5);
+export const NEUTRAL_STAR_COLOR = "var(--text-muted)";
+export const NEUTRAL_STAR_OPACITY = 0.7;
+
+/** CP-11: the starfield can be consumed as a 3D-style map or as a plain accessible list. */
+export type StarfieldView = "map" | "list";
+export const STARFIELD_VIEW_STORAGE_KEY = "ic-starfield-view";
+
+/** A stored explicit choice wins; otherwise prefers-reduced-motion users start on the list. */
+export function resolveInitialStarfieldView(): StarfieldView {
+  try {
+    const stored = localStorage.getItem(STARFIELD_VIEW_STORAGE_KEY);
+    if (stored === "map" || stored === "list") return stored;
+  } catch { /* storage unavailable — fall through to the media default */ }
+  return typeof window !== "undefined"
+    && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true
+    ? "list"
+    : "map";
+}
+
+/**
  * Turns the service's -100…100 projection into label-safe percentages. Time remains horizontal,
  * but records without an exact occurrence time form a small, deterministic constellation instead
  * of all inheriting the service's "now" coordinate at the far right.
@@ -81,10 +109,13 @@ const COPY: Record<Locale, {
   previewLoading: string; previewError: string; retry: string;
   modeExplanation: Record<StarfieldScene["mode"], string>;
   legend: Array<[string, string]>;
+  viewToggleAria: string; viewLabel: Record<StarfieldView, string>; encodingOffNote: string;
 }> = {
   "zh-CN": {
     aria: "记忆星空", heading: "你的记忆不是档案柜", count: n => `${n} 颗当前记忆`, modesAria: "星空视角",
     modeLabel: { TIME: "时间", THEME: "主题", PEOPLE: "人物" },
+    viewToggleAria: "星空呈现方式", viewLabel: { map: "星图视图", list: "列表视图" },
+    encodingOffNote: "已关闭情绪编码：星体大小、颜色与亮度统一为中性，不体现情绪权重",
     listAria: "记忆星空可访问列表", confidence: (p, v) => `置信度 ${p}% · v${v}`, revealBusy: "正在追溯…",
     revealBtn: "查看来源与变化", inaccurate: "这条不准确了", provAria: "记忆来源与变化", closeProv: "关闭记忆来源",
     curVersion: "当前版本", confidenceLabel: "理解置信度", memLayer: "记忆层", whyHere: "为什么它在这里",
@@ -121,6 +152,8 @@ const COPY: Record<Locale, {
   "en-SG": {
     aria: "Memory starfield", heading: "Your memory isn't a filing cabinet", count: n => `${n} current memor${n === 1 ? "y" : "ies"}`,
     modesAria: "Starfield view", modeLabel: { TIME: "Time", THEME: "Theme", PEOPLE: "People" },
+    viewToggleAria: "Starfield presentation", viewLabel: { map: "Star map", list: "List view" },
+    encodingOffNote: "Emotional encoding is off — size, colour and glow stay one neutral value with no emotional weighting",
     listAria: "Memory starfield accessible list", confidence: (p, v) => `Confidence ${p}% · v${v}`, revealBusy: "Tracing…",
     revealBtn: "View source & changes", inaccurate: "This isn't accurate", provAria: "Memory source & changes", closeProv: "Close memory source",
     curVersion: "Current version", confidenceLabel: "Understanding confidence", memLayer: "Memory layer", whyHere: "Why it's here",
@@ -201,6 +234,16 @@ export function MemoryStarfield({ starfield, starfieldBusy, onChangeMode, starfi
   const loadingDialogRef = useRef<HTMLElement>(null);
   const detailDialogRef = useRef<HTMLElement>(null);
   const detailCloseRef = useRef<HTMLButtonElement>(null);
+  // The backend VO (StarfieldSceneVO) carries emotionEncoding; api.ts' StarfieldScene type
+  // predates it, so read the field defensively. Undefined (older payloads, fixtures) keeps
+  // emotion encoding ON — only an explicit false closes every emotion channel.
+  const emotionEncodingOff
+    = (starfield as StarfieldScene & { emotionEncoding?: boolean }).emotionEncoding === false;
+  const [view, setView] = useState<StarfieldView>(resolveInitialStarfieldView);
+  const switchView = (next: StarfieldView) => {
+    setView(next);
+    try { localStorage.setItem(STARFIELD_VIEW_STORAGE_KEY, next); } catch { /* optional preference */ }
+  };
 
   useEffect(() => {
     if (detailBusy !== null) loadingDialogRef.current?.focus();
@@ -254,6 +297,9 @@ export function MemoryStarfield({ starfield, starfieldBusy, onChangeMode, starfi
     };
     return fixed[value] ?? value;
   };
+  // Closure invariant: a list row may only show title, theme, memory layer, confidence, version
+  // and the summary — never gravity, glow, colour or any "emotional intensity" wording. Those
+  // dimensions exist solely on the map and are neutralized there when emotionEncoding is false.
   const renderMemoryRow = (star: StarfieldStar) => <li key={star.id}><div><strong>{englishStarText(star.title)}</strong><span>{englishStarText(star.theme)} · {englishStarText(star.memoryLayer)}</span></div>
     <small>{t.confidence(Math.round(star.confidence * 100), star.versionNo)}</small><p className="ugc-text">{demoContentText(star.summary, locale)}</p>
     <div className="cosmos-list-actions">
@@ -273,7 +319,21 @@ export function MemoryStarfield({ starfield, starfieldBusy, onChangeMode, starfi
   const links = starfield.stars.flatMap(star => star.connectedMemoryIds
     .filter(targetId => visibleStarIds.has(targetId) && star.id < targetId)
     .map(targetId => ({ sourceId: star.id, targetId })));
-  return <section className="cosmos-space" aria-label={t.aria}>
+  // With emotional encoding off, the "size"/"glow" legend entries would describe channels that
+  // no longer vary (and the backend's "glow" text still names activity it no longer encodes).
+  // Rewrite the size entry to the neutral note and drop the glow entry instead.
+  const sizeLegendKey = locale === "en-SG" ? "Size" : "尺寸";
+  const glowLegendKey = locale === "en-SG" ? "Glow" : "亮度";
+  const baseLegend: Array<[string, string]> = locale === "en-SG" ? t.legend : Object.entries(starfield.legend);
+  const legendEntries = (emotionEncodingOff
+    ? baseLegend
+      .filter(([key]) => key !== glowLegendKey)
+      .map(([key, value]) => key === sizeLegendKey ? [key, t.encodingOffNote] as [string, string] : [key, value])
+      .concat(baseLegend.some(([key]) => key === sizeLegendKey)
+        ? [] : [[sizeLegendKey, t.encodingOffNote] as [string, string]])
+    : baseLegend);
+  return <section className="cosmos-space" aria-label={t.aria}
+    data-view={view} data-emotion-encoding={emotionEncodingOff ? "off" : "on"}>
     <div className="cosmos-heading"><div><span className="eyebrow">MEMORY, ALIVE</span><h2>{t.heading}</h2></div>
       <span>{t.count(starfield.stars.length)}</span></div>
     <p className="cosmos-purpose">{t.purpose}</p>
@@ -282,9 +342,14 @@ export function MemoryStarfield({ starfield, starfieldBusy, onChangeMode, starfi
         <button type="button" disabled={starfieldBusy} aria-pressed={starfield.mode === value} key={value}
           className={starfield.mode === value ? "active" : ""} onClick={() => onChangeMode(value)}>{t.modeLabel[value]}</button>)}
     </div>
+    <div className="cosmos-view-toggle" aria-label={t.viewToggleAria}>
+      {(["map", "list"] as StarfieldView[]).map(value =>
+        <button type="button" key={value} aria-pressed={view === value}
+          className={view === value ? "active" : ""} onClick={() => switchView(value)}>{t.viewLabel[value]}</button>)}
+    </div>
     <p className="cosmos-explanation">{t.modeExplanation[starfield.mode]}</p>
     {starfield.stars.length > 0 && <p className="cosmos-select-hint">{t.selectHint}</p>}
-    <div className="cosmos-map" aria-label={t.listAria}>
+    {view === "map" && <div className="cosmos-map" aria-label={t.listAria}>
       {links.length > 0 && <svg className="cosmos-links" aria-hidden="true" viewBox="0 0 100 100"
         preserveAspectRatio="none">
         {links.map(link => {
@@ -303,11 +368,12 @@ export function MemoryStarfield({ starfield, starfieldBusy, onChangeMode, starfi
         title={t.openStar(englishStarText(star.title))} disabled={detailBusy !== null}
         onClick={event => { lastStarTriggerRef.current = event.currentTarget; onRevealStar(star.id); }} style={{
         left: `${position.left}%`, top: `${position.top}%`,
-        color: star.color, opacity: Math.max(.45, star.glow ?? .7)
+        color: emotionEncodingOff ? NEUTRAL_STAR_COLOR : star.color,
+        opacity: emotionEncodingOff ? NEUTRAL_STAR_OPACITY : Math.max(.45, star.glow ?? .7)
       }}><span className="cosmos-star-core" aria-hidden="true" style={{
-          width: `${memoryStarDiameter(star.gravity)}px`,
-          height: `${memoryStarDiameter(star.gravity)}px`,
-          background: star.color
+          width: `${emotionEncodingOff ? NEUTRAL_STAR_DIAMETER : memoryStarDiameter(star.gravity)}px`,
+          height: `${emotionEncodingOff ? NEUTRAL_STAR_DIAMETER : memoryStarDiameter(star.gravity)}px`,
+          background: emotionEncodingOff ? NEUTRAL_STAR_COLOR : star.color
         }} /><span className="cosmos-star-label" aria-hidden="true">{englishStarText(star.title)}</span></button>;
       })}
       {starfield.stars.length === 0 && <div className="cosmos-empty">
@@ -315,16 +381,18 @@ export function MemoryStarfield({ starfield, starfieldBusy, onChangeMode, starfi
         <p>{t.emptyBody[starfield.mode]}</p>
         {onStartMemory && <button type="button" onClick={onStartMemory}>{t.emptyAction}</button>}
       </div>}
-    </div>
-    <div className="cosmos-legend">{(locale === "en-SG" ? t.legend : Object.entries(starfield.legend))
-      .map(([key, value]) => <span key={key}><strong>{key}</strong>{value}</span>)}</div>
-    <ol className="cosmos-list" aria-label={t.listAria}>
-      {visibleMemories.map(renderMemoryRow)}
-    </ol>
-    {foldedMemories.length > 0 && <details className="cosmos-more-memories">
-      <summary>{t.moreMemories(foldedMemories.length)}</summary>
-      <ol className="cosmos-list">{foldedMemories.map(renderMemoryRow)}</ol>
-    </details>}
+    </div>}
+    <div className="cosmos-legend">{legendEntries.map(([key, value]) =>
+      <span key={key}><strong>{key}</strong>{value}</span>)}</div>
+    {view === "list"
+      ? <ol className="cosmos-list" aria-label={t.listAria}>{starfield.accessibleList.map(renderMemoryRow)}</ol>
+      : <>
+        <ol className="cosmos-list" aria-label={t.listAria}>{visibleMemories.map(renderMemoryRow)}</ol>
+        {foldedMemories.length > 0 && <details className="cosmos-more-memories">
+          <summary>{t.moreMemories(foldedMemories.length)}</summary>
+          <ol className="cosmos-list">{foldedMemories.map(renderMemoryRow)}</ol>
+        </details>}
+      </>}
     {selectedStar && !starfieldDetail && <div className="memory-detail-backdrop" role="presentation"
       onMouseDown={event => { if (event.target === event.currentTarget) onCloseDetail(); }}>
       <aside ref={loadingDialogRef} className="provenance-panel memory-preview-panel" role="dialog" aria-modal="true"

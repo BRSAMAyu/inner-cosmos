@@ -9,6 +9,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -120,14 +121,27 @@ public class JdbcOutboxRepository {
         if (message.length() > MAX_ERROR_LENGTH) {
             message = message.substring(0, MAX_ERROR_LENGTH);
         }
-        jdbc.update("""
+        // Dialect twin of append(): PostgreSQL keeps its native interval arithmetic; H2 (dev/test)
+        // cannot parse `INTERVAL '1 millisecond'` in MySQL mode and uses DATEADD instead. Parameter
+        // order is identical in both branches. The claim SQL stays PostgreSQL-only (SKIP LOCKED).
+        String sql = postgres
+                ? """
                 UPDATE tb_outbox_event
                 SET attempts = attempts + 1,
                     status = CASE WHEN attempts + 1 >= ? THEN 'DEAD' ELSE 'RETRY' END,
                     available_at = CURRENT_TIMESTAMP + (? * INTERVAL '1 millisecond'),
                     locked_by = NULL, locked_until = NULL, last_error = ?
                 WHERE id = ? AND status = 'PROCESSING' AND locked_by = ?
-                """, maxAttempts, delay.toMillis(), message, event.id(), event.lockedBy());
+                """
+                : """
+                UPDATE tb_outbox_event
+                SET attempts = attempts + 1,
+                    status = CASE WHEN attempts + 1 >= ? THEN 'DEAD' ELSE 'RETRY' END,
+                    available_at = DATEADD('MILLISECOND', ?, CURRENT_TIMESTAMP),
+                    locked_by = NULL, locked_until = NULL, last_error = ?
+                WHERE id = ? AND status = 'PROCESSING' AND locked_by = ?
+                """;
+        jdbc.update(sql, maxAttempts, delay.toMillis(), message, event.id(), event.lockedBy());
     }
 
     /**
@@ -178,6 +192,72 @@ public class JdbcOutboxRepository {
         Long count = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM tb_outbox_event WHERE status = 'DEAD'", Long.class);
         return count == null ? 0L : count;
+    }
+
+    /**
+     * CP-40 admin DLQ dashboard: DEAD rows that really exist, newest (highest id) first, page by
+     * limit/offset. Read-only — an empty database honestly yields an empty page. Payloads are
+     * truncated to a recognisable preview; counts and timestamps come straight from the row.
+     */
+    public List<OutboxDeadLetter> findDead(int limit, int offset) {
+        return jdbc.query("""
+                SELECT id, event_id, event_type, aggregate_type, aggregate_id, payload,
+                       attempts, last_error, created_at, available_at
+                FROM tb_outbox_event
+                WHERE status = 'DEAD'
+                ORDER BY id DESC
+                LIMIT ? OFFSET ?
+                """, (rs, rowNum) -> new OutboxDeadLetter(
+                rs.getLong("id"),
+                rs.getObject("event_id", UUID.class),
+                rs.getString("event_type"),
+                rs.getString("aggregate_type"),
+                rs.getString("aggregate_id"),
+                summarizePayload(rs.getString("payload")),
+                rs.getInt("attempts"),
+                rs.getString("last_error"),
+                toLocalDateTime(rs, "created_at"),
+                toLocalDateTime(rs, "available_at")), limit, Math.max(offset, 0));
+    }
+
+    /**
+     * CP-40 per-event replay: requeue exactly the DEAD row identified by {@code eventId} with the
+     * same reset semantics as {@link #replayDead(int)} — status PENDING, attempts zeroed, available
+     * immediately, lease and last error cleared. The update is guarded by {@code status = 'DEAD'},
+     * so replay is single-shot per dead episode: once a row leaves DEAD (replayed, or revived by any
+     * other transition) a repeat call updates nothing and returns false rather than silently
+     * resetting live state. Duplicate side effects after a replay stay impossible via the
+     * {@code tb_inbox_receipt} consumer dedup, exactly as for {@link #replayDead(int)}.
+     */
+    public boolean replayDead(UUID eventId) {
+        return jdbc.update("""
+                UPDATE tb_outbox_event
+                SET status = 'PENDING', attempts = 0, available_at = CURRENT_TIMESTAMP,
+                    locked_by = NULL, locked_until = NULL, last_error = NULL
+                WHERE event_id = ? AND status = 'DEAD'
+                """, eventId) == 1;
+    }
+
+    /** CP-40: current lifecycle status of one outbox event, or null when no such event exists. */
+    public String statusOf(UUID eventId) {
+        List<String> statuses = jdbc.queryForList(
+                "SELECT status FROM tb_outbox_event WHERE event_id = ?", String.class, eventId);
+        return statuses.isEmpty() ? null : statuses.get(0);
+    }
+
+    private static final int PAYLOAD_SUMMARY_LENGTH = 200;
+
+    private static String summarizePayload(String payload) {
+        if (payload == null) {
+            return null;
+        }
+        return payload.length() <= PAYLOAD_SUMMARY_LENGTH
+                ? payload
+                : payload.substring(0, PAYLOAD_SUMMARY_LENGTH) + "…(truncated)";
+    }
+
+    private static LocalDateTime toLocalDateTime(ResultSet rs, String column) throws SQLException {
+        return rs.getTimestamp(column) == null ? null : rs.getTimestamp(column).toLocalDateTime();
     }
 
     private OutboxEvent map(ResultSet rs, int rowNum) throws SQLException {

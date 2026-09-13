@@ -56,9 +56,14 @@ public class StarfieldExplorerServiceImpl implements StarfieldExplorerService {
                         Comparator.nullsLast(Comparator.reverseOrder())).thenComparing(star -> star.title)).toList();
         if (!emotionEncoding) {
             // CP-24: emotional encoding OFF — gravity-driven size is flattened to one neutral
-            // constant so no visual hierarchy by "emotional weight" remains.
+            // constant so no visual hierarchy by "emotional weight" remains. CP-11 audit:
+            // color and glow encoded the same gravity and kept leaking it after the size
+            // was flattened (glow = 0.34 + gravity * 0.22), so all three channels are
+            // neutralized together — size, color and luminance.
             for (StarfieldVO star : stars) {
                 star.gravity = 0.5;
+                star.color = "#8a8a97";
+                star.glow = 0.7;
             }
         }
         return new StarfieldSceneVO(mode, explanation(mode), stars, accessible,

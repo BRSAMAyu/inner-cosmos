@@ -996,6 +996,10 @@ export const api = {
     `/api/me/consents/${encodeURIComponent(purposeCode)}`, {
       method: "POST", body: JSON.stringify({ grant })
     }),
+  /** CP-13: read-only age/identity-verification status for the account surface (VERIFIED_ID
+   *  badge). Mirrors the backend IdentityVerificationService.StatusView — see the
+   *  AgeVerificationStatusView type at the end of this file for the honesty rules. */
+  ageVerificationStatus: () => request<AgeVerificationStatusView>("/api/me/identity/age-verification"),
   createSession: () => request<{ id: number }>("/api/dialog/session/create", {
     method: "POST", body: JSON.stringify({
       title: apiCopy("Aurora conversation", "Aurora 对话"),
@@ -1517,3 +1521,33 @@ export async function replayTurnEvents(
   }
   return latest;
 }
+
+// ---------------------------------------------------------------------------
+// CP-13 owner-facing age/identity verification status (GET /api/me/identity/age-verification),
+// mirroring the backend IdentityVerificationService.StatusView record.
+//
+// Honesty rule for consumers: the ACCOUNT-level verified fact is
+// ageGateMethod === "VERIFIED_ID" — the backend only sets that on the user after a
+// provider-confirmed birth date of 18+ (IdentityVerificationServiceImpl.confirm). A
+// latestStatus/history row of "VERIFIED" alone can still be the minor-intercept path
+// (the row is verified, the account is NOT upgraded and is moved to minor-restricted),
+// so history and latestStatus must NEVER upgrade a badge by themselves. No verified
+// state may be shown unless the backend returned this fact.
+// ---------------------------------------------------------------------------
+export type AgeVerificationHistoryRow = {
+  /** VERIFIED_ID channel, e.g. OPERATOR_SMS / ALIPAY_CERTIFIED / MANUAL_REVIEW. */
+  method: string | null;
+  provider: string | null;
+  /** PENDING / VERIFIED / REJECTED / EXPIRED. */
+  status: string | null;
+  verifiedBirthDate: string | null;
+  createdAt: string | null;
+};
+export type AgeVerificationStatusView = {
+  /** Account-level gate method: "VERIFIED_ID" is the only verified value. */
+  ageGateMethod: string | null;
+  birthDate: string | null;
+  latestStatus: string | null;
+  latestFailureReason: string | null;
+  history: AgeVerificationHistoryRow[];
+};
