@@ -1817,3 +1817,17 @@ CREATE TABLE IF NOT EXISTS tb_payment_order (
   UNIQUE (order_id)
 );
 CREATE INDEX IF NOT EXISTS idx_payment_order_user ON tb_payment_order (user_id, product_id);
+
+-- CP-62: data portability import receipts (V47 twin) — idempotent re-import by natural key.
+CREATE TABLE IF NOT EXISTS tb_data_import_receipt (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  target_user_id BIGINT NOT NULL,
+  source_user_id BIGINT NOT NULL,
+  section VARCHAR(48) NOT NULL,
+  source_record_key VARCHAR(160) NOT NULL,
+  imported_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (section, source_record_key, target_user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_data_import_target ON tb_data_import_receipt (target_user_id, imported_at);

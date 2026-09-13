@@ -761,7 +761,10 @@ work_packages:
     stage: S5
     depends_on: ["CP-19", "CP-23", "CP-24", "CP-54"]
     vision_ids: ["V03", "V05", "V06", "V16"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
+    delivery_record: evidence/commercial-cn/CP-57/2026-09-13-trajectory-bank/delivery-record.md
+    test_command: "./mvnw test -Dtest=NinetyDayTrajectoryBankContractTest,NinetyDayTrajectoryEvaluationTest"
+    note: "首个增量：冻结九十日轨迹评测集(210条/3族/731探针,确定性生成器SHA稳定692277f7,生成器内置准入门自检)+评测执行器(系统准确率591/591=1.000 vs recency基线0.064,纠正优先140/140,撤回零返回零复活,跨用户污染0,早/晚探针均1.0);基线保留+93.6pp差距;仅EVALUATION_EXECUTED不构成CAPABILITY_ACCEPTED,90日真人队列为operator门禁"
     evidence_dir: evidence/commercial-cn/CP-57/
   - id: CP-58
     title: "多侧面共鸣与隔离模拟资产"
@@ -801,7 +804,10 @@ work_packages:
     stage: S5
     depends_on: ["CP-15", "CP-43", "CP-47", "CP-48", "CP-50"]
     vision_ids: ["V07", "V15", "V17", "V20"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
+    delivery_record: evidence/commercial-cn/CP-62/2026-09-13-export-import-roundtrip/delivery-record.md
+    test_command: "./mvnw test -Dtest=ExportImportRoundTripTest"
+    note: "首个增量：导出格式v2(schemaVersion白名单/源身份/每节SHA-256/整包摘要/纠正链与媒体引用随行,源行id不入包)+导入服务(L893六项机械化:损坏包拒/重签名走私拒FORBIDDEN/回执幂等零新增/共鸣体强制PRIVATE/信件一律DRAFT/grant永不入导入)+V47回执表+双端点(退出迁移不绑购买);PG基线47/105/98/28实机"
     evidence_dir: evidence/commercial-cn/CP-62/
   - id: CP-63
     title: "独立安全、隐私与监管复核"

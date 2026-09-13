@@ -1,0 +1,17 @@
+{
+  "id": "ninety-day-trajectory-bank-v1",
+  "version": "1.0.0",
+  "frozen_at": "2026-09-13",
+  "generator": "deterministic synthetic expansion of memory-retrieval-v1.json (generate.py, no randomness, no user data)",
+  "scenario_sha256": "692277f74ea78ac88226bfc30d5d90ba1913b76ca3f296a01004f8c2c85d411a",
+  "scenario_count": 210,
+  "families": {
+    "repeated_correction": 70,
+    "multi_person_relations": 70,
+    "life_migration": 70
+  },
+  "purpose": "CP-57 90-day trajectory evaluation: per-trajectory event replay (ADD/CONTRADICT/SUPERSEDE/REINFORCE/ARCHIVE/FORGET) with time-point probes scored against the real MemoryRetrievalService per the frozen experiment registry (accuracy >= 0.95, correction preference = 1.0, withdrawn resurrection = 0, cross-user leakage = 0)",
+  "license": "project-internal",
+  "schema": "keys are memory-retrieval-v1 keys with @<day> time-point suffixes; events[]{day,op,key,...}; correction events carry replacementKey; probes[]{day,kind,task,query,expectedKeys[],prohibitedKeys[]}; kind in FACT_RECALL|CORRECTION_PREFERENCE|WITHDRAWN_ZERO",
+  "change_log": "v1.0.0: initial freeze - 210 deterministic 90+ day trajectories synthesized from the 12 memory-retrieval-v1.json memories (same key + time-point suffix variants) across repeated correction, multi-person relation and TODO-to-HABIT migration families; every probe self-checked against the retrieval admission gate mirror in generate.py"
+}
