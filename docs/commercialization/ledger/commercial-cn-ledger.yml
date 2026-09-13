@@ -638,7 +638,9 @@ work_packages:
     note: "第二增量：统一服务端权益状态机(V44:tb_entitlement/tb_entitlement_event)——支付幂等激活/堆叠续期(已付时间不重叠,上海月历月末钳制Jan31→Feb28),渠道七态归一(待定/试用/续期/宽限/取消保留到期末/到期/恢复),退款粘性撤销(恢复通知不可洗白,新支付才复活),通知去重唯一键,惰性到期,EntitlementGates永不付费解锁目录(安全/纠正/导出删除结构不可入付费墙),GET /api/me/entitlements+cancel端点;8/8契约,PG基线44/103/96/25实机"
     delivery_record2: evidence/commercial-cn/CP-46/2026-09-13-quota-display/delivery-record.md
     note3: "第三增量：透明配额展示——ProviderSpendGuard.DailyQuota(used/limit/remaining+重置时刻锚定guard时钟区次日零点)+GET /api/me/quotas(DAILY窗口/SUBSCRIPTION_PERIOD窗口(权益周期末重置)/neverPayGated承诺列表);2/2契约"
-    next_action: "续费前显著提醒排程；前端配额UI消费该端点；IAP渠道服务器通知接线(需真实渠道账号)"
+    delivery_record4: evidence/commercial-cn/CP-46/2026-09-13-renewal-reminder-and-quota-ui/delivery-record.md
+    note4: "第四增量：续费前显著提醒排程(RenewalReminderService/Job,幂等键内嵌周期末每计费周期恰一条,取消/远期/撤销不提醒,文案点名续费日与取消入口,2/2契约)+前端QuotaPanel(api.quotas+双语+UTC重置时间本地化+neverPayGated错误态仍可见,account标签挂载,8用例)——web 750/750"
+    next_action: "IAP渠道服务器通知接线(需真实渠道账号)；真实续费/退款率数据回填CP-55定价实验"
     evidence_dir: evidence/commercial-cn/CP-46/
   - id: CP-47
     title: "真实单位经济、预算与税务对账"
@@ -676,7 +678,9 @@ work_packages:
     note: "首个增量：供应链唯一权威——删除并存npm lockfile(pnpm-lock.yaml为唯一),7个latest按锁定版本钉死,PackageManagerContract CI合同(单lockfile/精确packageManager/零浮动区间/禁npm install),SBOM与CVE命令基线"
     delivery_record: evidence/commercial-cn/CP-49/2026-09-13-release-manifest-and-sbom/delivery-record.md
     note2: "第二增量：版本化发布清单——generate-release-manifest.ps1(git SHA/双版本/产物与SBOM的SHA256,缺失即absent绝不占位)+assert-release-manifest.ps1(fail-closed:形状/活体漂移守卫/absent不重叠)+release-image.yml接线(双SBOM生成→清单断言→upload-artifact SHA钉扎 if-no-files-found=error)+ReleaseManifestScriptContractTest 2/2文本级钉住接线;本地实跑生成器+断言器通过"
-    next_action: "发布流程实际执行(tag推送)与镜像签名密钥策略为operator门禁；CVE扫描接入CI(需NVD key)"
+    delivery_record3: evidence/commercial-cn/CP-49/2026-09-13-cve-scan-contract/delivery-record.md
+    note4: "第三增量：CVE扫描命令合同——cve-scan.ps1(PS5.1/pwsh7双兼容,无key显式跳过退出码3绝不伪造0漏洞,key日志redacted,有key走dependency-check CVSS>=7+pnpm audit)+java-baseline.yml以secrets.NVD_API_KEY门控接线(exit3译绿保留可见跳过行,无continue-on-error)+契约2/2(含全文件钉死无continue-on-error);无key路径实跑验证"
+    next_action: "发布流程实际执行(tag推送)与镜像签名密钥策略为operator门禁；真实NVD扫描需CI注入key"
     evidence_dir: evidence/commercial-cn/CP-49/
   - id: CP-50
     title: "真实压力、故障与灾难恢复"
@@ -697,7 +701,10 @@ work_packages:
     stage: S2
     depends_on: ["CP-05", "CP-06", "CP-07", "CP-08", "CP-13", "CP-14", "CP-15", "CP-16", "CP-17", "CP-20", "CP-36", "CP-37", "CP-44", "CP-50A"]
     vision_ids: ["V01", "V13", "V14", "V19"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
+    delivery_record: evidence/commercial-cn/CP-51/2026-09-13-regulatory-ledgers/delivery-record.md
+    test_command: "./mvnw test -Dtest=RegulatoryLedgerContractTest"
+    note: "首个增量：法定程序台账(§5.1十二项逐行,适用判断/放行条件/工作包映射/allowed_scope逐条,receipt/signature operator-only)+六渠道提审台账(PASSED须官方receipt,提交截图不算完成,REJECTED须理由且保持阻断,51A/51B互不晋升);独立agent逐行审查回8处修正(含等保行丢失'专业意见'的实质弱化);契约2/2无APPROVED态"
     evidence_dir: evidence/commercial-cn/CP-51/
   - id: CP-52
     title: "大陆收费首发总演练与发布"
@@ -729,7 +736,10 @@ work_packages:
     stage: S4
     depends_on: ["CP-47", "CP-52", "CP-54"]
     vision_ids: ["V17", "V18", "V19"]
-    status: NOT_STARTED
+    status: IN_PROGRESS
+    delivery_record: evidence/commercial-cn/CP-55/2026-09-13-experiment-registry/delivery-record.md
+    test_command: "./mvnw test -Dtest=ExperimentRegistryContractTest"
+    note: "首个增量：预注册实验台账——3渠道实验DRAFT(CP-53预算上限5000/3000/2000)+1定价DRAFT(29/49/79仅可研究价格点,禁止变现断言集);契约钉死:终点仅CP-03字典键(诊断指标禁作终点),K2决策带恒0.15/0.25,补贴恒计入CAC自然留存分列,渠道≤3社区未许可不入组,DRAFT下operator字段一律null;字段规格由独立agent从蓝图逐行提取"
     evidence_dir: evidence/commercial-cn/CP-55/
   - id: CP-56
     title: "投资人／导师数据室与商业叙事"

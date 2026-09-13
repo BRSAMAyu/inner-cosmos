@@ -298,6 +298,10 @@ inner-cosmos:
     # environment/secret manager; blank (the default) fails CLOSED — an unconfigured
     # channel or secret rejects every callback, and no ledger row can ever be created.
     callback-secret: ${INNER_COSMOS_PAYMENTS_CALLBACK_SECRET:}
+    renewal-reminder:
+      # CP-46 续费前显著提醒（消费者保护）：每日 09:00 本地扫描，到期前 N 天提醒一次。
+      enabled: ${INNER_COSMOS_PAYMENTS_RENEWAL_REMINDER_ENABLED:true}
+      days: ${INNER_COSMOS_PAYMENTS_RENEWAL_REMINDER_DAYS:3}
     channels:
       wechatpay:
         mchid: ${INNER_COSMOS_PAYMENTS_WECHATPAY_MCHID:}

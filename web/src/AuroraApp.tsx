@@ -31,12 +31,13 @@ import { LettersInbox } from "./components/LettersInbox";
 import { PortraitView } from "./components/PortraitView";
 import { PortraitClaimsPanel } from "./components/PortraitClaimsPanel";
 import { AccountSettings, type AccountBusy } from "./components/AccountSettings";
+import { QuotaPanel } from "./components/QuotaPanel";
 import { DataRightsPanel } from "./components/DataRightsPanel";
 import { ConsentCenterPanel } from "./components/ConsentCenterPanel";
 import { ConsentRequestDialog } from "./components/ConsentRequestDialog";
 import type { ConsentView } from "./api";
 import { LocaleToggle } from "./components/LocaleToggle";
-import type { DataRetractionReceipt, TtsPreferences, TtsPreferencesPatch, UserProfileSettings } from "./api";
+import type { DataRetractionReceipt, QuotaOverview, TtsPreferences, TtsPreferencesPatch, UserProfileSettings } from "./api";
 import { loadLocale, saveLocale, syncDocumentLocale, type Locale } from "./i18n";
 import { APP_COPY, type DialogMode } from "./appCopy";
 import { AuthGate } from "./components/AuthGate";
@@ -140,6 +141,13 @@ export function AuroraApp() {
   const [dataRightsReceipts, setDataRightsReceipts] = useState<DataRetractionReceipt[]>([]);
   const [dataRightsLoading, setDataRightsLoading] = useState(false);
   const [dataRightsLoaded, setDataRightsLoaded] = useState(false);
+  // CP-46 transparent quotas: the me/account tab's QuotaPanel reads from this one fetched state
+  // (same shape as dataRightsReceipts above). `quotaError` is kept panel-local rather than pushed
+  // to the global status line so the panel can degrade inline and keep its own retry affordance.
+  const [quotaOverview, setQuotaOverview] = useState<QuotaOverview | null>(null);
+  const [quotaLoading, setQuotaLoading] = useState(false);
+  const [quotaLoaded, setQuotaLoaded] = useState(false);
+  const [quotaError, setQuotaError] = useState<string | null>(null);
   // CP-07 consent center + J01 progressive-consent dialog (driven by CONSENT_REQUIRED).
   const [consentViews, setConsentViews] = useState<ConsentView[]>([]);
   const [consentLoading, setConsentLoading] = useState(false);
@@ -1086,6 +1094,19 @@ export function AuroraApp() {
       ? "Data-rights receipts are temporarily unavailable."
       : "暂时无法读取数据权利回执"); }
     finally { setDataRightsLoading(false); }
+  };
+
+  // CP-46: unlike loadDataRightsReceipts above, a failure lands in the panel's own inline error
+  // state (with retry) instead of the global status line -- quota numbers are the whole point of
+  // this surface, so the degradation must be visible right where they would have been.
+  const loadQuotas = async () => {
+    setQuotaLoading(true);
+    setQuotaError(null);
+    try { setQuotaOverview(await api.quotas()); setQuotaLoaded(true); }
+    catch (error) { setQuotaError(error instanceof Error ? error.message : skillLocale === "en-SG"
+      ? "Usage and allowances are temporarily unavailable."
+      : "暂时无法读取配额信息"); }
+    finally { setQuotaLoading(false); }
   };
 
   // App-wide language: initialized from detection (loadLocale), overridable + persisted here so the
@@ -2225,6 +2246,11 @@ export function AuroraApp() {
           ttsPreferences={ttsPreferences} ttsBusy={ttsBusy}
           onUpdateTtsPreferences={patch => updateTtsPreferences(patch)} onPreviewVoice={voiceId => previewTtsVoice(voiceId)}
           locale={skillLocale} />
+        {/* CP-46: transparent quotas sit with the account surface (usage/allowances are account-
+            level entitlements, next to export/delete), auto-loading once like the profile tab's
+            PortraitClaimsPanel rather than behind an opt-in button. */}
+        <QuotaPanel view={quotaOverview} loading={quotaLoading} loaded={quotaLoaded} error={quotaError}
+          onLoad={() => void loadQuotas()} locale={skillLocale} />
         </div>
         <div hidden={meTab !== "appearance"} className="me-appearance-panel">
         <AppearanceSettings locale={skillLocale} />

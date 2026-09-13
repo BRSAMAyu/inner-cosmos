@@ -1,0 +1,160 @@
+# CP-53/CP-55 增长与定价实验注册表（pre-registered experiment registry）
+# 契约测试：src/test/java/com/innercosmos/experiments/ExperimentRegistryContractTest.java
+#
+# 诚实规则（结构性强制）：
+# - 预注册块（hypothesis/randomization_unit/primary_endpoint/decision_band/stopping_gates/
+#   budget_cap/sample_size/statistical_method）在 status>=PREREGISTERED 后必须已冻结——
+#   frozen_at 由 operator 签字落位（owner_signature 同理），coding agent 永远只能写 DRAFT
+# - 主终点只能是 CP-03 指标字典的 K1/K2/K3；时长、DAU、消息数、生成记忆数、发信数、
+#   流水额是诊断指标，禁止作主终点
+# - conclusion 只能由 reviewer 凭证据回填——跑完实验≠假设成立（EVALUATION_EXECUTED 与
+#   CAPABILITY_ACCEPTED 分离的同一纪律）
+# - variables_changed 上限 2 是严于蓝图（蓝图仅说"少量"）的内部政策，在契约测试中注明
+
+schema_version: 1
+ledger_id: COMMERCIAL-EXPERIMENT-REGISTRY-2026-09
+authority:
+  blueprint: docs/commercialization/01-中国大陆商业化执行蓝图.md
+  metric_dictionary: docs/commercialization/ledger/metric-dictionary.md
+
+experiments:
+  - experiment_id: growth-channel-001
+    kind: growth_channel
+    owner: 品牌＋增长＋内容审核
+    reviewer: 创始人
+    stage: S2
+    channel: 小红书（成人自我探索议题内容）
+    hypothesis: 通过成人自我探索议题的真实内容触达的目标用户，其 D30 窗口价值留存不低于 15% 决策带下限
+    randomization_unit: user
+    primary_endpoint: K2_d30_window_value_retention
+    secondary_endpoints: K1_weekly_confirmed_value, K3_monthly_contribution_margin
+    gate_metrics: G-SAFE, G-TRUST
+    minimum_meaningful_difference: K2 +3pp versus 自然流量对照
+    decision_band_pause_below: "0.15"
+    decision_band_further_validation_at: "0.25"
+    stopping_gates: 预算耗尽, G-SAFE/G-TRUST 严重事件立即停, 决策带下限两次核心改版无改善, 月度安全审查不通过
+    statistical_method: 两个独立二项比例的95%置信区间比较；0/N 用近似独立二项上界≈3/N；按用户聚类的稳健标准误
+    sample_size_exploratory_n: "60"
+    sample_size_power_target_n: null
+    budget_cap_amount: "5000"
+    budget_cap_currency: CNY
+    budget_cap_period: 单实验全程
+    subsidy_cap: "1000"
+    subsidy_counts_into_cac: "true"
+    natural_retention_reported_separately: "true"
+    variables_changed: 渠道内容主题, 落地页价值主张
+    community_permission_obtained: "false"
+    community_permission_evidence: null
+    funnel: reach, compliant_visit, activation, d30_window_value_retention, payment_or_refund
+    cac_cost_components: labor, subsidy, creator_fees
+    status: DRAFT
+    frozen_at: null
+    owner_signature: null
+    first_enrolled_at: null
+    conclusion: null
+    forbidden_practices_note: 不购买水军、不制造虚假热度、合成示例永久标 AI、不以分享换数据权利、不上传通讯录、不自动群发
+  - experiment_id: growth-channel-002
+    kind: growth_channel
+    owner: 品牌＋增长＋内容审核
+    reviewer: 创始人
+    stage: S2
+    channel: 微信公众号（慢社交与自我叙事专栏）
+    hypothesis: 经公众号长文触达的读者转注册后，其首周确认价值（K1 私密路径）达成率不低于自然渠道
+    randomization_unit: user
+    primary_endpoint: K1_weekly_confirmed_value
+    secondary_endpoints: K2_d30_window_value_retention
+    gate_metrics: G-SAFE, G-TRUST
+    minimum_meaningful_difference: K1 非劣于自然渠道（-2pp 下限）
+    decision_band_pause_below: "0.15"
+    decision_band_further_validation_at: "0.25"
+    stopping_gates: 预算耗尽, G-SAFE/G-TRUST 严重事件立即停, 触达合规投诉, 决策带下限两次核心改版无改善
+    statistical_method: 非劣检验（单侧95%下界）；按用户聚类
+    sample_size_exploratory_n: "60"
+    sample_size_power_target_n: null
+    budget_cap_amount: "3000"
+    budget_cap_currency: CNY
+    budget_cap_period: 单实验全程
+    subsidy_cap: "0"
+    subsidy_counts_into_cac: "true"
+    natural_retention_reported_separately: "true"
+    variables_changed: 专栏主题, 关注转化路径
+    community_permission_obtained: "false"
+    community_permission_evidence: null
+    funnel: reach, compliant_visit, activation, d30_window_value_retention, payment_or_refund
+    cac_cost_components: labor, subsidy, creator_fees
+    status: DRAFT
+    frozen_at: null
+    owner_signature: null
+    first_enrolled_at: null
+    conclusion: null
+    forbidden_practices_note: 不购买水军、不制造虚假热度、合成示例永久标 AI、不以分享换数据权利、不上传通讯录、不自动群发
+  - experiment_id: growth-channel-003
+    kind: growth_channel
+    owner: 品牌＋增长＋内容审核
+    reviewer: 创始人
+    stage: S2
+    channel: 校友与职场转折社群（获得社区允许后）
+    hypothesis: 经历职场/人生转折期的社群成员在慢社交产品中有更高的 D30 窗口价值留存
+    randomization_unit: user
+    primary_endpoint: K2_d30_window_value_retention
+    secondary_endpoints: K1_weekly_confirmed_value, K3_monthly_contribution_margin
+    gate_metrics: G-SAFE, G-TRUST
+    minimum_meaningful_difference: K2 +5pp versus 公众号渠道
+    decision_band_pause_below: "0.15"
+    decision_band_further_validation_at: "0.25"
+    stopping_gates: 预算耗尽, 社区允许被撤回, G-SAFE/G-TRUST 严重事件立即停, 决策带下限两次核心改版无改善
+    statistical_method: 两个独立二项比例的95%置信区间比较；按用户聚类
+    sample_size_exploratory_n: "40"
+    sample_size_power_target_n: null
+    budget_cap_amount: "2000"
+    budget_cap_currency: CNY
+    budget_cap_period: 单实验全程
+    subsidy_cap: "500"
+    subsidy_counts_into_cac: "true"
+    natural_retention_reported_separately: "true"
+    variables_changed: 社群选择, 招募话术
+    community_permission_obtained: "false"
+    community_permission_evidence: null
+    funnel: reach, compliant_visit, activation, d30_window_value_retention, payment_or_refund
+    cac_cost_components: labor, subsidy, creator_fees
+    status: DRAFT
+    frozen_at: null
+    owner_signature: null
+    first_enrolled_at: null
+    conclusion: null
+    forbidden_practices_note: 不购买水军、不制造虚假热度、合成示例永久标 AI、不以分享换数据权利、不上传通讯录、不自动群发
+  - experiment_id: pricing-001
+    kind: pricing
+    owner: 增长＋财务＋产品
+    reviewer: 创始人
+    stage: S4
+    hypothesis: 在 29/49/79 元/月三个可研究价格点中，49 元档的月度贡献毛利率（K3）不劣于其他档位且退款率更低
+    randomization_unit: user
+    primary_endpoint: K3_monthly_contribution_margin
+    secondary_endpoints: K2_d30_window_value_retention
+    gate_metrics: G-SAFE, G-TRUST
+    minimum_meaningful_difference: K3 每付费用户 +8 元/月
+    decision_band_pause_below: "0.15"
+    decision_band_further_validation_at: "0.25"
+    stopping_gates: 预算耗尽, G-SAFE/G-TRUST 严重事件立即停, 退款率超阈值, 暗扣/续费障碍类投诉出现即停
+    statistical_method: 区间估计为主（小样本不假装显著性）；0/N 用近似独立二项上界≈3/N
+    sample_size_exploratory_n: "30"
+    sample_size_power_target_n: null
+    budget_cap_amount: "1000"
+    budget_cap_currency: CNY
+    budget_cap_period: 单实验全程
+    subsidy_cap: "0"
+    subsidy_counts_into_cac: "true"
+    natural_retention_reported_separately: "true"
+    variables_changed: 价格点
+    single_membership_only: "true"
+    price_points_research_only: "true"
+    payment_disclosure: 支付前明确渠道价格、周期、税费、额度与到期行为
+    intent_vs_payment: 付费意向与真实付款分列两字段报告
+    forbidden_monetization: 不出售更爱你, 不出售收件人回应, 不出售突破他人边界, 不做心理弱点差别定价, 高风险会话不弹续费挽留, 无暗扣无续费障碍无脆弱性营销
+    status: DRAFT
+    frozen_at: null
+    owner_signature: null
+    first_enrolled_at: null
+    conclusion: null
+    forbidden_practices_note: 不购买水军、不制造虚假热度、合成示例永久标 AI、不以分享换数据权利、不上传通讯录、不自动群发

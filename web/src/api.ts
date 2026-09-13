@@ -73,6 +73,35 @@ export type DataRetractionReceipt = {
   createdAt: string;
 };
 export type ProactiveEvent = { type: string; content: string; ts: string };
+
+// CP-46 transparent quotas (GET /api/me/quotas): per-capability usage budgets, subscription-period
+// windows, and the fixed list of capabilities that are never pay-gated. resetsAt fields are UTC
+// LocalDateTime strings serialized WITHOUT a zone marker ("2026-09-14T00:00:00") — consumers must
+// re-tag them as UTC before localizing (see QuotaPanel's resetTimeLabel).
+export type QuotaRow = {
+  capability: string;
+  basis: "DAILY" | "SUBSCRIPTION_PERIOD" | string;
+  used: number;
+  limit: number;
+  remaining: number;
+  usedTokens: number | null;
+  limitTokens: number | null;
+  resetsAt: string | null;
+};
+export type SubscriptionWindowRow = {
+  productId: string;
+  capability: string;
+  basis: "SUBSCRIPTION_PERIOD" | string;
+  state: "ACTIVE" | string;
+  resetsAt: string | null;
+  autoRenew: boolean;
+  cancelAtPeriodEnd: boolean;
+};
+export type QuotaOverview = {
+  quotas: QuotaRow[];
+  subscriptionWindows: SubscriptionWindowRow[];
+  neverPayGated: string[];
+};
 // W2 voice feature: GET /api/me/tts/voices, PATCH /api/me/tts/preferences (same response shape),
 // POST /api/me/tts/preview. Fixed contract from the backend agent's parallel worktree -- see the
 // W2 dispatch brief for the exact shapes this mirrors.
@@ -920,6 +949,9 @@ export const api = {
   }),
   dataRightsReceipts: (limit?: number) => request<DataRetractionReceipt[]>(
     "/api/me/data-rights/receipts" + (limit ? `?limit=${limit}` : "")),
+  /** CP-46: the owner's transparent-quota view — daily usage, subscription windows, and the
+   *  capabilities that are never pay-gated. Read-only; no CSRF-relevant side effects. */
+  quotas: () => request<QuotaOverview>("/api/me/quotas"),
   consents: () => request<ConsentView[]>("/api/me/consents"),
   decideConsent: (purposeCode: string, grant: boolean) => request<ConsentView>(
     `/api/me/consents/${encodeURIComponent(purposeCode)}`, {

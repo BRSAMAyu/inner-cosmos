@@ -133,6 +133,29 @@ jobs:
           aquasec/trivy@sha256:be1190afcb28352bfddc4ddeb71470835d16462af68d310f9f4bca710961a41e
           image --skip-version-check --scanners vuln --severity HIGH,CRITICAL
           --exit-code 1 inner-cosmos:ci
+      # Toolchain for the pnpm half of the CVE scan step below (same pinned
+      # setup-node/pnpm as the web-contract job; nothing floating is introduced).
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22.20.0'
+      - name: Activate pinned pnpm for the CVE scan quick gate
+        run: corepack enable && corepack prepare pnpm@11.9.0 --activate
+      - name: CVE scan backend (OWASP dependency-check) and web (pnpm audit)
+        # cve-scan.ps1 exits 3 when NVD_API_KEY is not configured: that is the
+        # explicit, visible skip, translated here to success so unkeyed repos
+        # stay green. Every other non-zero exit is a real scan failure or a
+        # HIGH/CRITICAL finding and must fail the job; swallowing failures
+        # with a step-level error-suppression flag is forbidden.
+        shell: pwsh
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: |
+          ./scripts/supply-chain/cve-scan.ps1
+          if ($LASTEXITCODE -eq 3) {
+            Write-Host "CVE_SCAN_SKIPPED_NO_NVD_KEY: NVD_API_KEY secret not configured; nothing was scanned"
+            exit 0
+          }
+          exit $LASTEXITCODE
       - name: Upload test and SBOM evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -143,5 +166,6 @@ jobs:
             target/surefire-reports/
             target/sbom/
             target/spotbugsXml.xml
+            target/dependency-check-report.*
             poc/postgres-pgvector/target/surefire-reports/
             poc/postgres-pgvector/target/failsafe-reports/

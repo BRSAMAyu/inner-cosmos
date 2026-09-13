@@ -16,6 +16,10 @@ SBOM 必须随发布归档到 `evidence/commercial-cn/CP-49/<version>/`；同 SH
 ## CVE / 支持周期清单
 
 ```powershell
+# 一键入口（fail-closed）：无 NVD key 时打印 CVE_SCAN_SKIPPED_NO_NVD_KEY 并以退出码 3
+# 显式跳过——既不是成功也不是失败，绝不输出伪造的漏洞计数；key 走 -NvdApiKey 或 $env:NVD_API_KEY
+./scripts/supply-chain/cve-scan.ps1
+
 cd web; pnpm audit --prod          # 生产依赖漏洞（CI 快速门）
 # 后端：OWASP dependency-check（需 NVD API key，operator/CI 环境）或 Trivy 扫描最终镜像
 # ./mvnw org.owasp:dependency-check-maven:check -DnvdApiKey=$env:NVD_KEY

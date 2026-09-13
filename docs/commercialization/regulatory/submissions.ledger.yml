@@ -1,0 +1,66 @@
+# CP-51B 逐渠道提审台账（per-channel submission ledger）
+# 契约测试同 legal-procedures.ledger.yml。与 CP-43/44 的商店材料 checklist 分工：
+# 那边是"材料是否备齐"，这边是"每次提交的事实登记"。
+#
+# 诚实规则（结构性强制）：
+# - 每次提交一行：submitted_at/receipt/review_outcome 只能由 operator 在真实提交后回填
+# - review_outcome ∈ {PENDING, SUBMITTED, REJECTED, PASSED}，但 PASSED 必须带 receipt
+#   （官方"审批通过"凭据，提交截图不算）；REJECTED 必须带 rejection_reason
+# - 渠道之间互不晋升：一个渠道通过不代表其他渠道；51A 法定程序通过也不代表本表
+# - 未通过渠道保持关闭（blocks_launch: true 直到 PASSED）
+
+submissions:
+  - submission_id: web-pwa-001
+    channel: web-pwa
+    artifact: 主站/PWA 候选包（release-manifest 登记的制品）
+    blocks_launch: true
+    status: PENDING
+    submitted_at: null
+    receipt: null
+    review_outcome: PENDING
+    rejection_reason: null
+  - submission_id: apple-cn-001
+    channel: apple-cn
+    artifact: iOS 中国区候选包（组织签名 + 审核账号）
+    blocks_launch: true
+    status: PENDING
+    submitted_at: null
+    receipt: null
+    review_outcome: PENDING
+    rejection_reason: null
+  - submission_id: xiaomi-001
+    channel: xiaomi
+    artifact: 小米商店候选包（AI 资质/算法材料随附）
+    blocks_launch: true
+    status: PENDING
+    submitted_at: null
+    receipt: null
+    review_outcome: PENDING
+    rejection_reason: null
+  - submission_id: oppo-001
+    channel: oppo
+    artifact: OPPO 商店候选包（社交/AI 分类评估材料随附）
+    blocks_launch: true
+    status: PENDING
+    submitted_at: null
+    receipt: null
+    review_outcome: PENDING
+    rejection_reason: null
+  - submission_id: huawei-001
+    channel: huawei
+    artifact: 华为 Android 候选包（原生 HarmonyOS 另立行，不从 APK 推断）
+    blocks_launch: true
+    status: PENDING
+    submitted_at: null
+    receipt: null
+    review_outcome: PENDING
+    rejection_reason: null
+  - submission_id: vivo-others-001
+    channel: vivo-others
+    artifact: vivo/应用宝等候选包（独立台账，最新官方规范待核验）
+    blocks_launch: true
+    status: PENDING
+    submitted_at: null
+    receipt: null
+    review_outcome: PENDING
+    rejection_reason: null

@@ -630,6 +630,36 @@ h1 { margin: 14px 0; font-family: Georgia, "Noto Serif SC", serif; font-size: cl
 .data-rights-action.cleared { color: #b8c7a9; border-color: #b8c7a955; background: #55702c1f; }
 .data-rights-reason { margin: 7px 0 4px; color: #cbbfae; font-size: .8rem; line-height: 1.55; }
 .data-rights-list small { color: var(--text-faint); font-size: .7rem; }
+/* CP-46 transparent quotas (QuotaPanel) — follows the data-rights card conventions. */
+.quota-panel { margin-top: 18px; padding: 18px; border: 1px solid #ffffff12; border-radius: 16px; background: #241b17b0; }
+.quota-panel h3 { margin: 6px 0 4px; font: 500 1.05rem Georgia,"Noto Serif SC",serif; color: var(--text-primary); }
+.quota-panel h4 { margin: 14px 0 8px; color: var(--text-secondary); font-size: .84rem; letter-spacing: .04em; }
+.quota-intro { margin: 0; color: #9c9086; font-size: .82rem; line-height: 1.6; }
+.quota-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.quota-list li { padding: 11px 13px; border: 1px solid #ffffff0e; border-radius: 12px; background: #2d221b; }
+.quota-row-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.quota-capability { color: var(--text-primary); font-size: .84rem; }
+.quota-count { color: var(--accent-sage-soft); font-size: .78rem; }
+.quota-meter { margin: 8px 0 6px; height: 4px; border-radius: 999px; background: #ffffff14; overflow: hidden; }
+.quota-meter i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--accent-sage-soft), #c8b697); }
+.quota-row-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
+.quota-row-foot small { color: var(--text-faint); font-size: .7rem; }
+.quota-window-state { padding: 3px 9px; border-radius: 999px; font-size: .7rem; border: 1px solid #ffffff20; color: var(--text-muted); }
+.quota-window-state.active { color: #b8c7a9; border-color: #b8c7a955; background: #55702c1f; }
+.quota-renew { color: #c8b697; }
+.quota-empty-note { display: block; margin-top: 3px; }
+.quota-never { margin-top: 14px; padding: 11px 13px; border: 1px solid #b8c7a930; border-radius: 12px; background: #55702c12; }
+.quota-never h4 { margin: 0 0 4px; }
+.quota-never p { margin: 0; color: #cbbfae; font-size: .82rem; line-height: 1.55; }
+.quota-never-details { margin-top: 6px; }
+.quota-never-details summary { color: var(--text-faint); font-size: .72rem; cursor: pointer; }
+.quota-never-details ul { margin: 6px 0 0; padding-left: 18px; color: var(--text-muted); font-size: .74rem; }
+.quota-error { margin: 10px 0; padding: 11px 13px; border: 1px solid #e7c3a855; border-radius: 12px; background: #7e522c14; }
+.quota-error p { margin: 0 0 4px; color: #cbbfae; font-size: .8rem; }
+.quota-error-detail { color: var(--text-faint); font-size: .72rem; }
+.quota-error button { margin-top: 6px; padding: 7px 13px; border: 1px solid #c7bbaa45; border-radius: 999px; color: #c7bbaa; background: #74869b28; }
+.quota-foot { margin-top: 12px; }
+.quota-reload { padding: 8px 14px; border: 1px solid #c7bbaa45; border-radius: 999px; color: #c7bbaa; background: #74869b28; }
 .speaker { display: block; margin-bottom: 7px; color: var(--text-muted); font-size: .72rem; letter-spacing: .08em; }.user .speaker { color: #6b5a3f; }
 .message p { margin: 0; white-space: pre-wrap; line-height: 1.72; }.message small { display: block; margin-top: 8px; color: var(--text-muted); }
 /* Gemini audit 4.11 (CONFIRMED/P2): shared UGC free-text primitive. Any arbitrary-length
