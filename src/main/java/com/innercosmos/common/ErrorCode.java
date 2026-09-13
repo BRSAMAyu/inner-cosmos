@@ -33,6 +33,13 @@ public final class ErrorCode {
      * spend is simply spent; local features are unaffected and it resets next day.
      */
     public static final String AI_SPEND_EXCEEDED = "AI_SPEND_EXCEEDED";
+    /**
+     * CP-17 gateway concurrency gate: the per-pod cap on in-flight REMOTE provider calls is
+     * reached (429 semantics). Transient and retryable — unlike AI_SPEND_EXCEEDED nothing was
+     * spent (the refusal happens before the provider call) and unlike AI_PROVIDER_ERROR nothing
+     * failed; the caller should retry shortly rather than degrade to a deterministic fallback.
+     */
+    public static final String GATEWAY_BUSY = "GATEWAY_BUSY";
 
     private ErrorCode() {
     }

@@ -293,6 +293,17 @@ llm:
     timeout-ms: ${DEEPSEEK_TIMEOUT_MS:30000}
 
 inner-cosmos:
+  ai:
+    gateway:
+      # CP-17 网关治理（StructuredAiService.callObserved 咽喉，仅作用于 REMOTE 调用）。
+      # 并发闸：单 pod 内 REMOTE provider in-flight 上限（全局口径 —— failover 链最终由哪个
+      # 供应商承接对咽喉不可见，无法归因的 per-provider 上限只是装饰）；超限立即以
+      # GATEWAY_BUSY（429 语义，可重试、零消耗）失败，不排队。
+      max-concurrency: ${INNER_COSMOS_AI_GATEWAY_MAX_CONCURRENCY:16}
+      # per-call deadline：每次 provider 交互（含共享同一预算的 JSON 修复重试）的硬时限，
+      # 超时中断并走失败路径（fail-closed：不算成功、不记预算成功）。默认对齐现有最大
+      # totalTimeout 包络（AURORA_PLAN 复杂轮 120s），不悄悄改写模块级延迟合同。
+      call-deadline-ms: ${INNER_COSMOS_AI_GATEWAY_CALL_DEADLINE_MS:120000}
   payments:
     # CP-45 payment channel sandbox adapters. All values are operator-injected via
     # environment/secret manager; blank (the default) fails CLOSED — an unconfigured

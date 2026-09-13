@@ -9,16 +9,19 @@ import org.springframework.stereotype.Component;
 
 /**
  * CP-17 call manifest: every real-provider egress records task, user, purpose, data class,
- * region and provider — the auditable counterpart the gateway audit must match. Bounded
- * in-memory ring (the durable sink is the CP-40 observability pipeline); reads are for
- * tests and ops spot-checks, never for product features.
+ * region, provider and the structured contract/filing version — the auditable counterpart
+ * the gateway audit must match. The contract version is a closed {@link ModelContractVersion},
+ * never free text: unknown provider labels are recorded as UNREGISTERED (the row survives as
+ * audit truth; the contract metadata is never invented). Bounded in-memory ring (the durable
+ * sink is the CP-40 observability pipeline); reads are for tests and ops spot-checks, never
+ * for product features.
  */
 @Component
 public class GatewayCallLedger {
 
     public record CallRecord(LocalDateTime at, Long userId, String moduleName, String provider,
                              String purpose, String dataClass, String region,
-                             String contractVersion, String outcome) {
+                             ModelContractVersion contractVersion, String outcome) {
     }
 
     private static final int CAPACITY = 200;
@@ -31,7 +34,7 @@ public class GatewayCallLedger {
             }
             records.addLast(new CallRecord(LocalDateTime.now(ZoneOffset.UTC), userId, moduleName,
                     provider, "AI_PROVIDER_EGRESS", "USER_CONTENT", "CN",
-                    "contract:pending-per-provider", outcome));
+                    ModelContractVersion.forProvider(provider), outcome));
         }
     }
 

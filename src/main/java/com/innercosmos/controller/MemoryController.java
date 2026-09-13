@@ -26,6 +26,10 @@ public class MemoryController extends BaseController {
     private final StarfieldExplorerService starfieldExplorerService;
     private final MemoryLifecycleService memoryLifecycleService;
 
+    /** CP-14 unified boundary guard; optional so direct-construction tests keep working. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.innercosmos.service.privacy.SensitiveDataBoundaryService sensitiveBoundary;
+
     public MemoryController(MemoryService memoryService, ThemeAggregationService themeAggregationService,
                             StarfieldExplorerService starfieldExplorerService,
                             MemoryLifecycleService memoryLifecycleService) {
@@ -65,12 +69,22 @@ public class MemoryController extends BaseController {
     @GetMapping("/starfield/{id}/detail")
     public ApiResponse<StarfieldDetailVO> starfieldDetail(@PathVariable Long id, HttpSession session) {
         Long userId = currentUserId(session);
+        // CP-14: by-id read of a P1 memory card goes through the unified guard (tombstone +
+        // fail-closed requester state on top of the service-level owner check).
+        if (sensitiveBoundary != null) {
+            sensitiveBoundary.assertReadable("MEMORY", id, userId,
+                    com.innercosmos.service.privacy.SensitiveDataBoundaryService.Purpose.OWNER_READ);
+        }
         return ApiResponse.ok(memoryService.starfieldDetail(userId, id));
     }
 
     @PostMapping("/cards/{id}/importance")
     public ApiResponse<Void> updateImportance(@PathVariable Long id, @RequestBody Map<String, Double> body, HttpSession session) {
         Long userId = currentUserId(session);
+        if (sensitiveBoundary != null) {
+            sensitiveBoundary.assertReadable("MEMORY", id, userId,
+                    com.innercosmos.service.privacy.SensitiveDataBoundaryService.Purpose.OWNER_READ);
+        }
         memoryService.updateImportance(userId, id, body.get("importance"));
         return ApiResponse.ok(null);
     }
@@ -78,6 +92,10 @@ public class MemoryController extends BaseController {
     @PostMapping("/cards/{id}/archive")
     public ApiResponse<Void> archiveCard(@PathVariable Long id, HttpSession session) {
         Long userId = currentUserId(session);
+        if (sensitiveBoundary != null) {
+            sensitiveBoundary.assertReadable("MEMORY", id, userId,
+                    com.innercosmos.service.privacy.SensitiveDataBoundaryService.Purpose.OWNER_READ);
+        }
         memoryLifecycleService.execute(userId, new MemoryOperationCommand(
                 "ARCHIVE", id, null, null, null, null,
                 "用户从记忆卡片归档", 1.0, "legacy:/api/memory/cards/{id}/archive"));

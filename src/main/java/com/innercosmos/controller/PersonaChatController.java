@@ -18,6 +18,10 @@ import java.util.List;
 public class PersonaChatController extends BaseController {
     private final PersonaChatService personaChatService;
 
+    /** CP-14 unified boundary guard; optional so direct-construction tests keep working. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.innercosmos.service.privacy.SensitiveDataBoundaryService sensitiveBoundary;
+
     public PersonaChatController(PersonaChatService personaChatService) {
         this.personaChatService = personaChatService;
     }
@@ -29,7 +33,15 @@ public class PersonaChatController extends BaseController {
 
     @GetMapping("/capsule/{capsuleId}/active-session")
     public ApiResponse<PersonaChatSession> activeSession(@PathVariable Long capsuleId, HttpSession session) {
-        return ApiResponse.ok(personaChatService.activeSession(currentUserId(session), capsuleId));
+        Long userId = currentUserId(session);
+        // CP-14 CAPSULE_RUNTIME: a visitor's by-id read of a P2 capsule goes through the
+        // unified guard — tombstone-first (a withdrawn capsule stays unreachable even if a
+        // backup restore resurrected its row) and fail-closed on requester state.
+        if (sensitiveBoundary != null) {
+            sensitiveBoundary.assertReadable("CAPSULE", capsuleId, userId,
+                    com.innercosmos.service.privacy.SensitiveDataBoundaryService.Purpose.CAPSULE_RUNTIME);
+        }
+        return ApiResponse.ok(personaChatService.activeSession(userId, capsuleId));
     }
 
     @PostMapping("/message")
@@ -66,7 +78,15 @@ public class PersonaChatController extends BaseController {
      */
     @GetMapping("/quota")
     public ApiResponse<CapsuleQuotaVO> quota(@RequestParam Long capsuleId, HttpSession session) {
-        return ApiResponse.ok(personaChatService.quota(currentUserId(session), capsuleId));
+        Long userId = currentUserId(session);
+        // CP-14 CAPSULE_RUNTIME: the quota read previously loaded ANY capsule id and echoed
+        // back its conversationLimitPerDay — a P2 config probe. The guard restricts it to
+        // publicly listed capsules (or the owner's own), tombstone-first.
+        if (sensitiveBoundary != null) {
+            sensitiveBoundary.assertReadable("CAPSULE", capsuleId, userId,
+                    com.innercosmos.service.privacy.SensitiveDataBoundaryService.Purpose.CAPSULE_RUNTIME);
+        }
+        return ApiResponse.ok(personaChatService.quota(userId, capsuleId));
     }
 
     /** In-the-moment report — a visitor need not wait for a delivered letter to flag a session. */

@@ -166,6 +166,30 @@ public class WeeklyReviewV2ServiceImpl implements WeeklyReviewV2Service {
         vo.dailySnapshots = dailySnapshots;
         vo.legacy = false;
 
+        // CP-24 (J06): every presented dimension carries its evidence (source ids) or an
+        // honest missing note — a dimension without data is STATED, never faked with
+        // blanks or zeros.
+        if (!weekMemories.isEmpty()) {
+            vo.evidenceRefs.add(new WeeklyReviewV2VO.EvidenceRef("topThemes", "MEMORY_CARD",
+                    weekMemories.stream().map(m -> m.id).toList()));
+        } else {
+            vo.missingNotes.add(new WeeklyReviewV2VO.MissingNote("topThemes",
+                    "本周没有沉淀记忆卡片——没有材料，不编主题"));
+        }
+        if (!timelines.isEmpty()) {
+            vo.evidenceRefs.add(new WeeklyReviewV2VO.EvidenceRef("dominantEmotion",
+                    "EMOTION_TIMELINE", timelines.stream().map(t -> t.id).toList()));
+        } else {
+            vo.missingNotes.add(new WeeklyReviewV2VO.MissingNote("dominantEmotion",
+                    "本周没有情绪轨迹记录——情绪维度无数据，不作猜测"));
+        }
+        if (!allTodos.isEmpty()) {
+            vo.evidenceRefs.add(new WeeklyReviewV2VO.EvidenceRef("todoRatio", "TODO_ITEM",
+                    allTodos.stream().map(t -> t.id).toList()));
+        } else {
+            vo.missingNotes.add(new WeeklyReviewV2VO.MissingNote("todoRatio",
+                    "没有待办记录——完成率不适用，不显示 0%"));
+        }
         return vo;
     }
 

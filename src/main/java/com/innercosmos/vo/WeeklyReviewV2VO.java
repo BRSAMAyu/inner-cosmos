@@ -59,4 +59,15 @@ public class WeeklyReviewV2VO {
 
     /** True if this was generated from mock/placeholder data */
     public Boolean legacy = false;
+
+    /** CP-24 证据引用：每个呈现维度给出支撑数据的来源 id（J06 呈现依据）。 */
+    public List<EvidenceRef> evidenceRefs = new ArrayList<>();
+    /** CP-24 缺失说明：无数据的维度诚实标注原因，不用空白或 0 冒充（J06 允许"不是重点"）。 */
+    public List<MissingNote> missingNotes = new ArrayList<>();
+
+    public record EvidenceRef(String dimension, String sourceType, List<Long> sourceIds) {
+    }
+
+    public record MissingNote(String dimension, String reason) {
+    }
 }

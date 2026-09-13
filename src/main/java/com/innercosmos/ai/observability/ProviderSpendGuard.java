@@ -101,6 +101,15 @@ public class ProviderSpendGuard {
                 : current;
     }
 
+    /**
+     * CP-17 governance tests / ops introspection: provider calls actually recorded today for a
+     * user. The {@link DayCounters} record stays package-private; this is the public read of the
+     * one dimension the gateway negative tests assert (a refused/interrupted call records none).
+     */
+    public long recordedCallsToday(Long userId) {
+        return snapshot(userId).calls().get();
+    }
+
     /** CP-46 quota display view: today's usage against both budgets plus the reset
      *  instant (next start-of-day in the guard's own clock zone — the same anchor the
      *  day counters roll on). 配额显示剩余与重置时间. */

@@ -15,6 +15,10 @@ import java.util.Map;
 public class ThoughtShredderController extends BaseController {
     private final ThoughtShredderService thoughtShredderService;
 
+    /** CP-14 unified boundary guard; optional so direct-construction tests keep working. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.innercosmos.service.privacy.SensitiveDataBoundaryService sensitiveBoundary;
+
     public ThoughtShredderController(ThoughtShredderService thoughtShredderService) {
         this.thoughtShredderService = thoughtShredderService;
     }
@@ -37,6 +41,11 @@ public class ThoughtShredderController extends BaseController {
     @PostMapping("/{id}/settle")
     public ApiResponse<Void> settle(@PathVariable Long id, HttpSession session) {
         Long userId = currentUserId(session);
+        // CP-14: by-id operation on a P1 shredder memory card goes through the unified guard.
+        if (sensitiveBoundary != null) {
+            sensitiveBoundary.assertReadable("MEMORY", id, userId,
+                    com.innercosmos.service.privacy.SensitiveDataBoundaryService.Purpose.OWNER_READ);
+        }
         thoughtShredderService.settle(userId, id);
         return ApiResponse.ok(null);
     }
@@ -44,6 +53,10 @@ public class ThoughtShredderController extends BaseController {
     @DeleteMapping("/{id}")
     public ApiResponse<Void> delete(@PathVariable Long id, HttpSession session) {
         Long userId = currentUserId(session);
+        if (sensitiveBoundary != null) {
+            sensitiveBoundary.assertReadable("MEMORY", id, userId,
+                    com.innercosmos.service.privacy.SensitiveDataBoundaryService.Purpose.OWNER_READ);
+        }
         thoughtShredderService.delete(userId, id);
         return ApiResponse.ok(null);
     }

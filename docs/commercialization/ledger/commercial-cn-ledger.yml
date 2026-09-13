@@ -264,10 +264,10 @@ work_packages:
     vision_ids: ["V05", "V07", "V10"]
     status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-14/
-    delivery_record: evidence/commercial-cn/CP-14/2026-09-06-boundary-guard-and-tombstones/delivery-record.md
+    delivery_record: evidence/commercial-cn/CP-14/2026-09-13-by-id-full-wiring/delivery-record.md
     test_command: "./mvnw test -Dtest=SensitiveBoundaryAndAntiResurrectionTest"
-    note: "首个增量：读路径审计+统一守卫(状态fail-closed/tombstone优先/属主)+getOwnedCapsule与listCards接线+越权矩阵5/5"
-    next_action: "by-id全量接线；CAPSULE_RUNTIME purpose；缓存键授权版本"
+    note: "首个增量：读路径审计+统一守卫(状态fail-closed/tombstone优先/属主)+getOwnedCapsule与listCards接线+越权矩阵5/5；第二增量：by-id全量接线17端点(含quota无门禁/active-session无tombstone两个真实漏洞)+CAPSULE_RUNTIME purpose+TODO主体+矩阵8/8"
+    next_action: "EchoResonance landed端点tombstone(移交CP-31)；画像缓存真实引入时接授权版本键"
   - id: CP-15
     title: "撤回、删除与灾备防复活"
     owner: "数据后端＋隐私"
@@ -300,10 +300,10 @@ work_packages:
     vision_ids: ["V03", "V07", "V15", "V16"]
     status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-17/
-    delivery_record: evidence/commercial-cn/CP-27/2026-09-06-voice-skill-gateway/delivery-record.md
+    delivery_record: evidence/commercial-cn/CP-17/2026-09-13-gateway-budget-concurrency-deadline/delivery-record.md
     test_command: "./mvnw test -Dtest=VoiceSkillGatewayTest"
-    note: "首个增量：出站域名白名单(装配期fail-closed,未知主机拒)+调用manifest(user/模块/Provider/用途/数据级/区域,拒答同样入账)"
-    next_action: "合同版本填实；预算/并发/deadline统一治理(CP-38联动)；429/流中断负测"
+    note: "首个增量：出站域名白名单(装配期fail-closed,未知主机拒)+调用manifest(user/模块/Provider/用途/数据级/区域,拒答同样入账)；第二增量：ModelContractVersion封闭枚举(占位不伪造注册态)+并发闸16/429 GATEWAY_BUSY+runWithDeadline(上下文传播)+callObserved三层串行(仅REMOTE)+16负测全零计费fail-closed"
+    next_action: "SSE streamChat治理(emitter onError台账回写在ai/client/)+合同版本待备案后填实(操作者门禁)"
   - id: CP-18
     title: "对话编排与真实连续性"
     owner: "AI运行时＋前端"
@@ -384,10 +384,10 @@ work_packages:
     vision_ids: ["V02", "V05", "V06"]
     status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-24/
-    delivery_record: evidence/commercial-cn/CP-16/2026-09-06-threat-model/delivery-record.md
+    delivery_record: evidence/commercial-cn/CP-24/2026-09-13-evidence-refs-correction-journey/delivery-record.md
     test_command: "./mvnw test -Dtest=StarfieldEncodingAndLetterReceiptPrivacyTest"
-    note: "首个增量：星空情绪编码开关(关闭=统一中性尺寸)+图例永远声明非心理评分；J05/J06现场验收属CP-12A"
-    next_action: "周报证据与缺失说明；一条纠正贯穿全部视图的旅程测试"
+    note: "首个增量：星空情绪编码开关(关闭=统一中性尺寸)+图例永远声明非心理评分；J05/J06现场验收属CP-12A；第二增量：周报V2 evidenceRefs/missingNotes诚实结构(topThemes/dominantEmotion/todoRatio三维度)+纠正跨视图旅程测试(纠正->星图->周报证据引用1/1)"
+    next_action: "recommendation维度证据接线(规则式汇总,收益低暂缓)；J05/J06现场验收属CP-12A操作者门禁"
   - id: CP-25
     title: "Aurora人格连续性与受控演化"
     owner: "AI运行时＋产品"

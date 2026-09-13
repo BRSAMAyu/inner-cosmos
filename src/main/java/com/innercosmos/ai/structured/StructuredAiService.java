@@ -44,6 +44,14 @@ public class StructuredAiService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.innercosmos.ai.observability.ProviderSpendGuard spendGuard;
 
+    /**
+     * CP-17 gateway governance (in-flight concurrency gate + per-call deadline); optional so
+     * direct-construction tests keep working. Applied to REMOTE-bound calls only — the same
+     * scoping as the spend guard, since local mock/experiment legs carry no provider contention.
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.innercosmos.ai.gateway.GatewayCallGovernor gatewayGovernor;
+
     public <T> T call(Long userId, String moduleName, String instruction, Object context,
                       Class<T> resultType, Supplier<T> fallback) {
         return call(userId, moduleName, instruction, context, resultType, fallback, null);
@@ -84,6 +92,17 @@ public class StructuredAiService {
             spendGuard.tryAcquire(userId, moduleName);
         }
 
+        // CP-17: one throat, three gates — budget (above), in-flight concurrency and the
+        // per-call deadline (below). GATEWAY_BUSY propagates like AI_SPEND_EXCEEDED: a
+        // 429-semantic, retryable refusal must not be flattened into a deterministic fallback,
+        // because the honest signal to the caller is "retry soon", not "content failed".
+        com.innercosmos.ai.gateway.GatewayCallGovernor.CallLease lease = null;
+        long deadlineAt = Long.MAX_VALUE;
+        if (billable && gatewayGovernor != null) {
+            lease = gatewayGovernor.tryAcquire(userId, moduleName);
+            deadlineAt = gatewayGovernor.deadlineAt();
+        }
+
         try {
             String contextJson = JsonUtils.toJson(modelContext(context));
             String prompt = buildPrompt(contextJson, null);
@@ -92,7 +111,7 @@ public class StructuredAiService {
             configureRequest(request, instruction, context, moduleName, false, assignedGroup,
                     requireRemoteProvider, contextJson);
 
-            String raw = active.chat(request);
+            String raw = chatUnderDeadline(active, request, deadlineAt);
             if (billable && spendGuard != null) {
                 spendGuard.record(userId, moduleName,
                         com.innercosmos.util.TokenEstimateUtils.estimate(prompt == null ? "" : prompt));
@@ -108,22 +127,29 @@ public class StructuredAiService {
                 return new CallOutcome<>(parsed, CallStatus.SUCCESS, "provider_json");
             }
 
-            LlmRequest retry = new LlmRequest(userId, moduleName + "_JSON_REPAIR",
-                    buildPrompt(contextJson, raw));
-            configureRequest(retry, instruction, context, moduleName, true, assignedGroup,
-                    requireRemoteProvider, contextJson);
-            retry.thinkingEnabled = Boolean.FALSE;
-            retry.reasoningEffort = null;
+            // The repair retry shares the SAME per-call deadline budget: a first response that
+            // already consumed the budget leaves no room for a second provider round-trip, and
+            // the honest outcome is invalid-JSON-with-no-repair, never a budgetless retry.
+            if (System.currentTimeMillis() < deadlineAt) {
+                LlmRequest retry = new LlmRequest(userId, moduleName + "_JSON_REPAIR",
+                        buildPrompt(contextJson, raw));
+                configureRequest(retry, instruction, context, moduleName, true, assignedGroup,
+                        requireRemoteProvider, contextJson);
+                retry.thinkingEnabled = Boolean.FALSE;
+                retry.reasoningEffort = null;
 
-            String repaired = active.chat(retry);
-            parsed = StructuredOutputParser.parse(repaired, resultType);
-            if (parsed != null) {
-                success = true;
-                return new CallOutcome<>(parsed, CallStatus.SUCCESS, "provider_json_repaired");
+                String repaired = chatUnderDeadline(active, retry, deadlineAt);
+                parsed = StructuredOutputParser.parse(repaired, resultType);
+                if (parsed != null) {
+                    success = true;
+                    return new CallOutcome<>(parsed, CallStatus.SUCCESS, "provider_json_repaired");
+                }
+                log.warn("[BAD_AI_OUTPUT] Structured AI output for {} was not valid JSON after repair (raw truncated): {}",
+                        moduleName, truncate(repaired, 500));
+            } else {
+                log.warn("[BAD_AI_OUTPUT] Structured AI output for {} was invalid JSON and the per-call "
+                        + "deadline budget left no room for a repair retry", moduleName);
             }
-
-            log.warn("[BAD_AI_OUTPUT] Structured AI output for {} was not valid JSON after repair (raw truncated): {}",
-                    moduleName, truncate(repaired, 500));
             badOutputCounter.incrementAndGet();
             return new CallOutcome<>(fallback.get(), CallStatus.FALLBACK_INVALID_JSON,
                     "invalid_json_after_repair");
@@ -139,6 +165,12 @@ public class StructuredAiService {
             }
             return new CallOutcome<>(fallback.get(), CallStatus.FAILED, detail);
         } finally {
+            // CP-17: the in-flight slot is released on EVERY exit path — success, blank,
+            // invalid JSON, provider failure and deadline kill alike. A leaked lease would
+            // permanently shrink the gateway's concurrency budget.
+            if (lease != null) {
+                lease.close();
+            }
             double latency = System.currentTimeMillis() - startTime;
             try {
                 abTestService.recordMetrics(userId, assignedGroup, moduleName, latency, success, !success);
@@ -146,6 +178,18 @@ public class StructuredAiService {
                 log.debug("Failed to record A/B test metrics: {}", e.getMessage());
             }
         }
+    }
+
+    /**
+     * CP-17 per-call deadline: a governed REMOTE call runs on the governor's interruptible
+     * deadline runner; an ungoverned call (no governor bean, or MOCK/experiment leg) keeps the
+     * direct, byte-identical legacy path.
+     */
+    private String chatUnderDeadline(LlmClient client, LlmRequest request, long deadlineAt) {
+        if (gatewayGovernor == null || deadlineAt == Long.MAX_VALUE) {
+            return client.chat(request);
+        }
+        return gatewayGovernor.runWithDeadline(deadlineAt, request.moduleName, () -> client.chat(request));
     }
 
     private void configureRequest(LlmRequest request, String instruction, Object context,

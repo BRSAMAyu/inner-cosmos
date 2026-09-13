@@ -36,6 +36,10 @@ public class CapsuleController extends BaseController {
     private final CapsuleSandboxService sandboxService;
     private final DataUseGrantService dataUseGrantService;
 
+    /** CP-14 unified boundary guard; optional so direct-construction tests keep working. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.innercosmos.service.privacy.SensitiveDataBoundaryService sensitiveBoundary;
+
     public CapsuleController(CapsuleService capsuleService, DataMaskingService dataMaskingService,
                              CapsuleGenomeService genomeService, CapsuleSandboxService sandboxService,
                              DataUseGrantService dataUseGrantService) {
@@ -143,18 +147,35 @@ public class CapsuleController extends BaseController {
 
     @GetMapping("/{id}/genome-history")
     public ApiResponse<List<CapsuleGenomeVersion>> genomeHistory(@PathVariable Long id, HttpSession session) {
-        return ApiResponse.ok(genomeService.history(currentUserId(session), id));
+        Long userId = currentUserId(session);
+        // CP-14: P2 by-id read through the unified guard (the service keeps its own owner
+        // check; the guard adds tombstone + fail-closed requester state).
+        if (sensitiveBoundary != null) {
+            sensitiveBoundary.assertReadable("CAPSULE", id, userId,
+                    com.innercosmos.service.privacy.SensitiveDataBoundaryService.Purpose.OWNER_READ);
+        }
+        return ApiResponse.ok(genomeService.history(userId, id));
     }
 
     @GetMapping("/{id}/data-use-grants")
     public ApiResponse<List<DataUseGrant>> dataUseGrants(@PathVariable Long id, HttpSession session) {
-        return ApiResponse.ok(dataUseGrantService.history(currentUserId(session), id));
+        Long userId = currentUserId(session);
+        if (sensitiveBoundary != null) {
+            sensitiveBoundary.assertReadable("CAPSULE", id, userId,
+                    com.innercosmos.service.privacy.SensitiveDataBoundaryService.Purpose.OWNER_READ);
+        }
+        return ApiResponse.ok(dataUseGrantService.history(userId, id));
     }
 
     @PostMapping("/{id}/data-use-grants/{grantId}/revoke")
     public ApiResponse<DataUseGrant> revokeDataUseGrant(@PathVariable Long id, @PathVariable Long grantId,
                                                         @RequestBody(required = false) Map<String, Object> body,
                                                         HttpSession session) {
+        Long userId = currentUserId(session);
+        if (sensitiveBoundary != null) {
+            sensitiveBoundary.assertReadable("CAPSULE", id, userId,
+                    com.innercosmos.service.privacy.SensitiveDataBoundaryService.Purpose.OWNER_READ);
+        }
         Object rawReason = body == null ? null : body.get("reason");
         String reason = rawReason == null ? "owner revoked" : String.valueOf(rawReason);
         return ApiResponse.ok(dataUseGrantService.revoke(currentUserId(session), id, grantId, reason));
@@ -175,7 +196,12 @@ public class CapsuleController extends BaseController {
     public ApiResponse<CapsuleSandboxVO> sandbox(@PathVariable Long id,
                                                   @Valid @RequestBody CapsuleSandboxRequest request,
                                                   HttpSession session) {
-        return ApiResponse.ok(sandboxService.respond(currentUserId(session), id, request.question.trim()));
+        Long userId = currentUserId(session);
+        if (sensitiveBoundary != null) {
+            sensitiveBoundary.assertReadable("CAPSULE", id, userId,
+                    com.innercosmos.service.privacy.SensitiveDataBoundaryService.Purpose.OWNER_READ);
+        }
+        return ApiResponse.ok(sandboxService.respond(userId, id, request.question.trim()));
     }
 
     @PostMapping("/{id}/sandbox/feedback")
@@ -183,19 +209,34 @@ public class CapsuleController extends BaseController {
             @PathVariable Long id,
             @Valid @RequestBody CapsuleSandboxFeedbackRequest request,
             HttpSession session) {
-        return ApiResponse.ok(sandboxService.recordFeedback(currentUserId(session), id, request));
+        Long userId = currentUserId(session);
+        if (sensitiveBoundary != null) {
+            sensitiveBoundary.assertReadable("CAPSULE", id, userId,
+                    com.innercosmos.service.privacy.SensitiveDataBoundaryService.Purpose.OWNER_READ);
+        }
+        return ApiResponse.ok(sandboxService.recordFeedback(userId, id, request));
     }
 
     @GetMapping("/{id}/sandbox/feedback")
     public ApiResponse<List<CapsuleSandboxFeedback>> sandboxFeedback(
             @PathVariable Long id, HttpSession session) {
-        return ApiResponse.ok(sandboxService.feedback(currentUserId(session), id));
+        Long userId = currentUserId(session);
+        if (sensitiveBoundary != null) {
+            sensitiveBoundary.assertReadable("CAPSULE", id, userId,
+                    com.innercosmos.service.privacy.SensitiveDataBoundaryService.Purpose.OWNER_READ);
+        }
+        return ApiResponse.ok(sandboxService.feedback(userId, id));
     }
 
     @GetMapping("/{id}/sandbox/fidelity")
     public ApiResponse<List<CapsuleFidelitySummaryVO>> sandboxFidelity(
             @PathVariable Long id, HttpSession session) {
-        return ApiResponse.ok(sandboxService.fidelitySummary(currentUserId(session), id));
+        Long userId = currentUserId(session);
+        if (sensitiveBoundary != null) {
+            sensitiveBoundary.assertReadable("CAPSULE", id, userId,
+                    com.innercosmos.service.privacy.SensitiveDataBoundaryService.Purpose.OWNER_READ);
+        }
+        return ApiResponse.ok(sandboxService.fidelitySummary(userId, id));
     }
 
     private Integer parseVersion(String ifMatch) {
