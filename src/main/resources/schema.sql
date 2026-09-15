@@ -1036,12 +1036,18 @@ CREATE TABLE IF NOT EXISTS tb_belief_pattern (
   last_confirmed_at TIMESTAMP NULL,
   confirmation_count INT DEFAULT 1,
   status VARCHAR(32) DEFAULT 'ACTIVE',
+  version INT NOT NULL DEFAULT 1,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_belief_user (user_id),
   INDEX idx_belief_type (belief_type),
   INDEX idx_belief_strength (strength_score)
 );
+-- CP-21 H2 twin of V54__belief_pattern_version.sql (PG): the optimistic-lock token that
+-- POST /api/belief/{id}/recalculate pins. Existing file databases need the column too
+-- (CREATE TABLE IF NOT EXISTS alone never alters an existing table), so mirror it
+-- idempotently for every startup; DEFAULT 1 backfills old rows like the migration does.
+ALTER TABLE tb_belief_pattern ADD COLUMN IF NOT EXISTS version INT NOT NULL DEFAULT 1;
 
 CREATE TABLE IF NOT EXISTS tb_emotion_timeline (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -1870,7 +1876,27 @@ CREATE TABLE IF NOT EXISTS tb_entitlement_event (
 );
 CREATE INDEX IF NOT EXISTS idx_entitlement_event_entitlement ON tb_entitlement_event (entitlement_id);
 
+-- CP-45 residual (V55 twin, PG): immutable price versions. A price change is a NEW row
+-- (old row RETIRED) — amounts are never edited in place, so every order can trace the
+-- exact version it was priced at. PostgreSQL enforces one ACTIVE per product with a
+-- partial unique index; H2 has no partial indexes, so here it is a service-layer rule.
+CREATE TABLE IF NOT EXISTS tb_price_version (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  product_id VARCHAR(64) NOT NULL,
+  version INT NOT NULL,
+  amount_cents BIGINT NOT NULL,
+  currency CHAR(3) NOT NULL DEFAULT 'CNY',
+  status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE',
+  effective_from TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  retired_at TIMESTAMP,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (product_id, version)
+);
+
 -- CP-45: server-side order catalog (V45 twin) — expected amount/channel/product authority.
+-- V55 twin additions: price_version_id pins the priced version; expires_at is the order
+-- TTL deadline (NULL on legacy rows = never expires); status gains the EXPIRED terminal.
 CREATE TABLE IF NOT EXISTS tb_payment_order (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   order_id VARCHAR(64) NOT NULL,
@@ -1879,12 +1905,17 @@ CREATE TABLE IF NOT EXISTS tb_payment_order (
   channel VARCHAR(32) NOT NULL,
   expected_amount_cents BIGINT NOT NULL,
   currency CHAR(3) NOT NULL DEFAULT 'CNY',
+  price_version_id BIGINT,
   status VARCHAR(16) NOT NULL DEFAULT 'CREATED',
+  expires_at TIMESTAMP,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE (order_id)
+  UNIQUE (order_id),
+  CONSTRAINT fk_payment_order_price_version FOREIGN KEY (price_version_id)
+    REFERENCES tb_price_version (id)
 );
 CREATE INDEX IF NOT EXISTS idx_payment_order_user ON tb_payment_order (user_id, product_id);
+CREATE INDEX IF NOT EXISTS idx_payment_order_expiry ON tb_payment_order (status, expires_at);
 
 -- CP-62: data portability import receipts (V47 twin) — idempotent re-import by natural key.
 CREATE TABLE IF NOT EXISTS tb_data_import_receipt (

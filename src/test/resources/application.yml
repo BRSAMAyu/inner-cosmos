@@ -23,3 +23,7 @@ inner-cosmos:
     csrf-enabled: false
   demo:
     seed-enabled: true
+  wake:
+    # CP-26 服务端 vendor push 唤醒文案脱敏：与主 application.yml 同键同默认（测试 yml 会
+    # 整体遮蔽主配置，这里镜像一份保证测试上下文与生产口径一致）。详见主配置内注释。
+    push-sanitized: ${INNER_COSMOS_WAKE_PUSH_SANITIZED:true}

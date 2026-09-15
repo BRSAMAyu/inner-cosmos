@@ -86,4 +86,31 @@ describe("ConsentCenterPanel", () => {
     expect(screen.getByText("Not granted")).toBeVisible();
     expect(screen.getByRole("button", { name: "Grant: AI_PROVIDER_EGRESS" })).toBeVisible();
   });
+
+  // CP-07 versioned re-consent: ConsentView.source === "RE_CONSENT_REQUIRED" marks a recorded
+  // decision whose version is no longer the registry's current one (stale rows never authorize).
+  it("shows the re-confirm badge and version note only on RE_CONSENT_REQUIRED rows", () => {
+    render(<ConsentCenterPanel loaded loading={false}
+      onLoad={() => undefined} onDecide={() => undefined} busyPurpose={null} views={[
+        view({ purposeCode: "AI_PROVIDER_EGRESS", source: "RE_CONSENT_REQUIRED", granted: true }),
+        view({ purposeCode: "PROACTIVE_CARE", group: "OPTIONAL", source: "CONSENT_CENTER", granted: true }),
+        view({ purposeCode: "ANALYTICS", group: "OPTIONAL", source: "DEFAULT" })
+      ]} />);
+    // Exactly one badge, on the stale row, naming the current version it would record into.
+    expect(screen.getAllByText("条款已更新，需要重新确认")).toHaveLength(1);
+    expect(screen.getByText(/已不再作为当前依据；重新确认后以版本 PV-2026-09 为准/)).toBeVisible();
+    // The other sources stay badge-free.
+    expect(screen.getByText("AI_PROVIDER_EGRESS").closest("li")).toHaveAttribute("data-re-consent", "true");
+    expect(screen.getByText("PROACTIVE_CARE").closest("li")).not.toHaveAttribute("data-re-consent");
+    expect(screen.getByText("ANALYTICS").closest("li")).not.toHaveAttribute("data-re-consent");
+  });
+
+  it("carries the re-confirm copy into en-SG", () => {
+    render(<ConsentCenterPanel loaded loading={false} locale="en-SG"
+      onLoad={() => undefined} onDecide={() => undefined} busyPurpose={null} views={[
+        view({ source: "RE_CONSENT_REQUIRED" })
+      ]} />);
+    expect(screen.getByText("Terms updated · re-confirm")).toBeVisible();
+    expect(screen.getByText(/confirming again records it under version PV-2026-09/i)).toBeVisible();
+  });
 });

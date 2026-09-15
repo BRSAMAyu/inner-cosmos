@@ -45,6 +45,12 @@ public interface CapsuleService {
     List<Map<String, Object>> matchedCapsules(Long userId, ResonanceMatchStrategy strategy,
                                               ResonanceModePreference modePreference);
 
+    /**
+     * CP-31 登记项（LLM 出处信号）：用户镜像预览。有授权记忆时 personaPromptDraft 经
+     * {@code CapsuleAgent#generateUserPersona}（CAPSULE_PERSONA_SYNTHESIS）真实发起模型调用，
+     * 返回体 {@code aiGenerated=true}（调用失败即抛异常，不落模板替身）；无记忆时走本地固定模板
+     * 分支，{@code aiGenerated=false}。取值由生成路径携带，controller 只透出不猜测。
+     */
     CapsulePreviewVO previewUserMirror(Long userId);
 
     EchoCapsule updateContext(Long userId, Long capsuleId, Map<String, Object> body);

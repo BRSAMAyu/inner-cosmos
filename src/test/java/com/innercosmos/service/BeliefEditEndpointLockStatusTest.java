@@ -1,8 +1,10 @@
 package com.innercosmos.service;
 
+import com.innercosmos.common.ErrorCode;
 import com.innercosmos.entity.BeliefPattern;
 import com.innercosmos.entity.MemoryCard;
 import com.innercosmos.entity.User;
+import com.innercosmos.exception.BusinessException;
 import com.innercosmos.mapper.BeliefPatternMapper;
 import com.innercosmos.mapper.MemoryCardMapper;
 import com.innercosmos.dto.RegisterRequest;
@@ -16,24 +18,28 @@ import java.time.ZoneId;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * CP-21 residual batch — the BELIEF half stays honestly UNLOCKED (negative-test layer only).
+ * CP-21 residual — the BELIEF half is now genuinely LOCKED (V54 gave
+ * {@code tb_belief_pattern} a {@code version} column; the negative-test layer this class
+ * used to carry is retired).
  *
- * <p>Endpoint classification (see the batch report): {@code POST /api/belief/extract/{cardId}}
- * is a create/append action (upserts belief rows derived from a memory card — nothing for a
+ * <p>Endpoint classification (unchanged): {@code POST /api/belief/extract/{cardId}} is a
+ * create/append action (upserts belief rows derived from a memory card — nothing for a
  * caller to pin), while {@code POST /api/belief/{id}/recalculate} edits an existing
- * {@code tb_belief_pattern} row and therefore WANTS an expectedVersion optimistic lock.
- * It cannot get one honestly: {@code tb_belief_pattern} has NO version column (V1 baseline +
- * schema.sql), and this batch is schema-frozen — adding {@code expectedVersion} against a
- * nonexistent column, or inventing a lock token out of {@code updated_at}, would be theater.
- * These tests document the current behavior so the gap is a recorded fact, not folklore:</p>
+ * {@code tb_belief_pattern} row and therefore takes an {@code expectedVersion}
+ * optimistic lock, same contract as the portrait claim transitions
+ * (PortraitClaimControlServiceImpl):</p>
  *
  * <ul>
- *   <li>recalculate edits a row with no conflict channel — never CONFLICT, last call wins;</li>
- *   <li>extract keeps appending/upserting untouched — no lock to trip over;</li>
- *   <li>the read endpoints the belief gallery loads stay conflict-free (409 only ever comes
- *       from a real optimistic lock, which is exactly what the CP-21 UI waits for).</li>
+ *   <li>a stale pin dies as {@link ErrorCode#CONFLICT} (409 via GlobalExceptionHandler)
+ *       with the row untouched — no lost update, no silent overwrite;</li>
+ *   <li>a fresh pin recalculates and bumps {@code version} by one (atomic conditional
+ *       UPDATE, so a racing writer between read and write also surfaces as CONFLICT);</li>
+ *   <li>legacy callers with no pin keep working (null = unconditional intent);</li>
+ *   <li>extract stays append/upsert — new rows are born at version 1 and re-extraction
+ *       confirms in place instead of churning the version.</li>
  * </ul>
  */
 @SpringBootTest
@@ -73,29 +79,82 @@ class BeliefEditEndpointLockStatusTest {
     }
 
     @Test
-    void recalculateIsCurrentlyUnlocked_noConflictChannel_lastCallWins() {
+    void staleExpectedVersionIsRejectedAsConflictAndTouchesNothing() {
         User owner = human("cp21e");
         BeliefPattern belief = belief(owner, 4);
 
-        // Two sequential recalculates both land: there is no version token to pin, so no
-        // second caller can be told "someone updated this before you". Recorded as the
-        // honest current state — the lock lands when tb_belief_pattern gets a version
-        // column (schema decision, outside this schema-frozen batch).
-        assertThatCode(() -> beliefService.recalculateStrength(owner.id, belief.id))
-                .doesNotThrowAnyException();
-        assertThatCode(() -> beliefService.recalculateStrength(owner.id, belief.id))
-                .doesNotThrowAnyException();
+        // A pin that never matched the row (insert default is version 1) is rejected before
+        // any write: the row keeps its inserted shape — strength 0.5, not the 1.0 a
+        // successful recalculate of 4 confirmations would produce.
+        assertThatThrownBy(() -> beliefService.recalculateStrength(owner.id, belief.id, 99))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("已被更新")
+                .extracting(e -> ((BusinessException) e).code)
+                .isEqualTo(ErrorCode.CONFLICT);
+        BeliefPattern untouched = beliefMapper.selectById(belief.id);
+        assertThat(untouched.version).isEqualTo(1);
+        assertThat(untouched.strengthScore).isEqualTo(0.5);
 
-        BeliefPattern row = beliefMapper.selectById(belief.id);
+        // The caller re-pins the real version and lands: 1 -> 2, strength recalculated.
+        assertThatCode(() -> beliefService.recalculateStrength(owner.id, belief.id, 1))
+                .doesNotThrowAnyException();
+        BeliefPattern recalculated = beliefMapper.selectById(belief.id);
+        assertThat(recalculated.version).isEqualTo(2);
         // 0.3 base + min(4*0.1, 0.4) confirmation + same-day recency 0.3, clamped.
-        assertThat(row.strengthScore).isEqualTo(1.0);
-        // And the edit leaves no conflict-shaped trace: no version field exists to move.
+        assertThat(recalculated.strengthScore).isEqualTo(1.0);
+
+        // The OLD pin (1) is now stale and must not overwrite the newer write: still 409,
+        // version and data exactly where the winning recalculate left them.
+        assertThatThrownBy(() -> beliefService.recalculateStrength(owner.id, belief.id, 1))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).code)
+                .isEqualTo(ErrorCode.CONFLICT);
+        BeliefPattern stillRecalculated = beliefMapper.selectById(belief.id);
+        assertThat(stillRecalculated.version).isEqualTo(2);
+        assertThat(stillRecalculated.strengthScore).isEqualTo(1.0);
         assertThat(beliefService.findBeliefs(owner.id)).hasSize(1);
     }
 
     @Test
-    void extractRemainsAppendOnly_noLockToTripOver() {
+    void freshExpectedVersionLandsAndBumpsTheVersionByOne() {
         User owner = human("cp21f");
+        BeliefPattern belief = belief(owner, 0);
+
+        assertThatCode(() -> beliefService.recalculateStrength(owner.id, belief.id, 1))
+                .doesNotThrowAnyException();
+        BeliefPattern first = beliefMapper.selectById(belief.id);
+        assertThat(first.version).isEqualTo(2);
+        // 0.3 base + 0 confirmation + same-day recency 0.3.
+        assertThat(first.strengthScore).isEqualTo(0.6);
+
+        // Sequential recalculates with the freshly read pin keep landing, one bump each.
+        assertThatCode(() -> beliefService.recalculateStrength(owner.id, belief.id, 2))
+                .doesNotThrowAnyException();
+        assertThat(beliefMapper.selectById(belief.id).version).isEqualTo(3);
+    }
+
+    @Test
+    void legacyCallerWithoutExpectedVersionStillWorks() {
+        User owner = human("cp21g");
+        BeliefPattern belief = belief(owner, 4);
+
+        // null pin = legacy unconditional intent: both sequential recalculates land,
+        // the version bumps each time (and the atomic conditional UPDATE still guards
+        // against a racing writer for unpinned callers too).
+        assertThatCode(() -> beliefService.recalculateStrength(owner.id, belief.id, null))
+                .doesNotThrowAnyException();
+        assertThatCode(() -> beliefService.recalculateStrength(owner.id, belief.id, null))
+                .doesNotThrowAnyException();
+
+        BeliefPattern row = beliefMapper.selectById(belief.id);
+        assertThat(row.version).isEqualTo(3);
+        assertThat(row.strengthScore).isEqualTo(1.0);
+        assertThat(beliefService.findBeliefs(owner.id)).hasSize(1);
+    }
+
+    @Test
+    void extractRemainsAppendOnly_newRowsBornAtVersionOne() {
+        User owner = human("cp21h");
         MemoryCard card = new MemoryCard();
         card.userId = owner.id;
         card.title = "项目复盘";
@@ -105,14 +164,22 @@ class BeliefEditEndpointLockStatusTest {
         memoryMapper.insert(card);
 
         // Fallback extractor (mock LLM in tests) derives at least one belief from the card;
-        // extraction must keep working with no version parameter anywhere.
+        // extraction keeps working with no version parameter anywhere.
         assertThatCode(() -> beliefService.extractFromMemory(owner.id, card.id))
                 .doesNotThrowAnyException();
 
         assertThat(beliefService.findBeliefs(owner.id)).isNotEmpty();
-        // Re-extraction confirms the same content instead of conflicting with itself —
-        // an append/upsert action, by design never an optimistic-lock candidate.
+        // New rows from the extract upsert are born at version 1 (V54 column default +
+        // the explicit set in BeliefExtractServiceImpl), ready to be pinned.
+        assertThat(beliefService.findBeliefs(owner.id))
+                .allSatisfy(b -> assertThat(b.version).isEqualTo(1));
+
+        // Re-extraction confirms the same content in place instead of conflicting with
+        // itself — an append/upsert action, by design never an optimistic-lock candidate:
+        // the version does not churn on confirmation.
         assertThatCode(() -> beliefService.extractFromMemory(owner.id, card.id))
                 .doesNotThrowAnyException();
+        assertThat(beliefService.findBeliefs(owner.id))
+                .allSatisfy(b -> assertThat(b.version).isEqualTo(1));
     }
 }

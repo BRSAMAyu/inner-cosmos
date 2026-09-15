@@ -45,6 +45,21 @@ public class PaymentLedgerService {
                 "DISPUTED");
     }
 
+    /**
+     * §2-21 refused-late-callback recording: a payment/refund notify for an order already
+     * in the EXPIRED terminal is refused, but the refusal itself is a fact — recorded as
+     * an EXPIRED_ORDER_CALLBACK row with status REJECTED so reconciliation can see money
+     * the channel says moved against an order we already closed. Informational by
+     * construction: {@link #orderNetCents} never counts this event type. Same idempotency
+     * per provider_event_id as {@link #record} (a channel retry acks, never double-rows).
+     */
+    public PaymentEvent recordRejected(String providerEventId, String provider, String orderId,
+                                       String eventType, long amountCents,
+                                       LocalDateTime occurredAt) {
+        return record(providerEventId, provider, orderId, eventType, amountCents, occurredAt,
+                "REJECTED");
+    }
+
     private PaymentEvent record(String providerEventId, String provider, String orderId,
                                 String eventType, long amountCents, LocalDateTime occurredAt,
                                 String status) {
@@ -69,13 +84,21 @@ public class PaymentLedgerService {
         }
     }
 
-    /** Net cents for an order: payments minus refunds, arrival-order-insensitive. */
+    /**
+     * Net cents for an order: payments minus refunds, arrival-order-insensitive. Only
+     * money-movement facts count — informational rows (e.g. a refused EXPIRED_ORDER_
+     * CALLBACK) are skipped, so a refused late callback can never dent the net.
+     */
     public long orderNetCents(String orderId) {
         List<PaymentEvent> rows = mapper.selectList(new QueryWrapper<PaymentEvent>()
                 .eq("order_id", orderId));
         long net = 0;
         for (PaymentEvent row : rows) {
-            net += "PAYMENT_SUCCEEDED".equals(row.eventType) ? row.amountCents : -row.amountCents;
+            switch (row.eventType == null ? "" : row.eventType) {
+                case "PAYMENT_SUCCEEDED" -> net += row.amountCents;
+                case "REFUND_SUCCEEDED" -> net -= row.amountCents;
+                default -> { /* informational fact, not money movement */ }
+            }
         }
         return net;
     }

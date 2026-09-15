@@ -12,7 +12,7 @@
   "allowedData": ["answers-entered-in-this-run"],
   "allowedTools": [],
   "requiredInputs": ["choiceA", "choiceB", "important"],
-  "evidence": ["Schwartz 1992, Universals in the Content and Structure of Values", "Self-Determination Theory, Basic Psychological Needs Theory"],
+  "evidence": ["Schwartz 1992, Universals in the Content and Structure of Values, DOI 10.1016/S0065-2601(08)60281-6", "Self-Determination Theory, Basic Psychological Needs Theory, Deci & Ryan 2000, DOI 10.1207/S15327965PLI1104_01"],
   "limitations": {"zh-CN": "它帮助澄清优先级，不测量固定人格，也不提供法律、财务或医疗决策。", "en-SG": "It clarifies priorities; it does not measure a fixed personality or provide legal, financial or medical advice."},
   "retentionChoices": ["DISCARD_AFTER_SESSION", "SAVE_RESULT", "PROFILE_ELIGIBLE"],
   "evaluationSuite": "psychology-contract-v1:values-compass",

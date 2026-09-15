@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import {
   api, type ConnectionRequests, type DeliverySchedule, type DiscoverablePerson, type GroupInvite, type GroupMember, type GroupMessage,
   type LetterThread, type LiveChatInvites, type LiveChatMessage, type LiveChatSession,
-  type RelationMention, type RelationReview, type RelationTimelinePoint, type SlowLetter, type SlowLetterOutboxRow,
+  type RelationCorrectionProposal, type RelationMention, type RelationReview, type RelationTimelinePoint, type SlowLetter, type SlowLetterOutboxRow,
   type SocialConnection, type SocialGroup
 } from "../api";
 import { sendComposedLetter, type DraftedLetterState } from "../composeAndSend";
@@ -52,6 +52,14 @@ export function useConnectionsAndLetters({ setStatus, locale = "zh-CN" }: UseCon
   const [selectedThreadId, setSelectedThreadId] = useState<number | null>(null);
   const [threadLetters, setThreadLetters] = useState<SlowLetter[]>([]);
   const [threadLettersStatus, setThreadLettersStatus] = useState<FetchStatus>("idle");
+  // CP-34 both-party-consent corrections on a shared letter thread. incoming = awaiting this
+  // user's decision; outgoing = this user's own proposals with their honest status. Loaded with
+  // the opened thread (non-fatal on failure — letters still render; the correction block simply
+  // reports it could not load) and updated in place after each decision.
+  const [threadCorrections, setThreadCorrections] = useState<{
+    incoming: RelationCorrectionProposal[]; outgoing: RelationCorrectionProposal[];
+  }>({ incoming: [], outgoing: [] });
+  const [threadCorrectionsStatus, setThreadCorrectionsStatus] = useState<FetchStatus>("idle");
   const [replyBusyId, setReplyBusyId] = useState<number | null>(null);
   const [replyDrafts, setReplyDrafts] = useState<Record<number, string>>({});
   // W1 slow-letter voice reuse: ephemeral playback state for "hear this delivered letter read
@@ -74,6 +82,11 @@ export function useConnectionsAndLetters({ setStatus, locale = "zh-CN" }: UseCon
   const [groupMembersStatus, setGroupMembersStatus] = useState<FetchStatus>("idle");
   const [groupMessages, setGroupMessages] = useState<GroupMessage[]>([]);
   const [groupMessagesStatus, setGroupMessagesStatus] = useState<FetchStatus>("idle");
+  // CP-35: the last failed group-message send's server message, shown inline by the composer —
+  // the muted-member 403 ("你已被群内禁言，剩余约 X 分钟") must reach the person it names, not
+  // only the global status line. Cleared on a successful send, on opening another group, and on
+  // every refresh so it never lingers as stale state.
+  const [groupMessageError, setGroupMessageError] = useState<string | null>(null);
   const [liveChatInvites, setLiveChatInvites] = useState<LiveChatInvites>({ incoming: [], outgoing: [] });
   const [liveChatSessions, setLiveChatSessions] = useState<LiveChatSession[]>([]);
   const [selectedLiveChatSessionId, setSelectedLiveChatSessionId] = useState<number | null>(null);
@@ -96,10 +109,14 @@ export function useConnectionsAndLetters({ setStatus, locale = "zh-CN" }: UseCon
   const receiptPolicyBusyKeys = useBusyKeys<number>(); // keyed by letter id (CP-33 recipient receipt choice)
   const letterVoiceBusyKeys = useBusyKeys<number>(); // keyed by letter id (playLetterVoice)
   const draftBusyKeys = useBusyKeys<number>(); // keyed by draft id (sendDraft)
+  const correctionBusyKeys = useBusyKeys<number>(); // keyed by proposal id (CP-34 accept/reject/withdraw)
+  const correctionProposeBusyKeys = useBusyKeys<number>(); // keyed by thread id (CP-34 propose)
   const groupInviteBusyKeys = useBusyKeys<number>(); // keyed by groupId (inviteToGroup)
   const groupInviteDecisionBusyKeys = useBusyKeys<number>(); // keyed by memberId (respondToGroupInvite)
   const groupLeaveBusyKeys = useBusyKeys<number>(); // keyed by groupId (leaveGroup)
   const groupMessageBusyKeys = useBusyKeys<number>(); // keyed by groupId (sendGroupMessage)
+  const groupGovernanceBusyKeys = useBusyKeys<number>(); // keyed by target userId (CP-35 mute/unmute/transfer)
+  const groupDissolveBusyKeys = useBusyKeys<number>(); // keyed by groupId (CP-35 dissolve)
   const liveChatInviteBusyKeys = useBusyKeys<number>(); // keyed by target userId
   const liveChatDecisionBusyKeys = useBusyKeys<number>(); // keyed by invite id
   const liveChatMessageBusyKeys = useBusyKeys<number>(); // keyed by session id
@@ -220,21 +237,93 @@ export function useConnectionsAndLetters({ setStatus, locale = "zh-CN" }: UseCon
     } finally { if (isCurrent()) setRelationBusy(false); }
   }, [copy, setStatus]);
 
+  // CP-34: fetch both correction lists (user-scoped; LettersInbox filters to the selected
+  // thread). Sets its own status so the UI can distinguish "none" from "could not load".
+  const loadThreadCorrections = useCallback(async () => {
+    setThreadCorrectionsStatus("loading");
+    const [incoming, outgoing] = await Promise.all([
+      api.incomingRelationCorrections(),
+      api.outgoingRelationCorrections()
+    ]);
+    setThreadCorrections({ incoming, outgoing });
+    setThreadCorrectionsStatus("success");
+    return { incoming, outgoing };
+  }, []);
+
+  // After any decision the affected proposal moves lists (incoming → decided/outgoing view);
+  // reload both rather than guessing the server's post-transition placement.
+  const refreshCorrectionsQuietly = useCallback(() => {
+    loadThreadCorrections().catch(() => setThreadCorrectionsStatus("error"));
+  }, [loadThreadCorrections]);
+
+  /** CP-34: propose a correction on a shared thread. Only a thread party may propose. */
+  const proposeThreadCorrection = useCallback((threadId: number, correctionField: string,
+      proposedValue: string, note?: string) =>
+    correctionProposeBusyKeys.run(threadId, async () => {
+      try {
+        await api.proposeRelationCorrection({ threadId, correctionField, proposedValue, note });
+        refreshCorrectionsQuietly();
+        setStatus(copy("Correction proposed; it applies only if the other side accepts.",
+          "纠错提案已送出；只有对方接受后才会生效。"));
+      } catch (error) { setStatus(error instanceof Error ? error.message
+        : copy("Could not send this correction yet.", "暂时无法送出这条纠错提案")); }
+    }), [copy, correctionProposeBusyKeys, refreshCorrectionsQuietly, setStatus]);
+
+  /** CP-34: counterpart accepts → APPLIED. Only the counterpart; the proposer cannot self-accept. */
+  const acceptThreadCorrection = useCallback((proposalId: number) =>
+    correctionBusyKeys.run(proposalId, async () => {
+      try {
+        await api.acceptRelationCorrection(proposalId);
+        refreshCorrectionsQuietly();
+        setStatus(copy("Correction accepted and applied to this exchange.", "已接受这条纠错，并应用到这段往来。"));
+      } catch (error) { setStatus(error instanceof Error ? error.message
+        : copy("Could not accept this correction yet.", "暂时无法接受这条纠错")); }
+    }), [copy, correctionBusyKeys, refreshCorrectionsQuietly, setStatus]);
+
+  /** CP-34: counterpart rejects with an optional reason → REJECTED (terminal). */
+  const rejectThreadCorrection = useCallback((proposalId: number, reason?: string) =>
+    correctionBusyKeys.run(proposalId, async () => {
+      try {
+        await api.rejectRelationCorrection(proposalId, reason);
+        refreshCorrectionsQuietly();
+        setStatus(copy("Correction declined; the original understanding stays.", "已婉拒这条纠错；原有理解保持不变。"));
+      } catch (error) { setStatus(error instanceof Error ? error.message
+        : copy("Could not decline this correction yet.", "暂时无法婉拒这条纠错")); }
+    }), [copy, correctionBusyKeys, refreshCorrectionsQuietly, setStatus]);
+
+  /** CP-34: proposer withdraws before any decision → WITHDRAWN (terminal). */
+  const withdrawThreadCorrection = useCallback((proposalId: number) =>
+    correctionBusyKeys.run(proposalId, async () => {
+      try {
+        await api.withdrawRelationCorrection(proposalId);
+        refreshCorrectionsQuietly();
+        setStatus(copy("Correction withdrawn.", "已撤回这条纠错提案。"));
+      } catch (error) { setStatus(error instanceof Error ? error.message
+        : copy("Could not withdraw this correction yet.", "暂时无法撤回这条纠错")); }
+    }), [copy, correctionBusyKeys, refreshCorrectionsQuietly, setStatus]);
+
   const openThread = useCallback(async (threadId: number) => {
     const generation = ++threadGenerationRef.current;
     const isCurrent = () => threadGenerationRef.current === generation;
     setSelectedThreadId(threadId); setThreadLetters([]); setThreadLettersStatus("loading");
+    setThreadCorrections({ incoming: [], outgoing: [] }); setThreadCorrectionsStatus("loading");
     try {
-      const letters = await api.letterThreadLetters(threadId);
+      // CP-34: corrections load alongside the letters but never fail the thread open — letters
+      // still render if only this side request errors; the correction block reports its own state.
+      const [letters, corrections] = await Promise.all([
+        api.letterThreadLetters(threadId),
+        loadThreadCorrections().catch(() => null)
+      ]);
       if (!isCurrent()) return; // 4.4: a newer selection superseded this one -- discard silently.
       setThreadLetters(letters); setThreadLettersStatus("success");
+      if (corrections === null) setThreadCorrectionsStatus("error");
     } catch (error) {
       if (!isCurrent()) return;
       setThreadLettersStatus("error");
       setStatus(error instanceof Error ? error.message
         : copy("Could not read this exchange yet.", "暂时读不到这段往来"));
     }
-  }, [copy, setStatus]);
+  }, [copy, loadThreadCorrections, setStatus]);
 
   const sendDraft = useCallback((id: number) => draftBusyKeys.run(id, async () => {
     try {
@@ -512,6 +601,7 @@ export function useConnectionsAndLetters({ setStatus, locale = "zh-CN" }: UseCon
     setSelectedGroupId(groupId);
     setGroupMembers([]); setGroupMembersStatus("loading");
     setGroupMessages([]); setGroupMessagesStatus("loading");
+    setGroupMessageError(null);
     try {
       const [members, messages] = await Promise.all([
         api.groupMembers(groupId),
@@ -556,6 +646,7 @@ export function useConnectionsAndLetters({ setStatus, locale = "zh-CN" }: UseCon
       setGroupMembersStatus("success");
       setGroupMessages(messages);
       setGroupMessagesStatus("success");
+      setGroupMessageError(null);
     } catch {
       // Background sync is intentionally quiet; an explicit open/send still surfaces errors.
     }
@@ -571,10 +662,15 @@ export function useConnectionsAndLetters({ setStatus, locale = "zh-CN" }: UseCon
           ? current
           : [...current, sent]);
         setGroupMessagesStatus("success");
+        setGroupMessageError(null);
         return true;
       } catch (error) {
-        setStatus(error instanceof Error ? error.message
-          : copy("Could not send this group message yet.", "暂时无法发送这条群消息"));
+        // CP-35: the server's own message (e.g. the mute 403 naming the remaining minutes) is
+        // shown verbatim beside the composer — never reworded or softened client-side.
+        const message = error instanceof Error ? error.message
+          : copy("Could not send this group message yet.", "暂时无法发送这条群消息");
+        setGroupMessageError(message);
+        setStatus(message);
         return false;
       }
     }), [copy, groupMessageBusyKeys, setStatus]);
@@ -612,11 +708,64 @@ export function useConnectionsAndLetters({ setStatus, locale = "zh-CN" }: UseCon
       : copy("Could not leave this group yet.", "暂时无法退出这个群组")); }
   }), [copy, groupLeaveBusyKeys, selectedGroupId, setStatus]);
 
+  // ---- CP-35 group governance (host-only server-side; the backend refuses non-hosts). ----
+
+  /** Mute a member. durationMinutes null = muted until the host manually lifts it. */
+  const muteGroupMember = useCallback((groupId: number, userId: number, durationMinutes: number | null) =>
+    groupGovernanceBusyKeys.run(userId, async () => {
+      try {
+        await api.muteGroupMember(groupId, userId, durationMinutes);
+        await refreshSelectedGroupContext();
+        setStatus(durationMinutes == null
+          ? copy("Muted until you lift it manually.", "已禁言，需你手动解除。")
+          : copy(`Muted for ${durationMinutes} minutes.`, `已禁言 ${durationMinutes} 分钟。`));
+      } catch (error) { setStatus(error instanceof Error ? error.message
+        : copy("Could not mute this member yet.", "暂时无法禁言这位成员")); }
+    }), [copy, groupGovernanceBusyKeys, refreshSelectedGroupContext, setStatus]);
+
+  const unmuteGroupMember = useCallback((groupId: number, userId: number) =>
+    groupGovernanceBusyKeys.run(userId, async () => {
+      try {
+        await api.unmuteGroupMember(groupId, userId);
+        await refreshSelectedGroupContext();
+        setStatus(copy("This member can speak again.", "这位成员已恢复发言。"));
+      } catch (error) { setStatus(error instanceof Error ? error.message
+        : copy("Could not lift this mute yet.", "暂时无法解除禁言")); }
+    }), [copy, groupGovernanceBusyKeys, refreshSelectedGroupContext, setStatus]);
+
+  /** Transfer ownership — the current host becomes an ordinary member. */
+  const transferGroupOwnership = useCallback((groupId: number, userId: number) =>
+    groupGovernanceBusyKeys.run(userId, async () => {
+      try {
+        await api.transferGroupOwnership(groupId, userId);
+        await loadGroups();
+        await refreshSelectedGroupContext();
+        setStatus(copy("Ownership transferred.", "群主已移交。"));
+      } catch (error) { setStatus(error instanceof Error ? error.message
+        : copy("Could not transfer ownership yet.", "暂时无法移交群主")); }
+    }), [copy, groupGovernanceBusyKeys, loadGroups, refreshSelectedGroupContext, setStatus]);
+
+  /** Dissolve the group for everyone (terminal) — the component confirms first. */
+  const dissolveGroup = useCallback((groupId: number) =>
+    groupDissolveBusyKeys.run(groupId, async () => {
+      try {
+        await api.dissolveGroup(groupId);
+        setGroups(current => current.filter(group => group.id !== groupId));
+        if (selectedGroupId === groupId) {
+          setSelectedGroupId(null); setGroupMembers([]); setGroupMessages([]); setGroupMessageError(null);
+        }
+        setStatus(copy("The group has been dissolved.", "这个群组已解散。"));
+      } catch (error) { setStatus(error instanceof Error ? error.message
+        : copy("Could not dissolve this group yet.", "暂时无法解散这个群组")); }
+    }), [copy, groupDissolveBusyKeys, selectedGroupId, setStatus]);
+
   return {
     connectionRequests, friends, people, isPersonBusy: peopleBusyKeys.isBusy,
     relations, selectedRelation, relationTimeline, relationReview, relationBusy,
     letterInbox, letterOutbox, letterThreads, selectedThreadId, threadLetters, threadLettersStatus,
     lettersRefreshing,
+    threadCorrections, threadCorrectionsStatus,
+    isCorrectionBusy: correctionBusyKeys.isBusy, isCorrectionProposeBusy: correctionProposeBusyKeys.isBusy,
     isDraftBusy: draftBusyKeys.isBusy, replyBusyId, replyDrafts,
     isLetterActionBusy: letterActionBusyKeys.isBusy,
     setReceiptPolicy, isReceiptPolicyBusy: receiptPolicyBusyKeys.isBusy,
@@ -630,6 +779,8 @@ export function useConnectionsAndLetters({ setStatus, locale = "zh-CN" }: UseCon
     groupCreateBusy, isGroupInviteBusy: groupInviteBusyKeys.isBusy,
     isGroupInviteDecisionBusy: groupInviteDecisionBusyKeys.isBusy, isGroupLeaveBusy: groupLeaveBusyKeys.isBusy,
     isGroupMessageBusy: groupMessageBusyKeys.isBusy,
+    groupMessageError, isGroupGovernanceBusy: groupGovernanceBusyKeys.isBusy,
+    isGroupDissolveBusy: groupDissolveBusyKeys.isBusy,
     isLiveChatInviteBusy: liveChatInviteBusyKeys.isBusy,
     isLiveChatDecisionBusy: liveChatDecisionBusyKeys.isBusy,
     isLiveChatMessageBusy: liveChatMessageBusyKeys.isBusy,
@@ -641,6 +792,8 @@ export function useConnectionsAndLetters({ setStatus, locale = "zh-CN" }: UseCon
     actOnLetter, reportLetter, replyWithLetter, updateReplyDraft, playLetterVoice,
     requestConnection, decideConnection, leaveConnection,
     createGroup, joinClassroomGroup, openGroup, inviteToGroup, respondToGroupInvite, leaveGroup, sendGroupMessage,
+    proposeThreadCorrection, acceptThreadCorrection, rejectThreadCorrection, withdrawThreadCorrection,
+    muteGroupMember, unmuteGroupMember, transferGroupOwnership, dissolveGroup,
     inviteLiveChat, respondLiveChatInvite, selectLiveChatSession, sendLiveChatMessage, endLiveChatSession
   };
 }

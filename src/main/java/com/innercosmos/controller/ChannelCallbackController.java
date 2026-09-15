@@ -57,6 +57,9 @@ public class ChannelCallbackController {
             case REJECTED_SIGNATURE -> ResponseEntity.status(401).contentType(contentType).body(ack);
             case REJECTED_MERCHANT -> ResponseEntity.status(403).contentType(contentType).body(ack);
             case REJECTED_ORDER -> ResponseEntity.status(404).contentType(contentType).body(ack);
+            // Verified notify for an already-EXPIRED order: refused as a REJECTED ledger
+            // fact (never a success), acked as failure so the channel stops crediting.
+            case REJECTED_EXPIRED -> ResponseEntity.status(410).contentType(contentType).body(ack);
             // Verified signature, contradicted amount: kept as DISPUTED, acked as failure.
             case REJECTED_AMOUNT -> ResponseEntity.status(422).contentType(contentType).body(ack);
             case MALFORMED -> ResponseEntity.badRequest().contentType(contentType).body(ack);

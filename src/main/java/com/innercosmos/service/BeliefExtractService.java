@@ -36,8 +36,14 @@ public interface BeliefExtractService {
 
     /**
      * Recalculate belief strength based on all supporting memories.
+     *
+     * <p>CP-21 optimistic concurrency: {@code expectedVersion} is the caller's pin on
+     * the belief row it rendered. {@code null} means legacy/unconditional intent. A
+     * stale pin (or a racing writer between the read and the write) is rejected as
+     * {@link com.innercosmos.common.ErrorCode#CONFLICT} with no data touched; a passing
+     * pin (or no pin) recalculates and atomically bumps {@code version} by one.</p>
      */
-    void recalculateStrength(Long userId, Long beliefId);
+    void recalculateStrength(Long userId, Long beliefId, Integer expectedVersion);
 
     /**
      * Data class for contradiction pairs.

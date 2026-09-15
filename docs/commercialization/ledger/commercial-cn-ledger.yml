@@ -138,7 +138,7 @@ work_packages:
     delivery_record: evidence/commercial-cn/CP-03/2026-09-06-metric-pipeline/delivery-record.md
     test_command: "./mvnw test -Dtest=CommercialMetricFunnelTest"
     note: "K1/K2/G-SAFE/G-TRUST 全链落地并合成样本验收；K3事件管线就绪待CP-45发射器；CP-07接管同意默认值"
-    next_action: "独立复核；CP-45接入支付事件"
+    next_action: "独立复核(K3发射器已随ckpt-44接线,见CP-62 note2)"
   - id: CP-04
     title: "对标、AI评测与实验治理"
     owner: "AI评测＋独立研究员"
@@ -158,7 +158,7 @@ work_packages:
     depends_on: ["CP-01"]
     vision_ids: ["V01", "V19"]
     status: IN_PROGRESS
-    evidence_dir: evidence/commercial-cn/CP-05/
+    evidence_dir: docs/commercialization/compliance/
     delivery_record: docs/commercialization/compliance/cp05-entity-ip-rights-checklist.md
     note: "仓库资产权利链清点草稿完成( Apache-2.0/字体/商标/学校权利/许可矩阵 )；注册签约等全部BLOCKED_EXTERNAL"
     next_action: "所有者确认未知资产；法务核定许可矩阵"
@@ -169,7 +169,7 @@ work_packages:
     depends_on: ["CP-05"]
     vision_ids: ["V01", "V13", "V19"]
     status: IN_PROGRESS
-    evidence_dir: evidence/commercial-cn/CP-06/
+    evidence_dir: docs/commercialization/compliance/
     delivery_record: docs/commercialization/compliance/cp06-regulatory-route-design.md
     note: "S0路线设计部分已关闭(逐功能适用判断+程序台账骨架+属地问题单)；真实程序CP-51A收口"
     next_action: "CP-05确定属地后填受理机关；法务复核判断表"
@@ -181,11 +181,11 @@ work_packages:
     vision_ids: ["V05", "V07", "V13"]
     status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-07/
-    delivery_record: evidence/commercial-cn/CP-07/2026-09-13-versioned-reconsent/delivery-record.md
+    delivery_record: evidence/commercial-cn/CP-07/2026-09-15-reconsent-badge/delivery-record.md
     delivery_record_2: "evidence/commercial-cn/CP-07/2026-09-06-pia-and-consent-spec/delivery-record.md#增量2"
-    test_command: "./mvnw test -Dtest=ConsentVersionedReConsentTest"
-    note: "G1/G2已关闭：V38同意记录表+同意中心API(3端点)+Provider出站守卫(有凭证才包装,拒绝响亮不降级)+ANALYTICS与CP-03双写；测试5/5；版本重同意增量：effective()对stale版本记录回落无决策默认(egress fail-closed,CORE_SERVICE不断服务)+list()出RE_CONSENT_REQUIRED+decide()重盖当前版本恢复；version列NOT NULL用约束测试坐实"
-    next_action: "重同意提示的前端专门呈现(消费RE_CONSENT_REQUIRED)；版本提升运营流程文档化"
+    test_command: "npm test -- --run src/components/ConsentCenterPanel.test.tsx"
+    note: "G1/G2已关闭：V38同意记录表+同意中心API(3端点)+Provider出站守卫(有凭证才包装,拒绝响亮不降级)+ANALYTICS与CP-03双写；测试5/5；版本重同意增量：effective()对stale版本记录回落无决策默认(egress fail-closed,CORE_SERVICE不断服务)+list()出RE_CONSENT_REQUIRED+decide()重盖当前版本恢复；version列NOT NULL用约束测试坐实；重同意徽标增量：RE_CONSENT_REQUIRED行徽标+版本说明(双语)——重同意链前端闭环"
+    next_action: "版本提升运营流程文档化(条款文本变更时bump CURRENT_VERSION)"
   - id: CP-08
     title: "AI标识、成人准入与安全政策"
     owner: "信任与安全＋法务＋心理专家"
@@ -194,10 +194,11 @@ work_packages:
     vision_ids: ["V01", "V04", "V13"]
     status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-08/
-    delivery_record: evidence/commercial-cn/CP-08/2026-09-14-usage-time/delivery-record.md
-    test_command: "./mvnw test -Dtest=UsageTimeServiceTest"
-    note: "成人门槛(V37,商业profile fail-closed)+未成年拦截/申诉链+aiGenerated标识+政策剧本v1；专业审阅待外部门；使用时长增量：服务端按需聚合turn时长(COMPLETED/PARTIAL计入,取消/在途不计,上海锚点,无新表)+/api/me/usage/today透明视图+45分钟克制提醒(一次布尔+平静文案,不锁死不打分)；5新测试"
-    next_action: "前端提醒呈现；时长不进指标库的口径已写明(用户可见非商业指标)"
+    delivery_record: evidence/commercial-cn/CP-08/2026-09-15-usage-panel/delivery-record.md
+    delivery_record2: evidence/commercial-cn/CP-08/2026-09-06-adult-gate-and-labeling/delivery-record.md
+    test_command: "npm test -- --run src/components/UsageTodayPanel.test.tsx"
+    note: "成人门槛(V37,商业profile fail-closed)+未成年拦截/申诉链+aiGenerated标识+政策剧本v1；专业审阅待外部门；使用时长增量：服务端按需聚合turn时长(COMPLETED/PARTIAL计入,取消/在途不计,上海锚点,无新表)+/api/me/usage/today透明视图+45分钟克制提醒(一次布尔+平静文案,不锁死不打分)；5新测试；第二增量：UsageTodayPanel(account面,reminderDue平静呈现后端原文,失败不伪造)——登记项闭环"
+    next_action: "专业审阅签字属operator门禁"
   - id: CP-09
     title: "设计系统、信息架构与中文文案"
     owner: "产品设计＋前端"
@@ -207,6 +208,7 @@ work_packages:
     status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-09/
     delivery_record: evidence/commercial-cn/CP-09/2026-09-14-j01-onboarding-quiz/delivery-record.md
+    delivery_record2: evidence/commercial-cn/CP-09/2026-09-06-consent-center-web/delivery-record.md
     note: "首个增量：同意中心页(双语分组/逐项开关)+AI生成角标+样式体系扩展；web 708/708绿；J01增量：引导期渐进同意(三步同意卡走既有consent端点,拒绝合法)+理解题x3硬门(正确答案逐字对应注册表withdrawalEffect,全对才完成,跳步封堵,无跳过捷径——稍后再说不完成)；15+14前端测试"
     next_action: "理解题题目扩展(随purpose注册表版本演进由CP-07重同意触发)"
   - id: CP-10
@@ -231,7 +233,7 @@ work_packages:
     delivery_record: evidence/commercial-cn/CP-11/2026-09-14-accessible-list-and-scaling/delivery-record.md
     test_command: "npm test -- --run src/components/MemoryStarfieldTextScalingContract.test.tsx"
     note: "首个增量：J01-J12×全状态矩阵v1(锚点+缺口)+失败保留输入服务端契约测试(草稿幸存/跨账户隔离/成功才可见)；星域增量：星图/列表视图切换(localStorage持久化+reduced-motion默认列表+列表全量平铺)+情绪编码三通道闭锁(后端根因修复:color/glow此前仍泄露gravity)+200%缩放合同9用例(静态px审计+渲染rem断言)；29+9前端测试"
-    next_action: "真机200%缩放人工验证属CP-12A研究门；api.ts显式传emotionEncoding参数(前端默认true已闭环)"
+    next_action: "真机200%缩放人工验证属CP-12A研究门"
   - id: CP-12
     title: "非作者可用性与体验封板"
     owner: "研究负责人＋独立设计评审"
@@ -265,9 +267,10 @@ work_packages:
     status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-14/
     delivery_record: evidence/commercial-cn/CP-14/2026-09-13-by-id-full-wiring/delivery-record.md
+    delivery_record2: evidence/commercial-cn/CP-14/2026-09-06-boundary-guard-and-tombstones/delivery-record.md
     test_command: "./mvnw test -Dtest=SensitiveBoundaryAndAntiResurrectionTest"
     note: "首个增量：读路径审计+统一守卫(状态fail-closed/tombstone优先/属主)+getOwnedCapsule与listCards接线+越权矩阵5/5；第二增量：by-id全量接线17端点(含quota无门禁/active-session无tombstone两个真实漏洞)+CAPSULE_RUNTIME purpose+TODO主体+矩阵8/8"
-    next_action: "EchoResonance landed端点tombstone(移交CP-31)；画像缓存真实引入时接授权版本键"
+    next_action: "画像缓存真实引入时接授权版本键(EchoResonance非PUBLIC已有fail-closed门+撤回tombstone消费者同文件,软证据已覆盖)"
   - id: CP-15
     title: "撤回、删除与灾备防复活"
     owner: "数据后端＋隐私"
@@ -289,6 +292,7 @@ work_packages:
     status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-16/
     delivery_record: evidence/commercial-cn/CP-16/2026-09-14-pentest-scope/delivery-record.md
+    delivery_record2: evidence/commercial-cn/CP-16/2026-09-06-threat-model/delivery-record.md
     test_command: "./mvnw test -Dtest=IndependentPentestScopeContractTest"
     note: "首个增量：九类威胁模型v1+高危自动负测4/4(登录枚举一致/CSRF 403/admin拒绝/凭据硬拦)；MFA与渗透清单后续；第二增量：独立渗透范围文档9章(攻击面grep实测/S1-S9矩阵映射T1-T9/内部已覆盖30+测试类vs四项必独立验证面/验收SLA/操作者占位符)+契约测试6用例(无已渗透字样)；定位为采购输入非渗透结果"
     next_action: "独立渗透执行属operator门禁(采购第三方服务按本文档scope)；TOTP MFA骨架可选半边"
@@ -301,6 +305,7 @@ work_packages:
     status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-17/
     delivery_record: evidence/commercial-cn/CP-17/2026-09-13-stream-terminal-ledger/delivery-record.md
+    delivery_record2: evidence/commercial-cn/CP-17/2026-09-13-gateway-budget-concurrency-deadline/delivery-record.md
     test_command: "./mvnw test -Dtest=VoiceSkillGatewayTest"
     note: "首个增量：出站域名白名单(装配期fail-closed,未知主机拒)+调用manifest(user/模块/Provider/用途/数据级/区域,拒答同样入账)；第二增量：ModelContractVersion封闭枚举(占位不伪造注册态)+并发闸16/429 GATEWAY_BUSY+runWithDeadline(上下文传播)+callObserved三层串行(仅REMOTE)+16负测全零计费fail-closed；第三增量：SSE流终态台账回写——StreamOutcomeLedger首终态胜出(死流不再与健流同名)+ConsentEnforcing终态回调注册(Spring6复合回调共存性经实测纠正初版单槽误判)；10新测试"
     next_action: "合同版本待备案后填实(操作者门禁)；Aurora外层浏览器SSE非Provider出站不进GatewayCallLedger(语义已定)"
@@ -323,7 +328,7 @@ work_packages:
     depends_on: ["CP-04", "CP-17", "CP-18", "CP-22"]
     vision_ids: ["V03", "V04", "V16"]
     status: IN_PROGRESS
-    evidence_dir: evidence/commercial-cn/CP-19/
+    evidence_dir: evidence/commercial-cn/CP-18/2026-09-12-continuity-kernel-retrieval/
     delivery_record: evidence/commercial-cn/CP-18/2026-09-12-continuity-kernel-retrieval/delivery-record.md
     test_command: "./mvnw test -Dtest=ContinuityKernelRetrievalTest"
     note: "四增量：①KernelRoutingPolicy纯函数(危机走支持流,复杂度三信号升双核)；②TurnSignals.from生产提取+adaptive双腿路由+每轮可观测；③冻结集对拍harness(development分裂81场景,简单轮次主导如实记录)；④预算压力fixture——七类压力轴(长叙述/分析请求/多部分/困境/危机/简单对照)逐轴断言路由与adaptive决策,双核路径模块契约验证"
@@ -339,7 +344,7 @@ work_packages:
     delivery_record: evidence/commercial-cn/CP-20/2026-09-06-crisis-continuity/delivery-record.md
     test_command: "./mvnw test -Dtest=CrisisContinuityAndProvenanceAndProactiveTest"
     note: "首个增量：V41跨会话风险态(24h半衰,读时衰减,否定/第三人语境化)+处置台账(责任人/升级/最小披露)+HIGH强制分支不贴标签+属主状态API；测试4/4"
-    next_action: "专业审阅案例冻结+夜班值班演练(CP-48)；Docker恢复后复跑PG基线"
+    next_action: "专业审阅案例冻结+夜班值班演练(CP-48)(PG基线已多次实机复跑)"
   - id: CP-21
     title: "记忆生命周期与来源图"
     owner: "记忆系统"
@@ -348,10 +353,12 @@ work_packages:
     vision_ids: ["V05", "V06"]
     status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-21/
-    delivery_record: evidence/commercial-cn/CP-21/2026-09-14-portrait-optimistic-lock/delivery-record.md
+    delivery_record: evidence/commercial-cn/CP-21/2026-09-15-belief-optimistic-lock/delivery-record.md
+    delivery_record2: evidence/commercial-cn/CP-21/2026-09-12-merge-conflict-guards/delivery-record.md
+    delivery_record3: evidence/commercial-cn/CP-21/2026-09-13-conflict-refresh-ui/delivery-record.md
     test_command: "./mvnw test -Dtest='PortraitClaimOptimisticLockTest,BeliefEditEndpointLockStatusTest'"
-    note: "三增量：①来源图回放+撤回不可回放；②合并/冲突/并发编辑硬边界(expectedVersion乐观并发+终态/链分叉防护+回退前行核对)；③重复事件去重与版本归并——MemoryRecurrenceMatcher(0.60字符二元组余弦)重述折叠进既有记忆(REINFORCE/DUPLICATE_EVENT_DEDUP审计行),FORGOTTEN与tombstone行不可吸收；第三增量：统一409冲突码通道(不解析中文消息)+PortraitClaimsPanel/BeliefGallery冲突提示条(他人已更新→查看最新)+本地草稿仅在落库后清除(不静默丢弃)；Belief/Portrait端点expectedVersion接入后即完整生效；第四增量：portrait三编辑端点真乐观锁(expectedVersion原子条件UPDATE,旧pin 409,legacy兼容,版本列复用既有understanding_claim.version)+前端全链接通(面板传行/AuroraApp传pin)——冲突条端到端生效；belief recalculate无版本列不造假锁停负测层"
-    next_action: "belief recalculate乐观锁待tb_belief_pattern加版本列(schema决策)后接入"
+    note: "三增量：①来源图回放+撤回不可回放；②合并/冲突/并发编辑硬边界(expectedVersion乐观并发+终态/链分叉防护+回退前行核对)；③重复事件去重与版本归并——MemoryRecurrenceMatcher(0.60字符二元组余弦)重述折叠进既有记忆(REINFORCE/DUPLICATE_EVENT_DEDUP审计行),FORGOTTEN与tombstone行不可吸收；第三增量：统一409冲突码通道(不解析中文消息)+PortraitClaimsPanel/BeliefGallery冲突提示条(他人已更新→查看最新)+本地草稿仅在落库后清除(不静默丢弃)；Belief/Portrait端点expectedVersion接入后即完整生效；第四增量：portrait三编辑端点真乐观锁(expectedVersion原子条件UPDATE,旧pin 409,legacy兼容,版本列复用既有understanding_claim.version)+前端全链接通(面板传行/AuroraApp传pin)——冲突条端到端生效；belief recalculate无版本列不造假锁停负测层；第六增量：belief recalculate乐观锁V54(版本列+原子条件UPDATE,null legacy兼容,stale 409,负测层改造为真锁4用例)——CP-21登记项全部闭环"
+    next_action: "web端belief expectedVersion接线(legacy通道已保证现状,低优先)"
   - id: CP-22
     title: "任务化检索与真实向量质量"
     owner: "检索工程＋AI评测"
@@ -361,6 +368,7 @@ work_packages:
     status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-22/
     delivery_record: evidence/commercial-cn/CP-18/2026-09-12-continuity-kernel-retrieval/delivery-record.md
+    delivery_record2: evidence/commercial-cn/CP-22/2026-09-12-labeled-retrieval-bank/delivery-record.md
     test_command: "./mvnw test -Dtest=ContinuityKernelRetrievalTest"
     note: "五增量：①撤回硬边界(抗备份复活)；②任务化查询归一(meta-only诚实空)；③冻结标签评测集(真实检索服务precision/recall/排序断言)；④v1.1.0否定/时间约束四案例；⑤时间窗硬约束——TimeWindowParser可度量窗口(今天/这周/最近N月…)候选构造性排除,光杆'最近'保持软信号(它常描述回想而非记忆),bank v1.2.0(MR-013硬排除案例)"
     next_action: "真实provider向量质量校准"
@@ -373,6 +381,7 @@ work_packages:
     status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-23/
     delivery_record: evidence/commercial-cn/CP-23/2026-09-14-non-author-recruitment/delivery-record.md
+    delivery_record2: evidence/commercial-cn/CP-23/2026-09-12-claim-control/delivery-record.md
     test_command: "./mvnw test -Dtest=NonAuthorReviewRecruitmentContractTest"
     note: "三增量：①画像四态视图+未知不补齐+无分数;②属主控制(搁置/恢复/删除+PORTRAIT_CLAIM审计行+视图与Aurora上下文双清空)+J04旅程;③前端PortraitClaimsPanel(状态徽章/来源/版本/未知计数,搁置带理由,删除需确认,搁置区恢复,懒加载)；第五增量：非作者评审招募材料10章(任务书猜测员工JD被对照清单原文诚实纠正;蓝图CP-12/CP-02逐条映射,使命逐字引用,投放文案占位符,失败保留纪律)+契约测试7用例；员工JD未写因蓝图无编制假设"
     next_action: "招募执行属CP-12A operator门禁；员工JD如需待操作者定编制"
@@ -395,7 +404,7 @@ work_packages:
     depends_on: ["CP-08", "CP-19", "CP-21"]
     vision_ids: ["V04", "V16"]
     status: IN_PROGRESS
-    evidence_dir: evidence/commercial-cn/CP-25/
+    evidence_dir: evidence/commercial-cn/CP-11/2026-09-06-state-matrix/
     delivery_record: evidence/commercial-cn/CP-11/2026-09-06-state-matrix/delivery-record.md
     test_command: "./mvnw test -Dtest=StateMatrixAndPortraitAndPersonaTest"
     note: "首个增量：人格激活门合同锁定(无确认不可激活/不可重复激活);评测环节随CP-04注册表CP-25行执行"
@@ -408,10 +417,10 @@ work_packages:
     vision_ids: ["V04", "V08", "V14"]
     status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-26/
-    delivery_record: evidence/commercial-cn/CP-26/2026-09-13-quiet-hours-defer-idempotency/delivery-record.md
-    test_command: "./mvnw test -Dtest=CrisisContinuityAndProvenanceAndProactiveTest"
-    note: "首个增量：主动关心PROACTIVE_CARE同意门(拒/允/撤三态,退出持久不被任务重启)；测试4/4；第二增量：静默窗(平台yml默认关∪用户quietHours,跨午夜正确)+DEFERRED状态机(修正delay()改写preferred_at既有缺陷,可见不静默丢)+并发双领取恰一投递(条件UPDATE)+锁屏脱敏默认开fail-closed+V49；17新负测全绿"
-    next_action: "服务端vendor push文案脱敏(与CP-41联动)；J07真机现场验收属操作者门禁"
+    delivery_record: evidence/commercial-cn/CP-26/2026-09-15-push-copy-sanitization/delivery-record.md
+    test_command: "./mvnw test -Dtest='WakePushCopySanitizationTest,WakePushCopySanitizationOffTest'"
+    note: "首个增量：主动关心PROACTIVE_CARE同意门(拒/允/撤三态,退出持久不被任务重启)；测试4/4；第二增量：静默窗(平台yml默认关∪用户quietHours,跨午夜正确)+DEFERRED状态机(修正delay()改写preferred_at既有缺陷,可见不静默丢)+并发双领取恰一投递(条件UPDATE)+锁屏脱敏默认开fail-closed+V49；17新负测全绿；第四增量：服务端vendor push文案脱敏(enqueue边界fail-closed,与前端逐字一致的中性文案,locale感知,默认开可配关)——登记项闭环；2新测试+推送域36回归"
+    next_action: "用户级推送脱敏偏好列(schema解冻后与quietHours同表)；真机投递验证属渠道合同operator门禁"
   - id: CP-27
     title: "中文语音、朗读与隐私"
     owner: "语音＋客户端"
@@ -431,11 +440,11 @@ work_packages:
     depends_on: ["CP-08", "CP-20", "CP-21"]
     vision_ids: ["V09", "V16"]
     status: IN_PROGRESS
-    evidence_dir: evidence/commercial-cn/CP-28/
-    delivery_record: evidence/commercial-cn/CP-27/2026-09-06-voice-skill-gateway/delivery-record.md
-    test_command: "./mvnw test -Dtest=VoiceSkillGatewayTest"
-    note: "首个增量：ELEVATED高风险上下文暂停全部技能建议(转支持流程)；三项技能与专家审阅随外部门窗口"
-    next_action: "技能清单理论依据/skill kill switch；专家审阅(外部门)"
+    evidence_dir: evidence/commercial-cn/CP-27/2026-09-06-voice-skill-gateway/
+    delivery_record: evidence/commercial-cn/CP-28/2026-09-15-doi-backfill/delivery-record.md
+    test_command: "./mvnw test -Dtest='PsychologySkillRegistryTest,SkillExpertReviewContractTest'"
+    note: "首个增量：ELEVATED高风险上下文暂停全部技能建议(转支持流程)；三项技能与专家审阅随外部门窗口；第二增量：旧三技能evidence补DOI(Schwartz/Deci&Ryan/Su&Reeve逐条Crossref验证;Miller 1944书章无DOI如实标注不编造)"
+    next_action: "无——文献引注闭环"
   - id: CP-29
     title: "共鸣体编译与授权工作台"
     owner: "Capsule系统＋产品"
@@ -455,7 +464,7 @@ work_packages:
     depends_on: ["CP-04", "CP-17", "CP-29"]
     vision_ids: ["V10", "V16"]
     status: IN_PROGRESS
-    evidence_dir: evidence/commercial-cn/CP-30/
+    evidence_dir: evidence/commercial-cn/CP-29/2026-09-06-resonance-line/
     delivery_record: evidence/commercial-cn/CP-29/2026-09-06-resonance-line/delivery-record.md
     test_command: "./mvnw test -Dtest=ResonanceLineNegativeTest"
     note: "首个增量：沙盒确定性主题门(前置于模型/genome/安全,提示词纪律不是边界)；红队RT-CONS精神探针负测"
@@ -480,10 +489,10 @@ work_packages:
     vision_ids: ["V11", "V12", "V18"]
     status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-32/
-    delivery_record: evidence/commercial-cn/CP-32/2026-09-13-three-mode-resonance/delivery-record.md
-    test_command: "./mvnw test -Dtest=ResonanceMatchThreeModeTest"
-    note: "首个增量：发现硬过滤三层锁定(自我/双向屏蔽对/NEEDS_REVIEW)；匹配模式与解释排序后续；第二增量：三模式信号分类器(相似/互补/意外,全部既有信号,无桥/弱信号如实0)+解释VO(真实计数理由+confidence分档+insufficient_signal不编造)+mode参数接管排序(遗留公式逐字节守卫)+三层硬过滤零改动；11新测试"
-    next_action: "解释字段前端消费；themeOverlap频次加权空转缺陷处置；UNEXPECTED情绪节律曲线(EmotionTrace时序)后续"
+    delivery_record: evidence/commercial-cn/CP-32/2026-09-15-explanations-ui/delivery-record.md
+    test_command: "npm test -- --run src/components/ResonanceNetwork.test.tsx"
+    note: "首个增量：发现硬过滤三层锁定(自我/双向屏蔽对/NEEDS_REVIEW)；匹配模式与解释排序后续；第二增量：三模式信号分类器(相似/互补/意外,全部既有信号,无桥/弱信号如实0)+解释VO(真实计数理由+confidence分档+insufficient_signal不编造)+mode参数接管排序(遗留公式逐字节守卫)+三层硬过滤零改动；11新测试；第三增量：匹配卡模式chip+理由前3条(后端事实句原样)+insufficient_signal如实——解释字段前端闭环"
+    next_action: "themeOverlap频次加权空转处置(低优先);UNEXPECTED节律曲线(低价值)"
   - id: CP-33
     title: "慢信的节律与隐私友好状态"
     owner: "社交后端＋前端"
@@ -504,10 +513,10 @@ work_packages:
     vision_ids: ["V11", "V12", "V13"]
     status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-34/
-    delivery_record: evidence/commercial-cn/CP-34/2026-09-13-interaction-review-consent-corrections/delivery-record.md
-    test_command: "./mvnw test -Dtest='RelationInteractionReviewTest,RelationCorrectionConsentContractTest'"
-    note: "首个增量：直接路径统一屏蔽+拒绝30天冷静期+屏蔽/被拒同文案不细分+静默退场负测；测试3/3；第二增量：互动回顾替代温度分(真实计数VO+前端全链路+空窗口诚实不伪造0.5,healthScore彻底移除)+双方同意纠错状态机V51(PROPOSED→APPLIED/REJECTED/WITHDRAWN,条件UPDATE竞态恰一胜者,负测5/5)"
-    next_action: "关系标签→平台连接映射打通后接CP-59回轮深度到单关系粒度；纠错提案前端UI"
+    delivery_record: evidence/commercial-cn/CP-34/2026-09-15-correction-ui/delivery-record.md
+    test_command: "npm test -- --run src/components/LettersInbox.test.tsx"
+    note: "首个增量：直接路径统一屏蔽+拒绝30天冷静期+屏蔽/被拒同文案不细分+静默退场负测；测试3/3；第二增量：互动回顾替代温度分(真实计数VO+前端全链路+空窗口诚实不伪造0.5,healthScore彻底移除)+双方同意纠错状态机V51(PROPOSED→APPLIED/REJECTED/WITHDRAWN,条件UPDATE竞态恰一胜者,负测5/5)；第三增量：纠错提案UI(incoming接受/婉拒+outgoing状态+提案表单,决策后刷新)——纠错双方同意链前端闭环"
+    next_action: "关系标签→平台连接映射(打通CP-59回轮深度到单关系粒度,中优先)"
   - id: CP-35
     title: "小组、邀请与共同活动"
     owner: "社交系统＋运营"
@@ -516,10 +525,10 @@ work_packages:
     vision_ids: ["V12", "V13", "V18"]
     status: IN_PROGRESS
     evidence_dir: evidence/commercial-cn/CP-35/
-    delivery_record: evidence/commercial-cn/CP-35/2026-09-13-group-governance/delivery-record.md
-    test_command: "./mvnw test -Dtest=GroupGovernanceContractTest"
-    note: "首个增量：群邀请7天有效期(EXPIRED翻转+重新发起文案)；统一屏蔽已有(invite路径)；第二增量：V50禁言(惰性自愈/消息不落库)+移交(三条件UPDATE不可能双主)+解散(DISSOLVED全端点409)+历史可见范围(joined_at为界群主不限,修createdAt语义缺陷)+审核容量台账(默认20,超限显式拒绝不落库)；27新测试"
-    next_action: "治理端点前端接线；MODERATOR角色(如群规模需要)；真库Flyway验证属部署门禁"
+    delivery_record: evidence/commercial-cn/CP-35/2026-09-15-governance-ui/delivery-record.md
+    test_command: "npm test -- --run src/components/SocialGroupsView.test.tsx"
+    note: "首个增量：群邀请7天有效期(EXPIRED翻转+重新发起文案)；统一屏蔽已有(invite路径)；第二增量：V50禁言(惰性自愈/消息不落库)+移交(三条件UPDATE不可能双主)+解散(DISSOLVED全端点409)+历史可见范围(joined_at为界群主不限,修createdAt语义缺陷)+审核容量台账(默认20,超限显式拒绝不落库)；27新测试；第三增量：治理前端接线(禁言时长选择/移交/解散带确认,被禁言403原文inline)——治理链闭环；成员禁言状态字段后端未暴露(操作有状态无,如实注明)"
+    next_action: "成员列表暴露禁言状态字段(小后端增量,低优先)"
   - id: CP-36
     title: "内容审核、反诈与案件后台"
     owner: "信任与安全＋运营工程"
@@ -527,7 +536,7 @@ work_packages:
     depends_on: ["CP-08", "CP-14"]
     vision_ids: ["V01", "V12", "V13"]
     status: IN_PROGRESS
-    evidence_dir: evidence/commercial-cn/CP-36/
+    evidence_dir: evidence/commercial-cn/CP-34/2026-09-06-exit-silence-and-moderation/
     delivery_record: evidence/commercial-cn/CP-34/2026-09-06-exit-silence-and-moderation/delivery-record.md
     test_command: "./mvnw test -Dtest=ExitSilenceAndModerationTest"
     note: "首个增量：V42案件后台(一报一案/P0-P2分诊+SLA时钟/分派-处理-申诉/举报人隔离授权位)+两举报点挂钩+admin队列端点；测试3/3"
@@ -550,8 +559,8 @@ work_packages:
     delivery_record: evidence/commercial-cn/CP-49/2026-09-12-supply-chain/delivery-record.md
     test_command: "cd web && npm test -- --run src/PackageManagerContract.test.ts"
     note: "首个增量：api/ai/worker/scheduler四角色kustomize派生清单(同一镜像+RUNTIME_ROLE选角,调度应用侧禁用ai/worker外角色,角色化资源/优雅终止grace,探针三段式沿用base,README矩阵)"
-    next_action: "真实集群演练(争抢/租约/排空/预算封顶,CP-50A门禁)；KEDA按队列年龄接入"
-    evidence_dir: evidence/commercial-cn/CP-38/
+    next_action: "真实集群演练(争抢/租约/排空/预算封顶,CP-50A门禁)(KEDA队列年龄ScaledObject已于2026-07-23存在)"
+    evidence_dir: evidence/commercial-cn/CP-49/2026-09-12-supply-chain/
   - id: CP-39
     title: "数据迁移、事件可靠性与兼容发布"
     owner: "数据平台＋集成负责人"
@@ -560,6 +569,7 @@ work_packages:
     vision_ids: ["V15"]
     status: IN_PROGRESS
     delivery_record: evidence/commercial-cn/CP-39/2026-09-14-dlq-dashboard/delivery-record.md
+    delivery_record2: evidence/commercial-cn/CP-39/2026-09-12-outbox-reliability/delivery-record.md
     test_command: "./mvnw test -Dtest=OutboxDeadLetterDashboardTest"
     note: "首个增量：outbox可靠性——补data.retracted.v1缺失handler(v1 schema校验+inbox回执),writer↔handler登记合同,dedup append幂等,方言分支修复(append从未在H2运行过),毒/未知事件入DEAD+replayDead复活(Postgres门控)；DLQ看板增量：admin端点(死信列表+单事件重放,DEAD守卫幂等409/404,空态如实)+retry()的H2 INTERVAL方言真bug修复(PG分支真库验证不回归)；2新测试+27回归"
     next_action: "CP-40前端看板页面；AdminActionLog审计接入"
@@ -571,10 +581,10 @@ work_packages:
     depends_on: ["CP-03", "CP-17", "CP-37", "CP-38"]
     vision_ids: ["V15", "V16", "V17"]
     status: IN_PROGRESS
-    delivery_record: evidence/commercial-cn/CP-40/2026-09-12-spend-guard/delivery-record.md
-    test_command: "./mvnw test -Dtest=ProviderSpendGuardTest"
-    note: "首个增量：ProviderSpendGuard每日花费护栏——调用数+估算token双硬顶,provider调用前快速失败(AI_SPEND_EXCEEDED,本地功能不受影响文案),StructuredAiService唯一咽喉仅REMOTE计费,ai.spend.*指标,上海日锚"
-    next_action: "OTel贯穿HTTP/SSE/Provider/检索；多Pod Redis预算(CP-37/38联动)；账单对账看板"
+    delivery_record: evidence/commercial-cn/CP-40/2026-09-15-otel-throat-spans/delivery-record.md
+    test_command: "./mvnw test -Dtest='StructuredAiServiceObservationTest,MemoryRetrievalObservationTest'"
+    note: "首个增量：ProviderSpendGuard每日花费护栏——调用数+估算token双硬顶,provider调用前快速失败(AI_SPEND_EXCEEDED,本地功能不受影响文案),StructuredAiService唯一咽喉仅REMOTE计费,ai.spend.*指标,上海日锚；OTel咽喉增量：callObserved与检索咽喉Observation插桩(module/provider/leg/outcome+REFUSED闭合,userId完全不带沿用既有纪律,marker扫描证P0零泄漏)；9新测试+37回归；验证到内存捕获层,OTLP导出属部署门禁"
+    next_action: "真实OTLP collector导出(operator部署面)；streamChat流式span(chunk心跳设计)"
     evidence_dir: evidence/commercial-cn/CP-40/
   - id: CP-41
     title: "Android大陆真机与厂商推送"
@@ -603,11 +613,11 @@ work_packages:
     depends_on: ["CP-11", "CP-13", "CP-18", "CP-44"]
     vision_ids: ["V02", "V14", "V20"]
     status: IN_PROGRESS
-    delivery_record: evidence/commercial-cn/CP-47/2026-09-13-reconciliation-contract/delivery-record.md
-    test_command: "./mvnw test -Dtest=PaymentReconciliationContractTest,StoreSubmissionChecklistContractTest"
-    note: "首个增量：web-pwa渠道提审清单骨架(结构化checklist+结构合同:必填字段/唯一id/诚实状态集/无PASS态)"
-    next_action: "Chrome/Edge/Safari支持矩阵实测；PWA更新与桌面签名验证"
-    evidence_dir: evidence/commercial-cn/CP-43/
+    delivery_record: evidence/commercial-cn/CP-43/2026-09-15-browser-matrix/delivery-record.md
+    test_command: "cd web && IC_BROWSER_MATRIX=full npx playwright test e2e/pwa-submission-smoke.spec.ts"
+    note: "首个增量：web-pwa渠道提审清单骨架(结构化checklist+结构合同:必填字段/唯一id/诚实状态集/无PASS态)；第二增量：playwright多浏览器projects(chromium默认53不变,full矩阵159)+PWA提交冒烟三引擎实跑6/6+checklist结构契约3用例(禁伪完成态)"
+    next_action: "真机Chrome/Edge/Safari矩阵与商店提交回执属operator门禁"
+    evidence_dir: evidence/commercial-cn/CP-47/2026-09-13-reconciliation-contract/
   - id: CP-44
     title: "应用身份、渠道合同与HarmonyOS决策"
     owner: "发行架构＋创始人"
@@ -619,7 +629,7 @@ work_packages:
     test_command: "./mvnw test -Dtest=PaymentReconciliationContractTest,StoreSubmissionChecklistContractTest"
     note: "首个增量：apple-cn/xiaomi/oppo/huawei/vivo-others五渠道提审清单骨架(30项,evidence_required逐项,结构合同强制无PASS态)"
     next_action: "身份冻结/渠道合同/HarmonyOS PoC(operator门禁)"
-    evidence_dir: evidence/commercial-cn/CP-44/
+    evidence_dir: evidence/commercial-cn/CP-47/2026-09-13-reconciliation-contract/
   - id: CP-45
     title: "服务端订单与支付事实账本"
     owner: "支付后端＋财务"
@@ -627,10 +637,11 @@ work_packages:
     depends_on: ["CP-05", "CP-13", "CP-16", "CP-39"]
     vision_ids: ["V17", "V19"]
     status: IN_PROGRESS
-    delivery_record: evidence/commercial-cn/CP-45/2026-09-13-order-catalog/delivery-record.md
-    test_command: "./mvnw test -Dtest=ChannelCallbackSandboxContractTest,EntitlementStateMachineContractTest,PaymentReconciliationContractTest"
-    note: "第二增量：服务端订单目录(V45 tb_payment_order,POST /api/payments/orders唯一入口,目录价单一来源)接入ingest——未知订单/渠道错配拒收(404零入账),金额漂移与超额退款拒收但账本落DISPUTED事实(漂移可见绝不吸收),支付成功按order.userId/productId自动授予权益(扣款未解锁服务端闭合),全额退款撤销/部分退款保留;15/15+8/8契约,PG基线45/104/97/26实机"
-    next_action: "真实持牌渠道下单/预创建接线与证书为operator门禁；价格版本表与订单过期策略后续批次"
+    delivery_record: evidence/commercial-cn/CP-45/2026-09-15-price-version-order-expiry/delivery-record.md
+    delivery_record2: evidence/commercial-cn/CP-45/2026-09-13-channel-sandbox-adapters/delivery-record.md
+    test_command: "./mvnw test -Dtest='PriceVersionContractTest,OrderExpiryContractTest'"
+    note: "第二增量：服务端订单目录(V45 tb_payment_order,POST /api/payments/orders唯一入口,目录价单一来源)接入ingest——未知订单/渠道错配拒收(404零入账),金额漂移与超额退款拒收但账本落DISPUTED事实(漂移可见绝不吸收),支付成功按order.userId/productId自动授予权益(扣款未解锁服务端闭合),全额退款撤销/部分退款保留;15/15+8/8契约,PG基线45/104/97/26实机；第三增量：不可变价格版本V55(retire-first改价,PG partial unique,下单固化版本,并发双改价显式撞键)+订单过期(惰性+扫描双路径,晚到回调REJECTED_EXPIRED 410+ledger对账行,净额只计真实成败事件)；8新测试+payments域39回归"
+    next_action: "真库基线Docker环境验证；发票流与真实定价属持牌渠道operator门禁"
     evidence_dir: evidence/commercial-cn/CP-45/
   - id: CP-46
     title: "订阅、IAP与透明配额"

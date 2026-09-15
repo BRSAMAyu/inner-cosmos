@@ -418,4 +418,78 @@ describe("LettersInbox", () => {
     expect(screen.getByRole("button", { name: "Not telling the sender (default)" })).toBeVisible();
     expect(screen.getByText("The sender won't be told you read this letter.")).toBeVisible();
   });
+
+  // CP-34 both-party-consent corrections on the shared letter thread.
+  const thread9 = { id: 9, firstLetterId: 1, participantA: 1, participantB: 2, capsuleId: 4, status: "ACTIVE", lastLetterAt: null };
+  const proposal = (overrides = {}) => ({
+    id: 11, threadId: 9, proposerUserId: 2, counterpartUserId: 1,
+    correctionField: "relationLabel", proposedValue: "老朋友", note: "我们更像老朋友",
+    status: "PROPOSED", decisionReason: null, decidedAt: null,
+    createdAt: "2026-09-15T00:00:00", updatedAt: "2026-09-15T00:00:00", ...overrides
+  });
+  const correctionsProps = {
+    threadCorrections: { incoming: [proposal()], outgoing: [proposal({ id: 12, proposerUserId: 1, counterpartUserId: 2, proposedValue: "同路人" })] },
+    threadCorrectionsStatus: "success" as const
+  };
+
+  it("renders incoming correction cards with accept/decline and the outgoing status list on the open thread", () => {
+    const onAcceptCorrection = vi.fn();
+    const onRejectCorrection = vi.fn();
+    render(<LettersInbox letterInbox={[]} replyDrafts={{}} threads={[thread9]} selectedThreadId={9} threadLetters={[]}
+      threadLettersStatus="success" {...correctionsProps}
+      onAcceptCorrection={onAcceptCorrection} onRejectCorrection={onRejectCorrection}
+      connectionRequests={{ incoming: [], outgoing: [] }} friends={[]}
+      isDraftBusy={() => false} isLetterActionBusy={() => false} isConnectionDecisionBusy={() => false} isConnectionLeaveBusy={() => false} isLetterConnectionBusy={() => false} onReplyDraftChange={() => undefined} onReply={() => undefined} onActOnLetter={() => undefined}
+      onReportLetter={() => undefined} onRequestConnection={() => undefined}
+      onDecideConnection={() => undefined} onLeaveConnection={() => undefined} />);
+    fireEvent.click(screen.getByRole("tab", { name: /往来/ }));
+    expect(screen.getByText("等你确认的提案")).toBeVisible();
+    expect(screen.getByText("关系称呼 → 老朋友")).toBeVisible();
+    expect(screen.getByText("我们更像老朋友")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "接受" }));
+    expect(onAcceptCorrection).toHaveBeenCalledWith(11);
+    fireEvent.click(screen.getByRole("button", { name: "婉拒" }));
+    expect(onRejectCorrection).toHaveBeenCalledWith(11);
+    expect(screen.getByText("你提出的提案")).toBeVisible();
+    expect(screen.getByText("关系称呼 → 同路人")).toBeVisible();
+    expect(screen.getByText("待对方确认")).toBeVisible();
+  });
+
+  it("labels each outgoing proposal with its honest terminal status, and offers withdraw only while PROPOSED", () => {
+    const onWithdrawCorrection = vi.fn();
+    render(<LettersInbox letterInbox={[]} replyDrafts={{}} threads={[thread9]} selectedThreadId={9} threadLetters={[]} threadLettersStatus="success"
+      threadCorrections={{ incoming: [], outgoing: [
+        proposal({ id: 21, status: "APPLIED" }),
+        proposal({ id: 22, status: "REJECTED", decisionReason: "我们还是叫原来的称呼吧", decidedAt: "2026-09-15T01:00:00" }),
+        proposal({ id: 23, status: "WITHDRAWN" })
+      ] }} threadCorrectionsStatus="success"
+      onWithdrawCorrection={onWithdrawCorrection}
+      connectionRequests={{ incoming: [], outgoing: [] }} friends={[]}
+      isDraftBusy={() => false} isLetterActionBusy={() => false} isConnectionDecisionBusy={() => false} isConnectionLeaveBusy={() => false} isLetterConnectionBusy={() => false} onReplyDraftChange={() => undefined} onReply={() => undefined} onActOnLetter={() => undefined}
+      onReportLetter={() => undefined} onRequestConnection={() => undefined}
+      onDecideConnection={() => undefined} onLeaveConnection={() => undefined} />);
+    fireEvent.click(screen.getByRole("tab", { name: /往来/ }));
+    expect(screen.getByText("已应用")).toBeVisible();
+    expect(screen.getByText("被婉拒")).toBeVisible();
+    expect(screen.getByText("婉拒理由：我们还是叫原来的称呼吧")).toBeVisible();
+    expect(screen.getByText("已撤回")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "撤回" })).not.toBeInTheDocument();
+  });
+
+  it("sends a correction proposal with the chosen field, value and optional note", () => {
+    const onProposeCorrection = vi.fn();
+    render(<LettersInbox letterInbox={[]} replyDrafts={{}} threads={[thread9]} selectedThreadId={9} threadLetters={[]} threadLettersStatus="success"
+      threadCorrections={{ incoming: [], outgoing: [] }} threadCorrectionsStatus="success"
+      onProposeCorrection={onProposeCorrection} onAcceptCorrection={() => undefined}
+      connectionRequests={{ incoming: [], outgoing: [] }} friends={[]}
+      isDraftBusy={() => false} isLetterActionBusy={() => false} isConnectionDecisionBusy={() => false} isConnectionLeaveBusy={() => false} isLetterConnectionBusy={() => false} onReplyDraftChange={() => undefined} onReply={() => undefined} onActOnLetter={() => undefined}
+      onReportLetter={() => undefined} onRequestConnection={() => undefined}
+      onDecideConnection={() => undefined} onLeaveConnection={() => undefined} />);
+    fireEvent.click(screen.getByRole("tab", { name: /往来/ }));
+    fireEvent.click(screen.getByText("对这段往来的理解提出一处修改"));
+    fireEvent.change(screen.getByLabelText("你认为正确的内容"), { target: { value: "同行多年" } });
+    fireEvent.change(screen.getByLabelText("补充说明（可选）"), { target: { value: "一直互相照应" } });
+    fireEvent.click(screen.getByRole("button", { name: "送出提案" }));
+    expect(onProposeCorrection).toHaveBeenCalledWith(9, "relationLabel", "同行多年", "一直互相照应");
+  });
 });

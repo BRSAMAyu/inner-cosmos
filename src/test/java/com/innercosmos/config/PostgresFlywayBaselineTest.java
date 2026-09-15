@@ -72,9 +72,12 @@ class PostgresFlywayBaselineTest {
         // V51 (CP-34) adds both-party-consent relation corrections.
         // V52 (CP-18) adds the continuity opening-visibility preference.
         // V53 (CP-15) adds per-asset retraction cleanup results.
+        // V54 (CP-21) adds the tb_belief_pattern optimistic-lock version column.
+        // V55 (CP-45 §2-21) adds the immutable price version table, order expiry columns
+        // and the informational EXPIRED_ORDER_CALLBACK ledger fact.
         // It exists as a forward migration rather than an in-place edit of V30 because V30 is
         // already committed and rewriting it would break Flyway checksums on live databases.
-        assertEquals(53, flyway.migrate().migrationsExecuted);
+        assertEquals(55, flyway.migrate().migrationsExecuted);
         assertEquals(0, flyway.migrate().migrationsExecuted);
 
         String source = readClasspath("schema.sql");
@@ -102,16 +105,16 @@ class PostgresFlywayBaselineTest {
                     WHERE constraint_schema='public' AND constraint_type='FOREIGN KEY'
                     """);
 
-            // V50/V51/V52/V53 twins: group review ledger, relation corrections,
-            // continuity preference, retraction cleanup results.
-            assertEquals(109, expectedTables.size(), "source schema table inventory changed");
+            // V50/V51/V52/V53/V55 twins: group review ledger, relation corrections,
+            // continuity preference, retraction cleanup results, price versions.
+            assertEquals(110, expectedTables.size(), "source schema table inventory changed");
             assertEquals(expectedTables, actualTables, "PostgreSQL baseline table drift");
             assertTrue(actualIndexes.containsAll(expectedIndexes),
                     () -> "missing PostgreSQL indexes: " + difference(expectedIndexes, actualIndexes));
             assertEquals(expectedForeignKeys, actualForeignKeys, "PostgreSQL foreign-key drift");
             // V50-V53 add four IDENTITY-PK tables (review ledger, correction,
-            // continuity preference, cleanup result).
-            assertEquals(102, scalar(connection, """
+            // continuity preference, cleanup result); V55 adds the price version table.
+            assertEquals(103, scalar(connection, """
                     SELECT COUNT(*) FROM information_schema.columns
                     WHERE table_schema='public' AND is_identity='YES'
                     """));
@@ -182,14 +185,15 @@ class PostgresFlywayBaselineTest {
                 .locations("classpath:db/migration/postgresql")
                 .load();
         // No .target(): migrates from V19 all the way to the current latest
-        // (V20 through V53, including provenance, orchestration, safety, Pod takeover,
+        // (V20 through V55, including provenance, orchestration, safety, Pod takeover,
         // capsule-landing foreign-key rename, classroom social pair integrity, the
         // commercial-cn metric event store, the adult gate, the consent center,
         // identity verification, retraction tombstones, crisis continuity, the
         // moderation case backend, slow-letter receipt policy, wake-intent deferral,
-        // group governance, relation corrections, continuity visibility and retraction
-        // cleanup results).
-        assertEquals(34, v20.migrate().migrationsExecuted);
+        // group governance, relation corrections, continuity visibility, retraction
+        // cleanup results, the belief-pattern version column and the payment price
+        // version / order expiry batch).
+        assertEquals(36, v20.migrate().migrationsExecuted);
         try (Connection migrated = DriverManager.getConnection(
                 jdbcUrl, POSTGRES.getUsername(), POSTGRES.getPassword())) {
             assertEquals(2, scalar(migrated,

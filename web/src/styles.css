@@ -3762,3 +3762,64 @@ body {
 .cosmos-space[data-emotion-encoding="off"] .cosmos-star-core {
   box-shadow: 0 0 10px color-mix(in srgb, var(--text-muted) 45%, transparent);
 }
+
+/* ---------------------------------------------------------------------------
+   Frontend consumption batch (CP-08/31/32/34/35) — appended styles only.
+   --------------------------------------------------------------------------- */
+
+/* CP-08 usage-time panel: same family as the quota panel, quieter than it. */
+.usage-today-panel { margin-top: 18px; padding: 18px; border: 1px solid #ffffff12;
+  border-radius: 16px; background: #241b17b0; }
+.usage-today-panel .usage-today-minutes { margin: 4px 0 2px;
+  font: 500 1.15rem Georgia,"Noto Serif SC",serif; }
+.usage-today-panel .usage-today-turns { margin: 0 0 6px; }
+.usage-today-panel .usage-today-basis { display: block; color: var(--text-muted); }
+.usage-today-panel .usage-today-reminder { margin: 10px 0 0; padding: 10px 12px;
+  border-left: 2px solid #c8b69766; color: var(--text-secondary); font-size: .85rem; }
+.usage-today-panel .usage-today-reminder em { display: block; font-style: normal;
+  font-size: .72rem; letter-spacing: .1em; color: #c8b697; margin-bottom: 2px; }
+
+/* CP-07 versioned re-consent badge + note on a consent row. */
+.consent-reconsent-badge { display: inline-block; margin-right: 8px; padding: 1px 8px;
+  border: 1px solid #c8b69788; border-radius: 999px; font-size: .68rem;
+  letter-spacing: .04em; color: #e4cf9f; }
+.consent-reconsent-note { margin: 6px 0 0; font-size: .78rem; color: var(--text-secondary); }
+
+/* CP-32 recall-mode explanation on match cards — deliberately quiet. */
+.match-card .match-mode { display: flex; flex-wrap: wrap; gap: 4px 8px; margin-top: 6px; }
+.match-card .match-mode-label { padding: 1px 8px; border: 1px solid #ffffff1f;
+  border-radius: 999px; font-size: .66rem; letter-spacing: .06em; color: #c8b697; }
+.match-card .match-mode-reason { font-size: .68rem; color: var(--text-muted); }
+.match-card .match-mode-reason.insufficient { color: var(--text-secondary); font-style: italic; }
+
+/* CP-31 capsule field-provenance line in the workbench. */
+.capsule-ai-provenance { margin: 6px 0 0; font-size: .72rem; color: var(--text-muted); }
+
+/* CP-34 thread corrections. */
+.thread-corrections { margin-top: 14px; padding: 12px 14px; border: 1px solid #ffffff10;
+  border-radius: 12px; background: #1d1611; }
+.thread-corrections h4 { margin: 0 0 4px; font-size: .82rem; }
+.thread-corrections-intro { margin: 0 0 10px; color: var(--text-secondary); font-size: .78rem; }
+.correction-list { margin-bottom: 10px; }
+.correction-list strong { display: block; margin-bottom: 6px; font-size: .74rem;
+  letter-spacing: .08em; color: #c8b697; }
+.correction-list article { padding: 8px 10px; border: 1px solid #ffffff10;
+  border-radius: 10px; margin-bottom: 6px; font-size: .82rem; }
+.correction-list article > div { display: flex; gap: 8px; margin-top: 6px; }
+.correction-list small { display: block; color: var(--text-muted); font-size: .72rem; }
+.correction-reason { color: var(--text-secondary); }
+.correction-propose { margin-top: 8px; }
+.correction-propose summary { cursor: pointer; font-size: .78rem; color: var(--text-secondary); }
+.correction-propose label { display: block; margin-top: 8px; font-size: .78rem; }
+.correction-propose input, .correction-propose select { display: block; margin-top: 2px; }
+
+/* CP-35 group governance + the muted sender's inline rejection. */
+.member-governance { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.group-governance { margin: 10px 0; padding: 10px 12px; border: 1px dashed #ffffff1a;
+  border-radius: 10px; }
+.group-governance strong { display: block; margin-bottom: 6px; font-size: .78rem;
+  letter-spacing: .08em; color: #c8b697; }
+.group-governance label { font-size: .78rem; }
+.group-governance select { margin-left: 8px; }
+.group-governance small { display: block; margin-top: 6px; color: var(--text-muted); }
+.group-message-error { margin: 6px 0 0; font-size: .8rem; }

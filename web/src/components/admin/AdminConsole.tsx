@@ -9,6 +9,7 @@ import { AdminAiLogsTab } from "./AdminAiLogsTab";
 import { AdminSafetyTab } from "./AdminSafetyTab";
 import { AdminModelTab } from "./AdminModelTab";
 import { AdminAuditTab } from "./AdminAuditTab";
+import { AdminOutboxDlq } from "../AdminOutboxDlq";
 
 // Port of the legacy static /pages/admin.html (689 lines, 8 tabs) into the AppShell. Deliberately a
 // standalone route (see AuroraApp.tsx's `/admin` wiring), NOT a 6th ProductShell space -- moderation
@@ -17,7 +18,7 @@ import { AdminAuditTab } from "./AdminAuditTab";
 // session; AuroraApp.tsx redirects any non-admin session away before this ever mounts. This
 // component owns its own data fetching (useAdminConsole) so AuroraApp.tsx only needs the route
 // wiring and a single top-level render call, matching SafetyHarborPage's standalone-route pattern.
-const TABS = ["users", "capsules", "reports", "abtest", "ailogs", "safety", "model", "audit"] as const;
+const TABS = ["users", "capsules", "reports", "abtest", "ailogs", "safety", "model", "audit", "outbox"] as const;
 type TabKey = typeof TABS[number];
 
 const COPY: Record<Locale, {
@@ -29,14 +30,14 @@ const COPY: Record<Locale, {
   "zh-CN": {
     aria: "管理后台", heading: "管理后台", sub: "所有影响用户内容的操作都需要理由，并写入审计日志。",
     refresh: "刷新全部", back: "返回核心", tabsAria: "管理后台分区",
-    tabLabel: { users: "用户", capsules: "共鸣体", reports: "举报", abtest: "A/B 测试", ailogs: "AI 日志", safety: "安全", model: "模型", audit: "审计" },
+    tabLabel: { users: "用户", capsules: "共鸣体", reports: "举报", abtest: "A/B 测试", ailogs: "AI 日志", safety: "安全", model: "模型", audit: "审计", outbox: "死信" },
     metricUsers: "注册用户", metricPublicCapsules: "公开共鸣体", metricLetters: "慢信",
     metricPendingReports: "待处理举报", metricAiLogs: "AI 日志", metricSafetyEvents: "安全事件"
   },
   "en-SG": {
     aria: "Admin console", heading: "Admin console", sub: "Every action that affects a user's content needs a reason and is written to the audit log.",
     refresh: "Refresh all", back: "Back to today", tabsAria: "Admin console sections",
-    tabLabel: { users: "Users", capsules: "Capsules", reports: "Reports", abtest: "A/B test", ailogs: "AI logs", safety: "Safety", model: "Model", audit: "Audit" },
+    tabLabel: { users: "Users", capsules: "Capsules", reports: "Reports", abtest: "A/B test", ailogs: "AI logs", safety: "Safety", model: "Model", audit: "Audit", outbox: "DLQ" },
     metricUsers: "Registered users", metricPublicCapsules: "Public capsules", metricLetters: "Slow letters",
     metricPendingReports: "Pending reports", metricAiLogs: "AI logs", metricSafetyEvents: "Safety events"
   }
@@ -90,6 +91,9 @@ export function AdminConsole({ locale = "zh-CN", onBack }: { locale?: Locale; on
       {tab === "safety" && <AdminSafetyTab events={admin.safetyEvents} locale={locale} />}
       {tab === "model" && <AdminModelTab health={admin.aiHealth} configs={admin.modelConfig} locale={locale} />}
       {tab === "audit" && <AdminAuditTab logs={admin.auditLogs} locale={locale} />}
+      {/* CP-39/CP-40 DLQ: self-fetching (not part of loadAll) so it only hits the backend when its
+          tab is open; the backend requireAdmin-gates both endpoints independently. */}
+      {tab === "outbox" && <AdminOutboxDlq locale={locale} />}
     </section>
   </main>;
 }

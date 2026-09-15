@@ -5,7 +5,7 @@
 #
 # 诚实规则（结构性强制，照 legal-procedures.ledger.yml 范本）：
 # - status ∈ {NOT_STARTED, AUTOMATED_PASS, MANUAL_PENDING}：
-#     NOT_STARTED   尚未开始（当前全矩阵诚实状态）
+#     NOT_STARTED   尚未开始（未带证据推进前的默认诚实状态）
 #     AUTOMATED_PASS 仅当对应自动化可达性检查真实通过，且同维度 *_evidence
 #                   必须落位指向可复现实证（CI 作业/报告路径），否则契约测试拒绝
 #     MANUAL_PENDING 辅助技术人工测试（读屏/键盘真实设备操作）已排期或进行中，
@@ -14,6 +14,11 @@
 #   不以自动化通过冒充人工辅助技术验证，不以单端通过冒充五端通过
 # - 某平台未满足则该平台对应单元格保持真实状态，不得宣称"完全体多端完成"（CP-60 恢复条款）
 # - 行（journey_id）与蓝图 §3.2 的 J01–J12 一一对应；新增端或维度须同步改契约测试
+#
+# 2026-09-15 首批推进（CP-60C §2-26，证据优先）：web×keyboard（J01/J02/J05）与
+# web×contrast（J02/J04）共 5 格按既有自动化合同测试推进 AUTOMATED_PASS；每格 evidence
+# 引用 web/src 下真实存在的测试文件与用例名。其余 235 格保持 NOT_STARTED——它们没有
+# 既有自动化证据，不因同列其他格通过而冒进。
 
 matrix:
   - journey_id: J01
@@ -21,8 +26,8 @@ matrix:
     platform: web
     screen_reader: NOT_STARTED
     screen_reader_evidence: null
-    keyboard: NOT_STARTED
-    keyboard_evidence: null
+    keyboard: AUTOMATED_PASS
+    keyboard_evidence: "web/src/components/NonAuthorUsabilityContract.test.tsx#CP-12 usability contract — keyboard and focus (J01 consent decision)（焦点入框不预选任一选择、Escape 拒绝且焦点回到开启者）+ web/src/components/OnboardingGuide.test.tsx（closes on Escape without marking the tour complete, restores focus, and restarts from step one；J01: re-reading focuses the explanation card for another pass）"
     contrast: NOT_STARTED
     contrast_evidence: null
     weak_network: NOT_STARTED
@@ -76,10 +81,10 @@ matrix:
     platform: web
     screen_reader: NOT_STARTED
     screen_reader_evidence: null
-    keyboard: NOT_STARTED
-    keyboard_evidence: null
-    contrast: NOT_STARTED
-    contrast_evidence: null
+    keyboard: AUTOMATED_PASS
+    keyboard_evidence: "web/src/components/HeartDiary.focus-visible.test.tsx（真实样式表断言：无裸 .diary-textarea:focus{outline:none}、存在 :focus-visible 替代指示、聚焦真实心声日记 textarea 得到可见 box-shadow）——心声日记 textarea 是倾听旅程的核心键盘输入面"
+    contrast: AUTOMATED_PASS
+    contrast_evidence: "web/src/ContrastStackAudit.test.ts（night: / day: every audited composited surface keeps its text at 4.5:1+ —— 含 opening-continuity 开场延续卡）+ web/src/ContrastTokenAudit.test.ts（the default warm-night theme… / the effective day theme… 双用例全站文本 token 4.5:1 基线）"
     weak_network: NOT_STARTED
     weak_network_evidence: null
   - journey_id: J02
@@ -188,8 +193,8 @@ matrix:
     screen_reader_evidence: null
     keyboard: NOT_STARTED
     keyboard_evidence: null
-    contrast: NOT_STARTED
-    contrast_evidence: null
+    contrast: AUTOMATED_PASS
+    contrast_evidence: "web/src/ContrastStackAudit.test.ts（night: / day: every audited composited surface keeps its text at 4.5:1+ —— 含 .portrait-claims-panel/.portrait-claim-row/.portrait-calibrate textarea 回访纠正面）+ web/src/ContrastTokenAudit.test.ts（双用例全站文本 token 4.5:1 基线）"
     weak_network: NOT_STARTED
     weak_network_evidence: null
   - journey_id: J04
@@ -241,8 +246,8 @@ matrix:
     platform: web
     screen_reader: NOT_STARTED
     screen_reader_evidence: null
-    keyboard: NOT_STARTED
-    keyboard_evidence: null
+    keyboard: AUTOMATED_PASS
+    keyboard_evidence: "web/src/components/MemoryStarfield.test.tsx#moves focus into a loaded star detail and lets Escape close it（星详情对话框初始聚焦关闭钮、Tab 收回焦点、Escape 关闭）+ 同文件列表视图用例（列表保留键盘可达动作：查看来源与变化/这条不准确了；星图绝对定位按钮移出 Tab 序）"
     contrast: NOT_STARTED
     contrast_evidence: null
     weak_network: NOT_STARTED

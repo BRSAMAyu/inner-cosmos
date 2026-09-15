@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
-import type { AgeVerificationStatusView, TtsPreferences, TtsPreferencesPatch, UserProfileSettings } from "../api";
+import type { AgeVerificationStatusView, ContinuityVisibility, TtsPreferences, TtsPreferencesPatch, UserProfileSettings } from "../api";
 import { AsyncButton } from "../loading";
 import type { Locale } from "../i18n";
 import { InlineAudioPlayer } from "./shared/InlineAudioPlayer";
@@ -48,6 +48,9 @@ type AccountCopy = {
   // CP-09/CP-10 · VERIFIED_ID badge (consumes CP-13's read-only status endpoint).
   identityTitle: string; identityVerified: string; identityUnverified: string; identityUnverifiedHint: string;
   identityPending: string; identityLastFailed: string; identityLoadFailed: string; identityRefresh: string;
+  // CP-18 §2-13 · opening-recap re-entry switch (GET/PUT /api/dialog/session/continuity/visibility).
+  recapTitle: string; recapLabel: string; recapHintOn: string; recapHintOff: string;
+  recapLoadFailed: string; recapRefresh: string; recapSaveFailed: string;
 };
 
 const COPY: Record<Locale, AccountCopy> = {
@@ -84,7 +87,14 @@ const COPY: Record<Locale, AccountCopy> = {
     identityPending: "有一次核验正在进行中，完成后这里会更新。",
     identityLastFailed: "最近一次核验未通过：",
     identityLoadFailed: "实名状态暂时无法获取。",
-    identityRefresh: "刷新"
+    identityRefresh: "刷新",
+    recapTitle: "开场回顾",
+    recapLabel: "显示开场回顾",
+    recapHintOn: "开始新对话时，Aurora 会带来上次对话留下的开场回顾。",
+    recapHintOff: "不再显示开场回顾，连续性记录不受影响。",
+    recapLoadFailed: "开场回顾设置暂时无法获取。",
+    recapRefresh: "重试",
+    recapSaveFailed: "暂时没能保存，稍后再试。"
   },
   "en-SG": {
     aria: "Aurora & account settings", heading: "Aurora & account settings", eyebrow: "SETTINGS",
@@ -119,7 +129,14 @@ const COPY: Record<Locale, AccountCopy> = {
     identityPending: "A verification attempt is in progress; this updates when it completes.",
     identityLastFailed: "Most recent attempt failed: ",
     identityLoadFailed: "Identity status is temporarily unavailable.",
-    identityRefresh: "Refresh"
+    identityRefresh: "Refresh",
+    recapTitle: "Opening recap",
+    recapLabel: "Show the opening recap",
+    recapHintOn: "When you start a new conversation, Aurora opens with a short recap carried over from your last one.",
+    recapHintOff: "The opening recap is off; your continuity records are unaffected.",
+    recapLoadFailed: "Opening-recap setting is temporarily unavailable.",
+    recapRefresh: "Retry",
+    recapSaveFailed: "Could not save just now -- try again shortly."
   }
 };
 
@@ -318,10 +335,73 @@ function IdentityVerificationBadge({ status, loaded, error, busy, onRefresh, t }
   </div>;
 }
 
+// CP-18 §2-13 re-entry switch. The withdrawal button lives on the AuroraOpeningContinuity card
+// itself, but once withdrawn that card stops rendering -- this settings row is the one durable UI
+// path back. It reads the owner's real switch (GET /api/dialog/session/continuity/visibility) and
+// writes it back on toggle (PUT), with the same honesty rules as the card: while the value has
+// not loaded, NOTHING renders (no premature on/off flash); a failed load degrades to a neutral
+// "unavailable" line with a retry, never a guessed state; a failed save rolls the checkbox back
+// to the last server-confirmed value with a visible reason. The off-state copy mirrors the
+// backend's own semantics -- withdrawing is a display choice only; continuity facts keep being
+// recorded honestly either way.
+function OpeningRecapSetting({ loader, setter, t }: {
+  loader: () => Promise<ContinuityVisibility>;
+  setter: (openingVisible: boolean) => Promise<ContinuityVisibility>;
+  t: AccountCopy;
+}) {
+  const [visible, setVisible] = useState<boolean | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
+  const [refreshTick, setRefreshTick] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    loader()
+      .then(status => { if (!cancelled) { setVisible(status.openingVisible); setLoaded(true); setLoadFailed(false); } })
+      .catch(() => { if (!cancelled) setLoadFailed(true); });
+    return () => { cancelled = true; };
+  }, [loader, refreshTick]);
+
+  const toggle = (next: boolean) => {
+    if (busy || visible === null) return; // guard double-toggle while one PUT is in flight
+    const previous = visible;
+    setVisible(next); // optimistic, like VoicePreferencesEditor
+    setSaveFailed(false);
+    setBusy(true);
+    setter(next)
+      .then(status => setVisible(status.openingVisible)) // keep the server-confirmed value
+      .catch(() => { setVisible(previous); setSaveFailed(true); }) // roll back + explain, never silent
+      .finally(() => setBusy(false));
+  };
+
+  if (loadFailed) {
+    return <article>
+      <strong>{t.recapTitle}</strong>
+      <p className="muted" style={{ margin: 0 }}>{t.recapLoadFailed} </p>
+      <button type="button" className="quiet" style={{ padding: 0 }} onClick={() => setRefreshTick(value => value + 1)}>
+        {t.recapRefresh}
+      </button>
+    </article>;
+  }
+  if (!loaded) return null;
+  return <article>
+    <strong>{t.recapTitle}</strong>
+    <div className="account-toggle">
+      <label><input type="checkbox" checked={visible === true} disabled={busy}
+        onChange={event => toggle(event.target.checked)} />{t.recapLabel}</label>
+      <small>{visible ? t.recapHintOn : t.recapHintOff}</small>
+    </div>
+    {saveFailed && <p className="account-error" role="alert">{t.recapSaveFailed}</p>}
+  </article>;
+}
+
 export function AccountSettings({ busy, message, onChangePassword, onExportData, onDeleteAccount,
   profile = null, profileBusy = false, onSaveProfile,
   ttsPreferences = null, ttsBusy = false, onUpdateTtsPreferences, onPreviewVoice, locale = "zh-CN",
-  identityStatusLoader = api.ageVerificationStatus }: {
+  identityStatusLoader = api.ageVerificationStatus,
+  continuityVisibilityLoader = api.continuityVisibility,
+  setContinuityVisibility = api.setContinuityVisibility }: {
   busy: AccountBusy; message: string | null;
   // Gemini audit 4.10 (CONFIRMED/P1): both return a Promise resolving to `null` on confirmed
   // success or an error message string on failure -- the form below AWAITS this before deciding
@@ -341,6 +421,10 @@ export function AccountSettings({ busy, message, onChangePassword, onExportData,
   // CP-13 status loader for the VERIFIED_ID badge. Defaults to the real endpoint so the
   // already-mounted AccountSettings gains the badge without caller changes; injectable for tests.
   identityStatusLoader?: () => Promise<AgeVerificationStatusView>;
+  // CP-18 §2-13 opening-recap re-entry switch. Self-loading like identityStatusLoader above:
+  // defaults to the real GET/PUT endpoints so no caller change is needed; injectable for tests.
+  continuityVisibilityLoader?: () => Promise<ContinuityVisibility>;
+  setContinuityVisibility?: (openingVisible: boolean) => Promise<ContinuityVisibility>;
 }) {
   const t = COPY[locale];
   const [passwordOpen, setPasswordOpen] = useState(false);
@@ -418,6 +502,7 @@ export function AccountSettings({ busy, message, onChangePassword, onExportData,
           onUpdateTtsPreferences={onUpdateTtsPreferences} onPreviewVoice={onPreviewVoice} locale={locale} t={t} />}
       {profile && onSaveProfile && <AuroraPreferencesEditor key={profile.id} profile={profile} profileBusy={profileBusy}
         onSaveProfile={onSaveProfile} locale={locale} t={t} />}
+      <OpeningRecapSetting loader={continuityVisibilityLoader} setter={setContinuityVisibility} t={t} />
 
       <article>
         <strong>{t.exportTitle}</strong>

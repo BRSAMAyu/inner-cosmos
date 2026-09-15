@@ -15,6 +15,14 @@ const COPY: Record<Locale, {
   messagePlaceholder: string; messageBusy: string; sendMessage: string;
   hearthHeading: string; hearthIntro: string; hearthStart: string; hearthClose: string;
   hearthDuration: string; hearthLocal: string; hearthRemaining: (value: string) => string;
+  // CP-35 group governance (host view) + the muted-sender's honest inline rejection.
+  governanceHeading: string; governanceNote: string; muteDurationLabel: string;
+  muteDurationManual: string; muteDurationMinutes: (n: number) => string;
+  muteAction: (name: string) => string; muteBusy: string;
+  unmuteAction: (name: string) => string; unmuteBusy: string;
+  transferAction: (name: string) => string; transferBusy: string;
+  dissolveAction: string; dissolveBusy: string;
+  transferConfirm: (name: string) => string; dissolveConfirm: (name: string) => string;
 }> = {
   "zh-CN": {
     aria: "慢群组", heading: "一小群人，也可以认真地聊在一起", count: n => `${n} 个群组`,
@@ -31,7 +39,17 @@ const COPY: Record<Locale, {
     messagePlaceholder: "写给小组成员…", messageBusy: "正在发送", sendMessage: "发送",
     hearthHeading: "围炉", hearthIntro: "把群聊暂时变成一段共同在场的专注时间。消息仍写真正的群聊；这一轮计时只保存在你的设备上，不会伪装其他成员在线。",
     hearthStart: "开启围炉", hearthClose: "结束围炉", hearthDuration: "围炉时长", hearthLocal: "本地仪式 · 不代表成员在线",
-    hearthRemaining: value => `炉火还会亮 ${value}`
+    hearthRemaining: value => `炉火还会亮 ${value}`,
+    governanceHeading: "群主管理",
+    governanceNote: "成员列表不会显示谁正被禁言；禁言与解除都以群主操作为准。",
+    muteDurationLabel: "禁言时长", muteDurationManual: "至手动解除",
+    muteDurationMinutes: n => `${n} 分钟`,
+    muteAction: name => `禁言 ${name}`, muteBusy: "正在禁言",
+    unmuteAction: name => `解除禁言 ${name}`, unmuteBusy: "正在解除",
+    transferAction: name => `移交群主给 ${name}`, transferBusy: "正在移交",
+    dissolveAction: "解散群组", dissolveBusy: "正在解散",
+    transferConfirm: name => `确定把群主移交给 ${name} 吗？移交后你将成为普通成员。`,
+    dissolveConfirm: name => `确定解散「${name}」吗？所有成员都会失去这个群组，且无法恢复。`
   },
   "en-SG": {
     aria: "Slow groups", heading: "A small circle can still talk meaningfully together", count: n => `${n} group${n === 1 ? "" : "s"}`,
@@ -48,7 +66,17 @@ const COPY: Record<Locale, {
     messagePlaceholder: "Write to the group…", messageBusy: "Sending", sendMessage: "Send",
     hearthHeading: "Hearth", hearthIntro: "Turn the group into a shared period of focused presence. Messages remain real group messages; this timer stays on your device and never pretends others are online.",
     hearthStart: "Light the hearth", hearthClose: "Close the hearth", hearthDuration: "Hearth length", hearthLocal: "Local ritual · not an online claim",
-    hearthRemaining: value => `The hearth stays lit for ${value}`
+    hearthRemaining: value => `The hearth stays lit for ${value}`,
+    governanceHeading: "Host controls",
+    governanceNote: "The member list doesn't show who is currently muted; mute and unmute follow the host's actions.",
+    muteDurationLabel: "Mute length", muteDurationManual: "Until lifted manually",
+    muteDurationMinutes: n => `${n} minutes`,
+    muteAction: name => `Mute ${name}`, muteBusy: "Muting",
+    unmuteAction: name => `Unmute ${name}`, unmuteBusy: "Unmuting",
+    transferAction: name => `Make ${name} the host`, transferBusy: "Transferring",
+    dissolveAction: "Dissolve group", dissolveBusy: "Dissolving",
+    transferConfirm: name => `Transfer the host role to ${name}? You become an ordinary member afterwards.`,
+    dissolveConfirm: name => `Dissolve "${name}"? Every member loses this group, and it cannot be undone.`
   }
 };
 
@@ -56,7 +84,9 @@ export function SocialGroupsView({ groups, invites, friends, selectedGroupId, me
   messages = [], messagesStatus = "idle",
   createBusy, isInviteBusy, isInviteDecisionBusy, isLeaveBusy, currentUserId,
   isMessageBusy, onSelectGroup, onCreateGroup, onJoinClassroomGroup, onInvite, onRespondInvite, onLeaveGroup,
-  onSendMessage, locale = "zh-CN" }: {
+  onSendMessage, locale = "zh-CN",
+  groupMessageError = null, isGroupGovernanceBusy = () => false, isGroupDissolveBusy = () => false,
+  onMuteGroupMember, onUnmuteGroupMember, onTransferGroupOwnership, onDissolveGroup }: {
   groups: SocialGroup[]; invites: GroupInvite[]; friends: SocialConnection[];
   selectedGroupId: number | null; members: GroupMember[]; membersStatus?: "idle" | "loading" | "success" | "error";
   messages?: GroupMessage[]; messagesStatus?: "idle" | "loading" | "success" | "error";
@@ -75,12 +105,24 @@ export function SocialGroupsView({ groups, invites, friends, selectedGroupId, me
   onLeaveGroup: (groupId: number) => void;
   onSendMessage?: (groupId: number, messageBody: string) => Promise<boolean>;
   locale?: Locale;
+  // CP-35: the muted-sender's inline rejection (backend 403 text, verbatim) and the host-only
+  // governance actions. All optional — non-host callers and existing tests render unchanged.
+  groupMessageError?: string | null;
+  isGroupGovernanceBusy?: (userId: number) => boolean;
+  isGroupDissolveBusy?: (groupId: number) => boolean;
+  onMuteGroupMember?: (groupId: number, userId: number, durationMinutes: number | null) => void;
+  onUnmuteGroupMember?: (groupId: number, userId: number) => void;
+  onTransferGroupOwnership?: (groupId: number, userId: number) => void;
+  onDissolveGroup?: (groupId: number) => void;
 }) {
   const t = COPY[locale];
   const [name, setName] = useState("");
   const [inviteUserId, setInviteUserId] = useState("");
   const [messageBody, setMessageBody] = useState("");
   const [hearthMinutes, setHearthMinutes] = useState<10 | 15>(10);
+  // CP-35: one shared duration choice for the owner's mute action; "manual" maps to the backend's
+  // null durationMinutes (muted until the host lifts it).
+  const [muteMinutes, setMuteMinutes] = useState<"15" | "30" | "60" | "manual">("30");
   const [hearthEndsAt, setHearthEndsAt] = useState<number | null>(null);
   const [classroomBusy, setClassroomBusy] = useState(false);
   const [now, setNow] = useState(Date.now());
@@ -146,8 +188,41 @@ export function SocialGroupsView({ groups, invites, friends, selectedGroupId, me
           : members.length === 0 ? <div className="network-empty">{t.noMembers}</div> : <ul role="list">
           {members.map(member => <li key={member.userId}>
             <span>{member.nickname}</span><small>{member.memberRole === "OWNER" ? t.roleOwner : t.roleMember}</small>
+            {/* CP-35 host controls. The member endpoint exposes no muted state, so mute/unmute are
+                offered as actions without claiming who is currently muted (see the note below);
+                the backend refuses non-host callers and self/owner mutes with explicit errors. */}
+            {isOwner && member.memberRole !== "OWNER" && (onMuteGroupMember || onUnmuteGroupMember || onTransferGroupOwnership) && (
+              <div className="member-governance" aria-label={t.governanceHeading}>
+                {onMuteGroupMember && <AsyncButton className="quiet" busy={isGroupGovernanceBusy(member.userId)}
+                  busyText={t.muteBusy} aria-label={t.muteAction(member.nickname)}
+                  onClick={() => onMuteGroupMember(selectedGroup.id, member.userId,
+                    muteMinutes === "manual" ? null : Number(muteMinutes))}>{t.muteAction(member.nickname)}</AsyncButton>}
+                {onUnmuteGroupMember && <AsyncButton className="quiet" busy={isGroupGovernanceBusy(member.userId)}
+                  busyText={t.unmuteBusy} aria-label={t.unmuteAction(member.nickname)}
+                  onClick={() => onUnmuteGroupMember(selectedGroup.id, member.userId)}>{t.unmuteAction(member.nickname)}</AsyncButton>}
+                {onTransferGroupOwnership && <AsyncButton className="quiet" busy={isGroupGovernanceBusy(member.userId)}
+                  busyText={t.transferBusy} aria-label={t.transferAction(member.nickname)}
+                  onClick={() => {
+                    if (window.confirm(t.transferConfirm(member.nickname))) {
+                      onTransferGroupOwnership(selectedGroup.id, member.userId);
+                    }
+                  }}>{t.transferAction(member.nickname)}</AsyncButton>}
+              </div>
+            )}
           </li>)}
         </ul>}
+        {/* CP-35: the one shared mute-duration choice for the actions above. */}
+        {isOwner && onMuteGroupMember && <div className="group-governance">
+          <strong>{t.governanceHeading}</strong>
+          <label>{t.muteDurationLabel}<select value={muteMinutes} onChange={event =>
+            setMuteMinutes(event.target.value as "15" | "30" | "60" | "manual")}>
+            <option value="15">{t.muteDurationMinutes(15)}</option>
+            <option value="30">{t.muteDurationMinutes(30)}</option>
+            <option value="60">{t.muteDurationMinutes(60)}</option>
+            <option value="manual">{t.muteDurationManual}</option>
+          </select></label>
+          <small>{t.governanceNote}</small>
+        </div>}
         {friends.length > 0 && <div className="group-invite-form">
           <label>{t.inviteAria}<select value={inviteUserId} onChange={event => setInviteUserId(event.target.value)}>
             <option value="">{t.invitePlaceholder}</option>
@@ -199,9 +274,15 @@ export function SocialGroupsView({ groups, invites, friends, selectedGroupId, me
                   if (sent) setMessageBody("");
                 });
               }}>{t.sendMessage}</AsyncButton>
+            {groupMessageError && <p className="group-message-error" role="alert">{groupMessageError}</p>}
           </div>}
         </div>
         {!isOwner && <AsyncButton className="danger-quiet" busy={isLeaveBusy(selectedGroup.id)} busyText={t.leaveBusy} onClick={() => onLeaveGroup(selectedGroup.id)}>{t.leave}</AsyncButton>}
+        {/* CP-35: dissolution is terminal for everyone, so it always confirms first. */}
+        {isOwner && onDissolveGroup && <AsyncButton className="danger-quiet" busy={isGroupDissolveBusy(selectedGroup.id)}
+          busyText={t.dissolveBusy} onClick={() => {
+            if (window.confirm(t.dissolveConfirm(selectedGroup.groupName))) onDissolveGroup(selectedGroup.id);
+          }}>{t.dissolveAction}</AsyncButton>}
       </div>}
     </div>}
   </section>;

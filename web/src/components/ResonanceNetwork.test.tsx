@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ResonanceNetwork } from "./ResonanceNetwork";
-import type { CapsuleMatch, PersonaMessage, PersonaSession } from "../api";
+import type { CapsuleMatch, CapsuleMatchExplained, PersonaChatMessage, PersonaMessage, PersonaSession } from "../api";
 
 afterEach(cleanup);
 
@@ -279,5 +279,79 @@ describe("ResonanceNetwork", () => {
       onLetterTitleChange={() => undefined} onLetterBodyChange={() => undefined} onSendLetter={() => undefined}
       onPlayPersonaVoice={() => undefined} personaVoiceError="共鸣体语音暂时不可用" />);
     expect(screen.getByRole("alert")).toHaveTextContent("共鸣体语音暂时不可用");
+  });
+
+  // CP-31: PersonaChatMessageVO.aiGenerated is true iff the row is the LLM's (capsule's) reply.
+  it("badges capsule replies as AI-generated, never the visitor's own text", () => {
+    const session: PersonaSession = { id: 1, capsuleId: 4, status: "ACTIVE", turnCount: 2, dailyLimit: 5 };
+    const messages: PersonaChatMessage[] = [
+      { id: 1, sessionId: 1, senderType: "VISITOR", textContent: "我最近有点乱", aiGenerated: false },
+      { id: 2, sessionId: 1, senderType: "CAPSULE", textContent: "谢谢你愿意说", aiGenerated: true }
+    ];
+    render(<ResonanceNetwork resonanceMatches={[match]} resonanceStrategy="MIRROR" visitorBusy={false} visitorMatch={match}
+      personaSession={session} personaMessages={messages} personaDraft="" personaQuota={{ turnCount: 2, remaining: 3, dailyLimit: 5, seed: false, quotaDate: "2026-07-25" }}
+      letterTitle="" letterBody="" sentLetter={null} onChooseStrategy={() => undefined} onChooseMatch={() => undefined}
+      onStartPersonaConversation={() => undefined} onPersonaDraftChange={() => undefined} onSendPersonaTurn={() => undefined}
+      onLetterTitleChange={() => undefined} onLetterBodyChange={() => undefined} onSendLetter={() => undefined} />);
+    const badges = screen.getAllByText("AI 生成");
+    expect(badges).toHaveLength(1); // exactly the capsule reply — the visitor line stays unbadged
+    expect(badges[0].closest("article")).toHaveTextContent("谢谢你愿意说");
+  });
+
+  it("leaves older persona rows unbadged when the aiGenerated field is absent — never guessed", () => {
+    const session: PersonaSession = { id: 1, capsuleId: 4, status: "ACTIVE", turnCount: 1, dailyLimit: 5 };
+    // Pre-CP-31 fixture shape: no aiGenerated key at all.
+    const messages: PersonaMessage[] = [{ id: 1, sessionId: 1, senderType: "CAPSULE", textContent: "谢谢你愿意说" }];
+    render(<ResonanceNetwork resonanceMatches={[match]} resonanceStrategy="MIRROR" visitorBusy={false} visitorMatch={match}
+      personaSession={session} personaMessages={messages} personaDraft="" personaQuota={{ turnCount: 1, remaining: 4, dailyLimit: 5, seed: false, quotaDate: "2026-07-25" }}
+      letterTitle="" letterBody="" sentLetter={null} onChooseStrategy={() => undefined} onChooseMatch={() => undefined}
+      onStartPersonaConversation={() => undefined} onPersonaDraftChange={() => undefined} onSendPersonaTurn={() => undefined}
+      onLetterTitleChange={() => undefined} onLetterBodyChange={() => undefined} onSendLetter={() => undefined} />);
+    expect(screen.queryByText("AI 生成")).not.toBeInTheDocument();
+  });
+
+  // CP-32: the structured recall-mode explanation on /api/plaza/matches items.
+  it("shows the mode chip and the backend's factual reasons on a explained match card", () => {
+    const explained: CapsuleMatchExplained = {
+      ...match,
+      mode: "COMPLEMENTARY",
+      modeExplanation: {
+        mode: "COMPLEMENTARY", modeLabel: "互补", modeDefinition: "由定向组合驱动",
+        reasons: ["你近期的压力主题：工作转型", "对方内容中的支撑主题：边界感"], scoreBreakdown: { 压力主题: 2 },
+        confidence: "sufficient", similarScore: 0, complementaryScore: 2.4, unexpectedScore: 0
+      },
+      modeRelevance: 0.62
+    };
+    render(<ResonanceNetwork resonanceMatches={[explained]} resonanceStrategy="MIRROR" visitorBusy={false} visitorMatch={null}
+      personaSession={null} personaMessages={[]} personaDraft="" personaQuota={null} letterTitle="" letterBody="" sentLetter={null}
+      onChooseStrategy={() => undefined} onChooseMatch={() => undefined} onStartPersonaConversation={() => undefined}
+      onPersonaDraftChange={() => undefined} onSendPersonaTurn={() => undefined} onLetterTitleChange={() => undefined}
+      onLetterBodyChange={() => undefined} onSendLetter={() => undefined} />);
+    expect(screen.getAllByText("互补").length).toBeGreaterThan(0);
+    expect(screen.getByText("你近期的压力主题：工作转型")).toBeVisible();
+    expect(screen.getByText("对方内容中的支撑主题：边界感")).toBeVisible();
+    // The mode rides the card button's accessible name too (visual content is aria-hidden).
+    expect(screen.getByRole("listitem")).toHaveAccessibleName(/互补/);
+  });
+
+  it("says exactly 'insufficient signal' when the backend could not honestly explain a candidate", () => {
+    const unexplained: CapsuleMatchExplained = {
+      ...match,
+      mode: null,
+      modeExplanation: {
+        mode: null, modeLabel: null, modeDefinition: null, reasons: [], scoreBreakdown: {},
+        confidence: "insufficient_signal", similarScore: 0, complementaryScore: 0, unexpectedScore: 0
+      }
+    };
+    render(<ResonanceNetwork resonanceMatches={[unexplained]} resonanceStrategy="MIRROR" visitorBusy={false} visitorMatch={null}
+      personaSession={null} personaMessages={[]} personaDraft="" personaQuota={null} letterTitle="" letterBody="" sentLetter={null}
+      onChooseStrategy={() => undefined} onChooseMatch={() => undefined} onStartPersonaConversation={() => undefined}
+      onPersonaDraftChange={() => undefined} onSendPersonaTurn={() => undefined} onLetterTitleChange={() => undefined}
+      onLetterBodyChange={() => undefined} onSendLetter={() => undefined} />);
+    expect(screen.getByText("信号不足，暂不解释")).toBeVisible();
+    // No fabricated mode chip next to it.
+    expect(screen.queryByText("相似")).not.toBeInTheDocument();
+    expect(screen.queryByText("互补")).not.toBeInTheDocument();
+    expect(screen.queryByText("意外")).not.toBeInTheDocument();
   });
 });

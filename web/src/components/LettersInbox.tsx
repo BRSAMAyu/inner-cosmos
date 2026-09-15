@@ -1,7 +1,7 @@
 import { useEffect, useId, useState } from "react";
 import type {
   ConnectionRequests, DeliveryPreset, DeliverySchedule, LetterThread, LiveChatInvites, LiveChatMessage,
-  LiveChatSession, SlowLetter, SlowLetterOutboxRow, SocialConnection
+  LiveChatSession, RelationCorrectionProposal, SlowLetter, SlowLetterOutboxRow, SocialConnection
 } from "../api";
 import type { Locale } from "../i18n";
 import { AsyncButton, LoadingText } from "../loading";
@@ -49,6 +49,17 @@ const COPY: Record<Locale, {
   deliveryOptions: Record<DeliveryPreset, string>; sealNote: string; countdown: (value: string) => string;
   consentAria: string; awaitingYou: string; noIncoming: string; wantsToKnow: (name: string) => string; accept: string; acceptBusy: string; declineConn: string; declineConnBusy: string;
   awaitingThem: string; noOutgoing: string; notYetAgreed: string; bothAgreed: string; noFriends: string; leave: string; leaveBusy: string;
+  // CP-34 both-party-consent corrections on a shared letter thread.
+  correctionsAria: string; correctionsHeading: string; correctionsIntro: string;
+  correctionsIncoming: string; correctionsOutgoing: string; correctionsEmpty: string;
+  correctionsLoading: string; correctionsError: string;
+  correctionFieldLabel: (field: string) => string; correctionNote: string;
+  correctionStatus: Record<string, string>;
+  correctionsAccept: string; correctionsAcceptBusy: string;
+  correctionsReject: string; correctionsRejectBusy: string; correctionsWithdraw: string; correctionsWithdrawBusy: string;
+  correctionsProposeSummary: string; correctionsProposeField: string; correctionsProposeValue: string;
+  correctionsProposeNote: string; correctionsProposeSend: string; correctionsProposeBusy: string;
+  correctionsRejectedReason: (reason: string) => string;
 }> = {
   "zh-CN": {
     outboxStatus: { DRAFT: "草稿", SENT: "已寄出", FLYING: "飞行中", DELIVERED: "已抵达", READ: "对方已读", REPLIED: "对方回信了", CLOSED: "已结束", ARCHIVED: "已归档" },
@@ -72,6 +83,21 @@ const COPY: Record<Locale, {
     threadPickPrompt: "选一段往来，看你们之间的慢信。", threadLoading: "正在读取这段往来…",
     threadLettersEmpty: "这段往来里还没有信件。", threadLettersError: "暂时读不到这段往来，请稍后再试。",
     refresh: "刷新慢信", refreshBusy: "正在刷新", autoRefreshNote: "停留在这里时会自动同步抵达与回信。",
+    correctionsAria: "往来理解纠错", correctionsHeading: "这段往来的共同理解，可以一起改",
+    correctionsIntro: "往来里的关系理解来自你们双方；任何一方都不能单独改写。提案只有对方接受后才生效，被婉拒或撤回都如实留痕。",
+    correctionsIncoming: "等你确认的提案", correctionsOutgoing: "你提出的提案", correctionsEmpty: "这段往来还没有纠错提案。",
+    correctionsLoading: "正在读取纠错提案…", correctionsError: "暂时读不到纠错提案，请稍后再试。",
+    correctionFieldLabel: field => field === "relationLabel" ? "关系称呼"
+      : field === "threadTitle" ? "往来题目" : field,
+    correctionNote: "提案说明",
+    correctionStatus: { PROPOSED: "待对方确认", APPLIED: "已应用", REJECTED: "被婉拒", WITHDRAWN: "已撤回" },
+    correctionsAccept: "接受", correctionsAcceptBusy: "正在接受",
+    correctionsReject: "婉拒", correctionsRejectBusy: "正在婉拒",
+    correctionsWithdraw: "撤回", correctionsWithdrawBusy: "正在撤回",
+    correctionsProposeSummary: "对这段往来的理解提出一处修改",
+    correctionsProposeField: "要修改的字段", correctionsProposeValue: "你认为正确的内容",
+    correctionsProposeNote: "补充说明（可选）", correctionsProposeSend: "送出提案", correctionsProposeBusy: "正在送出",
+    correctionsRejectedReason: reason => `婉拒理由：${reason}`,
     composeDirect: "写给已连接的好友", composeDirectHint: "在当前页面打开写信表单，收信人只来自双方同意的连接。",
     composeDiscover: "先去遇见可以写信的人", composeDiscoverHint: "还没有可直接写信的连接；先去共鸣相遇，建立连接后再写。",
     safetyActions: "边界与安全",
@@ -105,6 +131,21 @@ const COPY: Record<Locale, {
     threadPickPrompt: "Pick a thread to see the letters between you.", threadLoading: "Loading this thread…",
     threadLettersEmpty: "No letters in this thread yet.", threadLettersError: "Couldn't load this thread right now -- try again shortly.",
     refresh: "Refresh letters", refreshBusy: "Refreshing", autoRefreshNote: "Arrivals and replies sync automatically while you stay here.",
+    correctionsAria: "Thread understanding corrections", correctionsHeading: "The shared understanding of this exchange can change together",
+    correctionsIntro: "A thread's relationship understanding comes from both of you; neither side rewrites it alone. A proposal applies only after the other side accepts, and a declined or withdrawn one stays on record as such.",
+    correctionsIncoming: "Awaiting your decision", correctionsOutgoing: "Your proposals", correctionsEmpty: "No corrections on this exchange yet.",
+    correctionsLoading: "Loading corrections…", correctionsError: "Couldn't load corrections right now -- try again shortly.",
+    correctionFieldLabel: field => field === "relationLabel" ? "relationship label"
+      : field === "threadTitle" ? "thread title" : field,
+    correctionNote: "Proposer's note",
+    correctionStatus: { PROPOSED: "Waiting on them", APPLIED: "Applied", REJECTED: "Declined", WITHDRAWN: "Withdrawn" },
+    correctionsAccept: "Accept", correctionsAcceptBusy: "Accepting",
+    correctionsReject: "Decline", correctionsRejectBusy: "Declining",
+    correctionsWithdraw: "Withdraw", correctionsWithdrawBusy: "Withdrawing",
+    correctionsProposeSummary: "Propose one change to this exchange's understanding",
+    correctionsProposeField: "Field to correct", correctionsProposeValue: "What you believe is right",
+    correctionsProposeNote: "A short note (optional)", correctionsProposeSend: "Send proposal", correctionsProposeBusy: "Sending",
+    correctionsRejectedReason: reason => `Their reason: ${reason}`,
     composeDirect: "Write to a connection", composeDirectHint: "Opens the composer here. Recipients are limited to mutual connections.",
     composeDiscover: "Meet someone you can write to", composeDiscoverHint: "No direct recipient yet. Meet through resonance and connect before writing.",
     safetyActions: "Boundaries & safety",
@@ -118,6 +159,85 @@ const COPY: Record<Locale, {
   }
 };
 
+// CP-34 both-party-consent corrections on one shared letter thread. Local form state lives in
+// this sub-component and resets per thread via key={threadId} (the CapsuleBoundaryEditor
+// pattern). Everything is optional at the LettersInbox level: callers not passing the props
+// (including existing tests) render no correction block at all.
+function ThreadCorrections({ threadId, corrections, status, locale, t,
+  isCorrectionBusy = () => false, isCorrectionProposeBusy = () => false,
+  onProposeCorrection, onAcceptCorrection, onRejectCorrection, onWithdrawCorrection }: {
+  threadId: number;
+  corrections: { incoming: RelationCorrectionProposal[]; outgoing: RelationCorrectionProposal[] };
+  status: "idle" | "loading" | "success" | "error";
+  locale: Locale;
+  t: typeof COPY["zh-CN"];
+  isCorrectionBusy?: (proposalId: number) => boolean;
+  isCorrectionProposeBusy?: (threadId: number) => boolean;
+  onProposeCorrection?: (threadId: number, correctionField: string, proposedValue: string, note?: string) => void;
+  onAcceptCorrection?: (proposalId: number) => void;
+  onRejectCorrection?: (proposalId: number) => void;
+  onWithdrawCorrection?: (proposalId: number) => void;
+}) {
+  const [proposeField, setProposeField] = useState("relationLabel");
+  const [proposeValue, setProposeValue] = useState("");
+  const [proposeNote, setProposeNote] = useState("");
+  const fieldOptions = ["relationLabel", "threadTitle"] as const;
+  const statusLabel = (value: string) => t.correctionStatus[value] ?? value;
+  // Both lists are user-scoped; only this thread's proposals belong in this thread's view.
+  const incoming = corrections.incoming.filter(item => item.threadId === threadId && item.status === "PROPOSED");
+  const outgoing = corrections.outgoing.filter(item => item.threadId === threadId);
+  const nothingHere = incoming.length === 0 && outgoing.length === 0;
+  return <section className="thread-corrections" aria-label={t.correctionsAria}>
+    <h4>{t.correctionsHeading}</h4>
+    <p className="thread-corrections-intro">{t.correctionsIntro}</p>
+    {status === "loading" && <p className="muted" role="status">{t.correctionsLoading}</p>}
+    {status === "error" && <p className="network-empty" role="alert">{t.correctionsError}</p>}
+    {status === "success" && nothingHere && <p className="muted">{t.correctionsEmpty}</p>}
+    {status === "success" && incoming.length > 0 && <div className="correction-list">
+      <strong>{t.correctionsIncoming}</strong>
+      {incoming.map(item => <article key={item.id} className="correction-card" data-status={item.status}>
+        <span>{t.correctionFieldLabel(item.correctionField)} → {item.proposedValue}</span>
+        {item.note && <small className="ugc-text">{item.note}</small>}
+        <div>
+          {onAcceptCorrection && <AsyncButton busy={isCorrectionBusy(item.id)} busyText={t.correctionsAcceptBusy}
+            onClick={() => onAcceptCorrection(item.id)}>{t.correctionsAccept}</AsyncButton>}
+          {onRejectCorrection && <AsyncButton busy={isCorrectionBusy(item.id)} busyText={t.correctionsRejectBusy}
+            onClick={() => onRejectCorrection(item.id)}>{t.correctionsReject}</AsyncButton>}
+        </div>
+      </article>)}
+    </div>}
+    {status === "success" && outgoing.length > 0 && <div className="correction-list">
+      <strong>{t.correctionsOutgoing}</strong>
+      {outgoing.map(item => <article key={item.id} className="correction-card" data-status={item.status}>
+        <span>{t.correctionFieldLabel(item.correctionField)} → {item.proposedValue}</span>
+        <small>{statusLabel(item.status)}</small>
+        {item.status === "REJECTED" && item.decisionReason
+          && <small className="correction-reason">{t.correctionsRejectedReason(item.decisionReason)}</small>}
+        {item.status === "PROPOSED" && onWithdrawCorrection && <AsyncButton className="quiet"
+          busy={isCorrectionBusy(item.id)} busyText={t.correctionsWithdrawBusy}
+          onClick={() => onWithdrawCorrection(item.id)}>{t.correctionsWithdraw}</AsyncButton>}
+      </article>)}
+    </div>}
+    {onProposeCorrection && <details className="correction-propose">
+      <summary>{t.correctionsProposeSummary}</summary>
+      <label>{t.correctionsProposeField}<select value={proposeField}
+          onChange={event => setProposeField(event.target.value)}>
+          {fieldOptions.map(field => <option key={field} value={field}>{t.correctionFieldLabel(field)}</option>)}
+        </select></label>
+      <label>{t.correctionsProposeValue}<input value={proposeValue}
+          onChange={event => setProposeValue(event.target.value)} /></label>
+      <label>{t.correctionsProposeNote}<input value={proposeNote}
+          onChange={event => setProposeNote(event.target.value)} /></label>
+      <AsyncButton busy={isCorrectionProposeBusy(threadId)} busyText={t.correctionsProposeBusy}
+        disabled={!proposeValue.trim()}
+        onClick={() => {
+          onProposeCorrection(threadId, proposeField, proposeValue.trim(), proposeNote.trim() || undefined);
+          setProposeValue(""); setProposeNote("");
+        }}>{t.correctionsProposeSend}</AsyncButton>
+    </details>}
+  </section>;
+}
+
 export function LettersInbox({ letterInbox, letterOutbox = [], threads = [], threadLetters = [], threadLettersStatus = "idle", selectedThreadId = null,
   isDraftBusy, replyBusyId = null, isLetterActionBusy, isConnectionDecisionBusy, isConnectionLeaveBusy, isLetterConnectionBusy,
   replyDrafts, connectionRequests, friends,
@@ -127,6 +247,9 @@ export function LettersInbox({ letterInbox, letterOutbox = [], threads = [], thr
   letterVoiceLetterId = null, letterVoiceAudio = null, letterVoiceError = null,
   isLetterVoiceBusy = () => false, onPlayLetterVoice, refreshBusy = false, onRefresh, onComposeNew,
   directLetterBusy = false, onSendDirectLetter,
+  threadCorrections = { incoming: [], outgoing: [] }, threadCorrectionsStatus = "idle",
+  isCorrectionBusy = () => false, isCorrectionProposeBusy = () => false,
+  onProposeCorrection, onAcceptCorrection, onRejectCorrection, onWithdrawCorrection,
   liveChatInvites = { incoming: [], outgoing: [] }, liveChatSessions = [], selectedLiveChatSessionId = null,
   liveChatMessages = [], liveChatStatus = "idle", currentUserId = null,
   isLiveChatInviteBusy = () => false, isLiveChatDecisionBusy = () => false,
@@ -162,6 +285,15 @@ export function LettersInbox({ letterInbox, letterOutbox = [], threads = [], thr
   isReceiptPolicyBusy?: (letterId: number) => boolean;
   directLetterBusy?: boolean;
   onSendDirectLetter?: (receiverUserId: number, title: string, body: string, delivery: DeliverySchedule) => Promise<boolean>;
+  // CP-34 both-party-consent corrections (all optional; absent props render no correction block).
+  threadCorrections?: { incoming: RelationCorrectionProposal[]; outgoing: RelationCorrectionProposal[] };
+  threadCorrectionsStatus?: "idle" | "loading" | "success" | "error";
+  isCorrectionBusy?: (proposalId: number) => boolean;
+  isCorrectionProposeBusy?: (threadId: number) => boolean;
+  onProposeCorrection?: (threadId: number, correctionField: string, proposedValue: string, note?: string) => void;
+  onAcceptCorrection?: (proposalId: number) => void;
+  onRejectCorrection?: (proposalId: number) => void;
+  onWithdrawCorrection?: (proposalId: number) => void;
   liveChatInvites?: LiveChatInvites; liveChatSessions?: LiveChatSession[];
   selectedLiveChatSessionId?: number | null; liveChatMessages?: LiveChatMessage[];
   liveChatStatus?: "idle" | "loading" | "success" | "error"; currentUserId?: number | null;
@@ -368,6 +500,12 @@ export function LettersInbox({ letterInbox, letterOutbox = [], threads = [], thr
             : threadLettersStatus === "error" ? <div className="network-empty" role="alert">{t.threadLettersError}</div>
             : threadLetters.length === 0 ? <div className="network-empty">{t.threadLettersEmpty}</div>
             : <div className="inbox-list">{threadLetters.map(letter => <article key={letter.id}><header><strong>{letter.title}</strong><span>{status(letter.status)}</span></header><p className="ugc-text">{letter.letterBody}</p></article>)}</div>}
+          {selectedThreadId != null && (onAcceptCorrection || onProposeCorrection || onWithdrawCorrection || onRejectCorrection) && <ThreadCorrections
+            key={selectedThreadId} threadId={selectedThreadId} corrections={threadCorrections}
+            status={threadCorrectionsStatus} locale={locale} t={t}
+            isCorrectionBusy={isCorrectionBusy} isCorrectionProposeBusy={isCorrectionProposeBusy}
+            onProposeCorrection={onProposeCorrection} onAcceptCorrection={onAcceptCorrection}
+            onRejectCorrection={onRejectCorrection} onWithdrawCorrection={onWithdrawCorrection} />}
         </div>
       </div>}
     </>}

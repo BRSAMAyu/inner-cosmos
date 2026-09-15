@@ -130,4 +130,66 @@ describe("SocialGroupsView", () => {
     expect(screen.getByText(/炉火还会亮/)).toBeVisible();
     expect(screen.getByRole("button", { name: "结束围炉" })).toBeVisible();
   });
+
+  // CP-35 group governance: host-only mute/unmute/transfer entries, terminal dissolve behind a
+  // confirm, and the muted sender's server message shown verbatim beside the composer.
+  const members: GroupMember[] = [
+    { userId: 1, memberRole: "OWNER", nickname: "我" },
+    { userId: 30, memberRole: "MEMBER", nickname: "阿哲" }
+  ];
+  const base = {
+    groups: [group()], invites: [], friends: [], selectedGroupId: 1, members,
+    membersStatus: "success" as const, createBusy: false,
+    isInviteBusy: () => false, isInviteDecisionBusy: () => false, isLeaveBusy: () => false,
+    currentUserId: 1, onSelectGroup: () => undefined, onCreateGroup: () => undefined,
+    onInvite: () => undefined, onRespondInvite: () => undefined, onLeaveGroup: () => undefined
+  };
+
+  it("gives the host mute/unmute per member and sends the chosen duration (manual = null)", () => {
+    const onMuteGroupMember = vi.fn();
+    const onUnmuteGroupMember = vi.fn();
+    render(<SocialGroupsView {...base} onMuteGroupMember={onMuteGroupMember} onUnmuteGroupMember={onUnmuteGroupMember} />);
+    // Default duration 30 minutes.
+    fireEvent.click(screen.getByRole("button", { name: "禁言 阿哲" }));
+    expect(onMuteGroupMember).toHaveBeenCalledExactlyOnceWith(1, 30, 30);
+    fireEvent.click(screen.getByRole("button", { name: "解除禁言 阿哲" }));
+    expect(onUnmuteGroupMember).toHaveBeenCalledExactlyOnceWith(1, 30);
+    // "至手动解除" maps to the backend's null durationMinutes.
+    fireEvent.change(screen.getByLabelText("禁言时长"), { target: { value: "manual" } });
+    fireEvent.click(screen.getByRole("button", { name: "禁言 阿哲" }));
+    expect(onMuteGroupMember).toHaveBeenLastCalledWith(1, 30, null);
+    // The owner row itself carries no governance actions.
+    expect(screen.queryByRole("button", { name: "禁言 我" })).not.toBeInTheDocument();
+  });
+
+  it("requires an explicit confirm before transferring ownership or dissolving", () => {
+    const onTransferGroupOwnership = vi.fn();
+    const onDissolveGroup = vi.fn();
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    render(<SocialGroupsView {...base} onTransferGroupOwnership={onTransferGroupOwnership} onDissolveGroup={onDissolveGroup} />);
+    fireEvent.click(screen.getByRole("button", { name: "移交群主给 阿哲" }));
+    expect(confirmSpy).toHaveBeenCalledExactlyOnceWith("确定把群主移交给 阿哲 吗？移交后你将成为普通成员。");
+    expect(onTransferGroupOwnership).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "解散群组" }));
+    expect(confirmSpy).toHaveBeenCalledWith("确定解散「老朋友们」吗？所有成员都会失去这个群组，且无法恢复。");
+    expect(onDissolveGroup).not.toHaveBeenCalled();
+    confirmSpy.mockReturnValue(true);
+    fireEvent.click(screen.getByRole("button", { name: "解散群组" }));
+    expect(onDissolveGroup).toHaveBeenCalledExactlyOnceWith(1);
+    fireEvent.click(screen.getByRole("button", { name: "移交群主给 阿哲" }));
+    expect(onTransferGroupOwnership).toHaveBeenCalledExactlyOnceWith(1, 30);
+  });
+
+  it("shows a muted sender's rejection verbatim beside the composer, and nothing for non-hosts", () => {
+    const rejection = "你已被群内禁言，剩余约 12 分钟";
+    const { rerender } = render(<SocialGroupsView {...base}
+      onSendMessage={vi.fn().mockResolvedValue(false)} groupMessageError={rejection} />);
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent(rejection);
+    // An ordinary member sees no host controls at all.
+    rerender(<SocialGroupsView {...base} currentUserId={30}
+      onMuteGroupMember={() => undefined} onDissolveGroup={() => undefined} />);
+    expect(screen.queryByRole("button", { name: "禁言 我" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "解散群组" })).not.toBeInTheDocument();
+  });
 });

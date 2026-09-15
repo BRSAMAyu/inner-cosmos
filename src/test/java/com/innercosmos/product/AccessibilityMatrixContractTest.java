@@ -120,20 +120,56 @@ class AccessibilityMatrixContractTest {
     }
 
     @Test
-    void currentFrozenStateIsHonestlyNotStartedEverywhere() throws IOException {
-        // 冻结起点（2026-09）：CP-60C 尚未开始任何一格。随着真实自动化/人工证据落位，
-        // 单元格会逐格更新——但每次更新都必须带证据，且由本契约逐格把关。
-        List<String> notStarted = new ArrayList<>();
+    void automatedPassCellsExistAndEachCitesAnExistingAutomatedTest() throws IOException {
+        // CP-60C §2-26 first advancement (2026-09-15): web×keyboard (J01/J02/J05) and
+        // web×contrast (J02/J04) moved to AUTOMATED_PASS on the strength of existing
+        // automated contract tests only. This test keeps that honesty structural:
+        //  - at least one cell must have advanced beyond the frozen all-NOT_STARTED start;
+        //  - every AUTOMATED_PASS cell must sit in a column that actually has an
+        //    automation leg today (web platform, keyboard/contrast dimension) — widening
+        //    to other platforms/dimensions requires deliberately updating this contract
+        //    together with new evidence, never silently;
+        //  - every evidence reference must name a test file that really exists under
+        //    web/, so a renamed/deleted test breaks the build instead of a stale claim.
+        List<String> failures = new ArrayList<>();
+        List<String> advanced = new ArrayList<>();
+        // Longest alternative first: "test\.ts" would otherwise truncate "Foo.test.tsx".
+        Pattern evidencePath = Pattern.compile("(web/(?:src|e2e)/[\\w/.-]+\\.(?:test\\.tsx|test\\.ts|spec\\.ts))");
+
         for (Item item : parse(LEDGER, "matrix")) {
+            String where = item.f("journey_id") + "/" + item.f("platform");
             for (String dimension : DIMENSIONS) {
-                if (!"NOT_STARTED".equals(item.f(dimension))) {
-                    notStarted.add(item.f("journey_id") + "/" + item.f("platform") + "/" + dimension
-                            + "=" + item.f(dimension));
+                if (!"AUTOMATED_PASS".equals(item.f(dimension))) {
+                    continue;
+                }
+                advanced.add(where + "/" + dimension);
+                if (!"web".equals(item.f("platform"))
+                        || !("keyboard".equals(dimension) || "contrast".equals(dimension))) {
+                    failures.add(where + "/" + dimension
+                            + ": 当前仅有 web×keyboard / web×contrast 存在自动化腿；其他平台/维度推进须先在本契约中扩列并带新证据");
+                }
+                String evidence = item.f(dimension + "_evidence");
+                Matcher matcher = evidencePath.matcher(evidence == null ? "" : evidence);
+                boolean citedExistingTest = false;
+                while (matcher.find()) {
+                    String path = matcher.group(1);
+                    if (!Files.exists(Path.of(path))) {
+                        failures.add(where + "/" + dimension + ": evidence 引用的测试文件不存在: " + path);
+                    } else {
+                        citedExistingTest = true;
+                    }
+                }
+                if (!citedExistingTest) {
+                    failures.add(where + "/" + dimension
+                            + ": evidence 必须引用至少一个真实存在的 web 自动化测试文件（web/src/**.test.ts(x) 或 web/e2e/**.spec.ts）");
                 }
             }
         }
-        assertTrue(notStarted.isEmpty(),
-                "当前矩阵应为全 NOT_STARTED（CP-60C 尚未启动）；已宣称的状态: " + notStarted);
+
+        assertTrue(!advanced.isEmpty(),
+                "CP-60C 已完成首批推进：AUTOMATED_PASS 单元格数必须 > 0（回退为全 NOT_STARTED 需同步改回本契约）");
+        assertTrue(failures.isEmpty(), "AUTOMATED_PASS evidence violations: " + failures
+                + "；已推进单元格: " + advanced);
     }
 
     private static Set<String> buildAllowedKeys() {

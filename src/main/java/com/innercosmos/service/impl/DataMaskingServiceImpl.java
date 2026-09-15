@@ -34,6 +34,9 @@ public class DataMaskingServiceImpl implements DataMaskingService {
             emptyPreview.abstractSummary = "暂无摘要";
             emptyPreview.suggestedPseudonym = "星际旅人";
             emptyPreview.personaPromptDraft = "这是一个空的共鸣体预览.";
+            // CP-31 登记项出处信号：preview-from-memory 全程为纯规则脱敏拼装，本服务不发起任何
+            // 模型调用 —— aiGenerated 显式 false（与默认值一致，显式写下以防未来漂移）。
+            emptyPreview.aiGenerated = false;
             return emptyPreview;
         }
         // Load MemoryCards
@@ -122,6 +125,9 @@ public class DataMaskingServiceImpl implements DataMaskingService {
             }
         }
 
+        // CP-31 登记项出处信号：有记忆的规则分支同样不做任何模型调用（generatePersonaPrompt 为
+        // 本地模板拼接），显式置 false。
+        preview.aiGenerated = false;
         return preview;
     }
 

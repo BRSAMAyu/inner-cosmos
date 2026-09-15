@@ -735,6 +735,37 @@ export type AdminAbTestGroupStats = {
   avgLatency: number; successRate: number;
 };
 export type AdminAbTestStats = Record<string, AdminAbTestGroupStats>;
+// CP-39/CP-40 admin outbox dead-letter dashboard (GET /api/admin/outbox/dead). One DEAD
+// tb_outbox_event row as projected by the backend's OutboxDeadLetter presentation record:
+// payloadSummary is a truncated preview meant to help an operator recognise the event, never a
+// re-deliverable payload. Timestamps are LocalDateTime serialized without a zone marker
+// ("2026-09-15T10:00:00"), and null columns are omitted by Jackson's non_null inclusion.
+export type OutboxDeadLetterRow = {
+  id: number;
+  eventId: string;
+  eventType: string;
+  aggregateType: string;
+  aggregateId: string;
+  payloadSummary: string;
+  attempts: number;
+  lastError: string | null;
+  createdAt: string | null;
+  lastAttemptAt: string | null;
+};
+/** CP-40: one page of dead letters. enabled:false is the backend's honest "the transactional
+ * outbox is not deployed" marker (inner-cosmos.events.outbox.enabled=false, the default) — the UI
+ * must present that as such, never as an empty queue behind a running one. */
+export type OutboxDeadLetterPage = {
+  enabled: boolean;
+  total: number;
+  limit: number;
+  offset: number;
+  entries: OutboxDeadLetterRow[];
+};
+/** CP-40: POST /api/admin/outbox/dead/{eventId}/replay — the row's status after requeueing
+ * (PENDING on success). Replay requeues the row; whether it then processes successfully is the
+ * worker's honest outcome, not this payload's. */
+export type OutboxReplayResult = { eventId: string; status: string };
 
 function englishUi(): boolean {
   return typeof document !== "undefined"
@@ -1334,6 +1365,17 @@ export const api = {
   }),
   adminDisableUser: (id: number) => request<void>(`/api/admin/users/${id}/disable`, { method: "POST" }),
   adminEnableUser: (id: number) => request<void>(`/api/admin/users/${id}/enable`, { method: "POST" }),
+  // CP-39/CP-40 admin outbox DLQ (requireAdmin-gated like every /api/admin/* above). The backend
+  // caps limit at 200; enabled:false is the honest "outbox not deployed" marker (see
+  // OutboxDeadLetterPage) that the DLQ page must report as such instead of an empty queue.
+  adminOutboxDead: (limit = 50, offset = 0) =>
+    request<OutboxDeadLetterPage>(`/api/admin/outbox/dead?limit=${limit}&offset=${offset}`),
+  // Requeues exactly one DEAD row. A non-DEAD row rejects with 409 CONFLICT and an unknown
+  // eventId with 404 NOT_FOUND (ApiCodeError) — both must be surfaced as-is by the DLQ page.
+  adminReplayOutboxDead: (eventId: string) =>
+    request<OutboxReplayResult>(`/api/admin/outbox/dead/${encodeURIComponent(eventId)}/replay`, {
+      method: "POST"
+    }),
   aiLogs: () => request<AdminAiLog[]>("/api/ai-logs"),
   // ABTestController.activeConfig() returns the single currently-active config (or null), not a
   // list -- unlike the legacy admin.html JS, which mistakenly treated the response as an array.
@@ -1379,7 +1421,43 @@ export const api = {
   beliefList: () => request<BeliefPattern[]>("/api/belief/list"),
   beliefByCategory: (category: string) => request<BeliefPattern[]>(`/api/belief/by-category?category=${encodeURIComponent(category)}`),
   beliefStrong: (minStrength = 0.5) => request<BeliefPattern[]>(`/api/belief/strong?minStrength=${minStrength}`),
-  beliefContradictions: () => request<BeliefContradiction[]>("/api/belief/contradictions")
+  beliefContradictions: () => request<BeliefContradiction[]>("/api/belief/contradictions"),
+
+  // ---- Frontend consumption batch (CP-08/31/32/34/35). Additive only: every endpoint below
+  // consumes a backend contract that already ships; no existing entry above changed. ----
+
+  /** CP-08: the user's own honest view of today's conversation time (GET /api/me/usage/today). */
+  usageToday: () => request<UsageToday>("/api/me/usage/today"),
+  /** CP-34: both-party-consent corrections on a shared letter thread. Base path is
+   *  /api/relation (RelationNetworkController's @RequestMapping) — singular, not /api/relations. */
+  incomingRelationCorrections: () =>
+    request<RelationCorrectionProposal[]>("/api/relation/corrections/incoming"),
+  outgoingRelationCorrections: (openOnly = false) =>
+    request<RelationCorrectionProposal[]>(`/api/relation/corrections/outgoing?openOnly=${openOnly}`),
+  proposeRelationCorrection: (input: { threadId: number; correctionField: string; proposedValue: string; note?: string }) =>
+    request<RelationCorrectionProposal>("/api/relation/corrections", { method: "POST", body: JSON.stringify(input) }),
+  acceptRelationCorrection: (id: number) =>
+    request<RelationCorrectionProposal>(`/api/relation/corrections/${id}/accept`, { method: "POST" }),
+  rejectRelationCorrection: (id: number, reason?: string) =>
+    request<RelationCorrectionProposal>(`/api/relation/corrections/${id}/reject`, {
+      method: "POST", body: JSON.stringify({ reason: reason ?? null })
+    }),
+  withdrawRelationCorrection: (id: number) =>
+    request<RelationCorrectionProposal>(`/api/relation/corrections/${id}/withdraw`, { method: "POST" }),
+  /** CP-35 group governance (host-only server-side; durationMinutes null/omitted = until the
+   *  host manually lifts it). The member list endpoint exposes no muted state, so callers offer
+   *  mute/unmute without claiming to display who is currently muted. */
+  muteGroupMember: (groupId: number, userId: number, durationMinutes?: number | null) =>
+    request<void>(`/api/social/groups/${groupId}/mute`, {
+      method: "POST",
+      body: JSON.stringify(durationMinutes == null ? { userId } : { userId, durationMinutes })
+    }),
+  unmuteGroupMember: (groupId: number, userId: number) =>
+    request<void>(`/api/social/groups/${groupId}/unmute`, { method: "POST", body: JSON.stringify({ userId }) }),
+  transferGroupOwnership: (groupId: number, userId: number) =>
+    request<void>(`/api/social/groups/${groupId}/transfer`, { method: "POST", body: JSON.stringify({ userId }) }),
+  dissolveGroup: (groupId: number) =>
+    request<void>(`/api/social/groups/${groupId}/dissolve`, { method: "POST" })
 };
 
 export type AsrResult = { text: string; audioDurationSec: number; speechRate: number; pauseCount: number; longPauseCount: number; inputConfidence: number };
@@ -1562,4 +1640,82 @@ export type AgeVerificationStatusView = {
   latestStatus: string | null;
   latestFailureReason: string | null;
   history: AgeVerificationHistoryRow[];
+};
+
+// ---------------------------------------------------------------------------
+// Frontend consumption batch (CP-08/31/32/34/35): types for backend contracts
+// that already ship. Appended only — no type above was modified. Where a newer
+// backend field rides on an existing endpoint (PersonaChatMessageVO.aiGenerated,
+// capsule labeling keys, /api/plaza/matches' modeExplanation), the wide type is
+// an intersection with optional extras so existing narrow data still typechecks.
+// ---------------------------------------------------------------------------
+
+/** CP-08 UsageTimeController's GET /api/me/usage/today body. basis is fixed by the backend
+ *  to "COMPLETED_TURN_DURATION"; reminderNote is the backend's own calm sentence and is
+ *  rendered verbatim (never reworded client-side) when reminderDue is true. */
+export type UsageToday = {
+  date: string;
+  activeSeconds: number;
+  turnCount: number;
+  reminderAfterMinutes: number;
+  reminderDue: boolean;
+  reminderNote: string;
+  basis: string;
+};
+
+/** CP-31 PersonaChatMessageVO: aiGenerated is true iff senderType is a CAPSULE (LLM) reply,
+ *  false for the visitor's own text — never rounded up. Optional here because rows cached or
+ *  typed before the field shipped (and test fixtures) still render, just without a badge. */
+export type PersonaChatMessage = PersonaMessage & { aiGenerated?: boolean | null };
+
+/** CP-31 CapsuleAiLabeling.augmentCapsulePayload's additive keys (CapsuleController's every
+ *  EchoCapsule payload). Field-name lists are the backend's provenance tiers, verbatim. */
+export type CapsuleAiLabelingView = {
+  aiGenerated?: boolean;
+  aiGeneratedFields?: string[];
+  systemCompiledFields?: string[];
+  ownerWrittenFields?: string[];
+  aiLabelingNote?: string;
+};
+/** The labeled payload an EchoCapsule actually arrives as from /api/capsule/my and /{id}. */
+export type EchoCapsuleLabeled = EchoCapsule & CapsuleAiLabelingView;
+
+/** CP-32 ResonanceMatchExplanationVO, carried per /api/plaza/matches item under the
+ *  modeExplanation key. mode is null (with confidence "insufficient_signal") when no honest
+ *  signal fired; reasons are the backend's own factual sentences. */
+export type ResonanceMatchExplanation = {
+  mode: string | null;
+  modeLabel: string | null;
+  modeDefinition: string | null;
+  reasons: string[];
+  scoreBreakdown: Record<string, number>;
+  confidence: "sufficient" | "weak" | "insufficient_signal" | string;
+  similarScore: number | null;
+  complementaryScore: number | null;
+  unexpectedScore: number | null;
+};
+/** A matches item with the CP-32 layer; modeRelevance is the preference-effective score that
+ *  drove ranking under an active mode preference (dominant-mode score otherwise). */
+export type CapsuleMatchExplained = CapsuleMatch & {
+  mode?: string | null;
+  modeExplanation?: ResonanceMatchExplanation | null;
+  modeRelevance?: number | null;
+};
+
+/** CP-34 tb_relation_correction (RelationCorrectionProposal entity). Status machine:
+ *  PROPOSED → APPLIED (counterpart accepts) / REJECTED (counterpart rejects, terminal) /
+ *  WITHDRAWN (proposer withdraws, terminal). decisionReason is set only on REJECTED. */
+export type RelationCorrectionProposal = {
+  id: number;
+  threadId: number;
+  proposerUserId: number;
+  counterpartUserId: number;
+  correctionField: string;
+  proposedValue: string;
+  note: string | null;
+  status: "PROPOSED" | "APPLIED" | "REJECTED" | "WITHDRAWN" | string;
+  decisionReason: string | null;
+  decidedAt: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
 };

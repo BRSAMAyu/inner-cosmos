@@ -6,6 +6,8 @@ import com.innercosmos.ai.prompt.StructuredOutputParser;
 import com.innercosmos.config.LlmConfig;
 import com.innercosmos.service.ABTestService;
 import com.innercosmos.util.JsonUtils;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -30,6 +32,9 @@ public class StructuredAiService {
     /** In-memory counter incremented on every [BAD_AI_OUTPUT] path for test observability. */
     public static final AtomicLong badOutputCounter = new AtomicLong(0);
 
+    /** CP-40 §2-19: observation (→ span with a tracer) name for the structured-call throat. */
+    public static final String STRUCTURED_CALL_OBSERVATION = "inner.cosmos.ai.structured.call";
+
     private final LlmClient llmClient;
     private final ABTestService abTestService;
     private final LlmConfig llmConfig;
@@ -52,6 +57,15 @@ public class StructuredAiService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.innercosmos.ai.gateway.GatewayCallGovernor gatewayGovernor;
 
+    /**
+     * CP-40 §2-19: registry for the {@code inner.cosmos.ai.structured.call} observation. Optional
+     * so direct-construction tests keep working; a null registry falls back to
+     * {@link ObservationRegistry#NOOP} (zero-overhead no-op, mirroring how a deployment without a
+     * tracing bridge treats observations).
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private ObservationRegistry observationRegistry;
+
     public <T> T call(Long userId, String moduleName, String instruction, Object context,
                       Class<T> resultType, Supplier<T> fallback) {
         return call(userId, moduleName, instruction, context, resultType, fallback, null);
@@ -72,16 +86,64 @@ public class StructuredAiService {
      * source-compatible, while asynchronous runtimes can distinguish a real provider result from
      * blank output, invalid JSON and provider failure instead of storing a deterministic fallback
      * as if it were deep-kernel guidance.
+     *
+     * <p>CP-40 §2-19: this method is the OTel chokepoint for every structured AI call. It opens a
+     * Micrometer {@link Observation} — bridged to an OpenTelemetry span by
+     * micrometer-tracing-bridge-otel in real deployments, a no-op without a registry — carrying
+     * only bounded, low-cardinality attributes: {@code module}, {@code provider} (the caller's
+     * routing preference when one was expressed, else {@code unspecified}), {@code leg} (the
+     * MOCK/REMOTE routing leg actually in force), {@code outcome} (the {@link CallStatus} name,
+     * or {@code REFUSED} for pre-flight GATEWAY_BUSY / AI_SPEND_EXCEEDED refusals that propagate)
+     * and on failure a bounded {@code error.type} / {@code refusal}.
+     *
+     * <p>Privacy: following the repo's AI tracing discipline (see
+     * {@link com.innercosmos.ai.observability.AiTurnObservation}), the span never carries the
+     * user id, instruction, prompt, message or context content — not even a user-id presence
+     * boolean: every production caller supplies a non-null user id, so that boolean would carry
+     * near-zero information while creating precedent for user-scoped span attributes. Streaming
+     * legs ({@link LlmClient#streamChat}) never traverse this throat and are deliberately not
+     * force-instrumented here.
      */
     public <T> CallOutcome<T> callObserved(Long userId, String moduleName, String instruction,
                                            Object context, Class<T> resultType,
                                            Supplier<T> fallback, LlmClient clientOverride) {
-        LlmClient active = clientOverride != null ? clientOverride : llmClient;
         String assignedGroup = abTestService.assignGroup(userId, moduleName);
         boolean requireRemoteProvider = requiresRemoteProvider(context);
         if (llmConfig.isProdMode() || requireRemoteProvider) {
             assignedGroup = "REMOTE";
         }
+        Observation observation = Observation.createNotStarted(
+                        STRUCTURED_CALL_OBSERVATION, observationRegistry())
+                .lowCardinalityKeyValue("module", boundedSpanAttribute(moduleName))
+                .lowCardinalityKeyValue("provider", providerSpanAttribute(context))
+                .lowCardinalityKeyValue("leg", boundedSpanAttribute(assignedGroup))
+                .start();
+        try (Observation.Scope ignored = observation.openScope()) {
+            return doCallObserved(userId, moduleName, instruction, context, resultType, fallback,
+                    clientOverride, assignedGroup, requireRemoteProvider, observation);
+        } catch (RuntimeException refusal) {
+            // CP-17: GATEWAY_BUSY / AI_SPEND_EXCEEDED are pre-flight refusals that deliberately
+            // propagate; the span must still close with an honest outcome, never silently vanish.
+            observation.lowCardinalityKeyValue("outcome", "REFUSED")
+                    .lowCardinalityKeyValue("refusal", refusal instanceof
+                            com.innercosmos.exception.BusinessException business
+                            ? boundedSpanAttribute(business.code) : "unknown");
+            throw refusal;
+        } finally {
+            observation.stop();
+        }
+    }
+
+    private ObservationRegistry observationRegistry() {
+        return observationRegistry == null ? ObservationRegistry.NOOP : observationRegistry;
+    }
+
+    private <T> CallOutcome<T> doCallObserved(Long userId, String moduleName, String instruction,
+                                              Object context, Class<T> resultType,
+                                              Supplier<T> fallback, LlmClient clientOverride,
+                                              String assignedGroup, boolean requireRemoteProvider,
+                                              Observation observation) {
+        LlmClient active = clientOverride != null ? clientOverride : llmClient;
         long startTime = System.currentTimeMillis();
         boolean success = false;
 
@@ -119,12 +181,13 @@ public class StructuredAiService {
             if (raw == null || raw.isBlank()) {
                 log.warn("[BAD_AI_OUTPUT] Structured AI returned blank/null for module {}", moduleName);
                 badOutputCounter.incrementAndGet();
-                return new CallOutcome<>(fallback.get(), CallStatus.FALLBACK_BLANK, "blank_provider_output");
+                return withOutcome(observation, new CallOutcome<>(fallback.get(),
+                        CallStatus.FALLBACK_BLANK, "blank_provider_output"));
             }
             T parsed = StructuredOutputParser.parse(raw, resultType);
             if (parsed != null) {
                 success = true;
-                return new CallOutcome<>(parsed, CallStatus.SUCCESS, "provider_json");
+                return withOutcome(observation, new CallOutcome<>(parsed, CallStatus.SUCCESS, "provider_json"));
             }
 
             // The repair retry shares the SAME per-call deadline budget: a first response that
@@ -142,7 +205,8 @@ public class StructuredAiService {
                 parsed = StructuredOutputParser.parse(repaired, resultType);
                 if (parsed != null) {
                     success = true;
-                    return new CallOutcome<>(parsed, CallStatus.SUCCESS, "provider_json_repaired");
+                    return withOutcome(observation, new CallOutcome<>(parsed,
+                            CallStatus.SUCCESS, "provider_json_repaired"));
                 }
                 log.warn("[BAD_AI_OUTPUT] Structured AI output for {} was not valid JSON after repair (raw truncated): {}",
                         moduleName, truncate(repaired, 500));
@@ -151,11 +215,13 @@ public class StructuredAiService {
                         + "deadline budget left no room for a repair retry", moduleName);
             }
             badOutputCounter.incrementAndGet();
-            return new CallOutcome<>(fallback.get(), CallStatus.FALLBACK_INVALID_JSON,
-                    "invalid_json_after_repair");
+            return withOutcome(observation, new CallOutcome<>(fallback.get(),
+                    CallStatus.FALLBACK_INVALID_JSON, "invalid_json_after_repair"));
         } catch (Exception exception) {
             badOutputCounter.incrementAndGet();
             String detail = boundedFailureDetail(exception);
+            observation.lowCardinalityKeyValue("error.type",
+                    exception == null ? "unknown" : exception.getClass().getSimpleName());
             if (llmConfig.isProdMode()) {
                 log.error("Structured AI call for {} failed in prod; returning explicit business fallback: {}",
                         moduleName, detail, exception);
@@ -163,7 +229,7 @@ public class StructuredAiService {
                 log.warn("Structured AI call for {} fell back to deterministic extraction: {}",
                         moduleName, detail, exception);
             }
-            return new CallOutcome<>(fallback.get(), CallStatus.FAILED, detail);
+            return withOutcome(observation, new CallOutcome<>(fallback.get(), CallStatus.FAILED, detail));
         } finally {
             // CP-17: the in-flight slot is released on EVERY exit path — success, blank,
             // invalid JSON, provider failure and deadline kill alike. A leaked lease would
@@ -229,6 +295,35 @@ public class StructuredAiService {
             cursor = cursor.getCause();
         }
         return truncate(best == null ? exception.getClass().getSimpleName() : best, 500);
+    }
+
+    /** Attaches the truthful {@link CallStatus} as the span outcome, then hands the outcome back. */
+    private static <T> CallOutcome<T> withOutcome(Observation observation, CallOutcome<T> outcome) {
+        observation.lowCardinalityKeyValue("outcome", outcome.status().name());
+        return outcome;
+    }
+
+    /**
+     * Bounded low-cardinality span token (CP-40, same hygiene as
+     * {@code OutboxTraceContext.bounded}): anything null, blank or outside
+     * {@code [A-Za-z0-9._-]{1,64}} collapses to {@code unknown} so a rogue module or
+     * provider string can never blow up tag cardinality.
+     */
+    static String boundedSpanAttribute(String value) {
+        if (value == null) return "unknown";
+        String token = value.trim();
+        return token.matches("[A-Za-z0-9._-]{1,64}") ? token : "unknown";
+    }
+
+    /**
+     * The only provider signal honestly available at this throat is the caller's routing
+     * preference ({@code preferredProvider} / {@code aiProviderPreference} in the context map);
+     * the wrapper chain below the LlmClient decides the concrete leg. Normalised + bounded.
+     */
+    private String providerSpanAttribute(Object context) {
+        String preferred = preferredProvider(context);
+        if (preferred == null) return "unspecified";
+        return boundedSpanAttribute(preferred.toLowerCase(java.util.Locale.ROOT));
     }
 
     public enum CallStatus {

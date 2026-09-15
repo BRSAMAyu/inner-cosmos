@@ -996,6 +996,9 @@ public class CapsuleServiceImpl implements CapsuleService {
         vo.riskWarnings = new ArrayList<>();
         vo.publicTags = new ArrayList<>();
         if (cards.isEmpty()) {
+            // CP-31 登记项出处信号：空记忆模板分支。buildPersonaPrompt 是遗留的本地字符串拼装，
+            // 全程无模型调用 —— aiGenerated 保持 false，这是分支真实决定，不是 controller 猜的。
+            vo.aiGenerated = false;
             vo.abstractSummary = "还没有足够的长期记忆来生成用户共鸣体。建议先完成一次 Aurora 对话或心声日记。";
             vo.suggestedPseudonym = "新的回声分身";
             vo.personaPromptDraft = capsuleAgent.buildPersonaPrompt(vo.suggestedPseudonym, vo.abstractSummary);
@@ -1023,8 +1026,13 @@ public class CapsuleServiceImpl implements CapsuleService {
         vo.publicTags = vo.publicTags.stream().distinct().limit(8).toList();
         vo.abstractSummary = summary.toString().trim();
         vo.suggestedPseudonym = "我的回声分身";
+        // CP-31 登记项出处信号：LLM 分支。generateUserPersona 失败即抛 BusinessException、不落
+        // 模板替身，所以能走到这行赋值 = CAPSULE_PERSONA_SYNTHESIS 的模型调用真实发起且成功
+        // 返回（dev 环境 mock provider 同样成立：走的就是模型调用路径）。置位紧贴成功返回点，
+        // 不允许出现"未调用也标 true"或"调用了却标 false"。
         vo.personaPromptDraft = capsuleAgent.generateUserPersona(userId, memorySummaries, vo.suggestedPseudonym,
                 "一个由授权长期记忆生成的用户共鸣体，用于慢社交中的低压力共鸣对话。");
+        vo.aiGenerated = true;
         vo.personaPromptDraft += "\n\n透明提示：这个共鸣体会保留真实困惑、表达习惯和价值偏好，不会把用户美化成完美人设。访问者看到的是授权后的脱敏回声。";
         vo.removedSensitiveItems.add("原始对话全文");
         vo.removedSensitiveItems.add("真实身份与联系方式");

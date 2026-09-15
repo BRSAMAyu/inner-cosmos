@@ -12,7 +12,7 @@
   "allowedData": ["answers-entered-in-this-run"],
   "allowedTools": [],
   "requiredInputs": ["decision", "pullToward", "pullAway"],
-  "evidence": ["Miller 1944, Experimental Studies of Conflict", "Self-Determination Theory, autonomy support"],
+  "evidence": ["Miller 1944, Experimental Studies of Conflict（章节文献，Crossref 未检索到 DOI，保留原文引注）", "Self-Determination Theory, autonomy support, Su & Reeve 2011, DOI 10.1007/s10648-010-9142-7"],
   "limitations": {"zh-CN": "这是决策反思，不预测结果，也不适合替代高风险领域的专业意见。", "en-SG": "This is decision reflection, not outcome prediction or a substitute for professional advice in high-risk domains."},
   "retentionChoices": ["DISCARD_AFTER_SESSION", "SAVE_RESULT", "PROFILE_ELIGIBLE"],
   "evaluationSuite": "psychology-contract-v1:decision-conflict-map",

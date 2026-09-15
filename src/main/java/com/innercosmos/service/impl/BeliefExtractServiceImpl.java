@@ -106,12 +106,23 @@ public class BeliefExtractServiceImpl implements BeliefExtractService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void recalculateStrength(Long userId, Long beliefId) {
+    public void recalculateStrength(Long userId, Long beliefId, Integer expectedVersion) {
         BeliefPattern belief = beliefPatternMapper.selectById(beliefId);
         if (belief == null) return;
         // M-078: only the belief's owner may recalculate it.
         if (!userId.equals(belief.userId)) {
             throw new com.innercosmos.exception.BusinessException(com.innercosmos.common.ErrorCode.UNAUTHORIZED, "无权操作此信念");
+        }
+
+        // CP-21: a caller that rendered the belief pins the version it saw. A stale pin is the
+        // "someone updated this before you" case — 409 CONFLICT, no data touched, no bypass
+        // that lets a stale caller overwrite the newer write (same contract as the portrait
+        // claim transitions in PortraitClaimControlServiceImpl).
+        int currentVersion = belief.version == null ? 1 : belief.version;
+        if (expectedVersion != null && !expectedVersion.equals(currentVersion)) {
+            throw new com.innercosmos.exception.BusinessException(com.innercosmos.common.ErrorCode.CONFLICT,
+                    "这条信念在你操作前已被更新（当前版本 " + currentVersion
+                            + "，你基于版本 " + expectedVersion + "），请查看最新后再试");
         }
 
         // Simple strength calculation: based on confirmation count and recency
@@ -125,8 +136,23 @@ public class BeliefExtractServiceImpl implements BeliefExtractService {
             recencyBoost = Math.max(0, 0.3 - (daysSince * 0.01));
         }
 
-        belief.strengthScore = BeliefPattern.clampStrength(baseStrength + confirmationBoost + recencyBoost);
-        beliefPatternMapper.updateById(belief);
+        double newStrength = BeliefPattern.clampStrength(baseStrength + confirmationBoost + recencyBoost);
+
+        // The recalculate itself is one atomic conditional UPDATE on the expected version, so
+        // even between the read above and this write a racing writer cannot be lost — it makes
+        // rowsAffected 0 and surfaces as CONFLICT for legacy (unpinned) callers too.
+        int nextVersion = currentVersion + 1;
+        int updated = beliefPatternMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<BeliefPattern>()
+                .eq("id", belief.id)
+                .eq("user_id", belief.userId)
+                .eq("version", currentVersion)
+                .set("strength_score", newStrength)
+                .set("version", nextVersion)
+                .set("updated_at", LocalDateTime.now()));
+        if (updated != 1) {
+            throw new com.innercosmos.exception.BusinessException(com.innercosmos.common.ErrorCode.CONFLICT,
+                    "这条信念在你操作前已被更新，请查看最新后再试");
+        }
     }
 
     private String buildBeliefExtractionPrompt(MemoryCard card) {
@@ -197,6 +223,9 @@ public class BeliefExtractServiceImpl implements BeliefExtractService {
                 belief.lastConfirmedAt = LocalDateTime.now();
                 belief.confirmationCount = 1;
                 belief.status = "ACTIVE";
+                // V54: every belief row carries the optimistic-lock token from birth; the
+                // column default also covers rows inserted by older code paths.
+                belief.version = 1;
 
                 beliefPatternMapper.insert(belief);
             }

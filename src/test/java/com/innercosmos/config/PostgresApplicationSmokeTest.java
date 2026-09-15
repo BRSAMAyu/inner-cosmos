@@ -80,8 +80,10 @@ class PostgresApplicationSmokeTest {
         // V36 (commercial-cn CP-03) adds tb_commercial_metric_event, tb_analysis_consent and
         // tb_commercial_metric_rollup for the K1-K3 / G-SAFE / G-TRUST metric pipeline.
         // V50 (CP-35) adds the group review ledger; V51 (CP-34) adds relation corrections;
-        // V52 (CP-18) the continuity preference; V53 (CP-15) retraction cleanup results.
-        assertEquals(109L, jdbcTemplate.queryForObject("""
+        // V52 (CP-18) the continuity preference; V53 (CP-15) retraction cleanup results;
+        // V54 (CP-21) the belief-pattern version column (a column, not a table — count stays);
+        // V55 (CP-45 §2-21) the immutable price version table.
+        assertEquals(110L, jdbcTemplate.queryForObject("""
                 SELECT COUNT(*) FROM information_schema.tables
                 WHERE table_schema='public' AND table_name LIKE 'tb_%'
                 """, Long.class));

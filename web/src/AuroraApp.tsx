@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
-import { api, apiConfigurationError, configureBearerAuth, demoModeBuild, hasConfiguredApiBase, transcribeAudio, type ClaimCandidate, type CapsuleBoundary, type CapsuleFidelitySummary, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type PersonaMessage, type PersonaSession, type PortraitClaimsView, type PortraitDimension, type PublicCapsule, type PortraitHistoryEntry, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type PsychologySkillSuggestion, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type StarfieldDetail, type StarfieldScene, type StarfieldStar, type UnderstandingClaim, type UserCorrection } from "./api";
+import { api, apiConfigurationError, configureBearerAuth, demoModeBuild, hasConfiguredApiBase, transcribeAudio, type ClaimCandidate, type CapsuleBoundary, type CapsuleFidelitySummary, type CapsuleGenomeVersion, type CapsuleMatch, type CapsulePreview, type CapsuleQuota, type CapsuleSandbox, type CorrectionCommand, type CorrectionImpact, type EchoCapsule, type MemoryCard, type MemoryOperation, type PersonaMessage, type PersonaSession, type PortraitClaimsView, type PortraitDimension, type PublicCapsule, type PortraitHistoryEntry, type PsychologyRetention, type PsychologySkillManifest, type PsychologySkillRun, type PsychologySkillSuggestion, type ResonanceStrategy, type SelfEvolution, type SlowLetter, type StarfieldDetail, type StarfieldScene, type StarfieldStar, type UnderstandingClaim, type UsageToday, type UserCorrection } from "./api";
 import { initialMobileState, mobileRuntime, type MobileRuntimeState } from "./mobile";
 import { mobileOidc } from "./mobile-auth";
 import { isTauriRuntime } from "./desktop-runtime";
@@ -32,6 +32,7 @@ import { PortraitView } from "./components/PortraitView";
 import { PortraitClaimsPanel } from "./components/PortraitClaimsPanel";
 import { AccountSettings, type AccountBusy } from "./components/AccountSettings";
 import { QuotaPanel } from "./components/QuotaPanel";
+import { UsageTodayPanel } from "./components/UsageTodayPanel";
 import { DataRightsPanel } from "./components/DataRightsPanel";
 import { ConsentCenterPanel } from "./components/ConsentCenterPanel";
 import { ConsentRequestDialog } from "./components/ConsentRequestDialog";
@@ -148,6 +149,12 @@ export function AuroraApp() {
   const [quotaLoading, setQuotaLoading] = useState(false);
   const [quotaLoaded, setQuotaLoaded] = useState(false);
   const [quotaError, setQuotaError] = useState<string | null>(null);
+  // CP-08 usage time: the me/account tab's UsageTodayPanel reads from this one fetched state
+  // (same shape as quotaOverview above; panel-local error + inline retry, never the global line).
+  const [usageToday, setUsageToday] = useState<UsageToday | null>(null);
+  const [usageTodayLoading, setUsageTodayLoading] = useState(false);
+  const [usageTodayLoaded, setUsageTodayLoaded] = useState(false);
+  const [usageTodayError, setUsageTodayError] = useState<string | null>(null);
   // CP-07 consent center + J01 progressive-consent dialog (driven by CONSENT_REQUIRED).
   const [consentViews, setConsentViews] = useState<ConsentView[]>([]);
   const [consentLoading, setConsentLoading] = useState(false);
@@ -1111,7 +1118,7 @@ export function AuroraApp() {
 
   // CP-46: unlike loadDataRightsReceipts above, a failure lands in the panel's own inline error
   // state (with retry) instead of the global status line -- quota numbers are the whole point of
-  // this surface, so the degradation must be visible right where they would have been.
+  // this surface, so the degradation must be visible right where they would be.
   const loadQuotas = async () => {
     setQuotaLoading(true);
     setQuotaError(null);
@@ -1120,6 +1127,18 @@ export function AuroraApp() {
       ? "Usage and allowances are temporarily unavailable."
       : "暂时无法读取配额信息"); }
     finally { setQuotaLoading(false); }
+  };
+
+  // CP-08: same degradation contract as loadQuotas — the honest "about X minutes today" number
+  // (and the backend's calm reminderNote when due) either renders or visibly fails inline.
+  const loadUsageToday = async () => {
+    setUsageTodayLoading(true);
+    setUsageTodayError(null);
+    try { setUsageToday(await api.usageToday()); setUsageTodayLoaded(true); }
+    catch (error) { setUsageTodayError(error instanceof Error ? error.message : skillLocale === "en-SG"
+      ? "Today's conversation time is temporarily unavailable."
+      : "暂时无法读取今日对话时长"); }
+    finally { setUsageTodayLoading(false); }
   };
 
   // App-wide language: initialized from detection (loadLocale), overridable + persisted here so the
@@ -2171,6 +2190,14 @@ export function AuroraApp() {
         onRespondInvite={(memberId, decision) => void connectionsAndLetters.respondToGroupInvite(memberId, decision)}
         onLeaveGroup={id => void connectionsAndLetters.leaveGroup(id)}
         onSendMessage={(groupId, messageBody) => connectionsAndLetters.sendGroupMessage(groupId, messageBody)}
+        groupMessageError={connectionsAndLetters.groupMessageError}
+        isGroupGovernanceBusy={connectionsAndLetters.isGroupGovernanceBusy}
+        isGroupDissolveBusy={connectionsAndLetters.isGroupDissolveBusy}
+        onMuteGroupMember={(groupId, userId, durationMinutes) =>
+          void connectionsAndLetters.muteGroupMember(groupId, userId, durationMinutes)}
+        onUnmuteGroupMember={(groupId, userId) => void connectionsAndLetters.unmuteGroupMember(groupId, userId)}
+        onTransferGroupOwnership={(groupId, userId) => void connectionsAndLetters.transferGroupOwnership(groupId, userId)}
+        onDissolveGroup={groupId => void connectionsAndLetters.dissolveGroup(groupId)}
         locale={skillLocale} />
       </div>
 
@@ -2188,6 +2215,15 @@ export function AuroraApp() {
         letterVoiceLetterId={connectionsAndLetters.letterVoiceLetterId} letterVoiceAudio={connectionsAndLetters.letterVoiceAudio} letterVoiceError={connectionsAndLetters.letterVoiceError}
         isLetterVoiceBusy={connectionsAndLetters.isLetterVoiceBusy} onPlayLetterVoice={letter => void connectionsAndLetters.playLetterVoice(letter)}
         refreshBusy={connectionsAndLetters.lettersRefreshing} onRefresh={() => void connectionsAndLetters.refreshLetters()}
+        threadCorrections={connectionsAndLetters.threadCorrections}
+        threadCorrectionsStatus={connectionsAndLetters.threadCorrectionsStatus}
+        isCorrectionBusy={connectionsAndLetters.isCorrectionBusy}
+        isCorrectionProposeBusy={connectionsAndLetters.isCorrectionProposeBusy}
+        onProposeCorrection={(threadId, correctionField, proposedValue, note) =>
+          void connectionsAndLetters.proposeThreadCorrection(threadId, correctionField, proposedValue, note)}
+        onAcceptCorrection={id => void connectionsAndLetters.acceptThreadCorrection(id)}
+        onRejectCorrection={id => void connectionsAndLetters.rejectThreadCorrection(id)}
+        onWithdrawCorrection={id => void connectionsAndLetters.withdrawThreadCorrection(id)}
         directLetterBusy={connectionsAndLetters.directLetterBusy}
         onSendDirectLetter={(receiverUserId, title, body, delivery) => connectionsAndLetters.sendDirectLetter(receiverUserId, title, body, delivery)}
         liveChatInvites={connectionsAndLetters.liveChatInvites} liveChatSessions={connectionsAndLetters.liveChatSessions}
@@ -2267,6 +2303,11 @@ export function AuroraApp() {
             PortraitClaimsPanel rather than behind an opt-in button. */}
         <QuotaPanel view={quotaOverview} loading={quotaLoading} loaded={quotaLoaded} error={quotaError}
           onLoad={() => void loadQuotas()} locale={skillLocale} />
+        {/* CP-08: today's conversation time on the same account surface, beside the quotas — a
+            calm record (and the backend's own reminderNote when due), never a conversation-page
+            strip that would nag on every view. Same auto-load-once + inline-error contract. */}
+        <UsageTodayPanel view={usageToday} loading={usageTodayLoading} loaded={usageTodayLoaded}
+          error={usageTodayError} onLoad={() => void loadUsageToday()} locale={skillLocale} />
         </div>
         <div hidden={meTab !== "appearance"} className="me-appearance-panel">
         <AppearanceSettings locale={skillLocale} />

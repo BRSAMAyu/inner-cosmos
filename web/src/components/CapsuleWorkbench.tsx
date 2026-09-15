@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { CapsuleBoundary, CapsuleFidelitySummary, CapsuleGenomeVersion, CapsulePreview, CapsuleSandbox, EchoCapsule, MemoryCard } from "../api";
+import type { CapsuleBoundary, CapsuleFidelitySummary, CapsuleGenomeVersion, CapsulePreview, CapsuleSandbox, EchoCapsule, EchoCapsuleLabeled, MemoryCard } from "../api";
 import type { Locale } from "../i18n";
 import { AsyncButton } from "../loading";
 
@@ -204,7 +204,7 @@ export function CapsuleWorkbench({ capsules, selectedCapsuleId, selectedCapsule,
   capsuleOwnerNote = "", onCapsuleOwnerNote, capsuleStandIn = false, onCapsuleStandIn,
   capsuleContactPolicy = "LETTER_ONLY", onCapsuleContactPolicy,
   capsulePrivacy = "STRICT", onCapsulePrivacy, onSaveContext, locale = "zh-CN" }: {
-  capsules: EchoCapsule[]; selectedCapsuleId: number | null; selectedCapsule: EchoCapsule | null;
+  capsules: EchoCapsuleLabeled[]; selectedCapsuleId: number | null; selectedCapsule: EchoCapsuleLabeled | null;
   selectableMemories: MemoryCard[]; selectedMemoryIds: number[]; capsuleName: string; capsuleIntro: string;
   capsulePreview: CapsulePreview | null; capsuleBusy: boolean; genomeHistory: CapsuleGenomeVersion[]; genomeHistoryError?: boolean;
   fidelitySummary: CapsuleFidelitySummary[]; sandboxQuestion: string; sandboxResult: CapsuleSandbox | null; sandboxFeedback: string | null;
@@ -301,6 +301,17 @@ export function CapsuleWorkbench({ capsules, selectedCapsuleId, selectedCapsule,
       <div className="capsule-summary"><div><span className="capsule-status">{summaryStatus(selectedCapsule.visibilityStatus)}</span>
         <h3>{selectedCapsule.pseudonym}</h3><p className="ugc-text">{selectedCapsule.intro}</p></div>
         <div className="genome-badge"><strong>v{genomeHistory[0]?.versionNo ?? "–"}</strong><small>{genomeHistory[0]?.status ?? t.genomeReading}</small></div></div>
+      {/* CP-31: field-level AI provenance from the labeled capsule payload (CapsuleAiLabeling's
+          additive keys). Rendered only when the payload actually carries the tier lists — an
+          empty aiGeneratedFields (a SEED capsule's hand-written template) shows an honest "无",
+          never a rounded-up AI claim. */}
+      {(selectedCapsule.aiGeneratedFields != null || selectedCapsule.systemCompiledFields != null) && (
+        <p className="capsule-ai-provenance">
+          {locale === "en-SG"
+            ? <>AI-involved fields: {selectedCapsule.aiGeneratedFields?.length ? selectedCapsule.aiGeneratedFields.join(", ") : "none"} · system-compiled (not LLM): {(selectedCapsule.systemCompiledFields ?? []).join(", ")}</>
+            : <>AI 参与生成：{selectedCapsule.aiGeneratedFields?.length ? selectedCapsule.aiGeneratedFields.join("、") : "无"} · 系统编译（非大模型）：{(selectedCapsule.systemCompiledFields ?? []).join("、")}</>}
+        </p>
+      )}
       {activeFidelity && <p className="fidelity-note">{t.fidelityCurrent(activeFidelity)}</p>}
       <details className="genome-history"><summary>{t.genomeHistorySummary}</summary>{genomeHistory.map(version => {
         const label = fidelityLabel(fidelitySummary.find(summary => summary.genomeVersionId === version.id), t);

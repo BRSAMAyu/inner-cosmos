@@ -24,7 +24,9 @@ import java.util.Optional;
  * drifting amount is rejected — a verified-but-contradicted amount is kept as a DISPUTED
  * fact (drift stays visible, never absorbed). Unknown statuses are quarantined for a human
  * 查单 (不确定支付先查单，禁止盲重扣) and the channel keeps retrying — recording is
- * idempotent once resolved.
+ * idempotent once resolved. §2-21: an order past its expiry TTL is terminal EXPIRED — a
+ * late notify for it is refused (REJECTED_EXPIRED) and kept as an informational ledger
+ * fact, never fabricated into a payment success.
  *
  * <p>Entitlement wiring: an accepted payment grants the order's product to the order's
  * user (the 扣款未解锁 gap closes server-side); a FULL refund revokes it. A partial refund
@@ -39,7 +41,7 @@ public class ChannelCallbackIngestService {
 
     public enum Outcome {
         ACCEPTED, REJECTED_SIGNATURE, REJECTED_MERCHANT, REJECTED_ORDER, REJECTED_AMOUNT,
-        QUARANTINED_STATUS, MALFORMED, UNKNOWN_PROVIDER
+        REJECTED_EXPIRED, QUARANTINED_STATUS, MALFORMED, UNKNOWN_PROVIDER
     }
 
     public record IngestResult(Outcome outcome, String providerEventId, String orderId, String detail) {
@@ -111,11 +113,24 @@ public class ChannelCallbackIngestService {
                     + " — 查单 before any ledger write");
         }
         // Order catalog: the app — not the callback — decides amount, channel and buyer.
+        // find() lazily expires an overdue CREATED order, so what follows sees the truth.
         PaymentOrder order = orders.find(callback.orderId());
         if (order == null || order.userId == null || order.productId == null
                 || !provider.equals(order.channel)) {
             return new IngestResult(Outcome.REJECTED_ORDER, callback.providerEventId(),
                     callback.orderId(), "unknown order or channel mismatch — nothing to reconcile against");
+        }
+        // §2-21 order expiry: a payment/refund notify for an order already past its TTL is
+        // REFUSED — an expired order never becomes a success, however valid the signature
+        // (过期不伪造支付成功). The refusal is recorded as an informational ledger fact so
+        // money the channel claims moved against a closed order stays visible for 对账;
+        // idempotent per provider event, so a channel retry acks without a second row.
+        if ("EXPIRED".equals(order.status)) {
+            ledger.recordRejected(callback.providerEventId(), provider, callback.orderId(),
+                    "EXPIRED_ORDER_CALLBACK", callback.amountCents(), callback.occurredAt());
+            return new IngestResult(Outcome.REJECTED_EXPIRED, callback.providerEventId(),
+                    callback.orderId(), "order expired at " + order.expiresAt
+                    + " — late callback refused, recorded for reconciliation");
         }
         String eventType = ledgerType.get();
         if ("PAYMENT_SUCCEEDED".equals(eventType)) {

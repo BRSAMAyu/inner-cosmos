@@ -327,6 +327,13 @@ inner-cosmos:
       enabled: ${INNER_COSMOS_WAKE_QUIET_HOURS_ENABLED:false}
       start: ${INNER_COSMOS_WAKE_QUIET_HOURS_START:22:00}
       end: ${INNER_COSMOS_WAKE_QUIET_HOURS_END:07:00}
+    # CP-26 服务端 vendor push 唤醒文案脱敏：与前端 WakeLockScreenPrivacy 同语义、隐私优先。
+    # tb_push_delivery.title/body（厂商推送 → 锁屏/横幅预览，设备上最公开的展示面）只承载
+    # 中性唤起「Aurora / Aurora 想起你」，用户自述的约定内容（reason_for_user/message 类
+    # 字段）绝不进推送正文，详情在 App 内通知查看；deep_link 不变，已投递行不回溯修改。
+    # UserProfile 无服务端推送脱敏偏好位且 schema 冻结（不加用户偏好列），故为平台级开关，
+    # 默认 true；置 false 是运维的显式选择（保留完整预览文案）。
+    push-sanitized: ${INNER_COSMOS_WAKE_PUSH_SANITIZED:true}
   experience:
     # Demo/product default: remove repeated disclaimers and lexical "UNSUPPORTED" dead ends while
     # retaining crisis interception, authorization, leakage gates and blocked-topic enforcement.

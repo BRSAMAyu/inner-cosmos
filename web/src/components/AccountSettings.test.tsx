@@ -464,3 +464,94 @@ describe("AccountSettings -- CP-13 VERIFIED_ID badge", () => {
     expect(screen.getByText(/Once you complete identity \(age\) verification/)).toBeVisible();
   });
 });
+
+describe("AccountSettings -- CP-18 opening-recap re-entry", () => {
+  const base = {
+    busy: null, message: null,
+    onChangePassword: () => Promise.resolve(null),
+    onExportData: () => undefined,
+    onDeleteAccount: () => Promise.resolve(null)
+  } as const;
+
+  afterEach(cleanup);
+
+  // The one durable UI path back after the opening card's own withdraw button disappears with
+  // the card: the settings row must reflect the owner's REAL switch value, never a guessed one.
+  it("seeds the checkbox from the real GET value and states what 'off' honestly means", async () => {
+    render(<AccountSettings {...base} identityStatusLoader={() => Promise.reject(new Error("offline"))}
+      continuityVisibilityLoader={() => Promise.resolve({ openingVisible: false })} />);
+    expect(await screen.findByLabelText("显示开场回顾")).not.toBeChecked();
+    expect(screen.getByText("不再显示开场回顾，连续性记录不受影响。")).toBeVisible();
+  });
+
+  it("renders nothing for the switch before the value resolves — no premature on/off flash", async () => {
+    let resolveVisibility!: (value: { openingVisible: boolean }) => void;
+    const pending = new Promise<{ openingVisible: boolean }>(resolve => { resolveVisibility = resolve; });
+    render(<AccountSettings {...base} identityStatusLoader={() => Promise.reject(new Error("offline"))}
+      continuityVisibilityLoader={() => pending} />);
+    expect(screen.queryByLabelText("显示开场回顾")).not.toBeInTheDocument();
+    expect(screen.queryByText("开场回顾")).not.toBeInTheDocument();
+    await act(async () => { resolveVisibility({ openingVisible: true }); await pending; });
+    expect(screen.getByLabelText("显示开场回顾")).toBeChecked();
+  });
+
+  it("re-opens the recap via PUT(true) and keeps it on after the server confirms", async () => {
+    const setContinuityVisibility = vi.fn().mockResolvedValue({ openingVisible: true });
+    render(<AccountSettings {...base} identityStatusLoader={() => Promise.reject(new Error("offline"))}
+      continuityVisibilityLoader={() => Promise.resolve({ openingVisible: false })}
+      setContinuityVisibility={setContinuityVisibility} />);
+    const toggle = await screen.findByLabelText("显示开场回顾");
+    fireEvent.click(toggle);
+    expect(setContinuityVisibility).toHaveBeenCalledExactlyOnceWith(true);
+    await waitFor(() => expect(screen.getByLabelText("显示开场回顾")).toBeChecked());
+    expect(screen.getByText("开始新对话时，Aurora 会带来上次对话留下的开场回顾。")).toBeVisible();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("withdraws again via PUT(false), showing the honest off-state copy", async () => {
+    const setContinuityVisibility = vi.fn().mockResolvedValue({ openingVisible: false });
+    render(<AccountSettings {...base} identityStatusLoader={() => Promise.reject(new Error("offline"))}
+      continuityVisibilityLoader={() => Promise.resolve({ openingVisible: true })}
+      setContinuityVisibility={setContinuityVisibility} />);
+    fireEvent.click(await screen.findByLabelText("显示开场回顾"));
+    expect(setContinuityVisibility).toHaveBeenCalledExactlyOnceWith(false);
+    await waitFor(() => expect(screen.getByText("不再显示开场回顾，连续性记录不受影响。")).toBeVisible());
+  });
+
+  it("rolls a failed toggle back to the last server-confirmed value and says why", async () => {
+    let rejectSave!: (error: Error) => void;
+    const pending = new Promise<{ openingVisible: boolean }>((_resolve, reject) => { rejectSave = reject; });
+    // Rejection is consumed by the component's .catch; pre-attach a no-op to keep it from
+    // surfacing as an unhandled rejection before that happens.
+    pending.catch(() => undefined);
+    render(<AccountSettings {...base} identityStatusLoader={() => Promise.reject(new Error("offline"))}
+      continuityVisibilityLoader={() => Promise.resolve({ openingVisible: false })}
+      setContinuityVisibility={vi.fn().mockReturnValue(pending)} />);
+    const toggle = await screen.findByLabelText("显示开场回顾");
+    fireEvent.click(toggle);
+    expect(toggle).toBeChecked(); // optimistic while in flight
+    await act(async () => { rejectSave(new Error("network down")); await pending.catch(() => undefined); });
+    expect(screen.getByLabelText("显示开场回顾")).not.toBeChecked(); // rolled back
+    expect(screen.getByRole("alert")).toHaveTextContent("暂时没能保存，稍后再试。");
+  });
+
+  it("a failed load shows a neutral unavailable line with a working retry, never a guessed state", async () => {
+    const loader = vi.fn().mockRejectedValue(new Error("offline"));
+    render(<AccountSettings {...base} identityStatusLoader={() => Promise.reject(new Error("offline"))}
+      continuityVisibilityLoader={loader} />);
+    expect(await screen.findByText("开场回顾设置暂时无法获取。")).toBeVisible();
+    expect(screen.queryByLabelText("显示开场回顾")).not.toBeInTheDocument();
+    loader.mockResolvedValue({ openingVisible: true });
+    fireEvent.click(screen.getByRole("button", { name: "重试" }));
+    expect(await screen.findByLabelText("显示开场回顾")).toBeChecked();
+    expect(loader).toHaveBeenCalledTimes(2);
+  });
+
+  it("renders the switch in English when locale is en-SG", async () => {
+    render(<AccountSettings {...base} locale="en-SG"
+      identityStatusLoader={() => Promise.reject(new Error("offline"))}
+      continuityVisibilityLoader={() => Promise.resolve({ openingVisible: false })} />);
+    expect(await screen.findByLabelText("Show the opening recap")).not.toBeChecked();
+    expect(screen.getByText("The opening recap is off; your continuity records are unaffected.")).toBeVisible();
+  });
+});

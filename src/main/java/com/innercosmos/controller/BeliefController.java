@@ -50,8 +50,12 @@ public class BeliefController extends BaseController {
     }
 
     @PostMapping("/{beliefId}/recalculate")
-    public ApiResponse<Void> recalculate(@PathVariable Long beliefId, HttpSession session) {
-        beliefExtractService.recalculateStrength(currentUserId(session), beliefId); // M-078
+    public ApiResponse<Void> recalculate(@PathVariable Long beliefId,
+                                         @RequestParam(required = false) Integer expectedVersion,
+                                         HttpSession session) {
+        // M-078 ownership check inside; CP-21: expectedVersion is the caller's optimistic-lock
+        // pin — null = legacy unconditional call, stale pin = 409 CONFLICT.
+        beliefExtractService.recalculateStrength(currentUserId(session), beliefId, expectedVersion);
         return ApiResponse.<Void>ok(null);
     }
 }

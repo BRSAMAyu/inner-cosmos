@@ -32,6 +32,7 @@ const COPY: Record<Locale, {
   eyebrow: string; heading: string; intro: string; load: string; refresh: string;
   empty: string; granted: string; declined: string; grant: string; revoke: string;
   requiredNote: string; managedNote: string; version: (v: string) => string;
+  reConsentBadge: string; reConsentNote: (v: string) => string;
 }> = {
   "zh-CN": {
     eyebrow: "数据与同意 · 你说了算",
@@ -46,7 +47,9 @@ const COPY: Record<Locale, {
     revoke: "撤回同意",
     requiredNote: "核心功能必需；如不需要，可通过注销账号终止全部处理。",
     managedNote: "在对应功能内逐项授权与撤回（如共鸣体工作台）。",
-    version: v => `版本 ${v}`
+    version: v => `版本 ${v}`,
+    reConsentBadge: "条款已更新，需要重新确认",
+    reConsentNote: v => `你上一次的选择记录在旧版条款下，已不再作为当前依据；重新确认后以版本 ${v} 为准。`
   },
   "en-SG": {
     eyebrow: "Data & consent · your call",
@@ -61,7 +64,9 @@ const COPY: Record<Locale, {
     revoke: "Withdraw",
     requiredNote: "Necessary for the core service; the only exit is account deletion.",
     managedNote: "Granted and withdrawn per item inside its own feature (e.g. the capsule workbench).",
-    version: v => `version ${v}`
+    version: v => `version ${v}`,
+    reConsentBadge: "Terms updated · re-confirm",
+    reConsentNote: v => `Your last choice was recorded under older terms and no longer applies; confirming again records it under version ${v}.`
   }
 };
 
@@ -94,13 +99,23 @@ export function ConsentCenterPanel({ views, loading, loaded, onLoad, onDecide, b
           <ul>
             {entry.rows.map(view => (
               <li key={view.purposeCode} data-purpose={view.purposeCode}
-                  data-granted={view.granted}>
+                  data-granted={view.granted}
+                  data-re-consent={view.source === "RE_CONSENT_REQUIRED" ? "true" : undefined}>
                 <div className="consent-row-head">
                   <strong>{view.purposeCode}</strong>
+                  {/* CP-07 versioned re-consent: source === RE_CONSENT_REQUIRED means the
+                      recorded decision predates the registry's current version, so a stale
+                      grant never authorizes — surface the re-confirm ask on that row only. */}
+                  {view.source === "RE_CONSENT_REQUIRED" && (
+                    <span className="consent-reconsent-badge">{copy.reConsentBadge}</span>
+                  )}
                   <span className={"consent-state " + (view.granted ? "granted" : "declined")}>
                     {view.granted ? copy.granted : copy.declined}
                   </span>
                 </div>
+                {view.source === "RE_CONSENT_REQUIRED" && (
+                  <p className="consent-reconsent-note">{copy.reConsentNote(view.version)}</p>
+                )}
                 <p className="consent-description">{view.description}</p>
                 {view.userSettable && view.granted && (
                   <p className="consent-withdrawal">{view.withdrawalEffect}</p>

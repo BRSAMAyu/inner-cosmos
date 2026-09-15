@@ -35,6 +35,15 @@ public class BeliefPattern extends BaseEntity {
     public String status;
 
     /**
+     * CP-21 optimistic-lock token (V54 / schema.sql twin, column default 1). Every
+     * {@code recalculateStrength} transition bumps it atomically; callers that rendered
+     * a belief row pin the version they saw and a stale pin surfaces as
+     * {@link com.innercosmos.common.ErrorCode#CONFLICT}. Null only for rows read before
+     * the column existed — treat null as 1.
+     */
+    public Integer version;
+
+    /**
      * Clamp a raw strength score into the valid [0,1] range, logging a warning
      * when the input was out of range. Use this at every write site instead of
      * assigning {@link #strengthScore} directly so the invariant is enforced

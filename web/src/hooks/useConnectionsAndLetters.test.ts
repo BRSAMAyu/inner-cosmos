@@ -1,7 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api";
-import type { ConnectionRequests, DiscoverablePerson, LetterThread, RelationMention, RelationReview, RelationTimelinePoint, SlowLetter, SocialConnection } from "../api";
+import type { ConnectionRequests, DiscoverablePerson, LetterThread, RelationCorrectionProposal, RelationMention, RelationReview, RelationTimelinePoint, SlowLetter, SocialConnection } from "../api";
 import { useConnectionsAndLetters } from "./useConnectionsAndLetters";
 
 vi.mock("../api", () => ({
@@ -40,7 +40,17 @@ vi.mock("../api", () => ({
     activeLiveChatSessions: vi.fn(),
     liveChatMessages: vi.fn(),
     sendLiveChatMessage: vi.fn(),
-    endLiveChatSession: vi.fn()
+    endLiveChatSession: vi.fn(),
+    incomingRelationCorrections: vi.fn(),
+    outgoingRelationCorrections: vi.fn(),
+    proposeRelationCorrection: vi.fn(),
+    acceptRelationCorrection: vi.fn(),
+    rejectRelationCorrection: vi.fn(),
+    withdrawRelationCorrection: vi.fn(),
+    muteGroupMember: vi.fn(),
+    unmuteGroupMember: vi.fn(),
+    transferGroupOwnership: vi.fn(),
+    dissolveGroup: vi.fn()
   }
 }));
 
@@ -810,5 +820,111 @@ describe("useConnectionsAndLetters -- talk now", () => {
     expect(sent).toBe(true);
     expect(api.sendLiveChatMessage).toHaveBeenCalledExactlyOnceWith(8, "我在。");
     expect(result.current.liveChatMessages[0].messageBody).toBe("我在。");
+  });
+
+});
+
+
+describe("useConnectionsAndLetters -- CP-34 thread corrections", () => {
+  const proposal = (overrides: Partial<RelationCorrectionProposal> = {}): RelationCorrectionProposal => ({
+    id: 11, threadId: 5, proposerUserId: 2, counterpartUserId: 1,
+    correctionField: "relationLabel", proposedValue: "老朋友", note: null,
+    status: "PROPOSED", decisionReason: null, decidedAt: null,
+    createdAt: "2026-09-15T00:00:00", updatedAt: "2026-09-15T00:00:00", ...overrides
+  });
+
+  it("openThread loads both correction lists alongside the letters", async () => {
+    vi.mocked(api.letterThreadLetters).mockResolvedValue([letter()]);
+    vi.mocked(api.incomingRelationCorrections).mockResolvedValue([proposal()]);
+    vi.mocked(api.outgoingRelationCorrections).mockResolvedValue([proposal({ id: 12, proposerUserId: 1, counterpartUserId: 2 })]);
+    const { result } = setup();
+    await act(async () => { await result.current.openThread(5); });
+    expect(result.current.threadCorrections.incoming).toHaveLength(1);
+    expect(result.current.threadCorrections.outgoing).toHaveLength(1);
+    expect(result.current.threadCorrectionsStatus).toBe("success");
+  });
+
+  it("a corrections load failure never fails the thread open — letters still render, corrections get their own error status", async () => {
+    vi.mocked(api.letterThreadLetters).mockResolvedValue([letter()]);
+    vi.mocked(api.incomingRelationCorrections).mockRejectedValue(new Error("HTTP 500"));
+    const { result } = setup();
+    await act(async () => { await result.current.openThread(5); });
+    expect(result.current.threadLettersStatus).toBe("success");
+    expect(result.current.threadCorrectionsStatus).toBe("error");
+  });
+
+  it("accept/withdraw hit the right endpoints and refresh both lists", async () => {
+    vi.mocked(api.acceptRelationCorrection).mockResolvedValue(proposal({ status: "APPLIED" }));
+    vi.mocked(api.withdrawRelationCorrection).mockResolvedValue(proposal({ status: "WITHDRAWN" }));
+    vi.mocked(api.incomingRelationCorrections).mockResolvedValue([]);
+    vi.mocked(api.outgoingRelationCorrections).mockResolvedValue([]);
+    const { result } = setup();
+    await act(async () => { await result.current.acceptThreadCorrection(11); });
+    expect(api.acceptRelationCorrection).toHaveBeenCalledWith(11);
+    await act(async () => { await result.current.withdrawThreadCorrection(12); });
+    expect(api.withdrawRelationCorrection).toHaveBeenCalledWith(12);
+    // Both decisions refreshed the lists (one reload per action).
+    expect(api.incomingRelationCorrections).toHaveBeenCalledTimes(2);
+    expect(api.outgoingRelationCorrections).toHaveBeenCalledTimes(2);
+  });
+
+  it("propose sends the thread's id, field, value and optional note", async () => {
+    vi.mocked(api.proposeRelationCorrection).mockResolvedValue(proposal());
+    vi.mocked(api.incomingRelationCorrections).mockResolvedValue([]);
+    vi.mocked(api.outgoingRelationCorrections).mockResolvedValue([]);
+    const { result } = setup();
+    await act(async () => { await result.current.proposeThreadCorrection(5, "relationLabel", "老朋友", "我们更像老朋友"); });
+    expect(api.proposeRelationCorrection).toHaveBeenCalledWith(
+      { threadId: 5, correctionField: "relationLabel", proposedValue: "老朋友", note: "我们更像老朋友" });
+  });
+
+});
+
+describe("useConnectionsAndLetters -- CP-35 group governance", () => {
+  it("mute sends the duration (or null for manual) and refreshes the selected group context", async () => {
+    vi.mocked(api.muteGroupMember).mockResolvedValue(undefined);
+    vi.mocked(api.groupMembers).mockResolvedValue([]);
+    vi.mocked(api.groupMessages).mockResolvedValue([]);
+    const { result } = setup();
+    await act(async () => { await result.current.openGroup(3); });
+    await act(async () => { await result.current.muteGroupMember(3, 30, 30); });
+    expect(api.muteGroupMember).toHaveBeenCalledExactlyOnceWith(3, 30, 30);
+    // The post-action refresh re-read members + messages for the selected group.
+    expect(api.groupMembers).toHaveBeenCalledWith(3);
+    await act(async () => { await result.current.muteGroupMember(3, 30, null); });
+    expect(api.muteGroupMember).toHaveBeenLastCalledWith(3, 30, null);
+    await act(async () => { await result.current.unmuteGroupMember(3, 30); });
+    expect(api.unmuteGroupMember).toHaveBeenCalledExactlyOnceWith(3, 30);
+  });
+
+  it("dissolve removes the group and clears the selection; transfer reloads groups", async () => {
+    vi.mocked(api.dissolveGroup).mockResolvedValue(undefined);
+    vi.mocked(api.transferGroupOwnership).mockResolvedValue(undefined);
+    vi.mocked(api.myGroups).mockResolvedValue([]);
+    vi.mocked(api.groupMembers).mockResolvedValue([]);
+    vi.mocked(api.groupMessages).mockResolvedValue([]);
+    const { result } = setup();
+    await act(async () => { await result.current.openGroup(3); });
+    await act(async () => { await result.current.dissolveGroup(3); });
+    expect(api.dissolveGroup).toHaveBeenCalledExactlyOnceWith(3);
+    expect(result.current.groups.find(group => group.id === 3)).toBeUndefined();
+    expect(result.current.selectedGroupId).toBeNull();
+    await act(async () => { await result.current.transferGroupOwnership(5, 30); });
+    expect(api.transferGroupOwnership).toHaveBeenCalledExactlyOnceWith(5, 30);
+    expect(api.myGroups).toHaveBeenCalled();
+  });
+
+  it("a rejected send records the server message inline (the mute 403) and clears it on success or reopen", async () => {
+    vi.mocked(api.sendGroupMessage)
+      .mockRejectedValueOnce(new Error("你已被群内禁言，剩余约 12 分钟"))
+      .mockResolvedValueOnce({ id: 99, groupId: 3, senderUserId: 1, senderNickname: "我", messageBody: "大家好", createdAt: null });
+    vi.mocked(api.groupMembers).mockResolvedValue([]);
+    vi.mocked(api.groupMessages).mockResolvedValue([]);
+    const { result } = setup();
+    await act(async () => { await result.current.openGroup(3); });
+    await act(async () => { await result.current.sendGroupMessage(3, "说一句"); });
+    expect(result.current.groupMessageError).toBe("你已被群内禁言，剩余约 12 分钟");
+    await act(async () => { await result.current.sendGroupMessage(3, "再说一句"); });
+    expect(result.current.groupMessageError).toBeNull();
   });
 });

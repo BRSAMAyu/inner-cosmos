@@ -1,11 +1,18 @@
 import { useMemo, useState } from "react";
-import type { CapsuleMatch, CapsuleQuota, PersonaMessage, PersonaSession, ResonanceStrategy, SlowLetter } from "../api";
+import type { CapsuleMatchExplained, CapsuleQuota, PersonaChatMessage, PersonaSession, ResonanceStrategy, SlowLetter } from "../api";
 import { demoContentText } from "../demoContentLocale";
 import type { Locale } from "../i18n";
 import { AsyncButton } from "../loading";
 import { InlineAudioPlayer } from "./shared/InlineAudioPlayer";
 
 const strategyOrder: ResonanceStrategy[] = ["MIRROR", "COMPLEMENT", "GROWTH_EDGE", "SERENDIPITY", "CONTEXTUAL"];
+
+// CP-32: locale-owned labels for the backend's three recall modes. The zh strings match
+// ResonanceMode.label verbatim; en is our own because the backend ships one label only.
+const MODE_LABEL: Record<Locale, Record<string, string>> = {
+  "zh-CN": { SIMILAR: "相似", COMPLEMENTARY: "互补", UNEXPECTED: "意外" },
+  "en-SG": { SIMILAR: "Similar", COMPLEMENTARY: "Complementary", UNEXPECTED: "Unexpected" }
+};
 
 const COPY: Record<Locale, {
   aria: string; heading: string; count: (n: number) => string; intro: string; strategyAria: string;
@@ -24,6 +31,7 @@ const COPY: Record<Locale, {
   playCapsuleVoice: string; capsuleVoiceBusy: string; capsuleVoiceAria: string;
   landedBtn: string; landedBusy: string; landedDone: string;
   showMoreMatches: (n: number) => string; showFewerMatches: string;
+  aiGeneratedBadge: string; modeInsufficient: string;
 }> = {
   "zh-CN": {
     aria: "发现共鸣并写一封慢信", heading: "遇见可能聊得来的人", count: n => `为你推荐 ${n} 个共鸣体`,
@@ -56,7 +64,8 @@ const COPY: Record<Locale, {
     playCapsuleVoice: "▶ 听这条回声", capsuleVoiceBusy: "正在合成…",
     capsuleVoiceAria: "听到这个共鸣体的回复（与 Aurora 不同的声音）",
     landedBtn: "这条回复有共鸣", landedBusy: "正在记录", landedDone: "已记录",
-    showMoreMatches: n => `再看 ${n} 个`, showFewerMatches: "收起，只看最相关的 3 个"
+    showMoreMatches: n => `再看 ${n} 个`, showFewerMatches: "收起，只看最相关的 3 个",
+    aiGeneratedBadge: "AI 生成", modeInsufficient: "信号不足，暂不解释"
   },
   "en-SG": {
     aria: "Discover resonance and write a slow letter", heading: "Not swiping cards — understanding why you'd meet", count: n => `${n} candidate${n === 1 ? "" : "s"} right now`,
@@ -89,7 +98,8 @@ const COPY: Record<Locale, {
     playCapsuleVoice: "▶ Hear this echo", capsuleVoiceBusy: "Synthesizing…",
     capsuleVoiceAria: "Hear this capsule's reply spoken (a voice distinct from Aurora)",
     landedBtn: "This landed with me", landedBusy: "Leaving an echo", landedDone: "Echo left",
-    showMoreMatches: n => `View ${n} more candidate${n === 1 ? "" : "s"}`, showFewerMatches: "Show only the top 3"
+    showMoreMatches: n => `View ${n} more candidate${n === 1 ? "" : "s"}`, showFewerMatches: "Show only the top 3",
+    aiGeneratedBadge: "AI-generated", modeInsufficient: "Not enough signal to explain yet"
   }
 };
 
@@ -99,8 +109,8 @@ export function ResonanceNetwork({ resonanceMatches, resonanceStrategy, visitorB
   onLetterTitleChange, onLetterBodyChange, onSendLetter, onReportSession, onBlockSession, personaTurnError = null,
   personaVoiceAudio = null, personaVoiceBusy = false, personaVoiceError = null, onPlayPersonaVoice,
   landed = false, landedBusy = false, onMarkLanded, locale = "zh-CN" }: {
-  resonanceMatches: CapsuleMatch[]; resonanceStrategy: ResonanceStrategy; visitorBusy: boolean;
-  visitorMatch: CapsuleMatch | null; personaSession: PersonaSession | null; personaMessages: PersonaMessage[];
+  resonanceMatches: CapsuleMatchExplained[]; resonanceStrategy: ResonanceStrategy; visitorBusy: boolean;
+  visitorMatch: CapsuleMatchExplained | null; personaSession: PersonaSession | null; personaMessages: PersonaChatMessage[];
   personaDraft: string; personaQuota: CapsuleQuota | null; letterTitle: string; letterBody: string; sentLetter: SlowLetter | null;
   onChooseStrategy: (strategy: ResonanceStrategy) => void; onChooseMatch: (capsuleId: number) => void;
   onStartPersonaConversation: () => void; onPersonaDraftChange: (value: string) => void; onSendPersonaTurn: () => void;
@@ -112,7 +122,7 @@ export function ResonanceNetwork({ resonanceMatches, resonanceStrategy, visitorB
 }) {
   const t = COPY[locale];
   const [showAllMatches, setShowAllMatches] = useState(false);
-  const matchTierLabel = (match: CapsuleMatch) => {
+  const matchTierLabel = (match: CapsuleMatchExplained) => {
     if (!match.matchTier) return match.resonant ? t.resonantNow : t.exploreMeet;
     if (locale === "en-SG") return match.matchTier === "FULL" ? "Strong resonance"
       : match.matchTier === "PARTIAL" ? "Some resonance" : "Explore this meeting";
@@ -153,15 +163,38 @@ export function ResonanceNetwork({ resonanceMatches, resonanceStrategy, visitorB
             unreadable run-on string (live-verified against a real seeded capsule). aria-hidden the
             visual content and give the button itself a short, properly separated aria-label; the
             visual card layout is unchanged. */}
-        {visibleMatches.map(match => <button type="button" role="listitem" key={match.capsule.id}
+        {visibleMatches.map(match => {
+          // CP-32: the candidate's true dominant recall mode. mode is null with confidence
+          // "insufficient_signal" when no honest signal fired — then we say exactly that and
+          // invent nothing (no mode label, no reasons, no 灵魂契合 filler).
+          const explanation = match.modeExplanation ?? null;
+          const modeText = explanation && explanation.mode != null
+            && explanation.confidence !== "insufficient_signal"
+            ? (MODE_LABEL[locale][explanation.mode] ?? explanation.modeLabel ?? explanation.mode)
+            : null;
+          const modeReasons = modeText && explanation ? explanation.reasons.slice(0, 3) : [];
+          return <button type="button" role="listitem" key={match.capsule.id}
           className={visitorMatch?.capsule.id === match.capsule.id ? "match-card active" : "match-card"}
-          aria-label={t.matchCardAria(demoContentText(match.capsule.pseudonym, locale), demoContentText(match.matchSummary, locale))}
+          aria-label={[
+            t.matchCardAria(demoContentText(match.capsule.pseudonym, locale), demoContentText(match.matchSummary, locale)),
+            modeText ?? (explanation ? t.modeInsufficient : null)
+          ].filter(Boolean).join(" · ")}
           onClick={() => onChooseMatch(match.capsule.id)}><span aria-hidden="true">{matchTierLabel(match)}</span>
           <em className={match.capsule.capsuleType === "USER_CAPSULE" ? "real" : "practice"} aria-hidden="true">
             {match.capsule.capsuleType === "USER_CAPSULE" ? t.realPersonPath : t.practiceCapsule}
           </em>
           <strong aria-hidden="true">{demoContentText(match.capsule.pseudonym, locale)}</strong><p className="ugc-text" aria-hidden="true">{demoContentText(match.capsule.intro, locale)}</p>
-          <small aria-hidden="true">{demoContentText(match.matchSummary, locale)}</small></button>)}
+          <small aria-hidden="true">{demoContentText(match.matchSummary, locale)}</small>
+          {/* CP-32 structured explanation — restrained, fact-only: the recall-mode chip plus the
+              backend's own reason sentences, or the honest "not enough signal" line. */}
+          {explanation && <span className="match-mode" data-confidence={explanation.confidence} aria-hidden="true">
+            {modeText
+              ? <><small className="match-mode-label">{modeText}</small>
+                  {modeReasons.map(reason => <small className="match-mode-reason" key={reason}>{demoContentText(reason, locale)}</small>)}</>
+              : <small className="match-mode-reason insufficient">{t.modeInsufficient}</small>}
+          </span>}
+        </button>;
+        })}
       </div>
       {resonanceMatches.length > 3 && <button type="button" className="match-rail-toggle"
         aria-expanded={showAllMatches} onClick={() => setShowAllMatches(value => !value)}>
@@ -186,6 +219,13 @@ export function ResonanceNetwork({ resonanceMatches, resonanceStrategy, visitorB
               const isLatestCapsule = message.senderType === "CAPSULE" && message.id === lastCapsuleId;
               return <article className={message.senderType === "VISITOR" ? "visitor" : "capsule"} key={message.id}>
                 <span>{message.senderType === "VISITOR" ? t.speakerYou : demoContentText(visitorMatch.capsule.pseudonym, locale)}</span>
+                {/* CP-31: PersonaChatMessageVO.aiGenerated is true iff this row is the LLM's
+                    (capsule's) reply, false for the visitor's own text — never rounded up. Same
+                    visual as AuroraConversation's aurora badge; rows without the field (older
+                    fixtures) simply render unbadged rather than guessed. */}
+                {message.aiGenerated === true && (
+                  <small className="ai-generated-badge" aria-label={t.aiGeneratedBadge}>{t.aiGeneratedBadge}</small>
+                )}
                 <p className="ugc-text">{message.textContent}</p>
                 {isLatestCapsule && onPlayPersonaVoice && <div className="capsule-voice">
                   {personaVoiceAudio

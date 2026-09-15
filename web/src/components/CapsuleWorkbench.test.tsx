@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CapsuleWorkbench } from "./CapsuleWorkbench";
-import type { CapsuleBoundary, CapsuleGenomeVersion, CapsuleSandbox, EchoCapsule, MemoryCard } from "../api";
+import type { CapsuleBoundary, CapsuleGenomeVersion, CapsuleSandbox, EchoCapsule, EchoCapsuleLabeled, MemoryCard } from "../api";
 
 afterEach(() => {
   cleanup();
@@ -301,5 +301,56 @@ describe("CapsuleWorkbench", () => {
     expect(screen.getByRole("button", { name: "Generate a new version from the current selection" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Save boundary settings" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Withdraw this capsule" })).toBeVisible();
+  });
+
+  // CP-31: CapsuleAiLabeling's additive keys on the labeled capsule payload. A USER_CAPSULE
+  // lists personaPrompt as AI-involved; a SEED capsule's empty list renders an honest "无".
+  it("names the AI-involved and system-compiled fields on the selected capsule", () => {
+    const labeled: EchoCapsuleLabeled = {
+      ...capsule,
+      aiGenerated: true,
+      aiGeneratedFields: ["personaPrompt"],
+      systemCompiledFields: ["contextPreviewJson", "styleProfileJson"],
+      ownerWrittenFields: ["pseudonym", "intro"],
+      aiLabelingNote: "personaPrompt 由外部大模型编译"
+    };
+    render(<CapsuleWorkbench capsules={[labeled]} selectedCapsuleId={labeled.id} selectedCapsule={labeled} selectableMemories={[memory]}
+      selectedMemoryIds={[1]} capsuleName="" capsuleIntro="" capsulePreview={null} capsuleBusy={false} genomeHistory={[genomeVersion]} fidelitySummary={[]}
+      sandboxQuestion="" sandboxResult={null} sandboxFeedback={null} onSelectCapsule={() => undefined}
+      onToggleMemory={() => undefined} onCapsuleName={() => undefined} onCapsuleIntro={() => undefined}
+      onPreviewNewCapsule={() => undefined} onCancelPreview={() => undefined} onCreateCapsule={() => undefined}
+      onRecompile={() => undefined} onSandboxQuestion={() => undefined} onRunSandbox={() => undefined}
+      onRateSandbox={() => undefined} onPublish={() => undefined} onPause={() => undefined} onArchive={() => undefined} />);
+    // The manager <details> starts closed when a capsule is selected — open it like the owner would.
+    fireEvent.click(screen.getByText("编辑、试聊或新建共鸣体"));
+    expect(screen.getByText(/AI 参与生成：personaPrompt/)).toBeVisible();
+    expect(screen.getByText(/系统编译（非大模型）：contextPreviewJson、styleProfileJson/)).toBeVisible();
+  });
+
+  it("shows an honest 'no AI-involved fields' for a SEED capsule and nothing before the payload carries the tiers", () => {
+    const seed: EchoCapsuleLabeled = {
+      ...capsule, aiGenerated: false, aiGeneratedFields: [],
+      systemCompiledFields: ["contextPreviewJson", "styleProfileJson"]
+    };
+    const { rerender } = render(<CapsuleWorkbench capsules={[seed]} selectedCapsuleId={seed.id} selectedCapsule={seed} selectableMemories={[memory]}
+      selectedMemoryIds={[1]} capsuleName="" capsuleIntro="" capsulePreview={null} capsuleBusy={false} genomeHistory={[genomeVersion]} fidelitySummary={[]}
+      sandboxQuestion="" sandboxResult={null} sandboxFeedback={null} onSelectCapsule={() => undefined}
+      onToggleMemory={() => undefined} onCapsuleName={() => undefined} onCapsuleIntro={() => undefined}
+      onPreviewNewCapsule={() => undefined} onCancelPreview={() => undefined} onCreateCapsule={() => undefined}
+      onRecompile={() => undefined} onSandboxQuestion={() => undefined} onRunSandbox={() => undefined}
+      onRateSandbox={() => undefined} onPublish={() => undefined} onPause={() => undefined} onArchive={() => undefined} />);
+    fireEvent.click(screen.getByText("编辑、试聊或新建共鸣体"));
+    expect(screen.getByText(/AI 参与生成：无/)).toBeVisible();
+
+    // A payload without the labeling keys (older fixture shape) renders no provenance line at all
+    // rather than guessing one.
+    rerender(<CapsuleWorkbench capsules={[capsule]} selectedCapsuleId={capsule.id} selectedCapsule={capsule} selectableMemories={[memory]}
+      selectedMemoryIds={[1]} capsuleName="" capsuleIntro="" capsulePreview={null} capsuleBusy={false} genomeHistory={[genomeVersion]} fidelitySummary={[]}
+      sandboxQuestion="" sandboxResult={null} sandboxFeedback={null} onSelectCapsule={() => undefined}
+      onToggleMemory={() => undefined} onCapsuleName={() => undefined} onCapsuleIntro={() => undefined}
+      onPreviewNewCapsule={() => undefined} onCancelPreview={() => undefined} onCreateCapsule={() => undefined}
+      onRecompile={() => undefined} onSandboxQuestion={() => undefined} onRunSandbox={() => undefined}
+      onRateSandbox={() => undefined} onPublish={() => undefined} onPause={() => undefined} onArchive={() => undefined} />);
+    expect(screen.queryByText(/AI 参与生成/)).not.toBeInTheDocument();
   });
 });

@@ -8,6 +8,8 @@ import com.innercosmos.mapper.MemoryCardMapper;
 import com.innercosmos.service.MemoryRetrievalService;
 import com.innercosmos.service.MemoryEmbeddingIndexService;
 import com.innercosmos.vo.MemoryEvidencePackVO;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -35,6 +37,16 @@ public class MemoryRetrievalServiceImpl implements MemoryRetrievalService {
     /** CP-22: withdrawn memories never surface in retrieval, even backup-resurrected. */
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.innercosmos.service.privacy.RetractionTombstoneService tombstoneService;
+
+    /**
+     * CP-40 §2-19: registry for the {@code inner.cosmos.memory.retrieval} observation. Optional so
+     * hand-built tests keep working; null falls back to {@link ObservationRegistry#NOOP}.
+     */
+    @Autowired(required = false)
+    private ObservationRegistry observationRegistry;
+
+    /** CP-40 §2-19: observation (→ span with a tracer) name for the retrieval throat. */
+    public static final String RETRIEVAL_OBSERVATION = "inner.cosmos.memory.retrieval";
     /**
      * Retrieval relevance is an admission gate, not merely one feature in a global score.
      * Freshness, salience and task fit may order relevant memories, but must never make an
@@ -61,6 +73,17 @@ public class MemoryRetrievalServiceImpl implements MemoryRetrievalService {
         this.semanticCalibration = semanticCalibration;
     }
 
+    /**
+     * CP-40 §2-19 retrieval chokepoint: every caller (the online Aurora context assembly, the
+     * public retrieval API, evaluations) funnels through here, so the span lives on the service,
+     * not on any single caller — distinct from {@code inner.cosmos.memory.retrieve}, which
+     * AgentContextAssembler emits for its own caller-side decision. Carries only bounded,
+     * low-cardinality attributes: {@code task} (normalized retrieval task), {@code top_k} (the
+     * clamped request), {@code hits} (admitted evidence count), {@code outcome} and on failure a
+     * bounded {@code error.type}. Never the user id, the raw query text, memory ids/titles or
+     * consent scopes — retrieval output is P1 memory content on its way into a provider prompt,
+     * so the span stays metadata-only (repo AI tracing discipline, see AiTurnObservation).
+     */
     @Override
     public MemoryEvidencePackVO retrieve(Long userId, MemoryRetrievalQuery raw) {
         // CP-22: score against the content terms, not the conversational wrapper. The pack
@@ -75,6 +98,46 @@ public class MemoryRetrievalServiceImpl implements MemoryRetrievalService {
                 : raw.allowedLayers().stream().map(v -> v.toUpperCase(Locale.ROOT)).collect(java.util.stream.Collectors.toSet());
         boolean includeContradicted = raw != null && raw.includeContradicted();
 
+        Observation observation = Observation.createNotStarted(
+                        RETRIEVAL_OBSERVATION, observationRegistry())
+                .lowCardinalityKeyValue("task", boundedSpanAttribute(task))
+                .lowCardinalityKeyValue("top_k", Integer.toString(max))
+                .start();
+        try (Observation.Scope ignored = observation.openScope()) {
+            MemoryEvidencePackVO pack = doRetrieve(userId, rawText, text, task, max, budget,
+                    layers, includeContradicted);
+            observation.lowCardinalityKeyValue("hits", Integer.toString(
+                    pack.evidence() == null ? 0 : pack.evidence().size()));
+            observation.lowCardinalityKeyValue("outcome", "OK");
+            return pack;
+        } catch (RuntimeException failure) {
+            observation.lowCardinalityKeyValue("outcome", "FAILED");
+            observation.lowCardinalityKeyValue("error.type",
+                    failure == null ? "unknown" : failure.getClass().getSimpleName());
+            throw failure;
+        } finally {
+            observation.stop();
+        }
+    }
+
+    private ObservationRegistry observationRegistry() {
+        return observationRegistry == null ? ObservationRegistry.NOOP : observationRegistry;
+    }
+
+    /**
+     * Bounded low-cardinality span token (CP-40, same hygiene as
+     * {@code OutboxTraceContext.bounded}): anything outside {@code [A-Za-z0-9._-]{1,64}}
+     * collapses to {@code unknown}.
+     */
+    static String boundedSpanAttribute(String value) {
+        if (value == null) return "unknown";
+        String token = value.trim();
+        return token.matches("[A-Za-z0-9._-]{1,64}") ? token : "unknown";
+    }
+
+    private MemoryEvidencePackVO doRetrieve(Long userId, String rawText, String text, String task,
+                                            int max, int budget, Set<String> layers,
+                                            boolean includeContradicted) {
         QueryWrapper<MemoryCard> db = new QueryWrapper<MemoryCard>().eq("user_id", userId)
                 .ne("status", "FORGOTTEN").ne("status", "SUPERSEDED").ne("status", "ARCHIVED");
         // CP-22: a backup-resurrected row can look ACTIVE — the tombstone decides at use time.

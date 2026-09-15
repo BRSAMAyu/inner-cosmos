@@ -1,5 +1,25 @@
 import { defineConfig } from "@playwright/test";
 
+// CP-43 (closing-checklist §2-22) browser-matrix automation leg.
+//
+// Chromium is the baseline engine: it is the engine every dev/CI machine running this
+// config is expected to have installed, so the default invocation (`playwright test`,
+// no env) runs the chromium project only and never silently claims engines it cannot
+// launch.
+//
+// Firefox and WebKit matrix legs are declared here and opt-in via IC_BROWSER_MATRIX so
+// a plain run does not break on machines where those engines are absent:
+//   IC_BROWSER_MATRIX=full            -> chromium + firefox + webkit
+//   IC_BROWSER_MATRIX=firefox,webkit  -> only the engines listed (comma separated)
+// Install the extra engines first (`npx playwright install firefox webkit`). Where they
+// are not installed the legs are execution-gated and reported as SKIPPED_BY_ENV in the
+// CP-43 delivery note — Chrome/Edge/Safari real-device end states remain operator gates.
+const matrixLegs = (process.env.IC_BROWSER_MATRIX ?? "chromium")
+  .split(",")
+  .map(leg => leg.trim())
+  .filter(Boolean);
+const wantsLeg = (leg: string) => matrixLegs.includes(leg) || matrixLegs.includes("full");
+
 export default defineConfig({
   testDir: "./e2e",
   testIgnore: "living-aurora-experience.spec.ts",
@@ -18,5 +38,16 @@ export default defineConfig({
     url: "http://127.0.0.1:8080/app/aurora/",
     timeout: 120_000,
     reuseExistingServer: false
-  }
+  },
+  projects: [
+    ...(wantsLeg("chromium")
+      ? [{ name: "chromium", use: { browserName: "chromium" as const } }]
+      : []),
+    ...(wantsLeg("firefox")
+      ? [{ name: "firefox", use: { browserName: "firefox" as const } }]
+      : []),
+    ...(wantsLeg("webkit")
+      ? [{ name: "webkit", use: { browserName: "webkit" as const } }]
+      : [])
+  ]
 });
